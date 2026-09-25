@@ -5877,7 +5877,8 @@ APP_STATE_TOOLS = [
     "open_project", "new_project", "save_project", "get_project", "import_media",
     "import_captions", "export_captions", "transcribe", "consolidate_media", "detect_silence",
     "normalize_clip", "set_playhead", "set_range", "set_selection", "set_scope", "undo", "redo",
-    "render_frame", "export", "record_screen",
+    "render_frame", "export", "record_screen", "write_graphic", "get_graphic", "graphic_reference",
+    "render_graphic", "import_graphic_font", "import_graphic_asset",
 ]
 # `git show df6b916^:app/Sources/AgentCatalog.swift`'s last ten rows, in order.
 FILE_GROUP_ORDER = [
@@ -5910,7 +5911,7 @@ def section_catalog(binary, sources):
           len(ops) >= 55 and len(set(ops)) == len(ops), f"{len(ops)}")
     check("7a: the catalog has at least 75 tools, no name twice", len(names) >= 75 and len(set(names)) == len(names),
           f"{len(names)} names, {len(set(names))} distinct")
-    check("7a: they are the 55 ops plus the twenty app-state tools, record_screen among them",
+    check("7a: they are the 55 ops plus the twenty-six app-state tools, record_screen among them",
           set(names) == set(ops) | set(APP_STATE_TOOLS), f"missing {sorted(set(ops) | set(APP_STATE_TOOLS) - set(names))}, "
           f"extra {sorted(set(names) - set(ops) - set(APP_STATE_TOOLS))}")
     check("7a: no app-state tool is also an op", not set(APP_STATE_TOOLS) & set(ops),
@@ -5924,7 +5925,7 @@ def section_catalog(binary, sources):
     without = [n for n in ops if not (by.get(n) or {}).get("hasScope")]
     check("7c: every op tool's schema declares `scope`", not without, f"without: {without}")
     with_scope = [n for n in APP_STATE_TOOLS if (by.get(n) or {}).get("hasScope")]
-    check("7c: none of the twenty app-state tools declares it", not with_scope, f"with: {with_scope}")
+    check("7c: none of the twenty-six app-state tools declares it", not with_scope, f"with: {with_scope}")
     rs = by.get("record_screen") or {}
     check("7c: record_screen's schema has no `scope` key", rs and rs.get("hasScope") is False, f"{rs}")
     check(f"7c: record_screen declares exactly {RECORD_SCREEN_ARGUMENTS}",

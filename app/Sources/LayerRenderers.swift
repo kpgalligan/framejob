@@ -16,9 +16,11 @@ import UniformTypeIdentifiers
 /// allowed to produce a texture.
 ///
 /// Everything is cached by the recipe's stable hash (§7.3), 64 entries LRU
-/// (§7.5). One instance per `Compositor`, called from its render queue; the
-/// measured-size and laid-out-text caches are static and shared, because the
-/// canvas overlay on the main thread needs the same numbers to draw handles.
+/// (§7.5) — except a graphic's texture, keyed by its SVG in a small pool of
+/// its own (`graphicCacheLimit`). One instance per `Compositor`, called from
+/// its render queue; the measured-size and laid-out-text caches are static
+/// and shared, because the canvas overlay on the main thread needs the same
+/// numbers to draw handles.
 ///
 /// **Text lives in `LayerRenderersText.swift`** — measuring, laying out and
 /// the three reveals — which is the size payment road map 2's phase 6 made
@@ -38,21 +40,28 @@ final class LayerRenderers {
 
     /// Textures kept before the least recently used one is dropped (§7.5).
     static let cacheLimit = 64
+    /// Graphic textures kept, in a least-recently-used pool of their OWN. An
+    /// animated graphic's SVG differs every frame, so playback mints a new
+    /// full-layer texture per frame (~8 MB at 1080p, ~33 MB at 4K) that is
+    /// almost never hit again. In the shared pool 64 of them would evict
+    /// every text and shape texture and hold ~2 GB at 4K; here a held or
+    /// static graphic still hits and an animating one holds at most this.
+    static let graphicCacheLimit = 6
     /// Widest texture rendered. Beyond this a description is refused rather
     /// than clamped — a 40 000 pt font is a typo, not a request.
     static let maxTextureSide = 8192
 
-    private let device: MTLDevice
+    let device: MTLDevice
     private let lock = NSLock()
-    private var entries: [String: Rendered] = [:]
-    /// Least recently used first.
-    private var order: [String] = []
+    private var layers = Pool(limit: LayerRenderers.cacheLimit)
+    private var graphics = Pool(limit: LayerRenderers.graphicCacheLimit)
 
     /// A cached rasterization: the texture plus the SOURCE SIZE it was drawn
     /// at, which is what §5.3 placement uses for this layer.
     struct Rendered {
         let texture: MTLTexture
         let size: CGSize
+        var warnings: [GraphicDiagnostic] = []
     }
 
     init(device: MTLDevice) {
@@ -70,31 +79,49 @@ final class LayerRenderers {
     /// milliseconds and the canvas overlay must not block on it. Two threads
     /// racing on the same miss render twice and the second store wins, which
     /// is cheaper than holding the lock across Core Text.
-    private func cached(_ key: String, _ make: () -> Rendered?) -> Rendered? {
+    /// `graphic` picks the graphics' own pool (`graphicCacheLimit`).
+    func cached(_ key: String, graphic: Bool = false, _ make: () -> Rendered?) -> Rendered? {
         lock.lock()
-        if let hit = entries[key] {
-            touch(key)
-            lock.unlock()
-            return hit
-        }
+        let hit = graphic ? graphics.hit(key) : layers.hit(key)
         lock.unlock()
+        if let hit = hit { return hit }
 
         guard let rendered = make() else { return nil }
         lock.lock()
-        entries[key] = rendered
-        touch(key)
-        while order.count > LayerRenderers.cacheLimit, let oldest = order.first {
-            order.removeFirst()
-            entries.removeValue(forKey: oldest)
-        }
+        if graphic { graphics.store(key, rendered) } else { layers.store(key, rendered) }
         lock.unlock()
         return rendered
     }
 
-    /// Moves `key` to the most-recent end. Call with the lock held.
-    private func touch(_ key: String) {
-        if let index = order.firstIndex(of: key) { order.remove(at: index) }
-        order.append(key)
+    /// One least-recently-used pool of textures. Call with the lock held.
+    private struct Pool {
+        let limit: Int
+        var entries: [String: Rendered] = [:]
+        /// Least recently used first.
+        var order: [String] = []
+
+        init(limit: Int) { self.limit = limit }
+
+        mutating func hit(_ key: String) -> Rendered? {
+            guard let hit = entries[key] else { return nil }
+            touch(key)
+            return hit
+        }
+
+        mutating func store(_ key: String, _ rendered: Rendered) {
+            entries[key] = rendered
+            touch(key)
+            while order.count > limit, let oldest = order.first {
+                order.removeFirst()
+                entries.removeValue(forKey: oldest)
+            }
+        }
+
+        /// Moves `key` to the most-recent end.
+        private mutating func touch(_ key: String) {
+            if let index = order.firstIndex(of: key) { order.remove(at: index) }
+            order.append(key)
+        }
     }
 
     /// Drops every texture. Called when the render context changes size —
@@ -102,8 +129,8 @@ final class LayerRenderers {
     /// resize invalidates nothing else and this keeps memory honest.
     func purge() {
         lock.lock()
-        entries.removeAll()
-        order.removeAll()
+        layers = Pool(limit: LayerRenderers.cacheLimit)
+        graphics = Pool(limit: LayerRenderers.graphicCacheLimit)
         lock.unlock()
     }
 
@@ -157,7 +184,7 @@ final class LayerRenderers {
         // the full text's box, whatever is showing of it at this instant.
         case .text(_, let props, _): return measuredSize(for: props)
         case .shape(_, let props): return layer.sourceSizeCG ?? props.boxSize
-        case .track, .image, .missing: return layer.sourceSizeCG
+        case .track, .image, .graphic, .missing: return layer.sourceSizeCG
         }
     }
 

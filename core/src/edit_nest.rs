@@ -190,6 +190,7 @@ impl Project {
             audio: audible.then(AudioProps::default),
             text: None,
             shape: None,
+            graphic: None,
             actions: Vec::new(),
             // A transition INTO the selection belonged to a clip that is now
             // inside the group, so the nest clip gets the default cross

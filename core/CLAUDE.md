@@ -47,6 +47,20 @@ file is what governs a module now.
   `split`'s second half make (W-3). Word times are clip-time POSITIONS: a
   negative start is legal, equal starts are legal, and `snap_animation`
   puts them on the grid after `check_text` has named what the caller sent.
+- `model_graphic.rs` — the graphic vocabulary (format version 10, road
+  map 10): `GraphicProps` (`name`, `width`, `height`, `in`, `length`,
+  `props`) and `GRAPHIC_MIN_SIDE` / `GRAPHIC_MAX_SIDE` / `GRAPHIC_MAX_PROPS`,
+  re-exported through `model_props.rs`; the FIELD `Clip.graphic` stays in
+  `model.rs`. And the `pub(crate)` checks every writer shares: `check_name`
+  (G-3's `^[a-z0-9][a-z0-9-]{0,62}$`, its clause `NAME_RULE` shared with
+  `validate`), `check_side`, `check_schema` (the engine's sentences, COPIED —
+  no module of the model may name the crate, G-2), `check_props` (by dotted
+  path against the schema the op carries, shape only without one; a `null`
+  is a removal and is never checked), `check_count` (on the map about to be
+  STORED) and `normalise_color` (G-12: hex and `rgb()`/`rgba()` to lowercase
+  `#rrggbb[aa]`). **A props map is changed only by `insert` and
+  `shift_remove`**: under `preserve_order`, `Map::remove` is `swap_remove`,
+  and `Project ==` cannot see the reorder.
 - `model_query.rs` — reading a project: `Project::new`, id allocation, the
   `clip`/`track`/`media`/`marker`/`nest` lookups, `clips_on`, `duration`,
   `validate` with its nesting walk, and `source_size`. The three
@@ -114,10 +128,11 @@ file is what governs a module now.
   `edit.rs` so no caller moved. A published interface, where the `Op` enum
   and the dispatch are its implementation. Its one reader in the crate is
   `op_schema.rs`, which carries the rows out through the FFI; the APP's
-  reader is every one of the fifty-seven op tools in the agent catalog,
+  reader is every one of the fifty-nine op tools in the agent catalog,
   which print these rows instead of restating them. **A `Bound` is
   published only where the core REFUSES outside it** — `set_canvas`'s two
-  dimensions, sourced from `edit_canvas.rs`'s own constants and never
+  dimensions, sourced from `edit_canvas.rs`'s own constants, and
+  `add_graphic_clip`'s `width` and `height`, from `model_graphic.rs`'s, never
   retyped — and never where it CLAMPS, which is the app's to say in its
   prose. A row holds no prose, no semantics and no default spelled twice;
   `Kind` is closed (eighteen kinds; `Texts`, a list of strings, is
@@ -153,6 +168,12 @@ file is what governs a module now.
   can still return `Err`. `refused_inside` is an EXHAUSTIVE match over every
   op, so a new op does not compile until it is classified. The READ half is
   `rc_project_scoped` in `ffi.rs`, which calls the same `scoped_view`.
+- `edit_graphic.rs` — `add_graphic_clip` and `set_graphic`: every argument
+  checked through `model_graphic.rs` BEFORE `edit_clip.rs`'s
+  `add_described_clip` (`pub(crate)`, with `Described`) places the clip, so
+  the op table's bound probe reaches the side check on any project;
+  `set_graphic`'s patch reader takes `name`, `width`, `height`, `length`,
+  `props` and refuses `in` by name.
 - `edit_clip.rs` — clip construction and placement callers: `add_clip`, move,
   duplicate, delete, join, detach, `fit_scale` and `fill_scale` (Fit is a RESCUE for oversized
   footage and honours `canvas.fit_new_clips`; Fill is a REQUIREMENT, ignores
@@ -166,6 +187,8 @@ file is what governs a module now.
   the cap, known debt (below).
 - `edit_clip_timing.rs` — `trim_start`, `trim_end`, `rate_stretch`, `set_speed`,
   their speed bounds and clip-relative action rescaling.
+  `trim_start` advances a graphic's `in` through `graphic_advanced` (no speed,
+  no head bound, saturating at 0); `trim_end` leaves `length` alone.
 - `edit_commit.rs` — the placement commit protocol: replacements preserve
   caller order and check old tracks before destination tracks; additions
   check caller-allocated candidates against the input project; both write
@@ -178,6 +201,9 @@ file is what governs a module now.
   ends. Every splitter in the crate routes here, so a rule stated once is a
   rule they all obey. A free function over `&mut Project` because it is
   called mid-edit on a clone the caller is still assembling.
+  A graphic's second half gets `in + cut` through `recipe_graphic.rs`'s
+  `graphic_advanced`, and BOTH halves' `length` are pinned to the ORIGINAL's
+  `effective_length` (G-9), so every splitter obeys it.
 - `edit_props.rs` — the five patches (`set_video`, `set_audio`, `set_text`,
   `set_shape`, `set_clip`), `Project::check_group` (the range check
   `paste_attributes` runs on each group it has just replaced — the same
@@ -245,6 +271,8 @@ file is what governs a module now.
   compositions of split + insert time + add made ONE op so a drop is one
   undo step and carries the rule neither half states — an insert cuts only
   the destination track and then shifts every unlocked one.
+  `roll` is a front trim on its clip, so it advances `graphic.in` as
+  `trim_start` does; the predecessor's end is an end trim and keeps `length`.
 - `edit_transition.rs` — the WRITE half of a transition: `set_transition`,
   `set_transition_duration`, `set_gained_transitions` (a clip that gains an
   overlap gains a transition), `add_transition` (an overlap built from the
@@ -276,6 +304,8 @@ file is what governs a module now.
   which copies the EARLIEST clip's property groups (then the front-most, then
   the lower id — never the array's first) onto each target, replaced whole
   and never merged.
+  `graphic` in a `patch` or an `off` path is an `Err` in G-10's sentence,
+  asked before the group lookup.
 - `edit_zoom.rs` — `add_zoom_action`, the screencast zoom, and `ZoomRegion`,
   the one op ARGUMENT that is a caller-authored object: its `Deserialize` is
   written out rather than derived so it answers as a patch does — an object
@@ -326,8 +356,13 @@ file is what governs a module now.
   `text.animation` into `reveal`, `reveal_phase` (the ORDER the renderer draws
   in, not a label on the amount) and `reveal_kind`, folded into the content
   hash so an animating layer is never served a stale texture — and
-  `burn_in_layer`. `serde_json`'s `Map` is a `BTreeMap` here: keys come out
-  sorted, which `content_hash` leans on.
+  `burn_in_layer`. `serde_json`'s `Map` keeps INSERTION order in this
+  build (`graphic` enables `preserve_order` and cargo unifies it), so
+  `content_hash` sorts every object's keys before it hashes — the order
+  every texture key was taken in — and nothing may lean on the wire order
+  of a map.
+  A graphic layer's source is one arm calling `recipe_graphic.rs`'s
+  `graphic_source`; `missing_source` is `pub(crate)` for it.
 - `recipe_words.rs` — what a timed text PAGE shows at one instant:
   `Words::of` answers `word` (how many of `text.words` have started, 0 to
   n) and `word_pop` (0..1 through the active word's pop over `WORD_POP`,
@@ -340,6 +375,21 @@ file is what governs a module now.
   `word_style` when unset, `case` when `as_written`, so an unstyled title
   hashes as before version 9), and folds the two keys into the hash only
   for a styled page.
+- `recipe_graphic.rs` — a graphic clip's own timeline (road map 10's G-9) and
+  its layer: `effective_length` (`graphic.length`, or `in + duration` when
+  null — G-9·c), `graphic_advanced` (`in` moved through `source_window.rs`'s
+  `in_advanced` at speed 1, never below 0), and `graphic_source`, the layer's
+  `{kind, name, hash, frame, ctx, props}` and `[width, height]` — `frame`
+  floored onto the canvas grid, `durationInFrames` ceiled, `ctx` exactly the
+  engine's keys (the app passes it through verbatim), `ctx.canvas` the
+  PROJECT's size inside a nest too, `props` the stored map cloned whole, the
+  hash over everything `render` is called with (G-9·b). It holds ONE equation
+  for the writers and the reader together: `trim_start`, `roll` and `split`'s
+  second half call `graphic_advanced`, `split` pins both halves' `length` to
+  `effective_length`, and the recipe reads the same `effective_length`.
+  **`Clip.graphic`'s `in` and `length` are written nowhere else**
+  (`set_graphic` refuses `in`). Never write the bare token `graphic::` here
+  (`graphic_ffi.rs` greps `core/src/`).
 - `motion.rs` — `video.motion` turned into PLACEMENT: presets to `scale`,
   `rotation`, `opacity`, `x`, `y` from the clip time, its duration, the
   source size and the container's canvas. **Its only callers are
@@ -380,6 +430,24 @@ file is what governs a module now.
   only; shared plumbing lives in `ffi_util.rs`, never copy-pasted.
   `ffi_query.rs`'s rule: a query never allocates a handle and has no
   `err_out`, which is why `rc_project_scoped` lives in `ffi.rs`.
+- `ffi_graphic.rs` — the ten `rc_graphic_*` exports (road map 10 §5e)
+  and the ONLY module of `core/src/` that names the `graphic` crate (spec
+  §11 G-2; `core/tests/graphic_ffi.rs` reads `core/src/` to hold it). An
+  `RcGraphicLibrary` is a BUILDER that the first compile or rasterize
+  FREEZES into one `Arc<graphic::Library>` (the crate's `Library` is
+  immutable — its `version` hashes every byte); an add after that is
+  refused. `RcGraphic` wraps `graphic::Module`, whose `Arc` keeps the
+  fonts alive past the library's free. `diag_out` is a JSON array of
+  Diagnostics, exactly one error on failure; its panic arm goes through
+  `ffi_util.rs`'s `fallible_op_wrapped`. `rc_graphic_library_families`
+  answers the frozen library's family names as JSON — the engine's own,
+  which a `font-family` must match (CoreText names 13 of 2500 host fonts
+  differently) — and freezes it. At 397 of 400: the next export pays a toll,
+  and nothing crate-free is left in it (`diag_json`/`diag_error` name
+  `Diagnostic`). `ffi_util.rs` holds the two crate-free helpers it gave up:
+  `read_bytes` (a pointer and a length into an owned `Vec`, `bytes is NULL`
+  refused) and `free_boxed` (drops a handle `boxed` made, under
+  `fallible_op` with no channel; NULL a no-op).
 
 ## Rules
 
@@ -401,7 +469,11 @@ never in the same phase as a feature). The current list is `wc -l` and
 `tiny_http` (the agent's socket), and `serde_path_to_error`, which is there
 so a patch refusal names the path to what only the type can refuse (a
 misspelt variant, a `null` a required field cannot take), where serde alone
-names only the value.
+names only the value. `graphic` (the path crate `../graphic`, road map
+10's motion-graphics engine), named by `ffi_graphic.rs` alone. It enables
+`serde_json`'s `preserve_order`, and a feature is unified across a path
+dependency, so the core's `serde_json` has it too; `Cargo.toml` spells it
+out. Dev: `sha2`, `graphic_ffi.rs`'s revision oracle.
 
 **One implementation per algorithm.** Before writing time math, find the
 existing implementation and route through it. Shared constants have exactly
@@ -447,7 +519,7 @@ Export names mirror the Rust method exactly.
 `RC_FORMAT_VERSION` in `format.rs` **and** the `#define` in
 `core/include/reelcut_core.h`; the reader must keep accepting every prior
 version; the writer enforces the reader's caps. A bump whose new fields all
-carry a serde default needs no migrate step (versions 3 through 9 have none)
+carry a serde default needs no migrate step (versions 3 through 10 have none)
 but still bumps, because unknown keys are ignored at every level by design
 and an older build would otherwise open the file, drop the new fields on read
 and write the loss back on the next save; a bump that changes a field's

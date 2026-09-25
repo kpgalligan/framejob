@@ -1,8 +1,9 @@
 import AppKit
 
 /// The whole menu bar (spec §9): `buildMainMenu()`, the ten menus it hangs off
-/// it, the four submenus under those, and the three helpers every row is made
-/// with — `item`, `tagged` and `submenuItem`.
+/// it (the eleventh, Insert, is `AppDelegate+GraphicMenu.swift`'s), the four
+/// submenus under those, and the three helpers every row is made with —
+/// `item`, `tagged` and `submenuItem`.
 ///
 /// **The seam is the one `AppDelegate.swift`'s own doc already promised.** A
 /// menu item here names a **nil-target selector** and nothing else: it is
@@ -21,12 +22,13 @@ import AppKit
 /// It is a pure move: the same declarations, in the same order, with the same
 /// bodies.
 ///
-/// **The toll is visibility**, and it is one name. `private` on an extension
-/// member reaches only its own file, so `buildMainMenu()` is internal now —
-/// `applicationWillFinishLaunching` calls it from the other half. Everything
-/// else stays `private`, because Swift's `private` covers a type's extensions
-/// within one file and every other builder and helper is called only from
-/// inside this one. Nothing needed to become a stored property either, which
+/// **The toll is visibility**. `private` on an extension member reaches only
+/// its own file, so `buildMainMenu()` is internal now —
+/// `applicationWillFinishLaunching` calls it from the other half — and so are
+/// `item` and `submenuItem`, which `AppDelegate+GraphicMenu.swift` builds the
+/// Insert menu with (road map 10's G5b). The other builders and helpers stay
+/// `private`, because Swift's `private` covers a type's extensions within one
+/// file and each is called only from inside this one. Nothing needed to become a stored property either, which
 /// is what makes an extension a legal home for it: the menu bar is built out
 /// of selectors, `TransitionKind.allCases` and `ClipLabel.allCases`, and holds
 /// no state at all once it is hung off `NSApp`.
@@ -41,6 +43,7 @@ extension AppDelegate {
         mainMenu.addItem(submenuItem(appMenu()))
         mainMenu.addItem(submenuItem(fileMenu()))
         mainMenu.addItem(submenuItem(editMenu()))
+        mainMenu.addItem(submenuItem(insertMenu()))
         mainMenu.addItem(submenuItem(clipMenu()))
         mainMenu.addItem(submenuItem(trackMenu()))
         mainMenu.addItem(submenuItem(markMenu()))
@@ -58,13 +61,13 @@ extension AppDelegate {
         return mainMenu
     }
 
-    private func submenuItem(_ menu: NSMenu) -> NSMenuItem {
+    func submenuItem(_ menu: NSMenu) -> NSMenuItem {
         let item = NSMenuItem(title: menu.title, action: nil, keyEquivalent: "")
         item.submenu = menu
         return item
     }
 
-    private func item(
+    func item(
         _ title: String,
         _ action: Selector?,
         _ key: String = "",
@@ -153,6 +156,13 @@ extension AppDelegate {
             item("Export Captions…", #selector(EditorViewController.exportCaptions(_:))))
         menu.addItem(
             item("Consolidate Media…", #selector(EditorViewController.consolidateMedia(_:))))
+        // Road map 10's G5b: a face or a picture into the package's
+        // graphics/, `import_graphic_font`'s and `import_graphic_asset`'s
+        // body. No key equivalents, the caption items' reason above.
+        menu.addItem(
+            item("Add Font to Graphics…", #selector(EditorViewController.addGraphicFont(_:))))
+        menu.addItem(
+            item("Add Image to Graphics…", #selector(EditorViewController.addGraphicImage(_:))))
         menu.addItem(.separator())
         menu.addItem(item("Export…", #selector(EditorViewController.exportProject(_:)), "e"))
         // Save Frame… is the still-image sibling of Export… and sits beside
@@ -544,6 +554,8 @@ extension AppDelegate {
     private func helpMenu() -> NSMenu {
         let menu = NSMenu(title: "Help")
         menu.addItem(item("Reelcut Help", #selector(NSApplication.showHelp(_:))))
+        menu.addItem(
+            item("Graphics Reference", #selector(AppDelegate.showGraphicsReference(_:))))
         return menu
     }
 }

@@ -44,8 +44,8 @@ use serde_json::Value;
 
 use crate::edit_split::split_clip;
 use crate::model::{
-    AudioProps, Clip, Enabled, Media, MediaKind, Project, ShapeKind, ShapeProps, Source, TextProps,
-    Track, VideoProps,
+    AudioProps, Clip, Enabled, GraphicProps, Media, MediaKind, Project, ShapeKind, ShapeProps,
+    Source, TextProps, Track, VideoProps,
 };
 use crate::outcome::Outcome;
 use crate::patch::{merge_group, Group};
@@ -69,13 +69,14 @@ const TITLE_CONTENT: &str = "Title";
 
 // ---- clip helpers --------------------------------------------------------
 
-/// What a sourceless clip — text or shape — is made of, so the shared
-/// placement tail takes one argument instead of four.
-struct Described {
-    source: Source,
-    scale: f64,
-    text: Option<TextProps>,
-    shape: Option<ShapeProps>,
+/// What a sourceless clip — text, shape or graphic — is made of, so the
+/// shared placement tail takes one argument instead of five.
+pub(crate) struct Described {
+    pub(crate) source: Source,
+    pub(crate) scale: f64,
+    pub(crate) text: Option<TextProps>,
+    pub(crate) shape: Option<ShapeProps>,
+    pub(crate) graphic: Option<GraphicProps>,
 }
 
 pub(crate) fn clip_end(clip: &Clip) -> Ticks {
@@ -270,6 +271,7 @@ impl Project {
             audio,
             text: None,
             shape: None,
+            graphic: None,
             actions: Vec::new(),
             transition_in: None,
             name: None,
@@ -321,6 +323,7 @@ impl Project {
                 scale: 1.0,
                 text: Some(props),
                 shape: None,
+                graphic: None,
             },
         )
     }
@@ -373,13 +376,15 @@ impl Project {
                 scale,
                 text: None,
                 shape: Some(props),
+                graphic: None,
             },
         )
     }
 
-    /// The shared tail of `add_text_clip` and `add_shape_clip`: a clip with
-    /// no source bound, placed under the same rules as any other.
-    fn add_described_clip(
+    /// The shared tail of `add_text_clip`, `add_shape_clip` and
+    /// `edit_graphic.rs`'s `add_graphic_clip`: a clip with no source bound,
+    /// placed under the same rules as any other.
+    pub(crate) fn add_described_clip(
         &self,
         track: u32,
         at: Ticks,
@@ -418,6 +423,7 @@ impl Project {
             audio: None,
             text: described.text,
             shape: described.shape,
+            graphic: described.graphic,
             actions: Vec::new(),
             transition_in: None,
             name: None,

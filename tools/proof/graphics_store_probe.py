@@ -1,0 +1,317 @@
+#!/usr/bin/env python3
+"""The package's `graphics/` store and its watcher: road map 10's G3a (§10.6).
+
+Builds `graphics_store_probe.swift` over `app/Sources` with
+`tools/proof/harness/build.sh`'s swiftc line (a probe that will not build is a
+scored FAILURE of every row, never an exit), runs it under
+`graphics_spike/bounded.py`'s `run` with `TMPDIR=<work>/tmp`, and scores what
+it measured against oracles of its own — hashlib for every revision, this
+file's literals for every sentence:
+
+W1  an untitled store makes its root under `NSTemporaryDirectory()/Reelcut/`
+    at start(), scans empty, never calls back and never posts (TMPDIR does not
+    move that directory on this host, measured; the probe reports it and
+    removes every root it made);
+W2  a PACKAGE store on a package without graphics/ creates nothing; a
+    `mkdir graphics` + `mv x.js` from outside posts ["x"] within 1 s and calls
+    back ONCE, and an in-place edit after it posts ["x"];
+W3  `a.js.tmp` renamed over `a.js` is ONE post ["a"], revision = hashlib's;
+W4  an in-place O_TRUNC rewrite (same inode) is ONE post ["a"], new revision;
+W5  `rm a.js` is ONE post ["a"], and the module is gone;
+W6  `b.js` and `c.js` back to back are ONE post ["b","c"] within 1 s;
+W7  `Bad.js` and `d.js.partial` post nothing in 0.5 s, and the scan warns
+    about `Bad.js` in the core's words;
+W8  `fonts/` + a bundled face: ONE post, library true, names = every module,
+    the version moved, makeLibrary() succeeds; `assets/` + a PNG + a 0-byte
+    PNG: ONE post, the version moved, exactly the empty file's warning, one
+    asset;
+W9  write(name: "d") on a package without graphics/ creates it, calls back
+    ONCE, leaves no .partial, the bytes equal, ONE post ["d"]; write(name:
+    "Bad") throws the core's sentence and creates nothing;
+W10 the folder swapped as a save swaps it posts nothing, and an in-place
+    edit after it posts ["x"] (the sources were re-armed by path);
+W11 packageDidMove(to:) posts the location once; an edit in the new folder
+    posts, one in the old does not;
+W12 an edit then stop() in the same turn, and an edit after: nothing posts;
+W13 write(name: "e") then rescan() at once is exactly ONE post ["e"];
+C1  a saved document's save carries graphics/x.js (the whitelist line);
+C2  an untitled document restored from autosave seeds its temporary root and
+    its save carries graphics/x.js;
+C3  a fresh untitled document's save has NO graphics/ (an empty root is not
+    carried, G-14);
+C4  a document is freed after close(), and after being dropped unclosed.
+
+    python3 tools/proof/graphics_store_probe.py
+    python3 tools/proof/graphics_store_probe.py --mutant whitelist-removed
+    python3 tools/proof/graphics_store_probe.py --mutant no-file-sources
+    python3 tools/proof/graphics_store_probe.py --mutant strong-callback
+
+A mutant is built from a COPY of `app/Sources` with one anchor, asserted to
+occur exactly once, replaced; exit 0 means the row it names FAILED in the copy
+(C1's file ABSENT, W4, C4), which is the pass. A mutant copy that does not
+build is a FAILURE.
+"""
+
+import hashlib
+import json
+import shutil
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
+from bounded import child_env, run as bounded_run  # noqa: E402
+
+WORK = ROOT / "tools/proof/work/graphics-store-probe"
+FONTS = ROOT / "app/Resources/Fonts"
+PNG = ROOT / "app/Assets.xcassets/AppIcon.appiconset/icon_16.png"
+DEADLINE = 600
+RULE = ("is not a module name (lowercase letters, digits and -, starting with a letter "
+        "or a digit, at most 63 characters)")
+ROWS = ["W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8", "W9", "W10", "W11", "W12", "W13",
+        "C1", "C2", "C3", "C4"]
+
+rows = {}
+answer_seen = {}
+
+
+def check(name, good, detail=""):
+    rows[name.split()[0]] = bool(good)
+    print(("  ok   " if good else "  FAIL ") + name + (f"\n       {detail}" if detail else ""))
+
+
+def sha(text):
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def one(settled, names, within=None):
+    """Exactly one post, naming `names`, inside `within` seconds if given."""
+    posts = (settled or {}).get("posts", [])
+    latency = (settled or {}).get("latency")
+    return (len(posts) == 1 and posts[0].get("names") == names
+            and (within is None or (isinstance(latency, (int, float)) and latency <= within)))
+
+
+def build(sources, out, seconds):
+    out.mkdir(parents=True, exist_ok=True)
+    entry = out / "main.swift"
+    shutil.copyfile(ROOT / "tools/proof/graphics_store_probe.swift", entry)
+    binary = out / "graphics-store-probe"
+    swift = sorted(str(p) for p in Path(sources).glob("*.swift") if p.name != "main.swift")
+    sdk = bounded_run(["xcrun", "--show-sdk-path", "--sdk", "macosx"], 60)["stdout"].strip()
+    lib = ROOT / "core/target/release/libreelcut_core.a"
+    result = bounded_run(
+        ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
+         "-import-objc-header", str(ROOT / "app/Bridging/Reelcut-Bridging-Header.h"),
+         "-L", str(lib.parent), "-lreelcut_core", *swift, str(entry), "-o", str(binary)],
+        seconds)
+    if result["expired"]:
+        return None, f"the build did not finish within {seconds} s"
+    if result["rc"]:
+        errors = [line for line in result["stderr"].splitlines() if ": error:" in line]
+        return None, "; ".join(errors[:8]) or result["stderr"][-600:]
+    return binary, ""
+
+
+def score(a, work):
+    # NSTemporaryDirectory() ignores TMPDIR on this host, so the root is
+    # scored against the directory the probe itself reports.
+    tmp = str((Path(a.get("tmp", "/nonexistent")) / "Reelcut").resolve()) + "/"
+
+    def under_tmp(path):
+        return isinstance(path, str) and str(Path(path).resolve()).startswith(tmp)
+
+    w1 = a.get("w1", {})
+    check("W1 the untitled root is made in the temporary directory at start(), empty, silent",
+          w1.get("exists") is True and under_tmp(w1.get("folder"))
+          and str(w1.get("folder", "")).endswith("-graphics")
+          and Path(w1.get("folder", "")).parent.name == "Reelcut"
+          and w1.get("empty") is True and w1.get("callbacks") == 0 and w1.get("posts") == 0,
+          f"{w1}")
+
+    w2 = a.get("w2", {})
+    check("W2 no graphics/ at start; an outside mkdir + mv posts [x] within 1 s, calls back "
+          "ONCE; an in-place edit then posts [x]",
+          w2.get("absent_after_start") is True and w2.get("callbacks_after_start") == 0
+          and one(w2.get("appear"), ["x"], 1.0) and w2.get("callbacks") == 1
+          and one(w2.get("edit"), ["x"]), f"{w2}")
+
+    w3 = a.get("w3", {})
+    check("W3 a.js.tmp renamed over a.js is ONE post [a], revision = hashlib's",
+          w3.get("renamed") is True and one(w3, ["a"])
+          and w3.get("revision") == sha(w3.get("content", "")), f"{w3}")
+
+    w4 = a.get("w4", {})
+    check("W4 an in-place O_TRUNC rewrite is ONE post [a] with the new revision",
+          w4.get("same_inode") is True and one(w4, ["a"])
+          and w4.get("revision") == sha(w4.get("content", ""))
+          and w4.get("revision") != w3.get("revision"), f"{w4}")
+
+    w5 = a.get("w5", {})
+    check("W5 rm a.js is ONE post [a], and the module is gone",
+          one(w5, ["a"]) and w5.get("gone") is True, f"{w5}")
+
+    w6 = a.get("w6", {})
+    check("W6 b.js and c.js back to back are ONE post [b, c] within 1 s",
+          one(w6, ["b", "c"], 1.0), f"{w6}")
+
+    w7 = a.get("w7", {})
+    check("W7 Bad.js and d.js.partial post nothing in 0.5 s; Bad.js is warned in the core's words",
+          w7.get("posts") == [] and f"graphics/Bad.js {RULE}" in w7.get("warnings", [])
+          and w7.get("modules") == ["b", "c"], f"{w7}")
+
+    w8 = a.get("w8", {})
+    fonts_post = (w8.get("posts") or [{}])[0]
+    assets = w8.get("assets", {})
+    assets_post = (assets.get("posts") or [{}])[0]
+    face = sorted(p.name for p in FONTS.iterdir() if p.suffix == ".ttf")[0]
+    check("W8 fonts/: ONE post, library true, names = every module, version moved, "
+          "makeLibrary() ok; assets/: ONE post, version moved, one warning, one asset",
+          len(w8.get("posts", [])) == 1 and fonts_post.get("library") is True
+          and fonts_post.get("names") == w8.get("modules") == ["b", "c"]
+          and w8.get("version_before") != w8.get("version_after")
+          and w8.get("library") == "ok" and w8.get("fonts") == [face]
+          and len(assets.get("posts", [])) == 1 and assets_post.get("library") is True
+          and assets.get("version_before") != assets.get("version_after")
+          and assets.get("warnings") == ["graphics/assets/empty.png is empty and was skipped"]
+          and assets.get("assets") == ["logo.png"], f"{w8}")
+
+    w9 = a.get("w9", {})
+    check("W9 write(d) creates graphics/, calls back ONCE, ONE post [d], bytes equal, no "
+          ".partial; write(Bad) throws the core's sentence and creates nothing",
+          w9.get("thrown") is None and w9.get("callbacks") == 1 and one(w9, ["d"])
+          and w9.get("bytes_equal") is True and w9.get("partials") == []
+          and w9.get("bad_message") == f'graphic name "Bad" {RULE}'
+          and w9.get("bad_files") == [], f"{w9}")
+
+    w10 = a.get("w10", {})
+    check("W10 the folder swapped as a save swaps it posts nothing; an in-place edit after "
+          "posts [x]",
+          w10.get("swap_posts") == [] and one(w10.get("edit"), ["x"]), f"{w10}")
+
+    w11 = a.get("w11", {})
+    check("W11 packageDidMove posts the location once; the new folder's edit posts, the "
+          "old one's does not",
+          w11.get("locations") == 1 and w11.get("folder") == w11.get("expected")
+          and one(w11.get("new_edit"), ["x"]) and w11.get("old_edit_posts") == [], f"{w11}")
+
+    w12 = a.get("w12", {})
+    check("W12 an edit then stop() in the same turn, and an edit after: nothing posts",
+          w12.get("posts") == [], f"{w12}")
+
+    w13 = a.get("w13", {})
+    check("W13 write(e) then rescan() at once is exactly ONE post [e]",
+          len(w13.get("posts", [])) == 1 and w13["posts"][0].get("names") == ["e"], f"{w13}")
+
+    c1 = a.get("c1", {})
+    check("C1 a saved document's save carries graphics/x.js",
+          c1.get("child") is True and c1.get("present") is True
+          and c1.get("bytes_equal") is True, f"{c1}")
+
+    c2 = a.get("c2", {})
+    check("C2 an untitled document restored from autosave seeds its temporary root; its "
+          "save carries graphics/x.js",
+          a.get("roots_removed") is True and c2.get("file_url_nil") is True and under_tmp(c2.get("folder"))
+          and c2.get("copied") is True and c2.get("child") is True
+          and c2.get("present") is True and c2.get("bytes_equal") is True, f"{c2}")
+
+    c3 = a.get("c3", {})
+    check("C3 a fresh untitled document's save has NO graphics/",
+          c3.get("child") is False and c3.get("graphics_dir") is False
+          and c3.get("root_exists") is True, f"{c3}")
+
+    c4 = a.get("c4", {})
+    check("C4 a document is freed after close(), and after being dropped unclosed",
+          c4.get("closed_freed") is True and c4.get("dropped_freed") is True, f"{c4}")
+
+
+def probe(sources, work):
+    if work.exists():
+        shutil.rmtree(work)
+    (work / "tmp").mkdir(parents=True)
+    began = time.monotonic()
+    binary, problem = build(sources, work / "build", DEADLINE)
+    if binary is None:
+        print(f"  FAIL the probe builds over app/Sources\n       {problem}")
+        for name in ROWS:
+            rows[name] = False
+        return
+    left = max(DEADLINE - (time.monotonic() - began), 60)
+    result = bounded_run([str(binary), str(FONTS), str(PNG), str(work)], left,
+                         env=child_env({"TMPDIR": str(work / "tmp") + "/"}))
+    try:
+        answer = json.loads(result["stdout"])
+    except json.JSONDecodeError:
+        answer = {}
+    answer_seen.update(answer)
+    if answer.get("ok") is not True:
+        print(f"  FAIL the probe answers: expired {result['expired']}, rc {result['rc']}: "
+              f"{result['stdout'][-300:]} {result['stderr'][-600:]}")
+        for name in ROWS:
+            rows[name] = False
+        return
+    (work / "answer.json").write_text(json.dumps(answer, indent=1, sort_keys=True))
+    score(answer, work)
+
+
+def replace_once(path, before, after):
+    text = path.read_text(encoding="utf-8")
+    count = text.count(before)
+    if count != 1:
+        raise RuntimeError(f"mutation anchor {path.name}: expected once, found {count}: "
+                           f"{before!r}")
+    path.write_text(text.replace(before, after), encoding="utf-8")
+
+
+MUTANTS = {
+    "whitelist-removed": (
+        "ProjectDocument.swift",
+        "        if let graphics = graphicsWrapper() "
+        "{ children[Self.graphicsDirectoryName] = graphics }\n",
+        "", "C1"),
+    "no-file-sources": (
+        "GraphicStore.swift", "            arm(url, folder: false, g)\n", "", "W4"),
+    "strong-callback": (
+        "ProjectDocument+Graphics.swift",
+        "{ [weak self] in self?.packageContentsDidChangeOnDisk() }",
+        "{ self.packageContentsDidChangeOnDisk() }", "C4"),
+}
+
+
+def mutant(name):
+    file, before, after, anchor = MUTANTS[name]
+    with tempfile.TemporaryDirectory(prefix=f"reelcut-graphics-store-{name}-") as temp:
+        sources = Path(temp) / "Sources"
+        shutil.copytree(ROOT / "app/Sources", sources)
+        replace_once(sources / file, before, after)
+        print(f"MUTANT {name}: {file}, anchor replaced once, in {sources}")
+        probe(sources, Path(temp) / "work")
+    answered = answer_seen.get("ok") is True
+    if anchor == "C1":
+        killed = answered and answer_seen.get("c1", {}).get("present") is False
+    else:
+        killed = answered and rows.get(anchor) is False
+    if killed:
+        failed = [k for k, v in rows.items() if not v]
+        print(f"MUTANT PASS: {name} — {anchor} FAILED in the copy (failed: {', '.join(failed)})")
+        return 0
+    print(f"MUTANT FAILURE: {name} — answered {answered}, {anchor} {rows.get(anchor)}")
+    return 1
+
+
+def main():
+    if len(sys.argv) == 3 and sys.argv[1] == "--mutant" and sys.argv[2] in MUTANTS:
+        return mutant(sys.argv[2])
+    if len(sys.argv) != 1:
+        sys.exit(__doc__)
+    print("G3a — the graphics store and its watcher (probe)")
+    probe(ROOT / "app/Sources", WORK)
+    passed = sum(1 for name in ROWS if rows.get(name))
+    print(f"{passed}/{len(ROWS)}")
+    return 0 if passed == len(ROWS) else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

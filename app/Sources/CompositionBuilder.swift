@@ -150,8 +150,8 @@ enum CompositionBuilder {
     /// Bundled one-frame black movie — see `addPlaceholderIfNeeded`.
     private static let placeholderName = "Blank"
 
-    /// Gives a timeline of nothing but text, shapes and images a video track
-    /// to tick against.
+    /// Gives a timeline of nothing but graphics, text, shapes and images a
+    /// video track to tick against — for the preview's item and the exports.
     ///
     /// Those layers need no decoding, so §7.2 gives them no composition
     /// track — and a composition with no track renders nothing offline. An
@@ -168,8 +168,8 @@ enum CompositionBuilder {
     ///
     /// Its track id is one past the plan's own numbering, so it can never
     /// collide with a track a recipe names. If the resource is missing the
-    /// composition is left as it was: the caller still refuses, which is the
-    /// old behaviour rather than a crash.
+    /// composition keeps no track: exports fail and the preview's item does
+    /// not play — never a crash (road map 10 §10.8).
     private static func addPlaceholderIfNeeded(
         to composition: AVMutableComposition, plan: CompositionPlan
     ) throws {

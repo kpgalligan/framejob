@@ -208,6 +208,10 @@ pub struct Clip {
     pub text: Option<TextProps>,
     #[serde(default)]
     pub shape: Option<ShapeProps>,
+    /// What a graphic clip draws (format version 10): which module, at
+    /// what size, over which stretch of its own timeline, with which props.
+    #[serde(default)]
+    pub graphic: Option<GraphicProps>,
     #[serde(default)]
     pub actions: Vec<Action>,
     /// The transition covering this clip's overlap with its predecessor on
@@ -268,6 +272,9 @@ pub enum Source {
     },
     Text,
     Shape,
+    /// Drawn by a JavaScript module in the package (format version 10);
+    /// described by [`Clip::graphic`].
+    Graphic,
     Nest {
         /// The [`Nest`] this clip shows, by id, in the project's `nests[]`.
         ///

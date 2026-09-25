@@ -49,7 +49,12 @@ extension EditorViewController {
     /// document's own handle. That costs one throwaway project value and keeps
     /// the fallback out of the undo stack: nothing is registered until the
     /// version that works is the one applied.
-    private func addGeneratedClip(named name: String, _ make: (UInt32, Ticks) -> ReelOp) {
+    ///
+    /// `grouped` is for a caller running OFF-EVENT (a panel's completion):
+    /// the edit goes through `performGroupedEdit`, else `applyEdit`.
+    func addGeneratedClip(
+        named name: String, grouped: Bool = false, _ make: (UInt32, Ticks) -> ReelOp
+    ) {
         guard let document = document else { return }
         // The EDITED project throughout, here and in every other command in
         // this file that places a clip: with a nest open the front track is
@@ -75,7 +80,11 @@ extension EditorViewController {
             // Index 0 is the BACK of the stack (§6), so the count is the front.
             ops = [.addTrack(index: before.tracks.count), make(before.nextId, at)]
         }
-        document.applyEdit(name, ops)
+        if grouped {
+            document.performGroupedEdit(name, ops)
+        } else {
+            document.applyEdit(name, ops)
+        }
         selectClips(addedSince: before, in: document)
     }
 

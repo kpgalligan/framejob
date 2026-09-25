@@ -1331,6 +1331,10 @@ enum ClipSource: Codable, Equatable {
     case image(id: UInt32)
     case text
     case shape
+    /// Drawn by a module in the package's `graphics/` (format version 10).
+    /// The description is the clip's `graphic` key, decoded as
+    /// `ClipSnapshot.graphic` (`ProjectSnapshot+Graphic.swift`).
+    case graphic
     /// A group of tracks and clips shown as one clip, by nest id
     /// (`ProjectSnapshot.nests`).
     ///
@@ -1361,6 +1365,8 @@ enum ClipSource: Codable, Equatable {
             self = .text
         case "shape":
             self = .shape
+        case "graphic":
+            self = .graphic
         case "nest":
             self = .nest(project: c.lenient(.project, 0))
         default:
@@ -1382,7 +1388,7 @@ enum ClipSource: Codable, Equatable {
             try c.encode(at, forKey: .at)
         case .image(let id):
             try c.encode(id, forKey: .media)
-        case .text, .shape:
+        case .text, .shape, .graphic:
             break
         case .nest(let project):
             try c.encode(project, forKey: .project)
@@ -1393,7 +1399,7 @@ enum ClipSource: Codable, Equatable {
     var mediaID: UInt32? {
         switch self {
         case .media(let id, _, _), .still(let id, _), .image(let id): return id
-        case .text, .shape, .nest: return nil
+        case .text, .shape, .graphic, .nest: return nil
         }
     }
 
@@ -1418,6 +1424,7 @@ enum ClipSource: Codable, Equatable {
         case .image: return "image"
         case .text: return "text"
         case .shape: return "shape"
+        case .graphic: return "graphic"
         case .nest: return "nest"
         }
     }
@@ -1428,7 +1435,7 @@ enum ClipSource: Codable, Equatable {
         switch self {
         case .media(_, let sourceIn, _): return sourceIn
         case .still(_, let at): return at
-        case .image, .text, .shape, .nest: return 0
+        case .image, .text, .shape, .graphic, .nest: return 0
         }
     }
 
@@ -1456,6 +1463,7 @@ struct ClipSnapshot: Codable, Equatable, Identifiable {
     let audio: AudioProps?
     let text: TextProps?
     let shape: ShapeProps?
+    let graphic: GraphicSnapshot?
     let actions: [ActionSnapshot]
     /// The transition into this clip. Its DURATION is the overlap with the
     /// previous clip on the track; with no overlap it is ignored.
@@ -1473,6 +1481,7 @@ struct ClipSnapshot: Codable, Equatable, Identifiable {
         source: ClipSource = .text, enabled: EnabledFlags = EnabledFlags(),
         speed: Double = 1, video: VideoProps? = nil, audio: AudioProps? = nil,
         text: TextProps? = nil, shape: ShapeProps? = nil,
+        graphic: GraphicSnapshot? = nil,
         actions: [ActionSnapshot] = [], transitionIn: TransitionSnapshot? = nil,
         name: String? = nil, label: String? = nil
     ) {
@@ -1487,6 +1496,7 @@ struct ClipSnapshot: Codable, Equatable, Identifiable {
         self.audio = audio
         self.text = text
         self.shape = shape
+        self.graphic = graphic
         self.actions = actions
         self.transitionIn = transitionIn
         self.name = name
@@ -1506,6 +1516,7 @@ struct ClipSnapshot: Codable, Equatable, Identifiable {
         audio = c.lenient(.audio)
         text = c.lenient(.text)
         shape = c.lenient(.shape)
+        graphic = c.lenient(.graphic)
         actions = c.lenient(.actions, [])
         transitionIn = c.lenient(.transitionIn)
         name = c.lenient(.name)
@@ -1536,6 +1547,7 @@ struct ClipSnapshot: Codable, Equatable, Identifiable {
             let content = text?.content ?? ""
             return content.isEmpty ? "Text" : content
         case .shape: return shape?.kind.displayName ?? "Shape"
+        case .graphic: return "Graphic"
         case .still: return "Freeze Frame"
         case .nest: return "Nest"
         case .media, .image: return "Clip"
@@ -1781,6 +1793,9 @@ struct ProjectSnapshot: Codable, Equatable {
             return n.canvasSize
         case .text:
             return nil
+        case .graphic:
+            guard let g = clip.graphic, g.width > 0, g.height > 0 else { return nil }
+            return CGSize(width: g.width, height: g.height)
         }
     }
 
@@ -1884,6 +1899,7 @@ enum RecipeSourceRef: Codable, Equatable {
     /// never collide with the whole text's texture.
     case text(hash: String, props: TextProps, reveal: RecipeReveal)
     case shape(hash: String, props: ShapeProps)
+    case graphic(name: String, hash: String, frame: Int, propsJSON: String, ctxJSON: String)
     /// The media could not be resolved — draw a slate.
     case missing
 
@@ -1918,6 +1934,7 @@ enum RecipeSourceRef: Codable, Equatable {
                     wordPop: c.lenient(.wordPop)))
         case "shape":
             self = .shape(hash: c.lenient(.hash, ""), props: c.lenient(.shape, ShapeProps()))
+        case "graphic": self = RecipeSourceRef.graphic(from: decoder)
         default:
             self = .missing
         }
@@ -1945,6 +1962,7 @@ enum RecipeSourceRef: Codable, Equatable {
             try c.encode("shape", forKey: .kind)
             try c.encode(hash, forKey: .hash)
             try c.encode(props, forKey: .shape)
+        case .graphic: try encodeGraphic(to: encoder)
         case .missing:
             try c.encode("missing", forKey: .kind)
         }
@@ -1957,6 +1975,7 @@ enum RecipeSourceRef: Codable, Equatable {
     var cacheHash: String? {
         switch self {
         case .text(let hash, _, _), .shape(let hash, _): return hash
+        case .graphic(_, let hash, _, _, _): return hash
         case .track, .image, .missing: return nil
         }
     }

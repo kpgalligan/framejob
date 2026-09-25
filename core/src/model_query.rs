@@ -19,6 +19,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::format::{self, RC_FORMAT_VERSION};
 use crate::model::{Canvas, Clip, Marker, Media, Nest, Project, Source, Track};
+use crate::model_graphic::{check_name, NAME_RULE};
 use crate::time::{Fps, Ticks};
 
 /// The clips of one container on `track`, in start order, ties broken by id.
@@ -162,6 +163,10 @@ impl Project {
                 .as_ref()
                 .filter(|shape| shape.width > 0.0 && shape.height > 0.0)
                 .map(|shape| (shape.width, shape.height)),
+            Source::Graphic => clip
+                .graphic
+                .as_ref()
+                .and_then(|graphic| sized(graphic.width, graphic.height)),
             Source::Nest { project } => {
                 let found = self.nest(*project)?;
                 sized(found.width, found.height)
@@ -336,13 +341,24 @@ impl Project {
                 Source::Media { media, .. } => Some(*media),
                 Source::Still { media, .. } => Some(*media),
                 Source::Image { media } => Some(*media),
-                Source::Text | Source::Shape | Source::Nest { .. } => None,
+                Source::Text | Source::Shape | Source::Graphic | Source::Nest { .. } => None,
             };
             if let Some(media) = referenced {
                 if self.is_missing_media(media) {
                     return Err(format!(
                         "clip {}{whose} refers to unknown media {}",
                         clip.id, media
+                    ));
+                }
+            }
+            // An absent description is tolerated as an absent `text` is; a
+            // present one names a module, and a name that could not be a
+            // file in `graphics/` is a corrupt clip (G-3).
+            if let (Source::Graphic, Some(graphic)) = (&clip.source, &clip.graphic) {
+                if check_name(&graphic.name).is_err() {
+                    return Err(format!(
+                        "clip {}{whose} has graphic name \"{}\", which {NAME_RULE}",
+                        clip.id, graphic.name
                     ));
                 }
             }

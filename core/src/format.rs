@@ -155,7 +155,22 @@ use crate::model::{Canvas, Project};
 /// from a recogniser run over the audio; nothing in the file that survives
 /// could rebuild them, so the loss is the one version whose repair is not a
 /// click in the inspector but a second transcription.
-pub const RC_FORMAT_VERSION: u32 = 9;
+///
+/// Version 10 is graphics (road map 10, G2a): a clip source kind,
+/// `graphic`, and the clip key [`crate::model::Clip::graphic`], placed
+/// after `shape` — a [`crate::model::GraphicProps`] naming the module in
+/// the package's `graphics/` folder that draws it, the size it draws at,
+/// its own `in` and `length`, and its `props` in the caller's key order.
+/// The key defaults to `None` and a version-9 file has no graphic clips,
+/// so there is again no migration step.
+///
+/// The argument for bumping is the same as ever, and this loss is the
+/// widest yet: a version-9 build cannot read a `graphic` source kind at
+/// all, and one that could would drop every graphic clip's description —
+/// which module, at what size, over which stretch of its timeline, with
+/// which props — leaving a clip that draws nothing and a file with nothing
+/// left in it to say what it drew.
+pub const RC_FORMAT_VERSION: u32 = 10;
 
 /// Reader caps, mirrored by the `RC_MAX_*` defines in the C header. They
 /// exist so a corrupt or generated file cannot make the app allocate
@@ -329,7 +344,7 @@ pub fn read(json: &str) -> Result<Project, String> {
 
     // MIGRATION HOOK. Each bump adds one step here, applied in order from
     // `version` up to RC_FORMAT_VERSION, rewriting `value` in place before
-    // it is deserialized. Versions 3, 4, 5, 6, 7, 8 and 9 needed no rewrite —
+    // it is deserialized. Versions 3, 4, 5, 6, 7, 8, 9 and 10 needed no rewrite —
     // every field any of them added carries a serde default — so none has a
     // line; the next version that changes a field's SHAPE adds its own
     // below.

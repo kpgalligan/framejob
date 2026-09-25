@@ -75,7 +75,8 @@ struct ExportChapter: Equatable {
 /// which players disagree about.
 ///
 /// **Cancellation and progress.** Every sample checks the flag, so a cancel
-/// lands within one frame; `AVAssetWriter` has no `progress` of its own, so
+/// lands within one frame, and the reader is torn down only once every pump
+/// has left its loop (`cancel`); `AVAssetWriter` has no `progress` of its own, so
 /// the fraction is kept here from the presentation time of the last sample
 /// appended and `Exporter`'s 0.1 s timer reads it.
 final class ExportWriter {
@@ -114,9 +115,6 @@ final class ExportWriter {
     private let lock = NSLock()
     private var progressValue: Double = 0
     private var cancelRequested = false
-    /// Whether `start` has reached `reader.startReading()`. `cancel`'s doc
-    /// says why cancelling the reader before that point kills the process.
-    private var started = false
     private var failure: (any Error)?
 
     /// Called once, on the main thread, and then dropped.
@@ -335,14 +333,10 @@ final class ExportWriter {
     /// refuses to start at all.
     func start(completion: @escaping (Result<URL, any Error>) -> Void) {
         self.completion = completion
-        // A cancel that arrived BEFORE this call is honoured here rather than
-        // forgotten. `cancel()` cannot reach the reader until `started` is
-        // set below, so without this line an export cancelled in the window
-        // between `Exporter.startWriting` publishing the pipeline and this
-        // running would write the whole file and report success.
+        // A cancel that arrived BEFORE this call is honoured here, before the
+        // reader or the writer has started, rather than one sample later.
         lock.lock()
         let cancelledAlready = cancelRequested
-        started = !cancelledAlready
         lock.unlock()
         guard !cancelledAlready else {
             report(.failure(Exporter.ExportError.cancelled))
@@ -382,34 +376,26 @@ final class ExportWriter {
     }
 
     /// Stops as soon as the pumps notice — within one sample. Safe from any
-    /// thread and safe to call twice; cancelling the READER is what wakes a
-    /// pump that is blocked inside `copyNextSampleBuffer`.
+    /// thread and safe to call twice. It ONLY sets the flag: the reader and
+    /// the writer are cancelled in `allInputsFinished`, after every pump has
+    /// left its loop.
     ///
-    /// **`started` is not bookkeeping — it is a crash guard**, and the crash
-    /// is reachable. `reader.cancelReading()` before `reader.startReading()`
-    /// makes the `startReading()` in `start` raise an uncaught
-    /// `NSInternalInconsistencyException`, which kills the process rather
-    /// than failing an export. The window is real: `Exporter.startWriting`
-    /// publishes `self.writer` and then calls `progressHandler` BEFORE
-    /// `writer.start`, so a driver that cancels from inside a progress
-    /// callback lands exactly there — and `measureShare` is a non-zero first
-    /// report for every row that measures loudness, which is every row but
-    /// the image ones. No PERSON can reach it (the sheet's and the queue's
-    /// Cancel buttons are their own events), but the export queue is a
-    /// programmatic driver and the next one will be too. Found by phase 7's
-    /// proof probe, which drove exactly that path.
-    ///
-    /// `cancelRequested` is still set unconditionally, so a cancel in that
-    /// window is not lost: `start` reads it and refuses, and `pump` tests it
-    /// per sample.
+    /// **Cancelling the reader from here crashed the app** (road map 10
+    /// §10.6, G3c). `reader.cancelReading()` on main while a pump was inside
+    /// `copyNextSampleBuffer` tore the reader down under it: EXC_BREAKPOINT
+    /// in `CMVideoFormatDescriptionMatchesImageBuffer` on the video queue, in
+    /// 12 of 30 mid-export cancels of a 4K graphic project — the sheet's and
+    /// the queue's Cancel path — and 16 of 40 exports stopped by a failing
+    /// graphic. The cost is that a pump blocked on a slow read finishes that
+    /// one sample before it stops — and a `copyNextSampleBuffer` that never
+    /// returns (a pump starved because the other stopped reading) can no
+    /// longer be woken by a cancel, so the completion would never fire; not
+    /// seen in 70 runs (road map 10 §10.6 G3c, owed). A cancel before `start` is refused there;
+    /// `cancelReading()` before `startReading()` would raise.
     func cancel() {
         lock.lock()
-        let alreadyCancelled = cancelRequested
         cancelRequested = true
-        let reachedTheReader = started
         lock.unlock()
-        guard !alreadyCancelled, reachedTheReader else { return }
-        reader.cancelReading()
     }
 
     /// 0…1, from the last sample appended. `AVAssetWriter` has no progress of
@@ -579,14 +565,12 @@ final class ExportWriter {
     }
 
     /// Records the first failure; later ones are noise from the other pumps
-    /// unwinding. Cancels the read so those pumps come back promptly.
+    /// unwinding. The other pumps see it before their next sample, and the
+    /// read is cancelled in `allInputsFinished` (`cancel`'s doc says why).
     private func stopped(with error: any Error) {
         lock.lock()
-        let first = failure == nil
-        if first { failure = error }
+        if failure == nil { failure = error }
         lock.unlock()
-        guard first else { return }
-        reader.cancelReading()
     }
 
     private func advance(to time: CMTime) {
@@ -597,13 +581,14 @@ final class ExportWriter {
         lock.unlock()
     }
 
-    /// Main thread, once every input has marked itself finished.
+    /// Main thread, once every input has marked itself finished — so no pump
+    /// is inside `copyNextSampleBuffer`, and the reader can be cancelled.
     private func allInputsFinished() {
         lock.lock()
         let error = failure
         let cancelled = cancelRequested
         lock.unlock()
-
+        if error != nil || cancelled { reader.cancelReading() }
         if let error = error {
             writer.cancelWriting()
             report(.failure(error))

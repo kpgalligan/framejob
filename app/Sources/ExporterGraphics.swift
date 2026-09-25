@@ -1,0 +1,95 @@
+import CoreGraphics
+import Foundation
+
+/// An export's graphics (road map 10 §5f, G-8 and G-13, G3c): the gate that
+/// refuses a module that does not compile before anything is built, and the
+/// mapping from a graphic that failed mid-export to the error the caller
+/// reads.
+///
+/// **The set is PINNED, not looked up.** `Exporter.export` and
+/// `renderFrameReported` pin the `GraphicSet` their caller captured on their
+/// own `RecipeSource` key (`GraphicRegistry.pin`), so an export draws the
+/// modules as they compiled when it was asked for, whatever the document's
+/// store does next, and a queued job draws the set it was ENQUEUED with.
+/// Every pin has its `unpin` on each exit: `finish`, `deinit`, and
+/// `renderFrameReported`'s `defer`.
+///
+/// **The gate is compile-only** (G-8 asks for no dry run): a module that
+/// throws at frame 900 is found at frame 900. The render thread records the
+/// failure on the export's key; the progress timer reads it on main and
+/// cancels, and `finish` replaces whatever the pipeline answered with
+/// `.graphicFailed` and removes the file.
+extension Exporter {
+
+    /// One offline frame and what its graphics reported while it was drawn:
+    /// the failure first, then the warnings (`GraphicRegistry.reports`).
+    struct RenderedFrame {
+        let image: CGImage?
+        let graphics: [GraphicReport]
+    }
+
+    /// `.graphicsNotCompiled` when a graphic clip the export will draw has a
+    /// module that failed to compile or has none, else nil. Nothing to gate
+    /// with no set or an audio-only export. The clips are the top level's in
+    /// `settings`' range, plus every graphic clip of each nest a clip in the
+    /// range shows — the whole nest, not its window, which over-includes by
+    /// decision.
+    static func graphicsRefusal(
+        project: ReelProject, settings: ExportSettings, graphics: GraphicSet?
+    ) -> ExportError? {
+        guard let graphics = graphics, !settings.isAudioOnly else { return nil }
+        let range = settings.start..<(settings.start + settings.duration)
+        let snapshot = project.snapshot
+        var names = Set<String>()
+        for clip in snapshot.clips where clip.start < range.upperBound && clip.end > range.lowerBound {
+            if let graphic = clip.graphic { names.insert(graphic.name) }
+            guard case .nest(let id) = clip.source,
+                let nest = snapshot.nests.first(where: { $0.id == id })
+            else { continue }
+            for inner in nest.clips {
+                if let graphic = inner.graphic { names.insert(graphic.name) }
+            }
+        }
+        let refused = names.sorted().compactMap { name -> (name: String, message: String)? in
+            switch graphics.modules[name] {
+            case nil:
+                return (name, "has no module in graphics/")
+            case .failed(let diagnostics, _)?:
+                let reason = diagnostics.first?.located ?? "the engine gave no reason"
+                return (name, "does not compile — " + reason)
+            case .compiled?:
+                return nil
+            }
+        }
+        return refused.isEmpty ? nil : .graphicsNotCompiled(refused)
+    }
+
+    /// `.graphicFailed` for one failed report.
+    static func graphicFailed(_ report: GraphicReport) -> ExportError {
+        .graphicFailed(
+            name: report.name, frame: report.frame,
+            message: report.diagnostics.first?.message ?? "the engine gave no reason")
+    }
+
+    /// `result`, unless a graphic failed on `key`: then the file at
+    /// `destination` is removed and the answer is `.graphicFailed`, whatever
+    /// the pipeline said — a success, the cancel `pollProgress` asked for,
+    /// or a reader's error.
+    static func graphicOutcome(
+        _ result: Result<URL, any Error>, key: Int?, destination: URL?
+    ) -> Result<URL, any Error> {
+        guard let key = key, let failure = GraphicRegistry.shared.failure(for: key) else {
+            return result
+        }
+        if let destination = destination { try? FileManager.default.removeItem(at: destination) }
+        return .failure(graphicFailed(failure))
+    }
+}
+
+extension GraphicDiagnostic {
+    /// The message, then ` (line L, column C)` when it has a line.
+    var located: String {
+        guard let line = line else { return message }
+        return message + " (line \(line)" + (column.map { ", column \($0)" } ?? "") + ")"
+    }
+}

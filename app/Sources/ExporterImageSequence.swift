@@ -74,16 +74,20 @@ extension Exporter {
     /// have to be handed to it as a value. That asymmetry is the whole reason
     /// this parameter exists, and it is why `ExporterWriter.swift` needed no
     /// edit for the burn-in at all.
+    ///
+    /// `graphics` goes the same way for the same reason: the export's pin is
+    /// on the export's key, and each image frame pins it on its own.
     static func pipeline(
         built: BuiltComposition, project: ReelProject, urls: [UInt32: URL],
         settings: ExportSettings, chapters: [ExportChapter], options: RecipeOptions,
-        to url: URL
+        graphics: GraphicSet?, to url: URL
     ) throws -> any ExportPipeline {
         guard settings.isImageSequence else {
             return try ExportWriter(built: built, settings: settings, chapters: chapters, to: url)
         }
         return try ImageSequenceWriter(
-            project: project, urls: urls, settings: settings, options: options, to: url)
+            project: project, urls: urls, settings: settings, options: options,
+            graphics: graphics, to: url)
     }
 }
 
@@ -260,6 +264,8 @@ final class ImageSequenceWriter: ExportPipeline {
     /// `Exporter.export` published these — is one no frame of this file will
     /// ever be composed against.
     private let options: RecipeOptions
+    /// The export's compiled graphics, pinned per frame for the same reason.
+    private let graphics: GraphicSet?
     private let destination: URL
     private let format: ImageSequenceFormat
     /// Every frame's time in the PROJECT's clock, in order. Precomputed:
@@ -301,7 +307,7 @@ final class ImageSequenceWriter: ExportPipeline {
     /// rendered and nothing is written until `start`.
     init(
         project: ReelProject, urls: [UInt32: URL], settings: ExportSettings,
-        options: RecipeOptions, to url: URL
+        options: RecipeOptions, graphics: GraphicSet?, to url: URL
     ) throws {
         guard let format = ImageSequenceFormat(container: settings.container) else {
             throw Exporter.ExportError.fileTypeUnsupported(settings.container)
@@ -329,6 +335,7 @@ final class ImageSequenceWriter: ExportPipeline {
         self.project = project
         self.urls = urls
         self.options = options
+        self.graphics = graphics
         self.destination = url
         self.format = format
         self.fps = settings.fps
@@ -367,9 +374,9 @@ final class ImageSequenceWriter: ExportPipeline {
         queue.async { [weak self] in self?.run() }
     }
 
-    /// Nothing to interrupt, unlike the writer's reader: a frame render is
-    /// bounded work that finishes on its own, so the flag is read between
-    /// frames and the render in flight is simply thrown away.
+    /// A flag, as the writer's cancel is: a frame render is bounded work that
+    /// finishes on its own, so the flag is read between frames and the
+    /// render in flight is simply thrown away.
     func cancel() {
         lock.lock()
         cancelRequested = true
@@ -434,10 +441,15 @@ final class ImageSequenceWriter: ExportPipeline {
     /// the preview renders here — the two go through the same composition —
     /// so a nil is a real failure worth reporting.
     private func append(at time: Ticks) -> (any Error)? {
-        guard let image = Exporter.renderFrame(
+        let rendered = Exporter.renderFrameReported(
             project: project, urls: urls, at: time, maxWidth: Int(frameSize.width),
-            options: options)
-        else {
+            options: options, graphics: graphics)
+        // A graphic that failed drew its error card; the frame is not written
+        // and `fail` removes the file.
+        if let failure = rendered.graphics.first(where: { $0.failed }) {
+            return Exporter.graphicFailed(failure)
+        }
+        guard let image = rendered.image else {
             let timecode = ReelTime.format(time, fps: fps, frames: true)
             return Exporter.ExportError.failed(
                 "The frame at \(timecode) could not be rendered, so the "

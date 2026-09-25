@@ -24,6 +24,7 @@ pub mod edit_clip;
 mod edit_clip_timing;
 mod edit_commit;
 pub mod edit_edge;
+pub mod edit_graphic;
 pub mod edit_insert;
 pub mod edit_nest;
 pub mod edit_paste;
@@ -42,10 +43,12 @@ pub mod export_table;
 pub mod ffi;
 pub mod ffi_agent;
 pub mod ffi_edit;
+pub mod ffi_graphic;
 pub mod ffi_query;
 pub mod format;
 pub mod frame_grid;
 pub mod model;
+pub mod model_graphic;
 pub mod model_motion;
 pub mod model_props;
 pub mod model_query;
@@ -61,6 +64,7 @@ pub mod outcome;
 pub mod patch;
 pub mod props_check;
 pub mod recipe;
+mod recipe_graphic;
 pub mod recipe_text;
 pub mod recipe_words;
 pub mod scope;
@@ -81,11 +85,11 @@ pub use crate::format::{
 };
 pub use crate::model::{
     Action, AudioProps, Backdrop, BlendMode, Canvas, Chroma, Clip, Color, ColorAdjust, Compressor,
-    Crop, Curve, Duck, Enabled, Filter, FilterKind, Gradient, GradientKind, GradientStop, Marker,
-    Media, MediaKind, Nest, ObscureKind, ObscureRegion, Outline, Project, Reflection, Shadow,
-    ShapeKind, ShapeProps, Source, SpotShape, Spotlight, Stroke, TextAlign, TextAnimation,
-    TextAnimationKind, TextProps, TextVAlign, Track, Transition, TransitionKind, VideoProps,
-    MAX_FILTERS, MAX_GRADIENT_STOPS, MAX_OBSCURE,
+    Crop, Curve, Duck, Enabled, Filter, FilterKind, Gradient, GradientKind, GradientStop,
+    GraphicProps, Marker, Media, MediaKind, Nest, ObscureKind, ObscureRegion, Outline, Project,
+    Reflection, Shadow, ShapeKind, ShapeProps, Source, SpotShape, Spotlight, Stroke, TextAlign,
+    TextAnimation, TextAnimationKind, TextProps, TextVAlign, Track, Transition, TransitionKind,
+    VideoProps, MAX_FILTERS, MAX_GRADIENT_STOPS, MAX_OBSCURE,
 };
 pub use crate::outcome::Outcome;
 pub use crate::time::{Fps, Ticks, TIMESCALE};

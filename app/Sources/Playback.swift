@@ -358,11 +358,11 @@ final class Playback {
         pending = nil
         canvasSize = request.plan.renderSizeCG
 
-        // An empty timeline has no tracks to compose. An `AVPlayerItem` over a
-        // composition with no tracks is not playable, so the item is dropped
-        // instead — the preview shows the layer's background and the transport
-        // refuses.
-        guard !request.plan.videoTracks.isEmpty || !request.plan.audioTracks.isEmpty else {
+        // Only an EMPTY timeline (duration 0) drops the item: the preview shows
+        // the layer's background and the transport refuses. A timeline of only
+        // graphics, text, shapes or images has no plan track, and the builder's
+        // placeholder gives its item one to tick against (road map 10 §10.8).
+        guard request.plan.duration > 0 else {
             built = nil
             builtPlanJSON = request.planJSON
             builtAudioDSP = request.audioDSP

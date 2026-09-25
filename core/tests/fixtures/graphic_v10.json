@@ -1,0 +1,95 @@
+{
+  "version": 10,
+  "canvas": {
+    "width": 1920,
+    "height": 1080,
+    "fps": [
+      30,
+      1
+    ],
+    "background": [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "fit_new_clips": true,
+    "timecode_frames": true
+  },
+  "media": [],
+  "tracks": [
+    {
+      "id": 3,
+      "name": "Track 1",
+      "hidden": false,
+      "muted": false,
+      "locked": false,
+      "solo": false
+    }
+  ],
+  "clips": [
+    {
+      "id": 40,
+      "track": 3,
+      "start": 0,
+      "duration": 5000000,
+      "source": {
+        "kind": "graphic"
+      },
+      "enabled": {
+        "video": true,
+        "audio": true
+      },
+      "speed": 1.0,
+      "video": {
+        "x": 0.0,
+        "y": 0.0,
+        "scale": 1.0,
+        "rotation": 0.0,
+        "opacity": 1.0,
+        "crop": {
+          "l": 0.0,
+          "t": 0.0,
+          "r": 0.0,
+          "b": 0.0
+        },
+        "corner_radius": 0.0,
+        "shadow": null,
+        "color": {
+          "brightness": 0.0,
+          "contrast": 0.0,
+          "saturation": 0.0,
+          "hue": 0.0
+        },
+        "chroma": null,
+        "filters": [],
+        "reflection": null,
+        "spotlight": null,
+        "obscure": [],
+        "blend": "normal",
+        "motion": null
+      },
+      "audio": null,
+      "text": null,
+      "shape": null,
+      "graphic": {
+        "name": "lower-third",
+        "width": 1920,
+        "height": 1080,
+        "in": 0,
+        "length": null,
+        "props": {
+          "title": "Kevin",
+          "accent": "#2d7ff9"
+        }
+      },
+      "actions": [],
+      "transition_in": null,
+      "name": null,
+      "label": null
+    }
+  ],
+  "markers": [],
+  "next_id": 41,
+  "nests": []
+}

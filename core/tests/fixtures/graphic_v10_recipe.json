@@ -1,0 +1,31 @@
+{
+  "t": 740000,
+  "source": {
+    "kind": "graphic",
+    "name": "lower-third",
+    "hash": "3f58effee3657324",
+    "frame": 37,
+    "ctx": {
+      "fps": 30.0,
+      "time": 1.2333333333333334,
+      "durationInFrames": 250,
+      "progress": 0.14859437751004015,
+      "width": 1920,
+      "height": 1080,
+      "canvas": {
+        "width": 1920,
+        "height": 1080
+      }
+    },
+    "props": {
+      "title": "Kevin",
+      "accent": "#2d7ff9"
+    },
+    "props_json": "{\"title\":\"Kevin\",\"accent\":\"#2d7ff9\"}",
+    "ctx_json": "{\"fps\":30.0,\"time\":1.2333333333333334,\"durationInFrames\":250,\"progress\":0.14859437751004015,\"width\":1920,\"height\":1080,\"canvas\":{\"width\":1920,\"height\":1080}}"
+  },
+  "source_size": [
+    1920,
+    1080
+  ]
+}

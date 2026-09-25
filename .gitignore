@@ -1,4 +1,5 @@
 /core/target/
+/graphic/target/
 /build/
 /Reelcut.xcodeproj/
 /app/Info.plist

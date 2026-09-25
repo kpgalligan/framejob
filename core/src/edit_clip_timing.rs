@@ -4,6 +4,7 @@ use crate::edit_clip::clip_end;
 use crate::model::{Action, Project, Source};
 use crate::model_words::rebase_words;
 use crate::outcome::Outcome;
+use crate::recipe_graphic::graphic_advanced;
 use crate::source_window::source_advanced;
 use crate::time::Ticks;
 
@@ -62,7 +63,9 @@ impl Project {
     /// out not an identity. `text.words` are the opposite, on purpose
     /// (spec §11, W-3): a word is anchored to speech that stays where it is
     /// on the timeline, so every word is rebased by the trim's delta and a
-    /// word trimmed off the front keeps its (negative) time.
+    /// word trimmed off the front keeps its (negative) time. A graphic's
+    /// `in` advances by the same delta (road map 10's G-9), with no speed
+    /// and no head bound, never below 0.
     pub fn trim_start(&self, clip: u32, to: Ticks) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
         let end = clip_end(&target);
@@ -83,6 +86,7 @@ impl Project {
         moved.source = source_advanced(&target.source, delta, target.speed);
         moved.start = to;
         moved.duration = end.saturating_sub(to);
+        moved.graphic = graphic_advanced(target.graphic.as_ref(), delta);
         if let Some(text) = moved.text.as_mut() {
             rebase_words(text, delta);
         }
@@ -94,7 +98,8 @@ impl Project {
     /// The source in point and the actions are untouched. The bound is
     /// `source_window.rs`'s `latest_end_on_grid`, measured at this clip's
     /// OWN start: the last frame at or before the end of the file, and
-    /// never the one past it (spec §11, #22 and D4-2).
+    /// never the one past it (spec §11, #22 and D4-2). A graphic's `length`
+    /// is untouched: null follows the new end, a number stays (G-9).
     pub fn trim_end(&self, clip: u32, to: Ticks) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
         let earliest = target.start.saturating_add(self.frame());

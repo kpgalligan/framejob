@@ -22,7 +22,7 @@ import Foundation
 ///
 /// **The `scope` was the payment's whole point and it cost ONE line.** It is
 /// injected in `tool` below, for every name the core calls an op, so the
-/// fifty-seven rows on the other side of the cut got it without being touched
+/// fifty-nine rows on the other side of the cut got it without being touched
 /// — which is what makes phase 9's diff over there empty and this file's
 /// readable.
 ///
@@ -51,18 +51,21 @@ extension AgentServer {
     /// free: with several projects open a call would otherwise be ambiguous,
     /// and the property costs nothing when only one is.
     ///
-    /// **Its own callers are the twenty APP-STATE tools** — the ones with no
-    /// op behind them, which have no row in the core's table to print and so
-    /// spell their arguments out here: the ten of the Projects group below
-    /// (`open_project` … `redo`), the two composites of
-    /// `AgentCatalog+Audio.swift` (`detect_silence`, `normalize_clip`) and
-    /// the eight `fileTools` returns (`import_media`, `import_captions`,
+    /// **Its own callers are the twenty-six APP-STATE tools** — the ones
+    /// with no op behind them, which have no row in the core's table to
+    /// print and so spell their arguments out here: the ten of the Projects
+    /// group below (`open_project` … `redo`), the two composites of
+    /// `AgentCatalog+Audio.swift` (`detect_silence`, `normalize_clip`), the
+    /// eight `fileTools` returns (`import_media`, `import_captions`,
     /// `consolidate_media`, `transcribe`, `export_captions`, `render_frame`,
     /// `export`, `record_screen` — the three caption rows of them built in
-    /// `AgentCatalog+Captions.swift`). Every
+    /// `AgentCatalog+Captions.swift`) and the six of
+    /// `AgentCatalog+Graphics.swift` (`write_graphic`, `get_graphic`,
+    /// `graphic_reference`, `render_graphic`, `import_graphic_font`,
+    /// `import_graphic_asset`). Every
     /// op tool is `opTool`'s since road map 7's D3·4, and `opTool` goes
-    /// through here, so this is still where all seventy-seven get `project`
-    /// and where all fifty-seven get `scope`.
+    /// through here, so this is still where all eighty-five get `project`
+    /// and where all fifty-nine get `scope`.
     ///
     /// Internal rather than private for one reason and no other: three other
     /// files build tools with it or with `opTool`, and `private` on an
@@ -75,7 +78,7 @@ extension AgentServer {
         schema["project"] = Self.projectProperty
         // Road map 2's phase 9: every §6 OP also takes the envelope's
         // `scope`, and it is injected HERE for the reason `project` is —
-        // one edit site instead of fifty-seven, and the op somebody adds in
+        // one edit site instead of fifty-nine, and the op somebody adds in
         // phase 10 cannot arrive with a tool that silently lacks it.
         //
         // Op-ness is the CORE's answer (`Self.opNames`, read through
@@ -119,11 +122,11 @@ extension AgentServer {
     /// injected keys are the same code and cannot come to differ: `project`
     /// on every tool, `scope` on every name the core calls an op.
     ///
-    /// **Every one of the fifty-seven op tools is built here** since road
+    /// **Every one of the fifty-nine op tools is built here** since road
     /// map 7's D3·4 — the clip and action rows, the two transitions, the
-    /// three raw media ops, the tracks, the markers and the canvas — so no
+    /// two graphics, the three raw media ops, the tracks, the markers and the canvas — so no
     /// tool anywhere declares an argument's type, its vocabulary or its
-    /// required-ness by hand. What is left in `tool` is the twenty app-state
+    /// required-ness by hand. What is left in `tool` is the twenty-six app-state
     /// tools, which have no op to read.
     func opTool(
         _ name: String, _ description: String, _ prose: [String: String]
@@ -158,7 +161,7 @@ extension AgentServer {
     /// tools, and the startup parity check asks that each of them has a tool
     /// AND that the tool declares the property. One list, so the three
     /// cannot disagree — and a `static let`, so the FFI call and the JSON
-    /// decode behind it happen once per process instead of seventy-seven
+    /// decode behind it happen once per process instead of eighty-five
     /// times per catalog build.
     ///
     /// **An empty answer is a silent catastrophe, so it is not allowed to be
@@ -312,7 +315,9 @@ extension AgentServer {
                     + "so an id is unambiguous on its own. tracks[0] is the BACK of the layer "
                     + "stack (the bottom lane of the timeline); times are ticks at 600000 per "
                     + "second. missing_media lists media whose file has moved — relink_media "
-                    + "points it at the new one.",
+                    + "points it at the new one. graphics: every module in the package's "
+                    + "graphics/ with its revision, whether it compiles, and the clips drawn "
+                    + "by it.",
                 [:]),
             tool(
                 "set_playhead",
@@ -410,6 +415,10 @@ extension AgentServer {
         // the end of the catalog — `recording_probe.py` reads the last
         // eleven names, which are the FILE tools.
         catalog += transitionTools(ticks: ticks, clipDescription: clipDescription)
+        // The two graphic rows (AgentCatalog+Graphics.swift) follow them, for
+        // the same reason: never at the end of the catalog.
+        catalog += graphicTools(
+            ticks: ticks, trackDescription: trackDescription, clipDescription: clipDescription)
         catalog += [
 
             // MARK: Tracks

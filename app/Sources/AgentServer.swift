@@ -103,7 +103,7 @@ final class AgentServer {
     /// main thread and each says so in its own handler.
     static let offMainTools: Set<String> = [
         "import_media", "render_frame", "export", "save_project", "new_project", "transcribe",
-        "record_screen",
+        "record_screen", "render_graphic",
     ]
 
     // MARK: - Lifecycle
@@ -272,6 +272,14 @@ final class AgentServer {
         "set_audio": { $0.setAudio },
         "set_text": { $0.setText },
         "set_shape": { $0.setShape },
+        "add_graphic_clip": { $0.addGraphicClip },
+        "set_graphic": { $0.setGraphic },
+        "write_graphic": { $0.writeGraphic },
+        "get_graphic": { $0.getGraphic },
+        "graphic_reference": { $0.graphicReference },
+        "render_graphic": { $0.renderGraphic },
+        "import_graphic_font": { $0.importGraphicFont },
+        "import_graphic_asset": { $0.importGraphicAsset },
         "set_clip": { $0.setClip },
         "set_enabled": { $0.setEnabled },
         "set_transition": { $0.setTransition },
@@ -315,12 +323,13 @@ final class AgentServer {
         "export": { $0.exportProject },
     ]
 
-    /// Ops the core declares that deliberately have NO tool. Empty, and the
-    /// bar for an entry is high: the agent-parity rule (app/CLAUDE.md) says
-    /// every user-visible edit gets a mirror, so the answer to "this op has
-    /// no tool" is almost always to write the tool. An entry here carries a
-    /// comment saying why it is the exception.
-    private static let opsWithoutTools: Set<String> = []
+    /// Ops the core declares that deliberately have NO tool. None today,
+    /// and the bar for an entry is high: the agent-parity rule
+    /// (app/CLAUDE.md) says every user-visible edit gets a mirror, so the
+    /// answer to "this op has no tool" is almost always to write the tool.
+    /// An entry here carries a comment saying why it is the exception.
+    private static let opsWithoutTools: Set<String> = [
+    ]
 
     /// The enforcement behind the table's contract, in five parts:
     ///
@@ -758,7 +767,7 @@ final class AgentBox<Value> {
 /// C callback for `RcAgentToolHandler`: hops to the main thread, executes, and
 /// hands the result back as a core-owned string.
 ///
-/// The seven `offMainTools` deliberately do NOT hop — they wait on work the
+/// The eight `offMainTools` deliberately do NOT hop — they wait on work the
 /// main thread has to perform, so taking it first would deadlock — and reach
 /// the main thread through `AgentServer.onMain` instead.
 private func agentToolTrampoline(

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ALL FIFTY-SEVEN op tools, against the core's own op table (road map 7's D3·4).
+"""ALL FIFTY-NINE op tools, against the core's own op table (road map 7's D3·4).
 
 `clip_catalog_proof.py` measured the forty-three clip and action tools when
 they stopped describing their own arguments. This measures the whole catalog:
@@ -114,6 +114,7 @@ func requirement(_ requirement: AgentDeclaration.Requirement) -> String {
     case .theCores: return "theCores"
     case .required: return "required"
     case .optional: return "optional"
+    case .filledByTheApp: return "filledByTheApp"
     }
 }
 answer["declarations"] = AgentServer.declarations.map { declaration in
@@ -231,13 +232,17 @@ def expected_input(op, table, declarations):
 
     properties = {}
     for argument, fragment in table[op]["properties"].items():
+        # A row the app fills is not published at all (G3b's `schema`).
+        if any(d["requirement"] == "filledByTheApp" for d in rows(argument)):
+            continue
         property = fragment
         for declaration in rows(argument):
             property = widened(declaration, property)
         properties[argument] = property
     required = [
         argument for argument in table[op]["required"]
-        if not any(d["requirement"] == "optional" for d in rows(argument))
+        if not any(d["requirement"] in ("optional", "filledByTheApp")
+                   for d in rows(argument))
     ]
     for argument in sorted(properties):
         if argument in required:
@@ -279,7 +284,7 @@ def main():
 
     print("\n1 — the catalog is the core's op list plus the app's own tools")
     check(f"the core declares {len(ops)} ops and every one of them is a tool",
-          len(ops) == 57 and ops <= set(tools),
+          len(ops) == 59 and ops <= set(tools),
           f"{len(ops)} ops, missing tools: {sorted(ops - set(tools))}")
     group = sorted(ops)
     envelope = {

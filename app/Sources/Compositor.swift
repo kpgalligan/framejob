@@ -29,7 +29,7 @@ final class RecipeInstruction: NSObject, AVVideoCompositionInstructionProtocol {
     /// composition rebuild (§7.6).
     let passthroughTrackID: CMPersistentTrackID = kCMPersistentTrackID_Invalid
 
-    /// The document's `RecipeSource` slot (`ReelCore.swift`) — or an
+    /// The document's `RecipeSource` slot (`RecipeSource.swift`) — or an
     /// export's own, which is a fresh one. It names the project a frame is
     /// composed from AND, since phase 7, the `RecipeOptions` that project is
     /// asked with, so an option never has to be threaded through the
@@ -973,6 +973,11 @@ final class MetalRenderer {
             guard let rendered = renderers.shape(props, hash: hash) else { return .absent }
             return .textured(
                 rendered.texture, rendered.size, premultiplied: true, orientation: 0)
+        case .graphic(let name, _, let frame, let props, let ctx):
+            let size = layer.sourceSizeCG ?? CGSize(width: 640, height: 360)
+            guard let drawn = renderers.graphic(name: name, frame: frame, propsJSON: props,
+                ctxJSON: ctx, size: size, recipeKey: instruction?.recipeKey ?? 0) else { return .slate(size) }
+            return .textured(drawn.texture, drawn.size, premultiplied: true, orientation: 0)
         case .missing:
             return .slate(layer.sourceSizeCG ?? CGSize(width: 640, height: 360))
         }

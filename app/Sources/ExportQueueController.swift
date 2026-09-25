@@ -141,6 +141,11 @@ final class ExportQueueController {
         /// burn-in (`RecipeOptions`). Carried per job, because two jobs from
         /// one document may legitimately differ in it.
         let options: RecipeOptions
+        /// The document's compiled graphics as they stood AT ENQUEUE (G-13) —
+        /// the type doc's list again: a module saved after Add to Queue is not
+        /// in the handle, and the document's set is swapped by that save and
+        /// dropped when it closes. `Exporter.export` pins it for the write.
+        let graphics: GraphicSet?
         var state: State = .waiting
         /// 0…1, and only meaningful while `state` is `.running`.
         var progress: Double = 0
@@ -277,7 +282,7 @@ final class ExportQueueController {
     @discardableResult
     func enqueue(
         project: ReelProject, urls: [UInt32: URL], settings: ExportSettings, to url: URL,
-        options: RecipeOptions = .none
+        options: RecipeOptions = .none, graphics: GraphicSet? = nil
     ) -> UInt64 {
         let id = nextID
         nextID += 1
@@ -287,7 +292,7 @@ final class ExportQueueController {
                 // The third piece of the enqueue-time snapshot; the type doc
                 // says why it cannot be left to be asked again at run time.
                 reverse: ReverseSource.shared.resolution(publishedFor: project),
-                settings: settings, destination: url, options: options))
+                settings: settings, destination: url, options: options, graphics: graphics))
         didChange()
         start()
         return id
@@ -345,7 +350,7 @@ final class ExportQueueController {
         didChange()
         exporter.export(
             project: job.project, urls: job.urls, settings: job.settings, to: job.destination,
-            options: job.options,
+            options: job.options, graphics: job.graphics,
             progress: { [weak self] value in self?.progressed(job.id, value) },
             completion: { [weak self] result in self?.finished(job.id, result) })
     }

@@ -351,6 +351,8 @@ final class ProjectDocument: NSDocument {
 
     /// Where regenerable caches go while the document has no file yet.
     private var temporaryCacheDirectory: URL?
+    /// This document's `graphics/` (`ProjectDocument+Graphics.swift`).
+    var graphicStore: GraphicStore?
 
     private var didReleaseRecipeKey = false
 
@@ -398,6 +400,7 @@ final class ProjectDocument: NSDocument {
         set {
             if let source = importSourceURL, newValue == source { return }
             super.fileURL = newValue
+            graphicStore?.packageDidMove(to: newValue)
         }
     }
 
@@ -439,6 +442,7 @@ final class ProjectDocument: NSDocument {
         // `addWindowController`, and a resolution published after that would
         // let a reversed clip play forwards for one build.
         publishReverseResolution()
+        startGraphicStore()
         addWindowController(EditorWindowController(document: self))
         // Filmstrips and waveforms for whatever the open brought in. Cheap
         // to ask for repeatedly: `MediaImporter` skips a cache whose marker
@@ -460,6 +464,7 @@ final class ProjectDocument: NSDocument {
             didReleaseRecipeKey = true
             RecipeSource.shared.unregister(recipeKey)
             ReverseSource.shared.unpublish(recipeKey)
+            stopGraphicStore()
         }
         super.close()
     }
@@ -671,6 +676,7 @@ final class ProjectDocument: NSDocument {
         if let media = directoryWrapper(Self.mediaDirectoryName) {
             children[Self.mediaDirectoryName] = media
         }
+        if let graphics = graphicsWrapper() { children[Self.graphicsDirectoryName] = graphics }
         return FileWrapper(directoryWithFileWrappers: children)
     }
 
@@ -966,57 +972,6 @@ final class ProjectDocument: NSDocument {
         // disk did, and the §7.6 rebuild rule compares plans. See the
         // notification's own comment.
         NotificationCenter.default.post(name: .reversedMediaDidChange, object: self)
-    }
-
-    /// File > Add Media… and every drop that adds files to an OPEN project.
-    /// Probing is asynchronous, so the files are probed one at a time and the
-    /// whole batch commits as ONE undo step; `completion` gets the new media
-    /// ids in the order the files were given, on the main thread.
-    func importMedia(_ urls: [URL], completion: (([UInt32]) -> Void)? = nil) {
-        guard !urls.isEmpty else {
-            completion?([])
-            return
-        }
-        probeNext(urls, index: 0, descriptors: [], completion: completion)
-    }
-
-    private func probeNext(
-        _ urls: [URL], index: Int, descriptors: [MediaDescriptor],
-        completion: (([UInt32]) -> Void)?
-    ) {
-        guard index < urls.count else {
-            // Two statements, never `completion?(commitImport(descriptors))`:
-            // optional chaining skips the ARGUMENT too, so with no completion
-            // — File ▸ Add Media… and a Media-tab drop pass none — the files
-            // were probed and never added, with no beep and no error.
-            let added = commitImport(descriptors)
-            completion?(added)
-            return
-        }
-        MediaImporter.probe(url: urls[index]) { [weak self] result in
-            guard let self = self else { return }
-            var collected = descriptors
-            switch result {
-            case .success(let descriptor):
-                collected.append(descriptor)
-            case .failure(let error):
-                // One unreadable file must not lose the rest of the drop.
-                self.present(error)
-            }
-            self.probeNext(
-                urls, index: index + 1, descriptors: collected, completion: completion)
-        }
-    }
-
-    private func commitImport(_ descriptors: [MediaDescriptor]) -> [UInt32] {
-        guard !descriptors.isEmpty else { return [] }
-        let before = Set(project.snapshot.media.map { $0.id })
-        performGroupedEdit(
-            descriptors.count == 1 ? "Add Media" : "Add \(descriptors.count) Media Files",
-            descriptors.map { ReelOp.addMedia(descriptor: $0) })
-        let added = project.snapshot.media.filter { !before.contains($0.id) }
-        generateCaches()
-        return added.map { $0.id }
     }
 
     // MARK: - Change counting
@@ -1370,7 +1325,7 @@ final class ProjectDocument: NSDocument {
 
     /// Errors never crash and never go to the console alone: they land in a
     /// sheet on the document's window when it has one.
-    private func present(_ error: any Error) {
+    func present(_ error: any Error) {
         if let window = windowForSheet {
             presentError(error, modalFor: window, delegate: nil, didPresent: nil, contextInfo: nil)
         } else {

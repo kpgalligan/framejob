@@ -253,6 +253,25 @@ extension ReelOp {
         return ReelOp(name: "add_shape_clip", args: a.values)
     }
 
+    /// `add_graphic_clip` (road map 10's G2a), raw: `props` and `schema`
+    /// travel as the caller's JSON and the core is their one validator. No
+    /// typed builder yet — G3's tool and G5's inspector are its callers.
+    static func addGraphicClipRaw(
+        track: UInt32, at: Ticks, duration: Ticks? = nil, name: String,
+        width: UInt32? = nil, height: UInt32? = nil, props: Any? = nil, schema: Any? = nil
+    ) -> ReelOp {
+        var a = OpArgs()
+        a.put("track", track)
+        a.put("at", at)
+        a.put("duration", duration)
+        a.put("name", name)
+        a.put("width", width)
+        a.put("height", height)
+        a.put("props", props)
+        a.put("schema", schema)
+        return ReelOp(name: "add_graphic_clip", args: a.values)
+    }
+
     /// The kind-only shorthand for the one caller that wants nothing else:
     /// the Add Shape menu, which picks a kind and takes the core's box,
     /// paint and — for an arrow — its head. An overload rather than a job
@@ -723,6 +742,15 @@ extension ReelOp {
 
     static func setShape(clips: [UInt32], patch: ShapePatch) -> ReelOp {
         setShapeRaw(clips: clips, patch: patch.dictionary)
+    }
+
+    /// `set_graphic` (road map 10's G2a), raw like `addGraphicClipRaw`.
+    static func setGraphicRaw(clips: [UInt32], patch: Any, schema: Any? = nil) -> ReelOp {
+        var a = OpArgs()
+        a.put("clips", clips)
+        a.put("patch", patch)
+        a.put("schema", schema)
+        return ReelOp(name: "set_graphic", args: a.values)
     }
 
     /// The fifth patch's raw factory (deepening D1·4). Its group has no

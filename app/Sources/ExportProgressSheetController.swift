@@ -41,6 +41,9 @@ final class ExportProgressSheetController: NSViewController {
     /// success. Defaulted, so a caller that does not burn in is written the
     /// way it always was.
     private let options: RecipeOptions
+    /// The document's compiled graphics as the export was confirmed (G-13),
+    /// pinned by `Exporter.export` for the write.
+    private let graphics: GraphicSet?
 
     private let bar = NSProgressIndicator()
     private let statusLabel = NSTextField(wrappingLabelWithString: "Preparing…")
@@ -55,13 +58,14 @@ final class ExportProgressSheetController: NSViewController {
 
     init(
         project: ReelProject, urls: [UInt32: URL], settings: ExportSettings, to url: URL,
-        options: RecipeOptions = .none
+        options: RecipeOptions = .none, graphics: GraphicSet? = nil
     ) {
         self.project = project
         self.urls = urls
         self.settings = settings
         self.destination = url
         self.options = options
+        self.graphics = graphics
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -115,6 +119,7 @@ final class ExportProgressSheetController: NSViewController {
         didStart = true
         exporter.export(
             project: project, urls: urls, settings: settings, to: destination, options: options,
+            graphics: graphics,
             progress: { [weak self] value in self?.progressed(value) },
             completion: { [weak self] result in self?.finished(result) })
     }

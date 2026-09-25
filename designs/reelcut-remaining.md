@@ -369,6 +369,69 @@ cannot move purely; `TextPane.swift` **513 → 530**. New and inside the cap:
 `WordProps.swift` **215**, `LayerRenderersWords.swift` **247**, and
 `TextProps.swift` / `TextPatch.swift` at **274** / **133** with the feature.
 
+**What road map 10's G1a did to it** (2026-09-24, `wc -l` against
+`c5f3265`; road map 10 §10.4). One toll, a pure move gated alone before
+G1d's graphics wrappers take anything on: `ReelCore.swift` **1440 → 1309**
+(`RecipeSource`, the compositor's recipe registry, to `RecipeSource.swift`,
+**135**, new — a 133-line block and the blank before it out, 3 header lines
+in). It frees 131 lines against G1d's ~110; if the wrappers measure more,
+the next seam is road map 10 §5e's own candidate, the media helpers (~94).
+
+**What road map 10's G1d did to it** (2026-09-25, `wc -l` against
+`cea2ddf`; road map 10 §10.4). The graphics wrappers — `GraphicDiagnostic`,
+`GraphicFailure`, `GraphicRaster`, `GraphicLibrary`, `GraphicModule` and a
+private diag-taker, plus the header's type list — took `ReelCore.swift`
+**1309 → 1440**, 131 lines net, exactly the room G1a made; no second move.
+The file is back at its pre-G1a count and the next thing it takes on pays a
+toll first: the media helpers (~94) are still the named seam, then the
+`dictionary` extensions. In the core, `ffi_graphic.rs` is new at **397** and
+`recipe.rs` grew **582 → 594** (`content_hash`'s sort).
+
+**What road map 10's G2a did to it** (2026-09-25, `wc -l` against
+`fe16e94`; road map 10 §10.5). The graphic clip and its two ops, with no
+toll: every new line that could go in a new module did. In the core,
+`model_graphic.rs` (**399** of 400) and `edit_graphic.rs` (**283**) are
+new; `edit_clip.rs` **751 → 757** (`Described` and `add_described_clip`
+made `pub(crate)` for `edit_graphic.rs`, the `graphic` field and its three
+`None`s), `edit.rs` **843 → 893** (two variants, two dispatch arms, two
+semantics rows — its standing exemption), `recipe.rs` **594 → 596** (the
+`Source::Graphic` placeholder arm G2b replaces; 4 lines under the cap) and
+`op_table.rs` **331 → 338** of 400. In the app, `ProjectSnapshot.swift`
+**2293 → 2305** (`ClipSource.graphic` and its arms), `AgentServer.swift`
+(frozen) **785 → 790** (the two `opsWithoutTools` entries G3 deletes) and
+`ReelOps.swift` **1163 → 1191** (the two raw factories; a table row per op,
+exempt).
+
+**What road map 10's G2b did to it** (2026-09-25, `wc -l` against
+`986cf5a`; road map 10 §10.5). The graphic's timeline rules and its layer,
+core only, with no toll: the arithmetic went into a new
+`recipe_graphic.rs` (**129**) because both natural homes are at their caps
+(`model_graphic.rs` **399**, a comment reworded in place;
+`source_window.rs` **396**, untouched). `recipe.rs` **596 → 596** (the
+placeholder's two lines out, one arm and one `use` in — still 4 under the
+cap); `edit.rs` **893 → 893** (six row clauses, no new lines);
+`edit_split.rs` **218 → 233**, `edit_clip_timing.rs` **177 → 182**,
+`edit_edge.rs` **203 → 207**, `edit_action.rs` **451 → 469**, `lib.rs`
+**95 → 96**. Nothing in the app moved.
+
+**What road map 10's G4b did to it** (2026-09-25, `wc -l` against
+`e7dfacb`; road map 10 §10.7 G4b). Two tolls, each landed and gated alone
+before the tenth export: `read_bytes` moved verbatim and the two frees'
+identical bodies deduplicated into `ffi_util.rs`'s `free_boxed` took
+`ffi_graphic.rs` **397 → 373**, and `rc_graphic_library_families` took it
+back to **397** of 400 (`ffi_util.rs` **161 → 189**) — the next export
+there pays again, and nothing crate-free in it is large enough (`diag_json`
+and `diag_error` name `Diagnostic`); `MediaDescriptor`, `mediaURL(for:)` and
+`bookmarkString(for:)` moved verbatim into the new `MediaDescriptor.swift`
+(**97**), taking `ReelCore.swift` **1440 → 1346**, and `GraphicLibrary.families()`
+to **1353**. The tools went into new files: `AgentServer+GraphicRender.swift`
+(**263**), `AgentServer+GraphicImports.swift` (**123**),
+`GraphicContactSheet.swift` (**189**), `GraphicStore+Import.swift` (**37**);
+`AgentServer+Graphics.swift` **296 → 314**, `AgentCatalog+Graphics.swift`
+**112 → 212**, `LayerRenderersGraphic.swift` **195 → 201**, `AgentServer.swift`
+(frozen) **791 → 794** (three handler lines; the `offMainTools` entry and
+the "eight" edited in place).
+
 Regenerate the list with
 `wc -l app/Sources/*.swift core/src/*.rs | awk '$1>600 && $2!="total"' | sort -rn`
 rather than trusting the numbers here; the standing exemptions are
@@ -377,32 +440,31 @@ row per op.
 
 | File | Lines |
 |---|---|
-| `app/Sources/ProjectSnapshot.swift` | 2293 (2516 before road map 8's W3) |
+| `app/Sources/ProjectSnapshot.swift` | 2312 after road map 10's G5a (2313 after G3b; 2309 after G3a; 2305 after G2a; 2293 before it; 2516 before road map 8's W3) |
 | `app/Sources/InspectorPane.swift` | 1665 |
 | `app/Sources/TimelineView.swift` | 1652 |
-| `app/Sources/ReelCore.swift` | 1440 (1542 before road map 8's W3) |
+| `app/Sources/ReelCore.swift` | 1353 after road map 10's G4b (1346 after its toll; 1440 before it; 1309 after G1a, then G1d's wrappers; 1542 before road map 8's W3) |
 | `app/Sources/VideoPane.swift` | 1411 |
-| `app/Sources/Compositor.swift` | 1391 |
-| `app/Sources/ProjectDocument.swift` | 1352 |
+| `app/Sources/Compositor.swift` | 1396 after road map 10's G3b (1391 before it) |
+| `app/Sources/ProjectDocument.swift` | 1335 after road map 10's G3b (1336 after G3a; 1380 before it; its media-import block moved out first and alone) |
 | `app/Sources/ReverseRenderer.swift` | 1311 |
-| `app/Sources/ReelOps.swift` | 1143 |
-| `app/Sources/EditorViewController.swift` | 1123 |
-| `app/Sources/ExporterWriter.swift` | 1114 |
+| `app/Sources/ReelOps.swift` | 1191 after road map 10's G2a (1163 before it) |
+| `app/Sources/EditorViewController.swift` | 1128 after road map 10's G5b (1127 after G3b; 1124 before it) |
+| `app/Sources/ExporterWriter.swift` | 1096 after road map 10's G3c (1114 before it) |
 | `app/Sources/PreviewCanvasView.swift` | 1104 |
 | `app/Sources/CanvasSessions.swift` | 1088 |
 | `app/Sources/OptionControls.swift` | 1081 |
-| `core/src/edit_clip.rs` | 751 after road map 7 part 3; 1021 before its pure move |
+| `core/src/edit_clip.rs` | 757 after road map 10's G2a; 751 after road map 7 part 3; 1021 before its pure move |
 | `app/Sources/AudioDSP.swift` | 890 |
 | `app/Sources/AgentServer+Clips.swift` | 847 |
-| `core/src/edit.rs` | 838 |
+| `core/src/edit.rs` | 893 after road map 10's G2a (843 before it) |
 | `app/Sources/AgentCatalog+Clips.swift` | 799 (792 before road map 8's W3) |
-| `app/Sources/AgentServer.swift` | 785 |
+| `app/Sources/AgentServer.swift` | 788 after road map 10's G3b (790 after G2a; 785 before it) |
 | `app/Sources/FFmpegRewrap.swift` | 768 |
 | `app/Sources/Loudness.swift` | 742 |
 | `app/Sources/Controls.swift` | 651 (567 before the sharp pass; Rasterize's own copy is 624 — the sync rule, app/CLAUDE.md "Shared chrome", is why it took `BlockSlider` verbatim and shed nothing; the seven lines over the verbatim block are the SH-2 fork of `drawBar`) |
 | `app/Sources/ExportSheetController.swift` | 639 |
-| `app/Sources/Exporter.swift` | 609 |
-| `app/Sources/ClipPane.swift` | 609 |
+| `app/Sources/ClipPane.swift` | 218 after road map 10's G5a, UNDER the cap (207 after its toll, the Timing move; 403 before it; 609 when this list was made) |
 | `app/Sources/MediaImporter.swift` | 604 at the pre-#23 baseline; 580 after its separately gated move |
 | `app/Sources/CompositionBuilder.swift` | 601 at the pre-#34 baseline; 577 after its separately gated move to `CompositionBuilder+AudioTracks.swift` |
 
@@ -427,7 +489,7 @@ when a fix took each over its line — and left two files AT the cap:
 | `ReelOps.swift` | 925 | Created by `b410125` at 853. It is a TABLE — one factory per row of `edit.rs`'s op table — so it has the same standing exemption `edit.rs` has on the Rust side |
 | `ProjectDocument.swift` | 1348 | Stored properties cannot move to an extension; the natural cut is the media/reverse machinery, NOT the scope. `ProjectDocument+DisplayStem.swift` is the shape a pure addition takes meanwhile; road map 3 added ONE internal method (`adoptImported`, +12 lines) so `ProjectDocument+Recording.swift` could build the untitled document by File ▸ Open's own spelling |
 | `TimelineView.swift` | 1652 | Frozen. Of the five lines the cache marker added, one is behaviour (the hit-clearing under `replaced`); the marquee's `.outside` case and `beginMarquee` added fourteen net on 2026-09-19, and road map 7 §10's phase C eight more for `sourceTime`'s reversed arm on 2026-09-20 — the dispatch the file says it holds |
-| `ExporterWriter.swift` | 1114 | Over since phase 7; its seam — the settings/encoder half — is still unpaid |
+| `ExporterWriter.swift` | 1096 after road map 10's G3c | Over since phase 7; its seam — the settings/encoder half — is still unpaid |
 | `AgentServer+Clips.swift` | 1196 | Over since phase 6. Road map 7's D1·3, D1·4 and D1·5 took it to **847** by deleting what the agent door used to check by hand — the last of it `checkActionPatch`, `checkVideoEnums`, `checkTextEnums`, the three per-group key sets and the region reader. D1·6 took the shared launder out of `AgentServer+Arguments.swift` (562 → **445**, under the cap and not in the list above), so the whole `AgentServer*` family is **617 lines smaller than before D1**. The seam still unpaid here is the clip-placement handlers against the property doors |
 
 **What the E2 reader review did to it** (2026-09-20, `wc -l`; road map 5
@@ -733,11 +795,146 @@ restated. The route and the Esc sheet are the new
 +1, the forward. The instruments, exempt: `tools/proof/text_apply_probe.swift`
 and `text_apply_proof.py`, new.
 
+**The package's `graphics/` store (road map 10's G3a, 2026-09-25).**
+`ProjectDocument.swift` **1380 → 1329 → 1336**: first, alone and gated
+(`make typecheck` 0 errors and the 7 baseline warnings, `make app`
+succeeded), a pure move of `importMedia`, `probeNext` and `commitImport` to
+the new `ProjectDocument+Import.swift` **63** (`present(_:)` lost
+`private`); then seven lines in — the stored `graphicStore` and its doc
+line, one call each in the `fileURL` setter, `makeWindowControllers()` and
+`close()` (two), and the whitelist line in `fileWrapper(ofType:)`.
+`ProjectSnapshot.swift` **2305 → 2309** (`ClipSnapshot.graphic`: the field,
+the memberwise parameter, its assignment and its decode; `ClipSource.graphic`'s
+stale "not decoded yet" comment reworded inside its two lines). New:
+`GraphicStore.swift` **399**, `ProjectDocument+Graphics.swift` **71**,
+`ProjectSnapshot+Graphic.swift` **88**. `ReelCore.swift` 1440, untouched.
+The instruments, exempt: `tools/proof/graphics_store_probe.swift` **415**,
+`graphics_store_probe.py` **317** and `graphics_store_proof.py` **281**, new.
+
+**A graphic clip drawn (road map 10's G3b, 2026-09-25, `wc -l` against
+`7bf518c`).** No toll: every ledger file took only the lines the spec
+allowed it. `ProjectSnapshot.swift` **2309 → 2313** (`case graphic`, its
+decode and encode dispatch lines, its `cacheHash` arm; the bodies are in
+`ProjectSnapshot+Graphic.swift` **88 → 130**). `Compositor.swift` **1391 →
+1396** (the `case .graphic` in `MetalRenderer.source(for:…)`, five lines).
+`ProjectDocument.swift` **1336 → 1335** (`close()`'s two store lines became
+`stopGraphicStore()`; the rest is in `ProjectDocument+Graphics.swift` **71 →
+111**). The FROZEN `EditorViewController.swift` **1124 → 1127** (one
+`addObserver`, three lines; the selector is `EditorViewController+Graphics.swift`
+**16**) and the FROZEN `AgentServer.swift` **790 → 788** (two `handlers`
+rows in, `opsWithoutTools`' two entries and their comments out, its doc
+sentence reworded). Under the cap: `LayerRenderers.swift` **467 → 492** (two
+members made internal, one `measuredSize` case, and the review's fix: the
+cache as a `Pool` struct, with graphics given their own six-entry pool),
+`AgentCatalog.swift`
+**525 → 529**, `AgentCatalog+Declarations.swift` **313 → 335**,
+`AgentServer+Parity.swift` **186 → 193**; in the core `recipe_graphic.rs`
+**129 → 133**. New: `GraphicRegistry.swift` **183**,
+`LayerRenderersGraphic.swift` **78**, `AgentServer+Graphics.swift` **138**,
+`AgentCatalog+Graphics.swift` **60**. `ReelCore.swift` 1440 and
+`ReelOps.swift` 1191, untouched. The instruments, exempt:
+`tools/proof/graphics_proof.py` **565**, new; `op_argument_proof.py` **949
+→ 1016** and `op_catalog_proof.py` **500 → 505**.
+
+**A failing graphic, its export gate and pin (road map 10's G3c,
+2026-09-25, `wc -l` against `b29d981`).** One toll, a pure move landed and
+gated alone first (`make typecheck` 0 errors and the 7 baseline warnings,
+`make app` succeeded): `Exporter.ExportError` from `Exporter.swift` to the
+new `ExporterErrors.swift`, **609 → 539** and **74**. Then the feature:
+`Exporter.swift` **539 → 581**, which takes it OFF this list (its row is
+gone); `ExporterErrors.swift` **74 → 91** (the two graphic cases). The
+cancel fix needed no toll because it made its file SMALLER:
+`ExporterWriter.swift` **1114 → 1096** (`cancel()` sets the flag and
+nothing else; the reader is cancelled in `allInputsFinished`; `started` and
+its paragraph went). Under the cap: `AgentServer+Render.swift` **563 →
+589**, `ExporterImageSequence.swift` **492 → 504**,
+`ExportQueueController.swift` **482 → 487**, `LayerRenderers.swift` **493
+→ 494**, `AgentCatalog+Files.swift` **487 → 491**,
+`ExportProgressSheetController.swift` **191 → 196**,
+`EditorViewController+Export.swift` **137 → 139**, `+SaveFrame` **387 →
+388**, `+Eyedropper` **318 → 319**, `GraphicRegistry.swift` **183 → 263**,
+`LayerRenderersGraphic.swift` **78 → 195**. New: `ExporterGraphics.swift`
+**95**. `Compositor.swift` 1396, untouched. The instruments, exempt:
+`tools/proof/graphics_proof.py` **565 → 848** and
+`tools/proof/graphics_pin_probe.swift` **146**, new.
+
+**The Graphic sub-tab (road map 10's G5a, 2026-09-25, `wc -l` against
+`f0e3472`).** One toll, a pure move landed and gated alone first (`make
+typecheck` 0 errors and the 7 baseline warnings; the patch is the
+pipeline's `step1-move.patch`, touching the two files and nothing else):
+`timingSection`, `reverseTimingSection` and `reverseRows` went verbatim from
+`ClipPane.swift` into the new `ClipPane+Timing.swift` **199**, losing
+`private`, and `videoPane` went from `private let` to `let`. That took
+`ClipPane.swift` **403 → 207**. The feature then brought it to **207 → 218**:
+the stored `graphicPane`, its construction, its signature, the sub-tab and
+the `.graphic` case. `ProjectSnapshot.swift` went **2313 → 2312**:
+`sourceSize(of:)`'s `.graphic` arm now answers the graphic's size, and its
+stale three-line comment went. `InspectorPane.swift` and the frozen
+`InspectorViewController.swift` and `AgentServer.swift` are untouched. New
+files: `GraphicPane.swift` **268**, `GraphicPane+Source.swift` **280** and
+`GraphicSchemaRows.swift` **390**. Under the cap: `ClipPinnedBlock.swift`
+**190 → 192** and `EditorViewController+Graphics.swift` **16 → 17**. The
+instruments are exempt: `tools/proof/graphics_inspector_proof.py` **337**
+and `graphics_inspector_probe.swift` **447**, both new, and
+`tools/proof/harness/main.swift` **1154 → 1159**, which starts the graphic
+store.
+
+**What G5b did to it (road map 10's G5b, the menus and templates,
+2026-09-25, `wc -l` against `2317a18`).** No toll: every file it touched
+stayed under the cap, and it added nothing over it. The FROZEN
+`EditorViewController.swift` **1127 → 1128** (one validator line, its row
+above). `AppDelegate+Menus.swift` **549 → 561** — the closest to the cap
+of anything this phase touched; its next item should consider moving a
+submenu builder out first. Under the cap: `GraphicStore.swift` **376 →
+388**, `GraphicStore+Import.swift` **37 → 120** (the import bodies moved
+in), `GraphicStore+Manual.swift` **53 → 60**,
+`AgentServer+GraphicImports.swift` **123 → 57** (the bodies moved out,
+`catchUpLibrary` deleted), `AgentServer+Graphics.swift` 314 and
+`AgentServer+GraphicRender.swift` 263 unchanged in length,
+`AgentCatalog+Graphics.swift` **212 → 213**, `AppDelegate.swift` **248 →
+253**, `EditorViewController+AddClips.swift` **347 → 356**,
+`GraphicPane+Source.swift` **280 → 274**. New: `GraphicTemplates.swift`
+**77**, `AppDelegate+GraphicMenu.swift` **48** and
+`EditorViewController+GraphicMenus.swift` **172**. `ReelCore.swift`,
+`AgentServer.swift` and `ProjectDocument.swift` untouched. The
+instruments, exempt: `tools/proof/graphics_menu_probe.swift` **321** and
+`graphics_menu_proof.py` **229**, new; `graphics_proof.py` **1371 → 1412**
+(W1).
+
 ## 4. What only a person at the machine can check
 
 These are not tasks so much as a list to run through at the machine once. The
 first two have been owed since M1 and spec §10 records them; phases 8 and 9
 and the closing above added the rest.
+
+- **Graphics playing, WATCHED (road map 10's G3, §9a item 5,
+  2026-09-25)** — in the running app, which no proof here can do: every
+  graphics row is a `render_frame` or an export. Worth judging: the
+  fixtures `lower-third` and `kinetic-type` (`graphic/tests/graphics/`) on a
+  1080p30 canvas with View ▸ Preview Quality ▸ Full, played through, with
+  no visible stutter; a 4K canvas with `title-card` (G0's q3 measured
+  26 ms p95 per frame there, inside a 33 ms frame at 30 fps); and Activity
+  Monitor's memory for Reelcut while `kinetic-type` plays at 4K — the
+  six-entry graphic texture pool (`LayerRenderers.graphicCacheLimit`) was
+  sized without that number (~33 MB a texture at 4K). If either canvas
+  stutters, G6 (road map 10 §9, the per-frame cost) is owed. The error card
+  in the preview is worth one look too: a module that throws draws dark red
+  with the message in white, never the last good frame.
+  **Partly checked 2026-09-25** by the user: with a video clip beneath
+  them the graphics play and scrub "smooth enough", and an action's fade on
+  a graphic clip "worked perfectly". **The 4K canvas, judged the same day**:
+  "I've tried a few of the graphics at 4K and see no performance issues" —
+  on an M2 Max with 96 GB, and with the bundled graphics, which "aren't
+  very complex". So G6 is NOT triggered; the user deferred it with the
+  caveat noted (road map 10 §9's G6). Not yet judged: the memory figure,
+  the error card in the live preview, a slower machine or a heavier graphic.
+  **A timeline of ONLY graphics now plays** (road map 10 §10.8, FIXED
+  2026-09-25; `tools/proof/media_less_playback_probe.py` 32/32 on the
+  editor's own player, 8/32 over cadc45d). Still for the person: open the
+  three playback-check projects (`tools/proof/work/playback-check/`) with
+  NO video beneath them, then watch that the preview shows the graphics,
+  that Play runs rather than beeps, and that scrubbing and a loop over an
+  in/out range look right. The probe cannot judge smoothness.
 
 - **The rest of the mode, FELT (road map 9's phase 5, 2026-09-24)** — in
   the running app. The probe drives the canvas sessions, the nudge and the
@@ -1206,6 +1403,8 @@ and the closing above added the rest.
 ---
 
 ## 5. Where a third road map would start
+
+**Road map 10, graphics (MERGED into `main` 2026-09-25, road map 10 §10.10; G0 spiked 2026-09-24, G1 the engine BUILT 2026-09-24/25; G2 the model BUILT 2026-09-25; G3 the picture BUILT 2026-09-25; G4 the agent BUILT 2026-09-25; G5 the person BUILT 2026-09-25; G6 deferred by the user 2026-09-25 — no stutter at 4K on an M2 Max).** The user asked for Remotion-style motion graphics: a clip whose JavaScript module, in the package's `graphics/` folder, returns SVG per frame, written mostly by an agent over MCP. `designs/reelcut-roadmap-10.md` is the design, reviewing the user's input plan `designs/svg-motion-components-plan.md` in its §1. **Its spike G0 ran complete** (§10.1, instruments in `tools/proof/graphics_spike/`, all nine rows `run`, `core/` and `app/` back at `c874069`): `rquickjs` 0.14 vendors quickjs-ng 0.16.2 and takes §5c's module verbatim; the engine builds into the one staticlib with `make test` only 1.12× slower warm (no cargo feature), at +18 s per cold build, +11.8 MB of staticlib and +7.2 MB of app binary that the linker keeps even with nothing calling it; the six sample graphics cost a worst p95 of 7.62 ms per frame at 1080p (so G6 is not owed; 4K full-frame fills reach 26 ms); 864 renders across 8 threads in shuffled orders matched byte for byte, and the on-purpose module-level-counter mutant was caught (137 mismatches); eighteen sandbox cases each answered in words with the process alive (four of them, `constructor` routes back to the wall clock and to compiling code from strings, added and closed after G0's review); `measureText` must answer the INK box as well as the advance, a font family the set lacks draws nothing, and `Source Sans 3` must be quoted; a directory `DispatchSource` raises `.write` (never `.rename`) and misses in-place saves, and only CREATING a folder inside an open package trips "changed by another application". §3a lists every section a row rewrote. **G1 (the engine) starts from road map 10 §9a**, which lists what each later phase must carry from G0, and from those rewritten sections: `raster-images` on, `serde_json` with `preserve_order`, the `ReelCore.swift` toll first (§5e), and the spike's `src/runtime.rs`, `raster.rs` and `stdlib.js` as the working reference for `graphic/`. Its decisions G-1 to G-13 are proposals until the phase that needs each copies it into spec §11; G-1 and G-2 amend spec §1's plugin non-goal and §7's pixel rule. **G1 is BUILT** (road map 10 §10.4, G1a–G1d): the `graphic/` crate (resvg drawing, QuickJS runtime, sandbox, standard library), linked into the core through `core/src/ffi_graphic.rs` alone, with nine `rc_graphic_*` exports, their `ReelCore.swift` wrappers, `docs/graphics-api.md` evaluated by a test, and `tools/proof/graphics_ffi_probe.py` (9/9); the app binary grew 12 661 536 → 20 596 752 bytes; spec §11 holds G-1, G-2 and G-5. Linking `graphic` unified `serde_json`'s `preserve_order` into the core, so `content_hash` now sorts before it hashes. Nothing a person sees exists yet. **G2 (the model, format version 10) is next**, from road map 10 §5g and §4. **G2a is BUILT** (road map 10 §10.5): `Source::Graphic`, `Clip.graphic` and format version 10, the ops `add_graphic_clip` and `set_graphic` in the core (props checked against the schema the op carries, a colour normalised to hex, the 64-key limit on the stored map, the props order kept), the app decoding a graphic clip, and spec §11 G-3, G-4, G-12 and G-13; the two ops sit in `AgentServer.opsWithoutTools` until G3 writes their tools. Owed from it: `tools/proof/op_catalog_proof.py:282` (`len(ops) == 57 and ops <= tools`) FAILS from G2a until G3 adds the two tools; `tools/proof/words_core_proof.py` hard-codes the format version (moved 9/10 → 10/11 by G2a) where it should read the header's `RC_FORMAT_VERSION` as `phase9_proof.py:168-173` does; named CSS colours and `hsl()` in a `color` prop. **G2b is BUILT, and G2 is closed** (road map 10 §10.5): `split` gives a graphic's second half `in + cut` and pins both halves' `length` to the original's effective length, `trim_start` and `roll` advance `in` with no head bound, `trim_end` leaves `length` alone, `set_action_end` refuses `graphic` in G-10's sentence, and the recipe publishes a graphic layer (`recipe_graphic.rs`: `frame`, the engine's `ctx`, the stored props and a hash over all of them); spec §11 now holds G-6 to G-11, G-9 with G2b's three decisions G-9·a/b/c. Owed from G2b: `add_transition`'s handle form extends a graphic's head without moving `graphic.in`; a canvas rate change does not re-snap `in`/`length`. **G3 (the picture) is BUILT** (road map 10 §10.6, G3a–G3c): the package's `graphics/` folder with its store and watcher; a graphic clip drawn from the registry's compiled set, with `add_graphic_clip` and `set_graphic` as tools; and failure and export — a graphic that fails draws its error card, `render_frame` names every graphic that warned or failed in the frame, an export refuses a module that does not compile before it starts and stops at the first frame that fails with no file left, and every export and offline frame PINS the document's compiled set as it was when asked (queued jobs included). G3c also fixed a crash the export's Cancel button had since phase 7 (`ExportWriter.cancel` cancelled the reader under a running pump; road map 10 §10.6 G3c). Owed from G3: the playback check (§4 above); a nest inside a nest is not reached by the export gate; the loudness measurement's own cancel still cancels its reader from main (`Exporter.cancel`); and G3b's list (the frozen `AgentServer.swift`'s numerals, `words_core_proof.py`'s version literal, `add_transition`'s handle form). **G4 (the agent) is BUILT** (road map 10 §10.7, G4a and G4b): the six app-state tools of §5h — `graphic_reference`, `write_graphic`, `get_graphic`, `render_graphic` (a contact sheet of up to 16 frames with no clip, or one frame's SVG), `import_graphic_font` and `import_graphic_asset` — and `get_project`'s `graphics`, proved end to end by `graphics_proof.py` (39 rows, the loop of §5h in one). The FFI has ten exports: G4b's `rc_graphic_library_families` answers the engine's own family names, because CoreText and fontdb disagree on 13 of 2500 font files on this host. After G4 an agent can make a motion graphic end to end. **G5a is BUILT** (road map 10 §10.9, 2026-09-25): the Clip tab's Graphic sub-tab — Source (module, file, revision, Open/Reveal/Duplicate, the compile's and the first frame's diagnostics), Properties (one row per schema key in the module's order, stale keys dimmed with ⌫, Reset writes `null`), Size and Timeline — proved by `tools/proof/graphics_inspector_proof.py` (50 rows). **G5b is BUILT, and G5 is closed** (road map 10 §10.9, 2026-09-25): Insert ▸ Graphic (the six bundled templates, copied into the app's `GraphicTemplates/`, and From File…; `write_graphic` then `add_graphic_clip`, one undo step, spec §11 G-16), File ▸ Add Font to Graphics… and Add Image to Graphics… (the two imports' own body), Help ▸ Graphics Reference, and G4b's watcher library gap closed in `GraphicStore.drain()` (a library change posts with no module names; `catchUpLibrary` deleted) — proved by `tools/proof/graphics_menu_proof.py` (14 rows) and `graphics_proof.py`'s W1 (40 rows). **G6 is deferred** (2026-09-25): the user played several graphics at 4K and saw no performance issues, on an M2 Max with 96 GB and simple graphics; noted, not scheduled (road map 10 §9). **Merged into `main` 2026-09-25** at the user's word (road map 10 §10.10). Owed from G5: G5a's and G4b's nits (road map 10 §10.9). Insert ▸ Graphic into an empty document now lands a clip that plays (the fix below). **The export Cancel button could crash `main`** (12 of 30 mid-export cancels on expensive 4K frames, since road map 2's phase 7); G3c fixed it on `svg-motion` (3a5df08), and it reached `main` with the merge (kpgalligan/reelcut#38, road map 10 §10.10). **FIXED (2026-09-25): a timeline of ONLY graphics, text, shapes or images now plays.** Before, there was no preview and Play beeped. `Playback.startRebuild` dropped the player item when the plan had no video or audio track, and those clips never get one, so the builder's `Blank.mp4` placeholder was never reached. That was a defect since the first commit, and not only graphics'. The guard now drops the item only for a plan of duration 0, the empty timeline, which still beeps. `tools/proof/media_less_playback_probe.py` reads the editor's own player and scores 32/32 at the fix and 8/32 over cadc45d's sources. Road map 10 §10.8 has the record. The person's watched re-check of the playback-check projects with no video beneath them is owed (§4 above).
 
 **Road map 9, the clip inspector redesign, is COMPLETE (phases 1, 2, 3a
 and 3b 2026-09-23, phases 4 and 5 2026-09-24; road map 9 §2, §4, §6, §8,

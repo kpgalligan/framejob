@@ -83,76 +83,6 @@ import AVFoundation
 /// here when the settings helpers went out.
 final class Exporter {
 
-    /// Why an export stopped. Every case is reported through `completion` —
-    /// nothing here throws at the caller and nothing crashes.
-    enum ExportError: LocalizedError {
-        /// The core could not produce a composition plan for this project.
-        case noPlan
-        /// Nothing to write: no video and no audio track in the plan. Reached
-        /// by an empty timeline AND by one holding only text, shapes and
-        /// images, which need no composition track (spec §7.2) — so the
-        /// message has to name the second case, which is the surprising one.
-        case emptyTimeline
-        /// This Mac will not encode what the core's preset resolved to — an
-        /// unknown codec name, or one `AVAssetWriter` refuses an input for.
-        /// Carries the preset id when the core gave one, else the codec.
-        case presetUnavailable(String)
-        /// The settings named a container this build cannot map to a file
-        /// type.
-        case fileTypeUnsupported(String)
-        /// An alpha-carrying row was asked for a size of a different ASPECT
-        /// from the canvas, which cannot be written correctly and so is not
-        /// written at all (road map 2, phase 7b). Carries the canvas and the
-        /// asked-for size, in that order.
-        ///
-        /// **Measured, not feared.** `AVVideoScalingModeResizeAspect` pads
-        /// the frame to the asked-for shape, and the padding path destroys
-        /// the alpha channel: a 320 × 180 transparent canvas written
-        /// `prores_4444` at 240 × 240 comes back with the PICTURE at alpha 0
-        /// and the letterbox BARS at alpha 255 — the answer inverted, not
-        /// merely lost. The same canvas at 160 × 90 or 640 × 360 is correct
-        /// at every pixel, so the fault is the padding and nothing else.
-        ///
-        /// It is refused rather than documented because the file would be
-        /// silently wrong in the one respect the row exists for, and this
-        /// codebase's rule for exactly that shape is `codecType(for:)`'s:
-        /// a refusal, never a fallback that puts a file on disk which is not
-        /// the one asked for. Nothing legitimate is blocked by accident —
-        /// every row of the Size popup is fitted to the document's own
-        /// aspect (`export_size.rs`), so only a hand-typed Custom size can
-        /// reach this, and the message says what to type instead.
-        case alphaAspectMismatch(width: Int, height: Int, wantWidth: Int, wantHeight: Int)
-        /// The user pressed Cancel. The sheet dismisses without an alert.
-        case cancelled
-        /// The write ended in a state that is neither completed nor
-        /// cancelled and had no error of its own — or one of the reader's or
-        /// writer's own steps refused with a message worth showing.
-        case failed(String)
-
-        var errorDescription: String? {
-            switch self {
-            case .noPlan:
-                return "The project could not be prepared for export."
-            case .emptyTimeline:
-                return "There is nothing on the timeline to export — add a clip first."
-            case .presetUnavailable(let name):
-                return "This Mac cannot export with the “\(name)” preset."
-            case .fileTypeUnsupported(let container):
-                return "“\(container)” is not a container this build can write."
-            case .alphaAspectMismatch(let width, let height, let wantWidth, let wantHeight):
-                return "An export that keeps transparency has to have the canvas's own shape. "
-                    + "This canvas is \(width) × \(height) and \(wantWidth) × \(wantHeight) is a "
-                    + "different shape, so the picture would be padded and the padding loses the "
-                    + "alpha channel. Export at \(width) × \(height), at one of the sizes in the "
-                    + "popup, or at any size with the same proportions."
-            case .cancelled:
-                return "The export was cancelled."
-            case .failed(let message):
-                return message
-            }
-        }
-    }
-
     /// How often the sheet's bar is refreshed. Neither
     /// `AVAssetExportSession` nor `AVAssetWriter` has a progress callback, so
     /// the only way to draw a bar is to ask (spec §7.8); 0.1 s is smooth and
@@ -175,6 +105,8 @@ final class Exporter {
     /// republishes on every edit, and a frame already queued must not be
     /// composed from a project the user changed halfway through the write.
     private var recipeKey: Int?
+    /// Where this export writes — removed by `finish` when a graphic failed.
+    private var destination: URL?
     private var progressHandler: ((Double) -> Void)?
     private var completionHandler: ((Result<URL, any Error>) -> Void)?
 
@@ -235,7 +167,10 @@ final class Exporter {
 
     deinit {
         timer?.invalidate()
-        if let key = recipeKey { RecipeSource.shared.unregister(key) }
+        if let key = recipeKey {
+            RecipeSource.shared.unregister(key)
+            GraphicRegistry.shared.unpin(key)
+        }
         scratchStorage?.deallocate()
     }
 
@@ -264,9 +199,14 @@ final class Exporter {
     ///
     /// The default is `.none`, so a caller that says nothing writes exactly
     /// the file it wrote before phase 7.
+    ///
+    /// **`graphics` is the document's compiled set as the export was asked
+    /// for** (G-13, `ExporterGraphics.swift`): pinned on this export's key
+    /// for its whole life, gated before the build, and the export stopped
+    /// on the first frame a graphic fails. nil draws every graphic's slate.
     func export(
         project: ReelProject, urls: [UInt32: URL], settings: ExportSettings, to url: URL,
-        options: RecipeOptions = .none,
+        options: RecipeOptions = .none, graphics: GraphicSet? = nil,
         progress: @escaping (Double) -> Void,
         completion: @escaping (Result<URL, any Error>) -> Void
     ) {
@@ -276,6 +216,7 @@ final class Exporter {
         pendingLoudness = nil
         progressHandler = progress
         completionHandler = completion
+        destination = url
 
         guard let plan = project.plan else {
             finish(.failure(ExportError.noPlan))
@@ -297,6 +238,7 @@ final class Exporter {
         // makes this enough: `finish` unregisters the key and takes them with
         // it, and nothing else in the process can be reading it.
         RecipeSource.shared.setOptions(options, for: key)
+        if let graphics = graphics { GraphicRegistry.shared.pin(graphics, for: key) }
 
         measureShare = Exporter.measuresLoudness(settings)
             ? (settings.isAudioOnly ? 0.5 : 0.1) : 0
@@ -311,7 +253,11 @@ final class Exporter {
                 try CompositionBuilder.build(
                     plan: plan, planJSON: planJSON, urls: urls, recipeKey: key)
             }
-            let result = Result(catching: build)
+            // A module that does not compile refuses the export here, through
+            // `startWriting`'s `.failure` arm, before the destination is touched.
+            let result = Exporter.graphicsRefusal(
+                project: project, settings: settings, graphics: graphics
+            ).map { Result<BuiltComposition, any Error>.failure($0) } ?? Result(catching: build)
             // Read here, not on the main thread: the markers come off the
             // SNAPSHOT, and on a handle nothing has looked at yet that is the
             // first decode of the whole project JSON.
@@ -330,7 +276,7 @@ final class Exporter {
             DispatchQueue.main.async { [weak self] in
                 self?.startWriting(
                     result, project: project, urls: urls, chapters: chapters,
-                    settings: settings, loudness: loudness, to: url)
+                    settings: settings, loudness: loudness, graphics: graphics, to: url)
             }
         }
     }
@@ -366,7 +312,7 @@ final class Exporter {
     private func startWriting(
         _ result: Result<BuiltComposition, any Error>, project: ReelProject,
         urls: [UInt32: URL], chapters: [ExportChapter], settings: ExportSettings,
-        loudness: ExportLoudness?, to url: URL
+        loudness: ExportLoudness?, graphics: GraphicSet?, to url: URL
     ) {
         guard completionHandler != nil else { return }
         pendingLoudness = loudness
@@ -401,7 +347,7 @@ final class Exporter {
         do {
             writer = try Exporter.pipeline(
                 built: built, project: project, urls: urls, settings: settings,
-                chapters: chapters, options: options, to: url)
+                chapters: chapters, options: options, graphics: graphics, to: url)
         } catch {
             finish(.failure(error))
             return
@@ -444,6 +390,9 @@ final class Exporter {
     }
 
     private func pollProgress() {
+        // A graphic failed on the render thread: stop the write, and `finish`
+        // says which graphic and which frame.
+        if let key = recipeKey, GraphicRegistry.shared.failure(for: key) != nil { cancel() }
         progressHandler?(currentProgress)
     }
 
@@ -477,12 +426,14 @@ final class Exporter {
     /// here rather than cleared: both callers read it after their completion
     /// has fired.
     private func finish(_ result: Result<URL, any Error>) {
+        let result = Exporter.graphicOutcome(result, key: recipeKey, destination: destination)
         loudnessReport = pendingLoudness
         pendingLoudness = nil
         timer?.invalidate()
         timer = nil
         if let key = recipeKey {
             RecipeSource.shared.unregister(key)
+            GraphicRegistry.shared.unpin(key)
             recipeKey = nil
         }
         writer = nil
@@ -556,18 +507,38 @@ final class Exporter {
     /// callers that pass something are the export sheet, the `export` tool
     /// and `render_frame` — the last one both for agent parity and because it
     /// is the only way a proof script can photograph a burn-in at all.
+    ///
+    /// `graphics` is pinned on the frame's own key, as `export` pins it on
+    /// its own; nil draws every graphic's slate.
     static func renderFrame(
         project: ReelProject, urls: [UInt32: URL], at t: Ticks, maxWidth: Int?,
-        options: RecipeOptions = .none
+        options: RecipeOptions = .none, graphics: GraphicSet? = nil
     ) -> CGImage? {
+        renderFrameReported(
+            project: project, urls: urls, at: t, maxWidth: maxWidth, options: options,
+            graphics: graphics
+        ).image
+    }
+
+    /// `renderFrame`, with what the frame's graphics reported while it was
+    /// drawn — read off the key's pin before it is dropped.
+    static func renderFrameReported(
+        project: ReelProject, urls: [UInt32: URL], at t: Ticks, maxWidth: Int?,
+        options: RecipeOptions, graphics: GraphicSet?
+    ) -> RenderedFrame {
         // No videoTracks is NOT a refusal: CompositionBuilder gives a
         // timeline of nothing but text, shapes and images a placeholder track
         // so the recipe can still drive every frame. Only a genuinely empty
         // timeline has nothing to render.
-        guard let plan = project.plan, plan.duration > 0 else { return nil }
+        guard let plan = project.plan, plan.duration > 0 else {
+            return RenderedFrame(image: nil, graphics: [])
+        }
         let key = RecipeSource.shared.register()
         defer { RecipeSource.shared.unregister(key) }
         RecipeSource.shared.set(project, for: key)
+        if let graphics = graphics { GraphicRegistry.shared.pin(graphics, for: key) }
+        // Runs after the `return` below has read the reports.
+        defer { GraphicRegistry.shared.unpin(key) }
         // Before the build, not after: the generator may ask for a frame the
         // moment the composition exists, and a frame composed against this
         // key's defaults would be one frame short of what was asked for.
@@ -578,7 +549,7 @@ final class Exporter {
             built = try CompositionBuilder.build(
                 plan: plan, planJSON: project.planJSON, urls: urls, recipeKey: key)
         } catch {
-            return nil
+            return RenderedFrame(image: nil, graphics: GraphicRegistry.shared.reports(for: key))
         }
 
         let generator = AVAssetImageGenerator(asset: built.composition)
@@ -592,8 +563,9 @@ final class Exporter {
         if let maxWidth = maxWidth, maxWidth > 0 {
             generator.maximumSize = scaledSize(built.videoComposition.renderSize, to: maxWidth)
         }
-        return try? generator.copyCGImage(
+        let image = try? generator.copyCGImage(
             at: CompositionBuilder.time(max(0, t)), actualTime: nil)
+        return RenderedFrame(image: image, graphics: GraphicRegistry.shared.reports(for: key))
     }
 
     /// `size` capped to `maxWidth`, aspect kept, never upscaled and never

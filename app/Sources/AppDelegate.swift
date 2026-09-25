@@ -234,6 +234,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                 ? "Allow Agent Connections (127.0.0.1:\(server.port)/mcp)"
                 : "Allow Agent Connections"
         }
+        if item.action == #selector(showGraphicsReference(_:)) {
+            // Help ▸ Graphics Reference opens the bundled file, so it is live
+            // exactly while the bundle holds one (road map 10's G5b).
+            return FileManager.default.fileExists(atPath: GraphicStore.bundledReferenceURL.path)
+        }
         return true
     }
 

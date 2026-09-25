@@ -360,6 +360,7 @@ impl Project {
             audio,
             text: None,
             shape,
+            graphic: None,
             actions: Vec::new(),
             transition_in: None,
             name: Some(BACKGROUND_NAME.to_string()),

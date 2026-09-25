@@ -334,7 +334,8 @@ must print nothing before a proof run means anything.
 
 **The EXACT tool count belongs to the newest phase's script**, because it is
 what tells a stale binary on the port from the build under test: road map 7's
-`op_argument_proof.py` asserts **77** (D3·5), and every script before it keeps
+`op_argument_proof.py` asserts **85** since road map 10's G4b (82 from G4a,
+79 from G3b, 77 from D3·5), and every script before it keeps
 a floor — phases 1 to 9's 63, 65, 68, 70, 71, 73, 73, 73 and 74, and road map
 3's 75 — so a later phase's tools never fail an older proof.
 Road map 5's own proof landed AFTER D3 and asserts FLOORS for that reason:
@@ -2559,6 +2560,54 @@ the picture has to change); the refresh-while-seeking dropped **57/58** (the
 held-thread row alone); the end branch removed **54/58** (the four end rows,
 the layer black on the end tick).
 
+## A timeline with no media, played (`media_less_playback_probe.py`)
+
+A timeline of ONLY graphics, text, shapes or images — Insert ▸ Graphic into
+an empty document is the common way to make one — showed nothing in the
+editor and Play beeped (road map 10 §10.8). The core gives those layers no
+composition segment (spec §7.2), so the plan has no track, and
+`Playback.startRebuild` dropped the player item for any plan with no track:
+a guard meant for the EMPTY timeline. `CompositionBuilder`'s placeholder,
+which exports and `render_frame` already used, never got the chance. The
+guard now drops the item only when the plan's duration is 0.
+
+**No MCP script can see this one.** `render_frame` composes offline and
+drew these timelines all along; the defect is in the editor's own player.
+The instrument is `media_less_playback_probe.swift`, compiled as
+`main.swift` over the whole of `app/Sources` (`--sources PATH` builds it
+over another tree, `mixed_audio_probe.py`'s tag scheme), with the app's
+`Compositor.metal`, `Fonts` and `Blank.mp4` beside it. Every subprocess
+goes through `graphics_spike/bounded.py`, and a build failure scores every
+row as a FAILURE. It writes five one-clip packages under
+`work/media-less-playback/` each run (no ffmpeg; the image is a white PNG
+written with `zlib`): `graphic` (a module whose white bar grows from a
+quarter of the width to all of it), `text`, `shape` and `image`, each
+white on a black 432 × 280 canvas, and `empty`, the CONTROL. It opens each
+in a real editor window and reads the editor's own player: the item and its
+video composition's validity, the Play/Pause validator, play, `setRate(2)`,
+the in/out loop, moves of the playhead, a paused opacity edit (the
+refresh branch on the placeholder item), and `displayedPixelBuffer()` as a
+40 × 40-grid mean. For `empty` it checks that nothing plays, that Insert ▸
+Shape then brings an item that plays, and that undo takes it away again.
+
+**What the instrument had to learn.** `displayedPixelBuffer()` answers nil
+for ANY playing layer. A media clip's did too (measured on
+`preview_refresh_probe.py`'s test card, 2026-09-25). So the row that needs
+frames drawn WHILE PLAYING reads them from an `AVPlayerItemVideoOutput`
+added to the item for the run: the same item, composition and compositor.
+The rows that read the picture (F·2, F·5, F·6, G·7) are skipped BY NAME on
+a locked console (`IOConsoleLocked`). Every other row is always scored,
+and a skip means the proof is not complete.
+
+**32/32** at the fix, console unlocked. Made to fail over cadc45d's
+`app/Sources` (`git archive cadc45d app/Sources | tar -x -C
+tools/proof/work/media-less-playback/baseline`, then `--sources
+tools/proof/work/media-less-playback/baseline/app/Sources`): **8/32**.
+F·1, F·2, F·4, F·5 and F·6 fail for all four media-less fixtures (no
+item), and G·7, G·8, G·9 and E·4 fail. The four F·3 validator rows and
+E·1, E·2, E·3 and E·5 pass on both trees, so a failing row is the
+defect and not the host.
+
 ## The transition sheet (`transition_sheet_probe.py`)
 
 Clip ▸ Transition ▸ at a hard cut between two WHOLE files used to beep and
@@ -2883,6 +2932,13 @@ compile), and the same oracle written in Python rather than imported.
 readers changed one row's SENTENCE and no row's verdict: `set_canvas
 {fps: [0, 1]}` is now refused as `fps[0] must be…`, so the row reads the
 path with the name. The probe is built BEFORE the first MCP call.
+**23/23** again at road map 10's G3b (2026-09-25), once the two graphic
+ops had their tools: it had failed its first check since G2a. The core now
+declares 59 ops, and the declarations list has 16 rows: G3b's two
+`filledByTheApp` rows take `schema` OUT of `add_graphic_clip` and
+`set_graphic` (the app reads it from the module), so `expected_input` skips
+such an argument and the probe's `requirement()` switch names the case. The
+counts in the paragraphs below are D3·4's.
 
 **Its structural half types no name at all**, not even the ends of a group:
 the group IS the core's op list (`rc_op_names`), so an op renamed on both
@@ -2922,7 +2978,7 @@ Only a row that asks the RUNNING APP can see a declaration dropped while the
 behaviour stays.
 
 
-## A stranger argument, put to all 77 (`op_argument_proof.py`)
+## A stranger argument, put to all 82 (`op_argument_proof.py`)
 
 `python3 tools/proof/op_argument_proof.py <port>`, against a running
 instance. Road map 7's D3·5, then the **argument gate** of
@@ -2930,6 +2986,15 @@ kpgalligan/reelcut#21, and **the script that owns the exact tool count**
 (77). **133/133** on 2026-09-20, when the frame-rate TERM rows landed;
 116/116 at #21; 86/86 at D3·5 (#19), 79 of those rows before the review added
 the optional half of section 3. The probe is built BEFORE the first MCP call.
+**138/138** at road map 10's G3b (2026-09-25), with `TOOLS = 79` and
+`OPS = 59`: the two graphic ops' `schema` is a `filledByTheApp` row, which
+the attribution section counts as used when the tool leaves it out and the
+stranger section leaves out of what a tool takes; and the opaque-door
+section counts 13 doors, reaching the two graphic ones by moving a
+`proof.js` into the untitled fixture's
+`<DARWIN_USER_TEMP_DIR>/Reelcut/*-graphics` root and pointing `set_graphic`
+at the clip `add_graphic_clip` lands from it. The counts in the paragraphs
+below are the ones before G3b.
 
 It exists because of the rule D3·3 and D3·4 each paid for: **a generated
 artefact is checked by asking the thing that generated it a question it did
@@ -4679,6 +4744,330 @@ closed. One SUB-row did not run and is named in road map 8 §10.3 and in
 `designs/reelcut-remaining.md` §4: q3's no-network case, which would change
 host network state.
 
+## Road map 10 — the graphics spike (`graphics_spike/`)
+
+G0, run complete on 2026-09-24: the nine questions
+`designs/reelcut-roadmap-10.md` §3 asks before any graphics code is written.
+**The answers are in that document's §10.1, and §3a lists every design
+section a row rewrote.** `tools/proof/graphics_spike/README.md` is how to
+run it again; this paragraph is the entry in this table.
+
+```sh
+python3 tools/proof/graphics_spike/graphics_spike.py                    # all nine
+python3 tools/proof/graphics_spike/graphics_spike.py --only q4,q5       # a subset; the rest carry forward
+python3 tools/proof/graphics_spike/graphics_spike.py --only q5 --mutant # the on-purpose failure: exit 0 only if caught
+python3 tools/proof/graphics_spike/graphics_spike.py --only q7          # git check, make app, the app on port 4843
+```
+
+The instruments are a scratch Rust crate (`rquickjs` 0.14.0 and `resvg`
+0.48.1 with only `text`, its own `[workspace]`, a CLI whose every
+subcommand prints one JSON object), the six §5k graphics, two Swift probes
+(`q9_probe.swift` calls a throwaway core export; `q7_watch.swift` is a
+`DispatchSource` on a folder) and a Python runner over `bounded.py`, which
+puts every child in its own process group under a hard bound, drains its
+pipes while it waits (the 64 KiB lesson of the words spike above) and
+answers an expiry as `expired: True`. **q1 and q9 patch the core** —
+`core/Cargo.toml`, `core/Cargo.lock`, `core/src/lib.rs` and a new
+`core/src/ffi_graphic.rs` — and **delete `core/target`** for their cold
+builds; `rows_build.revert()` always runs after them and writes `git diff
+c874069 --stat -- core app` and `git status --short -- core app`, both
+empty, into `answers.json`. q7 runs last, on the app built from the reverted
+tree, launches its own instance on port 4843 by PID and kills only that;
+`grep "Reelcut: " tools/proof/work/graphics_spike/reelcut-4843.log` must
+print nothing. q7 measures the package with `media/` as the STAND-IN for
+`graphics/`, which the unchanged app's whitelist cannot keep; the
+`graphics/` run is the CONTROL, expected absent.
+
+The full run scored **exit 0 with all nine rows `run`** and the git check
+empty; `--only q5 --mutant` caught the counter mutant (137 mismatches,
+exit 0) and `--only q7` re-ran q7 (exit 0). Nothing was left unrun; two
+answers are by proxy or by reading, and road map 10 §10.2 names them.
+
+## Road map 10's G1d — the engine through the app (`graphics_ffi_probe.py`, `graphics_ffi_probe.swift`)
+
+The nine `rc_graphic_*` exports have no caller a script can reach before
+G3, so the probe is compiled from `app/Sources` over `harness/build.sh`'s
+swiftc line (a probe that will not build is a scored FAILURE) and drives
+the app's own wrappers — `GraphicLibrary`, `GraphicModule`, `GraphicRaster`
+in `ReelCore.swift`. It runs under `graphics_spike/bounded.py`'s `run`
+(600 s bound, its own process group). The Swift side loads every `.ttf` in
+`app/Resources/Fonts`, compiles `graphic/tests/graphics/lower-third.js`,
+and prints one JSON object (kept as `work/graphics-ffi-probe/answer.json`)
+beside the raw BGRA of frame 30 and its PNG; the Python side scores P1–P9
+with oracles of its own: P1 built and answered; P2 every bundled `.ttf`
+taken (the folder's count) and 16 zero bytes refused; P3 `describeJSON`'s
+schema keys in the module's order and its revision equal to `hashlib`'s
+SHA-256 of the fixture; P4 frame 30 an `<svg` with no warnings; P5 the
+SHA-256 of the BGRA equal to the crate's pin (`graphic/tests/pins.json`
+`lower-third.30`, read from the file) and
+`work/graphics-ffi-probe/lower-third-30.png` a PNG with a 1920×1080 IHDR;
+P6 frame 30 twice byte-identical and frame 0 different; P7 a syntax error
+naming line 3; P8 a top-level `while (true) {}` at 50 ms failing inside the
+bound in the budget's sentence; P9 `{"size":"big"}` at frame 30 answering
+the one `props.size` warning with frame 30. A run took 74 s, most of it
+the build.
+
+`--mutant frame-off-by-one` builds from a COPY of `app/Sources` with
+`GraphicModule.svg`'s `Int64(frame)` replaced by `Int64(frame + 1)` (the
+anchor asserted to occur exactly once) and exits 0 only if P5 FAILED.
+
+```sh
+python3 tools/proof/graphics_ffi_probe.py                              # → 9/9
+python3 tools/proof/graphics_ffi_probe.py --mutant frame-off-by-one   # exit 0 = P5 FAILED
+```
+
+## Road map 10's G3a — the package's `graphics/` store (`graphics_store_probe.py`, `graphics_store_probe.swift`, `graphics_store_proof.py`)
+
+**The probe.** The watcher and the save whitelist have no MCP caller yet,
+so `graphics_store_probe.swift` is compiled from `app/Sources` over
+`harness/build.sh`'s swiftc line (a probe that will not build fails all
+seventeen rows) and drives the app's own `GraphicStore` and
+`ProjectDocument`, under `graphics_spike/bounded.py`'s `run`. Every wait
+pumps `RunLoop.main` — which runs the store's main-queue drain — in polls of
+at most 2 s. It prints one JSON object (kept as
+`work/graphics-store-probe/answer.json`); the Python side scores W1–W13 and
+C1–C4 with oracles of its own: `hashlib` for every revision and its own
+literals for the core's name sentence and the scan's warnings. W1 an
+untitled root made at start, empty and silent; W2 a package store that
+creates nothing, then sees an outside `mkdir graphics` + `mv x.js` (one post,
+ONE `folderDidAppear`) and an in-place edit after it; W3 a rename-over; W4
+an in-place `O_TRUNC` rewrite on the same inode; W5 a removal; W6 two files
+coalesced into one post; W7 `Bad.js` and `d.js.partial` posting nothing and
+`Bad.js` warned; W8 `fonts/` and `assets/` moving the library version (every
+module named, `library: true`, the 0-byte PNG warned and skipped); W9 the
+app's own `write` creating `graphics/` (one callback, no `.partial`) and
+refusing `Bad` in the core's sentence; W10 the folder swapped as a save
+swaps it (no post, then an edit posts: re-armed by path); W11
+`packageDidMove(to:)`; W12 `stop()` dropping a pending pass; W13 a write
+and a `rescan()` at once being ONE post. C1 a saved document's
+`fileWrapper(ofType:)` written over its own package keeps `graphics/x.js`;
+C2 an untitled document restored from autosave seeds its root and its save
+carries the file; C3 a fresh untitled document's save has no `graphics/`;
+C4 a document is freed after `close()` AND after being dropped unclosed.
+
+**`TMPDIR` does not move `NSTemporaryDirectory()`** on this host (measured
+2026-09-25: it answers `DARWIN_USER_TEMP_DIR` whatever the variable says),
+so the untitled roots land in the per-user temporary directory; the probe
+reports that directory, W1 and C2 are scored against it, and the probe
+removes every root it made before it answers.
+
+Three mutants, each built from a COPY of `app/Sources` with one anchor
+asserted to occur exactly once: `whitelist-removed` (the `graphics/` line in
+`fileWrapper(ofType:)` deleted) exits 0 only when C1's file is ABSENT;
+`no-file-sources` (the per-module `arm` deleted) only when W4 FAILED;
+`strong-callback` (`[weak self]` removed from `folderDidAppear`) only when
+C4 FAILED — which it can only do through C4's unclosed half, since
+`close()` drops the store and breaks the cycle either way.
+
+**The proof.** `graphics_store_proof.py` is G0's q7 package rows against
+`graphics/` itself, with the built app: its own instance on its own port
+(default 4851), launched and stopped by PID, the log at
+`work/graphics-store/reelcut-<port>.log`. S2 `new_project {path}` leaves no
+`graphics/`; S3 a `graphics/` made from outside while open is saved without
+"changed by another application"; S4 survives a relaunch and a save; S5 a
+Save As; S6 an autosave in place (15.1 s after the edit in the recorded
+run); S7 an untitled project's first save carries a file moved into its
+root; S8 a package that never gets a graphic stays without `graphics/`
+through a save; S9 a folder made while the app was closed survives open and
+save; S1 the parity grep over every launch prints nothing.
+
+```sh
+python3 tools/proof/graphics_store_probe.py                              # → 17/17
+python3 tools/proof/graphics_store_probe.py --mutant whitelist-removed   # exit 0 = C1 ABSENT
+python3 tools/proof/graphics_store_probe.py --mutant no-file-sources     # exit 0 = W4 FAILED
+python3 tools/proof/graphics_store_probe.py --mutant strong-callback     # exit 0 = C4 FAILED
+make app && python3 tools/proof/graphics_store_proof.py                  # → 9/9
+```
+
+Made to fail by hand (road map 10 §10.6): the whitelist line commented out
+and the app rebuilt, S3 through S7 and S9 failed (3/9), S3 with `x.js`
+ABSENT after the save; and `folderDidAppear` set to nil instead, S3 alone
+failed, its save refused with "The document “P1.reelcut” could not be
+saved. The file has been changed by another application."
+
+## Road map 10's G3b — a graphic clip drawn (`graphics_proof.py`)
+
+The registry, the compositor case and the two op tools against the BUILT
+app: its own instance on its own port (default 4879), launched and stopped
+by PID, the log at `work/graphics/reelcut-<port>.log`, every child bounded
+and every wait a bounded poll. The modules are written outside a package and
+`mv`d into its `graphics/` from the shell. `bar.js` is the script's own —
+one rect at x = frame × 4, 100 wide, filled with `props.color`, no fonts, no
+`meta` size so its raster is the canvas and maps 1:1 — plus the crate's
+fixtures `lower-third.js` and `callout.js`. PNGs are read with
+`e1_proof.py`'s decoder, stopped after the row a pixel needs so a 5 s poll is
+not spent decoding. P1 `add_graphic_clip` (polled ≤ 5 s while the store sees
+the module) stores `graphic.name` and meta's 120 frames; P2 frame 30's EDGE
+pixels (122,50) red and (222,50) black pin the frame number, with frame 31
+differing as a CONTROL; P3 a 17-frame `move_clip` makes frame 47 frame 30's
+bytes; S1 a `split` at frame 40 leaves frame 41's bytes; R1 `set_graphic`
+props change the frame, `{nope: 1}` is refused naming `props.nope`, and one
+undo restores the bytes; H1 a module rewritten by `mv` redraws within 5 s;
+L1 a stored prop the new schema dropped still draws (G-4's leniency); F1
+`lower-third` draws its accent bar through the bundled fonts, and is
+MEASURED against `graphics_ffi_probe.py`'s frame-30 BGRA over black; K1
+save, relaunch, open; K2 Save As; T1 frame 30 at 29.97 fps (tick 600 600) is
+the 30 fps frame's bytes; K3 an untitled project's graphic saved for the
+first time and reopened; A1 a transparent canvas with `callout` as
+`prores_4444`, decoded at 2 s, alpha 0 at a corner and 255 on the stroke; Z1
+the parity grep over every launch.
+
+`--mutant frame-plus-one` copies `app/` and `project.yml` (with `core/`
+linked, not copied), replaces the one anchor in
+`LayerRenderersGraphic.swift` so the module is asked for `frame + 1`, builds
+the copy with xcodegen and xcodebuild into its own directory, drives it
+through P1 and P2, and exits 0 only if P1 held and P2 FAILED. The rows after
+P2 are relative, so a uniform +1 moves both sides of them.
+
+```sh
+make app && python3 tools/proof/graphics_proof.py --port 4879          # → 14/14
+python3 tools/proof/graphics_proof.py --mutant frame-plus-one          # exit 0 = P2 FAILED
+```
+
+## Road map 10's G3c — a failing graphic and the export pin (`graphics_proof.py` E1–Q3)
+
+The same script, seven rows after A1; the score is **21/21**. E1–E3 reopen
+P1, `mv` in three modules of the script's own and add ONE front track, and
+each row adds its clip there and `undo`es it (a `spin` clip left behind
+would cost every later render its budget). E1 `throw10` (throws
+`"boom at ten"` at frame 10): frame 9 names no `throw10` and draws RED;
+frame 10's reply names it, `frame 10` and the message, and the picture is
+the error card — (1,540) its border (230,40,40), (1900,1060) its fill
+(64,8,8); `export` answers an error naming both, and nothing is at the
+path. `bar`'s stale-`color` warning from L1 appears in every E reply and is
+right (G-4). E2 `spin` (`while(true){}`): `render_frame` returns within 3 s
+naming the budget, and `get_project` answers within 5 s. E3 `nofont`: the
+reply names `Nope Sans` and the set's `IBM Plex Mono`. E4 a fresh project's
+`pin.js` clip exported `prores_4444` over MCP is RED at 2 s — the `export`
+tool passes the document's set, since an unpinned offline key slates. **No
+MCP row can race a module swap**: the server is one thread and `export`
+holds it until the file is written, so the swap is made deterministic
+in-process instead. Q1–Q3 are `graphics_pin_probe.swift`, built like
+`phase7_chrome.py`'s probe (every `app/Sources` file but `main.swift`, the
+harness's swiftc line, `Fonts`, `Blank.mp4` and a `default.metallib`
+beside it, cached in `work/graphics-pin-probe/`; a probe that will not
+build is three FAILURES) over the saved project PQ: Q1 a job ENQUEUED with
+the document's set, then the canvas turned blue and the document's set
+REMOVED (`stopGraphicStore()`) before the run loop spins — the file is RED
+at (480,540) and BLACK at (1440,540), and the CONTROL with no set is the
+slate; Q2 the same through `Exporter.export`; Q3 one `LayerRenderers` asked
+twice for `nofont` warns both times and the second answer is the pool's
+texture. ffmpeg's rawvideo is read through `subprocess.run(timeout=120)`.
+
+**Made to fail by hand (2026-09-25).** (a) `finish`'s mapping line deleted:
+E1 fell alone — the export answered "The export was cancelled." instead of
+naming the graphic (20/21). (b) the `pin` line in `Exporter.export`
+deleted: E4, Q1 and Q2 fell, with the pixel the slate's (25,28,33) — and
+A1 (the slate is opaque) and E1 (the export succeeded, a slate in place of
+the card) with them (16/21). Each was reverted and rebuilt.
+
+```sh
+make app && python3 tools/proof/graphics_proof.py --port 4881          # → 21/21
+python3 tools/proof/graphics_proof.py --mutant frame-plus-one          # exit 0 = P2 FAILED
+```
+
+## Road map 10's G4a — the agent's write/read loop (`graphics_proof.py` G1–G8)
+
+The same script, eight rows more; the score is **29/29**. G6 runs FIRST, on
+the fresh launch before any project is open: `graphic_reference {}` is not
+an error and its text is `docs/graphics-api.md`, which is also the app's
+`Contents/Resources/GraphicsAPI.md` (read beside `--app`). G1–G5 and G7 run
+after A1, each call naming its package. G1 on a new WG: `get_graphic {}`
+names `<WG>/graphics`, absent, no modules; `write_graphic` of `BROKEN_BAR`
+(`bar()` with line 2, its schema, replaced by `export const schema = {
+title: ;`) answers `ok: false`, `meta {}`, `schema {}` and an ERROR on line
+2 — the engine's lines are the module's own, and the column is never
+asserted — with those bytes on disk; `bar()` then answers `ok`, schema keys
+title and color (compared sorted: a JSON object has no order), hashlib's
+revision, `<WG>/graphics/bar.js`, no clips and "not undoable". G2 `API.md`
+and `API.d.ts` in the folder are the docs' bytes, and `get_graphic {}` says
+it exists with one module. G3 `add_graphic_clip` succeeds on the FIRST
+attempt (a control: no poll), `get_graphic {name: bar}` lists the clip and
+the source, and `get_project`'s `graphics` is `[{name, revision, ok,
+clips}]`. G4 saved and clean; a blue `bar.js` written answers its own
+revision and leaves `unsaved_changes` false (G-3); ONE `render_frame` at
+frame 30, no poll, is blue at (170,50) — the registry was current when the
+reply left. G5 `{name: "Bad"}` is refused as "is not a module name" (the
+core's sentence) and a missing `source` is named. G7 a new NG with a track,
+saved: no `graphics/` (the manual never creates it), and `get_graphic {}`
+says so. G8, on a fresh instance (K3's pattern), an untitled root from
+`get_graphic {}` given only `fonts/Anton-Regular.ttf` and saved to NF: the
+font arrives, no `.js` does, and `get_graphic {}` now names `NF/graphics`.
+The mutant copy links `docs/` beside `core/`, since the post-build step
+copies the reference out of it.
+
+**Made to fail by hand (2026-09-25)**, each reverted and rebuilt: (a) the
+`store.rescan()` in `writeGraphic` deleted — G1–G4 fell (25/29), every
+write answering "No module named" because the scan had not yet seen the
+file; (b) `writeManual()` deleted from `write()` and `ensureFolder()` — G2
+fell alone; (c) `holdsContent` counting regular files only — G8 fell alone.
+
+```sh
+make app && python3 tools/proof/graphics_proof.py --port 4883          # → 29/29
+python3 tools/proof/graphics_proof.py --mutant frame-plus-one          # exit 0 = P2 FAILED
+```
+
+## Road map 10's G4b — the contact sheet, the imports, the loop (`graphics_proof.py` C1–C4, I1–I4, G9, L2)
+
+The same script, ten rows more; the score is **39/39**. The sheets are
+decoded through ffmpeg (`decode_rgba`) — `decode_png`'s Python loops are too
+slow for a 3848 px row — and every pixel claim is an RGB read or a row
+comparison of that decode. On WG after G7, where `bar.js` is BLUE since G4
+and its clip sits at 0: **C1** `render_graphic {frames: [0, 0], background:
+"#000000", max_width: 8192}` is a 3848×1104 PNG whose cell 0 (columns
+0–1919) and cell 1 (1928–3847) are byte-identical over rows 0–1079 and whose
+text names "2 frame"; `frames: [0, 30]` makes the two cells differ. **C2**
+Placement: `render_frame` at frame 30 and `render_graphic {frame: 30,
+background: "#000000", max_width: 8192}` agree in every RGB pixel of the
+1920×1080 cell — 0 of 2 073 600 differ, F1's comparison. **C3** `{frame: 30,
+format: "svg"}` answers ok, frame 30, a rect at `x="120"` and no
+diagnostics. **I1** `needsfont` (120 px white text in `'Oswald'`): its sheet
+over black has 0 lit pixels and names Oswald; `import_graphic_font
+/Library/Fonts/Oswald-Medium.ttf` answers `families ["Oswald"]` — the
+engine's name; CoreText's is "Oswald Medium" — with `library_families`
+holding Oswald, IBM Plex Mono and Source Sans 3, its path in `fonts/`, not
+replaced, and `get_graphic {}`'s `families` the same list; the sheet then
+lights pixels and names no Oswald; Arial answers `["Arial"]` and says
+`replaced` the second time; a `.ttf` of text is refused "loaded no face" and
+a `.txt` naming ".ttf". A missing Oswald file is a FAIL, never a skip.
+**I2** `usesasset` (`<image href="${asset("red.png")}">`) names red.png and
+is black at (50,50); `import_graphic_asset graphic/tests/assets/red.png`
+answers `red.png` and `assets ["red.png"]`, as `get_graphic {}` does; the
+sheet is then (255,0,0) there with no red.png in the text; an empty file is
+refused "empty" and a `.txt` naming "PNG". **G9** `chmod 311 <WG>/graphics`
+(bounded): `write_graphic {name: ghost}` is refused saying it "was written"
+and the scan "does not list" it; after `chmod 755` the same write is ok.
+**I3** `save_project` on WG: `fonts/Oswald-Medium.ttf`, `fonts/Arial.ttf`
+and `assets/red.png` are in the package and `unsaved_changes` is false.
+**I4** a new IE whose `graphics/` holds NO module: the Oswald import's
+`library_families` holds Oswald at once, and `needsfont` written after it
+lights pixels with no warning (since G5b the store posts a library change
+even with no module, so the import's own `rescan()` rebuilds the registry's
+set; G4b's `catchUpLibrary` is gone, and I4 passing is what proves the post
+does its job). **L2** the loop of §5h on a
+new LP: `graphic_reference`, BROKEN_BAR (ok false, line 2), `bar()` (ok),
+`render_graphic {frames: [0, 15, 30]}` at the DEFAULT `max_width` — its
+path read out of "Written to …" — is exactly **2048×1202** and names "3
+frame", `add_graphic_clip`, `render_frame` at frame 30 is RED at (122,50),
+and `set_graphic {props: {title: "Looped"}}` changes that frame ("Loop"
+would not: `bar()` draws the title's LENGTH, and "Jane" is four letters
+too). **C4**, in `run_e` after E1 on P1: `render_graphic {name: throw10,
+frames: [9, 10], max_width: 8192}` names `"throw10"`, `frame 10` and `boom
+at ten`; cell 1 is the card — (1929,540) BORDER, (3828,1060) CARD — and cell
+0's (50,50) is RED.
+
+**Made to fail by hand (2026-09-25)**, each reverted and rebuilt: (a) the
+module asked for `frame + 1` in `renderGraphic` — C2 (1440 pixels differ),
+C3 and C4 fell (36/39); (b) `store.rescan()` deleted from
+`importGraphicFont` — I1 and I4 fell (37/39); (c) the extension check
+deleted from `importGraphicAsset` — I2 fell alone; (d) `catchUpLibrary`
+deleted from `importGraphicFont` — I4 fell alone.
+
+```sh
+make app && python3 tools/proof/graphics_proof.py --port 4883          # → 39/39
+python3 tools/proof/graphics_proof.py --mutant frame-plus-one          # exit 0 = P2 FAILED
+```
+
 ## The deployment target, rendered (`target_bump_proof.py`)
 
 W1a, road map 8 §10.4: the macOS 26 bump recompiles `Compositor.metal`
@@ -5159,4 +5548,117 @@ details.
 ```sh
 python3 tools/proof/text_apply_proof.py                      # → 27/27
 python3 tools/proof/text_apply_proof.py --baseline 7e946ed   # exit 0 = exactly A1 A2 A4 A6 A8–A11 FAIL
+```
+
+## Road map 10 — the person's playback-check projects (`graphics_playback_samples.py`)
+
+Not a proof: it BUILDS the three projects `designs/reelcut-remaining.md`
+§4's "Graphics playing, WATCHED" bullet asks a person to play, through the
+built app's MCP tools (its own instance on port 4891, killed after), into
+`tools/proof/work/playback-check/` (ignored by git):
+- `Playback-1080p.reelcut` — 1920×1080 at 30 fps: `lower-third` (0–5 s),
+  then `kinetic-type` (5–10 s);
+- `Playback-4K.reelcut` — 3840×2160 at 30 fps: `title-card` (0–4 s), then
+  `kinetic-type` (4–9 s), for the stutter and Activity Monitor memory rows;
+- `Error-card.reelcut` — a small module that throws from frame 60, so the
+  error card shows from 2 s.
+
+Run `python3 tools/proof/graphics_playback_samples.py` after `make app`;
+it replaces the three packages. Built 2026-09-25 at `0ade58c`, with a
+`render_frame` of each confirmed by eye.
+
+## Road map 10's G5a — the Graphic sub-tab (`graphics_inspector_proof.py`, `graphics_inspector_probe.swift`)
+
+One script with three instruments (road map 10 §10.9 G5a; spec §11 G-15):
+
+- **The fixture, over MCP.** One owned instance on its own port (default
+  4887; its log is `work/graphics-inspector/reelcut-<port>.log`) runs
+  `new_project`, `write_graphic six` (one schema entry of each type: a
+  string whose default holds `{"}:`, a number 12–200, an unbounded number, a
+  boolean, a colour defaulting to "#FF5A36", an enum and an asset; text drawn
+  in `'Nope Sans'`), `import_graphic_asset red.png`, `add_graphic_clip`,
+  `set_graphic {props: {size: 90}}` and `save_project`. The instance is then
+  stopped, and `"old": 1` and `"zzz": 2` are written into the clip's props in
+  `project.json`: the external edit G-4 tolerates, which the tool refuses.
+- **The probe** is compiled as `main.swift` over `app/Sources` on
+  `harness/build.sh`'s swiftc line, with `app/Resources/Fonts` copied beside
+  it. It runs over a COPY of the fixture and scores rows I1–I12. These cover
+  the module's key order, one row per type, Reset against the default, the
+  colour arithmetic and the null rule, stale keys and ⌫, the structure
+  signature, the tabs and section ids, the first-frame report, the tool's
+  edit read back, Fit to Canvas, `sourceSize(of:)` and the graphic's own In
+  point after a trim. A probe that will not build is a scored FAILURE. The
+  readout's text and the popup's items are private, so the probe reads them
+  by `Mirror`. Nothing in the app is widened for it.
+- **The harness** (`harness/build.sh`) renders the fixture at 1440 × 1500
+  with the subTab set to `graphic` and the four sections expanded. It renders
+  light twice (H1) and dark twice (H2). Each pair must be byte-identical, and
+  light must differ from dark. The PNGs are kept as
+  `work/graphics-inspector/gi-{light,dark}-{a,b}.png`, for a person to LOOK
+  at. The harness now starts the document's graphic store
+  (`startGraphicStore()`, under `#if !HARNESS_REFERENCE_BUILD`). Without that
+  call a graphic clip's sub-tab has no schema.
+
+```sh
+make app
+python3 tools/proof/graphics_inspector_proof.py --port 4887    # → 50/50
+python3 tools/proof/graphics_inspector_proof.py --mutant stale # exit 0 = the five I5 rows FAIL alone
+```
+
+The mutant builds the probe over a copy of `app/Sources` whose
+`GraphicSchemaRows.staleKeys` returns `[]`. It makes a fresh fixture in a
+temporary directory. The one I5 row it cannot touch is the compile row
+naming line 2, so that row is not expected to fail.
+
+## Road map 10's G5b — the graphics menus and templates (`graphics_menu_proof.py`, `graphics_menu_probe.swift`; `graphics_proof.py` W1)
+
+Road map 10 §10.9 G5b; spec §11 G-16. Two instruments and one row:
+
+- **R1, the bundle.** The built app's `Contents/Resources/GraphicTemplates/`
+  holds exactly the six modules of `graphic/tests/graphics/`, byte-equal
+  (project.yml's "Copy Graphic Templates" script).
+- **The fixture, over MCP.** One owned instance on its own port (default
+  4889; its log is `work/graphics-menu/reelcut-<port>.log`) runs
+  `new_project {path: GM}` and `save_project`: a package with NO module.
+- **The probe** is compiled as `main.swift` over `app/Sources` on
+  `harness/build.sh`'s swiftc line, with `app/Resources/Fonts`,
+  `GraphicTemplates/` (from `graphic/tests/graphics/`) and `GraphicsAPI.md`
+  (from `docs/graphics-api.md`) copied beside it — its `resourceURL`, where
+  the app finds all three. It runs over two COPIES of GM and scores M1–M10:
+  the probe builds (M1, a scored failure otherwise); the menu bar's Insert
+  right after Edit and its Graphic submenu, each template's URL byte-equal
+  to its source (M2); File's two items after Consolidate Media…, Help's
+  Graphics Reference, no key equivalent on the ten new items (M3); no
+  target for the four editor selectors with no window, and Graphics
+  Reference live until the copied `GraphicsAPI.md` is moved away, a CONTROL
+  (M4); the four validate false before `startGraphicStore()` and true after
+  (M5); the Lower Third item at 2 s — the file byte-equal, one clip at
+  1 200 000 lasting 3 000 000, "Insert Graphic", level 0 after a run-loop
+  turn, one undo removes it and the file stays (M6); again → `lower-third-2`
+  (M7); `insertGraphic(from: "My Counter (v2).js", grouped: true)` →
+  `my-counter-v2`, level 0 at once, one undo removes it and `lower-third-2`
+  STAYS (M8); a module that does not compile throws naming it and places
+  nothing (M9); `importFont` / `importAsset` on the second copy, the
+  registry's library holding Oswald at once, the refusals naming ".ttf" and
+  "PNG" (M10). **The probe never calls `endUndoGrouping`**: a command run
+  outside an AppKit event opens the implicit event group, and the probe
+  closes it the way AppKit does, a run-loop turn in `.default` mode
+  (`text_apply_probe.swift`'s `spin`).
+- **W1, in `graphics_proof.py`** (after I4): a new module-less IW; its
+  families lack Oswald (CONTROL); from the SHELL `mkdir -p IW/graphics/fonts`
+  and `cp` Oswald in; `get_graphic {}` polled for at most 5 s until its
+  families hold Oswald; `write_graphic needsfont` then lights pixels naming
+  no Oswald — the watcher's own post, no tool in the path.
+
+**Made to fail by hand (2026-09-25)**, each reverted: (a) `|| outcome.library`
+removed from `GraphicStore.drain()` (app rebuilt) — `graphics_proof.py` fell
+to 38/40, I4 and W1 alone; (b) From File… dropped from `graphicMenu()` — M2
+fell alone (13/14); (c) M7's run-loop turn removed from the probe — M7's own
+level check and M8 fell (12/14): with the implicit group still open, M8's
+grouped edit nested inside it and one undo took `lower-third-2` too.
+
+```sh
+make app
+python3 tools/proof/graphics_menu_proof.py --port 4889    # → 14/14
+python3 tools/proof/graphics_proof.py --port 4883         # → 40/40
 ```

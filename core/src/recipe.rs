@@ -50,6 +50,7 @@ use crate::evaluate::{json, number, Assignment};
 use crate::model::{BlendMode, Clip, Nest, Project, Source, TransitionKind, VideoProps};
 use crate::motion;
 use crate::nest::{Enclosing, Frame, Instance};
+use crate::recipe_graphic::graphic_source;
 use crate::recipe_text::burn_in_layer;
 use crate::time::Ticks;
 use crate::transition;
@@ -86,12 +87,26 @@ fn fnv1a(bytes: &[u8]) -> u64 {
     hash
 }
 
-/// The content hash of a rendered layer's description. Hashing the
-/// serialized `Value` is what makes it canonical: `serde_json` writes an
-/// object's keys in one fixed order, so two clips with identical text
-/// always hash the same and share one texture.
+/// The content hash of a rendered layer's description, over its keys
+/// SORTED at every depth: `serde_json`'s `Map` keeps insertion order in this
+/// build (`graphic` turns `preserve_order` on), so the sort is what makes
+/// two clips with identical text hash the same and share one texture — and
+/// it is the order every hash before the link was taken in.
 pub(crate) fn content_hash(description: &Value) -> String {
-    format!("{:016x}", fnv1a(description.to_string().as_bytes()))
+    format!("{:016x}", fnv1a(sorted(description).to_string().as_bytes()))
+}
+
+/// `value` with every object's keys in sorted order, recursively.
+fn sorted(value: &Value) -> Value {
+    match value {
+        Value::Object(map) => {
+            let keys: std::collections::BTreeMap<&String, Value> =
+                map.iter().map(|(k, v)| (k, sorted(v))).collect();
+            Value::Object(keys.into_iter().map(|(k, v)| (k.clone(), v)).collect())
+        }
+        Value::Array(items) => Value::Array(items.iter().map(sorted).collect()),
+        other => other.clone(),
+    }
 }
 
 // ---- what a caller asked for -------------------------------------------
@@ -198,12 +213,10 @@ impl RecipeLayer<'_> {
     /// The layer as the recipe publishes it.
     ///
     /// The insertions below follow the order spec §7.3 lists the keys in,
-    /// for a reader; the ORDER ON THE WIRE is not this one and does not
-    /// depend on it. `serde_json`'s `Map` is a `BTreeMap` in this build, so
-    /// every object comes out sorted by key — which is the property
-    /// [`content_hash`] already leans on ("`serde_json` writes an object's
-    /// keys in one fixed order"), and it means a key inserted in the wrong
-    /// place here is a readability bug and not a wire change.
+    /// and since `graphic` turned on `preserve_order` that IS the order on
+    /// the wire. Nothing depends on it: Swift decodes by key, and
+    /// [`content_hash`] sorts before it hashes, so a key inserted in the
+    /// wrong place here is a readability bug and not a cache-key change.
     pub(crate) fn object(self) -> Value {
         let video = self.video;
         let mut out = Map::new();
@@ -493,8 +506,8 @@ impl Project {
     ///
     /// `track` means "sample composition video track N", the id the plan
     /// gave this clip; `image` means "decode this media with ImageIO";
-    /// `text` and `shape` carry the resolved description plus the content
-    /// hash Swift caches the rendered texture by; `missing` is the slate
+    /// `text`, `shape` and `graphic` carry the resolved description plus the
+    /// content hash Swift caches the rendered texture by; `missing` is the slate
     /// (spec §7.3).
     ///
     /// **The `missing` arms are defensive, not a feature path.** They fire
@@ -571,11 +584,12 @@ impl Project {
             // `drawing_instances` has already dropped, so this arm exists
             // to keep the match exhaustive.
             Source::Nest { .. } => (missing_source(), Value::Null),
+            Source::Graphic => graphic_source(clip, clip_t, &self.canvas),
         }
     }
 }
 
-fn missing_source() -> Value {
+pub(crate) fn missing_source() -> Value {
     let mut source = Map::new();
     source.insert("kind".to_string(), Value::from("missing"));
     Value::Object(source)

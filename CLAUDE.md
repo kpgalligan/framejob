@@ -35,6 +35,7 @@ changes a file's role or adds a rule. Never append a status paragraph here.
 | `designs/reelcut-roadmap-7.md` | The deepening series, FOUR candidates, all closed: §0 the rules it inherits (deep module, seam, the deletion test, the interface is the test surface); §1–§3 D1, the core as the one validator of a caller's patch (tickets #2–#7) — start here for how a patch is checked; §4–§6 D2, an op's three answers and the eleven rules that say why they refused (tickets #9–#13) — start here for what an op ANSWERS; §7–§9 D3, one op table published (tickets #15–#20) — start here for where an op's arguments are written down, and §9 for where a next candidate starts; §10 the SOURCE WINDOW candidate, split in three and CLOSED — §10.1–§10.5 the measured inventory of the `× speed` arithmetic, the three head/tail clamp forms and the two road-map-2 defects that are evidence for it, §10.6 what was decided and what each phase owns, §10.7 the record of phase A, the module `core/src/source_window.rs` as a pure move, §10.8 the record of phase B, the window invariant made true at every writer through that module's one bound (spec §11's D4-2 to D4-5), and §10.9 the record of phase C, the app's reversed mirror in one file and the Speed sheet's readout asked of the core (spec §11's D4-6) — start at §10.6, and at §10's closing paragraphs for what a next candidate would be; §11 the HANDLER-FORWARD candidate §9 recommends, MEASURED and retired — why forwarding a caller's whole op unread would cost 21 named refusals, 6 app-state defaults and one correctness guard, what the core's decoder actually says when asked, and the smaller shape the measurement points at, the argument GATE, which §11.8 records LANDED (kpgalligan/reelcut#21). **Read §11 before acting on §9's closing sentence.** |
 | `designs/reelcut-roadmap-8.md` | Word captions — the social-video style (one row, pages filled to the MEASURED width, the spoken word highlighted, popped or pilled), from either engine: BUILT 2026-09-23, W0–W4b. §0 why a page is one text clip with its words timed inside it, §4 the decisions W-1..W-10 (W-8 moves the minimum to macOS 26 and the on-device engine to `SpeechTranscriber`), §5 the design (§5e the sheet's Style row, §5h the styles), §7 what is not built and why — where next work starts, §10 the record per phase (W0 §10.1 to W4b §10.10). Start here for word captions. |
 | `designs/reelcut-roadmap-9.md` | The clip inspector redesign, from `designs/design_handoff_clip_inspector/`: five phases (1, 2, 3a, 3b, 4, 5), all BUILT 2026-09-23/24. §0 the phases, §1–§2 phase 1 (the selected action, the action lane, the timeline's bands; spec §11 CI-1..CI-4), §3–§4 phase 2 (the Clip tab's sub-tabs and the block pinned above the scroll view, the block knob; CI-5, CI-6), §5–§6 phase 3a (the row marks, the keyed segment and the playhead tick, auto-open; CI-7, CI-8), §7–§8 phase 3b (Reset/Clear, the row menus, the refusal strip; CI-9, CI-10), §9–§10 phase 4 (band drags in the lane and on the timeline, the lane's decor; CI-11, CI-12), §11–§12 phase 5 (canvas gestures following the mode, off, mixed, Reduce Motion; CI-13..CI-15). Each even section is that phase's record, deviations and owed items. Start here for the Clip tab, the action lane, a band drag or the canvas's edit target. |
+| `designs/reelcut-roadmap-10.md` | Graphics — motion graphics drawn by code: a clip whose JavaScript module in the package's `graphics/` returns SVG per frame, run by QuickJS and rasterized by resvg in a separate `graphic/` crate. BUILT and merged into `main` 2026-09-25 (§10.10): G0 spiked 2026-09-24; G1–G4 BUILT 2026-09-24/25 (the engine, the model, the picture, the agent's six tools; §10.4–§10.7 their records) — an agent can make a graphic end to end over MCP; G5 BUILT 2026-09-25 (§10.9: the Clip tab's Graphic sub-tab, Insert ▸ Graphic with templates, File ▸ Add Font/Image to Graphics…, Help ▸ Graphics Reference) — a person can now make a graphic too; G6 (performance) deferred by the user; §10.8 the graphics-only playback defect, FIXED 2026-09-25. §1 reviews `designs/svg-motion-components-plan.md`, §3 the spike G0, §4 decisions G-1..G-13 (G-14..G-16 in spec §11) (G-1 and G-2 amend spec §1's plugin non-goal and §7's pixel rule), §5 the design, §9 the phases. Start here for graphics. |
 | `designs/reelcut-effects-survey.md` | The survey road map 5 came from. E3–E9 (tone, filters, looks, adjustment clips, LUT import, voice effects, background removal) are DEFERRED by the user. Concat is AGPL-3.0: its behaviour was studied, and none of its code, shaders, chains or colour tables may be carried over. |
 | `designs/reelcut-milestones.md` | The per-phase record this file carried until 2026-09-17, moved out verbatim. Not maintained. |
 | `designs/design_handoff_reelcut/` | The shipped chrome cleanup and identity; its README is normative for the redesign's metrics. |
@@ -46,8 +47,8 @@ changes a file's role or adds a rule. Never append a status paragraph here.
 
 ```sh
 make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
-make test       # cd core && cargo test --release  (black-box tests through the FFI)
-make lint       # cargo clippy --all-targets -- -D warnings
+make test       # cd core && cargo test --release, then cd graphic && cargo test --release  (black-box tests)
+make lint       # cargo clippy --all-targets -- -D warnings, in core/ then graphic/
 make typecheck  # swiftc -typecheck of app/Sources/*.swift — the ONLY authoritative Swift check
 make project    # xcodegen generate (Reelcut.xcodeproj is generated; project.yml is the source of truth)
 make run        # make app, then launch
@@ -55,7 +56,7 @@ make run        # make app, then launch
 
 - Single Rust test: `cd core && cargo test --release --test edge slip`
   (test-file name, then a name filter). Finish Rust work with `cargo fmt` in
-  `core/` and a clean `make lint`.
+  `core/` (and `graphic/`) and a clean `make lint`.
 - There are no Swift unit tests. App-side verification is `make typecheck`
   plus driving the built app over MCP and the probes in `tools/proof/`.
 - `make typecheck` is fast; run it before `make app` (~90 s). Its baseline is
@@ -81,6 +82,9 @@ core/                Rust staticlib — the model, the ops, the plan, the recipe
   include/…_core.h     export settings, the generic MCP server. THE FFI CONTRACT
   src/                 core/CLAUDE.md has the module map
   tests/               black-box, through the FFI
+graphic/             Rust crate — the graphics engine (road map 10): a Module run in
+  src/                 sandboxed QuickJS returns SVG per frame; rasterize (usvg →
+  tests/               resvg → BGRA), measure_text. graphic/CLAUDE.md has its rules
 app/
   Sources/             AppKit app, programmatic UI (app/CLAUDE.md has the map)
   Resources/Shaders/   Compositor.metal — the per-layer compositing pass
@@ -88,6 +92,7 @@ app/
   Bridging/            the bridging header importing core/include/reelcut_core.h
 designs/             the spec, the road maps, the handoff — the table above
 docs/agents/         what the engineering skills read: tracker, labels, domain docs
+docs/graphics-api.md the graphics reference an agent reads; graphic/tests/reference.rs runs every js block
 tools/proof/         mcp.py, the per-phase proof scripts, harness/ (offscreen chrome)
 project.yml          xcodegen definition; Makefile; README.md (user-facing)
 ```
@@ -173,7 +178,7 @@ else is what bloats files:
   (`AgentServer+Parity.swift`). What it cannot see is a CALL, which two
   things guard at dispatch: the argument GATE in `AgentServer+Gate.swift`
   compares the caller's keys to the schema the tool published and refuses a
-  stranger by name, for all seventy-seven tools, before any handler runs;
+  stranger by name, for all eighty-five tools, before any handler runs;
   and the throwing helpers in `AgentServer+Arguments.swift` refuse a value a
   handler cannot read by name rather than dropping it.
 - **A file at the ~600-line cap gives something up before it takes anything
@@ -204,7 +209,9 @@ envelope key, plus the app-state tools — `open_project`, `new_project`,
 `save_project`, `get_project`, `import_media`, `import_captions`,
 `export_captions`, `transcribe`, `consolidate_media`, `detect_silence`,
 `normalize_clip`, `set_playhead`, `set_range`, `set_selection`, `set_scope`,
-`undo`, `redo`, `render_frame`, `export` and `record_screen`. `rc_op_names`
+`undo`, `redo`, `render_frame`, `export`, `record_screen`, `write_graphic`,
+`get_graphic`, `graphic_reference`, `render_graphic`, `import_graphic_font`
+and `import_graphic_asset`. `rc_op_names`
 and the catalog are the authority for the counts; the parity check compares
 them at startup. `render_frame` writes a PNG and returns its path; `export`
 waits for the file.

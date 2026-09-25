@@ -268,9 +268,11 @@ impl Project {
                 let last = found.duration.saturating_sub(frame).max(0);
                 (*media, (*at).clamp(0, last), frame)
             }
-            Source::Image { .. } | Source::Text | Source::Shape | Source::Nest { .. } => {
-                return None
-            }
+            Source::Image { .. }
+            | Source::Text
+            | Source::Shape
+            | Source::Graphic
+            | Source::Nest { .. } => return None,
         };
 
         Some(Segment {
@@ -381,7 +383,7 @@ impl Project {
             Source::Media { media, .. } | Source::Still { media, .. } => {
                 self.media(*media).is_none_or(|m| m.has_video)
             }
-            Source::Image { .. } | Source::Text | Source::Shape => true,
+            Source::Image { .. } | Source::Text | Source::Shape | Source::Graphic => true,
             Source::Nest { .. } => false,
         }
     }

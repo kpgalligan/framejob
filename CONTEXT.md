@@ -31,3 +31,27 @@ _Avoid_: update, delta, diff, replacement
 **Selected action**:
 The one action of the single selected clip that the Clip tab is editing, or none. It is view state, like the playhead and the clip selection: not an edit, not undoable, not saved, and not something an agent sets — an agent names an action by its id. It is chosen by clicking the action's band, or by the playhead ENTERING the action's span; it stays chosen when the playhead leaves, and goes when the clip selection changes, on esc, or on the lane's Clip chip. While one is chosen the fields show and write its END state (spec §11 CI-1, CI-2). Actions are numbered by time order.
 _Avoid_: current action, active action, "the action under the playhead" (the playhead no longer decides)
+
+**Graphic**:
+A clip whose picture is drawn by code: a **Module** in the package's `graphics/` folder, run per frame with the clip's props, rasterized at the graphic's own size. It is a clip's CONTENT, in the place a media file or an image sits — not an effect, and not a plugin: its code reaches no other clip, no timeline, no model and no file, and the same frame with the same props always draws the same pixels (spec §11 G-1, G-5).
+_Avoid_: effect, plugin, overlay, template (a template is a graphic someone else wrote)
+
+**Template**:
+A **Module** the app ships, which a person copies into their package with Insert ▸ Graphic: the file is written into `graphics/` under a free name (`lower-third`, then `lower-third-2`) and a clip drawn by it is placed at the playhead. Once copied it is the package's own module — editing it changes no other package, and no later app version reaches it. Its menu title comes from its file name, never from running it (spec §11 G-16).
+_Avoid_: preset (a preset is stored settings, not code), sample, built-in graphic
+
+**Error card**:
+What a **Graphic** draws in its own box when it cannot draw itself — its **Module** is missing or does not compile, or a frame throws, runs past its budget or will not rasterize: dark red, a bright red border, and the graphic's name, its frame and the first diagnostic with its line and column in white. Never the last good frame, which would hide the error from someone scrubbing. An export never delivers one: it is refused before it starts, or stopped at the frame, with no file left (spec §11 G-8).
+_Avoid_: slate (the slate is what a layer with no source at all draws), error frame, placeholder
+
+**Module**:
+A graphic's source: one JavaScript ES module exporting `render(frame, props, ctx)`, which returns SVG, and optionally `meta` and `schema`. It is compiled once and drawn many times; the standard library is global and nothing can be imported. Many clips may name one module, as many clips share one media file.
+_Avoid_: script, component, file (the file holds the module), plugin
+
+**Revision**:
+Which text of a **Module** drew a frame: the SHA-256 of its source's bytes, 64 hex digits. Two identical texts are one revision wherever they came from; an edit to the file is a new revision, and an export pins the revision it started with.
+_Avoid_: version (the font and asset set has a version), hash, edit number
+
+**Props**:
+The values a **Graphic** is drawn with, stored on its clip in the caller's key order — a title, an accent colour, a size. When the op that sets them carries the module's schema, each is checked by its dotted path (`props.accent`) for its type, its range and its options, and a colour is stored as lowercase hex; without one, only its shape. Distinct from a **Patch**, which is what a caller SENDS to change them: a patch's `props` merges into the stored props key by key, and a null in it removes that key (spec §11 G-4, G-12).
+_Avoid_: parameters, inputs, settings, variables

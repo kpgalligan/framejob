@@ -1,0 +1,24 @@
+[package]
+name = "graphics_spike"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Road map 10 G0's scratch crate (designs/reelcut-roadmap-10.md §3). Not a
+# product crate: its own workspace, so the core's never sees it except while
+# q1/q9 patch it in by path.
+[workspace]
+
+[lib]
+name = "graphics_spike"
+path = "src/lib.rs"
+
+[[bin]]
+name = "graphics_spike"
+path = "src/main.rs"
+
+[dependencies]
+rquickjs = { version = "0.14.0", features = ["loader"] }
+resvg = { version = "0.48.1", default-features = false, features = ["text"] }
+serde_json = "1"
+sha2 = "0.10"

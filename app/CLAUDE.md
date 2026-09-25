@@ -15,15 +15,24 @@ detail there.
 - `ReelCore.swift` — the **only** home for `rc_*` calls: `ReelProject`
   (handle + lazily decoded `ProjectSnapshot`; `json`, `snapshot` and
   `planJSON` are memoised PER HANDLE, so keep handles rather than minting
-  them), timecode, snapping, export presets/sizes/settings, `RecipeSource`,
-  the `dictionary` extensions on the property types and the typed patches —
+  them), timecode, snapping, export presets/sizes/settings, the
+  `dictionary` extensions on the property types and the typed patches —
   except `TextPatch` (with `case`, `words` and `word_style`), which is
   `TextPatch.swift`'s, moved out so it could grow. `word_style` has ONE
   app-side writer, `CaptionLayout.place` (W-10).
+  The graphics engine's wrappers are here too: `GraphicLibrary` (`addFont`,
+  `addAsset`, `rasterize`, `families()`; frozen by its first compile,
+  rasterize or `families()`) and
+  `GraphicModule` (`compile`, `describeJSON`, `svg`; it holds its library
+  strongly), with `GraphicDiagnostic`, `GraphicFailure` (what a `diag_out`
+  failure throws; `err_out` stays `ReelCoreError`) and `GraphicRaster`.
+  `MediaDescriptor`, `mediaURL(for:)` and `bookmarkString(for:)` are
+  `MediaDescriptor.swift`'s: a `media[]` element minus its id, and the
+  media-file resolvers; they call no `rc_*`.
   It is also where the op table is read BACK: `ReelOp.coreNames()` over
   `rc_op_names`, and `ReelOp.coreSchemas()` over `rc_op_schemas` — every
   op's ARGUMENTS as JSON Schema, keyed by op name, which
-  `AgentCatalog.opTool` prints for all fifty-seven op tools.
+  `AgentCatalog.opTool` prints for all fifty-nine op tools.
   `deinit` frees the Rust allocation. It also holds **the one read of
   `rc_project_apply`'s TWO message channels**, in the header's own order — a
   sentence is a refusal, an error message is invalid input, neither written
@@ -73,7 +82,11 @@ detail there.
   `WordProps.swift` — the `Codable`, READ-ONLY mirror of spec §5.2 every view
   draws from. **Its enums decode LENIENTLY**
   — a misspelt kind becomes the first case, a `T??` field a clear — which is
-  why a caller-authored object is never decoded through them (below): no
+  why a caller-authored object is never decoded through them (below). The
+  one exception is `ClipSource`: an unknown `source.kind` THROWS, and
+  `ReelProject.snapshot` then falls back to `.empty`, so the WHOLE project
+  draws empty with no error. A new source kind in the core is therefore a
+  `ClipSource` case in the same phase (road map 10's G2a added `graphic`): no
   agent handler reads a caller-authored OBJECT at all. A scalar enum
   argument is a different thing and several handlers still parse one by name
   (`add_zoom_action`'s `fit`, `curveArg`, `set_transition`'s `kind`): the
@@ -87,7 +100,12 @@ detail there.
   `TextProps.swift` is the text group and `RecipeReveal` (with format version
   9's `textCase` / `words` / `wordStyle` and the recipe's `word` / `wordPop`),
   a pure move out of `ProjectSnapshot.swift` because a stored property cannot
-  be added from an extension. `WordProps.swift` mirrors `model_words.rs`
+  be added from an extension. `ProjectSnapshot+Graphic.swift` mirrors
+  `model_graphic.rs`'s `GraphicProps` as `GraphicSnapshot` (`in` is
+  `sourceIn`) and `GraphicPropValue` (string, number, bool; anything else
+  `.null`), decoded into `ClipSnapshot.graphic`; `props` keys keep the
+  module's own spelling (snake-case conversion does not reach a dictionary's
+  keys). `WordProps.swift` mirrors `model_words.rs`
   (`TextCase`, `TextWord`, `WordMode`, `ActivePill`, `WordStyle`)
   — `WordStyle.dictionary` writes ALL six keys, `NSNull` for a nil slot,
   `MotionProps.dictionary`'s rule, because the core deep-merges
@@ -101,7 +119,7 @@ detail there.
   W-6). It lives there, not in `InspectorPane.swift`, for the size rule.
 
 **The document.**
-- `ProjectDocument.swift` (+`DisplayStem`, +`Recording`, +`SelectedAction`)
+- `ProjectDocument.swift` (+`DisplayStem`, +`Recording`, +`SelectedAction`, +`Import`, +`Graphics`)
   — NSDocument, `.reelcut` package read/write, and the single mutation
   point (see Undo); `applyEdit`'s `.refused` arm beeps and then posts
   `projectDocumentDidRefuse` with the `ReelRefusal` (spec §11 CI-10), which
@@ -123,6 +141,22 @@ detail there.
   handle, and `project` still means the parent for save, export and
   consolidate. A range is cleared on every scope change: a pair of ticks
   means one thing inside a nest and another to an export.
+  `+Import` is File ▸ Add Media… and every drop into an open project
+  (`importMedia`, the probe chain and the one grouped commit). `+Graphics`
+  is the document's side of the package's `graphics/`:
+  `startGraphicStore()`, run from `makeWindowControllers()` and seeding an
+  untitled document's root from `autosavedContentsFileURL/graphics`, and
+  `graphicsWrapper()`, the lazy wrapper the save whitelist carries — for a
+  SAVED document it reads `<fileURL>/graphics` itself and never asks the
+  store, so a nil store can never drop a saved folder; for an untitled one
+  it carries the store's root only when `GraphicStore.holdsContent` (an
+  entry, file or directory, that is neither hidden nor the manual) says so
+  (spec §11 G-14).
+  `startGraphicStore()` also installs the document's compiled set in
+  `GraphicRegistry` and observes the store's `.graphicsDidChange`, whose
+  handler updates the registry and THEN posts `.projectGraphicsDidChange`
+  (object: the document) — never `rescan()` there; `stopGraphicStore()`,
+  from `close()`, removes the observer, drops the set and stops the store.
 - `MediaImporter.swift` (+`Probe`, +`Speech`, +`Peaks`) ·
   `MediaPeakBuckets.swift` · `MediaCacheFiles.swift` ·
   `FFmpegRewrap.swift` · `AppSupport.swift` — the import funnel and the
@@ -147,6 +181,46 @@ detail there.
 - `MediaConsolidator.swift` (+`EditorViewController+Consolidate`) — writes
   inside the package behind NSDocument's back, so it MUST call
   `ProjectDocument.packageContentsDidChangeOnDisk()` afterwards.
+- `GraphicStore.swift` — one document's `graphics/` (road map 10 §5f):
+  where it is (`<package>/graphics`, or an untitled document's
+  `<NSTemporaryDirectory()>/Reelcut/<UUID>-graphics`, re-pointed by
+  `packageDidMove(to:)` from the `fileURL` setter, posting
+  `.graphicsLocationDidChange`), the scan (each legal `*.js` with its
+  SHA-256 revision, G-13; `fonts/` validated on a throwaway
+  `GraphicLibrary`; `assets/` with a 0-byte file warned and skipped) and
+  the watch. **`graphics/` is created on the app's first write, never at
+  open** (G-14): `ensureFolder()` is the ONE creator inside a package, and
+  every app-side writer goes through `write(name:source:)` or it. While the
+  folder is absent the store watches the PACKAGE directory, and the first
+  observed appearance calls `folderDidAppear` →
+  `packageContentsDidChangeOnDisk()` once — without it the next save is
+  refused as "changed by another application". A folder source raises
+  `.write` only and an in-place save raises nothing on it (G0 q7), so each
+  module has its own source; every pass re-opens every source BY PATH and
+  arms BEFORE it scans; events coalesce over 100 ms. The queue owns the diff
+  and an outbox; main publishes in order through `drain()` (`scan`, the
+  callback, `.graphicsDidChange` with sorted names — every module and
+  `library: true` when the font/asset set moved; with NO names when the
+  folder holds no module and only the library moved, which still posts, G5b).
+  `uniqueModuleName(_:)` is the one free-name rule (`-copy`, `-copy-N`)
+  Duplicate and Insert ▸ Graphic share. **`drain()` is not
+  re-entrant: never call `rescan()` from a `.graphicsDidChange` observer.**
+  `stop()` bumps a generation under `queue.sync`. `makeLibrary()` is a NEW
+  builder every call (a library freezes on first use). It also writes the
+  app's bundled reference into an EXISTING folder as `API.md` and `API.d.ts`
+  (`writeManual()`, from `start()` for a saved package, `ensureFolder()` and
+  `write()`; only when the bytes differ) — never a reason to create the
+  folder (G-14).
+- `GraphicScan.swift` — `GraphicModuleFile`, `GraphicFile` and `GraphicScan`,
+  what one pass of the store found. `GraphicTemplates.swift` — pure: the
+  bundled `GraphicTemplates/` modules (copied by `project.yml`'s post-build
+  script), their titles from the file stem (never compiled — every chrome
+  probe builds the menu bar) and a stem sanitised to a legal module name.
+  `GraphicStore+Manual.swift` — the
+  manual: `manualNames` (`API.md`, `API.d.ts`), `bundledManualNames`
+  (`GraphicsAPI.md`, `GraphicsAPI.d.ts`, copied into Resources by
+  `project.yml`'s post-build step from `docs/`), `manualDirectory(besideFonts:)`,
+  `writeManual()` and `holdsContent`.
 - `ReverseRenderer.swift` — `Source::Media.reversed` resolved to
   `cache/reversed/<id>-<digest>.mov`, rendered on demand behind a sheet,
   substituted per CLIP by `CompositionBuilder`.
@@ -174,6 +248,8 @@ window-modal and the preview panel's forwarded keys would otherwise reach
 the key map behind it.
 
 **The editor.**
+- `EditorViewController+Graphics` refreshes the paused frame on
+  `.projectGraphicsDidChange` for its own document.
 - `EditorViewController+Timeline` / `+Canvas` / `+Inspector` / `+Toolbar` —
   installing the three panes and the toolbar (transport · timecode — view ·
   Export, nothing else). `+Timeline` holds the delete family, including ⌫
@@ -183,7 +259,14 @@ the key map behind it.
   (esc, `case 27` in `handleEditorKey`, false when nothing was selected),
   removes the selected one, and selects what ⌥⌘K, Zoom to Region and Zoom
   Back just added.
-- `+AddClips` (Add Text / Add Shape: the front track, else a new one),
+- `+AddClips` (Add Text / Add Shape: the front track, else a new one;
+  `addGeneratedClip` is internal and takes `grouped:` — `performGroupedEdit`
+  when the edit lands outside the menu's event, as a panel's completion does),
+  `+GraphicMenus` (Insert ▸ Graphic's templates and From File…, File ▸ Add
+  Font/Image to Graphics…; the template item runs in-event through
+  `applyEdit`, the panels through `performGroupedEdit`; the shared body
+  `insertGraphic(from:grouped:) throws` shows no dialog, and a module that
+  does not compile stays on disk and places nothing — G-16),
   `+Clipboard` (⌘X/⌘C/⌘V over the `com.kgalligan.reelcut.clips` pasteboard,
   the `paste` op's payload; ⌥⌘V Paste Attributes with no `groups`),
   `+Edge` (slip, roll, close gap, insert, overwrite, the `,` / `.` nudge —
@@ -203,7 +286,9 @@ the key map behind it.
   of every session in `CanvasSessions.swift`) because a region is drawn on
   what is on screen; ⇧ during the drag chooses `fill`.
 - `EditorWindowController.swift`, `WelcomeWindowController.swift`,
-  `AppDelegate.swift` (+`Menus`, +`Recording`), `main.swift` — the window,
+  `AppDelegate.swift` (+`Menus`, +`Recording`, +`GraphicMenu` — the Insert
+  menu's builder and Help ▸ Graphics Reference, `showGraphicsReference`, on
+  the delegate), `main.swift` — the window,
   the no-document window, the launch/terminate flow and the whole menu bar
   (spec §9). Menu items are nil-target selectors down the responder chain.
 - `EditorWindow.swift` — the editor's `NSWindow` subclass: its `sendEvent`
@@ -344,9 +429,14 @@ the key map behind it.
   `ClipPane.swift` (the sub-tabs — `subTabs` by kind, `activeSubTab`, and
   `choose` / `forgetSubTab`, which never refresh — and `makeSections()`, the
   function from the selection's kind and the active sub-tab to its
-  sections, with the open rule per tab) · `ClipSelectionHeader.swift`
+  sections, with the open rule per tab) · `ClipPane+Timing.swift` (the
+  Timing section — `timingSection`, `reverseTimingSection`, `reverseRows` —
+  a pure move out of `ClipPane.swift`; `makeSections()` is its only caller) ·
+  `ClipSelectionHeader.swift`
   (`ClipSelectionHeaderView`, a pure move out of `ClipPane.swift`) ·
-  `ClipPinnedBlock.swift` (`ClipSubTab` with its `◆N` key count,
+  `ClipPinnedBlock.swift` (`ClipSubTab` — six cases in display order, text,
+  shape, graphic, picture, sound, clip; `graphic` keys nothing, G-10 — with
+  its `◆N` key count,
   `ClipSubTabsView`, and `ClipHeaderBlock` — header, lane, sub-tabs — which
   `makeHeader()` builds once per pane build) · `ActionLaneView.swift` (the
   action lane, the Actions section's replacement, with the clip and action
@@ -360,6 +450,23 @@ the key map behind it.
   own gates, drawn under the bands; `Curve.laneName`; `CurveGlyphView`,
   beside the Curve popup because `OptionPopupControl` is not forked) · `VideoPane.swift` (+`Transition`,
   +`Motion`, +`Obscure` — the Obscure section, a pure move) · `AudioPane.swift` · `TextPane.swift` · `ShapePane.swift` ·
+  `GraphicPane.swift` (the Graphic sub-tab, road map 10 §5j, spec §11 G-15:
+  a factory `ClipPane` calls when EVERY selected clip is a graphic; the
+  shared module from `GraphicRegistry.entry(named:for:)`, main only, never a
+  rescan; a structure signature of schema keys and types, stale keys, the
+  asset popup's names and diagnostics — never values, the revision or the
+  playhead; Properties, Size and Timeline; every write is `set_graphic`) ·
+  `GraphicPane+Source.swift` (Source: name, file, revision, Open / Reveal /
+  Duplicate as New Graphic… — `store.write`, `rescan()` inside the button's
+  event, one `set_graphic {name}` step — and `report(for:)`, the compile's
+  diagnostics plus the first frame rasterized at the clip's OWN size,
+  memoised and frozen during a live gesture) · `GraphicSchemaRows.swift`
+  (pure, probe-callable: the schema in the MODULE's key order —
+  `GraphicSchema.orderedKeys` scans `describeJSON()`'s text because the
+  registry's dictionary lost it — one row per schema type, stale rows
+  sorted with ⌫ writing `null`, CSS ↔ `RGBA`, and the null rule: a value
+  equal to the default is written as `null`, a colour compared by parsed
+  channels) ·
   `DocumentPane.swift` (reads `documentSnapshot`, never the scoped one: its
   ops are document-level) · `OptionControls.swift` (the descriptor-driven
   row controls) · `OptionControls+Choices.swift` (the typed, value-carrying
@@ -406,6 +513,11 @@ the key map behind it.
   divide `g`, Full for a coprime canvas); `AVPlayerItem.videoComposition` is
   a COPY property, so the setter re-assigns. `makePreviewLayer` is the one
   door to a second `AVPlayerLayer`.
+  The item is dropped only for an EMPTY timeline (`plan.duration <= 0`,
+  where the transport beeps). Never gate it on the plan's track lists: a
+  timeline of only graphics, text, shapes or images has no plan track and
+  plays over the builder's placeholder (road map 10 §10.8,
+  `media_less_playback_probe.py`).
 - `CompositionBuilder.swift` (+`InstructionRanges`, +`AudioTracks`) — the app's ONE
   constructor of `AVMutableVideoComposition`, shared by the preview, both
   export passes and the offline frame. **Do not give it a preview-shaped
@@ -420,6 +532,38 @@ the key map behind it.
   format (spec §11 R2-1) — a tapped track that changes format part-way
   STALLS the player (kpgalligan/reelcut#34), so never feed one composition
   track two formats.
+  `addPlaceholderIfNeeded` gives a plan with no video track but a duration
+  a one-frame `Blank.mp4` track scaled across it. The preview's item, both
+  export passes and the offline frame all rely on it for a media-less
+  timeline.
+- `RecipeSource.swift` — the process-wide registry the compositor reads a
+  recipe from (§7.6): a slot per document (`ProjectDocument.recipeKey`) and
+  per export (`Exporter` mints its own), the project published under `set`
+  after every edit and the `RecipeOptions` stored BESIDE it per key, both
+  read under one lock hold in `recipe(for:at:)`.
+- `GraphicRegistry.swift` · `LayerRenderersGraphic.swift` — a graphic layer
+  drawn (road map 10). The registry maps a `RecipeSource` key to one
+  immutable `GraphicSet` (library, `libraryVersion`, each module `.compiled`
+  with `meta`/`schema` or `.failed`), installed at store start and swapped on
+  `.graphicsDidChange` — a NEW library and every module recompiled only when
+  `library` is true (or the last library failed to build), else just the
+  named modules against the existing (frozen) library. `install`/`update`/
+  `remove`/`entry` are main-only; `resolve` is the one cross-thread read of
+  the set: a document's own key at the 250 ms preview budget, a PINNED
+  offline key at 2 s, else nil — the slate. **An offline key draws only what
+  its caller pinned** (`pin(set, for: key)` with the document's
+  `snapshot(for: recipeKey)`, captured on main): every `pin` has its `unpin`
+  — `Exporter.finish` AND `deinit`, and `renderFrameReported`'s `defer`. A
+  pin also keeps its REPORTS: the first failure in a slot of its own for the
+  pin's life, then at most 64 distinct warnings, so a warning can never
+  displace a failure. `LayerRenderersGraphic` hands the engine the core's
+  own `props_json` / `ctx_json` untouched and keys the texture by the SVG
+  TEXT, the size and the library version, in `LayerRenderers`' separate
+  six-entry graphic pool. A graphic that fails — no module, not compiled, a
+  throw or timeout, a refused raster — draws its ERROR CARD, keyed by its
+  own text in the graphic pool, never the last good frame; a raster's
+  warnings ride in `Rendered.warnings` so a pool hit still reports them.
+  Only no set and a failed upload are nil.
 - `Compositor.swift` · `CompositorEffects.swift` · `Resources/Shaders/Compositor.metal`
   — the per-layer pass. The uniform block's field ORDER is a contract with the
   shader checked only by reading both, so change them in one edit; it is 104
@@ -439,7 +583,8 @@ the key map behind it.
 - `LayerRenderers.swift` · `LayerRenderersText.swift` · `LayerRenderersReveal.swift`
   · `LayerRenderersWords.swift` — text and shape descriptions to textures,
   keyed by the recipe's `hash` (`RecipeSourceRef.cacheHash` is the WHOLE key;
-  nothing here may append to it). Text draws what the recipe computed; the
+  nothing here may append to it — a graphic's key is its SVG text instead,
+  `LayerRenderersGraphic.swift`, in its own six-entry pool). Text draws what the recipe computed; the
   LAYOUT is always the full text's, laid from `laidContent`, cached without
   the reveal or the word, and `reveal = 1` takes the plain `CTFrameDraw` path
   so a full reveal is byte-identical to no animation; a line or token at
@@ -468,7 +613,8 @@ the key map behind it.
   algebraically self-cancelling) and pan (constant-power, unity at centre).
   A track whose clips ask for none is bit-identical.
 - `Exporter.swift` · `ExporterLoudness.swift` · `ExporterSettings.swift` ·
-  `ExporterWriter.swift` · `ExporterImageSequence.swift` — the writer
+  `ExporterWriter.swift` · `ExporterImageSequence.swift` ·
+  `ExporterErrors.swift` · `ExporterGraphics.swift` — the writer
   (`ExportWriter` REPLACED `AVAssetExportSession` so chapters, bitrate and
   size have one path) and the one-frame offline render. An export is TWO
   passes wherever the file holds sound: a measurement build of its own in
@@ -480,7 +626,17 @@ the key map behind it.
   grow the guard. GIF and APNG refuse past 600 frames rather than truncate.
   `renderFrame` is documented off-main. Audio export is NOT bit-deterministic
   within an 8 ms window at a duck ramp edge (AVFoundation's mix); a duck-free
-  project decodes byte-identical.
+  project decodes byte-identical. `ExportError` is `ExporterErrors.swift`'s.
+  An export PINS the `GraphicSet` it was handed for its whole life, GATES it
+  before the build (`ExporterGraphics.graphicsRefusal`: a graphic clip in the
+  range, or in a nest a clip in the range shows, whose module did not
+  compile or is missing, refuses before the destination is touched), and
+  ABORTS on a recorded failure: `pollProgress` cancels and `finish` removes
+  the file and answers `.graphicFailed`, whatever the pipeline said.
+  **`ExportWriter.cancel()` only sets the flag**; the reader and the writer
+  are cancelled in `allInputsFinished`, after every pump has left its loop —
+  cancelling the reader under a running `copyNextSampleBuffer` crashed the
+  process. Never call `cancelReading` from another thread while a pump runs.
 - `FrameWriter.swift` — a `CGImage` and a format in, a URL out, no panel:
   Save Frame and `render_frame` both call it, so their PNGs are
   byte-identical by construction. PNG keeps a NIL properties dictionary
@@ -765,7 +921,8 @@ free.
 - `ExportQueueController.swift` · `ExportQueueWindowController.swift` — the
   controller has NO AppKit in it so a probe can drive it; one job at a time on
   the MAIN thread with a fresh `Exporter` each (two concurrent ones deadlock);
-  `mediaURLs()` captured at ENQUEUE. No MCP mirror: `export` called N times is
+  `mediaURLs()` AND the document's compiled graphics (`Job.graphics`)
+  captured at ENQUEUE. No MCP mirror: `export` called N times is
   the capability.
 - `SettingsWindowController.swift` — Reelcut ▸ Settings… ⌘,, the app's one
   window for something PERSISTED beyond view state, with
@@ -831,25 +988,51 @@ free.
 **The agent.**
 - `AgentServer.swift` (frozen) and `AgentServer+Project` / `Clips` / `Tracks`
   / `Media` / `Render` / `History` / `Silence` / `Captions` / `Audio` /
-  `Background` / `Scope` / `Transitions` / `CloudCaptions` / `Recording`
+  `Background` / `Scope` / `Transitions` / `CloudCaptions` / `Recording` /
+  `Graphics`
   (+`RecordingArguments`, +`RecordingResult`) — the handlers, one file per
   group. `+CloudCaptions` is `transcribe`'s CLOUD arm alone — the `engine`
   reader, the three cloud-only arguments refused by name under `apple`, the
   vocabulary's trim/de-dup/cap, the credential and the endpoint read ABOVE
   the network, and the result keys; `+Captions` dispatches on `engine` and is
-  otherwise the code it was. `AgentCatalog.swift`
-  (+`Clips`, +`Audio`, +`Transitions`, +`Files`, +`Captions`, +`Declarations`)
+  otherwise the code it was. `+Graphics` holds the two graphic op tools and
+  the three app-state ones — `write_graphic` (the store's one writer, then a
+  synchronous `rescan()` so the reply is the compile of THAT text; a failed
+  compile is `ok: false`, not an error; not undoable, never dirty, G-3),
+  `get_graphic` (one module, or the folder with `folder_exists`, the
+  engine's `families` and the `assets`) and
+  `graphic_reference` (the bundled `GraphicsAPI.md`; it never calls
+  `target(a)`, so it answers with no project open) — and `graphicsSummary`,
+  `get_project`'s `graphics`. `+GraphicRender` is `render_graphic`, an
+  `offMainTools` member: one `onMain` for the target, the registry's
+  compiled module, the canvas and `meta`; then, off main, the ctx built by
+  hand (`recipe_graphic.rs`'s keys) and a contact sheet or one frame's SVG;
+  a failing frame is its error card, drawn by
+  `LayerRenderers.paintErrorCard`, the one card painter.
+  `+GraphicImports` is `import_graphic_font` / `import_graphic_asset`, on
+  main, thin: they call `GraphicStore+Import.swift`'s `importFont(from:)` /
+  `importAsset(from:as:)` — the ONE body File ▸ Add Font/Image to Graphics…
+  also runs (the copy via `ensureFolder()`, G-14, `.partial` moved into
+  place, then `rescan()`), and the store's own post reaches the registry; a
+  font's `families` come from a throwaway
+  library holding that file alone. `GraphicContactSheet.swift` is pure: the
+  layout (the scale is over the cells alone, so the sheet is exactly
+  `width × height ≤ max_width × 8192`), the painter and
+  `GraphicRaster.cgImage()`. `AgentCatalog.swift`
+  (+`Clips`, +`Audio`, +`Transitions`, +`Files`, +`Captions`, +`Graphics`,
+  +`Declarations`)
   — the catalog, spliced in ORDER (`recording_probe.py` reads the last eleven
   names). **A tool is built one of two ways**: `tool`, which declares its own
   schema, or `opTool`, which declares PROSE and prints the argument STRUCTURE
   from the core's published table (`Self.opSchemas` over `rc_op_schemas`).
-  **Every one of the fifty-seven op tools is `opTool`'s** and carries no
+  **Every one of the fifty-nine op tools is `opTool`'s** and carries no
   `"type"`, no `"enum"` and no hand-written required list; `tool`'s remaining
-  callers are the twenty APP-STATE tools, which have no op behind them and so
-  nothing to read from the table — the ten of the Projects group,
+  callers are the twenty-six APP-STATE tools, which have no op behind them
+  and so nothing to read from the table — the ten of the Projects group,
   `AgentCatalog+Audio.swift`'s two composites and
   `AgentCatalog+Captions.swift`'s three, spliced back at the two points they
-  left, and the five other file tools, `record_screen` among them. `opTool`
+  left, the five other file tools, `record_screen` among them, and
+  `AgentCatalog+Graphics.swift`'s six, after its two `opTool` rows. `opTool`
   goes THROUGH `tool`, so `project` and `scope` are injected by one piece of
   code either way. `AgentCatalog+Declarations.swift` is the one list of places
   a tool deliberately takes more or less than its op does — a bare-string
@@ -860,7 +1043,12 @@ free.
   with a reason, like an entry in `opsWithoutTools`; a leniency the tools have
   never declared is not a row until someone decides to OFFER it, because a
   schema narrower than what is accepted costs a caller nothing where a wider
-  one is a promise the app breaks. `AgentServer+Parity.swift` is the FIFTH
+  one is a promise the app breaks. A `.filledByTheApp` row takes an argument
+  OUT of the tool entirely — `declaredInput` omits it from `properties` and
+  `required` and the parity check's `expectedArguments` subtracts it — for an
+  argument only the app can fill: the two graphic ops' `schema`, read from
+  the module's current revision (G-4), which the gate therefore refuses as a
+  stranger. `AgentServer+Parity.swift` is the FIFTH
   part of the startup parity check — the one part that looks INSIDE an op
   tool's schema: its arguments must be the core's own (both directions, the
   envelope's two keys and the declarations list apart), each one must carry a
@@ -870,7 +1058,7 @@ free.
   `AgentServer+Scope.swift` with the feature it is about; all five assert in
   debug, log `Reelcut: ` in release and start the server either way.
   `AgentServer+Gate.swift` is the CALL-time half of the same contract
-  (kpgalligan/reelcut#21): one comparison in `dispatch`, for all seventy-seven
+  (kpgalligan/reelcut#21): one comparison in `dispatch`, for all eighty-five
   tools, of a caller's keys against the schema the tool published, every
   stranger refused by name — the tool, the strangers and the whole of what it
   takes — before the scope or any handler reads a thing. Its map is read once
@@ -880,7 +1068,8 @@ free.
   document through `NSApp.orderedDocuments`, never `documents.first`, and an
   explicit path through `AgentServer.canonical`. `offMainTools` names the
   handlers that wait for something the main thread must deliver
-  (`import_media`, `transcribe`, `record_screen`, `export`, …); the criterion
+  (`import_media`, `transcribe`, `record_screen`, `export`,
+  `render_graphic`, …); the criterion
   is "waits on main", not "touches the disk".
 - `AgentServer+Arguments.swift` — the shared argument vocabulary
   (`intArg`, `timeArg`, `rangesArg`, `rawPatchArg`, …), each refusing a
@@ -1037,7 +1226,10 @@ R6-7), the transcribe sheet's Download row's KVO main hop
 observation), `FFmpegRewrap`'s serial queue, the two one-frame render
 queues (`eyedropperQueue`, `frameGrabQueue` — a third one-frame render joins
 this entry rather than growing the list), `ScreenRecorder.shareableContent`'s
-global hop, and the cache's main hop. The recorder adds NO queue of its own:
+global hop, `GraphicStore`'s serial queue (its file-system sources'
+handlers, the coalesced pass and the outbox; main publishes through
+`drain()` and never waits on it but by `queue.sync`), and the cache's main
+hop. The recorder adds NO queue of its own:
 framework callbacks are stamped where they land and hopped to main. Colors,
 fonts and metrics come from `DS` tokens; shared controls go in
 `Controls.swift`. **A refusal and an identity both beep** (`NSSound.beep()`)

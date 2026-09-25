@@ -131,7 +131,7 @@ pub fn nested_pair(value: &Value) -> Value {
         "source":{"kind":"nest","project":50},
         "enabled":{"audio":true,"video":true}, "speed":1.0,
         "video":clip(value, 10)["video"], "audio":clip(value, 10)["audio"],
-        "text":null, "shape":null, "actions":[], "transition_in":null,
+        "text":null, "shape":null, "graphic":null, "actions":[], "transition_in":null,
         "name":null, "label":null
     }]);
     expected["next_id"] = json!(53);

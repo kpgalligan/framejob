@@ -359,6 +359,8 @@ APP_STATE_TOOLS = {
     "import_captions", "export_captions", "transcribe", "consolidate_media",
     "detect_silence", "normalize_clip", "set_playhead", "set_range", "set_selection",
     "set_scope", "undo", "redo", "render_frame", "export", "record_screen",
+    "write_graphic", "get_graphic", "graphic_reference", "render_graphic",
+    "import_graphic_font", "import_graphic_asset",
 }
 
 # `record_screen`'s own arguments (road map 3, R1d), as declared; `project`
@@ -769,7 +771,7 @@ def catalog_part(mcp):
           f"at least {OPS} tools declare the envelope's scope (got {len(scoped)}) — R1 adds "
           "no op, and the exact number is the newest phase's to assert")
     check(names - set(scoped) == APP_STATE_TOOLS,
-          "and the tools WITHOUT one are exactly the twenty app-state tools, named: "
+          "and the tools WITHOUT one are exactly the twenty-six app-state tools, named: "
           f"{sorted(names - set(scoped) - APP_STATE_TOOLS)} unexpected, "
           f"{sorted(APP_STATE_TOOLS - (names - set(scoped)))} missing")
 

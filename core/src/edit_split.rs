@@ -27,6 +27,7 @@ use crate::actions::{self, Evaluated, MAX_PATCH_DEPTH};
 use crate::edit_clip::clip_end;
 use crate::model::{Action, Project, VideoProps};
 use crate::model_words::{rebase_words, token_count};
+use crate::recipe_graphic::{effective_length, graphic_advanced};
 use crate::source_window::source_advanced;
 use crate::time::Ticks;
 
@@ -89,6 +90,9 @@ pub(crate) fn split_clip(project: &mut Project, clip_id: u32, at: Ticks) -> bool
     }
     let state = project.evaluate_clip(&original, clip_t);
     let patch_source = state_patch(&state);
+    // Measured on the ORIGINAL, so a null `length` is `in` plus the WHOLE
+    // duration, not the half either piece keeps.
+    let pinned = effective_length(&original);
 
     let mut second = original.clone();
     second.id = project.allocate_id();
@@ -98,6 +102,14 @@ pub(crate) fn split_clip(project: &mut Project, clip_id: u32, at: Ticks) -> bool
     // source; a still's frozen frame and the sourceless kinds do not move,
     // which is `source_advanced`'s own rule.
     second.source = source_advanced(&original.source, clip_t, original.speed);
+    // A graphic's own timeline (road map 10's G-9): the second half starts
+    // `clip_t` further into it, and BOTH halves keep the original's length,
+    // so the join is invisible and neither half's outro moves — the first
+    // half's `in + duration` would otherwise be only the head.
+    second.graphic = graphic_advanced(original.graphic.as_ref(), clip_t);
+    if let Some(graphic) = second.graphic.as_mut() {
+        graphic.length = pinned;
+    }
     // Presence of a group is a fact about the clip, so an audio-only clip
     // stays audio-only; only the values come from the evaluation.
     second.video = original.video.as_ref().map(|_| state.video.clone());
@@ -203,6 +215,9 @@ pub(crate) fn split_clip(project: &mut Project, clip_id: u32, at: Ticks) -> bool
     if let Some(first) = project.clip_mut(clip_id) {
         first.duration = clip_t;
         first.actions = first_actions;
+        if let Some(graphic) = first.graphic.as_mut() {
+            graphic.length = pinned;
+        }
         motion_of(&mut first.video, true);
         if let Some(animation) = first.text.as_mut().and_then(|t| t.animation.as_mut()) {
             animation.out = 0;

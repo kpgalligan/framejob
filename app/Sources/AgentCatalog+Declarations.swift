@@ -46,12 +46,16 @@ struct AgentDeclaration {
     /// key, and a default the app takes from its own state must not be made
     /// compulsory by the core's word.
     enum Requirement {
-        /// The core's answer stands, which is every argument but six.
+        /// The core's answer stands, which is every argument but eight.
         case theCores
         /// The tool asks for an argument the core calls optional.
         case required
         /// The tool does not ask for one the core requires.
         case optional
+        /// The tool does not PUBLISH the argument at all: the app fills it
+        /// from what only the app can read, and the gate refuses a
+        /// caller's own as a stranger.
+        case filledByTheApp
     }
 
     let subject: Subject
@@ -119,13 +123,14 @@ struct AgentDeclaration {
 extension AgentServer {
 
     /// Every declaration, in one list (`AgentDeclaration`'s doc has the rule
-    /// an entry has to pass). Fourteen rows over six kinds of difference:
+    /// an entry has to pass). Sixteen rows over seven kinds of difference:
     /// two bare-string shorthands, one reading of a whole JSON kind, two
     /// nulls that mean something, one range the core clamps to rather than
     /// refusing, one the APP refuses outside where the core's kind is
     /// looser, four times the tool takes from the app what the op would
     /// have made the caller send, and three times a list the tool will not
-    /// accept empty although the op reads one.
+    /// accept empty although the op reads one, and twice an argument only
+    /// the app can fill, which the tool does not publish at all.
     ///
     /// **Two rows narrow rather than widen, and they are the same rule read
     /// the other way.** `set_speed.rate` and `set_canvas.fps` each publish a
@@ -259,6 +264,20 @@ extension AgentServer {
                 + "window is looking (AgentServer+Tracks.swift). The core requires the tick "
                 + "because a marker IS a time; the app has one to supply and the core has "
                 + "not."),
+
+        // ---- an argument only the app can fill ------------------------------
+
+        AgentDeclaration(
+            .argument("schema", of: "add_graphic_clip"), requirement: .filledByTheApp,
+            why: "G-4: the core has no filesystem, so the schema the props are checked "
+                + "against is read by the app from the module's CURRENT revision in the "
+                + "package's graphics/ (GraphicRegistry) and sent with the op. A caller's "
+                + "own schema could only disagree with the module, so the tool does not "
+                + "publish it and the gate refuses one as a stranger."),
+        AgentDeclaration(
+            .argument("schema", of: "set_graphic"), requirement: .filledByTheApp,
+            why: "add_graphic_clip's reason: the app sends the schema of the module the "
+                + "patch names, else of the one module every clip is drawn by."),
     ]
 
     /// One op tool's declared input: the core's published structure, each
@@ -287,7 +306,8 @@ extension AgentServer {
             return declarations.filter { $0.covers(op, argument, type: fragment?["type"]) }
         }
         var properties: [String: Any] = [:]
-        for (argument, fragment) in published.properties {
+        for (argument, fragment) in published.properties
+        where !rows(about: argument).contains(where: { $0.requirement == .filledByTheApp }) {
             var property = fragment as? [String: Any] ?? [:]
             for declaration in rows(about: argument) {
                 property = declaration.applied(to: property)
@@ -301,7 +321,9 @@ extension AgentServer {
         // ARGUMENT order and not in list order, because `properties` is a
         // dictionary and a tool's required list may not vary per process.
         var required = published.required.filter { argument in
-            !rows(about: argument).contains { $0.requirement == .optional }
+            !rows(about: argument).contains {
+                $0.requirement == .optional || $0.requirement == .filledByTheApp
+            }
         }
         for argument in properties.keys.sorted() where !required.contains(argument) {
             guard rows(about: argument).contains(where: { $0.requirement == .required })

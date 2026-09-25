@@ -9,7 +9,7 @@
 //!
 //! It is a module of its own because the table is a published interface —
 //! the tool catalog will read it rather than restate it — while the [`Op`]
-//! enum and the fifty-seven-way dispatch are the implementation of that
+//! enum and the fifty-nine-way dispatch are the implementation of that
 //! interface. [`OP_NAMES`] is a projection of this table and is re-exported
 //! from `edit.rs` under its old name, so no caller anywhere moved.
 //!
@@ -75,11 +75,12 @@
 //! [`Op`]: crate::edit::Op
 
 use crate::edit_canvas::{CANVAS_MAX, CANVAS_MIN};
+use crate::model_graphic::{GRAPHIC_MAX_SIDE, GRAPHIC_MIN_SIDE};
 use Kind::*;
 
 /// How many ops there are. `edit.rs`'s enum, its dispatch and this table
 /// all have exactly this many arms.
-pub const OP_COUNT: usize = 57;
+pub const OP_COUNT: usize = 59;
 
 /// One op's row: its name, and its arguments in the order the enum declares
 /// them — which is the order the decoder lists them back in.
@@ -230,6 +231,11 @@ pub const OP_TABLE: [OpRow; OP_COUNT] = [
        &[req("track", Id), req("at", Ticks), opt("duration", Ticks), opt("text", Object)]),
     op("add_shape_clip",
        &[req("track", Id), req("at", Ticks), opt("duration", Ticks), opt("shape", Object)]),
+    op("add_graphic_clip",
+       &[req("track", Id), req("at", Ticks), opt("duration", Ticks), req("name", Text),
+         within(opt("width", Id), GRAPHIC_MIN_SIDE, GRAPHIC_MAX_SIDE),
+         within(opt("height", Id), GRAPHIC_MIN_SIDE, GRAPHIC_MAX_SIDE),
+         opt("props", Object), opt("schema", Object)]),
     op("add_background", &[opt("media", Id), opt("color", Color), opt("duration", Ticks)]),
     op("add_blurred_background", &[req("clip", Id)]),
     op("insert_clip", &[req("track", Id), req("media", Id), req("at", Ticks)]),
@@ -261,6 +267,7 @@ pub const OP_TABLE: [OpRow; OP_COUNT] = [
     op("set_audio", &[req("clips", Ids), req("patch", Object)]),
     op("set_text", &[req("clips", Ids), req("patch", Object)]),
     op("set_shape", &[req("clips", Ids), req("patch", Object)]),
+    op("set_graphic", &[req("clips", Ids), req("patch", Object), opt("schema", Object)]),
     op("set_clip", &[req("clips", Ids), req("patch", Object)]),
     op("set_enabled", &[req("clip", Id), opt("video", Boolean), opt("audio", Boolean)]),
     op("set_transition", &[req("clip", Id), opt("kind", Transition)]),

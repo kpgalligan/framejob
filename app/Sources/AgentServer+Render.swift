@@ -49,8 +49,14 @@ extension AgentServer {
     /// because a burn-in lives only in rendered pixels — this is the one tool
     /// that can photograph one, so it is the instrument every claim about
     /// phase 7c's layer is made through.
+    ///
+    /// **A graphic that warned or failed is named** (G-8, G3c): one sentence
+    /// per report the frame's pin held, before the last. The set is the
+    /// DOCUMENT's (`recipeKey`), not the scoped handle's: a nest draws the
+    /// package's modules too.
     func renderFrame(_ a: [String: Any]) throws -> String {
-        let context = try onMain { () throws -> (ReelProject, [UInt32: URL], Ticks, CGSize) in
+        let context = try onMain {
+            () throws -> (ReelProject, [UInt32: URL], Ticks, CGSize, GraphicSet?) in
             let document = try self.target(a)
             let t = try self.optionalTimeArg(a, "t", document) ?? document.playhead
             // `editedProject`, not `project` — road map 2's phase 9. With a
@@ -65,10 +71,11 @@ extension AgentServer {
             // phase's frame comparison is unaffected.
             return (
                 document.editedProject, document.mediaURLs(), max(0, t),
-                document.editedProject.snapshot.canvas.size
+                document.editedProject.snapshot.canvas.size,
+                GraphicRegistry.shared.snapshot(for: document.recipeKey)
             )
         }
-        let (project, urls, time, canvasSize) = context
+        let (project, urls, time, canvasSize, graphics) = context
         var maxWidth: Int?
         if let requested = try intArg(a, "max_width") {
             guard requested >= 16, requested <= 8192 else {
@@ -83,9 +90,10 @@ extension AgentServer {
         let (url, format) = try frameDestination(a, at: time)
         // Off the main thread by construction — `Exporter.renderFrame` opens
         // asset tracks and decodes, and says so.
-        guard let image = Exporter.renderFrame(
-            project: project, urls: urls, at: time, maxWidth: maxWidth, options: options)
-        else {
+        let rendered = Exporter.renderFrameReported(
+            project: project, urls: urls, at: time, maxWidth: maxWidth, options: options,
+            graphics: graphics)
+        guard let image = rendered.image else {
             throw ToolError(
                 message: "No frame at \(time). Either the time is past the end of the timeline, "
                     + "the media is missing, or the timeline is empty.")
@@ -113,6 +121,9 @@ extension AgentServer {
         if !format.carriesAlpha {
             text += " " + FrameWriter.flattenNote
         }
+        for report in rendered.graphics {
+            text += " " + Self.graphicSentence(report)
+        }
         text += " Written to \(url.path)."
         return try callResult(
             content: [
@@ -122,6 +133,17 @@ extension AgentServer {
                 ],
                 ["type": "text", "text": text],
             ], isError: false)
+    }
+
+    /// One graphic's report as `render_frame` says it: failed at a frame,
+    /// did not compile, or warned — each diagnostic with its location.
+    static func graphicSentence(_ report: GraphicReport) -> String {
+        let said = report.diagnostics.map { $0.located }.joined(separator: "; ")
+        guard let frame = report.frame else {
+            return "Graphic \"\(report.name)\" does not compile: \(said)."
+        }
+        let verb = report.failed ? "failed" : "warned"
+        return "Graphic \"\(report.name)\" \(verb) at frame \(frame): \(said)."
     }
 
     /// Where `render_frame` writes and in what container — its `path` and
@@ -256,7 +278,8 @@ extension AgentServer {
         // `ExportWriter` at all.
         let options = RecipeOptions(burnInTimecode: try boolArg(a, "burn_in_timecode") ?? false)
         let prepared = try onMain {
-            () throws -> (ProjectDocument, ReelProject, [UInt32: URL], ExportSettings) in
+            () throws -> (ProjectDocument, ReelProject, [UInt32: URL], ExportSettings, GraphicSet?)
+            in
             let document = try self.target(a)
             guard document.project.duration > 0 else {
                 throw ToolError(message: "There is nothing on the timeline to export.")
@@ -321,9 +344,12 @@ extension AgentServer {
             } catch {
                 throw Self.coreRefusal(error)
             }
-            return (document, document.project, document.mediaURLs(), settings)
+            return (
+                document, document.project, document.mediaURLs(), settings,
+                GraphicRegistry.shared.snapshot(for: document.recipeKey)
+            )
         }
-        let (document, project, urls, settings) = prepared
+        let (document, project, urls, settings, graphics) = prepared
         let url = Self.destinationURL(path, extension: Exporter.fileExtension(for: settings))
         let folder = url.deletingLastPathComponent()
         var isDirectory: ObjCBool = false
@@ -345,7 +371,7 @@ extension AgentServer {
             self.editor(document)?.playback.pause()
             exporter.export(
                 project: project, urls: urls, settings: settings, to: url, options: options,
-                progress: { _ in }
+                graphics: graphics, progress: { _ in }
             ) { result in
                 box.value = result
                 semaphore.signal()

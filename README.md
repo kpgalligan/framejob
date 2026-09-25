@@ -230,6 +230,16 @@ normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
   size is the document's own, or for a GIF or APNG the format's cap fitted to
   it — and an optional loudness target and timecode burn-in over it, plus an
   offline single-frame render used for verification and by File ▸ Save Frame….
+- **Motion graphics.** A graphic clip is drawn every frame by a small
+  JavaScript module in the package's `graphics/` folder. A person puts one on
+  the timeline from Insert ▸ Graphic — six bundled templates (Bar Chart,
+  Callout, Counter, Kinetic Type, Lower Third, Title Card) or a `.js` of
+  their own — edits its properties, size and timing in the Clip tab's
+  Graphic sub-tab, brings in a font or a picture with File ▸ Add Font to
+  Graphics… and Add Image to Graphics…, and reads the API from Help ▸
+  Graphics Reference. An agent can do the whole job over MCP: read the
+  reference, write a module, look at its frames without placing it, bring in
+  a font or a picture, put it on the timeline and change its properties.
 - **MCP agent** (below): one tool per edit op, plus open/new/save/read,
   import, playhead, frame render and export.
 
@@ -286,11 +296,11 @@ Makefile              Build orchestration
 
 | File(s) | Owns |
 |---|---|
-| `ReelCore.swift` · `ReelOps.swift` | the FFI and the op vocabulary: `ReelCore.swift` is the **only** `rc_*` caller (`ReelProject` — handle + lazy snapshot — `ReelTime`, `ReelSnap`, `ReelExport`, `RecipeSource`, and the op-argument types), `ReelOps.swift` holds `ReelOp` and the typed op builders |
+| `ReelCore.swift` · `ReelOps.swift` | the FFI and the op vocabulary: `ReelCore.swift` is the **only** `rc_*` caller (`ReelProject` — handle + lazy snapshot — `ReelTime`, `ReelSnap`, `ReelExport`, and the op-argument types), `ReelOps.swift` holds `ReelOp` and the typed op builders |
 | `ProjectSnapshot.swift` | the `Codable` mirror of the §5.2 project JSON, the plan and the recipe, plus the §5.3 placement maths |
 | `ProjectDocument.swift` | NSDocument, `.reelcut` package read/write, and the single mutation point (`applyEdit`, the live-edit trio, undo as a handle stack) |
 | `MediaImporter.swift` | `AVURLAsset` probing (the one file allowed `async`/`await`), thumbnails, waveform peaks |
-| `CompositionBuilder.swift` · `Compositor.swift` · `LayerRenderers.swift` · `LayerRenderersText.swift` · `Playback.swift` | plan → `AVComposition`; the `AVVideoCompositing` Metal pipeline — five states from three fragment functions, one of them reading the destination so a layer can blend; text/shape/image textures, a shape's gradient and the three text reveals the recipe asks for; the player and its rebuild-vs-refresh rule |
+| `CompositionBuilder.swift` · `Compositor.swift` · `LayerRenderers.swift` · `LayerRenderersText.swift` · `Playback.swift` · `RecipeSource.swift` | plan → `AVComposition`; the `AVVideoCompositing` Metal pipeline — five states from three fragment functions, one of them reading the destination so a layer can blend; text/shape/image textures, a shape's gradient and the three text reveals the recipe asks for; the player and its rebuild-vs-refresh rule; the registry the compositor reads a recipe from, one slot per document and per export |
 | `CaptionImporter.swift` · `CaptionLayout.swift` · `CaptionStyle.swift` · `CaptionPages.swift` · `Transcriber.swift` (+`Extract` `Jobs` `Languages`) · `CaptionExporter.swift` | captions in and out: the SubRip grammar, the placement every producer shares, the five word caption styles and the pager that fills their pages to a measured width, on-device speech recognition and the cue builder over it, the extractor and the job list both engines share, and the `.srt` / `.vtt` writer |
 | `CloudTranscriber.swift` (+`Media`) · `MediaTranscript.swift` · `AssemblyAIClient.swift` (+`Session`) · `AssemblyAITranscript.swift` · `AssemblyAIConfiguration.swift` · `AssemblyAILanguages.swift` · `SecretStore.swift` · `CloudProgress.swift` · `CloudEstimate.swift` | captions from the cloud (road map 6): the run that groups clips by media and deletes what it fetched, the transcript cache in the package, AssemblyAI's five REST calls and their wire values, where the client speaks and what it says it is, the `0600` key file, the progress number and the price the sheet shows before the button |
 | `Exporter.swift` · `ExporterSettings.swift` · `ExporterWriter.swift` · `ExportSheetController.swift` (with `ExportSheetOptions` `ExportSheetResolve` `ExportSheetPresets` `ExportProgressSheetController`) | writing a file — two passes wherever it holds sound, the first measuring loudness — and rendering one frame offline; the sheet's controls, the resolution behind them and the progress sheet |
@@ -416,6 +426,7 @@ hue rather than paints with it, is the one `[r, g, b]` in the model.
 | `undo` · `redo` | one step each (⌘Z / ⇧⌘Z), reporting the step's name |
 | `render_frame {t, max_width?, path?, format?, burn_in_timecode?}` | **the verification hook**. With neither `path` nor `format` it writes a PNG to a temporary file, exactly the call it always was. `format` is `png`, `jpeg` or `heic` and WINS over the path's extension, which is replaced rather than appended to (`{path: "shot.jpg", format: "png"}` writes `shot.png`); `png` and `heic` keep the canvas's alpha and `jpeg` flattens onto black. It is the same writer File ▸ Save Frame… uses, so a still from the menu and one from here are byte-identical. `burn_in_timecode` draws the document's timecode over the picture — the only way a burn-in can be photographed |
 | `export {preset, path, size?, range?, video_bitrate?, audio_bitrate?, loudness_lufs?, peak_dbtp?, burn_in_timecode?}` | writes a file and waits for it; `preset` is the encoding, `size` a Size-popup row (`document`, `1080p`, …) or `[width, height]`, default the document's size (a GIF or APNG's cap); `range: "in_out"` scopes it to the in/out range; the bitrates are the sheet's Quality popup in bits per second; `loudness_lufs` normalises the whole mix by one gain to that integrated target and `peak_dbtp` is the ceiling that gain is capped against (a ceiling with no target is refused — there would be nothing to cap). `burn_in_timecode` draws the document's own timecode over every frame (the export sheet's checkbox), showing PROJECT time even in a file written from the in/out range. The result reports what the file's sound MEASURED, asked for or not, and echoes the burn-in either way |
+| `graphic_reference` · `write_graphic {name, source}` · `get_graphic {name?}` · `render_graphic {name, frames?, frame?, props?, width?, height?, max_width?, background?, format?, path?}` · `import_graphic_font {path}` · `import_graphic_asset {path, name?}` | the six graphics tools, the agent's whole loop for a motion graphic: read the API once, write `graphics/<name>.js` and read its compile back (`ok` and `diagnostics`, not an error), look at up to 16 of its frames as a contact sheet with no clip (or one frame's SVG), copy a `.ttf`/`.otf` into `graphics/fonts/` — its reply names the exact family names the engine reads — or a picture into `graphics/assets/`; then `add_graphic_clip` and `set_graphic` place and change it. File writes are not undoable. They mirror the Graphic sub-tab, Insert ▸ Graphic (`write_graphic` then `add_graphic_clip`), File ▸ Add Font to Graphics… and Add Image to Graphics…, and Help ▸ Graphics Reference |
 
 `set_range`, `set_selection`, `set_scope`, `undo` and `redo` exist so that
 spec §10's own verifications —

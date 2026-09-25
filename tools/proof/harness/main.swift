@@ -1076,6 +1076,11 @@ do {
     FileHandle.standardError.write("read failed: \(error)\n".data(using: .utf8)!)
     exit(1)
 }
+#if !HARNESS_REFERENCE_BUILD
+// The package's `graphics/` compiled, as `makeWindowControllers()` does in
+// the app, so a graphic clip's Graphic sub-tab has its schema (road map 10 G5a).
+document.startGraphicStore()
+#endif
 
 let clips = document.project.snapshot.clips.sorted { $0.start < $1.start }
 if selectIndex >= 0, clips.indices.contains(selectIndex) {

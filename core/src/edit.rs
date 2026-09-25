@@ -87,7 +87,7 @@
 //! `add_media`, `relink_media`, `remove_media` (a nest references the
 //! parent's `media[]` in the parent's one id space, so a media edit inside
 //! a scope is an edit OUTSIDE it wearing a scope, which is the one thing a
-//! scope exists to prevent). Everything else — all fifty — works
+//! scope exists to prevent). Everything else — all fifty-two — works
 //! inside a nest as it works on the timeline, `nest` and `unnest`
 //! included.
 //!
@@ -98,17 +98,18 @@
 //! | `add_clip` | Whole media as one clip at `at`; source in 0, Fit scale when `canvas.fit_new_clips` and the source exceeds the canvas. The length is the media's snapped DOWN to whole frames, so the window stays inside the file and the segment plays at rate 1 (spec §11); a timed media shorter than one canvas frame is an `Err` naming the frame. |
 //! | `add_text_clip` | The Title preset, centered, 5 s long when `duration` is absent; `text` patches it exactly as `set_text` would. |
 //! | `add_shape_clip` | The default rectangle, 5 s long when `duration` is absent — an `arrow` kind gets `arrow_end` on, since a headless arrow is a diagonal line; `shape` patches that preset exactly as `set_shape` would, so an explicit `arrow_end: false` still wins. |
+//! | `add_graphic_clip` | A clip drawn by the module `graphics/<name>.js` in the package, 5 s long when `duration` is absent, at `width` × `height` — the canvas's when absent, and an `Err` naming the canvas when a canvas side is over 8192 — with Fit scale as a shape's box has, `in` 0 and no `length`. `name` must match `^[a-z0-9][a-z0-9-]{0,62}$` (G-3); the core has no filesystem and never checks the module exists. `props` (absent: none) is checked against `schema` when one is given — key by key, by dotted path, type, range and membership, a colour normalised to lowercase `#rrggbb[aa]` — and for shape only without one (G-4); a `null` prop is dropped, and more than 64 is an `Err`. |
 //! | `add_background` | A backdrop on a NEW back-most track, starting at 0, named "Background" and as long as the timeline unless `duration` says otherwise. With `media`, that file placed as `add_clip` would place it but for its SCALE — the right source kind, audio props when it has sound, and a FILL scale where `add_clip` takes a Fit one, because a plate that leaves the canvas showing down one side has failed at the one thing a background is for; with `color`, or with neither, a canvas-sized filled rectangle with no stroke at scale 1. The plate default is WHITE, not black: the canvas is already black, so a black plate is a command that appears to do nothing. `Err` for `media` and `color` together, an unknown media, a media with no pictures, a colour outside 0–1, a duration under a frame, or a timed media shorter than one canvas frame — a plate of a video or an audio file is held to that file's own whole length, given duration or default, so it never outruns what it shows (spec §11, D4-4). |
 //! | `add_blurred_background` | The screencast backdrop: `clip` copied onto a NEW back-most track at the same start, duration, speed and source window — so the two play the same frames — scaled to FILL the canvas, centred, uncropped, blended `normal` and blurred at full strength. The copy is muted (`enabled` becomes `{video: true, audio: false}`, `detach_audio`'s pair read the other way) and drops its `audio.duck` — the one field of that group that lowers OTHER material, so a copy keeping it would duck the mix including the clip it came from — along with its transition, its actions and its label; it is named "Blurred Background". `Err` for an unknown clip, a NEST (flattening drops a nest clip's own filters, so the copy would come out sharp), a source with no pixel size (text, audio-only), or a clip with no video properties. |
 //! | `insert_clip` | The insert edit: the clip `at` is strictly inside on `track` is split, every unlocked track opens by the media's whole length, then that media lands at `at`. Only the destination track is cut — straddlers elsewhere ride the shift whole. |
 //! | `overwrite_clip` | The overwrite edit: `[at, at + media length)` is cleared on `track` ALONE — cut at both bounds, the middles removed — and the media lands there. Nothing shifts and no other track is touched. |
 //! | `move_clip` | Shifts the selection by `delta`, clamped so the earliest clip stops at 0; `track` retargets by track-index delta, keeping relative offsets. |
-//! | `trim_start` | New start `to`; a media `in` advances by `(to − start) × speed`. Clamped to the source head — snapped UP to a whole frame, so a floored `in / speed` cannot write a sub-frame start (spec §11, D4-5) — and to one frame before the end. `text.words` are rebased by `to − start`, unlike actions: a word stays on its speech (spec §11, W-3). |
-//! | `trim_end` | New end `to`, clamped to `start + one frame` and to the source's remaining length, that bound snapped DOWN to a whole frame so a trim cannot put the end past the file (spec §11). |
+//! | `trim_start` | New start `to`; a media `in` advances by `(to − start) × speed`. Clamped to the source head — snapped UP to a whole frame, so a floored `in / speed` cannot write a sub-frame start (spec §11, D4-5) — and to one frame before the end. `text.words` are rebased by `to − start`, unlike actions: a word stays on its speech (spec §11, W-3). A graphic's `in` advances by `to − start` (no speed, no head bound), never below 0 (G-9). |
+//! | `trim_end` | New end `to`, clamped to `start + one frame` and to the source's remaining length, that bound snapped DOWN to a whole frame so a trim cannot put the end past the file (spec §11). A graphic's `length` is untouched (G-9). |
 //! | `rate_stretch` | `speed = content length / (to_end − start)`; duration follows and actions rescale. A non-media source is an `Err`, not a refusal. |
 //! | `slip` | Slides the source under a fixed clip: `in += delta × speed`, start and duration unchanged, clamped so the window stays inside the media. A `still` moves its `at` instead. A slip the clamps reduce to nothing is an identity; a source with nothing to slip is an `Err`. |
-//! | `roll` | Moves a hard cut: this clip's start and its predecessor's end both become `to`. The predecessor is the clip on the track ending EXACTLY at this one's start; with none — a gap, or an overlap, whose length is `set_transition_duration`'s — it refuses. Clamped to one frame and to the source available on each side. This clip's `text.words` are rebased by the move (W-3). |
-//! | `split` | Cuts at project time `at`. With `clips` absent, cuts every clip on an unlocked track that `at` is strictly inside. The second half keeps every `text.words` entry rebased by the cut (a negative start is legal); a second half whose evaluated content has a different token count stores `words: []` instead — a half is a clip the door must accept again (W-3). The first half's words are untouched. |
+//! | `roll` | Moves a hard cut: this clip's start and its predecessor's end both become `to`. The predecessor is the clip on the track ending EXACTLY at this one's start; with none — a gap, or an overlap, whose length is `set_transition_duration`'s — it refuses. Clamped to one frame and to the source available on each side. This clip's `text.words` are rebased by the move (W-3). This clip's `graphic.in` advances by the move as `trim_start`'s does; the predecessor's `length` is untouched (G-9). |
+//! | `split` | Cuts at project time `at`. With `clips` absent, cuts every clip on an unlocked track that `at` is strictly inside. The second half keeps every `text.words` entry rebased by the cut (a negative start is legal); a second half whose evaluated content has a different token count stores `words: []` instead — a half is a clip the door must accept again (W-3). The first half's words are untouched. A graphic's second half gets `in + (at − start)` and BOTH halves' `length` are pinned to the original's effective length (`length`, or `in + duration` when null) — G-9. |
 //! | `delete` | Removes the clips; the gaps stay. |
 //! | `ripple_delete` | Removes, then closes each removed span across every unlocked track. Markers do not move. |
 //! | `ripple_delete_range` | Splits every unlocked clip at both bounds, removes the middles, then closes the hole. A reversed range is the same range. |
@@ -122,13 +123,14 @@
 //! | `detach_audio` | Clears the clip's `enabled.audio` and puts an audio-only twin on the track below, inserting a track when there is none. |
 //! | `duplicate` | Copies each clip one selection-span later on its own track, with fresh ids. |
 //! | `paste` | Inserts the clips of a clipboard payload — `{"clips": […], "media": […]}`, what Copy wrote — with fresh ids, the earliest landing at `at` and the rest keeping their offsets. A payload clip's `track` is a DEPTH from the front (0 = front-most), so `track` says where depth 0 lands (default: the front) and the rest follow by the same index delta; tracks missing behind it are added. Media is matched to `media[]` by path and appended when absent. A clip the overlap rule refuses goes on a new track in front; an empty clip list changes nothing. Every landed clip — the payload's own and those inside the nests it brings — has its start, source-bounded duration, action spans and present base motion/text timings re-snapped to this document's grid (spec §11, D7-3). |
-//! | `paste_attributes` | Copies the payload's EARLIEST clip's property groups (at one start the front-most, then the lower id — never the array's first, which is creation order) onto each clip: video and audio whole, text but content and the `words` that time it (W-6), shape but kind, width, height, from and to. Default: every group both sides have; a named group either side lacks is an Err. Copied video motion and text animation pass their original-value range checks, then snap to the target grid; audio envelopes keep sample precision. Speed, enabled, actions, transition and identity stay. An identity when nothing changes. |
+//! | `paste_attributes` | Copies the payload's EARLIEST clip's property groups (at one start the front-most, then the lower id — never the array's first, which is creation order) onto each clip: video and audio whole, text but content and the `words` that time it (W-6), shape but kind, width, height, from and to. Default: every group both sides have; a named group either side lacks is an Err. Copied video motion and text animation pass their original-value range checks, then snap to the target grid; audio envelopes keep sample precision. Speed, enabled, actions, transition and identity stay. `graphic` is not a group: a target keeps its module, size, timeline and props (G-10). An identity when nothing changes. |
 //! | `nest` | Collapses the selection into ONE clip showing a nest named `Nest <n>` unless `name` says otherwise, on the front-most track the selection occupied, running from the earliest start to the latest end. The clips move whole — ids, props, actions, transitions — keeping their relative times (earliest → 0) and their track order; the nest's canvas is frozen at the project's current size. Refuses on an empty selection, on a lone nest clip, and when the nest clip would break the overlap rule. |
 //! | `unnest` | The inverse: the nest's clips return at `clip.start + their own start`, with fresh ids, on tracks counted back from the nest clip's own (front-most nest track first), and the nest clip goes. `nest` then `unnest` is the identity on clip content, ids aside. A clip the overlap rule refuses lands on a new track in front, as `paste` does; a nest clip trimmed shorter than its contents gives ALL of them back (a nest has no in point); the nest is dropped when nothing else shows it. Returning clips have translated start, source-bounded duration, action spans and present base motion/text timings normalized on the document grid (spec §11, D7-3). `Err` when `clip` is not a nest clip. |
 //! | `set_video` | Merges the patch into each clip's video props (spec §5.2). |
 //! | `set_audio` | Merges the patch into each clip's audio props. |
 //! | `set_text` | Merges the patch into each clip's text props. It can patch `case`, `words` and `word_style` like any declared key (W-10); a non-empty `words` whose length is not the content's `split_whitespace` count, a word time outside D7-1's envelope, an `end` before its `start`, a start before the previous word's, or a `word_style` value out of range is an `Err` naming the key and the number sent, before the times are snapped to the grid (W-2, W-3). |
 //! | `set_shape` | Merges the patch into each clip's shape props. |
+//! | `set_graphic` | Patches each graphic clip's `name`, `width`, `height`, `length` (`null`: it ends with the clip, `in` + the clip's duration; else snapped, at least one frame) and `props` — merged key by key, a `null` removing its key and the others keeping their order, checked as `add_graphic_clip` checks them against `schema` when one is given, and at most 64 once merged. `in` is an `Err` (the trims and `split` own it), and so is a clip that is not a graphic. An identity when nothing changes, a colour re-sent in another spelling included. |
 //! | `set_clip` | Sets or clears the clip's own name and label; absent keeps, null or an empty string clears. Unknown keys are an Err. A split, duplicate, detach or paste carries both. An identity when nothing changes. |
 //! | `set_enabled` | The per-clip hide and mute switches; omitted fields keep their value. |
 //! | `set_transition` | Sets `transition_in`; absent or `null` clears it. The overlap with the predecessor IS the duration. |
@@ -147,7 +149,7 @@
 //! | `add_action` | A new action at CLIP time `at` (the caller subtracts `clip.start`), 1 s long when `duration` is absent, end patch empty. Refuses when it would overlap another action or run past the clip. |
 //! | `add_zoom_action` | An `add_action` whose end patch is the `scale`, `x` and `y` that bring `region` to the canvas — the screencast zoom. An absent `duration` is 1 s, an absent `fit` is `fit` and an absent `curve` is `ease_in_out`. `region`'s `x`/`y` are its **CENTRE** and `width`/`height` its size, both SOURCE pixels from the centre of the clip's cropped rect (the spotlight's frame); `fit` shows the whole region, `fill` covers the whole canvas, both measured THROUGH the clip's rotation. Rotation and crop are read from the clip evaluated at `at`; the scale clamps to the layer maximum and the offsets follow the CLAMPED value, so a region too small to fill the canvas still lands centred. `region` absent or `null` is a zoom BACK: the end patch is the clip's base `scale`, `x`, `y`. The region is read the way a patch is: it must BE an object (a four-number list is refused, not read member by member), and an unknown, missing or wrong-typed member is an `Err` naming it. Same refusals as `add_action`; a clip with no video properties is an `Err`. |
 //! | `set_action` | Retimes or re-curves one action; omitted fields keep their value, same overlap checks. |
-//! | `set_action_end` | Merges into the action's `end` patch; a key set to `null` is removed from it, at any depth. Walked for keys and kinds like every other patch, over the three groups §5.4 allows (a `shape` object is an unknown key); values are NOT range-checked. A `video` object naming `motion` is an `Err`, and so is a `text` object naming `words`, a `null` included (W-6). `off` (absent or `null`: none) is a list of `"group.key"` paths written as `null` AFTER the merge — the optional property keyed OFF at the end, where a `null` in `patch` removes (spec §11 CI-14); each is an `Err` when malformed, when it is `video.motion` or `text.words` (the same two sentences), when it names a key the group lacks or a required key, and when `patch` names it too. |
+//! | `set_action_end` | Merges into the action's `end` patch; a key set to `null` is removed from it, at any depth. Walked for keys and kinds like every other patch, over the three groups §5.4 allows (a `shape` object is an unknown key); values are NOT range-checked. A `video` object naming `motion` is an `Err`, and so is a `text` object naming `words`, a `null` included (W-6). `off` (absent or `null`: none) is a list of `"group.key"` paths written as `null` AFTER the merge — the optional property keyed OFF at the end, where a `null` in `patch` removes (spec §11 CI-14); each is an `Err` when malformed, when it is `video.motion` or `text.words` (the same two sentences), when it names a key the group lacks or a required key, and when `patch` names it too. A `graphic` object, or `graphic` in `off`, is an `Err`: "props are not animated by actions; a graphic animates itself — change the module or its props" (G-10). |
 //! | `remove_action` | Removes the action. |
 //!
 //! The placement equation `add_zoom_action` solves, and the two limits it
@@ -253,6 +255,24 @@ pub enum Op {
         duration: Option<Ticks>,
         #[serde(default)]
         shape: Option<Value>,
+    },
+    /// `schema` is what the module declares, filled by the app (G-4); the
+    /// core never reads the module, so a props patch is checked against the
+    /// schema the op carries, or for shape only when it carries none.
+    AddGraphicClip {
+        track: u32,
+        at: Ticks,
+        #[serde(default)]
+        duration: Option<Ticks>,
+        name: String,
+        #[serde(default)]
+        width: Option<u32>,
+        #[serde(default)]
+        height: Option<u32>,
+        #[serde(default)]
+        props: Option<Value>,
+        #[serde(default)]
+        schema: Option<Value>,
     },
     /// `media` and `color` are alternatives, not a pair: a plate is either
     /// a picture or a colour, and naming both is an `Err` rather than a
@@ -404,6 +424,12 @@ pub enum Op {
     SetShape {
         clips: Vec<u32>,
         patch: Value,
+    },
+    SetGraphic {
+        clips: Vec<u32>,
+        patch: Value,
+        #[serde(default)]
+        schema: Option<Value>,
     },
     /// The fifth patch op: `patch` is `{name?, label?}`, each a string or
     /// `null`, read by `edit_props.rs`. A patch rather than two envelope
@@ -591,8 +617,8 @@ pub enum Op {
 ///
 /// A struct rather than a bare [`Op`] because `scope` is the envelope's
 /// key and not any op's argument — it is spelled once, it means the same
-/// thing over all fifty-seven, and folding it into the enum would mean
-/// fifty-seven copies of one optional field. [`Project::apply_op`] still
+/// thing over all fifty-nine, and folding it into the enum would mean
+/// fifty-nine copies of one optional field. [`Project::apply_op`] still
 /// takes an `&Op` and knows nothing about nests.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Envelope {
@@ -618,7 +644,7 @@ pub struct Envelope {
 /// envelope key. A `#[serde(flatten)]` wrapper is not the way round it
 /// either: serde documents `deny_unknown_fields` as unsupported with
 /// `flatten`, and it would silently stop refusing typos. Removing the key
-/// before the typed decode keeps all three — the refusal, all fifty-seven
+/// before the typed decode keeps all three — the refusal, all fifty-nine
 /// variants, and an envelope key that is not an argument.
 pub fn parse(op_json: &str) -> Result<Envelope, String> {
     let mut value: Value =
@@ -695,6 +721,25 @@ impl Project {
                 duration,
                 shape,
             } => self.add_shape_clip(*track, *at, *duration, shape.as_ref()),
+            Op::AddGraphicClip {
+                track,
+                at,
+                duration,
+                name,
+                width,
+                height,
+                props,
+                schema,
+            } => self.add_graphic_clip(
+                *track,
+                *at,
+                *duration,
+                name,
+                *width,
+                *height,
+                props.as_ref(),
+                schema.as_ref(),
+            ),
             Op::AddBackground {
                 media,
                 color,
@@ -745,6 +790,11 @@ impl Project {
             Op::SetAudio { clips, patch } => self.set_audio(clips, patch),
             Op::SetText { clips, patch } => self.set_text(clips, patch),
             Op::SetShape { clips, patch } => self.set_shape(clips, patch),
+            Op::SetGraphic {
+                clips,
+                patch,
+                schema,
+            } => self.set_graphic(clips, patch, schema.as_ref()),
             Op::SetClip { clips, patch } => self.set_clip(clips, patch),
             Op::SetEnabled { clip, video, audio } => self.set_enabled(*clip, *video, *audio),
             Op::SetTransition { clip, kind } => self.set_transition(*clip, *kind),

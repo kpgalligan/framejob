@@ -30,6 +30,7 @@ enum ClipKindStyle {
         case still
         case text
         case shape
+        case graphic
         case nest
     }
 
@@ -44,6 +45,8 @@ enum ClipKindStyle {
             return .text
         case .shape:
             return .shape
+        case .graphic:
+            return .graphic
         case .nest:
             return .nest
         }
@@ -57,6 +60,8 @@ enum ClipKindStyle {
         case .still: return DS.clipStill
         case .text: return DS.clipText
         case .shape: return DS.clipShape
+        // Shape's ink until road map 10's G5 gives a graphic a token.
+        case .graphic: return DS.clipShape
         case .nest: return DS.clipNest
         }
     }
@@ -74,6 +79,7 @@ enum ClipKindStyle {
             return ("photo", "▣")
         case .text: return ("textformat", "T")
         case .shape: return ("square.on.circle", "▭")
+        case .graphic: return ("curlybraces", "{}")
         case .nest: return ("square.stack.3d.down.right", "▤")
         }
     }
@@ -88,6 +94,7 @@ enum ClipKindStyle {
             return "image"
         case .text: return "text"
         case .shape: return "shape"
+        case .graphic: return "graphic"
         case .nest: return "nest"
         }
     }

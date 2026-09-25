@@ -24,8 +24,9 @@ shapes, transitions and simple animation, without Final Cut's magnetic
 timeline, roles, multicam, scopes, or a plugin ecosystem.
 
 Deliberate non-goals: camera recording, multicam, color grading beyond
-per-clip controls, audio beyond volume/fade/duck, a plugin system, any
-platform but macOS. **Screen recording was on this list until road map 3
+per-clip controls, audio beyond volume/fade/duck, a plugin system (a clip
+may draw itself from a JavaScript module in its package, road map 10;
+nothing else is scriptable — §11 G-1), any platform but macOS. **Screen recording was on this list until road map 3
 reversed it** (§11): the app records a display or a window through
 ScreenCaptureKit into a file it then imports exactly as File ▸ Open would —
 paused and resumed from the menu bar, each stretch its own file and its own
@@ -905,7 +906,7 @@ source position before `CompositionBuilder` reads them; a still's full-u32
 rational frame is at most `600000 × u32::MAX` ticks. Those bounds keep
 `sourceIn + sourceDuration` within Int64 without a duplicate Swift policy.
 
-### 5.2 Project — the JSON schema (format version 9)
+### 5.2 Project — the JSON schema (format version 10)
 
 The Rust value, serialized by serde. Small, no pixels. All times are
 ticks, all positions canvas pixels, colors `[r, g, b, a]` floats 0–1 — FOUR
@@ -958,7 +959,7 @@ it opens what a newer build wrote (§5.6).
       "audio": { "volume": 1.0, "muted": false, "fade_in": 0, "fade_out": 0,
                  "duck": null, "mono": false, "keep_pitch": true,
                  "pan": 0, "compressor": null, "noise_reduction": 0 },
-      "text": null, "shape": null,
+      "text": null, "shape": null, "graphic": null,
       "actions": [
         { "id": 1, "start": 2400000, "duration": 900000, "curve": "ease_in_out",
           "end": { "video": { "scale": 0.6, "x": 520 } } }
@@ -975,10 +976,24 @@ it opens what a newer build wrote (§5.6).
 - `source.kind` is one of `media` (video/audio file, with `in` = source
   time of the clip's first frame and `reversed` = play it back to front),
   `still` (`media`, `at` — a freeze frame), `image` (`media` — a
-  PNG/JPEG/HEIC), `text`, `shape`, `nest` (`project` — the ID of an entry
-  in the project's `nests[]`, M3). `speed` applies to `media` only;
-  `still`, `image`, `text`, `shape` and `nest` have no source bound and
-  any duration.
+  PNG/JPEG/HEIC), `text`, `shape`, `graphic` (format version 10, road map
+  10 — described by the clip's `graphic` key), `nest` (`project` — the ID
+  of an entry in the project's `nests[]`, M3). `speed` applies to `media`
+  only; `still`, `image`, `text`, `shape`, `graphic` and `nest` have no
+  source bound and any duration.
+- `graphic` (format version 10, road map 10's G2a; §11 G-3, G-4, G-12):
+  `null` for every clip but a `graphic` one, whose description it is —
+  `{ "name": "lower-third", "width": 1920, "height": 1080, "in": 0,
+  "length": null, "props": { "title": "Kevin", "accent": "#2d7ff9" } }`.
+  `name` is the module `graphics/<name>.js` in the package, matching
+  `^[a-z0-9][a-z0-9-]{0,62}$` (a file whose name breaks it is refused by
+  `validate`); `width` and `height` the size it draws at, 1–8192 — its
+  source size; `in` the graphic's own time at the clip's first frame, owned
+  by the trims and `split`; `length` the graphic's own length, `null` for
+  "ends with the clip" (`in` + the clip's duration, G-9·c); `props` the values it is drawn with, at most 64, in
+  the caller's key order (written back byte for byte), a `color` one as
+  lowercase `#rrggbb` or `#rrggbbaa`. Every key defaults; an absent
+  `graphic` on a graphic clip is tolerated as an absent `text` is.
 - `source.reversed` (M3) is a fact, not an instruction: the core does no
   pixel work, so it changes neither the plan nor the recipe, and Swift
   substitutes a pre-rendered reversed asset for that media's segments
@@ -1469,6 +1484,13 @@ Talk.reelcut/
     transcripts/<media id>.complete.json # four-field source and request marker, written last
     reversed/<media id>-<digest>.mov   # pre-rendered reverse (M3)
   media/                # only after Consolidate (M3)
+  graphics/             # road map 10 (§11 G-3, G-14): user content, not a cache;
+                        #   whitelisted in the save; created on the app's first write, never at open
+    <name>.js           # a module; its revision is the SHA-256 of its bytes (G-13)
+    API.md              # the reference, written by the app when the folder exists; not a module
+    API.d.ts            # the reference, written by the app when the folder exists; not a module
+    fonts/              # optional; .ttf/.otf (G-6)
+    assets/             # optional; .png/.jpg/.jpeg/.gif/.webp/.svg/.svgz
 ```
 
 The reader accepts every prior version; the writer enforces the reader's
@@ -1641,7 +1663,7 @@ its frozen pair, the rate / background / switches and the `media[]` and
 twice), applies the op to it, and merges `tracks`, `clips`, `next_id`,
 `media` and `nests` back. So `Project::clip` keeps its one meaning, no op
 gained a nest-aware code path, undo is still one stack of parent handles,
-and `rc_op_names` is still 57 — a scope is an envelope key, not an op.
+and `rc_op_names` gains no name — a scope is an envelope key, not an op.
 Times inside a scope are the nest's own, measured from its zero; a nest has
 no speed, so `t − nest_clip.start` is the whole mapping.
 
@@ -1674,17 +1696,18 @@ many clips`, `too many tracks`, `nests are more than 8 deep at nest N`.
 |---|---|
 | `add_clip {track, media, at}` | Whole media as one clip at `at`; source in 0; Fit scale if `fit_new_clips` and the source exceeds the canvas. The length is the media's, snapped DOWN to whole frames, so the window stays inside the file and the segment plays at rate 1 (§11); a timed media shorter than one canvas frame is an `Err` naming the frame. Refuses if the overlap rule fails. |
 | `add_text_clip {track, at, duration=5 s, text?}` / `add_shape_clip {…, shape?}` | Same placement rules; default text is the Title preset centered, default shape the rectangle — except that `shape.kind = "arrow"` is created with `arrow_end` on, since an arrow with no head is a diagonal line. `text` and `shape` are **patch objects** in the `set_text` / `set_shape` shape, merged over that default — not a bare string or kind — so an explicit `arrow_end: false` still wins. (The MCP tools additionally accept a bare string as shorthand: the words for `text`, a kind name for `shape`.) |
+| `add_graphic_clip {track, at, duration=5 s, name, width?, height?, props?, schema?}` | Same placement rules; a clip drawn by the module `graphics/<name>.js`, at `width` × `height` — the canvas's when absent, an **error** naming the canvas when a side taken from it is over 8192 (a side the caller gave is not tested against the canvas) — with Fit scale as a shape's box has, `in` 0 and no `length`. `name` must match `^[a-z0-9][a-z0-9-]{0,62}$` (§11 G-3); the core has no filesystem and never checks the module exists. `props` is checked against `schema` when the op carries one — every key by its dotted path, `props.accent`, for its type, `min`/`max` and enum membership, a colour normalised to lowercase hex (§11 G-4, G-12) — and for shape only without one (a string of at most 4096 characters, a number or a boolean, under a key matching `^[A-Za-z_][A-Za-z0-9_]{0,31}$`); a `null` prop is dropped unchecked, and more than 64 is an **error**. Every check runs before the placement. |
 | `add_background {media?, color?=white, duration?=the timeline's length}` | A backdrop on a NEW back-most track, starting at 0 and named "Background". With `media`, that file placed as `add_clip` would place it but for its SCALE — the right source kind, audio props when it has sound, and a FILL scale where `add_clip` takes a Fit one, because a plate that leaves the canvas showing down one side has failed at the one thing a background is for; with `color`, or with neither, a canvas-sized filled rectangle with no stroke at scale 1. The plate default is WHITE, not black: the canvas is already black, so a black plate is a command that appears to do nothing. A plate of a TIMED media — video or audio — is held to that file's own whole length, default duration or given, so it never outruns what it shows (§11, D4-4); an image plate has no source bound and runs as long as it was asked to. `Err` for `media` and `color` together, an unknown media, a media with no pictures, a colour outside 0–1, a duration under a frame, or a timed media shorter than one canvas frame (`add_clip`'s own sentence, through the same function). A full-canvas GRADIENT is this clip and a `set_shape {gradient}` after it — the canvas background stays one colour (§5.2). |
 | `add_blurred_background {clip}` | The screencast backdrop: `clip` copied onto a NEW back-most track at the same start, duration, speed and source window — so the two play the same frames — scaled to FILL the canvas, centred, uncropped, blended `normal` and blurred at full strength. The copy is muted (`enabled` becomes `{video: true, audio: false}`, `detach_audio`'s pair read the other way) and drops its `audio.duck` — the one field of that group that lowers OTHER material, so a copy keeping it would duck the mix including the clip it came from — along with its transition, its actions, its label and its `video.motion` (format version 8 — a backdrop that slid in or pulsed behind the clip it copies would be two pictures of one recording disagreeing about where they are, and a slide would leave the canvas showing down one side, which is the one thing a background exists to prevent); it is named "Blurred Background". `Err` for an unknown clip, a NEST (flattening drops a nest clip's own filters, so the copy would come out sharp), a source with no pixel size (text, audio-only), or a clip with no video properties. Both of these mint TWO objects — a track and the clip on it — and the TRACK takes the `next_id` the call was made with, the clip the one after. |
 | `insert_clip {track, media, at}` | The INSERT edit: the clip `at` is strictly inside on `track` is split, every unlocked track opens by the media's whole length (`insert_time`), then the media lands at `at`. Only the destination track is cut — a straddler on another track rides the shift whole, which is what keeps a bed unbroken. One op, so one undo step and one tool. Refuses when the clip could not be placed after the room was made, which is what a locked destination track gives. |
 | `overwrite_clip {track, media, at}` | The OVERWRITE edit: `[at, at + media length)` is cleared on `track` ALONE — cut at both bounds, whatever is left inside removed — and the media lands there. Nothing shifts and no other track is touched; the named track is cleared whether or not it is locked, exactly as `ripple_delete` removes the clips it was given. |
 | `move_clip {clips, delta, track?}` | Shifts by `delta` ticks (may be negative; clamps at 0) and optionally to another track (all selected clips keep their relative track offsets). **Overlap rule** on the destination track: a clip may overlap at most one neighbour on each side, and each overlap must be ≤ half of the shorter of the two clips; anything else refuses. An overlap is a transition; a clip that gains a predecessor overlap gets `transition_in = cross_dissolve` if it had none. |
-| `trim_start {clip, to}` | New start `to`; source in advances by `(to − start) × speed`. Clamps: `to ≥ start − in/speed` snapped UP to a whole frame (source bound — `in/speed` is a floored division and is not on the grid, so an un-snapped clamp could write a sub-frame start, §11 D4-5), `to < end − one frame`. A text clip's `text.words` are rebased by `to − start` — unlike its actions, because a word is anchored to speech that stays where it is on the timeline (§11 W-3). |
-| `trim_end {clip, to}` | New end `to`; clamps to the source's remaining length (`media` sources), snapped DOWN to a whole frame so the clamp cannot put the end past the file (§11), and `> start`. |
+| `trim_start {clip, to}` | New start `to`; source in advances by `(to − start) × speed`. Clamps: `to ≥ start − in/speed` snapped UP to a whole frame (source bound — `in/speed` is a floored division and is not on the grid, so an un-snapped clamp could write a sub-frame start, §11 D4-5), `to < end − one frame`. A text clip's `text.words` are rebased by `to − start` — unlike its actions, because a word is anchored to speech that stays where it is on the timeline (§11 W-3). A graphic clip's `graphic.in` advances by `to − start` — no speed and no head bound, so a start can be dragged to 0 and `in` saturates at 0 (§11 G-9). |
+| `trim_end {clip, to}` | New end `to`; clamps to the source's remaining length (`media` sources), snapped DOWN to a whole frame so the clamp cannot put the end past the file (§11), and `> start`. A graphic's `length` is untouched: `null` keeps ending with the clip, a number stays (§11 G-9). |
 | `rate_stretch {clip, to_end}` | `speed = source_len / (to_end − start)`; duration follows. Media sources only — a non-media clip is an **error**, not a refusal, so an MCP caller gets a message it can correct from (the UI never offers it). |
 | `slip {clip, delta}` | Slides the source under a fixed clip: `in += delta × speed`, start and duration unchanged, so nothing downstream moves. `delta` is TIMELINE ticks; positive shows later material. Clamped so the window stays inside the media (`in ≥ 0`, `in + duration × speed ≤ media.duration`), and a slip the clamps reduce to nothing refuses. A `still` moves its `at` instead — it has a source time if not a window. Any other source is an **error**, as `rate_stretch` is. Actions are clip-relative and do not move. |
-| `roll {clip, to}` | Moves a hard cut: this clip's start and its predecessor's end both become `to`, and nothing else moves — the pair's outer edges and its total length are invariants. The predecessor is the clip on the same track ending EXACTLY at this one's start; with a gap or an overlap there instead it refuses (an overlap is a transition, and its length is `set_transition_duration`'s). Clamped four ways: one frame kept on each side, this clip's own source head, and the predecessor's remaining source. Front-trim semantics here (`in` follows), a plain end trim there. This clip's `text.words` are rebased by the move, as `trim_start` rebases them (§11 W-3). |
-| `split {clips?, at}` | Two clips. Second: `start = at`, `in += (at − start) × speed`, base props = the evaluated state at `at`. Actions before `at` stay with the first; after go to the second (start rebased); a straddling action becomes two — the first half's end patch is the evaluated state at `at`. `transition_in` stays with the first. The second keeps every `text.words` entry rebased by the cut — a negative start is legal and means "already said", so the split is invisible — and the first half's words are untouched; a second half whose EVALUATED content (a finished action may have switched it) has a different token count stores `words: []` instead, because a half is a clip the door must accept again (format version 9, §11 W-3). A PRESET anchored to the clip's two ends is divided rather than copied (format version 8): the first half keeps `video.motion.in` and loses `out`, the second keeps `out` and loses `in`, each normalised to `null` when nothing is left, and `text.animation` is split the same way — `out` zeroed on the first half, `in` on the second, the pair becoming `null` when both are 0. Carrying both to both halves, which is what a clone does and what version 5 did, makes the first half leave at the cut and the second arrive again there. A `during` slot survives on both, since it is anchored to neither end, and restarts at each cut. Every splitter in the crate routes through this — `split`, `delete` and the two range cuts, `lift_range`, `insert_clip`, `overwrite_clip` and `freeze_frame` — so the rule is stated once (`edit_split.rs`, §7.10). Refuses when `at` is not strictly inside. **Omitting** `clips` — not passing a flag — means every unlocked clip `at` is strictly inside, the ⌘T-with-no-selection case. |
+| `roll {clip, to}` | Moves a hard cut: this clip's start and its predecessor's end both become `to`, and nothing else moves — the pair's outer edges and its total length are invariants. The predecessor is the clip on the same track ending EXACTLY at this one's start; with a gap or an overlap there instead it refuses (an overlap is a transition, and its length is `set_transition_duration`'s). Clamped four ways: one frame kept on each side, this clip's own source head, and the predecessor's remaining source. Front-trim semantics here (`in` follows), a plain end trim there. This clip's `text.words` are rebased by the move, as `trim_start` rebases them (§11 W-3), and its `graphic.in` advances by the move as `trim_start`'s does; the predecessor's `length` is untouched (§11 G-9). |
+| `split {clips?, at}` | Two clips. Second: `start = at`, `in += (at − start) × speed`, base props = the evaluated state at `at`. Actions before `at` stay with the first; after go to the second (start rebased); a straddling action becomes two — the first half's end patch is the evaluated state at `at`. `transition_in` stays with the first. A graphic's second half gets `graphic.in + (at − start)`, and BOTH halves' `graphic.length` are pinned to the original's effective length — `length`, or `in + duration` when `null` — so the animation continues across the cut and plays its outro once, at the true end (§11 G-9). The second keeps every `text.words` entry rebased by the cut — a negative start is legal and means "already said", so the split is invisible — and the first half's words are untouched; a second half whose EVALUATED content (a finished action may have switched it) has a different token count stores `words: []` instead, because a half is a clip the door must accept again (format version 9, §11 W-3). A PRESET anchored to the clip's two ends is divided rather than copied (format version 8): the first half keeps `video.motion.in` and loses `out`, the second keeps `out` and loses `in`, each normalised to `null` when nothing is left, and `text.animation` is split the same way — `out` zeroed on the first half, `in` on the second, the pair becoming `null` when both are 0. Carrying both to both halves, which is what a clone does and what version 5 did, makes the first half leave at the cut and the second arrive again there. A `during` slot survives on both, since it is anchored to neither end, and restarts at each cut. Every splitter in the crate routes through this — `split`, `delete` and the two range cuts, `lift_range`, `insert_clip`, `overwrite_clip` and `freeze_frame` — so the rule is stated once (`edit_split.rs`, §7.10). Refuses when `at` is not strictly inside. **Omitting** `clips` — not passing a flag — means every unlocked clip `at` is strictly inside, the ⌘T-with-no-selection case. |
 | `delete {clips}` | Removes; gaps stay. |
 | `ripple_delete {clips}` / `ripple_delete_range {from, to}` | Removes; then for each removed span (union of the removed clips' spans, processed right-to-left) shifts every clip on **unlocked** tracks whose start ≥ span end left by the span length. Clips on other tracks that straddle a span are left in place. Range form: every unlocked clip is split at both bounds first, the middle pieces removed, then the shift. |
 | `ripple_delete_ranges {ranges: [[from, to], …]}` | Several ranges as ONE edit — the silence cut. Each pair is snapped, clamped and ordered exactly as `ripple_delete_range`'s one is (a reversed pair is the same range), the pairs are then MERGED — touching as well as overlapping — and the survivors cut and closed right to left. So the op is **merge-then-cut and not N `ripple_delete_range`s**, and the difference is visible in the document: a cut at a boundary that no longer exists would mint a fragment and burn an id. `set_gained_transitions` runs once at the end, over the unlocked tracks. Markers do not move, as they do not for the singular. An empty list, and a list that merges to nothing, change nothing. Written by Clip ▸ Remove Silences… as one undo step, whatever the number of cuts. |
@@ -1697,10 +1720,11 @@ many clips`, `too many tracks`, `nests are more than 8 deep at nest N`.
 | `detach_audio {clip}` | `enabled.audio = false` on the clip; a new clip with `enabled = {video: false, audio: true}`, same source/in/duration/speed and the audio props, on the track below (a track is inserted at index 0 if needed). Refuses if the media has no audio or audio is already detached. |
 | `duplicate {clips}` | Copies placed after the originals' span on the same tracks (⌥-drag then moves them). |
 | `paste {at, track?, payload}` | Inserts the clips of a clipboard payload — `{"clips": [...], "media": [...]}`, what ⌘C wrote to `com.kgalligan.reelcut.clips` — with fresh ids for the clips, their actions and any media row added. The EARLIEST clip lands exactly at `at` and the rest keep their offsets from it. A payload clip's `track` is a **depth from the front** (0 = front-most), not an id, since the ids belong to the document copied from: `track` names where depth 0 lands (default: the front-most track), the rest follow by the same index delta, and tracks missing behind it are added. Media is matched to `media[]` **by path** — reused when it is there, appended when it is not — so a paste between documents brings the entry with it. A clip the overlap rule refuses on its target track goes on a new track in front (as Add Text does, §4.1), so the only refusal is an empty clip list; a malformed payload is an **error**. Every landed clip — the payload's own and those inside the nests it brings — has its start, source-bounded duration, action spans and present base motion/text timings normalized to this document's grid, since the payload may come from another frame rate (§11, D7-3). |
-| `paste_attributes {clips, payload, groups?}` | Copies the payload's EARLIEST clip's property groups onto each clip (at one start the front-most, then the lower id — never the array's first, which is Copy's creation order) — `payload` is the same Copy payload `paste` takes, and only that clip's `video`, `audio`, `text` and `shape` are read; its ids, times, media rows and nests do not matter and nothing is minted. A group is REPLACED whole, never merged: video and audio whole, transform included (`audio.muted` and `keep_pitch` travel — they are properties like opacity); text but its `content` and the `words` that time it (§11 W-6); a shape but its `kind`, `width`, `height`, `from` and `to`. `groups` ∈ `video`, `audio`, `text`, `shape`: absent, it means every group BOTH sides have, silently skipping the rest; a NAMED group the payload clip lacks, or a target lacks, is an **error**, all-or-nothing, and so is a copied value the inspector would refuse — each copied group passes the patches' range checks. Copied video motion and text animation pass the same original-value range checks as a patch, then snap to the target grid; audio envelopes retain sample precision. Speed, enabled, actions, the transition, the source and the clip's own name and label stay. One value is NORMALISED on the way in, not merely checked: a copied `video.motion` whose three slots are all null lands as `null`, the same one spelling of "no motion" `set_video` and `split` keep — this op's payload is a third door for a `Motion`, and `{"motion": {}}` means the same thing; `paste`'s payload and the file reader do NOT normalise (road map 5 §12 R2·2; `core/tests/schema_v8.rs`). Refuses when nothing changes, and on an empty `groups` list. |
+| `paste_attributes {clips, payload, groups?}` | Copies the payload's EARLIEST clip's property groups onto each clip (at one start the front-most, then the lower id — never the array's first, which is Copy's creation order) — `payload` is the same Copy payload `paste` takes, and only that clip's `video`, `audio`, `text` and `shape` are read; its ids, times, media rows and nests do not matter and nothing is minted. A group is REPLACED whole, never merged: video and audio whole, transform included (`audio.muted` and `keep_pitch` travel — they are properties like opacity); text but its `content` and the `words` that time it (§11 W-6); a shape but its `kind`, `width`, `height`, `from` and `to`. `groups` ∈ `video`, `audio`, `text`, `shape`: absent, it means every group BOTH sides have, silently skipping the rest; a NAMED group the payload clip lacks, or a target lacks, is an **error**, all-or-nothing, and so is a copied value the inspector would refuse — each copied group passes the patches' range checks. Copied video motion and text animation pass the same original-value range checks as a patch, then snap to the target grid; audio envelopes retain sample precision. Speed, enabled, actions, the transition, the source and the clip's own name and label stay; `graphic` is not a group, so a graphic target keeps its module, size, timeline and props (§11 G-10). One value is NORMALISED on the way in, not merely checked: a copied `video.motion` whose three slots are all null lands as `null`, the same one spelling of "no motion" `set_video` and `split` keep — this op's payload is a third door for a `Motion`, and `{"motion": {}}` means the same thing; `paste`'s payload and the file reader do NOT normalise (road map 5 §12 R2·2; `core/tests/schema_v8.rs`). Refuses when nothing changes, and on an empty `groups` list. |
 | `nest {clips, name?}` | Collapses the selection into ONE clip showing a nest (§5.2), on the front-most track the selection occupied, running from the earliest start to the latest end. The clips move whole — ids, props, actions, transitions — keeping their relative times (the earliest starts at 0 inside) and their track order, onto fresh tracks of the nest's own that copy the source tracks' names and their hidden/muted/locked/solo state (a copied solo is then judged among the nest's own tracks, §5.2). The nest's canvas is frozen at the project's current size, so a later `set_canvas` cannot re-lay-out what is inside it. Media is untouched: a nest references the project's `media[]` in the same one id space. Refuses on an empty selection, on a selection of one nest clip, and when the nest clip would break the overlap rule against what was left behind. |
 | `unnest {clip}` | The inverse: the nest's clips return at `clip.start + their own start` with fresh ids (as `split` then a re-join mints fresh ones), on tracks counted back from the nest clip's own — the nest's front-most track lands where the nest clip was — with tracks missing behind added, and the nest clip goes. A clip the overlap rule refuses lands on a new track in front, as `paste` does, so a group can always be opened. A nest clip trimmed shorter than its contents gives **all** of them back: there is no in point on a nest, so this is the inverse of `nest`, not of the trim. The nest is dropped from `nests[]` when no clip anywhere still shows it. Each returning clip has its translated start, source-bounded duration, action spans and present base motion/text timings normalized to the document's grid (§11, D7-3), including a legacy off-grid nest. An **error** when `clip` is not a nest clip. |
 | `set_video {clips, patch}` / `set_audio` / `set_text` / `set_shape` | Merge the patch into the base props. Refuses if nothing changes. An unknown key, a value of the wrong JSON kind or a misspelt variant anywhere in the patch is an **error** that names the dotted path to it, array indices included, and the value sent — `unknown key "filters[1].kindd" in a video patch`, `bad value at "shadow" in a video patch: expected an object, not 5`, ``bad value at "filters[1].kind" in a video patch: unknown variant `glw`, expected one of `blur`, …`` — so a number where a shadow belongs is refused rather than read as a clear, and a list where an object belongs (or an object where a string belongs) is refused rather than read field by field; `add_text_clip`'s `text` and `add_shape_clip`'s `shape` answer in the same words. One value is refused by the CLIP rather than by the vocabulary: `video.blend` on a nest clip is an **error** naming it (format version 6), because a nest is flattened rather than composited offscreen and there is no group picture for a blend to combine with. It fires on the MERGED value only, so `{"blend": "normal"}` on a nest clip is the identity and refuses instead — otherwise an all-or-nothing `paste_attributes` of an ordinary look onto a nest clip would fail over a value that changes nothing. `set_action_end` does not range-check, so the same rule is enforced again in the evaluator (§5.4's `clamp_video`), which closes the recipe, `clip_state` and both export writers at once. A `video.filters` entry must name BOTH `kind` and `amount` — `missing key "filters[0].kind" in a video patch` — because a list replaces whole, so an entry is merged over nothing and the keys it leaves out would be completed from the type's defaults into a half-strength blur nobody asked for; the file reader keeps that completion, so an older file still opens with the defaults it always had. `video.obscure` and `shape.gradient.stops` entries are NOT held to it: their omitted keys leave the entry recognisably the thing the caller named. `video.motion` (format version 8) deep-merges like every other nested object — `{"motion": {"in": …}}` keeps a stored `out`, and `{"motion": {"in": null}}` clears that slot alone. The APP's two writers still send the WHOLE object with nil slots as `null` (the inspector's Motion section and Clip ▸ Motion ▸ know all three slots), which is the same rule spelled out rather than a second one; an AGENT's patch is the caller's own object, forwarded unread (§7.9). `{"motion": null}` clears the field, and a motion whose three slots are all null is normalised to `null` before the range checks run, so one clip has one spelling of "no motion". `set_text` can patch `case`, `words` and `word_style` like any declared key (format version 9, §11 W-10); a `words` entry must name both `start` and `end`, and a non-empty `words` whose length is not the content's token count is an **error** in the rule's own words — `this text is timed word by word: 4 timings for 5 words` — as are a word time outside D7-1's envelope, an `end` before its `start`, a `start` before the previous word's, and a `word_style` value out of range (`active_scale` 1.0–1.5, colours 0–1, a negative pill padding or radius). The check runs on what the caller sent; the word times are then snapped to the grid, nearest, a negative one staying negative. A content edit that changes the count sends `words: []` in the same patch. |
+| `set_graphic {clips, patch, schema?}` | Patches each graphic clip's `name`, `width`, `height`, `length` (`null`: it ends with the clip, `in` + the clip's duration — G-9·c; else snapped nearest, at least one frame) and `props`, which merges key by key: a value is stored in the key's own slot or appended, a `null` removes its key and the rest keep their order — unchecked, so a key the schema no longer has can still be removed — each other value checked as `add_graphic_clip` checks them, and the merged map holds at most 64 (an **error** naming the count). `in` is an **error** — the trims and `split` own it (road map 10's G-9, recorded here by G2b) — and so is a clip that is not a graphic, an unknown key and a malformed `schema`. The identity when nothing changes, a colour re-sent in another spelling included. |
 | `set_clip {clips, patch: {name?: string \| null, label?: string \| null}}` | The fifth patch op: sets or clears the clip's own name and label (§5.2). Inside the patch an absent key keeps, `null` clears, and so does an empty string — after the trim a name gets on its way in — because an unnamed clip is `null`, not `""`. Any other key is an **error**, checked before the clip ids. A patch rather than two optional `Option<T>` envelope arguments lets "keep" and "clear" differ. A `split`, `duplicate`, `detach_audio` or `paste` carries both along (they clone the clip); `paste_attributes` never does. Refuses if nothing changes. |
 | `set_enabled {clip, video?, audio?}` | Visibility/mute per clip. |
 | `set_transition {clip, kind\|null}` | Sets `transition_in`. With a kind on a clip that already HAS a transition only the `kind` moves — its `curve` and `audio` stay where the person put them (format version 7), because a kind chosen from the popup, the menu or MCP must not reset a curve; a clip that had none gets a minted one (§11, R5-2). `set_transition_duration {clip, duration}` moves the clip so the overlap equals `duration` (subject to the overlap rule). |
@@ -1714,7 +1738,7 @@ many clips`, `too many tracks`, `nests are more than 8 deep at nest N`.
 | `add_action {clip, at, duration=1 s}` | Refuses if it would overlap another action or run past the clip end. End patch starts empty (= no change until edited). |
 | `add_zoom_action {clip, at, duration=1 s, region: {x, y, width, height} \| null, fit="fit", curve="ease_in_out"}` | An `add_action` whose end patch is the `scale`, `x` and `y` that bring `region` to the canvas — the screencast zoom. **`region`'s `x` and `y` are its CENTRE** and `width`/`height` its size, both source pixels from the centre of the cropped rect (§5.3's one region frame); the field names say neither, so the tool description and the core's doc say it too. `fit` shows the whole region, `fill` covers the whole canvas, both measured THROUGH the clip's rotation — a rectangle contains a rotated rectangle exactly when it contains its four corners, and the test collapses to the naive form at 0°. Rotation and crop — and nothing else — are read from the clip evaluated at `at`, the frame the rectangle was drawn on: the `scale`, `x` and `y` it writes are absolute, so the placement never reads a transform, base or evaluated. A rotation animated between `at` and `at + duration` is not tracked. The scale clamps to the layer maximum and the offsets are derived from the CLAMPED value, so a region too small to reach it still lands centred and only the magnification degrades. `region` absent or `null` is a zoom BACK: the end patch is the clip's STORED base `scale`, `x`, `y` — the one thing here that is NOT read evaluated, because "back" means where the clip sits when nothing is animating it, which is also what a later zoom on the same clip measures from. It composes `add_action` + `set_action` + `set_action_end`, so it is one undo step and inherits every `add_action` refusal rather than restating it; a clip with no video properties is an **error**. The region is read the way a patch is: it must BE an object (a four-number LIST is refused rather than read member by member), an unknown member and a missing member are **errors** naming the member beside the four it takes, and a wrong-typed one names its path (`bad value at "region.width"`). A non-finite or non-positive number is an **error** too — `region.width must be greater than 0` — because a zero-width region asks for an infinite scale. |
 | `set_action {clip, action, start?, duration?, curve?}` | Same overlap checks. |
-| `set_action_end {clip, action, patch, off?}` | Merges into the end patch; a key set to `null` removes it, at any depth. `off` — a list of `"group.key"` paths, `group` one of `video`, `audio`, `text` and `key` a top-level key of it — writes a `null` at each AFTER the merge, which keys that optional property OFF at the end (§5.4, §11 CI-14); a malformed path, `video.motion`, `text.words`, a required key (`video.opacity`), a key the group does not have and a path the patch also names are each an **error**. Absent or `null` is none. The patch is walked like every other one (§5.4): the three groups it may name are `video`, `audio` and `text`, and an unknown key, a value of the wrong JSON kind or a misspelt variant anywhere in it is an **error** naming the dotted path with the group in it — `unknown key "video.filters[1].kindd" in an action end patch` — and a `shape` object is an unknown key, because a shape is not animatable and the key would be stored, reported as success and animate nothing. VALUES are not range-checked, so an end state may name what no stored group could hold and the evaluator clamps it (§5.4's `clamp_video`). One refusal is about the op rather than the vocabulary: a `video` object naming `motion` is an **error** (format version 8, §5.4), because a preset is anchored to the clip's two ends rather than being a value to ramp between two states, and the evaluator would restore the base value anyway. A `text` object naming `words` — a `null` included — is an **error** too (format version 9, §11 W-6): a word's times are anchored to speech, not a state to ramp toward. |
+| `set_action_end {clip, action, patch, off?}` | Merges into the end patch; a key set to `null` removes it, at any depth. `off` — a list of `"group.key"` paths, `group` one of `video`, `audio`, `text` and `key` a top-level key of it — writes a `null` at each AFTER the merge, which keys that optional property OFF at the end (§5.4, §11 CI-14); a malformed path, `video.motion`, `text.words`, a required key (`video.opacity`), a key the group does not have and a path the patch also names are each an **error**. Absent or `null` is none. The patch is walked like every other one (§5.4): the three groups it may name are `video`, `audio` and `text`, and an unknown key, a value of the wrong JSON kind or a misspelt variant anywhere in it is an **error** naming the dotted path with the group in it — `unknown key "video.filters[1].kindd" in an action end patch` — and a `shape` object is an unknown key, because a shape is not animatable and the key would be stored, reported as success and animate nothing. VALUES are not range-checked, so an end state may name what no stored group could hold and the evaluator clamps it (§5.4's `clamp_video`). One refusal is about the op rather than the vocabulary: a `video` object naming `motion` is an **error** (format version 8, §5.4), because a preset is anchored to the clip's two ends rather than being a value to ramp between two states, and the evaluator would restore the base value anyway. A `text` object naming `words` — a `null` included — is an **error** too (format version 9, §11 W-6): a word's times are anchored to speech, not a state to ramp toward. A `graphic` object — a `null` included — or `graphic` in `off` is an **error** in G-10's sentence, `props are not animated by actions; a graphic animates itself — change the module or its props` (§11 G-10). |
 | `remove_action {clip, action}` | |
 
 **Tracks, markers, canvas, media**
@@ -1746,7 +1770,8 @@ arguments half rather than restating it (§7.9).
 
 ## 7. Architecture — Rust decides, AVFoundation and Metal do
 
-All pixel and sample work happens on the platform. Pure-Rust decoding of
+All pixel and sample work happens on the platform, except a graphic's
+rasterization, which is the `graphic` crate's (G-2). Pure-Rust decoding of
 H.264 / HEVC / ProRes does not exist at production quality, and linking
 ffmpeg is a 60 MB dependency with licensing questions and no VideoToolbox
 by default. AVFoundation gives hardware decode and encode, synchronized
@@ -1819,6 +1844,27 @@ bool    rc_timecode_parse(const char *s, uint32_t fps_num, uint32_t fps_den, int
 char *rc_export_presets(void);                                          /* [{id, name, container, codec, size, ...}], one per encoding */
 char *rc_export_sizes(const RcProject *p, const char *preset_id, char **err_out); /* [{id, name, width, height}], the default first */
 char *rc_export_settings(const RcProject *p, const char *preset_id, const char *overrides_json, char **err_out);
+
+/* graphics — road map 10: the `graphic` crate, through core/src/ffi_graphic.rs
+ * alone (G-2). A library is a builder that FREEZES at its first compile or
+ * rasterize; diag_out is NULL or a JSON array of {level, message, line,
+ * column, frame}, exactly one error on failure, written on success only
+ * for warnings. */
+typedef struct RcGraphicLibrary RcGraphicLibrary;
+typedef struct RcGraphic RcGraphic;
+RcGraphicLibrary *rc_graphic_library_new(void);                                     /* never NULL */
+bool  rc_graphic_library_add_font(RcGraphicLibrary *, const uint8_t *bytes, size_t len, char **err_out);
+bool  rc_graphic_library_add_asset(RcGraphicLibrary *, const char *name, const uint8_t *bytes, size_t len, char **err_out);
+char *rc_graphic_library_families(const RcGraphicLibrary *);      /* JSON array, sorted: the engine's own family names; freezes; NULL only for NULL */
+void  rc_graphic_library_free(RcGraphicLibrary *);
+RcGraphic *rc_graphic_compile(const RcGraphicLibrary *, const char *name, const char *source,
+                              uint32_t budget_ms, char **diag_out);
+char *rc_graphic_describe(const RcGraphic *);                     /* {"meta":…,"schema":…,"revision":…} */
+char *rc_graphic_svg(const RcGraphic *, int64_t frame, const char *props_json, const char *ctx_json,
+                     uint32_t budget_ms, char **diag_out);        /* NULL props_json = {} */
+bool  rc_graphic_rasterize(const RcGraphicLibrary *, const char *svg, uint32_t w, uint32_t h,
+                           uint8_t *out_bgra, size_t stride, char **diag_out);
+void  rc_graphic_free(RcGraphic *);
 
 /* agent — same signatures as Rasterize's rz_agent_* (copy them) */
 ```
@@ -2006,7 +2052,17 @@ Asked once per frame by the compositor, and by the overlay for hit-testing.
       "source_size": null,
       "x": -560, "y": -380, "scale": 1.0, "rotation": 0, "opacity": 0.72, … },
     { "clip": 31, "source": { "kind": "track", "track_id": 2 }, …,
-      "transition": { "kind": "push_left", "progress": 0.4, "role": "in", "partner": 17 } }
+      "transition": { "kind": "push_left", "progress": 0.4, "role": "in", "partner": 17 } },
+    { "clip": 40,
+      "source": { "kind": "graphic", "name": "lower-third", "hash": "3f58effee3657324",
+                  "frame": 37,
+                  "ctx": { "fps": 30.0, "time": 1.2333333333333334, "durationInFrames": 250,
+                           "progress": 0.14859437751004015, "width": 1920, "height": 1080,
+                           "canvas": { "width": 1920, "height": 1080 } },
+                  "props": { "title": "Kevin", "accent": "#2d7ff9" },
+                  "props_json": "{\"title\":\"Kevin\",\"accent\":\"#2d7ff9\"}",
+                  "ctx_json": "{\"fps\":30.0,\"time\":1.2333333333333334,…}" },
+      "source_size": [1920, 1080], … }
   ]
 }
 ```
@@ -2020,7 +2076,9 @@ Asked once per frame by the compositor, and by the overlay for hit-testing.
   why nothing that EDITS sees it. `source.kind` ∈ `track` (a composition video track id),
   `image` (`media` id — Swift decodes with ImageIO and caches the
   texture), `text` / `shape` (the resolved description plus a stable
-  content hash Swift caches textures by), `missing` (draw a slate).
+  content hash Swift caches textures by), `graphic` (format version 10,
+  road map 10: the module, the frame and `ctx` it is called with, its
+  props and a hash — the graphic bullet below), `missing` (draw a slate).
 - A text layer's source object carries THREE more keys (format version 5),
   and all three are present on every text layer whether it animates or not,
   because an absent key would mean two things — no animation here, or an
@@ -2108,8 +2166,30 @@ Asked once per frame by the compositor, and by the overlay for hit-testing.
   overlap the popup says `multiply` and the frame composites `normal`.
   Both are honest — the clip multiplies, and this frame does not.
 
+- A **graphic** layer's source (road map 10's G2b, `recipe_graphic.rs`;
+  §11 G-9) is `{kind, name, hash, frame, ctx, props, props_json,
+  ctx_json}`, in that order. The last two (road map 10's G3b) are
+  `serde_json`'s text of `props` and `ctx` — the engine takes JSON TEXT,
+  so the app hands these to `rc_graphic_svg` untouched and never
+  re-encodes either; neither is in the `hash`.
+  `frame` is the graphic's own frame, `floor((in + clip time) /
+  frame_ticks)` on the canvas grid, with clip time §7.3's own (a nested
+  graphic counts from its own first frame). `ctx` is exactly the engine's
+  (road map 10 §5c) and the app passes it to `render` verbatim: `fps` the
+  canvas rate, `time` = `frame / fps`, `durationInFrames` = `ceil(effective
+  length / frame_ticks)` where the effective length is `graphic.length`,
+  or `in + duration` when that is `null` (§11 G-9·c), `progress` =
+  `frame / max(1, durationInFrames − 1)` clamped to 0..1, `width` /
+  `height` the graphic's, and `canvas` the PROJECT's size, inside a nest
+  too. Every float is finite (a degenerate rate publishes 0). `props` is
+  the STORED map in its stored order. `hash` is `content_hash` over
+  `{name, frame, ctx, props}` — everything `render` is called with (§11
+  G-9·b), so a `trim_end` that changes `durationInFrames`, or a rate
+  change that changes `time`, is a new texture at the same frame; the
+  module's own revision is the app's to fold in (§11 G-13). A graphic clip
+  with no `graphic` description is a `missing` slate.
 - `source_size` is the media pixel size, or `null` for text (the renderer
-  knows) and the box size for shapes.
+  knows), the box size for shapes, and `[width, height]` for a graphic.
 - `filters`, `reflection` and `spotlight` (M3) and `obscure` (format
   version 4) are the §5.2 property groups already evaluated: an ordered
   list of `{ "kind", "amount" }` at most `MAX_FILTERS` long, the two
@@ -2218,19 +2298,21 @@ pass nothing, because each wants the picture rather than a deliverable.
 
 | File | Owns |
 |---|---|
-| `ReelCore.swift` · `ReelOps.swift` · `ReelEdit.swift` · `ReelOpSchema.swift` | the core's edge. `ReelCore.swift` is the **only** `rc_*` caller: `ReelProject` (handle + lazy `ProjectSnapshot`), `RecipeSource`, the typed patches, and the op table read BACK — `ReelOp.coreNames()` over `rc_op_names` and `ReelOp.coreSchemas()` over `rc_op_schemas`, which `AgentCatalog.opTool` prints (§7.9). `ReelOps.swift` is the typed op builders, cut out of it under the size rule — one factory per row of the op table, plus the eleven RAW factories that forward a caller's own object; `ReelEdit.swift` is the three arms an edit answers (§5.5) and `ReelOpSchema.swift` the value `coreSchemas()` answers, both their own files because neither names an `rc_*` symbol |
+| `ReelCore.swift` · `ReelOps.swift` · `ReelEdit.swift` · `ReelOpSchema.swift` | the core's edge. `ReelCore.swift` is the **only** `rc_*` caller: `ReelProject` (handle + lazy `ProjectSnapshot`), the typed patches, and the op table read BACK — `ReelOp.coreNames()` over `rc_op_names` and `ReelOp.coreSchemas()` over `rc_op_schemas`, which `AgentCatalog.opTool` prints (§7.9). `ReelOps.swift` is the typed op builders, cut out of it under the size rule — one factory per row of the op table, plus the eleven RAW factories that forward a caller's own object; `ReelEdit.swift` is the three arms an edit answers (§5.5) and `ReelOpSchema.swift` the value `coreSchemas()` answers, both their own files because neither names an `rc_*` symbol |
 | `MotionProps.swift` | `video.motion`'s Swift vocabulary (format version 8): `EdgeMotion` and `DuringMotion` with their display names, `MotionEdge`, `MotionDuring` and `MotionProps`, all decoded leniently and all with the core's own defaults mirrored rather than derived. `MotionEdge` also supplies nonpersisted activity and inactive display/menu titles (E2-27). Its `dictionary`s live here rather than beside every other property type's in `ReelCore.swift`, which is far over the ~600-line cap — and `MotionProps.dictionary` ALWAYS writes three keys, `NSNull` for a nil slot, because a core patch deep-merges a motion (§6) and a slot left out would leave the old one in place. Since D1·3 it is the ONLY writer of a whole motion: an agent's patch is the caller's object, forwarded unread, and merges slot by slot |
 | `ProjectDocument.swift` | NSDocument, `.reelcut` package read/write, the single mutation point (`applyEdit`, live-edit trio), undo as a handle stack, dirty counting, and the FIVE pieces of view state (playhead, selection, in/out range, `selectedMedia`, `nestPath`). `nestPath` is §4.4's nest scope as the PATH it was entered by — one step per level, each naming the nest and the nest CLIP that showed it, because a nest can be shown by two clips at two different starts. `scope` is its last step's nest and is what every op is stamped with (`ReelOp.scoped(_:)`), except the seven the core refuses inside a nest, which are sent unscoped; `editedProject` is the memoised `rc_project_scoped` handle every view of the TIMELINE draws from, where `project` stays the document for save, export, captions, consolidate and the Document and Media tabs |
 | `EditorViewController+NestScope.swift` · `TimelineView+NestScope.swift` | going inside a nest and coming back out (§4.4): Open / Close Nest, the double-click, the playhead mapping, and the breadcrumb the ruler draws in the corner over the track headers — one stored property, one closure, one draw call, one hit token and one gesture case in the frozen `TimelineView.swift`, `TimelineView+Candidates.swift`'s split exactly |
 | `Playback.swift` · `EditorViewController+PreviewQuality.swift` · `PreviewWindowController.swift` | `AVPlayer` + `AVPlayerItem` over the plan; the rebuild-vs-refresh decision (§7.6); coalesced exact seeks; JKL rates; loop range; `preferredMaximumResolution` = canvas size. **Preview Quality** (View ▸ Preview Quality ▸ Full / Half / Quarter) scales the PLAYER's render size on a `mutableCopy()` of the built video composition, so `CompositionBuilder.build` is untouched and the export and `render_frame` paths are UNREACHABLE from the setting rather than merely unchanged by it; the size always carries the canvas's EXACT aspect (`m · (w/g, h/g)`, `g = gcd(w,h)`, `m = ceil(g/divisor)`), falling back to the next coarser exact size and finally to Full for a coprime canvas, because the overlay maps every drag handle through `AVPlayerLayer.videoRect`. **Preview Window** (⇧⌘P) is a second `AVPlayerLayer` on the SAME player in an `NSPanel` — a panel because a titled window becomes MAIN and every ⌘-item whose action is on `EditorViewController` then resolves to nothing |
 | `CompositionBuilder.swift` | plan JSON → `AVMutableComposition` + `AVMutableAudioMix` + `AVMutableVideoComposition` (+ `CompositionInstruction`). Since road map 3, `fill` HOLDS a video track's last frame over any part of a segment's source range the track does not cover (§7.2): a screen recording's video track ends at the last screen change while its sound runs on, and AVFoundation inserts the uncovered range without clamping and renders it black |
 | `Compositor.swift` | the `AVVideoCompositing` class and its Metal pipeline (§7.5) |
+| `RecipeSource.swift` | the process-wide registry the compositor reads a recipe from (§7.6), keyed per document and per export, with the `RecipeOptions` stored beside the project per key (§7.3); out of `ReelCore.swift` as a pure move at road map 10's G1a, because it names no `rc_*` symbol |
 | `LayerRenderers.swift` · `LayerRenderersText.swift` · `LayerRenderersReveal.swift` · `LayerRenderersWords.swift` | text (Core Text) and shape (Core Graphics) descriptions → premultiplied BGRA `MTLTexture`s, LRU-cached by hash; reports measured text sizes to the overlay; draws a shape's `gradient` (format version 6) by CLIPPING to the path and running `CGGradient`, sorting the stops the core deliberately does not police (§5.2). The TEXT half — the layout caches, the attributed string (laid from `laidContent`, `case` applied), the per-axis insets and `drawText`, which dispatches — went out to `LayerRenderersText.swift` under the size rule when phase 6 came to add the gradient, so a reveal can never reflow the box; road map 8's W3 moved its three §5.2 reveals out again to `LayerRenderersReveal.swift` (a pure move) before the FOURTH routine landed in `LayerRenderersWords.swift`: a timed word-caption page drawn over the recipe's `word` / `word_pop` — the base pass, the active word's pill and its pop about the pill's centre — and `wordHeadroom`, the room that pop needs, inside `measuredSize` so the overlay's handles and the pager pay for it. `renderTextBitmap` is the drawn bitmap `renderText` uploads |
+| `GraphicRegistry.swift` · `LayerRenderersGraphic.swift` | a graphic layer drawn (road map 10's G3b, §5d): `GraphicRegistry` maps a `RecipeSource` key to one immutable `GraphicSet` — the document's library and every module of its `graphics/` compiled against it — installed when the document's store starts and swapped for a new set on every `.graphicsDidChange` (a new library and every module recompiled when the font and asset set moved, only the named modules otherwise), so preview follows the newest revision (§11 G-13); an offline key (`render_frame`, an export, Save Frame, the eyedropper, a queued job) draws with the set its caller PINNED on it (road map 10's G3c) — the document's set as it stood when the frame or the export was asked for — and a key with neither a set nor a pin resolves to nothing, the slate. A pin also keeps what its graphics REPORTED: the first failure in a slot of its own and up to 64 distinct warnings. `LayerRenderersGraphic.swift` is `LayerRenderers`' graphic entry: the module's SVG for the layer's frame from the core's own `props_json` / `ctx_json` (a 250 ms budget in preview, 2 s offline), a texture cached by the SVG TEXT, the size and the library's version — not by the recipe's hash, and in a six-entry LRU pool of its own so an animating graphic cannot evict the text and shape textures — rasterized at the layer's own size and uploaded premultiplied BGRA. A graphic that FAILS (no module of that name, a module that did not compile, a throw or a timeout, a raster the engine refused) draws its ERROR CARD (§11 G-8), keyed by its own text in the same pool, and records the failure; a warning is recorded too, a raster's carried in `Rendered.warnings` so a pool hit still reports it. Only a key with no set, or an upload that fails, is nil and the slate |
 | `TextProps.swift` · `WordProps.swift` · `TextPatch.swift` | the text group of the read-only mirror and the recipe's `RecipeReveal` (with `word` / `wordPop`, format version 9), out of `ProjectSnapshot.swift`; the word-caption vocabulary mirroring `model_words.rs` (`TextCase`, `TextWord`, `WordMode`, `ActivePill`, `WordStyle`), the `TextProps` facts the renderer and inspector share (`laidContent`, `tokenCount`, `isUntimedPage`), `TextPatch.contentEdit` and `InspectorBinding.contentOps` — the Content write, per clip; and the typed text patch (with `case` and `words`), out of `ReelCore.swift`. Both moves were pure and gated alone, made because Swift cannot add a stored property in an extension |
 | `CaptionImporter.swift` · `CaptionLayout.swift` · `CaptionStyle.swift` · `CaptionPages.swift` · `Transcriber.swift` (+`Extract` `Jobs` `Languages`) · `CaptionExporter.swift` | captions in both directions: the SubRip grammar; the placement every producer shares (the frame grid, the overlap trim, the Caption preset or a word caption style's page patch, the new front-most track, the restyle's replaced tracks); the five word caption styles (road map 8 §5h) and the pager that fills a word caption's pages to a measured width inside each job's span (§11 W-7); on-device speech recognition (`SpeechEngine.swift`, the one `async` file W-8 adds, over `SpeechAnalyzer`/`SpeechTranscriber`) and the cue builder over it; the extractor, the job list and the language table BOTH engines share — the supported locales, each marked installed, and the sheet's Download row (`TranscribeSheetController+Download.swift`); and the `.srt` / `.vtt` writer |
 | `CloudTranscriber.swift` (+`Report`, +`Media`) · `MediaTranscript.swift` · `TranscriptStamp.swift` · `CloudProgress.swift` · `CloudEstimate.swift` · `AssemblyAIClient.swift` (+`Session`, +`Submission`) · `AssemblyAITranscript.swift` · `AssemblyAIConfiguration.swift` · `AssemblyAILanguages.swift` · `SecretStore.swift` | road map 6's C1, captions from the cloud: the run that groups a scope's clips by MEDIA, uploads each file once, maps the words back through every clip's own window and deletes the transcript at the far end; the per-media cache in the package and R6-15's four-field source marker; R6-16's all-cached keyless admission and deferred cleanup report; the one progress number and the words beside it; what a run WOULD cost, before the button; AssemblyAI's REST calls over one `URLSession` with its retry, its poll ceiling and its cancel token, plus R6-14's bounded lost-submit recovery; the wire values; WHERE the client speaks and WHAT it says it is (spec §11's R6-6 and R6-9, the one reader of `-RCAssemblyAIEndpoint`, `-RCSecretFolder` and `RC_ASSEMBLYAI_KEY`); the twenty-one languages the popup offers; and the `0600` key file |
 | `MediaImporter.swift` | `AVURLAsset` probing (one of the TWO places `async`/`await` is allowed — AVFoundation's loading API is async-only going forward; `SpeechEngine.swift` is the other, §11 W-8), thumbnails via `AVAssetImageGenerator` — the seconds at or past the video track's end ask for its last frame once and hold it, the strip's half of the rule `CompositionBuilder` applies to the picture — peaks via `AVAssetReader` + vDSP, cache files in the package |
-| `Exporter.swift` | picks the pipeline for the core's settings — `ExportWriter` (`AVAssetReader`/`AVAssetWriter`: chapters, explicit bitrates, the loudness gain) or the ImageIO frame sequence for GIF/APNG — runs the loudness MEASUREMENT pass ahead of the write, reports progress, and renders one frame offline for `render_frame` |
+| `Exporter.swift` · `ExporterErrors.swift` · `ExporterGraphics.swift` | picks the pipeline for the core's settings — `ExportWriter` (`AVAssetReader`/`AVAssetWriter`: chapters, explicit bitrates, the loudness gain) or the ImageIO frame sequence for GIF/APNG — runs the loudness MEASUREMENT pass ahead of the write, reports progress, and renders one frame offline for `render_frame` (`renderFrameReported`, with what the frame's graphics reported). Every way an export stops is `ExportError`, in `ExporterErrors.swift` (a pure move at road map 10's G3c). `ExporterGraphics.swift` is an export's graphics (§7.8's closing paragraph): the compile gate, and the mapping from a graphic that failed mid-export to `.graphicFailed` |
 | `ExporterSettings.swift` | the resolved settings in AVFoundation's vocabulary — the time range, the fallback session preset, the file type, the UTI, the extension, `isAudioOnly` — cut out of `Exporter.swift` under the size rule when phase 7 gave `export` and `renderFrame` a `RecipeOptions` argument; `renderFrame` stayed behind because it is the app's only `copyCGImage` call and the build baseline names that warning by file |
 | `FrameWriter.swift` | a CGImage and a format in, a written file out (PNG / JPEG / HEIC) — the ONE writer File ▸ Save Frame… and `render_frame` both call, which is what makes their PNGs byte-identical by construction rather than by luck; PNG passes NIL destination properties, and JPEG flattens a transparent canvas onto black because the container has no alpha |
 | `AudioTap.swift` · `AudioDSP.swift` · `LevelMeter.swift` · `LevelMeterView.swift` | the sample-level audio the plan cannot carry: one `MTAudioProcessingTap` per composition audio track running noise reduction, the compressor and the Mix stage (the mono fold, then the pan), and the level meter's model and its one view — the model publishing a raw per-channel peak and RMS lock-free off the render thread, the view owning the ballistics |
@@ -2618,6 +2700,28 @@ the file will have — a vertical 1080 × 1920 timeline's "GIF default" is
 152 × 270 — and `ExporterImageSequence` draws each frame at exactly that
 size rather than fitting a second time.
 
+**Graphics** (road map 10's G3c; §11 G-8 and G-13). An export is handed
+the document's compiled `GraphicSet` as it stood when the export was asked
+for — by the sheet, a queued job (captured at ENQUEUE, beside the media
+URLs), or the `export` tool — and PINS it on its own `RecipeSource` key for
+its whole life (`GraphicRegistry.pin`, unpinned in `finish` and in
+`deinit`), so a module saved mid-export, or a document edited or closed
+under a queued job, cannot change what the file draws. Before the build it
+runs the GATE: every graphic clip overlapping the range, and every graphic
+clip of each nest a clip in the range shows, whose module did not compile
+or is not in `graphics/` refuses the export before anything is written,
+each named with its first diagnostic. Nothing is gated for an audio-only
+row. The gate is compile-only; a frame that fails while the file is being
+written records the failure on the export's key, the progress timer sees
+it and cancels, and `finish` answers `.graphicFailed` — the graphic, its
+frame and the message — and removes the file, whatever the pipeline had
+answered. GIF and APNG pin the same set per frame and stop on a failed
+report. An error card is therefore never delivered in a video. The writer's
+cancel only sets a flag its pumps read before each sample; the reader and
+the writer are torn down once every pump has left its loop, because
+cancelling the reader under a running pump crashed the process (road map
+10 §10.6 G3c).
+
 ### 7.9 Agent
 
 `agent.rs` is copied from Rasterize (generic streamable-HTTP MCP, tools
@@ -2627,7 +2731,7 @@ only). Catalog: one tool per §6 op with the same name and arguments —
 core's own `rc_op_names`, so a new op gets it for free and cannot drift, and
 enforced by a fourth part of the startup parity check, which is the only
 mechanism in the tree that would catch an op tool declaring none.
-**All fifty-seven op tools PRINT those arguments rather than
+**All fifty-nine op tools PRINT those arguments rather than
 restating them** (road map 7's D3·3 for the clip group, D3·4 for the rest):
 `AgentCatalog.opTool(...)` takes the
 tool's prose and a sentence per argument and merges the structure — kind,
@@ -2636,16 +2740,19 @@ constraints, closed vocabulary, required list — in underneath from
 what it is FOR**. Where a tool deliberately accepts more or less than its op
 does — a bare-string body, the string spellings of a boolean, a null that
 MEANS something, a range the core clamps to rather than refusing, a default
-taken from the playhead, a list the tool will not take empty — the
+taken from the playhead, a list the tool will not take empty, an argument
+only the app can fill and so does not publish (the two graphic ops'
+`schema`, read from the module's current revision, road map 10's G3b) — the
 difference is a row of `AgentCatalog+Declarations.swift` with the op, the
 argument, what the app adds and why, and the schema declares it, so an agent
 can SEE a shorthand rather than discover it. What still declares a schema of
-its own is the twenty APP-STATE tools, which have no op to read one from.
+its own is the twenty-six APP-STATE tools, which have no op to read one from.
 
 **A fifth part of the startup parity check holds that identity up**
 (`AgentServer+Parity.swift`, road map 7's D3·5). For every op tool the
 declared argument names must be exactly the core's for that op, plus the
-injected `project` and `scope`, plus whatever a declarations row names — in
+injected `project` and `scope`, plus whatever a declarations row names, less
+an argument a row says the app fills — in
 both directions, so an argument the core has that no tool declares and an
 argument a tool declares that no op has are each named with the op, the
 argument and the side, and a declarations row naming an argument the core has
@@ -2657,7 +2764,7 @@ caught rather than dropped in silence. App-state tools are skipped by the same r
 part 4 uses — the core's own op list, which has no row for a tool with no op
 behind it. What no comparison of two lists can see is a
 CALL. A call's KEYS are compared to the tool's published schema at the
-dispatch — the argument gate, kpgalligan/reelcut#21, for all seventy-seven
+dispatch — the argument gate, kpgalligan/reelcut#21, for all eighty-five
 tools — so a name no tool published is refused naming the tool and what it
 takes, where it used to be dropped in silence; and that an argument the
 catalog prints is one a hand-written handler really reads is put to the
@@ -2781,7 +2888,11 @@ too, which is what makes those two files byte-identical by construction
 rather than by luck, and the only way the line can be checked at all, since
 no script can press a save panel. `burn_in_timecode` is the recipe option of
 §7.3 and not an export override, and this tool is the only one that can
-photograph a burn-in, and
+photograph a burn-in. When a graphic in the frame warned or failed, one
+sentence per report precedes that last one — `Graphic "x" failed at frame
+N: <message> (line L, column C).`, `… warned at frame N: …` or `… does not
+compile: …` — and a failed graphic draws its error card in the picture
+(road map 10's G3c); the call is still not an error, and
 `normalize_clip {clips, peak_db?}` (road map 2's phase 5 — the mirror of
 the Audio section's Normalize button and Clip ▸ Normalize; it is a
 composite the UI offers as one command, not an op, and it reports each
@@ -2811,6 +2922,48 @@ checks only what the core cannot know, which is the target, the scope, an id
 against the container it names, a time, and that a required argument was
 passed at all.
 
+**The graphics loop** (road map 10's G4a): `write_graphic {name, source}`
+writes `graphics/<name>.js` through the store's one writer (atomically,
+creating the folder), rescans at once and answers the compile of THAT text —
+`ok`, `meta`, `schema`, `diagnostics [{level, message, line, column,
+frame}]`, `clips` — where a module that does not compile is an answer, not
+an error; the write is not undoable and never dirties the document (G-3),
+and a bad name is the core's sentence. `get_graphic {name?}` reads one
+module back (its source, revision and compile) or, with no name, the folder
+— its path whether or not it exists yet, and every module with its revision,
+`ok` and `clips`. `graphic_reference {}` answers the bundled
+`GraphicsAPI.md` verbatim and needs no open project. `get_project` gains
+`graphics: [{name, revision, ok, clips}]`, always present. The reference is
+also written into an EXISTING `graphics/` as `API.md` and `API.d.ts` (never
+a reason to create the folder, G-14, and not content that makes an untitled
+root worth carrying). `get_graphic {}` also lists `families` (the engine's own
+names, `rc_graphic_library_families`) and `assets`.
+
+G4b adds three. `render_graphic {name, frames | frame, props?, width?,
+height?, max_width?, background?, format?, path?}` draws a module WITHOUT a
+clip, on the server thread: the ctx a clip would get (the canvas's fps,
+`durationInFrames` from `meta` else 5 s, the size from the arguments, else
+`meta`, else the canvas), up to 16 frames on a contact sheet — the cells
+scaled down to `max_width` (default 2048), never the 8 px gaps or the 24 px
+label strips, a failing frame drawn as its error card — written through
+`FrameWriter` as a PNG, with one sentence per frame that failed or warned
+before "Written to <path>."; `format: "svg"` answers one frame's SVG, its
+diagnostics and its ctx. `import_graphic_font {path}` copies a `.ttf`/`.otf`
+into `graphics/fonts/` through the store (G-14), rescans, and answers
+`families` — the family names the ENGINE reads from that file, from a
+throwaway library holding it alone, because CoreText names some files
+differently — and `library_families`; a file that loads no face is refused
+in the engine's words. `import_graphic_asset {path, name?}` copies a PNG,
+JPEG, GIF, WebP, SVG or SVGZ into `graphics/assets/` and refuses anything
+else and an empty file. Both are not undoable and never dirty the document.
+
+G5b gives the person the same doors (§9): File ▸ Add Font to Graphics… and
+Add Image to Graphics… run the two imports' own body
+(`GraphicStore.importFont` / `importAsset`), Help ▸ Graphics Reference opens
+the file `graphic_reference` answers, and **Insert ▸ Graphic is
+`write_graphic` of a template (or a chosen `.js`) then `add_graphic_clip`**
+— one undo step, "Insert Graphic", placed by Add Text's rule (§11 G-16).
+
 Handlers use `performGroupedEdit` so off-event edits get their own undo group
 (Rasterize's `AgentServer.performGroupedEdit`). Default port 4817; env
 `RC_AGENT_PORT`; launch flag `-AgentServerEnabled YES`.
@@ -2819,7 +2972,8 @@ Handlers use `performGroupedEdit` so off-event edits get their own undo group
 
 Crate `reelcut_core`, `crate-type = ["staticlib", "rlib"]`, deps `serde`,
 `serde_json`, `serde_path_to_error` (the path a patch refusal names),
-`tiny_http` (agent). Soft cap 600 lines per module; a new
+`tiny_http` (agent), and `graphic` (road map 10's motion-graphics engine, a
+path dependency named by `ffi_graphic.rs` alone, G-2). Soft cap 600 lines per module; a new
 concern is a new module with its own `impl Project` block.
 
 | Module | Owns |
@@ -2832,6 +2986,8 @@ concern is a new module with its own `impl Project` block.
 | `model_shape.rs` | the shape vocabulary — `ShapeProps`, the `ShapeKind` it draws, the `Stroke` around it, and the `Gradient`, `GradientKind`, `GradientStop` and `MAX_GRADIENT_STOPS` that fill it. Cut out of `model_props.rs` under the size rule (road map 5, E2) and re-exported whole by it, and cut HERE because it is `model_text.rs`'s seam read a second time: shape and text are the two sources the model only DESCRIBES, drawn on the CPU and keyed by the recipe's content hash, where everything left in `model_props.rs` is read straight into the compositor's uniform block. Nothing here is ever a shader discriminant — `GradientKind` may gain a kind at the END and nothing derives a number from the order, where `BlendMode`'s order IS the discriminant |
 | `model_motion.rs` | the motion vocabulary (format version 8, road map 5's E2) — `Motion` and the `MotionEdge`, `MotionDuring`, `EdgeMotion` and `DuringMotion` it is made of. Its own module for a seam rather than for room: every other member of the video group is a quantity the compositor reads more or less straight, while these five say only what a clip should DO and the placement that comes out of them is computed at render time by `motion.rs`. Re-exported whole by `model_props.rs`; neither enum's declaration order is load-bearing, and both are closed |
 | `model_words.rs` | the word-caption vocabulary (format version 9, road map 8's W1b; §5.2, §11 W-1 to W-6) — `TextCase`, `Word`, `WordMode`, `ActivePill` and `WordStyle` (with `template()` for `patch.rs`), re-exported through `model_props.rs` like the other vocabularies; the FIELDS stay on `TextProps`. And the two facts every writer of `text.words` shares, `pub(crate)` and named directly by their callers: `token_count` (`split_whitespace` — the core is the one counter) and `rebase_words` (the one saturating subtraction `trim_start`, `roll`, `add_transition`'s handle form and `split`'s second half make) |
+| `model_graphic.rs` | the graphic vocabulary (format version 10, road map 10's G2a; §5.2, §11 G-3, G-4, G-12) — `GraphicProps` (`name`, `width`, `height`, `in`, `length`, `props`) and the `GRAPHIC_MIN_SIDE` / `GRAPHIC_MAX_SIDE` / `GRAPHIC_MAX_PROPS` bounds, re-exported through `model_props.rs`; the FIELD `Clip.graphic` stays in `model.rs`. And the checks every writer of one shares, `pub(crate)`: the module name rule, the side bound, a schema's eight sentences and the props checked against it (or for shape only without one), the key count on the STORED map, and `normalise_color`. The engine crate's sentences and limits are COPIED here, because no module of the model may name it (G-2); a props map is only ever changed by `insert` and `shift_remove`, because `serde_json`'s `remove` swaps the last key into the hole under `preserve_order` |
+| `recipe_graphic.rs` | a graphic clip's own timeline and its layer (road map 10's G2b; §7.3, §11 G-9): `effective_length` (`graphic.length`, or `in + duration` when `null`) and `graphic_advanced` (`in` moved through `source_window.rs`'s `in_advanced` at speed 1, never below 0), the ONE equation the writers — `trim_start`, `roll` and `split`'s second half move `in`, `split` pins both halves' `length` — and the reader share; and `graphic_source`, the layer's `{kind, name, hash, frame, ctx, props, props_json, ctx_json}` and `[width, height]`, its hash over everything `render` is called with — the two `_json` keys (road map 10's G3b) the serialized text of `props` and `ctx`, which the app hands the engine untouched. Here rather than in `model_graphic.rs` or `source_window.rs` because both stand at their caps; the edit modules importing it follow `edit_split.rs`'s reading of `actions` and `source_window` |
 | `model_query.rs` | reading a project: `Project::new`, id allocation, the `clip` / `track` / `media` / `marker` / `nest` lookups, `clips_on`, `duration`, `validate` with its nesting walk, and `source_size` — the source's pixel size when the model knows it, `None` for text and for a media, nest or shape with no positive size. That last one was TWO private readers, `edit_props.rs`'s and `edit_background.rs`'s stricter one, collapsed here by road map 5's T0f, so a source kind added to `model.rs` is answered once. The three source-window measurements moved out to `source_window.rs` (road map 7 §10, phase A) |
 | `frame_grid.rs` | One clip-time normalization concern (D7-3): placement start, `source_window.rs`'s bounded duration, action spans and present base motion/text timing. Called by canvas, both paste paths and unnest; source positions, action-end payloads and audio envelopes are untouched. |
 | `source_window.rs` | THE source window — how much material a clip shows and how much lies either side of it, in the unit its name says (road map 7 §10, phase A). The three readers moved out of `model_query.rs` with their units in their names (`content_length_in_source`, `source_head_on_timeline`, `source_length_on_timeline`), `SourceBound` in place of the `Option` whose `None` meant two opposite things, `longest_duration_on_grid` (the bound, snapped DOWN — §11's #22), the two tail readers `slip` and `freeze_frame` clamp against, the five functions phase B added so that every writer of a media clip's window reads ONE bound (§11's D4-2 to D4-5) — `longest_duration_on_grid_of`, which takes the pieces with the clip's `start` among them, `latest_end_on_grid` and `earliest_start_on_grid`, the two timeline POSITIONS an edge is held to, `duration_resnapped`, what every re-snap of a media duration writes, and `duration_at_speed`, what `set_speed` writes — and the ONE mover — `in_advanced` / `source_advanced`, the `round(Δ × speed)` advance of a source in point that `trim_start`, `roll`, `split_clip`, `freeze_frame`, `slip` and `add_transition` each used to write out |
@@ -2844,6 +3000,7 @@ concern is a new module with its own `impl Project` block.
 | `op_schema.rs` | the op table written as JSON SCHEMA — what `rc_op_schemas` publishes (road map 7's D3·2), one object per op whose properties are its arguments and whose `required` is the ones the decoder will not do without. A module of its own because a row changes when an OP does and this changes when the published DIALECT does, and the match over `Kind` is exhaustive so a kind cannot be added without saying what JSON it is. It publishes what an argument IS and never what it is FOR, an opaque object for a caller-authored patch (D1 is the one validator of what one may carry) and a `ZoomRegion`'s four declared members for the one caller-authored object the core does own, and no `additionalProperties` on an op, because the catalog merges `project` and `scope` in over it |
 | `scope.rs` | editing INSIDE a nest — the envelope's `scope` key (road map 2, phase 9). Builds a VIEW project out of the nest, applies the op to it unchanged, and merges `tracks`, `clips`, `next_id`, `media` and `nests` back. Its own module because a scope is a change of CONTAINER rather than an op or a property of one, and because the whole of it is two pure functions and a refusal list, which belong nowhere near the semantics of any single edit. Three readings in it are measured rather than reasoned: the scoped nest's row stays in the view with its tracks and clips **emptied** (whole, it doubles every id in `validate`'s one uniqueness sweep; removed, it dangles every other nest's clip that shows it — the nest-inside-a-nest case the phase exists for); the nests write-back is **union first, orphans after**, because `unnest`'s `nest_is_shown` cannot see the parent's timeline clips from inside a view and would drop a nest a timeline clip still shows; and the caps and the depth are checked ONCE on the merged parent, which is why a scoped op has a wider `Err` arm than any other |
 | `edit_clip.rs` / `edit_props.rs` / `edit_track.rs` / `edit_time.rs` | the §6 ops in `impl Project` blocks: clip construction and placement callers; the five property patches (`set_video` / `set_audio` / `set_text` / `set_shape`, and `set_clip` for the clip's own name and label), each merged through `patch.rs` and then range-checked; tracks, markers, canvas, media; ripple, insert time, range delete, freeze |
+| `edit_graphic.rs` | the two graphic ops (road map 10's G2a): `add_graphic_clip`, every argument checked through `model_graphic.rs` BEFORE `edit_clip.rs`'s `add_described_clip` places it, and `set_graphic`, whose patch reader takes `name`, `width`, `height`, `length` and `props` (merged key by key, `null` removing with `shift_remove`) and refuses `in` by name |
 | `edit_clip_timing.rs` | `trim_start`, `trim_end`, `rate_stretch`, `set_speed`, their speed bounds and action rescaling, moved unchanged from `edit_clip.rs` before road map 7 §12.8's placement-commit extraction |
 | `edit_commit.rs` | the internal placement commit: `commit_replacements` checks selected candidates on old tracks before destination tracks and replaces their IDs in place; `commit_additions` checks caller-allocated additions on `self` and appends them to the caller's draft; `finish_placement` mints gained transitions on the supplied tracks then calls the existing equality-before-validation `finish`. No op/FFI/schema/format surface changes |
 | `patch.rs` | reading a caller-authored patch: `Group` (the vocabulary the four patches and `paste_attributes` share, and its per-group template), `check_keys` (the walk of keys and JSON kinds, array indices in the path), `merge_group` (the one read of a group patch — walk, deep merge, typed read back) and `check_group_patch` (the same for a group that is not merged into a stored one, which is what `edit_action.rs` composes an end patch's door out of). Every refusal names the dotted path and the offending value, and `COMPLETE_ENTRIES` is where the `video.filters` entry rule is stated. Cut out of `edit_props.rs` under the size rule in D1·2 for `props_check.rs`'s reason: what a patch may CARRY is a fact about the vocabulary, not about an edit, and nothing here is handed a clip |
@@ -2859,7 +3016,7 @@ concern is a new module with its own `impl Project` block.
 | `actions.rs` | evaluation and interpolation, `clip_state(clip, t)`, and `clamp_video`, the last line of defence §5.4 describes. §5.4's LIST rule is stated here once and applies to every array of objects in the schema (`video.filters`, `video.obscure`), neither of which carries a line of its own code; the widened discriminant set is confined to list ENTRIES, so `video.spotlight`'s animation is what it has always been. `clamp_video` also carries the one bound that is not a range — a NEST clip's evaluated `blend` is forced to `normal` (format version 6) — because `set_action_end` never sees the clip (it checks the vocabulary, and `multiply` is a legal mode), and closing it in the evaluator closes the recipe, `clip_state` and both export writers at once, which no per-op check can |
 | `transition.rs` | overlap detection, the overlap rule, progress at *t* |
 | `evaluate.rs` | `composition_plan()` (A/B assignment, instruction tiling) and the `assign()` the recipe shares with it |
-| `recipe.rs` | `frame_recipe(t)`: the layer list at one instant — like every walk over what plays, it consumes `nest.rs`'s instances — and the keys of each layer in it, `blend` included. It is also where a clip's `video.motion` becomes placement, through the two `motion::apply` calls in `layer` and `frame_of` (§5.3); no layer key was added for it. `content_hash` and the FNV under it stay here and are `pub(crate)`: a SHAPE layer hashes its description through the same function, so the hash is the recipe's texture-cache primitive rather than a text concern. Phase 7 added `RecipeOptions` (what a caller wanted besides `t`; `frame_recipe(t)` is `frame_recipe_opts(t, defaults)`, one implementation so the two cannot drift) and `RecipeLayer`, the twenty layer keys written in ONE place — the burn-in is a second producer of layers, and a copied skeleton would drift silently, since `RecipeLayer.init(from:)` defaults a missing key with no diagnostic |
+| `recipe.rs` | `frame_recipe(t)`: the layer list at one instant — like every walk over what plays, it consumes `nest.rs`'s instances — and the keys of each layer in it, `blend` included. It is also where a clip's `video.motion` becomes placement, through the two `motion::apply` calls in `layer` and `frame_of` (§5.3); no layer key was added for it. `content_hash` and the FNV under it stay here and are `pub(crate)`: a SHAPE layer hashes its description through the same function, so the hash is the recipe's texture-cache primitive rather than a text concern. A GRAPHIC layer's source is one arm calling `recipe_graphic.rs`'s `graphic_source`, which is its home; `missing_source` is `pub(crate)` for it. Phase 7 added `RecipeOptions` (what a caller wanted besides `t`; `frame_recipe(t)` is `frame_recipe_opts(t, defaults)`, one implementation so the two cannot drift) and `RecipeLayer`, the twenty layer keys written in ONE place — the burn-in is a second producer of layers, and a copied skeleton would drift silently, since `RecipeLayer.init(from:)` defaults a missing key with no diagnostic |
 | `recipe_text.rs` | what a text layer SHOWS at one instant: the `reveal`, its phase and its kind (§7.3), computed in the core so everything that draws reads one description, folded into the layer's content hash so a per-frame picture cannot be served a stale texture, and assembled into the layer's `source` object by `text_source`. Cut out of `recipe.rs` under the size rule (road map 2, phase 7) and re-exported by it, so `crate::recipe::text_source` still resolves, and cut HERE because placement is the same question for every layer while text is the one kind that is not finished when its placement is — the model can only state an intent (§5.3, §11), and an ANIMATED intent is not even fixed. `text_source` takes a description, a clip time and a duration and nothing else — no clip, no instance — so a text layer the core synthesizes is a text layer like any other. The cut paid for itself at once: `burn_in_layer`, the timecode layer `burn_in_timecode` appends, is here, with no animation (so `Reveal::WHOLE`), a fraction-of-the-height placement rather than a bottom anchor, and the non-drop and project-time readings §7.3 records |
 | `recipe_words.rs` | what a timed text PAGE shows at one instant (format version 9, road map 8's W1b; §7.3, §11 W-4): `Words::of` — `word`, how many of `text.words` have started, and `word_pop`, how far the active word's pop has got over `WORD_POP` (0.12 s) — both null unless the text has a `word_style`, non-empty `words` and a matching token count. Total and order-blind (a count, a saturating subtraction and a clamp), because a paste payload and the file reader store `words` unchecked. `recipe_text.rs` emits the two keys on every text layer and folds them into the hash only for a styled page |
 | `motion.rs` | `video.motion` turned into PLACEMENT (§5.3): the two edge tables and the during table of road map 5 §5b, the tent rule, the `rem_euclid(360)` reduction — including the reduction's OWN 360, which `f64::rem_euclid` answers for a tiny negative and which is mapped back to 0 — and, with it, a BAND under a whole turn: `partnerBox`'s `rotation == 0` guard compares the recipe's f64 EXACTLY, so a layer that is unrotated to the eye must publish an exact 0, and every total that rounds to 360 as an f32 of DEGREES (within 2⁻¹⁶°, which moves the corner of a 4K frame by at most 5.87e-4 px) is published as 0. That width is CHOSEN, not a consumer's precision: the only f32 is the Metal uniform, `Float(rotation · π/180)`, in RADIANS, which the guard never reads — the visible-centre pivot and the slide geometry. `apply` takes the EVALUATED props, the clip time, the clip's own duration, the source's pixel size and the container's canvas and answers the same props with five fields moved; `recipe.rs`'s `layer` and `frame_of` are its only two callers, which is what keeps everything that EDITS reading the clip un-moved (§5.4). It never trusts the file — a degenerate duration, period or amount is inactive or clamped, and no NaN reaches the recipe — and it SHORT-CIRCUITS to `video.clone()` when no slot is running, so a frame past an arrival is byte-identical to the same clip with no preset |
@@ -2875,6 +3032,7 @@ concern is a new module with its own `impl Project` block.
 | `export_table.rs` | the rows themselves — the `Container` enum with the four questions a container answers about ITSELF (extension, UTI, whether a leading index is worth rewriting, whether it can hold sound at all), `Preset`, the `PRESETS` set one row per encoding in menu order, and the `preset(id)` lookup both resolvers share. Cut out of `export.rs` under the size rule (road map 2, phase 7 — the second cut that file has paid, after `export_overrides.rs`) and cut HERE because everything in it is a constant no project can influence, where `export_settings` is the only half handed a `&self`; `export.rs` re-exports both functions, so `crate::export::presets()` and `crate::export::preset(id)` resolve as they did |
 | `agent.rs` | MCP server (copied) |
 | `ffi.rs` / `ffi_edit.rs` / `ffi_query.rs` / `ffi_agent.rs` / `ffi_util.rs` | thin shims; `ffi_util` holds `catch_unwind` + `err_out` + CString helpers (copy Rasterize's) |
+| `ffi_graphic.rs` | the ten `rc_graphic_*` exports (§7.1), delegating to the `graphic` crate — the ONLY module that names it (G-2): the library builder that freezes into one `Arc<graphic::Library>` at first use, the compiled module's handle, and `diag_out`'s JSON array of Diagnostics |
 
 Tests: black-box in `core/tests/` through the FFI, oracle-checked, no
 golden files. Required from M1: JSON round-trip for every field; timecode
@@ -3071,7 +3229,16 @@ bound" table claims no row for it and every bare letter belongs to the
 editor's own `keyDown`; the queue's window sets
 `isExcludedFromWindowsMenu`, since this menu is `NSApp.windowsMenu` and
 AppKit would otherwise list it a second time under its own title — Bring All
-to Front), Help.
+to Front), Help (Reelcut Help, Graphics Reference — road map 10's G5b: the
+bundled `GraphicsAPI.md` opened in the person's own app, live while the
+bundle holds it, with no document needed).
+Road map 10's G5b adds **Insert**, right after Edit, holding **Graphic ▸**:
+one item per bundled template (the six of `graphic/tests/graphics/`, copied
+into the app's `GraphicTemplates/`, titled from the file stem —
+`lower-third.js` is Lower Third — never by compiling it), a separator and
+From File…; and File gains **Add Font to Graphics…** and **Add Image to
+Graphics…** right after Consolidate Media…. None of the ten items takes a
+key equivalent, for the caption items' reason; §11 G-16 has the rules.
 All menu items are nil-target selectors validated in
 `validateUserInterfaceItem`.
 
@@ -4321,3 +4488,279 @@ assisted import.
   ⌘Return a commit in place, blur commits): it sits among fields that
   commit on blur, and a session that must be left is the canvas's alone. No
   MCP mirror: the keys are view state, `set_text` is the apply.
+- **G-1 — A graphic is a SOURCE, not an effect; R5-1 stands for effects**
+  (road map 10 §4, 2026-09-25). §1 lists "a plugin system" as a non-goal,
+  and R5-1 says effects are "closed vocabularies, never a runtime… no
+  expression language". A graphic changes neither rule for what they
+  govern: a transition, a motion preset, a filter and a blend stay closed
+  vocabularies the one compositor draws, and a script cannot reach another
+  clip's pixels, the timeline, the model or the editor. A graphic is a
+  clip's CONTENT, in the same place a media file or an image sits — closer
+  to "the user can import any PNG" than to a plugin. §1's non-goal gains one
+  clause: "a clip may draw itself from a JavaScript module in its package
+  (road map 10); nothing else is scriptable". The user asked for this
+  reversal, as road map 3 reversed screen recording.
+- **G-2 — The engine is a separate Rust crate; the core crate keeps its two
+  rules** (road map 10 §4, 2026-09-25). QuickJS and resvg live in
+  `graphic/`, a crate at the repo root. `reelcut-core` depends on it by
+  path, and ONE file, `core/src/ffi_graphic.rs`, calls into it; no module of
+  the model, the ops, the plan or the recipe imports it. `core/src/` keeps
+  "no pixel work" and "no filesystem" exactly; the `graphic` crate does
+  pixel work and still no filesystem — the app reads every byte and hands it
+  over. §7's first sentence becomes: "All pixel and sample work happens on
+  the platform, except a graphic's rasterization, which is the `graphic`
+  crate's (G-2)." Not JavaScriptCore and a platform rasterizer, because
+  `measureText` has to be the rasterizer's own measurement or wrapped text
+  overflows by a pixel (macOS has no public SVG rasterizer), because QuickJS
+  gives public memory and time limits where JavaScriptCore's execution time
+  limit is SPI, and because one call in, pixels out is a smaller seam than
+  JavaScriptCore in Swift plus resvg over FFI. The graph's licences (road
+  map 10 §4) are MIT, Apache-2.0 OR MIT and BSD-3-Clause; no copyleft code,
+  and no code from Remotion.
+- **G-3 — A graphic's source is a FILE in the package, and is not an undo
+  step** (road map 10 §4, 2026-09-25). The code lives at
+  `graphics/<name>.js`, and `<name>` matches `^[a-z0-9][a-z0-9-]{0,62}$`, so
+  it is safe on disk, in a URL and in a tool argument. The clip names its
+  module (`graphic.name`), and many clips may share one module, as many
+  clips share one media file. Editing the file is NOT an undo step and does
+  not dirty the document, exactly as a change to a media file on disk is
+  not; undo covers what the model holds — which module, the size, the
+  timeline and the props. The reason is that a file is edited by things
+  that are not the app (an agent's own Write tool, a person's editor), and
+  an undo stack that owned the file would have to be rebuilt from whatever
+  those tools did. The price is stated to the agent in the `write_graphic`
+  reply: "not undoable; keep your own copy if you want the old one back". A
+  revision history is road map 10 §7's. The package gains `graphics/`
+  beside `cache/` and `media/`, and the `fileWrapper` whitelist gains its
+  line (§5.6: a directory not named there is DELETED by the next save); an
+  UNTITLED document keeps its `graphics/` under its temporary cache root,
+  and the first save carries it into the package, as `cache/` is carried.
+- **G-4 — The core checks props against the schema the OP carries; render
+  time is lenient** (road map 10 §4, 2026-09-25). The schema is declared in
+  the module (`export const schema`), and the core never reads the module,
+  so `add_graphic_clip` and `set_graphic` take a `schema` argument (JSON,
+  road map 10 §5c's shape). The app fills it from the module's current
+  revision, and the tools declare it as the one argument an agent does not
+  send (a Declarations row); an agent that sends one anyway is refused by
+  the gate, since the tool never published it. With a schema, the core
+  checks every key of a `props` patch by its dotted path (`props.accent`),
+  with type, range and enum membership, in the core's words, and no handler
+  predicts a refusal. A `null`, which removes its key, is not checked, so a
+  stored key the schema no longer has can always be cleared. Without a
+  schema (a file read, or a replayed op), the core checks shape only: at most 64 keys, each value a string of at most
+  4096 characters, a finite number or a boolean. The 64 is counted on the
+  map about to be STORED — after a `set_graphic` merge and its removals —
+  since a one-key patch can push a full map over. At RENDER time props are
+  lenient, because a file edit can change the schema after the props were
+  set: `ctx`'s props are the schema's defaults overlaid with the stored
+  values, a stored key the schema no longer has is passed through and a
+  wrong type falls back to the default, both reported as WARNINGS in the
+  graphic's diagnostics and never as errors. A clip whose module was edited
+  keeps drawing, and the agent is told what no longer matches.
+- **G-5 — A graphic is a pure function of its inputs (R5-5 for code)**
+  (road map 10 §4, 2026-09-25). A frame is a function of its source text,
+  props, frame number, size, font set and asset bytes only. Anything else is
+  removed or made to throw: no wall clock (`Date` is frozen at
+  2000-01-01T00:00:00Z and `Date.now()` returns its epoch); no randomness
+  (`Math.random` throws "Math.random is not available; use random(seed)");
+  no I/O (no `std` or `os` module, and `import` of anything is refused); no
+  state between calls (the module is evaluated once per thread, and a test
+  renders the same frame after 300 others and compares bytes). So
+  `render_frame` at a tick is byte-identical run after run, and preview and
+  export agree; a graphic that keeps a module-level counter breaks that, the
+  standard library cannot stop it, and road map 10 §5l's proof row catches
+  it. Limits: 64 MB heap per context, 1 MB stack, 250 ms per `render` call
+  in preview and 2 s in export and `render_frame` — over budget is an error
+  for that frame, not a hang. These limits are also what makes a package
+  from someone else safe to open: its code runs, and it can reach nothing.
+- **G-6 — Fonts: the app's bundled faces and the package's, never the
+  system's** (road map 10 §4, 2026-09-25). The engine's font set is the
+  faces bundled in `app/Resources/Fonts/` (Anton, Bebas Neue, Darker
+  Grotesque, IBM Plex Mono, Montserrat and Source Sans 3, all OFL) and
+  every `.ttf`/`.otf` in the package's `graphics/fonts/`. The system's
+  fonts are NOT loaded, so a graphic authored on this Mac renders the same
+  on another and the agent is told exactly what exists: a `font-family` the
+  set does not have is a warning naming the families it does have. The
+  warning cannot be skipped: with no system fonts there is NO fallback, so a
+  `<text>` whose family the set lacks draws nothing and `measureText` has
+  nothing to measure; a list (`"Nope, Montserrat"`) falls through to the
+  family it names. A family that starts with a digit is not a CSS
+  identifier, so `font-family="Source Sans 3"` lays out nothing and
+  `"'Source Sans 3'"` draws: the standard library quotes every family it
+  writes, the reference says to quote, and the warning names an unquoted
+  digit-led family as the likely cause. The variable faces load as one face
+  each and draw the instance `font-weight` asks for. `import_graphic_font`
+  copies a font into the package.
+- **G-7 — A graphic draws at its own size, and crosses the FFI as
+  premultiplied BGRA** (road map 10 §4, 2026-09-25). A graphic has a
+  `width` and `height` in canvas pixels — the module's `meta.width/height`
+  if it declares them, else the canvas size at the time of the add — and,
+  like a nest's, the size is frozen: a later canvas change does not re-lay
+  out a graphic. It rasterizes at exactly that size, 1 source px = 1 canvas
+  px, as a shape does; scale, position and rotation are the layer's. The
+  engine writes premultiplied BGRA8 in sRGB into a buffer the app owns,
+  the format `LayerRenderers` already uploads, so tiny-skia's RGBA is
+  swizzled once, in Rust, and nowhere else. The maximum side is 8192, the
+  renderer's own cap.
+- **G-8 — A failing graphic shows its error in preview, answers it to the
+  agent, and stops an export** (road map 10 §4, 2026-09-25). In PREVIEW a
+  module that does not compile, or a frame that throws or times out, draws
+  an ERROR CARD in the layer's box — a dark red fill, a 2 pt red border and
+  the first diagnostic in IBM Plex Mono with its line and column — and never
+  the last good frame, which would hide the error from a person scrubbing.
+  `render_frame` and `render_graphic` return the diagnostics as text beside
+  the image. An EXPORT compiles every module a clip in the range names
+  before it starts and refuses on a compile error, listing each; a frame
+  that fails during the export aborts it, naming the graphic and the frame.
+  An error card is never written into a video. Built by G3c (road map 10
+  §10.6): the card's border is 2 PIXELS of the layer's texture, and the
+  missing module draws a card of its own; `render_graphic` was built by
+  G4b (road map 10 §10.7): a failing frame is its cell's error card, through
+  the same painter.
+- **G-9 — A graphic has its own timeline: `in` and `length`, and `split`
+  pins it** (road map 10 §4, 2026-09-25; built by G2b). `graphic.in`
+  (ticks, ≥ 0) is where on the graphic's own timeline the clip's first
+  frame falls; `graphic.length` (ticks, or `null`) is how long that
+  timeline is, and `null` means "it ends with the clip", which is what a
+  fresh clip wants: stretch the clip and the animation stretches its outro
+  to the new end. `split` gives the right half `in + cut` and pins BOTH
+  halves' `length` to the original's effective length, so the animation
+  continues across the cut and plays its outro once, at the true end.
+  `trim_start` advances `in` and `trim_end` never changes `length`, so
+  trimming a graphic cuts it as trimming media cuts a file. There is no
+  source bound: a clip longer than `length` keeps calling `render` with
+  frames past `durationInFrames`, and what it draws there is the module's
+  business. The core computes the frame: `frame = floor((in + clip time) /
+  frame_ticks)` on the canvas grid and `ctx.durationInFrames =
+  ceil(effective length / frame_ticks)`, clip time being §7.3's, which
+  already accounts for nests. A graphic has no `speed`. Three decisions
+  G2b made building it (road map 10 §10.5):
+  - **G-9·a — no head bound, and `roll` is a front trim.** The head clamp
+    (`source_window.rs`'s `earliest_start_on_grid`) stays media-only and
+    answers nothing for a graphic, so a graphic's start can be dragged or
+    rolled to 0 and `in` saturates at 0 through `in_advanced` at speed 1.
+    `roll` moves `in` on the clip whose start it moves, as `trim_start`
+    does (its predecessor's end is an end trim and keeps `length`), because
+    it is the crate's other front-trim writer and has no source guard.
+    `in` and `length` are written only by `recipe_graphic.rs`'s
+    `graphic_advanced` (from `trim_start`, `roll` and `split`'s second
+    half) and the split pin; `set_graphic` refuses `in`.
+  - **G-9·b — the layer's hash covers `ctx`.** It is `content_hash` over
+    `{name, frame, ctx, props}` — everything `render` is called with — not
+    over name, props, size and frame alone: at one frame a `trim_end`
+    changes `durationInFrames` and so the outro, and a rate change changes
+    `time`, and a narrower key would serve a stale texture, the defect
+    `recipe_text.rs` folds `reveal` in to prevent. The module's revision is
+    the app's to add (G-13).
+  - **G-9·c — a `null` length is `in + duration`, not `duration`.** "It
+    ends with the clip" places the graphic's timeline end at the clip's
+    end, which is graphic time `in + duration`. With `duration` alone a
+    `trim_start` to 1 s on a fresh 5 s clip would give `durationInFrames`
+    120 while the clip's last frame is graphic frame 149 — the outro would
+    finish a second early and then hold — and split-then-delete-the-head,
+    which looks the same, would give 150. Under this rule a front trim or
+    a roll leaves `durationInFrames` where it was, and the split pin writes
+    the number the unsplit clip already had.
+- **G-10 — Props are not action targets; everything about the LAYER is**
+  (road map 10 §4, 2026-09-25; built by G2b). The graphic animates itself,
+  so `graphic` is not among the groups an action's `end` may carry, which
+  is W-6's precedent: `set_action_end` answers a `graphic` object (a `null`
+  included) or `graphic` in `off` with the **error** `props are not
+  animated by actions; a graphic animates itself — change the module or its
+  props`, as it answers `video.motion` and `text.words`; a file or paste
+  payload whose `end` names `graphic` keeps it and animates nothing. Nor is
+  `graphic` a `paste_attributes` group: a target keeps its module, size,
+  timeline and props. `video.*` actions, motion presets, transitions and
+  blend all apply, because they belong to the layer. Keyframed props are
+  road map 10 §7's.
+- **G-11 — Plain JavaScript, one ES module, no TypeScript** (road map 10
+  §4, 2026-09-25). A module is ES2020+ JavaScript as QuickJS evaluates it,
+  with no build step: agents write plain JavaScript as reliably as
+  TypeScript, and a transpiler (`swc`/`oxc`) would be a second large
+  dependency whose only output is the same JavaScript. `graphics/API.d.ts`
+  gives an editor completions without making types part of the format.
+- **G-12 — Colours in props are CSS strings** (road map 10 §4,
+  2026-09-25). A `color` prop is a CSS colour string, normalised by the core
+  to `#rrggbb` or `#rrggbbaa` lowercase (an opaque alpha is dropped). It is
+  not the model's `[r, g, b, a]` floats, because props are the module's
+  vocabulary, which goes straight into SVG attributes; the inspector's
+  colour well converts at its edge. The core takes the four hex forms and
+  `rgb()` / `rgba()`; named colours and `hsl()` are not taken yet (road
+  map 10 §10.5).
+- **G-13 — The revision is a content hash, and an export pins it** (road
+  map 10 §4, 2026-09-25). A module's revision is the SHA-256 of its bytes,
+  computed with CryptoKit. Preview always uses the newest revision, and the
+  watcher refreshes the paused frame when one lands
+  (`Playback.refreshPausedFrame`). An EXPORT pins, at its start, the
+  revisions (and the font and asset sets) it compiled, so an agent editing
+  a file mid-export cannot produce a video whose first half is one version
+  and its second half another. Built by G3c (road map 10 §10.6): the pin is
+  the whole compiled `GraphicSet`, retained, captured on main when the
+  export (or a queued job, or `render_frame`) is asked for.
+- **G-14 — `graphics/` is created on the app's first write into it, never
+  at open** (road map 10 §4, 2026-09-25, G3a; amends G-3's last sentence).
+  A package that never gets a graphic is not touched: opening, saving and
+  autosaving a package without `graphics/` leaves it without one.
+  `GraphicStore.ensureFolder()` is the ONE creator of `graphics/` inside a
+  package, and every app-side writer — G4's `write_graphic`, G5's
+  templates, the font and asset imports — goes through it. While the folder
+  is absent the store watches the package directory itself, so a
+  `graphics/` made from OUTSIDE (an agent's own `mkdir`) is picked up; the
+  first observed appearance, whether the app made it or found it, calls
+  `packageContentsDidChangeOnDisk()` once, which is what keeps the next
+  save from being refused as "changed by another application". An untitled
+  document's folder is the app's own scratch at
+  `<NSTemporaryDirectory()>/Reelcut/<UUID>-graphics`, created eagerly,
+  BESIDE the temporary cache root rather than under it as G-3 said —
+  `cacheWrapper()` would carry a child of the cache root into `cache/` —
+  and the first save carries it into the package only when it holds at
+  least one entry. An untitled document restored from autosave has its
+  saved `graphics/` copied into a fresh root.
+- **G-15 — The Graphic sub-tab: what it shows for several clips, and what a
+  write sends** (road map 10 §10.9 G5a, 2026-09-25).
+  (a) **Several clips.** The sub-tab exists when EVERY selected clip is a
+  graphic clip. Source and Size always show; Properties shows only when
+  every clip is drawn by ONE module, because that is the one schema rows can
+  be built from and the one `set_graphic` checks against; Timeline shows
+  only for one clip, because `in` and `length` are that clip's own. With
+  clips of different modules, Source names them and says to select one
+  module's clips.
+  (b) **A value equal to the schema's default is written as `null`.** The
+  key leaves the stored props and the module draws its own default, which
+  is what Reset writes too (CI-9), so "differs from the default" and "is
+  stored" agree. A colour is equal by its parsed channels (the core accepts
+  any string as a colour default and normalises only stored values). A
+  default the four hex forms cannot parse (a named colour, `rgb()`) shows
+  as transparent black, and its Reset writes `null`.
+  (c) **Stale keys are listed sorted by key** — the stored props reach the
+  app as a dictionary, which has no order. ⌫ writes `{key: null}` with no
+  schema; a `null` always removes (G-4).
+  (d) **The diagnostics are checked at the clip's FIRST frame**, drawn and
+  rasterized at the clip's own size (the paused frame's two calls), memoised
+  by module, revision, library, frame hash and size, and never recomputed
+  during a live gesture.
+  (e) **A string prop is a one-line text field, or a text area when
+  `multiline`**, not §5j's value row: `OptionFieldControl` is numeric.
+  (f) **No preview strip.** `render_graphic` has no inspector control; a
+  person looks at the preview well.
+- **G-16 — Insert ▸ Graphic: where the clip goes, what the module is
+  called, and what a module that does not compile does** (road map 10
+  §10.9 G5b, 2026-09-25). Insert ▸ Graphic is `write_graphic` of a template
+  or a chosen `.js`, then `add_graphic_clip` at the module's `meta`
+  duration and size, as ONE undo step "Insert Graphic" (the file write is
+  not undoable, G-3).
+  (a) **Placement is Add Text's** (`addGeneratedClip`, §4.1 "at the
+  playhead"): the front track if the clip fits there, else a new track
+  above everything. So no track, or a playhead over a clip, never disables
+  the item; it validates on the document's graphics store alone.
+  (b) **The name is the file's stem made a module name, then made free**:
+  lowercased, every run of anything but `a-z0-9` one `-`, trimmed, at most
+  63 (`graphic` when nothing is left) — `My Counter (v2).js` is
+  `my-counter-v2` — then `GraphicStore.uniqueModuleName`: the name when
+  the folder holds no module of it, else `-2`, `-3`, …, so an insert never
+  overwrites a module another clip draws. Duplicate as New Graphic…'s
+  suggestion uses the same rule.
+  (c) **A module that does not compile stays on disk and places nothing**:
+  the person reads "graphics/<name>.js was written but does not compile:
+  <the first diagnostic> (line N)" in a sheet, and can fix the file where
+  it is.

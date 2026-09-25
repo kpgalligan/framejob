@@ -272,6 +272,9 @@ final class EditorViewController: NSViewController {
         NotificationCenter.default.addObserver(
             self, selector: #selector(reversedMediaDidChange(_:)),
             name: .reversedMediaDidChange, object: nil)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(graphicsDidChange(_:)),
+            name: .projectGraphicsDidChange, object: nil)
         installCanvas()
         installTimeline()
         // Last: it registers the two views above as drop targets for a media
@@ -1102,6 +1105,7 @@ extension EditorViewController: NSUserInterfaceValidations {
             if let answer = validateSaveFrameAction(action) { return answer }
             if let answer = validatePreviewQualityAction(action, item: item) { return answer }
             if let answer = validatePreviewWindowAction(action, item: item) { return answer }
+            if let answer = validateGraphicMenuAction(action) { return answer }
             // The arms whose files are not `EditorViewController+…`: Remove
             // Silences' body and validator live at the foot of
             // SilenceSheetController.swift, beside the sheet, and phase 4's

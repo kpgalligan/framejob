@@ -218,6 +218,7 @@ extension AgentServer {
         result.merge(scopeReport(document)) { _, new in new }
         let missing = document.missingMedia.map { Int($0.id) }
         if !missing.isEmpty { result["missing_media"] = missing }
+        result["graphics"] = graphicsSummary(document)
         result["note"] =
             "Times are ticks at 600000 per second. tracks[0] is the BACK of the layer stack; "
             + "clip ids, track ids, marker ids and media ids share one number space."

@@ -1,5 +1,10 @@
 # Plan: Code-Driven Motion Graphics Components (SVG + Rust)
 
+> **Input document, kept as written.** The design built from it is
+> `designs/reelcut-roadmap-10.md` (2026-09-24), whose §1 reviews this plan
+> point by point against the codebase. Where the two disagree, road map 10
+> is the one that holds.
+
 ## Context
 
 The editor is a macOS-only video editor built in Swift (UI, playback, export) and Rust (core engine). We are adding a new timeline component type: a **motion graphics component** defined by a small JavaScript file. Each component renders frames as a pure function of `(frame, props, meta)` and returns an SVG string. Rust rasterizes the SVG with `resvg` and hands the pixels to the existing compositor.

@@ -3,15 +3,20 @@ import AppKit
 /// The ONLY file in the app that names an `rc_*` symbol. Everything the Rust
 /// core can do reaches the rest of Reelcut as typed Swift here: `ReelProject`
 /// (a handle plus its lazily decoded `ProjectSnapshot`), `ReelTime`,
-/// `ReelSnap`, `ReelExport` and `RecipeSource`, and the op ARGUMENTS an edit
-/// is built out of — `MediaDescriptor`, the `dictionary` extensions on the
-/// §5.2 property types, and the typed patches.
+/// `ReelSnap`, `ReelExport`, the graphics engine's `GraphicLibrary` and
+/// `GraphicModule`, and the op ARGUMENTS an edit is built out of — the
+/// `dictionary` extensions on the §5.2 property types, and the typed patches.
 /// `ProjectSnapshot.swift` owns the read side of the same contract;
 /// `core/include/reelcut_core.h` is the contract itself.
 ///
 /// `ReelOp` and its one static factory per row of the op table are next door
 /// in `ReelOps.swift`, the size payment this file owed at 2242 lines, and
 /// what an op ANSWERS is in `ReelEdit.swift`, the payment it owed at 1507.
+/// The compositor's recipe registry is in `RecipeSource.swift`, the payment
+/// it owed at 1440 before road map 10's graphics wrappers, for the same
+/// reason: it names no `rc_*` symbol. `MediaDescriptor`, `mediaURL(for:)`
+/// and `bookmarkString(for:)` are in `MediaDescriptor.swift`, the payment it
+/// owed at 1440 again before the engine's family list, for the same reason.
 /// Only `ReelOp.coreNames()` and `ReelOp.coreSchemas()` stayed behind — the
 /// op table read BACK, its names and its arguments — because they read
 /// `rc_op_names()` and `rc_op_schemas()` and the rule above admits no second
@@ -726,68 +731,6 @@ extension ReelOp {
     }
 }
 
-// MARK: - Media descriptors
-
-/// A `media[]` element minus its id — what `MediaImporter.probe` produces
-/// and `add_media` takes. The host probes the file; the core only stores
-/// what came out (§6, §7.7).
-struct MediaDescriptor: Equatable {
-    var path: String
-    var bookmark: String?
-    var kind: MediaKind
-    var duration: Ticks
-    var width: Int
-    var height: Int
-    var fps: Fps
-    var hasVideo: Bool
-    var hasAudio: Bool
-    var hasAlpha: Bool
-
-    init(
-        path: String, bookmark: String? = nil, kind: MediaKind = .video, duration: Ticks = 0,
-        width: Int = 0, height: Int = 0, fps: Fps = .thirty, hasVideo: Bool = false,
-        hasAudio: Bool = false, hasAlpha: Bool = false
-    ) {
-        self.path = path
-        self.bookmark = bookmark
-        self.kind = kind
-        self.duration = duration
-        self.width = width
-        self.height = height
-        self.fps = fps
-        self.hasVideo = hasVideo
-        self.hasAudio = hasAudio
-        self.hasAlpha = hasAlpha
-    }
-
-    /// Re-describes an existing entry, for Relink… and for the agent's
-    /// echo of what it imported.
-    init(_ media: MediaSnapshot) {
-        self.init(
-            path: media.path, bookmark: media.bookmark, kind: media.kind,
-            duration: media.duration, width: media.width, height: media.height, fps: media.fps,
-            hasVideo: media.hasVideo, hasAudio: media.hasAudio, hasAlpha: media.hasAlpha)
-    }
-
-    /// The descriptor under the model's own key names. `bookmark` is omitted
-    /// rather than null when absent, so the core's serde default applies.
-    var dictionary: [String: Any] {
-        var d: [String: Any] = [
-            "path": path,
-            "kind": kind.rawValue,
-            "duration": duration,
-            "width": width,
-            "height": height,
-            "fps": [fps.num, fps.den],
-            "has_video": hasVideo,
-            "has_audio": hasAudio,
-            "has_alpha": hasAlpha,
-        ]
-        if let bookmark = bookmark { d["bookmark"] = bookmark }
-        return d
-    }
-}
-
 // MARK: - Value types as op-JSON dictionaries
 
 /// These emit the model's own key names (§5.2). They live here rather than
@@ -1271,170 +1214,140 @@ extension ActionPatch {
     }
 }
 
-// MARK: - The compositor's recipe registry
+// MARK: - Graphics
 
-/// The atomic reference the Metal compositor reads on every frame (§7.6).
-///
-/// AVFoundation instantiates the `AVVideoCompositing` class ITSELF, so it
-/// can never be handed a reference to the document — the only channel is
-/// something process-wide. Keying by an `Int` rather than using one global
-/// slot is what keeps two open documents from cross-reading each other: the
-/// key travels in the video composition's instructions.
-///
-/// Storage is guarded by an `NSLock` because the compositor calls from its
-/// own serial queue while the main thread publishes edits. The published
-/// value itself needs no protection: a `ReelProject` handle is read-only
-/// once published, and an edit produces a NEW handle rather than mutating
-/// the old one, so a recipe in flight stays coherent. `RecipeOptions` is a
-/// value type of two words, so the same sentence covers it.
-final class RecipeSource {
-    static let shared = RecipeSource()
+/// One `{level, message, line, column, frame}` out of the graphics engine's
+/// `diag_out` (road map 10 §5e).
+struct GraphicDiagnostic: Decodable, Equatable {
+    let level: String
+    let message: String
+    let line: Int?
+    let column: Int?
+    let frame: Int?
+}
 
-    private let lock = NSLock()
-    private var projects: [Int: ReelProject] = [:]
-    /// What each key wants of its recipes besides the time (phase 7).
-    ///
-    /// **Keyed the same way as the project and stored SEPARATELY from it, on
-    /// purpose.** Options describe the ASK, not the project: a document
-    /// republishes a new handle after every edit, and an export or an
-    /// offline frame that asked for a burn-in must keep getting one across
-    /// that. An absent entry is `RecipeOptions.none`, so a key nobody set
-    /// options on answers exactly what it answered before this dictionary
-    /// existed — which is every key in the app but the ones `Exporter` mints
-    /// for an export and for an offline frame.
-    private var options: [Int: RecipeOptions] = [:]
-    private var nextKey = 1
+/// A graphic that did not compile, draw or rasterize: the engine's one error.
+struct GraphicFailure: Error {
+    let diagnostics: [GraphicDiagnostic]
+}
 
-    private init() {}
+/// One drawn frame: premultiplied BGRA rows `stride` bytes apart.
+struct GraphicRaster {
+    let width: Int
+    let height: Int
+    let stride: Int
+    let bgra: [UInt8]
+    let warnings: [GraphicDiagnostic]
+}
 
-    /// A fresh key for a document. `ProjectDocument` holds it for its life
-    /// and passes it to `CompositionBuilder`.
-    func register() -> Int {
-        lock.lock()
-        defer { lock.unlock() }
-        let key = nextKey
-        nextKey += 1
-        return key
+/// Decodes and frees a `diag_out`. An unreadable one is one error saying so.
+private func takeDiagnostics(_ raw: UnsafeMutablePointer<CChar>?) -> [GraphicDiagnostic] {
+    guard let text = takeString(raw) else { return [] }
+    guard let list = try? JSONDecoder().decode([GraphicDiagnostic].self, from: Data(text.utf8))
+    else {
+        return [GraphicDiagnostic(
+            level: "error", message: "The core's diagnostics could not be read: \(text)",
+            line: nil, column: nil, frame: nil)]
     }
+    return list
+}
 
-    /// Drops a document's slot. Call it when the document closes, or the
-    /// last handle — and the Rust project behind it — leaks for the life of
-    /// the process.
-    func unregister(_ key: Int) {
-        lock.lock()
-        defer { lock.unlock() }
-        projects.removeValue(forKey: key)
-        // The options go with the slot, never before it: `set(nil, for:)`
-        // deliberately leaves them, because a key with no project published
-        // right now is still the same ask.
-        options.removeValue(forKey: key)
-    }
+/// The engine's fonts and assets (`RcGraphicLibrary`). Filled with
+/// `addFont` / `addAsset` until the first compile or rasterize against it
+/// FREEZES it; an add after that throws. A module compiled against it keeps
+/// its fonts alive, so the two are freed in either order.
+final class GraphicLibrary {
+    /// The engine's `MAX_SIDE` (`graphic/src/raster.rs`): a larger side is
+    /// refused here, before a buffer is allocated for it.
+    static let maxSide = 8192
+    fileprivate let handle: OpaquePointer
 
-    /// Publishes the project the compositor should read from now. Called on
-    /// the main thread after every edit, live or not.
-    func set(_ project: ReelProject?, for key: Int) {
-        lock.lock()
-        defer { lock.unlock() }
-        if let project = project {
-            projects[key] = project
-        } else {
-            projects.removeValue(forKey: key)
+    init() { handle = rc_graphic_library_new() }
+    deinit { rc_graphic_library_free(handle) }
+
+    func addFont(_ bytes: Data) throws {
+        var err: UnsafeMutablePointer<CChar>? = nil
+        let ok = bytes.withUnsafeBytes { raw in
+            rc_graphic_library_add_font(
+                handle, raw.bindMemory(to: UInt8.self).baseAddress, raw.count, &err)
         }
+        if !ok { throw ReelCoreError(message: takeErrorMessage(err, fallback: "No font added.")) }
     }
 
-    /// What `key` wants of its recipes. `RecipeOptions.none` for a key that
-    /// never set any, which is every document's.
-    ///
-    /// Published by whoever owns the key and read on the compositor's queue,
-    /// like the project beside it — and NOT main-thread-only, because
-    /// `Exporter.renderFrame` mints a key, publishes to it and renders on
-    /// whatever thread it was called on (its own doc says off the main one).
-    /// The lock is what covers that, exactly as it already does for `set`.
-    func setOptions(_ newOptions: RecipeOptions, for key: Int) {
-        lock.lock()
-        defer { lock.unlock() }
-        // Store nothing for the default, so the dictionary holds only the
-        // keys that are actually asking for something and "absent means
-        // none" stays a fact rather than a convention.
-        if newOptions == .none {
-            options.removeValue(forKey: key)
-        } else {
-            options[key] = newOptions
+    func addAsset(name: String, bytes: Data) throws {
+        var err: UnsafeMutablePointer<CChar>? = nil
+        let ok = bytes.withUnsafeBytes { raw in
+            rc_graphic_library_add_asset(
+                handle, name, raw.bindMemory(to: UInt8.self).baseAddress, raw.count, &err)
         }
+        if !ok { throw ReelCoreError(message: takeErrorMessage(err, fallback: "No asset added.")) }
     }
 
-    /// The options published under `key`, for a caller that has to carry
-    /// them somewhere the compositor cannot reach — an image-sequence write
-    /// renders each frame through a key of its own.
-    func options(for key: Int) -> RecipeOptions {
-        lock.lock()
-        defer { lock.unlock() }
-        return options[key] ?? .none
+    /// The engine's own family names, sorted — the exact strings a
+    /// `font-family` must match. FREEZES the library, as a compile would.
+    func families() -> [String] {
+        guard let json = takeString(rc_graphic_library_families(handle)) else { return [] }
+        return ReelJSON.decode([String].self, from: json) ?? []
     }
 
-    /// The recipe at `t` for one document, WITH whatever that key asked for.
-    ///
-    /// The project and the options are read under ONE hold, which is what
-    /// makes "this key's options" true of the answer rather than of some
-    /// instant near it — and is why the compositor asks for a recipe rather
-    /// than for the two halves. It deliberately does NOT hold the lock
-    /// across the FFI call and the JSON decode — only across the dictionary
-    /// reads — so a slow frame never blocks the main thread's next publish.
-    func recipe(for key: Int, at t: Ticks) -> FrameRecipe? {
-        lock.lock()
-        let project = projects[key]
-        let asked = options[key] ?? .none
-        lock.unlock()
-        return project?.recipe(at: t, options: asked)
-    }
-
-    /// The handle published under `key`, for the mirrors that sit beside this
-    /// one and need something a frame recipe does not carry —
-    /// `AudioDSPSource` reads per-clip audio settings off it.
-    ///
-    /// This is what makes a key ENOUGH. Every caller that builds a
-    /// composition publishes the project here first, including the two in
-    /// `Exporter` that mint a fresh key of their own, so a mirror handed a
-    /// key it has no entry for can still derive its answer from exactly the
-    /// project being built instead of guessing at which open document that
-    /// key belongs to.
-    func project(for key: Int) -> ReelProject? {
-        lock.lock()
-        defer { lock.unlock() }
-        return projects[key]
+    /// `svg` drawn at `width`×`height`, rows `width × 4` bytes apart.
+    func rasterize(_ svg: String, width: Int, height: Int) throws -> GraphicRaster {
+        let sides = 0...Self.maxSide
+        guard sides.contains(width), sides.contains(height) else {
+            throw GraphicFailure(diagnostics: [GraphicDiagnostic(
+                level: "error", message: "\(width)×\(height) is outside 0…\(Self.maxSide)",
+                line: nil, column: nil, frame: nil)])
+        }
+        let stride = width * 4
+        var bgra = [UInt8](repeating: 0, count: max(height * stride, 1))
+        var diag: UnsafeMutablePointer<CChar>? = nil
+        let ok = bgra.withUnsafeMutableBufferPointer { out in
+            rc_graphic_rasterize(
+                handle, svg, UInt32(width), UInt32(height), out.baseAddress, stride, &diag)
+        }
+        let diagnostics = takeDiagnostics(diag)
+        guard ok else { throw GraphicFailure(diagnostics: diagnostics) }
+        return GraphicRaster(
+            width: width, height: height, stride: stride, bgra: bgra, warnings: diagnostics)
     }
 }
 
-// MARK: - Media files
+/// One compiled graphic module (`RcGraphic`). Holds its library strongly.
+final class GraphicModule {
+    let library: GraphicLibrary
+    private let handle: OpaquePointer
 
-/// Resolves a media entry to a file URL: the bookmark first (it survives a
-/// move or a rename), the stored path as the fallback. NO security scope —
-/// the app is not sandboxed (§11), so a resolved URL is usable as is and
-/// there is nothing to stop accessing.
-///
-/// nil means the file is gone: the clip draws a missing slate and Relink…
-/// is offered.
-func mediaURL(for media: MediaSnapshot) -> URL? {
-    if let bookmark = media.bookmark, let data = Data(base64Encoded: bookmark) {
-        var stale = false
-        if let url = try? URL(
-            resolvingBookmarkData: data, options: [.withoutUI], relativeTo: nil,
-            bookmarkDataIsStale: &stale),
-            FileManager.default.fileExists(atPath: url.path) {
-            return url
-        }
+    private init(library: GraphicLibrary, handle: OpaquePointer) {
+        self.library = library
+        self.handle = handle
     }
-    guard !media.path.isEmpty, FileManager.default.fileExists(atPath: media.path) else {
-        return nil
-    }
-    return URL(fileURLWithPath: media.path)
-}
 
-/// The base64 bookmark the model stores beside a path. nil when the URL
-/// cannot be bookmarked (an unreachable volume), which is not an error —
-/// the path alone still opens the file today.
-func bookmarkString(for url: URL) -> String? {
-    let data = try? url.bookmarkData(
-        options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
-    return data?.base64EncodedString()
+    deinit { rc_graphic_free(handle) }
+
+    static func compile(
+        library: GraphicLibrary, name: String, source: String, budgetMs: Int
+    ) throws -> GraphicModule {
+        var diag: UnsafeMutablePointer<CChar>? = nil
+        let made = rc_graphic_compile(
+            library.handle, name, source, UInt32(clamping: budgetMs), &diag)
+        let diagnostics = takeDiagnostics(diag)
+        guard let handle = made else { throw GraphicFailure(diagnostics: diagnostics) }
+        return GraphicModule(library: library, handle: handle)
+    }
+
+    /// `{"meta":…,"schema":…,"revision":…}`, the schema in the module's order.
+    func describeJSON() -> String {
+        takeString(rc_graphic_describe(handle)) ?? "{}"
+    }
+
+    func svg(
+        frame: Int, propsJSON: String, ctxJSON: String, budgetMs: Int
+    ) throws -> (svg: String, warnings: [GraphicDiagnostic]) {
+        var diag: UnsafeMutablePointer<CChar>? = nil
+        let out = rc_graphic_svg(
+            handle, Int64(frame), propsJSON, ctxJSON, UInt32(clamping: budgetMs), &diag)
+        let diagnostics = takeDiagnostics(diag)
+        guard let svg = takeString(out) else { throw GraphicFailure(diagnostics: diagnostics) }
+        return (svg, diagnostics)
+    }
 }
