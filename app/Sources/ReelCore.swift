@@ -4,8 +4,8 @@ import AppKit
 /// core can do reaches the rest of Reelcut as typed Swift here: `ReelProject`
 /// (a handle plus its lazily decoded `ProjectSnapshot`), `ReelTime`,
 /// `ReelSnap`, `ReelExport`, the graphics engine's `GraphicLibrary` and
-/// `GraphicModule`, and the op ARGUMENTS an edit is built out of — `MediaDescriptor`, the `dictionary` extensions on the
-/// §5.2 property types, and the typed patches.
+/// `GraphicModule`, and the op ARGUMENTS an edit is built out of — the
+/// `dictionary` extensions on the §5.2 property types, and the typed patches.
 /// `ProjectSnapshot.swift` owns the read side of the same contract;
 /// `core/include/reelcut_core.h` is the contract itself.
 ///
@@ -14,7 +14,9 @@ import AppKit
 /// what an op ANSWERS is in `ReelEdit.swift`, the payment it owed at 1507.
 /// The compositor's recipe registry is in `RecipeSource.swift`, the payment
 /// it owed at 1440 before road map 10's graphics wrappers, for the same
-/// reason: it names no `rc_*` symbol.
+/// reason: it names no `rc_*` symbol. `MediaDescriptor`, `mediaURL(for:)`
+/// and `bookmarkString(for:)` are in `MediaDescriptor.swift`, the payment it
+/// owed at 1440 again before the engine's family list, for the same reason.
 /// Only `ReelOp.coreNames()` and `ReelOp.coreSchemas()` stayed behind — the
 /// op table read BACK, its names and its arguments — because they read
 /// `rc_op_names()` and `rc_op_schemas()` and the rule above admits no second
@@ -729,68 +731,6 @@ extension ReelOp {
     }
 }
 
-// MARK: - Media descriptors
-
-/// A `media[]` element minus its id — what `MediaImporter.probe` produces
-/// and `add_media` takes. The host probes the file; the core only stores
-/// what came out (§6, §7.7).
-struct MediaDescriptor: Equatable {
-    var path: String
-    var bookmark: String?
-    var kind: MediaKind
-    var duration: Ticks
-    var width: Int
-    var height: Int
-    var fps: Fps
-    var hasVideo: Bool
-    var hasAudio: Bool
-    var hasAlpha: Bool
-
-    init(
-        path: String, bookmark: String? = nil, kind: MediaKind = .video, duration: Ticks = 0,
-        width: Int = 0, height: Int = 0, fps: Fps = .thirty, hasVideo: Bool = false,
-        hasAudio: Bool = false, hasAlpha: Bool = false
-    ) {
-        self.path = path
-        self.bookmark = bookmark
-        self.kind = kind
-        self.duration = duration
-        self.width = width
-        self.height = height
-        self.fps = fps
-        self.hasVideo = hasVideo
-        self.hasAudio = hasAudio
-        self.hasAlpha = hasAlpha
-    }
-
-    /// Re-describes an existing entry, for Relink… and for the agent's
-    /// echo of what it imported.
-    init(_ media: MediaSnapshot) {
-        self.init(
-            path: media.path, bookmark: media.bookmark, kind: media.kind,
-            duration: media.duration, width: media.width, height: media.height, fps: media.fps,
-            hasVideo: media.hasVideo, hasAudio: media.hasAudio, hasAlpha: media.hasAlpha)
-    }
-
-    /// The descriptor under the model's own key names. `bookmark` is omitted
-    /// rather than null when absent, so the core's serde default applies.
-    var dictionary: [String: Any] {
-        var d: [String: Any] = [
-            "path": path,
-            "kind": kind.rawValue,
-            "duration": duration,
-            "width": width,
-            "height": height,
-            "fps": [fps.num, fps.den],
-            "has_video": hasVideo,
-            "has_audio": hasAudio,
-            "has_alpha": hasAlpha,
-        ]
-        if let bookmark = bookmark { d["bookmark"] = bookmark }
-        return d
-    }
-}
-
 // MARK: - Value types as op-JSON dictionaries
 
 /// These emit the model's own key names (§5.2). They live here rather than
@@ -1272,40 +1212,6 @@ extension ActionPatch {
         if let text = text { d["text"] = text.dictionary }
         return d
     }
-}
-
-// MARK: - Media files
-
-/// Resolves a media entry to a file URL: the bookmark first (it survives a
-/// move or a rename), the stored path as the fallback. NO security scope —
-/// the app is not sandboxed (§11), so a resolved URL is usable as is and
-/// there is nothing to stop accessing.
-///
-/// nil means the file is gone: the clip draws a missing slate and Relink…
-/// is offered.
-func mediaURL(for media: MediaSnapshot) -> URL? {
-    if let bookmark = media.bookmark, let data = Data(base64Encoded: bookmark) {
-        var stale = false
-        if let url = try? URL(
-            resolvingBookmarkData: data, options: [.withoutUI], relativeTo: nil,
-            bookmarkDataIsStale: &stale),
-            FileManager.default.fileExists(atPath: url.path) {
-            return url
-        }
-    }
-    guard !media.path.isEmpty, FileManager.default.fileExists(atPath: media.path) else {
-        return nil
-    }
-    return URL(fileURLWithPath: media.path)
-}
-
-/// The base64 bookmark the model stores beside a path. nil when the URL
-/// cannot be bookmarked (an unreachable volume), which is not an error —
-/// the path alone still opens the file today.
-func bookmarkString(for url: URL) -> String? {
-    let data = try? url.bookmarkData(
-        options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
-    return data?.base64EncodedString()
 }
 
 // MARK: - Graphics
