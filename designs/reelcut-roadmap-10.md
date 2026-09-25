@@ -1895,3 +1895,116 @@ Out of scope and not built: generic CSS families mapped to bundled faces
 (`sans-serif` is warned like any missing name), the `font` shorthand in the
 scan, `xml:space="preserve"` measurement, an in-place render when
 `stride == width × 4` (a G6 candidate), and asset-name validation.
+
+#### G1c — the JavaScript half (2026-09-25)
+
+The `graphic/` crate's JavaScript half, against baseline `93c0181`:
+QuickJS through `rquickjs` 0.14.0 (`loader` feature only), a `Module`
+compiled once, a sandboxed engine per (thread, module), the §5c standard
+library, G-4's props overlay and `svg(module, frame, props, ctx,
+budget_ms)`. Nothing outside `graphic/` and this record was touched; the
+core does not depend on the crate yet (G1d).
+
+**What landed.** Seven new `src/` files: `module.rs` (`Module`, `Send +
+Sync + Clone`, holding no QuickJS object: name, source, the SHA-256
+revision of G-13, `meta` and `schema` read through `JSON.stringify` in the
+module's own key order, `{}` when not exported); `runtime.rs` (`Engine` —
+one `Runtime` + `Context` with §5b's 64 MB heap and 1 MB stack, the
+interrupt deadline, the refusing loader — the `thread_local!` map keyed by
+the module's id with a `Weak` swept before each call, `svg`,
+`engine_count`, `HEAP_BYTES`, `STACK_BYTES`; the ONE `std::time` import in
+`src/`); `sandbox.rs` (G0's sandbox script plus `delete
+globalThis.performance`, since `JS_NewContext` installs a clock there);
+`exception.rs` (exception → Diagnostic, the position from `stack`
+preferring the module's own frame, the budget's three sentences, what
+`render` returned); `host.rs` (`__measureText` with six arguments,
+`__assetNames`, `__warn`); `props.rs` (the compile-time schema check, the
+lenient render-time `overlay`); and the library as two scripts,
+`stdlib.js` and `noise.js`. `Cargo.toml` gains `rquickjs` and dev `png`
+(0.18, already in the lock through tiny-skia).
+
+`wc -l`: `exception.rs` 114, `host.rs` 71, `lib.rs` 30, `module.rs` 103,
+`noise.js` 132, `props.rs` 161, `runtime.rs` 284, `sandbox.rs` 74,
+`stdlib.js` 318 — each under 400.
+
+**The warning sink.** Arming a call (load or render) clears the sink;
+`svg` answers what `__warn` collected only on its `Ok` arm, stamped with
+the call's frame, after the overlay's own warnings. A refused call's
+warnings and a module's load-time warnings are discarded; `compile` has no
+warnings channel.
+
+**Tests** — 55 new in seven binaries, black-box through `graphic::`:
+
+| File | Tests | What it proved |
+|---|---|---|
+| `sandbox.rs` | 19 | G0's eighteen q6 cases plus `performance`, each answering §10.1 q6's words and positions exactly (`while (true) {}` → the budget sentence with `3:1`, 250.03 ms; `string_50mb` → the could-not-be-read sentence, 116.72 ms; every other call under 0.3 ms); the SAME-ENGINE check — each of the 17 cases that compile called a second time on the same `Module` and thread, answering identically; then the module dropped and the CONTROL — `lower-third` frame 0 at 1920×1080 hashed on the same thread equal to a fresh thread's; every call under the 1 000 ms bound |
+| `module.rs` | 9 | §5c's module compiles with schema keys `title, subtitle, accent, size, boxed, align, logo` and meta keys in order; the revision is SHA-256 of the source and moves with one byte; `Module: Send + Sync + Clone`; absent exports are `{}`; every compile sentence (20 sources) and the limits (64 keys, a 32-character key, a 4 096-character default) that pass; a syntax error answers `SyntaxError: unexpected token in expression: ';'` at **3:11**; a top-level loop answers `over the 250 ms budget while loading (InternalError: interrupted)`; five dropped modules' engines are swept (`engine_count` 5 → 1); a module draws on a thread that did not compile it |
+| `render.rs` | 7 | the six fixtures at frames 0/30/90 answer `<svg…` with zero warnings from `svg` and from `rasterize`; `42`, `"<div>"`, `ctx = []` each in its sentence with the frame; `Error: boom` at the module helper's **3:13**; the positioned throw — `interpolateColors` refusing `"boom"` inside the stdlib — reported at the module helper's **3:10**; a load that runs past a 1 ms budget inside `svg` on a thread with no engine yet answers `over the 1 ms budget while loading (…)` WITH the frame |
+| `determinism.rs` | 3 | 6 fixtures × 20 frames × 8 threads × 3 shuffled repeats: **2 880** renders, **0** SVG or BGRA differences from the single-thread reference; each fixture's frames 0/30/90 equal after 300 others; the MUTANT (a module-level call counter) through the same comparison: **468 of 480** differ |
+| `props.rs` | 6 | the overlay keeps schema order; a stale key passes through with its warning; five wrong types each fall back with their sentence; an enum outside its options; stored `[]` and `"x"`; through `svg` the warnings carry the frame |
+| `stdlib.rs` | 10 | the six `tests/js/*.test.js` files (interpolate, easing, spring, text, random, format) pass; the directory holds exactly those six; an unknown asset warns naming the four committed files; `warnings_do_not_leak_across_calls`; `load_time_warnings_are_discarded` |
+| `pins.rs` | 1 | frames 0/30/90 of each fixture hash to `tests/pins.json` (written by `GRAPHIC_REPIN=1`); on a mismatch the PNGs go to `target/pins/` |
+
+`counter.js` uses `formatNumber` in place of its hand-rolled `grouped`;
+the other five fixtures are G0's, verbatim.
+
+**Made to fail**, each reverted: the MUTANT is built in (above). Removing
+the four sandbox lines that redefine `Date.prototype.constructor` and the
+three function-kind constructors failed exactly `date_constructor` and the
+three `*_constructor` cases (15 passed, 4 failed). `position` taking the
+first frame instead of the module's failed the positioned-throw test
+(it read `133:62`, inside `stdlib.js`) and FIVE sandbox cases —
+`math_random` and the four that throw the sandbox's `Function` sentence,
+all of which start in the sandbox script's frame (they read line 15 or
+16); `Error: boom` did NOT fail, since its first frame is the module's.
+Reversing the `Engine`'s field order aborted
+`dropped_modules_engines_are_swept` (SIGABRT). Dropping `delete
+globalThis.performance` failed the `performance` case. Unquoting
+`textLines`' family failed `text_test_js`. Dropping the sink clear from
+`arm` failed `warnings_do_not_leak_across_calls` (two warnings) and
+`load_time_warnings_are_discarded` (one).
+
+**Review fixes** (the pipeline's review, one should-fix and three nits,
+all fixed). A load failing inside `svg` (a thread with no engine yet)
+now carries the frame, as every render-time diagnostic does; dropping
+the `get_or_insert(frame)` failed
+`a_load_that_fails_inside_svg_names_the_frame` (`None`, not `Some(9)`).
+`formatNumber` returns `toFixed`'s exponent form ungrouped
+(`formatNumber(1e21)` was `"1e,+21"`), and `svg()` escapes `background`;
+each reverted alone failed `format_test_js` on its new assertion.
+`engine_count`'s doc now says it counts dropped modules' engines not yet
+swept. The re-review passed, with one nit kept: that new test is
+TIMING-dependent — its top-level 1e6-step loop must finish inside the 250 ms
+compile budget yet overrun a 1 ms budget on a fresh thread. Both margins
+are wide; if it ever flakes, replace the loop with one sized to the budget.
+
+**Verified**, test runs through `bounded.run`: `cargo fmt --check` and
+`cargo clippy --all-targets -- -D warnings` in `graphic/` exit 0; `cargo
+test --release` in `graphic/` rc 0, not expired, 18.55 s, **95** passed (G1b's
+40 plus these 55), 0 failed; `make test && make lint` rc 0, 69 `test
+result:` lines, **922** passed (the core's 827, unchanged, plus 95), 0
+failed; `make typecheck` exit 0, 0 `error:`, the 7 baseline warning
+locations (a control); `rg 'std::(fs|env|net)' graphic/src` prints nothing;
+`rg -n 'std::time' graphic/src` prints one line, `src/runtime.rs:15`.
+
+**Deviations from the spec.**
+- `render returned {type}`: rquickjs names a number `int` or `float` and a
+  boolean `bool`; the sentence says `number` and `boolean`, as the spec's
+  own examples do.
+- The easings are wrapped to answer exactly 0 at `t === 0` and 1 at `t ===
+  1`: G0's `inBack(1)` is 0.9999999999999998 and `inSine(1)`
+  0.9999999999999999, which the endpoint test refuses.
+- `Engine::new` makes its own warning sink rather than taking one;
+  `engine_count` counts without sweeping (the call's sweep is what the test
+  proves), and `compile` sweeps too when it adopts its engine.
+- `textLines` escapes `fill` as well as the family.
+
+`graphic/CLAUDE.md`'s module map, amended purity rule (the one deadline
+clock), drop-order and evaluation rules were written by the orchestrator
+from the pipeline's draft, after the review.
+
+**Owed**, and out of scope here: G1d (the core's `ffi_graphic.rs`, the
+header, the `ReelCore.swift` wrappers, `docs/graphics-api.md`); path helpers; an SVG size cap; an
+LRU cap on per-thread engines (sweep-on-drop only); named CSS colours in
+`interpolateColors`; a warnings channel on `compile`; refusing the module
+name `eval_script`, whose frames `position` would take for a module's.

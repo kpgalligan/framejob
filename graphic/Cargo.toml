@@ -16,9 +16,16 @@ sha2 = "0.10"
 # usvg 0.48.1's own pins: `font-family` and CSS read exactly as usvg reads them.
 svgtypes = "0.16.1"
 simplecss = "0.2"
+# The JavaScript engine (road map 10 §5b, G0 q2): quickjs-ng 0.16.2, vendored
+# and compiled by rquickjs-sys, so no system library is reached. `loader` is
+# for `set_loader` alone — the resolver and loader installed refuse every
+# specifier; none of rquickjs's own loaders is used.
+rquickjs = { version = "0.14.0", features = ["loader"] }
 
 [dev-dependencies]
 flate2 = "1"
+# The pins' PNG dump on a mismatch (already in the lock through tiny-skia).
+png = "0.18"
 
 [profile.release]
 # No LTO (designs/reelcut-remaining.md §6).

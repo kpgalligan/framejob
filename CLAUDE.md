@@ -82,9 +82,9 @@ core/                Rust staticlib — the model, the ops, the plan, the recipe
   include/…_core.h     export settings, the generic MCP server. THE FFI CONTRACT
   src/                 core/CLAUDE.md has the module map
   tests/               black-box, through the FFI
-graphic/             Rust crate — the graphics engine (road map 10): the font and
-  src/                 asset Library, rasterize (usvg → resvg → BGRA), measure_text;
-  tests/               graphic/CLAUDE.md has its rules
+graphic/             Rust crate — the graphics engine (road map 10): a Module run in
+  src/                 sandboxed QuickJS returns SVG per frame; rasterize (usvg →
+  tests/               resvg → BGRA), measure_text. graphic/CLAUDE.md has its rules
 app/
   Sources/             AppKit app, programmatic UI (app/CLAUDE.md has the map)
   Resources/Shaders/   Compositor.metal — the per-layer compositing pass
