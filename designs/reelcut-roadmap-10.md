@@ -1304,6 +1304,11 @@ the branch `svg-motion`. G2 alone bumps the format.
   parallel frame rendering in export with an ordered writer, each against
   a before and after measurement. An SVG-string cache is not among them:
   the JavaScript is the smallest of the three costs (§5d).
+  **Deferred by the user, 2026-09-25**: "I've tried a few of the graphics
+  at 4K and see no performance issues. However, I have an M2 Max with 96g
+  of ram, and the graphics aren't very complex. For now, we can note but
+  defer the proposed performance work." The check says nothing about a
+  smaller machine or a heavier graphic; that is where G6 would start.
 
 ### 9a. How the phases run, and what each inherits from G0
 
@@ -3776,5 +3781,5 @@ comment names its UI path. The watcher gap G4b owed is closed.
 
 **Owed across G5.** The graphics-only playback defect (§10.8, deferred by
 the user); the G5a and G4b lists above; the person's playback check
-(remaining §4). **G6 is owed only if that check stutters.** **Merging
+(remaining §4). **G6 is deferred**: no stutter at 4K on the user's M2 Max (§9's G6). **Merging
 `svg-motion` into `main` is the user's decision.**
