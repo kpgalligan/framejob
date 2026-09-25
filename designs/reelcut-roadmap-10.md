@@ -2956,6 +2956,9 @@ loop turns, and the file still draws the set it was handed.
   closed it.
 
 **Owed from G3c.**
+- The export-cancel crash fix is on `svg-motion` only; `main` still has the
+  crash (12 of 30 expensive Cancels). Filed as kpgalligan/reelcut#38 for
+  the user's decision on cherry-picking the `ExporterWriter.swift` hunk.
 - The gate walks ONE nest level; a graphic in a nest inside a nest is
   caught by the mid-export abort instead of the gate.
 - `Exporter.cancel()` still cancels the loudness MEASUREMENT's reader from
