@@ -1331,6 +1331,10 @@ enum ClipSource: Codable, Equatable {
     case image(id: UInt32)
     case text
     case shape
+    /// Drawn by a module in the package's `graphics/` (format version 10).
+    /// The description is the clip's `graphic` key, which this side does
+    /// not decode yet (road map 10's G3).
+    case graphic
     /// A group of tracks and clips shown as one clip, by nest id
     /// (`ProjectSnapshot.nests`).
     ///
@@ -1361,6 +1365,8 @@ enum ClipSource: Codable, Equatable {
             self = .text
         case "shape":
             self = .shape
+        case "graphic":
+            self = .graphic
         case "nest":
             self = .nest(project: c.lenient(.project, 0))
         default:
@@ -1382,7 +1388,7 @@ enum ClipSource: Codable, Equatable {
             try c.encode(at, forKey: .at)
         case .image(let id):
             try c.encode(id, forKey: .media)
-        case .text, .shape:
+        case .text, .shape, .graphic:
             break
         case .nest(let project):
             try c.encode(project, forKey: .project)
@@ -1393,7 +1399,7 @@ enum ClipSource: Codable, Equatable {
     var mediaID: UInt32? {
         switch self {
         case .media(let id, _, _), .still(let id, _), .image(let id): return id
-        case .text, .shape, .nest: return nil
+        case .text, .shape, .graphic, .nest: return nil
         }
     }
 
@@ -1418,6 +1424,7 @@ enum ClipSource: Codable, Equatable {
         case .image: return "image"
         case .text: return "text"
         case .shape: return "shape"
+        case .graphic: return "graphic"
         case .nest: return "nest"
         }
     }
@@ -1428,7 +1435,7 @@ enum ClipSource: Codable, Equatable {
         switch self {
         case .media(_, let sourceIn, _): return sourceIn
         case .still(_, let at): return at
-        case .image, .text, .shape, .nest: return 0
+        case .image, .text, .shape, .graphic, .nest: return 0
         }
     }
 
@@ -1536,6 +1543,7 @@ struct ClipSnapshot: Codable, Equatable, Identifiable {
             let content = text?.content ?? ""
             return content.isEmpty ? "Text" : content
         case .shape: return shape?.kind.displayName ?? "Shape"
+        case .graphic: return "Graphic"
         case .still: return "Freeze Frame"
         case .nest: return "Nest"
         case .media, .image: return "Clip"
@@ -1780,6 +1788,10 @@ struct ProjectSnapshot: Codable, Equatable {
             guard let n = nest(for: clip), n.width > 0, n.height > 0 else { return nil }
             return n.canvasSize
         case .text:
+            return nil
+        case .graphic:
+            // G3 reads `graphic.width` / `graphic.height` here, once
+            // `ClipSnapshot` decodes the clip's `graphic` key.
             return nil
         }
     }

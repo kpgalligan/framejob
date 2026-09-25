@@ -78,7 +78,11 @@ detail there.
   `WordProps.swift` — the `Codable`, READ-ONLY mirror of spec §5.2 every view
   draws from. **Its enums decode LENIENTLY**
   — a misspelt kind becomes the first case, a `T??` field a clear — which is
-  why a caller-authored object is never decoded through them (below): no
+  why a caller-authored object is never decoded through them (below). The
+  one exception is `ClipSource`: an unknown `source.kind` THROWS, and
+  `ReelProject.snapshot` then falls back to `.empty`, so the WHOLE project
+  draws empty with no error. A new source kind in the core is therefore a
+  `ClipSource` case in the same phase (road map 10's G2a added `graphic`): no
   agent handler reads a caller-authored OBJECT at all. A scalar enum
   argument is a different thing and several handlers still parse one by name
   (`add_zoom_action`'s `fit`, `curveArg`, `set_transition`'s `kind`): the

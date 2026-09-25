@@ -91,7 +91,10 @@ fn general() -> Handle {
      "video": {}, "audio": {}},
     {"id": 47, "track": 8, "start": 3000000, "duration": 3000000,
      "source": {"kind": "media", "media": 1, "in": 12000000},
-     "video": {}, "audio": {}}
+     "video": {}, "audio": {}},
+    {"id": 48, "track": 7, "start": 4200000, "duration": 3000000,
+     "source": {"kind": "graphic"}, "video": {},
+     "graphic": {"name": "lower-third", "width": 1920, "height": 1080}}
   ],
   "markers": [{"id": 50, "time": 6000000, "name": "Intro"}],
   "next_id": 60,
@@ -601,6 +604,7 @@ fn op_table() -> Vec<Value> {
         json!({"op": "add_clip", "track": 4, "media": 3, "at": 12000000}),
         json!({"op": "add_text_clip", "track": 5, "at": 0, "duration": 1200000}),
         json!({"op": "add_shape_clip", "track": 5, "at": 1800000}),
+        json!({"op": "add_graphic_clip", "track": 5, "at": 0, "name": "lower-third"}),
         json!({"op": "insert_clip", "track": 4, "media": 3, "at": 3000000}),
         json!({"op": "overwrite_clip", "track": 4, "media": 3, "at": 1200000}),
         json!({"op": "move_clip", "clips": [10], "delta": 600000}),
@@ -649,6 +653,7 @@ fn op_table() -> Vec<Value> {
         json!({"op": "set_audio", "clips": [10], "patch": {"volume": 0.5}}),
         json!({"op": "set_text", "clips": [30], "patch": {"content": "Bye"}}),
         json!({"op": "set_shape", "clips": [40], "patch": {"width": 400}}),
+        json!({"op": "set_graphic", "clips": [48], "patch": {"props": {"title": "B"}}}),
         json!({"op": "set_clip", "clips": [10], "patch": {"name": "Talk"}}),
         json!({"op": "set_enabled", "clip": 10, "video": false}),
         json!({"op": "set_transition", "clip": 10, "kind": "wipe"}),
@@ -1985,7 +1990,7 @@ fn remove_media_takes_its_clips_only_when_asked() {
     assert_eq!(array(&after, "/media").len(), 2);
     assert_eq!(
         array(&after, "/clips").len(),
-        4,
+        5,
         "only clip 10 used media 1"
     );
 }
@@ -2397,7 +2402,7 @@ fn duplicate_places_the_copies_one_span_later_with_fresh_ids() {
     let after = project
         .apply(&json!({"op": "duplicate", "clips": [30, 40]}))
         .value();
-    assert_eq!(array(&after, "/clips").len(), 9);
+    assert_eq!(array(&after, "/clips").len(), 10);
     assert_eq!(placement(&after, first_new), (7_200_000, 3_000_000));
     assert_eq!(
         placement(&after, first_new + 1),

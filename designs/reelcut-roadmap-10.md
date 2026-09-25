@@ -2187,7 +2187,16 @@ pointer and is refused as `bytes is NULL`.
   `model_query.rs:217`'s id set, none of them serialized. What DOES change
   is that a `Value` the core stores or answers (a patch echoed, props) now
   keeps its caller's key order instead of sorting — deterministic, and
-  what G-4's props want; the 836 core tests pass on it.
+  what G-4's props want; the 836 core tests pass on it. One more
+  consequence, found by G2a's adversary: under `preserve_order`,
+  `Map::remove` SWAPS the last key into the removed slot (serde_json's
+  `swap_remove`), so a removal no longer keeps the others' order;
+  `shift_remove` does. The core's existing removals are harmless (checked
+  by the orchestrator): `edit.rs:655` takes `scope` out before a decode,
+  `recipe_text.rs:305-311` trims a description that `content_hash` sorts
+  anyway, and `edit_action.rs:106`'s `prune_removed` reorders an action
+  end's keys deterministically, where they were sorted before. New code
+  that promises an order (G2a's props) uses `shift_remove`.
 
 The `core/CLAUDE.md`, `app/CLAUDE.md` and root `CLAUDE.md` lines were written
 by the orchestrator from the pipeline's drafts, after the review.
@@ -2219,3 +2228,87 @@ list, G1c's list (path helpers, an SVG size cap, an LRU cap on per-thread
 engines, named CSS colours, a warnings channel on `compile`, refusing the
 module name `eval_script`) and G1d's above. **G2 (the model, format
 version 10) is next**, from §5g and §4's G-3, G-4 and G-6 to G-13.
+
+### 10.5. G2 — the model
+
+#### G2a — the persisted graphic clip and its two ops (2026-09-25)
+
+Against baseline `fe16e94`: §5g's model and §5h's two ops in the core,
+format version 10, and the app decoding a graphic clip rather than
+emptying the project. The timeline rules (`split`, the trims, the
+action-end refusal, `paste_attributes`), `recipe_graphic.rs` and the tools
+are G2b's and G3's. Nothing a person sees exists yet.
+
+**What landed.** `core/src/model_graphic.rs` (**399** of 400):
+`GraphicProps` (`name`, `width`, `height`, `in`, `length`, `props`, every
+key defaulted), `GRAPHIC_MIN_SIDE` 1 / `GRAPHIC_MAX_SIDE` 8192 /
+`GRAPHIC_MAX_PROPS` 64 (restating the crate's `MAX_SIDE` and `MAX_KEYS`,
+since G-2 forbids importing them), and the `pub(crate)` checks —
+`check_name` (G-3), `check_side`, `check_schema` (the crate's eight
+sentences, copied), `check_props` (by dotted path with a schema, shape
+only without), `check_count` (on the map about to be STORED) and
+`normalise_color` (G-12). `core/src/edit_graphic.rs` (**283**):
+`add_graphic_clip`, every argument checked before `add_described_clip`
+places it, and `set_graphic` with its patch reader. `Source::Graphic` and
+`Clip.graphic` (after `shape`) in `model.rs`; the six exhaustive arms
+(`source_size` answers `[width, height]`, `validate` refuses a stored name
+that breaks G-3, the plan never gives a graphic a segment, `draws()` is
+true, `recipe.rs` answers `missing` until G2b); `RC_FORMAT_VERSION` 10 in
+`format.rs` and the header; `OP_COUNT` 59, the two rows (`width` and
+`height` BOUNDED 1–8192, sourced from the constants), both ops allowed
+inside a nest. App: `ClipSource.graphic` (so `ReelCore.swift`'s `?? .empty`
+no longer empties a project holding one — opened over MCP from the
+`schema_v10.rs` fixture, `get_project` answered one clip), its arms in
+`TimelineView`, `TimelineLayout`, `InspectorPane` and `ClipKindStyle`
+(`curlybraces`, shape's tint until G5), `ReelOps.addGraphicClipRaw` /
+`setGraphicRaw`, and the two ops in `AgentServer.opsWithoutTools` with a
+comment each naming G3 as the phase that deletes them. Spec §5.2, §6,
+§7.10 and §11 G-3, G-4, G-12, G-13; `CONTEXT.md`'s **Props**.
+
+**The props rules, as built.** A value is stored with `Map::insert` (an
+existing key keeps its slot, a new one is appended) and a `null` removes
+with `shift_remove`; under `preserve_order`, `Map::remove` is
+`swap_remove` and would move the last key into the hole, and `Project ==`
+cannot see an order change, so `core/tests/graphic.rs` reads the order off
+the written text. The count is taken on the merged map, with or without a
+schema, so 64 stored keys plus a one-key patch is `props has 65 keys; the
+most is 64`, and the same patch with one `null` beside it applies at 64.
+A colour is normalised from the four hex forms and `rgb()` / `rgba()` (3–4
+components, commas, spaces or `/`, channels 0–255 or `%`, alpha 0–1 or
+`%`); an opaque alpha is dropped, and a colour re-sent in another spelling
+is an identity.
+
+**Measured.** `cargo test --release`: 857 (836 + 21 new — `graphic.rs` 14,
+`schema_v10.rs` 7); `make test` 955; `make lint` and `cargo fmt --check`
+clean; `make typecheck` 0 errors and the 7 baseline warnings; `make app`
+succeeded; the parity log clean and 77 tools. Made to fail once each:
+`graphic.rs` (a range sentence reworded; `shift_remove` swapped for
+`remove`, which failed the order test and the 64-key twin), `schema_v10.rs`
+(`graphic` declared before `shape`: the key-order, round-trip and props
+tests failed) and the parity check (`set_graphic` dropped from the
+allow-list: `Reelcut: the core's op table has ops with no agent tool:
+["set_graphic"]`).
+
+**Deviations from the spec.** Four test files the spec did not list held a
+literal the bump or the new key moved, and were changed to keep `make test`
+green: `core/tests/model_tests.rs` (three more `"version": 9` literals and
+the clip-defaults key list), `core/tests/common/commit_placement.rs` (the
+nest clip's key list), `core/tests/evaluate_tests.rs` (a `Clip` literal) and
+`edit_tests.rs`'s `remove_media` count (4 → 5, the other re-measured
+`general()` count). `check_side` takes a `u64` rather than a `u32`, so a
+patch's `5000000000` is named as sent.
+
+**Owed from G2a.**
+- `tools/proof/op_catalog_proof.py:282` (`len(ops) == 57 and ops <= tools`)
+  FAILS from G2a until G3 adds the two tools and deletes the allow-list
+  lines.
+- `tools/proof/words_core_proof.py` hard-codes the format version (moved to
+  11/10 by G2a) where it should read the header's `RC_FORMAT_VERSION`, as
+  `phase9_proof.py:168-173` does.
+- `core/src/edit_action.rs:106` removes an action end-patch key with
+  `target.remove(key)`, the same `swap_remove` under `preserve_order` — a
+  pre-existing, deterministic reorder of an opaque object, judged harmless
+  in §10.4's G1d review paragraph ("One more consequence, found by G2a's
+  adversary"); not changed here.
+- Named CSS colours and `hsl()` in a `color` prop (with G1c's "named CSS
+  colours").

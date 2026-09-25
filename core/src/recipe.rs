@@ -583,6 +583,8 @@ impl Project {
             // `drawing_instances` has already dropped, so this arm exists
             // to keep the match exhaustive.
             Source::Nest { .. } => (missing_source(), Value::Null),
+            // Road map 10's G2b gives a graphic its layer (`recipe_graphic.rs`).
+            Source::Graphic => (missing_source(), Value::Null),
         }
     }
 }

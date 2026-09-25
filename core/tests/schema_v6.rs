@@ -171,7 +171,7 @@ fn set_shape(patch: Value) -> Value {
 // ---- reading older files -------------------------------------------------
 
 fn assert_unstyled(project: &Value) {
-    assert_eq!(at(project, "/version"), &json!(9));
+    assert_eq!(at(project, "/version"), &json!(10));
     assert_eq!(at(project, "/clips/0/video/blend"), &json!("normal"));
     assert_eq!(at(project, "/clips/1/video/blend"), &json!("normal"));
     assert_eq!(at(project, "/clips/1/shape/gradient"), &Value::Null);
@@ -209,7 +209,7 @@ fn every_older_version_reads_the_same_way() {
 #[test]
 fn the_blend_and_the_gradient_round_trip_exactly() {
     let written = Handle::from_value(&styled()).value();
-    assert_eq!(at(&written, "/version"), &json!(9));
+    assert_eq!(at(&written, "/version"), &json!(10));
     assert_eq!(text(&written, "/clips/0/video/blend"), "multiply");
 
     let gradient = at(&written, "/clips/1/shape/gradient");

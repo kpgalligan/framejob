@@ -108,7 +108,7 @@ fn source_media(source: &Source) -> Option<u32> {
         Source::Media { media, .. } | Source::Still { media, .. } | Source::Image { media } => {
             Some(*media)
         }
-        Source::Text | Source::Shape | Source::Nest { .. } => None,
+        Source::Text | Source::Shape | Source::Graphic | Source::Nest { .. } => None,
     }
 }
 

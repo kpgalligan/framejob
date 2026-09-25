@@ -108,7 +108,7 @@ fn old_versions_extreme_speeds_and_negative_values_keep_their_reading() {
                 "enter": {"duration": i64::MAX}
             }}});
             let h = Handle::from_value(&p);
-            assert_eq!(h.value()["version"], 9);
+            assert_eq!(h.value()["version"], 10);
             assert_eq!(h.value()["clips"][0]["speed"], json!(speed));
         }
     }

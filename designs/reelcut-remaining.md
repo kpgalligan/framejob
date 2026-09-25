@@ -387,6 +387,21 @@ toll first: the media helpers (~94) are still the named seam, then the
 `dictionary` extensions. In the core, `ffi_graphic.rs` is new at **397** and
 `recipe.rs` grew **582 → 594** (`content_hash`'s sort).
 
+**What road map 10's G2a did to it** (2026-09-25, `wc -l` against
+`fe16e94`; road map 10 §10.5). The graphic clip and its two ops, with no
+toll: every new line that could go in a new module did. In the core,
+`model_graphic.rs` (**399** of 400) and `edit_graphic.rs` (**283**) are
+new; `edit_clip.rs` **751 → 757** (`Described` and `add_described_clip`
+made `pub(crate)` for `edit_graphic.rs`, the `graphic` field and its three
+`None`s), `edit.rs` **843 → 893** (two variants, two dispatch arms, two
+semantics rows — its standing exemption), `recipe.rs` **594 → 596** (the
+`Source::Graphic` placeholder arm G2b replaces; 4 lines under the cap) and
+`op_table.rs` **331 → 338** of 400. In the app, `ProjectSnapshot.swift`
+**2293 → 2305** (`ClipSource.graphic` and its arms), `AgentServer.swift`
+(frozen) **785 → 790** (the two `opsWithoutTools` entries G3 deletes) and
+`ReelOps.swift` **1163 → 1191** (the two raw factories; a table row per op,
+exempt).
+
 Regenerate the list with
 `wc -l app/Sources/*.swift core/src/*.rs | awk '$1>600 && $2!="total"' | sort -rn`
 rather than trusting the numbers here; the standing exemptions are
@@ -395,7 +410,7 @@ row per op.
 
 | File | Lines |
 |---|---|
-| `app/Sources/ProjectSnapshot.swift` | 2293 (2516 before road map 8's W3) |
+| `app/Sources/ProjectSnapshot.swift` | 2305 after road map 10's G2a (2293 before it; 2516 before road map 8's W3) |
 | `app/Sources/InspectorPane.swift` | 1665 |
 | `app/Sources/TimelineView.swift` | 1652 |
 | `app/Sources/ReelCore.swift` | 1440 (1309 after road map 10's G1a, then G1d's wrappers; 1542 before road map 8's W3) |
@@ -403,18 +418,18 @@ row per op.
 | `app/Sources/Compositor.swift` | 1391 |
 | `app/Sources/ProjectDocument.swift` | 1352 |
 | `app/Sources/ReverseRenderer.swift` | 1311 |
-| `app/Sources/ReelOps.swift` | 1143 |
+| `app/Sources/ReelOps.swift` | 1191 after road map 10's G2a (1163 before it) |
 | `app/Sources/EditorViewController.swift` | 1123 |
 | `app/Sources/ExporterWriter.swift` | 1114 |
 | `app/Sources/PreviewCanvasView.swift` | 1104 |
 | `app/Sources/CanvasSessions.swift` | 1088 |
 | `app/Sources/OptionControls.swift` | 1081 |
-| `core/src/edit_clip.rs` | 751 after road map 7 part 3; 1021 before its pure move |
+| `core/src/edit_clip.rs` | 757 after road map 10's G2a; 751 after road map 7 part 3; 1021 before its pure move |
 | `app/Sources/AudioDSP.swift` | 890 |
 | `app/Sources/AgentServer+Clips.swift` | 847 |
-| `core/src/edit.rs` | 838 |
+| `core/src/edit.rs` | 893 after road map 10's G2a (843 before it) |
 | `app/Sources/AgentCatalog+Clips.swift` | 799 (792 before road map 8's W3) |
-| `app/Sources/AgentServer.swift` | 785 |
+| `app/Sources/AgentServer.swift` | 790 after road map 10's G2a (785 before it) |
 | `app/Sources/FFmpegRewrap.swift` | 768 |
 | `app/Sources/Loudness.swift` | 742 |
 | `app/Sources/Controls.swift` | 651 (567 before the sharp pass; Rasterize's own copy is 624 — the sync rule, app/CLAUDE.md "Shared chrome", is why it took `BlockSlider` verbatim and shed nothing; the seven lines over the verbatim block are the SH-2 fork of `drawBar`) |
@@ -1225,7 +1240,7 @@ and the closing above added the rest.
 
 ## 5. Where a third road map would start
 
-**Road map 10, graphics (EXPERIMENTAL on the branch `svg-motion`; G0 spiked 2026-09-24, G1 the engine BUILT 2026-09-24/25; G2 next).** The user asked for Remotion-style motion graphics: a clip whose JavaScript module, in the package's `graphics/` folder, returns SVG per frame, written mostly by an agent over MCP. `designs/reelcut-roadmap-10.md` is the design, reviewing the user's input plan `designs/svg-motion-components-plan.md` in its §1. **Its spike G0 ran complete** (§10.1, instruments in `tools/proof/graphics_spike/`, all nine rows `run`, `core/` and `app/` back at `c874069`): `rquickjs` 0.14 vendors quickjs-ng 0.16.2 and takes §5c's module verbatim; the engine builds into the one staticlib with `make test` only 1.12× slower warm (no cargo feature), at +18 s per cold build, +11.8 MB of staticlib and +7.2 MB of app binary that the linker keeps even with nothing calling it; the six sample graphics cost a worst p95 of 7.62 ms per frame at 1080p (so G6 is not owed; 4K full-frame fills reach 26 ms); 864 renders across 8 threads in shuffled orders matched byte for byte, and the on-purpose module-level-counter mutant was caught (137 mismatches); eighteen sandbox cases each answered in words with the process alive (four of them, `constructor` routes back to the wall clock and to compiling code from strings, added and closed after G0's review); `measureText` must answer the INK box as well as the advance, a font family the set lacks draws nothing, and `Source Sans 3` must be quoted; a directory `DispatchSource` raises `.write` (never `.rename`) and misses in-place saves, and only CREATING a folder inside an open package trips "changed by another application". §3a lists every section a row rewrote. **G1 (the engine) starts from road map 10 §9a**, which lists what each later phase must carry from G0, and from those rewritten sections: `raster-images` on, `serde_json` with `preserve_order`, the `ReelCore.swift` toll first (§5e), and the spike's `src/runtime.rs`, `raster.rs` and `stdlib.js` as the working reference for `graphic/`. Its decisions G-1 to G-13 are proposals until the phase that needs each copies it into spec §11; G-1 and G-2 amend spec §1's plugin non-goal and §7's pixel rule. **G1 is BUILT** (road map 10 §10.4, G1a–G1d): the `graphic/` crate (resvg drawing, QuickJS runtime, sandbox, standard library), linked into the core through `core/src/ffi_graphic.rs` alone, with nine `rc_graphic_*` exports, their `ReelCore.swift` wrappers, `docs/graphics-api.md` evaluated by a test, and `tools/proof/graphics_ffi_probe.py` (9/9); the app binary grew 12 661 536 → 20 596 752 bytes; spec §11 holds G-1, G-2 and G-5. Linking `graphic` unified `serde_json`'s `preserve_order` into the core, so `content_hash` now sorts before it hashes. Nothing a person sees exists yet. **G2 (the model, format version 10) is next**, from road map 10 §5g and §4. Nothing merges to `main` until the user decides, after G4.
+**Road map 10, graphics (EXPERIMENTAL on the branch `svg-motion`; G0 spiked 2026-09-24, G1 the engine BUILT 2026-09-24/25; G2 next).** The user asked for Remotion-style motion graphics: a clip whose JavaScript module, in the package's `graphics/` folder, returns SVG per frame, written mostly by an agent over MCP. `designs/reelcut-roadmap-10.md` is the design, reviewing the user's input plan `designs/svg-motion-components-plan.md` in its §1. **Its spike G0 ran complete** (§10.1, instruments in `tools/proof/graphics_spike/`, all nine rows `run`, `core/` and `app/` back at `c874069`): `rquickjs` 0.14 vendors quickjs-ng 0.16.2 and takes §5c's module verbatim; the engine builds into the one staticlib with `make test` only 1.12× slower warm (no cargo feature), at +18 s per cold build, +11.8 MB of staticlib and +7.2 MB of app binary that the linker keeps even with nothing calling it; the six sample graphics cost a worst p95 of 7.62 ms per frame at 1080p (so G6 is not owed; 4K full-frame fills reach 26 ms); 864 renders across 8 threads in shuffled orders matched byte for byte, and the on-purpose module-level-counter mutant was caught (137 mismatches); eighteen sandbox cases each answered in words with the process alive (four of them, `constructor` routes back to the wall clock and to compiling code from strings, added and closed after G0's review); `measureText` must answer the INK box as well as the advance, a font family the set lacks draws nothing, and `Source Sans 3` must be quoted; a directory `DispatchSource` raises `.write` (never `.rename`) and misses in-place saves, and only CREATING a folder inside an open package trips "changed by another application". §3a lists every section a row rewrote. **G1 (the engine) starts from road map 10 §9a**, which lists what each later phase must carry from G0, and from those rewritten sections: `raster-images` on, `serde_json` with `preserve_order`, the `ReelCore.swift` toll first (§5e), and the spike's `src/runtime.rs`, `raster.rs` and `stdlib.js` as the working reference for `graphic/`. Its decisions G-1 to G-13 are proposals until the phase that needs each copies it into spec §11; G-1 and G-2 amend spec §1's plugin non-goal and §7's pixel rule. **G1 is BUILT** (road map 10 §10.4, G1a–G1d): the `graphic/` crate (resvg drawing, QuickJS runtime, sandbox, standard library), linked into the core through `core/src/ffi_graphic.rs` alone, with nine `rc_graphic_*` exports, their `ReelCore.swift` wrappers, `docs/graphics-api.md` evaluated by a test, and `tools/proof/graphics_ffi_probe.py` (9/9); the app binary grew 12 661 536 → 20 596 752 bytes; spec §11 holds G-1, G-2 and G-5. Linking `graphic` unified `serde_json`'s `preserve_order` into the core, so `content_hash` now sorts before it hashes. Nothing a person sees exists yet. **G2 (the model, format version 10) is next**, from road map 10 §5g and §4. **G2a is BUILT** (road map 10 §10.5): `Source::Graphic`, `Clip.graphic` and format version 10, the ops `add_graphic_clip` and `set_graphic` in the core (props checked against the schema the op carries, a colour normalised to hex, the 64-key limit on the stored map, the props order kept), the app decoding a graphic clip, and spec §11 G-3, G-4, G-12 and G-13; the two ops sit in `AgentServer.opsWithoutTools` until G3 writes their tools. Owed from it: `tools/proof/op_catalog_proof.py:282` (`len(ops) == 57 and ops <= tools`) FAILS from G2a until G3 adds the two tools; `tools/proof/words_core_proof.py` hard-codes the format version (moved 9/10 → 10/11 by G2a) where it should read the header's `RC_FORMAT_VERSION` as `phase9_proof.py:168-173` does; named CSS colours and `hsl()` in a `color` prop. G2b (the timeline rules, the recipe) is next. Nothing merges to `main` until the user decides, after G4.
 
 **Road map 9, the clip inspector redesign, is COMPLETE (phases 1, 2, 3a
 and 3b 2026-09-23, phases 4 and 5 2026-09-24; road map 9 §2, §4, §6, §8,

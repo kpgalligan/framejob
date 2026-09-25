@@ -47,6 +47,20 @@ file is what governs a module now.
   `split`'s second half make (W-3). Word times are clip-time POSITIONS: a
   negative start is legal, equal starts are legal, and `snap_animation`
   puts them on the grid after `check_text` has named what the caller sent.
+- `model_graphic.rs` — the graphic vocabulary (format version 10, road
+  map 10): `GraphicProps` (`name`, `width`, `height`, `in`, `length`,
+  `props`) and `GRAPHIC_MIN_SIDE` / `GRAPHIC_MAX_SIDE` / `GRAPHIC_MAX_PROPS`,
+  re-exported through `model_props.rs`; the FIELD `Clip.graphic` stays in
+  `model.rs`. And the `pub(crate)` checks every writer shares: `check_name`
+  (G-3's `^[a-z0-9][a-z0-9-]{0,62}$`, its clause `NAME_RULE` shared with
+  `validate`), `check_side`, `check_schema` (the engine's sentences, COPIED —
+  no module of the model may name the crate, G-2), `check_props` (by dotted
+  path against the schema the op carries, shape only without one; a `null`
+  is a removal and is never checked), `check_count` (on the map about to be
+  STORED) and `normalise_color` (G-12: hex and `rgb()`/`rgba()` to lowercase
+  `#rrggbb[aa]`). **A props map is changed only by `insert` and
+  `shift_remove`**: under `preserve_order`, `Map::remove` is `swap_remove`,
+  and `Project ==` cannot see the reorder.
 - `model_query.rs` — reading a project: `Project::new`, id allocation, the
   `clip`/`track`/`media`/`marker`/`nest` lookups, `clips_on`, `duration`,
   `validate` with its nesting walk, and `source_size`. The three
@@ -117,7 +131,8 @@ file is what governs a module now.
   reader is every one of the fifty-seven op tools in the agent catalog,
   which print these rows instead of restating them. **A `Bound` is
   published only where the core REFUSES outside it** — `set_canvas`'s two
-  dimensions, sourced from `edit_canvas.rs`'s own constants and never
+  dimensions, sourced from `edit_canvas.rs`'s own constants, and
+  `add_graphic_clip`'s `width` and `height`, from `model_graphic.rs`'s, never
   retyped — and never where it CLAMPS, which is the app's to say in its
   prose. A row holds no prose, no semantics and no default spelled twice;
   `Kind` is closed (eighteen kinds; `Texts`, a list of strings, is
@@ -153,6 +168,12 @@ file is what governs a module now.
   can still return `Err`. `refused_inside` is an EXHAUSTIVE match over every
   op, so a new op does not compile until it is classified. The READ half is
   `rc_project_scoped` in `ffi.rs`, which calls the same `scoped_view`.
+- `edit_graphic.rs` — `add_graphic_clip` and `set_graphic`: every argument
+  checked through `model_graphic.rs` BEFORE `edit_clip.rs`'s
+  `add_described_clip` (`pub(crate)`, with `Described`) places the clip, so
+  the op table's bound probe reaches the side check on any project;
+  `set_graphic`'s patch reader takes `name`, `width`, `height`, `length`,
+  `props` and refuses `in` by name.
 - `edit_clip.rs` — clip construction and placement callers: `add_clip`, move,
   duplicate, delete, join, detach, `fit_scale` and `fill_scale` (Fit is a RESCUE for oversized
   footage and honours `canvas.fit_new_clips`; Fill is a REQUIREMENT, ignores
@@ -464,7 +485,7 @@ Export names mirror the Rust method exactly.
 `RC_FORMAT_VERSION` in `format.rs` **and** the `#define` in
 `core/include/reelcut_core.h`; the reader must keep accepting every prior
 version; the writer enforces the reader's caps. A bump whose new fields all
-carry a serde default needs no migrate step (versions 3 through 9 have none)
+carry a serde default needs no migrate step (versions 3 through 10 have none)
 but still bumps, because unknown keys are ignored at every level by design
 and an older build would otherwise open the file, drop the new fields on read
 and write the loss back on the next save; a bump that changes a field's

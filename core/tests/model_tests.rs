@@ -447,7 +447,7 @@ fn full_project() -> Value {
     clips.push(clip40);
 
     json!({
-        "version": 9,
+        "version": 10,
         "canvas": {
             "width": 1280, "height": 720, "fps": [30000, 1001],
             "background": [0.1, 0.2, 0.3, 1.0],
@@ -699,7 +699,7 @@ fn a_new_project_is_the_documented_empty_project() {
     assert_eq!(
         project.value(),
         json!({
-            "version": 9,
+            "version": 10,
             "canvas": {
                 "width": 1280, "height": 720, "fps": [30000, 1001],
                 "background": [0.0, 0.0, 0.0, 1.0],
@@ -735,7 +735,7 @@ fn an_empty_object_is_an_empty_project() {
     assert_eq!(
         project,
         json!({
-            "version": 9,
+            "version": 10,
             "canvas": {
                 "width": 1920, "height": 1080, "fps": [30, 1],
                 "background": [0.0, 0.0, 0.0, 1.0],
@@ -770,7 +770,7 @@ fn omitted_optional_keys_take_the_documented_defaults() {
     }))
     .value();
 
-    assert_eq!(at(&project, "/version"), &json!(9));
+    assert_eq!(at(&project, "/version"), &json!(10));
     // A file that never heard of nests reads as one with none, which is
     // what "every new field carries a serde default" buys.
     assert_eq!(at(&project, "/nests"), &json!([]));
@@ -805,7 +805,7 @@ fn omitted_optional_keys_take_the_documented_defaults() {
             "source": { "kind": "text" },
             "enabled": { "video": true, "audio": true },
             "speed": 1.0,
-            "video": null, "audio": null, "text": null, "shape": null,
+            "video": null, "audio": null, "text": null, "shape": null, "graphic": null,
             "actions": [
                 { "id": 6, "start": 0, "duration": 600_000, "curve": "linear", "end": {} }
             ],
@@ -1088,15 +1088,15 @@ fn a_newer_format_version_is_refused_and_says_so() {
 fn every_prior_version_is_accepted_and_the_writer_stamps_the_current_one() {
     // The reader's promise (spec §5.6): a file from an older build opens,
     // and what comes back out is the current version.
-    for version in [1, 2, 3, 4, 5, 6, 7, 8, 9] {
+    for version in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] {
         assert_eq!(
             Handle::from_value(&json!({ "version": version })).value()["version"],
-            json!(9),
+            json!(10),
             "version {version} did not read back as the current version"
         );
     }
     // Absent, the version defaults to current rather than to 0.
-    assert_eq!(Handle::from_json("{}").value()["version"], json!(9));
+    assert_eq!(Handle::from_json("{}").value()["version"], json!(10));
 }
 
 #[test]

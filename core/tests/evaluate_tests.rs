@@ -1826,6 +1826,7 @@ fn a_clip_whose_media_is_absent_renders_a_slate() {
         audio: None,
         text: None,
         shape: None,
+        graphic: None,
         actions: Vec::new(),
         transition_in: None,
         name: None,

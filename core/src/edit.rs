@@ -87,7 +87,7 @@
 //! `add_media`, `relink_media`, `remove_media` (a nest references the
 //! parent's `media[]` in the parent's one id space, so a media edit inside
 //! a scope is an edit OUTSIDE it wearing a scope, which is the one thing a
-//! scope exists to prevent). Everything else — all fifty — works
+//! scope exists to prevent). Everything else — all fifty-two — works
 //! inside a nest as it works on the timeline, `nest` and `unnest`
 //! included.
 //!
@@ -98,6 +98,7 @@
 //! | `add_clip` | Whole media as one clip at `at`; source in 0, Fit scale when `canvas.fit_new_clips` and the source exceeds the canvas. The length is the media's snapped DOWN to whole frames, so the window stays inside the file and the segment plays at rate 1 (spec §11); a timed media shorter than one canvas frame is an `Err` naming the frame. |
 //! | `add_text_clip` | The Title preset, centered, 5 s long when `duration` is absent; `text` patches it exactly as `set_text` would. |
 //! | `add_shape_clip` | The default rectangle, 5 s long when `duration` is absent — an `arrow` kind gets `arrow_end` on, since a headless arrow is a diagonal line; `shape` patches that preset exactly as `set_shape` would, so an explicit `arrow_end: false` still wins. |
+//! | `add_graphic_clip` | A clip drawn by the module `graphics/<name>.js` in the package, 5 s long when `duration` is absent, at `width` × `height` — the canvas's when absent, and an `Err` naming the canvas when a canvas side is over 8192 — with Fit scale as a shape's box has, `in` 0 and no `length`. `name` must match `^[a-z0-9][a-z0-9-]{0,62}$` (G-3); the core has no filesystem and never checks the module exists. `props` (absent: none) is checked against `schema` when one is given — key by key, by dotted path, type, range and membership, a colour normalised to lowercase `#rrggbb[aa]` — and for shape only without one (G-4); a `null` prop is dropped, and more than 64 is an `Err`. |
 //! | `add_background` | A backdrop on a NEW back-most track, starting at 0, named "Background" and as long as the timeline unless `duration` says otherwise. With `media`, that file placed as `add_clip` would place it but for its SCALE — the right source kind, audio props when it has sound, and a FILL scale where `add_clip` takes a Fit one, because a plate that leaves the canvas showing down one side has failed at the one thing a background is for; with `color`, or with neither, a canvas-sized filled rectangle with no stroke at scale 1. The plate default is WHITE, not black: the canvas is already black, so a black plate is a command that appears to do nothing. `Err` for `media` and `color` together, an unknown media, a media with no pictures, a colour outside 0–1, a duration under a frame, or a timed media shorter than one canvas frame — a plate of a video or an audio file is held to that file's own whole length, given duration or default, so it never outruns what it shows (spec §11, D4-4). |
 //! | `add_blurred_background` | The screencast backdrop: `clip` copied onto a NEW back-most track at the same start, duration, speed and source window — so the two play the same frames — scaled to FILL the canvas, centred, uncropped, blended `normal` and blurred at full strength. The copy is muted (`enabled` becomes `{video: true, audio: false}`, `detach_audio`'s pair read the other way) and drops its `audio.duck` — the one field of that group that lowers OTHER material, so a copy keeping it would duck the mix including the clip it came from — along with its transition, its actions and its label; it is named "Blurred Background". `Err` for an unknown clip, a NEST (flattening drops a nest clip's own filters, so the copy would come out sharp), a source with no pixel size (text, audio-only), or a clip with no video properties. |
 //! | `insert_clip` | The insert edit: the clip `at` is strictly inside on `track` is split, every unlocked track opens by the media's whole length, then that media lands at `at`. Only the destination track is cut — straddlers elsewhere ride the shift whole. |
@@ -129,6 +130,7 @@
 //! | `set_audio` | Merges the patch into each clip's audio props. |
 //! | `set_text` | Merges the patch into each clip's text props. It can patch `case`, `words` and `word_style` like any declared key (W-10); a non-empty `words` whose length is not the content's `split_whitespace` count, a word time outside D7-1's envelope, an `end` before its `start`, a start before the previous word's, or a `word_style` value out of range is an `Err` naming the key and the number sent, before the times are snapped to the grid (W-2, W-3). |
 //! | `set_shape` | Merges the patch into each clip's shape props. |
+//! | `set_graphic` | Patches each graphic clip's `name`, `width`, `height`, `length` (`null`: the clip's duration; else snapped, at least one frame) and `props` — merged key by key, a `null` removing its key and the others keeping their order, checked as `add_graphic_clip` checks them against `schema` when one is given, and at most 64 once merged. `in` is an `Err` (the trims and `split` own it), and so is a clip that is not a graphic. An identity when nothing changes, a colour re-sent in another spelling included. |
 //! | `set_clip` | Sets or clears the clip's own name and label; absent keeps, null or an empty string clears. Unknown keys are an Err. A split, duplicate, detach or paste carries both. An identity when nothing changes. |
 //! | `set_enabled` | The per-clip hide and mute switches; omitted fields keep their value. |
 //! | `set_transition` | Sets `transition_in`; absent or `null` clears it. The overlap with the predecessor IS the duration. |
@@ -253,6 +255,24 @@ pub enum Op {
         duration: Option<Ticks>,
         #[serde(default)]
         shape: Option<Value>,
+    },
+    /// `schema` is what the module declares, filled by the app (G-4); the
+    /// core never reads the module, so a props patch is checked against the
+    /// schema the op carries, or for shape only when it carries none.
+    AddGraphicClip {
+        track: u32,
+        at: Ticks,
+        #[serde(default)]
+        duration: Option<Ticks>,
+        name: String,
+        #[serde(default)]
+        width: Option<u32>,
+        #[serde(default)]
+        height: Option<u32>,
+        #[serde(default)]
+        props: Option<Value>,
+        #[serde(default)]
+        schema: Option<Value>,
     },
     /// `media` and `color` are alternatives, not a pair: a plate is either
     /// a picture or a colour, and naming both is an `Err` rather than a
@@ -404,6 +424,12 @@ pub enum Op {
     SetShape {
         clips: Vec<u32>,
         patch: Value,
+    },
+    SetGraphic {
+        clips: Vec<u32>,
+        patch: Value,
+        #[serde(default)]
+        schema: Option<Value>,
     },
     /// The fifth patch op: `patch` is `{name?, label?}`, each a string or
     /// `null`, read by `edit_props.rs`. A patch rather than two envelope
@@ -591,8 +617,8 @@ pub enum Op {
 ///
 /// A struct rather than a bare [`Op`] because `scope` is the envelope's
 /// key and not any op's argument — it is spelled once, it means the same
-/// thing over all fifty-seven, and folding it into the enum would mean
-/// fifty-seven copies of one optional field. [`Project::apply_op`] still
+/// thing over all fifty-nine, and folding it into the enum would mean
+/// fifty-nine copies of one optional field. [`Project::apply_op`] still
 /// takes an `&Op` and knows nothing about nests.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Envelope {
@@ -618,7 +644,7 @@ pub struct Envelope {
 /// envelope key. A `#[serde(flatten)]` wrapper is not the way round it
 /// either: serde documents `deny_unknown_fields` as unsupported with
 /// `flatten`, and it would silently stop refusing typos. Removing the key
-/// before the typed decode keeps all three — the refusal, all fifty-seven
+/// before the typed decode keeps all three — the refusal, all fifty-nine
 /// variants, and an envelope key that is not an argument.
 pub fn parse(op_json: &str) -> Result<Envelope, String> {
     let mut value: Value =
@@ -695,6 +721,25 @@ impl Project {
                 duration,
                 shape,
             } => self.add_shape_clip(*track, *at, *duration, shape.as_ref()),
+            Op::AddGraphicClip {
+                track,
+                at,
+                duration,
+                name,
+                width,
+                height,
+                props,
+                schema,
+            } => self.add_graphic_clip(
+                *track,
+                *at,
+                *duration,
+                name,
+                *width,
+                *height,
+                props.as_ref(),
+                schema.as_ref(),
+            ),
             Op::AddBackground {
                 media,
                 color,
@@ -745,6 +790,11 @@ impl Project {
             Op::SetAudio { clips, patch } => self.set_audio(clips, patch),
             Op::SetText { clips, patch } => self.set_text(clips, patch),
             Op::SetShape { clips, patch } => self.set_shape(clips, patch),
+            Op::SetGraphic {
+                clips,
+                patch,
+                schema,
+            } => self.set_graphic(clips, patch, schema.as_ref()),
             Op::SetClip { clips, patch } => self.set_clip(clips, patch),
             Op::SetEnabled { clip, video, audio } => self.set_enabled(*clip, *video, *audio),
             Op::SetTransition { clip, kind } => self.set_transition(*clip, *kind),

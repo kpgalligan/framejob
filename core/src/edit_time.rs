@@ -538,6 +538,7 @@ impl Project {
             audio: None,
             text: None,
             shape: None,
+            graphic: None,
             actions: Vec::new(),
             transition_in: None,
             name: None,

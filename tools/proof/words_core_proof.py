@@ -143,19 +143,19 @@ def render(session, tick):
 
 
 def version_gate(mcp):
-    path = os.path.join(WORK, f"words-v10-{os.getpid()}.reelcut")
+    path = os.path.join(WORK, f"words-v11-{os.getpid()}.reelcut")
     shutil.rmtree(path, ignore_errors=True)
     os.makedirs(path)
     with open(os.path.join(path, "project.json"), "w", encoding="utf-8") as stream:
-        json.dump({"version": 10, "canvas": {"width": 640, "height": 360, "fps": [30, 1]},
+        json.dump({"version": 11, "canvas": {"width": 640, "height": 360, "fps": [30, 1]},
                    "tracks": [{"id": 2, "name": "T"}], "clips": [], "next_id": 3}, stream)
     try:
         mcp.call("open_project", path=path)
         message = None
     except ToolError as error:
         message = str(error)
-    check("a version-10 package is refused, naming version 9 as this build's",
-          message is not None and "version 10 is newer" in message and "(version 9)" in message,
+    check("a version-11 package is refused, naming version 10 as this build's",
+          message is not None and "version 11 is newer" in message and "(version 10)" in message,
           repr(message))
 
 
@@ -304,7 +304,7 @@ def save_and_reopen(s):
     with open(os.path.join(s.path, "project.json"), encoding="utf-8") as stream:
         text = stream.read()
     root = json.loads(text)
-    check("save_project writes \"version\": 9", '"version": 9' in text and root["version"] == 9,
+    check("save_project writes \"version\": 10", '"version": 10' in text and root["version"] == 10,
           f"version {root.get('version')}")
     texts = [c["text"] for c in root["clips"] if c.get("text")]
     check("…with word_style closing every text object, after animation, case, words",

@@ -90,6 +90,16 @@ pub use crate::model_words::*;
 /// are a file of their own.
 pub use crate::model_shape::*;
 
+/// The graphic types — [`GraphicProps`] and the [`GRAPHIC_MIN_SIDE`],
+/// [`GRAPHIC_MAX_SIDE`] and [`GRAPHIC_MAX_PROPS`] bounds on it — live in
+/// `model_graphic.rs` and are re-exported whole, so every
+/// `crate::model_props::GraphicProps` path (and, through `model.rs`'s own
+/// glob, every `crate::model::GraphicProps` one) still resolves. See that
+/// module's doc for the seam: a graphic is a source the model only
+/// describes and never reads, so its props are checked against a schema
+/// the op carries. Its `pub(crate)` checks are not widened by this glob.
+pub use crate::model_graphic::*;
+
 /// The motion types — [`Motion`] and the [`MotionEdge`], [`MotionDuring`],
 /// [`EdgeMotion`] and [`DuringMotion`] it is made of — live in
 /// `model_motion.rs` and are re-exported whole, so every

@@ -46,6 +46,20 @@ pub fn cases(fps: [u32; 2], f: i64) -> Vec<TickCase> {
             vec![("/clips/0/duration", json!(5 * f))],
         ),
         applied(
+            "add_graphic_clip.at",
+            "at",
+            empty.clone(),
+            json!({"op":"add_graphic_clip","track":1,"at":off(3,f),"duration":4*f,"name":"g"}),
+            vec![("/clips/0/start", json!(4 * f))],
+        ),
+        applied(
+            "add_graphic_clip.duration",
+            "duration",
+            empty.clone(),
+            json!({"op":"add_graphic_clip","track":1,"at":0,"duration":off(4,f),"name":"g"}),
+            vec![("/clips/0/duration", json!(5 * f))],
+        ),
+        applied(
             "add_background.duration",
             "duration",
             empty.clone(),

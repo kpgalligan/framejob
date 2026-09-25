@@ -974,7 +974,7 @@ final class TimelineView: NSView, NSTextFieldDelegate {
         guard clip.enabled.video else { return false }
         switch clip.source {
         case .media, .still, .image: return snapshot.media(for: clip)?.hasVideo ?? false
-        case .text, .shape, .nest: return false
+        case .text, .shape, .graphic, .nest: return false
         }
     }
 

@@ -315,12 +315,17 @@ final class AgentServer {
         "export": { $0.exportProject },
     ]
 
-    /// Ops the core declares that deliberately have NO tool. Empty, and the
-    /// bar for an entry is high: the agent-parity rule (app/CLAUDE.md) says
-    /// every user-visible edit gets a mirror, so the answer to "this op has
-    /// no tool" is almost always to write the tool. An entry here carries a
-    /// comment saying why it is the exception.
-    private static let opsWithoutTools: Set<String> = []
+    /// Ops the core declares that deliberately have NO tool. Two, both
+    /// temporary, and the bar for an entry is high: the agent-parity rule
+    /// (app/CLAUDE.md) says every user-visible edit gets a mirror, so the
+    /// answer to "this op has no tool" is almost always to write the tool.
+    /// An entry here carries a comment saying why it is the exception.
+    private static let opsWithoutTools: Set<String> = [
+        // road map 10 G2a: the op landed before its tool; G3 adds the handler and deletes this line
+        "add_graphic_clip",
+        // road map 10 G2a: the op landed before its tool; G3 adds the handler and deletes this line
+        "set_graphic",
+    ]
 
     /// The enforcement behind the table's contract, in five parts:
     ///

@@ -906,7 +906,7 @@ source position before `CompositionBuilder` reads them; a still's full-u32
 rational frame is at most `600000 × u32::MAX` ticks. Those bounds keep
 `sourceIn + sourceDuration` within Int64 without a duplicate Swift policy.
 
-### 5.2 Project — the JSON schema (format version 9)
+### 5.2 Project — the JSON schema (format version 10)
 
 The Rust value, serialized by serde. Small, no pixels. All times are
 ticks, all positions canvas pixels, colors `[r, g, b, a]` floats 0–1 — FOUR
@@ -959,7 +959,7 @@ it opens what a newer build wrote (§5.6).
       "audio": { "volume": 1.0, "muted": false, "fade_in": 0, "fade_out": 0,
                  "duck": null, "mono": false, "keep_pitch": true,
                  "pan": 0, "compressor": null, "noise_reduction": 0 },
-      "text": null, "shape": null,
+      "text": null, "shape": null, "graphic": null,
       "actions": [
         { "id": 1, "start": 2400000, "duration": 900000, "curve": "ease_in_out",
           "end": { "video": { "scale": 0.6, "x": 520 } } }
@@ -976,10 +976,24 @@ it opens what a newer build wrote (§5.6).
 - `source.kind` is one of `media` (video/audio file, with `in` = source
   time of the clip's first frame and `reversed` = play it back to front),
   `still` (`media`, `at` — a freeze frame), `image` (`media` — a
-  PNG/JPEG/HEIC), `text`, `shape`, `nest` (`project` — the ID of an entry
-  in the project's `nests[]`, M3). `speed` applies to `media` only;
-  `still`, `image`, `text`, `shape` and `nest` have no source bound and
-  any duration.
+  PNG/JPEG/HEIC), `text`, `shape`, `graphic` (format version 10, road map
+  10 — described by the clip's `graphic` key), `nest` (`project` — the ID
+  of an entry in the project's `nests[]`, M3). `speed` applies to `media`
+  only; `still`, `image`, `text`, `shape`, `graphic` and `nest` have no
+  source bound and any duration.
+- `graphic` (format version 10, road map 10's G2a; §11 G-3, G-4, G-12):
+  `null` for every clip but a `graphic` one, whose description it is —
+  `{ "name": "lower-third", "width": 1920, "height": 1080, "in": 0,
+  "length": null, "props": { "title": "Kevin", "accent": "#2d7ff9" } }`.
+  `name` is the module `graphics/<name>.js` in the package, matching
+  `^[a-z0-9][a-z0-9-]{0,62}$` (a file whose name breaks it is refused by
+  `validate`); `width` and `height` the size it draws at, 1–8192 — its
+  source size; `in` the graphic's own time at the clip's first frame, owned
+  by the trims and `split`; `length` the graphic's own length, `null` for
+  the clip's duration; `props` the values it is drawn with, at most 64, in
+  the caller's key order (written back byte for byte), a `color` one as
+  lowercase `#rrggbb` or `#rrggbbaa`. Every key defaults; an absent
+  `graphic` on a graphic clip is tolerated as an absent `text` is.
 - `source.reversed` (M3) is a fact, not an instruction: the core does no
   pixel work, so it changes neither the plan nor the recipe, and Swift
   substitutes a pre-rendered reversed asset for that media's segments
@@ -1642,7 +1656,7 @@ its frozen pair, the rate / background / switches and the `media[]` and
 twice), applies the op to it, and merges `tracks`, `clips`, `next_id`,
 `media` and `nests` back. So `Project::clip` keeps its one meaning, no op
 gained a nest-aware code path, undo is still one stack of parent handles,
-and `rc_op_names` is still 57 — a scope is an envelope key, not an op.
+and `rc_op_names` gains no name — a scope is an envelope key, not an op.
 Times inside a scope are the nest's own, measured from its zero; a nest has
 no speed, so `t − nest_clip.start` is the whole mapping.
 
@@ -1675,6 +1689,7 @@ many clips`, `too many tracks`, `nests are more than 8 deep at nest N`.
 |---|---|
 | `add_clip {track, media, at}` | Whole media as one clip at `at`; source in 0; Fit scale if `fit_new_clips` and the source exceeds the canvas. The length is the media's, snapped DOWN to whole frames, so the window stays inside the file and the segment plays at rate 1 (§11); a timed media shorter than one canvas frame is an `Err` naming the frame. Refuses if the overlap rule fails. |
 | `add_text_clip {track, at, duration=5 s, text?}` / `add_shape_clip {…, shape?}` | Same placement rules; default text is the Title preset centered, default shape the rectangle — except that `shape.kind = "arrow"` is created with `arrow_end` on, since an arrow with no head is a diagonal line. `text` and `shape` are **patch objects** in the `set_text` / `set_shape` shape, merged over that default — not a bare string or kind — so an explicit `arrow_end: false` still wins. (The MCP tools additionally accept a bare string as shorthand: the words for `text`, a kind name for `shape`.) |
+| `add_graphic_clip {track, at, duration=5 s, name, width?, height?, props?, schema?}` | Same placement rules; a clip drawn by the module `graphics/<name>.js`, at `width` × `height` — the canvas's when absent, an **error** naming the canvas when a side taken from it is over 8192 (a side the caller gave is not tested against the canvas) — with Fit scale as a shape's box has, `in` 0 and no `length`. `name` must match `^[a-z0-9][a-z0-9-]{0,62}$` (§11 G-3); the core has no filesystem and never checks the module exists. `props` is checked against `schema` when the op carries one — every key by its dotted path, `props.accent`, for its type, `min`/`max` and enum membership, a colour normalised to lowercase hex (§11 G-4, G-12) — and for shape only without one (a string of at most 4096 characters, a number or a boolean, under a key matching `^[A-Za-z_][A-Za-z0-9_]{0,31}$`); a `null` prop is dropped unchecked, and more than 64 is an **error**. Every check runs before the placement. |
 | `add_background {media?, color?=white, duration?=the timeline's length}` | A backdrop on a NEW back-most track, starting at 0 and named "Background". With `media`, that file placed as `add_clip` would place it but for its SCALE — the right source kind, audio props when it has sound, and a FILL scale where `add_clip` takes a Fit one, because a plate that leaves the canvas showing down one side has failed at the one thing a background is for; with `color`, or with neither, a canvas-sized filled rectangle with no stroke at scale 1. The plate default is WHITE, not black: the canvas is already black, so a black plate is a command that appears to do nothing. A plate of a TIMED media — video or audio — is held to that file's own whole length, default duration or given, so it never outruns what it shows (§11, D4-4); an image plate has no source bound and runs as long as it was asked to. `Err` for `media` and `color` together, an unknown media, a media with no pictures, a colour outside 0–1, a duration under a frame, or a timed media shorter than one canvas frame (`add_clip`'s own sentence, through the same function). A full-canvas GRADIENT is this clip and a `set_shape {gradient}` after it — the canvas background stays one colour (§5.2). |
 | `add_blurred_background {clip}` | The screencast backdrop: `clip` copied onto a NEW back-most track at the same start, duration, speed and source window — so the two play the same frames — scaled to FILL the canvas, centred, uncropped, blended `normal` and blurred at full strength. The copy is muted (`enabled` becomes `{video: true, audio: false}`, `detach_audio`'s pair read the other way) and drops its `audio.duck` — the one field of that group that lowers OTHER material, so a copy keeping it would duck the mix including the clip it came from — along with its transition, its actions, its label and its `video.motion` (format version 8 — a backdrop that slid in or pulsed behind the clip it copies would be two pictures of one recording disagreeing about where they are, and a slide would leave the canvas showing down one side, which is the one thing a background exists to prevent); it is named "Blurred Background". `Err` for an unknown clip, a NEST (flattening drops a nest clip's own filters, so the copy would come out sharp), a source with no pixel size (text, audio-only), or a clip with no video properties. Both of these mint TWO objects — a track and the clip on it — and the TRACK takes the `next_id` the call was made with, the clip the one after. |
 | `insert_clip {track, media, at}` | The INSERT edit: the clip `at` is strictly inside on `track` is split, every unlocked track opens by the media's whole length (`insert_time`), then the media lands at `at`. Only the destination track is cut — a straddler on another track rides the shift whole, which is what keeps a bed unbroken. One op, so one undo step and one tool. Refuses when the clip could not be placed after the room was made, which is what a locked destination track gives. |
@@ -1702,6 +1717,7 @@ many clips`, `too many tracks`, `nests are more than 8 deep at nest N`.
 | `nest {clips, name?}` | Collapses the selection into ONE clip showing a nest (§5.2), on the front-most track the selection occupied, running from the earliest start to the latest end. The clips move whole — ids, props, actions, transitions — keeping their relative times (the earliest starts at 0 inside) and their track order, onto fresh tracks of the nest's own that copy the source tracks' names and their hidden/muted/locked/solo state (a copied solo is then judged among the nest's own tracks, §5.2). The nest's canvas is frozen at the project's current size, so a later `set_canvas` cannot re-lay-out what is inside it. Media is untouched: a nest references the project's `media[]` in the same one id space. Refuses on an empty selection, on a selection of one nest clip, and when the nest clip would break the overlap rule against what was left behind. |
 | `unnest {clip}` | The inverse: the nest's clips return at `clip.start + their own start` with fresh ids (as `split` then a re-join mints fresh ones), on tracks counted back from the nest clip's own — the nest's front-most track lands where the nest clip was — with tracks missing behind added, and the nest clip goes. A clip the overlap rule refuses lands on a new track in front, as `paste` does, so a group can always be opened. A nest clip trimmed shorter than its contents gives **all** of them back: there is no in point on a nest, so this is the inverse of `nest`, not of the trim. The nest is dropped from `nests[]` when no clip anywhere still shows it. Each returning clip has its translated start, source-bounded duration, action spans and present base motion/text timings normalized to the document's grid (§11, D7-3), including a legacy off-grid nest. An **error** when `clip` is not a nest clip. |
 | `set_video {clips, patch}` / `set_audio` / `set_text` / `set_shape` | Merge the patch into the base props. Refuses if nothing changes. An unknown key, a value of the wrong JSON kind or a misspelt variant anywhere in the patch is an **error** that names the dotted path to it, array indices included, and the value sent — `unknown key "filters[1].kindd" in a video patch`, `bad value at "shadow" in a video patch: expected an object, not 5`, ``bad value at "filters[1].kind" in a video patch: unknown variant `glw`, expected one of `blur`, …`` — so a number where a shadow belongs is refused rather than read as a clear, and a list where an object belongs (or an object where a string belongs) is refused rather than read field by field; `add_text_clip`'s `text` and `add_shape_clip`'s `shape` answer in the same words. One value is refused by the CLIP rather than by the vocabulary: `video.blend` on a nest clip is an **error** naming it (format version 6), because a nest is flattened rather than composited offscreen and there is no group picture for a blend to combine with. It fires on the MERGED value only, so `{"blend": "normal"}` on a nest clip is the identity and refuses instead — otherwise an all-or-nothing `paste_attributes` of an ordinary look onto a nest clip would fail over a value that changes nothing. `set_action_end` does not range-check, so the same rule is enforced again in the evaluator (§5.4's `clamp_video`), which closes the recipe, `clip_state` and both export writers at once. A `video.filters` entry must name BOTH `kind` and `amount` — `missing key "filters[0].kind" in a video patch` — because a list replaces whole, so an entry is merged over nothing and the keys it leaves out would be completed from the type's defaults into a half-strength blur nobody asked for; the file reader keeps that completion, so an older file still opens with the defaults it always had. `video.obscure` and `shape.gradient.stops` entries are NOT held to it: their omitted keys leave the entry recognisably the thing the caller named. `video.motion` (format version 8) deep-merges like every other nested object — `{"motion": {"in": …}}` keeps a stored `out`, and `{"motion": {"in": null}}` clears that slot alone. The APP's two writers still send the WHOLE object with nil slots as `null` (the inspector's Motion section and Clip ▸ Motion ▸ know all three slots), which is the same rule spelled out rather than a second one; an AGENT's patch is the caller's own object, forwarded unread (§7.9). `{"motion": null}` clears the field, and a motion whose three slots are all null is normalised to `null` before the range checks run, so one clip has one spelling of "no motion". `set_text` can patch `case`, `words` and `word_style` like any declared key (format version 9, §11 W-10); a `words` entry must name both `start` and `end`, and a non-empty `words` whose length is not the content's token count is an **error** in the rule's own words — `this text is timed word by word: 4 timings for 5 words` — as are a word time outside D7-1's envelope, an `end` before its `start`, a `start` before the previous word's, and a `word_style` value out of range (`active_scale` 1.0–1.5, colours 0–1, a negative pill padding or radius). The check runs on what the caller sent; the word times are then snapped to the grid, nearest, a negative one staying negative. A content edit that changes the count sends `words: []` in the same patch. |
+| `set_graphic {clips, patch, schema?}` | Patches each graphic clip's `name`, `width`, `height`, `length` (`null`: the clip's duration; else snapped nearest, at least one frame) and `props`, which merges key by key: a value is stored in the key's own slot or appended, a `null` removes its key and the rest keep their order — unchecked, so a key the schema no longer has can still be removed — each other value checked as `add_graphic_clip` checks them, and the merged map holds at most 64 (an **error** naming the count). `in` is an **error** — the trims and `split` own it (road map 10's G-9, recorded here by G2b) — and so is a clip that is not a graphic, an unknown key and a malformed `schema`. The identity when nothing changes, a colour re-sent in another spelling included. |
 | `set_clip {clips, patch: {name?: string \| null, label?: string \| null}}` | The fifth patch op: sets or clears the clip's own name and label (§5.2). Inside the patch an absent key keeps, `null` clears, and so does an empty string — after the trim a name gets on its way in — because an unnamed clip is `null`, not `""`. Any other key is an **error**, checked before the clip ids. A patch rather than two optional `Option<T>` envelope arguments lets "keep" and "clear" differ. A `split`, `duplicate`, `detach_audio` or `paste` carries both along (they clone the clip); `paste_attributes` never does. Refuses if nothing changes. |
 | `set_enabled {clip, video?, audio?}` | Visibility/mute per clip. |
 | `set_transition {clip, kind\|null}` | Sets `transition_in`. With a kind on a clip that already HAS a transition only the `kind` moves — its `curve` and `audio` stay where the person put them (format version 7), because a kind chosen from the popup, the menu or MCP must not reset a curve; a clip that had none gets a minted one (§11, R5-2). `set_transition_duration {clip, duration}` moves the clip so the overlap equals `duration` (subject to the overlap rule). |
@@ -2856,6 +2872,7 @@ concern is a new module with its own `impl Project` block.
 | `model_shape.rs` | the shape vocabulary — `ShapeProps`, the `ShapeKind` it draws, the `Stroke` around it, and the `Gradient`, `GradientKind`, `GradientStop` and `MAX_GRADIENT_STOPS` that fill it. Cut out of `model_props.rs` under the size rule (road map 5, E2) and re-exported whole by it, and cut HERE because it is `model_text.rs`'s seam read a second time: shape and text are the two sources the model only DESCRIBES, drawn on the CPU and keyed by the recipe's content hash, where everything left in `model_props.rs` is read straight into the compositor's uniform block. Nothing here is ever a shader discriminant — `GradientKind` may gain a kind at the END and nothing derives a number from the order, where `BlendMode`'s order IS the discriminant |
 | `model_motion.rs` | the motion vocabulary (format version 8, road map 5's E2) — `Motion` and the `MotionEdge`, `MotionDuring`, `EdgeMotion` and `DuringMotion` it is made of. Its own module for a seam rather than for room: every other member of the video group is a quantity the compositor reads more or less straight, while these five say only what a clip should DO and the placement that comes out of them is computed at render time by `motion.rs`. Re-exported whole by `model_props.rs`; neither enum's declaration order is load-bearing, and both are closed |
 | `model_words.rs` | the word-caption vocabulary (format version 9, road map 8's W1b; §5.2, §11 W-1 to W-6) — `TextCase`, `Word`, `WordMode`, `ActivePill` and `WordStyle` (with `template()` for `patch.rs`), re-exported through `model_props.rs` like the other vocabularies; the FIELDS stay on `TextProps`. And the two facts every writer of `text.words` shares, `pub(crate)` and named directly by their callers: `token_count` (`split_whitespace` — the core is the one counter) and `rebase_words` (the one saturating subtraction `trim_start`, `roll`, `add_transition`'s handle form and `split`'s second half make) |
+| `model_graphic.rs` | the graphic vocabulary (format version 10, road map 10's G2a; §5.2, §11 G-3, G-4, G-12) — `GraphicProps` (`name`, `width`, `height`, `in`, `length`, `props`) and the `GRAPHIC_MIN_SIDE` / `GRAPHIC_MAX_SIDE` / `GRAPHIC_MAX_PROPS` bounds, re-exported through `model_props.rs`; the FIELD `Clip.graphic` stays in `model.rs`. And the checks every writer of one shares, `pub(crate)`: the module name rule, the side bound, a schema's eight sentences and the props checked against it (or for shape only without one), the key count on the STORED map, and `normalise_color`. The engine crate's sentences and limits are COPIED here, because no module of the model may name it (G-2); a props map is only ever changed by `insert` and `shift_remove`, because `serde_json`'s `remove` swaps the last key into the hole under `preserve_order` |
 | `model_query.rs` | reading a project: `Project::new`, id allocation, the `clip` / `track` / `media` / `marker` / `nest` lookups, `clips_on`, `duration`, `validate` with its nesting walk, and `source_size` — the source's pixel size when the model knows it, `None` for text and for a media, nest or shape with no positive size. That last one was TWO private readers, `edit_props.rs`'s and `edit_background.rs`'s stricter one, collapsed here by road map 5's T0f, so a source kind added to `model.rs` is answered once. The three source-window measurements moved out to `source_window.rs` (road map 7 §10, phase A) |
 | `frame_grid.rs` | One clip-time normalization concern (D7-3): placement start, `source_window.rs`'s bounded duration, action spans and present base motion/text timing. Called by canvas, both paste paths and unnest; source positions, action-end payloads and audio envelopes are untouched. |
 | `source_window.rs` | THE source window — how much material a clip shows and how much lies either side of it, in the unit its name says (road map 7 §10, phase A). The three readers moved out of `model_query.rs` with their units in their names (`content_length_in_source`, `source_head_on_timeline`, `source_length_on_timeline`), `SourceBound` in place of the `Option` whose `None` meant two opposite things, `longest_duration_on_grid` (the bound, snapped DOWN — §11's #22), the two tail readers `slip` and `freeze_frame` clamp against, the five functions phase B added so that every writer of a media clip's window reads ONE bound (§11's D4-2 to D4-5) — `longest_duration_on_grid_of`, which takes the pieces with the clip's `start` among them, `latest_end_on_grid` and `earliest_start_on_grid`, the two timeline POSITIONS an edge is held to, `duration_resnapped`, what every re-snap of a media duration writes, and `duration_at_speed`, what `set_speed` writes — and the ONE mover — `in_advanced` / `source_advanced`, the `round(Δ × speed)` advance of a source in point that `trim_start`, `roll`, `split_clip`, `freeze_frame`, `slip` and `add_transition` each used to write out |
@@ -2868,6 +2885,7 @@ concern is a new module with its own `impl Project` block.
 | `op_schema.rs` | the op table written as JSON SCHEMA — what `rc_op_schemas` publishes (road map 7's D3·2), one object per op whose properties are its arguments and whose `required` is the ones the decoder will not do without. A module of its own because a row changes when an OP does and this changes when the published DIALECT does, and the match over `Kind` is exhaustive so a kind cannot be added without saying what JSON it is. It publishes what an argument IS and never what it is FOR, an opaque object for a caller-authored patch (D1 is the one validator of what one may carry) and a `ZoomRegion`'s four declared members for the one caller-authored object the core does own, and no `additionalProperties` on an op, because the catalog merges `project` and `scope` in over it |
 | `scope.rs` | editing INSIDE a nest — the envelope's `scope` key (road map 2, phase 9). Builds a VIEW project out of the nest, applies the op to it unchanged, and merges `tracks`, `clips`, `next_id`, `media` and `nests` back. Its own module because a scope is a change of CONTAINER rather than an op or a property of one, and because the whole of it is two pure functions and a refusal list, which belong nowhere near the semantics of any single edit. Three readings in it are measured rather than reasoned: the scoped nest's row stays in the view with its tracks and clips **emptied** (whole, it doubles every id in `validate`'s one uniqueness sweep; removed, it dangles every other nest's clip that shows it — the nest-inside-a-nest case the phase exists for); the nests write-back is **union first, orphans after**, because `unnest`'s `nest_is_shown` cannot see the parent's timeline clips from inside a view and would drop a nest a timeline clip still shows; and the caps and the depth are checked ONCE on the merged parent, which is why a scoped op has a wider `Err` arm than any other |
 | `edit_clip.rs` / `edit_props.rs` / `edit_track.rs` / `edit_time.rs` | the §6 ops in `impl Project` blocks: clip construction and placement callers; the five property patches (`set_video` / `set_audio` / `set_text` / `set_shape`, and `set_clip` for the clip's own name and label), each merged through `patch.rs` and then range-checked; tracks, markers, canvas, media; ripple, insert time, range delete, freeze |
+| `edit_graphic.rs` | the two graphic ops (road map 10's G2a): `add_graphic_clip`, every argument checked through `model_graphic.rs` BEFORE `edit_clip.rs`'s `add_described_clip` places it, and `set_graphic`, whose patch reader takes `name`, `width`, `height`, `length` and `props` (merged key by key, `null` removing with `shift_remove`) and refuses `in` by name |
 | `edit_clip_timing.rs` | `trim_start`, `trim_end`, `rate_stretch`, `set_speed`, their speed bounds and action rescaling, moved unchanged from `edit_clip.rs` before road map 7 §12.8's placement-commit extraction |
 | `edit_commit.rs` | the internal placement commit: `commit_replacements` checks selected candidates on old tracks before destination tracks and replaces their IDs in place; `commit_additions` checks caller-allocated additions on `self` and appends them to the caller's draft; `finish_placement` mints gained transitions on the supplied tracks then calls the existing equality-before-validation `finish`. No op/FFI/schema/format surface changes |
 | `patch.rs` | reading a caller-authored patch: `Group` (the vocabulary the four patches and `paste_attributes` share, and its per-group template), `check_keys` (the walk of keys and JSON kinds, array indices in the path), `merge_group` (the one read of a group patch — walk, deep merge, typed read back) and `check_group_patch` (the same for a group that is not merged into a stored one, which is what `edit_action.rs` composes an end patch's door out of). Every refusal names the dotted path and the offending value, and `COMPLETE_ENTRIES` is where the `video.filters` entry rule is stated. Cut out of `edit_props.rs` under the size rule in D1·2 for `props_check.rs`'s reason: what a patch may CARRY is a fact about the vocabulary, not about an edit, and nothing here is handed a clip |
@@ -4375,6 +4393,46 @@ assisted import.
   JavaScriptCore in Swift plus resvg over FFI. The graph's licences (road
   map 10 §4) are MIT, Apache-2.0 OR MIT and BSD-3-Clause; no copyleft code,
   and no code from Remotion.
+- **G-3 — A graphic's source is a FILE in the package, and is not an undo
+  step** (road map 10 §4, 2026-09-25). The code lives at
+  `graphics/<name>.js`, and `<name>` matches `^[a-z0-9][a-z0-9-]{0,62}$`, so
+  it is safe on disk, in a URL and in a tool argument. The clip names its
+  module (`graphic.name`), and many clips may share one module, as many
+  clips share one media file. Editing the file is NOT an undo step and does
+  not dirty the document, exactly as a change to a media file on disk is
+  not; undo covers what the model holds — which module, the size, the
+  timeline and the props. The reason is that a file is edited by things
+  that are not the app (an agent's own Write tool, a person's editor), and
+  an undo stack that owned the file would have to be rebuilt from whatever
+  those tools did. The price is stated to the agent in the `write_graphic`
+  reply: "not undoable; keep your own copy if you want the old one back". A
+  revision history is road map 10 §7's. The package gains `graphics/`
+  beside `cache/` and `media/`, and the `fileWrapper` whitelist gains its
+  line (§5.6: a directory not named there is DELETED by the next save); an
+  UNTITLED document keeps its `graphics/` under its temporary cache root,
+  and the first save carries it into the package, as `cache/` is carried.
+- **G-4 — The core checks props against the schema the OP carries; render
+  time is lenient** (road map 10 §4, 2026-09-25). The schema is declared in
+  the module (`export const schema`), and the core never reads the module,
+  so `add_graphic_clip` and `set_graphic` take a `schema` argument (JSON,
+  road map 10 §5c's shape). The app fills it from the module's current
+  revision, and the tools declare it as the one argument an agent does not
+  send (a Declarations row); an agent that sends one anyway is refused by
+  the gate, since the tool never published it. With a schema, the core
+  checks every key of a `props` patch by its dotted path (`props.accent`),
+  with type, range and enum membership, in the core's words, and no handler
+  predicts a refusal. A `null`, which removes its key, is not checked, so a
+  stored key the schema no longer has can always be cleared. Without a
+  schema (a file read, or a replayed op), the core checks shape only: at most 64 keys, each value a string of at most
+  4096 characters, a finite number or a boolean. The 64 is counted on the
+  map about to be STORED — after a `set_graphic` merge and its removals —
+  since a one-key patch can push a full map over. At RENDER time props are
+  lenient, because a file edit can change the schema after the props were
+  set: `ctx`'s props are the schema's defaults overlaid with the stored
+  values, a stored key the schema no longer has is passed through and a
+  wrong type falls back to the default, both reported as WARNINGS in the
+  graphic's diagnostics and never as errors. A clip whose module was edited
+  keeps drawing, and the agent is told what no longer matches.
 - **G-5 — A graphic is a pure function of its inputs (R5-5 for code)**
   (road map 10 §4, 2026-09-25). A frame is a function of its source text,
   props, frame number, size, font set and asset bytes only. Anything else is
@@ -4391,3 +4449,19 @@ assisted import.
   in preview and 2 s in export and `render_frame` — over budget is an error
   for that frame, not a hang. These limits are also what makes a package
   from someone else safe to open: its code runs, and it can reach nothing.
+- **G-12 — Colours in props are CSS strings** (road map 10 §4,
+  2026-09-25). A `color` prop is a CSS colour string, normalised by the core
+  to `#rrggbb` or `#rrggbbaa` lowercase (an opaque alpha is dropped). It is
+  not the model's `[r, g, b, a]` floats, because props are the module's
+  vocabulary, which goes straight into SVG attributes; the inspector's
+  colour well converts at its edge. The core takes the four hex forms and
+  `rgb()` / `rgba()`; named colours and `hsl()` are not taken yet (road
+  map 10 §10.5).
+- **G-13 — The revision is a content hash, and an export pins it** (road
+  map 10 §4, 2026-09-25). A module's revision is the SHA-256 of its bytes,
+  computed with CryptoKit. Preview always uses the newest revision, and the
+  watcher refreshes the paused frame when one lands
+  (`Playback.refreshPausedFrame`). An EXPORT pins, at its start, the
+  revisions (and the font and asset sets) it compiled, so an agent editing
+  a file mid-export cannot produce a video whose first half is one version
+  and its second half another.

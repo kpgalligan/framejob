@@ -73,8 +73,15 @@ extern "C" {
  * is again no migration step; an older build would drop a page's timings,
  * which nothing left in the file could rebuild short of transcribing the
  * audio again. The recipe's `word` and `word_pop` are computed, never
- * stored. */
-#define RC_FORMAT_VERSION 9
+ * stored.
+ *
+ * Version 10 is graphics: a clip source kind `graphic` and the clip key
+ * `graphic` after `shape` — `{name, width, height, in, length, props}`, the
+ * module in the package's `graphics/` that draws it, its size, its own
+ * timeline and its props in the caller's key order. It defaults to null,
+ * so there is no migration step; an older build would drop every graphic
+ * clip's description and leave a clip that draws nothing. */
+#define RC_FORMAT_VERSION 10
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips
