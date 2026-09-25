@@ -5499,3 +5499,20 @@ details.
 python3 tools/proof/text_apply_proof.py                      # → 27/27
 python3 tools/proof/text_apply_proof.py --baseline 7e946ed   # exit 0 = exactly A1 A2 A4 A6 A8–A11 FAIL
 ```
+
+## Road map 10 — the person's playback-check projects (`graphics_playback_samples.py`)
+
+Not a proof: it BUILDS the three projects `designs/reelcut-remaining.md`
+§4's "Graphics playing, WATCHED" bullet asks a person to play, through the
+built app's MCP tools (its own instance on port 4891, killed after), into
+`tools/proof/work/playback-check/` (ignored by git):
+- `Playback-1080p.reelcut` — 1920×1080 at 30 fps: `lower-third` (0–5 s),
+  then `kinetic-type` (5–10 s);
+- `Playback-4K.reelcut` — 3840×2160 at 30 fps: `title-card` (0–4 s), then
+  `kinetic-type` (4–9 s), for the stutter and Activity Monitor memory rows;
+- `Error-card.reelcut` — a small module that throws from frame 60, so the
+  error card shows from 2 s.
+
+Run `python3 tools/proof/graphics_playback_samples.py` after `make app`;
+it replaces the three packages. Built 2026-09-25 at `0ade58c`, with a
+`render_frame` of each confirmed by eye.
