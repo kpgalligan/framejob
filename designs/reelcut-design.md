@@ -24,8 +24,9 @@ shapes, transitions and simple animation, without Final Cut's magnetic
 timeline, roles, multicam, scopes, or a plugin ecosystem.
 
 Deliberate non-goals: camera recording, multicam, color grading beyond
-per-clip controls, audio beyond volume/fade/duck, a plugin system, any
-platform but macOS. **Screen recording was on this list until road map 3
+per-clip controls, audio beyond volume/fade/duck, a plugin system (a clip
+may draw itself from a JavaScript module in its package, road map 10;
+nothing else is scriptable — §11 G-1), any platform but macOS. **Screen recording was on this list until road map 3
 reversed it** (§11): the app records a display or a window through
 ScreenCaptureKit into a file it then imports exactly as File ▸ Open would —
 paused and resumed from the menu bar, each stretch its own file and its own
@@ -1746,7 +1747,8 @@ arguments half rather than restating it (§7.9).
 
 ## 7. Architecture — Rust decides, AVFoundation and Metal do
 
-All pixel and sample work happens on the platform. Pure-Rust decoding of
+All pixel and sample work happens on the platform, except a graphic's
+rasterization, which is the `graphic` crate's (G-2). Pure-Rust decoding of
 H.264 / HEVC / ProRes does not exist at production quality, and linking
 ffmpeg is a 60 MB dependency with licensing questions and no VideoToolbox
 by default. AVFoundation gives hardware decode and encode, synchronized
@@ -1819,6 +1821,26 @@ bool    rc_timecode_parse(const char *s, uint32_t fps_num, uint32_t fps_den, int
 char *rc_export_presets(void);                                          /* [{id, name, container, codec, size, ...}], one per encoding */
 char *rc_export_sizes(const RcProject *p, const char *preset_id, char **err_out); /* [{id, name, width, height}], the default first */
 char *rc_export_settings(const RcProject *p, const char *preset_id, const char *overrides_json, char **err_out);
+
+/* graphics — road map 10: the `graphic` crate, through core/src/ffi_graphic.rs
+ * alone (G-2). A library is a builder that FREEZES at its first compile or
+ * rasterize; diag_out is NULL or a JSON array of {level, message, line,
+ * column, frame}, exactly one error on failure, written on success only
+ * for warnings. */
+typedef struct RcGraphicLibrary RcGraphicLibrary;
+typedef struct RcGraphic RcGraphic;
+RcGraphicLibrary *rc_graphic_library_new(void);                                     /* never NULL */
+bool  rc_graphic_library_add_font(RcGraphicLibrary *, const uint8_t *bytes, size_t len, char **err_out);
+bool  rc_graphic_library_add_asset(RcGraphicLibrary *, const char *name, const uint8_t *bytes, size_t len, char **err_out);
+void  rc_graphic_library_free(RcGraphicLibrary *);
+RcGraphic *rc_graphic_compile(const RcGraphicLibrary *, const char *name, const char *source,
+                              uint32_t budget_ms, char **diag_out);
+char *rc_graphic_describe(const RcGraphic *);                     /* {"meta":…,"schema":…,"revision":…} */
+char *rc_graphic_svg(const RcGraphic *, int64_t frame, const char *props_json, const char *ctx_json,
+                     uint32_t budget_ms, char **diag_out);        /* NULL props_json = {} */
+bool  rc_graphic_rasterize(const RcGraphicLibrary *, const char *svg, uint32_t w, uint32_t h,
+                           uint8_t *out_bgra, size_t stride, char **diag_out);
+void  rc_graphic_free(RcGraphic *);
 
 /* agent — same signatures as Rasterize's rz_agent_* (copy them) */
 ```
@@ -2820,7 +2842,8 @@ Handlers use `performGroupedEdit` so off-event edits get their own undo group
 
 Crate `reelcut_core`, `crate-type = ["staticlib", "rlib"]`, deps `serde`,
 `serde_json`, `serde_path_to_error` (the path a patch refusal names),
-`tiny_http` (agent). Soft cap 600 lines per module; a new
+`tiny_http` (agent), and `graphic` (road map 10's motion-graphics engine, a
+path dependency named by `ffi_graphic.rs` alone, G-2). Soft cap 600 lines per module; a new
 concern is a new module with its own `impl Project` block.
 
 | Module | Owns |
@@ -2876,6 +2899,7 @@ concern is a new module with its own `impl Project` block.
 | `export_table.rs` | the rows themselves — the `Container` enum with the four questions a container answers about ITSELF (extension, UTI, whether a leading index is worth rewriting, whether it can hold sound at all), `Preset`, the `PRESETS` set one row per encoding in menu order, and the `preset(id)` lookup both resolvers share. Cut out of `export.rs` under the size rule (road map 2, phase 7 — the second cut that file has paid, after `export_overrides.rs`) and cut HERE because everything in it is a constant no project can influence, where `export_settings` is the only half handed a `&self`; `export.rs` re-exports both functions, so `crate::export::presets()` and `crate::export::preset(id)` resolve as they did |
 | `agent.rs` | MCP server (copied) |
 | `ffi.rs` / `ffi_edit.rs` / `ffi_query.rs` / `ffi_agent.rs` / `ffi_util.rs` | thin shims; `ffi_util` holds `catch_unwind` + `err_out` + CString helpers (copy Rasterize's) |
+| `ffi_graphic.rs` | the nine `rc_graphic_*` exports (§7.1), delegating to the `graphic` crate — the ONLY module that names it (G-2): the library builder that freezes into one `Arc<graphic::Library>` at first use, the compiled module's handle, and `diag_out`'s JSON array of Diagnostics |
 
 Tests: black-box in `core/tests/` through the FFI, oracle-checked, no
 golden files. Required from M1: JSON round-trip for every field; timecode
@@ -4322,3 +4346,48 @@ assisted import.
   ⌘Return a commit in place, blur commits): it sits among fields that
   commit on blur, and a session that must be left is the canvas's alone. No
   MCP mirror: the keys are view state, `set_text` is the apply.
+- **G-1 — A graphic is a SOURCE, not an effect; R5-1 stands for effects**
+  (road map 10 §4, 2026-09-25). §1 lists "a plugin system" as a non-goal,
+  and R5-1 says effects are "closed vocabularies, never a runtime… no
+  expression language". A graphic changes neither rule for what they
+  govern: a transition, a motion preset, a filter and a blend stay closed
+  vocabularies the one compositor draws, and a script cannot reach another
+  clip's pixels, the timeline, the model or the editor. A graphic is a
+  clip's CONTENT, in the same place a media file or an image sits — closer
+  to "the user can import any PNG" than to a plugin. §1's non-goal gains one
+  clause: "a clip may draw itself from a JavaScript module in its package
+  (road map 10); nothing else is scriptable". The user asked for this
+  reversal, as road map 3 reversed screen recording.
+- **G-2 — The engine is a separate Rust crate; the core crate keeps its two
+  rules** (road map 10 §4, 2026-09-25). QuickJS and resvg live in
+  `graphic/`, a crate at the repo root. `reelcut-core` depends on it by
+  path, and ONE file, `core/src/ffi_graphic.rs`, calls into it; no module of
+  the model, the ops, the plan or the recipe imports it. `core/src/` keeps
+  "no pixel work" and "no filesystem" exactly; the `graphic` crate does
+  pixel work and still no filesystem — the app reads every byte and hands it
+  over. §7's first sentence becomes: "All pixel and sample work happens on
+  the platform, except a graphic's rasterization, which is the `graphic`
+  crate's (G-2)." Not JavaScriptCore and a platform rasterizer, because
+  `measureText` has to be the rasterizer's own measurement or wrapped text
+  overflows by a pixel (macOS has no public SVG rasterizer), because QuickJS
+  gives public memory and time limits where JavaScriptCore's execution time
+  limit is SPI, and because one call in, pixels out is a smaller seam than
+  JavaScriptCore in Swift plus resvg over FFI. The graph's licences (road
+  map 10 §4) are MIT, Apache-2.0 OR MIT and BSD-3-Clause; no copyleft code,
+  and no code from Remotion.
+- **G-5 — A graphic is a pure function of its inputs (R5-5 for code)**
+  (road map 10 §4, 2026-09-25). A frame is a function of its source text,
+  props, frame number, size, font set and asset bytes only. Anything else is
+  removed or made to throw: no wall clock (`Date` is frozen at
+  2000-01-01T00:00:00Z and `Date.now()` returns its epoch); no randomness
+  (`Math.random` throws "Math.random is not available; use random(seed)");
+  no I/O (no `std` or `os` module, and `import` of anything is refused); no
+  state between calls (the module is evaluated once per thread, and a test
+  renders the same frame after 300 others and compares bytes). So
+  `render_frame` at a tick is byte-identical run after run, and preview and
+  export agree; a graphic that keeps a module-level counter breaks that, the
+  standard library cannot stop it, and road map 10 §5l's proof row catches
+  it. Limits: 64 MB heap per context, 1 MB stack, 250 ms per `render` call
+  in preview and 2 s in export and `render_frame` — over budget is an error
+  for that frame, not a hang. These limits are also what makes a package
+  from someone else safe to open: its code runs, and it can reach nothing.

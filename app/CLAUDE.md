@@ -20,6 +20,11 @@ detail there.
   except `TextPatch` (with `case`, `words` and `word_style`), which is
   `TextPatch.swift`'s, moved out so it could grow. `word_style` has ONE
   app-side writer, `CaptionLayout.place` (W-10).
+  The graphics engine's wrappers are here too: `GraphicLibrary` (`addFont`,
+  `addAsset`, `rasterize`; frozen by its first compile or rasterize) and
+  `GraphicModule` (`compile`, `describeJSON`, `svg`; it holds its library
+  strongly), with `GraphicDiagnostic`, `GraphicFailure` (what a `diag_out`
+  failure throws; `err_out` stays `ReelCoreError`) and `GraphicRaster`.
   It is also where the op table is read BACK: `ReelOp.coreNames()` over
   `rc_op_names`, and `ReelOp.coreSchemas()` over `rc_op_schemas` — every
   op's ARGUMENTS as JSON Schema, keyed by op name, which

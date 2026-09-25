@@ -1233,8 +1233,8 @@ fn fnv1a_hex(bytes: &[u8]) -> String {
 
 /// [`text_clip`]'s text group, serialized exactly as a core WITHOUT
 /// `text.animation` wrote it: every field of `TextProps` at its default but
-/// `content`, keys in the order `serde_json` puts a map in — sorted, since
-/// the crate does not enable `preserve_order`.
+/// `content`, keys sorted — the order `content_hash` canonicalises a
+/// description into before it hashes, whatever order the map kept them in.
 ///
 /// This literal is the whole of the byte-identity claim. It was written from
 /// the struct, not copied from a run.

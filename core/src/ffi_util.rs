@@ -97,6 +97,24 @@ pub(crate) unsafe fn fallible_op<T, R>(
     body: impl FnOnce() -> Result<T, String>,
     success: impl FnOnce(T) -> R,
 ) -> R {
+    unsafe { fallible_op_wrapped(err_out, what, failure, body, success, |msg| msg) }
+}
+
+/// [`fallible_op`] for a channel whose messages have a shape of their own:
+/// `internal` wraps the caught panic's "internal error: `what`" before it is
+/// written (`ffi_graphic.rs`'s `diag_out` is a JSON array of Diagnostics).
+/// An `Err` from `body` is written as it stands — shaping it is the body's.
+///
+/// # Safety
+/// `err_out` must be NULL or a valid pointer to writable `*mut c_char`.
+pub(crate) unsafe fn fallible_op_wrapped<T, R>(
+    err_out: *mut *mut c_char,
+    what: &str,
+    failure: R,
+    body: impl FnOnce() -> Result<T, String>,
+    success: impl FnOnce(T) -> R,
+    internal: impl FnOnce(String) -> String,
+) -> R {
     match catch_unwind(AssertUnwindSafe(body)) {
         Ok(Ok(value)) => success(value),
         Ok(Err(msg)) => {
@@ -104,7 +122,8 @@ pub(crate) unsafe fn fallible_op<T, R>(
             failure
         }
         Err(_) => {
-            unsafe { set_message(err_out, &format!("internal error: {what}")) };
+            let msg = internal(format!("internal error: {what}"));
+            unsafe { set_message(err_out, &msg) };
             failure
         }
     }

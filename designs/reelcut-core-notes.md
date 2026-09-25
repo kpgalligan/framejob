@@ -1075,3 +1075,34 @@ whose evaluated content's token count differs from `words.len()` stores
 touched. The same mismatch arriving through `paste`'s stored-whole payload
 is NOT normalised (road map 5 §12, R2·2) and is road map 8 §10.5's known
 limit.
+
+## `ffi_graphic.rs` and the `preserve_order` unification, 2026-09-25 — road map 10's G1d
+
+**`ffi_graphic.rs` — new, 397.** The nine `rc_graphic_*` exports of road
+map 10 §5e and the only module of `core/src/` that names the `graphic` crate
+(spec §11 G-2; `core/tests/graphic_ffi.rs`'s last test reads `core/src/`
+to hold it). `RcGraphicLibrary` is a builder — a `Mutex<Option<Pending>>`
+of fonts and assets and a `OnceLock<Arc<graphic::Library>>` — that the
+first compile or rasterize freezes, because `graphic::Library` is
+immutable (its `version` hashes every byte): the freeze takes `pending`
+under the lock an add holds, so an add lands before it or finds `None` and
+is refused. `RcGraphic` wraps `graphic::Module`, whose own `Arc` keeps the
+fonts alive past `rc_graphic_library_free`. `diag_out` is a JSON array of
+Diagnostics, exactly one error on a failure; the panic arm goes through
+`ffi_util.rs`'s new `fallible_op_wrapped`, which lets the caller shape the
+"internal error: <what>" message (`fallible_op` is it with identity), so no
+`catch_unwind` is hand-rolled.
+
+**The unification finding.** `graphic` enables `serde_json`'s
+`preserve_order`, and cargo unifies a feature across a path dependency, so
+the core's `serde_json::Map` became insertion-ordered the moment the
+dependency landed; `core/Cargo.toml` now spells the feature out with the
+reason. One test broke (826 passed, 1 failed):
+`evaluate_tests.rs`'s pre-version-5 constant, a sorted literal hashed by
+FNV. The fix is `recipe.rs`'s `content_hash`, which now hashes
+`sorted(description)` — every object's keys through a `BTreeMap`,
+recursively — the order every hash was taken in before, so no texture key
+moved. `recipe.rs` 582 → 594; `RecipeLayer::object()`'s doc no longer
+claims the map is a `BTreeMap`. The wire order of recipe, plan and schema
+objects is now insertion order; Swift decodes by key and the proofs parse
+JSON, so nothing reads it.

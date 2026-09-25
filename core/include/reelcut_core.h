@@ -27,6 +27,7 @@
 #define REELCUT_CORE_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -337,6 +338,80 @@ char *rc_export_sizes(const RcProject *p, const char *preset_id, char **err_out)
  * through any other row is composited onto black. */
 char *rc_export_settings(const RcProject *p, const char *preset_id, const char *overrides_json,
                          char **err_out);
+
+/* -------------------------------------------------------------- graphics */
+
+/* The motion-graphics engine (road map 10 §5e), linked from the `graphic`
+ * crate through `core/src/ffi_graphic.rs`, the one module that names it.
+ *
+ * `RcGraphicLibrary` is a font and asset set being BUILT: `add_font` and
+ * `add_asset` fill it until the first `rc_graphic_compile` or
+ * `rc_graphic_rasterize` against it FREEZES it, after which an add answers
+ * false with `err_out` = "the library is frozen: a graphic was compiled or
+ * a frame drawn against it; build a new one". So a library never changes
+ * under a compiled graphic. `RcGraphic` is one compiled module; it keeps the
+ * library's fonts alive, so the two may be freed in either order.
+ *
+ * `diag_out` is NULL or a JSON ARRAY of Diagnostics, each
+ * {"level","message","line","column","frame"} in that order (an absent
+ * position is null). On failure it always holds exactly ONE error: the
+ * engine's own, or the FFI's for an argument it could not read ("library
+ * is NULL", "name is NULL", "source is NULL", "graphic is NULL", "svg is
+ * NULL", "out_bgra is NULL", "ctx_json is NULL", "props_json is not JSON:
+ * …", "ctx_json is not JSON: …", "height × stride overflows"), or
+ * "internal error: <what>" for a caught panic. On success it is written only
+ * when there are warnings. NULL `diag_out` and `err_out` are tolerated; every
+ * `char *` here is freed with `rc_string_free`. */
+typedef struct RcGraphicLibrary RcGraphicLibrary;
+typedef struct RcGraphic RcGraphic;
+
+/* A new, empty library. Never NULL. */
+RcGraphicLibrary *rc_graphic_library_new(void);
+
+/* Adds one font file's bytes. False with `err_out` for a NULL argument
+ * ("bytes is NULL"), bytes that load no face ("font bytes loaded no face"),
+ * or a frozen library. */
+bool rc_graphic_library_add_font(RcGraphicLibrary *lib, const uint8_t *bytes, size_t len,
+                                 char **err_out);
+
+/* Adds one asset under `name`, the string an `<image href>` names. False with
+ * `err_out` for a NULL argument, an empty name ("name is empty"), a name
+ * already added ("asset \"<name>\" is already in the library"), or a frozen
+ * library. */
+bool rc_graphic_library_add_asset(RcGraphicLibrary *lib, const char *name, const uint8_t *bytes,
+                                  size_t len, char **err_out);
+
+/* Releases a library. NULL-tolerant. */
+void rc_graphic_library_free(RcGraphicLibrary *lib);
+
+/* Compiles `source` as the ES module `name` against `lib` (freezing it); its
+ * top level runs under a deadline of `budget_ms`. NULL with one error through
+ * `diag_out` on failure. Freed with `rc_graphic_free`. */
+RcGraphic *rc_graphic_compile(const RcGraphicLibrary *lib, const char *name, const char *source,
+                              uint32_t budget_ms, char **diag_out);
+
+/* {"meta":…,"schema":…,"revision":…}: the module's exported meta and schema
+ * in its own key order, and the SHA-256 of its source as 64 hex digits.
+ * NULL only for a NULL graphic. */
+char *rc_graphic_describe(const RcGraphic *g);
+
+/* The SVG of `frame`: `props_json` overlaid on the schema's defaults (NULL is
+ * `{}`; a value the schema does not take is a warning, and the default is
+ * used), `ctx_json` the context object, run under `budget_ms`. NULL with one
+ * error through `diag_out` on failure. */
+char *rc_graphic_svg(const RcGraphic *g, int64_t frame, const char *props_json,
+                     const char *ctx_json, uint32_t budget_ms, char **diag_out);
+
+/* Draws `svg` with `lib`'s fonts and assets (freezing it) into `out_bgra`:
+ * `w`×`h` premultiplied BGRA rows `stride` bytes apart; the buffer holds
+ * `h × stride` writable bytes, and the bytes past `w × 4` in a row are left
+ * untouched. False with one error through `diag_out`, and nothing written,
+ * on failure. */
+bool rc_graphic_rasterize(const RcGraphicLibrary *lib, const char *svg, uint32_t w, uint32_t h,
+                          uint8_t *out_bgra, size_t stride, char **diag_out);
+
+/* Releases a graphic. NULL-tolerant. */
+void rc_graphic_free(RcGraphic *g);
 
 /* ----------------------------------------------------------------- agent */
 

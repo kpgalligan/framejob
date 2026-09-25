@@ -3,8 +3,8 @@ import AppKit
 /// The ONLY file in the app that names an `rc_*` symbol. Everything the Rust
 /// core can do reaches the rest of Reelcut as typed Swift here: `ReelProject`
 /// (a handle plus its lazily decoded `ProjectSnapshot`), `ReelTime`,
-/// `ReelSnap` and `ReelExport`, and the op ARGUMENTS an edit
-/// is built out of — `MediaDescriptor`, the `dictionary` extensions on the
+/// `ReelSnap`, `ReelExport`, the graphics engine's `GraphicLibrary` and
+/// `GraphicModule`, and the op ARGUMENTS an edit is built out of — `MediaDescriptor`, the `dictionary` extensions on the
 /// §5.2 property types, and the typed patches.
 /// `ProjectSnapshot.swift` owns the read side of the same contract;
 /// `core/include/reelcut_core.h` is the contract itself.
@@ -1306,4 +1306,135 @@ func bookmarkString(for url: URL) -> String? {
     let data = try? url.bookmarkData(
         options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
     return data?.base64EncodedString()
+}
+
+// MARK: - Graphics
+
+/// One `{level, message, line, column, frame}` out of the graphics engine's
+/// `diag_out` (road map 10 §5e).
+struct GraphicDiagnostic: Decodable, Equatable {
+    let level: String
+    let message: String
+    let line: Int?
+    let column: Int?
+    let frame: Int?
+}
+
+/// A graphic that did not compile, draw or rasterize: the engine's one error.
+struct GraphicFailure: Error {
+    let diagnostics: [GraphicDiagnostic]
+}
+
+/// One drawn frame: premultiplied BGRA rows `stride` bytes apart.
+struct GraphicRaster {
+    let width: Int
+    let height: Int
+    let stride: Int
+    let bgra: [UInt8]
+    let warnings: [GraphicDiagnostic]
+}
+
+/// Decodes and frees a `diag_out`. An unreadable one is one error saying so.
+private func takeDiagnostics(_ raw: UnsafeMutablePointer<CChar>?) -> [GraphicDiagnostic] {
+    guard let text = takeString(raw) else { return [] }
+    guard let list = try? JSONDecoder().decode([GraphicDiagnostic].self, from: Data(text.utf8))
+    else {
+        return [GraphicDiagnostic(
+            level: "error", message: "The core's diagnostics could not be read: \(text)",
+            line: nil, column: nil, frame: nil)]
+    }
+    return list
+}
+
+/// The engine's fonts and assets (`RcGraphicLibrary`). Filled with
+/// `addFont` / `addAsset` until the first compile or rasterize against it
+/// FREEZES it; an add after that throws. A module compiled against it keeps
+/// its fonts alive, so the two are freed in either order.
+final class GraphicLibrary {
+    /// The engine's `MAX_SIDE` (`graphic/src/raster.rs`): a larger side is
+    /// refused here, before a buffer is allocated for it.
+    static let maxSide = 8192
+    fileprivate let handle: OpaquePointer
+
+    init() { handle = rc_graphic_library_new() }
+    deinit { rc_graphic_library_free(handle) }
+
+    func addFont(_ bytes: Data) throws {
+        var err: UnsafeMutablePointer<CChar>? = nil
+        let ok = bytes.withUnsafeBytes { raw in
+            rc_graphic_library_add_font(
+                handle, raw.bindMemory(to: UInt8.self).baseAddress, raw.count, &err)
+        }
+        if !ok { throw ReelCoreError(message: takeErrorMessage(err, fallback: "No font added.")) }
+    }
+
+    func addAsset(name: String, bytes: Data) throws {
+        var err: UnsafeMutablePointer<CChar>? = nil
+        let ok = bytes.withUnsafeBytes { raw in
+            rc_graphic_library_add_asset(
+                handle, name, raw.bindMemory(to: UInt8.self).baseAddress, raw.count, &err)
+        }
+        if !ok { throw ReelCoreError(message: takeErrorMessage(err, fallback: "No asset added.")) }
+    }
+
+    /// `svg` drawn at `width`×`height`, rows `width × 4` bytes apart.
+    func rasterize(_ svg: String, width: Int, height: Int) throws -> GraphicRaster {
+        let sides = 0...Self.maxSide
+        guard sides.contains(width), sides.contains(height) else {
+            throw GraphicFailure(diagnostics: [GraphicDiagnostic(
+                level: "error", message: "\(width)×\(height) is outside 0…\(Self.maxSide)",
+                line: nil, column: nil, frame: nil)])
+        }
+        let stride = width * 4
+        var bgra = [UInt8](repeating: 0, count: max(height * stride, 1))
+        var diag: UnsafeMutablePointer<CChar>? = nil
+        let ok = bgra.withUnsafeMutableBufferPointer { out in
+            rc_graphic_rasterize(
+                handle, svg, UInt32(width), UInt32(height), out.baseAddress, stride, &diag)
+        }
+        let diagnostics = takeDiagnostics(diag)
+        guard ok else { throw GraphicFailure(diagnostics: diagnostics) }
+        return GraphicRaster(
+            width: width, height: height, stride: stride, bgra: bgra, warnings: diagnostics)
+    }
+}
+
+/// One compiled graphic module (`RcGraphic`). Holds its library strongly.
+final class GraphicModule {
+    let library: GraphicLibrary
+    private let handle: OpaquePointer
+
+    private init(library: GraphicLibrary, handle: OpaquePointer) {
+        self.library = library
+        self.handle = handle
+    }
+
+    deinit { rc_graphic_free(handle) }
+
+    static func compile(
+        library: GraphicLibrary, name: String, source: String, budgetMs: Int
+    ) throws -> GraphicModule {
+        var diag: UnsafeMutablePointer<CChar>? = nil
+        let made = rc_graphic_compile(
+            library.handle, name, source, UInt32(clamping: budgetMs), &diag)
+        let diagnostics = takeDiagnostics(diag)
+        guard let handle = made else { throw GraphicFailure(diagnostics: diagnostics) }
+        return GraphicModule(library: library, handle: handle)
+    }
+
+    /// `{"meta":…,"schema":…,"revision":…}`, the schema in the module's order.
+    func describeJSON() -> String {
+        takeString(rc_graphic_describe(handle)) ?? "{}"
+    }
+
+    func svg(
+        frame: Int, propsJSON: String, ctxJSON: String, budgetMs: Int
+    ) throws -> (svg: String, warnings: [GraphicDiagnostic]) {
+        var diag: UnsafeMutablePointer<CChar>? = nil
+        let out = rc_graphic_svg(
+            handle, Int64(frame), propsJSON, ctxJSON, UInt32(clamping: budgetMs), &diag)
+        let diagnostics = takeDiagnostics(diag)
+        guard let svg = takeString(out) else { throw GraphicFailure(diagnostics: diagnostics) }
+        return (svg, diagnostics)
+    }
 }

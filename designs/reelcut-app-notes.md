@@ -2822,3 +2822,21 @@ edits: `ReelCore.swift`'s header drops `RecipeSource` from its type list
 and gains a sentence naming `RecipeSource.swift` as the payment owed at
 1440 (the 3 lines in), and `Compositor.swift:32` names `RecipeSource.swift`
 as the slot's file. Road map 10 §10.4 is the record and has the scores.
+
+## The graphics wrappers, 2026-09-25 — road map 10's G1d
+
+**`ReelCore.swift` 1309 → 1440.** A `// MARK: - Graphics` section at the
+end of the file, after `bookmarkString(for:)`: `GraphicDiagnostic` (the
+`diag_out` element, `Decodable`), `GraphicFailure` (the error a compile, a
+frame or a rasterize throws, holding the core's one error),
+`GraphicRaster` (premultiplied BGRA, stride `width × 4`, and the warnings),
+`GraphicLibrary` (`RcGraphicLibrary`: `addFont`, `addAsset`, `rasterize`;
+frozen by its first compile or rasterize) and `GraphicModule` (`RcGraphic`:
+`compile`, `describeJSON`, `svg`; it holds its library strongly), and one
+private diag-taker beside `takeString`. Errors from `err_out` stay
+`ReelCoreError`; errors from `diag_out` are `GraphicFailure`. The header's
+type list names the two classes. 131 lines net, exactly the room G1a made;
+the file is back at 1440 and the next addition pays a toll first (the media
+helpers, ~94). Nothing calls the wrappers yet but
+`tools/proof/graphics_ffi_probe.swift`; G3 is the first app caller. Road
+map 10 §10.4's G1d record has the scores.

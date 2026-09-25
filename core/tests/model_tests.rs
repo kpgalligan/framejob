@@ -34,6 +34,11 @@ use reelcut_core::ffi_agent::{
     rc_agent_server_start, rc_agent_server_stop, rc_agent_string_create,
 };
 use reelcut_core::ffi_edit::rc_project_apply;
+use reelcut_core::ffi_graphic::{
+    rc_graphic_compile, rc_graphic_describe, rc_graphic_free, rc_graphic_library_add_asset,
+    rc_graphic_library_add_font, rc_graphic_library_free, rc_graphic_library_new,
+    rc_graphic_rasterize, rc_graphic_svg,
+};
 use reelcut_core::ffi_query::{
     rc_export_presets, rc_export_settings, rc_export_sizes, rc_op_names, rc_op_schemas,
     rc_project_clip_state, rc_project_composition_plan, rc_project_duration,
@@ -2124,6 +2129,145 @@ fn sweep_every_export_with_nulls() -> Vec<String> {
     // Safe when none is running, which is the state the sweep is in.
     rc_agent_server_stop();
     cover("rc_agent_server_stop");
+
+    // The graphics exports (`graphic_ffi.rs` checks what they draw). Every
+    // `diag_out` failure is ONE error Diagnostic in a JSON array.
+    let diag_of = |raw: *mut c_char| -> String {
+        let list: Value = serde_json::from_str(&take_string(raw).expect("diag_out was written"))
+            .expect("diag_out is JSON");
+        assert_eq!(
+            list.as_array().map(Vec::len),
+            Some(1),
+            "one diagnostic: {list}"
+        );
+        assert_eq!(list[0]["level"], "error");
+        list[0]["message"].as_str().expect("a message").to_string()
+    };
+    let lib = unsafe { rc_graphic_library_new() };
+    assert!(!lib.is_null(), "rc_graphic_library_new is never NULL");
+    cover("rc_graphic_library_new");
+
+    let byte = [0u8; 1];
+    let mut err: *mut c_char = ptr::null_mut();
+    assert!(!unsafe { rc_graphic_library_add_font(ptr::null_mut(), byte.as_ptr(), 1, &mut err) });
+    assert_eq!(take_string(err).as_deref(), Some("library is NULL"));
+    let mut err: *mut c_char = ptr::null_mut();
+    assert!(!unsafe { rc_graphic_library_add_font(lib, ptr::null(), 0, &mut err) });
+    assert_eq!(take_string(err).as_deref(), Some("bytes is NULL"));
+    assert!(!unsafe {
+        rc_graphic_library_add_font(ptr::null_mut(), ptr::null(), 0, ptr::null_mut())
+    });
+    cover("rc_graphic_library_add_font");
+
+    let asset = cstring("a.png");
+    let mut err: *mut c_char = ptr::null_mut();
+    assert!(!unsafe { rc_graphic_library_add_asset(lib, ptr::null(), byte.as_ptr(), 1, &mut err) });
+    assert_eq!(take_string(err).as_deref(), Some("name is NULL"));
+    let mut err: *mut c_char = ptr::null_mut();
+    assert!(!unsafe {
+        rc_graphic_library_add_asset(lib, asset.as_ptr(), ptr::null(), 0, &mut err)
+    });
+    assert_eq!(take_string(err).as_deref(), Some("bytes is NULL"));
+    assert!(!unsafe {
+        rc_graphic_library_add_asset(
+            ptr::null_mut(),
+            ptr::null(),
+            ptr::null(),
+            0,
+            ptr::null_mut(),
+        )
+    });
+    cover("rc_graphic_library_add_asset");
+
+    let source = cstring("export function render() { return \"\"; }");
+    let mut diag: *mut c_char = ptr::null_mut();
+    assert!(unsafe {
+        rc_graphic_compile(ptr::null(), asset.as_ptr(), source.as_ptr(), 50, &mut diag)
+    }
+    .is_null());
+    assert_eq!(diag_of(diag), "library is NULL");
+    let mut diag: *mut c_char = ptr::null_mut();
+    assert!(
+        unsafe { rc_graphic_compile(lib, ptr::null(), source.as_ptr(), 50, &mut diag) }.is_null()
+    );
+    assert_eq!(diag_of(diag), "name is NULL");
+    let mut diag: *mut c_char = ptr::null_mut();
+    assert!(
+        unsafe { rc_graphic_compile(lib, asset.as_ptr(), ptr::null(), 50, &mut diag) }.is_null()
+    );
+    assert_eq!(diag_of(diag), "source is NULL");
+    assert!(unsafe {
+        rc_graphic_compile(ptr::null(), ptr::null(), ptr::null(), 50, ptr::null_mut())
+    }
+    .is_null());
+    cover("rc_graphic_compile");
+
+    assert!(unsafe { rc_graphic_describe(ptr::null()) }.is_null());
+    cover("rc_graphic_describe");
+
+    let ctx = cstring("{}");
+    let mut diag: *mut c_char = ptr::null_mut();
+    assert!(
+        unsafe { rc_graphic_svg(ptr::null(), 0, ptr::null(), ctx.as_ptr(), 50, &mut diag) }
+            .is_null()
+    );
+    assert_eq!(diag_of(diag), "graphic is NULL");
+    assert!(unsafe {
+        rc_graphic_svg(
+            ptr::null(),
+            0,
+            ptr::null(),
+            ptr::null(),
+            50,
+            ptr::null_mut(),
+        )
+    }
+    .is_null());
+    cover("rc_graphic_svg");
+
+    let svg = cstring("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1\" height=\"1\"/>");
+    let mut pixel = [0u8; 4];
+    let mut diag: *mut c_char = ptr::null_mut();
+    assert!(!unsafe {
+        rc_graphic_rasterize(
+            ptr::null(),
+            svg.as_ptr(),
+            1,
+            1,
+            pixel.as_mut_ptr(),
+            4,
+            &mut diag,
+        )
+    });
+    assert_eq!(diag_of(diag), "library is NULL");
+    let mut diag: *mut c_char = ptr::null_mut();
+    assert!(!unsafe {
+        rc_graphic_rasterize(lib, ptr::null(), 1, 1, pixel.as_mut_ptr(), 4, &mut diag)
+    });
+    assert_eq!(diag_of(diag), "svg is NULL");
+    let mut diag: *mut c_char = ptr::null_mut();
+    assert!(!unsafe {
+        rc_graphic_rasterize(lib, svg.as_ptr(), 1, 1, ptr::null_mut(), 4, &mut diag)
+    });
+    assert_eq!(diag_of(diag), "out_bgra is NULL");
+    assert!(!unsafe {
+        rc_graphic_rasterize(
+            ptr::null(),
+            ptr::null(),
+            1,
+            1,
+            ptr::null_mut(),
+            4,
+            ptr::null_mut(),
+        )
+    });
+    cover("rc_graphic_rasterize");
+
+    unsafe { rc_graphic_free(ptr::null_mut()) };
+    cover("rc_graphic_free");
+    unsafe { rc_graphic_library_free(ptr::null_mut()) };
+    unsafe { rc_graphic_library_free(lib) };
+    cover("rc_graphic_library_free");
 
     swept.sort();
     swept.dedup();

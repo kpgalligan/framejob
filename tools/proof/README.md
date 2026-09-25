@@ -4718,6 +4718,39 @@ empty; `--only q5 --mutant` caught the counter mutant (137 mismatches,
 exit 0) and `--only q7` re-ran q7 (exit 0). Nothing was left unrun; two
 answers are by proxy or by reading, and road map 10 §10.2 names them.
 
+## Road map 10's G1d — the engine through the app (`graphics_ffi_probe.py`, `graphics_ffi_probe.swift`)
+
+The nine `rc_graphic_*` exports have no caller a script can reach before
+G3, so the probe is compiled from `app/Sources` over `harness/build.sh`'s
+swiftc line (a probe that will not build is a scored FAILURE) and drives
+the app's own wrappers — `GraphicLibrary`, `GraphicModule`, `GraphicRaster`
+in `ReelCore.swift`. It runs under `graphics_spike/bounded.py`'s `run`
+(600 s bound, its own process group). The Swift side loads every `.ttf` in
+`app/Resources/Fonts`, compiles `graphic/tests/graphics/lower-third.js`,
+and prints one JSON object (kept as `work/graphics-ffi-probe/answer.json`)
+beside the raw BGRA of frame 30 and its PNG; the Python side scores P1–P9
+with oracles of its own: P1 built and answered; P2 every bundled `.ttf`
+taken (the folder's count) and 16 zero bytes refused; P3 `describeJSON`'s
+schema keys in the module's order and its revision equal to `hashlib`'s
+SHA-256 of the fixture; P4 frame 30 an `<svg` with no warnings; P5 the
+SHA-256 of the BGRA equal to the crate's pin (`graphic/tests/pins.json`
+`lower-third.30`, read from the file) and
+`work/graphics-ffi-probe/lower-third-30.png` a PNG with a 1920×1080 IHDR;
+P6 frame 30 twice byte-identical and frame 0 different; P7 a syntax error
+naming line 3; P8 a top-level `while (true) {}` at 50 ms failing inside the
+bound in the budget's sentence; P9 `{"size":"big"}` at frame 30 answering
+the one `props.size` warning with frame 30. A run took 74 s, most of it
+the build.
+
+`--mutant frame-off-by-one` builds from a COPY of `app/Sources` with
+`GraphicModule.svg`'s `Int64(frame)` replaced by `Int64(frame + 1)` (the
+anchor asserted to occur exactly once) and exits 0 only if P5 FAILED.
+
+```sh
+python3 tools/proof/graphics_ffi_probe.py                              # → 9/9
+python3 tools/proof/graphics_ffi_probe.py --mutant frame-off-by-one   # exit 0 = P5 FAILED
+```
+
 ## The deployment target, rendered (`target_bump_proof.py`)
 
 W1a, road map 8 §10.4: the macOS 26 bump recompiles `Compositor.metal`

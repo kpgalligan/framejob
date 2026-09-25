@@ -31,3 +31,15 @@ _Avoid_: update, delta, diff, replacement
 **Selected action**:
 The one action of the single selected clip that the Clip tab is editing, or none. It is view state, like the playhead and the clip selection: not an edit, not undoable, not saved, and not something an agent sets — an agent names an action by its id. It is chosen by clicking the action's band, or by the playhead ENTERING the action's span; it stays chosen when the playhead leaves, and goes when the clip selection changes, on esc, or on the lane's Clip chip. While one is chosen the fields show and write its END state (spec §11 CI-1, CI-2). Actions are numbered by time order.
 _Avoid_: current action, active action, "the action under the playhead" (the playhead no longer decides)
+
+**Graphic**:
+A clip whose picture is drawn by code: a **Module** in the package's `graphics/` folder, run per frame with the clip's props, rasterized at the graphic's own size. It is a clip's CONTENT, in the place a media file or an image sits — not an effect, and not a plugin: its code reaches no other clip, no timeline, no model and no file, and the same frame with the same props always draws the same pixels (spec §11 G-1, G-5).
+_Avoid_: effect, plugin, overlay, template (a template is a graphic someone else wrote)
+
+**Module**:
+A graphic's source: one JavaScript ES module exporting `render(frame, props, ctx)`, which returns SVG, and optionally `meta` and `schema`. It is compiled once and drawn many times; the standard library is global and nothing can be imported. Many clips may name one module, as many clips share one media file.
+_Avoid_: script, component, file (the file holds the module), plugin
+
+**Revision**:
+Which text of a **Module** drew a frame: the SHA-256 of its source's bytes, 64 hex digits. Two identical texts are one revision wherever they came from; an edit to the file is a new revision, and an export pins the revision it started with.
+_Avoid_: version (the font and asset set has a version), hash, edit number

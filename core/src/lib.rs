@@ -42,6 +42,7 @@ pub mod export_table;
 pub mod ffi;
 pub mod ffi_agent;
 pub mod ffi_edit;
+pub mod ffi_graphic;
 pub mod ffi_query;
 pub mod format;
 pub mod frame_grid;

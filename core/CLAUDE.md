@@ -326,8 +326,11 @@ file is what governs a module now.
   `text.animation` into `reveal`, `reveal_phase` (the ORDER the renderer draws
   in, not a label on the amount) and `reveal_kind`, folded into the content
   hash so an animating layer is never served a stale texture — and
-  `burn_in_layer`. `serde_json`'s `Map` is a `BTreeMap` here: keys come out
-  sorted, which `content_hash` leans on.
+  `burn_in_layer`. `serde_json`'s `Map` keeps INSERTION order in this
+  build (`graphic` enables `preserve_order` and cargo unifies it), so
+  `content_hash` sorts every object's keys before it hashes — the order
+  every texture key was taken in — and nothing may lean on the wire order
+  of a map.
 - `recipe_words.rs` — what a timed text PAGE shows at one instant:
   `Words::of` answers `word` (how many of `text.words` have started, 0 to
   n) and `word_pop` (0..1 through the active word's pop over `WORD_POP`,
@@ -380,6 +383,16 @@ file is what governs a module now.
   only; shared plumbing lives in `ffi_util.rs`, never copy-pasted.
   `ffi_query.rs`'s rule: a query never allocates a handle and has no
   `err_out`, which is why `rc_project_scoped` lives in `ffi.rs`.
+- `ffi_graphic.rs` — the nine `rc_graphic_*` exports (road map 10 §5e)
+  and the ONLY module of `core/src/` that names the `graphic` crate (spec
+  §11 G-2; `core/tests/graphic_ffi.rs` reads `core/src/` to hold it). An
+  `RcGraphicLibrary` is a BUILDER that the first compile or rasterize
+  FREEZES into one `Arc<graphic::Library>` (the crate's `Library` is
+  immutable — its `version` hashes every byte); an add after that is
+  refused. `RcGraphic` wraps `graphic::Module`, whose `Arc` keeps the
+  fonts alive past the library's free. `diag_out` is a JSON array of
+  Diagnostics, exactly one error on failure; its panic arm goes through
+  `ffi_util.rs`'s `fallible_op_wrapped`.
 
 ## Rules
 
@@ -401,7 +414,11 @@ never in the same phase as a feature). The current list is `wc -l` and
 `tiny_http` (the agent's socket), and `serde_path_to_error`, which is there
 so a patch refusal names the path to what only the type can refuse (a
 misspelt variant, a `null` a required field cannot take), where serde alone
-names only the value.
+names only the value. `graphic` (the path crate `../graphic`, road map
+10's motion-graphics engine), named by `ffi_graphic.rs` alone. It enables
+`serde_json`'s `preserve_order`, and a feature is unified across a path
+dependency, so the core's `serde_json` has it too; `Cargo.toml` spells it
+out. Dev: `sha2`, `graphic_ffi.rs`'s revision oracle.
 
 **One implementation per algorithm.** Before writing time math, find the
 existing implementation and route through it. Shared constants have exactly

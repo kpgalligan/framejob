@@ -2008,3 +2008,214 @@ header, the `ReelCore.swift` wrappers, `docs/graphics-api.md`); path helpers; an
 LRU cap on per-thread engines (sweep-on-drop only); named CSS colours in
 `interpolateColors`; a warnings channel on `compile`; refusing the module
 name `eval_script`, whose frames `position` would take for a module's.
+
+#### G1d — the link into the core and the app (2026-09-25)
+
+Against baseline `cea2ddf`: the nine exports of §5e in one new core module,
+the header and `ReelCore.swift` in lockstep, a probe that draws through the
+app's own wrappers, and `docs/graphics-api.md` with a test that runs it. No
+format bump (G2's); nothing user-visible, so the README is untouched.
+
+**What landed.** `core/Cargo.toml` gains `graphic = { path = "../graphic" }`
+(plain, no cargo feature), `serde_json`'s `preserve_order` spelled out with
+the reason (below), and dev `sha2` (already in the lock through `graphic`).
+`core/src/ffi_graphic.rs` (397 lines) is the ONLY module of `core/src/`
+that names the crate: `RcGraphicLibrary` (a `Mutex<Option<Pending>>` of
+fonts and assets and a `OnceLock<Arc<graphic::Library>>`), `RcGraphic`
+(wrapping `graphic::Module`), and `rc_graphic_library_new`, `_add_font`,
+`_add_asset`, `_free`, `rc_graphic_compile`, `_describe`, `_svg`,
+`_rasterize` and `rc_graphic_free`. `ffi_util.rs` gains
+`fallible_op_wrapped` (the panic message shaped by the caller; `fallible_op`
+is it with identity), so `ffi_graphic.rs` hand-rolls no `catch_unwind`. The
+header gains `<stddef.h>` and a `/* graphics */` section with the two
+opaque types, the nine prototypes and the `diag_out` contract in prose.
+`ReelCore.swift` gains `// MARK: - Graphics` at its end —
+`GraphicDiagnostic`, `GraphicFailure`, `GraphicRaster`, `GraphicLibrary`,
+`GraphicModule` and a private diag-taker — and its header's type list the
+two classes: **1309 → 1440**, 131 lines net, exactly the room G1a made, so
+no second move was needed.
+
+**The `diag_out` contract.** NULL, or a JSON ARRAY of `{level, message,
+line, column, frame}` in that order (`Diagnostic::to_json`). A failure
+always writes exactly ONE error: the crate's own, or the FFI's for an
+argument it could not read (`library is NULL`, `name is NULL`, `source is
+NULL`, `graphic is NULL`, `svg is NULL`, `out_bgra is NULL`, `ctx_json is
+NULL`, `props_json is not JSON: …`, `ctx_json is not JSON: …`, `height ×
+stride overflows`), or `internal error: <what>` for a caught panic, wrapped
+the same way. A success writes it only when there are warnings.
+
+**Deviations from §5e** (its C block is left as written; this is what was
+picked, as G1a did):
+1. **A library is a builder that FREEZES.** `graphic::Library` is immutable
+   (its `version` hashes every byte), so `rc_graphic_library_add_font` /
+   `_add_asset` fill a pending set that the first `rc_graphic_compile` or
+   `rc_graphic_rasterize` against it turns into one `Arc<Library>`; an add
+   after that answers false with `the library is frozen: a graphic was
+   compiled or a frame drawn against it; build a new one`. A library never
+   changes under a compiled graphic, and `RcGraphic`'s `Module` holds the
+   `Arc`, so the fonts outlive `rc_graphic_library_free`.
+2. **`rc_graphic_compile` takes `budget_ms`**, passed to
+   `Module::compile` (0 passes through): a top-level `while (true) {}` must
+   stop, and §5e's prototype had no deadline for it.
+3. **The adds refuse where the crate warns.** `add_font` refuses bytes that
+   load no face (`font bytes loaded no face`, read off a throwaway one-font
+   `Library`'s `warnings()`), and `add_asset` an empty name (`name is
+   empty`) and a duplicate (`asset "<name>" is already in the library`),
+   so a library built through the FFI never carries a `warnings()` entry.
+   Also a correction to the request: `app/Resources/Fonts/` holds EIGHT
+   `.ttf` files, not seven (six families; Montserrat and IBM Plex Mono have
+   two faces each).
+
+**The `preserve_order` finding — feature unification, measured here for
+the first time.** `graphic/Cargo.toml` enables `serde_json`'s
+`preserve_order`, and a path dependency unifies it into the core's build,
+so `serde_json::Map` in `core/` became insertion-ordered the moment the
+dependency was added (the G0 spike's `serde_json = "1"` never exercised
+this). With only `Cargo.toml` changed, `cargo test --release
+--no-fail-fast` in `core/` printed **826 passed, 1 failed**: exactly
+`evaluate_tests::an_unanimated_text_layer_shows_all_of_itself_and_hashes_as_it_always_did`,
+whose oracle is a sorted literal hashed by FNV. No refusal test failed on
+key order. The fix is in `recipe.rs`, not the literal: `content_hash` now
+hashes `sorted(description)` (every object's keys through a `BTreeMap`,
+recursively), which is the order every hash before the link was taken in,
+so no texture key changes; `RecipeLayer::object()`'s doc, which said "`Map`
+is a `BTreeMap` in this build", was rewritten, and the test's doc comment
+re-worded. `recipe.rs` 582 → 594. After it: 827 passed, 0 failed. The wire
+order of recipe, plan and schema objects is now insertion order — harmless
+(Swift decodes by key; the proofs parse JSON), and recorded here.
+
+**Lock drift.** Resolving `core/Cargo.lock` with `graphic` added differs
+from `graphic/Cargo.lock` in three packages: `smallvec` 1.16.2 (graphic
+1.16.1), `syn` 3.0.4 (3.0.6) and `unicode-ident` 1.0.24 (1.0.26). `syn` and
+`unicode-ident` are compile-time only; none touches a pixel, and the probe's
+P5 (the crate's pin, through the core's lock) is the proof.
+
+**Tests.** `core/tests/graphic_ffi.rs`, 9, through the FFI only, with the
+bundled faces, the `lower-third` fixture and G1c's `ctx(30, 30.0, 150,
+1920, 1080)`: the library takes all eight faces and refuses 16 zero bytes,
+an empty name and a duplicate asset; `describe` answers the schema keys
+`title, subtitle, accent, size, boxed, align` in the module's order (read
+off the TEXT) and a revision equal to `sha2` of the source; frame 30 writes
+no `diag_out`, and `{"size":"big"}` answers the one warning `props.size is
+a string but the schema says number; the default 64 is used` with frame
+30; the BGRA of frame 30 at 1920×1080 hashes to `graphic/tests/pins.json`'s
+`lower-third.30` (read from the file), and stride 32 at width 5 leaves the
+`0xAB` padding; a syntax error (line 3) and a top-level loop at 50 ms
+(`over the 50 ms budget while loading`) each answer one error; every refused
+argument above is one error Diagnostic with the five keys in order; a
+library freezes at its first compile and at its first rasterize, and a
+graphic draws the same SVG after its library is freed; a graphic drawn from
+a second thread answers byte-identical SVG; and only `ffi_graphic.rs` in
+`core/src/` names the crate. `model_tests.rs`'s NULL sweep covers the nine
+(the header-coverage test fails until it does). `graphic/tests/reference.rs`,
+3: every `js` block of `docs/graphics-api.md` runs (20 blocks; a block that
+`export`s compiles and draws frames 0 and 30, any other is a `render` body
+drawn at frame 30); every `^function` name of `src/stdlib.js` AND
+`src/noise.js` not starting `__`, plus `Easing`, is in the doc in
+backticks; every bundled family and the three sandbox sentences appear.
+
+**The probe.** `tools/proof/graphics_ffi_probe.py` builds
+`graphics_ffi_probe.swift` over `app/Sources` with `harness/build.sh`'s
+swiftc line and runs it under `graphics_spike/bounded.py`'s `run` (600 s
+bound); the Swift side drives `GraphicLibrary` and `GraphicModule` and
+writes the raw BGRA and a PNG, and Python scores with its own oracles:
+**9/9** — P1 built and answered; P2 all 8 `.ttf` taken, 16 zero bytes
+refused; P3 the schema order and `hashlib`'s revision
+(`38b382b6…`); P4 frame 30 `<svg`, no warnings; P5 the BGRA's SHA-256
+`86f017e8…a595` equal to the pin, and
+`work/graphics-ffi-probe/lower-third-30.png` a PNG with a 1920×1080 IHDR;
+P6 frame 30 twice byte-identical, frame 0 different; P7 `SyntaxError:
+unexpected token in expression: ';'` at line 3; P8 `over the 50 ms budget
+while loading (InternalError: interrupted)` after 0.051 s; P9 the
+`props.size` warning at frame 30.
+
+**Made to fail**, each reverted: `--mutant frame-off-by-one` (a COPY of
+`app/Sources` with `GraphicModule.svg`'s `Int64(frame)` replaced by
+`Int64(frame + 1)`, the anchor asserted once) exited 0 — P5 FAILED
+(`cf1a6048…237b` against the pin) and P9 FAILED (frame 31). The reference
+test: `measureText("x", { family: "Nope" });` appended to the `escapeXml`
+block failed `every_js_block_in_the_reference_runs` (`the block at line 212
+failed: Error: measureText: no face for family "Nope"; the set has: Anton,
+Bebas Neue, Darker Grotesque, IBM Plex Mono, Montserrat, Source Sans 3`),
+and passed again with the line removed.
+
+**Binary size.** `stat -f %z` of `Reelcut.app/Contents/MacOS/Reelcut`,
+Release: **12 661 536** before (the untouched tree, `make app`), **20 596 752**
+after — **+7 935 216** bytes, against G0 q1's +7 194 848 with nothing
+calling the engine; `nm` finds the nine `rc_graphic_*` symbols in the
+binary, since the wrappers now call them. The bundle after is 23 116 KiB
+(`du -sk`).
+
+**Verified**, each printed by a run: `make test` exit 0 — core **836**
+passed (827 + 9), graphic **98** (95 + 3), 0 failed; `make lint`, `cargo
+fmt --check` in both crates, exit 0; `make typecheck` exit 0, 0 `error:`,
+the 7 baseline warning locations and no eighth; `make app` `** BUILD
+SUCCEEDED **`; `tools/proof/harness/build.sh --force` exit 0 (a CONTROL:
+every app file compiles against the fatter staticlib, with `project.yml`'s
+and the harness's link lines unchanged); the probe 9/9 and its mutant exit
+0; `rg -n "graphic::|use graphic" core/src` prints only
+`core/src/ffi_graphic.rs` lines; `rg 'std::(fs|env|net)' graphic/src`
+prints nothing (a CONTROL); `wc -l`: `ReelCore.swift` 1440,
+`ffi_graphic.rs` 397, `recipe.rs` 594, `docs/graphics-api.md` 389.
+
+**Spec and glossary.** Spec §1's non-goal gains G-1's clause; §7's first
+sentence is G-2's; §7.1's code block gains the typedefs and nine prototypes;
+§7.10 gains `graphic` in its deps sentence and an `ffi_graphic.rs` row; §11
+gains G-1, G-2 and G-5, dated 2026-09-25. `CONTEXT.md` gains **Graphic**,
+**Module** and **Revision**.
+
+**Owed from G1d.** A `rc_graphic_library_version` export for §5d's texture
+key is G3's to add if it needs it; `describe` carries no `name` or
+`defaults` (G2/G5 may add); `GraphicLibrary.rasterize` refuses a side over
+8192 in Swift before it allocates, restating the crate's `MAX_SIDE` in
+`GraphicLibrary.maxSide` — one constant in two places, to be read through
+the FFI if it ever moves; a zero-length asset crosses from Swift as a NULL
+pointer and is refused as `bytes is NULL`.
+
+**Review.** Passed first time, no blocker or should-fix. Its three nits:
+- `ReelCore.swift:7` has one 123-column comment line from the header's
+  rewrap; reflowing it costs a line over the 1440 budget, so it waits for
+  the file's next pure move. Owed.
+- `core/tests/graphic_ffi.rs`'s `only_ffi_graphic_names_the_graphic_crate`
+  reads only the top level of `core/src`; a future subdirectory would
+  panic its `read_to_string` and go unchecked. Owed (recurse when the core
+  first gains a subdirectory).
+- Does any serialized core value come from a `HashMap`, whose order
+  `preserve_order` would now carry through a `Value` instead of sorting?
+  Answered by the orchestrator: NO. `rg 'HashMap|HashSet' core/src` finds
+  only `edit_paste.rs`'s and `model_query.rs`'s `u32 → u32` id remaps and
+  `model_query.rs:217`'s id set, none of them serialized. What DOES change
+  is that a `Value` the core stores or answers (a patch echoed, props) now
+  keeps its caller's key order instead of sorting — deterministic, and
+  what G-4's props want; the 836 core tests pass on it.
+
+The `core/CLAUDE.md`, `app/CLAUDE.md` and root `CLAUDE.md` lines were written
+by the orchestrator from the pipeline's drafts, after the review.
+
+#### G1 closed — what it delivered against §9a
+
+G1 (G1a–G1d, 2026-09-24/25) is BUILT. §9a's checklist, item by item:
+1. `serde_json` with `preserve_order` — BUILT: `graphic/Cargo.toml`, the
+   schema in the module's order (`tests/module.rs`, `graphic_ffi.rs`), and
+   unified into the core, whose `content_hash` now sorts (G1d).
+2. resvg `text`, `raster-images`, `svgz` — BUILT (G1b): `tests/images.rs`
+   draws PNG, JPEG, GIF, WebP and a nested `.svg`/`.svgz`.
+3. The sandbox, eighteen q6 cases plus `performance` — BUILT (G1c):
+   `tests/sandbox.rs`, 19.
+4. Line and column from `stack`, an interrupt at its function — BUILT
+   (G1c): `exception.rs`; `tests/module.rs`, `tests/sandbox.rs`.
+5. `measureText`'s advance AND ink box within 2 px — BUILT (G1b):
+   `measure.rs`; `tests/measure.rs`, worst 1.656 px.
+6. A missing or unquoted family warned, every helper quoting — BUILT (G1b
+   `raster.rs`, `tests/families.rs`; G1c `textLines`).
+7. `formatNumber` — BUILT (G1c): `stdlib.js`, `tests/js/format.test.js`.
+8. The engine's own sentence for a string too large to read — BUILT (G1c):
+   `exception.rs`, the `string_50mb` case.
+9. The `ReelCore.swift` toll first — BUILT (G1a): `RecipeSource.swift`;
+   G1d's wrappers took exactly the 131 lines it freed.
+
+**Owed from G1 as a whole**: G1b's three review nits and its out-of-scope
+list, G1c's list (path helpers, an SVG size cap, an LRU cap on per-thread
+engines, named CSS colours, a warnings channel on `compile`, refusing the
+module name `eval_script`) and G1d's above. **G2 (the model, format
+version 10) is next**, from §5g and §4's G-3, G-4 and G-6 to G-13.
