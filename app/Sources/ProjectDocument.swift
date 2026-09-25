@@ -464,8 +464,7 @@ final class ProjectDocument: NSDocument {
             didReleaseRecipeKey = true
             RecipeSource.shared.unregister(recipeKey)
             ReverseSource.shared.unpublish(recipeKey)
-            graphicStore?.stop()
-            graphicStore = nil
+            stopGraphicStore()
         }
         super.close()
     }

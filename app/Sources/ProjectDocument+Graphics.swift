@@ -6,6 +6,8 @@
 // base file is over the ~600-line cap and takes only what cannot live here —
 // the stored `graphicStore`, the whitelist line, and the three one-line
 // calls in `fileURL`'s setter, `makeWindowControllers()` and `close()`.
+// G3b adds the compiled set: `GraphicRegistry`'s install at start, its
+// update on the store's `.graphicsDidChange`, its removal at stop.
 //
 // **`graphics/` is user content, and the save wrapper is a whitelist**: a
 // folder `fileWrapper(ofType:)` does not name is DELETED by the next save,
@@ -67,5 +69,43 @@ extension ProjectDocument {
         store.folderDidAppear = { [weak self] in self?.packageContentsDidChangeOnDisk() }
         graphicStore = store
         store.start()
+        GraphicRegistry.shared.install(store, for: recipeKey)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(graphicsDidChange(_:)), name: .graphicsDidChange,
+            object: store)
     }
+
+    /// The store saw modules or the font and asset set change: the registry
+    /// compiles what changed (road map 10 G3b; G-13, preview follows the
+    /// newest revision), THEN the document says so, so an observer that
+    /// redraws draws with the new set. Never `rescan()` here: `drain()`,
+    /// which posted this, is not re-entrant.
+    @objc func graphicsDidChange(_ note: Notification) {
+        guard let store = graphicStore, note.object as? GraphicStore === store else { return }
+        let names = note.userInfo?[GraphicStore.namesKey] as? [String] ?? []
+        let library = note.userInfo?[GraphicStore.libraryKey] as? Bool ?? false
+        GraphicRegistry.shared.update(store, for: recipeKey, names: names, library: library)
+        NotificationCenter.default.post(
+            name: .projectGraphicsDidChange, object: self,
+            userInfo: [GraphicStore.namesKey: names, GraphicStore.libraryKey: library])
+    }
+
+    /// Stops the store and drops its compiled set, from `close()`.
+    func stopGraphicStore() {
+        if let store = graphicStore {
+            NotificationCenter.default.removeObserver(
+                self, name: .graphicsDidChange, object: store)
+        }
+        GraphicRegistry.shared.remove(recipeKey)
+        graphicStore?.stop()
+        graphicStore = nil
+    }
+}
+
+extension Notification.Name {
+    /// Posted on main (object: the document) after the registry has taken a
+    /// `.graphicsDidChange` from the document's store; `userInfo` carries
+    /// the store's `namesKey` and `libraryKey` through. The editor refreshes
+    /// the paused frame on it.
+    static let projectGraphicsDidChange = Notification.Name("ReelcutProjectGraphicsDidChange")
 }

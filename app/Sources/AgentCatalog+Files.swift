@@ -46,7 +46,7 @@ extension AgentServer {
 
     /// The file rows of `catalogJSON()`'s array, in its order: Media,
     /// Captions, Rendering and export, then Recording — appended LAST, so
-    /// the seventy-four rows before it list in the order they always did.
+    /// the seventy-six rows before it list in the order they always did.
     func fileTools(ticks: String) -> [[String: Any]] {
         // `render_frame`'s three image containers, read off `FrameWriter`'s
         // own enum rather than restated, and hoisted for the same budget

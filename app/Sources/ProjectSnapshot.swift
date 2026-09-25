@@ -1900,6 +1900,7 @@ enum RecipeSourceRef: Codable, Equatable {
     /// never collide with the whole text's texture.
     case text(hash: String, props: TextProps, reveal: RecipeReveal)
     case shape(hash: String, props: ShapeProps)
+    case graphic(name: String, hash: String, frame: Int, propsJSON: String, ctxJSON: String)
     /// The media could not be resolved — draw a slate.
     case missing
 
@@ -1934,6 +1935,7 @@ enum RecipeSourceRef: Codable, Equatable {
                     wordPop: c.lenient(.wordPop)))
         case "shape":
             self = .shape(hash: c.lenient(.hash, ""), props: c.lenient(.shape, ShapeProps()))
+        case "graphic": self = RecipeSourceRef.graphic(from: decoder)
         default:
             self = .missing
         }
@@ -1961,6 +1963,7 @@ enum RecipeSourceRef: Codable, Equatable {
             try c.encode("shape", forKey: .kind)
             try c.encode(hash, forKey: .hash)
             try c.encode(props, forKey: .shape)
+        case .graphic: try encodeGraphic(to: encoder)
         case .missing:
             try c.encode("missing", forKey: .kind)
         }
@@ -1973,6 +1976,7 @@ enum RecipeSourceRef: Codable, Equatable {
     var cacheHash: String? {
         switch self {
         case .text(let hash, _, _), .shape(let hash, _): return hash
+        case .graphic(_, let hash, _, _, _): return hash
         case .track, .image, .missing: return nil
         }
     }

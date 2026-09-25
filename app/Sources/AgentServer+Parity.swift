@@ -43,7 +43,7 @@ import Foundation
 /// and passes here. Twice in D3 exactly that happened
 /// (`designs/reelcut-roadmap-7.md` §8.3 and §8.4). What catches that class is
 /// a row that calls the RUNNING tool and reads its answer: the misspelt
-/// argument sent to all fifty-seven ops in
+/// argument sent to all fifty-nine ops in
 /// `tools/proof/op_argument_proof.py`, and the behavioural sections of the
 /// two catalog proofs.
 ///
@@ -164,10 +164,13 @@ extension AgentServer {
     }
 
     /// Every argument the tool for `op` may declare: the core's published
-    /// row, plus any argument `AgentServer.declarations` names for that op.
+    /// row, plus any argument `AgentServer.declarations` names for that op,
+    /// less any a row says the app fills (`.filledByTheApp`), which the
+    /// tool does not publish.
     ///
-    /// The union is the core's row exactly today — all fourteen rows name an
-    /// argument the table publishes, or a KIND, or a NAME — and it is
+    /// The union is the core's row exactly today, less the two graphic ops'
+    /// `schema` — all sixteen rows name an argument the table publishes, or
+    /// a KIND, or a NAME — and it is
     /// written as a union anyway because the declarations list is where a
     /// deliberate difference belongs. A row naming an argument the core has
     /// NOT got is the case worth having: `declaredInput` emits nothing for
@@ -178,7 +181,11 @@ extension AgentServer {
         var names = Set((opSchemas[op]?.properties ?? [:]).keys)
         for declaration in declarations {
             if case let .argument(argument, of: owner) = declaration.subject, owner == op {
-                names.insert(argument)
+                if declaration.requirement == .filledByTheApp {
+                    names.remove(argument)
+                } else {
+                    names.insert(argument)
+                }
             }
         }
         return names

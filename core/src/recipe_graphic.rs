@@ -106,6 +106,8 @@ pub(crate) fn graphic_source(clip: &Clip, clip_t: Ticks, canvas: &Canvas) -> (Va
     ctx.insert("canvas".to_string(), Value::Object(size));
     let ctx = Value::Object(ctx);
     let props = Value::Object(graphic.props.clone());
+    let ctx_json = serde_json::to_string(&ctx).unwrap_or_default();
+    let props_json = serde_json::to_string(&props).unwrap_or_default();
 
     let mut called = Map::new();
     called.insert("name".to_string(), Value::from(graphic.name.as_str()));
@@ -121,6 +123,8 @@ pub(crate) fn graphic_source(clip: &Clip, clip_t: Ticks, canvas: &Canvas) -> (Va
     source.insert("frame".to_string(), Value::from(frame));
     source.insert("ctx".to_string(), ctx);
     source.insert("props".to_string(), props);
+    source.insert("props_json".to_string(), Value::String(props_json));
+    source.insert("ctx_json".to_string(), Value::String(ctx_json));
     let source_size = Value::Array(vec![
         Value::from(graphic.width),
         Value::from(graphic.height),

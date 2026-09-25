@@ -633,7 +633,32 @@ fn the_recipe_publishes_the_seams_shape() {
         .expect("source is an object")
         .keys()
         .collect();
-    assert_eq!(keys, ["kind", "name", "hash", "frame", "ctx", "props"]);
+    assert_eq!(
+        keys,
+        [
+            "kind",
+            "name",
+            "hash",
+            "frame",
+            "ctx",
+            "props",
+            "props_json",
+            "ctx_json"
+        ]
+    );
+}
+
+#[test]
+fn the_props_and_ctx_texts_parse_back_to_their_objects_as_written() {
+    let project = project().apply(&set_bare(json!({"props": {"accent_color": "#123456"}})));
+    let source = source_at(&project, 11, 37 * FRAME);
+    for (text, object) in [("props_json", "props"), ("ctx_json", "ctx")] {
+        let written = source[text].as_str().expect("a string");
+        let parsed: Value = serde_json::from_str(written).expect("the text parses");
+        assert_eq!(parsed, source[object], "{text}");
+    }
+    let props_json = source["props_json"].as_str().expect("a string");
+    assert_contains(props_json, "\"accent_color\":\"#123456\"");
 }
 
 #[test]

@@ -272,6 +272,9 @@ final class EditorViewController: NSViewController {
         NotificationCenter.default.addObserver(
             self, selector: #selector(reversedMediaDidChange(_:)),
             name: .reversedMediaDidChange, object: nil)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(graphicsDidChange(_:)),
+            name: .projectGraphicsDidChange, object: nil)
         installCanvas()
         installTimeline()
         // Last: it registers the two views above as drop targets for a media

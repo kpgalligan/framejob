@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A stranger argument, put to all seventy-seven tools (road map 7's D3·5, and
+"""A stranger argument, put to all seventy-nine tools (road map 7's D3·5, and
 the gate of kpgalligan/reelcut#21).
 
 The startup parity check gained a FIFTH part with this ticket: every op tool's
@@ -30,7 +30,7 @@ The sections, in order:
    whose prose names nothing. Each must be named with its op, its argument and
    the side that has it. An app-state tool broken the same way must draw
    NOTHING, which is the fourth part's skip rule.
-1. **The catalog's size**, EXACTLY 77 — this script owns the exact count now
+1. **The catalog's size**, EXACTLY 79 — this script owns the exact count now
    and every older script keeps the floor the proof README's handover rule
    gives it — and the shipped binary's own parity log, which must be empty.
 2. **Every difference between a tool's schema and the core's table is one the
@@ -39,7 +39,7 @@ The sections, in order:
    type, an enum, a minimum, an items, a required list — must have a row that
    says so, and each row must be visible somewhere, so a row that does nothing
    is a failure too.
-3. **A stranger argument, for every op tool.** For each of the fifty-seven:
+3. **A stranger argument, for every op tool.** For each of the fifty-nine:
    one CONTROL call with every required argument spelled
    right, which must not be refused for a missing argument — that is the
    tool's required list proved SUFFICIENT against the running app; one call
@@ -100,6 +100,7 @@ the app.
     python3 tools/proof/op_argument_proof.py 4903
 """
 
+import glob
 import json
 import os
 import re
@@ -118,12 +119,12 @@ WORK = os.path.join(ROOT, "tools", "proof", "work", "op-argument-probe")
 MEDIA = os.path.join(ROOT, "tools", "proof", "media", "AV.mov")
 
 # This script owns the EXACT tool count (`tools/proof/README.md`'s handover
-# rule): 57 ops plus the twenty app-state tools. D3 adds no tool and renames
+# rule): 59 ops plus the twenty app-state tools (G3b added the two graphic ops' tools). D3 adds no tool and renames
 # none, so it is road map 3's 75 plus phase 9's set_scope and… no: it is the
 # number the catalog has had since road map 5's E1, taken exactly here for the
 # first time. Every older script keeps its floor.
-TOOLS = 77
-OPS = 57
+TOOLS = 79
+OPS = 59
 PARITY = "Reelcut: "
 
 passed = 0
@@ -176,6 +177,7 @@ func requirement(_ requirement: AgentDeclaration.Requirement) -> String {
     case .theCores: return "theCores"
     case .required: return "required"
     case .optional: return "optional"
+    case .filledByTheApp: return "filledByTheApp"
     }
 }
 answer["declarations"] = AgentServer.declarations.map { declaration in
@@ -403,6 +405,26 @@ def arguments_for(required, published, ids):
     return values
 
 
+def temp_roots():
+    """The untitled graphics roots in `getconf DARWIN_USER_TEMP_DIR`, where
+    the app's NSTemporaryDirectory() is whatever TMPDIR says (road map 10
+    §10.6 G3a)."""
+    base = subprocess.run(["getconf", "DARWIN_USER_TEMP_DIR"], capture_output=True,
+                          text=True, timeout=30).stdout.strip()
+    return set(glob.glob(os.path.join(base, "Reelcut", "*-graphics")))
+
+
+def mv_in(folder, name, text):
+    """Writes OUTSIDE the folder, then `mv`s it in — how another process
+    lands a file; the `mv`'s exit status."""
+    os.makedirs(WORK, exist_ok=True)
+    outside = os.path.join(WORK, f"outside-{name}")
+    with open(outside, "w") as handle:
+        handle.write(text)
+    return subprocess.run(["mv", outside, os.path.join(folder, name)],
+                          timeout=30).returncode
+
+
 def names_as_missing(text, argument):
     """Whether this refusal says the app could not do without `argument`.
 
@@ -429,7 +451,7 @@ def names_as_missing(text, argument):
 def main():
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 4903
     log = f"/tmp/reelcut-{port}.log"
-    print("a stranger argument, put to all seventy-seven tools\n")
+    print("a stranger argument, put to all seventy-nine tools\n")
 
     binary, error = build_probe()
     check("the probe builds — an instrument that will not compile is a FAILURE here, "
@@ -501,6 +523,18 @@ def main():
 
     print("\n2 — every difference from the core's table is one the declarations list names")
     group = sorted(ops)
+    # The arguments a `filledByTheApp` row takes out of a tool (road map 10
+    # G3b: the two graphic ops' `schema`, which the app reads from the
+    # module): the core publishes them and the tool deliberately does not.
+    filled = {(d["subject"]["op"], d["subject"]["name"]): n
+              for n, d in enumerate(declarations)
+              if d["requirement"] == "filledByTheApp" and d["subject"]["kind"] == "argument"}
+
+    def published_of(name):
+        """The core's row for `name` less what the app fills."""
+        return {argument: fragment for argument, fragment in table[name]["properties"].items()
+                if (name, argument) not in filled}
+
     unnamed = {}
     used = [False] * len(declarations)
     for name in group:
@@ -511,6 +545,14 @@ def main():
             if key not in ("project", "scope")
         }
         for argument, core in published.items():
+            if (name, argument) in filled:
+                # The row's whole effect is the omission, so it is used when
+                # the tool does not declare the argument and named when it does.
+                if argument in declared:
+                    unnamed[f"{name}.{argument}"] = ["filled by the app", "declared"]
+                else:
+                    used[filled[(name, argument)]] = True
+                continue
             fragment = {k: v for k, v in declared.get(argument, {}).items() if k != "description"}
             rows = [(n, d) for n, d in enumerate(declarations)
                     if covers(d, name, argument, core.get("type"))]
@@ -542,15 +584,16 @@ def main():
                 used[n] = True
             if not rows:
                 unnamed[f"{name}.{argument}.required"] = ["the core does", "the tool does not"]
-    check(f"all {len(group)} op tools declare exactly the core's argument NAMES", not any(
+    check(f"all {len(group)} op tools declare exactly the core's argument NAMES, less the "
+          f"{len(filled)} the app fills", not any(
         set(k for k in tools[name]["inputSchema"]["properties"] if k not in ("project", "scope"))
-        != set(table[name]["properties"]) for name in group),
+        != set(published_of(name)) for name in group),
         json.dumps({name: sorted(
             set(k for k in tools[name]["inputSchema"]["properties"]
-                if k not in ("project", "scope")) ^ set(table[name]["properties"]))
+                if k not in ("project", "scope")) ^ set(published_of(name)))
             for name in group
             if set(k for k in tools[name]["inputSchema"]["properties"]
-                   if k not in ("project", "scope")) != set(table[name]["properties"])}))
+                   if k not in ("project", "scope")) != set(published_of(name))}))
     check("every difference in kind, enum, minimum, maximum, items or required-ness is one "
           "AgentServer.declarations names", not unnamed, json.dumps(unnamed, indent=2)[:1000])
     idle = sorted(
@@ -561,7 +604,9 @@ def main():
           json.dumps(idle))
 
     print("\n3 — a stranger argument, for every op tool")
+    roots_before = temp_roots()
     mcp.call("new_project")
+    new_roots = sorted(temp_roots() - roots_before)
     mcp.call("import_media", path=MEDIA)
     project = mcp.call("get_project")["project"]
     track = project["tracks"][0]["id"]
@@ -619,13 +664,14 @@ def main():
         declares the core's row PLUS its rows, and this section must not be
         narrower than the check it exists to second."""
         return {d["subject"]["name"] for d in declarations
-                if d["subject"]["kind"] == "argument" and d["subject"]["op"] == name}
+                if d["subject"]["kind"] == "argument" and d["subject"]["op"] == name
+                and d["requirement"] != "filledByTheApp"}
 
     # Two names no op has, sent together so the sentence's plural is read too.
     STRANGERS = {"nosuchargument": 1, "nor_this_one": True}
     nothing_required = []
     for name in group:
-        published = table[name]["properties"]
+        published = published_of(name)
         required = tools[name]["inputSchema"].get("required", [])
         takes = set(published) | rows_for(name) | {"project", "scope"}
         arguments = arguments_for(required, published, ids)
@@ -880,21 +926,42 @@ def main():
     print("\n4 — a misspelt key inside an opaque object is named by the CORE")
     doors = sorted(
         (name, argument) for name in group
-        for argument, fragment in table[name]["properties"].items()
+        for argument, fragment in published_of(name).items()
         if fragment.get("type") == "object" and "properties" not in fragment)
-    check(f"the core publishes {len(doors)} arguments as an opaque object — a caller's own "
-          "patch, which deepening D1 made the core the one validator of",
-          len(doors) == 11, json.dumps(doors))
+    check(f"the core publishes {len(doors)} arguments as an opaque object a tool takes — a "
+          "caller's own patch, which deepening D1 made the core the one validator of",
+          len(doors) == 13, json.dumps(doors))
+    # The two graphic doors reach the core only through a module the
+    # untitled project's graphics/ holds (road map 10 G3b: the app reads the
+    # schema from it and refuses a module it cannot find). `value_for` names
+    # the module "proof", so `proof.js` is moved in from outside, and the
+    # clip `add_graphic_clip` lands once the store has seen it is the one
+    # `set_graphic` is pointed at.
+    module = ("export const schema = { title: { type: 'string', default: 'A' } };\n"
+              "export function render() { return '<svg/>'; }\n")
+    moved = mv_in(new_roots[0], "proof.js", module) if len(new_roots) == 1 else None
+    graphic_clip = None
+    deadline = time.monotonic() + 5
+    while moved == 0 and time.monotonic() < deadline:
+        text, applied = refusal("add_graphic_clip", {"track": track, "at": 24000000,
+                                                      "name": "proof"})
+        if applied is not None:
+            graphic_clip = max(c["id"] for c in mcp.call("get_project")["project"]["clips"])
+            break
+        time.sleep(0.2)
+    check("the untitled project's graphics/ takes proof.js and add_graphic_clip lands a clip "
+          "drawn by it within 5 s", graphic_clip is not None,
+          f"new roots {new_roots}, mv {moved}")
     # A property group belongs to a KIND of clip, and an op whose rule is
     # "this clip has no text properties" answers that before the patch is
-    # read. So two ops are pointed at the clip their group lives on; every
+    # read. So three ops are pointed at the clip their group lives on; every
     # other door takes the fixture's AV clip, which has both video and audio.
-    subject_clip = {"set_text": text_clip, "set_shape": shape_clip}
+    subject_clip = {"set_text": text_clip, "set_shape": shape_clip, "set_graphic": graphic_clip}
     for name, argument in doors:
         if argument == "payload":
             continue
         required = tools[name]["inputSchema"].get("required", [])
-        published = table[name]["properties"]
+        published = published_of(name)
         arguments = arguments_for(required, published, ids)
         if name in subject_clip:
             arguments["clips"] = [subject_clip[name]]

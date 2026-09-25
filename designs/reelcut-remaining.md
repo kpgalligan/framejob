@@ -422,16 +422,16 @@ row per op.
 
 | File | Lines |
 |---|---|
-| `app/Sources/ProjectSnapshot.swift` | 2309 after road map 10's G3a (2305 after G2a; 2293 before it; 2516 before road map 8's W3) |
+| `app/Sources/ProjectSnapshot.swift` | 2313 after road map 10's G3b (2309 after G3a; 2305 after G2a; 2293 before it; 2516 before road map 8's W3) |
 | `app/Sources/InspectorPane.swift` | 1665 |
 | `app/Sources/TimelineView.swift` | 1652 |
 | `app/Sources/ReelCore.swift` | 1440 (1309 after road map 10's G1a, then G1d's wrappers; 1542 before road map 8's W3) |
 | `app/Sources/VideoPane.swift` | 1411 |
-| `app/Sources/Compositor.swift` | 1391 |
-| `app/Sources/ProjectDocument.swift` | 1336 after road map 10's G3a (1380 before it; its media-import block moved out first and alone) |
+| `app/Sources/Compositor.swift` | 1396 after road map 10's G3b (1391 before it) |
+| `app/Sources/ProjectDocument.swift` | 1335 after road map 10's G3b (1336 after G3a; 1380 before it; its media-import block moved out first and alone) |
 | `app/Sources/ReverseRenderer.swift` | 1311 |
 | `app/Sources/ReelOps.swift` | 1191 after road map 10's G2a (1163 before it) |
-| `app/Sources/EditorViewController.swift` | 1123 |
+| `app/Sources/EditorViewController.swift` | 1127 after road map 10's G3b (1124 before it) |
 | `app/Sources/ExporterWriter.swift` | 1114 |
 | `app/Sources/PreviewCanvasView.swift` | 1104 |
 | `app/Sources/CanvasSessions.swift` | 1088 |
@@ -441,7 +441,7 @@ row per op.
 | `app/Sources/AgentServer+Clips.swift` | 847 |
 | `core/src/edit.rs` | 893 after road map 10's G2a (843 before it) |
 | `app/Sources/AgentCatalog+Clips.swift` | 799 (792 before road map 8's W3) |
-| `app/Sources/AgentServer.swift` | 790 after road map 10's G2a (785 before it) |
+| `app/Sources/AgentServer.swift` | 788 after road map 10's G3b (790 after G2a; 785 before it) |
 | `app/Sources/FFmpegRewrap.swift` | 768 |
 | `app/Sources/Loudness.swift` | 742 |
 | `app/Sources/Controls.swift` | 651 (567 before the sharp pass; Rasterize's own copy is 624 — the sync rule, app/CLAUDE.md "Shared chrome", is why it took `BlockSlider` verbatim and shed nothing; the seven lines over the verbatim block are the SH-2 fork of `drawBar`) |
@@ -793,6 +793,31 @@ stale "not decoded yet" comment reworded inside its two lines). New:
 `ProjectSnapshot+Graphic.swift` **88**. `ReelCore.swift` 1440, untouched.
 The instruments, exempt: `tools/proof/graphics_store_probe.swift` **415**,
 `graphics_store_probe.py` **317** and `graphics_store_proof.py` **281**, new.
+
+**A graphic clip drawn (road map 10's G3b, 2026-09-25, `wc -l` against
+`7bf518c`).** No toll: every ledger file took only the lines the spec
+allowed it. `ProjectSnapshot.swift` **2309 → 2313** (`case graphic`, its
+decode and encode dispatch lines, its `cacheHash` arm; the bodies are in
+`ProjectSnapshot+Graphic.swift` **88 → 130**). `Compositor.swift` **1391 →
+1396** (the `case .graphic` in `MetalRenderer.source(for:…)`, five lines).
+`ProjectDocument.swift` **1336 → 1335** (`close()`'s two store lines became
+`stopGraphicStore()`; the rest is in `ProjectDocument+Graphics.swift` **71 →
+111**). The FROZEN `EditorViewController.swift` **1124 → 1127** (one
+`addObserver`, three lines; the selector is `EditorViewController+Graphics.swift`
+**16**) and the FROZEN `AgentServer.swift` **790 → 788** (two `handlers`
+rows in, `opsWithoutTools`' two entries and their comments out, its doc
+sentence reworded). Under the cap: `LayerRenderers.swift` **467 → 492** (two
+members made internal, one `measuredSize` case, and the review's fix: the
+cache as a `Pool` struct, with graphics given their own six-entry pool),
+`AgentCatalog.swift`
+**525 → 529**, `AgentCatalog+Declarations.swift` **313 → 335**,
+`AgentServer+Parity.swift` **186 → 193**; in the core `recipe_graphic.rs`
+**129 → 133**. New: `GraphicRegistry.swift` **183**,
+`LayerRenderersGraphic.swift` **78**, `AgentServer+Graphics.swift` **138**,
+`AgentCatalog+Graphics.swift` **60**. `ReelCore.swift` 1440 and
+`ReelOps.swift` 1191, untouched. The instruments, exempt:
+`tools/proof/graphics_proof.py` **565**, new; `op_argument_proof.py` **949
+→ 1016** and `op_catalog_proof.py` **500 → 505**.
 
 ## 4. What only a person at the machine can check
 

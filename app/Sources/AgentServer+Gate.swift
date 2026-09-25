@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - The argument gate: a call's keys against the tool's published schema
 
-/// One comparison at dispatch, for all seventy-seven tools: the keys a
+/// One comparison at dispatch, for all seventy-nine tools: the keys a
 /// caller wrote against the properties the tool PUBLISHED, and every
 /// stranger refused by name before a handler reads a thing
 /// (kpgalligan/reelcut#21; the measurement behind it is

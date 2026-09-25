@@ -334,7 +334,8 @@ must print nothing before a proof run means anything.
 
 **The EXACT tool count belongs to the newest phase's script**, because it is
 what tells a stale binary on the port from the build under test: road map 7's
-`op_argument_proof.py` asserts **77** (D3·5), and every script before it keeps
+`op_argument_proof.py` asserts **79** since road map 10's G3b (77 from D3·5
+until then), and every script before it keeps
 a floor — phases 1 to 9's 63, 65, 68, 70, 71, 73, 73, 73 and 74, and road map
 3's 75 — so a later phase's tools never fail an older proof.
 Road map 5's own proof landed AFTER D3 and asserts FLOORS for that reason:
@@ -2883,6 +2884,13 @@ compile), and the same oracle written in Python rather than imported.
 readers changed one row's SENTENCE and no row's verdict: `set_canvas
 {fps: [0, 1]}` is now refused as `fps[0] must be…`, so the row reads the
 path with the name. The probe is built BEFORE the first MCP call.
+**23/23** again at road map 10's G3b (2026-09-25), once the two graphic
+ops had their tools: it had failed its first check since G2a. The core now
+declares 59 ops, and the declarations list has 16 rows: G3b's two
+`filledByTheApp` rows take `schema` OUT of `add_graphic_clip` and
+`set_graphic` (the app reads it from the module), so `expected_input` skips
+such an argument and the probe's `requirement()` switch names the case. The
+counts in the paragraphs below are D3·4's.
 
 **Its structural half types no name at all**, not even the ends of a group:
 the group IS the core's op list (`rc_op_names`), so an op renamed on both
@@ -2922,7 +2930,7 @@ Only a row that asks the RUNNING APP can see a declaration dropped while the
 behaviour stays.
 
 
-## A stranger argument, put to all 77 (`op_argument_proof.py`)
+## A stranger argument, put to all 79 (`op_argument_proof.py`)
 
 `python3 tools/proof/op_argument_proof.py <port>`, against a running
 instance. Road map 7's D3·5, then the **argument gate** of
@@ -2930,6 +2938,15 @@ kpgalligan/reelcut#21, and **the script that owns the exact tool count**
 (77). **133/133** on 2026-09-20, when the frame-rate TERM rows landed;
 116/116 at #21; 86/86 at D3·5 (#19), 79 of those rows before the review added
 the optional half of section 3. The probe is built BEFORE the first MCP call.
+**138/138** at road map 10's G3b (2026-09-25), with `TOOLS = 79` and
+`OPS = 59`: the two graphic ops' `schema` is a `filledByTheApp` row, which
+the attribution section counts as used when the tool leaves it out and the
+stranger section leaves out of what a tool takes; and the opaque-door
+section counts 13 doors, reaching the two graphic ones by moving a
+`proof.js` into the untitled fixture's
+`<DARWIN_USER_TEMP_DIR>/Reelcut/*-graphics` root and pointing `set_graphic`
+at the clip `add_graphic_clip` lands from it. The counts in the paragraphs
+below are the ones before G3b.
 
 It exists because of the rule D3·3 and D3·4 each paid for: **a generated
 artefact is checked by asking the thing that generated it a question it did
@@ -4819,6 +4836,45 @@ and the app rebuilt, S3 through S7 and S9 failed (3/9), S3 with `x.js`
 ABSENT after the save; and `folderDidAppear` set to nil instead, S3 alone
 failed, its save refused with "The document “P1.reelcut” could not be
 saved. The file has been changed by another application."
+
+## Road map 10's G3b — a graphic clip drawn (`graphics_proof.py`)
+
+The registry, the compositor case and the two op tools against the BUILT
+app: its own instance on its own port (default 4879), launched and stopped
+by PID, the log at `work/graphics/reelcut-<port>.log`, every child bounded
+and every wait a bounded poll. The modules are written outside a package and
+`mv`d into its `graphics/` from the shell. `bar.js` is the script's own —
+one rect at x = frame × 4, 100 wide, filled with `props.color`, no fonts, no
+`meta` size so its raster is the canvas and maps 1:1 — plus the crate's
+fixtures `lower-third.js` and `callout.js`. PNGs are read with
+`e1_proof.py`'s decoder, stopped after the row a pixel needs so a 5 s poll is
+not spent decoding. P1 `add_graphic_clip` (polled ≤ 5 s while the store sees
+the module) stores `graphic.name` and meta's 120 frames; P2 frame 30's EDGE
+pixels (122,50) red and (222,50) black pin the frame number, with frame 31
+differing as a CONTROL; P3 a 17-frame `move_clip` makes frame 47 frame 30's
+bytes; S1 a `split` at frame 40 leaves frame 41's bytes; R1 `set_graphic`
+props change the frame, `{nope: 1}` is refused naming `props.nope`, and one
+undo restores the bytes; H1 a module rewritten by `mv` redraws within 5 s;
+L1 a stored prop the new schema dropped still draws (G-4's leniency); F1
+`lower-third` draws its accent bar through the bundled fonts, and is
+MEASURED against `graphics_ffi_probe.py`'s frame-30 BGRA over black; K1
+save, relaunch, open; K2 Save As; T1 frame 30 at 29.97 fps (tick 600 600) is
+the 30 fps frame's bytes; K3 an untitled project's graphic saved for the
+first time and reopened; A1 a transparent canvas with `callout` as
+`prores_4444`, decoded at 2 s, alpha 0 at a corner and 255 on the stroke; Z1
+the parity grep over every launch.
+
+`--mutant frame-plus-one` copies `app/` and `project.yml` (with `core/`
+linked, not copied), replaces the one anchor in
+`LayerRenderersGraphic.swift` so the module is asked for `frame + 1`, builds
+the copy with xcodegen and xcodebuild into its own directory, drives it
+through P1 and P2, and exits 0 only if P1 held and P2 FAILED. The rows after
+P2 are relative, so a uniform +1 moves both sides of them.
+
+```sh
+make app && python3 tools/proof/graphics_proof.py --port 4879          # → 14/14
+python3 tools/proof/graphics_proof.py --mutant frame-plus-one          # exit 0 = P2 FAILED
+```
 
 ## The deployment target, rendered (`target_bump_proof.py`)
 

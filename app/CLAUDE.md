@@ -28,7 +28,7 @@ detail there.
   It is also where the op table is read BACK: `ReelOp.coreNames()` over
   `rc_op_names`, and `ReelOp.coreSchemas()` over `rc_op_schemas` — every
   op's ARGUMENTS as JSON Schema, keyed by op name, which
-  `AgentCatalog.opTool` prints for all fifty-seven op tools.
+  `AgentCatalog.opTool` prints for all fifty-nine op tools.
   `deinit` frees the Rust allocation. It also holds **the one read of
   `rc_project_apply`'s TWO message channels**, in the header's own order — a
   sentence is a refusal, an error message is invalid input, neither written
@@ -146,6 +146,11 @@ detail there.
   SAVED document it reads `<fileURL>/graphics` itself and never asks the
   store, so a nil store can never drop a saved folder; for an untitled one
   it carries the store's root only when it holds an entry (spec §11 G-14).
+  `startGraphicStore()` also installs the document's compiled set in
+  `GraphicRegistry` and observes the store's `.graphicsDidChange`, whose
+  handler updates the registry and THEN posts `.projectGraphicsDidChange`
+  (object: the document) — never `rescan()` there; `stopGraphicStore()`,
+  from `close()`, removes the observer, drops the set and stops the store.
 - `MediaImporter.swift` (+`Probe`, +`Speech`, +`Peaks`) ·
   `MediaPeakBuckets.swift` · `MediaCacheFiles.swift` ·
   `FFmpegRewrap.swift` · `AppSupport.swift` — the import funnel and the
@@ -220,6 +225,8 @@ window-modal and the preview panel's forwarded keys would otherwise reach
 the key map behind it.
 
 **The editor.**
+- `EditorViewController+Graphics` refreshes the paused frame on
+  `.projectGraphicsDidChange` for its own document.
 - `EditorViewController+Timeline` / `+Canvas` / `+Inspector` / `+Toolbar` —
   installing the three panes and the toolbar (transport · timecode — view ·
   Export, nothing else). `+Timeline` holds the delete family, including ⌫
@@ -471,6 +478,21 @@ the key map behind it.
   per export (`Exporter` mints its own), the project published under `set`
   after every edit and the `RecipeOptions` stored BESIDE it per key, both
   read under one lock hold in `recipe(for:at:)`.
+- `GraphicRegistry.swift` · `LayerRenderersGraphic.swift` — a graphic layer
+  drawn (road map 10). The registry maps a `RecipeSource` key to one
+  immutable `GraphicSet` (library, `libraryVersion`, each module `.compiled`
+  with `meta`/`schema` or `.failed`), installed at store start and swapped on
+  `.graphicsDidChange` — a NEW library and every module recompiled only when
+  `library` is true (or the last library failed to build), else just the
+  named modules against the existing (frozen) library. `install`/`update`/
+  `remove`/`entry` are main-only; `resolve` is the one cross-thread read: a
+  document's own key at the 250 ms preview budget, an offline key
+  (`render_frame`, an export) by HANDLE match against what a document last
+  published at 2 s, else nil — the slate. `LayerRenderersGraphic` hands the
+  engine the core's own `props_json` / `ctx_json` untouched and keys the
+  texture by the SVG TEXT, the size and the library version, in
+  `LayerRenderers`' separate six-entry graphic pool; any failure is nil and
+  the compositor slates.
 - `Compositor.swift` · `CompositorEffects.swift` · `Resources/Shaders/Compositor.metal`
   — the per-layer pass. The uniform block's field ORDER is a contract with the
   shader checked only by reading both, so change them in one edit; it is 104
@@ -490,7 +512,8 @@ the key map behind it.
 - `LayerRenderers.swift` · `LayerRenderersText.swift` · `LayerRenderersReveal.swift`
   · `LayerRenderersWords.swift` — text and shape descriptions to textures,
   keyed by the recipe's `hash` (`RecipeSourceRef.cacheHash` is the WHOLE key;
-  nothing here may append to it). Text draws what the recipe computed; the
+  nothing here may append to it — a graphic's key is its SVG text instead,
+  `LayerRenderersGraphic.swift`, in its own six-entry pool). Text draws what the recipe computed; the
   LAYOUT is always the full text's, laid from `laidContent`, cached without
   the reveal or the word, and `reveal = 1` takes the plain `CTFrameDraw` path
   so a full reveal is byte-identical to no animation; a line or token at
@@ -882,19 +905,21 @@ free.
 **The agent.**
 - `AgentServer.swift` (frozen) and `AgentServer+Project` / `Clips` / `Tracks`
   / `Media` / `Render` / `History` / `Silence` / `Captions` / `Audio` /
-  `Background` / `Scope` / `Transitions` / `CloudCaptions` / `Recording`
+  `Background` / `Scope` / `Transitions` / `CloudCaptions` / `Recording` /
+  `Graphics`
   (+`RecordingArguments`, +`RecordingResult`) — the handlers, one file per
   group. `+CloudCaptions` is `transcribe`'s CLOUD arm alone — the `engine`
   reader, the three cloud-only arguments refused by name under `apple`, the
   vocabulary's trim/de-dup/cap, the credential and the endpoint read ABOVE
   the network, and the result keys; `+Captions` dispatches on `engine` and is
   otherwise the code it was. `AgentCatalog.swift`
-  (+`Clips`, +`Audio`, +`Transitions`, +`Files`, +`Captions`, +`Declarations`)
+  (+`Clips`, +`Audio`, +`Transitions`, +`Files`, +`Captions`, +`Graphics`,
+  +`Declarations`)
   — the catalog, spliced in ORDER (`recording_probe.py` reads the last eleven
   names). **A tool is built one of two ways**: `tool`, which declares its own
   schema, or `opTool`, which declares PROSE and prints the argument STRUCTURE
   from the core's published table (`Self.opSchemas` over `rc_op_schemas`).
-  **Every one of the fifty-seven op tools is `opTool`'s** and carries no
+  **Every one of the fifty-nine op tools is `opTool`'s** and carries no
   `"type"`, no `"enum"` and no hand-written required list; `tool`'s remaining
   callers are the twenty APP-STATE tools, which have no op behind them and so
   nothing to read from the table — the ten of the Projects group,
@@ -911,7 +936,12 @@ free.
   with a reason, like an entry in `opsWithoutTools`; a leniency the tools have
   never declared is not a row until someone decides to OFFER it, because a
   schema narrower than what is accepted costs a caller nothing where a wider
-  one is a promise the app breaks. `AgentServer+Parity.swift` is the FIFTH
+  one is a promise the app breaks. A `.filledByTheApp` row takes an argument
+  OUT of the tool entirely — `declaredInput` omits it from `properties` and
+  `required` and the parity check's `expectedArguments` subtracts it — for an
+  argument only the app can fill: the two graphic ops' `schema`, read from
+  the module's current revision (G-4), which the gate therefore refuses as a
+  stranger. `AgentServer+Parity.swift` is the FIFTH
   part of the startup parity check — the one part that looks INSIDE an op
   tool's schema: its arguments must be the core's own (both directions, the
   envelope's two keys and the declarations list apart), each one must carry a
@@ -921,7 +951,7 @@ free.
   `AgentServer+Scope.swift` with the feature it is about; all five assert in
   debug, log `Reelcut: ` in release and start the server either way.
   `AgentServer+Gate.swift` is the CALL-time half of the same contract
-  (kpgalligan/reelcut#21): one comparison in `dispatch`, for all seventy-seven
+  (kpgalligan/reelcut#21): one comparison in `dispatch`, for all seventy-nine
   tools, of a caller's keys against the schema the tool published, every
   stranger refused by name — the tool, the strangers and the whole of what it
   takes — before the scope or any handler reads a thing. Its map is read once

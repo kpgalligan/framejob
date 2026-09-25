@@ -2624,3 +2624,178 @@ found none. Its four nits, owed:
   re-entrant first).
 - `GraphicStore.swift:223-228`: a failed move in `write()` leaves
   `<name>.js.partial` in `graphics/`, which every later save carries.
+
+#### G3b — a graphic clip drawn (2026-09-25)
+
+Against baseline `7bf518c`: §5d's rendering, §5f's registry paragraph, G-7,
+G-4's render-time leniency, G-13's "preview follows the newest revision"
+and §5h's two OP tools. Failure still draws the `missing` slate — the error
+card, `render_frame`'s diagnostics and the export pin are G3c's.
+
+**What landed.**
+- **The core hands the engine its own JSON text.** `recipe_graphic.rs`
+  (129 → 133): `graphic_source` publishes `props_json` and `ctx_json` after
+  `props`, each `serde_json::to_string` of the same `Value`; `hash` is
+  unchanged (still over `{name, frame, ctx, props}`). The fixture
+  `graphic_v10_recipe.json` carries both; `core/tests/graphic.rs`'s seam
+  test lists them, and a new test parses each back equal to its object with
+  `accent_color` kept as written. The engine takes JSON TEXT
+  (`GraphicModule.svg(frame:propsJSON:ctxJSON:budgetMs:)`), so the app has
+  no Swift mirror of `ctx` and re-encodes nothing; the engine's overlay of
+  defaults and its stale-key and wrong-type warnings stay inside
+  `rc_graphic_svg`. **The snake-case hazard was measured ABSENT**: the
+  reviewer's scratch decode on Swift 6.2.3 / Darwin 25.5 of
+  `{"props":{"accent_color":1}}` through `.convertFromSnakeCase`, as
+  `[String: Int]` and as a `GraphicPropValue`-shaped enum, nested included,
+  kept the key (and `.convertToSnakeCase` leaves `accentColor` alone), which
+  matches `app/CLAUDE.md`'s note; `GraphicSnapshot.props` is correct and
+  nothing about it is owed.
+- **`RecipeSourceRef.graphic(name:hash:frame:propsJSON:ctxJSON:)`**:
+  `ProjectSnapshot.swift` 2309 → 2313 (the case, one decode and one encode
+  dispatch line, the `cacheHash` arm); the bodies and `GraphicSourceKeys` —
+  a second keyed container on the same decoder, `CodingKeys` being private —
+  in `ProjectSnapshot+Graphic.swift` (88 → 130). `measuredSize` answers
+  `source_size` for it.
+- **`GraphicRegistry.swift`** (183): a `RecipeSource` key → one immutable
+  `GraphicSet` (the library, the store's `libraryVersion`, and each module
+  `.compiled(module, revision, meta, schema)` or `.failed(diagnostics,
+  revision)`). `install` builds one library through `makeLibrary()` and
+  compiles every module of `store.scan` at a 250 ms budget; `update` builds
+  a NEW library and recompiles everything only when `library` is true, and
+  otherwise compiles only the named modules against the existing library (a
+  frozen library still compiles; only adds are refused), dropping a name the
+  scan no longer holds; either way a new set is swapped in under the lock.
+  `resolve(key)` is the one cross-thread read: a document's own key answers
+  its set at the 250 ms preview budget; any other key answers the set of the
+  document whose `RecipeSource` handle is `===` the handle published under
+  it, at the 2000 ms offline budget (`ReverseSource`'s handle-match
+  precedent); else nil. Nothing calls `rescan()`.
+- **`LayerRenderersGraphic.swift`** (78): `resolve` → the `.compiled`
+  module → `svg` → the texture key `"graphic:" + hex(SHA-256(svg)) + ":" +
+  "WxH" + ":" + libraryVersion` → `cached(key, graphic: true)` (made
+  internal, with `device`) → `rasterize` at the layer's `source_size` →
+  `upload`, a `.bgra8Unorm` texture of the raster's own size. Any throw or
+  miss answers nil. **Graphic textures have their own LRU pool of six**
+  (`LayerRenderers.graphicCacheLimit`, 467 → 492 lines, the cache now a
+  `Pool` struct): an animated graphic mints a new full-layer texture every
+  frame (~8 MB at 1080p, ~33 MB at 4K), which in the shared 64-entry pool
+  would have evicted every text and shape texture and held ~2 GB at 4K; a
+  held or static graphic still hits. Taken from the review's nit 3; resident
+  memory during playback is still unmeasured (owed below).
+  `Compositor.swift` 1391 → 1396: the `case .graphic`, which slates on nil.
+- **The document and the editor.** `ProjectDocument+Graphics.swift` (71 →
+  111): `startGraphicStore()` installs the registry after `store.start()`
+  and observes the store's `.graphicsDidChange`; the observer updates the
+  registry and THEN posts the new `.projectGraphicsDidChange` (object: the
+  document, the store's two `userInfo` keys passed through);
+  `stopGraphicStore()` removes the observer, drops the set, stops the store.
+  `ProjectDocument.swift` 1336 → 1335 (`close()`). The frozen editor takes
+  one `addObserver` (1124 → 1127); `EditorViewController+Graphics.swift`
+  (16) refreshes the paused frame for its own document.
+- **The two op tools** (77 → 79 tools; the core's 59 ops all have one).
+  `AgentServer+Graphics.swift` (138): `add_graphic_clip` refuses a module
+  the folder does not hold ("No module named "x" in graphics/ — the folder
+  holds: …"), one that did not compile (its first diagnostic and line), a
+  `width`/`height` outside 1–8192 by name, and a `meta.durationInFrames`,
+  `meta.width` or `meta.height` that is not a whole number in range by name;
+  it defaults `duration` to `meta.durationInFrames` at the canvas rate — read
+  only when the caller passed no `duration`, so an explicit one is never
+  refused for a bad meta value (the review's finding 1) — and
+  `width`/`height` to meta's, and sends the module's `schema`.
+  `set_graphic` sends the schema of the patch's `name`, else of the one
+  module every clip shares (two different ones refused naming both), when
+  the patch carries `props` or `name`. Neither handler reads `a["schema"]`;
+  both name "none yet — G5's Graphic sub-tab (§5j)" as their UI path.
+  `AgentCatalog+Graphics.swift` (60), spliced right after the transition
+  rows. `AgentCatalog+Declarations.swift`: `Requirement.filledByTheApp`,
+  which `declaredInput` omits from `properties` and `required`, and two rows
+  (`schema` of each op, G-4); the parity check's `expectedArguments`
+  subtracts such an argument. `AgentServer.swift` (frozen, 790 → 788): two
+  `handlers` rows, `opsWithoutTools` empty.
+
+**Measured.** `cargo fmt --check` clean; `make test` 0 failed — 868 in the
+core (one new) and 98 in `graphic/`, 966 in all; `make lint` clean;
+`make typecheck` 0 errors and exactly the 7 baseline warning locations;
+`make app` succeeded; the parity grep empty on every launch.
+`op_catalog_proof.py` 23/23 (failing its first check since G2a until now);
+`op_argument_proof.py` 138/138; `graphics_proof.py` 14/14 on its own
+instance (port 4879): P1–P3, S1, R1, H1, L1, F1, K1, K2, T1, K3, A1, Z1. F1
+MEASURED, not scored: 0 of 2 073 600 pixels of the app's frame 30 differ
+from `graphics_ffi_probe.py`'s frame-30 BGRA over black, max channel delta
+0. **Made to fail**: `--mutant frame-plus-one` (a COPY of `app/` with the
+one anchor in `LayerRenderersGraphic.swift` asserted and replaced by
+`frame: frame + 1`, built with xcodegen and xcodebuild into its own
+directory) held P1 and FAILED P2 — (122,50) read (0,0,0) and (222,50) read
+(255,90,54), the rect one frame on; the real app was never mutated.
+
+**Where `resolve` answers nil, so the layer draws the slate — owed to
+G3c's revision pin (G-13).** `RecipeSource.shared.project(for: D)` is what
+the document last published (`editedProject`); `render_frame` and Save Frame
+pass `editedProject` and an export passes `document.project`, equal handles
+while no nest is open. Nil, therefore:
+- (a) an export with a nest open;
+- (b) the eyedropper's suppression handle
+  (`EditorViewController+Eyedropper.swift:191`);
+- (c) a QUEUED export, or any export that outlives an edit, undo or close of
+  its document — the job keeps the handle it captured
+  (`ExportSheetController.swift:384-386`) while the document publishes a new
+  one, so the match fails for every remaining frame. `ReverseSource.pin`
+  exists for exactly this; G3b adds no analogue.
+
+**Deviations from the spec.**
+- `op_argument_proof.py` needed more than its two constants: it had also
+  been failing since G2a, and `schema` not being published broke three of
+  its sections. Section 2 counts a `filledByTheApp` row as used when the
+  tool OMITS the argument; section 3 leaves such an argument out of what a
+  tool takes; section 4 counts 13 opaque doors and reaches the two graphic
+  ones by moving a `proof.js` into the untitled fixture's graphics root and
+  pointing `set_graphic` at the clip `add_graphic_clip` lands from it. The
+  probe's `requirement()` switch gained the case, as `op_catalog_proof.py`'s
+  did.
+- Spec §7.10 is the RUST module map; the rows for `GraphicRegistry.swift`
+  and `LayerRenderersGraphic.swift` went into §7.4, the Swift file map, and
+  §7.10's `recipe_graphic.rs` row names the two keys.
+- Count prose beyond the spec's list, each because the sentence became
+  false: `AgentCatalog+Declarations.swift` "every argument but six" → eight
+  and "six kinds of difference" → seven; `AgentServer+Parity.swift`'s
+  "all fourteen rows" → sixteen;
+  `AgentCatalog.swift`'s list of `opTool`'s callers gained "the two
+  graphics".
+- `install` answers a library `makeLibrary()` could not build by marking
+  every module `.failed` with that sentence (on an empty library), rather
+  than leaving the key without a set. That set carries `libraryFailed`, and
+  `update` rebuilds it whole through `install` rather than compiling a named
+  module against the empty stand-in (the review's nit 2: one module would
+  otherwise have drawn with no fonts and lost the failure sentence).
+- `stopGraphicStore()` removes the observer before it stops the store.
+- S1 undoes its `split`, so R1 onwards act on one clip.
+- `graphics_proof.py` reads PNG pixels with `e1_proof.py`'s decoder stopped
+  after the needed row, so a 5 s poll is not spent decoding; `ffmpeg`'s
+  rawvideo is read through `subprocess.run` with a timeout, since
+  `bounded.run` is text-mode.
+
+**Numerals left, whose referent is not the tool or op count.**
+`AgentCatalog+Files.swift:120` ("some seventy literals");
+`op_argument_proof.py`'s "fifty-eight handlers" and `op_catalog_proof.py`'s
+"the last fourteen tools" (D3·4's migrated set).
+
+**Owed from G3b.**
+- The three comment numerals in the frozen `AgentServer.swift` (`:49`
+  "fifty-eight handlers", `:189` and `:193` "seventy-seven", `:194`
+  "fifty-seven") — frozen-file rule: wiring only.
+- The slate cases (a), (b) and (c) above → G3c's revision pin (G-13).
+- `words_core_proof.py`'s version literal (G2a); `add_transition`'s handle
+  form (G2b).
+- `core/CLAUDE.md:131` and `app/CLAUDE.md:31, 897, 924` still say
+  fifty-seven / seventy-seven, and `app/CLAUDE.md` has no entries yet for
+  `GraphicRegistry.swift`, `LayerRenderersGraphic.swift`,
+  `AgentServer+Graphics.swift`, `AgentCatalog+Graphics.swift`,
+  `EditorViewController+Graphics.swift` or `.filledByTheApp` — the
+  pipeline drafted the sentences for the orchestrator.
+- G3c: the error card (G-8), `render_frame`'s diagnostics block, the export
+  compile gate and revision pin, the missing-font warning, the Sandbox and
+  Failure proof rows, the playback check (remaining §4) — which should
+  also read resident memory while an animated graphic plays, the one
+  number the six-entry graphic texture pool was sized without. G4/G5: the six
+  app-state tools, `get_project`'s `graphics` block, the Graphic sub-tab,
+  typed builders in `ReelOps.swift`.

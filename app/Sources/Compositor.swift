@@ -973,6 +973,11 @@ final class MetalRenderer {
             guard let rendered = renderers.shape(props, hash: hash) else { return .absent }
             return .textured(
                 rendered.texture, rendered.size, premultiplied: true, orientation: 0)
+        case .graphic(let name, _, let frame, let props, let ctx):
+            let size = layer.sourceSizeCG ?? CGSize(width: 640, height: 360)
+            guard let drawn = renderers.graphic(name: name, frame: frame, propsJSON: props,
+                ctxJSON: ctx, size: size, recipeKey: instruction?.recipeKey ?? 0) else { return .slate(size) }
+            return .textured(drawn.texture, drawn.size, premultiplied: true, orientation: 0)
         case .missing:
             return .slate(layer.sourceSizeCG ?? CGSize(width: 640, height: 360))
         }

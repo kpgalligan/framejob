@@ -86,3 +86,45 @@ enum GraphicPropValue: Codable, Equatable {
         }
     }
 }
+
+/// The keys of a recipe layer's `graphic` source (spec §7.3; road map 10
+/// §5d, G3b), read through a SECOND keyed container on the decoder
+/// `RecipeSourceRef` decodes from — its own `CodingKeys` is private, and
+/// `ProjectSnapshot.swift` is on the size ledger. `props_json` and
+/// `ctx_json` arrive camel-cased by `ReelJSON.decoder()`'s converter.
+enum GraphicSourceKeys: String, CodingKey {
+    case name, hash, frame
+    case propsJSON = "propsJson"
+    case ctxJSON = "ctxJson"
+}
+
+extension RecipeSourceRef {
+    /// The `graphic` arm's decode. Lenient, with "" and 0 as the defaults:
+    /// an empty JSON text fails in the engine and the layer draws the slate.
+    /// The two texts are the core's own serialization of `props` and `ctx`,
+    /// handed to the engine untouched — never re-encoded here.
+    static func graphic(from decoder: Decoder) -> RecipeSourceRef {
+        guard let c = try? decoder.container(keyedBy: GraphicSourceKeys.self) else {
+            return .graphic(name: "", hash: "", frame: 0, propsJSON: "", ctxJSON: "")
+        }
+        return .graphic(
+            name: c.lenient(.name, ""), hash: c.lenient(.hash, ""), frame: c.lenient(.frame, 0),
+            propsJSON: c.lenient(.propsJSON, ""), ctxJSON: c.lenient(.ctxJSON, ""))
+    }
+
+    /// The `graphic` arm's encode, beside the `kind` it shares with every arm.
+    func encodeGraphic(to encoder: Encoder) throws {
+        guard case .graphic(let name, let hash, let frame, let propsJSON, let ctxJSON) = self
+        else { return }
+        var kind = encoder.container(keyedBy: GraphicKindKey.self)
+        try kind.encode("graphic", forKey: .kind)
+        var c = encoder.container(keyedBy: GraphicSourceKeys.self)
+        try c.encode(name, forKey: .name)
+        try c.encode(hash, forKey: .hash)
+        try c.encode(frame, forKey: .frame)
+        try c.encode(propsJSON, forKey: .propsJSON)
+        try c.encode(ctxJSON, forKey: .ctxJSON)
+    }
+
+    private enum GraphicKindKey: String, CodingKey { case kind }
+}
