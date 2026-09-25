@@ -204,6 +204,7 @@ APP_STATE_TOOLS = {
     "import_captions", "export_captions", "transcribe", "consolidate_media",
     "detect_silence", "normalize_clip", "set_playhead", "set_range", "set_selection",
     "set_scope", "undo", "redo", "render_frame", "export", "record_screen",
+    "write_graphic", "get_graphic", "graphic_reference",
 }
 
 # The seven ops `core/src/scope.rs` refuses inside a nest, and the sentence
@@ -596,7 +597,7 @@ def catalog_part(mcp):
           "key, not an op. A FLOOR since road map 5's E1 added two ops; the exact "
           "count is the newest phase's")
     check(names - set(scoped) == APP_STATE_TOOLS,
-          "and the tools WITHOUT one are exactly the twenty app-state tools, named rather "
+          "and the tools WITHOUT one are exactly the twenty-three app-state tools, named rather "
           f"than counted: {sorted(names - set(scoped) - APP_STATE_TOOLS)} unexpected, "
           f"{sorted(APP_STATE_TOOLS - (names - set(scoped)))} missing")
     check("set_scope" not in scoped,

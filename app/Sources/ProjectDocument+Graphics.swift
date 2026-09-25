@@ -42,9 +42,7 @@ extension ProjectDocument {
                 Self.graphicsDirectoryName, isDirectory: true)
             guard files.fileExists(atPath: directory.path) else { return nil }
         } else {
-            guard let root = graphicStore?.folderURL,
-                let entries = try? files.contentsOfDirectory(atPath: root.path),
-                !entries.isEmpty
+            guard let root = graphicStore?.folderURL, GraphicStore.holdsContent(root)
             else { return nil }
             directory = root
         }

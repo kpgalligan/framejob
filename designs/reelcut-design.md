@@ -1487,6 +1487,8 @@ Talk.reelcut/
   graphics/             # road map 10 (§11 G-3, G-14): user content, not a cache;
                         #   whitelisted in the save; created on the app's first write, never at open
     <name>.js           # a module; its revision is the SHA-256 of its bytes (G-13)
+    API.md              # the reference, written by the app when the folder exists; not a module
+    API.d.ts            # the reference, written by the app when the folder exists; not a module
     fonts/              # optional; .ttf/.otf (G-6)
     assets/             # optional; .png/.jpg/.jpeg/.gif/.webp/.svg/.svgz
 ```
@@ -2743,7 +2745,7 @@ only the app can fill and so does not publish (the two graphic ops'
 difference is a row of `AgentCatalog+Declarations.swift` with the op, the
 argument, what the app adds and why, and the schema declares it, so an agent
 can SEE a shorthand rather than discover it. What still declares a schema of
-its own is the twenty APP-STATE tools, which have no op to read one from.
+its own is the twenty-three APP-STATE tools, which have no op to read one from.
 
 **A fifth part of the startup parity check holds that identity up**
 (`AgentServer+Parity.swift`, road map 7's D3·5). For every op tool the
@@ -2761,7 +2763,7 @@ caught rather than dropped in silence. App-state tools are skipped by the same r
 part 4 uses — the core's own op list, which has no row for a tool with no op
 behind it. What no comparison of two lists can see is a
 CALL. A call's KEYS are compared to the tool's published schema at the
-dispatch — the argument gate, kpgalligan/reelcut#21, for all seventy-nine
+dispatch — the argument gate, kpgalligan/reelcut#21, for all eighty-two
 tools — so a name no tool published is refused naming the tool and what it
 takes, where it used to be dropped in silence; and that an argument the
 catalog prints is one a hand-written handler really reads is put to the
@@ -2918,6 +2920,22 @@ is the one validator of what each may carry (§5.2, §6) — the agent door
 checks only what the core cannot know, which is the target, the scope, an id
 against the container it names, a time, and that a required argument was
 passed at all.
+
+**The graphics loop** (road map 10's G4a): `write_graphic {name, source}`
+writes `graphics/<name>.js` through the store's one writer (atomically,
+creating the folder), rescans at once and answers the compile of THAT text —
+`ok`, `meta`, `schema`, `diagnostics [{level, message, line, column,
+frame}]`, `clips` — where a module that does not compile is an answer, not
+an error; the write is not undoable and never dirties the document (G-3),
+and a bad name is the core's sentence. `get_graphic {name?}` reads one
+module back (its source, revision and compile) or, with no name, the folder
+— its path whether or not it exists yet, and every module with its revision,
+`ok` and `clips`. `graphic_reference {}` answers the bundled
+`GraphicsAPI.md` verbatim and needs no open project. `get_project` gains
+`graphics: [{name, revision, ok, clips}]`, always present. The reference is
+also written into an EXISTING `graphics/` as `API.md` and `API.d.ts` (never
+a reason to create the folder, G-14, and not content that makes an untitled
+root worth carrying).
 
 Handlers use `performGroupedEdit` so off-event edits get their own undo group
 (Rasterize's `AgentServer.performGroupedEdit`). Default port 4817; env

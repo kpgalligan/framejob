@@ -3036,3 +3036,143 @@ G3 (G3a–G3c, 2026-09-25) is BUILT. §9a's G3 checklist, item by item:
 **G4 (the six app-state tools, §5h) is next.** After G4 the feature works
 end to end for an agent, and merging `svg-motion` into `main` is the
 user's decision (§9a).
+
+### 10.7. G4 — the agent
+
+§9's G4 is split in two: **G4a** the write/read loop and the reference
+(below), and **G4b** `render_graphic`, `import_graphic_font`,
+`import_graphic_asset`, §5l's Contact-sheet row and the Help menu item —
+not built.
+
+#### G4a — `write_graphic`, `get_graphic`, `graphic_reference`, and the reference in three places (2026-09-25)
+
+Against baseline `7ff17ce`, branch `svg-motion`.
+
+**What landed.**
+- **The toll, first and alone.** `GraphicModuleFile`, `GraphicFile` and
+  `GraphicScan` moved verbatim out of `GraphicStore.swift` (399 of the 400
+  cap) into the new `GraphicScan.swift` (32 lines): `GraphicStore.swift`
+  **399 → 373**; gated alone — `make typecheck` 0 errors and the 7 baseline
+  warnings, `make app` built, `graphics_store_probe.py` 17/17 — and saved
+  as its own patch before any feature line. With the three `writeManual()`
+  calls it ends at **376**.
+- **Three app-state tools** (`AgentServer+Graphics.swift` 138 → 296,
+  `AgentCatalog+Graphics.swift` 60 → 112, three `tool(...)` rows after the
+  two `opTool` rows, so the catalog's last eleven are unchanged).
+  `write_graphic {name, source}` — `target` → the two strings → the store's
+  one writer (`write(name:source:)`; a bad name is its
+  `GraphicStore.nameSentence`, the core's words) → `rescan()`, synchronous,
+  so the document's `.graphicsDidChange` observer has recompiled THAT text
+  in `GraphicRegistry` before the reply is built → `{ok, name, path,
+  revision, meta, schema, diagnostics, clips, note}`. A module that does not
+  compile is `ok: false` with `meta {}`, `schema {}` and the engine's
+  diagnostics, and is NOT an error. Not undoable, never dirty (G-3); the
+  note says so. `get_graphic {name?}` — one module (`source` added) or, with
+  no name, `{folder, folder_exists, modules}`, `folder` being where
+  `graphics/` is or WILL be. `graphic_reference {}` — the bundled
+  `GraphicsAPI.md` verbatim; it never calls `target(a)`, so it answers on a
+  fresh launch with only the welcome window up. All three run on main.
+  `compiledModule`'s "No module named …" sentence is hoisted into
+  `noModuleSentence` so `get_graphic` speaks it too.
+- **`get_project` gains `graphics: [{name, revision, ok, clips}]`**, always
+  present (`graphicsSummary`; `[]` with no store). `clips` are the ascending
+  ids of every clip, the timeline's and every nest's, drawn by the module.
+- **The reference in three places.** `docs/graphics-api.d.ts` (212 lines,
+  NEW, G-11): global declarations — `Ctx`, `Meta`, `SchemaEntry`/`Schema`,
+  `Font`, `TextMetrics`, `declare const Easing` with `linear`, `bezier` and
+  the 21 named eases, and a `declare function` per standard-library
+  function — checked by `graphic/tests/reference.rs`'s new
+  `the_typings_declare_every_standard_library_function` (every stdlib name
+  from `stdlib.js`/`noise.js` declared, `Easing`, the seven `ctx` keys, no
+  line starting `import ` or `export `; made to fail by renaming `asset`'s
+  declaration). `docs/graphics-api.md` gains "## Working over MCP", eight
+  lines, no fence (389 → 399). `project.yml`'s post-build script copies both
+  into `Contents/Resources` as `GraphicsAPI.md` and `GraphicsAPI.d.ts`;
+  `codesign --verify --deep --strict` passes on the built app.
+  `GraphicStore+Manual.swift` (53 lines, NEW) writes them into an EXISTING
+  `graphics/` as `API.md` and `API.d.ts` — at `start()` for a saved package,
+  in `ensureFolder()` after creating it, and in `write()` — each only when
+  its bytes differ, and never creates the folder (G-14).
+- **`holdsContent` replaces `!entries.isEmpty`** in `graphicsWrapper()`'s
+  untitled branch: any non-hidden entry, file or directory, that is not
+  `API.md`/`API.d.ts`. A root holding only `fonts/` or `assets/` is still
+  carried (row G8), a root holding only the manual is not, and — as a side
+  effect — G3a's review nit is FIXED: a root holding only a `.DS_Store` is
+  no longer carried into the first save.
+- **Counts**: 82 tools (59 op + 23 app-state); the gate, the catalog prose,
+  spec §7.9, `op_argument_proof.py`'s `TOOLS = 82`, and the three
+  `APP_STATE_TOOLS` sets (`phase9_proof.py`, `recording_proof.py`,
+  `recording_probe.py`) with their "twenty-three" labels.
+
+**Measured.** `make test` core 868 + graphic 99, 0 failed; `make lint`
+and both `cargo fmt --check` clean; `make typecheck` 0 errors and the 7
+baseline warnings; `make app` built. `graphics_proof.py --port 4883`
+**29/29** (the G3 rows unchanged); `--mutant frame-plus-one` caught (P1
+held, P2 failed). On a fresh 4823 instance: `op_catalog_proof.py` 23/23,
+`op_argument_proof.py` 141/141 (EXACTLY 82 tools, 23 of them app-state),
+`phase9_proof.py` 218/218, `recording_proof.py` 186/187 — the one FAIL is
+the known Bluetooth-INPUT head-loss row (`designs/reelcut-remaining.md`
+§4), two tone rows skipped by name; `recording_probe.py --only catalog`
+28/28; the parity grep empty on every launch. `graphics_store_probe.py`
+17/17 on the final tree. From G1: the broken module's diagnostic is
+`SyntaxError: unexpected token in expression: ';'` at line 2 (column 32,
+not asserted).
+
+**The rows** (`graphics_proof.py`, now 29): G6 first, before any project
+is open — `graphic_reference` equals `docs/graphics-api.md` and the app's
+`GraphicsAPI.md`; G1–G5 and G7 after A1 on their own packages WG and NG;
+G8 on a fresh instance after them, before E1. `tools/proof/README.md`'s
+G4a section has each row.
+
+**Made to fail by hand (2026-09-25)**, each reverted and rebuilt:
+- (a) `store.rescan()` deleted from `writeGraphic`: G1–G4 fell (25/29).
+  Without it the store's scan does not yet hold the file the handler just
+  wrote, so every write answered `No module named "bar" in graphics/ — the
+  folder holds: nothing`, and G2's listing and G3's add, made within the
+  watcher's ~100 ms coalesce, saw nothing either. A side diagnostic on the
+  same mutant build showed the watcher itself catching up within 0.5 s of
+  a lone write — the rescan is what makes the REPLY current, as §5h asks.
+- (b) `writeManual()` deleted from `write()` and `ensureFolder()`: G2 fell
+  alone (28/29), `API.md`/`API.d.ts` absent.
+- (c) `holdsContent` counting regular files only: G8 fell alone (28/29) —
+  the untitled root holding only `fonts/` was not carried, and
+  `NF/graphics` did not exist after the save.
+
+**Deviations from the spec.**
+- G1 compares `schema`'s keys SORTED (`["color", "title"]`): a JSON object
+  from `JSONSerialization` has no key order, so `["title", "color"]` in
+  order was not a claim the reply can make.
+- G4 also asserts the reply's `revision` is the blue source's hashlib
+  digest and its `clips` the G3 clip — a strengthening, not in the spec.
+- The spec's `recording_probe.py --only 7` is spelled `--only catalog`: the
+  script's `--only` takes section NAMES and refused `7`.
+- `graphics_proof.py`'s `--mutant` copy now symlinks `docs/` beside `core/`:
+  the post-build step reads `docs/`, and without it the mutant copy failed
+  to build (xcodebuild rc 65) — found on the first mutant run.
+
+**Owed.**
+- G4b (above). The Help menu item and G5's Graphic sub-tab are the UI
+  paths `graphic_reference` and `get_graphic` name as "none yet".
+- `graphic_reference`, like every tool, carries the injected `project`
+  argument, which it ignores (it never resolves a document).
+- The offscreen harness and the probes copy no manual: for them
+  `writeManual()` is a no-op (out of scope).
+- `AgentServer.swift`'s own numerals and the rest of G3b's list, still.
+- (Review nits, owed to G4b.) `AgentServer+Graphics.swift:118`: a file
+  written but not read back by the scan answers "No module named …", which
+  reads as a failed write. `:215`: a module with no registry entry answers
+  `ok: false` with EMPTY `diagnostics` — the agent gets no reason.
+  `GraphicStore+Manual.swift:51`: `holdsContent` counts a leftover
+  `.js.partial` (only after a crash mid-write), so an untitled root holding
+  only that is carried by the first save.
+- `make typecheck | grep -c "warning:"` prints 14 for the 7 baseline
+  warnings on this run (each printed twice); G3 runs printed each once. Count
+  distinct `file:line:col` lines.
+
+The review passed first time, no blocker or should-fix; it confirmed
+`write_graphic`'s `rescan()` can never run inside a `.graphicsDidChange`
+observer (the handler runs as a main-queue block, which is serial, and
+neither observer runs a handler), and that `recording_proof.py`'s 186/187 is
+the Bluetooth head-loss row remaining §4 names (a FAIL by design on this
+host, not a skip). The `app/CLAUDE.md` and root `CLAUDE.md` entries were
+written by the orchestrator from the pipeline's drafts after the review.

@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """A graphic clip DRAWN, against the built app: road map 10's G3b and G3c
 (§10.6) — the draw, then a failing graphic's error card, `render_frame`'s
-diagnostics, the export gate and the pinned set.
+diagnostics, the export gate and the pinned set — and G4a (§10.7), the
+agent's write/read loop: `write_graphic`, `get_graphic`, `graphic_reference`,
+`get_project`'s `graphics` and the reference written into `graphics/`.
 
 One owned instance on its own port, launched and stopped by PID, with its log
 at `tools/proof/work/graphics/reelcut-<port>.log`; nothing else is ever
 killed. Every child runs under `graphics_spike/bounded.py`, and every wait is
-a bounded poll. The modules are written OUTSIDE a package and `mv`d into its
-`graphics/` from the shell (`write_graphic` is G4's). `bar.js` is this
+a bounded poll. The G3 rows' modules are written OUTSIDE a package and `mv`d
+into its `graphics/` from the shell; the G rows write through `write_graphic`.
+`bar.js` is this
 script's own: one rect at x = frame × 4, 100 wide, 100 + 20 × len(title)
 tall, filled with `props.color` — no fonts, and no `meta` size, so its raster
 is the 1920 × 1080 canvas and maps 1:1. Frame N is N × 20000 ticks.
@@ -71,12 +74,40 @@ Q2  the same through `Exporter.export` directly: `direct pin` RED,
 Q3  `hit`: one `LayerRenderers` asked twice for `nofont`: both answers'
     `warnings` name `Nope Sans`, and the second is the pool's hit (the same
     texture object);
+G6  (first, on the fresh launch, before any project is open) `graphic_reference
+    {}` is not an error and its text is `docs/graphics-api.md` and the app's
+    `Contents/Resources/GraphicsAPI.md`, both;
+G1  (after A1) `new_project {path: WG}`; `get_graphic {}` before any write:
+    folder `<WG>/graphics`, not existing, no modules; `write_graphic` of
+    BROKEN_BAR (bar.js with its schema line, line 2, broken): ok false, the
+    first diagnostic an error on line 2 (never the column), the file holds
+    those bytes; `write_graphic` of bar.js: ok, schema keys title and color,
+    revision = hashlib's, path `<WG>/graphics/bar.js`, no clips, the note says
+    "not undoable";
+G2  `API.md` and `API.d.ts` in `<WG>/graphics` byte-equal to
+    `docs/graphics-api.md` / `docs/graphics-api.d.ts`; `get_graphic {}` now
+    says the folder exists and holds one module;
+G3  `add_graphic_clip {name: bar}` succeeds on the FIRST attempt (a CONTROL:
+    no poll); `get_graphic {name: bar}` lists that clip and the source;
+    `get_project`'s `graphics` is `[{name: bar, revision, ok: true, clips}]`;
+G4  saved, `unsaved_changes` false; `write_graphic` of a blue bar.js answers the
+    new revision and leaves `unsaved_changes` false (G-3); ONE `render_frame`
+    at frame 30 with no poll: (170,50) is blue — the registry was current at
+    the reply;
+G5  `write_graphic {name: Bad}` is an error saying "is not a module name";
+    `write_graphic {name: x}` with no source is an error naming `source`;
+G7  `new_project {path: NG}`, `add_track`, `save_project`: NG/graphics is ABSENT
+    (the manual never creates it) and `get_graphic {}` says so;
+G8  (a fresh instance) an untitled `new_project`; its root from `get_graphic
+    {}` (existing, no modules) given `fonts/Anton-Regular.ttf` only;
+    `save_project {path: NF}`: `NF/graphics/fonts/Anton-Regular.ttf` exists,
+    no `.js`, and `get_graphic {}` now names `NF/graphics`, existing;
 Z1  `grep "Reelcut: "` over every launch's log prints nothing.
 
     python3 tools/proof/graphics_proof.py [--port 4879] [--app PATH]
     python3 tools/proof/graphics_proof.py --mutant frame-plus-one
 
-The mutant is built from a COPY of `app/` (with `core/` linked, not copied)
+The mutant is built from a COPY of `app/` (with `core/` and `docs/` linked, not copied)
 with one anchor in `LayerRenderersGraphic.swift`, asserted to occur exactly
 once, replaced so the module is asked for `frame + 1`; the copy is built by
 xcodegen and xcodebuild into its own directory and driven through P1 and P2.
@@ -87,6 +118,7 @@ both sides of them, so they are not expected to fail.
 
 import argparse
 import glob
+import hashlib
 import json
 import os
 import re
@@ -116,8 +148,10 @@ FRAME = 20000
 RED, BLUE, BLACK = (255, 90, 54), (45, 127, 249), (0, 0, 0)
 BORDER, CARD = (230, 40, 40), (64, 8, 8)
 SECOND = 30 * FRAME
-ROWS = ["P1", "P2", "P3", "S1", "R1", "H1", "L1", "F1", "K1", "K2", "T1", "K3", "A1",
-        "E1", "E2", "E3", "E4", "Q1", "Q2", "Q3", "Z1"]
+ROWS = ["G6", "P1", "P2", "P3", "S1", "R1", "H1", "L1", "F1", "K1", "K2", "T1", "K3", "A1",
+        "G1", "G2", "G3", "G4", "G5", "G7", "G8", "E1", "E2", "E3", "E4", "Q1", "Q2", "Q3", "Z1"]
+DOC_MD = ROOT / "docs/graphics-api.md"
+DOC_DTS = ROOT / "docs/graphics-api.d.ts"
 ANCHOR = "frame: frame, propsJSON: propsJSON, ctxJSON: ctxJSON,"
 rows = {}
 
@@ -148,6 +182,11 @@ def module(render_body, frames=120):
     return ("export const meta = { name: \"G3c\", durationInFrames: " + str(frames) + " };\n"
             "export function render(frame, props, ctx) {\n" + render_body + "\n}\n")
 
+
+# bar() with line 2, its schema, broken; `render` on line 3 is intact.
+BROKEN_BAR = "\n".join(
+    line if i != 1 else "export const schema = { title: ;"
+    for i, line in enumerate(bar().split("\n")))
 
 PIN_JS = ("export const meta = { name: \"Pin\", durationInFrames: 90 };\n"
           "export const schema = { color: { type: \"color\", default: \"#ff5a36\" } };\n"
@@ -394,6 +433,7 @@ def run_p1_p2(client, p1):
 
 def run(app, port):
     log = WORK / f"reelcut-{port}.log"
+    wg, ng, nf = (WORK / f"{n}.reelcut" for n in ("WG", "NG", "NF"))
     p1, p1b, p2, pf, pa = (WORK / f"{n}.reelcut" for n in ("P1", "P1b", "P2", "F", "A"))
     instance = Instance(app, port, log)
     try:
@@ -401,6 +441,7 @@ def run(app, port):
         if client is None:
             check("P1 the app launches", False, "the app never logged its port")
             return log
+        run_g6(client, app)
         clip, track, f30 = run_p1_p2(client, p1)
         cid = clip["id"] if clip else 0
 
@@ -503,6 +544,12 @@ def run(app, port):
               f"save {saved}, present {present}, identical {k3 == k3_ref}")
 
         run_a1(client, pa)
+        run_g(client, wg, ng)
+        # A fresh instance, K3's pattern: the untitled draft is the implicit
+        # target of every call.
+        instance.stop()
+        client = instance.start()
+        run_g8(client, nf)
         run_e(client, p1)
         run_e4(client, WORK / "E4.reelcut")
         make_pq(client, WORK / "PQ.reelcut")
@@ -569,6 +616,150 @@ def run_a1(client, pa):
           and corner == 0 and centre == 255,
           f"clip {clip is not None} {why!r}, export {exported.get('error', 'ok')}, "
           f"decoded {len(raw)} bytes, alpha {corner} / {centre}")
+
+
+def run_g6(client, app):
+    """G6 — before any project is open: the reference needs none."""
+    got = attempt(client, "graphic_reference", {})
+    bundled = Path(app).resolve().parents[1] / "Resources/GraphicsAPI.md"
+    doc = DOC_MD.read_bytes().decode("utf-8")
+    text = got.get("reply") if got["ok"] else None
+    in_app = bundled.read_bytes().decode("utf-8") if bundled.exists() else None
+    check("G6 graphic_reference with no project open answers docs/graphics-api.md verbatim, "
+          "which is the app's Resources/GraphicsAPI.md",
+          got["ok"] and text == doc and in_app == doc,
+          f"ok {got['ok']} {got.get('error', '')!r}, equals doc {text == doc}, "
+          f"bundled {bundled} equals doc {in_app == doc}")
+
+
+def run_g(client, wg, ng):
+    """G1–G5 on WG and G7 on NG, every call naming its project."""
+    folder = wg / "graphics"
+    made = attempt(client, "new_project", {"path": str(wg)})
+    empty = attempt(client, "get_graphic", {"project": str(wg)})
+    e = empty.get("reply") or {}
+    broken = attempt(client, "write_graphic", {"project": str(wg), "name": "bar",
+                                               "source": BROKEN_BAR})
+    b = broken.get("reply") or {}
+    diagnostics = b.get("diagnostics") or [{}]
+    on_disk = (folder / "bar.js").read_text() if (folder / "bar.js").exists() else None
+    good = attempt(client, "write_graphic", {"project": str(wg), "name": "bar",
+                                             "source": bar()})
+    g = good.get("reply") or {}
+    revision = hashlib.sha256(bar().encode()).hexdigest()
+    check("G1 before a write the folder is <WG>/graphics and absent; a broken bar.js is ok "
+          "false with an error on line 2 and its bytes on disk; bar.js is ok with schema title "
+          "and color, hashlib's revision, its path, no clips and the not-undoable note",
+          made["ok"] and empty["ok"] and e.get("folder") == str(folder)
+          and e.get("folder_exists") is False and e.get("modules") == []
+          and broken["ok"] and b.get("ok") is False and b.get("meta") == {}
+          and b.get("schema") == {} and diagnostics[0].get("level") == "error"
+          and diagnostics[0].get("line") == 2 and on_disk == BROKEN_BAR
+          and good["ok"] and g.get("ok") is True
+          and sorted((g.get("schema") or {}).keys()) == ["color", "title"]
+          and g.get("revision") == revision and g.get("path") == str(folder / "bar.js")
+          and g.get("clips") == [] and "not undoable" in (g.get("note") or ""),
+          f"new {made['ok']}, empty {empty}, broken {broken}, on disk equal "
+          f"{on_disk == BROKEN_BAR}, good {good}")
+
+    manual = [(folder / name).read_bytes() if (folder / name).exists() else None
+              for name in ("API.md", "API.d.ts")]
+    listed = attempt(client, "get_graphic", {"project": str(wg)})
+    l = listed.get("reply") or {}
+    check("G2 API.md and API.d.ts in <WG>/graphics are the docs' bytes; get_graphic {} says "
+          "the folder exists and holds one module",
+          manual == [DOC_MD.read_bytes(), DOC_DTS.read_bytes()]
+          and listed["ok"] and l.get("folder_exists") is True
+          and [m.get("name") for m in l.get("modules") or []] == ["bar"],
+          f"API.md {manual[0] == DOC_MD.read_bytes()}, API.d.ts "
+          f"{manual[1] == DOC_DTS.read_bytes()}, listed {listed}")
+
+    track = ((project_of(client, wg) or {}).get("tracks") or [{}])[0].get("id")
+    added = attempt(client, "add_graphic_clip", {"project": str(wg), "name": "bar",
+                                                 "track": track, "at": 0})
+    ours = [c for c in (project_of(client, wg) or {}).get("clips", [])
+            if (c.get("graphic") or {}).get("name") == "bar"]
+    cid = ours[0]["id"] if len(ours) == 1 else None
+    one = attempt(client, "get_graphic", {"project": str(wg), "name": "bar"})
+    o = one.get("reply") or {}
+    whole = attempt(client, "get_project", {"project": str(wg)})
+    graphics = (whole.get("reply") or {}).get("graphics")
+    check("G3 add_graphic_clip on the FIRST attempt; get_graphic {name: bar} lists the clip "
+          "and the source; get_project's graphics is [{name, revision, ok, clips}]",
+          added["ok"] and cid is not None and one["ok"] and o.get("clips") == [cid]
+          and o.get("source") == bar()
+          and graphics == [{"name": "bar", "revision": revision, "ok": True, "clips": [cid]}],
+          f"add {added}, clip {cid}, get_graphic {one}, graphics {graphics}")
+
+    saved = attempt(client, "save_project", {"project": str(wg)})
+    clean = (project_of_reply(client, wg) or {}).get("unsaved_changes")
+    blue = bar(color="#2d7ff9")
+    rewritten = attempt(client, "write_graphic", {"project": str(wg), "name": "bar",
+                                                  "source": blue})
+    r = rewritten.get("reply") or {}
+    still = (project_of_reply(client, wg) or {}).get("unsaved_changes")
+    seen = pixel(render(client, wg, 30 * FRAME, "g4"), 170, 50)
+    check("G4 saved and clean; write_graphic of a blue bar.js answers its revision and leaves "
+          "the project clean; ONE render_frame at frame 30: (170,50) is blue",
+          saved["ok"] and clean is False and rewritten["ok"] and r.get("ok") is True
+          and r.get("revision") == hashlib.sha256(blue.encode()).hexdigest()
+          and r.get("clips") == [cid] and still is False and seen == BLUE,
+          f"save {saved['ok']}, clean {clean}, write {rewritten}, after {still}, "
+          f"(170,50) {seen}")
+
+    bad = attempt(client, "write_graphic", {"project": str(wg), "name": "Bad",
+                                            "source": bar()})
+    bare = attempt(client, "write_graphic", {"project": str(wg), "name": "x"})
+    check("G5 write_graphic {name: Bad} is refused as not a module name; {name: x} with no "
+          "source is an error naming source",
+          not bad["ok"] and "is not a module name" in bad["error"]
+          and not bare["ok"] and "source" in bare["error"]
+          and not (folder / "Bad.js").exists() and not (folder / "x.js").exists(),
+          f"Bad {bad}, bare {bare}")
+
+    made = attempt(client, "new_project", {"path": str(ng)})
+    track = attempt(client, "add_track", {"project": str(ng)})
+    saved = attempt(client, "save_project", {"project": str(ng)})
+    after = attempt(client, "get_graphic", {"project": str(ng)})
+    check("G7 a project saved without a graphic has no graphics/ and get_graphic says so",
+          made["ok"] and track["ok"] and saved["ok"] and not (ng / "graphics").exists()
+          and after["ok"] and (after.get("reply") or {}).get("folder_exists") is False,
+          f"new {made['ok']}, track {track['ok']}, save {saved['ok']}, exists "
+          f"{(ng / 'graphics').exists()}, get_graphic {after}")
+
+
+def run_g8(client, nf):
+    """G8 — an untitled root holding only fonts/ is carried by the first save."""
+    made = attempt(client, "new_project", {})
+    before = attempt(client, "get_graphic", {})
+    b = before.get("reply") or {}
+    root = b.get("folder")
+    copied = False
+    if root:
+        fonts = Path(root) / "fonts"
+        fonts.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / "app/Resources/Fonts/Anton-Regular.ttf",
+                     fonts / "Anton-Regular.ttf")
+        copied = True
+    saved = attempt(client, "save_project", {"path": str(nf)})
+    font = (nf / "graphics/fonts/Anton-Regular.ttf").exists()
+    modules = sorted(p.name for p in (nf / "graphics").glob("*.js"))
+    after = attempt(client, "get_graphic", {})
+    a = after.get("reply") or {}
+    check("G8 an untitled root holding only fonts/Anton-Regular.ttf, saved to NF: the font "
+          "arrives, no module does, and get_graphic now names NF/graphics",
+          made["ok"] and before["ok"] and b.get("folder_exists") is True
+          and b.get("modules") == [] and copied and saved["ok"] and font and modules == []
+          and after["ok"] and a.get("folder") == str(nf / "graphics")
+          and a.get("folder_exists") is True,
+          f"new {made['ok']}, before {before}, save {saved}, font {font}, modules {modules}, "
+          f"after {after}")
+
+
+def project_of_reply(client, project):
+    """`get_project`'s whole reply, or None."""
+    got = attempt(client, "get_project", with_project(project, {}))
+    return got["reply"] if got["ok"] else None
 
 
 def near(found, want, slack=6):
@@ -775,14 +966,17 @@ def run_q(binary, why):
 
 
 def build_mutant():
-    """A COPY of `app/` and `project.yml` with `core/` linked, the anchor
-    replaced, built by xcodegen and xcodebuild. The binary, or None and why."""
+    """A COPY of `app/` and `project.yml` with `core/` and `docs/` linked
+    (`project.yml`'s post-build step copies the graphics reference out of
+    `docs/`), the anchor replaced, built by xcodegen and xcodebuild. The
+    binary, or None and why."""
     copy = WORK / "mutant"
     shutil.rmtree(copy, ignore_errors=True)
     copy.mkdir(parents=True)
     shutil.copytree(ROOT / "app", copy / "app")
     shutil.copy(ROOT / "project.yml", copy / "project.yml")
     os.symlink(ROOT / "core", copy / "core")
+    os.symlink(ROOT / "docs", copy / "docs")
     target = copy / "app/Sources/LayerRenderersGraphic.swift"
     text = target.read_text()
     if text.count(ANCHOR) != 1:
@@ -827,8 +1021,8 @@ def main():
         print("the mutant is CAUGHT: P1 held and P2 failed" if verdict
               else "the mutant was NOT caught")
         return 0 if verdict else 1
-    print("G3b/G3c graphics — a graphic clip drawn, and one failing, against the built app "
-          "(proof)", flush=True)
+    print("G3b/G3c/G4a graphics — a graphic clip drawn, one failing, and the agent's "
+          "write/read loop, against the built app (proof)", flush=True)
     if not args.app.exists():
         print(f"  FAIL the app is not built: {args.app}")
         print(f"0/{len(ROWS)}")

@@ -145,7 +145,9 @@ detail there.
   `graphicsWrapper()`, the lazy wrapper the save whitelist carries — for a
   SAVED document it reads `<fileURL>/graphics` itself and never asks the
   store, so a nil store can never drop a saved folder; for an untitled one
-  it carries the store's root only when it holds an entry (spec §11 G-14).
+  it carries the store's root only when `GraphicStore.holdsContent` (an
+  entry, file or directory, that is neither hidden nor the manual) says so
+  (spec §11 G-14).
   `startGraphicStore()` also installs the document's compiled set in
   `GraphicRegistry` and observes the store's `.graphicsDidChange`, whose
   handler updates the registry and THEN posts `.projectGraphicsDidChange`
@@ -197,7 +199,17 @@ detail there.
   `library: true` when the font/asset set moved). **`drain()` is not
   re-entrant: never call `rescan()` from a `.graphicsDidChange` observer.**
   `stop()` bumps a generation under `queue.sync`. `makeLibrary()` is a NEW
-  builder every call (a library freezes on first use).
+  builder every call (a library freezes on first use). It also writes the
+  app's bundled reference into an EXISTING folder as `API.md` and `API.d.ts`
+  (`writeManual()`, from `start()` for a saved package, `ensureFolder()` and
+  `write()`; only when the bytes differ) — never a reason to create the
+  folder (G-14).
+- `GraphicScan.swift` — `GraphicModuleFile`, `GraphicFile` and `GraphicScan`,
+  what one pass of the store found. `GraphicStore+Manual.swift` — the
+  manual: `manualNames` (`API.md`, `API.d.ts`), `bundledManualNames`
+  (`GraphicsAPI.md`, `GraphicsAPI.d.ts`, copied into Resources by
+  `project.yml`'s post-build step from `docs/`), `manualDirectory(besideFonts:)`,
+  `writeManual()` and `holdsContent`.
 - `ReverseRenderer.swift` — `Source::Media.reversed` resolved to
   `cache/reversed/<id>-<digest>.mov`, rendered on demand behind a sheet,
   substituted per CLIP by `CompositionBuilder`.
@@ -932,7 +944,14 @@ free.
   reader, the three cloud-only arguments refused by name under `apple`, the
   vocabulary's trim/de-dup/cap, the credential and the endpoint read ABOVE
   the network, and the result keys; `+Captions` dispatches on `engine` and is
-  otherwise the code it was. `AgentCatalog.swift`
+  otherwise the code it was. `+Graphics` holds the two graphic op tools and
+  the three app-state ones — `write_graphic` (the store's one writer, then a
+  synchronous `rescan()` so the reply is the compile of THAT text; a failed
+  compile is `ok: false`, not an error; not undoable, never dirty, G-3),
+  `get_graphic` (one module, or the folder with `folder_exists`) and
+  `graphic_reference` (the bundled `GraphicsAPI.md`; it never calls
+  `target(a)`, so it answers with no project open) — and `graphicsSummary`,
+  `get_project`'s `graphics`. `AgentCatalog.swift`
   (+`Clips`, +`Audio`, +`Transitions`, +`Files`, +`Captions`, +`Graphics`,
   +`Declarations`)
   — the catalog, spliced in ORDER (`recording_probe.py` reads the last eleven
@@ -941,11 +960,12 @@ free.
   from the core's published table (`Self.opSchemas` over `rc_op_schemas`).
   **Every one of the fifty-nine op tools is `opTool`'s** and carries no
   `"type"`, no `"enum"` and no hand-written required list; `tool`'s remaining
-  callers are the twenty APP-STATE tools, which have no op behind them and so
-  nothing to read from the table — the ten of the Projects group,
+  callers are the twenty-three APP-STATE tools, which have no op behind them
+  and so nothing to read from the table — the ten of the Projects group,
   `AgentCatalog+Audio.swift`'s two composites and
   `AgentCatalog+Captions.swift`'s three, spliced back at the two points they
-  left, and the five other file tools, `record_screen` among them. `opTool`
+  left, the five other file tools, `record_screen` among them, and
+  `AgentCatalog+Graphics.swift`'s three, after its two `opTool` rows. `opTool`
   goes THROUGH `tool`, so `project` and `scope` are injected by one piece of
   code either way. `AgentCatalog+Declarations.swift` is the one list of places
   a tool deliberately takes more or less than its op does — a bare-string
@@ -971,7 +991,7 @@ free.
   `AgentServer+Scope.swift` with the feature it is about; all five assert in
   debug, log `Reelcut: ` in release and start the server either way.
   `AgentServer+Gate.swift` is the CALL-time half of the same contract
-  (kpgalligan/reelcut#21): one comparison in `dispatch`, for all seventy-nine
+  (kpgalligan/reelcut#21): one comparison in `dispatch`, for all eighty-two
   tools, of a caller's keys against the schema the tool published, every
   stranger refused by name — the tool, the strangers and the whole of what it
   takes — before the scope or any handler reads a thing. Its map is read once

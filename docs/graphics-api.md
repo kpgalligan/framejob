@@ -288,6 +288,16 @@ Every problem comes back as `{level, message, line, column, frame}`.
 are where the function begins, not the statement that ran long. `frame` is
 set for a problem found while drawing.
 
+## Working over MCP
+
+Read `graphic_reference` once, before or after a project is open. Then
+`write_graphic {name, source}` and read its `diagnostics`; fix the source and
+write it again until `ok` is true. `add_graphic_clip {name}` puts it on the
+timeline, `render_frame` shows a frame, and `set_graphic {patch: {props}}`
+changes what it draws. `get_graphic` reads a module back, or with no `name`
+names the folder, which your own file tools may edit too; the folder's
+`API.md` and `API.d.ts` are this page and its TypeScript declarations.
+
 ## Idioms
 
 ### A slide-in

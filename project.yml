@@ -132,6 +132,23 @@ targets:
           cargo build --release
         outputFiles:
           - $(PROJECT_DIR)/core/target/release/libreelcut_core.a
+    # The graphics reference (road map 10's G4a): `graphic_reference` reads
+    # GraphicsAPI.md, and a package's graphics/ gets both as API.md and
+    # API.d.ts. Copied under new names, so not a resources-phase entry.
+    postBuildScripts:
+      - name: Copy Graphics Reference
+        script: |
+          set -e
+          dest="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH"
+          mkdir -p "$dest"
+          cp "$PROJECT_DIR/docs/graphics-api.md" "$dest/GraphicsAPI.md"
+          cp "$PROJECT_DIR/docs/graphics-api.d.ts" "$dest/GraphicsAPI.d.ts"
+        inputFiles:
+          - $(PROJECT_DIR)/docs/graphics-api.md
+          - $(PROJECT_DIR)/docs/graphics-api.d.ts
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GraphicsAPI.md
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GraphicsAPI.d.ts
 
 schemes:
   Reelcut:

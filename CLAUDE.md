@@ -178,7 +178,7 @@ else is what bloats files:
   (`AgentServer+Parity.swift`). What it cannot see is a CALL, which two
   things guard at dispatch: the argument GATE in `AgentServer+Gate.swift`
   compares the caller's keys to the schema the tool published and refuses a
-  stranger by name, for all seventy-nine tools, before any handler runs;
+  stranger by name, for all eighty-two tools, before any handler runs;
   and the throwing helpers in `AgentServer+Arguments.swift` refuse a value a
   handler cannot read by name rather than dropping it.
 - **A file at the ~600-line cap gives something up before it takes anything
@@ -209,7 +209,8 @@ envelope key, plus the app-state tools — `open_project`, `new_project`,
 `save_project`, `get_project`, `import_media`, `import_captions`,
 `export_captions`, `transcribe`, `consolidate_media`, `detect_silence`,
 `normalize_clip`, `set_playhead`, `set_range`, `set_selection`, `set_scope`,
-`undo`, `redo`, `render_frame`, `export` and `record_screen`. `rc_op_names`
+`undo`, `redo`, `render_frame`, `export`, `record_screen`, `write_graphic`,
+`get_graphic` and `graphic_reference`. `rc_op_names`
 and the catalog are the authority for the counts; the parity check compares
 them at startup. `render_frame` writes a PNG and returns its path; `export`
 waits for the file.

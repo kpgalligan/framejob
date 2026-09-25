@@ -18,6 +18,7 @@ use graphic::Module;
 use common::{shared, BUDGET_MS};
 
 const DOC: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../docs/graphics-api.md");
+const TYPINGS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../docs/graphics-api.d.ts");
 const SOURCES: [&str; 2] = [
     concat!(env!("CARGO_MANIFEST_DIR"), "/src/stdlib.js"),
     concat!(env!("CARGO_MANIFEST_DIR"), "/src/noise.js"),
@@ -111,6 +112,22 @@ fn every_js_block_in_the_reference_runs() {
 fn the_reference_names_every_standard_library_function() {
     let text = doc();
     let mut names = vec!["Easing".to_string()];
+    names.extend(stdlib_functions());
+    assert!(names.contains(&"noise3D".to_string()), "{names:?}");
+    let missing: Vec<&String> = names
+        .iter()
+        .filter(|name| !text.contains(&format!("`{name}")))
+        .collect();
+    assert!(
+        missing.is_empty(),
+        "the reference does not name {missing:?}"
+    );
+}
+
+/// Every global `function NAME(` the standard library's sources declare,
+/// the `__` host helpers left out.
+fn stdlib_functions() -> Vec<String> {
+    let mut names = Vec::new();
     for path in SOURCES {
         for line in fs::read_to_string(path).expect("a stdlib file").lines() {
             let Some(rest) = line.strip_prefix("function ") else {
@@ -127,15 +144,40 @@ fn the_reference_names_every_standard_library_function() {
             }
         }
     }
+    names
+}
+
+#[test]
+fn the_typings_declare_every_standard_library_function() {
+    let text = fs::read_to_string(TYPINGS).expect("docs/graphics-api.d.ts");
+    let names = stdlib_functions();
     assert!(names.contains(&"noise3D".to_string()), "{names:?}");
     let missing: Vec<&String> = names
         .iter()
-        .filter(|name| !text.contains(&format!("`{name}")))
+        .filter(|name| !text.contains(&format!("declare function {name}(")))
         .collect();
+    assert!(missing.is_empty(), "the typings do not declare {missing:?}");
     assert!(
-        missing.is_empty(),
-        "the reference does not name {missing:?}"
+        text.contains("declare const Easing"),
+        "the typings lack Easing"
     );
+    for key in [
+        "fps",
+        "time",
+        "durationInFrames",
+        "progress",
+        "width",
+        "height",
+        "canvas",
+    ] {
+        assert!(text.contains(key), "the typings do not name ctx.{key}");
+    }
+    for line in text.lines() {
+        assert!(
+            !line.starts_with("import ") && !line.starts_with("export "),
+            "the typings are a global declaration file, not a module: {line:?}"
+        );
+    }
 }
 
 #[test]

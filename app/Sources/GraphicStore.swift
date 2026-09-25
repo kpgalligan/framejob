@@ -134,6 +134,7 @@ final class GraphicStore {
             }
             seed = nil
         }
+        if self.package != nil { writeManual() }
         let (package, folder) = (self.package, folderURL)
         let initial: GraphicScan = queue.sync {
             generation += 1
@@ -180,6 +181,7 @@ final class GraphicStore {
     func ensureFolder() throws {
         guard !FileManager.default.fileExists(atPath: folderURL.path) else { return }
         try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
+        writeManual()
         rescan()
     }
 
@@ -190,6 +192,7 @@ final class GraphicStore {
     func write(name: String, source: String) throws {
         guard Self.isModuleName(name) else { throw ReelCoreError(message: Self.nameSentence(name)) }
         try ensureFolder()
+        writeManual()
         let files = FileManager.default
         let target = folderURL.appendingPathComponent(name + ".js")
         let partial = folderURL.appendingPathComponent(name + ".js.partial")

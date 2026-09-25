@@ -334,8 +334,8 @@ must print nothing before a proof run means anything.
 
 **The EXACT tool count belongs to the newest phase's script**, because it is
 what tells a stale binary on the port from the build under test: road map 7's
-`op_argument_proof.py` asserts **79** since road map 10's G3b (77 from D3·5
-until then), and every script before it keeps
+`op_argument_proof.py` asserts **82** since road map 10's G4a (79 from G3b,
+77 from D3·5), and every script before it keeps
 a floor — phases 1 to 9's 63, 65, 68, 70, 71, 73, 73, 73 and 74, and road map
 3's 75 — so a later phase's tools never fail an older proof.
 Road map 5's own proof landed AFTER D3 and asserts FLOORS for that reason:
@@ -2930,7 +2930,7 @@ Only a row that asks the RUNNING APP can see a declaration dropped while the
 behaviour stays.
 
 
-## A stranger argument, put to all 79 (`op_argument_proof.py`)
+## A stranger argument, put to all 82 (`op_argument_proof.py`)
 
 `python3 tools/proof/op_argument_proof.py <port>`, against a running
 instance. Road map 7's D3·5, then the **argument gate** of
@@ -4915,6 +4915,47 @@ the card) with them (16/21). Each was reverted and rebuilt.
 
 ```sh
 make app && python3 tools/proof/graphics_proof.py --port 4881          # → 21/21
+python3 tools/proof/graphics_proof.py --mutant frame-plus-one          # exit 0 = P2 FAILED
+```
+
+## Road map 10's G4a — the agent's write/read loop (`graphics_proof.py` G1–G8)
+
+The same script, eight rows more; the score is **29/29**. G6 runs FIRST, on
+the fresh launch before any project is open: `graphic_reference {}` is not
+an error and its text is `docs/graphics-api.md`, which is also the app's
+`Contents/Resources/GraphicsAPI.md` (read beside `--app`). G1–G5 and G7 run
+after A1, each call naming its package. G1 on a new WG: `get_graphic {}`
+names `<WG>/graphics`, absent, no modules; `write_graphic` of `BROKEN_BAR`
+(`bar()` with line 2, its schema, replaced by `export const schema = {
+title: ;`) answers `ok: false`, `meta {}`, `schema {}` and an ERROR on line
+2 — the engine's lines are the module's own, and the column is never
+asserted — with those bytes on disk; `bar()` then answers `ok`, schema keys
+title and color (compared sorted: a JSON object has no order), hashlib's
+revision, `<WG>/graphics/bar.js`, no clips and "not undoable". G2 `API.md`
+and `API.d.ts` in the folder are the docs' bytes, and `get_graphic {}` says
+it exists with one module. G3 `add_graphic_clip` succeeds on the FIRST
+attempt (a control: no poll), `get_graphic {name: bar}` lists the clip and
+the source, and `get_project`'s `graphics` is `[{name, revision, ok,
+clips}]`. G4 saved and clean; a blue `bar.js` written answers its own
+revision and leaves `unsaved_changes` false (G-3); ONE `render_frame` at
+frame 30, no poll, is blue at (170,50) — the registry was current when the
+reply left. G5 `{name: "Bad"}` is refused as "is not a module name" (the
+core's sentence) and a missing `source` is named. G7 a new NG with a track,
+saved: no `graphics/` (the manual never creates it), and `get_graphic {}`
+says so. G8, on a fresh instance (K3's pattern), an untitled root from
+`get_graphic {}` given only `fonts/Anton-Regular.ttf` and saved to NF: the
+font arrives, no `.js` does, and `get_graphic {}` now names `NF/graphics`.
+The mutant copy links `docs/` beside `core/`, since the post-build step
+copies the reference out of it.
+
+**Made to fail by hand (2026-09-25)**, each reverted and rebuilt: (a) the
+`store.rescan()` in `writeGraphic` deleted — G1–G4 fell (25/29), every
+write answering "No module named" because the scan had not yet seen the
+file; (b) `writeManual()` deleted from `write()` and `ensureFolder()` — G2
+fell alone; (c) `holdsContent` counting regular files only — G8 fell alone.
+
+```sh
+make app && python3 tools/proof/graphics_proof.py --port 4883          # → 29/29
 python3 tools/proof/graphics_proof.py --mutant frame-plus-one          # exit 0 = P2 FAILED
 ```
 

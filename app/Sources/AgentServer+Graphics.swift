@@ -1,6 +1,9 @@
 // app/Sources/AgentServer+Graphics.swift — the two graphic OP tools (road map
-// 10 §5h, G3b): `add_graphic_clip` and `set_graphic`. The six app-state
-// graphics tools are G4's.
+// 10 §5h, G3b): `add_graphic_clip` and `set_graphic`; and G4a's three
+// app-state tools, the agent's write/read loop over the package's
+// `graphics/`: `write_graphic`, `get_graphic` and `graphic_reference`, with
+// `graphicsSummary`, which `get_project` reports as `graphics`. G4b's three
+// are not built.
 //
 // **The app fills `schema`, and only the app can** (G-4): the core has no
 // filesystem, so the schema a `props` patch is checked against is read here
@@ -81,6 +84,159 @@ extension AgentServer {
             [.setGraphicRaw(clips: clips, patch: patch, schema: schema)])
     }
 
+    // MARK: - The write/read loop (G4a)
+
+    static let notUndoableNote = "not undoable; keep your own copy if you want the old one back"
+
+    /// `<Resources>/GraphicsAPI.md`, from the app bundle, no document involved.
+    private static var bundledReferenceURL: URL {
+        GraphicStore.manualDirectory(besideFonts: ProjectDocument.bundledFontsDirectory)
+            .appendingPathComponent(GraphicStore.bundledManualNames[0])
+    }
+
+    /// `write_graphic` — UI path: the file on disk (an external editor); no
+    /// menu.
+    ///
+    /// Writes `graphics/<name>.js` through the store's one writer, then
+    /// rescans at once, so the registry has compiled THAT text before the
+    /// reply is built: a failed compile is an answer (`ok` false with its
+    /// diagnostics), not an error. Not undoable and never dirty (G-3).
+    func writeGraphic(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let name = try requiredString(a, "name")
+        let source = try requiredString(a, "source")
+        let store = try graphicStore(document)
+        do {
+            try store.write(name: name, source: source)
+        } catch let error as ReelCoreError {
+            throw ToolError(message: error.message)
+        } catch {
+            throw ToolError(
+                message: "graphics/\(name).js could not be written: \(error.localizedDescription)")
+        }
+        store.rescan()
+        guard store.module(named: name) != nil else {
+            throw ToolError(message: noModuleSentence(name, document))
+        }
+        var result = moduleReport(named: name, document)
+        result["name"] = name
+        result["note"] = Self.notUndoableNote
+        return try jsonResult(result)
+    }
+
+    /// `get_graphic` — UI path: none yet — G5's Graphic sub-tab, Source
+    /// section (§5j).
+    ///
+    /// With `name`, one module as the folder holds it now: its source, its
+    /// revision and its compile. Without, where the folder is and what it
+    /// holds.
+    func getGraphic(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let store = try graphicStore(document)
+        guard let name = try stringArg(a, "name") else {
+            return try jsonResult([
+                "folder": store.folderURL.path,
+                "folder_exists": FileManager.default.fileExists(atPath: store.folderURL.path),
+                "modules": graphicsSummary(document),
+            ])
+        }
+        guard let file = store.module(named: name) else {
+            throw ToolError(message: noModuleSentence(name, document))
+        }
+        var result = moduleReport(named: name, document)
+        result["name"] = name
+        result["source"] = String(decoding: file.bytes, as: UTF8.self)
+        return try jsonResult(result)
+    }
+
+    /// `graphic_reference` — UI path: none yet — Help ▸ Graphics Reference
+    /// (G5).
+    ///
+    /// The bundled `GraphicsAPI.md`, verbatim. Needs no open document, so
+    /// it never calls `target(a)`.
+    func graphicReference(_ a: [String: Any]) throws -> String {
+        guard let data = try? Data(contentsOf: Self.bundledReferenceURL) else {
+            throw ToolError(
+                message: "The bundled reference GraphicsAPI.md is missing from the app's Resources")
+        }
+        return try callResult(
+            content: [["type": "text", "text": String(decoding: data, as: UTF8.self)]],
+            isError: false)
+    }
+
+    /// `[{name, revision, ok, clips}]` by name over the store's scan; `[]`
+    /// with no store. `get_project`'s `graphics`.
+    func graphicsSummary(_ document: ProjectDocument) -> [[String: Any]] {
+        guard let store = document.graphicStore else { return [] }
+        return store.scan.modules.values.sorted { $0.name < $1.name }.map { file in
+            let ok: Bool
+            if case .compiled = GraphicRegistry.shared.entry(
+                named: file.name, for: document.recipeKey)
+            {
+                ok = true
+            } else {
+                ok = false
+            }
+            return [
+                "name": file.name, "revision": file.revision, "ok": ok,
+                "clips": clipsUsing(file.name, document),
+            ]
+        }
+    }
+
+    private func graphicStore(_ document: ProjectDocument) throws -> GraphicStore {
+        guard let store = document.graphicStore else {
+            throw ToolError(
+                message: "This project has no graphics folder open (its window has not been made)")
+        }
+        return store
+    }
+
+    /// `{path, revision, ok, meta, schema, diagnostics, clips}` for a module
+    /// the scan holds.
+    private func moduleReport(named name: String, _ document: ProjectDocument) -> [String: Any] {
+        let file = document.graphicStore?.module(named: name)
+        var result: [String: Any] = [
+            "path": file?.url.path ?? NSNull(),
+            "revision": file?.revision ?? NSNull(),
+            "clips": clipsUsing(name, document),
+        ]
+        switch GraphicRegistry.shared.entry(named: name, for: document.recipeKey) {
+        case .compiled(_, _, let meta, let schema):
+            result["ok"] = true
+            result["meta"] = meta
+            result["schema"] = schema
+            result["diagnostics"] = [[String: Any]]()
+        case .failed(let diagnostics, _):
+            result["ok"] = false
+            result["meta"] = [String: Any]()
+            result["schema"] = [String: Any]()
+            result["diagnostics"] = diagnostics.map(Self.diagnosticJSON)
+        case nil:
+            result["ok"] = false
+            result["meta"] = [String: Any]()
+            result["schema"] = [String: Any]()
+            result["diagnostics"] = [[String: Any]]()
+        }
+        return result
+    }
+
+    /// Ascending ids of every clip, the timeline's and every nest's, drawn
+    /// by the module `name`.
+    private func clipsUsing(_ name: String, _ document: ProjectDocument) -> [Int] {
+        let snapshot = document.project.snapshot
+        let clips = snapshot.clips + snapshot.nests.flatMap { $0.clips }
+        return clips.filter { $0.graphic?.name == name }.map { Int($0.id) }.sorted()
+    }
+
+    private static func diagnosticJSON(_ d: GraphicDiagnostic) -> [String: Any] {
+        [
+            "level": d.level, "message": d.message,
+            "line": d.line ?? NSNull(), "column": d.column ?? NSNull(),
+            "frame": d.frame ?? NSNull(),
+        ] as [String: Any]
+    }
+
     // MARK: - What only the app can know
 
     private var sides: ClosedRange<Int> { 1...GraphicLibrary.maxSide }
@@ -92,12 +248,7 @@ extension AgentServer {
     ) throws -> (meta: [String: Any], schema: [String: Any]) {
         guard document.graphicStore?.module(named: name) != nil,
             let entry = GraphicRegistry.shared.entry(named: name, for: document.recipeKey)
-        else {
-            let held = (document.graphicStore?.scan.modules.keys).map { Array($0).sorted() } ?? []
-            let listed = held.isEmpty ? "nothing" : held.joined(separator: ", ")
-            throw ToolError(
-                message: "No module named \"\(name)\" in graphics/ — the folder holds: \(listed)")
-        }
+        else { throw ToolError(message: noModuleSentence(name, document)) }
         switch entry {
         case .compiled(_, _, let meta, let schema):
             return (meta, schema)
@@ -108,6 +259,13 @@ extension AgentServer {
                 message: "The module \"\(name)\" does not compile: "
                     + (first?.message ?? "no diagnostic") + line)
         }
+    }
+
+    /// The sentence for a module the folder does not hold, naming what it does.
+    private func noModuleSentence(_ name: String, _ document: ProjectDocument) -> String {
+        let held = (document.graphicStore?.scan.modules.keys).map { Array($0).sorted() } ?? []
+        let listed = held.isEmpty ? "nothing" : held.joined(separator: ", ")
+        return "No module named \"\(name)\" in graphics/ — the folder holds: \(listed)"
     }
 
     /// `width` or `height` as a side, refused by name outside 1…8192.
