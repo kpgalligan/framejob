@@ -2020,9 +2020,9 @@ struct RecipeTransition: Codable, Equatable {
 /// The rotated canvas rectangle a layer is clipped to (§7.3 `clip_rect`).
 ///
 /// Only a nest ever sets one — a layer flattened out of a nest is clipped to
-/// that nest's canvas rect — so every layer the core emits today carries
-/// `null` here. The type exists so the compositor can implement the clip
-/// once, against a recipe shape that will not change when nests arrive.
+/// that nest's canvas rect (the innermost one, `nest.rs`) — so a layer from
+/// the top-level timeline carries `null` here. The compositor implements the
+/// clip once, against this one recipe shape, however deep the nesting.
 struct RecipeClipRect: Codable, Equatable {
     let x: Double
     let y: Double
@@ -2094,7 +2094,7 @@ struct RecipeLayer: Codable, Equatable {
     /// The obscured regions, at most `ObscureProps.max` of them.
     let obscure: [ObscureProps]
     /// The rectangle this layer is clipped to; nil unless it came out of a
-    /// nest. Always nil today — see `RecipeClipRect`.
+    /// nest — see `RecipeClipRect`.
     let clipRect: RecipeClipRect?
     let transition: RecipeTransition?
 

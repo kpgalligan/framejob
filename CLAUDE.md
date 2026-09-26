@@ -14,32 +14,32 @@ read them before writing code on that side:
   dirty tracking, agent parity, state flow, hygiene.
 
 **These three files are the rulebook, and they hold no status and no
-history.** A phase's record — what landed, what was measured, what its review
-found, what is owed — goes in that road map's own document under `designs/`;
-a file's past goes in `designs/reelcut-app-notes.md` or
-`designs/reelcut-core-notes.md`. Update a map entry or a rule when a phase
+history.** A road map in progress lives in `designs/`, and its own document
+holds each phase's record — what landed, what was measured, what its review
+found, what is owed — including the past of any file the phase changed. When
+a road map closes: condense it into `designs/adr/<name>.md` (any existing ADR
+is the template), move its unfinished items into
+`designs/reelcut-remaining.md`, `git mv` the original into `archive/`, and add
+its row to `archive/INDEX.md`. Update a map entry or a rule when a phase
 changes a file's role or adds a rule. Never append a status paragraph here.
+
+**`archive/` is historical.** Don't consult it unless asked, or unless you
+need to know why an earlier phase made a particular decision — and even then
+read the condensed record in `designs/adr/` first; its "Where to look in the
+original" section says which archived section holds the detail. The index is
+`archive/INDEX.md`. Update `archive/INDEX.md` with each added file. A code
+comment citing "road map N §x" refers to the archived original.
 
 ## Where to look
 
 | Document | What it is |
 |---|---|
-| `designs/reelcut-design.md` | **The normative spec.** §5 schemas, §6 op table, §7 architecture, §9 keys and menus, §10 acceptance steps, §11 decisions already made — not to be re-litigated. |
-| `designs/reelcut-remaining.md` | What is left: §3 the size-debt ledger a phase consults before paying a toll, §4 what only a person at the machine can check, §5 where the next road map starts, §6 the Rust build settings, measured, and the two `Cargo.toml` lines that landed from it. |
-| `designs/reelcut-roadmap.md` | M1–M3: how each was proved, the known limits. |
-| `designs/reelcut-roadmap-2.md` | Ten phases, all built. §0 is the rules every phase inherits; §2 holds each phase's record. |
-| `designs/reelcut-roadmap-3.md` | Screen recording (R1) and pause/resume (R2), built. Start here for the recorder. |
-| `designs/reelcut-roadmap-4.md` | Remove Silences judged by voice — Silero VAD through Core ML (S1), built and proved by `tools/proof/silence2_proof.py` and `silence2_probe.py`. Start here for `detect_silence`. |
-| `designs/reelcut-roadmap-5.md` | Transitions second pass (E1) and motion presets (E2), built and proved. Start here for transitions or `video.motion`. |
-| `designs/reelcut-roadmap-6.md` | Captions from the cloud (AssemblyAI): C1 built — §5 its specification, §10 its record per pipeline, §3 the spike C0 (instruments in `tools/proof/cloud_spike/`); C2, the relay, is designed in §6 and not built. Start here for transcription. |
-| `designs/reelcut-roadmap-7.md` | The deepening series, FOUR candidates, all closed: §0 the rules it inherits (deep module, seam, the deletion test, the interface is the test surface); §1–§3 D1, the core as the one validator of a caller's patch (tickets #2–#7) — start here for how a patch is checked; §4–§6 D2, an op's three answers and the eleven rules that say why they refused (tickets #9–#13) — start here for what an op ANSWERS; §7–§9 D3, one op table published (tickets #15–#20) — start here for where an op's arguments are written down, and §9 for where a next candidate starts; §10 the SOURCE WINDOW candidate, split in three and CLOSED — §10.1–§10.5 the measured inventory of the `× speed` arithmetic, the three head/tail clamp forms and the two road-map-2 defects that are evidence for it, §10.6 what was decided and what each phase owns, §10.7 the record of phase A, the module `core/src/source_window.rs` as a pure move, §10.8 the record of phase B, the window invariant made true at every writer through that module's one bound (spec §11's D4-2 to D4-5), and §10.9 the record of phase C, the app's reversed mirror in one file and the Speed sheet's readout asked of the core (spec §11's D4-6) — start at §10.6, and at §10's closing paragraphs for what a next candidate would be; §11 the HANDLER-FORWARD candidate §9 recommends, MEASURED and retired — why forwarding a caller's whole op unread would cost 21 named refusals, 6 app-state defaults and one correctness guard, what the core's decoder actually says when asked, and the smaller shape the measurement points at, the argument GATE, which §11.8 records LANDED (kpgalligan/reelcut#21). **Read §11 before acting on §9's closing sentence.** |
-| `designs/reelcut-roadmap-8.md` | Word captions — the social-video style (one row, pages filled to the MEASURED width, the spoken word highlighted, popped or pilled), from either engine: BUILT 2026-09-23, W0–W4b. §0 why a page is one text clip with its words timed inside it, §4 the decisions W-1..W-10 (W-8 moves the minimum to macOS 26 and the on-device engine to `SpeechTranscriber`), §5 the design (§5e the sheet's Style row, §5h the styles), §7 what is not built and why — where next work starts, §10 the record per phase (W0 §10.1 to W4b §10.10). Start here for word captions. |
-| `designs/reelcut-roadmap-9.md` | The clip inspector redesign, from `designs/design_handoff_clip_inspector/`: five phases (1, 2, 3a, 3b, 4, 5), all BUILT 2026-09-23/24. §0 the phases, §1–§2 phase 1 (the selected action, the action lane, the timeline's bands; spec §11 CI-1..CI-4), §3–§4 phase 2 (the Clip tab's sub-tabs and the block pinned above the scroll view, the block knob; CI-5, CI-6), §5–§6 phase 3a (the row marks, the keyed segment and the playhead tick, auto-open; CI-7, CI-8), §7–§8 phase 3b (Reset/Clear, the row menus, the refusal strip; CI-9, CI-10), §9–§10 phase 4 (band drags in the lane and on the timeline, the lane's decor; CI-11, CI-12), §11–§12 phase 5 (canvas gestures following the mode, off, mixed, Reduce Motion; CI-13..CI-15). Each even section is that phase's record, deviations and owed items. Start here for the Clip tab, the action lane, a band drag or the canvas's edit target. |
-| `designs/reelcut-roadmap-10.md` | Graphics — motion graphics drawn by code: a clip whose JavaScript module in the package's `graphics/` returns SVG per frame, run by QuickJS and rasterized by resvg in a separate `graphic/` crate. BUILT and merged into `main` 2026-09-25 (§10.10): G0 spiked 2026-09-24; G1–G4 BUILT 2026-09-24/25 (the engine, the model, the picture, the agent's six tools; §10.4–§10.7 their records) — an agent can make a graphic end to end over MCP; G5 BUILT 2026-09-25 (§10.9: the Clip tab's Graphic sub-tab, Insert ▸ Graphic with templates, File ▸ Add Font/Image to Graphics…, Help ▸ Graphics Reference) — a person can now make a graphic too; G6 (performance) deferred by the user; §10.8 the graphics-only playback defect, FIXED 2026-09-25. §1 reviews `designs/svg-motion-components-plan.md`, §3 the spike G0, §4 decisions G-1..G-13 (G-14..G-16 in spec §11) (G-1 and G-2 amend spec §1's plugin non-goal and §7's pixel rule), §5 the design, §9 the phases. Start here for graphics. |
-| `designs/reelcut-effects-survey.md` | The survey road map 5 came from. E3–E9 (tone, filters, looks, adjustment clips, LUT import, voice effects, background removal) are DEFERRED by the user. Concat is AGPL-3.0: its behaviour was studied, and none of its code, shaders, chains or colour tables may be carried over. |
-| `designs/reelcut-milestones.md` | The per-phase record this file carried until 2026-09-17, moved out verbatim. Not maintained. |
+| `designs/reelcut-design.md` | **The normative spec.** §5 schemas, §6 op table, §7 architecture, §9 keys and menus, §10 acceptance steps, §11 decisions already made — not to be re-litigated. An ADR cites §11's IDs; it never replaces them. |
+| `designs/reelcut-remaining.md` | **What is left**, and the one place it is kept: §3 the size-debt ledger a phase consults before paying a toll, §4 what only a person at the machine can check, §5 where the next work starts (open defects, candidates, work the user deferred), §6 the Rust build settings, measured. An item leaves when it is done. |
+| `designs/adr/` | One condensed decision record per closed road map, survey or file history: why the code is the shape it is. Start with the one for the area: `roadmap-03` the recorder · `roadmap-04` `detect_silence` · `roadmap-05` transitions and `video.motion` · `roadmap-06` transcription (C2, the relay, designed and deferred) · `roadmap-07` how a patch is checked, what an op answers, where its arguments are written down, the source window, the argument gate · `roadmap-08` word captions · `roadmap-09` the Clip tab, the action lane, band drags · `roadmap-10` graphics · `app-file-history` / `core-file-history` why a file or module is cut where it is · `effects-survey` E3–E9 (deferred by the user) and **the Concat rule: it is AGPL-3.0; none of its code, shaders, chains or colour tables may be carried over** · `remaining-closed` the debts already paid. |
 | `designs/design_handoff_reelcut/` | The shipped chrome cleanup and identity; its README is normative for the redesign's metrics. |
 | `designs/design_handoff_reelcut_sharp/` | The sharp pass (2026-09-23): square chrome, 2 pt clips, the zoom slider's block knob. Its README is normative for radii and the knob, with spec §11 SH-1 and SH-2 as the deviations. |
+| `designs/design_handoff_clip_inspector/` | The clip inspector handoff road map 9 built from; `designs/adr/roadmap-09-clip-inspector.md` records the deviations. |
 | `tools/proof/README.md` | The proof scripts, the MCP client and the offscreen harness. |
 | `README.md` | User-facing. |
 
@@ -90,7 +90,8 @@ app/
   Resources/Shaders/   Compositor.metal — the per-layer compositing pass
   Resources/Models/    silero_vad.mlmodelc, vendored compiled (PROVENANCE.md)
   Bridging/            the bridging header importing core/include/reelcut_core.h
-designs/             the spec, the road maps, the handoff — the table above
+designs/             the spec, what is left, adr/ (condensed records), the handoffs — the table above
+archive/             closed road maps and histories, verbatim; INDEX.md — read only when asked
 docs/agents/         what the engineering skills read: tracker, labels, domain docs
 docs/graphics-api.md the graphics reference an agent reads; graphic/tests/reference.rs runs every js block
 tools/proof/         mcp.py, the per-phase proof scripts, harness/ (offscreen chrome)
@@ -269,6 +270,8 @@ skip rows for a named host condition such as a locked console.
 ### Issue tracker
 
 GitHub Issues on `kpgalligan/reelcut`, through the `gh` CLI. See `docs/agents/issue-tracker.md`.
+**Every issue an agent creates carries the `ai-drafted` label**, beside any
+triage label: `gh issue create --label ai-drafted …`.
 
 ### Triage labels
 

@@ -177,7 +177,7 @@ extension AgentServer {
     /// checkbox); changing `fps` re-snaps every clip start and duration.
     ///
     /// **`background` goes to the core UNREAD** (deepening D1·4,
-    /// `designs/reelcut-roadmap-7.md` §2.4): a colour is four numbers each
+    /// `archive/reelcut-roadmap-7.md` §2.4): a colour is four numbers each
     /// 0–1 everywhere, so the three-element form `colorArg` used to fill an
     /// alpha into and the clamp it used to apply are both gone, and the core
     /// names what it refused — the wrong length by its type, an out-of-range

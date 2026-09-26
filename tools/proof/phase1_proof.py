@@ -86,7 +86,7 @@ class Session:
     def refused_with(self, tool, tail, **kwargs):
         """A RULE'S refusal, which since deepening D2·3 arrives in the rule's
         own words rather than as the identity's sentence
-        (`designs/reelcut-roadmap-7.md` §5.3).
+        (`archive/reelcut-roadmap-7.md` §5.3).
 
         The reply must END in `was refused at <op>: <the whole sentence>`,
         which is `refusal_proof.py`'s own bar: the sentence entire, ids and

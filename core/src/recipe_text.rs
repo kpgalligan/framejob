@@ -1,8 +1,9 @@
 //! What a text layer SHOWS at one instant: [`Reveal`] — the amount, the
 //! phase and the kind that `text.animation` resolves to (spec §5.2, §7.3)
-//! — the [`text_hash`] that folds all three into the layer's cache key,
-//! the [`text_source`] that assembles the `source` object a text layer
-//! carries, and the one text layer the core writes itself, the timecode
+//! — the [`text_hash`] that folds all three, and a word-timed page's two
+//! word keys, into the layer's cache key, the [`text_source`] that
+//! assembles the `source` object a text layer carries, and the one text
+//! layer the core writes itself, the timecode
 //! [`burn_in_layer`].
 //!
 //! Split out of `recipe.rs` under the size rule (core/CLAUDE.md: a module
@@ -268,8 +269,9 @@ fn reveal_kind(reveal: &Reveal) -> Value {
 }
 
 /// A text layer's `source` object (spec §7.3): the description Swift lays
-/// out, the hash it caches the laid-out result under, and the three
-/// computed keys that say how much of the description is showing.
+/// out, the hash it caches the laid-out result under, and the five
+/// computed keys that say how much of the description is showing — three
+/// for the reveal, two for a word-timed page's words.
 ///
 /// It takes a description, a clip time and a duration and nothing else —
 /// no clip, no instance, no `Evaluated` — for [`Reveal`]'s reason read one
@@ -319,7 +321,7 @@ pub(crate) fn text_source(text: &TextProps, clip_t: Ticks, duration: Ticks) -> V
         Value::from(text_hash(&description, &reveal, styled)),
     );
     source.insert("text".to_string(), description);
-    // The three computed keys ride INSIDE the source object, where the
+    // The three computed reveal keys ride INSIDE the source object, where the
     // kind-specific description already lives, and all three are emitted
     // on every text layer whether it animates or not: an absent key would
     // mean two things — no animation here, or an older core that never

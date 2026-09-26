@@ -1,6 +1,6 @@
 # The word-captions spike — road map 8, W0 (2026-09-22)
 
-Seven questions `designs/reelcut-roadmap-8.md` §3 asks before any word-caption
+Seven questions `archive/reelcut-roadmap-8.md` §3 asks before any word-caption
 code is written, and the instruments that answered them. **The answers are not
 here**: they are in that document's §10.1, with §3a listing every design
 section a row overturned. What is here is how to run it again.
@@ -16,7 +16,7 @@ python3 tools/proof/words_spike/words_spike.py                  # all seven rows
 python3 tools/proof/words_spike/words_spike.py --only q4,q5     # a subset; the rest carry forward
 python3 tools/proof/words_spike/words_spike.py --remake         # rebuild fixtures, binaries, the scratch tree
 python3 tools/proof/words_spike/words_spike.py --leakcheck tools/proof/words_spike \
-    tools/proof/work/words_spike designs/reelcut-roadmap-8.md tools/proof/README.md \
+    tools/proof/work/words_spike archive/reelcut-roadmap-8.md tools/proof/README.md \
     designs/reelcut-remaining.md
 ```
 

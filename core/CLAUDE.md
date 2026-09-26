@@ -4,9 +4,10 @@ Applies to everything under `core/`. Build commands and the FFI three-file
 lockstep are in the root `CLAUDE.md`; the full design is
 `designs/reelcut-design.md` (§5 the schemas, §6 the op table, §7 the
 architecture, §7.10 this module map in the spec's words). The long form of
-each entry below — the history of every cut, with its line counts and the
-argument for where the seam fell — is `designs/reelcut-core-notes.md`; this
-file is what governs a module now.
+each entry below — why the seam fell where it did — is
+`designs/adr/core-file-history.md` (the full history of every cut, with its
+line counts, is archived; see its "Original" line); this file is what
+governs a module now.
 
 ## Module map
 
@@ -30,9 +31,10 @@ file is what governs a module now.
   ever a measured size. Regions (`Spotlight`, `ObscureRegion`, `SpotShape`,
   `MAX_OBSCURE`) share one coordinate frame — the centre as an offset in
   SOURCE pixels from the centre of the layer's cropped rect — which
-  `edit_zoom.rs` writes out as an equation and nothing else restates. No
-  declaration order in these four is load-bearing; the JSON spelling of every
-  variant is, so a rename needs a migration step. The enums are closed:
+  `edit_zoom.rs` writes out as an equation and nothing else restates. The
+  one load-bearing declaration order in these four is `ObscureKind`'s
+  (`model_regions.rs`), a shader discriminant like `BlendMode`'s above;
+  elsewhere only the JSON spelling of every variant is, so a rename needs a migration step. The enums are closed:
   there is no neutral kind to fall back to.
 - `model_words.rs` — the word-caption vocabulary (format version 9, road
   map 8's W1b): `TextCase`, `Word`, `WordMode`, `ActivePill` and

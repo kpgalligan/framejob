@@ -59,10 +59,10 @@ enum ReelEdit {
     /// and the project is exactly as it was, so a refused call is safe to
     /// retry.
     ///
-    /// Not every refusal the core's doc comments describe arrives here yet —
+    /// Not every refusal the core's doc comments describe arrives here —
     /// `Outcome::Identity`'s doc in `core/src/outcome.rs` is the one list of
-    /// which rules can say so out loud, and the rest answer `.identity`
-    /// until road map 7's D2·3 gives them their sentences.
+    /// which rules can say so out loud since road map 7's D2·3, and of the
+    /// clamped edges that still answer `.identity`.
     case refused(ReelRefusal)
 
     /// The new project, or nil for BOTH non-applied arms.

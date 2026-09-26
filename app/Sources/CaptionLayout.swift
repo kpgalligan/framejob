@@ -220,7 +220,8 @@ enum CaptionLayout {
     /// Caption preset and the code path this function always had; a word
     /// style writes `style.pagePatch` per page — the props the pager measured,
     /// at the page's own size (a shrunk one or the style's), with its wrap
-    /// width and its `words` in CLIP time — and puts the batch at the style's `y`. `replacing` names caption tracks to remove
+    /// width and its `words` in CLIP time — and puts the batch at the style's
+    /// `y`. `replacing` names caption tracks to remove
     /// WITH their clips in the same ops, first — `replaceableTracks` says
     /// which qualify — and the new track takes their place at the front.
     static func place(

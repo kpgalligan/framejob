@@ -1,4 +1,4 @@
-//! `graphics_spike` — road map 10 G0's scratch engine (designs/reelcut-roadmap-10.md
+//! `graphics_spike` — road map 10 G0's scratch engine (archive/reelcut-roadmap-10.md
 //! §3): QuickJS through `rquickjs`, SVG through `resvg`, the six §5k
 //! graphics' workload. Not product code. Re-exports only.
 

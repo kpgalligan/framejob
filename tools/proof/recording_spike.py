@@ -2,7 +2,7 @@
 """Road map 3, phase R0 — the recording spike: six questions MEASURED before
 R1's design leans on them.
 
-`designs/reelcut-roadmap-3.md` §3 ("Phase R0 — The spike") names five things
+`archive/reelcut-roadmap-3.md` §3 ("Phase R0 — The spike") names five things
 the plan needs to know and cannot read off a header, and writes R1 two ways
 wherever an answer picks. This script is the tracked instrument: a Swift
 probe embedded below, compiled with `harness/build.sh`'s own swiftc line
@@ -11,7 +11,7 @@ QUESTION PER SUBPROCESS so a crash — a privacy abort on the microphone ask,
 say — is a reported outcome for that question and never a lost run, its
 numbers assembled into ONE JSON object printed to stdout and saved to
 `tools/proof/work/spike/answers.json`, with a readable summary on stderr.
-**Its answers are pasted into `designs/reelcut-roadmap-3.md` dated, with the
+**Its answers are pasted into `archive/reelcut-roadmap-3.md` dated, with the
 host OS**, before R1's first wave is briefed; it stays in the tree afterwards
 as the record, re-runnable.
 
@@ -2290,7 +2290,7 @@ def main():
 
     binary, error = build_probe()
     answers = {
-        "spike": "designs/reelcut-roadmap-3.md §3 phase R0",
+        "spike": "archive/reelcut-roadmap-3.md §3 phase R0",
         "date": started,
         "host": {
             "macOS": subprocess.run(["sw_vers", "-productVersion"], capture_output=True, text=True).stdout.strip(),

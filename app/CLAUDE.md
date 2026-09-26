@@ -3,9 +3,10 @@
 Applies to everything under `app/`. Build/verification commands and the FFI
 lockstep are in the root `CLAUDE.md`; the full design is
 `designs/reelcut-design.md` (§3–4 the UI, §7.4–7.8 the platform side). The
-long form of each entry below — the history of every size toll, the
-measurements behind each decision, what each review found — is
-`designs/reelcut-app-notes.md`; this file is what governs a file now. Files
+long form of each entry below — why each file is the shape it is, and the
+traps its history turned up — is `designs/adr/app-file-history.md` (the
+full history, every size toll and measurement, is archived; see its
+"Original" line); this file is what governs a file now. Files
 are listed by family; a file with a header comment of its own carries its
 detail there.
 
@@ -1101,13 +1102,14 @@ free.
   this side fills in an alpha or clamps a component. **There is no decoder
   for a caller's object in this file and a new door does not add one** (the
   rule under Rules; what was deleted and what it measured,
-  `designs/reelcut-roadmap-7.md` §2–§3).
+  `archive/reelcut-roadmap-7.md` §2–§3).
 
 **Shared chrome.** `Theme.swift` (`DS` tokens, including the three track
 heights S/M/L per kind), `Controls.swift`, `OptionControls.swift`,
 `Sheets.swift`, `EditorChrome.swift` (`BarView`), `FileDropView.swift`
-(Finder drops + the first responder the bare-key map needs), `BrandMark.swift`
-— copied from Rasterize; keep them in sync rather than forking.
+(Finder drops + the first responder the bare-key map needs) — copied from
+Rasterize; keep them in sync rather than forking. `BrandMark.swift` is
+Reelcut's own, drawn from `designs/design_handoff_reelcut/`.
 `Controls.swift`'s `BlockSlider` is the timeline's zoom slider. Two known
 divergences, each recorded: `StickerButton` still has its pill, the one
 place `Controls.swift` lags Rasterize (spec §11 SH-1, owed); and
@@ -1183,7 +1185,7 @@ than a patch and has no op of its own to be refused by
 exception on purpose). The hand checks this rule replaced were deleted
 rather than moved, so a new door that wants one is a door that has not been
 read; the spec says the same in §7.9, and what went and what it measured is
-`designs/reelcut-roadmap-7.md` §2–§3.
+`archive/reelcut-roadmap-7.md` §2–§3.
 
 **Agent parity.** Every user-visible EDIT gets an MCP mirror: a handler, a
 catalog entry declaring `scope`, and a comment naming the UI path. Handlers

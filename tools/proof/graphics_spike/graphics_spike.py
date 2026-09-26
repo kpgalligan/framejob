@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Road map 10 G0 — the graphics spike (designs/reelcut-roadmap-10.md §3).
+"""Road map 10 G0 — the graphics spike (archive/reelcut-roadmap-10.md §3).
 
 Nine rows, run in the order q2, q8, q3, q4, q5, q6, q1, q9, q7: q1 and q9
 patch and rebuild the core and are REVERTED before q7, which launches the

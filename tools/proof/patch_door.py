@@ -6,7 +6,7 @@ nothing here knows about any one door. It is the vocabulary — what a
 say — so that a door's section is the door and nothing else.
 
 **Why it is a file of its own** (deepening D1·4,
-`designs/reelcut-roadmap-7.md` §2.4). The proof arrives one door at a time:
+`archive/reelcut-roadmap-7.md` §2.4). The proof arrives one door at a time:
 D1·3 built it with `set_video` alone, at exactly the 400 lines §0 gives a
 new file, and D1·4 added eight more sections. A file at its cap gives
 something up before it takes anything on (`CLAUDE.md`), and the thing to

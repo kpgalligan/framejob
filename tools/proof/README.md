@@ -618,7 +618,7 @@ tolerance alone would pass against a build that reported the SAMPLE peak and
 called it true, so it is joined by the two claims that fail such a build:
 true peak is never below sample peak, and a 45° fs/4 sine reads at least
 2.5 dB above its own sample peak. Beside that sits the standing limit
-CLAUDE.md records — **audio export is not bit-deterministic near a duck ramp
+`app/CLAUDE.md` records — **audio export is not bit-deterministic near a duck ramp
 edge** (three exports of one project gave two results differing by 38 samples
 of one 16-bit LSB in an 8 ms window at a release edge) — so every fixture
 here is duck-free and fade-free, and the byte-identity claims need no
@@ -2313,7 +2313,7 @@ subset run carries the other questions' answers forward under
 direct line, and `open -a … --env … --stdout … --stderr … --args …`) on ports
 4890 and 4891, records a few seconds of the main display for the others, and
 writes `work/spike/answers.json`. Its answers are pasted into
-`designs/reelcut-roadmap-3.md` dated; two of them overturned the plan. The
+`archive/reelcut-roadmap-3.md` dated; two of them overturned the plan. The
 seventh (2026-09-12, `--only 7`, three rows of three 2 s segments) is R2's:
 pause and resume as segments over ONE running stream — the recording output
 removed at each pause and a fresh one added at each resume, with a `.screen`
@@ -2612,7 +2612,7 @@ defect and not the host.
 
 Dragging a clip flashed the playhead to 0 and back, and with the playhead
 scrolled off screen it yanked the timeline back to it
-(`designs/reelcut-app-notes.md`, "The playhead echo, 2026-09-26").
+(`archive/reelcut-app-notes.md`, "The playhead echo, 2026-09-26").
 `Playback` reported its OWN seeks as playhead moves: the periodic time
 observer fires on every time jump, so a rebuild's item swap (the new item
 starts at 0) and its re-land, and the paused refresh's one-tick round trip,
@@ -2700,7 +2700,7 @@ app/CLAUDE.md's undo pitfall.
 for a phase**, which is the one thing about it that is not the house shape:
 what it proves is the single door every caller-authored object comes through
 (`core/src/patch.rs`, `CONTEXT.md`'s **Patch**), and the doors arrive one
-deepening ticket at a time (`designs/reelcut-roadmap-7.md` §1). D1·3
+deepening ticket at a time (`archive/reelcut-roadmap-7.md` §1). D1·3
 (kpgalligan/reelcut#4) built it with `set_video`'s section, at **39/39**;
 D1·4 (#5) added eight more, at **199/199**; D1·5 (#6) added the last two —
 `set_action_end` and `add_zoom_action`'s region — and it is **258/258**, with
@@ -2710,7 +2710,7 @@ LATER phase's door copies; neither kind is owed one today.
 **It is four files and one script.** The sections outgrew a single file when
 D1·4's eight landed, so the split went by kind — for navigation, since a
 proof script is not held to the 400-line cap a new SOURCE module gets
-(`designs/reelcut-roadmap-7.md` §2.4 argues it; most scripts here are well
+(`archive/reelcut-roadmap-7.md` §2.4 argues it; most scripts here are well
 past it):
 
 | File | What is in it |
@@ -2781,7 +2781,7 @@ which every refusal at that door said.
 a phase**, as the patch door is: what it proves is the answer every edit
 comes back with (`core/src/outcome.rs`, `app/Sources/ReelEdit.swift`,
 `CONTEXT.md`'s **Op**), and the rules that can say WHY arrive one deepening
-ticket at a time (`designs/reelcut-roadmap-7.md` §4, kpgalligan/reelcut#8).
+ticket at a time (`archive/reelcut-roadmap-7.md` §4, kpgalligan/reelcut#8).
 Deepening D2·2 (#10) built it with the overlap rule's section, at
 **39/39** (40/40 after its review); D2·3 (#11) took it to **113/113** with
 one section per rule that found its voice, each a copy of `overlap_rule`;
@@ -3378,7 +3378,7 @@ the patch asserting its text occurs exactly once:
 2026-09-20, §2 scored 4/5: the reversed clip's waveform was loud on the LEFT,
 18 028 lit pixels against 760 on the right — the forward clip's own split
 pixel for pixel — and its `sourceTime` answered the forward clip's ticks
-exactly. `designs/reelcut-roadmap-7.md` §10.9 carries the table.
+exactly. `archive/reelcut-roadmap-7.md` §10.9 carries the table.
 
 **The one-tick-high mirror is a known limit, not a defect to chase here**: a
 reversed tick `p` covers the forward file's tick `T − 1 − p` and the app
@@ -3392,7 +3392,7 @@ numbers tick-exact.
 
 Road map 4's S1 — quiet judged by Silero VAD through Core ML — and the two
 instruments §4g owes it, landed 2026-09-19 against the unmodified tree and
-widened by the READER REVIEW of 2026-09-20 (`designs/reelcut-roadmap-4.md`
+widened by the READER REVIEW of 2026-09-20 (`archive/reelcut-roadmap-4.md`
 §8), whose five new sections are marked below, and again by the SCEPTIC's
 pass over that review the same day, which added four rows (one in claim 10,
 three at the foot of §8c) for the two defects the review's own fixes left —
@@ -3664,7 +3664,7 @@ fps on this host's fixture.
 Phases 2, 3, 3-silence and 5 and the remaining-work proof were re-run against
 the same binary and score **86, 123, 8, 88 and 79**.
 
-**The 2026-09-20 reader review** (`designs/reelcut-roadmap-4.md` §8) added
+**The 2026-09-20 reader review** (`archive/reelcut-roadmap-4.md` §8) added
 eight more mutants, each a tree copy on port 4872 with the app rebuilt in it
 and the patch asserting its replaced text occurs exactly once. Six are named
 beside the rows they take, above. The other two are the review's two "without
@@ -3874,7 +3874,7 @@ here are measured against.
 `env RC_ASSEMBLYAI_KEY=proof-key python3 tools/proof/e2_chrome.py`, no port,
 **52/52** after E2-27 (35/35 before it; 24/24 until the E2
   reader review of 2026-09-20 added nine rows, and its residue run two,
-  `designs/reelcut-roadmap-5.md` §12).
+  `archive/reelcut-roadmap-5.md` §12).
 
 E2-27 extends that same script with no-motion versus zero In, zero Out and
 both-zero name-strip pixel equality; a one-frame positive wedge on each
@@ -3963,7 +3963,7 @@ fallback used for a shape, the period read as a fraction of the clip, the
 tent removed, the pivot compensation removed, the split rule removed, the
 `evaluate_clip` restore removed, the `set_action_end` refusal removed,
 `structural` not widened, `drift` using the period. Every score is in
-`designs/reelcut-roadmap-5.md` §12, with the rows each one took.
+`archive/reelcut-roadmap-5.md` §12, with the rows each one took.
 
 **The E2 reader review added nineteen more** (2026-09-20, same shape, same
 scratch copy, every patch asserting one occurrence): eight NAMED mutants of
@@ -4021,7 +4021,7 @@ ordinary clip length.
 ## Road map 6 — the cloud spike (`cloud_spike/`)
 
 C0, run 2026-09-20: eight questions about AssemblyAI that
-`designs/reelcut-roadmap-6.md` §3 leaned on, MEASURED. Its own README
+`archive/reelcut-roadmap-6.md` §3 leaned on, MEASURED. Its own README
 (`tools/proof/cloud_spike/README.md`) is the full one — the instrument table,
 the fixtures, the key and spend rules, the ledger's outcomes — and the
 ANSWERS are in road map 6 §3, not here.
@@ -4030,7 +4030,7 @@ ANSWERS are in road map 6 §3, not here.
 python3 tools/proof/cloud_spike/cloud_spike.py --selftest    # free, no key, loopback only
 python3 tools/proof/cloud_spike/cloud_spike.py               # all eight rows
 python3 tools/proof/cloud_spike/cloud_spike.py --only q3,q4  # a subset; the rest carry forward with their dates
-python3 tools/proof/cloud_spike/cloud_spike.py --leakcheck tools/proof/cloud_spike tools/proof/work/cloud_spike designs/reelcut-roadmap-6.md
+python3 tools/proof/cloud_spike/cloud_spike.py --leakcheck tools/proof/cloud_spike tools/proof/work/cloud_spike archive/reelcut-roadmap-6.md
 ```
 
 **Nothing here is a pass.** Every row is a MEASUREMENT, and the two ways a
@@ -4737,7 +4737,7 @@ the litecode checks and fix-notes files hold the evidence.
 ## Road map 8 — the word captions spike (`words_spike/`)
 
 W0, run complete on 2026-09-22: the seven questions
-`designs/reelcut-roadmap-8.md` §3 asks before any word-caption code is
+`archive/reelcut-roadmap-8.md` §3 asks before any word-caption code is
 written. **The answers are in that document's §10.1, and §3a lists every
 design section a row overturned.** `tools/proof/words_spike/README.md` is how
 to run it again; this paragraph is the entry in this table.
@@ -4746,7 +4746,7 @@ to run it again; this paragraph is the entry in this table.
 python3 tools/proof/words_spike/words_spike.py                  # all seven rows
 python3 tools/proof/words_spike/words_spike.py --only q4,q5     # a subset; the rest carry forward
 python3 tools/proof/words_spike/words_spike.py --leakcheck tools/proof/words_spike \
-    tools/proof/work/words_spike designs/reelcut-roadmap-8.md tools/proof/README.md \
+    tools/proof/work/words_spike archive/reelcut-roadmap-8.md tools/proof/README.md \
     designs/reelcut-remaining.md
 ```
 
@@ -4796,7 +4796,7 @@ host network state.
 ## Road map 10 — the graphics spike (`graphics_spike/`)
 
 G0, run complete on 2026-09-24: the nine questions
-`designs/reelcut-roadmap-10.md` §3 asks before any graphics code is written.
+`archive/reelcut-roadmap-10.md` §3 asks before any graphics code is written.
 **The answers are in that document's §10.1, and §3a lists every design
 section a row rewrote.** `tools/proof/graphics_spike/README.md` is how to
 run it again; this paragraph is the entry in this table.

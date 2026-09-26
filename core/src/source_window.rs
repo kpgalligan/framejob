@@ -18,7 +18,7 @@
 //! readers sat in `model_query.rs` with only their prose to say that one
 //! multiplied where the other two divided, and every caller that had to
 //! convert back wrote the multiplication out again — six copies of it
-//! (`designs/reelcut-roadmap-7.md` §10.1). `in_advanced` is now the only
+//! (`archive/reelcut-roadmap-7.md` §10.1). `in_advanced` is now the only
 //! one, and `source_advanced` is it applied to a whole [`Source`], which is
 //! what `trim_start`, `roll`, `split_clip` and `add_transition` each want.
 //!

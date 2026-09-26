@@ -28,8 +28,9 @@ import AppKit
 /// `item` and `submenuItem`, which `AppDelegate+GraphicMenu.swift` builds the
 /// Insert menu with (road map 10's G5b). The other builders and helpers stay
 /// `private`, because Swift's `private` covers a type's extensions within one
-/// file and each is called only from inside this one. Nothing needed to become a stored property either, which
-/// is what makes an extension a legal home for it: the menu bar is built out
+/// file and each is called only from inside this one. Nothing needed to
+/// become a stored property either, which is what makes an extension a legal
+/// home for it: the menu bar is built out
 /// of selectors, `TransitionKind.allCases` and `ClipLabel.allCases`, and holds
 /// no state at all once it is hung off `NSApp`.
 extension AppDelegate {

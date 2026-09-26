@@ -1,7 +1,7 @@
 # The silence spike — road map 4, S0 (2026-09-13)
 
 Three programs, run from a shell (so under the terminal's TCC attribution,
-as every proof is), whose output `designs/reelcut-roadmap-4.md` §2 quotes.
+as every proof is), whose output `archive/reelcut-roadmap-4.md` §2 quotes.
 None is a proof; each is an instrument, tracked so the numbers in that
 document can be reproduced rather than believed.
 

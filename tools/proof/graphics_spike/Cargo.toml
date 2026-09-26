@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 
-# Road map 10 G0's scratch crate (designs/reelcut-roadmap-10.md §3). Not a
+# Road map 10 G0's scratch crate (archive/reelcut-roadmap-10.md §3). Not a
 # product crate: its own workspace, so the core's never sees it except while
 # q1/q9 patch it in by path.
 [workspace]

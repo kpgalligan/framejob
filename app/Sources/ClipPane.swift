@@ -27,7 +27,7 @@ import AppKit
 /// design asks for — plus Transform open and the rest closed — is what keeps
 /// the panel readable at that length.
 final class ClipPane: InspectorPaneView {
-    /// The four factories. Constructed once and kept: their sections capture
+    /// The five factories. Constructed once and kept: their sections capture
     /// them (a Reset closure holds `binding`, a button holds `inspector`), and
     /// they are cheap — an `NSView` with a stack view nobody ever lays out.
     let videoPane: VideoPane

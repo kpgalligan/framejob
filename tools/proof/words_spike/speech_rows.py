@@ -182,7 +182,7 @@ def _pause_reading(rows, pauses):
     """§5c's `breakGap` reads the PREVIOUS word's end, so both edges are
     measured: how late the first word after a pause starts, and how early the
     run that carries it begins. S0 saw ranges ABSORB the pause before them
-    (`designs/reelcut-roadmap-4.md:110-118`)."""
+    (`archive/reelcut-roadmap-4.md:110-118`)."""
     timed = [r for r in rows
              if isinstance(r["start"], (int, float)) and isinstance(r["end"], (int, float))]
     out = []

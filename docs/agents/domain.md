@@ -13,12 +13,16 @@ If `CONTEXT.md` doesn't exist, **proceed silently**. Don't flag its absence; don
 
 `CLAUDE.md` makes §11 binding: a decision there is not re-litigated, and a phase that needs a new one records it there before the code. So when a skill would write an ADR, add a §11 entry instead, in that section's style: a bold one-line decision, then its reasoning and the risk it accepts. Don't create `docs/adr/`.
 
+`designs/adr/` is something else: one condensed record per CLOSED road map, written when the road map is archived (root `CLAUDE.md` says how). It explains the history behind the code and cites §11's IDs; it is not where a new decision goes. Read the one for your area when you need to know why the code is shaped as it is.
+
 ## File structure
 
 ```
 /
 ├── CONTEXT.md                  ← glossary, created lazily
 ├── designs/reelcut-design.md   ← §11 is the decision record
+├── designs/adr/                ← condensed records of closed road maps
+├── archive/                    ← their originals; read only when asked (INDEX.md)
 ├── core/                       ← Rust staticlib
 └── app/                        ← Swift/AppKit
 ```

@@ -3,7 +3,7 @@
 Named for the seam and not for a phase: what it proves is the one door every
 caller-authored object comes through (`core/src/patch.rs`, `CONTEXT.md`'s
 **Patch**), and the doors arrive one deepening ticket at a time
-(`designs/reelcut-roadmap-7.md` §1, kpgalligan/reelcut#1). Deepening D1·3
+(`archive/reelcut-roadmap-7.md` §1, kpgalligan/reelcut#1). Deepening D1·3
 built it with `set_video`'s section; D1·4 added eight more; D1·5 added the
 last two, `set_action_end` and `add_zoom_action`'s region. There is no phase
 number to put on that, and every door the app has is here.

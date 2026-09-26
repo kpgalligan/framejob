@@ -41,7 +41,7 @@ import Foundation
 /// same table the catalog reads, so a constraint the app still ENFORCES that
 /// the TABLE stops declaring moves both sides of this comparison together
 /// and passes here. Twice in D3 exactly that happened
-/// (`designs/reelcut-roadmap-7.md` §8.3 and §8.4). What catches that class is
+/// (`archive/reelcut-roadmap-7.md` §8.3 and §8.4). What catches that class is
 /// a row that calls the RUNNING tool and reads its answer: the misspelt
 /// argument sent to all fifty-nine ops in
 /// `tools/proof/op_argument_proof.py`, and the behavioural sections of the

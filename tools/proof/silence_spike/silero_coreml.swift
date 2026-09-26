@@ -11,7 +11,7 @@
 //   xcrun swiftc -O -target arm64-apple-macos26.0 silero_coreml.swift -o silero_coreml
 //   SILERO_MLMODELC=./silero_vad.mlmodelc ./silero_coreml <media>...
 //
-// designs/reelcut-roadmap-4.md §2 quotes its output (q6, q7).
+// archive/reelcut-roadmap-4.md §2 quotes its output (q6, q7).
 import Foundation
 @preconcurrency import AVFoundation
 import CoreML

@@ -24,7 +24,11 @@ shapes, transitions and simple animation, without Final Cut's magnetic
 timeline, roles, multicam, scopes, or a plugin ecosystem.
 
 Deliberate non-goals: camera recording, multicam, color grading beyond
-per-clip controls, audio beyond volume/fade/duck, a plugin system (a clip
+per-clip controls, audio beyond what shipped (volume, fades, duck, pan,
+compressor, noise reduction, peak normalize, the transition crossfade and
+the export's loudness target — M3 and §11 R5-2; so no EQ, mix buses or
+Audio Units, while offline voice effects are deferred rather than out), a
+plugin system (a clip
 may draw itself from a JavaScript module in its package, road map 10;
 nothing else is scriptable — §11 G-1), any platform but macOS. **Screen recording was on this list until road map 3
 reversed it** (§11): the app records a display or a window through
@@ -423,7 +427,8 @@ Chroma key — or to a media source, which is Speed.
   value moves.
 - M3: *Chroma key* (key color with a canvas eyedropper, tolerance,
   softness, spill suppression), *Reflection*, *Filters* (blur, sharpen,
-  pixelate, sepia, noir, vignette, invert — Core Image behind them).
+  pixelate, sepia, noir, vignette, invert — a pass of the one Metal
+  compositor, not Core Image; §5.2).
 - M3: *Spotlight* — the stand-in for a screencast editor's freehand callout — lives
   here rather than in the Shape pane below, because only the layer that
   owns the pixels can draw its 1.2–2× zoom.
@@ -2419,7 +2424,7 @@ pass nothing, because each wants the picture rather than a deliverable.
   about `curve`. A layer mid-transition always draws
   `normal`, and the core is what says so (§7.3), so this shader has no
   special case for it and none may be added. Shadows (M3) render the
-  layer's alpha to a small offscreen texture, blur with
+  layer's alpha to a canvas-sized offscreen mask (one shared pair), blur with
   `MPSImageGaussianBlur`, draw first — and the MASK pass takes the layer's
   gather specialization WITHOUT its blend, because the mask asks about the
   layer's SHAPE, which no blend mode changes. That separation is DEFENSIVE
@@ -3165,7 +3170,7 @@ a clean `make lint` before finishing Rust work.
 | ⌥-click a track header | Select every clip on that track |
 | ⌘-drag | Suppress snapping |
 
-**Proposed, not yet bound** — the keys `designs/reelcut-roadmap-2.md` asks
+**Proposed, not yet bound** — the keys `archive/reelcut-roadmap-2.md` asks
 for, kept here so a phase that binds one checks this table for a conflict
 first and then promotes its row into the one above. A row here is a claim on
 a key, nothing more.
@@ -3561,7 +3566,7 @@ assisted import.
 - **D2-1 — A refused op says why in the CORE's words; a tool still names an
   argument the caller left out.** Deepening D2 gave every rule that refuses
   a sentence of its own and deleted the app's copies
-  (`designs/reelcut-roadmap-7.md` §4–§5), so no agent handler trial-applies
+  (`archive/reelcut-roadmap-7.md` §4–§5), so no agent handler trial-applies
   an op in order to write a reason. The line between the two, drawn at D2·4
   because six handlers answer a caller before the core sees the call: **a
   check that predicts a RULE goes; a check that names the CALL stays.**
@@ -3579,7 +3584,7 @@ assisted import.
   inconsistent for a caller.
 - **D3-1 — The core says what an argument IS; the app says what it is FOR.**
   Deepening D3 made the op table a published interface
-  (`designs/reelcut-roadmap-7.md` §7–§9): `core/src/op_table.rs` holds one row
+  (`archive/reelcut-roadmap-7.md` §7–§9): `core/src/op_table.rs` holds one row
   per op and one `Argument` per argument — name, `Kind`, required — and
   `rc_op_schemas` publishes it as JSON Schema, which all fifty-seven op tools
   PRINT instead of hand-writing a `"type"`, an `"enum"` or a `required` list.
@@ -3605,7 +3610,7 @@ assisted import.
   (`AgentServer+Gate.swift`): the caller's keys against the tool's published
   `inputSchema`, every stranger refused naming the tool, the strangers and
   the whole of what the tool takes. Two choices, taken with the fix
-  (`designs/reelcut-roadmap-7.md` §11.6): it covers **all seventy-seven
+  (`archive/reelcut-roadmap-7.md` §11.6): it covers **all seventy-seven
   tools** and not the fifty-seven ops, because the app-state tools have the
   same defect and the comparison reads a published schema either way; and it
   speaks the **app's** sentence rather than the core's serde wording, because
@@ -3643,7 +3648,7 @@ assisted import.
   minted before this, and the one-frame floor `resnap` cannot go below still
   reach it. No persisted field changes, so `RC_FORMAT_VERSION` stays 8.
 - **D4-1 — A clip's content length is ONE function, and the plan obeys it.**
-  `designs/reelcut-roadmap-7.md` §10.3's unverified reading is confirmed:
+  `archive/reelcut-roadmap-7.md` §10.3's unverified reading is confirmed:
   `evaluate.rs`'s `segment_of` held a second copy of `content_length`, and
   the two differed in the degenerate case. The `clip.duration` fallback
   there against the reader's `clip.duration.max(1)` is NOT observable —
@@ -3697,7 +3702,7 @@ assisted import.
   that tail is no longer an identity; and the one-frame floor still wins
   over the bound, which is what `evaluate.rs`'s last-line clamp stays for.
   `rate_stretch` needed no change and its vector is in
-  `designs/reelcut-roadmap-7.md` §10.8: it writes `speed = content / duration`
+  `archive/reelcut-roadmap-7.md` §10.8: it writes `speed = content / duration`
   and leaves both the content length and `in` alone, so
   `round(d × (c/d)) == c` and the window it had is the window it keeps.
   No persisted field changes, so `RC_FORMAT_VERSION` stays 8.
@@ -3738,7 +3743,7 @@ assisted import.
   `RC_FORMAT_VERSION` stays 8.
 - **D4-6 — the reversed mirror is APP arithmetic with ONE home, and the
   Speed sheet's readout is the core's own answer.**
-  `designs/reelcut-roadmap-7.md` §10.6's fourth decision, built as phase C.
+  `archive/reelcut-roadmap-7.md` §10.6's fourth decision, built as phase C.
   The core keeps no mirror — `edit_clip.rs`'s `set_reversed` argues why: `in`
   is measured in the stream the clip PLAYS, and a second convention would
   have to be known by every trim, split and source-length reader in the
@@ -3827,7 +3832,7 @@ assisted import.
   nothing. The file rather than the Keychain because C0's q7 measured what
   an ad-hoc signature does to a login-keychain item: the next `make app`
   cannot read it without a modal and cannot delete it at all
-  (`designs/reelcut-roadmap-6.md` §3 q7, §5d). A build signed with a stable
+  (`archive/reelcut-roadmap-6.md` §3 q7, §5d). A build signed with a stable
   identity could keep it in the Keychain, and `SecretStore` is the protocol
   that lets that be a later conformer.
   **Current product scope (2026-09-21):** users supply their own AssemblyAI
@@ -4175,6 +4180,9 @@ assisted import.
   by name ("a person has to install it") and never downloads. Closing the
   sheet mid-download lets the download run on in the framework.
   `DictationTranscriber` is not built until a locale asks for it.
+- **W-9 — No language model chooses words.** Keyword emphasis and emoji
+  insertion are left out: every styled word is styled by its position in
+  time, never by its meaning (road map 8 §4 W-9).
 - **W-10 (the core's sentence) — `set_text` can patch `case`, `words` and
   `word_style`,** because deepening D1 makes every declared key patchable.
   That is the agent's door, and it is not a promise that a hand-restyled

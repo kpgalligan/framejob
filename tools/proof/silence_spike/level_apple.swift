@@ -7,7 +7,7 @@
 //   xcrun swiftc -O -parse-as-library -target arm64-apple-macos26.0 level_apple.swift -o level_apple
 //   ./level_apple <media> [minLength seconds, default 0.5]
 //
-// designs/reelcut-roadmap-4.md §2 quotes its output (q1, q2, q3, q4, q5).
+// archive/reelcut-roadmap-4.md §2 quotes its output (q1, q2, q3, q4, q5).
 import Foundation
 import AVFoundation
 import Speech

@@ -472,7 +472,7 @@ extension AgentServer {
     /// action's end state.
     ///
     /// **The patch goes to the core UNREAD** (deepening D1·3,
-    /// `designs/reelcut-roadmap-7.md` §2.3). Decoding the object into a
+    /// `archive/reelcut-roadmap-7.md` §2.3). Decoding the object into a
     /// `VideoPatch`, checking an allowed-key set, reading `motion` by hand
     /// and checking four closed enums are all `core/src/patch.rs`'s now, and
     /// its refusals name the dotted path (array indices included) and the
@@ -496,7 +496,7 @@ extension AgentServer {
     /// handles (`FadeHandleSession`).
     ///
     /// **The patch goes to the core UNREAD**, as `set_video`'s does (D1·4
-    /// after D1·3, `designs/reelcut-roadmap-7.md` §2.4). Its group holds no
+    /// after D1·3, `archive/reelcut-roadmap-7.md` §2.4). Its group holds no
     /// enum at all, so what the forwarding buys here is the nested object: a
     /// `duck` or a `compressor` MERGES now instead of being replaced from
     /// defaults, and a misspelt key inside one is
@@ -666,7 +666,7 @@ extension AgentServer {
     /// edit. Requiring the key means a caller says `null` on purpose.
     ///
     /// **The region goes to the core UNREAD** (deepening D1·5,
-    /// `designs/reelcut-roadmap-7.md` §2.5). It is the one op ARGUMENT that
+    /// `archive/reelcut-roadmap-7.md` §2.5). It is the one op ARGUMENT that
     /// is a caller-authored object, and `edit_zoom.rs`'s `ZoomRegion` reads
     /// it the way a patch is read: an unknown member is named beside the four
     /// the region takes, a missing one is named (there is no defensible
@@ -813,7 +813,7 @@ extension AgentServer {
     /// spec §11 CI-9).
     ///
     /// **The patch goes to the core UNREAD** (deepening D1·5,
-    /// `designs/reelcut-roadmap-7.md` §2.5) — the LAST door of the six, and
+    /// `archive/reelcut-roadmap-7.md` §2.5) — the LAST door of the six, and
     /// the one that used to check the most: `checkActionPatch` walked three
     /// allowed-key sets, `checkVideoEnums` and `checkTextEnums` ran here
     /// alone, and `patchArg`'s round trip decoded the whole thing through

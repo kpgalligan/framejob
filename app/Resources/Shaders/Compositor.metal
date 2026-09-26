@@ -1480,7 +1480,7 @@ fragment float4 reelcut_layer_blend_fragment(Varyings in [[stage_in]],
 // `LayerUniforms`: this stage shares none of the layer block's placement
 // fields, and a separate struct costs `LayerUniforms` one float instead of
 // six. The same layout contract applies — scalars only, mirrored
-// field-for-field by `ShadowUniforms` in Compositor.swift, 8 floats = 32
+// field-for-field by `ShadowUniforms` in Compositor.swift, 12 floats = 48
 // bytes.
 struct ShadowUniforms {
     float canvasWidth;

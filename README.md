@@ -251,7 +251,7 @@ volume/fade/duck/detach, freeze frame, speed, the in/out range and the agent —
 and **M2 and M3 are now done too**: chapters on export, nests, filters,
 reflection, spotlight, reverse, the audio DSP, GIF/APNG export, SRT captions,
 Consolidate Media and ffmpeg-assisted import. Beyond the spec,
-`designs/reelcut-roadmap-2.md`'s phases 0 through 7 have landed — the
+`archive/reelcut-roadmap-2.md`'s phases 0 through 7 have landed — the
 groundwork, the cutting moves, clip identity, the screencast trio, captions
 in both directions with the built-in text animations, sound (the mono fold,
 a level meter, Normalize Clip, loudness on export and the two uncompressed
@@ -262,8 +262,8 @@ settings, and the export queue), viewing and finding (preview quality, a
 second preview window, and a Media tab you can search, sort and filter), and
 now the last of them: editing INSIDE a nest, which the spec designed and left
 and which every op reaches through one envelope key.
-`CLAUDE.md` carries the milestone record and `designs/reelcut-roadmap.md`
-what still needs a person at the machine.
+`designs/adr/` holds the condensed record of each road map, and
+`designs/reelcut-remaining.md` §4 what still needs a person at the machine.
 
 What has actually been checked, and what has not: the model, the ops, the
 composition plan, the frame recipe, the compositor, save/open and export were
@@ -287,7 +287,9 @@ app/
   Sources/            Swift AppKit application (programmatic UI, no storyboards)
   Resources/Shaders/  Compositor.metal — the per-layer compositing pass
   Bridging/           Bridging header importing the Rust FFI header
-designs/              reelcut-design.md — the accepted design and spec
+designs/              reelcut-design.md — the accepted design and spec;
+                      reelcut-remaining.md — what is left; adr/ — condensed records
+archive/              closed road maps, verbatim (INDEX.md)
 project.yml           xcodegen definition — source of truth for the Xcode project
 Makefile              Build orchestration
 ```
@@ -314,7 +316,7 @@ Makefile              Build orchestration
 | `InspectorPane.swift` · `InspectorViewController.swift` · `ClipPane` `MediaPane` `DocumentPane` (with `VideoPane` `AudioPane` `TextPane` `ShapePane` as section factories) | the binding that knows about actions, one file per tab, and the sections the Clip tab composes |
 | `MediaRowView.swift` · `MediaListFilter.swift` · `MediaPaneCommands.swift` · `MediaUsage.swift` · `MediaReveal.swift` | the Media tab around its pane: the row and the drag it sources, the find band as a value, the row's commands, the one answer to "is this file used" (which walks the nests), and Reveal in Timeline |
 | `EditorViewController.swift` + `EditorViewController+{Timeline,Canvas,Inspector,Export}.swift` | wiring in the base file, features in extensions |
-| `AgentServer.swift` + `AgentServer+{Arguments,Project,Clips,Tracks,Media,Render,History,Silence,Captions,Audio,Background,Scope,Recording}.swift` · `AgentServer+CloudCaptions.swift` · `AgentCatalog.swift` · `AgentCatalog+Clips.swift` · `AgentCatalog+Files.swift` · `AgentCatalog+Captions.swift` | the MCP endpoint, its handlers, and the tool catalog |
+| `AgentServer.swift` + `AgentServer+{Arguments,Gate,Parity,Project,Clips,Tracks,Media,Render,History,Silence,Captions,CloudCaptions,Audio,Background,Transitions,Scope,Recording,RecordingArguments,RecordingResult,Graphics,GraphicImports,GraphicRender}.swift` · `AgentCatalog.swift` + `AgentCatalog+{Clips,Files,Captions,Audio,Transitions,Graphics,Declarations}.swift` | the MCP endpoint, its handlers, and the tool catalog |
 | `RecordingSetup.swift` · `ScreenRecorder.swift` (with `+Finishing` and `+Content`) · `RecordingLanding.swift` · `ProjectDocument+Recording.swift` · `RecorderPanelController.swift` (with `+Rows` and `+Recording`) · `RecorderStatusItem.swift` · `AppDelegate+Recording.swift` · `AgentServer+Recording.swift` | screen recording (road map 3): the values, the session over ScreenCaptureKit and a second `AVCaptureSession` for the microphone, the landing as ordinary media, the floating non-activating panel with its countdown and meter, the menu-bar status item, and the `record_screen` tool |
 | `AppDelegate.swift` · `EditorWindowController.swift` · `WelcomeWindowController.swift` · `main.swift` | menus (nil-target selectors), window, welcome |
 | `SpeedSheetController.swift` · `RelinkSheetController.swift` · `SilenceSheetController.swift` (with `SilenceDetector.swift` behind it) · `TranscribeSheetController.swift` (+`Cloud` `Commit`) · `SettingsWindowController.swift` | the remaining dialogs, and Reelcut ▸ Settings… |

@@ -1,0 +1,368 @@
+# Graphics — motion graphics drawn by code (road map 10)
+
+- **Status:** Built and merged into `main` 2026-09-25 (G0 spike, G1–G5 built;
+  G6 performance deferred by the user).
+- **Original:** `archive/reelcut-roadmap-10.md` (3859 lines) — the full record;
+  sections cited below as "orig §x" refer to it. Its input was the user's
+  proposal, `archive/svg-motion-components-plan.md` (ADR:
+  `designs/adr/svg-motion-plan.md`).
+- **Spec decisions:** G-1..G-16 in spec §11 (`designs/reelcut-design.md`),
+  with G-9·a/b/c and G-15(a)–(f). One-line gists:
+  G-1 a graphic is a clip's SOURCE, not an effect (spec §1's plugin non-goal
+  gains one clause; R5-1 stands);
+  G-2 the engine is a separate crate, `graphic/`, and the core keeps "no
+  pixels, no filesystem";
+  G-3 a module is a FILE in the package, and editing it is not an undo step;
+  G-4 the core checks props against the schema the OP carries, render time is
+  lenient;
+  G-5 a frame is a pure function of source, props, frame, size, fonts, assets;
+  G-6 fonts are the bundled faces plus `graphics/fonts/`, never the system's;
+  G-7 a graphic draws at its own frozen size, premultiplied BGRA across the FFI;
+  G-8 a failure draws an error card, answers the agent, and stops an export;
+  G-9 a graphic's own timeline is `in` + `length`, and `split` pins it;
+  G-10 props are not action targets;
+  G-11 plain JavaScript, one ES module, no TypeScript;
+  G-12 colour props are CSS strings normalised to hex;
+  G-13 the revision is a SHA-256 content hash, and an export pins it;
+  G-14 `graphics/` is created on first write, never at open;
+  G-15 the Graphic sub-tab's multi-clip and write rules;
+  G-16 Insert ▸ Graphic's placement, naming and compile-failure rules.
+
+## Context
+
+The user asked for something like Remotion: motion graphics made from code
+(2026-09-24). Here a JavaScript module returns an SVG string for a frame, and
+the result is a new clip type. An AI over MCP would create and edit most of
+these clips. A clip's code lives on disk inside the `.reelcut` package.
+
+Before this, Reelcut had no scripting and no C code in the build. The core
+did no pixel work and had no filesystem. The design fits the feature into
+those rules. A graphic is one more producer of the premultiplied BGRA layer
+texture that text and shapes already make. So placement, actions, blend
+modes, transitions, motion presets and alpha export all apply to it with no
+change (orig §0, §2).
+
+## Decisions
+
+**The engine is QuickJS (via `rquickjs`) plus resvg, in the `graphic/` crate at
+the repo root, linked into the one staticlib** (G-2; orig §4 G-2, §10.1 q1/q9).
+Only `core/src/ffi_graphic.rs` names the crate, and no model, op, plan or
+recipe module imports it. The crate does pixel work but never touches the
+filesystem: the app reads every byte and hands it over. A second staticlib
+was ruled out because two Rust staticlibs duplicate `std`'s symbols.
+JavaScriptCore plus a platform rasterizer was rejected for three reasons:
+- `measureText` must be the rasterizer's own measurement, and macOS has no
+  public SVG rasterizer;
+- JSC's execution time limit is SPI, where QuickJS's memory and interrupt
+  limits are public;
+- one call in and pixels out is a smaller seam.
+
+The risk accepted: the first C code in the build, costing about 18 s per
+cold build and about 7–8 MB of app binary. The linker keeps QuickJS even
+when nothing calls it. **Issue #39** (open) asks to revisit this choice for
+JavaScriptCore, perhaps through `objc2` from Rust, mainly because
+quickjs-ng has no `Intl`. Anyone who takes it up must answer every one of
+these G-2 and G-5 arguments:
+- the time-limit SPI;
+- byte-identical frames across machines and OS versions — q8 proved
+  QuickJS's float identity only across build profiles on one host, and a
+  system JSC changes with the OS;
+- the sandbox's removals (orig §5b);
+- the preview/export determinism test.
+
+Keeping `measureText` in resvg is not affected by that choice.
+
+**No cargo feature gates the engine.** Linking it made `make test` 1.12×
+slower warm, well under the 2× threshold that would have put it behind
+`features = ["graphic"]` (orig §5a, §10.1 q1).
+
+**resvg takes its defaults minus the two features that reach the filesystem**
+(`text`, `raster-images` and `svgz` on; `system-fonts` and `memmap-fonts`
+off). The user ruled that binary size and clean-build time are not reasons
+to drop a feature. `raster-images` is required: resvg 0.48 decodes no
+`<image>` without it (orig §5a).
+
+**`serde_json` has `preserve_order`,** so a module's schema keeps its key
+order, which is the order the inspector's rows appear in. Cargo feature
+unification pushed it into the core. `recipe.rs`'s `content_hash` now hashes
+a recursively SORTED copy, so no existing texture key moved. Under
+`preserve_order`, `Map::remove` is `swap_remove`: code that promises an
+order must use `shift_remove`, as the props code does (orig §10.4 G1d).
+
+**The sandbox (G-5), with each rule made to fail on purpose** (orig §5b,
+§10.1 q6):
+- limits: a 64 MB heap, a 1 MB stack, and a 250 ms interrupt deadline per
+  call in preview (2 s in export and `render_frame`);
+- no `std`/`os` modules, and a loader that resolves no specifier;
+- `Math.random` throws and names `random(seed)`;
+- `Date` is frozen at 2000-01-01, including via `Date.prototype.constructor`;
+- `eval`, `Function` and the Async/Generator/AsyncGenerator function
+  constructors are deleted or throw;
+- `performance` is deleted (quickjs-ng installs a clock there).
+
+The one thing the sandbox cannot stop is module-level state. The
+determinism test's mutant (a module-level call counter) is what catches it.
+
+**One QuickJS runtime and context per (thread, module), in a `thread_local!`
+map.** A `Module` is `Send + Sync` and holds no QuickJS object; engines are
+swept when their module drops. The engine's fields must drop in the order
+`render` fn, then context, then runtime; the reverse aborts inside
+`JS_FreeRuntime` (orig §5b). There is no LRU cap on engines.
+
+**A diagnostic's line and column are parsed from the exception's `stack`,
+preferring a frame in the module's own name.** rquickjs 0.14's `Exception`
+has no `line()`/`column()`. For an interrupt, the position is the enclosing
+function, not the loop (orig §5b).
+
+**`measureText` parses a one-`<text>` SVG with the engine's own options and
+answers both the advance box and the INK box** (orig §5c, §10.1 q4). The
+advance is what layout wants, but it differs from the drawn ink by up to
+78 px. The ink box agrees with the pixels within 2 px of whole-pixel
+columns. Direct shaping (the plan's "step 2") was measured as unnecessary.
+
+**Fonts: a missing family draws NOTHING, so the engine warns itself** (G-6;
+orig §10.1 q4, §10.4 G1b). resvg has no fallback with system fonts off, and
+it does not report the miss. An unquoted family name with a digit-led word
+(`Source Sans 3`) lays out nothing. So every standard-library helper quotes
+family names, and `rasterize` warns about a family the set cannot resolve,
+naming the families it has.
+
+**The texture cache is keyed on the SVG TEXT plus size and library version,
+not on the recipe hash** (orig §5d). A graphic that has settled on one frame
+rasterizes once, and an edited file can never hit a stale texture. The
+JavaScript still runs every frame; it is the cheapest of the three costs
+(p95 ≤ 1.67 ms at 1080p). Graphic textures get their own LRU pool of six
+(`LayerRenderers.graphicCacheLimit`), because a new 8–33 MB texture every
+frame would evict every text and shape texture from the shared pool of 64.
+
+**Parallel rendering, prefetch and a worker pool were not built (G6)** (orig
+§1, §9 G6). The compositor and export are serial, and q3 measured the six
+samples at a worst p95 of 7.62 ms per frame at 1080p, against a 12 ms line.
+At 4K, `title-card` measured 26 ms p95. The user played graphics at 4K on an
+M2 Max, saw no stutter, and deferred G6.
+
+**The FFI is ten `rc_graphic_*` exports, and a library is a builder that
+FREEZES** at its first compile, rasterize or `families` call
+(orig §5e, §10.4 G1d):
+- `diag_out` is always a JSON array of `{level, message, line, column,
+  frame}`, with exactly one error on failure;
+- `rc_graphic_compile` takes a budget, so a top-level infinite loop stops;
+- the tenth export, `rc_graphic_library_families`, gives the ENGINE's
+  family names. CoreText and fontdb disagreed on 13 of 2500 host font
+  files, so a Swift copy of the rule would drift (orig §10.7 G4b).
+
+**The model: `Source::Graphic` plus `Clip.graphic {name, width, height, in,
+length, props}`, format version 10** (orig §5g, §10.5):
+- the core computes `frame = floor((in + clip_time) / frame_ticks)` and the
+  whole `ctx` into the recipe;
+- the recipe publishes `props_json` and `ctx_json` as text, so the app
+  passes them straight to the engine and keeps no Swift mirror of `ctx`;
+- the hash covers name, frame, ctx and props (G-9·b).
+
+The timeline arithmetic lives in `recipe_graphic.rs`, shared by the writers
+and the reader. `split` pins both halves' `length`; `trim_start` and `roll`
+advance `in` with no head bound (G-9·a). A null length means `in + duration`
+(G-9·c).
+
+**Two ops, `add_graphic_clip` and `set_graphic`, carry a `schema` argument
+that the app fills and never publishes** (G-4;
+`Requirement.filledByTheApp` in `AgentCatalog+Declarations.swift`). With a
+schema, the core refuses a bad prop by its dotted path. Without one (a
+replayed op), it checks shape only. At render time, stale keys and wrong
+types become warnings, never errors.
+
+**Six app-state tools** (orig §5h, §10.7):
+- `write_graphic` answers the compile in the same call; its
+  `store.rescan()` is synchronous so the reply is current;
+- `get_graphic`;
+- `render_graphic`, a contact sheet of up to 16 frames with no clip;
+- `graphic_reference`;
+- `import_graphic_font` and `import_graphic_asset`.
+
+The agent's loop is `graphic_reference` → `write_graphic` →
+`render_graphic` → `add_graphic_clip` → `set_graphic`.
+
+**The package's `graphics/` folder is whitelisted in `fileWrapper`,
+created only by `GraphicStore.ensureFolder()`, and watched** (G-3, G-14; orig
+§5f, §10.1 q7, §10.6 G3a):
+- one `DispatchSource` on the folder, one on each subfolder, and one on
+  each `*.js` file. A folder source raises only `.write`, and misses an
+  editor's in-place save;
+- events coalesce over 100 ms into one pass;
+- `packageContentsDidChangeOnDisk()` is called only when the folder is
+  CREATED. Creating a folder inside an open package is the one thing that
+  trips "changed by another application";
+- an untitled document's folder sits BESIDE the temporary cache root, and
+  the first save carries it only when it holds real content.
+
+**`GraphicRegistry` maps a recipe key to an immutable compiled set.
+Preview follows the newest revision, and every offline door PINS the set it
+was handed** (G-13; orig §10.6 G3b/G3c). The offline doors are export, the
+queue (captured at enqueue), `render_frame`, Save Frame and the eyedropper.
+An offline key without a pin draws the missing slate. A pin keeps the first
+failure in a slot of its own, plus at most 64 warnings.
+
+**Failure** (G-8): an error card (dark red, a red border, the message in
+IBM Plex Mono), never the last good frame. Export compiles every module in
+range before it starts, refuses without touching the destination, and
+aborts at the first failing frame, leaving no file.
+
+**`ExportWriter.cancel()` only sets a flag; the reader and writer are
+cancelled in `allInputsFinished`** (orig §10.6 G3c). Cancelling the reader
+under a running `copyNextSampleBuffer` had crashed the app since road map
+2's phase 7: 12 of 30 mid-export cancels crashed. G3c found and fixed it
+(issue #38, closed with the merge). The accepted cost is that a pump
+blocked on a read finishes one sample first (0.1–0.3 s).
+
+**Media-less timelines play** (orig §10.8). `Playback.startRebuild` now
+drops the player item only when `plan.duration == 0`, so the builder's
+`Blank.mp4` placeholder gives a timeline of only graphics, text, shapes or
+images something to tick against. This defect dated from the first commit.
+
+**The inspector's Graphic sub-tab is the first section built from data**
+(G-15; orig §5j, §10.9 G5a). It has one row per schema key in module order.
+A value equal to its default writes `null`. Stale keys show dimmed, each
+with ⌫. The diagnostics shown are checked at the clip's first frame. It has
+no preview strip. The pane rebuilds when the schema's keys or types change,
+not when a default changes.
+
+**The reference is one document in three places** (orig §5i):
+`docs/graphics-api.md`, kept at 400 lines or fewer so it fits a prompt, and
+`docs/graphics-api.d.ts`. The build copies them into the bundle, and the
+store writes them into an existing `graphics/` as `API.md` and `API.d.ts`.
+`graphic/tests/reference.rs` runs every `js` block and checks that every
+stdlib function is documented and typed.
+
+**Tests are oracle tests, with one exception: `graphic/tests/pins.json`**
+(orig §5l). It pins the SHA-256 of fixture frames as a tripwire for a resvg
+upgrade (re-pin with `GRAPHIC_REPIN=1`). Zero-tolerance golden PNGs, as the
+plan proposed, were rejected under `core/CLAUDE.md`'s rules.
+
+## What it built — where it lives now
+
+- `graphic/` — the crate. `src/`: `lib.rs`, `library.rs`, `raster.rs`,
+  `measure.rs`, `module.rs`, `runtime.rs`, `sandbox.rs`, `exception.rs`,
+  `host.rs`, `props.rs`, `diagnostic.rs`, `stdlib.js`, `noise.js`; rules in
+  `graphic/CLAUDE.md`. `tests/graphics/` holds the six fixtures, which are
+  also the Insert ▸ Graphic templates (copied into the bundle as
+  `GraphicTemplates/` by `project.yml`).
+- Core: `ffi_graphic.rs` (the ten exports; `read_bytes`/`free_boxed` in
+  `ffi_util.rs`), `model_graphic.rs`, `edit_graphic.rs`, `recipe_graphic.rs`;
+  arms in `edit_split.rs`, `edit_clip_timing.rs`, `edit_edge.rs` and
+  `edit_action.rs` (`GRAPHIC_NOT_A_TARGET`); tests `core/tests/graphic.rs`,
+  `graphic_ffi.rs`, `schema_v10.rs`.
+- Header `core/include/reelcut_core.h` (`/* graphics */` section); Swift
+  wrappers at the end of `app/Sources/ReelCore.swift`. The size toll moved
+  code out first, into `RecipeSource.swift` and `MediaDescriptor.swift`.
+- App: `GraphicStore.swift` (+`Manual`, +`Import`), `GraphicScan.swift`,
+  `GraphicRegistry.swift`, `LayerRenderersGraphic.swift`,
+  `GraphicContactSheet.swift`, `GraphicTemplates.swift`,
+  `ProjectDocument+Graphics.swift`, `ProjectSnapshot+Graphic.swift`,
+  `ExporterGraphics.swift`, `ExporterErrors.swift`, `GraphicPane.swift`
+  (+`Source`), `GraphicSchemaRows.swift`, `EditorViewController+Graphics.swift`
+  and `+GraphicMenus.swift`, `AppDelegate+GraphicMenu.swift`,
+  `AgentServer+Graphics.swift`, `+GraphicRender.swift`, `+GraphicImports.swift`,
+  `AgentCatalog+Graphics.swift`.
+- Docs: `docs/graphics-api.md`, `docs/graphics-api.d.ts`; `CONTEXT.md`
+  terms Graphic, Module, Props, Revision.
+- Proofs: `tools/proof/graphics_proof.py` (40 rows, the agent loop),
+  `graphics_ffi_probe.py`, `graphics_store_probe.py`/`_proof.py`,
+  `graphics_inspector_proof.py`, `graphics_menu_proof.py`,
+  `graphics_pin_probe.swift`, `media_less_playback_probe.py`,
+  `graphics_playback_samples.py`. The G0 spike's instruments are in
+  `tools/proof/graphics_spike/`; do not re-run it, because it overwrites the
+  recorded `work/` outputs.
+
+## Known limits
+
+- **Cost.** The app binary is about 7.9 MB larger, and QuickJS is kept even
+  when nothing calls it. A cold build pays about 18 s for QuickJS's C.
+- **Performance** was measured on one M2 Max only. The worst 1080p p95 was
+  7.62 ms per frame; 4K `title-card` was 26 ms p95 (57 ms max). Rasterizing
+  dominates, not the JavaScript. A slower machine or a heavier graphic is
+  unmeasured, and so is resident memory while an animated 4K graphic plays.
+- **quickjs-ng 0.16.2 has no `Intl` and no `structuredClone`.**
+  `formatNumber` exists for that reason (issue #39).
+- **Largest string `render` can return:** well under 50 MB. A 50 MB string
+  is built but cannot be read out of a 64 MB heap; the engine's own sentence
+  says so.
+- **Deliberately not built** (orig §7):
+  - keyframed props (G-10);
+  - `paste_attributes` for graphics;
+  - a revision history;
+  - HEVC with alpha (ProRes 4444 and APNG already carry alpha);
+  - mattes or video input to a graphic;
+  - system fonts as an opt-in;
+  - path helpers;
+  - audio from a graphic;
+  - `delete_graphic`/`rename_graphic`;
+  - named CSS colours and `hsl()` in a `color` prop, and in
+    `interpolateColors`;
+  - generic CSS families such as `sans-serif`, which are warned like any
+    missing name.
+- **The watcher:** `fonts/` and `assets/` have folder sources only, so an
+  in-place rewrite of a font is seen at the next folder event. Untitled
+  graphics roots are never deleted. `GraphicStore.drain()` is not
+  re-entrant, so never call `rescan()` from a `.graphicsDidChange` observer
+  (`app/CLAUDE.md`).
+- **Export:** the compile gate walks one nest level; deeper nests are caught
+  by the mid-export abort. A successful export's warnings are dropped at
+  unpin.
+- **An agent cannot observe a module swap during an export over MCP:** the
+  core's agent server is one thread, and `export` holds it.
+- **Constants restated across the G-2 boundary:** `MAX_SIDE` 8192 (the crate,
+  `model_graphic.rs`'s `GRAPHIC_MAX_SIDE`, and `GraphicLibrary.maxSide`) and
+  the 64-key limit. Change them together.
+
+## Open items
+
+- G6 (prefetch plus parallel export against a before/after measurement) —
+  deferred by the user; tracked in `designs/reelcut-remaining.md` §5f.
+- The person's watched checks: the playback-check projects with no video
+  underneath, memory at 4K, and the error card in the live preview —
+  tracked in `designs/reelcut-remaining.md` §4i.
+- Model and export correctness items:
+  - `add_transition`'s handle form does not advance `graphic.in`;
+  - a canvas rate change does not re-snap `in`/`length`;
+  - `validate` accepts a graphic clip with no description;
+  - the export gate's single nest level;
+  - the loudness reader is still cancelled from main.
+
+  Tracked in `designs/reelcut-remaining.md` §5a ("Graphics, model and
+  export"), with the starved export pump.
+- Small app and proof nits from the G1b–G5b reviews (Insert ▸ Graphic's
+  stale-scan name choice, the non-UTF-8 From File…, the leftover
+  `.js.partial`, the contact sheet's peak memory, and others) — each listed
+  in `designs/reelcut-remaining.md`: §5a ("Graphics, store and menus"), §5b
+  (the proof and test nits), §5c (the stale comments and numerals), §5d
+  ("Graphics engine and tools", "The Graphic sub-tab").
+- The not-built list (keyframed props, `paste_attributes`, revision history,
+  HEVC with alpha, mattes, system fonts, path helpers, `delete_graphic` /
+  `rename_graphic`) — tracked in `designs/reelcut-remaining.md` §5d.
+- Replacing QuickJS with JavaScriptCore — GitHub issue #39 (pointer in
+  `designs/reelcut-remaining.md` §5f).
+
+## Where to look in the original
+
+- orig §0–§2a — the idea, the proposal reviewed point by point (the table
+  behind `svg-motion-plan.md`'s ADR), what a graphic reuses, what was new.
+- orig §3, §3a, §10.1–§10.3 — the G0 spike: nine questions, their numbers
+  (q1 build cost, q2 quickjs-ng, q3 per-frame cost, q4 `measureText`, q5
+  determinism, q6 the eighteen sandbox cases, q7 the package and watcher, q8
+  float identity, q9 the FFI shape) and what each rewrote.
+- orig §4 — G-1..G-14 as first argued (the JSC rejection is in G-2).
+- orig §5a–§5m — the design: crate layout, runtime limits, module format and
+  stdlib, rendering and caches, FFI, store and watcher, model v10, ops and
+  tools, reference, inspector, templates, tests, file tolls.
+- orig §6–§8 — the picks settled for the user, not built, and tunable
+  numbers.
+- orig §9, §9a — phase shape and what each phase had to carry from G0;
+  G6's deferral quote.
+- orig §10.4 — G1a–G1d: the toll, the drawing half, the JavaScript half, the
+  link (`preserve_order` unification, the freezing library).
+- orig §10.5 — G2a/G2b: props rules, the timeline arithmetic, the mutants.
+- orig §10.6 — G3a–G3c: store and watcher, the registry and pools, the error
+  card, the pin, and the export-Cancel crash and its fix.
+- orig §10.7 — G4a/G4b: the six tools, the tenth export, the contact sheet.
+- orig §10.8 — the media-less playback defect and its fix.
+- orig §10.9–§10.10 — G5a/G5b (sub-tab, menus, templates) and the merge.

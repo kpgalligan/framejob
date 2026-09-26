@@ -7,7 +7,7 @@
 //   xcrun swiftc -O -parse-as-library -target arm64-apple-macos26.0 separation_streaming.swift -o separation_streaming
 //   ./separation_streaming <media>...
 //
-// designs/reelcut-roadmap-4.md §2 quotes its output (q3, q5).
+// archive/reelcut-roadmap-4.md §2 quotes its output (q3, q5).
 import Foundation
 @preconcurrency import AVFoundation
 import Speech

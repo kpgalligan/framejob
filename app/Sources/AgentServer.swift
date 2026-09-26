@@ -46,8 +46,8 @@ final class AgentServer {
     /// is the sanctioned reason for a frozen file to gain one (app/CLAUDE.md;
     /// `Exporter`'s `lock` and `scratchStorage` are the precedent). The
     /// alternative was an arguments dictionary threaded through
-    /// `performGroupedEdit`, `editResult` and fifty-eight handlers, all in
-    /// two files already near the size cap, to carry one optional integer.
+    /// `performGroupedEdit`, `editResult` and fifty-nine op handlers, spread
+    /// over files already near the size cap, to carry one optional integer.
     ///
     /// **It is safe from races because the server is single-request.**
     /// `core/src/agent.rs`'s `serve` is one thread running
@@ -186,12 +186,12 @@ final class AgentServer {
         // one this tool published, or the call is refused here by name before
         // the scope or any handler reads a thing. It is here for the reason
         // the scope read below is — the one place that holds the name and
-        // the arguments of all seventy-seven.
+        // the arguments of all eighty-five.
         try Self.checkArgumentNames(tool, a)
         // The envelope's `scope` is read ONCE, here, because this is the only
         // place that holds both the tool's name and its arguments for all
-        // seventy-seven of them — a read inside each handler would be
-        // fifty-seven edit sites across two files, every one of them able to
+        // eighty-five of them — a read inside each handler would be
+        // fifty-nine edit sites across the handler files, every one able to
         // forget. It is read for exactly the tools whose schema declares it
         // (`AgentCatalog.opNames`, the core's own op list), and a `scope` on
         // `get_project` or `export` is refused by the gate above as a key
@@ -212,12 +212,15 @@ final class AgentServer {
     /// and `start()` checks the two sets match on every launch.
     ///
     /// One entry per row of the op table (spec §6, and the module doc of
-    /// `core/src/edit.rs`) plus the twenty tools that are not ops: the
+    /// `core/src/edit.rs`) plus the twenty-six tools that are not ops: the
     /// project-level ones spec §7.9 names, the five view-state and history
     /// mirrors beside them (`set_range`, `set_selection`, `set_scope`,
     /// `undo`, `redo`), the composites later phases added —
     /// `detect_silence`, `transcribe`, `import_captions`, `export_captions`,
-    /// `normalize_clip` — and road map 3's `record_screen`. The count is
+    /// `normalize_clip` — road map 3's `record_screen`, and road map 10's
+    /// six graphics tools (`write_graphic`, `get_graphic`,
+    /// `graphic_reference`, `render_graphic`, `import_graphic_font`,
+    /// `import_graphic_asset`). The count is
     /// not decoration: `start()`'s parity check reads the core's own
     /// `rc_op_names` and holds an explicit allow-list for the ops that
     /// deliberately have no tool, so a new tool that is not an op belongs in
