@@ -502,8 +502,16 @@ the key map behind it.
   `MediaReveal.swift` — the Media tab. The find band never rebuilds the pane.
 
 **Playback and rendering.**
-- `Playback.swift` — one `AVPlayer` over the plan's composition; the
-  transport, JKL, the rate KVO. **A paused refresh is a one-tick round trip**
+- `Playback.swift` (+`Meter`) — one `AVPlayer` over the plan's composition; the
+  transport, JKL, the rate KVO; `+Meter` is the level meter, moved out under
+  the size rule. **Only a seek someone ASKED for reports a time**:
+  `seek(to:)` is that door, and Playback's own RESTORES — the rebuild's item
+  swap and re-seek, the paused refresh's round trip — go through `startSeek`
+  silently and report once, only if they come to rest off the last reported
+  tick; `report(_:)` is the one caller of `onTimeChanged`. An echoed restore
+  moved the playhead (0 and back on every rebuild), and the timeline reveals
+  every moved playhead, so a clip drag yanked the view
+  (`playhead_echo_probe.py`). **A paused refresh is a one-tick round trip**
   (`refreshPausedFrame`): a zero-tolerance seek to the current time is a
   NO-OP on macOS 26.5.1, so the refresh seeks one tick off and returns; parked
   at the end it rests on the last frame's final tick, because the end tick

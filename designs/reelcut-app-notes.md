@@ -2840,3 +2840,95 @@ the file is back at 1440 and the next addition pays a toll first (the media
 helpers, ~94). Nothing calls the wrappers yet but
 `tools/proof/graphics_ffi_probe.swift`; G3 is the first app caller. Road
 map 10 §10.4's G1d record has the scores.
+
+## The playhead echo, 2026-09-26 — Playback's own seeks
+
+**The toll, a pure move landed and gated alone.** `Playback.swift` was
+**600**, AT the cap (the sizes paragraph under road map 2's phase 8 above
+said the next line to land on it pays a cut), so the level meter's section
+went first: `meterReading()`, `startMetering()` and `stopMetering()`, with
+their doc comments, are **`Playback+Meter.swift` — new, 60** (`import
+Foundation`, a header, one `extension Playback`); `ExporterLoudness.swift`
+is the precedent for moving an extension's worth out and widening the
+stored properties it reads. **`Playback.swift` 600 → 546.** What widened
+and why: `built` `private` → `private(set)` (the reading and the stop read
+its meters), `meterTimer` `private` → internal (the two switches write it),
+and `startMetering` / `stopMetering` lost `private` (the rate KVO in `init`
+calls them from the other file). One sentence in the type doc names the new
+file; `startMetering`'s "this file's header" became "`Playback.swift`'s
+header". `tools/proof/harness/main.swift` and
+`CompositionBuilder+AudioTracks.swift` name `Playback.meterReading()`,
+which is still true. Gate: `make typecheck` 0 errors and the 7 baseline
+warnings, `mixed_audio_probe.py` **37/37**, `media_less_playback_probe.py`
+**32/32**. Snapshot tree (the working tree with the move alone, written
+through a scratch index): `1e2e636eaf0caa262471ee3966da4e9abc37a9a9`.
+
+**The defect.** Dragging a clip made the timeline jump around, which made
+dragging "fairly useless" (the user's report). Two symptoms, one cause: with
+the playhead on screen the view flashed to time 0 and straight back during
+a drag; and in the user's Test B, with the playhead scrolled off screen,
+dragging a clip yanked the view back to the playhead.
+
+**The cause.** `Playback` reported its OWN seeks as playhead moves.
+AVPlayer's periodic time observer is also invoked whenever time jumps, and
+`timeAdvanced` passed every jump to `onTimeChanged`, guarding only
+`lastKnownTime` with `isSeeking`. A structural edit's `finishRebuild` swaps
+in a new item, which starts at 0, and seeks back to where the transport
+was: the document heard 0 and then its own playhead, the timeline's
+`setPlayhead` revealed each one (`revealPlayhead` scrolls on any change
+outside its band), and the action entry rule (spec §11 CI-1) saw the
+playhead leave a span and come back, selecting it. The paused refresh's
+round trip was reported the same way. It had echoed before too, but e50dd64
+(2026-09-17) replaced the same-time seek — a no-op on macOS 26.5.1 — with a
+one-tick step to `here ± 1` and back, which made the refresh's echo a
+CHANGE: the document heard `here + 1` and then `here`, and every property
+edit revealed.
+
+**The fix, in `Playback.swift` alone.** `seek(to:)` is THE ASKED DOOR: it
+clears `restoring` and calls `startSeek(to:)`, which is the old body. A
+RESTORE — `finishRebuild`'s swap and re-land, both legs of
+`refreshPausedFrame` — sets `restoring` and seeks through `startSeek`;
+`timeAdvanced` returns first thing while it is set, and `seekFinished`
+ends it when the chain has no pending seek, reading `currentTime` and
+reporting it ONLY if it differs from `reported`, the last tick
+`onTimeChanged` carried. So a restore that rests where the document was
+last told is silent, and one that rests elsewhere — parked at the end, a
+timeline shortened under the playhead, an asked seek a rebuild interrupted
+before its echo arrived — is heard once. `report(_:)` is the one caller of
+`onTimeChanged`. `seekSerial`, bumped by every `player.seek` and by
+`finishRebuild` before the swap, makes a completion for an older seek (one
+the swap cancelled) stale instead of ending the newer one. `invalidate()`
+clears `restoring`. `play()`'s loop-start seek, the loop wrap and
+`stepFrames` still call `seek(to:)`, so they still report — which
+`EditorViewController.stepFrames` depends on, since the timeline follows
+the arrow keys only through the echo. **598** lines after the fix. Step 5
+of the spec (dropping a stale time while paused) was not needed: no row
+failed for a report arriving after its restore ended.
+
+**The end-parked decision.** Parked AT the end, the refresh rests on
+`end − 1` (the end tick composes black) and does not return. The document
+HEARS it: it was told `end`, the restore rests one tick earlier, so the
+landing differs and is reported once. `preview_refresh_probe.py` section 3's
+rows for `opacity0atEnd`, `opacity1atEnd`, `halfAfterPlay` and
+`opacity1afterPlay` require the playhead to equal the player's tick there,
+and they pass.
+
+**Measured** by `tools/proof/playhead_echo_probe.py` (its README section has
+the instrument and the rows): **20/20** at the fix, console unlocked. Over
+f7dd9e3's `app/Sources`: **13/20** — refresh·2 (`[600001, 600000]`),
+rebuild·2 (`0, 600000` for each of the live drag's five rebuilds),
+rebuild·4 (`[0, 600000]`), action·1 (`selectedAction` 5 after the
+structural edit) and reveal·2 (the clip view's `minX` 16132 → 3685) fail
+as predicted; play·2 fails there too (a `0` among the reports after an edit
+mid-play) and short·2 (`[0, 3000000, 2020000]`, at the fix `[2020000]`);
+the thirteen CONTROLS pass on both trees, end·1 among them (`[3639999]`,
+`duration − 1`, on both). Regressions at the fix: `make typecheck` 0 errors
+and 7 warnings, `mixed_audio_probe.py` **37/37**,
+`media_less_playback_probe.py` **32/32**, `preview_refresh_probe.py`
+**58/58** (console unlocked), `make app` succeeded.
+
+**Owed.** A person drags a clip with the playhead on screen and with it
+scrolled off, and sees neither a flash to 0 nor a jump
+(`designs/reelcut-remaining.md` §4). No MCP drive: no tool reads the live
+player's reports. app/CLAUDE.md's Playback entry is the orchestrator's to
+update. Not committed.

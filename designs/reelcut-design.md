@@ -2463,6 +2463,12 @@ new `ReelProject` and `isLive`. `Playback` then:
    background queue, swap `AVPlayerItem` at the same time, keep the play
    state. Rebuilds are debounced at 80 ms during live gestures
    (`isLive`), and the final `endLiveEdit` always rebuilds if needed.
+
+   Neither the refresh's round trip nor the rebuild's swap and re-land is
+   reported as a playhead move: `Playback.onTimeChanged` carries seeks
+   someone asked for and time while playing, and a restore that comes to
+   rest somewhere other than the tick last reported reports that once (the
+   end-parked rest, a timeline shortened under the playhead).
 4. Instructions carry the plan's instruction ranges only; the
    compositor's `RecipeSource` is what makes property edits render
    without a rebuild.

@@ -2608,6 +2608,55 @@ item), and G·7, G·8, G·9 and E·4 fail. The four F·3 validator rows and
 E·1, E·2, E·3 and E·5 pass on both trees, so a failing row is the
 defect and not the host.
 
+## The playhead echo (`playhead_echo_probe.py`)
+
+Dragging a clip flashed the playhead to 0 and back, and with the playhead
+scrolled off screen it yanked the timeline back to it
+(`designs/reelcut-app-notes.md`, "The playhead echo, 2026-09-26").
+`Playback` reported its OWN seeks as playhead moves: the periodic time
+observer fires on every time jump, so a rebuild's item swap (the new item
+starts at 0) and its re-land, and the paused refresh's one-tick round trip,
+all reached `onTimeChanged`, and the editor wrote each one to the document,
+the timeline (which reveals any change) and the action entry rule. The fix
+splits the asked seek (`seek(to:)`) from the restore (`startSeek` under
+`restoring`): a restore is silent, and heard once on landing only if it
+rests off the tick last reported.
+
+**No MCP script can see this one**: no tool reads what the editor's own
+player reports. The instrument is `playhead_echo_probe.swift`, compiled as
+`main.swift` over the whole of `app/Sources` (`--sources PATH` builds it
+over another tree), `media_less_playback_probe.py`'s build line and tag
+scheme, every subprocess under `graphics_spike/bounded.py`, a build failure
+or a missing ffmpeg scoring every row as a FAILURE. It writes `card.mov`
+(an 8 s test card, ffmpeg) and `echo.reelcut` (432 × 280 at 30 fps, clip 3
+at 0–3 s and clip 4 at 4–6 s) under `work/playhead-echo/` each run, opens
+the package in a real editor window and WRAPS the editor's
+`playback.onTimeChanged`, logging every tick before forwarding it. Each
+action clears the log and settles 1.5 s. The rows: a paused opacity edit
+(refresh·1–3), the right arrow (step·1), `setPlayhead` (seek·1), a live
+drag of five ticks 0.25 s apart and a non-live move (rebuild·1–4), a
+deselected action span that holds 1 s and not 0 under a structural edit
+(action·1, spec §11 CI-1), the timeline zoomed to `maxZoom` and scrolled to
+4 s during a live drag, with `revealPlayhead`'s band read off the clip view
+(reveal·1–3), play, a structural edit mid-play and the loop wrap (play·1,
+play·2, loop·1), the end-parked refresh and playing into the end (end·1,
+end·2), and clip 4 deleted under a 5 s playhead (short·1, short·2). No row
+reads a picture, so every row is scored whatever the console state; the
+first printed line names it.
+
+**20/20** at the fix, console unlocked. Made to fail over f7dd9e3's
+`app/Sources` (`git archive f7dd9e3 app/Sources | tar -x -C
+tools/proof/work/playhead-echo/baseline`, then `--sources
+tools/proof/work/playhead-echo/baseline/app/Sources`): **13/20**. The five
+predicted rows fail: refresh·2 (reports `[600001, 600000]`, the round
+trip), rebuild·2 (`0, 600000` five times), rebuild·4 (`[0, 600000]`),
+action·1 (the span re-selected, `selectedAction` 5) and reveal·2 (the clip
+view's `minX` from 16132 to 3685 on the first tick). The two unpredicted
+rows fail there too: play·2 (a `0` reported mid-play after the edit) and
+short·2 (`[0, 3000000, 2020000]`; at the fix `[2020000]`). The thirteen
+others are CONTROLS and pass on both trees, end·1 among them: parked at the
+end, both trees report `[3639999]`, `duration − 1`, once.
+
 ## The transition sheet (`transition_sheet_probe.py`)
 
 Clip ▸ Transition ▸ at a hard cut between two WHOLE files used to beep and

@@ -901,6 +901,15 @@ instruments, exempt: `tools/proof/graphics_menu_probe.swift` **321** and
 `graphics_menu_proof.py` **229**, new; `graphics_proof.py` **1371 → 1412**
 (W1).
 
+**What the playhead-echo fix did to it (2026-09-26, `wc -l` against
+`f7dd9e3`).** `Playback.swift` was **600**, AT the cap, so it paid a toll
+first, a pure move gated alone: the level meter's three functions went to
+`Playback+Meter.swift`, **new, 60**, and `Playback.swift` went **600 →
+546**. The fix then took it **546 → 598**, back under the cap by two lines;
+its next addition pays a cut first. The instruments, exempt:
+`tools/proof/playhead_echo_probe.py` **341** and
+`playhead_echo_probe.swift` **273**, new.
+
 ## 4. What only a person at the machine can check
 
 These are not tasks so much as a list to run through at the machine once. The
@@ -1400,6 +1409,15 @@ and the closing above added the rest.
   while an input method is composing (marked text), which the route leaves
   to the input method.
 
+- **Dragging a clip leaves the timeline still (the playhead echo,
+  2026-09-26)** — `playhead_echo_probe.py` logs what the editor's own
+  player reports and reads the clip view's scroll; it cannot watch. At the
+  machine: drag a clip with the playhead on screen — the playhead line does
+  not flash to 0 and back; then scroll the timeline so the playhead is off
+  screen and drag a clip again (the user's Test B) — the view does not jump
+  back to the playhead. The arrow keys and a click in the ruler still move
+  and reveal it.
+
 ---
 
 ## 5. Where a third road map would start
@@ -1519,6 +1537,17 @@ failing rows and the limits left are road map 2 §2, Phase 4, "#37 — Return
 applies in the canvas text editor; Esc asks" (kpgalligan/reelcut#37). The
 Text tab's `InspectorTextArea` keeps its own keys by decision; a look at
 the machine is §4's.
+
+**Dragging a clip made the timeline jump (2026-09-26):** during a drag the
+playhead flashed to 0 and back, and with the playhead scrolled off screen
+the view was yanked back to it. `Playback` reported its own restore seeks —
+a rebuild's item swap and re-land, the paused refresh's one-tick round trip
+— as playhead moves; it now reports only seeks someone asked for and time
+while playing, and a restore that rests off the tick last reported once.
+The record, the baseline's failing rows and what is owed are
+`designs/reelcut-app-notes.md`, "The playhead echo, 2026-09-26 —
+Playback's own seeks"; `tools/proof/playhead_echo_probe.py` scores 20/20
+at the fix and 13/20 over f7dd9e3's sources. A look at the machine is §4's.
 
 **Bounded recovery after a lost AssemblyAI submit reply (#28).** R6-14 reads
 only the newest page of 200 transcripts at most three times. An outage,

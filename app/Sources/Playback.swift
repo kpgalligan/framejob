@@ -20,6 +20,7 @@ import AppKit
 /// reads them, multiplies by the plan's envelope and publishes one reading to
 /// `LevelMeter.shared`. See `LevelMeter.swift` for why the meter is computed
 /// from the DSP tap rather than observed from a second one.
+/// The meter's read and its two switches live in `Playback+Meter.swift`.
 ///
 /// Road map 2's phase 8 hung two more things off the player, and both are here
 /// because both are about the PLAYER rather than about the document: View ▸
@@ -53,7 +54,14 @@ final class Playback {
     let playerLayer: AVPlayerLayer
 
     /// Playhead time, from the periodic observer — the timeline and the
-    /// timecode field both follow this.
+    /// timecode field both follow this. It carries a seek someone ASKED for
+    /// (`seek(to:)`) and time while PLAYING, and never the jumps of this
+    /// object's own RESTORE seeks — a rebuild's item swap and re-land, the
+    /// paused refresh's round trip — which the observer reports too: a
+    /// restore is silent while it runs and is heard once, when it lands, only
+    /// if it rests somewhere other than the tick last carried (parked at the
+    /// end, a timeline shortened under the playhead). `report(_:)` is its one
+    /// caller.
     var onTimeChanged: ((Ticks) -> Void)?
     /// Transport rate, including the rate AVFoundation sets itself when an
     /// item ends or stalls, which is why this is KVO and not a wrapper.
@@ -75,7 +83,7 @@ final class Playback {
     private let rebuildQueue = DispatchQueue(
         label: "com.kgalligan.reelcut.rebuild", qos: .userInitiated)
 
-    private var built: BuiltComposition?
+    private(set) var built: BuiltComposition?
     /// The plan the CURRENT item was built from; nil before the first build.
     private(set) var builtPlanJSON: String?
     /// The sample-level audio settings the CURRENT item's taps were built
@@ -92,7 +100,7 @@ final class Playback {
     /// the rate KVO arms and disarms it — so an idle editor pays nothing for
     /// having a meter, exactly as it pays nothing for the periodic time
     /// observer AVFoundation stops delivering.
-    private var meterTimer: Timer?
+    var meterTimer: Timer?
 
     private var canvasSize = CGSize(width: 1920, height: 1080)
     /// View ▸ Preview Quality (road map 2's phase 8a). Persisted, so it is read
@@ -105,6 +113,13 @@ final class Playback {
     private var pendingSeek: Ticks?
     /// A paused refresh asked for mid-seek: run when the seek lands, not dropped.
     private var refreshWanted = false
+    /// True from a restore's first line until its last seek lands.
+    private var restoring = false
+    /// The last tick `onTimeChanged` carried.
+    private var reported: Ticks?
+    /// Bumped by every `player.seek`; a completion for an older serial is
+    /// ignored, so one the item swap cancelled cannot end a newer seek.
+    private var seekSerial = 0
     private var lastKnownTime: Ticks = 0
     private var timeObserver: Any?
     private var rateObservation: NSKeyValueObservation?
@@ -164,6 +179,7 @@ final class Playback {
         debounceTimer = nil
         pending = nil
         refreshWanted = false
+        restoring = false
         stopMetering()
         player.pause()
         player.replaceCurrentItem(with: nil)
@@ -248,6 +264,10 @@ final class Playback {
     /// that played through is, it rests on the last frame's final tick
     /// instead: the end tick composes nothing (every seek to it, tolerant or
     /// not, displays black — measured), so a return there would blank it.
+    ///
+    /// Both seeks are a RESTORE, not a playhead move: `onTimeChanged` hears
+    /// neither jump, and hears the landing only when it differs from the tick
+    /// last reported — which the end branch's `end - 1` does, once.
     func refreshPausedFrame() {
         refreshWanted = false
         guard player.rate == 0, player.currentItem != nil else { return }
@@ -258,13 +278,17 @@ final class Playback {
         let here = currentTime
         let end = built.map { CompositionBuilder.ticks($0.composition.duration) } ?? 0
         if here >= end {
-            if end >= 1 { seek(to: end - 1) }
+            if end >= 1 {
+                restoring = true
+                startSeek(to: end - 1)
+            }
             return
         }
         let step = here + 1 < end ? here + 1 : here - 1
         guard step >= 0 else { return }
-        seek(to: step)
-        seek(to: here)
+        restoring = true
+        startSeek(to: step)
+        startSeek(to: here)
     }
 
     // MARK: - Preview quality and the second layer (road map 2's phase 8)
@@ -422,12 +446,15 @@ final class Playback {
             builtPlanJSON = composition.planJSON
             builtAudioDSP = audioDSP
             isSeeking = false
+            seekSerial += 1
             pendingSeek = nil
             refreshWanted = false
-            player.replaceCurrentItem(with: item)
             // Land on the same frame with the same transport state: an edit
-            // mid-playback must not jump the playhead.
-            seek(to: time)
+            // mid-playback must not jump the playhead — nor report the new
+            // item's 0 on the way (a restore; see `onTimeChanged`).
+            restoring = true
+            player.replaceCurrentItem(with: item)
+            startSeek(to: time)
             if rate != 0 { player.rate = rate }
         }
     }
@@ -475,14 +502,21 @@ final class Playback {
         player.rate = rate
     }
 
+    /// THE ASKED DOOR: a seek someone wants, so its jump is reported as a
+    /// playhead move. This object's own restores go through `startSeek`.
+    func seek(to t: Ticks) {
+        restoring = false
+        startSeek(to: t)
+    }
+
     /// One in-flight seek at a time, intermediates dropped (§7.6): a scrub
     /// generates far more positions than the decoder can serve, and queueing
     /// them all makes the preview lag seconds behind the pointer.
-    func seek(to t: Ticks) {
+    private func startSeek(to t: Ticks) {
         let clamped = max(0, t)
         lastKnownTime = clamped
         guard player.currentItem != nil else {
-            onTimeChanged?(clamped)
+            report(clamped)
             return
         }
         guard !isSeeking else {
@@ -490,24 +524,42 @@ final class Playback {
             return
         }
         isSeeking = true
+        seekSerial += 1
+        let serial = seekSerial
         player.seek(
             to: CompositionBuilder.time(clamped), toleranceBefore: .zero, toleranceAfter: .zero
         ) { [weak self] _ in
             guard let self = self else { return }
-            self.onMain { self.seekFinished() }
+            self.onMain {
+                guard serial == self.seekSerial else { return }
+                self.seekFinished()
+            }
         }
     }
 
     /// One seek has landed: take the newest position that arrived while it
-    /// was in flight, if any, dropping the rest; then any paused refresh waiting.
+    /// was in flight, if any, dropping the rest; then end a restore, heard
+    /// only if it rests off the tick last reported; then any paused refresh
+    /// waiting.
     private func seekFinished() {
         isSeeking = false
         if let next = pendingSeek {
             pendingSeek = nil
-            seek(to: next)
+            startSeek(to: next)
             return
         }
+        if restoring {
+            restoring = false
+            let rest = currentTime
+            if rest != reported { report(rest) }
+        }
         if refreshWanted { refreshPausedFrame() }
+    }
+
+    /// The ONE caller of `onTimeChanged`.
+    private func report(_ t: Ticks) {
+        reported = t
+        onTimeChanged?(t)
     }
 
     /// Steps `n` frames (negative steps back) and pauses: stepping while
@@ -520,67 +572,13 @@ final class Playback {
         seek(to: max(0, currentTime + Ticks(n) * step))
     }
 
-    // MARK: - The level meter
-
-    /// The transport's levels, right now: every metered track's last buffer,
-    /// each multiplied by the mix envelope over it, summed.
-    ///
-    /// **The envelope is the multiply that makes the number post-fader.** The
-    /// taps are `PreEffects`, so what they measured is the track before
-    /// volume, the fades and ducking — and the plan's ramps are exactly what
-    /// `CompositionBuilder` handed AVFoundation to apply downstream of them.
-    /// `LevelMeter.swift` argues why the meter must be computed this way
-    /// rather than observed from a second tap.
-    ///
-    /// It is read at the PLAYHEAD's tick, while the buffer the taps last
-    /// published is a little ahead of it — the audio path renders in front of
-    /// the picture. The two differ by under one buffer, so on a fade the
-    /// displayed level lags the applied gain by up to 85 ms, which is under
-    /// this meter's own resolution and far under the eye's.
-    func meterReading() -> LevelMeterReading {
-        guard let meters = built?.meters, !meters.isEmpty else { return .silent }
-        let t = currentTime
-        var total = LevelMeterReading.silent
-        for track in meters {
-            let gain = Float(LevelMeterEnvelope.value(track.ramps, at: t))
-            total = total.adding(track.sink.read().scaled(by: gain))
-        }
-        return total
-    }
-
-    /// Armed by the rate KVO when the transport starts moving. A run-loop
-    /// `Timer`, not a dispatch source, for the reason this file's header gives
-    /// for the debounce: it cancels deterministically, and app/CLAUDE.md's
-    /// five `DispatchQueue` seams are not to grow a sixth.
-    private func startMetering() {
-        guard meterTimer == nil else { return }
-        meterTimer = Timer.scheduledTimer(
-            withTimeInterval: Playback.meterInterval, repeats: true
-        ) { [weak self] _ in
-            guard let self = self else { return }
-            LevelMeter.shared.publish(self.meterReading(), from: ObjectIdentifier(self))
-        }
-    }
-
-    /// Disarmed on every stop, with a final zero. Nothing is pulled through
-    /// the taps at rate 0, so the last buffer's peak would otherwise sit lit
-    /// on the meter for as long as the window was open — which reads as a bug
-    /// rather than as a paused transport. The sinks are cleared as well, so a
-    /// resumed preview does not flash the peak it paused on before its first
-    /// buffer arrives.
-    private func stopMetering() {
-        meterTimer?.invalidate()
-        meterTimer = nil
-        built?.meters.forEach { $0.sink.clear() }
-        LevelMeter.shared.publish(.silent, from: ObjectIdentifier(self))
-    }
-
     // MARK: - Observers
 
     private func timeAdvanced(_ time: CMTime) {
+        if restoring { return }
         let ticks = max(0, CompositionBuilder.ticks(time))
         if !isSeeking { lastKnownTime = ticks }
-        onTimeChanged?(ticks)
+        report(ticks)
         guard let loop = loopRange, player.rate != 0, loop.duration > 0,
             ticks >= loop.start + loop.duration
         else { return }
