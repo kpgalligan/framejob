@@ -5,7 +5,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
 
 - **SH-1 — `StickerButton` keeps its pill** (the sharp pass, 2026-09-23).
   The sharp handoff deletes it "once it has no callers"; it has callers in
-  13 files (`Sheets`, `Welcome`, `Settings`, `Recorder`, `ExportQueue`,
+  12 files (`Sheets`, `Welcome`, `Settings`, `ExportQueue`,
   `Relink`, `ReverseRenderer`, `Silence`, `Transcribe`, `ExportProgress`,
   `ExportSheet`, `Consolidate`, `RecorderPanel`) and `recording_probe.py`
   §6 measures its 2 pt shadow margins against a reference build. Squaring

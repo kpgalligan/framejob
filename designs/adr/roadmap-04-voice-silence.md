@@ -209,19 +209,18 @@ there (orig §6).
 - Three listening checks need a person at the machine: a narrated screencast recorded by the app,
   with the truth marked by ear; a cut heard across a voice-mode boundary, and whether padding should
   drop to 0.05 s (which would reopen level-based edge refinement); and the sheet's note with one
-  file pending and another judged by level. These are tracked in `designs/reelcut-remaining.md`
-  §4g.
+  file pending and another judged by level. These are tracked in #54.
 - #23's person check needs a person at the machine: a human listen, and a visual waveform judgement
-  on real footage. Tracked in `designs/reelcut-remaining.md` §4a.
+  on real footage. Tracked in #47.
 - Unscored proof branch: the tool note's mixed ending, "spans inside N of them ARE proposed here
   and nothing inside the other M is". A row needs a document with two waveform-waiting media, one of
-  them ducked. Tracked in `designs/reelcut-remaining.md` §5b.
+  them ducked. Tracked in #79.
 - README drift: `README.md`'s catalog file-map row omits `AgentCatalog+Audio`, `+Transitions`,
-  `+Declarations` and `+Graphics`. Tracked in `designs/reelcut-remaining.md` §5c.
+  `+Declarations` and `+Graphics`. Fixed by 2026-09-26: the row lists all four.
 - A per-voice `Outcome`, so the notes name a clip (optional; `SilenceDetector.swift` pays a toll
-  first). Tracked in `designs/reelcut-remaining.md` §5d ("Smaller") and §3.
+  first). Tracked in #107.
 - Candidate: a transcript-level edit ("remove the ums and false starts"), which is where a network
-  model would belong. Tracked in `designs/reelcut-remaining.md` §5d ("Captions").
+  model would belong. Tracked in #92.
 
 ## Where to look in the original
 

@@ -39,10 +39,9 @@ import AppKit
 /// `cloudFields` names no region — every proof instance runs under
 /// `-RCAssemblyAIEndpoint`, where the region is not where the run spoke, so
 /// the key could be proved only where it is false. The honest shape, the
-/// base URL's HOST under a key named `endpoint`, is residue in
-/// `designs/reelcut-remaining.md` §5. The vocabulary's rules are
-/// `TranscriptOptions.keyterms`, the one spelling the sheet shares (c1-chrome
-/// moved them there verbatim).
+/// base URL's HOST under a key named `endpoint`, is GitHub issue #94.
+/// The vocabulary's rules are `TranscriptOptions.keyterms`, the one spelling
+/// the sheet shares (c1-chrome moved them there verbatim).
 extension AgentServer {
 
     // MARK: - The engine argument

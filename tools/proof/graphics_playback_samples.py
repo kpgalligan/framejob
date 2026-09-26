@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Builds the playback-check projects (designs/reelcut-remaining.md §4,
-"Graphics playing, WATCHED") through a running Reelcut's MCP tools."""
+"""Builds the playback-check projects (issue #56, "Graphics playing,
+WATCHED") through a running Reelcut's MCP tools."""
 import re
 import subprocess
 import sys

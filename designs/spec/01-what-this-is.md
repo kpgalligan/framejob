@@ -16,7 +16,9 @@ the export's loudness target — M3 and §11 R5-2; so no EQ, mix buses or
 Audio Units, while offline voice effects are deferred rather than out), a
 plugin system (a clip
 may draw itself from a JavaScript module in its package, road map 10;
-nothing else is scriptable — §11 G-1), any platform but macOS. **Screen recording was on this list until road map 3
+nothing else is scriptable — §11 G-1), motion blur, stabilisation,
+optical-flow retiming and auto-reframe (heavy pixel work or ML, outside the
+compositor's one-pass shape — road map 2 §4), any platform but macOS. **Screen recording was on this list until road map 3
 reversed it** (§11): the app records a display or a window through
 ScreenCaptureKit into a file it then imports exactly as File ▸ Open would —
 paused and resumed from the menu bar, each stretch its own file and its own

@@ -5,7 +5,7 @@ the AssemblyAI key to disk.
 `xcodebuild` records every task's ENVIRONMENT in its build database under
 `build/Build/Intermediates.noindex/XCBuildData/`, so a `make app` run from a
 shell that exports `RC_ASSEMBLYAI_KEY` used to leave that key's value there
-(`designs/reelcut-remaining.md` §5 has the measurement). The `Makefile` now
+(road map 6 §10.12 has the measurement). The `Makefile` now
 carries one directive, `unexport RC_ASSEMBLYAI_KEY`, above `.PHONY`, which
 covers every recipe in the file — `app`, `rust`, `test`, `lint`, `fmt`,
 `project`, `typecheck` and `run`.

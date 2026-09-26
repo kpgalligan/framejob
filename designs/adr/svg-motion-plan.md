@@ -131,9 +131,8 @@ entry for what a switch to JavaScriptCore must answer.
 
 None of its own. Everything left from the plan (G6, HEVC with alpha, path
 helpers, and issue #39) is listed under Open items in
-`designs/adr/roadmap-10-graphics.md` and tracked in
-`designs/reelcut-remaining.md` (G6 and #39 in §5f, HEVC with alpha and path
-helpers in §5d) or issue #39.
+`designs/adr/roadmap-10-graphics.md` and tracked in issues #127 (G6), #103
+(HEVC with alpha and path helpers) and #39.
 
 ## Where to look in the original
 

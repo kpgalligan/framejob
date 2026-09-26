@@ -48,7 +48,7 @@ Spec §1 made screen and camera recording non-goals on day one ("a screencast ed
 ## Known limits
 
 - **TCC attribution:** a shell-launched binary runs under the TERMINAL's grants (R0 q1). A proof's instance therefore never tests Reelcut.app's own grant. `open -a … --env … --args …` gives an instance responsible for itself. `open -a` activates an existing instance instead of launching a new one.
-- **Host state is a proof input.** A locked console lists 0 shareable displays under a true preflight. A muted output reaches the tap unreliably. Another app's sound lands in the tap. A Bluetooth OUTPUT gives the system-audio tap digital silence. A Bluetooth INPUT makes the mic lag the picture (see remaining §4). The proofs skip these by name.
+- **Host state is a proof input.** A locked console lists 0 shareable displays under a true preflight. A muted output reaches the tap unreliably. Another app's sound lands in the tap. A Bluetooth OUTPUT gives the system-audio tap digital silence. A Bluetooth INPUT makes the mic lag the picture (see #57). The proofs skip these by name.
 - **A variable-rate recording in a new project gives an inexact canvas rate only via File ▸ Open**, not via the recorder. At such a rate, "touching" segments may have a sub-frame gap.
 - **Stopping and pausing edge cases** (documented in `ScreenRecorder+Pause.swift`):
   - A pause within ~10 ms of a resume's add can close an unopened file. That empty movie then fails the recording at stop instead of being dropped.
@@ -61,13 +61,13 @@ Spec §1 made screen and camera recording non-goals on day one ("a screencast ed
 
 ## Open items
 
-- Person checks for R1 and R2 (picker window mode, countdown look, panel absent from the file, playback absent from the file, the system indicator and its Stop, the status item's two menus and pause glyph, the indicator staying up through a pause, the panel returning only with a note, ⌘Q while paused, playback across a segment boundary, the mic grant prompt from the signed bundle): tracked in `designs/reelcut-remaining.md` §4h.
-- `recording_proof.py`'s mic rows fail rather than skip with a Bluetooth INPUT: tracked in `designs/reelcut-remaining.md` §4j.
-- Show Clicks: nobody has seen a click ring in a recorded file. The spike's pointer was never on the recorded display. Tracked in `designs/reelcut-remaining.md` §4h.
-- `ScreenRecorder.swift` (399) and `AgentServer+Recording.swift` (400) sit at the 400-line new-file cap, so the next addition to either pays a toll first. Tracked in `designs/reelcut-remaining.md` §3.
-- Landing the readable segments of a recording whose last segment failed (the "kinder rule"), with the two R2 edge cases (a pause within ~10 ms of a resume; a mic stopped before its first sample). Not built by design; a candidate. Tracked in `designs/reelcut-remaining.md` §5d ("The recorder").
-- Pause/Resume in the File menu and a fixed-width status title; a pre-roll mic meter; a picture-less voice-over recording as its own command: tracked in `designs/reelcut-remaining.md` §5d ("The recorder").
-- Camera recording and callouts stay out by decision: `designs/reelcut-remaining.md` §5f.
+- Person checks for R1 and R2 (picker window mode, countdown look, panel absent from the file, playback absent from the file, the system indicator and its Stop, the status item's two menus and pause glyph, the indicator staying up through a pause, the panel returning only with a note, ⌘Q while paused, playback across a segment boundary, the mic grant prompt from the signed bundle): tracked in #55.
+- `recording_proof.py`'s mic rows fail rather than skip with a Bluetooth INPUT: tracked in #57.
+- Show Clicks: nobody has seen a click ring in a recorded file. The spike's pointer was never on the recorded display. Tracked in #55.
+- `ScreenRecorder.swift` (399) and `AgentServer+Recording.swift` (400) sit at the 400-line new-file cap, so the next addition to either pays a toll first. The named cut for the second is in `designs/adr/app-file-history.md` "Named next cuts".
+- Landing the readable segments of a recording whose last segment failed (the "kinder rule"), with the two R2 edge cases (a pause within ~10 ms of a resume; a mic stopped before its first sample). Not built by design; a candidate. Tracked in #97.
+- Pause/Resume in the File menu and a fixed-width status title; a pre-roll mic meter; a picture-less voice-over recording as its own command: tracked in #98 and #99.
+- Camera recording and callouts stay out by decision: spec §1 and §11 record the exclusion.
 
 ## Where to look in the original
 

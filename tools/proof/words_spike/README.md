@@ -16,8 +16,7 @@ python3 tools/proof/words_spike/words_spike.py                  # all seven rows
 python3 tools/proof/words_spike/words_spike.py --only q4,q5     # a subset; the rest carry forward
 python3 tools/proof/words_spike/words_spike.py --remake         # rebuild fixtures, binaries, the scratch tree
 python3 tools/proof/words_spike/words_spike.py --leakcheck tools/proof/words_spike \
-    tools/proof/work/words_spike archive/reelcut-roadmap-8.md tools/proof/README.md \
-    designs/reelcut-remaining.md
+    tools/proof/work/words_spike archive/reelcut-roadmap-8.md tools/proof/README.md
 ```
 
 ## The instruments

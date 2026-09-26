@@ -18,9 +18,9 @@ history.** A road map in progress lives in `designs/`, and its own document
 holds each phase's record — what landed, what was measured, what its review
 found, what is owed — including the past of any file the phase changed. When
 a road map closes: condense it into `designs/adr/<name>.md` (any existing ADR
-is the template), move its unfinished items into
-`designs/reelcut-remaining.md`, `git mv` the original into `archive/`, and add
-its row to `archive/INDEX.md`. Update a map entry or a rule when a phase
+is the template), file each unfinished item as a GitHub issue (reviewed
+against the tree first), `git mv` the original into `archive/`, and add its
+row to `archive/INDEX.md`. Update a map entry or a rule when a phase
 changes a file's role or adds a rule. Never append a status paragraph here.
 
 **`archive/` is historical.** Don't consult it unless asked, or unless you
@@ -35,8 +35,8 @@ comment citing "road map N §x" refers to the archived original.
 | Document | What it is |
 |---|---|
 | `designs/spec/` | **The normative spec, one file per section — never read it whole.** Start at its `README.md` (the index: each file, its size, what it answers), then read only the file you need; "spec §7.3" is `07.3-frame-recipe.md`. §5 schemas, §6 op table, §7 architecture, §9 keys and menus, §10 acceptance steps, §11 decisions already made — not to be re-litigated, indexed by ID in `11-decisions/README.md`. An ADR cites §11's IDs; it never replaces them. |
-| `designs/reelcut-remaining.md` | **What is left**, and the one place it is kept: §3 the size-debt ledger a phase consults before paying a toll, §4 what only a person at the machine can check, §5 where the next work starts (open defects, candidates, work the user deferred), §6 the Rust build settings, measured. An item leaves when it is done. |
-| `designs/adr/` | One condensed decision record per closed road map, survey or file history: why the code is the shape it is. Start with the one for the area: `roadmap-03` the recorder · `roadmap-04` `detect_silence` · `roadmap-05` transitions and `video.motion` · `roadmap-06` transcription (C2, the relay, designed and deferred) · `roadmap-07` how a patch is checked, what an op answers, where its arguments are written down, the source window, the argument gate · `roadmap-08` word captions · `roadmap-09` the Clip tab, the action lane, band drags · `roadmap-10` graphics · `app-file-history` / `core-file-history` why a file or module is cut where it is · `effects-survey` E3–E9 (deferred by the user) and **the Concat rule: it is AGPL-3.0; none of its code, shaders, chains or colour tables may be carried over** · `remaining-closed` the debts already paid. |
+| GitHub issues | **What is left**, and the one place it is kept: open defects, proof residue, candidates, accepted limits, work the user deferred (`gh issue list`), and what only a person at the machine can check (`--label ready-for-human`). Nothing open is tracked in a document. |
+| `designs/adr/` | One condensed decision record per closed road map, survey or file history: why the code is the shape it is. Start with the one for the area: `roadmap-03` the recorder · `roadmap-04` `detect_silence` · `roadmap-05` transitions and `video.motion` · `roadmap-06` transcription (C2, the relay, designed and deferred) · `roadmap-07` how a patch is checked, what an op answers, where its arguments are written down, the source window, the argument gate · `roadmap-08` word captions · `roadmap-09` the Clip tab, the action lane, band drags · `roadmap-10` graphics · `app-file-history` / `core-file-history` why a file or module is cut where it is, and its named next cut · `rust-build-settings` why release builds are incremental with no LTO · `effects-survey` E3–E9 (deferred by the user) and **the Concat rule: it is AGPL-3.0; none of its code, shaders, chains or colour tables may be carried over** · `remaining-closed` the debts already paid. |
 | `designs/design_handoff_reelcut/` | The shipped chrome cleanup and identity; its README is normative for the redesign's metrics. |
 | `designs/design_handoff_reelcut_sharp/` | The sharp pass (2026-09-23): square chrome, 2 pt clips, the zoom slider's block knob. Its README is normative for radii and the knob, with spec §11 SH-1 and SH-2 as the deviations. |
 | `designs/design_handoff_clip_inspector/` | The clip inspector handoff road map 9 built from; `designs/adr/roadmap-09-clip-inspector.md` records the deviations. |
@@ -90,7 +90,7 @@ app/
   Resources/Shaders/   Compositor.metal — the per-layer compositing pass
   Resources/Models/    silero_vad.mlmodelc, vendored compiled (PROVENANCE.md)
   Bridging/            the bridging header importing core/include/reelcut_core.h
-designs/             the spec, what is left, adr/ (condensed records), the handoffs — the table above
+designs/             the spec, adr/ (condensed records), the handoffs — the table above
 archive/             closed road maps and histories, verbatim; INDEX.md — read only when asked
 docs/agents/         what the engineering skills read: tracker, labels, domain docs
 docs/graphics-api.md the graphics reference an agent reads; graphic/tests/reference.rs runs every js block
@@ -183,8 +183,13 @@ else is what bloats files:
   and the throwing helpers in `AgentServer+Arguments.swift` refuse a value a
   handler cannot read by name rather than dropping it.
 - **A file at the ~600-line cap gives something up before it takes anything
-  on**, as a pure move landed and gated alone. `designs/reelcut-remaining.md`
-  §3 is the ledger; new files are capped at 400 lines.
+  on**, as a pure move landed and gated alone; new files are capped at 400
+  lines. Frozen files take wiring only. `core/src/edit.rs` and
+  `app/Sources/ReelOps.swift` are exempt (tables, one row per op), and proof
+  instruments in `tools/proof/` are held to neither cap. The ledger is
+  `wc -l app/Sources/*.swift core/src/*.rs graphic/src/*.rs | sort -rn`; the
+  seam a record already named for a file is under "Named next cuts" in
+  `designs/adr/app-file-history.md` / `core-file-history.md`.
 - **A decision in spec §11 is not re-litigated** (`designs/spec/11-decisions/`). A phase that needs a new
   one records it there before the code, not after.
 - Commit only when asked. A commit message says what was verified and what
@@ -233,7 +238,7 @@ because nothing closes one: relaunch between proof sessions.
 
 Spec §10's per-step verifications are the acceptance tests. Still unchecked
 by a human: step 4's "the clip plays with audio" and step 5's 60 fps, which
-no still frame can answer; `designs/reelcut-remaining.md` §4 lists the rest.
+no still frame can answer; the `ready-for-human` issues list the rest.
 
 ## Seeing the chrome
 
@@ -271,7 +276,10 @@ skip rows for a named host condition such as a locked console.
 
 GitHub Issues on `kpgalligan/reelcut`, through the `gh` CLI. See `docs/agents/issue-tracker.md`.
 **Every issue an agent creates carries the `ai-drafted` label**, beside any
-triage label: `gh issue create --label ai-drafted …`.
+triage label: `gh issue create --label ai-drafted …`. **It also carries
+`low-priority` unless it is urgent** — data loss or a corrupt project reachable
+in ordinary use, a crash or hang reachable in ordinary use, a secret leak, or
+something blocking other work now.
 
 ### Triage labels
 

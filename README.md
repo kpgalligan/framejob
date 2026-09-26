@@ -263,8 +263,8 @@ settings, and the export queue), viewing and finding (preview quality, a
 second preview window, and a Media tab you can search, sort and filter), and
 now the last of them: editing INSIDE a nest, which the spec designed and left
 and which every op reaches through one envelope key.
-`designs/adr/` holds the condensed record of each road map, and
-`designs/reelcut-remaining.md` §4 what still needs a person at the machine.
+`designs/adr/` holds the condensed record of each road map, and the GitHub
+issues labelled `ready-for-human` what still needs a person at the machine.
 
 What has actually been checked, and what has not: the model, the ops, the
 composition plan, the frame recipe, the compositor, save/open and export were
@@ -289,7 +289,7 @@ app/
   Resources/Shaders/  Compositor.metal — the per-layer compositing pass
   Bridging/           Bridging header importing the Rust FFI header
 designs/              spec/ — the accepted design and spec, one file per section;
-                      reelcut-remaining.md — what is left; adr/ — condensed records
+                      adr/ — condensed records
 archive/              closed road maps, verbatim (INDEX.md)
 project.yml           xcodegen definition — source of truth for the Xcode project
 Makefile              Build orchestration

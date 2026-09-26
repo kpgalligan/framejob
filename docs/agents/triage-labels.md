@@ -14,4 +14,6 @@ When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the 
 
 This repo carries a **sixth** label the five roles have no room for: `spec`, for an issue that IS a spec (`docs/agents/issue-tracker.md:30`) or that needs a spec §11 decision before it can be built (#27 is one). An issue labelled `spec` never takes `ready-for-agent` — that label is a work order to a polling agent, and a spec is an input.
 
+Two more labels sit beside the roles: `ai-drafted` on every issue an agent creates, and `low-priority` on every agent-created issue that is not urgent (the test is in `docs/agents/issue-tracker.md`).
+
 Edit the right-hand column to match whatever vocabulary you actually use.

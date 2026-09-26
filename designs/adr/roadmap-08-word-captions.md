@@ -322,7 +322,7 @@ is the one style that pages to two lines by design.
 
 ## Open items
 
-- The person checks are tracked in `designs/reelcut-remaining.md` §4e:
+- The person checks are tracked in #52:
   - no network;
   - a real model download: its progress, cancel, the popups' lock and the
     model's survival;
@@ -335,39 +335,35 @@ is the one style that pages to two lines by design.
   - the Style row seen as a sheet.
 - The not-built list (AI emphasis/emoji, a sliding pill, a karaoke in-word
   fill and "dim during silence", restyling in place, WebVTT inline
-  timestamps, filler words, per-word confidence styling) is tracked in
-  `designs/reelcut-remaining.md` §5d.
+  timestamps, filler words, per-word confidence styling) is tracked in #96.
 - `cloud_captions_probe.py` still leaves `cloudprobe-*` suites in
-  `~/Library/Preferences`, and should move to `MemoryDefaults`. Tracked in
-  `designs/reelcut-remaining.md` §5b.
+  `~/Library/Preferences`, and should move to `MemoryDefaults`. Tracked in #76.
 - The user has not yet confirmed three choices: Karaoke's two-line exception,
-  the initial font set and the 80 % shrink floor. Tracked in
-  `designs/reelcut-remaining.md` §4e.
+  the initial font set and the 80 % shrink floor. Tracked in #45.
 - Spec §7.7's format list still says "measured on macOS 15" and
-  was not re-measured at 26. Tracked in `designs/reelcut-remaining.md` §5c.
+  was not re-measured at 26. Tracked in #46.
 - `AVVideoComposition.Configuration` not adopted (the 3 deprecation warnings
-  since the bump). Tracked in `designs/reelcut-remaining.md` §5d.
-- The sheet's preview plate goes stale on a light/dark switch, because
-  `PreviewKey` carries no appearance, and the W-5 note is cut to "…the word
-  style w…" in the 304 pt inspector. Tracked in
-  `designs/reelcut-remaining.md` §5a ("Word captions").
-- Stale text and small nits, tracked in `designs/reelcut-remaining.md` §5b
-  and §5c:
-  - `ProjectSnapshot.formatVersion = 5`
-  - the "three computed keys" docs in `recipe_text.rs`
-  - the grant-era comments in `harness/main.swift` and `phase4_chrome.py`
-  - a misnamed test in `core/tests/words.rs`
-  - a 128-character doc line in `CaptionLayout.swift`
-  - the probe's unchecked P8 drain
-  - the spike's DELETE-status gate
+  since the bump). Tracked in #91.
+- The W-5 note is cut to "…the word style w…" in the 304 pt inspector.
+  Tracked in #70. The sheet's preview plate going stale on a light/dark
+  switch (`PreviewKey` carries no appearance) was closed on 2026-09-26: it
+  was not a defect.
+- Stale text and small nits:
+  - `ProjectSnapshot.formatVersion = 5` (#84)
+  - the "three computed keys" docs in `recipe_text.rs` (closed 2026-09-26:
+    accurate, three reveal keys then two word keys)
+  - the grant-era comments in `harness/main.swift` and `phase4_chrome.py` (#82)
+  - a misnamed test in `core/tests/words.rs` (#83)
+  - a 128-character doc line in `CaptionLayout.swift` (fixed by 2026-09-26)
+  - the probe's unchecked P8 drain (#82)
+  - the spike's DELETE-status gate (#82)
   - `words_core_proof.py`'s hard-coded format version (also in road map 10's
-    owed list)
+    owed list; #77)
 - `paste` stores a `words` count mismatch whole (refused at the next
-  `set_text`). Tracked with `paste`'s payload in
-  `designs/reelcut-remaining.md` §5a.
+  `set_text`). Tracked with `paste`'s payload in #62.
 - Not tracked: `words_core_proof.py` (425) and `word_captions_probe.swift`
   (422) are over 400 lines, but proof instruments are not held to the
-  new-file cap (`designs/reelcut-remaining.md` §3).
+  new-file cap (the root `CLAUDE.md`).
 
 ## Where to look in the original
 

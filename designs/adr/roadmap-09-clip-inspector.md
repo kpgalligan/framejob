@@ -220,10 +220,9 @@ converts the inks and compares within ±1.
 ## Open items
 
 - A person checks each phase in the running app, in both appearances. Phases 1, 2, 3a, 3b, 4 and
-  5 are tracked in `designs/reelcut-remaining.md` §4c, phase 1 written out in full (the lane and
+  5 are tracked in #49, phase 1 written out in full (the lane and
   bands, the light ink, a real band click, and esc).
-- The handoff items never built are tracked in `designs/reelcut-remaining.md` §5d ("Chrome") as
-  decisions to take up:
+- The handoff items never built are tracked in #102 as decisions to take up:
   - the 64 pt label
   - the dashed ⊘ border
   - the boxed "clip" tag

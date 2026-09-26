@@ -95,8 +95,8 @@ these instruments deletes, truncates or moves `ledger.json`** — not
   ≤ 48 h retention. q5's refused language code is NOT this: its submit was
   answered, so it closes `no_transcript`;
 * `unresolved` — a submit whose reply was lost and whose look could not
-  prove either way. That is the one outcome that owes a line in
-  `designs/reelcut-remaining.md` §4, because only a person can look at the
+  prove either way. That is the one outcome that owes a line in a
+  person-check issue (#53), because only a person can look at the
   dashboard.
 
 Every run with a key STARTS by settling the ledger and ENDS by settling it

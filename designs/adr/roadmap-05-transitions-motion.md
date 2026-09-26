@@ -282,24 +282,21 @@ Measured and rejected (do not re-try blind):
 
 ## Open items
 
-- Person checks, E1 (§4g) and E2 (§6g) — tracked in
-  `designs/reelcut-remaining.md` §4g.
+- Person checks, E1 (§4g) and E2 (§6g) — tracked in #54.
 - `e2_proof.py` cannot see a spin's DIRECTION or a slide inside a nest against
   the nest's canvas over MCP (core tests pin both; the MCP rows are owed) —
-  tracked in `designs/reelcut-remaining.md` §5b.
+  tracked in #78.
 - AVFoundation's first-~12 ms mix point at a clip's start (a lead-in ramp is
-  the candidate fix) — tracked in `designs/reelcut-remaining.md` §5d.
+  the candidate fix) — tracked in #87.
 - `paste`'s payload clips are neither range-checked nor normalised — tracked
-  in `designs/reelcut-remaining.md` §5a.
+  in #62.
 - A sub-frame `add_transition` duration refuses with "the 0 frames asked
-  for" — tracked in `designs/reelcut-remaining.md` §5d ("The core's
-  refusals").
+  for" — tracked in #88 (the core's refusals' sentences).
 - `core/src/actions.rs` is at 592 lines; the plan's pre-agreed toll is to move
   `clamp_video` and helpers to `actions_clamp.rs` before its next addition —
-  tracked in `designs/reelcut-remaining.md` §3.
+  see `designs/adr/core-file-history.md` "Named next cuts".
 - `add_transition`'s handle form does not advance `graphic.in` for a graphic
-  incoming clip — road map 10's G2b item, tracked in
-  `designs/reelcut-remaining.md` §5a ("Graphics, model and export").
+  incoming clip — road map 10's G2b item, tracked in #72.
 - Issues #25, #26, #27 filed from this road map are CLOSED (D7-2 and D7-3 in
   `e1411be`; E2-27 in `71f3a8d`).
 

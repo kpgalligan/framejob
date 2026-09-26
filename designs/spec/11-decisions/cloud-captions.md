@@ -174,8 +174,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   proof instance runs under `-RCAssemblyAIEndpoint`, where the region is
   NOT where the run spoke, so such a key could only ever be proved on the
   one host where it is false; the honest shape — the base URL's HOST, under
-  a key named `endpoint` — is recorded as residue in
-  `designs/reelcut-remaining.md` §5 rather than guessed at here. The
+  a key named `endpoint` — is recorded as GitHub issue #94 rather
+  than guessed at here. The
   Settings window's **Verify** runs on `CloudTranscriber`'s own `work`
   queue, one of the seams `app/CLAUDE.md` lists, and adds no queue (R6-7).
 - **R6-13 — The estimate never counts a HELD media as "to upload", and

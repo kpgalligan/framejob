@@ -323,24 +323,23 @@ reversed in a commit message); run EVERY proof script when the FFI changes; meas
 ## Open items
 
 - The clamped-edge family could answer `Refused` with a sentence — a candidate, not started, not
-  owed by D2 — tracked in `designs/reelcut-remaining.md` §5d ("The core's refusals").
+  owed by D2 — tracked in #88.
 - Index range refusals (`filters[1].amount`), moving `phase6_proof.py`'s `[]` assertions with it —
-  tracked in `designs/reelcut-remaining.md` §5d.
+  tracked in #89.
 - `performGroupedEdit`'s empty undo group on an identity/refusal: reproduce with undo-stack
   assertions and re-audit the "unreachable" claim (inspector, canvas and add-clip paths call it) —
-  tracked in `designs/reelcut-remaining.md` §5a.
+  tracked in #59.
 - A partial success whose list also held a refusal drops the sentence; no tool produces the case
-  today — tracked in `designs/reelcut-remaining.md` §5d.
-- Nullability as an op-table column (optional design) — tracked in `designs/reelcut-remaining.md`
-  §5d.
+  today — tracked in #88.
+- Nullability as an op-table column (optional design) — tracked in #90.
 - Residual argument-name literals in older proof scripts (app-state tools; `phase4`/`phase5` prose
-  claims) — tracked in `designs/reelcut-remaining.md` §5b.
+  claims) — tracked in #82.
 - Stale doc comment: `app/Sources/ReelEdit.swift` still says refusals answer `.identity` "until road
-  map 7's D2·3 gives them their sentences" — tracked in `designs/reelcut-remaining.md` §5c.
+  map 7's D2·3 gives them their sentences" — fixed by 2026-09-26 (`ReelEdit.swift:64`).
 - The Speed sheet showing a neighbour's dissolve rather than a length (a separate UI decision) —
-  tracked in `designs/reelcut-remaining.md` §5d.
-- Person checks for parts 1–6 (playback, layout of the Speed sheet hint) — tracked in
-  `designs/reelcut-remaining.md` §4a and §4b.
+  tracked in #109.
+- Person checks for parts 1–6 (playback, layout of the Speed sheet hint) — tracked in #47 and
+  #48.
 
 ## Where to look in the original
 

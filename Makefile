@@ -5,7 +5,7 @@ APP_PATH := $(BUILD_DIR)/Build/Products/Release/$(APP).app
 # `xcodebuild` records every task's ENVIRONMENT in its build database under
 # build/Build/Intermediates.noindex/XCBuildData/, so a `make app` from a shell
 # that exports the AssemblyAI key writes that key to disk
-# (`designs/reelcut-remaining.md` §5, measured). `unexport` covers every
+# (road map 6 §10.12, measured). `unexport` covers every
 # recipe in this file, which is what the proofs' own `child_env()` already
 # does for themselves; `tools/proof/makefile_env_proof.py` measures `app`.
 unexport RC_ASSEMBLYAI_KEY

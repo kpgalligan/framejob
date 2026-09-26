@@ -26,8 +26,8 @@ gradients, backgrounds and filters as action targets; (7) output: Save Frame, Pr
 timecode burn-in, presets and a queue; (8) viewing and finding: preview quality, a preview window
 and Media search; (9) editing inside a nest. The format went from v3 to v6 along the way.
 
-§0 of the original also became the project's standing process rules. Later road maps and
-`designs/reelcut-remaining.md` still cite those rules, so they are condensed first below.
+§0 of the original also became the project's standing process rules. Later road maps still cite
+those rules, so they are condensed first below.
 
 ## Decisions
 
@@ -360,24 +360,24 @@ All of these were verified as still true on 2026-09-26.
 
 ## Open items
 
-- **Person checks for phases 1–7, not yet in remaining §4:** gestures and keys (P1); the rename,
+- **Person checks for phases 1–7:** gestures and keys (P1); the rename,
   label, solo and paste UI (P2); the Z mode and a face actually hidden (P3); captions legible and
   reveals in motion (P4); the meter in motion, mono and pan heard, −14 LUFS apparent (P5); blend
   and gradient on real footage and the blurred-background default (P6); relaunch keeping the
-  export choice and the preview frame, and the queue window (P7/P8). Tracked in
-  `designs/reelcut-remaining.md` §4 (4a, 4b, 4d, 4e).
-- **Tracked in `designs/reelcut-remaining.md` §5 (5a defects, 5d candidates):**
-  - a float export write path, so a hot mix is not clipped by the Int16 decode;
-  - 24-bit WAV/AIFF through an `audio_bits` override;
-  - the meter sink holding its last buffer across empty timeline spans (from #34's record);
-  - stored obscure regions drawn and draggable on the canvas (`canvasQuad` is the seed);
-  - `selectedMedia` pointing at a filtered-out row;
-  - the forty-document deadlock;
-  - the canvas text editor's line breaks against the render (#36), an accepted limit (§5e);
-  - #35's residue: other bare keys dead after a field commit, and Caps Lock (§5a).
-- **Also tracked in `designs/reelcut-remaining.md`:** #34's built-in-speaker run and listen, and
-  the #35/#36/#37 and phase 8/9 looks (§4); the §4 left-outs — voice-over, speed ramps and bins
-  (§5d), LUTs (deferred as E7, §5f), motion blur and similar, multicam (§5f).
+  export choice and the preview frame, and the queue window (P7/P8). Tracked in #47, #48, #51
+  and #52.
+- **Tracked in GitHub issues (defects and candidates):**
+  - a float export write path, so a hot mix is not clipped by the Int16 decode (#86);
+  - 24-bit WAV/AIFF through an `audio_bits` override (#86);
+  - the meter sink holding its last buffer across empty timeline spans (from #34's record; #65);
+  - stored obscure regions drawn and draggable on the canvas (`canvasQuad` is the seed; #85);
+  - `selectedMedia` pointing at a filtered-out row (#68);
+  - the forty-document deadlock (#40);
+  - the canvas text editor's line breaks against the render (#36), an accepted limit (#117);
+  - #35's residue: other bare keys dead after a field commit, and Caps Lock (#60, #61).
+- **Also tracked:** #34's built-in-speaker run and listen (#51), and the #35/#36/#37 and phase
+  8/9 looks (#48, #47); the §4 left-outs — voice-over (#99), speed ramps (#111) and bins (#112),
+  LUTs (deferred as E7, #122), motion blur and similar, multicam (out by decision, spec §1).
 
 ## Where to look in the original
 

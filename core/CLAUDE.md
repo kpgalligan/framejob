@@ -464,8 +464,8 @@ thirds of the truth. Over the cap today and known debt, not licence:
 `edit_clip.rs` and `edit.rs`, whose
 standing exemption is that its module doc IS the op table's semantics half
 (the cut there, if ever forced, is the `Op` enum into an `edit_ops.rs`, and
-never in the same phase as a feature). The current list is `wc -l` and
-`designs/reelcut-remaining.md` §3.
+never in the same phase as a feature). The current list is `wc -l`; named
+seams are in `designs/adr/core-file-history.md` "Named next cuts".
 
 **Dependencies.** `serde` and `serde_json` (the JSON the FFI speaks),
 `tiny_http` (the agent's socket), and `serde_path_to_error`, which is there

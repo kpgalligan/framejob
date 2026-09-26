@@ -25,5 +25,5 @@ sha2 = "0.10"
 
 [profile.release]
 # No LTO: cargo skips it for a staticlib+rlib unit anyway, and asking for it
-# fat-LTOs each of the 32 test binaries (designs/reelcut-remaining.md §6).
+# fat-LTOs each of the 32 test binaries (designs/adr/rust-build-settings.md).
 incremental = true

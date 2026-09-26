@@ -248,7 +248,7 @@ if let (document, editor, window) = openEditor() {
 
     // e. A button keeps the key: the window hands it the Space. Whether AppKit
     // then PRESSES it depends on Full Keyboard Access, a host setting, so the
-    // press is reported, not scored — remaining §4's hands-on check owns it.
+    // press is reported, not scored — issue #48's hands-on check owns it.
     let button = CountingButton(frame: NSRect(x: 0, y: 0, width: 40, height: 20))
     button.title = "Probe"
     button.target = button

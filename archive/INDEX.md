@@ -29,4 +29,4 @@ comments that cite "road map N §x". The spec they cite as `designs/reelcut-desi
 | `reelcut-effects-survey.md` | `designs/adr/effects-survey.md` | The effects survey road map 5 came from. E3–E9 are deferred by the user. It also holds the Concat AGPL rule. |
 | `reelcut-app-notes.md` | `designs/adr/app-file-history.md` | Why each Swift file in `app/Sources/` is the shape it is: size tolls, measurements, review findings. |
 | `reelcut-core-notes.md` | `designs/adr/core-file-history.md` | Why the Rust core's seams fall where they do: every cut, with its line counts. |
-| `reelcut-remaining.md` | `designs/adr/remaining-closed.md` | The "what is left" file as of 2026-09-26, before it was condensed. Its open items are in the live `designs/reelcut-remaining.md`; its closed items and their lessons are in the ADR. |
+| `reelcut-remaining.md` | `designs/adr/remaining-closed.md` | The "what is left" file as of 2026-09-26. Its open items became GitHub issues and the live file was deleted; its closed items and their lessons are in the ADR, its build settings in `designs/adr/rust-build-settings.md`. |

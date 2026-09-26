@@ -4,7 +4,7 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 
 ## Conventions
 
-- **Create an issue**: `gh issue create --title "..." --body "..." --label ai-drafted`. Use a heredoc for multi-line bodies. Every issue an agent creates carries `ai-drafted`, beside any triage label.
+- **Create an issue**: `gh issue create --title "..." --body "..." --label ai-drafted`. Use a heredoc for multi-line bodies. Every issue an agent creates carries `ai-drafted`, beside any triage label, and `low-priority` unless it is urgent (data loss or a corrupt project, a crash or hang, a secret leak — each reachable in ordinary use — or something blocking other work now).
 - **Read an issue**: `gh issue view <number> --comments`, filtering comments by `jq` and also fetching labels.
 - **List issues**: `gh issue list --state open --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'` with appropriate `--label` and `--state` filters.
 - **Comment on an issue**: `gh issue comment <number> --body "..."`

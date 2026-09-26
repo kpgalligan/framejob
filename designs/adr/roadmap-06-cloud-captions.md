@@ -322,12 +322,11 @@ The proofs live in `tools/proof/`:
 
 ## Open items
 
-- C2, the relay, is deferred by the user and blocked on caller identity. Tracked in
-  `designs/reelcut-remaining.md` §5f.
-- `KeychainStore` waits for a stable Developer ID signature. Tracked in
-  `designs/reelcut-remaining.md` §5f.
-- Person checks, tracked in `designs/reelcut-remaining.md` §4f (the mic-input row and the tainted
-  build databases in §4j):
+- C2, the relay, is deferred by the user and blocked on caller identity. Tracked in #125.
+- `KeychainStore` waits for a stable Developer ID signature. Tracked in #126.
+- Person checks, tracked in #53 (the mic-input row in #57; the tainted build databases were
+  closed on 2026-09-26: none found, and the `Makefile`'s `unexport RC_ASSEMBLYAI_KEY` prevents
+  new ones):
   - the q7 Keychain prompt
   - the Settings window and the sheet looked at, and the reasons tooltip
   - Verify and a real 402 against the live service
@@ -338,12 +337,11 @@ The proofs live in `tools/proof/`:
   - how a held media feels
   - ⌘, in a document window
   - `recording_proof.py` with a wired input
-- Reader-review residue nits (tracked in `designs/reelcut-remaining.md` §5a and §5b):
+- Reader-review residue nits (tracked in #71 and #81):
   - "retried at the next run" is false for a `notSent` id
   - two row-I checks say "five" and assert six
   - a stale 2.5 s comment in `cloud_captions_proof.py`
-- An `endpoint` (host) key in `transcribe`'s result (R6-12 residue). Tracked in
-  `designs/reelcut-remaining.md` §5d.
+- An `endpoint` (host) key in `transcribe`'s result (R6-12 residue). Tracked in #94.
 - Items the reader review left UNJUDGED:
   - the 21 pairs of refusals
   - the sheet's Stop during upload, submit, wait and save
@@ -351,14 +349,13 @@ The proofs live in `tools/proof/`:
   - a second reader for fixes R1·1, R1·2, R1·3, R2·1 and H·3
   - the re-aimed mutants that were never re-run
 
-  Tracked in `designs/reelcut-remaining.md` §5b.
+  Tracked in #80.
 - Candidates not started: windowed transcription (deferred until the estimate is seen to bite) and
-  a per-speaker caption label/colour. Tracked in `designs/reelcut-remaining.md` §5d.
+  a per-speaker caption label/colour. Tracked in #95 and #93.
 - Accepted limits a later phase may revisit: #28's bounded recovery, the janitor's 404 hold,
-  #30's identity, the block-buffered client log, the support folder's mode. Tracked in
-  `designs/reelcut-remaining.md` §5e and §5d.
-- The rest of the app against a hand-written `speed` (H·4). Tracked in
-  `designs/reelcut-remaining.md` §5a.
+  #30's identity, the block-buffered client log, the support folder's mode. Tracked in #113,
+  #44, #114, #116 and #108.
+- The rest of the app against a hand-written `speed` (H·4). Tracked in #41.
 
 ## Where to look in the original
 

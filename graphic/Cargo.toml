@@ -28,5 +28,5 @@ flate2 = "1"
 png = "0.18"
 
 [profile.release]
-# No LTO (designs/reelcut-remaining.md §6).
+# No LTO (designs/adr/rust-build-settings.md).
 incremental = true

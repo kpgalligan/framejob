@@ -353,23 +353,55 @@ Still true of the current code:
 - Closing the transcribe sheet mid-download lets the download run on (a decision).
 - The playhead echo has no MCP drive: no tool reads the live player's reports.
 
+## Named next cuts
+
+The size rule is in the root `CLAUDE.md`; which files are over it is `wc -l`, never a table here.
+What follows is only the SEAM each over-cap or at-edge file's record named, so the phase that has
+to pay a toll starts from it. A file not listed has no named seam yet.
+
+- `ProjectSnapshot.swift`: a property group's snapshot types out, whole. The precedents are
+  `TextProps.swift` and `ProjectSnapshot+Graphic.swift`.
+- `ReelCore.swift`: the `dictionary` extensions (the media helpers already went to
+  `MediaDescriptor.swift`). It stays the only file that calls `rc_*`.
+- `ProjectDocument.swift`: stored properties cannot move; the natural cut is the media/reverse
+  machinery, in the shape of `+DisplayStem`, `+Import`, `+Graphics`.
+- `InspectorPane.swift`: the precedents are `InspectorSection.swift`, `InspectorSlider.swift` and
+  `InspectorBinding+Writes.swift`.
+- `ExporterWriter.swift`: the settings/encoder half.
+- `OptionControls.swift`: the precedent is `OptionControls+Choices.swift`.
+- `VideoPane.swift`: a section out as an extension, the precedent `VideoPane+Obscure.swift`.
+- `AgentServer+Clips.swift`: the clip-placement handlers against the property doors.
+- `AgentServer+Scope.swift`: the envelope rule (`checkCallScope`, `effectiveScope`, `idScope`,
+  `addressed`, `checkDocumentLevelTicks`, `scopeLanding`, `scopeFailure`) against `set_scope` the
+  tool (`setScope`, `nestScopePath`, `pathToClip`, `applyNestScope`, `commonPrefix`,
+  `scopeReport`).
+- `SilenceDetector.swift`: must pay before a per-voice `Outcome` (#107).
+- `CompositionBuilder.swift`: `audioParameters`.
+- `AppDelegate+Menus.swift`: a submenu builder out (the precedent is
+  `AppDelegate+GraphicMenu.swift`).
+- `SettingsWindowController.swift`: over its 400-line new-file cap; the Verify bookkeeping to
+  `SettingsWindowController+Verify.swift` (#58).
+- `AgentServer+Recording.swift`: `RecordingToolChrome` (the status-item wrapper with `freeze()`)
+  out (road map 3 R2).
+- `Controls.swift`: held to the sync rule with Rasterize's copy (`app/CLAUDE.md` "Shared chrome");
+  7 of its lines are the SH-2 fork of `drawBar` (#101).
+- `ReelOps.swift` is exempt (a table, one row per op). `TimelineView.swift`,
+  `PreviewCanvasView.swift`, `EditorViewController.swift` and `AgentServer.swift` are frozen and
+  take wiring only.
+
 ## Open items
 
-- A real mouse band pressed from below the lanes. Tracked in `designs/reelcut-remaining.md` §4
-  ("The band from below the lanes").
-- A person drags a clip and sees no flash to 0 and no jump. Tracked in
-  `designs/reelcut-remaining.md` §4 ("Dragging a clip leaves the timeline still").
-- `relink_media` re-probe (§5a) and caption-name agreement (§5d). Tracked in
-  `designs/reelcut-remaining.md`.
+- A real mouse band pressed from below the lanes. Tracked in #48 ("The marquee from below the
+  lanes").
+- A person drags a clip and sees no flash to 0 and no jump. Tracked in #48 ("Dragging a clip
+  leaves the timeline still").
+- `relink_media` re-probe (#63) and caption-name agreement (#43).
 - `SettingsWindowController.swift` is 453 lines, over the 400-line cap for a new file. Tracked in
-  `designs/reelcut-remaining.md` §3 ("At the edge").
-- Rasterize's `BlockSliderCell.drawBar` still has the SH-2 defect upstream. Tracked in
-  `designs/reelcut-remaining.md` §5d ("Chrome").
-- SH-1: square `StickerButton` or move its callers ("a phase of its own"). Tracked in
-  `designs/reelcut-remaining.md` §5d ("Chrome").
-- Pause/Resume live only in a status item that macOS can hide (§5d, "The recorder"); two open
-  documents at one path have no close tool (§5a, "No tool closes a document"). Tracked in
-  `designs/reelcut-remaining.md`.
+  #58.
+- Rasterize's `BlockSliderCell.drawBar` still has the SH-2 defect upstream. Tracked in #101.
+- SH-1: square `StickerButton` or move its callers ("a phase of its own"). Tracked in #100.
+- Pause/Resume live only in a status item that macOS can hide (#98); two open documents at one
+  path have no close tool (#40).
 
 ## Where to look in the original
 

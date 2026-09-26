@@ -47,7 +47,7 @@ the hit test, the no-menu row, an undo with nothing to undo and the
 last-track row, which asks `trackMenu(for:)` directly).
 
 Not measured: ⌃-click, which AppKit routes to `menu(for:)` itself before any
-`mouseDown` — a person at the machine confirms it (remaining §4).
+`mouseDown` — a person at the machine confirms it (#48).
 
     python3 tools/proof/track_menu_probe.py
 """

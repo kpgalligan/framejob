@@ -80,8 +80,8 @@ An adjustment clip is a clip, not a grading node. Spec §1 is unchanged.
 becomes a `Media` of kind `lut`, so relink, consolidate and usage come from
 paths that already exist. The LUT is applied to ENCODED sRGB, which suits a
 display-referred Rec.709 LUT. A log or scene-referred LUT will look wrong,
-and that is a stated limit. D3 reverses road map 2 §4's "LUTs" exclusion,
-which remaining.md §5 still lists. Declining E7 leaves D2 intact. (orig §4)
+and that is a stated limit. D3 reverses road map 2 §4's "LUTs" exclusion;
+the user has since called LUTs deferred, not a non-goal (#122). Declining E7 leaves D2 intact. (orig §4)
 
 **Proposed D4 — voice effects are rendered offline, not live.** The live
 tap (`AudioTap.swift`, one PreEffects tap per track) cannot host a pitch
@@ -308,8 +308,8 @@ at step 7; a frame whose mask is pending draws uncut.
 asserts 416; a layer samples one texture, and there is no time or seed
 uniform; output is confined to the layer's quad, so glow and aberration
 cannot bleed past it; there is no previous frame; there is one PreEffects
-tap per track; file sizes have moved since orig §3; consult remaining.md §3
-before paying a toll.
+tap per track; file sizes have moved since orig §3; measure with `wc -l` and read
+the file-history ADRs' "Named next cuts" before paying a toll.
 
 **Wipes are measured in each layer's own box**, so a different-size pair
 does not meet at one edge (spec §7.5). A canvas-space wipe was withdrawn
@@ -365,22 +365,19 @@ change with preview quality; saturation −100 inverting chroma.
 
 - **E3–E9** (tone/flip/mask, filters and clock, looks, adjustment clips, LUT
   import, voice effects, background removal): DEFERRED by the user. Tracked
-  in `designs/reelcut-remaining.md` §5f.
+  in #118–#124, one per phase.
 - **D2–D7 are unrecorded proposals.** Recording them moves spec §1's "color
   grading beyond per-clip controls" and "audio beyond volume/fade/duck". The
-  live list now calls LUTs deferred (E7), not a non-goal. The audio line is
-  already stale against M3. Tracked in `designs/reelcut-remaining.md` §5f and
-  §5c.
-- **Doc drift the survey's scout found, still false.** Tracked in
-  `designs/reelcut-remaining.md` §5c.
+  user now calls LUTs deferred (E7), not a non-goal. The audio line is
+  already stale against M3. Tracked in #118–#124.
+- **Doc drift the survey's scout found.** Fixed by 2026-09-26: none of the
+  four strings is left in the spec or the code.
   - spec §4.3 "Core Image behind them";
   - spec §7.5 "small offscreen texture";
   - the `ShadowUniforms` comment "8 floats = 32 bytes";
   - `RecipeClipRect`'s "always nil today".
-- **The wipe union-box measure** for a different-size pair. Tracked in
-  `designs/reelcut-remaining.md` §5d ("Smaller").
-- **Speed-curve presets:** tracked in `designs/reelcut-remaining.md` §5d
-  ("Smaller", speed ramps).
+- **The wipe union-box measure** for a different-size pair. Tracked in #110.
+- **Speed-curve presets:** tracked in #111 (speed ramps).
 
 ## Where to look in the original
 

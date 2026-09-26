@@ -2,7 +2,7 @@
 """Road map 2, phase 9 — the breadcrumb, PHOTOGRAPHED, and the two gestures
 around it.
 
-**Route 1 of `designs/reelcut-remaining.md` §1b: a probe, not two harness
+**Route 1 of `archive/reelcut-remaining.md` §1b: a probe, not two harness
 arguments.** The thing under test is a z-order — the ruler must float ABOVE
 the track-header column, because the two bands overlap in exactly one
 square, the 132 × 22 corner where the nest breadcrumb is drawn, and they

@@ -438,7 +438,7 @@ final class SilenceSheetController: NSViewController, NSTextFieldDelegate {
     /// while this sheet is up withdraws the old `.bin` FIRST, so the sheet
     /// went on showing spans measured from a file the project no longer uses
     /// until something else woke it (the reader review, road map 4 §8, R2·2 —
-    /// the limit `designs/reelcut-remaining.md` §5 recorded as unprovable, on
+    /// the limit `archive/reelcut-remaining.md` §5 recorded as unprovable, on
     /// the belief that no proof could drive this sheet; `silence2_probe.py`'s
     /// claim 17 does). The media id is not checked against the scope: a file
     /// this project does not use posts nothing, and a re-read costs one pass

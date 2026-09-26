@@ -4,7 +4,7 @@
 driving the built binary and comparing what it renders, not by reading
 code. These are the scripts that do it — an MCP script per road-map-2 phase,
 from phase 2 an offscreen-chrome script beside it, and for the fixes
-`designs/reelcut-remaining.md` records, `remaining_proof.py` over MCP and
+`archive/reelcut-remaining.md` records, `remaining_proof.py` over MCP and
 `remaining_probe.py` offscreen — so a proof can be re-run after a later
 change rather than believed on the strength of a paragraph.
 
@@ -317,7 +317,7 @@ at scroll 0. It is a probe too, one that builds a bare `TimelineView`, scrolls
 it and captures through the harness's own `cacheDisplay` path; the untracked
 `work/phase9-corner-probe/` that measured the fix at the time is superseded by
 it and deleted. `remaining_probe.py` is a third probe: the app arithmetic
-behind `designs/reelcut-remaining.md`'s fixes, one section per item, and its
+behind `archive/reelcut-remaining.md`'s fixes, one section per item, and its
 last section photographs a bare `TimelineView`'s filmstrip tile the same way
 `phase9_chrome.py` photographs the corner. `refusal_probe.py` is a fourth:
 the three app paths a refusal reaches that no MCP call can, driven through a
@@ -1979,7 +1979,7 @@ argument at all.
 ## Phase 9 — the corner, photographed (`phase9_chrome.py`)
 
 `python3 tools/proof/phase9_chrome.py`, **62/62**. No port, no window server
-grant, no media: route 1 of `designs/reelcut-remaining.md` §1b, a probe over
+grant, no media: route 1 of `archive/reelcut-remaining.md` §1b, a probe over
 the WHOLE of `app/Sources` in `phase9_probe.py`'s shape — `harness/build.sh`'s
 own swiftc line, cached on modification times under `work/cornerprobe/<tag>/`,
 a build failure scored as a FAILURE rather than an exit — except that this one
@@ -2099,7 +2099,7 @@ are a proof-time requirement here as for `phase2_proof.py`'s PCM decode: a stand
 line, cached on modification times under
 `work/remainingprobe/<tree|mutant-hash>/`, a build failure scored as a
 FAILURE rather than an exit — for the items in
-`designs/reelcut-remaining.md` that are APP arithmetic or an app PICTURE no
+`archive/reelcut-remaining.md` that are APP arithmetic or an app PICTURE no
 tool reaches. One section per item, and one binary answering all of them by
 a request `mode`, so the next item adds a `case` and a `section_…` without
 touching the others: section 1 is §2b's naming (70 checks with the build
@@ -3087,7 +3087,7 @@ reason and asserted to be the whole of the exceptions. Then **a fraction
 where a whole number belongs** — `trim_start {clip: 3.5}` and
 `delete {clips: [3.5]}` — is refused rather than truncated to clip 3, and
 `{clip: 3.0}` is still the id. Then **a TERM of a frame rate**, the 17 rows
-of 2026-09-20 that closed `designs/reelcut-remaining.md` §5's residue: the
+of 2026-09-20 that closed `archive/reelcut-remaining.md` §5's residue: the
 two `[numerator, denominator]` readers took each half through `intValue`
 after the gate, so `set_canvas {fps: [29.97, 1]}` was 29 fps in silence;
 both now read through `rateTerm`, and a fraction, a zero, a negative,
@@ -3181,7 +3181,7 @@ the case Track ▸ Remove Track gets wrong — and its undo; a clip-holding
 track's sheet, answered by pressing its Remove button; and the last track's
 disabled item. Made to fail twice: `removeTrackCommand` ignoring its id
 takes 3 rows (19/22), `menu(for:)` answering nil takes 14 (8/22). ~75 s
-with a rebuild. ⌃-click is a person's check (remaining §4).
+with a rebuild. ⌃-click is a person's check (#48).
 
 ## The marquee, from anywhere empty (`marquee_probe.py`)
 
@@ -3224,8 +3224,7 @@ empty because `RangeSession` replaces rather than adds, so the click with
 no drag is the one row that can see the press-time clear.
 
 What it cannot see is a real `mouseDown` delivered by AppKit below the
-lanes — `designs/reelcut-remaining.md` §4 lists it for a person at the
-machine.
+lanes — #48 lists it for a person at the machine.
 
 ## The sharp chrome pass (`sharp_chrome.py`)
 
@@ -3257,7 +3256,7 @@ row is 12 px of ink at scale 2, so the run is not found and all four
 slider rows go), `DS.buttonRadius` 4 (25/29). The fork it guards is spec
 §11 SH-2: Rasterize's `withAlphaComponent` painted the track in the knob's
 own solid ink, which the slider row caught. ~3 min with a probe rebuild.
-A person still looks at both appearances (remaining §4). One earlier row
+A person still looks at both appearances (#50). One earlier row
 moved with the pass, in place and dated: `phase8_chrome.py` section 7 told
 the find band's hairlines from the search field by the field's rounded
 corners, and now excludes the square field's box by position (150/150).
@@ -3609,7 +3608,7 @@ modes and five processes:
   open sheet is replaced by one that says "talking" at every chunk and a
   `speech` post is made — the readout drops to No cuts and the wash to 0 —
   then the original bytes are posted back and the two cuts return. That is the
-  limit `designs/reelcut-remaining.md` §5 recorded as unprovable because "no
+  limit `archive/reelcut-remaining.md` §5 recorded as unprovable because "no
   proof can drive the sheet"; this one does, the guard is gone, and a copy
   with it restored scores **64/65**. Two more (R3·1) withdraw the WAVEFORM
   with the voice cache in place: the sheet still says 2 cuts, and it no longer
@@ -3685,8 +3684,8 @@ have read as "caught" while measuring nothing.
 
 What neither can see is a narrated screencast marked by ear, a cut LISTENED
 to across a voice-mode boundary, and the sheet's note when one file is
-pending while another is judged by level — `designs/reelcut-remaining.md` §4
-lists all three for a person at the machine.
+pending while another is judged by level — #54 lists all three for a
+person at the machine.
 
 ## Transitions and motion (`e1_proof.py`, `e1_chrome.py`, `e2_proof.py`, `e2_chrome.py`)
 
@@ -4013,7 +4012,7 @@ pivot compensation makes the drawn position depend on the sign of φ; closing
 the second needs a nest whose canvas differs from the project's and a render
 part-way through the slide. Neither row was written.
 
-What neither pair can see is in `designs/reelcut-remaining.md` §4: a
+What neither pair can see is in #54: a
 crossfade across a Remove Silences cut HEARD, an eased push FELT, the three
 wipes read as directions, and whether each preset's numbers look right at an
 ordinary clip length.
@@ -4057,7 +4056,7 @@ deletes, truncates or moves `ledger.json`** — not `--remake`, which rebuilds
 `fixtures/`, `bin/` and `bundles/` and nothing else, and not `--selftest`,
 which works in a `mkdtemp` root of its own. A reservation closes `deleted`,
 `no_transcript`, `upload_only` or `unresolved`, and only the last owes a line
-in `designs/reelcut-remaining.md` §4. Every run with a key starts and ends by
+in a person-check issue (#53). Every run with a key starts and ends by
 settling the ledger: DELETE everything created and not closed, and for an
 upload whose submit reply was lost, `find_own` — ONE page of the list, matched
 only against an upload URL this ledger recorded, the body parsed and dropped
@@ -4467,7 +4466,7 @@ names which answered. Three free loopback ports, and one free port per fake.
 `media/speech.mov`'s 16 kHz extract is not repeatable at ALL — four extracts,
 four distinct byte strings of one length (167 930 bytes), spans 105–228 bytes
 — where the `say` AIFF over the identical code is the TWO-string,
-one-sample population `designs/reelcut-remaining.md` §5 records. The
+one-sample population `archive/reelcut-remaining.md` §5 records. The
 difference is the AAC decode, not the resampler. So row 2's upload-count and
 request claims are made over `speech.mov` and its BYTE population over the
 AIFF, with the .mov's own spread printed as a row beside it, named as the
@@ -4746,8 +4745,7 @@ to run it again; this paragraph is the entry in this table.
 python3 tools/proof/words_spike/words_spike.py                  # all seven rows
 python3 tools/proof/words_spike/words_spike.py --only q4,q5     # a subset; the rest carry forward
 python3 tools/proof/words_spike/words_spike.py --leakcheck tools/proof/words_spike \
-    tools/proof/work/words_spike archive/reelcut-roadmap-8.md tools/proof/README.md \
-    designs/reelcut-remaining.md
+    tools/proof/work/words_spike archive/reelcut-roadmap-8.md tools/proof/README.md
 ```
 
 Five instruments. `speech_probe.swift` is a standalone `@main async` probe
@@ -4790,7 +4788,7 @@ edited.
 
 The full run scored **exit 0 with all seven rows `run`** and every reservation
 closed. One SUB-row did not run and is named in road map 8 §10.3 and in
-`designs/reelcut-remaining.md` §4: q3's no-network case, which would change
+#52: q3's no-network case, which would change
 host network state.
 
 ## Road map 10 — the graphics spike (`graphics_spike/`)
@@ -5505,7 +5503,7 @@ key and play toggles; (c) the timecode field types it; (d) the canvas
 overlay toggles on key-UP; (e) an `NSButton` first responder is handed the
 Space (its `keyDown` sees it once — whether AppKit then presses it depends on
 Full Keyboard Access, a host setting, so FKA and the press are printed in the
-detail and not scored; `designs/reelcut-remaining.md` §4 is the press's
+detail and not scored; #48 is the press's
 hands-on check); (f) an auto-repeat is
 swallowed; (g) the window is an `EditorWindow`. The beep is not observable;
 (a) and (b) together are the claim that the window returned before
@@ -5601,8 +5599,8 @@ python3 tools/proof/text_apply_proof.py --baseline 7e946ed   # exit 0 = exactly 
 
 ## Road map 10 — the person's playback-check projects (`graphics_playback_samples.py`)
 
-Not a proof: it BUILDS the three projects `designs/reelcut-remaining.md`
-§4's "Graphics playing, WATCHED" bullet asks a person to play, through the
+Not a proof: it BUILDS the three projects #56's "Graphics playing,
+WATCHED" check asks a person to play, through the
 built app's MCP tools (its own instance on port 4891, killed after), into
 `tools/proof/work/playback-check/` (ignored by git):
 - `Playback-1080p.reelcut` — 1920×1080 at 30 fps: `lower-third` (0–5 s),

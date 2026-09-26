@@ -146,14 +146,14 @@ entries in end patches (road map 7's D1); the one-minute `SFSpeech` ceiling (W-8
 the Remove Silences sheet's stale spans after an MCP relink (road map 4).
 
 ## Open items
-- R1/R2 recorder person checks and `phase8_chrome.py`'s unlocked-console rows — tracked in
-  `designs/reelcut-remaining.md` §4.
-- `relink_media` re-probing (§5a) and the panel/MCP caption-name spelling (`chart.png.srt` vs
-  `chart.srt`, §5d) — tracked in `designs/reelcut-remaining.md`.
-- `AgentServer+Clips.swift` over the cap (856) — tracked in `designs/reelcut-remaining.md` §3.
-- Nested reversed clips unmirrored in analysis; obscure-region canvas handles; `selectedMedia`
-  pointing at a hidden row; rename Escape / undo-merge; the ~40-document deadlock; 24-bit
-  WAV/AIFF — tracked in `designs/reelcut-remaining.md` §5a and §5d.
+- R1/R2 recorder person checks and `phase8_chrome.py`'s unlocked-console rows — tracked in #55
+  and #57.
+- `relink_media` re-probing (#63) and the panel/MCP caption-name spelling (`chart.png.srt` vs
+  `chart.srt`, #43).
+- `AgentServer+Clips.swift` over the cap (856) — its seam is in `designs/adr/app-file-history.md` "Named next cuts".
+- Nested reversed clips unmirrored in analysis (#64); obscure-region canvas handles (#85);
+  `selectedMedia` pointing at a hidden row (#68); rename Escape / undo-merge (#69); the
+  ~40-document deadlock (#40); 24-bit WAV/AIFF (#86).
 
 ## Where to look in the original
 - orig M1–M3 — the milestone bullets: export writer, shadow math, GIF/APNG, schema v2–v6 history,

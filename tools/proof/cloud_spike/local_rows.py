@@ -268,7 +268,7 @@ def q7(work, here, save):
     _q7_sequence(bare, False, "bare Mach-O, file keychain", steps)
     save(measured)
     # Cleanup, bounded like everything else, and its failure is a MEASURED
-    # answer that owes `designs/reelcut-remaining.md` §4 a bullet.
+    # answer that owes a person-check issue (#53) a line.
     blocked = False
     for dp in (False, True):
         step = _q7_step(bundled["A"], "delete", dp, steps, f"cleanup delete dp={dp}")

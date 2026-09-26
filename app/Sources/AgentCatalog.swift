@@ -45,7 +45,7 @@ import Foundation
 /// took to 535 as the helper grew, back to 496 as the nine op rows lost
 /// their hand-written schemas, and up again with the ten argument
 /// descriptions the fifth parity part turned from a silence into a
-/// complaint. `designs/reelcut-remaining.md` §3 has the number today.
+/// complaint. `wc -l` has the number today.
 extension AgentServer {
     /// One tool, declaring its whole schema. Every tool gets `project` for
     /// free: with several projects open a call would otherwise be ambiguous,

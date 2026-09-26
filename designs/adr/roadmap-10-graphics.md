@@ -317,10 +317,10 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
 ## Open items
 
 - G6 (prefetch plus parallel export against a before/after measurement) —
-  deferred by the user; tracked in `designs/reelcut-remaining.md` §5f.
+  deferred by the user; tracked in #127.
 - The person's watched checks: the playback-check projects with no video
   underneath, memory at 4K, and the error card in the live preview —
-  tracked in `designs/reelcut-remaining.md` §4i.
+  tracked in #56.
 - Model and export correctness items:
   - `add_transition`'s handle form does not advance `graphic.in`;
   - a canvas rate change does not re-snap `in`/`length`;
@@ -328,19 +328,17 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   - the export gate's single nest level;
   - the loudness reader is still cancelled from main.
 
-  Tracked in `designs/reelcut-remaining.md` §5a ("Graphics, model and
-  export"), with the starved export pump.
+  Tracked in #72 (the model), #73 (the export gate, with the starved export
+  pump) and #74 (the loudness reader's cancel).
 - Small app and proof nits from the G1b–G5b reviews (Insert ▸ Graphic's
   stale-scan name choice, the non-UTF-8 From File…, the leftover
   `.js.partial`, the contact sheet's peak memory, and others) — each listed
-  in `designs/reelcut-remaining.md`: §5a ("Graphics, store and menus"), §5b
-  (the proof and test nits), §5c (the stale comments and numerals), §5d
-  ("Graphics engine and tools", "The Graphic sub-tab").
+  in an issue: #75 (store and menus), #82 and #83 (the proof and test nits),
+  #104 and #105 (the graphics engine and tools), #106 (the Graphic sub-tab).
 - The not-built list (keyframed props, `paste_attributes`, revision history,
   HEVC with alpha, mattes, system fonts, path helpers, `delete_graphic` /
-  `rename_graphic`) — tracked in `designs/reelcut-remaining.md` §5d.
-- Replacing QuickJS with JavaScriptCore — GitHub issue #39 (pointer in
-  `designs/reelcut-remaining.md` §5f).
+  `rename_graphic`) — tracked in #103.
+- Replacing QuickJS with JavaScriptCore — GitHub issue #39.
 
 ## Where to look in the original
 

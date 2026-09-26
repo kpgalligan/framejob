@@ -81,13 +81,10 @@ overrode the spec; what came after is road maps 2 onward.
 ## Open items
 - The person checks orig §2 lists that no later document carries — the timeline's transient
   states, the canvas overlay's unseen modes, gesture feel, the M3 inspector sections and sheets,
-  and every tooltip, hover and cursor — tracked in `designs/reelcut-remaining.md` §4.
-- Playback with audio, J/K/L, scrubbing and 60 fps (spec §10 steps 4–5) — tracked in
-  `designs/reelcut-remaining.md` §4.
-- The transition zone over the previous clip's ring — tracked in `designs/reelcut-remaining.md`
-  §5a.
-- `import_media`'s MCP timeout on a first transcode — tracked in `designs/reelcut-remaining.md`
-  §5a.
+  and every tooltip, hover and cursor — tracked in the `ready-for-human` issues (#47–#57).
+- Playback with audio, J/K/L, scrubbing and 60 fps (spec §10 steps 4–5) — tracked in #47.
+- The transition zone over the previous clip's ring — tracked in #66.
+- `import_media`'s MCP timeout on a first transcode — tracked in #67.
 
 ## Where to look in the original
 - orig §1 — M3's closing numbers (203 tests, 57 tools, format v2) and the table of what proved

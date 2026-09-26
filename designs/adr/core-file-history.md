@@ -25,8 +25,8 @@ rule (a file at the cap gives something up first, as a pure move), purity, the t
 here. The original's own Purity and Errors paragraphs (`None`, two tiers) are
 **superseded** by D2's three arms (`core/src/outcome.rs`, spec §5.5). Do not read them as
 current. What follows is only the "why" that the rulebook compresses or leaves out.
-Line counts are omitted: they go stale, and `wc -l` plus `designs/reelcut-remaining.md`
-§3 is the ledger.
+Line counts are omitted: they go stale, and `wc -l` is the ledger. The seams a record
+named for the next cut are under "Named next cuts".
 
 ## Decisions, by module
 
@@ -197,13 +197,26 @@ tests are in `core/tests/`: `media_window.rs`, `source_window.rs`, `motion_edges
   mismatch is refused at its next `set_text` until `words: []` is sent (road map 8
   §10.5).
 
+## Named next cuts
+
+The size rule is in the root `CLAUDE.md` and `core/CLAUDE.md`; which modules are over it is
+`wc -l`, never a table here. What follows is only the seam a record named.
+
+- `actions.rs`: `clamp_video` and its helpers to a new `actions_clamp.rs` (roadmap 5 §5e).
+- `edit.rs`: exempt, its module doc being the op table's semantics half. If a cut is ever forced,
+  the `Op` enum goes to `edit_ops.rs`, never in a feature phase.
+- `edit_clip.rs`: known debt, no seam named.
+- `ffi_graphic.rs`: at the new-module cap with nothing crate-free left to move (`diag_json` and
+  `diag_error` name `Diagnostic`; road map 10 §10.7).
+- `core/tests/add_transition_edges.rs`: at the new-file cap; gives something up before it takes
+  anything on.
+
 ## Open items
 
 - `actions.rs` is at 592 of ~600 (and `recipe.rs` 596, `evaluate.rs` 593). The original's plan is that the next addition first cuts
-  `clamp_video` and its helpers to an `actions_clamp.rs` — tracked in
-  `designs/reelcut-remaining.md` §3 ("At the edge").
+  `clamp_video` and its helpers to an `actions_clamp.rs` (see "Named next cuts").
 - The off-grid shift at an inexact canvas rate (`add_transition_by_shift`, `close_gap`)
-  is unfixed — tracked in `designs/reelcut-remaining.md` §5a.
+  is unfixed — tracked in #42.
 
 ## Where to look in the original
 

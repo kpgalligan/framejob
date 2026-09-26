@@ -1,8 +1,10 @@
 # What the old remaining list closed
 
 - **Status:** Closed record (2026-09-26). The items `designs/reelcut-remaining.md` recorded as
-  CLOSED or DONE between road map 2's close (2026-09-17) and its rebuild as a live list
-  (2026-09-26), with the lessons each closure taught. What was still open moved to the live list.
+  CLOSED or DONE between road map 2's close (2026-09-17) and 2026-09-26, with the lessons each
+  closure taught. What was still open became GitHub issues, and the document was deleted: its
+  size ledger is `wc -l` plus the file-history ADRs' "Named next cuts", and its build settings are
+  `designs/adr/rust-build-settings.md`.
 - **Original:** `archive/reelcut-remaining.md` (2088 lines) — the full record; sections cited below
   as "orig §x" refer to it. Code and proofs cite §1b, §2a and §2b; those sections are summarised
   under the same names here.
@@ -16,7 +18,7 @@
 The file began as the honest remainder when road map 2 closed: the debt two large phases left,
 plus the checks no script can make. It then became where every later road map and issue left its
 dated size readings, residue and "filed, not fixed" defects, and grew to 2088 lines, most of it
-history. The history moved into this record; the open items stayed in the live list.
+history. The history moved into this record; the open items became GitHub issues.
 
 ## Decisions and lessons
 
@@ -132,7 +134,7 @@ history. The history moved into this record; the open items stayed in the live l
   `chrome` row compares them over two rounds; a later merge must keep a comparison.
 - **`transcribe` has no `region` key** (R6-12): every proof instance runs under
   `-RCAssemblyAIEndpoint`, so the key would be false where it is proved. An `endpoint` host key is
-  the honest shape (live list §5d).
+  the honest shape (#94).
 - **Proof instruments are not held to the 400-line cap.** Road map 6 §10.13 corrected earlier
   sentences that said they were.
 
@@ -158,7 +160,7 @@ history. The history moved into this record; the open items stayed in the live l
 - **Frozen files took wiring only**, counted per phase against an allowance the phase's spec set.
 - **A new file at 399 is the warning for the next phase**, not a success: `MediaTranscript.swift`
   went to 411 mid-build and had its doc comment cut to fit; `SettingsWindowController.swift` went
-  from 376 to 453 unnoticed (live list §3).
+  from 376 to 453 unnoticed (#58).
 - **Dated line counts in prose go stale within days.** The live ledger is one table measured on one
   date, with the command to regenerate it.
 
@@ -198,14 +200,13 @@ history. The history moved into this record; the open items stayed in the live l
 
 ## Known limits
 
-The limits these closures recorded and did not fix are in the live list: `relink_media` never
-re-probes (§5a); the cache ledger's stuck pass and the `stripHolds` two-step (§5e); the caption
-name `chart.png.srt` in the panel against `chart.srt` over MCP (§5d).
+The limits these closures recorded and did not fix are open issues: `relink_media` never
+re-probes (#63); the cache ledger's stuck pass and the `stripHolds` two-step (#115); the caption
+name `chart.png.srt` in the panel against `chart.srt` over MCP (#43).
 
 ## Open items
 
-None of its own. Everything still open from the original is in `designs/reelcut-remaining.md`
-§3–§5.
+None of its own. Everything still open from the original is a GitHub issue.
 
 ## Where to look in the original
 
@@ -214,7 +215,8 @@ None of its own. Everything still open from the original is in `designs/reelcut-
 - orig §2b: the three display-stem sites, and why the MCP path could not be the evidence.
 - orig §3: every phase's dated `wc -l` readings from road map 7 D3 to the playhead echo, and the
   road map 3 table of seams.
-- orig §4: the person checks as each pipeline wrote them (now regrouped in the live list's §4).
+- orig §4: the person checks as each pipeline wrote them (now regrouped into the `ready-for-human`
+  issues, #47–#57).
 - orig §5: the road map status paragraphs, the C1 residue blocks (c1-chrome, c1-parts, the reader
   review, c1-close), the filed-and-not-fixed issues, and the closed smaller items.
 - orig §6: the build-settings table and the run narrative.
