@@ -5,7 +5,7 @@ How the engineering skills should consume this repo's domain documentation when 
 ## Before exploring, read these
 
 - **`CONTEXT.md`** at the repo root: the glossary.
-- **`designs/reelcut-design.md` §11, "Decisions made — do not re-litigate"**: this repo's decision record, in the role ADRs play elsewhere. Read the entries that touch the area you're about to work in.
+- **Spec §11, "Decisions made — do not re-litigate"** (`designs/spec/11-decisions/`): this repo's decision record, in the role ADRs play elsewhere. Its `README.md` indexes every decision by ID and names the file it is in; read only the entries that touch the area you're about to work in.
 
 If `CONTEXT.md` doesn't exist, **proceed silently**. Don't flag its absence; don't suggest creating it upfront. `/domain-modeling` creates it lazily when a term actually gets resolved.
 
@@ -20,7 +20,7 @@ If `CONTEXT.md` doesn't exist, **proceed silently**. Don't flag its absence; don
 ```
 /
 ├── CONTEXT.md                  ← glossary, created lazily
-├── designs/reelcut-design.md   ← §11 is the decision record
+├── designs/spec/               ← the spec, one file per section; 11-decisions/ is the decision record
 ├── designs/adr/                ← condensed records of closed road maps
 ├── archive/                    ← their originals; read only when asked (INDEX.md)
 ├── core/                       ← Rust staticlib

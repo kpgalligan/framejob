@@ -34,7 +34,7 @@ comment citing "road map N §x" refers to the archived original.
 
 | Document | What it is |
 |---|---|
-| `designs/reelcut-design.md` | **The normative spec.** §5 schemas, §6 op table, §7 architecture, §9 keys and menus, §10 acceptance steps, §11 decisions already made — not to be re-litigated. An ADR cites §11's IDs; it never replaces them. |
+| `designs/spec/` | **The normative spec, one file per section — never read it whole.** Start at its `README.md` (the index: each file, its size, what it answers), then read only the file you need; "spec §7.3" is `07.3-frame-recipe.md`. §5 schemas, §6 op table, §7 architecture, §9 keys and menus, §10 acceptance steps, §11 decisions already made — not to be re-litigated, indexed by ID in `11-decisions/README.md`. An ADR cites §11's IDs; it never replaces them. |
 | `designs/reelcut-remaining.md` | **What is left**, and the one place it is kept: §3 the size-debt ledger a phase consults before paying a toll, §4 what only a person at the machine can check, §5 where the next work starts (open defects, candidates, work the user deferred), §6 the Rust build settings, measured. An item leaves when it is done. |
 | `designs/adr/` | One condensed decision record per closed road map, survey or file history: why the code is the shape it is. Start with the one for the area: `roadmap-03` the recorder · `roadmap-04` `detect_silence` · `roadmap-05` transitions and `video.motion` · `roadmap-06` transcription (C2, the relay, designed and deferred) · `roadmap-07` how a patch is checked, what an op answers, where its arguments are written down, the source window, the argument gate · `roadmap-08` word captions · `roadmap-09` the Clip tab, the action lane, band drags · `roadmap-10` graphics · `app-file-history` / `core-file-history` why a file or module is cut where it is · `effects-survey` E3–E9 (deferred by the user) and **the Concat rule: it is AGPL-3.0; none of its code, shaders, chains or colour tables may be carried over** · `remaining-closed` the debts already paid. |
 | `designs/design_handoff_reelcut/` | The shipped chrome cleanup and identity; its README is normative for the redesign's metrics. |
@@ -185,7 +185,7 @@ else is what bloats files:
 - **A file at the ~600-line cap gives something up before it takes anything
   on**, as a pure move landed and gated alone. `designs/reelcut-remaining.md`
   §3 is the ledger; new files are capped at 400 lines.
-- **A decision in spec §11 is not re-litigated.** A phase that needs a new
+- **A decision in spec §11 is not re-litigated** (`designs/spec/11-decisions/`). A phase that needs a new
   one records it there before the code, not after.
 - Commit only when asked. A commit message says what was verified and what
   is owed, and the road map's record says the same.

@@ -8,7 +8,7 @@
 - **Original:** `archive/reelcut-roadmap-7.md` (6577 lines) — the full record, ticket by ticket.
   Sections cited below as "orig §x" refer to it. Code comments across `core/` and `app/Sources/`
   cite it as "road map 7 §x"; the section map at the foot resolves those.
-- **Spec decisions** (spec §11, `designs/reelcut-design.md`, binding):
+- **Spec decisions** (spec §11, `designs/spec/11-decisions/`, binding):
   - **D2-1** — a refused op says why in the CORE's words; a check that predicts a RULE goes, a
     check that names the CALL stays (the six "at least one key" guards, `normalize_clip`).
   - **D3-1** — the core says what an argument IS (name, kind, required, refused bound); the app

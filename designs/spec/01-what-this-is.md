@@ -1,0 +1,30 @@
+# 1. What this is
+
+a screencast editor's editor without a screencast editor's recorder — and, since road map 3,
+a recorder of the SCREEN alone, whose output is ordinary media. Open one or
+more video files from disk, arrange them on layered tracks over a fixed canvas, trim,
+split, annotate, animate, and export. Mac only, Apple Silicon, macOS 26+.
+
+The bar is a screencast editor's balance: enough to make a real cut with text,
+shapes, transitions and simple animation, without Final Cut's magnetic
+timeline, roles, multicam, scopes, or a plugin ecosystem.
+
+Deliberate non-goals: camera recording, multicam, color grading beyond
+per-clip controls, audio beyond what shipped (volume, fades, duck, pan,
+compressor, noise reduction, peak normalize, the transition crossfade and
+the export's loudness target — M3 and §11 R5-2; so no EQ, mix buses or
+Audio Units, while offline voice effects are deferred rather than out), a
+plugin system (a clip
+may draw itself from a JavaScript module in its package, road map 10;
+nothing else is scriptable — §11 G-1), any platform but macOS. **Screen recording was on this list until road map 3
+reversed it** (§11): the app records a display or a window through
+ScreenCaptureKit into a file it then imports exactly as File ▸ Open would —
+paused and resumed from the menu bar, each stretch its own file and its own
+clip; camera capture and callouts reconstructed after the fact stay out.
+
+**The opening flow is the point.** File > Open on a `.mov` or `.mp4` (or a
+drop on the Dock icon, or the welcome window's Open Video…) creates an
+*untitled* project sized to that file, with the file as the first clip on
+Track 1, ready to cut. Save then writes a `.reelcut` package next to the
+source. The app is also the Alternate handler for movie, audio and image
+types so Open With… works from the Finder.

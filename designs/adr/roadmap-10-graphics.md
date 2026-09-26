@@ -6,7 +6,7 @@
   sections cited below as "orig §x" refer to it. Its input was the user's
   proposal, `archive/svg-motion-components-plan.md` (ADR:
   `designs/adr/svg-motion-plan.md`).
-- **Spec decisions:** G-1..G-16 in spec §11 (`designs/reelcut-design.md`),
+- **Spec decisions:** G-1..G-16 in spec §11 (`designs/spec/11-decisions/`),
   with G-9·a/b/c and G-15(a)–(f). One-line gists:
   G-1 a graphic is a clip's SOURCE, not an effect (spec §1's plugin non-goal
   gains one clause; R5-1 stands);

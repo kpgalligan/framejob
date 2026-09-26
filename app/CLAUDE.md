@@ -2,7 +2,8 @@
 
 Applies to everything under `app/`. Build/verification commands and the FFI
 lockstep are in the root `CLAUDE.md`; the full design is
-`designs/reelcut-design.md` (§3–4 the UI, §7.4–7.8 the platform side). The
+`designs/spec/` (§3–4 the UI, §7.4–7.8 the platform side; its `README.md` is
+the index). The
 long form of each entry below — why each file is the shape it is, and the
 traps its history turned up — is `designs/adr/app-file-history.md` (the
 full history, every size toll and measurement, is archived; see its

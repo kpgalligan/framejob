@@ -7,7 +7,8 @@ you at the detail behind a decision.
 
 The documents were moved here verbatim. Paths inside them still say `designs/…`, and any section
 number they cite (e.g. "road map 7 §10.1") refers to the archived copy. The same goes for code
-comments that cite "road map N §x".
+comments that cite "road map N §x". The spec they cite as `designs/reelcut-design.md` is now
+`designs/spec/`, split by section with the numbers unchanged.
 
 **Every file added here gets a row below, in the same change.**
 

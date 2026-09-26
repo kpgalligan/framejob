@@ -2,8 +2,8 @@
 
 Applies to everything under `core/`. Build commands and the FFI three-file
 lockstep are in the root `CLAUDE.md`; the full design is
-`designs/reelcut-design.md` (§5 the schemas, §6 the op table, §7 the
-architecture, §7.10 this module map in the spec's words). The long form of
+`designs/spec/` (§5 the schemas, §6 the op table, §7 the architecture,
+§7.10 this module map in the spec's words; its `README.md` is the index). The long form of
 each entry below — why the seam fell where it did — is
 `designs/adr/core-file-history.md` (the full history of every cut, with its
 line counts, is archived; see its "Original" line); this file is what

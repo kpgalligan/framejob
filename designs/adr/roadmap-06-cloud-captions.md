@@ -4,7 +4,7 @@
   C2, the relay, is Deferred by the user (2026-09-21). It is designed below and not built.
 - **Original:** `archive/reelcut-roadmap-6.md` (3992 lines). It is the full record. Sections cited
   below as "orig §x" refer to it.
-- **Spec decisions:** R6-1..R6-16 in spec §11 (`designs/reelcut-design.md`), which stay binding:
+- **Spec decisions:** R6-1..R6-16 in spec §11 (`designs/spec/11-decisions/`), which stay binding:
   - R6-1: one command with two engines. A cloud caption is an ordinary text clip.
   - R6-2: audio leaves the machine only when someone names the cloud engine, with the price shown.
     The tool's default is always `apple`.

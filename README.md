@@ -11,8 +11,9 @@ project sized and rated to that file, with the file as the first clip on
 Track 1, ready to cut. Save then writes a `.reelcut` package next to the
 source.
 
-The full design and implementation spec is `designs/reelcut-design.md`. It is
-normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
+The full design and implementation spec is `designs/spec/`, one file per
+section, indexed by its `README.md`. It is normative: §5.2 is the project
+schema, §6 the op table, §7 the architecture.
 
 ## What it does today
 
@@ -287,7 +288,7 @@ app/
   Sources/            Swift AppKit application (programmatic UI, no storyboards)
   Resources/Shaders/  Compositor.metal — the per-layer compositing pass
   Bridging/           Bridging header importing the Rust FFI header
-designs/              reelcut-design.md — the accepted design and spec;
+designs/              spec/ — the accepted design and spec, one file per section;
                       reelcut-remaining.md — what is left; adr/ — condensed records
 archive/              closed road maps, verbatim (INDEX.md)
 project.yml           xcodegen definition — source of truth for the Xcode project
