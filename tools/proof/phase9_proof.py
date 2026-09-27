@@ -147,6 +147,7 @@ import sys
 import zlib
 
 from mcp import MCP, ToolError
+from dev_tools import DEV_TOOLS
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 4823
 LOG = sys.argv[2] if len(sys.argv) > 2 else f"/tmp/reelcut-{PORT}.log"
@@ -597,9 +598,10 @@ def catalog_part(mcp):
           "added an op would move it, and phase 9 must NOT have: a scope is an envelope "
           "key, not an op. A FLOOR since road map 5's E1 added two ops; the exact "
           "count is the newest phase's")
-    check(names - set(scoped) == APP_STATE_TOOLS,
+    check(names - set(scoped) - set(DEV_TOOLS) == APP_STATE_TOOLS,
           "and the tools WITHOUT one are exactly the twenty-six app-state tools, named rather "
-          f"than counted: {sorted(names - set(scoped) - APP_STATE_TOOLS)} unexpected, "
+          f"than counted (the dev tools apart): "
+          f"{sorted(names - set(scoped) - set(DEV_TOOLS) - APP_STATE_TOOLS)} unexpected, "
           f"{sorted(APP_STATE_TOOLS - (names - set(scoped)))} missing")
     check("set_scope" not in scoped,
           "set_scope itself declares no scope — it IS the scope, and a scope on it would be "

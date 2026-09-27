@@ -338,6 +338,9 @@ what tells a stale binary on the port from the build under test: road map 7's
 79 from G3b, 77 from D3·5), and every script before it keeps
 a floor — phases 1 to 9's 63, 65, 68, 70, 71, 73, 73, 73 and 74, and road map
 3's 75 — so a later phase's tools never fail an older proof.
+That exact count is of PRODUCT tools: road map 11's dev tools are in a Release
+catalog and not a Distribution one, so they are counted apart through
+`dev_tools.py` (`op_argument_proof.py` section 1).
 Road map 5's own proof landed AFTER D3 and asserts FLOORS for that reason:
 `e1_proof.py` and `e2_proof.py` want `>= 77` and `>= 57` of this build, so a
 later phase that adds a tool does not have to come back and edit them — and
@@ -5781,3 +5784,67 @@ screen when one exists, and without one W4a–c skip as
 ```sh
 python3 tools/proof/capture_spike/capture_spike.py [--only q1,q2,q3,q4] [--rebuild]
 ```
+
+## Road map 11's V2a — `snapshot_ui` (`v2_snapshot.py`, `v2_layout_probe.swift`, `v2_cover.swift`)
+
+The phase proof of the first dev tool, `snapshot_ui`, over `mcp.py`. It
+runs against the Release app launched fresh on its port with the pinned
+defaults the V2a spec's Verification lists (`-ReelcutInspectorWidth 304
+-ReelcutTimelineHeight 300 -ReelcutInspectorCollapsed NO
+-ReelcutSafeGuidesVisible NO -ReelcutTimelineTrackHeight 1
+-ReelcutInspectorSection.text.animation '<false/>'`). Before the first MCP
+call it:
+- writes two fixtures, `work/v2_snapshot/fixtures/{v2well,note}.reelcut`:
+  V1's magenta-canvas well with a second shape at 3–6 s, and V1's note;
+- builds `v2_layout_probe.swift` over `harness/build.sh`'s swiftc line;
+- builds `v2_cover.swift`, a standalone opaque non-activating panel.
+
+A build failure is a scored FAIL of the rows that need it.
+
+The 29 rows:
+- **T**: the schema, the parity log and the dev-tool marker, and the gate.
+- **N**: the listing.
+- **O**: occlusion, under the cover. The captures are byte-identical
+  covered, uncovered and across a `set_selection`, and O5 checks that the
+  app was inactive.
+- **C**: capture bytes, the image block, region sizes, the refusals, and
+  Welcome/Settings.
+- **F**: the preview fill.
+  - F0 samples the well's centre, covered.
+  - F2: the overlay's marks kept under the picture.
+  - F3: the fill removed. It compares against the run's first capture,
+    taken before any fill.
+  - F4: `no_frame`.
+- **A**: appearance switched and restored.
+- **L**: the layout dump.
+  - **L2 compares `problems` to `KNOWN`**, the filed defects listed as data
+    in the script (#129 today). It fails on a problem not listed AND on a
+    listed defect that no longer appears.
+  - L3 finds #70.
+- **P1–P6**: the three rules and their controls, put to synthetic trees by
+  the probe.
+
+Output is one line per row, then `scores:` and `digest:`. Exit 0 iff no row
+failed.
+
+**The cover** is at floating level over the editor window's frame. It is up
+for about a second per episode, twice a run, and each episode is bounded at
+60 s. Keep the pointer off the Reelcut window while this runs.
+
+**Named host skips:**
+- a locked console skips the O rows and F0;
+- O2 skips as `host: editor occluded without the cover` when the person's
+  windows cover the editor both before and after the episode;
+- any comparison whose `scale`, `active`, `key` or `color_space` differ.
+
+**Colour management.** Captures are in the window's colour space. F0's
+yellow bound is B < 100 because the built-in Display P3 screen gives the
+fixture's sRGB yellow as [255, 255, 84].
+
+```sh
+python3 tools/proof/v2_snapshot.py <port> [--log PATH] [--only T,N,O,C,F,A,L,P]
+```
+
+`dev_tools.py` names the dev tools once (`DEV_TOOLS`, in catalog order) and
+reads the startup marker's count (`dev_marker_count`). The scripts that
+assert an exact tool set subtract `DEV_TOOLS` first.

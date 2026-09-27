@@ -1068,7 +1068,7 @@ free.
   `AgentServer+Scope.swift` with the feature it is about; all five assert in
   debug, log `Reelcut: ` in release and start the server either way.
   `AgentServer+Gate.swift` is the CALL-time half of the same contract
-  (kpgalligan/reelcut#21): one comparison in `dispatch`, for all eighty-five
+  (kpgalligan/reelcut#21): one comparison in `dispatch`, for all eighty-five product
   tools, of a caller's keys against the schema the tool published, every
   stranger refused by name — the tool, the strangers and the whole of what it
   takes — before the scope or any handler reads a thing. Its map is read once
@@ -1089,7 +1089,30 @@ free.
   holds `devToolsMarker`, the string `tools/proof/dist_check.py` requires in
   Release's binary and absent from Distribution's; a tool NAME cannot be the
   marker, because an `-O` binary stores a literal of 15 bytes or fewer
-  inline.
+  inline. Its tables hold
+  `snapshot_ui` (V2a); a dev tool is counted apart from the product tools
+  (`tools/proof/dev_tools.py`).
+- `AgentServer+Snapshot.swift` — `snapshot_ui` (road map 11's V2a, dev only,
+  wholly under the flag). It lists the windows, or captures the editor (whole
+  or a region), an attached sheet, Settings or Welcome through `cacheDisplay`:
+  an image block plus JSON and a PNG, with a `<name>.layout.json` beside it.
+  It runs OFF main (`devOffMainTools`): the fill renders through
+  `Exporter.renderFrameReported`, the settle sleeps between passes, and every
+  AppKit touch is an `onMain` hop. A `defer` unstages on every exit. It works
+  with the app inactive and its window occluded (measured, V2a's O rows).
+- `UISnapshot.swift` — `snapshot_ui`'s main-thread half. It resolves the
+  window (Settings and Welcome found in `NSApp.windows` by controller class,
+  never `.shared`) and the regions (the root's `BarView` and the three pane
+  containers), holds the window facts and the listing, and stages: the
+  appearance on the live window, and the fill as an `NSImageView` just above
+  `playerHost`, under `safeGuides` and `overlay` (V1's W4a). It also runs one
+  `cacheDisplay` pass.
+- `UISnapshotLayout.swift` — the layout dump. A pre-order walk over non-hidden
+  views and three rules, each with a 0.5 pt tolerance: ambiguous;
+  outside_superview, except under an `NSClipView` or at zero area; truncated,
+  except when wrapping. Problems on `_NS…` views go to `private_problems`. A
+  secure field's text is never written. It is pure over an `NSView` tree, so
+  `tools/proof/v2_layout_probe.swift` calls it.
 - `AgentServer+Arguments.swift` — the shared argument vocabulary
   (`intArg`, `timeArg`, `rangesArg`, `rawPatchArg`, …), each refusing a
   value it cannot read BY NAME, and ONLY what the core cannot know: target

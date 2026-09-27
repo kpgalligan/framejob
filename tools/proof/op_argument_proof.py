@@ -30,9 +30,14 @@ The sections, in order:
    whose prose names nothing. Each must be named with its op, its argument and
    the side that has it. An app-state tool broken the same way must draw
    NOTHING, which is the fourth part's skip rule.
-1. **The catalog's size**, EXACTLY 85 — this script owns the exact count now
-   and every older script keeps the floor the proof README's handover rule
-   gives it — and the shipped binary's own parity log, which must be empty.
+1. **The catalog's size**, EXACTLY 85 PRODUCT tools — this script owns the
+   exact count now and every older script keeps the floor the proof README's
+   handover rule gives it — and the shipped binary's own parity log, which
+   must be empty. The dev tools (road map 11, `dev_tools.py`) are counted
+   apart: all present with the log's marker count equal to their number
+   (Release), or all absent with no marker line (Distribution), and when
+   present they sit together immediately before `import_media`, where
+   `devTools()` splices them (V0's owed count and order probes).
 2. **Every difference between a tool's schema and the core's table is one the
    declarations list NAMES.** Not a second computation of the merge (that is
    `op_catalog_proof.py`'s) but an attribution: each key that differs — a
@@ -110,6 +115,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mcp import MCP, ToolError  # noqa: E402
+from dev_tools import DEV_TOOLS, dev_marker_count  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 WORK = os.path.join(ROOT, "tools", "proof", "work", "op-argument-probe")
@@ -123,8 +129,10 @@ MEDIA = os.path.join(ROOT, "tools", "proof", "media", "AV.mov")
 # tools, G4a the three app-state graphics tools, G4b three more). D3 adds no tool and renames
 # none, so it is road map 3's 75 plus phase 9's set_scope and… no: it is the
 # number the catalog has had since road map 5's E1, taken exactly here for the
-# first time. Every older script keeps its floor.
-TOOLS = 85
+# first time. Every older script keeps its floor. It counts PRODUCT tools:
+# road map 11's dev tools (`dev_tools.py`) are in a Release catalog and not a
+# Distribution one, so section 1 counts them apart.
+PRODUCT_TOOLS = 85
 OPS = 59
 PARITY = "Reelcut: "
 
@@ -511,9 +519,24 @@ def main():
     tools = mcp.schemas()
 
     print("\n1 — the catalog's size, and the shipped binary's own parity log")
-    check(f"the catalog holds EXACTLY {TOOLS} tools — this script owns the exact count now, "
-          "and every older script keeps a floor (tools/proof/README.md)",
-          len(tools) == TOOLS, f"{len(tools)} tools")
+    product = [name for name in tools if name not in DEV_TOOLS]
+    check(f"the catalog holds EXACTLY {PRODUCT_TOOLS} product tools — this script owns the "
+          "exact count now, and every older script keeps a floor (tools/proof/README.md)",
+          len(product) == PRODUCT_TOOLS, f"{len(product)} product tools of {len(tools)}")
+    present = [name for name in DEV_TOOLS if name in tools]
+    marker = dev_marker_count(log)
+    check(f"the dev tools {DEV_TOOLS} are all present with the log's marker count equal to "
+          "their number, or all absent with no marker line",
+          (present == DEV_TOOLS and marker == len(DEV_TOOLS))
+          or (present == [] and marker is None),
+          f"present {present}, marker count {marker}")
+    if present:
+        names = list(tools)
+        at = names.index(DEV_TOOLS[0]) if DEV_TOOLS[0] in names else len(names)
+        block = names[at:at + len(DEV_TOOLS) + 1]
+        check("…and they sit together, in dev_tools.py's order, immediately before "
+              "import_media, where devTools() splices them",
+              block == DEV_TOOLS + ["import_media"], f"{block}")
     check(f"the core declares {OPS} ops and every one of them is a tool",
           len(ops) == OPS and ops <= set(tools),
           f"{len(ops)} ops, missing tools: {sorted(ops - set(tools))}")
@@ -993,7 +1016,10 @@ def main():
 
     print("\n5 — the twenty tools the core calls no op, which the gate covers the same way")
     others = sorted(set(tools) - ops)
-    check(f"there are {TOOLS - OPS} of them", len(others) == TOOLS - OPS, json.dumps(others))
+    dev = [name for name in DEV_TOOLS if name in tools]
+    want = PRODUCT_TOOLS - OPS + len(dev)
+    check(f"there are {want} of them ({PRODUCT_TOOLS - OPS} product and {len(dev)} dev)",
+          len(others) == want, json.dumps(others))
     for name in others:
         # A hand-written schema is the only spelling these have, so the list
         # the gate speaks is compared to the catalog's — what a caller reads

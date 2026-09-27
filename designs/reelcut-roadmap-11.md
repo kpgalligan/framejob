@@ -432,3 +432,167 @@ canvas background, not black (from W1), and its sheet is an app sheet (from S2c)
 - Defects to file at the road map's close: #70 is reproduced by L7 (intrinsic 289.5 > frame
   271); `newProject:`'s app-modal `NSApp.presentError` (`AppDelegate.swift:170`) is outside V2's
   refusal list unless the grep grows a `presentError(` token.
+
+### V2a — `snapshot_ui` and its layout dump (2026-09-26)
+
+**Built.** `snapshot_ui`, the first dev tool.
+
+The app side, every new file wholly under `#if REELCUT_DEV_TOOLS`:
+- `app/Sources/AgentServer+Snapshot.swift` (398 lines): the handler, argument reading, the
+  catalog row and the result.
+- `UISnapshot.swift` (216): window resolution, regions, facts, staging and one capture pass.
+- `UISnapshotLayout.swift` (160): the view walk and its three rules.
+- `AgentServer+DevTools.swift`'s flag-on tables name the tool, its handler and its off-main
+  membership (85 lines).
+- `AgentServer.swift` and `AgentCatalog.swift` are untouched.
+
+The proof side:
+- `tools/proof/dev_tools.py`: `DEV_TOOLS` and the marker count.
+- `v2_snapshot.py`: 29 rows.
+- `v2_layout_probe.swift`: P1–P6.
+- `v2_cover.swift`: an opaque, non-activating floating panel that occludes the editor.
+- `op_argument_proof.py`: `PRODUCT_TOOLS = 85`, the dev tools counted apart, and V0's owed
+  count and order rows.
+- `recording_proof.py` and `phase9_proof.py`: their app-state set subtracts `DEV_TOOLS`.
+
+**Measured.** Host: console not locked; two screens. The editor opened on the external
+BenQ GW2790QT at scale 1, frame [2536, 701, 944, 736], content 944 × 704. The width is the
+fixture's own: canvas 640 + inspector 304 (`EditorWindowController.swift:21-24`).
+- `make typecheck`: 0 errors, 7 unique warnings. `make app` exit 0. `make dist` exit 0,
+  `dist_check: 5/5`. `grep "Reelcut: "` printed nothing on every launch.
+- **Occlusion was measured first** (step 2), with `--only T,N,O`: 8/8 pass.
+  - The cover made the listing read `occluded: true`.
+  - Covered captures were byte-identical, settled in 2 passes, at 944 × 704 px.
+  - A covered capture was byte-identical to an uncovered one.
+  - `set_selection [3]` while covered changed only the inspector and timeline regions.
+  - The app was inactive for every capture.
+  - Each cover episode lasted 0.5–0.9 s.
+- **Step 5 stopped on L2**: one problem, which the orchestrator filed as #129 (below). L2
+  now compares `problems` to `KNOWN` in `v2_snapshot.py`.
+- **Final runs**: two fresh instances on port 4861, each `29 pass, 0 fail, 0 skip of 29`,
+  digest `c53b8d741e9f0f3e288439cb51c21cf4f7c8a2d74817c6c08cb970e329a018cc`, exit 0. The row
+  values quoted below come from the full runs; they were the same in every run shown.
+  - The very first full run had the same scores and digest, but used F3's earlier form
+    (without the baseline) and F0's earlier bound.
+  - Two intermediate runs scored `28 pass, 0 fail, 1 skip`, digest `3ee9cf1c…ebbd9`. O2
+    skipped as `host: editor occluded without the cover (occluded before True, after True)`:
+    the person's windows were over the editor.
+- Row values:
+  - C1: 42 902-byte PNGs, byte-identical.
+  - C3: toolbar 944×44, preview 639×359, inspector 304×359, timeline 944×300 px, each equal
+    to its region rect × scale.
+  - C4: 15 of 15 refusals name their argument or window.
+  - C5: Welcome was open and captured at 720×600 px; Settings was closed and refused by name.
+  - F0 (covered): the box [288, 151, 352, 186] px was [252, 254, 48] filled and
+    [254, 25, 251] unfilled.
+  - F2: M = 3 820 px, all of which also differ when filled (1.0000).
+  - F1, F3, F4, A1 and A2 pass.
+  - L1: 84 views.
+  - L2: #129 matched, 0 not known.
+  - L3: the note is intrinsic 290 against frame 271, listed `truncated` (#70).
+  - P1–P6 pass. In P4 the wrapping label is intrinsic 349.5 against frame 120, so the
+    wrapping exemption is exercised.
+- **#129 does not depend on the window's width or screen.** A scratch probe (V1's
+  `probe_support.swift` over v2well, not kept) ran `UISnapshotLayout.report` at content
+  widths 900, 944, 960, 1024, 1200 and 1440 pt, on the scale-2 built-in screen and on the
+  scale-1 external screen. Every one of those twelve reports held exactly #129: frame
+  [367, 15, 90, 14], overhang [0, 0, 2, 0].
+  - At 800 pt, below the window's 900 pt `minSize` (`EditorWindowController.swift:15`), 21
+    ambiguous views in the timeline's tool bar and a 17 pt stack overhang appear as well.
+    That width is unreachable, so they are not filed.
+- **F0 and colour management.** Captures are in the window's colour space: the PNG carries
+  the display's profile, where `render_frame`'s carries sRGB IEC61966-2.1. A scratch probe
+  staged the app's own `render_frame` picture with `UISnapshot.stage` on the built-in
+  "Color LCD" screen at scale 2, then captured with `UISnapshot.pass`:
+  - filled: [255, 255, 84];
+  - unfilled: [234, 51, 247], matching V1's W1.
+
+  The spec's yellow bound (B < 60) fails there on colour management alone, so F0's bound is
+  B < 100. The BenQ gives 48.
+- **Mutants**, each run on a fresh instance or a rebuilt probe, and each file restored
+  (`cmp` against a saved copy, since the files are untracked):
+  - **M1**, the fill `.above` the overlay: F2 fails, 0 of 3 820 (0.0000); the other F rows
+    pass.
+  - **M2**, `unstage` leaves the fill: F3 fails, byte-identical to the one just before but
+    NOT to the run's first capture. F0 also fails: its unfilled box is yellow, 2 240 px not
+    magenta, because its unfilled capture follows its filled one.
+  - **M3**, the appearance not restored: A2 fails (dark → light); A1 passes.
+  - **M4**, `isPrivate` always false: P3 fails, `_NSV2ProbeView` in `problems`.
+  - **M5**, the wrapping exemption removed: P4 fails, the wrapping label #5 flagged.
+- **The three older proofs**, each on a fresh instance:
+  - `op_argument_proof.py`: 147/147. This includes 85 product tools, `['snapshot_ui']`
+    present with marker count 1, the dev tools immediately before `import_media`, and 27
+    tools that are not ops (26 product and 1 dev).
+  - `recording_proof.py`: 187/187 at implementation, with the known 2-check
+    Bluetooth-output skip; the edited app-state row passes. After the pass-1 review fix (a
+    change to where `snapshot_ui` reads a view's bounds, which recording never calls), a
+    fresh-instance run on the dev-tools Release build scored 186/187: the edited app-state
+    row passes, and one microphone-length row fails ("the microphone file is not SHORTER
+    than the movie by more than two frames": microphone 1201600 vs movie 1280000 ticks, a
+    residual of -38.5 ms of tail). A control on the Distribution build, which has none of
+    this phase's code, scored 178/183: the answer carried no `mic_clip`, and five
+    microphone rows failed. The failures are put down to host microphone state (the
+    default input and output were AirPods), not to this phase; that is not confirmed.
+  - `phase9_proof.py`: 216/218. The edited app-state row passes. The two failures are
+    nest-scope playhead rows ("maps the playhead in by the nest clip's start", "with the
+    playhead mapped back out"). The same rows fail on both builds. "With the playhead mapped
+    back out" failed on every run of either build; "maps the playhead in" and two more rows,
+    "the playhead reads 1 in here where the timeline's is 1200000" and "leaving maps the
+    playhead back OUT (600000)", fail on some runs and not others. Filed as #130. Five fresh-instance runs after
+    review showed this. On the dev-tools Release build: 215/218 ("mapped back out", "maps
+    in", "reads 1"), then 216/218 ("mapped back out", "maps in"). On the Distribution build,
+    which has none of this phase's code: 216/218 ("mapped back out", "maps in"), 216/218
+    ("mapped back out", "leaving"), then 215/218 ("mapped back out", "reads 1", "leaving").
+    The first control scored 217/218, failing only "mapped back out". So the failures are
+    not this phase's.
+
+**Deviations from this road map's V2 text and the V2a spec.**
+- `snapshot_ui` runs off main (`AgentServer+DevTools.swift`'s `devOffMainTools`), where
+  the road map's V2 bullet says "main thread; not in `offMainTools`". The fill waits on
+  `Exporter.renderFrameReported`, and the settle waits 20 ms between passes; every AppKit
+  touch is an `onMain` hop (`AgentServer+Snapshot.swift`).
+- The layout dump's `frame` is in capture points with a top-left origin
+  (`UISnapshot.rect`), not window points. For an editor capture, the result's `origin`
+  gives the captured root's rect in window-content points.
+- Problems on AppKit's private `_NS…` views of EVERY kind (not only ambiguity) go to
+  `private_problems` (`UISnapshotLayout.report`).
+- The ambiguous-constraint mutant is the probe's (P1, a synthetic tree), not one in the
+  running app.
+- The `set_selection` row runs covered (O3).
+- L2 is "`problems` equals the filed defects in `KNOWN`" rather than "empty". This was the
+  user's decision after the step-5 STOP.
+- F0's yellow bound is B < 100, not < 60 (colour management, above).
+- F3 also compares against the run's first capture, taken before any fill: without that
+  baseline, M2 passes F3.
+- M2 fails F0 as well as F3 (above). The spec's "exactly its row" does not hold for it,
+  because any unfilled capture after a filled one shows the leftover picture.
+- `project` is refused with `welcome` as well as `settings`. `openWindow` counts only a
+  visible window, which matches the listing.
+- C4 exercises 15 refusals. It cannot reach two over MCP in V2a: a windowless document, and
+  a file-panel sheet.
+
+**Review.** litecode, full route, two fix passes. The adversary's three objections (F0's
+sample box on the shape's edge, L3's missing-label case, L2 against the pass rule) were taken
+into the spec before code. Implementation stopped once at L2, as the spec required: the tool's
+first run over a clean editor found the toolbar's duration label 2 pt past its stack view. The
+user chose to file it (#129) and have L2 expect the filed defects by issue number. Pass 1
+moved the last AppKit read (`bounds.size`) into an `onMain` hop and split the nest-playhead
+rows by build and run; pass 2 corrected the record's `recording_proof.py` figures. The last
+review passed with four nits, applied by hand: this paragraph, the nest rows' double count
+(now #130), `op_argument_proof.py`'s dev-tool index guarded against a missing first tool, and
+L3's "inspector wide enough" skip given the truncation rule's 0.5 pt tolerance
+(`py_compile` only; neither proof was re-run for these two lines).
+
+**Owed.**
+- kpgalligan/reelcut#129: the toolbar's duration label runs 2 pt past its stack view. It is
+  filed, and L2 lists it in `KNOWN`; when it is fixed, L2 fails until the entry is removed.
+- `phase9_proof.py`'s nest-scope playhead rows fail on the dev-tools build and on the
+  Distribution build alike (the results above). "With the playhead mapped back out" fails
+  on every run, and three others fail on some runs. They are not this phase's; filed as
+  #130.
+- `recording_proof.py`'s microphone rows failed after review on both builds (186/187 on
+  the dev-tools build, 178/183 on the Distribution control; the results above). The cause
+  is thought to be host microphone state (AirPods as the default input) but is
+  unexplained; a rerun with a built-in or wired input is owed. Not filed.
+- V2b: `perform_menu_item`, sheet capture through it, and the file-panel refusal proved
+  over MCP.

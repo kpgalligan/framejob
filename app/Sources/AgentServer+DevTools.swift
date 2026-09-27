@@ -57,15 +57,18 @@ extension AgentServer {
     // closing quote — at least 16 bytes, present in Release's binary, absent from Distribution's.
     static let devToolsMarker = "reelcut-dev-tools-compiled-in"
 
-    private static let devHandlers: [String: ToolHandler] = [:]
+    private static let devHandlers: [String: ToolHandler] = [
+        // AgentServer+Snapshot.swift
+        "snapshot_ui": { $0.snapshotUI },
+    ]
 
-    static let devOffMainTools: Set<String> = []
+    static let devOffMainTools: Set<String> = ["snapshot_ui"]
 
-    /// The dev tools' catalog rows. V0 has none. The log is what keeps
+    /// The dev tools' catalog rows: `snapshot_ui` (V2a). The log is what keeps
     /// `devToolsMarker` in the optimised binary; it never says `Reelcut: `,
     /// the prefix a proof reads as the parity check complaining.
     func devTools() -> [[String: Any]] {
-        let rows: [[String: Any]] = []
+        let rows: [[String: Any]] = [snapshotUITool()]
         NSLog("Reelcut agent server: %@, %ld dev tools", Self.devToolsMarker, rows.count)
         return rows
     }

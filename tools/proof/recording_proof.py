@@ -310,6 +310,7 @@ import wave
 from datetime import datetime
 
 from mcp import MCP, ToolError
+from dev_tools import DEV_TOOLS
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 4895
 LOG = sys.argv[2] if len(sys.argv) > 2 else f"/tmp/reelcut-{PORT}.log"
@@ -770,9 +771,10 @@ def catalog_part(mcp):
     check(len(scoped) >= OPS,
           f"at least {OPS} tools declare the envelope's scope (got {len(scoped)}) — R1 adds "
           "no op, and the exact number is the newest phase's to assert")
-    check(names - set(scoped) == APP_STATE_TOOLS,
-          "and the tools WITHOUT one are exactly the twenty-six app-state tools, named: "
-          f"{sorted(names - set(scoped) - APP_STATE_TOOLS)} unexpected, "
+    check(names - set(scoped) - set(DEV_TOOLS) == APP_STATE_TOOLS,
+          "and the tools WITHOUT one are exactly the twenty-six app-state tools (the dev "
+          "tools apart), named: "
+          f"{sorted(names - set(scoped) - set(DEV_TOOLS) - APP_STATE_TOOLS)} unexpected, "
           f"{sorted(APP_STATE_TOOLS - (names - set(scoped)))} missing")
 
     complaints = parity_lines(LOG)
