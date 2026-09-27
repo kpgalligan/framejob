@@ -1,45 +1,56 @@
 #!/usr/bin/env python3
-"""Road map 6 §10.13 (the C1 reader review), H·2 — `make app` does not write
-the AssemblyAI key to disk.
+"""Road map 6 §10.13 (the C1 reader review), H·2, and road map 12 A1 part 2 —
+`make app` does not write the two keys to disk.
 
 `xcodebuild` records every task's ENVIRONMENT in its build database under
 `build/Build/Intermediates.noindex/XCBuildData/`, so a `make app` run from a
 shell that exports `RC_ASSEMBLYAI_KEY` used to leave that key's value there
-(road map 6 §10.12 has the measurement). The `Makefile` now
-carries one directive, `unexport RC_ASSEMBLYAI_KEY`, above `.PHONY`, which
-covers every recipe in the file — `app`, `rust`, `test`, `lint`, `fmt`,
-`project`, `typecheck` and `run`.
+(road map 6 §10.12 has the measurement), and `ANTHROPIC_API_KEY` is the
+same kind of value. The `Makefile` carries one directive per key,
+`unexport RC_ASSEMBLYAI_KEY` and `unexport ANTHROPIC_API_KEY`, above
+`.PHONY`, which cover every recipe in the file — `app`, `rust`, `test`,
+`lint`, `fmt`, `project`, `typecheck` and `run`.
 
-    env -u RC_ASSEMBLYAI_KEY python3 tools/proof/makefile_env_proof.py
-    env -u RC_ASSEMBLYAI_KEY python3 tools/proof/makefile_env_proof.py --mutant no-unexport
+    (unset ANTHROPIC_API_KEY RC_ASSEMBLYAI_KEY; python3 tools/proof/makefile_env_proof.py)
+    (unset …; python3 tools/proof/makefile_env_proof.py --mutant no-unexport)
+    (unset …; python3 tools/proof/makefile_env_proof.py --mutant no-unexport-anthropic)
 
 **It measures `app` ONLY, and says so.** `app` is the one recipe that runs
 `xcodebuild`, which is the one tool measured to write its environment down.
 The other recipes are covered by the same directive and are not built here.
 
-**The value used is a DUMMY and never the person's.** The child's environment
-is built from `os.environ` with `RC_ASSEMBLYAI_KEY` POPPED and
-`RCDUMMY-makefile-env-proof-5d1c` put in its place; the person's own value is
-never read, printed, searched for or written. The search afterwards is IN
-PROCESS — the bytes of the dummy against the bytes of every file under the
-copy's `build/` and `Reelcut.xcodeproj/` — and nothing but paths and booleans
-is ever printed.
+**The values used are DUMMIES and never the person's.** The child's
+environment is built from `os.environ` with both keys POPPED and
+`RCDUMMY-makefile-env-proof-5d1c` and
+`RCDUMMY-makefile-env-proof-anthropic-9b3e` put in their places; the
+person's own values are never read, printed, searched for or written. The
+search afterwards is IN PROCESS — the bytes of each dummy against the bytes
+of every file under the copy's `build/` and `Reelcut.xcodeproj/` — and
+nothing but paths and booleans is ever printed.
 
 **The tree is never touched.** Everything happens in a COPY under
-`tools/proof/work/makefile-env/` whose `core` is a SYMLINK to the tree's
-already-built one, so `project.yml`'s pre-build `cargo build --release` is a
-no-op and the copy links the tree's `libreelcut_core.a` —
-`cloud_captions_proof.py`'s `build_mutant` shape.
+`tools/proof/work/makefile-env/` whose `core`, `graphic` and `docs` are
+SYMLINKS to the tree's (`core` already built, so `project.yml`'s pre-build
+`cargo build --release` is a no-op and the copy links the tree's
+`libreelcut_core.a`; `graphic` and `docs` are what its other build steps
+read) — `cloud_captions_proof.py`'s `build_mutant` shape. `agent/` is
+COPIED without `node_modules`, not linked, because the helper's build step
+runs `bun install` and `bun build`, which write into it; a copy keeps bun
+out of the tree.
 
 The three rows:
 
 * the build made `Reelcut.app`'s binary — a failed build holds nothing, and
   "no file holds the dummy" would be true of it for the wrong reason;
-* no file under the copy's `build/` or `Reelcut.xcodeproj/` holds the dummy's
-  bytes;
-* under `--mutant no-unexport` — the directive's line asserted to occur
-  exactly once in the tree's `Makefile` and removed in the COPY — the second
-  row FAILS. That is the CONTROL that this instrument can see a leak at all.
+* no file under the copy's `build/` or `Reelcut.xcodeproj/` holds the
+  AssemblyAI dummy's bytes;
+* no file there holds the Anthropic dummy's bytes.
+
+Each directive is asserted to occur exactly once in the tree's `Makefile`.
+Under `--mutant no-unexport` the AssemblyAI directive is removed in the
+COPY and its row FAILS; under `--mutant no-unexport-anthropic` the
+Anthropic one is, and that row FAILS. Those are the CONTROLS that this
+instrument can see a leak of either key at all.
 """
 
 import argparse
@@ -52,12 +63,17 @@ import time
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 WORK = os.path.join(ROOT, "tools", "proof", "work", "makefile-env")
 
-KEY = "RC_ASSEMBLYAI_KEY"
-# Recognisable, and nothing else in the tree or in any SDK spells it.
-DUMMY = "RCDUMMY-makefile-env-proof-5d1c"
-
-# The one directive, as it stands in the tree's Makefile.
-DIRECTIVE = "unexport RC_ASSEMBLYAI_KEY\n"
+# Each key: its dummy (recognisable, and nothing else in the tree or in any
+# SDK spells it), its directive as it stands in the tree's Makefile, the
+# mutant that removes that directive, and the row's name.
+KEYS = [
+    {"key": "RC_ASSEMBLYAI_KEY", "dummy": "RCDUMMY-makefile-env-proof-5d1c",
+     "directive": "unexport RC_ASSEMBLYAI_KEY\n", "mutant": "no-unexport",
+     "label": "AssemblyAI"},
+    {"key": "ANTHROPIC_API_KEY", "dummy": "RCDUMMY-makefile-env-proof-anthropic-9b3e",
+     "directive": "unexport ANTHROPIC_API_KEY\n", "mutant": "no-unexport-anthropic",
+     "label": "Anthropic"},
+]
 
 passed = 0
 failed = 0
@@ -74,20 +90,22 @@ def check(name, ok, detail=""):
 
 
 def child_env():
-    """`os.environ` with the person's key POPPED and the dummy in its place.
+    """`os.environ` with the person's keys POPPED and the dummies in their
+    places.
 
     `pop` never binds the old value to a name here, so this process does not
-    read the person's key in order to remove it."""
+    read the person's keys in order to remove them."""
     env = dict(os.environ)
-    env.pop(KEY, None)
-    env[KEY] = DUMMY
+    for one in KEYS:
+        env.pop(one["key"], None)
+        env[one["key"]] = one["dummy"]
     return env
 
 
 def make_copy(mutant):
-    """A COPY of the tree with `core` a symlink, and the directive removed
-    when the mutant asks for it. Answers the copy's root, or None and a
-    reason."""
+    """A COPY of the tree with `core`, `graphic` and `docs` symlinks and
+    `agent/` copied without `node_modules`, and a directive removed when the
+    mutant asks for it. Answers the copy's root, or None and a reason."""
     shutil.rmtree(WORK, ignore_errors=True)
     os.makedirs(WORK)
     root = os.path.join(WORK, "tree")
@@ -96,22 +114,27 @@ def make_copy(mutant):
                     ignore=shutil.ignore_patterns("Info.plist", "*.entitlements"))
     for one in ("project.yml", "Makefile"):
         shutil.copy2(os.path.join(ROOT, one), os.path.join(root, one))
-    os.symlink(os.path.join(ROOT, "core"), os.path.join(root, "core"))
+    for one in ("core", "graphic", "docs"):
+        os.symlink(os.path.join(ROOT, one), os.path.join(root, one))
+    shutil.copytree(os.path.join(ROOT, "agent"), os.path.join(root, "agent"),
+                    ignore=shutil.ignore_patterns("node_modules"))
 
     makefile = os.path.join(root, "Makefile")
     with open(makefile) as handle:
         text = handle.read()
-    count = text.count(DIRECTIVE)
-    if mutant == "no-unexport":
+    for one in KEYS:
+        count = text.count(one["directive"])
         if count != 1:
-            return None, (f"the directive occurs {count} times in the Makefile, not once — "
-                          f"the mutant needs re-aiming")
-        with open(makefile, "w") as handle:
-            handle.write(text.replace(DIRECTIVE, ""))
-        print(f"  mutant no-unexport: {DIRECTIVE.strip()!r} removed from the COPY — the "
-              f"CONTROL that this instrument can see a leak\n")
-    elif count != 1:
-        return None, (f"the tree's Makefile carries the directive {count} times, not once")
+            return None, (f"the tree's Makefile carries {one['directive'].strip()!r} {count} "
+                          f"times, not once" + (" — the mutant needs re-aiming"
+                                                if mutant == one["mutant"] else ""))
+    for one in KEYS:
+        if mutant == one["mutant"]:
+            text = text.replace(one["directive"], "")
+            with open(makefile, "w") as handle:
+                handle.write(text)
+            print(f"  mutant {mutant}: {one['directive'].strip()!r} removed from the COPY — "
+                  f"the CONTROL that this instrument can see a leak of that key\n")
     return root, None
 
 
@@ -136,13 +159,13 @@ def build(root, wall):
 
 
 def holders(root):
-    """Every file under the copy's `build/` and `Reelcut.xcodeproj/` whose
-    BYTES hold the dummy, as paths relative to the copy.
+    """For each dummy, every file under the copy's `build/` and
+    `Reelcut.xcodeproj/` whose BYTES hold it, as paths relative to the copy.
 
     In process, with `open(..., 'rb')` and `in`: nothing is shelled out to,
-    so the dummy is never a process argument and never reaches a log."""
-    needle = DUMMY.encode("utf-8")
-    found = []
+    so a dummy is never a process argument and never reaches a log."""
+    needles = {one["dummy"]: one["dummy"].encode("utf-8") for one in KEYS}
+    found = {dummy: [] for dummy in needles}
     scanned = 0
     for folder in ("build", "Reelcut.xcodeproj"):
         base = os.path.join(root, folder)
@@ -157,22 +180,23 @@ def holders(root):
                 except OSError:
                     continue
                 scanned += 1
-                if needle in body:
-                    found.append(os.path.relpath(path, root))
+                for dummy, needle in needles.items():
+                    if needle in body:
+                        found[dummy].append(os.path.relpath(path, root))
     return found, scanned
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--mutant", choices=["no-unexport"],
-                        help="remove the `unexport` directive in the COPY — the CONTROL, "
-                             "under which the leak row must FAIL")
+    parser.add_argument("--mutant", choices=[one["mutant"] for one in KEYS],
+                        help="remove one key's `unexport` directive in the COPY — the "
+                             "CONTROL, under which that key's leak row must FAIL")
     parser.add_argument("--wall", type=float, default=900,
                         help="the copy's `make app` wall-clock bound in seconds (rule H)")
     arguments = parser.parse_args()
 
     started = time.time()
-    print("road map 6 §10.13, H·2 — `make app` and the AssemblyAI key\n")
+    print("road map 6 §10.13, H·2, and road map 12 A1 part 2 — `make app` and the two keys\n")
     print("  (this measures the `app` recipe ONLY: it is the one that runs xcodebuild, "
           "which is the one tool measured to write its environment down)\n")
 
@@ -191,9 +215,11 @@ def main():
         return 1
 
     found, scanned = holders(root)
-    check(f"no file under the copy's build/ or Reelcut.xcodeproj/ holds the dummy "
-          f"({scanned} files read)",
-          not found, "held by:\n       " + "\n       ".join(found[:8]))
+    for one in KEYS:
+        held = found[one["dummy"]]
+        check(f"no file under the copy's build/ or Reelcut.xcodeproj/ holds the "
+              f"{one['label']} dummy ({scanned} files read)",
+              not held, "held by:\n       " + "\n       ".join(held[:8]))
 
     print(f"\n{passed}/{passed + failed} checks passed in {time.time() - started:.0f} s")
     return 0 if failed == 0 else 1

@@ -7,11 +7,13 @@ DIST_PATH := $(BUILD_DIR)/Build/Products/Distribution/$(APP).app
 
 # `xcodebuild` records every task's ENVIRONMENT in its build database under
 # build/Build/Intermediates.noindex/XCBuildData/, so a `make app` from a shell
-# that exports the AssemblyAI key writes that key to disk
+# that exports the AssemblyAI key or the Anthropic key writes that key to disk
 # (road map 6 §10.12, measured). `unexport` covers every
 # recipe in this file, which is what the proofs' own `child_env()` already
-# does for themselves; `tools/proof/makefile_env_proof.py` measures `app`.
+# does for themselves; `tools/proof/makefile_env_proof.py` measures `app`,
+# one "holds the dummy" row per key.
 unexport RC_ASSEMBLYAI_KEY
+unexport ANTHROPIC_API_KEY
 
 .PHONY: all app dist rust test lint fmt typecheck project run clean
 
@@ -55,6 +57,8 @@ dist: app
 # Fast compile check of the Swift sources without a full Xcode build.
 # `-D REELCUT_DEV_TOOLS` as Debug and Release set it (project.yml); the
 # flag-OFF path, what Distribution ships, is compiled only by `make dist`.
+# The last line is agent/'s `tsc --noEmit`, through bun (agent/build.sh),
+# which fails rather than skips when bun is missing.
 typecheck:
 	swiftc -typecheck \
 		-D REELCUT_DEV_TOOLS \
@@ -62,6 +66,7 @@ typecheck:
 		-target arm64-apple-macos26.0 \
 		-import-objc-header app/Bridging/Reelcut-Bridging-Header.h \
 		app/Sources/*.swift
+	/bin/sh agent/build.sh typecheck
 
 run: app
 	open "$(APP_PATH)"

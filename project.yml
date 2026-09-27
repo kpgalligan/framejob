@@ -185,6 +185,14 @@ targets:
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GraphicTemplates/kinetic-type.js
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GraphicTemplates/lower-third.js
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GraphicTemplates/title-card.js
+      # The assistant's agent helper (agent/, spec §11 AI-1): compiled with
+      # Bun, placed in Contents/Helpers and signed by agent/build.sh, before
+      # Xcode signs the app around it — the app's own signature does not
+      # cover a nested executable. Without bun it fails; it never skips.
+      - name: Build Agent Helper
+        # Bun rebuilds the helper in well under a second, so it runs every build.
+        basedOnDependencyAnalysis: false
+        script: /bin/sh "$PROJECT_DIR/agent/build.sh" helper
 
 schemes:
   Reelcut:

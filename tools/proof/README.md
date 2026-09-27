@@ -4566,33 +4566,48 @@ Road map 6 §10.13 is the record. The review added ONE script, three scenario
 keys, one flag on both cloud instruments, and rows and mutants inside what was
 already there. **No live call was made and nothing was spent.**
 
-### `makefile_env_proof.py` — H·2, the key and `make app`
+### `makefile_env_proof.py` — H·2, the two keys and `make app`
 
 ```sh
-env -u RC_ASSEMBLYAI_KEY python3 tools/proof/makefile_env_proof.py
-env -u RC_ASSEMBLYAI_KEY python3 tools/proof/makefile_env_proof.py --mutant no-unexport
+(unset ANTHROPIC_API_KEY RC_ASSEMBLYAI_KEY; python3 tools/proof/makefile_env_proof.py)
+(unset ANTHROPIC_API_KEY RC_ASSEMBLYAI_KEY; python3 tools/proof/makefile_env_proof.py --mutant no-unexport)
+(unset ANTHROPIC_API_KEY RC_ASSEMBLYAI_KEY; python3 tools/proof/makefile_env_proof.py --mutant no-unexport-anthropic)
 ```
 
-**2/2** on the tree, **1/2** under the mutant. It builds a tree COPY under
-`tools/proof/work/makefile-env/` — `app/`, `project.yml`, `Makefile`, with
-`core` a SYMLINK to the tree's already-built one, `cloud_captions_proof.py`'s
-`build_mutant` shape — runs `make app` inside it with the person's
-`RC_ASSEMBLYAI_KEY` POPPED and `RCDUMMY-makefile-env-proof-5d1c` in its place,
-and then searches every file under the copy's `build/` and
-`Reelcut.xcodeproj/` **in process** for the dummy's bytes. It prints paths and
-booleans and nothing else; the person's own value is never read, printed or
-searched for.
+**3/3** on the tree, and **2/3** under each mutant (road map 12 A1 part 2
+added the Anthropic key). It builds a tree COPY under
+`tools/proof/work/makefile-env/`: `app/`, `project.yml` and `Makefile` are
+copied; `core`, `graphic` and `docs` are SYMLINKS to the tree's (`core`
+already built, so the copy links the tree's staticlib; `graphic` and `docs`
+are what the other build steps read); and `agent/` is COPIED without
+`node_modules`, because the helper's build step runs `bun install` and
+`bun build`, which write into it, and a copy keeps bun out of the tree. It
+runs `make app` inside the copy with both keys POPPED and a dummy in each
+place, `RCDUMMY-makefile-env-proof-5d1c` for `RC_ASSEMBLYAI_KEY` and
+`RCDUMMY-makefile-env-proof-anthropic-9b3e` for `ANTHROPIC_API_KEY`. Then it
+searches every file under the copy's `build/` and `Reelcut.xcodeproj/`
+**in process** for each dummy's bytes. It prints paths and booleans and
+nothing else; the person's own values are never read, printed or searched
+for.
 
-Three rows: the copy's `make app` made `Reelcut.app`'s binary (a failed build
-holds nothing, and "no file holds the dummy" would be true of it for the wrong
-reason); **no file of 448 holds the dummy**; and, under `--mutant
-no-unexport`, which removes the `Makefile`'s one `unexport RC_ASSEMBLYAI_KEY`
-directive in the COPY, that second row FAILS with the dummy in
+Three rows:
+- The copy's `make app` made `Reelcut.app`'s binary. A failed build holds
+  nothing, and "no file holds the dummy" would be true of it for the wrong
+  reason.
+- **No file of 553 holds the AssemblyAI dummy.**
+- **No file of 553 holds the Anthropic dummy.**
+
+Each `unexport` directive is asserted to occur exactly once in the tree's
+`Makefile`. `--mutant no-unexport` removes `unexport RC_ASSEMBLYAI_KEY` in
+the COPY, and `--mutant no-unexport-anthropic` removes
+`unexport ANTHROPIC_API_KEY`. Under each, that key's row FAILS, with the
+dummy in
 `build/Build/Intermediates.noindex/XCBuildData/<hash>.xcbuilddata/task-store.msgpack`
-and one attachment beside it — the CONTROL that the instrument can see a leak
-at all. **It measures the `app` recipe ONLY** and says so in its header and in
-its first printed line: `app` is the one recipe that runs `xcodebuild`, which
-is the one tool measured to write its environment down.
+and one attachment beside it. These are the CONTROLS that the instrument can
+see a leak of either key. **It measures the `app` recipe ONLY** and says so
+in its header and in its first printed line: `app` is the one recipe that
+runs `xcodebuild`, which is the one tool measured to write its environment
+down.
 
 ### Three new scenario keys on the fake
 
@@ -6165,4 +6180,65 @@ passes.
 ```sh
 python3 tools/proof/assistant_lane_proof.py               # L0–L9, C1, M1
 python3 tools/proof/assistant_lane_proof.py --no-prepare  # the mutant alone: L0 and L1 FAIL, exit 1
+```
+
+## Road map 12's A1 part 2 — the helper and its build (assistant_helper_proof.py)
+
+The helper (`agent/`, spec §11 AI-1), its build and road map 12 §2's three
+`configure` fields. It launches no app and reads no key: every child's
+environment has `RC_ASSEMBLYAI_KEY` and `ANTHROPIC_API_KEY` popped. The
+helper only ever gets `proof-key`, and every `configure` it is sent points
+`api_base` at a running `anthropic_fake.py`, so no row reaches
+api.anthropic.com. Each child runs under a wall in its own process group
+(rule H): P1 30 s; the helper 20 s to `ready`, 60 s for a turn and 5 s to
+exit; P5 180 s. It works in `work/assistant_helper/`, prints
+`<ID> ok|FAIL|skip — <reason>` per row and then `n/m`, and exits 0 only when
+no row fails. An instrument that cannot run is a scored FAIL.
+
+- **P0**, the wiring, read from the source:
+  - `project.yml` has exactly one "Build Agent Helper" item, after "Copy
+    Graphic Templates" and before `schemes:`, with
+    `basedOnDependencyAnalysis: false` and `agent/build.sh" helper`.
+  - The Makefile's `typecheck` runs `/bin/sh agent/build.sh typecheck`.
+  - `unexport ANTHROPIC_API_KEY` occurs once.
+- **P1**, never skips. `build.sh helper` and `build.sh typecheck` run with a
+  fresh empty `HOME`, `PATH=/usr/bin:/bin` and a scratch
+  `TARGET_BUILD_DIR`. Each exits non-zero with a first stderr line
+  `error: bun is not installed …` and places no helper. It skips only as
+  `host: bun at a fixed path`, when bun is at `/opt/homebrew/bin` or
+  `/usr/local/bin`.
+- **P2r / P2d**, the Release helper and, with `--dist`, the Distribution
+  one. Each is present, shows `flags=0x10002(adhoc,runtime)`, has
+  entitlements that parse as exactly `{com.apple.security.cs.allow-jit:
+  true}`, and passes `codesign --verify --strict`.
+- **P3**. The Release helper is launched with exactly `HOME`, `TMPDIR` and
+  `PATH=/usr/bin:/bin`. It answers a `configure` with `ready` and exits 0
+  once stdin closes. The stand-in sees only the Models API `GET`, no POST,
+  and no failures.
+- **P4**, the §2 fields reach the API. `configure` carries `get_project` and
+  `add_marker`, `core_tools ["get_project"]`, `search_guide "P4-GUIDE"`,
+  `compaction_instructions "P4-COMPACTION"`, `system "P4-SYSTEM"` and
+  `auto_compact_tokens 1`, and one `send` follows. The checks:
+  - The first POST's system is `P4-SYSTEM\n\nP4-GUIDE`.
+  - Its tools are `tool_search_tool_bm25`, `get_project` with no
+    `defer_loading`, and `add_marker` with `defer_loading: true`.
+  - The POST after `compaction_started` carries `P4-COMPACTION`. The SDK
+    sends that POST inside the same turn, so the second `send`, kept for
+    the other case, was not needed.
+- **P5**, the control. A scratch copy of `agent/` without `node_modules`,
+  with `const p5: number = "p5";` appended to `main.ts`, fails `build.sh
+  typecheck` with a tsc error naming `src/main.ts`.
+- **Mutants**, each running only its row, which must FAIL (exit 1). A mutant
+  whose row skipped on this host exits 2 and says the control could not be
+  performed; it is never read as caught:
+  - `skip-without-bun` runs P1 against a scratch `build.sh` whose guard
+    `exit 1` (asserted once) became `exit 0`.
+  - `no-fields` runs P4 with the three fields omitted. The system then ends
+    in "undefined", `get_project` is deferred, and the summary POST lacks
+    the instructions.
+
+```sh
+python3 tools/proof/assistant_helper_proof.py --dist build/Build/Products/Distribution/Reelcut.app  # 7/7
+python3 tools/proof/assistant_helper_proof.py --mutant skip-without-bun  # P1 FAIL, exit 1
+python3 tools/proof/assistant_helper_proof.py --mutant no-fields         # P4 FAIL, exit 1
 ```

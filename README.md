@@ -288,6 +288,8 @@ app/
   Sources/            Swift AppKit application (programmatic UI, no storyboards)
   Resources/Shaders/  Compositor.metal — the per-layer compositing pass
   Bridging/           Bridging header importing the Rust FFI header
+agent/                the assistant helper: Bun and the Anthropic SDK's Tool Runner,
+                      built into Contents/Helpers/reelcut-agent (build.sh)
 designs/              spec/ — the accepted design and spec, one file per section;
                       adr/ — condensed records
 archive/              closed road maps, verbatim (INDEX.md)
@@ -326,7 +328,7 @@ Makefile              Build orchestration
 
 ## Building
 
-Requires Xcode 26 or later (the macOS 26 SDK), Rust (cargo), and [xcodegen](https://github.com/yonaskolb/XcodeGen).
+Requires Xcode 26 or later (the macOS 26 SDK), Rust (cargo), [xcodegen](https://github.com/yonaskolb/XcodeGen), and [bun](https://bun.sh) (the assistant helper, `agent/`, is built by every `make app` and typechecked by `make typecheck`; without bun they fail rather than skip).
 
 ```sh
 make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
@@ -334,7 +336,7 @@ make dist       # make app, then the Distribution build (no dev tools) → build
 make run        # build and launch
 make test       # Rust core and graphics tests, then the agent lane's proof (tools/proof/assistant_lane_proof.py)
 make lint       # cargo clippy --all-targets -D warnings
-make typecheck  # swiftc -typecheck of app/Sources — the ONLY authoritative Swift check
+make typecheck  # swiftc -typecheck of app/Sources — the ONLY authoritative Swift check, then agent/'s tsc --noEmit (through bun)
 make project    # xcodegen generate
 ```
 

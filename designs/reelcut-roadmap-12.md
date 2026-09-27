@@ -2,8 +2,8 @@
 
 **Status: IN PROGRESS. PROPOSED 2026-09-27; the user answered §6 the same day. §4's decisions
 are recorded in spec §11 (`11-decisions/assistant.md`, AI-1..AI-12) and A0 ran the same day
-(§7). A1 part 1 of 3, the lane, is built (§8); parts 2 (the helper) and 3 (the session) are
-not, and there is no assistant a person can use yet.** This is the design the user asked for:
+(§7). A1 parts 1 and 2 built (§8): the lane, and the helper and its build. Part 3 (the
+session) is not, and there is no assistant a person can use yet.** This is the design the user asked for:
 an AI agent in the editor, "designed in the same way that the agent for
 `~/devel/rasterize` is". §1 is what Rasterize built. §2 is what carries over unchanged.
 §3 is what Reelcut needs that Rasterize did not. §4 is the decisions §11 must record
@@ -525,3 +525,113 @@ The built app, launched on port 4861, logged no `Reelcut: ` line and passed
   (L0), not by launching.
 - A gesture held down holds the lane's lock and every other caller with it: AI-12's accepted
   risk.
+
+### Part 2 — the helper and its build (2026-09-27)
+
+**What landed.**
+- `agent/` (new): Rasterize's `package.json`, `bun.lock`, `tsconfig.json`, `entitlements.plist`
+  and `src/`. `rasterize-agent` becomes `reelcut-agent` in `package.json`'s name and build
+  outfile and in `bun.lock`'s root workspace, and nowhere else.
+  - `src/` carries §2's change. `CORE_TOOLS`, `TOOL_SEARCH_GUIDE` and `COMPACTION_INSTRUCTIONS`
+    are gone from `main.ts`, and `Configure` gains `core_tools`, `search_guide` and
+    `compaction_instructions`.
+  - `runnableTool(entry, core)` defers every tool not in `new Set(message.core_tools)`. The
+    runner's system is `${config.system}\n\n${config.search_guide}`, and the compaction
+    uses `config.compaction_instructions`.
+  - The comments that named one app are now true of both. `main.ts`'s header states the
+    one-diff rule.
+- `agent/build.sh` (new) is the one place bun is found and run. It puts `~/.bun/bin`, mise's
+  shims, `/opt/homebrew/bin` and `/usr/local/bin` on `PATH`. Without bun it writes one
+  `error: bun is not installed …` line and exits 1.
+  - `typecheck` runs `bun install --frozen-lockfile` and `bun run typecheck`.
+  - `helper` builds, runs `mkdir -p` on `Contents/Helpers`, copies `reelcut-agent` into it and
+    signs it as Rasterize's step does. Outside Xcode it exits 2.
+  - No mode, variable or flag skips.
+- `project.yml`: a last `postBuildScripts` item, "Build Agent Helper",
+  `basedOnDependencyAnalysis: false`, which runs `build.sh helper`.
+- `Makefile`: `unexport ANTHROPIC_API_KEY` beside `unexport RC_ASSEMBLYAI_KEY`, and
+  `typecheck`'s last line `/bin/sh agent/build.sh typecheck`.
+- `.gitignore`: `/agent/node_modules/`.
+- Proofs:
+  - `tools/proof/assistant_helper_proof.py` (new): P0–P5 and two mutants.
+  - `tools/proof/makefile_env_proof.py` now covers two keys. Its copy symlinks `core`,
+    `graphic` and `docs` and copies `agent/` without `node_modules`. It has one row per dummy
+    and a second mutant, `no-unexport-anthropic`.
+- Documents: the root `CLAUDE.md` (the `make typecheck` line and baseline, a bun bullet, the
+  `agent/` map entry), the README, spec §8 (the tree, `make typecheck`, and the `make test`
+  line, stale since part 1), and `tools/proof/README.md`.
+- No Reelcut Swift file changed, and nothing launches the helper yet.
+
+**What was measured.** Every command ran as `(unset ANTHROPIC_API_KEY RC_ASSEMBLYAI_KEY; …)`.
+- `make typecheck`: swiftc gave 0 errors and 7 warnings (the baseline). `bun install` (bun
+  1.3.6) installed 13 packages, and `tsc --noEmit` printed nothing. Exit 0.
+- `make lint` was clean. `make test` exited 0: 73 cargo test binaries, 968 tests passed and 0
+  failed, and the lane proof scored 12/12.
+- `make app` and `make dist` built.
+  - In both configurations, "Build Agent Helper" ran after the resource steps and before
+    Xcode's `CodeSign` of the app.
+  - The helper is 57,719,424 bytes in each bundle (read back with `stat -f %z` from both
+    `build/Build/Products/{Release,Distribution}/Reelcut.app/Contents/Helpers/reelcut-agent`
+    after the review, since no run printed it).
+  - `codesign -dv` shows `flags=0x10002(adhoc,runtime)`, and the entitlements are exactly
+    `com.apple.security.cs.allow-jit`.
+  - `codesign --verify --strict --deep` of the Release app passed.
+  - `dist_check: 5/5`.
+- `assistant_helper_proof.py --dist …Distribution/Reelcut.app` scored 7/7:
+  - P0: the wiring is as written.
+  - P1: `build.sh helper` and `build.sh typecheck`, with an empty `HOME` and
+    `PATH=/usr/bin:/bin`, each exited 1 with the `error: bun is not installed` line and placed
+    no helper. It did not skip: bun is under mise here, not at a fixed path.
+  - P2r and P2d: both helpers are `adhoc,runtime`, have exactly `allow-jit` and pass
+    `--verify --strict`.
+  - P3: the helper answered `ready` and exited 0 when stdin closed. The stand-in saw one
+    request, `GET /v1/models/claude-opus-5-5`, no POST and no failures.
+  - P4: the first POST's system was `P4-SYSTEM\n\nP4-GUIDE`. `get_project` had no
+    `defer_loading` and `add_marker` had `defer_loading: true`. The runner sent the summary POST,
+    carrying `P4-COMPACTION`, inside the same turn, so there were 2 POSTs and no second `send`.
+  - P5: the planted type error failed `build.sh typecheck` in under a second with
+    `src/main.ts(379,7): error TS2322`.
+- The mutants each scored 0/1 and exited 1.
+  - `skip-without-bun`: the guard's `exit 0` made both modes exit 0.
+  - `no-fields`: the system ended in `undefined`, `get_project` was deferred, and the summary
+    POST lacked the instructions.
+- `makefile_env_proof.py`: 3/3 in 98 s, with 553 files read and neither dummy found. Under
+  `--mutant no-unexport` it scored 2/3 in 96 s: the AssemblyAI row failed, with its dummy in
+  `XCBuildData/…/task-store.msgpack` and one attachment. Under `--mutant no-unexport-anthropic`
+  it scored 2/3 in 100 s, and the Anthropic row failed the same way. The copy built and signed
+  its own helper.
+- `diff`/`cmp` against Rasterize: `package.json` differs in its two name lines and
+  `bun.lock` in its one. `tsconfig.json` and `entitlements.plist` are identical. `src/`
+  differs by exactly §2's change, because Rasterize did not take it (below).
+
+**The Rasterize outcome: not applied (#147).**
+- The guard passed. Rasterize's HEAD was `77d8434`, past both A0's `acdf6d0` and the spec's
+  `29c4fcc`. The three paths were clean, and `main.ts`/`protocol.ts` matched A0's B1 hashes.
+- The write into `~/devel/rasterize` was refused by the session's permission check as a change
+  to a shared resource. `AssistantHelperSession.swift` had already been written, and it was
+  restored from the saved bytes. Afterwards all three paths were back at their original hashes
+  (`807fcdb1…` for the Swift file) and none was in `git status`. Nothing was committed or
+  stashed there, and no bun, tsc, make or xcodebuild ran there.
+- Rasterize checks 2 and 3 were run in scratch only:
+  - `swiftc -typecheck` over `git archive HEAD` gave 0 errors both as is and with the edited
+    file (13 warnings each).
+  - The three values, from `bun` over the old declarations and `swift` over the new statics,
+    are equal as parsed JSON: the guide is 984 characters and the instructions 502.
+- Until #147 lands, Rasterize's `agent/src/` is one diff behind Reelcut's.
+- Rasterize's current helper ignores the three new keys, but Rasterize must not take
+  Reelcut's `src/` without the Swift half, or it defers every tool.
+
+**Limits.**
+- P1 skips on a host with bun at `/opt/homebrew/bin` or `/usr/local/bin`, because
+  `build.sh`'s own `PATH` finds it there whatever `PATH` the row gives.
+- P3 and P4 run the helper against the stand-in, not the API. Nothing here reaches
+  api.anthropic.com.
+- `dist_check.py` still reads only `Contents/MacOS/Reelcut`; its helper rows are A4's.
+
+**What is owed.**
+- #146: `cloud_captions_proof.py`'s and `graphics_proof.py`'s `build_mutant`,
+  `cloud_captions_probe.py` row 18's `project.yml` allow-list, and `assistant_spike.py`'s
+  `make_tree` each miss or duplicate what `project.yml`'s post-build steps read.
+- #147: Rasterize takes §2's change.
+- Part 3: the session sends the three fields (Reelcut's core set, A0 C3), the key, the model,
+  `assistant_send` and `assistant_answer`, the end-to-end proof, and closing A1's record.

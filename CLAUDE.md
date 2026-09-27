@@ -50,7 +50,7 @@ comment citing "road map N §x" refers to the archived original.
 make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
 make test       # make rust, cd core && cargo test --release, cd graphic && cargo test --release (black-box tests), then tools/proof/assistant_lane_proof.py (the agent lane's probe)
 make lint       # cargo clippy --all-targets -- -D warnings, in core/ then graphic/
-make typecheck  # swiftc -typecheck -D REELCUT_DEV_TOOLS of app/Sources/*.swift — the ONLY authoritative Swift check
+make typecheck  # swiftc -typecheck -D REELCUT_DEV_TOOLS of app/Sources/*.swift — the ONLY authoritative Swift check, then agent/'s `tsc --noEmit` (through bun)
 make project    # xcodegen generate (Reelcut.xcodeproj is generated; project.yml is the source of truth)
 make run        # make app, then launch
 make dist       # make app, then the Distribution build (no dev tools, spec §11 V-1) and tools/proof/dist_check.py
@@ -62,7 +62,8 @@ make dist       # make app, then the Distribution build (no dev tools, spec §11
 - There are no Swift unit tests. App-side verification is `make typecheck`
   plus driving the built app over MCP and the probes in `tools/proof/`.
 - `make typecheck` is fast; run it before `make app` (~90 s). Its baseline is
-  **0 errors and 7 warnings**, all AVFoundation deprecations: 4 (3 in
+  **0 errors and 7 warnings**, and tsc prints no error; the warnings are
+  all AVFoundation deprecations: 4 (3 in
   `CompositionBuilder.swift`, 1 in `Exporter.swift`) deliberate because
   their replacements are `async`-only and `async` is confined to
   `MediaImporter.swift` and `SpeechEngine.swift` (spec §11 W-8), and 3
@@ -73,6 +74,10 @@ make dist       # make app, then the Distribution build (no dev tools, spec §11
   the bump. Any eighth warning is new and yours. It stops before
   SILGen, so a clean typecheck does not prove the app builds; only `make app`
   does.
+- `make app`/`make dist` build the assistant helper (`agent/`) in their
+  last Xcode step, and `make typecheck` ends with its tsc. All need bun, and
+  without it they fail with an `error: bun is not installed` line rather
+  than skipping.
 - `Reelcut.xcodeproj` is generated; never commit it. xcodegen and
   `make typecheck` both glob `app/Sources/`, so a new Swift file needs no
   registration anywhere.
@@ -87,6 +92,12 @@ core/                Rust staticlib — the model, the ops, the plan, the recipe
 graphic/             Rust crate — the graphics engine (road map 10): a Module run in
   src/                 sandboxed QuickJS returns SVG per frame; rasterize (usvg →
   tests/               resvg → BGRA), measure_text. graphic/CLAUDE.md has its rules
+agent/               the assistant helper (AI-1): Bun, the Anthropic SDK's Tool Runner
+  src/                 meant to be byte-identical to ~/devel/rasterize/agent/src/, one
+                       diff applied to both; NOT YET: Rasterize lacks road map 12 §2's
+                       change until #147 lands. What the apps differ in arrives in
+                       `configure`
+  build.sh             used by the Xcode step and `make typecheck`
 app/
   Sources/             AppKit app, programmatic UI (app/CLAUDE.md has the map)
   Resources/Shaders/   Compositor.metal — the per-layer compositing pass

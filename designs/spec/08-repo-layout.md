@@ -9,6 +9,7 @@ reelcut/
     Cargo.toml        # reelcut-core; lib name reelcut_core; serde, serde_json, serde_path_to_error, tiny_http; lto
     include/reelcut_core.h
     src/  tests/
+  agent/              # the assistant helper (§11 AI-1): Bun, src/ shared with Rasterize's; build.sh
   app/
     Bridging/Reelcut-Bridging-Header.h
     Sources/          # AppKit, programmatic, no storyboards
@@ -29,9 +30,9 @@ Commands (identical to Rasterize's):
 
 ```sh
 make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
-make test       # cd core && cargo test --release
+make test       # make rust, cd core && cargo test --release, cd graphic && cargo test --release (black-box tests), then tools/proof/assistant_lane_proof.py (the agent lane's probe)
 make lint       # cargo clippy --all-targets -- -D warnings
-make typecheck  # swiftc -typecheck of app/Sources/*.swift with the bridging header — the ONLY Swift check
+make typecheck  # swiftc -typecheck of app/Sources/*.swift with the bridging header — the ONLY Swift check, then agent/'s tsc --noEmit (through bun)
 make project    # xcodegen generate
 make run
 ```

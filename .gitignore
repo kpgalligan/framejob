@@ -1,5 +1,6 @@
 /core/target/
 /graphic/target/
+/agent/node_modules/
 /build/
 /Reelcut.xcodeproj/
 /app/Info.plist
