@@ -66,7 +66,9 @@ The answers go in this road map's V1 record and bind V2's design.
   open windows with their titles and sizes; `view` — a named region (`toolbar`, `preview`,
   `inspector`, `timeline`) or the whole window; `appearance` — `light`, `dark`, or the
   window's own, set on the live window for the capture and restored after (V1's A3–A6: the
-  switch and the restore are byte-identical to a fresh window and to the capture before);
+  switch and the restore are byte-identical to a fresh window and to the capture before —
+  WITHDRAWN in V3, which measured the switch against an instance launched light and found a
+  mix; the argument is now refused and the look set at launch, `-RCDevAppearance`);
   `path`; `fill_preview` (default true): `render_frame`'s picture put UNDER the canvas overlay
   for the capture and removed after, so handles and guides land on top as on screen (V1's
   W4a–c; W6 is what leaving it in costs). A `sheet` that is a file panel (`NSOpenPanel`, an
@@ -359,7 +361,14 @@ occluded for `layout`, `well`, `sheets` and `appearance`; the probe activated in
   setting it back to nil gives the bytes from before (A3–A6, 0 px each, against A1's 63.9 %
   and A2/A7's identities). The colours taken once as `CGColor`s left no residue in this
   editor state. V2's `appearance` argument sets `window.appearance`, captures, and restores
-  it; no fresh window is needed.
+  it; no fresh window is needed. **Qualified in V3:** the reference here was a fresh window
+  built with aqua INSIDE the same dark-system process (A0), not an app launched light, so it
+  could not see a colour a view takes once at build time from the launch appearance. Against
+  a Release instance launched light, V3's review measured the switched light capture of the
+  editor different at 389 266 of 1 117 376 px — the inspector 163 654 of 163 856, the preview
+  surround 126 294, the timeline 99 050, the toolbar 268 — and Welcome dark-grounded where the
+  light launch is white. The answer holds only for the one state A3–A6 measured; the argument
+  was withdrawn (V3's record).
 - **Q4 — the layout signals in an `-O` build: answered.** `hasAmbiguousLayout` answers
   truthfully in the `-O -wmo` build against a deliberate ambiguity and its control (L1, L2).
   The editor's own tree is NOT clean: three private AppKit views inside the Text sub-tab's text
@@ -385,7 +394,7 @@ modal loop" in general (from Q2(c)), and says what S1 measured of delivery. (3) 
 keeps its default of true and names its technique: the picture under the canvas overlay for the
 capture, removed after (from Q1). (4) `snapshot_ui`'s `sheet` says a file panel captures as one
 colour and reports it rather than returning a flat picture (from S2c). (5) `appearance` sets the
-live window's appearance and restores it after (from Q3). (6) The proof's unfilled well is the
+live window's appearance and restores it after (from Q3; withdrawn in V3, see Q3). (6) The proof's unfilled well is the
 canvas background, not black (from W1), and its sheet is an app sheet (from S2c).
 
 **Deviations.**
@@ -454,6 +463,13 @@ The proof side:
 - `op_argument_proof.py`: `PRODUCT_TOOLS = 85`, the dev tools counted apart, and V0's owed
   count and order rows.
 - `recording_proof.py` and `phase9_proof.py`: their app-state set subtracts `DEV_TOOLS`.
+
+**Since V3.** `appearance` no longer switches the live window: it is refused whatever its
+value, naming `-RCDevAppearance`, the dev-only launch default that sets the look before any
+window is built (V3's record has the measurement). `UISnapshot`'s staging holds only the fill.
+A1 now proves both looks refused with no file written, A2 that the captures before and after
+the refusals are byte-identical, and C4's two `appearance` cases name `-RCDevAppearance`. The
+A-row mutant M3 below is of the withdrawn switch.
 
 **Measured.** Host: console not locked; two screens. The editor opened on the external
 BenQ GW2790QT at scale 1, frame [2536, 701, 944, 736], content 944 × 704. The width is the
@@ -759,3 +775,275 @@ settle early. No run showed it; every `cancel_sheet` answered with no sheet atta
 - The `CLAUDE.md` lines listed in the implementation notes were applied by hand: `app/CLAUDE.md`'s
   four map entries and two edits, and root `CLAUDE.md`'s dev-tool paragraph under "Seeing the
   chrome".
+
+### V3 — the screen catalog (2026-09-27)
+
+**Built.** Sixteen screen files, the runner that captures them, and two dev-only additions
+that make every listed screen reachable. Every new app line is under `#if REELCUT_DEV_TOOLS`.
+
+The app side:
+- `app/Sources/AgentServer+InspectorTab.swift` (147 lines, new): `select_inspector_tab {tab?,
+  sub_tab?}`, a dev tool on MAIN (not in `devOffMainTools`). It picks the tab through
+  `InspectorViewController.select(_:)` and the sub-tab through `selectClipSubTab(_:)`, the two
+  strips' click paths. With no `tab` it answers what is shown. Each refusal leaves the inspector
+  as it was; the missing-sub-tab refusal is sent after `select(previous)`.
+- `AgentServer+DevTools.swift` (94): the handler row and `selectInspectorTabTool()` last in
+  `devTools()`; the marker line now reads `4 dev tools`.
+- `UISnapshot.swift` (220): `WindowKind` gains `recorder` (last) and a `title`.
+  `openWindow(.recorder)` finds the visible window whose controller is `RecorderPanelController`
+  in `NSApp.windows`, never `.shared`. `kind(of:)` answers `recorder` before the `NSPanel` line.
+  After the review, the live appearance staging is gone: `Look`, `Staging.savedAppearance` and
+  the restore in `unstage`.
+- `AgentServer+Snapshot.swift` (400, was 399): `project` is refused for any window but
+  editor/sheet; the Settings/Welcome arm also takes `recorder`, with `kind.title`; the `window`
+  description names `recorder`. After the review, `appearance` is refused whatever its value
+  (`appearanceRefusal`, naming `-RCDevAppearance`), is no longer a capture argument, and its
+  schema says so.
+- `app/Sources/DevAppearance.swift` (35 lines, new, wholly under the flag, after the review):
+  the dev-only launch default `-RCDevAppearance light|dark`, which sets `NSApp.appearance`;
+  any other value is named on stderr and ignored. Wired in `main.swift` (three lines under the
+  flag, before `NSApplicationMain`, so before any window is built). It was first wired in
+  `AppDelegate.applicationWillFinishLaunching`; that moved three `runModal` lines the capture
+  spike's `inventory.json` pins by line, and `v2_menu.py`'s H1 failed with 11 problems, so it
+  moved.
+- `InspectorViewController.swift`, `ClipPane.swift`, `EditorViewController.swift` and
+  `AgentServer.swift` are untouched.
+
+The proof side:
+- `tools/proof/screens.py` (new, 1016 lines): the launcher, fixture builder, front-block reader and
+  validator, screen runner, `screens.md` and `results.json` writer, and `--compare`. After the
+  review, it walks the catalog twice, on an instance launched `-RCDevAppearance light` and then
+  one launched `dark`, never passes `appearance`, and fails a screen whose capture answers any
+  other look; a screen's row is scored after both.
+- `tools/proof/v2_snapshot.py`, after the review: A1 and A2 prove the refusal, and C4's two
+  `appearance` cases name `-RCDevAppearance`.
+- `tools/proof/v3_tools.py` (new, 312 lines): L1, T1–T4, R1–R2.
+- `dev_tools.py`: `DEV_TOOLS` gains `select_inspector_tab`, last.
+
+The catalog, `designs/screens/`:
+- `README.md`: the format, the fixtures and how to add a screen.
+- `01-welcome` … `16-recorder-panel`, each with prose written after the captures were Read.
+
+The documents: spec §7.9's dev-tools paragraph (`recorder`, `select_inspector_tab`, and after
+the review `appearance` refused and `-RCDevAppearance`), the spec index's line count, and two
+sections of `tools/proof/README.md` (after the review, also its V2a A-row line). After the
+review, every screen's light paragraph was rewritten from the per-look captures.
+
+**The recorder panel.** It is captured, with the orchestrator's containment:
+- 16 is the last screen and R2 the last row. `screens.py` refuses New Recording… anywhere else
+  (`front block: New Recording… must be the last screen run`).
+- The captures follow the perform at once, and the instance is stopped straight after.
+- Showing the panel asks for no grant and records nothing: `newRecording:` only calls `show()`
+  when nothing records (`AppDelegate+Recording.swift:42-53`).
+- **Measured: the panel was key with Reelcut ACTIVE in every capture** (four in `screens.py`'s
+  runs, R2's in every `v3_tools.py` run; after the review, both looks' captures in each of
+  four runs). Every earlier capture in those runs read `active: false`, so putting the panel up
+  brings Reelcut to the front.
+- Panel up, from the perform's answer to the child's exit, in `screens.py`: 137 and 135 ms
+  in the first compared pair, and 140 and 134 ms in the final pair (139 in a scratch run). In
+  `v3_tools.py` it was 60 ms in the final run (58 and 56 in the others). After the review the
+  panel goes up once per instance, so twice a run, with one capture each: light / dark 70 / 62
+  and 68 / 63 ms in the first pair, 63 / 60 and 69 / 65 ms in the final one; `v3_tools.py` 60
+  and 57 ms. Record was never pressed.
+
+**Measured.** Host: console not locked. The editor, Welcome, Settings, the sheets and the
+panel all captured at scale 1 on the external screen (colour space `BenQ GW2790QT`), with the
+person's windows up.
+- `make typecheck`: 0 errors, 7 unique warnings. `make app` exit 0. `make dist` exit 0,
+  `dist_check: 5/5`. `wc -l`: `AgentServer+Snapshot.swift` 398,
+  `AgentServer+InspectorTab.swift` 147.
+- `v3_tools.py` (fresh instance on 4872): `7 pass, 0 fail, 0 skip of 7`, digest
+  `05e15829bc9009da3c40b7499a6cd1b74d3cfc66ba1bfe07ef07e9af3dcb8c49`.
+  - L1: the block reads `snapshot_ui, perform_menu_item, cancel_sheet, select_inspector_tab,
+    import_media`; marker count 4.
+  - T1: `{}` answered `clip` / `picture` / `[picture, sound, clip]`; the inspector captures
+    before and after were byte-identical.
+  - R2: 500 × 402 px = 500 × 402 pt × 1.
+- `screens.py`, two pairs of full runs on fresh instances (4871), the second pair after the
+  last prose edit: each run `19 pass, 0 fail, 0 skip of 19`
+  (P1, P2, the 16 screens, P3), digest
+  `44ce547766e1d9f1644bb1e34f394b0bfa9e0cb97545c04840f118f3c18d8f94`, exit 0, `new problems:
+  96`. In each pair, the second run's `--compare` against the first printed `same` for all 48
+  PNGs, then `compare: 48/48 byte-identical`. The final pair wrote
+  `work/screens/2026-09-27-110039` and `-110050`. No capture differed, so none needs a reason. The 48 PNGs of
+  the first scratch run, the ones Read to write the prose, are byte-identical to the final
+  run's. P2 reported 43 section ids, and 23 key literals: 18 pinned, 5 not shown.
+- The captures:
+  - The editor is 1264 × 884 pt; the inspector region is 304 × 539 and the timeline region
+    1264 × 300.
+  - Welcome is 720 × 600, Settings 460 × 340, the recorder panel 500 × 402.
+  - The sheets: Export 420 × 671, Speed 420 × 278, Remove Silences 420 × 441, Generate
+    Captions 420 × 472.
+  - #129 was matched as known in every editor-window capture; #70 did not appear, because the
+    Reveal section is pinned closed.
+- **Screen-file mutants**, each a copy of `designs/screens/` in the scratchpad:
+  - M1, 12's path `["File", "Exprot…"]`: 12 fails `front block: steps[1]: File ▸ Exprot… is
+    not a menu leaf`, and 13 passes.
+  - M2, a comma dropped in 06: 06 fails `front block: not JSON — Expecting ',' delimiter`, and
+    05 passes.
+  - M3, an `export` step in 04: 04 fails `front block: steps[2] calls 'export', which is not
+    one of …` before any step runs, exit 1.
+  - M4, 02's `visible_text` changed: 02 fails `expect: no visible view reads 'An API key is
+    set.'`, and no `02-*` file is left.
+  - M5, 13 without its `after`: 13 fails `left a sheet attached: NSWindow`, and 14 passes.
+- **App mutants**, each built with `make app`, run, restored and `cmp`-checked:
+  - M6, `Self.clipPane(in:)?.choose(sub)` for `selectClipSubTab(sub)`: T3 alone fails. The
+    answer said `clip`, but the dump showed `Position X` and no `Reversed frames`. Run with
+    `--only L,T`.
+  - M7, `openWindow(.recorder)` answering `RecorderPanelController.shared.window`: R1 alone
+    fails, the capture ACCEPTED. Run with `--only L,R`.
+- **The older proofs**, each on a fresh instance with its README line:
+  - `op_argument_proof.py`: 150/150 on Release (4883) and 145/145 on Distribution (4884). The
+    four dev tools were all present with marker count 4 on Release, and all absent on
+    Distribution.
+  - `v2_snapshot.py` (4882): `29 pass, 0 fail, 0 skip of 29`, digest `c53b8d74…a018cc`. O2 ran
+    this time rather than skipping.
+  - `v2_menu.py` (4881): `24 pass, 0 fail, 0 skip of 24`, digest `91ac4a50…fedd011` (V2b's).
+- `grep "Reelcut: "` printed nothing on every launch. `pgrep -f "MacOS/Reelcut"` read `18677
+  20832` before and after every run.
+
+**Measured after the review (fix pass 1).** Same host and screen.
+- `make typecheck`: 0 errors, 7 unique warnings. `make app` exit 0; `make dist` exit 0,
+  `dist_check: 5/5`; `RCDevAppearance` occurs 3 times in the Release binary's strings and 0 in
+  Distribution's. `wc -l`: `AgentServer+Snapshot.swift` 400, `AgentServer+InspectorTab.swift`
+  147, `DevAppearance.swift` 35, `UISnapshot.swift` 220.
+- **The launch look.** A scratch script launched one instance per configuration with
+  `screens.py`'s argv, captured Welcome, then opened a copy of the Demo fixture and captured
+  the editor (nothing selected, playhead 1 500 000), the inspector with the video selected and
+  Settings, never passing `appearance`. The host is Dark (`AppleInterfaceStyle` = `Dark`).
+  - No argument and `-RCDevAppearance dark`: all four `dark`, byte-identical.
+  - `-RCDevAppearance light` and `-NSRequiresAquaSystemAppearance YES`: all four `light`;
+    Welcome, the inspector and Settings byte-identical; the editor different at 97 786 px, all
+    in the timeline — the grey alternate lanes 140 against 139, and the vertical scroller's
+    track 233 against 255. The light inspector is white with dark labels.
+  - `-NSRequiresAquaSystemAppearance YES -RCDevAppearance dark` (dark asked of a process whose
+    system look is forced light, the nearest this host gets to a Light host): all four `dark`;
+    Welcome, the inspector and Settings byte-identical to the plain dark launch; the editor
+    different at 4 488 px, all in x 1247–1263, the timeline's scroller column.
+  - `-AppleInterfaceStyle Light` gave the plain dark launch's bytes, and
+    `-NSRequiresAquaSystemAppearance YES -AppleInterfaceStyle Dark` the light one's, so no
+    Apple launch argument gives a dark app on a light system; hence the dev default.
+  - The same seven launches after the wiring moved to `main.swift` printed the same hashes.
+- `screens.py`, four full runs on fresh instances (4871), each `21 pass, 0 fail, 0 skip of 21`
+  (`P1.light`, `P1.dark`, `P2`, the 16 screens, `P3.light`, `P3.dark`), digest
+  `6751536a9e969e6a386352cedcb18fc228e6583f582ffca57e7fb0463e738117`, exit 0; P2: 43 section ids,
+  24 key literals, 19 pinned (`RCDevAppearance` per look), 5 not shown. `new problems:` 103,
+  102, 103 and 104.
+  - First pair, `work/screens/2026-09-27-112958` and `-113108`: `compare: 45/48
+    byte-identical`. `04-editor.window.{light,dark}` differ by 832 px in [132,682,340,685]:
+    the tone clip's waveform band, which `TimelineClipDrawing.drawWaveform` draws only once the
+    peaks are cached — absent in the first run's 04, present in the second's. `15-…sheet.light`
+    differs by 1 546 px in [211,417,379,447]: Cancel and Generate, whose stack is the ambiguous
+    one already reported; its note measures 191 pt (truncated) in some launches and 196 pt in
+    others.
+  - Final pair, `-115803` and `-115819`: `compare: 47/48 byte-identical`, only
+    `15-…sheet.light` (1 546 px, the same box). The waveform band was absent in both.
+  - Against the last pre-review run (`-110050`): every dark PNG byte-identical but 04's (the
+    band) and 15's (the stack); every light PNG differs, which is the fix.
+  - Every light PNG was Read, and each screen's light paragraph rewritten from it. 04's prose
+    now says the tone clip's line shows once its waveform is read, and 15's that the note's
+    last letter is clipped in some captures.
+  - The 06 and 10 inspector and window captures now report an `NSStackView` 17 pt past its
+    superview on the right, in both looks, where the pre-review runs reported nothing, though
+    06 and 10's dark PNGs are byte-identical to the pre-review ones. Not measured further; the
+    pre-review switch and restore relaid the window before each capture, which may have hidden
+    it.
+- `v2_snapshot.py` (4882): `29 pass, 0 fail, 0 skip of 29`, digest `c53b8d74…a018cc` (the row
+  ids and states are V2a's). A1: `dark: refused True, names -RCDevAppearance True, file written
+  False` and the same for light. **Mutant MA**, the refusal line replaced by a no-op, run with
+  `--only T,C,A`: C4 fails (13/15, both `appearance` cases answered) and A1 fails (both captured,
+  files written); the other seven pass. Restored, `cmp`-checked, rebuilt.
+- `v2_menu.py` (4881): `24 pass, 0 fail, 0 skip of 24`, digest `91ac4a50…fedd011`. With the
+  wiring in `AppDelegate.swift` it had scored 23/24, H1 failing on the moved sites.
+- `op_argument_proof.py`: 150/150 on Release (4883), 145/145 on Distribution (4884).
+- `v3_tools.py` (4872): `7 pass, 0 fail, 0 skip of 7`, digest `05e15829…dcb8c49`.
+- Screen-file mutants M1–M5 re-run on the per-look runner, each named failure as before: M1
+  fails 12 (`not a menu leaf`), 13 passes; M2 fails 06 (`front block: not JSON — Expecting ','
+  delimiter: line 4 column 3`), 05 passes; M3 fails 04 before any step, exit 1; M4 fails 02 as
+  `light: expect: no visible view reads 'An API key is set.' in window (light); dark: …`, no
+  `02-*` file left; M5 fails 13 `left a sheet attached: NSWindow`, 14 passes.
+- `grep "Reelcut: "` printed nothing on every launch. `pgrep -f "MacOS/Reelcut"` read `18677
+  20832` after the first look measurement and nothing after the second; no script here
+  signals any pid but its own child's, so the person's two instances closed in between.
+
+**Deviations from this road map's V3 text and the V3 spec.**
+- After the review: the look is chosen at LAUNCH (`-RCDevAppearance`, dev only), not through
+  `snapshot_ui`'s `appearance`, which is now refused (spec §7.9). `screens.py` therefore runs
+  each look on its own instance and scores 21 rows, not 19: `P1` and `P3` per look, and each
+  screen after both looks, `P2` printed first.
+- An app change was made (the road map hoped for none): `select_inspector_tab` and the
+  `recorder` window kind, at the orchestrator's direction.
+- T2 and T3 read ROW labels, not section titles: `Frame rate` for Document, `Reversed frames`
+  for Timing, and `Position X` as the Transform row that must be gone. The spec named `Frame
+  Rate`, `Timing` and `Transform`. A section's title is drawn by
+  `InspectorSectionHeader.draw` (`InspectorSectionHeader.swift:139`), so no layout dump holds
+  it. 09 and 10 `expect` `Gain` and `Reversed frames` for the same reason.
+- T4's windowless-document refusal is named but not exercised: no tool makes a document
+  without a window (V2a's C4 said the same).
+- P3 is read just before the instance is stopped (`screens.py` `Run.row_p3`). Screen 16
+  stops the child, so "at the end" means right after the last screen's captures.
+- The fixtures' `save_project` differs by fixture (`screens.py` `build_fixture`):
+  - Empty is saved to its own path. A plain save of a package no op has dirtied was refused
+    as "changed by another application", because the app writes `cache/` into the package at
+    open.
+  - Demo is saved plainly. A save of it to its own path was refused as "locked".
+- `PINS` passes numbers as plist fragments (`<real>304</real>`, `<integer>1</integer>`) as
+  well as booleans, so each reads typed. Measured with a scratch reader: bare `304` reads as a
+  string.
+- The demo's content, which the spec left open:
+  - The text clip reads "Reelcut". The shape is an ellipse. Both are 5 s.
+  - The graphic module is named `lower-third`.
+  - Screens 04–10 put the playhead at 1 500 000 ticks (2.5 s).
+- The Video track sits below the timeline's visible 300 pt in every editor capture, so the
+  prose describes the four tracks in view. The pins are the harness's, so the track height was
+  not changed to fit it.
+- `select_inspector_tab`'s refusals carry a clause after the spec's quoted words, and its
+  window guard also requires the inspector's view to be loaded.
+
+**Review.** litecode, full route. The adversary raised four objections and the final design
+took each: the tab tool, the Clip sub-tab's pin, `RC_ASSEMBLYAI_KEY` in `NOT_SHOWN`, and the
+recorder panel captured under containment. The implementation review found one blocker and two
+should-fixes. (1) Every light capture came through `snapshot_ui`'s live `appearance` switch,
+which a Release instance launched with `-NSRequiresAquaSystemAppearance YES` showed unfaithful:
+the switched light editor differed from it at 389 266 of 1 117 376 px (the inspector 163 654 of
+163 856, the preview surround 126 294, the timeline 99 050, the toolbar 268), and Welcome kept a
+dark ground. (2) The prose's light paragraphs described that artefact. (3) The Owed entry
+blamed the app, and V1's Q3 claimed more than its dark-process reference measured. Fix pass 1:
+the dev default and the refusal above, `screens.py` per look, every light paragraph rewritten,
+Q3 qualified, and this record. The timeline's share of the review's count is at least partly
+the difference measured above between an `NSApp.appearance` launch and a forced-aqua one (the
+lanes and the scroller), which the fix does not remove. The re-review passed with two nits in `screens.py`, and the
+orchestrator applied both by hand:
+- `validate` refuses `after` steps on the New Recording… screen, whose instance is stopped
+  straight after its captures.
+- A capture that raises on the recorder screen now stops the instance at once, not at
+  `finish()`.
+One run after those edits printed 21 pass, 0 fail, 0 skip, with the fix pass's digest
+(`6751536a…`), and the recorder panel was up 66 ms (light) and 61 ms (dark).
+- The new layout problems the runs printed: 48 distinct, each in both looks, before the
+  review; after it, per run 102–104, the same kinds plus the 17 pt `NSStackView` in 06 and 10
+  (above). None was fixed (out of scope), and none is filed yet.
+  - A 2 pt `outside_superview` on labels. Hit: Welcome's wordmark and file-type row;
+    Settings' heading, labels, status and paragraph; the Document tab's five DOCUMENT row
+    labels; the Export, Speed, Remove Silences and Generate Captions sheets' titles,
+    paragraphs, summaries and footnotes; and the recorder panel's paragraph and footnote.
+  - `ambiguous` `NSStackView`s: two on Welcome, two on Settings.
+  - On the Generate Captions sheet, `captions go on a new front track` is ambiguous,
+    outside its superview and truncated (191 pt for 192), and the stack holding Cancel and
+    Generate is ambiguous. Its last letter is visibly clipped.
+- The dark-labels-on-dark light captures were `snapshot_ui`'s live switch, not the app (the
+  review, above); fixed by setting the look at launch. Owed: no capture on a real Light host.
+  On this Dark host, `-RCDevAppearance` differs from a forced-aqua launch only in the
+  timeline's lanes and scroller (97 786 px light, 4 488 px dark), and which of the two a Light
+  host matches is unmeasured. Not filed.
+- Two captures are not byte-identical from run to run: 04 (the tone clip's waveform band races
+  the peaks cache) and 15 (its Cancel/Generate stack is ambiguous). A step that waits for the
+  peaks would settle 04; 15 is an app layout defect. Neither filed.
+- Putting up the New Recording panel activates Reelcut (measured above). That is a hazard
+  for a person typing in another app, because Return is Record. Not filed.
+- `open_project` then `save_project` of a hand-written, unedited package is refused as
+  "changed by another application", and a dirtied one saved to its own path as "locked"
+  (above). Worth a look; not filed.
+- A catalog run on a second machine, and a Media-tab screen. The tool accepts `media`; no
+  screen captures it.
+- (The `CLAUDE.md` lines listed in the implementation and fix notes were applied by hand.)

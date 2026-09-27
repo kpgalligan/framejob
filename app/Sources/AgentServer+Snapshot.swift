@@ -21,7 +21,6 @@ extension AgentServer {
     private struct SnapshotRequest {
         let window: UISnapshot.WindowKind
         let region: UISnapshot.Region?
-        let look: UISnapshot.Look?
         let url: URL
         let fill: Bool
         let layout: Bool
@@ -36,7 +35,10 @@ extension AgentServer {
         let maxWidth: Int
     }
 
-    private static let captureArguments = ["view", "appearance", "path", "fill_preview", "layout"]
+    private static let captureArguments = ["view", "path", "fill_preview", "layout"]
+    private static let appearanceRefusal = "appearance is refused: switched on a live window it "
+        + "left colours built in the launch appearance, a mix the app never draws. Launch the "
+        + "instance with -RCDevAppearance light or -RCDevAppearance dark instead."
 
     func snapshotUI(_ a: [String: Any]) throws -> String {
         guard let request = try snapshotRequest(a) else {
@@ -55,7 +57,7 @@ extension AgentServer {
         }
 
         var staging: UISnapshot.Staging? = onMain {
-            UISnapshot.stage(subject, look: request.look, picture: picture)
+            UISnapshot.stage(subject, picture: picture)
         }
         defer {
             if let left = staging { onMain { UISnapshot.unstage(left) } }
@@ -156,7 +158,7 @@ extension AgentServer {
     private func snapshotRequest(_ a: [String: Any]) throws -> SnapshotRequest? {
         let window = try enumArg(a, "window", UISnapshot.WindowKind.self)
         let region = try enumArg(a, "view", UISnapshot.Region.self)
-        let look = try enumArg(a, "appearance", UISnapshot.Look.self)
+        if a["appearance"] != nil { throw ToolError(message: Self.appearanceRefusal) }
         let path = try stringArg(a, "path")
         let fill = try boolArg(a, "fill_preview") ?? true
         let layout = try boolArg(a, "layout") ?? true
@@ -176,7 +178,7 @@ extension AgentServer {
             }
             return nil
         }
-        if hasProject, window == .settings || window == .welcome {
+        if hasProject, window != .editor, window != .sheet {
             throw ToolError(
                 message: "project cannot name the \(window.rawValue) window: it belongs to no "
                     + "document.")
@@ -187,7 +189,7 @@ extension AgentServer {
                     + "\(window.rawValue).")
         }
         return SnapshotRequest(
-            window: window, region: region, look: look,
+            window: window, region: region,
             url: try snapshotDestination(path, window, region), fill: fill, layout: layout)
     }
 
@@ -238,10 +240,9 @@ extension AgentServer {
     ) throws -> (UISnapshot.Subject, FillContext?) {
         let kind = request.window
         switch kind {
-        case .settings, .welcome:
-            let title = kind == .settings ? "Settings" : "Welcome"
+        case .settings, .welcome, .recorder:
             guard let window = UISnapshot.openWindow(kind), let root = window.contentView else {
-                throw ToolError(message: "The \(title) window is not open.")
+                throw ToolError(message: "The \(kind.title) window is not open.")
             }
             return (
                 UISnapshot.Subject(window: window, root: root, kind: kind, region: nil, editor: nil),
@@ -367,17 +368,17 @@ extension AgentServer {
                     "type": "string",
                     "enum": UISnapshot.WindowKind.allCases.map { $0.rawValue },
                     "description": "What to capture: editor (the project's editor window), "
-                        + "sheet (the sheet attached to it), settings or welcome (when open). "
-                        + "Omit to list the windows instead.",
+                        + "sheet (the sheet attached to it), settings, welcome or recorder (the "
+                        + "New Recording panel), when open. Omit to list the windows instead.",
                 ],
                 "view": [
                     "type": "string", "enum": UISnapshot.Region.allCases.map { $0.rawValue },
                     "description": "Editor only: capture one region, not the whole window.",
                 ],
                 "appearance": [
-                    "type": "string", "enum": UISnapshot.Look.allCases.map { $0.rawValue },
-                    "description": "Set on the live window for the capture and restored after. "
-                        + "Default: the window's own.",
+                    "type": "string",
+                    "description": "Refused, whatever its value: the look is the instance's, "
+                        + "chosen at launch with -RCDevAppearance light or dark.",
                 ],
                 "path": [
                     "type": "string",

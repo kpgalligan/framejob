@@ -5818,7 +5818,11 @@ The 29 rows:
   - F3: the fill removed. It compares against the run's first capture,
     taken before any fill.
   - F4: `no_frame`.
-- **A**: appearance switched and restored.
+- **A**: `appearance` refused, whatever its value, naming `-RCDevAppearance`
+  (since V3: a live switch left build-time colours in the launch look). A1: both
+  looks refused and no file written; A2: the captures before and after the
+  refusals byte-identical. Mutant (V3): the refusal line removed fails A1 and
+  C4 (its two `appearance` cases) and nothing else of T, C, A.
 - **L**: the layout dump.
   - **L2 compares `problems` to `KNOWN`**, the filed defects listed as data
     in the script (#129 today). It fails on a problem not listed AND on a
@@ -5907,3 +5911,175 @@ window-list item` when AppKit put no window in the Window menu.
 ```sh
 python3 tools/proof/v2_menu.py <port> [--log PATH] [--only T,H,N,D,U,R,S]
 ```
+
+## Road map 11's V3 — the screen catalog (`screens.py`)
+
+The catalog's runner, over `mcp.py`, dependency-free. It walks every screen
+file in `designs/screens/` (the format is that folder's `README.md`), drives
+its OWN Release instance into each screen over MCP and the dev tools, captures
+it light and dark through `snapshot_ui`, and writes `screens.md` — each
+picture beside its prose and its layout problems — ready to attach to a design
+request.
+
+```sh
+python3 tools/proof/screens.py [--port 4871] [--app build/Build/Products/Release/Reelcut.app] \
+    [--screens designs/screens] [--out tools/proof/work/screens/<YYYY-MM-DD-HHMMSS>] \
+    [--only ID,…] [--compare EARLIER_OUT]
+```
+
+**The launch** (`screens.launch`, which `v3_tools.py` shares): the app's
+binary with `-ApplePersistenceIgnoreState YES -AgentServerEnabled YES
+-RCSecretFolder <out>/../secrets -RCAssemblyAIEndpoint http://127.0.0.1:9
+-NSRecentDocumentsLimit 0` and every `PINS` pair; the environment without
+`RC_ASSEMBLYAI_KEY` and with `RC_AGENT_PORT`; stdin closed, stdout and stderr
+to `<out>/app.<look>.log` (`app.log` without a look), its own session; the port
+read from the log's `listening on` line. `stop()` terminates that pid and kills
+it after 10 s; nothing else is ever signalled.
+
+**One instance per look.** The walk runs twice, each time on a fresh instance:
+first launched with `-RCDevAppearance light`, then with `-RCDevAppearance
+dark` — a dev-only launch default (`DevAppearance.swift`) that sets
+`NSApp.appearance` before any window is built. `snapshot_ui` is never asked for
+an `appearance` (it refuses one): switching a live window left the colours its
+views took when they were built in the launch look, so each "light" capture was
+a mix the app never draws. Every capture must answer the look its instance was
+launched in, or the screen fails. Measured on this (Dark) host, 2026-09-27,
+Welcome, the Demo editor, its inspector with the video selected and Settings,
+each launch capturing with no `appearance`: `-RCDevAppearance dark` gives all
+four byte-identical to a plain launch; `-RCDevAppearance light` gives Welcome,
+the inspector and Settings byte-identical to a launch with
+`-NSRequiresAquaSystemAppearance YES` (the one launch argument that makes this
+process's system look light), and the editor different only in the timeline —
+97 786 px, the grey alternate lanes one level apart (140 against 139) and the
+vertical scroller's track (233 against 255). On that forced-light system,
+`-RCDevAppearance dark` still answers dark, with Welcome, the inspector and
+Settings byte-identical to the plain dark launch and the editor different only
+in the 17 pt scroller column (4 488 px). `-AppleInterfaceStyle Light` or `Dark`
+as a launch argument changes nothing, so no Apple argument gives a dark app on
+a light system. A real Light host was not available (the machine's setting was
+not changed).
+
+**The pins.** `PINS` is the offscreen harness's `pinDefaults`
+(`harness/main.swift:289-390`) minus `AgentServerEnabled`, as launch arguments
+(booleans and numbers as plist fragments, `<false/>`, `<real>304</real>`), plus
+`ReelcutInspectorSection.<id>` for every section id in `app/Sources`
+(`SECTIONS`), each pinned to its FIRST-RUN state: collapsed unless
+`defaultExpanded`, except `audio.volume` and `clip.timing`, which
+`ClipPane.makeSections()`'s `expandByDefault` walk opens on the Sound and Clip
+sub-tabs and which any pin would stop — so those two are pinned open, and
+screens 09 and 10 `expect` a row inside each. Nothing is ever written with
+`defaults`. P2 holds the pins to the tree: the section ids in `app/Sources` are
+exactly `SECTIONS`'s, and every `static let …Key = "Reelcut…"/"RC…"` literal is
+pinned or in `NOT_SHOWN` (with why no captured screen draws it), and every
+`NOT_SHOWN` key is such a literal.
+
+**The key.** The Settings capture cannot show an AssemblyAI key: the secret
+folder is rebuilt EMPTY before launch (the run refuses to start if it is not
+empty after), `RC_ASSEMBLYAI_KEY` is stripped from the child's environment, the
+Settings field is never filled from the store (`SettingsWindowController.swift`),
+`snapshot_ui` never writes a secure field's text, and screen 02 `expect`s
+`No API key is set.` — if it is not visible, the screen fails and its files
+are deleted. The script never reads a key file.
+
+**No recording, transcription, export or network.** Steps come only from
+`STEP_TOOLS`; a menu item must be a leaf the dev tool classifies `sheet` or
+`window`; no sheet button is pressed except through `cancel_sheet`; the engine
+is pinned `apple` and the AssemblyAI endpoint is a dead loopback port.
+
+**The recorder hazard.** File ▸ New Recording… puts up a non-activating panel
+(`RecorderPanelController.swift:204`) that `show()` makes key (`:325`), whose
+default button is Record (`Sheets.swift:86`) — and Record asks for the Screen
+Recording and microphone grants. Showing it asks and records nothing. So the
+path is allowed only in the run's LAST screen (16), the captures follow the
+perform at once, the instance is stopped straight after them, and the run
+prints `recorder panel up (<look>): <ms> ms` (the perform's answer to the
+child's exit) and each capture's `key` and `active`. The panel goes up once per
+instance, so twice a run. Measured: 134–140 ms over four runs with both looks
+from one instance, then 62–70 ms per instance with one capture each; the panel
+was key with Reelcut ACTIVE — putting it up brings Reelcut to the front. **Keep
+your hands off the keyboard while the last screen of each look runs.**
+
+**Unpinnable inputs.** The recorder's Source row names the host's display and
+its size note is that display's size (`RecorderPanelController+Rows.swift`);
+the Export sheet's presets come from the person's `ExportPresets.json`; the
+Generate Captions sheet's language list is the installed speech models; the
+window lands on whichever screen AppKit picks, at its scale and colour profile.
+Two runs on one machine are byte-identical but for the captures named below; two
+machines need not be.
+
+**Rows**, one line each as `<ID> <pass|fail|skip> — <reason>`: `P2` the pins;
+`P1.light` and `P1.dark` each launch (child alive, port bound, Welcome up,
+`grep "Reelcut: "` empty, the dev tools in `tools/list`, the marker count);
+`P3.light` and `P3.dark` each instance's end (child alive and the log clean,
+read just before the child is stopped); one row per screen, scored after both
+looks — a pass needs both, and each look first prints an indented progress line
+`  <id> <look>: <state> — <reason>`. 21 rows for the 16 screens.
+Then `new problems:` with each, `recorder panel up (<look>):`, `scores:`, `digest:`
+(sha256 of the sorted `ID=state` lines) and `out:`; with `--compare`, every PNG
+against the same name in the earlier run — `same`, `differs: N px in [x0,y0,x1,y1]`,
+`size differs` or `only in one run` — and `compare: S/N byte-identical`, not
+scored. Exit 0 iff no row failed. A screen fails on a front-block problem
+(`front block: …`, before any step), a missing fixture medium (naming this
+README's "Running one" recipe), a tool error, a failed `expect` (its files
+deleted), or a sheet left attached (closed with `cancel_sheet`; one that will
+not close fails every later screen). Layout problems are classified against
+`KNOWN` (#129, #70) and new ones are reported, never scored.
+
+**Outputs** in `<out>`: `<id>.<capture>.<light|dark>.png` and `.layout.json`,
+`screens.md`, `results.json` (the rows and, per capture, its PNG's sha256, scale,
+points, pixels, window facts and known/new problems), and `app.light.log` and
+`app.dark.log`. The fixtures are rebuilt by each instance under
+`work/screens/fixtures/`.
+
+**What is not byte-identical across runs** (2026-09-27, two runs, `compare:
+45/48`): 04's two captures differ by 832 px in the Music clip — its waveform
+band, drawn once the tone's peaks are cached, which one run's 04 caught and the
+other's did not; and 15's light sheet by 1 546 px around Cancel and Generate —
+the ambiguous stack under them settles differently from one launch to the next
+(its note is 191 pt and truncated in one process, 196 pt in another).
+
+**Mutants** (2026-09-27), each a copy of `designs/screens/` in a scratch folder
+passed as `--screens`: File ▸ "Exprot…" in 12 fails 12 as not a menu leaf and
+13 passes; 06's front block missing a comma fails 06 as `front block: not JSON`;
+an `export` step in 04 fails 04 as `front block:` before any step runs (exit 1);
+02's `visible_text` changed fails 02 and leaves no `02-*` file; 13 without its
+`after` fails 13 with `left a sheet attached: NSWindow` and 14 still passes.
+
+## Road map 11's V3 — the tab tool and the recorder window (`v3_tools.py`)
+
+The proof of V3's two app additions: the dev tool `select_inspector_tab` and
+`snapshot_ui`'s `recorder` window. It launches its own instance through
+`screens.launch` (the same pins) and builds `screens.py`'s `demo` fixture.
+
+```sh
+python3 tools/proof/v3_tools.py [--port 4872] [--app APP] [--only L,T,R]   # → 7/7
+```
+
+- **L1**: as `screens.py`'s P1, plus the four dev tools in `dev_tools.py`'s
+  order immediately before `import_media`, and `select_inspector_tab`'s
+  properties exactly `{tab, sub_tab, project}`, none required, no `scope`.
+- **T1**: with the video clip selected, `{}` answers `clip` / `picture` /
+  `[picture, sound, clip]`, and inspector captures before and after it are
+  byte-identical. **T2**: `{tab: document}` answers `document` / null, and its
+  dump shows `Frame rate` and no `Position X`. **T3**: `{tab: clip}` answers
+  `picture`; `{tab: clip, sub_tab: clip}` answers `clip` and its dump shows
+  `Reversed frames` and no `Position X`; after `set_selection [text]`, `{}`
+  answers `text`. **T4**: each refusal by its words, and `{}` after each
+  answers what it did before; the missing sub-tab is `sound` on the text clip
+  from the Document tab. A section's title is drawn, not a text field, so the
+  dumps are read for row labels. The windowless-document refusal is not
+  reachable over MCP.
+- **R1**: before New Recording…, `snapshot_ui {window: recorder}` is refused
+  `not open`, no `recorder` row is listed, and the menu listing has
+  `["File", "New Recording…"]` with verdict `window`. **R2, the LAST row**: it
+  is performed; `windows_opened` holds one `recorder` row; the capture's pixels
+  are its points × scale; `project` and `view` with it are refused by name; the
+  item is still titled `New Recording…`; the panel's `key` and `active` are
+  printed; the instance is stopped and `recorder panel up` printed (56–60 ms).
+
+**Mutants** (2026-09-27), each built with `make app`, run, restored and
+`cmp`-checked: `selectInspectorTab` calling `ClipPane.choose(_:)` instead of
+`selectClipSubTab(_:)` fails T3 alone (the answer says `clip`, the dump still
+shows Picture's rows); `UISnapshot.openWindow(.recorder)` answering
+`RecorderPanelController.shared.window` fails R1 alone (the capture is taken
+instead of refused).

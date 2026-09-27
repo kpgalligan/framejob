@@ -63,16 +63,21 @@ extension AgentServer {
         // AgentServer+MenuItem.swift
         "perform_menu_item": { $0.performMenuItem },
         "cancel_sheet": { $0.cancelSheet },
+        // AgentServer+InspectorTab.swift
+        "select_inspector_tab": { $0.selectInspectorTab },
     ]
 
     static let devOffMainTools: Set<String> = ["snapshot_ui", "perform_menu_item", "cancel_sheet"]
 
     /// The dev tools' catalog rows, in catalog order: `snapshot_ui` (V2a),
-    /// `perform_menu_item` and `cancel_sheet` (V2b). The log is what keeps
+    /// `perform_menu_item` and `cancel_sheet` (V2b), `select_inspector_tab`
+    /// (V3). The log is what keeps
     /// `devToolsMarker` in the optimised binary; it never says `Reelcut: `,
     /// the prefix a proof reads as the parity check complaining.
     func devTools() -> [[String: Any]] {
-        let rows: [[String: Any]] = [snapshotUITool(), performMenuItemTool(), cancelSheetTool()]
+        let rows: [[String: Any]] = [
+            snapshotUITool(), performMenuItemTool(), cancelSheetTool(), selectInspectorTabTool(),
+        ]
         NSLog("Reelcut agent server: %@, %ld dev tools", Self.devToolsMarker, rows.count)
         return rows
     }

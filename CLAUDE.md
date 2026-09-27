@@ -40,6 +40,7 @@ comment citing "road map N §x" refers to the archived original.
 | `designs/design_handoff_reelcut/` | The shipped chrome cleanup and identity; its README is normative for the redesign's metrics. |
 | `designs/design_handoff_reelcut_sharp/` | The sharp pass (2026-09-23): square chrome, 2 pt clips, the zoom slider's block knob. Its README is normative for radii and the knob, with spec §11 SH-1 and SH-2 as the deviations. |
 | `designs/design_handoff_clip_inspector/` | The clip inspector handoff road map 9 built from; `designs/adr/roadmap-09-clip-inspector.md` records the deviations. |
+| `designs/screens/` | The screen catalog (road map 11's V3). One file per screen: a JSON front block (the fixture, the MCP steps that reach it, the captures) and prose for a designer. `tools/proof/screens.py` captures them light and dark into `tools/proof/work/screens/<date>/screens.md`; its `README.md` has the format and how to add a screen. |
 | `tools/proof/README.md` | The proof scripts, the MCP client and the offscreen harness. |
 | `README.md` | User-facing. |
 
@@ -258,10 +259,18 @@ line, the argument list and the pinned `UserDefaults`.
 
 To look at the LIVE app, a Release build (the one `make app` builds, never
 Distribution) has dev tools over MCP (road map 11, spec §11 V-1).
-`snapshot_ui` captures the editor, a sheet, Settings or Welcome, with a
+`snapshot_ui` captures the editor, a sheet, Settings, Welcome or the recorder panel, with a
 layout dump. `perform_menu_item` runs a menu item by path to put a sheet or
-Settings up, and `cancel_sheet` closes the sheet. All three work with the
-app inactive and its window covered.
+Settings up, `cancel_sheet` closes the sheet, and `select_inspector_tab`
+picks an inspector tab and sub-tab. All four work with the
+app inactive and its window covered. A capture's look is set at launch with
+the dev-only `-RCDevAppearance light|dark`, never switched live. To see every
+catalogued screen at once, `python3 tools/proof/screens.py` walks
+`designs/screens/`, once per look, each time on its own pinned instance. It
+writes each screen's PNGs and layout dumps and one `screens.md` with the
+prose and each capture's layout problems. The last screen is the recorder
+panel, which brings Reelcut to the front with Record on Return, so the
+script stops each instance straight after capturing it.
 
 Two rules from it worth carrying into any proof: **identical, stable,
 DIFFERENT output across processes is an Auto Layout ambiguity to find, not a

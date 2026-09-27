@@ -543,13 +543,13 @@ def rows_c(mcp):
     missing = os.path.join(WORK, "no", "such", "folder", "x.png")
     cases = [
         ({"view": "toolbar"}, ["view", "window"]),
-        ({"appearance": "dark"}, ["appearance", "window"]),
+        ({"appearance": "dark"}, ["appearance", "-RCDevAppearance"]),
         ({"path": os.path.join(PNG, "x.png")}, ["path", "window"]),
         ({"fill_preview": False}, ["fill_preview", "window"]),
         ({"layout": False}, ["layout", "window"]),
         ({"window": "nope"}, ["window", "editor, sheet, settings, welcome"]),
         ({"window": "editor", "view": "nope"}, ["view", "toolbar, preview, inspector, timeline"]),
-        ({"window": "editor", "appearance": "sepia"}, ["appearance", "light, dark"]),
+        ({"window": "editor", "appearance": "sepia"}, ["appearance", "-RCDevAppearance"]),
         ({"project": WELL}, ["project"]),
         ({"window": "settings", "project": WELL}, ["project", "settings"]),
         ({"window": "welcome", "project": WELL}, ["project", "welcome"]),
@@ -725,25 +725,28 @@ def row_f4(mcp):
 
 
 def rows_a(mcp):
+    """`appearance` is refused, whatever its value (V3): a live switch left
+    build-time colours in the launch appearance, so the look is the
+    instance's, set at launch with `-RCDevAppearance`."""
     before = shot(mcp, "a_before", window="editor", project=WELL)
-    dark = shot(mcp, "a_dark", window="editor", project=WELL, appearance="dark")
-    light = shot(mcp, "a_light", window="editor", project=WELL, appearance="light")
+    notes, ok = [], True
+    for look in ("dark", "light"):
+        path = os.path.join(PNG, f"a_{look}.png")
+        text = refused(mcp, {"window": "editor", "project": WELL, "appearance": look,
+                             "path": path})
+        wrote = os.path.exists(path)
+        ok = ok and text is not None and "-RCDevAppearance" in text and not wrote
+        notes.append(f"{look}: refused {text is not None}, names -RCDevAppearance "
+                     f"{text is not None and '-RCDevAppearance' in text}, file written {wrote}")
+    score("A1", "pass" if ok else "fail", "; ".join(notes))
     after = shot(mcp, "a_after", window="editor", project=WELL)
-    differ = facts_differ(dark, light)
-    if differ:
-        score("A1", "skip", differ)
-    else:
-        ok = (not same_bytes(dark, light) and dark["appearance"] == "dark"
-              and light["appearance"] == "light")
-        score("A1", "pass" if ok else "fail",
-              f"dark vs light byte-identical {same_bytes(dark, light)}; reported "
-              f"{dark['appearance']}, {light['appearance']}")
     differ = facts_differ(before, after)
     if differ:
         score("A2", "skip", differ)
     else:
-        score("A2", "pass" if same_bytes(before, after) else "fail",
-              f"no appearance after both byte-identical to before: {same_bytes(before, after)} "
+        ok = same_bytes(before, after) and before["appearance"] == after["appearance"]
+        score("A2", "pass" if ok else "fail",
+              f"captures before and after the refusals byte-identical: {same_bytes(before, after)} "
               f"(appearance {before['appearance']} → {after['appearance']})")
 
 

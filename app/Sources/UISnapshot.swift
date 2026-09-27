@@ -12,18 +12,27 @@ import AppKit
 ///
 /// **Staging is undone on every exit.** The fill is an `NSImageView` put
 /// just above `playerHost` — under `safeGuides` and `overlay`, V1's W4a — so
-/// the handles land on the picture as they do on screen, and an appearance
-/// is set on the live window (V1's Q3). Both come out again in `unstage`,
-/// which the handler calls from a `defer`: left in, the next capture differs
-/// (V1's W6).
+/// the handles land on the picture as they do on screen. It comes out again
+/// in `unstage`, which the handler calls from a `defer`: left in, the next
+/// capture differs (V1's W6). No appearance is staged: a live switch left
+/// build-time colours in the launch appearance (V3), so the look is the
+/// instance's, chosen at launch (`DevAppearance`).
 enum UISnapshot {
-    enum WindowKind: String, CaseIterable { case editor, sheet, settings, welcome }
-    enum Region: String, CaseIterable { case toolbar, preview, inspector, timeline }
-    enum Look: String, CaseIterable {
-        case light, dark
+    enum WindowKind: String, CaseIterable {
+        case editor, sheet, settings, welcome, recorder
 
-        var name: NSAppearance.Name { self == .light ? .aqua : .darkAqua }
+        /// The window's name in a refusal.
+        var title: String {
+            switch self {
+            case .editor: return "editor"
+            case .sheet: return "sheet"
+            case .settings: return "Settings"
+            case .welcome: return "Welcome"
+            case .recorder: return "New Recording"
+            }
+        }
     }
+    enum Region: String, CaseIterable { case toolbar, preview, inspector, timeline }
 
     /// What one capture is of: the window, the view drawn into the PNG, and
     /// the editor behind it when there is one (the fill and the regions).
@@ -45,7 +54,6 @@ enum UISnapshot {
     /// What `stage` changed, so `unstage` can put it back.
     struct Staging {
         let window: NSWindow
-        let savedAppearance: NSAppearance?
         let fill: NSImageView?
     }
 
@@ -56,15 +64,17 @@ enum UISnapshot {
 
     // MARK: - Resolution
 
-    /// The open Settings or Welcome window, found among `NSApp.windows` by its
-    /// controller's class. Never `.shared`: touching either singleton BUILDS
-    /// its window, and a capture must not open what it was asked to look at.
+    /// The open Settings, Welcome or New Recording window, found among
+    /// `NSApp.windows` by its controller's class. Never `.shared`: touching
+    /// any of those singletons BUILDS its window, and a capture must not open
+    /// what it was asked to look at.
     static func openWindow(_ kind: WindowKind) -> NSWindow? {
         NSApp.windows.first { window in
             guard window.isVisible else { return false }
             switch kind {
             case .settings: return window.windowController is SettingsWindowController
             case .welcome: return window.windowController is WelcomeWindowController
+            case .recorder: return window.windowController is RecorderPanelController
             case .editor, .sheet: return false
             }
         }
@@ -132,6 +142,7 @@ enum UISnapshot {
         if window.sheetParent != nil { return "sheet" }
         if window.windowController is SettingsWindowController { return "settings" }
         if window.windowController is WelcomeWindowController { return "welcome" }
+        if window.windowController is RecorderPanelController { return "recorder" }
         if window is NSPanel { return "panel" }
         return "other"
     }
@@ -172,13 +183,9 @@ enum UISnapshot {
 
     // MARK: - Staging
 
-    /// Sets the asked appearance on the live window and, with a picture, puts
-    /// it under the canvas overlay at `playerHost`'s frame (V1's W4a).
-    static func stage(_ subject: Subject, look: Look?, picture: CGImage?) -> Staging {
-        let saved = subject.window.appearance
-        if let look {
-            subject.window.appearance = NSAppearance(named: look.name)
-        }
+    /// With a picture, puts it under the canvas overlay at `playerHost`'s
+    /// frame (V1's W4a).
+    static func stage(_ subject: Subject, picture: CGImage?) -> Staging {
         var fill: NSImageView?
         if let picture, let canvas = subject.editor?.previewCanvas {
             let host = canvas.playerHost
@@ -190,15 +197,12 @@ enum UISnapshot {
             canvas.addSubview(view, positioned: .above, relativeTo: host)
             fill = view
         }
-        return Staging(window: subject.window, savedAppearance: saved, fill: fill)
+        return Staging(window: subject.window, fill: fill)
     }
 
-    /// Takes the fill out and restores the window's own appearance.
+    /// Takes the fill out.
     static func unstage(_ staging: Staging) {
         staging.fill?.removeFromSuperview()
-        if staging.window.appearance !== staging.savedAppearance {
-            staging.window.appearance = staging.savedAppearance
-        }
     }
 
     // MARK: - Capture

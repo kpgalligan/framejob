@@ -1090,8 +1090,8 @@ free.
   Release's binary and absent from Distribution's; a tool NAME cannot be the
   marker, because an `-O` binary stores a literal of 15 bytes or fewer
   inline. Its tables hold
-  `snapshot_ui` (V2a), `perform_menu_item` and `cancel_sheet` (V2b); a dev
-  tool is counted apart from the product tools (`tools/proof/dev_tools.py`).
+  `snapshot_ui` (V2a), `perform_menu_item` and `cancel_sheet` (V2b), and
+  `select_inspector_tab` (V3); a dev tool is counted apart from the product tools (`tools/proof/dev_tools.py`).
 - `AgentServer+MenuItem.swift` — `perform_menu_item` and `cancel_sheet`
   (road map 11's V2b, dev only, wholly under the flag). It runs a main-menu
   item by path in a NAMED project window's own responder chain, never
@@ -1117,19 +1117,34 @@ free.
   window, the visible window numbers) and the Cancel: a file panel is ended
   with `.cancel`, otherwise the Escape button is pressed, otherwise a lone
   button.
+- `AgentServer+InspectorTab.swift` — `select_inspector_tab` (road map 11's
+  V3, dev only, wholly under the flag). It picks the inspector's tab and the
+  Clip tab's sub-tab through `InspectorViewController.select(_:)` and
+  `selectClipSubTab(_:)`, the strips' own click paths, so a `snapshot_ui`
+  capture is what a click shows. It runs on MAIN, not in `devOffMainTools`.
+  With no tab it changes nothing, and answers the tab, the active sub-tab
+  and the sub-tabs on offer. Every refusal leaves the inspector as it was.
+- `DevAppearance.swift` — `-RCDevAppearance light|dark`, a dev-only launch
+  default (road map 11's V3). It sets `NSApp.appearance` from `main.swift`
+  before `NSApplicationMain`, so every view is built in that look. A live
+  switch leaves colours taken at build time in the launch look, which is why
+  `snapshot_ui` refuses `appearance` and names this default instead. It is
+  not in `AppDelegate.swift`, because a line added there moves the `runModal`
+  sites that `inventory.json` pins by line.
 - `AgentServer+Snapshot.swift` — `snapshot_ui` (road map 11's V2a, dev only,
   wholly under the flag). It lists the windows, or captures the editor (whole
-  or a region), an attached sheet, Settings or Welcome through `cacheDisplay`:
+  or a region), an attached sheet, Settings, Welcome or the recorder panel through `cacheDisplay`:
   an image block plus JSON and a PNG, with a `<name>.layout.json` beside it.
   It runs OFF main (`devOffMainTools`): the fill renders through
   `Exporter.renderFrameReported`, the settle sleeps between passes, and every
   AppKit touch is an `onMain` hop. A `defer` unstages on every exit. It works
   with the app inactive and its window occluded (measured, V2a's O rows).
+  `appearance` is refused, naming `-RCDevAppearance`.
 - `UISnapshot.swift` — `snapshot_ui`'s main-thread half. It resolves the
-  window (Settings and Welcome found in `NSApp.windows` by controller class,
-  never `.shared`) and the regions (the root's `BarView` and the three pane
-  containers), holds the window facts and the listing, and stages: the
-  appearance on the live window, and the fill as an `NSImageView` just above
+  window (Settings, Welcome and the recorder panel found in `NSApp.windows`
+  by controller class, never `.shared`, which would build them) and the regions (the root's `BarView` and the three pane
+  containers), holds the window facts and the listing, and stages the fill
+  as an `NSImageView` just above
   `playerHost`, under `safeGuides` and `overlay` (V1's W4a). It also runs one
   `cacheDisplay` pass. `kind(of:)` and `row(_:)` are internal, not private,
   because the menu tool's result rows use them.
