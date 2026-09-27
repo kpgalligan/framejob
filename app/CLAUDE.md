@@ -1081,6 +1081,15 @@ free.
   (`import_media`, `transcribe`, `record_screen`, `export`,
   `render_graphic`, …); the criterion
   is "waits on main", not "touches the disk".
+- `AgentServer+DevTools.swift` — the dev tools' seam (road map 11, spec
+  §11 V-1/V-2): the handler table, catalog rows and off-main set compiled
+  only under `REELCUT_DEV_TOOLS`, which Debug and Release set and
+  Distribution does not. The frozen file merges them (`withDevHandlers`, a
+  union) and `catalogJSON()` splices the rows in BEFORE the file tools. It
+  holds `devToolsMarker`, the string `tools/proof/dist_check.py` requires in
+  Release's binary and absent from Distribution's; a tool NAME cannot be the
+  marker, because an `-O` binary stores a literal of 15 bytes or fewer
+  inline.
 - `AgentServer+Arguments.swift` — the shared argument vocabulary
   (`intArg`, `timeArg`, `rangesArg`, `rawPatchArg`, …), each refusing a
   value it cannot read BY NAME, and ONLY what the core cannot know: target

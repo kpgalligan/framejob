@@ -1,0 +1,1091 @@
+{
+ "baseline": "38cb86047bebd44830680ec16f592a3f01c4a929",
+ "selectors": {
+  "showAboutPanel:": {
+   "verdict": "window",
+   "code": [
+    "app/Sources/AppDelegate.swift:179"
+   ],
+   "note": "orderFrontStandardAboutPanel — a non-modal panel"
+  },
+  "showSettings:": {
+   "verdict": "window",
+   "code": [
+    "app/Sources/SettingsWindowController.swift:450"
+   ],
+   "note": "SettingsWindowController.shared.show()"
+  },
+  "hide:": {
+   "verdict": "framework",
+   "code": [
+    "app/Sources/AppDelegate+Menus.swift:101"
+   ],
+   "note": "NSApplication.hide(_:) — hides every window"
+  },
+  "hideOtherApplications:": {
+   "verdict": "framework",
+   "code": [
+    "app/Sources/AppDelegate+Menus.swift:104"
+   ],
+   "note": "NSApplication — acts on other apps"
+  },
+  "unhideAllApplications:": {
+   "verdict": "framework",
+   "code": [
+    "app/Sources/AppDelegate+Menus.swift:106"
+   ],
+   "note": "NSApplication"
+  },
+  "terminate:": {
+   "verdict": "framework",
+   "code": [
+    "app/Sources/AppDelegate+Menus.swift:108"
+   ],
+   "note": "NSApplication.terminate(_:): AppKit's document review, then applicationShouldTerminate — whose runModal (AppDelegate.swift:121) runs only when the export queue is busy; quits the app otherwise"
+  },
+  "newProject:": {
+   "verdict": "window",
+   "code": [
+    "app/Sources/AppDelegate.swift:166"
+   ],
+   "note": "openUntitledDocumentAndDisplay — a new editor window; on failure NSApp.presentError (AppDelegate.swift:170), an app-modal alert the site grep does not count"
+  },
+  "newRecording:": {
+   "verdict": "window",
+   "code": [
+    "app/Sources/AppDelegate+Recording.swift:42"
+   ],
+   "note": "the recorder panel (RecorderPanelController.show), or stops a recording"
+  },
+  "openDocument:": {
+   "verdict": "framework",
+   "code": [
+    "app/Sources/AppDelegate+Menus.swift:124"
+   ],
+   "note": "NSDocumentController.openDocument(_:): AppKit's Open panel (app-modal); what opens can then put up the relink or reverse sheet, or the ffmpeg consent alert"
+  },
+  "clearRecentDocuments:": {
+   "verdict": "framework",
+   "code": [
+    "app/Sources/AppDelegate+Menus.swift:130"
+   ],
+   "note": "NSDocumentController — clears the list"
+  },
+  "performClose:": {
+   "verdict": "framework",
+   "code": [
+    "app/Sources/AppDelegate+Menus.swift:136"
+   ],
+   "note": "NSWindow.performClose(_:) — closes the window; an edited document's review is AppKit's sheet"
+  },
+  "saveDocument:": {
+   "verdict": "framework",
+   "code": [
+    "app/Sources/AppDelegate+Menus.swift:137"
+   ],
+   "note": "NSDocument.save(_:) — autosaves in place; an untitled document gets AppKit's save panel sheet"
+  },
+  "saveDocumentAs:": {
+   "verdict": "framework",
+   "code": [
+    "app/Sources/AppDelegate+Menus.swift:138"
+   ],
+   "note": "NSDocument.saveAs(_:) — AppKit's save panel sheet"
+  },
+  "revertDocumentToSaved:": {
+   "verdict": "framework",
+   "code": [
+    "app/Sources/AppDelegate+Menus.swift:139"
+   ],
+   "note": "NSDocument.revertToSaved(_:) — AppKit's confirmation sheet"
+  },
+  "addMediaFiles:": {
+   "verdict": "sheet",
+   "code": [
+    "app/Sources/EditorViewController.swift:644",
+    "app/Sources/EditorViewController.swift:653"
+   ],
+   "note": "NSOpenPanel.beginSheetModal; its completion's importMedia can reach FFmpegRewrap's runModal (reached_after)"
+  },
+  "importCaptions:": {
+   "verdict": "sheet",
+   "code": [
+    "app/Sources/EditorViewController.swift:873",
+    "app/Sources/CaptionImporter.swift:387"
+   ],
+   "note": "NSOpenPanel.beginSheetModal; the completion's alerts are sheets"
+  },
+  "generateCaptions:": {
+   "verdict": "sheet",
+   "code": [
+    "app/Sources/EditorViewController.swift:888",
+    "app/Sources/TranscribeSheetController+Commit.swift:180"
+   ],
+   "note": "presentAsSheet(TranscribeSheetController); beeps with no transcribable clip"
+  },
+  "exportCaptions:": {
+   "verdict": "sheet",
+   "code": [
+    "app/Sources/EditorViewController.swift:889",
+    "app/Sources/CaptionExporter.swift:519"
+   ],
+   "note": "NSSavePanel.beginSheetModal; beeps with no text track"
+  },
+  "consolidateMedia:": {
+   "verdict": "sheet",
+   "code": [
+    "app/Sources/EditorViewController.swift:871",
+    "app/Sources/EditorViewController+Consolidate.swift:37",
+    "app/Sources/EditorViewController+Consolidate.swift:84"
+   ],
+   "note": "an untitled project asks to save first (alert sheet :37), else an alert sheet (:67, :81) or the progress sheet (:84)"
+  },
+  "addGraphicFont:": {
+   "verdict": "sheet",
+   "code": [
+    "app/Sources/EditorViewController+GraphicMenus.swift:52",
+    "app/Sources/EditorViewController+GraphicMenus.swift:152"
+   ],
+   "note": "NSOpenPanel.beginSheetModal (chooseGraphicFile)"
+  },
+  "addGraphicImage:": {
+   "verdict": "sheet",
+   "code": [
+    "app/Sources/EditorViewController+GraphicMenus.swift:63",
+    "app/Sources/EditorViewController+GraphicMenus.swift:152"
+   ],
+   "note": "NSOpenPanel.beginSheetModal (chooseGraphicFile)"
+  },
+  "exportProject:": {
+   "verdict": "sheet",
+   "code": [
+    "app/Sources/EditorViewController.swift:836",
+    "app/Sources/EditorViewController+Export.swift:33"
+   ],
+   "note": "presentAsSheet(ExportSheetController); beeps on an empty timeline. Inside the sheet: Save… (preset) runs a runModal (ExportSheetPresets.swift:289), Export… a save panel sheet"
+  },
+  "saveFrame:": {
+   "verdict": "sheet",
+   "code": [
+    "app/Sources/EditorViewController+SaveFrame.swift:73",
+    "app/Sources/EditorViewController+SaveFrame.swift:130"
+   ],
+   "note": "NSSavePanel.beginSheetModal"
+  },
+  "undo:": {
+   "verdict": "framework",
+   "code": [
+    "app/Sources/AppDelegate+Menus.swift:188"
+   ],
+   "note": "the window's NSUndoManager; an undo that brings back an unrendered reverse puts up the reverse sheet (reached_after)"
+  },
+  "redo:": {
+   "verdict": "framework",
+   "code": [
+    "app/Sources/AppDelegate+Menus.swift:189"
+   ],
+   "note": "as undo:"
+  },
+  "cut:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:849"
+   ],
+   "note": "an edit or the pasteboard"
+  },
+  "copy:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:850"
+   ],
+   "note": "an edit or the pasteboard"
+  },
+  "paste:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:851"
+   ],
+   "note": "an edit; a pasted reversed clip can bring the reverse sheet (reached_after)"
+  },
+  "pasteAttributes:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:852"
+   ],
+   "note": "an edit"
+  },
+  "duplicateClips:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:811"
+   ],
+   "note": "an edit or a selection"
+  },
+  "deleteClips:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:809"
+   ],
+   "note": "an edit or a selection"
+  },
+  "rippleDeleteClips:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:810"
+   ],
+   "note": "an edit or a selection"
+  },
+  "insertMediaAtPlayhead:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:845"
+   ],
+   "note": "an edit or a selection"
+  },
+  "overwriteMediaAtPlayhead:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:846"
+   ],
+   "note": "an edit or a selection"
+  },
+  "selectAllClipsOnTrack:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:847"
+   ],
+   "note": "an edit or a selection"
+  },
+  "selectAll:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:591"
+   ],
+   "note": "a selection"
+  },
+  "selectAfterPlayhead:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:609"
+   ],
+   "note": "a selection"
+  },
+  "insertGraphicTemplate:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+GraphicMenus.swift:26"
+   ],
+   "note": "an edit; a template that fails to compile or place raises an alert SHEET (:169) inside the call"
+  },
+  "insertGraphicFromFile:": {
+   "verdict": "sheet",
+   "code": [
+    "app/Sources/EditorViewController+GraphicMenus.swift:35",
+    "app/Sources/EditorViewController+GraphicMenus.swift:45"
+   ],
+   "note": "NSOpenPanel.beginSheetModal"
+  },
+  "splitAtPlayhead:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:806"
+   ],
+   "note": "an edit"
+  },
+  "trimStartToPlayhead:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:807"
+   ],
+   "note": "an edit"
+  },
+  "trimEndToPlayhead:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:808"
+   ],
+   "note": "an edit"
+  },
+  "freezeFrame:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:812"
+   ],
+   "note": "an edit"
+  },
+  "detachAudio:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:813"
+   ],
+   "note": "an edit"
+  },
+  "addActionAtPlayhead:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:830"
+   ],
+   "note": "an edit"
+  },
+  "closeGapAtPlayhead:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:844"
+   ],
+   "note": "an edit"
+  },
+  "renameClip:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:855"
+   ],
+   "note": "an edit (Rename… starts the timeline's inline field)"
+  },
+  "setClipLabel:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:856"
+   ],
+   "note": "an edit"
+  },
+  "nestClips:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:838"
+   ],
+   "note": "an edit"
+  },
+  "unnestClips:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:839"
+   ],
+   "note": "an edit"
+  },
+  "normalizeClips:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:927"
+   ],
+   "note": "an edit"
+  },
+  "showSpeedSheet:": {
+   "verdict": "sheet",
+   "code": [
+    "app/Sources/EditorViewController.swift:816",
+    "app/Sources/EditorViewController+Export.swift:108"
+   ],
+   "note": "presentAsSheet(SpeedSheetController); a reverse committed there brings the reverse sheet (reached_after)"
+  },
+  "removeSilences:": {
+   "verdict": "sheet",
+   "code": [
+    "app/Sources/EditorViewController.swift:883",
+    "app/Sources/SilenceSheetController.swift:527"
+   ],
+   "note": "presentAsSheet(SilenceSheetController); beeps with no audio"
+  },
+  "setTransitionKind:": {
+   "verdict": "sheet",
+   "code": [
+    "app/Sources/EditorViewController.swift:832",
+    "app/Sources/EditorViewController+Inspector.swift:282"
+   ],
+   "note": "an edit; when there is no spare footage at the cut, an alert SHEET (:282) inside the call"
+  },
+  "setMotionIn:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+Motion.swift:24"
+   ],
+   "note": "an edit"
+  },
+  "setMotionOut:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+Motion.swift:27"
+   ],
+   "note": "an edit"
+  },
+  "setMotionDuring:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+Motion.swift:30"
+   ],
+   "note": "an edit"
+  },
+  "previewClipMotion:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+Motion.swift:35"
+   ],
+   "note": "an edit, or a preview play"
+  },
+  "addSolidColorBackground:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+AddClips.swift:123"
+   ],
+   "note": "an edit"
+  },
+  "addImageBackground:": {
+   "verdict": "sheet",
+   "code": [
+    "app/Sources/EditorViewController+AddClips.swift:147",
+    "app/Sources/EditorViewController+AddClips.swift:163"
+   ],
+   "note": "NSOpenPanel.beginSheetModal (images only, so the probe never asks ffmpeg: MediaImporter.swift:98)"
+  },
+  "addBlurredBackground:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+AddClips.swift:301"
+   ],
+   "note": "an edit"
+  },
+  "openNest:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+NestScope.swift:57"
+   ],
+   "note": "a scope change"
+  },
+  "closeNest:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+NestScope.swift:58"
+   ],
+   "note": "a scope change"
+  },
+  "newTrack:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:817"
+   ],
+   "note": "an edit"
+  },
+  "removeTrack:": {
+   "verdict": "sheet",
+   "code": [
+    "app/Sources/EditorViewController.swift:818",
+    "app/Sources/EditorViewController+Timeline.swift:323"
+   ],
+   "note": "an edit on an empty track; an alert SHEET when the track holds clips"
+  },
+  "removeEmptyTracks:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:819"
+   ],
+   "note": "an edit or a playhead move"
+  },
+  "toggleTrackHidden:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:820"
+   ],
+   "note": "an edit or a playhead move"
+  },
+  "toggleTrackMuted:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:821"
+   ],
+   "note": "an edit or a playhead move"
+  },
+  "toggleTrackLocked:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:822"
+   ],
+   "note": "an edit or a playhead move"
+  },
+  "toggleTrackSolo:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:857"
+   ],
+   "note": "an edit or a playhead move"
+  },
+  "addMarker:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:823"
+   ],
+   "note": "an edit or a playhead move"
+  },
+  "nextMarker:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:826"
+   ],
+   "note": "an edit or a playhead move"
+  },
+  "previousMarker:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:827"
+   ],
+   "note": "an edit or a playhead move"
+  },
+  "setInPoint:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:617"
+   ],
+   "note": "view state"
+  },
+  "setOutPoint:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:625"
+   ],
+   "note": "view state"
+  },
+  "clearInOutRange:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:633"
+   ],
+   "note": "view state"
+  },
+  "zoomIn:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:539"
+   ],
+   "note": "view state"
+  },
+  "zoomOut:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:543"
+   ],
+   "note": "view state"
+  },
+  "zoomToFit:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:547"
+   ],
+   "note": "view state"
+  },
+  "fitTimeline:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:834"
+   ],
+   "note": "view state"
+  },
+  "toggleSnapping:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:573"
+   ],
+   "note": "view state"
+  },
+  "toggleSafeAreas:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:559"
+   ],
+   "note": "view state"
+  },
+  "toggleInspector:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:566"
+   ],
+   "note": "view state"
+  },
+  "setTrackHeight:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController.swift:581"
+   ],
+   "note": "view state"
+  },
+  "setPreviewQuality:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+PreviewQuality.swift:165"
+   ],
+   "note": "view state"
+  },
+  "togglePreviewWindow:": {
+   "verdict": "window",
+   "code": [
+    "app/Sources/PreviewWindowController.swift:380"
+   ],
+   "note": "the preview window, shown or closed"
+  },
+  "toggleAgentServer:": {
+   "verdict": "modal",
+   "code": [
+    "app/Sources/AppDelegate.swift:191",
+    "app/Sources/AppDelegate.swift:212"
+   ],
+   "note": "starting the server can fail, and the failure is NSAlert.runModal (:212) inside the call"
+  },
+  "performMiniaturize:": {
+   "verdict": "framework",
+   "code": [
+    "app/Sources/AppDelegate+Menus.swift:546"
+   ],
+   "note": "NSWindow — minimises the window"
+  },
+  "performZoom:": {
+   "verdict": "framework",
+   "code": [
+    "app/Sources/AppDelegate+Menus.swift:547"
+   ],
+   "note": "NSWindow — zooms the window"
+  },
+  "showExportQueue:": {
+   "verdict": "window",
+   "code": [
+    "app/Sources/AppDelegate.swift:250"
+   ],
+   "note": "ExportQueueWindowController.shared.show()"
+  },
+  "arrangeInFront:": {
+   "verdict": "framework",
+   "code": [
+    "app/Sources/AppDelegate+Menus.swift:551"
+   ],
+   "note": "NSApplication"
+  },
+  "showHelp:": {
+   "verdict": "framework",
+   "code": [
+    "app/Sources/AppDelegate+Menus.swift:557"
+   ],
+   "note": "NSApplication.showHelp(_:) — the app has no help book, so AppKit's own \"Help isn't available\" alert; not run"
+  },
+  "showGraphicsReference:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/AppDelegate+GraphicMenu.swift:45"
+   ],
+   "note": "NSWorkspace.open of the bundled reference — another app's window"
+  }
+ },
+ "sites": {
+  "app/Sources/AppDelegate.swift:121": {
+   "token": "runModal",
+   "reached_from": [],
+   "reached_after": [
+    {
+     "selector": "terminate:",
+     "via": "app/Sources/AppDelegate.swift:90",
+     "gate": "app/Sources/AppDelegate.swift:108 — the export queue is not idle"
+    }
+   ],
+   "other_caller": ""
+  },
+  "app/Sources/AppDelegate.swift:212": {
+   "token": "runModal",
+   "reached_from": [
+    "toggleAgentServer:"
+   ],
+   "reached_after": [],
+   "other_caller": "app/Sources/AppDelegate.swift:40 — applicationDidFinishLaunching with AgentServerEnabled set; app/Sources/AppDelegate.swift:206 — only when start() throws"
+  },
+  "app/Sources/CaptionExporter.swift:519": {
+   "token": "beginSheetModal",
+   "reached_from": [
+    "exportCaptions:"
+   ],
+   "reached_after": [],
+   "other_caller": ""
+  },
+  "app/Sources/CaptionExporter.swift:539": {
+   "token": "beginSheetModal",
+   "reached_from": [],
+   "reached_after": [
+    {
+     "selector": "exportCaptions:",
+     "via": "app/Sources/CaptionExporter.swift:521",
+     "gate": "app/Sources/CaptionExporter.swift:535 — the export throws"
+    }
+   ],
+   "other_caller": ""
+  },
+  "app/Sources/CaptionImporter.swift:387": {
+   "token": "beginSheetModal",
+   "reached_from": [
+    "importCaptions:"
+   ],
+   "reached_after": [],
+   "other_caller": ""
+  },
+  "app/Sources/CaptionImporter.swift:408": {
+   "token": "beginSheetModal",
+   "reached_from": [],
+   "reached_after": [
+    {
+     "selector": "importCaptions:",
+     "via": "app/Sources/CaptionImporter.swift:389",
+     "gate": "app/Sources/CaptionImporter.swift:405 — the plan throws"
+    }
+   ],
+   "other_caller": ""
+  },
+  "app/Sources/CaptionImporter.swift:420": {
+   "token": "beginSheetModal",
+   "reached_from": [],
+   "reached_after": [
+    {
+     "selector": "importCaptions:",
+     "via": "app/Sources/CaptionImporter.swift:389",
+     "gate": "app/Sources/CaptionImporter.swift:412 — the import has a report"
+    }
+   ],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+AddClips.swift:163": {
+   "token": "beginSheetModal",
+   "reached_from": [
+    "addImageBackground:"
+   ],
+   "reached_after": [],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+AddClips.swift:179": {
+   "token": "beginSheetModal",
+   "reached_from": [],
+   "reached_after": [
+    {
+     "selector": "addImageBackground:",
+     "via": "app/Sources/EditorViewController+AddClips.swift:176",
+     "gate": "app/Sources/EditorViewController+AddClips.swift:178 — the probe fails"
+    }
+   ],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+AddClips.swift:231": {
+   "token": "beginSheetModal",
+   "reached_from": [],
+   "reached_after": [
+    {
+     "selector": "addImageBackground:",
+     "via": "app/Sources/EditorViewController+AddClips.swift:181",
+     "gate": "app/Sources/EditorViewController+AddClips.swift:226 — no media id for the picture"
+    }
+   ],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+AddClips.swift:236": {
+   "token": "beginSheetModal",
+   "reached_from": [],
+   "reached_after": [
+    {
+     "selector": "addImageBackground:",
+     "via": "app/Sources/EditorViewController+AddClips.swift:181",
+     "gate": "app/Sources/EditorViewController+AddClips.swift:235 — adding the media throws"
+    }
+   ],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+Consolidate.swift:37": {
+   "token": "beginSheetModal",
+   "reached_from": [
+    "consolidateMedia:"
+   ],
+   "reached_after": [],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+Consolidate.swift:67": {
+   "token": "beginSheetModal",
+   "reached_from": [
+    "consolidateMedia:"
+   ],
+   "reached_after": [],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+Consolidate.swift:81": {
+   "token": "beginSheetModal",
+   "reached_from": [
+    "consolidateMedia:"
+   ],
+   "reached_after": [],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+Consolidate.swift:84": {
+   "token": "presentAsSheet",
+   "reached_from": [
+    "consolidateMedia:"
+   ],
+   "reached_after": [],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+Export.swift:33": {
+   "token": "presentAsSheet",
+   "reached_from": [
+    "exportProject:"
+   ],
+   "reached_after": [],
+   "other_caller": "the toolbar's Export button"
+  },
+  "app/Sources/EditorViewController+Export.swift:56": {
+   "token": "presentAsSheet",
+   "reached_from": [],
+   "reached_after": [
+    {
+     "selector": "exportProject:",
+     "via": "app/Sources/ExportSheetController.swift:591",
+     "gate": "app/Sources/ExportSheetController.swift:588 — Export…, not Add to Queue, and the save panel answered OK"
+    }
+   ],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+Export.swift:108": {
+   "token": "presentAsSheet",
+   "reached_from": [
+    "showSpeedSheet:"
+   ],
+   "reached_after": [],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+Export.swift:121": {
+   "token": "presentAsSheet",
+   "reached_from": [],
+   "reached_after": [
+    {
+     "selector": "openDocument:",
+     "via": "app/Sources/EditorViewController.swift:296",
+     "gate": "app/Sources/EditorViewController+Export.swift:118 — the project has missing media"
+    }
+   ],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+GraphicMenus.swift:45": {
+   "token": "beginSheetModal",
+   "reached_from": [
+    "insertGraphicFromFile:"
+   ],
+   "reached_after": [],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+GraphicMenus.swift:152": {
+   "token": "beginSheetModal",
+   "reached_from": [
+    "addGraphicFont:",
+    "addGraphicImage:"
+   ],
+   "reached_after": [],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+GraphicMenus.swift:169": {
+   "token": "beginSheetModal",
+   "reached_from": [
+    "insertGraphicTemplate:"
+   ],
+   "reached_after": [
+    {
+     "selector": "insertGraphicFromFile:",
+     "via": "app/Sources/EditorViewController+GraphicMenus.swift:47",
+     "gate": "app/Sources/EditorViewController+GraphicMenus.swift:164 — the insert throws"
+    },
+    {
+     "selector": "addGraphicFont:",
+     "via": "app/Sources/EditorViewController+GraphicMenus.swift:154",
+     "gate": "app/Sources/EditorViewController+GraphicMenus.swift:164 — the import throws"
+    },
+    {
+     "selector": "addGraphicImage:",
+     "via": "app/Sources/EditorViewController+GraphicMenus.swift:154",
+     "gate": "app/Sources/EditorViewController+GraphicMenus.swift:164 — the import throws"
+    }
+   ],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+Inspector.swift:282": {
+   "token": "beginSheetModal",
+   "reached_from": [
+    "setTransitionKind:"
+   ],
+   "reached_after": [],
+   "other_caller": "the Clip tab's transition controls (EditorViewController+Inspector.swift:240, the same command)"
+  },
+  "app/Sources/EditorViewController+SaveFrame.swift:130": {
+   "token": "beginSheetModal",
+   "reached_from": [
+    "saveFrame:"
+   ],
+   "reached_after": [],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+SaveFrame.swift:209": {
+   "token": "beginSheetModal",
+   "reached_from": [],
+   "reached_after": [
+    {
+     "selector": "saveFrame:",
+     "via": "app/Sources/EditorViewController+SaveFrame.swift:198",
+     "gate": "app/Sources/EditorViewController+SaveFrame.swift:207 — the render or the write failed"
+    }
+   ],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+Timeline.swift:323": {
+   "token": "beginSheetModal",
+   "reached_from": [
+    "removeTrack:"
+   ],
+   "reached_after": [],
+   "other_caller": "app/Sources/EditorViewController+Timeline.swift:44 — the track header's context menu"
+  },
+  "app/Sources/EditorViewController.swift:653": {
+   "token": "beginSheetModal",
+   "reached_from": [
+    "addMediaFiles:"
+   ],
+   "reached_after": [],
+   "other_caller": ""
+  },
+  "app/Sources/ExportSheetController.swift:582": {
+   "token": "beginSheetModal",
+   "reached_from": [],
+   "reached_after": [
+    {
+     "selector": "exportProject:",
+     "via": "app/Sources/ExportSheetController.swift:522",
+     "gate": "app/Sources/ExportSheetController.swift:552 — the card resolves (the sheet's Export… or Add to Queue button)"
+    }
+   ],
+   "other_caller": ""
+  },
+  "app/Sources/ExportSheetPresets.swift:289": {
+   "token": "runModal",
+   "reached_from": [],
+   "reached_after": [
+    {
+     "selector": "exportProject:",
+     "via": "app/Sources/ExportSheetPresets.swift:149",
+     "gate": "app/Sources/ExportSheetPresets.swift:180 — the card resolves (the export sheet's preset Save… button)"
+    }
+   ],
+   "other_caller": ""
+  },
+  "app/Sources/FFmpegRewrap.swift:473": {
+   "token": "runModal",
+   "reached_from": [],
+   "reached_after": [
+    {
+     "selector": "addMediaFiles:",
+     "via": "app/Sources/EditorViewController.swift:655",
+     "gate": "app/Sources/FFmpegRewrap.swift:510 — policy ask and canAsk (false while AgentServerEnabled), after AVFoundation refuses a non-image file (MediaImporter.swift:98)"
+    },
+    {
+     "selector": "openDocument:",
+     "via": "app/Sources/ProjectDocument.swift:592",
+     "gate": "app/Sources/FFmpegRewrap.swift:510 — a movie opened as a project, as above"
+    }
+   ],
+   "other_caller": "app/Sources/EditorViewController+Inspector.swift:50 — the Media tab's import; app/Sources/AgentServer+Media.swift:74 — import_media (canAsk is false there); app/Sources/ScreenRecorder+Finishing.swift:142 — a finished recording's probe"
+  },
+  "app/Sources/GraphicPane+Source.swift:200": {
+   "token": "runModal",
+   "reached_from": [],
+   "reached_after": [],
+   "other_caller": "app/Sources/GraphicPane+Source.swift:63 — the Graphic sub-tab's Duplicate as New Graphic button"
+  },
+  "app/Sources/GraphicPane+Source.swift:205": {
+   "token": "runModal",
+   "reached_from": [],
+   "reached_after": [],
+   "other_caller": "app/Sources/GraphicPane+Source.swift:200 — refuse(), after the name alert above, on a bad or taken name"
+  },
+  "app/Sources/MediaPaneCommands.swift:181": {
+   "token": "beginSheetModal",
+   "reached_from": [],
+   "reached_after": [],
+   "other_caller": "app/Sources/MediaRowView.swift:393 — a Media tab row's Relink… item"
+  },
+  "app/Sources/MediaPaneCommands.swift:237": {
+   "token": "beginSheetModal",
+   "reached_from": [],
+   "reached_after": [],
+   "other_caller": "app/Sources/MediaRowView.swift:394 — a Media tab row's Remove item"
+  },
+  "app/Sources/OptionControls.swift:178": {
+   "token": "popUp",
+   "reached_from": [],
+   "reached_after": [],
+   "other_caller": "app/Sources/OptionControls.swift:164 — an inspector field's chevron (mouse only)"
+  },
+  "app/Sources/OptionControls.swift:401": {
+   "token": "popUp",
+   "reached_from": [],
+   "reached_after": [],
+   "other_caller": "app/Sources/OptionControls.swift:389 — an inspector popup control's mouseDown"
+  },
+  "app/Sources/PreviewCanvasView+TextEditKeys.swift:56": {
+   "token": "beginSheetModal",
+   "reached_from": [],
+   "reached_after": [],
+   "other_caller": "app/Sources/PreviewCanvasView.swift:777 — Escape in the canvas text editor with unapplied text"
+  },
+  "app/Sources/ProjectDocument.swift:930": {
+   "token": "presentAsSheet",
+   "reached_from": [],
+   "reached_after": [
+    {
+     "selector": "openDocument:",
+     "via": "app/Sources/ProjectDocument.swift:455",
+     "gate": "app/Sources/ProjectDocument.swift:919 — a reversed clip whose reverse is not rendered"
+    },
+    {
+     "selector": "showSpeedSheet:",
+     "via": "app/Sources/ProjectDocument.swift:1265",
+     "gate": "app/Sources/ProjectDocument.swift:919 — the sheet committed a reverse"
+    },
+    {
+     "selector": "undo:",
+     "via": "app/Sources/ProjectDocument.swift:1265",
+     "gate": "app/Sources/ProjectDocument.swift:919 — as above"
+    },
+    {
+     "selector": "redo:",
+     "via": "app/Sources/ProjectDocument.swift:1265",
+     "gate": "app/Sources/ProjectDocument.swift:919 — as above"
+    },
+    {
+     "selector": "paste:",
+     "via": "app/Sources/ProjectDocument.swift:1265",
+     "gate": "app/Sources/ProjectDocument.swift:919 — as above"
+    }
+   ],
+   "other_caller": "app/Sources/ProjectDocument.swift:940 — the Video tab's Render Reverse button; app/Sources/ReverseRenderer.swift:1222 — after the sheet closes"
+  },
+  "app/Sources/RelinkSheetController.swift:123": {
+   "token": "beginSheetModal",
+   "reached_from": [],
+   "reached_after": [
+    {
+     "selector": "openDocument:",
+     "via": "app/Sources/RelinkSheetController.swift:254",
+     "gate": "app/Sources/EditorViewController+Export.swift:118 — the relink sheet is up (missing media); its Locate… button"
+    }
+   ],
+   "other_caller": ""
+  },
+  "app/Sources/SilenceSheetController.swift:527": {
+   "token": "presentAsSheet",
+   "reached_from": [
+    "removeSilences:"
+   ],
+   "reached_after": [],
+   "other_caller": ""
+  },
+  "app/Sources/TranscribeSheetController+Commit.swift:180": {
+   "token": "presentAsSheet",
+   "reached_from": [
+    "generateCaptions:"
+   ],
+   "reached_after": [],
+   "other_caller": ""
+  }
+ }
+}

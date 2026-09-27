@@ -101,10 +101,12 @@ final class AgentServer {
     /// `detect_silence`, `consolidate_media`, `import_captions` and
     /// `export_captions` are all absent: each reads or writes a file on the
     /// main thread and each says so in its own handler.
-    static let offMainTools: Set<String> = [
+    private static let productOffMainTools: Set<String> = [
         "import_media", "render_frame", "export", "save_project", "new_project", "transcribe",
         "record_screen", "render_graphic",
     ]
+    // The dev tools' members join here (AgentServer+DevTools.swift).
+    static let offMainTools = productOffMainTools.union(devOffMainTools)
 
     // MARK: - Lifecycle
 
@@ -225,7 +227,7 @@ final class AgentServer {
     /// `rc_op_names` and holds an explicit allow-list for the ops that
     /// deliberately have no tool, so a new tool that is not an op belongs in
     /// that sentence as well as in this table.
-    private static let handlers: [String: (AgentServer) -> ([String: Any]) throws -> String] = [
+    private static let productHandlers: [String: ToolHandler] = [
         // Projects (AgentServer+Project.swift)
         "open_project": { $0.openProject },
         "new_project": { $0.newProject },
@@ -325,6 +327,8 @@ final class AgentServer {
         "render_frame": { $0.renderFrame },
         "export": { $0.exportProject },
     ]
+    // The dev tools' handlers join here (AgentServer+DevTools.swift).
+    private static let handlers = withDevHandlers(productHandlers)
 
     /// Ops the core declares that deliberately have NO tool. None today,
     /// and the bar for an entry is high: the agent-parity rule

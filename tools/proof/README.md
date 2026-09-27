@@ -1525,8 +1525,12 @@ two.
 with every `app/Sources/*.swift` but the app's own `main.swift`, links the
 staticlib, opens a package from disk and `cacheDisplay`s the editor into a
 PNG — `harness/build.sh` builds it into `work/harness/` (about 30 s, skipped
-when the binary is newer than the sources and the staticlib; `--force`
-rebuilds) and pins every `UserDefaults` key the chrome reads — the
+when the binary is newer than the sources, `harness/main.swift`, `build.sh`
+itself and the staticlib, so a change to the build line makes the binary
+stale; `--force` rebuilds) with `-D REELCUT_DEV_TOOLS`, as the app's
+Debug and Release set it (road map 11 V0), so the harness links what the
+app links; the other probes' own `swiftc` lines stay flag-off, as
+Distribution is — and pins every `UserDefaults` key the chrome reads — the
 persisted view state, the Document tab's `ReelcutInspectorRescaleClips`
 checkbox and `AppleShowScrollBars` — in the argument domain, and captures on
 SETTLE rather than after a fixed number of runloop turns, so two renders of
@@ -5708,4 +5712,72 @@ grouped edit nested inside it and one undo took `lower-third-2` too.
 make app
 python3 tools/proof/graphics_menu_proof.py --port 4889    # → 14/14
 python3 tools/proof/graphics_proof.py --port 4883         # → 40/40
+```
+
+## Road map 11's V0 — the dev tools are absent from Distribution (`dist_check.py`)
+
+`make dist` builds the Distribution configuration — Release without the
+Swift condition `REELCUT_DEV_TOOLS` (spec §11 V-1) — into
+`build/Build/Products/Distribution/`, beside Release's product and never in
+it, then runs this check, and a failure fails `make`. The script reads each
+app's `Contents/MacOS/Reelcut` in process, as bytes, with the stdlib only,
+and prints the needle and both paths before its rows:
+
+- **D1** — the needle is read from `app/Sources/AgentServer+DevTools.swift`:
+  exactly one BARE `static let devToolsMarker = "…"` line (a trailing `//`
+  comment fails it), ASCII, at least 16 UTF-8 bytes;
+- **D2** — the Release binary exists; **D3** — the Distribution binary exists;
+- **D4** — the Release binary holds the needle: the POSITIVE CONTROL, without
+  which an absence check passes against a build that never had the tools;
+- **D5** — the Distribution binary does not hold the needle.
+
+No row is ever skipped: if D1 fails, D4 and D5 FAIL too, and so does D4 or
+D5 when its binary is missing. The last line is `dist_check: <passed>/5`;
+the exit is 0 only at 5/5.
+
+**Why a marker and not the tool names.** Swift string literals of 15 UTF-8
+bytes or fewer are stored inline in the code of an `-O` binary, not as
+contiguous bytes: measured on the Release binary with
+`LC_ALL=C grep -c -a -F`, `RC_AGENT_PORT` (13 bytes) and `unsaved_changes`
+(15) are found 0 times, `AgentServerEnabled` (18) once. A name like
+`snapshot_ui` (11) could never be a needle. The marker is kept live in the
+optimised binary by the log line the flag-on `devTools()` writes, so a dev
+tool added to the seam needs no edit here.
+
+```sh
+make dist                                                  # → dist_check: 5/5
+python3 tools/proof/dist_check.py [--release APP] [--dist APP]
+```
+
+**Made to fail by hand (2026-09-26)**, each reverted and the seam file
+`cmp`-identical afterwards: `--release` pointed at the Distribution app — D4
+FAIL (4/5); `--dist` at the Release app — D5 FAIL (4/5); `--release` at a
+missing path — D2 and D4 FAIL (3/5); `--dist` at a missing path — D3 and D5
+FAIL (3/5); a trailing `// note` on the marker line, a 12-byte marker, and a
+second declaration line — each D1, D4 and D5 FAIL (2/5). Each exits 1. And
+the build mutant: `Distribution: {SWIFT_ACTIVE_COMPILATION_CONDITIONS:
+REELCUT_DEV_TOOLS}` added under the target's `settings.configs` in
+`project.yml` — `make dist` exits 2 with D5 FAIL (the marker once in the
+Distribution binary); with `project.yml` restored, 5/5 again.
+
+## Road map 11's V1 — the capture spike (`capture_spike/`)
+
+The spike behind V2's `snapshot_ui` and `perform_menu_item`: the preview well
+of a live editor under `cacheDisplay` and three ways of putting a still under
+the canvas overlay (q1), a sheet put up by a menu item and the inventory of
+which menu items reach a sheet, a window or a modal run loop (q2), switching a
+live window's appearance (q3), and `hasAmbiguousLayout` plus the truncation
+heuristic in an `-O` build (q4). A probe built from `app/Sources` with
+`-O -wmo -D REELCUT_DEV_TOOLS`, six bounded modes, 38 scored rows, a digest.
+Its README has the rows, the build line and the output; the answers are in
+`designs/reelcut-roadmap-11.md`'s V1 record. The W, S and A rows need the
+probe's window on screen and the probe active — run it with the terminal
+frontmost and the display on; otherwise they skip by name. W4a–c's answer
+depends on the display scale (the recorded digest is scale 2's; on a scale-1
+screen W4a–c pass): the probe puts its windows on a scale-2 (built-in)
+screen when one exists, and without one W4a–c skip as
+`host: no scale-2 screen`.
+
+```sh
+python3 tools/proof/capture_spike/capture_spike.py [--only q1,q2,q3,q4] [--rebuild]
 ```

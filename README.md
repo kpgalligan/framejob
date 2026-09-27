@@ -317,7 +317,7 @@ Makefile              Build orchestration
 | `InspectorPane.swift` · `InspectorViewController.swift` · `ClipPane` `MediaPane` `DocumentPane` (with `VideoPane` `AudioPane` `TextPane` `ShapePane` as section factories) | the binding that knows about actions, one file per tab, and the sections the Clip tab composes |
 | `MediaRowView.swift` · `MediaListFilter.swift` · `MediaPaneCommands.swift` · `MediaUsage.swift` · `MediaReveal.swift` | the Media tab around its pane: the row and the drag it sources, the find band as a value, the row's commands, the one answer to "is this file used" (which walks the nests), and Reveal in Timeline |
 | `EditorViewController.swift` + `EditorViewController+{Timeline,Canvas,Inspector,Export}.swift` | wiring in the base file, features in extensions |
-| `AgentServer.swift` + `AgentServer+{Arguments,Gate,Parity,Project,Clips,Tracks,Media,Render,History,Silence,Captions,CloudCaptions,Audio,Background,Transitions,Scope,Recording,RecordingArguments,RecordingResult,Graphics,GraphicImports,GraphicRender}.swift` · `AgentCatalog.swift` + `AgentCatalog+{Clips,Files,Captions,Audio,Transitions,Graphics,Declarations}.swift` | the MCP endpoint, its handlers, and the tool catalog |
+| `AgentServer.swift` + `AgentServer+{Arguments,Gate,Parity,Project,Clips,Tracks,Media,Render,History,Silence,Captions,CloudCaptions,Audio,Background,Transitions,Scope,Recording,RecordingArguments,RecordingResult,Graphics,GraphicImports,GraphicRender,DevTools}.swift` · `AgentCatalog.swift` + `AgentCatalog+{Clips,Files,Captions,Audio,Transitions,Graphics,Declarations}.swift` | the MCP endpoint, its handlers, and the tool catalog |
 | `RecordingSetup.swift` · `ScreenRecorder.swift` (with `+Finishing` and `+Content`) · `RecordingLanding.swift` · `ProjectDocument+Recording.swift` · `RecorderPanelController.swift` (with `+Rows` and `+Recording`) · `RecorderStatusItem.swift` · `AppDelegate+Recording.swift` · `AgentServer+Recording.swift` | screen recording (road map 3): the values, the session over ScreenCaptureKit and a second `AVCaptureSession` for the microphone, the landing as ordinary media, the floating non-activating panel with its countdown and meter, the menu-bar status item, and the `record_screen` tool |
 | `AppDelegate.swift` · `EditorWindowController.swift` · `WelcomeWindowController.swift` · `main.swift` | menus (nil-target selectors), window, welcome |
 | `SpeedSheetController.swift` · `RelinkSheetController.swift` · `SilenceSheetController.swift` (with `SilenceDetector.swift` behind it) · `TranscribeSheetController.swift` (+`Cloud` `Commit`) · `SettingsWindowController.swift` | the remaining dialogs, and Reelcut ▸ Settings… |
@@ -329,6 +329,7 @@ Requires Xcode 26 or later (the macOS 26 SDK), Rust (cargo), and [xcodegen](http
 
 ```sh
 make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
+make dist       # make app, then the Distribution build (no dev tools) → build/Build/Products/Distribution/Reelcut.app, checked
 make run        # build and launch
 make test       # Rust core tests
 make lint       # cargo clippy --all-targets -D warnings

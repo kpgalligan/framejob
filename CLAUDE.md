@@ -49,9 +49,10 @@ comment citing "road map N §x" refers to the archived original.
 make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
 make test       # cd core && cargo test --release, then cd graphic && cargo test --release  (black-box tests)
 make lint       # cargo clippy --all-targets -- -D warnings, in core/ then graphic/
-make typecheck  # swiftc -typecheck of app/Sources/*.swift — the ONLY authoritative Swift check
+make typecheck  # swiftc -typecheck -D REELCUT_DEV_TOOLS of app/Sources/*.swift — the ONLY authoritative Swift check
 make project    # xcodegen generate (Reelcut.xcodeproj is generated; project.yml is the source of truth)
 make run        # make app, then launch
+make dist       # make app, then the Distribution build (no dev tools, spec §11 V-1) and tools/proof/dist_check.py
 ```
 
 - Single Rust test: `cd core && cargo test --release --test edge slip`

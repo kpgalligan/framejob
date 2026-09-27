@@ -20,6 +20,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | [`word-captions.md`](word-captions.md) | 112 | **Word captions (road map 8).** W-1..W-10. |
 | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) | 306 | **Chrome, the clip inspector and keys (the sharp pass, road map 9, #35).** SH-1, SH-2, CI-1..CI-15, K-1, K-2. |
 | [`graphics.md`](graphics.md) | 281 | **Graphics (road map 10).** G-1..G-16. |
+| [`dev-tools.md`](dev-tools.md) | 24 | **Dev tools (road map 11).** V-1..V-3: the `REELCUT_DEV_TOOLS` flag and `make dist`, dev tools as ordinary tools, capture by `cacheDisplay`. |
 
 ## Every decision
 
@@ -137,3 +138,6 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | G-14 | `graphics/` is created on the app's first write into it, never at open | [`graphics.md`](graphics.md) |
 | G-15 | The Graphic sub-tab: what it shows for several clips, and what a write sends | [`graphics.md`](graphics.md) |
 | G-16 | Insert ▸ Graphic: where the clip goes, what the module is called, and what a module that does not compile does | [`graphics.md`](graphics.md) |
+| V-1 | Dev tools are compiled only under `REELCUT_DEV_TOOLS`; Distribution ships without them | [`dev-tools.md`](dev-tools.md) |
+| V-2 | A dev tool is not an op, but goes through the catalog, gate and parity check like any tool | [`dev-tools.md`](dev-tools.md) |
+| V-3 | Screens are captured with `cacheDisplay`, never ScreenCaptureKit | [`dev-tools.md`](dev-tools.md) |

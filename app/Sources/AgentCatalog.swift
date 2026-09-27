@@ -527,6 +527,9 @@ extension AgentServer {
         // `AgentCatalog+Files.swift`'s. They are the catalog's LAST three
         // groups, so this splice is an append and the order is unchanged;
         // `ticks` is the one local they share with the groups above.
+        // The dev tools' rows (AgentServer+DevTools.swift) go HERE, before the file
+        // tools, never at the end; Distribution's are none.
+        catalog += devTools()
         catalog += fileTools(ticks: ticks)
         let data = try JSONSerialization.data(withJSONObject: catalog)
         return String(decoding: data, as: UTF8.self)
