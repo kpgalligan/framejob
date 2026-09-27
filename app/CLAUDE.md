@@ -1072,7 +1072,8 @@ free.
   tools, of a caller's keys against the schema the tool published, every
   stranger refused by name — the tool, the strangers and the whole of what it
   takes — before the scope or any handler reads a thing. Its map is read once
-  from the catalog string `start()` registered. What it cannot see is a
+  from the catalog string `prepareCatalog()` built at launch (spec §11 AI-3),
+  which `start()` then registers. What it cannot see is a
   declared argument no handler reads, which is the optional half of
   `op_argument_proof.py`'s section 3. `target(_:)` resolves the implicit
   document through `NSApp.orderedDocuments`, never `documents.first`, and an
@@ -1081,6 +1082,30 @@ free.
   (`import_media`, `transcribe`, `record_screen`, `export`,
   `render_graphic`, …); the criterion
   is "waits on main", not "touches the disk".
+- `AgentLane.swift` — every tool call's one door (road map 12 A1, spec §11
+  AI-2, AI-3, AI-5, AI-12): the MCP trampoline's `serve` (server thread,
+  synchronous) and the assistant session's `submit` (returns at once; one
+  completion, on the lane's serial queue). One `NSLock` admits one call at a
+  time, which is what keeps `callScope` and `callDocument` race-free; it is
+  NEVER taken on main, because an `offMainTools` member holding it waits for
+  main. A `submit` is refused (a withheld tool) or asked (an ask-first one,
+  through the session's hook on main, BEFORE the lock) and then runs inside
+  `AgentServer.pinning(document)`; `serve` never pins and never asks.
+  `onMainWhenIdle` is `onMain`'s body: off main it waits, retrying every
+  20 ms, while any open document `isLiveEditing`, so a call mid-drag lands
+  after mouse-up above the gesture's undo step (AI-12, #144); ON main it runs
+  in place — a wait there could never end. `pinnedTarget` is
+  `targetDocument`'s first statement for a pinned call: the pinned document,
+  or a refusal by name when it is closed or `project` names another.
+  `prepareAtLaunch()` runs `prepareCatalog()` from `main.swift`, at top level
+  before `NSApplicationMain` — `assistant_lane_proof.py`'s L0 reads that line.
+- `AssistantToolTable.swift` — spec §11 AI-7's ONE table: withheld
+  (`record_screen`; `transcribe` only with `engine: "assemblyai"`; every dev
+  tool, from `AgentServer.devToolNames`) and ask-first (`export`,
+  `export_captions`, `save_project`, `consolidate_media`), a reason on every
+  row; the refusal sentence, the question (main only: the path the call
+  writes, tilde-expanded, and whether a file is already there — "REPLACES")
+  and the assistant's catalog, which drops only an unconditional withheld row.
 - `AgentServer+DevTools.swift` — the dev tools' seam (road map 11, spec
   §11 V-1/V-2): the handler table, catalog rows and off-main set compiled
   only under `REELCUT_DEV_TOOLS`, which Debug and Release set and
@@ -1312,8 +1337,9 @@ queues (`eyedropperQueue`, `frameGrabQueue` — a third one-frame render joins
 this entry rather than growing the list), `ScreenRecorder.shareableContent`'s
 global hop, `GraphicStore`'s serial queue (its file-system sources'
 handlers, the coalesced pass and the outbox; main publishes through
-`drain()` and never waits on it but by `queue.sync`), and the cache's main
-hop. The recorder adds NO queue of its own:
+`drain()` and never waits on it but by `queue.sync`), the cache's main
+hop, and the agent lane's serial queue (`AgentLane.swift`). The recorder adds
+NO queue of its own:
 framework callbacks are stamped where they land and hopped to main. Colors,
 fonts and metrics come from `DS` tokens; shared controls go in
 `Controls.swift`. **A refusal and an identity both beep** (`NSSound.beep()`)

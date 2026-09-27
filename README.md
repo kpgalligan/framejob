@@ -318,6 +318,7 @@ Makefile              Build orchestration
 | `MediaRowView.swift` · `MediaListFilter.swift` · `MediaPaneCommands.swift` · `MediaUsage.swift` · `MediaReveal.swift` | the Media tab around its pane: the row and the drag it sources, the find band as a value, the row's commands, the one answer to "is this file used" (which walks the nests), and Reveal in Timeline |
 | `EditorViewController.swift` + `EditorViewController+{Timeline,Canvas,Inspector,Export}.swift` | wiring in the base file, features in extensions |
 | `AgentServer.swift` + `AgentServer+{Arguments,Gate,Parity,Project,Clips,Tracks,Media,Render,History,Silence,Captions,CloudCaptions,Audio,Background,Transitions,Scope,Recording,RecordingArguments,RecordingResult,Graphics,GraphicImports,GraphicRender,DevTools}.swift` · `AgentCatalog.swift` + `AgentCatalog+{Clips,Files,Captions,Audio,Transitions,Graphics,Declarations}.swift` | the MCP endpoint, its handlers, and the tool catalog |
+| `AgentLane.swift` · `AssistantToolTable.swift` | the one door every tool call goes through (a lock, one call at a time, and the wait for mouse-up), and the table of tools the coming assistant may not call or must ask about first |
 | `RecordingSetup.swift` · `ScreenRecorder.swift` (with `+Finishing` and `+Content`) · `RecordingLanding.swift` · `ProjectDocument+Recording.swift` · `RecorderPanelController.swift` (with `+Rows` and `+Recording`) · `RecorderStatusItem.swift` · `AppDelegate+Recording.swift` · `AgentServer+Recording.swift` | screen recording (road map 3): the values, the session over ScreenCaptureKit and a second `AVCaptureSession` for the microphone, the landing as ordinary media, the floating non-activating panel with its countdown and meter, the menu-bar status item, and the `record_screen` tool |
 | `AppDelegate.swift` · `EditorWindowController.swift` · `WelcomeWindowController.swift` · `main.swift` | menus (nil-target selectors), window, welcome |
 | `SpeedSheetController.swift` · `RelinkSheetController.swift` · `SilenceSheetController.swift` (with `SilenceDetector.swift` behind it) · `TranscribeSheetController.swift` (+`Cloud` `Commit`) · `SettingsWindowController.swift` | the remaining dialogs, and Reelcut ▸ Settings… |
@@ -331,7 +332,7 @@ Requires Xcode 26 or later (the macOS 26 SDK), Rust (cargo), and [xcodegen](http
 make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
 make dist       # make app, then the Distribution build (no dev tools) → build/Build/Products/Distribution/Reelcut.app, checked
 make run        # build and launch
-make test       # Rust core tests
+make test       # Rust core and graphics tests, then the agent lane's proof (tools/proof/assistant_lane_proof.py)
 make lint       # cargo clippy --all-targets -D warnings
 make typecheck  # swiftc -typecheck of app/Sources — the ONLY authoritative Swift check
 make project    # xcodegen generate
@@ -367,6 +368,10 @@ goose session --with-streamable-http-extension "http://127.0.0.1:4817/mcp"
 
 The endpoint is **unauthenticated**: any local process may connect while it
 runs. It is off by default.
+
+Calls run one at a time. A call made while you are dragging something in
+the window (a clip, a canvas handle, an inspector slider) waits for mouse-up
+and then runs, as its own undo step after the drag's.
 
 ### The tools
 

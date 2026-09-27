@@ -76,3 +76,11 @@ amended by the user's answers in §6).
 - **AI-11 — The default model is `claude-opus-5-5` at medium effort.** The model is a person's
   setting, chosen in Settings' Assistant pane; like the key, no tool reads or writes it
   (§6.2). Risk accepted: the costliest default, paid with the person's key.
+- **AI-12 — A tool call that arrives during a live gesture waits for mouse-up, then runs.** It
+  applies to every caller, MCP and the assistant alike, because the lane (AI-2) is shared.
+  "Live" means any open `ProjectDocument.isLiveEditing`: a timeline, canvas or inspector-slider
+  gesture. A waiting call is never refused and never lost; before this, a call run between two
+  ticks of a drag answered ok and was then undone by the next tick (#144; road map 12 §7 D2).
+  The call lands above the gesture's own undo step. It is reversible: the wait is
+  `AgentLane.onMainWhenIdle` alone. Risk accepted: a call, and the lane's lock with it, waits
+  as long as the mouse is held down.

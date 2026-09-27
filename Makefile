@@ -20,9 +20,12 @@ all: app
 rust:
 	cd core && cargo build --release
 
-test:
+# The last line is spec §11 AI-3's `make test`-reachable probe (the agent
+# lane); `rust` first, because it links the staticlib.
+test: rust
 	cd core && cargo test --release
 	cd graphic && cargo test --release
+	python3 tools/proof/assistant_lane_proof.py
 
 lint:
 	cd core && cargo clippy --all-targets -- -D warnings

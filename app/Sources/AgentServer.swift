@@ -49,15 +49,21 @@ final class AgentServer {
     /// `performGroupedEdit`, `editResult` and fifty-nine op handlers, spread
     /// over files already near the size cap, to carry one optional integer.
     ///
-    /// **It is safe from races because the server is single-request.**
-    /// `core/src/agent.rs`'s `serve` is one thread running
-    /// `for request in server.incoming_requests()` with the comment "One
-    /// request at a time" on it, and a batched array is `filter_map`ped in
-    /// that same thread — so at most one tool is ever executing, whether it
-    /// hopped to the main thread or (an `offMainTools` member) stayed on the
-    /// server's. `private(set)` keeps the writing to this file, where the one
-    /// write and its `defer` sit together.
+    /// **It is safe from races because the lane's lock admits one call at a
+    /// time** (`AgentLane.swift`, spec §11 AI-2): every caller, the MCP
+    /// trampoline and the assistant alike, goes through it, so at most one
+    /// tool is ever executing, whether it hopped to the main thread or (an
+    /// `offMainTools` member) stayed on its caller's. `private(set)` keeps the
+    /// writing to this file, where the one write and its `defer` sit together.
     private(set) var callScope: UInt32?
+
+    /// The document the CURRENT call is pinned to (spec §11 AI-5), or nil for
+    /// an MCP call. `targetDocument` checks it first. Written only by
+    /// `pinning`, on the lane's thread under its lock, before any main hop.
+    private(set) var callDocument: ProjectDocument?
+
+    /// The catalog `prepareCatalog()` built, once it has succeeded.
+    private var preparedCatalog: String?
 
     private init() {}
 
@@ -118,18 +124,7 @@ final class AgentServer {
         let preferred =
             ProcessInfo.processInfo.environment["RC_AGENT_PORT"]
             .flatMap(UInt16.init) ?? Self.defaultPort
-        let catalog = try catalogJSON()
-        // The gate reads this same string at every call (AgentServer+Gate.swift).
-        Self.noteArguments(in: catalog)
-        // Nothing else forces the catalog and the dispatch table to agree, so
-        // debug builds refuse to start the server on a mismatch. `make app`
-        // builds Release, where an `assert` is compiled out — which would make
-        // the one enforcement of the parity rule dead in every shipped build —
-        // so Release logs the same message instead of failing silently.
-        if let failure = Self.catalogParityFailure(catalog) {
-            assertionFailure(failure)
-            NSLog("Reelcut: %@", failure)
-        }
+        let catalog = try prepareCatalog()
         let version =
             Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
             ?? "0.0"
@@ -157,6 +152,30 @@ final class AgentServer {
         guard isRunning else { return }
         rc_agent_server_stop()
         port = 0
+    }
+
+    /// Builds the catalog, fills the gate and runs the parity check, once per
+    /// launch (spec §11 AI-3): `AgentLane.prepareAtLaunch()` calls it from
+    /// `main.swift`, and `start()` gets the memoised string. Main only; a
+    /// throw is not memoised.
+    @discardableResult
+    func prepareCatalog() throws -> String {
+        assert(Thread.isMainThread)
+        if let prepared = preparedCatalog { return prepared }
+        let catalog = try catalogJSON()
+        // The gate reads this same string at every call (AgentServer+Gate.swift).
+        Self.noteArguments(in: catalog)
+        // Nothing else forces the catalog and the dispatch table to agree, so
+        // debug builds refuse to start the server on a mismatch. `make app`
+        // builds Release, where an `assert` is compiled out — which would make
+        // the one enforcement of the parity rule dead in every shipped build —
+        // so Release logs the same message instead of failing silently.
+        if let failure = Self.catalogParityFailure(catalog) {
+            assertionFailure(failure)
+            NSLog("Reelcut: %@", failure)
+        }
+        preparedCatalog = catalog
+        return catalog
     }
 
     // MARK: - Dispatch
@@ -430,8 +449,15 @@ final class AgentServer {
     /// thing an `offMainTools` handler may use to touch a document, AppKit or
     /// `RecipeSource`'s publish side.
     func onMain<T>(_ body: () throws -> T) rethrows -> T {
-        if Thread.isMainThread { return try body() }
-        return try DispatchQueue.main.sync(execute: body)
+        try AgentLane.shared.onMainWhenIdle(body)
+    }
+
+    /// Runs `body` with every `target(_:)` pinned to `document` (AI-5). The
+    /// one writer of `callDocument`; the `defer` makes it per CALL.
+    func pinning<T>(_ document: ProjectDocument, _ body: () throws -> T) rethrows -> T {
+        callDocument = document
+        defer { callDocument = nil }
+        return try body()
     }
 
     // MARK: - Projects
@@ -499,6 +525,7 @@ final class AgentServer {
     }
 
     private func targetDocument(_ a: [String: Any]) throws -> ProjectDocument {
+        if let pinned = callDocument { return try pinnedTarget(pinned, a) }
         assert(Thread.isMainThread)
         let documents = openProjects()
         if let wanted = try stringArg(a, "project") {
@@ -771,31 +798,21 @@ final class AgentBox<Value> {
     }
 }
 
-/// C callback for `RcAgentToolHandler`: hops to the main thread, executes, and
-/// hands the result back as a core-owned string.
-///
-/// The eight `offMainTools` deliberately do NOT hop — they wait on work the
-/// main thread has to perform, so taking it first would deadlock — and reach
-/// the main thread through `AgentServer.onMain` instead.
+/// C callback for `RcAgentToolHandler`: hands the call to the lane, which
+/// takes its lock (what serialises every caller, AI-2), routes it to main or
+/// leaves an `offMainTools` member on this thread, and hands the result back
+/// as a core-owned string.
 private func agentToolTrampoline(
     _ context: UnsafeMutableRawPointer?,
     _ toolName: UnsafePointer<CChar>?,
     _ argumentsJSON: UnsafePointer<CChar>?
 ) -> UnsafeMutablePointer<CChar>? {
-    guard let context = context, let toolName = toolName, let argumentsJSON = argumentsJSON
+    guard context != nil, let toolName = toolName, let argumentsJSON = argumentsJSON
     else { return nil }
-    let server = Unmanaged<AgentServer>.fromOpaque(context).takeUnretainedValue()
     let name = String(cString: toolName)
     let arguments = String(cString: argumentsJSON)
-    let run = { server.execute(tool: name, argumentsJSON: arguments) }
-    let result: String
-    if AgentServer.offMainTools.contains(name) || Thread.isMainThread {
-        // The header's contract is that this is called from the server
-        // thread, which is what makes the off-main branch safe: an off-main
-        // tool waits for the main thread, so taking it here would deadlock.
-        result = run()
-    } else {
-        result = DispatchQueue.main.sync(execute: run)
-    }
+    // The header's contract is that this is called from the server thread,
+    // which is what lets the lane take its lock here.
+    let result = AgentLane.shared.serve(tool: name, argumentsJSON: arguments)
     return result.withCString { rc_agent_string_create($0) }
 }

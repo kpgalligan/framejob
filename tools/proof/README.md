@@ -6111,3 +6111,58 @@ L1 skips as `host: no key`.
 ```sh
 python3 tools/proof/assistant_spike/assistant_spike.py [--only B,H,C,F,T,E,D,L] [--rasterize ~/devel/rasterize]
 ```
+
+## Road map 12's A1 — the agent lane (`assistant_lane_proof.py`, `assistant_lane_probe.swift`)
+
+The last line of `make test` (spec §11 AI-3's "`make test`-reachable
+probe"). It launches no app instance, reads no key and uses no media: every
+child gets the environment without `RC_ASSEMBLYAI_KEY` and
+`ANTHROPIC_API_KEY`. The probe is compiled AS `main.swift` over every file in
+`app/Sources` but the app's own `main.swift`, on `harness/build.sh`'s swiftc
+line with `-D REELCUT_DEV_TOOLS`, into `work/assistant_lane/probe/`, and
+rebuilt only when a source, the probe, the proof or the staticlib is newer
+than it (about 90 s when it is). It prints one `ANSWER {json}` line; nothing
+in it calls `start()`, and every row makes its own documents.
+
+- **L0** (the proof, from the source — the probe cannot see `main.swift`):
+  `app/Sources/main.swift` has a line `AgentLane.prepareAtLaunch()` at top
+  level, between no `#if` and its `#endif`, before the `NSApplicationMain`
+  line.
+- **L1** (AI-3): after `prepareAtLaunch()` alone, `submit add_marker {at,
+  name}` answers ok and `get_project` lists the marker.
+- **L2** (AI-2): 20 concurrent calls, `serve` from background threads (to B by
+  its saved path) alternating with `submit` (pinned to A): every marker on its
+  own document, none refused.
+- **L3** (AI-5): B frontmost, a `submit` pinned to A lands on A; with
+  `project` = B's path it is refused with the AI-5 sentence and neither
+  changes; once A is closed, "no longer open".
+- **L4** (AI-7): `submit` of `record_screen`, `transcribe {engine:
+  "assemblyai"}` and `snapshot_ui` each answers its refusal as written and the
+  hook is never called; `serve snapshot_ui` is not refused by the lane.
+- **L5** (AI-7): `export` Deny to a fresh path ("export writes P", the
+  declined sentence, no file) and onto a sentinel ("export REPLACES S", bytes
+  unchanged); `save_project` Allow writes Q, again Deny asks "save_project
+  REPLACES Q"; `serve save_project` asks nothing and writes R.
+- **L6**: the assistant's catalog has no `record_screen` and no dev tool, and
+  has `transcribe` and `export`.
+- **L7** (#144, AI-12, `serve` from a background thread) and **L8** (the same
+  through `submit`): `add_marker` made between two ticks of a clip-body drag,
+  driven through `TimelineView`'s gesture methods, has not returned two ticks
+  later; after `endGesture` it answers ok, the marker is present and the clip
+  moved; Undo "Add Marker" removes the marker and leaves the clip, Undo "Move
+  Clips" puts the clip back at 0.
+- **L9**: `onMainWhenIdle` on main with a gesture live runs its body at once.
+- **C1** (control): `execute` on main between two ticks, as A0's D2 ran it,
+  loses the marker — the instrument can see #144.
+- **M1** (made to fail on purpose): L0 against a scratch copy of `main.swift`
+  with the prepare line deleted, and the probe's L1 under `--no-prepare`
+  (the gate is empty, so `add_marker` is refused for `at` and `name`), must
+  BOTH fail.
+
+A probe that does not build is a scored FAIL. Exit 0 only when every row
+passes.
+
+```sh
+python3 tools/proof/assistant_lane_proof.py               # L0–L9, C1, M1
+python3 tools/proof/assistant_lane_proof.py --no-prepare  # the mutant alone: L0 and L1 FAIL, exit 1
+```

@@ -24,17 +24,18 @@ import Foundation
 /// correctness guard (§11.2). The gate keeps every one of them: it runs
 /// before the handler and reads nothing but names.
 ///
-/// **What it reads.** The catalog string `start()` registered with the
-/// server — the same bytes a caller sees over `tools/list` — parsed once into
+/// **What it reads.** The catalog string `prepareCatalog()` built at launch
+/// (spec §11 AI-3) — the same bytes `start()` registers with the server and a
+/// caller sees over `tools/list` — parsed once into
 /// each tool's property names. The startup parity check's five parts already
 /// say that catalog is exactly the dispatch table, that every op tool prints
 /// the core's own arguments and that `project` and `scope` are on the tools
 /// they belong to (`AgentServer+Parity.swift`), so the set compared against
 /// here is the one those five vouch for. It is state for
-/// `proseWithoutArgument`'s reason: written once, inside `start()`, from the
-/// catalog `start()` has just built, and only read after — on the main
-/// thread and, for the `offMainTools`, on the server thread, which is safe
-/// because nothing writes it while a server is up.
+/// `proseWithoutArgument`'s reason: written once, by `prepareCatalog()` from
+/// `main.swift` at launch, before any other thread exists, and only read
+/// after — on the main thread and, for the `offMainTools`, on the lane's
+/// caller's thread, which is safe because nothing writes it again.
 ///
 /// **What it speaks.** The APP's sentence — the tool, the strangers and the
 /// whole of what the tool does take — rather than the core's serde wording:
@@ -53,11 +54,12 @@ import Foundation
 extension AgentServer {
 
     /// Every tool's published property names, keyed by tool, from the
-    /// catalog `start()` registered.
+    /// catalog `prepareCatalog()` built.
     private(set) static var publishedArguments: [String: Set<String>] = [:]
 
-    /// Reads `catalog` — the string `catalogJSON()` answered and
-    /// `rc_agent_server_start` was handed — into `publishedArguments`. A
+    /// Reads `catalog` — the string `catalogJSON()` answered, which
+    /// `prepareCatalog()` memoises and `start()` hands to
+    /// `rc_agent_server_start` — into `publishedArguments`. A
     /// tool the catalog does not describe, or describes with no properties,
     /// takes NOTHING: the parity check has already complained about that
     /// catalog, and a gate that waved a call through for want of a schema

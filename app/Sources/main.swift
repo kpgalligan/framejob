@@ -8,4 +8,8 @@ NSApplication.shared.delegate = delegate
 #if REELCUT_DEV_TOOLS
 DevAppearance.apply()
 #endif
+// The catalog, the gate and the parity check, once, before any other thread
+// exists (spec §11 AI-3): the assistant needs the gate whether or not the MCP
+// server is ever started.
+AgentLane.prepareAtLaunch()
 _ = NSApplicationMain(CommandLine.argc, CommandLine.unsafeArgv)

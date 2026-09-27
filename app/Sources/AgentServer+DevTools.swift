@@ -52,6 +52,10 @@ extension AgentServer {
         return merged
     }
 
+    /// Every dev tool's name, in either build (empty in Distribution): the
+    /// assistant withholds each one (spec §11 AI-7, `AssistantToolTable`).
+    static var devToolNames: Set<String> { Set(devHandlers.keys) }
+
     #if REELCUT_DEV_TOOLS
     // dist_check.py parses the next line (D1) and requires it bare — nothing after the
     // closing quote — at least 16 bytes, present in Release's binary, absent from Distribution's.

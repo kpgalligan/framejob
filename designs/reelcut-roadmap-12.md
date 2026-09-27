@@ -1,12 +1,14 @@
 # Road map 12 — the Assistant tab
 
-**Status: PROPOSED 2026-09-27; the user answered §6 the same day. §4's decisions are recorded in
-spec §11 (`11-decisions/assistant.md`, AI-1..AI-11) and A0 ran the same day (§7). No product
-code is built.** This is the design the user asked for:
+**Status: IN PROGRESS. PROPOSED 2026-09-27; the user answered §6 the same day. §4's decisions
+are recorded in spec §11 (`11-decisions/assistant.md`, AI-1..AI-12) and A0 ran the same day
+(§7). A1 part 1 of 3, the lane, is built (§8); parts 2 (the helper) and 3 (the session) are
+not, and there is no assistant a person can use yet.** This is the design the user asked for:
 an AI agent in the editor, "designed in the same way that the agent for
 `~/devel/rasterize` is". §1 is what Rasterize built. §2 is what carries over unchanged.
 §3 is what Reelcut needs that Rasterize did not. §4 is the decisions §11 must record
 before any code is written. §5 is the phases. §6 is the user's answers. §7 is A0's record.
+§8 is A1's record.
 
 ## 1. What Rasterize built
 
@@ -439,3 +441,87 @@ phase fixes it; it is filed as #144.
 **Rerun.** `python3 tools/proof/assistant_spike/assistant_spike.py [--only B,H,C,F,T,E,D,L]`
 (about 5 min, the copy and both builds made fresh each run;
 `tools/proof/assistant_spike/README.md`).
+
+## 8. A1 record
+
+A1 is three parts: 1, the lane (below); 2, the helper and its build; 3, the session, the two
+dev tools and the end-to-end proof, which closes this record.
+
+### Part 1 — the lane (2026-09-27)
+
+**Decision first.** Spec §11 AI-12 was recorded before any code: a tool call that arrives
+during a live gesture waits for mouse-up, then runs, for every caller, because the lane is
+shared. It fixes #144.
+
+**What landed.**
+- `app/Sources/AgentLane.swift` (new). `serve` is the MCP trampoline's door, synchronous, on the
+  server thread. `submit` is the session's door: it returns at once and completes once, on the
+  lane's serial queue. One `NSLock` admits one call at a time from either caller and is never
+  taken on main. An `offMainTools` member runs in place, and every other tool runs through
+  `onMainWhenIdle`. A `submit` first answers a withheld tool's refusal. For an ask-first tool it
+  builds the question on main, puts it to the hook on main and waits for the first answer, all
+  BEFORE the lock; a Deny answers "The person declined: <sentence>." without running the tool.
+  Otherwise it runs inside `AgentServer.pinning(document)`. `onMainWhenIdle` runs `body` in
+  place on main. Off main, it does `main.sync` and skips while any open document
+  `isLiveEditing`, retrying every 20 ms with no bound. `pinnedTarget` refuses a closed pinned
+  document and a `project` naming another, each in AI-5's sentence. `prepareAtLaunch()` runs
+  `prepareCatalog()` and logs a throw as `Reelcut: `.
+- `app/Sources/AssistantToolTable.swift` (new). AI-7's one table, with a reason on every
+  row. Every dev tool is withheld through `AgentServer.devToolNames`. It also holds
+  the refusal sentence, the question (`export` / `export_captions`: their `path`, tilde-expanded;
+  `save_project`: its `path`, else `fileURL`; `consolidate_media`: `<fileURL>/media`; "REPLACES"
+  when a file exists) and the assistant's catalog, which drops only unconditional withheld rows.
+- `AgentServer.swift` (frozen; wiring only, +17 net lines). The trampoline calls
+  `AgentLane.shared.serve`. `onMain` is `AgentLane.shared.onMainWhenIdle`. `callDocument` and
+  `pinning` are added. `targetDocument` checks `callDocument` first. `prepareCatalog()` holds
+  `start()`'s old catalog, gate and parity lines, memoised on success, and `start()` calls it.
+  The `callScope` and trampoline comments say the lane's lock is what serialises calls.
+- `AgentServer+DevTools.swift`: `devToolNames`. `AgentServer+Gate.swift`: the doc comment only.
+  `main.swift`: `AgentLane.prepareAtLaunch()` at top level, before `NSApplicationMain`.
+- `Makefile`: `test: rust`, and `python3 tools/proof/assistant_lane_proof.py` as the recipe's
+  last line (AI-3's `make test`-reachable probe).
+- Documents: spec §7.9 "The lane", §7.4's row, `app/CLAUDE.md`, the root `CLAUDE.md`'s and the
+  README's `make test` lines, the README's file-table row and its mid-gesture sentence.
+
+**What was measured.** `tools/proof/assistant_lane_proof.py` scored 12/12 inside `make test`.
+Its probe, compiled over 259 sources, built in 93 s (the `--no-prepare` run's build; in the
+`make test` run it was already up to date).
+- L0: the launch path, read from `main.swift`, at line 14, before `NSApplicationMain` at 15.
+- L1: after `prepareAtLaunch()` alone, `submit add_marker {at, name}` answered ok and
+  `get_project` listed it.
+- L2: 20 concurrent calls, 10 `serve` to B by path and 10 `submit` pinned to A. There were 0
+  errors, and every marker landed on its own document.
+- L3: with B frontmost, a call pinned to A landed on A. With `project` = B's path it was refused
+  in AI-5's words, and neither document changed. With A closed, the answer was "no longer
+  open".
+- L4: `record_screen`, `transcribe {engine: "assemblyai"}` and `snapshot_ui` were each refused as
+  written, and the hook was never called. `serve snapshot_ui` was not refused.
+- L5: 11 of 11 checks passed. "export writes P" was declined with no file written, and
+  "export REPLACES S" was declined with S's bytes unchanged. `save_project` Allow wrote Q, and
+  the same call again asked "save_project REPLACES Q". `serve save_project` asked nothing and
+  wrote R.
+- L6: the Release catalog's 89 tools become 84 for the assistant: no `record_screen` and no
+  dev tool, with `transcribe` and `export` kept.
+- L7 (`serve`) and L8 (`submit`): `add_marker` sent between two ticks of a clip-body drag had
+  not returned two ticks later. After mouse-up it answered ok, the marker was present, and the
+  clip had moved from 0 to 1200000. Undo "Add Marker" removed the marker and left the clip;
+  Undo "Move Clips" put the clip back at 0.
+- L9: `onMainWhenIdle` on main, with a gesture live, answered in under 0.1 ms.
+- C1 (control): `execute` on main between ticks lost the marker, as A0's D2 did.
+- #144 was closed on L7 and L8.
+- M1, made to fail on purpose: with the prepare line deleted from a scratch copy of
+  `main.swift`, L0 fails. Without `prepareAtLaunch()`, L1 fails: the gate refuses "add_marker does
+  not take at and name". `--no-prepare` alone scores 0/2 and exits 1.
+
+`make typecheck` stays at 0 errors and 7 warnings, `make lint` is clean and `make app` builds.
+The built app, launched on port 4861, logged no `Reelcut: ` line and passed
+`op_argument_proof.py` 150/150 with every call through the lane.
+
+**What is owed.**
+- Part 2: the helper and its build.
+- Part 3: the session, which calls `submit`, and `assistant_send` / `assistant_answer`.
+- The end-to-end proof: a launch without `-AgentServerEnabled`, and export Deny, Allow and Stop.
+- The lane's rows run in a probe, not the built app. The launch path is checked from the source
+  (L0), not by launching.
+- A gesture held down holds the lane's lock and every other caller with it: AI-12's accepted
+  risk.
