@@ -8,6 +8,9 @@ finds is traced to the menu selectors that reach it, synchronously
 later (`reached_after`: from a sheet or panel completion, an async hop or an
 AppKit delegate callback, with the `via` line and the `gate` that must hold).
 Every other live selector is read to `none`, `window` or `framework`.
+The grep counts the APP-MODAL `presentError(` (road map 11's V2b) — the
+`presentError(_:)` / `NSApp.presentError(_:)` that runs a modal loop — and
+not the sheet form `presentError(_:modalFor:…)`, which is not modal.
 
   I1  every leaf of `buildMainMenu()` (the probe's `menu` mode) has its
       selector in `selectors`, and every row there names a live selector;
@@ -32,12 +35,14 @@ SOURCES = os.path.join(ROOT, "app", "Sources")
 INVENTORY = os.path.join(HERE, "inventory.json")
 
 SITE = re.compile(r"(presentAsSheet|beginSheetModal|beginSheet|runModal)\s*\(|popUp\(positioning:"
-                  r"|nextEvent\(matching:|RunLoop\.\w+\.run\(|CFRunLoopRun\(")
+                  r"|nextEvent\(matching:|RunLoop\.\w+\.run\(|CFRunLoopRun\("
+                  r"|presentError\((?![^)]*modalFor:)")
 SHEET_TOKENS = {"presentAsSheet", "beginSheetModal", "beginSheet"}
-LOOP_TOKENS = {"runModal", "popUp", "runLoop", "nextEvent"}
+LOOP_TOKENS = {"runModal", "popUp", "runLoop", "nextEvent", "presentError"}
 TOKEN_TEXT = {"presentAsSheet": "presentAsSheet", "beginSheetModal": "beginSheetModal",
               "beginSheet": "beginSheet", "runModal": "runModal", "popUp": "popUp(positioning:",
-              "nextEvent": "nextEvent(matching:", "runLoop": "RunLoop."}
+              "nextEvent": "nextEvent(matching:", "runLoop": "RunLoop.",
+              "presentError": "presentError("}
 REF = re.compile(r"(app/Sources/[\w+]+\.swift):(\d+)")
 VERDICTS = {"none", "sheet", "window", "modal", "framework"}
 
@@ -51,6 +56,8 @@ def token_of(match):
         return "popUp"
     if text.startswith("nextEvent"):
         return "nextEvent"
+    if text.startswith("presentError"):
+        return "presentError"
     return "runLoop"
 
 

@@ -596,3 +596,166 @@ L3's "inspector wide enough" skip given the truncation rule's 0.5 pt tolerance
   unexplained; a rerun with a built-in or wired input is owed. Not filed.
 - V2b: `perform_menu_item`, sheet capture through it, and the file-panel refusal proved
   over MCP.
+
+### V2b — `perform_menu_item`, `cancel_sheet` and sheet capture through them (2026-09-27)
+
+**Built.** Two dev tools, every new app line under `#if REELCUT_DEV_TOOLS`.
+- `perform_menu_item {path?}` runs a main-menu item by its titles, delivered to the NAMED
+  project window's own responder chain, answered after a bounded settle; with no `path` it
+  lists every leaf (path, selector, verdict, refusal, enabled, state, hidden).
+- `cancel_sheet {}` closes the sheet attached to a project's window through its own Cancel: a
+  file panel by `endSheet(_:returnCode: .cancel)` on its parent, else the button whose key
+  is Escape, else a lone button; anything else is refused with the buttons' titles.
+
+The app side:
+- `app/Sources/AgentServer+MenuItem.swift` (314 lines): both handlers, argument reading, the
+  window, the settle loop (`UISheet.pollInterval` 20 ms, 5 equal reads, bound 3 s), the
+  results and both catalog rows.
+- `UIMenu.swift` (224): the leaf walk, the path lookup (each level validated before its titles
+  are read), the refusal, the responder walk, validation (`validateMenuItem`, else
+  `validateUserInterfaceItem`; `isEnabled` is never written) and the perform, inside one
+  explicit undo group on the window's document (`performGroupedEdit`'s discipline).
+- `UIMenuTable.swift` (112): `UIMenu.verdicts`, one row per `inventory.json` selector, in
+  its order (93).
+- `UISheet.swift` (85): the settle fingerprint (attached sheet, `NSApp.modalWindow`, the
+  sorted visible window numbers) and the Cancel search and press.
+- `AgentServer+DevTools.swift` (89): the two handlers, `devOffMainTools` and the two catalog
+  rows. `UISnapshot.swift`: `kind(of:)` and `row(_:)` lost `private`.
+- `AgentServer.swift`, `AgentCatalog.swift` and `AgentServer+Snapshot.swift` are untouched.
+
+The proof side:
+- `tools/proof/capture_spike/inventory.py`: the site grep counts the app-modal
+  `presentError(` (not `presentError(_:modalFor:…)`) as a loop token (V1's Owed).
+- `inventory.json`: five `presentError` sites, and `newProject:` read `modal` (below).
+- `dev_tools.py`: `DEV_TOOLS = ["snapshot_ui", "perform_menu_item", "cancel_sheet"]`.
+- `v2_menu.py` (24 rows, T H N D U R S) and `v2_menu_probe.swift`.
+
+**The inventory decision.** Of the five app-modal `presentError` sites only
+`AppDelegate.swift:170`, New Project's failure path, is reached INSIDE a menu action, so
+`newProject:` is `modal` and refused; the `new_project` tool is the capability.
+`EditorViewController.swift:415` is `playback.onError`, reported asynchronously after any edit:
+an app-modal started outside a call services the main queue (V1's S4) and holds no call open.
+`FileDropView.swift:52` (a Finder drop), `WelcomeWindowController.swift:189` (the Recent
+buttons) and `ProjectDocument.swift:1332` (`present(_:)` with no window, which
+`perform_menu_item` cannot reach — it reaches editor actions only through a window) are
+reached by no menu item. Of the six `runModal` lines, Quit (`:121`) and Allow Agent
+Connections (`:212`) are refused; `ExportSheetPresets.swift:289` needs the Export sheet's
+Save…, `FFmpegRewrap.swift:473` a chosen file, and `GraphicPane+Source.swift:200, 205` no menu
+item — neither tool presses any of those.
+
+**Measured.** Host: console not locked; the person's windows over the editors (V2a's O2
+skipped on the same host, below).
+- `make typecheck`: 0 errors, 7 unique warnings. `make app` exit 0. `make dist` exit 0,
+  `dist_check: 5/5`. `grep "Reelcut: "` printed nothing on every launch; the startup log
+  reads `reelcut-dev-tools-compiled-in, 3 dev tools`.
+- **Delivery was measured first** (`--only T,D`, fresh instance on 4881): 7 pass, 0 fail,
+  0 skip, digest `1e678078…62974`; the same after the script's last edit.
+  - D0: the cover up over B's frame, B read `occluded: true`, the listing `active: false`.
+  - D1: Add Marker to B went to `Reelcut.EditorViewController`; B markers +1, A +0;
+    `active` false, B occluded; the action took 5–7 ms and the settle 124–136 ms over the
+    runs.
+  - D2: with no `project` the front project, A, was resolved; A +1, B +0, `active` false.
+  - D3: Export… on B had its sheet (`NSWindow`) at the answer and A none; `snapshot_ui
+    window: sheet` captured 420 × 671 px, equal to points × scale; `cancel_sheet` pressed
+    `Cancel` (`cancel_button`) and no sheet was attached at its answer (settled in 129–143 ms).
+  - D4: Settings… went to `Reelcut.AppDelegate`; `windows_opened` held one `settings` row,
+    `active` false; `snapshot_ui window: settings` captured 460 × 340 px.
+  - Each cover episode lasted 1.6–1.7 s.
+- **Final runs**: two fresh instances on port 4881, each `24 pass, 0 fail, 0 skip of 24`,
+  digest `91ac4a50f3154e1a383c540a7a06537b5640beb3bd2705b688976312fbedd011`, exit 0.
+  - H1: 145 leaves, 93 live selectors, 93 rows, 46 grep sites (41 + the five
+    `presentError`), 0 problems. H2: the table and the inventory agree both ways. H3: 18
+    leaves refused, framework 16 and modal 2. H4: the fake leaf `v2Stranger:` alone, and the
+    table without `addActionAtPlayhead:` alone, were reported.
+  - N1: the live menu has 172 leaves and 104 live selectors. Unclassified, AppKit's:
+    `_handleInsertFromContactsCommand:`, `_handleInsertFromCreditCardsCommand:`,
+    `_handleInsertFromPasswordsCommand:`, `closeAll:`, `duplicateDocument:`, `moveDocument:`,
+    `renameDocument:` ×1 each, `makeKeyAndOrderFront:` ×3, `orderFrontCharacterPalette:` ×3,
+    `showWritingTools:` ×11, `startDictation:` ×2.
+  - U1: two Add Markers +2, `undo` +1, `undo` +0.
+  - R1–R6: the Undo item (retitled "Undo Add Marker") refused `framework` naming `undo:`;
+    New Project refused `modal` naming `newProject:` with the editor count unchanged; Clear
+    Range with no range refused `disabled`; an unknown item and menu refused listing
+    `Export…` and `File`; Clip ▸ Transition refused `submenu`; `[]` refused; a Window-menu
+    window item refused `unclassified` naming `makeKeyAndOrderFront:`.
+  - S1: Export… on A, settled, captured 420 × 671 px with 250 and 387 colours (runs 1 and
+    2); Add Marker refused `disabled` while it was up; cancelled with nothing changed. S2:
+    Remove Track's alert (`_NSAlertPanel`) captured 260 × 138 px, cancelled by `Cancel`,
+    tracks and clips unchanged. S3: Add Media… put up an `NSOpenPanel` (`file_panel` true);
+    `snapshot_ui window: sheet` refused it as a file panel; `cancel_sheet` ended it
+    (`end_sheet`), media unchanged. S4: `cancel_sheet` with none refused. S5: all 14 answers
+    settled, 124–158 ms, no modal window.
+- **Mutants**, each on a fresh instance (M1–M4 after `make app`), each file restored and
+  `cmp`-checked against a saved copy:
+  - **M1**, `refusal` answers nil for `framework`: H3 (framework 0 refused), N1 and R1 fail.
+    R1's Undo was PERFORMED inside the perform's undo group and the app died:
+    `NSInternalInconsistencyException`, "undo was called with too many nested undo groups";
+    every later R and S row then failed on the lost connection.
+  - **M2**, `sendAction(…, to: nil, …)`: D1 and D2 fail — nothing handled Add Marker with
+    the app inactive (V1's S0) — and so does every later row that performs an editor item
+    (D3, D4, U1, R1–R6, S1–S5), since the tool refuses an action nothing handled.
+  - **M3**, no undo group: U1 alone fails — one undo took both markers, the second took
+    D1's (+0, then −1).
+  - **M4**, `isEnabled` always true: R3 (Clear Range performed) and S1 (Add Marker performed
+    under the sheet) fail, and only those.
+  - **M5**, `inventory.json`'s `newProject:` back to `window` (no rebuild): H1 (I3,
+    "reaches presentError at app/Sources/AppDelegate.swift:170 synchronously but is not
+    modal"), H2 and N1 fail, and only those.
+- **The older proofs**, each on a fresh instance:
+  - `v2_snapshot.py` (4882, V2a's launch line): `28 pass, 0 fail, 1 skip of 29`, digest
+    `3ee9cf1c…ebbd9`, V2a's own digest for that skip — O2, `host: editor occluded without the
+    cover`. A first run launched without `-ReelcutInspectorSection.text.animation '<false/>'`
+    also skipped L3 (`host: Reveal collapsed`); that launch was not V2a's line.
+  - `op_argument_proof.py`: 149/149 on Release (4883), 145/145 on Distribution (4884), the
+    three dev tools all present with marker count 3 / all absent.
+
+**Deviations from this road map's V2 text and the V2b spec.**
+- Both tools run OFF main (`AgentServer+DevTools.swift:68`), as `snapshot_ui` does: the
+  settle sleeps between reads, and every AppKit touch is an `onMain` hop.
+- Delivery is the tool's own responder walk and `NSApp.sendAction(_:to:from:)` to the object
+  found (`UIMenu.swift:123`, `:150`, `:207`), not `performActionForItem`, which is
+  nil-targeted.
+- The refusal list is an ALLOW-table (`UIMenu.swift:109`, `UIMenuTable.swift`): a selector
+  with no row is refused as `unclassified`, so AppKit's injected items and any item added
+  after the inventory are refused until the inventory and the table read them; H1/H2 fail
+  until both are written.
+- `newProject:` is reclassified `window` → `modal` (`inventory.json`, its `code` now
+  `AppDelegate.swift:166, :170`), so New Project is refused.
+- `cancel_sheet` (`AgentServer+MenuItem.swift:101`) is a tool the road map did not name; it is
+  how the proof closes what it opened.
+- `perform_menu_item` with no `path` lists every leaf (`AgentServer+MenuItem.swift:49`).
+- The proof is a new `v2_menu.py`, not an extension of `v2_snapshot.py`.
+- A path names the title the menu SHOWS after validation, so Edit ▸ Undo is "Undo Add
+  Marker" once there is something to undo; R1 reads the Undo item's path from the listing
+  (`v2_menu.py:454`) instead of the spec's literal `["Edit", "Undo"]`, which the first full
+  run refused as `not found`.
+- H3 holds each refusal to the probe's OWN table (`v2_menu.py:288`), and H4's table
+  control subtracts any difference already present (`v2_menu.py:301`), so M5 fails exactly
+  H1, H2 and N1 as the spec names; before that change M5 failed H4 too.
+- A perform whose `sendAction` answers false is refused ("nothing handled it",
+  `AgentServer+MenuItem.swift:68`), a refusal the spec's list did not name; it is what M2
+  hits.
+- `v2_menu.py`'s `guarded` (`:565`) fails a letter's remaining rows by name when a call
+  throws, so a mutant run still prints every row, `scores:` and `digest:`.
+- M3 was made by always taking the ungrouped branch (`guard …, document == nil`) and M4 by
+  an always-true first line in `isEnabled`; each is the mutant the spec names.
+
+**Review.** litecode, full route, with no fix passes. The adversary raised no objections. It
+noted one unevidenced risk: a sheet still attached while it animates closed could end the
+settle early. No run showed it; every `cancel_sheet` answered with no sheet attached, in
+129–158 ms. The review passed with no blockers and two nits, both listed under Owed.
+
+**Owed.**
+- A row for a sheet that arrives AFTER the action returns (Speed… / Paste's reverse progress
+  sheet needs rendered media): the settle covers it by design and nothing here measured it.
+- The V1 spike's I rows read the grown inventory (46 sites, `newProject:` modal) and were not
+  re-run; V1's record above still quotes 41 sites and one `modal` selector, as it measured.
+- `UIMenu.swift:151`: `target(for:)` takes an item's explicit `target` without asking
+  `responds(to:)`, so an item AppKit would disable passes `isEnabled`. The perform's "nothing
+  handled it" refusal catches it afterwards, not before (review nit).
+- `UISheet.swift:68`: a file panel with no `sheetParent` returns nil, and `cancel_sheet`'s
+  refusal (`AgentServer+MenuItem.swift:113-118`) then talks about an Escape button and a
+  button count, which does not describe a file panel (review nit).
+- The `CLAUDE.md` lines listed in the implementation notes were applied by hand: `app/CLAUDE.md`'s
+  four map entries and two edits, and root `CLAUDE.md`'s dev-tool paragraph under "Seeing the
+  chrome".

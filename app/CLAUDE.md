@@ -1090,8 +1090,33 @@ free.
   Release's binary and absent from Distribution's; a tool NAME cannot be the
   marker, because an `-O` binary stores a literal of 15 bytes or fewer
   inline. Its tables hold
-  `snapshot_ui` (V2a); a dev tool is counted apart from the product tools
-  (`tools/proof/dev_tools.py`).
+  `snapshot_ui` (V2a), `perform_menu_item` and `cancel_sheet` (V2b); a dev
+  tool is counted apart from the product tools (`tools/proof/dev_tools.py`).
+- `AgentServer+MenuItem.swift` — `perform_menu_item` and `cancel_sheet`
+  (road map 11's V2b, dev only, wholly under the flag). It runs a main-menu
+  item by path in a NAMED project window's own responder chain, never
+  nil-targeted, and works with the app inactive and the window occluded
+  (measured, V2b's D rows). It refuses by name an item that is disabled, a
+  submenu, `framework`, `modal` or unclassified. It answers after a settle:
+  reads 20 ms apart, answered on 5 equal, bounded at 3 s. `cancel_sheet`
+  closes an attached sheet through its own Cancel. Both run off main
+  (`devOffMainTools`), and every AppKit touch is an `onMain` hop.
+- `UIMenu.swift` — the menu tool's main-thread half. It walks the menu's
+  leaves and looks up a path, validating each level first because a
+  validator may retitle an item. It holds the refusal, an ALLOW table where
+  a selector with no row is `unclassified`, and the responder walk and
+  validation, which never write `isEnabled`. It performs the item inside one
+  explicit undo group on the window's document, with `performGroupedEdit`'s
+  discipline; without that, two performed edits merge into one undo step
+  (mutant M3).
+- `UIMenuTable.swift` — `UIMenu.verdicts`, one row per selector, a mirror of
+  `tools/proof/capture_spike/inventory.json` in its order. `v2_menu.py`'s H2
+  holds the two together, and H1 holds the inventory to the live menu, so a
+  new menu item needs a row in both.
+- `UISheet.swift` — the settle fingerprint (the attached sheet, the modal
+  window, the visible window numbers) and the Cancel: a file panel is ended
+  with `.cancel`, otherwise the Escape button is pressed, otherwise a lone
+  button.
 - `AgentServer+Snapshot.swift` — `snapshot_ui` (road map 11's V2a, dev only,
   wholly under the flag). It lists the windows, or captures the editor (whole
   or a region), an attached sheet, Settings or Welcome through `cacheDisplay`:
@@ -1106,7 +1131,8 @@ free.
   containers), holds the window facts and the listing, and stages: the
   appearance on the live window, and the fill as an `NSImageView` just above
   `playerHost`, under `safeGuides` and `overlay` (V1's W4a). It also runs one
-  `cacheDisplay` pass.
+  `cacheDisplay` pass. `kind(of:)` and `row(_:)` are internal, not private,
+  because the menu tool's result rows use them.
 - `UISnapshotLayout.swift` — the layout dump. A pre-order walk over non-hidden
   views and three rules, each with a 0.5 pt tolerance: ambiguous;
   outside_superview, except under an `NSClipView` or at zero area; truncated,

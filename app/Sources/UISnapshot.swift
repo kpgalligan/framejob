@@ -127,7 +127,7 @@ enum UISnapshot {
         ]
     }
 
-    private static func kind(of window: NSWindow) -> String {
+    static func kind(of window: NSWindow) -> String {
         if window.contentViewController is EditorViewController { return "editor" }
         if window.sheetParent != nil { return "sheet" }
         if window.windowController is SettingsWindowController { return "settings" }
@@ -136,7 +136,7 @@ enum UISnapshot {
         return "other"
     }
 
-    private static func row(_ window: NSWindow) -> [String: Any] {
+    static func row(_ window: NSWindow) -> [String: Any] {
         let frame = window.frame
         let content = window.contentView?.bounds.size ?? .zero
         var project: Any = NSNull()

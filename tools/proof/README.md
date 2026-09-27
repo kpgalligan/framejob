@@ -5779,7 +5779,10 @@ frontmost and the display on; otherwise they skip by name. W4a–c's answer
 depends on the display scale (the recorded digest is scale 2's; on a scale-1
 screen W4a–c pass): the probe puts its windows on a scale-2 (built-in)
 screen when one exists, and without one W4a–c skip as
-`host: no scale-2 screen`.
+`host: no scale-2 screen`. Since road map 11's V2b the inventory's site grep
+(`capture_spike/inventory.py`) also counts the APP-MODAL `presentError(` —
+`presentError(_:)` and `NSApp.presentError(_:)`, not the sheet form
+`presentError(_:modalFor:…)` — as a loop token.
 
 ```sh
 python3 tools/proof/capture_spike/capture_spike.py [--only q1,q2,q3,q4] [--rebuild]
@@ -5848,3 +5851,59 @@ python3 tools/proof/v2_snapshot.py <port> [--log PATH] [--only T,N,O,C,F,A,L,P]
 `dev_tools.py` names the dev tools once (`DEV_TOOLS`, in catalog order) and
 reads the startup marker's count (`dev_marker_count`). The scripts that
 assert an exact tool set subtract `DEV_TOOLS` first.
+
+## Road map 11's V2b — `perform_menu_item` and `cancel_sheet` (`v2_menu.py`, `v2_menu_probe.swift`)
+
+The phase proof of the second and third dev tools, over `mcp.py`. It runs
+against the Release app launched fresh on its port with V2a's pinned defaults
+plus `-RCSecretFolder "$PWD/tools/proof/work/v2_menu/secrets"` (the Settings
+window it opens then reads no real key store). Before the first MCP call it:
+- writes two fixtures, `work/v2_menu/fixtures/menu_{a,b}.reelcut` (version 10,
+  640×360 at 30 fps, one track, a shape at 0 s and one at 3 s); B is opened,
+  then A, so A is the front project;
+- for the H rows, builds `v2_menu_probe.swift` over `harness/build.sh`'s swiftc
+  line into `work/v2_menu/probe/`, with `graphic/tests/graphics/*.js` copied to
+  `GraphicTemplates/` beside it so Insert ▸ Graphic has its template items;
+- for the D rows, builds `v2_snapshot.py`'s cover (`v2_cover.swift`).
+
+A build failure is a scored FAIL of the rows that need it; a call that throws
+where a row expected an answer fails the rest of that letter's rows by name.
+
+The 24 rows:
+- **T**: both schemas (`{path, project}` and `{project}`, nothing required,
+  no `scope`), the parity log, the marker count, and the gate on each tool.
+- **H**: the probe walks `AppDelegate().buildMainMenu()` with
+  `UIMenu.leaves(of:)` and prints each leaf's refusal and the whole
+  `UIMenu.verdicts`. H1 puts its leaves to `inventory.check` (0 problems);
+  H2 holds the table to `inventory.json` both ways; H3 holds each leaf's
+  refusal to the table's verdict; H4 is the control — a fake leaf and a
+  removed table row are each reported exactly.
+- **N**: the live listing: an inventoried selector carries its verdict and
+  refusal, every other one is `unclassified` (AppKit's injected items, printed
+  as `selector ×count`), and every inventoried selector is live.
+- **D**: delivery with Reelcut inactive and B covered — the cover over B, then
+  Add Marker to B and to the implicit (front) project, Export… on B captured
+  through `snapshot_ui window: sheet` and cancelled, and Settings… opened and
+  captured. Each answer must read `active: false`.
+- **U**: two performed Add Markers are two undo steps.
+- **R**: the refusals — `undo:` (`framework`; its path read from the listing,
+  since its validator retitles it "Undo Add Marker"), `newProject:`
+  (`modal`), a disabled item, an unknown item and menu, a submenu, an empty
+  path, and a Window-menu window item (`unclassified`).
+- **S**: Export…, Remove Track and Add Media… on A, each opened, captured (the
+  file panel refused by `snapshot_ui`) and cancelled with nothing changed;
+  `cancel_sheet` with no sheet refused; and every answer of the run settled
+  inside the 3 s bound with no modal window.
+
+It performs only Add Marker, Export…, Remove Track, Add Media… (the last three
+cancelled) and Settings…, and never Quit, Close, Save, Revert, Allow Agent
+Connections, New Recording or a Help item.
+
+**The cover** is up once a run, over B's frame, for about two seconds.
+**Named host skips:** Reelcut active skips every D row as `host: Reelcut
+active`, a locked console as `host: console locked`; R6 skips as `host: no
+window-list item` when AppKit put no window in the Window menu.
+
+```sh
+python3 tools/proof/v2_menu.py <port> [--log PATH] [--only T,H,N,D,U,R,S]
+```

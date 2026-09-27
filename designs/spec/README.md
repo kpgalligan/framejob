@@ -38,7 +38,7 @@ this index gets its row in the same change.
 | [`07.6-playback-update-rules.md`](07.6-playback-update-rules.md) | 35 | What playback does after every edit: rebuild or refresh. |
 | [`07.7-import.md`](07.7-import.md) | 18 | `MediaImporter.probe` and the formats import accepts. |
 | [`07.8-export.md`](07.8-export.md) | 232 | Export: writers, formats, loudness, the queue. |
-| [`07.9-agent.md`](07.9-agent.md) | 269 | The MCP agent: one tool per op plus `scope`, the app-state tools, the dev tools, parity, the graphics loop. |
+| [`07.9-agent.md`](07.9-agent.md) | 296 | The MCP agent: one tool per op plus `scope`, the app-state tools, the dev tools, parity, the graphics loop. |
 | [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 75 | The spec's Rust module map (core/CLAUDE.md is the live one). |
 | [`08-repo-layout.md`](08-repo-layout.md) | 63 | Repo layout, build, conventions. |
 | [`09-keys-and-menus.md`](09-keys-and-menus.md) | 133 | The keyboard map and every menu, and keys proposed but not yet bound. |

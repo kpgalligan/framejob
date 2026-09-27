@@ -44,11 +44,12 @@
    "note": "NSApplication.terminate(_:): AppKit's document review, then applicationShouldTerminate — whose runModal (AppDelegate.swift:121) runs only when the export queue is busy; quits the app otherwise"
   },
   "newProject:": {
-   "verdict": "window",
+   "verdict": "modal",
    "code": [
-    "app/Sources/AppDelegate.swift:166"
+    "app/Sources/AppDelegate.swift:166",
+    "app/Sources/AppDelegate.swift:170"
    ],
-   "note": "openUntitledDocumentAndDisplay — a new editor window; on failure NSApp.presentError (AppDelegate.swift:170), an app-modal alert the site grep does not count"
+   "note": "openUntitledDocumentAndDisplay — a new editor window on success; on failure NSApp.presentError (AppDelegate.swift:170), an app-modal alert INSIDE the call, so modal and refused by perform_menu_item (road map 11's V2b); the new_project tool is the capability"
   },
   "newRecording:": {
    "verdict": "window",
@@ -683,6 +684,14 @@
    ],
    "other_caller": ""
   },
+  "app/Sources/AppDelegate.swift:170": {
+   "token": "presentError",
+   "reached_from": [
+    "newProject:"
+   ],
+   "reached_after": [],
+   "other_caller": "app/Sources/WelcomeWindowController.swift:63 — the welcome window's New Project button"
+  },
   "app/Sources/AppDelegate.swift:212": {
    "token": "runModal",
    "reached_from": [
@@ -936,6 +945,12 @@
    "reached_after": [],
    "other_caller": "app/Sources/EditorViewController+Timeline.swift:44 — the track header's context menu"
   },
+  "app/Sources/EditorViewController.swift:415": {
+   "token": "presentError",
+   "reached_from": [],
+   "reached_after": [],
+   "other_caller": "app/Sources/EditorViewController.swift:268 — playback.onError, a failed player rebuild, reported async after any edit; it holds no call open (an app-modal started outside a call services the main queue, V1's S4)"
+  },
   "app/Sources/EditorViewController.swift:653": {
    "token": "beginSheetModal",
    "reached_from": [
@@ -984,6 +999,12 @@
     }
    ],
    "other_caller": "app/Sources/EditorViewController+Inspector.swift:50 — the Media tab's import; app/Sources/AgentServer+Media.swift:74 — import_media (canAsk is false there); app/Sources/ScreenRecorder+Finishing.swift:142 — a finished recording's probe"
+  },
+  "app/Sources/FileDropView.swift:52": {
+   "token": "presentError",
+   "reached_from": [],
+   "reached_after": [],
+   "other_caller": "app/Sources/FileDropView.swift:45 — a Finder drop that will not open"
   },
   "app/Sources/GraphicPane+Source.swift:200": {
    "token": "runModal",
@@ -1059,6 +1080,12 @@
    ],
    "other_caller": "app/Sources/ProjectDocument.swift:940 — the Video tab's Render Reverse button; app/Sources/ReverseRenderer.swift:1222 — after the sheet closes"
   },
+  "app/Sources/ProjectDocument.swift:1332": {
+   "token": "presentError",
+   "reached_from": [],
+   "reached_after": [],
+   "other_caller": "app/Sources/ProjectDocument.swift:1328 — present(_:) for a document with no window; perform_menu_item reaches editor actions only through a window"
+  },
   "app/Sources/RelinkSheetController.swift:123": {
    "token": "beginSheetModal",
    "reached_from": [],
@@ -1086,6 +1113,12 @@
    ],
    "reached_after": [],
    "other_caller": ""
+  },
+  "app/Sources/WelcomeWindowController.swift:189": {
+   "token": "presentError",
+   "reached_from": [],
+   "reached_after": [],
+   "other_caller": "app/Sources/WelcomeWindowController.swift:179 — the welcome window's Recent buttons"
   }
  }
 }

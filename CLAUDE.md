@@ -256,6 +256,13 @@ so nothing about the PICTURE is ever claimed offscreen; pixel claims go over
 MCP. `tools/proof/README.md`'s "offscreen harness" section has the build
 line, the argument list and the pinned `UserDefaults`.
 
+To look at the LIVE app, a Release build (the one `make app` builds, never
+Distribution) has dev tools over MCP (road map 11, spec §11 V-1).
+`snapshot_ui` captures the editor, a sheet, Settings or Welcome, with a
+layout dump. `perform_menu_item` runs a menu item by path to put a sheet or
+Settings up, and `cancel_sheet` closes the sheet. All three work with the
+app inactive and its window covered.
+
 Two rules from it worth carrying into any proof: **identical, stable,
 DIFFERENT output across processes is an Auto Layout ambiguity to find, not a
 race to out-wait** — reach for constraint priorities, not for more run-loop

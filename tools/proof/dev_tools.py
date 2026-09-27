@@ -7,11 +7,13 @@ set of tools subtracts `DEV_TOOLS` first; `op_argument_proof.py` counts them
 apart.
 
 `DEV_TOOLS` is in catalog order: `devTools()` in `AgentServer+DevTools.swift`
-splices its rows in immediately before `import_media`, the first file tool."""
+splices its rows in immediately before `import_media`, the first file tool:
+`snapshot_ui` (road map 11's V2a), then `perform_menu_item` and `cancel_sheet`
+(V2b)."""
 
 import re
 
-DEV_TOOLS = ["snapshot_ui"]
+DEV_TOOLS = ["snapshot_ui", "perform_menu_item", "cancel_sheet"]
 
 MARKER = re.compile(r"Reelcut agent server: reelcut-dev-tools-compiled-in, (\d+) dev tools")
 
