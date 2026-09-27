@@ -62,8 +62,9 @@ final class AgentServer {
     /// `pinning`, on the lane's thread under its lock, before any main hop.
     private(set) var callDocument: ProjectDocument?
 
-    /// The catalog `prepareCatalog()` built, once it has succeeded.
-    private var preparedCatalog: String?
+    /// The catalog `prepareCatalog()` built, once it has succeeded. The
+    /// assistant's session reads it and never prepares (AI-3).
+    private(set) var preparedCatalog: String?
 
     private init() {}
 

@@ -5868,9 +5868,11 @@ fixture's sRGB yellow as [255, 255, 84].
 python3 tools/proof/v2_snapshot.py <port> [--log PATH] [--only T,N,O,C,F,A,L,P]
 ```
 
-`dev_tools.py` names the dev tools once (`DEV_TOOLS`, in catalog order) and
-reads the startup marker's count (`dev_marker_count`). The scripts that
-assert an exact tool set subtract `DEV_TOOLS` first.
+`dev_tools.py` names the dev tools once (`DEV_TOOLS`, in catalog order: the
+four of road map 11, then road map 12 A1's `assistant_send` and
+`assistant_answer`) and reads the startup marker's count
+(`dev_marker_count`). The scripts that assert an exact tool set subtract
+`DEV_TOOLS` first.
 
 ## Road map 11's V2b — `perform_menu_item` and `cancel_sheet` (`v2_menu.py`, `v2_menu_probe.swift`)
 
@@ -6159,7 +6161,9 @@ in it calls `start()`, and every row makes its own documents.
   unchanged); `save_project` Allow writes Q, again Deny asks "save_project
   REPLACES Q"; `serve save_project` asks nothing and writes R.
 - **L6**: the assistant's catalog has no `record_screen` and no dev tool, and
-  has `transcribe` and `export`.
+  has `transcribe`, `export` and every `AssistantPrompt.coreTools` name (A1
+  part 3: a core tool the catalog lacked would be loaded up front by a name
+  the helper was never given).
 - **L7** (#144, AI-12, `serve` from a background thread) and **L8** (the same
   through `submit`): `add_marker` made between two ticks of a clip-body drag,
   driven through `TimelineView`'s gesture methods, has not returned two ticks
@@ -6241,4 +6245,88 @@ no row fails. An instrument that cannot run is a scored FAIL.
 python3 tools/proof/assistant_helper_proof.py --dist build/Build/Products/Distribution/Reelcut.app  # 7/7
 python3 tools/proof/assistant_helper_proof.py --mutant skip-without-bun  # P1 FAIL, exit 1
 python3 tools/proof/assistant_helper_proof.py --mutant no-fields         # P4 FAIL, exit 1
+```
+
+## Road map 12's A1 part 3 — the session (assistant_session_proof.py)
+
+Real assistant turns in the built Release app against a running
+`anthropic_fake.py` (spec §11 AI-3, AI-5, AI-7, AI-8, AI-10, AI-11, AI-13):
+the session (`AssistantSession.swift`) driven over MCP by the dev tools
+`assistant_send` / `assistant_answer`, and without the MCP server by the
+dev-only launch default `-RCDevAssistantSend` / `-RCDevAssistantReport`. It
+works in `work/assistant_session/`, posts each row's scenario to
+`/__control/scenario` and reads `/__control/log`, prints `<ID> ok|FAIL —
+<detail>` per row and then `n/m`, and scores an instrument that cannot run
+as a FAIL. Walls: a port in 60 s; MCP calls 300 s; each assistant `timeout`
+60 s; the W report 150 s; the mutant build 900 s.
+
+Safety: every child's environment has `ANTHROPIC_API_KEY` and
+`RC_ASSEMBLYAI_KEY` popped and none sets either. The only key is the dummy
+`proof-key`, in a `0600` `anthropic-key` in a `0700` scratch
+`-RCSecretFolder`, and `RC_ASSISTANT_BASE_URL` always names the stand-in.
+Each app runs in its own process group; only the proof's own apps are
+killed, with the helper children each started (named by ppid and path,
+`ps -o pid=,ppid=,comm=`, before the app goes).
+
+Launch A (`-AgentServerEnabled YES`, port 4872, the scratch folder, the
+variable):
+- **A0**: no `Reelcut: ` line; the dev-tool marker counts
+  `len(DEV_TOOLS)` = 6; the dev block is `DEV_TOOLS + ["import_media"]`.
+- **T1** (AI-5, AI-10): `new_project` A then B (B frontmost). A scripted
+  `add_marker {at: 1200000, name: "A1 part 3"}` with no `project`, then text;
+  `assistant_send {project: A}` answers `finished` with that text and one
+  `add_marker` `tool_result` event, `is_error` false; A has the marker at
+  1200000, B has none; one MCP `undo {project: A}` removes it.
+- **T2** (T1's stand-in log): `GET /v1/models/claude-opus-5-5`; every POST's
+  model `claude-opus-5-5` and credential `proof-key`; the first POST's
+  system is two non-empty halves joined by `\n\n`; its tools are
+  `tool_search_tool_bm25` then the Release `tools/list` less
+  `record_screen` and `DEV_TOOLS`, in order, with exactly the four core tools
+  up front and every other `defer_loading: true`.
+- **R**: `allow` with nothing pending, `stop` while idle and `answer:
+  "maybe"` are each refused as written; the project is unchanged and the
+  stand-in hears nothing.
+- **D** (Deny): a text clip is added to A; the scripted `export {preset:
+  "h264", path: P_D}` makes `assistant_send` answer `asking`, "export writes
+  P_D", no file; `deny` answers `finished`, still no file; POST 2 carries that
+  call's `tool_result`, `is_error` true, "The person declined: export writes
+  P_D."; the events hold the answer by `person`.
+- **E** (Allow): onto a sentinel at P_E the question is "export REPLACES
+  P_E"; `allow` answers `finished`; P_E has `ftyp` at byte 4; POST 2's
+  `tool_result` has `is_error` false.
+- **S** (Stop): export to a fresh P_S plus a spare text reply; `send` →
+  `asking`; `stop` → `finished`; no file; the answer by `stop`; no stand-in
+  failures. The POST count is printed as a measure.
+- **X** (helper death): export to a fresh P_X → `asking`; the app's own
+  helper child is SIGKILLed; within 10 s a new `assistant_send` is taken and
+  its scripted marker at 2400000 lands on A; no file at P_X; the app lives.
+- **K1**: `proof-key` is in no MCP answer of launch A and nowhere in its log.
+
+Launch B, **W** (`-AgentServerEnabled NO`, the launch default,
+`-ReelcutAssistantModel claude-proof-model`, the folder, the variable, no
+`RC_AGENT_PORT`): the report is `ok`, `server_running` false, `finished`,
+with an `add_marker` `tool_result` `is_error` false and the marker in its
+`get_project`; the stand-in saw `GET /v1/models/claude-proof-model` and
+POSTs with that model and `proof-key`, no failures; the log has no
+`Reelcut: ` and no `listening on` line.
+
+Launch C, **K2** (AI-13: `-AgentServerEnabled YES`, port 4873, NO
+`-RCSecretFolder`, the variable set): after `new_project`, `assistant_send`
+is refused "No Anthropic API key is set…"; the stand-in logged no request;
+the app has no helper child.
+
+**Mutant `no-prepare`**: a copy of the tree in `work/assistant_session/mutant/`
+in `makefile_env_proof.make_copy`'s shape (`app/`, `project.yml`, `Makefile`
+copied; `core`, `graphic`, `docs` symlinked; `agent/` copied without
+`node_modules`), its `AgentLane.prepareAtLaunch()` line (asserted once)
+deleted and `make app` run there; W alone against it must FAIL — the report
+`ok: false`, naming AI-3 — and the run exits 1. A mutant that did not build
+exits 2: the control was not performed.
+
+The mid-drag row is not reachable live (no MCP tool begins a gesture); the
+lane's L8 measures `submit`, the one door the session uses, mid-drag.
+
+```sh
+python3 tools/proof/assistant_session_proof.py                       # 11/11
+python3 tools/proof/assistant_session_proof.py --mutant no-prepare   # W FAIL, exit 1
 ```

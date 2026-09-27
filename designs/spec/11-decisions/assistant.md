@@ -84,3 +84,15 @@ amended by the user's answers in §6).
   The call lands above the gesture's own undo step. It is reversible: the wait is
   `AgentLane.onMainWhenIdle` alone. Risk accepted: a call, and the lane's lock with it, waits
   as long as the mouse is held down.
+- **AI-13 — The assistant's one base-URL override is `RC_ASSISTANT_BASE_URL`, and with it set
+  no key file is opened.** The helper's `api_base` comes from this environment variable alone
+  (the shared `protocol.ts` calls it "an environment variable of its own"; A0's F and T rows
+  used it). Plain `http` is accepted only for a loopback host, as R6-9 allows for AssemblyAI;
+  any other value refuses the session by name. This is AI-8's R6-9 made explicit:
+  `-RCSecretFolder`, from the argument domain, names the folder of `anthropic-key`; with the
+  override set and no `-RCSecretFolder`, NO `FileStore` is built and the store is an empty
+  `MemoryStore`, so the person's file is never read; the store is read first and
+  `ANTHROPIC_API_KEY` second (R6-9 (d)). A variable rather than the argument domain because a
+  variable cannot be persisted in the app's defaults, which is R6-9 (c)'s reason. Risk
+  accepted: a person who exports it sends their environment's key, and only that, to the
+  server it names.

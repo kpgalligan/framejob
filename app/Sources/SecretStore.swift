@@ -66,20 +66,27 @@ enum SecretStoreError: LocalizedError, Equatable {
 /// chose, and a directory the app did not create is not the app's to relax.
 final class FileStore: SecretStore {
 
-    /// The one spelling of the file's name.
+    /// The one spelling of AssemblyAI's file's name, and `name`'s default.
     static let fileName = "assemblyai-key"
 
-    /// The folder the file sits in. `AssemblyAIConfiguration.store` resolves
-    /// it — from `AppSupport.directory` for a person, from `-RCSecretFolder`
-    /// for a proof — and nothing here reaches for a default of its own, so
-    /// there is exactly one line in the tree that can name a person's real
-    /// folder (R6-9).
+    /// The folder the file sits in. `AssemblyAIConfiguration.store` and
+    /// `AssistantConfiguration.store` resolve it — from `AppSupport.directory`
+    /// for a person, from `-RCSecretFolder` for a proof — and nothing here
+    /// reaches for a default of its own, so each key has exactly one line in
+    /// the tree that can name a person's real folder (R6-9, AI-13).
     let directory: URL
 
-    var fileURL: URL { directory.appendingPathComponent(Self.fileName, isDirectory: false) }
+    /// The file's name in `directory`: `fileName` for AssemblyAI's key,
+    /// `AssistantConfiguration.keyFileName` (`anthropic-key`, spec §11 AI-8,
+    /// AI-13) for the assistant's. Each store is one file; the temporary a
+    /// write renames into place carries the same name.
+    let name: String
 
-    init(directory: URL) {
+    var fileURL: URL { directory.appendingPathComponent(name, isDirectory: false) }
+
+    init(directory: URL, name: String = FileStore.fileName) {
         self.directory = directory
+        self.name = name
     }
 
     /// The key, trimmed. An empty or whitespace-only file reads as NO key
@@ -97,7 +104,7 @@ final class FileStore: SecretStore {
     func write(_ secret: String) throws {
         try makeDirectory()
         let temporary = directory.appendingPathComponent(
-            ".\(Self.fileName).\(UUID().uuidString)", isDirectory: false)
+            ".\(name).\(UUID().uuidString)", isDirectory: false)
         let descriptor = temporary.withUnsafeFileSystemRepresentation { path -> Int32 in
             guard let path = path else { return -1 }
             return open(path, O_WRONLY | O_CREAT | O_EXCL, 0o600)

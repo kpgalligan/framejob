@@ -385,14 +385,19 @@ func rowL6() {
         $0["name"] as? String
     })
     let dev = AgentServer.devToolNames
+    // Every core tool (loaded up front, not deferred) must be one the
+    // assistant is handed, or the helper would be told to load a stranger.
+    let missingCore = AssistantPrompt.coreTools.filter { !names.contains($0) }
     let ok = !dev.isEmpty && !names.contains("record_screen") && names.isDisjoint(with: dev)
-        && names.contains("transcribe") && names.contains("export")
-    measure["l6"] = ["catalog": tools.count, "assistant": names.count, "dev": dev.sorted()]
+        && names.contains("transcribe") && names.contains("export") && missingCore.isEmpty
+    measure["l6"] = ["catalog": tools.count, "assistant": names.count, "dev": dev.sorted(),
+                     "core_tools": AssistantPrompt.coreTools]
     row("L6", ok,
         "\(tools.count) tools → \(names.count) for the assistant; record_screen "
             + "\(names.contains("record_screen")), dev tools \(dev.sorted()) present "
             + "\(!names.isDisjoint(with: dev)), transcribe \(names.contains("transcribe")), "
-            + "export \(names.contains("export"))")
+            + "export \(names.contains("export")), core tools \(AssistantPrompt.coreTools) "
+            + "missing \(missingCore)")
 }
 
 // MARK: - The drag rows: L7, L8 (#144, AI-12), L9 and C1

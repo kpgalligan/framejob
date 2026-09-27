@@ -1,9 +1,10 @@
 # Road map 12 — the Assistant tab
 
 **Status: IN PROGRESS. PROPOSED 2026-09-27; the user answered §6 the same day. §4's decisions
-are recorded in spec §11 (`11-decisions/assistant.md`, AI-1..AI-12) and A0 ran the same day
-(§7). A1 parts 1 and 2 built (§8): the lane, and the helper and its build. Part 3 (the
-session) is not, and there is no assistant a person can use yet.** This is the design the user asked for:
+are recorded in spec §11 (`11-decisions/assistant.md`, AI-1..AI-13) and A0 ran the same day
+(§7). A1 is built (§8): the lane, the helper and its build, and the session with its two dev
+tools and end-to-end proof. A2 (the Assistant tab) is next; until it lands there is no
+assistant a person can use.** This is the design the user asked for:
 an AI agent in the editor, "designed in the same way that the agent for
 `~/devel/rasterize` is". §1 is what Rasterize built. §2 is what carries over unchanged.
 §3 is what Reelcut needs that Rasterize did not. §4 is the decisions §11 must record
@@ -635,3 +636,95 @@ The built app, launched on port 4861, logged no `Reelcut: ` line and passed
 - #147: Rasterize takes §2's change.
 - Part 3: the session sends the three fields (Reelcut's core set, A0 C3), the key, the model,
   `assistant_send` and `assistant_answer`, the end-to-end proof, and closing A1's record.
+
+### Part 3 — the session (2026-09-27)
+
+**Decision first.** Spec §11 AI-13 was recorded before any code: the assistant's one base-URL
+override is `RC_ASSISTANT_BASE_URL`, plain `http` only for a loopback host, and with it set and
+no `-RCSecretFolder` no key file is opened (AI-8's R6-9 made explicit).
+
+**What landed.**
+- `app/Sources/AssistantSession.swift` (new, 399 lines): Rasterize's `AssistantHelperSession`,
+  ported. `open(document:)` refuses, in order, a bad base URL, no key, a catalog not prepared
+  at launch (it reads `AgentServer.preparedCatalog` and never prepares), no bundled helper, and
+  a helper that will not start, each in its own sentence. The helper gets exactly `HOME`,
+  `TMPDIR` and `PATH=/usr/bin:/bin`, and a `configure` carrying the key, the model, the
+  placeholder system prompt, the assistant's catalog, the core tools, the search guide, the
+  compaction instructions, the chat settings and `api_base`. Tool requests run one at a time
+  through `AgentLane.submit`, never `execute`; results are spliced verbatim; every write goes
+  through one serial queue, `F_SETNOSIGPIPE` on the write end. `send` sets busy before its
+  write. Every ask-first question is answered exactly once: Allow/Deny, Stop, close, the
+  helper's exit, `deinit`, and a hop reaching a closed, cancelling or released session.
+- `AssistantConfiguration.swift` (new): the key store (`anthropic-key`, AI-13's order), the
+  credential (store, then `ANTHROPIC_API_KEY`), the base URL, the model
+  (`ReelcutAssistantModel`, else `claude-opus-5-5`) and the chat settings.
+  `AssistantPrompt.swift` (new): the core tools `get_project`, `render_frame`, `undo`, `redo`
+  and three placeholder texts A3 replaces.
+- `SecretStore.swift`: `FileStore` gains `name` (default `assemblyai-key`).
+  `AssemblyAIConfiguration.swift`: `argument` is internal, the one argument-domain reader.
+- `EditorViewController.swift` (frozen): one stored `assistant` with its AI-4 comment;
+  `EditorViewController+Assistant.swift` (new): `assistantSession()` and the window's
+  `willClose`. `AgentServer.swift` (frozen): `preparedCatalog` is `private(set)`.
+  `AgentLane.swift`: `releasingLock`.
+- Dev only: `AgentServer+Assistant.swift` (new), `assistant_send` and `assistant_answer`, off
+  main, waiting inside `releasingLock`; `AgentServer+DevTools.swift`: their rows after
+  `select_inspector_tab`; `DevAssistantLaunch.swift` (new), `-RCDevAssistantSend` /
+  `-RCDevAssistantReport`, installed from `main.swift` after `DevAppearance.apply()`.
+- Proofs: `tools/proof/assistant_session_proof.py` (new); `dev_tools.py` gains the two tools;
+  the lane probe's L6 also requires every core tool in the assistant's catalog.
+- Documents: spec §7.9 (the two tools, "The assistant session"), §7.4's lane row, the spec
+  index's counts, `app/CLAUDE.md`, the root `CLAUDE.md`'s dev-tool list, the README's file
+  row, `tools/proof/README.md`.
+
+**What was measured.** Every command ran as `(unset ANTHROPIC_API_KEY RC_ASSEMBLYAI_KEY; …)`.
+- `make typecheck`: 0 errors and 7 warnings (the baseline); `tsc --noEmit` printed nothing.
+  `make lint` was clean. `make test` exited 0: 73 cargo test result lines, 968 tests passed
+  and 0 failed, and the lane proof scored 12/12, its probe built over 265 sources in 95 s. L6:
+  91 tools become 84 for the assistant, no core tool missing.
+- `make app` built; `make dist` ended `dist_check: 5/5`.
+- The Release app on port 4871 logged no `Reelcut: ` line, and `op_argument_proof.py` passed
+  152/152, the two new tools' strangers refused by the gate naming `[answer, project,
+  timeout]` and `[project, text, timeout]`.
+- `assistant_session_proof.py` scored 11/11:
+  - A0: the marker counted 6 dev tools, in `dev_tools.py`'s order before `import_media`.
+  - T1: with B frontmost, the scripted `add_marker` landed on A only, at 1200000, in a
+    `finished` turn answered in 125 ms; one MCP `undo {project: A}` ("Add Marker") removed it.
+  - T2: one `GET /v1/models/claude-opus-5-5` and 2 POSTs, each with the model and the dummy;
+    the system's halves were 291 and 254 characters; 85 tools, the search tool first, then the
+    catalog less `record_screen` and the dev tools in order, with exactly the four core tools
+    up front.
+  - R: the three refusals as written; the project unchanged and the stand-in silent.
+  - D: "export writes …/D.mp4" asked, Deny answered in 53 ms, no file; POST 2's
+    `tool_result` was `is_error` true, "The person declined: export writes …/D.mp4.".
+  - E: "export REPLACES …/E.mp4" asked; Allow answered in 351 ms; the file has `ftyp` at
+    byte 4, and POST 2's `tool_result` was `is_error` false.
+  - S: Stop answered `finished` in 58 ms, no file, the question declined by "stop", after 1
+    POST (the measure).
+  - X: after the helper child was SIGKILLed mid-question, one send was refused and the next,
+    0.4 s after the kill, was taken; its marker at 2400000 landed on A, no file was written,
+    and the app lived.
+  - K1: `proof-key` appeared in none of 25 MCP answers and not in the log.
+  - W (no MCP server): the report was `ok`, `server_running` false, `finished`, with the
+    marker in its `get_project`; the stand-in saw `GET /v1/models/claude-proof-model` and 2
+    POSTs with that model and the dummy; no `Reelcut: ` and no `listening on` line.
+  - K2: with no `-RCSecretFolder`, `assistant_send` was refused "No Anthropic API key is
+    set…"; the stand-in logged 0 requests and the app had no helper child.
+- Made to fail on purpose: `--mutant no-prepare` built its copy in 105 s, and W failed with
+  the report's error "The tool catalog was not prepared at launch (spec §11 AI-3), so the
+  assistant cannot start."; 0/1, exit 1.
+- `assistant_helper_proof.py --dist …` still scored 7/7.
+
+**Limits.**
+- The mid-drag row is not reachable live: no MCP tool begins a gesture. The lane's L8
+  measures `submit`, the one door the session uses, mid-drag.
+- Every turn is against the stand-in; nothing reached api.anthropic.com.
+- The prompt texts are placeholders (A3).
+
+**Issues filed.**
+- #148: the lane's one serial queue lets one window's pending question hold every other
+  window's assistant calls.
+- #149: Stop does not interrupt a tool already running (an `export` in flight finishes).
+- #150: proof gaps — a window closed with a question pending (`performClose:` is `framework`
+  in `UIMenuTable.swift`) and the `ANTHROPIC_API_KEY` override (no proof child may carry it).
+
+**A1 is closed.** Its three parts are built and proven; A2, the Assistant tab, is next.

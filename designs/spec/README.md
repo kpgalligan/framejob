@@ -33,17 +33,17 @@ this index gets its row in the same change.
 | [`07.1-ffi-surface.md`](07.1-ffi-surface.md) | 116 | The `rc_*` exports and their contracts. |
 | [`07.2-composition-plan.md`](07.2-composition-plan.md) | 114 | The composition plan: A/B assignment, speed and freeze, audio envelopes, instructions. |
 | [`07.3-frame-recipe.md`](07.3-frame-recipe.md) | 267 | The per-frame recipe the compositor draws: layers, nests, recipe options, burn-in. |
-| [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 39 | The spec's Swift file map (app/CLAUDE.md is the live one). |
+| [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 40 | The spec's Swift file map (app/CLAUDE.md is the live one). |
 | [`07.5-compositor.md`](07.5-compositor.md) | 106 | The Metal compositor's passes, and transitions. |
 | [`07.6-playback-update-rules.md`](07.6-playback-update-rules.md) | 35 | What playback does after every edit: rebuild or refresh. |
 | [`07.7-import.md`](07.7-import.md) | 18 | `MediaImporter.probe` and the formats import accepts. |
 | [`07.8-export.md`](07.8-export.md) | 232 | Export: writers, formats, loudness, the queue. |
-| [`07.9-agent.md`](07.9-agent.md) | 314 | The MCP agent: one tool per op plus `scope`, the app-state tools, the dev tools, parity, the graphics loop. |
+| [`07.9-agent.md`](07.9-agent.md) | 390 | The MCP agent: one tool per op plus `scope`, the app-state tools, the dev tools, parity, the graphics loop, the lane and the assistant session. |
 | [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 75 | The spec's Rust module map (core/CLAUDE.md is the live one). |
 | [`08-repo-layout.md`](08-repo-layout.md) | 64 | Repo layout, build, conventions. |
 | [`09-keys-and-menus.md`](09-keys-and-menus.md) | 133 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 1607 in 11 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 1784 in 12 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

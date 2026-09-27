@@ -278,7 +278,10 @@ the key map behind it.
   a nest; the three marker commands validate OFF inside one, because a
   nest-local tick sent unscoped would land at the wrong project time),
   `+Motion` (Clip ▸ Motion ▸, one `set_video` PER CLIP; inactive stored edge
-  titles refreshed at validation), `+Export` (the
+  titles refreshed at validation), `+Assistant` (`assistantSession()`: the
+  window's live session or a new one, stored in the frozen file's
+  `assistant` — spec §11 AI-4 — and closed by the window's `willClose`),
+  `+Export` (the
   dialogs), `+SaveFrame` (⌥⌘E; renders off-main on `frameGrabQueue`; passes
   no burn-in), `+PreviewQuality`, `+Eyedropper` and `+ZoomRegion`.
 - The two modal canvas modes (`+Eyedropper`, `+ZoomRegion`) install a bare
@@ -773,10 +776,14 @@ free.
 - `AssemblyAIConfiguration.swift` · `AssemblyAILanguages.swift` ·
   `SecretStore.swift` — WHERE the client speaks and WHAT it says it is.
   `AssemblyAIConfiguration` is the ONE reader of `-RCAssemblyAIEndpoint` and
-  `-RCSecretFolder`, both out of the ARGUMENT domain only, and the ONE line
+  `-RCSecretFolder`, both out of the ARGUMENT domain only (its `argument` is
+  the one argument-domain reader, which `AssistantConfiguration` and
+  `DevAssistantLaunch` reuse), and the ONE line
   in the feature that names `AppSupport.directory` (spec §11's R6-9: with an
   endpoint set and no secret folder, `store()` answers an EMPTY `MemoryStore`
-  so a proof never opens the person's key). Non-`https` is accepted only for
+  so a proof never opens the person's key). `FileStore` has a `name`:
+  `assemblyai-key` by default, `anthropic-key` for the assistant's key
+  (AI-8, AI-13, whose `RC_ASSISTANT_BASE_URL` plays R6-9's endpoint). Non-`https` is accepted only for
   `127.0.0.1`, `localhost` and `::1`. `FileStore` creates its file with
   `O_CREAT|O_EXCL` at `0600` under a temporary name and `rename(2)`s it, in a
   directory it `mkdir`s at `0700` — never `chmod`ed after; `MemoryStore` is
@@ -1099,6 +1106,10 @@ free.
   or a refusal by name when it is closed or `project` names another.
   `prepareAtLaunch()` runs `prepareCatalog()` from `main.swift`, at top level
   before `NSApplicationMain` — `assistant_lane_proof.py`'s L0 reads that line.
+  `releasingLock` runs a body with the lock released and relocks in a
+  `defer`; its only callers are the two assistant dev tools, which `serve`
+  runs under the lock on that thread and which wait for a turn whose own
+  `submit` calls need it.
 - `AssistantToolTable.swift` — spec §11 AI-7's ONE table: withheld
   (`record_screen`; `transcribe` only with `engine: "assemblyai"`; every dev
   tool, from `AgentServer.devToolNames`) and ask-first (`export`,
@@ -1106,6 +1117,37 @@ free.
   row; the refusal sentence, the question (main only: the path the call
   writes, tilde-expanded, and whether a file is already there — "REPLACES")
   and the assistant's catalog, which drops only an unconditional withheld row.
+- `AssistantSession.swift` — one window's assistant conversation (road map
+  12 A1, spec §11 AI-1, AI-4, AI-5, AI-7), a port of Rasterize's
+  `AssistantHelperSession`. `open(document:)` refuses, in order and each in
+  its own sentence, a bad `RC_ASSISTANT_BASE_URL`, no key, a catalog not
+  prepared at launch (it READS `AgentServer.preparedCatalog` and never
+  prepares — AI-3 stays a trap that can fail), and no bundled helper; the
+  helper gets exactly `HOME`, `TMPDIR` and `PATH=/usr/bin:/bin`, and the key
+  only in the first stdin line, `configure`. Main only; every write goes
+  through the one serial `writeQueue` (`HelperInput`, so a write after the
+  close is nothing), `F_SETNOSIGPIPE` on the write end. Tool requests run ONE
+  at a time through `AgentLane.submit` (never `execute`), results spliced
+  verbatim. `send` sets busy BEFORE its write, so the phase reads `busy` the
+  moment it returns true; `turn_started` does not clear `cancelRequested`.
+  **Every question is answered exactly once** — Allow/Deny, Stop, `close`,
+  the helper's exit, `deinit`, and a hop that reaches a closed, cancelling or
+  released session (the `askFirst` closure is `[weak self]` and REPLIES when
+  `self` is nil) — because an unanswered one holds the lane's one queue for
+  every window. `events` is append-only and never holds a `tool_request` or
+  the key.
+- `AssistantConfiguration.swift` — the assistant's key (spec §11 AI-8), base
+  URL (AI-13), model (AI-11) and chat settings. `store()` is AI-13's whole
+  decision: `-RCSecretFolder` (read through
+  `AssemblyAIConfiguration.argument`, the argument domain alone) → a
+  `FileStore` named `anthropic-key`; else `RC_ASSISTANT_BASE_URL` set → an
+  EMPTY `MemoryStore`; else the one `AppSupport.directory` line. The store
+  first, `ANTHROPIC_API_KEY` second. `model()` is `ReelcutAssistantModel`,
+  else `claude-opus-5-5`; no tool reads or writes it.
+- `AssistantPrompt.swift` — the core tools loaded up front (`get_project`,
+  `render_frame`, `undo`, `redo`; the lane probe's L6 holds each to the
+  assistant's catalog) and the three PLACEHOLDER texts A3 replaces: the
+  system prompt, the search guide and the compaction instructions.
 - `AgentServer+DevTools.swift` — the dev tools' seam (road map 11, spec
   §11 V-1/V-2): the handler table, catalog rows and off-main set compiled
   only under `REELCUT_DEV_TOOLS`, which Debug and Release set and
@@ -1115,8 +1157,9 @@ free.
   Release's binary and absent from Distribution's; a tool NAME cannot be the
   marker, because an `-O` binary stores a literal of 15 bytes or fewer
   inline. Its tables hold
-  `snapshot_ui` (V2a), `perform_menu_item` and `cancel_sheet` (V2b), and
-  `select_inspector_tab` (V3); a dev tool is counted apart from the product tools (`tools/proof/dev_tools.py`).
+  `snapshot_ui` (V2a), `perform_menu_item` and `cancel_sheet` (V2b),
+  `select_inspector_tab` (V3), and `assistant_send` and `assistant_answer`
+  (road map 12 A1); a dev tool is counted apart from the product tools (`tools/proof/dev_tools.py`).
 - `AgentServer+MenuItem.swift` — `perform_menu_item` and `cancel_sheet`
   (road map 11's V2b, dev only, wholly under the flag). It runs a main-menu
   item by path in a NAMED project window's own responder chain, never
@@ -1156,6 +1199,22 @@ free.
   `snapshot_ui` refuses `appearance` and names this default instead. It is
   not in `AppDelegate.swift`, because a line added there moves the `runModal`
   sites that `inventory.json` pins by line.
+- `AgentServer+Assistant.swift` — `assistant_send` and `assistant_answer`
+  (road map 12 A1, dev only, wholly under the flag). Both run off main
+  (`devOffMainTools`): one `onMain` resolves the target, the editor and the
+  session and sends, answers or stops; then the wait for "not busy" runs
+  INSIDE `AgentLane.releasingLock`, polling the phase every 50 ms, because
+  the turn's own calls need the lock. The target is resolved BEFORE the
+  release, never inside it, where an assistant call may hold
+  `callDocument`. `assistant_answer` never opens a session. The answer is
+  the state, the question, the text deltas joined and the other events since
+  the call — never the key or the model.
+- `DevAssistantLaunch.swift` — `-RCDevAssistantSend <text>
+  -RCDevAssistantReport <path>`, a dev-only launch default (road map 12 A1),
+  both from the argument domain alone: after launch, one turn in an untitled
+  project with or without the MCP server, a `get_project` through the lane,
+  one atomic JSON report, and the session closed. One key alone is one
+  stderr line. Installed from `main.swift` after `DevAppearance.apply()`.
 - `AgentServer+Snapshot.swift` — `snapshot_ui` (road map 11's V2a, dev only,
   wholly under the flag). It lists the windows, or captures the editor (whole
   or a region), an attached sheet, Settings, Welcome or the recorder panel through `cacheDisplay`:
@@ -1338,7 +1397,8 @@ this entry rather than growing the list), `ScreenRecorder.shareableContent`'s
 global hop, `GraphicStore`'s serial queue (its file-system sources'
 handlers, the coalesced pass and the outbox; main publishes through
 `drain()` and never waits on it but by `queue.sync`), the cache's main
-hop, and the agent lane's serial queue (`AgentLane.swift`). The recorder adds
+hop, the agent lane's serial queue (`AgentLane.swift`), and the assistant
+session's write queue (`AssistantSession.swift`). The recorder adds
 NO queue of its own:
 framework callbacks are stamped where they land and hopped to main. Colors,
 fonts and metrics come from `DS` tokens; shared controls go in

@@ -171,7 +171,7 @@ enum AssemblyAIConfiguration {
     /// persisted in the app's own plist — by a previous session, by an
     /// installer, by anything running as the person — move where the key is
     /// read from, which is exactly what this rule forbids. Empty is absent.
-    private static func argument(_ key: String, defaults: UserDefaults) -> String? {
+    static func argument(_ key: String, defaults: UserDefaults) -> String? {
         let domain = defaults.volatileDomain(forName: UserDefaults.argumentDomain)
         guard let value = domain[key] as? String, !value.isEmpty else { return nil }
         return value

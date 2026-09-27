@@ -233,7 +233,10 @@ envelope key, plus the app-state tools — `open_project`, `new_project`,
 `get_graphic`, `graphic_reference`, `render_graphic`, `import_graphic_font`
 and `import_graphic_asset`. A Release build also has the dev tools
 (`snapshot_ui`, `perform_menu_item`, `cancel_sheet`, `select_inspector_tab`;
-"Seeing the chrome" below), which Distribution does not. `rc_op_names`
+"Seeing the chrome" below; and `assistant_send` / `assistant_answer`, which
+drive a window's assistant turn against a stand-in server, with the dev-only
+launch default `-RCDevAssistantSend <text> -RCDevAssistantReport <path>` for
+a turn in a launch without the server), which Distribution does not. `rc_op_names`
 and the catalog are the authority for the counts; the parity check compares
 them at startup. `render_frame` writes a PNG and returns its path; `export`
 waits for the file.

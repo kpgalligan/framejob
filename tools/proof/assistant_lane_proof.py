@@ -8,7 +8,9 @@ probe".
           its `#endif`), before the `NSApplicationMain` line
   L1–L9   the probe's rows (`assistant_lane_probe.swift`, compiled over
           `app/Sources` minus `main.swift` on `harness/build.sh`'s swiftc line
-          with `-D REELCUT_DEV_TOOLS`, rebuilt only when stale)
+          with `-D REELCUT_DEV_TOOLS`, rebuilt only when stale); L6 also
+          requires every `AssistantPrompt.coreTools` name in the assistant's
+          catalog (A1 part 3)
   C1      the control: `execute` on main mid-drag loses the marker, so the
           instrument can see #144
   M1      made to fail on purpose: L0 against a scratch copy of `main.swift`

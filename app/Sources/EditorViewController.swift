@@ -76,6 +76,11 @@ final class EditorViewController: NSViewController {
     /// probe.
     var previewWindow: PreviewWindowController?
 
+    /// This window's assistant conversation (spec §11 AI-4: one per window,
+    /// owned outside any view), once asked for; `+Assistant` holds the rest.
+    /// Stored here for `previewWindow`'s reason: an extension cannot hold it.
+    var assistant: AssistantSession?
+
     // MARK: - Panes
 
     /// Spec §3's three regions. The containers are stable; their contents are

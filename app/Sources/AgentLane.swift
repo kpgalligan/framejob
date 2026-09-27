@@ -134,6 +134,17 @@ final class AgentLane {
         return (try? server.callResult(content: content, isError: true)) ?? fallback
     }
 
+    /// `body` with the lock RELEASED, relocked in a `defer` before this
+    /// returns. Its only callers are the two assistant dev tools, which
+    /// `serve` runs under the lock on this thread: while one waits for a
+    /// turn, the turn's own `submit` calls need the lock.
+    func releasingLock<T>(_ body: () throws -> T) rethrows -> T {
+        assert(!Thread.isMainThread)
+        lock.unlock()
+        defer { lock.lock() }
+        return try body()
+    }
+
     // MARK: - The gesture wait (AI-12)
 
     /// On main: `body` in place, with no gesture check, no `main.sync` and no
