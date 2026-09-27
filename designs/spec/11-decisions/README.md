@@ -17,10 +17,11 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | [`effects-motion.md`](effects-motion.md) | 60 | **Transitions and motion (road map 5).** R5-1..R5-5, E2-27. |
 | [`deepening.md`](deepening.md) | 268 | **Deepening (road map 7).** D2-1, D3-1, #21, #22, D4-1..D4-6, D7-1..D7-3: how ops refuse, the op table, the gate, the source window, time envelopes. |
 | [`cloud-captions.md`](cloud-captions.md) | 242 | **Cloud captions (road map 6).** R6-1..R6-16: AssemblyAI, keys, deletion, recovery. |
-| [`word-captions.md`](word-captions.md) | 112 | **Word captions (road map 8).** W-1..W-10. |
+| [`word-captions.md`](word-captions.md) | 117 | **Word captions (road map 8).** W-1..W-10. |
 | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) | 306 | **Chrome, the clip inspector and keys (the sharp pass, road map 9, #35).** SH-1, SH-2, CI-1..CI-15, K-1, K-2. |
 | [`graphics.md`](graphics.md) | 281 | **Graphics (road map 10).** G-1..G-16. |
 | [`dev-tools.md`](dev-tools.md) | 27 | **Dev tools (road map 11).** V-1..V-3: the `REELCUT_DEV_TOOLS` flag and `make dist`, dev tools as ordinary tools, capture by `cacheDisplay`. |
+| [`assistant.md`](assistant.md) | 78 | **The Assistant (road map 12, in progress).** AI-1..AI-11: the bundled helper, one lane, the catalog at launch, the fourth tab, the window's own project, W-9's reach, withheld and ask-first tools, the key, history, undo, the model. |
 
 ## Every decision
 
@@ -101,7 +102,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | W-6 | `words` is not an animation target, and `paste_attributes` treats it as part of `content` | [`word-captions.md`](word-captions.md) |
 | W-7 | Pages are filled to a MEASURED width, in one Swift builder, and the cue builder does not change | [`word-captions.md`](word-captions.md) |
 | W-8 | The minimum is macOS 26, and the on-device engine is `SpeechTranscriber` | [`word-captions.md`](word-captions.md) |
-| W-9 | No language model chooses words | [`word-captions.md`](word-captions.md) |
+| W-9 | No language model chooses words — amended by AI-6 | [`word-captions.md`](word-captions.md) |
 | W-10 | `set_text` can patch `case`, `words` and `word_style` | [`word-captions.md`](word-captions.md) |
 | SH-1 | `StickerButton` keeps its pill | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
 | SH-2 | `BlockSliderCell.drawBar` is forked from Rasterize's copy | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
@@ -141,3 +142,14 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | V-1 | Dev tools are compiled only under `REELCUT_DEV_TOOLS`; Distribution ships without them | [`dev-tools.md`](dev-tools.md) |
 | V-2 | A dev tool is not an op, but goes through the catalog, gate and parity check like any tool | [`dev-tools.md`](dev-tools.md) |
 | V-3 | Screens are captured with `cacheDisplay`, never ScreenCaptureKit | [`dev-tools.md`](dev-tools.md) |
+| AI-1 | The assistant is a bundled helper, and the app never calls Anthropic itself | [`assistant.md`](assistant.md) |
+| AI-2 | The helper owns no tools; every call goes through `AgentServer.execute` by way of one lane | [`assistant.md`](assistant.md) |
+| AI-3 | The catalog and the gate are prepared at launch, not at `start()` | [`assistant.md`](assistant.md) |
+| AI-4 | The Assistant is the inspector's fourth tab: Clip, Media, Document, Assistant | [`assistant.md`](assistant.md) |
+| AI-5 | The assistant edits its own window's project | [`assistant.md`](assistant.md) |
+| AI-6 | W-9 governs automatic styling, not a person's request | [`assistant.md`](assistant.md) |
+| AI-7 | What the assistant may not call, and what it must ask about first | [`assistant.md`](assistant.md) |
+| AI-8 | The key is the person's own, and is R6-5 and R6-12's key in everything but the vendor | [`assistant.md`](assistant.md) |
+| AI-9 | History is append-only, and end-of-turn compaction is the one rewrite | [`assistant.md`](assistant.md) |
+| AI-10 | Each tool call the assistant makes is its own undo step | [`assistant.md`](assistant.md) |
+| AI-11 | The default model is `claude-opus-5-5` at medium effort | [`assistant.md`](assistant.md) |

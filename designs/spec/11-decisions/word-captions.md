@@ -106,6 +106,11 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
 - **W-9 — No language model chooses words.** Keyword emphasis and emoji
   insertion are left out: every styled word is styled by its position in
   time, never by its meaning (road map 8 §4 W-9).
+  **Amended 2026-09-27, by AI-6 (road map 12): W-9 governs automatic
+  styling, not a person's request.** No PIPELINE picks words by meaning.
+  The assistant writes a caption's text or style only because the person
+  asked it to in the conversation, and each such edit is an ordinary undo
+  step.
 - **W-10 (the core's sentence) — `set_text` can patch `case`, `words` and
   `word_style`,** because deepening D1 makes every declared key patchable.
   That is the agent's door, and it is not a promise that a hand-restyled

@@ -2,6 +2,7 @@
 
 > **Scope: Reelcut only** (`kpgalligan/reelcut`, AppKit in `app/Sources/`).
 > Everything in this folder is about the Reelcut editor window. A separate handoff exists for Rasterize. It is not referenced here and none of its parts belong in this codebase. Do **not** add a tool rail, options bar, layers panel, assistant panel, status bar or zoom HUD to Reelcut.
+> *Amended 2026-09-27 by spec §11 AI-4 (road map 12): the Assistant is the inspector's fourth tab, never a panel of its own; the rest of this line stands.*
 
 ## Overview
 

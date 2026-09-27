@@ -6084,3 +6084,30 @@ python3 tools/proof/v3_tools.py [--port 4872] [--app APP] [--only L,T,R]   # →
 shows Picture's rows); `UISnapshot.openWindow(.recorder)` answering
 `RecorderPanelController.shared.window` fails R1 alone (the capture is taken
 instead of refused).
+
+## Road map 12's A0 — the assistant spike (`assistant_spike/`, `anthropic_fake.py`)
+
+The spike behind A1's plumbing: Rasterize's Bun helper (`agent/`, renamed
+`reelcut-agent`) built, placed in `Contents/Helpers` and signed by Rasterize's
+own build step, in a COPY of the tree under `work/assistant_spike/tree/` with
+a hook (`AssistantSpikeHook.swift`) that exists only there. It answers
+whether the helper launches from a Release and a Distribution bundle under
+the hardened runtime and needs its one entitlement (B, H), how big the
+catalog is and whether it wants tool search (C), whether a stand-in Messages
+server scripts a whole turn — a `tool_use`, the tool's result, then text —
+against the built app (F, T), whether `export` replaces an existing file
+(E), and what an agent edit does to a timeline drag in progress (D, a probe
+built from `app/Sources`). 32 scored rows, a digest. Its README has the rows,
+the copy, the run order and the output; the answers are in
+`designs/reelcut-roadmap-12.md` §7. `anthropic_fake.py` is the stand-in, at
+the top level because A1 reuses it: `port <n>` first, a scripted reply per
+`POST /v1/messages` (SSE when the body asks to stream), and R6-9(e)'s
+credential rule — only `proof-key` and `wrong-key` are ever logged.
+`ANTHROPIC_API_KEY` is popped from every child's environment; with it
+present, C3 counts the catalog through `count_tokens` and L1 searches every
+file the spike and the builds wrote for it, and without it C3 estimates and
+L1 skips as `host: no key`.
+
+```sh
+python3 tools/proof/assistant_spike/assistant_spike.py [--only B,H,C,F,T,E,D,L] [--rasterize ~/devel/rasterize]
+```
