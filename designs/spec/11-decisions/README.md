@@ -20,7 +20,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | [`word-captions.md`](word-captions.md) | 112 | **Word captions (road map 8).** W-1..W-10. |
 | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) | 306 | **Chrome, the clip inspector and keys (the sharp pass, road map 9, #35).** SH-1, SH-2, CI-1..CI-15, K-1, K-2. |
 | [`graphics.md`](graphics.md) | 281 | **Graphics (road map 10).** G-1..G-16. |
-| [`dev-tools.md`](dev-tools.md) | 24 | **Dev tools (road map 11).** V-1..V-3: the `REELCUT_DEV_TOOLS` flag and `make dist`, dev tools as ordinary tools, capture by `cacheDisplay`. |
+| [`dev-tools.md`](dev-tools.md) | 27 | **Dev tools (road map 11).** V-1..V-3: the `REELCUT_DEV_TOOLS` flag and `make dist`, dev tools as ordinary tools, capture by `cacheDisplay`. |
 
 ## Every decision
 

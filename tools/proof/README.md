@@ -5773,7 +5773,8 @@ live window's appearance (q3), and `hasAmbiguousLayout` plus the truncation
 heuristic in an `-O` build (q4). A probe built from `app/Sources` with
 `-O -wmo -D REELCUT_DEV_TOOLS`, six bounded modes, 38 scored rows, a digest.
 Its README has the rows, the build line and the output; the answers are in
-`designs/reelcut-roadmap-11.md`'s V1 record. The W, S and A rows need the
+`archive/reelcut-roadmap-11.md`'s V1 record (condensed in
+`designs/adr/roadmap-11-dev-tools.md`). The W, S and A rows need the
 probe's window on screen and the probe active — run it with the terminal
 frontmost and the display on; otherwise they skip by name. W4a–c's answer
 depends on the display scale (the recorded digest is scale 2's; on a scale-1

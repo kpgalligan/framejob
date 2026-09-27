@@ -36,7 +36,7 @@ comment citing "road map N §x" refers to the archived original.
 |---|---|
 | `designs/spec/` | **The normative spec, one file per section — never read it whole.** Start at its `README.md` (the index: each file, its size, what it answers), then read only the file you need; "spec §7.3" is `07.3-frame-recipe.md`. §5 schemas, §6 op table, §7 architecture, §9 keys and menus, §10 acceptance steps, §11 decisions already made — not to be re-litigated, indexed by ID in `11-decisions/README.md`. An ADR cites §11's IDs; it never replaces them. |
 | GitHub issues | **What is left**, and the one place it is kept: open defects, proof residue, candidates, accepted limits, work the user deferred (`gh issue list`), and what only a person at the machine can check (`--label ready-for-human`). Nothing open is tracked in a document. |
-| `designs/adr/` | One condensed decision record per closed road map, survey or file history: why the code is the shape it is. Start with the one for the area: `roadmap-03` the recorder · `roadmap-04` `detect_silence` · `roadmap-05` transitions and `video.motion` · `roadmap-06` transcription (C2, the relay, designed and deferred) · `roadmap-07` how a patch is checked, what an op answers, where its arguments are written down, the source window, the argument gate · `roadmap-08` word captions · `roadmap-09` the Clip tab, the action lane, band drags · `roadmap-10` graphics · `app-file-history` / `core-file-history` why a file or module is cut where it is, and its named next cut · `rust-build-settings` why release builds are incremental with no LTO · `effects-survey` E3–E9 (deferred by the user) and **the Concat rule: it is AGPL-3.0; none of its code, shaders, chains or colour tables may be carried over** · `remaining-closed` the debts already paid. |
+| `designs/adr/` | One condensed decision record per closed road map, survey or file history: why the code is the shape it is. Start with the one for the area: `roadmap-03` the recorder · `roadmap-04` `detect_silence` · `roadmap-05` transitions and `video.motion` · `roadmap-06` transcription (C2, the relay, designed and deferred) · `roadmap-07` how a patch is checked, what an op answers, where its arguments are written down, the source window, the argument gate · `roadmap-08` word captions · `roadmap-09` the Clip tab, the action lane, band drags · `roadmap-10` graphics · `roadmap-11` the dev tools (snapshot_ui, perform_menu_item, the screen catalog) and `make dist` · `app-file-history` / `core-file-history` why a file or module is cut where it is, and its named next cut · `rust-build-settings` why release builds are incremental with no LTO · `effects-survey` E3–E9 (deferred by the user) and **the Concat rule: it is AGPL-3.0; none of its code, shaders, chains or colour tables may be carried over** · `remaining-closed` the debts already paid. |
 | `designs/design_handoff_reelcut/` | The shipped chrome cleanup and identity; its README is normative for the redesign's metrics. |
 | `designs/design_handoff_reelcut_sharp/` | The sharp pass (2026-09-23): square chrome, 2 pt clips, the zoom slider's block knob. Its README is normative for radii and the knob, with spec §11 SH-1 and SH-2 as the deviations. |
 | `designs/design_handoff_clip_inspector/` | The clip inspector handoff road map 9 built from; `designs/adr/roadmap-09-clip-inspector.md` records the deviations. |
@@ -220,7 +220,9 @@ envelope key, plus the app-state tools — `open_project`, `new_project`,
 `normalize_clip`, `set_playhead`, `set_range`, `set_selection`, `set_scope`,
 `undo`, `redo`, `render_frame`, `export`, `record_screen`, `write_graphic`,
 `get_graphic`, `graphic_reference`, `render_graphic`, `import_graphic_font`
-and `import_graphic_asset`. `rc_op_names`
+and `import_graphic_asset`. A Release build also has the dev tools
+(`snapshot_ui`, `perform_menu_item`, `cancel_sheet`, `select_inspector_tab`;
+"Seeing the chrome" below), which Distribution does not. `rc_op_names`
 and the catalog are the authority for the counts; the parity check compares
 them at startup. `render_frame` writes a PNG and returns its path; `export`
 waits for the file.
@@ -252,10 +254,11 @@ have, and it silently writes a black PNG. The way to LOOK at the chrome is
 `.reelcut` package, puts an `EditorViewController` in an `NSWindow` and
 `cacheDisplay`s it into a PNG at the display's backing scale — the same paint
 path the window uses, no TCC grant, either appearance, captured on SETTLE.
-The preview well comes out black (a Metal layer has no drawable offscreen),
-so nothing about the PICTURE is ever claimed offscreen; pixel claims go over
-MCP. `tools/proof/README.md`'s "offscreen harness" section has the build
-line, the argument list and the pinned `UserDefaults`.
+The preview well comes out as the canvas background (an `AVPlayerLayer` or
+Metal layer does not draw into `cacheDisplay`), so nothing about the PICTURE
+is ever claimed offscreen; pixel claims go over MCP. `tools/proof/README.md`'s
+"offscreen harness" section has the build line, the argument list and the
+pinned `UserDefaults`.
 
 To look at the LIVE app, a Release build (the one `make app` builds, never
 Distribution) has dev tools over MCP (road map 11, spec §11 V-1).

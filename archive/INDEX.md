@@ -25,6 +25,7 @@ comments that cite "road map N §x". The spec they cite as `designs/reelcut-desi
 | `reelcut-roadmap-8.md` | `designs/adr/roadmap-08-word-captions.md` | Road map 8: word captions in the social-video style (W0–W4b). |
 | `reelcut-roadmap-9.md` | `designs/adr/roadmap-09-clip-inspector.md` | Road map 9: the clip inspector redesign (CI-1..CI-15). |
 | `reelcut-roadmap-10.md` | `designs/adr/roadmap-10-graphics.md` | Road map 10: motion graphics drawn by code (QuickJS + resvg, the `graphic/` crate). |
+| `reelcut-roadmap-11.md` | `designs/adr/roadmap-11-dev-tools.md` | Road map 11: the dev tools (`REELCUT_DEV_TOOLS`, `make dist`, `snapshot_ui`, `perform_menu_item`, `cancel_sheet`, `select_inspector_tab`, `-RCDevAppearance`) and the screen catalog. |
 | `svg-motion-components-plan.md` | `designs/adr/svg-motion-plan.md` | The proposal road map 10 reviewed, and what was adopted, amended or rejected. |
 | `reelcut-effects-survey.md` | `designs/adr/effects-survey.md` | The effects survey road map 5 came from. E3–E9 are deferred by the user. It also holds the Concat AGPL rule. |
 | `reelcut-app-notes.md` | `designs/adr/app-file-history.md` | Why each Swift file in `app/Sources/` is the shape it is: size tolls, measurements, review findings. |

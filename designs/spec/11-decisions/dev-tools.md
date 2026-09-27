@@ -3,6 +3,9 @@
 Part of spec §11, *Decisions made — do not re-litigate*. The index of every decision is
 [`README.md`](README.md).
 
+The road map that made these is closed; its condensed record is
+`designs/adr/roadmap-11-dev-tools.md` (the original is `archive/reelcut-roadmap-11.md`).
+
 - **V-1 — Dev tools are compiled only under `REELCUT_DEV_TOOLS`, and the shipping build is
   the Distribution configuration, which does not set it.** Debug and Release set the flag;
   `make app` builds Release, so every proof and agent session has the tools, and the binary

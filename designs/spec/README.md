@@ -43,11 +43,11 @@ this index gets its row in the same change.
 | [`08-repo-layout.md`](08-repo-layout.md) | 63 | Repo layout, build, conventions. |
 | [`09-keys-and-menus.md`](09-keys-and-menus.md) | 133 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 1521 in 10 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 1524 in 10 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 
-**Status: accepted and built** (M1–M3, then road maps 2–10; `designs/adr/` has each one's
+**Status: accepted and built** (M1–M3, then road maps 2–11; `designs/adr/` has each one's
 record). The preface below is the original handoff's, kept for its reading order.
 
 Sibling of `~/devel/rasterize` — the same shape (Swift/AppKit app over a Rust staticlib core, a
