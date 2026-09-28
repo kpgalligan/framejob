@@ -28,8 +28,8 @@ import ScreenCaptureKit
 /// named with the System Settings pane. Only then the display or window
 /// lookup, which cannot be asked without the grant — a list with NO display
 /// in it (a locked console) is named as that, not as an index out of range.
-/// `CGRequestScreenCaptureAccess` and the picker are never called (decision
-/// 4): the panel is where a person grants.
+/// `CGRequestScreenCaptureAccess` and the picker are never called, nor is
+/// System Settings opened (decision 4): the panel is where a person grants.
 ///
 /// **The target is `.document(recipeKey:)`**, resolved BEFORE the recording
 /// and looked up again AFTER it (`RecordingLanding.resolve`): a document that

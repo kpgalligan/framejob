@@ -12,7 +12,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | File | Lines | Holds |
 |---|---|---|
 | [`foundations.md`](foundations.md) | 106 | **Foundations (M1–M3, road map 2).** AVFoundation not ffmpeg, the compositor, one op entry point, overlap and ripple rules, ticks, `async` confinement, media by reference; R2-1. |
-| [`recording.md`](recording.md) | 73 | **Screen recording (road map 3).** The recorder: what is in and out, files, grants, pause. |
+| [`recording.md`](recording.md) | 97 | **Screen recording (road map 3).** The recorder: what is in and out, files, grants, pause. |
 | [`silence.md`](silence.md) | 49 | **Remove Silences (road map 4).** Silero VAD, its grid and cache, voice mode; S1-23. |
 | [`effects-motion.md`](effects-motion.md) | 60 | **Transitions and motion (road map 5).** R5-1..R5-5, E2-27. |
 | [`deepening.md`](deepening.md) | 268 | **Deepening (road map 7).** D2-1, D3-1, #21, #22, D4-1..D4-6, D7-1..D7-3: how ops refuse, the op table, the gate, the source window, time envelopes. |
@@ -49,6 +49,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | — | The file lives in `~/Movies/Reelcut Recordings/` | [`recording.md`](recording.md) |
 | — | The canvas takes the recorder's RATE; the media record takes the file's | [`recording.md`](recording.md) |
 | — | The panel asks for the grants; the tool never does | [`recording.md`](recording.md) |
+| — | A press of Record asks for Screen Recording once, and every later press opens System Settings at the pane | [`recording.md`](recording.md) |
 | — | Microphone and system audio are two sources and stay two FILES | [`recording.md`](recording.md) |
 | — | Undo of Add Recording leaves the files on disk | [`recording.md`](recording.md) |
 | — | A paused recording is a SEQUENCE of files over ONE stream | [`recording.md`](recording.md) |

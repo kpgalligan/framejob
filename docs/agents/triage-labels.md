@@ -8,6 +8,8 @@ The skills speak in terms of five canonical triage roles. This file maps those r
 | `needs-info`               | `needs-info`         | Waiting on reporter for more information |
 | `ready-for-agent`          | `ready-for-agent`    | Fully specified, ready for an AFK agent  |
 | `ready-for-human`          | `ready-for-human`    | Requires human implementation            |
+
+In this repo `ready-for-human` is a one-off ask of the owner: a spend to approve, a choice to make, a permission an agent was refused. A check only a person can make is not an issue: it is a row in `docs/manual-checks.md`, the list the owner runs before releases.
 | `wontfix`                  | `wontfix`            | Will not be actioned                     |
 
 When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from this table.

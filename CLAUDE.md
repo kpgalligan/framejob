@@ -35,7 +35,8 @@ comment citing "road map N §x" refers to the archived original.
 | Document | What it is |
 |---|---|
 | `designs/spec/` | **The normative spec, one file per section — never read it whole.** Start at its `README.md` (the index: each file, its size, what it answers), then read only the file you need; "spec §7.3" is `07.3-frame-recipe.md`. §5 schemas, §6 op table, §7 architecture, §9 keys and menus, §10 acceptance steps, §11 decisions already made — not to be re-litigated, indexed by ID in `11-decisions/README.md`. An ADR cites §11's IDs; it never replaces them. |
-| GitHub issues | **What is left**, and the one place it is kept: open defects, proof residue, candidates, accepted limits, work the user deferred (`gh issue list`), and what only a person at the machine can check (`--label ready-for-human`). Nothing open is tracked in a document. |
+| GitHub issues | **What is left**, and the one place it is kept: open defects, proof residue, candidates, accepted limits, work the user deferred (`gh issue list`), and one-off asks of the owner — a spend, a choice, a permission an agent was refused (`--label ready-for-human`). Nothing open is tracked in a document. |
+| `docs/manual-checks.md` | **What only a person at the machine can confirm**, as a standing list the owner runs periodically and before every release — not open work, so not an issue. A change that creates such a check adds or edits its row in the same change. |
 | `designs/adr/` | One condensed decision record per closed road map, survey or file history: why the code is the shape it is. Start with the one for the area: `roadmap-03` the recorder · `roadmap-04` `detect_silence` · `roadmap-05` transitions and `video.motion` · `roadmap-06` transcription (C2, the relay, designed and deferred) · `roadmap-07` how a patch is checked, what an op answers, where its arguments are written down, the source window, the argument gate · `roadmap-08` word captions · `roadmap-09` the Clip tab, the action lane, band drags · `roadmap-10` graphics · `roadmap-11` the dev tools (snapshot_ui, perform_menu_item, the screen catalog) and `make dist` · `roadmap-12` the assistant (the bundled helper, the agent lane, withheld and ask-first tools, the Assistant tab and its prompt) · `app-file-history` / `core-file-history` why a file or module is cut where it is, and its named next cut · `rust-build-settings` why release builds are incremental with no LTO · `effects-survey` E3–E9 (deferred by the user) and **the Concat rule: it is AGPL-3.0; none of its code, shaders, chains or colour tables may be carried over** · `remaining-closed` the debts already paid. |
 | `designs/design_handoff_reelcut/` | The shipped chrome cleanup and identity; its README is normative for the redesign's metrics. |
 | `designs/design_handoff_reelcut_sharp/` | The sharp pass (2026-09-23): square chrome, 2 pt clips, the zoom slider's block knob. Its README is normative for radii and the knob, with spec §11 SH-1 and SH-2 as the deviations. |
@@ -206,6 +207,11 @@ else is what bloats files:
   `designs/adr/app-file-history.md` / `core-file-history.md`.
 - **A decision in spec §11 is not re-litigated** (`designs/spec/11-decisions/`). A phase that needs a new
   one records it there before the code, not after.
+- **A check only a person at the machine can make is a row in
+  `docs/manual-checks.md`**, added in the change that creates it — never a
+  `ready-for-human` issue, and never an instrument built to stand in for the
+  person (how a pane looks, whether audio plays, a real key's conversation).
+  Automate what a script can truly measure; list only the residue.
 - Commit only when asked. A commit message says what was verified and what
   is owed, and the road map's record says the same.
 
@@ -255,9 +261,9 @@ Bluetooth output). Add the next phase's proof there rather than writing a
 throwaway. An instance DEADLOCKS somewhere past forty open documents,
 because nothing closes one: relaunch between proof sessions.
 
-Spec §10's per-step verifications are the acceptance tests. Still unchecked
-by a human: step 4's "the clip plays with audio" and step 5's 60 fps, which
-no still frame can answer; the `ready-for-human` issues list the rest.
+Spec §10's per-step verifications are the acceptance tests. What no script
+can answer — step 4's "the clip plays with audio", step 5's 60 fps, and the
+rest — is a row in `docs/manual-checks.md`, which the owner runs.
 
 ## Seeing the chrome
 

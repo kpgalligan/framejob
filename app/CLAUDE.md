@@ -1022,18 +1022,21 @@ free.
   set false, and it is retained by one stored property on the editor, NOT
   `addWindowController`, which would silence the save prompt on close. It
   forwards bare keys to `handleEditorKey`, the one key map.
-- `RecorderPanelController.swift` (+`Rows`, +`Recording`, +`Pause`,
-  +`Landing`, +`Picker`) · `RecorderStatusItem.swift` — File ▸ New Recording…
-  A `.floating`, `.nonactivatingPanel` with `hidesOnDeactivate` false, ONE
-  instance, no window delegate. **The panel is the only place the two grants
-  are requested**, both before the countdown; it orders OUT at
+- `RecorderPanelController.swift` (+`Rows`, +`Recording`, +`Grants`,
+  +`Pause`, +`Landing`, +`Picker`) · `RecorderStatusItem.swift` — File ▸ New
+  Recording… A `.floating`, `.nonactivatingPanel` with `hidesOnDeactivate`
+  false, ONE instance, no window delegate. **The panel is the only place the
+  two grants are requested, and the only place System Settings is opened
+  for them** (`+Grants`, through `RecorderPanelController.grantDoors`, which
+  a probe seals), both before the countdown; it orders OUT at
   `recordingDidStart` for every source and comes back only with a note. The
   status item is the recording's whole chrome (Pause / Resume / Stop).
 
 **Recording.**
 - `RecordingSetup.swift` · `RecordingResult.swift` — the half a probe can
   call: choices, file naming, `RecordingConfiguration.make` (PURE), the grant
-  reads, the result types. Nothing here prompts.
+  reads, the step a press takes, the two pane URLs, the result types;
+  nothing here prompts or opens.
 - `ScreenRecorder.swift` (+`Pause`, +`Delegates`, +`Microphone`,
   +`Finishing`, +`Content`) — the machine `idle → arming → recording ⇄ paused
   → finishing → idle`. **The microphone is a SECOND FILE** through an
@@ -1440,6 +1443,9 @@ Media tab's search and sort, the Assistant tab (view state; the dev tool
 calls already are tool calls) and Settings' Assistant pane (the key and the
 model are the person's, spec §11 AI-8, AI-11) get no mirror, because they
 edit no project and `set_selection` / `export` already are the capability.
+Opening System Settings at a grant's pane (the recorder panel) is no edit
+and gets no mirror; `record_screen` refuses by name instead (spec §11
+recording).
 
 **State flow.** Views → VC through `on*` closures (`[weak self]`); document →
 observers via `.projectDocumentDidChange` with `userInfo["isLive"]` — live

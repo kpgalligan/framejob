@@ -29,8 +29,9 @@ schema, §6 the op table, §7 the architecture.
   removes the clip, never the file); a microphone is a second file on its
   own Microphone track, aligned to the picture. A new project takes the
   rate you chose; a screen recording's own rate is whatever the screen did.
-  The app asks for the Screen Recording and Microphone grants the first
-  time you press Record, and never from an agent.
+  The first time you press Record the app asks for the Screen Recording
+  and Microphone grants; a later press without them opens System Settings
+  at the grant's pane. An agent never asks and never opens it.
 - **Timeline** with a frame-accurate ruler, filmstrips and waveforms from a
   per-media cache, three row heights, magnify/⌥-wheel zoom about the cursor,
   and gesture sessions for drag, trim, rate-stretch (⌥ on the end edge),
@@ -278,7 +279,7 @@ second preview window, and a Media tab you can search, sort and filter), and
 now the last of them: editing INSIDE a nest, which the spec designed and left
 and which every op reaches through one envelope key.
 `designs/adr/` holds the condensed record of each road map, and the GitHub
-issues labelled `ready-for-human` what still needs a person at the machine.
+`docs/manual-checks.md` the checks only a person at the machine can make.
 
 What has actually been checked, and what has not: the model, the ops, the
 composition plan, the frame recipe, the compositor, save/open and export were
@@ -286,7 +287,8 @@ verified by driving the built app over MCP and comparing pixels and probed
 files against the sources (spec §10 steps 3, 4, 5, 7, 9, 10, 11 and 12). The
 parts only a person can reach — live playback and its 60 fps target (steps 4
 and 5), the timeline view (step 6), the canvas overlay (step 8), the
-inspector — are written and typecheck but have not been exercised by anyone.
+inspector — are written and typecheck but have not been exercised by anyone;
+`docs/manual-checks.md` lists them.
 Treat the gesture and playback bullets above as "implemented", not as
 "observed working".
 

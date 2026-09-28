@@ -12,10 +12,12 @@ import ScreenCaptureKit
 /// file is the window, its rows and its phases; `+Rows.swift` is what fills
 /// the popups and turns them into a `RecordingChoice` and back;
 /// `+Recording.swift` is everything from Record pressed to the recording
-/// running, `+Landing.swift` everything from the recording's end to the
-/// note that says where it went, `+Picker.swift` the window picker, and
-/// `+Pause.swift` the pause and the resume, the hidden recording's one door
-/// and the phases drawn (R2c). Six files at the 400-line cap, and the
+/// running, `+Grants.swift` the two grants a press checks first and the
+/// one place System Settings is opened for them, `+Landing.swift`
+/// everything from the recording's end to the note that says where it
+/// went, `+Picker.swift` the window picker, and `+Pause.swift` the pause
+/// and the resume, the hidden recording's one door and the phases drawn
+/// (R2c). Seven files at the 400-line cap, and the
 /// crossing members are internal for it, the tree's rule for a class split
 /// across files.
 ///
@@ -321,6 +323,7 @@ final class RecorderPanelController: NSWindowController {
         rebuildDestinations()
         refreshSizeNote()
         fitWindowToContent()
+        floatAgain()
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
         armSyncTimer()

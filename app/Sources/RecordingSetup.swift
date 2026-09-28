@@ -223,11 +223,16 @@ enum RecordingConfiguration {
 
 /// Decision 4 (road map 3 §0): the PANEL asks for the grants, the tool never
 /// does — the rule the speech grant's `canAsk` carried, for two grants.
-/// What lives here is the synchronous READ of each and the sentence a
-/// refusal names the fix in;
-/// `CGRequestScreenCaptureAccess()` and `AVCaptureDevice.requestAccess` are
-/// called by the recorder panel alone, because a system prompt needs a
-/// person in front of it.
+/// What lives here is the READ of each grant, the STEP a press takes, the
+/// pane URLs and the sentences — all pure: nothing here prompts or opens;
+/// `CGRequestScreenCaptureAccess()`, `AVCaptureDevice.requestAccess` and
+/// the pane's `NSWorkspace.open` are called by the recorder panel alone
+/// (`RecorderPanelController+Grants.swift`), because a system prompt needs
+/// a person in front of it. A press asks for Screen Recording ONCE and
+/// opens the pane on every later press (spec §11 recording) — but only in
+/// a launchd-owned launch: a shell-launched press always asks, because TCC
+/// gives that prompt to the terminal (R0 q1). A denied or restricted
+/// microphone opens its pane; `.notDetermined` asks.
 ///
 /// **Both refusal sentences are COMPUTED, and end with `launchClause` when
 /// it is non-empty** (R1 review, unjudged and upheld): R0 q1 measured that
@@ -297,5 +302,66 @@ enum RecordingGrant {
             return head + "Turn it on in System Settings ▸ Privacy & Security ▸ Microphone, "
                 + "then relaunch." + launchClause
         }
+    }
+
+    // MARK: The step a press takes
+
+    /// What a press of Record does about one grant: go on, put up the
+    /// system prompt, or open System Settings at the grant's pane.
+    enum Step: Equatable {
+        case proceed
+        case ask
+        case openPane
+    }
+
+    /// True when launchd is the parent (`open -a`, the Finder, the Dock) —
+    /// the reading `launchClause` makes, so the two cannot disagree.
+    static var launchedByLaunchd: Bool { getppid() == 1 }
+
+    /// Screen Recording: granted goes on; a shell launch always asks (its
+    /// prompt is the terminal's, R0 q1, so `asked` means nothing there);
+    /// a launchd-owned press that has asked before opens the pane; else ask.
+    static func screenStep(granted: Bool, asked: Bool, launchedByLaunchd: Bool) -> Step {
+        if granted { return .proceed }
+        if !launchedByLaunchd { return .ask }
+        if asked { return .openPane }
+        return .ask
+    }
+
+    /// The microphone, when one is chosen: authorized goes on,
+    /// `.notDetermined` asks, and denied, restricted or unknown opens the
+    /// pane — the system never prompts twice for it.
+    static func microphoneStep(_ status: AVAuthorizationStatus) -> Step {
+        switch status {
+        case .authorized: return .proceed
+        case .notDetermined: return .ask
+        case .denied, .restricted: return .openPane
+        @unknown default: return .openPane
+        }
+    }
+
+    /// System Settings ▸ Privacy & Security ▸ Screen & System Audio Recording.
+    static let screenRecordingPaneURL = URL(
+        string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")
+
+    /// System Settings ▸ Privacy & Security ▸ Microphone.
+    static let microphonePaneURL = URL(
+        string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")
+
+    /// What a note adds once the pane has been opened.
+    static let paneOpenedSentence = " System Settings is open at that pane."
+
+    /// The screen note after the pane opened: the pane sentence stays the
+    /// PREFIX, and `launchClause` stays last.
+    static var screenRecordingOpenedNote: String {
+        screenRecordingPaneSentence + paneOpenedSentence + launchClause
+    }
+
+    /// The microphone note after its pane opened: the refusal's head and
+    /// fix, the opened sentence, then `launchClause`.
+    static func microphoneOpenedNote(_ status: AVAuthorizationStatus) -> String {
+        "The microphone is not granted to Reelcut (status: \(name(of: status))). "
+            + "Turn it on in System Settings ▸ Privacy & Security ▸ Microphone, then relaunch."
+            + paneOpenedSentence + launchClause
     }
 }

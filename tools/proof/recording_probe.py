@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Road map 3 — the recorder's APP half, measured: R1 (sections 1–8) and R2's
-pause and resume (rows 3o–3t, section 4b, rows 5p–5u, 7d, and section 9).
+"""Road map 3 — the recorder's APP half, measured: R1 (sections 1–8), R2's
+pause and resume (rows 3o–3t, section 4b, rows 5p–5u, 7d, and section 9),
+and the grants a press checks (section 10, spec §11 recording).
 
 Why a probe and not an MCP script. Three of the things R1a added have no
 caller a running binary can be asked to reach, and one of them is the row
@@ -31,14 +32,20 @@ request JSON in and an answer JSON out dispatched on `mode`, `--sources` /
 as a FAILURE rather than an exit so a rotted instrument cannot take the
 rest of the score down with it. The probe NEVER presents a picker, starts a
 stream, or puts up the status item — a bare Mach-O has no bundle, and
-`Transcriber.swift` records what a usage-string prompt does to one. It DOES
-call `record(_:)` in one place (section 5k, the R1 review's window-row
+`Transcriber.swift` records what a usage-string prompt does to one. **Every
+mode runs under SEALED grant doors**: before the dispatch the probe's
+`main` puts a `RecorderGrantDoors` in `RecorderPanelController.grantDoors`
+whose three reads are real and whose two prompts, the asked-flag write and
+the System Settings opener do nothing (the opener answering false), so no
+mode can put up a prompt, open a pane or touch `ReelcutScreenRecordingAsked`.
+It DOES call `record(_:)` — in section 5k (the R1 review's window-row
 guard), because the fix under test is that a press over the "Window…" row
 with no filter refuses at the door and reaches no capture — the tree's path
 returns before any grant is read; only the `window-row-unguarded` mutant
-falls through, and on the shell-launched host R0 q1 measured (grant present)
-it stops at a countdown numeral, not a system prompt. The two grants' current
-readings are printed as HOST FACTS and never asserted (section 8).
+falls through, and there the sealed doors are what it meets; in 9c, the
+granted tier's panel; and in section 10e, each row under a spy of its own.
+The two grants' current readings are printed as HOST FACTS and never
+asserted (section 8).
 
 Section 1 (`files`): `RecordingFiles.folder()` with `-RCRecordingFolder`
 pinned in the volatile argument domain (the harness's own pin) and without
@@ -309,9 +316,10 @@ is "New Recording…" and, the export queue being idle, the reply is
 
 **Then the R1 review's chrome fixes** (lane P2), in rows 5h–5o. 5h is
 STRUCTURAL over the source (comment-stripped), the reads a running panel
-cannot show: `+Recording.swift` gates no grant ask on `canAsk` and still asks
-on a press (fix 1), the countdown and the tick are added in `.common`
-run-loop modes (fix 6), `microphoneAnswered` guards visibility and re-enables
+cannot show: `+Recording.swift` and `+Grants.swift` gate no grant ask on
+`canAsk` and `+Grants.swift` still asks on a press (fix 1), the countdown and
+the tick are added in `.common` run-loop modes (fix 6), `microphoneAnswered`
+(`+Grants.swift` since the grants moved) guards visibility and re-enables
 the button (fix 9), `beginCountdown` prepares the microphone and every exit
 discards it (fix 11), the attempt is numbered and bounded (fix 2), and
 `newRecording` routes through all three doors (fix 12); `+Landing.swift`'s
@@ -464,6 +472,51 @@ it. **On the host this was written on the console was LOCKED for every
 run** (0 shareable displays under a TRUE preflight, the state phase 8
 recorded), so the tier compiled and skipped, and its rows are unmeasured
 until somebody runs the script with the console unlocked.
+
+Section 10 (`grants`) is the press's grants (spec §11 recording: the first
+press asks for Screen Recording, every later one opens System Settings at
+the pane, and only in a launchd-owned launch). 10a: `screenStep` over all
+eight combinations of granted, asked and `launchedByLaunchd` — granted
+proceeds, a shell launch always asks, a launchd-owned press that has asked
+opens the pane, else it asks. 10b: `microphoneStep` — authorized proceeds,
+`notDetermined` asks, denied and restricted open the pane. 10c: the two
+URLs' exact `absoluteString` and scheme; `NSWorkspace.urlForApplication(toOpen:)`
+resolving each to `/System/Applications/System Settings.app` (resolved,
+never opened); and, read by Python, `SecurityPrivacyExtension.appex`'s
+Info.plist (`legacyBundleIdentifier` the URLs' host, the URL-scheme flag
+true) and its binary's bytes (both anchors present). 10d:
+`screenRecordingOpenedNote` is the pane sentence, the opened sentence and
+`launchClause`; `microphoneOpenedNote` keeps the refusal's head and fix.
+10e: DRIVEN through `RecorderPanelController.shared.record(nil)` with one
+spy per row — an in-memory asked flag, the launchd answer, prompt counters,
+the URLs handed to the opener and the Bool it answers, the microphone
+prompt's completion HELD; `show()` is called once before the rows (it
+rebuilds the microphone popup) and a fake `probe-mic` row added after it.
+Launchd-owned: 1 ungranted asks once, opens nothing, sets the flag; 2 the
+next press opens the Screen Recording pane with the opened note and asks no
+more; 3 an opener answering false leaves the plain refusal; 4 and 5 a
+denied or restricted microphone opens the Microphone pane with no prompt;
+6 `notDetermined` asks once with the button disabled, and the held answer,
+fired with the status now denied, re-enables it with the refusal and opens
+nothing; 7 authorized and 8 Off count down with nothing called; 9 granted
+leaves the flag false. Shell-launched: 10 two presses ask twice, open
+nothing and never write the flag; 11 a flag already true still asks. 10f,
+structural over the comment-stripped source: `CGRequestScreenCaptureAccess(`,
+`requestAccess(` and `NSWorkspace` in no `AgentServer+Recording*` or
+`ScreenRecorder*` file; `x-apple.systempreferences` only in
+`RecordingSetup.swift`; `CGRequestScreenCaptureAccess(` only in
+`+Grants.swift`.
+
+**Measured 2026-09-28 against the tree with section 10: 983/983, with no
+row skipped** — section 9 RAN (a true preflight and two shareable
+displays). By section: the build row 1; section 1, 21; section 2, 242;
+section 3, 133; section 4, 164; section 4b, 83; section 5, 117 (5h's
+`+Grants` "in the sources" row added); 5p–5u, 59; section 6, 28; section 7,
+27; section 8, 1; section 9, 42; section 10, 65. `--only chrome,grants` is
+183/183. Since then section 10e gained one row (the panel steps down to
+normal level for every prompt or pane, 2026-09-28): `--only chrome,grants`
+measured 184/184, so the whole run is 984 rows; it has not been re-run
+whole since.
 
 **Measured 2026-09-12 against the tree after R2's fix wave: 876/876**, with
 section 9's 41 rows SKIPPED by name (the console was locked — 0 shareable
@@ -626,6 +679,40 @@ no-handle-check 875, sync-while-recording 874, no-constrain 875,
 show-while-hidden 874, window-row-unguarded 874, arm-no-generation 875,
 route-to-show 874 — every one below the count.
 
+**The grants' mutants** (section 10), measured 2026-09-28 with
+`--only chrome,grants` against 183/183, and re-measured the same day against
+184/184 when 10e gained its level row: each scored exactly one more (the
+level row passes under each), so each figure below is +1 of 184 today:
+
+  ask-every-press   `screenStep` ignores `asked` → `.ask` (RecordingSetup.swift)
+                    — 178/183: 10a's asked-and-launchd row, 10e 2's three
+                    rows, 10e 3's tried pane.
+  open-first-press  `screenStep` always `.openPane` for an ungranted press
+                    (RecordingSetup.swift) — 170/183: 10a's three ask rows,
+                    10e 1's four, 10e 2's two, 10e 10's three, 10e 11.
+  asked-forgotten   the `rememberScreenAsked()` call deleted
+                    (RecorderPanelController+Grants.swift) — 179/183: 10e 1's
+                    flag, 10e 2's three rows.
+  shell-remembers   the `if owned` guard on `rememberScreenAsked()` dropped
+                    (RecorderPanelController+Grants.swift) — 182/183: 10e 10's
+                    flag row.
+  shell-opens       `screenStep`'s launchd arm deleted (RecordingSetup.swift) —
+                    181/183: 10a's shell-and-asked row, 10e 11.
+  mic-denied-asks   `.denied` → `.ask` in `microphoneStep` (RecordingSetup.swift)
+                    — 179/183: 10b's denied row, 10e 4's three rows.
+  panes-swapped     the two pane anchors swapped (RecordingSetup.swift) —
+                    177/183: 10c's two URLs, 10e 2, 3, 4 and 5's opened URL.
+  opened-claimed    the opener's answer ignored in the screen arm
+                    (RecorderPanelController+Grants.swift) — 182/183: 10e 3's
+                    plain-refusal row.
+
+`canask-restored` was RE-AIMED at `+Grants.swift`'s live `requestScreen`
+line when the ask moved there; `Transcriber.canAsk` no longer exists, so the
+copy does not compile and scores 0/1 on the build row, as it did before the
+move. `window-row-unguarded` re-scored 181/183 (5k's two rows), 182/184 today; under the
+sealed doors its fall-through meets no prompt. Emptying
+`stepAsideForSystemUI()` scores 183/184: the level row alone.
+
 6b's "one program" row, the tree's one failure when this file was first
 written, turned green when the harness literalised the six recorder keys
 in its pin map (R1's landing): both cross-builds are one program again.
@@ -721,7 +808,7 @@ def check_table(label, rows, answers, keys, got_key, expect_key="expect"):
 def read_code(sources, name):
     """A source file with its comments removed, so a structural read can look
     for a token in CODE without a doc comment that mentions it (the header of
-    `+Recording.swift` names `canAsk` to say it no longer gates a thing)
+    `+Grants.swift` names `canAsk` to say it no longer gates a thing)
     answering yes. `/* */` blocks and `//`/`///` line tails go; nothing this
     probe searches for lives inside a string literal with a `//` in it."""
     path = os.path.join(sources, name)
@@ -3435,12 +3522,259 @@ func granted(_ request: [String: Any]) -> [String: Any] {
     return out
 }
 
+// ---- mode "grants": the step a press takes, the panes, the press ---------
+
+/// The doors every mode runs under (installed before the dispatch): the
+/// three READS are real, and every door that could prompt, open System
+/// Settings or write `ReelcutScreenRecordingAsked` does nothing — so no mode,
+/// the window-row mutant's fall-through and the granted tier's press
+/// included, can put up a prompt or a pane.
+func sealedDoors() -> RecorderGrantDoors {
+    RecorderGrantDoors(
+        screenGranted: { RecordingGrant.screenRecordingGranted },
+        launchedByLaunchd: { RecordingGrant.launchedByLaunchd },
+        requestScreen: {},
+        screenAsked: { false },
+        rememberScreenAsked: {},
+        microphoneStatus: { RecordingGrant.microphoneStatus },
+        requestMicrophone: { _ in },
+        openSettings: { _ in false })
+}
+
+/// One row's doors: an in-memory asked flag, the launchd answer, the grant
+/// and the microphone status the row chooses, counters for the two
+/// prompts, the URLs the opener was handed and the Bool it answers, and
+/// the microphone prompt's completion HELD until the row fires it.
+final class GrantSpy {
+    var granted = false
+    var asked = false
+    var launchd = true
+    var mic: AVAuthorizationStatus = .authorized
+    var openAnswer = true
+    var screenRequests = 0
+    var micRequests = 0
+    var remembered = 0
+    var opened: [String] = []
+    var held: (() -> Void)?
+
+    var doors: RecorderGrantDoors {
+        RecorderGrantDoors(
+            screenGranted: { self.granted },
+            launchedByLaunchd: { self.launchd },
+            requestScreen: { self.screenRequests += 1 },
+            screenAsked: { self.asked },
+            rememberScreenAsked: {
+                self.remembered += 1
+                self.asked = true
+            },
+            microphoneStatus: { self.mic },
+            requestMicrophone: { answered in
+                self.micRequests += 1
+                self.held = answered
+            },
+            openSettings: { url in
+                self.opened.append(url.absoluteString)
+                return self.openAnswer
+            })
+    }
+}
+
+func levelName(_ level: NSWindow.Level?) -> String {
+    switch level {
+    case .some(.floating): return "floating"
+    case .some(.normal): return "normal"
+    case .some(let other): return "\(other.rawValue)"
+    case .none: return "none"
+    }
+}
+
+func stepName(_ step: RecordingGrant.Step) -> String {
+    switch step {
+    case .proceed: return "proceed"
+    case .ask: return "ask"
+    case .openPane: return "openPane"
+    }
+}
+
+func grants(_ request: [String: Any]) -> [String: Any] {
+    var out: [String: Any] = [:]
+    // 10a — screenStep over all eight combinations.
+    var screen: [[String: Any]] = []
+    for granted in [false, true] {
+        for asked in [false, true] {
+            for launchd in [false, true] {
+                let step = RecordingGrant.screenStep(
+                    granted: granted, asked: asked, launchedByLaunchd: launchd)
+                screen.append(["granted": granted, "asked": asked, "launchd": launchd,
+                               "step": stepName(step)])
+            }
+        }
+    }
+    out["screenSteps"] = screen
+    // 10b — microphoneStep over the four statuses.
+    let statuses: [(String, AVAuthorizationStatus)] = [
+        ("authorized", .authorized), ("notDetermined", .notDetermined),
+        ("denied", .denied), ("restricted", .restricted),
+    ]
+    out["microphoneSteps"] = statuses.map { (word, status) -> [String: Any] in
+        ["status": word, "step": stepName(RecordingGrant.microphoneStep(status))]
+    }
+    // 10c — the two URLs, and the application that would open them
+    // (resolved, never opened).
+    let screenURL = RecordingGrant.screenRecordingPaneURL
+    let micURL = RecordingGrant.microphonePaneURL
+    var urls: [String: String] = [:]
+    urls["screen"] = screenURL?.absoluteString ?? "<nil>"
+    urls["screenScheme"] = screenURL?.scheme ?? "<nil>"
+    var screenHost = ""
+    if let url = screenURL, let parts = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+        screenHost = parts.path
+    }
+    urls["screenHost"] = screenHost
+    urls["microphone"] = micURL?.absoluteString ?? "<nil>"
+    urls["microphoneScheme"] = micURL?.scheme ?? "<nil>"
+    var screenHandler = "<nil>"
+    if let url = screenURL, let app = NSWorkspace.shared.urlForApplication(toOpen: url) {
+        screenHandler = app.path
+    }
+    var micHandler = "<nil>"
+    if let url = micURL, let app = NSWorkspace.shared.urlForApplication(toOpen: url) {
+        micHandler = app.path
+    }
+    urls["screenHandler"] = screenHandler
+    urls["microphoneHandler"] = micHandler
+    out["urls"] = urls
+    // 10d — the opened notes against the refusals they extend.
+    out["notes"] = [
+        "paneSentence": RecordingGrant.screenRecordingPaneSentence,
+        "openedSentence": RecordingGrant.paneOpenedSentence,
+        "launchClause": RecordingGrant.launchClause,
+        "screenOpened": RecordingGrant.screenRecordingOpenedNote,
+        "screenRefusal": RecordingGrant.screenRecordingRefusal,
+        "micOpenedDenied": RecordingGrant.microphoneOpenedNote(.denied),
+        "micOpenedRestricted": RecordingGrant.microphoneOpenedNote(.restricted),
+        "micRefusalDenied": RecordingGrant.microphoneRefusal(.denied),
+        "micRefusalRestricted": RecordingGrant.microphoneRefusal(.restricted),
+    ]
+
+    // 10e — the press, through record(_:), one spy per row.
+    let app = NSApplication.shared
+    app.setActivationPolicy(.prohibited)
+    UserDefaults.standard.setVolatileDomain([
+        RecorderPanelController.displayKey: 0, RecorderPanelController.microphoneKey: "",
+        RecorderPanelController.systemAudioKey: true, RecorderPanelController.showClicksKey: false,
+        RecorderPanelController.rateKey: 60, RecorderPanelController.sizeKey: "nominal",
+        "AgentServerEnabled": false,
+    ], forName: UserDefaults.argumentDomain)
+    let panel = RecorderPanelController.shared
+    // show() ONCE: in .idle it rebuilds the microphone popup, which would
+    // drop the fake row below.
+    panel.show()
+    panel.selectDisplay(CGMainDisplayID())
+    let fake = NSMenuItem(title: "Probe Microphone", action: nil, keyEquivalent: "")
+    fake.representedObject = "probe-mic"
+    panel.microphonePopup.menu?.addItem(fake)
+    func reset() {
+        panel.cancelCountdown()
+        panel.phase = .idle
+        panel.setNote("")
+    }
+    func press(_ spy: GrantSpy) -> [String: Any] {
+        RecorderPanelController.grantDoors = spy.doors
+        panel.record(nil)
+        return [
+            "phase": "\(panel.phase)", "note": panel.noteLabel.stringValue,
+            "screenRequests": spy.screenRequests, "micRequests": spy.micRequests,
+            "opened": spy.opened, "asked": spy.asked, "remembered": spy.remembered,
+            "buttonEnabled": panel.recordButton.isEnabled,
+            "micChoice": panel.currentChoice().microphone ?? "",
+            "level": levelName(panel.window?.level),
+        ]
+    }
+    var rows: [String: Any] = [:]
+    out["visible"] = panel.window?.isVisible ?? false
+    panel.microphonePopup.selectItem(at: 0)
+
+    reset()
+    let first = GrantSpy()
+    rows["1"] = press(first)
+    reset()
+    rows["2"] = press(first)
+    reset()
+    let third = GrantSpy()
+    third.asked = true
+    third.openAnswer = false
+    rows["3"] = press(third)
+
+    panel.microphonePopup.select(fake)
+    for (key, status) in [("4", AVAuthorizationStatus.denied), ("5", .restricted)] {
+        reset()
+        let spy = GrantSpy()
+        spy.granted = true
+        spy.mic = status
+        rows[key] = press(spy)
+    }
+    reset()
+    let sixth = GrantSpy()
+    sixth.granted = true
+    sixth.mic = .notDetermined
+    var six = press(sixth)
+    sixth.mic = .denied
+    let heldFired = sixth.held != nil
+    sixth.held?()
+    six["heldFired"] = heldFired
+    six["afterPhase"] = "\(panel.phase)"
+    six["afterNote"] = panel.noteLabel.stringValue
+    six["afterButtonEnabled"] = panel.recordButton.isEnabled
+    six["afterOpened"] = sixth.opened
+    six["afterMicRequests"] = sixth.micRequests
+    six["afterLevel"] = levelName(panel.window?.level)
+    rows["6"] = six
+    reset()
+    let seventh = GrantSpy()
+    seventh.granted = true
+    seventh.mic = .authorized
+    rows["7"] = press(seventh)
+    reset()
+    panel.microphonePopup.selectItem(at: 0)
+    let eighth = GrantSpy()
+    eighth.granted = true
+    eighth.mic = .denied
+    rows["8"] = press(eighth)
+    reset()
+    let ninth = GrantSpy()
+    ninth.granted = true
+    rows["9"] = press(ninth)
+    reset()
+    let tenth = GrantSpy()
+    tenth.launchd = false
+    var ten = press(tenth)
+    reset()
+    let tenSecond = press(tenth)
+    ten["second"] = tenSecond
+    rows["10"] = ten
+    reset()
+    let eleventh = GrantSpy()
+    eleventh.launchd = false
+    eleventh.asked = true
+    rows["11"] = press(eleventh)
+    reset()
+    out["rows"] = rows
+    out["countdown"] = "\(RecorderPanelController.Phase.countdown(RecorderPanelController.countdownSeconds))"
+    RecorderPanelController.grantDoors = sealedDoors()
+    panel.window?.orderOut(nil)
+    return out
+}
+
 // ---- dispatch -------------------------------------------------------------
 let args = CommandLine.arguments
 guard args.count >= 3 else {
     FileHandle.standardError.write(Data("usage: probe <request.json> <answer.json>\n".utf8))
     exit(2)
 }
+// Sealed before any mode runs: no mode can prompt, open System Settings or
+// touch `ReelcutScreenRecordingAsked` (section 10's rows put spies in).
+RecorderPanelController.grantDoors = sealedDoors()
 var answer: [String: Any] = [:]
 do {
     let data = try Data(contentsOf: URL(fileURLWithPath: args[1]))
@@ -3469,6 +3803,8 @@ do {
         answer = catalog(request)
     case "host":
         answer = host(request)
+    case "grants":
+        answer = grants(request)
     default:
         answer["error"] = "unknown mode \"\(mode)\" — the binary predates the section asking"
     }
@@ -5104,24 +5440,25 @@ def section_chrome(binary, sources):
     print("  5h — the R1 review's chrome fixes, structural (no probe can press a panel's "
           "way into a capture)")
     rec = read_code(sources, "RecorderPanelController+Recording.swift")
+    grants = read_code(sources, "RecorderPanelController+Grants.swift")
     land = read_code(sources, "RecorderPanelController+Landing.swift")
     base = read_code(sources, "RecorderPanelController.swift")
     rows = read_code(sources, "RecorderPanelController+Rows.swift")
     route = read_code(sources, "AppDelegate+Recording.swift")
     status = read_code(sources, "RecorderStatusItem.swift")
     for name, code in [
-        ("+Recording", rec), ("+Landing", land), ("base", base), ("+Rows", rows),
-        ("+Recording (route)", route), ("status item", status),
+        ("+Recording", rec), ("+Grants", grants), ("+Landing", land), ("base", base),
+        ("+Rows", rows), ("+Recording (route)", route), ("status item", status),
     ]:
         check(f"5h: {name} is in the sources", code is not None)
-    if None in (rec, land, base, rows, route, status):
+    if None in (rec, grants, land, base, rows, route, status):
         return
     # fix 1: the grant is asked on every press — no `canAsk` gate survives here
     # (canask-restored puts one back).
-    check("5h: `+Recording.swift` gates no grant ask on canAsk (fix 1)",
-          "canAsk" not in rec, "a canAsk gate is back")
-    check("5h: … and still asks CGRequestScreenCaptureAccess on a press",
-          "CGRequestScreenCaptureAccess()" in rec)
+    check("5h: `+Recording.swift` and `+Grants.swift` gate no grant ask on canAsk (fix 1)",
+          "canAsk" not in rec and "canAsk" not in grants, "a canAsk gate is back")
+    check("5h: … and `+Grants.swift` still asks CGRequestScreenCaptureAccess on a press",
+          "CGRequestScreenCaptureAccess()" in grants)
     # fix 3: land() compares the document's handle before trusting the commit.
     check("5h: `+Landing.swift`'s land() compares the project handle (fix 3, no-handle-check)",
           "!== before" in land, "the handle is not compared")
@@ -5141,7 +5478,7 @@ def section_chrome(binary, sources):
           "(fix 5, no-constrain)",
           "constrainFrameRect" in fit_body and "window.screen" in fit_body, fit_body)
     # fix 9: microphoneAnswered guards visibility and re-enables the button.
-    mic_body = function_body(rec.splitlines(), "func microphoneAnswered()")
+    mic_body = function_body(grants.splitlines(), "func microphoneAnswered()")
     joined_mic = "\n".join(mic_body or [])
     check("5h: microphoneAnswered guards `window?.isVisible == true` (fix 9)",
           "isVisible == true" in joined_mic, joined_mic)
@@ -6166,6 +6503,231 @@ def granted_rows(answer, folder):
 
 
 # --------------------------------------------------------------------------
+# Section 10 — the grants a press checks (spec §11 recording): the step, the
+# panes, the notes, the press through a spy, and where the calls may live.
+
+SCREEN_PANE_URL = "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
+MICROPHONE_PANE_URL = "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
+SETTINGS_APP = "/System/Applications/System Settings.app"
+PRIVACY_EXTENSION = "/System/Library/ExtensionKit/Extensions/SecurityPrivacyExtension.appex"
+
+
+def expected_screen_step(granted, asked, launchd):
+    if granted:
+        return "proceed"
+    if not launchd:
+        return "ask"
+    return "openPane" if asked else "ask"
+
+
+MICROPHONE_STEPS = {"authorized": "proceed", "notDetermined": "ask", "denied": "openPane",
+                    "restricted": "openPane"}
+
+
+def find_key(obj, key):
+    """The first value under `key` anywhere in a plist tree, or None."""
+    if isinstance(obj, dict):
+        if key in obj:
+            return obj[key]
+        for value in obj.values():
+            found = find_key(value, key)
+            if found is not None:
+                return found
+    elif isinstance(obj, list):
+        for value in obj:
+            found = find_key(value, key)
+            if found is not None:
+                return found
+    return None
+
+
+def section_grants(binary, sources):
+    import plistlib
+    print("\nSection 10 — the grants a press checks: the step, the two panes, the notes, the press "
+          "through a spy (no prompt, no pane), and where the calls may live")
+    answer, error = run_probe(binary, "grants", {"mode": "grants"})
+    check("10: the probe answers", answer is not None and not answer.get("error"),
+          error or (answer or {}).get("error", ""))
+    if not answer or answer.get("error"):
+        return
+
+    print("  10a — screenStep over granted × asked × launchedByLaunchd")
+    by = {(r.get("granted"), r.get("asked"), r.get("launchd")): r.get("step")
+          for r in answer.get("screenSteps") or []}
+    for granted, asked, launchd in itertools.product([False, True], repeat=3):
+        want = expected_screen_step(granted, asked, launchd)
+        got = by.get((granted, asked, launchd))
+        check(f"10a: granted {granted}, asked {asked}, launchd {launchd} → {want}", got == want,
+              f"got {got!r}")
+
+    print("  10b — microphoneStep")
+    mic = {r.get("status"): r.get("step") for r in answer.get("microphoneSteps") or []}
+    for status, want in MICROPHONE_STEPS.items():
+        check(f"10b: {status} → {want}", mic.get(status) == want, f"got {mic.get(status)!r}")
+
+    print("  10c — the two pane URLs, their handler, and the extension that answers them")
+    u = answer.get("urls") or {}
+    check("10c: the Screen Recording pane URL, exactly", u.get("screen") == SCREEN_PANE_URL,
+          f"{u.get('screen')!r}")
+    check("10c: the Microphone pane URL, exactly", u.get("microphone") == MICROPHONE_PANE_URL,
+          f"{u.get('microphone')!r}")
+    check("10c: both schemes are x-apple.systempreferences",
+          u.get("screenScheme") == "x-apple.systempreferences"
+          and u.get("microphoneScheme") == "x-apple.systempreferences", f"{u}")
+    check(f"10c: the screen URL resolves to {SETTINGS_APP} (resolved, never opened)",
+          (u.get("screenHandler") or "").rstrip("/") == SETTINGS_APP, f"{u.get('screenHandler')!r}")
+    check(f"10c: the microphone URL resolves to {SETTINGS_APP}",
+          (u.get("microphoneHandler") or "").rstrip("/") == SETTINGS_APP,
+          f"{u.get('microphoneHandler')!r}")
+    host = SCREEN_PANE_URL.split(":", 1)[1].split("?", 1)[0]
+    info_path = os.path.join(PRIVACY_EXTENSION, "Contents", "Info.plist")
+    try:
+        with open(info_path, "rb") as f:
+            info = plistlib.load(f)
+    except (OSError, plistlib.InvalidFileException) as exc:
+        info = None
+        info_error = str(exc)
+    else:
+        info_error = ""
+    check("10c: the privacy extension's Info.plist reads", info is not None, info_error)
+    legacy = find_key(info, "legacyBundleIdentifier") if info is not None else None
+    allows = find_key(info, "allowsXAppleSystemPreferencesURLScheme") if info is not None else None
+    check(f"10c: its legacyBundleIdentifier is the URLs' host ({host})",
+          legacy == host and u.get("screenHost") == host, f"legacy {legacy!r}, URL {u.get('screenHost')!r}")
+    check("10c: allowsXAppleSystemPreferencesURLScheme is true", allows is True, f"{allows!r}")
+    binary_path = os.path.join(PRIVACY_EXTENSION, "Contents", "MacOS", "SecurityPrivacyExtension")
+    try:
+        with open(binary_path, "rb") as f:
+            blob = f.read()
+    except OSError:
+        blob = b""
+    for anchor in ["Privacy_ScreenCapture", "Privacy_Microphone"]:
+        check(f"10c: the extension's binary holds {anchor}", anchor.encode() in blob,
+              f"{len(blob)} bytes read")
+
+    print("  10d — the opened notes")
+    n = answer.get("notes") or {}
+    pane = n.get("paneSentence") or "\u0000"
+    opened = n.get("openedSentence") or "\u0000"
+    clause = n.get("launchClause")
+    screen_opened = n.get("screenOpened") or ""
+    check("10d: the opened sentence names System Settings and the pane",
+          opened == " System Settings is open at that pane.", f"{opened!r}")
+    check("10d: the screen's opened note starts with the pane sentence",
+          screen_opened.startswith(pane), f"{screen_opened!r}")
+    check("10d: … holds the opened sentence", opened in screen_opened, f"{screen_opened!r}")
+    check("10d: … and ends with launchClause (non-empty from a probe)",
+          bool(clause) and screen_opened.endswith(clause)
+          and screen_opened == pane + opened + clause, f"{screen_opened!r}")
+    for word in ["denied", "restricted"]:
+        key = word.capitalize()
+        got = n.get(f"micOpened{key}") or ""
+        refusal = n.get(f"micRefusal{key}") or "\u0000"
+        head = refusal[: len(refusal) - len(clause or "")]
+        check(f"10d: microphoneOpenedNote(.{word}) keeps the refusal's head and fix, then the opened "
+              "sentence and the clause",
+              bool(clause) and refusal.endswith(clause) and got == head + opened + clause
+              and f"(status: {word})" in got, f"{got!r}")
+
+    print("  10e — the press, through record(_:), one spy per row (launchd true for rows 1–9)")
+    rows = answer.get("rows") or {}
+    refusal = n.get("screenRefusal") or "\u0000"
+    countdown = answer.get("countdown") or "\u0000"
+    check("10e: the panel is on screen for the rows", answer.get("visible") is True,
+          f"{answer.get('visible')}")
+    r = rows.get("1") or {}
+    check("10e 1: ungranted, not asked → ONE request", r.get("screenRequests") == 1, f"{r}")
+    check("10e 1: … nothing opened", r.get("opened") == [], f"{r.get('opened')}")
+    check("10e 1: … the flag set", r.get("asked") is True and r.get("remembered") == 1, f"{r}")
+    check("10e 1: … idle, the refusal note", r.get("phase") == "idle" and r.get("note") == refusal,
+          f"{r.get('phase')}, {r.get('note')!r}")
+    r = rows.get("2") or {}
+    check("10e 2: pressed again → still one request", r.get("screenRequests") == 1, f"{r}")
+    check("10e 2: … the Screen Recording pane opened, once", r.get("opened") == [SCREEN_PANE_URL],
+          f"{r.get('opened')}")
+    check("10e 2: … the opened note", r.get("note") == screen_opened and r.get("phase") == "idle",
+          f"{r.get('note')!r}")
+    r = rows.get("3") or {}
+    check("10e 3: asked, the opener answers false → the pane was tried",
+          r.get("opened") == [SCREEN_PANE_URL] and r.get("screenRequests") == 0, f"{r}")
+    check("10e 3: … and the note is the plain refusal, never the opened one",
+          r.get("note") == refusal, f"{r.get('note')!r}")
+    for key, word in [("4", "denied"), ("5", "restricted")]:
+        r = rows.get(key) or {}
+        want = n.get(f"micOpened{word.capitalize()}")
+        check(f"10e {key}: granted, mic {word} → the Microphone pane opened",
+              r.get("opened") == [MICROPHONE_PANE_URL] and r.get("micChoice") == "probe-mic",
+              f"{r.get('opened')}, choice {r.get('micChoice')!r}")
+        check(f"10e {key}: … no requests", r.get("screenRequests") == 0 and r.get("micRequests") == 0,
+              f"{r}")
+        check(f"10e {key}: … idle, microphoneOpenedNote(.{word})",
+              r.get("phase") == "idle" and r.get("note") == want, f"{r.get('note')!r}")
+    r = rows.get("6") or {}
+    check("10e 6: mic notDetermined → ONE microphone request, the button disabled",
+          r.get("micRequests") == 1 and r.get("buttonEnabled") is False and r.get("phase") == "idle",
+          f"{r}")
+    check("10e 6: the held answer fired with the status now denied → the button enabled",
+          r.get("heldFired") is True and r.get("afterButtonEnabled") is True, f"{r}")
+    check("10e 6: … the note microphoneRefusal(.denied)",
+          r.get("afterNote") == n.get("micRefusalDenied") and r.get("afterPhase") == "idle",
+          f"{r.get('afterNote')!r}")
+    check("10e 6: … and nothing opened (a prompt's answer never opens Settings)",
+          r.get("afterOpened") == [] and r.get("afterMicRequests") == 1, f"{r}")
+    r = rows.get("7") or {}
+    check(f"10e 7: mic authorized → {countdown}", r.get("phase") == countdown, f"{r.get('phase')}")
+    check("10e 7: … nothing called",
+          r.get("screenRequests") == 0 and r.get("micRequests") == 0 and r.get("opened") == []
+          and r.get("remembered") == 0, f"{r}")
+    r = rows.get("8") or {}
+    check(f"10e 8: mic Off (its status denied) → {countdown}",
+          r.get("phase") == countdown and r.get("micChoice") == "", f"{r}")
+    check("10e 8: … nothing called",
+          r.get("screenRequests") == 0 and r.get("micRequests") == 0 and r.get("opened") == [],
+          f"{r}")
+    r = rows.get("9") or {}
+    check("10e 9: granted with the flag false → the flag stays false",
+          r.get("asked") is False and r.get("remembered") == 0 and r.get("phase") == countdown, f"{r}")
+    r = rows.get("10") or {}
+    s = r.get("second") or {}
+    check("10e 10: launchd false, ungranted, flag false, pressed twice → two requests",
+          r.get("screenRequests") == 1 and s.get("screenRequests") == 2, f"{r.get('screenRequests')}, "
+          f"{s.get('screenRequests')}")
+    check("10e 10: … nothing opened", r.get("opened") == [] and s.get("opened") == [], f"{s.get('opened')}")
+    levels = {k: (rows.get(k) or {}).get("level") for k in [str(i) for i in range(1, 12)]}
+    levels["10b"] = ((rows.get("10") or {}).get("second") or {}).get("level")
+    levels["6after"] = (rows.get("6") or {}).get("afterLevel")
+    stepped = ["1", "2", "3", "4", "5", "6", "6after", "10", "10b", "11"]
+    check("10e: the panel steps down to normal level for every prompt or pane, and floats "
+          "again for every press that goes on (7 follows 6's normal)",
+          all(levels.get(k) == "normal" for k in stepped)
+          and all(levels.get(k) == "floating" for k in ["7", "8", "9"]), f"{levels}")
+    check("10e 10: … the flag still false (a shell launch never remembers)",
+          s.get("asked") is False and s.get("remembered") == 0, f"{s}")
+    check("10e 10: … the refusal note each time",
+          r.get("note") == refusal and s.get("note") == refusal, f"{r.get('note')!r} / {s.get('note')!r}")
+    r = rows.get("11") or {}
+    check("10e 11: launchd false, ungranted, flag TRUE → one request, nothing opened",
+          r.get("screenRequests") == 1 and r.get("opened") == [] and r.get("note") == refusal, f"{r}")
+
+    print("  10f — where the calls may live (comment-stripped source)")
+    names = sorted(n for n in os.listdir(sources) if n.endswith(".swift"))
+    tool_side = [n for n in names
+                 if n.startswith("AgentServer+Recording") or n.startswith("ScreenRecorder")]
+    check("10f: the tool's side has files to read", len(tool_side) >= 4, f"{tool_side}")
+    codes = {name: read_code(sources, name) or "" for name in names}
+    for token in ["CGRequestScreenCaptureAccess(", "requestAccess(", "NSWorkspace"]:
+        holders = [name for name in tool_side if token in codes[name]]
+        check(f"10f: `{token}` in no AgentServer+Recording*/ScreenRecorder* file", holders == [],
+              f"{holders}")
+    holders = [name for name in names if "x-apple.systempreferences" in codes[name]]
+    check("10f: `x-apple.systempreferences` only in RecordingSetup.swift",
+          holders == ["RecordingSetup.swift"], f"{holders}")
+    holders = [name for name in names if "CGRequestScreenCaptureAccess(" in codes[name]]
+    check("10f: `CGRequestScreenCaptureAccess(` only in RecorderPanelController+Grants.swift",
+          holders == ["RecorderPanelController+Grants.swift"], f"{holders}")
+
+
+# --------------------------------------------------------------------------
 # The mutants. Each is one string replaced in a COPY of the tree's
 # `app/Sources` under `work/`, and the replacement must match exactly once,
 # or the copy is not the mutant it claims to be (`phase9_chrome.py`'s
@@ -6251,9 +6813,9 @@ MUTANTS = {
         "the path clause not appended — a failure past beginFinishing names no file (finding 6 undone)"),
     # Lane P2's, the R1 review's chrome fixes (section 5's structural and driven rows).
     "canask-restored": (
-        "RecorderPanelController+Recording.swift",
-        "            _ = CGRequestScreenCaptureAccess()\n",
-        "            if Transcriber.canAsk { _ = CGRequestScreenCaptureAccess() }\n",
+        "RecorderPanelController+Grants.swift",
+        "            requestScreen: { _ = CGRequestScreenCaptureAccess() },\n",
+        "            requestScreen: { if Transcriber.canAsk { _ = CGRequestScreenCaptureAccess() } },\n",
         "the grant ask gated on canAsk again — Record under -AgentServerEnabled shows a refusal "
         "for a button nobody but a person pressed (fix 1 undone)"),
     "no-handle-check": (
@@ -6364,6 +6926,59 @@ MUTANTS = {
         "        state = .paused\n",
         "        state = .paused\n",
         "pause() leaves the microphone's writer running through the pause"),
+    # The grants a press checks (spec §11 recording; section 10's rows).
+    "ask-every-press": (
+        "RecordingSetup.swift",
+        "        if asked { return .openPane }\n",
+        "        if asked { return .ask }\n",
+        "screenStep ignores the asked flag — every press puts up a prompt that never comes again"),
+    "open-first-press": (
+        "RecordingSetup.swift",
+        "        if !launchedByLaunchd { return .ask }\n"
+        "        if asked { return .openPane }\n"
+        "        return .ask\n",
+        "        return .openPane\n",
+        "screenStep always opens the pane — the first press never asks, so the app is never listed"),
+    "asked-forgotten": (
+        "RecorderPanelController+Grants.swift",
+        "            if owned { doors.rememberScreenAsked() }\n",
+        "",
+        "the ask is never remembered — every press asks and the pane never opens"),
+    "shell-remembers": (
+        "RecorderPanelController+Grants.swift",
+        "            if owned { doors.rememberScreenAsked() }\n",
+        "            doors.rememberScreenAsked()\n",
+        "a shell-launched press writes the flag — a later Finder launch would never be asked"),
+    "shell-opens": (
+        "RecordingSetup.swift",
+        "        if !launchedByLaunchd { return .ask }\n",
+        "",
+        "screenStep's launchd arm deleted — a shell-launched press that finds the flag opens the pane"),
+    "mic-denied-asks": (
+        "RecordingSetup.swift",
+        "        case .denied, .restricted: return .openPane\n",
+        "        case .denied: return .ask\n"
+        "        case .restricted: return .openPane\n",
+        "a denied microphone asks again — a prompt the system will never show"),
+    "panes-swapped": (
+        "RecordingSetup.swift",
+        "        string: \"x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture\")\n"
+        "\n"
+        "    /// System Settings ▸ Privacy & Security ▸ Microphone.\n"
+        "    static let microphonePaneURL = URL(\n"
+        "        string: \"x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone\")\n",
+        "        string: \"x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone\")\n"
+        "\n"
+        "    /// System Settings ▸ Privacy & Security ▸ Microphone.\n"
+        "    static let microphonePaneURL = URL(\n"
+        "        string: \"x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture\")\n",
+        "the two pane anchors swapped — each press opens the other grant's pane"),
+    "opened-claimed": (
+        "RecorderPanelController+Grants.swift",
+        "            let opened = RecordingGrant.screenRecordingPaneURL.map(doors.openSettings) ?? false\n",
+        "            _ = RecordingGrant.screenRecordingPaneURL.map(doors.openSettings)\n"
+        "            let opened = true\n",
+        "the opener's answer ignored — the note claims System Settings is open when it did not open"),
 }
 
 
@@ -6391,7 +7006,7 @@ def prepare_mutant(name):
 
 SECTIONS = [section_files, section_configuration, section_state, section_landing, section_segments,
             section_chrome, section_chrome_pause, section_welcome, section_catalog, section_host,
-            section_granted]
+            section_granted, section_grants]
 
 
 def main():
@@ -6406,7 +7021,8 @@ def main():
     parser.add_argument("--only",
                         help="a comma-separated subset of sections to run, by the name after "
                              "`section_` (files, configuration, state, landing, segments, chrome, "
-                             "chrome_pause, welcome, catalog, host, granted) — for iterating on "
+                             "chrome_pause, welcome, catalog, host, granted, grants) — for "
+                             "iterating on "
                              "one; the full run is what the counts in the docstring are")
     args = parser.parse_args()
     sources = os.path.abspath(args.sources)

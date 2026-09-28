@@ -168,6 +168,8 @@ NOT_SHOWN = {
                           "(DevAssistantLaunch.swift); no screen launches with it",
     "RCDevAssistantReport": "the report path beside RCDevAssistantSend; no screen launches "
                             "with it",
+    "ReelcutScreenRecordingAsked": "whether the panel has put up the Screen Recording prompt "
+                                   "once; read only by a press of Record, which no screen makes",
 }
 
 # Filed layout defects, each named by its issue. A problem's text is

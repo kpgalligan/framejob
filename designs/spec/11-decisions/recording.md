@@ -38,6 +38,36 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   usage key and the hardened-runtime entitlement
   `com.apple.security.device.audio-input` for the microphone; Screen
   Recording needs neither.
+- **A press of Record asks for Screen Recording once, and every later
+  press opens System Settings at the pane** (2026-09-28). The first press
+  without the grant calls `CGRequestScreenCaptureAccess`, and the panel
+  remembers it across launches in `ReelcutScreenRecordingAsked`, because
+  the system prompt appears once per app, not once per launch; every later
+  press opens `x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture`
+  through `NSWorkspace` and the note says System Settings is open at that
+  pane (the plain refusal when `open` answers false). The flag counts only
+  in a launchd-owned launch (`getppid() == 1`, `launchClause` empty): a
+  shell-launched press always asks and never writes it, because TCC gives
+  that prompt to the terminal (R0 q1), and a flag written there would stop
+  a later Finder launch from ever being put in the pane's list. A
+  `.denied` or `.restricted` microphone opens `Privacy_Microphone` the same
+  way; `.notDetermined` still asks, and a prompt's answer never opens
+  Settings. Only the panel opens a pane: `record_screen` never does, and
+  opening Settings is no edit and gets no mirror. Measured on macOS 26.5.1
+  (25F80): System Settings is the default handler of
+  `x-apple.systempreferences`; `SecurityPrivacyExtension.appex` declares
+  `legacyBundleIdentifier` `com.apple.preference.security` with
+  `allowsXAppleSystemPreferencesURLScheme` true, and its binary holds
+  `Privacy_ScreenCapture` and `Privacy_Microphone`. Accepted: the flag is
+  never cleared, so after `tccutil reset ScreenCapture` a launchd-owned
+  press opens the pane rather than prompting (the pane's + adds the app).
+  Whether the pane lands on its row is a person's check (REC-1, REC-2 in
+  `docs/manual-checks.md`). **Before either prompt, and before opening a
+  pane, the panel steps down from `.floating` to `.normal`**: a floating
+  panel sits over every normal window on the screen, and the prompt and
+  System Settings are another process's normal windows — the person found
+  the Screen Recording prompt hidden behind the panel. The next press that
+  goes on, a granted microphone's answer, and `show()` float it again.
 - **Microphone and system audio are two sources and stay two FILES.**
   Measured (road map 3's R0): with both on, `SCRecordingOutput` writes ONE
   stereo track that is their SUM, inseparable and clipping when both are

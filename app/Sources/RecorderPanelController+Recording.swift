@@ -3,33 +3,14 @@ import AppKit
 import ScreenCaptureKit
 
 /// Everything the recorder panel does from Record pressed to the recording
-/// RUNNING (road map 3, R1c) — the grants, the countdown, the start, the
-/// stop — `RecorderPanelController.swift`'s third file. The recording's END
+/// RUNNING (road map 3, R1c) — the countdown, the start, the stop —
+/// `RecorderPanelController.swift`'s third file. The grants a press checks
+/// first are `+Grants.swift`. The recording's END
 /// and its landing are `+Landing.swift`, and the window picker is
 /// `+Picker.swift`, both cut out along the lines `recordingEnded` and
 /// `presentPicker` draw when the R1 review's fixes put this file past the
 /// 400-line cap; the pause and the resume, and the phases drawn, are
 /// `+Pause.swift` (R2c).
-///
-/// **The grants are asked for HERE and nowhere else, and UNCONDITIONALLY**
-/// (decision 4: the TOOL never asks — it reads the status and refuses by
-/// name — because a system prompt needs a person in front of it; the panel
-/// asks, because a press of Record IS that person, exactly as the transcribe
-/// sheet's Start is). Screen Recording is asked with
-/// `CGRequestScreenCaptureAccess()` on every press that finds it absent; it
-/// may prompt and it returns false at once on a first ask, so the refusal
-/// sentence is shown either way and the person presses Record again once
-/// the grant is on. The microphone is asked only when one is chosen, from
-/// `.notDetermined`, and the countdown starts from the answer; `.denied` and
-/// `.restricted` name the pane and stop there. Both readings happen BEFORE
-/// the countdown, so a countdown never ends in a prompt. An earlier draft
-/// gated both asks on a `canAsk` (since deleted with the speech grant) —
-/// false under `-AgentServerEnabled YES` — and the R1 review measured what
-/// that cost: under that flag the refusal note told the person to press the
-/// button they had just pressed, and a `notDetermined` microphone could never
-/// be granted from anywhere.
-/// `canAsk` is the tool's rule about a prompt nobody would see; it does not
-/// apply to a button somebody clicked.
 ///
 /// **Before the grants, the source** (R1 review): Record with the Source row
 /// reading "Window…" and no picked filter refuses FIRST, by name, and starts
@@ -133,46 +114,7 @@ extension RecorderPanelController {
             setNote(Self.chooseWindowSentence)
             return
         }
-        guard RecordingGrant.screenRecordingGranted else {
-            _ = CGRequestScreenCaptureAccess()
-            setNote(RecordingGrant.screenRecordingRefusal)
-            return
-        }
-        if currentChoice().microphone != nil {
-            let status = RecordingGrant.microphoneStatus
-            switch status {
-            case .authorized:
-                break
-            case .notDetermined:
-                recordButton.isEnabled = false
-                // The framework does not say which queue it answers on, so
-                // the answer hops to main.
-                AVCaptureDevice.requestAccess(for: .audio) { [weak self] _ in
-                    DispatchQueue.main.async { self?.microphoneAnswered() }
-                }
-                return
-            default:
-                setNote(RecordingGrant.microphoneRefusal(status))
-                return
-            }
-        }
-        setNote("")
-        beginCountdown()
-    }
-
-    /// The prompt's answer. The button comes back either way; the countdown
-    /// begins only in an idle panel that is still ON SCREEN (R1 review) — a
-    /// panel closed during the prompt must not count down where nobody can
-    /// cancel it, and `panelWillClose` cannot cancel a countdown that has not
-    /// begun.
-    private func microphoneAnswered() {
-        recordButton.isEnabled = true
-        guard phase == .idle, window?.isVisible == true else { return }
-        let status = RecordingGrant.microphoneStatus
-        guard status == .authorized else {
-            setNote(RecordingGrant.microphoneRefusal(status))
-            return
-        }
+        guard checkScreenRecordingGrant(), checkMicrophoneGrant() else { return }
         setNote("")
         beginCountdown()
     }
@@ -186,7 +128,7 @@ extension RecorderPanelController {
     /// with nothing started. The microphone the choice names is prepared
     /// here, after the grants and before the first second has passed, so its
     /// start cost is paid while the numeral is still on screen.
-    private func beginCountdown() {
+    func beginCountdown() {
         countdownTimer?.invalidate()
         phase = .countdown(Self.countdownSeconds)
         recorder.prepareMicrophone(currentChoice().microphone)

@@ -2384,7 +2384,10 @@ fix wave built (a placement throw unwrapped, the `path` trim removed, a
 named project falling through to a new document, the Goertzel share on the
 wrong scale) are in its docstring with the rows that kill them.
 
-`python3 tools/proof/recording_probe.py`, **876/876 with 41 rows skipped by
+`python3 tools/proof/recording_probe.py`, **983/983 with no row skipped** on
+2026-09-28 (section 9 ran: a true preflight and two shareable displays),
+after section 10 was added, and 984 rows since 10e's level row
+(`--only chrome,grants` 184/184; the whole run not repeated); before it, **876/876 with 41 rows skipped by
 name** on 2026-09-21: the locked console's granted tier had zero shareable
 displays. Its historical welcome comparison ran and passed; no §6b row was
 skipped. A later `--only host,granted` rerun on the unlocked desktop passed
@@ -2426,10 +2429,23 @@ mic URL, and the three-segment walker; folded lane L's two- and
 three-segment landings into 4b (the short-voice and sub-frame notes, the
 24981/1000 canvas with no overlap); and added 5p–5u for the item's pure
 vocabulary, `resumeProblem`, `revealIfNoted` and a real pause/resume/stop
-through the panel. `--mutant <name>` prepares a copy of
-`app/Sources` and runs the whole thing over it; twenty-nine are named in the
+through the panel. Section 10 (`grants`, spec §11 recording) is the press's
+grants: `screenStep` over all eight combinations of granted, asked and
+`launchedByLaunchd`, `microphoneStep` over four statuses, the two pane URLs
+with System Settings as their resolved handler (never opened) and the
+privacy extension's Info.plist and binary read for the legacy id, the
+URL-scheme flag and both anchors, the opened notes, eleven presses through
+`record(nil)` each under a spy of its own (ask once then open the pane; a
+false opener leaves the plain refusal; a denied or restricted microphone
+opens its pane; a shell launch always asks and never writes the flag), and
+where the prompt and opener calls may live. Every mode runs under SEALED
+grant doors — real reads, and no prompt, no pane, no write of
+`ReelcutScreenRecordingAsked`. `--mutant <name>` prepares a copy of
+`app/Sources` and runs the whole thing over it; thirty-seven are named in the
 docstring, every one killed — the nine R2 ones at 811–875 of 876, R1's
-re-scored at 857–875.
+re-scored at 857–875, section 10's eight at 171–183 of `--only chrome,grants`'
+184 (170–182 of 183 before 10e's level row; emptying the step-aside scores
+183/184, that row alone).
 
 Worth knowing: the built app is ad-hoc signed, so its designated requirement
 is its cdhash and a Screen Recording or Microphone grant given to Reelcut.app
