@@ -13,6 +13,9 @@
   A         agreement: every case name has a passing `case: <name>` testcase
             in the JUnit report AND a passing C row; prints the case count
             and cases.json's sha256
+  R         update.py's `reduce_table` over agent/prices/reduce_cases.json's
+            `litellm` block answers exactly its `models` (road map 13 P2: the
+            helper's `reduceLiteLLM` answers the same fixture in bun test)
 
     python3 tools/proof/prices_proof.py                          # exit 0 iff every row passes
     python3 tools/proof/prices_proof.py --mutant py-disagrees    # C prices with cache_read
@@ -21,6 +24,8 @@
     python3 tools/proof/prices_proof.py --mutant ts-disagrees    # T/A on a scratch agent/ whose
                                                                  # opus-mixed expects +0.01:
                                                                  # T and A FAIL naming it (exit 1)
+    python3 tools/proof/prices_proof.py --mutant reduce-disagrees  # R with the expected opus
+                                                                   # input +1: R FAILs (exit 1)
 
 An instrument that cannot run is a scored FAIL, never a skip. Every child
 runs under a wall in its own process group (graphics_spike/bounded.py) with
@@ -46,6 +51,9 @@ import prices  # noqa: E402
 
 ROOT = prices.ROOT
 AGENT = os.path.join(ROOT, "agent")
+sys.path.insert(0, os.path.join(AGENT, "prices"))
+
+REDUCE_CASES = os.path.join(AGENT, "prices", "reduce_cases.json")
 JUNIT = os.path.join(ROOT, "build", "agent", "bun-test.xml")
 WORK = os.path.join(HERE, "work", "prices")
 TOLERANCE = 1e-12
@@ -151,7 +159,7 @@ def scratch_agent():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--mutant", choices=["py-disagrees", "ts-disagrees"],
+    parser.add_argument("--mutant", choices=["py-disagrees", "ts-disagrees", "reduce-disagrees"],
                         help="a made-to-fail variant; it must end exit 1")
     args = parser.parse_args()
     results = []  # (id, ok, detail)
@@ -235,6 +243,27 @@ def main():
                      f"absent from bun {missing or 'none'}; failing in bun {ts_bad or 'none'}; "
                      f"failing in prices.py {py_bad or 'none'}"))
         score("A", ok, detail)
+
+    # R: update.py's reducer over the fixture the helper's reducer also answers.
+    try:
+        import update  # inside the row: an unimportable update.py is R's FAIL, not a traceback
+        with open(REDUCE_CASES) as f:
+            fixture = json.load(f)
+        want = fixture["models"]
+        label = ""
+        if args.mutant == "reduce-disagrees":
+            want = copy.deepcopy(want)
+            want["claude-opus-5-5"]["input"] += 1
+            label = "(expected opus input +1) "
+        got = update.reduce_table(fixture["litellm"], "0" * 40, "proof")["models"]
+        differs = sorted(m for m in set(got) | set(want) if got.get(m) != want.get(m))
+        ok = not differs
+        detail = (f"{len(fixture['litellm'])} LiteLLM entries reduce to {len(got)} rows "
+                  f"{sorted(got)}" + ("" if ok else "; differing " + "; ".join(
+                      f"{m}: got {got.get(m)}, expected {want.get(m)}" for m in differs)))
+        score("R", ok, label + detail)
+    except Exception as error:  # noqa: BLE001
+        score("R", False, f"the instrument could not run: {type(error).__name__}: {error}")
 
     passed = sum(1 for _, ok, _ in results if ok)
     print(f"scores: {passed}/{len(results)} pass", flush=True)

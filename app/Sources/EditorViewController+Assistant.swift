@@ -22,10 +22,7 @@ extension EditorViewController {
             return .failure(error)
         case .success(let session):
             assistant = session
-            session.onEvent = { [weak self] event in
-                self?.assistantTranscript.take(event)
-                self?.assistantRefresh()
-            }
+            session.onEvent = assistantEventHandler(spendFolder: AssistantSpend.folder())
             if let window = view.window {
                 let center = NotificationCenter.default
                 center.removeObserver(self, name: NSWindow.willCloseNotification, object: window)
@@ -34,6 +31,21 @@ extension EditorViewController {
                     name: NSWindow.willCloseNotification, object: window)
             }
             return .success(session)
+        }
+    }
+
+    /// Each session event: into the transcript, and a `cost` into the spend
+    /// ledger in `spendFolder`, resolved once for the session (spec §11 P-5).
+    /// A ledger that cannot be written is one transcript note per session.
+    private func assistantEventHandler(spendFolder: URL?) -> ([String: Any]) -> Void {
+        var ledgerFailed = false
+        return { [weak self] event in
+            self?.assistantTranscript.take(event)
+            if let failure = AssistantSpend.record(event, in: spendFolder), !ledgerFailed {
+                ledgerFailed = true
+                self?.assistantTranscript.note(failure)
+            }
+            self?.assistantRefresh()
         }
     }
 

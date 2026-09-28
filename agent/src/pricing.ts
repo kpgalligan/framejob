@@ -24,8 +24,9 @@ export type PriceTable = {
   provider: "anthropic";
   unit: "USD per million tokens";
   source: string;
-  litellm_commit: string;
-  litellm_commit_date: string;
+  litellm_commit?: string;
+  litellm_commit_date?: string;
+  fetched_at?: string;
   models: Record<string, PriceRow>;
 };
 export type UnknownCause = "model" | "rate" | "usage" | "speed" | "service_tier" | "inference_geo";

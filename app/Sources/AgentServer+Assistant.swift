@@ -238,7 +238,7 @@ extension AgentServer {
         let events = fresh.filter {
             let type = $0["type"] as? String
             return type != "text_delta" && type != "progress_delta"
-        }
+        }.map(AssistantSpend.toolView)
         var question: Any = NSNull()
         if let asked = session.pendingQuestion {
             question = [

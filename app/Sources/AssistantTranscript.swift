@@ -41,6 +41,8 @@ final class AssistantTranscript {
     private var streamingType: String?
     /// The last question's sentence, which the answer event does not carry.
     private var questionSentence = ""
+    /// The running turn's `cost` events, summed (road map 13 P2).
+    private var turnCost = AssistantTurnCost()
 
     /// What the person sent.
     func person(_ text: String) {
@@ -108,6 +110,13 @@ final class AssistantTranscript {
             }
         case "error":
             append(.error, event["message"] as? String ?? "Unknown error.")
+        case "turn_started":
+            turnCost = AssistantTurnCost()
+        case "cost":
+            turnCost.add(event)
+        case "turn_finished":
+            if let line = turnCost.line { append(.meta, line) }
+            turnCost = AssistantTurnCost()
         default:
             break
         }
@@ -119,6 +128,7 @@ final class AssistantTranscript {
         entries = []
         streamingType = nil
         questionSentence = ""
+        turnCost = AssistantTurnCost()
         onChange?(.cleared)
         setUsage(AssistantContextUsage(used: 0, limit: usage.limit, reported: usage.reported))
     }
@@ -127,6 +137,7 @@ final class AssistantTranscript {
     /// the note says so, and the usage starts over.
     func endConversation(note text: String) {
         note(text)
+        turnCost = AssistantTurnCost()
         setUsage(AssistantContextUsage(used: 0, limit: usage.limit, reported: usage.reported))
     }
 

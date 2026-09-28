@@ -134,7 +134,7 @@ final class DevAssistantRun: NSObject {
         captured["events"] = fresh.filter {
             let type = $0["type"] as? String
             return type != "text_delta" && type != "progress_delta"
-        }
+        }.map(AssistantSpend.toolView)
         return captured
     }
 

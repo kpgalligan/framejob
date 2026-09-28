@@ -1,6 +1,8 @@
 // The stdio protocol between the app (its helper session) and
 // this helper: one JSON object per line in each direction.
 
+import type { Price } from "./pricing";
+
 /** One entry of the app's MCP-format tool catalog. */
 export type CatalogTool = {
   name: string;
@@ -23,6 +25,11 @@ export type ChatSettings = {
   clear_tool_results: boolean;
 };
 
+/** The table a price came from: the bundled snapshot (as of its LiteLLM
+ *  commit's date), the cached copy or a fresh fetch (as of `fetched_at`), and
+ *  why it was not refreshed, if it was not. */
+export type PriceSource = { kind: "bundled" | "cached" | "fetched"; as_of: string /* bundled: litellm_commit_date; else fetched_at */; problem?: string };
+
 // App -> helper
 
 export type Configure = {
@@ -40,6 +47,10 @@ export type Configure = {
   /** The app's base-URL override (an environment variable of its own), for pointing at a test server. */
   api_base?: string;
   settings: ChatSettings;
+  /** The absolute path of the price cache; absent = the bundled table only, and no refresh. */
+  price_cache?: string;
+  /** Where the refresh fetches LiteLLM's table; absent = LITELLM_URL. */
+  price_feed?: string;
 };
 
 export type HostMessage =
@@ -76,4 +87,8 @@ export type HelperEvent =
   | { type: "compaction_failed"; reason: string }
   /** The API cleared old tool results from what the model saw on one request. */
   | { type: "tool_results_cleared"; tool_uses: number; tokens: number }
+  /** Once per configure: before `ready` if no refresh is due, else when it settles. */
+  | { type: "prices"; source: PriceSource }
+  /** Per response, at the turn's prices: after message_done; for a summary, before compacted/compaction_failed. */
+  | { type: "cost"; model: string; usage: unknown; cost: Price; prices: PriceSource }
   | { type: "turn_finished" };

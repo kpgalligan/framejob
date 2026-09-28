@@ -282,7 +282,11 @@ the key map behind it.
   window's live session or a new one, stored in the frozen file's
   `assistant` — spec §11 AI-4 — and closed by the window's `willClose`; its
   `onEvent` is set there, the ONE line that feeds `assistantTranscript`, which
-  `assistant_tab_proof.py`'s mutant deletes. Road map 12 A2 added the tab's
+  `assistant_tab_proof.py`'s mutant deletes. Road map 13 P2: that line is
+  `assistantEventHandler(spendFolder: AssistantSpend.folder())`, the spend
+  folder resolved once per session; the handler feeds the transcript and
+  records each `cost` in the ledger, a ledger failure being at most one
+  transcript note per session. Road map 12 A2 added the tab's
   glue: `installAssistant(on:)` from `installInspector`, `attachAssistant`
   wiring the view's five intents as one-line forwards, `assistantRefresh()`
   — run LAST in every path that can change the phase or the question, since
@@ -526,7 +530,10 @@ the key map behind it.
   conversation**: the transcript is `EditorViewController.assistantTranscript`
   (`AssistantTranscript`, Rasterize's `handleEvent` ported as storage — a
   delta extends the last entry only while the previous event was the same
-  delta type; `argumentSummary` drops `project`), the question the session's
+  delta type; `argumentSummary` drops `project`; road map 13 P2: it sums the
+  `cost` events from `turn_started` to `turn_finished` into an
+  `AssistantTurnCost` and ends the turn with its line as `.meta`, and
+  `clear()` and `endConversation` reset the sum), the question the session's
   `pendingQuestion`, the session `EditorViewController.assistant`; a floating
   window later calls `attachAssistant` with the same view. **Return never
   answers**: Allow and Deny are `OptionButtonControl`s (a click, no key), Send
@@ -1192,7 +1199,23 @@ free.
   released session (the `askFirst` closure is `[weak self]` and REPLIES when
   `self` is nil) — because an unanswered one holds the lane's one queue for
   every window. `events` is append-only and never holds a `tool_request` or
-  the key.
+  the key. `configure` merges `AssistantSpend.configureFields()` (road map
+  13 P2) — the one line that changed; the file stays at 400.
+- `AssistantSpend.swift` — what the assistant's responses cost, on the app's
+  side (road map 13 P2, spec §11 P-4, P-5). `folder()` is P-5's whole
+  decision: `-RCSpendFolder` (the argument domain alone, through
+  `AssemblyAIConfiguration.argument`); else `RC_ASSISTANT_BASE_URL` set →
+  none; else the one `AppSupport.directory` line. `configureFields()` gives
+  `price_cache` (the folder's `anthropic-prices.json`; with the override set
+  only beside `-RCPriceFeed`) and `price_feed`. `ledgerLine` turns a `cost`
+  event into `spend.jsonl`'s line — `time`, `service`, `model`, a
+  whitelisted `usage`, `dollars`, `unknown`, `rows`, `prices`, nothing else —
+  and `record` creates the folder and appends it with one `write`
+  (`O_APPEND|O_CREAT`, 0600), answering a failure sentence. `toolView` is a
+  `cost` as a dev tool may show it: `{type, cost: {kind, dollars|cause},
+  prices}`. `AssistantTurnCost` sums a turn's dollars and formats the
+  transcript line (`$%.4f`, `under $0.0001`, `unknown (…)`, the table's
+  `day` in the local zone). **No pricing arithmetic**: the helper priced it.
 - `AssistantConfiguration.swift` — the assistant's key (spec §11 AI-8), base
   URL (AI-13), model (AI-11) and chat settings. `store()` is AI-13's whole
   decision: `-RCSecretFolder` (read through
@@ -1287,7 +1310,8 @@ free.
   release, never inside it, where an assistant call may hold
   `callDocument`. `assistant_answer` never opens a session. The answer is
   the state, the question, the text deltas joined and the other events since
-  the call — never the key or the model. `assistant_send` without `pane`
+  the call — never the key or the model, each `cost` passed through
+  `AssistantSpend.toolView` (road map 13 P2). `assistant_send` without `pane`
   sends through `EditorViewController.assistantSend`, so the transcript gets
   the person's line; with `pane` (road map 12 A2) both tools go through the
   Assistant tab's own controls — the composer and a `performClick` on Send,
@@ -1300,8 +1324,9 @@ free.
   -RCDevAssistantReport <path>`, a dev-only launch default (road map 12 A1),
   both from the argument domain alone: after launch, one turn in an untitled
   project with or without the MCP server, a `get_project` through the lane,
-  one atomic JSON report, and the session closed. One key alone is one
-  stderr line. Installed from `main.swift` after `DevAppearance.apply()`.
+  one atomic JSON report (its events' `cost`s through
+  `AssistantSpend.toolView`, road map 13 P2), and the session closed. One key
+  alone is one stderr line. Installed from `main.swift` after `DevAppearance.apply()`.
 - `AgentServer+Snapshot.swift` — `snapshot_ui` (road map 11's V2a, dev only,
   wholly under the flag). It lists the windows, or captures the editor (whole
   or a region), an attached sheet, Settings, Welcome or the recorder panel through `cacheDisplay`:

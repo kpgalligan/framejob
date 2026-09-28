@@ -34,8 +34,11 @@ the tab's own controls (`assistant_send` / `assistant_answer` with `pane`):
       has the composer and Send visible, the no-key pointer and the question
       hidden, and no layout problem inside the tab
   L2  a scripted add_marker turn sent through the composer: finished; the
-      dump's entries are the person's line, `add_marker (…`, the reply; the
-      composer is empty; the marker is on the project
+      dump's entries are the person's line, `add_marker (…`, the reply and
+      the turn's cost line, exactly (road map 13 P2: two stand-in replies at
+      the bundled table, its date the local date of anthropic.json's
+      `litellm_commit_date`, not refreshed for want of a cache); the composer
+      is empty; the marker is on the project
   L3  Deny through the pane: the row reads `export writes D`, Send reads
       Stop, and no layout problem inside the tab; then no file, the row
       hidden, `Declined: …`
@@ -66,6 +69,7 @@ stand-in or to a dead loopback port; only this script's processes are killed.
 """
 
 import argparse
+import datetime
 import json
 import os
 import shutil
@@ -78,6 +82,7 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "graphics_spike"))
 import assistant_session_proof as asp  # noqa: E402
 import bounded  # noqa: E402
+import prices  # noqa: E402
 
 WORK = os.path.join(HERE, "work", "assistant_tab")
 asp.WORK = WORK  # its App, Fake and secret folder write under this proof's folder
@@ -237,6 +242,20 @@ class Dump:
         return [p for p in self.problems if p.get("view") in inside]
 
 
+def bundled_cost_line(replies):
+    """The transcript's cost line for `replies` stand-in replies (100 input
+    and 10 output tokens each on claude-opus-5-5) at the bundled table, in a
+    session with no price cache."""
+    table = prices.load()
+    usage = {"input_tokens": 100, "output_tokens": 10, "cache_creation_input_tokens": 0,
+             "cache_read_input_tokens": 0}
+    dollars = replies * prices.price(usage, asp.DEFAULT_MODEL, table)["dollars"]
+    instant = table["litellm_commit_date"]
+    day = datetime.datetime.fromisoformat(instant.replace("Z", "+00:00")).astimezone()
+    return (f"Cost: ${dollars:.4f} · Reelcut's estimate at LiteLLM prices (bundled table of "
+            f"{day.strftime('%Y-%m-%d')}; not refreshed: no price cache is configured)")
+
+
 def fmt_entries(entries):
     return [f"{kind}: {(text or '')[:60]}" for kind, text in entries]
 
@@ -292,11 +311,14 @@ def row_l2(app, fake, ctx):
     reply = [t for k, t in entries if k == "reply"]
     composer = dump.shown_text("assistant.composer")
     marked = (1200000, "L2 marker") in asp.markers(app, a)
-    good = (answer.get("state") == "finished" and kinds == ["person", "meta", "reply"]
-            and person == [text] and meta and meta[0].startswith("add_marker (")
+    cost = bundled_cost_line(2)
+    good = (answer.get("state") == "finished" and kinds == ["person", "meta", "reply", "meta"]
+            and person == [text] and len(meta) == 2 and meta[0].startswith("add_marker (")
+            and meta[1] == cost
             and reply == ["L2: the marker is in."] and composer == "" and marked
             and dump.shown_text("assistant.send") == "Send")
-    return good, (f"{asp.brief(answer)}; entries {fmt_entries(entries)}; composer "
+    return good, (f"{asp.brief(answer)}; entries {fmt_entries(entries)}; last entry "
+                  f"{(entries[-1][1] if entries else None)!r}, wanted {cost!r}; composer "
                   f"{composer!r}; Send reads {dump.shown_text('assistant.send')!r}; marker on "
                   f"A {marked}")
 

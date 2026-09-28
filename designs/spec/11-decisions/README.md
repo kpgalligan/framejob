@@ -22,7 +22,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | [`graphics.md`](graphics.md) | 281 | **Graphics (road map 10).** G-1..G-16. |
 | [`dev-tools.md`](dev-tools.md) | 27 | **Dev tools (road map 11).** V-1..V-3: the `REELCUT_DEV_TOOLS` flag and `make dist`, dev tools as ordinary tools, capture by `cacheDisplay`. |
 | [`assistant.md`](assistant.md) | 117 | **The Assistant (road map 12).** AI-1..AI-15: the bundled helper, one lane, the catalog at launch, the fourth tab, the window's own project, W-9's reach, withheld and ask-first tools, the key, history, undo, the model, a call mid-gesture, the base-URL override, the tab kept on a selection change, the live context on each message. |
-| [`pricing.md`](pricing.md) | 30 | **Pricing and spend (road map 13, in progress).** P-1..P-4: LiteLLM's table as the feed, a call priced from its own `usage` and `model` (per iteration), monthly dollar budgets per service, the app's spend as its own. |
+| [`pricing.md`](pricing.md) | 42 | **Pricing and spend (road map 13, in progress).** P-1..P-5: LiteLLM's table as the feed, a call priced from its own `usage` and `model` (per iteration), monthly dollar budgets per service, the app's spend as its own, the spend folder (ledger and price cache) that a proof never touches. |
 
 ## Every decision
 
@@ -164,3 +164,4 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | P-2 | A call is priced from the response's own `usage` and `model`, per `iterations` entry; unknown is never $0 | [`pricing.md`](pricing.md) |
 | P-3 | Budgets are dollars per calendar month per service, enforced by the proofs at the worst case | [`pricing.md`](pricing.md) |
 | P-4 | Spend shown in the app is Reelcut's own, and says so | [`pricing.md`](pricing.md) |
+| P-5 | The spend ledger and the price cache are the person's, in the spend folder; a proof never touches them | [`pricing.md`](pricing.md) |

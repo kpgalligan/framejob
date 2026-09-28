@@ -42,7 +42,7 @@ comment citing "road map N §x" refers to the archived original.
 | `designs/design_handoff_reelcut_sharp/` | The sharp pass (2026-09-23): square chrome, 2 pt clips, the zoom slider's block knob. Its README is normative for radii and the knob, with spec §11 SH-1 and SH-2 as the deviations. |
 | `designs/design_handoff_clip_inspector/` | The clip inspector handoff road map 9 built from; `designs/adr/roadmap-09-clip-inspector.md` records the deviations. |
 | `designs/screens/` | The screen catalog (road map 11's V3). One file per screen: a JSON front block (the fixture, the MCP steps that reach it, the captures) and prose for a designer. `tools/proof/screens.py` captures them light and dark into `tools/proof/work/screens/<date>/screens.md`; its `README.md` has the format and how to add a screen. |
-| `agent/prices/` | The price table (spec §11 P-1, P-2): `anthropic.json` is LiteLLM's Anthropic rows in $/MTok with the LiteLLM commit it came from, written only by `make prices`; `cases.json` the hand-checked cases `agent/src/pricing.ts` and `tools/proof/prices.py` both answer. Road map 13 holds the record. |
+| `agent/prices/` | The price table (spec §11 P-1, P-2, P-5): `anthropic.json` is LiteLLM's Anthropic rows in $/MTok with the LiteLLM commit it came from, written only by `make prices` and bundled into the helper, which refreshes its own daily copy into the spend folder (`agent/src/priceTable.ts`); `cases.json` the hand-checked cases `agent/src/pricing.ts` and `tools/proof/prices.py` both answer; `reduce_cases.json` the LiteLLM document both reducers (`update.py`, `priceTable.ts`) answer. Road map 13 holds the record. |
 | `tools/proof/README.md` | The proof scripts, the MCP client and the offscreen harness. |
 | `README.md` | User-facing. |
 
@@ -50,7 +50,7 @@ comment citing "road map N §x" refers to the archived original.
 
 ```sh
 make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
-make test       # make rust, cd core && cargo test --release, cd graphic && cargo test --release (black-box tests), then tools/proof/assistant_lane_proof.py (the agent lane's probe), tools/proof/assistant_prompt_proof.py --probe (the prompt texts' drift checks) and tools/proof/prices_proof.py (the price function: prices.py and agent/'s `bun test` against agent/prices/cases.json, no network)
+make test       # make rust, cd core && cargo test --release, cd graphic && cargo test --release (black-box tests), then tools/proof/assistant_lane_proof.py (the agent lane's probe), tools/proof/assistant_prompt_proof.py --probe (the prompt texts' drift checks) and tools/proof/prices_proof.py (the price function: prices.py and agent/'s `bun test` against agent/prices/cases.json, and update.py's reducer against reduce_cases.json, no network)
 make lint       # cargo clippy --all-targets -- -D warnings, in core/ then graphic/
 make typecheck  # swiftc -typecheck -D REELCUT_DEV_TOOLS of app/Sources/*.swift — the ONLY authoritative Swift check, then agent/'s `tsc --noEmit` (through bun)
 make project    # xcodegen generate (Reelcut.xcodeproj is generated; project.yml is the source of truth)
@@ -99,11 +99,14 @@ graphic/             Rust crate — the graphics engine (road map 10): a Module 
 agent/               the assistant helper (AI-1): Bun, the Anthropic SDK's Tool Runner
   src/                 meant to be byte-identical to ~/devel/rasterize/agent/src/, one
                        diff applied to both; NOT YET: Rasterize lacks road map 12 §2's
-                       change and road map 13's pricing.ts / pricing.test.ts until
-                       #147 lands. What the apps differ in arrives in `configure`
+                       change, road map 13's pricing.ts / pricing.test.ts and P2's
+                       priceTable.ts / priceTable.test.ts, the protocol's prices and
+                       cost events, and tsconfig's resolveJsonModule until #147 lands.
+                       What the apps differ in arrives in `configure`
   prices/              anthropic.json (LiteLLM's Anthropic rows, $/MTok; written only by
-                       `make prices` → update.py), cases.json (the fixture both price
-                       readers run)
+                       `make prices` → update.py; bundled into the helper), cases.json
+                       (the fixture both price readers run), reduce_cases.json (the
+                       fixture update.py's and priceTable.ts's LiteLLM reducers run)
   build.sh             used by the Xcode step (`helper`), `make typecheck` (`typecheck`)
                        and `make test`'s prices_proof.py (`test`)
 app/

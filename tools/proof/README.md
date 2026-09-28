@@ -6428,8 +6428,12 @@ and `RC_ASSISTANT_BASE_URL=http://127.0.0.1:9`:
   answers `assistant`; composer, Send and Clear visible, the no-key pointer
   and the question hidden; no layout problem inside the `AssistantView`.
 - **L2** a scripted `add_marker` turn typed into the composer: `finished`;
-  the entries are exactly person, `add_marker (…`, the reply; the composer is
-  empty; Send reads Send; the marker is on the project.
+  the entries are exactly person, `add_marker (…`, the reply and the turn's
+  cost line (road map 13 P2: exactly `Cost: $0.0012 · Reelcut's estimate at
+  LiteLLM prices (bundled table of <day>; not refreshed: no price cache is
+  configured)`, the dollars from `prices.py`, `<day>` the local date of
+  anthropic.json's `litellm_commit_date`); the composer is empty; Send reads
+  Send; the marker is on the project.
 - **L3** Deny: the row reads `export writes <D>`, Send reads Stop, Allow and
   Deny are visible and the tab has no layout problem while asking; after it
   no file, the row hidden, `Declined: export writes <D>` in the transcript.
@@ -6758,3 +6762,79 @@ The cross-check: 18 page rows parsed, X1 and X2 equal on all five rates,
 3/3; `--mutant table` X1 FAIL "claude-opus-5-5 cache_read: table 0.21, page
 0.2", `--mutant page` X2 FAIL "claude-fable-5-1: the page has no 'Claude
 Fable 5.1' row", each 2/3, exit 1.
+
+## Road map 13's P2 — the helper prices every response (`spend_proof.py`, `spend_probe.swift`; `prices_proof.py` R)
+
+The helper keeps the price table in force (`agent/src/priceTable.ts`): the
+bundled `anthropic.json`, or the cache `configure`'s `price_cache` names,
+refreshed at most once a day from LiteLLM's raw `main` file (or
+`price_feed`). It emits `prices` once per `configure` and a `cost` for every
+response and compaction summary, at the prices in force when the turn
+started. The app writes one `spend.jsonl` line per `cost` into the spend
+folder and ends each turn's transcript with the cost line
+(`AssistantSpend.swift`, spec §11 P-5).
+
+**`prices_proof.py` R** (in `make test`): `update.py`'s `reduce_table` over
+`agent/prices/reduce_cases.json`'s `litellm` block answers exactly its
+`models` — the opus and fable rows, an `_above_200k_tokens` row, a row with
+no `…_above_1hr`, a bedrock row dropped and batch fields dropped. The
+helper's `reduceLiteLLM` answers the same fixture in `bun test`
+(`reduce:` tests). `--mutant reduce-disagrees` raises the expected opus
+input by 1: R FAILs, exit 1.
+
+**`spend_proof.py`** — no network: the API is `anthropic_fake.py`, the feed
+an in-process `http.server` on 127.0.0.1:0 serving the fixture's LiteLLM
+block with opus input at `8e-06` (`/litellm.json`), the same without fable
+(`/no-fable.json`), and one that holds its answer until the proof releases
+it (`/held.json`). A stand-in reply is 100 input and 10 output tokens on
+`claude-opus-5-5`: $0.0006 bundled, $0.001 at the feed; every expected
+dollar is `prices.py`'s, every expected date the local date of the instant.
+
+- **H1–H9**, the Release helper over stdio (`assistant_helper_proof`'s
+  `Helper`): no cache (bundled, "no price cache is configured", one `cost`
+  per POST equal to `prices.py`); a fetch (one GET, the cache written, the
+  reply at $0.001); the same cache (cached, no GET); a cache aged 25 h and a
+  dead feed (cached, with the `fetching …` problem, the cache unchanged); a
+  feed without fable (bundled, the problem names `claude-fable-5-1`, no
+  cache); `http://example.invalid/` (refused by name); compaction (`cost`
+  count = POST count, a `cost` before `compaction_failed`);
+  `claude-proof-model` (unknown, cause `model`); and the turn's prices over
+  the held feed (the turn's two `cost`s bundled although `prices` (fetched)
+  arrived between them, the next turn's fetched).
+- **L0–L2**, the Release app (`assistant_session_proof`'s `App`;
+  `assistant_tab_proof`'s `Dump`, `open_tab`; ports 4897, 4898): no
+  `Reelcut: ` line; with `-RCSpendFolder` scratch and `-RCPriceFeed` local, a
+  priming turn, the cache within 10 s, then a two-reply pane turn whose
+  events carry `cost` only as `{type, cost, prices}` and `claude-opus-5-5`
+  nowhere, one ledger line per `cost` with the listed keys only and no key or
+  text, and the last entry exactly `Cost: $0.0020 · … (fetched <day>)`; with
+  the override and no `-RCSpendFolder`, bundled with the problem, the feed
+  hears nothing, and the person's `spend.jsonl` and `anthropic-prices.json`
+  keep their existence, size and mtime (a concurrent person session can
+  fail this row; rerun).
+- **S1–S5**, `spend_probe.swift` over `app/Sources` on `build_probe`'s
+  swiftc line: the cost line's formats and `day`
+  (`2026-09-29T01:00:00Z` in America/New_York is `2026-09-28`; an
+  unparseable `as_of` its first 10 characters); the transcript's sum and its
+  resets; the ledger whitelist; `record` (two lines at 0600, a nested
+  folder created, a file as the folder refused); P-5's table over a
+  `UserDefaults` answering the argument domain.
+
+Made to fail: `--mutant stale-refresh` builds a scratch `agent/` with
+`REFRESH_AFTER_MS = 0` through its own `build.sh helper` and runs H2 and
+H3 on it (H3 FAILs: a GET and a fetched `prices`); `--mutant
+unknown-as-zero` runs the probe over a copy of `app/Sources` whose cost line
+renders unknown as `$0.0000` (S1 FAILs). Either exits 2 when its instrument
+did not build.
+
+```sh
+python3 tools/proof/prices_proof.py --mutant reduce-disagrees  # R FAIL, exit 1
+python3 tools/proof/spend_proof.py                            # 17/17
+python3 tools/proof/spend_proof.py --mutant stale-refresh     # H3 FAIL, exit 1
+python3 tools/proof/spend_proof.py --mutant unknown-as-zero   # S1 FAIL, exit 1
+```
+
+Measured 2026-09-28: `spend_proof.py` 17/17; `stale-refresh` 1/2 (H3 FAIL:
+no `prices` before `ready`, 1 GET, a later fetched `prices`), exit 1;
+`unknown-as-zero` 4/5 (S1 FAIL: `Cost: $0.0000 · …` for an unknown), exit 1;
+`prices_proof.py` 27/27 and `reduce-disagrees` 26/27, exit 1.

@@ -68,7 +68,11 @@ schema, §6 the op table, §7 the architecture.
   will not record the screen or send audio to the cloud transcriber (File ▸
   Generate Captions… does that, with the price in front of you), and each
   message tells it the playhead, the selection and the open nest as they
-  stand when you send. The
+  stand when you send. Each turn ends with what it cost — Reelcut's own
+  estimate at LiteLLM's prices, naming the table's date, and "unknown"
+  rather than $0 when a response could not be priced — and every response
+  is one line in `spend.jsonl` in Reelcut's Application Support folder
+  (tokens and dollars, never your key or the conversation). The
   Clip tab is a
   selection header — the clip's name, editable there for a single clip and
   the one place a name can be cleared back to what the clip shows, with its
@@ -336,7 +340,7 @@ Makefile              Build orchestration
 | `MediaRowView.swift` · `MediaListFilter.swift` · `MediaPaneCommands.swift` · `MediaUsage.swift` · `MediaReveal.swift` | the Media tab around its pane: the row and the drag it sources, the find band as a value, the row's commands, the one answer to "is this file used" (which walks the nests), and Reveal in Timeline |
 | `EditorViewController.swift` + `EditorViewController+{Timeline,Canvas,Inspector,Export}.swift` | wiring in the base file, features in extensions |
 | `AgentServer.swift` + `AgentServer+{Arguments,Gate,Parity,Project,Clips,Tracks,Media,Render,History,Silence,Captions,CloudCaptions,Audio,Background,Transitions,Scope,Recording,RecordingArguments,RecordingResult,Graphics,GraphicImports,GraphicRender,DevTools}.swift` · `AgentCatalog.swift` + `AgentCatalog+{Clips,Files,Captions,Audio,Transitions,Graphics,Declarations}.swift` | the MCP endpoint, its handlers, and the tool catalog |
-| `AgentLane.swift` · `AssistantToolTable.swift` · `AssistantSession.swift` · `AssistantConfiguration.swift` · `AssistantPrompt.swift` · `AssistantLiveContext.swift` | the one door every tool call goes through (a lock, one call at a time, and the wait for mouse-up), and the table of tools the assistant may not call or must ask about first; the assistant's per-window session over the bundled helper, its key, base URL and model, its core tools and prompt texts, and the live context each message carries |
+| `AgentLane.swift` · `AssistantToolTable.swift` · `AssistantSession.swift` · `AssistantConfiguration.swift` · `AssistantPrompt.swift` · `AssistantLiveContext.swift` · `AssistantSpend.swift` | the one door every tool call goes through (a lock, one call at a time, and the wait for mouse-up), and the table of tools the assistant may not call or must ask about first; the assistant's per-window session over the bundled helper, its key, base URL and model, its core tools and prompt texts, the live context each message carries, and what each response cost (the spend ledger, the price cache's place, the turn's cost line) |
 | `AssistantView.swift` · `AssistantTranscriptView.swift` · `AssistantTranscript.swift` · `AssistantContextMeter.swift` · `AssistantSettingsPane.swift` · `EditorViewController+Assistant.swift` | the Assistant tab's views, which hold no conversation; the transcript the window keeps; the context meter; Settings' Assistant pane (key and model); and the glue between the tab and the window's session |
 | `RecordingSetup.swift` · `ScreenRecorder.swift` (with `+Finishing` and `+Content`) · `RecordingLanding.swift` · `ProjectDocument+Recording.swift` · `RecorderPanelController.swift` (with `+Rows` and `+Recording`) · `RecorderStatusItem.swift` · `AppDelegate+Recording.swift` · `AgentServer+Recording.swift` | screen recording (road map 3): the values, the session over ScreenCaptureKit and a second `AVCaptureSession` for the microphone, the landing as ordinary media, the floating non-activating panel with its countdown and meter, the menu-bar status item, and the `record_screen` tool |
 | `AppDelegate.swift` · `EditorWindowController.swift` · `WelcomeWindowController.swift` · `main.swift` | menus (nil-target selectors), window, welcome |

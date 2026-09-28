@@ -16,6 +16,9 @@ import type {
 import type { BetaRunnableTool } from "@anthropic-ai/sdk/lib/tools/BetaRunnableTool";
 import { ToolError } from "@anthropic-ai/sdk/lib/tools/ToolError";
 import { createInterface } from "node:readline";
+import { price } from "./pricing";
+import { initialPrices, refreshPrices } from "./priceTable";
+import type { LoadedPrices, PriceOptions } from "./priceTable";
 import type {
   CallToolResult,
   CatalogTool,
@@ -64,6 +67,8 @@ let nextCallID = 0;
 let contextUsed = 0;
 let contextLimit: number | null = null;
 const pendingCalls = new Map<string, (result: CallToolResult | null) => void>();
+/** The price table in force; a turn takes it once, at its start (spec §11 P-5). */
+let prices: LoadedPrices | undefined;
 
 function emit(event: HelperEvent) {
   process.stdout.write(JSON.stringify(event) + "\n");
@@ -80,6 +85,33 @@ function configure(message: Configure) {
   tools = message.tools.map((entry) => runnableTool(entry, core));
   settings = message.settings;
   void lookUpContextLimit(message.model);
+  setUpPrices({ cache: message.price_cache, feed: message.price_feed });
+}
+
+/** The prices at `configure`: reported now when no refresh is due, else once
+ *  the refresh settles, in the same continuation that puts it in force. */
+function setUpPrices(options: PriceOptions) {
+  const initial = initialPrices(options);
+  prices = initial.prices;
+  if (!initial.refreshDue) {
+    emit({ type: "prices", source: initial.prices.source });
+    return;
+  }
+  void refreshPrices(initial.prices, options).then((loaded) => {
+    prices = loaded;
+    emit({ type: "prices", source: loaded.source });
+  });
+}
+
+/** What one response cost, at the prices its turn started with. */
+function emitCost(message: BetaMessage, turnPrices: LoadedPrices) {
+  emit({
+    type: "cost",
+    model: message.model,
+    usage: message.usage,
+    cost: price(message.usage, message.model, turnPrices.table),
+    prices: turnPrices.source,
+  });
 }
 
 /** The model's context window, from the Models API, for the panel's meter. */
@@ -196,7 +228,7 @@ function contextManagement() {
 }
 
 async function runTurn(text: string) {
-  if (!client || !config) {
+  if (!client || !config || !prices) {
     emit({ type: "error", message: "The assistant helper was not configured." });
     return;
   }
@@ -206,6 +238,7 @@ async function runTurn(text: string) {
   }
   const controller = new AbortController();
   turn = controller;
+  const turnPrices = prices;
   emit({ type: "turn_started" });
   pushUserText(text);
 
@@ -248,12 +281,14 @@ async function runTurn(text: string) {
       if (compacting) {
         // The summary request the runner sent after the final reply.
         compacting = false;
+        emitCost(message, turnPrices);
         reportCompaction(message);
         continue;
       }
 
       last = message;
       emit({ type: "message_done", stop_reason: message.stop_reason, usage: message.usage });
+      emitCost(message, turnPrices);
       // Everything this request sent (cached or not) plus the reply, which
       // becomes part of the next request.
       const usage = message.usage;

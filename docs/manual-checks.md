@@ -374,6 +374,11 @@ Needs your own Anthropic API key (Setup 3).
 - **Expect:** the no-key pointer to Settings; the context meter, Clear, the transcript's wrapping and the composer all read at a glance.
 - **Source:** #159.
 
+**AS-4 — What a turn cost**
+- **Do:** 1. Quit Reelcut and delete `~/Library/Application Support/Reelcut/anthropic-prices.json`. 2. Relaunch; send two messages. 3. Clear; send one more. 4. Open `~/Library/Application Support/Reelcut/spend.jsonl`.
+- **Expect:** each turn ends with `Cost: $… · Reelcut's estimate at LiteLLM prices (…)`, the three reading `(bundled table of …)`, then `(fetched <today>)`, then `(cached <today>)`; the ledger has one line per response, with no key and no message text; the month's total is near the Anthropic Console's for the same calls.
+- **Source:** road map 13 P2; spec §11 P-4, P-5.
+
 ## Host-state proof runs
 
 Scripts that need a state no agent session has. Run from a terminal on an

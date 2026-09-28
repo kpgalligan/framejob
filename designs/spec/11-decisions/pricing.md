@@ -28,3 +28,15 @@ them and whose §1 holds what was measured.
   never raises them.
 - **P-4 — Spend shown in the app is Reelcut's own**, from its ledger, and says so. The Anthropic
   Console is the truth for the account.
+- **P-5 — The spend ledger and the price cache are the person's, and a proof never touches them.**
+  Both live in the spend folder, `~/Library/Application Support/Reelcut/` (`spend.jsonl`, one JSON
+  line per priced response; `anthropic-prices.json`, the helper's daily copy of LiteLLM's table).
+  `-RCSpendFolder <path>` replaces the folder, read from the argument domain alone (R6-9 (c)). With
+  `RC_ASSISTANT_BASE_URL` set and no `-RCSpendFolder` there is NO spend folder: no ledger line is
+  written, no cache is kept, and the helper prices from its bundled table and says so. The refresh
+  fetches LiteLLM's raw `main` file; `-RCPriceFeed <url>` (argument domain) replaces it, and with
+  the base URL set the cache is handed to the helper only together with `-RCPriceFeed`, so a proof
+  never reaches LiteLLM. The helper refuses a feed that is neither https nor http to 127.0.0.1,
+  localhost or ::1. A turn is priced with the prices in force at its `turn_started`; a refresh that
+  settles mid-turn applies from the next turn. Risk accepted: two sessions opened at once may both
+  fetch.

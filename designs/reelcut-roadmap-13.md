@@ -1,7 +1,8 @@
 # Road map 13 — pricing and spend
 
 **Status: IN PROGRESS. Proposed and approved 2026-09-28; P1 (the table and the price function) built
-2026-09-28, uncommitted, record in §5. P2–P4 not started.**
+2026-09-28 and committed 79a8b56; P2 (the helper prices every response) built 2026-09-28,
+uncommitted. Records in §5. P3–P4 not started.**
 
 The user asked three things: to set a spend budget, to price each call the assistant and the proofs
 make, and eventually to show spend in the UI. The rules they gave:
@@ -117,7 +118,7 @@ Each phase follows the root `CLAUDE.md` recipe and is built with /litecode.
 
 ## 5. Records
 
-### P1 — the table and the price function (built 2026-09-28, uncommitted)
+### P1 — the table and the price function (built 2026-09-28, committed 79a8b56)
 
 **What landed.**
 
@@ -180,3 +181,86 @@ when input + cache writes + cache reads > 200 000; a class with tokens but no us
 **Owed.** Rasterize does not carry `agent/src/pricing.ts` or `pricing.test.ts` (nor the
 `agent/prices/` files the test reads) until #147 lands (commented there). No residue issue was filed:
 every row above passed and every control failed as stated. P2–P4 as §4 plans them.
+
+### P2 — the helper prices every response (built 2026-09-28, uncommitted)
+
+**What landed.**
+
+- Spec §11 **P-5** in `designs/spec/11-decisions/pricing.md` (written before any code), indexed in
+  `11-decisions/README.md`: the spend ledger and the price cache are the person's, in the spend
+  folder (`~/Library/Application Support/Reelcut/`, or `-RCSpendFolder`); none with
+  `RC_ASSISTANT_BASE_URL` set and no `-RCSpendFolder`; with the override the cache is passed only
+  beside `-RCPriceFeed`; a feed must be https or loopback http; a turn is priced at the prices in
+  force at its `turn_started`.
+- The helper (`agent/src/`): `priceTable.ts` — the bundled table (a JSON import, `tsconfig`'s
+  `resolveJsonModule`), `parseTable`, `reduceLiteLLM` (`update.py`'s `reduce_table` step for step,
+  with the feed and `fetched_at` in place of a commit), `feedProblem`, `initialPrices` (a synchronous
+  cache read; a refresh is due when the cache is absent, unreadable, invalid, 24 h old or more, in
+  the future or unparseable) and `refreshPrices` (never rejects; on success the cache is written
+  `mkdir -p`, `<cache>.tmp-<pid>`, `rename`, as its last step; on failure `current` is kept with the
+  problem and nothing is written). `protocol.ts` — `PriceSource`, `price_cache` / `price_feed`, the
+  `prices` and `cost` events. `main.ts` — `configure` sets up the prices (`prices` before `ready`
+  when no refresh is due, else in the refresh's own continuation, which also puts it in force);
+  `runTurn` takes the prices once beside `turn_started`; `emitCost` after every `message_done` and
+  before `reportCompaction`. `pricing.ts`'s `PriceTable` type: `litellm_commit` /
+  `litellm_commit_date` optional, `fetched_at?`. `priceTable.test.ts` (12 `reduce:` / `refresh:`
+  tests, `Bun.serve` on 127.0.0.1 only) and `agent/prices/reduce_cases.json`.
+- The app: `AssistantSpend.swift` (269 lines) — `folder()`, `configureFields()`, `ledgerLine` (the
+  listed keys only, `usage` whitelisted), `record` (creates the folder, `O_APPEND|O_CREAT` 0600, one
+  `write`), `toolView` and `AssistantTurnCost` (the sum, `amount`, `day` in the local zone, the
+  line). `AssistantSession.swift` line 134 merges `configureFields()` (still 400 lines).
+  `EditorViewController+Assistant.swift`: `session.onEvent =` stays one line, now
+  `assistantEventHandler(spendFolder: AssistantSpend.folder())`, which feeds the transcript and
+  records each `cost`, a ledger failure being at most one note per session. `AssistantTranscript`
+  sums the turn's `cost`s and appends the line as `.meta` on `turn_finished`; `clear()` and
+  `endConversation` reset it. `AgentServer+Assistant.swift` and `DevAssistantLaunch.swift` map their
+  `events` through `AssistantSpend.toolView` (no line added).
+- Proofs: `prices_proof.py` row R (and `--mutant reduce-disagrees`); `spend_proof.py` (H1–H9, L0–L2,
+  S1–S5) with `spend_probe.swift`; `assistant_tab_proof.py`'s L2 now expects the exact bundled cost
+  line. Docs: spec §7.9's session paragraph, `docs/manual-checks.md` AS-4, `app/CLAUDE.md`, the root
+  `CLAUDE.md`, `README.md`, `tools/proof/README.md`.
+
+**Measured 2026-09-28** (every command with `ANTHROPIC_API_KEY` and `RC_ASSEMBLYAI_KEY` unset):
+
+- `make typecheck`: 0 errors, the 7 baseline warnings, tsc clean. `make lint` clean. `make test`
+  exit 0, `prices_proof.py` 27/27 (bun test 36 testcases, 0 failing; R: 5 LiteLLM entries reduce
+  to 4 rows). `make app`: BUILD SUCCEEDED.
+- `spend_proof.py` 17/17: H1 bundled as of 2026-09-28T06:07:45Z with "no price cache is
+  configured", 2 POSTs and 2 costs of $0.0006; H2 one GET, the cache written, the reply $0.001
+  (fetched); H3 cached before `ready`, 0 GETs; H4 cached with "fetching http://127.0.0.1:…: Unable
+  to connect…", the cache unchanged; H5 "… was rejected: no claude-fable-5-1 row", no cache; H6
+  "the price feed http://example.invalid/ is neither https nor a loopback http URL"; H7 2 POSTs, 2
+  costs, order `message_done, cost, cost, compaction_failed`; H8 unknown, cause `model`; H9 the
+  first turn's two costs bundled with the GET held and released between them, the next turn's
+  fetched at $0.001; L1 3 ledger lines for 3 costs, no stranger key, no text, the last entry
+  `Cost: $0.0020 · Reelcut's estimate at LiteLLM prices (fetched 2026-09-28)`; L2 bundled with the
+  problem, 0 feed GETs, the person's two files absent before and after; S1–S5 ok.
+- Made to fail: `prices_proof.py --mutant reduce-disagrees` R FAIL, 26/27, exit 1; `spend_proof.py
+  --mutant stale-refresh` H3 FAIL (no `prices` before `ready`, 1 GET), 1/2, exit 1;
+  `--mutant unknown-as-zero` S1 FAIL (`Cost: $0.0000 · …` for an unknown), 4/5, exit 1.
+- `assistant_tab_proof.py` 16/16 (L2 ends with `Cost: $0.0012 · … (bundled table of 2026-09-28;
+  not refreshed: no price cache is configured)`); `assistant_helper_proof.py` 6/6;
+  `assistant_session_proof.py` 11/11. No launch log held a `Reelcut: ` line.
+
+**The review's five nits, fixed (2026-09-28, at the owner's ask).** Two change wording P2's spec
+prescribed. (1) A turn with an unknown response whose priced part rounds to $0 no longer reads
+`unknown (…) · at least $0.0000`; it reads `unknown (…) · the priced part under $0.0001`
+(`AssistantTurnCost.pricedPart`); a larger priced part still reads ` · at least $%.4f`. (2) A
+`fetched` table whose cache write failed no longer reads `fetched <day>; not refreshed: the price
+cache could not be written: …`, which contradicted itself; for `fetched` the problem follows a bare
+`; `, and `bundled` / `cached` keep `; not refreshed: <problem>`. `spend_probe.swift`'s S1 gained a
+check for each. (3) `priceTable.test.ts`'s "a fresh cache is in force with no GET" never called
+`refreshPrices`, so its GET count was vacuous; it is now "a fresh cache is in force and no refresh
+is due", with no feed served (spend_proof's H3 carries the no-GET claim). (4) `prices_proof.py`
+imports `update` inside R's `try`, so an unimportable `update.py` scores R FAIL instead of killing
+the proof. (5) `AssistantSpend.swift`'s doc comment now says the spend folder is created by
+`record` or by the helper's cache write, whichever comes first. Re-run after the fixes: typecheck
+0 errors and the 7 baseline warnings, tsc clean; lint clean; `make test` exit 0, prices_proof 27/27
+(bun test 36 testcases); `make app` BUILD SUCCEEDED; `--mutant reduce-disagrees` R FAIL, 26/27,
+exit 1; spend_proof 17/17, `--mutant stale-refresh` H3 FAIL exit 1, `--mutant unknown-as-zero` S1
+FAIL exit 1; tab 16/16, helper 6/6, session 11/11; no `Reelcut: ` line.
+
+**Owed.** A response cut short by Stop or an error has no final usage and is not priced (#162).
+Rasterize carries none of P2's `agent/src` change until #147 lands (commented there). AS-4 in
+`docs/manual-checks.md` (a real key: bundled, then fetched, then cached; the ledger against the
+Console) is the owner's. P3–P4 as §4 plans them.

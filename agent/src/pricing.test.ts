@@ -49,7 +49,7 @@ test("table: committed", () => {
   expect(table.format).toBe(1);
   expect(table.unit).toBe("USD per million tokens");
   expect(table.provider).toBe("anthropic");
-  expect(/^[0-9a-f]{40}$/.test(table.litellm_commit)).toBe(true);
+  expect(/^[0-9a-f]{40}$/.test(table.litellm_commit ?? "")).toBe(true);
   for (const model of ["claude-opus-5-5", "claude-fable-5-1"]) {
     const row = table.models[model];
     expect(row).toBeDefined();
