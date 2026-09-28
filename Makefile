@@ -48,7 +48,10 @@ app: rust project
 # Builds the Distribution configuration (Release without REELCUT_DEV_TOOLS,
 # spec §11 V-1) beside Release's product, then runs the binary check: the
 # dev-tools marker must be absent from Distribution's binary and present in
-# Release's, which is its positive control. The file-wide
+# Release's, which is its positive control; and each bundle's assistant helper
+# (Contents/Helpers/reelcut-agent) must be present, signed with the hardened
+# runtime, hold exactly the allow-jit entitlement and not hold the marker
+# (road map 12 A4, D6–D13). The file-wide
 # `unexport RC_ASSEMBLYAI_KEY` above covers this recipe too.
 dist: app
 	xcodebuild -project $(APP).xcodeproj -scheme $(APP) -configuration Distribution \

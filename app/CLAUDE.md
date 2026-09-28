@@ -1229,7 +1229,8 @@ free.
   Distribution does not. The frozen file merges them (`withDevHandlers`, a
   union) and `catalogJSON()` splices the rows in BEFORE the file tools. It
   holds `devToolsMarker`, the string `tools/proof/dist_check.py` requires in
-  Release's binary and absent from Distribution's; a tool NAME cannot be the
+  Release's binary and absent from Distribution's, and absent from each
+  bundle's assistant helper (D12, D13); a tool NAME cannot be the
   marker, because an `-O` binary stores a literal of 15 bytes or fewer
   inline. Its tables hold
   `snapshot_ui` (V2a), `perform_menu_item` and `cancel_sheet` (V2b),

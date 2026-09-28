@@ -1,18 +1,20 @@
 # Road map 12 — the Assistant tab
 
-**Status: IN PROGRESS. PROPOSED 2026-09-27; the user answered §6 the same day. §4's decisions
-are recorded in spec §11 (`11-decisions/assistant.md`, AI-1..AI-15) and A0 ran the same day
-(§7). A1 is built (§8): the lane, the helper and its build, and the session with its two dev
-tools and end-to-end proof. A2 is built (§9): the Assistant tab, View ▸ Assistant ⌃⌘A and
-Settings' Assistant pane, so a person can use the assistant. A3 is built (§10): the prompt
-texts, the live context on each message, their drift checks in `make test`, and the
-spend-capped evaluation, whose live run is owed to a person with a key. A4 (close) is next.**
+**Status: CLOSED 2026-09-28. Its condensed record is `designs/adr/roadmap-12-assistant.md`.
+PROPOSED 2026-09-27; the user answered §6 the same day. §4's decisions are recorded in spec
+§11 (`11-decisions/assistant.md`, AI-1..AI-15) and A0 ran the same day (§7). A1 is built
+(§8): the lane, the helper and its build, and the session with its two dev tools and
+end-to-end proof. A2 is built (§9): the Assistant tab, View ▸ Assistant ⌃⌘A and Settings'
+Assistant pane. A3 is built (§10): the prompt texts, the live context on each message, their
+drift checks in `make test`, and the spend-capped evaluation, whose live run is owed to a
+person with a key (#157). A4 (§11) added `dist_check.py`'s helper rows and closed the road map;
+what is left is GitHub issues #145–#161.**
 This is the design the user asked for:
 an AI agent in the editor, "designed in the same way that the agent for
 `~/devel/rasterize` is". §1 is what Rasterize built. §2 is what carries over unchanged.
 §3 is what Reelcut needs that Rasterize did not. §4 is the decisions §11 must record
 before any code is written. §5 is the phases. §6 is the user's answers. §7 is A0's record.
-§8 is A1's record. §9 is A2's record. §10 is A3's record.
+§8 is A1's record. §9 is A2's record. §10 is A3's record. §11 is A4's record.
 
 ## 1. What Rasterize built
 
@@ -955,3 +957,66 @@ review has not run on it yet.
 section, the ADR, the archive.
 
 **Issues filed.** #157 run the live evaluation with a key (`ready-for-human`).
+
+## 11. A4 record (2026-09-28)
+
+**What landed.**
+- `tools/proof/dist_check.py`: rows D6–D13 after D1–D5 (whose names, order and details are
+  unchanged). D6/D7 the Release/Distribution helper `Contents/Helpers/reelcut-agent` exists;
+  D8/D9 it is signed with the hardened runtime — the first `flags=0x…(…)` in
+  `codesign -dv --verbose=4`'s STDERR lists `runtime`, and `codesign --verify --strict` exits 0;
+  D10/D11 `codesign -d --entitlements - --xml`'s stdout parses to exactly
+  `{com.apple.security.cs.allow-jit: true}`; D12/D13 it does not hold the `devToolsMarker`
+  needle. No row skips: a missing helper fails its three rows, no needle fails D12/D13, and a
+  missing `codesign`, a timeout or unparsable output fails the row with the reason. The last
+  line is `dist_check: <passed>/13`.
+- `tools/proof/dist_check_mutants.py` (new): eleven cases, each running `dist_check.py` as a
+  child against a skeleton bundle whose binary is a symlink to the real one and whose helper is
+  a mutated, re-signed copy; nothing is written into `build/`.
+- `assistant_spike.py`'s H3 parses `dist_check: (\d+)/(\d+)` and passes on full marks; its
+  `ROADMAP` is this file's archive path. Not run (#146 rots its tree copy).
+- `Makefile`: the `dist:` comment names the helper rows. No recipe change.
+- Documents: spec §7.9's new paragraph "The helper", §7.4's two assistant rows, the spec index,
+  `11-decisions/assistant.md` and its index row, `app/CLAUDE.md`'s `AgentServer+DevTools.swift`
+  entry, the README (the Inspector bullet's reach and live-context sentence; the `make dist`
+  line), `tools/proof/README.md` (V0's counts and a new A4 section), the assistant spike's
+  README; then the close: `designs/adr/roadmap-12-assistant.md`, this file moved to `archive/`,
+  its `archive/INDEX.md` row and the root `CLAUDE.md`'s ADR cell.
+- No Swift, Rust, TypeScript, `project.yml` or `agent/` change.
+
+**What was measured.** Every command ran as `(unset ANTHROPIC_API_KEY RC_ASSEMBLYAI_KEY; …)`.
+- `make typecheck`: 0 errors and 7 warnings (the baseline); `tsc --noEmit` printed nothing.
+  `make lint` was clean. `make test` exited 0: 73 cargo test result lines, 968 passed, 0
+  failed; the lane proof 12/12; the prompt probe 11/11.
+- `make dist` built Release then Distribution and ended `dist_check: 13/13`. Each helper is
+  57719424 bytes, `flags=0x10002(adhoc,runtime)`, entitlements exactly allow-jit, the needle 0
+  times.
+- `dist_check_mutants.py`: 11/11, each case failing exactly its set — `control` and `skeleton`
+  none (13/13, exit 0); `no-helper-release` D6 D8 D10 D12 and `no-helper-dist` D7 D9 D11 D13
+  (9/13); `no-runtime-release` D8 and `-dist` D9 ("CodeDirectory flags (adhoc) lack runtime");
+  `extra-entitlement-release` D10 and `-dist` D11 (the two-key dict with
+  `disable-library-validation`); `no-entitlements-dist` D11 ("the entitlements do not
+  parse"); `marker-release` D12 and `-dist` D13 ("1 occurrences") — each 12/13, exit 1.
+- `dist_check.py --dist /nonexistent/Reelcut.app`: D3, D5, D7, D9, D11 and D13 FAIL, 7/13,
+  exit 1.
+
+**The reviews, corrected.** §9 and §10 each say "the pipeline's reader review has not run on it
+yet"; both ran before their commits. A2 (`dae833a`): the review's fix, one-line JSON in tool
+summaries, and two nits. A3 (`172cf0c`): the fix, `assistant_prompt_eval.py`'s
+`Evaluation.send` answering stop to a non-E6 turn left asking; two proof nits fixed and two
+filed as #158.
+
+**Limits.**
+- The helper rows read signatures only; the helper was not launched (A0's H5 and the session
+  proofs launch it). Ad-hoc signing only: no Developer ID, notarization or quarantine, and
+  the app's own entitlements (`get-task-allow`, #145) have no row.
+- Every assistant turn in this road map was against the stand-in; the live evaluation (#157)
+  and compaction on the real API (#161) have not run.
+
+**Issues.** The items under §7–§10's "Owed", "Limits" and "Issues filed" were reviewed against
+the tree and `gh issue list --state all`: #145–#158 stand and are referenced, not refiled (#144
+closed by AI-12); A2's two nits, A3's `child_env` pop and F3's `graphics[]` nits are fixed in
+the tree. Filed at the close: #159 the person check of the tab with a real key
+(`ready-for-human`; #157 is its scripted half); #160 candidate, the Assistant in a floating
+window (§6 answer 1); #161 end-of-turn compaction against the real API. #157 has a comment:
+report the live run there, not here.

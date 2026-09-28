@@ -5760,11 +5760,16 @@ and prints the needle and both paths before its rows:
 - **D2** — the Release binary exists; **D3** — the Distribution binary exists;
 - **D4** — the Release binary holds the needle: the POSITIVE CONTROL, without
   which an absence check passes against a build that never had the tools;
-- **D5** — the Distribution binary does not hold the needle.
+- **D5** — the Distribution binary does not hold the needle;
+- **D6–D13** — each bundle's assistant helper: present, signed with the
+  hardened runtime, entitlements exactly `allow-jit`, no needle (road map
+  12's A4, the last section of this file).
 
-No row is ever skipped: if D1 fails, D4 and D5 FAIL too, and so does D4 or
-D5 when its binary is missing. The last line is `dist_check: <passed>/5`;
-the exit is 0 only at 5/5.
+No row is ever skipped: if D1 fails, D4, D5, D12 and D13 FAIL too, and so
+does each when its binary or helper is missing. The last line is
+`dist_check: <passed>/13`; the exit is 0 only at 13/13.
+`dist_check_mutants.py` makes each helper row fail on purpose; the last
+section of this file has its cases.
 
 **Why a marker and not the tool names.** Swift string literals of 15 UTF-8
 bytes or fewer are stored inline in the code of an `-O` binary, not as
@@ -5776,12 +5781,12 @@ optimised binary by the log line the flag-on `devTools()` writes, so a dev
 tool added to the seam needs no edit here.
 
 ```sh
-make dist                                                  # → dist_check: 5/5
+make dist                                                  # → dist_check: 13/13
 python3 tools/proof/dist_check.py [--release APP] [--dist APP]
 ```
 
-**Made to fail by hand (2026-09-26)**, each reverted and the seam file
-`cmp`-identical afterwards: `--release` pointed at the Distribution app — D4
+**Made to fail by hand (2026-09-26, when there were five rows)**, each
+reverted and the seam file `cmp`-identical afterwards: `--release` pointed at the Distribution app — D4
 FAIL (4/5); `--dist` at the Release app — D5 FAIL (4/5); `--release` at a
 missing path — D2 and D4 FAIL (3/5); `--dist` at a missing path — D3 and D5
 FAIL (3/5); a trailing `// note` on the marker line, a 12-byte marker, and a
@@ -6135,7 +6140,8 @@ against the built app (F, T), whether `export` replaces an existing file
 (E), and what an agent edit does to a timeline drag in progress (D, a probe
 built from `app/Sources`). 32 scored rows, a digest. Its README has the rows,
 the copy, the run order and the output; the answers are in
-`designs/reelcut-roadmap-12.md` §7. `anthropic_fake.py` is the stand-in, at
+`archive/reelcut-roadmap-12.md` §7 (condensed in
+`designs/adr/roadmap-12-assistant.md`). `anthropic_fake.py` is the stand-in, at
 the top level because A1 reuses it: `port <n>` first, a scripted reply per
 `POST /v1/messages` (SSE when the body asks to stream), and R6-9(e)'s
 credential rule — only `proof-key` and `wrong-key` are ever logged.
@@ -6598,3 +6604,61 @@ python3 tools/proof/assistant_prompt_proof.py --rehearse --cap 0.0001   # WARNIN
 python3 tools/proof/assistant_prompt_proof.py --mutant bare-send        # S2 FAIL, exit 1
 python3 tools/proof/assistant_prompt_proof.py --live --cap 15           # a person, with a key
 ```
+
+## Road map 12's A4 — the helper in both bundles (`dist_check.py` D6–D13, `dist_check_mutants.py`)
+
+Both bundles carry the assistant helper, `Contents/Helpers/reelcut-agent`,
+which `agent/build.sh helper` copies in and signs `--options runtime` with
+`agent/entitlements.plist` before Xcode signs the app. `dist_check.py` holds
+each bundle's helper to that contract, after D1–D5 and with none skipped:
+
+- **D6 / D7** — the Release / Distribution helper exists;
+- **D8 / D9** — it is signed with the hardened runtime: the first
+  `flags=0x…(…)` in `codesign -dv --verbose=4`'s display (which goes to
+  STDERR; the CodeDirectory line) lists `runtime`, and
+  `codesign --verify --strict` exits 0. `runtime`, not `adhoc`, so a
+  Developer ID signature passes too;
+- **D10 / D11** — `codesign -d --entitlements - --xml`'s stdout, parsed as a
+  plist, is exactly `{com.apple.security.cs.allow-jit: true}`;
+- **D12 / D13** — it does not hold the `devToolsMarker` needle.
+
+A missing helper FAILs its three rows ("no Release helper (D6)"); no needle
+(D1) FAILs D12 and D13. A missing `codesign`, a timeout (120 s) or output
+that does not parse FAILs the row with the reason. Every child gets
+`child_env()`, the environment without `ANTHROPIC_API_KEY` and
+`RC_ASSEMBLYAI_KEY`.
+
+**Made to fail on purpose, scripted.** `dist_check_mutants.py` runs
+`dist_check.py` as a child once per case, with the mutated side a SKELETON
+bundle under `work/dist_check_mutants/<case>/`: `Contents/MacOS/Reelcut` a
+symlink to the real app's untouched binary and the helper a COPY, mutated
+and re-signed ad hoc; nothing is written into `build/`. A case passes iff
+the FAIL ids equal its expected set exactly, the last line is
+`dist_check: <13 − |set|>/13` and the exit is 0 for an empty set, 1
+otherwise; a failed setup step is a scored FAIL naming it.
+
+| Case | The mutation | Expected FAIL |
+|---|---|---|
+| `control` | both sides the real apps | none |
+| `skeleton` | both sides skeletons, helpers copied untouched | none |
+| `no-helper-release` / `-dist` | no helper in the skeleton | D6 D8 D10 D12 / D7 D9 D11 D13 |
+| `no-runtime-release` / `-dist` | re-signed with `agent/entitlements.plist`, no `--options runtime` | D8 / D9 |
+| `extra-entitlement-release` / `-dist` | re-signed `--options runtime` with allow-jit plus `disable-library-validation` | D10 / D11 |
+| `no-entitlements-dist` | re-signed `--options runtime`, no entitlements | D11 |
+| `marker-release` / `-dist` | the needle written over the copy at the first `compaction_instructions`, re-signed as `build.sh` signs | D12 / D13 |
+
+```sh
+make dist                                                  # → dist_check: 13/13
+python3 tools/proof/dist_check_mutants.py [--release APP] [--dist APP]   # → dist_check_mutants: 11/11
+python3 tools/proof/dist_check.py --dist /nonexistent/Reelcut.app        # D3 D5 D7 D9 D11 D13 FAIL, 7/13, exit 1
+```
+
+**Measured 2026-09-28**, every command as `(unset ANTHROPIC_API_KEY
+RC_ASSEMBLYAI_KEY; …)`: `make dist` built Release then Distribution and
+ended `dist_check: 13/13`; each helper is 57719424 bytes,
+`flags=0x10002(adhoc,runtime)`, entitlements exactly allow-jit, the needle 0
+times. `dist_check_mutants.py` scored 11/11 in about 3 s, each case failing
+exactly its set: no-runtime's reason "CodeDirectory flags (adhoc) lack
+runtime", extra-entitlement's the two-key dict, no-entitlements' "the
+entitlements do not parse", marker's "1 occurrences". `--dist` at a missing
+path: D3, D5, D7, D9, D11 and D13 FAIL, 7/13, exit 1.

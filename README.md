@@ -63,7 +63,11 @@ schema, §6 the op table, §7 the architecture.
   Send becomes Stop while it works, Clear starts over, and a meter shows how
   full the conversation is. It runs on your own Anthropic API key and the
   model you choose (claude-opus-5-5 unless you pick another), both set in
-  Settings' Assistant pane; changing either starts a new conversation. The
+  Settings' Assistant pane; changing either starts a new conversation. It
+  will not record the screen or send audio to the cloud transcriber (File ▸
+  Generate Captions… does that, with the price in front of you), and each
+  message tells it the playhead, the selection and the open nest as they
+  stand when you send. The
   Clip tab is a
   selection header — the clip's name, editable there for a single clip and
   the one place a name can be cleared back to what the clip shows, with its
@@ -343,7 +347,7 @@ Requires Xcode 26 or later (the macOS 26 SDK), Rust (cargo), [xcodegen](https://
 
 ```sh
 make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
-make dist       # make app, then the Distribution build (no dev tools) → build/Build/Products/Distribution/Reelcut.app, checked
+make dist       # make app, then the Distribution build (no dev tools; the assistant helper signed with the hardened runtime) → build/Build/Products/Distribution/Reelcut.app, checked
 make run        # build and launch
 make test       # Rust core and graphics tests, then the agent lane's proof (tools/proof/assistant_lane_proof.py) and the prompt texts' checks (tools/proof/assistant_prompt_proof.py --probe)
 make lint       # cargo clippy --all-targets -D warnings

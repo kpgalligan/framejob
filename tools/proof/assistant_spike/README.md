@@ -2,8 +2,9 @@
 
 The questions A1 cannot be designed without, and the instrument that
 measures them. **The answers are not here**: they are in
-`designs/reelcut-roadmap-12.md` §7 ("A0 record"), which also says what they
-changed in §5. What is here is how to run it again.
+`archive/reelcut-roadmap-12.md` §7 ("A0 record"; condensed in
+`designs/adr/roadmap-12-assistant.md`), which also says what they changed in
+§5. What is here is how to run it again.
 
 - **B** — Rasterize's `agent/` copied and renamed, a hook and the build step
   in a COPY of the tree; the copy's `make app`, its Distribution build, and
@@ -76,7 +77,7 @@ is the copy's Release or Distribution build.
 | B1 I, B2 A, B3 I, B4 I, B5 I, B6 I | Rasterize's HEAD, `agent/` dirty, `src/*.ts` sha256, SDK and bun versions; `bun install --frozen-lockfile` after the rename (else a plain install and the lock diff); the anchors; the two builds; the probe's build |
 | H1r/d A, H2r/d A | the helper's bytes, `runtime` flag, entitlements exactly `allow-jit`; the app's strict deep verify, `runtime`, entitlements exactly `audio-input` |
 | H2t A | the tree's OWN `build/Build/Products/{Release,Distribution}/Reelcut.app` (read, never built) carry the same entitlements as the copy's, with each binary's mtime; a skip when either is absent |
-| H3 C | the tree's `dist_check.py` on the copy's two builds: 5/5 |
+| H3 C | the tree's `dist_check.py` on the copy's two builds: full marks |
 | H4r/d A | the copy binds its port, no `Reelcut: ` line, and the hook logs `ready` from its helper |
 | H5 C, H6 A | the Release helper launched by the runner (three-variable environment) reaches `ready` in 20 s; a copy re-signed `--options runtime` with NO entitlements does not, with its exit status and first stderr line |
 | C1r/d A, C2 A, C3 A | `catalogJSON()` bytes and tools; run d's first POST (body, tool count, tools array bytes); the assistant catalog (C2's tools minus tool search and `record_screen`, `defer_loading` stripped) counted through `count_tokens` with the key, else ESTIMATED as `[bytes/4, bytes/2.5]`, and the choice: ≤ 10000 all up front, > 10000 tool search, a straddle "undecided" |

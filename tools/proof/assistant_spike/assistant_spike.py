@@ -65,7 +65,7 @@ ANSWERS = os.path.join(WORK, "answers.json")
 FAKE = os.path.join(PROOF, "anthropic_fake.py")
 HOOK = os.path.join(HERE, "AssistantSpikeHook.swift")
 DRAG = os.path.join(HERE, "drag_probe.swift")
-ROADMAP = os.path.join(ROOT, "designs", "reelcut-roadmap-12.md")
+ROADMAP = os.path.join(ROOT, "archive", "reelcut-roadmap-12.md")
 LIB = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
 PRODUCTS = os.path.join(TREE, "build", "Build", "Products")
 APPS = {"r": os.path.join(PRODUCTS, "Release", "Reelcut.app"),
@@ -93,7 +93,7 @@ ROWS = [
     ("H2r", "H", "A", "the Release app verifies strictly, runtime, exactly audio-input"),
     ("H2d", "H", "A", "the Distribution app verifies strictly, runtime, exactly audio-input"),
     ("H2t", "H", "A", "the tree's own build/ Release and Distribution apps carry the copy's entitlements"),
-    ("H3", "H", "C", "the tree's dist_check.py scores 5/5 on the copy's two builds"),
+    ("H3", "H", "C", "the tree's dist_check.py scores full marks on the copy's two builds"),
     ("H4r", "H", "A", "the Release copy binds, parity is clean, its helper answers ready"),
     ("H4d", "H", "A", "the Distribution copy binds, parity is clean, its helper answers ready"),
     ("H5", "H", "C", "the H1r helper, launched by the runner, reaches ready within 20 s"),
@@ -1022,10 +1022,11 @@ def main():
         if built["r"] and built["d"]:
             checked = run([sys.executable, os.path.join(ROOT, "tools", "proof", "dist_check.py"),
                            "--release", APPS["r"], "--dist", APPS["d"]], 120)
-            score = re.search(r"dist_check: (\d+)/5", checked["stdout"])
+            score = re.search(r"dist_check: (\d+)/(\d+)", checked["stdout"])
             passed = int(score.group(1)) if score else None
-            put("H3", "pass" if passed == 5 and checked["rc"] == 0 else "fail",
-                f"dist_check {passed}/5, rc {checked['rc']}",
+            total = int(score.group(2)) if score else None
+            put("H3", "pass" if score and passed == total and checked["rc"] == 0 else "fail",
+                f"dist_check {passed}/{total}, rc {checked['rc']}",
                 {"stdout": checked["stdout"][-800:]})
         else:
             put("H3", "fail", "a build failed", {})

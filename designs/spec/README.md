@@ -38,16 +38,16 @@ this index gets its row in the same change.
 | [`07.6-playback-update-rules.md`](07.6-playback-update-rules.md) | 35 | What playback does after every edit: rebuild or refresh. |
 | [`07.7-import.md`](07.7-import.md) | 18 | `MediaImporter.probe` and the formats import accepts. |
 | [`07.8-export.md`](07.8-export.md) | 232 | Export: writers, formats, loudness, the queue. |
-| [`07.9-agent.md`](07.9-agent.md) | 433 | The MCP agent: one tool per op plus `scope`, the app-state tools, the dev tools, parity, the graphics loop, the lane, the assistant session, its prompt and the Assistant tab. |
+| [`07.9-agent.md`](07.9-agent.md) | 452 | The MCP agent: one tool per op plus `scope`, the app-state tools, the dev tools, parity, the graphics loop, the lane, the helper, the assistant session, its prompt and the Assistant tab. |
 | [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 75 | The spec's Rust module map (core/CLAUDE.md is the live one). |
 | [`08-repo-layout.md`](08-repo-layout.md) | 64 | Repo layout, build, conventions. |
 | [`09-keys-and-menus.md`](09-keys-and-menus.md) | 135 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 1804 in 12 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 1805 in 12 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 
-**Status: accepted and built** (M1–M3, then road maps 2–11; `designs/adr/` has each one's
+**Status: accepted and built** (M1–M3, then road maps 2–12; `designs/adr/` has each one's
 record). The preface below is the original handoff's, kept for its reading order.
 
 Sibling of `~/devel/rasterize` — the same shape (Swift/AppKit app over a Rust staticlib core, a
