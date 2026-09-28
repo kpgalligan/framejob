@@ -345,16 +345,17 @@ Makefile              Build orchestration
 
 ## Building
 
-Requires Xcode 26 or later (the macOS 26 SDK), Rust (cargo), [xcodegen](https://github.com/yonaskolb/XcodeGen), and [bun](https://bun.sh) (the assistant helper, `agent/`, is built by every `make app` and typechecked by `make typecheck`; without bun they fail rather than skip).
+Requires Xcode 26 or later (the macOS 26 SDK), Rust (cargo), [xcodegen](https://github.com/yonaskolb/XcodeGen), and [bun](https://bun.sh) (the assistant helper, `agent/`, is built by every `make app`, typechecked by `make typecheck` and its price function tested by `make test`; without bun they fail rather than skip).
 
 ```sh
 make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
 make dist       # make app, then the Distribution build (no dev tools; the assistant helper signed with the hardened runtime) → build/Build/Products/Distribution/Reelcut.app, checked
 make run        # build and launch
-make test       # Rust core and graphics tests, then the agent lane's proof (tools/proof/assistant_lane_proof.py) and the prompt texts' checks (tools/proof/assistant_prompt_proof.py --probe)
+make test       # Rust core and graphics tests, then the agent lane's proof (tools/proof/assistant_lane_proof.py), the prompt texts' checks (tools/proof/assistant_prompt_proof.py --probe) and the price function in both readers (tools/proof/prices_proof.py, no network)
 make lint       # cargo clippy --all-targets -D warnings
 make typecheck  # swiftc -typecheck of app/Sources — the ONLY authoritative Swift check, then agent/'s tsc --noEmit (through bun)
 make project    # xcodegen generate
+make prices     # regenerate agent/prices/anthropic.json from LiteLLM's price table (network); the file's only writer
 ```
 
 `Reelcut.xcodeproj` is generated — run `xcodegen generate` (or `make project`)

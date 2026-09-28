@@ -15,20 +15,23 @@ DIST_PATH := $(BUILD_DIR)/Build/Products/Distribution/$(APP).app
 unexport RC_ASSEMBLYAI_KEY
 unexport ANTHROPIC_API_KEY
 
-.PHONY: all app dist rust test lint fmt typecheck project run clean
+.PHONY: all app dist rust test lint fmt typecheck project run clean prices
 
 all: app
 
 rust:
 	cd core && cargo build --release
 
-# The last line is spec §11 AI-3's `make test`-reachable probe (the agent
-# lane); `rust` first, because it links the staticlib.
+# `assistant_lane_proof.py` is spec §11 AI-3's `make test`-reachable probe
+# (the agent lane); `rust` first, because it links the staticlib. The last
+# line is road map 13 P1's price function: the Python reader and the helper's
+# `bun test` (agent/build.sh test) against one fixture file, no network.
 test: rust
 	cd core && cargo test --release
 	cd graphic && cargo test --release
 	python3 tools/proof/assistant_lane_proof.py
 	python3 tools/proof/assistant_prompt_proof.py --probe
+	python3 tools/proof/prices_proof.py
 
 lint:
 	cd core && cargo clippy --all-targets -- -D warnings
@@ -71,6 +74,12 @@ typecheck:
 		-import-objc-header app/Bridging/Reelcut-Bridging-Header.h \
 		app/Sources/*.swift
 	/bin/sh agent/build.sh typecheck
+
+# Regenerates agent/prices/anthropic.json from LiteLLM's table over the
+# network (spec §11 P-1); the only writer of that file. Never a prerequisite
+# of app, test, typecheck or dist.
+prices:
+	python3 agent/prices/update.py
 
 run: app
 	open "$(APP_PATH)"

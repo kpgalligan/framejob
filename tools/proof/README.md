@@ -6681,3 +6681,80 @@ exactly its set: no-runtime's reason "CodeDirectory flags (adhoc) lack
 runtime", extra-entitlement's the two-key dict, no-entitlements' "the
 entitlements do not parse", marker's "1 occurrences". `--dist` at a missing
 path: D3, D5, D7, D9, D11 and D13 FAIL, 7/13, exit 1.
+
+## Road map 13's P1 — the price table (`prices.py`, `prices_proof.py`, `prices_crosscheck.py`)
+
+`agent/prices/anthropic.json` is LiteLLM's Anthropic rows (every entry whose
+`litellm_provider` is `"anthropic"`) in US dollars per million tokens, with
+the LiteLLM commit and committer date it came from (spec §11 P-1). `make
+prices` (`agent/prices/update.py`, network, stdlib only) is its only writer:
+it asks GitHub for the newest commit touching LiteLLM's
+`model_prices_and_context_window.json`, fetches the file at that commit,
+keeps input, output, cache_read, cache_write_5m, cache_write_1h and their
+`above_200k` tier (a field LiteLLM lacks is absent, never 0), writes a temp
+file beside the table and `os.replace`s it. It prints `commit <sha> <date>`,
+`rows <n>`, then `unchanged` or each added / removed / changed id; any
+failure is `error: …` on stderr, exit 1, and the file's bytes untouched.
+
+`tools/proof/prices.py` is the proofs' reader (importable: `load`,
+`match_model`, `price`); `agent/src/pricing.ts` is the helper's. Both answer
+`agent/prices/cases.json`, the hand-checked cases over a pinned fixture
+table, and never re-derive a rate. A model matches by exact id, or by the id
+less a trailing `-YYYYMMDD` when that is a key; nothing else is stripped.
+Unknown models, fast mode, a non-standard `service_tier`, a non-global
+`inference_geo`, a malformed count and a class whose rate the row lacks each
+answer `unknown` with its cause, never $0. With `usage.iterations`, each
+entry prices at its own model (spec §11 P-2).
+
+**`prices_proof.py`** — the last line of `make test`; no network.
+
+- **C:\<name\>** — each case through `prices.py`.
+- **K** — the committed table: format 1, the unit, the provider, a 40-hex
+  commit; `claude-opus-5-5` and `claude-fable-5-1` hold all five base rates
+  as finite numbers ≥ 0; 1000 input tokens on opus price as dollars > 0.
+- **T** — `/bin/sh agent/build.sh test` exits 0 (`bun test`, its JUnit report
+  in `build/agent/bun-test.xml`, deleted first; 300 s wall).
+- **A** — every case name has a passing `case: <name>` testcase in the JUnit
+  report AND a passing C row; prints the case count and `cases.json`'s sha256.
+
+Made to fail on purpose: `--mutant py-disagrees` prices C with every
+`cache_read` rate doubled in memory (the cache-read C rows and A FAIL by
+name); `--mutant ts-disagrees` runs T and A on a scratch copy of `agent/`
+under `work/prices/ts-disagrees/` (`node_modules` ignored) whose `opus-mixed`
+expects its dollars + 0.01 (T and A FAIL naming `opus-mixed`).
+
+**`prices_crosscheck.py`** — network, not in `make test`. **X0** fetches
+`https://platform.claude.com/docs/en/about-claude/pricing.md` and parses the
+table under `## Model pricing` (its five rate headers; `$<n> / MTok` after
+stripping `<sup>…</sup>`); **X1** `claude-opus-5-5` ↔ "Claude Opus 5.5" and
+**X2** `claude-fable-5-1` ↔ "Claude Fable 5.1" compare each of the five rates
+after `round(…, 6)`, a mismatch named `<id> <key>: table <a>, page <b>`.
+`--mutant table` sets opus's cache_read to 0.21 in memory (X1 FAILs naming
+`claude-opus-5-5 cache_read`); `--mutant page` deletes the "Claude Fable 5.1"
+line (X2 FAILs naming `claude-fable-5-1`).
+
+```sh
+make prices                                               # network; the table's only writer
+python3 tools/proof/prices_proof.py                       # C × 23, K, T, A: 26/26
+python3 tools/proof/prices_proof.py --mutant py-disagrees # exit 1
+python3 tools/proof/prices_proof.py --mutant ts-disagrees # exit 1
+python3 tools/proof/prices_crosscheck.py                  # X0–X2 (network)
+python3 tools/proof/prices_crosscheck.py --mutant table   # exit 1
+python3 tools/proof/prices_crosscheck.py --mutant page    # exit 1
+python3 agent/prices/update.py --api-base http://127.0.0.1:9   # the fetch control: exit 1, file untouched
+```
+
+**Measured 2026-09-28**, every command with `ANTHROPIC_API_KEY` and
+`RC_ASSEMBLYAI_KEY` unset: `make prices` wrote LiteLLM
+`b79fc9f1b0249cb533391dd7c941082f0cd6ddb1` (2026-09-28T06:07:45Z), 20 rows;
+a rerun printed `unchanged` and `diff` was empty. `prices_proof.py` scored
+26/26 (bun test: 24 testcases, 0 failing; `cases.json` sha256
+`ce70456a…763e1c`). `py-disagrees`: C:opus-cache-read, C:opus-mixed,
+C:fable-cache-read, C:long-context and A FAIL, 21/26, exit 1.
+`ts-disagrees`: T (failing `case: opus-mixed`) and A FAIL, 24/26, exit 1.
+The fetch control: `error: fetching http://127.0.0.1:9/…: URLError …
+Connection refused`, exit 1, the table's shasum `124dd034…` before and after.
+The cross-check: 18 page rows parsed, X1 and X2 equal on all five rates,
+3/3; `--mutant table` X1 FAIL "claude-opus-5-5 cache_read: table 0.21, page
+0.2", `--mutant page` X2 FAIL "claude-fable-5-1: the page has no 'Claude
+Fable 5.1' row", each 2/3, exit 1.

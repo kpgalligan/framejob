@@ -1,20 +1,22 @@
 #!/bin/sh
 # The one place bun is found and run (spec §11 AI-1): `helper` is the last
 # Xcode build step (project.yml's "Build Agent Helper"), `typecheck` is the
-# last line of `make typecheck`. Neither skips when bun is missing.
+# last line of `make typecheck`, and `test` (`bun test`, its JUnit report in
+# build/agent/bun-test.xml) is run by tools/proof/prices_proof.py, the last
+# line of `make test`. None skips when bun is missing.
 set -e
 
 AGENT="$(cd "$(dirname "$0")" && pwd -P)"
 export PATH="$HOME/.bun/bin:$HOME/.local/share/mise/shims:/opt/homebrew/bin:/usr/local/bin:$PATH"
 
 usage() {
-  echo "usage: agent/build.sh helper|typecheck" >&2
+  echo "usage: agent/build.sh helper|typecheck|test" >&2
   exit 2
 }
 
 [ $# -eq 1 ] || usage
 case "$1" in
-  helper|typecheck) ;;
+  helper|typecheck|test) ;;
   *) usage ;;
 esac
 
@@ -28,6 +30,11 @@ case "$1" in
   typecheck)
     bun install --frozen-lockfile
     bun run typecheck
+    ;;
+  test)
+    bun install --frozen-lockfile
+    mkdir -p "$AGENT/../build/agent"
+    bun test --reporter=junit --reporter-outfile="$AGENT/../build/agent/bun-test.xml"
     ;;
   helper)
     if [ -z "$TARGET_BUILD_DIR" ] || [ -z "$CONTENTS_FOLDER_PATH" ]; then
