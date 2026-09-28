@@ -4,7 +4,9 @@
   "project": null,
   "steps": [{"call": "perform_menu_item", "args": {"path": ["Reelcut", "Settings…"]}}],
   "captures": [{"name": "window", "window": "settings"}],
-  "expect": [{"capture": "window", "visible_text": "No API key is set."}]
+  "expect": [{"capture": "window", "visible_text": "No API key is set."},
+             {"capture": "window",
+              "visible_text": "Reelcut's own estimate at LiteLLM prices, from its spend ledger. The Anthropic Console shows what your account was billed."}]
 }
 ```
 
@@ -36,7 +38,17 @@ that a blank model means claude-opus-5-5; and that changing the key or the model
 starts a new conversation. Along its bottom: "Save" (blue) and "Remove" (dimmed).
 It has no Verify and no account link.
 
-In the light capture the ground is white and the headings, labels and status lines
-black; the paragraphs are mid-grey, the key and model fields white boxes with grey
+Under those two buttons, after a small gap, is what the assistant has cost this
+month: one line in the same black as the status lines, here "Nothing recorded in
+September 2026 (UTC)." (the capture's launch keeps an empty spend folder, and the
+month is the UTC calendar month the capture was taken in). With responses recorded
+it reads, for example, "September 2026 (UTC): $0.42 over 12 responses.", and says
+how many could not be priced or could not be read rather than counting them as
+nothing. Under it, in the small grey of the paragraphs: "Reelcut's own estimate at
+LiteLLM prices, from its spend ledger. The Anthropic Console shows what your
+account was billed."
+
+In the light capture the ground is white and the headings, labels, status lines and
+the month's line black; the paragraphs are mid-grey, the key and model fields white boxes with grey
 borders, the Region pop-up a light-grey pill, and "Account Page" a white button
 with a black outline and a hard black shadow.

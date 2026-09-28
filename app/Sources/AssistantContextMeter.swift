@@ -86,6 +86,53 @@ final class AssistantContextMeterView: NSView {
     }
 }
 
+/// The Assistant tab's Spend row (road map 13 P4, spec §11 P-7): a "Spend"
+/// micro label and what the conversation has cost so far, as Reelcut
+/// estimates it (`AssistantTurnCost.figure`), laid out like the meter's
+/// label row.
+final class AssistantConversationCostView: NSView {
+    private let title = NSTextField(labelWithString: "")
+    let figureLabel = NSTextField(labelWithString: "")
+
+    init() {
+        super.init(frame: .zero)
+        title.attributedStringValue = DS.microLabel("Spend")
+        title.setContentHuggingPriority(.required, for: .horizontal)
+        title.setContentCompressionResistancePriority(.required, for: .horizontal)
+        figureLabel.font = DS.mono(10)
+        figureLabel.textColor = DS.textFaint
+        figureLabel.lineBreakMode = .byTruncatingTail
+        figureLabel.alignment = .right
+        figureLabel.toolTip = AssistantTurnCost.figureTooltip
+        figureLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        figureLabel.setAccessibilityIdentifier("assistant.spend")
+        for view in [title, figureLabel] as [NSView] {
+            view.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(view)
+        }
+        // The meter's 2 pt insets: a label's frame is 2 pt wider than its text.
+        NSLayoutConstraint.activate([
+            title.topAnchor.constraint(equalTo: topAnchor),
+            title.bottomAnchor.constraint(equalTo: bottomAnchor),
+            title.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 2),
+            figureLabel.firstBaselineAnchor.constraint(equalTo: title.firstBaselineAnchor),
+            figureLabel.leadingAnchor.constraint(
+                greaterThanOrEqualTo: title.trailingAnchor, constant: 8),
+            figureLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -2),
+        ])
+        update(AssistantTurnCost())
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("AssistantConversationCostView does not support NSCoder")
+    }
+
+    func update(_ cost: AssistantTurnCost) {
+        figureLabel.stringValue = cost.figure
+    }
+}
+
 /// A square track with the used fraction filled in the accent; the fill
 /// turns to the meter's clip colour past 80%.
 private final class AssistantContextBar: NSView {

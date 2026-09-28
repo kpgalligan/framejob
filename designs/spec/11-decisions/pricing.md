@@ -3,8 +3,9 @@
 Part of spec §11, *Decisions made — do not re-litigate*. The index of every decision is
 [`README.md`](README.md).
 
-The road map that makes these is in progress: `designs/reelcut-roadmap-13.md`, whose §3 words
-them and whose §1 holds what was measured.
+The road map that made these is closed: its condensed record is `designs/adr/roadmap-13-pricing.md`,
+and the original, `archive/reelcut-roadmap-13.md`, words them in §3 and holds what was measured in §1
+and §5.
 
 - **P-1 — Prices come from LiteLLM's table.** A committed snapshot
   (`agent/prices/anthropic.json`) is refreshed daily at runtime and by `make prices`. Never
@@ -64,3 +65,17 @@ them and whose §1 holds what was measured.
   helper requests none of them); a torn or hand-broken line stops every paid proof until a person
   repairs it; the road map 6 and 8 spikes (`cloud_spike/`, `words_spike/`) keep their own ledgers
   and are not held to it (#163).
+- **P-7 — The app shows two figures: what the current conversation has cost, on the Assistant
+  tab, and what the UTC calendar month has cost, in Settings ▸ Assistant; both say they are
+  Reelcut's own estimate (P-4).** The conversation figure is the transcript's sum of the `cost`
+  events since its last Clear or ended conversation (a key or model change): kept in memory, it
+  carries across a helper restart and is shown with no spend folder. The month figure is a fold of
+  the spend folder's `spend.jsonl` over the **UTC** calendar month, because the ledger's `time` is
+  UTC and P-6's budget month is UTC, so the app and the proofs count one month; its title says
+  "(UTC)". The ledger is read only when Settings shows and after each line recorded while it is
+  visible, and a read after a recorded line keeps the figure shown until its fold answers, so the
+  window does not jump twice per response. An absent ledger answers at once on main; a present one
+  is folded on one serial queue and only the latest read is shown. A line that could not be priced
+  is counted and said, never added as $0 (P-2); a line that cannot be read is counted and said; a
+  launch with no spend folder (P-5) says it keeps no ledger. Risk accepted: near the turn of a
+  month the UTC month differs from the person's local calendar month by up to a day.

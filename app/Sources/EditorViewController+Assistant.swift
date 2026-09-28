@@ -79,7 +79,9 @@ extension EditorViewController {
             NSApp.sendAction(#selector(AppDelegate.showSettings(_:)), to: nil, from: nil)
         }
         assistantTranscript.onChange = { [weak view] change in view?.apply(change) }
-        view.reload(assistantTranscript.entries, usage: assistantTranscript.usage)
+        view.reload(
+            assistantTranscript.entries, usage: assistantTranscript.usage,
+            cost: assistantTranscript.conversationCost)
         view.show(hasKey: assistantHasKey)
         assistantRefresh()
     }

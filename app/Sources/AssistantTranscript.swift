@@ -20,6 +20,8 @@ enum AssistantTranscriptChange: Equatable {
     case extended(index: Int, text: String)
     case cleared
     case usage(AssistantContextUsage)
+    /// The conversation's cost so far (road map 13 P4, spec §11 P-7).
+    case conversationCost(AssistantTurnCost)
 }
 
 /// The window's conversation as the person reads it (road map 12 A2): the
@@ -32,6 +34,10 @@ enum AssistantTranscriptChange: Equatable {
 final class AssistantTranscript {
     private(set) var entries: [AssistantEntry] = []
     private(set) var usage = AssistantContextUsage()
+    /// Every `cost` event since the last Clear or ended conversation, summed:
+    /// the tab's Spend row (spec §11 P-7). In memory, so it carries across a
+    /// helper restart and needs no spend folder.
+    private(set) var conversationCost = AssistantTurnCost()
 
     /// Each change, as it happens.
     var onChange: ((AssistantTranscriptChange) -> Void)?
@@ -114,6 +120,8 @@ final class AssistantTranscript {
             turnCost = AssistantTurnCost()
         case "cost":
             turnCost.add(event)
+            conversationCost.add(event)
+            onChange?(.conversationCost(conversationCost))
         case "turn_finished":
             if let line = turnCost.line { append(.meta, line) }
             turnCost = AssistantTurnCost()
@@ -122,22 +130,24 @@ final class AssistantTranscript {
         }
     }
 
-    /// Clear: every entry gone, the usage back to none used. The window size
-    /// is the model's, so it is kept.
+    /// Clear: every entry gone, the cost and the usage back to none. The
+    /// window size is the model's, so it is kept.
     func clear() {
         entries = []
         streamingType = nil
         questionSentence = ""
         turnCost = AssistantTurnCost()
         onChange?(.cleared)
+        resetConversationCost()
         setUsage(AssistantContextUsage(used: 0, limit: usage.limit, reported: usage.reported))
     }
 
     /// The conversation ended under the transcript (a key or model change):
-    /// the note says so, and the usage starts over.
+    /// the note says so, and the cost and the usage start over.
     func endConversation(note text: String) {
         note(text)
         turnCost = AssistantTurnCost()
+        resetConversationCost()
         setUsage(AssistantContextUsage(used: 0, limit: usage.limit, reported: usage.reported))
     }
 
@@ -185,6 +195,11 @@ final class AssistantTranscript {
         }
         entries[last].text += text
         onChange?(.extended(index: last, text: entries[last].text))
+    }
+
+    private func resetConversationCost() {
+        conversationCost = AssistantTurnCost()
+        onChange?(.conversationCost(conversationCost))
     }
 
     private func setUsage(_ next: AssistantContextUsage) {

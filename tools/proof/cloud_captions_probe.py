@@ -4866,9 +4866,10 @@ def section_hygiene(binary, sources):
           "SettingsWindowController.shared" not in harness_code
           and "AssemblyAIConfiguration.store" not in harness_code,
           "the harness reaches for the shared window or the default store")
-    check("S: and the one it does build is handed a MemoryStore and an empty environment",
+    check("S: and the one it does build is handed a MemoryStore, an empty environment and an "
+          "absent spend folder",
           "SettingsWindowController(\n        store: { MemoryStore() }, assistantStore: { MemoryStore() }, "
-          "environment: [:])"
+          "environment: [:],\n        spendFolder: { absentSpend })"
           in harness_text, "the harness's settings mode does not inject a store")
     sentences = sorted(
         name for name in os.listdir(sources)
@@ -5219,14 +5220,18 @@ PROBE_LANGUAGE_ROWS = [["en-US", "English (United States)"], ["fr-FR", "French (
 
 
 def chrome_child(binary, fake, tag, request, timeout=180):
-    """One chrome child, with BOTH launch arguments on it — the endpoint so no
-    request can leave this machine, and a disposable secret folder so R6-9's
-    override is what `AssemblyAIConfiguration.store()` answers."""
+    """One chrome child, with THREE launch arguments on it — the endpoint so no
+    request can leave this machine, a disposable secret folder so R6-9's
+    override is what `AssemblyAIConfiguration.store()` answers, and a
+    disposable spend folder so Settings' month line never reads the person's
+    ledger (spec §11 P-5, P-7)."""
     folder = fresh("chrome-secrets-" + tag)
+    spend = fresh("chrome-spend-" + tag)
     body = dict(request, suite=f"cloudprobe-chrome-{tag}-{os.getpid()}", folder=folder)
     answer, error, out = run_probe(
         binary, "chrome-" + tag, dict(body, mode="chrome"), timeout=timeout,
-        extra=["-RCAssemblyAIEndpoint", fake.base, "-RCSecretFolder", folder])
+        extra=["-RCAssemblyAIEndpoint", fake.base, "-RCSecretFolder", folder,
+               "-RCSpendFolder", spend])
     return answer, error, folder
 
 
@@ -5843,14 +5848,16 @@ def section_chrome(binary, sources):
               one[0] == two[0] and one[0] != b"", "the two renders differ")
     check("18: light and dark differ — both appearances really were rendered",
           taken[("light", 1)][0] != taken[("dark", 1)][0], "the two appearances are equal")
-    # 610, not 340, since road map 12 A2: Settings' Assistant pane sits under
-    # the Transcription pane in the same stack and the window grows to fit it.
+    # 677, not 340, since road map 12 A2 (610) and road map 13 P4 (677):
+    # Settings' Assistant pane sits under the Transcription pane in the same
+    # stack, with the month's spend line and its note under its buttons, and
+    # the window grows to fit it.
     size = png_size(taken[("light", 1)][0])
     scale = (size[0] / 460.0) if size else 0
-    check(f"18: the PNG is the window's content — 460 × 610 points at the display's backing "
+    check(f"18: the PNG is the window's content — 460 × 677 points at the display's backing "
           f"scale (measured {size!r}, scale {scale:g})",
-          size is not None and size[0] % 460 == 0 and size[1] % 610 == 0
-          and size[0] // 460 == size[1] // 610 and size[0] // 460 >= 1,
+          size is not None and size[0] % 460 == 0 and size[1] % 677 == 0
+          and size[0] // 460 == size[1] // 677 and size[0] // 460 >= 1,
           f"got {size!r}")
 
 

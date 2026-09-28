@@ -114,13 +114,15 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         store: @escaping () -> any SecretStore = { AssemblyAIConfiguration.store() },
         assistantStore: @escaping () -> any SecretStore = { AssistantConfiguration.store() },
         defaults: UserDefaults = .standard,
-        environment: [String: String] = ProcessInfo.processInfo.environment
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        spendFolder: @escaping () -> URL? = { AssistantSpend.folder() }
     ) {
         self.store = store
         self.defaults = defaults
         self.environment = environment
         assistantPane = AssistantSettingsPane(
-            store: assistantStore, defaults: defaults, environment: environment)
+            store: assistantStore, defaults: defaults, environment: environment,
+            spendFolder: spendFolder)
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: Self.windowWidth, height: 340),
             styleMask: [.titled, .closable], backing: .buffered, defer: false)
@@ -231,6 +233,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         applyBackground()
         sync()
         assistantPane.sync()
+        assistantPane.refreshSpend()
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
     }

@@ -107,7 +107,12 @@
 // would write and delete that file. The controller is also handed an EMPTY
 // environment, so `RC_ASSEMBLYAI_KEY` in the shell that launched the harness
 // cannot change what the window says: the photograph is of a Mac with no key
-// set, whatever the machine taking it has.
+// set, whatever the machine taking it has. The same wipe takes
+// `-RCSpendFolder`, so `AssistantSpend.folder()` would be the person's
+// spend folder and `show()` would read their ledger into the picture (road
+// map 13 P4, spec §11 P-5): the controller is handed a spend folder that
+// does not exist, so the Assistant pane's month line is an empty month,
+// answered synchronously — the two processes' renders stay byte-identical.
 //
 //   harness transcribe <project.reelcut> <out.png> <light|dark> <style> [replace 0|1]
 //
@@ -1037,8 +1042,10 @@ Harness.registerFonts(URL(fileURLWithPath: arguments[0]).deletingLastPathCompone
 // launch arguments that would have made `store()` safe.
 #if !HARNESS_REFERENCE_BUILD
 if arguments[1] == "settings" {
+    let absentSpend = URL(fileURLWithPath: "/nonexistent/reelcut-harness-spend", isDirectory: true)
     let settings = SettingsWindowController(
-        store: { MemoryStore() }, assistantStore: { MemoryStore() }, environment: [:])
+        store: { MemoryStore() }, assistantStore: { MemoryStore() }, environment: [:],
+        spendFolder: { absentSpend })
     settings.show()
     for _ in 0..<10 { RunLoop.current.run(until: Date().addingTimeInterval(0.05)) }
     guard let root = settings.window?.contentView else { exit(3) }

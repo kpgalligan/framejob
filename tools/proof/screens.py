@@ -6,8 +6,11 @@
 
 It launches its OWN Release instance on `--port` (the log names the port it
 actually bound), with every `UserDefaults` key a captured screen draws pinned
-as a launch argument (`PINS`), an empty `-RCSecretFolder`, a dead loopback
-AssemblyAI endpoint and no recent documents; builds the fixture projects the
+as a launch argument (`PINS`), an empty `-RCSecretFolder`, a `-RCSpendFolder`
+that does not exist (removed before each launch and never created, so
+Settings' month line is an empty month and the person's ledger is never read,
+spec §11 P-5, P-7), a dead loopback AssemblyAI endpoint and no recent
+documents; builds the fixture projects the
 screens name (`FIXTURES`) from `tools/proof/media/`; walks every screen file
 in `--screens` (default `designs/screens/`) in name order; captures each
 screen light and dark through `snapshot_ui`; and writes `--out` (default
@@ -220,9 +223,14 @@ def launch(app, port, out, look=None):
     os.makedirs(secrets)
     if os.listdir(secrets):
         raise LaunchError(f"{secrets} is not empty after it was rebuilt")
+    spend = os.path.join(os.path.dirname(os.path.abspath(out)), "spend")
+    shutil.rmtree(spend, ignore_errors=True)
+    if os.path.exists(spend):
+        raise LaunchError(f"{spend} is still there after it was removed")
     argv = [os.path.join(app, "Contents", "MacOS", "Reelcut"),
             "-ApplePersistenceIgnoreState", "YES", "-AgentServerEnabled", "YES",
-            "-RCSecretFolder", secrets, "-RCAssemblyAIEndpoint", "http://127.0.0.1:9",
+            "-RCSecretFolder", secrets, "-RCSpendFolder", spend,
+            "-RCAssemblyAIEndpoint", "http://127.0.0.1:9",
             "-NSRecentDocumentsLimit", "0"]
     for key, value in PINS:
         argv += [f"-{key}", value]

@@ -1,9 +1,10 @@
 # Road map 13 — pricing and spend
 
-**Status: IN PROGRESS. Proposed and approved 2026-09-28; P1 (the table and the price function) built
-2026-09-28 and committed 79a8b56; P2 (the helper prices every response) built 2026-09-28 and
-committed 0f0a442; P3 (the proofs' ledger and the monthly budgets) built 2026-09-28, uncommitted.
-Records in §5. P4 not started.**
+**Status: CLOSED 2026-09-28. Proposed and approved 2026-09-28; P1 (the table and the price function)
+built 2026-09-28 and committed 79a8b56; P2 (the helper prices every response) built 2026-09-28 and
+committed 0f0a442; P3 (the proofs' ledger and the monthly budgets) built 2026-09-28 and committed
+86162c2; P4 (spend in the UI) built 2026-09-28, uncommitted. Records in §5; the condensed record is
+`designs/adr/roadmap-13-pricing.md`.**
 
 The user asked three things: to set a spend budget, to price each call the assistant and the proofs
 make, and eventually to show spend in the UI. The rules they gave:
@@ -339,3 +340,83 @@ up. Re-run: the five bad values each end in the argument error, `--probe` 11/11,
 **Owed.** #157 (the live A3 run) was commented with the new headroom and the budget. #163: the C0
 and W spikes spend AssemblyAI money outside the proofs' ledger. No paid run was made. P4 as §4
 plans it.
+
+### P4 — spend in the UI (built 2026-09-28, uncommitted)
+
+**What landed.**
+
+- Spec §11 **P-7** in `designs/spec/11-decisions/pricing.md` (written before any code), indexed in
+  `11-decisions/README.md`: two figures, both Reelcut's own estimate — the conversation's, the
+  transcript's sum of `cost` events since its last Clear or ended conversation (in memory, across a
+  helper restart, with no spend folder), and the month's, a fold of `spend.jsonl` over the **UTC**
+  calendar month (the ledger's `time` and P-6's month are UTC; the title says "(UTC)"), read when
+  Settings shows and after each recorded line while it is visible, a read after a recorded line
+  keeping the shown figure until its fold answers; unpriced and unreadable lines counted and said,
+  never $0; no spend folder said. Risk accepted: near a month's turn it differs from the local month.
+- `AssistantSpendMonth.swift` (145, new): `queue` (serial), `zone` (`TimeZone.gmt`, spelled once),
+  `note`, `Summary`, `Reading`, `month(containing:)`, `title`, `fold` (pure), `read` (the fold on
+  `queue`, the answer on main), `amount` (`$%.2f`, `under $0.01`), `sentence`.
+- `AssistantSpend.swift` (269 → 291): `didRecordNotification`, posted by `record` exactly when it
+  wrote; `number` internal; `instant` (whole or fractional seconds), which `day` now uses;
+  `AssistantTurnCost.figure` ("Nothing yet", "$… · Reelcut's estimate", "at least $%.4f · …" at
+  0.00005 and above with an unknown response, else "unknown · …") and `figureTooltip`.
+- The tab: `AssistantTranscript` (194 → 209) keeps `conversationCost`, adds each `cost` to it and
+  emits `.conversationCost`; `clear()` and `endConversation` reset it and emit it before their
+  `.usage`. `AssistantConversationCostView` in `AssistantContextMeter.swift` (105 → 152): "SPEND"
+  and the figure (`assistant.spend`, the tooltip), 6 pt under the meter and Clear, the rule under
+  it (`AssistantView.swift` 299 → 308, `reload(_:usage:cost:)`); `AssistantTranscriptView` ignores
+  the new change; `EditorViewController+Assistant.swift`'s `attachAssistant` passes the cost (one
+  statement, three lines at 100 columns).
+- Settings: `AssistantSettingsPane.swift` (207 → 283): `spendLabel` and `spendNoteLabel` after the
+  Save/Remove row (16 pt, then 4), a `spendFolder` factory, `refreshSpend(now:keepShown:)` with one
+  generation counter, and the observer of `didRecordNotification`, live only while the window is
+  visible. `SettingsWindowController.swift` (462 → 465, wiring): the `spendFolder:` factory passed
+  through, and `show()` calls `refreshSpend()`.
+- Launchers kept off the person's ledger (P-5): the harness's `settings` mode hands the controller
+  `/nonexistent/reelcut-harness-spend` (its `pinDefaults` wipes `-RCSpendFolder`);
+  `cloud_captions_probe.py`'s `chrome_child` passes a fresh `-RCSpendFolder`, its S check holds the
+  harness's new constructor text and row 18 measures 460 × 677; `screens.py` launches with a
+  removed, never-created `-RCSpendFolder`; `v2_menu.py`'s launch line names one.
+- Proof: `spend_ui_proof.py` (M1–M3, C1–C3 over `spend_ui_probe.swift`; U0–U3 live; mutants
+  `local-month`, `unknown-as-zero`). Docs: spec §4.3, §7.4, §7.9 and the spec README's line counts;
+  screens 02 and 11b (an expect each, prose from the captures); `docs/manual-checks.md` AS-5;
+  `app/CLAUDE.md` (map entries, the DispatchQueue seam); `README.md`; `tools/proof/README.md` (a P4
+  section, the screens and v2_menu launch lines, the harness `settings` paragraph).
+
+**Measured 2026-09-28** (every command with `ANTHROPIC_API_KEY` and `RC_ASSEMBLYAI_KEY` unset):
+
+- `make typecheck`: 0 errors, the 7 baseline warnings, tsc clean. `make lint` clean. `make test`
+  exit 0 (`budget_proof.py` 21/21 last). `make app`: BUILD SUCCEEDED.
+- `spend_ui_proof.py` 10/10: M1 {0.875, 3, 2, 3} over 13 lines; M2 13 sentences, 7 amounts and the
+  note; M3 September 2026 (UTC) at both edges, August and October either side, with the probe's
+  zone America/Los_Angeles; C1–C2 as listed; C3 "Reading the spend ledger…", then "September 2026
+  (UTC): 3 responses; 1 could not be priced, the rest came to $0.75.", unchanged when `record`
+  returned, then "… 4 responses; … $0.81."; U0 no `Reelcut: ` line; U1 the month line equal to the
+  Python oracle ("September 2026 (UTC): 2 responses; 1 could not be priced, the rest came to $0.50.
+  1 ledger line could not be read."), the note exact, no problem on the two labels but #140's 2 pt
+  overhang (2 counted apart); U2 "Nothing yet", then "$0.0018 · Reelcut's estimate" over three
+  $0.0006 tool-view costs, Settings "… 5 responses; …" equal to the oracle; U3 "This launch keeps
+  no spend ledger.", the person's two files absent before the run, before the launch and after.
+- Made to fail: `--mutant local-month` M1 (dollars 100.375) and M3 (the month from 2026-08-01
+  07:00 UTC) FAIL, 4/6, exit 1; `--mutant unknown-as-zero` M1 (priced 5, unpriced 0) FAIL, and C3
+  with it, 4/6, exit 1.
+- `spend_proof.py` 17/17; `assistant_tab_proof.py` 16/16 (P1's `.usage` last after `clear()`, P7's
+  pane last in the window's stack). `cloud_captions_probe.py --only hygiene,chrome,settings_verify`
+  144/145: the S check on the new constructor and row 18 at 460 × 677 (both appearances
+  byte-identical across two processes) pass; the one FAIL is row 18's `project.yml` diff, which
+  predates this road map (#156). `screens.py --only 02-settings,11b-assistant-tab` 7/7, both looks,
+  0 new problems on 11b; 02's month line and note carry #140's 2 pt overhang like every label there.
+  No launch log held a `Reelcut: ` line.
+
+**The review's two nits, fixed (2026-09-28).** `AssistantSpend.instant` builds its two
+`ISO8601DateFormatter`s once (static) instead of per call, since a month's fold calls it per ledger
+line and the ledger is never rotated. `spend_ui_proof.py`'s surviving mutant now exits 3, never a clean
+run's 0. Re-run: `make typecheck` 0 errors and the 7 baseline warnings, `make app` succeeded,
+`spend_ui_proof.py` 10/10, `--mutant local-month` and `--mutant unknown-as-zero` each caught (exit 1),
+`spend_proof.py` 17/17, and the person's `spend.jsonl` still absent.
+
+**Owed.** AS-5 in `docs/manual-checks.md` (a real key: the tab's sum against the turns' `Cost:`
+lines, Clear, Settings growing per response, the month against the Console) is the owner's. #164
+filed: reconciling the ledger with Anthropic's Admin usage-and-cost API (§1's "later"). Still open
+and unchanged by P4: #147 (Rasterize's copy of `agent/`), #157 (the live evaluation), #162 (a
+Stop-cut response is not priced), #163 (the spikes' ledgers).

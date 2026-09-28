@@ -21,6 +21,14 @@ import AppKit
 ///
 /// The store is a FACTORY, as the Transcription pane's is, so the harness and
 /// the probes hand it a `MemoryStore` and no file is read or written.
+///
+/// **The month's spend (road map 13 P4, spec §11 P-7)** is the two labels
+/// under the buttons: the UTC month folded from the spend folder's ledger
+/// (`AssistantSpendMonth`) and the note that it is Reelcut's own estimate
+/// (P-4). The folder is a FACTORY too, so the harness hands it an absent one.
+/// `init` and `sync()` never read the ledger; `refreshSpend` does, when the
+/// window shows and after each line `AssistantSpend.record` writes while it
+/// is visible. Only the latest refresh's answer is shown.
 final class AssistantSettingsPane: NSStackView, NSTextFieldDelegate {
     static let paneTitle = "Assistant"
     static let emptyPlaceholder = "Paste your Anthropic API key"
@@ -30,25 +38,37 @@ final class AssistantSettingsPane: NSStackView, NSTextFieldDelegate {
     private let store: () -> any SecretStore
     private let defaults: UserDefaults
     private let environment: [String: String]
+    private let spendFolder: () -> URL?
+    /// The reading `spendLabel` last showed, and the refresh whose answer may
+    /// still be shown.
+    private var shown: AssistantSpendMonth.Reading = .reading
+    private var spendGeneration = 0
 
     let headingLabel = NSTextField(labelWithString: AssistantSettingsPane.paneTitle)
     let keyField = NSSecureTextField()
     let modelField = NSTextField()
     let statusLabel = NSTextField(wrappingLabelWithString: "")
     let explanationLabel = NSTextField(wrappingLabelWithString: "")
+    let spendLabel = NSTextField(wrappingLabelWithString: "")
+    let spendNoteLabel = NSTextField(wrappingLabelWithString: AssistantSpendMonth.note)
     private(set) var saveButton: NSButton!
     private(set) var removeButton: NSButton!
 
     init(
         store: @escaping () -> any SecretStore, defaults: UserDefaults,
-        environment: [String: String]
+        environment: [String: String],
+        spendFolder: @escaping () -> URL? = { AssistantSpend.folder() }
     ) {
         self.store = store
         self.defaults = defaults
         self.environment = environment
+        self.spendFolder = spendFolder
         super.init(frame: .zero)
         build()
         sync()
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(spendRecorded(_:)),
+            name: AssistantSpend.didRecordNotification, object: nil)
     }
 
     @available(*, unavailable)
@@ -87,15 +107,27 @@ final class AssistantSettingsPane: NSStackView, NSTextFieldDelegate {
         removeButton = StickerButton(
             title: "Remove", style: .secondary, target: self, action: #selector(removeClicked(_:)))
 
+        spendLabel.font = DS.sans(12)
+        spendLabel.textColor = DS.textStrong
+        spendLabel.preferredMaxLayoutWidth = Self.textWidth
+        spendLabel.setAccessibilityIdentifier("settings.assistant.spend")
+        spendNoteLabel.font = DS.sans(11)
+        spendNoteLabel.textColor = DS.textFaint
+        spendNoteLabel.preferredMaxLayoutWidth = Self.textWidth
+        spendNoteLabel.setAccessibilityIdentifier("settings.assistant.spendnote")
+
         orientation = .vertical
         alignment = .leading
         spacing = 12
+        let buttons = row([saveButton, removeButton])
         let views: [NSView] = [
             headingLabel, row([fieldLabel("API key:"), keyField]),
             row([fieldLabel("Model:"), modelField]), statusLabel, explanationLabel,
-            row([saveButton, removeButton]),
+            buttons, spendLabel, spendNoteLabel,
         ]
         for view in views { addArrangedSubview(view) }
+        setCustomSpacing(16, after: buttons)
+        setCustomSpacing(4, after: spendLabel)
     }
 
     private func row(_ views: [NSView]) -> NSStackView {
@@ -138,6 +170,50 @@ final class AssistantSettingsPane: NSStackView, NSTextFieldDelegate {
     private func say(_ text: String, problem: Bool) {
         statusLabel.stringValue = text
         statusLabel.textColor = problem ? DS.textStrong : DS.textMuted
+    }
+
+    // MARK: - The month's spend
+
+    /// The UTC month holding `now`, from the spend folder's ledger: no
+    /// folder says so at once, an absent ledger is an empty month at once,
+    /// and a present one reads "Reading…" while `AssistantSpendMonth.read`
+    /// folds it — except that with `keepShown` a sentence already shown for
+    /// a summary or a failure stays until the fold answers (P-7). Each call
+    /// supersedes every earlier one.
+    func refreshSpend(now: Date = Date(), keepShown: Bool = false) {
+        spendGeneration += 1
+        let generation = spendGeneration
+        let month = AssistantSpendMonth.month(containing: now)
+        guard let folder = spendFolder() else {
+            showSpend(.noLedger, month: month)
+            return
+        }
+        let ledger = folder.appendingPathComponent(AssistantSpend.ledgerName)
+        guard FileManager.default.fileExists(atPath: ledger.path) else {
+            showSpend(.summary(AssistantSpendMonth.Summary()), month: month)
+            return
+        }
+        var keeps = false
+        switch shown {
+        case .summary, .failed: keeps = keepShown
+        case .noLedger, .reading: keeps = false
+        }
+        if !keeps { showSpend(.reading, month: month) }
+        AssistantSpendMonth.read(ledger: ledger, month: month) { [weak self] reading in
+            guard let self, self.spendGeneration == generation else { return }
+            self.showSpend(reading, month: month)
+        }
+    }
+
+    private func showSpend(_ reading: AssistantSpendMonth.Reading, month: DateInterval) {
+        shown = reading
+        spendLabel.stringValue = AssistantSpendMonth.sentence(reading, month: month)
+    }
+
+    /// A ledger line was written: re-read it, only while the window shows.
+    @objc private func spendRecorded(_ notification: Notification) {
+        guard window?.isVisible == true else { return }
+        refreshSpend(keepShown: true)
     }
 
     // MARK: - Buttons

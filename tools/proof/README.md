@@ -1626,12 +1626,25 @@ key is set." on a machine whose shell has a real `RC_ASSEMBLYAI_KEY` in it.
 on this host: 460 × 340 points at backing scale **1** for an offscreen
 window (the same as `welcome`'s), byte-identical across two processes in each
 appearance, light ≠ dark. Since road map 12 A2 the window has a second pane,
-Settings' Assistant pane, and the harness hands it a second `MemoryStore`
-(`SettingsWindowController(store: { MemoryStore() }, assistantStore: {
-MemoryStore() }, environment: [:])`, the line `cloud_captions_probe.py`'s
-hygiene section holds it to); `pinDefaults` pins `ReelcutAssistantModel` to
-`""`, the pane's model field. The window is 460 × 610 points now
-(`cloud_captions_probe.py`'s row 18 measures it).
+Settings' Assistant pane, and the harness hands it a second `MemoryStore`;
+`pinDefaults` pins `ReelcutAssistantModel` to `""`, the pane's model field.
+Since road map 13 P4 the pane ends with the month's spend line, which
+`show()` reads from the spend folder — and `pinDefaults`' wipe takes
+`-RCSpendFolder` too, so `AssistantSpend.folder()` would be the person's and
+the picture would hold their ledger (spec §11 P-5). The harness therefore
+hands the controller a spend folder that does not exist
+(`/nonexistent/reelcut-harness-spend`): the line is an empty month, answered
+synchronously, so two processes still render byte for byte the same. The
+constructor, exactly as `cloud_captions_probe.py`'s hygiene section holds it:
+
+```swift
+    let settings = SettingsWindowController(
+        store: { MemoryStore() }, assistantStore: { MemoryStore() }, environment: [:],
+        spendFolder: { absentSpend })
+```
+
+The window is 460 × 677 points now (`cloud_captions_probe.py`'s row 18
+measures it).
 
 Road map 8's W4b took a fifth render target, in `settings`' shape:
 
@@ -5924,7 +5937,9 @@ four of road map 11, then road map 12 A1's `assistant_send` and
 The phase proof of the second and third dev tools, over `mcp.py`. It runs
 against the Release app launched fresh on its port with V2a's pinned defaults
 plus `-RCSecretFolder "$PWD/tools/proof/work/v2_menu/secrets"` (the Settings
-window it opens then reads no real key store). Before the first MCP call it:
+window it opens then reads no real key store) and `-RCSpendFolder
+"$PWD/tools/proof/work/v2_menu/spend"` (its month line then reads no real
+spend ledger, spec §11 P-5; road map 13 P4). Before the first MCP call it:
 - writes two fixtures, `work/v2_menu/fixtures/menu_{a,b}.reelcut` (version 10,
   640×360 at 30 fps, one track, a shape at 0 s and one at 3 s); B is opened,
   then A, so A is the front project;
@@ -5992,8 +6007,11 @@ python3 tools/proof/screens.py [--port 4871] [--app build/Build/Products/Release
 
 **The launch** (`screens.launch`, which `v3_tools.py` shares): the app's
 binary with `-ApplePersistenceIgnoreState YES -AgentServerEnabled YES
--RCSecretFolder <out>/../secrets -RCAssemblyAIEndpoint http://127.0.0.1:9
--NSRecentDocumentsLimit 0` and every `PINS` pair; the environment without
+-RCSecretFolder <out>/../secrets -RCSpendFolder <out>/../spend
+-RCAssemblyAIEndpoint http://127.0.0.1:9 -NSRecentDocumentsLimit 0` and every
+`PINS` pair — the spend folder removed before each launch and never created,
+so Settings' month line is an empty month and the person's ledger is never
+read (spec §11 P-5, P-7); the environment without
 `RC_ASSEMBLYAI_KEY` and with `RC_AGENT_PORT`; stdin closed, stdout and stderr
 to `<out>/app.<look>.log` (`app.log` without a look), its own session; the port
 read from the log's `listening on` line. `stop()` terminates that pid and kills
@@ -6989,3 +7007,65 @@ stand-in logged 0 POSTs, exit 1; `--rehearse --cap 0.0001` E1–E6 FAIL
 --live` with no key: the eight CONTROLs ok (the budget one included), 29
 rows SKIP "absent", 9/9. `budget.LEDGER` was absent before and after every
 command.
+
+## Road map 13's P4 — spend in the UI (`spend_ui_proof.py`, `spend_ui_probe.swift`)
+
+The app shows two figures, each Reelcut's own estimate (spec §11 P-4, P-7):
+the Assistant tab's Spend row, the transcript's sum of `cost` events since
+its last Clear (`AssistantTurnCost.figure`, `assistant.spend`), and Settings
+▸ Assistant's month line, `spend.jsonl` folded over the UTC calendar month
+off main (`AssistantSpendMonth.swift`, `settings.assistant.spend`, with its
+note `settings.assistant.spendnote`). No network, no key but the dummy
+`proof-key`, every child with `ANTHROPIC_API_KEY` and `RC_ASSEMBLYAI_KEY`
+popped; work in `work/spend_ui/`.
+
+- **M1–M3, C1–C3**, `spend_ui_probe.swift` over `app/Sources` on
+  `assistant_tab_proof`'s `build_probe` line, run with
+  `TZ=America/Los_Angeles` (so a local-zone month would differ from UTC's at
+  both edges) and a scratch folder: the fold over a September 2026 fixture
+  (both edges in, the seconds either side out, a fractional second in,
+  `dollars` null and `true` unpriced, a torn line, `[]` and a bad time
+  unreadable, `assemblyai` skipped, blanks ignored = {0.875, 3, 2, 3}); every
+  Settings sentence and `amount`; `month` and `title` at both edges; the
+  transcript's conversation sum, its figures and `.conversationCost` before
+  `.usage` on `clear()` and `endConversation`; `AssistantView.reload` /
+  `apply` → `assistant.spend` and its tooltip; the pane in an
+  `orderFrontRegardless()` window — no folder, an absent ledger (still absent
+  after), a fixture ledger (`Reading the spend ledger…`, then its sentence
+  within 5 s), then `AssistantSpend.record` → the sentence unchanged when
+  `record` returns, then the new one within 5 s.
+- **U0–U3**, the Release app (`asp.App`, the stand-in; ports 4899, 4893):
+  no `Reelcut: ` line; a seeded `-RCSpendFolder` ledger (this UTC month's
+  start + 1 s priced, the previous month's end − 1 s, one unpriced, one
+  torn) → Reelcut ▸ Settings… and `snapshot_ui window: settings`: the month
+  line equals the script's own Python fold and sentence, the note is exact,
+  and neither label has a layout problem beyond #140's 2 pt label overhang,
+  which every label in Settings shows and which is counted apart; the tab
+  reads "Nothing yet", then after a two-reply and a one-reply pane turn
+  "$%.4f · Reelcut's estimate" of the tool-view dollars, and Settings,
+  re-captured (up to 5 s), equals the fold of the ledger as it now is; with
+  the override and no `-RCSpendFolder`, "This launch keeps no spend
+  ledger.", and the person's `spend.jsonl` and `anthropic-prices.json` keep
+  their existence, size and mtime across that launch and the whole run.
+
+Made to fail: each mutant runs the probe rows over a copy of `app/Sources`
+with one literal of `AssistantSpendMonth.swift` replaced, exactly once, and
+exits 1 when its named rows all FAIL, 3 when one passed (it survived), 2 when the literal
+is not found once or the probe did not build. `--mutant local-month`
+(`TimeZone.gmt` → `TimeZone.current`) FAILs M1 and M3; `--mutant
+unknown-as-zero` (`summary.unpriced += 1` → `summary.priced += 1`) FAILs M1.
+
+```sh
+python3 tools/proof/spend_ui_proof.py                            # 10/10
+python3 tools/proof/spend_ui_proof.py --mutant local-month       # M1 M3 FAIL, exit 1
+python3 tools/proof/spend_ui_proof.py --mutant unknown-as-zero   # M1 FAIL, exit 1
+```
+
+Measured 2026-09-28, every command with `ANTHROPIC_API_KEY` and
+`RC_ASSEMBLYAI_KEY` unset: `spend_ui_proof.py` 10/10 (U1 "September 2026
+(UTC): 2 responses; 1 could not be priced, the rest came to $0.50. 1 ledger
+line could not be read."; U2 the tab "$0.0018 · Reelcut's estimate" over
+three $0.0006 responses, Settings "… 5 responses; …"); `local-month` 4/6
+(M1 dollars 100.375 for 0.875, M3 the month starting 2026-08-01 07:00 UTC),
+exit 1; `unknown-as-zero` 4/6 (M1 priced 5, unpriced 0; C3 also FAILs),
+exit 1. The person's two files were absent before and after.

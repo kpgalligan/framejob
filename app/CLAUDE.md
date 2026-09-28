@@ -533,7 +533,10 @@ the key map behind it.
   delta type; `argumentSummary` drops `project`; road map 13 P2: it sums the
   `cost` events from `turn_started` to `turn_finished` into an
   `AssistantTurnCost` and ends the turn with its line as `.meta`, and
-  `clear()` and `endConversation` reset the sum), the question the session's
+  `clear()` and `endConversation` reset the sum; road map 13 P4: every `cost`
+  also adds to `conversationCost` and emits `.conversationCost`, and `clear()`
+  and `endConversation` reset it and emit `.conversationCost` BEFORE their
+  `.usage`, which `assistant_tab_probe`'s P1 needs last), the question the session's
   `pendingQuestion`, the session `EditorViewController.assistant`; a floating
   window later calls `attachAssistant` with the same view. **Return never
   answers**: Allow and Deny are `OptionButtonControl`s (a click, no key), Send
@@ -544,8 +547,12 @@ the key map behind it.
   2 pt (`snapshot_ui`'s outside_superview rule). `AssistantTranscriptView` is
   the flipped document view, one selectable label per entry with
   `preferredMaxLayoutWidth` set in `layout()`; `AssistantContextMeterView`
-  the inline meter and `figures(_:)`, its three sentences. Accessibility ids
-  `assistant.composer|send|allow|deny|question|clear|settings|nokey` and
+  the inline meter and `figures(_:)`, its three sentences;
+  `AssistantConversationCostView` (the same file, road map 13 P4, spec §11
+  P-7) the Spend row 6 pt under the meter and Clear, the rule under it:
+  `AssistantTurnCost.figure` of `conversationCost`, which `reload(_:usage:cost:)`
+  and `apply`'s `.conversationCost` set. Accessibility ids
+  `assistant.composer|send|allow|deny|question|clear|settings|nokey|spend` and
   `assistant.entry.<kind>` are what the proofs read.
 - `MediaPane.swift` · `MediaRowView.swift` (a row and the drag it starts,
   with `MediaDropMode` read from `NSEvent.modifierFlags` at the drop) ·
@@ -1019,7 +1026,18 @@ free.
   no account link (AI-1), holds the model (blank is AI-11's default), and is
   the ONE poster of `AssistantConfiguration.didChangeNotification` —
   `key` on Save and Remove, `model` only when `AssistantConfiguration.model`
-  actually changes. The window is wiring-only for it (#58).
+  actually changes. Road map 13 P4 (spec §11 P-7) ends the pane with the
+  UTC month's spend (`spendLabel`, `settings.assistant.spend`) and its note
+  (`spendNoteLabel`, `settings.assistant.spendnote`); the spend folder is a
+  third FACTORY, `spendFolder:` (`AssistantSpend.folder()` by default, an
+  absent folder in the harness, whose `pinDefaults` wipes `-RCSpendFolder`).
+  `init` and `sync()` never read the ledger: `show()` calls
+  `refreshSpend()`, and the pane's observer of
+  `AssistantSpend.didRecordNotification` calls `refreshSpend(keepShown:
+  true)` only while its window is visible, keeping a shown summary until
+  the fold answers. No folder and an absent ledger answer synchronously;
+  a generation counter shows only the latest read. The window is
+  wiring-only for it (#58).
 - `PreviewWindowController.swift` — a second `AVPlayerLayer` on the same
   player (measured: two layers both display). It is an **`NSPanel`** (a titled
   window becomes main and every editor selector goes dead), the controller is
@@ -1215,7 +1233,24 @@ free.
   `cost` as a dev tool may show it: `{type, cost: {kind, dollars|cause},
   prices}`. `AssistantTurnCost` sums a turn's dollars and formats the
   transcript line (`$%.4f`, `under $0.0001`, `unknown (…)`, the table's
-  `day` in the local zone). **No pricing arithmetic**: the helper priced it.
+  `day` in the local zone) and, summed over a conversation, the tab's Spend
+  `figure` ("Nothing yet", "at least …", "unknown …", never $0) with its
+  `figureTooltip`. Road map 13 P4: `record` posts `didRecordNotification`
+  (object nil) exactly when it wrote a line; `number` (a JSON number, not a
+  boolean) and `instant` (ISO 8601, whole or fractional seconds) are
+  internal for the month's fold. **No pricing arithmetic**: the helper
+  priced it.
+- `AssistantSpendMonth.swift` — Settings' month line (road map 13 P4, spec
+  §11 P-4, P-7): `month(containing:)` and `title` ("September 2026 (UTC)")
+  in `zone`, `TimeZone.gmt`, spelled once — the ledger's `time` and P-6's
+  budget month are UTC, so app and proofs count one month; `fold`, pure, over
+  `spend.jsonl` (another `service` skipped; no parse or no readable `time` is
+  `unreadable`; a `dollars` that is not a finite non-negative number is
+  `unpriced`, never $0); `read`, the fold on `queue` (serial) with the answer
+  on main; `amount` (`$%.2f`, `under $0.01`) and `sentence`, the pane's
+  words for each `Reading`. It only sums the helper's dollars.
+  `spend_ui_proof.py --mutant local-month|unknown-as-zero` edits its
+  `TimeZone.gmt` and `summary.unpriced += 1`, each exactly once.
 - `AssistantConfiguration.swift` — the assistant's key (spec §11 AI-8), base
   URL (AI-13), model (AI-11) and chat settings. `store()` is AI-13's whole
   decision: `-RCSecretFolder` (read through
@@ -1515,8 +1550,10 @@ this entry rather than growing the list), `ScreenRecorder.shareableContent`'s
 global hop, `GraphicStore`'s serial queue (its file-system sources'
 handlers, the coalesced pass and the outbox; main publishes through
 `drain()` and never waits on it but by `queue.sync`), the cache's main
-hop, the agent lane's serial queue (`AgentLane.swift`), and the assistant
-session's write queue (`AssistantSession.swift`). The recorder adds
+hop, the agent lane's serial queue (`AgentLane.swift`), the assistant
+session's write queue (`AssistantSession.swift`), and the spend-month
+queue (`AssistantSpendMonth.queue`, Settings' ledger fold, answered by a
+main hop). The recorder adds
 NO queue of its own:
 framework callbacks are stamped where they land and hopped to main. Colors,
 fonts and metrics come from `DS` tokens; shared controls go in

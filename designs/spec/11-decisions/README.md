@@ -22,7 +22,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | [`graphics.md`](graphics.md) | 281 | **Graphics (road map 10).** G-1..G-16. |
 | [`dev-tools.md`](dev-tools.md) | 27 | **Dev tools (road map 11).** V-1..V-3: the `REELCUT_DEV_TOOLS` flag and `make dist`, dev tools as ordinary tools, capture by `cacheDisplay`. |
 | [`assistant.md`](assistant.md) | 117 | **The Assistant (road map 12).** AI-1..AI-15: the bundled helper, one lane, the catalog at launch, the fourth tab, the window's own project, W-9's reach, withheld and ask-first tools, the key, history, undo, the model, a call mid-gesture, the base-URL override, the tab kept on a selection change, the live context on each message. |
-| [`pricing.md`](pricing.md) | 66 | **Pricing and spend (road map 13, in progress).** P-1..P-6: LiteLLM's table as the feed, a call priced from its own `usage` and `model` (per iteration), monthly dollar budgets per service, the app's spend as its own, the spend folder (ledger and price cache) that a proof never touches, the proofs' own ledger and how a paid proof request is held to the month's budget in it. |
+| [`pricing.md`](pricing.md) | 81 | **Pricing and spend (road map 13).** P-1..P-7: LiteLLM's table as the feed, a call priced from its own `usage` and `model` (per iteration), monthly dollar budgets per service, the app's spend as its own, the spend folder (ledger and price cache) that a proof never touches, the proofs' own ledger and how a paid proof request is held to the month's budget in it, and the two figures the app shows (the conversation's on the Assistant tab, the UTC month's in Settings). |
 
 ## Every decision
 
@@ -166,3 +166,4 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | P-4 | Spend shown in the app is Reelcut's own, and says so | [`pricing.md`](pricing.md) |
 | P-5 | The spend ledger and the price cache are the person's, in the spend folder; a proof never touches them | [`pricing.md`](pricing.md) |
 | P-6 | The proofs' ledger is `~/Library/Application Support/Reelcut Proofs/spend.jsonl`; every paid proof request is reserved at its worst case there and refused past the month's budget | [`pricing.md`](pricing.md) |
+| P-7 | The app shows the conversation's cost on the Assistant tab and the UTC month's, folded from the ledger, in Settings; unpriced and unreadable lines are counted, never $0 | [`pricing.md`](pricing.md) |

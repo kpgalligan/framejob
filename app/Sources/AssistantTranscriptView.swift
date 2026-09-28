@@ -68,7 +68,7 @@ final class AssistantTranscriptView: NSView {
             scrollToNewest()
         case .cleared:
             reload([])
-        case .usage:
+        case .usage, .conversationCost:
             break
         }
     }

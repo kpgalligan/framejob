@@ -1,7 +1,8 @@
 import AppKit
 
 /// Every view of the Assistant tab (road map 12 A2): the context meter and
-/// Clear along the top, the transcript, the ask-first row, and the composer
+/// Clear along the top, the conversation's Spend row under them (road map 13
+/// P4), the transcript, the ask-first row, and the composer
 /// whose Send becomes Stop — or, with no key, a pointer at Settings.
 ///
 /// **It holds no conversation** (spec §11 AI-4): the transcript is
@@ -44,6 +45,7 @@ final class AssistantView: NSView {
     let clearButton: GhostButton
 
     private let meter = AssistantContextMeterView()
+    private let spend = AssistantConversationCostView()
     private let transcript = AssistantTranscriptView()
     private let scroll = NSScrollView()
     private let questionHeadingLabel = NSTextField(labelWithString: AssistantView.questionHeading)
@@ -185,7 +187,7 @@ final class AssistantView: NSView {
         top.alignment = .centerY
         top.spacing = 8
         let rule = AssistantRule()
-        for view in [top, rule, scroll, foot] as [NSView] {
+        for view in [top, spend, rule, scroll, foot] as [NSView] {
             view.translatesAutoresizingMaskIntoConstraints = false
             addSubview(view)
         }
@@ -193,7 +195,10 @@ final class AssistantView: NSView {
             top.topAnchor.constraint(equalTo: topAnchor, constant: 8),
             top.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Self.inset),
             top.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Self.inset),
-            rule.topAnchor.constraint(equalTo: top.bottomAnchor, constant: 8),
+            spend.topAnchor.constraint(equalTo: top.bottomAnchor, constant: 6),
+            spend.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Self.inset),
+            spend.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Self.inset),
+            rule.topAnchor.constraint(equalTo: spend.bottomAnchor, constant: 8),
             rule.leadingAnchor.constraint(equalTo: leadingAnchor),
             rule.trailingAnchor.constraint(equalTo: trailingAnchor),
             rule.heightAnchor.constraint(equalToConstant: 1),
@@ -221,13 +226,17 @@ final class AssistantView: NSView {
 
     // MARK: - What it is shown
 
-    func reload(_ entries: [AssistantEntry], usage: AssistantContextUsage) {
+    func reload(
+        _ entries: [AssistantEntry], usage: AssistantContextUsage, cost: AssistantTurnCost
+    ) {
         transcript.reload(entries)
         meter.update(usage)
+        spend.update(cost)
     }
 
     func apply(_ change: AssistantTranscriptChange) {
         if case .usage(let usage) = change { meter.update(usage) }
+        if case .conversationCost(let cost) = change { spend.update(cost) }
         transcript.apply(change)
     }
 

@@ -26,6 +26,10 @@ import Foundation
 enum AssistantSpend {
     static let folderArgument = "RCSpendFolder", feedArgument = "RCPriceFeed",
         ledgerName = "spend.jsonl", priceCacheName = "anthropic-prices.json"
+    /// Posted by `record` (object nil, on its caller's thread — main in the
+    /// app) each time it writes a ledger line; Settings' month figure
+    /// re-reads the ledger on it (spec §11 P-7).
+    static let didRecordNotification = Notification.Name("ReelcutSpendDidRecord")
 
     /// The token counts a ledger line keeps from a `usage` or an iteration.
     private static let countKeys = [
@@ -125,6 +129,7 @@ enum AssistantSpend {
         guard written == data.count else {
             return failure(written < 0 ? String(cString: strerror(errno)) : "a short write")
         }
+        NotificationCenter.default.post(name: didRecordNotification, object: nil)
         return nil
     }
 
@@ -143,14 +148,27 @@ enum AssistantSpend {
         return ["type": "cost", "cost": view, "prices": prices(event["prices"])]
     }
 
-    // MARK: - Private
+    /// An ISO 8601 instant, with whole or fractional seconds; nil otherwise.
+    /// The two parsers are built once: a month's fold calls this per line.
+    static func instant(_ text: String) -> Date? {
+        wholeSeconds.date(from: text) ?? fractionalSeconds.date(from: text)
+    }
+
+    private static let wholeSeconds = ISO8601DateFormatter()
+    private static let fractionalSeconds: ISO8601DateFormatter = {
+        let parser = ISO8601DateFormatter()
+        parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return parser
+    }()
 
     /// A JSON number that is not a boolean.
-    private static func number(_ value: Any?) -> NSNumber? {
+    static func number(_ value: Any?) -> NSNumber? {
         guard let value = value as? NSNumber, CFGetTypeID(value) != CFBooleanGetTypeID()
         else { return nil }
         return value
     }
+
+    // MARK: - Private
 
     private static func counts(_ from: [String: Any], into: inout [String: Any]) {
         for key in countKeys { if let value = number(from[key]) { into[key] = value } }
@@ -235,6 +253,21 @@ struct AssistantTurnCost: Equatable {
         return "Cost: \(amount) · Reelcut's estimate at LiteLLM prices (\(source))"
     }
 
+    /// The Assistant tab's Spend row (spec §11 P-7): "Nothing yet" before any
+    /// response; the amount when every response was priced; "at least" the
+    /// priced part when one was not and the part shows; else "unknown".
+    var figure: String {
+        guard responses > 0 else { return "Nothing yet" }
+        let estimate = " · Reelcut's estimate"
+        if firstUnknown == nil { return Self.amount(dollars) + estimate }
+        if dollars >= 0.000_05 { return "at least " + String(format: "$%.4f", dollars) + estimate }
+        return "unknown" + estimate
+    }
+
+    static let figureTooltip =
+        "What this conversation's responses cost at LiteLLM prices, as Reelcut estimates it. "
+        + "The Anthropic Console shows what your account was billed."
+
     /// `$%.4f`, or `under $0.0001` for a positive amount that would round to 0.
     static func amount(_ dollars: Double) -> String {
         if dollars > 0 && dollars < 0.000_05 { return "under $0.0001" }
@@ -252,13 +285,7 @@ struct AssistantTurnCost: Equatable {
     /// The `yyyy-MM-dd` of the ISO 8601 instant `asOf` in `zone`; its first 10
     /// characters when it does not parse.
     static func day(_ asOf: String, in zone: TimeZone = .current) -> String {
-        let parser = ISO8601DateFormatter()
-        var instant = parser.date(from: asOf)
-        if instant == nil {
-            parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            instant = parser.date(from: asOf)
-        }
-        guard let instant else { return String(asOf.prefix(10)) }
+        guard let instant = AssistantSpend.instant(asOf) else { return String(asOf.prefix(10)) }
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.calendar = Calendar(identifier: .gregorian)

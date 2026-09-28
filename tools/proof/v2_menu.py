@@ -7,7 +7,9 @@ the running app.
 `--only` takes row letters (`T,H,N,D,U,R,S`); omitted, every row runs. The app
 is the Release build on `<port>`, launched with the V2b spec's Verification
 line (V2a's pinned defaults plus `-RCSecretFolder` under
-`work/v2_menu/secrets`), fresh for each run; `--log` defaults to
+`work/v2_menu/secrets` and `-RCSpendFolder` under `work/v2_menu/spend` —
+it opens Settings, whose month line would otherwise read the person's
+ledger, spec §11 P-5), fresh for each run; `--log` defaults to
 `/tmp/reelcut-<port>.log`.
 
 **The cover.** The D rows put `v2_cover.swift`'s opaque, non-activating

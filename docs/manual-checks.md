@@ -379,6 +379,11 @@ Needs your own Anthropic API key (Setup 3).
 - **Expect:** each turn ends with `Cost: $… · Reelcut's estimate at LiteLLM prices (…)`, the three reading `(bundled table of …)`, then `(fetched <today>)`, then `(cached <today>)`; the ledger has one line per response, with no key and no message text; the month's total is near the Anthropic Console's for the same calls.
 - **Source:** road map 13 P2; spec §11 P-4, P-5.
 
+**AS-5 — What a conversation and the month cost**
+- **Do:** With your real key, open Reelcut ▸ Settings… and keep it beside the window; View ▸ Assistant (⌃⌘A). 1. Read the tab's Spend row. 2. Send two messages. 3. Clear; send one more.
+- **Expect:** the Spend row starts at "Nothing yet"; after the messages it equals the sum of those turns' `Cost:` lines ("$… · Reelcut's estimate"); Clear puts it back to "Nothing yet" and the next turn starts a new sum. Settings' month line ("<Month> <year> (UTC): $… over N responses.") grows with each response while it is open, without flickering to "Reading the spend ledger…", and is near the Anthropic Console's total for the same UTC days.
+- **Source:** road map 13 P4; spec §11 P-4, P-7.
+
 ## Host-state proof runs
 
 Scripts that need a state no agent session has. Run from a terminal on an

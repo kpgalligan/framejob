@@ -72,7 +72,11 @@ schema, §6 the op table, §7 the architecture.
   estimate at LiteLLM's prices, naming the table's date, and "unknown"
   rather than $0 when a response could not be priced — and every response
   is one line in `spend.jsonl` in Reelcut's Application Support folder
-  (tokens and dollars, never your key or the conversation). The
+  (tokens and dollars, never your key or the conversation). The tab's Spend
+  row shows what the conversation has cost since you last cleared it, and
+  Settings' Assistant pane what this calendar month has cost (the month in
+  UTC, as the ledger records it), both Reelcut's own estimate: the
+  Anthropic Console is the truth for what your account was billed. The
   Clip tab is a
   selection header — the clip's name, editable there for a single clip and
   the one place a name can be cleared back to what the clip shows, with its
