@@ -1,16 +1,18 @@
 # Road map 12 — the Assistant tab
 
 **Status: IN PROGRESS. PROPOSED 2026-09-27; the user answered §6 the same day. §4's decisions
-are recorded in spec §11 (`11-decisions/assistant.md`, AI-1..AI-14) and A0 ran the same day
+are recorded in spec §11 (`11-decisions/assistant.md`, AI-1..AI-15) and A0 ran the same day
 (§7). A1 is built (§8): the lane, the helper and its build, and the session with its two dev
 tools and end-to-end proof. A2 is built (§9): the Assistant tab, View ▸ Assistant ⌃⌘A and
-Settings' Assistant pane, so a person can use the assistant. A3 (the prompt texts) is next.**
+Settings' Assistant pane, so a person can use the assistant. A3 is built (§10): the prompt
+texts, the live context on each message, their drift checks in `make test`, and the
+spend-capped evaluation, whose live run is owed to a person with a key. A4 (close) is next.**
 This is the design the user asked for:
 an AI agent in the editor, "designed in the same way that the agent for
 `~/devel/rasterize` is". §1 is what Rasterize built. §2 is what carries over unchanged.
 §3 is what Reelcut needs that Rasterize did not. §4 is the decisions §11 must record
 before any code is written. §5 is the phases. §6 is the user's answers. §7 is A0's record.
-§8 is A1's record. §9 is A2's record.
+§8 is A1's record. §9 is A2's record. §10 is A3's record.
 
 ## 1. What Rasterize built
 
@@ -841,3 +843,115 @@ offered; #152 a question asked while the tab is hidden draws no attention; #153 
 transcript cannot be selected across entries; #154 the composer is single-line; #155 screens
 03 and 11 still describe three tabs; #156 the cloud probe's row 18. Comments on #140 and
 #143 for Settings' Assistant pane.
+
+## 10. A3 record (2026-09-27)
+
+**Decision first.** Spec §11 AI-15 was recorded before any code: the window's live context
+rides on each person message, and the system prompt is fixed for a session. `configure` is the
+helper's only system channel and `agent/` is one diff with Rasterize (#147); a system prompt
+that changed per turn would break AI-9's unchanged prefix and the prompt cache; the playhead
+and selection change between turns. Risk accepted: about sixty tokens a message, and the block
+is the state at send time, so after its own edits the model re-reads with `get_project`.
+
+**What landed.**
+- `AssistantPrompt.swift` (163 lines): the system prompt, the search guide and the compaction
+  instructions as Swift literals, one `\n` between paragraphs and no blank line; `coreTools`
+  unchanged; `sharedIdKinds` (`clips`, `tracks`, `markers`, `media`, `nests`, `actions`);
+  `searchTopics`, fourteen topics covering the assistant's catalog but the core tools exactly
+  once (project and view state; tracks; markers and the canvas; placing clips; cutting and
+  timing; how a clip looks and sounds; nests; transitions; actions and zooms; media files;
+  captions; audio clean-up; graphics; export), of which the guide shows the words only; and
+  `message(_:document:)`. The system prompt interpolates `ReelTime.perSecond`, the ask-first
+  and conditional withheld rows of `AssistantToolTable.rows` (backticked names, the row's key
+  and quoted value) and `AssistantLiveContext.tag`. It states: the window's own project (leave
+  `project` out), one undo step per call, the context block and its five keys, ticks snapped
+  to `canvas.fps`'s grid, `get_project`'s shape (`tracks[0]` the back, a clip's `track`,
+  `start`, `duration`, `source.kind`, the five patch tools' merge rules, the shared id space and
+  `next_id`), nests and `scope`, markers on the timeline, captions as text clips written only on
+  request, graphics as modules, what `render_frame` shows and `max_width`, the ask-first tools
+  and "The person declined: …" as final for that call, and replies of a sentence or two.
+- `AssistantLiveContext.swift` (54): the `<reelcut_context>` block — name, path or "none (never
+  saved)", scope or "none (the timeline is open)", the playhead in ticks and seconds, the
+  selection ascending or "none".
+- `AssistantSession.swift`: `send` writes `AssistantPrompt.message(text, document: document)`;
+  its two-line doc comment reworded in place; still 400 lines. `assistantSend` still writes the
+  bare text to the transcript. `agent/` and `DevAssistantLaunch.swift` are untouched (the
+  latter sends through `session.send`, so it carries the context).
+- `anthropic_fake.py`: a scripted reply may carry `input_tokens` (default 100).
+- Instruments: `assistant_prompt_probe.swift`, `assistant_prompt_proof.py` and
+  `assistant_prompt_eval.py` (new); `make test` runs `assistant_prompt_proof.py --probe` after
+  the lane proof.
+- Documents: spec §11 AI-15 and the index, §7.9's "The prompt", §7.4's row, §8's and the
+  README's and `CLAUDE.md`'s `make test` line, the spec index's counts, `app/CLAUDE.md`
+  (`AssistantPrompt.swift`'s drift rule, `AssistantLiveContext.swift`, `send`'s prefix),
+  `tools/proof/README.md`.
+
+**The drift rule.** Every fact in a text is interpolated from the code that decides it or
+checked against it by `make test` (F1–F7): a backticked token must be a tool or a path of
+argument names and `get_project` keys, no withheld tool is named anywhere, the timescale is
+`RC_TIMESCALE` in the prompt and in `get_project`'s note, each id kind is an array of objects
+with integer ids in a fixture (all distinct, below `next_id`), the topics cover the catalog
+exactly, the ask-first rows are named, no text holds a blank line and each is within its bound
+(system 2655/6000, guide 1292/1500, compaction 499/1000 characters). M1–M4 made each checker
+fail on a mutated copy.
+
+**What was measured.** Every app and probe ran with `ANTHROPIC_API_KEY` and `RC_ASSEMBLYAI_KEY`
+out of its environment.
+- `make typecheck`: 0 errors and 7 warnings (the baseline); `tsc --noEmit` printed nothing.
+  `make lint` was clean. `make test` exited 0: 73 cargo test result lines, 968 passed, 0 failed;
+  the lane proof 12/12; the prompt probe 11/11 (F1: 47 backticked tokens against 84 tools and
+  145 names; F3: clips 4, tracks 4, markers 1, media 1, nests 1, actions 1, 12 ids below
+  `next_id` 13; F4: 14 topics, 80 tools and 4 core against 84). `make app` built.
+- `assistant_prompt_proof.py`: 15/15 with E1–E6, H and K SKIP. S1: POST 1's system is the
+  system prompt, a blank line and the guide (3949 characters). S2: turn 1's last user text is
+  the exact block and the text; turn 2 carries the new block and its `messages[0]` is turn 1's.
+  S3: a 300000-token reply made the helper compact, and POST 2 carried the instructions
+  verbatim.
+- `--rehearse`: 22/22 (K SKIP), E1–E6 each through the right tool, 12 POSTs at the stand-in;
+  H's worst POST priced $2.55, every body within 256,000 bytes and `max_tokens` 32,000.
+  `--wrong`: E1–E6 all FAIL, exit 1. `--cap 0.0001`: the WARNING printed first, E1–E6 FAIL
+  `cap: refused at $0.0000 of $0.0001`, the stand-in logged 0 POSTs, exit 1.
+- `--live` with no `--cap`: printed the arithmetic and exited 2, having launched nothing.
+- Made to fail on purpose: `--mutant bare-send` built its copy; S2 FAILED with turn 1's last
+  user text the bare `'What is at the playhead?'`; exit 1.
+- The A1/A2 proofs kept their scores: lane 12/12, helper 6/6, session 11/11, tab 16/16.
+- Our own Release instance on port 4879 logged no `Reelcut: ` line.
+- Found by the instruments and fixed before they passed: S2's second playhead (4800000) was
+  clamped to a 3 s project's end; the proof's text clip is 6 s now.
+
+**Spend.** None: the live evaluation was not run — no key on this host, and no dollar figure
+approved. It is owed (#157). The rehearsal ledger's dollars are the stand-in's scripted usage
+priced at `RATES`, not spend.
+
+**The cap's rates and headroom.** `RATES` is a deliberate upper bound, never a quote: Claude
+Fable 5.1's $10.00 input and $50.00 output per MTok, with cache writes at 1.25× ($12.50) and
+cache reads at 0.1× ($1.00) its input — the priciest model `fallbacks: "default"` can bill a
+turn at. Opus 5.5's real rates are $4.00 input, $20.00 output and $0.20 cache read per MTok,
+cache write unlisted (the claude-api skill's model table, cached 2026-06-24, read 2026-09-27).
+The arithmetic, which `headroom_lines` prints before the first request: the helper sends
+`max_tokens` 32,000 on every POST (`agent/src/main.ts:31`) and all 85 definitions, deferred
+ones included; the A2 session proof's largest logged body was 230,340 bytes, bounded at
+256,000 ≈ 85,333 tokens. The worst POST is 85,333 × $12.50 + 32,000 × $50.00 per MTok ≈ $1.07
++ $1.60 = $2.67. A row is bounded at one cache write of that body ($1.07) + 4 cache reads
+($0.34) + 5 rounds × 2,000 output ($0.50) ≈ $1.91 — an estimate that bills every definition
+byte, deferred ones too. The floor is the worst POST + 6 rows ≈ $14.11, and `SUGGESTED_CAP` is
+$15.00. `--live` requires an explicit `--cap` (any positive figure; raising it is the runner's
+decision). Row H fails in rehearsal if a real POST outgrows the bounds, so the arithmetic
+cannot go stale silently.
+
+**Review.** The implementer read the change back against the spec; the pipeline's reader
+review has not run on it yet.
+
+**Limits.**
+- Every turn was against the stand-in; nothing reached api.anthropic.com, so whether a real
+  model does the six asks right is unmeasured (#157).
+- The block is the window's state at send time; mid-turn the model must re-read.
+- F1 checks that a backticked token NAMES something real, not that the sentence around it is
+  true; the prose's claims (merge rules, `tracks[0]` the back) are held to the code's own docs
+  by reading, not by a row.
+- Compaction on the real API is not tested (out of scope).
+
+**Owed.** The live evaluation (#157). A4: `dist_check.py`'s helper rows, spec §7's assistant
+section, the ADR, the archive.
+
+**Issues filed.** #157 run the live evaluation with a key (`ready-for-human`).

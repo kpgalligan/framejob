@@ -104,3 +104,13 @@ amended by the user's answers in §6).
   `clipPicked()` — a click on a clip in the timeline or canvas — still shows Clip from any
   tab. Risk accepted: a selection made by an MCP caller or a menu item while the Assistant tab
   shows does not bring the clip's properties forward; a click does.
+- **AI-15 — The window's live context rides on each person message; the system prompt is fixed
+  for a session.** `AssistantSession.send` writes the person's text behind a
+  `<reelcut_context>` block (`AssistantLiveContext.swift`): the project's name and path, the
+  open nest, the playhead and the selection, as they are at send time. The system prompt, the
+  tool-search guide and the compaction instructions are written once, in `configure`, and never
+  change for the session. `configure` is the helper's only system channel and `agent/` is one
+  diff with Rasterize (#147); a system prompt that changed per turn would break AI-9's
+  unchanged prefix and the prompt cache; and the playhead and selection change between turns.
+  Risk accepted: about sixty tokens on every message, and the block is the state at send time,
+  so after its own edits the model re-reads with `get_project`.

@@ -17,7 +17,8 @@ Routes:
 * `POST /v1/messages` (any query string: the SDK's beta calls add
   `?beta=true`) answers the NEXT scripted reply. With `"stream": true` in the
   body it answers server-sent events and then closes the connection:
-  `message_start` (usage input 100, output 0, `cache_*` 0); per content
+  `message_start` (usage input 100 unless the reply says otherwise, output
+  0, `cache_*` 0); per content
   block a `content_block_start`, ONE `content_block_delta` (`text_delta`,
   or `input_json_delta` carrying the whole input) and a
   `content_block_stop`; then `message_delta` (`stop_reason`, output 10) and
@@ -26,7 +27,10 @@ Routes:
 * `POST /__control/scenario` replaces the scenario and resets the log:
   `{"replies":[{"content":[Block],"stop_reason"}],"max_input_tokens":1000000}`,
   a Block being `{"type":"text","text"}` or
-  `{"type":"tool_use","id","name","input"}`.
+  `{"type":"tool_use","id","name","input"}`. A reply may also carry
+  `"input_tokens": <int>` (default 100), the usage's `input_tokens` in
+  `message_start` and in the non-stream Message (road map 12 A3: a large
+  figure makes the helper compact at the end of the turn).
 * `GET /__control/log` answers
   `{"requests":[{"method","path","headers","body","bytes"}],"failures":[str]}`.
 
@@ -105,7 +109,7 @@ def message_object(reply, index, model):
     return {"id": f"msg_a0_{index + 1}", "type": "message", "role": "assistant",
             "model": model, "content": reply.get("content", []),
             "stop_reason": reply.get("stop_reason"), "stop_sequence": None,
-            "usage": {"input_tokens": 100, "output_tokens": 10,
+            "usage": {"input_tokens": reply.get("input_tokens", 100), "output_tokens": 10,
                       "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0}}
 
 
@@ -114,7 +118,7 @@ def stream_events(reply, index, model):
     start = message_object(reply, index, model)
     start["content"] = []
     start["stop_reason"] = None
-    start["usage"] = {"input_tokens": 100, "output_tokens": 0,
+    start["usage"] = {"input_tokens": reply.get("input_tokens", 100), "output_tokens": 0,
                       "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0}
     events = [("message_start", {"type": "message_start", "message": start})]
     for at, block in enumerate(reply.get("content", [])):

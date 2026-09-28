@@ -30,7 +30,7 @@ Commands (identical to Rasterize's):
 
 ```sh
 make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
-make test       # make rust, cd core && cargo test --release, cd graphic && cargo test --release (black-box tests), then tools/proof/assistant_lane_proof.py (the agent lane's probe)
+make test       # make rust, cd core && cargo test --release, cd graphic && cargo test --release (black-box tests), then tools/proof/assistant_lane_proof.py (the agent lane's probe) and tools/proof/assistant_prompt_proof.py --probe (the prompt texts' drift checks)
 make lint       # cargo clippy --all-targets -- -D warnings
 make typecheck  # swiftc -typecheck of app/Sources/*.swift with the bridging header — the ONLY Swift check, then agent/'s tsc --noEmit (through bun)
 make project    # xcodegen generate

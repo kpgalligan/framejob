@@ -28,6 +28,7 @@ test: rust
 	cd core && cargo test --release
 	cd graphic && cargo test --release
 	python3 tools/proof/assistant_lane_proof.py
+	python3 tools/proof/assistant_prompt_proof.py --probe
 
 lint:
 	cd core && cargo clippy --all-targets -- -D warnings

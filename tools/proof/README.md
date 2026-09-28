@@ -6439,3 +6439,162 @@ it.
 python3 tools/proof/assistant_tab_proof.py                        # 16/16
 python3 tools/proof/assistant_tab_proof.py --mutant no-forward    # L2 FAIL, exit 1
 ```
+
+## Road map 12's A3 — the prompt (assistant_prompt_proof.py, assistant_prompt_probe.swift, assistant_prompt_eval.py)
+
+The assistant's texts, the live context each message carries, and the
+evaluation against a real model (spec §11 AI-7, AI-9, AI-15). It works in
+`work/assistant_prompt/`, reuses `assistant_session_proof.py`'s stand-in,
+`App`, secret folder and helpers (its `WORK` re-pointed here), prints `<ID>
+ok|FAIL|SKIP — <detail>` per row and then `n/m pass, k skipped` (the cap's
+failures counted apart), and scores an instrument that cannot run as a FAIL.
+
+**F and M** — `assistant_prompt_probe.swift`, compiled AS `main.swift` over
+`app/Sources` minus `main.swift` on `harness/build.sh`'s swiftc line with `-D
+REELCUT_DEV_TOOLS` (rebuilt only when stale; a build failure fails every
+row), `AgentLane.prepareAtLaunch()` first. Its fixture is an untitled
+document edited through `AgentLane.submit` pinned to it: two `add_track`, a
+text clip "Welcome", two shapes, an action on the text clip, a marker, a
+64 × 64 image through `add_media`, and `nest` over the second shape; then
+`get_project`.
+- **F1** every backticked token in the three texts is an identifier path
+  whose whole is an assistant-catalog tool or whose every segment is an
+  argument name (any depth of any `inputSchema`) or a key at any depth of
+  the fixture's `get_project`; no snake_case word outside backticks but
+  `<reelcut_context>`; no withheld tool (the unconditional rows and the dev
+  tools) anywhere.
+- **F2** `ReelTime.perSecond == RC_TIMESCALE`, and the system prompt and
+  `get_project`'s note both say it.
+- **F3** each `sharedIdKinds` name backticked in the system prompt; every
+  array under such a key at any depth of the fixture's `project` holds
+  objects with integer ids; each kind has one; all distinct and below
+  `next_id`.
+- **F4** `searchTopics` ∪ `coreTools` is the assistant's catalog, each tool
+  once; the guide shows every topic's words and each core tool backticked.
+- **F5** every ask-first row's tool, and each conditional withheld row's
+  tool and key backticked and its value in double quotes, in the system
+  prompt.
+- **F6** no text holds `\n\n`; system ≤ 6000, guide ≤ 1500, compaction ≤
+  1000 characters; none empty.
+- **F7** `AssistantLiveContext.text` for four samples equals the template;
+  `message(t, document:)` is the block, a newline and `t`; `message(t, nil)`
+  is `t`; each label is a key of `get_project`.
+- **M1–M4** each checker FAILS on a mutated copy: `` system + " `add_markers`" ``
+  (F1), the timescale's digits → 60000 (F2), the first topic's last tool
+  dropped (F4), `system + " record_screen"` (F1).
+
+`--probe` runs these alone (no app, no bun): it is the last line of
+`make test`.
+
+**Launch S** (Release, port 4878, `-AgentServerEnabled YES`, `proof-key` in a
+scratch `-RCSecretFolder`, `RC_ASSISTANT_BASE_URL` at the stand-in), in a
+saved project with a 6 s text clip (a playhead is clamped to the project's
+end):
+- **S0** no `Reelcut: ` line.
+- **S2** `set_playhead 2400000` and the text clip selected: turn 1's last user
+  text is exactly the block (from `get_project`'s name and path) + `\n` +
+  the person's text; after `set_playhead 4800000` and an empty selection,
+  turn 2 carries the new block, and its `messages[0]` equals turn 1's.
+- **S1** S2's POST 1's system is `system + "\n\n" + search_guide`.
+- **S3** a scripted reply of `input_tokens: 300000` (`anthropic_fake.py`'s
+  reply field) makes the helper compact: `compaction_started`, and POST 2
+  carries `compaction_instructions` verbatim.
+
+**Mutant `bare-send`**: the tree copied as the session proof's mutant is,
+`AssistantPrompt.message(text, document: document)` → `text` in the copy's
+`AssistantSession.swift`, `make app` there, S2 alone on port 4881: it must
+FAIL (exit 1); a copy that did not build exits 2.
+
+**The evaluation** (`assistant_prompt_eval.py`, imported, never a child).
+Launch E: port 4880, `proof-key`, `-ReelcutAssistantModel claude-opus-5-5`,
+`RC_ASSISTANT_BASE_URL` at the RELAY — a thread in the proof's own process
+on 127.0.0.1:0 that takes only `x-api-key: proof-key` (else 401, the value
+never logged), routes `GET /v1/models/*` and `POST /v1/messages*` only, and
+forwards with the real credential less `x-api-key`, `authorization`,
+`host`, `content-length`, `connection` and `accept-encoding`. Each row is its
+own saved project `E<n>.reelcut` (a background plate to 6 s; "Welcome" on
+Titles 0–3 s; a rectangle on Shapes 0–6 s; E5 nests it), judged by
+`get_project` placement only — "unchanged" is each clip's id, track, start,
+duration, kind and content:
+- **E1** "Put a marker called Intro at 3 seconds." → one new marker at
+  1800000 named Intro, clips unchanged. **E2** in E1's window, "Undo that."
+  → the fixture's markers. **E3** playhead 2400000, the title selected,
+  "Split the selected clip at the playhead." → the title split at 2400000,
+  every other clip unchanged. **E4** "Change the title to say Hello
+  Reelcut." → its content, timing kept. **E5** "Inside the nest, move the
+  rectangle so it starts at 1 second." → the nested rectangle at 600000,
+  duration kept, the nest clip unchanged. **E6** "Export this project as a
+  movie to <abs>/E6.mp4." → every question denied (at most 3): no file,
+  exactly one export question, the project unchanged. A turn past 600 s is
+  stopped and FAILs. A row whose session met a cap refusal FAILs `cap:
+  refused at $<spent> of $<cap>`.
+- **H** every POST the relay saw was within `BODY_BYTES_BOUND` (256,000
+  bytes less image data) and `MAX_TOKENS_BOUND` (32,000); a breach FAILs
+  and says the arithmetic is stale. It prints the worst POST priced.
+- **K** (live only) the key's bytes in no file under `work/assistant_prompt/`
+  nor the app log.
+Per row it prints the tools called, the tokens and the dollars at `RATES`,
+then the run's and the ledger's totals.
+
+**The cap.** Per POST, under one lock, the relay prices the WORST case — the
+body less image data at one token per 3 bytes plus 1600 per image, all at
+the cache-write rate, plus the body's `max_tokens` at the output rate — and
+forwards only when settled spend + reserved + that ≤ the cap, else answers
+400 `invalid_request_error` naming the cap; then it settles the reply's real
+usage and appends a ledger line `{run,row,path,status,model,usage,dollars,
+refused}` (never a header or a body). `RATES` is **an upper bound, not a
+quote**: Claude Fable 5.1's $10 input / $50 output per MTok, cache write
+1.25× and cache read 0.1× its input ($12.50 / $1.00) — the priciest model
+`fallbacks: "default"` can bill a turn at. Opus 5.5's own rates are $4.00
+input, $20.00 output and $0.20 cache read per MTok (cache write unlisted),
+from the claude-api skill's model table (cached 2026-06-24, read
+2026-09-27). The headroom arithmetic, printed before the first request:
+the helper sends `max_tokens` 32,000 on every POST and all 85 definitions,
+deferred ones included; the A2 session proof's largest logged body was
+230,340 bytes, bounded at 256,000 ≈ 85,333 tokens. The worst POST is
+85,333 × $12.50 + 32,000 × $50.00 per MTok ≈ $1.07 + $1.60 = $2.67. A row is
+bounded at one cache write of that body ($1.07) + 4 cache reads ($0.34) + 5
+rounds × 2,000 output ($0.50) ≈ $1.91, an estimate that bills every
+definition byte. The floor is the worst POST + 6 rows ≈ $14.11;
+`SUGGESTED_CAP` is $15.00. Below the floor it prints `WARNING: below the
+floor; rows past $<cap − worst> of settled spend will fail naming the cap`
+and still runs.
+
+**Modes.** Without `--live` or `--rehearse`, E1–E6, H and K SKIP "not asked
+(--live)". `--live` needs an explicit `--cap <dollars>` (any positive
+figure; raising it is the runner's decision): without one it prints the
+arithmetic and exits 2 before launching anything; with no key, E1–E6, H and
+K SKIP "host: no key". Live: the relay's upstream is `https://api.anthropic.com`,
+its credential `anthropic_key()` — the ONE read of `ANTHROPIC_API_KEY`, whose
+presence alone is printed — and the ledger `work/assistant_prompt/ledger.jsonl`.
+`--rehearse` runs the same rows with the stand-in upstream, the credential
+`proof-key`, the cap `SUGGESTED_CAP` unless `--cap`, scripted right calls
+(`add_marker`; `undo`; `split` with `clips`; `set_text`; `move_clip` with
+`scope`; `export`) and the ledger `work/assistant_prompt/rehearsal/ledger.jsonl`;
+`--wrong` scripts the mistakes (3000000; no undo; `split` without `clips`;
+"Hello"; no `scope`; `export` again after the deny) and every E row FAILs.
+H runs in rehearsal on the real helper's real bodies — only usage is
+scripted — so rehearsal is what shows the worst POST.
+
+Key safety: every child's environment has `ANTHROPIC_API_KEY`,
+`RC_ASSEMBLYAI_KEY` and `RC_AGENT_PORT` popped. The app and helper get only
+`proof-key` over the existing stdin path; the real key leaves the runner
+only as the relay's `x-api-key` to the live API. Rule H: the proof's own
+process groups only, plus the helper children each app started.
+
+Measured 2026-09-27: `--probe` 11/11; the default run 15/15 with 8 SKIP;
+`--rehearse` 22/22 (K SKIP), H's worst POST priced $2.55 at `RATES`;
+`--wrong` fails E1–E6 (exit 1); `--cap 0.0001` prints the WARNING first,
+fails E1–E6 `cap:` and the stand-in logs 0 POSTs (exit 1); `--live` with no
+`--cap` exits 2 having launched nothing; the `bare-send` mutant's S2 FAILS
+(exit 1). The live run is owed (#157).
+
+```sh
+python3 tools/proof/assistant_prompt_proof.py --probe                   # F1–F7, M1–M4 (make test)
+python3 tools/proof/assistant_prompt_proof.py                           # + S0–S3; E, H, K SKIP
+python3 tools/proof/assistant_prompt_proof.py --rehearse                # + E1–E6, H
+python3 tools/proof/assistant_prompt_proof.py --rehearse --wrong        # every E row FAILs, exit 1
+python3 tools/proof/assistant_prompt_proof.py --rehearse --cap 0.0001   # WARNING; E rows fail `cap:`
+python3 tools/proof/assistant_prompt_proof.py --mutant bare-send        # S2 FAIL, exit 1
+python3 tools/proof/assistant_prompt_proof.py --live --cap 15           # a person, with a key
+```

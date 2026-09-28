@@ -162,14 +162,14 @@ final class AssistantSession {
 
     // MARK: - The person's side
 
-    /// Starts a turn. Only while idle and the helper runs; the phase reads
-    /// `busy` the moment this returns true.
+    /// Starts a turn, `text` behind the window's live context (AI-15). Only
+    /// while idle and the helper runs; `busy` the moment this returns true.
     @discardableResult
     func send(_ text: String) -> Bool {
         guard phase == .idle, process.isRunning else { return false }
         busy = true
         cancelRequested = false
-        write(["type": "send", "text": text])
+        write(["type": "send", "text": AssistantPrompt.message(text, document: document)])
         return true
     }
 

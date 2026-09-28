@@ -1179,8 +1179,11 @@ free.
   through the one serial `writeQueue` (`HelperInput`, so a write after the
   close is nothing), `F_SETNOSIGPIPE` on the write end. Tool requests run ONE
   at a time through `AgentLane.submit` (never `execute`), results spliced
-  verbatim. `send` sets busy BEFORE its write, so the phase reads `busy` the
-  moment it returns true; `turn_started` does not clear `cancelRequested`.
+  verbatim. `send` writes the person's text behind the window's live
+  context, `AssistantPrompt.message(text, document:)` (AI-15; the
+  transcript keeps the bare text), and sets busy BEFORE its write, so the
+  phase reads `busy` the moment it returns true; `turn_started` does not
+  clear `cancelRequested`.
   **Every question is answered exactly once** — Allow/Deny, Stop, `close`,
   the helper's exit, `deinit`, and a hop that reaches a closed, cancelling or
   released session (the `askFirst` closure is `[weak self]` and REPLIES when
@@ -1199,8 +1202,27 @@ free.
   pane alone.
 - `AssistantPrompt.swift` — the core tools loaded up front (`get_project`,
   `render_frame`, `undo`, `redo`; the lane probe's L6 holds each to the
-  assistant's catalog) and the three PLACEHOLDER texts A3 replaces: the
-  system prompt, the search guide and the compaction instructions.
+  assistant's catalog), the system prompt, the search guide, the compaction
+  instructions, `searchTopics`, `sharedIdKinds` and `message(_:document:)`
+  (road map 12 A3). **The drift rule: every fact in a text is INTERPOLATED
+  from the code that decides it or CHECKED against it by `make test`** —
+  never "remember to update the prompt". The texts are Swift literals, not
+  bundled files, so they can interpolate `ReelTime.perSecond`,
+  `AssistantToolTable.rows` (the ask-first and conditional withheld rows)
+  and `AssistantLiveContext.tag`, and `assistant_prompt_proof.py --probe`
+  (rows F1–F7, in `make test`) fails the build's tests when a backticked
+  token is not a tool, an argument or a `get_project` key, a withheld tool
+  is named, an id kind or the timescale is wrong, `searchTopics` does not
+  cover the assistant's catalog but the core tools exactly once, a text
+  holds a blank line (the helper joins system and guide with one) or passes
+  its length bound. Backticks hold identifiers only; literals go in double
+  quotes; no menu path is written by hand. A new tool needs a topic here or
+  F4 fails.
+- `AssistantLiveContext.swift` — the `<reelcut_context>` block each person
+  message carries (spec §11 AI-15): the project's name and path, the open
+  nest, the playhead in ticks and seconds, the selection ascending, each
+  label a key of `get_project`'s answer; `init(document:)` is main only. The
+  system prompt names it by `tag`; F7 holds its text to the template.
 - `AgentServer+DevTools.swift` — the dev tools' seam (road map 11, spec
   §11 V-1/V-2): the handler table, catalog rows and off-main set compiled
   only under `REELCUT_DEV_TOOLS`, which Debug and Release set and
