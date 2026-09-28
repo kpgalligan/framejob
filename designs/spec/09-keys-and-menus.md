@@ -34,8 +34,9 @@
 | ⌘E | Export… |
 | ⌥⌘E | Save Frame… — the frame under the playhead as a PNG, JPEG or HEIC still (road map 2's phase 7a). Export…'s still-image sibling, under the same letter |
 | ⌥⌘N | New Recording… — the recorder panel (road map 3). The same item reads Stop Recording while one runs, paused included, and stops it; a nil-target action on `AppDelegate`, so it resolves with no document open, as New Project does. Pause Recording and Resume Recording have no menu item and no key — they are the status item's rows (R2) |
-| ⌘, | Settings… — Reelcut ▸ Settings…, the app's one window for something PERSISTED beyond view state (road map 6 §5d): one pane, "Transcription", holding the AssemblyAI key, the region and a Verify button. macOS's own place for the item and its own key; the nudge pair below is the BARE `,` and `.`, so nothing is displaced. A nil-target selector on `AppDelegate`, so it resolves with no document open, as New Project does |
+| ⌘, | Settings… — Reelcut ▸ Settings…, the app's one window for something PERSISTED beyond view state (road map 6 §5d): two panes, "Transcription", holding the AssemblyAI key, the region and a Verify button, and under it "Assistant" (road map 12 A2), holding the Anthropic key and the model (§11 AI-8, AI-11) with no Verify. macOS's own place for the item and its own key; the nudge pair below is the BARE `,` and `.`, so nothing is displaced. A nil-target selector on `AppDelegate`, so it resolves with no document open, as New Project does |
 | ⌥⌘I | Toggle inspector |
+| ⌃⌘A | View ▸ Assistant — show the inspector, pick its Assistant tab and focus the composer (road map 12 A2, §11 AI-4). ⌘A is Select All and ⌥⌘A Deselect All; ⌃⌘A was free. Not a toggle: pressed on the Assistant tab it only refocuses the composer |
 | ⇧⌘P | Preview Window — a second window showing the same picture as the canvas, with no overlay (road map 2's phase 8b). A TOGGLE: the item carries a checkmark and the key both opens the window and puts it away |
 | `,` / `.` (⇧ ×10) | Nudge the selection one frame |
 | ⌥-drag clip | Duplicate |
@@ -101,7 +102,8 @@ grouping group because going inside a nest is the third thing you do with
 one), Track (New Track,
 Remove Track, Remove Empty Tracks, Hide/Mute/Lock/Solo), Mark (Add Marker,
 Set In, Set Out, Clear Range, Next/Previous Marker), View (Zoom, Fit,
-Snapping, Safe Areas, Inspector, Timeline Track Height, and — road map 2's
+Snapping, Safe Areas, Inspector, Assistant ⌃⌘A (road map 12 A2: the
+Assistant tab, shown and focused), Timeline Track Height, and — road map 2's
 phase 8, in a group of their own after a separator because both are about the
 PREVIEW rather than about the editor's panes — Preview Quality ▸ (Full · Half ·
 Quarter, a tagged submenu with a checkmark for the current row and no key

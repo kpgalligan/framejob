@@ -123,7 +123,7 @@ def _plist(value):
     return value
 
 
-# tools/proof/harness/main.swift:289-390's `pinDefaults` — every key and value
+# tools/proof/harness/main.swift:289-395's `pinDefaults` — every key and value
 # but `AgentServerEnabled` (the launch turns the server on) — plus each
 # section's collapsed state. Booleans and numbers go as plist fragments, which
 # the argument domain parses into typed values.
@@ -147,6 +147,7 @@ PINS = [(key, _plist(value)) for key, value in [
     ("ReelcutCaptionEngine", "apple"),
     ("ReelcutAssemblyAIRegion", "us"),
     ("ReelcutCaptionStyle", "subtitles"),
+    ("ReelcutAssistantModel", ""),
     ("AppleShowScrollBars", "Always"),
 ]] + [(f"ReelcutInspectorSection.{sid}", _plist(collapsed))
       for sid, collapsed in sorted(SECTIONS.items())]
@@ -163,6 +164,10 @@ NOT_SHOWN = {
                          "recorder panel does not show it and nothing records",
     "RC_ASSEMBLYAI_KEY": "an environment variable, stripped from the child's environment at "
                          "launch",
+    "RCDevAssistantSend": "a dev launch default that runs one assistant turn after launch "
+                          "(DevAssistantLaunch.swift); no screen launches with it",
+    "RCDevAssistantReport": "the report path beside RCDevAssistantSend; no screen launches "
+                            "with it",
 }
 
 # Filed layout defects, each named by its issue. A problem's text is
@@ -222,6 +227,7 @@ def launch(app, port, out, look=None):
     if look is not None:
         argv += [f"-{APPEARANCE_KEY}", look]
     env = bounded.child_env({"RC_AGENT_PORT": str(port)})
+    env.pop("ANTHROPIC_API_KEY", None)
     log = log_path(out, look)
     handle = open(log, "w")
     try:

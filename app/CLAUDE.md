@@ -280,7 +280,17 @@ the key map behind it.
   `+Motion` (Clip ▸ Motion ▸, one `set_video` PER CLIP; inactive stored edge
   titles refreshed at validation), `+Assistant` (`assistantSession()`: the
   window's live session or a new one, stored in the frozen file's
-  `assistant` — spec §11 AI-4 — and closed by the window's `willClose`),
+  `assistant` — spec §11 AI-4 — and closed by the window's `willClose`; its
+  `onEvent` is set there, the ONE line that feeds `assistantTranscript`, which
+  `assistant_tab_proof.py`'s mutant deletes. Road map 12 A2 added the tab's
+  glue: `installAssistant(on:)` from `installInspector`, `attachAssistant`
+  wiring the view's five intents as one-line forwards, `assistantRefresh()`
+  — run LAST in every path that can change the phase or the question, since
+  `AssistantSession.send` goes busy and emits nothing — `assistantSend`
+  (false = not taken, the composer keeps the text), Stop, Allow/Deny, Clear,
+  View ▸ Assistant ⌃⌘A `showAssistant`, and `assistantConfigurationDidChange`,
+  which ends the conversation with a note on a Settings key or model change;
+  the frozen file stores `assistantTranscript` and a weak `assistantView`),
   `+Export` (the
   dialogs), `+SaveFrame` (⌥⌘E; renders off-main on `frameGrabQueue`; passes
   no burn-in), `+PreviewQuality`, `+Eyedropper` and `+ZoomRegion`.
@@ -372,6 +382,10 @@ the key map behind it.
   (`forScale(of:)`): `set_shape` has no action form.
 
 **Inspector.**
+- `InspectorTab.swift` — `InspectorTab` (Clip, Media, Document, Assistant; the
+  raw value is the strip index) and the three kind tests the Clip tab's
+  sections are chosen by; a pure move out of `InspectorPane.swift` (road map
+  12 A2) before `assistant` was added.
 - `InspectorViewController.swift` (frozen: the tab strip, and the PINNED
   container between it and the scroll view that hosts a pane's
   `pinnedBlock`, one generation retired like the strip; the FOOT container
@@ -380,7 +394,10 @@ the key map behind it.
   clears a stale refusal; `selectClipSubTab`
   is a sub-tab pick's one refresh, and `refresh(isLive:)` calls
   `ClipPane.forgetSubTab()` whenever the selection's ids change, spec §11
-  CI-5) · `InspectorRefusalStrip.swift` (spec §11 CI-10: "Refused: " and the
+  CI-5; a changed selection switches to Clip only from the Media and
+  Document tabs, never from the Assistant tab, and `clipPicked()` from any,
+  spec §11 AI-14; `onAssistantView` hands the editor the Assistant tab's
+  view) · `InspectorRefusalStrip.swift` (spec §11 CI-10: "Refused: " and the
   core's sentence verbatim, remembered with the `editedProject` handle it
   was shown under and cleared on the first refresh under another handle or
   a click; `showRefusal` is the editor's forward of
@@ -499,6 +516,30 @@ the key map behind it.
   `rebuild()` destroys every control and preserves no first responder, so a
   control a person TYPES into must live outside `structureSignature` and be
   applied to views that already exist (`MediaPane.arrange()` is the shape).
+- `AssistantPane.swift` · `AssistantView.swift` · `AssistantTranscriptView.swift`
+  · `AssistantTranscript.swift` · `AssistantContextMeter.swift` — the
+  Assistant tab (road map 12 A2, spec §11 AI-4). The pane builds its ONE
+  `AssistantView` in `init`, never in `makeSections()` (a rebuild would take
+  the composer's first responder), calls `onAssistantView` with it, and is
+  exactly the visible height (`== 0` at priority 1 under the controller's
+  `>=`), so the transcript scrolls itself. **The views hold no
+  conversation**: the transcript is `EditorViewController.assistantTranscript`
+  (`AssistantTranscript`, Rasterize's `handleEvent` ported as storage — a
+  delta extends the last entry only while the previous event was the same
+  delta type; `argumentSummary` drops `project`), the question the session's
+  `pendingQuestion`, the session `EditorViewController.assistant`; a floating
+  window later calls `attachAssistant` with the same view. **Return never
+  answers**: Allow and Deny are `OptionButtonControl`s (a click, no key), Send
+  is a 64 pt `AccentButton` with no key equivalent that reads Stop while busy
+  or asking, and the composer's Return sends only while idle and beeps
+  otherwise. No spinner (the harness settles). A label's frame is 2 pt wider
+  than its text each side, so a row that holds a wrapping label is inset by
+  2 pt (`snapshot_ui`'s outside_superview rule). `AssistantTranscriptView` is
+  the flipped document view, one selectable label per entry with
+  `preferredMaxLayoutWidth` set in `layout()`; `AssistantContextMeterView`
+  the inline meter and `figures(_:)`, its three sentences. Accessibility ids
+  `assistant.composer|send|allow|deny|question|clear|settings|nokey` and
+  `assistant.entry.<kind>` are what the proofs read.
 - `MediaPane.swift` · `MediaRowView.swift` (a row and the drag it starts,
   with `MediaDropMode` read from `NSEvent.modifierFlags` at the drop) ·
   `MediaPaneCommands.swift` · `MediaListFilter.swift` (the find band as a
@@ -946,7 +987,7 @@ free.
   `extension AppDelegate { showSettings }` at its foot
   (`CaptionImporter.swift`'s command-at-the-foot precedent, which is why
   `AppDelegate.swift` is untouched). `ExportQueueWindowController`'s mould.
-  One pane, the `Transcription` HEADING that is the content stack's first
+  Two panes: the `Transcription` HEADING that is the content stack's first
   arranged subview — which is what makes the `transcribe` tool's and the
   catalog's "Settings ▸ Transcription" sentence true without either being
   edited. The key goes in through an `NSSecureTextField` and NEVER comes
@@ -961,7 +1002,17 @@ free.
   captured at click time. Text edits, Save, Remove, sync and reopening keep
   Verify enabled only when an effective credential exists and no current
   request is checking those same inputs.
-  **No key set is not an error** anywhere in it.
+  **No key set is not an error** anywhere in it. The second pane,
+  `AssistantSettingsPane.swift` (road map 12 A2), is appended after the
+  Transcription buttons (custom spacing 24) and synced in `show()`; the
+  window takes its store as a second FACTORY, `assistantStore:`
+  (`AssistantConfiguration.store()` by default, a `MemoryStore` in the
+  harness). It mirrors the Transcription pane's key rules (secure field,
+  fixed mask in the placeholder, Save empties the field) with no Verify and
+  no account link (AI-1), holds the model (blank is AI-11's default), and is
+  the ONE poster of `AssistantConfiguration.didChangeNotification` —
+  `key` on Save and Remove, `model` only when `AssistantConfiguration.model`
+  actually changes. The window is wiring-only for it (#58).
 - `PreviewWindowController.swift` — a second `AVPlayerLayer` on the same
   player (measured: two layers both display). It is an **`NSPanel`** (a titled
   window becomes main and every editor selector goes dead), the controller is
@@ -1143,7 +1194,9 @@ free.
   `FileStore` named `anthropic-key`; else `RC_ASSISTANT_BASE_URL` set → an
   EMPTY `MemoryStore`; else the one `AppSupport.directory` line. The store
   first, `ANTHROPIC_API_KEY` second. `model()` is `ReelcutAssistantModel`,
-  else `claude-opus-5-5`; no tool reads or writes it.
+  else `claude-opus-5-5`; no tool reads or writes it. `didChangeNotification`
+  (`userInfo[changeKey]` "key" or "model") is posted by Settings' Assistant
+  pane alone.
 - `AssistantPrompt.swift` — the core tools loaded up front (`get_project`,
   `render_frame`, `undo`, `redo`; the lane probe's L6 holds each to the
   assistant's catalog) and the three PLACEHOLDER texts A3 replaces: the
@@ -1208,7 +1261,15 @@ free.
   release, never inside it, where an assistant call may hold
   `callDocument`. `assistant_answer` never opens a session. The answer is
   the state, the question, the text deltas joined and the other events since
-  the call — never the key or the model.
+  the call — never the key or the model. `assistant_send` without `pane`
+  sends through `EditorViewController.assistantSend`, so the transcript gets
+  the person's line; with `pane` (road map 12 A2) both tools go through the
+  Assistant tab's own controls — the composer and a `performClick` on Send,
+  Allow's or Deny's `mouseDown` with a synthesized click at its centre, Send
+  while it reads Stop — refused by name, changing nothing, when the control
+  is not in a window or is hidden. The pane check comes before the session
+  opens, and the idle check before the click, so a pane send never clicks
+  Stop.
 - `DevAssistantLaunch.swift` — `-RCDevAssistantSend <text>
   -RCDevAssistantReport <path>`, a dev-only launch default (road map 12 A1),
   both from the argument domain alone: after launch, one turn in an untitled
@@ -1351,8 +1412,11 @@ follow the canonical shape: `target(a)` → validate ids → `performGroupedEdit
 → `jsonResult`; failures throw `ToolError` and return in-band
 (`isError: true`). View state and preferences are the one exemption, and it
 is a decision: Preview Quality, the preview window, the export queue, the
-Media tab's search and sort get no mirror, because they edit no project and
-`set_selection` / `export` already are the capability.
+Media tab's search and sort, the Assistant tab (view state; the dev tool
+`select_inspector_tab` shows it in a Release build, and the assistant's own
+calls already are tool calls) and Settings' Assistant pane (the key and the
+model are the person's, spec §11 AI-8, AI-11) get no mirror, because they
+edit no project and `set_selection` / `export` already are the capability.
 
 **State flow.** Views → VC through `on*` closures (`[weak self]`); document →
 observers via `.projectDocumentDidChange` with `userInfo["isLive"]` — live

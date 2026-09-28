@@ -19,7 +19,9 @@
 // `ProjectDocument.makeWindowControllers()` — with synthesized key events
 // through `NSWindow.sendEvent`, and reads `editor.playback.isPlaying`. The
 // beep itself is not observable; S2a and S2b together are the claim: the
-// window returned before `super.sendEvent`, the only path that beeps.
+// window returned before `super.sendEvent`, the only path that beeps. S2h
+// (road map 12 A2) is the Assistant tab's composer, compiled out of the
+// reference build with S1 and S2g.
 import AppKit
 
 final class ProbeDocumentController: NSDocumentController {
@@ -279,6 +281,25 @@ if let (document, editor, window) = openEditor() {
     check("S2g the document's window is an EditorWindow",
           document.windowControllers.first?.window is EditorWindow,
           "\(type(of: window))")
+
+    // h. The Assistant tab's composer (road map 12 A2), shown by View ▸
+    // Assistant's own method: the Space is typed. The proof launches this
+    // probe with a dummy key in `-RCSecretFolder`, so the composer shows.
+    editor.showAssistant(nil)
+    spin(0.3)
+    let composer = editor.assistantView?.composer
+    let composing = composer.map { $0.currentEditor() != nil
+        && window.firstResponder === $0.currentEditor() } ?? false
+    send(key(window: window))
+    let typedH = (window.firstResponder as? NSTextView)?.string ?? "(not a text view)"
+    let playingH = held()
+    check("S2h the Assistant tab's composer being typed into: the Space is typed, play stays "
+            + "paused",
+          composing && typedH == " " && !playingH,
+          "composer is first responder \(composing); field editor string \"\(typedH)\"; "
+            + "isPlaying \(playingH); tab \(editor.inspector?.tab.title ?? "none")")
+    window.makeFirstResponder(editor.view)
+    paused()
     #endif
 }
 

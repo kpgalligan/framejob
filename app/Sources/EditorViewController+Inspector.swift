@@ -52,6 +52,7 @@ extension EditorViewController {
         inspector.onSeek = { [weak self] time in self?.inspectorSeek(time) }
         inspector.onCommand = { [weak self] selector in self?.inspectorCommand(selector) }
         inspector.onSelectAction = { [weak self] id in self?.selectAction(id) }
+        installAssistant(on: inspector)
         NotificationCenter.default.addObserver(
             self, selector: #selector(documentDidRefuse(_:)),
             name: .projectDocumentDidRefuse, object: document)

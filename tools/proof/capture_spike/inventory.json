@@ -103,15 +103,15 @@
   "addMediaFiles:": {
    "verdict": "sheet",
    "code": [
-    "app/Sources/EditorViewController.swift:644",
-    "app/Sources/EditorViewController.swift:653"
+    "app/Sources/EditorViewController.swift:653",
+    "app/Sources/EditorViewController.swift:662"
    ],
    "note": "NSOpenPanel.beginSheetModal; its completion's importMedia can reach FFmpegRewrap's runModal (reached_after)"
   },
   "importCaptions:": {
    "verdict": "sheet",
    "code": [
-    "app/Sources/EditorViewController.swift:873",
+    "app/Sources/EditorViewController.swift:882",
     "app/Sources/CaptionImporter.swift:387"
    ],
    "note": "NSOpenPanel.beginSheetModal; the completion's alerts are sheets"
@@ -119,7 +119,7 @@
   "generateCaptions:": {
    "verdict": "sheet",
    "code": [
-    "app/Sources/EditorViewController.swift:888",
+    "app/Sources/EditorViewController.swift:897",
     "app/Sources/TranscribeSheetController+Commit.swift:180"
    ],
    "note": "presentAsSheet(TranscribeSheetController); beeps with no transcribable clip"
@@ -127,7 +127,7 @@
   "exportCaptions:": {
    "verdict": "sheet",
    "code": [
-    "app/Sources/EditorViewController.swift:889",
+    "app/Sources/EditorViewController.swift:898",
     "app/Sources/CaptionExporter.swift:519"
    ],
    "note": "NSSavePanel.beginSheetModal; beeps with no text track"
@@ -135,7 +135,7 @@
   "consolidateMedia:": {
    "verdict": "sheet",
    "code": [
-    "app/Sources/EditorViewController.swift:871",
+    "app/Sources/EditorViewController.swift:880",
     "app/Sources/EditorViewController+Consolidate.swift:37",
     "app/Sources/EditorViewController+Consolidate.swift:84"
    ],
@@ -160,7 +160,7 @@
   "exportProject:": {
    "verdict": "sheet",
    "code": [
-    "app/Sources/EditorViewController.swift:836",
+    "app/Sources/EditorViewController.swift:845",
     "app/Sources/EditorViewController+Export.swift:33"
    ],
    "note": "presentAsSheet(ExportSheetController); beeps on an empty timeline. Inside the sheet: Save… (preset) runs a runModal (ExportSheetPresets.swift:289), Export… a save panel sheet"
@@ -190,84 +190,84 @@
   "cut:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:849"
+    "app/Sources/EditorViewController.swift:858"
    ],
    "note": "an edit or the pasteboard"
   },
   "copy:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:850"
+    "app/Sources/EditorViewController.swift:859"
    ],
    "note": "an edit or the pasteboard"
   },
   "paste:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:851"
+    "app/Sources/EditorViewController.swift:860"
    ],
    "note": "an edit; a pasted reversed clip can bring the reverse sheet (reached_after)"
   },
   "pasteAttributes:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:852"
+    "app/Sources/EditorViewController.swift:861"
    ],
    "note": "an edit"
   },
   "duplicateClips:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:811"
+    "app/Sources/EditorViewController.swift:820"
    ],
    "note": "an edit or a selection"
   },
   "deleteClips:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:809"
+    "app/Sources/EditorViewController.swift:818"
    ],
    "note": "an edit or a selection"
   },
   "rippleDeleteClips:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:810"
+    "app/Sources/EditorViewController.swift:819"
    ],
    "note": "an edit or a selection"
   },
   "insertMediaAtPlayhead:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:845"
+    "app/Sources/EditorViewController.swift:854"
    ],
    "note": "an edit or a selection"
   },
   "overwriteMediaAtPlayhead:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:846"
+    "app/Sources/EditorViewController.swift:855"
    ],
    "note": "an edit or a selection"
   },
   "selectAllClipsOnTrack:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:847"
+    "app/Sources/EditorViewController.swift:856"
    ],
    "note": "an edit or a selection"
   },
   "selectAll:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:591"
+    "app/Sources/EditorViewController.swift:600"
    ],
    "note": "a selection"
   },
   "selectAfterPlayhead:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:609"
+    "app/Sources/EditorViewController.swift:618"
    ],
    "note": "a selection"
   },
@@ -289,91 +289,91 @@
   "splitAtPlayhead:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:806"
+    "app/Sources/EditorViewController.swift:815"
    ],
    "note": "an edit"
   },
   "trimStartToPlayhead:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:807"
+    "app/Sources/EditorViewController.swift:816"
    ],
    "note": "an edit"
   },
   "trimEndToPlayhead:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:808"
+    "app/Sources/EditorViewController.swift:817"
    ],
    "note": "an edit"
   },
   "freezeFrame:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:812"
+    "app/Sources/EditorViewController.swift:821"
    ],
    "note": "an edit"
   },
   "detachAudio:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:813"
+    "app/Sources/EditorViewController.swift:822"
    ],
    "note": "an edit"
   },
   "addActionAtPlayhead:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:830"
+    "app/Sources/EditorViewController.swift:839"
    ],
    "note": "an edit"
   },
   "closeGapAtPlayhead:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:844"
+    "app/Sources/EditorViewController.swift:853"
    ],
    "note": "an edit"
   },
   "renameClip:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:855"
+    "app/Sources/EditorViewController.swift:864"
    ],
    "note": "an edit (Rename… starts the timeline's inline field)"
   },
   "setClipLabel:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:856"
+    "app/Sources/EditorViewController.swift:865"
    ],
    "note": "an edit"
   },
   "nestClips:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:838"
+    "app/Sources/EditorViewController.swift:847"
    ],
    "note": "an edit"
   },
   "unnestClips:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:839"
+    "app/Sources/EditorViewController.swift:848"
    ],
    "note": "an edit"
   },
   "normalizeClips:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:927"
+    "app/Sources/EditorViewController.swift:936"
    ],
    "note": "an edit"
   },
   "showSpeedSheet:": {
    "verdict": "sheet",
    "code": [
-    "app/Sources/EditorViewController.swift:816",
+    "app/Sources/EditorViewController.swift:825",
     "app/Sources/EditorViewController+Export.swift:108"
    ],
    "note": "presentAsSheet(SpeedSheetController); a reverse committed there brings the reverse sheet (reached_after)"
@@ -381,7 +381,7 @@
   "removeSilences:": {
    "verdict": "sheet",
    "code": [
-    "app/Sources/EditorViewController.swift:883",
+    "app/Sources/EditorViewController.swift:892",
     "app/Sources/SilenceSheetController.swift:527"
    ],
    "note": "presentAsSheet(SilenceSheetController); beeps with no audio"
@@ -389,8 +389,8 @@
   "setTransitionKind:": {
    "verdict": "sheet",
    "code": [
-    "app/Sources/EditorViewController.swift:832",
-    "app/Sources/EditorViewController+Inspector.swift:282"
+    "app/Sources/EditorViewController.swift:841",
+    "app/Sources/EditorViewController+Inspector.swift:283"
    ],
    "note": "an edit; when there is no spare footage at the cut, an alert SHEET (:282) inside the call"
   },
@@ -461,14 +461,14 @@
   "newTrack:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:817"
+    "app/Sources/EditorViewController.swift:826"
    ],
    "note": "an edit"
   },
   "removeTrack:": {
    "verdict": "sheet",
    "code": [
-    "app/Sources/EditorViewController.swift:818",
+    "app/Sources/EditorViewController.swift:827",
     "app/Sources/EditorViewController+Timeline.swift:323"
    ],
    "note": "an edit on an empty track; an alert SHEET when the track holds clips"
@@ -476,133 +476,140 @@
   "removeEmptyTracks:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:819"
+    "app/Sources/EditorViewController.swift:828"
    ],
    "note": "an edit or a playhead move"
   },
   "toggleTrackHidden:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:820"
+    "app/Sources/EditorViewController.swift:829"
    ],
    "note": "an edit or a playhead move"
   },
   "toggleTrackMuted:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:821"
+    "app/Sources/EditorViewController.swift:830"
    ],
    "note": "an edit or a playhead move"
   },
   "toggleTrackLocked:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:822"
+    "app/Sources/EditorViewController.swift:831"
    ],
    "note": "an edit or a playhead move"
   },
   "toggleTrackSolo:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:857"
+    "app/Sources/EditorViewController.swift:866"
    ],
    "note": "an edit or a playhead move"
   },
   "addMarker:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:823"
+    "app/Sources/EditorViewController.swift:832"
    ],
    "note": "an edit or a playhead move"
   },
   "nextMarker:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:826"
+    "app/Sources/EditorViewController.swift:835"
    ],
    "note": "an edit or a playhead move"
   },
   "previousMarker:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:827"
+    "app/Sources/EditorViewController.swift:836"
    ],
    "note": "an edit or a playhead move"
   },
   "setInPoint:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:617"
+    "app/Sources/EditorViewController.swift:626"
    ],
    "note": "view state"
   },
   "setOutPoint:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:625"
+    "app/Sources/EditorViewController.swift:634"
    ],
    "note": "view state"
   },
   "clearInOutRange:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:633"
+    "app/Sources/EditorViewController.swift:642"
    ],
    "note": "view state"
   },
   "zoomIn:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:539"
+    "app/Sources/EditorViewController.swift:548"
    ],
    "note": "view state"
   },
   "zoomOut:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:543"
+    "app/Sources/EditorViewController.swift:552"
    ],
    "note": "view state"
   },
   "zoomToFit:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:547"
+    "app/Sources/EditorViewController.swift:556"
    ],
    "note": "view state"
   },
   "fitTimeline:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:834"
+    "app/Sources/EditorViewController.swift:843"
    ],
    "note": "view state"
   },
   "toggleSnapping:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:573"
+    "app/Sources/EditorViewController.swift:582"
    ],
    "note": "view state"
   },
   "toggleSafeAreas:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:559"
+    "app/Sources/EditorViewController.swift:568"
    ],
    "note": "view state"
   },
   "toggleInspector:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:566"
+    "app/Sources/EditorViewController.swift:575"
+   ],
+   "note": "view state"
+  },
+  "showAssistant:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+Assistant.swift:121"
    ],
    "note": "view state"
   },
   "setTrackHeight:": {
    "verdict": "none",
    "code": [
-    "app/Sources/EditorViewController.swift:581"
+    "app/Sources/EditorViewController.swift:590"
    ],
    "note": "view state"
   },
@@ -862,7 +869,7 @@
    "reached_after": [
     {
      "selector": "openDocument:",
-     "via": "app/Sources/EditorViewController.swift:296",
+     "via": "app/Sources/EditorViewController.swift:305",
      "gate": "app/Sources/EditorViewController+Export.swift:118 — the project has missing media"
     }
    ],
@@ -909,7 +916,7 @@
    ],
    "other_caller": ""
   },
-  "app/Sources/EditorViewController+Inspector.swift:282": {
+  "app/Sources/EditorViewController+Inspector.swift:283": {
    "token": "beginSheetModal",
    "reached_from": [
     "setTransitionKind:"
@@ -945,13 +952,13 @@
    "reached_after": [],
    "other_caller": "app/Sources/EditorViewController+Timeline.swift:44 — the track header's context menu"
   },
-  "app/Sources/EditorViewController.swift:415": {
+  "app/Sources/EditorViewController.swift:424": {
    "token": "presentError",
    "reached_from": [],
    "reached_after": [],
-   "other_caller": "app/Sources/EditorViewController.swift:268 — playback.onError, a failed player rebuild, reported async after any edit; it holds no call open (an app-modal started outside a call services the main queue, V1's S4)"
+   "other_caller": "app/Sources/EditorViewController.swift:277 — playback.onError, a failed player rebuild, reported async after any edit; it holds no call open (an app-modal started outside a call services the main queue, V1's S4)"
   },
-  "app/Sources/EditorViewController.swift:653": {
+  "app/Sources/EditorViewController.swift:662": {
    "token": "beginSheetModal",
    "reached_from": [
     "addMediaFiles:"
@@ -989,7 +996,7 @@
    "reached_after": [
     {
      "selector": "addMediaFiles:",
-     "via": "app/Sources/EditorViewController.swift:655",
+     "via": "app/Sources/EditorViewController.swift:664",
      "gate": "app/Sources/FFmpegRewrap.swift:510 — policy ask and canAsk (false while AgentServerEnabled), after AVFoundation refuses a non-image file (MediaImporter.swift:98)"
     },
     {

@@ -4867,7 +4867,8 @@ def section_hygiene(binary, sources):
           and "AssemblyAIConfiguration.store" not in harness_code,
           "the harness reaches for the shared window or the default store")
     check("S: and the one it does build is handed a MemoryStore and an empty environment",
-          "SettingsWindowController(store: { MemoryStore() }, environment: [:])"
+          "SettingsWindowController(\n        store: { MemoryStore() }, assistantStore: { MemoryStore() }, "
+          "environment: [:])"
           in harness_text, "the harness's settings mode does not inject a store")
     sentences = sorted(
         name for name in os.listdir(sources)
@@ -5842,12 +5843,14 @@ def section_chrome(binary, sources):
               one[0] == two[0] and one[0] != b"", "the two renders differ")
     check("18: light and dark differ — both appearances really were rendered",
           taken[("light", 1)][0] != taken[("dark", 1)][0], "the two appearances are equal")
+    # 610, not 340, since road map 12 A2: Settings' Assistant pane sits under
+    # the Transcription pane in the same stack and the window grows to fit it.
     size = png_size(taken[("light", 1)][0])
     scale = (size[0] / 460.0) if size else 0
-    check(f"18: the PNG is the window's content — 460 × 340 points at the display's backing "
+    check(f"18: the PNG is the window's content — 460 × 610 points at the display's backing "
           f"scale (measured {size!r}, scale {scale:g})",
-          size is not None and size[0] % 460 == 0 and size[1] % 340 == 0
-          and size[0] // 460 == size[1] // 340 and size[0] // 460 >= 1,
+          size is not None and size[0] % 460 == 0 and size[1] % 610 == 0
+          and size[0] // 460 == size[1] // 610 and size[0] // 460 >= 1,
           f"got {size!r}")
 
 

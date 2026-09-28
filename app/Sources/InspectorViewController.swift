@@ -10,7 +10,9 @@ import AppKit
 ///  - a PICKED clip shows the Clip tab, because that is what the user just
 ///    asked about — `clipPicked()` for a click (which switches even when the
 ///    click re-picks the clip that was already selected) and, on top of it, a
-///    selection that changed under an unrelated path (paste, ⌘A, the agent);
+///    selection that changed under an unrelated path (paste, ⌘A, the agent),
+///    from the Media and Document tabs only — the Assistant tab stays, since
+///    the assistant's own calls change the selection mid-turn (spec §11 AI-14);
 ///  - a pane is REBUILT only when the model's shape changes
 ///    (`structureSignature`) and merely refreshed otherwise, so a live canvas
 ///    drag updates every field without tearing down the control the user is
@@ -18,7 +20,7 @@ import AppKit
 ///
 /// The policy used to be three times this size — a tab was disabled when no
 /// selected clip had that aspect, a new selection picked the most relevant
-/// enabled tab, and a pin existed to defeat that pick. Three tabs, all always
+/// enabled tab, and a pin existed to defeat that pick. Four tabs, all always
 /// live, retire all of it: which SECTIONS the Clip tab shows is now
 /// `ClipPane.makeSections()`'s answer, and there is nothing left for a pin to
 /// protect.
@@ -55,6 +57,8 @@ final class InspectorViewController: NSViewController {
     var onCommand: ((Selector) -> Void)?
     /// Select an action of the single selected clip, or nil to leave the mode.
     var onSelectAction: ((UInt32?) -> Void)?
+    /// The Assistant tab's view, the moment `AssistantPane` builds it.
+    var onAssistantView: ((AssistantView) -> Void)?
 
     // MARK: - State
 
@@ -250,6 +254,7 @@ final class InspectorViewController: NSViewController {
         case .clip: made = ClipPane(inspector: self)
         case .media: made = MediaPane(inspector: self)
         case .document: made = DocumentPane(inspector: self)
+        case .assistant: made = AssistantPane(inspector: self)
         }
         panes[tab] = made
         return made
@@ -324,7 +329,7 @@ final class InspectorViewController: NSViewController {
             lastSelection = ids
             toTop = true
             (pane(for: .clip) as? ClipPane)?.forgetSubTab()
-            if !clips.isEmpty, tab != .clip {
+            if !clips.isEmpty, tab == .media || tab == .document {  // AI-14
                 tab = .clip
                 buildTabs()
             }

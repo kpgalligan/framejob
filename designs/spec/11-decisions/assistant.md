@@ -96,3 +96,11 @@ amended by the user's answers in §6).
   variable cannot be persisted in the app's defaults, which is R6-9 (c)'s reason. Risk
   accepted: a person who exports it sends their environment's key, and only that, to the
   server it names.
+- **AI-14 — A selection change that is not a click on a clip leaves the Assistant tab
+  showing; a click on a clip still shows Clip.** The inspector's switch to Clip on a changed
+  selection (`InspectorViewController.refresh(isLive:)`) runs only from the Media and Document
+  tabs. The assistant's own calls change the selection mid-turn, and a tab that jumped to Clip
+  under the person would hide the reply and the ask-first row they are waiting on.
+  `clipPicked()` — a click on a clip in the timeline or canvas — still shows Clip from any
+  tab. Risk accepted: a selection made by an MCP caller or a menu item while the Assistant tab
+  shows does not bring the clip's properties forward; a click does.

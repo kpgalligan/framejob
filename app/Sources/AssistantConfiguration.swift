@@ -120,3 +120,13 @@ enum AssistantConfiguration {
         return chosen
     }
 }
+
+extension AssistantConfiguration {
+    /// Posted by Settings' Assistant pane, and only by it, when the key is
+    /// saved or removed or the model changes: each window's conversation
+    /// ends, since a session keeps what it was opened with (road map 12 A2).
+    static let didChangeNotification = Notification.Name("ReelcutAssistantConfigurationDidChange")
+
+    /// The notification's `userInfo` key; its value is "key" or "model".
+    static let changeKey = "change"
+}

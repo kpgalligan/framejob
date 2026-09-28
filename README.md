@@ -54,7 +54,17 @@ schema, §6 the op table, §7 the architecture.
   band on Z for a zoom or an obscured area, and Fit / 50 % / 100 % / 200 %
   zoom stops. With an action selected, a drag or an arrow-key nudge edits
   that action's end state, as the inspector does.
-- **Inspector** with three tabs — Clip, Media, Document. The Clip tab is a
+- **Inspector** with four tabs — Clip, Media, Document and **Assistant**
+  (View ▸ Assistant, ⌃⌘A): a conversation with a built-in assistant that
+  edits the window's project with the same tools an agent uses, each call
+  its own undo step. It streams its reply and a line per tool call, asks
+  before it writes a file — naming the file, and saying REPLACES when one is
+  already there — and waits for Allow or Deny (a click; Return never answers);
+  Send becomes Stop while it works, Clear starts over, and a meter shows how
+  full the conversation is. It runs on your own Anthropic API key and the
+  model you choose (claude-opus-5-5 unless you pick another), both set in
+  Settings' Assistant pane; changing either starts a new conversation. The
+  Clip tab is a
   selection header — the clip's name, editable there for a single clip and
   the one place a name can be cleared back to what the clip shows, with its
   label dot — and the clip's **action lane**: its actions as numbered bands
@@ -124,7 +134,7 @@ schema, §6 the op table, §7 the architecture.
   cloud engine sends audio off this machine, so the sheet says so before the
   button does anything: which files would be uploaded, how long they are and
   what they would cost at today's published rate. Your API key goes in
-  Reelcut ▸ Settings… (⌘,) — a file only you can read, never a launch
+  Reelcut ▸ Settings… (⌘,), under Transcription — a file only you can read, never a launch
   argument — and what comes back is cached in the project package, one
   transcript per media file, re-used by the next run, with the copy at
   AssemblyAI deleted as soon as it has been read. If every requested media
@@ -316,11 +326,12 @@ Makefile              Build orchestration
 | `Loudness.swift` | BS.1770-4 integrated loudness and true peak, the export gain that follows, and the 16-bit scaler that applies it |
 | `TimelineLayout.swift` · `TimelineSessions.swift` · `TimelineView.swift` | all tick↔point arithmetic; the gesture session structs; the timeline view |
 | `CanvasSessions.swift` · `PreviewCanvasView.swift` · `EditorViewController+PreviewQuality.swift` · `PreviewWindowController.swift` | canvas geometry and gestures; the preview and its overlay; the preview's render size (View ▸ Preview Quality, applied to a copy of the player's composition so the export path cannot see it) and the second preview window, an `NSPanel` carrying a second layer on the same player |
-| `InspectorPane.swift` · `InspectorViewController.swift` · `ClipPane` `MediaPane` `DocumentPane` (with `VideoPane` `AudioPane` `TextPane` `ShapePane` as section factories) | the binding that knows about actions, one file per tab, and the sections the Clip tab composes |
+| `InspectorPane.swift` · `InspectorTab.swift` · `InspectorViewController.swift` · `ClipPane` `MediaPane` `DocumentPane` `AssistantPane` (with `VideoPane` `AudioPane` `TextPane` `ShapePane` as section factories) | the binding that knows about actions, the four tabs, one file per tab, and the sections the Clip tab composes |
 | `MediaRowView.swift` · `MediaListFilter.swift` · `MediaPaneCommands.swift` · `MediaUsage.swift` · `MediaReveal.swift` | the Media tab around its pane: the row and the drag it sources, the find band as a value, the row's commands, the one answer to "is this file used" (which walks the nests), and Reveal in Timeline |
 | `EditorViewController.swift` + `EditorViewController+{Timeline,Canvas,Inspector,Export}.swift` | wiring in the base file, features in extensions |
 | `AgentServer.swift` + `AgentServer+{Arguments,Gate,Parity,Project,Clips,Tracks,Media,Render,History,Silence,Captions,CloudCaptions,Audio,Background,Transitions,Scope,Recording,RecordingArguments,RecordingResult,Graphics,GraphicImports,GraphicRender,DevTools}.swift` · `AgentCatalog.swift` + `AgentCatalog+{Clips,Files,Captions,Audio,Transitions,Graphics,Declarations}.swift` | the MCP endpoint, its handlers, and the tool catalog |
-| `AgentLane.swift` · `AssistantToolTable.swift` · `AssistantSession.swift` · `AssistantConfiguration.swift` · `AssistantPrompt.swift` | the one door every tool call goes through (a lock, one call at a time, and the wait for mouse-up), and the table of tools the coming assistant may not call or must ask about first; the assistant's per-window session over the bundled helper, its key, base URL and model, and its core tools and prompt texts |
+| `AgentLane.swift` · `AssistantToolTable.swift` · `AssistantSession.swift` · `AssistantConfiguration.swift` · `AssistantPrompt.swift` | the one door every tool call goes through (a lock, one call at a time, and the wait for mouse-up), and the table of tools the assistant may not call or must ask about first; the assistant's per-window session over the bundled helper, its key, base URL and model, and its core tools and prompt texts |
+| `AssistantView.swift` · `AssistantTranscriptView.swift` · `AssistantTranscript.swift` · `AssistantContextMeter.swift` · `AssistantSettingsPane.swift` · `EditorViewController+Assistant.swift` | the Assistant tab's views, which hold no conversation; the transcript the window keeps; the context meter; Settings' Assistant pane (key and model); and the glue between the tab and the window's session |
 | `RecordingSetup.swift` · `ScreenRecorder.swift` (with `+Finishing` and `+Content`) · `RecordingLanding.swift` · `ProjectDocument+Recording.swift` · `RecorderPanelController.swift` (with `+Rows` and `+Recording`) · `RecorderStatusItem.swift` · `AppDelegate+Recording.swift` · `AgentServer+Recording.swift` | screen recording (road map 3): the values, the session over ScreenCaptureKit and a second `AVCaptureSession` for the microphone, the landing as ordinary media, the floating non-activating panel with its countdown and meter, the menu-bar status item, and the `record_screen` tool |
 | `AppDelegate.swift` · `EditorWindowController.swift` · `WelcomeWindowController.swift` · `main.swift` | menus (nil-target selectors), window, welcome |
 | `SpeedSheetController.swift` · `RelinkSheetController.swift` · `SilenceSheetController.swift` (with `SilenceDetector.swift` behind it) · `TranscribeSheetController.swift` (+`Cloud` `Commit`) · `SettingsWindowController.swift` | the remaining dialogs, and Reelcut ▸ Settings… |

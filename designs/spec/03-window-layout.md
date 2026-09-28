@@ -44,7 +44,7 @@ and SH-2.
 | Title bar | OS | — | the document name, and its size · rate · edited state as the subtitle |
 | Toolbar | 44 pt | fixed | transport, timecode, canvas zoom, safe guides, Export |
 | Preview canvas | flexible | — | the composition at canvas size, letterboxed in the void |
-| Inspector | 304 pt | 280–440, collapsible (⌥⌘I) | three tabs + collapsible sections |
+| Inspector | 304 pt | 280–440, collapsible (⌥⌘I) | four tabs + collapsible sections |
 | Timeline bar | 36 pt | fixed | the selection block, the clip actions, snap, the output level meter, zoom, S/M/L |
 | Timeline | 300 pt | 140 pt – 60 % of window | ruler, track headers + lanes |
 

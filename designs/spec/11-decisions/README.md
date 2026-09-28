@@ -21,7 +21,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) | 306 | **Chrome, the clip inspector and keys (the sharp pass, road map 9, #35).** SH-1, SH-2, CI-1..CI-15, K-1, K-2. |
 | [`graphics.md`](graphics.md) | 281 | **Graphics (road map 10).** G-1..G-16. |
 | [`dev-tools.md`](dev-tools.md) | 27 | **Dev tools (road map 11).** V-1..V-3: the `REELCUT_DEV_TOOLS` flag and `make dist`, dev tools as ordinary tools, capture by `cacheDisplay`. |
-| [`assistant.md`](assistant.md) | 98 | **The Assistant (road map 12, in progress).** AI-1..AI-13: the bundled helper, one lane, the catalog at launch, the fourth tab, the window's own project, W-9's reach, withheld and ask-first tools, the key, history, undo, the model, a call mid-gesture, the base-URL override. |
+| [`assistant.md`](assistant.md) | 106 | **The Assistant (road map 12, in progress).** AI-1..AI-14: the bundled helper, one lane, the catalog at launch, the fourth tab, the window's own project, W-9's reach, withheld and ask-first tools, the key, history, undo, the model, a call mid-gesture, the base-URL override, the tab kept on a selection change. |
 
 ## Every decision
 
@@ -155,3 +155,4 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | AI-11 | The default model is `claude-opus-5-5` at medium effort | [`assistant.md`](assistant.md) |
 | AI-12 | A tool call that arrives during a live gesture waits for mouse-up, then runs | [`assistant.md`](assistant.md) |
 | AI-13 | The assistant's one base-URL override is `RC_ASSISTANT_BASE_URL`, and with it set no key file is opened | [`assistant.md`](assistant.md) |
+| AI-14 | A selection change that is not a click on a clip leaves the Assistant tab showing; a click still shows Clip | [`assistant.md`](assistant.md) |

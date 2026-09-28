@@ -41,7 +41,7 @@ from mcp import MCP, ToolError  # noqa: E402
 
 WORK = os.path.join(HERE, "work", "v3_tools")
 ROWS = ["L1", "T1", "T2", "T3", "T4", "R1", "R2"]
-TABS = ["clip", "media", "document"]
+TABS = ["clip", "media", "document", "assistant"]
 SUBS = ["text", "shape", "graphic", "picture", "sound", "clip"]
 states = {}
 

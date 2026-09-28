@@ -1625,7 +1625,13 @@ key is set." on a machine whose shell has a real `RC_ASSEMBLYAI_KEY` in it.
 `ReelcutExportChoice`'s terms — ordinary use of the app writes both. Measured
 on this host: 460 × 340 points at backing scale **1** for an offscreen
 window (the same as `welcome`'s), byte-identical across two processes in each
-appearance, light ≠ dark.
+appearance, light ≠ dark. Since road map 12 A2 the window has a second pane,
+Settings' Assistant pane, and the harness hands it a second `MemoryStore`
+(`SettingsWindowController(store: { MemoryStore() }, assistantStore: {
+MemoryStore() }, environment: [:])`, the line `cloud_captions_probe.py`'s
+hygiene section holds it to); `pinDefaults` pins `ReelcutAssistantModel` to
+`""`, the pane's model field. The window is 460 × 610 points now
+(`cloud_captions_probe.py`'s row 18 measures it).
 
 Road map 8's W4b took a fifth render target, in `settings`' shape:
 
@@ -5527,7 +5533,12 @@ Space (its `keyDown` sees it once — whether AppKit then presses it depends on
 Full Keyboard Access, a host setting, so FKA and the press are printed in the
 detail and not scored; #48 is the press's
 hands-on check); (f) an auto-repeat is
-swallowed; (g) the window is an `EditorWindow`. The beep is not observable;
+swallowed; (g) the window is an `EditorWindow`; (h) (road map 12 A2) the
+Assistant tab's composer, shown by `showAssistant` — View ▸ Assistant's own
+method — and first responder, types the Space and play stays paused. For (h)
+the probe runs with a DUMMY key in a `-RCSecretFolder` of its own (so the
+composer shows), `-ReelcutInspectorCollapsed NO`, and `ANTHROPIC_API_KEY` and
+`RC_ASSEMBLYAI_KEY` popped from its environment. The beep is not observable;
 (a) and (b) together are the claim that the window returned before
 `super.sendEvent`.
 
@@ -5537,14 +5548,16 @@ media track is what lets the transport move. Needs `media/A.mov` (a scored
 row when missing), no ffmpeg.
 
 `--baseline <commit>` builds the same probe over `git archive <commit>
-app/Sources` with `-D HARNESS_REFERENCE_BUILD` (S1 and S2g compiled out) in
-`work/space-key/baseline/`, and exits 0 only when EXACTLY S2a and S2b fail
-there. Measured 2026-09-24: 28/28 on the fix; `--baseline b69972e` fails
-exactly S2a and S2b and exits 0. Road map 2 §2 Phase 8's #35 record says why
+app/Sources` with `-D HARNESS_REFERENCE_BUILD` (S1, S2g and S2h compiled out)
+in `work/space-key/baseline/`, and exits 0 only when EXACTLY S2a and S2b fail
+there and no S1, S2g or S2h row is present. Measured 2026-09-24: 28/28 on the
+fix; `--baseline b69972e` fails exactly S2a and S2b and exits 0. Measured
+2026-09-27 with S2h (road map 12 A2): 29/29, and the baseline still exactly
+S2a and S2b. Road map 2 §2 Phase 8's #35 record says why
 S2e scores the hand-off rather than the press.
 
 ```sh
-python3 tools/proof/space_key_proof.py                      # → 28/28
+python3 tools/proof/space_key_proof.py                      # → 29/29
 python3 tools/proof/space_key_proof.py --baseline b69972e   # exit 0 = exactly S2a, S2b FAIL
 ```
 
@@ -5978,7 +5991,7 @@ a light system. A real Light host was not available (the machine's setting was
 not changed).
 
 **The pins.** `PINS` is the offscreen harness's `pinDefaults`
-(`harness/main.swift:289-390`) minus `AgentServerEnabled`, as launch arguments
+(`harness/main.swift:289-395`) minus `AgentServerEnabled`, as launch arguments
 (booleans and numbers as plist fragments, `<false/>`, `<real>304</real>`), plus
 `ReelcutInspectorSection.<id>` for every section id in `app/Sources`
 (`SECTIONS`), each pinned to its FIRST-RUN state: collapsed unless
@@ -5989,11 +6002,17 @@ screens 09 and 10 `expect` a row inside each. Nothing is ever written with
 `defaults`. P2 holds the pins to the tree: the section ids in `app/Sources` are
 exactly `SECTIONS`'s, and every `static let …Key = "Reelcut…"/"RC…"` literal is
 pinned or in `NOT_SHOWN` (with why no captured screen draws it), and every
-`NOT_SHOWN` key is such a literal.
+`NOT_SHOWN` key is such a literal. Road map 12 A1 added three such literals
+and A2 covered them: `ReelcutAssistantModel` is pinned `""` (Settings'
+Assistant pane draws it as its model field), and `RCDevAssistantSend` /
+`RCDevAssistantReport`, the dev launch default no screen launches with, are
+`NOT_SHOWN`.
 
 **The key.** The Settings capture cannot show an AssemblyAI key: the secret
 folder is rebuilt EMPTY before launch (the run refuses to start if it is not
-empty after), `RC_ASSEMBLYAI_KEY` is stripped from the child's environment, the
+empty after), `RC_ASSEMBLYAI_KEY` and `ANTHROPIC_API_KEY` are stripped from the
+child's environment (so the Assistant tab's screen, 11b, shows the no-key
+pointer and Settings' Assistant pane says `No API key is set.` too), the
 Settings field is never filled from the store (`SettingsWindowController.swift`),
 `snapshot_ui` never writes a secure field's text, and screen 02 `expect`s
 `No API key is set.` — if it is not visible, the screen fails and its files
@@ -6031,7 +6050,7 @@ machines need not be.
 `P3.light` and `P3.dark` each instance's end (child alive and the log clean,
 read just before the child is stopped); one row per screen, scored after both
 looks — a pass needs both, and each look first prints an indented progress line
-`  <id> <look>: <state> — <reason>`. 21 rows for the 16 screens.
+`  <id> <look>: <state> — <reason>`. 22 rows for the 17 screens (road map 12 A2 added 11b, the Assistant tab).
 Then `new problems:` with each, `recorder panel up (<look>):`, `scores:`, `digest:`
 (sha256 of the sorted `ID=state` lines) and `out:`; with `--compare`, every PNG
 against the same name in the earlier run — `same`, `differs: N px in [x0,y0,x1,y1]`,
@@ -6329,4 +6348,94 @@ lane's L8 measures `submit`, the one door the session uses, mid-drag.
 ```sh
 python3 tools/proof/assistant_session_proof.py                       # 11/11
 python3 tools/proof/assistant_session_proof.py --mutant no-prepare   # W FAIL, exit 1
+```
+
+## Road map 12's A2 — the Assistant tab (assistant_tab_proof.py, assistant_tab_probe.swift)
+
+The inspector's fourth tab (spec §11 AI-4, AI-7, AI-8, AI-11, AI-14), read
+back two ways: a probe for the arithmetic and structure no script reaches,
+and the built Release app driven through the tab's OWN controls. It works in
+`work/assistant_tab/` and reuses `assistant_session_proof.py`'s stand-in,
+`App`, secret folder and helpers (its `WORK` re-pointed here), prints `<ID>
+ok|FAIL — <detail>` per row and then `n/m`, and scores an instrument that
+cannot run as a FAIL. Safety as the session proof's: every child's
+environment has `ANTHROPIC_API_KEY` and `RC_ASSEMBLYAI_KEY` popped; the only
+keys are dummies in `0600` files in scratch folders; the helper speaks to the
+stand-in or to a dead loopback port.
+
+**P** — `assistant_tab_probe.swift`, compiled AS `main.swift` over
+`app/Sources` minus `main.swift` on `harness/build.sh`'s swiftc line with `-D
+REELCUT_DEV_TOOLS` (a build failure fails every P row), `AgentLane.prepareAtLaunch()`
+first, the Release build's helper copied to `<probe dir>/Contents/Helpers/reelcut-agent`
+(a bare binary's `Bundle.main.bundleURL` is its own folder), run with
+`-RCSecretFolder` holding `probe-dummy-key`, `-ReelcutInspectorCollapsed NO`
+and `RC_ASSISTANT_BASE_URL=http://127.0.0.1:9`:
+- **P1** the transcript over a scripted event list: 16 entries exactly
+  (a text run and a progress run each ONE entry, broken by any other event;
+  `add_marker (at: 1200000, name: P1)` with `project` dropped; `failed: …`;
+  Rasterize's four compaction sentences; `Allowed:` / `Declined:` /
+  `Declined (stop):` with the question's sentence; the error), the usage,
+  two `extended` changes, `argumentSummary`'s `""` / 70-character cut, and
+  Clear and `endConversation` keeping the window size.
+- **P2** the meter's three figures.
+- **P3** `showAssistant`: the Assistant tab, the composer first responder.
+- **P4** on an `AssistantView` in a window of its own: an idle Return sends
+  and empties the composer (the control); with a question shown, Return
+  answers nothing, sends nothing and stops nothing; Send reads Stop; Allow's
+  and Deny's own `mouseDown` answer true, then false, once each.
+- **P5** AI-14: from Media a changed selection shows Clip (the control);
+  from Assistant it stays; `clipPicked()` shows Clip.
+- **P6** a REAL session (the helper runs, nothing is sent): a posted model
+  change closes it, nils `assistant` and writes "The model is now …; the
+  next message starts a new conversation."; a second session is closed by
+  the Clear button, and the transcript empties.
+- **P7** Settings' Assistant pane over `MemoryStore`s and a scratch suite:
+  empty state; Save writes, empties the field, masks the placeholder and posts
+  `key` (the key in no status text); Remove; `claude-opus-5-5` over an unset
+  model posts nothing; a new model writes the suite and posts `model`, and the
+  same text again posts nothing; in a `SettingsWindowController` the
+  Transcription heading is still first and the Assistant pane last.
+
+**Live A** (`-AgentServerEnabled YES`, port 4874, `proof-key` in
+`-RCSecretFolder`, `RC_ASSISTANT_BASE_URL` at the stand-in,
+`-ReelcutInspectorCollapsed NO`), every turn through `assistant_send` /
+`assistant_answer` with `pane: true`, and the tab read back through
+`snapshot_ui`'s inspector dump by accessibility id (`assistant.*`):
+- **L0** no `Reelcut: ` line.
+- **L1** `perform_menu_item View ▸ Assistant` → `select_inspector_tab {}`
+  answers `assistant`; composer, Send and Clear visible, the no-key pointer
+  and the question hidden; no layout problem inside the `AssistantView`.
+- **L2** a scripted `add_marker` turn typed into the composer: `finished`;
+  the entries are exactly person, `add_marker (…`, the reply; the composer is
+  empty; Send reads Send; the marker is on the project.
+- **L3** Deny: the row reads `export writes <D>`, Send reads Stop, Allow and
+  Deny are visible and the tab has no layout problem while asking; after it
+  no file, the row hidden, `Declined: export writes <D>` in the transcript.
+- **L4** Allow over a sentinel E: `export REPLACES <E>`, a movie at E
+  (`ftyp`), `Allowed: …`.
+- **L5** Stop while asking: no file, `Declined (stop): …`.
+- **L6** with the Media tab showing, `assistant_send {pane: true}` is refused
+  `… select_inspector_tab {tab: "assistant"} first.` and the stand-in hears
+  nothing.
+- **K** `proof-key` in no MCP answer, no layout dump and not the log.
+
+**Launch B**, **N1** (the variable set, NO `-RCSecretFolder`: no key, AI-13;
+port 4877): View ▸ Assistant shows "Add your Anthropic API key in Settings
+to use the assistant." and Open Settings…, and neither the composer nor Send.
+
+**Mutant `no-forward`**: the tree copied as the session proof's mutant is,
+the ONE `session.onEvent =` line deleted from
+`EditorViewController+Assistant.swift`, `make app` there, then L1's steps and
+L2 alone: L2 must FAIL (the transcript holds only the person's line) and the
+run exits 1; a copy that did not build exits 2.
+
+Measured 2026-09-27: 16/16; the mutant's L2 FAILS with entries `['person:
+…']` and Send still reading Stop (exit 1). In this agent's shell sandbox the
+process-group kill at cleanup is refused (`PermissionError`, from `killpg` —
+the unchanged session proof hits it too), so these proofs were run outside
+it.
+
+```sh
+python3 tools/proof/assistant_tab_proof.py                        # 16/16
+python3 tools/proof/assistant_tab_proof.py --mutant no-forward    # L2 FAIL, exit 1
 ```

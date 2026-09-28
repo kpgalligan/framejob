@@ -1,15 +1,16 @@
 # Road map 12 — the Assistant tab
 
 **Status: IN PROGRESS. PROPOSED 2026-09-27; the user answered §6 the same day. §4's decisions
-are recorded in spec §11 (`11-decisions/assistant.md`, AI-1..AI-13) and A0 ran the same day
+are recorded in spec §11 (`11-decisions/assistant.md`, AI-1..AI-14) and A0 ran the same day
 (§7). A1 is built (§8): the lane, the helper and its build, and the session with its two dev
-tools and end-to-end proof. A2 (the Assistant tab) is next; until it lands there is no
-assistant a person can use.** This is the design the user asked for:
+tools and end-to-end proof. A2 is built (§9): the Assistant tab, View ▸ Assistant ⌃⌘A and
+Settings' Assistant pane, so a person can use the assistant. A3 (the prompt texts) is next.**
+This is the design the user asked for:
 an AI agent in the editor, "designed in the same way that the agent for
 `~/devel/rasterize` is". §1 is what Rasterize built. §2 is what carries over unchanged.
 §3 is what Reelcut needs that Rasterize did not. §4 is the decisions §11 must record
 before any code is written. §5 is the phases. §6 is the user's answers. §7 is A0's record.
-§8 is A1's record.
+§8 is A1's record. §9 is A2's record.
 
 ## 1. What Rasterize built
 
@@ -728,3 +729,115 @@ no `-RCSecretFolder` no key file is opened (AI-8's R6-9 made explicit).
   in `UIMenuTable.swift`) and the `ANTHROPIC_API_KEY` override (no proof child may carry it).
 
 **A1 is closed.** Its three parts are built and proven; A2, the Assistant tab, is next.
+
+## 9. A2 record (2026-09-27)
+
+**Decision first.** Spec §11 AI-14 was recorded before any code: a selection change that is not
+a click on a clip leaves the Assistant tab showing (the assistant's own calls change the
+selection mid-turn); a click on a clip still shows Clip. The first code change was the pure
+move of `InspectorTab` out of `InspectorPane.swift` into `InspectorTab.swift` (73 lines),
+gated alone at the typecheck baseline (0 errors, 7 warnings) before `case assistant` was added.
+
+**What landed.**
+- The tab. `AssistantPane.swift` (45 lines) builds its one `AssistantView` in `init`, never in
+  `makeSections()`, hands it to the editor through `InspectorViewController.onAssistantView`,
+  and is exactly the visible height (`== 0` at priority 1). `AssistantView.swift` (299): the
+  context strip with Clear, the transcript, the ask-first row ("The assistant asks first:", the
+  question's sentence, Allow and Deny as `OptionButtonControl`s), the composer ("Ask about or
+  edit this project…") with a 64 pt `AccentButton` Send that reads Stop while busy or asking,
+  and the no-key pointer ("Add your Anthropic API key in Settings to use the assistant." and
+  Open Settings…). It holds no conversation (AI-4). `AssistantTranscriptView.swift` (121): the
+  flipped document view, one selectable wrapping label per entry, scrolled to the newest.
+  `AssistantTranscript.swift` (170): Rasterize's `handleEvent` as storage — person, reply,
+  progress, meta and error entries, a delta extending the last entry only while the previous
+  event was the same delta type, `argumentSummary` (sorted, `project` dropped, 70 characters),
+  `Allowed:` / `Declined:` / `Declined (<by>):` with the question's sentence, Rasterize's four
+  compaction sentences, and the context usage. `AssistantContextMeter.swift` (105):
+  `AssistantContextUsage` and the inline meter, restyled (a square 3 pt bar, coral past 80%).
+- The glue. `EditorViewController.swift` (frozen) stores `assistantTranscript` and a weak
+  `assistantView`; `EditorViewController+Inspector.swift` gains one line,
+  `installAssistant(on:)`; `EditorViewController+Assistant.swift` (145) sets the session's
+  `onEvent` (the transcript, then `assistantRefresh()`), attaches the view (five one-line
+  forwards), and holds `assistantSend` / Stop / Allow-Deny / Clear, `assistantRefresh()` (run
+  last in each path, since `send` goes busy and emits nothing), `showAssistant` and
+  `assistantConfigurationDidChange`, which ends a live conversation with "The API key
+  changed; …" or "The model is now <m>; the next message starts a new conversation.".
+  `InspectorViewController.swift` (frozen): `onAssistantView`, the pane's case, and AI-14 — the
+  changed-selection switch runs only from Media and Document.
+- Settings. `AssistantSettingsPane.swift` (207): the Anthropic key through a secure field never
+  shown back (the Transcription pane's rules: the fixed mask in the placeholder, Save empties
+  the field, "No API key is set." is not an error), the model (blank is AI-11's default), no
+  Verify and no account link (AI-1). It alone posts `AssistantConfiguration.didChangeNotification`
+  (`key` on Save and Remove, `model` only when `AssistantConfiguration.model` changes).
+  `SettingsWindowController.swift` (462, wiring only, #58 open): `assistantStore:`, the pane
+  after the buttons row (spacing 24), `sync()` in `show()`.
+- The menu. View ▸ Assistant ⌃⌘A after Hide Inspector (`AppDelegate+Menus.swift`, 566);
+  `UIMenuTable.swift` and `inventory.json` gain `showAssistant:` (`none`, "view state"). Every
+  `inventory.json` ref into `EditorViewController.swift` and `EditorViewController+Inspector.swift`
+  was re-pointed from the A0 tree by a line map (A1 had left `sites` and two `sheet` rows'
+  `code` stale: 415→424, 653→662, 282→283).
+- The dev tools. `assistant_send` and `assistant_answer` take `pane`: the composer and Send,
+  Allow's or Deny's own `mouseDown`, Send while it reads Stop — refused by name, opening and
+  changing nothing, when the control is not on screen. Without `pane`, `assistant_send` sends
+  through `assistantSend`, so the transcript has the person's line; its three A1 refusals keep
+  their sentences.
+- Instruments. `assistant_tab_probe.swift` and `assistant_tab_proof.py` (new); `space_key`'s
+  S2h; the harness's settings mode and `pinDefaults`; `cloud_captions_probe.py`'s harness
+  string and its Settings photograph's size (460 × 610 now); `screens.py`'s pin and two
+  `NOT_SHOWN` rows (P2 had failed since A1 on the three literals) and its `ANTHROPIC_API_KEY`
+  pop; `v3_tools.py`'s tab list; screen 11b and screen 02's prose.
+- Documents: spec §4.3, §3, §9, §7.4, §7.9 and the index; `app/CLAUDE.md`; the README;
+  `tools/proof/README.md`.
+
+**What was measured.** Every app and probe ran with `ANTHROPIC_API_KEY` and
+`RC_ASSEMBLYAI_KEY` out of its environment.
+- `make typecheck`: 0 errors and 7 warnings (the baseline); `tsc --noEmit` printed nothing.
+  `make lint` was clean. `make test` exited 0: 73 cargo test result lines, 968 passed, 0 failed,
+  and the lane proof 12/12 (its probe over 272 sources). `make app` built.
+- The Release app on port 4875 (`-RCSecretFolder` a scratch folder) logged no `Reelcut: `
+  line; `op_argument_proof.py` passed 152/152; `v2_menu.py --only H` passed H1–H4 (0 problems
+  over 146 leaves, 94 live selectors, 94 rows, 46 grep sites).
+- `assistant_tab_proof.py` scored 16/16: P1–P7 in the probe (P1's 16 entries exact, two
+  `extended` changes; P4's Return answering nothing with the idle Return as the control; P5's
+  Media control switching to Clip; P6's real session closed by a posted model change and by
+  the Clear button; P7's no-op model commits posting nothing); L0–L6 and K live (L2's entries
+  exactly person, `add_marker (at: 1200000, name: L2 marker)`, the reply; L3's row and Stop,
+  then `Declined: …`; L4's movie over the sentinel; L5's `Declined (stop): …`; L6 refused with
+  the stand-in silent; `proof-key` in none of 23 answers and 8 dumps); N1's no-key pointer.
+- Made to fail on purpose: `--mutant no-forward` built its copy in 106 s; L2 FAILED with the
+  entries `['person: Put a marker at two seconds.']` and Send still reading Stop; exit 1.
+- The A1 proofs: `assistant_session_proof.py` 11/11 (K2's "No Anthropic API key is set."
+  unchanged); `assistant_helper_proof.py` 6/6, exit 0.
+- `space_key_proof.py` 29/29 with S2h; `--baseline b69972e` still fails exactly S2a and S2b.
+  `v3_tools.py --only L,T` 5/5.
+- `cloud_captions_probe.py --only hygiene,chrome,settings_verify` 144/145: the one failure is
+  row 18's `project.yml` diff, which predates this phase (road map 11 V0's Distribution
+  `configs:` block; `project.yml` is untouched here) — #156.
+- `screens.py --only 02-settings,11b-assistant-tab`: 7/7, both screens in both looks, P2
+  passing (27 key literals: 20 pinned, 7 not shown). The PNGs were looked at. Screen 11b has 0
+  layout problems. Screen 02 has 30: the Transcription pane's 7 per look, as before, and the
+  Assistant pane's 8 per look, the same two kinds because the pane mirrors it — the heading,
+  "API key:", "Model:", the status line and the explanation overhang 2 pt (#140), and the key,
+  model and buttons rows are ambiguous stack views (#143); both issues have a comment.
+- Found by the instruments and fixed before they passed: the context meter's labels and the
+  no-key row's label overhung by 2 pt (inset by 2 pt), and the Allow/Deny row was ambiguous
+  while shown (it hugs its buttons now; L3 checks the tab while asking).
+
+**Review.** The implementer read the change back against the spec; the pipeline's reader
+review has not run on it yet.
+
+**Limits.**
+- Every turn was against the stand-in; nothing reached api.anthropic.com.
+- The app-launching proofs ran outside this agent's shell sandbox, where cleanup's `killpg`
+  is refused (`PermissionError`; the unchanged session proof hits it too).
+- The prompt texts are still A1's placeholders (A3).
+
+**Owed.** A3 (the prompt texts) and A4 (`dist_check.py`'s helper rows, the ADR, the archive).
+The person checks: typing a real conversation with a real key, and how the tab reads at a
+glance.
+
+**Issues filed.** #151 Chat Settings (compaction threshold, clearing tool results) are not
+offered; #152 a question asked while the tab is hidden draws no attention; #153 the
+transcript cannot be selected across entries; #154 the composer is single-line; #155 screens
+03 and 11 still describe three tabs; #156 the cloud probe's row 18. Comments on #140 and
+#143 for Settings' Assistant pane.

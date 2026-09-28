@@ -80,6 +80,10 @@ final class EditorViewController: NSViewController {
     /// owned outside any view), once asked for; `+Assistant` holds the rest.
     /// Stored here for `previewWindow`'s reason: an extension cannot hold it.
     var assistant: AssistantSession?
+    /// Its transcript, and the view drawing it (road map 12 A2): the view
+    /// holds none of the conversation (AI-4), so both are kept here.
+    let assistantTranscript = AssistantTranscript()
+    weak var assistantView: AssistantView?
 
     // MARK: - Panes
 

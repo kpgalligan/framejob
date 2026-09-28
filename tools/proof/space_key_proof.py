@@ -12,9 +12,15 @@ app's own window with synthesized Space events and reads whether play
 toggled.
 
 `--baseline <commit>` builds the same probe over `git archive <commit>
-app/Sources` with `-D HARNESS_REFERENCE_BUILD` (S1 and S2g compiled out) and
-exits 0 only when EXACTLY the rows in `BASELINE_EXPECTED` fail there and no S1
-or S2g row is present — the fix is what S2a and S2b measure, and only they.
+app/Sources` with `-D HARNESS_REFERENCE_BUILD` (S1, S2g and S2h compiled out)
+and exits 0 only when EXACTLY the rows in `BASELINE_EXPECTED` fail there and
+no S1, S2g or S2h row is present — the fix is what S2a and S2b measure, and
+only they.
+
+S2h (road map 12 A2) is the Assistant tab's composer. The probe runs with a
+DUMMY key in a `-RCSecretFolder` of its own (so the composer shows),
+`-ReelcutInspectorCollapsed NO`, and ANTHROPIC_API_KEY and RC_ASSEMBLYAI_KEY
+popped from its environment: no person's key is read.
 """
 
 import json
@@ -148,8 +154,17 @@ def probe_checks(sources, out, paths, reference=False):
         os.remove(answer)
     with open(request, "w") as f:
         json.dump(paths, f, indent=2)
-    result = subprocess.run([binary, request, answer], capture_output=True, text=True,
-                            timeout=300)
+    secrets = os.path.join(out, "secrets")
+    shutil.rmtree(secrets, ignore_errors=True)
+    os.makedirs(secrets)
+    with open(os.path.join(secrets, "anthropic-key"), "w") as f:
+        f.write("space-key-dummy-key\n")
+    env = dict(os.environ)
+    env.pop("ANTHROPIC_API_KEY", None)
+    env.pop("RC_ASSEMBLYAI_KEY", None)
+    result = subprocess.run([binary, request, answer, "-RCSecretFolder", secrets,
+                             "-ReelcutInspectorCollapsed", "NO"],
+                            capture_output=True, text=True, timeout=300, env=env)
     if result.returncode != 0 or not os.path.exists(answer):
         check("the probe runs", False, (result.stdout + result.stderr).strip()[-400:])
         return None
@@ -157,7 +172,7 @@ def probe_checks(sources, out, paths, reference=False):
         rows = json.load(f)["rows"]
     groups = ["S2a", "S2b", "S2c", "S2d", "S2e", "S2f"]
     if not reference:
-        groups = ["S1", "S2g"] + groups
+        groups = ["S1", "S2g"] + groups + ["S2h"]
     check(f"the probe answers every row group ({', '.join(groups)} present)",
           all(any(r["name"].startswith(g + " ") for r in rows) for g in groups),
           f"{len(rows)} rows")
@@ -194,13 +209,13 @@ def baseline(commit):
         return 1
     failed = sorted({r["name"].split(" ")[0] for r in rows if not r["ok"]})
     absent = [r["name"] for r in rows
-              if r["name"].startswith("S1 ") or r["name"].startswith("S2g ")]
+              if r["name"].startswith(("S1 ", "S2g ", "S2h "))]
     structural = [n for n, ok in RESULTS if not ok and not n.startswith("S")]
     if failed == sorted(BASELINE_EXPECTED) and not absent and not structural:
         print(f"BASELINE PASS: exactly {', '.join(BASELINE_EXPECTED)} FAILED on {commit} and "
               f"nothing else did, {elapsed:.0f} s")
         return 0
-    print(f"BASELINE FAILURE: failed {failed} (want {BASELINE_EXPECTED}), S1/S2g rows "
+    print(f"BASELINE FAILURE: failed {failed} (want {BASELINE_EXPECTED}), S1/S2g/S2h rows "
           f"present {absent}, other failures {structural}, {elapsed:.0f} s")
     return 1
 

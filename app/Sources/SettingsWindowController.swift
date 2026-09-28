@@ -16,10 +16,11 @@ import AppKit
 /// the Window menu opens it, so AppKit's own row is the only way back to a
 /// window the person has buried.
 ///
-/// **One pane for now, "Transcription".** §5d says so, and this build takes
-/// it as a HEADING inside a window titled Settings rather than as a tab bar
-/// with one tab — a tab strip with a single tab is chrome that says nothing
-/// and has to be torn out when the second pane arrives. The heading is the
+/// **Two panes, "Transcription" and "Assistant"** (road map 12 A2's
+/// `AssistantSettingsPane`, below the first). §5d's one pane was taken as a
+/// HEADING inside a window titled Settings rather than as a tab bar with one
+/// tab, and the second is a second heading in the same stack. The
+/// Transcription heading is the
 /// first arranged subview of the content, which is what makes the sentence
 /// the `transcribe` tool and its catalog entry both print — the one that
 /// sends a caller to Settings and then to Transcription — true without
@@ -101,6 +102,8 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
     /// The window's one stack: the heading is its first arranged subview,
     /// which is the structural claim a probe reads.
     let content = NSStackView()
+    /// Settings' Assistant pane, after the Transcription pane's buttons.
+    let assistantPane: AssistantSettingsPane
 
     private(set) var saveButton: NSButton!
     private(set) var removeButton: NSButton!
@@ -109,12 +112,15 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
 
     init(
         store: @escaping () -> any SecretStore = { AssemblyAIConfiguration.store() },
+        assistantStore: @escaping () -> any SecretStore = { AssistantConfiguration.store() },
         defaults: UserDefaults = .standard,
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) {
         self.store = store
         self.defaults = defaults
         self.environment = environment
+        assistantPane = AssistantSettingsPane(
+            store: assistantStore, defaults: defaults, environment: environment)
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: Self.windowWidth, height: 340),
             styleMask: [.titled, .closable], backing: .buffered, defer: false)
@@ -187,6 +193,8 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         for view in [headingLabel, keyRow, regionRow, statusLabel, explanationLabel, buttons] {
             content.addArrangedSubview(view)
         }
+        content.addArrangedSubview(assistantPane)
+        content.setCustomSpacing(24, after: buttons)
         content.translatesAutoresizingMaskIntoConstraints = false
 
         let root = NSView(
@@ -222,6 +230,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
     func show() {
         applyBackground()
         sync()
+        assistantPane.sync()
         showWindow(nil)
         window?.makeKeyAndOrderFront(nil)
     }

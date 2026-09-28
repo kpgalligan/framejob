@@ -487,6 +487,10 @@ extension AppDelegate {
             item(
                 "Hide Inspector", #selector(EditorViewController.toggleInspector(_:)), "i",
                 [.command, .option]))
+        menu.addItem(
+            item(
+                "Assistant", #selector(EditorViewController.showAssistant(_:)), "a",
+                [.command, .control]))
         menu.addItem(submenuItem(trackHeightMenu()))
         menu.addItem(.separator())
         // Road map 2's phase 8: a group of their own, because both are about

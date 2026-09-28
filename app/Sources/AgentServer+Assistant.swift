@@ -5,7 +5,9 @@ import AppKit
 /// §11 V-1..V-2): type a message into a project window's assistant session
 /// and wait for its turn, and answer the ask-first question it stopped on
 /// (Allow, Deny) or Stop it. They are how a proof drives a real turn against
-/// the stand-in server; the person's own door is A2's pane.
+/// the stand-in server; the person's own door is A2's Assistant tab, and
+/// with `pane` both go through that tab's own composer, Send, Allow and Deny
+/// (road map 12 A2), refused by name when the control is not on screen.
 ///
 /// **Both run on the SERVER thread** (`devOffMainTools`), under the lane's
 /// lock, which `serve` took on this thread. The wait RELEASES it
@@ -29,9 +31,12 @@ extension AgentServer {
             throw ToolError(message: "text must not be empty.")
         }
         let timeout = try assistantTimeout(a)
+        let pane = try boolArg(a, "pane") ?? false
         let (session, project, cursor) = try onMain {
             () throws -> (AssistantSession, Any, Int) in
             let (editor, project) = try self.assistantEditor(a)
+            // With `pane`, the tab must be showing BEFORE anything is opened.
+            let view = try pane ? Self.visibleAssistantView(editor, "composer", \.composer) : nil
             let session: AssistantSession
             switch editor.assistantSession() {
             case .failure(let error): throw ToolError(message: error.message)
@@ -39,7 +44,9 @@ extension AgentServer {
             }
             guard session.phase == .idle else { throw ToolError(message: Self.midTurn) }
             let cursor = session.events.count
-            guard session.send(text) else {
+            if let view {
+                try Self.sendThroughComposer(view, text, editor)
+            } else if !editor.assistantSend(text) {
                 throw ToolError(
                     message: "The assistant helper is not running; assistant_send again starts "
                         + "a new conversation.")
@@ -57,6 +64,7 @@ extension AgentServer {
             throw ToolError(message: "answer must be allow, deny or stop (got \"\(raw)\").")
         }
         let timeout = try assistantTimeout(a)
+        let pane = try boolArg(a, "pane") ?? false
         let (session, project, cursor) = try onMain {
             () throws -> (AssistantSession, Any, Int) in
             let (editor, project) = try self.assistantEditor(a)
@@ -70,12 +78,19 @@ extension AgentServer {
                 guard session.phase == .busy || session.phase == .asking else {
                     throw ToolError(message: "No turn is running, so there is nothing to stop.")
                 }
-                session.cancel()
+                if pane {
+                    try Self.stopThroughPane(editor, session)
+                } else {
+                    session.cancel()
+                }
+            } else if pane {
+                guard session.pendingQuestion != nil else {
+                    throw ToolError(message: Self.noQuestion)
+                }
+                try Self.answerThroughPane(editor, session, allow: raw == "allow")
             } else {
                 guard session.answer(raw == "allow") else {
-                    throw ToolError(
-                        message: "No question is pending: allow and deny answer the "
-                            + "assistant's ask-first question.")
+                    throw ToolError(message: Self.noQuestion)
                 }
             }
             return (session, project, cursor)
@@ -83,9 +98,87 @@ extension AgentServer {
         return try jsonResult(assistantWait(session, project, cursor, timeout))
     }
 
+    private static let noQuestion =
+        "No question is pending: allow and deny answer the assistant's ask-first question."
+
     private static let midTurn =
         "The assistant is in the middle of a turn: assistant_answer answers its question or "
         + "stops it."
+
+    // MARK: - Through the pane
+
+    /// The Assistant tab's view, when `control` (and Send) is in a window
+    /// and not hidden; else refused by name, changing nothing. Main thread.
+    private static func visibleAssistantView(
+        _ editor: EditorViewController, _ name: String,
+        _ control: KeyPath<AssistantView, some NSView>
+    ) throws -> AssistantView {
+        func onScreen(_ view: NSView) -> Bool {
+            view.window != nil && !view.isHiddenOrHasHiddenAncestor
+        }
+        guard let view = editor.assistantView, onScreen(view[keyPath: control]),
+            name == "Allow" || name == "Deny" || onScreen(view.sendButton)
+        else {
+            throw ToolError(
+                message: "The Assistant tab's \(name) is not on screen: "
+                    + "select_inspector_tab {tab: \"assistant\"} first.")
+        }
+        return view
+    }
+
+    /// The composer set to `text` (any edit ended) and Send clicked, as the
+    /// person would. Refused when the composer still holds the text after.
+    private static func sendThroughComposer(
+        _ view: AssistantView, _ text: String, _ editor: EditorViewController
+    ) throws {
+        if view.composer.currentEditor() != nil { view.window?.endEditing(for: view.composer) }
+        view.composer.stringValue = text
+        editor.assistantRefresh()
+        view.sendButton.performClick(nil)
+        guard view.composer.stringValue != text else {
+            throw ToolError(
+                message: "The Assistant tab's Send did not take the message, so nothing was "
+                    + "sent.")
+        }
+    }
+
+    /// Allow or Deny through the control's own `mouseDown`, at its centre.
+    private static func answerThroughPane(
+        _ editor: EditorViewController, _ session: AssistantSession, allow: Bool
+    ) throws {
+        editor.assistantRefresh()
+        let name = allow ? "Allow" : "Deny"
+        let view = try visibleAssistantView(
+            editor, name, allow ? \AssistantView.allowButton : \AssistantView.denyButton)
+        let control: NSView = allow ? view.allowButton : view.denyButton
+        let centre = control.convert(
+            NSPoint(x: control.bounds.midX, y: control.bounds.midY), to: nil)
+        guard let window = control.window,
+            let event = NSEvent.mouseEvent(
+                with: .leftMouseDown, location: centre, modifierFlags: [],
+                timestamp: ProcessInfo.processInfo.systemUptime,
+                windowNumber: window.windowNumber, context: nil, eventNumber: 0,
+                clickCount: 1, pressure: 1)
+        else {
+            throw ToolError(message: "Could not make a click for the \(name) button.")
+        }
+        control.mouseDown(with: event)
+        guard session.pendingQuestion == nil else {
+            throw ToolError(message: "The \(name) button did not answer the question.")
+        }
+    }
+
+    /// Stop: a click on Send while it reads Stop.
+    private static func stopThroughPane(
+        _ editor: EditorViewController, _ session: AssistantSession
+    ) throws {
+        editor.assistantRefresh()
+        let view = try visibleAssistantView(editor, "Stop button", \.sendButton)
+        guard view.sendButton.title == "Stop" else {
+            throw ToolError(message: "The Assistant tab's Send does not read Stop.")
+        }
+        view.sendButton.performClick(nil)
+    }
 
     /// `timeout`, seconds: 120 when absent, else 1…600.
     private func assistantTimeout(_ a: [String: Any]) throws -> Double {
@@ -179,6 +272,12 @@ extension AgentServer {
                     "type": "number",
                     "description": "Seconds to wait for the turn, 1 to 600 (default 120).",
                 ],
+                "pane": [
+                    "type": "boolean",
+                    "description": "Type into the Assistant tab's composer and click its Send "
+                        + "instead (default false). Refused, opening nothing, unless the tab "
+                        + "is showing (select_inspector_tab {tab: \"assistant\"}).",
+                ],
             ], required: ["text"])
     }
 
@@ -200,6 +299,12 @@ extension AgentServer {
                 "timeout": [
                     "type": "number",
                     "description": "Seconds to wait for the turn, 1 to 600 (default 120).",
+                ],
+                "pane": [
+                    "type": "boolean",
+                    "description": "Answer through the Assistant tab's own Allow and Deny "
+                        + "buttons, or its Send while it reads Stop (default false). Refused, "
+                        + "changing nothing, when the control is not on screen.",
                 ],
             ], required: ["answer"])
     }

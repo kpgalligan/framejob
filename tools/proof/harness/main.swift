@@ -378,6 +378,11 @@ enum Harness {
             // `transcribe` hands the card `MemoryDefaults` and no other mode
             // builds the card.
             "ReelcutCaptionStyle": "subtitles",
+            // Settings' Assistant pane's model field (`AssistantConfiguration.modelKey`,
+            // road map 12 A2), a literal for the recorder keys' reason: written
+            // by ordinary use whenever a person chooses a model, and drawn by
+            // the `settings` mode. Blank is AI-11's default.
+            "ReelcutAssistantModel": "",
             "AgentServerEnabled": false,
             // AppKit picks legacy (16 pt, always visible) or overlay scrollers
             // by whether a MOUSE is attached, and the inspector pane is 16 pt
@@ -1032,7 +1037,8 @@ Harness.registerFonts(URL(fileURLWithPath: arguments[0]).deletingLastPathCompone
 // launch arguments that would have made `store()` safe.
 #if !HARNESS_REFERENCE_BUILD
 if arguments[1] == "settings" {
-    let settings = SettingsWindowController(store: { MemoryStore() }, environment: [:])
+    let settings = SettingsWindowController(
+        store: { MemoryStore() }, assistantStore: { MemoryStore() }, environment: [:])
     settings.show()
     for _ in 0..<10 { RunLoop.current.run(until: Date().addingTimeInterval(0.05)) }
     guard let root = settings.window?.contentView else { exit(3) }

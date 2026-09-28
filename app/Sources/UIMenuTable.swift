@@ -97,6 +97,7 @@ extension UIMenu {
         "toggleSnapping:": .plain,
         "toggleSafeAreas:": .plain,
         "toggleInspector:": .plain,
+        "showAssistant:": .plain,
         "setTrackHeight:": .plain,
         "setPreviewQuality:": .plain,
         "togglePreviewWindow:": .window,
