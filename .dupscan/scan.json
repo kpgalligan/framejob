@@ -1,0 +1,592 @@
+{
+  "schema": 1,
+  "repo": "/Users/kevingalligan/devel/reelcut",
+  "commit": "489b793e417ed5ed54dbf48adb1169cd52a6d253",
+  "languages": [
+    "rust",
+    "swift"
+  ],
+  "roots": [
+    "app/Sources",
+    "core/src",
+    "core/tests",
+    "graphic/src",
+    "graphic/tests"
+  ],
+  "sweepRoots": [
+    "app/Sources",
+    "core/src",
+    "graphic/src"
+  ],
+  "ignore": [
+    {
+      "path": "build",
+      "reason": "Git-ignored Xcode build output; only a small share of it copies tracked files.",
+      "evidence": [
+        "shadow_copies: working-tree-only, ratio 0.07, originals graphic/tests/graphics 12, tools/proof/graphics_spike/graphics 10, docs 2",
+        "CLAUDE.md: make app → build/Build/Products/Release/Reelcut.app"
+      ]
+    },
+    {
+      "path": "designs/design_handoff_clip_inspector/_ds/reelcut-design-system-2b6440ca-3b4a-4f1b-a40b-66a71401af03/_ds_bundle.js",
+      "reason": "Generated design-system bundle in a design handoff.",
+      "evidence": [
+        "census: generated, low line diversity, 1 file 13047 lines"
+      ]
+    },
+    {
+      "path": "designs/design_handoff_clip_inspector/support.js",
+      "reason": "Generated handoff support script ('do not edit').",
+      "evidence": [
+        "census: generated marker 'do not edit' on line 1, 1911 lines"
+      ]
+    },
+    {
+      "path": "designs/design_handoff_reelcut/support.js",
+      "reason": "Generated handoff support script ('do not edit').",
+      "evidence": [
+        "census: generated marker 'do not edit' on line 1, 1911 lines"
+      ]
+    },
+    {
+      "path": "graphic/tests/graphics",
+      "reason": "JavaScript test-fixture modules, exact copies of the graphics spike's modules.",
+      "evidence": [
+        "shadow_copies: ratio 0.88; exact groups with tools/proof/graphics_spike/graphics (lower-third.js, callout.js, bar-chart.js)"
+      ]
+    },
+    {
+      "path": "tools",
+      "reason": "Proof instruments, spikes and probes (mostly unsupported Python), which CLAUDE.md exempts from the size caps. They are verification tooling, not product code.",
+      "evidence": [
+        "dir_summary tools: python 94329 of 114307 lines, all under tools/proof",
+        "CLAUDE.md: proof instruments in tools/proof/ are held to neither cap",
+        "census: 66 of 69 source files have path hints (probe 40, spike 37)"
+      ]
+    },
+    {
+      "path": "tools/proof/work",
+      "reason": "Git-ignored scratch trees: mutant copies of app/Sources, core and fixtures.",
+      "evidence": [
+        "shadow_copies: working-tree-only, 19009 of 21184 files, ratio 0.85, originals app/Sources 18433",
+        "tools/proof/README.md: mutants build from a COPY of app/Sources under work/"
+      ]
+    }
+  ],
+  "tests": {
+    "includeHelpers": true,
+    "extraPatterns": []
+  },
+  "contextDocs": [
+    "CLAUDE.md",
+    "core/CLAUDE.md",
+    "app/CLAUDE.md",
+    "graphic/CLAUDE.md",
+    "designs/adr/core-file-history.md",
+    "designs/adr/app-file-history.md",
+    "README.md",
+    "designs/spec/README.md",
+    "designs/spec/11-decisions/README.md",
+    "tools/proof/README.md",
+    "designs/design_handoff_reelcut/README.md",
+    "designs/design_handoff_reelcut_sharp/README.md",
+    "designs/design_handoff_clip_inspector/README.md",
+    "designs/clip_inspector_brief/README.md",
+    "designs/design_handoff_clip_inspector/_ds/reelcut-design-system-2b6440ca-3b4a-4f1b-a40b-66a71401af03/README.md",
+    "designs/screens/README.md",
+    "graphic/tests/assets/README.md"
+  ],
+  "deliberateDuplication": [
+    "The FFI is three files in lockstep: the Rust #[no_mangle] export, its entry in the hand-maintained core/include/reelcut_core.h, and its wrapper in app/Sources/ReelCore.swift. Each export is deliberately stated three times. (source: CLAUDE.md)",
+    "The op table is mirrored on purpose. core/src/edit.rs holds the semantics and core/src/op_table.rs the arguments. ReelOps.swift's typed builders, AgentCatalog*.swift's tools and spec §6 mirror them: change one, change all four. (source: CLAUDE.md)",
+    "Agent parity: every user-visible edit gets an MCP mirror, meaning an AgentServer+<Feature>.swift handler, a catalog entry and a comment naming the UI path it mirrors. UI command code and agent handlers intentionally parallel each other. (source: app/CLAUDE.md)",
+    "Swift mirrors of core types are kept on purpose: ReelOpSchema.swift mirrors op_schema.rs; ReelEdit.swift mirrors outcome.rs; ProjectSnapshot/TextProps/MotionProps/WordProps and ProjectSnapshot+Graphic mirror the spec §5.2 model (model_words.rs, model_graphic.rs); ReelOps.documentLevelNames mirrors scope.rs's refused_inside. (source: app/CLAUDE.md)",
+    "core/src/model_graphic.rs's check_schema COPIES the graphic engine's sentences, because no model module may name the graphic crate (G-2). It duplicates graphic/src/props.rs on purpose. (source: core/CLAUDE.md)",
+    "core/src/agent.rs is a generic MCP server copied from Rasterize; do not add domain knowledge. (source: core/CLAUDE.md)",
+    "Theme.swift, Controls.swift, OptionControls.swift, Sheets.swift, EditorChrome.swift and FileDropView.swift are copied from Rasterize and kept in sync rather than forked. The divergences are recorded: StickerButton's pill (SH-1) and BlockSliderCell.drawBar (SH-2). (source: app/CLAUDE.md)",
+    "MotionProps.dictionary and WordStyle.dictionary both write every key, with NSNull for nil slots, because the core deep-merges. This is the same rule stated twice on purpose. (source: app/CLAUDE.md)",
+    "agent/src is meant to be byte-identical to ~/devel/rasterize/agent/src/, with one diff applied to both. (source: CLAUDE.md)",
+    "The price function is answered by both agent/src/pricing.ts and tools/proof/prices.py against agent/prices/cases.json. Both reducers (update.py, priceTable.ts) answer reduce_cases.json. (source: CLAUDE.md)",
+    "silence2_proof.py spells the reversed mirror in Python on purpose, because a reference walk must not import what it checks. (source: tools/proof/README.md)"
+  ],
+  "crossLanguagePairs": [
+    [
+      "rust",
+      "swift"
+    ]
+  ],
+  "estimate": {
+    "units": 6441,
+    "sweepLines": 109207,
+    "listUsd": {
+      "low": 264.94,
+      "point": 406.16,
+      "high": 817.99
+    },
+    "claudeUsd": {
+      "low": 258.64,
+      "point": 398.25,
+      "high": 808.79
+    },
+    "jevUsd": {
+      "low": 6.31,
+      "point": 7.91,
+      "high": 9.2
+    },
+    "activeHours": {
+      "low": 1.6,
+      "point": 2.1,
+      "high": 3.2
+    },
+    "planWindows": {
+      "low": 0.8,
+      "point": 1.3,
+      "high": 2.6
+    },
+    "scope": {
+      "files": 432,
+      "lines": 146959,
+      "units": 6441,
+      "testUnits": 1176,
+      "testDirUnits": 596,
+      "stepFunctions": 873,
+      "extractErrors": 0,
+      "sweepFiles": 353,
+      "sweepLines": 109207,
+      "sweepPartitions": 14
+    },
+    "derived": {
+      "stepUnits": {
+        "low": 2881,
+        "point": 2934,
+        "high": 3405
+      },
+      "eligibleUnits": {
+        "low": 7723,
+        "point": 7781,
+        "high": 8372
+      },
+      "pairs": {
+        "low": 162183,
+        "point": 203395,
+        "high": 229393
+      },
+      "poolTop": {
+        "low": 1621,
+        "point": 2033,
+        "high": 2293
+      },
+      "pool": {
+        "low": 3307,
+        "point": 5001,
+        "high": 5641
+      },
+      "clusters": {
+        "low": 439,
+        "point": 443,
+        "high": 1047
+      },
+      "sweepClusters": {
+        "low": 212,
+        "point": 222,
+        "high": 328
+      }
+    },
+    "stages": [
+      {
+        "stage": "describe",
+        "billing": "claude",
+        "itemName": "units",
+        "items": {
+          "low": 6441,
+          "point": 6441,
+          "high": 6441
+        },
+        "calls": {
+          "low": 645,
+          "point": 645,
+          "high": 645
+        },
+        "usd": {
+          "low": 27.7,
+          "point": 36.07,
+          "high": 38.65
+        },
+        "minutes": {
+          "low": 25.8,
+          "point": 25.8,
+          "high": 26.8
+        }
+      },
+      {
+        "stage": "steps",
+        "billing": "claude",
+        "itemName": "functions",
+        "items": {
+          "low": 873,
+          "point": 873,
+          "high": 873
+        },
+        "calls": {
+          "low": 219,
+          "point": 219,
+          "high": 219
+        },
+        "usd": {
+          "low": 8.29,
+          "point": 11.35,
+          "high": 11.35
+        },
+        "minutes": {
+          "low": 6.7,
+          "point": 11.6,
+          "high": 11.6
+        }
+      },
+      {
+        "stage": "candidates",
+        "billing": "local",
+        "itemName": "eligible units",
+        "items": {
+          "low": 7723,
+          "point": 7781,
+          "high": 8372
+        },
+        "calls": {
+          "low": 0,
+          "point": 0,
+          "high": 0
+        },
+        "usd": {
+          "low": 0,
+          "point": 0,
+          "high": 0
+        },
+        "minutes": {
+          "low": 25.7,
+          "point": 42.8,
+          "high": 55.8
+        }
+      },
+      {
+        "stage": "jev",
+        "billing": "typesafe",
+        "itemName": "pairs",
+        "items": {
+          "low": 162183,
+          "point": 203395,
+          "high": 229393
+        },
+        "calls": {
+          "low": 15446,
+          "point": 15562,
+          "high": 16744
+        },
+        "usd": {
+          "low": 6.31,
+          "point": 7.91,
+          "high": 9.2
+        },
+        "minutes": {
+          "low": 10.5,
+          "point": 13.2,
+          "high": 18
+        }
+      },
+      {
+        "stage": "judge",
+        "billing": "claude",
+        "itemName": "pool pairs",
+        "items": {
+          "low": 3307,
+          "point": 5001,
+          "high": 5641
+        },
+        "calls": {
+          "low": 552,
+          "point": 834,
+          "high": 941
+        },
+        "usd": {
+          "low": 7.28,
+          "point": 15,
+          "high": 20.87
+        },
+        "minutes": {
+          "low": 4.4,
+          "point": 7.4,
+          "high": 8.4
+        }
+      },
+      {
+        "stage": "verify",
+        "billing": "claude",
+        "itemName": "clusters",
+        "items": {
+          "low": 439,
+          "point": 443,
+          "high": 1047
+        },
+        "calls": {
+          "low": 439,
+          "point": 443,
+          "high": 1047
+        },
+        "usd": {
+          "low": 118.53,
+          "point": 194.92,
+          "high": 523.5
+        },
+        "minutes": {
+          "low": 10.6,
+          "point": 10.7,
+          "high": 35.8
+        }
+      },
+      {
+        "stage": "sweep",
+        "billing": "claude",
+        "itemName": "partitions",
+        "items": {
+          "low": 14,
+          "point": 14,
+          "high": 14
+        },
+        "calls": {
+          "low": 14,
+          "point": 14,
+          "high": 14
+        },
+        "usd": {
+          "low": 36.48,
+          "point": 39.97,
+          "high": 43.68
+        },
+        "minutes": {
+          "low": 3,
+          "point": 4.5,
+          "high": 6
+        }
+      },
+      {
+        "stage": "sweep-verify",
+        "billing": "claude",
+        "itemName": "sweep clusters",
+        "items": {
+          "low": 212,
+          "point": 222,
+          "high": 328
+        },
+        "calls": {
+          "low": 212,
+          "point": 222,
+          "high": 328
+        },
+        "usd": {
+          "low": 57.24,
+          "point": 97.68,
+          "high": 164
+        },
+        "minutes": {
+          "low": 5.1,
+          "point": 5.4,
+          "high": 11.2
+        }
+      },
+      {
+        "stage": "report",
+        "billing": "claude",
+        "itemName": "verified clusters",
+        "items": {
+          "low": 651,
+          "point": 665,
+          "high": 1375
+        },
+        "calls": {
+          "low": 3,
+          "point": 3,
+          "high": 6
+        },
+        "usd": {
+          "low": 3.12,
+          "point": 3.26,
+          "high": 6.74
+        },
+        "minutes": {
+          "low": 9.7,
+          "point": 9.9,
+          "high": 22.5
+        }
+      }
+    ],
+    "notes": [
+      "plan limits, not dollars, set the pace: ~1.3 five-hour windows at ~$315 list per window (one observation, reelcut 2026-09-25); each window beyond the first can add up to 5 h of waiting to the ~2.1 h active; weekly utilisation was 81% during the M1 spikes, so the seven-day limit can also pause the run (the scheduler waits up to --max-wait-hours)",
+      "Jev is billed to TypeSafe credit, not the Claude plan, and is skipped when TYPESAFE_API_KEY is unset",
+      "rates m6e-2026-09-26: measured on the reelcut Python full run, the rung-5 slice and the bench (PLAN 9); a slice run replaces them with this repo's own (PLAN 7)"
+    ],
+    "rates": {
+      "version": "m6e-2026-09-26",
+      "origin": "measured runs to 2026-09-26 (PLAN 9)",
+      "rates": {
+        "describeUsdPerUnit": {
+          "low": 0.0043,
+          "point": 0.0056,
+          "high": 0.006,
+          "source": "rung 5 (port) $0.94/218; reelcut Python $34.26/6,149 (both launches); reference ~$0.006"
+        },
+        "stepsUsdPerFunction": {
+          "low": 0.0095,
+          "point": 0.013,
+          "high": 0.013,
+          "source": "rung 5 $0.37/39; reelcut $10.76/826"
+        },
+        "stepUnitsPerFunction": {
+          "low": 3.3,
+          "point": 3.361,
+          "high": 3.9,
+          "source": "bench 2,210/666 (M3d); reelcut 2,776/826; rung 5 151/39"
+        },
+        "testDirEligibleShare": {
+          "low": 0.29,
+          "point": 0.299,
+          "high": 0.5,
+          "source": "reelcut 178/596 non-test units under tests/ kept (core/tests 159/540, graphic/tests 19/56; the rest described role test); none in rung 5 or bench; high allows for one-repo uncertainty"
+        },
+        "pairsPerEligibleUnit": {
+          "low": 21,
+          "point": 26.14,
+          "high": 27.4,
+          "source": "rung 5 7,731/369; reelcut 191,616/7,331; bench 149,401/5,451"
+        },
+        "poolPerTop": {
+          "low": 2.04,
+          "point": 2.46,
+          "high": 2.46,
+          "source": "rung 5 3,054/1,500; reelcut 4,708/1,916; bench 3,571/1,500"
+        },
+        "jevUsdPerPair": {
+          "low": 0.0000389,
+          "point": 0.0000389,
+          "high": 0.0000401,
+          "source": "both views: reelcut $7.45/191,616; rung 5 $0.31/7,731"
+        },
+        "judgeUsdPerPair": {
+          "low": 0.0022,
+          "point": 0.003,
+          "high": 0.0037,
+          "source": "reelcut Python $9.92/4,461; reference ~$0.003; rung 5 port $11.24/3,054"
+        },
+        "clustersPerEligibleUnit": {
+          "low": 0.0569,
+          "point": 0.0569,
+          "high": 0.125,
+          "source": "reelcut 417/7,331; rung 5 46/369"
+        },
+        "verifyUsdPerCluster": {
+          "low": 0.27,
+          "point": 0.44,
+          "high": 0.5,
+          "source": "M5 A/B port $0.27 (6 pairs); reelcut $183.62/417; M5 bench $58.78/128; rung 5 sweep-verify $4.46/9"
+        },
+        "sweepUsdPerKLine": {
+          "low": 0.334,
+          "point": 0.366,
+          "high": 0.4,
+          "source": "rung 5 $1.55/4,643 lines; reelcut $37.96/103,784; reference ~$0.40"
+        },
+        "sweepClustersPerKLine": {
+          "low": 1.94,
+          "point": 2.03,
+          "high": 3,
+          "source": "rung 5 9/4,643 lines; reelcut 211/103,784; high = 1.5x reelcut (one full-repo measurement)"
+        },
+        "consolidationsPerCluster": {
+          "low": 0.51,
+          "point": 0.51,
+          "high": 0.6,
+          "source": "reelcut 320/628; rung 5 33/55"
+        },
+        "reportUsdPerCluster": {
+          "low": 0.0048,
+          "point": 0.0049,
+          "high": 0.0049,
+          "source": "reelcut $3.05/628 verified; rung 5 $0.27/55"
+        },
+        "describeSecPerUnit": {
+          "low": 0.24,
+          "point": 0.24,
+          "high": 0.25,
+          "source": "reelcut 24.6 min/6,149; rung 5 0.9 min/218 (10 workers)"
+        },
+        "stepsSecPerFunction": {
+          "low": 0.46,
+          "point": 0.8,
+          "high": 0.8,
+          "source": "rung 5 0.3 min/39; reelcut 11 min/826"
+        },
+        "embedSecPerUnit": {
+          "low": 0.2,
+          "point": 0.33,
+          "high": 0.4,
+          "source": "rung 5 1.2 min/369; M2b2 12.7 desc + 4.0 code units/s; Python 48.8 min/7,331"
+        },
+        "jevSecPerPair": {
+          "low": 0.0039,
+          "point": 0.0039,
+          "high": 0.0047,
+          "source": "both views: reelcut 12.4 min/191,616; rung 5 0.6 min/7,731"
+        },
+        "judgeSecPerPair": {
+          "low": 0.08,
+          "point": 0.089,
+          "high": 0.089,
+          "source": "rung 5 4.1 min/3,054; reelcut 6.6 min/4,461"
+        },
+        "verifySecPerCluster": {
+          "low": 1.45,
+          "point": 1.45,
+          "high": 2.05,
+          "source": "reelcut 10.1 min/417; rung 5 1.5 min/44 (10 workers)"
+        },
+        "sweepMinPerWave": {
+          "low": 1,
+          "point": 1.5,
+          "high": 2,
+          "source": "reelcut: 1-2 min per 7.4k-line partition (experiments 15); wave = FIXED.sweepWorkers partitions"
+        },
+        "reportSecPerCluster": {
+          "low": 0.89,
+          "point": 0.89,
+          "high": 0.98,
+          "source": "reelcut 9.3 min/628; rung 5 0.9 min/55"
+        },
+        "planUsdPerWindow": {
+          "low": 315,
+          "point": 315,
+          "high": 315,
+          "source": "reelcut 2026-09-25: $315 list, 19:18 relaunch to 21:26 session limit (reset 23:00), shared with interactive use"
+        }
+      }
+    }
+  },
+  "proposal": {
+    "source": "agent",
+    "createdAt": "2026-09-28T23:09:32.233Z",
+    "version": "0.0.0",
+    "notes": [
+      "agent/ (TypeScript, which the scan does not support) is not under any root. Its intended byte-identity with Rasterize's agent/src is recorded as a rule for context only.",
+      "tools/ stays ignored whole. Its Swift probes and harness compile app/Sources, and its Python proofs deliberately re-derive core arithmetic as independent oracles, so duplicates found there are not consolidation candidates.",
+      "core/target, graphic/target, tools/proof/graphics_spike/target and tools/proof/tools are git-ignored build output or tooling and sit outside every root, so no ignore entry is needed.",
+      "archive/ holds only non-source markdown (20 files, 0 source lines) and is historical per CLAUDE.md. It is outside the roots.",
+      "Most shared-looking Swift/Rust pairs, such as model mirrors and op builders, are deliberate mirrors that the startup parity check enforces. Treat them as lockstep, not as consolidation targets.",
+      "Rasterize-copied chrome files (Theme, Controls, OptionControls, Sheets, EditorChrome, FileDropView) should not be forked or merged locally.",
+      "+ contextDocs: designs/adr/core-file-history.md -- core/CLAUDE.md names it as the long form of why each module is cut where it is. That context is needed before proposing consolidations.",
+      "+ contextDocs: designs/adr/app-file-history.md -- app/CLAUDE.md names it as the long form of each Swift file's shape and traps.",
+      "+ contextDocs: tools/proof/README.md -- The root CLAUDE.md lists it in 'Where to look'. It states a deliberate Python mirror and explains the work/ mutant copies."
+    ]
+  },
+  "approval": {
+    "hash": "95b7a993513d446c9feb01e191112b1257445ee6311a239b441963ab99357d4a",
+    "approvedAt": "2026-09-28T23:12:40.413Z"
+  }
+}
