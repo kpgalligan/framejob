@@ -22,13 +22,14 @@ Launch S (Release app, port 4878, `-AgentServerEnabled YES`, a dummy
 The evaluation (`assistant_prompt_eval.py`, imported), launch E on port 4880
 through the relay:
   E1–E6  six asks, each in a project of its own, judged by `get_project`
-          placement only; an E row whose session met the cap FAILs `cap: …`
+          placement only; an E row whose session met the month's budget FAILs
+          `budget: …`, one that met the cap `cap: …`
   H   every POST the relay saw was within the bounds the arithmetic assumes
   K   the key's bytes in no file under work/assistant_prompt/ nor the app log
 
     python3 tools/proof/assistant_prompt_proof.py --probe       # F, M (make test)
     python3 tools/proof/assistant_prompt_proof.py               # F, M, S; E, H, K SKIP
-    python3 tools/proof/assistant_prompt_proof.py --rehearse [--wrong] [--cap D]
+    python3 tools/proof/assistant_prompt_proof.py --rehearse [--wrong] [--cap D] [--month-spent D]
     python3 tools/proof/assistant_prompt_proof.py --live --cap D   # needs the key
     python3 tools/proof/assistant_prompt_proof.py --mutant bare-send   # S2 alone: FAILS
 
@@ -36,7 +37,14 @@ through the relay:
 (`--wrong`: the plausible mistakes, every E row must FAIL); `--cap` SETS the
 cap, any positive figure: raising it is the runner's decision. `--live`
 without `--cap` prints the headroom arithmetic and exits 2 before launching
-anything. `--mutant bare-send` builds a tree copy whose `send` writes the bare
+anything.
+
+The month's budget (spec §11 P-3, P-6): a keyed `--live` reserves every POST
+in the proofs' ledger, `budget.LEDGER`, and nothing else ever opens it. A
+rehearsal uses a scratch ledger, `work/assistant_prompt/rehearsal/spend.jsonl`,
+deleted first; `--month-spent D` (rehearsal only) seeds it with D dollars
+already spent this month, so `--month-spent 24.99` shows every E row refused
+`budget:` with nothing sent to the stand-in. `--mutant bare-send` builds a tree copy whose `send` writes the bare
 text and runs S2 against it (port 4881): it must FAIL (exit 1); a copy that
 did not build exits 2.
 
@@ -50,6 +58,7 @@ each app started.
 
 import argparse
 import json
+import math
 import os
 import shutil
 import sys
@@ -398,15 +407,24 @@ def main():
     parser.add_argument("--wrong", action="store_true",
                         help="with --rehearse: script the mistakes; every E row must FAIL")
     parser.add_argument("--cap", type=float, help="the spend cap in dollars, any positive figure")
+    parser.add_argument("--month-spent", type=float, dest="month_spent",
+                        help="with --rehearse: seed the scratch proofs' ledger with this many "
+                             "dollars already spent this month")
     parser.add_argument("--mutant", choices=["bare-send"],
                         help="S2 alone, against a build whose send writes the bare text; FAILS")
     args = parser.parse_args()
-    if args.cap is not None and args.cap <= 0:
-        parser.error("--cap must be a positive figure")
+    if args.cap is not None and not (math.isfinite(args.cap) and args.cap > 0):
+        parser.error("--cap must be a positive finite figure")
     if args.wrong and not args.rehearse:
         parser.error("--wrong goes with --rehearse")
+    if args.month_spent is not None and not args.rehearse:
+        parser.error("--month-spent goes with --rehearse")
+    if args.month_spent is not None and not (math.isfinite(args.month_spent)
+                                             and args.month_spent >= 0):
+        parser.error("--month-spent must be a finite figure of 0 or more")
 
     import assistant_prompt_eval as ev
+    import budget
 
     if args.live or args.rehearse:
         cap = args.cap if args.cap is not None or args.live else ev.SUGGESTED_CAP
@@ -474,17 +492,29 @@ def main():
             for row_id in EVAL_ROWS:
                 score(row_id, True, "host: no key", skip=True)
         else:
+            run_id = ev.run_id()
             if args.live:
                 folder = os.path.join(WORK, "eval")
                 ledger = os.path.join(WORK, "ledger.jsonl")
-                relay = ev.Relay(ev.LIVE_UPSTREAM, ev.anthropic_key, args.cap, ledger, ev.run_id())
+                spend = budget.SpendLedger(budget.LEDGER, "anthropic", "assistant_prompt_proof",
+                                           run_id)
+                relay = ev.Relay(ev.LIVE_UPSTREAM, ev.anthropic_key, args.cap, ledger, run_id,
+                                 spend)
                 stand_in = None
             else:
                 folder = os.path.join(WORK, "rehearsal")
                 ledger = os.path.join(folder, "ledger.jsonl")
+                scratch = os.path.join(folder, "spend.jsonl")
+                if os.path.exists(scratch):
+                    os.remove(scratch)
+                spend = budget.SpendLedger(scratch, "anthropic", "assistant_prompt_proof", run_id)
+                if args.month_spent is not None:
+                    seed = spend.reserve(args.month_spent, "seed", gate=False)
+                    spend.settle(seed, args.month_spent, "seed")
                 cap = args.cap if args.cap is not None else ev.SUGGESTED_CAP
-                relay = ev.Relay(fake.base, lambda: ev.PROOF_KEY, cap, ledger, ev.run_id())
+                relay = ev.Relay(fake.base, lambda: ev.PROOF_KEY, cap, ledger, run_id, spend)
                 stand_in = fake
+            print(spend.describe(), flush=True)
             for name in os.listdir(folder) if os.path.isdir(folder) else []:
                 if name.endswith(".reelcut") or name.endswith(".mp4"):
                     shutil.rmtree(os.path.join(folder, name), ignore_errors=True)
@@ -515,7 +545,7 @@ def main():
                 print(f"the stand-in logged {posted} POSTs during the evaluation", flush=True)
             score("H", *ev.row_h(relay))
             if args.live:
-                score("K", *ev.row_k(key, WORK, app.log_path))
+                score("K", *ev.row_k(key, WORK, app.log_path, extra=[spend.path]))
             else:
                 score("K", True, "not asked (--live)", skip=True)
             evaluation.print_report(ledger)
@@ -533,9 +563,10 @@ def summary(evaluation):
     skipped = len(RESULTS) - len(scored)
     failed = [r[0] for r in scored if r[1] == "FAIL"]
     caps = evaluation.cap_failures if evaluation is not None else 0
+    budgets = evaluation.budget_failures if evaluation is not None else 0
     print(f"{passed}/{len(scored)} pass, {skipped} skipped"
-          + (f"; failed {failed} ({caps} on the cap, {len(failed) - caps} otherwise)"
-             if failed else ""), flush=True)
+          + (f"; failed {failed} ({caps} on the cap, {budgets} on the budget, "
+             f"{len(failed) - caps - budgets} otherwise)" if failed else ""), flush=True)
     return 0 if not failed else 1
 
 

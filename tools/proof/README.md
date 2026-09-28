@@ -4522,7 +4522,18 @@ for every `POST /v2/transcript` line and every transcript id the APP made
 that the ledger had not already accounted for — so the ceiling counts what
 the app DID, not what the rows expected. Nothing deletes or truncates the
 ledger; an open or `unresolved` row from an earlier run is a FAIL and stops
-the next one before it calls.
+the next one before it calls. The run's ledger is a `LiveLedger`
+(`cloud_live_ledger.py`), so every reservation is ALSO made first in the
+proofs' ledger, `~/Library/Application Support/Reelcut Proofs/spend.jsonl`
+(spec §11 P-6), at its worst case — the planned seconds at
+`AssemblyAIRates`' $0.21 + $0.02 an hour, read from
+`app/Sources/CloudEstimate.swift` — refused `budget:` past the month's $5
+(an `extra` is recorded, never refused), and settled there at the billed
+seconds, or at $0 when it closed `no_transcript` or `no_upload`. Before the
+first call, row **B** checks that the month's budget covers one; when it
+does not, B FAILs with the refusal and the rest SKIP. The keyless run never
+opens the proofs' ledger; its budget CONTROL uses scratch ledgers under
+`work/cloudlive/controls/`.
 
 **What it uploads.** Only `work/cloudprobe/fixtures/speech.aiff`, the
 synthetic `say` fixture. Never a real recording, never a file from outside
@@ -4570,7 +4581,7 @@ the stand-in proof are NOT changed: their rows do not count lines.
 word `absent`, never the value); no TCP connect to `api.assemblyai.com:443`
 in 5 s; no `say`; the ledger gate refusing; and, inside row 20, the race for
 the provider's own bytes — a GET of the app's own transcript id every 0.25 s
-for at most 30 s, which the app's DELETE can win. `LIVE_ROW_COUNT` (36) is
+for at most 30 s, which the app's DELETE can win. `LIVE_ROW_COUNT` (37, with road map 13 P3's budget CONTROL) is
 what a precondition skip reports, and the run prints the number of checks it
 actually made beside it.
 
@@ -6562,29 +6573,39 @@ duration, kind and content:
 Per row it prints the tools called, the tokens and the dollars at `RATES`,
 then the run's and the ledger's totals.
 
-**The cap.** Per POST, under one lock, the relay prices the WORST case — the
-body less image data at one token per 3 bytes plus 1600 per image, all at
-the cache-write rate, plus the body's `max_tokens` at the output rate — and
-forwards only when settled spend + reserved + that ≤ the cap, else answers
-400 `invalid_request_error` naming the cap; then it settles the reply's real
-usage and appends a ledger line `{run,row,path,status,model,usage,dollars,
-refused}` (never a header or a body). `RATES` is **an upper bound, not a
-quote**: Claude Fable 5.1's $10 input / $50 output per MTok, cache write
-1.25× and cache read 0.1× its input ($12.50 / $1.00) — the priciest model
-`fallbacks: "default"` can bill a turn at. Opus 5.5's own rates are $4.00
-input, $20.00 output and $0.20 cache read per MTok (cache write unlisted),
-from the claude-api skill's model table (cached 2026-06-24, read
-2026-09-27). The headroom arithmetic, printed before the first request:
+**The cap and the budget.** Per POST, under one lock, the relay prices the
+WORST case — the body less image data at one token per 3 bytes plus 1600 per
+image, all at the cache-write rate, plus the body's `max_tokens` at the
+output rate. When settled spend + reserved + that would pass the cap it
+answers 400 `invalid_request_error` naming the cap and writes nothing to the
+proofs' ledger. Otherwise it reserves that worst case in the proofs' ledger
+(`budget.SpendLedger`, road map 13 P3, spec §11 P-6) and answers 400 naming
+the BUDGET instead when this UTC month's recorded Anthropic spend plus it
+would pass $25; only once that reservation is made does the cap count it,
+so a POST the budget refuses holds no cap reservation. A forwarded reply's
+whole usage is read and priced by the table (`budget.settle_anthropic`: the
+table's price, `table`; usage it cannot price at each class's dearest rate,
+`worst`; a reply whose usage cannot be read, or the relay's own 502, at the
+reservation, `reserved`), settled in the proofs' ledger, and one run-ledger
+line appended `{run,row,path,status,model,usage,dollars,refused,basis}`, a
+refused line with `why` `cap` or `budget` (never a header or a body).
+`RATES` is **an upper bound, not a quote**: each token class at its dearest
+rate over every row and `above_200k` tier of `agent/prices/anthropic.json`
+(`budget.anthropic_worst_row`), the two cache writes folded into the dearer
+— today $10.00 input, $20.00 cache write, $1.00 cache read and $50.00
+output per MTok. The headroom arithmetic, printed before the first request:
 the helper sends `max_tokens` 32,000 on every POST and all 85 definitions,
 deferred ones included; the A2 session proof's largest logged body was
 230,340 bytes, bounded at 256,000 ≈ 85,333 tokens. The worst POST is
-85,333 × $12.50 + 32,000 × $50.00 per MTok ≈ $1.07 + $1.60 = $2.67. A row is
-bounded at one cache write of that body ($1.07) + 4 cache reads ($0.34) + 5
-rounds × 2,000 output ($0.50) ≈ $1.91, an estimate that bills every
-definition byte. The floor is the worst POST + 6 rows ≈ $14.11;
-`SUGGESTED_CAP` is $15.00. Below the floor it prints `WARNING: below the
-floor; rows past $<cap − worst> of settled spend will fail naming the cap`
-and still runs.
+85,333 × $20.00 + 32,000 × $50.00 per MTok ≈ $1.71 + $1.60 = $3.31. A row is
+bounded at one cache write of that body ($1.71) + 4 cache reads ($0.34) + 5
+rounds × 2,000 output ($0.50) ≈ $2.55, an estimate that bills every
+definition byte. The floor is the worst POST + 6 rows ≈ $18.59;
+`SUGGESTED_CAP` is $20.00, under the month's $25. Below the floor it prints
+`WARNING: below the floor; rows past $<cap − worst> of settled spend will
+fail naming the cap` and still runs. A row whose session met the budget
+FAILs `budget: …` before the cap is considered, and the summary counts
+`<c> on the cap, <b> on the budget, <n> otherwise`.
 
 **Modes.** Without `--live` or `--rehearse`, E1–E6, H and K SKIP "not asked
 (--live)". `--live` needs an explicit `--cap <dollars>` (any positive
@@ -6595,11 +6616,18 @@ its credential `anthropic_key()` — the ONE read of the owner's key:
 `ANTHROPIC_API_KEY` when set, else `.secrets/anthropic-key` at the repo
 root (gitignored, `chmod 600`; a looser mode warns), so a live run needs
 nobody at the machine — whose
-presence alone is printed — and the ledger `work/assistant_prompt/ledger.jsonl`.
-`--rehearse` runs the same rows with the stand-in upstream, the credential
-`proof-key`, the cap `SUGGESTED_CAP` unless `--cap`, scripted right calls
-(`add_marker`; `undo`; `split` with `clips`; `set_text`; `move_clip` with
-`scope`; `export`) and the ledger `work/assistant_prompt/rehearsal/ledger.jsonl`;
+presence alone is printed — the ledger `work/assistant_prompt/ledger.jsonl`,
+and the proofs' ledger `budget.LEDGER`, which only a keyed `--live` opens (K
+scans it for the key too). `--rehearse` runs the same rows with the stand-in
+upstream, the credential `proof-key`, the cap `SUGGESTED_CAP` unless `--cap`,
+scripted right calls (`add_marker`; `undo`; `split` with `clips`;
+`set_text`; `move_clip` with `scope`; `export`), the ledger
+`work/assistant_prompt/rehearsal/ledger.jsonl` and a scratch proofs' ledger,
+`work/assistant_prompt/rehearsal/spend.jsonl`, deleted first; `--month-spent
+D` (rehearsal only, D ≥ 0) seeds it with D dollars already spent this month,
+so `--month-spent 24.99` fails every E row `budget:` with nothing sent to
+the stand-in. Each run prints the ledger's month line after building the
+relay and again with the report;
 `--wrong` scripts the mistakes (3000000; no undo; `split` without `clips`;
 "Hello"; no `scope`; `export` again after the deny) and every E row FAILs.
 H runs in rehearsal on the real helper's real bodies — only usage is
@@ -6838,3 +6866,126 @@ Measured 2026-09-28: `spend_proof.py` 17/17; `stale-refresh` 1/2 (H3 FAIL:
 no `prices` before `ready`, 1 GET, a later fetched `prices`), exit 1;
 `unknown-as-zero` 4/5 (S1 FAIL: `Cost: $0.0000 · …` for an unknown), exit 1;
 `prices_proof.py` 27/27 and `reduce-disagrees` 26/27, exit 1.
+
+## Road map 13's P3 — the proofs' ledger and the budgets (`budget.py`, `budget_proof.py`)
+
+Every paid proof request is held to the month's budget (spec §11 P-3, P-6):
+$25 for Anthropic, $5 for AssemblyAI, the owner's numbers, constants in
+`budget.py` that nothing takes from a flag or the environment.
+
+**`budget.py`** (stdlib and `prices.py`) is the only writer of the proofs'
+ledger, `LEDGER` = `~/Library/Application Support/Reelcut Proofs/spend.jsonl`
+— outside the repo, so it survives `rm -rf tools/proof/work` and a clone and
+every worktree shares it, and outside the app's spend folder (P-5). One JSON
+object per line, appended with one `os.write` to a file opened
+`O_APPEND|O_CREAT` 0600 in a folder made 0700: `format` 1, `at` (UTC,
+`%Y-%m-%dT%H:%M:%SZ`), `service`, `kind`, `id` (`<proof>/<run>/<pid>/<n>`);
+a `reserve` adds `proof`, `run`, `row`, `worst`; a `refused` adds those and
+`month_total`, `budget`; a `settle` adds `dollars`, `basis` and, for
+Anthropic, `model` and `usage`, for AssemblyAI `seconds`. Never a key, a
+header, a body or a text.
+
+- `SpendLedger(path, service, proof, run, now=None)` — `month()` (UTC),
+  `month_total()`, `refusal(worst)` (writes nothing), `reserve(worst, row,
+  gate=True)`, `settle(rid, dollars, basis, **detail)` (never raises),
+  `describe()`. The month's total is a fold: a `reserve` made in the month
+  counts its largest `settle`, or its `worst` while it has none; a `settle`
+  with no `reserve` counts its own dollars in its own month; a `refused`
+  counts nothing. `reserve` reads, folds and appends under one
+  `flock(LOCK_EX)`, and with `gate` appends a `refused` line and raises
+  `BudgetRefused` (`budget: $<total> of the $<budget> <service> budget is
+  recorded for <YYYY-MM> (UTC) in <path>; this request's worst case is
+  $<worst>`) when total + worst passes the budget. It fails CLOSED: a line
+  that does not parse, or a file that cannot be read or written, refuses by
+  name until a person repairs it.
+- `anthropic_worst_row(table)` — each class's dearest usable rate over every
+  row and `above_200k` tier; the relay's `RATES` come from it.
+  `settle_anthropic(usage, model, table, reserved, whole)` — `table` at
+  `prices.price`; else, less `speed` / `service_tier` / `inference_geo` and
+  each iteration's `model`, at the worst row, `worst`; else, or when the
+  reply was not whole, the reservation, `reserved`.
+- `assemblyai_rates()` reads `AssemblyAIRates` in
+  `app/Sources/CloudEstimate.swift` — `perHour`, `speakersPerHour` and
+  `readOn` must each be declared exactly once, as a literal, inside the enum
+  (its use sites elsewhere in the file are ignored), else `ValueError`.
+  `assemblyai_worst(seconds)` adds both rates; `assemblyai_dollars(seconds,
+  speakers=False)` is the billed price.
+
+Only a keyed live run opens `LEDGER`: `assistant_prompt_proof.py --live`
+with the key, and `cloud_captions_proof.py --live` with `RC_ASSEMBLYAI_KEY`
+(`cloud_live_ledger.LiveLedger`). Rehearsals, CONTROLs and `budget_proof.py`
+use scratch ledgers.
+
+**`budget_proof.py`** — the last line of `make test`; no network, no app, no
+key. It works in `work/budget/` (made fresh), prints `<ID> ok|FAIL — detail`
+and then `n/m`, exits 0 or 1, and scores an instrument that cannot run as a
+FAIL.
+
+- **P** the budgets are `{anthropic 25, assemblyai 5}`; `LEDGER` is absolute
+  and outside the repo; worst POST ≤ the floor ≤ `SUGGESTED_CAP` ≤ $25.
+- **F1** the fold over a hand-written file: last month's $30 counts nothing;
+  this month's reserve 2 settled 0.5, open reserve 1, refused 9 and orphan
+  settle 0.25 → $1.75; AssemblyAI's 4 settled 4 → $4.00. **F2** an absent
+  file is $0; a non-JSON line refuses naming `line 2`, and `reserve`
+  appends nothing.
+- **G1** at $24.00 a $1.00 reservation passes (the edge) and $0.01 is refused
+  `budget:` with exactly one `refused` line; `gate=False` still records.
+  **G2** with an injected clock, $25 recorded in August counts nothing in
+  September. **G3** a nested folder is created 0700 and the file is 0600.
+- **W** `anthropic_worst_row` over a two-row fixture (one tiered) is the
+  per-class maximum; no committed rate exceeds it, and it equals the
+  proof's own loop over the table.
+- **S1** a known model settles at `prices.price`'s dollars, `table`; **S2** an
+  unknown model and a `speed: fast` request at the counts × the worst row,
+  `worst`; **S3** an unknown-model iteration the same; **S4** a malformed
+  count and a reply that is not whole at the reservation, `reserved`.
+- **U1** `read_usage` keeps `service_tier` and the `cache_creation` object,
+  overlays `message_delta`'s output, and a stream with no `message_stop` or
+  a body with no `usage` is not whole. **U2** `Evaluation.finish` over a
+  usage holding a string, an object and a bool totals only the integers.
+- **R1–R4** `ev.Relay` over `anthropic_fake.py` with a scratch proofs'
+  ledger: a streamed `claude-opus-5-5` POST forwarded, reserved at
+  `measure`'s worst and settled $0.0006, `table`; at $24.999 recorded and a
+  cap of 1.5 × the POST's worst, TWO POSTs each answered 400 naming the
+  budget, nothing sent to the stand-in, two `refused` lines, no cap refusal
+  and `_reserved` 0 (a leaked cap reservation would make the second a cap
+  refusal); a cap below the worst answers the cap and writes no
+  proofs'-ledger line; upstream `http://127.0.0.1:9` answers 502 and settles
+  at the reservation, `reserved`.
+- **A1** `assemblyai_rates()` is finite, its `per_hour` equals
+  `aai.RATE_PER_HOUR`, and a copy of `CloudEstimate.swift` without its one
+  `static let perHour` line (the use sites kept) is a `ValueError`. **A2**
+  `cloud_live_ledger.controls()`'s budget CONTROL holds: over scratch ledgers
+  seeded at this month's $5.00, a gated `LiveLedger.reserve` is refused
+  `budget:` and neither ledger gains a reservation, while an `extra` is
+  recorded in both. **A3** a `LiveLedger` reservation `billed` 11 s settles
+  `assemblyai_dollars(11)`, one closed `no_upload` settles $0, and the
+  month's total is their sum.
+- **N** `LEDGER`'s existence, size and mtime are the same before and after.
+
+Made to fail on purpose: `--mutant no-budget` sets both budgets to infinity
+in memory (P, G1, R2 and A2 FAIL); `--mutant unknown-as-zero` replaces
+`budget.anthropic_worst_row` with all-zero rates after import (W, S2 and S3
+FAIL). Either exits 1.
+
+```sh
+python3 tools/proof/budget_proof.py                          # 21/21 (make test)
+python3 tools/proof/budget_proof.py --mutant no-budget       # P G1 R2 A2 FAIL, exit 1
+python3 tools/proof/budget_proof.py --mutant unknown-as-zero # W S2 S3 FAIL, exit 1
+(unset ANTHROPIC_API_KEY RC_ASSEMBLYAI_KEY; python3 tools/proof/assistant_prompt_proof.py --rehearse --month-spent 24.99 --cap 10)  # E1–E6 FAIL budget:, exit 1
+```
+
+Measured 2026-09-28, every command with `ANTHROPIC_API_KEY` and
+`RC_ASSEMBLYAI_KEY` unset: `budget_proof.py` 21/21 (R1 reserved $0.050807
+at `measure`'s worst and settled $0.0006 `table`; R2 two 400s naming the
+budget at $24.9990, 0 stand-in POSTs, `_reserved` 0); `no-budget` 17/21 (P,
+G1, R2, A2 FAIL), exit 1; `unknown-as-zero` 18/21 (W, S2, S3 FAIL), exit 1.
+`assistant_prompt_proof.py --rehearse` 22/22 with K SKIP, H's worst POST
+priced $3.1137, the scratch ledger at $0.0072 after six rows; `--rehearse
+--month-spent 24.99 --cap 10` E1–E6 FAIL `budget:` (worst cases
+$3.1031–$3.1049), "0 on the cap, 6 on the budget, 0 otherwise", the
+stand-in logged 0 POSTs, exit 1; `--rehearse --cap 0.0001` E1–E6 FAIL
+`cap:`, "6 on the cap, 0 on the budget", exit 1. `cloud_captions_proof.py
+--live` with no key: the eight CONTROLs ok (the budget one included), 29
+rows SKIP "absent", 9/9. `budget.LEDGER` was absent before and after every
+command.

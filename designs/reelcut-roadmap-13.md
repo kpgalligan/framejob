@@ -1,8 +1,9 @@
 # Road map 13 — pricing and spend
 
 **Status: IN PROGRESS. Proposed and approved 2026-09-28; P1 (the table and the price function) built
-2026-09-28 and committed 79a8b56; P2 (the helper prices every response) built 2026-09-28,
-uncommitted. Records in §5. P3–P4 not started.**
+2026-09-28 and committed 79a8b56; P2 (the helper prices every response) built 2026-09-28 and
+committed 0f0a442; P3 (the proofs' ledger and the monthly budgets) built 2026-09-28, uncommitted.
+Records in §5. P4 not started.**
 
 The user asked three things: to set a spend budget, to price each call the assistant and the proofs
 make, and eventually to show spend in the UI. The rules they gave:
@@ -182,7 +183,7 @@ when input + cache writes + cache reads > 200 000; a class with tokens but no us
 `agent/prices/` files the test reads) until #147 lands (commented there). No residue issue was filed:
 every row above passed and every control failed as stated. P2–P4 as §4 plans them.
 
-### P2 — the helper prices every response (built 2026-09-28, uncommitted)
+### P2 — the helper prices every response (built 2026-09-28, committed 0f0a442)
 
 **What landed.**
 
@@ -264,3 +265,77 @@ FAIL exit 1; tab 16/16, helper 6/6, session 11/11; no `Reelcut: ` line.
 Rasterize carries none of P2's `agent/src` change until #147 lands (commented there). AS-4 in
 `docs/manual-checks.md` (a real key: bundled, then fetched, then cached; the ledger against the
 Console) is the owner's. P3–P4 as §4 plans them.
+
+### P3 — the proofs' ledger and the monthly budgets (built 2026-09-28, uncommitted)
+
+**What landed.**
+
+- Spec §11 **P-6** in `designs/spec/11-decisions/pricing.md` (written before any code), indexed in
+  `11-decisions/README.md`: the proofs' ledger is
+  `~/Library/Application Support/Reelcut Proofs/spend.jsonl`, outside the repo and outside P-5's
+  spend folder; `budget.py` its only
+  writer; the fold, the `flock`, fail-closed; the UTC month; the worst cases; unknown usage at the
+  worst row, an unreadable reply at its reservation; only a keyed live run writes it. Risks
+  accepted: fast / priority / US-only usage counted at the dearest standard rates; a torn line
+  stops every paid proof until a person repairs it; the C0 and W spikes keep their own ledgers
+  (#163).
+- `tools/proof/budget.py`: `LEDGER`, `BUDGETS` ($25 / $5), `SpendLedger` (`month`, `month_total`,
+  `refusal`, `reserve`, `settle`, `describe`), `BudgetRefused`, `anthropic_worst_row`,
+  `settle_anthropic`, `assemblyai_rates` (read from `AssemblyAIRates` in `CloudEstimate.swift`,
+  each constant declared exactly once inside the enum), `assemblyai_worst`, `assemblyai_dollars`.
+- `assistant_prompt_eval.py`: `RATES` from `anthropic_worst_row` over the table ($10 input, $20
+  cache write — the 1-hour write, dearer than the $12.50 used before — $1 cache read, $50 output);
+  `SUGGESTED_CAP` $20; the relay tests the cap, then reserves in the proofs' ledger, and adds to
+  its own `_reserved` only after that reservation returns, so a budget refusal leaks no cap
+  reservation; a reply settles through `settle_anthropic` (the relay's own 502 at the
+  reservation); `read_usage` keeps the whole usage and answers `whole`; `finish()` scores a
+  budget refusal `budget: …` before the cap and totals only integer usage values; `row_k` takes
+  `extra` files. `assistant_prompt_proof.py`: a `SpendLedger` on `budget.LEDGER` for a keyed
+  `--live` only, a scratch one for `--rehearse` (deleted first; `--month-spent D` seeds it); the
+  summary counts `<c> on the cap, <b> on the budget, <n> otherwise`.
+- `cloud_live_ledger.py`: `LiveLedger(aai.Ledger)` reserves in the proofs' ledger first (an
+  `extra` recorded, never refused), settles `billed` at `assemblyai_dollars` and a `no_transcript`
+  / `no_upload` close at $0; `refusal()` and `dollars()` price at `AssemblyAIRates`; one budget
+  CONTROL. `cloud_captions_live.py`: `run()` builds the two ledgers and fails row B and skips the
+  rest when the month's budget does not cover the next call; `LIVE_ROW_COUNT` 36 → 37 for the new
+  CONTROL. `cloud_spike/aai.py` untouched.
+- `tools/proof/budget_proof.py` (P, F1–F2, G1–G3, W, S1–S4, U1–U2, R1–R4, A1–A3, N; mutants
+  `no-budget`, `unknown-as-zero`), the new last line of `make test`. Docs: the root `CLAUDE.md`
+  (`make test` line, the `.secrets/` rule), `README.md`, `tools/proof/README.md` (a P3 section; A3's
+  cap and modes; the cloud live money paragraph), the `Makefile` comment.
+
+**Measured 2026-09-28** (every command with `ANTHROPIC_API_KEY` and `RC_ASSEMBLYAI_KEY` unset):
+
+- `make test` exit 0 (`prices_proof.py` 27/27, `budget_proof.py` 21/21); `make lint` clean;
+  `make typecheck` 0 errors, the 7 baseline warnings, tsc clean.
+- The new headroom: worst POST 85,333 tokens × $20 + 32,000 × $50 per MTok = $3.31 (was $2.67);
+  row bound $1.71 + $0.34 + $0.50 = $2.55 (was $1.91); floor $18.59 (was $14.11); suggested cap
+  $20.00 (was $15.00), under the month's $25.
+- `budget_proof.py` 21/21: F1 $1.7500 and $4.0000; G1 $1.00 passes at $24.00 and $0.01 is refused
+  with one `refused` line; R1 reserved $0.050807 and settled $0.0006 `table`; R2 two 400s naming
+  the budget at $24.9990, 0 stand-in POSTs, two `refused` lines, 0 cap refusals, `_reserved` 0;
+  R3 a cap refusal and no proofs'-ledger line; R4 502 settled at its reservation; A1 $0.21 +
+  $0.02 an hour read on 2026-09-17, and the copy without `static let perHour` a `ValueError`;
+  A3 $0.000642 billed for 11 s. Made to fail: `--mutant no-budget` 17/21 (P, G1, R2, A2), exit 1;
+  `--mutant unknown-as-zero` 18/21 (W, S2, S3), exit 1.
+- `assistant_prompt_proof.py --rehearse` 22/22, K SKIP, H's worst POST $3.1137, six rows settled
+  $0.0072 in the scratch ledger; `--rehearse --month-spent 24.99 --cap 10` E1–E6 FAIL `budget:`
+  (0 on the cap, 6 on the budget), the stand-in 0 POSTs, exit 1; `--rehearse --cap 0.0001` E1–E6
+  FAIL `cap:` (6 on the cap, 0 on the budget), exit 1; `--live` with no key and no cap printed the
+  headroom and the budget line and exited 2. No launch log held a `Reelcut: ` line.
+- `cloud_captions_proof.py --live --port-base 4980` with no key: the eight CONTROLs ok (the budget
+  CONTROL included), 29 rows SKIP "absent", 9/9. `cloud_live_selftest.py` 14/14.
+  `prices_proof.py` 27/27.
+- `~/Library/Application Support/Reelcut Proofs/spend.jsonl` was absent before and after every
+  command above.
+
+**The review's three nits, fixed (2026-09-28).** `CLAUDE.md`'s `make test` line gained its missing
+comma, and its bun sentence now says `prices_proof.py` runs second to last. `assistant_prompt_proof.py`
+refuses a non-finite `--cap` or `--month-spent` (`inf`, `nan`) as an argument error before anything
+launches; `--month-spent inf` had passed the `>= 0` test and raised `BudgetRefused` after the app was
+up. Re-run: the five bad values each end in the argument error, `--probe` 11/11, `budget_proof.py`
+21/21, `--live` without `--cap` still refuses, and the real ledger still does not exist.
+
+**Owed.** #157 (the live A3 run) was commented with the new headroom and the budget. #163: the C0
+and W spikes spend AssemblyAI money outside the proofs' ledger. No paid run was made. P4 as §4
+plans it.

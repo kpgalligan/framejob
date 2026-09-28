@@ -40,3 +40,27 @@ them and whose §1 holds what was measured.
   localhost or ::1. A turn is priced with the prices in force at its `turn_started`; a refresh that
   settles mid-turn applies from the next turn. Risk accepted: two sessions opened at once may both
   fetch.
+- **P-6 — The proofs' ledger is `~/Library/Application Support/Reelcut Proofs/spend.jsonl`, and
+  every paid proof request is held to the month's budget in it before it is sent.** It is outside
+  the repo, so it survives `rm -rf tools/proof/work` and a fresh clone and is shared by every
+  worktree, and outside P-5's spend folder, which is the person's. `tools/proof/budget.py` is its
+  only writer: one JSON line per event (`reserve`, `settle`, `refused`; `format` 1, `at` in UTC,
+  `service`, `kind`, `id`), appended in one write to a file created 0600 in a folder created 0700,
+  never a key, a header, a body or a text. The month is the UTC calendar month. A month's total for
+  a service is a fold: a `reserve` made in the month counts its largest `settle`, or its `worst`
+  while it has none; a `settle` with no `reserve` counts its own dollars in its own month; a
+  `refused` counts nothing. The read, the fold and the append happen under one exclusive `flock` on
+  the file, and a request is refused (`budget: …`) when the month's total plus its worst case would
+  pass P-3's budget. It fails closed: a line that does not parse, or a ledger that cannot be read or
+  written, refuses every paid request until a person repairs it. The worst case is the dearest the
+  request can bill: for Anthropic, the relay's measure of the body and `max_tokens` at each token
+  class's dearest rate over every row and `above_200k` tier of the price table; for AssemblyAI, the
+  planned seconds at `AssemblyAIRates`' two rates added (speakers included). A reply is settled at
+  the table's price; usage the table cannot price (an unknown model, a mode it has no rate for)
+  settles at those dearest rates, and a reply whose usage cannot be read settles at its
+  reservation. Only a keyed live run writes this ledger: rehearsals and verifications use scratch
+  ledgers of their own. The budgets are constants in `budget.py`, pinned by `budget_proof.py`.
+  Risk accepted: fast, priority and US-only usage is counted at the dearest standard rates (the
+  helper requests none of them); a torn or hand-broken line stops every paid proof until a person
+  repairs it; the road map 6 and 8 spikes (`cloud_spike/`, `words_spike/`) keep their own ledgers
+  and are not held to it (#163).

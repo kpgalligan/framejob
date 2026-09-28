@@ -1982,7 +1982,9 @@ def main():
     parser.add_argument("--live", action="store_true",
                         help="road map 6 §5i's rows 20 and 21 against the REAL service "
                              "INSTEAD of rows 1-11 — this SPENDS money, under "
-                             "cloud_captions_live.py's ledger and its $0.25 ceiling")
+                             "cloud_captions_live.py's ledger and its $0.25 ceiling, and "
+                             "the month's $5 AssemblyAI budget in the proofs' ledger "
+                             "(spec §11 P-6)")
     args = parser.parse_args()
 
     started = time.time()

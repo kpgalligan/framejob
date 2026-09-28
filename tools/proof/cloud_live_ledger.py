@@ -14,6 +14,13 @@ and answers a boolean.
 
 **Nothing here lists the account.** Every id it acts on came from a line the
 app printed in this run or from the cache file this run wrote.
+
+**The month's budget** (spec §11 P-3, P-6). `LiveLedger` is the run's
+`aai.Ledger` with the proofs' ledger beside it: every reservation is made
+there FIRST, at `budget.assemblyai_worst` of its planned seconds and refused
+past the month's $5 (an `extra` is a record of what the app did, so it is
+recorded, never refused), then settled at the billed seconds or at $0 when it
+closed with nothing made. Every rate here is the app's own `AssemblyAIRates`.
 """
 
 import json
@@ -22,9 +29,11 @@ import re
 import socket
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "cloud_spike"))
 
-from aai import RATE_PER_HOUR, Scrubber                                    # noqa: E402
+import budget                                                              # noqa: E402
+from aai import BudgetError, Ledger, Scrubber                              # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LEDGER = os.path.join(HERE, "work", "cloudlive", "ledger.json")
@@ -44,6 +53,48 @@ DELETED_TEXT = "Deleted by user."
 
 class Refused(Exception):
     """The gate said no BEFORE a billable call was made."""
+
+
+class LiveLedger(Ledger):
+    """The run's own ledger, with every reservation also held to the month's
+    AssemblyAI budget in the proofs' ledger `spend` (a `budget.SpendLedger`).
+    Its method signatures are `aai.Ledger`'s."""
+
+    def __init__(self, path, scrubber, spend):
+        super().__init__(path, scrubber)
+        self.spend = spend
+        self.monthly = {}  # this run's rid -> the proofs' ledger id
+        self.settled = set()
+
+    def reserve(self, row, label, planned_seconds):
+        sid = self.spend.reserve(budget.assemblyai_worst(planned_seconds), f"{row}-{label}",
+                                 gate=label != "extra")
+        try:
+            rid = super().reserve(row, label, planned_seconds)
+        except BudgetError:
+            self.spend.settle(sid, 0.0, "not_sent", seconds=0)
+            raise
+        self.monthly[rid] = sid
+        return rid
+
+    def billed(self, rid, audio_duration):
+        super().billed(rid, audio_duration)
+        sid = self.monthly.get(rid)
+        if sid is not None:
+            self.spend.settle(sid, budget.assemblyai_dollars(audio_duration), "billed",
+                              seconds=audio_duration)
+            self.settled.add(rid)
+
+    def closed(self, rid, outcome, status=None):
+        super().closed(rid, outcome, status)
+        sid = self.monthly.get(rid)
+        if sid is not None and rid not in self.settled \
+                and outcome in ("no_transcript", "no_upload"):
+            self.spend.settle(sid, 0.0, outcome, seconds=0)
+            self.settled.add(rid)
+
+    def dollars(self):
+        return self.total_seconds() / 3600.0 * budget.assemblyai_rates()["per_hour"]
 
 
 def requests_in(lines):
@@ -90,7 +141,8 @@ def refusal(ledger):
     `no_upload` — so open rows, `deleted` rows, `unresolved` rows and every
     `extra` row `account` wrote all count against the six.
     """
-    dollars = (ledger.total_seconds() + PLANNED_SECONDS) / 3600.0 * RATE_PER_HOUR
+    dollars = ((ledger.total_seconds() + PLANNED_SECONDS) / 3600.0
+               * budget.assemblyai_rates()["per_hour"])
     if dollars > CEILING_DOLLARS:
         return (f"the next call would reach ${dollars:.4f}, past the "
                 f"${CEILING_DOLLARS:.2f} ceiling")
@@ -325,3 +377,52 @@ def controls(proof):
     proof.check("C: CONTROL — `leaks` flags a registered dummy in a STRING and in a FILE, "
                 "and the file is taken away again",
                 flagged == (True, True) and not os.path.exists(seeded), f"got {flagged!r}")
+
+    try:
+        ok, detail = budget_control()
+    except Exception as error:  # noqa: BLE001 — an instrument that cannot run is a FAIL
+        ok, detail = False, f"the control could not run: {type(error).__name__}: {error}"
+    proof.check("C: CONTROL — at this month's $5.00 already recorded, a gated reservation is "
+                "refused `budget:` and neither ledger gains one, while an `extra` is recorded "
+                "in both", ok, detail)
+
+
+def budget_control():
+    """(held, detail) over scratch ledgers under `FOLDER/controls/`, removed
+    after: the proofs' ledger seeded at this month's AssemblyAI budget."""
+    folder = os.path.join(FOLDER, "controls")
+    os.makedirs(folder, exist_ok=True)
+    spend_path = os.path.join(folder, "spend.jsonl")
+    run_path = os.path.join(folder, "ledger.json")
+    for one in (spend_path, run_path):
+        if os.path.exists(one):
+            os.remove(one)
+    try:
+        spend = budget.SpendLedger(spend_path, "assemblyai", "cloud_captions_live-control",
+                                   f"control-{os.getpid()}")
+        seed = spend.reserve(5.00, "seed", gate=False)
+        spend.settle(seed, 5.00, "seed", seconds=0)
+        live = LiveLedger(run_path, Scrubber([]), spend)
+
+        def reserves():
+            with open(spend_path) as handle:
+                return [json.loads(line) for line in handle
+                        if json.loads(line).get("kind") == "reserve"]
+
+        before = len(reserves())
+        try:
+            live.reserve("C", "control", PLANNED_SECONDS)
+            refused = None
+        except budget.BudgetRefused as problem:
+            refused = str(problem)
+        gained = (len(reserves()) - before, len(live.reservations()))
+        extra = live.reserve("C", "extra", PLANNED_SECONDS)
+        recorded = (len(reserves()) - before, extra in live.reservations())
+        held = (refused is not None and refused.startswith("budget: ") and gained == (0, 0)
+                and recorded == (1, True))
+        return held, (f"refused {refused!r:.160}; reservations gained by the refusal "
+                      f"(proofs', run's) {gained}; the extra recorded {recorded}")
+    finally:
+        for one in (spend_path, run_path):
+            if os.path.exists(one):
+                os.remove(one)

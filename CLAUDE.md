@@ -50,7 +50,7 @@ comment citing "road map N §x" refers to the archived original.
 
 ```sh
 make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
-make test       # make rust, cd core && cargo test --release, cd graphic && cargo test --release (black-box tests), then tools/proof/assistant_lane_proof.py (the agent lane's probe), tools/proof/assistant_prompt_proof.py --probe (the prompt texts' drift checks) and tools/proof/prices_proof.py (the price function: prices.py and agent/'s `bun test` against agent/prices/cases.json, and update.py's reducer against reduce_cases.json, no network)
+make test       # make rust, cd core && cargo test --release, cd graphic && cargo test --release (black-box tests), then tools/proof/assistant_lane_proof.py (the agent lane's probe), tools/proof/assistant_prompt_proof.py --probe (the prompt texts' drift checks), tools/proof/prices_proof.py (the price function: prices.py and agent/'s `bun test` against agent/prices/cases.json, and update.py's reducer against reduce_cases.json, no network) and tools/proof/budget_proof.py (the proofs' ledger and the monthly budgets, over scratch ledgers, no network)
 make lint       # cargo clippy --all-targets -- -D warnings, in core/ then graphic/
 make typecheck  # swiftc -typecheck -D REELCUT_DEV_TOOLS of app/Sources/*.swift — the ONLY authoritative Swift check, then agent/'s `tsc --noEmit` (through bun)
 make project    # xcodegen generate (Reelcut.xcodeproj is generated; project.yml is the source of truth)
@@ -78,8 +78,8 @@ make prices     # NETWORK: regenerate agent/prices/anthropic.json from LiteLLM (
   SILGen, so a clean typecheck does not prove the app builds; only `make app`
   does.
 - `make app`/`make dist` build the assistant helper (`agent/`) in their
-  last Xcode step, `make typecheck` ends with its tsc, and `make test` ends
-  with its `bun test` (through `prices_proof.py`). All need bun, and
+  last Xcode step, `make typecheck` ends with its tsc, and `make test` runs
+  its `bun test` (through `prices_proof.py`, second to last). All need bun, and
   without it they fail with an `error: bun is not installed` line rather
   than skipping.
 - `Reelcut.xcodeproj` is generated; never commit it. xcodegen and
@@ -223,7 +223,10 @@ else is what bloats files:
   list its contents; never move a key from it into an argument, the
   environment of a build, a log or a file. A run that spends money still
   needs its explicit flags (`--live --cap <dollars>`); the file's presence
-  spends nothing.
+  spends nothing. Every paid proof request is also held to the month's
+  budget (spec §11 P-3, P-6) in
+  `~/Library/Application Support/Reelcut Proofs/spend.jsonl`; an agent never
+  edits it, raises a budget, or points a verification at it.
 - **A check only a person at the machine can make is a row in
   `docs/manual-checks.md`**, added in the change that creates it — never a
   `ready-for-human` issue, and never an instrument built to stand in for the

@@ -24,14 +24,17 @@ rust:
 
 # `assistant_lane_proof.py` is spec §11 AI-3's `make test`-reachable probe
 # (the agent lane); `rust` first, because it links the staticlib. The last
-# line is road map 13 P1's price function: the Python reader and the helper's
-# `bun test` (agent/build.sh test) against one fixture file, no network.
+# line but one is road map 13 P1's price function: the Python reader and the
+# helper's `bun test` (agent/build.sh test) against one fixture file, no
+# network. The last is P3's proofs' ledger and monthly budgets (spec §11 P-6),
+# over scratch ledgers only, no network.
 test: rust
 	cd core && cargo test --release
 	cd graphic && cargo test --release
 	python3 tools/proof/assistant_lane_proof.py
 	python3 tools/proof/assistant_prompt_proof.py --probe
 	python3 tools/proof/prices_proof.py
+	python3 tools/proof/budget_proof.py
 
 lint:
 	cd core && cargo clippy --all-targets -- -D warnings

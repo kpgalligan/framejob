@@ -15,7 +15,13 @@ cannot do. Every leak check compares in process and prints a boolean.
 **The money.** `work/cloudlive/ledger.json` is the spike's own append-only
 ledger; a reservation is written BEFORE every billable call and the gate
 refuses at $0.25 or at six transcriptions, counting an `extra` row for every
-submit or id the APP made that the ledger had not accounted for. The fixture
+submit or id the APP made that the ledger had not accounted for. Every
+reservation is ALSO made first in the proofs' ledger
+(`~/Library/Application Support/Reelcut Proofs/spend.jsonl`, spec §11 P-6) at
+its worst case — the planned seconds at `AssemblyAIRates`' two rates added —
+and refused `budget:` past the month's $5 (P-3); it is settled there at the
+billed seconds. Before the first call the run checks that the month's budget
+covers one, and fails row B and skips the rest when it does not. The fixture
 is `say`'s eleven seconds — a fraction of a cent a run; the ceiling is there
 for a loop that should not exist.
 
@@ -40,9 +46,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "clo
 
 from cloud_live_ledger import (                                            # noqa: E402,F401
     CEILING_DOLLARS, DELETED_TEXT, DELETED_URL, FOLDER, LEDGER, MAX_TRANSCRIPTIONS,
-    PLANNED_SECONDS, Captured, Refused, account, cleanup, controls, erase, ids, leaks,
-    normalise, read_json, reachable, refusal, requests_in, reserve, scrubbed, subsequence,
-    submits, touches, uploads_ok, words_span)
+    PLANNED_SECONDS, Captured, LiveLedger, Refused, account, cleanup, controls, erase, ids,
+    leaks, normalise, read_json, reachable, refusal, requests_in, reserve, scrubbed,
+    subsequence, submits, touches, uploads_ok, words_span)
+import budget                                                              # noqa: E402
 from aai import KEY_ENV, Ledger, client_from_env                           # noqa: E402
 from fixtures import truth_pauses                                          # noqa: E402
 
@@ -50,7 +57,7 @@ from cloud_captions_probe import SPEECH_TEXT, make_fixture, run_probe      # noq
 
 # What a full run checks, and what a precondition SKIPS BY NAME. The run
 # prints what it actually made beside it, so a drift shows.
-LIVE_ROW_COUNT = 36
+LIVE_ROW_COUNT = 37
 
 
 # --------------------------------------------------------------------------
@@ -352,7 +359,9 @@ def run(proof, binary, port_base, probe):
     client, scrubber = client_from_env()
     proof.live_scrubber = scrubber
     os.makedirs(FOLDER, exist_ok=True)
-    ledger = Ledger(LEDGER, scrubber)
+    spend = budget.SpendLedger(budget.LEDGER, "assemblyai", "cloud_captions_live",
+                               time.strftime("%Y%m%dT%H%M%S"))
+    ledger = LiveLedger(LEDGER, scrubber, spend)
 
     def left():
         return max(0, LIVE_ROW_COUNT - (proof.passed + proof.failed - at))
@@ -376,6 +385,11 @@ def run(proof, binary, port_base, probe):
     why = refusal(ledger)
     if why:
         proof.skip_rows(left(), f"the ledger gate refuses the next call: {why}")
+        return
+    why = spend.refusal(budget.assemblyai_worst(PLANNED_SECONDS))
+    if why:
+        proof.check("B: the month's AssemblyAI budget covers the next call", False, why)
+        proof.skip_rows(left(), "the month's AssemblyAI budget does not cover the next call")
         return
 
     instance = None

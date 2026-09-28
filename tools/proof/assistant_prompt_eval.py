@@ -13,17 +13,24 @@ sent — the body less its image data at one token per three bytes plus
 `IMAGE_TOKENS` per image, all at the cache-write rate, plus its `max_tokens`
 at the output rate — and forwarded only when settled spend, what is still
 reserved and that worst case fit under the cap; otherwise it is answered 400
-`invalid_request_error` naming the cap, and recorded. A body over
+`invalid_request_error` naming the cap, and recorded. A POST that fits the
+cap is then RESERVED at that worst case in the proofs' ledger
+(`budget.SpendLedger`, spec §11 P-6) and answered 400 naming the budget
+instead when this UTC month's recorded Anthropic spend plus it would pass
+$25; only once that reservation is made does the cap count it. A body over
 `BODY_BYTES_BOUND` or a `max_tokens` over `MAX_TOKENS_BOUND` is a bound breach
 (row H): the headroom arithmetic below assumed neither. The reply is buffered,
-its usage read and settled at `RATES`, and one ledger line appended —
-`{run,row,path,status,model,usage,dollars,refused}`, never a header or a body.
+its whole usage read, priced by the table (`budget.settle_anthropic`: the
+table's price, else each class at its dearest, else the reservation) and
+settled in the proofs' ledger, and one run-ledger line appended —
+`{run,row,path,status,model,usage,dollars,refused,basis}`, a refused line
+with `why` `cap` or `budget`, never a header or a body.
 
-**`RATES` is a deliberate upper bound, never a quote**: Claude Fable 5.1's
-$10 input / $50 output per MTok, the priciest model `fallbacks: "default"` can
-bill a turn at, with cache writes at 1.25x input and cache reads at 0.1x.
-Opus 5.5's own rates ($4 / $20, cache reads $0.20) are lower; the road map's
-A3 record names them and their source.
+**`RATES` is a deliberate upper bound, never a quote**: each token class at
+its dearest rate over every row and tier of `agent/prices/anthropic.json`
+(`budget.anthropic_worst_row`), with the 5-minute and 1-hour cache writes
+folded into the dearer. It prices the worst case only; what a reply cost is
+the table's price for its own model.
 
 **The headroom arithmetic** (`headroom_lines`): the helper sends
 `max_tokens` 32,000 on every POST (`agent/src/main.ts:31`) and all of the
@@ -33,20 +40,29 @@ logged body was 230,340 bytes, bounded here at 256,000, about 85,333 tokens.
 
 import json
 import os
+import sys
 import threading
 import time
 import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import budget  # noqa: E402
+import prices  # noqa: E402
+
 LIVE_UPSTREAM = "https://api.anthropic.com"
-RATES = {"input": 10.00, "cache_write": 12.50, "cache_read": 1.00, "output": 50.00}
+TABLE = prices.load()
+_WORST = budget.anthropic_worst_row(TABLE)
+RATES = {"input": _WORST["input"],
+         "cache_write": max(_WORST["cache_write_5m"], _WORST["cache_write_1h"]),
+         "cache_read": _WORST["cache_read"], "output": _WORST["output"]}
 IMAGE_TOKENS = 1600
 BODY_BYTES_BOUND = 256_000
 MAX_TOKENS_BOUND = 32_000
 ROUNDS_PER_ROW = 5
 OUTPUT_PER_ROUND = 2_000
-SUGGESTED_CAP = 15.00
+SUGGESTED_CAP = 20.00
 ROWS = 6
 PROOF_KEY = "proof-key"
 DROPPED_HEADERS = {"x-api-key", "authorization", "host", "content-length", "connection",
@@ -111,8 +127,8 @@ def cap_floor():
 
 def headroom_lines(cap):
     lines = [
-        "rates ($/MTok, an UPPER BOUND, not a quote: Claude Fable 5.1's $10 input / $50 "
-        f"output, cache write 1.25x and cache read 0.1x its input): input "
+        "rates ($/MTok, an UPPER BOUND, not a quote: each class's dearest in "
+        f"agent/prices/anthropic.json of {TABLE.get('litellm_commit_date')}): input "
         f"{RATES['input']:.2f}, cache write {RATES['cache_write']:.2f}, cache read "
         f"{RATES['cache_read']:.2f}, output {RATES['output']:.2f}",
         f"worst POST: {BODY_BYTES_BOUND:,} bytes / 3 = {body_tokens():,.0f} tokens at cache write "
@@ -126,6 +142,8 @@ def headroom_lines(cap):
         f"${row_bound():.2f}, an estimate billing every definition byte",
         f"floor: worst POST + {ROWS} row bounds = ${cap_floor():.2f}; suggested cap "
         f"${SUGGESTED_CAP:.2f}",
+        "budget: $25.00 a calendar month (UTC) for Anthropic, before each POST, in the proofs' "
+        "ledger (spec §11 P-6)",
     ]
     if cap is None:
         lines.append("cap: none given — --live needs --cap <dollars>, the runner's decision")
@@ -175,17 +193,21 @@ def measure(raw):
     return worst, stripped, images, max_tokens
 
 
-def read_usage(data, content_type):
-    """(usage of integer fields, model) of a buffered reply, stream or not."""
+def read_usage(data, content_type, status=200):
+    """(usage, model, whole) of a buffered reply, stream or not. `usage` keeps
+    every key; a stream's `message_delta.usage` keys overlay
+    `message_start`'s. `whole` is False for a 200 stream with no
+    `message_stop` and a 200 body with no `usage` object: a reply whose usage
+    cannot be read settles at its reservation."""
     usage, model = {}, None
 
     def take(given):
-        for name, value in (given or {}).items():
-            if isinstance(value, int) and not isinstance(value, bool):
-                usage[name] = value
+        if isinstance(given, dict):
+            usage.update(given)
 
     text = data.decode("utf-8", "replace")
     if "text/event-stream" in (content_type or ""):
+        stopped = False
         for line in text.splitlines():
             if not line.startswith("data:"):
                 continue
@@ -193,42 +215,46 @@ def read_usage(data, content_type):
                 event = json.loads(line[5:].strip())
             except ValueError:
                 continue
+            if not isinstance(event, dict):
+                continue
             if event.get("type") == "message_start":
-                message = event.get("message") or {}
+                message = event.get("message")
+                message = message if isinstance(message, dict) else {}
                 model = message.get("model") or model
                 take(message.get("usage"))
             elif event.get("type") == "message_delta":
                 take(event.get("usage"))
+            elif event.get("type") == "message_stop":
+                stopped = True
+        whole = stopped or status != 200
     else:
         try:
             body = json.loads(text)
         except ValueError:
             body = {}
+        has_usage = False
         if isinstance(body, dict):
             model = body.get("model")
+            has_usage = isinstance(body.get("usage"), dict)
             take(body.get("usage"))
-    return usage, model
-
-
-def dollars(usage):
-    return (_per_million(usage.get("input_tokens", 0), "input")
-            + _per_million(usage.get("cache_creation_input_tokens", 0), "cache_write")
-            + _per_million(usage.get("cache_read_input_tokens", 0), "cache_read")
-            + _per_million(usage.get("output_tokens", 0), "output"))
+        whole = has_usage or status != 200
+    return usage, model, whole
 
 
 class Relay:
-    def __init__(self, upstream, credential, cap, ledger, run):
+    def __init__(self, upstream, credential, cap, ledger, run, spend):
         self.upstream = upstream.rstrip("/")
         self.credential = credential
         self.cap = cap
         self.ledger = ledger
         self.run = run
+        self.spend = spend
         self.row = None
         self.lock = threading.Lock()
         self._spent = 0.0
         self._reserved = 0.0
         self._refusals = []
+        self._budget_refusals = []
         self._breaches = []
         self._max_worst = 0.0
         self.entries = []
@@ -245,6 +271,10 @@ class Relay:
     def refusals(self):
         with self.lock:
             return list(self._refusals)
+
+    def budget_refusals(self):
+        with self.lock:
+            return list(self._budget_refusals)
 
     def max_worst(self):
         with self.lock:
@@ -288,6 +318,7 @@ class Relay:
                 self._send(status, json.dumps(body).encode())
 
             def _forward(self, method, raw):
+                """(status, content type, data, the relay's own answer)."""
                 headers = {name: value for name, value in self.headers.items()
                            if name.lower() not in DROPPED_HEADERS}
                 headers["x-api-key"] = relay.credential()
@@ -297,14 +328,14 @@ class Relay:
                 try:
                     with urllib.request.urlopen(request, timeout=900) as response:
                         return response.status, response.headers.get("content-type", ""), \
-                            response.read()
+                            response.read(), False
                 except urllib.error.HTTPError as error:
-                    return error.code, error.headers.get("content-type", ""), error.read()
+                    return error.code, error.headers.get("content-type", ""), error.read(), False
                 except Exception as error:  # noqa: BLE001 — answered, never raised
                     body = {"type": "error", "error": {
                         "type": "api_error",
                         "message": f"the relay could not reach upstream: {type(error).__name__}"}}
-                    return 502, "application/json", json.dumps(body).encode()
+                    return 502, "application/json", json.dumps(body).encode(), True
 
             def _handle(self, method):
                 length = int(self.headers.get("content-length") or 0)
@@ -314,7 +345,7 @@ class Relay:
                     return self._error(401, "authentication_error",
                                        "the relay takes the proof's dummy key only")
                 if method == "GET" and path.startswith("/v1/models/"):
-                    status, kind, data = self._forward(method, raw)
+                    status, kind, data, _ = self._forward(method, raw)
                     return self._send(status, data, kind or "application/json")
                 if method == "POST" and path.startswith("/v1/messages"):
                     return self._messages(raw)
@@ -332,28 +363,48 @@ class Relay:
                     if max_tokens > MAX_TOKENS_BOUND:
                         relay._breaches.append(
                             f"row {row}: max_tokens {max_tokens:,} is over {MAX_TOKENS_BOUND:,}")
+                    # The cap's test first, reserving nothing yet; a POST that
+                    # fits is reserved in the proofs' ledger, and only once that
+                    # reservation is made does the cap count it — so a POST the
+                    # budget refuses holds no cap reservation.
                     fits = relay._spent + relay._reserved + worst <= relay.cap
-                    if fits:
-                        relay._reserved += worst
-                    else:
+                    refused, sid = None, None
+                    if not fits:
                         relay._refusals.append({"row": row, "spent": relay._spent,
                                                 "reserved": relay._reserved, "worst": worst})
+                    else:
+                        try:
+                            sid = relay.spend.reserve(worst, row)
+                        except budget.BudgetRefused as problem:
+                            refused = str(problem)
+                            relay._budget_refusals.append({"row": row, "why": refused})
+                        else:
+                            relay._reserved += worst
                 if not fits:
                     relay._write({"run": relay.run, "row": row, "path": self.path, "status": 400,
-                                  "model": None, "usage": {}, "dollars": 0.0, "refused": True})
+                                  "model": None, "usage": {}, "dollars": 0.0, "refused": True,
+                                  "why": "cap"})
                     return self._error(
                         400, "invalid_request_error",
                         f"the evaluation's spend cap of ${relay.cap:.4g} would be passed: "
                         f"${relay.spent():.4f} settled, this request's worst case "
                         f"${worst:.2f}")
-                status, kind, data = self._forward("POST", raw)
-                usage, model = read_usage(data, kind)
-                cost = dollars(usage)
+                if refused is not None:
+                    relay._write({"run": relay.run, "row": row, "path": self.path, "status": 400,
+                                  "model": None, "usage": {}, "dollars": 0.0, "refused": True,
+                                  "why": "budget"})
+                    return self._error(400, "invalid_request_error", refused)
+                status, kind, data, own = self._forward("POST", raw)
+                usage, model, whole = read_usage(data, kind, status)
+                cost, basis = budget.settle_anthropic(usage, model, TABLE, worst,
+                                                      whole and not own)
                 with relay.lock:
                     relay._reserved -= worst
                     relay._spent += cost
+                relay.spend.settle(sid, cost, basis, model=model, usage=usage)
                 relay._write({"run": relay.run, "row": row, "path": self.path, "status": status,
-                              "model": model, "usage": usage, "dollars": cost, "refused": False})
+                              "model": model, "usage": usage, "dollars": cost, "refused": False,
+                              "basis": basis})
                 return self._send(status, data, kind or "application/json")
 
             def do_GET(self):
@@ -490,6 +541,7 @@ class Evaluation:
         self.wrong = wrong
         self.report = []  # (row, tools, tokens, dollars)
         self.cap_failures = 0
+        self.budget_failures = 0
         self.left_asking = {}  # row -> the pending question's tool, answered "stop"
 
     def send(self, row, project, text):
@@ -518,11 +570,17 @@ class Evaluation:
         tokens = {}
         for entry in mine:
             for name, value in (entry.get("usage") or {}).items():
-                tokens[name] = tokens.get(name, 0) + value
+                if isinstance(value, int) and not isinstance(value, bool):
+                    tokens[name] = tokens.get(name, 0) + value
         cost = sum(e.get("dollars", 0.0) for e in mine)
         self.report.append((row, tools, tokens, cost))
         if row in self.left_asking:
             detail += f"; left asking {self.left_asking[row]!r}, answered \"stop\""
+        budgeted = [r for r in self.relay.budget_refusals() if r.get("row") == row]
+        if budgeted:
+            self.budget_failures += 1
+            self.score(row, False, f"{budgeted[0]['why']} ({detail})")
+            return
         refused = [r for r in self.relay.refusals() if r.get("row") == row]
         if refused:
             self.cap_failures += 1
@@ -655,7 +713,8 @@ class Evaluation:
                     events)
 
     def print_report(self, ledger):
-        print("per row (dollars at RATES, an upper bound, not a quote):", flush=True)
+        print("per row (dollars at the price table; usage it cannot price at each class's "
+              "dearest):", flush=True)
         for row, tools, tokens, cost in self.report:
             print(f"  {row}: tools {tools}; tokens {tokens}; ${cost:.4f}", flush=True)
         total = 0.0
@@ -668,8 +727,9 @@ class Evaluation:
                         pass
         except OSError:
             pass
-        print(f"run {self.relay.run}: ${self.relay.spent():.4f} settled (upper bound); ledger "
+        print(f"run {self.relay.run}: ${self.relay.spent():.4f} settled; ledger "
               f"{ledger}: ${total:.4f} over every run", flush=True)
+        print(self.relay.spend.describe(), flush=True)
 
 
 def row_h(relay):
@@ -682,8 +742,9 @@ def row_h(relay):
                   f"{MAX_TOKENS_BOUND:,}")
 
 
-def row_k(key, folder, app_log):
-    """A0 L1's shape: the key's bytes in no file under `folder` nor the log."""
+def row_k(key, folder, app_log, extra=()):
+    """A0 L1's shape: the key's bytes in no file under `folder`, the log, nor
+    any `extra` file (the proofs' ledger)."""
     needle = key.encode()
     held, scanned = [], 0
     for here, dirs, names in os.walk(folder):
@@ -700,14 +761,17 @@ def row_k(key, folder, app_log):
             scanned += 1
             if needle in body:
                 held.append(os.path.relpath(path, folder))
-    if app_log and not os.path.abspath(app_log).startswith(os.path.abspath(folder) + os.sep):
-        scanned += 1
+    for other in [app_log] + list(extra):
+        if not other or os.path.abspath(other).startswith(os.path.abspath(folder) + os.sep):
+            continue
         try:
-            with open(app_log, "rb") as handle:
-                if needle in handle.read():
-                    held.append(app_log)
+            with open(other, "rb") as handle:
+                body = handle.read()
         except OSError:
-            pass
+            continue
+        scanned += 1
+        if needle in body:
+            held.append(other)
     return not held, f"key present; {scanned} files read; holding it: {sorted(held)[:10]}"
 
 
