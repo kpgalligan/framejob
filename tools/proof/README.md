@@ -6587,7 +6587,10 @@ and still runs.
 figure; raising it is the runner's decision): without one it prints the
 arithmetic and exits 2 before launching anything; with no key, E1–E6, H and
 K SKIP "host: no key". Live: the relay's upstream is `https://api.anthropic.com`,
-its credential `anthropic_key()` — the ONE read of `ANTHROPIC_API_KEY`, whose
+its credential `anthropic_key()` — the ONE read of the owner's key:
+`ANTHROPIC_API_KEY` when set, else `.secrets/anthropic-key` at the repo
+root (gitignored, `chmod 600`; a looser mode warns), so a live run needs
+nobody at the machine — whose
 presence alone is printed — and the ledger `work/assistant_prompt/ledger.jsonl`.
 `--rehearse` runs the same rows with the stand-in upstream, the credential
 `proof-key`, the cap `SUGGESTED_CAP` unless `--cap`, scripted right calls
@@ -6618,7 +6621,7 @@ python3 tools/proof/assistant_prompt_proof.py --rehearse                # + E1�
 python3 tools/proof/assistant_prompt_proof.py --rehearse --wrong        # every E row FAILs, exit 1
 python3 tools/proof/assistant_prompt_proof.py --rehearse --cap 0.0001   # WARNING; E rows fail `cap:`
 python3 tools/proof/assistant_prompt_proof.py --mutant bare-send        # S2 FAIL, exit 1
-python3 tools/proof/assistant_prompt_proof.py --live --cap 15           # a person, with a key
+python3 tools/proof/assistant_prompt_proof.py --live --cap 15           # spends: the key from .secrets/ or the env
 ```
 
 ## Road map 12's A4 — the helper in both bundles (`dist_check.py` D6–D13, `dist_check_mutants.py`)

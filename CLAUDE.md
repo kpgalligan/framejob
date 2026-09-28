@@ -207,6 +207,13 @@ else is what bloats files:
   `designs/adr/app-file-history.md` / `core-file-history.md`.
 - **A decision in spec §11 is not re-litigated** (`designs/spec/11-decisions/`). A phase that needs a new
   one records it there before the code, not after.
+- **`.secrets/` (gitignored) holds the owner's own keys for proofs**, e.g.
+  `.secrets/anthropic-key`, read ONLY by `anthropic_key()` in
+  `tools/proof/assistant_prompt_eval.py`. Never open, print, grep, copy or
+  list its contents; never move a key from it into an argument, the
+  environment of a build, a log or a file. A run that spends money still
+  needs its explicit flags (`--live --cap <dollars>`); the file's presence
+  spends nothing.
 - **A check only a person at the machine can make is a row in
   `docs/manual-checks.md`**, added in the change that creates it — never a
   `ready-for-human` issue, and never an instrument built to stand in for the

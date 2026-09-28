@@ -53,10 +53,29 @@ DROPPED_HEADERS = {"x-api-key", "authorization", "host", "content-length", "conn
                    "accept-encoding"}
 
 
+KEY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".secrets",
+                        "anthropic-key")
+
+
 def anthropic_key():
-    """The ONE read of `ANTHROPIC_API_KEY`. Nothing that holds its answer is
-    ever printed or written; only its presence is."""
-    return os.environ.get("ANTHROPIC_API_KEY") or None
+    """The ONE read of the owner's Anthropic key: `ANTHROPIC_API_KEY` when it
+    is set, otherwise `.secrets/anthropic-key` at the repo root (gitignored,
+    the owner's own file, so a run needs nobody at the machine). Nothing
+    that holds its answer is ever printed or written; only its presence is.
+    A file anyone but its owner can read is still used, with a warning."""
+    env = os.environ.get("ANTHROPIC_API_KEY")
+    if env:
+        return env
+    try:
+        mode = os.stat(KEY_FILE).st_mode
+        with open(KEY_FILE) as f:
+            key = f.read().strip()
+    except OSError:
+        return None
+    if mode & 0o077:
+        print("warning: .secrets/anthropic-key is readable by others; "
+              "chmod 600 .secrets/anthropic-key", flush=True)
+    return key or None
 
 
 # ---------------------------------------------------------------------------

@@ -465,7 +465,8 @@ def main():
 
         key = ev.anthropic_key() if args.live else None
         if args.live:
-            print(f"ANTHROPIC_API_KEY: {'present' if key else 'absent'}", flush=True)
+            print(f"Anthropic key (ANTHROPIC_API_KEY or .secrets/anthropic-key): "
+                  f"{'present' if key else 'absent'}", flush=True)
         if not (args.live or args.rehearse):
             for row_id in EVAL_ROWS:
                 score(row_id, True, "not asked (--live)", skip=True)

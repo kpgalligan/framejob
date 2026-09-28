@@ -11,3 +11,5 @@ xcuserdata/
 .claude/scheduled_tasks.lock
 .claude/worktrees
 **/.claude/settings.local.json
+# The owner's proof-only keys (tools/proof/assistant_prompt_eval.py). Never read or printed by an agent.
+/.secrets/

@@ -115,3 +115,9 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   `word_style`,** because deepening D1 makes every declared key patchable.
   That is the agent's door, and it is not a promise that a hand-restyled
   page still fits: restyling is regenerating (road map 8 §4 W-10).
+- **W-11 — Three style choices are confirmed as shipped** (the user,
+  2026-09-28, closing #45): Karaoke is the one style that pages to two
+  lines (every other style is one row); the caption faces bundled are
+  Montserrat ExtraBold and Black, Anton and Bebas Neue (OFL, in
+  `app/Resources/Fonts/`); and a page that does not fit shrinks no further
+  than 80 % of its size (`CaptionPages.Rules.shrinkFloor`).

@@ -17,7 +17,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | [`effects-motion.md`](effects-motion.md) | 60 | **Transitions and motion (road map 5).** R5-1..R5-5, E2-27. |
 | [`deepening.md`](deepening.md) | 268 | **Deepening (road map 7).** D2-1, D3-1, #21, #22, D4-1..D4-6, D7-1..D7-3: how ops refuse, the op table, the gate, the source window, time envelopes. |
 | [`cloud-captions.md`](cloud-captions.md) | 242 | **Cloud captions (road map 6).** R6-1..R6-16: AssemblyAI, keys, deletion, recovery. |
-| [`word-captions.md`](word-captions.md) | 117 | **Word captions (road map 8).** W-1..W-10. |
+| [`word-captions.md`](word-captions.md) | 123 | **Word captions (road map 8).** W-1..W-11. |
 | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) | 306 | **Chrome, the clip inspector and keys (the sharp pass, road map 9, #35).** SH-1, SH-2, CI-1..CI-15, K-1, K-2. |
 | [`graphics.md`](graphics.md) | 281 | **Graphics (road map 10).** G-1..G-16. |
 | [`dev-tools.md`](dev-tools.md) | 27 | **Dev tools (road map 11).** V-1..V-3: the `REELCUT_DEV_TOOLS` flag and `make dist`, dev tools as ordinary tools, capture by `cacheDisplay`. |
@@ -105,6 +105,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | W-8 | The minimum is macOS 26, and the on-device engine is `SpeechTranscriber` | [`word-captions.md`](word-captions.md) |
 | W-9 | No language model chooses words — amended by AI-6 | [`word-captions.md`](word-captions.md) |
 | W-10 | `set_text` can patch `case`, `words` and `word_style` | [`word-captions.md`](word-captions.md) |
+| W-11 | Karaoke's two lines, the bundled caption faces and the 80 % shrink floor are confirmed | [`word-captions.md`](word-captions.md) |
 | SH-1 | `StickerButton` keeps its pill | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
 | SH-2 | `BlockSliderCell.drawBar` is forked from Rasterize's copy | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
 | CI-1 | The selected action is the SIXTH piece of view state | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
