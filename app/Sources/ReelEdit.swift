@@ -106,7 +106,8 @@ extension ReelProject {
     /// The FIRST refusal is remembered and answered only when nothing applied
     /// at all, because that is the case where a caller is owed a reason and
     /// the earliest thing that went wrong is the one to name. `.identity`
-    /// when every op was one.
+    /// when every op was one. Spec §11 #88 keeps this fold as it is: CI-10's
+    /// strip means "nothing changed", which a list that applied is not.
     func applying(_ ops: [ReelOp]) throws -> ReelEdit {
         var current: ReelProject?
         var refusal: ReelRefusal?

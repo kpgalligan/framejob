@@ -303,9 +303,12 @@ reversed in a commit message); run EVERY proof script when the FFI changes; meas
 - **The parity check cannot see a CALL**: an inert declarations row or an argument no handler reads
   is invisible to it; `op_argument_proof.py` and the gate cover those (orig §8.5).
 - **The fold drops a refusal's sentence when another op in the list applied** (orig §5.2).
-- **Clamped-edge ops answer `Identity`**, not a refusal: slip/roll clamped to nothing, roll with no
+- ~~**Clamped-edge ops answer `Identity`**, not a refusal: slip/roll clamped to nothing, roll with no
   predecessor, trim whose clamps cross, rate stretch outside ×0.1–×10, `detach_audio` with no
-  audio, `set_transition_duration` with no predecessor or room (orig §5.3, §6).
+  audio, `set_transition_duration` with no predecessor or room (orig §5.3, §6).~~ Struck (issue
+  batch B12): roll with no predecessor, `detach_audio` with no audio and `set_transition_duration`
+  with no predecessor or room now refuse in their own sentences (spec §11 #88); the clamps that land
+  where the clip was stay identities (§5.5).
 - **The reversed mirror is one tick high** (`T − p`, not `T − 1 − p`): one blank waveform column at
   a whole-file reversed clip's head. Declined: `silence2_proof.py` walks these numbers tick-exact in
   Python on purpose (orig §10.9).
@@ -321,15 +324,16 @@ reversed in a commit message); run EVERY proof script when the FFI changes; meas
 
 ## Open items
 
-- The clamped-edge family could answer `Refused` with a sentence — a candidate, not started, not
-  owed by D2 — tracked in #88.
+- ~~The clamped-edge family could answer `Refused` with a sentence — a candidate, not started, not
+  owed by D2 — tracked in #88.~~ Struck (issue batch B12): §5.5 keeps a clamp that lands where the
+  clip was an identity (spec §11 #88).
 - Index range refusals (`filters[1].amount`), moving `phase6_proof.py`'s `[]` assertions with it —
   tracked in #89.
 - `performGroupedEdit`'s empty undo group on an identity/refusal: reproduce with undo-stack
   assertions and re-audit the "unreachable" claim (inspector, canvas and add-clip paths call it) —
   tracked in #59.
-- A partial success whose list also held a refusal drops the sentence; no tool produces the case
-  today — tracked in #88.
+- ~~A partial success whose list also held a refusal drops the sentence; no tool produces the case
+  today — tracked in #88.~~ Struck (issue batch B12): decided, the fold stays (spec §11 #88).
 - Nullability as an op-table column (optional design) — tracked in #90.
 - ~~Residual argument-name literals in older proof scripts (app-state tools; `phase4`/`phase5` prose
   claims) — tracked in #82.~~ Struck (issue batch B7): since 77b0bb8 those scripts read `tools/list`

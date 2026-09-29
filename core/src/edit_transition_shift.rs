@@ -11,9 +11,10 @@
 //! amendment of 2026-09-16); nothing else calls it.
 
 use crate::edit_time::{locked_track, shift_clips, unlocked_tracks};
+use crate::edit_transition::transition_too_short;
 use crate::model::{Clip, Project, Transition, TransitionKind};
 use crate::outcome::Outcome;
-use crate::time::Ticks;
+use crate::time::{frames_back, frames_in, frames_within, snap_up_to_frame, Ticks};
 use crate::transition_search::shift_frame_limit;
 
 impl Project {
@@ -31,16 +32,21 @@ impl Project {
     /// in sync and the timeline gets shorter by the overlap. Markers do not
     /// move, as they do not for `ripple_delete` or `close_gap`.
     ///
-    /// The duration is snapped down to whole frames, capped at half the
-    /// shorter of the two clips (the pair's own overlap rule, closed form),
-    /// and then searched for the greatest length at which every track something
-    /// moved on passes the overlap rule — clamped rather than refused, the
-    /// handle form's posture. A clip on another track that the shift pushes
-    /// into its predecessor gains a minted `cross_dissolve`, which is
-    /// `close_gap`'s rule for the same shift.
+    /// The duration is counted in whole frames of the canvas's own grid
+    /// (`time::frames_in`), capped at the frames that fit in half the
+    /// shorter of the two clips back from the cut (the pair's own overlap
+    /// rule, closed form), and then searched for the greatest count at which
+    /// every track something moved on passes the overlap rule — clamped
+    /// rather than refused, the handle form's posture. The incoming clip
+    /// lands that many GRID frames back from the cut (`time::frames_back`),
+    /// and everything else moves by the same delta (spec §11 #42). A clip on
+    /// another track that the shift pushes into its predecessor gains a
+    /// minted `cross_dissolve`, which is `close_gap`'s rule for the same
+    /// shift.
     ///
-    /// Three refusals, each in its own sentence: an incoming clip on a
-    /// LOCKED track cannot move ([`locked_track`]); a pair whose shorter
+    /// Four refusals, each in its own sentence: an incoming clip on a
+    /// LOCKED track cannot move ([`locked_track`]); a request under one grid
+    /// frame is too short ([`transition_too_short`]); a pair whose shorter
     /// clip is under two frames has no half to give; and a shift every
     /// length of which would break the overlap rule somewhere it moved
     /// something.
@@ -61,7 +67,14 @@ impl Project {
                 ),
             )));
         }
-        let frame = self.frame();
+        let fps = self.canvas.fps;
+        let asked = frames_in(duration, fps);
+        if asked < 1 {
+            let one = snap_up_to_frame(1, fps);
+            return Ok(Outcome::Refused(transition_too_short(
+                later.id, duration, one,
+            )));
+        }
         let cut = later.start;
         let mut touched: Vec<u32> = Vec::new();
         for clip in &self.clips {
@@ -72,10 +85,9 @@ impl Project {
         }
 
         let shorter = earlier.duration.min(later.duration);
-        let asked = duration / frame;
-        let allowed = shorter / 2 / frame;
-        // Asked first, so a request under a frame and a pair too short to
-        // halve are told apart by the two numbers rather than by a guess.
+        // The pair rule is in ticks; how many grid frames back from the cut
+        // fit inside it is the count the shift may spend.
+        let allowed = frames_within(cut, shorter / 2, fps);
         let frames = asked.min(allowed);
         if frames <= 0 {
             return Ok(Outcome::Refused(format!(
@@ -90,9 +102,13 @@ impl Project {
                 return Ok(Outcome::Refused(why));
             }
         }
-        if let Some(frames) = shift_frame_limit(self, cut, frame, most, &touched) {
+        if let Some(frames) = shift_frame_limit(self, cut, most, &touched) {
             let mut next = self.clone();
-            shift_clips(&mut next, cut, -(frames * frame));
+            shift_clips(
+                &mut next,
+                cut,
+                frames_back(cut, frames, fps).saturating_sub(cut),
+            );
             for track in &touched {
                 if let Err(why) = next.check_overlap_rule(&[], *track, &[]) {
                     return Ok(Outcome::Refused(why));

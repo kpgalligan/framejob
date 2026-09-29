@@ -27,7 +27,8 @@ use crate::model_words::rebase_words;
 use crate::outcome::Outcome;
 use crate::recipe_graphic::graphic_advanced;
 use crate::source_window::source_advanced;
-use crate::time::Ticks;
+use crate::time::{frames_in, snap_up_to_frame, Ticks};
+use crate::transition::overlap_limit;
 use crate::transition_search::{largest_passing, reduced_split};
 
 /// Where the overlap [`Project::add_transition`] makes is taken FROM.
@@ -75,6 +76,16 @@ pub(crate) fn set_gained_transitions(project: &mut Project, tracks: &[u32]) {
             clip.transition_in = Some(Transition::minted(TransitionKind::default()));
         }
     }
+}
+
+/// THE too-short sentence, for both forms of `add_transition` (spec §11
+/// #88): a request under one frame of the canvas's grid, naming `one`, the
+/// smallest duration the form would take.
+pub(crate) fn transition_too_short(clip: u32, duration: Ticks, one: Ticks) -> String {
+    format!(
+        "a transition of {duration} ticks is too short to make at the cut before clip \
+         {clip}; pass a duration of at least {one} ticks"
+    )
 }
 
 /// The pair as [`Project::add_transition`] would leave it: `earlier` grown
@@ -194,7 +205,9 @@ impl Project {
     ///    two extensions are read off the frame
     ///    GRID, not taken as a multiple of [`Project::frame`], which is a
     ///    fallback at a rate that does not divide the timescale.
-    /// 7. Nothing left to give — below one frame — is a refusal.
+    /// 7. Nothing left to give — below one frame — is a refusal. A request
+    ///    that is itself under one frame never gets here: it is refused
+    ///    after the preflight in [`transition_too_short`]'s words.
     /// 8. Write: A grows at the end, B grows at the front and its `in`
     ///    moves back by the same timeline time TIMES its speed, the
     ///    arithmetic `trim_start` and `roll` both use. A graphic's own `in`
@@ -268,8 +281,16 @@ impl Project {
         if let Err(why) = self.check_overlap_rule(&[], later.track, &[]) {
             return Ok(Outcome::Refused(why));
         }
-
+        // Under one frame of the real grid, or of the fallback `frame` the
+        // arithmetic below still divides by (5994/100: 10010 is a grid frame
+        // and a zero `requested`), is too short; `one` passes both.
+        let fps = self.canvas.fps;
         let frame = self.frame();
+        if frames_in(duration, fps) < 1 || duration / frame < 1 {
+            let one = snap_up_to_frame(1, fps).max(snap_up_to_frame(frame, fps));
+            return Ok(Outcome::Refused(transition_too_short(clip, duration, one)));
+        }
+
         // 2 and 3. The handles, floored to whole frames. `None` is
         //    UNBOUNDED, which is not the same as a handle of zero.
         let head_frames = self.head_handle_frames(&later, frame);
@@ -284,8 +305,6 @@ impl Project {
         //    one-frame trials, 36 hours extrapolated from a measured
         //    ladder. The bounded search still keeps this ceiling because
         //    it prevents a reordered pair from passing the wrong rule.
-        //    `requested` keeps the caller's own number, because
-        //    that is what the refusal sentence below has to name.
         //
         //    It is also what keeps B's new start at or after tick 0. A
         //    handle says what the SOURCE holds, not what the timeline in
@@ -381,10 +400,10 @@ impl Project {
             // Three clamps can land here — the two handles, the
             // neighbours on the track, and the search above — so the
             // sentence names all three rather than guessing which one
-            // it was. The number in it is the request in whole FRAMES
-            // (`requested`, the caller's ticks divided by the grid),
-            // which is the unit every clamp above is measured in and
-            // the one a caller has to change.
+            // it was. The number in it is the request in whole FRAMES of
+            // the canvas's grid (`time::frames_in`), the unit a caller
+            // has to change.
+            let requested = frames_in(duration, fps);
             return Ok(Outcome::Refused(format!(
                 "the cut before clip {clip} has no room for an overlap: the {requested} \
                      frames asked for clamp to nothing against the two clips' unused \
@@ -501,9 +520,12 @@ impl Project {
     /// `duration` (spec §6) — the transition's length IS that overlap, so
     /// there is nothing else to set.
     ///
-    /// Refuses when the clip has no predecessor on its track, when the new
-    /// start would be negative, or when the result breaks the overlap rule.
-    /// `Err` on a negative duration.
+    /// Refuses when the clip has no predecessor on its track, when the
+    /// duration is past the pair's overlap limit (half the shorter clip,
+    /// snapped down) — which covers a start below 0 and a start in front of
+    /// the predecessor (#175) — or when the result breaks the overlap rule
+    /// elsewhere; each sentence names the value (spec §11 #88). `Err` on a
+    /// negative duration.
     pub fn set_transition_duration(&self, clip: u32, duration: Ticks) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
         let duration = self.snapped(duration);
@@ -518,13 +540,32 @@ impl Project {
             None => return Ok(Outcome::Identity),
         };
         let Some(previous) = index.checked_sub(1).and_then(|i| ordered.get(i)) else {
-            return Ok(Outcome::Identity);
+            return Ok(Outcome::Refused(format!(
+                "clip {clip} is the first clip on track {}, so there is no clip before it \
+                 to overlap",
+                target.track
+            )));
         };
         // The overlap is the tail of the previous clip the later one covers,
         // so the later one starts exactly `duration` before that tail ends.
         let start = clip_end(previous).saturating_sub(duration);
-        if start < 0 {
-            return Ok(Outcome::Identity);
+        let limit = self.snapped_down(overlap_limit(previous, &target));
+        if duration > limit {
+            let place = if start < 0 {
+                ", before the timeline,".to_string()
+            } else if start < previous.start {
+                format!(
+                    ", before clip {} starts at {},",
+                    previous.id, previous.start
+                )
+            } else {
+                String::new()
+            };
+            return Ok(Outcome::Refused(format!(
+                "clip {clip} would start at {start}{place} to overlap clip {} by {duration} \
+                 ticks; the two can overlap by at most {limit} ticks",
+                previous.id
+            )));
         }
 
         let mut moved = target.clone();

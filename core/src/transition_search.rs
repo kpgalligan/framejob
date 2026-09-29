@@ -12,14 +12,18 @@
 //!
 //! Ripple has no such global monotonicity: a moved clip can pass across a
 //! fixed clip and become valid again. Its forbidden integer intervals are
-//! calculated exactly instead. Pairwise half-shorter checks also enforce
-//! the non-adjacent rule for positive durations: if A reaches C across B,
+//! calculated exactly instead, in whole frames of the canvas's own grid
+//! counted back from the cut (`time::frames_within`, spec §11 #42), so a
+//! shift of `k` frames is `time::frames_back(cut, k) − cut` and not
+//! `k` times `Project::frame`'s 1/30 s fallback. Pairwise half-shorter
+//! checks also enforce the non-adjacent rule for positive durations: if A
+//! reaches C across B,
 //! either B ends before C (then A covers all B), or A/B staying within
 //! half B puts A's end before B's midpoint while B/C staying within half B
 //! puts C's start after that midpoint, contradicting A reaching C.
 
 use crate::model::Project;
-use crate::time::Ticks;
+use crate::time::{frames_within, Ticks};
 use crate::transition::overlap_limit;
 
 /// The old larger-side decrement path, including its head-first tie rule.
@@ -58,12 +62,17 @@ pub(crate) fn largest_passing(limit: Ticks, mut fits: impl FnMut(Ticks) -> bool)
 pub(crate) fn shift_frame_limit(
     project: &Project,
     cut: Ticks,
-    frame: Ticks,
     limit: Ticks,
     touched: &[u32],
 ) -> Option<Ticks> {
     let mut forbidden: Vec<(i128, i128)> = Vec::new();
-    let frame = i128::from(frame);
+    let fps = project.canvas.fps;
+    // A threshold outside the tick range saturates: past either end, no
+    // count the search can reach is on the other side of it.
+    let within = |span: i128| {
+        let span = Ticks::try_from(span).unwrap_or(if span < 0 { Ticks::MIN } else { Ticks::MAX });
+        i128::from(frames_within(cut, span, fps))
+    };
     let maximum = i128::from(limit);
     for track in touched {
         let fixed: Vec<_> = project
@@ -83,10 +92,11 @@ pub(crate) fn shift_frame_limit(
                 let m = i128::from(b.start);
                 let n = m + i128::from(b.duration);
                 let half = i128::from(overlap_limit(a, b));
-                // Too much overlap iff m-e+L < k*frame < n-s-L.
-                // div_euclid is signed floor; strict upper uses one less tick.
-                let low = (m - e + half).div_euclid(frame) + 1;
-                let high = (n - s - half - 1).div_euclid(frame);
+                // Too much overlap iff m-e+L < shift(k) < n-s-L, where
+                // shift(k) = cut - frames_back(cut, k) grows with k; the
+                // strict upper bound uses one less tick.
+                let low = within(m - e + half) + 1;
+                let high = within(n - s - half - 1);
                 let low = low.max(1);
                 let high = high.min(maximum);
                 if low <= high {

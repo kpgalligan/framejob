@@ -423,7 +423,7 @@ extension AgentServer {
                     + "predecessor's end both become `to`: one clip grows by exactly what the "
                     + "other loses, and the pair's outer edges and total length do not move. "
                     + "The predecessor is the clip on the same track ending EXACTLY at this "
-                    + "one's start; with a gap or an overlap there instead, nothing changes (an "
+                    + "one's start; with a gap or an overlap there instead, it is refused (an "
                     + "overlap is a transition — use set_transition_duration). Clamped so each "
                     + "clip keeps a frame and neither asks for source it does not have.",
                 ["clip": clipDescription, "to": "Where the cut moves to, \(ticks)"]),
@@ -550,8 +550,8 @@ extension AgentServer {
                 "detach_audio",
                 "Splits a clip's audio onto its own clip on the track below (inserting one when "
                     + "there is none), muting the original's audio and hiding the new clip's "
-                    + "video — ⌥⌘D. The two can then be trimmed and moved apart. Refused when "
-                    + "the media has no audio or the audio is already detached.",
+                    + "video — ⌥⌘D. The two can then be trimmed and moved apart. Refused, saying "
+                    + "why, for a non-media clip, media with no audio, or audio already detached.",
                 ["clip": clipDescription]),
             opTool(
                 "duplicate",
@@ -713,8 +713,8 @@ extension AgentServer {
             opTool(
                 "set_transition_duration",
                 "Makes a clip's transition last `duration` by MOVING the clip so its overlap "
-                    + "with the clip before it equals that. Subject to the overlap rule, so a "
-                    + "duration past half the shorter clip is refused.",
+                    + "with the clip before it equals that. Refused on a track's first clip and past "
+                    + "half the shorter clip (snapped down), naming that limit.",
                 ["clip": clipDescription, "duration": "Overlap length, \(ticks)"]),
 
             // MARK: Actions

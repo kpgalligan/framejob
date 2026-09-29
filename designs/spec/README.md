@@ -25,9 +25,9 @@ this index gets its row in the same change.
 | [`05.2-project-schema.md`](05.2-project-schema.md) | 355 | The project JSON schema: every persisted field (format version 10). |
 | [`05.3-placement.md`](05.3-placement.md) | 81 | Where a layer lands on the canvas: position, scale, crop, regions, reflection, motion, nests flattened. |
 | [`05.4-actions.md`](05.4-actions.md) | 81 | Actions (keyframed segments): what they target, how lists interpolate, a stored `null` as off. |
-| [`05.5-purity-and-undo.md`](05.5-purity-and-undo.md) | 38 | An edit's three answers, purity, undo. |
+| [`05.5-purity-and-undo.md`](05.5-purity-and-undo.md) | 40 | An edit's three answers, purity, undo. |
 | [`05.6-persistence.md`](05.6-persistence.md) | 143 | The package on disk: Consolidate, bookmarks, reversed assets, caches and their markers, transcripts. |
-| [`06-edit-operations.md`](06-edit-operations.md) | 494 | Every op's exact semantics (the arguments half is `core/src/op_table.rs`). |
+| [`06-edit-operations.md`](06-edit-operations.md) | 505 | Every op's exact semantics (the arguments half is `core/src/op_table.rs`). |
 | **§7 — Architecture: Rust decides, AVFoundation and Metal do** | | |
 | [`07-architecture.md`](07-architecture.md) | 25 | The Rust/platform split in one page. |
 | [`07.1-ffi-surface.md`](07.1-ffi-surface.md) | 116 | The `rc_*` exports and their contracts. |
@@ -43,7 +43,7 @@ this index gets its row in the same change.
 | [`08-repo-layout.md`](08-repo-layout.md) | 64 | Repo layout, build, conventions. |
 | [`09-keys-and-menus.md`](09-keys-and-menus.md) | 136 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 2031 in 13 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 2117 in 13 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

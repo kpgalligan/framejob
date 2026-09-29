@@ -204,7 +204,9 @@ many clips`, `too many tracks`, `nests are more than 8 deep at nest N`.
   span (union of the removed clips' spans, processed right-to-left) shifts every clip on
   **unlocked** tracks whose start ≥ span end left by the span length. Clips on other tracks that
   straddle a span are left in place. Range form: every unlocked clip is split at both bounds first,
-  the middle pieces removed, then the shift.
+  the middle pieces removed, then the shift. Every clip a shift moves moves by that ONE delta, so
+  clips that abutted still abut — at a rate whose frame is not a whole number of ticks (7 fps) a
+  moved start may sit a tick off the grid (§11 #42).
 - **`ripple_delete_ranges {ranges: [[from, to], …]}`** — Several ranges as ONE edit — the silence
   cut. Each pair is snapped, clamped and ordered exactly as `ripple_delete_range`'s one is (a
   reversed pair is the same range), the pairs are then MERGED — touching as well as overlapping —
@@ -245,8 +247,8 @@ many clips`, `too many tracks`, `nests are more than 8 deep at nest N`.
   Media sources only, an **error** on any other kind (as `rate_stretch`).
 - **`detach_audio {clip}`** — `enabled.audio = false` on the clip; a new clip with `enabled =
   {video: false, audio: true}`, same source/in/duration/speed and the audio props, on the track
-  below (a track is inserted at index 0 if needed). Refuses if the media has no audio or audio is
-  already detached.
+  below (a track is inserted at index 0 if needed). Refuses, naming why (§11 #88), on a clip that
+  is not media, whose media has no audio, or whose audio is already detached.
 - **`duplicate {clips}`** — Copies placed after the originals' span on the same tracks (⌥-drag then
   moves them).
 - **`paste {at, track?, payload}`** — Inserts the clips of a clipboard payload — `{"clips": [...],
@@ -361,7 +363,10 @@ many clips`, `too many tracks`, `nests are more than 8 deep at nest N`.
   HAS a transition only the `kind` moves — its `curve` and `audio` stay where the person put them
   (format version 7), because a kind chosen from the popup, the menu or MCP must not reset a curve;
   a clip that had none gets a minted one (§11, R5-2). `set_transition_duration {clip, duration}`
-  moves the clip so the overlap equals `duration` (subject to the overlap rule).
+  moves the clip so the overlap equals `duration` (subject to the overlap rule). It refuses, in its
+  own sentence (§11 #88), on the first clip of a track, and on a duration past the pair's overlap
+  limit — half the shorter clip, snapped down — naming the limit and saying when the start would be
+  before the timeline or in front of the predecessor (#175).
 - **`add_transition {clip, kind?, duration, align="center", ripple=false}`** — Makes an overlap at
   the HARD CUT before `clip` out of the two clips' unused handles and puts a transition on it —
   **nothing else on the timeline moves** and the pair's outer edges stay (§11, R5-3). `align`
@@ -378,7 +383,11 @@ many clips`, `too many tracks`, `nests are more than 8 deep at nest N`.
   already-invalid affected track refuses with the overlap rule before fitting. Each trial's two
   extensions are read off the frame GRID rather than taken as a multiple of one frame, because the
   canvas frame is a FALLBACK of 1/30 s at a rate that does not divide the timescale (7 fps) and a
-  multiple of it is not a grid position there. A request that clamps below one frame of the real
+  multiple of it is not a grid position there. A request under one frame of the real grid (in the
+  handle form, also under that fallback, which its arithmetic still divides by) is REFUSED FIRST in
+  both modes, right after
+  the lock check (ripple) or the overlap-rule preflight (handles), naming the shortest duration that
+  passes (§11 #88). A request that clamps below one frame of the real
   grid is REFUSED, in a sentence naming the cut, the frames asked for and `ripple: true` as the way
   past it. The incoming clip's `in` moves back by the extension times its speed, and its ACTIONS
   move with it, as do its `text.words` (§11 W-3) — where `trim_start` deliberately leaves actions
@@ -390,7 +399,9 @@ many clips`, `too many tracks`, `nests are more than 8 deep at nest N`.
   unknown clip, and for not being at a hard cut — naming which of: no predecessor, a gap, an overlap
   that already exists. **`ripple: true` makes the overlap by MOVING instead** (§11, R5-3's
   amendment): no handle is read and `align` is ignored; the incoming clip and every clip at or after
-  the cut on every UNLOCKED track slide left by the snapped duration — `close_gap`'s set, through
+  the cut on every UNLOCKED track slide left by the duration counted in whole frames of the canvas's
+  own grid, the incoming clip landing on the grid that many frames back from the cut (§11 #42) —
+  `close_gap`'s set, through
   the same shift — so the timeline gets shorter, the outgoing clip keeps every frame and its place,
   and no source window or action moves. The duration is capped at half the shorter of the two clips
   and limited to the greatest whole-frame shift outside exact forbidden overlap intervals, including

@@ -102,8 +102,12 @@ governs a module now.
   out of `model_query.rs` by road map 7 §10's phase A.
 - `time.rs` — `Ticks`, `TIMESCALE`, `Fps`, frame snapping, timecode
   format/parse (non-drop `HH:MM:SS:FF` and `HH:MM:SS.mmm`). Snapping keeps
-  frame indices wide through directional adjustment and saturates only at
-  the public tick/index result.
+  frame indices wide through directional adjustment and saturates only at the
+  public tick/index result. `frames_in` (whole grid frames in a length),
+  `frames_back` (the grid position k frames before the frame nearest a
+  position) and `frames_within` (the most whole frames back from a position
+  that stay within a span) count on the canvas's own grid at a rate the
+  timescale does not divide (spec §11 #42).
 - `time_bounds.rs` — the single structural-time admission checker and
   `MAX_STORED_TICKS`: ±9,000,000,000,000,000 for stored media, markers,
   clips, source positions and actions, including clip/action endpoints in
@@ -115,7 +119,8 @@ governs a module now.
   rather than a side channel so that a site which has not decided which
   answer it gives does not compile; the fourth possibility, a request that
   could not be read, stays the `Err(String)` beside it. Its `Identity` doc
-  is also the one place that says which refusals can say why yet.
+  is also the one place that says which non-edits speak and which stay
+  identities on purpose (spec §5.5, §11 #88).
 - `edit.rs` — the op enum, `parse` and `apply`. **Its module doc IS the op
   table's SEMANTICS half** — what each op means, and what an absent
   optional argument means — where `op_table.rs` is the ARGUMENTS half;
@@ -272,7 +277,9 @@ governs a module now.
 - `edit_time.rs` — ripple, insert time, `ripple_delete_ranges` (the pairs are
   ordered, MERGED — touching as well as overlapping — then cut and closed
   right to left as ONE edit; the singular delegates to it), `lift_range`
-  (the hole left open), `close_gap` (refuses rather than closing part way),
+  (the hole left open), `close_gap` (refuses rather than closing part way, and
+  refuses naming what is there when `at` is on a clip or nothing follows it,
+  spec §11 #88),
   freeze frame, `shift_clips`, and `locked_track` — THE locked-track
   refusal's sentence, written once here for its three callers
   (`close_gap`, `edit_insert.rs`'s `insert_clip`, `edit_transition.rs`'s
@@ -290,15 +297,21 @@ governs a module now.
   `set_transition_duration`, `set_gained_transitions` (a clip that gains an
   overlap gains a transition), `add_transition` (an overlap built from the
   two clips' handles at a hard cut) and `set_transition_style` (curve and
-  audio crossfade). `transition.rs` is the READ half and nothing here
-  restates it.
+  audio crossfade). `transition.rs` is the READ half and nothing here restates
+  it. `transition_too_short`, THE too-short sentence both forms of
+  `add_transition` share (spec §11 #88); `set_transition_duration` refuses on
+  a track's first clip and past the pair's snapped overlap limit, naming it
+  (#88, #175).
 - `edit_transition_shift.rs` — `add_transition_by_shift`, the `ripple` half
   of `add_transition`: the same overlap made by sliding the incoming clip
   and everything at or after the cut left through `shift_clips`. Cut out of
   `edit_transition.rs` under the size rule (the E1 reader review's toll T),
   a pure move: the handle form spends unused SOURCE and moves nothing,
-  this one spends the TIMELINE and moves `close_gap`'s set by
-  `close_gap`'s rules.
+  this one spends the TIMELINE and moves `close_gap`'s set by `close_gap`'s
+  rules. The request is counted in whole frames of the real grid
+  (`time::frames_in`) and the incoming clip lands on it (`time::frames_back`);
+  a request under one grid frame refuses in `transition_too_short`'s words,
+  right after the lock check.
 - `edit_action.rs` · `edit_nest.rs` · `edit_paste.rs` — the action ops and
   their no-overlap rule, plus `check_end_patch`, the END patch's door: the
   three groups §5.4 allows (a `shape` is an unknown key), a `null` that
@@ -349,7 +362,8 @@ governs a module now.
   apart, not by clearing the kind.
 - `transition_search.rs` — the bounded fitting arithmetic for both hard-cut
   transition forms: the old handle decrement path by total, and exact
-  forbidden shift intervals across fixed/moved clips for ripple. It does
+  forbidden shift intervals across fixed/moved clips for ripple, counted in
+  whole grid frames back from the cut (`time::frames_within`). It does
   not enumerate timeline frames; final placements still pass
   `check_overlap_rule`.
 - `evaluate.rs` — `composition_plan()` (A/B assignment, instruction tiling)
@@ -523,8 +537,12 @@ number the door rounded to (`props_check.rs`, `edit_props.rs`'s
 `snap_motion` / `snap_animation`). The one family that is deliberately NOT
 on the grid is the audio ramps — `audio.fade_in` / `fade_out`, the duck's
 and the compressor's attack and release — because they are envelope lengths
-sampled at the audio rate, not positions in the picture, and quantising
-them to a video frame would round a 10 ms attack to nothing.
+sampled at the audio rate, not positions in the picture, and quantising them
+to a video frame would round a 10 ms attack to nothing. The other is a SHIFT
+(spec §11 #42): an op that moves several clips — the ripples, `close_gap`,
+`insert_time`, `move_clip` — moves them all by ONE delta so abutments stay
+exact, and at a rate whose frame is not a whole number of ticks (7 fps) a
+moved start may sit a tick off the grid; a canvas rate change re-snaps (D7-3).
 
 **FFI exports.** Every export: `#[no_mangle] pub unsafe extern "C"`, a `///`
 comment restating the header contract, a `/// # Safety` paragraph, NULL

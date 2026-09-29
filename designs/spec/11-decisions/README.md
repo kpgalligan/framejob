@@ -15,7 +15,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | [`recording.md`](recording.md) | 111 | **Screen recording (road map 3).** The recorder: what is in and out, files, grants, pause. |
 | [`silence.md`](silence.md) | 49 | **Remove Silences (road map 4).** Silero VAD, its grid and cache, voice mode; S1-23. |
 | [`effects-motion.md`](effects-motion.md) | 60 | **Transitions and motion (road map 5).** R5-1..R5-5, E2-27. |
-| [`deepening.md`](deepening.md) | 268 | **Deepening (road map 7).** D2-1, D3-1, #21, #22, D4-1..D4-6, D7-1..D7-3: how ops refuse, the op table, the gate, the source window, time envelopes. |
+| [`deepening.md`](deepening.md) | 352 | **Deepening (road map 7).** D2-1, D3-1, #21, #22, D4-1..D4-6, D7-1..D7-3, #42, #88: how ops refuse, the op table, the gate, the source window, time envelopes, one-delta shifts on the canvas's grid, the non-edits that speak. |
 | [`cloud-captions.md`](cloud-captions.md) | 242 | **Cloud captions (road map 6).** R6-1..R6-16: AssemblyAI, keys, deletion, recovery. |
 | [`word-captions.md`](word-captions.md) | 123 | **Word captions (road map 8).** W-1..W-11. |
 | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) | 306 | **Chrome, the clip inspector and keys (the sharp pass, road map 9, #35).** SH-1, SH-2, CI-1..CI-15, K-1, K-2. |
@@ -81,6 +81,8 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | D7-1 | Structural times have one admission envelope | [`deepening.md`](deepening.md) |
 | D7-2 | Transition searches are bounded while retaining their chosen result | [`deepening.md`](deepening.md) |
 | D7-3 | Normalize clip times when crossing a frame grid | [`deepening.md`](deepening.md) |
+| #42 | A shift moves every clip it moves by ONE delta, counted on the canvas's own grid | [`deepening.md`](deepening.md) |
+| #88 | A non-edit a rule declined names the rule's value; a clamp that lands where the clip was stays an identity; a list that applied answers applied | [`deepening.md`](deepening.md) |
 | R6-1 | The cloud engine is a second engine behind the same command, never a second command | [`cloud-captions.md`](cloud-captions.md) |
 | R6-2 | Audio leaves the machine only by name, with the price in front of the person | [`cloud-captions.md`](cloud-captions.md) |
 | R6-3 | The transcript is a per-media asset in the package | [`cloud-captions.md`](cloud-captions.md) |

@@ -183,8 +183,8 @@ extension AgentServer {
 
     /// `roll` — ⌥⇧-dragging a clip's EDGE (`RollSession`). The predecessor is
     /// whatever ends exactly at this clip's start; with a gap or an overlap
-    /// there instead, the core refuses and the caller is told nothing
-    /// changed.
+    /// there instead, the core refuses and the caller gets its sentence
+    /// (spec §11 #88).
     func roll(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clip = try clipArg(a, "clip", document)

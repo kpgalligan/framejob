@@ -215,18 +215,14 @@ fn at_a_rate_the_timescale_does_not_divide_both_clips_still_land_on_the_grid() {
 
 #[test]
 fn a_request_under_one_frame_of_the_real_grid_is_refused_rather_than_stored_flat() {
-    // One fallback frame at 7 fps is a QUARTER of a real one, so it snaps
-    // inward to nothing on both sides. The op's own posture for a request
-    // that clamps below a frame is a refusal, not a transition with a
-    // zero-length overlap.
-    let out = odd_rate().try_apply(&add(11, FRAME));
-    match out {
-        Ok(Outcome::Refused(why)) => assert!(
-            why.contains("no room for an overlap"),
-            "unexpected refusal: {why}"
-        ),
-        other => panic!("expected a refusal, got {other:?}"),
-    }
+    // One fallback frame at 7 fps is a QUARTER of a real one. The op's own
+    // posture for a request under a frame is a refusal naming the shortest
+    // duration that passes (spec §11 #88), not a zero-length overlap.
+    odd_rate().refuses_with(
+        &add(11, FRAME),
+        "a transition of 20000 ticks is too short to make at the cut before clip 11; \
+         pass a duration of at least 85714 ticks",
+    );
 }
 
 // ---- the handle is not the timeline --------------------------------------

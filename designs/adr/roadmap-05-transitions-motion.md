@@ -290,8 +290,10 @@ Measured and rejected (do not re-try blind):
   the candidate fix) — tracked in #87.
 - `paste`'s payload clips are neither range-checked nor normalised — tracked
   in #62.
-- A sub-frame `add_transition` duration refuses with "the 0 frames asked
-  for" — tracked in #88 (the core's refusals' sentences).
+- ~~A sub-frame `add_transition` duration refuses with "the 0 frames asked
+  for" — tracked in #88 (the core's refusals' sentences).~~ Struck (issue
+  batch B12): it refuses as too short, naming the shortest duration that
+  passes (spec §11 #88).
 - `core/src/actions.rs` is at 592 lines; the plan's pre-agreed toll is to move
   `clamp_video` and helpers to `actions_clamp.rs` before its next addition —
   see `designs/adr/core-file-history.md` "Named next cuts".

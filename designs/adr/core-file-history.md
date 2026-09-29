@@ -183,10 +183,10 @@ tests are in `core/tests/`: `media_window.rs`, `source_window.rs`, `motion_edges
   This is the last line of defence for hand-written JSON, pre-#22 documents and the
   one-frame floor. Do not swap in `last_in_point`, which would re-frame old files.
 - **At a canvas rate the timescale does not divide (e.g. 7 fps), `frame()` falls back to
-  1/30 s.** `add_transition_by_shift` shifts by `frames * frame`
-  (`edit_transition_shift.rs:95`), and `close_gap` shifts by one delta. Either can leave
-  clips off the real grid. Judged the ripple family's posture (road map 5 §12, R1·1),
-  not fixed.
+  1/30 s.** `add_transition_by_shift` counts whole frames of the real grid
+  (`time::frames_in` / `frames_back` / `frames_within`) and lands the incoming clip on it;
+  every shift (`close_gap`, the ripples) moves its clips by ONE delta, so a moved start can
+  sit a tick off the grid while abutments stay exact — decided in spec §11 #42.
 - **A text-animation tent whose `in` is tiny but nonzero reports phase `"in"` for its
   whole life.** Documented rather than fixed (`recipe_text.rs` `Reveal::of`).
 - **The burn-in covers the bottom of a two-line caption at every canvas size.**
@@ -215,8 +215,6 @@ The size rule is in the root `CLAUDE.md` and `core/CLAUDE.md`; which modules are
 
 - `actions.rs` is at 592 of ~600 (and `recipe.rs` 596, `evaluate.rs` 593). The original's plan is that the next addition first cuts
   `clamp_video` and its helpers to an `actions_clamp.rs` (see "Named next cuts").
-- The off-grid shift at an inexact canvas rate (`add_transition_by_shift`, `close_gap`)
-  is unfixed — tracked in #42.
 
 ## Where to look in the original
 

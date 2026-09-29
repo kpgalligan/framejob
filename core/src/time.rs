@@ -215,6 +215,113 @@ pub fn snap_down_to_frame(t: Ticks, fps: Fps) -> Ticks {
     }
 }
 
+/// Ticks in one 1/30 s frame: what the three counts below fall back to at a
+/// degenerate rate, the same fallback as `Project::frame`.
+const FALLBACK_FRAME: i64 = TIMESCALE / 30;
+
+/// The whole frames of the grid in a LENGTH: the greatest `k` with
+/// `tick_at_frame(k) ≤ length` (negative for a negative length). At a rate
+/// that divides the timescale it is `length.div_euclid(frame)`; at one that
+/// does not (7 fps) it counts the grid's own rounded boundaries, so
+/// 257 143 ticks is three frames and 257 142 is two (spec §11 #42).
+/// Degenerate rate: `length.div_euclid(TIMESCALE / 30)`.
+pub fn frames_in(length: Ticks, fps: Fps) -> i64 {
+    if !fps.is_valid() {
+        return length.div_euclid(FALLBACK_FRAME);
+    }
+    let guess = floor_frames(length, fps);
+    clamp_ticks(greatest_fitting(guess, |k| {
+        tick_at_frame_wide(k, fps).is_some_and(|t| t <= length)
+    }))
+}
+
+/// The grid position `frames` whole frames before the frame nearest `from`:
+/// `tick_at_frame(frame_index(from) − frames)`. On the grid at every rate,
+/// and `from − frames × frame` at a rate that divides the timescale with
+/// `from` on the grid. Degenerate rate: `from − frames × (TIMESCALE / 30)`.
+pub fn frames_back(from: Ticks, frames: i64, fps: Fps) -> Ticks {
+    match frame_index_wide(from, fps) {
+        Some(index) => tick_at_frame_wide(index - i128::from(frames), fps).unwrap_or(from),
+        None => clamp_ticks(i128::from(from) - i128::from(frames) * i128::from(FALLBACK_FRAME)),
+    }
+}
+
+/// The most whole frames [`frames_back`] can step back from `from` and stay
+/// within `span` ticks of it: the greatest `k` with
+/// `from − frames_back(from, k, fps) ≤ span` — 0 or less when not one frame
+/// fits. What a shift by whole grid frames may spend of a span measured in
+/// ticks. Degenerate rate: `span.div_euclid(TIMESCALE / 30)`.
+pub fn frames_within(from: Ticks, span: Ticks, fps: Fps) -> i64 {
+    let Some(index) = frame_index_wide(from, fps) else {
+        return span.div_euclid(FALLBACK_FRAME);
+    };
+    let guess = floor_frames(span, fps);
+    clamp_ticks(greatest_fitting(guess, |k| {
+        tick_at_frame_wide(index - k, fps)
+            .is_some_and(|t| i128::from(from) - i128::from(t) <= i128::from(span))
+    }))
+}
+
+/// `t × num / (TIMESCALE × den)` rounded toward −∞: the frame count a length
+/// spans on the ideal (unrounded) grid, which the rounded grid's answer is
+/// within a frame or two of. Only a starting point for [`greatest_fitting`].
+fn floor_frames(t: Ticks, fps: Fps) -> i128 {
+    let numer = i128::from(t) * i128::from(fps.num);
+    let denom = TIMESCALE as i128 * i128::from(fps.den);
+    numer.div_euclid(denom.max(1))
+}
+
+/// The greatest `k` in the i64 range for which `fits(k)` holds, where
+/// `fits` is true up to some `k` and false after it. Walks out from `guess`
+/// by doubling steps and then bisects, so a guess that is off by a few
+/// frames (or by many, at a rate faster than the timescale) costs a few
+/// dozen probes and a saturated boundary cannot loop.
+fn greatest_fitting(guess: i128, fits: impl Fn(i128) -> bool) -> i128 {
+    let (low, high) = (i128::from(i64::MIN), i128::from(i64::MAX));
+    let guess = guess.clamp(low, high);
+    let (mut good, mut bad);
+    let mut step = 1_i128;
+    if fits(guess) {
+        good = guess;
+        loop {
+            let probe = (good + step).min(high);
+            if probe == good {
+                return good;
+            }
+            if fits(probe) {
+                good = probe;
+                step = step.saturating_mul(2);
+            } else {
+                bad = probe;
+                break;
+            }
+        }
+    } else {
+        bad = guess;
+        loop {
+            let probe = (bad - step).max(low);
+            if probe == bad {
+                return low;
+            }
+            if fits(probe) {
+                good = probe;
+                break;
+            }
+            bad = probe;
+            step = step.saturating_mul(2);
+        }
+    }
+    while good + 1 < bad {
+        let mid = good + (bad - good) / 2;
+        if fits(mid) {
+            good = mid;
+        } else {
+            bad = mid;
+        }
+    }
+    good
+}
+
 // ---- seconds -------------------------------------------------------------
 
 /// Seconds to ticks, rounded. A NaN or out-of-range input saturates rather

@@ -55,27 +55,30 @@ pub enum Outcome {
     /// describing the DOMAIN, which is what a reader needs; this is the one
     /// place that says which of them can say so out loud.
     ///
-    /// The rules that speak, after road map 7's D2·1 and D2·3: the overlap
-    /// rule (`transition.rs`, the sentence every placement op hands on), a
-    /// locked track (`edit_time.rs`'s `locked_track`, at `close_gap`,
-    /// `insert_clip` and a rippled transition), the last track and a track
-    /// that still holds clips, a media row a clip still shows
-    /// (`edit_track.rs`), a cut with nothing left to give a transition and
-    /// the two ways a rippled one has nowhere to shift to
-    /// (`edit_transition.rs`), an action that would overlap another or run
-    /// past its clip (`edit_action.rs`), and a move to a track index the
-    /// document has not got (`edit_clip.rs`).
+    /// The rules that speak, after road map 7's D2·1 and D2·3 and spec §11
+    /// #88: the overlap rule (`transition.rs`, the sentence every placement
+    /// op hands on), a locked track (`edit_time.rs`'s `locked_track`, at
+    /// `close_gap`, `insert_clip` and a rippled transition), the last track
+    /// and a track that still holds clips, a media row a clip still shows
+    /// (`edit_track.rs`), a cut with nothing left to give a transition, a
+    /// request too short to make one and the two ways a rippled one has
+    /// nowhere to shift to (`edit_transition.rs`), an action that would
+    /// overlap another or run past its clip (`edit_action.rs`), a move to a
+    /// track index the document has not got (`edit_clip.rs`), and the
+    /// non-edits #88 gave a sentence: a roll with no cut (`edit_edge.rs`),
+    /// `detach_audio` with no audio to detach, `set_transition_duration`
+    /// with no clip before it or past the pair's overlap limit, and
+    /// `close_gap` aimed at a clip or at a track with nothing after `at`.
     ///
     /// **What still answers `Identity` although a doc comment calls it a
-    /// refusal**, and is therefore where a next ticket would start: the
-    /// clamped edge ops in `edit_edge.rs` and `edit_clip.rs` — a slip or a
-    /// roll the clamps reduce to nothing, a roll with no predecessor, a
-    /// trim whose two clamps crossed, a rate stretch outside ×0.1 – ×10 —
-    /// `detach_audio` on a clip with no audio to detach, and
-    /// `set_transition_duration` with no predecessor or no room in front.
-    /// Every one of them is a clamp that landed on where the clip already
-    /// was, which is the case where an identity is also the honest answer;
-    /// none was named by the spec (kpgalligan/reelcut#8, decision 3).
+    /// refusal**, deliberately (§11 #88): the clamped edge ops in
+    /// `edit_edge.rs` and `edit_clip.rs` — a slip or a roll the clamps
+    /// reduce to nothing, a trim whose two clamps crossed, a rate stretch
+    /// outside ×0.1 – ×10 — each a clamp that landed on where the clip
+    /// already was, which is the case where an identity is also the honest
+    /// answer (kpgalligan/reelcut#8, decision 3); and the unreachable misses
+    /// — a clip absent from its own track's list in `add_transition` and
+    /// `set_transition_duration`, and `close_gap`'s `end <= start` guard.
     ///
     /// The **empty-selection** answers are not on that list at all: an op
     /// handed an empty list of clips is a TRUE identity and stays one,

@@ -112,9 +112,9 @@ impl Project {
     /// become `to`, and nothing else in the timeline moves (spec §6).
     ///
     /// The predecessor is the clip on the same track that ends EXACTLY at
-    /// this clip's start. With no such clip the op refuses — a gap has no
-    /// cut to roll, and an overlap is a transition whose length
-    /// `set_transition_duration` owns.
+    /// this clip's start. With no such clip the op refuses, naming the
+    /// track and the start (spec §11 #88) — a gap has no cut to roll, and an
+    /// overlap is a transition whose length `set_transition_duration` owns.
     ///
     /// `to` is clamped four ways, one pair per side: each clip keeps at
     /// least one frame, this clip may only reach back as far as its own
@@ -141,7 +141,11 @@ impl Project {
             .find(|c| c.id != target.id && clip_end(c) == target.start)
             .cloned()
         else {
-            return Ok(Outcome::Identity);
+            return Ok(Outcome::Refused(format!(
+                "no clip on track {} ends where clip {clip} begins ({}), so there is no cut \
+                 to roll",
+                target.track, target.start
+            )));
         };
 
         let frame = self.frame();

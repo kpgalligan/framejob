@@ -472,8 +472,8 @@ def locked_track(mcp):
 
     The fixture is two ten-second clips with a ten-second gap between them,
     so `close_gap` has a real gap to be stopped from closing: the refusal is
-    the lock's and not "there is no gap here", which is a different answer
-    (an identity) and is scored below."""
+    the lock's and not "there is no gap here", which is a different sentence
+    (spec §11 #88) and is scored below."""
     print("\n4 — a locked track says which track is locked")
     s = Session(mcp, "refusal-locked")
     media = s.media("A.mov")
@@ -510,12 +510,15 @@ def locked_track(mcp):
     landed("…undone again, so the fixture is back where 4b found it",
            s.clip(b)["start"], 20 * SEC)
 
-    print("\n4d — and a gap that is not there is still an IDENTITY, not this rule")
-    # The distinction the whole candidate is about, at one op: same tool,
-    # same track, two different answers.
-    identity(s, "close_gap", "Close Gap",
-             "a time that is ON a clip is not in a gap, which no rule declined",
-             track=track, at=1 * SEC)
+    print("\n4d — and a gap that is not there is a different sentence, not this rule")
+    # The distinction at one op: same tool, same track, two different
+    # sentences — the lock's, and the one naming the clip under `at`
+    # (spec §11 #88; this row scored an identity before it).
+    refused(s, "close_gap", "close_gap",
+            "a time that is ON a clip names the clip, not the lock",
+            f"clip {a} runs from 0 to {10 * SEC} on track {track}, so {1 * SEC} is not "
+            "in a gap",
+            track=track, at=1 * SEC)
 
     print("\n4e — and not one of them was an undo step")
     undo_claim(s, start)
@@ -824,6 +827,95 @@ def off_the_track_stack(mcp):
     undo_claim(s, start)
 
 
+def the_non_edits_that_speak(mcp):
+    """The non-edits a rule declined, each in its own sentence (spec §11 #88).
+
+    Until #88 each of these answered the IDENTITY, which says only that the
+    project is already in that state — true, and no help to a caller who
+    aimed at a cut, a gap or a clip's audio that is not there. Now each names
+    the value: the track and the start with no cut before them, the first
+    clip of a track, the overlap limit a transition may have (and sending it
+    LANDS), the track with nothing after `at`, and why a clip has no audio to
+    detach — not media, media with no audio (`A.mov`), or audio already
+    detached (`AV.mov`, after one detach that applied).
+
+    The fixture: A.mov (ten seconds, no audio) at 0 and at 12 s on the
+    bottom track, so there is a two-second gap and not a cut in front of the
+    second; on a track above, a one-second text clip at 0 and AV.mov (five
+    seconds, with audio) at 30 s, whose detached twin lands on the bottom
+    track clear of both."""
+    print("\n10 — the non-edits that speak")
+    s = Session(mcp, "refusal-non-edits")
+    silent = s.media("A.mov")
+    sound = s.media("AV.mov")
+    track = s.project()["tracks"][0]["id"]
+    upper = s.op("add_track")["new_tracks"][0]
+    a = s.place(silent, 0)
+    b = s.place(silent, 12 * SEC)
+    t = s.op("add_text_clip", track=upper, at=0, duration=SEC)["new_clips"][0]
+    c = s.place(sound, 30 * SEC, track=upper)
+    landed("the fixture: two ten-second clips with a gap, a text clip and a five-second one",
+           [[x["id"], x["start"], x["duration"]] for x in s.project()["clips"]],
+           [[a, 0, 10 * SEC], [b, 12 * SEC, 10 * SEC], [t, 0, SEC], [c, 30 * SEC, 5 * SEC]])
+
+    print("\n10a — a real edit, whose undo step the answers below must leave alone")
+    start = undo_marker(s, lambda: s.op("set_clip", clips=[a], patch={"name": "Marker"}))
+
+    print("\n10b — a roll with no cut in front of the clip")
+    refused(s, "roll", "roll",
+            "a roll across a gap names the track and where the clip begins",
+            f"no clip on track {track} ends where clip {b} begins ({12 * SEC}), so there is "
+            "no cut to roll",
+            clip=b, to=11 * SEC)
+
+    print("\n10c — a transition length with nothing before the clip, or past the limit")
+    refused(s, "set_transition_duration", "set_transition_duration",
+            "the first clip on a track has nothing to overlap",
+            f"clip {a} is the first clip on track {track}, so there is no clip before it to "
+            "overlap",
+            clip=a, duration=SEC)
+    # clip a ends at 10 s, so twelve seconds of overlap would start clip b
+    # at -2 s; half the shorter clip is five seconds, on the grid already.
+    refused(s, "set_transition_duration", "set_transition_duration",
+            "an overlap that would start the clip before the timeline names the limit",
+            f"clip {b} would start at {-2 * SEC}, before the timeline, to overlap clip {a} by "
+            f"{12 * SEC} ticks; the two can overlap by at most {5 * SEC} ticks",
+            clip=b, duration=12 * SEC)
+    applied(s, "set_transition_duration", "…and the limit it names, sent back, lands",
+            clip=b, duration=5 * SEC)
+    landed("…with clip b five seconds before clip a's end", s.clip(b)["start"], 5 * SEC)
+    s.op("undo")
+
+    print("\n10d — a gap with nothing after it")
+    refused(s, "close_gap", "close_gap",
+            "a time past the track's last clip names the track and the time",
+            f"no clip on track {track} starts after {25 * SEC}, so there is no gap to close",
+            track=track, at=25 * SEC)
+
+    print("\n10e — detach_audio with nothing to detach, three ways")
+    refused(s, "detach_audio", "detach_audio",
+            "a text clip is not media",
+            f"clip {t} has no audio to detach: it is not a media clip",
+            clip=t)
+    refused(s, "detach_audio", "detach_audio",
+            "A.mov has no audio track",
+            f"clip {a} has no audio to detach: media {silent} has no audio track",
+            clip=a)
+    applied(s, "detach_audio", "AV.mov's audio detaches", clip=c)
+    landed("…and the original's audio is switched off",
+           s.clip(c)["enabled"]["audio"], False)
+    refused(s, "detach_audio", "detach_audio",
+            "a second detach names the audio already switched off",
+            f"clip {c} has no audio to detach: its audio is switched off",
+            clip=c)
+    s.op("undo")
+    landed("…and one undo puts the audio back, so the refusal was not a step",
+           [s.clip(c)["enabled"]["audio"], len(s.project()["clips"])], [True, 4])
+
+    print("\n10f — and not one of them was an undo step")
+    undo_claim(s, start)
+
+
 def summary(aborted=None):
     """The last line, and the exit status. An op that unexpectedly refused or
     errored — a `ToolError` no check was waiting for — aborts the run and is
@@ -854,23 +946,25 @@ def main():
     the_transition_cut(mcp)
     the_action_rules(mcp)
     off_the_track_stack(mcp)
+    the_non_edits_that_speak(mcp)
     summary()
 
 
 # ---- the next rule's section goes here ------------------------------------
 #
-# Sections 4 to 9 are D2·3's (kpgalligan/reelcut#11), and the shape has not
-# changed: a fixture whose numbers are hand-computed, a marker edit, the
-# refusals with their WHOLE sentences, a boundary that LANDS, and one `undo`
-# closing the batch. `Outcome::Identity`'s doc in `core/src/outcome.rs` is
-# the list of which rules can say why and which are still owed a sentence.
+# Sections 4 to 9 are D2·3's (kpgalligan/reelcut#11) and section 10 is
+# spec §11 #88's, and the shape has not changed: a fixture whose numbers are
+# hand-computed, a marker edit, the refusals with their WHOLE sentences, a
+# boundary that LANDS, and one `undo` closing the batch.
+# `Outcome::Identity`'s doc in `core/src/outcome.rs` is the list of which
+# rules can say why and which stay identities on purpose.
 #
 # Every rule that speaks is now measured HERE as well as in
 # `core/tests/refusal.rs`: D2·4 (kpgalligan/reelcut#12) deleted the four
 # app-side answers that stood in front of §5d, §6b, §7b and §7d, and there
-# is no `shadowed` helper any more. What is still owed a sentence is the
-# clamped-edge family in `Outcome::Identity`'s doc, and a section for one of
-# those goes here the day it finds its voice.
+# is no `shadowed` helper any more. The clamped-edge family in
+# `Outcome::Identity`'s doc stays an identity (spec §5.5, §11 #88); a rule
+# that finds its voice later gets its section here.
 
 if __name__ == "__main__":
     try:

@@ -266,3 +266,87 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   nests have no markers. Paste and unnest retain their placement, fallback
   and transition rules while normalizing returned clips to the target grid.
   No load-time migration is performed.
+- **#42 — A shift moves every clip it moves by ONE delta, counted on the
+  canvas's own grid.** `ripple_delete`, `ripple_delete_range(s)`,
+  `close_gap`, `insert_time` and `move_clip` move every clip they move by
+  the same number of ticks (`edit_time.rs`'s `shift_clips`), so relative
+  placement stays exact: two clips that abutted still abut, and no overlap
+  is made that was not there. At a canvas rate whose frame is not a whole
+  number of ticks (7 fps, 5994/100, 24981/1000) the delta is a difference of
+  two grid positions and a grid position is rounded to the tick, so a moved
+  start may sit off the grid by up to a tick per shift. **Snapping each
+  moved clip on its own is rejected**: at 7 fps, `ripple_delete` of a clip
+  at [171429, 257143) with two abutting clips after it at 428571 (85715
+  ticks long) and 514286 lands them at 342857 and 428571 if each start is
+  snapped apart — a one-tick overlap that `set_gained_transitions` mints a
+  `cross_dissolve` on — and at 342857 and 428572 with one delta, abutting.
+  **Snapping both edges of each clip is rejected** as well, because it
+  rewrites durations, and a media clip's duration is held to its file's
+  bound (#22). The risk accepted: such a cut is first drawn one frame later,
+  because the compositor samples at the grid's own ticks and a start one
+  tick past a grid tick is not yet on at that tick. A canvas rate change
+  re-snaps every clip (D7-3) and restores the grid. **`add_transition`'s
+  ripple form counts the request as whole frames of the REAL grid**
+  (`time::frames_in`) and lands the incoming clip that many grid frames
+  back from the cut (`time::frames_back`); its pair limit counts the frames
+  that fit in half the shorter clip from the cut (`time::frames_within`), and
+  `transition_search.rs`'s forbidden intervals are counted the same way — no
+  longer multiples of `Project::frame`'s 1/30 s fallback, which put the
+  incoming clip off the grid at such a rate. At a rate that divides the
+  timescale nothing moves: with the cut on the grid the three functions are
+  `div_euclid(frame)` and `cut − k·frame`. D7-2 and R5-3 stand.
+- **#88 — A non-edit a rule declined names the rule's value; a clamp that
+  lands where the clip was stays an identity; a list that applied answers
+  applied.** Five ops answered an identity where a rule had declined them,
+  and now refuse in their own sentence (§5.5, `core/src/outcome.rs`):
+  - `roll` with no clip ending exactly at the clip's start — `no clip on
+    track {track} ends where clip {clip} begins ({start}), so there is no
+    cut to roll`;
+  - `detach_audio` with nothing to detach — `clip {clip} has no audio to
+    detach: {why}`, where `why` is `it is not a media clip`, `media {media}
+    has no audio track` or `its audio is switched off`, asked in that order.
+    A non-media clip is a refusal and not the non-media rule's `Err`,
+    because Detach Audio is enabled for any selection
+    (`validateTimelineAction`) and an `Err` is an error sheet
+    (`commitEdit`'s `present(error)`);
+  - `set_transition_duration` with no clip before it — `clip {clip} is the
+    first clip on track {track}, so there is no clip before it to overlap` —
+    and with a duration past the pair's overlap limit, `limit` being half
+    the shorter clip snapped DOWN to the grid: `clip {clip} would start at
+    {start}, before the timeline, to overlap clip {previous} by {duration}
+    ticks; the two can overlap by at most {limit} ticks` when the start is
+    below 0, `…, before clip {previous} starts at {previous_start}, …` when
+    it lands in front of its predecessor (#175: at 30 fps, P [2400000,
+    3000000), X [3000000, 3300000) and 900000 used to APPLY and put X at
+    [2100000, 2400000), the pair's order flipped), and with no clause
+    otherwise. One condition, `duration > limit`, covers all three, so the
+    number named is always one that applies when sent;
+  - `close_gap` aimed at no gap — `clip {clip} runs from {start} to {end}
+    on track {track}, so {at} is not in a gap` (the first clip in track
+    order under `at`) and `no clip on track {track} starts after {at}, so
+    there is no gap to close`. It refuses because spec §6 (normative) and
+    `edit.rs` already said it did; it is the same case as `roll`'s missing
+    cut — the op's target is not there — and it is in neither of §5.5's
+    identity families. `refusal_proof.py`'s §4d scored the code of its day,
+    not a decision. Clip ▸ Close Gap on a clip, and a double-click past a
+    lane's last clip, now show the sentence in CI-10's strip;
+  - `add_transition` with a request under one frame — `a transition of
+    {duration} ticks is too short to make at the cut before clip {clip};
+    pass a duration of at least {one} ticks`, `one` being the smallest
+    duration that passes (20000 at 30 fps, 85714 at 7 fps, 20020 at
+    5994/100, where the handle form also needs one `Project::frame`). The
+    app cannot reach it at 30 fps: both the inspector and MCP send grid
+    values.
+
+  **What stays an identity**: §5.5's two families (an empty selection; a
+  clamp that landed where the clip already was — `roll`'s and `slip`'s
+  clamps, a trim whose clamps crossed, a rate stretch outside ×0.1 – ×10),
+  the unreachable `position` misses in `add_transition` and
+  `set_transition_duration`, and `close_gap`'s `end <= start` guard, which
+  no `at` reaches. **The list fold is unchanged** (`ReelEdit.swift`'s
+  `applying`): a list in which anything applied answers applied, and a
+  refusal is named only when nothing did, because CI-10's strip means
+  "nothing changed" and the list's own applied edit clears it, and no MCP
+  tool sends a list that can be partly refused (`refusal_proof.py` §3).
+  Detach Audio over a mixed selection is the one app path that drops a
+  sentence.

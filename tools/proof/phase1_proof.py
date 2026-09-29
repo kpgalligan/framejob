@@ -199,7 +199,12 @@ def main():
 
     # A roll needs a hard cut.
     s.op("move_clip", clips=[b], delta=2 * SEC)  # open a gap
-    check(s.refuses("roll", clip=b, to=7 * SEC), "a roll across a gap changes nothing")
+    check(
+        s.refused_with(
+            "roll", f"no clip on track {track} ends where clip {b} begins ({8 * SEC}), so "
+            "there is no cut to roll", clip=b, to=7 * SEC),
+        "a roll across a gap refuses, naming the track and where the clip begins",
+    )
     s.op("undo")
 
     # ---- lift, and how it differs from a ripple --------------------------
@@ -260,8 +265,18 @@ def main():
         placement(clips, locked) == before[locked],
         "a locked track's clips did not move",
     )
-    check(s.refuses("close_gap", track=picture, at=4 * SEC), "there is no gap left to close")
-    check(s.refuses("close_gap", track=picture, at=SEC), "a time on a clip is not in a gap")
+    check(
+        s.refused_with(
+            "close_gap", f"no clip on track {picture} starts after {4 * SEC}, so there is no "
+            "gap to close", track=picture, at=4 * SEC),
+        "there is no gap left to close",
+    )
+    check(
+        s.refused_with(
+            "close_gap", f"clip {a} runs from 0 to {2 * SEC} on track {picture}, so {SEC} is "
+            "not in a gap", track=picture, at=SEC),
+        "a time on a clip is not in a gap",
+    )
     check(
         s.refused_with(
             "close_gap", f"track {bed} is locked, so the gap on it cannot be closed",

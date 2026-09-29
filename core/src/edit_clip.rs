@@ -664,23 +664,22 @@ impl Project {
     ///
     /// The original keeps its video and gets `enabled.audio = false`; the
     /// new clip is `{video: false, audio: true}` with the same source, in
-    /// point, duration and speed. Its VIDEO props are carried over too, so
-    /// re-enabling video on it is not lossy.
-    ///
-    /// Refuses when the media has no audio, when the audio is already
-    /// detached, or when the new clip would break the overlap rule on the
-    /// track below.
+    /// point, duration and speed, and its VIDEO props, so re-enabling video
+    /// on it is not lossy. Refuses, naming why, with no audio to detach
+    /// (spec §11 #88), and when the new clip breaks the overlap rule below.
     pub fn detach_audio(&self, clip: u32) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
-        let Source::Media { media, .. } = target.source else {
-            // Stills, images, text and shapes have no audio to detach.
-            return Ok(Outcome::Identity);
+        let why = match target.source {
+            Source::Media { media, .. } if !self.require_media(media)?.has_audio => {
+                format!("media {media} has no audio track")
+            }
+            Source::Media { .. } if target.enabled.audio => String::new(),
+            Source::Media { .. } => "its audio is switched off".to_string(),
+            _ => "it is not a media clip".to_string(),
         };
-        let Some(found) = self.media(media) else {
-            return Ok(Outcome::Identity);
-        };
-        if !found.has_audio || !target.enabled.audio {
-            return Ok(Outcome::Identity);
+        if !why.is_empty() {
+            let why = format!("clip {clip} has no audio to detach: {why}");
+            return Ok(Outcome::Refused(why));
         }
         let index = self.require_track_index(target.track)?;
 

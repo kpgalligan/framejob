@@ -328,7 +328,8 @@ impl Project {
     /// The gap is bounded by the nearest clip edges ON `track` — the last
     /// end at or before `at`, or 0 when nothing precedes it, and the first
     /// start after it. A playhead ON a clip is not in a gap, and a gap with
-    /// nothing after it is not one to close: both are identities.
+    /// nothing after it is not one to close: both refuse, naming the clip or
+    /// the track (spec §11 #88).
     ///
     /// The shift is the ripple's, timeline-wide over unlocked tracks with
     /// straddlers staying put, so the material that follows the gap keeps
@@ -355,8 +356,13 @@ impl Project {
         }
         let at = self.snapped(at).max(0);
         let ordered = self.clips_on_track(track);
-        if ordered.iter().any(|c| c.start <= at && at < clip_end(c)) {
-            return Ok(Outcome::Identity);
+        if let Some(on) = ordered.iter().find(|c| c.start <= at && at < clip_end(c)) {
+            return Ok(Outcome::Refused(format!(
+                "clip {} runs from {} to {} on track {track}, so {at} is not in a gap",
+                on.id,
+                on.start,
+                clip_end(on)
+            )));
         }
         let start = ordered
             .iter()
@@ -365,7 +371,9 @@ impl Project {
             .max()
             .unwrap_or(0);
         let Some(end) = ordered.iter().map(|c| c.start).filter(|s| *s > at).min() else {
-            return Ok(Outcome::Identity);
+            return Ok(Outcome::Refused(format!(
+                "no clip on track {track} starts after {at}, so there is no gap to close"
+            )));
         };
         if end <= start {
             return Ok(Outcome::Identity);
