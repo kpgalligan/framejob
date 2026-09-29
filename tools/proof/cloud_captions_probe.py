@@ -384,6 +384,95 @@ func describe(_ error: any Error) -> [String: Any] {
     }
     return ["error": "other", "message": error.localizedDescription]
 }
+
+// MARK: - Defaults that never reach disk (#76)
+
+/// The harness's `MemoryDefaults` (`tools/proof/harness/main.swift`),
+/// override for override, with ONE difference: the ARGUMENT domain is this
+/// process's own, seeded once from its launch arguments.
+///
+/// A named suite left `~/Library/Preferences/cloudprobe-*.plist` behind on
+/// every run (#76): cfprefsd writes the emptied domain seconds after the
+/// process has exited, so no removal inside the process can win that race.
+/// This class answers every keyed call from memory and every domain write
+/// traps — except the argument domain, which it must SERVE: every chrome
+/// child launches with `-RCAssemblyAIEndpoint`, `-RCSecretFolder` and
+/// `-RCSpendFolder`, `AssemblyAIConfiguration.argument` and
+/// `AssistantSpend.folder` read them from `volatileDomain(forName:)`, and an
+/// empty one would send Settings' Verify to the real host and read the
+/// person's own spend ledger. SV's `endpoint(_:)` replaces it, so that write
+/// is kept, in memory.
+final class ProbeDefaults: UserDefaults {
+    private var values: [String: Any] = [:]
+    private var arguments: [String: Any] =
+        UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+
+    // Keyed reads, off `values`.
+    override func object(forKey defaultName: String) -> Any? { values[defaultName] }
+    override func string(forKey defaultName: String) -> String? { values[defaultName] as? String }
+    override func array(forKey defaultName: String) -> [Any]? { values[defaultName] as? [Any] }
+    override func dictionary(forKey defaultName: String) -> [String: Any]? {
+        values[defaultName] as? [String: Any]
+    }
+    override func data(forKey defaultName: String) -> Data? { values[defaultName] as? Data }
+    override func stringArray(forKey defaultName: String) -> [String]? {
+        values[defaultName] as? [String]
+    }
+    override func url(forKey defaultName: String) -> URL? { values[defaultName] as? URL }
+    override func integer(forKey defaultName: String) -> Int {
+        (values[defaultName] as? NSNumber)?.intValue ?? 0
+    }
+    override func float(forKey defaultName: String) -> Float {
+        (values[defaultName] as? NSNumber)?.floatValue ?? 0
+    }
+    override func double(forKey defaultName: String) -> Double {
+        (values[defaultName] as? NSNumber)?.doubleValue ?? 0
+    }
+    override func bool(forKey defaultName: String) -> Bool {
+        (values[defaultName] as? NSNumber)?.boolValue ?? false
+    }
+
+    // Keyed writes, into `values`; a nil removes.
+    override func set(_ value: Any?, forKey defaultName: String) { values[defaultName] = value }
+    override func set(_ value: Int, forKey defaultName: String) { values[defaultName] = value }
+    override func set(_ value: Float, forKey defaultName: String) { values[defaultName] = value }
+    override func set(_ value: Double, forKey defaultName: String) { values[defaultName] = value }
+    override func set(_ value: Bool, forKey defaultName: String) { values[defaultName] = value }
+    override func set(_ url: URL?, forKey defaultName: String) { values[defaultName] = url }
+    override func removeObject(forKey defaultName: String) { values[defaultName] = nil }
+
+    // Domain reads. The argument domain is `arguments`; every other
+    // volatile domain is EMPTY. Argument keys win in the whole
+    // representation, as they do in a real suite.
+    override func dictionaryRepresentation() -> [String: Any] {
+        values.merging(arguments) { _, argument in argument }
+    }
+    override func volatileDomain(forName domainName: String) -> [String: Any] {
+        domainName == UserDefaults.argumentDomain ? arguments : [:]
+    }
+    override func objectIsForced(forKey key: String) -> Bool { false }
+    override func objectIsForced(forKey key: String, inDomain domain: String) -> Bool { false }
+
+    // Everything else would reach the real defaults domain: a trap, which is
+    // a crash and so a scored FAILURE, never a silent write to disk.
+    override func register(defaults registrationDictionary: [String: Any]) { trap() }
+    override func addSuite(named suiteName: String) { trap() }
+    override func removeSuite(named suiteName: String) { trap() }
+    override func persistentDomain(forName domainName: String) -> [String: Any]? { trap() }
+    override func setPersistentDomain(_ domain: [String: Any], forName domainName: String) {
+        trap()
+    }
+    override func removePersistentDomain(forName domainName: String) { trap() }
+    override func setVolatileDomain(_ domain: [String: Any], forName domainName: String) {
+        guard domainName == UserDefaults.argumentDomain else { trap() }
+        arguments = domain
+    }
+    override func removeVolatileDomain(forName domainName: String) { trap() }
+    override func synchronize() -> Bool { trap() }
+    private func trap(_ function: String = #function) -> Never {
+        fatalError("ProbeDefaults: \(function) would reach the real defaults domain")
+    }
+}
 '''
 
 PROBE_MAPPING = r'''
@@ -481,7 +570,7 @@ func modeStamp(_ request: [String: Any]) -> [String: Any] {
     // The CONTROL: the region changes the base URL and NOT the stamp.
     var regions: [String: String] = [:]
     for region in AssemblyAIConfiguration.Region.allCases {
-        let suite = UserDefaults(suiteName: "cloudprobe-region-\(region.rawValue)-\(UUID().uuidString)")
+        let suite = ProbeDefaults(suiteName: nil)
         suite?.set(region.rawValue, forKey: AssemblyAIConfiguration.regionKey)
         let resolved = suite.flatMap { try? AssemblyAIConfiguration.baseURL(defaults: $0) }
         regions[region.rawValue] = resolved?.absoluteString ?? "<none>"
@@ -715,7 +804,7 @@ func modeRun(_ request: [String: Any]) -> [String: Any] {
         "janitorDeferred": report.janitorDeferred.map { Int($0) },
         "held": report.held.map { Int($0) },
     ]
-    answer["cloudFields"] = AgentServer.cloudFields(report, code: nil, notes: [])
+    answer["cloudFields"] = AgentServer.cloudFields(report, code: nil, endpoint: nil, notes: [])
     let names = media.mapValues { $0.name }
     answer["cloudReportLines"] = TranscribeSheetController.cloudReportLines(
         report, names: names, detected: true)
@@ -1017,9 +1106,9 @@ func modeSecrets(_ request: [String: Any]) -> [String: Any] {
         "directory": (resolved as? FileStore)?.directory.path ?? "",
         "memoryIsEmpty": (resolved as? MemoryStore)?.read() == nil,
     ]
-    // (c): the same two keys persisted in a SUITE must redirect nothing.
-    let suiteName = "cloudprobe-persisted-\(UUID().uuidString)"
-    let suite = UserDefaults(suiteName: suiteName)
+    // (c): the same two keys set as ordinary defaults, outside the argument
+    // domain, must redirect nothing.
+    let suite = ProbeDefaults(suiteName: nil)
     suite?.set("/tmp/cloudprobe-persisted-secret-folder",
                forKey: AssemblyAIConfiguration.secretFolderArgument)
     suite?.set("http://127.0.0.1:2/persisted-must-not-win",
@@ -1032,7 +1121,6 @@ func modeSecrets(_ request: [String: Any]) -> [String: Any] {
         "directory": (persistedStore as? FileStore)?.directory.path ?? "",
         "baseURL": persistedBase?.absoluteString ?? "<threw>",
     ]
-    suite?.removePersistentDomain(forName: suiteName)
 
     // The endpoint this PROCESS was launched with, resolved.
     do {
@@ -1465,9 +1553,10 @@ PROBE_CHROME = r"""
 /// WINDOW is photographed by the harness instead; this mode reads its rows
 /// and drives its four buttons.
 ///
-/// Every row builds its own `UserDefaults` suite and removes it afterwards,
-/// and every store is a `MemoryStore` — except the `settings` op, which goes
-/// through `AssemblyAIConfiguration.store()` ON PURPOSE, so R6-9's
+/// Every row builds its own in-memory `ProbeDefaults`, which never reaches
+/// `~/Library/Preferences` (#76), and every store is a `MemoryStore` —
+/// except the `settings` op, which goes through
+/// `AssemblyAIConfiguration.store()` ON PURPOSE, so R6-9's
 /// `-RCSecretFolder` is the thing under test rather than something assumed.
 func modeChrome(_ request: [String: Any]) -> [String: Any] {
     // `ProjectDocument` and `NSViewController` need the shared application to
@@ -1487,15 +1576,20 @@ func modeChrome(_ request: [String: Any]) -> [String: Any] {
     }
 }
 
-/// A suite nothing else shares, gone before the process exits.
-func chromeSuite(_ request: [String: Any]) -> UserDefaults {
-    let name = request["suite"] as? String ?? "cloudprobe-chrome-\(UUID().uuidString)"
-    return UserDefaults(suiteName: name) ?? .standard
-}
+/// The in-memory defaults each `suite` name has had in this process, held
+/// for the process's life; nothing is written to disk, so nothing is dropped.
+var probeSuites: [String: ProbeDefaults] = [:]
 
-func dropSuite(_ request: [String: Any]) {
-    guard let name = request["suite"] as? String else { return }
-    UserDefaults.standard.removePersistentDomain(forName: name)
+/// One `ProbeDefaults` per `request["suite"]`, and a new one when it is
+/// absent. The argument domain is this process's own (`ProbeDefaults`).
+func chromeSuite(_ request: [String: Any]) -> UserDefaults {
+    let name = request["suite"] as? String
+    if let name, let held = probeSuites[name] { return held }
+    guard let fresh = ProbeDefaults(suiteName: nil) else {
+        fatalError("ProbeDefaults would not build")
+    }
+    if let name { probeSuites[name] = fresh }
+    return fresh
 }
 
 /// One audio media over the fixture and one clip on it, built with OPS.
@@ -1529,7 +1623,6 @@ func popupRows(_ popup: NSPopUpButton) -> [[String]] {
 }
 
 func chromeSheet(_ request: [String: Any]) -> [String: Any] {
-    defer { dropSuite(request) }
     let defaults = chromeSuite(request)
     guard let built = chromeDocument(request) else {
         return ["error": "the document would not build"]
@@ -1666,7 +1759,6 @@ func chromeSheet(_ request: [String: Any]) -> [String: Any] {
 /// The queued variants hold main until worker success has been enqueued;
 /// Stop is then delivered through the actual button before main drains.
 func chromeKeyless(_ request: [String: Any]) -> [String: Any] {
-    defer { dropSuite(request) }
     guard let built = chromeDocument(request),
         let cache = built.document.cacheDirectory,
         let seed = request["cache"] as? String
@@ -1767,7 +1859,6 @@ func chromeKeyless(_ request: [String: Any]) -> [String: Any] {
 /// thing under test. Save, then look for the value everywhere a view could
 /// hold it, then Remove.
 func chromeSettings(_ request: [String: Any]) -> [String: Any] {
-    defer { dropSuite(request) }
     let defaults = chromeSuite(request)
     let controller = SettingsWindowController(defaults: defaults, environment: [:])
     let key = request["key"] as? String ?? "proof-key"
@@ -1877,7 +1968,6 @@ func chromeVerify(_ request: [String: Any]) -> [String: Any] {
 /// Delayed, real Verify requests. The only transport controls are the two
 /// argument-domain loopback endpoints; every action is the controller's own.
 func chromeVerifyState(_ request: [String: Any]) -> [String: Any] {
-    defer { dropSuite(request) }
     let defaults = chromeSuite(request)
     guard let scenario = request["scenario"] as? String,
         let firstText = request["firstEndpoint"] as? String,
@@ -2061,7 +2151,7 @@ func chromeReport(_ request: [String: Any]) -> [String: Any] {
     return [
         "lines": TranscribeSheetController.cloudReportLines(
             report, names: names, detected: request["detected"] as? Bool ?? false),
-        "fields": AgentServer.cloudFields(report, code: nil, notes: []),
+        "fields": AgentServer.cloudFields(report, code: nil, endpoint: nil, notes: []),
         "failure": AgentServer.cloudFailure(failure, report: report),
     ]
 }
@@ -2069,7 +2159,6 @@ func chromeReport(_ request: [String: Any]) -> [String: Any] {
 /// The progress arithmetic AS DISPLAYED: pairs in, the bar's value and the
 /// detail label out, and the same pairs again after the run has finished.
 func chromeProgress(_ request: [String: Any]) -> [String: Any] {
-    defer { dropSuite(request) }
     guard let built = chromeDocument(request) else {
         return ["error": "the document would not build"]
     }
@@ -3089,12 +3178,14 @@ UPLOAD_OK = json.dumps({"upload_url": "https://cdn.example.invalid/u/1"})
 FAST = {"pollInterval": 0.05, "retryBackoff": 0.25, "requestTimeout": 5, "deleteTimeout": 1}
 
 
-def completed(words_literal, status="completed"):
+def completed(words_literal, status="completed", served_id="t_probe"):
     """A poll body with `words` written as LITERAL TEXT, so a row can serve
-    an absent key, a `null` and an object as easily as an array."""
-    head = ('{"id":"t_probe","status":"%s","audio_url":"https://x","speech_model_used":'
+    an absent key, a `null` and an object as easily as an array — and under
+    `served_id`, so a row can serve a body under an id other than the one
+    polled (#71)."""
+    head = ('{"id":%s,"status":"%s","audio_url":"https://x","speech_model_used":'
             '"universal-3-5-pro","language_code":"en_us","language_confidence":0.99,'
-            '"audio_duration":11' % status)
+            '"audio_duration":11' % (json.dumps(served_id), status))
     return head + ("," + words_literal if words_literal else "") + "}"
 
 
@@ -3279,6 +3370,28 @@ def section_client(binary, sources):
           control.get("ok") is True and control.get("wordsJSON") == "[]"
           and control.get("wordCount") == 0 and "delete" not in routes(control.get("log", [])),
           f"got {control!r}")
+
+    # #71: a completed body under ANOTHER id is `.malformed`, and the DELETE
+    # goes to the id that was POLLED. `words-empty` above is the CONTROL: the
+    # same body under the polled id is a Fetched with no delete.
+    echoed = ("AssemblyAI's answer could not be read: the transcript came back completed "
+              "under an id other than the one polled")
+    for served, tag, label in (("../upload", "dotdot", "an id that is not one"),
+                               ("t_other", "other", "a plain id that is not the one polled")):
+        row = call(f"echoed-{tag}", {
+            "call": "poll", "tuning": FAST,
+            "steps": [{"route": "poll", "status": 200,
+                       "body": completed('"words":[]', served_id=served)}]}) or {}
+        log = row.get("log", [])
+        deleted = [entry.get("path") for entry in log if entry.get("route") == "delete"]
+        check(f"15 (#71): a completed body served under {label} ({served!r}) is `malformed` "
+              f"in the rule's own sentence, and ONE delete goes to the polled "
+              f"/v2/transcript/t_probe",
+              row.get("error") == "malformed" and row.get("message") == echoed
+              and routes(log) == ["poll", "delete"]
+              and deleted == ["/v2/transcript/t_probe"],
+              f"got {row.get('error')!r} / {row.get('message')!r}, log {routes(log)!r}, "
+              f"deletes {deleted!r}")
 
 
 # --------------------------------------------------------------------------
@@ -3617,15 +3730,16 @@ def section_secrets(binary, sources):
               "MemoryStore — the person's file is never opened",
               store_b.get("type") == "MemoryStore" and store_b.get("memoryIsEmpty") is True,
               f"got {store_b!r}")
-        # (c), measured in the same run: the same two keys PERSISTED in a
-        # suite redirect nothing.
+        # (c), measured in the same run: the same two keys set as ordinary
+        # defaults, outside the argument domain, redirect nothing.
         persisted = answer_b.get("persisted", {})
-        check("17 · R6-9 (c): the same keys persisted in a defaults suite move NOTHING — "
-              "the store is still the argument domain's answer",
+        check("17 · R6-9 (c): the same keys set as ordinary defaults, outside the argument "
+              "domain, move NOTHING — the store is still the argument domain's answer",
               persisted.get("type") == "MemoryStore" and persisted.get("directory") == "",
               f"got {persisted!r}")
-        check("17 · R6-9 (c): and a persisted endpoint does not move the base URL either — "
-              "the LAUNCH argument still wins",
+        check("17 · R6-9 (c): and an endpoint set as an ordinary default, outside the "
+              "argument domain, does not move the base URL either — the LAUNCH argument "
+              "still wins",
               persisted.get("baseURL") == "http://127.0.0.1:1",
               f"got {persisted.get('baseURL')!r}")
 
@@ -4646,6 +4760,8 @@ def section_run(binary, sources):
     # author's choosing on the API host, with the person's key.
     hostile = {11: "../upload", 12: "a/b", 13: "?x=1", 14: "x" * 1000,
                15: "../../../../etc/passwd", 16: "t_looks_fine"}
+    five = {11, 12, 13, 14, 15}
+    control = 16
     hostile_cache = fresh("run-hostile")
     plant_undeleted(hostile_cache, [])
     folder = os.path.join(hostile_cache, "transcripts")
@@ -4664,28 +4780,31 @@ def section_run(binary, sources):
     else:
         paths = [row["path"] for row in log["requests"] if row["method"] == "DELETE"]
         janitor_paths = [p for p in paths if "t_" not in p.rsplit("/", 1)[1]]
-        check("I: NONE of the five hostile ids reached the wire \u2014 no `..`, no second "
-              "path segment, no query, no kilobyte",
+        check("I: NONE of the five hostile ids (media 11\u201315) reached the wire \u2014 "
+              "no `..`, no second path segment, no query, no kilobyte",
               not janitor_paths, f"got {janitor_paths!r}")
         check("I: CONTROL \u2014 the ONE well-formed id beside them DID, so the janitor was "
               "running and the row is not vacuous",
               "/v2/transcript/t_looks_fine" in paths, f"got {paths!r}")
         report = answer.get("report", {})
-        check("I: and none of the five is in `janitorFailed`, so R6-11 does not HOLD a "
-              "media for ever over a string somebody else wrote",
-              sorted(report.get("janitorFailed") or []) == [16],
+        check("I: and the five hostile ids (media 11\u201315) are not in `janitorFailed`; "
+              "the control (16), whose DELETE was sent and failed, is the only one there, "
+              "so R6-11 does not HOLD a media for ever over a string somebody else wrote",
+              sorted(report.get("janitorFailed") or []) == [control],
               f"got {report.get('janitorFailed')!r}")
         # The reader review's fix pass: a refusal is not a delete either.
-        check("I: and none of the five is in `janitorDeleted` — a DELETE that was never "
-              "sent is not a delete the run may report",
-              not (set(report.get("janitorDeleted") or []) & set(hostile)),
+        check("I: and none of the five hostile ids (media 11\u201315) is in "
+              "`janitorDeleted` — a DELETE that was never sent is not a delete the run "
+              "may report",
+              not (set(report.get("janitorDeleted") or []) & five),
               f"got {report.get('janitorDeleted')!r}")
         still_owed = sorted(
             media for media in hostile
             if json.loads(open(os.path.join(folder, f"{media}.json")).read())["remote_deleted"]
             is False)
-        check("I: and their cache files still say `remote_deleted: false`, so the one "
-              "record that something was owed is not erased by a refusal",
+        check("I: and all six cache files \u2014 the five hostile ids' and the control's "
+              "\u2014 still say `remote_deleted: false`, so the one record that something "
+              "was owed is not erased by a refusal",
               still_owed == sorted(hostile),
               f"got {still_owed!r}, planted {sorted(hostile)!r}")
 
@@ -4926,6 +5045,20 @@ def section_hygiene(binary, sources):
     naked = [c for c in calls if "env=" not in c]
     check(f"K: every `subprocess` call in this file passes `env=` ({len(calls)} calls)",
           not naked, f"without env=: {[c[:60] for c in naked]!r}")
+
+    # #76: a named suite left `cloudprobe-*.plist` in `~/Library/Preferences`
+    # on every run, because cfprefsd writes the emptied domain after exit.
+    suite_pattern = r"UserDefaults\(suiteName:|\.removePersistentDomain\("
+    found = re.findall(suite_pattern, PROBE_SOURCE)
+    check("K (#76): the probe's Swift names no `UserDefaults` suite and removes no "
+          "persistent domain", not found, f"found {found!r}")
+    planted = ('let s = UserDefaults(suiteName: "x")\n'
+               'UserDefaults.standard.removePersistentDomain(forName: "x")\n')
+    check("K (#76): CONTROL \u2014 the same pattern finds both spellings in a planted "
+          "two-line string",
+          sorted(re.findall(suite_pattern, planted))
+          == [".removePersistentDomain(", "UserDefaults(suiteName:"],
+          f"got {re.findall(suite_pattern, planted)!r}")
 
     # The reader review's L10, made checkable rather than read: `chromeSettings`
     # builds a `SettingsWindowController` with NO `store:` on purpose \u2014 that is
@@ -6373,6 +6506,11 @@ MUTANTS = {
         "",
         "the transcript-id gate removed from `delete` \u2014 the reader review's R3\u00b71, "
         "reverted (row I)"),
+    "echoed-id-trusted": (
+        "AssemblyAIClient.swift",
+        "                    try requireEchoedID(response, polled: id)\n",
+        "",
+        "#71's id check removed (section 15's two echoed-id rows)"),
     "refused-id-reported-as-deleted": (
         "AssemblyAIClient.swift",
         "            return .notSent\n",

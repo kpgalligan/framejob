@@ -336,8 +336,6 @@ is the one style that pages to two lines by design.
 - The not-built list (AI emphasis/emoji, a sliding pill, a karaoke in-word
   fill and "dim during silence", restyling in place, WebVTT inline
   timestamps, filler words, per-word confidence styling) is tracked in #96.
-- `cloud_captions_probe.py` still leaves `cloudprobe-*` suites in
-  `~/Library/Preferences`, and should move to `MemoryDefaults`. Tracked in #76.
 - Three choices shipped unconfirmed: Karaoke's two-line exception, the
   initial font set and the 80 % shrink floor. The user confirmed all three
   on 2026-09-28 (spec §11 W-11; #45 closed).

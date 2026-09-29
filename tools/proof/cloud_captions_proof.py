@@ -21,7 +21,10 @@ Road map 6 §5i's rows 1–11, plus four of this pipeline's own:
   POPULATION and not as one comparison: this host's 16 kHz extract is not
   bit-deterministic (`archive/reelcut-remaining.md` §5), so what is asserted
   is one length, at most two distinct strings differing in a single sample,
-  with a CONTROL that says the instrument would notice a third.
+  with a CONTROL that says the instrument would notice a third. The
+  result's `endpoint` is the fake's host alone, `127.0.0.1` (#94).
+* **LOG** every request the client made is in the instance's redirected
+  log, in the fake's order, as soon as `transcribe` answers (#116).
 * **3** the placed cues, tick for tick, against an ORACLE computed in Python
   from the served words and the clips' own `in`, `speed` and `start`, with
   the harness's `cues` mode doing the line-breaking.
@@ -118,7 +121,7 @@ BOUND_PORT = re.compile(r"listening on http://127\.0\.0\.1:(\d+)/mcp")
 
 # The words the fake serves for every row that needs a transcript. Five of
 # them, inside the first five seconds of the fixture, spread so a split at
-# 2.5 s puts some either side.
+# 3.0 s puts some either side.
 WORDS = [
     {"text": "Hello", "start": 600, "end": 1120, "confidence": 0.98, "speaker": None},
     {"text": "there", "start": 1180, "end": 1600, "confidence": 0.96, "speaker": None},
@@ -567,6 +570,8 @@ def row_keyless_mcp(instance, fake, seed):
           and preview.get("cached") == [seed["media"]]
           and preview.get("uploaded") == [] and preview.get("audio_seconds") == 0,
           f"preview={preview!r}, seeded={seed['cues']!r}")
+    check("KL MCP: a keyless run built no client, so its result has no `endpoint` (#94)",
+          "endpoint" not in preview, f"got {preview.get('endpoint')!r}")
     check("KL MCP: place:false leaves project and package unchanged",
           project() == before and package_before == {
               name: read(os.path.join(folder, name)) for name in os.listdir(folder)},
@@ -668,6 +673,8 @@ def row_two(instance, fake, probe):
           f"got uploaded={answer.get('uploaded')!r} cached={answer.get('cached')!r}")
     check("2: the engine is named in the result",
           answer.get("engine") == "assemblyai", f"got {answer.get('engine')!r}")
+    check("2: and `endpoint` is the host alone, no scheme or port (#94)",
+          answer.get("endpoint") == "127.0.0.1", f"got {answer.get('endpoint')!r}")
     carried = uploads(log)[0]["headers"].get("authorization") if uploads(log) else None
     check("2: the upload carried the dummy key in its authorization header and nothing else",
           carried == DUMMY, f"got {carried!r}")
@@ -816,6 +823,33 @@ def mapped(clip, words):
         out.append(word(one["text"], place(one["start"]),
                         place(max(one["start"], one["end"])), one.get("speaker")))
     return out
+
+
+def row_log(instance, fake):
+    """#116: the client's log lines reach the instance's REDIRECTED log as
+    they are written — `print` was block-buffered there, so the log was a
+    lower bound on the requests."""
+    print("\nLOG. every request the client made is in the instance's log, in order")
+    scenario(fake)
+    speech, _ = fixtures()
+    session = Session(instance, "log")
+    media = session.media_of(speech)
+    session.add(media, at=0, duration=3 * SEC)
+    mark = len(read(instance.log))
+    session.op("transcribe", engine="assemblyai", place=False)
+    text = read(instance.log)[mark:].decode("utf-8", "replace")
+    logged = [f"{found.group(1)} {found.group(2)}" for found in (
+        re.match(r"^AssemblyAI: (GET|POST|DELETE) (\S+) → ", line)
+        for line in text.splitlines()) if found]
+    served = routes(fake.log())
+    check("LOG: CONTROL — the fake saw an upload, a submit, a poll and a DELETE",
+          "POST /v2/upload" in served and "POST /v2/transcript" in served
+          and any(r.startswith("GET /v2/transcript/") for r in served)
+          and any(r.startswith("DELETE /v2/transcript/") for r in served),
+          f"got {served!r}")
+    check("LOG: the instance's log names every one of those requests, in the fake's order, "
+          "as soon as the call answers",
+          logged == served, f"logged {logged!r}, served {served!r}")
 
 
 def row_three(instance, fake, harness):
@@ -1891,6 +1925,18 @@ CLOUD_MUTANTS = {
         '            "audio_seconds": report.uploaded.reduce(0) { $0 + $1.audioSeconds },\n',
         "the saturating sum reverted to `+` \u2014 the reader review's R1\u00b71 (row O: the "
         "app dies on two media the server answered `9223372036854775807` for)"),
+    "endpoint-whole-url": (
+        "app/Sources/AgentServer+CloudCaptions.swift",
+        "endpoint: client?.base.host,",
+        'endpoint: client?.base.absoluteString ?? "none",',
+        "#94's `endpoint` carrying the whole base URL rather than its host (row 2's "
+        "endpoint check; KL MCP's absence check)"),
+    "note-block-buffered": (
+        "app/Sources/AssemblyAIClient+Session.swift",
+        '        try? FileHandle.standardOutput.write(contentsOf: Data("AssemblyAI: \\(line)\\n".utf8))\n',
+        '        print("AssemblyAI: \\(line)")\n',
+        "#116 reverted — the client's log lines block-buffered again under a file "
+        "redirect (row LOG's sequence check)"),
     "universal-2-only": (
         "app/Sources/AssemblyAITranscript.swift",
         '    static let shippedModels = ["universal-3-5-pro", "universal-2"]\n',
@@ -2055,6 +2101,7 @@ def main():
             with Instance("A", port_base, fake_a, binary) as a:
                 run_row(row_one_caller, a, fake_a)
                 run_row(row_two, a, fake_a, probe)
+                run_row(row_log, a, fake_a)
                 run_row(row_three, a, fake_a, harness)
                 run_row(row_four, a, fake_a)
                 run_row(row_recovery, a, fake_a)

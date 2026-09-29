@@ -157,7 +157,9 @@ accepted cost: a long DELETE outage blocks re-transcription of already-transcrib
 are untrusted input. `isPlainIdentifier` gates every interpolated id, because the reader review
 showed `../upload` and `../../etc/passwd` reaching the API host with the person's key. A `notSent`
 id is in neither janitor list: it is not claimed as deleted and not held for ever. `poll` throws
-`.malformed` on such an id. (orig §10.13 R3·1, sceptic finding 6)
+`.malformed` on such an id, and on a `completed` body whose `id` is not the polled one
+(`requireEchoedID`, #71), so the id `fetch` caches and deletes is always the submitted one. (orig
+§10.13 R3·1, sceptic finding 6)
 
 **A lost submit reply gets bounded list recovery, never a second POST (R6-14, #28).** The run takes
 up to three looks at `GET /v2/transcript?limit=200`, 2.5 s apart, with a 5 s timeout each. It
@@ -306,8 +308,9 @@ The proofs live in `tools/proof/`:
   janitor.
 - **The transcript identity uses modification seconds and recorded duration**, with no content
   hash.
-- **Client log lines (`AssemblyAIClient+Session.swift`) are block-buffered under a file redirect.**
-  An instance log is a lower bound on requests, so count them through a pty.
+- **Client log lines (`AssemblyAIClient+Session.swift`) are no longer block-buffered** under a file
+  redirect (fixed, #116): `note` writes straight to fd 1 through `FileHandle.standardOutput`, so an
+  instance log names every request as soon as the call answers (`cloud_captions_proof.py` row LOG).
 - **This Mac's 16 kHz extract is not bit-deterministic.** One sample flips about one time in five,
   and an AAC source (`media/speech.mov`) varies by 60–115 samples. Rows that want bytes must use a
   population of runs and an uncompressed fixture.
@@ -337,11 +340,6 @@ The proofs live in `tools/proof/`:
   - how a held media feels
   - ⌘, in a document window
   - `recording_proof.py` with a wired input
-- Reader-review residue nits (tracked in #71 and #81):
-  - "retried at the next run" is false for a `notSent` id
-  - two row-I checks say "five" and assert six
-  - a stale 2.5 s comment in `cloud_captions_proof.py`
-- An `endpoint` (host) key in `transcribe`'s result (R6-12 residue). Tracked in #94.
 - Items the reader review left UNJUDGED:
   - the 21 pairs of refusals
   - the sheet's Stop during upload, submit, wait and save
@@ -353,8 +351,7 @@ The proofs live in `tools/proof/`:
 - Candidates not started: windowed transcription (deferred until the estimate is seen to bite) and
   a per-speaker caption label/colour. Tracked in #95 and #93.
 - Accepted limits a later phase may revisit: #28's bounded recovery, the janitor's 404 hold,
-  #30's identity, the block-buffered client log, the support folder's mode. Tracked in #113,
-  #44, #114, #116 and #108.
+  #30's identity, the support folder's mode. Tracked in #113, #44, #114 and #108.
 - The rest of the app against a hand-written `speed` (H·4). Tracked in #41.
 
 ## Where to look in the original

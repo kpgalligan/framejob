@@ -831,7 +831,11 @@ free.
   4xx or after a cancel; `poll` sleeps in ≤ 0.1 s slices that read the token
   and EVERY throwing exit deletes the transcript first. A `completed` body
   whose `words` is absent, null or not an array is `.malformed`, never an
-  empty transcript; `[]` is zero words. `request` and `send` stay in the
+  empty transcript; `[]` is zero words. A `completed` body whose `id` is not
+  the polled id is `.malformed` too (`requireEchoedID` in `+Session`, #71), so
+  the id `fetch` stores and deletes is always the submitted one. `note` writes
+  straight to fd 1 through `FileHandle.standardOutput`, never `print`, so a
+  file-redirected log is complete (#116). `request` and `send` stay in the
   first file, with `withoutCredential(_:)` beside them: those three are the
   members that touch `credential`, and that helper keeps the three sentences
   the client RELAYS verbatim — a 402's, a 4xx's and a transcript's `error` —

@@ -38,8 +38,10 @@ import AppKit
 /// `AssemblyAIConfiguration` and offers neither as an argument, and
 /// `cloudFields` names no region — every proof instance runs under
 /// `-RCAssemblyAIEndpoint`, where the region is not where the run spoke, so
-/// the key could be proved only where it is false. The honest shape, the
-/// base URL's HOST under a key named `endpoint`, is GitHub issue #94.
+/// the key could be proved only where it is false. The honest shape is the
+/// one that has landed (#94): the run's client's HOST alone, under a key
+/// named `endpoint` — a fact about where the requests went, never an
+/// argument.
 /// The vocabulary's rules are `TranscriptOptions.keyterms`, the one spelling
 /// the sheet shares (c1-chrome moved them there verbatim).
 extension AgentServer {
@@ -162,7 +164,10 @@ extension AgentServer {
             // channel a throw has; the result KEYS are unchanged.
             throw ToolError(message: Self.cloudFailure(error, report: transcriber.report))
         }
-        return (outcome, Self.cloudFields(transcriber.report, code: code, notes: notes))
+        return (
+            outcome,
+            Self.cloudFields(transcriber.report, code: code, endpoint: client?.base.host, notes: notes)
+        )
     }
 
     /// What a FAILED run already cost, as a sentence to put after the
@@ -227,8 +232,13 @@ extension AgentServer {
     /// `note` exists only when there is a part to put in it: R6-8's fallback
     /// ran, a vocabulary was cut, or a remote delete is still owed. An empty
     /// note would be a key a caller has to read to learn nothing.
+    ///
+    /// `endpoint` is the HOST alone of the base URL the run's client spoke
+    /// to (#94) — no scheme, port, path or userinfo, so no credential can
+    /// ride in it (R6-5) — and it is absent when there was no client: a
+    /// keyless run found no credential, built none, and sent nothing.
     static func cloudFields(
-        _ report: CloudTranscriber.Report, code: String?, notes: [String]
+        _ report: CloudTranscriber.Report, code: String?, endpoint: String?, notes: [String]
     ) -> [String: Any] {
         var parts = notes
         let preferred = TranscriptOptions.shippedModels.first ?? "universal-3-5-pro"
@@ -272,6 +282,7 @@ extension AgentServer {
             }
             if !detected.isEmpty { fields["language_detected"] = detected }
         }
+        if let endpoint { fields["endpoint"] = endpoint }
         if !parts.isEmpty { fields["note"] = parts.joined(separator: " ") }
         return fields
     }

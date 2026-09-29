@@ -86,6 +86,23 @@ extension AssemblyAIClient {
         return failure
     }
 
+    /// A `completed` body must name the id that was polled, or it is
+    /// `.malformed` (#71).
+    ///
+    /// `fetch` stores `response.id` in the cache file and later deletes it,
+    /// so a body served under another id — `../upload`, or a plain id that
+    /// is somebody else's — would be cached and promised a retry that can
+    /// never be sent, or would move the DELETE to a transcript this run
+    /// never made. Refusing here keeps the id `fetch` stores and deletes the
+    /// submitted one, and `refusing` deletes the POLLED id, which is plain.
+    func requireEchoedID(_ response: TranscriptResponse, polled id: String) throws {
+        guard response.id != id else { return }
+        throw refusing(
+            .malformed(
+                "the transcript came back completed under an id other than the one polled"),
+            id: id)
+    }
+
     /// Waits in slices of at most a tenth of a second, reading the token
     /// between them, so a cancel during a three-second gap is acted on in a
     /// tenth rather than at the next poll.
@@ -103,8 +120,14 @@ extension AssemblyAIClient {
     /// `authorization` is in one, a signed URL may be in the other. Named
     /// `note` rather than `log` because Darwin's `log(_:)` is a global
     /// function on `Double` and an unqualified `log("…")` resolves to it.
+    ///
+    /// Written straight to fd 1 through `FileHandle.standardOutput`, never
+    /// `print` (#116): `print` is block-buffered (4096 B) under a file
+    /// redirect, so an instance log held only the lines before the last full
+    /// block. The throwing `write(contentsOf:)` because the legacy
+    /// `write(_:)` raises an Objective-C exception on a bad descriptor.
     func note(_ line: String) {
-        print("AssemblyAI: \(line)")
+        try? FileHandle.standardOutput.write(contentsOf: Data("AssemblyAI: \(line)\n".utf8))
     }
 
     // MARK: - The delegate

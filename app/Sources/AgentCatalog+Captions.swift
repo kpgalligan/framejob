@@ -126,8 +126,9 @@ extension AgentServer {
                     + "and caches one transcript per media file "
                     + "inside the project package, so a second run over the same files makes no "
                     + "request and reports them under cached. It adds uploaded, cached, "
-                    + "audio_seconds (what was billed), speech_model_used, language_detected "
-                    + "and, when there is something to say, note.",
+                    + "audio_seconds (what was billed), speech_model_used, language_detected, "
+                    + "endpoint (the host alone of the server a keyed run's requests go to; "
+                    + "absent when no API key is set) and, when there is something to say, note.",
                 [
                     "clips": [
                         "type": "array", "items": ["type": "integer"], "minItems": 1,

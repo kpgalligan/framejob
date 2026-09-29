@@ -242,6 +242,7 @@ final class AssemblyAIClient {
                         id: id)
                 }
                 if response.status == "completed" {
+                    try requireEchoedID(response, polled: id)
                     guard let words = wordsBytes(in: reply.data) else {
                         throw refusing(
                             .malformed("the transcript came back completed with no words array"),

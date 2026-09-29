@@ -134,7 +134,7 @@ history. The history moved into this record; the open items became GitHub issues
   `chrome` row compares them over two rounds; a later merge must keep a comparison.
 - **`transcribe` has no `region` key** (R6-12): every proof instance runs under
   `-RCAssemblyAIEndpoint`, so the key would be false where it is proved. An `endpoint` host key is
-  the honest shape (#94).
+  the honest shape, and it landed (#94): the run's client's host alone, absent on a keyless run.
 - **Proof instruments are not held to the 400-line cap.** Road map 6 §10.13 corrected earlier
   sentences that said they were.
 

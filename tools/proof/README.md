@@ -4450,8 +4450,8 @@ with a row asserting `grep "Reelcut: "` finds nothing in its log — nothing in
 this file ever reads `pgrep`, so another session's instance is none of its
 business.
 
-* **A** (4955, `RC_ASSEMBLYAI_KEY=proof-key`) — rows 1's caller arms, 2, 3,
-  4, 5, 7, 8, 9, 10.
+* **A** (4955, `RC_ASSEMBLYAI_KEY=proof-key`) — rows 1's caller arms, 2, LOG,
+  3, 4, 5, 7, 8, 9, 10.
 * **B** (4956, the variable REMOVED) — row 1's no-key arm.
 * **C** (4957, `proof-key`) — rows 6, 11, H, T.
 
@@ -4724,6 +4724,35 @@ Row M's write is made to fail by setting the cache file's `UF_IMMUTABLE`
 flag: an `.atomic` write renames over the file, which the flag refuses, while
 the FOLDER stays writable so the marker's own write still succeeds — which is
 the whole point of that row.
+
+**B4 (2026-09-29, #71, #76, #81, #94, #116).** `cloud_captions_probe.py`
+gained four rows, **735/737** on the tree against 731/733 before (the two
+failures are the same two rows both times: F's ffmpeg decoder, a host fact,
+and 18's `project.yml` diff check, #156). Section 15 has two #71 rows, a
+`completed` body served
+under `../upload` and under `t_other`, each `malformed` with one DELETE to
+the POLLED `/v2/transcript/t_probe` (`words-empty` is their CONTROL); the
+hygiene section has **K (#76)**, that the probe's Swift names no
+`UserDefaults` suite and removes no persistent domain, with its CONTROL on a
+planted string. Every defaults object the probe builds is now a
+`ProbeDefaults` (in `PROBE_HEAD`): the harness's `MemoryDefaults`, override
+for override, except that its argument domain is the process's own, seeded
+from the launch arguments and replaceable in memory, so R6-9 and SV's second
+endpoint still read what the chrome child was launched with and nothing
+reaches `~/Library/Preferences` (0 `cloudprobe-*` plists after a run and a
+35 s wait). Row I's wording now says which five ids are hostile (media
+11–15) and which one is the control (16). New mutant `echoed-id-trusted`:
+42/44 under `--only client`, failing exactly the two #71 rows.
+`cloud_captions_proof.py` gained four rows, **171/171** against 167/167:
+row 2's `endpoint` is `127.0.0.1` (#94), KL MCP's keyless result has no
+`endpoint`, and **LOG** (instance A, after row 2) reads the client's lines
+out of the instance's redirected log and holds them to the fake's request
+list in order (#116), with a CONTROL that the fake saw an upload, a submit,
+a poll and a DELETE. New mutants `endpoint-whole-url` (169/171: row 2's
+`endpoint` and KL MCP's absence check) and `note-block-buffered` (170/171:
+LOG's sequence check; its CONTROL passes). Both were scored against a copy
+built by hand and run with `--binary`, because `--mutant`'s copy lacks
+`docs/`, `graphic/tests/graphics/` and `agent/`, and its `xcodebuild` fails.
 
 ### Road map 7 part 6 — core argument contract
 
