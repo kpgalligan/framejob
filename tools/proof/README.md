@@ -2918,13 +2918,15 @@ the invalid tier would BLOCK — the runner gives it a 120 s timeout and
 scores a hang as the failure it is. The beep is the one consequence nothing
 here can observe; it is a single statement the two non-applied arms share.
 
-**One thing it prints and does not score.** `performGroupedEdit` opens an
-undo group and balances it whatever the edit answered, so an edit that
-changes nothing leaves an EMPTY group behind — a step a person would have to
-press ⌘Z twice past. An identity has always done it, no caller reaches it
-(the agent refuses at its trial, and the menu path does not use that entry
-point), and it is not D2's doing; the note is there so it is found written
-down rather than rediscovered.
+**`performGroupedEdit`'s two answers that are not an edit** (#59), section
+6, scored. It used to open an undo group and balance it whatever the edit
+answered, so an identity or a refusal left an EMPTY step behind — one a
+person had to press ⌘Z past — and cleared the redo. It now opens its
+explicit group only around an APPLIED edit (`commitEdit`). Each row starts
+from a redo of its own (a real grouped edit, then undo) and holds
+`canUndo`, `undoActionName`, `canRedo` and `redoActionName` to what they
+were before the answer. Measured 2026-09-29: 17/17; the same probe over
+HEAD 97e870a's `app/Sources` fails exactly those two rows (15/17).
 
 ## The op table, read back through the app (`op_schema_probe.py`)
 
@@ -7159,3 +7161,61 @@ M0 window 143.0 s and 139.5 s; M1 0 crashes of 30 both; M2 latencies
 the cancel waits for the sample buffer in flight over four noise-reduced
 tracks. The second full run took 1632 s of wall time, most of it M1 (each
 run measures for its `delay`, up to window/2).
+
+## Issue batch B3 — editor keys, undo steps, the transition ring (`editor_keys_undo_proof.py`, `editor_keys_undo_probe.swift`)
+
+kpgalligan/reelcut#59 #60 #61 #66 #68 #69. `python3
+tools/proof/editor_keys_undo_proof.py`, no port and no running app. The probe
+is compiled AS `main.swift` over `app/Sources` (`harness/build.sh`'s swiftc
+line; a build failure is a scored FAILURE) with `Compositor.metal` built
+beside it, and runs with `-ReelcutInspectorCollapsed NO` and
+`ANTHROPIC_API_KEY` / `RC_ASSEMBLYAI_KEY` popped. The driver writes four
+packages under `work/editor-keys-undo/`: `card` (`space_key_proof.py`'s
+fixture — a grey card 0–6 s, then `media/A.mov` as clip 3 at 6–12 s),
+`ringPair` (shape cards A 0–6 s and B 4–10 s with a linear cross dissolve
+in), `ringAlone` (A only) and `ringAbut` (A, and B at 6–12 s with no
+transition). F, C, R and M each open their OWN fresh `card` editor
+(`makeWindowControllers()`), so no group's undo stack or open implicit group
+reaches another; keys are synthesized `NSEvent`s through `window.sendEvent`.
+
+- **U** (#59, a windowless document, two text clips): U1 an identity and U2 a
+  refused move through `performGroupedEdit`, each from a redo of its own,
+  leave undo and redo as they were. U3 (control) a real grouped edit
+  registers one step named for it.
+- **F** (#60, clip 2 on the Picture sub-tab, the Transform section's Scale
+  field): F1 type `50`, Return → `video.scale == 0.5` AND the editor's root
+  view is first responder; F2 then a bare I sets the in point; F3 focus the
+  field again, Esc, then a bare O sets the out point.
+- **C** (#61, the root view first responder): C1 I with Caps Lock; C2 ↓ with
+  `[.numericPad, .function]` steps to 6 s; C3 End with `[.function]` goes to
+  12 s. C4 (control) `handleEditorKey` answers false for ⌘I, ⌥I, ⌃I and ⌥↓,
+  and none moves the range or the playhead.
+- **R** (#69, `beginClipRename(2)`, "Renamed" typed): R1 Esc closes the
+  field, keeps the name, makes no undo step and leaves the root view first
+  responder; R2 a rename ended by `beginGesture` on the track's M: the first
+  undo unmutes and keeps "Renamed", the second restores the name. R3
+  (control) Return commits one "Rename Clip" step.
+- **M** (#68, the Media tab, `MediaPane.select(20)`, searches through
+  `MediaSearchField.controlTextDidChange`): M1 (control) "A.mov" keeps
+  media 20 selected and Insert / Overwrite at Playhead live; M2 "zzz" clears
+  `selectedMedia` and both go dead.
+- **D** (#66, `cacheDisplay` of the timeline's content): the device-pixel
+  columns wholly inside A's ring stroke, `[body.maxX − 2, body.maxX]`, over
+  the stroke's straight run (1 pt + the clip radius in from the body's top
+  and bottom). D1 with A selected ringPair's columns are byte-identical to
+  ringAlone's; D2 (control) with nothing selected they differ; D3 (control)
+  ringAbut with A selected is byte-identical to ringAlone.
+
+`--baseline <commit>` builds the same probe over `git archive <commit>
+app/Sources` with `-D HARNESS_REFERENCE_BUILD` in
+`work/editor-keys-undo/baseline/`, linked to the CURRENT `libreelcut_core.a`
+(valid while a batch changes nothing under `core/`), and exits 0 only when
+EXACTLY U1 U2 F1 F2 F3 C1 C2 C3 R1 R2 M2 D1 fail there and every control
+passes. Needs `media/A.mov` (a scored row when missing), no ffmpeg.
+Measured 2026-09-29: 21/21 on the fix (18 probe rows); `--baseline 97e870a`
+(HEAD before the batch) fails exactly those twelve and exits 0.
+
+```sh
+python3 tools/proof/editor_keys_undo_proof.py                     # → 21/21
+python3 tools/proof/editor_keys_undo_proof.py --baseline 97e870a  # exit 0 = exactly the twelve FAIL
+```

@@ -42,13 +42,37 @@ extension TimelineContentView {
             height: max(body.height - DS.clipHeaderHeight, 0))
     }
 
-    /// One clip bar, in paint order: body, media, the selected action's wash,
-    /// name strip, action lane, fade handles, grips, border, the transition
-    /// zone — which belongs to two clips and so is drawn outside the body's
-    /// clip — and the selection ring last, so nothing paints over it.
-    func draw(
-        clip: ClipSnapshot, in rect: CGRect, track: TrackSnapshot, previous: ClipSnapshot?,
-        owner: TimelineView, visible: CGRect
+    /// One track's clips in three passes: every body, then every transition
+    /// zone, then every selection ring. A zone starts at `clip.start` and so
+    /// lies inside the PREVIOUS clip's body, over its right edge: drawn with
+    /// that clip, the NEXT clip's hatch painted white 0.26 and a solid white
+    /// edge straight over the previous clip's ring (#66). Clips outside
+    /// `dirtyRect` are skipped in every pass.
+    func drawClips(
+        _ clips: [ClipSnapshot], row: Int, track: TrackSnapshot, owner: TimelineView,
+        dirtyRect: CGRect
+    ) {
+        let rects = clips.map { owner.layout.clipRect($0, row: row) }
+        let shown = clips.indices.filter { rects[$0].intersects(dirtyRect) }
+        for i in shown {
+            draw(clip: clips[i], in: rects[i], track: track, owner: owner, visible: dirtyRect)
+        }
+        for i in shown where i > 0 {
+            drawTransition(
+                clips[i], previous: clips[i - 1], in: Self.bodyRect(rects[i]),
+                layout: owner.layout)
+        }
+        for i in shown where owner.selection.contains(clips[i].id) {
+            drawSelectionRing(Self.bodyRect(rects[i]))
+        }
+    }
+
+    /// One clip's body, in paint order: fill, media, the selected action's
+    /// wash, name strip, action lane, fade handles, grips and border. Its
+    /// transition zone and its selection ring are `drawClips`'s later passes.
+    private func draw(
+        clip: ClipSnapshot, in rect: CGRect, track: TrackSnapshot, owner: TimelineView,
+        visible: CGRect
     ) {
         let layout = owner.layout
         let body = Self.bodyRect(rect)
@@ -131,22 +155,17 @@ extension TimelineContentView {
         border.lineWidth = 1
         NSColor.white.withAlphaComponent(0.14).setStroke()
         border.stroke()
+    }
 
-        // The transition goes down BEFORE the ring. Its zone starts at
-        // `clip.start`, which is the body's own left edge, so a hatch drawn
-        // after the ring paints white 0.26 and a solid white edge straight over
-        // the coral — the selected clip would lose its left side exactly where
-        // it overlaps its predecessor.
-        drawTransition(clip, previous: previous, in: body, layout: layout)
-
-        if owner.selection.contains(clip.id) {
-            DS.playhead.setStroke()
-            let outline = NSBezierPath(
-                roundedRect: body.insetBy(dx: 1, dy: 1), xRadius: TimelineLayout.clipRadius,
-                yRadius: TimelineLayout.clipRadius)
-            outline.lineWidth = 2
-            outline.stroke()
-        }
+    /// The selected clip's 2 pt coral ring, inside its body's edge. Painted in
+    /// `drawClips`' last pass, so no transition hatch lies over it.
+    private func drawSelectionRing(_ body: CGRect) {
+        DS.playhead.setStroke()
+        let outline = NSBezierPath(
+            roundedRect: body.insetBy(dx: 1, dy: 1), xRadius: TimelineLayout.clipRadius,
+            yRadius: TimelineLayout.clipRadius)
+        outline.lineWidth = 2
+        outline.stroke()
     }
 
     // MARK: - Name strip

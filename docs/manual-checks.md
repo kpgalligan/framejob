@@ -116,9 +116,9 @@ the same way.
 - **Source:** #48.
 
 **TL-7 — Renaming a clip**
-- **Do:** 1. Double-click a (non-nest) clip, type, Enter. 2. Double-click again and press Enter unchanged. 3. Edit the Clip tab's header name; leave with Tab, then with a click away; empty it. 4. Select a far-off clip and press ⇧⌘R. 5. Zoom or resize the window with a rename open; delete the clip with a rename open.
-- **Expect:** "Rename Clip" updates the strip, the Clip tab header and the selection block; the unchanged Enter makes no undo step; an emptied header restores the fallback name (nothing on an unnamed clip); ⇧⌘R scrolls the clip into view first; the field follows zoom and closes with no rename on delete. The header's text sits centred in its box.
-- **Source:** #48.
+- **Do:** 1. Double-click a (non-nest) clip, type, Enter. 2. Double-click again and press Enter unchanged. 3. Edit the Clip tab's header name; leave with Tab, then with a click away; empty it. 4. Select a far-off clip and press ⇧⌘R. 5. Zoom or resize the window with a rename open; delete the clip with a rename open. 6. Double-click a clip, type, press Esc; double-click again, type, then click a track's M; ⌘Z twice.
+- **Expect:** "Rename Clip" updates the strip, the Clip tab header and the selection block; the unchanged Enter makes no undo step; an emptied header restores the fallback name (nothing on an unnamed clip); ⇧⌘R scrolls the clip into view first; the field follows zoom and closes with no rename on delete. The header's text sits centred in its box. Esc keeps the old name with no undo step; the first ⌘Z unmutes and keeps the new name, the second undoes the rename.
+- **Source:** #48, #69.
 
 **TL-8 — Labels, solo and Paste Attributes**
 - **Do:** 1. Clip ▸ Label ▸ Blue, then None. 2. Click a track's headphones toggle at S, M and L height; watch Track ▸ Solo. 3. Copy a clip, select another, Edit ▸ Paste Attributes (⌥⌘V); try it between a video and an audio-only clip.
@@ -144,6 +144,11 @@ the same way.
 - **Do:** 1. Drag a clip with the playhead on screen. 2. Scroll the playhead off screen and drag a clip. 3. Press ← / →, and click the ruler.
 - **Expect:** the playhead does not flash to 0 and the view does not jump back; the arrows and a ruler click still bring the playhead into view.
 - **Source:** #48.
+
+**TL-13 — Bare keys after a field, and with Caps Lock**
+- **Do:** 1. Change an inspector number, press Return, then press I, O, ←, →, ↑, ↓, Home, End without clicking. 2. Click into another number field, press Esc, then L and K. 3. Turn Caps Lock on and repeat 1 and J / K / L.
+- **Expect:** every key acts with no beep and no click first.
+- **Source:** #60, #61.
 
 ## Clip tab and action lane
 

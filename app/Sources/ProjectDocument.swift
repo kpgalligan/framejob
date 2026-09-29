@@ -1067,7 +1067,7 @@ final class ProjectDocument: NSDocument {
     /// meant. All that is different is that each op is addressed at the nest
     /// first. `updateLiveEdit` does the same to its own ops for the same
     /// reason — a drag inside a nest is a drag — and `performGroupedEdit`
-    /// gets it for free, because it calls `applyEdit`.
+    /// gets it for free, because it shares `applyEdit`'s `commitEdit`.
     ///
     /// **A document-level op is sent UNSCOPED** (`ReelOp.isDocumentLevel`,
     /// which argues it where the seven names are). One edit can mix the two
@@ -1105,23 +1105,37 @@ final class ProjectDocument: NSDocument {
         applyEdit(actionName, [op])
     }
 
-    /// Applies a sequence of ops as ONE undo step — a compound gesture
-    /// (freeze frame, a multi-file import) is one thing to undo.
-    ///
+    /// Applies a sequence of ops as ONE undo step — a compound gesture (freeze
+    /// frame, a multi-file import); what each answer does is `commitEdit`'s.
+    func applyEdit(_ actionName: String, _ ops: [ReelOp]) {
+        commitEdit(actionName, ops, grouped: false)
+    }
+
+    /// `applyEdit` as an explicit group (`inExplicitUndoGroup`): a path outside
+    /// an AppKit event (the async import completion, the agent's tool calls),
+    /// or a rename commit that must be its own step inside one (#69).
+    func performGroupedEdit(_ actionName: String, _ ops: [ReelOp]) {
+        commitEdit(actionName, ops, grouped: true)
+    }
+
     /// Four answers (spec §5.5): `.applied` registers undo and publishes,
     /// `.identity` and `.refused` are BOTH a beep and no undo step — a
     /// refusal also posts `projectDocumentDidRefuse` with its sentence (spec
     /// §11 CI-10) — and a throw is the core's own message. `ReelEdit` argues
-    /// the middle two.
-    func applyEdit(_ actionName: String, _ ops: [ReelOp]) {
+    /// the middle two. Only `.applied` opens the explicit group: an empty one
+    /// is still a step on the stack, and closing it clears redo (#59).
+    private func commitEdit(_ actionName: String, _ ops: [ReelOp], grouped: Bool) {
         let current = project
         do {
             switch try current.applying(addressed(ops)) {
             case .applied(let updated):
-                registerUndo(restoring: current, actionName: actionName)
-                project = updated
-                countEditChange(.changeDone)
-                projectDidChange()
+                func commit() {
+                    registerUndo(restoring: current, actionName: actionName)
+                    project = updated
+                    countEditChange(.changeDone)
+                    projectDidChange()
+                }
+                if grouped { inExplicitUndoGroup(commit) } else { commit() }
             case .identity:
                 NSSound.beep()
             case .refused(let refusal):
@@ -1136,36 +1150,22 @@ final class ProjectDocument: NSDocument {
         }
     }
 
-    /// `applyEdit` for a path that is NOT running inside an AppKit event — the
-    /// async import completion above, and later the agent's
-    /// dispatched-to-main tool calls.
-    ///
-    /// **Pitfall** (app/CLAUDE.md): an undo registration made outside an event
-    /// lands in the implicit group `NSUndoManager` opens per event, which
-    /// AppKit never closes here, so every such edit silently merges into ONE
-    /// undo step.
-    ///
-    /// The fix is to turn event grouping OFF for the duration and balance an
-    /// explicit group, **not** to force the level back to zero afterwards.
-    /// Force-closing leaves the manager with an end and no begin, and the
-    /// next `_postCheckpointNotification` — which `NSDocument` posts from
-    /// inside the file-coordination accessor of every save — then raises
-    /// `NSInternalInconsistencyException: endUndoGrouping called with no
-    /// matching begin`. Under `autosavesInPlace` that exception is swallowed
-    /// inside the coordinator, so the save neither completes nor writes nor
-    /// relinquishes its file-access claim: ⌘S and `save_project` hang for
-    /// good after the first agent edit, and every later file access on the
-    /// document blocks behind the claim.
-    func performGroupedEdit(_ actionName: String, _ ops: [ReelOp]) {
-        guard let manager = undoManager else {
-            applyEdit(actionName, ops)
-            return
-        }
+    /// **Pitfall** (app/CLAUDE.md): a registration made outside an event lands
+    /// in the implicit per-event group AppKit never closes here, so every such
+    /// edit silently merges into ONE undo step. The fix is event grouping OFF
+    /// for the duration and a balanced explicit group, **not** forcing the
+    /// level to zero: that leaves an end with no begin, the checkpoint
+    /// `NSDocument` posts inside every save's file-coordination accessor then
+    /// raises `endUndoGrouping called with no matching begin`, the coordinator
+    /// swallows it under `autosavesInPlace`, and ⌘S and `save_project` hang
+    /// for good, every later file access blocking behind the unreleased claim.
+    private func inExplicitUndoGroup(_ body: () -> Void) {
+        guard let manager = undoManager else { return body() }
         let groupsByEvent = manager.groupsByEvent
         if groupsByEvent { manager.groupsByEvent = false }
         let level = manager.groupingLevel
         manager.beginUndoGrouping()
-        applyEdit(actionName, ops)
+        body()
         // Close exactly what this call opened — never a group it did not.
         while manager.groupingLevel > level { manager.endUndoGrouping() }
         if groupsByEvent { manager.groupsByEvent = true }

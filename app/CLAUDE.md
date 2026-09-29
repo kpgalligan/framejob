@@ -315,6 +315,9 @@ the key map behind it.
   presses on it (spec §11 K-1), so Space never beeps when focus has fallen
   to the window. A new text-taking or Space-handling view must be added to
   `SpaceKey.route` and to `tools/proof/space_key_probe.swift`.
+  `EditorKey.isBare` is the bare-key map's modifier rule (⇧ ⇪ always;
+  `.numericPad`/`.function` on function-key scalars; never ⌘ ⌥ ⌃), read by
+  `handleEditorKey` (#61).
 
 **Timeline.**
 - `TimelineView.swift` (frozen) · `TimelineLayout.swift` (every ticks ↔
@@ -322,11 +325,16 @@ the key map behind it.
   real heights per track KIND) · `TimelineBar.swift` · `TimelineClipDrawing.swift`
   (a clip is ONE object: body, name strip with the kind symbol, label dot,
   motion wedges for active edges only, filmstrip under a tint wash, waveform, grips on the
-  selected clip, hatched transition zone) · `TimelineSessions.swift` (drag,
+  selected clip, hatched transition zone; a track paints in three passes —
+  bodies, transition zones, selection rings (`drawClips`, #66) — because a
+  zone lies inside the PREVIOUS clip's body) · `TimelineSessions.swift` (drag,
   trim, slip, roll sessions) · `TimelineView+Rename` (the one inline editor
   for clips, tracks and markers; it drops an unchanged and an empty commit,
   follows its target through relayout, and ends with its commit DROPPED when
-  the target is gone) · `+TrackMenu` (the right-click menu on a header or an
+  the target is gone or on Escape; a commit goes through `onGroupedEdit`
+  (`performGroupedEdit`), so a rename is its own undo step even when the
+  mouse-down that ended it edits too (#69)) · `+TrackMenu` (the right-click
+  menu on a header or an
   empty lane: the four toggles, checked, and Remove Track through
   `onRemoveTrack` to `removeTrackCommand`, which asks when clips would go;
   a clip hit answers no menu) · `+Candidates` (Remove Silences' wash, drawn not
@@ -560,6 +568,8 @@ the key map behind it.
   VALUE; not persisted) · `MediaUsage.swift` (the ONE spelling of "is this
   media used", over the timeline's clips AND every nest's) ·
   `MediaReveal.swift` — the Media tab. The find band never rebuilds the pane.
+  A filter that hides the selected row clears `selectedMedia`
+  (`dropHiddenSelection`, #68).
 
 **Playback and rendering.**
 - `Playback.swift` (+`Meter`) — one `AVPlayer` over the plan's composition; the
@@ -1417,8 +1427,10 @@ heights S/M/L per kind), `Controls.swift`, `OptionControls.swift`,
 (Finder drops + the first responder the bare-key map needs) — copied from
 Rasterize; keep them in sync rather than forking. `BrandMark.swift` is
 Reelcut's own, drawn from `designs/design_handoff_reelcut/`.
-`Controls.swift`'s `BlockSlider` is the timeline's zoom slider. Two known
-divergences, each recorded: `StickerButton` still has its pill, the one
+`Controls.swift`'s `BlockSlider` is the timeline's zoom slider. Three known
+divergences, each recorded: `OptionFieldControl.finishEditing` returns first
+responder to `window.contentView` (#60) where Rasterize's copy keeps
+`makeFirstResponder(nil)`; `StickerButton` still has its pill, the one
 place `Controls.swift` lags Rasterize (spec §11 SH-1, owed); and
 `BlockSliderCell.drawBar` dims through the context's alpha rather than
 `withAlphaComponent`, the one deliberate fork (SH-2) — Rasterize's spelling
@@ -1441,7 +1453,10 @@ at the ~600-line cap gives something up first, as a pure move landed alone.
 count deterministically via `countEditChange()`. **Pitfall:** undo
 registrations outside an AppKit event (agent edits, async callbacks) land in
 the implicit event group AppKit never closes, silently merging edits into one
-undo step; any off-event path goes through `ProjectDocument.performGroupedEdit`.
+undo step; any off-event path goes through
+`ProjectDocument.performGroupedEdit`. It opens its explicit group only for an
+`.applied` answer (`commitEdit`, shared with `applyEdit`), so an identity, a
+refusal or an error leaves the stack — redo included — untouched (#59).
 **Do not "flush" the manager to grouping level zero** to close that group: the
 undo checkpoint `NSDocument` posts inside every save then raises, the
 exception is swallowed inside the file coordinator, and ⌘S and `save_project`

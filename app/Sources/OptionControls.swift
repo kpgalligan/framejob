@@ -241,7 +241,7 @@ final class OptionFieldControl: NSView, NSTextFieldDelegate, OptionControl {
     private func finishEditing(commit: Bool) {
         finishing = true
         if commit { commitCurrentText() }
-        window?.makeFirstResponder(nil)
+        window?.makeFirstResponder(window?.contentView)  // #60
         finishing = false
         field.stringValue = restText()
     }

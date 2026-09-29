@@ -95,8 +95,10 @@ final class TimelineView: NSView, NSTextFieldDelegate {
     var onLiveBegin: (() -> Void)?
     var onLiveUpdate: (([ReelOp]) -> Void)?
     var onLiveEnd: ((String) -> Void)?
-    /// A one-shot edit (a header toggle, a rename) as one undo step.
+    /// A one-shot edit (a header toggle) as one undo step.
     var onEdit: ((String, [ReelOp]) -> Void)?
+    /// A rename's commit, as its OWN undo step even when the click that ended it edits too (#69).
+    var onGroupedEdit: ((String, [ReelOp]) -> Void)?
     /// Applies ops to the current handle PURELY and hands back the result,
     /// only so a gesture can learn the ids the core is about to mint for a
     /// `duplicate` or an `add_track`. Nothing is mutated and no undo step is
@@ -936,7 +938,7 @@ final class TimelineView: NSView, NSTextFieldDelegate {
             in: headers, frame: trackRenameFrame(row: row), text: track.name,
             relocate: trackRenameRelocator(track.id)
         ) { [weak self] name in
-            self?.onEdit?("Rename Track", [.setTrack(track: track.id, name: name)])
+            self?.onGroupedEdit?("Rename Track", [.setTrack(track: track.id, name: name)])
         }
     }
 
@@ -945,7 +947,7 @@ final class TimelineView: NSView, NSTextFieldDelegate {
             in: ruler, frame: markerRenameFrame(marker), text: marker.name,
             relocate: markerRenameRelocator(marker.id)
         ) { [weak self] name in
-            self?.onEdit?("Rename Marker", [.setMarker(marker: marker.id, name: name)])
+            self?.onGroupedEdit?("Rename Marker", [.setMarker(marker: marker.id, name: name)])
         }
     }
 
@@ -1372,15 +1374,9 @@ final class TimelineContentView: NSView {
             let row = layout.row(forTrackIndex: index)
             let lane = layout.rowRect(row, width: layout.contentWidth)
             guard lane.intersects(dirtyRect) else { continue }
-            let clips = snapshot.clips(onTrack: track.id)
-            for (position, clip) in clips.enumerated() {
-                let rect = layout.clipRect(clip, row: row)
-                guard rect.intersects(dirtyRect) else { continue }
-                draw(
-                    clip: clip, in: rect, track: track,
-                    previous: position > 0 ? clips[position - 1] : nil,
-                    owner: owner, visible: dirtyRect)
-            }
+            drawClips(
+                snapshot.clips(onTrack: track.id), row: row, track: track, owner: owner,
+                dirtyRect: dirtyRect)
             if track.locked {
                 TimelineDraw.hatch(lane, color: DS.textFaint.withAlphaComponent(0.55))
             }

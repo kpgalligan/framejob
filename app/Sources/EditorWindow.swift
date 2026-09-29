@@ -5,10 +5,10 @@ import AppKit
 ///
 /// **Space is the transport's unless the first responder is typing or claims
 /// it.** The window routes a bare Space key-DOWN (⇧ and ⇪ allowed, any other
-/// modifier untouched) BEFORE dispatch, because dispatch is what beeped: an
-/// inspector number field ends its edit with `makeFirstResponder(nil)`
-/// (`OptionFieldControl.finishEditing`), which leaves the WINDOW as first
-/// responder, `NSWindow.keyDown` forwards to nothing, and
+/// modifier untouched) BEFORE dispatch, because dispatch is what beeped when
+/// the WINDOW was first responder — as it still can be when a focused view is
+/// removed (`OptionFieldControl.finishEditing` hands focus to the content
+/// view since #60): `NSWindow.keyDown` forwards to nothing, and
 /// `NSResponder.noResponder(for:)` beeps — the key never reached
 /// `EditorViewController.keyDown`.
 ///
@@ -49,6 +49,17 @@ enum SpaceKey {
         }
         if event.isARepeat { return .held }
         return .transport
+    }
+}
+
+/// The bare-key map's modifier rule, read by `handleEditorKey` (#61).
+enum EditorKey {
+    /// Device-independent part of `flags` minus [.shift, .capsLock] must be empty, except that on a
+    /// function-key scalar (0xF700...0xF8FF) .numericPad and .function are also allowed. ⌘ ⌥ ⌃ .help never. Pure.
+    static func isBare(_ flags: NSEvent.ModifierFlags, scalar: UInt32) -> Bool {
+        var allowed: NSEvent.ModifierFlags = [.shift, .capsLock]
+        if (0xF700...0xF8FF).contains(scalar) { allowed.formUnion([.numericPad, .function]) }
+        return flags.intersection(.deviceIndependentFlagsMask).subtracting(allowed).isEmpty
     }
 }
 

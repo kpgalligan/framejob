@@ -41,6 +41,7 @@ extension EditorViewController {
         timeline.onLiveUpdate = { [weak self] ops in self?.document?.updateLiveEdit(ops) }
         timeline.onLiveEnd = { [weak self] name in self?.document?.endLiveEdit(name) }
         timeline.onEdit = { [weak self] name, ops in self?.document?.applyEdit(name, ops) }
+        timeline.onGroupedEdit = { [weak self] name, ops in self?.document?.performGroupedEdit(name, ops) }
         timeline.onRemoveTrack = { [weak self] id in self?.removeTrackCommand(id) }
         timeline.onProbe = { [weak self] ops in self?.timelineProbe(ops) }
         timeline.onSnapCandidates = { [weak self] clips in self?.timelineCandidates(clips) ?? [] }

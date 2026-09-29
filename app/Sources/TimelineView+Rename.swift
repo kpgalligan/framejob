@@ -32,12 +32,17 @@ import AppKit
 /// * **An unchanged one.** The field opened on the fallback; sending that
 ///   back would pin it as the clip's OWN name — an undo step and a dirty
 ///   document for nothing, and a text clip's strip frozen at the words it
-///   had. Every exit commits (Return, Tab, a click elsewhere; there is no
-///   Escape), so an accidental double-click has to have a harmless way out.
+///   had. Return, Tab and a click elsewhere commit, and Escape closes the
+///   field with its commit dropped (`control(_:textView:doCommandBy:)`), so
+///   an accidental double-click has a harmless way out by every exit.
 /// * **An empty one** — right for a track and a marker, whose names cannot
 ///   be cleared. So the strip cannot clear a name back to the fallback. That
 ///   is the Clip tab's job: the header field in `ClipSelectionHeaderView`
 ///   (`ClipPane.swift`) sends `null` for an emptied field.
+///
+/// A commit goes through `onGroupedEdit` (`performGroupedEdit`), so a rename
+/// is its own undo step even when the mouse-down that ended it edits too — a
+/// track's M, say — instead of sharing that event's implicit group (#69).
 ///
 /// Whatever else was being typed into — that header field, a timecode —
 /// commits BEFORE the name is read, so the field opens on the name that
@@ -64,6 +69,20 @@ extension TimelineView {
             return
         }
         if field.frame != frame { field.frame = frame }
+    }
+
+    /// Escape: the field closes and keeps the old name, with no undo step. The
+    /// commit is dropped BEFORE `endRename`, because removing the field fires
+    /// `controlTextDidEndEditing`, which reads it — `relocateRename`'s path.
+    @objc func control(
+        _ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector
+    ) -> Bool {
+        guard control === renameField,
+              commandSelector == #selector(NSResponder.cancelOperation(_:))
+        else { return false }
+        renameCommit = nil
+        endRename()
+        return true
     }
 
     /// The track header's field: 20 pt over the row's 13 pt name label.
@@ -144,7 +163,7 @@ extension TimelineView {
         let relocate: () -> NSRect? = { [weak self] in self?.clipRenameFrame(id) }
         beginRename(in: content, frame: frame, text: snapshot.name(of: clip), relocate: relocate) {
             [weak self] name in
-            self?.onEdit?(
+            self?.onGroupedEdit?(
                 "Rename Clip", [.setClip(clips: [id], patch: ClipPatch(name: .some(name)))])
         }
     }

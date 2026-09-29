@@ -301,6 +301,7 @@ final class MediaPane: InspectorPaneView {
         if noMatchesRow?.isHidden == empty { noMatchesRow?.isHidden = !empty }
         let tally = MediaPane.tally(shown: shown, of: snapshot.media.count)
         if tallyLabel?.stringValue != tally { tallyLabel?.stringValue = tally }
+        dropHiddenSelection()
         refreshOptionControls(in: self)
     }
 

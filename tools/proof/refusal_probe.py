@@ -46,15 +46,12 @@ and the one the criterion is about; the edits that must REGISTER go through
 `performGroupedEdit`, the off-event path app/CLAUDE.md requires of anything
 not inside an AppKit event.
 
-**One thing it measures and does not score**, because it is neither this
-ticket's doing nor reachable from any caller: `performGroupedEdit` opens an
-undo group and balances it whatever the edit answered, so an edit that
-changes nothing leaves an EMPTY group behind — a step a person would have to
-press ⌘Z twice past. An identity has always done this; the agent never
-reaches it, since `AgentServer.performGroupedEdit` refuses at its trial
-first; and the menu path scored above does not use that entry point. It is
-printed as a note so the next reader finds it written down rather than
-rediscovering it.
+**And `performGroupedEdit` of an answer that is not an edit leaves the stack
+alone** (#59), section 6. It opens its explicit undo group only around an
+APPLIED edit, so an identity or a refusal through it pushes no empty step a
+person would have to press ⌘Z past, and clears no redo. Each is scored from
+a redo of its own (a real grouped edit, then undo). It used to be printed as
+a note and not scored; the fix made it a claim.
 
     python3 tools/proof/refusal_probe.py
 """
@@ -197,26 +194,39 @@ do {
     answer["invalid"] = ["threw": true, "message": error.localizedDescription]
 }
 
-// ---- 5. MEASURED, not a claim: the empty group `performGroupedEdit`
-// leaves behind when the edit it wraps changes nothing. It opens a group
-// and balances it whatever the answer, so an identity or a refusal that
-// reached it would push an empty step a person has to undo twice past. It
-// is PRE-EXISTING (an identity has always done this, and the arms did not
-// change it) and unreachable from the agent, whose `editResult` refuses at
-// its trial before the document is asked — but it is the one place the
-// "no phantom undo step" rule is not enforced, so it is written down here
-// rather than rediscovered.
+// ---- 5. performGroupedEdit: an answer that is not an undo step leaves the
+// stack alone (#59). The off-event path opens its explicit group only around
+// an APPLIED edit, so an identity or a refusal pushes no empty step and
+// clears no redo. Each answer starts from a redo of its own: a real grouped
+// edit, then undo.
+func stacks(_ document: ProjectDocument) -> [String: Any] {
+    let manager = document.undoManager
+    return ["canUndo": manager?.canUndo ?? false, "undo": manager?.undoActionName ?? "",
+            "canRedo": manager?.canRedo ?? false, "redo": manager?.redoActionName ?? ""]
+}
 let second = ProjectDocument()
 if let t = second.project.snapshot.tracks.first?.id {
-    second.performGroupedEdit("Add", [.addTextClip(track: t, at: 0, duration: 10 * SEC)])
-    let named = second.undoManager?.undoActionName ?? ""
     second.performGroupedEdit(
-        "Opacity",
-        [.setVideo(clips: second.project.snapshot.clips.map { $0.id }, patch: VideoPatch(opacity: 1))])
-    answer["emptyGroup"] = [
-        "before": named,
-        "after": second.undoManager?.undoActionName ?? "",
-    ]
+        "Add", [.addTextClip(track: t, at: 0, duration: 10 * SEC),
+                .addTextClip(track: t, at: 10 * SEC, duration: 10 * SEC)])
+    let ids = second.project.snapshot.clips.sorted { $0.start < $1.start }.map { $0.id }
+    func armed() -> [String: Any] {
+        second.performGroupedEdit("Name", [.setClip(clips: [ids[0]], patch: ClipPatch(name: "N"))])
+        second.undoManager?.undo()
+        return stacks(second)
+    }
+    var grouped: [String: Any] = [:]
+    if ids.count == 2 {
+        let beforeIdentity = armed()
+        second.performGroupedEdit(
+            "Opacity", [.setVideo(clips: [ids[0]], patch: VideoPatch(opacity: 1))])
+        grouped["identity"] = ["before": beforeIdentity, "after": stacks(second)]
+        let beforeRefusal = armed()
+        second.performGroupedEdit(
+            "Move", [.moveClip(clips: [ids[1]], delta: -(10 * SEC / 2 + 10 * FRAME))])
+        grouped["refusal"] = ["before": beforeRefusal, "after": stacks(second)]
+    }
+    answer["grouped"] = grouped
 }
 
 write(answer)
@@ -347,19 +357,15 @@ def main():
     check("an unknown clip id still throws, in the core's own words",
           invalid["threw"] and "9999" in invalid["message"], json.dumps(invalid))
 
-    # Measured and printed rather than scored, because it is neither this
-    # ticket's doing nor reachable from any caller the app has: an edit that
-    # changes nothing and goes through `performGroupedEdit` leaves the EMPTY
-    # group that call opened and balanced. An identity has always done it,
-    # the agent never reaches it (its trial refuses first), and the menu path
-    # scored above does not use that entry point.
-    group = answer.get("emptyGroup")
-    if group:
-        note = ("LEAVES an empty undo step" if group["after"] != group["before"]
-                else "leaves no step")
-        print(f"\n  note ProjectDocument.performGroupedEdit of an edit that changes "
-              f"nothing {note} (undo action name {group['before']!r} → "
-              f"{group['after']!r}) — pre-existing, and no caller reaches it")
+    print("\n6 — performGroupedEdit: an identity and a refusal are not an undo step (#59)")
+    grouped = answer.get("grouped", {})
+    for arm, what in [("identity", "an opacity of 1 the clip already has"),
+                      ("refusal", "a move the overlap rule refuses")]:
+        pair = grouped.get(arm)
+        check(f"{what}, through performGroupedEdit, leaves undo and redo as they were — "
+              "no empty step, and the redo still there",
+              pair is not None and pair["before"]["canRedo"]
+              and pair["after"] == pair["before"], json.dumps(pair))
 
     print(f"\n{passed}/{passed + failed} checks passed")
     return 1 if failed else 0

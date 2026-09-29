@@ -74,6 +74,17 @@ extension MediaPane {
         rows.forEach { $0.view.needsDisplay = true }
     }
 
+    /// A filter that hides the selected row clears the selection, so Insert /
+    /// Overwrite at Playhead cannot place a row nobody can see (#68). No work
+    /// when nothing selected is hidden: `arrange()` calls it on every refresh.
+    func dropHiddenSelection() {
+        guard let document = binding.document, let media = document.selectedMedia,
+              let row = rows.first(where: { $0.media == media }), row.view.isHidden
+        else { return }
+        document.selectedMedia = nil
+        row.view.needsDisplay = true
+    }
+
     /// The row menu's Insert / Overwrite at Playhead. The same two ops the
     /// Edit menu runs, on the row that was right-clicked.
     func place(_ media: UInt32, insert: Bool) {

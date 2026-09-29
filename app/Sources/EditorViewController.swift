@@ -725,10 +725,10 @@ final class EditorViewController: NSViewController {
         // nothing for a case it cannot reach.
         if view.window?.attachedSheet != nil { return false }
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        guard flags.subtracting(.shift).isEmpty else { return false }
         guard let scalar = event.charactersIgnoringModifiers?.unicodeScalars.first else {
             return false
         }
+        guard EditorKey.isBare(flags, scalar: scalar.value) else { return false }
         let shift = flags.contains(.shift)
         switch scalar.value {
         case UInt32(NSLeftArrowFunctionKey):
