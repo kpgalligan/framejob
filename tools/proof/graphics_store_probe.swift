@@ -93,10 +93,12 @@ func settle(_ mark: Int, _ store: GraphicStore) -> [String: Any] {
 func write(_ text: String, _ url: URL) { try? Data(text.utf8).write(to: url) }
 
 /// An in-place save: the file truncated and rewritten through its own inode.
-func writeInPlace(_ text: String, _ url: URL) {
+func writeInPlace(_ text: String, _ url: URL) { writeInPlace(Data(text.utf8), url) }
+
+func writeInPlace(_ data: Data, _ url: URL) {
     let fd = open(url.path, O_WRONLY | O_TRUNC)
     guard fd >= 0 else { return }
-    _ = Data(text.utf8).withUnsafeBytes { Darwin.write(fd, $0.baseAddress, $0.count) }
+    _ = data.withUnsafeBytes { Darwin.write(fd, $0.baseAddress, $0.count) }
     close(fd)
 }
 
@@ -323,6 +325,86 @@ pump(1.0)
 answer["w13"] = ["posts": since(mark, es)]
 es.stop()
 
+// MARK: - W14 — a font or an asset rewritten IN PLACE is seen (issue #75)
+
+let faces = ((try? files.contentsOfDirectory(atPath: fontsDir.path)) ?? [])
+    .filter { $0.hasSuffix(".ttf") }.sorted()
+let ls = GraphicStore(package: nil, seed: nil, bundledFonts: fontsDir)
+ls.start()
+let libraryFolder = ls.folderURL
+let lsFont = libraryFolder.appendingPathComponent("fonts/\(faces.first ?? "none.ttf")")
+let lsLogo = libraryFolder.appendingPathComponent("assets/logo.png")
+mark = posts.count
+try? files.createDirectory(
+    at: libraryFolder.appendingPathComponent("fonts"), withIntermediateDirectories: false)
+try? files.copyItem(at: fontsDir.appendingPathComponent(faces.first ?? "none.ttf"), to: lsFont)
+try? files.createDirectory(
+    at: libraryFolder.appendingPathComponent("assets"), withIntermediateDirectories: false)
+try? files.copyItem(at: assetPNG, to: lsLogo)
+row = ["setup": settle(mark, ls)]
+pump(0.3)
+/// Other PNG bytes: a 2 × 2 opaque blue bitmap, encoded here.
+let otherPNG: Data = {
+    guard let rep = NSBitmapImageRep(
+        bitmapDataPlanes: nil, pixelsWide: 2, pixelsHigh: 2, bitsPerSample: 8,
+        samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+        bytesPerRow: 0, bitsPerPixel: 0)
+    else { return Data([0x89, 0x50, 0x4e, 0x47]) }
+    rep.setColor(NSColor.blue, atX: 0, y: 0)
+    return rep.representation(using: .png, properties: [:]) ?? Data([0x89, 0x50, 0x4e, 0x47])
+}()
+let logoInode = inode(lsLogo)
+let libraryBefore = ls.scan.libraryVersion
+row["png_differs"] = (try? Data(contentsOf: lsLogo)) != otherPNG
+mark = posts.count
+writeInPlace(otherPNG, lsLogo)
+var logoRow = settle(mark, ls)
+logoRow["same_inode"] = logoInode == inode(lsLogo)
+logoRow["version_moved"] = ls.scan.libraryVersion != libraryBefore
+row["logo"] = logoRow
+let fontInode = inode(lsFont)
+let fontBefore = ls.scan.libraryVersion
+let secondFace = (try? Data(contentsOf: fontsDir.appendingPathComponent(
+    faces.count > 1 ? faces[1] : "none.ttf"))) ?? Data()
+row["faces"] = faces.count
+mark = posts.count
+writeInPlace(secondFace, lsFont)
+var fontRow = settle(mark, ls)
+fontRow["same_inode"] = fontInode == inode(lsFont)
+fontRow["version_moved"] = ls.scan.libraryVersion != fontBefore
+row["font"] = fontRow
+answer["w14"] = row
+
+// MARK: - W15 — a failed write leaves no .partial and the file as it was
+
+let qSource = "// q, immutable\n"
+let qURL = libraryFolder.appendingPathComponent("q.js")
+write(qSource, qURL)
+try? files.setAttributes([.immutable: true], ofItemAtPath: qURL.path)
+var qThrown: Any = NSNull()
+do { try ls.write(name: "q", source: "// q, replaced\n") } catch {
+    qThrown = error.localizedDescription
+}
+answer["w15"] = [
+    "thrown": qThrown,
+    "partial": present(libraryFolder.appendingPathComponent("q.js.partial")),
+    "bytes_unchanged": (try? Data(contentsOf: qURL)) == Data(qSource.utf8),
+]
+try? files.setAttributes([.immutable: false], ofItemAtPath: qURL.path)
+try? files.removeItem(at: libraryFolder.appendingPathComponent("q.js.partial"))
+ls.stop()
+
+// MARK: - W16 — a .partial is not content (G-14)
+
+let w16 = work.appendingPathComponent("W16-graphics", isDirectory: true)
+try? files.removeItem(at: w16)
+try? files.createDirectory(at: w16, withIntermediateDirectories: true)
+write("# manual\n", w16.appendingPathComponent("API.md"))
+write("// half\n", w16.appendingPathComponent("x.js.partial"))
+let w16Before = GraphicStore.holdsContent(w16)
+write("// x\n", w16.appendingPathComponent("x.js"))
+answer["w16"] = ["partial_only": w16Before, "with_module": GraphicStore.holdsContent(w16)]
+
 // MARK: - W12 — stop() drops a pending pass and every source
 
 mark = posts.count
@@ -405,9 +487,95 @@ autoreleasepool {
 pump(0.1)
 answer["c4"] = ["closed_freed": closedDocument == nil, "dropped_freed": droppedDocument == nil]
 
+// MARK: - C5 — the untitled graphics root goes at close and at the first save
+
+let moduleSource = "export function render() { return '<svg/>' } // m\n"
+let c5a = ProjectDocument()
+c5a.startGraphicStore()
+try? c5a.graphicStore?.write(name: "m", source: moduleSource)
+let c5aRoot = c5a.graphicStore?.folderURL
+var r5: [String: Any] = [
+    "closed_root_before": c5aRoot.map { present($0.appendingPathComponent("m.js")) } ?? false,
+]
+c5a.close()
+r5["closed_root_after"] = c5aRoot.map(present) ?? true
+let c5b = ProjectDocument()
+c5b.startGraphicStore()
+try? c5b.graphicStore?.write(name: "m", source: moduleSource)
+let c5bRoot = c5b.graphicStore?.folderURL
+let c5Package = work.appendingPathComponent("C5-saved.reelcut", isDirectory: true)
+try? files.removeItem(at: c5Package)
+do {
+    let wrapper = try c5b.fileWrapper(ofType: projectType)
+    try wrapper.write(to: c5Package, options: .atomic, originalContentsURL: nil)
+    c5b.fileURL = c5Package
+} catch {
+    r5["save_error"] = error.localizedDescription
+}
+r5["saved_root_after"] = c5bRoot.map(present) ?? true
+r5["folder"] = c5b.graphicStore?.folderURL.path ?? NSNull()
+r5["expected"] = c5Package.appendingPathComponent("graphics").path
+r5["module_in_package"] = (try? Data(contentsOf: c5Package.appendingPathComponent(
+    "graphics/m.js"))) == Data(moduleSource.utf8)
+c5b.close()
+r5["control_package_graphics"] = present(c5Package.appendingPathComponent("graphics/m.js"))
+answer["c5"] = r5
+
+// MARK: - C6 — the untitled cache root goes at close ONLY
+
+let transcript = Data("{\"words\": [], \"note\": \"C6\"}\n".utf8)
+func seedTranscript(_ document: ProjectDocument) -> URL? {
+    guard let cache = document.cacheDirectory else { return nil }
+    let folder = cache.appendingPathComponent("transcripts", isDirectory: true)
+    try? files.createDirectory(at: folder, withIntermediateDirectories: true)
+    try? transcript.write(to: folder.appendingPathComponent("9.json"))
+    return cache
+}
+let c6a = ProjectDocument()
+let c6aRoot = seedTranscript(c6a)
+var r6: [String: Any] = [
+    "closed_root_before": c6aRoot.map {
+        present($0.appendingPathComponent("transcripts/9.json"))
+    } ?? false,
+    "closed_root_is_temporary": c6aRoot != nil && c6aRoot == c6a.temporaryCacheDirectory,
+]
+c6a.close()
+r6["closed_root_after"] = c6aRoot.map(present) ?? true
+let c6b = ProjectDocument()
+let c6bRoot = seedTranscript(c6b)
+let c6Package = work.appendingPathComponent("C6-saved.reelcut", isDirectory: true)
+try? files.removeItem(at: c6Package)
+let packaged = c6Package.appendingPathComponent("cache/transcripts/9.json")
+do {
+    let wrapper = try c6b.fileWrapper(ofType: projectType)
+    try wrapper.write(to: c6Package, options: .atomic, originalContentsURL: nil)
+    c6b.fileURL = c6Package
+} catch {
+    r6["save_error"] = error.localizedDescription
+}
+r6["copy_equal"] = (try? Data(contentsOf: packaged)) == transcript
+r6["saved_root_kept"] = c6bRoot.map(present) ?? false
+c6b.close()
+r6["saved_root_after"] = c6bRoot.map(present) ?? true
+r6["copy_after_close"] = (try? Data(contentsOf: packaged)) == transcript
+let c6c = ProjectDocument()
+do {
+    try c6c.read(from: c6Package, ofType: projectType)
+    c6c.fileURL = c6Package
+    r6["control_temporary_nil"] = c6c.temporaryCacheDirectory == nil
+    c6c.close()
+    r6["control_package_cache"] = present(c6Package.appendingPathComponent("cache"))
+} catch {
+    r6["control_error"] = error.localizedDescription
+}
+answer["c6"] = r6
+
 // The untitled roots this run made, removed so the temporary directory is
-// left as found.
-let roots = [s.folderURL, es.folderURL] + [c2Root, c3Root].compactMap { $0 }
+// left as found (a mutant leaves the C5 and C6 ones behind).
+for leftover in [c5aRoot, c5bRoot, c6aRoot, c6bRoot].compactMap({ $0 }) {
+    try? files.removeItem(at: leftover)
+}
+let roots = [s.folderURL, es.folderURL, libraryFolder] + [c2Root, c3Root].compactMap { $0 }
 for root in roots { try? files.removeItem(at: root) }
 answer["roots_removed"] = roots.allSatisfy { !present($0) }
 

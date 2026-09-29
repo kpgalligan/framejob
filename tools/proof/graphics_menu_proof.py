@@ -47,11 +47,21 @@ M10 on the second copy (NO module): `importFont(Oswald-Medium.ttf)` answers
     `["Oswald"]`, lands in `fonts/`, and the registry's library holds Oswald
     at once; a `.txt` is refused naming ".ttf"; `importAsset(red.png)` lists
     `["red.png"]`, a `.txt` naming "PNG";
+M11 (issue batch B8, #75; on the first copy, after M9) `graphics/counter.js`
+    written straight to disk, then at once, with no run-loop turn,
+    `insertGraphic(from: templates/counter.js, grouped: true)`: a clip
+    `counter-2`, `counter.js` unchanged, `counter-2.js` equal to the template
+    (`uniqueModuleName` checks the disk, not only the last scan); then undo;
+M12 `insertGraphic` of a scratch `latin1.js` holding `// caf` and the byte
+    0xE9 throws "<path> is not UTF-8 text — a graphic module must be UTF-8 JavaScript";
+    `graphics/latin1.js` is absent and the clip count unchanged;
 Z1  `grep "Reelcut: "` over the log prints nothing.
 
 Made to fail by hand (G5b's record): `|| outcome.library` removed from
 `GraphicStore.drain()` fails `graphics_proof.py`'s W1 and I4; From File…
 dropped from `graphicMenu()` fails M2; M7's run-loop turn removed fails M8.
+Issue batch B8: `holdsModule(named:)`'s disk check removed fails M11, and
+`String(decoding:as:)` restored in `insertGraphic` fails M12.
 """
 
 import argparse
@@ -75,7 +85,7 @@ TEMPLATES = ROOT / "graphic/tests/graphics"
 REFERENCE = ROOT / "docs/graphics-api.md"
 OSWALD = Path("/Library/Fonts/Oswald-Medium.ttf")
 RED_PNG = ROOT / "graphic/tests/assets/red.png"
-PROBE_ROWS = ["M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9", "M10"]
+PROBE_ROWS = ["M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12"]
 
 RESULTS = []
 
@@ -166,7 +176,7 @@ def build_probe(out):
 
 
 def probe_checks(package):
-    print("\n1 — the probe: M1–M10", flush=True)
+    print("\n1 — the probe: M1–M12", flush=True)
     out = WORK / "probe"
     binary, error = build_probe(out)
     check("M1 the probe builds over app/Sources", binary is not None, error or "")
@@ -194,7 +204,7 @@ def probe_checks(package):
         return
     probe_rows = json.loads(answer.read_text())["rows"]
     present = all(any(r["name"].split()[0] == n for r in probe_rows) for n in PROBE_ROWS)
-    check("the probe answers every M-row (M2–M10 present)", present, f"{len(probe_rows)} rows")
+    check("the probe answers every M-row (M2–M12 present)", present, f"{len(probe_rows)} rows")
     for row in probe_rows:
         check(row["name"], row["ok"], row["detail"])
 

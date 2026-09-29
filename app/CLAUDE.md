@@ -157,8 +157,12 @@ detail there.
   `startGraphicStore()` also installs the document's compiled set in
   `GraphicRegistry` and observes the store's `.graphicsDidChange`, whose
   handler updates the registry and THEN posts `.projectGraphicsDidChange`
-  (object: the document) — never `rescan()` there; `stopGraphicStore()`,
-  from `close()`, removes the observer, drops the set and stops the store.
+  (object: the document) — never `rescan()` there; `stopGraphicStore()`, from
+  `close()`, removes the observer, drops the set, stops the store and removes
+  BOTH untitled roots — the graphics root (`removeScratchRoot()`) and
+  `temporaryCacheDirectory` (`removeTemporaryCacheDirectory()`); the cache
+  root goes at close ONLY, never at the first save, because the timeline and
+  any pass in flight still hold its path (G-19 (d)).
 - `MediaImporter.swift` (+`Probe`, +`Speech`, +`Peaks`) ·
   `MediaPeakBuckets.swift` · `MediaCacheFiles.swift` ·
   `FFmpegRewrap.swift` · `AppSupport.swift` — the import funnel and the
@@ -198,14 +202,22 @@ detail there.
   `packageContentsDidChangeOnDisk()` once — without it the next save is
   refused as "changed by another application". A folder source raises
   `.write` only and an in-place save raises nothing on it (G0 q7), so each
-  module has its own source; every pass re-opens every source BY PATH and
+  module has its own source, and so does each font and asset file up to
+  `libraryFileSourceLimit` (16 a pass, fonts first, in name order; spec §11
+  G-19 (c)); every pass re-opens every source BY PATH and
   arms BEFORE it scans; events coalesce over 100 ms. The queue owns the diff
   and an outbox; main publishes in order through `drain()` (`scan`, the
   callback, `.graphicsDidChange` with sorted names — every module and
   `library: true` when the font/asset set moved; with NO names when the
   folder holds no module and only the library moved, which still posts, G5b).
-  `uniqueModuleName(_:)` is the one free-name rule (`-copy`, `-copy-N`)
-  Duplicate and Insert ▸ Graphic share. **`drain()` is not
+  `GraphicStore+Files.swift` holds the store's own writes:
+  `uniqueModuleName(_:)`, the one free-name rule (`-copy`, `-copy-N`)
+  Duplicate and Insert ▸ Graphic share, which takes a name as held when the
+  scan OR the disk has it (`holdsModule(named:)`, #75); `write(name:source:)`
+  and `importFile` land through `land(at:writing:)`, whose `.partial` is
+  removed on any failure; and `removeScratchRoot()`, which removes an untitled
+  root after `stop()` — from `packageDidMove(to:)` and `stopGraphicStore()`
+  (G-19 (d)). **`drain()` is not
   re-entrant: never call `rescan()` from a `.graphicsDidChange` observer.**
   `stop()` bumps a generation under `queue.sync`. `makeLibrary()` is a NEW
   builder every call (a library freezes on first use). It also writes the
@@ -268,7 +280,8 @@ the key map behind it.
   Font/Image to Graphics…; the template item runs in-event through
   `applyEdit`, the panels through `performGroupedEdit`; the shared body
   `insertGraphic(from:grouped:) throws` shows no dialog, and a module that
-  does not compile stays on disk and places nothing — G-16),
+  does not compile stays on disk and places nothing — G-16; a file that is not
+  UTF-8 is refused by name before anything is written (#75)),
   `+Clipboard` (⌘X/⌘C/⌘V over the `com.kgalligan.reelcut.clips` pasteboard,
   the `paste` op's payload; ⌥⌘V Paste Attributes with no `groups`),
   `+Edge` (slip, roll, close gap, insert, overwrite, the `,` / `.` nudge —
@@ -490,20 +503,29 @@ the key map behind it.
   `GraphicPane.swift` (the Graphic sub-tab, road map 10 §5j, spec §11 G-15:
   a factory `ClipPane` calls when EVERY selected clip is a graphic; the
   shared module from `GraphicRegistry.entry(named:for:)`, main only, never a
-  rescan; a structure signature of schema keys and types, stale keys, the
-  asset popup's names and diagnostics — never values, the revision or the
-  playhead; Properties, Size and Timeline; every write is `set_graphic`) ·
+  rescan; a structure signature of the schema's entries spelled WHOLE
+  (default, bounds, options), stale keys, each asset entry's
+  `GraphicSchemaRows.assetNames` (the rows' own call) and diagnostics — never
+  stored values, the revision or the playhead; `schema(_:)` is memoised by
+  name and revision (`schemaMemo`) and `report(for:)` reads a clip's layer
+  through `layerMemo`, emptied on a new project handle; Properties, Size and
+  Timeline; every write is `set_graphic`) ·
   `GraphicPane+Source.swift` (Source: name, file, revision, Open / Reveal /
   Duplicate as New Graphic… — `store.write`, `rescan()` inside the button's
   event, one `set_graphic {name}` step — and `report(for:)`, the compile's
   diagnostics plus the first frame rasterized at the clip's OWN size,
   memoised and frozen during a live gesture) · `GraphicSchemaRows.swift`
   (pure, probe-callable: the schema in the MODULE's key order —
-  `GraphicSchema.orderedKeys` scans `describeJSON()`'s text because the
+  `GraphicSchema.orderedKeys` (in `GraphicSchema.swift`) scans
+  `describeJSON()`'s text because the
   registry's dictionary lost it — one row per schema type, stale rows
   sorted with ⌫ writing `null`, CSS ↔ `RGBA`, and the null rule: a value
   equal to the default is written as `null`, a colour compared by parsed
-  channels) ·
+  channels); `decimals(for:)` (a step decides, else a fractional default, min
+  or max) and `assetNames(for:files:clips:)`; a one-line string field's own
+  height is re-pinned to `DS.controlHeight`, as is `DocumentPane`'s marker
+  name field. `GraphicSchema.swift` holds `GraphicSchemaEntry` and
+  `GraphicSchema` (with `orderedKeys`), a pure move out of it ·
   `DocumentPane.swift` (reads `documentSnapshot`, never the scoped one: its
   ops are document-level) · `OptionControls.swift` (the descriptor-driven
   row controls) · `OptionControls+Choices.swift` (the typed, value-carrying
@@ -1127,6 +1149,9 @@ free.
   `offMainTools` member: one `onMain` for the target, the registry's
   compiled module, the canvas and `meta`; then, off main, the ctx built by
   hand (`recipe_graphic.rs`'s keys) and a contact sheet or one frame's SVG;
+  `format` is read first, and svg refuses a non-null `path`, `background` or
+  `max_width` by name (G-19 (a)); a frame past `durationInFrames` is drawn,
+  `progress` clamped at 1 (G-19 (b));
   a failing frame is its error card, drawn by
   `LayerRenderers.paintErrorCard`, the one card painter.
   `+GraphicImports` is `import_graphic_font` / `import_graphic_asset`, on

@@ -324,6 +324,11 @@ Uses the three `tools/proof/work/playback-check/` projects (Setup 3).
 - **Expect:** a dark red card with the message in white in the live preview, never the last good frame.
 - **Source:** #56.
 
+**GR-4 — The Title and marker name fields**
+- **Do:** 1. Insert ▸ Graphic ▸ Lower Third, select it, open Clip ▸ Graphic. 2. Press M, then open the Document tab.
+- **Expect:** the Title field is the height of the number fields, and the marker's name field is the height of the Rate row's controls, in both appearances. (Their text sits at the top of an outlined box rather than centred and filled like the number fields; that look is #171, not this check.)
+- **Source:** #106.
+
 ## Screen recording
 
 Launch Reelcut from the Finder or Dock unless the check says otherwise.

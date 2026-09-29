@@ -16,113 +16,6 @@
 
 import AppKit
 
-/// One schema entry, as `describe` published it.
-struct GraphicSchemaEntry: Equatable {
-    let key: String, type: String, `default`: GraphicPropValue, label: String, help: String?
-    let min: Double?, max: Double?, step: Double?, multiline: Bool, options: [String]
-}
-
-/// A module's schema, in the module's own key order.
-struct GraphicSchema: Equatable {
-    let entries: [GraphicSchemaEntry]
-
-    var keys: [String] { entries.map(\.key) }
-
-    /// The order from `describeJSON`'s text, the values from `schema` (the
-    /// registry's parse, which lost the order through `JSONSerialization`).
-    /// A key the dictionary lacks is dropped; a dictionary key the text
-    /// lacks is appended, sorted.
-    init(describeJSON: String, schema: [String: Any]) {
-        var seen = Set<String>()
-        var order: [String] = []
-        for key in Self.orderedKeys(describeJSON: describeJSON)
-        where schema[key] != nil && !seen.contains(key) {
-            seen.insert(key)
-            order.append(key)
-        }
-        order += schema.keys.filter { !seen.contains($0) }.sorted()
-        entries = order.map { key in
-            let entry = schema[key] as? [String: Any] ?? [:]
-            func number(_ name: String) -> Double? {
-                guard let value = entry[name] as? NSNumber,
-                      CFGetTypeID(value) != CFBooleanGetTypeID()
-                else { return nil }
-                return value.doubleValue
-            }
-            return GraphicSchemaEntry(
-                key: key, type: entry["type"] as? String ?? "",
-                default: GraphicSchemaRows.value(entry["default"]),
-                label: entry["label"] as? String ?? key, help: entry["help"] as? String,
-                min: number("min"), max: number("max"), step: number("step"),
-                multiline: (entry["multiline"] as? NSNumber)?.boolValue ?? false,
-                options: entry["options"] as? [String] ?? [])
-        }
-    }
-
-    /// The keys of the top-level `"schema"` object in `describe`'s JSON
-    /// text, in the order the text has them — the core serialises with
-    /// `preserve_order`. A scanner rather than a parser: string state with
-    /// `\` escapes, a stack of `{` and `[`, and a key is a string followed
-    /// by `:` directly inside an object.
-    static func orderedKeys(describeJSON text: String) -> [String] {
-        let bytes = Array(text.utf8)
-        let quote = UInt8(ascii: "\""), backslash = UInt8(ascii: "\\")
-        let colon = UInt8(ascii: ":"), comma = UInt8(ascii: ",")
-        let openBrace = UInt8(ascii: "{"), closeBrace = UInt8(ascii: "}")
-        let openBracket = UInt8(ascii: "["), closeBracket = UInt8(ascii: "]")
-        var stack: [UInt8] = []
-        var lastString: [UInt8]?
-        var armed = false  // the top-level key just read is "schema"
-        var inSchema = false  // inside the schema's own object (depth 2)
-        var keys: [String] = []
-        var i = 0
-        while i < bytes.count {
-            let byte = bytes[i]
-            if byte == quote {
-                var j = i + 1
-                var string: [UInt8] = []
-                while j < bytes.count, bytes[j] != quote {
-                    if bytes[j] == backslash, j + 1 < bytes.count {
-                        string.append(bytes[j])
-                        j += 1
-                    }
-                    string.append(bytes[j])
-                    j += 1
-                }
-                lastString = string
-                i = j + 1
-                continue
-            }
-            switch byte {
-            case colon:
-                if stack.last == openBrace, let string = lastString {
-                    let key = String(decoding: string, as: UTF8.self)
-                    if stack.count == 1 {
-                        armed = key == "schema"
-                    } else if inSchema, stack.count == 2 {
-                        keys.append(key)
-                    }
-                }
-                lastString = nil
-            case openBrace, openBracket:
-                if armed, stack.count == 1, byte == openBrace { inSchema = true }
-                armed = false
-                stack.append(byte)
-            case closeBrace, closeBracket:
-                _ = stack.popLast()
-                if stack.count < 2 { inSchema = false }
-            case comma:
-                lastString = nil
-                if stack.count == 1 { armed = false }
-            default:
-                break
-            }
-            i += 1
-        }
-        return keys
-    }
-}
-
 enum GraphicSchemaRows {
     /// The swatch when a colour default does not parse as one of the four
     /// hex forms (a named colour, `rgb()`): transparent black.
@@ -199,6 +92,29 @@ enum GraphicSchemaRows {
         return stored.keys.filter { !declared.contains($0) }.sorted()
     }
 
+    /// A number row's decimals: with a `step`, 2 below 1 and else 0; with
+    /// none, 2 when the default, `min` or `max` has a fraction, else 0.
+    static func decimals(for entry: GraphicSchemaEntry) -> Int {
+        if let step = entry.step { return step < 1 ? 2 : 0 }
+        var values = [entry.min, entry.max].compactMap { $0 }
+        if case .number(let number) = entry.default { values.append(number) }
+        return values.contains { $0 != $0.rounded() } ? 2 : 0
+    }
+
+    /// An asset entry's popup names: the folder's `files`, then, sorted,
+    /// every name a clip holds under `entry.key`, and a string default, that
+    /// `files` lacks. The rows and the pane's signature both call this.
+    static func assetNames(
+        for entry: GraphicSchemaEntry, files: [String], clips: [ClipSnapshot]
+    ) -> [String] {
+        var held = clips.compactMap { clip -> String? in
+            if case .string(let text)? = clip.graphic?.props[entry.key] { return text }
+            return nil
+        }
+        if case .string(let text) = entry.default { held.append(text) }
+        return files + Set(held).subtracting(files).sorted()
+    }
+
     /// `set_graphic {clips, patch: {props}, schema}` over `clips`.
     static func op(clips: [ClipSnapshot], props: [String: Any], schema: [String: Any]?) -> ReelOp {
         .setGraphicRaw(clips: clips.map(\.id), patch: ["props": props], schema: schema)
@@ -235,7 +151,7 @@ enum GraphicSchemaRows {
             let bounded = entry.min != nil && entry.max != nil
             view = inspectorValueRow(
                 entry.label, binding, name: name,
-                decimals: (entry.step ?? 1) < 1 ? 2 : 0,
+                decimals: decimals(for: entry),
                 min: entry.min ?? -1e9, max: entry.max ?? 1e9, slider: bounded,
                 read: {
                     if case .number(let number) = current() { return number }
@@ -301,14 +217,7 @@ enum GraphicSchemaRows {
         ops: @escaping (GraphicPropValue) -> [ReelOp], mixed: @escaping () -> Bool
     ) -> NSView {
         let none = entry.default == .null
-        let files = assets()
-        var held = clips().compactMap { clip -> String? in
-            if case .string(let text)? = clip.graphic?.props[entry.key] { return text }
-            return nil
-        }
-        if case .string(let text) = entry.default { held.append(text) }
-        let missing = Set(held).subtracting(files).sorted()
-        let names = files + missing
+        let names = assetNames(for: entry, files: assets(), clips: clips())
         let items = (none ? ["None"] : []) + names
         let offset = none ? 1 : 0
         return inspectorPopupRow(
@@ -348,6 +257,12 @@ enum GraphicSchemaRows {
                 read: read, write: { [weak binding] in binding?.apply(name, write($0)) },
                 enabled: { true }, onEdit: { [weak binding] in binding?.edited() })
         if !entry.multiline {
+            // `DSField.style` installed a 26 pt height on the field itself;
+            // the one constraint is re-pinned to the row's control height.
+            for constraint in control.constraints
+            where constraint.firstItem === control && constraint.firstAttribute == .height {
+                constraint.constant = DS.controlHeight
+            }
             control.translatesAutoresizingMaskIntoConstraints = false
             control.widthAnchor.constraint(equalToConstant: 170).isActive = true
         }

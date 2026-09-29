@@ -320,3 +320,49 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   `schema_v10.rs`'s
   `a_file_with_a_bad_module_name_is_refused_and_an_absent_description_is_not`
   is the oracle.
+- **G-19 — `render_graphic`'s svg takes no sheet arguments and draws past
+  the length; the library files' watch is capped; the untitled roots are
+  removed** (issues #75, #104, 2026-09-29).
+  (a) **`format: "svg"` refuses a non-null `path`, `background` or
+  `max_width` by name.** They belong to the png sheet, and svg answers text
+  and writes no file. This was chosen over writing a `.svg` at `path` so
+  that each format keeps one reply shape.
+  (b) **Declined: a frame at or past `durationInFrames` is drawn, not
+  refused.** G-9 says a clip longer than its `length` keeps calling
+  `render` past `durationInFrames`, with `progress` clamped at 1
+  (`recipe_graphic.rs` `graphic_source`). `render_graphic`'s ctx is that
+  clip's ctx, so the frame is one that clips draw. `graphics_proof.py` C6
+  pins this.
+  (c) **Each font and asset file gets its own source**, as a module does (a
+  folder source raises nothing for an in-place rewrite; G0 q7). A store
+  arms at most 16 of them per pass, fonts first, in name order. An in-place
+  rewrite of a later file is seen at the next folder event, which is
+  accepted. Why 16:
+  - Every source holds a descriptor until its cancel handler runs on the
+    store's queue, which happens after the pass that replaced it. So a pass
+    briefly holds two sets.
+  - A store's folders and library files therefore hold at most 19
+    descriptors, or 38 during a pass.
+  - Four documents at the cap hold 76, or 152 if all four pass at once.
+    That is arithmetic, not a measurement.
+  - The comparison is with the soft limit of 256 (`launchctl limit
+    maxfiles` printed `256 unlimited` on 2026-09-29) and with the owner's
+    running Reelcut, which held 28 numbered descriptors (`lsof -p`; its
+    documents were unknown).
+  - Modules keep one source each and are uncapped, as before.
+  (d) **The untitled graphics root (G-14) is removed when its document
+  closes.** It is also removed when the first save re-points the store,
+  which happens after NSDocument has written the package: `fileURL` is set
+  after the write, and the writes are synchronous. `graphics_proof.py` G8
+  shows it.
+  - The untitled CACHE root (`temporaryCacheDirectory`, the same leak) is
+    removed at close ONLY, whether or not the document was ever saved. It
+    is not removed at the first save, for two reasons. Until the next
+    `refreshTimeline`, the timeline still draws from that path, and
+    `TimelineCaches` remembers a miss without its directory. An import or
+    transcription pass that is in flight also keeps writing there.
+  - By close, every save has finished. So the first save's copy is
+    complete, and that copy holds any transcript still owing AssemblyAI a
+    DELETE (`MediaTranscript.undeleted`). Whatever the root still holds
+    after that is read by nothing, because the janitor reads
+    `cacheDirectory`, which is the package's once the document is saved.

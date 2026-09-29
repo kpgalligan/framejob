@@ -285,6 +285,51 @@ check("M9 a .js that does not compile throws a sentence naming the module and \"
       "thrown \(thrown9), clips \(document.project.snapshot.clips.count) vs \(clips9), "
           + "canUndo \(undo.canUndo) vs \(canUndo9)")
 
+// MARK: - M11: a module written from the shell a moment before is not overwritten (#75)
+
+let outsideCounter = folder.appendingPathComponent("counter.js")
+let outsideBytes = Data("// written outside the app\n".utf8)
+try? outsideBytes.write(to: outsideCounter)
+let counterSource = try? Data(contentsOf: templatesURL.appendingPathComponent("counter.js"))
+var thrown11 = ""
+do {
+    try controller.insertGraphic(
+        from: templatesURL.appendingPathComponent("counter.js"), grouped: true)
+} catch {
+    thrown11 = error.localizedDescription
+}
+let names11 = names()
+let counterKept = (try? Data(contentsOf: outsideCounter)) == outsideBytes
+let counter2 = try? Data(contentsOf: folder.appendingPathComponent("counter-2.js"))
+if names11.contains("counter-2") { undo.undo() }
+check("M11 graphics/counter.js written straight to disk, then at once (no run-loop turn) "
+      + "insertGraphic(from: templates/counter.js): a clip counter-2, counter.js unchanged, "
+      + "counter-2.js equal to the template",
+      thrown11.isEmpty && names11 == ["counter-2", "lower-third-2"] && counterKept
+          && counterSource != nil && counter2 == counterSource,
+      "thrown \(thrown11), clips \(names11), counter.js kept \(counterKept), counter-2.js "
+          + "equal \(counter2 == counterSource), after undo \(names())")
+
+// MARK: - M12: a module that is not UTF-8 is refused before it is written
+
+let latin1 = scratch.appendingPathComponent("latin1.js")
+try? Data([0x2f, 0x2f, 0x20, 0x63, 0x61, 0x66, 0xe9, 0x0a]).write(to: latin1)
+let clips12 = document.project.snapshot.clips.count
+var thrown12 = ""
+do {
+    try controller.insertGraphic(from: latin1, grouped: true)
+} catch {
+    thrown12 = error.localizedDescription
+}
+let want12 = "\(latin1.path) is not UTF-8 text — a graphic module must be UTF-8 JavaScript"
+let latinWritten = FileManager.default.fileExists(
+    atPath: folder.appendingPathComponent("latin1.js").path)
+check("M12 insertGraphic of a latin1.js holding \"// caf\\xE9\" throws the UTF-8 sentence; "
+      + "graphics/latin1.js is absent and the clip count unchanged",
+      thrown12 == want12 && !latinWritten && document.project.snapshot.clips.count == clips12,
+      "thrown \(thrown12), written \(latinWritten), clips "
+          + "\(document.project.snapshot.clips.count) vs \(clips12)")
+
 // MARK: - M10: the imports on a package with no module
 
 guard let bare = openDocument(bareURL) else { finish() }

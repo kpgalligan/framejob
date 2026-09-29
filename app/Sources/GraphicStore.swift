@@ -7,8 +7,9 @@
 // the PACKAGE directory is watched, so an outside `mkdir` is seen.
 //
 // **The watch** is G0's q7(c): a folder source raises `.write` only and an
-// in-place (`O_TRUNC`) save raises nothing on the folder, so every `*.js`
-// has its own source; events are coalesced over 100 ms. Every pass re-opens
+// in-place (`O_TRUNC`) save raises nothing on the folder, so every `*.js`,
+// and each font and asset file up to `libraryFileSourceLimit` (spec §11
+// G-19 (c)), has its own source; events are coalesced over 100 ms. Every pass re-opens
 // every source BY PATH (a save swaps inodes) and arms BEFORE it scans.
 //
 // **Threading.** One serial queue alone touches the queue-confined state; it
@@ -40,6 +41,9 @@ final class GraphicStore {
     /// §5a: the pictures resvg draws from `graphics/assets/`.
     static let assetExtensions: Set<String> = ["png", "jpg", "jpeg", "gif", "webp", "svg", "svgz"]
     static let coalesceInterval: TimeInterval = 0.1
+    /// The font and asset files one pass arms a source on: fonts, then
+    /// assets, in listing order (spec §11 G-19 (c)).
+    static let libraryFileSourceLimit = 16
 
     /// G-3's rule, `^[a-z0-9][a-z0-9-]{0,62}$`, mirrored from
     /// `model_graphic.rs`'s `check_name`; the core stays the validator.
@@ -50,17 +54,6 @@ final class GraphicStore {
             ("a"..."z").contains(s) || ("0"..."9").contains(s)
         }
         return lowerOrDigit(head) && scalars.allSatisfy { lowerOrDigit($0) || $0 == "-" }
-    }
-
-    /// `base` when the scan holds no module of that name, else `base-2`,
-    /// `base-3`, … — `base` cut to 60 scalars first, so a suffix fits.
-    func uniqueModuleName(_ base: String) -> String {
-        let root = String(String.UnicodeScalarView(base.unicodeScalars.prefix(60)))
-        let held = scan.modules
-        guard held[root] != nil else { return root }
-        var n = 2
-        while held["\(root)-\(n)"] != nil { n += 1 }
-        return "\(root)-\(n)"
     }
 
     private static let nameRule = "is not a module name (lowercase letters, digits and -, "
@@ -178,6 +171,7 @@ final class GraphicStore {
         let folder = package.appendingPathComponent(Self.folderName, isDirectory: true)
         guard folder.standardizedFileURL.path != folderURL.standardizedFileURL.path else { return }
         stop()
+        removeScratchRoot()
         self.package = package
         folderURL = folder
         start()
@@ -198,24 +192,6 @@ final class GraphicStore {
     }
 
     func module(named name: String) -> GraphicModuleFile? { scan.modules[name] }
-
-    /// The app's own write: `<name>.js.partial`, then moved into place, so
-    /// a reader never sees half a module.
-    func write(name: String, source: String) throws {
-        guard Self.isModuleName(name) else { throw ReelCoreError(message: Self.nameSentence(name)) }
-        try ensureFolder()
-        writeManual()
-        let files = FileManager.default
-        let target = folderURL.appendingPathComponent(name + ".js")
-        let partial = folderURL.appendingPathComponent(name + ".js.partial")
-        try? files.removeItem(at: partial)
-        try Data(source.utf8).write(to: partial)
-        if files.fileExists(atPath: target.path) {
-            _ = try files.replaceItemAt(target, withItemAt: partial)
-        } else {
-            try files.moveItem(at: partial, to: target)
-        }
-    }
 
     /// A NEW builder each call — a library is frozen by its first compile
     /// or rasterize — holding the bundled faces, then `scan.fonts`, then
@@ -290,7 +266,8 @@ final class GraphicStore {
     }
 
     /// FOLDER mode when the folder exists (a source on it, on each existing
-    /// subfolder and on each module file); PACKAGE mode when a saved
+    /// subfolder, on each module file and on the first
+    /// `libraryFileSourceLimit` font and asset files); PACKAGE mode when a saved
     /// package has none (one source on the package directory). An untitled
     /// root found absent is recreated. Arms first, then scans.
     private func armAndScan(_ g: Int) -> (GraphicScan, Bool) {
@@ -310,6 +287,14 @@ final class GraphicStore {
         for folder in [watchedFolder, fonts, assets] where files.fileExists(atPath: folder.path) {
             arm(folder, folder: true, g)
         }
+        let fontURLs = listing(fonts).filter {
+            Self.fontExtensions.contains($0.pathExtension.lowercased())
+        }
+        let assetURLs = listing(assets).filter {
+            Self.assetExtensions.contains($0.pathExtension.lowercased())
+        }
+        let library = fontURLs + assetURLs
+        for url in library.prefix(Self.libraryFileSourceLimit) { arm(url, folder: false, g) }
         var warnings: [String] = []
         var modules: [String: GraphicModuleFile] = [:]
         for url in listing(watchedFolder) where url.pathExtension == "js" {
@@ -324,8 +309,7 @@ final class GraphicStore {
                 name: name, url: url, bytes: bytes, revision: Self.hex(SHA256.hash(data: bytes)))
         }
         var fontFiles: [GraphicFile] = []
-        for url in listing(fonts)
-        where Self.fontExtensions.contains(url.pathExtension.lowercased()) {
+        for url in fontURLs {
             guard let bytes = try? Data(contentsOf: url) else { continue }
             do {
                 try GraphicLibrary().addFont(bytes)
@@ -335,8 +319,7 @@ final class GraphicStore {
             }
         }
         var assetFiles: [GraphicFile] = []
-        for url in listing(assets)
-        where Self.assetExtensions.contains(url.pathExtension.lowercased()) {
+        for url in assetURLs {
             guard let bytes = try? Data(contentsOf: url) else { continue }
             // An empty `Data` crosses the FFI as NULL, which `addAsset` refuses.
             guard !bytes.isEmpty else {

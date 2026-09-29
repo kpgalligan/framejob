@@ -119,8 +119,10 @@ extension AgentServer {
                     + "engine's location. svg answers one frame's SVG text, its diagnostics and "
                     + "the ctx it was drawn with. ctx is a clip's: the canvas fps, "
                     + "durationInFrames from meta (else 5 s), the size from width/height, else "
-                    + "meta, else the canvas. No inspector control mirrors it: a person looks at "
-                    + "the preview well.",
+                    + "meta, else the canvas. svg takes no path, background or max_width, which "
+                    + "are the png sheet's, and writes no file. A frame at or past "
+                    + "durationInFrames is drawn, with progress 1, as a longer clip draws it. "
+                    + "No inspector control mirrors it: a person looks at the preview well.",
                 [
                     "name": [
                         "type": "string",
@@ -155,12 +157,14 @@ extension AgentServer {
                     "max_width": [
                         "type": "integer", "minimum": 64, "maximum": 8192,
                         "description": "The widest the png sheet may be, in pixels. Default "
-                            + "2048; 8192 keeps a 1920-wide graphic's two cells at full size.",
+                            + "2048; 8192 keeps a 1920-wide graphic's two cells at full size. Not "
+                            + "with format svg.",
                     ],
                     "background": [
                         "type": "string",
                         "description": "What the png sheet is painted on: transparent (the "
-                            + "default), checker, or a hex colour (#rgb, #rrggbb, #rrggbbaa).",
+                            + "default), checker, or a hex colour (#rgb, #rrggbb, #rrggbbaa). Not "
+                            + "with format svg.",
                     ],
                     "format": [
                         "type": "string", "enum": ["png", "svg"],
@@ -170,7 +174,8 @@ extension AgentServer {
                     "path": [
                         "type": "string",
                         "description": "Where to write the png sheet; its folder must exist. "
-                            + "Omit for a temporary file. The reply ends \"Written to <path>.\"",
+                            + "Omit for a temporary file. The reply ends \"Written to <path>.\" "
+                            + "Not with format svg.",
                     ],
                 ], required: ["name"]),
             tool(

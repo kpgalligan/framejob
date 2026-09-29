@@ -444,6 +444,10 @@ final class DocumentPane: InspectorPaneView {
             enabled: { true },
             onEdit: { binding.edited() })
         name.placeholderString = "Marker"
+        for constraint in name.constraints
+        where constraint.firstItem === name && constraint.firstAttribute == .height {
+            constraint.constant = DS.controlHeight
+        }
         name.translatesAutoresizingMaskIntoConstraints = false
         name.widthAnchor.constraint(greaterThanOrEqualToConstant: 120).isActive = true
         return inspectorRow(nil, [time, name])

@@ -350,7 +350,7 @@ final class ProjectDocument: NSDocument {
     private(set) var importSourceURL: URL?
 
     /// Where regenerable caches go while the document has no file yet.
-    private var temporaryCacheDirectory: URL?
+    var temporaryCacheDirectory: URL?
     /// This document's `graphics/` (`ProjectDocument+Graphics.swift`).
     var graphicStore: GraphicStore?
 

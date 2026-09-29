@@ -84,9 +84,14 @@ extension EditorViewController {
             throw ReelCoreError(
                 message: "\(url.path) could not be read: \(error.localizedDescription)")
         }
+        guard let source = String(data: bytes, encoding: .utf8) else {
+            throw ReelCoreError(
+                message: "\(url.path) is not UTF-8 text — a graphic module must be UTF-8 "
+                    + "JavaScript")
+        }
         let name = store.uniqueModuleName(
             GraphicTemplates.moduleName(from: url.deletingPathExtension().lastPathComponent))
-        try store.write(name: name, source: String(decoding: bytes, as: UTF8.self))
+        try store.write(name: name, source: source)
         store.rescan()
         let entry = GraphicRegistry.shared.entry(named: name, for: document.recipeKey)
         guard case .compiled(_, _, let meta, let schema)? = entry else {

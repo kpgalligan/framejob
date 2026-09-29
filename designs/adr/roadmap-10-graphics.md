@@ -300,9 +300,13 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
     `interpolateColors`;
   - generic CSS families such as `sans-serif`, which are warned like any
     missing name.
-- **The watcher:** `fonts/` and `assets/` have folder sources only, so an
-  in-place rewrite of a font is seen at the next folder event. Untitled
-  graphics roots are never deleted. `GraphicStore.drain()` is not
+- **The watcher:** each font and asset file has its own source, as a module
+  does, but a store arms at most 16 of them per pass, fonts first, in name
+  order; an in-place rewrite of a later one is seen at the next folder event
+  (spec §11 G-19 (c), which carries the descriptor arithmetic). Module
+  sources stay uncapped. The untitled graphics root is removed at close and
+  when the first save re-points the store; the untitled cache root at close
+  only, never at the first save (G-19 (d)). `GraphicStore.drain()` is not
   re-entrant, so never call `rescan()` from a `.graphicsDidChange` observer
   (`app/CLAUDE.md`).
 - **Export:** a successful export's warnings are dropped at unpin.
@@ -317,7 +321,16 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   under a running read — `Exporter.cancel()` now only sets flags, and the
   measurement's loop cancels its own reader (#74). A starved pump's read that
   never returns is not woken, accepted in spec §11 G-17 (#73). Both proved by
-  `tools/proof/export_cancel_proof.py` (issue batch B1, 2026-09-29).
+  `tools/proof/export_cancel_proof.py` (issue batch B1, 2026-09-29). Issue
+  batch B8 (2026-09-29) closed the store and menu gaps — a free name checks
+  the disk, a non-UTF-8 module is refused, a failed write leaves no
+  `.partial` and `holdsContent` ignores one, the untitled roots are removed,
+  fonts and assets are watched per file (#75) — made `render_graphic`'s svg
+  refuse the sheet's arguments while a frame past the length stays drawn
+  (#104, G-19), and fixed the Graphic sub-tab's signature, decimals, Title
+  height, repeated parses and two asset-name builders (#106), each pinned by
+  a row of `graphics_store_probe.py`, `graphics_menu_proof.py`,
+  `graphics_inspector_proof.py` or `graphics_proof.py` made to fail once.
 
 ## Open items
 
@@ -332,11 +345,8 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   - `validate` accepts a graphic clip with no description.
 
   Tracked in #72.
-- Small app and proof nits from the G1b–G5b reviews (Insert ▸ Graphic's
-  stale-scan name choice, the non-UTF-8 From File…, the leftover
-  `.js.partial`, the contact sheet's peak memory, and others) — each listed
-  in an issue: #75 (store and menus), #104 and #105 (the graphics engine and
-  tools), #106 (the Graphic sub-tab).
+- Small engine and tool refinements from the G1b–G5b reviews (the contact
+  sheet's peak memory, and others) — listed in #105.
 - The not-built list (keyframed props, `paste_attributes`, revision history,
   HEVC with alpha, mattes, system fonts, path helpers, `delete_graphic` /
   `rename_graphic`) — tracked in #103.

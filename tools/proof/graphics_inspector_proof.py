@@ -3,7 +3,7 @@
 §11 G-15), against the built app, a probe and the offscreen harness.
 
     python3 tools/proof/graphics_inspector_proof.py [--port 4887] [--app PATH]
-    python3 tools/proof/graphics_inspector_proof.py --mutant stale [--port 4887]
+    python3 tools/proof/graphics_inspector_proof.py --mutant NAME [--port 4887]
 
 **The fixture, over MCP** (one owned instance on its own port, launched and
 stopped by PID, its log at `work/graphics-inspector/reelcut-<port>.log`):
@@ -34,8 +34,11 @@ I4  `patchValue`'s null rule (a number, "#ff5a36" vs "#FF5A36", the unparsed
 I5  `staleKeys` sorted; the stale rows old then zzz; a syntax error makes every
     stored key stale and the Source section's compile row names line 2; each
     ⌫ removes its key;
-I6  one more schema key changes `structureSignature`; a default or a stored
-    value alone does not;
+I6  one more schema key changes `structureSignature`; so does each of a
+    default 64 → 65, `max` 200 → 250 (after which the rebuilt Size slider's
+    reflected `upper` is 250) and `align`'s options gaining "justify" — the
+    entries are spelled whole (issue batch B8, #106); a stored value alone
+    does not;
 I7  the tabs [graphic, picture, clip]; the four section ids; two modules →
     [graphic.source, graphic.size]; `keyedCount` 0;
 I8  the report names Nope Sans and the set's families, with no size warning;
@@ -44,7 +47,24 @@ I8  the report names Nope Sans and the set's families, with no size warning;
 I9  the TOOL's size 90 shows in the Size field; the checkbox's write lands
     under the module's spelling (`showBox`);
 I10 `fitToCanvasOps`; I11 `sourceSize(of:)`; I12 after `trim_start` by 2 s
-    the In readout shows the graphic's own in point.
+    the In readout shows the graphic's own in point;
+I13 (B8) `decimals(for:)`: no step with default 0.5 → 2, step 0.1 → 2, step 1
+    with default 0.5 → 0, no step with default 3 → 0, no step with max 1.5 →
+    2; with six's `offset` default rewritten to 0.5 the Offset field reads
+    "0.50";
+I14 (B8) the Title `InspectorNameField`'s height constraint is
+    `DS.controlHeight`, and the Title row's `fittingSize.height` equals the
+    Offset row's;
+I16 (B8) after two signature reads `schemaMemo.key` is "six|<registry
+    revision>" and `layerMemo[clip]` is set with `layerProject ===
+    document.editedProject`; after a rewrite of six the key names the new
+    revision;
+I17 (B8) a `DocumentPane(inspector:)` over the fixture with one marker added
+    through `ReelOp.addMarker`: its marker `InspectorNameField` (placeholder
+    "Marker") has exactly one height constraint of its own, `DS.controlHeight`;
+I15 (B8, last) a second `six` clip; the two hold logo "a.png" and "b.png" and
+    both are selected: the Logo popup is `["None", "red.png", "a.png",
+    "b.png"]`, and the signature holds "red.png,a.png,b.png".
 
 **The harness** (`harness/build.sh`, 1440 × 1500, the clip selected, subTab
 graphic, the four sections expanded):
@@ -53,9 +73,20 @@ H2  dark, rendered twice: byte-identical, and light ≠ dark. Both kept under
     `work/graphics-inspector/` to be LOOKED AT.
 Z1  `grep "Reelcut: "` over the log prints nothing.
 
-`--mutant stale` builds the probe over a COPY of `app/Sources` whose
-`GraphicSchemaRows.staleKeys` answers `[]`, over a fresh fixture. Exit 0
-means exactly `MUTANT_EXPECTED` failed and nothing else did.
+`--mutant NAME` builds the probe over a COPY of `app/Sources` with one
+anchor of `MUTANTS[NAME]`, asserted to occur exactly once, replaced, over a
+fresh fixture. Exit 0 means exactly that mutant's expected rows failed and
+nothing else did:
+  stale              `GraphicSchemaRows.staleKeys` answers `[]` — the five I5 rows;
+  entry-signature    the signature spells an entry "key:type" again — I6's
+                     default, max and options rows;
+  step-decimals      `decimals(for:)` is the old `(step ?? 1) < 1 ? 2 : 0` — I13;
+  title-height       no height re-pin in `stringRow` — I14;
+  marker-height      no height re-pin in `DocumentPane.markerRow` — I17;
+  merged-asset-names the signature's asset names built from `storedProps()`,
+                     the first clip's value winning, as before — I15's
+                     signature row;
+  no-schema-memo     `schema(_:)` never stores `schemaMemo` — I16.
 """
 
 import argparse
@@ -97,15 +128,57 @@ export function render(frame, props, ctx) {
 }
 '''
 
-MUTANT_FILE = "GraphicSchemaRows.swift"
-MUTANT_ANCHOR = "        return stored.keys.filter { !declared.contains($0) }.sorted()\n"
-MUTANT_EXPECTED = [
-    "I5 staleKeys is [old, zzz] from a dictionary built in the reverse order",
-    "I5 the Properties section lists the stale rows old then zzz, under the schema's",
-    "I5 six rewritten to a syntax error: every stored key is a stale row, sorted",
-    "I5 old's ⌫ nulls it: the key leaves the stored props",
-    "I5 zzz's ⌫ nulls it: the key leaves the stored props",
-]
+HEIGHT_LOOP = (
+    "{indent}for constraint in {name}.constraints\n"
+    "{indent}where constraint.firstItem === {name} && constraint.firstAttribute == .height {{\n"
+    "{indent}    constraint.constant = DS.controlHeight\n"
+    "{indent}}}\n")
+# name: (file, anchor, replacement, the rows that must fail and no others)
+MUTANTS = {
+    "stale": (
+        "GraphicSchemaRows.swift",
+        "        return stored.keys.filter { !declared.contains($0) }.sorted()\n",
+        "        _ = declared\n        return []  // mutant: nothing is stale\n",
+        ["I5 staleKeys is [old, zzz] from a dictionary built in the reverse order",
+         "I5 the Properties section lists the stale rows old then zzz, under the schema's",
+         "I5 six rewritten to a syntax error: every stored key is a stale row, sorted",
+         "I5 old's ⌫ nulls it: the key leaves the stored props",
+         "I5 zzz's ⌫ nulls it: the key leaves the stored props"]),
+    "entry-signature": (
+        "GraphicPane.swift",
+        "parsed?.schema.entries.map { String(describing: $0) }",
+        "parsed?.schema.entries.map { \"\\($0.key):\\($0.type)\" }",
+        ["I6 a default 64 → 65 changes it",
+         "I6 max 200 → 250 changes it, and the rebuilt Size slider's upper is 250",
+         "I6 align's options gaining \"justify\" changes it"]),
+    "step-decimals": (
+        "GraphicSchemaRows.swift",
+        "        if let step = entry.step { return step < 1 ? 2 : 0 }\n",
+        "        return (entry.step ?? 1) < 1 ? 2 : 0\n",
+        ["I13 decimals(for:): no step default 0.5 → 2, step 0.1 → 2, step 1 default 0.5 → 0, "
+         "no step default 3 → 0, no step max 1.5 → 2",
+         "I13 six's offset default rewritten to 0.5 (no step): the Offset field reads \"0.50\""]),
+    "title-height": (
+        "GraphicSchemaRows.swift", HEIGHT_LOOP.format(indent=" " * 12, name="control"), "",
+        ["I14 the Title InspectorNameField's height constraint is DS.controlHeight, and the "
+         "Title row's fittingSize.height equals the Offset row's"]),
+    "marker-height": (
+        "DocumentPane.swift", HEIGHT_LOOP.format(indent=" " * 8, name="name"), "",
+        ["I17 the Document tab's marker InspectorNameField has exactly one height constraint "
+         "of its own, DS.controlHeight"]),
+    "merged-asset-names": (
+        "GraphicPane.swift",
+        "GraphicSchemaRows.assetNames(for: $0, files: files, clips: clips)",
+        "{ entry -> [String] in _ = clips; let held = [storedProps()[entry.key]].compactMap "
+        "{ value -> String? in if case .string(let text)? = value { return text }; return nil }; "
+        "return files + Set(held).subtracting(files).sorted() }($0)",
+        ["I15 … and the signature holds red.png,a.png,b.png"]),
+    "no-schema-memo": (
+        "GraphicPane.swift", "        schemaMemo = (key, parsed)\n", "",
+        ["I16 after two signature reads schemaMemo.key is \"six|<registry revision>\" and "
+         "layerMemo holds the clip under document.editedProject; after a rewrite of six the "
+         "key names the new revision"]),
+}
 
 RESULTS = []
 
@@ -214,7 +287,7 @@ def build_probe(sources, out):
 
 
 def probe_checks(sources, out, package):
-    print("\n1 — the probe: I1–I12", flush=True)
+    print("\n1 — the probe: I1–I17", flush=True)
     binary, error = build_probe(Path(sources), out)
     check("the probe builds over app/Sources", binary is not None, error or "")
     if binary is None:
@@ -231,8 +304,8 @@ def probe_checks(sources, out, package):
         check("the probe runs", False, (ran["stdout"] + ran["stderr"]).strip()[-600:])
         return
     probe_rows = json.loads(answer.read_text())["rows"]
-    present = all(any(r["name"].startswith(f"I{n} ") for r in probe_rows) for n in range(1, 13))
-    check("the probe answers every I-row (I1–I12 present)", present, f"{len(probe_rows)} rows")
+    present = all(any(r["name"].startswith(f"I{n} ") for r in probe_rows) for n in range(1, 18))
+    check("the probe answers every I-row (I1–I17 present)", present, f"{len(probe_rows)} rows")
     for row in probe_rows:
         check(row["name"], row["ok"], row["detail"])
 
@@ -276,20 +349,20 @@ def harness_checks(package):
 # ---------------------------------------------------------------------------
 
 
-def mutant(app, port):
+def mutant(app, port, name):
     began = time.time()
-    with tempfile.TemporaryDirectory(prefix="reelcut-graphics-inspector-stale-") as temp:
+    file, anchor, replacement, expected = MUTANTS[name]
+    with tempfile.TemporaryDirectory(prefix=f"reelcut-graphics-inspector-{name}-") as temp:
         temp = Path(temp)
         sources = temp / "Sources"
         shutil.copytree(ROOT / "app/Sources", sources)
-        path = sources / MUTANT_FILE
+        path = sources / file
         text = path.read_text()
-        if text.count(MUTANT_ANCHOR) != 1:
-            print(f"MUTANT FAILURE: the anchor occurs {text.count(MUTANT_ANCHOR)} times")
+        if text.count(anchor) != 1:
+            print(f"MUTANT FAILURE: {name}'s anchor occurs {text.count(anchor)} times in {file}")
             return 2
-        path.write_text(text.replace(
-            MUTANT_ANCHOR, "        _ = declared\n        return []  // mutant: nothing is stale\n", 1))
-        print(f"MUTANT stale: GraphicSchemaRows.staleKeys answers [], in {sources}", flush=True)
+        path.write_text(text.replace(anchor, replacement, 1))
+        print(f"MUTANT {name}: {file}, anchor replaced once, in {sources}", flush=True)
         package, why, _ = fixture(app, port, temp / "fixture")
         if package is None:
             print(f"MUTANT FAILURE: the fixture was not made: {why}")
@@ -298,13 +371,13 @@ def mutant(app, port):
     failed = [n for n, ok in RESULTS if not ok]
     built = bool(RESULTS) and RESULTS[0][1]
     elapsed = time.time() - began
-    if built and sorted(failed) == sorted(MUTANT_EXPECTED):
-        print(f"MUTANT PASS: stale — exactly the {len(MUTANT_EXPECTED)} expected I5 row(s) "
+    if built and sorted(failed) == sorted(expected):
+        print(f"MUTANT PASS: {name} — exactly the {len(expected)} expected row(s) "
               f"FAILED in the copy and nothing else did, {elapsed:.0f} s")
         return 0
-    print(f"MUTANT FAILURE: stale — built {built}; missing failures "
-          f"{[n for n in MUTANT_EXPECTED if n not in failed]}; unexpected failures "
-          f"{[n for n in failed if n not in MUTANT_EXPECTED]}, {elapsed:.0f} s")
+    print(f"MUTANT FAILURE: {name} — built {built}; missing failures "
+          f"{[n for n in expected if n not in failed]}; unexpected failures "
+          f"{[n for n in failed if n not in expected]}, {elapsed:.0f} s")
     return 1
 
 
@@ -312,11 +385,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=4887)
     parser.add_argument("--app", default=str(APP))
-    parser.add_argument("--mutant", choices=["stale"])
+    parser.add_argument("--mutant", choices=sorted(MUTANTS))
     args = parser.parse_args()
     app = Path(args.app)
     if args.mutant:
-        return mutant(app, args.port)
+        return mutant(app, args.port, args.mutant)
     print("Road map 10, G5a — the Graphic sub-tab", flush=True)
     print("\n0 — the fixture over MCP", flush=True)
     package, why, log = fixture(app, args.port, WORK)

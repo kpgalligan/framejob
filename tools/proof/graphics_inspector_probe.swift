@@ -355,6 +355,15 @@ rewrite("six", sixSource)
 let restored = graphic.structureSignature
 rewrite("six", sixSource.replacingOccurrences(of: "default: 64", with: "default: 65"))
 let defaultMoved = graphic.structureSignature
+rewrite("six", sixSource.replacingOccurrences(of: "max: 200", with: "max: 250"))
+let maxMoved = graphic.structureSignature
+let upper = row(section("graphic.properties"), "Size")
+    .flatMap { walk($0).first { $0 is InspectorSliderControl } }
+    .flatMap { reflected($0, "upper", as: Double.self) }
+rewrite("six", sixSource.replacingOccurrences(
+    of: "options: [\"left\", \"center\", \"right\"]",
+    with: "options: [\"left\", \"center\", \"right\", \"justify\"]"))
+let optionsMoved = graphic.structureSignature
 rewrite("six", sixSource)
 document.applyEdit("probe", [GraphicSchemaRows.op(
     clips: clip().map { [$0] } ?? [], props: ["size": 91], schema: nil)])
@@ -364,8 +373,56 @@ document.applyEdit("probe", [GraphicSchemaRows.op(
     clips: clip().map { [$0] } ?? [], props: ["size": 90], schema: nil)])
 check("I6 one more schema key (store.rescan()) changes structureSignature",
       added != before && restored == before, "before \(before)\nadded \(added)")
-check("I6 changing only a default value does not", defaultMoved == before, defaultMoved)
+check("I6 a default 64 → 65 changes it", defaultMoved != before, defaultMoved)
+check("I6 max 200 → 250 changes it, and the rebuilt Size slider's upper is 250",
+      maxMoved != before && upper == 250, "upper \(String(describing: upper))\n\(maxMoved)")
+check("I6 align's options gaining \"justify\" changes it", optionsMoved != before, optionsMoved)
 check("I6 changing only a stored value does not", valueMoved == before, valueMoved)
+
+// MARK: - I13 a number's decimals
+
+func numberEntry(step: Double? = nil, value: Double = 0, max: Double? = nil) -> GraphicSchemaEntry {
+    GraphicSchemaEntry(
+        key: "k", type: "number", default: .number(value), label: "K", help: nil, min: nil,
+        max: max, step: step, multiline: false, options: [])
+}
+let decimalCases: [(String, GraphicSchemaEntry, Int)] = [
+    ("no step, default 0.5", numberEntry(value: 0.5), 2),
+    ("step 0.1", numberEntry(step: 0.1), 2),
+    ("step 1, default 0.5", numberEntry(step: 1, value: 0.5), 0),
+    ("no step, default 3", numberEntry(value: 3), 0),
+    ("no step, max 1.5", numberEntry(max: 1.5), 2),
+]
+let decimalAnswers = decimalCases.map { "\($0.0) → \(GraphicSchemaRows.decimals(for: $0.1))" }
+check("I13 decimals(for:): no step default 0.5 → 2, step 0.1 → 2, step 1 default 0.5 → 0, "
+        + "no step default 3 → 0, no step max 1.5 → 2",
+      decimalCases.allSatisfy { GraphicSchemaRows.decimals(for: $0.1) == $0.2 },
+      decimalAnswers.joined(separator: ", "))
+rewrite("six", sixSource.replacingOccurrences(
+    of: "offset: { type: \"number\", default: 0,", with: "offset: { type: \"number\", default: 0.5,"))
+let offsetField = row(section("graphic.properties"), "Offset").flatMap {
+    walk($0).first { $0 is OptionFieldControl }
+}.flatMap { walk($0).compactMap { $0 as? NSTextField }.first }
+check("I13 six's offset default rewritten to 0.5 (no step): the Offset field reads \"0.50\"",
+      offsetField?.stringValue == "0.50", "\(offsetField?.stringValue ?? "no field")")
+rewrite("six", sixSource)
+
+// MARK: - I14 the Title field's height
+
+properties = section("graphic.properties")
+let titleRow = row(properties, "Title")
+let offsetRow = row(properties, "Offset")
+let titleField = titleRow.flatMap { walk($0).first { $0 is InspectorNameField } }
+let titleHeights = titleField.map { field in
+    field.constraints.filter { $0.firstItem === field && $0.firstAttribute == .height }
+        .map(\.constant)
+} ?? []
+let titleFit = titleRow?.fittingSize.height ?? -1
+let offsetFit = offsetRow?.fittingSize.height ?? -2
+check("I14 the Title InspectorNameField's height constraint is DS.controlHeight, and the Title "
+        + "row's fittingSize.height equals the Offset row's",
+      titleHeights == [DS.controlHeight] && titleFit == offsetFit,
+      "heights \(titleHeights), title row \(titleFit), offset row \(offsetFit)")
 
 // MARK: - I5 stale keys
 
@@ -442,6 +499,84 @@ if let start = clip()?.start {
           shown == want && shown != ReelTime.format(0, fps: canvas.fps,
                                                     frames: canvas.timecodeFrames),
           "\(shown ?? "no readout")")
+}
+
+// MARK: - I16 the memos
+
+func sixRevision() -> String? {
+    if case .compiled(_, let revision, _, _)? = GraphicRegistry.shared.entry(
+        named: "six", for: document.recipeKey)
+    {
+        return revision
+    }
+    return nil
+}
+binding.invalidate()
+_ = graphic.structureSignature
+_ = graphic.structureSignature
+let memoKey = graphic.schemaMemo?.key
+let revision16 = sixRevision()
+let layerHeld = graphic.layerMemo[clipID] != nil
+let layerHandle = graphic.layerProject === document.editedProject
+rewrite("six", sixSource + "// rewritten for I16\n")
+_ = graphic.structureSignature
+let rewrittenKey = graphic.schemaMemo?.key
+let revision16b = sixRevision()
+rewrite("six", sixSource)
+check("I16 after two signature reads schemaMemo.key is \"six|<registry revision>\" and "
+        + "layerMemo holds the clip under document.editedProject; after a rewrite of six the "
+        + "key names the new revision",
+      revision16 != nil && memoKey == "six|\(revision16 ?? "")" && layerHeld && layerHandle
+        && revision16b != nil && revision16b != revision16
+        && rewrittenKey == "six|\(revision16b ?? "")",
+      "key \(memoKey ?? "nil"), revision \(revision16 ?? "nil"), layer \(layerHeld), handle "
+        + "\(layerHandle), rewritten key \(rewrittenKey ?? "nil"), revision "
+        + "\(revision16b ?? "nil")")
+
+// MARK: - I17 the marker name field's height
+
+document.applyEdit("probe", [.addMarker(at: second)])
+let documentPane = DocumentPane(inspector: inspector)
+documentPane.rebuild()
+documentPane.refresh()
+let markerField = walk(documentPane).compactMap { $0 as? InspectorNameField }
+    .first { $0.placeholderString == "Marker" }
+let markerHeights = markerField.map { field in
+    field.constraints.filter { $0.firstItem === field && $0.firstAttribute == .height }
+        .map(\.constant)
+} ?? []
+check("I17 the Document tab's marker InspectorNameField has exactly one height constraint of "
+        + "its own, DS.controlHeight",
+      markerField != nil && markerHeights == [DS.controlHeight],
+      "field \(markerField != nil), heights \(markerHeights)")
+
+// MARK: - I15 (last) two clips' asset names
+
+if let first = clip() {
+    document.applyEdit("probe", [.addGraphicClipRaw(
+        track: first.track, at: 30 * second, duration: 2 * second, name: "six")])
+    let twin = document.project.snapshot.clips.first {
+        $0.graphic?.name == "six" && $0.id != clipID
+    }
+    if let twin {
+        document.applyEdit("probe", [
+            GraphicSchemaRows.op(clips: [first], props: ["logo": "a.png"], schema: nil),
+            GraphicSchemaRows.op(clips: [twin], props: ["logo": "b.png"], schema: nil),
+        ])
+        document.selection = [clipID, twin.id]
+    }
+    properties = section("graphic.properties")
+    let logo = row(properties, "Logo").flatMap { walk($0).first { $0 is OptionPopupControl } }
+    let items = logo.flatMap { reflected($0, "items", as: [String].self) }
+    check("I15 two six clips holding logo a.png and b.png, both selected: the Logo popup is "
+            + "[None, red.png, a.png, b.png]",
+          twin != nil && items == ["None", "red.png", "a.png", "b.png"], "\(items ?? [])")
+    let signature = graphic.structureSignature
+    check("I15 … and the signature holds red.png,a.png,b.png",
+          twin != nil && signature.contains("red.png,a.png,b.png"), signature)
+} else {
+    check("I15 two six clips holding logo a.png and b.png, both selected: the Logo popup is "
+            + "[None, red.png, a.png, b.png]", false, "no clip")
 }
 
 finish()

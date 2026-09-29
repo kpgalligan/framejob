@@ -18,6 +18,13 @@
 // the canvas — `add_graphic_clip`'s defaults — and the project's canvas.
 // A frame that throws or will not rasterize is its error card on the sheet
 // and a sentence in the reply; a warning is a sentence too.
+//
+// **`format` is read and checked first** (spec §11 G-19): with svg a
+// non-null `path`, `background` or `max_width` — the png sheet's — is refused
+// by name, before the multi-frame refusal, since svg answers text and writes
+// no file. A frame at or past `durationInFrames` is DRAWN, not refused, with
+// `progress` clamped at 1: a clip longer than its length draws those frames
+// too (G-9, G-19 (b)).
 
 import Foundation
 
@@ -31,6 +38,26 @@ extension AgentServer {
         let propsJSON = try graphicPropsJSON(a)
         let requestedWidth = try graphicSide(a, "width")
         let requestedHeight = try graphicSide(a, "height")
+        let format = try stringArg(a, "format") ?? "png"
+        guard format == "png" || format == "svg" else {
+            throw ToolError(message: "format must be png or svg (got \"\(format)\").")
+        }
+        if format == "svg" {
+            let sheetOnly = ["path", "background", "max_width"].filter {
+                a[$0].map { !($0 is NSNull) } ?? false
+            }
+            if !sheetOnly.isEmpty {
+                throw ToolError(
+                    message: "format svg takes no path, background or max_width — those are the "
+                        + "png contact sheet's; svg answers one frame's SVG text in the reply and "
+                        + "writes no file (got \(sheetOnly.joined(separator: ", "))).")
+            }
+            if frames.count > 1 {
+                throw ToolError(
+                    message: "format svg answers ONE frame's SVG, and frames names "
+                        + "\(frames.count); ask for one frame, or for a png contact sheet.")
+            }
+        }
         let maxWidth = try intArg(a, "max_width") ?? GraphicContactSheet.maxWidthDefault
         let widths = GraphicContactSheet.maxWidthMin...GraphicContactSheet.maxSide
         guard widths.contains(maxWidth) else {
@@ -43,15 +70,6 @@ extension AgentServer {
             throw ToolError(
                 message: "background must be \(GraphicSheetBackground.accepted) "
                     + "(got \"\(backgroundName)\").")
-        }
-        let format = try stringArg(a, "format") ?? "png"
-        guard format == "png" || format == "svg" else {
-            throw ToolError(message: "format must be png or svg (got \"\(format)\").")
-        }
-        if format == "svg", frames.count > 1 {
-            throw ToolError(
-                message: "format svg answers ONE frame's SVG, and frames names \(frames.count); "
-                    + "ask for one frame, or for a png contact sheet.")
         }
         let url = format == "png" ? try graphicSheetDestination(a, name: name) : nil
 

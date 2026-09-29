@@ -132,9 +132,8 @@ extension GraphicPane {
         guard let graphic = clip.graphic, let document = binding.document else { return .empty }
         if document.isLiveEditing { return lastReports[clip.id] ?? .empty }
         guard let set = GraphicRegistry.shared.snapshot(for: document.recipeKey),
-              let recipe = binding.project?.recipe(at: clip.start),
-              let layer = recipe.layers.first(where: { $0.clip == clip.id }),
-              case .graphic(_, let hash, let frame, let propsJSON, let ctxJSON) = layer.source
+              let source = layerSource(of: clip),
+              case .graphic(_, let hash, let frame, let propsJSON, let ctxJSON) = source
         else { return .empty }
         let key = [
             shared.name, revision, libraryVersion, hash, "\(graphic.width)×\(graphic.height)",
@@ -164,6 +163,23 @@ extension GraphicPane {
         reportMemo[key] = report
         lastReports[clip.id] = report
         return report
+    }
+
+    /// `clip`'s layer source in the recipe at its start, through
+    /// `layerMemo`: `recipe(at:)` is asked only on a miss, and the memo is
+    /// emptied when the binding's project is another handle.
+    func layerSource(of clip: ClipSnapshot) -> RecipeSourceRef? {
+        guard let project = binding.project else { return nil }
+        if project !== layerProject {
+            layerMemo = [:]
+            layerProject = project
+        }
+        if let hit = layerMemo[clip.id] { return hit }
+        guard let layer = project.recipe(at: clip.start)?.layers
+            .first(where: { $0.clip == clip.id })
+        else { return nil }
+        layerMemo[clip.id] = layer.source
+        return layer.source
     }
 
     /// The engine's diagnostics out of a thrown error, else one error
@@ -205,7 +221,7 @@ extension GraphicPane {
                 .runModal()
         }
         guard GraphicStore.isModuleName(name) else { return refuse(GraphicStore.nameSentence(name)) }
-        guard store.module(named: name) == nil else {
+        guard !store.holdsModule(named: name) else {
             return refuse("graphics/\(name).js already exists")
         }
         do {

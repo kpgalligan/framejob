@@ -33,15 +33,7 @@ extension GraphicStore {
         let folder = folderURL.appendingPathComponent(subfolder, isDirectory: true)
         try files.createDirectory(at: folder, withIntermediateDirectories: true)
         let target = folder.appendingPathComponent(name)
-        let partial = folder.appendingPathComponent(name + ".partial")
-        try? files.removeItem(at: partial)
-        try files.copyItem(at: source, to: partial)
-        let replaced = files.fileExists(atPath: target.path)
-        if replaced {
-            _ = try files.replaceItemAt(target, withItemAt: partial)
-        } else {
-            try files.moveItem(at: partial, to: target)
-        }
+        let replaced = try Self.land(at: target) { try files.copyItem(at: source, to: $0) }
         return (target, replaced)
     }
 

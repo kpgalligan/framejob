@@ -35,6 +35,12 @@ final class GraphicPane: InspectorPaneView {
     /// runs, so the signature holds still through a drag.
     var reportMemo: [String: GraphicClipReport] = [:]
     var lastReports: [UInt32: GraphicClipReport] = [:]
+    /// The parsed schema of the last module asked, keyed "name|revision".
+    var schemaMemo: (key: String, schema: GraphicSchema)?
+    /// Each clip's recipe layer source under `layerProject`, the handle it
+    /// was read from; emptied when the binding's project is another handle.
+    weak var layerProject: ReelProject?
+    var layerMemo: [UInt32: RecipeSourceRef] = [:]
 
     /// Whether the graphic sections apply: they write `set_graphic`, which
     /// errors on any other kind, so a mixed selection gets none of them.
@@ -62,10 +68,16 @@ final class GraphicPane: InspectorPaneView {
     }
 
     /// The compiled schema of `shared`, parsed in the module's order, and
-    /// the registry's dictionary the ops carry.
+    /// the registry's dictionary the ops carry. Parsed once per name and
+    /// revision (`schemaMemo`).
     func schema(_ shared: Shared?) -> (schema: GraphicSchema, raw: [String: Any])? {
-        guard case .compiled(let module, _, _, let raw)? = shared?.entry else { return nil }
-        return (GraphicSchema(describeJSON: module.describeJSON(), schema: raw), raw)
+        guard let shared, case .compiled(let module, let revision, _, let raw)? = shared.entry
+        else { return nil }
+        let key = "\(shared.name)|\(revision)"
+        if let memo = schemaMemo, memo.key == key { return (memo.schema, raw) }
+        let parsed = GraphicSchema(describeJSON: module.describeJSON(), schema: raw)
+        schemaMemo = (key, parsed)
+        return (parsed, raw)
     }
 
     /// The selection's stored props, merged; the first clip holding a key wins.
@@ -82,15 +94,15 @@ final class GraphicPane: InspectorPaneView {
         (binding.document?.graphicStore?.scan.assets.map(\.name) ?? []).sorted()
     }
 
-    /// The schema's keys and types, the stale keys, the asset popup's names
-    /// and the diagnostics' messages — each one a row that appears or goes.
-    /// Values, the revision and the playhead are NOT here: they are read
-    /// fresh by `refresh()`.
+    /// The schema's entries whole (a default, bounds or options a row is
+    /// built from), the stale keys, each asset popup's names and the
+    /// diagnostics' messages. Stored values, the revision and the playhead
+    /// are NOT here: they are read fresh by `refresh()`.
     override var structureSignature: String {
         guard allGraphic else { return super.structureSignature + "|-" }
         let shared = self.shared()
         let parsed = schema(shared)
-        let keys = parsed?.schema.entries.map { "\($0.key):\($0.type)" } ?? []
+        let keys = parsed?.schema.entries.map { String(describing: $0) } ?? []
         let stale = GraphicSchemaRows.staleKeys(stored: storedProps(), schema: parsed?.schema)
         var messages = ["-", "-"]
         if let shared, let clip = binding.graphicClips.first, let document = binding.document {
@@ -104,22 +116,18 @@ final class GraphicPane: InspectorPaneView {
         }
         return [
             super.structureSignature, shared?.name ?? "mixed", keys.joined(separator: ","),
-            stale.joined(separator: ","), assetPopupNames(parsed?.schema).joined(separator: ","),
+            stale.joined(separator: ","), assetSignature(parsed?.schema),
         ].joined(separator: "|") + "|" + messages.joined(separator: "|")
     }
 
-    /// The asset popups' names: the folder's, then any an asset prop holds
-    /// that the folder lacks — each one an item of a popup.
-    private func assetPopupNames(_ schema: GraphicSchema?) -> [String] {
-        let files = assetNames()
-        let assetKeys = schema?.entries.filter { $0.type == "asset" }.map(\.key) ?? []
-        guard !assetKeys.isEmpty else { return files }
-        let stored = storedProps()
-        let held = assetKeys.compactMap { key -> String? in
-            if case .string(let text)? = stored[key] { return text }
-            return nil
-        }
-        return files + Set(held).subtracting(files).sorted()
+    /// Each asset entry's popup names, from the rows' own
+    /// `GraphicSchemaRows.assetNames` call: names joined by ",", entries by ";".
+    private func assetSignature(_ schema: GraphicSchema?) -> String {
+        let files = assetNames(), clips = binding.graphicClips
+        return (schema?.entries ?? []).filter { $0.type == "asset" }.map {
+            GraphicSchemaRows.assetNames(for: $0, files: files, clips: clips)
+                .joined(separator: ",")
+        }.joined(separator: ";")
     }
 
     // MARK: - Properties

@@ -49,12 +49,15 @@ extension GraphicStore {
     }
 
     /// True when `folder` holds ANY entry, file or directory, that is
-    /// neither hidden nor one of `manualNames`. A `fonts/` or `assets/`
-    /// subfolder counts; `listing(_:)`'s regular-files rule is not this.
+    /// neither hidden, one of `manualNames`, nor a `.partial`. A `fonts/` or
+    /// `assets/` subfolder counts; `listing(_:)`'s regular-files rule is not
+    /// this.
     static func holdsContent(_ folder: URL) -> Bool {
         let entries = (try? FileManager.default.contentsOfDirectory(
             at: folder, includingPropertiesForKeys: nil,
             options: [.skipsHiddenFiles])) ?? []
-        return entries.contains { !manualNames.contains($0.lastPathComponent) }
+        return entries.contains {
+            !manualNames.contains($0.lastPathComponent) && $0.pathExtension != "partial"
+        }
     }
 }

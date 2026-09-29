@@ -7454,3 +7454,65 @@ Before and after, on the tree (HEAD 5481ce6, then this batch):
 python3 tools/proof/tree_copy.py --selftest                       # → 4/4
 python3 tools/proof/capture_spike/inventory.py --check            # → 3/3 (make test)
 ```
+
+## Issue batch B8 — the graphics store and menus, render_graphic's svg arguments, the Graphic sub-tab (`graphics_store_probe.py`, `graphics_menu_proof.py`, `graphics_inspector_proof.py`, `graphics_proof.py`; #75 #104 #106)
+
+Spec §11 G-19 is the decision. The new rows:
+
+- **`graphics_store_probe.py`** — W14 (a font and an asset rewritten IN
+  PLACE each post once with `library` true: every font and asset file has
+  its own source, at most 16 a pass), W15 (a write over an immutable `q.js`
+  throws and leaves no `.partial` and the file as it was), W16
+  (`holdsContent` ignores a `.partial`), C5 (the untitled graphics root is
+  removed at close and at the first save's re-point; CONTROL: a saved
+  package's `graphics/` stays) and C6 (the untitled cache root is removed at
+  close ONLY — it survives the first save, whose package holds the copy;
+  CONTROL: an opened package's `cache/` stays). Mutants `partial-left` (W15),
+  `scratch-kept` (C5), `cache-kept` (C6), `no-library-file-sources` (W14);
+  `no-file-sources` (W4) is re-anchored on the module arm line plus the two
+  after it, because the library arm line spells the same call.
+- **`graphics_menu_proof.py`** — M11 (a `counter.js` written to disk a moment
+  before Insert ▸ Graphic is not overwritten: the clip is `counter-2`) and
+  M12 (a module that is not UTF-8 is refused before it is written).
+- **`graphics_inspector_proof.py`** — I6 reworked (a default, a `max` — the
+  rebuilt slider's `upper` follows — and an enum's options each change the
+  signature), I13 (`decimals(for:)` and "0.50"), I14 (the Title field's own
+  height is `DS.controlHeight`, and its row fits as tall as Offset's), I16
+  (the schema and layer memos), I17 (the Document tab's marker name field's
+  height) and I15 (two clips' asset names in the popup and the signature).
+  `--mutant` is now a table of seven, each held to "exactly these rows fail".
+- **`graphics_proof.py`** — C5 (`render_graphic` svg refuses `path`, then
+  `background` and `max_width`, by name, and writes no file), C6 (frame 150
+  of a 120-frame module is DRAWN, `progress` 1) and G8's untitled root gone
+  after the first save.
+
+Run on 2026-09-29 (this host: ffmpeg is broken, `libx265.215.dylib` not
+loaded, so `graphics_proof.py`'s pixel rows fail for that reason alone):
+
+| Command | Answer |
+|---|---|
+| `make typecheck` | 0 errors, 7 warnings, tsc silent |
+| `make app` | BUILD SUCCEEDED |
+| `capture_spike/inventory.py --check` | 3/3; `ProjectDocument.swift` still 1335 lines |
+| `graphics_store_probe.py` | 22/22 |
+| `graphics_store_probe.py --mutant partial-left` / `scratch-kept` / `cache-kept` / `no-library-file-sources` | MUTANT PASS: W15 / C5 / C6 / W14 failed, and nothing else |
+| `graphics_store_probe.py --mutant no-file-sources` | MUTANT PASS: W4 failed (with W2, W10, W11) |
+| `graphics_menu_proof.py --port 4871` | 16/16 |
+| …`holdsModule`'s disk check removed by hand (reverted) | 15/16, M11 FAIL: clips `counter`, `counter.js` overwritten |
+| …`String(decoding:as:)` restored in `insertGraphic` by hand (reverted) | 15/16, M12 FAIL: `latin1.js` written, "does not compile" |
+| `graphics_inspector_proof.py --port 4872` | 59/59 |
+| `graphics_inspector_proof.py --mutant` each of `stale`, `entry-signature`, `step-decimals`, `title-height`, `marker-height`, `merged-asset-names`, `no-schema-memo` | MUTANT PASS, each exactly its rows (5, 3, 2, 1, 1, 1, 1) |
+| `graphics_proof.py --port 4873` at the pre-change HEAD (a tree copy) | 29/40; A1 C1 C2 I1 I2 I4 W1 C4 E4 Q1 Q2 FAIL (ffmpeg) |
+| `graphics_proof.py --port 4873` with B8 | 31/42; the same eleven FAIL; C5, C6, G8 and Z1 ok |
+| …in one hand-mutated `make app` (a tree copy: the svg refusal removed, a `frame >= length` refusal added) | 29/42; C5 and C6 FAIL besides the eleven |
+
+`grep "Reelcut: "` printed nothing over every instance's log.
+
+```sh
+python3 tools/proof/graphics_store_probe.py                                  # → 22/22
+python3 tools/proof/graphics_store_probe.py --mutant cache-kept              # → MUTANT PASS
+python3 tools/proof/graphics_menu_proof.py --port 4871                       # → 16/16
+python3 tools/proof/graphics_inspector_proof.py --port 4872                  # → 59/59
+python3 tools/proof/graphics_inspector_proof.py --mutant title-height --port 4872
+python3 tools/proof/graphics_proof.py --port 4873                            # C5, C6, G8
+```

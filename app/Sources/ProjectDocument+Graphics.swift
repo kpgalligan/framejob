@@ -88,7 +88,10 @@ extension ProjectDocument {
             userInfo: [GraphicStore.namesKey: names, GraphicStore.libraryKey: library])
     }
 
-    /// Stops the store and drops its compiled set, from `close()`.
+    /// Stops the store and drops its compiled set, from `close()`, then
+    /// removes the untitled graphics root and the untitled cache root (spec
+    /// §11 G-19 (d)). `close()`, in the over-cap base file, reaches the
+    /// cache removal through this call.
     func stopGraphicStore() {
         if let store = graphicStore {
             NotificationCenter.default.removeObserver(
@@ -96,7 +99,20 @@ extension ProjectDocument {
         }
         GraphicRegistry.shared.remove(recipeKey)
         graphicStore?.stop()
+        graphicStore?.removeScratchRoot()
         graphicStore = nil
+        removeTemporaryCacheDirectory()
+    }
+
+    /// Main, from `stopGraphicStore()`, which `close()` in the over-cap base
+    /// file calls: removes `temporaryCacheDirectory` when it is set, whatever
+    /// `fileURL` is, and leaves the property as it is. At close ONLY, never
+    /// at the first save: until then the timeline and any pass in flight
+    /// still hold that path, and the save's copy is complete by close
+    /// (G-19 (d)).
+    func removeTemporaryCacheDirectory() {
+        guard let directory = temporaryCacheDirectory else { return }
+        try? FileManager.default.removeItem(at: directory)
     }
 }
 

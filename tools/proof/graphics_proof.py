@@ -113,6 +113,14 @@ C2  Placement: `render_frame` at frame 30 and `render_graphic {frame: 30,
     1920×1080 cell (0 of 2 073 600 differ — F1's comparison);
 C3  `render_graphic {frame: 30, format: "svg"}`: ok, frame 30, the rect at
     `x="120"`, no diagnostics;
+C5  (issue batch B8, #104; spec §11 G-19 (a)) `render_graphic {name: bar,
+    frame: 30, format: svg, path: WORK/c5.svg}` is refused with "format svg
+    takes no path, background or max_width — … (got path)." and writes no
+    file; `{…, background: "#000000", max_width: 100}` is refused with "…(got
+    background, max_width).";
+C6  (B8, G-19 (b)) `{name: bar, frame: 150, format: svg}`, past bar's 120
+    frames, is ok: `frame` 150, `ctx.durationInFrames` 120, `ctx.progress` 1
+    — a frame past the length is drawn, as a longer clip draws it (G-9);
 I1  `write_graphic needsfont` (120 px white text in `'Oswald'`): its sheet over
     black has 0 lit pixels and names Oswald; `import_graphic_font` of
     `/Library/Fonts/Oswald-Medium.ttf` answers families `["Oswald"]` (the
@@ -151,7 +159,8 @@ L2  the loop of §5h on a new LP: `graphic_reference`, `write_graphic`
 G8  (a fresh instance) an untitled `new_project`; its root from `get_graphic
     {}` (existing, no modules) given `fonts/Anton-Regular.ttf` only;
     `save_project {path: NF}`: `NF/graphics/fonts/Anton-Regular.ttf` exists,
-    no `.js`, and `get_graphic {}` now names `NF/graphics`, existing;
+    no `.js`, `get_graphic {}` now names `NF/graphics`, existing, and the
+    untitled root it named before the save no longer exists (B8, G-19 (d));
 Z1  `grep "Reelcut: "` over every launch's log prints nothing.
 
     python3 tools/proof/graphics_proof.py [--port 4879] [--app PATH]
@@ -201,7 +210,7 @@ RED, BLUE, BLACK = (255, 90, 54), (45, 127, 249), (0, 0, 0)
 BORDER, CARD = (230, 40, 40), (64, 8, 8)
 SECOND = 30 * FRAME
 ROWS = ["G6", "P1", "P2", "P3", "S1", "R1", "H1", "L1", "F1", "K1", "K2", "T1", "K3", "A1",
-        "G1", "G2", "G3", "G4", "G5", "G7", "C1", "C2", "C3", "I1", "I2", "G9", "I3", "I4", "W1",
+        "G1", "G2", "G3", "G4", "G5", "G7", "C1", "C2", "C3", "C5", "C6", "I1", "I2", "G9", "I3", "I4", "W1",
         "L2",
         "G8", "E1", "C4", "E2", "E3", "E4", "Q1", "Q2", "Q3", "Z1"]
 DOC_MD = ROOT / "docs/graphics-api.md"
@@ -901,6 +910,30 @@ def run_c(client, wg):
           and 'x="120"' in (r.get("svg") or "") and r.get("diagnostics") == [],
           f"{got}")
 
+    refusal = ("format svg takes no path, background or max_width — those are the png contact "
+               "sheet's; svg answers one frame's SVG text in the reply and writes no file (got ")
+    target = WORK / "c5.svg"
+    base = {"project": str(wg), "name": "bar", "frame": 30, "format": "svg"}
+    pathed = attempt(client, "render_graphic", dict(base, path=str(target)))
+    sheeted = attempt(client, "render_graphic",
+                      dict(base, background="#000000", max_width=100))
+    check("C5 render_graphic svg with path is refused naming path and writes no file; with "
+          "background and max_width it is refused naming both (G-19 (a))",
+          not pathed["ok"] and refusal + "path)." in pathed.get("error", "")
+          and not target.exists() and not (WORK / "c5.svg.png").exists()
+          and not sheeted["ok"] and refusal + "background, max_width)." in sheeted.get("error", ""),
+          f"path {pathed}, file {target.exists()}, sheet args {sheeted}")
+
+    past = attempt(client, "render_graphic", {"project": str(wg), "name": "bar", "frame": 150,
+                                              "format": "svg"})
+    p = past.get("reply") or {}
+    ctx = p.get("ctx") or {}
+    check("C6 render_graphic {frame: 150, format: svg} past bar's 120 frames is DRAWN: ok, frame "
+          "150, ctx.durationInFrames 120, ctx.progress 1 (G-9, G-19 (b))",
+          past["ok"] and p.get("ok") is True and p.get("frame") == 150
+          and ctx.get("durationInFrames") == 120 and ctx.get("progress") == 1,
+          f"{past}")
+
 
 def run_i(client, wg):
     """I1, I2, G9 and I3 on WG: a font and an asset imported, the reason-less
@@ -1106,14 +1139,16 @@ def run_g8(client, nf):
     modules = sorted(p.name for p in (nf / "graphics").glob("*.js"))
     after = attempt(client, "get_graphic", {})
     a = after.get("reply") or {}
+    gone = bool(root) and not Path(root).exists()
     check("G8 an untitled root holding only fonts/Anton-Regular.ttf, saved to NF: the font "
-          "arrives, no module does, and get_graphic now names NF/graphics",
+          "arrives, no module does, get_graphic now names NF/graphics, and the untitled root "
+          "is gone (G-19 (d))",
           made["ok"] and before["ok"] and b.get("folder_exists") is True
           and b.get("modules") == [] and copied and saved["ok"] and font and modules == []
           and after["ok"] and a.get("folder") == str(nf / "graphics")
-          and a.get("folder_exists") is True,
+          and a.get("folder_exists") is True and gone,
           f"new {made['ok']}, before {before}, save {saved}, font {font}, modules {modules}, "
-          f"after {after}")
+          f"after {after}, root gone {gone}")
 
 
 def project_of_reply(client, project):

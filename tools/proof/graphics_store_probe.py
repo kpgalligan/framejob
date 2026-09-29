@@ -34,22 +34,51 @@ W11 packageDidMove(to:) posts the location once; an edit in the new folder
     posts, one in the old does not;
 W12 an edit then stop() in the same turn, and an edit after: nothing posts;
 W13 write(name: "e") then rescan() at once is exactly ONE post ["e"];
+W14 (issue batch B8, #75) a new untitled store with `fonts/<bundled face>`
+    and `assets/logo.png`, settled: `logo.png` rewritten IN PLACE (O_TRUNC,
+    same inode) with other PNG bytes is ONE post, library true, within 1 s,
+    and `libraryVersion` moved; the font rewritten in place with another
+    bundled face's bytes is ONE post, library true (each font and asset file
+    has its own source, spec §11 G-19 (c));
+W15 `write(name: "q")` over a `q.js` flagged `.immutable` throws, leaves no
+    `q.js.partial` and leaves q.js's bytes as they were (`land`'s cleanup);
+W16 `holdsContent` is false for a folder holding only `API.md` and
+    `x.js.partial`, and true once `x.js` is added;
 C1  a saved document's save carries graphics/x.js (the whitelist line);
 C2  an untitled document restored from autosave seeds its temporary root and
     its save carries graphics/x.js;
 C3  a fresh untitled document's save has NO graphics/ (an empty root is not
     carried, G-14);
-C4  a document is freed after close(), and after being dropped unclosed.
+C4  a document is freed after close(), and after being dropped unclosed;
+C5  an untitled document holding a module: its graphics root exists, and after
+    close() it is gone; a second one, its wrapper written to a package and then
+    its `fileURL` set: its old root is gone, `folderURL` is `<package>/graphics`
+    and holds the module; CONTROL: that saved document's close() leaves
+    `<package>/graphics` (G-19 (d));
+C6  an untitled document's `cacheDirectory` holding `transcripts/9.json`: after
+    close() that root is gone; a second one, its wrapper written to a package
+    and `fileURL` set: `<package>/cache/transcripts/9.json` equals the original
+    and its temporary root still exists; after close() the root is gone and
+    the package's copy unchanged; CONTROL: a document opened from the package
+    has `temporaryCacheDirectory` nil and its close() leaves `<package>/cache`.
 
     python3 tools/proof/graphics_store_probe.py
     python3 tools/proof/graphics_store_probe.py --mutant whitelist-removed
     python3 tools/proof/graphics_store_probe.py --mutant no-file-sources
     python3 tools/proof/graphics_store_probe.py --mutant strong-callback
+    python3 tools/proof/graphics_store_probe.py --mutant partial-left
+    python3 tools/proof/graphics_store_probe.py --mutant scratch-kept
+    python3 tools/proof/graphics_store_probe.py --mutant cache-kept
+    python3 tools/proof/graphics_store_probe.py --mutant no-library-file-sources
 
 A mutant is built from a COPY of `app/Sources` with one anchor, asserted to
 occur exactly once, replaced; exit 0 means the row it names FAILED in the copy
-(C1's file ABSENT, W4, C4), which is the pass. A mutant copy that does not
-build is a FAILURE.
+(C1's file ABSENT, W4, C4, W15, C5, C6, W14), which is the pass. A mutant copy
+that does not build is a FAILURE. `no-file-sources` drops the MODULE arm
+line, anchored with the line after it, since the library files' arm line
+(`no-library-file-sources`) spells the same call; `partial-left` drops the
+cleanup in `land`'s catch, `scratch-kept` empties `removeScratchRoot`, and
+`cache-kept` drops `stopGraphicStore`'s `removeTemporaryCacheDirectory()`.
 """
 
 import hashlib
@@ -71,7 +100,7 @@ DEADLINE = 600
 RULE = ("is not a module name (lowercase letters, digits and -, starting with a letter "
         "or a digit, at most 63 characters)")
 ROWS = ["W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8", "W9", "W10", "W11", "W12", "W13",
-        "C1", "C2", "C3", "C4"]
+        "W14", "W15", "W16", "C1", "C2", "C3", "C4", "C5", "C6"]
 
 rows = {}
 answer_seen = {}
@@ -205,6 +234,30 @@ def score(a, work):
     check("W13 write(e) then rescan() at once is exactly ONE post [e]",
           len(w13.get("posts", [])) == 1 and w13["posts"][0].get("names") == ["e"], f"{w13}")
 
+    w14 = a.get("w14", {})
+    logo, font = w14.get("logo") or {}, w14.get("font") or {}
+
+    def library_post(settled):
+        posts = (settled or {}).get("posts", [])
+        return len(posts) == 1 and posts[0].get("library") is True
+
+    check("W14 an asset rewritten IN PLACE is ONE post, library true, within 1 s, the version "
+          "moved; a font rewritten in place is ONE post, library true",
+          w14.get("png_differs") is True and w14.get("faces", 0) >= 2
+          and logo.get("same_inode") is True and library_post(logo)
+          and isinstance(logo.get("latency"), (int, float)) and logo["latency"] <= 1.0
+          and logo.get("version_moved") is True
+          and font.get("same_inode") is True and library_post(font), f"{w14}")
+
+    w15 = a.get("w15", {})
+    check("W15 write(q) over an immutable q.js throws, leaves no q.js.partial and q.js unchanged",
+          w15.get("thrown") is not None and w15.get("partial") is False
+          and w15.get("bytes_unchanged") is True, f"{w15}")
+
+    w16 = a.get("w16", {})
+    check("W16 holdsContent is false for API.md and x.js.partial alone, true once x.js is added",
+          w16.get("partial_only") is False and w16.get("with_module") is True, f"{w16}")
+
     c1 = a.get("c1", {})
     check("C1 a saved document's save carries graphics/x.js",
           c1.get("child") is True and c1.get("present") is True
@@ -225,6 +278,26 @@ def score(a, work):
     c4 = a.get("c4", {})
     check("C4 a document is freed after close(), and after being dropped unclosed",
           c4.get("closed_freed") is True and c4.get("dropped_freed") is True, f"{c4}")
+
+    c5 = a.get("c5", {})
+    check("C5 an untitled graphics root is gone after close() and after the first save "
+          "re-points the store to <package>/graphics, which holds the module; CONTROL: the "
+          "saved document's close() leaves <package>/graphics",
+          c5.get("closed_root_before") is True and c5.get("closed_root_after") is False
+          and "save_error" not in c5 and c5.get("saved_root_after") is False
+          and c5.get("folder") == c5.get("expected") and c5.get("module_in_package") is True
+          and c5.get("control_package_graphics") is True, f"{c5}")
+
+    c6 = a.get("c6", {})
+    check("C6 an untitled cache root is gone after close(); after a first save it is KEPT and "
+          "the package holds the transcript, and close() then removes it leaving the copy; "
+          "CONTROL: an opened package's close() leaves <package>/cache",
+          c6.get("closed_root_before") is True and c6.get("closed_root_is_temporary") is True
+          and c6.get("closed_root_after") is False and "save_error" not in c6
+          and c6.get("copy_equal") is True and c6.get("saved_root_kept") is True
+          and c6.get("saved_root_after") is False and c6.get("copy_after_close") is True
+          and c6.get("control_temporary_nil") is True
+          and c6.get("control_package_cache") is True, f"{c6}")
 
 
 def probe(sources, work):
@@ -272,7 +345,30 @@ MUTANTS = {
         "{ children[Self.graphicsDirectoryName] = graphics }\n",
         "", "C1"),
     "no-file-sources": (
-        "GraphicStore.swift", "            arm(url, folder: false, g)\n", "", "W4"),
+        "GraphicStore.swift",
+        "            arm(url, folder: false, g)\n"
+        "            guard let bytes = try? Data(contentsOf: url) else { continue }\n"
+        "            modules[name] = ",
+        "            guard let bytes = try? Data(contentsOf: url) else { continue }\n"
+        "            modules[name] = ", "W4"),
+    "no-library-file-sources": (
+        "GraphicStore.swift",
+        "        for url in library.prefix(Self.libraryFileSourceLimit) "
+        "{ arm(url, folder: false, g) }\n",
+        "        _ = library\n", "W14"),
+    "partial-left": (
+        "GraphicStore+Files.swift",
+        "            try? files.removeItem(at: partial)\n            throw error\n",
+        "            throw error\n", "W15"),
+    "scratch-kept": (
+        "GraphicStore+Files.swift",
+        "        guard package == nil else { return }\n"
+        "        try? FileManager.default.removeItem(at: folderURL)\n",
+        "", "C5"),
+    "cache-kept": (
+        "ProjectDocument+Graphics.swift",
+        "        graphicStore = nil\n        removeTemporaryCacheDirectory()\n",
+        "        graphicStore = nil\n", "C6"),
     "strong-callback": (
         "ProjectDocument+Graphics.swift",
         "{ [weak self] in self?.packageContentsDidChangeOnDisk() }",
