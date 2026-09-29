@@ -625,7 +625,9 @@ the key map behind it.
   NO-OP on macOS 26.5.1, so the refresh seeks one tick off and returns; parked
   at the end it rests on the last frame's final tick, because the end tick
   composes black. Do not put a same-time seek back. Preview Quality overrides
-  `renderSize` on a `mutableCopy()` of the composition here, keeping the
+  `renderSize` on a copy of the builder's
+  `BuiltComposition.videoConfiguration` here (`Playback.previewComposition`,
+  static so `phase8_chrome.py` calls it), keeping the
   canvas's EXACT aspect (`m · (w/g, h/g)`, coarser when the divisor does not
   divide `g`, Full for a coprime canvas); `AVPlayerItem.videoComposition` is
   a COPY property, so the setter re-assigns. `makePreviewLayer` is the one
@@ -635,8 +637,12 @@ the key map behind it.
   timeline of only graphics, text, shapes or images has no plan track and
   plays over the builder's placeholder (road map 10 §10.8,
   `media_less_playback_probe.py`).
-- `CompositionBuilder.swift` (+`InstructionRanges`, +`AudioTracks`) — the app's ONE
-  constructor of `AVMutableVideoComposition`, shared by the preview, both
+- `CompositionBuilder.swift` (+`InstructionRanges`, +`AudioTracks`) — the
+  app's ONE builder of the video composition, from an
+  `AVVideoComposition.Configuration` it keeps on
+  `BuiltComposition.videoConfiguration` (#91; a variant — Preview Quality's
+  size, an export row's rate — is that value with one field changed, never a
+  `mutableCopy()`), shared by the preview, both
   export passes and the offline frame. **Do not give it a preview-shaped
   argument**; the `metering` flag is passed true by `Playback.startRebuild`
   and nothing else. `fill` holds a video track's last frame over any part of
@@ -1033,7 +1039,10 @@ free.
   `audioTapProcessor` per input, exclusive flags). Do not "fix" it back. The
   MODEL publishes a raw peak and RMS and the VIEW owns the ballistics, with
   ONE resting appearance so the harness settles. `Loudness` is BS.1770-4 with
-  no AVFoundation in it, refusing any rate but 48 kHz.
+  no AVFoundation in it, refusing any rate but 48 kHz. A metered track counts
+  only while one of its OWN sounding spans holds the playhead
+  (`LevelMeterTrack.mix`; its format family's resolved segments, #65): a sink
+  keeps its last buffer across silence.
 
 **Dialogs and windows.**
 - `Sheets.swift` (the `makeSheetView` builders every sheet uses) ·

@@ -65,16 +65,11 @@ make prices     # NETWORK: regenerate agent/prices/anthropic.json from LiteLLM (
 - There are no Swift unit tests. App-side verification is `make typecheck`
   plus driving the built app over MCP and the probes in `tools/proof/`.
 - `make typecheck` is fast; run it before `make app` (~90 s). Its baseline is
-  **0 errors and 7 warnings**, and tsc prints no error; the warnings are
-  all AVFoundation deprecations: 4 (3 in
-  `CompositionBuilder.swift`, 1 in `Exporter.swift`) deliberate because
-  their replacements are `async`-only and `async` is confined to
-  `MediaImporter.swift` and `SpeechEngine.swift` (spec §11 W-8), and 3
-  `AVMutableVideoComposition` deprecations
-  that came with the macOS 26 minimum (`Playback.swift`,
-  `ExporterWriter.swift`, `CompositionBuilder.swift`; road map 8 §10.4),
-  whose replacement `AVVideoComposition.Configuration` was not taken with
-  the bump. Any eighth warning is new and yours. It stops before
+  **0 errors and 4 warnings**, and tsc prints no error; the warnings are all
+  AVFoundation deprecations (3 in `CompositionBuilder.swift`, 1 in
+  `Exporter.swift`), deliberate because their replacements are `async`-only
+  and `async` is confined to `MediaImporter.swift` and `SpeechEngine.swift`
+  (spec §11 W-8). Any fifth warning is new and yours. It stops before
   SILGen, so a clean typecheck does not prove the app builds; only `make app`
   does.
 - `make app`/`make dist` build the assistant helper (`agent/`) in their

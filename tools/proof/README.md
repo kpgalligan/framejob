@@ -7672,3 +7672,77 @@ log.
 python3 tools/proof/save_project_proof.py 4861        # fresh instance → 9/9
 python3 tools/proof/v2_menu.py 4862 --only U          # U1, U2
 ```
+
+## Issue batch B11 — nested reversed analysis, the meter's stale sink, `AVVideoComposition.Configuration` (`playback_audio_proof.py`, `playback_audio_probe.swift`, `video_configuration_proof.py`, `video_configuration_probe.swift`; #64 #65 #91)
+
+`MediaPeaks.reversedPivot` looks a segment's clip up at the top level, then
+among every nest's clips, so silence detection and Normalize mirror a
+reversed clip inside a CLOSED nest (#64). `LevelMeterTrack` carries
+`sounding`, the spans of its format family's resolved segments (filled in
+`audioFamilies`), and `LevelMeterTrack.mix` — which `Playback.meterReading()`
+answers and the harness's meter mode now calls — adds a track only while one
+of those spans holds the tick: a sink keeps its last buffer across an empty
+stretch of its track (#65). `CompositionBuilder.build` makes an
+`AVVideoComposition.Configuration`, keeps it on
+`BuiltComposition.videoConfiguration` and builds the composition from it;
+Preview Quality (`Playback.previewComposition`, now static) and the export's
+frame-rate override (`ExportWriter.videoComposition(_:settings:)`) change one
+field of a copy and build again, and hand out the builder's own object when
+nothing changes (#91). `make typecheck` falls from 7 warnings to 4.
+
+- **`playback_audio_proof.py [--mutant NAME]`** — no instance. The probe is
+  built over `app/Sources` minus `main.swift` with `Blank.mp4` beside it.
+  N1–N4 (#64): a 6 s audio media at a missing path, peaks 1.0 over its first
+  3 s, a whole-file clip reversed, nested, its nest clip's track locked; N1
+  the pivot from the PARENT plan is the media's duration; N2 level-mode
+  spans with the nest closed equal those with it open, inside [0, 3 s]; N3
+  (control) the forward twin, pivot nil, [3 s, 6 s]; N4 (control) the twins'
+  plan JSON is byte-identical. M1–M5 (#65): `AVAudioFile` writes an AAC
+  (48 kHz stereo), a 16-bit WAV (44.1 kHz mono) and a 7 s AAC, each declared
+  1 s short; F1 is aac, WAV, missing on one track, F2 aac and the long one on
+  two; sinks written with `store`. M1 F1 at 4 s is the WAV alone; M2 F2 at
+  4 s the long track alone; M3 (control) F2 at 1 s both; M4 F1 at 7 s
+  silent; M5 F1's two meters sound over [0, 2 s) and [3 s, 5 s). A mutant
+  exits 1 only when exactly its rows fail.
+- **`video_configuration_proof.py <port> capture|compare <dir>`**,
+  `--mutant keep-frame-duration compare <dir>` — the caller owns the instance.
+  `target_bump_proof.py`'s `document()` as `<dir>/frames.reelcut`; over MCP
+  `render_frame` at its three ticks and `export` of `apng`, `gif`,
+  `prores_422` at 30 fps; through the probe `prores_422` at 25 fps (the
+  frame-rate override). Movies compare after zeroing `creation_time` and
+  `modification_time` in every `mvhd`, `tkhd` and `mdhd` (at least 3 boxes
+  each). `capture` scores C1/C2 (each export written twice is equal to
+  itself); `compare` scores V1–V7 against the capture.
+
+Run on 2026-09-29. The control is HEAD d289364 before any `app/Sources` or
+`core/` edit: its `make app`, `capture` on port 4861, and the five existing
+proofs below.
+
+| Command | Answer |
+|---|---|
+| `video_configuration_proof.py 4861 capture work/video_configuration/control` (control tree) | 2/2: C1 ok (ProRes masked 3 boxes each), C2 ok |
+| `phase8_proof.py 4861` (control tree) | 75/76; the one FAIL is section 1's ProRes decode through ffmpeg — host skip |
+| `source_mirror_probe.py` / `phase5_chrome.py` / `phase8_chrome.py` / `media_less_playback_probe.py` (control tree) | 40/40 / 81/81 / 150/150 / 32/32 |
+| `make typecheck` | 0 errors, 4 warnings (3 `CompositionBuilder.swift`, 1 `Exporter.swift`), tsc silent |
+| `make test` / `make lint` / `cargo fmt --check` in `core/` / `make app` | exit 0 / exit 0 / silent, exit 0 / BUILD SUCCEEDED |
+| `playback_audio_proof.py` | 9/9 |
+| `… --mutant nest-lookup` (MediaPeaks.swift's nest fallback deleted) | 7/9, N1 N2 FAIL, exit 1 |
+| `… --mutant always-sounding` (`isSounding` answers `true`) | 6/9, M1 M2 M4 FAIL, exit 1 |
+| `… --mutant plan-track-spans` (every meter given every plan-track segment) | 6/9, M1 M4 M5 FAIL, exit 1 |
+| `video_configuration_proof.py 4861 compare work/video_configuration/control` | 7/7 |
+| `… --mutant keep-frame-duration compare …` (the export variant returns `built.videoComposition`) | V7 FAIL (8266279 bytes vs 6885931), exit 1 |
+| `phase8_proof.py 4861` | 75/76, row for row as the control; the same ffmpeg host skip |
+| `source_mirror_probe.py` / `phase5_chrome.py` / `phase8_chrome.py` / `media_less_playback_probe.py` | 40/40 / 81/81 / 150/150 / 32/32, as the control |
+
+Host skip: ffmpeg does not start on this host (`dyld: Library not loaded:
+/opt/homebrew/opt/x265/lib/libx265.215.dylib`), so `phase8_proof.py`'s
+section 1 ProRes decode fails on both trees; `mixed_audio_probe.py`,
+`preview_validity_probe.py` and `silence2_proof.py` were not run.
+`grep "Reelcut: "` printed nothing on the control launch's log at launch, nor on
+the changed build's log at launch and after `phase8_proof.py`.
+
+```sh
+python3 tools/proof/playback_audio_proof.py                      # 9/9
+python3 tools/proof/video_configuration_proof.py 4861 capture <dir>   # on the control tree
+python3 tools/proof/video_configuration_proof.py 4861 compare <dir>   # 7/7
+```

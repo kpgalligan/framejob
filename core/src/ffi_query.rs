@@ -46,7 +46,7 @@ pub unsafe extern "C" fn rc_project_duration(p: *const Project) -> i64 {
 
 /// The composition plan (spec §7.2): what Swift builds an
 /// `AVMutableComposition`, `AVMutableAudioMix` and
-/// `AVMutableVideoComposition` from. Byte-for-byte deterministic, because
+/// `AVVideoComposition.Configuration` from. Byte-for-byte deterministic, because
 /// Swift rebuilds only when this string differs from the current plan.
 /// NULL only for a NULL project.
 ///

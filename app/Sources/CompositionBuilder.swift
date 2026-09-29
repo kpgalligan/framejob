@@ -7,7 +7,13 @@ import AppKit
 /// against to decide rebuild-versus-refresh (§7.6, §11).
 struct BuiltComposition {
     let composition: AVComposition
+    /// `AVVideoComposition(configuration: videoConfiguration)` — handed out
+    /// as is wherever nothing about it is to change.
     let videoComposition: AVVideoComposition
+    /// What `videoComposition` was built from (#91). A variant — Preview
+    /// Quality's size, an export row's rate — is this value with one field
+    /// changed, never a `mutableCopy()` of the composition.
+    let videoConfiguration: AVVideoComposition.Configuration
     let audioMix: AVAudioMix
     /// The EXACT bytes `rc_project_composition_plan` returned. Compared as a
     /// string, never re-encoded and never decoded first — a re-encode can
@@ -24,9 +30,10 @@ struct BuiltComposition {
     let meters: [LevelMeterTrack]
 }
 
-/// Plan JSON → `AVMutableComposition` + `AVMutableVideoComposition` +
-/// `AVMutableAudioMix` (spec §7.2). Pure translation: every decision was
-/// already made in Rust, and nothing here consults the project.
+/// Plan JSON → `AVMutableComposition` + an `AVVideoComposition` built from an
+/// `AVVideoComposition.Configuration` + `AVMutableAudioMix` (spec §7.2). Pure
+/// translation: every decision was already made in Rust, and nothing here
+/// consults the project.
 ///
 /// Runs on the rebuild queue in `Playback.swift`, never on the main thread —
 /// opening asset tracks touches the disk.
@@ -112,15 +119,9 @@ enum CompositionBuilder {
         let codes = orientationCodes(plan: plan, urls: urls, assets: &assets)
         let missing = missingClips(plan: plan, urls: urls, reverse: reverse)
 
-        let videoComposition = AVMutableVideoComposition()
-        videoComposition.frameDuration = frameDuration(plan.fps)
         let size = plan.renderSizeCG
-        videoComposition.renderSize =
-            size.width >= 1 && size.height >= 1 ? size : CGSize(width: 1920, height: 1080)
-        videoComposition.renderScale = 1
-        videoComposition.customVideoCompositorClass = Compositor.self
         let ranges = instructionRanges(plan, ending: composition.duration)
-        videoComposition.instructions = zip(plan.instructions, ranges).map { instruction, range in
+        let instructions = zip(plan.instructions, ranges).map { instruction, range in
             RecipeInstruction(
                 timeRange: range,
                 // PITFALL, and not a bug: AVFoundation reads an EMPTY
@@ -136,13 +137,20 @@ enum CompositionBuilder {
                     plan: plan, instruction: instruction, codes: codes),
                 missingClips: missing)
         }
+        let videoConfiguration = AVVideoComposition.Configuration(
+            customVideoCompositorClass: Compositor.self, frameDuration: frameDuration(plan.fps),
+            instructions: instructions, renderScale: 1,
+            renderSize: size.width >= 1 && size.height >= 1
+                ? size : CGSize(width: 1920, height: 1080))
 
         let audioMix = AVMutableAudioMix()
         audioMix.inputParameters = inputParameters
 
         return BuiltComposition(
-            composition: composition, videoComposition: videoComposition, audioMix: audioMix,
-            planJSON: planJSON, meters: meters)
+            composition: composition,
+            videoComposition: AVVideoComposition(configuration: videoConfiguration),
+            videoConfiguration: videoConfiguration, audioMix: audioMix, planJSON: planJSON,
+            meters: meters)
     }
 
     // MARK: - The media-less timeline

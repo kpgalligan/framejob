@@ -401,7 +401,7 @@ struct Instruction {
 impl Project {
     /// The composition plan (spec §7.2): everything structural Swift needs
     /// to build an `AVMutableComposition`, an `AVMutableAudioMix` and an
-    /// `AVMutableVideoComposition`, and nothing that changes when a
+    /// `AVVideoComposition.Configuration`, and nothing that changes when a
     /// property does.
     ///
     /// Deterministic to the byte for a given project — Swift compares this

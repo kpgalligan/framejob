@@ -258,12 +258,22 @@ final class LevelMeterSink: @unchecked Sendable {
     }
 }
 
-/// One metered composition audio track: the sink its tap writes into, and the
-/// envelope that turns what the tap saw into what the mix hears.
+/// One metered composition audio track: the sink its tap writes into, the
+/// envelope that turns what the tap saw into what the mix hears, and the spans
+/// over which the track plays anything at all.
 ///
-/// The ramps are copied out of the plan when the composition is built, beside
-/// the sink, because that is the one moment both are known — `Playback`'s
-/// timer must not go looking for a plan track by id thirty times a second.
+/// The ramps and the spans are copied out of the plan when the composition is
+/// built, beside the sink, because that is the one moment all three are known
+/// — `Playback`'s timer must not go looking for a plan track by id thirty
+/// times a second.
+///
+/// **A sink has no age** (#65). It holds the LAST buffer its tap measured, and
+/// nothing replaces that buffer over an empty stretch of the composition track
+/// — past a short clip's end, or while the other format family of a
+/// mixed-format plan track plays — so a reading taken from the sinks alone
+/// kept a finished clip's level lit. `sounding` is what says the buffer is
+/// current: `mix` counts a track only while one of its OWN spans holds the
+/// tick.
 struct LevelMeterTrack {
     let id: Int
     /// The plan's envelope over this track's whole extent — volume, the fades,
@@ -271,7 +281,29 @@ struct LevelMeterTrack {
     /// track the plan gave no ramps, which means unity (`audio.rs`'s meaning
     /// of an unmodified track).
     let ramps: [PlanRamp]?
+    /// [start, start + duration) of every segment this composition track plays
+    /// media over — its format family's segments whose source resolved,
+    /// exactly what `CompositionBuilder.fill` inserts media for.
+    let sounding: [Range<Ticks>]
     let sink: LevelMeterSink
+
+    /// True while one of this track's own sounding spans holds `t`.
+    func isSounding(at t: Ticks) -> Bool {
+        sounding.contains { $0.contains(t) }
+    }
+
+    /// The meter's reading at a project tick: from silence, in array order,
+    /// every track sounding at `t` adds its sink's last buffer scaled by the
+    /// mix envelope over it. `Playback.meterReading()` answers this, and the
+    /// offscreen harness calls it rather than a copy.
+    static func mix(_ meters: [LevelMeterTrack], at t: Ticks) -> LevelMeterReading {
+        var total = LevelMeterReading.silent
+        for track in meters where track.isSounding(at: t) {
+            let gain = Float(LevelMeterEnvelope.value(track.ramps, at: t))
+            total = total.adding(track.sink.read().scaled(by: gain))
+        }
+        return total
+    }
 }
 
 /// The mix envelope a metered track is under, at a project tick — the multiply

@@ -202,7 +202,7 @@ char *rc_op_schemas(void);
 int64_t rc_project_duration(const RcProject *p);
 
 /* The composition plan (spec 7.2): what Swift builds an AVMutableComposition,
- * AVMutableAudioMix and AVMutableVideoComposition from. Swift asks for this
+ * AVMutableAudioMix and AVVideoComposition.Configuration from. Swift asks for this
  * after every edit and rebuilds ONLY when the JSON differs from the current
  * plan — the plan holds exactly the structural facts. */
 char *rc_project_composition_plan(const RcProject *p);

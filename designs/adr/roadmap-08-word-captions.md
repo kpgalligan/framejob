@@ -341,8 +341,6 @@ is the one style that pages to two lines by design.
   on 2026-09-28 (spec §11 W-11; #45 closed).
 - Spec §7.7's format list still says "measured on macOS 15" and
   was not re-measured at 26. Tracked in #46.
-- `AVVideoComposition.Configuration` not adopted (the 3 deprecation warnings
-  since the bump). Tracked in #91.
 - Stale text and small nits:
   - the "three computed keys" docs in `recipe_text.rs` (closed 2026-09-26:
     accurate, three reveal keys then two word keys)

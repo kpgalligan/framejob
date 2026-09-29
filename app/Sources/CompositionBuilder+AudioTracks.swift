@@ -23,6 +23,10 @@ extension CompositionBuilder {
         let id: Int
         var signature: AudioFormatSignature?
         var segments: [PlanSegment]
+        /// Spans of the segments (duration > 0) whose source resolved —
+        /// exactly what `fill` inserts media for, and the only ticks at which
+        /// the meter counts this track (`LevelMeterTrack`, #65).
+        var sounding: [Range<Ticks>] = []
     }
 
     /// The first audio format description on `track`, read by KEY for
@@ -92,28 +96,36 @@ extension CompositionBuilder {
         var families: [AudioFamily] = []
         for segment in planTrack.segments {
             // A zero-length segment is one `fill` skips, so it names no family.
-            let key = segment.duration > 0
+            // The source first, then its signature: a resolved source is what
+            // `fill` inserts media for, and so what the meter counts (#65).
+            let source = segment.duration > 0
                 ? resolveSource(
                     for: segment, mediaType: .audio, urls: urls, reverse: reverse,
-                    assets: &assets, reversedAssets: &reversedAssets
-                ).flatMap(audioFormatSignature(of:))
+                    assets: &assets, reversedAssets: &reversedAssets)
                 : nil
-            guard let key = key else {
+            let span = segment.start..<(segment.start + max(0, segment.duration))
+            guard let key = source.flatMap(audioFormatSignature(of:)) else {
                 if families.isEmpty {
                     families.append(AudioFamily(id: planTrack.id, signature: nil, segments: []))
                 }
                 families[0].segments.append(segment)
+                if source != nil { families[0].sounding.append(span) }
                 continue
             }
             if let index = families.firstIndex(where: { $0.signature == key }) {
                 families[index].segments.append(segment)
+                families[index].sounding.append(span)
             } else if let first = families.first, first.signature == nil {
                 families[0].signature = key
                 families[0].segments.append(segment)
+                families[0].sounding.append(span)
             } else if families.isEmpty {
-                families.append(AudioFamily(id: planTrack.id, signature: key, segments: [segment]))
+                families.append(
+                    AudioFamily(
+                        id: planTrack.id, signature: key, segments: [segment], sounding: [span]))
             } else {
-                families.append(AudioFamily(id: nextID, signature: key, segments: [segment]))
+                families.append(
+                    AudioFamily(id: nextID, signature: key, segments: [segment], sounding: [span]))
                 nextID += 1
             }
         }
@@ -125,8 +137,10 @@ extension CompositionBuilder {
 
     /// Every plan audio track as composition audio tracks, with one
     /// input-parameter block per composition track and, on a metering build,
-    /// one meter per composition track. A family's members never sound at the
-    /// same instant, so `Playback.meterReading`'s sum over meters is right.
+    /// one meter per composition track, carrying its family's sounding spans
+    /// so `LevelMeterTrack.mix` counts it only while one of them holds the
+    /// playhead (#65). A family's members never sound at the same instant, so
+    /// the sum over the meters that sound is right.
     static func addAudioTracks(
         to composition: AVMutableComposition, plan: CompositionPlan, urls: [UInt32: URL],
         reverse: ReverseResolution, dsp: AudioDSPParameters, metering: Bool,
@@ -147,7 +161,9 @@ extension CompositionBuilder {
                 let sink = metering ? LevelMeterSink() : nil
                 if let sink = sink {
                     meters.append(
-                        LevelMeterTrack(id: family.id, ramps: planTrack.ramps, sink: sink))
+                        LevelMeterTrack(
+                            id: family.id, ramps: planTrack.ramps, sounding: family.sounding,
+                            sink: sink))
                 }
                 inputParameters.append(
                     audioParameters(

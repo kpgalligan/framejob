@@ -5,8 +5,15 @@ import Foundation
 /// at the 600-line cap; the stored state (`built`, `meterTimer`) stays there
 /// because an extension cannot add stored properties.
 extension Playback {
-    /// The transport's levels, right now: every metered track's last buffer,
-    /// each multiplied by the mix envelope over it, summed.
+    /// The transport's levels, right now: every metered track SOUNDING at the
+    /// playhead, its last buffer multiplied by the mix envelope over it,
+    /// summed — `LevelMeterTrack.mix`, where the fold lives so the offscreen
+    /// harness calls it rather than a copy of it.
+    ///
+    /// **Only a track sounding at the playhead counts** (#65): a sink keeps
+    /// its last buffer across an empty stretch of its composition track, and
+    /// without that test a finished clip's level stayed lit —
+    /// `LevelMeterTrack`'s doc says why.
     ///
     /// **The envelope is the multiply that makes the number post-fader.** The
     /// taps are `PreEffects`, so what they measured is the track before
@@ -22,13 +29,7 @@ extension Playback {
     /// this meter's own resolution and far under the eye's.
     func meterReading() -> LevelMeterReading {
         guard let meters = built?.meters, !meters.isEmpty else { return .silent }
-        let t = currentTime
-        var total = LevelMeterReading.silent
-        for track in meters {
-            let gain = Float(LevelMeterEnvelope.value(track.ramps, at: t))
-            total = total.adding(track.sink.read().scaled(by: gain))
-        }
-        return total
+        return LevelMeterTrack.mix(meters, at: currentTime)
     }
 
     /// Armed by the rate KVO when the transport starts moving. A run-loop

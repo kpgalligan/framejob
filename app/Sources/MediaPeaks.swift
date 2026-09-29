@@ -151,12 +151,14 @@ enum MediaPeaks {
     ///
     /// `reversed` is deliberately NOT in the plan (a reversed clip and a
     /// forward one must produce byte-identical plan JSON, or the
-    /// rebuild-vs-refresh test breaks), so it is read back off the clip — which
-    /// answers nil for a clip inside a nest, because `Project::clip` searches
-    /// the top level only. `ReverseMirror.pivot` records what that costs and
-    /// the escape road map 2's phase 9 gave it.
+    /// rebuild-vs-refresh test breaks), so it is read back off the clip. The
+    /// clip is looked up at the top level first and then among every nest's
+    /// clips (#64): clip ids are one space and `nests` is flat, so a clip
+    /// inside a CLOSED nest, at any depth, is found and mirrored too.
     static func reversedPivot(for segment: PlanSegment, in snapshot: ProjectSnapshot) -> Ticks? {
-        snapshot.clip(segment.clip).flatMap { ReverseMirror.pivot(for: $0, in: snapshot) }
+        let clip = snapshot.clip(segment.clip)
+            ?? snapshot.nests.lazy.compactMap { $0.clips.first { $0.id == segment.clip } }.first
+        return clip.flatMap { ReverseMirror.pivot(for: $0, in: snapshot) }
     }
 
     /// Source time under a project tick, at the rate the plan resolved:

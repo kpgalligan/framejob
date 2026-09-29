@@ -26,15 +26,17 @@ import AppKit
 /// · **The audio path**, which has no render size at all.
 ///
 /// **It is the player's alone, by construction rather than by testing.** There
-/// is exactly one constructor of `AVMutableVideoComposition` in the app
-/// (`CompositionBuilder.build`), and it is shared by the preview, both export
-/// passes and the offline one-frame render. Rather than give that function an
-/// argument every caller would have to pass correctly, `Playback` takes the
-/// composition it was handed, `mutableCopy()`s it and overrides `renderSize` on
-/// the COPY — `ExportWriter.videoComposition(_:settings:)`'s shape exactly,
-/// which does the same to `frameDuration` for the export sheet's frame-rate
-/// popup. The export and `render_frame` paths are therefore not merely
-/// unchanged but UNREACHABLE from this setting: they never see the copy.
+/// is exactly one builder of the video composition in the app
+/// (`CompositionBuilder.build`, from an `AVVideoComposition.Configuration` it
+/// keeps on `BuiltComposition.videoConfiguration`), and it is shared by the
+/// preview, both export passes and the offline one-frame render. Rather than
+/// give that function an argument every caller would have to pass correctly,
+/// `Playback.previewComposition` copies the configuration it was handed,
+/// overrides `renderSize` on the COPY and builds from that —
+/// `ExportWriter.videoComposition(_:settings:)`'s shape exactly, which does
+/// the same to `frameDuration` for the export sheet's frame-rate popup. The
+/// export and `render_frame` paths are therefore not merely unchanged but
+/// UNREACHABLE from this setting: they never see the copy.
 ///
 /// **No MCP mirror is owed and none may be added.** The parity rule (spec §7.9)
 /// is that every user-visible EDIT gets a tool; this edits nothing, and there

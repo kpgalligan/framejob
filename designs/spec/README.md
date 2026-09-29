@@ -19,7 +19,7 @@ this index gets its row in the same change.
 | [`04.1-toolbar.md`](04.1-toolbar.md) | 26 | The toolbar. |
 | [`04.2-preview-canvas.md`](04.2-preview-canvas.md) | 65 | The preview canvas: selection, handles, crop and region modes, on-canvas text, snapping. |
 | [`04.3-inspector.md`](04.3-inspector.md) | 495 | The inspector: the Clip tab's sub-tabs, row marks, Reset/Clear; every video, audio, text and shape section; the Media, Document and Assistant tabs. |
-| [`04.4-timeline.md`](04.4-timeline.md) | 192 | The timeline: its bar, the level meter, ruler, tracks, clip bodies, gestures, entering a nest. |
+| [`04.4-timeline.md`](04.4-timeline.md) | 193 | The timeline: its bar, the level meter, ruler, tracks, clip bodies, gestures, entering a nest. |
 | **§5 — Editing model** | | |
 | [`05.1-time.md`](05.1-time.md) | 23 | Ticks (600 000 per second), frame rates, snapping to the grid. |
 | [`05.2-project-schema.md`](05.2-project-schema.md) | 355 | The project JSON schema: every persisted field (format version 10). |

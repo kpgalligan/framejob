@@ -243,9 +243,10 @@ those rules, so they are condensed first below.
 
 ### Phase 8: viewing and finding (no new tool)
 
-- **Preview Quality scales only the PLAYER's composition.** `Playback` calls `mutableCopy()`,
-  so the export path cannot be reached from the setting at all. The size keeps the canvas's
-  EXACT aspect, because the overlay maps through `videoRect`.
+- **Preview Quality scales only the PLAYER's composition.** `Playback` varies a copy of the
+  builder's configuration (a `mutableCopy()` until #91), so the export path cannot be reached
+  from the setting at all. The size keeps the canvas's EXACT aspect, because the overlay maps
+  through `videoRect`.
 - **The preview window is an `NSPanel` retained by the editor controller.** A titled window left
   the editor's selectors dead, and `addWindowController` suppressed the save sheet (a data-loss
   shape). Two `AVPlayerLayer`s on one player both display; `displayedPixelBuffer` is the only
@@ -325,8 +326,7 @@ All of these were verified as still true on 2026-09-26.
     than their surroundings. A blurred region combines in quadrature.
   - Stored obscure regions are not drawn on the canvas outside the region mode. `canvasQuad`
     (`CanvasSessions.swift:293`) is written and has no caller.
-  - Remove Silences cannot cut inside a nest (a nest is a wall). A reversed clip inside a nest is
-    analysed unmirrored.
+  - Remove Silences cannot cut inside a nest (a nest is a wall).
   - A text-animation tent with a tiny but non-zero `in` reports `"in"` for its whole life. An
     action can interpolate an animation's `in`/`out`, which slides its timebase.
   - An inspector blend popup shows the model's value while a transition overlap draws `normal`.
@@ -369,7 +369,6 @@ All of these were verified as still true on 2026-09-26.
 - **Tracked in GitHub issues (defects and candidates):**
   - a float export write path, so a hot mix is not clipped by the Int16 decode (#86);
   - 24-bit WAV/AIFF through an `audio_bits` override (#86);
-  - the meter sink holding its last buffer across empty timeline spans (from #34's record; #65);
   - stored obscure regions drawn and draggable on the canvas (`canvasQuad` is the seed; #85);
   - `selectedMedia` pointing at a filtered-out row (#68);
   - the forty-document deadlock (#40);

@@ -60,8 +60,8 @@ the same way.
 
 **PB-3 — Preview Quality is actually faster**
 - **Do:** 1. With the timing log on, play the same span at Full, then at Quarter. 2. Repeat with a drop shadow on the clip.
-- **Expect:** Quarter's average is clearly lower than Full's. With a shadow, the gap is smaller (shadow passes run at canvas size; known).
-- **Source:** #47.
+- **Expect:** Quarter's average is clearly lower than Full's. With a shadow, the gap is smaller (shadow passes run at canvas size; known). At Half and Quarter the picture is Full's, softer: the same framing, nothing shifted or cropped.
+- **Source:** #47, #91.
 
 **PB-4 — The two previews agree, and the preview window remembers where it was**
 - **Do:** 1. Press ⇧⌘P on the real keyboard (View ▸ Preview Window). 2. Play, pause, scrub; compare it with the main preview side by side. 3. Drag the preview window to a second display, quit, relaunch, reopen it.
@@ -215,9 +215,9 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Source:** #51.
 
 **SE-3 — Loudness and mixed formats**
-- **Do:** 1. Export at −14 LUFS; play it beside commercial streaming material at the same volume. 2. Put an AAC clip and a WAV clip (different sample rates) on one track; play across the join on the built-in speakers.
-- **Expect:** the export sits level with the commercial material; the mixed-format track plays clean, at the right pitch, with no gap. (The scripted half is HS-3.)
-- **Source:** #51 (#34).
+- **Do:** 1. Export at −14 LUFS; play it beside commercial streaming material at the same volume. 2. Put an AAC clip and a WAV clip (different sample rates) on one track; play across the join on the built-in speakers. 3. Watch the meter across the join, and past the end of a short clip playing under a longer one.
+- **Expect:** the export sits level with the commercial material; the mixed-format track plays clean, at the right pitch, with no gap. (The scripted half is HS-3.) The meter follows what plays: none of the AAC's level stays lit once the WAV plays, and a finished track adds nothing.
+- **Source:** #51 (#34, #65).
 
 **SE-4 — Blends, gradients and the blurred background**
 - **Do:** 1. Try each blend mode on real footage. 2. Add a gradient shape across the canvas. 3. Clip ▸ Add Blurred Background on a portrait clip in a landscape canvas, at the Fill default.

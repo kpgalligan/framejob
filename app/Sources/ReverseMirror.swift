@@ -47,13 +47,11 @@ enum ReverseMirror {
     /// The pivot a clip's source times are mirrored about — the media's model
     /// duration — or nil when the clip plays forwards or its media is unknown.
     ///
-    /// This function finds the pivot for ANY clip it is handed. What cannot
-    /// reach it is a clip inside a CLOSED nest: `Project::clip` searches the
-    /// top level only, so a caller that looked the clip up there has nothing
-    /// to hand here. Such a clip is measured unmirrored while the nest
-    /// is closed — a recorded limit with an escape since road map 2's phase 9:
-    /// OPEN the nest (⌘↓) and the scoped view puts that clip at the top level,
-    /// where the pivot is found.
+    /// This function finds the pivot for ANY clip it is handed, and a clip
+    /// inside a CLOSED nest reaches it too (#64): `MediaPeaks.reversedPivot`
+    /// looks a segment's clip up among every nest's clips when the top level
+    /// does not hold it, so silence detection and Normalize measure such a
+    /// clip mirrored without the nest being opened.
     ///
     /// No check of the source KIND beyond `isReversed`, which only a `media`
     /// source can be true for.

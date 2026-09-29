@@ -309,8 +309,6 @@ reversed in a commit message); run EVERY proof script when the FFI changes; meas
 - **The reversed mirror is one tick high** (`T − p`, not `T − 1 − p`): one blank waveform column at
   a whole-file reversed clip's head. Declined: `silence2_proof.py` walks these numbers tick-exact in
   Python on purpose (orig §10.9).
-- **The mirror pivot is nil for a clip in a CLOSED nest** (`Project::clip` searches the top level);
-  opening the nest is the escape (orig §10.9; spec §7's `ReverseMirror.swift` row).
 - **×2 then ×1 at a file's tail is not an identity** — D4-3's stated cost (orig §10.8).
 - **The Speed sheet readout shows a length, not the cross dissolve a neighbour gains** (orig §10.9,
   §12.10).

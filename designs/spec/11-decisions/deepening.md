@@ -199,8 +199,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   aligned window end and leaves one blank waveform column at the head of a
   whole-file reversed clip, and it is not fixed here because
   `tools/proof/silence2_proof.py`'s claim 9 walks the current numbers
-  tick-exact; and the pivot is nil for a clip inside a CLOSED nest, where
-  `Project::clip` cannot see it, which OPENING the nest resolves.
+  tick-exact; and the pivot was nil for a clip inside a CLOSED nest until
+  #64, which looks a segment's clip up through `nests` as well.
   **The timeline now draws a reversed clip MIRRORED.** It did not before:
   `TimelineView.sourceTime` took no `media` and applied no mirror, so a
   reversed clip's filmstrip and waveform indexed the FORWARD cache

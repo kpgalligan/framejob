@@ -120,8 +120,6 @@ Core: `core/src/model_query.rs`, `model_props.rs`, `model_regions.rs`, `model_te
 
 ## Known limits
 Still true of the code (verified 2026-09-26):
-- A nested reversed clip is analysed UNMIRRORED by silence/normalize — `MediaPeaks.reversedPivot`
-  reads `Project::clip`, top level only; entering the nest is the workaround.
 - Stored obscure regions have no canvas handles; the band commits a rect only (ellipse via the
   popup). Overlapping regions: the greater hiding wins, no blend. A pixelated region on a blurred
   layer shows unblurred blocks; a region on a slated layer does nothing.
@@ -151,7 +149,7 @@ the Remove Silences sheet's stale spans after an MCP relink (road map 4).
 - `relink_media` re-probing (#63) and the panel/MCP caption-name spelling (`chart.png.srt` vs
   `chart.srt`, #43).
 - `AgentServer+Clips.swift` over the cap (856) — its seam is in `designs/adr/app-file-history.md` "Named next cuts".
-- Nested reversed clips unmirrored in analysis (#64); obscure-region canvas handles (#85);
+- Obscure-region canvas handles (#85);
   `selectedMedia` pointing at a hidden row (#68); rename Escape / undo-merge (#69); the
   ~40-document deadlock (#40); 24-bit WAV/AIFF (#86).
 

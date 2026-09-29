@@ -205,13 +205,14 @@
 // Each reading is reported as linear magnitude AND in dBFS, the model's own
 // accessors, because the phase's tolerance is stated in dB.
 //
-// The fold from per-track readings to the total is `Playback.meterReading()`'s
-// own three lines, and they are QUOTED here rather than called for the one
-// reason `meterReading` cannot be called at all: it reads `built`, the
-// AVFoundation composition, which needs a player. Everything they are made of
-// — `LevelMeterEnvelope.value`, `.scaled(by:)`, `.adding(_:)` — is the model's
-// and is what is under test; if that loop ever grows a rule, this copy has to
-// grow it too, and `phase5_chrome.py` says so where it reports the number.
+// The fold from per-track readings to the total is CALLED, not quoted:
+// `LevelMeterTrack.mix`, which is what `Playback.meterReading()` answers
+// (`meterReading` itself cannot be called here — it reads `built`, the
+// AVFoundation composition, which needs a player). Since #65 the fold counts a
+// track only while one of its sounding spans holds `at`; a request's track
+// may give `sounding` as `[[start, end], …]` (ticks, half-open), and one that
+// does not sounds everywhere, so `phase5_chrome.py`'s requests keep their
+// numbers. Each row reports `sounding`, and its `gain`/`raw`/`scaled` beside.
 //
 // **The mode compiles out under `-D HARNESS_REFERENCE_BUILD`**, and that flag
 // exists for one caller: `phase5_chrome.py` builds a SECOND harness out of an
@@ -596,10 +597,10 @@ enum Harness {
     /// Like the cue mode, everything here is a translation: a planar float
     /// file into the pointers `AudioTap` hands the sink, and the readings back
     /// into JSON. The one thing that is not a translation is the fold, and it
-    /// is `Playback.meterReading()`'s, quoted (the header says why it cannot
-    /// be called): each track's last buffer, multiplied by the mix envelope
-    /// over it at `at`, summed — which is what makes the number POST-fader
-    /// even though every tap is PreEffects.
+    /// is `LevelMeterTrack.mix`, called (the header says so): each sounding
+    /// track's last buffer, multiplied by the mix envelope over it at `at`,
+    /// summed — which is what makes the number POST-fader even though every
+    /// tap is PreEffects.
     static func meter(from input: URL, to output: URL) throws {
         struct Request: Decodable {
             /// Four magnitudes written STRAIGHT into the sink, instead of a
@@ -643,6 +644,9 @@ enum Harness {
                 let ramps: [PlanRamp]?
                 /// Set instead of `samples` to write the sink directly.
                 let store: Store?
+                /// `[[start, end], …]` in ticks, half-open: the spans the
+                /// track sounds over. Absent means everywhere.
+                let sounding: [[Ticks]]?
             }
             let at: Ticks?
             /// After the total is published, publish silence from the SAME
@@ -677,7 +681,7 @@ enum Harness {
         }
 
         var rows: [[String: Any]] = []
-        var total = LevelMeterReading.silent
+        var meters: [LevelMeterTrack] = []
         for (index, track) in request.tracks.enumerated() {
             let sink = LevelMeterSink()
             if let stored = track.store {
@@ -724,19 +728,25 @@ enum Harness {
                     }
                 }
             }
-            let metered = LevelMeterTrack(id: track.id ?? index, ramps: track.ramps, sink: sink)
+            let sounding = track.sounding.map { spans in
+                spans.compactMap { $0.count == 2 && $0[0] <= $0[1] ? $0[0]..<$0[1] : nil }
+            } ?? [Ticks.min..<Ticks.max]
+            let metered = LevelMeterTrack(
+                id: track.id ?? index, ramps: track.ramps, sounding: sounding, sink: sink)
+            meters.append(metered)
 
-            // Playback.meterReading()'s own three lines.
+            // What each track brings, reported beside the fold below.
             let gain = Float(LevelMeterEnvelope.value(metered.ramps, at: at))
             let raw = metered.sink.read()
             let scaled = raw.scaled(by: gain)
-            total = total.adding(scaled)
 
             rows.append([
-                "id": metered.id, "gain": Double(gain),
+                "id": metered.id, "gain": Double(gain), "sounding": metered.isSounding(at: at),
                 "raw": describe(raw), "scaled": describe(scaled),
             ])
         }
+        // `Playback.meterReading()`'s fold, called.
+        let total = LevelMeterTrack.mix(meters, at: at)
 
         // The publish, and the read BACK — `published` is the model's own
         // state, not the local total, so a model that dropped a publish on the

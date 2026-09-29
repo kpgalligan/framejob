@@ -217,7 +217,7 @@ final class ExportWriter {
                 kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA),
                 kCVPixelBufferMetalCompatibilityKey as String: true,
             ])
-        output.videoComposition = Self.videoComposition(built.videoComposition, settings: settings)
+        output.videoComposition = Self.videoComposition(built, settings: settings)
         guard reader.canAdd(output) else {
             throw Exporter.ExportError.failed(
                 "The composition could not be read for export.")
@@ -647,21 +647,20 @@ final class ExportWriter {
     /// `CompositionBuilder` ticks the composition at the PROJECT's rate, and
     /// the sheet's Frame-rate popup overrides `settings.fps` — which the
     /// session path could not honour at all (a preset name carries no rate),
-    /// so the readout promised 25 fps and the file held 30. A copy with the
-    /// asked-for `frameDuration` samples the same timeline at the asked-for
-    /// instants; the recipes are evaluated per frame at whatever tick is
-    /// requested, so nothing else has to know.
+    /// so the readout promised 25 fps and the file held 30. The builder's
+    /// configuration with the asked-for `frameDuration` samples the same
+    /// timeline at the asked-for instants (#91); the recipes are evaluated per
+    /// frame at whatever tick is requested, so nothing else has to know.
     private static func videoComposition(
-        _ videoComposition: AVVideoComposition, settings: ExportSettings
+        _ built: BuiltComposition, settings: ExportSettings
     ) -> AVVideoComposition {
         let fps = settings.fps
-        guard fps.num > 0, fps.den > 0 else { return videoComposition }
-        let wanted = CompositionBuilder.frameDuration(fps)
-        guard wanted != videoComposition.frameDuration,
-            let copy = videoComposition.mutableCopy() as? AVMutableVideoComposition
-        else { return videoComposition }
-        copy.frameDuration = wanted
-        return copy
+        var configuration = built.videoConfiguration
+        guard fps.num > 0, fps.den > 0 else { return built.videoComposition }
+        configuration.frameDuration = CompositionBuilder.frameDuration(fps)
+        guard configuration.frameDuration != built.videoConfiguration.frameDuration
+        else { return built.videoComposition }
+        return AVVideoComposition(configuration: configuration)
     }
 
     /// Refuses an alpha-carrying export whose size would have to be PADDED

@@ -12,7 +12,7 @@ that view, and section 7 photographs it.
 **Section 9 is the exception, and it is the phase's own defect made
 measurable.** The harness cannot photograph a preview, but a PROBE can render
 one: `AVAssetImageGenerator` over a composition built exactly as `Playback`
-builds it, with `renderSize` scaled exactly as `previewComposition` scales it,
+builds it, with `renderSize` scaled by `Playback.previewComposition` itself,
 answers a CGImage at 1920 x 1080, 960 x 540 and 480 x 270 with no window and no
 drawable anywhere. That is how the reduced sizes came to be looked at at all —
 and what it showed was that `[[position]]` is in DESTINATION pixels while three
@@ -1531,7 +1531,7 @@ func runAppKitPremise() {
 // This is the only mode that renders a pixel, and it is the only one whose
 // bundle carries a `default.metallib` — `build_metal_probe` says why the two
 // bundles are separate. Everything below `render` is the app's: the document,
-// `CompositionBuilder.build`, `Playback.previewComposition`'s copy-and-set,
+// `CompositionBuilder.build`, `Playback.previewComposition` (called),
 // `Compositor`, `MetalRenderer` and the project's own shader. Nothing here
 // fills a uniform by hand, which is the point: a probe that wrote
 // `canvasPerDest*` itself would pass against a build where Swift never wrote
@@ -1607,9 +1607,8 @@ func measureFrame(_ image: CGImage, _ classes: [ColorClass]) -> [String: Any] {
 }
 
 /// One frame of one document at one quality, through the app's own path.
-/// The three lines that scale it are `Playback.previewComposition`'s, copied
-/// rather than called because that method is private to a `Playback` this
-/// probe has no player for — and copied EXACTLY, including the guard that
+/// The scaling is `Playback.previewComposition` itself, CALLED — it is static
+/// since #91, so this probe needs no player for it — guard and all: it
 /// returns the builder's own object when the size does not move.
 func renderPreviewFrame(
     _ document: ProjectDocument, quality: PreviewQuality, at tick: Ticks
@@ -1630,12 +1629,7 @@ func renderPreviewFrame(
         return (nil, .zero, .zero, "the composition would not build: \(error)")
     }
     let base: AVVideoComposition = built.videoComposition
-    var composition = base
-    let wanted = quality.renderSize(for: base.renderSize)
-    if wanted != base.renderSize, let copy = base.mutableCopy() as? AVMutableVideoComposition {
-        copy.renderSize = wanted
-        composition = copy
-    }
+    let composition = Playback.previewComposition(built, quality: quality)
     let generator = AVAssetImageGenerator(asset: built.composition)
     generator.videoComposition = composition
     generator.requestedTimeToleranceBefore = .zero
@@ -3268,7 +3262,7 @@ def main():
                       for r in rows if "error" in r]
     check("all twelve renders came back with a frame — four fixtures through the app's own "
           "path: `ProjectDocument.read`, `CompositionBuilder.build`, "
-          "`Playback.previewComposition`'s copy-and-set, `Compositor`, `MetalRenderer` and "
+          "`Playback.previewComposition` (called), `Compositor`, `MetalRenderer` and "
           "the project's own shader, with no uniform filled by hand anywhere (a probe that "
           "wrote `canvasPerDest*` itself would pass against a build where Swift never "
           "wrote them at all)",
