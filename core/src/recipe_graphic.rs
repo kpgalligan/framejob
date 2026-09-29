@@ -10,9 +10,11 @@
 //! by the `hash` published here.
 //!
 //! The arithmetic lives here, in ONE place, because it has writers and a
-//! reader that must agree on it: `trim_start`, `roll` and `split`'s second
-//! half move `in` through [`graphic_advanced`], `split` pins both halves'
-//! `length` to [`effective_length`], and the recipe reads the same
+//! reader that must agree on it: `trim_start`, `roll`, `split`'s second
+//! half and `add_transition`'s head move `in` through [`graphic_advanced`],
+//! `split` pins both halves' `length` to [`effective_length`], every
+//! re-snap through `frame_grid.rs` puts `in` and `length` on the new grid
+//! through [`graphic_resnapped`] (G-18), and the recipe reads the same
 //! [`effective_length`] for `durationInFrames`. An edit module importing a
 //! read-side one has precedent (`edit_split.rs` reads `actions` and
 //! `source_window`); the two natural homes, `model_graphic.rs` and
@@ -26,7 +28,7 @@
 use serde_json::{Map, Value};
 
 use crate::evaluate::number;
-use crate::model::{Canvas, Clip, GraphicProps};
+use crate::model::{Canvas, Clip, GraphicProps, Project};
 use crate::recipe::{content_hash, missing_source};
 use crate::source_window::in_advanced;
 use crate::time::{frame_index, snap_down_to_frame, snap_up_to_frame, Ticks};
@@ -52,9 +54,10 @@ pub(crate) fn effective_length(clip: &Clip) -> Option<Ticks> {
 ///
 /// Through `source_window.rs`'s one mover at speed 1 (a graphic has no
 /// speed), so `in` never goes below 0: a start dragged earlier than the
-/// graphic's own first frame saturates there (decision G-9·a). Its three
-/// callers are the front-trim writers: `trim_start`, `roll` and `split`'s
-/// second half.
+/// graphic's own first frame saturates there (decision G-9·a). Its four
+/// callers are the front-trim writers: `trim_start`, `roll`, `split`'s
+/// second half, and `add_transition`'s handle form, which moves `in` BACK
+/// by the head it adds (G-18·a).
 pub(crate) fn graphic_advanced(
     graphic: Option<&GraphicProps>,
     timeline: Ticks,
@@ -63,6 +66,25 @@ pub(crate) fn graphic_advanced(
         let mut moved = graphic.clone();
         moved.r#in = in_advanced(graphic.r#in, timeline, 1.0);
         moved
+    })
+}
+
+/// `graphic` on `project`'s frame grid, or `None` when there is no graphic
+/// — what every re-snap through `frame_grid.rs` writes (G-18·b). `in` is
+/// the canvas's frames, not a source position, so it snaps to the nearest
+/// frame, never below 0; a set `length` snaps with `set_graphic`'s
+/// one-frame floor, and a null one stays null.
+pub(crate) fn graphic_resnapped(
+    graphic: Option<&GraphicProps>,
+    project: &Project,
+) -> Option<GraphicProps> {
+    graphic.map(|graphic| {
+        let mut snapped = graphic.clone();
+        snapped.r#in = project.snapped(graphic.r#in).max(0);
+        snapped.length = graphic
+            .length
+            .map(|length| project.snapped(length).max(project.frame()));
+        snapped
     })
 }
 

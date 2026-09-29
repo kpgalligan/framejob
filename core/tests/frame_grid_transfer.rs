@@ -222,15 +222,12 @@ fn scoped_attributes_and_unnest_obey_the_same_parent_grid() {
 }
 
 #[test]
-fn full_paste_and_unnest_keep_the_loaded_empty_motion_spelling() {
+fn full_paste_normalises_the_empty_motion_and_unnest_keeps_the_loaded_spelling() {
     let mut incoming = text_clip(7, 0, 20_000, 60_000);
     incoming["video"]["motion"] = json!({});
     let pasted = Handle::new(640, 360, 24, 1).apply(&json!({"op":"paste","at":0,
         "payload":{"clips":[incoming]}}));
-    assert_eq!(
-        pasted.value()["clips"][0]["video"]["motion"],
-        json!({"in":null,"out":null,"during":null})
-    );
+    assert_eq!(pasted.value()["clips"][0]["video"]["motion"], Value::Null);
     let mut child = text_clip(12, 11, 20_000, 60_000);
     child["video"]["motion"] = json!({});
     let base = Handle::from_value(&project(

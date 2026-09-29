@@ -416,10 +416,22 @@ fn a_graphic_draws_from_a_second_thread_identically() {
 
 #[test]
 fn only_ffi_graphic_names_the_graphic_crate() {
-    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/src");
+    let root = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/src"));
+    // Every `.rs` file under `core/src`, module directories included.
+    let mut files: Vec<std::path::PathBuf> = Vec::new();
+    let mut pending = vec![root.to_path_buf()];
+    while let Some(dir) = pending.pop() {
+        for entry in fs::read_dir(&dir).expect("a source directory") {
+            let path = entry.expect("an entry").path();
+            if path.is_dir() {
+                pending.push(path);
+            } else if path.extension().is_some_and(|e| e == "rs") {
+                files.push(path);
+            }
+        }
+    }
     let mut naming: Vec<String> = Vec::new();
-    for entry in fs::read_dir(dir).expect("core/src") {
-        let path = entry.expect("an entry").path();
+    for path in files {
         let text = fs::read_to_string(&path).expect("a source file");
         let names = text.lines().any(|line| {
             line.trim_start().starts_with("use graphic")
@@ -430,8 +442,10 @@ fn only_ffi_graphic_names_the_graphic_crate() {
                 })
         });
         if names {
-            naming.push(path.file_name().unwrap().to_string_lossy().into_owned());
+            let relative = path.strip_prefix(root).expect("under core/src");
+            naming.push(relative.to_string_lossy().into_owned());
         }
     }
+    naming.sort();
     assert_eq!(naming, vec!["ffi_graphic.rs".to_string()]);
 }

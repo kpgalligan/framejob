@@ -325,47 +325,23 @@ fn paste_attributes_still_copies_a_real_motion() {
 
 // ---- R3·1: what a motion patch answers on a clip already out of range ----
 
-/// `paste` does not range-check its payload (it stores a `scale` of 500 as
-/// readily as a legal one — R2·2, and true of every property, not of motion),
-/// so a clip can be carrying a value `check_video` refuses. A later `set_video`
-/// re-checks the WHOLE group, so a motion patch on such a clip is an `Err`
-/// — the arm that THROWS in Swift, where an identity and a refusal only beep.
+/// The file reader does not range-check what it reads (a `scale` of 500
+/// loads as readily as a legal one — true of every property, not of motion;
+/// `paste` checks its payload since issue #62), so a clip can be carrying a
+/// value `check_video` refuses. A later `set_video` re-checks the WHOLE
+/// group, so a motion patch on such a clip is an `Err` — the arm that
+/// THROWS in Swift, where an identity and a refusal only beep.
 ///
 /// That is what makes `EditorViewController+Motion.swift`'s "a mixed one
 /// lands" only two thirds of the story: a batch with one such clip in it
 /// lands NOTHING and puts up the core's own message.
 #[test]
 fn a_motion_patch_on_a_clip_already_out_of_range_is_an_error() {
-    let handle = with_motion(Value::Null, 6 * SEC);
-    let payload = json!({
-        "clips": [{
-            "id": 11, "track": 2, "start": 0, "duration": 6 * SEC,
-            "source": { "kind": "media", "media": 1, "in": 0 },
-            "video": { "x": 0.0, "scale": 500.0 },
-            "audio": {}
-        }],
-        "media": [{
-            "id": 1, "path": "/fixtures/1.mov", "kind": "video",
-            "duration": 10 * 60 * SEC, "width": SW as u32, "height": SH as u32,
-            "fps": [30, 1], "has_video": true, "has_audio": true
-        }],
-        "fps": [30, 1]
-    });
-    let pasted = handle.apply(&json!({
-        "op": "paste", "payload": payload, "at": 60 * SEC, "track": 2
-    }));
-    let id = pasted.value()["clips"]
-        .as_array()
-        .expect("clips")
-        .iter()
-        .find(|c| c["start"] == json!(60 * SEC))
-        .expect("the pasted clip")["id"]
-        .as_u64()
-        .expect("id");
-    assert_eq!(pasted.value()["clips"][1]["video"]["scale"], json!(500.0));
+    let loaded = Handle::from_value(&project(json!({"x": 0.0, "scale": 500.0}), 6 * SEC));
+    assert_eq!(loaded.value()["clips"][0]["video"]["scale"], json!(500.0));
 
-    let message = pasted.errors(&json!({
-        "op": "set_video", "clips": [id],
+    let message = loaded.errors(&json!({
+        "op": "set_video", "clips": [11],
         "patch": { "motion": { "in": { "kind": "fade", "duration": 300_000 } } }
     }));
     assert!(

@@ -388,10 +388,9 @@ fn a_stop_added_with_nothing_said_is_opaque_black_at_zero() {
 
 #[test]
 fn every_stop_value_is_range_checked_and_the_message_names_it() {
-    // The element key is spelled without an index —
-    // `shape.gradient.stops[].at` — exactly as `video.filters[].amount` and
-    // `video.obscure[].x` are, because the check walks the list and the
-    // caller is being told which FIELD it got wrong.
+    // The element key names its index — `shape.gradient.stops[0].at` —
+    // exactly as `video.filters[0].amount` and `video.obscure[0].x` do, so
+    // the caller is told which STOP and which field it got wrong (#89).
     //
     // `angle` has no case here: it is only required to be finite, which
     // JSON cannot spell, and `clamp_video`'s equivalent for an infinity
@@ -400,25 +399,25 @@ fn every_stop_value_is_range_checked_and_the_message_names_it() {
     let cases: [(Value, &str); 4] = [
         (
             json!({ "gradient": { "stops": [{ "at": -0.1 }, { "at": 1.0 }] } }),
-            "shape.gradient.stops[].at must be between 0 and 1, not -0.1",
+            "shape.gradient.stops[0].at must be between 0 and 1, not -0.1",
         ),
         (
             json!({ "gradient": { "stops": [{ "at": 0.0 }, { "at": 1.5 }] } }),
-            "shape.gradient.stops[].at must be between 0 and 1, not 1.5",
+            "shape.gradient.stops[1].at must be between 0 and 1, not 1.5",
         ),
         (
             json!({ "gradient": { "stops": [
                 { "at": 0.0, "color": [0.0, 0.0, 0.0, 1.0] },
                 { "at": 1.0, "color": [1.0, 1.0, 255.0, 1.0] }
             ] } }),
-            "shape.gradient.stops[].color must be between 0 and 1, not 255",
+            "shape.gradient.stops[1].color must be between 0 and 1, not 255",
         ),
         (
             json!({ "gradient": { "stops": [
                 { "at": 0.0, "color": [0.0, 0.0, 0.0, -1.0] },
                 { "at": 1.0 }
             ] } }),
-            "shape.gradient.stops[].color must be between 0 and 1, not -1",
+            "shape.gradient.stops[0].color must be between 0 and 1, not -1",
         ),
     ];
     for (patch, expected) in cases {

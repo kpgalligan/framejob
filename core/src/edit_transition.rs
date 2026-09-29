@@ -25,6 +25,7 @@ use crate::edit_clip::clip_end;
 use crate::model::{Clip, Curve, Project, Source, Transition, TransitionKind};
 use crate::model_words::rebase_words;
 use crate::outcome::Outcome;
+use crate::recipe_graphic::graphic_advanced;
 use crate::source_window::source_advanced;
 use crate::time::Ticks;
 use crate::transition_search::{largest_passing, reduced_split};
@@ -78,7 +79,8 @@ pub(crate) fn set_gained_transitions(project: &mut Project, tracks: &[u32]) {
 
 /// The pair as [`Project::add_transition`] would leave it: `earlier` grown
 /// by `tail` ticks at its end, `later` moved back `head` ticks and grown by
-/// the same, its `in` following.
+/// the same, its `in` following — a graphic's own `in` too, through
+/// `graphic_advanced` (spec §11 G-18·a).
 ///
 /// One function, so the trial the overlap rule is checked against and the
 /// clips that are finally written cannot be two different arithmetics.
@@ -94,6 +96,7 @@ fn extended(earlier: &Clip, later: &Clip, tail: Ticks, head: Ticks) -> (Clip, Cl
     // BACKWARD, and the reason the handle above is measured in TIMELINE
     // time and never divided by the speed a second time.
     moved.source = source_advanced(&later.source, head.saturating_neg(), later.speed);
+    moved.graphic = graphic_advanced(later.graphic.as_ref(), head.saturating_neg());
     moved.start = later.start.saturating_sub(head);
     moved.duration = later.duration.saturating_add(head);
     (grown, moved)
@@ -161,8 +164,8 @@ impl Project {
     ///    `roll`'s own test (`edit_edge.rs`).
     /// 2. Measure the handles in TIMELINE ticks. B's head is
     ///    `source_head_on_timeline` for a media clip, UNBOUNDED for a
-    ///    still, an image, text and a shape — none of which has a source
-    ///    window — and **0 for a nest**, because trimming a nest clip's
+    ///    still, an image, text, a shape and a graphic — none of which has
+    ///    a source window — and **0 for a nest**, because trimming a nest clip's
     ///    head moves its contents (`nest.rs`) rather than revealing
     ///    anything, so a nest gives nothing on that side. A's tail is
     ///    `source_length_on_timeline − duration` for a media clip (an
@@ -194,7 +197,8 @@ impl Project {
     /// 7. Nothing left to give — below one frame — is a refusal.
     /// 8. Write: A grows at the end, B grows at the front and its `in`
     ///    moves back by the same timeline time TIMES its speed, the
-    ///    arithmetic `trim_start` and `roll` both use.
+    ///    arithmetic `trim_start` and `roll` both use. A graphic's own `in`
+    ///    moves back by the timeline time, saturating at 0 (G-18·a).
     /// 9. Rebase B's ACTIONS by the same amount, so an action stays on the
     ///    source frame it was drawn over — a screencast zoom stays on its
     ///    click. `trim_start` deliberately does not do this, and the

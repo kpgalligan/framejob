@@ -423,7 +423,7 @@ def shape_door(mcp):
             patch={"gradient": {"stops": [{"at": 0.0, "color": [0, 0, 0]},
                                           {"at": 1.0, "color": [1, 1, 1]}]}})
     refused(s, "set_shape", "a stop colour component outside 0–1",
-            "shape.gradient.stops[].color must be between 0 and 1, not 2",
+            "shape.gradient.stops[0].color must be between 0 and 1, not 2",
             clips=[clip],
             patch={"gradient": {"stops": [{"at": 0.0, "color": [2, 0, 0, 1]},
                                           {"at": 1.0, "color": [1, 1, 1, 1]}]}})

@@ -42,7 +42,7 @@ use serde_json::Value;
 use crate::export::describe;
 use crate::model::{BlendMode, Clip, Project, Source, TextProps, VideoProps};
 use crate::outcome::Outcome;
-use crate::patch::{merge_group, Group};
+use crate::patch::{merge_group, Group, GROUPS};
 use crate::props_check::{check_audio, check_shape, check_text, check_video};
 
 /// The one check a video group cannot make on its own: a NEST clip may not
@@ -224,19 +224,19 @@ impl Project {
         animation.out = self.snapped(animation.out);
     }
 
-    /// What `paste_attributes` runs on each copied group: canonicalize an
-    /// empty motion, check the original values, then snap present video or
-    /// text timing to the destination grid.
+    /// What `paste_attributes` runs on each copied group, and `paste` on
+    /// every group of every clip it lands ([`Self::normalise_and_check_pasted`]):
+    /// canonicalize an empty motion, check the original values, then snap
+    /// present video or text timing to the destination grid.
     ///
     /// "One clip has one spelling of no motion" (road map 5 §5a) is kept by
-    /// the patch path and by the split rule, and THIS op's payload is a third
-    /// door: `{"motion": {}}`, or three explicit nulls, deserialises to a
-    /// `Motion` with three `None`s and would be stored as `{"in": null, "out":
-    /// null, "during": null}` where those two store `null`. That closes this
-    /// door and NOT the invariant: `paste`'s payload clips are stored whole,
-    /// neither normalised nor range-checked (road map 5 §12, R2·2), and the
-    /// FILE reader keeps the long spelling on purpose until a patch touches it
-    /// (`core/tests/schema_v8.rs`'s
+    /// the patch path and by the split rule, and a clipboard payload is a
+    /// third door: `{"motion": {}}`, or three explicit nulls, deserialises to
+    /// a `Motion` with three `None`s and would be stored as `{"in": null,
+    /// "out": null, "during": null}` where those two store `null`. Both
+    /// clipboard ops close that door here; the invariant stays open only at
+    /// the FILE reader, which keeps the long spelling on purpose until a patch
+    /// touches it (`core/tests/schema_v8.rs`'s
     /// `a_motion_whose_slots_are_all_cleared_normalises_back_to_null`; road
     /// map 7 §2.2). Normalising is not a range check, so it happens here
     /// rather than inside one, beside `check_group` and the snappers whose
@@ -270,13 +270,31 @@ impl Project {
         Ok(())
     }
 
+    /// Every group of one clip `paste` is about to land, through
+    /// [`Self::normalise_and_check_group`] in [`GROUPS`] order, so a payload
+    /// written by hand meets the bounds a patch does (issue #62). A failure
+    /// names the id the PAYLOAD gave the clip, the only one its writer
+    /// knows. The clip's own times are the caller's to re-snap, after this.
+    pub(crate) fn normalise_and_check_pasted(
+        &self,
+        clip: &mut Clip,
+        payload_id: u32,
+    ) -> Result<(), String> {
+        for group in GROUPS {
+            self.normalise_and_check_group(clip, group)
+                .map_err(|why| format!("pasted clip {payload_id}: {why}"))?;
+        }
+        Ok(())
+    }
+
     /// The range check for ONE of a clip's groups — the second half of
     /// [`Self::normalise_and_check_group`], its only caller, which
-    /// `paste_attributes` runs on each group it has just replaced and only on
-    /// those, so a payload written by hand meets the bounds a patch does (the
-    /// same `check_video` / `check_audio` / `check_text` / `check_shape` the
-    /// patch path calls) and a group the op did not touch is not its business.
-    /// A group the clip lacks has nothing to check.
+    /// `paste_attributes` runs on each group it has just replaced and `paste`
+    /// on every group of every clip it lands, so a payload written by hand
+    /// meets the bounds a patch does (the same `check_video` / `check_audio`
+    /// / `check_text` / `check_shape` the patch path calls) and a group
+    /// `paste_attributes` did not touch is not its business. A group the clip
+    /// lacks has nothing to check.
     pub(crate) fn check_group(&self, clip: &Clip, group: Group) -> Result<(), String> {
         match group {
             Group::Video => match &clip.video {

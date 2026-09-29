@@ -50,9 +50,9 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   a `null` included, is an **error** (§5.5's fourth answer, no undo step):
   `text.words is not an animation target`. `paste_attributes` copies text
   "but content", and the target's `words` stay with its content. A count
-  mismatch that only an action switching `content` (or a paste payload or a
-  hand-written file, which are stored whole) can produce degrades in the
-  recipe: `word` becomes null and the page draws static.
+  mismatch that only an action switching `content` (or a hand-written file,
+  which is stored whole) can produce degrades in the recipe: `word` becomes
+  null and the page draws static.
 - **W-7 — Pages are filled to a MEASURED width, in one Swift builder, and
   the cue builder does not change** (road map 8 §4 W-7, §5c; built by W4a,
   §10.9). `CaptionPages` fills each page greedily by

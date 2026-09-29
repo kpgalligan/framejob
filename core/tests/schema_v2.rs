@@ -260,11 +260,11 @@ fn every_new_video_value_is_range_checked_and_the_message_names_it() {
     let cases: [(Value, &str); 10] = [
         (
             json!({ "filters": [{ "kind": "blur", "amount": 1.5 }] }),
-            "video.filters[].amount must be between 0 and 1, not 1.5",
+            "video.filters[0].amount must be between 0 and 1, not 1.5",
         ),
         (
             json!({ "filters": [{ "kind": "blur", "amount": -0.5 }] }),
-            "video.filters[].amount must be between 0 and 1, not -0.5",
+            "video.filters[0].amount must be between 0 and 1, not -0.5",
         ),
         (
             json!({ "reflection": { "opacity": 2.0 } }),

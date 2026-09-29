@@ -78,7 +78,7 @@ fn text_clip(id: u32, start: i64, duration: i64, group: Value) -> Value {
 }
 
 /// Clip 11 alone, six seconds from 0, with `group` as its text, READ from a
-/// file — so it is stored whole, as only the file reader and `paste` store.
+/// file — so it is stored whole, as only the file reader stores.
 fn page_of(group: Value) -> Handle {
     Handle::from_value(&project(vec![text_clip(11, 0, 6 * SEC, group)], 12))
 }
@@ -152,7 +152,7 @@ fn a_refusal_names_the_number_the_caller_sent_not_the_snapped_one() {
 }
 
 #[test]
-fn a_rate_change_resnaps_the_words_under_d7_3() {
+fn a_canvas_fps_change_resnaps_the_words_under_d7_3() {
     let resnapped = timed()
         .apply(&json!({ "op": "set_canvas", "fps": [24, 1] }))
         .value();

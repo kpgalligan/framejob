@@ -46,6 +46,10 @@ pub enum Group {
     Shape,
 }
 
+/// Every group in its order on `Clip` — the order `paste` and a default
+/// `paste_attributes` visit them, so a range error names the schema's first.
+pub(crate) const GROUPS: [Group; 4] = [Group::Video, Group::Audio, Group::Text, Group::Shape];
+
 impl Group {
     pub(crate) fn name(self) -> &'static str {
         match self {

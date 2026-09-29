@@ -160,8 +160,8 @@ pub(crate) fn token_count(content: &str) -> usize {
 
 /// Moves every word `by` ticks EARLIER in clip time — what a clip whose
 /// head moved `by` later along its content must do so each word stays on
-/// the speech it times (W-3). Saturating, because the file reader and
-/// `paste` store `words` unchecked and no input may panic.
+/// the speech it times (W-3). Saturating, because the file reader stores
+/// `words` unchecked and no input may panic.
 pub(crate) fn rebase_words(text: &mut TextProps, by: Ticks) {
     for word in &mut text.words {
         word.start = word.start.saturating_sub(by);

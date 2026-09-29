@@ -351,9 +351,9 @@ impl Project {
                     ));
                 }
             }
-            // An absent description is tolerated as an absent `text` is; a
-            // present one names a module, and a name that could not be a
-            // file in `graphics/` is a corrupt clip (G-3).
+            // An absent description is tolerated as an absent `text` is
+            // (spec §11 G-18(c)); a present one names a module, and a name
+            // that could not be a file in `graphics/` is a corrupt clip (G-3).
             if let (Source::Graphic, Some(graphic)) = (&clip.source, &clip.graphic) {
                 if check_name(&graphic.name).is_err() {
                     return Err(format!(

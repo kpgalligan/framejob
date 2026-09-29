@@ -248,9 +248,9 @@ fn a_region_added_with_nothing_said_takes_the_documented_defaults() {
 
 #[test]
 fn every_region_value_is_range_checked_and_the_message_names_it() {
-    // The element key is spelled without an index — `video.obscure[].x` —
-    // exactly as `video.filters[].amount` is, because the check walks the
-    // list and the caller is being told which FIELD it got wrong.
+    // The element key names its index — `video.obscure[0].x` — exactly as
+    // `video.filters[0].amount` does, so the caller is told which ENTRY
+    // and which field it got wrong (issue #89).
     //
     // `x` and `y` are only required to be finite, which JSON cannot spell,
     // so they have no case here: a centre outside the layer is legitimate
@@ -261,23 +261,23 @@ fn every_region_value_is_range_checked_and_the_message_names_it() {
     let cases: [(Value, &str); 5] = [
         (
             json!({ "obscure": [{ "width": 0.0 }] }),
-            "video.obscure[].width must be greater than 0, not 0",
+            "video.obscure[0].width must be greater than 0, not 0",
         ),
         (
             json!({ "obscure": [{ "height": -10.0 }] }),
-            "video.obscure[].height must be greater than 0, not -10",
+            "video.obscure[0].height must be greater than 0, not -10",
         ),
         (
             json!({ "obscure": [{ "feather": -1.0 }] }),
-            "video.obscure[].feather must be at least 0, not -1",
+            "video.obscure[0].feather must be at least 0, not -1",
         ),
         (
             json!({ "obscure": [{ "amount": 1.5 }] }),
-            "video.obscure[].amount must be between 0 and 1, not 1.5",
+            "video.obscure[0].amount must be between 0 and 1, not 1.5",
         ),
         (
             json!({ "obscure": [{ "amount": -0.5 }] }),
-            "video.obscure[].amount must be between 0 and 1, not -0.5",
+            "video.obscure[0].amount must be between 0 and 1, not -0.5",
         ),
     ];
     for (patch, expected) in cases {
@@ -292,7 +292,10 @@ fn every_region_value_is_range_checked_and_the_message_names_it() {
         "op": "set_video", "clips": [11],
         "patch": { "obscure": [{ "amount": 0.5 }, { "amount": 2.0 }] }
     }));
-    assert_eq!(msg, "video.obscure[].amount must be between 0 and 1, not 2");
+    assert_eq!(
+        msg,
+        "video.obscure[1].amount must be between 0 and 1, not 2"
+    );
 }
 
 #[test]
@@ -412,7 +415,7 @@ fn paste_attributes_carries_the_regions_and_re_checks_them() {
         "op": "paste_attributes", "clips": [11],
         "payload": payload_with(json!([{ "width": -5.0 }]))
     }));
-    assert_eq!(msg, "video.obscure[].width must be greater than 0, not -5");
+    assert_eq!(msg, "video.obscure[0].width must be greater than 0, not -5");
 }
 
 // ---- the recipe ----------------------------------------------------------

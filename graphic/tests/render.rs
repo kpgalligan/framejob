@@ -118,7 +118,10 @@ fn a_throw_from_the_stdlib_names_the_module_helpers_line() {
 
 /// A thread with no engine yet loads one inside `svg`; when that load
 /// runs past the budget, the sentence says "while loading" and still
-/// carries the frame.
+/// carries the frame. The budget is 0, so the deadline has passed at the
+/// load's first interrupt poll on any host; the loop is kept so polls
+/// happen. (An unbounded loop cannot be used: `compile` runs the same
+/// top-level code under its own budget.)
 #[test]
 fn a_load_that_fails_inside_svg_names_the_frame() {
     let source = "export const meta = {};\n\
@@ -128,17 +131,16 @@ fn a_load_that_fails_inside_svg_names_the_frame() {
     let module = compile(source);
     let d = std::thread::spawn(move || {
         let ctx = common::ctx(9, 30.0, 150, 1920, 1080);
-        match graphic::svg(&module, 9, &serde_json::json!({}), &ctx, 1) {
+        match graphic::svg(&module, 9, &serde_json::json!({}), &ctx, 0) {
             Ok((svg, _)) => panic!("drew, and should not have: {svg:.120}"),
             Err(d) => d,
         }
     })
     .join()
     .expect("the thread");
-    assert!(
-        d.message
-            .starts_with("over the 1 ms budget while loading ("),
-        "{d:?}"
+    assert_eq!(
+        d.message,
+        "over the 0 ms budget while loading (InternalError: interrupted)"
     );
     assert_eq!(d.frame, Some(9));
 }

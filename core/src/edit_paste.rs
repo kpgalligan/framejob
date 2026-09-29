@@ -52,6 +52,8 @@
 //! which is `add_media`'s one-entry-per-path rule, so pasting between two
 //! documents that both reference `/m/talk.mov` reuses the row that is there
 //! and pasting into a document that has never seen it brings the row along.
+//! Every group of every clip that lands, nested ones included, first passes
+//! the patch path's normalise-and-check, as `paste_attributes`' do.
 //!
 //! Placement obeys the overlap rule like everything else (spec §11), and a
 //! clip the rule refuses on its target track goes on a NEW track in front —
@@ -86,7 +88,7 @@ use crate::export::describe;
 use crate::format::MAX_TRACKS;
 use crate::model::{Clip, Media, Nest, Project, ShapeProps, Source, TextProps, Track};
 use crate::outcome::Outcome;
-use crate::patch::Group;
+use crate::patch::{Group, GROUPS};
 use crate::time::Ticks;
 
 /// One clipboard payload. `media` and `nests` default because most
@@ -199,15 +201,20 @@ fn reachable_nests(payload: &Payload) -> Result<Vec<&Nest>, String> {
 /// Times inside are re-snapped to this document's frame grid for the same
 /// reason the pasted clips' are: the payload may come from a document at
 /// another rate, and nothing sub-frame may reach the model.
+///
+/// `Err` when a clip inside fails [`Project::normalise_and_check_pasted`].
+/// That runs in a second pass, once every copy is in, so a clip showing a
+/// nest is measured against the copy it shows.
 fn absorb_nests(
     project: &mut Project,
     nests: &[&Nest],
     media: &HashMap<u32, u32>,
-) -> HashMap<u32, u32> {
+) -> Result<HashMap<u32, u32>, String> {
     let mut map: HashMap<u32, u32> = HashMap::new();
     for nest in nests {
         map.insert(nest.id, project.allocate_id());
     }
+    let first = project.nests.len();
     for nest in nests {
         let mut copy = (*nest).clone();
         copy.id = map.get(&nest.id).copied().unwrap_or(nest.id);
@@ -228,11 +235,23 @@ fn absorb_nests(
             if !(clip.speed.is_finite() && clip.speed > 0.0) {
                 clip.speed = 1.0;
             }
-            project.resnap_clip_times(clip);
         }
         project.nests.push(copy);
     }
-    map
+    for (offset, nest) in nests.iter().enumerate() {
+        let index = first + offset;
+        let Some(mut clips) = project.nests.get(index).map(|n| n.clips.clone()) else {
+            continue;
+        };
+        for (clip, source) in clips.iter_mut().zip(&nest.clips) {
+            project.normalise_and_check_pasted(clip, source.id)?;
+            project.resnap_clip_times(clip);
+        }
+        if let Some(copy) = project.nests.get_mut(index) {
+            copy.clips = clips;
+        }
+    }
+    Ok(map)
 }
 
 /// Resolves every media the pasted clips name onto an entry of this
@@ -311,10 +330,6 @@ fn new_track(project: &mut Project) -> Track {
         solo: false,
     }
 }
-
-/// The four groups in the order a default `paste_attributes` visits them —
-/// their order on `Clip`, so a range error names the schema's first group.
-const GROUPS: [Group; 4] = [Group::Video, Group::Audio, Group::Text, Group::Shape];
 
 /// Whether a clip HAS the group — the model's only notion of what a clip
 /// can take, the same one `edit_props.rs`'s patches go by.
@@ -395,7 +410,8 @@ impl Project {
     /// An identity for an empty clip list — the only answer that changes
     /// nothing, since the fallback track means a placement cannot fail.
     /// `Err` for a malformed payload, an unknown `track`, a clip naming a
-    /// media the payload does not carry, or a depth past the track cap.
+    /// media the payload does not carry, a depth past the track cap, or a
+    /// value out of range (`pasted clip N: …`, N the payload's id).
     pub fn paste(&self, at: Ticks, track: Option<u32>, payload: &Value) -> Result<Outcome, String> {
         let payload = parse_payload(payload)?;
         // An explicit destination is an id from THIS project, so an unknown
@@ -432,7 +448,7 @@ impl Project {
             .chain(nests.iter().flat_map(|n| n.clips.iter()))
             .collect();
         let media = absorb_media(&mut next, &payload, &landing)?;
-        let nests = absorb_nests(&mut next, &nests, &media);
+        let nests = absorb_nests(&mut next, &nests, &media)?;
 
         // Tracks missing behind the destination. Inserting at index 0 shifts
         // every existing track up, so the destination index moves with them.
@@ -471,6 +487,8 @@ impl Project {
                 clip.speed = 1.0;
             }
             clip.start = at.saturating_add(source.start.saturating_sub(earliest));
+            // Checked on what the payload sent, before any snap (issue #62).
+            next.normalise_and_check_pasted(&mut clip, source.id)?;
             // `next` and not `self`: the media this clip names was absorbed
             // into it above, and only a project that HOLDS the media can
             // measure how much window is left (spec §11, D4-4).

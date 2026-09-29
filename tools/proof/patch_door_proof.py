@@ -28,9 +28,9 @@ patch`, `a clip patch` or `an action end patch`; in the last the path carries
 the group (`video.filters[1].kind`), and that door alone does NOT range-check,
 because the state a clip interpolates toward may name a value no stored group
 could hold (spec §5.4). Beside them the RANGE refusals,
-`props_check.rs`'s, spelled with the group's name and NO array index —
-`video.shadow.color must be between 0 and 1, not 2`,
-`shape.gradient.stops[].color must be between 0 and 1, not 2`. A door whose
+`props_check.rs`'s, spelled with the group's name and, in a list, the
+entry's index — `video.shadow.color must be between 0 and 1, not 2`,
+`shape.gradient.stops[0].color must be between 0 and 1, not 2`. A door whose
 caller-authored object is an ARGUMENT rather than a patch — a colour, a
 region — has no group to name, so its wrong TYPE is refused one level out, by
 the op envelope: `op "set_canvas" is not valid: invalid length 3, expected an

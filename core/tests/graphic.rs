@@ -456,7 +456,7 @@ fn clip(handle: &Handle, id: i64) -> Value {
         .clone()
 }
 
-/// The ids of the graphic clips in `handle`, by start.
+/// The graphic clips in `handle`, by start.
 fn graphic_starts(handle: &Handle) -> Vec<Value> {
     let mut clips: Vec<Value> = array(&handle.value(), "/clips")
         .iter()
@@ -568,6 +568,49 @@ fn roll_advances_the_graphics_in_as_a_front_trim() {
 }
 
 #[test]
+fn add_transition_moves_the_graphics_in_back_under_its_head() {
+    let with_in = |r#in: i64| {
+        let mut value = project_with_cut().value();
+        value["clips"][0]["graphic"]["in"] = json!(r#in);
+        Handle::from_value(&value)
+    };
+    let op = json!({"op": "add_transition", "clip": 11, "duration": 10 * FRAME,
+                    "align": "before"});
+
+    let cut = with_in(600_000);
+    let before = source_at(&cut, 11, 2 * SEC);
+    assert_eq!(before["frame"], json!(30));
+    assert_eq!(before["ctx"]["durationInFrames"], json!(120));
+    let joined = cut.apply(&op);
+    let moved = clip(&joined, 11);
+    assert_eq!(moved["start"], json!(1_000_000));
+    assert_eq!(moved["graphic"]["in"], json!(400_000));
+    let after = source_at(&joined, 11, 2 * SEC);
+    assert_eq!(after["frame"], json!(30), "the frame at the old cut stays");
+    assert_eq!(after["ctx"]["durationInFrames"], json!(120));
+
+    // No head bound (G-18a): `in` saturates at 0, and the graphic's first
+    // frame lands on the clip's new first frame.
+    let joined = with_in(0).apply(&op);
+    assert_eq!(at(&clip(&joined, 11), "/graphic/in"), &json!(0));
+    assert_eq!(source_at(&joined, 11, 2 * SEC)["frame"], json!(10));
+}
+
+#[test]
+fn a_canvas_rate_change_puts_in_and_length_on_the_new_grid() {
+    let fps = json!({"op": "set_canvas", "fps": [24, 1]});
+    let moved = project_with(620_000, json!(1_220_000)).apply(&fps);
+    assert_eq!(at(&clip(&moved, 11), "/graphic/in"), &json!(625_000));
+    assert_eq!(at(&clip(&moved, 11), "/graphic/length"), &json!(1_225_000));
+
+    let open = project_with(620_000, Value::Null).apply(&fps);
+    assert_eq!(at(&clip(&open, 11), "/graphic/length"), &Value::Null);
+
+    let tiny = project_with(0, json!(1)).apply(&fps);
+    assert_eq!(at(&clip(&tiny, 11), "/graphic/length"), &json!(25_000));
+}
+
+#[test]
 fn an_action_end_naming_graphic_is_an_error_in_g10s_sentence() {
     let sentence =
         "props are not animated by actions; a graphic animates itself — change the module or its props";
@@ -659,6 +702,28 @@ fn the_props_and_ctx_texts_parse_back_to_their_objects_as_written() {
     }
     let props_json = source["props_json"].as_str().expect("a string");
     assert_contains(props_json, "\"accent_color\":\"#123456\"");
+    // The ctx text's key ORDER, read under `preserve_order` as `prop_keys`
+    // reads the props'.
+    let ctx: Value = serde_json::from_str(source["ctx_json"].as_str().expect("a string"))
+        .expect("the ctx text parses");
+    let keys: Vec<&str> = ctx
+        .as_object()
+        .expect("ctx is an object")
+        .keys()
+        .map(String::as_str)
+        .collect();
+    assert_eq!(
+        keys,
+        [
+            "fps",
+            "time",
+            "durationInFrames",
+            "progress",
+            "width",
+            "height",
+            "canvas"
+        ]
+    );
 }
 
 #[test]
@@ -769,12 +834,17 @@ fn a_graphic_inside_a_nest_counts_frames_from_its_own_first_frame() {
         .find(|c| c["source"]["kind"] == json!("nest"))
         .map(|c| int(c, "/id"))
         .expect("a nest clip");
-    let moved = nested.apply(&json!({"op": "move_clip", "clips": [nest_clip], "delta": SEC}));
+    // A project canvas that differs from the nest's frozen 1920×1080, so
+    // `ctx.canvas` can only be the PROJECT's.
+    let resized = nested.apply(&json!({"op": "set_canvas", "width": 1280, "height": 720}));
+    assert_eq!(at(&resized.value(), "/nests/0/width"), &json!(1920));
+    assert_eq!(at(&resized.value(), "/nests/0/height"), &json!(1080));
+    let moved = resized.apply(&json!({"op": "move_clip", "clips": [nest_clip], "delta": SEC}));
     let layer = layer_of(&moved.recipe(SEC + 37 * FRAME), 11);
     assert_eq!(layer["source"]["frame"], json!(37));
     assert_eq!(
         layer["source"]["ctx"]["canvas"],
-        json!({"width": 1920, "height": 1080})
+        json!({"width": 1280, "height": 720})
     );
     assert!(!layer["clip_rect"].is_null(), "{layer}");
 }

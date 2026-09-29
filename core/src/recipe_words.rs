@@ -48,8 +48,8 @@ impl Words {
     /// The word keys `clip_t` ticks into the clip.
     ///
     /// Total, and it assumes nothing about ORDER. The patch door refuses a
-    /// list whose starts decrease, but it is not the only writer: `paste`'s
-    /// payload and the file reader store `words` whole
+    /// list whose starts decrease, but it is not the only writer: the file
+    /// reader stores `words` whole
     /// (`edit_props.rs`'s `normalise_and_check_group` doc), so an unsorted
     /// list, or a start of `i64::MIN`, reaches here. `word` is therefore a
     /// COUNT of started words rather than a search, and `pop` subtracts

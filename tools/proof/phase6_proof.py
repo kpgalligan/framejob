@@ -1322,7 +1322,7 @@ def gradient_rules_part(mcp):
           f"a NINTH stop is NAMED, not trimmed — got {nine!r}")
     outside = s.error("set_shape", clips=[clip], patch={
         "gradient": gradient(stops=[stop(0, A_STOP), stop(1.5, B_STOP)])})
-    check(outside is not None and "shape.gradient.stops[].at" in outside,
+    check(outside is not None and "shape.gradient.stops[1].at" in outside,
           f"an `at` outside 0–1 is refused by its dotted key — got {outside!r}")
     conic = s.error("set_shape", clips=[clip], patch={
         "gradient": gradient("conic", stops=[stop(0, A_STOP), stop(1, B_STOP)])})

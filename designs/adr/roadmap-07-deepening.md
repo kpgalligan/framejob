@@ -294,6 +294,7 @@ reversed in a commit message); run EVERY proof script when the FFI changes; meas
 - **Range refusals are not indexed**: `props_check.rs` spells `video.filters[].amount`,
   `video.obscure[].*`, `shape.gradient.stops[].*`, so a refusal names the field and value, not
   which entry (orig §2.1). See Open items.
+  Fixed since: the key names its index (`video.filters[2].amount`), issue #89.
 - **A type error names the Rust type, not the argument** (internally tagged `Op`; measured).
   The Swift readers and the gate name arguments instead (orig §8.1, §11.3).
 - **Nullability is not in the published table**: `set_transition.kind` and

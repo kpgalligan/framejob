@@ -1,6 +1,6 @@
-//! Anti-aliased edges are premultiplied: white text composited with the
-//! premultiplied "over" is exactly white over white, and exactly the source
-//! over black.
+//! Anti-aliased edges are premultiplied: every colour channel is at most
+//! its alpha (a control proves the check can fail), and white text
+//! composited with the premultiplied "over" is exactly white over white.
 
 mod common;
 
@@ -21,13 +21,18 @@ fn white_text_edges_composite_exactly() {
         }
         done
     };
+    let premultiplied = |px: &[u8]| px[..3].iter().all(|c| *c <= px[3]);
+    assert!(
+        !premultiplied(&[255, 255, 255, 128]),
+        "the control: a straight-alpha pixel is not premultiplied"
+    );
     let mut partial = 0;
     for px in out.chunks_exact(4) {
         if px[3] > 0 && px[3] < 255 {
             partial += 1;
         }
+        assert!(premultiplied(px), "premultiplied: {px:?}");
         assert_eq!(over(px, 255), [255, 255, 255], "over white: {px:?}");
-        assert_eq!(over(px, 0), [px[0], px[1], px[2]], "over black: {px:?}");
     }
     println!("partially covered pixels: {partial}");
     assert!(partial > 0, "no anti-aliased edge was drawn");

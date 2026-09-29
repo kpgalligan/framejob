@@ -259,9 +259,12 @@ many clips`, `too many tracks`, `nests are more than 8 deep at nest N`.
   when it is not — so a paste between documents brings the entry with it. A clip the overlap rule
   refuses on its target track goes on a new track in front (as Add Text does, §4.1), so the only
   refusal is an empty clip list; a malformed payload is an **error**. Every landed clip — the
-  payload's own and those inside the nests it brings — has its start, source-bounded duration,
-  action spans and present base motion/text timings normalized to this document's grid, since the
-  payload may come from another frame rate (§11, D7-3).
+  payload's own and those inside the nests it brings — first has every group pass
+  `paste_attributes`' normalise-and-check on the values the payload sent (an empty motion lands as
+  `null`; a value out of range is an **error**, `pasted clip N: …`, N the payload's id), then has its
+  start, source-bounded duration, action spans, present base motion/text timings and a graphic's
+  `in` and `length` normalized to this document's grid, since the payload may come from another
+  frame rate (§11, D7-3, G-18·b).
 - **`paste_attributes {clips, payload, groups?}`** — Copies the payload's EARLIEST clip's property
   groups onto each clip (at one start the front-most, then the lower id — never the array's first,
   which is Copy's creation order) — `payload` is the same Copy payload `paste` takes, and only that
@@ -279,8 +282,8 @@ many clips`, `too many tracks`, `nests are more than 8 deep at nest N`.
   timeline and props (§11 G-10). One value is NORMALISED on the way in, not merely checked: a copied
   `video.motion` whose three slots are all null lands as `null`, the same one spelling of "no
   motion" `set_video` and `split` keep — this op's payload is a third door for a `Motion`, and
-  `{"motion": {}}` means the same thing; `paste`'s payload and the file reader do NOT normalise
-  (road map 5 §12 R2·2; `core/tests/schema_v8.rs`). Refuses when nothing changes, and on an empty
+  `{"motion": {}}` means the same thing; the file reader does NOT normalise
+  (`core/tests/schema_v8.rs`). Refuses when nothing changes, and on an empty
   `groups` list.
 - **`nest {clips, name?}`** — Collapses the selection into ONE clip showing a nest (§5.2), on the
   front-most track the selection occupied, running from the earliest start to the latest end. The
@@ -367,7 +370,7 @@ many clips`, `too many tracks`, `nests are more than 8 deep at nest N`.
   incoming clip's head, `after` all from the outgoing clip's tail. The duration is snapped DOWN to
   whole frames before the split — snapping two halves separately would lose the odd frame — and then
   clamped: to each side's handle (a media clip's source window; UNBOUNDED for a still, an image,
-  text or a shape; **0 for a nest's head**, since trimming a nest clip's head moves its contents,
+  text, a shape or a graphic; **0 for a nest's head**, since trimming a nest clip's head moves its contents,
   and the nest's own remaining length for its tail), to the neighbours on the track, and to the
   overlap rule, which is held FIRST to `(A.duration + B.duration) / 3 frames` — the most that rule
   can pass at any split, so the step-down walks the CLIPS and not the caller's number — and then
@@ -379,7 +382,9 @@ many clips`, `too many tracks`, `nests are more than 8 deep at nest N`.
   grid is REFUSED, in a sentence naming the cut, the frames asked for and `ripple: true` as the way
   past it. The incoming clip's `in` moves back by the extension times its speed, and its ACTIONS
   move with it, as do its `text.words` (§11 W-3) — where `trim_start` deliberately leaves actions
-  alone, because a transition reveals material in front of a first frame nobody asked to move.
+  alone, because a transition reveals material in front of a first frame nobody asked to move. A
+  graphic's own `in` moves back by the extension too, saturating at 0 (UNBOUNDED like a still;
+  §11 G-18·a).
   `kind` absent uses the clip's own stored kind if it has one, else `cross_dissolve`; a stored
   transition keeps its style and a new one is minted. **Error** for a non-positive duration, an
   unknown clip, and for not being at a hard cut — naming which of: no predecessor, a gap, an overlap
@@ -467,8 +472,8 @@ many clips`, `too many tracks`, `nests are more than 8 deep at nest N`.
 - **`set_canvas {width?, height?, fps?, background?, rescale_clips?, fit_new_clips?,
   timecode_frames?}`** — `rescale_clips` multiplies every clip's `x`, `y`, `scale` by the size
   ratio. Changing fps normalizes top-level and every stored nest's clip starts, source-bounded
-  durations, action spans and present base motion/text timing, plus top-level markers (§11, D7-3).
-  Size-only and same-fps edits leave legacy timing alone.
+  durations, action spans, present base motion/text timing and a graphic's `in` and `length`, plus
+  top-level markers (§11, D7-3, G-18·b). Size-only and same-fps edits leave legacy timing alone.
 - **`add_media {descriptor}` → returns the id · `relink_media {media, path, bookmark?}` ·
   `remove_media {media, with_clips=false}`** — The descriptor is the `media[]` element minus `id`;
   the host probes the file.

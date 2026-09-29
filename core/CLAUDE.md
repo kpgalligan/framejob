@@ -69,9 +69,11 @@ governs a module now.
   source-window measurements moved out to `source_window.rs`.
 - `frame_grid.rs` — clip-time normalization shared by canvas rate changes,
   both full-paste paths and unnest. It snaps placement start, delegates the
-  source-bounded duration to `source_window.rs`, clamps action spans and snaps
-  present base motion/text timing through the patch snappers. It does not
-  change source positions, action-end payloads or audio envelopes.
+  source-bounded duration to `source_window.rs`, clamps action spans, snaps
+  present base motion/text timing through the patch snappers, and snaps a
+  graphic's `in` and `length` through `recipe_graphic.rs`'s
+  `graphic_resnapped` (spec §11 G-18). It does not change source positions,
+  action-end payloads or audio envelopes.
 - `source_window.rs` — THE source window: how much material a clip shows,
   how much lies either side of it, and the one way a source in point moves.
   **Every name here carries its UNIT**, because the readers divide by a
@@ -208,19 +210,22 @@ governs a module now.
   `effective_length` (G-9), so every splitter obeys it.
 - `edit_props.rs` — the five patches (`set_video`, `set_audio`, `set_text`,
   `set_shape`, `set_clip`), `Project::check_group` (the range check
-  `paste_attributes` runs on each group it has just replaced — the same
-  `check_video` / `check_audio` / `check_text` / `check_shape` the patch
-  path calls directly; its only caller is `normalise_and_check_group`) and
+  `paste_attributes` runs on each group it has just replaced and `paste` on
+  every group of every clip it lands — the same `check_video` /
+  `check_audio` / `check_text` / `check_shape` the patch path calls
+  directly; its only caller is `normalise_and_check_group`) and
   `normalise_and_check_group` beside it (the one NORMALISATION a copied
-  group needs first: `paste_attributes`' payload is a third door for a
-  `Motion`, and an empty one has two spellings; `paste`'s payload and the
-  file reader do not normalise; the copied group is checked before its
-  present video/text timing is snapped), `check_blend`, the one check
-  about a CLIP rather than a value (a nest clip cannot blend), and
-  `snap_motion` / `snap_animation`, which put the ticks a patch or checked
-  copied group carries on the frame grid AFTER the range check, so a refusal
-  names what the caller sent. What a patch may CARRY is `patch.rs`'s and
-  nothing here restates it.
+  group needs first: a clipboard payload is a third door for a `Motion`, and
+  an empty one has two spellings; only the file reader does not normalise;
+  the copied group is checked before its present video/text timing is
+  snapped), and `normalise_and_check_pasted`, which runs it over every group
+  of every clip `paste` lands — nested ones in a second pass, once every
+  copy is in — naming the PAYLOAD's clip id (`pasted clip N: …`, issue #62),
+  `check_blend`, the one check about a CLIP rather than a value (a nest clip
+  cannot blend), and `snap_motion` / `snap_animation`, which put the ticks a
+  patch or checked copied group carries on the frame grid AFTER the range
+  check, so a refusal names what the caller sent. What a patch may CARRY is
+  `patch.rs`'s and nothing here restates it.
 - `patch.rs` — reading a caller-authored patch, cut out of `edit_props.rs`
   under the size rule: `Group` and its per-group template, `check_keys` (the
   walk of keys and JSON kinds, array indices in the path) and `merge_group`
@@ -233,19 +238,25 @@ governs a module now.
   every depth, an array replaces its list, and `null` clears an optional key
   (a required one refuses it). `COMPLETE_ENTRIES` is the one exception to
   "absent keeps": a `video.filters` entry must name both its keys, because a
-  list replaces whole and the type's defaults would invent a filter.
-  Nothing here is handed a clip or a project: what a patch may carry is a
-  fact about the vocabulary, which is `props_check.rs`'s reason for existing
-  one step further on.
+  list replaces whole and the type's defaults would invent a filter. Nothing
+  here is handed a clip or a project: what a patch may carry is a fact about
+  the vocabulary, which is `props_check.rs`'s reason for existing one step
+  further on. `GROUPS` — every group in its order on `Clip`, the order
+  `paste` and a default `paste_attributes` visit them — lives here, its one
+  home.
 - `props_check.rs` — the range checks every value written into a property
   group passes first (`check_video` / `check_audio` / `check_text` /
   `check_shape`, the `finite` / `in_range` family, the bounds `actions.rs`'s
-  `clamp_video` reads too). A range check is a fact about the vocabulary, not
-  about an edit — and it runs BEFORE `edit_props.rs` snaps a patch's ticks,
-  which is what lets a refusal name the number the caller sent rather than
-  the one a snap rounded it to. Gradient stops are deliberately NOT order-checked: a refusal
-  would break dragging one stop past another mid-gesture, so the renderer
-  sorts, and the comment says so where the check would have gone.
+  `clamp_video` reads too). A range check is a fact about the vocabulary,
+  not about an edit — and it runs BEFORE `edit_props.rs` snaps a patch's
+  ticks, which is what lets a refusal name the number the caller sent rather
+  than the one a snap rounded it to. Gradient stops are deliberately NOT
+  order-checked: a refusal would break dragging one stop past another
+  mid-gesture, so the renderer sorts, and the comment says so where the
+  check would have gone. A list entry's key names its index —
+  `video.filters[0].amount`, `video.obscure[1].x`,
+  `shape.gradient.stops[0].color` — so a refusal names the entry as well as
+  the field (issue #89).
 - `edit_track.rs` — tracks, markers and the media list: the three lists a
   clip sits in. The canvas left here at road map 7's D2·3 toll. `clip_list`
   is the ONE spelling of the clips a `with_clips` refusal names — three ids
@@ -366,28 +377,32 @@ governs a module now.
   A graphic layer's source is one arm calling `recipe_graphic.rs`'s
   `graphic_source`; `missing_source` is `pub(crate)` for it.
 - `recipe_words.rs` — what a timed text PAGE shows at one instant:
-  `Words::of` answers `word` (how many of `text.words` have started, 0 to
-  n) and `word_pop` (0..1 through the active word's pop over `WORD_POP`,
-  0.12 s), both null unless the text has a `word_style`, non-empty `words`
-  and a matching token count, and `word_pop` null at `active_scale` 1.0.
-  Total and order-blind — a count, a saturating subtraction and a clamp —
-  because `paste`'s payload and the file reader store `words` unchecked.
-  `recipe_text.rs` emits both keys on every text layer, gives a styled
-  page a WHOLE reveal (W-5), strips `words` from the description (and
-  `word_style` when unset, `case` when `as_written`, so an unstyled title
-  hashes as before version 9), and folds the two keys into the hash only
-  for a styled page.
-- `recipe_graphic.rs` — a graphic clip's own timeline (road map 10's G-9) and
-  its layer: `effective_length` (`graphic.length`, or `in + duration` when
-  null — G-9·c), `graphic_advanced` (`in` moved through `source_window.rs`'s
-  `in_advanced` at speed 1, never below 0), and `graphic_source`, the layer's
-  `{kind, name, hash, frame, ctx, props}` and `[width, height]` — `frame`
-  floored onto the canvas grid, `durationInFrames` ceiled, `ctx` exactly the
-  engine's keys (the app passes it through verbatim), `ctx.canvas` the
-  PROJECT's size inside a nest too, `props` the stored map cloned whole, the
-  hash over everything `render` is called with (G-9·b). It holds ONE equation
-  for the writers and the reader together: `trim_start`, `roll` and `split`'s
-  second half call `graphic_advanced`, `split` pins both halves' `length` to
+  `Words::of` answers `word` (how many of `text.words` have started, 0 to n)
+  and `word_pop` (0..1 through the active word's pop over `WORD_POP`, 0.12
+  s), both null unless the text has a `word_style`, non-empty `words` and a
+  matching token count, and `word_pop` null at `active_scale` 1.0. Total and
+  order-blind — a count, a saturating subtraction and a clamp — because the
+  file reader stores `words` unchecked. `recipe_text.rs` emits both keys on
+  every text layer, gives a styled page a WHOLE reveal (W-5), strips `words`
+  from the description (and `word_style` when unset, `case` when
+  `as_written`, so an unstyled title hashes as before version 9), and folds
+  the two keys into the hash only for a styled page.
+- `recipe_graphic.rs` — a graphic clip's own timeline (road map 10's G-9)
+  and its layer: `effective_length` (`graphic.length`, or `in + duration`
+  when null — G-9·c), `graphic_advanced` (`in` moved through
+  `source_window.rs`'s `in_advanced` at speed 1, never below 0),
+  `graphic_resnapped` (what every re-snap through `frame_grid.rs` writes:
+  `in` to the nearest frame, ≥ 0; a set `length` to the nearest frame with a
+  one-frame floor; null stays null — G-18), and `graphic_source`, the
+  layer's `{kind, name, hash, frame, ctx, props}` and `[width, height]` —
+  `frame` floored onto the canvas grid, `durationInFrames` ceiled, `ctx`
+  exactly the engine's keys (the app passes it through verbatim),
+  `ctx.canvas` the PROJECT's size inside a nest too, `props` the stored map
+  cloned whole, the hash over everything `render` is called with (G-9·b). It
+  holds ONE equation for the writers and the reader together: `trim_start`,
+  `roll`, `split`'s second half and `add_transition`'s handle form call
+  `graphic_advanced`, every `frame_grid.rs` re-snap calls
+  `graphic_resnapped`, `split` pins both halves' `length` to
   `effective_length`, and the recipe reads the same `effective_length`.
   **`Clip.graphic`'s `in` and `length` are written nowhere else**
   (`set_graphic` refuses `in`). Never write the bare token `graphic::` here

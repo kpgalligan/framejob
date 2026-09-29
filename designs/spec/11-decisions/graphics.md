@@ -297,3 +297,26 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   and an MCP `export` holds the server until its one-hour ceiling. Not seen
   in 70 runs (G3c) nor in issue batch B1's M1 runs
   (`tools/proof/export_cancel_proof.py`). Revisit only if one is observed.
+- **G-18 — A graphic's own timeline moves with a transition's head and
+  crosses a frame grid; a graphic clip with no description is tolerated**
+  (issue #72, 2026-09-29).
+  (a) **`add_transition`'s handle form moves `in` back by the head
+  extension** through `graphic_advanced`, its fourth writer. G-9·a stands —
+  no head bound — so where `in` is less than the extension it saturates at
+  0 and the graphic's first frame lands on the clip's new first frame:
+  `trim_start`'s answer at 0, and the one step 9 gives a text reveal.
+  (b) **`graphic.in` is not a source position in D7-3's sense**: the
+  graphic's frames are the canvas's (G-9's `floor((in + clip time) /
+  frame)`). So every re-snap through `frame_grid.rs` (`set_canvas` fps,
+  both paste paths, `unnest`) snaps `in` to the nearest frame, ≥ 0, and a
+  set `length` to the nearest frame with `set_graphic`'s one-frame floor. A
+  null length stays null.
+  (c) **Declined: `validate` keeps accepting a `Source::Graphic` clip with
+  no `graphic`.** The recipe answers `missing`, and the app draws the slate
+  it draws for missing media. `set_graphic` answers `clip N is not a
+  graphic clip`, so the clip is deleted rather than repaired. Refusing
+  would make a whole document unreadable over a clip that holds nothing,
+  which is `validate`'s canvas posture (model_query.rs:205-208).
+  `schema_v10.rs`'s
+  `a_file_with_a_bad_module_name_is_refused_and_an_absent_description_is_not`
+  is the oracle.

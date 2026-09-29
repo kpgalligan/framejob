@@ -224,8 +224,13 @@ pub(crate) fn check_video(props: &VideoProps, size: Option<(f64, f64)>) -> Resul
             props.filters.len()
         ));
     }
-    for filter in &props.filters {
-        in_range("video.filters[].amount", filter.amount, 0.0, 1.0)?;
+    for (i, filter) in props.filters.iter().enumerate() {
+        in_range(
+            &format!("video.filters[{i}].amount"),
+            filter.amount,
+            0.0,
+            1.0,
+        )?;
     }
     if let Some(reflection) = &props.reflection {
         in_range("video.reflection.opacity", reflection.opacity, 0.0, 1.0)?;
@@ -257,16 +262,21 @@ pub(crate) fn check_video(props: &VideoProps, size: Option<(f64, f64)>) -> Resul
             props.obscure.len()
         ));
     }
-    for region in &props.obscure {
+    for (i, region) in props.obscure.iter().enumerate() {
         // The centre may sit outside the layer, for the spotlight's reason
         // above: half a region running off the edge of the frame is a
         // legitimate picture, so x and y are only required to be numbers.
-        finite("video.obscure[].x", region.x)?;
-        finite("video.obscure[].y", region.y)?;
-        above("video.obscure[].width", region.width, 0.0)?;
-        above("video.obscure[].height", region.height, 0.0)?;
-        at_least("video.obscure[].feather", region.feather, 0.0)?;
-        in_range("video.obscure[].amount", region.amount, 0.0, 1.0)?;
+        finite(&format!("video.obscure[{i}].x"), region.x)?;
+        finite(&format!("video.obscure[{i}].y"), region.y)?;
+        above(&format!("video.obscure[{i}].width"), region.width, 0.0)?;
+        above(&format!("video.obscure[{i}].height"), region.height, 0.0)?;
+        at_least(&format!("video.obscure[{i}].feather"), region.feather, 0.0)?;
+        in_range(
+            &format!("video.obscure[{i}].amount"),
+            region.amount,
+            0.0,
+            1.0,
+        )?;
     }
     Ok(())
 }
@@ -461,9 +471,9 @@ pub(crate) fn check_shape(props: &ShapeProps) -> Result<(), String> {
         // read this as "the list rule handles it"; there is no list rule in
         // play here, and if shapes ever become animatable the ordering
         // question has to be asked again against `lerp`.
-        for stop in &gradient.stops {
-            in_range("shape.gradient.stops[].at", stop.at, 0.0, 1.0)?;
-            color_ok("shape.gradient.stops[].color", &stop.color)?;
+        for (i, stop) in gradient.stops.iter().enumerate() {
+            in_range(&format!("shape.gradient.stops[{i}].at"), stop.at, 0.0, 1.0)?;
+            color_ok(&format!("shape.gradient.stops[{i}].color"), &stop.color)?;
         }
         // Finite and nothing more, exactly as `video.shadow.angle` is: the
         // value is named and never clamped, and wrapping it into 0..360 here
