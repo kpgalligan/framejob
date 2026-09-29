@@ -23,8 +23,16 @@ import AppKit
 /// **What it refuses runs nothing**: an app-modal window already up, a path
 /// that names no item or a submenu, an item with no action, a selector
 /// `UIMenuTable.swift` reads `framework` or `modal` or does not list, an
-/// action nothing in the chain answers, and a disabled item (its own
-/// validator's answer, as AppKit would ask it).
+/// item whose own target does not answer its action (disabled, as AppKit
+/// shows it), an action nothing in the chain answers, and a disabled item
+/// (its own validator's answer, as AppKit would ask it). `cancel_sheet`
+/// refuses a sheet it has nothing to press, and a file panel with no parent
+/// window to end it on.
+///
+/// **`sheet_at_return`** is whether the window had a sheet attached when the
+/// action returned, read in the same main-thread hop; `sheet` is the one
+/// after the settle, so a sheet that arrives later answers false and then
+/// a sheet.
 extension AgentServer {
 
     /// What the first hop resolved, carried to the next ones. Every
@@ -56,10 +64,12 @@ extension AgentServer {
         }
         let run = try onMain { try self.menuRun(a, path) }
         var performMs = 0
+        var sheetAtReturn = false
         let sent = onMain { () -> Bool in
             let started = Date()
             let sent = UIMenu.perform(run.item, target: run.target, window: run.window)
             performMs = Self.milliseconds(since: started)
+            sheetAtReturn = run.window?.attachedSheet != nil
             return sent
         }
         guard sent else {
@@ -81,6 +91,7 @@ extension AgentServer {
                 "target": Self.className(run.target),
                 "project": run.project,
                 "perform_ms": performMs,
+                "sheet_at_return": sheetAtReturn,
                 "settled": settle.settled,
                 "settle_ms": settle.ms,
                 "polls": settle.polls,
@@ -110,6 +121,14 @@ extension AgentServer {
                 throw ToolError(message: "No sheet attached to the window \"\(window.title)\".")
             }
             let sheetClass = NSStringFromClass(type(of: sheet))
+            // Unreachable as far as known: `sheet` is `window.attachedSheet`,
+            // whose `sheetParent` is `window`. Refused in its own words
+            // rather than as "nothing to press" should it ever be reached.
+            if sheet is NSSavePanel, sheet.sheetParent == nil {
+                throw ToolError(
+                    message: "The \(sheetClass) sheet is a file panel with no parent window to "
+                        + "end it on, so cancel_sheet cannot close it.")
+            }
             guard let pressed = UISheet.cancel(sheet) else {
                 let titles = sheet.contentView.map { UISheet.buttons(in: $0).map(\.title) } ?? []
                 throw ToolError(
@@ -219,6 +238,11 @@ extension AgentServer {
             break
         }
         guard let target = UIMenu.target(for: item, window: window) else {
+            if let own = item.target {
+                throw ToolError(
+                    message: "\(shown) (\(selector)) is disabled here: its own target "
+                        + "\(Self.className(own)) does not answer \(selector).")
+            }
             throw ToolError(
                 message: "\(shown) (\(selector)): nothing in the "
                     + (window == nil ? "app's" : "project window's")
@@ -284,9 +308,11 @@ extension AgentServer {
                 + "puts a sheet, the Settings window or a panel up for snapshot_ui. Refused, "
                 + "by name and running nothing: a disabled item, a submenu, an item AppKit "
                 + "owns (framework: Quit, Open…, Save, Close, Undo …), one that can run a "
-                + "modal loop (modal: New Project, Allow Agent Connections), and one the inventory "
-                + "does not classify. The answer: the target, how long the action and the "
-                + "settle took, the attached sheet, the windows opened and closed, the modal "
+                + "modal loop (modal: New Project, Allow Agent Connections), one the inventory "
+                + "does not classify, and one whose own target does not answer its action. "
+                + "The answer: the target, how long the action and the settle took, whether "
+                + "a sheet was attached when the action returned (sheet_at_return) and the "
+                + "sheet attached after the settle, the windows opened and closed, the modal "
                 + "window and whether the app is active. With no path, lists every item: path, "
                 + "selector, verdict, refusal, enabled, state and hidden. cancel_sheet closes "
                 + "a sheet it opened.",
@@ -306,7 +332,8 @@ extension AgentServer {
                 + "project's window the way its own Cancel would: a file panel is ended with "
                 + "cancel, any other sheet's button whose key is Escape is pressed, or its only "
                 + "button when it has exactly one; anything else is refused with the buttons' "
-                + "titles. Answers after the app settles, with how it closed the sheet and "
+                + "titles, and a file panel with no parent window is refused in its own words. "
+                + "Answers after the app settles, with how it closed the sheet and "
                 + "whether one is still attached.",
             [:])
     }

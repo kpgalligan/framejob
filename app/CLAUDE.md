@@ -551,8 +551,10 @@ the key map behind it.
   is a 64 pt `AccentButton` with no key equivalent that reads Stop while busy
   or asking, and the composer's Return sends only while idle and beeps
   otherwise. No spinner (the harness settles). A label's frame is 2 pt wider
-  than its text each side, so a row that holds a wrapping label is inset by
-  2 pt (`snapshot_ui`'s outside_superview rule). `AssistantTranscriptView` is
+  than its text each side, and a row that holds a wrapping label is inset by 2
+  pt; `snapshot_ui`'s outside_superview rule measures alignment rects since
+  #140 and no longer needs the inset, which is kept. `AssistantTranscriptView`
+  is
   the flipped document view, one selectable label per entry with
   `preferredMaxLayoutWidth` set in `layout()`; `AssistantContextMeterView`
   the inline meter and `figures(_:)`, its three sentences;
@@ -1066,7 +1068,10 @@ free.
 - `RecorderPanelController.swift` (+`Rows`, +`Recording`, +`Grants`,
   +`Pause`, +`Landing`, +`Picker`) · `RecorderStatusItem.swift` — File ▸ New
   Recording… A `.floating`, `.nonactivatingPanel` with `hidesOnDeactivate`
-  false, ONE instance, no window delegate. **The panel is the only place the
+  false, ONE instance, no window delegate. `show()` makes it key only when
+  Reelcut is active; from the background it is ordered front without key, so
+  the person's Return stays in the app in front (spec §11 recording.md, #137).
+  **The panel is the only place the
   two grants are requested, and the only place System Settings is opened
   for them** (`+Grants`, through `RecorderPanelController.grantDoors`, which
   a probe seals), both before the countdown; it orders OUT at
@@ -1318,15 +1323,22 @@ free.
   item by path in a NAMED project window's own responder chain, never
   nil-targeted, and works with the app inactive and the window occluded
   (measured, V2b's D rows). It refuses by name an item that is disabled, a
-  submenu, `framework`, `modal` or unclassified. It answers after a settle:
-  reads 20 ms apart, answered on 5 equal, bounded at 3 s. `cancel_sheet`
-  closes an attached sheet through its own Cancel. Both run off main
+  submenu, `framework`, `modal` or unclassified, and one whose own target does
+  not answer its action. It answers after a settle:
+  reads 20 ms apart, answered on 5 equal, bounded at 3 s. The answer's
+  `sheet_at_return` says whether a sheet was attached when the action
+  returned, read in the perform's own hop. `cancel_sheet` closes an attached
+  sheet through its own Cancel, and refuses a file panel with no parent window
+  in its own words (unreachable as far as known). Both run off main
   (`devOffMainTools`), and every AppKit touch is an `onMain` hop.
 - `UIMenu.swift` — the menu tool's main-thread half. It walks the menu's
   leaves and looks up a path, validating each level first because a
   validator may retitle an item. It holds the refusal, an ALLOW table where
   a selector with no row is `unclassified`, and the responder walk and
-  validation, which never write `isEnabled`. It performs the item inside one
+  validation, which never write `isEnabled`. An item's explicit target counts
+  only when it answers the action; otherwise the item has no target and is
+  disabled, as AppKit greys it, with no fallback to the chain (#133,
+  `v2_menu.py` H5). It performs the item inside one
   explicit undo group on the window's document, with `performGroupedEdit`'s
   discipline; without that, two performed edits merge into one undo step
   (mutant M3).
@@ -1397,7 +1409,9 @@ free.
   because the menu tool's result rows use them.
 - `UISnapshotLayout.swift` — the layout dump. A pre-order walk over non-hidden
   views and three rules, each with a 0.5 pt tolerance: ambiguous;
-  outside_superview, except under an `NSClipView` or at zero area; truncated,
+  outside_superview, measured on the view's ALIGNMENT rect
+  (`alignmentRect(forFrame:)`), so a label pinned flush is clean, except under
+  an `NSClipView` or at zero area (the frame's); truncated,
   except when wrapping. Problems on `_NS…` views go to `private_problems`. A
   secure field's text is never written. It is pure over an `NSView` tree, so
   `tools/proof/v2_layout_probe.swift` calls it.

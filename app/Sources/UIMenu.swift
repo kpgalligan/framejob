@@ -145,11 +145,14 @@ enum UIMenu {
         return chain
     }
 
-    /// The item's own target, else the first object in the chain that
-    /// answers its action.
+    /// The item's own target when it answers the action — nil when it does
+    /// not, with no fallback to the chain, since AppKit greys such an item —
+    /// else the first object in the chain that answers it.
     static func target(for item: NSMenuItem, window: NSWindow?) -> AnyObject? {
-        if let own = item.target { return own }
         guard let action = item.action else { return nil }
+        if let own = item.target {
+            return (own as? NSObjectProtocol)?.responds(to: action) == true ? own : nil
+        }
         return responders(for: window).first {
             ($0 as? NSObjectProtocol)?.responds(to: action) == true
         }

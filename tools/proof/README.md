@@ -5909,7 +5909,7 @@ call it:
 
 A build failure is a scored FAIL of the rows that need it.
 
-The 29 rows:
+The 30 rows:
 - **T**: the schema, the parity log and the dev-tool marker, and the gate.
 - **N**: the listing.
 - **O**: occlusion, under the cover. The captures are byte-identical
@@ -5930,11 +5930,18 @@ The 29 rows:
   C4 (its two `appearance` cases) and nothing else of T, C, A.
 - **L**: the layout dump.
   - **L2 compares `problems` to `KNOWN`**, the filed defects listed as data
-    in the script (#129 today). It fails on a problem not listed AND on a
-    listed defect that no longer appears.
+    in the script. It fails on a problem not listed AND on a listed defect
+    that no longer appears. `KNOWN` is empty, so L2 expects no problem: its
+    one entry, the toolbar's duration label, was the label's 2 pt alignment
+    inset, and with the rule on alignment rects L2 failed `#129 MISSING`
+    until it was removed (2026-09-29).
   - L3 finds #70.
-- **P1–P6**: the three rules and their controls, put to synthetic trees by
-  the probe.
+- **P1–P7**: the three rules and their controls, put to synthetic trees by
+  the probe. P7: `outside_superview` measures the ALIGNMENT rect — a label
+  pinned flush to its container, whose frame passes it by the inset, has no
+  problem, and a label whose alignment rect is 10 pt past its container is
+  flagged `[0, 0, 10, 0]`. It FAILED against the frame rule (the flush label
+  flagged, the other `[0, 0, 12, 0]`) before the rule changed.
 
 Output is one line per row, then `scores:` and `digest:`. Exit 0 iff no row
 failed.
@@ -5971,9 +5978,10 @@ plus `-RCSecretFolder "$PWD/tools/proof/work/v2_menu/secrets"` (the Settings
 window it opens then reads no real key store) and `-RCSpendFolder
 "$PWD/tools/proof/work/v2_menu/spend"` (its month line then reads no real
 spend ledger, spec §11 P-5; road map 13 P4). Before the first MCP call it:
-- writes two fixtures, `work/v2_menu/fixtures/menu_{a,b}.reelcut` (version 10,
-  640×360 at 30 fps, one track, a shape at 0 s and one at 3 s); B is opened,
-  then A, so A is the front project;
+- writes three fixtures, `work/v2_menu/fixtures/menu_{a,b}.reelcut` (version
+  10, 640×360 at 30 fps, one track, a shape at 0 s and one at 3 s) and
+  `menu_late.reelcut` (the first shape only), and deletes `fixtures/late.mov`;
+  B is opened, then A, so A is the front project;
 - for the H rows, builds `v2_menu_probe.swift` over `harness/build.sh`'s swiftc
   line into `work/v2_menu/probe/`, with `graphic/tests/graphics/*.js` copied to
   `GraphicTemplates/` beside it so Insert ▸ Graphic has its template items;
@@ -5982,7 +5990,7 @@ spend ledger, spec §11 P-5; road map 13 P4). Before the first MCP call it:
 A build failure is a scored FAIL of the rows that need it; a call that throws
 where a row expected an answer fails the rest of that letter's rows by name.
 
-The 24 rows:
+The 26 rows:
 - **T**: both schemas (`{path, project}` and `{project}`, nothing required,
   no `scope`), the parity log, the marker count, and the gate on each tool.
 - **H**: the probe walks `AppDelegate().buildMainMenu()` with
@@ -5990,7 +5998,12 @@ The 24 rows:
   `UIMenu.verdicts`. H1 puts its leaves to `inventory.check` (0 problems);
   H2 holds the table to `inventory.json` both ways; H3 holds each leaf's
   refusal to the table's verdict; H4 is the control — a fake leaf and a
-  removed table row are each reported exactly.
+  removed table row are each reported exactly. H5 (#133): two items share an
+  action in a menu of the probe's own, one targeting an object that answers
+  it and one an object that does not; `UIMenu.target` answers nil for the
+  second (disabled, no fallback to the chain) and the object for the first.
+  It FAILED before the change (the silent item's target was the silent
+  object, enabled true).
 - **N**: the live listing: an inventoried selector carries its verdict and
   refusal, every other one is `unclassified` (AppKit's injected items, printed
   as `selector ×count`), and every inventoried selector is live.
@@ -6007,6 +6020,18 @@ The 24 rows:
   file panel refused by `snapshot_ui`) and cancelled with nothing changed;
   `cancel_sheet` with no sheet refused; and every answer of the run settled
   inside the 3 s bound with no modal window.
+- **L1** (#135), last: the late sheet. On `menu_late.reelcut` it adds a 2 s
+  video media at `late.mov` (missing), a clip of it at 6 s, and reverses the
+  clip — a missing file makes no reverse job, so no sheet (checked). It then
+  writes `late.mov` as non-movie bytes and performs Add Marker: the edit's
+  `ensureReversedMedia` puts the reverse progress sheet up a run-loop turn
+  AFTER the action returns, and the failed render keeps it up with Close. It
+  passes when `sheet_at_return` is false, `sheet` is not null, the settle
+  settled, the markers went +1 and the sheet's layout shows a visible
+  "Reversing"; `cancel_sheet` then closes it (at most three calls). Its
+  mutant does NOT fail it: with `settleAfter` returning at once (settled, 0
+  ms), L1 still passed, because the answer's later main-thread hop already
+  runs after the sheet's `DispatchQueue.main.async`.
 
 It performs only Add Marker, Export…, Remove Track, Add Media… (the last three
 cancelled) and Settings…, and never Quit, Close, Save, Revert, Allow Agent
@@ -6018,7 +6043,7 @@ active`, a locked console as `host: console locked`; R6 skips as `host: no
 window-list item` when AppKit put no window in the Window menu.
 
 ```sh
-python3 tools/proof/v2_menu.py <port> [--log PATH] [--only T,H,N,D,U,R,S]
+python3 tools/proof/v2_menu.py <port> [--log PATH] [--only T,H,N,D,U,R,S,L]
 ```
 
 ## Road map 11's V3 — the screen catalog (`screens.py`)
@@ -6105,17 +6130,29 @@ are deleted. The script never reads a key file.
 is pinned `apple` and the AssemblyAI endpoint is a dead loopback port.
 
 **The recorder hazard.** File ▸ New Recording… puts up a non-activating panel
-(`RecorderPanelController.swift:204`) that `show()` makes key (`:325`), whose
-default button is Record (`Sheets.swift:86`) — and Record asks for the Screen
-Recording and microphone grants. Showing it asks and records nothing. So the
-path is allowed only in the run's LAST screen (16), the captures follow the
-perform at once, the instance is stopped straight after them, and the run
-prints `recorder panel up (<look>): <ms> ms` (the perform's answer to the
-child's exit) and each capture's `key` and `active`. The panel goes up once per
-instance, so twice a run. Measured: 134–140 ms over four runs with both looks
-from one instance, then 62–70 ms per instance with one capture each; the panel
-was key with Reelcut ACTIVE — putting it up brings Reelcut to the front. **Keep
-your hands off the keyboard while the last screen of each look runs.**
+(`RecorderPanelController.swift:207`) whose default button is Record
+(`Sheets.swift:86`) — and Record asks for the Screen Recording and microphone
+grants. Showing it asks and records nothing. Since #137 (spec §11, "The
+recorder panel takes key only from an active Reelcut") `show()` makes it key
+only when Reelcut is active (`:332`); shown from the background it is ordered
+front without key (`:334`) and Reelcut stays inactive (`v3_tools.py`'s R3).
+But an instance that is ACTIVE when New Recording… runs still gets a key panel
+with Record on Return, and the script cannot hold its child inactive. So the
+path is still allowed only in the run's LAST screen (16), the captures follow
+the perform at once, the instance is stopped straight after them, and the run
+prints `recorder panel up (<look>): <ms> ms; active before New Recording…
+<True|False>` (the perform's answer to the child's exit, and the listing's
+`active` read after `open_project`, before the perform) and each capture's
+`key` and `active`, unscored. With `active before … False` the captures must
+read `key False active False`; with `True` the look is the host state `host:
+Reelcut active before New Recording…`, not a failure. The panel goes up once
+per instance, so twice a run. Measured before #137: 134–140 ms over four runs
+with both looks from one instance, then 62–70 ms per instance with one capture
+each; the panel was key with Reelcut ACTIVE — putting it up brought Reelcut to
+the front. Measured after it (2026-09-29): 106 ms light and 100 ms dark,
+`active before New Recording… False` for both, and each capture `key False
+active False`. **Keep your hands off the keyboard while the last screen of each
+look runs.**
 
 **Unpinnable inputs.** The recorder's Source row names the host's display and
 its size note is that display's size (`RecorderPanelController+Rows.swift`);
@@ -6141,7 +6178,7 @@ scored. Exit 0 iff no row failed. A screen fails on a front-block problem
 README's "Running one" recipe), a tool error, a failed `expect` (its files
 deleted), or a sheet left attached (closed with `cancel_sheet`; one that will
 not close fails every later screen). Layout problems are classified against
-`KNOWN` (#129, #70) and new ones are reported, never scored.
+`KNOWN` (#70) and new ones are reported, never scored.
 
 **Outputs** in `<out>`: `<id>.<capture>.<light|dark>.png` and `.layout.json`,
 `screens.md`, `results.json` (the rows and, per capture, its PNG's sha256, scale,
@@ -6170,7 +6207,7 @@ The proof of V3's two app additions: the dev tool `select_inspector_tab` and
 `screens.launch` (the same pins) and builds `screens.py`'s `demo` fixture.
 
 ```sh
-python3 tools/proof/v3_tools.py [--port 4872] [--app APP] [--only L,T,R]   # → 7/7
+python3 tools/proof/v3_tools.py [--port 4872] [--app APP] [--only L,T,R]   # → 8/8
 ```
 
 - **L1**: as `screens.py`'s P1, plus the four dev tools in `dev_tools.py`'s
@@ -6189,11 +6226,19 @@ python3 tools/proof/v3_tools.py [--port 4872] [--app APP] [--only L,T,R]   # →
   reachable over MCP.
 - **R1**: before New Recording…, `snapshot_ui {window: recorder}` is refused
   `not open`, no `recorder` row is listed, and the menu listing has
-  `["File", "New Recording…"]` with verdict `window`. **R2, the LAST row**: it
-  is performed; `windows_opened` holds one `recorder` row; the capture's pixels
-  are its points × scale; `project` and `view` with it are refused by name; the
-  item is still titled `New Recording…`; the panel's `key` and `active` are
-  printed; the instance is stopped and `recorder panel up` printed (56–60 ms).
+  `["File", "New Recording…"]` with verdict `window`. **R2, the last row to
+  touch the app**: the listing's `active` is read, then the item is performed;
+  `windows_opened` holds one `recorder` row; the capture's pixels are its
+  points × scale; `project` and `view` with it are refused by name; the item is
+  still titled `New Recording…`; the readings are printed; the instance is
+  stopped and `recorder panel up` printed (56–60 ms before #137; 70 and 72 ms
+  on 2026-09-29). **R3** (#137) makes no MCP call: from R2's readings, with
+  Reelcut inactive before New Recording…, the answer's `active` and the
+  capture's `active` and `key` must all be false. It skips by name as `host:
+  console locked` or `host: Reelcut active before New Recording…`. Against the
+  build before the `show()` change (a `ditto` copy, `--app`) it FAILED —
+  `active before New Recording… False; the answer's active True; the capture's
+  active True key True` — and passed after it.
 
 **Mutants** (2026-09-27), each built with `make app`, run, restored and
 `cmp`-checked: `selectInspectorTab` calling `ClipPane.choose(_:)` instead of
@@ -7070,8 +7115,7 @@ popped; work in `work/spend_ui/`.
   start + 1 s priced, the previous month's end − 1 s, one unpriced, one
   torn) → Reelcut ▸ Settings… and `snapshot_ui window: settings`: the month
   line equals the script's own Python fold and sentence, the note is exact,
-  and neither label has a layout problem beyond #140's 2 pt label overhang,
-  which every label in Settings shows and which is counted apart; the tab
+  and neither label has a layout problem; the tab
   reads "Nothing yet", then after a two-reply and a one-reply pane turn
   "$%.4f · Reelcut's estimate" of the tool-view dollars, and Settings,
   re-captured (up to 5 s), equals the fold of the ledger as it now is; with
@@ -7100,6 +7144,13 @@ three $0.0006 responses, Settings "… 5 responses; …"); `local-month` 4/6
 (M1 dollars 100.375 for 0.875, M3 the month starting 2026-08-01 07:00 UTC),
 exit 1; `unknown-as-zero` 4/6 (M1 priced 5, unpriced 0; C3 also FAILs),
 exit 1. The person's two files were absent before and after.
+
+Measured again 2026-09-29 (issue batch B5), once U1 no longer counted a 2 pt
+label overhang apart (the layout rule measures alignment rects since #140):
+`spend_ui_proof.py` 10/10, U1's "layout problems on the two labels []" with
+the same month line as above, U2 the tab "$0.0018 · Reelcut's estimate" over
+three $0.0006 responses and Settings "… 5 responses; …"; the person's two
+files absent before and after.
 
 ## Issue batch B1 — export cancel, the nested gate, import_media's wait (`export_cancel_proof.py`, `export_cancel_probe.swift`)
 

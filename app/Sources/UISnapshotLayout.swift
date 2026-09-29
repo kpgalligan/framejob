@@ -13,8 +13,10 @@ import AppKit
 /// - **ambiguous** — `hasAmbiguousLayout` (V1's L1/L2 measured it truthful
 ///   in an `-O` build);
 /// - **outside_superview** — a view of non-zero area, not the root and not a
-///   clip view's document, whose frame passes its superview's bounds by
-///   more than `tolerance` on any side;
+///   clip view's document, whose ALIGNMENT rect (`alignmentRect(forFrame:)`,
+///   the rect Auto Layout pins) passes its superview's bounds by more than
+///   `tolerance` on any side — so a label pinned flush, whose frame is its
+///   alignment inset wider, is not one;
 /// - **truncated** — a text field with text whose intrinsic width passes its
 ///   frame by more than `tolerance`, unless it wraps (V1's L4–L7; #70 is
 ///   the shape of it).
@@ -109,12 +111,13 @@ enum UISnapshotLayout {
         return found
     }
 
-    /// `[left, top, right, bottom]` in points past the superview's bounds, or
-    /// nil when the view is within them (or exempt).
+    /// `[left, top, right, bottom]` in points the view's alignment rect
+    /// passes the superview's bounds by, or nil when it is within them (or
+    /// exempt). The zero-area exemption reads the frame.
     private static func overhang(_ view: NSView) -> [Double]? {
         guard let superview = view.superview, !(superview is NSClipView) else { return nil }
-        let frame = view.frame
-        guard frame.width * frame.height > 0 else { return nil }
+        guard view.frame.width * view.frame.height > 0 else { return nil }
+        let frame = view.alignmentRect(forFrame: view.frame)
         let bounds = superview.bounds
         let left = bounds.minX - frame.minX
         let right = frame.maxX - bounds.maxX

@@ -77,9 +77,11 @@ before any of its steps runs.
 
 **Menu items.** `perform_menu_item` takes a path of titles as the menu shows
 them (`["File", "Export…"]`). Only items the dev tool classifies `sheet` or
-`window` are allowed, and File ▸ New Recording… only in the LAST screen run: its
-panel becomes key and its default button is Record, so `screens.py` stops the
-instance straight after that screen's captures.
+`window` are allowed, and File ▸ New Recording… only in the LAST screen run:
+shown from the background its panel no longer takes key (spec §11, #137), but
+an instance that is active when it runs still gets a key panel whose default
+button is Record, and the script cannot hold its child inactive, so
+`screens.py` stops the instance straight after that screen's captures.
 
 ## The fixtures
 

@@ -5,7 +5,7 @@
 // compiles it LAST with every file in `app/Sources` but `main.swift`, over
 // `harness/build.sh`'s swiftc line (`-D REELCUT_DEV_TOOLS`), so the rules
 // measured are the ones the app ships. It prints exactly one stdout line,
-// `ANSWER <json>`: `{"P1": {"ok": Bool, "detail": String}, … "P6": …}`.
+// `ANSWER <json>`: `{"P1": {"ok": Bool, "detail": String}, … "P7": …}`.
 //
 // P1 an ambiguous view is one problem naming it, and the tree without it has
 //    none (the road map's mutant, here rather than in the running app);
@@ -14,7 +14,11 @@
 // P4 a truncating label is flagged, a fitting and a wrapping label are not;
 // P5 a view past its superview is flagged, a clip view's document and a
 //    zero-area view are not;
-// P6 `skipping` drops the view and its subtree.
+// P6 `skipping` drops the view and its subtree;
+// P7 the rule measures the ALIGNMENT rect (#140, #129): a label pinned flush
+//    to its container, whose frame passes it by the label's alignment inset,
+//    is not flagged, and a label whose alignment rect is 10 pt past its
+//    container is flagged with exactly that overhang.
 import AppKit
 
 final class V2ProbeAmbiguous: NSView {}
@@ -221,6 +225,56 @@ do {
         "ok": ok,
         "detail": "views \(allViews) → \(skippedViews) with skipping; problems "
             + "\(problems(all).count) → \(problems(skipped).count)",
+    ]
+    _ = w
+}
+
+// P7
+do {
+    let root = container()
+    let flushBox = NSView(frame: NSRect(x: 10, y: 150, width: 200, height: 100))
+    let controlBox = NSView(frame: NSRect(x: 10, y: 10, width: 200, height: 100))
+    root.addSubview(flushBox)
+    root.addSubview(controlBox)
+    let flush = NSTextField(labelWithString: "Flush to its container")
+    flush.translatesAutoresizingMaskIntoConstraints = false
+    flushBox.addSubview(flush)
+    let control = NSTextField(labelWithString: "Control")
+    control.translatesAutoresizingMaskIntoConstraints = false
+    controlBox.addSubview(control)
+    NSLayoutConstraint.activate([
+        flush.leadingAnchor.constraint(equalTo: flushBox.leadingAnchor),
+        flush.trailingAnchor.constraint(equalTo: flushBox.trailingAnchor),
+        flush.topAnchor.constraint(equalTo: flushBox.topAnchor),
+        control.trailingAnchor.constraint(equalTo: controlBox.trailingAnchor, constant: 10),
+        control.topAnchor.constraint(equalTo: controlBox.topAnchor),
+    ])
+    let w = window(root)
+    let report = UISnapshotLayout.report(root: root, skipping: nil)
+    let list = problems(report)
+    let f = index(of: flush, in: report, root: root) ?? -1
+    let c = index(of: control, in: report, root: root) ?? -1
+    let onFlush = list.filter { $0["view"] as? Int == f }
+    let onControl = list.filter {
+        $0["view"] as? Int == c && $0["kind"] as? String == "outside_superview"
+    }
+    let overhang = (onControl.first?["detail"] as? [String: Any])?["overhang"] as? [Double]
+    let inset = flush.alignmentRectInsets
+    let frame = flush.frame
+    let bounds = flushBox.bounds
+    let passes = frame.minX < bounds.minX - 0.5 || frame.maxX > bounds.maxX + 0.5
+        || frame.minY < bounds.minY - 0.5 || frame.maxY > bounds.maxY + 0.5
+    let ambiguous = flush.hasAmbiguousLayout || control.hasAmbiguousLayout
+    let ok = inset.left > 0.5 && passes && onFlush.isEmpty && onControl.count == 1
+        && overhang == [0, 0, 10, 0] && !ambiguous
+    answer["P7"] = [
+        "ok": ok,
+        "detail": "flush label #\(f): alignment insets [\(inset.left), \(inset.top), "
+            + "\(inset.right), \(inset.bottom)] (left must exceed 0.5, or the row proves "
+            + "nothing), frame \(frame) vs its container \(bounds): passes it \(passes), "
+            + "problems [\(summary(onFlush))]; control label #\(c): outside_superview "
+            + "\(onControl.count), overhang \(overhang.map { "\($0)" } ?? "none") (want "
+            + "[0, 0, 10, 0]); ambiguous \(ambiguous)",
     ]
     _ = w
 }

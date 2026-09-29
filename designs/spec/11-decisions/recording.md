@@ -101,3 +101,11 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   target, a microphone problem, a refused resume, a file the landing could
   not place, a failure). ⌥⌘N shows it again; while it is hidden, the quit
   guard opens the item's menu rather than beeping.
+- **The recorder panel takes key only from an active Reelcut** (#137,
+  2026-09-29). Shown with Reelcut active (File ▸ New Recording…, ⌥⌘N, the
+  welcome button), it comes to the front key, with Record on Return. Shown
+  with Reelcut in the background (a script's `perform_menu_item`, a Dock
+  quit while a tool records), it is ordered front without key: Reelcut
+  stays inactive, and the person's typing, Return included, stays in the
+  app in front. A click on it still works without activating Reelcut
+  (`.nonactivatingPanel`).

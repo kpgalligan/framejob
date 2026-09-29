@@ -44,7 +44,6 @@ The user asked for three things: a spend budget, a price on every call the assis
 - **The month is UTC's**, so near a month's turn Settings' figure differs from the person's local calendar month by up to a day (P-7's accepted risk).
 - **The road map 6 and 8 spikes keep their own AssemblyAI ledgers** outside the proofs' budget (#163).
 - **Fast, priority/batch and US-only usage is `unknown` in the app** and counted at the dearest standard rates by the proofs (P-2, P-6).
-- **The layout dump flags a 2 pt overhang on Settings' labels**, the month line included (#140, the NSTextField alignment inset); `spend_ui_proof.py`'s U1 counts it apart.
 
 ## Open items
 

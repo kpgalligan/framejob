@@ -42,11 +42,16 @@ PNG against the same name in an earlier run (not scored). Exit 0 iff no row
 failed.
 
 **The recorder panel.** File ▸ New Recording… puts up a non-activating panel
-that becomes key, whose default button is Record. So it is allowed only in
-the LAST screen run, its captures follow the perform at once, and the
-instance is stopped right after them; the time from the perform's answer to
-the child's exit is printed per look as `recorder panel up`. It goes up once
-per instance, so twice a run.
+whose default button is Record. Shown with Reelcut in the background it no
+longer takes key (spec §11, "The recorder panel takes key only from an active
+Reelcut", #137), but an instance that is ACTIVE when New Recording… runs
+still gets a key panel with Record on Return, and this script cannot hold its
+child inactive. So it is allowed only in the LAST screen run, its captures
+follow the perform at once, and the instance is stopped right after them;
+the time from the perform's answer to the child's exit is printed per look as
+`recorder panel up`, with the listing's `active` read before the perform
+(`active before New Recording…`). It goes up once per instance, so twice a
+run.
 """
 
 import argparse
@@ -178,7 +183,6 @@ NOT_SHOWN = {
 # Filed layout defects, each named by its issue. A problem's text is
 # `views[problem.view].text`.
 KNOWN = {
-    "#129": {"kind": "outside_superview", "class": "NSTextField", "text_prefix": "/ "},
     "#70": {"kind": "truncated", "class": "InspectorNoteLabel"},
 }
 
@@ -488,7 +492,10 @@ def validate(front, menu, last):
     steps("steps")
     steps("after")
     # The recorder screen's instance is stopped straight after its captures,
-    # so an `after` step there would run against a dead instance.
+    # so an `after` step there would run against a dead instance. It stays
+    # last and stopped: an instance active when New Recording… runs still
+    # gets a key panel with Record on Return (#137's decision), and the
+    # script cannot hold its child inactive.
     if any(isinstance(s, dict) and s.get("call") == "perform_menu_item"
            and (s.get("args") or {}).get("path") == NEW_RECORDING
            for s in front.get("steps", []) or []) and front.get("after"):
@@ -544,6 +551,7 @@ class Run:
         self.looks = {}
         self.recorder_ms = {}
         self.recorder_facts = {}
+        self.recorder_before = {}
         self.child = None
         self.begin(None)
 
@@ -685,6 +693,10 @@ class Run:
         if project:
             path, ids = self.fixture(project)
             self.call("open_project", {"path": path})
+        if any(isinstance(s, dict) and s.get("call") == "perform_menu_item"
+               and (s.get("args") or {}).get("path") == NEW_RECORDING
+               for s in front.get("steps", []) or []):
+            self.recorder_before[self.look] = self.snap({}).get("active")
         performed_recorder = None
         for step, answer in self.run_steps(front.get("steps", []), path, ids):
             if step["call"] == "perform_menu_item" and step["args"].get("path") == NEW_RECORDING:
@@ -703,8 +715,9 @@ class Run:
                 answer = self.snap(arguments)
                 captures.append((cap, look, answer))
         except BaseException:
-            # The recorder panel is key with Reelcut in front and its Return is
-            # Record: a failed capture stops the instance NOW, not at finish().
+            # The recorder panel is key when Reelcut was active before it, and
+            # its Return is Record: a failed capture stops the instance NOW,
+            # not at finish(). The script cannot hold its child inactive.
             if performed_recorder is not None:
                 stop(self.child)
                 self.recorder_ms[look] = int(round((time.monotonic() - performed_recorder) * 1000))
@@ -1014,7 +1027,8 @@ def main():
               f"at {problem['frame']} {problem.get('detail')}")
     for look in LOOKS:
         if look in run.recorder_ms:
-            print(f"recorder panel up ({look}): {run.recorder_ms[look]} ms")
+            print(f"recorder panel up ({look}): {run.recorder_ms[look]} ms; active before New "
+                  f"Recording… {run.recorder_before.get(look)}")
             for facts in run.recorder_facts.get(look) or []:
                 print(f"  recorder capture: key {facts.get('key')} active {facts.get('active')} "
                       f"occluded {facts.get('occluded')}")

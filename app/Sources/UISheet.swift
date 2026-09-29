@@ -65,6 +65,8 @@ enum UISheet {
     /// there is nothing it may press.
     static func cancel(_ sheet: NSWindow) -> (how: Cancel, button: String?)? {
         if sheet is NSSavePanel {
+            // Not reached for a parentless panel: `cancelSheet` refuses it
+            // first, in its own words.
             guard let parent = sheet.sheetParent else { return nil }
             parent.endSheet(sheet, returnCode: .cancel)
             return (.endSheet, nil)

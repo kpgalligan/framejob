@@ -30,8 +30,9 @@ Two captures whose `scale`, `active`, `key` or `color_space` differ are never
 compared: that row is a named host skip.
 
 L2 compares the dump's `problems` to `KNOWN`, the FILED layout defects (each
-named by its issue): it fails on a problem not listed and on a listed defect
-that no longer appears. The tool itself exempts nothing. Pixel thresholds are
+named by its issue; none today, so L2 expects no problem): it fails on a
+problem not listed and on a listed defect that no longer appears. The tool
+itself exempts nothing. Pixel thresholds are
 for colour-managed captures (see `yellow`).
 """
 
@@ -75,19 +76,15 @@ EPISODE = 60
 # still reports them; L2 fails on any problem not matched here AND on a listed
 # defect that no longer appears, so a fix forces this list to shrink. Each
 # entry matches kind, class, the view's text and its frame (capture points).
-# #129 was measured the same — frame [367, 15, 90, 14], overhang
-# [0, 0, 2, 0] — at content widths 900–1440 pt (the window's minimum is 900)
-# on a scale-1 and a scale-2 screen, so it does not depend on either.
-KNOWN = {
-    "#129": {"kind": "outside_superview", "class": "NSTextField",
-             "text": "/ 00:00:06:00", "frame": [367, 15, 90, 14]},
-}
+# Empty: the one entry, the toolbar's duration label, was its frame's 2 pt
+# alignment inset, and the rule measures the alignment rect now (P7).
+KNOWN = {}
 
 ROWS = [("T1", "I"), ("T2", "C"), ("N1", "A"), ("O0", "I"), ("O1", "A"), ("O2", "A"),
         ("O3", "A"), ("O5", "A"), ("C1", "A"), ("C2", "A"), ("C3", "A"), ("C4", "A"),
         ("C5", "A"), ("F0", "A"), ("F1", "A"), ("F2", "A"), ("F3", "A"), ("F4", "A"),
         ("A1", "A"), ("A2", "A"), ("L1", "A"), ("L2", "A"), ("L3", "A"), ("P1", "C"),
-        ("P2", "C"), ("P3", "C"), ("P4", "C"), ("P5", "C"), ("P6", "C")]
+        ("P2", "C"), ("P3", "C"), ("P4", "C"), ("P5", "C"), ("P6", "C"), ("P7", "C")]
 KIND = dict(ROWS)
 states = {}
 captures = []
@@ -824,7 +821,7 @@ def rows_l(mcp):
 
 
 def rows_p(probe, probe_error):
-    ids = [f"P{i}" for i in range(1, 7)]
+    ids = [f"P{i}" for i in range(1, 8)]
     if probe is None:
         for rid in ids:
             score(rid, "fail", probe_error)

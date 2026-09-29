@@ -60,6 +60,9 @@ import ScreenCaptureKit
 /// `hiddenForRecording` (R1 review) — the welcome window's button reaches
 /// it — because a panel un-hidden into the recording would be in the file;
 /// the quit guard goes through `revealControls()` instead (`+Pause.swift`).
+/// **It takes key only from an active Reelcut** (spec §11, #137): shown from
+/// the background it is ordered front without key, so Return stays with
+/// the app in front.
 ///
 /// Two limits of that chrome, accepted (R2 review). With the panel hidden
 /// the status item is the ONLY Pause and Resume, and macOS drops a status
@@ -324,8 +327,12 @@ final class RecorderPanelController: NSWindowController {
         refreshSizeNote()
         fitWindowToContent()
         floatAgain()
-        showWindow(nil)
-        window?.makeKeyAndOrderFront(nil)
+        if NSApp.isActive {
+            showWindow(nil)
+            window?.makeKeyAndOrderFront(nil)
+        } else {
+            window?.orderFrontRegardless()
+        }
         armSyncTimer()
     }
 

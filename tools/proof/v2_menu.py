@@ -4,7 +4,7 @@ the running app.
 
     python3 tools/proof/v2_menu.py <port> [--log PATH] [--only LETTERS]
 
-`--only` takes row letters (`T,H,N,D,U,R,S`); omitted, every row runs. The app
+`--only` takes row letters (`T,H,N,D,U,R,S,L`); omitted, every row runs. The app
 is the Release build on `<port>`, launched with the V2b spec's Verification
 line (V2a's pinned defaults plus `-RCSecretFolder` under
 `work/v2_menu/secrets` and `-RCSpendFolder` under `work/v2_menu/spend` —
@@ -20,13 +20,27 @@ case an agent is in while a person works in other apps. One episode, under
 is ever activated. Reelcut active skips every D row as `host: Reelcut
 active`; a locked console as `host: console locked`.
 
-Before the first MCP call the script writes two fixtures
+Before the first MCP call the script writes three fixtures
 (`work/v2_menu/fixtures/menu_{a,b}.reelcut`, version 10, 640×360 at 30 fps,
-one track, a shape at 0 s and one at 3 s) and, for the H rows, builds
+one track, a shape at 0 s and one at 3 s; `menu_late.reelcut`, the same with
+the first shape only), deletes `fixtures/late.mov` and, for the H rows, builds
 `v2_menu_probe.swift` over `harness/build.sh`'s swiftc line into
 `work/v2_menu/probe/` with the graphic templates beside it. A build that
 fails is a scored FAIL of the rows that need it. B is opened, then A (A is
 the front project). Every readback is a relative count from `get_project`.
+H5 is #133's case in the probe: an item whose own target does not answer
+its action has no target and is disabled.
+
+**L1 (#135), the late sheet, runs last.** It opens `menu_late.reelcut`, adds
+a 2 s video media at `late.mov` (missing) and a clip of it at 6 s, and
+reverses the clip: a missing file makes no reverse job, so no sheet (checked).
+It then writes `late.mov` as non-movie bytes, so the reverse render fails and
+its sheet stays up with Close, and performs Add Marker: the edit's
+`ensureReversedMedia` puts the reverse progress sheet up a run-loop turn
+AFTER the action returns. It passes when `sheet_at_return` is false, `sheet`
+is not null, the settle settled, the markers went +1 and the sheet's layout
+shows a visible "Reversing"; the sheet is then closed with `cancel_sheet`
+(at most three calls). `perform_ms` and `settle_ms` are printed.
 
 The script performs only Add Marker, Export… (cancelled), Remove Track
 (cancelled), Add Media… (cancelled) and Settings…, plus the items it expects
@@ -68,14 +82,17 @@ TICKS = 600_000
 PLAYHEAD = 600_000
 A = os.path.join(FIXTURES, "menu_a.reelcut")
 B = os.path.join(FIXTURES, "menu_b.reelcut")
+LATE = os.path.join(FIXTURES, "menu_late.reelcut")
+LATE_MOVIE = os.path.join(FIXTURES, "late.mov")
 PROPERTIES = {"perform_menu_item": {"path", "project"}, "cancel_sheet": {"project"}}
 STRANGER = "v2_stranger_key"
 FAKE = "v2Stranger:"
 
 ROWS = [("T1", "I"), ("T2", "C"), ("H1", "I"), ("H2", "A"), ("H3", "A"), ("H4", "C"),
-        ("N1", "A"), ("D0", "I"), ("D1", "A"), ("D2", "A"), ("D3", "A"), ("D4", "A"),
+        ("H5", "C"), ("N1", "A"), ("D0", "I"), ("D1", "A"), ("D2", "A"), ("D3", "A"), ("D4", "A"),
         ("U1", "A"), ("R1", "A"), ("R2", "A"), ("R3", "A"), ("R4", "A"), ("R5", "A"),
-        ("R6", "A"), ("S1", "A"), ("S2", "A"), ("S3", "A"), ("S4", "A"), ("S5", "A")]
+        ("R6", "A"), ("S1", "A"), ("S2", "A"), ("S3", "A"), ("S4", "A"), ("S5", "A"),
+        ("L1", "A")]
 KIND = dict(ROWS)
 states = {}
 answers = []
@@ -98,6 +115,10 @@ def make_fixtures():
         snapshot.write_package(path, canvas, [
             snapshot.shape(2, 0, [1.0, 1.0, 0.0, 1.0]),
             snapshot.shape(3, 3 * TICKS, [0.0, 1.0, 1.0, 1.0])])
+    snapshot.write_package(LATE, canvas, [snapshot.shape(2, 0, [1.0, 1.0, 0.0, 1.0])])
+    # L1's media file must be MISSING until the row writes it.
+    if os.path.exists(LATE_MOVIE):
+        os.remove(LATE_MOVIE)
 
 
 def build_probe():
@@ -263,7 +284,7 @@ def expected_refusal(selector, verdicts):
 
 
 def rows_h(probe, probe_error):
-    ids = ["H1", "H2", "H3", "H4"]
+    ids = ["H1", "H2", "H3", "H4", "H5"]
     answer, why = (None, probe_error) if probe is None else run_probe(probe)
     if answer is None:
         for rid in ids:
@@ -305,6 +326,11 @@ def rows_h(probe, probe_error):
     score("H4", "pass" if ok else "fail",
           f"a fake leaf {FAKE} → the checker reported {found}; the table without {removed} → "
           f"differs at {missing}")
+    target = answer.get("target")
+    if not isinstance(target, dict):
+        score("H5", "fail", "the probe's answer has no \"target\" case")
+    else:
+        score("H5", "pass" if target.get("ok") else "fail", target.get("detail", ""))
 
 
 def rows_n(mcp):
@@ -562,6 +588,62 @@ def row_s5():
 
 
 # ---------------------------------------------------------------------------
+# L: a sheet that arrives after the action returns (#135).
+
+
+def rows_l(mcp):
+    """A reversed clip whose media is missing makes no reverse job and no
+    sheet; once the file exists (non-movie bytes, so the render fails and its
+    sheet stays up with Close), the next edit's `ensureReversedMedia` puts the
+    reverse progress sheet up a run-loop turn AFTER the action returns."""
+    mcp.call_with("open_project", {"path": LATE})
+    added = mcp.call_with("add_media", {"project": LATE, "descriptor": {
+        "path": LATE_MOVIE, "kind": "video", "duration": 2 * TICKS, "width": 640,
+        "height": 360, "fps": [30, 1]}})
+    media = added["media"]
+    clip = mcp.call_with("add_clip", {"project": LATE, "track": 1, "media": media,
+                                      "at": 6 * TICKS})["new_clips"][0]
+    mcp.call_with("set_reversed", {"project": LATE, "clip": clip, "reversed": True})
+    before = (listing(mcp, LATE).get("window") or {}).get("sheet")
+    if before is not None:
+        score("L1", "fail", f"a sheet was up before the file existed: {before}")
+        return
+    with open(LATE_MOVIE, "wb") as f:
+        f.write(b"not a movie\n" * 64)
+    m0 = markers(mcp, LATE)
+    r = perform(mcp, ["Mark", "Add Marker"], LATE)
+    m1 = markers(mcp, LATE)
+    visible = False
+    if r["sheet"] is not None:
+        shot = snapshot.snap(mcp, window="sheet", project=LATE,
+                             path=os.path.join(PNG, "l1_late.png"))
+        views = snapshot.load_layout(shot)["views"]
+        visible = any("Reversing" in (v.get("text") or "") and not v.get("hidden")
+                      for v in views)
+    closed, calls = False, 0
+    while calls <= 3:
+        rows = {canonical(w.get("project")): w for w in windows(mcp) if w.get("kind") == "editor"}
+        if (rows.get(canonical(LATE)) or {}).get("sheet") is None:
+            closed = True
+            break
+        if calls == 3:
+            break
+        calls += 1
+        try:
+            cancel(mcp, LATE)
+        except ToolError:
+            pass
+    ok = (r.get("sheet_at_return") is False and r["sheet"] is not None and r["settled"] is True
+          and m1 - m0 == 1 and visible and closed)
+    score("L1", "pass" if ok else "fail",
+          f"sheet before the file {before}; Add Marker: sheet_at_return "
+          f"{r.get('sheet_at_return')}, sheet after the settle {(r['sheet'] or {}).get('class')}, "
+          f"settled {r['settled']}, perform {r['perform_ms']} ms, settle {r['settle_ms']} ms, "
+          f"markers +{m1 - m0}; visible \"Reversing\" {visible}; closed after {calls} "
+          f"cancel_sheet call(s) {closed}")
+
+
+# ---------------------------------------------------------------------------
 
 
 def guarded(letter, rows, *args):
@@ -590,7 +672,7 @@ def main():
     parser.add_argument("--only")
     args = parser.parse_args()
     log = args.log or f"/tmp/reelcut-{args.port}.log"
-    only = set(args.only.replace(" ", "").split(",")) if args.only else set("THNDURS")
+    only = set(args.only.replace(" ", "").split(",")) if args.only else set("THNDURSL")
     selected = [rid for rid, _ in ROWS if rid[0] in only]
 
     shutil.rmtree(PNG, ignore_errors=True)
@@ -618,6 +700,8 @@ def main():
         guarded("S", rows_s, mcp)
         if "S5" not in states:
             row_s5()
+    if "L" in only:
+        guarded("L", rows_l, mcp)
 
     for rid in selected:
         if rid not in states:

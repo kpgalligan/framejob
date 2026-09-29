@@ -15,8 +15,8 @@ in both appearances (System Settings ▸ Appearance, Light then Dark).
 2. Open the Release app from the Finder, or with
    `open build/Build/Products/Release/Reelcut.app`. **Not from a terminal**:
    a terminal-launched app's permissions (Screen Recording, Microphone)
-   belong to the terminal, not to Reelcut. Only REC-3 and HS-2 launch from
-   a terminal on purpose.
+   belong to the terminal, not to Reelcut. Only REC-3, REC-7 and HS-2
+   launch from a terminal on purpose.
 3. Have to hand:
    - **Real footage**: a 1080p movie with sound, a long recording (twenty
      minutes or more), an AAC file and a WAV file.
@@ -359,6 +359,11 @@ To take a permission away again: System Settings ▸ Privacy & Security, or
 - **Do:** Record the main display with Show Clicks on and click a few times; again with it off.
 - **Expect:** rings at each click in the first file; none in the second.
 - **Source:** #55.
+
+**REC-7 — The panel shown from the background leaves your typing alone**
+- **Do:** 1. Launch Reelcut from Terminal as in CLAUDE.md's "Verifying a build" (port 4817) and open a project. 2. In a second Terminal tab, in the repository, run `sleep 5 && python3 -c 'import sys; sys.path.insert(0, "tools/proof"); from mcp import MCP; MCP(4817).call("perform_menu_item", path=["File", "New Recording…"])'`, then within the five seconds click into a TextEdit document. 3. When the panel appears, type a few words and press Return without clicking anything. 4. Click the panel's Close. 5. Click Reelcut's project window and press ⌥⌘N.
+- **Expect:** in step 3 the New Recording panel is in front of TextEdit, TextEdit keeps the focus, the words and the Return land in TextEdit, and no countdown starts. In step 4 the panel closes without bringing Reelcut's windows forward. In step 5 the panel comes up key, with Record as its default button.
+- **Source:** #137; spec §11 recording.md (the recorder panel takes key only from an active Reelcut).
 
 ## Assistant
 

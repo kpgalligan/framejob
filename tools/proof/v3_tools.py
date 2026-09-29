@@ -11,12 +11,18 @@ the same pins, an empty secret folder, the port from the log), builds the
 `tools/proof/work/v3_tools/<stamp>/`. It kills only the process it started.
 
 Rows, in order: `L1` the launch and the catalog; `T1`–`T4` the tab tool;
-`R1`–`R2` the recorder window. **R2 is the LAST row**: it puts up File ▸ New
-Recording…, whose non-activating panel becomes key with Record as its default
-button, captures it, reads its refusals and stops the instance at once; the
+`R1`–`R3` the recorder window. **R2 is the last row to touch the app**: it
+reads the listing's `active`, puts up File ▸ New Recording…, captures the
+panel, reads its refusals and stops the instance at once — an instance that
+was active when it ran still gets a key panel with Record on Return; the
 time from the perform's answer to the child's exit is printed as `recorder
-panel up`. Rows print as `<ID> <pass|fail|skip> — <reason>`, then `scores:` and
-`digest:`. Exit 0 iff no row failed.
+panel up`. `R3` (#137) makes no MCP call: from R2's readings, the panel
+shown with Reelcut in the background must leave it so — the perform's answer
+`active` false and the capture's `active` and `key` false (spec §11, "The
+recorder panel takes key only from an active Reelcut"). It is a named host
+skip when the console is locked or Reelcut was active before New
+Recording…. Rows print as `<ID> <pass|fail|skip> — <reason>`, then `scores:`
+and `digest:`. Exit 0 iff no row failed.
 
 Two deviations from the V3 spec's row text, both because a section's TITLE is
 drawn by `InspectorSectionHeader.draw` (`InspectorSectionHeader.swift:139`) and
@@ -38,9 +44,10 @@ sys.path.insert(0, HERE)
 import screens  # noqa: E402
 from dev_tools import DEV_TOOLS  # noqa: E402
 from mcp import MCP, ToolError  # noqa: E402
+from media_less_playback_probe import console_locked  # noqa: E402
 
 WORK = os.path.join(HERE, "work", "v3_tools")
-ROWS = ["L1", "T1", "T2", "T3", "T4", "R1", "R2"]
+ROWS = ["L1", "T1", "T2", "T3", "T4", "R1", "R2", "R3"]
 TABS = ["clip", "media", "document", "assistant"]
 SUBS = ["text", "shape", "graphic", "picture", "sound", "clip"]
 states = {}
@@ -60,6 +67,9 @@ class Proof:
         self.demo = None
         self.ids = {}
         self.recorder_ms = None
+        # R2's readings, for R3: the listing's `active` before the perform,
+        # the answer's `active` and the capture's `window_facts`.
+        self.r2 = None
 
     def tab(self, **arguments):
         return self.mcp.call_with("select_inspector_tab", dict(arguments, project=self.demo))
@@ -234,8 +244,10 @@ class Proof:
               f"{kinds}; New Recording… verdict {item and item.get('verdict')!r}")
 
     def row_r2(self):
+        before = self.mcp.call("perform_menu_item", project=self.demo).get("active")
         answer = self.mcp.call("perform_menu_item", project=self.demo, path=screens.NEW_RECORDING)
         up = time.monotonic()
+        self.r2 = {"before": before, "active": answer.get("active"), "facts": None}
         notes, ok = [], True
         try:
             shot, _ = self.snap("r2_recorder", window="recorder")
@@ -250,6 +262,7 @@ class Proof:
             items = self.mcp.call("perform_menu_item", project=self.demo)["items"]
             titled = any(i["path"] == screens.NEW_RECORDING for i in items)
             facts = shot.get("window_facts") or {}
+            self.r2["facts"] = shot.get("window_facts")
             ok = (len(opened) == 1 and sized and with_project is not None
                   and "project" in with_project and with_view is not None
                   and "view" in with_view and titled)
@@ -259,13 +272,35 @@ class Proof:
                      f"with project: {(with_project or 'ACCEPTED')[:70]!r}",
                      f"with view: {(with_view or 'ACCEPTED')[:70]!r}",
                      f"listing still titles New Recording… {titled}",
-                     f"panel key {facts.get('key')} active {facts.get('active')} (not scored)"]
+                     f"active before {before}; answer active {answer.get('active')}; "
+                     f"panel key {facts.get('key')} active {facts.get('active')} (R3 scores it)"]
         except (ToolError, OSError, RuntimeError, KeyError) as error:
             ok = False
             notes.append(f"threw: {error}")
         screens.stop(self.child)
         self.recorder_ms = int(round((time.monotonic() - up) * 1000))
         score("R2", "pass" if ok else "fail", "; ".join(notes))
+
+    def row_r3(self):
+        if console_locked():
+            score("R3", "skip", "host: console locked")
+            return
+        if self.r2 is None:
+            score("R3", "fail", "R2 did not run, so there is nothing to read")
+            return
+        before, active, facts = self.r2["before"], self.r2["active"], self.r2["facts"]
+        if before is True:
+            score("R3", "skip", f"host: Reelcut active before New Recording… ({before})")
+            return
+        if before is not False:
+            score("R3", "fail", f"the listing's active before New Recording… read {before!r}, "
+                  "not a bool")
+            return
+        facts = facts or {}
+        ok = active is False and facts.get("active") is False and facts.get("key") is False
+        score("R3", "pass" if ok else "fail",
+              f"active before New Recording… {before}; the answer's active {active}; the "
+              f"capture's active {facts.get('active')} key {facts.get('key')} (want all false)")
 
 
 def main():

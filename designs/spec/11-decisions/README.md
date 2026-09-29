@@ -12,7 +12,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | File | Lines | Holds |
 |---|---|---|
 | [`foundations.md`](foundations.md) | 106 | **Foundations (M1–M3, road map 2).** AVFoundation not ffmpeg, the compositor, one op entry point, overlap and ripple rules, ticks, `async` confinement, media by reference; R2-1. |
-| [`recording.md`](recording.md) | 103 | **Screen recording (road map 3).** The recorder: what is in and out, files, grants, pause. |
+| [`recording.md`](recording.md) | 111 | **Screen recording (road map 3).** The recorder: what is in and out, files, grants, pause. |
 | [`silence.md`](silence.md) | 49 | **Remove Silences (road map 4).** Silero VAD, its grid and cache, voice mode; S1-23. |
 | [`effects-motion.md`](effects-motion.md) | 60 | **Transitions and motion (road map 5).** R5-1..R5-5, E2-27. |
 | [`deepening.md`](deepening.md) | 268 | **Deepening (road map 7).** D2-1, D3-1, #21, #22, D4-1..D4-6, D7-1..D7-3: how ops refuse, the op table, the gate, the source window, time envelopes. |
@@ -55,6 +55,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | — | Undo of Add Recording leaves the files on disk | [`recording.md`](recording.md) |
 | — | A paused recording is a SEQUENCE of files over ONE stream | [`recording.md`](recording.md) |
 | — | The recorder panel goes away when a recording starts, for every source, and comes back only with something to say | [`recording.md`](recording.md) |
+| — | The recorder panel takes key only from an active Reelcut | [`recording.md`](recording.md) |
 | — | The silence detector's second signal is a voice-activity model, and the model is Silero VAD v6.2.1 as a Core ML program | [`silence.md`](silence.md) |
 | — | Edges come from the model's own 32 ms grid, inward; the level rule is the judge only where no voice is found | [`silence.md`](silence.md) |
 | — | The probabilities are a per-media CACHE, never computed at feature time | [`silence.md`](silence.md) |

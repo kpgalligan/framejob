@@ -23,8 +23,7 @@ The Release app (`assistant_session_proof`'s `App`, `Fake`, `secret_folder`;
       the previous month's end − 1 s, one unpriced line, one torn line):
       Reelcut ▸ Settings…, `snapshot_ui window: settings` → the month line
       equals this script's own fold and sentence, the note is exact, and
-      neither label has a layout problem (#140's 2 pt label overhang, which
-      every label in Settings shows, is counted apart and not scored)
+      neither label has a layout problem
   U2  the tab's `assistant.spend` reads "Nothing yet"; a two-reply pane turn
       and a one-reply turn → "$%.4f · Reelcut's estimate" of the tool-view
       dollars; Settings, re-captured (polled up to 5 s), equals the fold of
@@ -185,15 +184,9 @@ class SettingsDump:
         return texts[0] if texts else None
 
     def problems_on(self, identifiers):
-        """(problems, #140's) on the views named: #140 is the 2 pt
-        `outside_superview` every label in this window shows (an NSTextField's
-        alignment inset, filed against the layout rule), counted apart."""
+        """The layout problems on the views named, every kind."""
         indices = {v["i"] for v in self.views if v.get("id") in identifiers}
-        mine = [p for p in self.problems if p.get("view") in indices]
-        known = [p for p in mine if p.get("kind") == "outside_superview"
-                 and p.get("class") == "NSTextField"
-                 and max((p.get("detail") or {}).get("overhang") or [99]) <= 2]
-        return [p for p in mine if p not in known], known
+        return [p for p in self.problems if p.get("view") in indices]
 
 
 def settings_until(app, want, name):
@@ -255,13 +248,12 @@ def rows_u(fake, secrets, score):
             dump = settings_until(app, want, "u1")
             got, note = dump.text("settings.assistant.spend"), dump.text(
                 "settings.assistant.spendnote")
-            problems, known = dump.problems_on({"settings.assistant.spend",
-                                                "settings.assistant.spendnote"})
+            problems = dump.problems_on({"settings.assistant.spend",
+                                         "settings.assistant.spendnote"})
             kinds = [w.get("kind") for w in opened.get("windows_opened", [])]
             score("U1", got == want and note == NOTE and not problems,
                   f"Settings… opened {kinds}; month line {got!r}, the oracle {want!r}; note "
-                  f"exact {note == NOTE}; layout problems on the two labels {problems[:3]} "
-                  f"(and {len(known)} of #140's 2 pt label overhangs, not counted)")
+                  f"exact {note == NOTE}; layout problems on the two labels {problems[:3]}")
         except Exception as error:  # noqa: BLE001 — an instrument that cannot run is a FAIL
             score("U1", False, f"the instrument could not run: {type(error).__name__}: {error}")
             score("U2", False, "not run: U1 could not open the tab and Settings")

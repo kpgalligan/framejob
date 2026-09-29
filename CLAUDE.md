@@ -312,8 +312,9 @@ catalogued screen at once, `python3 tools/proof/screens.py` walks
 `designs/screens/`, once per look, each time on its own pinned instance. It
 writes each screen's PNGs and layout dumps and one `screens.md` with the
 prose and each capture's layout problems. The last screen is the recorder
-panel, which brings Reelcut to the front with Record on Return, so the
-script stops each instance straight after capturing it.
+panel: shown from the background it no longer takes key (#137), but an
+instance that is active when it runs still gets a key panel with Record on
+Return, so the script stops each instance straight after capturing it.
 
 Two rules from it worth carrying into any proof: **identical, stable,
 DIFFERENT output across processes is an Auto Layout ambiguity to find, not a
