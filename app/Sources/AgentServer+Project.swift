@@ -77,13 +77,21 @@ extension AgentServer {
 
     /// `save_project` — ⌘S. An untitled project (a movie opened as one, or a
     /// `new_project` with no path) has no file yet, so `path` is required for
-    /// it and optional everywhere else; passing one always writes there, the
-    /// way Save As does.
+    /// it and optional everywhere else; passing one writes there, the way
+    /// Save As does — unless it names the document's own file, however
+    /// spelled (`canonical`), which is a plain save: Save As onto itself
+    /// would re-spell the document's path as the caller wrote it (#138).
     func saveProject(_ a: [String: Any]) throws -> String {
         let document = try onMain { try self.target(a) }
         let existing = onMain { document.fileURL }
         if let path = try stringArg(a, "path") {
             let url = Self.destinationURL(path, extension: ProjectDocument.projectFileExtension)
+            if let existing, Self.canonical(url.path) == Self.canonical(existing.path) {
+                try save(document, to: existing, operation: .saveOperation)
+                return try onMain {
+                    try self.jsonResult(["saved": existing.path, "project": self.summary(document)])
+                }
+            }
             try save(document, to: url, operation: .saveAsOperation)
             return try onMain {
                 try self.jsonResult(["saved": url.path, "project": self.summary(document)])

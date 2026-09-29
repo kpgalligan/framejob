@@ -11,7 +11,7 @@
   "showSettings:": {
    "verdict": "window",
    "code": [
-    "app/Sources/SettingsWindowController.swift:450"
+    "app/Sources/SettingsWindowController.swift:371"
    ],
    "note": "SettingsWindowController.shared.show()"
   },
@@ -1055,37 +1055,37 @@
    "reached_after": [],
    "other_caller": "app/Sources/PreviewCanvasView.swift:777 — Escape in the canvas text editor with unapplied text"
   },
-  "app/Sources/ProjectDocument.swift:930": {
+  "app/Sources/ProjectDocument.swift:927": {
    "token": "presentAsSheet",
    "reached_from": [],
    "reached_after": [
     {
      "selector": "openDocument:",
      "via": "app/Sources/ProjectDocument.swift:455",
-     "gate": "app/Sources/ProjectDocument.swift:919 — a reversed clip whose reverse is not rendered"
+     "gate": "app/Sources/ProjectDocument.swift:916 — a reversed clip whose reverse is not rendered"
     },
     {
      "selector": "showSpeedSheet:",
      "via": "app/Sources/ProjectDocument.swift:1265",
-     "gate": "app/Sources/ProjectDocument.swift:919 — the sheet committed a reverse"
+     "gate": "app/Sources/ProjectDocument.swift:916 — the sheet committed a reverse"
     },
     {
      "selector": "undo:",
      "via": "app/Sources/ProjectDocument.swift:1265",
-     "gate": "app/Sources/ProjectDocument.swift:919 — as above"
+     "gate": "app/Sources/ProjectDocument.swift:916 — as above"
     },
     {
      "selector": "redo:",
      "via": "app/Sources/ProjectDocument.swift:1265",
-     "gate": "app/Sources/ProjectDocument.swift:919 — as above"
+     "gate": "app/Sources/ProjectDocument.swift:916 — as above"
     },
     {
      "selector": "paste:",
      "via": "app/Sources/ProjectDocument.swift:1265",
-     "gate": "app/Sources/ProjectDocument.swift:919 — as above"
+     "gate": "app/Sources/ProjectDocument.swift:916 — as above"
     }
    ],
-   "other_caller": "app/Sources/ProjectDocument.swift:940 — the Video tab's Render Reverse button; app/Sources/ReverseRenderer.swift:1222 — after the sheet closes"
+   "other_caller": "app/Sources/ProjectDocument.swift:937 — the Video tab's Render Reverse button; app/Sources/ReverseRenderer.swift:1222 — after the sheet closes"
   },
   "app/Sources/ProjectDocument.swift:1332": {
    "token": "presentError",

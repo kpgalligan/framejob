@@ -4964,7 +4964,7 @@ def section_hygiene(binary, sources):
         and "CloudTranscriber(" in open(os.path.join(sources, name)).read())
     check("S: `CloudTranscriber(` is constructed in exactly THREE files of app/Sources — "
           "the tool's cloud arm, the Settings window's Verify and the sheet's cloud run",
-          others == ["AgentServer+CloudCaptions.swift", "SettingsWindowController.swift",
+          others == ["AgentServer+CloudCaptions.swift", "SettingsWindowController+Verify.swift",
                      "TranscribeSheetController+Cloud.swift"], f"found in {others!r}")
     keyterms = sorted(
         name for name in os.listdir(sources)
@@ -6310,7 +6310,7 @@ MUTANTS = {
         "        if false {\n",
         "queued successful completion places captions despite a later Stop"),
     "verify-ignores-input": (
-        "SettingsWindowController.swift",
+        "SettingsWindowController+Verify.swift",
         "        guard let credential,\n"
         "            (try? verificationInput(credential: credential)) == input\n"
         "        else {\n",
@@ -6318,7 +6318,7 @@ MUTANTS = {
         "the owning Verify completion announces an answer after its inputs changed "
         "(settings_verify section)"),
     "verify-ignores-owner": (
-        "SettingsWindowController.swift",
+        "SettingsWindowController+Verify.swift",
         "        guard verifying?.id == id else { return }\n",
         "        // Mutant: every completion may write the status and controls.\n",
         "an older Verify completion can retire and answer for a newer request "
@@ -6453,13 +6453,8 @@ MUTANTS = {
         "finding 2, reverted (row 18's region row)"),
     "two-stores-per-sync": (
         "SettingsWindowController.swift",
-        "        let store = self.store()\n"
-        "        let stored = store.read()\n"
-        "        let credential = AssemblyAIConfiguration.credential(\n"
-        "            store: store, environment: environment)\n",
-        "        let stored = store().read()\n"
-        "        let credential = AssemblyAIConfiguration.credential(\n"
-        "            store: store(), environment: environment)\n",
+        "        let credential = effectiveCredential(storedCredential: stored)\n",
+        "        let credential = effectiveCredential(storedCredential: self.store().read())\n",
         "the store factory called twice per sync \u2014 05-review's nit 4, reverted "
         "(row 18's sync row)"),
     # The reader review's NAMED MUTANTS of today's tree (road map 6

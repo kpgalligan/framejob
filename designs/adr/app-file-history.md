@@ -379,8 +379,6 @@ to pay a toll starts from it. A file not listed has no named seam yet.
 - `CompositionBuilder.swift`: `audioParameters`.
 - `AppDelegate+Menus.swift`: a submenu builder out (the precedent is
   `AppDelegate+GraphicMenu.swift`).
-- `SettingsWindowController.swift`: over its 400-line new-file cap; the Verify bookkeeping to
-  `SettingsWindowController+Verify.swift` (#58).
 - `AgentServer+Recording.swift`: `RecordingToolChrome` (the status-item wrapper with `freeze()`)
   out (road map 3 R2).
 - `Controls.swift`: held to the sync rule with Rasterize's copy (`app/CLAUDE.md` "Shared chrome");
@@ -396,8 +394,6 @@ to pay a toll starts from it. A file not listed has no named seam yet.
 - A person drags a clip and sees no flash to 0 and no jump. Tracked in #48 ("Dragging a clip
   leaves the timeline still").
 - `relink_media` re-probe (#63) and caption-name agreement (#43).
-- `SettingsWindowController.swift` is 453 lines, over the 400-line cap for a new file. Tracked in
-  #58.
 - Rasterize's `BlockSliderCell.drawBar` still has the SH-2 defect upstream. Tracked in #101.
 - SH-1: square `StickerButton` or move its callers ("a phase of its own"). Tracked in #100.
 - Pause/Resume live only in a status item that macOS can hide (#98); two open documents at one

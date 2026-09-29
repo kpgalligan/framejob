@@ -26,10 +26,16 @@ import AppKit
 ///
 /// **Undo.** An action run here is outside an AppKit event, so an edit it
 /// makes would land in the implicit event group AppKit never closes and merge
-/// with the next (app/CLAUDE.md "Undo and dirty tracking"). `perform` opens
-/// and closes one explicit group on the window's document's undo manager,
-/// `ProjectDocument.performGroupedEdit`'s discipline: event grouping off,
-/// begin, act, close exactly what it opened, restore — never a flush.
+/// with the next (app/CLAUDE.md "Undo and dirty tracking"). On a
+/// `ProjectDocument`, `perform` runs the action inside
+/// `inUndoGroupIfRegistered`: the explicit group opens at the item's first
+/// undo registration, so an item's edits are one step (M3), and an item that
+/// registers nothing — Zoom In — leaves undo and redo as they were (#167,
+/// `v2_menu.py` U2). An `NSText` target's typing undo bypasses
+/// `registerUndo`, so there, and on any other document, `perform` keeps the
+/// eager group, `ProjectDocument.performGroupedEdit`'s discipline: event
+/// grouping off, begin, act, close exactly what it opened, restore — never a
+/// flush.
 enum UIMenu {
     /// V1's verdicts. `none` is spelled `.plain` so no `Optional.none`
     /// comparison is ever ambiguous.
@@ -205,13 +211,19 @@ enum UIMenu {
         }
     }
 
-    /// Sends the item's action to `target` inside one explicit undo group on
-    /// the window's document's manager. False when nothing handled it.
+    /// Sends the item's action to `target`, its undo in one explicit group on
+    /// the window's document's manager (the header's **Undo.**). False when
+    /// nothing handled it.
     static func perform(_ item: NSMenuItem, target: AnyObject, window: NSWindow?) -> Bool {
         guard let action = item.action else { return false }
         let document = window?.windowController?.document as? NSDocument
         guard let manager = document?.undoManager else {
             return NSApp.sendAction(action, to: target, from: item)
+        }
+        if let document = document as? ProjectDocument, !(target is NSText) {
+            return document.inUndoGroupIfRegistered {
+                NSApp.sendAction(action, to: target, from: item)
+            }
         }
         let groupsByEvent = manager.groupsByEvent
         if groupsByEvent { manager.groupsByEvent = false }

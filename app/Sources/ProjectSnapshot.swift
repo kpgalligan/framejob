@@ -1712,10 +1712,10 @@ struct ProjectSnapshot: Codable, Equatable {
         nests = c.lenient(.nests, [])
     }
 
-    /// `RC_FORMAT_VERSION` — the version the core always writes, mirrored
-    /// here so a decode that never saw the key still reports the truth. The
-    /// C header is the contract; this is a fallback, not a second source.
-    static let formatVersion = 5
+    /// `RC_FORMAT_VERSION` — the version the core always writes, read from
+    /// the header so a decode that never saw the key still reports the truth.
+    /// The C header is the contract; this is a fallback, not a second source.
+    static let formatVersion = Int(RC_FORMAT_VERSION)
 
     /// The value a failed decode falls back to, so `ReelProject.snapshot`
     /// can stay non-optional and no view needs an "unloaded" state.

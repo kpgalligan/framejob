@@ -121,7 +121,7 @@ detail there.
   W-6). It lives there, not in `InspectorPane.swift`, for the size rule.
 
 **The document.**
-- `ProjectDocument.swift` (+`DisplayStem`, +`Recording`, +`SelectedAction`, +`Import`, +`Graphics`)
+- `ProjectDocument.swift` (+`DisplayStem`, +`Recording`, +`SelectedAction`, +`Import`, +`Graphics`, +`UndoGroup`)
   — NSDocument, `.reelcut` package read/write, and the single mutation
   point (see Undo); `applyEdit`'s `.refused` arm beeps and then posts
   `projectDocumentDidRefuse` with the `ReelRefusal` (spec §11 CI-10), which
@@ -141,8 +141,17 @@ detail there.
   PATH of (nest, clip) steps, not a nest id, because two clips can show one
   nest at two starts; `editedProject` is a STORED, memoised `rc_project_scoped`
   handle, and `project` still means the parent for save, export and
-  consolidate. A range is cleared on every scope change: a pair of ticks
-  means one thing inside a nest and another to an export.
+  consolidate. A range is cleared on every scope change: a pair of ticks means
+  one thing inside a nest and another to an export. `+UndoGroup`:
+  `inUndoGroupIfRegistered` runs a body with an undo group pending, and
+  `registerUndo(restoring:actionName:)`'s first statement
+  (`openPendingUndoGroup()`) opens it at the body's first registration, at the
+  body's level and never while undoing or redoing; a body that registers
+  nothing leaves undo and redo untouched (#167); `registerUndo` stays the one
+  registrar. `cacheDirectory` calls `packageContentsDidChangeOnDisk()` when it
+  creates `cache/` — only if the package's date, read through a fresh `URL`
+  before the create, is still `fileModificationDate`, so an outside change made before it is not absorbed — and that method re-reads the date through a fresh
+  `URL`, because `fileURL` still holds the date it cached at open (#138).
   `+Import` is File ▸ Add Media… and every drop into an open project
   (`importMedia`, the probe chain and the one grouped commit). `+Graphics`
   is the document's side of the package's `graphics/`:
@@ -1048,6 +1057,7 @@ free.
   `extension AppDelegate { showSettings }` at its foot
   (`CaptionImporter.swift`'s command-at-the-foot precedent, which is why
   `AppDelegate.swift` is untouched). `ExportQueueWindowController`'s mould.
+  `+Verify` holds the Verify bookkeeping (pure move, #58).
   Two panes: the `Transcription` HEADING that is the content stack's first
   arranged subview — which is what makes the `transcribe` tool's and the
   catalog's "Settings ▸ Transcription" sentence true without either being
@@ -1375,10 +1385,10 @@ free.
   validation, which never write `isEnabled`. An item's explicit target counts
   only when it answers the action; otherwise the item has no target and is
   disabled, as AppKit greys it, with no fallback to the chain (#133,
-  `v2_menu.py` H5). It performs the item inside one
-  explicit undo group on the window's document, with `performGroupedEdit`'s
-  discipline; without that, two performed edits merge into one undo step
-  (mutant M3).
+  `v2_menu.py` H5). It performs through
+  `ProjectDocument.inUndoGroupIfRegistered`: an item's edits are one step
+  (M3); an item that registers nothing leaves undo and redo untouched (#167,
+  `v2_menu.py` U2); an `NSText` target keeps the eager group.
 - `UIMenuTable.swift` — `UIMenu.verdicts`, one row per selector, a mirror of
   `tools/proof/capture_spike/inventory.json` in its order. `v2_menu.py`'s H2
   holds the two together, and H1 holds the inventory to the live menu, so a

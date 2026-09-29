@@ -747,10 +747,12 @@ final class ProjectDocument: NSDocument {
     /// orphaned there regenerate on demand — except a transcript still owing
     /// AssemblyAI a DELETE, whose only record goes with it (§10.13, R3·2).
     var cacheDirectory: URL? {
-        let directory = intendedCacheDirectory
-        guard let directory = directory else { return nil }
-        try? FileManager.default.createDirectory(
-            at: directory, withIntermediateDirectories: true)
+        guard let directory = intendedCacheDirectory else { return nil }
+        let existed = FileManager.default.fileExists(atPath: directory.path)
+        let before = existed ? nil : fileURL.flatMap { try? URL(fileURLWithPath: $0.path)
+            .resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate }
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        if let before, before == fileModificationDate { packageContentsDidChangeOnDisk() }
         return directory
     }
 
@@ -779,25 +781,20 @@ final class ProjectDocument: NSDocument {
     /// Re-reads the package's modification date after this app has written
     /// inside it behind `NSDocument`'s back.
     ///
-    /// **Consolidate is the one thing that does that**, and without this the
-    /// next save is refused for good: `NSDocument` compares the package
-    /// directory's modification date against `fileModificationDate` and
+    /// Without it the next save is refused for good: `NSDocument` compares
+    /// the package's modification date with `fileModificationDate` and
     /// answers *"The file has been changed by another application"* — an
-    /// honest complaint about the wrong application, since the change was
-    /// ours. Measured: consolidate, then ⌘S, and every save from then on
-    /// fails until the document is closed and reopened, stranding the
-    /// relinks in memory while the copies sit on disk.
+    /// honest complaint about the wrong application, since the change was ours.
     ///
-    /// Creating `media/` is what trips it. Writing a filmstrip into `cache/`
-    /// does not, because `fileWrapper(ofType:)` already wrote that directory
-    /// on the last save, so only the CHILD's date moves and the package's own
-    /// stays put.
-    ///
-    /// This is not a "save anyway" override: the date is re-read from disk,
-    /// so a change some OTHER application made in the same moment still
-    /// raises the conflict on the following save.
+    /// Creating a top-level directory is what moves that date; writing into
+    /// one that exists moves only the child's. The creators are `media/`
+    /// (Consolidate), `graphics/` (the store), a reverse render's exit, and
+    /// `cache/` (`cacheDirectory`, #138, only if the date it read first is
+    /// ours). Not a "save anyway": an outside change in the same moment (for
+    /// `cache/`, one before it too) still raises the conflict on the next save.
     func packageContentsDidChangeOnDisk() {
-        guard let fileURL = fileURL else { return }
+        // A fresh URL: `fileURL` may still hold the date it cached at open (#138).
+        guard let fileURL = fileURL.map({ URL(fileURLWithPath: $0.path) }) else { return }
         let values = try? fileURL.resourceValues(forKeys: [.contentModificationDateKey])
         guard let date = values?.contentModificationDate else { return }
         fileModificationDate = date
@@ -1220,8 +1217,11 @@ final class ProjectDocument: NSDocument {
         projectDidChange(isLive: false)
     }
 
+    /// The menu tool's group, opened by the first registration (`+UndoGroup`).
+    var pendingUndoGroup: PendingUndoGroup?
     /// The ONE `registerUndo` call site in the app (app/CLAUDE.md).
     private func registerUndo(restoring handle: ReelProject, actionName: String) {
+        openPendingUndoGroup()
         undoManager?.registerUndo(withTarget: self) { document in
             document.restore(handle, actionName: actionName)
         }

@@ -344,7 +344,6 @@ is the one style that pages to two lines by design.
 - `AVVideoComposition.Configuration` not adopted (the 3 deprecation warnings
   since the bump). Tracked in #91.
 - Stale text and small nits:
-  - `ProjectSnapshot.formatVersion = 5` (#84)
   - the "three computed keys" docs in `recipe_text.rs` (closed 2026-09-26:
     accurate, three reveal keys then two word keys)
   - a 128-character doc line in `CaptionLayout.swift` (fixed by 2026-09-26)

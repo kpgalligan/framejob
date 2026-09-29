@@ -312,14 +312,7 @@ def build_fixture(mcp, name):
         mcp.call("open_project", path=path)
         if name == "demo":
             ids = _demo_ops(mcp, path)
-        if ids:
-            mcp.call("save_project", project=path)
-        else:
-            # The app writes `cache/` into the package at open, so a plain save
-            # of a document no op has dirtied is refused as "changed by another
-            # application"; a save to its own path is not. (A dirtied one is
-            # the other way round: that save is refused as "locked".)
-            mcp.call("save_project", project=path, path=path)
+        mcp.call("save_project", project=path)
     except ToolError as error:
         raise FixtureError(f"building {name}: {error}") from error
     return path, ids

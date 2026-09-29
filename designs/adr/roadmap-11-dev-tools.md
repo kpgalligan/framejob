@@ -57,7 +57,6 @@ Two needs, one instrument: an agent should be able to look at the running app's 
 - `recording_proof.py`'s microphone rows, failed on both builds with a Bluetooth input, owed a rerun with a wired or built-in input: #57 (V2a's figures added as a comment).
 - Re-run the capture spike: three bare `RunLoop.main.run` waits, and I rows against the grown inventory: #132.
 - The late-sheet row (`v2_menu.py` L1) exists, but its mutant clause does not hold: a settle removed still passes it: #135.
-- `save_project` refuses an unedited save in place ("changed by another application") and an edited save to the document's own path ("locked"): #138.
 - The catalog on a Light host and a second machine, and a Media-tab screen: #139.
 - `snapshot_ui` was the instrument for #131 (relink on open), which is not this road map's.
 

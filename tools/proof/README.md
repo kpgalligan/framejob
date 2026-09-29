@@ -5998,7 +5998,7 @@ spend ledger, spec §11 P-5; road map 13 P4). Before the first MCP call it:
 A build failure is a scored FAIL of the rows that need it; a call that throws
 where a row expected an answer fails the rest of that letter's rows by name.
 
-The 26 rows:
+The 27 rows:
 - **T**: both schemas (`{path, project}` and `{project}`, nothing required,
   no `scope`), the parity log, the marker count, and the gate on each tool.
 - **H**: the probe walks `AppDelegate().buildMainMenu()` with
@@ -6019,7 +6019,13 @@ The 26 rows:
   Add Marker to B and to the implicit (front) project, Export… on B captured
   through `snapshot_ui window: sheet` and cancelled, and Settings… opened and
   captured. Each answer must read `active: false`.
-- **U**: two performed Add Markers are two undo steps.
+- **U**: U1, two performed Add Markers are two undo steps. U2 (#167): Add
+  Marker at 2.5 s, then `undo` (`undone: "Add Marker"`, `can_redo: true`);
+  View ▸ Zoom In, then `redo` must answer `redone: "Add Marker"` with the
+  marker back; View ▸ Zoom Out, then `undo` must answer `undone: "Add
+  Marker"` with it gone. A refused `redo` fails the row with its text. It
+  FAILED before the change ("There is nothing to redo"): the eager group an
+  item that registers nothing still closed was a step, and cleared redo.
 - **R**: the refusals — `undo:` (`framework`; its path read from the listing,
   since its validator retitles it "Undo Add Marker"), `newProject:`
   (`modal`), a disabled item, an unknown item and menu, a submenu, an empty
@@ -6042,8 +6048,8 @@ The 26 rows:
   runs after the sheet's `DispatchQueue.main.async`.
 
 It performs only Add Marker, Export…, Remove Track, Add Media… (the last three
-cancelled) and Settings…, and never Quit, Close, Save, Revert, Allow Agent
-Connections, New Recording or a Help item.
+cancelled), Settings…, and View ▸ Zoom In and Zoom Out (U2), and never Quit,
+Close, Save, Revert, Allow Agent Connections, New Recording or a Help item.
 
 **The cover** is up once a run, over B's frame, for about two seconds.
 **Named host skips:** Reelcut active skips every D row as `host: Reelcut
@@ -7592,4 +7598,77 @@ python3 tools/proof/assistant_lane_proof.py --mutant one-queue     # L10 FAILS, 
 python3 tools/proof/assistant_tab_proof.py                         # → 17/17
 python3 tools/proof/assistant_tab_proof.py --mutant no-close-decline   # P8 FAILS, exit 1
 python3 tools/proof/assistant_prompt_proof.py --probe              # F1–F8, M1–M6
+```
+
+## Issue batch B10 — save_project and the menu tool's undo step (`save_project_proof.py`, `v2_menu.py` U2; #138 #167 #58 #84)
+
+`ProjectDocument.cacheDirectory` calls `packageContentsDidChangeOnDisk()`
+when it creates `cache/` in a package that has none, only if the package's
+date, read before it creates `cache/`, is still `fileModificationDate` (N1
+keeps an outside change's conflict), and that method re-reads the date
+through a FRESH `URL`: at open, `fileURL` still holds the date
+NSDocument cached, so a re-read through it changed nothing. Measured: with
+the call alone, and no fresh `URL`, the build scored 3/8 and refused every
+in-place save, C3 included. `save_project {project, path}` whose path is the
+document's own file, however spelled (`AgentServer.canonical`), is a plain
+save (#138). `UIMenu.perform` runs a `ProjectDocument`'s item inside
+`inUndoGroupIfRegistered` (`ProjectDocument+UndoGroup.swift`), whose group
+opens at the item's first undo registration (#167).
+`ProjectSnapshot.formatVersion` is `Int(RC_FORMAT_VERSION)` (#84). The
+Verify bookkeeping moved to `SettingsWindowController+Verify.swift` as a pure
+move (#58).
+
+- **`save_project_proof.py <port> [--log PATH]`** — needs a fresh instance
+  per run. Each row writes its own version-9 package under
+  `work/save_project/`, with no `cache/`. T1 checks the parity log. P0
+  (control) checks that `cache/` exists after the open. P1 is an unedited
+  plain save: `unsaved_changes: false`, and `version` is the header's.
+  P2 and P3 add a marker and save to the document's own path, spelled as
+  opened (P2) or `<dir>/./<name>.reelcut` (P3): 1 marker on disk, and
+  `get_project`'s path is unchanged string for string. C1 is an edited
+  plain save. C2 (control) saves C1's document to `copy.reelcut`. C3
+  (control) saves an unedited document to its own path. N1 dirties a
+  document, removes its `cache/` from outside, has `import_media` recreate
+  it, and wants the plain save refused as "changed by another application"
+  with no marker on disk. A failed row quotes the tool's error.
+- **`v2_menu.py` U2** — Add Marker, `undo`, View ▸ Zoom In, then `redo`
+  must redo it; View ▸ Zoom Out, then `undo` must undo it.
+- **`cloud_captions_probe.py`** — the hygiene row's `CloudTranscriber(` file
+  and the `verify-*` mutants name `SettingsWindowController+Verify.swift`.
+  `two-stores-per-sync` is re-aimed at `sync()`'s `effectiveCredential`
+  line, with a second `self.store().read()`. It had been stale since
+  49af3f4.
+
+Run on 2026-09-29. Baseline = HEAD 7084a4d's `make app`, copied to
+`work/b10/Reelcut-baseline.app`; its sources went to `work/b10/baseline-src/`.
+
+| Command | Answer |
+|---|---|
+| `cloud_captions_probe.py --only chrome,settings_verify --sources <baseline-src>` | 116/116 |
+| `cloud_captions_probe.py --only chrome,settings_verify,hygiene` (after #58) | 147/147; its 116 chrome/settings_verify rows identical to the baseline's |
+| `… --only settings_verify --mutant verify-ignores-input` | 38/41, 3 SV rows FAIL, exit 1 |
+| `… --only settings_verify --mutant verify-ignores-owner` | 37/41, 4 SV rows FAIL, exit 1 |
+| `… --only chrome --mutant two-stores-per-sync` | 75/76: `18: ONE sync builds ONE store` FAIL, `got 2`; the other 74 rows identical to the unmutated run |
+| `save_project_proof.py` on the baseline (before N1 existed) | 5 pass, 3 fail: P1 and C1 "The document “<name>.reelcut” could not be saved. The file has been changed by another application."; P3 path re-spelled `…/./p3.reelcut` |
+| `v2_menu.py --only U` on the baseline | U1 pass; U2 FAIL, "redo: There is nothing to redo. Only an undo makes a redo step." |
+| `cloud_captions_proof.py --binary <baseline>` | 171/171 |
+| `make typecheck` | 0 errors, 7 warnings, tsc silent |
+| `make test` | exit 0 |
+| `make app` | BUILD SUCCEEDED |
+| `save_project_proof.py` | 9/9 |
+| `save_project_proof.py`, `cacheDirectory`'s `before == fileModificationDate` removed | 8 pass, 1 fail: N1 "saved … over an outside change; 1 marker(s) on disk" |
+| `v2_menu.py` | 27/27, no skip |
+| `editor_keys_undo_proof.py` / `refusal_probe.py` | 21/21 / 17/17 |
+| `screens.py --only 03-empty-editor,04-editor` | 7/7, no `FixtureError` |
+| `cloud_captions_proof.py` | 171/171, row for row as the baseline |
+
+The issue's "locked" refusal (an edited save to the document's own path) did
+not reproduce on the baseline. The sequences tried were add_marker,
+write_graphic, add_text_clip and import_media, each followed by a save to
+the document's own path. `grep "Reelcut: "` printed nothing on any launch
+log.
+
+```sh
+python3 tools/proof/save_project_proof.py 4861        # fresh instance → 9/9
+python3 tools/proof/v2_menu.py 4862 --only U          # U1, U2
 ```

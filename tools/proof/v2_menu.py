@@ -43,7 +43,9 @@ shows a visible "Reversing"; the sheet is then closed with `cancel_sheet`
 (at most three calls). `perform_ms` and `settle_ms` are printed.
 
 The script performs only Add Marker, Export… (cancelled), Remove Track
-(cancelled), Add Media… (cancelled) and Settings…, plus the items it expects
+(cancelled), Add Media… (cancelled), Settings…, and View ▸ Zoom In and Zoom
+Out (U2: an item that edits nothing leaves undo and redo as they were, #167),
+plus the items it expects
 REFUSED — never Quit, Close, Save, Revert, Allow Agent Connections, New
 Recording or a Help item.
 
@@ -90,7 +92,7 @@ FAKE = "v2Stranger:"
 
 ROWS = [("T1", "I"), ("T2", "C"), ("H1", "I"), ("H2", "A"), ("H3", "A"), ("H4", "C"),
         ("H5", "C"), ("N1", "A"), ("D0", "I"), ("D1", "A"), ("D2", "A"), ("D3", "A"), ("D4", "A"),
-        ("U1", "A"), ("R1", "A"), ("R2", "A"), ("R3", "A"), ("R4", "A"), ("R5", "A"),
+        ("U1", "A"), ("U2", "A"), ("R1", "A"), ("R2", "A"), ("R3", "A"), ("R4", "A"), ("R5", "A"),
         ("R6", "A"), ("S1", "A"), ("S2", "A"), ("S3", "A"), ("S4", "A"), ("S5", "A"),
         ("L1", "A")]
 KIND = dict(ROWS)
@@ -470,6 +472,39 @@ def rows_u(mcp):
     ok = (b2 - b0, b1 - b0, bz - b0) == (2, 1, 0)
     score("U1", "pass" if ok else "fail",
           f"two Add Markers +{b2 - b0}; undo → +{b1 - b0}; undo → +{bz - b0} (want 2, 1, 0)")
+    row_u2(mcp)
+
+
+def row_u2(mcp):
+    """#167: a performed item that registers no undo (View ▸ Zoom In / Zoom
+    Out) leaves the stack as it was — redo still redoes, undo still undoes."""
+    seen = []
+    try:
+        b0 = markers(mcp, B)
+        mcp.call_with("set_playhead", {"project": B, "t": 1_500_000})
+        perform(mcp, ["Mark", "Add Marker"], B)
+        b1 = markers(mcp, B)
+        undone = mcp.call_with("undo", {"project": B})
+        seen.append(f"undo {undone.get('undone')!r} can_redo {undone.get('can_redo')}")
+        perform(mcp, ["View", "Zoom In"], B)
+        redone = mcp.call_with("redo", {"project": B})
+        b2 = markers(mcp, B)
+        seen.append(f"Zoom In; redo {redone.get('redone')!r} → +{b2 - b0}")
+        perform(mcp, ["View", "Zoom Out"], B)
+        again = mcp.call_with("undo", {"project": B})
+        b3 = markers(mcp, B)
+        seen.append(f"Zoom Out; undo {again.get('undone')!r} → +{b3 - b0}")
+        ok = (b1 - b0 == 1 and undone.get("undone") == "Add Marker"
+              and undone.get("can_redo") is True
+              and redone.get("redone") == "Add Marker" and b2 - b0 == 1
+              and again.get("undone") == "Add Marker" and b3 - b0 == 0)
+        score("U2", "pass" if ok else "fail",
+              f"Add Marker +{b1 - b0}; " + "; ".join(seen)
+              + " (want \"Add Marker\" can_redo True; +1; +0)")
+    except ToolError as error:
+        score("U2", "fail", "; ".join(seen + [f"ToolError: {error}"]))
+    finally:
+        mcp.call_with("set_playhead", {"project": B, "t": PLAYHEAD})
 
 
 def rows_r(mcp):

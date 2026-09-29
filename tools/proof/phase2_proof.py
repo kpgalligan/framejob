@@ -88,9 +88,10 @@ def copy_package(source, destination):
     ANYWHERE else is still an error.
 
     `cache/` itself is copied rather than skipped: the app creates the
-    directory when it opens a package that has none, which changes the
-    package directory's modification date, and `save_project` then refuses
-    the document as "changed by another application" (also measured)."""
+    directory when it opens a package that has none, which changed the
+    package directory's modification date, and `save_project` then refused
+    the document as "changed by another application" (also measured; fixed
+    by #138, which re-reads the date when `cache/` is created)."""
     for root, _, files in os.walk(source):
         relative = os.path.relpath(root, source)
         target = destination if relative == "." else os.path.join(destination, relative)
