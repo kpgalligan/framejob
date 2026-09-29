@@ -319,7 +319,9 @@ Return, so the script stops each instance straight after capturing it.
 Two rules from it worth carrying into any proof: **identical, stable,
 DIFFERENT output across processes is an Auto Layout ambiguity to find, not a
 race to out-wait** — reach for constraint priorities, not for more run-loop
-turns; and **when the thing to check is app ARITHMETIC or app STRUCTURE with
+turns (on an `NSStackView` that is `setHuggingPriority(_:for:)`;
+`setContentHuggingPriority` is inert on a stack); and **when the thing to
+check is app ARITHMETIC or app STRUCTURE with
 no caller a script can reach** (a menu, a validator, a cue builder, a queue),
 the answer is a probe compiled from `app/Sources` over `harness/build.sh`'s
 own `swiftc` line, not a photograph. A probe that will not build is a scored

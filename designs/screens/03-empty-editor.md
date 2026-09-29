@@ -18,8 +18,8 @@ length. On the right are a "Fit" zoom pop-up for the preview, a "Safe" checkbox
 (safe-area guides, off) and a blue "Export…" button.
 
 The upper left is the preview: the black canvas centred in a grey well, captioned
-"960 × 540 · 30 fps". The upper right is the inspector with three tabs, Clip
-(selected), Media and Document; with nothing selected the Clip tab says only
+"960 × 540 · 30 fps". The upper right is the inspector with four tabs, Clip
+(selected), Media, Document and Assistant; with nothing selected the Clip tab says only
 "Select a clip to edit its properties."
 
 The lower half is the timeline. Its bar reads "No selection" on the left, then

@@ -70,7 +70,6 @@ The user asked for an AI agent in the editor, "designed in the same way that the
 - #152 a question asked while the tab is hidden draws no attention.
 - #153 the transcript cannot be selected across entries.
 - #154 the composer is single-line.
-- #155 screens 03 and 11 still describe three tabs.
 - #156 `cloud_captions_probe.py` row 18 (predates this road map).
 - #157 the live evaluation with a key (`ready-for-human`).
 - #158 the prompt's ask-first sentence and its null/none literals.

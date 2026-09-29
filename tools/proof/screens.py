@@ -11,7 +11,10 @@ that does not exist (removed before each launch and never created, so
 Settings' month line is an empty month and the person's ledger is never read,
 spec §11 P-5, P-7), a dead loopback AssemblyAI endpoint and no recent
 documents; builds the fixture projects the
-screens name (`FIXTURES`) from `tools/proof/media/`; walks every screen file
+screens name (`FIXTURES`) from `tools/proof/media/`, and for a fixture that
+names `sound` clips waits until `detect_silence` answers no `pending_peaks`
+for them (`wait_for_peaks`, printed as `fixture <name>: peaks cached after …`),
+so a timeline capture never races a waveform band; walks every screen file
 in `--screens` (default `designs/screens/`) in name order; captures each
 screen light and dark through `snapshot_ui`; and writes `--out` (default
 `tools/proof/work/screens/<YYYY-MM-DD-HHMMSS>/`): the PNGs, their layout
@@ -182,15 +185,13 @@ NOT_SHOWN = {
 
 # Filed layout defects, each named by its issue. A problem's text is
 # `views[problem.view].text`.
-KNOWN = {
-    "#70": {"kind": "truncated", "class": "InspectorNoteLabel"},
-}
+KNOWN = {}
 
 FIXTURES = {
     "empty": {"path": os.path.join(FIXTURE_DIR, "Empty.reelcut"), "clips": []},
     "demo": {"path": os.path.join(FIXTURE_DIR, "Demo.reelcut"),
              "clips": ["video", "text", "graphic", "shape", "tone"],
-             "media": ["speech.mov", "toneA.m4a"]},
+             "media": ["speech.mov", "toneA.m4a"], "sound": ["video", "tone"]},
 }
 CANVAS = {"width": 960, "height": 540, "fps": [30, 1], "background": [0.0, 0.0, 0.0, 1.0],
           "fit_new_clips": True}
@@ -322,6 +323,24 @@ def build_fixture(mcp, name):
     except ToolError as error:
         raise FixtureError(f"building {name}: {error}") from error
     return path, ids
+
+
+def wait_for_peaks(mcp, path, clips, within=60):
+    """Poll `detect_silence` in level mode (read-only: no undo step, no
+    selection change) every 0.5 s until its answer names no `pending_peaks`,
+    so the timeline draws every sound clip's waveform band. Answers
+    `(polls, ms)`. Raises FixtureError after `within` s."""
+    started = time.monotonic()
+    polls = 0
+    while True:
+        polls += 1
+        answer = mcp.call("detect_silence", project=path, clips=clips, mode="level")
+        pending = answer.get("pending_peaks") if isinstance(answer, dict) else None
+        if not pending:
+            return polls, int((time.monotonic() - started) * 1000)
+        if time.monotonic() - started > within:
+            raise FixtureError(f"{len(pending)} media still pending_peaks after {within} s")
+        time.sleep(0.5)
 
 
 def _demo_ops(mcp, path):
@@ -661,7 +680,13 @@ class Run:
     def fixture(self, name):
         if name not in self.fixtures:
             try:
-                self.fixtures[name] = ("ok", build_fixture(self.mcp, name))
+                path, ids = build_fixture(self.mcp, name)
+                sound = FIXTURES[name].get("sound")
+                if sound:
+                    polls, ms = wait_for_peaks(self.mcp, path, [ids[c] for c in sound])
+                    print(f"fixture {name}: peaks cached after {polls} poll(s), {ms} ms",
+                          flush=True)
+                self.fixtures[name] = ("ok", (path, ids))
             except FixtureError as error:
                 self.fixtures[name] = ("fail", str(error))
             except (ToolError, OSError, RuntimeError) as error:

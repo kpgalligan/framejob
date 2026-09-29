@@ -350,7 +350,7 @@ final class TranscribeSheetController: NSViewController {
             title: "Generate Captions", hint: nil, content: content,
             buttonRow: makeButtonRow(
                 cancel: stopButton, apply: startButton,
-                leading: [sheetFootnote("captions go on a new front track")]))
+                leading: [sheetFootnote("captions go on a new track")]))
         // A key saved or removed while this card is up must not leave a
         // dead Generate button behind it.
         NotificationCenter.default.addObserver(

@@ -114,6 +114,7 @@ final class InspectorViewController: NSViewController {
         collapse.priority = NSLayoutConstraint.Priority(1)
 
         scroll = NSScrollView()
+        scroll.contentView = InspectorClipView()
         scroll.translatesAutoresizingMaskIntoConstraints = false
         scroll.hasVerticalScroller = true
         scroll.autohidesScrollers = true

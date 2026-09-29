@@ -343,10 +343,6 @@ is the one style that pages to two lines by design.
   was not re-measured at 26. Tracked in #46.
 - `AVVideoComposition.Configuration` not adopted (the 3 deprecation warnings
   since the bump). Tracked in #91.
-- The W-5 note is cut to "…the word style w…" in the 304 pt inspector.
-  Tracked in #70. The sheet's preview plate going stale on a light/dark
-  switch (`PreviewKey` carries no appearance) was closed on 2026-09-26: it
-  was not a defect.
 - Stale text and small nits:
   - `ProjectSnapshot.formatVersion = 5` (#84)
   - the "three computed keys" docs in `recipe_text.rs` (closed 2026-09-26:

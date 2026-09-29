@@ -22,9 +22,7 @@ Engine "On this Mac"; From "Whole timeline"; Style "Subtitles"; then a dark
 preview box showing a sample caption, "This is how it looks", in a black band.
 "Replace:" has a dimmed checkbox, "existing captions". A summary line reads
 "2 clips · 00:00:10.200 of audio". At the foot, a grey note "captions go on a new
-front track", whose last letter is clipped in some captures and not others (its
-width is ambiguous, so it settles differently from one launch to the next), then "Cancel" and a
-blue "Generate".
+track", then "Cancel" and a blue "Generate".
 
 In the light capture the sheet is white with black text; the pop-ups are
 light-grey pills, the sample-caption box keeps its dark picture and black band,

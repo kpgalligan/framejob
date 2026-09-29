@@ -809,14 +809,13 @@ def rows_l(mcp):
     if v["hidden"]:
         score("L3", "skip", "host: Reveal collapsed")
         return
-    if v["intrinsic"][0] <= v["frame"][2] + 0.5:  # the truncation rule's own 0.5 pt tolerance
-        score("L3", "skip", f"host: inspector wide enough (intrinsic {v['intrinsic'][0]} ≤ frame "
-                            f"{v['frame'][2]})")
-        return
+    # #70's regression row: the note fits its row (the truncation rule's own
+    # 0.5 pt tolerance) and the dump names no truncation of it.
+    fits = v["intrinsic"][0] <= v["frame"][2] + 0.5
     hit = [p for p in n["problems"] if p["kind"] == "truncated" and p["view"] == v["i"]]
-    score("L3", "pass" if hit else "fail",
+    score("L3", "pass" if fits and not hit else "fail",
           f"the word-style note #{v['i']}: intrinsic {v['intrinsic'][0]} vs frame {v['frame'][2]}; "
-          f"truncated problem {'listed' if hit else 'MISSING'}"
+          f"truncated problem {'listed' if hit else 'none'}"
           + (f" ({hit[0]['detail']})" if hit else ""))
 
 

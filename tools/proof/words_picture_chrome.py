@@ -4,7 +4,7 @@
 The Text inspector gained two things in W3, and both are CHROME: the Style
 section's UPPERCASE checkbox (`case`), and what a word-styled page does to two
 sections — the Animation section's three rows greyed with the sentence "Word
-style and animation do not compose; the word style wins.", and the Content
+style wins; the reveal does not apply.", and the Content
 section's footnote "Not timed — regenerate to time it again" on a styled page
 whose `words` is empty. This script photographs them through
 `tools/proof/harness/` (the root CLAUDE.md's "Seeing the chrome") and compares

@@ -5935,7 +5935,13 @@ The 30 rows:
     one entry, the toolbar's duration label, was the label's 2 pt alignment
     inset, and with the rule on alignment rects L2 failed `#129 MISSING`
     until it was removed (2026-09-29).
-  - L3 finds #70.
+  - **L3 is #70's regression row**: the Reveal section's word-style note
+    (`TextPane.wordStyleNote`) on a word-styled page must fit its row
+    (intrinsic ≤ frame + 0.5 pt) with no `truncated` problem naming it; not in
+    the dump fails, hidden skips as `host: Reveal collapsed`. It FAILED against
+    the old sentence (2026-09-29: intrinsic 289.5 vs frame 271, truncated
+    problem listed) and passes with the new one at 304 pt (194.5 vs 271) and
+    at 280 pt (194.5 vs 247).
 - **P1–P7**: the three rules and their controls, put to synthetic trees by
   the probe. P7: `outside_superview` measures the ALIGNMENT rect — a label
   pinned flush to its container, whose frame passes it by the inset, has no
@@ -6178,20 +6184,30 @@ scored. Exit 0 iff no row failed. A screen fails on a front-block problem
 README's "Running one" recipe), a tool error, a failed `expect` (its files
 deleted), or a sheet left attached (closed with `cancel_sheet`; one that will
 not close fails every later screen). Layout problems are classified against
-`KNOWN` (#70) and new ones are reported, never scored.
+`KNOWN` (empty since #70 was fixed) and new ones are reported, never scored.
 
 **Outputs** in `<out>`: `<id>.<capture>.<light|dark>.png` and `.layout.json`,
 `screens.md`, `results.json` (the rows and, per capture, its PNG's sha256, scale,
 points, pixels, window facts and known/new problems), and `app.light.log` and
 `app.dark.log`. The fixtures are rebuilt by each instance under
-`work/screens/fixtures/`.
+`work/screens/fixtures/`; a fixture that names `sound` clips (`demo`: `video`
+and `tone`) is ready only once `detect_silence` in level mode answers no
+`pending_peaks` for them (`wait_for_peaks`, polled every 0.5 s, printed as
+`fixture demo: peaks cached after <n> poll(s), <ms> ms`), and one still pending
+after 60 s fails every screen on that fixture for that look.
 
-**What is not byte-identical across runs** (2026-09-27, two runs, `compare:
-45/48`): 04's two captures differ by 832 px in the Music clip — its waveform
-band, drawn once the tone's peaks are cached, which one run's 04 caught and the
-other's did not; and 15's light sheet by 1 546 px around Cancel and Generate —
-the ambiguous stack under them settles differently from one launch to the next
-(its note is 191 pt and truncated in one process, 196 pt in another).
+**What is not byte-identical across runs** (2026-09-29, the #70/#136/#141–#143/#155 batch): two runs of
+the same build answered `compare: 52/52 byte-identical`, 04 and 15 included —
+04 now waits for the peaks, and 15's button row is no longer ambiguous (#141).
+Against the build before that batch the run answered `compare: 50/52 byte-identical`:
+only 15's sheet, `differs: 5939 px in [296,834,760,895]` dark and `differs:
+721 px in [296,857,421,873]` light, its new footnote "captions go on a new
+track" and the row it no longer squeezes. Before it (2026-09-27, `compare:
+45/48`) 04 differed by 832 px in the Music clip's waveform band and 15's light
+sheet by 1 546 px around Cancel and Generate. One of that batch's runs' dark instance
+failed 04–16 with `1 media still pending_peaks after 60 s`: toneA.m4a's peaks
+never landed in that instance's package, though its speech cache did, and
+nothing retries them before the next open (#169).
 
 **Mutants** (2026-09-27), each a copy of `designs/screens/` in a scratch folder
 passed as `--screens`: File ▸ "Exprot…" in 12 fails 12 as not a menu leaf and

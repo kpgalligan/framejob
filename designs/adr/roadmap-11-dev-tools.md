@@ -53,16 +53,10 @@ Two needs, one instrument: an agent should be able to look at the running app's 
 
 ## Open items
 
-- **Layout problems found by the screen catalog** (the ~48 distinct rows the runs printed in both looks):
-  - #141: the Generate Captions footnote, clipped, with an ambiguous row, which is also why screen 15 differs run to run;
-  - #142: the 17 pt stack overhang in the Clip inspector's Text and Clip sub-tabs;
-  - #143: the ambiguous stacks on Welcome and Settings.
-- The Reveal section's word-style note, truncated (reproduced by V1's L7 and V2a's L3): #70.
 - `phase9_proof.py`'s nest-scope playhead rows, failing on both builds: #130.
 - `recording_proof.py`'s microphone rows, failed on both builds with a Bluetooth input, owed a rerun with a wired or built-in input: #57 (V2a's figures added as a comment).
 - Re-run the capture spike: three bare `RunLoop.main.run` waits, and I rows against the grown inventory: #132.
 - The late-sheet row (`v2_menu.py` L1) exists, but its mutant clause does not hold: a settle removed still passes it: #135.
-- Screen 04 races the waveform peaks cache: #136.
 - `save_project` refuses an unedited save in place ("changed by another application") and an edited save to the document's own path ("locked"): #138.
 - The catalog on a Light host and a second machine, and a Media-tab screen: #139.
 - `snapshot_ui` was the instrument for #131 (relink on open), which is not this road map's.

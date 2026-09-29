@@ -27,7 +27,7 @@ Height "540 px", and an unchecked "Resize clips proportionally"; FRAME RATE — 
 colour well and Timecode set to "Frames", the last row in view.
 
 In the light capture the inspector is white with black labels and values; the
-Document tab is a white cell with a blue underline beside the light-grey Clip and
-Media cells, the pop-ups and the Width and Height fields are white with grey
+Document tab is a light-grey cell with a blue underline beside the white Clip,
+Media and Assistant cells, the pop-ups and the Width and Height fields are white with grey
 borders, "Resize clips proportionally" is pale grey, and the section headers are
 light-grey bars.

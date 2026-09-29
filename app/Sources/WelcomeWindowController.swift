@@ -11,6 +11,10 @@ final class WelcomeWindowController: NSWindowController {
     /// is closed, so it cannot be built once in init.
     private let recentStack = NSStackView()
     private let recentLabel = NSTextField(labelWithString: "")
+    /// The column and its button row, kept so an empty recent list can be
+    /// hidden without moving anything (#143).
+    private var column: NSStackView?
+    private var buttonRow: NSStackView?
 
     private init() {
         // 600 rather than the old 520: the lockup is taller than the motif it
@@ -74,6 +78,8 @@ final class WelcomeWindowController: NSWindowController {
         buttons.translatesAutoresizingMaskIntoConstraints = false
         buttons.orientation = .horizontal
         buttons.spacing = 12
+        // Hugs at its buttons, so its width is not a tie with the column's (#143).
+        buttons.setHuggingPriority(.required, for: .horizontal)
 
         recentLabel.translatesAutoresizingMaskIntoConstraints = false
         recentLabel.attributedStringValue = DS.microLabel("Recent")
@@ -109,6 +115,8 @@ final class WelcomeWindowController: NSWindowController {
         stack.setCustomSpacing(24, after: buttons)
         stack.setCustomSpacing(8, after: recentLabel)
         stack.setCustomSpacing(24, after: recentStack)
+        column = stack
+        buttonRow = buttons
 
         root.addSubview(stack)
         NSLayoutConstraint.activate([
@@ -162,6 +170,13 @@ final class WelcomeWindowController: NSWindowController {
         }
         let urls = Array(NSDocumentController.shared.recentDocumentURLs.prefix(5))
         recentLabel.isHidden = urls.isEmpty
+        // An empty stack is hidden rather than left at zero height, which
+        // was ambiguous (#143). 48 is the two 24 pt gaps it used to sit
+        // between, so the window without recents does not move a pixel.
+        recentStack.isHidden = urls.isEmpty
+        if let column = column, let buttonRow = buttonRow {
+            column.setCustomSpacing(urls.isEmpty ? 48 : 24, after: buttonRow)
+        }
         for (index, url) in urls.enumerated() {
             let button = NSButton(
                 title: url.deletingPathExtension().lastPathComponent, target: self,

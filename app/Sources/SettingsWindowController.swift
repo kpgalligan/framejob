@@ -185,6 +185,11 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
 
         let keyRow = row([fieldLabel("API key:"), keyField])
         let regionRow = row([fieldLabel("Region:"), regionPopup])
+        // Hug at their content, so the column's leading alignment is their
+        // one answer and not a tie with its width (#143). `buttons` is left
+        // alone: its spacer pushes Account Page right.
+        keyRow.setHuggingPriority(.required, for: .horizontal)
+        regionRow.setHuggingPriority(.required, for: .horizontal)
         let spacer = NSView()
         spacer.setContentHuggingPriority(.defaultLow - 1, for: .horizontal)
         let buttons = row([saveButton, removeButton, verifyButton, spacer, accountButton])

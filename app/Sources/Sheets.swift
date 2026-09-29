@@ -79,11 +79,19 @@ func makeSheetView(
 /// the app and a change to it is worth making where the type checker can see
 /// every existing call is unchanged; it defaults to nil, so every dialog but
 /// the export card still asks for the two-button row it always had.
+///
+/// **Every `leading` view resists compression at `.defaultLow`**, below the
+/// buttons' default 750, so a long footnote gives way before a button and the
+/// row has one answer instead of two tied ones (#141; a divergence from
+/// Rasterize's copy).
 func makeButtonRow(
     cancel: NSButton, apply: NSButton, secondary: NSButton? = nil, leading: [NSView] = []
 ) -> NSStackView {
     cancel.keyEquivalent = "\u{1b}"
     apply.keyEquivalent = "\r"
+    for view in leading {
+        view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+    }
     let spacer = NSView()
     spacer.setContentHuggingPriority(.defaultLow - 1, for: .horizontal)
     let trailing: [NSView] = secondary.map { [$0, cancel, apply] } ?? [cancel, apply]
@@ -103,10 +111,15 @@ func fieldLabel(_ text: String) -> NSTextField {
 }
 
 /// Bottom-left 10px mono footnote carried in the button row's leading slot.
+/// A label built by `NSTextField(labelWithString:)` breaks by clipping, so a
+/// footnote too long for its slot ends with a tail ellipsis and carries the
+/// whole string as a tooltip (Rasterize's two lines, #141).
 func sheetFootnote(_ text: String) -> NSTextField {
     let label = NSTextField(labelWithString: text)
     label.font = DS.mono(10)
     label.textColor = DS.textFaint
+    label.lineBreakMode = .byTruncatingTail
+    label.toolTip = text
     return label
 }
 

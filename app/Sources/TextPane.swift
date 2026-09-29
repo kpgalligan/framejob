@@ -33,9 +33,11 @@ final class TextPane: InspectorPaneView {
 
     /// The footnote on a word-styled page whose timings a content edit
     /// dropped (road map 8 §5e), and the Animation section's on a styled
-    /// page, whose reveal the word style replaces (spec §11 W-5).
+    /// page, whose reveal the word style replaces (spec §11 W-5). The second
+    /// is short on purpose: its row is 244 pt at the 280 pt narrowest
+    /// inspector (`DocumentPane.transparencyNote` has the arithmetic, #70).
     static let untimedNote = "Not timed — regenerate to time it again"
-    static let wordStyleNote = "Word style and animation do not compose; the word style wins."
+    static let wordStyleNote = "Word style wins; the reveal does not apply."
 
     func contentSection() -> InspectorSection {
         let binding = self.binding

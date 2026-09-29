@@ -22,9 +22,8 @@ of Photography" beneath. The inspector reads "Select a clip to edit its
 properties." because nothing is selected.
 
 The timeline shows four tracks, each a named row with the eye, speaker, lock and
-headphone icons: Music, holding a green audio clip "toneA.m4a" with a level line
-across it once the file's waveform has been read (a capture taken before that
-lacks the line); Shapes, a teal clip "Ellipse"; Graphics, a taller teal clip "Graphic";
+headphone icons: Music, holding a green audio clip "toneA.m4a" with a pale level
+line across it, its waveform band; Shapes, a teal clip "Ellipse"; Graphics, a taller teal clip "Graphic";
 and Titles, an orange clip "Reelcut". Each clip's name sits in a darker strip
 along its top with a small icon for its kind. The red playhead is at about the
 2.5-second mark, a thin line through every track.

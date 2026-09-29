@@ -408,8 +408,11 @@ the key map behind it.
   `ClipPane.forgetSubTab()` whenever the selection's ids change, spec §11
   CI-5; a changed selection switches to Clip only from the Media and
   Document tabs, never from the Assistant tab, and `clipPicked()` from any,
-  spec §11 AI-14; `onAssistantView` hands the editor the Assistant tab's
-  view) · `InspectorRefusalStrip.swift` (spec §11 CI-10: "Refused: " and the
+  spec §11 AI-14; `onAssistantView` hands the editor the Assistant tab's view)
+  · `InspectorClipView.swift` (the inspector scroll view's clip view,
+  installed first: a width change re-lays its document view, so a pane follows
+  an autohiding legacy scroller, #142) · `InspectorRefusalStrip.swift` (spec
+  §11 CI-10: "Refused: " and the
   core's sentence verbatim, remembered with the `editedProject` handle it
   was shown under and cleared on the first refresh under another handle or
   a click; `showRefusal` is the editor's forward of
@@ -1445,8 +1448,10 @@ heights S/M/L per kind), `Controls.swift`, `OptionControls.swift`,
 (Finder drops + the first responder the bare-key map needs) — copied from
 Rasterize; keep them in sync rather than forking. `BrandMark.swift` is
 Reelcut's own, drawn from `designs/design_handoff_reelcut/`.
-`Controls.swift`'s `BlockSlider` is the timeline's zoom slider. Three known
-divergences, each recorded: `OptionFieldControl.finishEditing` returns first
+`Controls.swift`'s `BlockSlider` is the timeline's zoom slider. Four known
+divergences, each recorded: `makeButtonRow` gives its `leading` views
+compression resistance `.defaultLow`, so a footnote gives way before a button
+(#141); `OptionFieldControl.finishEditing` returns first
 responder to `window.contentView` (#60) where Rasterize's copy keeps
 `makeFirstResponder(nil)`; `StickerButton` still has its pill, the one
 place `Controls.swift` lags Rasterize (spec §11 SH-1, owed); and

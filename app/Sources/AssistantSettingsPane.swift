@@ -135,6 +135,8 @@ final class AssistantSettingsPane: NSStackView, NSTextFieldDelegate {
         stack.orientation = .horizontal
         stack.alignment = .centerY
         stack.spacing = 8
+        // Hugs at its content, so its width is not a tie with the column's (#143).
+        stack.setHuggingPriority(.required, for: .horizontal)
         return stack
     }
 
