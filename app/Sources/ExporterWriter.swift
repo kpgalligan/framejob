@@ -390,7 +390,7 @@ final class ExportWriter {
     /// one sample before it stops — and a `copyNextSampleBuffer` that never
     /// returns (a pump starved because the other stopped reading) can no
     /// longer be woken by a cancel, so the completion would never fire; not
-    /// seen in 70 runs (road map 10 §10.6 G3c, owed). A cancel before `start` is refused there;
+    /// seen in 70 runs, and accepted (spec §11 G-17). A cancel before `start` is refused there;
     /// `cancelReading()` before `startReading()` would raise.
     func cancel() {
         lock.lock()

@@ -1,0 +1,538 @@
+#!/usr/bin/env python3
+"""Issue batch B1, against the built app: the export gate follows nests at
+any depth (#73), `import_media` waits as long as an ffmpeg conversion may
+legitimately run (#67), and an export's Cancel during the loudness
+measurement only sets a flag — the measurement's own loop cancels its reader
+(#74, spec §11 G-17).
+
+One owned instance on its own port, launched with
+`-ApplePersistenceIgnoreState YES -AgentServerEnabled YES
+-RCFFmpegImport always -RCFFmpegPath <work>/standin/ffmpeg`, stopped by PID,
+its log at `tools/proof/work/export-cancel/reelcut-<port>.log`; nothing else
+is ever killed. Every child runs under `graphics_spike/bounded.py`. The M rows
+run `export_cancel_probe.swift`, an in-process instrument built like
+`graphics_proof.py`'s pin probe into `tools/proof/work/export-cancel-probe/`;
+a probe that will not build scores M0–M2 as FAILURES.
+
+G1  (CONTROL) `new_project`; `write_graphic gate` (compiles, 30 frames, one
+    rect); `add_graphic_clip gate` at 0; `nest` it; `add_text_clip` right
+    after the nest clip; `nest` both. `get_project`: timeline nest clip →
+    nest B holding a nest clip → nest A holding the `gate` clip. `export
+    h264` succeeds and the file exists.
+G2  `write_graphic gate` with a syntax error answers `ok: false`; a sentinel
+    file at the path; `export h264` to it is an error starting "The export
+    was not started:" naming "gate", and the sentinel's bytes are unchanged.
+I1  stand-in `ffprobe` (fixed JSON: one h264 640×360 30/1 stream, 10 s) and
+    `ffmpeg` (sleeps 45 s, copies `media/A.mov` to its last argument, then
+    touches `standin/ffmpeg.exited`); `import_media` of a 4096-byte
+    `slow-<hex>.mkv` answers ok after ≥ 45 s, kind video, 640×360, a `.mov`
+    directly inside Rewrapped. Cleanup, whatever it answered and before the
+    instance stops: wait for `ffmpeg.exited` (120 s from the call's start),
+    then for no `slow-<hex>-*.partial.mov` (10 s), then delete every
+    Rewrapped entry starting `slow-<hex>-` (parent-checked) and the fixture.
+    An expired bound fails the row and names the leftovers.
+M0  (CONTROL) a noise WAV imported over MCP onto four tracks with
+    `noise_reduction: 1.0`, saved; the probe's uncancelled run is `success`
+    with a measurement `window` ≥ 3.0 s.
+M1  `--runs` probe runs, each cancelling `delay` s (uniform in
+    [0.2, window/2]) into the measurement: every run rc 0 (a signal or an
+    expiry is a crash), `phase_at_cancel` "Measuring loudness…", `outcome`
+    `cancelled`, `left` false. Prints the crash count.
+M2  every M1 `latency` ≤ 1.0 s.
+Z1  `grep "Reelcut: "` over this launch's log prints nothing.
+
+    python3 tools/proof/export_cancel_proof.py [--port 4893] [--app PATH]
+        [--only gate,import,cancel] [--runs 30]
+"""
+
+import argparse
+import json
+import os
+import random
+import re
+import shutil
+import subprocess
+import sys
+import time
+import uuid
+import wave
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
+sys.path.insert(0, str(ROOT / "tools/proof"))
+import bounded  # noqa: E402
+import mcp  # noqa: E402
+
+WORK = ROOT / "tools/proof/work/export-cancel"
+STANDIN = WORK / "standin"
+APP = ROOT / "build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut"
+PROBE_SOURCE = ROOT / "tools/proof/export_cancel_probe.swift"
+# Outside WORK, which every run empties, so an up-to-date probe is not rebuilt.
+PROBE_DIR = ROOT / "tools/proof/work/export-cancel-probe"
+A_MOV = ROOT / "tools/proof/media/A.mov"
+REWRAPPED = Path.home() / "Library/Application Support/Reelcut/Rewrapped"
+CALL_BOUND = 600
+FFMPEG_SLEEP = 45
+NOISE_SECONDS = 300
+NOISE_TRACKS = 4
+GROUPS = {"gate": ["G1", "G2"], "import": ["I1"], "cancel": ["M0", "M1", "M2"]}
+ORDER = ["G1", "G2", "I1", "M0", "M1", "M2", "Z1"]
+rows = {}
+
+GATE_JS = ("export const meta = { name: \"Gate\", durationInFrames: 30 };\n"
+           "export function render(frame, props, ctx) {\n"
+           "  return svg(ctx, `<rect x=\"0\" y=\"0\" width=\"200\" height=\"200\" "
+           "fill=\"#ff5a36\"/>`);\n}\n")
+BROKEN_JS = ("export const meta = { name: ;\n"
+             "export function render(frame, props, ctx) {\n"
+             "  return svg(ctx, ``);\n}\n")
+FFPROBE_JSON = json.dumps({
+    "streams": [{"index": 0, "codec_type": "video", "codec_name": "h264", "width": 640,
+                 "height": 360, "avg_frame_rate": "30/1"}],
+    "format": {"duration": "10.0", "size": "4096"},
+})
+
+
+def check(name, good, detail=""):
+    rows[name.split()[0]] = bool(good)
+    print(("  ok   " if good else "  FAIL ") + name + (f"\n       {detail}" if detail else ""),
+          flush=True)
+
+
+class Instance:
+    """One owned app, by PID, on its own port."""
+
+    def __init__(self, app, port, log):
+        self.app, self.port, self.log = app, port, log
+        self.child = None
+
+    def start(self):
+        with open(self.log, "a") as out:
+            self.child = subprocess.Popen(
+                [str(self.app), "-ApplePersistenceIgnoreState", "YES",
+                 "-AgentServerEnabled", "YES", "-RCFFmpegImport", "always",
+                 "-RCFFmpegPath", str(STANDIN / "ffmpeg")],
+                stdin=subprocess.DEVNULL, stdout=out, stderr=out, start_new_session=True,
+                env=bounded.child_env({"RC_AGENT_PORT": str(self.port)}))
+        deadline = time.monotonic() + 60
+        while time.monotonic() < deadline:
+            time.sleep(0.25)
+            found = re.search(r"listening on http://127\.0\.0\.1:(\d+)/mcp",
+                              self.log.read_text(errors="replace"))
+            if found:
+                bound = int(found.group(1))
+                print(f"  instance PID {self.child.pid} on port {bound}", flush=True)
+                return mcp.MCP(bound, timeout=CALL_BOUND)
+        return None
+
+    def stop(self):
+        if self.child is None:
+            return
+        self.child.terminate()
+        try:
+            self.child.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            self.child.kill()
+            self.child.wait()
+        self.child = None
+
+
+def attempt(client, tool, arguments):
+    """One MCP call; a refusal is an answer, and so is an expiry."""
+    if client is None:
+        return {"ok": False, "error": "no instance"}
+    try:
+        return {"ok": True, "reply": client.call_with(tool, arguments)}
+    except mcp.ToolError as error:
+        return {"ok": False, "error": str(error)}
+    except Exception as error:  # a socket timeout is the expiry
+        return {"ok": False, "error": f"{type(error).__name__}: {error}"}
+
+
+def project_of(client, project):
+    got = attempt(client, "get_project", {"project": str(project)})
+    return got["reply"].get("project") if got["ok"] and isinstance(got["reply"], dict) else None
+
+
+def tool_message(error, tool):
+    prefix = f"{tool}: "
+    return error[len(prefix):] if error.startswith(prefix) else error
+
+
+# ---- the probe --------------------------------------------------------------
+
+def build_probe():
+    """`export_cancel_probe.swift` as `main.swift` over every other file in
+    `app/Sources`, on `harness/build.sh`'s swiftc line, with the app's
+    `Fonts`, `Blank.mp4` and a `default.metallib` of `Compositor.metal`
+    beside it. Rebuilt only when stale. The binary, or None and why."""
+    PROBE_DIR.mkdir(parents=True, exist_ok=True)
+    binary = PROBE_DIR / "export_cancel_probe"
+    entry = PROBE_DIR / "main.swift"
+    if not entry.exists() or entry.read_text() != PROBE_SOURCE.read_text():
+        entry.write_text(PROBE_SOURCE.read_text())
+    fonts = PROBE_DIR / "Fonts"
+    resources = ROOT / "app/Resources"
+    if not fonts.is_dir() or (resources / "Fonts").stat().st_mtime > fonts.stat().st_mtime:
+        shutil.rmtree(fonts, ignore_errors=True)
+        shutil.copytree(resources / "Fonts", fonts)
+    if not (PROBE_DIR / "Blank.mp4").exists():
+        shutil.copy2(resources / "Blank.mp4", PROBE_DIR / "Blank.mp4")
+    shader = resources / "Shaders/Compositor.metal"
+    metallib, air = PROBE_DIR / "default.metallib", PROBE_DIR / "Compositor.air"
+    if not metallib.exists() or shader.stat().st_mtime > metallib.stat().st_mtime:
+        step = bounded.run(["xcrun", "-sdk", "macosx", "metal", "-c", str(shader), "-o",
+                            str(air)], 300)
+        if step["rc"] == 0:
+            step = bounded.run(["xcrun", "-sdk", "macosx", "metallib", str(air), "-o",
+                                str(metallib)], 300)
+        if step["rc"] != 0 or not metallib.exists():
+            return None, f"the shader did not build: {step['stderr'][-400:]}"
+    sources = sorted(path for path in (ROOT / "app/Sources").glob("*.swift")
+                     if path.name != "main.swift")
+    lib = ROOT / "core/target/release/libreelcut_core.a"
+    if not lib.exists():
+        return None, f"{lib} is missing — run `cd core && cargo build --release` first"
+    if binary.exists() and all(path.stat().st_mtime < binary.stat().st_mtime
+                               for path in sources + [entry, lib]):
+        return binary, ""
+    sdk = bounded.run(["xcrun", "--show-sdk-path", "--sdk", "macosx"], 60)["stdout"].strip()
+    built = bounded.run(
+        ["swiftc", "-D", "REELCUT_DEV_TOOLS", "-sdk", sdk, "-target", "arm64-apple-macos26.0",
+         "-module-name", "Reelcut",
+         "-import-objc-header", str(ROOT / "app/Bridging/Reelcut-Bridging-Header.h"),
+         "-L", str(lib.parent), "-lreelcut_core"]
+        + [str(path) for path in sources] + [str(entry), "-o", str(binary)], 900)
+    if built["rc"] != 0 or not binary.exists():
+        errors = [line for line in built["stderr"].splitlines() if ": error:" in line]
+        tail = built["stderr"].strip().splitlines()[-4:]
+        return None, f"swiftc rc {built['rc']}: {(errors or tail or ['(no output)'])[:6]}"
+    return binary, ""
+
+
+def run_probe(binary, package, tag, delay):
+    """One probe run: its JSON answer (with `rc` and `expired`), or an error."""
+    out = WORK / f"{tag}.m4a"
+    got = bounded.run([str(binary), str(package), str(out), f"{delay:.3f}"], 400)
+    answer = {}
+    try:
+        answer = json.loads(got["stdout"].strip().splitlines()[-1])
+    except (IndexError, ValueError):
+        answer = {"error": f"no answer: {(got['stdout'] + got['stderr'])[-300:]!r}"}
+    answer["rc"], answer["expired"] = got["rc"], got["expired"]
+    return answer
+
+
+# ---- G1, G2 -----------------------------------------------------------------
+
+def land(client, project, name, track, at):
+    """`add_graphic_clip` polled for at most 5 s while the store sees the
+    module land. The new clip, or None and the last sentence."""
+    deadline = time.monotonic() + 5
+    last = ""
+    while time.monotonic() < deadline:
+        got = attempt(client, "add_graphic_clip",
+                      {"project": str(project), "name": name, "track": track, "at": at})
+        if got["ok"]:
+            clips = (project_of(client, project) or {}).get("clips", [])
+            ours = [c for c in clips if (c.get("graphic") or {}).get("name") == name]
+            return (max(ours, key=lambda c: c["id"]) if ours else None), ""
+        last = got["error"]
+        time.sleep(0.2)
+    return None, last
+
+
+def nest_kind(clip):
+    source = clip.get("source") or {}
+    return source.get("project") if source.get("kind") == "nest" else None
+
+
+def run_gate(client):
+    pkg = WORK / "gate.reelcut"
+    made = attempt(client, "new_project", {"path": str(pkg)})
+    wrote = attempt(client, "write_graphic", {"project": str(pkg), "name": "gate",
+                                              "source": GATE_JS})
+    track = ((project_of(client, pkg) or {}).get("tracks") or [{}])[0].get("id")
+    clip, why = land(client, pkg, "gate", track, 0)
+    first = attempt(client, "nest", {"project": str(pkg), "clips": [clip["id"]] if clip else []})
+    top = (project_of(client, pkg) or {}).get("clips", [])
+    inner = [c for c in top if nest_kind(c) is not None]
+    text = attempt(client, "add_text_clip", {
+        "project": str(pkg), "track": track,
+        "at": inner[0]["start"] + inner[0]["duration"] if inner else 0})
+    top = (project_of(client, pkg) or {}).get("clips", [])
+    texts = [c for c in top if nest_kind(c) is None]
+    second = attempt(client, "nest", {"project": str(pkg),
+                                      "clips": [c["id"] for c in inner + texts]})
+    project = project_of(client, pkg) or {}
+    nests = {n["id"]: n for n in project.get("nests", [])}
+    top = project.get("clips", [])
+    b = nests.get(nest_kind(top[0])) if len(top) == 1 else None
+    b_nest = [c for c in (b or {}).get("clips", []) if nest_kind(c) is not None]
+    a = nests.get(nest_kind(b_nest[0])) if len(b_nest) == 1 else None
+    a_gate = [c for c in (a or {}).get("clips", [])
+              if (c.get("graphic") or {}).get("name") == "gate"]
+    shape = (len(top) == 1 and b is not None and len(b_nest) == 1
+             and len((b or {}).get("clips", [])) == 2 and a is not None and len(a_gate) == 1)
+    movie = WORK / "g1.mp4"
+    exported = attempt(client, "export", {"project": str(pkg), "preset": "h264",
+                                          "path": str(movie)})
+    check("G1 (CONTROL) timeline nest clip → nest B holding a nest clip → nest A holding the "
+          "compiling `gate` clip; export h264 succeeds and the file exists",
+          made["ok"] and wrote["ok"] and (wrote["reply"] or {}).get("ok") is True
+          and clip is not None and first["ok"] and text["ok"] and second["ok"] and shape
+          and exported["ok"] and movie.exists(),
+          f"new {made['ok']}, write {wrote.get('error', 'ok')}, clip {clip is not None} "
+          f"{why!r}, nest {first.get('error', 'ok')}, text {text.get('error', 'ok')}, "
+          f"nest {second.get('error', 'ok')}, shape {shape} (top {len(top)}, B clips "
+          f"{len((b or {}).get('clips', []))}, A gate clips {len(a_gate)}), export "
+          f"{exported.get('error', 'ok')}, file {movie.exists()}")
+
+    broken = attempt(client, "write_graphic", {"project": str(pkg), "name": "gate",
+                                               "source": BROKEN_JS})
+    # The store's set changes when it sees the file; poll get_project's view.
+    deadline, seen = time.monotonic() + 5, None
+    while time.monotonic() < deadline:
+        graphics = (attempt(client, "get_project", {"project": str(pkg)}).get("reply")
+                    or {}).get("graphics") or []
+        seen = [g.get("ok") for g in graphics if g.get("name") == "gate"]
+        if seen == [False]:
+            break
+        time.sleep(0.2)
+    sentinel = WORK / "g2.mp4"
+    known = b"B1 sentinel " + os.urandom(64)
+    sentinel.write_bytes(known)
+    refused = attempt(client, "export", {"project": str(pkg), "preset": "h264",
+                                         "path": str(sentinel)})
+    message = tool_message(refused.get("error", ""), "export")
+    after = sentinel.read_bytes() if sentinel.exists() else None
+    check("G2 a `gate` that does not compile, two nests deep: export h264 is refused before "
+          "anything is written — \"The export was not started:\" naming \"gate\" — and the "
+          "sentinel's bytes are unchanged",
+          broken["ok"] and (broken["reply"] or {}).get("ok") is False and seen == [False]
+          and not refused["ok"] and message.startswith("The export was not started:")
+          and '"gate"' in message and after == known,
+          f"write ok={(broken.get('reply') or {}).get('ok')}, store sees {seen}, export "
+          f"{refused.get('reply') if refused['ok'] else message!r}, sentinel unchanged "
+          f"{after == known}")
+
+
+# ---- I1 ---------------------------------------------------------------------
+
+def write_standins():
+    STANDIN.mkdir(parents=True, exist_ok=True)
+    marker = STANDIN / "ffmpeg.exited"
+    (STANDIN / "ffprobe").write_text("#!/bin/bash\ncat <<'EOF'\n" + FFPROBE_JSON + "\nEOF\n")
+    (STANDIN / "ffmpeg").write_text(
+        "#!/bin/bash\n"
+        "for a in \"$@\"; do [ \"$a\" = \"-encoders\" ] && exit 0; done\n"
+        f"trap 'touch \"{marker}\"' EXIT\n"
+        f"sleep {FFMPEG_SLEEP}\n"
+        f"cp \"{A_MOV}\" \"${{@: -1}}\"\n")
+    for name in ("ffprobe", "ffmpeg"):
+        os.chmod(STANDIN / name, 0o755)
+
+
+def rewrapped_entries(prefix):
+    try:
+        return sorted(name for name in os.listdir(REWRAPPED) if name.startswith(prefix))
+    except OSError:
+        return []
+
+
+def run_import(client):
+    marker = STANDIN / "ffmpeg.exited"
+    if marker.exists():
+        marker.unlink()
+    hexed = uuid.uuid4().hex
+    stem = f"slow-{hexed}"
+    fixture = WORK / f"{stem}.mkv"
+    fixture.write_bytes(os.urandom(4096))
+    pkg = WORK / "import.reelcut"
+    made = attempt(client, "new_project", {"path": str(pkg)})
+    started = time.monotonic()
+    got = attempt(client, "import_media", {"project": str(pkg), "path": str(fixture)})
+    elapsed = time.monotonic() - started
+    reply = got.get("reply") if got["ok"] and isinstance(got.get("reply"), dict) else {}
+    path = Path(reply.get("path", "")) if reply.get("path") else None
+    inside = (path is not None and path.suffix == ".mov"
+              and path.resolve().parent == REWRAPPED.resolve()
+              and path.name.startswith(stem + "-"))
+
+    # Cleanup, whatever the call answered, before the instance stops.
+    expired = []
+    deadline = started + 120
+    while not marker.exists() and time.monotonic() < deadline:
+        time.sleep(0.5)
+    if not marker.exists():
+        expired.append("ffmpeg.exited never appeared within 120 s of the call")
+    partial_deadline = time.monotonic() + 10
+    while (any(n.endswith(".partial.mov") for n in rewrapped_entries(stem + "-"))
+           and time.monotonic() < partial_deadline):
+        time.sleep(0.2)
+    if any(n.endswith(".partial.mov") for n in rewrapped_entries(stem + "-")):
+        expired.append("a .partial.mov was still in Rewrapped after 10 s")
+    for name in rewrapped_entries(stem + "-"):
+        entry = REWRAPPED / name
+        if entry.resolve().parent == REWRAPPED.resolve():
+            try:
+                entry.unlink()
+            except OSError:
+                pass
+    left = rewrapped_entries(stem + "-")
+    if left:
+        expired.append(f"left in Rewrapped: {left}")
+    fixture.unlink(missing_ok=True)
+
+    check(f"I1 import_media of a {FFMPEG_SLEEP} s stand-in conversion answers ok after "
+          f">= {FFMPEG_SLEEP} s: kind video, 640×360, a .mov directly inside Rewrapped; "
+          "cleaned up",
+          made["ok"] and got["ok"] and elapsed >= FFMPEG_SLEEP
+          and reply.get("kind") == "video" and reply.get("width") == 640
+          and reply.get("height") == 360 and inside and not expired,
+          f"elapsed {elapsed:.1f} s, answer {reply if got['ok'] else got.get('error')!r}, "
+          f"inside Rewrapped {inside}, cleanup {expired or 'clean'}")
+
+
+# ---- M0–M2 ------------------------------------------------------------------
+
+def write_noise(path, seconds):
+    with wave.open(str(path), "wb") as out:
+        out.setnchannels(2)
+        out.setsampwidth(2)
+        out.setframerate(48000)
+        chunk = 48000 * 4
+        for _ in range(seconds):
+            out.writeframes(os.urandom(chunk))
+
+
+def build_noise_fixture(client):
+    """The M fixture over MCP: the saved package, or None and why."""
+    noise = WORK / "noise.wav"
+    write_noise(noise, NOISE_SECONDS)
+    pkg = WORK / "noise.reelcut"
+    steps = [attempt(client, "new_project", {"path": str(pkg)})]
+    imported = attempt(client, "import_media", {"project": str(pkg), "path": str(noise)})
+    steps.append(imported)
+    media = (imported.get("reply") or {}).get("media") if imported["ok"] else None
+    for _ in range(NOISE_TRACKS - 1):
+        steps.append(attempt(client, "add_track", {"project": str(pkg)}))
+    tracks = [t["id"] for t in (project_of(client, pkg) or {}).get("tracks", [])]
+    for track in tracks[:NOISE_TRACKS]:
+        steps.append(attempt(client, "add_clip", {"project": str(pkg), "track": track,
+                                                  "media": media, "at": 0}))
+    clips = [c["id"] for c in (project_of(client, pkg) or {}).get("clips", [])]
+    steps.append(attempt(client, "set_audio", {"project": str(pkg), "clips": clips,
+                                               "patch": {"noise_reduction": 1.0}}))
+    steps.append(attempt(client, "save_project", {"project": str(pkg)}))
+    failed = [s.get("error") for s in steps if not s["ok"]]
+    if failed or len(tracks) < NOISE_TRACKS or len(clips) != NOISE_TRACKS:
+        return None, f"fixture: errors {failed}, tracks {len(tracks)}, clips {len(clips)}"
+    return pkg, ""
+
+
+def run_cancel(binary, why, pkg, pkg_why, runs):
+    if binary is None or pkg is None:
+        reason = why if binary is None else pkg_why
+        check("M0 (CONTROL) the uncancelled measurement", False, reason)
+        check("M1 cancels during the measurement", False, reason)
+        check("M2 cancel latency", False, reason)
+        return
+    control = run_probe(binary, pkg, "m0", -1)
+    window = control.get("window")
+    check(f"M0 (CONTROL) {NOISE_SECONDS} s of noise on {NOISE_TRACKS} tracks with noise "
+          "reduction: the uncancelled probe run is success with window >= 3.0 s",
+          control.get("rc") == 0 and control.get("outcome") == "success"
+          and isinstance(window, (int, float)) and window >= 3.0,
+          f"{control}")
+    if not (isinstance(window, (int, float)) and window >= 0.5):
+        check("M1 cancels during the measurement", False, "no measurement window from M0")
+        check("M2 cancel latency", False, "no measurement window from M0")
+        return
+    seed = random.randrange(1 << 30)
+    rng = random.Random(seed)
+    print(f"  M1 seed {seed}, delay in [0.2, {window / 2:.3f}] s", flush=True)
+    answers, crashes, bad = [], 0, []
+    for index in range(runs):
+        delay = rng.uniform(0.2, window / 2)
+        answer = run_probe(binary, pkg, f"m1-{index}", delay)
+        answers.append(answer)
+        crashed = answer["rc"] != 0 or answer["expired"]
+        crashes += crashed
+        good = (not crashed and answer.get("phase_at_cancel") == "Measuring loudness…"
+                and answer.get("outcome") == "cancelled" and answer.get("left") is False)
+        if not good:
+            bad.append(index)
+        latency = answer.get("latency")
+        print(f"    run {index:2d} delay {delay:6.3f} rc {answer['rc']} "
+              f"outcome {answer.get('outcome')} phase {answer.get('phase_at_cancel')!r} "
+              f"latency {latency if latency is None else round(latency, 3)} "
+              f"left {answer.get('left')}" + ("" if good else f"  {answer}"), flush=True)
+    print(f"  M1 crashes: {crashes} of {runs}", flush=True)
+    check(f"M1 {runs} cancels during the measurement: every run rc 0, cancelled while "
+          "\"Measuring loudness…\", no file left",
+          not bad and crashes == 0, f"crashes {crashes} of {runs}, failing runs {bad}")
+    latencies = [a.get("latency") for a in answers]
+    slow = [i for i, value in enumerate(latencies)
+            if not isinstance(value, (int, float)) or value > 1.0]
+    known = [value for value in latencies if isinstance(value, (int, float))]
+    check("M2 every M1 cancel completes within 1.0 s (the loop cancels its own reader)",
+          not slow and len(known) == runs,
+          (f"max {max(known):.3f} s, " if known else "") + f"over 1.0 s or missing: {slow}")
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--port", type=int, default=4893)
+    parser.add_argument("--app", type=Path, default=APP)
+    parser.add_argument("--only", default="gate,import,cancel")
+    parser.add_argument("--runs", type=int, default=30)
+    args = parser.parse_args()
+    groups = [g.strip() for g in args.only.split(",") if g.strip()]
+    unknown = [g for g in groups if g not in GROUPS]
+    if unknown:
+        parser.error(f"unknown group(s) {unknown}; choose from {sorted(GROUPS)}")
+    selected = [row for g in groups for row in GROUPS[g]] + ["Z1"]
+
+    shutil.rmtree(WORK, ignore_errors=True)
+    WORK.mkdir(parents=True)
+    write_standins()
+
+    binary, why = (None, "")
+    if "cancel" in groups:
+        binary, why = build_probe()
+        print(f"  probe: {binary or 'did not build — ' + why}", flush=True)
+
+    log = WORK / f"reelcut-{args.port}.log"
+    instance = Instance(args.app, args.port, log)
+    pkg, pkg_why = None, "the instance did not start"
+    try:
+        client = instance.start()
+        if "gate" in groups:
+            run_gate(client)
+        if "import" in groups:
+            run_import(client)
+        if "cancel" in groups and client is not None:
+            pkg, pkg_why = build_noise_fixture(client)
+    finally:
+        instance.stop()
+    try:
+        complaints = [line.strip() for line in open(log) if "Reelcut: " in line]
+    except OSError:
+        complaints = ["the log could not be read"]
+    if "cancel" in groups:
+        run_cancel(binary, why, pkg, pkg_why, args.runs)
+    check("Z1 grep \"Reelcut: \" over this launch's log prints nothing",
+          not complaints and log.exists(), f"{complaints[:5]}")
+
+    missing = [row for row in selected if row not in rows]
+    failed = [row for row in ORDER if row in selected and not rows.get(row)]
+    print(f"\n{len(selected) - len(failed)}/{len(selected)} rows ok"
+          + (f"; failed {failed}" if failed else "")
+          + (f"; never scored {missing}" if missing else ""), flush=True)
+    sys.exit(0 if not failed and not missing else 1)
+
+
+if __name__ == "__main__":
+    main()

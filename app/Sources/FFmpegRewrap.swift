@@ -65,12 +65,9 @@ enum FFmpegRewrap {
     }
 
     /// Whether a modal question can actually be answered. An agent-driven app
-    /// (`-AgentServerEnabled YES`) has nobody at the keyboard: an alert there
-    /// would sit unanswered until `import_media`'s own 30-second ceiling
-    /// expired, turning a clean "cannot read this file" into a timeout. So
-    /// under the agent the stored policy decides on its own and `ask` means
-    /// no — which is exactly today's behaviour, and a scripted run that wants
-    /// the conversion says so with `-RCFFmpegImport always`.
+    /// (`-AgentServerEnabled YES`) has nobody at the keyboard to answer an
+    /// alert, so there the stored policy decides alone and `ask` means no; a
+    /// scripted run that wants the conversion says `-RCFFmpegImport always`.
     private static var canAsk: Bool {
         !UserDefaults.standard.bool(forKey: AgentServer.enabledDefaultsKey)
     }
@@ -646,8 +643,11 @@ enum FFmpegRewrap {
     private static func timeout(for plan: Plan) -> TimeInterval {
         let duration = max(0, plan.duration)
         let ceiling = plan.isStreamCopy ? max(300, duration * 2) : max(1800, duration * 30)
-        return min(ceiling, 4 * 3600)
+        return min(ceiling, longestConversion)
     }
+
+    /// The longest ffmpeg is ever given; `import_media`'s wait covers it.
+    static let longestConversion: TimeInterval = 4 * 3600
 
     private static func lastLine(of data: Data) -> String {
         let text = String(decoding: data, as: UTF8.self)

@@ -696,15 +696,17 @@ the key map behind it.
   within an 8 ms window at a duck ramp edge (AVFoundation's mix); a duck-free
   project decodes byte-identical. `ExportError` is `ExporterErrors.swift`'s.
   An export PINS the `GraphicSet` it was handed for its whole life, GATES it
-  before the build (`ExporterGraphics.graphicsRefusal`: a graphic clip in the
-  range, or in a nest a clip in the range shows, whose module did not
-  compile or is missing, refuses before the destination is touched), and
+  before the build (`ExporterGraphics.graphicsRefusal`: a graphic clip in
+  the range, or in any nest reached from one, however deep, whose module did
+  not compile or is missing, refuses before the destination is touched), and
   ABORTS on a recorded failure: `pollProgress` cancels and `finish` removes
   the file and answers `.graphicFailed`, whatever the pipeline said.
-  **`ExportWriter.cancel()` only sets the flag**; the reader and the writer
-  are cancelled in `allInputsFinished`, after every pump has left its loop —
-  cancelling the reader under a running `copyNextSampleBuffer` crashed the
-  process. Never call `cancelReading` from another thread while a pump runs.
+  **`ExportWriter.cancel()` and `Exporter.cancel()` only set flags**; the
+  measurement's loop cancels its own reader, and the writer's reader and
+  writer are cancelled in `allInputsFinished`, after every pump has left its
+  loop — cancelling a reader under a running `copyNextSampleBuffer` crashed
+  the process. Never call `cancelReading` from another thread while a loop
+  reads; a read that never returns is not woken (spec §11 G-17).
 - `FrameWriter.swift` — a `CGImage` and a format in, a URL out, no panel:
   Save Frame and `render_frame` both call it, so their PNGs are
   byte-identical by construction. PNG keeps a NIL properties dictionary

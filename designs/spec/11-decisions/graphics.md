@@ -279,3 +279,21 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   the person reads "graphics/<name>.js was written but does not compile:
   <the first diagnostic> (line N)" in a sheet, and can fix the file where
   it is.
+- **G-17 — An export's Cancel only sets flags; a reader is cancelled only
+  by the loop that reads it, and a read that never returns is not woken —
+  accepted** (issues #73, #74, 2026-09-29). `ExportWriter.cancel()` and
+  `Exporter.cancel()` set flags and nothing else. The measurement's loop
+  (`Exporter.measureLoudness`) sees the flag between samples and cancels
+  its own reader; the writer's reader and writer are cancelled in
+  `allInputsFinished`, after every pump has left its loop. Why:
+  `cancelReading()` from main while a pump was inside
+  `copyNextSampleBuffer` crashed 12 of 30 mid-export cancels (road map 10
+  §10.6 G3c, #38). A cross-thread watchdog that cancels a stuck reader is
+  that same mechanism again, and abandoning the completion instead would
+  leave a live reader and writer on the destination. The risk accepted: a
+  read that never returns (a pump starved because the other stopped
+  reading, or a volume that stops answering) keeps its export alive — the
+  sheet or the queue's job never completes and the queue stalls behind it,
+  and an MCP `export` holds the server until its one-hour ceiling. Not seen
+  in 70 runs (G3c) nor in issue batch B1's M1 runs
+  (`tools/proof/export_cancel_proof.py`). Revisit only if one is observed.

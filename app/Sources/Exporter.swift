@@ -127,10 +127,10 @@ final class Exporter {
     private var cancelRequested = false
     /// 0…1 through the measurement pass.
     private var measureProgress: Double = 0
-    /// The reader the measurement is blocked in. Cancelling it is what wakes
-    /// a `copyNextSampleBuffer` that is waiting on a slow volume — the same
-    /// trick `ExportWriter.cancel` plays on its pumps.
-    var measureReader: AVAssetReader?
+    /// True while the measurement reads samples. Only its own loop cancels
+    /// its reader, never `cancel()`, and a read that never returns is not
+    /// woken (spec §11 G-17).
+    var measuring = false
 
     /// The share of the progress bar the measurement pass owns, decided
     /// before the build so the mapping cannot move under the sheet. A
@@ -283,13 +283,10 @@ final class Exporter {
 
     /// Cancels whatever stage the export is at. Safe to call twice, and safe
     /// to call before the composition has finished building — that is what
-    /// `cancelRequested` is for.
+    /// `cancelRequested` is for. It only sets flags: each reader is cancelled
+    /// by the loop that reads it (spec §11 G-17).
     func cancel() {
         setCancelRequested(true)
-        lock.lock()
-        let reader = measureReader
-        lock.unlock()
-        reader?.cancelReading()
         writer?.cancel()
     }
 
@@ -411,13 +408,13 @@ final class Exporter {
     /// What the sheet should say while this runs, or nil for its own
     /// wording. Only the measurement has a phase of its own: the build
     /// before it is "Preparing…" and everything after it is "Writing…",
-    /// which is what the sheet already says. The live READER is the test
-    /// rather than a flag of its own, so the label appears exactly while
-    /// samples are being measured and not for the build that precedes them.
+    /// which is what the sheet already says. `measuring` is set only once
+    /// the reader has started, so the label appears exactly while samples
+    /// are being measured and not for the build that precedes them.
     var phaseDescription: String? {
         lock.lock()
         defer { lock.unlock() }
-        return measureReader == nil ? nil : "Measuring loudness…"
+        return measuring ? "Measuring loudness…" : nil
     }
 
     /// The one exit. Tears down the timer and the recipe slot before the

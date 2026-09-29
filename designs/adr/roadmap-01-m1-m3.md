@@ -71,12 +71,12 @@ overrode the spec; what came after is road maps 2 onward.
   `TimelineView.swift`'s content `draw`; the fix is a two-pass loop (clips, then transitions,
   then rings) in that frozen file.
 - **Noise reduction delays its track 512 samples** (10.7 ms at 48 kHz; `AudioDSP.swift`).
-- **`import_media` over MCP can time out on a first ffmpeg transcode**: the tool waits 30 s on
-  the probe (`AgentServer+Media.swift`), and the rewrap runs inside it with its own much longer
-  timeout; the conversion completes and a second call is instant.
 - Fixed since: a wrong-typed value nested in a property patch used to be silently dropped
   (orig §3.3) — road map 7's D1 hands the core the caller's raw patch; `AudioProps.mono` was
-  unimplemented (orig §3.7) — road map 2's phase 5.
+  unimplemented (orig §3.7) — road map 2's phase 5; `import_media` over MCP timed out on a first
+  ffmpeg transcode, waiting 30 s on a probe the rewrap runs inside — it now waits
+  `FFmpegRewrap.longestConversion` plus 300 s (`AgentServer+Media.swift` `probeCeiling`; #67,
+  issue batch B1, proved by `tools/proof/export_cancel_proof.py`'s I1).
 
 ## Open items
 - The person checks orig §2 lists that no later document carries — the timeline's transient
@@ -84,7 +84,6 @@ overrode the spec; what came after is road maps 2 onward.
   and every tooltip, hover and cursor — tracked in the `ready-for-human` issues (#47–#57).
 - Playback with audio, J/K/L, scrubbing and 60 fps (spec §10 steps 4–5) — tracked in #47.
 - The transition zone over the previous clip's ring — tracked in #66.
-- `import_media`'s MCP timeout on a first transcode — tracked in #67.
 
 ## Where to look in the original
 - orig §1 — M3's closing numbers (203 tests, 57 tools, format v2) and the table of what proved

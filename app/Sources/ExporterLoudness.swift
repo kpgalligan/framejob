@@ -6,7 +6,7 @@ import AVFoundation
 /// because `Exporter.swift` went past app/CLAUDE.md's ~600-line cap when phase
 /// 5 put a second pass in it. It is a MOVE and nothing else — the same methods,
 /// the same order, the same bodies — so `Exporter.swift`'s five internal members
-/// (`lock`, `measureReader`, `scratchStorage`, `scratchCapacity`, and the
+/// (`lock`, `measuring`, `scratchStorage`, `scratchCapacity`, and the
 /// `isCancelled` / `setMeasureProgress` accessors over that lock) are internal
 /// only to be reachable from here. Stored properties cannot live in an
 /// extension, which is the whole reason the split is where it is.
@@ -144,11 +144,11 @@ extension Exporter {
         reader.add(output)
         guard reader.startReading() else { return nil }
         lock.lock()
-        measureReader = reader
+        measuring = true
         lock.unlock()
         defer {
             lock.lock()
-            measureReader = nil
+            measuring = false
             lock.unlock()
         }
 

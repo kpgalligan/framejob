@@ -12,14 +12,14 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | File | Lines | Holds |
 |---|---|---|
 | [`foundations.md`](foundations.md) | 106 | **Foundations (M1–M3, road map 2).** AVFoundation not ffmpeg, the compositor, one op entry point, overlap and ripple rules, ticks, `async` confinement, media by reference; R2-1. |
-| [`recording.md`](recording.md) | 97 | **Screen recording (road map 3).** The recorder: what is in and out, files, grants, pause. |
+| [`recording.md`](recording.md) | 103 | **Screen recording (road map 3).** The recorder: what is in and out, files, grants, pause. |
 | [`silence.md`](silence.md) | 49 | **Remove Silences (road map 4).** Silero VAD, its grid and cache, voice mode; S1-23. |
 | [`effects-motion.md`](effects-motion.md) | 60 | **Transitions and motion (road map 5).** R5-1..R5-5, E2-27. |
 | [`deepening.md`](deepening.md) | 268 | **Deepening (road map 7).** D2-1, D3-1, #21, #22, D4-1..D4-6, D7-1..D7-3: how ops refuse, the op table, the gate, the source window, time envelopes. |
 | [`cloud-captions.md`](cloud-captions.md) | 242 | **Cloud captions (road map 6).** R6-1..R6-16: AssemblyAI, keys, deletion, recovery. |
 | [`word-captions.md`](word-captions.md) | 123 | **Word captions (road map 8).** W-1..W-11. |
 | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) | 306 | **Chrome, the clip inspector and keys (the sharp pass, road map 9, #35).** SH-1, SH-2, CI-1..CI-15, K-1, K-2. |
-| [`graphics.md`](graphics.md) | 281 | **Graphics (road map 10).** G-1..G-16. |
+| [`graphics.md`](graphics.md) | 299 | **Graphics (road map 10).** G-1..G-17. |
 | [`dev-tools.md`](dev-tools.md) | 27 | **Dev tools (road map 11).** V-1..V-3: the `REELCUT_DEV_TOOLS` flag and `make dist`, dev tools as ordinary tools, capture by `cacheDisplay`. |
 | [`assistant.md`](assistant.md) | 117 | **The Assistant (road map 12).** AI-1..AI-15: the bundled helper, one lane, the catalog at launch, the fourth tab, the window's own project, W-9's reach, withheld and ask-first tools, the key, history, undo, the model, a call mid-gesture, the base-URL override, the tab kept on a selection change, the live context on each message. |
 | [`pricing.md`](pricing.md) | 81 | **Pricing and spend (road map 13).** P-1..P-7: LiteLLM's table as the feed, a call priced from its own `usage` and `model` (per iteration), monthly dollar budgets per service, the app's spend as its own, the spend folder (ledger and price cache) that a proof never touches, the proofs' own ledger and how a paid proof request is held to the month's budget in it, and the two figures the app shows (the conversation's on the Assistant tab, the UTC month's in Settings). |
@@ -142,6 +142,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | G-14 | `graphics/` is created on the app's first write into it, never at open | [`graphics.md`](graphics.md) |
 | G-15 | The Graphic sub-tab: what it shows for several clips, and what a write sends | [`graphics.md`](graphics.md) |
 | G-16 | Insert ▸ Graphic: where the clip goes, what the module is called, and what a module that does not compile does | [`graphics.md`](graphics.md) |
+| G-17 | An export's Cancel only sets flags; a reader is cancelled only by the loop that reads it, and a read that never returns is not woken — accepted | [`graphics.md`](graphics.md) |
 | V-1 | Dev tools are compiled only under `REELCUT_DEV_TOOLS`; Distribution ships without them | [`dev-tools.md`](dev-tools.md) |
 | V-2 | A dev tool is not an op, but goes through the catalog, gate and parity check like any tool | [`dev-tools.md`](dev-tools.md) |
 | V-3 | Screens are captured with `cacheDisplay`, never ScreenCaptureKit | [`dev-tools.md`](dev-tools.md) |

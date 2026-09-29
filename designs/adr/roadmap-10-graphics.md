@@ -305,14 +305,19 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   graphics roots are never deleted. `GraphicStore.drain()` is not
   re-entrant, so never call `rescan()` from a `.graphicsDidChange` observer
   (`app/CLAUDE.md`).
-- **Export:** the compile gate walks one nest level; deeper nests are caught
-  by the mid-export abort. A successful export's warnings are dropped at
-  unpin.
+- **Export:** a successful export's warnings are dropped at unpin.
 - **An agent cannot observe a module swap during an export over MCP:** the
   core's agent server is one thread, and `export` holds it.
 - **Constants restated across the G-2 boundary:** `MAX_SIDE` 8192 (the crate,
   `model_graphic.rs`'s `GRAPHIC_MAX_SIDE`, and `GraphicLibrary.maxSide`) and
   the 64-key limit. Change them together.
+- Fixed since: the export's compile gate walked one nest level, deeper nests
+  caught only by the mid-export abort — it now walks every nest reached from
+  the range, however deep (#73); the loudness reader was cancelled from main
+  under a running read — `Exporter.cancel()` now only sets flags, and the
+  measurement's loop cancels its own reader (#74). A starved pump's read that
+  never returns is not woken, accepted in spec §11 G-17 (#73). Both proved by
+  `tools/proof/export_cancel_proof.py` (issue batch B1, 2026-09-29).
 
 ## Open items
 
@@ -324,12 +329,9 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
 - Model and export correctness items:
   - `add_transition`'s handle form does not advance `graphic.in`;
   - a canvas rate change does not re-snap `in`/`length`;
-  - `validate` accepts a graphic clip with no description;
-  - the export gate's single nest level;
-  - the loudness reader is still cancelled from main.
+  - `validate` accepts a graphic clip with no description.
 
-  Tracked in #72 (the model), #73 (the export gate, with the starved export
-  pump) and #74 (the loudness reader's cancel).
+  Tracked in #72.
 - Small app and proof nits from the G1b–G5b reviews (Insert ▸ Graphic's
   stale-scan name choice, the non-UTF-8 From File…, the leftover
   `.js.partial`, the contact sheet's peak memory, and others) — each listed

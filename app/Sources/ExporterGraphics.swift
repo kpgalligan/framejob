@@ -31,9 +31,9 @@ extension Exporter {
     /// `.graphicsNotCompiled` when a graphic clip the export will draw has a
     /// module that failed to compile or has none, else nil. Nothing to gate
     /// with no set or an audio-only export. The clips are the top level's in
-    /// `settings`' range, plus every graphic clip of each nest a clip in the
-    /// range shows — the whole nest, not its window, which over-includes by
-    /// decision.
+    /// `settings`' range, plus every graphic clip of each nest reached from a
+    /// clip in the range, however deep — the whole nest, not its window,
+    /// which over-includes by decision.
     static func graphicsRefusal(
         project: ReelProject, settings: ExportSettings, graphics: GraphicSet?
     ) -> ExportError? {
@@ -41,14 +41,11 @@ extension Exporter {
         let range = settings.start..<(settings.start + settings.duration)
         let snapshot = project.snapshot
         var names = Set<String>()
+        var visited = Set<UInt32>()
         for clip in snapshot.clips where clip.start < range.upperBound && clip.end > range.lowerBound {
             if let graphic = clip.graphic { names.insert(graphic.name) }
-            guard case .nest(let id) = clip.source,
-                let nest = snapshot.nests.first(where: { $0.id == id })
-            else { continue }
-            for inner in nest.clips {
-                if let graphic = inner.graphic { names.insert(graphic.name) }
-            }
+            guard let id = clip.source.nestID else { continue }
+            collectGraphicNames(inNest: id, of: snapshot, into: &names, visited: &visited)
         }
         let refused = names.sorted().compactMap { name -> (name: String, message: String)? in
             switch graphics.modules[name] {
@@ -62,6 +59,22 @@ extension Exporter {
             }
         }
         return refused.isEmpty ? nil : .graphicsNotCompiled(refused)
+    }
+
+    /// Every graphic clip's module name in nest `id` and in each nest reached
+    /// from it. `visited` is belt and braces: `check_nesting` refuses a
+    /// cycle, but a hand-written file is not held to it (`pathToClip`'s rule).
+    private static func collectGraphicNames(
+        inNest id: UInt32, of snapshot: ProjectSnapshot,
+        into names: inout Set<String>, visited: inout Set<UInt32>
+    ) {
+        guard visited.insert(id).inserted, let nest = snapshot.nest(id) else { return }
+        for inner in nest.clips {
+            if let graphic = inner.graphic { names.insert(graphic.name) }
+            if let child = inner.source.nestID {
+                collectGraphicNames(inNest: child, of: snapshot, into: &names, visited: &visited)
+            }
+        }
     }
 
     /// `.graphicFailed` for one failed report.

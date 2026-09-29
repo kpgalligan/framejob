@@ -62,9 +62,17 @@ extension AgentServer {
         }
     }
 
+    /// The longest conversion plus 300 s for the funnel's other bounds: two
+    /// 30 s header probes (`MediaImporter.waitForProbe`), ffprobe's and the
+    /// encoder query's 20 s each with `run`'s 20 s grace, and ffmpeg's own.
+    private static let probeCeiling: TimeInterval = FFmpegRewrap.longestConversion + 300
+
     /// Probes one file and waits for the answer. MUST run off the main thread
-    /// — see `importMedia` — and gives up after 30 seconds, the same ceiling
-    /// `ProjectDocument.readMediaFile` puts on an unreadable file.
+    /// — see `importMedia` — and gives up only after `probeCeiling`: a file
+    /// AVFoundation cannot read may be converted by ffmpeg first
+    /// (`FFmpegRewrap.assist`), which legitimately takes as long as
+    /// `FFmpegRewrap.longestConversion`, so a shorter wait would answer a
+    /// timeout while the conversion is still running.
     private func probe(_ url: URL) throws -> MediaDescriptor {
         guard !Thread.isMainThread else {
             throw ToolError(message: "Probing cannot run on the main thread.")
@@ -75,7 +83,7 @@ extension AgentServer {
             box.value = result
             semaphore.signal()
         }
-        guard semaphore.wait(timeout: .now() + 30) == .success else {
+        guard semaphore.wait(timeout: .now() + Self.probeCeiling) == .success else {
             throw ToolError(message: "Timed out reading \(url.lastPathComponent).")
         }
         guard let outcome = box.value else {

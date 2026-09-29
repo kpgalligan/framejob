@@ -7069,3 +7069,93 @@ three $0.0006 responses, Settings "… 5 responses; …"); `local-month` 4/6
 (M1 dollars 100.375 for 0.875, M3 the month starting 2026-08-01 07:00 UTC),
 exit 1; `unknown-as-zero` 4/6 (M1 priced 5, unpriced 0; C3 also FAILs),
 exit 1. The person's two files were absent before and after.
+
+## Issue batch B1 — export cancel, the nested gate, import_media's wait (`export_cancel_proof.py`, `export_cancel_probe.swift`)
+
+Three fixes against the built app: the pre-export graphics gate follows nests
+however deep (#73), `import_media` waits as long as an ffmpeg conversion may
+run (`FFmpegRewrap.longestConversion` + 300 s, #67), and an export's Cancel
+during the loudness measurement only sets a flag, the measurement's own loop
+cancelling its reader (#74, spec §11 G-17). One owned instance on
+`--port` (4893), launched with `-ApplePersistenceIgnoreState YES
+-AgentServerEnabled YES -RCFFmpegImport always -RCFFmpegPath
+<work>/standin/ffmpeg` and stopped by PID; work in `work/export-cancel/`,
+its log `reelcut-<port>.log` there. Every child runs under
+`graphics_spike/bounded.py`. `--only gate,import,cancel` picks groups (Z1
+always runs); `--runs` (30) is M1's count.
+
+- **G1** (CONTROL) `write_graphic gate` (compiles, 30 frames, one rect),
+  `add_graphic_clip`, `nest` it, `add_text_clip` right after, `nest` both:
+  `get_project` shows timeline nest clip → nest B (a nest clip and the
+  text) → nest A (the `gate` clip), and `export h264` writes its file.
+- **G2** `write_graphic gate` with a syntax error answers `ok: false` (and
+  `get_project`'s `graphics` says so within 5 s); `export h264` onto a
+  sentinel file is an error starting "The export was not started:" naming
+  `"gate"`, and the sentinel's bytes are unchanged.
+- **I1** stand-in tools, because the host's Homebrew ffmpeg does not load
+  (`dyld: Library not loaded: …libx265.215.dylib`) and nothing here may need
+  a real one: `standin/ffprobe` prints fixed JSON (one `h264` 640×360
+  `30/1` stream, 10 s, 4096 bytes), so the plan is a stream copy;
+  `standin/ffmpeg` exits 0 for `-encoders`, else sleeps 45 s, copies
+  `media/A.mov` to its last argument (the app's `.partial.mov`) and touches
+  `standin/ffmpeg.exited` on exit. `import_media` of 4096 random bytes as
+  `slow-<uuid hex>.mkv` answers ok after ≥ 45 s, kind `video`, 640×360, a
+  `.mov` directly inside `~/Library/Application Support/Reelcut/Rewrapped/`.
+  Cleanup runs whatever the call answered and before the instance stops:
+  it waits for `ffmpeg.exited` (120 s from the call), then for no
+  `.partial.mov` (10 s), then deletes every Rewrapped entry starting
+  `slow-<hex>-` whose resolved parent is that folder, and the fixture; an
+  expired bound fails the row and names the leftovers.
+- **M0** (CONTROL) 300 s of 48 kHz stereo 16-bit `os.urandom` noise
+  (`wave`), imported over MCP onto four tracks at 0 with
+  `noise_reduction: 1.0`, saved; the probe's uncancelled run is `success`
+  with a measurement `window` ≥ 3.0 s.
+- **M1** `--runs` probe runs, each cancelling from main `delay` s (uniform
+  in [0.2, window/2], the seed printed) after "Measuring loudness…" first
+  shows: every run rc 0 (a signal or an expiry is a crash), cancelled while
+  the phase read "Measuring loudness…", `outcome` `cancelled`, no file left.
+  Prints the crash count.
+- **M2** every M1 latency (cancel to completion) ≤ 1.0 s.
+- **Z1** no `Reelcut: ` line in the launch's log.
+
+`export_cancel_probe.swift` is built like `graphics_proof.py`'s pin probe
+(every `app/Sources` file but `main.swift`, this file as `main.swift`,
+`harness/build.sh`'s swiftc line with `-D REELCUT_DEV_TOOLS`, `Fonts`,
+`Blank.mp4` and a `default.metallib` beside it) into
+`work/export-cancel-probe/`, rebuilt when stale; a probe that will not build
+scores M0–M2 as FAILURES. `export_cancel_probe <package> <out.m4a>
+<delay|-1>` opens the package as the app does, exports `audio_m4a` through
+`Exporter`, polls `phaseDescription` in ≤ 10 ms run-loop slices under a
+300 s deadline and prints one JSON object (`outcome`, `error`, `window`,
+`phase_at_cancel`, `latency`, `left`).
+
+Made to fail, each by hand, reverted and rebuilt after:
+
+- (a) + (b) in ONE `make app`: `collectGraphicNames`' recursive call removed
+  and `probeCeiling` set to 30 → `--only gate,import`: G2 FAIL ("The export
+  was stopped: the graphic "gate" does not compile — … No file was
+  written.", sentinel changed — the mid-export abort, not the gate), I1 FAIL
+  (30.0 s, "Timed out reading slow-<hex>.mkv."; cleanup clean), exit 1.
+- (c) `ExporterLoudness`'s in-loop `isCancelled` early return removed (probe
+  rebuild only) → `--only cancel --runs 5`: M2 FAIL, latencies 73.5–136.7 s
+  (the measurement runs to its end), M1 ok, exit 1.
+- CONTROL, measured not scored: HEAD's `Exporter.swift` and
+  `ExporterLoudness.swift` (the main-thread `cancelReading` in `cancel()`)
+  → `--only cancel --runs 30`: 0 crashes of 30, latencies 0.358–0.842 s.
+  This fixture does not reproduce a crash with the old cancel; the change
+  rests on G3c's writer-side crash (12 of 30) and on G-17's rule, not on a
+  crash seen here.
+
+```sh
+python3 tools/proof/export_cancel_proof.py --port 4893          # 7/7
+python3 tools/proof/export_cancel_proof.py --only gate,import    # G1 G2 I1 Z1
+python3 tools/proof/export_cancel_proof.py --only cancel --runs 5
+```
+
+Measured 2026-09-29, every command with `ANTHROPIC_API_KEY` and
+`RC_ASSEMBLYAI_KEY` unset, two full runs: 7/7 both times; I1 45.4 s both;
+M0 window 143.0 s and 139.5 s; M1 0 crashes of 30 both; M2 latencies
+0.421–0.889 s and 0.411–0.790 s. M2's 1.0 s bound is not far above them:
+the cancel waits for the sample buffer in flight over four noise-reduced
+tracks. The second full run took 1632 s of wall time, most of it M1 (each
+run measures for its `delay`, up to window/2).
