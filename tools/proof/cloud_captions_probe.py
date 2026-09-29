@@ -58,12 +58,12 @@ Sections, by the name after `section_`:
   readings, the button with and without a credential, a Mac with no on-device
   model at all, the Settings window's rows and its Save / Verify / Remove
   through R6-9's folder, the report card's lines, the bar as displayed, the
-  estimate against the RUN, the menu item, `project.yml`'s one changed
-  string, and the Settings window PHOTOGRAPHED through the harness in both
-  appearances. c1-chrome's review added six rows here: the summary's
-  tooltip on both sides of the Engine switch, a REGION changed under an
-  open card, one store built per `sync`, and what Stop did to a run that
-  had started.
+  estimate against the RUN, the menu item, `project.yml`'s `info:` and
+  `entitlements:` blocks, and the Settings window PHOTOGRAPHED through the
+  harness in both appearances. c1-chrome's review added six rows here: the
+  summary's tooltip on both sides of the Engine switch, a REGION changed
+  under an open card, one store built per `sync`, and what Stop did to a run
+  that had started.
 * `run` (P, T) — `CloudProgress` as pure calls over a table, then
   `CloudTranscriber.transcribe` itself against the fake: every
   `(fraction, detail)` it published, non-decreasing, inside its phase's band
@@ -5331,6 +5331,26 @@ def section_estimate(binary, sources):
 # --------------------------------------------------------------------------
 # Row 18 — the chrome: the Settings window and the sheet
 
+def project_yml_blocks(text):
+    """Row 18's scope (#156): each block of `project.yml` that starts at a
+    `    info:` or `    entitlements:` line and runs through the last following
+    line that is blank or indented more than four spaces."""
+    lines = text.split("\n")
+    blocks = []
+    index = 0
+    while index < len(lines):
+        if lines[index].rstrip() in ("    info:", "    entitlements:"):
+            end = index + 1
+            while end < len(lines) and (not lines[end].strip()
+                                        or len(lines[end]) - len(lines[end].lstrip(" ")) > 4):
+                end += 1
+            blocks.append("\n".join(lines[index:end]))
+            index = end
+        else:
+            index += 1
+    return blocks
+
+
 APPLE_HINT = ("The words are recognised ON THIS MAC and land as ordinary text clips on a "
               "track of their own, so they show in the preview and burn into an export with "
               "no further step. Nothing is uploaded.")
@@ -5904,7 +5924,7 @@ def section_chrome(binary, sources):
                   len([row for row in rows
                        if row["key"] == "," and row["command"]]) == 1, f"got {rows!r}")
 
-    # --- `project.yml`: one string, and still no ATS key.
+    # --- `project.yml`'s `info:` and `entitlements:` blocks, and still no ATS key.
     baseline = subprocess.run(
         ["git", "show", f"{BASELINE_TREE_C1CHROME}:project.yml"], cwd=ROOT,
         capture_output=True, text=True, env=child_env(), timeout=60)
@@ -5912,20 +5932,20 @@ def section_chrome(binary, sources):
     if baseline.returncode != 0:
         check("18: the baseline tree's project.yml reads", False, baseline.stderr[-200:])
     else:
+        # Only the blocks this row owns (#156): the build settings, build
+        # phases and schemes above and below them change with other road maps.
         diff = [line for line in difflib.unified_diff(
-            baseline.stdout.splitlines(), current.splitlines(), lineterm="", n=0)
+            "\n".join(project_yml_blocks(baseline.stdout)).splitlines(),
+            "\n".join(project_yml_blocks(current)).splitlines(), lineterm="", n=0)
             if line and line[0] in "+-" and not line.startswith(("---", "+++"))]
-        # Since this baseline: W1a's three macOS 26 lines, and road map 8's
-        # W2, which DELETED the Speech usage string with its comment (no code
-        # path asks for the grant any more, spec §11 W-8) and reworded the
-        # microphone comment's aside about how speech reads a file.
-        check("18: `project.yml` changed in the three macOS 26 lines, the deleted Speech "
-              "usage string and the microphone comment's aside, and NOWHERE else",
-              diff == ['-    macOS: "15.0"',
-                       '+    macOS: "26.0"',
-                       '-        MACOSX_DEPLOYMENT_TARGET: "15.0"',
-                       '+        MACOSX_DEPLOYMENT_TARGET: "26.0"',
-                       '-        LSMinimumSystemVersion: "15.0"',
+        # Since this baseline: W1a's macOS 26 minimum (LSMinimumSystemVersion),
+        # and road map 8's W2, which DELETED the Speech usage string with its
+        # comment (no code path asks for the grant any more, spec §11 W-8) and
+        # reworded the microphone comment's aside about how speech reads a file.
+        check("18: `project.yml`'s `info:` and `entitlements:` blocks changed in the macOS 26 "
+              "minimum, the deleted Speech usage string and the microphone comment's aside, "
+              "and NOWHERE else",
+              diff == ['-        LSMinimumSystemVersion: "15.0"',
                        '+        LSMinimumSystemVersion: "26.0"',
                        "-        # File ▸ Generate Captions… (Transcriber.swift). NOT optional and not",
                        "-        # a nicety: SFSpeechRecognizer.h says an app whose Info.plist lacks",

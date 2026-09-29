@@ -46,7 +46,7 @@ a skip.
 |---|---|
 | `capture_spike.py` | the runner: host facts, the two fixtures, the shader and the probe build (B0), one bounded child per mode, scoring, `answers.json`, the digest, the exit code |
 | `rows.py` | the row table (ID, question, kind, mode) and one pure predicate per row over the probe's JSON; `host_skip` |
-| `inventory.py` | the site grep over `app/Sources`, the I1–I4 checks, the printed menu table |
+| `inventory.py` | the site grep over `app/Sources`, the I1–I4 checks, the printed menu table; `--check` (a line of `make test`, no app) runs I2 and I3 over the tree as K1 with two CONTROLs, K2 (three lines put above every site) and K3 (one rewritten site blanked) |
 | `inventory.json` | the hand-read inventory: every live menu selector's verdict (`none`, `sheet`, `window`, `modal`, `framework`) with the lines that present, and every grep site traced to the selectors that reach it — `reached_from` (inside the action), `reached_after` (a completion, an async hop or a delegate callback, with its `via` line and `gate`) |
 | `capture_probe.swift` | the probe's entry, copied to `work/capture_spike/probe/main.swift`: arguments, mode dispatch, the one `ANSWER` line |
 | `probe_support.swift` | boot (`.regular`, `finishLaunching`, the argument-domain pins, the app's fonts), `ProbeEditor` (a package opened as the app opens one, 1440 × 862), activation, the settle capture, capture-pixel mapping, masks and statistics |
@@ -83,7 +83,7 @@ I instrument, C control, A answer. An answer row's `fail` is a measured
 | W0 I, W1 A, W2–W3 C, W4a–c A, W5–W6 C | `well` | the live well classified; M, the overlay's marks (selected vs unselected); the quadrant classifier; three techniques scored (i) quadrants 4/4, (ii) ≥ 99 % of M-core within 3/255, (iii) nothing changed outside the well ∪ M+2, (iv) tree restored and the next capture byte-identical; the two controls that make (ii) and (iv) fail |
 | S0 I, S1a–c A, S2a–c A, S3 C | `sheets` | File ▸ Export…, Track ▸ Remove Track, File ▸ Add Media… through `performActionForItem(at:)` then `NSApp.sendAction`; the sheet captured and closed; the parent's capture does not hold the sheet |
 | S4 C | `modal` | a probe item running `NSAlert().runModal()`: the call blocks and the main queue is serviced inside it |
-| I1–I3 I, I4 C | `menu` + `inventory.py` | the inventory against `buildMainMenu()`'s leaves and the site grep; the checker's own control |
+| I1–I3 I, I4 C | `menu` + `inventory.py` | the inventory against `buildMainMenu()`'s leaves and the site grep; the checker's own control. A site is found by its token, not its line (#166): `resolve` pairs the inventory's sites with the grep's per file and token, in line order, when the two counts agree, and a cited site (`code`, `via`, `gate`) is read at its resolved line |
 | A0 I, A1–A2 C, A3–A6 A, A7 C | `appearance` | fresh windows (the harness's method) against a live window switched and restored, `window.appearance` and `contentView.appearance` |
 | L1–L2 C, L3 A, L4–L5 C, L6–L7 A | `layout` | `hasAmbiguousLayout` on controls and the editor tree; the truncation heuristic on controls, a wrapping label and #70's note |
 

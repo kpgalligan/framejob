@@ -32,10 +32,17 @@ proves the real one, `budget.LEDGER`, was not created or changed.
       `static let perHour` line is a ValueError
   A2  `cloud_live_ledger`'s budget CONTROL holds
   A3  `LiveLedger` settles `billed` and `no_upload`; the month total is their sum
+  A4  `spike_ledger` (#163): unkeyed, a plain `aai.Ledger` and no spend file;
+      keyed, one `reserve` line with proof `words_spike`, settled at $0 by
+      `upload_only`; keyed at this month's $5.00, `aai.BudgetError` starting
+      `budget: ` and nothing in the run ledger
+  A5  each spike (`cloud_spike.py`, `words_spike.py`) makes its ledger with one
+      `spike_ledger(` and no `aai.Ledger(`; CONTROL: the text with
+      `spike_ledger(` turned back into `aai.Ledger(` fails
   N   `budget.LEDGER`'s existence, size and mtime unchanged
 
     python3 tools/proof/budget_proof.py                          # every row ok (make test)
-    python3 tools/proof/budget_proof.py --mutant no-budget       # P G1 R2 A2 FAIL, exit 1
+    python3 tools/proof/budget_proof.py --mutant no-budget       # P G1 R2 A2 A4 FAIL, exit 1
     python3 tools/proof/budget_proof.py --mutant unknown-as-zero # W S2 S3 FAIL, exit 1
 
 `no-budget` sets both budgets to infinity in memory; `unknown-as-zero`
@@ -64,7 +71,7 @@ UTC = datetime.timezone.utc
 SEPTEMBER = datetime.datetime(2026, 9, 15, 12, 0, 0, tzinfo=UTC)
 AUGUST = datetime.datetime(2026, 8, 31, 23, 59, 0, tzinfo=UTC)
 ROWS = ["P", "F1", "F2", "G1", "G2", "G3", "W", "S1", "S2", "S3", "S4", "U1", "U2",
-        "R1", "R2", "R3", "R4", "A1", "A2", "A3", "N"]
+        "R1", "R2", "R3", "R4", "A1", "A2", "A3", "A4", "A5", "N"]
 RESULTS = []
 
 
@@ -548,6 +555,61 @@ def row_a3(budget, ledger_module):
     return ok, f"settles {settles}; month total ${total:.6f} (want ${want:.6f})"
 
 
+def row_a4(budget, ledger_module):
+    import aai
+    unkeyed_spend = scratch("a4", "unkeyed-spend.jsonl")
+    plain = ledger_module.spike_ledger(scratch("a4", "unkeyed.json"), aai.Scrubber([]), False,
+                                       "words_spike", spend_path=unkeyed_spend)
+    unkeyed = type(plain) is aai.Ledger and not os.path.exists(unkeyed_spend)
+
+    keyed_spend = scratch("a4", "keyed-spend.jsonl")
+    keyed = ledger_module.spike_ledger(scratch("a4", "keyed.json"), aai.Scrubber([]), True,
+                                       "words_spike", spend_path=keyed_spend)
+    rid = keyed.reserve("q2", "a4", 11)
+    keyed.closed(rid, "upload_only")
+    reserves = kinds(keyed_spend, "reserve")
+    settles = [(s["dollars"], s["basis"]) for s in kinds(keyed_spend, "settle")]
+    held = (len(reserves) == 1 and reserves[0].get("proof") == "words_spike"
+            and settles == [(0.0, "upload_only")])
+
+    full_spend = scratch("a4", "full-spend.jsonl")
+    seeder = budget.SpendLedger(full_spend, "assemblyai", "budget_proof", "a4")
+    seed = seeder.reserve(5.00, "seed", gate=False)
+    seeder.settle(seed, 5.00, "seed", seconds=0)
+    run_path = scratch("a4", "full.json")
+    full = ledger_module.spike_ledger(run_path, aai.Scrubber([]), True, "words_spike",
+                                      spend_path=full_spend)
+    try:
+        full.reserve("q2", "a4", 11)
+        refused = None
+    except aai.BudgetError as error:
+        refused = str(error)
+    gained = len(aai.Ledger(run_path).reservations())
+    at_budget = refused is not None and refused.startswith("budget: ") and gained == 0
+    ok = unkeyed and held and at_budget
+    return ok, (f"unkeyed {type(plain).__name__}, spend file written "
+                f"{os.path.exists(unkeyed_spend)}; keyed reserves "
+                f"{[(r.get('proof'), r.get('row')) for r in reserves]}, settles {settles}; at "
+                f"$5.00: {refused!r:.160}, run ledger gained {gained}")
+
+
+def spike_predicate(text):
+    return text.count("spike_ledger(") == 1 and "aai.Ledger(" not in text
+
+
+def row_a5():
+    found = []
+    for name in (os.path.join("cloud_spike", "cloud_spike.py"),
+                 os.path.join("words_spike", "words_spike.py")):
+        with open(os.path.join(HERE, name)) as handle:
+            text = handle.read()
+        control = text.replace("spike_ledger(", "aai.Ledger(")
+        found.append((name, spike_predicate(text), spike_predicate(control)))
+    ok = all(held and not control for _, held, control in found)
+    return ok, "; ".join(f"{name} holds {held}, CONTROL (aai.Ledger) holds {control}"
+                         for name, held, control in found)
+
+
 # ---------------------------------------------------------------------------
 
 
@@ -613,6 +675,8 @@ def main():
     guarded("A1", row_a1, budget)
     guarded("A2", row_a2, cloud_live_ledger)
     guarded("A3", row_a3, budget, cloud_live_ledger)
+    guarded("A4", row_a4, budget, cloud_live_ledger)
+    guarded("A5", row_a5)
 
     after = snapshot(budget.LEDGER)
     score("N", real == after, f"{budget.LEDGER}: (exists, size, mtime_ns) {real} before, "

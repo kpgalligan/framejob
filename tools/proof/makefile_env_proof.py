@@ -28,15 +28,13 @@ search afterwards is IN PROCESS — the bytes of each dummy against the bytes
 of every file under the copy's `build/` and `Reelcut.xcodeproj/` — and
 nothing but paths and booleans is ever printed.
 
-**The tree is never touched.** Everything happens in a COPY under
-`tools/proof/work/makefile-env/` whose `core`, `graphic` and `docs` are
-SYMLINKS to the tree's (`core` already built, so `project.yml`'s pre-build
-`cargo build --release` is a no-op and the copy links the tree's
-`libreelcut_core.a`; `graphic` and `docs` are what its other build steps
-read) — `cloud_captions_proof.py`'s `build_mutant` shape. `agent/` is
-COPIED without `node_modules`, not linked, because the helper's build step
-runs `bun install` and `bun build`, which write into it; a copy keeps bun
-out of the tree.
+**The tree is never touched.** Everything happens in a COPY at
+`tools/proof/work/makefile-env/tree`, made by `tree_copy.make_copy`: `app/`
+and `agent/` (without `node_modules`, because the helper's build step runs
+`bun install` and `bun build`, which write into it) are COPIED, and every
+other build input `project.yml` names is a SYMLINK to the tree's (`core`
+already built, so `project.yml`'s pre-build `cargo build --release` is a
+no-op and the copy links the tree's `libreelcut_core.a`).
 
 The three rows:
 
@@ -59,6 +57,8 @@ import shutil
 import subprocess
 import sys
 import time
+
+import tree_copy
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 WORK = os.path.join(ROOT, "tools", "proof", "work", "makefile-env")
@@ -103,21 +103,13 @@ def child_env():
 
 
 def make_copy(mutant):
-    """A COPY of the tree with `core`, `graphic` and `docs` symlinks and
-    `agent/` copied without `node_modules`, and a directive removed when the
-    mutant asks for it. Answers the copy's root, or None and a reason."""
+    """A COPY of the tree from `tree_copy.make_copy`, and a directive
+    removed when the mutant asks for it. Answers the copy's root, or None
+    and a reason."""
     shutil.rmtree(WORK, ignore_errors=True)
-    os.makedirs(WORK)
-    root = os.path.join(WORK, "tree")
-    os.makedirs(root)
-    shutil.copytree(os.path.join(ROOT, "app"), os.path.join(root, "app"),
-                    ignore=shutil.ignore_patterns("Info.plist", "*.entitlements"))
-    for one in ("project.yml", "Makefile"):
-        shutil.copy2(os.path.join(ROOT, one), os.path.join(root, one))
-    for one in ("core", "graphic", "docs"):
-        os.symlink(os.path.join(ROOT, one), os.path.join(root, one))
-    shutil.copytree(os.path.join(ROOT, "agent"), os.path.join(root, "agent"),
-                    ignore=shutil.ignore_patterns("node_modules"))
+    root, reason = tree_copy.make_copy(os.path.join(WORK, "tree"))
+    if root is None:
+        return None, reason
 
     makefile = os.path.join(root, "Makefile")
     with open(makefile) as handle:

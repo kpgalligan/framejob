@@ -91,10 +91,21 @@ def call(client, ledger, scrub, row, label, path, planned, options,
     deleted = client.delete(transcript_id)
     out["delete"] = {"status": deleted.status, "seconds": round(deleted.seconds, 3),
                      "body": scrub.clean(deleted.body[:200].decode("utf-8", "replace"))}
-    ledger.closed(rid, "deleted", deleted.status)
-    out["outcome"] = "deleted"
+    out["outcome"] = record_delete(ledger, rid, deleted)
     out["transcript_id_ledgered"] = True
     return out
+
+
+def record_delete(ledger, rid, reply):
+    """What a single transcript's DELETE got, in the ledger (#82).
+
+    A 2xx closes the reservation `deleted` with its status. Anything else
+    leaves it OPEN, so `undeleted()` still owes it and the next `settle`
+    retries it, and answers `delete_failed`."""
+    if 200 <= reply.status < 300:
+        ledger.closed(rid, "deleted", reply.status)
+        return "deleted"
+    return "delete_failed"
 
 
 def recover(client, ledger, scrub, rid, url, list_match, uploaded_at=None):
@@ -119,9 +130,8 @@ def settle(client, ledger, scrub, list_match, say):
     """The first and last act of every run that has a key."""
     counts = {}
     for rid, transcript_id in ledger.undeleted():
-        reply = client.delete(transcript_id)
-        ledger.closed(rid, "deleted", reply.status)
-        counts["deleted"] = counts.get("deleted", 0) + 1
+        answer = record_delete(ledger, rid, client.delete(transcript_id))
+        counts[answer] = counts.get(answer, 0) + 1
     for rid in ledger.unsent():
         ledger.closed(rid, "upload_only")
         counts["upload_only"] = counts.get("upload_only", 0) + 1

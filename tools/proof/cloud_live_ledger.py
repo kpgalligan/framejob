@@ -21,6 +21,9 @@ there FIRST, at `budget.assemblyai_worst` of its planned seconds and refused
 past the month's $5 (an `extra` is a record of what the app did, so it is
 recorded, never refused), then settled at the billed seconds or at $0 when it
 closed with nothing made. Every rate here is the app's own `AssemblyAIRates`.
+`SpikeLedger` is the same for the road map 6 and 8 spikes (#163): a keyed run
+of either reserves here too, through `spike_ledger`, beside its own $2.00
+ledger.
 """
 
 import json
@@ -28,6 +31,7 @@ import os
 import re
 import socket
 import sys
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "cloud_spike"))
@@ -95,6 +99,37 @@ class LiveLedger(Ledger):
 
     def dollars(self):
         return self.total_seconds() / 3600.0 * budget.assemblyai_rates()["per_hour"]
+
+
+class SpikeLedger(LiveLedger):
+    """`LiveLedger` for the C0 and W0 spikes (#163). A month's refusal
+    reaches the spike as the `aai.BudgetError` its loops already catch, and
+    an `upload_only` close settles at $0 like the other nothing-made
+    outcomes."""
+
+    def reserve(self, row, label, planned_seconds):
+        try:
+            return super().reserve(row, label, planned_seconds)
+        except budget.BudgetRefused as refused:
+            raise BudgetError(str(refused))
+
+    def closed(self, rid, outcome, status=None):
+        super().closed(rid, outcome, status)
+        sid = self.monthly.get(rid)
+        if sid is not None and rid not in self.settled and outcome == "upload_only":
+            self.spend.settle(sid, 0.0, outcome, seconds=0)
+            self.settled.add(rid)
+
+
+def spike_ledger(path, scrubber, keyed, proof, spend_path=None):
+    """A spike's run ledger: a `SpikeLedger` over the proofs' ledger when
+    the run has a key, a plain `aai.Ledger` (no spend file) when it has
+    none."""
+    if not keyed:
+        return Ledger(path, scrubber)
+    return SpikeLedger(path, scrubber,
+                       budget.SpendLedger(spend_path or budget.LEDGER, "assemblyai", proof,
+                                          time.strftime("%Y%m%dT%H%M%S")))
 
 
 def requests_in(lines):

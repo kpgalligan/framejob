@@ -23,11 +23,13 @@ rust:
 	cd core && cargo build --release
 
 # `assistant_lane_proof.py` is spec §11 AI-3's `make test`-reachable probe
-# (the agent lane); `rust` first, because it links the staticlib. The last
-# line but one is road map 13 P1's price function: the Python reader and the
-# helper's `bun test` (agent/build.sh test) against one fixture file, no
-# network. The last is P3's proofs' ledger and monthly budgets (spec §11 P-6),
-# over scratch ledgers only, no network.
+# (the agent lane); `rust` first, because it links the staticlib.
+# `prices_proof.py` is road map 13 P1's price function: the Python reader and
+# the helper's `bun test` (agent/build.sh test) against one fixture file, no
+# network. `budget_proof.py` is P3's proofs' ledger and monthly budgets (spec
+# §11 P-6), over scratch ledgers only, no network. The last line checks the
+# menu inventory's sheet and modal sites against app/Sources, each found by
+# its token rather than its line; no app, no build.
 test: rust
 	cd core && cargo test --release
 	cd graphic && cargo test --release
@@ -35,6 +37,7 @@ test: rust
 	python3 tools/proof/assistant_prompt_proof.py --probe
 	python3 tools/proof/prices_proof.py
 	python3 tools/proof/budget_proof.py
+	python3 tools/proof/capture_spike/inventory.py --check
 
 lint:
 	cd core && cargo clippy --all-targets -- -D warnings

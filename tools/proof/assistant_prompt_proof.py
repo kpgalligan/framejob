@@ -44,7 +44,8 @@ in the proofs' ledger, `budget.LEDGER`, and nothing else ever opens it. A
 rehearsal uses a scratch ledger, `work/assistant_prompt/rehearsal/spend.jsonl`,
 deleted first; `--month-spent D` (rehearsal only) seeds it with D dollars
 already spent this month, so `--month-spent 24.99` shows every E row refused
-`budget:` with nothing sent to the stand-in. `--mutant bare-send` builds a tree copy whose `send` writes the bare
+`budget:` with nothing sent to the stand-in. `--mutant bare-send` builds a tree copy (`tree_copy.make_copy`, into
+`work/assistant_prompt/mutant/tree`) whose `send` writes the bare
 text and runs S2 against it (port 4881): it must FAIL (exit 1); a copy that
 did not build exits 2.
 
@@ -69,6 +70,7 @@ ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "graphics_spike"))
 import bounded  # noqa: E402
+import tree_copy  # noqa: E402
 
 WORK = os.path.join(HERE, "work", "assistant_prompt")
 PROBE_DIR = os.path.join(WORK, "probe")
@@ -364,16 +366,9 @@ def stand_in_posts():
 def build_mutant(asp):
     base = os.path.join(WORK, "mutant")
     shutil.rmtree(base, ignore_errors=True)
-    root = os.path.join(base, "tree")
-    os.makedirs(root)
-    shutil.copytree(os.path.join(ROOT, "app"), os.path.join(root, "app"),
-                    ignore=shutil.ignore_patterns("Info.plist", "*.entitlements"))
-    for one in ("project.yml", "Makefile"):
-        shutil.copy2(os.path.join(ROOT, one), os.path.join(root, one))
-    for one in ("core", "graphic", "docs"):
-        os.symlink(os.path.join(ROOT, one), os.path.join(root, one))
-    shutil.copytree(os.path.join(ROOT, "agent"), os.path.join(root, "agent"),
-                    ignore=shutil.ignore_patterns("node_modules"))
+    root, reason = tree_copy.make_copy(os.path.join(base, "tree"))
+    if root is None:
+        return None, reason
     session = os.path.join(root, "app", "Sources", "AssistantSession.swift")
     with open(session) as handle:
         text = handle.read()

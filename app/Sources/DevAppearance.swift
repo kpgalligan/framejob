@@ -3,9 +3,7 @@ import AppKit
 #if REELCUT_DEV_TOOLS
 /// `-RCDevAppearance light|dark` — a dev-only LAUNCH default (road map 11's
 /// V3): the whole app's appearance, set on `NSApp` in `main.swift` before
-/// `NSApplicationMain`, so before the first window is built. (Not in
-/// `AppDelegate.swift`: a line there moves the `runModal` sites
-/// `capture_spike/inventory.json` pins by line.)
+/// `NSApplicationMain`, so before the first window is built.
 ///
 /// **Why at launch and not per capture.** `snapshot_ui` used to set an
 /// appearance on the live window for one capture (V2a). Measured in V3, that

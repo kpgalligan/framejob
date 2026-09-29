@@ -335,8 +335,8 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
 - Small app and proof nits from the G1b–G5b reviews (Insert ▸ Graphic's
   stale-scan name choice, the non-UTF-8 From File…, the leftover
   `.js.partial`, the contact sheet's peak memory, and others) — each listed
-  in an issue: #75 (store and menus), #82 and #83 (the proof and test nits),
-  #104 and #105 (the graphics engine and tools), #106 (the Graphic sub-tab).
+  in an issue: #75 (store and menus), #104 and #105 (the graphics engine and
+  tools), #106 (the Graphic sub-tab).
 - The not-built list (keyframed props, `paste_attributes`, revision history,
   HEVC with alpha, mattes, system fonts, path helpers, `delete_graphic` /
   `rename_graphic`) — tracked in #103.

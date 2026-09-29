@@ -207,6 +207,8 @@ def build_shader(probe):
 def build_probe(sources):
     """The probe over `sources`, in a directory of its own per source tree.
     (binary, None) or (None, reason)."""
+    if not os.path.isdir(sources):
+        return None, f"--sources {sources} is not a directory"
     tag = "probe" if os.path.samefile(sources, SOURCES) else (
         "probe-" + hashlib.sha256(os.path.abspath(sources).encode()).hexdigest()[:10])
     probe = os.path.join(WORK, tag)

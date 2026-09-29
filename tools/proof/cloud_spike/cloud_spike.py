@@ -33,6 +33,8 @@ import aai                                                          # noqa: E402
 import cloud_rows                                                   # noqa: E402
 import local_rows                                                   # noqa: E402
 from fixtures import Fixtures                                       # noqa: E402
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import cloud_live_ledger                                            # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROWS = ["q1", "q2", "q3", "q4", "q5", "q6", "q7", "q8"]
@@ -109,7 +111,9 @@ def run(arguments):
     if arguments.remake:
         remake(work)
     client, scrub = aai.client_from_env()
-    ledger = aai.Ledger(os.path.join(work, "ledger.json"), aai.Scrubber(list(scrub.secrets)))
+    ledger = cloud_live_ledger.spike_ledger(os.path.join(work, "ledger.json"),
+                                            aai.Scrubber(list(scrub.secrets)),
+                                            client is not None, "cloud_spike")
 
     def say(text):
         print(scrub.clean(str(text)), flush=True)

@@ -380,8 +380,20 @@ if english == nil {
             try? await Task.sleep(for: .seconds(90))
         }
     }
+    // The stall cancelled, then awaited: true when it left the gate within 5 s.
+    func drain() -> Bool {
+        stall.cancel()
+        let drained = DispatchSemaphore(value: 0)
+        Task.detached {
+            _ = await stall.value
+            drained.signal()
+        }
+        return drained.wait(timeout: .now() + 5) == .success
+    }
     if entered.wait(timeout: .now() + 5) != .success {
-        check("P8 gate stalled", false, "the stall never entered the gate within 5 s")
+        let drained = drain()
+        check("P8 gate stalled", false, "the stall never entered the gate within 5 s; "
+                + "cancelled, it drained within 5 s: \(drained)")
     } else {
         let began = Date()
         let runs = offMain(60) {
@@ -391,11 +403,12 @@ if english == nil {
         } ?? nil
         let wall = Date().timeIntervalSince(began)
         let tokens = runs?.map { $0.text } ?? []
-        check("P8 gate stalled", runs != nil && matched(tokens) >= 20 && wall < 30,
+        let drained = drain()
+        check("P8 gate stalled", runs != nil && matched(tokens) >= 20 && wall < 30 && drained,
               "with the gate held for 90 s: \(runs == nil ? "no answer" : "\(tokens.count) runs"), "
-                + "\(matched(tokens)) pangram words, in \(String(format: "%.2f", wall)) s")
+                + "\(matched(tokens)) pangram words, in \(String(format: "%.2f", wall)) s; "
+                + "the stall, cancelled, drained within 5 s: \(drained)")
     }
-    stall.cancel()
 }
 
 print("\n\(passed)/\(passed + failed) probe rows passed, \(skipped) skipped")

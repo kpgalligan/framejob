@@ -48,6 +48,21 @@ TIMINGS = [
     {"start": 360000, "end": 618000},
 ]
 STYLE = {"mode": "highlight", "active_color": [1.0, 0.85, 0.0, 1.0], "active_scale": 1.2}
+HEADER = os.path.join(ROOT, "core", "include", "reelcut_core.h")
+
+
+def format_version():
+    """`RC_FORMAT_VERSION` off the tree's own header, not a copy: a copy goes stale at every bump."""
+    with open(HEADER) as f:
+        text = f.read()
+    match = re.search(r"#define RC_FORMAT_VERSION (\d+)", text)
+    if match is None:
+        raise RuntimeError(f"{HEADER} has no `#define RC_FORMAT_VERSION <n>` line")
+    return int(match.group(1))
+
+
+CURRENT_VERSION = format_version()
+NEWER_VERSION = CURRENT_VERSION + 1
 WRITTEN = re.compile(r"Written to (\S+\.png)\.")
 
 passed = 0
@@ -143,19 +158,21 @@ def render(session, tick):
 
 
 def version_gate(mcp):
-    path = os.path.join(WORK, f"words-v11-{os.getpid()}.reelcut")
+    path = os.path.join(WORK, f"words-v{NEWER_VERSION}-{os.getpid()}.reelcut")
     shutil.rmtree(path, ignore_errors=True)
     os.makedirs(path)
     with open(os.path.join(path, "project.json"), "w", encoding="utf-8") as stream:
-        json.dump({"version": 11, "canvas": {"width": 640, "height": 360, "fps": [30, 1]},
+        json.dump({"version": NEWER_VERSION, "canvas": {"width": 640, "height": 360, "fps": [30, 1]},
                    "tracks": [{"id": 2, "name": "T"}], "clips": [], "next_id": 3}, stream)
     try:
         mcp.call("open_project", path=path)
         message = None
     except ToolError as error:
         message = str(error)
-    check("a version-11 package is refused, naming version 10 as this build's",
-          message is not None and "version 11 is newer" in message and "(version 10)" in message,
+    check(f"a version-{NEWER_VERSION} package is refused, naming version {CURRENT_VERSION} as "
+          f"this build's",
+          message is not None and f"version {NEWER_VERSION} is newer" in message
+          and f"(version {CURRENT_VERSION})" in message,
           repr(message))
 
 
@@ -304,7 +321,8 @@ def save_and_reopen(s):
     with open(os.path.join(s.path, "project.json"), encoding="utf-8") as stream:
         text = stream.read()
     root = json.loads(text)
-    check("save_project writes \"version\": 10", '"version": 10' in text and root["version"] == 10,
+    check(f"save_project writes \"version\": {CURRENT_VERSION}",
+          f'"version": {CURRENT_VERSION}' in text and root["version"] == CURRENT_VERSION,
           f"version {root.get('version')}")
     texts = [c["text"] for c in root["clips"] if c.get("text")]
     check("…with word_style closing every text object, after animation, case, words",

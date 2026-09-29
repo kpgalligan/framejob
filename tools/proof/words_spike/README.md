@@ -93,7 +93,9 @@ asks.
 - `Ledger.reserve` runs before every upload and refuses at
   `aai.BUDGET_DOLLARS` ($2.00). Every transcript created is DELETEd and the
   DELETE's status recorded; `settle` runs at the start and the end of every
-  run that has a key.
+  run that has a key. A run with a key also reserves every paid call in the
+  proofs' ledger against the month's AssemblyAI budget (spec §11 P-6, #163),
+  through `cloud_live_ledger.spike_ledger`; a keyless run writes no spend file.
 - Upload URLs live in `work/words_spike/ledger.json` and nowhere else.
 - `--leakcheck` carries its OWN secret list — the key plus every `upload_url`
   this spike's ledger recorded — and exempts that ledger alone. It is NOT

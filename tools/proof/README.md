@@ -4476,12 +4476,13 @@ mixed refusal, deferred cleanup notes and unchanged package bytes/request
 count. `keyless-agent-requires-key` must build and fail the named keyless
 result row.
 
-**Mutant scores**, each a COPY of the tree — `app/`, `project.yml` and
-`Makefile`, with `core` a SYMLINK to the tree's already-built one, so
-`project.yml`'s pre-build `cargo build --release` is a no-op — one text
-asserted to occur exactly once, `xcodegen generate` plus the Makefile's
-`xcodebuild` line inside the copy under a 900 s wall, then every row on port
-base 4960 (2026-09-20, against 115):
+**Mutant scores**, each a COPY of the tree from `tree_copy.make_copy` —
+`app/` and `agent/` copied, every other build input `project.yml` names a
+SYMLINK to the tree's, `core` already built, so `project.yml`'s pre-build
+`cargo build --release` is a no-op — one text asserted to occur exactly
+once, the copy's own `make app` under a 900 s wall (since issue batch B7;
+`xcodegen generate` plus the Makefile's `xcodebuild` line before it), then
+every row on port base 4960 (2026-09-20, against 115):
 
 | `--mutant` | What it breaks | Score |
 |---|---|---|
@@ -4623,11 +4624,11 @@ already there. **No live call was made and nothing was spent.**
 ```
 
 **3/3** on the tree, and **2/3** under each mutant (road map 12 A1 part 2
-added the Anthropic key). It builds a tree COPY under
-`tools/proof/work/makefile-env/`: `app/`, `project.yml` and `Makefile` are
-copied; `core`, `graphic` and `docs` are SYMLINKS to the tree's (`core`
-already built, so the copy links the tree's staticlib; `graphic` and `docs`
-are what the other build steps read); and `agent/` is COPIED without
+added the Anthropic key). It builds a tree COPY at
+`tools/proof/work/makefile-env/tree` with `tree_copy.make_copy`: `app/`,
+`project.yml` and `Makefile` are copied; every other build input
+`project.yml` names is a SYMLINK to the tree's (`core` already built, so the
+copy links the tree's staticlib); and `agent/` is COPIED without
 `node_modules`, because the helper's build step runs `bun install` and
 `bun build`, which write into it, and a copy keeps bun out of the tree. It
 runs `make app` inside the copy with both keys POPPED and a dummy in each
@@ -5058,10 +5059,11 @@ first time and reopened; A1 a transparent canvas with `callout` as
 `prores_4444`, decoded at 2 s, alpha 0 at a corner and 255 on the stroke; Z1
 the parity grep over every launch.
 
-`--mutant frame-plus-one` copies `app/` and `project.yml` (with `core/`
-linked, not copied), replaces the one anchor in
-`LayerRenderersGraphic.swift` so the module is asked for `frame + 1`, builds
-the copy with xcodegen and xcodebuild into its own directory, drives it
+`--mutant frame-plus-one` copies the tree with `tree_copy.make_copy` (`app/`
+and `agent/` copied, every other build input `project.yml` names linked),
+replaces the one anchor in `LayerRenderersGraphic.swift` so the module is
+asked for `frame + 1`, builds the copy with its own `make app` into its own
+directory, drives it
 through P1 and P2, and exits 0 only if P1 held and P2 FAILED. The rows after
 P2 are relative, so a uniform +1 moves both sides of them.
 
@@ -6267,8 +6269,9 @@ instead of refused).
 
 The spike behind A1's plumbing: Rasterize's Bun helper (`agent/`, renamed
 `reelcut-agent`) built, placed in `Contents/Helpers` and signed by Rasterize's
-own build step, in a COPY of the tree under `work/assistant_spike/tree/` with
-a hook (`AssistantSpikeHook.swift`) that exists only there. It answers
+own build step, in a COPY of the tree under `work/assistant_spike/tree/`
+(`tree_copy.make_copy` with `agent=False`, the copy's own agent step removed
+from its `project.yml` before Rasterize's is spliced in) with a hook (`AssistantSpikeHook.swift`) that exists only there. It answers
 whether the helper launches from a Release and a Distribution bundle under
 the hardened runtime and needs its one entitlement (B, H), how big the
 catalog is and whether it wants tool search (C), whether a stand-in Messages
@@ -6293,7 +6296,7 @@ python3 tools/proof/assistant_spike/assistant_spike.py [--only B,H,C,F,T,E,D,L] 
 
 ## Road map 12's A1 — the agent lane (`assistant_lane_proof.py`, `assistant_lane_probe.swift`)
 
-The last line of `make test` (spec §11 AI-3's "`make test`-reachable
+A line of `make test` (spec §11 AI-3's "`make test`-reachable
 probe"). It launches no app instance, reads no key and uses no media: every
 child gets the environment without `RC_ASSEMBLYAI_KEY` and
 `ANTHROPIC_API_KEY`. The probe is compiled AS `main.swift` over every file in
@@ -6477,9 +6480,9 @@ Launch C, **K2** (AI-13: `-AgentServerEnabled YES`, port 4873, NO
 is refused "No Anthropic API key is set…"; the stand-in logged no request;
 the app has no helper child.
 
-**Mutant `no-prepare`**: a copy of the tree in `work/assistant_session/mutant/`
-in `makefile_env_proof.make_copy`'s shape (`app/`, `project.yml`, `Makefile`
-copied; `core`, `graphic`, `docs` symlinked; `agent/` copied without
+**Mutant `no-prepare`**: a copy of the tree in `work/assistant_session/mutant/tree`
+from `tree_copy.make_copy` (`app/`, `project.yml`, `Makefile` copied; every
+other build input `project.yml` names symlinked; `agent/` copied without
 `node_modules`), its `AgentLane.prepareAtLaunch()` line (asserted once)
 deleted and `make app` run there; W alone against it must FAIL — the report
 `ok: false`, naming AI-3 — and the run exits 1. A mutant that did not build
@@ -6570,7 +6573,8 @@ and `RC_ASSISTANT_BASE_URL=http://127.0.0.1:9`:
 port 4877): View ▸ Assistant shows "Add your Anthropic API key in Settings
 to use the assistant." and Open Settings…, and neither the composer nor Send.
 
-**Mutant `no-forward`**: the tree copied as the session proof's mutant is,
+**Mutant `no-forward`**: the tree copied as the session proof's mutant is
+(`tree_copy.make_copy`, into `work/assistant_tab/mutant/tree`),
 the ONE `session.onEvent =` line deleted from
 `EditorViewController+Assistant.swift`, `make app` there, then L1's steps and
 L2 alone: L2 must FAIL (the transcript holds only the person's line) and the
@@ -6630,7 +6634,7 @@ text clip "Welcome", two shapes, an action on the text clip, a marker, a
   (F1), the timescale's digits → 60000 (F2), the first topic's last tool
   dropped (F4), `system + " record_screen"` (F1).
 
-`--probe` runs these alone (no app, no bun): it is the last line of
+`--probe` runs these alone (no app, no bun): it is a line of
 `make test`.
 
 **Launch S** (Release, port 4878, `-AgentServerEnabled YES`, `proof-key` in a
@@ -6647,7 +6651,8 @@ end):
   reply field) makes the helper compact: `compaction_started`, and POST 2
   carries `compaction_instructions` verbatim.
 
-**Mutant `bare-send`**: the tree copied as the session proof's mutant is,
+**Mutant `bare-send`**: the tree copied as the session proof's mutant is
+(`tree_copy.make_copy`, into `work/assistant_prompt/mutant/tree`),
 `AssistantPrompt.message(text, document: document)` → `text` in the copy's
 `AssistantSession.swift`, `make app` there, S2 alone on port 4881: it must
 FAIL (exit 1); a copy that did not build exits 2.
@@ -6848,7 +6853,7 @@ Unknown models, fast mode, a non-standard `service_tier`, a non-global
 answer `unknown` with its cause, never $0. With `usage.iterations`, each
 entry prices at its own model (spec §11 P-2).
 
-**`prices_proof.py`** — the last line of `make test`; no network.
+**`prices_proof.py`** — a line of `make test`; no network.
 
 - **C:\<name\>** — each case through `prices.py`.
 - **K** — the committed table: format 1, the unit, the provider, a 40-hex
@@ -7026,7 +7031,7 @@ with the key, and `cloud_captions_proof.py --live` with `RC_ASSEMBLYAI_KEY`
 (`cloud_live_ledger.LiveLedger`). Rehearsals, CONTROLs and `budget_proof.py`
 use scratch ledgers.
 
-**`budget_proof.py`** — the last line of `make test`; no network, no app, no
+**`budget_proof.py`** — a line of `make test`; no network, no app, no
 key. It works in `work/budget/` (made fresh), prints `<ID> ok|FAIL — detail`
 and then `n/m`, exits 0 or 1, and scores an instrument that cannot run as a
 FAIL.
@@ -7071,16 +7076,25 @@ FAIL.
   recorded in both. **A3** a `LiveLedger` reservation `billed` 11 s settles
   `assemblyai_dollars(11)`, one closed `no_upload` settles $0, and the
   month's total is their sum.
+- **A4** (issue batch B7, #163) `cloud_live_ledger.spike_ledger` over scratch
+  files: unkeyed, it is a plain `aai.Ledger` and writes no spend file; keyed,
+  one reservation writes one `reserve` line with proof `words_spike` and an
+  `upload_only` close settles it at $0; keyed over a spend file seeded at
+  this month's $5.00, `reserve` raises `aai.BudgetError` starting `budget: `
+  and the run ledger gains nothing. **A5** each spike's text
+  (`cloud_spike.py`, `words_spike.py`) has one `spike_ledger(` and no
+  `aai.Ledger(`; CONTROL: that text with `spike_ledger(` turned into
+  `aai.Ledger(` fails the predicate.
 - **N** `LEDGER`'s existence, size and mtime are the same before and after.
 
 Made to fail on purpose: `--mutant no-budget` sets both budgets to infinity
-in memory (P, G1, R2 and A2 FAIL); `--mutant unknown-as-zero` replaces
+in memory (P, G1, R2, A2 and A4 FAIL); `--mutant unknown-as-zero` replaces
 `budget.anthropic_worst_row` with all-zero rates after import (W, S2 and S3
 FAIL). Either exits 1.
 
 ```sh
-python3 tools/proof/budget_proof.py                          # 21/21 (make test)
-python3 tools/proof/budget_proof.py --mutant no-budget       # P G1 R2 A2 FAIL, exit 1
+python3 tools/proof/budget_proof.py                          # 23/23 (make test)
+python3 tools/proof/budget_proof.py --mutant no-budget       # P G1 R2 A2 A4 FAIL, exit 1
 python3 tools/proof/budget_proof.py --mutant unknown-as-zero # W S2 S3 FAIL, exit 1
 (unset ANTHROPIC_API_KEY RC_ASSEMBLYAI_KEY; python3 tools/proof/assistant_prompt_proof.py --rehearse --month-spent 24.99 --cap 10)  # E1–E6 FAIL budget:, exit 1
 ```
@@ -7314,4 +7328,129 @@ Measured 2026-09-29: 21/21 on the fix (18 probe rows); `--baseline 97e870a`
 ```sh
 python3 tools/proof/editor_keys_undo_proof.py                     # → 21/21
 python3 tools/proof/editor_keys_undo_proof.py --baseline 97e870a  # exit 0 = exactly the twelve FAIL
+```
+
+## Issue batch B7 — one tree copy, stale pins, proof nits, spike ledgers (`tree_copy.py`, `capture_spike/inventory.py --check`; #146 #156 #166 #77 #82 #163)
+
+**One tree copy (#146).** Every proof that builds the app in a copy gets the
+copy from `tree_copy.make_copy(dest, agent=True)`. The rule: `app/` (without
+`Info.plist` or `*.entitlements`) and `agent/` (without `node_modules`) are
+COPIED, because the build writes into them; `project.yml` and `Makefile` are
+copied; every other top-level directory `project.yml` names as `NAME/` (not
+after a name character) is a SYMLINK to the tree's, found by
+`build_inputs()` rather than listed by hand — today `core`, `docs` and
+`graphic`. `build` and `Reelcut.xcodeproj` are never linked. So the next
+build input a `project.yml` step reads is in every copy the day it lands.
+The builders: `makefile_env_proof.make_copy` (`work/makefile-env/tree`), the
+session, tab and prompt mutants (`work/<proof>/mutant/tree`), the cloud
+mutants (`work/cloudproof/mutants/<name>`) and graphics' `frame-plus-one`
+(`work/graphics/mutant`), the last two now built by the copy's own
+`make app` (whose `unexport` keeps both keys out of the copy's build
+database) instead of xcodegen and xcodebuild; and the assistant spike's
+`make_tree` (`agent=False`), which removes the copy's own `Build Agent
+Helper` item from its `project.yml` before splicing Rasterize's in (B3's
+anchors "project.yml's own Build Agent Helper item" and "one Build Agent
+Helper step"). `python3 tools/proof/tree_copy.py --selftest` scores T1–T4:
+the five inputs found and neither generated name; a copy's shape; `agent=False`
+leaves no `agent`; and the CONTROL that a `designs/` line in `project.yml`
+adds `designs`.
+
+The cloud mutants `silent-about-the-bill` (row B) and
+`marker-over-stale-file` (row M) are re-aimed at today's text; every
+`CLOUD_MUTANTS` before-text occurs exactly once in the tree.
+
+**Row 18 (#156)** of `cloud_captions_probe.py --only chrome` compares only
+`project.yml`'s `info:` and `entitlements:` blocks (`project_yml_blocks`)
+against the baseline's: 14 lines (the `LSMinimumSystemVersion` bump, the
+deleted Speech usage string and the microphone comment's aside). The ATS
+and microphone checks stay.
+
+**The inventory's sites by token (#166).** `inventory.resolve` pairs the
+inventory's sites with the grep's per file and token, in line order, when
+the two counts agree (otherwise each pin stands as written); I2 and I3 read
+through that mapping, and `line_of`'s cache is keyed by the full path.
+`python3 tools/proof/capture_spike/inventory.py --check` is a line of
+`make test`, no app: K1 I2 and I3 over the tree, its detail listing the pins
+found at another line; K2 (CONTROL) three lines put at the top of every file
+holding a site, no problem; K3 (CONTROL) the inventory's site keys rewritten
+through `resolve`, the first one's line blanked, exactly that site reported
+under I2. Residue: a SWAP inside one file and token — one site removed and
+another added, so the group's counts still agree — is absorbed by the
+in-order pairing and I2 reports neither; the old line pins caught it. The
+b7Probe row below is that case.
+
+**The format version (#77).** `words_core_proof.py` reads
+`RC_FORMAT_VERSION` from `core/include/reelcut_core.h`
+(`CURRENT_VERSION`, `NEWER_VERSION = CURRENT + 1`); the version gate's and
+save-and-reopen's rows are built from the two.
+
+**#82's boxes.** (1) `harness/main.swift` and `phase4_chrome.py` say what is
+true: the app reaches `CaptionCues.build` through `CaptionPages` once a
+transcription (`SpeechTranscriber`, no grant, spec §11 W-8, or the cloud
+engine) has produced words, and `transcribe` over MCP; the harness's cue
+mode is the one place that hands it an arbitrary word list. (2)
+`speech_engine_probe.swift`'s P8 cancels the stall and requires it to drain
+within 5 s (both branches). (3) `cloud_rows.record_delete`: a 2xx closes the
+reservation `deleted` with its status; anything else leaves it open (owed by
+`undeleted()`, retried by the next `settle`) and answers `delete_failed`.
+Beyond `speech_rows._cloud_call`'s q2, it is used at `cloud_rows.call` and
+at both spikes' `settle` undeleted loops. (4) `media_less_playback_probe.py
+--sources <missing>` fails every row with "--sources <path> is not a
+directory" and exits 1, no traceback. (5) `graphics_menu_probe.swift`'s M3
+finds From File… by title and action, not as the Graphic menu's last item.
+(6) Struck: since 77b0bb8 the cited scripts read `tools/list` through
+`mcp.schemas()`; the literals that remain are property names a check has to
+spell, an app-state tool has no table to read them from, and the gate
+refuses a stale name loudly.
+
+**The spikes' ledger (#163).** A keyed C0 or W0 run makes its ledger with
+`cloud_live_ledger.spike_ledger`: a `SpikeLedger` (a `LiveLedger` whose
+refusal is the `aai.BudgetError` the spikes catch, and whose `upload_only`
+settles at $0) over the proofs' ledger; unkeyed, a plain `aai.Ledger`.
+`budget_proof.py` A4 and A5 hold it (P3's section).
+
+Measured 2026-09-29, `RC_ASSEMBLYAI_KEY` and `ANTHROPIC_API_KEY` unset for
+every run that could read them, the proofs' `spend.jsonl` absent before and
+after:
+
+| Command | Answer |
+|---|---|
+| `tree_copy.py --selftest` | 4/4 |
+| `capture_spike/inventory.py --check` | 3/3 (K1: `WelcomeWindowController.swift:189 → 204`) |
+| …with `func b7Probe() { _ = NSAlert().runModal() }` appended to `AppDelegate.swift` (reverted) | K1 FAIL naming `AppDelegate.swift:255`; K2 FAIL (the copies carry it: four `runModal` sites against three pins, so each pin stands as written and the three-line shift breaks them); K3 FAIL with `[]` (blanking `:121` brings the group back to three and three, `resolve` re-pairs `121 → 170 → 212 → 255` in line order, and neither the blanked pin nor the new site is reported — the swap residue above); 0/3, exit 1 |
+| …with two lines atop `AppDelegate.swift` (reverted) | 3/3; K1 lists `121 → 123`, `170 → 172`, `212 → 214` and `189 → 204` |
+| `make typecheck` | 0 errors, 7 warnings, tsc silent |
+| `make test` | exit 0; lane 12/12, prompt probe 11/11, prices 27/27, budget 23/23, inventory 3/3 |
+| `budget_proof.py --mutant no-budget` | 18/23, P G1 R2 A2 A4 FAIL, exit 1 |
+| `cloud_spike.py --selftest` | 25/25 |
+| `words_spike.py --only q2` (scratch work root) | q2 skipped: `RC_ASSEMBLYAI_KEY is not set`, exit 2 |
+| `make app` | BUILD SUCCEEDED |
+| `makefile_env_proof.py` | 3/3 |
+| `cloud_captions_proof.py --mutant silent-about-the-bill` | built; 169/171, the two row-B checks FAIL, exit 1 |
+| `cloud_captions_proof.py --mutant marker-over-stale-file` | built; 169/171, the two row-M checks FAIL, exit 1 |
+| `graphics_proof.py --mutant frame-plus-one --port 4898` | built; P1 ok, P2 FAIL, exit 0 |
+| `assistant_session_proof.py --mutant no-prepare` | built; W FAIL, 0/1, exit 1 |
+| `assistant_tab_proof.py --mutant no-forward` | built; L2 FAIL, 0/1, exit 1 |
+| `assistant_prompt_proof.py --mutant bare-send` | built; S2 FAIL, 0/1, exit 1 |
+| `assistant_spike.py --only B` | B1–B6 pass, B3 "11 anchors, each once"; the copy's `project.yml` holds one `name: Build Agent Helper` |
+
+Before and after, on the tree (HEAD 5481ce6, then this batch):
+
+| Command | HEAD | B7 |
+|---|---|---|
+| `cloud_captions_probe.py --only chrome` | 75/76, row 18's `project.yml` check FAIL | 76/76 |
+| …a temporary line inside `info:` / in `postBuildScripts` (reverted) | — | 75/76 (row 18 FAIL) / 76/76 |
+| `v2_menu.py 4899 --only H` | 4 pass, 1 fail (H1: `WelcomeWindowController.swift:189` stale) | 5 pass |
+| `words_core_proof.py 4893` | 27/27 | 27/27 (the header at 11: `11 12`; restored: `10 11`) |
+| `speech_engine_proof.py 4894 --no-mutants` | 29/29 | 29/29 (P8: drained within 5 s: true) |
+| `graphics_menu_proof.py --port 4895` | 14/14 | 14/14; From File… removed (reverted): 12/14, M2 and M3 FAIL |
+| `media_less_playback_probe.py` | 32/32 | 32/32 |
+| `media_less_playback_probe.py --sources /nonexistent/Sources` | a `FileNotFoundError` traceback, exit 1 | 0/32, each row "--sources /nonexistent/Sources is not a directory", exit 1 |
+| `phase4_chrome.py` | 59/59 | 59/59 |
+
+`grep "Reelcut: "` printed nothing over every instance's log.
+
+```sh
+python3 tools/proof/tree_copy.py --selftest                       # → 4/4
+python3 tools/proof/capture_spike/inventory.py --check            # → 3/3 (make test)
 ```

@@ -108,7 +108,10 @@ let consolidate = fileTitles.firstIndex(of: "Consolidate Media…") ?? -10
 let fontItem = file?.items.first { $0.title == "Add Font to Graphics…" }
 let imageItem = file?.items.first { $0.title == "Add Image to Graphics…" }
 let referenceItem = help?.items.first { $0.title == "Graphics Reference" }
-let newItems = templateItems + [graphic?.items.last, fontItem, imageItem, referenceItem]
+let fromFileItem = graphic?.items.first {
+    $0.title == "From File…" && $0.action == #selector(EditorViewController.insertGraphicFromFile(_:))
+}
+let newItems = templateItems + [fromFileItem, fontItem, imageItem, referenceItem]
     .compactMap { $0 }
 let keyed = newItems.filter { !$0.keyEquivalent.isEmpty }.map(\.title)
 check("M3 File holds Add Font to Graphics… then Add Image to Graphics… right after "

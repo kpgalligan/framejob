@@ -58,10 +58,10 @@ in its log. Host-state inputs: `media/speech.mov`, `say` for the second
 fixture, `ffmpeg` for row 2's second decoder (the row names which decoders
 answered and `AVAudioFile` always runs), and free loopback ports.
 
-`--mutant <name>` builds a COPY of the tree — `app/`, `project.yml`,
-`Makefile`, with `core` a SYMLINK to the tree's already-built one — patches
-one text asserted to occur exactly once, runs `xcodegen` and the Makefile's
-`xcodebuild` line inside the copy under a 900 s wall, and runs every row
+`--mutant <name>` builds a COPY of the tree with `tree_copy.make_copy` —
+`app/` and `agent/` copied, every other build input `project.yml` names a
+SYMLINK to the tree's, `core` already built — patches one text asserted to
+occur exactly once, runs the copy's `make app` under a 900 s wall, and runs every row
 against that binary on `--port-base 4960`. A mutant that survives is a
 finding about the ROW, not about the mutant.
 """
@@ -92,6 +92,7 @@ from mcp import MCP, ToolError
 # `FAKE` global, and `Fake.__enter__` reads it off the module, so the
 # rebinding has to happen there and not on a copy of the name here.
 import cloud_captions_probe
+import tree_copy
 
 from cloud_captions_probe import (
     HARNESS_MAIN, PROBE_SOURCE, TREE_SOURCES, Fake, MUTANTS, build, child_env,
@@ -1886,9 +1887,8 @@ CLOUD_MUTANTS = {
         'Z12 — the poll ceiling removed'),
     "silent-about-the-bill": (
         "app/Sources/AgentServer+CloudCaptions.swift",
-        '                message: error.localizedDescription\n'
-        '                    + Self.billed(transcriber.report))\n',
-        '                message: error.localizedDescription)\n',
+        '        return ([error.localizedDescription + billed(report)] + warnings)',
+        '        return ([error.localizedDescription] + warnings)',
         "the bill sentence dropped from a failed run \u2014 the reader review's R5\u00b72, "
         "reverted (row B)"),
     "bill-promises-cache": (
@@ -1908,10 +1908,9 @@ CLOUD_MUTANTS = {
         "refusal)"),
     "marker-over-stale-file": (
         "app/Sources/CloudTranscriber+Media.swift",
-        '        if MediaTranscript.write(file, for: media.id, in: cacheDirectory) {\n'
+        '        if transcriptWritten {\n'
         '            MediaTranscript.writeStamp(stamp, for: media.id, in: cacheDirectory)\n'
         '        }\n',
-        '        MediaTranscript.write(file, for: media.id, in: cacheDirectory)\n'
         '        MediaTranscript.writeStamp(stamp, for: media.id, in: cacheDirectory)\n',
         "`write`'s answer discarded again \u2014 the reader review's R1\u00b73 (row M: a marker "
         "stamped over a cache file the write never replaced)"),
@@ -1953,19 +1952,16 @@ for _name in ("mapping-no-in", "no-retry", "no-fifth-rule"):
 def build_mutant(name, wall=900):
     """A COPY of the tree with one text replaced and the app built inside it.
 
-    `core` is a SYMLINK to the tree's, which is byte-identical and already
-    built, so `project.yml`'s pre-build `cargo build --release` is a no-op and
-    the copy links the tree's `libreelcut_core.a`. The working tree is never
-    touched."""
+    The copy is `tree_copy.make_copy`'s: `app/` and `agent/` copied, every
+    other build input `project.yml` names a SYMLINK to the tree's (`core`
+    already built, so `project.yml`'s pre-build `cargo build --release` is a
+    no-op and the copy links the tree's `libreelcut_core.a`). The copy is
+    built by its own `make app`, whose `unexport` keeps both keys out of its
+    build database. The working tree is never touched."""
     path, before, after, what = CLOUD_MUTANTS[name]
-    root = os.path.join(WORK, "mutants", name)
-    shutil.rmtree(root, ignore_errors=True)
-    os.makedirs(root)
-    shutil.copytree(os.path.join(ROOT, "app"), os.path.join(root, "app"),
-                    ignore=shutil.ignore_patterns("Info.plist", "*.entitlements"))
-    for one in ("project.yml", "Makefile"):
-        shutil.copy2(os.path.join(ROOT, one), os.path.join(root, one))
-    os.symlink(os.path.join(ROOT, "core"), os.path.join(root, "core"))
+    root, reason = tree_copy.make_copy(os.path.join(WORK, "mutants", name))
+    if root is None:
+        return None, reason
 
     target = os.path.join(root, path)
     text = open(target).read()
@@ -1978,21 +1974,13 @@ def build_mutant(name, wall=900):
     print(f"  mutant {name}: {what}")
     started = time.time()
     try:
-        gen = subprocess.run(["xcodegen", "generate"], cwd=root, capture_output=True,
-                             text=True, env=child_env(), timeout=wall, stdin=subprocess.DEVNULL)
-        if gen.returncode != 0:
-            return None, f"xcodegen failed: {gen.stderr[-400:]}"
-        left = max(60, wall - (time.time() - started))
-        run = subprocess.run(
-            ["xcodebuild", "-project", "Reelcut.xcodeproj", "-scheme", "Reelcut",
-             "-configuration", "Release", "-derivedDataPath", "build", "build"],
-            cwd=root, capture_output=True, text=True, env=child_env(), timeout=left,
-            stdin=subprocess.DEVNULL)
+        run = subprocess.run(["make", "app"], cwd=root, capture_output=True, text=True,
+                             env=child_env(), timeout=wall, stdin=subprocess.DEVNULL)
     except subprocess.TimeoutExpired:
         return None, f"the mutant's build passed its {wall:.0f} s wall"
     if run.returncode != 0:
-        errors = [line for line in run.stdout.splitlines() if "error:" in line]
-        return None, "xcodebuild failed:\n      " + "\n      ".join(errors[:6] or ["(none)"])
+        errors = [line for line in (run.stdout + run.stderr).splitlines() if "error:" in line]
+        return None, "`make app` failed:\n      " + "\n      ".join(errors[:6] or ["(none)"])
     binary = os.path.join(root, "build", "Build", "Products", "Release", "Reelcut.app",
                           "Contents", "MacOS", "Reelcut")
     print(f"  built {binary} in {time.time() - started:.0f} s")

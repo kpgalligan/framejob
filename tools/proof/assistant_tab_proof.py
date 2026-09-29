@@ -55,8 +55,8 @@ Launch B (the override set, no `-RCSecretFolder`: no key, AI-13):
     python3 tools/proof/assistant_tab_proof.py
     python3 tools/proof/assistant_tab_proof.py --mutant no-forward   # L2 alone: FAILS
 
-The mutant copies the tree (`assistant_session_proof.py`'s shape) into
-`work/assistant_tab/mutant/`, deletes the `session.onEvent =` line from
+The mutant copies the tree with `tree_copy.make_copy` into
+`work/assistant_tab/mutant/tree`, deletes the `session.onEvent =` line from
 `EditorViewController+Assistant.swift`, runs `make app` there, and runs L1's
 steps and L2 against that app: L2 must FAIL (exit 1). A copy that did not
 build could not perform the control (exit 2).
@@ -83,6 +83,7 @@ sys.path.insert(0, os.path.join(HERE, "graphics_spike"))
 import assistant_session_proof as asp  # noqa: E402
 import bounded  # noqa: E402
 import prices  # noqa: E402
+import tree_copy  # noqa: E402
 
 WORK = os.path.join(HERE, "work", "assistant_tab")
 asp.WORK = WORK  # its App, Fake and secret folder write under this proof's folder
@@ -470,16 +471,9 @@ def row_n1(fake):
 def build_mutant():
     base = os.path.join(WORK, "mutant")
     shutil.rmtree(base, ignore_errors=True)
-    root = os.path.join(base, "tree")
-    os.makedirs(root)
-    shutil.copytree(os.path.join(ROOT, "app"), os.path.join(root, "app"),
-                    ignore=shutil.ignore_patterns("Info.plist", "*.entitlements"))
-    for one in ("project.yml", "Makefile"):
-        shutil.copy2(os.path.join(ROOT, one), os.path.join(root, one))
-    for one in ("core", "graphic", "docs"):
-        os.symlink(os.path.join(ROOT, one), os.path.join(root, one))
-    shutil.copytree(os.path.join(ROOT, "agent"), os.path.join(root, "agent"),
-                    ignore=shutil.ignore_patterns("node_modules"))
+    root, reason = tree_copy.make_copy(os.path.join(base, "tree"))
+    if root is None:
+        return None, reason
     glue = os.path.join(root, "app", "Sources", "EditorViewController+Assistant.swift")
     with open(glue) as handle:
         lines = handle.read().splitlines(keepends=True)

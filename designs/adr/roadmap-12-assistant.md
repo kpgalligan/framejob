@@ -61,7 +61,6 @@ The user asked for an AI agent in the editor, "designed in the same way that the
 ## Open items
 
 - #145 the Distribution app is signed with `get-task-allow` beside `audio-input`.
-- #146 tree-copy proof builders miss what `project.yml`'s post-build steps read.
 - #147 Rasterize takes §2's change (one diff).
 - #148 one window's pending question holds every other window's assistant calls.
 - #149 Stop does not interrupt a tool already running.
@@ -70,7 +69,6 @@ The user asked for an AI agent in the editor, "designed in the same way that the
 - #152 a question asked while the tab is hidden draws no attention.
 - #153 the transcript cannot be selected across entries.
 - #154 the composer is single-line.
-- #156 `cloud_captions_probe.py` row 18 (predates this road map).
 - #157 the live evaluation with a key (`ready-for-human`).
 - #158 the prompt's ask-first sentence and its null/none literals.
 - #159 the person check: the tab with a real key (`ready-for-human`).

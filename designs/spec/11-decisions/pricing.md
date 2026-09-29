@@ -63,8 +63,8 @@ and §5.
   ledgers of their own. The budgets are constants in `budget.py`, pinned by `budget_proof.py`.
   Risk accepted: fast, priority and US-only usage is counted at the dearest standard rates (the
   helper requests none of them); a torn or hand-broken line stops every paid proof until a person
-  repairs it; the road map 6 and 8 spikes (`cloud_spike/`, `words_spike/`) keep their own ledgers
-  and are not held to it (#163).
+  repairs it. A keyed run of either road map 6 or 8 spike (`cloud_spike/`, `words_spike/`) reserves
+  here too, through `cloud_live_ledger.spike_ledger`, beside its own $2.00 ledger (#163).
 - **P-7 — The app shows two figures: what the current conversation has cost, on the Assistant
   tab, and what the UTC calendar month has cost, in Settings ▸ Assistant; both say they are
   Reelcut's own estimate (P-4).** The conversation figure is the transcript's sum of the `cost`

@@ -5,10 +5,10 @@ Phase 4 is three features and the harness can photograph exactly one of
 them. **Nothing about the picture is claimed here.** The preview well
 renders BLACK offscreen — a Metal layer has no drawable — so the reveal
 itself (the typewriter's prefix, the word fade's per-word alpha, the line
-rise's per-line offset) cannot be seen by this program at all, and neither
-can auto captions, whose recogniser needs a TCC grant no headless run can
-obtain. Those belong to `tools/proof/phase4_proof.py`, which drives a
-running app over MCP. What is left is the chrome, and for phase 4 that is
+rise's per-line offset) cannot be seen by this program at all, and auto
+captions are a transcription, not a picture. Those belong to the proofs that
+drive a running app over MCP (`tools/proof/phase4_proof.py`, and
+`transcribe` for the captions). What is left is the chrome, and for phase 4 that is
 one thing:
 
     4c  the TextPane "Animation" section — that it EXISTS in the Clip tab
@@ -24,11 +24,13 @@ this file follows it line for line — through section 7.
 
 **Section 8 is not a picture at all**, and it is here because the HARNESS is
 here. It is the one binary in the tree that links `app/Sources` outside the
-app, so it is the only place from which 4a's cue builder — `CaptionCues`,
+app, so it is the one place that hands 4a's cue builder — `CaptionCues`,
 whose four rules (at most 2 lines, at most 42 characters a line, at most 6 s
-a cue, at least one frame of gap between cues) shape every generated
-caption — can be called at all: in the app nothing reaches it until a
-recogniser has produced words, and the recogniser needs the grant. The rules
+a cue, at least one frame of gap between cues) shape every Subtitles
+caption — an ARBITRARY word list. The app reaches it through `CaptionPages`
+once a transcription has produced words (`SpeechTranscriber`, which asks for
+no grant, spec §11 W-8, or the cloud engine), and `transcribe` reaches it
+over MCP, but only with the words a transcription heard. The rules
 themselves are arithmetic over a word list with no `Speech` in them, so the
 harness grew a second mode that runs the builder over a word list from a
 file (`harness cues <words.json> <out.json>`, added, not rearranged — every
@@ -628,14 +630,14 @@ def origin_interval(band, offsets):
 #
 # It is here, in a script named for the chrome, because the harness is here:
 # it is the one binary in the tree that links `app/Sources` outside the app,
-# and the four cue rules cannot be reached any other way without a person at
-# the machine. In the app nothing calls `CaptionCues` until a recogniser has
-# produced words, and `SFSpeechRecognizer` produces none without a Speech
-# Recognition grant only a frontmost app can be given — which is why
-# `phase4_proof.py` says, honestly, that it cannot reach them over MCP. The
-# rules are pure arithmetic over a word list with no `Speech` in them at all,
-# so the harness hands the builder a word list and these checks read the
-# answer. The four:
+# and so the one place that hands the builder an ARBITRARY word list. The app
+# reaches `CaptionCues.build` through `CaptionPages` (the Subtitles style) once
+# a transcription has produced words — `SpeechTranscriber`, which asks for no
+# grant (spec §11 W-8), or the cloud engine — and `transcribe` reaches it over
+# MCP, but only with the words a transcription heard. The rules are pure
+# arithmetic over a word list with no `Speech` in them at all, so the harness
+# hands the builder a word list and these checks read the answer, each rule at
+# its boundary. The four:
 #
 #     at most 2 lines · at most 42 characters a line · at most 6 s a cue ·
 #     at least one frame of gap between cues

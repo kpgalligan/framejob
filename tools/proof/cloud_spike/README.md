@@ -105,7 +105,10 @@ again, printing the count per outcome: DELETE everything `created` and not
 list, matched ONLY against an upload URL this ledger recorded, the body parsed
 and dropped inside the method — and a DELETE of what it returns. The spike
 never deletes, reads, counts, prints or records anything about a transcript it
-did not create.
+did not create. A run with a key also reserves every paid call in the proofs'
+ledger against the month's AssemblyAI budget (spec §11 P-6, #163), through
+`cloud_live_ledger.spike_ledger`, beside its own $2.00 `ledger.json`; a keyless
+run writes no spend file.
 
 ## `--selftest`: seven checks, each broken on purpose once
 

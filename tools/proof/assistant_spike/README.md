@@ -42,16 +42,18 @@ stand-in; nothing else. A run takes about 5 min, most of it the two builds and t
 | `drag_probe.swift` | the D probe, compiled as `main.swift` over `app/Sources` minus `main.swift` on `harness/build.sh`'s swiftc line; prints one `ANSWER {"rows":[…],"measure":{…}}` line |
 | `../anthropic_fake.py` | the stand-in Messages API (top level, beside `assemblyai_fake.py`, because A1 reuses it); its docstring is its contract |
 
-**The copy** is `work/assistant_spike/tree/`, made the way
-`makefile_env_proof.py` makes its own: `app/` (without `Info.plist` or
-`*.entitlements`), `project.yml` and `Makefile` copied; `core`, `graphic` and
-`docs` symlinked; `agent/` holding Rasterize's `package.json`, `bun.lock`,
+**The copy** is `work/assistant_spike/tree/`, made by
+`tree_copy.make_copy(TREE, agent=False)`: `app/` (without `Info.plist` or
+`*.entitlements`), `project.yml` and `Makefile` copied; every other build
+input `project.yml` names but `agent` symlinked; `agent/` holding Rasterize's `package.json`, `bun.lock`,
 `tsconfig.json`, `entitlements.plist` and `src/{main,protocol}.ts` with
 `rasterize-agent` renamed `reelcut-agent` (package name, outfile, the lock's
 root workspace). The hook goes in `app/Sources/`, one call to it after
 `AppDelegate`'s `enabledDefaultsKey` block, and Rasterize's `Build Agent
 Helper` step (its `project.yml:173-190`, renamed) goes before `schemes:` as
-the last `postBuildScripts` item. Every anchor must occur exactly once (B3).
+the last `postBuildScripts` item, once the copy's own `Build Agent Helper`
+item (its comment through its `script:` line) is removed, so the copy's
+`project.yml` holds exactly one. Every anchor must occur exactly once (B3).
 The copy, `build/` included, is made fresh every run: a kept `build/` fails
 the next build, because xcodegen rewrites `app/Reelcut.entitlements` and Xcode
 refuses an entitlements file "modified during the build".

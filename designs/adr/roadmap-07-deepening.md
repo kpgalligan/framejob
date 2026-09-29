@@ -333,8 +333,9 @@ reversed in a commit message); run EVERY proof script when the FFI changes; meas
 - A partial success whose list also held a refusal drops the sentence; no tool produces the case
   today — tracked in #88.
 - Nullability as an op-table column (optional design) — tracked in #90.
-- Residual argument-name literals in older proof scripts (app-state tools; `phase4`/`phase5` prose
-  claims) — tracked in #82.
+- ~~Residual argument-name literals in older proof scripts (app-state tools; `phase4`/`phase5` prose
+  claims) — tracked in #82.~~ Struck (issue batch B7): since 77b0bb8 those scripts read `tools/list`
+  through `mcp.schemas()`; the literals left are property names a check has to spell.
 - Stale doc comment: `app/Sources/ReelEdit.swift` still says refusals answer `.identity` "until road
   map 7's D2·3 gives them their sentences" — fixed by 2026-09-26 (`ReelEdit.swift:64`).
 - The Speed sheet showing a neighbour's dissolve rather than a length (a separate UI decision) —

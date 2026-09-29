@@ -347,13 +347,7 @@ is the one style that pages to two lines by design.
   - `ProjectSnapshot.formatVersion = 5` (#84)
   - the "three computed keys" docs in `recipe_text.rs` (closed 2026-09-26:
     accurate, three reveal keys then two word keys)
-  - the grant-era comments in `harness/main.swift` and `phase4_chrome.py` (#82)
-  - a misnamed test in `core/tests/words.rs` (#83)
   - a 128-character doc line in `CaptionLayout.swift` (fixed by 2026-09-26)
-  - the probe's unchecked P8 drain (#82)
-  - the spike's DELETE-status gate (#82)
-  - `words_core_proof.py`'s hard-coded format version (also in road map 10's
-    owed list; #77)
 - `paste` stores a `words` count mismatch whole (refused at the next
   `set_text`). Tracked with `paste`'s payload in #62.
 - Not tracked: `words_core_proof.py` (425) and `word_captions_probe.swift`

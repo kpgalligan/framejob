@@ -130,19 +130,16 @@
 //
 //   harness cues <words.json> <out.json>
 //
-// reads a word list and writes the cues `CaptionCues.build` makes of it. It
-// belongs in this program and nowhere else, for one reason: this is the only
-// binary in the tree that links `app/Sources` outside the app, and the four
-// cue rules — at most two lines, at most 42 characters a line, at most six
-// seconds a cue, at least a frame of gap between cues — cannot be reached any
-// other way without a person at the machine. Nothing in the app calls
-// `CaptionCues` until a recogniser has produced words, and
-// `SFSpeechRecognizer` will not produce any without a Speech Recognition
-// grant that only a frontmost app can be given, so over MCP those rules are
-// unreachable and `phase4_proof.py` says so out loud rather than pretending
-// otherwise. The arithmetic itself has no `Speech` in it at all — words with
-// times in, cues out — so the way to test it is to hand it words with times,
-// and this is the one place from which that can be done.
+// reads a word list and writes the cues `CaptionCues.build` makes of it. The
+// app reaches `CaptionCues.build` through `CaptionPages` (the Subtitles style)
+// once a transcription has produced words — `SpeechTranscriber`, which asks
+// for no grant (spec §11 W-8), or the cloud engine — and `transcribe` reaches
+// it over MCP. But a transcription hands the builder the words it heard, and
+// this mode is the one place that hands it an ARBITRARY word list, which is
+// why the four cue rules — at most two lines, at most 42 characters a line, at
+// most six seconds a cue, at least a frame of gap between cues — are tested
+// here, each at its boundary. The arithmetic has no `Speech` in it at all —
+// words with times in, cues out.
 //
 // It is a MODE and not a fifth render argument because it shares nothing with
 // a render: no window, no pinned defaults, no fonts, no appearance. It is
@@ -525,8 +522,8 @@ enum Harness {
     }
 
     /// The cue builder, run over a word list from a file — the second mode of
-    /// the header, and the only way `CaptionCues.build` can be reached without
-    /// a Speech Recognition grant.
+    /// the header, and the one place `CaptionCues.build` is handed an
+    /// arbitrary word list rather than the words a transcription produced.
     ///
     /// Everything here is a translation: JSON into `CaptionCues.Word`s, the
     /// cues back into JSON. Nothing is computed that the app does not compute,

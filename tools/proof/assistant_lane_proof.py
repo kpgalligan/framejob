@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """The agent lane — road map 12 A1, part 1 (spec §11 AI-2, AI-3, AI-5, AI-7,
-AI-12; #144). The last line of `make test`: AI-3's "`make test`-reachable
+AI-12; #144). A line of `make test`: AI-3's "`make test`-reachable
 probe".
 
   L0      the launch path: `app/Sources/main.swift` calls

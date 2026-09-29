@@ -31,6 +31,7 @@ for folder in (CLOUD,):
         sys.path.append(folder)
 
 import aai                                                           # noqa: E402
+import cloud_rows                                                    # noqa: E402
 import local_rows                                                    # noqa: E402
 
 TARGET = ["-O", "-parse-as-library", "-target", "arm64-apple-macos26.0"]
@@ -374,8 +375,7 @@ def _cloud_call(client, ledger, scrub, label, path, planned, say):
     deleted = client.delete(transcript_id)
     out["delete"] = {"status": deleted.status,
                      "body": scrub.clean(deleted.body[:200].decode("utf-8", "replace"))}
-    ledger.closed(rid, "deleted", deleted.status)
-    out["outcome"] = "deleted"
+    out["outcome"] = cloud_rows.record_delete(ledger, rid, deleted)
     out["word_count"] = len(words)
     say(f"  q2/{label}: {out['outcome']} {out.get('speech_model_used')} "
         f"{len(words)} words, delete {deleted.status}")

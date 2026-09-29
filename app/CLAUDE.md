@@ -1364,9 +1364,7 @@ free.
   default (road map 11's V3). It sets `NSApp.appearance` from `main.swift`
   before `NSApplicationMain`, so every view is built in that look. A live
   switch leaves colours taken at build time in the launch look, which is why
-  `snapshot_ui` refuses `appearance` and names this default instead. It is
-  not in `AppDelegate.swift`, because a line added there moves the `runModal`
-  sites that `inventory.json` pins by line.
+  `snapshot_ui` refuses `appearance` and names this default instead.
 - `AgentServer+Assistant.swift` — `assistant_send` and `assistant_answer`
   (road map 12 A1, dev only, wholly under the flag). Both run off main
   (`devOffMainTools`): one `onMain` resolves the target, the editor and the

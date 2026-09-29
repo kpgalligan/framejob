@@ -56,6 +56,7 @@ sys.path.insert(0, os.path.join(PROOF, "graphics_spike"))
 sys.path.insert(0, PROOF)
 import bounded  # noqa: E402
 import mcp  # noqa: E402
+import tree_copy  # noqa: E402
 
 WORK = os.path.join(PROOF, "work", "assistant_spike")
 TREE = os.path.join(WORK, "tree")
@@ -194,22 +195,16 @@ def replace_once(text, old, new, anchors, label):
 
 
 def make_tree(rasterize):
-    """The copy, `makefile_env_proof.make_copy`'s way, made fresh every run
-    with its `build/`: a kept `build/` fails the next build, because
+    """The copy, `tree_copy.make_copy(TREE, agent=False)`, made fresh every
+    run with its `build/`: a kept `build/` fails the next build, because
     xcodegen rewrites `app/Reelcut.entitlements` and Xcode refuses an
     entitlements file "modified during the build". Answers (anchors,
     agent_copied, error)."""
-    shutil.rmtree(TREE, ignore_errors=True)
-    os.makedirs(TREE)
     anchors = {}
+    made, reason = tree_copy.make_copy(TREE, agent=False)
+    if made is None:
+        return anchors, False, reason
     try:
-        shutil.copytree(os.path.join(ROOT, "app"), os.path.join(TREE, "app"),
-                        ignore=shutil.ignore_patterns("Info.plist", "*.entitlements"))
-        for one in ("project.yml", "Makefile"):
-            shutil.copy2(os.path.join(ROOT, one), os.path.join(TREE, one))
-        for one in ("core", "graphic", "docs"):
-            os.symlink(os.path.join(ROOT, one), os.path.join(TREE, one))
-
         # agent/: Rasterize's files, renamed.
         source = os.path.join(rasterize, "agent")
         agent = os.path.join(TREE, "agent")
@@ -254,12 +249,23 @@ def make_tree(rasterize):
         step = step.replace("rasterize-agent", "reelcut-agent")
         yml_path = os.path.join(TREE, "project.yml")
         yml = open(yml_path).read()
+        # The copy's own agent step goes first, so Rasterize's is the one.
+        start = "      # The assistant's agent helper (agent/, spec §11 AI-1): compiled with\n"
+        end = '        script: /bin/sh "$PROJECT_DIR/agent/build.sh" helper\n'
+        at = yml.find(start)
+        until = yml.find(end, at) if at >= 0 else -1
+        if at >= 0 and until >= 0:
+            yml = replace_once(yml, yml[at:until + len(end)], "", anchors,
+                               "project.yml's own Build Agent Helper item")
+        else:
+            anchors["project.yml's own Build Agent Helper item"] = 0
         yml = replace_once(yml, "\nschemes:\n", "\n" + step + "\n\nschemes:\n", anchors,
                            "project.yml schemes:")
         # `schemes:` must follow the last postBuildScripts item for the step
         # to be the last item.
         anchors["project.yml step follows Copy Graphic Templates"] = int(
             yml.find("name: Copy Graphic Templates") < yml.find("name: Build Agent Helper"))
+        anchors["one Build Agent Helper step"] = int(yml.count("name: Build Agent Helper") == 1)
         open(yml_path, "w").write(yml)
     except (OSError, IndexError) as error:
         return anchors, locals().get("agent_copied", False), f"{type(error).__name__}: {error}"

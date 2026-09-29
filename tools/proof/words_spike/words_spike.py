@@ -44,11 +44,13 @@ for folder in (PROOF, CLOUD):
         sys.path.append(folder)
 
 import aai                                                           # noqa: E402
+import cloud_rows                                                    # noqa: E402
 import local_rows                                                    # noqa: E402
 import scratch_rows                                                  # noqa: E402
 import speech_rows                                                   # noqa: E402
 import text_rows                                                     # noqa: E402
 from fixtures import Fixtures                                        # noqa: E402
+import cloud_live_ledger                                             # noqa: E402
 
 ROWS = ["q1", "q2", "q3", "q4", "q5", "q6", "q7"]
 PAID = {"q2"}
@@ -123,9 +125,8 @@ def settle(client, ledger, scrub, say):
     created and did not delete, deleted."""
     counts = {}
     for rid, transcript_id in ledger.undeleted():
-        reply = client.delete(transcript_id)
-        ledger.closed(rid, "deleted", reply.status)
-        counts["deleted"] = counts.get("deleted", 0) + 1
+        answer = cloud_rows.record_delete(ledger, rid, client.delete(transcript_id))
+        counts[answer] = counts.get(answer, 0) + 1
     for rid in ledger.unsent():
         ledger.closed(rid, "upload_only")
         counts["upload_only"] = counts.get("upload_only", 0) + 1
@@ -171,8 +172,9 @@ def run(arguments):
     if arguments.remake:
         remake(work)
     client, scrub = aai.client_from_env()
-    ledger = aai.Ledger(os.path.join(work, "ledger.json"),
-                        aai.Scrubber(list(scrub.secrets)))
+    ledger = cloud_live_ledger.spike_ledger(os.path.join(work, "ledger.json"),
+                                            aai.Scrubber(list(scrub.secrets)),
+                                            client is not None, "words_spike")
 
     def say(text):
         print(scrub.clean(str(text)), flush=True)

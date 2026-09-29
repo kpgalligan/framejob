@@ -157,10 +157,11 @@ Z1  `grep "Reelcut: "` over every launch's log prints nothing.
     python3 tools/proof/graphics_proof.py [--port 4879] [--app PATH]
     python3 tools/proof/graphics_proof.py --mutant frame-plus-one
 
-The mutant is built from a COPY of `app/` (with `core/` and `docs/` linked, not copied)
-with one anchor in `LayerRenderersGraphic.swift`, asserted to occur exactly
-once, replaced so the module is asked for `frame + 1`; the copy is built by
-xcodegen and xcodebuild into its own directory and driven through P1 and P2.
+The mutant is built in a COPY of the tree from `tree_copy.make_copy` (`app/` and
+`agent/` copied, every other build input `project.yml` names linked) with
+one anchor in `LayerRenderersGraphic.swift`, asserted to occur exactly once,
+replaced so the module is asked for `frame + 1`; the copy is built by its
+own `make app` into its own directory and driven through P1 and P2.
 Exit 0 means P2 FAILED in the mutant, which is the pass; a mutant that does
 not build is a FAILURE. The rows past P2 are relative and a uniform +1 moves
 both sides of them, so they are not expected to fail.
@@ -185,6 +186,7 @@ sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
 sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
 import mcp  # noqa: E402
+import tree_copy  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/graphics"
 APP = ROOT / "build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut"
@@ -1335,31 +1337,26 @@ def run_q(binary, why):
 
 
 def build_mutant():
-    """A COPY of `app/` and `project.yml` with `core/` and `docs/` linked
-    (`project.yml`'s post-build step copies the graphics reference out of
-    `docs/`), the anchor replaced, built by xcodegen and xcodebuild. The
-    binary, or None and why."""
-    copy = WORK / "mutant"
-    shutil.rmtree(copy, ignore_errors=True)
-    copy.mkdir(parents=True)
-    shutil.copytree(ROOT / "app", copy / "app")
-    shutil.copy(ROOT / "project.yml", copy / "project.yml")
-    os.symlink(ROOT / "core", copy / "core")
-    os.symlink(ROOT / "docs", copy / "docs")
+    """A COPY of the tree from `tree_copy.make_copy` (`app/` and `agent/`
+    copied, every other build input `project.yml` names linked), the anchor
+    replaced, built by the copy's own `make app`. The binary, or None and
+    why."""
+    made, reason = tree_copy.make_copy(str(WORK / "mutant"))
+    if made is None:
+        return None, reason
+    copy = Path(made)
     target = copy / "app/Sources/LayerRenderersGraphic.swift"
     text = target.read_text()
     if text.count(ANCHOR) != 1:
         return None, f"the anchor occurs {text.count(ANCHOR)} times"
     target.write_text(text.replace(ANCHOR, ANCHOR.replace("frame: frame,", "frame: frame + 1,")))
-    generated = bounded.run(["xcodegen", "generate"], 300, cwd=str(copy))
-    if generated["rc"] != 0:
-        return None, f"xcodegen: {generated['stderr'][-400:]}"
-    built = bounded.run(["xcodebuild", "-project", "Reelcut.xcodeproj", "-scheme", "Reelcut",
-                         "-configuration", "Release", "-derivedDataPath", "build", "build"],
-                        1200, cwd=str(copy))
+    built = bounded.run(["make", "app"], 1500, cwd=str(copy))
     binary = copy / "build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut"
     if built["rc"] != 0 or not binary.exists():
-        return None, f"xcodebuild rc {built['rc']}: {built['stdout'][-600:]}"
+        errors = [line for line in (built["stdout"] + built["stderr"]).splitlines()
+                  if "error:" in line]
+        return None, (f"make app rc {built['rc']} (expired {built['expired']}): "
+                      + ("\n      ".join(errors[:6]) or built["stdout"][-600:]))
     return binary, ""
 
 

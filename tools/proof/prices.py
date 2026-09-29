@@ -6,7 +6,7 @@ a rate. `price` is `agent/src/pricing.ts`'s `price` in Python, step for step:
 the same checks in the same order, the same arithmetic in the same order, and
 the same answers — `{"kind": "dollars", "dollars", "rows"}` or
 `{"kind": "unknown", "cause", "detail"}`. Both readers run every case in
-`agent/prices/cases.json` (`prices_proof.py`, the last line of `make test`).
+`agent/prices/cases.json` (`prices_proof.py`, a line of `make test`).
 It never raises and never answers NaN, whatever JSON value `usage` is.
 
     import prices

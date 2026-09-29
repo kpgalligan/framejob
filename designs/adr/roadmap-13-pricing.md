@@ -42,7 +42,6 @@ The user asked for three things: a spend budget, a price on every call the assis
 - **Every priced response has been the stand-in's**: no response from api.anthropic.com has been priced or recorded; AS-4 and AS-5 in `docs/manual-checks.md` hold the figures against the Anthropic Console with a real key.
 - **A response cut short by Stop or an error has no final usage and is not priced** (#162).
 - **The month is UTC's**, so near a month's turn Settings' figure differs from the person's local calendar month by up to a day (P-7's accepted risk).
-- **The road map 6 and 8 spikes keep their own AssemblyAI ledgers** outside the proofs' budget (#163).
 - **Fast, priority/batch and US-only usage is `unknown` in the app** and counted at the dearest standard rates by the proofs (P-2, P-6).
 
 ## Open items
@@ -50,7 +49,6 @@ The user asked for three things: a spend budget, a price on every call the assis
 - #147 Rasterize takes road map 12 §2's change and this road map's `pricing.ts` / `priceTable.ts`.
 - #157 the assistant's live evaluation with a key (`ready-for-human`).
 - #162 a response cut short by Stop or an error is not priced.
-- #163 the C0 and W spikes spend AssemblyAI money outside the proofs' ledger.
 - #164 reconcile the app's ledger with Anthropic's Admin usage-and-cost API.
 
 ## Where to look in the original
