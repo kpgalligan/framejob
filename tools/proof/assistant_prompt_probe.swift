@@ -26,8 +26,16 @@
 //   F5  the ask-first and conditional withheld rows of
 //       `AssistantToolTable.rows` are named in the system prompt
 //   F6  no blank line in any text; the length bounds
-//   F7  the live context block, exactly, and `AssistantPrompt.message`
-//   M1–M4  each checker FAILS on a mutated copy of the texts
+//   F7  the live context block, exactly, and `AssistantPrompt.message`; and
+//       `checkLiterals` (#158): every `none` and `null` in the three texts is
+//       in double quotes, and the system prompt names the scope-less value
+//       as the block writes it, `("<word>": the timeline)`
+//   F8  (#158) `checkF8`: every ask-first row's reason is a write ("It
+//       writes " or "It copies "), there is at least one, and the system
+//       prompt says "These tools write files, so each asks the person first: "
+//   M1–M6  each checker FAILS on a mutated copy of its input (M5: `"none"`
+//       unquoted in the system prompt; M6: an ask-first row that spends money
+//       rather than writing)
 //
 // The fixture is an untitled document edited through `AgentLane.submit`
 // pinned to it, as the assistant's session calls: two tracks, a text clip
@@ -312,6 +320,66 @@ func checkF4(_ topics: [(words: String, tools: [String])], guide: String) -> (Bo
                 + (problems.isEmpty ? "" : "; " + problems.prefix(8).joined(separator: "; ")))
 }
 
+/// (#158) Every `none`/`null` in the three texts has `"` on both sides, and
+/// `system` holds `("<noScope>": the timeline)`.
+func checkLiterals(_ texts: Texts, noScope: String) -> (Bool, String) {
+    var problems: [String] = []
+    var count = 0
+    let pattern = try? NSRegularExpression(pattern: #"\b(none|null)\b"#)
+    for (label, text) in [("system", texts.system), ("guide", texts.guide),
+                          ("compaction", texts.compaction)] {
+        let ns = text as NSString
+        for match in pattern?.matches(in: text, range: NSRange(location: 0, length: ns.length))
+            ?? [] {
+            count += 1
+            let range = match.range
+            let before = range.location > 0
+                ? ns.substring(with: NSRange(location: range.location - 1, length: 1)) : ""
+            let end = range.location + range.length
+            let after = end < ns.length ? ns.substring(with: NSRange(location: end, length: 1)) : ""
+            if before != "\"" || after != "\"" {
+                let from = max(0, range.location - 12)
+                let context = ns.substring(
+                    with: NSRange(location: from, length: min(ns.length, end + 12) - from))
+                problems.append("\(label): \(ns.substring(with: range)) unquoted in \"\(context)\"")
+            }
+        }
+    }
+    let scopeLine = "(\"\(noScope)\": the timeline)"
+    if !texts.system.contains(scopeLine) { problems.append("system lacks \(scopeLine)") }
+    return (problems.isEmpty && count > 0 && !noScope.isEmpty,
+            "\(count) none/null literals\(problems.isEmpty ? ", each quoted" : ""); the no-scope "
+                + "word \"\(noScope)\" as "
+                + "\(scopeLine)"
+                + (problems.isEmpty ? "" : "; " + problems.prefix(6).joined(separator: "; ")))
+}
+
+/// The first word after `scope: ` in a scope-less live context block.
+func noScopeWord() -> String {
+    let text = AssistantLiveContext(name: "x", path: nil, scope: nil, playhead: 0, selection: [])
+        .text
+    guard let range = text.range(of: "scope: ") else { return "" }
+    return String(text[range.upperBound...].prefix { !$0.isWhitespace })
+}
+
+/// (#158) "These tools write files": each ask-first row's reason is a write.
+func checkF8(_ rows: [AssistantToolRow], system: String) -> (Bool, String) {
+    let claim = "These tools write files, so each asks the person first: "
+    var problems: [String] = []
+    let asking = rows.filter { $0.rule == .askFirst }
+    if asking.isEmpty { problems.append("no ask-first row") }
+    for entry in asking where !(entry.reason.hasPrefix("It writes ")
+        || entry.reason.hasPrefix("It copies ")) {
+        problems.append("\(entry.tool): \"\(entry.reason)\" is not a write")
+    }
+    if !system.contains(claim) { problems.append("system lacks \"\(claim)\"") }
+    return (problems.isEmpty,
+            "\(asking.count) ask-first rows (\(asking.map(\.tool)))"
+                + (problems.isEmpty ? ", each reason a write; " : "; ")
+                + "the claim in system \(system.contains(claim))"
+                + (problems.isEmpty ? "" : "; " + problems.joined(separator: "; ")))
+}
+
 // MARK: - The rows
 
 func rowF3() {
@@ -438,9 +506,11 @@ func rowF7() {
     let labels = ["name", "path", "scope", "playhead", "selection"]
     let missing = labels.filter { fixture[$0] == nil }
     if !missing.isEmpty { problems.append("labels not keys of get_project: \(missing)") }
+    let literals = checkLiterals(texts, noScope: noScopeWord())
+    if !literals.0 { problems.append("literals: \(literals.1)") }
     row("F7", problems.isEmpty,
         "\(samples.count) samples exact, message() with and without a document, labels "
-            + "\(labels) keys of get_project"
+            + "\(labels) keys of get_project; \(literals.1)"
             + (problems.isEmpty ? "" : "; " + problems.prefix(6).joined(separator: "; ")))
 }
 
@@ -462,6 +532,8 @@ row("F4", f4.0, f4.1)
 rowF5()
 rowF6()
 rowF7()
+let f8 = checkF8(AssistantToolTable.rows, system: texts.system)
+row("F8", f8.0, f8.1)
 
 // The mutants: each checker must FAIL on its copy.
 let m1 = checkF1((texts.system + " `add_markers`", texts.guide, texts.compaction))
@@ -475,6 +547,16 @@ let m3 = checkF4(dropped, guide: texts.guide)
 row("M3", !m3.0, "the first topic's last tool dropped: F4 fails \(!m3.0) (\(m3.1))")
 let m4 = checkF1((texts.system + " record_screen", texts.guide, texts.compaction))
 row("M4", !m4.0, "system + \" record_screen\": F1 fails \(!m4.0) (\(m4.1))")
+let m5 = checkLiterals(
+    (texts.system.replacingOccurrences(of: "\"none\"", with: "none"), texts.guide,
+     texts.compaction), noScope: noScopeWord())
+row("M5", !m5.0, "system's \"none\" unquoted: the literal check fails \(!m5.0) (\(m5.1))")
+let m6 = checkF8(
+    AssistantToolTable.rows + [AssistantToolRow(
+        tool: "transcribe", rule: .askFirst, onlyWith: nil,
+        reason: "It spends the person's money.")],
+    system: texts.system)
+row("M6", !m6.0, "an ask-first transcribe that spends money: F8 fails \(!m6.0) (\(m6.1))")
 
 for document in AgentServer.shared.openProjects() { document.close() }
 spin(0.2)

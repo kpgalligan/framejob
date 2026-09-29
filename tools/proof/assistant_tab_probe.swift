@@ -9,9 +9,12 @@
 // `Bundle.main.bundleURL` is its own folder) and runs it with a DUMMY key in
 // `-RCSecretFolder`, `-ReelcutInspectorCollapsed NO`, and
 // `RC_ASSISTANT_BASE_URL=http://127.0.0.1:9` (nothing listens there; no row
-// here sends a message).
+// here sends a message). Under `--close <path>` it runs P8 ALONE, and the
+// proof points `RC_ASSISTANT_BASE_URL` at its stand-in (`anthropic_fake.py`),
+// scripted to ask for `export` to `<path>` (#150).
 //
-//   assistant_tab_probe
+//   assistant_tab_probe                 P1–P7
+//   assistant_tab_probe --close <path>  P8
 //
 // Prints exactly one stdout line:
 //   ANSWER {"rows":[{"id","ok","detail"}]}
@@ -23,6 +26,10 @@
 //   P5  AI-14: a changed selection keeps the Assistant tab; a click shows Clip
 //   P6  a real session ended by a model change, and by Clear
 //   P7  Settings' Assistant pane over MemoryStores and a suite
+//   P8  (#150) a window closed with a question pending: the session, held
+//       strongly so `deinit` cannot stand in, is closed and the question
+//       answered once `{allowed: false, by: "close"}`; the window's next lane
+//       call answers; no file at the path
 import AppKit
 
 final class ProbeDocumentController: NSDocumentController {
@@ -415,19 +422,95 @@ func rowP7() {
         notes.joined(separator: "; "))
 }
 
+// MARK: - P8 close with a question pending (#150)
+
+/// A lane answer crossing to main.
+final class LaneResult {
+    private let lock = NSLock()
+    private var stored: String?
+
+    var value: String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return stored
+    }
+
+    func set(_ result: String) {
+        lock.lock()
+        stored = result
+        lock.unlock()
+    }
+}
+
+func rowP8(_ path: String) {
+    try? FileManager.default.removeItem(atPath: path)
+    guard let (document, editor, window) = newEditor() else {
+        row("P8", false, "the editor did not open")
+        return
+    }
+    let sent = editor.assistantSend("Export the project (P8).")
+    let deadline = Date().addingTimeInterval(30)
+    while editor.assistant?.phase != .asking && Date() < deadline { spin(0.05) }
+    // Held STRONGLY from here, so its `deinit` cannot decline in `close`'s place.
+    guard let session = editor.assistant, session.phase == .asking else {
+        row("P8", false, "sent \(sent); never asking in 30 s (phase "
+            + "\(editor.assistant.map { "\($0.phase)" } ?? "no session"))")
+        return
+    }
+    let sentence = session.pendingQuestion?.sentence ?? "none"
+    let asked = sentence == "export writes \(path)"
+    window.close()
+    spin(0.5)
+    let closed = session.phase == .closed
+    let released = editor.assistant == nil
+    let events = session.events
+    let questionAt = events.lastIndex { $0["type"] as? String == "question" }
+    let after = questionAt.map { Array(events[($0 + 1)...]) } ?? []
+    let answers = after.filter { $0["type"] as? String == "answer" }
+    let byClose = answers.count == 1 && answers[0]["allowed"] as? Bool == false
+        && answers[0]["by"] as? String == "close"
+    let followUp = LaneResult()
+    AgentLane.shared.submit(
+        tool: "get_project", argumentsJSON: "{}", document: document,
+        askFirst: { _, reply in reply(false) }, completion: { followUp.set($0) })
+    let followDeadline = Date().addingTimeInterval(10)
+    while followUp.value == nil && Date() < followDeadline { spin(0.02) }
+    let answered = followUp.value != nil
+    let noFile = !FileManager.default.fileExists(atPath: path)
+    let described = answers.map { answer in
+        "{allowed: \(answer["allowed"] ?? "nil"), by: \(answer["by"] ?? "nil")}"
+    }
+    row("P8", asked && closed && released && byClose && answered && noFile,
+        "asked \"\(sentence)\" (as wanted \(asked)); after window.close(): phase closed "
+            + "\(closed), editor.assistant nil \(released), answers after the question "
+            + "\(described) (one, by close: \(byClose)); the next call on the document answered "
+            + "in 10 s \(answered) (\(String((followUp.value ?? "nothing").prefix(120)))); "
+            + "no file \(noFile)")
+    withExtendedLifetime(session) {}
+}
+
 // MARK: - Run
 
-rowP1()
-rowP2()
-if let (document, editor, window) = newEditor() {
-    rowP3(editor, window)
-    rowP4()
-    rowP5(document, editor)
-    rowP6(editor)
-} else {
-    for id in ["P3", "P4", "P5", "P6"] { row(id, false, "the editor did not open") }
+let arguments = CommandLine.arguments
+let closePath: String? = arguments.firstIndex(of: "--close").flatMap { index in
+    index + 1 < arguments.count ? arguments[index + 1] : nil
 }
-rowP7()
+
+if let closePath {
+    rowP8(closePath)
+} else {
+    rowP1()
+    rowP2()
+    if let (document, editor, window) = newEditor() {
+        rowP3(editor, window)
+        rowP4()
+        rowP5(document, editor)
+        rowP6(editor)
+    } else {
+        for id in ["P3", "P4", "P5", "P6"] { row(id, false, "the editor did not open") }
+    }
+    rowP7()
+}
 
 let body: [String: Any] = ["rows": rows]
 let data = (try? JSONSerialization.data(withJSONObject: body, options: [.sortedKeys]))

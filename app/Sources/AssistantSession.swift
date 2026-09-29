@@ -23,8 +23,8 @@ struct AssistantOpenError: Error {
 ///
 /// **Every question is answered exactly once** (AI-7). The lane's `ask` puts
 /// an ask-first call to `askFirst` on main and waits with no timeout, holding
-/// the lane's one queue for every window, so a question left unanswered
-/// stops every assistant. The person answers it (`answer`); Stop, close, the
+/// its window's queue on the lane, so a question left unanswered stops this
+/// window's assistant (#148). The person answers it (`answer`); Stop, close, the
 /// helper's death and `deinit` decline it; and a question that reaches a
 /// session already closed, cancelling or released is declined at once.
 ///

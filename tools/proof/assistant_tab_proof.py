@@ -25,6 +25,13 @@ with a DUMMY key in a `-RCSecretFolder` of its own,
       model commit writes the suite and posts `model`; a commit that leaves
       the model where it was (`""` → claude-opus-5-5, the same text again)
       posts nothing; the pane sits under the Transcription heading
+  P8  (#150) the probe run alone under `--close <path>`, against the
+      stand-in scripted to ask for `export` to `work/assistant_tab/p8/P8.mp4`:
+      the question `export writes <path>`; then `window.close()` with the
+      session held strongly — the session closed, `editor.assistant` nil,
+      exactly one `answer` after the question, `{allowed: false, by:
+      "close"}`, the window's next lane call answered within 10 s, no file;
+      and no failure in the stand-in's log
 
 Live A (`-AgentServerEnabled YES`, the dummy `proof-key` in `-RCSecretFolder`,
 `RC_ASSISTANT_BASE_URL` at `anthropic_fake.py`, port 4874), every turn through
@@ -53,13 +60,17 @@ Launch B (the override set, no `-RCSecretFolder`: no key, AI-13):
       composer
 
     python3 tools/proof/assistant_tab_proof.py
-    python3 tools/proof/assistant_tab_proof.py --mutant no-forward   # L2 alone: FAILS
+    python3 tools/proof/assistant_tab_proof.py --mutant no-forward        # L2 alone: FAILS
+    python3 tools/proof/assistant_tab_proof.py --mutant no-close-decline  # P8 alone: FAILS
 
-The mutant copies the tree with `tree_copy.make_copy` into
+`no-forward` copies the tree with `tree_copy.make_copy` into
 `work/assistant_tab/mutant/tree`, deletes the `session.onEvent =` line from
 `EditorViewController+Assistant.swift`, runs `make app` there, and runs L1's
 steps and L2 against that app: L2 must FAIL (exit 1). A copy that did not
-build could not perform the control (exit 2).
+build could not perform the control (exit 2). `no-close-decline` builds the
+probe over a copy of `app/Sources` in `work/assistant_tab/mutants/` with
+`close()`'s `decline(by: "close")` line removed (`MUTANTS`), and runs P8
+alone: P8 must FAIL (exit 1); no build, or no such line, exits 2.
 
 Prints `<ID> ok|FAIL — <detail>` per row, then `n/m`; exit 0 only when every
 row passes. Safety as `assistant_session_proof.py`: every child's
@@ -97,6 +108,9 @@ FORWARD = "session.onEvent ="
 PORT_A, PORT_B = 4874, 4877
 WALL_BUILD, WALL_RUN, WALL_TURN = 900, 300, 60
 PROBE_ROWS = ["P1", "P2", "P3", "P4", "P5", "P6", "P7"]
+# name: (file in app/Sources, before — exactly once, after, row)
+MUTANTS = {"no-close-decline": ("AssistantSession.swift", '        decline(by: "close")\n', "",
+                                "P8")}
 STOP_TEXT = 'select_inspector_tab {tab: "assistant"} first'
 
 
@@ -108,11 +122,11 @@ def child_env(extra=None):
 # P: the probe.
 
 
-def build_probe():
+def build_probe(sources=SOURCES, probe_dir=PROBE_DIR):
     """(binary, None) or (None, reason)."""
-    os.makedirs(PROBE_DIR, exist_ok=True)
-    binary = os.path.join(PROBE_DIR, "assistant_tab_probe")
-    entry = os.path.join(PROBE_DIR, "main.swift")
+    os.makedirs(probe_dir, exist_ok=True)
+    binary = os.path.join(probe_dir, "assistant_tab_probe")
+    entry = os.path.join(probe_dir, "main.swift")
     source = open(PROBE_SWIFT).read()
     if not os.path.exists(entry) or open(entry).read() != source:
         with open(entry, "w") as f:
@@ -121,15 +135,15 @@ def build_probe():
         return None, f"{LIB} is missing — run `cd core && cargo build --release` first"
     if not os.path.exists(HELPER):
         return None, f"{HELPER} is missing — run `make app` first"
-    helpers = os.path.join(PROBE_DIR, "Contents", "Helpers")
+    helpers = os.path.join(probe_dir, "Contents", "Helpers")
     os.makedirs(helpers, exist_ok=True)
     shutil.copy2(HELPER, os.path.join(helpers, "reelcut-agent"))
-    swift = sorted(os.path.join(SOURCES, n) for n in os.listdir(SOURCES)
+    swift = sorted(os.path.join(sources, n) for n in os.listdir(sources)
                    if n.endswith(".swift") and n != "main.swift")
     inputs = swift + [entry, LIB, os.path.join(ROOT, "app", "Bridging",
                                                 "Reelcut-Bridging-Header.h"),
                       os.path.join(ROOT, "core", "include", "reelcut_core.h")]
-    stamp = os.path.join(PROBE_DIR, "sources.txt")
+    stamp = os.path.join(probe_dir, "sources.txt")
     listing = "\n".join(swift)
     if (os.path.exists(stamp) and open(stamp).read() == listing and os.path.exists(binary)
             and all(os.path.getmtime(f) < os.path.getmtime(binary) for f in inputs)):
@@ -195,6 +209,60 @@ def rows_p(score):
             score(row_id, False, f"no row: {why if answer is None else 'not answered'}")
         else:
             score(row_id, bool(r["ok"]), r["detail"])
+
+
+def row_p8(score, fake, secrets, binary=None):
+    """P8: the probe under `--close`, against the stand-in (#150)."""
+    if binary is None:
+        binary, why = build_probe()
+        if binary is None:
+            score("P8", False, f"the probe did not build: {why}")
+            return
+    folder = os.path.join(WORK, "p8")
+    shutil.rmtree(folder, ignore_errors=True)
+    os.makedirs(folder)
+    path = os.path.join(folder, "P8.mp4")
+    fake.scenario([asp.use("toolu_p8", "export", {"preset": "h264", "path": path}),
+                   asp.say("P8: closed.")])
+    ran = bounded.run([binary, "--close", path, "-RCSecretFolder", secrets,
+                       "-ReelcutInspectorCollapsed", "NO"], WALL_RUN,
+                      cwd=os.path.dirname(binary),
+                      env=child_env({"RC_ASSISTANT_BASE_URL": fake.base}))
+    answer = None
+    for line in ran["stdout"].splitlines():
+        if line.startswith("ANSWER "):
+            answer = json.loads(line[len("ANSWER "):])
+    with open(os.path.join(folder, "probe-answer.json"), "w") as f:
+        json.dump(answer, f, indent=1, sort_keys=True)
+    r = {r["id"]: r for r in (answer or {}).get("rows", [])}.get("P8")
+    failures = fake.log().get("failures", [])
+    if r is None:
+        score("P8", False, f"no row (exit {ran['rc']}, expired {ran['expired']}): "
+                           f"{ran['stderr'].strip()[-300:]}")
+    else:
+        score("P8", bool(r["ok"]) and not failures,
+              f"{r['detail']}; stand-in failures {failures[:2]}")
+
+
+def mutant_probe(name):
+    """(binary, None): the probe built over a copy of app/Sources with the
+    mutant's `before` removed once; or (None, reason)."""
+    file, before, after, _ = MUTANTS[name]
+    base = os.path.join(WORK, "mutants", name)
+    sources = os.path.join(base, "Sources")
+    shutil.rmtree(sources, ignore_errors=True)
+    os.makedirs(sources)
+    for entry in sorted(os.listdir(SOURCES)):
+        if entry.endswith(".swift"):
+            shutil.copy2(os.path.join(SOURCES, entry), os.path.join(sources, entry))
+    path = os.path.join(sources, file)
+    text = open(path).read() if os.path.exists(path) else ""
+    count = text.count(before)
+    if count != 1:
+        return None, f"{file} holds {before!r} {count} times, not once"
+    with open(path, "w") as f:
+        f.write(text.replace(before, after))
+    return build_probe(sources, os.path.join(base, "probe"))
 
 
 # ---------------------------------------------------------------------------
@@ -498,9 +566,10 @@ def build_mutant():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--mutant", choices=["no-forward"],
-                        help="L2 alone, against a build without the session's event forward; "
-                             "must FAIL")
+    parser.add_argument("--mutant", choices=["no-forward", "no-close-decline"],
+                        help="no-forward: L2 alone, against a build without the session's "
+                             "event forward; no-close-decline: P8 alone, against a probe "
+                             "whose close() declines nothing; each must FAIL")
     args = parser.parse_args()
     os.makedirs(WORK, exist_ok=True)
     results = []
@@ -524,7 +593,18 @@ def main():
         shutil.rmtree(folder, ignore_errors=True)
         os.makedirs(folder)
         ctx = {"folder": folder, "dumps": []}
-        if args.mutant:
+        if args.mutant == "no-close-decline":
+            binary, why = mutant_probe(args.mutant)
+            if binary is None:
+                score("P8", False, f"(mutant {args.mutant}) the control could not be "
+                                   f"performed: {why}")
+                print(f"0/1\nmutant {args.mutant}: the control could not be performed",
+                      flush=True)
+                return 2
+            row_p8(lambda row_id, ok, detail: score(row_id, ok, f"(mutant {args.mutant}) "
+                                                             + detail),
+                   fake, secrets, binary)
+        elif args.mutant:
             built, why = build_mutant()
             if built is None:
                 score("L2", False, f"the mutant did not build: {why}")
@@ -543,6 +623,11 @@ def main():
                 app.stop()
         else:
             rows_p(score)
+            try:
+                row_p8(score, fake, secrets)
+            except Exception as error:  # noqa: BLE001 — an instrument that cannot run is a FAIL
+                score("P8", False, f"the instrument could not run: {type(error).__name__}: "
+                                   f"{error}")
             app = asp.App("A", RELEASE, ["-AgentServerEnabled", "YES", "-RCSecretFolder",
                                          secrets, "-ReelcutInspectorCollapsed", "NO"],
                           fake.base, port=PORT_A)

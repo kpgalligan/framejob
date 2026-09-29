@@ -23,11 +23,13 @@ import Foundation
 /// Every accessor answers a PATH and creates nothing but the Application
 /// Support root itself, which `FileManager` creates as a side effect of being
 /// asked for it. The caller creates the leaf, because the caller is the one
-/// that knows whether it is about to write — `FFmpegRewrap.convert` does it
-/// with `withIntermediateDirectories: true`, and so does
-/// `ExportPresetsStore.write`. Building a path must not have the side effect of
-/// littering the user's Library with empty folders for features they never
-/// used.
+/// that knows whether it is about to write — and it does so through
+/// `ensureDirectory`, the ONE creator of this folder and of any folder under
+/// it: `0700` at each level it makes, an existing folder left alone (#108).
+/// `FFmpegRewrap.convert`, `ExportPresetsStore.write`, `FileStore.write` and
+/// `AssistantSpend.record` all call it. Building a path must not have the side
+/// effect of littering the user's Library with empty folders for features
+/// they never used.
 enum AppSupport {
     /// The app's folder name inside Application Support. The one literal.
     static let folderName = "Reelcut"
@@ -52,5 +54,56 @@ enum AppSupport {
     /// A file directly inside it — the path only.
     static func file(_ name: String) -> URL? {
         directory?.appendingPathComponent(name, isDirectory: false)
+    }
+
+    /// Why `ensureDirectory` could not make a folder, as the sentence itself:
+    /// "<path> is not a folder", or `strerror`'s text.
+    struct FolderError: LocalizedError, Equatable {
+        let reason: String
+        var errorDescription: String? { reason }
+    }
+
+    /// Makes `url` a folder (#108). It walks up to the nearest existing
+    /// ancestor, which must be a folder, then `mkdir(2)`s each missing level
+    /// top down at `0700` — never `chmod`ed after, and an existing folder's
+    /// mode is left alone, so a person who chose their own keeps it. `EEXIST`
+    /// counts as made when the path is now a folder (another writer won the
+    /// race); any other errno throws its `strerror` sentence.
+    static func ensureDirectory(_ url: URL) throws {
+        let manager = FileManager.default
+        var missing: [URL] = []
+        var level = url.standardizedFileURL
+        while true {
+            var isDirectory: ObjCBool = false
+            if manager.fileExists(atPath: level.path, isDirectory: &isDirectory) {
+                guard isDirectory.boolValue else {
+                    throw FolderError(reason: "\(level.path) is not a folder")
+                }
+                break
+            }
+            missing.append(level)
+            let parent = level.deletingLastPathComponent().standardizedFileURL
+            if parent.path == level.path { break }
+            level = parent
+        }
+        for level in missing.reversed() {
+            let made = level.withUnsafeFileSystemRepresentation { path -> Int32 in
+                guard let path else {
+                    errno = EINVAL
+                    return -1
+                }
+                return mkdir(path, 0o700)
+            }
+            if made == 0 { continue }
+            let code = errno
+            var isDirectory: ObjCBool = false
+            if code == EEXIST,
+                manager.fileExists(atPath: level.path, isDirectory: &isDirectory),
+                isDirectory.boolValue
+            {
+                continue
+            }
+            throw FolderError(reason: String(cString: strerror(code)))
+        }
     }
 }

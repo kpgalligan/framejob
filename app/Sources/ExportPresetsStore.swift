@@ -268,15 +268,14 @@ struct ExportPresetsStore: Equatable {
         return store
     }
 
-    /// Writes the list, creating `~/Library/Application Support/Reelcut/` if
-    /// this is the first thing to need it. Answers whether it landed, so a
-    /// caller can beep; it never throws, for the reason the type doc gives.
+    /// Writes the list, creating `~/Library/Application Support/Reelcut/` at
+    /// `0700` (`AppSupport.ensureDirectory`) if this is the first thing to
+    /// need it. Answers whether it landed, so a caller can beep; it never
+    /// throws, for the reason the type doc gives.
     @discardableResult
     func write() -> Bool {
         guard let url = Self.url, let directory = AppSupport.directory else { return false }
-        guard (try? FileManager.default.createDirectory(
-            at: directory, withIntermediateDirectories: true)) != nil
-        else { return false }
+        guard (try? AppSupport.ensureDirectory(directory)) != nil else { return false }
         let encoder = JSONEncoder()
         // Sorted keys and an indent so the file is diffable and readable by
         // the person whose Library it is in — it is a preferences file, not a

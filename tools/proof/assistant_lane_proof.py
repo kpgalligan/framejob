@@ -11,15 +11,35 @@ probe".
           with `-D REELCUT_DEV_TOOLS`, rebuilt only when stale); L6 also
           requires every `AssistantPrompt.coreTools` name in the assistant's
           catalog (A1 part 3)
+  L10     (#148) a question pending in window A holds A's next call but not
+          window B's: B's call answers while A's two wait, and Deny then
+          answers A's first as declined and runs A's second
+  L11     (#150; AI-8, AI-13) the credential: the store first, then
+          `ANTHROPIC_API_KEY` trimmed, blank is none, and with
+          `RC_ASSISTANT_BASE_URL` set `store()` is an empty MemoryStore whose
+          credential is the environment's — literal dummy values only
+  L12     (#108) `AppSupport.ensureDirectory` makes each missing level 0700,
+          leaves an existing folder's mode, refuses a file in the path by
+          name; `FileStore.write` and `AssistantSpend.record` go through it —
+          all under this run's work folder
   C1      the control: `execute` on main mid-drag loses the marker, so the
           instrument can see #144
   M1      made to fail on purpose: L0 against a scratch copy of `main.swift`
           with the `prepareAtLaunch()` line deleted, and the probe's L1 under
           `--no-prepare`, must BOTH fail
+  S1      (#108) each support-folder creator (`SUPPORT_CREATORS`) spells no
+          `createDirectory(` and calls `AppSupport.ensureDirectory(` once
+  M2      made to fail on purpose: S1's checker over the tree with
+          `AssistantSpend.swift`'s call put back to `createDirectory(` must FAIL
 
     python3 tools/proof/assistant_lane_proof.py              # every row; exit 0 when all pass
     python3 tools/proof/assistant_lane_proof.py --no-prepare # the mutant alone: L0 and L1
                                                              # are expected to FAIL (exit 1)
+    python3 tools/proof/assistant_lane_proof.py --mutant NAME
+        # one of `MUTANTS` (one-queue → L10, no-env-fallback → L11,
+        # mode-0755 → L12): the probe built over a copy of app/Sources with
+        # one text replaced, its one row run and expected to FAIL (exit 1);
+        # a copy that cannot be made or built exits 2. Not with --no-prepare.
 
 A probe that does not build is a scored FAIL (exit 1), never a skip. No app
 instance is launched, no media is used, and no key is read: every child gets
@@ -49,7 +69,21 @@ LIB = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
 PREPARE = "AgentLane.prepareAtLaunch()"
 WALL_BUILD, WALL_RUN = 900, 300
 
-PROBE_ROWS = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "C1"]
+PROBE_ROWS = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11", "L12", "C1"]
+
+# The four files that make a folder under the support folder (#108).
+SUPPORT_CREATORS = ("SecretStore.swift", "ExportPresetsStore.swift", "FFmpegRewrap.swift",
+                    "AssistantSpend.swift")
+ENSURE = "AppSupport.ensureDirectory("
+
+# name: (file in app/Sources, before — exactly once, after, row)
+MUTANTS = {
+    "one-queue": ("AgentLane.swift", "ObjectIdentifier(document)",
+                  "ObjectIdentifier(AgentLane.self)", "L10"),
+    "no-env-fallback": ("AssistantConfiguration.swift", "environment[environmentKey]",
+                        'environment["RC_PROBE_UNSET"]', "L11"),
+    "mode-0755": ("AppSupport.swift", "0o700", "0o755", "L12"),
+}
 
 
 def child_env():
@@ -109,29 +143,76 @@ def mutant_main():
 
 
 # ---------------------------------------------------------------------------
+# S1: the support folder's creators, read from the source.
+
+
+def support_sites(texts):
+    """(ok, detail): each of `SUPPORT_CREATORS` in `texts` (name → text)
+    spells no `createDirectory(` and calls `AppSupport.ensureDirectory(`
+    exactly once."""
+    wrong = []
+    for name in SUPPORT_CREATORS:
+        text = texts.get(name)
+        if text is None:
+            wrong.append(f"{name} missing")
+            continue
+        creates, ensures = text.count("createDirectory("), text.count(ENSURE)
+        if creates or ensures != 1:
+            wrong.append(f"{name}: createDirectory( {creates}, {ENSURE} {ensures}")
+    if wrong:
+        return False, "; ".join(wrong)
+    return True, (f"{', '.join(SUPPORT_CREATORS)}: no createDirectory(, one {ENSURE} each")
+
+
+def tree_texts():
+    return {name: open(os.path.join(SOURCES, name)).read() for name in SUPPORT_CREATORS
+            if os.path.exists(os.path.join(SOURCES, name))}
+
+
+def mutant_sources(name):
+    """(WORK/mutants/<name>/Sources, None): app/Sources/*.swift copied with
+    the mutant's `before` replaced exactly once; or (None, reason)."""
+    file, before, after, _ = MUTANTS[name]
+    target = os.path.join(WORK, "mutants", name, "Sources")
+    shutil.rmtree(target, ignore_errors=True)
+    os.makedirs(target)
+    for entry in sorted(os.listdir(SOURCES)):
+        if entry.endswith(".swift"):
+            shutil.copy2(os.path.join(SOURCES, entry), os.path.join(target, entry))
+    path = os.path.join(target, file)
+    text = open(path).read() if os.path.exists(path) else ""
+    count = text.count(before)
+    if count != 1:
+        return None, f"{file} holds {before!r} {count} times, not once"
+    with open(path, "w") as f:
+        f.write(text.replace(before, after))
+    return target, None
+
+
+# ---------------------------------------------------------------------------
 # The probe.
 
 
-def build_probe():
+def build_probe(sources=SOURCES, probe_dir=PROBE_DIR):
     """(binary, None) or (None, reason). Rebuilt only when stale."""
-    os.makedirs(PROBE_DIR, exist_ok=True)
-    binary = os.path.join(PROBE_DIR, "assistant_lane_probe")
-    entry = os.path.join(PROBE_DIR, "main.swift")
+    os.makedirs(probe_dir, exist_ok=True)
+    binary = os.path.join(probe_dir, "assistant_lane_probe")
+    entry = os.path.join(probe_dir, "main.swift")
     source = open(PROBE_SWIFT).read()
     if not os.path.exists(entry) or open(entry).read() != source:
         with open(entry, "w") as f:
             f.write(source)
     for name in ("Fonts", "Models"):
         src = os.path.join(ROOT, "app", "Resources", name)
-        dst = os.path.join(PROBE_DIR, name)
+        dst = os.path.join(probe_dir, name)
         if not os.path.isdir(dst) or os.path.getmtime(src) > os.path.getmtime(dst):
             shutil.rmtree(dst, ignore_errors=True)
             shutil.copytree(src, dst)
     if not os.path.exists(LIB):
         return None, f"{LIB} is missing — run `cd core && cargo build --release` first"
-    swift = sorted(os.path.join(SOURCES, n) for n in os.listdir(SOURCES)
+    swift = sorted(os.path.join(sources, n) for n in os.listdir(sources)
                    if n.endswith(".swift") and n != "main.swift")
-    stamp = os.path.join(PROBE_DIR, "sources.txt")
+    stamp = os.path.join(probe_dir, "sources.txt")
     listing = "\n".join(swift)
     same_set = os.path.exists(stamp) and open(stamp).read() == listing
     if same_set and os.path.exists(binary) and all(
@@ -165,8 +246,9 @@ def build_probe():
     return binary, None
 
 
-def run_probe(binary, extra):
-    runs = os.path.join(WORK, "runs", "no-prepare" if "--no-prepare" in extra else "prepare")
+def run_probe(binary, extra, runs=None):
+    runs = runs or os.path.join(WORK, "runs",
+                                "no-prepare" if "--no-prepare" in extra else "prepare")
     shutil.rmtree(runs, ignore_errors=True)
     os.makedirs(runs, exist_ok=True)
     ran = run([binary, runs] + extra, WALL_RUN, cwd=os.path.dirname(binary))
@@ -186,13 +268,21 @@ def main():
     parser.add_argument("--no-prepare", action="store_true",
                         help="the made-to-fail run: L0 on a scratch main.swift without the "
                              "prepare line, and the probe without prepareAtLaunch()")
+    parser.add_argument("--mutant", choices=sorted(MUTANTS),
+                        help="the probe over a copy of app/Sources with one text replaced; "
+                             "its row is expected to FAIL (exit 1)")
     args = parser.parse_args()
+    if args.mutant and args.no_prepare:
+        parser.error("--mutant cannot be combined with --no-prepare")
 
     results = []  # (id, ok, detail)
 
     def score(row_id, ok, detail):
         results.append((row_id, ok, detail))
         print(f"{'PASS' if ok else 'FAIL'} {row_id}: {detail}", flush=True)
+
+    if args.mutant:
+        sys.exit(run_mutant(args.mutant, score))
 
     if args.no_prepare:
         ok, detail = launch_path(open(mutant_main()).read())
@@ -233,9 +323,45 @@ def main():
                   f"prepareAtLaunch() L1 fails {l1_failed} "
                   f"({l1['detail'] if l1 else why})")
 
+    ok, detail = support_sites(tree_texts())
+    score("S1", ok, detail)
+    texts = tree_texts()
+    spend = texts.get("AssistantSpend.swift", "")
+    texts["AssistantSpend.swift"] = spend.replace(ENSURE, "FileManager.default.createDirectory(")
+    m2_ok, m2_detail = support_sites(texts)
+    score("M2", not m2_ok,
+          f"with AssistantSpend.swift's {ENSURE} put back to createDirectory(, S1's checker "
+          f"fails {not m2_ok} ({m2_detail})")
+
     passed = sum(1 for _, ok, _ in results if ok)
     print(f"scores: {passed}/{len(results)} pass", flush=True)
     sys.exit(0 if passed == len(results) else 1)
+
+
+def run_mutant(name, score):
+    """The mutant's one row, scored; 1 when it FAILS (the expected outcome),
+    0 when it survives, 2 when the copy could not be made or built."""
+    _, _, _, row_id = MUTANTS[name]
+    prefix = f"(mutant {name}) "
+    sources, why = mutant_sources(name)
+    if sources is None:
+        print(f"mutant {name}: {why}", flush=True)
+        return 2
+    binary, why = build_probe(sources, os.path.join(WORK, "mutants", name, "probe"))
+    if binary is None:
+        print(f"mutant {name}: the probe did not build: {why}", flush=True)
+        return 2
+    answer, why = run_probe(binary, ["--rows", row_id],
+                            runs=os.path.join(WORK, "mutants", name, "runs"))
+    r = {r["id"]: r for r in (answer or {}).get("rows", [])}.get(row_id)
+    if r is None:
+        score(row_id, False, prefix + f"no row: {why or 'the probe did not answer it'}")
+    else:
+        score(row_id, bool(r["ok"]), prefix + r["detail"])
+    failed = r is None or not r["ok"]
+    print(f"mutant {name}: {row_id} {'FAILS (expected)' if failed else 'PASSES (survived)'}",
+          flush=True)
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

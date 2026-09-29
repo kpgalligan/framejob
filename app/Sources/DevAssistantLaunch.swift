@@ -104,8 +104,8 @@ final class DevAssistantRun: NSObject {
         timer?.invalidate()
         timer = nil
         // The turn as it stood, then the close — which declines a pending
-        // question and drops the queue — BEFORE `get_project`: the lane's
-        // serial queue would otherwise hold it behind that question's wait.
+        // question and drops the queue — BEFORE `get_project`: this window's
+        // queue on the lane would otherwise hold it behind that question's wait.
         let captured = capture()
         session.close()
         AgentLane.shared.submit(

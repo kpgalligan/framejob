@@ -527,9 +527,8 @@ enum FFmpegRewrap {
 
     private static func convert(_ plan: Plan, with tools: Tools) throws -> URL {
         let manager = FileManager.default
-        guard (try? manager.createDirectory(
-            at: plan.destination.deletingLastPathComponent(),
-            withIntermediateDirectories: true)) != nil
+        guard (try? AppSupport.ensureDirectory(plan.destination.deletingLastPathComponent()))
+            != nil
         else {
             throw RewrapError.failed(plan.source, "the conversion folder could not be created")
         }

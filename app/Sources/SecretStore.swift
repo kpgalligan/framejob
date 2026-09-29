@@ -141,32 +141,15 @@ final class FileStore: SecretStore {
         }
     }
 
-    /// `mkdir(2)` at `0700` when the directory is absent, and nothing at all
-    /// when it is there — `FileManager.createDirectory`'s
-    /// `withIntermediateDirectories: true` would silently succeed on an
-    /// existing directory of any mode, which is the behaviour wanted, but it
-    /// would also apply the attributes to the intermediates it makes. One
-    /// call, one directory, one mode.
+    /// The directory through `AppSupport.ensureDirectory` (#108): `mkdir(2)`
+    /// at `0700` for each level that is absent, the intermediates included,
+    /// and nothing at all for a level that is there. One mode, never
+    /// `chmod`ed after.
     private func makeDirectory() throws {
-        var isDirectory: ObjCBool = false
-        if FileManager.default.fileExists(atPath: directory.path, isDirectory: &isDirectory) {
-            guard isDirectory.boolValue else {
-                throw SecretStoreError.unwritable("\(directory.path) is not a folder")
-            }
-            return
-        }
         do {
-            try FileManager.default.createDirectory(
-                at: directory.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try AppSupport.ensureDirectory(directory)
         } catch {
             throw SecretStoreError.unwritable(error.localizedDescription)
-        }
-        let made = directory.withUnsafeFileSystemRepresentation { path -> Int32 in
-            guard let path = path else { return -1 }
-            return mkdir(path, 0o700)
-        }
-        guard made == 0 || errno == EEXIST else {
-            throw SecretStoreError.unwritable(String(cString: strerror(errno)))
         }
     }
 }

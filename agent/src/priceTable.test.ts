@@ -4,7 +4,7 @@
 // 127.0.0.1 only. No test reaches the network.
 
 import { afterAll, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -117,6 +117,24 @@ test("refresh: no cache fetches once and writes the cache", async () => {
     expect(written.source).toBe(served.url);
     expect(written.fetched_at).toBe("2026-09-28T12:00:00.000Z");
     expect(written.models).toEqual(fixture.models as typeof written.models);
+  } finally {
+    served.stop();
+  }
+});
+
+test("refresh: the cache's missing folders are made 0700; an existing folder keeps its mode", async () => {
+  const served = feed(JSON.stringify(fixture.litellm));
+  try {
+    const base = folder();
+    chmodSync(base, 0o755);
+    const cache = join(base, "made", "deeper", "anthropic-prices.json");
+    const initial = initialPrices({ cache, feed: served.url });
+    const loaded = await refreshPrices(initial.prices, { cache, feed: served.url });
+    expect(loaded.source.kind).toBe("fetched");
+    expect(existsSync(cache)).toBe(true);
+    expect(statSync(join(base, "made")).mode & 0o777).toBe(0o700);
+    expect(statSync(join(base, "made", "deeper")).mode & 0o777).toBe(0o700);
+    expect(statSync(base).mode & 0o777).toBe(0o755);
   } finally {
     served.stop();
   }

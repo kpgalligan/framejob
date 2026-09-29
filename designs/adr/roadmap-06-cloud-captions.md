@@ -296,9 +296,9 @@ The proofs live in `tools/proof/`:
   upload is left to the provider's ≤ 48 h retention.
 - **`transcribe` over MCP cannot be cancelled.** If a client gives up, the janitor cleans up on the
   next run.
-- **The key file is readable by anything running as the person.** The FileStore's folder is `0700`
-  only if FileStore created it. `ExportPresetsStore` and `FFmpegRewrap` create the same folder at
-  the umask mode, so the key FILE stays `0600` but the folder may be listable.
+- **The key file is readable by anything running as the person.** Every creator of the support
+  folder makes it `0700` (`AppSupport.ensureDirectory`, #108); a folder that already existed keeps
+  its mode.
 - **A janitor 404 is a failure, which means a hold, not "already gone".** C0 q6 measured that a
   truly deleted transcript answers 200 with the sentinel `audio_url: "http://deleted_by_user"`.
   What the service answers for another account's well-formed id is unmeasured.
@@ -351,7 +351,7 @@ The proofs live in `tools/proof/`:
 - Candidates not started: windowed transcription (deferred until the estimate is seen to bite) and
   a per-speaker caption label/colour. Tracked in #95 and #93.
 - Accepted limits a later phase may revisit: #28's bounded recovery, the janitor's 404 hold,
-  #30's identity, the support folder's mode. Tracked in #113, #44, #114 and #108.
+  #30's identity. Tracked in #113, #44 and #114.
 - The rest of the app against a hand-written `speed` (H·4). Tracked in #41.
 
 ## Where to look in the original

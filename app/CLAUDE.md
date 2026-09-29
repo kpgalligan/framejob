@@ -184,6 +184,9 @@ detail there.
   `FFmpegRewrap` is opt-in (`-RCFFmpegImport always`), runs `Process` on a
   serial queue, and writes conversions under `AppSupport` — the ONE spelling
   of `~/Library/Application Support/Reelcut/` — never in the package.
+  `AppSupport.ensureDirectory` is the ONE creator of that folder and of any
+  folder under it: `0700` at each level it makes, an existing folder left
+  alone (#108).
 - `MediaConsolidator.swift` (+`EditorViewController+Consolidate`) — writes
   inside the package behind NSDocument's back, so it MUST call
   `ProjectDocument.packageContentsDidChangeOnDisk()` afterwards.
@@ -884,7 +887,8 @@ free.
   (AI-8, AI-13, whose `RC_ASSISTANT_BASE_URL` plays R6-9's endpoint). Non-`https` is accepted only for
   `127.0.0.1`, `localhost` and `::1`. `FileStore` creates its file with
   `O_CREAT|O_EXCL` at `0600` under a temporary name and `rename(2)`s it, in a
-  directory it `mkdir`s at `0700` — never `chmod`ed after; `MemoryStore` is
+  directory `AppSupport.ensureDirectory` makes, `0700` at each level it makes
+  — never `chmod`ed after; `MemoryStore` is
   the probe's. The language table is a DATED static list, not an authority:
   a code AssemblyAI refuses comes back as AssemblyAI's own sentence.
 - `MediaTranscript.swift` — `cache/transcripts/<id>.json` and its
@@ -1220,8 +1224,10 @@ free.
 - `AgentLane.swift` — every tool call's one door (road map 12 A1, spec §11
   AI-2, AI-3, AI-5, AI-12): the MCP trampoline's `serve` (server thread,
   synchronous) and the assistant session's `submit` (returns at once; one
-  completion, on the lane's serial queue). One `NSLock` admits one call at a
-  time, which is what keeps `callScope` and `callDocument` race-free; it is
+  completion, on its document's serial queue — one per document with a call
+  outstanding, so a pending question holds only its own window, #148). One
+  `NSLock` admits one call at a time, which is what keeps `callScope` and
+  `callDocument` race-free; it is
   NEVER taken on main, because an `offMainTools` member holding it waits for
   main. A `submit` is refused (a withheld tool) or asked (an ask-first one,
   through the session's hook on main, BEFORE the lock) and then runs inside
@@ -1264,8 +1270,8 @@ free.
   **Every question is answered exactly once** — Allow/Deny, Stop, `close`,
   the helper's exit, `deinit`, and a hop that reaches a closed, cancelling or
   released session (the `askFirst` closure is `[weak self]` and REPLIES when
-  `self` is nil) — because an unanswered one holds the lane's one queue for
-  every window. `events` is append-only and never holds a `tool_request` or
+  `self` is nil) — because an unanswered one holds its window's queue on the
+  lane. `events` is append-only and never holds a `tool_request` or
   the key. `configure` merges `AssistantSpend.configureFields()` (road map
   13 P2) — the one line that changed; the file stays at 400.
 - `AssistantSpend.swift` — what the assistant's responses cost, on the app's
@@ -1277,7 +1283,8 @@ free.
   only beside `-RCPriceFeed`) and `price_feed`. `ledgerLine` turns a `cost`
   event into `spend.jsonl`'s line — `time`, `service`, `model`, a
   whitelisted `usage`, `dollars`, `unknown`, `rows`, `prices`, nothing else —
-  and `record` creates the folder and appends it with one `write`
+  and `record` creates the folder (`AppSupport.ensureDirectory`, `0700`) and
+  appends it with one `write`
   (`O_APPEND|O_CREAT`, 0600), answering a failure sentence. `toolView` is a
   `cost` as a dev tool may show it: `{type, cost: {kind, dollars|cause},
   prices}`. `AssistantTurnCost` sums a turn's dollars and formats the
@@ -1320,7 +1327,9 @@ free.
   bundled files, so they can interpolate `ReelTime.perSecond`,
   `AssistantToolTable.rows` (the ask-first and conditional withheld rows)
   and `AssistantLiveContext.tag`, and `assistant_prompt_proof.py --probe`
-  (rows F1–F7, in `make test`) fails the build's tests when a backticked
+  (rows F1–F8, in `make test`; F7 also holds `"none"`/`"null"` in double
+  quotes and the no-scope word to the block's, F8 each ask-first row's reason
+  to a write) fails the build's tests when a backticked
   token is not a tool, an argument or a `get_project` key, a withheld tool
   is named, an id kind or the timescale is wrong, `searchTopics` does not
   cover the assistant's catalog but the core tools exactly once, a text
@@ -1613,8 +1622,8 @@ this entry rather than growing the list), `ScreenRecorder.shareableContent`'s
 global hop, `GraphicStore`'s serial queue (its file-system sources'
 handlers, the coalesced pass and the outbox; main publishes through
 `drain()` and never waits on it but by `queue.sync`), the cache's main
-hop, the agent lane's serial queue (`AgentLane.swift`), the assistant
-session's write queue (`AssistantSession.swift`), and the spend-month
+hop, the agent lane's per-document serial queues (`AgentLane.swift`), the
+assistant session's write queue (`AssistantSession.swift`), and the spend-month
 queue (`AssistantSpendMonth.queue`, Settings' ledger fold, answered by a
 main hop). The recorder adds
 NO queue of its own:

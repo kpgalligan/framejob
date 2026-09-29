@@ -17,9 +17,9 @@ import Foundation
 /// helper prices from its bundled table. With the base URL set, the cache is
 /// handed to the helper only together with `-RCPriceFeed`, so a proof never
 /// reaches LiteLLM. The support folder is named in exactly one line of this
-/// file, as in `AssistantConfiguration.swift`; the folder is created by
-/// whichever comes first: a ledger line written (`record`) or the helper's
-/// cache write (`refreshPrices`, `mkdir -p`).
+/// file, as in `AssistantConfiguration.swift`; the folder is created, at
+/// 0700, by whichever comes first: a ledger line written (`record`) or the
+/// helper's cache write (`refreshPrices`, `mkdir -p`).
 ///
 /// **Never the key, never content.** A ledger line carries the keys
 /// `ledgerLine` lists and nothing else; `usage` is whitelisted field by field.
@@ -114,8 +114,7 @@ enum AssistantSpend {
             return "The spend ledger \(path) could not be written: \(bare)."
         }
         do {
-            try FileManager.default.createDirectory(
-                at: folder, withIntermediateDirectories: true)
+            try AppSupport.ensureDirectory(folder)
         } catch {
             return failure(error.localizedDescription)
         }

@@ -6,7 +6,7 @@ import Foundation
 ///
 /// **Every fact here is interpolated from the code that decides it, or
 /// checked against it by `make test`** (`assistant_prompt_proof.py --probe`,
-/// rows F1–F7): a backticked token must be a tool, an argument or a key of
+/// rows F1–F8): a backticked token must be a tool, an argument or a key of
 /// `get_project`'s answer; the timescale is `ReelTime.perSecond`; the
 /// ask-first and conditional withheld tools are read from
 /// `AssistantToolTable.rows`; the id kinds are checked against a fixture;
@@ -78,16 +78,16 @@ enum AssistantPrompt {
             + "it lands, and each tool call is one step they can undo.",
         "Each message from the person begins with a <\(AssistantLiveContext.tag)> block: the "
             + "window as it was when they sent it. `name` and `path` are the project's, `scope` "
-            + "is the nest open in the window (none: the timeline), `playhead` is a time, and "
-            + "`selection` lists the selected clip ids. It is not updated during your turn, so "
+            + "is the nest open in the window (\"none\": the timeline), `playhead` is a time, "
+            + "and `selection` lists the selected clip ids. It is not updated during your turn, so "
             + "after your own edits read the project again with `get_project`.",
         "Times are ticks, \(ReelTime.perSecond) per second. Every time you pass is snapped to "
             + "the frame grid of `canvas.fps`.",
         "`get_project` answers the project as JSON. `tracks[0]` is the BACK of the layer stack. "
             + "A clip sits on `track` at `start` for `duration`, and `source.kind` says what it "
             + "shows. Its property groups are patched by `set_video`, `set_audio`, `set_text`, "
-            + "`set_shape` and `set_graphic`: a patch merges key by key, null clears a key, and "
-            + "an array replaces the whole list. "
+            + "`set_shape` and `set_graphic`: a patch merges key by key, \"null\" clears a key "
+            + "(the JSON value, never a string), and an array replaces the whole list. "
             + list(sharedIdKinds.map { "`\($0)`" })
             + " ids share one number space, and the id a call creates is the project's "
             + "`next_id` read before the call.",

@@ -62,15 +62,12 @@ The user asked for an AI agent in the editor, "designed in the same way that the
 
 - #145 the Distribution app is signed with `get-task-allow` beside `audio-input`.
 - #147 Rasterize takes §2's change (one diff).
-- #148 one window's pending question holds every other window's assistant calls.
 - #149 Stop does not interrupt a tool already running.
-- #150 session proof gaps: a window closed with a question pending; the `ANTHROPIC_API_KEY` override.
 - #151 Chat Settings are not offered.
 - #152 a question asked while the tab is hidden draws no attention.
 - #153 the transcript cannot be selected across entries.
 - #154 the composer is single-line.
 - #157 the live evaluation with a key (`ready-for-human`).
-- #158 the prompt's ask-first sentence and its null/none literals.
 - #159 the person check: the tab with a real key (`ready-for-human`).
 - #160 candidate: the Assistant in a floating window.
 - #161 end-of-turn compaction against the real API.

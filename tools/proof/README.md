@@ -7516,3 +7516,80 @@ python3 tools/proof/graphics_inspector_proof.py --port 4872                  # �
 python3 tools/proof/graphics_inspector_proof.py --mutant title-height --port 4872
 python3 tools/proof/graphics_proof.py --port 4873                            # C5, C6, G8
 ```
+
+## Issue batch B9 — a lane queue per document, the session's two unproven paths, the prompt's literals, the support folder at 0700 (`assistant_lane_proof.py`, `assistant_tab_proof.py`, `assistant_prompt_proof.py`, `agent/`'s `bun test`; #148 #150 #158 #108)
+
+`AgentLane.submit` now answers on its DOCUMENT's serial queue (#148), and
+`AppSupport.ensureDirectory` is the one creator of the support folder and
+anything under it, `0700` at each level it makes (#108); the helper's price
+cache folder is made with `mode: 0o700`. The new rows:
+
+- **`assistant_lane_probe.swift`** (in `make test`) — L10 (#148: a question
+  pending in window A, held by a `HeldHook`, holds A's next call but not
+  window B's, which answers within 10 s; Deny then answers A's first as
+  declined and runs A's second; no file), L11 (#150: the credential over
+  literal dummies — the store first, `ANTHROPIC_API_KEY` trimmed, blank is
+  none, and `store()` with `RC_ASSISTANT_BASE_URL` in its dictionary is an
+  empty `MemoryStore` whose credential is the environment's) and L12 (#108:
+  `ensureDirectory` makes `T/a/b/c` at 0700 each and leaves `T`, keeps a
+  0755 `T/open`, refuses `T/file/x` as "`<T/file>` is not a folder",
+  changes nothing on a second call; `FileStore.write` and
+  `AssistantSpend.record` through it, every level 0700, all under the run's
+  work folder).
+- **`assistant_lane_proof.py`** (in `make test`) — S1 (each of
+  `SUPPORT_CREATORS` spells no `createDirectory(` and calls
+  `AppSupport.ensureDirectory(` once) and M2 (S1's checker over the tree
+  with `AssistantSpend.swift`'s call put back must FAIL). `--mutant NAME`
+  builds the probe over a copy of `app/Sources` in
+  `work/assistant_lane/mutants/<name>/` with one text replaced once and runs
+  its one row: `one-queue` (L10), `no-env-fallback` (L11), `mode-0755`
+  (L12); exit 1 when the row fails, 2 when the copy cannot be made or built.
+- **`assistant_tab_proof.py`** — P8 (#150, the probe alone under
+  `--close <path>` against the stand-in: a window closed with an `export`
+  question pending, the session held strongly so `deinit` cannot stand in —
+  closed, `editor.assistant` nil, exactly one answer after the question,
+  `{allowed: false, by: "close"}`, the window's next lane call answered
+  within 10 s, no file, no stand-in failure). `--mutant` takes
+  `no-forward` (unchanged: the `make app` tree copy and L2) and
+  `no-close-decline` (the probe over a copy of `app/Sources` without
+  `close()`'s `decline(by: "close")`, and P8 alone).
+- **`assistant_prompt_probe.swift`** (in `make test`) — F7 also runs
+  `checkLiterals` (every `none`/`null` in the three texts in double quotes,
+  and `("none": the timeline)` with the live block's own no-scope word);
+  F8 (every ask-first row's reason begins "It writes " or "It copies ", and
+  the system prompt says "These tools write files, so each asks the person
+  first: "); M5 (`"none"` unquoted must fail) and M6 (an ask-first
+  `transcribe` that "spends the person's money" must fail).
+- **`agent/src/priceTable.test.ts`** — "refresh: the cache's missing folders
+  are made 0700; an existing folder keeps its mode".
+
+Run on 2026-09-29:
+
+| Command | Answer |
+|---|---|
+| `make typecheck` | 0 errors, 7 warnings, tsc silent |
+| `make test` | exit 0; lane 17/17 (L0–L12, C1, M1, S1, M2); prompt probe F1–F8, M1–M6 ok, 14/14; prices 27/27 (T: 37 testcases, failing none) |
+| `make app` | BUILD SUCCEEDED |
+| `assistant_lane_proof.py --mutant one-queue` | L10 FAIL: Other on B "no answer", exit 1 |
+| `assistant_lane_proof.py --mutant no-env-fallback` | L11 FAIL: 4/6 checks, exit 1 |
+| `assistant_lane_proof.py --mutant mode-0755` | L12 FAIL: 1/6 checks, every level made 755, exit 1 |
+| `sh agent/build.sh test` | 37 pass, 0 fail |
+| …with `, mode: 0o700` dropped by hand (restored) | 36 pass, 1 fail: the new case (Expected 448, Received 493) |
+| `assistant_tab_proof.py` | 17/17, P8 ok |
+| `assistant_tab_proof.py --mutant no-close-decline` | P8 FAIL: no answer after the question, the next call unanswered in 10 s; 0/1, exit 1 |
+| `assistant_tab_proof.py --mutant no-forward` | L2 FAIL; 0/1, exit 1 |
+| `assistant_prompt_proof.py` | 18/18 pass, 8 skipped (E1–E6, H, K: not asked) |
+| `assistant_session_proof.py` | 11/11 |
+| `spend_proof.py` | 17/17; L2's person's files unchanged |
+| `cloud_captions_probe.py --only secrets` | 40/40, "the DIRECTORY it created is 0700" ok |
+
+`grep "Reelcut: "` printed nothing over every instance's log (each live
+proof's L0/S0/A0 row).
+
+```sh
+python3 tools/proof/assistant_lane_proof.py                        # → 17/17
+python3 tools/proof/assistant_lane_proof.py --mutant one-queue     # L10 FAILS, exit 1
+python3 tools/proof/assistant_tab_proof.py                         # → 17/17
+python3 tools/proof/assistant_tab_proof.py --mutant no-close-decline   # P8 FAILS, exit 1
+python3 tools/proof/assistant_prompt_proof.py --probe              # F1–F8, M1–M6
+```

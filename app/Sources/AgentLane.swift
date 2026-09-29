@@ -25,13 +25,19 @@ typealias AssistantAskFirst = (AssistantQuestion, @escaping (Bool) -> Void) -> V
 /// tools' hops too. Risk accepted: the call, and the lock with it, waits as
 /// long as the mouse is held down.
 ///
-/// **The queue.** `submit` runs on one serial queue, so the assistant's calls
-/// are answered in order and its caller never waits.
+/// **The queues (#148).** `submit` runs on its document's serial queue, one
+/// per document with a call outstanding, so each window's calls are answered
+/// in order, its caller never waits, and a question pending in one window
+/// holds no other window's calls. `queuesLock` guards only the dictionary and
+/// is never held across a call, a wait or a completion; a document's queue is
+/// dropped once none of its calls is outstanding, so a new one is made only
+/// when there is nothing left to keep in order.
 final class AgentLane {
     static let shared = AgentLane()
 
     private let lock = NSLock()
-    private let queue = DispatchQueue(label: "com.kgalligan.reelcut.agent-lane")
+    private let queuesLock = NSLock()
+    private var queues: [ObjectIdentifier: LaneQueue] = [:]
     private let server: AgentServer
 
     private init() {
@@ -72,17 +78,42 @@ final class AgentLane {
     }
 
     /// An assistant call, pinned to `document` (AI-5). Returns at once;
-    /// `completion` runs exactly once, on the lane's queue. A withheld tool is
-    /// refused, and an ask-first one is put to `askFirst` BEFORE the lock, so
-    /// a pending question never holds up an MCP caller.
+    /// `completion` runs exactly once, on `document`'s serial queue (#148).
+    /// A withheld tool is refused, and an ask-first one is put to `askFirst`
+    /// BEFORE the lock, so a pending question never holds up an MCP caller,
+    /// nor another document's calls.
     func submit(
         tool: String, argumentsJSON: String, document: ProjectDocument,
         askFirst: @escaping AssistantAskFirst,
         completion: @escaping (String) -> Void
     ) {
-        queue.async { [self] in
+        let key = ObjectIdentifier(document)
+        enter(key).async { [self] in
             completion(answer(tool, argumentsJSON, document, askFirst))
+            leave(key)
         }
+    }
+
+    /// `key`'s queue, made on first use, with one more call outstanding.
+    private func enter(_ key: ObjectIdentifier) -> DispatchQueue {
+        queuesLock.lock()
+        defer { queuesLock.unlock() }
+        var entry =
+            queues[key]
+            ?? LaneQueue(
+                queue: DispatchQueue(label: "com.kgalligan.reelcut.agent-lane"), calls: 0)
+        entry.calls += 1
+        queues[key] = entry
+        return entry.queue
+    }
+
+    /// One call fewer outstanding on `key`'s queue; the entry is dropped at 0.
+    private func leave(_ key: ObjectIdentifier) {
+        queuesLock.lock()
+        defer { queuesLock.unlock() }
+        guard var entry = queues[key] else { return }
+        entry.calls -= 1
+        queues[key] = entry.calls > 0 ? entry : nil
     }
 
     private func answer(
@@ -109,7 +140,8 @@ final class AgentLane {
     }
 
     /// Puts `question` to the hook on main and waits for its answer here, on
-    /// the lane's queue. The first answer counts.
+    /// the document's queue, which holds only that document's calls (#148).
+    /// The first answer counts.
     private func ask(_ question: AssistantQuestion, _ askFirst: @escaping AssistantAskFirst)
         -> Bool {
         let reply = LaneAnswer()
@@ -171,7 +203,7 @@ final class AgentLane {
 }
 
 /// The ask-first answer crossing from main (or wherever the hook replies) to
-/// the lane's queue. Only the first `settle` counts.
+/// the document's queue on the lane. Only the first `settle` counts.
 private final class LaneAnswer {
     private let lock = NSLock()
     private let semaphore = DispatchSemaphore(value: 0)
@@ -197,6 +229,12 @@ private final class LaneAnswer {
         defer { lock.unlock() }
         return value ?? false
     }
+}
+
+/// One document's serial queue and how many of its calls are outstanding.
+private struct LaneQueue {
+    let queue: DispatchQueue
+    var calls: Int
 }
 
 // MARK: - The pinned document (AI-5)

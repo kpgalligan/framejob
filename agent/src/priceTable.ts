@@ -229,7 +229,7 @@ export async function refreshPrices(current: LoadedPrices, o: PriceOptions): Pro
     const fetched: LoadedPrices = { table, source: { kind: "fetched", as_of: fetchedAt } };
     const temporary = `${o.cache}.tmp-${process.pid}`;
     try {
-      mkdirSync(dirname(o.cache), { recursive: true });
+      mkdirSync(dirname(o.cache), { recursive: true, mode: 0o700 });
       writeFileSync(temporary, JSON.stringify(table, null, 2) + "\n");
       renameSync(temporary, o.cache);
     } catch (error) {

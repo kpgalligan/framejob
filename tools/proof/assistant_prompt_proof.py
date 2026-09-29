@@ -2,11 +2,14 @@
 """The assistant's prompt texts, live context and evaluation — road map 12
 A3 (spec §11 AI-7, AI-9, AI-15).
 
-  F1–F7, M1–M4  the probe (`assistant_prompt_probe.swift`, compiled over
+  F1–F8, M1–M6  the probe (`assistant_prompt_probe.swift`, compiled over
           `app/Sources` minus `main.swift` on `harness/build.sh`'s swiftc line,
           rebuilt only when stale): the texts in `AssistantPrompt.swift`
           checked against the code that decides what they say, and each
-          checker made to fail on a mutated copy. `--probe` runs these alone:
+          checker made to fail on a mutated copy. F7 also holds every
+          `none`/`null` literal to double quotes and the no-scope word to the
+          live context block's; F8 holds each ask-first row's reason to a
+          write (#158). `--probe` runs these alone:
           no app, no bun — the line `make test` runs.
 Launch S (Release app, port 4878, `-AgentServerEnabled YES`, a dummy
 `-RCSecretFolder`, `RC_ASSISTANT_BASE_URL` at the stand-in):
@@ -79,7 +82,8 @@ PROBE_SWIFT = os.path.join(HERE, "assistant_prompt_probe.swift")
 LIB = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
 WALL_BUILD, WALL_RUN, WALL_TURN = 900, 300, 60
 PORT_S, PORT_E, PORT_MUTANT = 4878, 4880, 4881
-PROBE_ROWS = ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "M1", "M2", "M3", "M4"]
+PROBE_ROWS = ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "M1", "M2", "M3", "M4", "M5",
+              "M6"]
 EVAL_ROWS = ["E1", "E2", "E3", "E4", "E5", "E6", "H", "K"]
 SEND = "AssistantPrompt.message(text, document: document)"
 TAG = "reelcut_context"

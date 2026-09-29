@@ -1,5 +1,10 @@
 // Road map 12 A1 — the agent lane's probe (spec §11 AI-2, AI-3, AI-5, AI-7,
-// AI-12; #144).
+// AI-12; #144), and issue batch B9's rows: L10, a question pending in one
+// window holds no other window's calls (#148); L11, the assistant's credential
+// with the `ANTHROPIC_API_KEY` fallback (#150; AI-8, AI-13), on literal dummy
+// values only; L12, every support-folder level `AppSupport.ensureDirectory`
+// makes is 0700 and an existing one keeps its mode (#108), under this run's
+// work folder only.
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
 // `main.swift`, module `Reelcut`, against `libreelcut_core.a` —
@@ -106,6 +111,30 @@ final class Hook {
     }
 }
 
+/// The ask-first hook that KEEPS its replies (L10): each question is recorded
+/// (main only) and answered only by `release`, which answers every held reply
+/// with `allowed` — and any question that arrives after it at once, so a row
+/// that timed out still drains the lane.
+final class HeldHook {
+    var questions: [String] = []
+    private var replies: [(Bool) -> Void] = []
+    private var released: Bool?
+
+    var closure: AssistantAskFirst {
+        { [self] question, reply in
+            questions.append(question.sentence)
+            if let released { reply(released) } else { replies.append(reply) }
+        }
+    }
+
+    func release(_ allowed: Bool) {
+        released = allowed
+        let held = replies
+        replies = []
+        for reply in held { reply(allowed) }
+    }
+}
+
 /// `serve`, from a background thread, as the MCP server thread calls it.
 func serve(_ tool: String, _ arguments: [String: Any]) -> Pending {
     let pending = Pending()
@@ -119,6 +148,16 @@ func serve(_ tool: String, _ arguments: [String: Any]) -> Pending {
 /// `submit`, pinned to `document`, from main, as the session will call it.
 func submit(_ tool: String, _ arguments: [String: Any], _ document: ProjectDocument,
             _ hook: Hook) -> Pending {
+    let pending = Pending()
+    AgentLane.shared.submit(
+        tool: tool, argumentsJSON: json(arguments), document: document,
+        askFirst: hook.closure, completion: { pending.set($0) })
+    return pending
+}
+
+/// `submit` with a held hook (L10).
+func submitHeld(_ tool: String, _ arguments: [String: Any], _ document: ProjectDocument,
+                _ hook: HeldHook) -> Pending {
     let pending = Pending()
     AgentLane.shared.submit(
         tool: tool, argumentsJSON: json(arguments), document: document,
@@ -536,13 +575,181 @@ func rowC1() {
             + "after mouse-up \(presentAfterUp) (the loss #144 names: \(!presentAfterUp))")
 }
 
+// MARK: - L10 (#148): a pending question holds only its own document's calls
+
+func rowL10() {
+    closeAll()
+    let a = newDocument()
+    let b = newDocument()
+    let p = path("L10-A.mp4")
+    remove(p)
+    let hook = HeldHook()
+    let first = submitHeld("export", ["preset": "h264", "path": p], a, hook)
+    let askDeadline = Date().addingTimeInterval(10)
+    while hook.questions.isEmpty && Date() < askDeadline { spin(0.02) }
+    let asked = hook.questions == ["export writes \(p)"]
+    let second = submitHeld("add_marker", ["at": 600_000, "name": "L10-A"], a, hook)
+    let other = submitHeld("add_marker", ["at": 600_000, "name": "L10-B"], b, hook)
+    let otherResult = wait(other, 10)
+    let otherLanded = markerNames(b).contains("L10-B")
+    let otherOK = otherResult != nil && !isError(otherResult) && otherLanded
+    let firstHeldAtOther = first.value == nil
+    spin(0.3)
+    let bothHeld = first.value == nil && second.value == nil
+    hook.release(false)
+    let firstResult = wait(first, 10)
+    let secondResult = wait(second, 10)
+    let declined = "The person declined: export writes \(p)."
+    let firstOK = isError(firstResult) && text(firstResult) == declined
+    let secondOK = secondResult != nil && !isError(secondResult)
+        && markerNames(a).contains("L10-A") && !markerNames(b).contains("L10-A")
+        && !markerNames(a).contains("L10-B")
+    let noFile = !FileManager.default.fileExists(atPath: p)
+    measure["l10"] = ["questions": hook.questions, "other": brief(otherResult),
+                      "first": brief(firstResult), "second": brief(secondResult)]
+    row("L10", asked && otherOK && firstHeldAtOther && bothHeld && firstOK && secondOK && noFile,
+        "asked \"export writes P\" \(asked) (\(hook.questions)); Other on B while A's "
+            + "question pends: \(brief(otherResult)), L10-B on B then \(otherLanded), "
+            + "First unanswered then \(firstHeldAtOther); First and Second unanswered 0.3 s on "
+            + "\(bothHeld); after Deny, First \(brief(firstResult)) (as written \(firstOK)), "
+            + "Second \(brief(secondResult)) (L10-A on A only \(secondOK)); no file at P \(noFile)")
+}
+
+// MARK: - L11 (#150; AI-8, AI-13): the credential and its environment fallback
+
+func rowL11() {
+    let key = AssistantConfiguration.environmentKey
+    let env = [key: "  l11-env-dummy \n"]
+    var checks: [(String, Bool)] = []
+    checks.append(("environmentKey is ANTHROPIC_API_KEY", key == "ANTHROPIC_API_KEY"))
+    checks.append(("empty store + env: the env dummy, trimmed",
+                   AssistantConfiguration.credential(store: MemoryStore(), environment: env)
+                    == "l11-env-dummy"))
+    checks.append(("stored + env: the store's value",
+                   AssistantConfiguration.credential(
+                    store: MemoryStore("l11-store-dummy"), environment: env)
+                    == "l11-store-dummy"))
+    checks.append(("empty store, no env: nil",
+                   AssistantConfiguration.credential(store: MemoryStore(), environment: [:])
+                    == nil))
+    checks.append(("empty store, whitespace-only env: nil",
+                   AssistantConfiguration.credential(
+                    store: MemoryStore(), environment: [key: " \n\t "]) == nil))
+    // Only the base URL is in the dictionary `store()` reads, so it can never
+    // answer the person's file; and `read()` is called only on a MemoryStore.
+    let overridden = AssistantConfiguration.store(
+        environment: ["RC_ASSISTANT_BASE_URL": "http://127.0.0.1:9"])
+    var fallback = false
+    var kind = String(describing: type(of: overridden))
+    if let memory = overridden as? MemoryStore, memory.read() == nil {
+        kind = "an empty MemoryStore"
+        var both = env
+        both["RC_ASSISTANT_BASE_URL"] = "http://127.0.0.1:9"
+        fallback = AssistantConfiguration.credential(store: memory, environment: both)
+            == "l11-env-dummy"
+    }
+    checks.append(("base-URL store is an empty MemoryStore and the env dummy is its credential",
+                   fallback))
+    let failed = checks.filter { !$0.1 }.map { $0.0 }
+    measure["l11"] = ["overridden_store": kind, "failed": failed]
+    row("L11", failed.isEmpty,
+        "\(checks.count - failed.count)/\(checks.count) checks; base-URL store: \(kind)"
+            + (failed.isEmpty ? "" : "; failed: \(failed.joined(separator: ", "))"))
+}
+
+// MARK: - L12 (#108): every support-folder level made is 0700
+
+func permissions(_ file: String) -> Int? {
+    guard let attributes = try? FileManager.default.attributesOfItem(atPath: file),
+        let number = attributes[.posixPermissions] as? NSNumber
+    else { return nil }
+    return number.intValue & 0o777
+}
+
+func octal(_ mode: Int?) -> String { mode.map { String($0, radix: 8) } ?? "nil" }
+
+func rowL12() {
+    let files = FileManager.default
+    let t = path("L12")
+    remove(t)
+    try? files.createDirectory(atPath: t, withIntermediateDirectories: true)
+    let tMode = permissions(t)
+    var checks: [(String, Bool)] = []
+    var modes: [String: String] = ["T": octal(tMode)]
+    func at(_ parts: String...) -> String {
+        parts.reduce(t) { ($0 as NSString).appendingPathComponent($1) }
+    }
+    func record(_ label: String, _ file: String) -> Int? {
+        let mode = permissions(file)
+        modes[label] = octal(mode)
+        return mode
+    }
+
+    let abc = (try? AppSupport.ensureDirectory(URL(fileURLWithPath: at("a", "b", "c")))) != nil
+    let made = [record("a", at("a")), record("a/b", at("a", "b")), record("a/b/c", at("a", "b", "c"))]
+    checks.append(("T/a/b/c: made, each level 0700, T unchanged",
+                   abc && made.allSatisfy { $0 == 0o700 } && permissions(t) == tMode))
+
+    try? files.createDirectory(atPath: at("open"), withIntermediateDirectories: false,
+                               attributes: [.posixPermissions: 0o755])
+    let openBefore = record("open (before)", at("open"))
+    let inner = (try? AppSupport.ensureDirectory(URL(fileURLWithPath: at("open", "inner")))) != nil
+    checks.append(("T/open 0755 keeps its mode, inner 0700",
+                   openBefore == 0o755 && inner && record("open", at("open")) == 0o755
+                    && record("open/inner", at("open", "inner")) == 0o700))
+
+    let plain = at("file")
+    files.createFile(atPath: plain, contents: Data("L12\n".utf8))
+    var thrown = "nothing thrown"
+    var exact = false
+    do {
+        try AppSupport.ensureDirectory(URL(fileURLWithPath: at("file", "x")))
+    } catch {
+        thrown = error.localizedDescription
+        exact = (error as? AppSupport.FolderError)
+            == AppSupport.FolderError(reason: "\(plain) is not a folder")
+            && thrown == "\(plain) is not a folder"
+    }
+    checks.append(("T/file/x throws \"<T/file> is not a folder\" (\(thrown))",
+                   exact && !files.fileExists(atPath: at("file", "x"))))
+
+    let again = (try? AppSupport.ensureDirectory(URL(fileURLWithPath: at("a", "b", "c")))) != nil
+    checks.append(("a second call on an existing 0700 folder changes nothing",
+                   again && [permissions(at("a")), permissions(at("a", "b")),
+                             permissions(at("a", "b", "c"))].allSatisfy { $0 == 0o700 }))
+
+    let store = FileStore(directory: URL(fileURLWithPath: at("keys", "nested"), isDirectory: true),
+                          name: "anthropic-key")
+    var wrote = "ok"
+    do { try store.write("l12-dummy") } catch { wrote = error.localizedDescription }
+    checks.append(("FileStore.write: keys and nested 0700, the file 0600 (\(wrote))",
+                   wrote == "ok" && record("keys", at("keys")) == 0o700
+                    && record("keys/nested", at("keys", "nested")) == 0o700
+                    && record("anthropic-key", at("keys", "nested", "anthropic-key")) == 0o600))
+
+    let spend = AssistantSpend.record(
+        ["type": "cost"], in: URL(fileURLWithPath: at("spend", "deeper"), isDirectory: true))
+    checks.append(("AssistantSpend.record: nil, spend and deeper 0700, spend.jsonl (\(spend ?? "nil"))",
+                   spend == nil && record("spend", at("spend")) == 0o700
+                    && record("spend/deeper", at("spend", "deeper")) == 0o700
+                    && files.fileExists(atPath: at("spend", "deeper", AssistantSpend.ledgerName))))
+
+    let failed = checks.filter { !$0.1 }.map { $0.0 }
+    measure["l12"] = ["modes": modes, "failed": failed]
+    row("L12", failed.isEmpty,
+        "\(checks.count - failed.count)/\(checks.count) checks; modes "
+            + modes.sorted { $0.key < $1.key }.map { "\($0.key) \($0.value)" }
+                .joined(separator: ", ")
+            + (failed.isEmpty ? "" : "; failed: \(failed.joined(separator: "; "))"))
+}
+
 try? FileManager.default.createDirectory(atPath: work, withIntermediateDirectories: true)
 let steps: [(String, () -> Void)] = [
     ("L1", rowL1), ("L2", rowL2), ("L3", rowL3), ("L4", rowL4), ("L5", rowL5), ("L6", rowL6),
     ("L7", { waitRow("L7", { tool, arguments, _ in serve(tool, arguments) }) }),
     ("L8", { waitRow("L8", { tool, arguments, document in
         submit(tool, arguments, document, Hook()) }) }),
-    ("L9", rowL9), ("C1", rowC1),
+    ("L9", rowL9), ("L10", rowL10), ("L11", rowL11), ("L12", rowL12), ("C1", rowC1),
 ]
 for (id, step) in steps where wanted(id) {
     step()
