@@ -66,11 +66,16 @@ Launch B (the override set, no `-RCSecretFolder`: no key, AI-13):
 `no-forward` copies the tree with `tree_copy.make_copy` into
 `work/assistant_tab/mutant/tree`, deletes the `session.onEvent =` line from
 `EditorViewController+Assistant.swift`, runs `make app` there, and runs L1's
-steps and L2 against that app: L2 must FAIL (exit 1). A copy that did not
-build could not perform the control (exit 2). `no-close-decline` builds the
+steps and L2 against that app: L2 must FAIL (exit 1; 0 when it survives). A
+copy that did not build could not perform the control (exit 2). `no-close-decline` builds the
 probe over a copy of `app/Sources` in `work/assistant_tab/mutants/` with
 `close()`'s `decline(by: "close")` line removed (`MUTANTS`), and runs P8
-alone: P8 must FAIL (exit 1); no build, or no such line, exits 2.
+alone: P8 must FAIL (exit 1); no build, or no such line, exits 2. Rule R
+(issue batch B13): a mutant run whose row was never scored, or that scored
+any row by a path where the row's own comparison did not run (the probe
+printed no P8 row, an exception caught by `guarded`, the launch or the
+setup failing), prints `mutant <name>: the control could not be performed —
+<why>` and exits 2, never 1.
 
 Prints `<ID> ok|FAIL — <detail>` per row, then `n/m`; exit 0 only when every
 row passes. Safety as `assistant_session_proof.py`: every child's
@@ -216,7 +221,7 @@ def row_p8(score, fake, secrets, binary=None):
     if binary is None:
         binary, why = build_probe()
         if binary is None:
-            score("P8", False, f"the probe did not build: {why}")
+            score("P8", False, f"the probe did not build: {why}", instrument=True)
             return
     folder = os.path.join(WORK, "p8")
     shutil.rmtree(folder, ignore_errors=True)
@@ -238,7 +243,7 @@ def row_p8(score, fake, secrets, binary=None):
     failures = fake.log().get("failures", [])
     if r is None:
         score("P8", False, f"no row (exit {ran['rc']}, expired {ran['expired']}): "
-                           f"{ran['stderr'].strip()[-300:]}")
+                           f"{ran['stderr'].strip()[-300:]}", instrument=True)
     else:
         score("P8", bool(r["ok"]) and not failures,
               f"{r['detail']}; stand-in failures {failures[:2]}")
@@ -574,8 +579,8 @@ def main():
     os.makedirs(WORK, exist_ok=True)
     results = []
 
-    def score(row_id, ok, detail):
-        results.append((row_id, ok))
+    def score(row_id, ok, detail, *, instrument=False):
+        results.append((row_id, ok, instrument))
         print(f"{row_id} {'ok' if ok else 'FAIL'} — {detail}", flush=True)
 
     def guarded(row_id, function, *arguments):
@@ -583,7 +588,7 @@ def main():
             score(row_id, *function(*arguments))
         except Exception as error:  # noqa: BLE001 — an instrument that cannot run is a FAIL
             score(row_id, False, f"the instrument could not run: {type(error).__name__}: "
-                                 f"{error}")
+                                 f"{error}", instrument=True)
 
     fake = None
     try:
@@ -597,19 +602,19 @@ def main():
             binary, why = mutant_probe(args.mutant)
             if binary is None:
                 score("P8", False, f"(mutant {args.mutant}) the control could not be "
-                                   f"performed: {why}")
-                print(f"0/1\nmutant {args.mutant}: the control could not be performed",
-                      flush=True)
+                                   f"performed: {why}", instrument=True)
+                print(f"0/1\nmutant {args.mutant}: the control could not be performed — "
+                      f"the probe was not built: {why}", flush=True)
                 return 2
-            row_p8(lambda row_id, ok, detail: score(row_id, ok, f"(mutant {args.mutant}) "
-                                                             + detail),
+            row_p8(lambda row_id, ok, detail, **kw: score(row_id, ok, f"(mutant {args.mutant}) "
+                                                                   + detail, **kw),
                    fake, secrets, binary)
         elif args.mutant:
             built, why = build_mutant()
             if built is None:
-                score("L2", False, f"the mutant did not build: {why}")
-                print(f"0/1\nmutant {args.mutant}: the control could not be performed",
-                      flush=True)
+                score("L2", False, f"the mutant did not build: {why}", instrument=True)
+                print(f"0/1\nmutant {args.mutant}: the control could not be performed — "
+                      f"the mutant did not build: {why}", flush=True)
                 return 2
             app = asp.App("mutant", built, ["-AgentServerEnabled", "YES", "-RCSecretFolder",
                                             secrets, "-ReelcutInspectorCollapsed", "NO"],
@@ -627,7 +632,7 @@ def main():
                 row_p8(score, fake, secrets)
             except Exception as error:  # noqa: BLE001 — an instrument that cannot run is a FAIL
                 score("P8", False, f"the instrument could not run: {type(error).__name__}: "
-                                   f"{error}")
+                                   f"{error}", instrument=True)
             app = asp.App("A", RELEASE, ["-AgentServerEnabled", "YES", "-RCSecretFolder",
                                          secrets, "-ReelcutInspectorCollapsed", "NO"],
                           fake.base, port=PORT_A)
@@ -644,20 +649,39 @@ def main():
                 guarded("K", row_k, app, ctx)
             except Exception as error:  # noqa: BLE001
                 for row_id in live:
-                    if row_id not in [r for r, _ in results]:
-                        score(row_id, False, f"launch A could not run: {error}")
+                    if row_id not in [r for r, _, _ in results]:
+                        score(row_id, False, f"launch A could not run: {error}",
+                              instrument=True)
             finally:
                 app.stop()
             guarded("N1", row_n1, fake)
     except Exception as error:  # noqa: BLE001
-        score("setup", False, f"the instrument could not run: {type(error).__name__}: {error}")
+        score("setup", False, f"the instrument could not run: {type(error).__name__}: {error}",
+              instrument=True)
     finally:
         if fake is not None:
             fake.stop()
 
-    passed = sum(1 for _, ok in results if ok)
+    passed = sum(1 for _, ok, _ in results if ok)
     print(f"{passed}/{len(results)}", flush=True)
+    if args.mutant:
+        why = not_performed({"no-forward": "L2", "no-close-decline": "P8"}[args.mutant],
+                            results)
+        if why:
+            print(f"mutant {args.mutant}: the control could not be performed — {why}",
+                  flush=True)
+            return 2
     return 0 if passed == len(results) else 1
+
+
+def not_performed(row_id, results):
+    """Rule R (issue batch B13): why a mutant run could not perform its
+    control — its row never scored, or any row scored as an instrument
+    failure — or "" when it could."""
+    if row_id not in [r for r, _, _ in results]:
+        return f"{row_id} was never scored"
+    broken = [r for r, _, instrument in results if instrument]
+    return f"scored as instrument failures: {', '.join(broken)}" if broken else ""
 
 
 if __name__ == "__main__":

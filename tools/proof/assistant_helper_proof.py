@@ -27,9 +27,12 @@ road map 12 §2).
     python3 tools/proof/assistant_helper_proof.py --mutant skip-without-bun  # P1 alone: FAILS
     python3 tools/proof/assistant_helper_proof.py --mutant no-fields         # P4 alone: FAILS
 
-Each mutant runs only its row, which must fail (exit 1); a mutant whose row
-skipped on this host (bun at a fixed path P1 cannot hide) exits 2, the control
-not performed. An instrument that
+Each mutant runs only its row, which must fail (exit 1; 0 when it
+survives); a mutant whose row skipped on this host (bun at a fixed path P1
+cannot hide) exits 2, the control not performed — and so, by rule R (issue
+batch B13), does one whose scratch build.sh could not be made or whose row
+was scored by a caught exception, printing `mutant <name>: the control could
+not be performed — <why>`. An instrument that
 cannot run is a scored FAIL, never an exit. No app is launched. No key is
 read: every child's environment has `RC_ASSEMBLYAI_KEY` and
 `ANTHROPIC_API_KEY` popped, the helper only ever gets `proof-key`, and every
@@ -450,11 +453,11 @@ def main():
                         help="run one row against its made-to-fail variant; it must FAIL")
     args = parser.parse_args()
     os.makedirs(WORK, exist_ok=True)
-    results = []  # (id, state, reason); state is "ok", "FAIL" or "skip"
+    results = []  # (id, state, reason, instrument); state is "ok", "FAIL" or "skip"
 
-    def score(row_id, ok, reason):
+    def score(row_id, ok, reason, *, instrument=False):
         state = "skip" if ok is None else ("ok" if ok else "FAIL")
-        results.append((row_id, state, reason))
+        results.append((row_id, state, reason, instrument))
         print(f"{row_id} {state} — {reason}", flush=True)
 
     def guarded(row_id, function, *arguments):
@@ -462,7 +465,7 @@ def main():
             score(row_id, *function(*arguments))
         except Exception as error:  # noqa: BLE001 — an instrument that cannot run is a FAIL
             score(row_id, False, f"the instrument could not run: {type(error).__name__}: "
-                                 f"{error}")
+                                 f"{error}", instrument=True)
 
     def with_fake(row_id, function, *arguments):
         fake = None
@@ -471,14 +474,14 @@ def main():
             score(row_id, *function(*arguments, fake, base))
         except Exception as error:  # noqa: BLE001
             score(row_id, False, f"the instrument could not run: {type(error).__name__}: "
-                                 f"{error}")
+                                 f"{error}", instrument=True)
         finally:
             kill_group(fake)
 
     if args.mutant == "skip-without-bun":
         script, why = mutant_build_sh()
         if script is None:
-            score("P1", False, why)
+            score("P1", False, why, instrument=True)
         else:
             guarded("P1", lambda: (lambda ok, r: (ok, "(scratch build.sh, guard exits 0) " + r))
                     (*p1(script)))
@@ -503,8 +506,15 @@ def main():
     if args.mutant and not scored:
         # A mutant whose row skipped proved nothing either way: exit 2, never
         # the 0 of a clean run or the 1 of a caught mutant.
-        print(f"mutant {args.mutant}: its row did not run on this host, so this control "
-              "could not be performed", flush=True)
+        print(f"mutant {args.mutant}: the control could not be performed — its row did not "
+              "run on this host", flush=True)
+        return 2
+    broken = [r[0] for r in scored if r[3]]
+    if args.mutant and broken:
+        # Rule R (issue batch B13): a row scored where its own comparison did
+        # not run is an instrument failure, never a caught mutant.
+        print(f"mutant {args.mutant}: the control could not be performed — scored as "
+              f"instrument failures: {', '.join(broken)}", flush=True)
         return 2
     return 0 if passed == len(scored) else 1
 

@@ -722,6 +722,12 @@ in its pin map (R1's landing): both cross-builds are one program again.
     python3 tools/proof/recording_probe.py --mutant excludes
     python3 tools/proof/recording_probe.py --sources <dir> # any copy
     RC_APP_SOURCES=<dir> python3 tools/proof/recording_probe.py
+
+A `--mutant` run is scored as the tree is (its rows, exit 1 when any
+failed); when its control could not be performed — the text to replace not
+found exactly once, or the probe not built — it prints `mutant <name>: the
+control could not be performed — <why>` and exits 2 (rule R, issue batch
+B13).
 """
 
 import argparse
@@ -6996,8 +7002,10 @@ def prepare_mutant(name):
     with open(path) as f:
         text = f.read()
     if text.count(before) != 1:
-        sys.exit(f"mutant {name}: the text to replace occurs {text.count(before)} times in "
-                 f"{file_name}, not once — the tree has moved and the mutant needs re-aiming")
+        print(f"mutant {name}: the control could not be performed — the text to replace "
+              f"occurs {text.count(before)} times in {file_name}, not once — the tree has "
+              f"moved and the mutant needs re-aiming", file=sys.stderr, flush=True)
+        sys.exit(2)
     with open(path, "w") as f:
         f.write(text.replace(before, after))
     print(f"  mutant {name}: {what}\n")
@@ -7044,6 +7052,13 @@ def main():
     binary, error = build_probe(sources)
     check("the probe builds — an instrument that will not compile is a FAILURE here, "
           "not an exit", binary is not None, error or "")
+    if args.mutant and binary is None:
+        # Rule R (issue batch B13): a probe that did not build performs no
+        # control, and is never read as a caught mutant.
+        print(f"\n{passed}/{passed + failed} checks passed")
+        print(f"mutant {args.mutant}: the control could not be performed — the probe did not "
+              f"build")
+        return 2
     if binary is not None:
         for section in sections:
             section(binary, sources)

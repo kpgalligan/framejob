@@ -49,8 +49,11 @@ deleted first; `--month-spent D` (rehearsal only) seeds it with D dollars
 already spent this month, so `--month-spent 24.99` shows every E row refused
 `budget:` with nothing sent to the stand-in. `--mutant bare-send` builds a tree copy (`tree_copy.make_copy`, into
 `work/assistant_prompt/mutant/tree`) whose `send` writes the bare
-text and runs S2 against it (port 4881): it must FAIL (exit 1); a copy that
-did not build exits 2.
+text and runs S2 against it (port 4881): it must FAIL (exit 1; 0 when it
+survives); a copy that did not build exits 2, and so (rule R, issue batch
+B13) does a run whose S2 was never scored or was scored by a caught
+exception or a launch that could not run: `mutant <name>: the control could
+not be performed — <why>`.
 
 Safety: every child's environment has `ANTHROPIC_API_KEY`, `RC_ASSEMBLYAI_KEY`
 and `RC_AGENT_PORT` popped; the app and helper get only the dummy
@@ -338,8 +341,9 @@ def launch_s(asp, app_path, port, secrets, fake, texts, score, guarded, only_s2=
             guarded("S3", row_s3, asp, app, fake, texts, ctx)
     except Exception as error:  # noqa: BLE001 — an instrument that cannot run is a FAIL
         for row_id in ids:
-            if row_id not in [r for r, _, _ in RESULTS]:
-                score(row_id, False, f"launch S could not run: {type(error).__name__}: {error}")
+            if row_id not in [r[0] for r in RESULTS]:
+                score(row_id, False, f"launch S could not run: {type(error).__name__}: {error}",
+                      instrument=True)
     finally:
         app.stop()
 
@@ -393,7 +397,7 @@ def build_mutant(asp):
 
 # ---------------------------------------------------------------------------
 
-RESULTS = []  # (id, state, detail): state "ok" | "FAIL" | "SKIP"
+RESULTS = []  # (id, state, detail, instrument): state "ok" | "FAIL" | "SKIP"
 
 
 def main():
@@ -435,9 +439,9 @@ def main():
 
     os.makedirs(WORK, exist_ok=True)
 
-    def score(row_id, ok, detail, skip=False):
+    def score(row_id, ok, detail, skip=False, *, instrument=False):
         state = "SKIP" if skip else ("ok" if ok else "FAIL")
-        RESULTS.append((row_id, state, detail))
+        RESULTS.append((row_id, state, detail, instrument))
         print(f"{row_id} {state} — {detail}", flush=True)
 
     def guarded(row_id, function, *arguments):
@@ -445,7 +449,7 @@ def main():
             score(row_id, *function(*arguments))
         except Exception as error:  # noqa: BLE001 — an instrument that cannot run is a FAIL
             score(row_id, False, f"the instrument could not run: {type(error).__name__}: "
-                                 f"{error}")
+                                 f"{error}", instrument=True)
 
     if args.probe:
         probe_rows(score)
@@ -461,15 +465,18 @@ def main():
             secrets = asp.secret_folder()
             app, why = build_mutant(asp)
             if app is None:
-                score("S2", False, f"the mutant did not build: {why}")
-                print(f"0/1\nmutant {args.mutant}: the control could not be performed",
-                      flush=True)
+                score("S2", False, f"the mutant did not build: {why}", instrument=True)
+                print(f"0/1\nmutant {args.mutant}: the control could not be performed — "
+                      f"the mutant did not build: {why}", flush=True)
                 return 2
             launch_s(asp, app, PORT_MUTANT, secrets, fake, None, score, guarded, only_s2=True)
+        except Exception as error:  # noqa: BLE001 — an instrument that cannot run is a FAIL
+            score("setup", False, f"the instrument could not run: {type(error).__name__}: "
+                                  f"{error}", instrument=True)
         finally:
             if fake is not None:
                 fake.stop()
-        return summary(None)
+        return summary(None, mutant=args.mutant)
 
     texts = probe_rows(score)
     release = os.path.join(ROOT, asp.APP_PATH)
@@ -533,7 +540,7 @@ def main():
                 evaluation.run()
             except Exception as error:  # noqa: BLE001
                 for row_id in EVAL_ROWS[:6]:
-                    if row_id not in [r for r, _, _ in RESULTS]:
+                    if row_id not in [r[0] for r in RESULTS]:
                         score(row_id, False, f"launch E could not run: {type(error).__name__}: "
                                              f"{error}")
             finally:
@@ -556,7 +563,10 @@ def main():
     return summary(evaluation)
 
 
-def summary(evaluation):
+def summary(evaluation, mutant=None):
+    """The count line; exit 0 when nothing failed, else 1 — and under
+    `--mutant`, 2 when S2 was never scored or any row was scored as an
+    instrument failure (rule R, issue batch B13)."""
     scored = [r for r in RESULTS if r[1] != "SKIP"]
     passed = sum(1 for r in scored if r[1] == "ok")
     skipped = len(RESULTS) - len(scored)
@@ -566,6 +576,13 @@ def summary(evaluation):
     print(f"{passed}/{len(scored)} pass, {skipped} skipped"
           + (f"; failed {failed} ({caps} on the cap, {budgets} on the budget, "
              f"{len(failed) - caps - budgets} otherwise)" if failed else ""), flush=True)
+    if mutant:
+        broken = [r[0] for r in RESULTS if r[3]]
+        why = ("S2 was never scored" if "S2" not in [r[0] for r in RESULTS] else
+               f"scored as instrument failures: {', '.join(broken)}" if broken else "")
+        if why:
+            print(f"mutant {mutant}: the control could not be performed — {why}", flush=True)
+            return 2
     return 0 if not failed else 1
 
 

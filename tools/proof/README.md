@@ -7747,3 +7747,171 @@ python3 tools/proof/playback_audio_proof.py                      # 9/9
 python3 tools/proof/video_configuration_proof.py 4861 capture <dir>   # on the control tree
 python3 tools/proof/video_configuration_proof.py 4861 compare <dir>   # 7/7
 ```
+
+## Issue batch B13 — proof tooling follow-ups: rule R, spike recovery, the inventory's citations, export cancel (#173 #170 #168 #165)
+
+This section supersedes what B1 and B7 say about `export_cancel_proof.py`,
+`inventory.py` and `inventory.json` wherever the two disagree.
+
+**Rule R (#173): a mutant run has three outcomes.** *Caught* (the script's
+caught exit), *survived* (its survived exit), and *not performed* — exit
+**2**, printed as `mutant <name>: the control could not be performed —
+<why>`. A control is not performed when the copy, an anchor, the build, the
+launch, the fixture or an M0-style control failed; when a row the mutant
+names was never scored; or when ANY row scored in that run is an instrument
+failure — scored by a path where its own comparison did not run: an
+exception caught by a guard, "no row" / "no answer", a probe or copy that
+did not build, a failed import or fetch, no JUnit report. A row function
+that returns False is the row's verdict, not an instrument failure. Each
+per-row runner's scoring function takes a keyword-only `instrument=False`
+and keeps it with the row. A run without `--mutant` is unchanged: an
+instrument failure is a scored FAIL, exit 1.
+
+| Runner | caught / survived / not performed |
+|---|---|
+| `assistant_lane_proof.py`, `assistant_tab_proof.py`, `assistant_helper_proof.py`, `assistant_prompt_proof.py`, `assistant_session_proof.py`, `spend_proof.py`, `budget_proof.py`, `prices_proof.py`, `prices_crosscheck.py`, `makefile_env_proof.py`, `export_cancel_proof.py`, `video_configuration_proof.py` | 1 / 0 / 2 |
+| `spend_ui_proof.py` | 1 / 3 / 2 |
+| `graphics_proof.py`, `words_picture_probe.py` | 0 / 1 / 2 |
+| `cloud_captions_proof.py`, `cloud_captions_probe.py` (`--mutant`, `--fake-mutant`), `recording_probe.py`, `phase9_chrome.py` — whole-suite mutants | the per-row count and a normal run's exit / 2 |
+
+`playback_audio_proof.py`'s runner already reads a missing answer as a
+survivor (every row failing is not its exact target set), so it is
+unchanged. `spend_proof.py` and `spend_ui_proof.py` now hand
+`assistant_tab_proof.build_probe` their sources and probe folder: its
+defaults were bound when it was imported, so since B9 both proofs' probes
+were built over the TREE into the Assistant tab's probe folder, and every
+one of their `--mutant` runs measured the unmutated app (seen here:
+`spend_proof.py --mutant unknown-as-zero` 5/5 exit 0, `spend_ui_proof.py
+--mutant local-month` and `unknown-as-zero` 6/6 exit 3, before the fix).
+
+**Spike recovery (#170).** `cloud_rows.record_delete(ledger, rid, reply,
+*more)` closes a reservation `deleted` (the last reply's status) only when
+every reply is 2xx, and otherwise leaves it open and answers
+`delete_failed`. `cloud_rows.delete_found(client, ledger, rid, ids)` DELETEs
+every id `find_own` returned, even after one fails, and records the replies
+through it; `recover` and `words_spike.settle`'s `lost()` branch use it, so a
+failed remote delete stays in `lost()` for the next settle. `cloud_rows.call`
+writes what `recover` answered, `lost reply — find_own: <answer>`, not a
+fixed "recovered". `fake.Fake.delete_status` (an int) makes a DELETE of a
+live transcript answer that status and delete nothing. `--selftest` step 1h
+drives it on a ledger of its own (`ledger-h.json`): `call` with the submit
+reply dropped and DELETE at 500, then `settle` at 500, then at 200.
+
+**The menu inventory's citations (#168).** A site in `inventory.json` carries
+its enclosing `func` (the nearest `func NAME` or `init(` at or above it), and
+`resolve` pairs sites per (file, token, func), so a site removed in one
+function and another added in another no longer balance and hide each other.
+Every other citation is anchored — ``app/Sources/<F>.swift `<anchor>` ``, the
+anchor a piece of the line meant (a method's declaration for a method) that
+occurs exactly once in `<F>` — or is a site ref naming a key of `sites`.
+`inventory.py --check` (a line of `make test`, no app, no build) prints
+`n/5`: K1 the tree clean, K2 three lines above every file holding a site or
+cited by an anchor, K3 one site blanked, **K4** a site's line blanked and
+re-appended inside a new `func b13Swap` at the file's end (I2 must report
+exactly that site, its line not holding its token, and the appended line,
+missing from the inventory), **K5** one anchor given an invisible U+2063 (I3
+must report exactly its selector). Each control that writes into its copy
+calls `_forget(root)` first, because `line_of` caches every file it reads.
+Every pin was re-pinned to its current line (five had moved:
+`EditorViewController+GraphicMenus.swift` 152→157 and 169→174,
+`GraphicPane+Source.swift` 200→216 and 205→221, `WelcomeWindowController.swift`
+189→204), the 159 line citations that were not sites anchored, each read by
+hand against its row (the four stale `code` lines in `AppDelegate+Menus.swift`
+— `performMiniaturize:`, `performZoom:`, `arrangeInFront:`, `showHelp:` — and
+`showSettings:`, `showAssistant:`, `setPreviewQuality:` re-aimed at their
+selector or declaration; a call line that is not unique in its file, such as
+`ProjectDocument.swift`'s `ensureReversedMedia()` callers, anchored on its
+enclosing declaration), the six bare `<F>.swift:<N>` in notes and site prose
+made citations, and `baseline` set to the tree they were read against.
+
+**`export_cancel_proof.py` (#165).** The noise fixture is 60 s (was 300), M0's
+window floor 8.0 s (was 3.0), M2's bound 2.0 s (was 1.0). The probe is rebuilt
+when the bridging header or `core/include/reelcut_core.h` is newer than it,
+and says `probe: built …` or `probe: up to date …`; the summary line ends with
+the wall time. `--mutant no-loop-check` (the measurement loop's `guard
+!isCancelled` removed; M2 must FAIL) and `--mutant old-cancel` (#74's shape
+put back: `cancel()` reads a lock-guarded `measureReader` and calls
+`cancelReading()` on it from main; M1 is its row) build the probe over a copy
+of `app/Sources` in `work/export-cancel-mutants/<name>/` and imply `--only
+cancel`. The bounded search for a fixture that tells the old cancel
+from the new (#165's M1 bullet): the new 60 s noise fixture caught
+`old-cancel` once — 1 crash in 30 under the mutant, 0 in 30 under the tree —
+so it stays M's fixture, one run's evidence. The one other candidate tried,
+`media/AV.mov` (5 s, video and sound) twelve times end to end on each of the
+four tracks with `noise_reduction: 1.0`, by a temporary edit of
+`build_noise_fixture` reverted after, gave 0 crashes in 30 under the tree
+(M0 window 29.073 s, M2 max 0.626 s) but no count under `old-cancel`: the
+mutant's UNCANCELLED M0 run crashed (rc −5), so that run could not perform
+its control (exit 2) and the candidate was not kept.
+
+**#91's leftovers.** `preview_validity_probe.py`'s section 1 builds its
+plan-range copy as the builder's `videoConfiguration` with `instructions`
+changed and `AVVideoComposition(configuration:)` — #91's way, no
+`mutableCopy()`. It does not call `Playback.previewComposition`: that copy
+changes the render size and keeps the builder's instructions, and section 1
+measures the plan's own ranges installed. `phase8_proof.py`'s docstring
+names `Playback`'s copy of the configuration.
+
+Run on 2026-09-29 against HEAD 964038a (every command with
+`ANTHROPIC_API_KEY` and `RC_ASSEMBLYAI_KEY` unset, under a perl alarm).
+
+| Command | Answer |
+|---|---|
+| Before the change: `assistant_lane_proof.py --mutant one-queue`, `exit(3)` first in `assistant_lane_probe.swift` | `FAIL L10: … no row: no answer (exit 3)`, "FAILS (expected)", exit 1 |
+| Before the change: `words_picture_probe.py --mutant ignore-word`, `exit(3)` first in `words_picture_probe.swift` | the probe built, "the probe answers one JSON object" FAIL, `MUTANT PASS`, exit 0 |
+| `make app` / `make test` | BUILD SUCCEEDED / exit 0 (lane 17/17, prompt probe 14/14, prices 27/27, budget 23/23, inventory 5/5) |
+| `inventory.py --check` | 5/5, "every pin at its own line" |
+| … with `resolve`'s key put back to (file, token) | 4/5, K4 FAIL |
+| … with K4's `_forget` call removed | 4/5, K4 FAIL |
+| `v2_menu.py 4914 --only H` (own instance) | 5 pass, 0 fail |
+| `cloud_spike.py --selftest` | 29/29 |
+| … with `delete_found` closing `deleted` whatever the replies | 25/29, all four 1h rows FAIL |
+| `words_spike.settle` over a stub client and a scratch `aai.Ledger` | DELETE 500 → `{"delete_failed": 1}`, rid in `lost()`; 200 → `{"deleted": 1}`, closed `deleted` |
+| `RC_WORDS_SPIKE_WORK=$(mktemp -d) words_spike.py --only q2` | q2 skipped (`RC_ASSEMBLYAI_KEY is not set`), SPIKE INCOMPLETE, exit 2 |
+| `assistant_lane_proof.py --mutant one-queue` / `no-env-fallback` / `mode-0755` | L10 / L11 / L12 FAIL, exit 1 each |
+| `assistant_tab_proof.py --mutant no-close-decline` / `no-forward` | P8 FAIL / L2 FAIL, exit 1 each |
+| `assistant_helper_proof.py --mutant skip-without-bun` / `no-fields` | P1 FAIL / P4 FAIL, exit 1 each |
+| `assistant_prompt_proof.py --mutant bare-send` | S2 FAIL, exit 1 |
+| `assistant_session_proof.py --mutant no-prepare` | W FAIL, exit 1 |
+| `spend_proof.py --mutant unknown-as-zero` / `stale-refresh` | 4/5, S1 FAIL / 1/2, H3 FAIL; exit 1 each |
+| `spend_ui_proof.py --mutant local-month` / `unknown-as-zero` | 4/6, "M1, M3 all FAIL — caught" / 4/6, "M1 all FAIL — caught"; exit 1 each |
+| `spend_proof.py` / `spend_ui_proof.py` (no mutant, after the `build_probe` fix) | 17/17 / 10/10 |
+| `budget_proof.py --mutant no-budget` / `unknown-as-zero` | 18/23, P G1 R2 A2 A4 FAIL / 20/23, W S2 S3 FAIL; exit 1 each |
+| `prices_proof.py --mutant py-disagrees` / `ts-disagrees` / `reduce-disagrees` | 22/27 / 25/27 / 26/27; exit 1 each |
+| `prices_crosscheck.py --mutant table` / `page` (the public GET answered) | X1 FAIL / X2 FAIL, 2/3, exit 1 each |
+| `makefile_env_proof.py --mutant no-unexport` | 2/3, exit 1 |
+| `words_picture_probe.py --mutant ignore-word` | `MUTANT PASS`, 3 rows FAILED, exit 0 |
+| `graphics_proof.py --mutant frame-plus-one --port 4898` | "CAUGHT: P1 held and P2 failed", exit 0 |
+| `exit(3)` first in the probe: `assistant_lane … one-queue` / `assistant_tab … no-close-decline` / `spend_ui … local-month` / `words_picture_probe … ignore-word` | exit 2 each: "L10 no row" / "instrument failures: P8" / "no row: M1, M2, M3, C1, C2, C3" / "the probe did not answer one JSON object" |
+| `HOME=$(mktemp -d) PATH=/usr/bin:/bin prices_proof.py --mutant ts-disagrees` | T and A instrument failures, exit 2 (with `PATH=/usr/bin:/bin` alone bun is still found through `$HOME`'s mise shims: T FAIL naming opus-mixed, exit 1) |
+| `https_proxy=http://127.0.0.1:9 prices_crosscheck.py --mutant page` | X0 X1 X2 instrument failures, exit 2 |
+| `budget_proof.py --mutant no-budget` with `row_f1` raising (a scratch copy of the script) | "instrument failures: F1", exit 2 |
+| `makefile_env_proof.py --mutant no-unexport --wall 1` | "the copy's `make app` passed its 1 s wall", exit 2 |
+| the mutant's before-text altered in the script: `graphics_proof` / `cloud_captions_proof` / `cloud_captions_probe` / `recording_probe` / `phase9_chrome` / `words_picture_probe` | exit 2 each, naming the anchor found 0 times |
+| `export_cancel_proof.py --port 4913` | 7/7 in 456 s; M0 window 29.078 s; M1 0 crashes of 30; M2 max 0.936 s |
+| `… --mutant no-loop-check` | M2 FAIL (every run over 2.0 s, max 28.587 s), exit 1, 1078 s |
+| `… --mutant old-cancel` | M1 FAIL: 1 crash of 30 (run 29, rc −5, AVFoundation's "Cannot remove a listener … for AssetReader_Failed … that was never added"), exit 1, 439 s |
+| `touch app/Bridging/Reelcut-Bridging-Header.h`, then `core/include/reelcut_core.h`, each followed by `--only cancel --runs 1` | `probe: built in 101 s` / `probe: built in 102 s`; 4/4 each |
+| `… --mutant old-cancel` on the AV.mov candidate (temporary) | M0 FAIL, the uncancelled run rc −5; "instrument failures: M0, M1, M2", exit 2, 150 s |
+| `… --only cancel --runs 30` on the AV.mov candidate (temporary) | 4/4: M0 window 29.073 s, M1 0 crashes of 30, M2 max 0.626 s; exit 0 |
+
+Host skips: ffmpeg does not start on this host (`dyld: Library not loaded:
+/opt/homebrew/opt/x265/lib/libx265.215.dylib`), so `preview_validity_probe.py`
+was not RUN; its probe was built with its own swiftc line
+(`preview_validity_probe.build_probe()`: built in 118.3 s). Not run in this
+batch: `video_configuration_proof.py --mutant keep-frame-duration` (its rule-R
+change is read back only — it needs a control tree's capture), the
+`--fake-mutant` path of `cloud_captions_probe.py` / `cloud_captions_proof.py`,
+and every normal (non-mutant) run of the #173 runners but those in `make test`
+and the two spend proofs.
+
+**Issues not fixed.** None of #173, #170, #168 or #165 is left open by this
+batch; what remains thin is #165's M1, whose discrimination is one crash in
+thirty on one run.
+
+```sh
+python3 tools/proof/capture_spike/inventory.py --check                # 5/5
+python3 tools/proof/cloud_spike/cloud_spike.py --selftest             # 29/29
+python3 tools/proof/export_cancel_proof.py --port 4913                # 7/7
+python3 tools/proof/export_cancel_proof.py --port 4913 --mutant no-loop-check   # M2 FAIL, exit 1
+```

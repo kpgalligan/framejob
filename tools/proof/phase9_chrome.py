@@ -123,6 +123,12 @@ Run it from anywhere; it needs no port and no window server grant, only
 
     python3 tools/proof/phase9_chrome.py
     python3 tools/proof/phase9_chrome.py --mutant init-order
+
+A `--mutant` run is scored as the tree is (its rows, exit 1 when any
+failed); when its control could not be performed — the text to replace not
+found exactly once, or the probe not built or not answering — it prints
+`mutant <name>: the control could not be performed — <why>` and exits 2
+(rule R, issue batch B13).
 """
 
 import argparse
@@ -694,8 +700,10 @@ def prepare_mutant(name):
     with open(path) as f:
         text = f.read()
     if text.count(before) != 1:
-        sys.exit(f"mutant {name}: the text to replace occurs {text.count(before)} times in "
-                 f"{file_name}, not once — the tree has moved and the mutant needs re-aiming")
+        print(f"mutant {name}: the control could not be performed — the text to replace "
+              f"occurs {text.count(before)} times in {file_name}, not once — the tree has "
+              f"moved and the mutant needs re-aiming", file=sys.stderr, flush=True)
+        sys.exit(2)
     with open(path, "w") as f:
         f.write(text.replace(before, after))
     print(f"mutant {name}: {what}\n      {os.path.relpath(path, ROOT)}")
@@ -1249,12 +1257,12 @@ def main():
           "not an exit", binary is not None, error or "")
     if binary is None:
         print(f"\n{passed}/{passed + failed} checks passed")
-        return 1
+        return not_performed(args.mutant, "the probe did not build")
     answer, error, elapsed, shots = run_probe(binary, probe_dir)
     check("the probe answers", answer is not None, error or f"ran in {elapsed:.1f} s")
     if answer is None:
         print(f"\n{passed}/{passed + failed} checks passed")
-        return 1
+        return not_performed(args.mutant, "the probe did not answer")
     check("nothing threw inside it", "error" not in answer, answer.get("error", ""))
 
     scene_scores(answer, shots)
@@ -1268,6 +1276,16 @@ def main():
           "push is read in section 3,\nnot photographed. Light appearance only.")
     print(f"\n{passed}/{passed + failed} checks passed")
     return 0 if failed == 0 else 1
+
+
+def not_performed(mutant, why):
+    """An instrument that did not build or answer: 2 under `--mutant` (rule
+    R, issue batch B13 — the control could not be performed), the scored
+    FAIL's 1 without."""
+    if not mutant:
+        return 1
+    print(f"mutant {mutant}: the control could not be performed — {why}")
+    return 2
 
 
 if __name__ == "__main__":

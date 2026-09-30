@@ -32,7 +32,9 @@ count is printed and must be >= 3. APNG and GIF compare as plain bytes.
   --mutant keep-frame-duration  the probe rebuilt over a copy of app/Sources
            whose `ExportWriter` variant returns `built.videoComposition`;
            V7 alone, which must FAIL (exit 1; 0 when it survives, 2 when the
-           copy or the build could not be made)
+           copy or the build could not be made, or — rule R, issue batch
+           B13 — when V7 was scored without its comparison running: the
+           probe wrote no file, or there is no control file)
 
 Rows print `<ID> ok|FAIL — <detail>`, then `n/m`; exit 0 iff every row passes.
 Every child runs under `graphics_spike/bounded.py`.
@@ -77,8 +79,8 @@ MUTANTS = {
 rows = []
 
 
-def score(row_id, ok, detail):
-    rows.append((row_id, bool(ok)))
+def score(row_id, ok, detail, *, instrument=False):
+    rows.append((row_id, bool(ok), instrument))
     print(f"{row_id} {'ok' if ok else 'FAIL'} — {detail}", flush=True)
 
 
@@ -313,7 +315,7 @@ def compare_probe(where, binary, why, row_id="V7"):
     project = os.path.join(where, "frames.reelcut")
     kept = os.path.join(where, "probe-prores25.mov")
     if binary is None:
-        score(row_id, False, f"the probe did not build: {why}")
+        score(row_id, False, f"the probe did not build: {why}", instrument=True)
         return
     out_dir = os.path.join(where, "compare")
     os.makedirs(out_dir, exist_ok=True)
@@ -323,10 +325,10 @@ def compare_probe(where, binary, why, row_id="V7"):
     started = time.time() - 1
     written, why = run_probe(binary, project, out)
     if written is None or not fresh(written, started):
-        score(row_id, False, f"the probe wrote no file this run: {why}")
+        score(row_id, False, f"the probe wrote no file this run: {why}", instrument=True)
         return
     if not os.path.exists(kept):
-        score(row_id, False, f"no control file {kept}")
+        score(row_id, False, f"no control file {kept}", instrument=True)
         return
     ok, detail = same_movie(written, kept)
     score(row_id, ok, "probe ProRes at 25 fps, masked, against the control: " + detail)
@@ -372,13 +374,18 @@ def run_mutant(name, where):
     _, _, _, row_id = MUTANTS[name]
     sources, why = mutant_sources(name)
     if sources is None:
-        print(f"mutant {name}: {why}", flush=True)
+        print(f"mutant {name}: the control could not be performed — {why}", flush=True)
         return 2
     binary, why = build_probe(sources, os.path.join(PROBE_WORK, "mutants", name, "probe"))
     if binary is None:
-        print(f"mutant {name}: the probe did not build: {why}", flush=True)
+        print(f"mutant {name}: the control could not be performed — the probe did not "
+              f"build: {why}", flush=True)
         return 2
     compare_probe(where, binary, why, row_id)
+    if rows[-1][2]:
+        print(f"mutant {name}: the control could not be performed — {row_id} was scored "
+              f"without its comparison", flush=True)
+        return 2
     failed = not rows[-1][1]
     print(f"mutant {name}: {row_id} {'FAILS (expected)' if failed else 'PASSES (survived)'}",
           flush=True)
@@ -399,7 +406,7 @@ def main():
         capture(port, where)
     else:
         compare(port, where)
-    passed = sum(1 for _, ok in rows if ok)
+    passed = sum(1 for _, ok, _ in rows if ok)
     print(f"{passed}/{len(rows)}", flush=True)
     sys.exit(0 if rows and passed == len(rows) else 1)
 

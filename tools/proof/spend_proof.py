@@ -45,7 +45,11 @@ The probe `spend_probe.swift` (over `app/Sources`, `build_probe`'s line):
                                                                 # S1 FAILs (exit 1)
 
 A mutant whose instrument did not build could not perform its control
-(exit 2). Prints `<ID> ok|FAIL — <detail>` per row, then `n/m`. An
+(exit 2); so, by rule R (issue batch B13), could one whose named row (H3,
+S1) was never scored, or that scored any row where its own comparison did
+not run (a probe that printed no row, an exception caught by `guarded`, a
+failed setup): `mutant <name>: the control could not be performed — <why>`,
+exit 2. A caught mutant exits 1, a surviving one 0. Prints `<ID> ok|FAIL — <detail>` per row, then `n/m`. An
 instrument that cannot run is a scored FAIL. No network: the feed is an
 in-process `http.server` on 127.0.0.1:0, the API is the stand-in, and every
 child has `ANTHROPIC_API_KEY` and `RC_ASSEMBLYAI_KEY` popped. The only key is
@@ -589,10 +593,13 @@ def rows_s(score, sources=None, label=""):
     atp.PROBE_DIR = probe_dir
     atp.PROBE_SWIFT = PROBE_SWIFT
     atp.SOURCES = sources or os.path.join(ROOT, "app", "Sources")
-    binary, why = atp.build_probe()
+    # Passed, not left to the defaults: `build_probe`'s defaults were bound
+    # when assistant_tab_proof was imported, so the two assignments above do
+    # not reach them (issue batch B13).
+    binary, why = atp.build_probe(atp.SOURCES, probe_dir)
     if binary is None:
         for row_id in PROBE_ROWS:
-            score(row_id, False, f"the probe did not build: {why}")
+            score(row_id, False, f"the probe did not build: {why}", instrument=True)
         return False
     scratch = os.path.join(WORK, "probe-scratch")
     shutil.rmtree(scratch, ignore_errors=True)
@@ -607,7 +614,7 @@ def rows_s(score, sources=None, label=""):
         r = got.get(row_id)
         if r is None:
             score(row_id, False, f"no row (exit {ran['rc']}, expired {ran['expired']}): "
-                                 f"{ran['stderr'].strip()[-300:]}")
+                                 f"{ran['stderr'].strip()[-300:]}", instrument=True)
         else:
             score(row_id, bool(r["ok"]), label + r["detail"])
     return True
@@ -674,8 +681,8 @@ def main():
     os.makedirs(WORK, exist_ok=True)
     results = []
 
-    def score(row_id, ok, detail):
-        results.append((row_id, ok))
+    def score(row_id, ok, detail, *, instrument=False):
+        results.append((row_id, ok, instrument))
         print(f"{row_id} {'ok' if ok else 'FAIL'} — {detail}", flush=True)
 
     def guarded(row_id, function, *arguments):
@@ -683,15 +690,19 @@ def main():
             score(row_id, *function(*arguments))
         except Exception as error:  # noqa: BLE001 — an instrument that cannot run is a FAIL
             score(row_id, False, f"the instrument could not run: {type(error).__name__}: "
-                                 f"{error}")
+                                 f"{error}", instrument=True)
 
     if args.mutant == "unknown-as-zero":
-        sources, why = unknown_as_zero_sources()
+        try:
+            sources, why = unknown_as_zero_sources()
+        except OSError as error:  # a copy that could not be made performs no control
+            sources, why = None, f"the copy could not be made: {type(error).__name__}: {error}"
         built = sources is not None and rows_s(score, sources, "(unknown rendered as $0.0000) ")
         if not built:
             if sources is None:
-                score("S1", False, why)
-            print(f"mutant {args.mutant}: the control could not be performed", flush=True)
+                score("S1", False, why, instrument=True)
+            print(f"mutant {args.mutant}: the control could not be performed — "
+                  + (why if sources is None else "the probe did not build"), flush=True)
             return 2
     else:
         fake = feed = None
@@ -702,9 +713,9 @@ def main():
             if args.mutant == "stale-refresh":
                 helper, why = stale_helper()
                 if helper is None:
-                    score("H3", False, f"the mutant did not build: {why}")
-                    print(f"mutant {args.mutant}: the control could not be performed",
-                          flush=True)
+                    score("H3", False, f"the mutant did not build: {why}", instrument=True)
+                    print(f"mutant {args.mutant}: the control could not be performed — "
+                          f"the mutant did not build: {why}", flush=True)
                     return 2
                 for row_id, function in H_ROWS[1:3]:
                     guarded(row_id, lambda f=function: (lambda ok, d: (
@@ -718,15 +729,24 @@ def main():
                 rows_s(score)
         except Exception as error:  # noqa: BLE001
             score("setup", False, f"the instrument could not run: {type(error).__name__}: "
-                                  f"{error}")
+                                  f"{error}", instrument=True)
         finally:
             if fake is not None:
                 fake.stop()
             if feed is not None:
                 feed.stop()
 
-    passed = sum(1 for _, ok in results if ok)
+    passed = sum(1 for _, ok, _ in results if ok)
     print(f"{passed}/{len(results)}", flush=True)
+    if args.mutant:
+        named = {"stale-refresh": "H3", "unknown-as-zero": "S1"}[args.mutant]
+        broken = [r for r, _, instrument in results if instrument]
+        why = (f"{named} was never scored" if named not in [r for r, _, _ in results] else
+               f"scored as instrument failures: {', '.join(broken)}" if broken else "")
+        if why:
+            print(f"mutant {args.mutant}: the control could not be performed — {why}",
+                  flush=True)
+            return 2
     return 0 if passed == len(results) else 1
 
 

@@ -13,6 +13,9 @@ be told to misbehave in the two ways that would otherwise be untestable:
   header never reaches it.
 * `drop_submit_reply` — the transcript is created and the socket is closed
   unanswered. That is the lost submit road map 6 §3's recovery is for.
+* `delete_status` — an int: a DELETE of a live transcript answers that
+  status and deletes nothing (#170's failed remote delete); `None`, the
+  default, deletes and answers 200.
 
 `foreign` seeds the list route with entries carrying other `audio_url`s, so
 the selftest can prove `find_own` returns none of them.
@@ -35,6 +38,7 @@ class Fake:
         self.foreign = []
         self.redirect_next = None
         self.drop_submit_reply = False
+        self.delete_status = None
         self.transcripts = {}
         self.deleted = set()
         self.uploads = []
@@ -107,6 +111,8 @@ class Fake:
                     tid = path.rsplit("/", 1)[1]
                     if tid not in fake.transcripts or tid in fake.deleted:
                         return self._json(404, {"error": "not found"})
+                    if method == "DELETE" and fake.delete_status is not None:
+                        return self._json(fake.delete_status, {"error": "delete refused"})
                     if method == "DELETE":
                         fake.deleted.add(tid)
                         return self._json(200, fake.body(tid, "completed", deleted=True))

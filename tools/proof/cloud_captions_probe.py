@@ -10,6 +10,12 @@ no socket at all. Nothing here calls AssemblyAI.
     env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --mutant no-retry
     env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only mapping,stamp
 
+A `--mutant` or `--fake-mutant` run is scored as a normal run is (its rows,
+exit 1 when any failed); when its control could not be performed — the text
+to replace not found exactly once, or the probe or harness not built — it
+prints `mutant <name>: the control could not be performed — <why>` and exits
+2 (rule R, issue batch B13).
+
 Sections, by the name after `section_`:
 
 * `mapping` (5i·12) — THE MAPPING at its boundaries: a word straddling `in`,
@@ -6580,8 +6586,10 @@ def prepare_fake_mutant(name):
     with open(FAKE, encoding="utf-8") as handle:
         text = handle.read()
     if text.count(before) != 1:
-        sys.exit(f"fake mutant {name}: the text to replace occurs {text.count(before)} times, "
-                 f"not once \u2014 the tree has moved and the mutant needs re-aiming")
+        print(f"mutant {name}: the control could not be performed \u2014 the text to replace "
+              f"occurs {text.count(before)} times in the fake, not once \u2014 the tree has "
+              f"moved and the mutant needs re-aiming", file=sys.stderr, flush=True)
+        sys.exit(2)
     with open(path, "w", encoding="utf-8") as handle:
         handle.write(text.replace(before, after))
     FAKE = path
@@ -6604,8 +6612,10 @@ def prepare_mutant(name):
     with open(path) as f:
         text = f.read()
     if text.count(before) != 1:
-        sys.exit(f"mutant {name}: the text to replace occurs {text.count(before)} times in "
-                 f"{file_name}, not once — the tree has moved and the mutant needs re-aiming")
+        print(f"mutant {name}: the control could not be performed — the text to replace "
+              f"occurs {text.count(before)} times in {file_name}, not once — the tree has "
+              f"moved and the mutant needs re-aiming", file=sys.stderr, flush=True)
+        sys.exit(2)
     with open(path, "w") as f:
         f.write(text.replace(before, after))
     print(f"  mutant {name}: {what}\n")
@@ -6674,6 +6684,15 @@ def main():
         harness, harness_error = build(sources, open(HARNESS_MAIN).read(), "harness", "harness")
         check("the harness builds against the same sources — `build.sh` is not used, it "
               "hard-codes the tree", harness is not None, harness_error or "")
+    mutant = args.mutant or args.fake_mutant
+    if mutant and (binary is None or (harness is None and any(
+            s.__name__.removeprefix("section_") in HARNESS_SECTIONS for s in sections))):
+        # Rule R (issue batch B13): an instrument that did not build performs
+        # no control, and is never read as a caught mutant.
+        print(f"\n{passed}/{passed + failed} checks passed in {time.time() - started:.0f} s")
+        print(f"mutant {mutant}: the control could not be performed — "
+              + ("the probe did not build" if binary is None else "the harness did not build"))
+        return 2
 
     for section in sections:
         if time.time() - started > args.wall:

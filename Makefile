@@ -28,8 +28,9 @@ rust:
 # the helper's `bun test` (agent/build.sh test) against one fixture file, no
 # network. `budget_proof.py` is P3's proofs' ledger and monthly budgets (spec
 # §11 P-6), over scratch ledgers only, no network. The last line checks the
-# menu inventory's sheet and modal sites against app/Sources, each found by
-# its token rather than its line; no app, no build.
+# menu inventory's sites against app/Sources, each found by its token and
+# enclosing function rather than its line, and its other citations by
+# anchor; no app, no build.
 test: rust
 	cd core && cargo test --release
 	cd graphic && cargo test --release

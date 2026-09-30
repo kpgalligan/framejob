@@ -38,8 +38,11 @@ probe".
     python3 tools/proof/assistant_lane_proof.py --mutant NAME
         # one of `MUTANTS` (one-queue → L10, no-env-fallback → L11,
         # mode-0755 → L12): the probe built over a copy of app/Sources with
-        # one text replaced, its one row run and expected to FAIL (exit 1);
-        # a copy that cannot be made or built exits 2. Not with --no-prepare.
+        # one text replaced, its one row run and expected to FAIL (exit 1;
+        # 0 when it survives). Exit 2 when the control could not be
+        # performed: a copy that cannot be made or built, or a probe that
+        # printed no such row (a crash, a timeout) — never read as caught.
+        # Not with --no-prepare.
 
 A probe that does not build is a scored FAIL (exit 1), never a skip. No app
 instance is launched, no media is used, and no key is read: every child gets
@@ -175,17 +178,20 @@ def mutant_sources(name):
     file, before, after, _ = MUTANTS[name]
     target = os.path.join(WORK, "mutants", name, "Sources")
     shutil.rmtree(target, ignore_errors=True)
-    os.makedirs(target)
-    for entry in sorted(os.listdir(SOURCES)):
-        if entry.endswith(".swift"):
-            shutil.copy2(os.path.join(SOURCES, entry), os.path.join(target, entry))
-    path = os.path.join(target, file)
-    text = open(path).read() if os.path.exists(path) else ""
-    count = text.count(before)
-    if count != 1:
-        return None, f"{file} holds {before!r} {count} times, not once"
-    with open(path, "w") as f:
-        f.write(text.replace(before, after))
+    try:
+        os.makedirs(target)
+        for entry in sorted(os.listdir(SOURCES)):
+            if entry.endswith(".swift"):
+                shutil.copy2(os.path.join(SOURCES, entry), os.path.join(target, entry))
+        path = os.path.join(target, file)
+        text = open(path).read() if os.path.exists(path) else ""
+        count = text.count(before)
+        if count != 1:
+            return None, f"{file} holds {before!r} {count} times, not once"
+        with open(path, "w") as f:
+            f.write(text.replace(before, after))
+    except OSError as error:
+        return None, f"the copy could not be made: {error}"
     return target, None
 
 
@@ -277,8 +283,8 @@ def main():
 
     results = []  # (id, ok, detail)
 
-    def score(row_id, ok, detail):
-        results.append((row_id, ok, detail))
+    def score(row_id, ok, detail, *, instrument=False):
+        results.append((row_id, ok, detail, instrument))
         print(f"{'PASS' if ok else 'FAIL'} {row_id}: {detail}", flush=True)
 
     if args.mutant:
@@ -333,32 +339,38 @@ def main():
           f"with AssistantSpend.swift's {ENSURE} put back to createDirectory(, S1's checker "
           f"fails {not m2_ok} ({m2_detail})")
 
-    passed = sum(1 for _, ok, _ in results if ok)
+    passed = sum(1 for _, ok, _, _ in results if ok)
     print(f"scores: {passed}/{len(results)} pass", flush=True)
     sys.exit(0 if passed == len(results) else 1)
 
 
 def run_mutant(name, score):
     """The mutant's one row, scored; 1 when it FAILS (the expected outcome),
-    0 when it survives, 2 when the copy could not be made or built."""
+    0 when it survives, 2 when the control could not be performed — the copy
+    could not be made or built, or the probe printed no such row (rule R,
+    issue batch B13)."""
     _, _, _, row_id = MUTANTS[name]
     prefix = f"(mutant {name}) "
     sources, why = mutant_sources(name)
     if sources is None:
-        print(f"mutant {name}: {why}", flush=True)
+        print(f"mutant {name}: the control could not be performed — {why}", flush=True)
         return 2
     binary, why = build_probe(sources, os.path.join(WORK, "mutants", name, "probe"))
     if binary is None:
-        print(f"mutant {name}: the probe did not build: {why}", flush=True)
+        print(f"mutant {name}: the control could not be performed — the probe did not "
+              f"build: {why}", flush=True)
         return 2
     answer, why = run_probe(binary, ["--rows", row_id],
                             runs=os.path.join(WORK, "mutants", name, "runs"))
     r = {r["id"]: r for r in (answer or {}).get("rows", [])}.get(row_id)
     if r is None:
-        score(row_id, False, prefix + f"no row: {why or 'the probe did not answer it'}")
-    else:
-        score(row_id, bool(r["ok"]), prefix + r["detail"])
-    failed = r is None or not r["ok"]
+        why = f"no row: {why or 'the probe did not answer it'}"
+        score(row_id, False, prefix + why, instrument=True)
+        print(f"mutant {name}: the control could not be performed — {row_id} {why}",
+              flush=True)
+        return 2
+    score(row_id, bool(r["ok"]), prefix + r["detail"])
+    failed = not r["ok"]
     print(f"mutant {name}: {row_id} {'FAILS (expected)' if failed else 'PASSES (survived)'}",
           flush=True)
     return 1 if failed else 0

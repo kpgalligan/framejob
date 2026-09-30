@@ -36,8 +36,11 @@ Launch C, K2: AI-13 — the override set and no `-RCSecretFolder`: the session
 The mutant copies the tree with `tree_copy.make_copy` into
 `work/assistant_session/mutant/tree`, deletes the `AgentLane.prepareAtLaunch()`
 line, runs `make app` there, and runs W against that app: the report must
-be `ok: false`, naming AI-3 (exit 1). A mutant that did not build could not
-perform the control (exit 2).
+be `ok: false`, naming AI-3 (exit 1; 0 when it survives). A mutant that did
+not build could not perform the control (exit 2), and so (rule R, issue
+batch B13) could one whose W was never scored or was scored by a caught
+exception or a failed setup: `mutant <name>: the control could not be
+performed — <why>`, exit 2.
 
 Prints `<ID> ok|FAIL — <detail>` per row, then `n/m`. An instrument that
 cannot run is a scored FAIL. Safety: every child's environment has
@@ -663,8 +666,8 @@ def main():
     os.makedirs(WORK, exist_ok=True)
     results = []
 
-    def score(row_id, ok, detail):
-        results.append((row_id, ok))
+    def score(row_id, ok, detail, *, instrument=False):
+        results.append((row_id, ok, instrument))
         print(f"{row_id} {'ok' if ok else 'FAIL'} — {detail}", flush=True)
 
     def guarded(row_id, function, *arguments):
@@ -672,7 +675,7 @@ def main():
             score(row_id, *function(*arguments))
         except Exception as error:  # noqa: BLE001 — an instrument that cannot run is a FAIL
             score(row_id, False, f"the instrument could not run: {type(error).__name__}: "
-                                 f"{error}")
+                                 f"{error}", instrument=True)
 
     fake = None
     try:
@@ -681,9 +684,9 @@ def main():
         if args.mutant:
             app, why = build_mutant()
             if app is None:
-                score("W", False, f"the mutant did not build: {why}")
-                print(f"0/1\nmutant {args.mutant}: the control could not be performed",
-                      flush=True)
+                score("W", False, f"the mutant did not build: {why}", instrument=True)
+                print(f"0/1\nmutant {args.mutant}: the control could not be performed — "
+                      f"the mutant did not build: {why}", flush=True)
                 return 2
             guarded("W", lambda: (lambda ok, d: (ok, "(no prepareAtLaunch) " + d))
                     (*row_w(app, fake, secrets)))
@@ -708,20 +711,30 @@ def main():
                 guarded("K1", row_k1, app)
             except Exception as error:  # noqa: BLE001
                 for row_id in ("A0", "T1", "T2", "R", "D", "E", "S", "X", "K1"):
-                    if row_id not in [r for r, _ in results]:
-                        score(row_id, False, f"launch A could not run: {error}")
+                    if row_id not in [r for r, _, _ in results]:
+                        score(row_id, False, f"launch A could not run: {error}",
+                              instrument=True)
             finally:
                 app.stop()
             guarded("W", row_w, release, fake, secrets)
             guarded("K2", row_k2, release, fake)
     except Exception as error:  # noqa: BLE001
-        score("setup", False, f"the instrument could not run: {type(error).__name__}: {error}")
+        score("setup", False, f"the instrument could not run: {type(error).__name__}: {error}",
+              instrument=True)
     finally:
         if fake is not None:
             fake.stop()
 
-    passed = sum(1 for _, ok in results if ok)
+    passed = sum(1 for _, ok, _ in results if ok)
     print(f"{passed}/{len(results)}", flush=True)
+    if args.mutant:
+        broken = [r for r, _, instrument in results if instrument]
+        why = ("W was never scored" if "W" not in [r for r, _, _ in results] else
+               f"scored as instrument failures: {', '.join(broken)}" if broken else "")
+        if why:
+            print(f"mutant {args.mutant}: the control could not be performed — {why}",
+                  flush=True)
+            return 2
     return 0 if passed == len(results) else 1
 
 

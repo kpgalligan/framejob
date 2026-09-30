@@ -14,20 +14,28 @@ not the sheet form `presentError(_:modalFor:…)`, which is not modal.
 
   I1  every leaf of `buildMainMenu()` (the probe's `menu` mode) has its
       selector in `selectors`, and every row there names a live selector;
-  I2  the grep's sites and `sites` are one-to-one, each line holding its token;
-      a site is FOUND BY ITS TOKEN, not its line (#166): `resolve` pairs the
-      inventory's sites with the grep's, per file and token, in line order,
-      whenever the two counts agree, so a line added above a site moves its
-      pin instead of failing it; where they disagree each pin stands as
-      written. Blind spot: a swap in one file and token (a site removed and
-      another added, the counts still agreeing) is absorbed by the pairing
-      and I2 reports neither, where the old line pins caught it;
-  I3  a `modal` selector cites a line holding a loop token, a `sheet` one a
-      sheet token (a cited site read at its resolved line); every cited line
-      (`code`, `via`, `gate`) exists; every
-      `reached_from` / `reached_after` selector names a row; a selector in the
-      `reached_from` of a `runModal` or loop-token site is `modal`
-      (`reached_after` never forces a verdict);
+  I2  the grep's sites and `sites` are one-to-one, each line holding its token
+      and lying in its entry's `func`; a site is FOUND BY ITS TOKEN AND ITS
+      ENCLOSING FUNCTION, not its line (#166, #168): `resolve` pairs the
+      inventory's sites with the grep's per (file, token, func) — `func` the
+      nearest `func NAME` or `init(` declaration at or above the line — in
+      line order, whenever the two counts agree, so a line added above a
+      site moves its pin instead of failing it; where they disagree each pin
+      stands as written. A site removed and another added in one file and
+      token no longer balance unless both are in one function, so a swap
+      across functions is reported (K4);
+  I3  every citation is checked for content (#168). A citation is a SITE ref,
+      `app/Sources/<F>.swift:<N>` naming a key of `sites` (read at its
+      resolved line), or an ANCHORED ref, ``app/Sources/<F>.swift `<anchor>` ``,
+      whose anchor is a piece of the line meant and occurs exactly once in
+      `<F>`. Each `code` item is exactly one citation; `note`, `via`, `gate`
+      and `other_caller` hold citations in prose; any other `<F>.swift:<N>`
+      is a problem, as is a line citation that is not a site, an anchor
+      missing or not unique, and a `reached_after` whose `via` cites nothing.
+      A `modal` selector cites a line holding a loop token, a `sheet` one a
+      sheet token; every `reached_from` / `reached_after` selector names a
+      row; a selector in the `reached_from` of a `runModal` or loop-token
+      site is `modal` (`reached_after` never forces a verdict);
   I4  the checker over a copy missing one selector and one site reports
       exactly those two.
 
@@ -37,10 +45,22 @@ not the sheet form `presentError(_:modalFor:…)`, which is not modal.
   K1  I2 and I3 over the tree have no problem (I1 needs the probe, so it is
       `v2_menu.py`'s H1); its detail lists the pins found at another line;
   K2  CONTROL: a copy of `app/Sources` with three blank lines put at the top
-      of every file that holds a site has no I2 or I3 problem;
+      of every file that holds a site or is cited by an anchor has no I2 or
+      I3 problem;
   K3  CONTROL: a fresh copy, the inventory's site keys first rewritten
       through `resolve`, then the line of the first rewritten site blanked:
-      the checker reports exactly that site under I2.
+      the checker reports exactly that site under I2;
+  K4  CONTROL: a fresh copy, the keys rewritten, the first site's line
+      blanked and `func b13Swap() { <that line> }` appended as the file's
+      last line — a swap in one file and token: I2 reports exactly that site
+      (its line does not hold its token) and the appended line (a grep site
+      missing from the inventory);
+  K5  CONTROL: the first anchored `code` citation (selectors sorted) with an
+      invisible U+2063 appended to its anchor: `check` reports exactly that
+      selector under I3 beyond the tree's own problems.
+
+Every control that writes into its copy calls `_forget(root)` after its last
+write and before its `check`, because `line_of` caches each file it reads.
 """
 
 import argparse
@@ -65,7 +85,9 @@ TOKEN_TEXT = {"presentAsSheet": "presentAsSheet", "beginSheetModal": "beginSheet
               "beginSheet": "beginSheet", "runModal": "runModal", "popUp": "popUp(positioning:",
               "nextEvent": "nextEvent(matching:", "runLoop": "RunLoop.",
               "presentError": "presentError("}
-REF = re.compile(r"(app/Sources/[\w+]+\.swift):(\d+)")
+FUNC = re.compile(r"\bfunc\s+([A-Za-z_]\w*)|(?:^|\s)(init)\s*[?!]?\s*[(<]")
+CITE = re.compile(r"(app/Sources/[\w+]+\.swift)(?::(\d+)| `([^`\n]+)`)")
+BARE = re.compile(r"(?<![\w/+])[\w+]+\.swift:\d+")
 VERDICTS = {"none", "sheet", "window", "modal", "framework"}
 
 
@@ -117,24 +139,58 @@ def line_of(ref, root=ROOT):
     return lines[n - 1]
 
 
-def refs(text):
-    return [f"{m.group(1)}:{m.group(2)}" for m in REF.finditer(text or "")]
+def _forget(root):
+    """Evict every `_lines` entry whose path is under `root`: a control that
+    wrote into its copy reads the files again."""
+    prefix = os.path.join(os.path.abspath(root), "")
+    for full in [k for k in _lines if k.startswith(prefix)]:
+        del _lines[full]
+
+
+def _file_lines(path, root=ROOT):
+    """Every line of `path` (under `root`) through `line_of`'s cache, or None."""
+    line_of(f"{path}:1", root)
+    return _lines.get(os.path.join(root, path))
+
+
+def enclosing_func(ref, root=ROOT):
+    """The name of the nearest line at or above `ref`'s that does not start
+    `//` and matches `FUNC` (`init` for an initializer); "" if none."""
+    path, number = ref.rsplit(":", 1)
+    for n in range(int(number), 0, -1):
+        line = line_of(f"{path}:{n}", root)
+        if line is None or line.strip().startswith("//"):
+            continue
+        match = FUNC.search(line)
+        if match:
+            return match.group(1) or match.group(2)
+    return ""
+
+
+def citations(text):
+    """(path, line, anchor) per `CITE` match in `text`: a site ref has a line
+    and no anchor, an anchored ref an anchor and no line."""
+    return [(m.group(1), int(m.group(2)) if m.group(2) else None, m.group(3))
+            for m in CITE.finditer(text or "")]
 
 
 def _line_number(ref):
     return int(ref.rsplit(":", 1)[1])
 
 
-def resolve(sites, grep):
+def resolve(sites, grep, root=ROOT):
     """{inventory site ref: current ref}. The inventory's sites are grouped
-    by (file, entry `token`) and the grep's by (file, grep token); where a
-    group's two counts agree they are paired in line order, and otherwise
-    each inventory ref maps to itself."""
+    by (file, entry `token`, entry `func`) and the grep's by (file, grep
+    token, `enclosing_func` under `root`); where a group's two counts agree
+    they are paired in line order, and otherwise each inventory ref maps to
+    itself."""
     ours, theirs = {}, {}
     for ref, entry in sites.items():
-        ours.setdefault((ref.rsplit(":", 1)[0], entry.get("token")), []).append(ref)
+        ours.setdefault((ref.rsplit(":", 1)[0], entry.get("token"), entry.get("func")),
+                        []).append(ref)
     for ref, token in grep.items():
-        theirs.setdefault((ref.rsplit(":", 1)[0], token), []).append(ref)
+        theirs.setdefault((ref.rsplit(":", 1)[0], token, enclosing_func(ref, root)),
+                          []).append(ref)
     mapping = {}
     for key, refs_here in ours.items():
         mine = sorted(refs_here, key=_line_number)
@@ -153,10 +209,38 @@ def check(inventory, leaves, grep, root=ROOT):
     problems = []
     selectors = inventory.get("selectors", {})
     sites = inventory.get("sites", {})
-    mapping = resolve(sites, grep)
+    mapping = resolve(sites, grep, root)
 
     def at(ref):
         return line_of(mapping.get(ref, ref), root)
+
+    def cited(path, number, anchor):
+        """(the line a citation means or None, why not): a site ref at its
+        resolved line, an anchored ref at the one line holding its anchor."""
+        if number is not None:
+            ref = f"{path}:{number}"
+            if ref not in sites:
+                return None, f"line citation {ref} is not a site"
+            line = at(ref)
+            return line, "" if line is not None else f"cited line {ref} does not exist"
+        lines = _file_lines(path, root)
+        if lines is None:
+            return None, f"anchor file {path} is missing"
+        count = "\n".join(lines).count(anchor)
+        if count != 1:
+            return None, f"anchor `{anchor}` occurs {count} times in {path}, not once"
+        return next(line for line in lines if anchor in line), ""
+
+    def prose(subject, text):
+        """Every citation in `text` resolves; no bare `<F>.swift:<N>` outside one."""
+        spans = [m.span() for m in CITE.finditer(text or "")]
+        for m in BARE.finditer(text or ""):
+            if not any(a <= m.start() and m.end() <= b for a, b in spans):
+                problems.append(("I3", subject, f"bare citation {m.group(0)}"))
+        for path, number, anchor in citations(text):
+            _, why = cited(path, number, anchor)
+            if why:
+                problems.append(("I3", subject, why))
 
     # I1
     if leaves is None:
@@ -180,21 +264,34 @@ def check(inventory, leaves, grep, root=ROOT):
             problems.append(("I2", ref, f"line does not hold its token {token}"))
         elif now in grep and grep[now] != token:
             problems.append(("I2", ref, f"token {token}, the grep says {grep[now]}"))
+        func = entry.get("func")
+        if not isinstance(func, str):
+            problems.append(("I2", ref, f"func {func!r} is not a string"))
+        elif line is not None and enclosing_func(now, root) != func:
+            problems.append(("I2", ref, f"in func {enclosing_func(now, root)!r}, not {func!r}"))
     # I3
     for sel, row in selectors.items():
         verdict = row.get("verdict")
         if verdict not in VERDICTS:
             problems.append(("I3", sel, f"verdict {verdict!r}"))
-        cited = [at(r) or "" for r in row.get("code", [])]
+        lines = []
+        for item in row.get("code", []):
+            match = CITE.fullmatch(item)
+            if not match:
+                problems.append(("I3", sel, f"code item {item!r} is not one citation"))
+                continue
+            line, _ = cited(match.group(1), int(match.group(2)) if match.group(2) else None,
+                            match.group(3))
+            lines.append(line or "")
         if verdict == "modal" and not any(
-                any(TOKEN_TEXT[t] in c for t in LOOP_TOKENS) for c in cited):
+                any(TOKEN_TEXT[t] in c for t in LOOP_TOKENS) for c in lines):
             problems.append(("I3", sel, "modal, but no cited line holds a loop token"))
         if verdict == "sheet" and not any(
-                any(TOKEN_TEXT[t] in c for t in SHEET_TOKENS) for c in cited):
+                any(TOKEN_TEXT[t] in c for t in SHEET_TOKENS) for c in lines):
             problems.append(("I3", sel, "sheet, but no cited line holds a sheet token"))
-        for r in row.get("code", []):
-            if not REF.fullmatch(r) or at(r) is None:
-                problems.append(("I3", sel, f"cited line {r} does not exist"))
+        for item in row.get("code", []):
+            prose(sel, item)
+        prose(sel, row.get("note"))
     for ref, entry in sites.items():
         for sel in entry.get("reached_from", []):
             if sel not in selectors:
@@ -205,11 +302,11 @@ def check(inventory, leaves, grep, root=ROOT):
         for after in entry.get("reached_after", []):
             if after.get("selector") not in selectors:
                 problems.append(("I3", ref, f"reached_after {after.get('selector')} names no row"))
-            for r in refs(after.get("via")) + refs(after.get("gate")):
-                if at(r) is None:
-                    problems.append(("I3", ref, f"cited line {r} does not exist"))
-            if not refs(after.get("via")):
-                problems.append(("I3", ref, "reached_after has no via line"))
+            prose(ref, after.get("via"))
+            prose(ref, after.get("gate"))
+            if not citations(after.get("via")):
+                problems.append(("I3", ref, "reached_after has no via citation"))
+        prose(ref, entry.get("other_caller"))
     return problems
 
 
@@ -324,11 +421,34 @@ def _pairs(problems, wanted=("I2", "I3")):
     return [(c, s, why) for c, s, why in problems if c in wanted]
 
 
+def _anchored_files(inventory):
+    """Every `app/Sources/<F>.swift` an anchored citation names."""
+    texts = []
+    for row in inventory.get("selectors", {}).values():
+        texts += list(row.get("code", [])) + [row.get("note") or ""]
+    for entry in inventory.get("sites", {}).values():
+        texts.append(entry.get("other_caller") or "")
+        for after in entry.get("reached_after", []):
+            texts += [after.get("via") or "", after.get("gate") or ""]
+    return {path for text in texts for path, _, anchor in citations(text) if anchor}
+
+
+def _rewritten(inventory, sites, copied, root):
+    """The inventory with its site keys rewritten through `resolve` over the
+    copy (read before any write into it)."""
+    mapping = resolve(sites, grep_sites(copied), root)
+    rewritten = copy.deepcopy(inventory)
+    rewritten["sites"] = {mapping[ref]: entry for ref, entry in sites.items()}
+    return rewritten
+
+
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="the menu inventory's sheet and modal "
-                                                 "sites against app/Sources, by token")
+    parser = argparse.ArgumentParser(description="the menu inventory's sites, found by token "
+                                                 "and enclosing function, and its other "
+                                                 "citations, found by anchor, against "
+                                                 "app/Sources")
     parser.add_argument("--check", action="store_true",
-                        help="K1–K3 in a fresh work/inventory_check/")
+                        help="K1–K5 in a fresh work/inventory_check/")
     arguments = parser.parse_args(argv)
     if not arguments.check:
         parser.print_help()
@@ -370,13 +490,17 @@ def main(argv=None):
     try:
         root = _copy_sources(os.path.join(work, "k2"))
         copied = os.path.join(root, "app", "Sources")
-        holding = sorted({ref.rsplit(":", 1)[0].rsplit("/", 1)[1] for ref in grep_sites(copied)})
+        holding = sorted({ref.rsplit(":", 1)[0].rsplit("/", 1)[1] for ref in grep_sites(copied)}
+                         | {path.rsplit("/", 1)[1] for path in _anchored_files(inventory)})
         for name in holding:
             path = os.path.join(copied, name)
+            if not os.path.exists(path):
+                continue
             with open(path, encoding="utf-8") as f:
                 text = f.read()
             with open(path, "w", encoding="utf-8") as f:
                 f.write("\n\n\n" + text)
+        _forget(root)
         found = _pairs(check(inventory, None, grep_sites(copied), root=root))
         row("K2", not found,
             f"CONTROL: three lines put at the top of {len(holding)} files: "
@@ -390,9 +514,7 @@ def main(argv=None):
     try:
         root = _copy_sources(os.path.join(work, "k3"))
         copied = os.path.join(root, "app", "Sources")
-        mapping = resolve(sites, grep_sites(copied))
-        rewritten = copy.deepcopy(inventory)
-        rewritten["sites"] = {mapping[ref]: entry for ref, entry in sites.items()}
+        rewritten = _rewritten(inventory, sites, copied, root)
         first = sorted(rewritten["sites"])[0]
         path, number = first.rsplit(":", 1)
         full = os.path.join(root, path)
@@ -401,12 +523,74 @@ def main(argv=None):
         lines[int(number) - 1] = ""
         with open(full, "w", encoding="utf-8") as f:
             f.write("\n".join(lines))
+        _forget(root)
         reported = {(c, s) for c, s, _ in check(rewritten, None, grep_sites(copied), root=root)
                     if c == "I2"}
         row("K3", reported == {("I2", first)},
             f"CONTROL: {first} blanked; I2 reported {sorted(reported)}")
     except Exception as error:
         row("K3", False, f"the control raised {error!r}")
+
+    # K4 (CONTROL): a swap in one file and token, across functions.
+    try:
+        root = _copy_sources(os.path.join(work, "k4"))
+        copied = os.path.join(root, "app", "Sources")
+        rewritten = _rewritten(inventory, sites, copied, root)
+        first = sorted(rewritten["sites"])[0]
+        path, number = first.rsplit(":", 1)
+        full = os.path.join(root, path)
+        with open(full, encoding="utf-8") as f:
+            lines = f.read().split("\n")
+        moved_text = lines[int(number) - 1].strip()
+        lines[int(number) - 1] = ""
+        swap = f"func b13Swap() {{ {moved_text} }}"
+        if lines and lines[-1] == "":
+            lines[-1:] = [swap, ""]
+            appended = f"{path}:{len(lines) - 1}"
+        else:
+            lines.append(swap)
+            appended = f"{path}:{len(lines)}"
+        with open(full, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines))
+        _forget(root)
+        found = [(s, why) for c, s, why in check(rewritten, None, grep_sites(copied), root=root)
+                 if c == "I2"]
+        subjects = {s for s, _ in found}
+        first_whys = [why for s, why in found if s == first]
+        appended_whys = [why for s, why in found if s == appended]
+        ok = (subjects == {first, appended}
+              and any(why.startswith("line does not hold its token") for why in first_whys)
+              and appended_whys == ["grep site missing from inventory"])
+        row("K4", ok, f"CONTROL: {first} blanked and its line appended as {appended} in "
+                      f"`func b13Swap`; I2 reported "
+                      + ("; ".join(f"({s}, {why})" for s, why in sorted(found)) or "nothing"))
+    except Exception as error:
+        row("K4", False, f"the control raised {error!r}")
+
+    # K5 (CONTROL): an anchor that no longer occurs.
+    try:
+        target = None
+        for sel in sorted(inventory.get("selectors", {})):
+            for index, item in enumerate(inventory["selectors"][sel].get("code", [])):
+                match = CITE.fullmatch(item)
+                if match and match.group(3):
+                    target = (sel, index, match)
+                    break
+            if target:
+                break
+        if target is None:
+            row("K5", False, "CONTROL: no anchored `code` citation to alter")
+        else:
+            sel, index, match = target
+            altered = copy.deepcopy(inventory)
+            altered["selectors"][sel]["code"][index] = f"{match.group(1)} `{match.group(3)}\u2063`"
+            baseline = {(c, s) for c, s, _ in check(inventory, None, grep)}
+            found = {(c, s) for c, s, _ in check(altered, None, grep)} - baseline
+            row("K5", found == {("I3", sel)},
+                f"CONTROL: {sel}'s anchor `{match.group(3)}` given a U+2063; the checker "
+                f"reported {sorted(found)} beyond the tree's own")
+    except Exception as error:
+        row("K5", False, f"the control raised {error!r}")
 
     print(f"{sum(rows)}/{len(rows)}")
     return 0 if all(rows) else 1

@@ -27,7 +27,12 @@
     python3 tools/proof/prices_proof.py --mutant reduce-disagrees  # R with the expected opus
                                                                    # input +1: R FAILs (exit 1)
 
-An instrument that cannot run is a scored FAIL, never a skip. Every child
+An instrument that cannot run is a scored FAIL, never a skip. A mutant run
+exits 1 when a row failed (caught) and 0 when every row passed (it
+survived); by rule R (issue batch B13) it exits 2 instead, printing `mutant
+<name>: the control could not be performed — <why>`, when any row was scored
+where its own comparison did not run: an instrument that could not run, T
+with no JUnit report, A with no cases read or no JUnit report. Every child
 runs under a wall in its own process group (graphics_spike/bounded.py) with
 `RC_ASSEMBLYAI_KEY` and `ANTHROPIC_API_KEY` popped from its environment.
 """
@@ -164,8 +169,8 @@ def main():
     args = parser.parse_args()
     results = []  # (id, ok, detail)
 
-    def score(row_id, ok, detail):
-        results.append((row_id, ok, detail))
+    def score(row_id, ok, detail, *, instrument=False):
+        results.append((row_id, ok, detail, instrument))
         print(f"{'PASS' if ok else 'FAIL'} {row_id}: {detail}", flush=True)
 
     # C: the cases through the Python reader.
@@ -194,13 +199,15 @@ def main():
             score(f"C:{case['name']}", ok, ("(cache_read doubled) " if args.mutant ==
                                             "py-disagrees" else "") + detail)
     except Exception as error:  # noqa: BLE001
-        score("C", False, f"the instrument could not run: {type(error).__name__}: {error}")
+        score("C", False, f"the instrument could not run: {type(error).__name__}: {error}",
+              instrument=True)
 
     # K: the committed table.
     try:
         score("K", *committed())
     except Exception as error:  # noqa: BLE001
-        score("K", False, f"the instrument could not run: {type(error).__name__}: {error}")
+        score("K", False, f"the instrument could not run: {type(error).__name__}: {error}",
+              instrument=True)
 
     # T: bun test, through build.sh.
     tests = None
@@ -224,15 +231,16 @@ def main():
                      else "no JUnit report"))
         if ran["rc"] != 0 and tests is None:
             detail += "; " + (ran["stderr"].strip().splitlines() or ["(no stderr)"])[-1][:160]
-        score("T", ok, label + detail)
+        score("T", ok, label + detail, instrument=tests is None)
     except Exception as error:  # noqa: BLE001
-        score("T", False, f"the instrument could not run: {type(error).__name__}: {error}")
+        score("T", False, f"the instrument could not run: {type(error).__name__}: {error}",
+              instrument=True)
 
     # A: both readers pass every case.
     if not names:
-        score("A", False, "no cases were read")
+        score("A", False, "no cases were read", instrument=True)
     elif tests is None:
-        score("A", False, "no JUnit report to compare against")
+        score("A", False, "no JUnit report to compare against", instrument=True)
     else:
         missing = [n for n in names if f"case: {n}" not in tests]
         ts_bad = [n for n in names if tests.get(f"case: {n}") is False]
@@ -263,10 +271,16 @@ def main():
                       f"{m}: got {got.get(m)}, expected {want.get(m)}" for m in differs)))
         score("R", ok, label + detail)
     except Exception as error:  # noqa: BLE001
-        score("R", False, f"the instrument could not run: {type(error).__name__}: {error}")
+        score("R", False, f"the instrument could not run: {type(error).__name__}: {error}",
+              instrument=True)
 
-    passed = sum(1 for _, ok, _ in results if ok)
+    passed = sum(1 for _, ok, _, _ in results if ok)
     print(f"scores: {passed}/{len(results)} pass", flush=True)
+    broken = [row_id for row_id, _, _, instrument in results if instrument]
+    if args.mutant and broken:
+        print(f"mutant {args.mutant}: the control could not be performed — scored as "
+              f"instrument failures: {', '.join(broken)}", flush=True)
+        return 2
     return 0 if passed == len(results) else 1
 
 

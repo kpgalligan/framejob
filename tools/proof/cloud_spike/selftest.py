@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Road map 6, spike C0 — `--selftest`: seven checks, free, before a paid call.
+"""Road map 6, spike C0 — `--selftest`: eight checks, free, before a paid call.
 
 `python3 tools/proof/cloud_spike/cloud_spike.py --selftest` works in a
 `tempfile.mkdtemp()` work root of its own and NEVER opens the real
@@ -7,7 +7,7 @@
 the pair guard in `aai.Client` is what makes that safe: the real key cannot be
 sent to a loopback base and the dummy cannot be sent to AssemblyAI.
 
-The seven, each of which was broken on purpose once and seen to fail before it
+The eight, each of which was broken on purpose once and seen to fail before it
 was trusted (`tools/proof/README.md` names which line was broken for each):
 
   a  the paid code path end to end against the fake — the header, the models,
@@ -22,6 +22,11 @@ was trusted (`tools/proof/README.md` names which line was broken for each):
      its `measured` behind with `cleanup_blocked: true`
   g  the pause-crossing detector, the budget, and a keyless run that SKIPS the
      five paid rows by name and exits 2
+  h  (#170) a lost submit whose found transcript's DELETE fails stays owed:
+     `call` answers `lost reply — find_own: delete_failed` with the
+     reservation still in `lost()` and nothing deleted; `settle` at the same
+     500 answers `delete_failed` and keeps it there; `settle` once DELETE
+     works closes it `deleted` — on a ledger of its own, `ledger-h.json`
 """
 
 import contextlib
@@ -240,6 +245,40 @@ def g_detector_budget_and_skips(work):
     check("SPIKE INCOMPLETE" in child.stdout, "1g and says SPIKE INCOMPLETE")
 
 
+def h_failed_delete_stays_owed(work):
+    server = fake_module.Fake()
+    base = server.start()
+    scrub = aai.Scrubber([aai.SELFTEST_KEY])
+    client = aai.Client(base, aai.SELFTEST_KEY, scrub)
+    ledger = aai.Ledger(os.path.join(work, "ledger-h.json"), aai.Scrubber(list(scrub.secrets)))
+    server.drop_submit_reply = True
+    server.delete_status = 500
+    captured = io.StringIO()
+    with contextlib.redirect_stdout(captured):
+        answer = cloud_rows.call(client, ledger, scrub, "selftest", "lost-h",
+                                 os.path.join(work, "fixtures", "speech.wav"), 1.0, {})
+    rid = answer["rid"]
+    owed = [entry[0] for entry in ledger.lost()]
+    check(answer.get("outcome") == "lost reply — find_own: delete_failed",
+          "1h a lost submit whose DELETE answers 500 is `lost reply — find_own: delete_failed`")
+    check(rid in owed and not server.deleted,
+          "1h and its reservation is still in lost(), with nothing deleted")
+    said = []
+    first = cloud_rows.settle(client, ledger, scrub, "proven", said.append)
+    owed = [entry[0] for entry in ledger.lost()]
+    check(first == {"delete_failed": 1} and rid in owed,
+          "1h settle at the same 500 answers delete_failed and keeps it in lost()")
+    server.delete_status = None
+    second = cloud_rows.settle(client, ledger, scrub, "proven", said.append)
+    row = ledger.reservations()[rid]
+    transcripts = [tid for tid, t in server.transcripts.items()
+                   if t["audio_url"] == row.get("upload_url")]
+    server.stop()
+    check(second == {"deleted": 1} and row.get("outcome") == "deleted"
+          and transcripts and all(tid in server.deleted for tid in transcripts),
+          "1h settle once DELETE works closes it deleted, the transcript gone")
+
+
 def run():
     work = tempfile.mkdtemp(prefix="cloud-spike-selftest-")
     started = time.monotonic()
@@ -248,7 +287,8 @@ def run():
     with open(os.path.join(work, "answers.json"), "w") as handle:
         handle.write("{}")
     for step in (a_round_trip, b_pair_guard, c_no_redirect, d_lost_reply,
-                 e_remake_keeps_the_ledger, f_bounded, g_detector_budget_and_skips):
+                 e_remake_keeps_the_ledger, f_bounded, g_detector_budget_and_skips,
+                 h_failed_delete_stays_owed):
         print(f"{step.__name__.split('_')[0]} —")
         step(work)
     passed = sum(1 for ok, _ in CHECKS if ok)

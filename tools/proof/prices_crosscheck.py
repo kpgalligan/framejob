@@ -19,7 +19,12 @@ with the page's, after `round(…, 6)`; a mismatch is named
     python3 tools/proof/prices_crosscheck.py --mutant page   # the "Claude Fable 5.1" line
                                                              # deleted: X2 FAILs (exit 1)
 
-An instrument that cannot run is a scored FAIL, never a skip.
+An instrument that cannot run is a scored FAIL, never a skip. A mutant run
+exits 1 when a row failed (caught) and 0 when none did (it survived); by
+rule R (issue batch B13) it exits 2 instead, printing `mutant <name>: the
+control could not be performed — <why>`, when any row was scored where its
+own comparison did not run — X0's except (the page not fetched), the table
+unread, no page rows, X1/X2's except.
 """
 
 import argparse
@@ -124,8 +129,8 @@ def main():
     args = parser.parse_args()
     results = []
 
-    def score(row_id, ok, detail):
-        results.append((row_id, ok, detail))
+    def score(row_id, ok, detail, *, instrument=False):
+        results.append((row_id, ok, detail, instrument))
         print(f"{'PASS' if ok else 'FAIL'} {row_id}: {detail}", flush=True)
 
     page = None
@@ -147,7 +152,7 @@ def main():
                          + (f"; {ignored} unparsed cell(s) in rows not compared, ignored"
                             if ignored else "")))
     except Exception as error:  # noqa: BLE001 — an instrument that cannot run is a FAIL
-        score("X0", False, f"{PAGE}: {type(error).__name__}: {error}")
+        score("X0", False, f"{PAGE}: {type(error).__name__}: {error}", instrument=True)
 
     table = None
     try:
@@ -157,11 +162,12 @@ def main():
     except Exception as error:  # noqa: BLE001
         why = f"the table could not be read: {type(error).__name__}: {error}"
         for row_id, _, _ in PAIRS:
-            score(row_id, False, why)
+            score(row_id, False, why, instrument=True)
     if table is not None:
         for row_id, model, name in PAIRS:
             if not page:
-                score(row_id, False, f"{model}: no page rows to compare against")
+                score(row_id, False, f"{model}: no page rows to compare against",
+                      instrument=True)
                 continue
             try:
                 label = "(opus cache_read 0.21 in memory) " if (
@@ -172,12 +178,17 @@ def main():
                 score(row_id, ok, label + detail)
             except Exception as error:  # noqa: BLE001
                 score(row_id, False, f"the instrument could not run: "
-                                     f"{type(error).__name__}: {error}")
+                                     f"{type(error).__name__}: {error}", instrument=True)
 
     print(f"table: LiteLLM {table.get('litellm_commit') if table else '?'} "
           f"({table.get('litellm_commit_date') if table else '?'})", flush=True)
-    passed = sum(1 for _, ok, _ in results if ok)
+    passed = sum(1 for _, ok, _, _ in results if ok)
     print(f"scores: {passed}/{len(results)} pass", flush=True)
+    broken = [row_id for row_id, _, _, instrument in results if instrument]
+    if args.mutant and broken:
+        print(f"mutant {args.mutant}: the control could not be performed — scored as "
+              f"instrument failures: {', '.join(broken)}", flush=True)
+        return 2
     return 0 if passed == len(results) else 1
 
 

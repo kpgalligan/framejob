@@ -44,7 +44,9 @@ The Release app (`assistant_session_proof`'s `App`, `Fake`, `secret_folder`;
 A mutant runs the probe rows only, over a copy of `app/Sources`, and exits 1
 when every row it names FAILs (the mutant is caught), 3 when one passed (it
 survived, never confused with a clean run's 0) and 2 when its literal is not found exactly once or its probe did
-not build (the control could not be performed). Prints `<ID> ok|FAIL —
+not build (the control could not be performed) — and, by rule R (issue batch
+B13), when a row it names was never scored or any row was scored "no row"
+(a probe that printed none), which is never counted as caught. Prints `<ID> ok|FAIL —
 <detail>` per row, then `n/m`. An instrument that cannot run is a scored
 FAIL. No network, no key but the dummy `proof-key`; every child has
 `ANTHROPIC_API_KEY` and `RC_ASSEMBLYAI_KEY` popped. Rule H: only this
@@ -321,10 +323,13 @@ def rows_probe(score, sources=None, label=""):
     atp.PROBE_DIR = probe_dir
     atp.PROBE_SWIFT = PROBE_SWIFT
     atp.SOURCES = sources or os.path.join(ROOT, "app", "Sources")
-    binary, why = atp.build_probe()
+    # Passed, not left to the defaults: `build_probe`'s defaults were bound
+    # when assistant_tab_proof was imported, so the two assignments above do
+    # not reach them (issue batch B13).
+    binary, why = atp.build_probe(atp.SOURCES, probe_dir)
     if binary is None:
         for row_id in PROBE_ROWS:
-            score(row_id, False, f"the probe did not build: {why}")
+            score(row_id, False, f"the probe did not build: {why}", instrument=True)
         return False
     scratch = os.path.join(WORK, "probe-scratch")
     shutil.rmtree(scratch, ignore_errors=True)
@@ -340,7 +345,7 @@ def rows_probe(score, sources=None, label=""):
         r = got.get(row_id)
         if r is None:
             score(row_id, False, f"no row (exit {ran['rc']}, expired {ran['expired']}): "
-                                 f"{ran['stderr'].strip()[-300:]}")
+                                 f"{ran['stderr'].strip()[-300:]}", instrument=True)
         else:
             score(row_id, bool(r["ok"]), label + r["detail"])
     return True
@@ -353,14 +358,18 @@ def mutant_sources(name):
     base = os.path.join(WORK, name)
     shutil.rmtree(base, ignore_errors=True)
     sources = os.path.join(base, "Sources")
-    shutil.copytree(os.path.join(ROOT, "app", "Sources"), sources)
-    path = os.path.join(sources, "AssistantSpendMonth.swift")
-    with open(path) as f:
-        text = f.read()
-    if text.count(old) != 1:
-        return None, f"`{old}` occurs {text.count(old)} times in AssistantSpendMonth.swift, not once"
-    with open(path, "w") as f:
-        f.write(text.replace(old, new))
+    try:
+        shutil.copytree(os.path.join(ROOT, "app", "Sources"), sources)
+        path = os.path.join(sources, "AssistantSpendMonth.swift")
+        with open(path) as f:
+            text = f.read()
+        if text.count(old) != 1:
+            return None, (f"`{old}` occurs {text.count(old)} times in "
+                          "AssistantSpendMonth.swift, not once")
+        with open(path, "w") as f:
+            f.write(text.replace(old, new))
+    except OSError as error:
+        return None, f"the copy could not be made: {error}"
     return sources, None
 
 
@@ -375,22 +384,30 @@ def main():
     os.makedirs(WORK, exist_ok=True)
     results = []
 
-    def score(row_id, ok, detail):
-        results.append((row_id, ok))
+    def score(row_id, ok, detail, *, instrument=False):
+        results.append((row_id, ok, instrument))
         print(f"{row_id} {'ok' if ok else 'FAIL'} — {detail}", flush=True)
 
     if args.mutant:
         old, new, named = MUTANTS[args.mutant]
         sources, why = mutant_sources(args.mutant)
         built = sources is not None and rows_probe(score, sources, f"({old} → {new}) ")
-        passed = sum(1 for _, ok in results if ok)
+        passed = sum(1 for _, ok, _ in results if ok)
         print(f"{passed}/{len(results)}", flush=True)
         if not built:
-            if sources is None:
-                print(why, flush=True)
-            print(f"mutant {args.mutant}: the control could not be performed", flush=True)
+            print(f"mutant {args.mutant}: the control could not be performed — "
+                  + (why if sources is None else "the probe did not build"), flush=True)
             return 2
-        failed = {row_id for row_id, ok in results if not ok}
+        scored = {row_id: instrument for row_id, _, instrument in results}
+        unscored = [row_id for row_id in named if row_id not in scored]
+        broken = [row_id for row_id, instrument in scored.items() if instrument]
+        if unscored or broken:
+            print(f"mutant {args.mutant}: the control could not be performed — "
+                  + "; ".join(([f"never scored: {', '.join(unscored)}"] if unscored else [])
+                              + ([f"no row: {', '.join(broken)}"] if broken else [])),
+                  flush=True)
+            return 2
+        failed = {row_id for row_id, ok, _ in results if not ok}
         caught = all(row_id in failed for row_id in named)
         print(f"mutant {args.mutant}: {', '.join(named)} "
               f"{'all FAIL — caught' if caught else 'did not all FAIL — it SURVIVED'}",
@@ -414,7 +431,7 @@ def main():
         if fake is not None:
             fake.stop()
 
-    passed = sum(1 for _, ok in results if ok)
+    passed = sum(1 for _, ok, _ in results if ok)
     print(f"{passed}/{len(results)}", flush=True)
     return 0 if passed == len(results) else 1
 

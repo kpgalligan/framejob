@@ -133,10 +133,10 @@ def settle(client, ledger, scrub, say):
     for rid, url, _ in ledger.lost():
         status, ids = client.find_own({url})
         if ids:
-            for found in ids:
-                client.delete(found)
-            ledger.closed(rid, "deleted", status)
-            counts["deleted"] = counts.get("deleted", 0) + 1
+            # Closed `deleted` only when every DELETE answered 2xx; else left
+            # in `lost()` for the next settle (#170).
+            answer = cloud_rows.delete_found(client, ledger, rid, ids)
+            counts[answer] = counts.get(answer, 0) + 1
         else:
             ledger.closed(rid, "unresolved", status)
             counts["unresolved"] = counts.get("unresolved", 0) + 1

@@ -48,7 +48,11 @@ Each directive is asserted to occur exactly once in the tree's `Makefile`.
 Under `--mutant no-unexport` the AssemblyAI directive is removed in the
 COPY and its row FAILS; under `--mutant no-unexport-anthropic` the
 Anthropic one is, and that row FAILS. Those are the CONTROLS that this
-instrument can see a leak of either key at all.
+instrument can see a leak of either key at all. A mutant run exits 1 when a
+row failed (caught) and 0 when none did (it survived); a copy that could
+not be made or a build that failed performs no control and exits 2 (rule R,
+issue batch B13), printing `mutant <name>: the control could not be
+performed — <why>`. Without `--mutant` either is a scored FAIL, exit 1.
 """
 
 import argparse
@@ -196,7 +200,7 @@ def main():
     if root is None:
         check("the tree copy is made and the directive is where it is expected", False, reason)
         print(f"\n{passed}/{passed + failed} checks passed in {time.time() - started:.0f} s")
-        return 1
+        return not_performed(arguments.mutant, reason)
 
     binary, reason = build(root, arguments.wall)
     check("the copy's `make app` built Reelcut.app's binary — a failed build holds nothing, "
@@ -204,7 +208,7 @@ def main():
           binary is not None, reason or "")
     if binary is None:
         print(f"\n{passed}/{passed + failed} checks passed in {time.time() - started:.0f} s")
-        return 1
+        return not_performed(arguments.mutant, reason)
 
     found, scanned = holders(root)
     for one in KEYS:
@@ -215,6 +219,16 @@ def main():
 
     print(f"\n{passed}/{passed + failed} checks passed in {time.time() - started:.0f} s")
     return 0 if failed == 0 else 1
+
+
+def not_performed(mutant, reason):
+    """A copy or build that failed: 2 under `--mutant` (rule R, issue batch
+    B13 — the control could not be performed), the scored FAIL's 1 without."""
+    if not mutant:
+        return 1
+    print(f"mutant {mutant}: the control could not be performed — "
+          f"{((reason or '').strip().splitlines() or ['no reason given'])[0]}")
+    return 2
 
 
 if __name__ == "__main__":

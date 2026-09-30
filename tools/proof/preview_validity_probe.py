@@ -248,10 +248,12 @@ case "ranges":
     answer["planDuration"] = plan.duration
     answer["durationEqualsPlanEnd"] = duration == planEnd
 
-    // 1. The plan's own ranges installed on a copy of the built composition.
+    // 1. The plan's own ranges installed on a copy of the built composition:
+    // the builder's configuration with one field changed, #91's way (no
+    // mutableCopy), as `Playback.previewComposition` changes its size.
     let installed = built.videoComposition.instructions.compactMap { $0 as? RecipeInstruction }
-    let plain = built.videoComposition.mutableCopy() as! AVMutableVideoComposition
-    plain.instructions = zip(installed, planRanges(plan)).map { instruction, range in
+    var planConfiguration = built.videoConfiguration
+    planConfiguration.instructions = zip(installed, planRanges(plan)).map { instruction, range in
         RecipeInstruction(
             timeRange: range,
             requiredTrackIDs: (instruction.requiredSourceTrackIDs ?? []).map { ($0 as! NSNumber).intValue },
@@ -259,6 +261,7 @@ case "ranges":
             sourceOrientations: instruction.sourceOrientations,
             missingClips: instruction.missingClips)
     }
+    let plain = AVVideoComposition(configuration: planConfiguration)
     answer["planRanges"] = validity(plain, built.composition)
 
     // 2. What the builder installed.

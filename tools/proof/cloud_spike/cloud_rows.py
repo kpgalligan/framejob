@@ -9,7 +9,8 @@ before the first poll (so a crashed run knows what to delete), the billed
 what became of it. `settle` is what reads that back at the start and the end
 of a run: it DELETEs what is undeleted, and for an upload whose submit never
 answered it asks `find_own` — one page of the list, matched only against an
-upload URL this ledger recorded — and deletes what comes back.
+upload URL this ledger recorded — and deletes what comes back, closing the
+reservation only when every DELETE answered 2xx (`record_delete`).
 """
 
 import os
@@ -44,8 +45,10 @@ def call(client, ledger, scrub, row, label, path, planned, options,
         submitted = client.submit(url, **options)
     except aai.TransportError as error:
         out["submit"] = {"transport_error": scrub.clean(str(error))}
-        out["outcome"] = "lost reply — recovered by find_own at once"
-        recover(client, ledger, scrub, rid, url, "proven")
+        # What `recover` answered, not a fixed "recovered": a found transcript
+        # whose DELETE failed stays owed (#170).
+        answer = recover(client, ledger, scrub, rid, url, "proven")
+        out["outcome"] = f"lost reply — find_own: {answer}"
         return out
     out["submit"] = {"status": submitted.status, "seconds": round(submitted.seconds, 3)}
     if submitted.status != 200:
@@ -96,26 +99,35 @@ def call(client, ledger, scrub, row, label, path, planned, options,
     return out
 
 
-def record_delete(ledger, rid, reply):
-    """What a single transcript's DELETE got, in the ledger (#82).
+def record_delete(ledger, rid, reply, *more):
+    """What a reservation's DELETEs got, in the ledger (#82, #170).
 
-    A 2xx closes the reservation `deleted` with its status. Anything else
-    leaves it OPEN, so `undeleted()` still owes it and the next `settle`
-    retries it, and answers `delete_failed`."""
-    if 200 <= reply.status < 300:
-        ledger.closed(rid, "deleted", reply.status)
+    One reply per transcript DELETEd for it. When every one is 2xx the
+    reservation closes `deleted` with the last reply's status. Anything else
+    leaves it OPEN, so `undeleted()` (or, for a lost submit, `lost()`) still
+    owes it and the next `settle` retries it, and answers `delete_failed`."""
+    replies = (reply,) + more
+    if all(200 <= each.status < 300 for each in replies):
+        ledger.closed(rid, "deleted", replies[-1].status)
         return "deleted"
     return "delete_failed"
 
 
+def delete_found(client, ledger, rid, ids):
+    """A lost submit's transcripts, found by `find_own`, DELETEd — every id,
+    even after one failed — and recorded through `record_delete` (#170): the
+    reservation closes `deleted` only when every DELETE answered 2xx."""
+    replies = [client.delete(found) for found in ids]
+    return record_delete(ledger, rid, *replies)
+
+
 def recover(client, ledger, scrub, rid, url, list_match, uploaded_at=None):
-    """An upload whose submit was lost: find it by ITS OWN url, delete it."""
+    """An upload whose submit was lost: find it by ITS OWN url, delete it.
+    A found transcript whose DELETE failed answers `delete_failed` and leaves
+    the reservation in `lost()`, for the next `settle` (#170)."""
     status, ids = client.find_own({url})
     if ids:
-        for found in ids:
-            client.delete(found)
-        ledger.closed(rid, "deleted", status)
-        return "deleted"
+        return delete_found(client, ledger, rid, ids)
     young = uploaded_at is not None and (time.time() - uploaded_at) < 60
     if list_match == "proven" and status == 200 and not young:
         ledger.closed(rid, "no_transcript", status)

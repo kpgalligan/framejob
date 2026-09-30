@@ -24,7 +24,7 @@ python3 tools/proof/cloud_spike/cloud_spike.py --leakcheck tools/proof/cloud_spi
 | `cloud_spike.py` | the runner: `--only`, `--remake`, `--allow-q8-rerun`, `--selftest`, `--leakcheck`, the host facts, `answers.json`, the summary and the exit code |
 | `aai.py` | the AssemblyAI client (stdlib `urllib`, no redirects), `Scrubber`, `Ledger` |
 | `fake.py` | the in-process stand-in the selftest drives — upload, submit, get, delete, list, plus `redirect_next` and `drop_submit_reply` |
-| `selftest.py` | the seven checks of `--selftest` |
+| `selftest.py` | the eight checks of `--selftest` |
 | `fixtures.py` | `say`'s three pangrams, the extracted WAV, the measured truth pauses, the looped hour, q4's two late files |
 | `cloud_rows.py` | q1, q2, q5, q6, q8 — the paid rows — and the recovery of a lost submit |
 | `local_rows.py` | q3, q4, q7, probe and bundle building, `run_bounded` |
@@ -105,18 +105,24 @@ again, printing the count per outcome: DELETE everything `created` and not
 list, matched ONLY against an upload URL this ledger recorded, the body parsed
 and dropped inside the method — and a DELETE of what it returns. The spike
 never deletes, reads, counts, prints or records anything about a transcript it
-did not create. A run with a key also reserves every paid call in the proofs'
+did not create. A found transcript's reservation closes `deleted` only when
+every DELETE of it answered 2xx (`cloud_rows.record_delete`, through
+`delete_found`, #170); a failed DELETE leaves it OPEN — still owed, in
+`lost()` — so the next settle tries again and counts it `delete_failed`
+meanwhile. A run with a key also reserves every paid call in the proofs'
 ledger against the month's AssemblyAI budget (spec §11 P-6, #163), through
 `cloud_live_ledger.spike_ledger`, beside its own $2.00 `ledger.json`; a keyless
 run writes no spend file.
 
-## `--selftest`: seven checks, each broken on purpose once
+## `--selftest`: eight checks, each broken on purpose once
 
 It works in a `tempfile.mkdtemp()` root of its own, never opens the real
 ledger, and talks only to `fake.Fake` over loopback with `selftest-dummy`.
-Twenty-five checks in seven groups. Each group was broken on purpose and seen
-to fail before it was trusted (2026-09-20, in a copy of this directory under
-the scratch root, the tree never edited):
+Twenty-nine checks in eight groups. Each group was broken on purpose and seen
+to fail before it was trusted (1a–1g on 2026-09-20, in a copy of this
+directory under the scratch root, the tree never edited, when there were
+twenty-five checks; 1h on 2026-09-29, issue batch B13, by a hand edit of the
+tree reverted after):
 
 | Check | The mutant | What it scored |
 |---|---|---|
@@ -127,6 +133,7 @@ the scratch root, the tree never edited):
 | 1e `--remake` leaves `ledger.json` byte for byte | `remake()` given an `os.remove` of the ledger | 23/25 |
 | 1f `run_bounded` bounds a hang, and a q7 whose cleanup hangs still leaves `measured` with `cleanup_blocked: true` | the `child.kill()` in `run_bounded` deleted | 24/25 |
 | 1g the pause-crossing detector, the budget, and a keyless run that skips the five paid rows BY NAME and exits 2 | the crossing threshold moved from 33 ms to 33 000 ms | 24/25 |
+| 1h (#170) a lost submit whose found transcript's DELETE answers 500 stays owed: `call` answers `lost reply — find_own: delete_failed`, the reservation in `lost()`, nothing deleted; `settle` at 500 answers `{"delete_failed": 1}`; `settle` at 200 closes it `deleted` | `delete_found` closing `deleted` whatever the replies | 25/29, taking all four 1h rows |
 
 Two of those mutants first scored 25/25 and the CHECK was strengthened rather
 than the mutant excused, which is the part worth remembering: 1e watched a

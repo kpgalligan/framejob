@@ -171,9 +171,12 @@ The mutant is built in a COPY of the tree from `tree_copy.make_copy` (`app/` and
 one anchor in `LayerRenderersGraphic.swift`, asserted to occur exactly once,
 replaced so the module is asked for `frame + 1`; the copy is built by its
 own `make app` into its own directory and driven through P1 and P2.
-Exit 0 means P2 FAILED in the mutant, which is the pass; a mutant that does
-not build is a FAILURE. The rows past P2 are relative and a uniform +1 moves
-both sides of them, so they are not expected to fail.
+Exit 0 means P2 FAILED in the mutant, which is the pass, and 1 that it
+survived. Exit 2 (rule R, issue batch B13) means the control could not be
+performed — the copy did not build or launch, P1 did not hold, or frame 30
+or 31 did not render — printed as `mutant frame-plus-one: the control could
+not be performed — <why>`. The rows past P2 are relative and a uniform +1
+moves both sides of them, so they are not expected to fail.
 """
 
 import argparse
@@ -550,7 +553,7 @@ def sheet(client, project, arguments, tag):
 
 def run_p1_p2(client, p1):
     """P1 and P2 — the rows the mutant is driven through too. The clip, the
-    track and frame 30's bytes."""
+    track, and frames 30's and 31's bytes (None when not rendered)."""
     made = attempt(client, "new_project", {"path": str(p1)})
     rc = mv_in(p1 / "graphics", "bar.js", bar(), make_folder=True)
     project = project_of(client, p1) or {}
@@ -569,7 +572,7 @@ def run_p1_p2(client, p1):
           and f31 is not None and f31 != f30,
           f"(122,50) {edge_in}, (222,50) {edge_out}, (50,50) {left}, "
           f"frame 31 differs {f31 is not None and f31 != f30}")
-    return clip, track, f30
+    return clip, track, f30, f31
 
 
 def run(app, port):
@@ -583,7 +586,7 @@ def run(app, port):
             check("P1 the app launches", False, "the app never logged its port")
             return log
         run_g6(client, app)
-        clip, track, f30 = run_p1_p2(client, p1)
+        clip, track, f30, _ = run_p1_p2(client, p1)
         cid = clip["id"] if clip else 0
 
         moved = attempt(client, "move_clip", {"project": str(p1), "clips": [cid],
@@ -1408,17 +1411,27 @@ def main():
         binary, why = build_mutant()
         if binary is None:
             print(f"  FAIL the mutant builds — {why}")
-            return 1
+            print(f"mutant {args.mutant}: the control could not be performed — the copy was "
+                  f"not built: {why}")
+            return 2
         instance = Instance(binary, args.port, WORK / f"reelcut-{args.port}.log")
         try:
             client = instance.start()
             if client is None:
                 print("  FAIL the mutant launches")
-                return 1
-            run_p1_p2(client, WORK / "M.reelcut")
+                print(f"mutant {args.mutant}: the control could not be performed — the copy "
+                      f"did not launch")
+                return 2
+            _, _, f30, f31 = run_p1_p2(client, WORK / "M.reelcut")
         finally:
             instance.stop()
-        verdict = rows.get("P1") and not rows.get("P2")
+        why = ("P1 did not hold" if not rows.get("P1") else
+               "frame 30 was not rendered" if f30 is None else
+               "frame 31 was not rendered" if f31 is None else "")
+        if why:
+            print(f"mutant {args.mutant}: the control could not be performed — {why}")
+            return 2
+        verdict = not rows.get("P2")
         print("the mutant is CAUGHT: P1 held and P2 failed" if verdict
               else "the mutant was NOT caught")
         return 0 if verdict else 1

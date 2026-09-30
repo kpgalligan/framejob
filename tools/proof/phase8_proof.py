@@ -38,7 +38,7 @@ setting" means where it can be measured: not that the two calls agree, but
 that two processes AT DIFFERENT QUALITIES write identical files. The mutant
 this catches is the one the design exists to prevent — the scale passed into
 `CompositionBuilder.build`, which every path shares, instead of applied to
-`Playback`'s own `mutableCopy()`.
+`Playback`'s own copy of the configuration (`Playback.previewComposition`).
 
 **What section 1 deliberately CANNOT claim, said plainly.** No MCP call
 reads the player, its composition, or its render size: `render_frame` builds

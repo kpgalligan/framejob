@@ -11,8 +11,11 @@ One owned instance on its own port, launched with
 its log at `tools/proof/work/export-cancel/reelcut-<port>.log`; nothing else
 is ever killed. Every child runs under `graphics_spike/bounded.py`. The M rows
 run `export_cancel_probe.swift`, an in-process instrument built like
-`graphics_proof.py`'s pin probe into `tools/proof/work/export-cancel-probe/`;
-a probe that will not build scores M0–M2 as FAILURES.
+`graphics_proof.py`'s pin probe into `tools/proof/work/export-cancel-probe/`
+(rebuilt when any of `app/Sources`, the probe, `libreelcut_core.a`, the
+bridging header or `core/include/reelcut_core.h` is newer than it; the line
+reads `probe: built …` or `probe: up to date …`); a probe that will not build
+scores M0–M2 as FAILURES.
 
 G1  (CONTROL) `new_project`; `write_graphic gate` (compiles, 30 frames, one
     rect); `add_graphic_clip gate` at 0; `nest` it; `add_text_clip` right
@@ -31,18 +34,38 @@ I1  stand-in `ffprobe` (fixed JSON: one h264 640×360 30/1 stream, 10 s) and
     then for no `slow-<hex>-*.partial.mov` (10 s), then delete every
     Rewrapped entry starting `slow-<hex>-` (parent-checked) and the fixture.
     An expired bound fails the row and names the leftovers.
-M0  (CONTROL) a noise WAV imported over MCP onto four tracks with
-    `noise_reduction: 1.0`, saved; the probe's uncancelled run is `success`
-    with a measurement `window` ≥ 3.0 s.
+M0  (CONTROL) a 60 s noise WAV (`NOISE_SECONDS`, 300 before issue batch
+    B13) imported over MCP onto four tracks with `noise_reduction: 1.0`,
+    saved; the probe's uncancelled run is `success` with a measurement
+    `window` ≥ `WINDOW_FLOOR` (8.0 s).
 M1  `--runs` probe runs, each cancelling `delay` s (uniform in
     [0.2, window/2]) into the measurement: every run rc 0 (a signal or an
     expiry is a crash), `phase_at_cancel` "Measuring loudness…", `outcome`
     `cancelled`, `left` false. Prints the crash count.
-M2  every M1 `latency` ≤ 1.0 s.
+M2  every M1 `latency` ≤ `LATENCY_BOUND` (2.0 s; 1.0 s before B13, when two
+    full runs printed 0.889 s and 0.790 s).
 Z1  `grep "Reelcut: "` over this launch's log prints nothing.
 
     python3 tools/proof/export_cancel_proof.py [--port 4893] [--app PATH]
-        [--only gate,import,cancel] [--runs 30]
+        [--only gate,import,cancel] [--runs 30] [--mutant NAME]
+
+`--mutant NAME` (implies `--only cancel`; the tree's app still builds the
+fixture) builds the probe over a copy of `app/Sources` under
+`work/export-cancel-mutants/<name>/` with each of `MUTANTS[name]`'s texts
+replaced exactly once, and runs M0–M2 on it: `no-loop-check` removes the
+measurement loop's `guard !isCancelled` (M2 must FAIL); `old-cancel` puts
+back #74's shape, `cancel()` cancelling the measurement's reader from main
+(M1 is its row). Exit 1 when the named row FAILED (caught), 0 when it passed
+(survived), and 2 — rule R — when the control could not be performed: the
+copy, an anchor, the build, the fixture or M0 failed, or the row was never
+scored, printed as `mutant <name>: the control could not be performed —
+<why>`. On this fixture `old-cancel` was caught once in issue batch B13 — 1
+crash in 30 cancels (AVFoundation's "Cannot remove a listener … for
+AssetReader_Failed … that was never added", rc −5), where the tree's own run
+had 0 in 30 — which is one run's evidence: a rerun can survive, and a
+survivor says nothing about the tree until it is repeated.
+
+The summary line ends with the run's wall time, ` in <N> s`.
 """
 
 import argparse
@@ -74,11 +97,37 @@ A_MOV = ROOT / "tools/proof/media/A.mov"
 REWRAPPED = Path.home() / "Library/Application Support/Reelcut/Rewrapped"
 CALL_BOUND = 600
 FFMPEG_SLEEP = 45
-NOISE_SECONDS = 300
+NOISE_SECONDS = 60
 NOISE_TRACKS = 4
+WINDOW_FLOOR = 8.0
+LATENCY_BOUND = 2.0
+MUTANT_WORK = ROOT / "tools/proof/work/export-cancel-mutants"
+# name → (the row it must fail, [(file in app/Sources, before — exactly once, after)])
+MUTANTS = {
+    "no-loop-check": ("M2", [
+        ("ExporterLoudness.swift",
+         "            guard !isCancelled else {\n"
+         "                reader.cancelReading()\n"
+         "                return nil\n"
+         "            }\n",
+         ""),
+    ]),
+    "old-cancel": ("M1", [
+        ("Exporter.swift", "    var measuring = false\n",
+         "    var measuring = false\n    var measureReader: AVAssetReader?\n"),
+        ("ExporterLoudness.swift", "        measuring = true\n",
+         "        measuring = true\n        measureReader = reader\n"),
+        ("ExporterLoudness.swift", "            measuring = false\n",
+         "            measuring = false\n            measureReader = nil\n"),
+        ("Exporter.swift", "setCancelRequested(true)\n        writer?.cancel()\n",
+         "setCancelRequested(true)\n        lock.lock()\n        let reader = measureReader\n"
+         "        lock.unlock()\n        reader?.cancelReading()\n        writer?.cancel()\n"),
+    ]),
+}
 GROUPS = {"gate": ["G1", "G2"], "import": ["I1"], "cancel": ["M0", "M1", "M2"]}
 ORDER = ["G1", "G2", "I1", "M0", "M1", "M2", "Z1"]
 rows = {}
+instrument_rows = set()
 
 GATE_JS = ("export const meta = { name: \"Gate\", durationInFrames: 30 };\n"
            "export function render(frame, props, ctx) {\n"
@@ -94,8 +143,10 @@ FFPROBE_JSON = json.dumps({
 })
 
 
-def check(name, good, detail=""):
+def check(name, good, detail="", *, instrument=False):
     rows[name.split()[0]] = bool(good)
+    if instrument and not good:
+        instrument_rows.add(name.split()[0])
     print(("  ok   " if good else "  FAIL ") + name + (f"\n       {detail}" if detail else ""),
           flush=True)
 
@@ -162,25 +213,26 @@ def tool_message(error, tool):
 
 # ---- the probe --------------------------------------------------------------
 
-def build_probe():
+def build_probe(sources=ROOT / "app/Sources", probe_dir=PROBE_DIR):
     """`export_cancel_probe.swift` as `main.swift` over every other file in
-    `app/Sources`, on `harness/build.sh`'s swiftc line, with the app's
-    `Fonts`, `Blank.mp4` and a `default.metallib` of `Compositor.metal`
-    beside it. Rebuilt only when stale. The binary, or None and why."""
-    PROBE_DIR.mkdir(parents=True, exist_ok=True)
-    binary = PROBE_DIR / "export_cancel_probe"
-    entry = PROBE_DIR / "main.swift"
+    `sources`, on `harness/build.sh`'s swiftc line, with the app's `Fonts`,
+    `Blank.mp4` and a `default.metallib` of `Compositor.metal` beside it, in
+    `probe_dir`. Rebuilt only when stale — the sources, the entry, the
+    staticlib and both headers are its inputs. The binary, or None and why."""
+    probe_dir.mkdir(parents=True, exist_ok=True)
+    binary = probe_dir / "export_cancel_probe"
+    entry = probe_dir / "main.swift"
     if not entry.exists() or entry.read_text() != PROBE_SOURCE.read_text():
         entry.write_text(PROBE_SOURCE.read_text())
-    fonts = PROBE_DIR / "Fonts"
+    fonts = probe_dir / "Fonts"
     resources = ROOT / "app/Resources"
     if not fonts.is_dir() or (resources / "Fonts").stat().st_mtime > fonts.stat().st_mtime:
         shutil.rmtree(fonts, ignore_errors=True)
         shutil.copytree(resources / "Fonts", fonts)
-    if not (PROBE_DIR / "Blank.mp4").exists():
-        shutil.copy2(resources / "Blank.mp4", PROBE_DIR / "Blank.mp4")
+    if not (probe_dir / "Blank.mp4").exists():
+        shutil.copy2(resources / "Blank.mp4", probe_dir / "Blank.mp4")
     shader = resources / "Shaders/Compositor.metal"
-    metallib, air = PROBE_DIR / "default.metallib", PROBE_DIR / "Compositor.air"
+    metallib, air = probe_dir / "default.metallib", probe_dir / "Compositor.air"
     if not metallib.exists() or shader.stat().st_mtime > metallib.stat().st_mtime:
         step = bounded.run(["xcrun", "-sdk", "macosx", "metal", "-c", str(shader), "-o",
                             str(air)], 300)
@@ -189,26 +241,51 @@ def build_probe():
                                 str(metallib)], 300)
         if step["rc"] != 0 or not metallib.exists():
             return None, f"the shader did not build: {step['stderr'][-400:]}"
-    sources = sorted(path for path in (ROOT / "app/Sources").glob("*.swift")
-                     if path.name != "main.swift")
+    swift = sorted(path for path in Path(sources).glob("*.swift")
+                   if path.name != "main.swift")
     lib = ROOT / "core/target/release/libreelcut_core.a"
     if not lib.exists():
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
+    headers = [ROOT / "app/Bridging/Reelcut-Bridging-Header.h",
+               ROOT / "core/include/reelcut_core.h"]
     if binary.exists() and all(path.stat().st_mtime < binary.stat().st_mtime
-                               for path in sources + [entry, lib]):
+                               for path in swift + [entry, lib] + headers):
+        print(f"  probe: up to date — {binary}", flush=True)
         return binary, ""
+    started = time.monotonic()
     sdk = bounded.run(["xcrun", "--show-sdk-path", "--sdk", "macosx"], 60)["stdout"].strip()
     built = bounded.run(
         ["swiftc", "-D", "REELCUT_DEV_TOOLS", "-sdk", sdk, "-target", "arm64-apple-macos26.0",
          "-module-name", "Reelcut",
          "-import-objc-header", str(ROOT / "app/Bridging/Reelcut-Bridging-Header.h"),
          "-L", str(lib.parent), "-lreelcut_core"]
-        + [str(path) for path in sources] + [str(entry), "-o", str(binary)], 900)
+        + [str(path) for path in swift] + [str(entry), "-o", str(binary)], 900)
     if built["rc"] != 0 or not binary.exists():
         errors = [line for line in built["stderr"].splitlines() if ": error:" in line]
         tail = built["stderr"].strip().splitlines()[-4:]
         return None, f"swiftc rc {built['rc']}: {(errors or tail or ['(no output)'])[:6]}"
+    print(f"  probe: built in {time.monotonic() - started:.0f} s — {binary}", flush=True)
     return binary, ""
+
+
+def mutant_sources(name):
+    """(MUTANT_WORK/<name>/Sources, "") — `app/Sources/*.swift` copied with
+    each of the mutant's `before` texts replaced exactly once — or (None, why)."""
+    _, edits = MUTANTS[name]
+    target = MUTANT_WORK / name / "Sources"
+    try:
+        shutil.rmtree(target, ignore_errors=True)
+        target.mkdir(parents=True)
+        for path in sorted((ROOT / "app/Sources").glob("*.swift")):
+            shutil.copy2(path, target / path.name)
+        for file, before, after in edits:
+            text = (target / file).read_text() if (target / file).exists() else ""
+            if text.count(before) != 1:
+                return None, f"{file} holds {before!r} {text.count(before)} times, not once"
+            (target / file).write_text(text.replace(before, after))
+    except OSError as error:
+        return None, f"the copy could not be made: {error}"
+    return target, ""
 
 
 def run_probe(binary, package, tag, delay):
@@ -435,20 +512,21 @@ def build_noise_fixture(client):
 def run_cancel(binary, why, pkg, pkg_why, runs):
     if binary is None or pkg is None:
         reason = why if binary is None else pkg_why
-        check("M0 (CONTROL) the uncancelled measurement", False, reason)
-        check("M1 cancels during the measurement", False, reason)
-        check("M2 cancel latency", False, reason)
+        check("M0 (CONTROL) the uncancelled measurement", False, reason, instrument=True)
+        check("M1 cancels during the measurement", False, reason, instrument=True)
+        check("M2 cancel latency", False, reason, instrument=True)
         return
     control = run_probe(binary, pkg, "m0", -1)
     window = control.get("window")
     check(f"M0 (CONTROL) {NOISE_SECONDS} s of noise on {NOISE_TRACKS} tracks with noise "
-          "reduction: the uncancelled probe run is success with window >= 3.0 s",
+          f"reduction: the uncancelled probe run is success with window >= {WINDOW_FLOOR} s",
           control.get("rc") == 0 and control.get("outcome") == "success"
-          and isinstance(window, (int, float)) and window >= 3.0,
-          f"{control}")
+          and isinstance(window, (int, float)) and window >= WINDOW_FLOOR,
+          f"{control}", instrument=True)
     if not (isinstance(window, (int, float)) and window >= 0.5):
-        check("M1 cancels during the measurement", False, "no measurement window from M0")
-        check("M2 cancel latency", False, "no measurement window from M0")
+        check("M1 cancels during the measurement", False, "no measurement window from M0",
+              instrument=True)
+        check("M2 cancel latency", False, "no measurement window from M0", instrument=True)
         return
     seed = random.randrange(1 << 30)
     rng = random.Random(seed)
@@ -475,11 +553,13 @@ def run_cancel(binary, why, pkg, pkg_why, runs):
           not bad and crashes == 0, f"crashes {crashes} of {runs}, failing runs {bad}")
     latencies = [a.get("latency") for a in answers]
     slow = [i for i, value in enumerate(latencies)
-            if not isinstance(value, (int, float)) or value > 1.0]
+            if not isinstance(value, (int, float)) or value > LATENCY_BOUND]
     known = [value for value in latencies if isinstance(value, (int, float))]
-    check("M2 every M1 cancel completes within 1.0 s (the loop cancels its own reader)",
+    check(f"M2 every M1 cancel completes within {LATENCY_BOUND} s (the loop cancels its own "
+          "reader)",
           not slow and len(known) == runs,
-          (f"max {max(known):.3f} s, " if known else "") + f"over 1.0 s or missing: {slow}")
+          (f"max {max(known):.3f} s, " if known else "")
+          + f"over {LATENCY_BOUND} s or missing: {slow}")
 
 
 def main():
@@ -488,7 +568,13 @@ def main():
     parser.add_argument("--app", type=Path, default=APP)
     parser.add_argument("--only", default="gate,import,cancel")
     parser.add_argument("--runs", type=int, default=30)
+    parser.add_argument("--mutant", choices=sorted(MUTANTS),
+                        help="the probe over a copy of app/Sources with the mutant's texts "
+                             "replaced; implies --only cancel; its row must FAIL (exit 1)")
     args = parser.parse_args()
+    began = time.monotonic()
+    if args.mutant:
+        args.only = "cancel"
     groups = [g.strip() for g in args.only.split(",") if g.strip()]
     unknown = [g for g in groups if g not in GROUPS]
     if unknown:
@@ -500,9 +586,24 @@ def main():
     write_standins()
 
     binary, why = (None, "")
-    if "cancel" in groups:
+    if args.mutant:
+        sources, why = mutant_sources(args.mutant)
+        if sources is None:
+            print(f"mutant {args.mutant}: the control could not be performed — {why} "
+                  f"in {time.monotonic() - began:.0f} s", flush=True)
+            sys.exit(2)
+        print(f"  mutant {args.mutant}: {len(MUTANTS[args.mutant][1])} text(s) replaced "
+              f"once each in {sources}", flush=True)
+        binary, why = build_probe(sources, MUTANT_WORK / args.mutant / "probe")
+        if binary is None:
+            print(f"  probe: did not build — {why}", flush=True)
+            print(f"mutant {args.mutant}: the control could not be performed — the probe did "
+                  f"not build in {time.monotonic() - began:.0f} s", flush=True)
+            sys.exit(2)
+    elif "cancel" in groups:
         binary, why = build_probe()
-        print(f"  probe: {binary or 'did not build — ' + why}", flush=True)
+        if binary is None:
+            print(f"  probe: did not build — {why}", flush=True)
 
     log = WORK / f"reelcut-{args.port}.log"
     instance = Instance(args.app, args.port, log)
@@ -528,9 +629,23 @@ def main():
 
     missing = [row for row in selected if row not in rows]
     failed = [row for row in ORDER if row in selected and not rows.get(row)]
+    wall = time.monotonic() - began
     print(f"\n{len(selected) - len(failed)}/{len(selected)} rows ok"
           + (f"; failed {failed}" if failed else "")
-          + (f"; never scored {missing}" if missing else ""), flush=True)
+          + (f"; never scored {missing}" if missing else "") + f" in {wall:.0f} s", flush=True)
+    if args.mutant:
+        named = MUTANTS[args.mutant][0]
+        broken = sorted(instrument_rows)
+        not_done = (f"{named} was never scored" if named not in rows else
+                    f"scored as instrument failures: {', '.join(broken)}" if broken else "")
+        if not_done:
+            print(f"mutant {args.mutant}: the control could not be performed — {not_done}",
+                  flush=True)
+            sys.exit(2)
+        caught = not rows[named]
+        print(f"mutant {args.mutant}: {named} "
+              + ("FAILS (expected — caught)" if caught else "PASSES (it survived)"), flush=True)
+        sys.exit(1 if caught else 0)
     sys.exit(0 if not failed and not missing else 1)
 
 

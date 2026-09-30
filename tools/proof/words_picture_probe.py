@@ -30,7 +30,12 @@ P9  no pill, active_scale 1.5, a ≥ 3-em word: the red ink at pop 1 is at least
 
 A mutant is built from a COPY of `app/Sources` with one anchor, asserted to
 occur exactly once, replaced; exit 0 means at least one row FAILED in the
-copy, which is the pass. A mutant copy that does not build is a FAILURE.
+copy, which is the pass, and 1 that every row held (it survived). Exit 2
+(rule R, issue batch B13) means the control could not be performed — the
+copy could not be made, the anchor was not found exactly once, the copy did
+not build, the probe did not answer one JSON object, or the run passed its
+deadline — printed as `mutant <name>: the control could not be performed —
+<why>`.
 """
 
 import hashlib
@@ -222,18 +227,33 @@ def mutant(name):
     began = time.time()
     with tempfile.TemporaryDirectory(prefix=f"reelcut-words-picture-{name}-") as temp:
         sources = Path(temp) / "Sources"
-        shutil.copytree(ROOT / "app/Sources", sources)
-        replace_once(sources / file, before, after)
+        try:
+            shutil.copytree(ROOT / "app/Sources", sources)
+            replace_once(sources / file, before, after)
+        except (OSError, RuntimeError) as error:
+            print(f"mutant {name}: the control could not be performed — {error}")
+            return 2
         print(f"MUTANT {name}: {file}, anchor replaced once, in {sources}")
         try:
             run(sources, Path(temp) / "out")
         except subprocess.TimeoutExpired:
             print(f"MUTANT FAILURE: {name} did not finish within {DEADLINE} s")
+            print(f"mutant {name}: the control could not be performed — the run passed "
+                  f"{DEADLINE} s")
             return 2
     elapsed = time.time() - began
-    built = bool(rows) and rows[0]
-    caught = built and not all(rows[1:])
-    if caught and elapsed <= DEADLINE:
+    if not (len(rows) >= 2 and rows[0] and rows[1]):
+        why = ("the probe did not build" if not (rows and rows[0])
+               else "the probe did not answer one JSON object")
+        print(f"mutant {name}: the control could not be performed — {why}")
+        return 2
+    if elapsed > DEADLINE:
+        print(f"mutant {name}: the control could not be performed — the run passed "
+              f"{DEADLINE} s ({elapsed:.0f} s)")
+        return 2
+    caught = not all(rows[2:])
+    built = True
+    if caught:
         print(f"MUTANT PASS: {name} — {rows.count(False)} row(s) FAILED in the copy, "
               f"{elapsed:.0f} s")
         return 0

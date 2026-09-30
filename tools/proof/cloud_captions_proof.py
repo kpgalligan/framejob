@@ -63,7 +63,10 @@ answered and `AVAudioFile` always runs), and free loopback ports.
 SYMLINK to the tree's, `core` already built — patches one text asserted to
 occur exactly once, runs the copy's `make app` under a 900 s wall, and runs every row
 against that binary on `--port-base 4960`. A mutant that survives is a
-finding about the ROW, not about the mutant.
+finding about the ROW, not about the mutant. A mutant (or `--fake-mutant`)
+whose control could not be performed — the text to replace not found
+exactly once, or the copy not built — prints `mutant <name>: the control
+could not be performed — <why>` and exits 2 (rule R, issue batch B13).
 """
 
 import argparse
@@ -2042,7 +2045,12 @@ def main():
         if binary is None:
             check(f"the mutant {args.mutant} builds", False, error)
             print(f"\n{passed}/{passed + failed} checks passed in {time.time() - started:.0f} s")
-            return 1
+            # Rule R (issue batch B13): a mutant that did not build performs
+            # no control, and is never read as a caught mutant.
+            why = ((error or "no build").strip().splitlines() or ["no reason given"])[0]
+            why = why.removeprefix(f"mutant {args.mutant}: ")
+            print(f"mutant {args.mutant}: the control could not be performed — {why}")
+            return 2
     if not os.path.exists(binary):
         check("the built binary is there — run `make app` first", False, binary)
         print(f"\n{passed}/{passed + failed} checks passed in {time.time() - started:.0f} s")

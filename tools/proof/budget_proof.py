@@ -48,7 +48,11 @@ proves the real one, `budget.LEDGER`, was not created or changed.
 `no-budget` sets both budgets to infinity in memory; `unknown-as-zero`
 replaces `budget.anthropic_worst_row` with all-zero rates after import.
 Prints `<ID> ok|FAIL — detail`, then `n/m`; an instrument that cannot run is
-a FAIL.
+a FAIL. A mutant run exits 1 when a row failed (caught), 0 when every row
+passed (it survived), and 2 — rule R, issue batch B13 — when any row was
+scored where its own comparison did not run (an import that failed, an
+exception caught by `guarded`, a stand-in that could not run), printing
+`mutant <name>: the control could not be performed — <why>`.
 """
 
 import argparse
@@ -75,9 +79,9 @@ ROWS = ["P", "F1", "F2", "G1", "G2", "G3", "W", "S1", "S2", "S3", "S4", "U1", "U
 RESULTS = []
 
 
-def score(row, ok, detail):
+def score(row, ok, detail, *, instrument=False):
     state = "ok" if ok else "FAIL"
-    RESULTS.append((row, state))
+    RESULTS.append((row, state, instrument))
     print(f"{row} {state} — {detail}", flush=True)
 
 
@@ -85,7 +89,8 @@ def guarded(row, function, *arguments):
     try:
         score(row, *function(*arguments))
     except Exception as error:  # noqa: BLE001 — an instrument that cannot run is a FAIL
-        score(row, False, f"the instrument could not run: {type(error).__name__}: {error}")
+        score(row, False, f"the instrument could not run: {type(error).__name__}: {error}",
+              instrument=True)
 
 
 def at(when):
@@ -629,8 +634,9 @@ def main():
         import assistant_session_proof as asp
     except Exception as error:  # noqa: BLE001 — an instrument that cannot run is a FAIL
         for row in ROWS:
-            score(row, False, f"an import failed: {type(error).__name__}: {error}")
-        return summary()
+            score(row, False, f"an import failed: {type(error).__name__}: {error}",
+                  instrument=True)
+        return summary(args.mutant)
     real = snapshot(budget.LEDGER)
 
     if args.mutant == "no-budget":
@@ -665,8 +671,9 @@ def main():
         guarded("R3", row_r3, budget, ev, fake)
     except Exception as error:  # noqa: BLE001
         for row in ("R1", "R2", "R3"):
-            if row not in [r for r, _ in RESULTS]:
-                score(row, False, f"the stand-in could not run: {type(error).__name__}: {error}")
+            if row not in [r for r, _, _ in RESULTS]:
+                score(row, False, f"the stand-in could not run: {type(error).__name__}: {error}",
+                      instrument=True)
     finally:
         if fake is not None:
             fake.stop()
@@ -681,13 +688,18 @@ def main():
     after = snapshot(budget.LEDGER)
     score("N", real == after, f"{budget.LEDGER}: (exists, size, mtime_ns) {real} before, "
                               f"{after} after")
-    return summary()
+    return summary(args.mutant)
 
 
-def summary():
-    passed = sum(1 for _, state in RESULTS if state == "ok")
-    failed = [row for row, state in RESULTS if state != "ok"]
+def summary(mutant=None):
+    passed = sum(1 for _, state, _ in RESULTS if state == "ok")
+    failed = [row for row, state, _ in RESULTS if state != "ok"]
     print(f"{passed}/{len(RESULTS)}" + (f"; failed {failed}" if failed else ""), flush=True)
+    broken = [row for row, _, instrument in RESULTS if instrument]
+    if mutant and broken:
+        print(f"mutant {mutant}: the control could not be performed — scored as instrument "
+              f"failures: {', '.join(broken)}", flush=True)
+        return 2
     return 0 if not failed else 1
 
 
