@@ -5,6 +5,15 @@ import Foundation
 /// at the 600-line cap; the stored state (`built`, `meterTimer`) stays there
 /// because an extension cannot add stored properties.
 extension Playback {
+    /// How often the level meter is re-read while the transport is moving.
+    ///
+    /// It is a READ rate, not a measurement rate: the taps publish once per
+    /// buffer, which is 12–20 Hz on the paths this app has measured (4096
+    /// frames is 85 ms at 48 kHz), so 30 Hz merely makes sure a new buffer is
+    /// picked up within a frame of arriving. `Exporter.progressInterval` is
+    /// the same idea at a slower cadence.
+    static let meterInterval: TimeInterval = 1.0 / 30
+
     /// The transport's levels, right now: every metered track SOUNDING at the
     /// playhead, its last buffer multiplied by the mix envelope over it,
     /// summed — `LevelMeterTrack.mix`, where the fold lives so the offscreen

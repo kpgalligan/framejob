@@ -284,6 +284,18 @@ def duration_of(path):
     return float(out.stdout.strip())
 
 
+def duration_text(path):
+    """`duration_of` as printed text, or why it could not be measured — a
+    PRINTED length, never scored, so a host whose ffprobe will not run names
+    that and carries on rather than aborting the proof (issue batch B21)."""
+    try:
+        return f"{duration_of(path):.3f} s"
+    except (subprocess.CalledProcessError, OSError) as error:
+        text = getattr(error, "stderr", None) or str(error)
+        first = (text.strip().splitlines() or ["(no output)"])[0]
+        return f"unmeasured (ffprobe failed on this host: {first})"
+
+
 # ---- PCM, phase 2's ------------------------------------------------------
 
 
@@ -1216,7 +1228,7 @@ def partial_part(mcp):
     speech = os.path.join(s.path, "cache", "speech", f"{media}.bin")
     marker = os.path.join(s.path, "cache", "speech", f"{media}.complete.json")
     peaks = os.path.join(s.path, "cache", "peaks", f"{media}.bin")
-    note(f"the fixture is {duration_of(fixture('corrupt.m4a')):.3f} s")
+    note(f"the fixture is {duration_text(fixture('corrupt.m4a'))}")
     check(
         not os.path.exists(speech) and not os.path.exists(marker),
         f"no speech `.bin` and no marker are written for it "
@@ -1314,6 +1326,62 @@ def waveform_part(mcp, truth):
             "enough to be quiet before either cache is asked."),
         f"and the note counts it as proposed rather than promising nothing inside it "
         f"is: {ducked.get('note')!r}")
+
+
+# ---- 8d. Two waveform waiters, one proposed and one not -------------------
+
+
+def mixed_part(mcp):
+    """The note's MIXED ending (#79): "spans inside N of them ARE proposed
+    here and nothing inside the other M is", which no row had scored.
+
+    Three media on one track, each waveform then withheld: `clean.wav` and
+    `hum3.wav` hold voice, so the model has spans inside both; `tone.wav`
+    holds none, so it is judged by level, and with its waveform gone nothing
+    inside it is proposed. The tone is UN-ducked on purpose: a ducked clip is
+    quiet by the floor and so proposed (`tone_part`'s ducked row), which would
+    make it a third proposed media. N = 2 and M = 1 differ, so a build that
+    swaps the two counts cannot pass (c)."""
+    print("\n8d — two waveform waiters proposed and one not, in one reply")
+    s = Session(mcp, "silence2-mixed")
+    clean, clean_clip = s.lay("clean.wav", at=0)
+    hum, hum_clip = s.lay("hum3.wav", at=12 * SEC)
+    tone, tone_clip = s.lay("tone.wav", at=24 * SEC)
+    detect(s)
+    for media in (clean, hum, tone):
+        os.remove(os.path.join(s.path, "cache", "peaks", f"{media}.bin"))
+    answer = s.op("detect_silence")
+    check(
+        sorted(answer.get("pending_peaks") or []) == sorted([clean, hum, tone])
+        and "voice_pending" not in answer
+        and answer.get("judged_by_level") == [tone],
+        f"CONTROL: all three are WAVEFORM waiters and none a voice one, the tone judged "
+        f"by level: pending_peaks {answer.get('pending_peaks')}, voice_pending "
+        f"{answer.get('voice_pending')}, judged_by_level {answer.get('judged_by_level')} "
+        f"(media {clean}, {hum}, {tone})")
+    placed = {c["id"]: (c["start"], c["start"] + c["duration"]) for c in s.project()["clips"]}
+    found = spans(answer)
+
+    def within(clip):
+        a, b = placed[clip]
+        return any(r[0] >= a and r[1] <= b for r in found)
+
+    tone_span = placed[tone_clip]
+    check(
+        within(clean_clip) and within(hum_clip)
+        and not any(r[0] < tone_span[1] and r[1] > tone_span[0] for r in found),
+        f"CONTROL: a span lies inside the clean clip {placed[clean_clip]} and one inside "
+        f"the hum3 clip {placed[hum_clip]}, and none overlaps the tone's {tone_span}: "
+        f"{show(found)}")
+    check(
+        (answer.get("note") or "") == (
+            "Analysis is still running for 3 media file(s); call again in a moment. "
+            "For them it is the WAVEFORM that has not landed, which in voice mode decides "
+            "only a clip holding no voice, so spans inside 2 of them ARE proposed here and "
+            "nothing inside the other 1 is. 1 media file(s) hold no voice in at least one "
+            "clip and were judged by level there."),
+        f"and the note's mixed ending counts the two proposed and the one not, in that "
+        f"order: {answer.get('note')!r}")
 
 
 # ---- 10b. The two durations ---------------------------------------------
@@ -1489,7 +1557,7 @@ def main():
     print(f"fixtures in {FIXTURES}")
     for name in ("clean.wav", "hum3.wav", "quiet2.wav", "tone.wav",
                  "voicetone.wav", "mute.mov"):
-        print(f"  {name}: {duration_of(fixture(name)):.3f} s")
+        print(f"  {name}: {duration_text(fixture(name))}")
 
     mcp = MCP(PORT)
     names = mcp.tools()
@@ -1505,6 +1573,7 @@ def main():
     withheld_part(mcp, truth)
     partial_part(mcp)
     waveform_part(mcp, truth)
+    mixed_part(mcp)
     reversed_part(mcp)
     refusal_part(session)
     duration_part(mcp)

@@ -4045,21 +4045,29 @@ end patch that differs only by a KIND leaves the same picture at every tick,
 because the action loop interpolates and a string it can only take whole, so
 the patch had to differ by a number.
 
-**Two things `e2_proof.py` cannot see, measured rather than guessed** (road
-map 5 §12, R4·1 and R4·2). A mutant that turns every spin the OTHER way
-scores **61/61**: §4's rows are an eighth-turn bounding box and a whole
-period byte-identical to no motion, and neither can see a DIRECTION — a
-card's bounding box at +45° and −45° is the same rectangle, a whole turn
-reduces to 0 either way, and the fixtures are rectangles symmetric about
-their own centre. A mutant that measures every container against the PROJECT
-canvas scores **61/61** too: §5's nest rows are about a nest CLIP's own
-arrival, and none is about a clip INSIDE a nest sliding against the nest's
-frozen canvas. Both properties are pinned through the FFI in
-`core/tests/motion.rs` and `core/tests/motion_edges.rs`, so they are proved
-— just not over MCP. Closing the first needs a CROPPED fixture, where the
-pivot compensation makes the drawn position depend on the sign of φ; closing
-the second needs a nest whose canvas differs from the project's and a render
-part-way through the slide. Neither row was written.
+**Two things `e2_proof.py` could not see, and the rows that now see them**
+(road map 5 §12, R4·1 and R4·2; #78, issue batch B21). A mutant that turned
+every spin the OTHER way scored **61/61**, and so did one that measured every
+container against the PROJECT canvas: §4's rows were an eighth-turn bounding
+box and a whole period byte-identical to no motion, and a card's bounding box
+at +45° and −45° is one rectangle; §5's nest rows were about a nest CLIP's own
+arrival. §4 now spins a 500 × 100 card cropped 100 px on the left — a
+400 × 100 visible rect centred at (370, 180), so the pivot compensation makes
+the turned corners depend on the sign of φ — and reads frame 3 (φ = 45°): a
+CONTROL that the ink box is centred on the visible centre ± 1.5 px; the
+topmost ink row's mean column LEFT of 370 and the leftmost ink column's mean
+row ABOVE 180 (clockwise, y down); and that column within 3 px of
+`turned_corners`' topmost corner, 263.9 (a reversed spin puts it at 476.1).
+§5 slides a 200 × 200 card in (`slide_left`, 1 s) inside a nest made at
+640 × 360 and then moves the project to 1280 × 720 with `set_canvas`: a
+CONTROL that the nest stays 640 × 360 and its clip at scale 1, x = y = 0; a
+CONTROL that the arrived card is at (540, 260, 739, 459) ± 1; and at u = 0.5
+the leading column at 645 ± 1, measured on the nest's frozen canvas (the
+project's would give 725). Core mutants Y2 (`phi: -720.0 * amount * cycles`
+in `motion.rs`) and Y6 (the enclosing container's size read off the project
+canvas in `recipe.rs`) each fail exactly their rows and nothing else (the
+B21 section has the runs). The same properties stay pinned through the FFI
+in `core/tests/motion.rs` and `core/tests/motion_edges.rs`.
 
 What neither pair can see is in #54: a
 crossfade across a Remove Silences cut HEARD, an eased push FELT, the three
@@ -8362,3 +8370,84 @@ loaded; nothing below needed it):
 | `dist_check_mutants.py` | 12/12, exit 0; `app-entitlements-dist` FAIL {D14}, 13/14, rc 1 |
 | `dist_check.py --dist /nonexistent/Reelcut.app` | D3 D5 D7 D9 D11 D13 D14 FAIL, 7/14, exit 1 |
 | `codesign -d --entitlements - --xml` Distribution / Release | `audio-input` alone / `audio-input` and `get-task-allow` |
+
+## Issue batch B21 — a spin's direction and a slide inside a nest, the silence note's mixed ending, the nest-scope playhead (`e2_proof.py` §4 and §5, `silence2_proof.py` 8d, `scope_playhead_probe.py`; #78 #79 #130)
+
+- **`e2_proof.py` (#78)** — §4's spin-direction rows and §5's nest-slide rows;
+  the e2 section's "Two things `e2_proof.py` could not see" paragraph has what
+  they read. `turned_corners(sw, sh, crop, scale, rot, x, y, w, h)` answers the
+  visible rect's four corners turned `rot`° clockwise (y down) about the
+  visible centre `geometry` answers at no rotation. §7's APNG decode now runs
+  with its output captured, and an ffmpeg that will not run is `skip(3, "ffmpeg
+  could not take the APNG apart on this host: <first stderr line>")`, so §8
+  still runs.
+- **`silence2_proof.py` 8d (#79)** — `mixed_part`, after 8c: `clean.wav` at 0,
+  `hum3.wav` at 12 s and `tone.wav` at 24 s on one track, both caches waited
+  for, the three `cache/peaks/<id>.bin` removed, one plain `detect_silence`.
+  (a) CONTROL all three in `pending_peaks`, no `voice_pending`,
+  `judged_by_level` the tone alone; (b) CONTROL a span inside the clean clip
+  and one inside the hum3 clip, none overlapping the tone's; (c) the note in
+  full, "…so spans inside 2 of them ARE proposed here and nothing inside the
+  other 1 is. …". The tone is UN-ducked: a ducked clip is quiet by the floor
+  and so proposed. `duration_text(path)` prints a fixture's length, or
+  `unmeasured (ffprobe failed on this host: <first stderr line>)`, in `main`'s
+  listing and 8b's note, which used to ABORT the script at its first line on
+  a host whose ffprobe will not run.
+- **`scope_playhead_probe.py` (#130)** — `scope_playhead_probe.swift` over
+  `playhead_echo_probe.py`'s build (`--sources PATH`; a build or answer
+  failure is a FAIL on every row; no ffmpeg, no port). Fixture:
+  `work/scope-playhead/scope.reelcut`, 640 × 360 at 30 fps, one track, no
+  clips, version `RC_FORMAT_VERSION` off the header; the probe adds shape A at
+  0–1 s and B at 2–4 s and nests B into N. `Playback.rebuildHop` (nil in the
+  app) HOLDS a rebuild's finishing block: the probe waits for it (≤ 10 s) and
+  for five equal player reads 20 ms apart (≤ 3 s), then runs it. "One turn" is
+  two calls with no run-loop spin between. Rows: S0 the fixture; S1 [B] inside
+  at 1 s, held, leave → 3 s during the hold, rests at 3 s, every tick 3 s; S2
+  inside at 0, one turn `setPlayhead(1 s)` + leave → 3 s; S3 timeline 3 s,
+  held, enter → 1 s; S4 [B] one turn enter + leave → the built plan is the
+  timeline's, rests at 3 s; S5 one turn opacity on A + `setPlayhead(3 s)` +
+  enter → 1 s; S6 [B] one turn opacity on A + `setPlayhead(2 s)` → the log
+  non-empty, every tick 2 s; S7 [B] a move of A held, one turn the held block
+  + `setPlayhead(2 s)` → every tick 2 s; S8–S11 `playhead_echo_probe.py`'s
+  seek, arrow, refresh and rebuild rows without media; S12 1.2 s of play.
+  **S2 and S5 were written as B rows and pass on the pre-fix tree** (every
+  run, five of five: the scope's rebuild lands before the seek in flight, and
+  the restore takes the last asked time), so they are controls. The pre-fix
+  reference is `work/b21/prefix-sources/` — the tree after the three pure
+  moves and the seam, before the fix.
+
+**The fix** (`Playback.swift`, `EditorViewController+NestScope.swift`;
+`designs/adr/app-file-history.md` "### Playback" has the long form). F1:
+`finishScopeChange` writes the snapped playhead and calls
+`Playback.seekAfterRebuild(to:)` instead of `setPlayhead`, whose asked seek
+went to the OUTGOING item, clamped at its end and was heard; with a rebuild in
+flight the time is held for it. Gated by S1. F2: `seek(to:)` clears
+`restoring` only when no seek is in flight, so an asked seek during a restore
+is heard once, where it lands. Gated by S6 and S7. F3: `update`'s same-plan
+and empty-plan arms bump `generation`, discarding a rebuild in flight. Gated
+by S4. `Playback.swift` paid first by three pure moves (598 → 546), then the
+seam (551), then the fix (595); step 6's fallback (`onMain` moved) was not
+needed.
+
+Run on 2026-09-30 (this host: ffmpeg and ffprobe are broken,
+`libx265.215.dylib` not loaded). Every instance was a fresh one of my own,
+and `grep "Reelcut: "` on its log printed nothing before and after each run:
+
+| Command | Answer |
+|---|---|
+| `phase9_proof.py` ×3 on the baseline Release app (HEAD `f6bc11f`) | 216/218 ("maps the playhead in" — 1800000 outside becomes 0 inside; "mapped back out"), 215/218 (those two and "the playhead reads 1200000 in here"), 216/218 ("mapped back out", "reads 1200000") |
+| `phase9_proof.py` (this tree's script) ×3 on `538db30^` (`f7dd9e3`, `git archive`, its own `make app`) | 217/218 ("mapped back out"), 215/218 ("mapped back out", "reads 1200000", "leaving maps the playhead back OUT (0)"), 216/218 ("mapped back out", "reads 1200000"); the same 218 rows, so 538db30 did not cause #130 |
+| `work/b21/replay_scope.py --fast` ×2 on the baseline app (section 5's and 10's calls, `get_project` right after each `set_scope`) | run 1: leaving read 600000 at once where 1800000 was wanted, twice (section 5's and 10's), 1800000 1.5 s later; run 2: every read right |
+| `work/b21/replay_scope.py` ×2 (1.5 s between calls) | each run: one read of 600001 right after section 5's "up" `set_scope` (600000 wanted), 600000 1.5 s later; the rest right |
+| `scope_playhead_probe.py --sources work/b21/prefix-sources` ×5 | 9/13, exit 1, each run: S1 FAIL (1200000 during the hold and at rest, log [1200000]), S4 FAIL (plan mismatch, rests at 1200000), S6 FAIL (log [600001, 1200000]), S7 FAIL (log [600000, 600000, 1200000]); S2 and S5 pass |
+| `scope_playhead_probe.py` ×3 | 13/13, exit 0 |
+| `phase9_proof.py` ×5 on the fixed Release app, a fresh instance each, then ×5 again on the final `make app` of the same sources | 218/218, exit 0, ten times |
+| `e2_proof.py` on the fixed app | 72/75, exit 1: §7's three checks the named skip (`dyld[…]: Library not loaded: /opt/homebrew/opt/x265/lib/libx265.215.dylib`); every other row, the six new ones included, ok |
+| `e2_proof.py` on mutant Y2 (`git archive HEAD`, `phi: -720.0 * amount * cycles`, its own `make app`) | 70/75: exactly (b) and (c) FAIL beyond the tree's three skips — caught |
+| `e2_proof.py` on mutant Y6 (`git archive HEAD`, `Some(_) => (f64::from(self.canvas.width), f64::from(self.canvas.height)),`) | 71/75: exactly (f) FAIL (725, wanted 645) beyond the three skips — caught |
+| `silence2_proof.py` on the fixed app, and on the baseline app | 90/90 then ABORTED at section 11 (ffmpeg's PCM decode, SIGABRT) — the named host skip; every row identical between the two apps |
+| `silence2_proof.py` on the swap mutant (`tree_copy` copy, `\(proposedHere.count)` ↔ `\(silentHere.count)`, the copy's `make app`) | 89/90 then the same abort: exactly 8d (c) FAIL ("spans inside 1 of them … the other 2") — caught |
+| `media_less_playback_probe.py`, `phase9_chrome.py` | 32/32, 62/62 |
+| `phase8_chrome.py` on this tree, and on a `git archive HEAD` tree | 144/150 both: the same six focus rows (the probe never became active: "attempt 1: active False, key 'nil', main 'nil'", ×3) — host state, not this change |
+| `make typecheck`; `make test`; `make app`; `wc -l app/Sources/Playback.swift` | 0 errors, 4 warnings, tsc clean; exit 0; BUILD SUCCEEDED; 595 |
+| `playhead_echo_probe.py` | 0/20, exit 1: its fixture's ffmpeg failed (`dyld[…]: Library not loaded: …libx265.215.dylib`) — the named host skip; S8–S11 are its rows without media |

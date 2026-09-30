@@ -318,7 +318,9 @@ the key map behind it.
   `+Identity` (Rename ⇧⌘R, the Label submenu over `ClipLabel.allCases`),
   `+Nest` (⌘G / ⇧⌘G), `+NestScope` (⌘↓ / ⌘↑ and the double-click that enters
   a nest; the three marker commands validate OFF inside one, because a
-  nest-local tick sent unscoped would land at the wrong project time),
+  nest-local tick sent unscoped would land at the wrong project time;
+  `finishScopeChange` lands the player through `Playback.seekAfterRebuild`,
+  never `setPlayhead`),
   `+Motion` (Clip ▸ Motion ▸, one `set_video` PER CLIP; inactive stored edge
   titles refreshed at validation), `+Assistant` (`assistantSession()`: the
   window's live session or a new one, stored in the frozen file's
@@ -654,13 +656,19 @@ the key map behind it.
   (`dropHiddenSelection`, #68).
 
 **Playback and rendering.**
-- `Playback.swift` (+`Meter`) — one `AVPlayer` over the plan's composition; the
+- `Playback.swift` (+`Meter`, +`PreviewQuality`, +`Step`) — one `AVPlayer` over the plan's composition; the
   transport, JKL, the rate KVO; `+Meter` is the level meter, moved out under
   the size rule. **Only a seek someone ASKED for reports a time**:
   `seek(to:)` is that door, and Playback's own RESTORES — the rebuild's item
   swap and re-seek, the paused refresh's round trip — go through `startSeek`
   silently and report once, only if they come to rest off the last reported
-  tick; `report(_:)` is the one caller of `onTimeChanged`. An echoed restore
+  tick; a scope change seeks through `seekAfterRebuild(to:)`: its time is the
+  NEW container's, so the outgoing item is neither sought nor heard and the
+  rebuild in flight lands there, heard once (#130, `scope_playhead_probe.py`);
+  an asked seek that arrives while a restore is seeking is heard once, when it
+  lands; `update`'s same-plan and empty-plan arms discard a rebuild in flight;
+  `rebuildHop` is the probe's seam, nil in the app; `report(_:)` is the one
+  caller of `onTimeChanged`. An echoed restore
   moved the playhead (0 and back on every rebuild), and the timeline reveals
   every moved playhead, so a clip drag yanked the view
   (`playhead_echo_probe.py`). **A paused refresh is a one-tick round trip**

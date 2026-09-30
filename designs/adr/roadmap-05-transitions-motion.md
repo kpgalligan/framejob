@@ -283,9 +283,11 @@ Measured and rejected (do not re-try blind):
 ## Open items
 
 - Person checks, E1 (§4g) and E2 (§6g) — tracked in #54.
-- `e2_proof.py` cannot see a spin's DIRECTION or a slide inside a nest against
+- ~~`e2_proof.py` cannot see a spin's DIRECTION or a slide inside a nest against
   the nest's canvas over MCP (core tests pin both; the MCP rows are owed) —
-  tracked in #78.
+  tracked in #78.~~ Struck (issue batch B21): §4 reads a spin's direction off a
+  cropped card and §5 a slide inside a nest after `set_canvas`, each made to fail
+  by a core mutant (`tools/proof/README.md`, B21).
 - AVFoundation's first-~12 ms mix point at a clip's start (a lead-in ramp is
   the candidate fix) — tracked in #87.
 - `paste`'s payload clips are neither range-checked nor normalised — tracked

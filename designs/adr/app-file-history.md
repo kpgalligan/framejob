@@ -149,6 +149,27 @@ lenient-decoding rule.
   the rebuild's item swap would end the newer one.
 - **`stepFrames` depends on the asked seek's echo.** The timeline follows the arrow keys only
   through that echo (orig "The playhead echo").
+- **A scope change seeks through `seekAfterRebuild(to:)`, never `setPlayhead` (#130, issue batch
+  B21).** Entering or leaving a nest rebuilds the item for the other container, and
+  `finishScopeChange` used to call `setPlayhead`, whose ASKED seek went to the item still on the
+  player: the OUTGOING one, measured in the old container. A time past that item's end clamped
+  there and was heard, and the rebuild then restored to the clamped time — `phase9_proof.py`'s
+  "mapped back out" failed on every run and three rows now and then (216, 215 and 216 of 218 at
+  HEAD `f6bc11f`; 217, 215 and 216 at `538db30^`, so 538db30 did not cause it). The time is the NEW
+  container's: with a rebuild in flight (`rebuilding`) it is HELD (`holding`, `isSeeking` true so
+  `currentTime` answers it) and the rebuild's existing restore lands there, heard once; with none,
+  it is a restore on the current item. Two neighbours of the same race went with it. An asked
+  seek that arrives while a restore is seeking (a paused refresh's round trip, a rebuild's
+  re-land) no longer clears `restoring`: it queues and is heard once where it lands, where it
+  used to report the restore's intermediate ticks. And `update`'s same-plan and empty-plan arms
+  bump `generation`, so enter-then-leave in one turn no longer installs the NEST's item under the
+  timeline. `rebuildHop` (nil in the app) is `scope_playhead_probe.py`'s seam: it holds a
+  rebuild's finishing block so a row can force the interleaving.
+- **`Playback.swift` paid for it first**, by pure moves gated alone: `previewComposition` to
+  `Playback+PreviewQuality.swift`, `stepFrames` to `Playback+Step.swift`, `meterInterval` to
+  `Playback+Meter.swift` (598 → 546 lines; 551 with the seam; 595 with the fix, no fallback).
+  `setPreviewQuality`, `init` and `makePreviewLayer` stay: they read the private `player`, and
+  `phase8_chrome.py` counts `AVPlayer()` and `AVPlayerLayer(player:` in this file.
 
 ### Export and still frames
 
@@ -323,7 +344,7 @@ Files that were split since the notes wrote them:
 | Notes named | Now also |
 |---|---|
 | `MediaCacheFiles` | `MediaPeakBuckets.swift`, `MediaImporter+Peaks.swift` (#23) |
-| `Playback` | `Playback+Meter.swift` |
+| `Playback` | `Playback+Meter.swift`, `Playback+PreviewQuality.swift`, `Playback+Step.swift` (B21) |
 | `ReelCore` | `RecipeSource.swift`, `TextPatch.swift`, `MediaDescriptor.swift` |
 | `InspectorPane` | `InspectorSection.swift`, `InspectorSectionHeader.swift`, `InspectorSlider.swift`, `InspectorBinding+Writes.swift` |
 | `ClipPane` | `ClipSelectionHeader.swift`, `ClipPane+Timing.swift` |
@@ -376,6 +397,8 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   `scopeReport`).
 - `SilenceDetector.swift`: must pay before a per-voice `Outcome` (#107).
 - `CompositionBuilder.swift`: `audioParameters`.
+- `Playback.swift`: `onMain(_:)` to `Playback+Step.swift`, `private` dropped (a
+  main hop holding no state; B21's named fallback, not taken). `player` stays private.
 - `AppDelegate+Menus.swift`: a submenu builder out (the precedent is
   `AppDelegate+GraphicMenu.swift`).
 - `AgentServer+Recording.swift`: `RecordingToolChrome` (the status-item wrapper with `freeze()`)

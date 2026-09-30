@@ -34,11 +34,15 @@ clip's motion is cleared, the frame is rendered, and the motion is put back.
 * **3** `fade`, `zoom_in` and `pop`: the eased opacity, the scale about the
   visible centre cropped or not, and the overshoot passing 1 and coming back.
 * **4** the four continuous presets: a whole spin byte-identical to no
-  motion (the `rem_euclid(360)` rule), a quarter of one at 45°, a `shake`
-  that reads the PERIOD and not the clip, a `drift` that reads the clip, and
-  a `bounce` lifted by exactly `0.08·A·H·|sin|`.
+  motion (the `rem_euclid(360)` rule), a quarter of one at 45°, the
+  DIRECTION of a spin read off a CROPPED card (clockwise, y down: its
+  topmost corner left of the visible centre), a `shake` that reads the
+  PERIOD and not the clip, a `drift` that reads the clip, and a `bounce`
+  lifted by exactly `0.08·A·H·|sin|`.
 * **5** composition: the tent, an action moving under an arrival, two slots
-  multiplying, and a nest scaling every inner layer about its placed centre.
+  multiplying, a nest scaling every inner layer about its placed centre, and
+  a slide INSIDE a nest measured on the nest's frozen canvas after
+  `set_canvas` has moved the project's.
 * **6** the model rules: `get_project` un-moved while the frame moves, and
   what a split and a ripple delete leave behind.
 * **7** the export path: an `apng` of an in/out range, measured frame by
@@ -543,6 +547,24 @@ def drawn_box(sw, sh, crop, scale, rot, x, y, w, h, delta=(0.0, 0.0),
     return cx - hx, cy - hy, cx + hx, cy + hy
 
 
+def turned_corners(sw, sh, crop, scale, rot, x, y, w, h):
+    """The VISIBLE rect's four corners in canvas pixels, turned `rot`°
+    CLOCKWISE (y down, spec §7.3) about the visible centre `geometry` answers.
+
+    A turn here is a motion's `φ`, so the pivot rule holds the visible centre
+    where the un-turned layer has it: the centre is `geometry`'s at no
+    rotation, and only the corners turn. `(x, y)` → `(x·cos − y·sin,
+    x·sin + y·cos)` is clockwise on a y-down canvas."""
+    l, t, r, b = crop
+    _, _, px, py = geometry(sw, sh, crop, scale, 0.0, x, y)
+    cx, cy = w / 2.0 + px, h / 2.0 + py
+    ax = scale * max(sw - l - r, 0.0) / 2.0
+    ay = scale * max(sh - t - b, 0.0) / 2.0
+    c, s = math.cos(math.radians(rot)), math.sin(math.radians(rot))
+    return [(cx + u * c - v * s, cy + u * s + v * c)
+            for u, v in ((-ax, -ay), (ax, -ay), (ax, ay), (-ax, ay))]
+
+
 # ---- a motion patch ------------------------------------------------------
 #
 # `MotionProps.dictionary` always writes three keys and a `motion` patch
@@ -892,6 +914,43 @@ def during_part(mcp):
           f"…and an EIGHTH of one turns the square 45°: bounding box "
           f"{found[2] - found[0] + 1} × {found[3] - found[1] + 1} (wanted {side:.1f} ± 2)")
 
+    # **The DIRECTION, which a square cannot show** (#78): a bounding box at
+    # +45° and −45° is one rectangle. A 500 × 100 card cropped 100 px on the
+    # left is a 400 × 100 visible rect whose centre sits 50 px right of the
+    # anchor, so the pivot compensation matters and the turned corners do
+    # not mirror: clockwise (y down), the TOPMOST corner lies left of the
+    # visible centre and the LEFTMOST above it; a reversed spin swaps both.
+    crop = (100.0, 0.0, 0.0, 0.0)
+    turned, tclip = card_session(
+        mcp, "e2-spin-crop", size=(500, 100),
+        crop={"l": crop[0], "t": crop[1], "r": crop[2], "b": crop[3]})
+    set_motion(turned, tclip, motion(during=slot("spin", 0.5, 0.8)))
+    image = turned.image(SEC // 10)
+    found = ink_box(image)
+    corners = turned_corners(500, 100, crop, 1.0, 45.0, 0.0, 0.0, 640, 360)
+    centre = ((found[0] + found[2] + 1) / 2.0, (found[1] + found[3] + 1) / 2.0) \
+        if found else None
+    check(centre is not None and abs(centre[0] - 370) <= 1.5 and abs(centre[1] - 180) <= 1.5,
+          f"CONTROL: the cropped card turns about its VISIBLE centre: ink box {found}, "
+          f"centre {centre} (wanted (370, 180) ± 1.5)")
+    ch = image.channels
+    top_cols = left_rows = []
+    if found:
+        top_cols = [x for x in range(image.width)
+                    if image.rows[found[1]][x * ch] >= INK]
+        left_rows = [y for y in range(image.height)
+                     if image.rows[y][found[0] * ch] >= INK]
+    top_x = sum(top_cols) / len(top_cols) if top_cols else None
+    left_y = sum(left_rows) / len(left_rows) if left_rows else None
+    check(top_x is not None and left_y is not None and top_x < 370 and left_y < 180,
+          f"…and it turns CLOCKWISE: the topmost ink row's mean column {top_x} is left of "
+          f"370 and the leftmost ink column's mean row {left_y} is above 180")
+    wanted = min(corners, key=lambda p: p[1])[0]
+    check(top_x is not None and abs(top_x - wanted) <= 3,
+          f"…with that topmost column where the turned corners put it: {top_x} (wanted "
+          f"{wanted:.1f} ± 3; a reversed spin would put it at "
+          f"{min(turned_corners(500, 100, crop, 1.0, -45.0, 0.0, 0.0, 640, 360), key=lambda p: p[1])[0]:.1f})")
+
     # **Where a whole turn that is not EXACTLY no turn actually shows.** A
     # rotation of 360 reaches the compositor as `Float(360·π/180)`, whose
     # `sin` is ~1.7e-7 rather than 0 — far too small to move a pixel by
@@ -1013,6 +1072,39 @@ def compose_part(mcp):
     check(abs(image.centre()[0] - round(192 * ease("ease_out", 0.5))) <= 1,
           f"…and at the nest's own eased opacity ({image.centre()})")
 
+    # **A slide INSIDE a nest travels on the NEST's canvas** (#78). The nest
+    # freezes the 640 × 360 it was made at; `set_canvas` then moves the
+    # project to 1280 × 720. An inner card's `slide_left` enters from the
+    # nest's right edge (320 + 100 px out at u = 0), not the project's
+    # (640 + 100): at u = 0.5 the leading column is 645 on the nest's
+    # canvas and would be 725 on the project's.
+    slid = Session(mcp, "e2-nest-slide")
+    strack = slid.tracks()[0]
+    scard = slid.card(strack, grey(192), size=(200, 200), at=0, duration=4 * SEC)
+    set_motion(slid, scard, motion(arrive=edge("slide_left", 1.0)))
+    snest = slid.op_with("nest", {"clips": [scard]})["new_clips"][0]
+    slid.op("set_canvas", width=1280, height=720)
+    project = slid.project()
+    frozen = (project["nests"][0]["width"], project["nests"][0]["height"])
+    video = {c["id"]: c for c in project["clips"]}[snest]["video"]
+    check((project["canvas"]["width"], project["canvas"]["height"]) == (1280, 720)
+          and frozen == (640, 360)
+          and video["scale"] == 1 and video["x"] == 0 and video["y"] == 0,
+          f"CONTROL: the project is 1280 × 720 and the nest stays {frozen[0]} × {frozen[1]}, "
+          f"its clip at scale {video['scale']}, x {video['x']}, y {video['y']}")
+    found = ink_box(slid.image(SEC))
+    check(found is not None
+          and all(abs(a - b) <= 1 for a, b in zip(found, (540, 260, 739, 459))),
+          f"CONTROL: arrived, the card sits in the nest's centre on the bigger canvas: "
+          f"{found} (wanted (540, 260, 739, 459) ± 1)")
+    dx, _ = slide_edge("slide_left", 0.5, 200, 200, (0, 0, 0, 0), 1.0, 0.0, 0.0, 0.0, 640, 360)
+    wanted = 320 + 220 + dx
+    found = ink_box(slid.image(SEC // 2))
+    check(found is not None and abs(found[0] - wanted) <= 1,
+          f"…and at u = 0.5 its leading column is measured on the NEST's frozen canvas: "
+          f"{found[0] if found else None} (wanted {wanted:.0f} ± 1; the project's canvas "
+          f"would give {320 + 220 + slide_edge('slide_left', 0.5, 200, 200, (0, 0, 0, 0), 1.0, 0.0, 0.0, 0.0, 1280, 720)[0]:.0f})")
+
 
 # ---- section 6: the model rules ------------------------------------------
 
@@ -1103,9 +1195,16 @@ def export_part(mcp):
     if os.path.exists(frames):
         shutil.rmtree(frames)
     os.makedirs(frames)
-    subprocess.run(
-        ["ffmpeg", "-v", "error", "-y", "-i", written,
-         os.path.join(frames, "frame_%03d.png")], check=True)
+    try:
+        subprocess.run(
+            ["ffmpeg", "-v", "error", "-y", "-i", written,
+             os.path.join(frames, "frame_%03d.png")],
+            check=True, capture_output=True, text=True)
+    except (subprocess.CalledProcessError, OSError) as error:
+        text = getattr(error, "stderr", None) or str(error)
+        first = (text.strip().splitlines() or ["(no output)"])[0]
+        skip(3, f"ffmpeg could not take the APNG apart on this host: {first}")
+        return
     written_frames = sorted(os.listdir(frames))
     check(len(written_frames) >= 13,
           f"the APNG holds {len(written_frames)} frames (the image-sequence writer refuses "

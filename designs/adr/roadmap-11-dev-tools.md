@@ -53,7 +53,6 @@ Two needs, one instrument: an agent should be able to look at the running app's 
 
 ## Open items
 
-- `phase9_proof.py`'s nest-scope playhead rows, failing on both builds: #130.
 - `recording_proof.py`'s microphone rows, failed on both builds with a Bluetooth input, owed a rerun with a wired or built-in input: #57 (V2a's figures added as a comment).
 - Re-run the capture spike: three bare `RunLoop.main.run` waits, and I rows against the grown inventory: #132.
 - The late-sheet row (`v2_menu.py` L1) exists, but its mutant clause does not hold: a settle removed still passes it: #135.

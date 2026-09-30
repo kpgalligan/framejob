@@ -160,10 +160,24 @@ extension EditorViewController {
     /// scroll that normally rides along with a moved playhead does not fire.
     /// `revealPlayhead` widened from private to internal for it, the widening
     /// `MediaReveal.swift` already forced on `scroll(toX:)` next door.
+    ///
+    /// **Not through `setPlayhead`** (#130). Its asked seek went to the item
+    /// still on the player — the OUTGOING one, the other container's — where a
+    /// time past that item's end clamped there and was HEARD, and the rebuild
+    /// then restored to the clamped time. The playhead is snapped as
+    /// `setPlayhead` snaps it and written here, and `Playback.seekAfterRebuild`
+    /// holds it for the rebuild in flight, which lands there and is heard once.
     private func finishScopeChange() {
         guard let document = document else { return }
         refreshFromDocument(isLive: false)
-        setPlayhead(document.playhead)
+        let snapped = ReelTime.snapToFrame(
+            max(0, document.playhead), fps: document.editedProject.snapshot.canvas.fps)
+        document.playhead = snapped
+        playback.seekAfterRebuild(to: snapped)
+        refreshTimecode()
+        canvasPlayheadMoved()
+        timelinePlayheadMoved()
+        inspectorPlayheadMoved()
         timeline?.revealPlayhead()
     }
 

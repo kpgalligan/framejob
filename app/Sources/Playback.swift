@@ -21,6 +21,7 @@ import AppKit
 /// `LevelMeter.shared`. See `LevelMeter.swift` for why the meter is computed
 /// from the DSP tap rather than observed from a second one.
 /// The meter's read and its two switches live in `Playback+Meter.swift`.
+/// `previewComposition` lives in `Playback+PreviewQuality.swift`, `stepFrames` in `+Step`.
 ///
 /// Road map 2's phase 8 hung two more things off the player, and both are here
 /// because both are about the PLAYER rather than about the document: View ▸
@@ -40,15 +41,6 @@ final class Playback {
     /// short enough that the preview never feels detached (§7.6).
     static let liveRebuildDelay: TimeInterval = 0.08
 
-    /// How often the level meter is re-read while the transport is moving.
-    ///
-    /// It is a READ rate, not a measurement rate: the taps publish once per
-    /// buffer, which is 12–20 Hz on the paths this app has measured (4096
-    /// frames is 85 ms at 48 kHz), so 30 Hz merely makes sure a new buffer is
-    /// picked up within a frame of arriving. `Exporter.progressInterval` is
-    /// the same idea at a slower cadence.
-    static let meterInterval: TimeInterval = 1.0 / 30
-
     /// The layer `PreviewCanvasView` puts under its overlay (§11: an
     /// `AVPlayerLayer`, not a self-driven `MTKView`, so A/V sync and
     /// scrubbing come from the player).
@@ -56,7 +48,8 @@ final class Playback {
 
     /// Playhead time, from the periodic observer — the timeline and the
     /// timecode field both follow this. It carries a seek someone ASKED for
-    /// (`seek(to:)`) and time while PLAYING, and never the jumps of this
+    /// (`seek(to:)`; a scope change's `seekAfterRebuild(to:)`, heard once where
+    /// it lands) and time while PLAYING, and never the jumps of this
     /// object's own RESTORE seeks — a rebuild's item swap and re-land, the
     /// paused refresh's round trip — which the observer reports too: a
     /// restore is silent while it runs and is heard once, when it lands, only
@@ -70,6 +63,9 @@ final class Playback {
     /// A rebuild that failed. Rare (a corrupt file mid-edit) and never fatal:
     /// the previous item keeps playing.
     var onError: ((any Error) -> Void)?
+    /// The probe's seam (`scope_playhead_probe.py`), nil in the app: handed the block a rebuild
+    /// would give `DispatchQueue.main.async`, its holder runs it on main, once.
+    var rebuildHop: ((@escaping () -> Void) -> Void)?
 
     /// The in/out range when one is set: playback wraps at its end (§4.4).
     var loopRange: (start: Ticks, duration: Ticks)?
@@ -116,6 +112,10 @@ final class Playback {
     private var refreshWanted = false
     /// True from a restore's first line until its last seek lands.
     private var restoring = false
+    /// True from `startRebuild`'s dispatch until that generation lands or is discarded.
+    private var rebuilding = false
+    /// True from `seekAfterRebuild` until the rebuild it waits for lands, fails or is discarded.
+    private var holding = false
     /// The last tick `onTimeChanged` carried.
     private var reported: Ticks?
     /// Bumped by every `player.seek`; a completion for an older serial is
@@ -181,6 +181,8 @@ final class Playback {
         pending = nil
         refreshWanted = false
         restoring = false
+        rebuilding = false
+        holding = false
         stopMetering()
         player.pause()
         player.replaceCurrentItem(with: nil)
@@ -230,6 +232,13 @@ final class Playback {
             debounceTimer?.invalidate()
             debounceTimer = nil
             pending = nil
+            generation += 1  // …and one in flight is discarded (#130).
+            rebuilding = false
+            if holding {
+                holding = false
+                isSeeking = false
+                startSeek(to: lastKnownTime)
+            }
             if player.rate == 0 { refreshPausedFrame() }
             return
         }
@@ -325,40 +334,6 @@ final class Playback {
         refreshPausedFrame()
     }
 
-    /// The composition to hand the player: the one the plan built at Full, and
-    /// otherwise the builder's configuration with a smaller `renderSize` (#91).
-    ///
-    /// **The copy is the whole design.** `CompositionBuilder.build` is shared
-    /// by the preview, both export passes and the offline one-frame render, so
-    /// scaling there — even behind an argument — would put the export within
-    /// one wrong parameter of the preview's setting. Copying here means the
-    /// export path never sees a scaled composition at all;
-    /// `ExportWriter.videoComposition(_:settings:)` does exactly this to
-    /// `frameDuration` for the same reason.
-    ///
-    /// It reads the size off the BUILT configuration every time rather than
-    /// remembering one, so it is idempotent: two quality changes in a row both
-    /// scale the pristine canvas size and never a size already scaled.
-    ///
-    /// The configuration carries the plan's `RecipeInstruction`s through, a
-    /// CUSTOM class rather than one of AVFoundation's (`Compositor.swift`), as
-    /// the item's own `copy` of `videoComposition` always has. Static, so
-    /// `phase8_chrome.py`'s probe calls it rather than a copy of it.
-    ///
-    /// At Full — and at any quality a coprime canvas degrades to Full — the
-    /// guard returns the builder's own object with no new one made at all, so a
-    /// preview at the default setting is byte for byte the preview this file
-    /// built before the setting existed.
-    static func previewComposition(
-        _ built: BuiltComposition, quality: PreviewQuality
-    ) -> AVVideoComposition {
-        var configuration = built.videoConfiguration
-        let wanted = quality.renderSize(for: configuration.renderSize)
-        guard wanted != configuration.renderSize else { return built.videoComposition }
-        configuration.renderSize = wanted
-        return AVVideoComposition(configuration: configuration)
-    }
-
     /// A second `AVPlayerLayer` on this document's player, for the preview
     /// window (`PreviewWindowController.swift`).
     ///
@@ -387,6 +362,10 @@ final class Playback {
         // graphics, text, shapes or images has no plan track, and the builder's
         // placeholder gives its item one to tick against (road map 10 §10.8).
         guard request.plan.duration > 0 else {
+            generation += 1
+            rebuilding = false
+            holding = false
+            isSeeking = false
             built = nil
             builtPlanJSON = request.planJSON
             builtAudioDSP = request.audioDSP
@@ -401,6 +380,8 @@ final class Playback {
         let planJSON = request.planJSON
         let urls = request.urls
         let audioDSP = request.audioDSP
+        let hop = rebuildHop
+        rebuilding = true
         rebuildQueue.async { [weak self] in
             let result = Result {
                 // The ONE metering build in the app. An export and a rendered
@@ -410,9 +391,10 @@ final class Playback {
                 try CompositionBuilder.build(
                     plan: plan, planJSON: planJSON, urls: urls, recipeKey: key, metering: true)
             }
-            DispatchQueue.main.async { [weak self] in
+            let finish: () -> Void = { [weak self] in
                 self?.finishRebuild(result, generation: generation, audioDSP: audioDSP)
             }
+            if let hop = hop { hop(finish) } else { DispatchQueue.main.async(execute: finish) }
         }
     }
 
@@ -423,10 +405,17 @@ final class Playback {
         // A newer rebuild started while this one was on the queue: its result
         // is the current one, and this item would be a step backwards.
         guard generation == self.generation else { return }
+        rebuilding = false
         switch result {
         case .failure(let error):
+            if holding {
+                holding = false
+                isSeeking = false
+                restoring = false
+            }
             onError?(error)
         case .success(let composition):
+            holding = false
             let time = currentTime
             let rate = player.rate
             let item = AVPlayerItem(asset: composition.composition)
@@ -503,10 +492,28 @@ final class Playback {
     }
 
     /// THE ASKED DOOR: a seek someone wants, so its jump is reported as a
-    /// playhead move. This object's own restores go through `startSeek`.
+    /// playhead move. This object's own restores go through `startSeek`. Asked
+    /// while a restore is seeking, it queues silently and is heard once where
+    /// it lands (#130).
     func seek(to t: Ticks) {
-        restoring = false
+        if !isSeeking { restoring = false }
         startSeek(to: t)
+    }
+
+    /// A scope change's seek (#130): `t` is in the container `update` was just handed, so the
+    /// OUTGOING item is neither sought nor heard, and a rebuild in flight lands there, heard once.
+    func seekAfterRebuild(to t: Ticks) {
+        seekSerial += 1
+        pendingSeek = nil
+        restoring = true
+        lastKnownTime = max(0, t)
+        guard rebuilding else {
+            isSeeking = false
+            startSeek(to: t)
+            return
+        }
+        holding = true
+        isSeeking = true
     }
 
     /// One in-flight seek at a time, intermediates dropped (§7.6): a scrub
@@ -560,16 +567,6 @@ final class Playback {
     private func report(_ t: Ticks) {
         reported = t
         onTimeChanged?(t)
-    }
-
-    /// Steps `n` frames (negative steps back) and pauses: stepping while
-    /// playing means nothing, and the arrow keys are how a cut is placed
-    /// exactly (§9).
-    func stepFrames(_ n: Int, fps: Fps) {
-        let step = fps.frameDuration
-        guard step > 0, n != 0 else { return }
-        pause()
-        seek(to: max(0, currentTime + Ticks(n) * step))
     }
 
     // MARK: - Observers
