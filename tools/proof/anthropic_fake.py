@@ -41,6 +41,16 @@ Routes:
   reaches the partial cost — then holds the connection open until the client
   closes it or `"stall_seconds"` (default 30) pass. With no `"cut"` the bytes
   are unchanged.
+  A Block may also be `{"type":"compaction","content"}` (issue batch B26,
+  #161), the API's summary: streamed, its `content_block_start` carries
+  `{"type":"compaction","content":null,"encrypted_content":null}` and its ONE
+  delta is a `compaction_delta` carrying the whole content and
+  `"encrypted_content":null`; in a non-stream Message the block gains
+  `"encrypted_content":null`. A reply may also carry `"iterations"`, a list
+  of `{"type","input_tokens","output_tokens","cache_creation_input_tokens",
+  "cache_read_input_tokens"}`, which becomes `usage.iterations` in the final
+  `message_delta` and in the non-stream Message. A reply with neither keeps
+  its bytes.
 * `GET /__control/log` answers
   `{"requests":[{"method","path","headers","body","bytes"}],"failures":[str]}`.
 
@@ -119,11 +129,16 @@ class Fake:
 
 
 def message_object(reply, index, model):
-    return {"id": f"msg_a0_{index + 1}", "type": "message", "role": "assistant",
-            "model": model, "content": reply.get("content", []),
-            "stop_reason": reply.get("stop_reason"), "stop_sequence": None,
-            "usage": {"input_tokens": reply.get("input_tokens", 100), "output_tokens": 10,
-                      "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0}}
+    content = [dict(block, encrypted_content=None) if block.get("type") == "compaction"
+               else block for block in reply.get("content", [])]
+    message = {"id": f"msg_a0_{index + 1}", "type": "message", "role": "assistant",
+               "model": model, "content": content,
+               "stop_reason": reply.get("stop_reason"), "stop_sequence": None,
+               "usage": {"input_tokens": reply.get("input_tokens", 100), "output_tokens": 10,
+                         "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0}}
+    if "iterations" in reply:
+        message["usage"]["iterations"] = reply["iterations"]
+    return message
 
 
 def stream_events(reply, index, model):
@@ -148,6 +163,10 @@ def stream_events(reply, index, model):
                        "input": {}}
             delta = {"type": "input_json_delta",
                      "partial_json": json.dumps(block.get("input", {}))}
+        elif block.get("type") == "compaction":
+            opening = {"type": "compaction", "content": None, "encrypted_content": None}
+            delta = {"type": "compaction_delta", "content": block.get("content"),
+                     "encrypted_content": None}
         else:
             opening = {"type": "text", "text": ""}
             delta = {"type": "text_delta", "text": block.get("text", "")}
@@ -158,10 +177,13 @@ def stream_events(reply, index, model):
         events.append(("content_block_stop", {"type": "content_block_stop", "index": at}))
     if cut in ("drop", "stall"):
         return events
+    final_usage = {"output_tokens": 10}
+    if "iterations" in reply:
+        final_usage["iterations"] = reply["iterations"]
     events.append(("message_delta", {"type": "message_delta",
                                      "delta": {"stop_reason": reply.get("stop_reason"),
                                                "stop_sequence": None},
-                                     "usage": {"output_tokens": 10}}))
+                                     "usage": final_usage}))
     events.append(("message_stop", {"type": "message_stop"}))
     return events
 

@@ -40,11 +40,21 @@ enum AssistantConfiguration {
     /// AI-11's default.
     static let defaultModel = "claude-opus-5-5"
 
+    /// The end-of-turn compaction threshold, in tokens (AI-9).
+    static let autoCompactTokens = 300_000
+
     /// The helper's `ChatSettings` (`agent/src/protocol.ts`): compaction at
-    /// the end of a turn past 300 000 tokens (AI-9), and old tool results kept.
-    static let settingsJSON: [String: Any] = [
-        "auto_compact_tokens": 300_000, "clear_tool_results": false,
-    ]
+    /// the end of a turn past `autoCompactTokens` (AI-9), and old tool results
+    /// kept. A dev build takes `-RCDevAssistantAutoCompact <tokens>` in its
+    /// place, for a proof (AI-18).
+    static func settingsJSON(defaults: UserDefaults = .standard) -> [String: Any] {
+        #if REELCUT_DEV_TOOLS
+        let tokens = devAutoCompactTokens(defaults: defaults) ?? autoCompactTokens
+        #else
+        let tokens = autoCompactTokens
+        #endif
+        return ["auto_compact_tokens": tokens, "clear_tool_results": false]
+    }
 
     /// Why the base-URL override cannot be used, in the sentence the session
     /// refuses with.
@@ -130,3 +140,25 @@ extension AssistantConfiguration {
     /// The notification's `userInfo` key; its value is "key" or "model".
     static let changeKey = "change"
 }
+
+#if REELCUT_DEV_TOOLS
+extension AssistantConfiguration {
+    /// `-RCDevAssistantAutoCompact <tokens>` — a dev-only LAUNCH default
+    /// (spec §11 AI-18): the end-of-turn compaction threshold a proof lowers,
+    /// read from the argument domain alone. The shipped threshold is
+    /// `autoCompactTokens`.
+    static let devAutoCompactArgument = "RCDevAssistantAutoCompact"
+
+    /// The knob's tokens, or nil when it is absent. A value that is not a
+    /// whole number of 1 or more is named on stderr and ignored.
+    static func devAutoCompactTokens(defaults: UserDefaults) -> Int? {
+        guard let raw = AssemblyAIConfiguration.argument(devAutoCompactArgument, defaults: defaults)
+        else { return nil }
+        if let tokens = Int(raw), tokens >= 1 { return tokens }
+        let line = "\(devAutoCompactArgument) must be a whole number of tokens, 1 or more "
+            + "(got \"\(raw)\"); \(autoCompactTokens) is kept.\n"
+        FileHandle.standardError.write(Data(line.utf8))
+        return nil
+    }
+}
+#endif

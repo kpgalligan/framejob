@@ -1436,7 +1436,9 @@ free.
   first, `ANTHROPIC_API_KEY` second. `model()` is `ReelcutAssistantModel`,
   else `claude-opus-5-5`; no tool reads or writes it. `didChangeNotification`
   (`userInfo[changeKey]` "key" or "model") is posted by Settings' Assistant
-  pane alone.
+  pane alone. `settingsJSON()` sends `autoCompactTokens` (300 000, AI-9), or
+  in a dev build `-RCDevAssistantAutoCompact <tokens>` from the argument
+  domain (AI-18).
 - `AssistantPrompt.swift` — the core tools loaded up front (`get_project`,
   `render_frame`, `undo`, `redo`; the lane probe's L6 holds each to the
   assistant's catalog), the system prompt, the search guide, the compaction

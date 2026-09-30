@@ -8120,7 +8120,7 @@ instrument failure is a scored FAIL, exit 1.
 
 | Runner | caught / survived / not performed |
 |---|---|
-| `assistant_lane_proof.py`, `assistant_tab_proof.py`, `assistant_helper_proof.py`, `assistant_prompt_proof.py`, `assistant_session_proof.py`, `spend_proof.py`, `budget_proof.py`, `prices_proof.py`, `prices_crosscheck.py`, `makefile_env_proof.py`, `export_cancel_proof.py`, `video_configuration_proof.py`, `speed_sheet_probe.py`, `text_break_proof.py`, `name_field_proof.py` (`--baseline`, B23) and `obscure_handles_probe.py` (`--baseline` and `--mutant`, B25) | 1 / 0 / 2 |
+| `assistant_lane_proof.py`, `assistant_tab_proof.py`, `assistant_helper_proof.py`, `assistant_prompt_proof.py`, `assistant_session_proof.py`, `spend_proof.py`, `budget_proof.py`, `prices_proof.py`, `prices_crosscheck.py`, `makefile_env_proof.py`, `export_cancel_proof.py`, `video_configuration_proof.py`, `speed_sheet_probe.py`, `text_break_proof.py`, `name_field_proof.py` (`--baseline`, B23), `obscure_handles_probe.py` (`--baseline` and `--mutant`, B25) and `assistant_compaction_proof.py` (`--mutant`, B26) | 1 / 0 / 2 |
 | `spend_ui_proof.py` | 1 / 3 / 2 |
 | `graphics_proof.py`, `graphics_store_probe.py`, `words_picture_probe.py` | 0 / 1 / 2 |
 | `cloud_captions_proof.py`, `cloud_captions_probe.py` (`--mutant`, `--fake-mutant`), `recording_probe.py`, `phase9_chrome.py` — whole-suite mutants | the per-row count and a normal run's exit / 2 |
@@ -8897,3 +8897,59 @@ Run on 2026-09-30 against HEAD0 `ffae505`, every instance my own:
 | `phase3_chrome.py` on HEAD0 (a worktree) and on the fix | 33/33; 35/35 |
 | `clip_inspector6_proof.py` (port 4851) | 25/25, K3's parity row: no `Reelcut: ` line |
 | `make typecheck`; `make test`; `make app` | 0 errors, 4 warnings, tsc clean; exit 0; BUILD SUCCEEDED |
+
+## Issue batch B26 — the assistant's compaction against the real API (`assistant_compaction_proof.py`; #161)
+
+The assistant's end-of-turn compaction (spec §11 AI-9) had only run against
+the stand-in (`assistant_helper_proof.py` P4, `assistant_prompt_proof.py` S3).
+`assistant_compaction_proof.py` drives a two-turn conversation through the
+Assistant tab's composer (`assistant_send` with `pane`) across a compaction,
+against the stand-in (`--rehearse`) or the real API (`--live --cap D`),
+through `assistant_prompt_eval.py`'s relay (now with `keep_exchanges`: each
+forwarded POST's parsed body and reply bytes kept in memory, never on disk).
+The app launches on port 4883 with `-RCDevAssistantAutoCompact 1` (spec §11
+AI-18, compiled only with `REELCUT_DEV_TOOLS`), so every turn ends compacted;
+the shipped threshold stays 300 000. The fixture burns ids to 71 first
+(`add_track` then `remove_empty_tracks`, pair after pair, under
+`MAX_TRACKS`), so every judged id has two digits and matches no number in the
+two messages. The rows (the runner's docstring has each in full): C0 no
+`Reelcut: ` line; C1 turn 1's three edits and a `render_frame`, by
+`get_project`; C2 one `compaction_started` below 300 000, then `compacted`,
+and the summary POST's 200 with stop_reason `compaction`; C3 the summary POST
+is turn 1's last and carries `{"type":"summarize","instructions": …}` with
+`AssistantPrompt.compactionInstructions` exactly (from
+`assistant_prompt_proof.py`'s probe); C4 the summary names the title clip,
+the Shapes track and the Intro marker by id, the edits, the frame and the
+outro's 4.5 s; C5 turn 2 starts from the summary block and places Outro at
+2700000, nothing else changed; C6 the tab's transcript (layout dump,
+`assistant.entry.<kind>`, each part's first 200 characters): no error, no
+unfinished compaction, the two person entries, each "Compacting…" followed
+directly by "Compacted: B → about A tokens…" with 0 < A < B; H the relay's
+bounds; K (live) the key in no file. A refused POST fails its turn's rows
+naming `cap:` or `budget:`. The stand-in (`anthropic_fake.py`) gained a
+`compaction` block and a reply's optional `iterations`; replies without them
+keep their bytes.
+
+Headroom, as the runner prints it: worst POST $3.31; a conversation bound of
+12 POSTs (one cache write, 11 cache reads, 12 × 2,000 output) $3.85; floor
+$7.15; suggested cap $8.00. Its estimate at `claude-opus-5-5`'s table row
+(8 POSTs × 3,000 input + 5,000 5-minute write + 20,000 read + 500 output) is
+$0.41.
+
+Run on 2026-09-30 against HEAD0 `68d58ea`, every instance my own:
+
+| Command | Answer |
+|---|---|
+| `assistant_compaction_proof.py --rehearse` | 8/8 pass, 1 skipped (K), exit 0 |
+| `assistant_compaction_proof.py --rehearse --wrong` | 3/8, exit 1: exactly C1, C2, C4, C5, C6 FAIL (5 otherwise); C0, C3, H ok |
+| `assistant_compaction_proof.py --rehearse --month-spent 24.99` | 2/8, exit 1: C1–C6 FAIL `budget:` (6 on the budget); the stand-in logged 0 POSTs |
+| `assistant_compaction_proof.py --mutant extra-instruction` | exit 1, caught: C3 FAIL alone ("verbatim False", instructions 509 chars, wanted 499) |
+| `assistant_prompt_proof.py --rehearse` | 25/25 pass, 1 skipped, exit 0 |
+| `assistant_compaction_proof.py --live --cap 8` (run 20260930T115547) | 9/9 pass, exit 0; $0.3321 settled (turn 1 $0.1850 over 5 POSTs, turn 2 $0.1471 over 3); the proofs' ledger $0.5272 before, $0.8594 after, of $25.00 |
+| `make typecheck`; `make test`; `make app`; `make dist` | 0 errors, 4 warnings, tsc clean; exit 0 on a re-run (the first run's `graphic/tests/sandbox.rs` `string_50mb` went over its 250 ms budget at a load average of 63; `graphic/` is untouched); BUILD SUCCEEDED; `dist_check: 14/14` |
+
+The live run's turn 1 compacted from 18,998 to about 884 tokens (C2), and its
+2,186-character summary held every C4 fact. The live run is not in
+`make test`. Run it only when a change is likely to break compaction (the
+helper, the SDK, `AssistantPrompt.compactionInstructions`, the session's
+`configure`).

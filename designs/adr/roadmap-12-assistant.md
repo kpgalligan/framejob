@@ -2,7 +2,7 @@
 
 - **Status:** Built and closed 2026-09-28. A0 the spike 2026-09-27 (`4f8d4ce`); A1 the lane (`08ab2ee`), the helper and its build (`68ccc20`) and the session (`5a88a57`) 2026-09-27; A2 the Assistant tab 2026-09-27 (`dae833a`); A3 the prompt 2026-09-27 (`172cf0c`, committed 2026-09-28); A4 `dist_check.py`'s helper rows and the close 2026-09-28 (uncommitted when this was written). Each phase was one litecode pipeline; A2's and A3's reader reviews each found one fix, landed in their commits.
 - **Original:** `archive/reelcut-roadmap-12.md` (1022 lines) is the full record. Sections cited below as "orig §x" refer to it.
-- **Spec decisions:** AI-1..AI-16 in spec §11 (`designs/spec/11-decisions/assistant.md`), which stay binding:
+- **Spec decisions:** AI-1..AI-18 in spec §11 (`designs/spec/11-decisions/assistant.md`), which stay binding:
   - AI-1: the assistant is a bundled helper, and the app never calls Anthropic itself.
   - AI-2: the helper owns no tools; every call goes through `AgentServer.execute` by way of one lane.
   - AI-3: the catalog and the gate are prepared at launch, not at `start()`.
@@ -19,6 +19,8 @@
   - AI-14: a selection change that is not a click on a clip leaves the Assistant tab showing; a click still shows Clip.
   - AI-15: the window's live context rides on each person message; the system prompt is fixed for a session.
   - AI-16: Stop stops a running `export` or on-device `transcribe`; any other running call finishes.
+  - AI-17: the transcript is one selectable text, and the composer is multi-line with K-2's Return.
+  - AI-18: a proof lowers the end-of-turn compaction threshold with the dev-only launch default `-RCDevAssistantAutoCompact <tokens>`; the shipped threshold stays 300 000.
   The helper, the lane, the session, the prompt and the tab are specified in spec §7.9; the files are mapped in §7.4.
 
 ## Context
@@ -48,12 +50,12 @@ The user asked for an AI agent in the editor, "designed in the same way that the
 - The lane and table: `AgentLane.swift` (224), `AssistantToolTable.swift` (130); wiring in the frozen `AgentServer.swift`, `main.swift`.
 - The session: `AssistantSession.swift` (400), `AssistantConfiguration.swift` (132), `AssistantPrompt.swift` (163), `AssistantLiveContext.swift` (54), `EditorViewController+Assistant.swift` (150).
 - The tab: `InspectorTab.swift` (73), `AssistantPane.swift` (45), `AssistantView.swift` (299), `AssistantTranscriptView.swift` (121), `AssistantTranscript.swift` (183), `AssistantContextMeter.swift` (105), `AssistantSettingsPane.swift` (207); View ▸ Assistant ⌃⌘A.
-- Dev only: `AgentServer+Assistant.swift` (312: `assistant_send`, `assistant_answer`), `DevAssistantLaunch.swift` (175), rows in `AgentServer+DevTools.swift` (105).
-- Proof: `assistant_spike/` (32 rows, B/H/C/F/T/E/D/L); `anthropic_fake.py` (285, the stand-in); `assistant_lane_proof.py` + `assistant_lane_probe.swift` (12 rows, in `make test`); `assistant_helper_proof.py` (P0–P5, two mutants); `assistant_session_proof.py` (11 rows); `assistant_tab_proof.py` + `assistant_tab_probe.swift` (16 rows); `assistant_prompt_proof.py` + `assistant_prompt_probe.swift` (F1–F7, M1–M4 in `make test`; S0–S3; E1–E6, H, K) and `assistant_prompt_eval.py` (696); `dist_check.py` (D1–D13) and `dist_check_mutants.py` (11 cases). `tools/proof/README.md` has each one's launch line.
+- Dev only: `AgentServer+Assistant.swift` (312: `assistant_send`, `assistant_answer`), `DevAssistantLaunch.swift` (175), rows in `AgentServer+DevTools.swift` (105); the `-RCDevAssistantAutoCompact <tokens>` launch default in `AssistantConfiguration.swift`'s `#if REELCUT_DEV_TOOLS` extension (issue batch B26, AI-18).
+- Proof: `assistant_spike/` (32 rows, B/H/C/F/T/E/D/L); `anthropic_fake.py` (285, the stand-in); `assistant_lane_proof.py` + `assistant_lane_probe.swift` (12 rows, in `make test`); `assistant_helper_proof.py` (P0–P5, two mutants); `assistant_session_proof.py` (11 rows); `assistant_tab_proof.py` + `assistant_tab_probe.swift` (16 rows); `assistant_prompt_proof.py` + `assistant_prompt_probe.swift` (F1–F7, M1–M4 in `make test`; S0–S3; E1–E6, H, K) and `assistant_prompt_eval.py` (696); `dist_check.py` (D1–D13) and `dist_check_mutants.py` (11 cases); `assistant_compaction_proof.py` (C0–C6, H, K; `--rehearse`, `--wrong`, `--live`, the `extra-instruction` mutant; issue batch B26, #161). `tools/proof/README.md` has each one's launch line.
 
 ## Known limits
 
-- **The six asks have run once against the real API** (#157, 2026-09-30 at f5ec6e9, `--live --cap 20`): 26/26, E1–E6 each right by `get_project` placement, $0.5272 settled at the table's own prices. End-of-turn compaction on the real API has never run (#161).
+- **The six asks have run once against the real API** (#157, 2026-09-30 at f5ec6e9, `--live --cap 20`): 26/26, E1–E6 each right by `get_project` placement, $0.5272 settled at the table's own prices. **End-of-turn compaction has run once against the real API** (#161, issue batch B26, 2026-09-30 at 68d58ea plus the batch's diff, `assistant_compaction_proof.py --live --cap 8`, run 20260930T115547): 9/9 — turn 1's three edits and its `render_frame` placed; one `compaction_started` at 18,998 tokens, then `compacted` to about 884; the summary POST carried `compactionInstructions` verbatim; its 2,186-character summary named the title clip, the Shapes track and the Intro marker by id, the edits, the frame and the outro's 4.5 s; turn 2 started from the summary block and placed Outro at 2700000; the tab's transcript read cleanly; $0.3321 settled, the proofs' ledger $0.5272 before and $0.8594 after. It ran at `-RCDevAssistantAutoCompact 1` (AI-18), so it proves a summary of about 19 000 tokens of context, not of 300 000.
 - **Ad-hoc signing only**: no Developer ID, notarization or quarantine; the Release app carries `get-task-allow`; Distribution does not (#145, `dist_check.py` D14).
 - **`assistant_helper_proof.py` P1 skips** on a host with bun at a fixed path (`/opt/homebrew/bin`, `/usr/local/bin`), because `build.sh`'s own `PATH` finds it there.
 - **The mid-drag row is reachable in a probe only**: no MCP tool begins a gesture; L8 measures `submit`, the session's one door.
@@ -66,7 +68,7 @@ The user asked for an AI agent in the editor, "designed in the same way that the
 - #151 Chat Settings are not offered.
 - #152 a question asked while the tab is hidden draws no attention.
 - #160 candidate: the Assistant in a floating window.
-- #161 end-of-turn compaction against the real API.
+- #161 end-of-turn compaction against the real API: answered by issue batch B26's live run (9/9, $0.3321 settled, Known limits above); it closes with that run's comment.
 
 ## Where to look in the original
 

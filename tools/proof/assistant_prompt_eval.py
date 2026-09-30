@@ -24,7 +24,10 @@ its whole usage read, priced by the table (`budget.settle_anthropic`: the
 table's price, else each class at its dearest, else the reservation) and
 settled in the proofs' ledger, and one run-ledger line appended —
 `{run,row,path,status,model,usage,dollars,refused,basis}`, a refused line
-with `why` `cap` or `budget`, never a header or a body.
+with `why` `cap` or `budget`, never a header or a body. With
+`keep_exchanges` (issue batch B26), each forwarded POST's parsed body, status,
+content type and reply bytes are also kept in memory in `relay.exchanges`,
+never on disk.
 
 **`RATES` is a deliberate upper bound, never a quote**: each token class at
 its dearest rate over every row and tier of `agent/prices/anthropic.json`
@@ -242,7 +245,7 @@ def read_usage(data, content_type, status=200):
 
 
 class Relay:
-    def __init__(self, upstream, credential, cap, ledger, run, spend):
+    def __init__(self, upstream, credential, cap, ledger, run, spend, keep_exchanges=False):
         self.upstream = upstream.rstrip("/")
         self.credential = credential
         self.cap = cap
@@ -258,6 +261,8 @@ class Relay:
         self._breaches = []
         self._max_worst = 0.0
         self.entries = []
+        self.keep_exchanges = keep_exchanges
+        self.exchanges = []
         os.makedirs(os.path.dirname(ledger), exist_ok=True)
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), self._handler())
         self.base = f"http://127.0.0.1:{self.server.server_address[1]}"
@@ -405,6 +410,15 @@ class Relay:
                 relay._write({"run": relay.run, "row": row, "path": self.path, "status": status,
                               "model": model, "usage": usage, "dollars": cost, "refused": False,
                               "basis": basis})
+                if relay.keep_exchanges:
+                    try:
+                        request = json.loads(raw) if raw else None
+                    except ValueError:
+                        request = None
+                    with relay.lock:
+                        relay.exchanges.append({
+                            "row": row, "request": request if isinstance(request, dict) else None,
+                            "status": status, "content_type": kind, "reply": data})
                 return self._send(status, data, kind or "application/json")
 
             def do_GET(self):

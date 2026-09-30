@@ -146,3 +146,17 @@ in §6).
   document's, so ⌘Z while typing would undo a project edit. Risk accepted: accessibility sees
   one text area, not one element per entry; and the scroll to the newest line still runs on
   every change, so it can move a drag-selection during a streaming reply.
+- **AI-18 — A proof lowers the end-of-turn compaction threshold with the dev-only launch default
+  `-RCDevAssistantAutoCompact <tokens>`; the shipped threshold stays 300 000** (issue batch B26,
+  #161). `AssistantConfiguration.settingsJSON()` sends `autoCompactTokens` (300 000, AI-9) as
+  `configure.settings.auto_compact_tokens`; a build with `REELCUT_DEV_TOOLS` (V-1) sends the
+  knob's value instead when it is present, read from the ARGUMENT domain alone
+  (`AssemblyAIConfiguration.argument`). A value that is not a whole number of 1 or more is named
+  on stderr and ignored. It replaces nothing else, and a Distribution build does not compile it.
+  Why: a 300 000-token context means a body far past row H's 256 000-byte bound
+  (`assistant_prompt_eval.py`) and dollars of cache writes for every run, while on-demand
+  compaction has no trigger or minimum of its own (the SDK's `BetaCompactionConfig`), so at 1
+  every turn ends compacted and one short conversation proves the whole path against the real
+  API (`assistant_compaction_proof.py`). Risk accepted: the proof shows summaries of tens of
+  thousands of tokens, not of 300 000; and #151's person setting, when it lands, will not remove
+  the knob.

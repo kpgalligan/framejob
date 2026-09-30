@@ -132,7 +132,7 @@ final class AssistantSession {
             "core_tools": AssistantPrompt.coreTools,
             "search_guide": AssistantPrompt.searchGuide,
             "compaction_instructions": AssistantPrompt.compactionInstructions,
-            "settings": AssistantConfiguration.settingsJSON,
+            "settings": AssistantConfiguration.settingsJSON(),
         ].merging(AssistantSpend.configureFields()) { _, new in new }
         if let base { configure["api_base"] = base.absoluteString }
 
