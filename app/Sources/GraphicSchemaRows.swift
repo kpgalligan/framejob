@@ -257,12 +257,6 @@ enum GraphicSchemaRows {
                 read: read, write: { [weak binding] in binding?.apply(name, write($0)) },
                 enabled: { true }, onEdit: { [weak binding] in binding?.edited() })
         if !entry.multiline {
-            // `DSField.style` installed a 26 pt height on the field itself;
-            // the one constraint is re-pinned to the row's control height.
-            for constraint in control.constraints
-            where constraint.firstItem === control && constraint.firstAttribute == .height {
-                constraint.constant = DS.controlHeight
-            }
             control.translatesAutoresizingMaskIntoConstraints = false
             control.widthAnchor.constraint(equalToConstant: 170).isActive = true
         }

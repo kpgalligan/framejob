@@ -304,3 +304,30 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   ⌘Return a commit in place, blur commits): it sits among fields that
   commit on blur, and a session that must be left is the canvas's alone. No
   MCP mirror: the keys are view state, `set_text` is the apply.
+- **K-3 — The canvas text editor lays its text out with the renderer's
+  attributes at view scale; an UPPERCASE text is edited as typed**
+  (kpgalligan/reelcut#117, 2026-09-30). The font, `.kern` and paragraph
+  style are `LayerRenderers.textAttributes` at `video.scale × canvasScale`,
+  unclamped; the font is the renderer's `CTFontCreateWithName` face, its
+  fallback included. The editor keeps its own ink (`DS.textStrong` on the
+  chrome backdrop) and draws no stroke: a stroke moves no glyph, and a
+  clip's colours can vanish on the backdrop. `case: upper` is shown as
+  typed, because the storage is what `set_text` commits and `uppercased()`
+  cannot be inverted ("ß" → "SS"); so a capital wider than its letter can
+  wrap where the render does not, and that is the accepted limit. A rotated
+  clip is edited axis-aligned: AppKit text editing in a rotated frame fights
+  the input method. The 60 × 24 pt floor still widens a box narrower than
+  60 pt.
+- **SH-3 — An inspector name field is the inspector's value field**
+  (kpgalligan/reelcut#171, 2026-09-30). `InspectorNameField` — the Graphic
+  sub-tab's string rows, the Document tab's marker name and the clip
+  header's name — is drawn as `OptionFieldControl` draws: an
+  `NSColor.controlBackgroundColor` fill, a 1 pt `DS.border` stroke on
+  `bounds.insetBy(0.5)`, `DS.controlRadius`, 7 pt padding, the line centred
+  vertically, no focus ring. Its cell draws it, not a layer border, so it
+  follows the appearance and a `cacheDisplay` capture holds it. The type is
+  Source Sans (`DS.sans(11)`; the header's 12 semibold), not the handoff's
+  Mono, because a name is a person's words. The clip header's name, which
+  the handoff draws as a label, is this field at 20 pt, because the header
+  is where a clip's own name is set. `DSField.style` (shared chrome, and
+  Rasterize's) is unchanged.

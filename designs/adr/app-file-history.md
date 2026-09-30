@@ -348,7 +348,7 @@ Files that were split since the notes wrote them:
 | `MediaCacheFiles` | `MediaPeakBuckets.swift`, `MediaImporter+Peaks.swift` (#23) |
 | `Playback` | `Playback+Meter.swift`, `Playback+PreviewQuality.swift`, `Playback+Step.swift` (B21) |
 | `ReelCore` | `RecipeSource.swift`, `TextPatch.swift`, `MediaDescriptor.swift` |
-| `InspectorPane` | `InspectorSection.swift`, `InspectorSectionHeader.swift`, `InspectorSlider.swift`, `InspectorBinding+Writes.swift` |
+| `InspectorPane` | `InspectorSection.swift`, `InspectorSectionHeader.swift`, `InspectorSlider.swift`, `InspectorBinding+Writes.swift`, `InspectorNameField.swift` (#171) |
 | `ClipPane` | `ClipSelectionHeader.swift`, `ClipPane+Timing.swift` |
 | `VideoPane` | `VideoPane+Obscure.swift` |
 | `Transcriber` | `+Languages`, `+Jobs`, `+Extract`; `SpeechEngine.swift` |
@@ -375,6 +375,8 @@ Still true of the current code:
 - A second `PostEffects` meter tap cannot be built: there is one `audioTapProcessor` per input.
 - Closing the transcribe sheet mid-download lets the download run on (a decision).
 - The playhead echo has no MCP drive: no tool reads the live player's reports.
+- The canvas text editor shows an UPPERCASE text as typed, so a capital wider than its letter can
+  wrap where the render does not; a rotated clip is edited axis-aligned (spec §11 K-3, #117).
 
 ## Named next cuts
 

@@ -110,67 +110,6 @@ final class InspectorMixedBadge: NSTextField, OptionControl {
     }
 }
 
-/// An editable one-line string — a marker's name. `OptionFieldControl` is
-/// numeric only, and a name is the one text value the inspector edits outside
-/// the Text tab's content area.
-final class InspectorNameField: NSTextField, OptionControl, NSTextFieldDelegate {
-    private let read: () -> String
-    private let write: (String) -> Void
-    /// Not `enabled`: `NSControl` already owns that name, and a stored
-    /// property would be read as an override of it.
-    private let isLive: () -> Bool
-    private let onEdit: () -> Void
-
-    init(
-        read: @escaping () -> String, write: @escaping (String) -> Void,
-        enabled: @escaping () -> Bool, onEdit: @escaping () -> Void
-    ) {
-        self.read = read
-        self.write = write
-        self.isLive = enabled
-        self.onEdit = onEdit
-        super.init(frame: .zero)
-        DSField.style(self)
-        font = DS.sans(11)
-        delegate = self
-        refresh()
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("InspectorNameField does not support NSCoder")
-    }
-
-    func refresh() {
-        let active = isLive()
-        alphaValue = active ? 1 : 0.42
-        isEditable = active
-        isSelectable = active
-        // Skipped while the field is being typed into, or the value it is
-        // about to commit would be overwritten by the one it replaces.
-        guard currentEditor() == nil else { return }
-        let value = read()
-        if stringValue != value { stringValue = value }
-    }
-
-    func controlTextDidEndEditing(_ obj: Notification) {
-        let value = stringValue
-        if value != read() {
-            write(value)
-            onEdit()
-        }
-        // Re-read directly rather than through `refresh()`: every refresh the
-        // commit just ran was skipped, because the field editor is still
-        // attached here — and after Return or Tab AppKit re-attaches it — so
-        // the field would go on showing what was typed (blank after a clear,
-        // padded text after a padded rename, blank on a clip whose empty
-        // commit sent nothing) while the model holds the trimmed name or the
-        // fallback. The timecode field's beep path sets itself the same way.
-        let now = read()
-        if stringValue != now { stringValue = now }
-    }
-}
-
 /// An editable TIMECODE — the Clip tab's In and Out. `OptionFieldControl` is
 /// a number with a unit and would spell 4.5 seconds "4.50 s"; a clip's edges
 /// are read against the ruler, so they are spelled the way the ruler and the

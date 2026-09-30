@@ -81,8 +81,12 @@ nothing else did:
   entry-signature    the signature spells an entry "key:type" again — I6's
                      default, max and options rows;
   step-decimals      `decimals(for:)` is the old `(step ?? 1) < 1 ? 2 : 0` — I13;
-  title-height       no height re-pin in `stringRow` — I14;
-  marker-height      no height re-pin in `DocumentPane.markerRow` — I17;
+  name-height        `InspectorNameField` pins no height of its own — I14 and
+                     I17 (issue batch B23, #171: the field pins its own
+                     `DS.controlHeight` since `stringRow` and
+                     `DocumentPane.markerRow` stopped re-pinning a
+                     `DSField.style` height; supersedes B8's `title-height`
+                     and `marker-height`);
   merged-asset-names the signature's asset names built from `storedProps()`,
                      the first clip's value winning, as before — I15's
                      signature row;
@@ -128,11 +132,6 @@ export function render(frame, props, ctx) {
 }
 '''
 
-HEIGHT_LOOP = (
-    "{indent}for constraint in {name}.constraints\n"
-    "{indent}where constraint.firstItem === {name} && constraint.firstAttribute == .height {{\n"
-    "{indent}    constraint.constant = DS.controlHeight\n"
-    "{indent}}}\n")
 # name: (file, anchor, replacement, the rows that must fail and no others)
 MUTANTS = {
     "stale": (
@@ -158,13 +157,12 @@ MUTANTS = {
         ["I13 decimals(for:): no step default 0.5 → 2, step 0.1 → 2, step 1 default 0.5 → 0, "
          "no step default 3 → 0, no step max 1.5 → 2",
          "I13 six's offset default rewritten to 0.5 (no step): the Offset field reads \"0.50\""]),
-    "title-height": (
-        "GraphicSchemaRows.swift", HEIGHT_LOOP.format(indent=" " * 12, name="control"), "",
+    "name-height": (
+        "InspectorNameField.swift",
+        "        heightAnchor.constraint(equalToConstant: DS.controlHeight).isActive = true\n", "",
         ["I14 the Title InspectorNameField's height constraint is DS.controlHeight, and the "
-         "Title row's fittingSize.height equals the Offset row's"]),
-    "marker-height": (
-        "DocumentPane.swift", HEIGHT_LOOP.format(indent=" " * 8, name="name"), "",
-        ["I17 the Document tab's marker InspectorNameField has exactly one height constraint "
+         "Title row's fittingSize.height equals the Offset row's",
+         "I17 the Document tab's marker InspectorNameField has exactly one height constraint "
          "of its own, DS.controlHeight"]),
     "merged-asset-names": (
         "GraphicPane.swift",

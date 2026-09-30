@@ -19,9 +19,10 @@ import AppKit
 final class ClipSelectionHeaderView: NSView, OptionControl {
     static let height: CGFloat = 44
     /// The name line: 16 pt at y 8 drawn, a 20 pt field at y 6 typed into —
-    /// both centred on y 16 — with the meta line under it. `DSField.style`
-    /// pins a field at the panel's 26 pt, more than a 44 pt band with a meta
-    /// line can give, so the field's is re-pinned (`installNameField`).
+    /// both centred on y 16 — with the meta line under it. An
+    /// `InspectorNameField` pins its own height at `DS.controlHeight`, more
+    /// than a 44 pt band with a meta line can give, so the field's is
+    /// re-pinned (`installNameField`).
     private static let nameTop: CGFloat = 8
     private static let nameHeight: CGFloat = 16
     private static let fieldTop: CGFloat = 6
@@ -106,8 +107,8 @@ final class ClipSelectionHeaderView: NSView, OptionControl {
             onEdit: { binding.edited() })
         field.font = DS.sans(12, weight: .semibold)
         field.toolTip = "The clip's own name — empty it to go back to what the clip shows"
-        // `DSField.style` installed a 26 pt height on the field itself; the
-        // one constraint is re-pinned rather than fought with a second.
+        // The field pins its own `DS.controlHeight` height; the one
+        // constraint is re-pinned rather than fought with a second.
         for constraint in field.constraints
         where constraint.firstItem === field && constraint.firstAttribute == .height {
             constraint.constant = Self.fieldHeight

@@ -412,7 +412,7 @@ the key map behind it.
   `enabled.video`, which is the Detach switch.
 
 **Canvas.**
-- `PreviewCanvasView.swift` (frozen, 1132 lines) · `CanvasSessions.swift`
+- `PreviewCanvasView.swift` (frozen, 1107 lines) · `CanvasSessions.swift`
   · `PreviewCanvasView+TextEditFrame.swift` · `+TextEditKeys` — the picture at
   document size and the handle gestures. All coordinate mapping goes through
   `viewToCanvas` / `canvasToView`, and every handle maps through
@@ -421,7 +421,10 @@ the key map behind it.
   sizes the on-canvas text editor after every keystroke from the SAME
   measurement that sizes the applied box (`LayerRenderers.measuredSize`
   placed by `canvasRect`); never give the editor a second sizing rule, or
-  the text jumps at apply (kpgalligan/reelcut#36). `+TextEditKeys` is the
+  the text jumps at apply (kpgalligan/reelcut#36). It also STYLES the editor
+  from `LayerRenderers.textAttributes` at the box's view scale (spec §11 K-3):
+  the render's font, kern and paragraph style, the editor's own ink.
+  `+TextEditKeys` is the
   editor's keys (spec §11 K-2): bare Return applies, a modified Return is a
   newline, Esc over changed text asks Cancel · Revert · Apply in a sheet
   whose Apply goes through `performGroupedEdit` (a sheet completion is
@@ -442,6 +445,9 @@ the key map behind it.
   raw value is the strip index) and the three kind tests the Clip tab's
   sections are chosen by; a pure move out of `InspectorPane.swift` (road map
   12 A2) before `assistant` was added.
+- `InspectorNameField.swift` — a pure move out of `InspectorPane.swift`:
+  the one-line name field, drawn by `InspectorNameFieldCell` as the value
+  field is (spec §11 SH-3).
 - `InspectorViewController.swift` (frozen: the tab strip, and the PINNED
   container between it and the scroll view that hosts a pane's
   `pinnedBlock`, one generation retired like the strip; the FOOT container
@@ -763,8 +769,10 @@ the key map behind it.
   the reveal or the word, and `reveal = 1` takes the plain `CTFrameDraw` path
   so a full reveal is byte-identical to no animation; a line or token at
   PARTIAL alpha draws inside a transparency layer so fill and stroke composite
-  once. `LayerRenderersText` is measuring, layout, the per-axis `textInsets`
-  and `drawText`, which dispatches — the words arm FIRST, then the three
+  once. `LayerRenderersText` is measuring, layout, the per-axis `textInsets`,
+  `textAttributes(_:scale:)` (the one attribute set, which `attributedString`
+  and the canvas editor both take) and `drawText`, which dispatches — the
+  words arm FIRST, then the three
   reveals, which are `LayerRenderersReveal`'s. `LayerRenderersWords` is a
   timed page (road map 8's W3): tokens of `laidContent` only, clipped at the
   whitespace midpoints; the active token `word − 1` scaled about its pill's

@@ -136,9 +136,9 @@ the same way.
 - **Source:** #48 (#35).
 
 **TL-11 — Editing text on the canvas**
-- **Do:** 1. Double-click a centred auto-sized text on the canvas and type a long line. 2. Do the same on a fixed-width text. 3. Return, then ⌘Z; ⇧Return for a new line. 4. Change the text and press Esc; answer the sheet with Esc, then Return. 5. Type with a Japanese or Chinese input method.
-- **Expect:** the auto-sized field widens about its centre with no wrap, and commit moves only the grey plate; the fixed-width one keeps its width and grows down; Esc on a change asks Cancel / Revert / Apply. Input-method text types correctly (it may not refit; note what it does).
-- **Source:** #48 (#36, #37).
+- **Do:** 1. Double-click a centred auto-sized text on the canvas and type a long line. 2. Do the same on a fixed-width text. 3. Return, then ⌘Z; ⇧Return for a new line. 4. Change the text and press Esc; answer the sheet with Esc, then Return. 5. Type with a Japanese or Chinese input method. 6. Give a fixed-width text tracking 20, line spacing 1.6 and UPPERCASE case; zoom the canvas to 50 %; double-click it and type.
+- **Expect:** the auto-sized field widens about its centre with no wrap, and commit moves only the grey plate; the fixed-width one keeps its width and grows down; Esc on a change asks Cancel / Revert / Apply. Input-method text types correctly (it may not refit; note what it does). In step 6 the editor's letters and lines sit over the rendered ones, UPPERCASE shows as typed (spec §11 K-3), and input-method text still types.
+- **Source:** #48 (#36, #37, #117).
 
 **TL-12 — Dragging leaves the timeline still**
 - **Do:** 1. Drag a clip with the playhead on screen. 2. Scroll the playhead off screen and drag a clip. 3. Press ← / →, and click the ruler.
@@ -326,8 +326,8 @@ Uses the three `tools/proof/work/playback-check/` projects (Setup 3).
 
 **GR-4 — The Title and marker name fields**
 - **Do:** 1. Insert ▸ Graphic ▸ Lower Third, select it, open Clip ▸ Graphic. 2. Press M, then open the Document tab.
-- **Expect:** the Title field is the height of the number fields, and the marker's name field is the height of the Rate row's controls, in both appearances. (Their text sits at the top of an outlined box rather than centred and filled like the number fields; that look is #171, not this check.)
-- **Source:** #106.
+- **Expect:** the Title field is the height of the number fields, and the marker's name field is the height of the Rate row's controls, in both appearances. Both are filled and bordered like the number fields, with their text centred vertically, in both appearances; clicking into either moves no text.
+- **Source:** #106, #171.
 
 ## Screen recording
 

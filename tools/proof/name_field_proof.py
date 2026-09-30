@@ -1,0 +1,310 @@
+#!/usr/bin/env python3
+"""kpgalligan/reelcut#171 — the inspector's name field is the inspector's
+value field: filled, a 1 pt `DS.border` stroke, 7 pt padding, the line
+centred (spec §11 SH-3).
+
+    python3 tools/proof/name_field_proof.py
+    python3 tools/proof/name_field_proof.py --baseline <commit>
+
+**The probe**, `name_field_probe.swift`, compiled AS `main.swift` over every
+file in `app/Sources` but the app's own `main.swift` on `harness/build.sh`'s
+swiftc line, `-D REELCUT_DEV_TOOLS` included (a probe that will not build is
+a scored FAILURE, never an exit), and run once per look, `light` then `dark`
+(`NSApp.appearance` set before any view is built, the app's fonts
+registered). In an offscreen window: an `InspectorNameField` "HHHH" at 170 ×
+`DS.controlHeight`, a header-configured one (12 semibold, re-pinned to
+20 pt) and an `OptionFieldControl`, captured by `cacheDisplay` into PNGs kept
+in `work/name-field/probe/`:
+
+  N1 the name field's border and interior pixels are the number field's,
+     within 2 per channel;
+  N2 the cap ink's vertical centre is within 1 pt of the field's;
+  N3 the height constraint + 20 pt moves the ink by 10 ± 0.5 pt;
+  N4 N3 for the header field;
+  N5 N2 and N3 with the field editor attached and the caret at the end,
+     measured on the first glyph's columns;
+  N6 the ink starts 7–11 pt from the left edge;
+  N7 exactly one height constraint of its own, `DS.controlHeight`;
+  N8 (control) `UISnapshotLayout.report` over the host finds no problem with
+     "Director of Photography";
+  N9 and one `truncated` with a string wider than the field. Both read the
+     field not editable, as a dimmed row is: an editable `NSTextField` reports
+     no intrinsic width (measured -1), so the rule never reaches it. N9 is not
+     a control: the rule skips a field whose cell wraps, and the unfixed field
+     (not single-line, a wrapping cell) wrapped a long name out of sight.
+
+A probe that dies scores every row it did not write as FAIL.
+
+**The harness** (`harness/build.sh`, the tree's own build, 1440 × 1500) over a
+package with one text clip and one marker: the Document tab (H1 light, H2
+dark) and the Clip tab with the clip selected (H3 light, H4 dark), each
+rendered twice — byte-identical, and light ≠ dark — and kept under
+`work/name-field/` to be LOOKED AT.
+
+`--baseline <commit>` builds the same probe over `git archive <commit>
+app/Sources` in `work/name-field/baseline/` (no harness) and follows rule R:
+exit 1 is CAUGHT — exactly N1–N7 and N9 fail in each look and N8 passes in
+both; 0
+is SURVIVED; 2 is NOT PERFORMED (the archive, the build or a run failed, a
+row was never written, or a control failed), printed as `mutant baseline:
+the control could not be performed — <why>`.
+"""
+
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import e2_chrome as e2  # noqa: E402  (video_props, project, write_package)
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
+WORK = os.path.join(HERE, "work", "name-field")
+PROBE_SWIFT = os.path.join(HERE, "name_field_probe.swift")
+HARNESS_BUILD = os.path.join(HERE, "harness", "build.sh")
+HEADER = os.path.join(ROOT, "core", "include", "reelcut_core.h")
+FONTS = os.path.join(ROOT, "app", "Resources", "Fonts")
+TICKS = e2.TICKS
+LOOKS = ["light", "dark"]
+
+ROW_NAMES = [
+    "N1 the name field's border and interior pixels are the number field's, within 2",
+    "N2 the cap ink's vertical centre is within 1 pt of the field's",
+    "N3 the name field 20 pt taller: the ink moves by 10 ± 0.5 pt",
+    "N4 the header's field (12 semibold, 20 pt) 20 pt taller: the ink moves by 10 ± 0.5 pt",
+    "N5 with the field editor attached: the first glyph's centre is within 1 pt of the "
+    "field's, and 20 pt taller moves it by 10 ± 0.5 pt",
+    "N6 the ink starts 7–11 pt from the field's left edge",
+    "N7 the name field has exactly one height constraint of its own, DS.controlHeight",
+    "N8 the layout dump finds no problem with \"Director of Photography\" (a CONTROL)",
+    "N9 the layout dump finds a name wider than the field truncated",
+]
+ROWS = [f"{name} [{look}]" for look in LOOKS for name in ROW_NAMES]
+BASELINE_EXPECTED = [f"{name} [{look}]" for look in LOOKS for name in ROW_NAMES
+                     if "(a CONTROL)" not in name]
+
+RESULTS = []  # (name, ok, instrument)
+
+
+def check(name, ok, detail="", *, instrument=False):
+    RESULTS.append((name, bool(ok), instrument))
+    print(f"  {'ok  ' if ok else 'FAIL'} {name}")
+    if detail:
+        print("       " + detail)
+
+
+def run(command, limit):
+    """Rule H: every child under a wall-clock limit; an expiry is the answer."""
+    try:
+        done = subprocess.run(command, capture_output=True, text=True, timeout=limit)
+        return done.returncode, done.stdout, done.stderr
+    except subprocess.TimeoutExpired:
+        return None, "", f"expired after {limit} s"
+
+
+# ---------------------------------------------------------------------------
+# The probe.
+
+
+def build_probe(sources, out):
+    os.makedirs(out, exist_ok=True)
+    entry = os.path.join(out, "main.swift")
+    with open(PROBE_SWIFT) as f:
+        source = f.read()
+    if not os.path.exists(entry) or open(entry).read() != source:
+        with open(entry, "w") as f:
+            f.write(source)
+    binary = os.path.join(out, "name-field-probe")
+    swift = sorted(os.path.join(sources, n) for n in os.listdir(sources)
+                   if n.endswith(".swift") and n != "main.swift")
+    lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+    if not os.path.exists(lib):
+        return None, f"{lib} is missing — run `cd core && cargo build --release` first"
+    if os.path.exists(binary) and all(
+            os.path.getmtime(f) < os.path.getmtime(binary) for f in swift + [entry, lib]):
+        return binary, None
+    sdk = subprocess.run(["xcrun", "--show-sdk-path", "--sdk", "macosx"],
+                         capture_output=True, text=True).stdout.strip()
+    start = time.time()
+    rc, _, err = run(
+        ["swiftc", "-D", "REELCUT_DEV_TOOLS", "-sdk", sdk, "-target", "arm64-apple-macos26.0",
+         "-module-name", "Reelcut", "-import-objc-header",
+         os.path.join(ROOT, "app", "Bridging", "Reelcut-Bridging-Header.h"),
+         "-L", os.path.dirname(lib), "-lreelcut_core"] + swift + [entry, "-o", binary], 900)
+    if rc != 0 or not os.path.exists(binary):
+        errors = [line for line in err.splitlines() if ": error:" in line]
+        return None, "swiftc failed:\n       " + "\n       ".join(
+            errors[:6] or [err.strip()[-300:] or "(no error lines)"])
+    print(f"  probe built in {time.time() - start:.0f} s")
+    return binary, None
+
+
+def probe_checks(sources, out):
+    print("\n1 — the probe: N1–N9, light and dark")
+    binary, error = build_probe(sources, out)
+    check("the probe builds over app/Sources", binary is not None, error or "",
+          instrument=binary is None)
+    if binary is None:
+        for name in ROWS:
+            check(name, False, "no row: the probe did not build", instrument=True)
+        return
+    written = {}
+    for look in LOOKS:
+        answer = os.path.join(out, f"answer-{look}.json")
+        if os.path.exists(answer):
+            os.remove(answer)
+        rc, stdout, stderr = run([binary, look, FONTS, out], 120)
+        check(f"the probe runs to its end [{look}]", rc == 0,
+              "" if rc == 0 else (stdout + stderr).strip()[-400:], instrument=rc != 0)
+        if os.path.exists(answer):
+            try:
+                with open(answer) as f:
+                    for row in json.load(f)["rows"]:
+                        written[row["name"]] = row
+            except (ValueError, KeyError) as error:
+                check(f"the answer reads [{look}]", False, str(error), instrument=True)
+    for name in written:
+        if name not in ROWS:
+            check(name, False, "a row this proof does not know: " + written[name]["detail"],
+                  instrument=True)
+    for name in ROWS:
+        row = written.get(name)
+        if row is None:
+            check(name, False, "no row: the probe did not write it", instrument=True)
+        else:
+            check(name, row["ok"], row["detail"])
+
+
+# ---------------------------------------------------------------------------
+# The harness.
+
+
+def format_version():
+    with open(HEADER) as f:
+        found = re.search(r"#define RC_FORMAT_VERSION (\d+)", f.read())
+    return int(found.group(1)) if found else 10
+
+
+def package():
+    e2.CHROME = os.path.join(WORK, "fixtures")
+    clip = {
+        "id": 2, "track": 1, "start": 0, "duration": 6 * TICKS,
+        "source": {"kind": "text"}, "enabled": {"video": True, "audio": True},
+        "speed": 1.0, "video": e2.video_props(), "audio": None,
+        "text": {
+            "content": "Opening title", "font": "SourceSans3-SemiBold", "size": 96.0,
+            "color": [1.0, 1.0, 1.0, 1.0], "align": "center", "valign": "middle",
+            "line_spacing": 1.0, "tracking": 0.0, "outline": None, "backdrop": None,
+            "width": None,
+        },
+        "shape": None, "actions": [], "transition_in": None, "name": "Director of Photography",
+        "label": None,
+    }
+    body = e2.project([clip])
+    body["version"] = format_version()
+    body["markers"] = [{"id": 3, "time": 2 * TICKS, "name": "Interview starts",
+                        "color": "orange", "chapter": False}]
+    body["next_id"] = 4
+    return e2.write_package("names", body)
+
+
+def harness_checks():
+    print("\n2 — the harness: the Document tab and the Clip tab, light and dark, 1440 × 1500")
+    rc, stdout, stderr = run([HARNESS_BUILD], 900)
+    binary = stdout.strip().splitlines()[-1] if rc == 0 and stdout.strip() else None
+    error = None if binary else f"build.sh failed: {(stdout + stderr).strip()[-400:]}"
+    path = package() if binary else None
+    renders = {}
+    for tab, select in (("document", "-1"), ("clip", "0")):
+        for look in LOOKS:
+            for copy in ("a", "b"):
+                if error:
+                    break
+                out = os.path.join(WORK, f"names-{tab}-{look}-{copy}.png")
+                if os.path.exists(out):
+                    os.remove(out)
+                rc, stdout, stderr = run(
+                    [binary, path, out, look, "1440", "1500", select, "0", "1", tab], 120)
+                if rc != 0 or not os.path.exists(out):
+                    error = (stdout + stderr).strip()[-400:] or f"rc {rc}"
+                renders[(tab, look, copy)] = out
+
+    def data(key):
+        with open(renders[key], "rb") as f:
+            return f.read()
+    rows = [("H1", "document", "light"), ("H2", "document", "dark"),
+            ("H3", "clip", "light"), ("H4", "clip", "dark")]
+    for label, tab, look in rows:
+        name = (f"{label} the {'Document' if tab == 'document' else 'Clip'} tab, {look}, "
+                "rendered twice: byte-identical PNGs"
+                + (", and light ≠ dark" if look == "dark" else ""))
+        if error:
+            check(name, False, error, instrument=True)
+            continue
+        same = data((tab, look, "a")) == data((tab, look, "b"))
+        if look == "dark":
+            same = same and data((tab, "dark", "a")) != data((tab, "light", "a"))
+        check(name, same, os.path.relpath(renders[(tab, look, "a")], ROOT))
+
+
+# ---------------------------------------------------------------------------
+
+
+def baseline(commit):
+    began = time.time()
+    tree = os.path.join(WORK, "baseline")
+    if os.path.exists(tree):
+        shutil.rmtree(tree)
+    os.makedirs(tree)
+
+    def not_performed(why):
+        print(f"mutant baseline: the control could not be performed — {why}")
+        return 2
+
+    archive = subprocess.run(["git", "-C", ROOT, "archive", commit, "app/Sources"],
+                             capture_output=True)
+    if archive.returncode != 0:
+        return not_performed(f"git archive {commit} failed: "
+                             f"{archive.stderr.decode(errors='replace').strip()}")
+    untar = subprocess.run(["tar", "-x", "-C", tree], input=archive.stdout,
+                           capture_output=True)
+    if untar.returncode != 0:
+        return not_performed(f"tar failed: {untar.stderr.decode(errors='replace').strip()}")
+    print(f"BASELINE {commit}: app/Sources in {os.path.relpath(tree, ROOT)}")
+    probe_checks(os.path.join(tree, "app", "Sources"), os.path.join(tree, "out"))
+    elapsed = time.time() - began
+    instruments = [n for n, ok, inst in RESULTS if inst and not ok]
+    if instruments:
+        return not_performed(f"instrument failures {instruments[:4]}, {elapsed:.0f} s")
+    failed = sorted(n for n, ok, _ in RESULTS if not ok)
+    controls = [n for n in failed if "(a CONTROL)" in n]
+    if controls:
+        return not_performed(f"controls failed on {commit}: {controls}, {elapsed:.0f} s")
+    if failed == sorted(BASELINE_EXPECTED):
+        print(f"BASELINE CAUGHT: exactly the {len(BASELINE_EXPECTED)} expected rows FAILED on "
+              f"{commit} and every other row passed, {elapsed:.0f} s")
+        return 1
+    print(f"BASELINE SURVIVED: failed {failed} (want {sorted(BASELINE_EXPECTED)}), "
+          f"{elapsed:.0f} s")
+    return 0
+
+
+def main():
+    if len(sys.argv) == 3 and sys.argv[1] == "--baseline":
+        return baseline(sys.argv[2])
+    if len(sys.argv) != 1:
+        sys.exit(__doc__)
+    print("#171 — the inspector's name field is the inspector's value field")
+    probe_checks(os.path.join(ROOT, "app", "Sources"), os.path.join(WORK, "probe"))
+    harness_checks()
+    good = sum(1 for _, ok, _ in RESULTS if ok)
+    print(f"\n{good}/{len(RESULTS)} checks passed")
+    return 0 if RESULTS and good == len(RESULTS) else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

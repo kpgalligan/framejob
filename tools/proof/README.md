@@ -7865,7 +7865,7 @@ instrument failure is a scored FAIL, exit 1.
 
 | Runner | caught / survived / not performed |
 |---|---|
-| `assistant_lane_proof.py`, `assistant_tab_proof.py`, `assistant_helper_proof.py`, `assistant_prompt_proof.py`, `assistant_session_proof.py`, `spend_proof.py`, `budget_proof.py`, `prices_proof.py`, `prices_crosscheck.py`, `makefile_env_proof.py`, `export_cancel_proof.py`, `video_configuration_proof.py`, `speed_sheet_probe.py` | 1 / 0 / 2 |
+| `assistant_lane_proof.py`, `assistant_tab_proof.py`, `assistant_helper_proof.py`, `assistant_prompt_proof.py`, `assistant_session_proof.py`, `spend_proof.py`, `budget_proof.py`, `prices_proof.py`, `prices_crosscheck.py`, `makefile_env_proof.py`, `export_cancel_proof.py`, `video_configuration_proof.py`, `speed_sheet_probe.py`, `text_break_proof.py` and `name_field_proof.py` (`--baseline`, B23) | 1 / 0 / 2 |
 | `spend_ui_proof.py` | 1 / 3 / 2 |
 | `graphics_proof.py`, `graphics_store_probe.py`, `words_picture_probe.py` | 0 / 1 / 2 |
 | `cloud_captions_proof.py`, `cloud_captions_probe.py` (`--mutant`, `--fake-mutant`), `recording_probe.py`, `phase9_chrome.py` — whole-suite mutants | the per-row count and a normal run's exit / 2 |
@@ -8526,3 +8526,83 @@ and `grep "Reelcut: "` on its log printed nothing:
 | `screens.py --only 14-remove-silences-sheet --port 4874 --out tools/proof/work/b22/screen14` | 6 pass, 0 fail, 0 skip of 6; 4 captures, 0 new problems; the sheet's note in both looks: "toneA.m4a at 00:00:00:00 holds no voice and is judged by level." |
 | `make test`; `make app`; `inventory.py --check` | exit 0; BUILD SUCCEEDED; 5/5 (the sheet's site re-pinned 527 → 529) |
 | `wc -l` SilenceDetector, +Vocabulary, SilenceSheetController, AgentServer+Silence | 450, 229, 556, 313 |
+
+## Issue batch B23 — the canvas editor lays text out as the render does, the inspector's name fields (`text_break_proof.py`, `text_break_probe.swift`, `name_field_proof.py`, `name_field_probe.swift`, `graphics_inspector_proof.py --mutant name-height`; #117 #171)
+
+Both probes are compiled AS `main.swift` over `app/Sources` minus the app's
+`main.swift` on `harness/build.sh`'s swiftc line, `-D REELCUT_DEV_TOOLS`
+included; a probe that will not build is a scored FAILURE, a probe that dies
+scores every row it did not write as FAIL, and each calls only what HEAD
+`2e78a25` already had. `--baseline <commit>` builds the same probe over
+`git archive <commit> app/Sources` and follows rule R (1 caught, 0 survived,
+2 not performed; a failed control or an unwritten row is not performed).
+
+- **`text_break_proof.py` (#117, spec §11 K-3)** — the app's own editor
+  window over one-clip packages in `SourceSans3-SemiBold` (left, fixed width,
+  except E9). A line START is the UTF-16 offset a line begins at: the
+  editor's from `textLayoutManager` (TextKit 2; reading `layoutManager` would
+  switch the view to TextKit 1), the render's from `LayerRenderers.layout(for:)`.
+  E0 the font (control); E1 plain, ≥ 3 lines and equal starts (controls); E2
+  `tracking` 24; E3 E2 after " and more" by key events, against the applied
+  render; E4 E2 after the window shrinks to 75 % (the canvas scale moving
+  > 5 %, control); E5 `line_spacing` 1.8, starts (control) and each line
+  pitch within 1 pt of the render's × scale; E6 size 12 at video scale 0.6
+  (4.71 pt in view, control), the frame the box + 2 px (control), starts;
+  E7 `case: upper` holds `content` before and after "ab" (control); E8 E2
+  emptied by Delete over the select-all (control), "Wrap" typed (control),
+  the storage's font size and kern at index 0 the render's × scale, starts;
+  E9 auto-sized, centred, one line at `tracking` 24, one line in the render
+  (control) and the editor, and after " again" (the render a control). E6's
+  width is 260 px on purpose: the editor's frame is aligned to backing
+  pixels (#36's rule), so its wrap width can stand up to ~1 px wider than the
+  render's; at 240 px a line with its next word measured 240.04 px and the
+  editor kept the word. E6 is at video scale 0.6 because at scale 1 the view
+  size (7.84 pt) was too near the old 8 pt clamp to break differently.
+- **`name_field_proof.py` (#171, spec §11 SH-3)** — the probe, once per look
+  (`NSApp.appearance` set first), over an `InspectorNameField` "HHHH" at
+  170 × `DS.controlHeight`, a header-configured one (12 semibold, 20 pt) and
+  an `OptionFieldControl`, captured by `cacheDisplay` over an opaque host
+  (PNGs in `work/name-field/probe/`). N1 border and interior pixels equal the
+  number field's within 2; N2 the cap ink's centre within 1 pt of the
+  field's; N3 + 20 pt moves the ink 10 ± 0.5; N4 N3 for the header field; N5
+  N2 and N3 with the field editor attached, on the first glyph's columns;
+  N6 the ink 7–11 pt from the left edge; N7 one height constraint of its own
+  (Auto Layout's `NSContentSizeLayoutConstraint` left out), `DS.controlHeight`;
+  N8 (control) the layout dump finds no problem with "Director of
+  Photography"; N9 it finds a wider name `truncated`. N8 and N9 read the field
+  not editable, because an editable `NSTextField` reports no intrinsic width
+  (measured -1); N9 is not a control, because the unfixed field's cell
+  wrapped. Then the harness (1440 × 1500, the tree's build) renders a text
+  clip with one marker: H1/H2 the Document tab, H3/H4 the Clip tab with the
+  clip selected, light and dark, twice each, byte-identical (kept in
+  `work/name-field/`).
+- **`graphics_inspector_proof.py --mutant name-height`** supersedes B8's
+  `title-height` and `marker-height`: the anchor is the height-pin line in
+  `InspectorNameField.swift`, and exactly I14 and I17 must fail (the runner's
+  own exits, 0 caught).
+
+**The fix.** #117: `LayerRenderers.textAttributes(_:scale:)` is split out of
+`attributedString` (every value at scale 1 is today's), and
+`PreviewCanvasView+TextEditFrame`'s `fitTextEditor` styles the editor from it
+at `video.scale × canvasScale` before sizing it (`styleTextEditor`: the
+editor's ink, no stroke, the storage rewritten only when its font, kern or
+paragraph style differ, never over marked text or an empty storage). A pure
+move of `refitTextEditor`, `editorFont` and `alignment` out of the frozen
+`PreviewCanvasView.swift` came first, gated alone. #171: `InspectorNameField`
+moved out of `InspectorPane.swift` (a pure move, gated alone) into
+`InspectorNameField.swift`, then drawn by `InspectorNameFieldCell`; it pins
+its own `DS.controlHeight`, so `stringRow` and `markerRow` stopped re-pinning.
+
+Run on 2026-09-30 against HEAD0 `2e78a25`, every instance my own:
+
+| Command | Answer |
+|---|---|
+| `text_edit_proof.py`; `text_apply_proof.py` on HEAD0, after the pure move, and on the fix | 15/15; 27/27 each time |
+| `text_break_proof.py` | 24/24, exit 0 |
+| `text_break_proof.py --baseline 2e78a25…` | exit 1, caught: exactly E2, E3, E4, E5's pitch row, E6's line-start row and E8's attribute row FAIL |
+| `name_field_proof.py` | 25/25, exit 0 |
+| `name_field_proof.py --baseline 2e78a25…` | exit 1, caught: exactly N1–N7 and N9 FAIL in each look (16 rows); N8 passes in both |
+| `graphics_inspector_proof.py --port 4881` | 59/59, exit 0 (Z1: no `Reelcut: ` line) |
+| `graphics_inspector_proof.py --mutant name-height --port 4881` | exit 0, MUTANT PASS: exactly I14 and I17 FAIL |
+| `screens.py --port 4882 --only 05-clip-picture,07-clip-graphic,11-document-inspector`, on HEAD0 and on the fix | 8 pass of 8, 0 new problems, both |
+| `make typecheck`; `make test`; `make app` | 0 errors, 4 warnings, tsc clean; exit 0; BUILD SUCCEEDED |

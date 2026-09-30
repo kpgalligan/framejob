@@ -768,8 +768,6 @@ final class PreviewCanvasView: NSView {
         editor.drawsBackground = true
         editor.backgroundColor = DS.chromeBackground.withAlphaComponent(0.92)
         editor.textColor = DS.textStrong
-        editor.font = editorFont(for: props, box: box)
-        editor.alignment = alignment(props.align)
         editor.string = props.content
         fitTextEditor(editor, to: box)
         editor.onChange = { [weak self] in self?.refitTextEditor() }
@@ -814,29 +812,6 @@ final class PreviewCanvasView: NSView {
         overlay.needsDisplay = true
         guard commit, let clip = snapshot.clip(id), clip.text?.content != value else { return }
         onEdit?("Edit Text", [.setText(clips: [id], patch: TextPatch(content: value))])
-    }
-
-    /// The live editor to the box its string will have, in the font at the
-    /// canvas's current scale (#36).
-    private func refitTextEditor() {
-        guard let editor = textEditor, let id = editingClip, let box = box(for: id),
-              let props = box.clip.text else { return }
-        let font = editorFont(for: props, box: box)
-        if editor.font != font { editor.font = font }
-        fitTextEditor(editor, to: box)
-    }
-
-    private func editorFont(for props: TextProps, box: CanvasLayerBox) -> NSFont {
-        let size = min(max(props.size * box.video.scale * Double(canvasScale), 8), 300)
-        return NSFont(name: props.font, size: size) ?? DS.sans(size)
-    }
-
-    private func alignment(_ value: String) -> NSTextAlignment {
-        switch value {
-        case "center": return .center
-        case "right": return .right
-        default: return .left
-        }
     }
 
     // MARK: - Drawing

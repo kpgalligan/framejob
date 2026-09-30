@@ -19,10 +19,19 @@ import AppKit
 /// is left is the width CoreText lays the text in, so a fixed-width text
 /// breaks where the render breaks it and an auto-sized one does not wrap —
 /// measured: with a fixed 2 pt inset, an auto-sized "Hello " wrapped.
+///
+/// Inside that frame the text is laid out in the render's own attributes
+/// (spec §11 K-3, kpgalligan/reelcut#117): `LayerRenderers.textAttributes` at
+/// the box's view scale, unclamped — the font, the kern and the paragraph
+/// style, so tracking, line spacing and a small or large size break lines
+/// where the render does — in the editor's own ink and with no stroke. An
+/// UPPERCASE text is edited as typed, because the storage is what `set_text`
+/// commits; a rotated clip is edited axis-aligned.
 extension PreviewCanvasView {
     func fitTextEditor(_ editor: NSTextView, to box: CanvasLayerBox) {
         guard let props = box.clip.text else { return }
         let typed = props.withContent(editor.string)
+        styleTextEditor(editor, as: typed, scale: box.video.scale * canvasScale)
         let size = LayerRenderers.measuredSize(for: typed)
         let rect = canvasToView(
             canvasRect(of: box.clip, in: box.canvas, sourceSize: size, video: box.uncropped)
@@ -46,6 +55,44 @@ extension PreviewCanvasView {
         default: x = rect.minX
         }
         editor.frame = CGRect(x: x, y: rect.minY, width: width, height: height)
+    }
+
+    /// The live editor to the box its string will have, in the render's
+    /// attributes at the canvas's current scale (#36, K-3).
+    func refitTextEditor() {
+        guard let editor = textEditor, let id = editingClip, let box = box(for: id),
+              box.clip.text != nil else { return }
+        fitTextEditor(editor, to: box)
+    }
+
+    /// The render's attribute set at `scale`, in the editor's ink and with
+    /// no stroke, as the editor's typing attributes, default paragraph style
+    /// and — when it differs — its storage. The storage is written with
+    /// `addAttributes`, so nothing else in it is dropped, and never while an
+    /// input method holds marked text, whose own attributes that would
+    /// overwrite. An EMPTY storage is not read (index 0 of an empty string
+    /// raises) or written; the typing attributes are what the next letter
+    /// takes.
+    private func styleTextEditor(_ editor: NSTextView, as props: TextProps, scale: CGFloat) {
+        var attributes = LayerRenderers.textAttributes(props, scale: scale)
+        attributes[.foregroundColor] = DS.textStrong
+        attributes[.strokeWidth] = nil
+        attributes[.strokeColor] = nil
+        editor.defaultParagraphStyle = attributes[.paragraphStyle] as? NSParagraphStyle
+        editor.typingAttributes = attributes
+        guard let storage = editor.textStorage, storage.length > 0, !editor.hasMarkedText()
+        else { return }
+        let current = storage.attributes(at: 0, effectiveRange: nil)
+        let same = (current[.font] as? NSFont) == (attributes[.font] as? NSFont)
+            && (current[.kern] as? CGFloat) == (attributes[.kern] as? CGFloat)
+            && (current[.paragraphStyle] as? NSParagraphStyle)
+                == (attributes[.paragraphStyle] as? NSParagraphStyle)
+        if same { return }
+        let whole = NSRange(location: 0, length: storage.length)
+        storage.beginEditing()
+        storage.addAttributes(attributes, range: whole)
+        if attributes[.kern] == nil { storage.removeAttribute(.kern, range: whole) }
+        storage.endEditing()
     }
 }
 

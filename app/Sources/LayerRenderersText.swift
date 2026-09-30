@@ -140,8 +140,20 @@ extension LayerRenderers {
     }
 
     static func attributedString(_ props: TextProps) -> NSAttributedString {
+        NSAttributedString(string: props.laidContent, attributes: textAttributes(props))
+    }
+
+    /// The one attribute set a text is laid out in: the font, the fill, the
+    /// paragraph style, the kern and the outline. `scale` multiplies every
+    /// LENGTH — the font size and the kern — so the canvas's text editor
+    /// takes the render's own set at view points (spec §11 K-3); the stroke
+    /// is a percentage of the font size and so scale-free. At scale 1 every
+    /// value is the one the render has always laid out.
+    static func textAttributes(
+        _ props: TextProps, scale: CGFloat = 1
+    ) -> [NSAttributedString.Key: Any] {
         let size = max(1, CGFloat(props.size))
-        let font = CTFontCreateWithName(props.font as CFString, size, nil)
+        let font = CTFontCreateWithName(props.font as CFString, size * scale, nil)
         let paragraph = NSMutableParagraphStyle()
         switch props.align {
         case "left": paragraph.alignment = .left
@@ -158,7 +170,7 @@ extension LayerRenderers {
             .foregroundColor: props.color.nsColor,
             .paragraphStyle: paragraph,
         ]
-        if props.tracking != 0 { attributes[.kern] = CGFloat(props.tracking) }
+        if props.tracking != 0 { attributes[.kern] = CGFloat(props.tracking) * scale }
         if let outline = props.outline {
             // A NEGATIVE stroke width means "fill AND stroke", and the value
             // is a PERCENTAGE of the font size — positive would draw the
@@ -166,7 +178,7 @@ extension LayerRenderers {
             attributes[.strokeWidth] = -CGFloat(outline.width) / size * 100
             attributes[.strokeColor] = outline.color.nsColor
         }
-        return NSAttributedString(string: props.laidContent, attributes: attributes)
+        return attributes
     }
 
     // MARK: - Laid-out text
