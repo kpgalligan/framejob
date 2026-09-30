@@ -11,7 +11,7 @@ the environment — or, for row 1's no-key arm, nothing at all.
     env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py
     env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --mutant no-hold
 
-Road map 6 §5i's rows 1–11, plus four of this pipeline's own:
+Road map 6 §5i's rows 1–11, plus five of this pipeline's own:
 
 * **1** the caller's own mistakes — a misspelt `engine`, a cloud-only
   argument under `apple`, and the cloud engine with no key at all — each
@@ -51,10 +51,16 @@ Road map 6 §5i's rows 1–11, plus four of this pipeline's own:
 * **K** the dummy key appears in no app log, no MCP answer and no file this
   run wrote but the fake's own request log.
 * **X** no logged header or body holds this host's user name or home path.
+* **RP** (issue batch B24, #80; spec §11 R6-17) the 21 pairs of `transcribe`'s
+  seven refusals, each cell ONE check — the winner's own sentence line for
+  line, no loser's words, and the fake's log delta — after seven
+  single-ingredient CONTROLS.
 
-Three instances, each on its own port with its own fake, each killed by its
+Five instances, each on its own port with its own fake, each killed by its
 own PID in a `finally`, each with a row that `grep "Reelcut: "` finds nothing
-in its log. Host-state inputs: `media/speech.mov` and `media/AV.mov`, `say`
+in its log: A, B and C, then **RP** (`port_base + 3`, keyed) and **RQ**
+(`port_base + 4`, no key, its own loopback fake) for row RP. Host-state
+inputs: `media/speech.mov` and `media/AV.mov`, `say`
 for the second fixture, `ffmpeg` for row 2's second decoder (the row names which decoders
 answered and `AVAudioFile` always runs), and free loopback ports.
 
@@ -1801,6 +1807,231 @@ def row_k(fake_folders):
 
 
 # --------------------------------------------------------------------------
+# RP — the 21 pairs of `transcribe`'s seven refusals (issue batch B24, #80;
+# spec §11 R6-17)
+
+PAIR_ORDER = [1, 2, 3, 4, 5, 7, 6]
+# What a refusal's sentence is recognised by when it is NOT the winner: a
+# loser's marker anywhere in the answer is a pair answering in two rules'
+# words.
+LOSER_MARKERS = {
+    1: "No clip has id", 2: "can be transcribed", 3: 'engine must be "apple"',
+    4: "only applies with engine", 5: "No AssemblyAI API key is set",
+    6: "10-hour limit", 7: "its earlier transcript",
+}
+NO_KEY = ("No AssemblyAI API key is set. Set one in Reelcut ▸ Settings ▸ "
+          "Transcription, or RC_ASSEMBLYAI_KEY for a proof.")
+DEFERRED = ("AssemblyAI has not confirmed deleting the transcript of media {media}; cleanup "
+            "was deferred because no API key is set. Its deletion ID is retained in the "
+            "project; a later run with a key for the originating account and region will "
+            "retry deletion only if that ID is safe to send.")
+HELD_LINE = ("AssemblyAI has not confirmed deleting the transcript of media {media}; it will "
+             "be retried at the next run with an API key. It was not uploaded again in this "
+             "run.")
+
+
+def rewrite_media_duration(package, seconds):
+    """The one media's `duration` in a SAVED package's `project.json`, set to
+    `seconds` — row H's rewrite, since no op can make a media longer than its
+    file. Answers whether it was found and written."""
+    path = os.path.join(package, "project.json")
+    try:
+        document = json.loads(read(path).decode("utf-8"))
+        document["media"][0]["duration"] = int(seconds * SEC)
+    except (ValueError, KeyError, IndexError, TypeError):
+        return False
+    with open(path, "w") as handle:
+        json.dump(document, handle)
+    return True
+
+
+def pair_copy(source, name):
+    """A copy of a package that is OPEN in an instance. Its display caches
+    are still being written while it is copied, through `.sb-` temporaries
+    that can vanish between the listing and the copy, so those are left out
+    and a copy that raced one anyway is taken again (three tries)."""
+    path = os.path.join(WORK, f"pairs-{name}-{os.getpid()}.reelcut")
+    for attempt in range(3):
+        shutil.rmtree(path, ignore_errors=True)
+        try:
+            shutil.copytree(source, path, ignore=shutil.ignore_patterns("*.sb-*"))
+            return path
+        except shutil.Error:
+            if attempt == 2:
+                raise
+            time.sleep(0.5)
+    return path
+
+
+def build_pair_packages(rp, fake_rp):
+    """Six packages over ONE media with two clips on it — A plays sound, M's
+    audio is switched off — and the owed transcript id the `held` ones carry.
+    None, with a scored failure, when any step of the fixture fails."""
+    speech, _ = fixtures()
+    session = Session(rp, "pairs-plain")
+    media = session.media_of(speech)
+    a = session.add(media, at=0, duration=2 * SEC)
+    m = session.add(media, at=2 * SEC, duration=2 * SEC)
+    session.op("set_enabled", clip=m, audio=False)
+    session.save()
+    plain = session.path
+    long = pair_copy(plain, "long")
+    plain_q = pair_copy(plain, "plain_q")
+    long_q = pair_copy(plain, "long_q")
+    held = pair_copy(plain, "held")
+    rewritten = rewrite_media_duration(long, 40_000) and rewrite_media_duration(long_q, 40_000)
+    if not rewritten:
+        check("RP fixture: the copied packages' media duration can be rewritten", False,
+              "no media duration in project.json")
+        return None
+
+    rp.mcp.call("open_project", path=held)
+    # Never reset during RP: every DELETE the fake is sent answers 500, so
+    # the one this transcribe makes leaves its id owed, and every later
+    # janitor over `held` fails and HOLDS the media (R6-11).
+    scenario(fake_rp, fail=[{"route": "delete", "status": 500, "times": -1}])
+    answer = rp.mcp.call_with("transcribe", {"project": held, "engine": "assemblyai",
+                                            "clips": [a], "place": False})
+    transcript_of_the_run.append(json.dumps(answer, default=str))
+    rp.mcp.call("save_project", project=held)
+    header = json.loads(read(os.path.join(held, "cache", "transcripts", f"{media}.json"))
+                        or b"{}")
+    owed = header.get("transcript_id")
+    if header.get("remote_deleted") is not False or not owed:
+        check("RP fixture: the held package owes a DELETE", False,
+              f"header {header!r}, answer {answer!r}")
+        return None
+    held_q = pair_copy(held, "held_q")
+    heldlong = pair_copy(held, "heldlong")
+    if not rewrite_media_duration(heldlong, 40_000):
+        check("RP fixture: heldlong's media duration can be rewritten", False, "")
+        return None
+    for path in (long, heldlong):
+        rp.mcp.call("open_project", path=path)
+    return {"plain": plain, "long": long, "held": held, "heldlong": heldlong,
+            "plain_q": plain_q, "long_q": long_q, "held_q": held_q,
+            "a": a, "m": m, "media": media, "owed": owed}
+
+
+def pair_call(instance, fake, packages, cell):
+    """One cell: its package and its arguments, the answer (a refusal's
+    text), and the fake's log delta across the call."""
+    s = set(cell)
+    if 6 in s and 7 in s:
+        package = "heldlong"
+    elif 6 in s:
+        package = "long"
+    elif 7 in s:
+        package = "held"
+    else:
+        package = "plain"
+    if 5 in s:
+        package += "_q"
+    arguments = {"project": packages[package], "engine": "assemblyai", "place": False}
+    if 1 in s and 2 in s:
+        arguments["clips"] = [packages["m"], 99999]
+    elif 1 in s:
+        arguments["clips"] = [packages["a"], 99999] if (6 in s or 7 in s) else [99999]
+    elif 2 in s:
+        arguments["clips"] = [packages["m"]]
+    else:
+        arguments["clips"] = [packages["a"]]
+    if 3 in s:
+        arguments["engine"] = "nope"
+    if 4 in s:
+        if 3 not in s:
+            arguments["engine"] = "apple"
+        arguments["speakers"] = True
+    if 7 in s:
+        arguments["refresh"] = True
+    mark = len(fake.log()["requests"])
+    try:
+        answer = instance.mcp.call_with("transcribe", arguments)
+        text = None
+        transcript_of_the_run.append(json.dumps(answer, default=str))
+    except ToolError as problem:
+        text = str(problem)
+        transcript_of_the_run.append(text)
+    delta = [f"{r['method']} {r['path']}" for r in fake.log()["requests"][mark:]]
+    return text, delta, package
+
+
+def pair_expected(packages, winner, cell):
+    """The winner's answer, line for line, and the log delta it may make."""
+    a, m, media = packages["a"], packages["m"], packages["media"]
+    first = {
+        1: "No clip has id 99999. get_project lists the clips.",
+        2: f"None of those clips can be transcribed — clip {m}: its audio is switched off.",
+        3: 'engine must be "apple" or "assemblyai" (got "nope").',
+        4: 'speakers only applies with engine "assemblyai". Pass engine: "assemblyai", or '
+           'leave it out.',
+        5: NO_KEY,
+        6: f"The transcription failed: clip {a}: “speech.mov” is longer than "
+           "AssemblyAI's 10-hour limit for one file.",
+        7: f"The transcription failed: clip {a}: AssemblyAI has not confirmed deleting its "
+           "earlier transcript, so it was not uploaded again; the next run with an API key "
+           "retries the delete",
+    }[winner]
+    lines = ["transcribe: " + first]
+    if winner == 5 and 7 in cell:
+        lines.append(DEFERRED.format(media=media))
+    if winner == 7:
+        lines.append(HELD_LINE.format(media=media))
+    delta = [f"DELETE /v2/transcript/{packages['owed']}"] if winner == 7 else []
+    return lines, delta
+
+
+def score_cell(instance, fake, packages, cell, control=False):
+    winner = min(cell, key=PAIR_ORDER.index)
+    text, delta, package = pair_call(instance, fake, packages, cell)
+    lines, want_delta = pair_expected(packages, winner, cell)
+    losers = [LOSER_MARKERS[i] for i in LOSER_MARKERS if i != winner
+              and LOSER_MARKERS[i] in (text or "")]
+    label = ("CONTROL R" + str(cell[0]) + " alone") if control else (
+        "R" + "×R".join(str(i) for i in cell))
+    print(f"  ({label} on {package}: {text!r}; log {delta!r})")
+    check(f"RP {label}: answers in R{winner}'s own sentence, line for line, with no other "
+          "rule's words in it, and the fake saw "
+          + ("exactly the owed DELETE" if want_delta else "nothing"),
+          text is not None and text.split("\n") == lines and not losers
+          and delta == want_delta,
+          f"got {text!r}, losers {losers!r}, log {delta!r}; want {lines!r}, "
+          f"log {want_delta!r}")
+
+
+PAIRS = [(i, j) for i in range(1, 8) for j in range(i + 1, 8)]
+
+
+def row_pairs(rp, fake_rp, packages):
+    print("\nRP. the 21 pairs of transcribe's seven refusals — the 15 without R5, "
+          "and six single-ingredient CONTROLS (B24, #80)")
+    if packages is None:
+        check("RP: the pair packages were built", False)
+        return
+    # The single-ingredient CONTROLS first: a cell whose loser's ingredient
+    # did not apply on its own proves nothing.
+    for one in (1, 2, 3, 4, 6, 7):
+        score_cell(rp, fake_rp, packages, (one,), control=True)
+    for cell in PAIRS:
+        if 5 not in cell:
+            score_cell(rp, fake_rp, packages, cell)
+
+
+def row_pairs_keyless(rq, fake_rq, packages):
+    print("\nRP (keyless). the six pairs with R5, on an instance with no key, and R5's "
+          "CONTROL (B24, #80)")
+    if packages is None:
+        check("RP keyless: the pair packages were built", False)
+        return
+    for path in (packages["plain_q"], packages["long_q"], packages["held_q"]):
+        rq.mcp.call("open_project", path=path)
+    score_cell(rq, fake_rq, packages, (5,), control=True)
+    for cell in PAIRS:
+        if 5 in cell:
+            score_cell(rq, fake_rq, packages, cell)
+
+
+# --------------------------------------------------------------------------
 # The mutants
 
 
@@ -1948,6 +2179,17 @@ CLOUD_MUTANTS = {
         '    static let shippedModels = ["universal-2"]\n',
         "`speech_models` pinned to Universal-2 (row 2)"),
 }
+# Issue batch B24 (#80): `engine` read before the scope — R1 and R2 would
+# then lose to R3 (RP's R1×R3 and R2×R3 cells).
+CLOUD_MUTANTS["engine-before-scope"] = (
+    "app/Sources/AgentServer+Captions.swift",
+    "        let document = try onMain { try self.target(a) }\n"
+    "        // The scope, the jobs and the frame in ONE main-thread hop, so every\n",
+    "        _ = try transcriptionEngine(a)\n"
+    "        let document = try onMain { try self.target(a) }\n"
+    "        // The scope, the jobs and the frame in ONE main-thread hop, so every\n",
+    "`engine` read before the scope — R6-17's first two places behind the third "
+    "(RP's R1×R3 and R2×R3)")
 # Three come straight from the probe's own table rather than being spelled a
 # second time here (road map 6 §10.9 aimed them).
 for _name in ("mapping-no-in", "no-retry", "no-fifth-rule"):
@@ -2133,6 +2375,25 @@ def main():
                     run_row(row_m, c, fake_c)
                     run_row(row_e, c, fake_c)
                     run_row(row_b, c, fake_c)
+        # RP (issue batch B24, #80): two instances of their own, so C is not
+        # loaded further (an instance deadlocks past ~40 open documents).
+        if time.time() - started > args.wall:
+            skip_rows(1, f"the run passed its --wall bound of {args.wall:.0f} s before RP")
+        else:
+            packages = None
+            with Fake("proof-rp") as fake_rp:
+                fake_folders.append(fake_rp.folder)
+                with Instance("RP", port_base + 3, fake_rp, binary) as rp:
+                    try:
+                        packages = build_pair_packages(rp, fake_rp)
+                    except Exception as problem:  # noqa: BLE001 — the fixture's answer
+                        check("RP fixture: the pair packages build", False,
+                              f"{type(problem).__name__}: {problem}")
+                    run_row(row_pairs, rp, fake_rp, packages)
+            with Fake("proof-rq") as fake_rq:
+                fake_folders.append(fake_rq.folder)
+                with Instance("RQ", port_base + 4, fake_rq, binary, key=None) as rq:
+                    run_row(row_pairs_keyless, rq, fake_rq, packages)
         run_row(row_k, fake_folders)
     finally:
         left = [one for one in temp_uploads()]

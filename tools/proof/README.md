@@ -4770,6 +4770,258 @@ LOG's sequence check; its CONTROL passes). Both were scored against a copy
 built by hand and run with `--binary`, because `--mutant`'s copy lacks
 `docs/`, `graphic/tests/graphics/` and `agent/`, and its `xcodebuild` fails.
 
+### Issue batch B24 — the five items the reader review left unjudged (#80)
+
+Road map 6 §10.13's review closed with five items nobody judged. Each is now
+a scored row that was made to fail once, or a written judgement. **No live
+call was made and nothing was spent**: every row runs against
+`assemblyai_fake.py`, with `RC_ASSEMBLYAI_KEY` unset.
+
+```sh
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only drip,stop
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --port-base 4955
+```
+
+**1. The 21 pairs of `transcribe`'s refusals: row RP in
+`cloud_captions_proof.py`, and spec §11 R6-17.** The seven refusals are:
+R1, an unknown clip (`clips` holds 99999); R2, a scope with nothing to
+transcribe (`clips: [M]`, where M's audio is switched off); R3, `engine:
+"nope"`; R4, `engine: "apple", speakers: true`; R5, no key (the call is made on
+instance RQ); R6, a media over ten hours (the `long` package's media duration
+rewritten to 40 000 s); R7, a HELD media (`refresh: true` on the `held`
+package, whose one DELETE the fake refuses with a 500 every time). Every
+other cell names `clips: [A]`. Every cell uses `place: false`.
+
+RP runs on two new instances so that C is not loaded further: **RP** on
+`port_base + 3` (keyed), and **RQ** on `port_base + 4` (no key, its own
+loopback fake). `build_pair_packages` makes a `plain` project over
+`media/speech.mov` with clip A (0–2 s) and clip M (2–4 s, audio off), and six
+copies of it: `long`, `plain_q`, `long_q`, `held`, `held_q` and `heldlong`.
+Each cell is ONE check. The first line must be `transcribe: ` plus the
+winner's own sentence, and the lines after it must be exactly the deletion
+lines the winner owes. No loser's marker may appear anywhere in the answer.
+The fake's log delta across the call must be empty, except where R7 wins:
+there it is exactly the owed DELETE. Seven single-ingredient CONTROLS run
+first, because a cell whose losing ingredient does not apply on its own
+proves nothing. All 28 passed (`cloud_captions_proof.py --port-base 4955`,
+201/201).
+
+| Pair | Winner | Pair | Winner | Pair | Winner |
+|---|---|---|---|---|---|
+| R1×R2 | R1 | R2×R3 | R2 | R3×R6 | R3 |
+| R1×R3 | R1 | R2×R4 | R2 | R3×R7 | R3 |
+| R1×R4 | R1 | R2×R5 | R2 | R4×R5 | R4 |
+| R1×R5 | R1 | R2×R6 | R2 | R4×R6 | R4 |
+| R1×R6 | R1 | R2×R7 | R2 | R4×R7 | R4 |
+| R1×R7 | R1 | R3×R4 | R3 | R5×R6 | R5 |
+| — | — | R3×R5 | R3 | R5×R7 | R5, with R6-16's deferred-deletion line as line 2 |
+| — | — | — | — | R6×R7 | R7, with R6-11's held line as line 2, and one DELETE |
+
+The observed order is **1 > 2 > 3 > 4 > 5 > 7 > 6**, in every cell. Nothing
+answered in the wrong rule's sentence, so no app code changed. R1–R5 restate
+spec §7.9's order. 5 > 7, 5 > 6 and 7 > 6 were not written down anywhere, so
+R6-17 records them. The reasons: a keyless run runs no janitor, so it holds
+nothing, and it builds no client, so it measures no length. A held media is
+never fetched, and the ten-hour check is the head of the fetch. The
+per-media winners, R6 and R7, arrive as `The transcription failed: clip 3: …`.
+Mutant **`engine-before-scope`** reads `engine` above the scope. It scored
+**199/201** and exited 1, failing exactly the R1×R3 and R2×R3 cells.
+
+**2. The sheet's Stop during upload, submit, wait and save: section `stop` in
+`cloud_captions_probe.py` (ST).** A new chrome op, `chromeStop`, reaches the
+probe only through `chrome_child`. It builds the real
+`TranscribeSheetController` with the AssemblyAI engine and the dummy key, and
+clicks Generate. It then reads the fake's `/__control/log` until the stage's
+request has arrived, and presses Stop through the button. Each row checks
+five things:
+
+- a CONTROL: the run started, the request arrived, and the card had not
+  finished before Stop;
+- the card's first line is `The transcription was cancelled.`, the button
+  reads Close, and one clip remains;
+- the time from Stop to finish;
+- the fake's log;
+- the cache.
+
+| Row | Scenario | Stop pressed at (the detail line) | Stop → finish | Fake log | Cache |
+|---|---|---|---|---|---|
+| ST·save | `stall {delete, 3}` | `Saving speech.aiff` | 3.01 s (1.0–8.0) | one DELETE; the created id deleted | file and marker landed, `remote_deleted` true |
+| ST·submit | `stall {submit, 6}` | `Uploading speech.aiff · 0 MB of 0` | 6.0 s (3.0–11.0) | one submit, no poll, the created id deleted | nothing |
+| ST·wait | `never_complete` | `Waiting for AssemblyAI · 0 s` | 0.1 s (≤ 5.0) | one submit, ≥ 1 poll, the created id deleted | nothing |
+| ST·upload | `stall {upload, 30}` | `Uploading speech.aiff · 0 MB of 0` | 0.03 s (≤ 5.0) | one upload, no submit | nothing |
+
+A submit takes no cancel token, so Stop is heard only when the submit
+answers. Its id then arrives and is deleted, which is R6-14 read across.
+Save's DELETE takes no token either, so Stop waits for it, and the transcript
+it saved stays saved. Extract keeps its own row, row 18. Three mutants,
+`--only stop`, all exiting 1:
+
+- **`token-not-attached`** never hands the running task to the token:
+  **19/21**. ST·upload took 30.01 s and made a submit.
+- **`cancel-orphans-transcript`** makes poll's cancel throw without its
+  DELETE: **19/21**, failing ST·submit's and ST·wait's log rows.
+- **`--fake-mutant stall-ignored`**, over `stop,drip`: **16/26**. It fails
+  DR0, ST·save (three rows) and ST·submit (five). ST·upload's log row also
+  fails, because the upload answered at once and a submit went out before
+  Stop took effect. ST·upload's timing row passed (0.03 s).
+
+**3. A server that drips: the fake's new `drip` key, section `drip` in
+`cloud_captions_probe.py` (DR), and spec §11 R6-18.**
+
+| Key | What it does |
+|---|---|
+| `drip {route, interval_ms}` | the named route's reply (a forced failure included) goes out as its status line and headers at once, with the full `content-length`, then its body ONE byte at a time, `interval_ms` apart (default 100); the log entry gains `dripped`, `drip_complete` and `drip_seconds` |
+
+Both rows use `DRIP_TUNING`: a 1.5 s idle timeout, no upload retry, and a
+fresh cache for each run.
+
+- **DR1**: the upload's reply dripped at 100 ms a byte. The run completes, in
+  at least 6.0 s, and the fake confirms the whole drip.
+- **DR0**: the CONTROL, a 12 s `stall` on the upload. The run fails with
+  `AssemblyAI did not finish the transcript in the time allowed.` in under
+  8.0 s.
+
+Measured:
+
+- `--only drip`: DR1 **10.70 s**, 85 bytes over 8.71 s; DR0 **2.09 s**.
+- The full run: DR1 **9.37 s**, 85 bytes over 8.71 s; DR0 **2.31 s**.
+
+**The honest answer is that a drip keeps a request alive for as long as it
+drips.** R6-18 records this as an accepted limit (residue for the
+orchestrator to file). Mutant **`resource-bounded`** adds a
+`timeoutIntervalForResource` equal to the idle timeout. It scored **3/6** and
+exited 1: DR1's three rows failed (15 bytes over 1.50 s, then a timeout),
+and DR0's two rows passed.
+
+**4. The second reader.** Each fix was read against the current code at
+`ea2bc9a`. Each item's row passed in this batch's full runs, and each
+mutant's anchor occurs exactly once, checked. None of the findings below was
+fixed.
+
+- **R1·1, a saturating `audio_seconds`.** Verdict: **holds, with a named
+  residue.**
+  - Both sums of server seconds saturate: `cloudFields`' `audio_seconds` and
+    `billed`'s sentence, both in `AgentServer+CloudCaptions.swift`, each
+    through `addingReportingOverflow`.
+  - Nothing else sums them. The report card shows no seconds, and
+    `CloudEstimate` sums local durations.
+  - Residue: saturation is not sticky across signs. Once the sum has pinned
+    at `Int.max`, a later negative term pulls it back, so `[Int.max, Int.max,
+    Int.min]` reports −1.
+  - Residue: a negative `audio_duration` is not clamped. It is written to the
+    cache header and reported as a negative bill.
+  - Pinned by row O. Mutant `audio-seconds-plus`.
+- **R1·2, Stop before and between janitor items.** Verdict: **holds, with a
+  named residue.**
+  - `CloudTranscriber.transcribe` checks the token above the janitor and
+    after it, and `retryDeletes(cancel:)` reads it between items.
+  - Residue: one in-flight DELETE sends no token. That covers the janitor's
+    DELETE, `refusing`'s and `fetch`'s. So one DELETE still costs up to
+    `deleteTimeout` (5 s shipped) after a Stop. ST·save measured 3.01 s
+    against a 3 s stall.
+  - `deleteTimeout` is `URLRequest.timeoutInterval`, an idle timeout, so
+    under R6-18 a dripping DELETE holds a Stop for as long as it drips.
+  - Pinned by row J. Mutant `janitor-deaf`.
+- **R1·3, the marker written only after the file lands.** Verdict: **holds,
+  with a named residue.**
+  - `CloudTranscriber+Media.swift`'s `fetch` is `MediaTranscript.writeStamp`'s
+    only caller, and it is gated on `write`'s answer.
+  - Residue: `writeStamp`'s own answer is discarded. A marker that failed
+    leaves a file with no marker, which is fail-safe (it is re-fetched), but
+    the run reports nothing, so the next run pays again unannounced.
+  - Residue: `fetch`'s post-DELETE `remote_deleted` rewrite runs even when the
+    first write failed. Take a transient first failure, followed by a
+    successful rewrite, over an older file and marker. The result is the new
+    request's words under the OLD request's marker, and a later run with the
+    old request is served them. That is R1·3's defect, reached through the
+    second write. Row M's `UF_IMMUTABLE` stops both writes, so it cannot see
+    this.
+  - The janitor's rewrite changes only the header over the same file, so it
+    is harmless.
+  - Pinned by row M. Mutant `marker-over-stale-file`.
+- **R2·1, `withoutCredential`.** Verdict: **holds for what it covers, with a
+  named residue.**
+  - It covers the three relayed `error` sentences: `classify`'s 402 and other
+    4xx, and `poll`'s transcript `error`.
+  - Residue: other server-supplied strings reach an answer unfiltered.
+    `speech_model_used` reaches the MCP `speech_model_used` key, the `note`,
+    the report card and the cache. `language_code` reaches
+    `language_detected`, the card and the cache. The `words` text reaches the
+    `cues`, the placed clips and the cache.
+  - Residue: an id that passes `isPlainIdentifier` goes into the cache's
+    `transcript_id` and into the client's own log lines (`send`'s path, and
+    `poll`'s failure line). A key made of letters and digits passes that gate.
+  - So an echoing server can still put the key in all of those.
+  - Pinned by row E. Mutant `key-relayed-verbatim`.
+- **H·3, `writeAll`'s EINTR retry (`SecretStore.swift`).** Verdict: **holds,
+  with a named residue.**
+  - A partial write advances `offset` and loops.
+  - An interrupted partial write returns its count, not `EINTR`, so it is
+    covered.
+  - `errno` is read straight after the call. The closure touches nothing
+    that sets it.
+  - Residue: a 0 return, which is not reachable for a regular file with a
+    non-zero count, is reported with a stale `errno`'s sentence.
+  - Residue: the EINTR retry has no bound.
+  - Pinned by section 17's three EINTR rows. Mutant `eintr-unwritable`.
+
+**5. The two re-aimed mutants, re-run.**
+
+- **`any-id-on-the-wire`** (`cloud_captions_probe.py`, the whole suite):
+  **758/762**, exit 1. It fails:
+  - I's "none of the five hostile ids reached the wire";
+  - I's "the hostile ids are not in `janitorFailed`";
+  - KL's "later keyed janitor retries safe IDs first and never sends unsafe
+    ID";
+  - F's ffmpeg decoder row, the host fact below.
+- **`no-delete`** (`cloud_captions_proof.py`, port base 4960): **172/188**,
+  exit 1. The total moves because three rows throw, as their earlier
+  measurement recorded. It fails:
+  - 2's "exactly one DELETE";
+  - LOG's CONTROL;
+  - 4's `remote_deleted`;
+  - four R6-14 rows (immediate and delayed, the DELETE and the cache);
+  - 5's "a second run makes NO request";
+  - 11's janitor rewrite;
+  - T's error, 401 and 500 runs;
+  - B's "cache write could not land";
+  - `row_seven`, `row_eleven` and `row_m` ran to their ends. R6-11 holds
+    every later media.
+
+  RP's 28 cells all pass under it.
+
+**The run table** (2026-09-30, at `ea2bc9a` plus this batch):
+
+| Command | Printed answer |
+|---|---|
+| `make typecheck` | 0 errors, 4 warnings (the baseline); tsc clean |
+| `make test` | exit 0 |
+| `make app` | BUILD SUCCEEDED |
+| `cloud_captions_probe.py` (full) | **761/762**, exit 1, in 527 s. Baseline at `ea2bc9a` was 736/737; this batch adds 25 rows (DR 5, ST 20). The one failure is F's ffmpeg row, both times |
+| `cloud_captions_proof.py --port-base 4955` | **201/201**, exit 0, in 80 s. Baseline was 171/171; this batch adds RP's 28 cells and two parity rows; row K now covers the RP and RQ fakes' folders |
+| `grep "Reelcut: " /tmp/reelcut-495{5..9}.log` | nothing |
+| `--only drip` (observation run) | 6/6 |
+| `--only stop` | 21/21 |
+| proof `--mutant engine-before-scope` | 199/201, exit 1 |
+| proof `--mutant no-delete` | 172/188, exit 1 |
+| probe `--mutant any-id-on-the-wire` | 758/762, exit 1 |
+| probe `--only stop --mutant token-not-attached` | 19/21, exit 1 |
+| probe `--only stop --mutant cancel-orphans-transcript` | 19/21, exit 1 |
+| probe `--only drip --mutant resource-bounded` | 3/6, exit 1 |
+| probe `--only stop,drip --fake-mutant stall-ignored` | 16/26, exit 1 |
+
+No mutant run exited 2.
+
+**Host skips.** F's second FLAC decoder fails on this host. The reason:
+`dyld: Library not loaded: /opt/homebrew/opt/x265/lib/libx265.215.dylib`,
+because the ffmpeg install is broken. The new rows use `say` and
+`media/speech.mov` only.
+
+**A flake seen once.** In one proof run before the verified one, row H's
+`copytree` of an open package raced a `.sb-` temporary in `cache/thumbs/`
+(`[Errno 2]`, `row_h ran to its end`). Row H is unchanged. RP's own copies go
+through `pair_copy`, which leaves `.sb-*` out and retries, up to three tries.
+
 ### Road map 7 part 6 — core argument contract
 
 Run `python3 tools/proof/op_contract_proof.py` from the repository root. It

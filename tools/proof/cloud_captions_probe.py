@@ -82,6 +82,14 @@ Sections, by the name after `section_`:
   failure, next-run janitor, zero-word throw, and production UI/MCP warnings.
 * `settings_verify` — delayed loopback Verify replies against actual Settings
   actions: unchanged, changed input, removal, region, and overlapping owners.
+* `drip` (DR, issue batch B24, #80) — a reply the fake DRIPS a byte every
+  100 ms under a 1.5 s idle timeout (DR1, the run completes and waits the
+  drip out), and its CONTROL against a silent socket (DR0, the same timeout
+  fires).
+* `stop` (ST, issue batch B24, #80) — the Transcribe sheet's Stop pressed,
+  through the button, once the fake has seen the upload, the submit, a poll
+  or the DELETE: how long the card took to finish, what it says, and what the
+  fake and the cache were left holding. Row 18 holds the extract stage.
 
 Host-state inputs: `say` for the fixture, `ffmpeg` for the FLAC decode row's
 second decoder (the row names which decoder answered and `AVAudioFile` always
@@ -1578,6 +1586,7 @@ func modeChrome(_ request: [String: Any]) -> [String: Any] {
     case "agreement": return chromeAgreement(request)
     case "keyless": return chromeKeyless(request)
     case "menu": return chromeMenu(request)
+    case "stop": return chromeStop(request)
     default: return ["error": "this probe does not know the chrome op \(request["op"] ?? "")"]
     }
 }
@@ -1858,6 +1867,81 @@ func chromeKeyless(_ request: [String: Any]) -> [String: Any] {
         built.document.undoManager?.redo()
         answer["redoRestores"] = built.document.project.json == after
     }
+    return answer
+}
+
+/// Issue batch B24 (#80): the sheet's Stop pressed while a cloud run is at ONE
+/// named stage. The run is started through the button's own action; the
+/// fake's log is read (`chromeVerifyState`'s pattern) until a request with
+/// `method` and a path starting `pathPrefix` has ARRIVED at the fake, and only
+/// then is Stop pressed, through the button. What it answers is what a
+/// person would see: whether it finished, how long after the press, the card
+/// and the button, the clip count, and what landed in the cache.
+func chromeStop(_ request: [String: Any]) -> [String: Any] {
+    guard let built = chromeDocument(request), let cache = built.document.cacheDirectory,
+        let base = request["base"] as? String,
+        let logURL = URL(string: base + "/__control/log")
+    else { return ["error": "the Stop fixture would not build"] }
+    let method = request["method"] as? String ?? ""
+    let prefix = request["pathPrefix"] as? String ?? ""
+    let wall = (request["wall"] as? NSNumber)?.doubleValue ?? 60
+    let sheet = TranscribeSheetController(
+        document: built.document, store: MemoryStore(request["key"] as? String ?? "proof-key"),
+        defaults: chromeSuite(request), environment: [:], languages: probeLanguages)
+    _ = sheet.view
+    if let index = sheet.enginePopup.itemArray.firstIndex(where: {
+        $0.representedObject as? String == TranscriptionEngine.assemblyai.rawValue
+    }) { sheet.enginePopup.selectItem(at: index) }
+    sheet.perform(NSSelectorFromString("engineChanged:"), with: nil)
+    sheet.controlChanged(nil)
+    func arrived() -> Bool {
+        guard let data = try? Data(contentsOf: logURL),
+            let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let rows = object["requests"] as? [[String: Any]]
+        else { return false }
+        return rows.contains {
+            ($0["method"] as? String) == method
+                && (($0["path"] as? String) ?? "").hasPrefix(prefix)
+        }
+    }
+    sheet.startClicked(nil)
+    var answer: [String: Any] = ["didStart": sheet.didStart]
+    var deadline = Date().addingTimeInterval(wall)
+    var reached = false
+    while Date() < deadline {
+        if arrived() {
+            reached = true
+            break
+        }
+        // A run that ended without making the request never will.
+        if sheet.didFinish { break }
+        RunLoop.current.run(until: Date().addingTimeInterval(0.025))
+    }
+    answer["reached"] = reached
+    answer["finishedBeforeStop"] = sheet.didFinish
+    answer["detailAtStop"] = sheet.detailLabel.stringValue
+    let pressed = Date()
+    // Stop on a FINISHED card is Close, which dismisses a sheet this probe
+    // never presented; `finishedBeforeStop` is already the row's answer.
+    if !sheet.didFinish { sheet.stopButton.performClick(nil) }
+    deadline = Date().addingTimeInterval(wall)
+    while Date() < deadline, !sheet.didFinish {
+        RunLoop.current.run(until: Date().addingTimeInterval(0.025))
+    }
+    answer["stopToFinish"] =
+        sheet.didFinish && !(answer["finishedBeforeStop"] as? Bool ?? false)
+        ? Date().timeIntervalSince(pressed) as Any : NSNull()
+    answer["finished"] = sheet.didFinish
+    answer["status"] = sheet.statusLabel.stringValue
+    answer["stopTitle"] = sheet.stopButton.title
+    answer["clips"] = built.document.project.snapshot.clips.count
+    answer["transcriptCached"] = FileManager.default.fileExists(
+        atPath: MediaTranscript.fileURL(for: built.media, in: cache).path)
+    answer["markerCached"] = FileManager.default.fileExists(
+        atPath: MediaTranscript.markerURL(for: built.media, in: cache).path)
+    answer["remoteDeleted"] =
+        MediaTranscript.read(for: built.media, in: cache).map { $0.header.remoteDeleted as Any }
+        ?? NSNull()
     return answer
 }
 
@@ -4847,6 +4931,83 @@ def section_run(binary, sources):
                   f"before {answer.get('tempBefore')!r}")
 
 
+# --------------------------------------------------------------------------
+# DR — a server that drips (issue batch B24, #80)
+
+# RUN_TUNING with an idle timeout short enough to measure against and no
+# upload retry, so a timed-out upload is ONE request and its answer is the
+# run's.
+DRIP_TUNING = {"pollInterval": 0.2, "retryBackoff": 0.05, "requestTimeout": 1.5,
+               "pollCeilingFloor": 60, "deleteTimeout": 5, "uploadRetries": 0}
+DRIP_SENTENCE = "AssemblyAI did not finish the transcript in the time allowed."
+
+
+def section_drip(binary, sources):
+    print("\nDR. a server that drips its reply a byte at a time under the idle timeout "
+          "(B24, #80)")
+    speech = make_fixture()
+    if speech is None:
+        skip_rows(5, "`say` is not on this host, so the drip rows have no audio to send")
+        return
+    second = os.path.join(os.path.dirname(speech), "speech-b.aiff")
+    if not os.path.exists(second):
+        shutil.copy2(speech, second)
+    media, jobs = run_media(speech, second)
+    one_media, one_job = media[:1], jobs[:1]
+    with Fake("drip") as fake:
+        # --- DR1: the upload's reply, 100 ms a byte, under a 1.5 s idle
+        # timeout. A FRESH cache, because a cached transcript skips the upload.
+        fake.scenario(drip={"route": "upload", "interval_ms": 100})
+        answer, error, _ = run_probe(binary, "drip-DR1", {
+            "mode": "run", "base": fake.base, "key": DUMMY_KEY, "tuning": DRIP_TUNING,
+            "cache": fresh("drip-cache-DR1"), "media": one_media, "jobs": one_job},
+            timeout=300)
+        log = fake.log()
+        entry = next((row for row in log["requests"] if row["path"] == "/v2/upload"), {})
+        if answer is None:
+            check("DR1: the dripped-upload run answers", False, error)
+        else:
+            print(f"  (DR1 measured: the run took {answer.get('seconds', 0):.2f} s; the fake "
+                  f"dripped {entry.get('dripped')!r} bytes over "
+                  f"{entry.get('drip_seconds', 0):.2f} s, complete "
+                  f"{entry.get('drip_complete')!r})")
+            check("DR1: a reply dripped a byte every 100 ms under a 1.5 s IDLE timeout is "
+                  "never timed out — the run completes",
+                  answer.get("ok") is True,
+                  f"got ok={answer.get('ok')!r} {answer.get('message')!r}")
+            check("DR1: and the drip is what the run waited on — it took at least 6.0 s, "
+                  "four idle timeouts' worth",
+                  (answer.get("seconds") or 0) >= 6.0,
+                  f"the run took {answer.get('seconds')!r} s")
+            check("DR1: CONTROL — the fake really dripped the whole reply, and the drip "
+                  "itself lasted at least 6.0 s",
+                  entry.get("drip_complete") is True
+                  and (entry.get("drip_seconds") or 0) >= 6.0,
+                  f"got {entry.get('dripped')!r} bytes, complete "
+                  f"{entry.get('drip_complete')!r}, {entry.get('drip_seconds')!r} s")
+
+        # --- DR0 CONTROL: the same tuning against a SILENT socket does time
+        # out, so DR1's answer is about the drip and not a timer that never
+        # fires.
+        fake.scenario(stall={"route": "upload", "seconds": 12})
+        answer, error, _ = run_probe(binary, "drip-DR0", {
+            "mode": "run", "base": fake.base, "key": DUMMY_KEY, "tuning": DRIP_TUNING,
+            "cache": fresh("drip-cache-DR0"), "media": one_media, "jobs": one_job},
+            timeout=300)
+        if answer is None:
+            check("DR0: the stalled-upload run answers", False, error)
+        else:
+            print(f"  (DR0 measured: the run took {answer.get('seconds', 0):.2f} s)")
+            check("DR0: CONTROL — the same 1.5 s idle timeout against a socket that says "
+                  "NOTHING for 12 s fails the run with the timeout's own sentence",
+                  answer.get("ok") is False
+                  and DRIP_SENTENCE in str(answer.get("cloudFailure", "")),
+                  f"got ok={answer.get('ok')!r} {answer.get('cloudFailure')!r}")
+            check("DR0: CONTROL — and it ended in under 8.0 s, long before the stall did",
+                  (answer.get("seconds") or 99) < 8.0,
+                  f"the run took {answer.get('seconds')!r} s")
+
+
 def progress_oracle(row):
     """`CloudProgress.fraction`, computed here from §5a's four boundaries."""
     clean = [s if s > 0 else 0 for s in row["seconds"]]
@@ -6020,6 +6181,107 @@ def section_chrome(binary, sources):
           f"got {size!r}")
 
 
+# --------------------------------------------------------------------------
+# ST — the sheet's Stop at each network stage (issue batch B24, #80). Row 18
+# holds the extract stage; these hold upload, submit, wait and save.
+
+CANCELLED = "The transcription was cancelled."
+# (row, scenario, the request Stop waits for, Stop→finish low, high). The
+# upload stall outlives its child, so it runs last.
+STOP_ROWS = [
+    ("save", {"stall": {"route": "delete", "seconds": 3}}, "DELETE", "/v2/transcript/",
+     1.0, 8.0),
+    ("submit", {"stall": {"route": "submit", "seconds": 6}}, "POST", "/v2/transcript",
+     3.0, 11.0),
+    ("wait", {"never_complete": True}, "GET", "/v2/transcript/", None, 5.0),
+    ("upload", {"stall": {"route": "upload", "seconds": 30}}, "POST", "/v2/upload",
+     None, 5.0),
+]
+
+
+def section_stop(binary, sources):
+    print("\nST. the Transcribe sheet's Stop during upload, submit, wait and save "
+          "(B24, #80)")
+    fixture = make_fixture()
+    if fixture is None:
+        skip_rows(5 * len(STOP_ROWS), "`say` is not on this host, so the Stop rows have no "
+                                      "audio to send")
+        return
+    with Fake("stop") as fake:
+        for tag, scenario, method, prefix, low, high in STOP_ROWS:
+            fake.scenario(**scenario)
+            row, error, _ = chrome_child(binary, fake, "stop-" + tag, {
+                "op": "stop", "fixture": fixture, "key": DUMMY_KEY, "base": fake.base,
+                "method": method, "pathPrefix": prefix, "wall": 60}, timeout=300)
+            log = fake.log()
+            name = f"ST·{tag}"
+            if row is None or "error" in row:
+                check(f"{name}: the Stop child answers", False,
+                      error or (row or {}).get("error"))
+                continue
+            took = row.get("stopToFinish")
+            print(f"  ({name} measured: Stop pressed at \"{row.get('detailAtStop')}\", "
+                  f"the card finished {took if took is None else round(took, 2)} s later)")
+            check(f"{name}: CONTROL — the run started, reached {method} {prefix}… at "
+                  "the fake, and was still running when Stop was pressed",
+                  row.get("didStart") is True and row.get("reached") is True
+                  and row.get("finishedBeforeStop") is False,
+                  f"got didStart={row.get('didStart')!r} reached={row.get('reached')!r} "
+                  f"finishedBeforeStop={row.get('finishedBeforeStop')!r}")
+            status = str(row.get("status", ""))
+            check(f"{name}: Stop ends it — the card says \"{CANCELLED}\" first, the "
+                  "button is Close, and no caption clip landed",
+                  row.get("finished") is True and status.split("\n")[0] == CANCELLED
+                  and row.get("stopTitle") == "Close" and row.get("clips") == 1,
+                  f"got finished={row.get('finished')!r} status={status!r} "
+                  f"title={row.get('stopTitle')!r} clips={row.get('clips')!r}")
+            bound = (f"{low}–{high} s" if low is not None else f"≤ {high} s")
+            check(f"{name}: and it finished {bound} after the press",
+                  took is not None and (low is None or took >= low) and took <= high,
+                  f"got {took!r} s")
+            requests = log["requests"]
+            created = [row_["id"] for row_ in log.get("transcripts", [])]
+            deleted = set(log.get("deleted", []))
+            deletes = [r for r in requests if r["method"] == "DELETE"]
+            submits_ = [r for r in requests
+                        if r["method"] == "POST" and r["path"] == "/v2/transcript"]
+            polls = [r for r in requests if r["method"] == "GET"
+                     and r["path"].startswith("/v2/transcript/")]
+            uploads_ = [r for r in requests if r["path"] == "/v2/upload"]
+            all_deleted = bool(created) and all(one in deleted for one in created)
+            if tag == "save":
+                ok = len(deletes) == 1 and all_deleted
+                claim = "one DELETE, and every transcript it created is deleted"
+            elif tag == "submit":
+                ok = len(submits_) == 1 and not polls and all_deleted
+                claim = ("one submit, NO poll after it, and the transcript the submit "
+                         "created is deleted — the id arrives and is not orphaned")
+            elif tag == "wait":
+                ok = len(submits_) == 1 and len(polls) >= 1 and all_deleted
+                claim = ("one submit, at least one poll, and the transcript is deleted "
+                         "on the way out")
+            else:
+                ok = len(uploads_) == 1 and not submits_
+                claim = "one upload and NO submit — nothing was paid for"
+            check(f"{name}: the fake's log — {claim}", ok,
+                  f"requests {[r['method'] + ' ' + r['path'] for r in requests]!r}, "
+                  f"created {created!r}, deleted {sorted(deleted)!r}")
+            if tag == "save":
+                check(f"{name}: and the transcript that was being saved LANDED — the "
+                      "file and its marker are in the cache and `remote_deleted` is true",
+                      row.get("transcriptCached") is True and row.get("markerCached") is True
+                      and row.get("remoteDeleted") is True,
+                      f"got file={row.get('transcriptCached')!r} "
+                      f"marker={row.get('markerCached')!r} "
+                      f"remoteDeleted={row.get('remoteDeleted')!r}")
+            else:
+                check(f"{name}: and nothing landed in the cache — no transcript file, "
+                      "no marker",
+                      row.get("transcriptCached") is False and row.get("markerCached") is False,
+                      f"got file={row.get('transcriptCached')!r} "
+                      f"marker={row.get('markerCached')!r}")
+
+
 def png_size(data):
     """A PNG's IHDR width and height, so no image library is needed."""
     if len(data) < 24 or data[:8] != b"\x89PNG\r\n\x1a\n":
@@ -6556,6 +6818,25 @@ MUTANTS = {
         "        self.speakerLabels = options.speakerLabels\n",
         "        self.speakerLabels = false\n",
         "one request field dropped from the stamp (row 13)"),
+    # Issue batch B24 (#80): the Stop and drip rows' mutants.
+    "token-not-attached": (
+        "AssemblyAIClient.swift",
+        "        cancel?.attach(task)\n",
+        "",
+        "the cancel token never handed the running task \u2014 Stop waits out an upload "
+        "(ST\u00b7upload)"),
+    "cancel-orphans-transcript": (
+        "AssemblyAIClient.swift",
+        "            if cancel?.isCancelled == true { throw refusing(.cancelled, id: id) }\n",
+        "            if cancel?.isCancelled == true { throw ClientError.cancelled }\n",
+        "a Stop heard in `poll` throws without deleting the transcript (ST\u00b7submit, "
+        "ST\u00b7wait)"),
+    "resource-bounded": (
+        "AssemblyAIClient.swift",
+        "        configuration.timeoutIntervalForRequest = tuning.requestTimeout\n",
+        "        configuration.timeoutIntervalForRequest = tuning.requestTimeout\n"
+        "        configuration.timeoutIntervalForResource = tuning.requestTimeout\n",
+        "a TOTAL deadline of one idle timeout on every request (DR1; DR0 still passes)"),
 }
 
 
@@ -6569,6 +6850,12 @@ FAKE_MUTANTS: dict[str, tuple[str, str, str]] = {
         "                    if True:\n",
         "Z11 \u2014 the fake logging ANY authorization value, not just the two "
         "allow-listed dummies (row G)"),
+    # Issue batch B24 (#80): the fake's `stall` ignored \u2014 every stalled route
+    # answers at once (DR0, ST\u00b7submit, ST\u00b7save).
+    "stall-ignored": (
+        '                threading.Event().wait(entry["stalled_seconds"])\n',
+        "                pass\n",
+        "B24 \u2014 the fake's `stall` answering at once (DR0, ST\u00b7submit, ST\u00b7save)"),
 }
 
 
@@ -6626,8 +6913,9 @@ SECTIONS = [section_mapping, section_jobs, section_stamp, section_keyless,
             section_client, section_submission,
             section_cancel,
             section_secrets, section_cues, section_extract, section_verbatim,
-            section_cache_write, section_run,
-            section_estimate, section_settings_verify, section_chrome, section_hygiene]
+            section_cache_write, section_run, section_drip,
+            section_estimate, section_settings_verify, section_chrome, section_stop,
+            section_hygiene]
 # The sections the HARNESS binary drives rather than the probe binary.
 HARNESS_SECTIONS = {"cues"}
 
@@ -6647,8 +6935,8 @@ def main():
     parser.add_argument("--only",
                         help="a comma-separated subset of sections, by the name after "
                              "`section_` (mapping, jobs, stamp, client, submission, cancel, "
-                             "secrets, cues, extract, verbatim, cache_write, run, estimate, "
-                             "settings_verify, chrome, hygiene)")
+                             "secrets, cues, extract, verbatim, cache_write, run, drip, "
+                             "estimate, settings_verify, chrome, stop, hygiene)")
     parser.add_argument("--wall", type=float, default=1800,
                         help="the whole run's wall-clock bound in seconds (rule H)")
     args = parser.parse_args()

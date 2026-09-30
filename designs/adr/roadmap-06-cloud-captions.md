@@ -4,7 +4,7 @@
   C2, the relay, is Deferred by the user (2026-09-21). It is designed below and not built.
 - **Original:** `archive/reelcut-roadmap-6.md` (3992 lines). It is the full record. Sections cited
   below as "orig §x" refer to it.
-- **Spec decisions:** R6-1..R6-16 in spec §11 (`designs/spec/11-decisions/`), which stay binding:
+- **Spec decisions:** R6-1..R6-18 in spec §11 (`designs/spec/11-decisions/`), which stay binding:
   - R6-1: one command with two engines. A cloud caption is an ordinary text clip.
   - R6-2: audio leaves the machine only when someone names the cloud engine, with the price shown.
     The tool's default is always `apple`.
@@ -23,6 +23,10 @@
   - R6-15: the transcript marker holds the audio identity plus the request, with no display-cache
     fields.
   - R6-16: current cached transcripts can be reused without a key.
+  - R6-17: `transcribe`'s seven refusals answer in one precedence, 1 > 2 > 3 > 4 > 5 > 7 > 6,
+    each in the winner's own sentence (issue batch B24, #80).
+  - R6-18: a request's only timeout is an idle one, so a server that drips holds it (accepted;
+    issue batch B24, #80).
 
 ## Context
 
@@ -303,6 +307,10 @@ The proofs live in `tools/proof/`:
   truly deleted transcript answers 200 with the sentinel `audio_url: "http://deleted_by_user"`.
   What the service answers for another account's well-formed id is unmeasured.
 - **A prolonged DELETE outage holds every already-transcribed media** (R6-11, accepted).
+- **A server that drips holds a request for as long as it drips** (R6-18, accepted). The only
+  timeout is the idle one, which every byte resets: a reply dripped a byte every 100 ms under a
+  1.5 s idle timeout was waited out (`cloud_captions_probe.py` DR1). Stop ends a dripping upload
+  or poll; a submit takes no token, and MCP `transcribe` has no Stop.
 - **Submit recovery covers only the newest 200 transcripts and three looks.** A crash between POST
   and reply cannot be recovered. There is no durable pending-submission journal and no account-wide
   janitor.
@@ -340,14 +348,6 @@ The proofs live in `tools/proof/`:
   - how a held media feels
   - ⌘, in a document window
   - `recording_proof.py` with a wired input
-- Items the reader review left UNJUDGED:
-  - the 21 pairs of refusals
-  - the sheet's Stop during upload, submit, wait and save
-  - a server that drips bytes under the idle timeout
-  - a second reader for fixes R1·1, R1·2, R1·3, R2·1 and H·3
-  - the re-aimed mutants that were never re-run
-
-  Tracked in #80.
 - Candidates not started: windowed transcription (deferred until the estimate is seen to bite) and
   a per-speaker caption label/colour. Tracked in #95 and #93.
 - Accepted limits a later phase may revisit: #28's bounded recovery, the janitor's 404 hold,

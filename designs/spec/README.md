@@ -38,12 +38,12 @@ this index gets its row in the same change.
 | [`07.6-playback-update-rules.md`](07.6-playback-update-rules.md) | 40 | What playback does after every edit: rebuild or refresh. |
 | [`07.7-import.md`](07.7-import.md) | 20 | `MediaImporter.probe` and the formats import accepts. |
 | [`07.8-export.md`](07.8-export.md) | 235 | Export: writers, formats, loudness, the queue. |
-| [`07.9-agent.md`](07.9-agent.md) | 522 | The MCP agent: one tool per op plus `scope`, the app-state tools, the dev tools, parity, the graphics loop, the lane, the helper, the assistant session, its prompt and the Assistant tab. |
+| [`07.9-agent.md`](07.9-agent.md) | 523 | The MCP agent: one tool per op plus `scope`, the app-state tools, the dev tools, parity, the graphics loop, the lane, the helper, the assistant session, its prompt and the Assistant tab. |
 | [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 76 | The spec's Rust module map (core/CLAUDE.md is the live one). |
 | [`08-repo-layout.md`](08-repo-layout.md) | 64 | Repo layout, build, conventions. |
 | [`09-keys-and-menus.md`](09-keys-and-menus.md) | 137 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 2266 in 13 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 2332 in 13 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

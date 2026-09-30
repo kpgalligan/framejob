@@ -240,3 +240,38 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   sheet's main-thread completion prevents placement of a success already
   queued, retaining its cleanup report. No endpoint is resolved for a
   keyless run and no credential is added to a tool call or project file.
+- **R6-17 — `transcribe`'s seven refusals have one precedence, and the
+  answer is the winner's own sentence.** The seven are (1) an unknown clip,
+  (2) a scope with nothing to transcribe, (3) a misspelt `engine`, (4) a
+  cloud-only argument under `apple`, (5) no credential, (6) a media over the
+  ten-hour limit and (7) a media HELD by R6-11 (named under `refresh`, the
+  one way a held media is reached). When two apply the order is
+  1 > 2 > 3 > 4 > 5 > 7 > 6. The scope is read before `engine`; under `apple`
+  no key, length or hold is consulted; a keyless run runs no janitor, so it
+  holds nothing, and builds no client, so it measures no length (R6-16); a
+  held media is never fetched, and the ten-hour check is the head of the
+  fetch. A per-media winner (6 or 7) arrives as "The transcription failed:
+  clip N: …", followed only by R6-4 and R6-16's deletion lines; every other
+  winner is its own sentence alone, and no answer carries a loser's words.
+  1–5 restate spec §7.9's order; 5 > 7, 5 > 6 and 7 > 6 are new, recorded
+  from `cloud_captions_proof.py`'s row RP (issue batch B24, #80), which
+  observed all 21 pairs in this order before this entry was written.
+- **R6-18 — A request's only timeout is an idle one; a server that drips
+  holds it for as long as it drips (accepted).** `timeoutIntervalForRequest`
+  resets on every byte, `timeoutIntervalForResource` is URLSession's
+  default, and the poll ceiling is read only between polls, so no request
+  has a total deadline. Measured by `cloud_captions_probe.py`'s section
+  `drip`: a reply dripped a byte every 100 ms under a 1.5 s idle timeout
+  (85 bytes over 8.71 s) was waited out and the run completed in 10.70 s
+  (DR1), while the same timeout against a socket silent for 12 s failed the
+  run in 2.09 s (DR0, the CONTROL) — the `--only drip` run that observed it;
+  the full probe run measured 9.37 s and 2.31 s. Stop ends a dripping upload
+  or poll, because the token cancels the running task (read from the code;
+  row ST·upload measured it against a silent upload, 0.03 s); it is not
+  heard inside a submit, which takes no token, so the submit's id always
+  arrives and is deleted (R6-14
+  read across; the sheet's Stop during a 6 s submit finished 6.0 s later,
+  row ST·submit); and MCP `transcribe`'s cloud arm has no Stop at all.
+  Accepted because the far end is AssemblyAI or a relay speaking its
+  protocol (R6-6), and a total deadline would fail a large upload on a slow
+  line; C2 revisits it. DECLINED for now: a per-request resource timeout.

@@ -71,6 +71,18 @@ the counters):
                                  caught carrying a credential
     list_lag                     initial recovery-list looks that omit newly
                                  created transcripts (default 0)
+    drip                         {route, interval_ms} — that route's reply
+                                 (whatever it would answer, a forced failure
+                                 included) goes out as its status line and
+                                 headers at once, with the full
+                                 `content-length`, and then its body ONE
+                                 byte at a time, `interval_ms` apart
+                                 (default 100): what an idle timeout that
+                                 resets on every byte is measured against
+                                 (issue batch B24, #80). The route's log
+                                 entry gains `dripped` (bytes written),
+                                 `drip_complete` and `drip_seconds` (first
+                                 body byte to last)
 
 `GET /__control/log` answers `{"requests": [...], "failures": [...]}`;
 `GET /__control/words` answers the exact bytes this fake serves as `words`.
@@ -84,6 +96,7 @@ import os
 import struct
 import sys
 import threading
+import time
 import uuid
 
 # R6-9(e). Two dummies and nothing else. A value off this list is never
@@ -182,6 +195,8 @@ class Scenario:
         self.echo_authorization = bool(given.get("echo_authorization", False))
         self.list_lag = int(given.get("list_lag", 0))
         self.list_looks = 0
+        # B24 (#80): the named route's body goes out a byte at a time.
+        self.drip = given.get("drip")
 
     def take_drop(self, route):
         """Whether this route's reply is dropped this time. `times: -1` never
@@ -307,9 +322,39 @@ def make_handler(fake):
                 self.send_header("content-type", kind)
                 self.send_header("content-length", str(len(data)))
                 self.end_headers()
+                if self._drip is not None:
+                    return self._drip_body(data)
                 self.wfile.write(data)
             except OSError:
                 self.close_connection = True
+
+        def _drip_body(self, data):
+            """`drip`: the body ONE byte at a time, `interval_ms` apart, the
+            headers having already gone out whole. A write error ends it; the
+            entry says how far it got."""
+            entry = self._drip_entry
+            interval = float(self._drip.get("interval_ms", 100)) / 1000.0
+            entry["dripped"] = 0
+            entry["drip_complete"] = False
+            entry["drip_seconds"] = 0.0
+            self.wfile.flush()
+            first = None
+            for index in range(len(data)):
+                if index:
+                    threading.Event().wait(interval)
+                try:
+                    self.wfile.write(data[index:index + 1])
+                    self.wfile.flush()
+                except OSError:
+                    self.close_connection = True
+                    break
+                now = time.monotonic()
+                if first is None:
+                    first = now
+                entry["dripped"] = index + 1
+                entry["drip_seconds"] = now - first
+            entry["drip_complete"] = entry["dripped"] == len(data)
+            return None
 
         def _json(self, code, body):
             self._bytes(code, json.dumps(body).encode("utf-8"))
@@ -358,6 +403,11 @@ def make_handler(fake):
 
         def _handle(self, method):
             path = self.path.split("?")[0]
+            # `drip`, per request: None unless this request's route is the one
+            # named. A kept-alive connection reuses the handler, so it is set
+            # afresh here every time.
+            self._drip = None
+            self._drip_entry = None
             headers = {}
             for name, value in self.headers.items():
                 name = name.lower()
@@ -372,6 +422,11 @@ def make_handler(fake):
 
             if path.startswith("/__control/"):
                 return self._control(method, path, entry)
+
+            drip = fake.scenario.drip
+            if drip and drip.get("route") == self._route(method, path):
+                self._drip = drip
+                self._drip_entry = entry
 
             # Logged as soon as the HEADERS are parsed, and mutated in place
             # as the body arrives: an upload the client CANCELS mid-body never
