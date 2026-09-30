@@ -808,7 +808,10 @@ the key map behind it.
   bitmap `renderText` uploads; its body is `static textBitmap`, which the
   Generate Captions sheet's preview draws with, off-Metal (road map 8's W4b). A shape's gradient SORTS its stops (the core
   does not police order), projects a linear ramp onto the box, and is ignored
-  by `line` and `arrow`.
+  by `line` and `arrow`. `maxTextureSide` is never below
+  `GraphicLibrary.maxSide`, since an error card is drawn through `bitmap(_:)`
+  at the graphic's size; `core/tests/graphic_ffi.rs` reads its `static let`
+  line, so it stays one integer literal.
 - `AudioTap.swift` · `AudioDSP.swift` — the `MTAudioProcessingTap` playback
   and export share, and the four sample-level effects: noise reduction (a
   512-sample delay), the compressor, the mono fold (BEFORE the pan, or it is

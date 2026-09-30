@@ -381,8 +381,8 @@ final class GraphicStore {
         return nil
     }
 
-    /// `graphics/`, `graphics/fonts/`, `graphics/<file>`,
-    /// `graphics/fonts/<file>` or `the package`, for a warning.
+    /// `graphics/`, `graphics/fonts/`, `graphics/assets/`, `graphics/<file>`,
+    /// `graphics/fonts/<file>`, `graphics/assets/<file>` or `the package`, for a warning.
     private func watchSubject(_ url: URL, folder: Bool) -> String {
         if url == watchedPackage { return "the package" }
         if url == watchedFolder { return "\(Self.folderName)/" }

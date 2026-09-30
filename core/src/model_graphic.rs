@@ -33,9 +33,9 @@ pub const GRAPHIC_MIN_SIDE: u32 = 1;
 /// it); `graphic_ffi.rs`'s `one_max_side_…` test pins the three equal.
 pub const GRAPHIC_MAX_SIDE: u32 = 8192;
 
-/// The most keys a stored `props` object may hold. Restates the engine
-/// crate's `MAX_KEYS` in its `props.rs`, which bounds a schema the same way
-/// (G-4).
+/// The most keys a stored `props` object may hold. Restates the engine's
+/// `MAX_PROPS`, which bounds a schema the same way (G-4; G-2 forbids importing
+/// it); `graphic_ffi.rs`'s `one_max_props_…` test pins the two equal.
 pub const GRAPHIC_MAX_PROPS: usize = 64;
 
 /// The engine's `MAX_OPTIONS` (an `enum` entry's) and `MAX_STRING` (in

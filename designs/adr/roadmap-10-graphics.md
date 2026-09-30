@@ -320,8 +320,14 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   `model_graphic.rs`'s `GRAPHIC_MAX_SIDE`, and the header's
   `RC_GRAPHIC_MAX_SIDE`, which `GraphicLibrary.maxSide` reads — the three
   pinned equal by `core/tests/graphic_ffi.rs`'s
-  `one_max_side_in_the_engine_the_core_and_the_header`) and the 64-key
-  limit, which is still restated and must be changed together.
+  `one_max_side_in_the_engine_the_core_and_the_header`), the 64-key limit
+  (the crate's `MAX_PROPS` and `GRAPHIC_MAX_PROPS`, pinned equal by
+  `one_max_props_in_the_engine_and_the_core`), and the app's
+  `LayerRenderers.maxTextureSide`, which `the_app_texture_side_holds_the_largest_graphic`
+  reads from the Swift source and holds at or above `MAX_SIDE`, since a
+  graphic's error card is drawn at the graphic's own size (G-8).
+  `model_graphic.rs` still restates the engine's `MAX_OPTIONS` (32),
+  `MAX_STRING` (4096) and `TYPES` with no pin; those must be changed together.
 - Fixed since: the export's compile gate walked one nest level, deeper nests
   caught only by the mid-export abort — it now walks every nest reached from
   the range, however deep (#73); the loudness reader was cancelled from main
@@ -348,7 +354,13 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   given, had the harness copy the manual, and dropped `graphicImportSource`'s
   unused path (G-20 (c)–(e)). Pinned by `graphic/tests/families.rs` and
   `render.rs`, `core/tests/graphic_ffi.rs`, `graphics_store_probe.py` W17
-  and `graphics_proof.py` C7, G10 and G11, each made to fail once.
+  and `graphics_proof.py` C7, G10 and G11, each made to fail once. Issue
+  batch B31 (2026-09-30, #183 items 1–4) exported the engine's `MAX_PROPS`
+  and pinned it and `maxTextureSide` in `core/tests/graphic_ffi.rs` (each
+  test made to fail once, by a 65-key cap and a 4096 side), completed
+  `watchSubject`'s doc, and replaced G11's 0.5 s settle with an in-place
+  rewrite of `m00.js` polled until its revision is seen, then one coalesce
+  interval.
 
 ## Open items
 

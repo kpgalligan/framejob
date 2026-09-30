@@ -48,7 +48,10 @@ final class LayerRenderers {
     /// static graphic still hits and an animating one holds at most this.
     static let graphicCacheLimit = 6
     /// Widest texture rendered. Beyond this a description is refused rather
-    /// than clamped — a 40 000 pt font is a typo, not a request.
+    /// than clamped — a 40 000 pt font is a typo, not a request. Never below
+    /// `GraphicLibrary.maxSide`: a failing graphic's error card is drawn through
+    /// `bitmap(_:)` at the graphic's own size, and would otherwise draw nothing.
+    /// `core/tests/graphic_ffi.rs` reads this line, so it stays one integer literal.
     static let maxTextureSide = 8192
 
     let device: MTLDevice

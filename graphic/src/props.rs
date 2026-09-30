@@ -6,7 +6,11 @@ use serde_json::{Map, Value};
 
 use crate::diagnostic::Diagnostic;
 
-const MAX_KEYS: usize = 64;
+/// The most keys a module's schema may declare (G-4). The core restates it
+/// as `GRAPHIC_MAX_PROPS`, since G-2 forbids importing it there;
+/// `core/tests/graphic_ffi.rs`'s `one_max_props_in_the_engine_and_the_core`
+/// pins the two.
+pub const MAX_PROPS: usize = 64;
 const MAX_OPTIONS: usize = 32;
 const MAX_STRING: usize = 4096;
 const TYPES: [&str; 6] = ["string", "number", "boolean", "color", "enum", "asset"];
@@ -16,9 +20,9 @@ pub(crate) fn check_schema(schema: &Value) -> Result<(), Diagnostic> {
     let Some(entries) = schema.as_object() else {
         return Err(Diagnostic::error("schema must be an object"));
     };
-    if entries.len() > MAX_KEYS {
+    if entries.len() > MAX_PROPS {
         return Err(Diagnostic::error(format!(
-            "schema has {} keys; the most is {MAX_KEYS}",
+            "schema has {} keys; the most is {MAX_PROPS}",
             entries.len()
         )));
     }

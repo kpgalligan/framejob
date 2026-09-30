@@ -9231,3 +9231,36 @@ here.
 python3 tools/proof/scope_playhead_probe.py                                                # 16/16, exit 0
 python3 tools/proof/scope_playhead_probe.py --sources tools/proof/work/b30/prefix-sources  # S13–S15 FAIL, exit 1
 ```
+
+## Issue batch B31 — graphics residue: the props-cap pin, the texture-side pin, G11's settle (`core/tests/graphic_ffi.rs`, `graphics_proof.py` G11; #183 items 1–4)
+
+- **`core/tests/graphic_ffi.rs`** — `one_max_props_in_the_engine_and_the_core`
+  compares the engine's now-exported `graphic::MAX_PROPS` with the core's
+  `GRAPHIC_MAX_PROPS`; `the_app_texture_side_holds_the_largest_graphic` reads
+  `app/Sources/LayerRenderers.swift`'s `static let maxTextureSide = <integer>`
+  line at run time and holds it at or above `graphic::MAX_SIDE` (a G-8 error
+  card is drawn through `bitmap(_:)` at the graphic's own size).
+- **`graphics_proof.py`** — G11's 0.5 s settle is gone: after the 17 writes,
+  `m00.js` is rewritten in place and `await_revisions` (the new shared helper,
+  polling `get_graphic` every 0.2 s) waits up to 5 s for its revision, which
+  proves a pass ran after every write event from the setup; then 0.3 s (one
+  `GraphicStore.coalesceInterval` and margin) for the pass the settle's own
+  write may leave pending. The control's poll uses the same helper.
+  `store-uncapped` still fails G11.
+
+Run on 2026-09-30:
+
+| Command | Answer |
+|---|---|
+| `cd core && cargo test --release --test graphic_ffi` | 13 passed |
+| the same, `one_max_props`, with `MAX_PROPS = 65` (reverted at once) | FAILED: `left: 65`, `right: 64` — caught; 1 passed after the revert |
+| the same, `texture_side`, with `maxTextureSide = 4096` (reverted at once) | FAILED: "LayerRenderers.maxTextureSide (4096) is below GraphicLibrary.maxSide (8192): a graphic's G-8 error card at its own size would draw nothing" — caught; 1 passed after the revert |
+| `make test`; `make lint`; `make typecheck`; `make app` | exit 0; exit 0; 0 errors, 4 warnings, tsc clean; BUILD SUCCEEDED |
+| `graphics_proof.py --port` 4931, 4932, 4933 | 45/45, exit 0, each run; G11 and Z1 ok |
+| `graphics_proof.py --port 4934 --mutant store-uncapped` | exit 0: "the mutant is CAUGHT: G11 failed"; the settle and the control held |
+
+```sh
+cd core && cargo test --release --test graphic_ffi                        # 13 passed
+python3 tools/proof/graphics_proof.py --port 4931                         # 45/45
+python3 tools/proof/graphics_proof.py --port 4934 --mutant store-uncapped # exit 0
+```

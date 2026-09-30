@@ -129,10 +129,13 @@ C7  (B19, G-20 (d); on WG) `render_graphic {name: bar, frames: [0, 1, 2],
     width: 8192, height: 8192, path: WORK/c7.png}` is an error naming
     134217728 and 201326592, and `c7.png` does not exist; CONTROL: `{frames:
     [0, 1]}` at 8192×8192, exactly the cap, is ok and names "2 frame";
-G11 (B19, #172, G-20 (a)) `new_project {path: WS}`, `write_graphic` of 17
-    modules `m00`…`m16`, a 0.5 s settle; `m16.js` rewritten IN PLACE (same
-    inode) from the shell: after 2 s `get_graphic {name: m16}`'s revision is
-    unchanged (the 17th file is past the 16-source cap); CONTROL: `m00.js`
+G11 (B19, B31, #172, #183, G-20 (a)) `new_project {path: WS}`, `write_graphic`
+    of 17 modules `m00`…`m16`; a SETTLE: `m00.js` rewritten in place until
+    `get_graphic {name: m00}` answers its revision (a pass ran after every
+    write event from the setup), then 0.3 s (one coalesce interval and margin,
+    for the pass the settle's own write may leave pending); `m16.js` rewritten
+    IN PLACE (same inode) from the shell: after 2 s `get_graphic {name: m16}`'s
+    revision is unchanged (the 17th file is past the 16-source cap); CONTROL: `m00.js`
     then rewritten in place: within 5 s the revisions of both `m00` and
     `m16` are hashlib's of their new bytes (the next pass reads every file);
 I1  `write_graphic needsfont` (120 px white text in `'Oswald'`): its sheet over
@@ -1475,6 +1478,19 @@ def revision_of(client, ws, name):
     return (got.get("reply") or {}).get("revision") if got["ok"] else None
 
 
+def await_revisions(client, ws, want, seconds):
+    """Polls `get_graphic` every 0.2 s until each module in `want` (name →
+    SHA-256 hex) answers that revision, or `seconds` pass. The revisions last
+    seen, by name."""
+    deadline = time.monotonic() + seconds
+    seen = {}
+    while True:
+        seen = {name: revision_of(client, ws, name) for name in want}
+        if seen == want or time.monotonic() >= deadline:
+            return seen
+        time.sleep(0.2)
+
+
 def run_g11(client, ws):
     """G11 — module sources share the 16-file cap (G-20 (a)). Whether its
     setup and its control half held."""
@@ -1486,8 +1502,23 @@ def run_g11(client, ws):
                          f'// {name}')}) for name in names]
     setup = made["ok"] and all(w["ok"] and (w.get("reply") or {}).get("ok") is True
                                for w in wrote)
-    time.sleep(0.5)
     folder = ws / "graphics"
+    # The SETTLE: `write_graphic` rescans synchronously, so m16's revision is
+    # final at once and a stability poll could not see a coalesced pass still
+    # pending from the setup's writes (#183). m00's settle revision, once seen,
+    # proves a pass ran after every one of them.
+    settle00 = module('  return svg(ctx, `<rect width="10" height="10" fill="#ff5a36"/>`); '
+                      '// m00 settle')
+    same_settle = rewrite_in_place(folder / "m00.js", settle00)
+    want_settle = hashlib.sha256(settle00.encode()).hexdigest()
+    seen_settle = await_revisions(client, ws, {"m00": want_settle}, 5)["m00"]
+    settled = same_settle and seen_settle == want_settle
+    setup = setup and settled
+    # The settle's own write can leave one pass scheduled after its revision
+    # is seen: a pass already pending can re-arm m00's source between `cat`'s
+    # truncate and its write (`GraphicStore.armAndScan`). 0.3 s is one
+    # `GraphicStore.coalesceInterval` (0.1 s, GraphicStore.swift :44) and margin.
+    time.sleep(0.3)
     old16 = revision_of(client, ws, "m16")
     new16 = module('  return svg(ctx, `<rect width="20" height="20" fill="#2d7ff9"/>`); // m16 v2')
     same16 = rewrite_in_place(folder / "m16.js", new16)
@@ -1497,19 +1528,16 @@ def run_g11(client, ws):
     same00 = rewrite_in_place(folder / "m00.js", new00)
     want00 = hashlib.sha256(new00.encode()).hexdigest()
     want16 = hashlib.sha256(new16.encode()).hexdigest()
-    deadline = time.monotonic() + 5
-    seen00 = seen16 = None
-    while time.monotonic() < deadline:
-        seen00, seen16 = revision_of(client, ws, "m00"), revision_of(client, ws, "m16")
-        if seen00 == want00 and seen16 == want16:
-            break
-        time.sleep(0.2)
+    seen = await_revisions(client, ws, {"m00": want00, "m16": want16}, 5)
+    seen00, seen16 = seen["m00"], seen["m16"]
     control = same00 and seen00 == want00 and seen16 == want16
-    check("G11 17 modules: m16.js rewritten in place is NOT seen after 2 s (past the 16-source "
-          "cap); CONTROL: m00.js rewritten in place, and within 5 s both revisions are "
-          "hashlib's (G-20 (a))",
+    check("G11 17 modules, settled by m00.js rewritten in place until its revision is seen, "
+          "then one coalesce interval: m16.js rewritten in place is NOT seen after 2 s (past "
+          "the 16-source cap); CONTROL: m00.js rewritten in place, and within 5 s both "
+          "revisions are hashlib's (G-20 (a))",
           setup and old16 is not None and same16 and after16 == old16 and control,
-          f"setup {setup}, m16 {old16} → {after16} (same inode {same16}), then m00 {seen00} "
+          f"setup {setup} (settle m00 {seen_settle} want {want_settle}, same inode "
+          f"{same_settle}), m16 {old16} → {after16} (same inode {same16}), then m00 {seen00} "
           f"want {want00}, m16 {seen16} want {want16} (same inode {same00})")
     return setup and control
 
@@ -1570,7 +1598,7 @@ def main():
                        "frame 31 was not rendered" if f31 is None else "")
             elif args.mutant == "store-uncapped":
                 why = "" if run_g11(client, WORK / "WS.reelcut") else \
-                    "the 17 writes or the m00 control did not hold"
+                    "the 17 writes, the m00 settle or the m00 control did not hold"
             else:
                 wg = WORK / "WG.reelcut"
                 if not setup_bar(client, wg):

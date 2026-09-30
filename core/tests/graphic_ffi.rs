@@ -30,6 +30,10 @@ const FIXTURE: &str = concat!(
     "/../graphic/tests/graphics/lower-third.js"
 );
 const PINS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../graphic/tests/pins.json");
+const LAYER_RENDERERS: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../app/Sources/LayerRenderers.swift"
+);
 const FROZEN: &str =
     "the library is frozen: a graphic was compiled or a frame drawn against it; build a new one";
 
@@ -465,4 +469,42 @@ fn one_max_side_in_the_engine_the_core_and_the_header() {
         .find_map(|line| line.strip_prefix("#define RC_GRAPHIC_MAX_SIDE "))
         .expect("the header has a `#define RC_GRAPHIC_MAX_SIDE <n>` line");
     assert_eq!(stated.trim().parse::<u32>().ok(), Some(graphic::MAX_SIDE));
+}
+
+#[test]
+fn one_max_props_in_the_engine_and_the_core() {
+    // G-2 keeps `graphic` out of `model_graphic.rs`, so the core restates the
+    // engine's schema key cap; the header has no `#define` for it because the
+    // app needs none. This is the one place the two are compared.
+    assert_eq!(
+        graphic::MAX_PROPS,
+        reelcut_core::model_graphic::GRAPHIC_MAX_PROPS
+    );
+}
+
+#[test]
+fn the_app_texture_side_holds_the_largest_graphic() {
+    // `LayerRenderers.bitmap(_:)` refuses a side over `maxTextureSide`, and a
+    // failing graphic's error card is drawn through `bitmap(_:)` at the
+    // graphic's own size (`errorCard` in `LayerRenderersGraphic.swift`). That
+    // size can be up to `GraphicLibrary.maxSide`, which is the header's
+    // `RC_GRAPHIC_MAX_SIDE`, pinned to `graphic::MAX_SIDE` by `one_max_side_…`
+    // above. A smaller texture side would answer nil and draw no card at all
+    // (spec §11 G-7 "the renderer's own cap", G-8). The Swift line is read as
+    // text because the texture side has no FFI path.
+    let text = fs::read_to_string(LAYER_RENDERERS).expect("app/Sources/LayerRenderers.swift");
+    let side: u32 = text
+        .lines()
+        .find_map(|line| {
+            line.trim_start()
+                .strip_prefix("static let maxTextureSide = ")
+        })
+        .and_then(|rest| rest.trim().parse().ok())
+        .expect("LayerRenderers.swift has a `static let maxTextureSide = <integer>` line");
+    assert!(
+        side >= graphic::MAX_SIDE,
+        "LayerRenderers.maxTextureSide ({side}) is below GraphicLibrary.maxSide ({}): \
+         a graphic's G-8 error card at its own size would draw nothing",
+        graphic::MAX_SIDE
+    );
 }

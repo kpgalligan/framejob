@@ -40,8 +40,10 @@ The crate's record is road map 10 §10.4.
   sentences, what `render` returned (a string over `SVG_BYTES` refused by its
   length, before the `<svg` check). The texts are load-bearing.
 - `host.rs` — the globals `__measureText`, `__assetNames`, `__warn`.
-- `props.rs` — `check_schema` (compile, strict) and `overlay` (render,
-  lenient; every surprise a warning).
+- `props.rs` — `check_schema` (compile, strict), `overlay` (render,
+  lenient; every surprise a warning) and `MAX_PROPS`, a schema's key cap,
+  which the core restates as `GRAPHIC_MAX_PROPS` (`core/tests/graphic_ffi.rs`
+  pins the two).
 - `stdlib.js`, `noise.js` — §5c's standard library, evaluated as SCRIPTS
   (globals) before the sandbox; each under 400 lines.
 
