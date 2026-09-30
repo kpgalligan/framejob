@@ -6309,7 +6309,16 @@ The 28 rows:
   it — its `target` must be a class whose name holds `Text` (else FAIL "no
   text target") — then `redo` must answer `redone: "Add Marker"` (+1) and
   `undo` `undone: "Add Marker"` (+0). It FAILED before the change ("There is
-  nothing to redo"): an `NSText` target always took the eager group.
+  nothing to redo"): an `NSText` target always took the eager group. Then
+  (#184) the field is closed: `field_editors` counts the layout records in
+  B's editor (one `snapshot_ui`, `fill_preview: false`) whose class is
+  Select All's target's last dotted component and whose text is null — the
+  dump nulls only a field editor's — once with the field open (must be ≥ 1),
+  then after a `delete` of the clip under it (a clip gone from under the
+  field ends it with its commit dropped; must be 0); `undo` must answer
+  `undone: "Delete"` with B's clip count back. The detail ends `field editors
+  N → 0 after delete; undo 'Delete' → clips n`. A `ToolError` after Rename…
+  and before the delete still tries delete and undo, once.
 - **R**: the refusals — `undo:` (`framework`; its path read from the listing,
   since its validator retitles it "Undo Add Marker"), `newProject:`
   (`modal`), a disabled item, an unknown item and menu, a submenu, an empty
@@ -9351,3 +9360,44 @@ python3 tools/proof/text_break_proof.py                          # 24/24
 python3 tools/proof/text_break_proof.py --mutant pre-fix-width   # exit 1, E6 FAILS
 python3 tools/proof/name_field_proof.py --mutant frame-insets    # exit 1, N13 FAILS
 ```
+
+## Issue batch B33 — the Speed sheet names a transition that grows or shrinks, U3 closes its Rename field (`speed_sheet_probe.py` P4, P6, P7 and `--mutant no-length-lines`, `v2_menu.py` U3; #184 items 1 and 3)
+
+- **#184 item 1** (`SpeedSheetController.swift`): `transitionChanges` answers
+  every clip, on a track holding a selected clip, whose transition plays after
+  the trial and either did not before (`.gains`) or did at a smaller or larger
+  overlap (`.grows`, `.shrinks`), both overlaps read off the snapshots (spec
+  §11 D4-6). `changeLine` prints `clip <id> gains a <s> s <kind>`, `clip
+  <id>'s <kind> grows to <s> s` or `clip <id>'s <kind> shrinks to <s> s`. A
+  transition at the same overlap before and after is not named.
+- **`speed_sheet_probe.py`** rows, beside B20's B0, P0–P3, P5 and H1: P4 A
+  already at ×0.5 (B's dissolve 400 000 ticks), then [A] at ×0.4 → exactly
+  two lines, line 2 `clip <B>'s cross dissolve grows to 1.50 s` (no longer a
+  control); P6 (the `slower` fixture) A already at ×0.4, then [A] at ×0.5 →
+  exactly two lines, line 2 `clip <B>'s cross dissolve shrinks to 0.67 s`;
+  P7 (control) A already at ×0.5, then [A] at ×0.5 → one line whose two
+  lengths are equal. `answer_gaps` checks `clips.B`, `P4clips.B`, `P5clips.B`
+  and `P6clips.B`. Mutants (rule R 1 / 0 / 2): `no-gain-lines` (the readout
+  joins no change line) must fail P1 P3 P4 P5 P6; `minted-only` (a clip
+  that had a `transitionIn` before counts as having had it) must fail P5;
+  `no-length-lines` (`guard !had || now != was` becomes `guard !had`, so
+  only `.gains` is produced) must fail P4 P6.
+- **`v2_menu.py` U3 (#184 item 3)**: the V2b section has the close — two
+  `field_editors` counts around a `delete` of the renamed clip, then `undo`.
+- **#184 item 2** (Cut/Paste on a vetoing field leaves an empty undo step)
+  is filed, not fixed: no field in the app vetoes a change, and a fix needs
+  an `NSUndoManager` subclass installed through `ProjectDocument.swift`,
+  which is over the cap.
+
+Run on 2026-09-30, the change over `ecdcbb0`, every instance my own:
+
+| Command | Answer |
+|---|---|
+| `make typecheck`; `make test`; `make app` | 0 errors, 4 warnings, tsc clean; exit 0; BUILD SUCCEEDED |
+| `speed_sheet_probe.py` | 10/10, exit 0 |
+| `speed_sheet_probe.py --sources tools/proof/work/b33/baseline/app/Sources` (`ecdcbb0`) | 8/10, exit 1 — P4 and P6 fail, one summary line each |
+| `speed_sheet_probe.py --mutant no-length-lines` | 8/10, "caught — P4, P6 failed", exit 1; P1, P3, P5 pass |
+| `speed_sheet_probe.py --mutant no-gain-lines` | 5/10, "caught — P1, P3, P4, P5, P6 failed", exit 1 |
+| `speed_sheet_probe.py --mutant minted-only` | 9/10, "caught — P5 failed", exit 1 (P5 read `clip 7's wipe grows to 0.67 s`) |
+| `source_mirror_probe.py` | 40/40, exit 0 |
+| `v2_menu.py 4863` (fresh own instance) | 28 pass, 0 fail, 0 skip of 28, exit 0 — U3 "field editors 1 → 0 after delete; undo 'Delete' → clips 2"; `grep "Reelcut: "` printed nothing |

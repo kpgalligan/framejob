@@ -166,11 +166,13 @@ final class SpeedSheetController: NSViewController, NSTextFieldDelegate {
         clips.map { .setSpeed(clip: $0, rate: rate, keepPitch: keepPitch) }
     }
 
-    /// A clip a trial gives a transition it did not play before, and that
-    /// transition's length (#109).
-    struct GainedTransition: Equatable {
+    /// A clip whose transition a trial makes play (#109), or makes longer or
+    /// shorter (#184), and that transition's length after the trial.
+    struct TransitionChange: Equatable {
+        enum Change: Equatable { case gains, grows, shrinks }
         let clip: UInt32
         let kind: TransitionKind
+        let change: Change
         /// The overlap with its predecessor after the trial.
         let duration: Ticks
     }
@@ -215,13 +217,15 @@ final class SpeedSheetController: NSViewController, NSTextFieldDelegate {
     }
 
     /// Every clip, on a track holding one of `clips`, whose transition plays
-    /// in `after` and did not in `before` — a minted cross dissolve, or a
-    /// transition set earlier that an overlap now reaches. A transition plays
-    /// when the clip has one and overlaps its predecessor
-    /// (`VideoPane.overlap(before:)`'s idiom). Ordered by start, then id.
-    static func gainedTransitions(
+    /// in `after` and either did not in `before` (`.gains` — a minted cross
+    /// dissolve, or a transition set earlier that an overlap now reaches) or
+    /// did at a smaller or larger overlap (`.grows`, `.shrinks`). A transition
+    /// plays when the clip has one and overlaps its predecessor
+    /// (`VideoPane.overlap(before:)`'s idiom). One that plays in both at the
+    /// same overlap is absent. Ordered by start, then id.
+    static func transitionChanges(
         of clips: [UInt32], before: ProjectSnapshot, after: ProjectSnapshot
-    ) -> [GainedTransition] {
+    ) -> [TransitionChange] {
         func overlap(_ id: UInt32, in snapshot: ProjectSnapshot) -> Ticks {
             guard let clip = snapshot.clip(id) else { return 0 }
             let earlier = snapshot.clips(onTrack: clip.track).filter { $0.start < clip.start }
@@ -232,27 +236,37 @@ final class SpeedSheetController: NSViewController, NSTextFieldDelegate {
             snapshot.clip(id)?.transitionIn != nil && overlap(id, in: snapshot) > 0
         }
         let tracks = Set(clips.compactMap { before.clip($0)?.track })
-        var gains: [(start: Ticks, gain: GainedTransition)] = []
+        var changes: [(start: Ticks, change: TransitionChange)] = []
         for clip in after.clips where tracks.contains(clip.track) {
             let id = clip.id
             let had = effective(id, in: before)
-            guard !had, effective(id, in: after), let kind = clip.transitionIn?.kind else {
-                continue
-            }
-            let gain = GainedTransition(clip: id, kind: kind, duration: overlap(id, in: after))
-            gains.append((clip.start, gain))
+            guard effective(id, in: after), let kind = clip.transitionIn?.kind else { continue }
+            let now = overlap(id, in: after)
+            let was = overlap(id, in: before)
+            guard !had || now != was else { continue }
+            let change: TransitionChange.Change = !had ? .gains : now > was ? .grows : .shrinks
+            changes.append(
+                (clip.start, TransitionChange(clip: id, kind: kind, change: change, duration: now)))
         }
-        return gains.sorted { ($0.start, $0.gain.clip) < ($1.start, $1.gain.clip) }.map(\.gain)
+        return changes.sorted { ($0.start, $0.change.clip) < ($1.start, $1.change.clip) }
+            .map(\.change)
     }
 
-    /// "clip 7 gains a 0.67 s cross dissolve".
-    static func gainLine(_ gain: GainedTransition) -> String {
-        "clip \(gain.clip) gains a \(String(format: "%.2f", ReelTime.seconds(gain.duration))) s "
-            + gain.kind.displayName.lowercased()
+    /// "clip 7 gains a 0.67 s cross dissolve", "clip 7's cross dissolve grows
+    /// to 1.50 s", "clip 7's cross dissolve shrinks to 0.67 s".
+    static func changeLine(_ change: TransitionChange) -> String {
+        let seconds = String(format: "%.2f", ReelTime.seconds(change.duration))
+        let kind = change.kind.displayName.lowercased()
+        switch change.change {
+        case .gains: return "clip \(change.clip) gains a \(seconds) s \(kind)"
+        case .grows: return "clip \(change.clip)'s \(kind) grows to \(seconds) s"
+        case .shrinks: return "clip \(change.clip)'s \(kind) shrinks to \(seconds) s"
+        }
     }
 
-    /// "3 clips · 00:00:12:00 → 00:00:06:00", then one `gainLine` per clip
-    /// the trial gives a transition — every line read off one trial handle.
+    /// "3 clips · 00:00:12:00 → 00:00:06:00", then one `changeLine` per clip
+    /// whose transition the trial makes play, grow or shrink — every line
+    /// read off one trial handle.
     static func readout(
         of clips: [UInt32], rate: Double, keepPitch: Bool, in project: ReelProject
     ) -> String {
@@ -264,8 +278,8 @@ final class SpeedSheetController: NSViewController, NSTextFieldDelegate {
         let summary =
             count + " · " + ReelTime.format(from, fps: fps, frames: true) + " → "
             + ReelTime.format(to, fps: fps, frames: true)
-        let gains = gainedTransitions(of: clips, before: before, after: after)
-        return ([summary] + gains.map(gainLine)).joined(separator: "\n")
+        let changes = transitionChanges(of: clips, before: before, after: after)
+        return ([summary] + changes.map(changeLine)).joined(separator: "\n")
     }
 
     private func syncReadout() {

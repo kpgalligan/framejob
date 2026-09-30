@@ -1,6 +1,8 @@
 // Issue batch B20 (#109): the Speed sheet names the transition a slowed clip
-// gives its neighbour. Built by `speed_sheet_probe.py` over
-// `harness/build.sh`'s swiftc line and run once; it drives the REAL sheet —
+// gives its neighbour; issue batch B33 (#184): and a transition that already
+// plays and grows or shrinks (P4, P6), but not one left as it was (P7).
+// Built by `speed_sheet_probe.py` over `harness/build.sh`'s swiftc line and
+// run once; it drives the REAL sheet —
 // `SpeedSheetController(document:clips:)`, its view loaded, the rate typed
 // into its own field and `controlTextDidEndEditing(_:)` called — and prints
 // one JSON object on stdout: each row's readout lines and the hint. The
@@ -120,6 +122,15 @@ guard slowed.document.project.snapshot.clip(slowed.b)?.transitionIn != nil else 
 }
 answer["P4"] = sheet(slowed.document, [slowed.a], rate: 0.4)
 answer["P4clips"] = ["A": slowed.a, "B": slowed.b]
+answer["P7"] = sheet(slowed.document, [slowed.a], rate: 0.5)
+
+let slower = fixture()
+slower.document.performGroupedEdit("Speed", [.setSpeed(clip: slower.a, rate: 0.4)])
+guard slower.document.project.snapshot.clip(slower.b)?.transitionIn != nil else {
+    fail("P6's fixture: A at ×0.4 gave B no transition")
+}
+answer["P6"] = sheet(slower.document, [slower.a], rate: 0.5)
+answer["P6clips"] = ["A": slower.a, "B": slower.b]
 
 let wiped = fixture()
 wiped.document.performGroupedEdit("Transition", [.setTransition(clip: wiped.b, kind: .wipe)])
@@ -129,4 +140,6 @@ guard wiped.document.project.snapshot.clip(wiped.b)?.transitionIn?.kind == .wipe
 answer["P5"] = sheet(wiped.document, [wiped.a], rate: 0.5)
 answer["P5clips"] = ["A": wiped.a, "B": wiped.b]
 answer["H1"] = answer["P0"]
-withExtendedLifetime([base.document, slowed.document, wiped.document]) { emit() }
+withExtendedLifetime([base.document, slowed.document, slower.document, wiped.document]) {
+    emit()
+}

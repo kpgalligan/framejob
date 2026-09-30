@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Issue batch B20 (#109): the Speed sheet names each clip a slowed selection
-gives a transition, and its length, read off the trial handle (spec §11 D4-6).
+gives a transition, and its length, read off the trial handle (spec §11 D4-6);
+issue batch B33 (#184): and each transition that already plays and grows or
+shrinks.
 
     python3 tools/proof/speed_sheet_probe.py [--sources DIR] [--mutant NAME]
 
@@ -18,11 +20,15 @@ Rows:
   P1  [A] at ×0.5 — line 2 exactly `clip <B> gains a 0.67 s cross dissolve`.
   P2  [C] at ×0.5, refused by the overlap rule — one line.
   P3  [A, C] at ×0.5 — line 1 `2 clips · …`, then exactly P1's line.
-  P4  CONTROL: A already at ×0.5 (B already has its dissolve), then [A] at
-      ×0.4 — the summary's two lengths differ, one line (a transition that
-      only lengthens is not named).
+  P4  A already at ×0.5 (B already has its 0.67 s dissolve), then [A] at
+      ×0.4 — exactly two lines, line 2 `clip <B>'s cross dissolve grows to
+      1.50 s`.
   P5  B given a wipe first (no overlap yet), then [A] at ×0.5 — line 2
       exactly `clip <B> gains a 0.67 s wipe`.
+  P6  A already at ×0.4 (B's dissolve 1.50 s), then [A] at ×0.5 — exactly
+      two lines, line 2 `clip <B>'s cross dissolve shrinks to 0.67 s`.
+  P7  CONTROL: A already at ×0.5, then [A] at ×0.5 — one line whose two
+      lengths are equal (an unchanged transition is not named).
   H1  the hint is the new text.
 
 Exit (rule R): a plain run exits 0 iff every row passed and 1 when a row
@@ -30,8 +36,8 @@ failed; a build failure is B0's FAIL there. A `--mutant` run exits 1 when
 every row the mutant names failed (caught), 0 when one passed (survived),
 and 2 when the control could not be performed: the copy's `before` text not
 found exactly once, the copy did not build, or a named row was not scored.
-An answer that is not a JSON object, or that lacks `clips.B` or
-`P5clips.B`, is no answer (issue batch B28): every row but B0 fails as
+An answer that is not a JSON object, or that lacks `clips.B`, `P4clips.B`,
+`P5clips.B` or `P6clips.B`, is no answer (issue batch B28): every row but B0 fails as
 `no row: the answer lacks …` and is not scored, so a plain run exits 1 and
 a `--mutant` run 2.
 """
@@ -44,7 +50,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/speed-sheet"
-ROWS = ["B0", "P0", "P1", "P2", "P3", "P4", "P5", "H1"]
+ROWS = ["B0", "P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7", "H1"]
 BUILD_WALL = 600
 RUN_WALL = 120
 SUMMARY_X1 = "1 clip · 00:00:01:20 → 00:00:01:20"
@@ -54,14 +60,18 @@ HINT = ("Faster clips can leave gaps; slower clips can overlap. Later clips stay
 
 # name: (the rows it must fail, [(file, before, after), ...])
 MUTANTS = {
-    "no-gain-lines": (["P1", "P3", "P5"], [
+    "no-gain-lines": (["P1", "P3", "P4", "P5", "P6"], [
         ("SpeedSheetController.swift",
-         "return ([summary] + gains.map(gainLine)).joined(separator: \"\\n\")",
-         "return ([summary] + gains.map(gainLine).prefix(0)).joined(separator: \"\\n\")")]),
+         "return ([summary] + changes.map(changeLine)).joined(separator: \"\\n\")",
+         "return ([summary] + changes.map(changeLine).prefix(0)).joined(separator: \"\\n\")")]),
     "minted-only": (["P5"], [
         ("SpeedSheetController.swift",
          "let had = effective(id, in: before)",
          "let had = effective(id, in: before) || before.clip(id)?.transitionIn != nil")]),
+    "no-length-lines": (["P4", "P6"], [
+        ("SpeedSheetController.swift",
+         "guard !had || now != was else { continue }",
+         "guard !had else { continue }")]),
 }
 
 
@@ -110,11 +120,11 @@ def mutate(sources, name, dest):
 
 
 def answer_gaps(answer):
-    """The members of `clips.B` and `P5clips.B` the answer lacks — each
-    path's parent must be an object holding the key; a non-object answer
-    lacks both."""
+    """The members of `clips.B`, `P4clips.B`, `P5clips.B` and `P6clips.B` the
+    answer lacks — each path's parent must be an object holding the key; a
+    non-object answer lacks them all."""
     gaps = []
-    for path in ("clips.B", "P5clips.B"):
+    for path in ("clips.B", "P4clips.B", "P5clips.B", "P6clips.B"):
         parent, key = path.split(".")
         holder = answer.get(parent) if isinstance(answer, dict) else None
         if not (isinstance(holder, dict) and key in holder):
@@ -145,14 +155,19 @@ def judge(answer):
     verdict("P3", lambda got: len(got) == 2 and got[0].startswith("2 clips · ") and got[1] == gain,
             f"'2 clips · …', then {gain!r}")
 
-    def lengths_differ(got):
+    grows = f"clip {answer['P4clips']['B']}'s cross dissolve grows to 1.50 s"
+    verdict("P4", lambda got: len(got) == 2 and got[1] == grows, f"line 2 {grows!r}")
+    wipe = f"clip {answer['P5clips']['B']} gains a 0.67 s wipe"
+    verdict("P5", lambda got: len(got) == 2 and got[1] == wipe, f"line 2 {wipe!r}")
+    shrinks = f"clip {answer['P6clips']['B']}'s cross dissolve shrinks to 0.67 s"
+    verdict("P6", lambda got: len(got) == 2 and got[1] == shrinks, f"line 2 {shrinks!r}")
+
+    def lengths_equal(got):
         if len(got) != 1 or " · " not in got[0] or " → " not in got[0]:
             return False
         before, after = got[0].split(" · ", 1)[1].split(" → ")
-        return before != after
-    verdict("P4", lengths_differ, "one line whose two lengths differ")
-    wipe = f"clip {answer['P5clips']['B']} gains a 0.67 s wipe"
-    verdict("P5", lambda got: len(got) == 2 and got[1] == wipe, f"line 2 {wipe!r}")
+        return before == after
+    verdict("P7", lengths_equal, "one line whose two lengths are equal")
     hint = (answer.get("H1") or {}).get("hint")
     results["H1"] = (hint == HINT, f"{hint!r}" + ("" if hint == HINT else f"; want {HINT!r}"))
     return results

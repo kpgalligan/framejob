@@ -47,7 +47,9 @@ The script performs only Add Marker, Export… (cancelled), Remove Track
 (cancelled), Add Media… (cancelled), Settings…, and View ▸ Zoom In and Zoom
 Out (U2: an item that edits nothing leaves undo and redo as they were, #167),
 Clip ▸ Rename… and Edit ▸ Select All on its field (U3: a text field's Select
-All leaves undo and redo as they were, #176), plus the items it expects
+All leaves undo and redo as they were, #176; the field is then closed by a
+`delete` of its clip, checked by counting the editor's field editors in two
+`snapshot_ui` layouts, and the delete undone, #184), plus the items it expects
 REFUSED — never Quit, Close, Save, Revert, Allow Agent Connections, New
 Recording or a Help item.
 
@@ -227,6 +229,17 @@ def colours(path):
             if len(seen) >= 4096:
                 return len(seen)
     return len(seen)
+
+
+def field_editors(mcp, name, cls):
+    """The layout records in project B's editor whose class is `cls`'s last
+    dotted component and whose text is null — the dump nulls only a field
+    editor's text (`UISnapshotLayout.text(of:)`). One `snapshot_ui` call."""
+    shot = snapshot.snap(mcp, window="editor", project=B, path=os.path.join(PNG, name + ".png"),
+                         fill_preview=False, layout=True)
+    want = cls.split(".")[-1]
+    return sum(1 for v in snapshot.load_layout(shot)["views"]
+               if v.get("class") == want and v.get("text") is None)
 
 
 def sheet_capture(mcp, project, name):
@@ -513,8 +526,12 @@ def row_u2(mcp):
 def row_u3(mcp):
     """#176: Edit ▸ Select All performed on a focused text field (Clip ▸
     Rename…'s inline field) changes no text, so it leaves the stack as it
-    was — redo still redoes, undo still undoes."""
+    was — redo still redoes, undo still undoes. #184: the field is then
+    closed by deleting its clip (a clip gone from under the field ends it with
+    its commit dropped) and the delete undone; the editor's field editors go
+    from at least one to none, and the clip count comes back."""
     seen = []
+    renamed = closing = False
     try:
         clip = next((c for c in project_of(mcp, B).get("clips", []) if c.get("start") == 0),
                     None)
@@ -529,6 +546,7 @@ def row_u3(mcp):
         undone = mcp.call_with("undo", {"project": B})
         seen.append(f"undo {undone.get('undone')!r} can_redo {undone.get('can_redo')}")
         perform(mcp, ["Clip", "Rename…"], B)
+        renamed = True
         r = perform(mcp, ["Edit", "Select All"], B)
         target = r.get("target")
         if not (isinstance(target, str) and "Text" in target):
@@ -542,15 +560,34 @@ def row_u3(mcp):
         again = mcp.call_with("undo", {"project": B})
         b3 = markers(mcp, B)
         seen.append(f"undo {again.get('undone')!r} → +{b3 - b0}")
+        n0 = counts(mcp, B)["clips"]
+        opened = field_editors(mcp, "u3_open", target)
+        closing = True
+        mcp.call_with("delete", {"project": B, "clips": [clip["id"]]})
+        closed = field_editors(mcp, "u3_closed", target)
+        restored = mcp.call_with("undo", {"project": B})
+        n1 = counts(mcp, B)["clips"]
+        seen.append(f"field editors {opened} → {closed} after delete; "
+                    f"undo {restored.get('undone')!r} → clips {n1}")
         ok = (b1 - b0 == 1 and undone.get("undone") == "Add Marker"
               and undone.get("can_redo") is True
               and redone.get("redone") == "Add Marker" and b2 - b0 == 1
-              and again.get("undone") == "Add Marker" and b3 - b0 == 0)
+              and again.get("undone") == "Add Marker" and b3 - b0 == 0
+              and opened >= 1 and closed == 0
+              and restored.get("undone") == "Delete" and n1 == n0)
         score("U3", "pass" if ok else "fail",
               f"Add Marker +{b1 - b0}; " + "; ".join(seen)
-              + " (want \"Add Marker\" can_redo True; +1; +0)")
+              + f" (want \"Add Marker\" can_redo True; +1; +0; field editors ≥1 → 0; "
+              f"undo 'Delete' → clips {n0})")
     except ToolError as error:
-        score("U3", "fail", "; ".join(seen + [f"ToolError: {error}"]))
+        seen.append(f"ToolError: {error}")
+        if renamed and not closing:
+            try:
+                mcp.call_with("delete", {"project": B, "clips": [clip["id"]]})
+                mcp.call_with("undo", {"project": B})
+            except ToolError as again_error:
+                seen.append(f"ToolError: {again_error}")
+        score("U3", "fail", "; ".join(seen))
     finally:
         mcp.call_with("set_playhead", {"project": B, "t": PLAYHEAD})
 
