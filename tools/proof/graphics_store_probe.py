@@ -44,6 +44,12 @@ W15 `write(name: "q")` over a `q.js` flagged `.immutable` throws, leaves no
     `q.js.partial` and leaves q.js's bytes as they were (`land`'s cleanup);
 W16 `holdsContent` is false for a folder holding only `API.md` and
     `x.js.partial`, and true once `x.js` is added;
+W17 (issue batch B19, #172) an untitled store holding `a.js`, settled:
+    RLIMIT_NOFILE's soft limit set to the lowest free descriptor (found by
+    opening `/dev/null`), `rescan()`, the limit restored — `scan.warnings`
+    holds `graphics/ is not watched: open failed (Too many open files)`
+    (spec §11 G-20 (b)); CONTROL: a second `rescan()` has no "is not
+    watched" warning and lists `a`;
 C1  a saved document's save carries graphics/x.js (the whitelist line);
 C2  an untitled document restored from autosave seeds its temporary root and
     its save carries graphics/x.js;
@@ -70,15 +76,19 @@ C6  an untitled document's `cacheDirectory` holding `transcripts/9.json`: after
     python3 tools/proof/graphics_store_probe.py --mutant scratch-kept
     python3 tools/proof/graphics_store_probe.py --mutant cache-kept
     python3 tools/proof/graphics_store_probe.py --mutant no-library-file-sources
+    python3 tools/proof/graphics_store_probe.py --mutant silent-open
 
 A mutant is built from a COPY of `app/Sources` with one anchor, asserted to
-occur exactly once, replaced; exit 0 means the row it names FAILED in the copy
-(C1's file ABSENT, W4, C4, W15, C5, C6, W14), which is the pass. A mutant copy
-that does not build is a FAILURE. `no-file-sources` drops the MODULE arm
-line, anchored with the line after it, since the library files' arm line
-(`no-library-file-sources`) spells the same call; `partial-left` drops the
-cleanup in `land`'s catch, `scratch-kept` empties `removeScratchRoot`, and
-`cache-kept` drops `stopGraphicStore`'s `removeTemporaryCacheDirectory()`.
+occur exactly once, replaced. Rule R: exit 0 means the row it names FAILED in
+the copy (C1's file ABSENT, W4, C4, W15, C5, C6, W14, W17) — caught; exit 1
+means it passed — survived; exit 2 means the control was not performed (the
+copy, the anchor or the build failed, or the probe gave no answer).
+`no-file-sources` drops the one file-arm loop (modules, fonts and assets,
+spec §11 G-20 (a)); `no-library-file-sources` drops the fonts and assets from
+it; `silent-open` makes `arm`'s failure branch answer nil; `partial-left`
+drops the cleanup in `land`'s catch, `scratch-kept` empties
+`removeScratchRoot`, and `cache-kept` drops `stopGraphicStore`'s
+`removeTemporaryCacheDirectory()`.
 """
 
 import hashlib
@@ -100,7 +110,8 @@ DEADLINE = 600
 RULE = ("is not a module name (lowercase letters, digits and -, starting with a letter "
         "or a digit, at most 63 characters)")
 ROWS = ["W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8", "W9", "W10", "W11", "W12", "W13",
-        "W14", "W15", "W16", "C1", "C2", "C3", "C4", "C5", "C6"]
+        "W14", "W15", "W16", "W17", "C1", "C2", "C3", "C4", "C5", "C6"]
+UNWATCHED = "graphics/ is not watched: open failed (Too many open files)"
 
 rows = {}
 answer_seen = {}
@@ -258,6 +269,16 @@ def score(a, work):
     check("W16 holdsContent is false for API.md and x.js.partial alone, true once x.js is added",
           w16.get("partial_only") is False and w16.get("with_module") is True, f"{w16}")
 
+    w17 = a.get("w17", {})
+    control = w17.get("control_warnings")
+    check("W17 a failed open is the scan warning \"graphics/ is not watched: open failed (Too many "
+          "open files)\"; CONTROL: the next rescan has no such warning and lists a",
+          w17.get("modules_before") == ["a"] and w17.get("limited") is True
+          and w17.get("restored") is True and UNWATCHED in w17.get("warnings", [])
+          and isinstance(control, list)
+          and not any("is not watched" in w for w in control)
+          and w17.get("control_modules") == ["a"], f"{w17}")
+
     c1 = a.get("c1", {})
     check("C1 a saved document's save carries graphics/x.js",
           c1.get("child") is True and c1.get("present") is True
@@ -346,16 +367,19 @@ MUTANTS = {
         "", "C1"),
     "no-file-sources": (
         "GraphicStore.swift",
-        "            arm(url, folder: false, g)\n"
-        "            guard let bytes = try? Data(contentsOf: url) else { continue }\n"
-        "            modules[name] = ",
-        "            guard let bytes = try? Data(contentsOf: url) else { continue }\n"
-        "            modules[name] = ", "W4"),
+        "        for url in (moduleURLs + fontURLs + assetURLs).prefix(Self.fileSourceLimit) {\n"
+        "            if let unwatched = arm(url, folder: false, g) { warnings.append(unwatched) }\n"
+        "        }\n",
+        "", "W4"),
     "no-library-file-sources": (
         "GraphicStore.swift",
-        "        for url in library.prefix(Self.libraryFileSourceLimit) "
-        "{ arm(url, folder: false, g) }\n",
-        "        _ = library\n", "W14"),
+        "        for url in (moduleURLs + fontURLs + assetURLs).prefix(Self.fileSourceLimit) {\n",
+        "        for url in moduleURLs.prefix(Self.fileSourceLimit) {\n", "W14"),
+    "silent-open": (
+        "GraphicStore.swift",
+        "            return \"\\(watchSubject(url, folder: folder)) is not watched: open failed "
+        "(\\(why))\"\n",
+        "            return nil\n", "W17"),
     "partial-left": (
         "GraphicStore+Files.swift",
         "            try? files.removeItem(at: partial)\n            throw error\n",
@@ -377,14 +401,23 @@ MUTANTS = {
 
 
 def mutant(name):
+    """Rule R: 0 caught, 1 survived, 2 the control was not performed."""
     file, before, after, anchor = MUTANTS[name]
     with tempfile.TemporaryDirectory(prefix=f"reelcut-graphics-store-{name}-") as temp:
         sources = Path(temp) / "Sources"
-        shutil.copytree(ROOT / "app/Sources", sources)
-        replace_once(sources / file, before, after)
+        try:
+            shutil.copytree(ROOT / "app/Sources", sources)
+            replace_once(sources / file, before, after)
+        except (OSError, RuntimeError) as error:
+            print(f"mutant {name}: the control could not be performed — {error}")
+            return 2
         print(f"MUTANT {name}: {file}, anchor replaced once, in {sources}")
         probe(sources, Path(temp) / "work")
     answered = answer_seen.get("ok") is True
+    if not answered:
+        print(f"mutant {name}: the control could not be performed — the probe did not build "
+              "or gave no answer")
+        return 2
     if anchor == "C1":
         killed = answered and answer_seen.get("c1", {}).get("present") is False
     else:

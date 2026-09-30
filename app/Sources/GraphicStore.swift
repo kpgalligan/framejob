@@ -7,10 +7,11 @@
 // the PACKAGE directory is watched, so an outside `mkdir` is seen.
 //
 // **The watch** is G0's q7(c): a folder source raises `.write` only and an
-// in-place (`O_TRUNC`) save raises nothing on the folder, so every `*.js`,
-// and each font and asset file up to `libraryFileSourceLimit` (spec §11
-// G-19 (c)), has its own source; events are coalesced over 100 ms. Every pass re-opens
-// every source BY PATH (a save swaps inodes) and arms BEFORE it scans.
+// in-place (`O_TRUNC`) save raises nothing on the folder, so each module,
+// font and asset file up to `fileSourceLimit`, modules first (spec §11
+// G-19 (c), G-20 (a)), has its own source; events are coalesced over 100 ms.
+// Every pass re-opens every source BY PATH (a save swaps inodes) and arms
+// BEFORE it scans. A source whose `open` fails is a scan warning (G-20 (b)).
 //
 // **Threading.** One serial queue alone touches the queue-confined state; it
 // diffs, and main publishes in order through `drain()`. Main waits on the
@@ -41,9 +42,9 @@ final class GraphicStore {
     /// §5a: the pictures resvg draws from `graphics/assets/`.
     static let assetExtensions: Set<String> = ["png", "jpg", "jpeg", "gif", "webp", "svg", "svgz"]
     static let coalesceInterval: TimeInterval = 0.1
-    /// The font and asset files one pass arms a source on: fonts, then
-    /// assets, in listing order (spec §11 G-19 (c)).
-    static let libraryFileSourceLimit = 16
+    /// The module, font and asset files one pass arms a source on: modules,
+    /// then fonts, then assets, in listing order (spec §11 G-20 (a)).
+    static let fileSourceLimit = 16
 
     /// G-3's rule, `^[a-z0-9][a-z0-9-]{0,62}$`, mirrored from
     /// `model_graphic.rs`'s `check_name`; the core stays the validator.
@@ -266,10 +267,10 @@ final class GraphicStore {
     }
 
     /// FOLDER mode when the folder exists (a source on it, on each existing
-    /// subfolder, on each module file and on the first
-    /// `libraryFileSourceLimit` font and asset files); PACKAGE mode when a saved
-    /// package has none (one source on the package directory). An untitled
-    /// root found absent is recreated. Arms first, then scans.
+    /// subfolder, and on the first `fileSourceLimit` module, font and asset
+    /// files); PACKAGE mode when a saved package has none (one source on the
+    /// package directory). An untitled root found absent is recreated. Arms
+    /// first, then scans; a source that did not arm is a warning.
     private func armAndScan(_ g: Int) -> (GraphicScan, Bool) {
         cancelSources()
         let files = FileManager.default
@@ -279,13 +280,22 @@ final class GraphicStore {
             exists = files.fileExists(atPath: watchedFolder.path)
         }
         guard exists else {
-            if let package = watchedPackage { arm(package, folder: true, g) }
-            return (.empty, false)
+            let unwatched = watchedPackage.flatMap { arm($0, folder: true, g) }
+            return (.empty(warnings: unwatched.map { [$0] } ?? []), false)
         }
+        var warnings: [String] = []
         let fonts = watchedFolder.appendingPathComponent(Self.fontsFolderName, isDirectory: true)
         let assets = watchedFolder.appendingPathComponent(Self.assetsFolderName, isDirectory: true)
         for folder in [watchedFolder, fonts, assets] where files.fileExists(atPath: folder.path) {
-            arm(folder, folder: true, g)
+            if let unwatched = arm(folder, folder: true, g) { warnings.append(unwatched) }
+        }
+        var moduleURLs: [URL] = []
+        for url in listing(watchedFolder) where url.pathExtension == "js" {
+            guard Self.isModuleName(url.deletingPathExtension().lastPathComponent) else {
+                warnings.append("\(Self.folderName)/\(url.lastPathComponent) \(Self.nameRule)")
+                continue
+            }
+            moduleURLs.append(url)
         }
         let fontURLs = listing(fonts).filter {
             Self.fontExtensions.contains($0.pathExtension.lowercased())
@@ -293,17 +303,12 @@ final class GraphicStore {
         let assetURLs = listing(assets).filter {
             Self.assetExtensions.contains($0.pathExtension.lowercased())
         }
-        let library = fontURLs + assetURLs
-        for url in library.prefix(Self.libraryFileSourceLimit) { arm(url, folder: false, g) }
-        var warnings: [String] = []
+        for url in (moduleURLs + fontURLs + assetURLs).prefix(Self.fileSourceLimit) {
+            if let unwatched = arm(url, folder: false, g) { warnings.append(unwatched) }
+        }
         var modules: [String: GraphicModuleFile] = [:]
-        for url in listing(watchedFolder) where url.pathExtension == "js" {
+        for url in moduleURLs {
             let name = url.deletingPathExtension().lastPathComponent
-            guard Self.isModuleName(name) else {
-                warnings.append("\(Self.folderName)/\(url.lastPathComponent) \(Self.nameRule)")
-                continue
-            }
-            arm(url, folder: false, g)
             guard let bytes = try? Data(contentsOf: url) else { continue }
             modules[name] = GraphicModuleFile(
                 name: name, url: url, bytes: bytes, revision: Self.hex(SHA256.hash(data: bytes)))
@@ -356,9 +361,15 @@ final class GraphicStore {
         return regular.sorted { $0.lastPathComponent < $1.lastPathComponent }
     }
 
-    private func arm(_ url: URL, folder: Bool, _ g: Int) {
+    /// Arms one source; nil when it is armed, else the scan warning saying
+    /// what is not watched and why (spec §11 G-20 (b)).
+    private func arm(_ url: URL, folder: Bool, _ g: Int) -> String? {
         let descriptor = open(url.path, O_EVTONLY)
-        guard descriptor >= 0 else { return }
+        guard descriptor >= 0 else {
+            let code = errno
+            let why = String(cString: strerror(code))
+            return "\(watchSubject(url, folder: folder)) is not watched: open failed (\(why))"
+        }
         let mask: DispatchSource.FileSystemEvent = folder
             ? [.write, .delete, .rename, .revoke] : [.write, .extend, .delete, .rename]
         let source = DispatchSource.makeFileSystemObjectSource(
@@ -367,5 +378,17 @@ final class GraphicStore {
         source.setCancelHandler { close(descriptor) }
         source.resume()
         sources.append(source)
+        return nil
+    }
+
+    /// `graphics/`, `graphics/fonts/`, `graphics/<file>`,
+    /// `graphics/fonts/<file>` or `the package`, for a warning.
+    private func watchSubject(_ url: URL, folder: Bool) -> String {
+        if url == watchedPackage { return "the package" }
+        if url == watchedFolder { return "\(Self.folderName)/" }
+        if folder { return "\(Self.folderName)/\(url.lastPathComponent)/" }
+        let parent = url.deletingLastPathComponent().standardizedFileURL.path
+        return parent == watchedFolder.standardizedFileURL.path
+            ? "\(Self.folderName)/\(url.lastPathComponent)" : Self.relative(url)
     }
 }

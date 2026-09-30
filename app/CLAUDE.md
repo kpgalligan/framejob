@@ -228,9 +228,12 @@ detail there.
   `packageContentsDidChangeOnDisk()` once — without it the next save is
   refused as "changed by another application". A folder source raises
   `.write` only and an in-place save raises nothing on it (G0 q7), so each
-  module has its own source, and so does each font and asset file up to
-  `libraryFileSourceLimit` (16 a pass, fonts first, in name order; spec §11
-  G-19 (c)); every pass re-opens every source BY PATH and
+  module, font and asset file has its own source, up to `fileSourceLimit` (16
+  a pass, modules first, then fonts, then assets, each in name order; spec §11
+  G-19 (c), G-20 (a)); a source whose `open` fails is a scan warning,
+  "`<subject>` is not watched: open failed (`<strerror>`)", `errno` copied
+  first (G-20 (b); `GraphicScan.warnings`, which nothing shows yet, #105);
+  every pass re-opens every source BY PATH and
   arms BEFORE it scans; events coalesce over 100 ms. The queue owns the diff
   and an outbox; main publishes in order through `drain()` (`scan`, the
   callback, `.graphicsDidChange` with sorted names — every module and
@@ -1210,15 +1213,18 @@ free.
   compile is `ok: false`, not an error; not undoable, never dirty, G-3),
   `get_graphic` (one module, or the folder with `folder_exists`, the
   engine's `families` and the `assets`) and
-  `graphic_reference` (the bundled `GraphicsAPI.md`; it never calls
-  `target(a)`, so it answers with no project open) — and `graphicsSummary`,
+  `graphic_reference` (the bundled `GraphicsAPI.md`; it calls `target(a)` only
+  when given a non-null `project`, so it answers with no project open and
+  refuses a path no open project is at, G-20 (e)) — and `graphicsSummary`,
   `get_project`'s `graphics`. `+GraphicRender` is `render_graphic`, an
   `offMainTools` member: one `onMain` for the target, the registry's
   compiled module, the canvas and `meta`; then, off main, the ctx built by
   hand (`recipe_graphic.rs`'s keys) and a contact sheet or one frame's SVG;
   `format` is read first, and svg refuses a non-null `path`, `background` or
   `max_width` by name (G-19 (a)); a frame past `durationInFrames` is drawn,
-  `progress` clamped at 1 (G-19 (b));
+  `progress` clamped at 1 (G-19 (b)); a png sheet past
+  `GraphicContactSheet.maxCellPixels` (`2 × maxSide²`, 134,217,728 px of
+  frames) is refused before any frame is drawn or file written (G-20 (d));
   a failing frame is its error card, drawn by
   `LayerRenderers.paintErrorCard`, the one card painter.
   `+GraphicImports` is `import_graphic_font` / `import_graphic_asset`, on
@@ -1229,7 +1235,8 @@ free.
   font's `families` come from a throwaway
   library holding that file alone. `GraphicContactSheet.swift` is pure: the
   layout (the scale is over the cells alone, so the sheet is exactly
-  `width × height ≤ max_width × 8192`), the painter and
+  `width × height ≤ max_width × maxSide`, `maxSide` being
+  `GraphicLibrary.maxSide`), `maxCellPixels`, the painter and
   `GraphicRaster.cgImage()`. `AgentCatalog.swift`
   (+`Clips`, +`Audio`, +`Transitions`, +`Files`, +`Captions`, +`Graphics`,
   +`Declarations`)

@@ -28,6 +28,8 @@ use crate::sandbox::{NoImports, SANDBOX};
 pub const HEAP_BYTES: usize = 64 << 20;
 /// §5b's stack limit per runtime.
 pub const STACK_BYTES: usize = 1 << 20;
+/// The most SVG `render` may answer, in bytes (spec §11 G-20 (c)).
+pub const SVG_BYTES: usize = 8 << 20;
 
 const STDLIB: &str = include_str!("stdlib.js");
 const NOISE: &str = include_str!("noise.js");

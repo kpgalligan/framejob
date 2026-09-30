@@ -31,12 +31,14 @@ The crate's record is road map 10 §10.4.
 - `runtime.rs` — `Engine` (one QuickJS `Runtime` + `Context` per (thread,
   module), §5b's limits, the interrupt deadline), the `thread_local!` map
   swept by `Weak` before each call, `svg`, `engine_count`, `HEAP_BYTES`,
-  `STACK_BYTES`. The crate's one clock.
+  `STACK_BYTES`, `SVG_BYTES` (8 MiB, spec §11 G-20 (c)). The crate's one
+  clock.
 - `sandbox.rs` — the sandbox script (G-5) and the loader that resolves no
   specifier, with `IMPORT_REFUSAL`.
 - `exception.rs` — QuickJS error → Diagnostic: `{name}: {message}`, the
   position from `stack` (the module's own frame first), the budget's
-  sentences, what `render` returned. The texts are load-bearing.
+  sentences, what `render` returned (a string over `SVG_BYTES` refused by its
+  length, before the `<svg` check). The texts are load-bearing.
 - `host.rs` — the globals `__measureText`, `__assetNames`, `__warn`.
 - `props.rs` — `check_schema` (compile, strict) and `overlay` (render,
   lenient; every surprise a warning).

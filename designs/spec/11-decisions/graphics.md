@@ -349,7 +349,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
     maxfiles` printed `256 unlimited` on 2026-09-29) and with the owner's
     running Reelcut, which held 28 numbered descriptors (`lsof -p`; its
     documents were unknown).
-  - Modules keep one source each and are uncapped, as before.
+  - Modules keep one source each and are uncapped, as before. Superseded
+    by G-20 (a).
   (d) **The untitled graphics root (G-14) is removed when its document
   closes.** It is also removed when the first save re-points the store,
   which happens after NSDocument has written the package: `fileURL` is set
@@ -366,3 +367,39 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
     DELETE (`MediaTranscript.undeleted`). Whatever the root still holds
     after that is read by nothing, because the janitor reads
     `cacheDirectory`, which is the package's once the document is saved.
+- **G-20 — Every file source shares G-19 (c)'s limit, modules first; a
+  failed open is a scan warning; `render` answers at most 8 MiB of SVG; the
+  png sheet draws at most 134,217,728 px; `graphic_reference` checks a
+  `project` it is given** (issues #172, #105, 2026-09-30).
+  (a) **Module, font and asset files share G-19 (c)'s 16 sources per store
+  per pass, modules first**, then fonts, then assets, each in name order.
+  The folder and package sources are outside the limit. Why: an uncapped
+  module list let one document spend the process's descriptors, which G-19
+  (c) had closed for the library files only. G-19 (c)'s arithmetic now
+  covers every file: 19 descriptors a store, 38 during a pass, 152 for four
+  documents passing at once, against the soft limit of 256. A file past the
+  16th is not watched for an in-place rewrite; it is seen at the next pass,
+  which is accepted, as it was for the library files.
+  (b) **A failed `open` is a scan warning**: "`<subject>` is not watched:
+  open failed (`<strerror>`)", where the subject is `graphics/`,
+  `graphics/fonts/`, `graphics/assets/`, `graphics/<file>`,
+  `graphics/fonts/<file>`, `graphics/assets/<file>` or `the package`. Why:
+  a source that did not arm was silent, so a store that stopped seeing
+  edits said nothing. Nothing shows scan warnings yet (#105); the warning
+  is recorded so the surface that shows them has it.
+  (c) **`render` answers at most 8 MiB of SVG** (`graphic::SVG_BYTES`);
+  a longer string is the frame's error, naming its length. Why: the text
+  is a preview pool key, crosses the FFI and an MCP reply, and is parsed
+  whole, so an unbounded string costs memory at every one of those.
+  (d) **The png contact sheet draws at most 134,217,728 px of frames**
+  (`2 × 8192²`: two frames at the largest side, or sixteen 3840×2160). A
+  call past it is refused before any frame is drawn, and no file is
+  written. Why: every cell's raster is held until the sheet is painted, and
+  sixteen 8192² frames are about 4 GB. `svg` writes no raster and is not
+  capped.
+  (e) **`graphic_reference` checks a `project` it is given**: when present
+  and not null, it must name an open project, or the call is refused with
+  the sentence every tool uses ("No open project is at …"). Without one it
+  still answers when no project is open. Why: every tool publishes
+  `project` (§7.9), so refusing the key would contradict the schema, and
+  ignoring it would pass a wrong path in silence.

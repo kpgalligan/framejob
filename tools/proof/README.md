@@ -7845,7 +7845,7 @@ instrument failure is a scored FAIL, exit 1.
 |---|---|
 | `assistant_lane_proof.py`, `assistant_tab_proof.py`, `assistant_helper_proof.py`, `assistant_prompt_proof.py`, `assistant_session_proof.py`, `spend_proof.py`, `budget_proof.py`, `prices_proof.py`, `prices_crosscheck.py`, `makefile_env_proof.py`, `export_cancel_proof.py`, `video_configuration_proof.py` | 1 / 0 / 2 |
 | `spend_ui_proof.py` | 1 / 3 / 2 |
-| `graphics_proof.py`, `words_picture_probe.py` | 0 / 1 / 2 |
+| `graphics_proof.py`, `graphics_store_probe.py`, `words_picture_probe.py` | 0 / 1 / 2 |
 | `cloud_captions_proof.py`, `cloud_captions_probe.py` (`--mutant`, `--fake-mutant`), `recording_probe.py`, `phase9_chrome.py` — whole-suite mutants | the per-row count and a normal run's exit / 2 |
 
 `playback_audio_proof.py`'s runner already reads a missing answer as a
@@ -8238,3 +8238,64 @@ Run on 2026-09-30:
 | `v2_menu.py 4917 --only H` (own instance on 4917) | 5 pass, 0 fail, 0 skip of 5, exit 0 |
 | `recording_proof.py 4871` (own instance) | 184/188, exit 1 — the four failures are the host's broken `ffmpeg` (`libx265.215.dylib` not loaded: the lane-E fixture and three `signalstats` reads); 2 tone rows skipped by name (the output is muted). The granted tier RAN: this terminal (tmux) held the grant |
 | `recording_probe.py` (the whole run) | 1045/1045, exit 0, no row skipped — section 9's granted tier RAN |
+
+## Issue batch B19 — graphics defects, cleanups and caps (`graphics_store_probe.py` W17, `graphics_proof.py` C7, G10 and G11; #172, #105 items 4 and 6–12)
+
+Spec §11 G-20 is the decision. #105's items 1, 2, 3 and 5 and the rest of
+its list stay open there.
+
+- **`graphics_store_probe.py`** — W17: an untitled store holding `a.js`,
+  settled; RLIMIT_NOFILE's soft limit set to the lowest free descriptor
+  (found by opening `/dev/null`), `rescan()`, the limit restored:
+  `scan.warnings` holds `graphics/ is not watched: open failed (Too many
+  open files)` (G-20 (b)); CONTROL: a second `rescan()` has no "is not
+  watched" warning and lists `a`. Mutant `silent-open` makes `arm`'s failure
+  branch answer nil (W17). `no-file-sources` is re-anchored to drop the one
+  file-arm loop (modules, fonts and assets, G-20 (a)) and
+  `no-library-file-sources` to drop `fontURLs + assetURLs` from it. Its
+  `mutant()` now follows rule R (the row is in B13's table): 0 caught, 1
+  survived, 2 not performed (the copy, the anchor or the build failed, or
+  the probe gave no answer).
+- **`graphics_proof.py`** — G10 (after G7, on the open WG): `graphic_reference
+  {project: WG}` answers `docs/graphics-api.md`, and `{project:
+  WORK/nowhere.reelcut}` is refused "No open project is at" (G-20 (e)); C7
+  (on WG): `render_graphic` of frames `[0, 1, 2]` at 8192×8192 is refused
+  naming 134217728 and 201326592 and writes no `c7.png`, CONTROL: `[0, 1]`,
+  exactly the cap, draws and names "2 frame" (G-20 (d)); G11: on a new WS,
+  17 modules `m00`…`m16` written; `m16.js` rewritten in place from the shell
+  is NOT seen after 2 s, CONTROL: `m00.js` then rewritten in place, and
+  within 5 s both revisions are hashlib's (G-20 (a)). `build_mutant(file,
+  anchor, replacement)` now takes any anchor in `app/Sources`; each mutant
+  drives only its own row and that row's setup: `sheet-uncapped` (the pixel
+  guard's condition made `pixels < 0`, C7), `reference-unchecked` (the
+  `target` line removed, G10), `store-uncapped` (`.prefix(Self.fileSourceLimit)`
+  removed, G11).
+- **`harness/build.sh`** copies `docs/graphics-api.md` and `.d.ts` beside
+  `Fonts` as `GraphicsAPI.md` and `GraphicsAPI.d.ts` on every run, before
+  its staleness exit, so the harness's stores write the manual.
+- **Engine and core tests** — `graphic/tests/families.rs`
+  `an_explicit_default_family_is_named_not_called_absent`,
+  `graphic/tests/render.rs` `an_svg_over_the_cap_is_refused_with_its_length`
+  (and `an_svg_at_the_cap_is_returned`, a control that passed before the
+  fix too), and `core/tests/graphic_ffi.rs`
+  `one_max_side_in_the_engine_the_core_and_the_header` (failed with the
+  header's `#define` set to 8193).
+
+Run on 2026-09-30 (this host: ffmpeg is broken, `libx265.215.dylib` not
+loaded, so `graphics_proof.py`'s pixel rows fail for that reason alone):
+
+| Command | Answer |
+|---|---|
+| `graphics_store_probe.py` | 23/23 |
+| `graphics_store_probe.py --mutant` each of `silent-open`, `no-file-sources`, `no-library-file-sources`, `whitelist-removed`, `strong-callback`, `partial-left`, `scratch-kept`, `cache-kept` | exit 0 each: W17 / W4 (with W2, W10, W11, W14) / W14 / C1 (with C2, C5) / C4 / W15 / C5 / C6 failed |
+| `graphics_proof.py --port 4893` at HEAD `33065c6` (a worktree, its own `make app`) | 31/42; A1 C1 C2 I1 I2 I4 W1 C4 E4 Q1 Q2 FAIL (ffmpeg) |
+| `graphics_proof.py --port 4891` with B19 | 34/45; the same eleven FAIL; G10, C7, G11, C5, C6, G6 and Z1 ok |
+| `graphics_proof.py --port 4892 --mutant` each of `sheet-uncapped`, `reference-unchecked`, `store-uncapped` | exit 0 each: C7 / G10 / G11 failed, each row's control held |
+| `graphics_inspector_proof.py` (4894; at HEAD, 4895) | 59/59 both |
+
+```sh
+python3 tools/proof/graphics_store_probe.py                         # → 23/23
+python3 tools/proof/graphics_store_probe.py --mutant silent-open    # → exit 0
+python3 tools/proof/graphics_proof.py --port 4891                   # C7, G10, G11
+python3 tools/proof/graphics_proof.py --port 4892 --mutant store-uncapped
+```

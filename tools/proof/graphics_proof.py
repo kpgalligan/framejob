@@ -121,6 +121,20 @@ C5  (issue batch B8, #104; spec §11 G-19 (a)) `render_graphic {name: bar,
 C6  (B8, G-19 (b)) `{name: bar, frame: 150, format: svg}`, past bar's 120
     frames, is ok: `frame` 150, `ctx.durationInFrames` 120, `ctx.progress` 1
     — a frame past the length is drawn, as a longer clip draws it (G-9);
+G10 (issue batch B19, #105; spec §11 G-20 (e); after G7, on the open WG)
+    `graphic_reference {project: WG}` is ok and its text is
+    `docs/graphics-api.md`; `{project: WORK/nowhere.reelcut}` is an error
+    containing "No open project is at";
+C7  (B19, G-20 (d); on WG) `render_graphic {name: bar, frames: [0, 1, 2],
+    width: 8192, height: 8192, path: WORK/c7.png}` is an error naming
+    134217728 and 201326592, and `c7.png` does not exist; CONTROL: `{frames:
+    [0, 1]}` at 8192×8192, exactly the cap, is ok and names "2 frame";
+G11 (B19, #172, G-20 (a)) `new_project {path: WS}`, `write_graphic` of 17
+    modules `m00`…`m16`, a 0.5 s settle; `m16.js` rewritten IN PLACE (same
+    inode) from the shell: after 2 s `get_graphic {name: m16}`'s revision is
+    unchanged (the 17th file is past the 16-source cap); CONTROL: `m00.js`
+    then rewritten in place: within 5 s the revisions of both `m00` and
+    `m16` are hashlib's of their new bytes (the next pass reads every file);
 I1  `write_graphic needsfont` (120 px white text in `'Oswald'`): its sheet over
     black has 0 lit pixels and names Oswald; `import_graphic_font` of
     `/Library/Fonts/Oswald-Medium.ttf` answers families `["Oswald"]` (the
@@ -165,18 +179,27 @@ Z1  `grep "Reelcut: "` over every launch's log prints nothing.
 
     python3 tools/proof/graphics_proof.py [--port 4879] [--app PATH]
     python3 tools/proof/graphics_proof.py --mutant frame-plus-one
+    python3 tools/proof/graphics_proof.py --mutant sheet-uncapped
+    python3 tools/proof/graphics_proof.py --mutant reference-unchecked
+    python3 tools/proof/graphics_proof.py --mutant store-uncapped
 
-The mutant is built in a COPY of the tree from `tree_copy.make_copy` (`app/` and
-`agent/` copied, every other build input `project.yml` names linked) with
-one anchor in `LayerRenderersGraphic.swift`, asserted to occur exactly once,
-replaced so the module is asked for `frame + 1`; the copy is built by its
-own `make app` into its own directory and driven through P1 and P2.
-Exit 0 means P2 FAILED in the mutant, which is the pass, and 1 that it
-survived. Exit 2 (rule R, issue batch B13) means the control could not be
-performed — the copy did not build or launch, P1 did not hold, or frame 30
-or 31 did not render — printed as `mutant frame-plus-one: the control could
-not be performed — <why>`. The rows past P2 are relative and a uniform +1
-moves both sides of them, so they are not expected to fail.
+A mutant is built in a COPY of the tree from `tree_copy.make_copy` (`app/` and
+`agent/` copied, every other build input `project.yml` names linked) by
+`build_mutant(file, anchor, replacement)`, the anchor asserted to occur
+exactly once in `app/Sources/<file>`; the copy is built by its own `make app`
+into its own directory and driven through its own rows only.
+`frame-plus-one` asks the module for `frame + 1` in `LayerRenderersGraphic.swift`
+and is driven through P1 and P2; P2 must FAIL. The rows past P2 are relative
+and a uniform +1 moves both sides of them, so they are not expected to fail.
+`sheet-uncapped` removes `render_graphic`'s pixel cap (C7 must FAIL),
+`reference-unchecked` removes `graphic_reference`'s `target` line (G10), and
+`store-uncapped` removes `.prefix(Self.fileSourceLimit)` from the store's
+file-arm loop (G11); C7's and G10's setup is `new_project` plus
+`write_graphic bar`. Exit 0 means the row FAILED in the mutant, which is the
+pass, and 1 that it survived. Exit 2 (rule R, issue batch B13) means the
+control could not be performed — the copy did not build or launch, the setup
+did not hold, or the row's own control half failed — printed as `mutant
+<name>: the control could not be performed — <why>`.
 """
 
 import argparse
@@ -213,12 +236,28 @@ RED, BLUE, BLACK = (255, 90, 54), (45, 127, 249), (0, 0, 0)
 BORDER, CARD = (230, 40, 40), (64, 8, 8)
 SECOND = 30 * FRAME
 ROWS = ["G6", "P1", "P2", "P3", "S1", "R1", "H1", "L1", "F1", "K1", "K2", "T1", "K3", "A1",
-        "G1", "G2", "G3", "G4", "G5", "G7", "C1", "C2", "C3", "C5", "C6", "I1", "I2", "G9", "I3", "I4", "W1",
-        "L2",
+        "G1", "G2", "G3", "G4", "G5", "G7", "G10", "C1", "C2", "C3", "C5", "C6", "C7", "I1", "I2",
+        "G9", "I3", "I4", "W1", "L2", "G11",
         "G8", "E1", "C4", "E2", "E3", "E4", "Q1", "Q2", "Q3", "Z1"]
 DOC_MD = ROOT / "docs/graphics-api.md"
 DOC_DTS = ROOT / "docs/graphics-api.d.ts"
 ANCHOR = "frame: frame, propsJSON: propsJSON, ctxJSON: ctxJSON,"
+SHEET_GUARD = (
+    "        let pixels = frames.count * context.width * context.height\n"
+    "        if format == \"png\", pixels > GraphicContactSheet.maxCellPixels {\n")
+REFERENCE_CHECK = (
+    "        if let project = a[\"project\"], !(project is NSNull) { _ = try target(a) }\n")
+# name: (file in app/Sources, anchor, replacement, the row it must fail)
+MUTANTS = {
+    "frame-plus-one": ("LayerRenderersGraphic.swift", ANCHOR,
+                       ANCHOR.replace("frame: frame,", "frame: frame + 1,"), "P2"),
+    "sheet-uncapped": ("AgentServer+GraphicRender.swift", SHEET_GUARD,
+                       "        let pixels = frames.count * context.width * context.height\n"
+                       "        if format == \"png\", pixels < 0 {\n", "C7"),
+    "reference-unchecked": ("AgentServer+Graphics.swift", REFERENCE_CHECK, "", "G10"),
+    "store-uncapped": ("GraphicStore.swift", ".prefix(Self.fileSourceLimit)", "", "G11"),
+}
+CAP = 134_217_728
 rows = {}
 
 
@@ -689,9 +728,12 @@ def run(app, port):
 
         run_a1(client, pa)
         run_g(client, wg, ng)
+        run_g10(client, wg)
         run_c(client, wg)
+        run_c7(client, wg)
         run_i(client, wg)
         run_loop(client, WORK / "LP.reelcut")
+        run_g11(client, WORK / "WS.reelcut")
         # A fresh instance, K3's pattern: the untitled draft is the implicit
         # target of every call.
         instance.stop()
@@ -1374,20 +1416,118 @@ def run_q(binary, why):
           f"{why}{hit}")
 
 
-def build_mutant():
+def setup_bar(client, wg):
+    """C7's and G10's own setup in a mutant run: WG with bar.js. Whether it held."""
+    made = attempt(client, "new_project", {"path": str(wg)})
+    wrote = attempt(client, "write_graphic", {"project": str(wg), "name": "bar",
+                                              "source": bar()})
+    return made["ok"] and wrote["ok"] and (wrote.get("reply") or {}).get("ok") is True
+
+
+def run_g10(client, wg):
+    """G10 — `graphic_reference` checks a `project` it is given (G-20 (e)).
+    Whether its control half (the open WG answers the doc) held."""
+    doc = DOC_MD.read_bytes().decode("utf-8")
+    named = attempt(client, "graphic_reference", {"project": str(wg)})
+    nowhere = WORK / "nowhere.reelcut"
+    stray = attempt(client, "graphic_reference", {"project": str(nowhere)})
+    control = named["ok"] and named.get("reply") == doc
+    check("G10 graphic_reference {project: WG} answers docs/graphics-api.md; {project: "
+          "nowhere.reelcut} is refused \"No open project is at\" (G-20 (e))",
+          control and not stray["ok"] and "No open project is at" in stray.get("error", ""),
+          f"WG ok {named['ok']} equals doc {named.get('reply') == doc} "
+          f"{named.get('error', '')!r}, nowhere {stray}")
+    return control
+
+
+def run_c7(client, wg):
+    """C7 — the png sheet's pixel cap (G-20 (d)). Whether its control half
+    (exactly the cap draws) held."""
+    target = WORK / "c7.png"
+    if target.exists():
+        target.unlink()
+    over = attempt(client, "render_graphic", {"project": str(wg), "name": "bar",
+                                              "frames": [0, 1, 2], "width": 8192,
+                                              "height": 8192, "path": str(target)})
+    ok, text, _ = sheet(client, wg, {"name": "bar", "frames": [0, 1], "width": 8192,
+                                     "height": 8192}, "c7-control")
+    error = over.get("error", "")
+    check("C7 render_graphic of 3 frames at 8192×8192 is refused naming 134217728 and "
+          "201326592 and writes no c7.png; CONTROL: 2 frames, exactly the cap, draw (G-20 (d))",
+          not over["ok"] and str(CAP) in error and str(3 * 8192 * 8192) in error
+          and not target.exists() and ok and "2 frame" in text,
+          f"over {over}, c7.png {target.exists()}, control ok {ok} {text[:200]!r}")
+    return ok and "2 frame" in text
+
+
+def rewrite_in_place(path, text):
+    """`cat staged > path` from the shell: truncated and rewritten through
+    the same inode. Whether the inode held."""
+    staged = WORK / f"staged-{path.name}"
+    staged.write_text(text)
+    before = path.stat().st_ino if path.exists() else None
+    bounded.run(["/bin/sh", "-c", 'cat "$1" > "$2"', "sh", str(staged), str(path)], 30)
+    return before is not None and path.stat().st_ino == before
+
+
+def revision_of(client, ws, name):
+    got = attempt(client, "get_graphic", {"project": str(ws), "name": name})
+    return (got.get("reply") or {}).get("revision") if got["ok"] else None
+
+
+def run_g11(client, ws):
+    """G11 — module sources share the 16-file cap (G-20 (a)). Whether its
+    setup and its control half held."""
+    names = [f"m{i:02d}" for i in range(17)]
+    made = attempt(client, "new_project", {"path": str(ws)})
+    wrote = [attempt(client, "write_graphic", {
+        "project": str(ws), "name": name,
+        "source": module(f'  return svg(ctx, `<rect width="10" height="10" fill="#ff5a36"/>`); '
+                         f'// {name}')}) for name in names]
+    setup = made["ok"] and all(w["ok"] and (w.get("reply") or {}).get("ok") is True
+                               for w in wrote)
+    time.sleep(0.5)
+    folder = ws / "graphics"
+    old16 = revision_of(client, ws, "m16")
+    new16 = module('  return svg(ctx, `<rect width="20" height="20" fill="#2d7ff9"/>`); // m16 v2')
+    same16 = rewrite_in_place(folder / "m16.js", new16)
+    time.sleep(2)
+    after16 = revision_of(client, ws, "m16")
+    new00 = module('  return svg(ctx, `<rect width="20" height="20" fill="#2d7ff9"/>`); // m00 v2')
+    same00 = rewrite_in_place(folder / "m00.js", new00)
+    want00 = hashlib.sha256(new00.encode()).hexdigest()
+    want16 = hashlib.sha256(new16.encode()).hexdigest()
+    deadline = time.monotonic() + 5
+    seen00 = seen16 = None
+    while time.monotonic() < deadline:
+        seen00, seen16 = revision_of(client, ws, "m00"), revision_of(client, ws, "m16")
+        if seen00 == want00 and seen16 == want16:
+            break
+        time.sleep(0.2)
+    control = same00 and seen00 == want00 and seen16 == want16
+    check("G11 17 modules: m16.js rewritten in place is NOT seen after 2 s (past the 16-source "
+          "cap); CONTROL: m00.js rewritten in place, and within 5 s both revisions are "
+          "hashlib's (G-20 (a))",
+          setup and old16 is not None and same16 and after16 == old16 and control,
+          f"setup {setup}, m16 {old16} → {after16} (same inode {same16}), then m00 {seen00} "
+          f"want {want00}, m16 {seen16} want {want16} (same inode {same00})")
+    return setup and control
+
+
+def build_mutant(file, anchor, replacement):
     """A COPY of the tree from `tree_copy.make_copy` (`app/` and `agent/`
-    copied, every other build input `project.yml` names linked), the anchor
-    replaced, built by the copy's own `make app`. The binary, or None and
-    why."""
+    copied, every other build input `project.yml` names linked), `anchor`
+    in `app/Sources/<file>` replaced, built by the copy's own `make app`.
+    The binary, or None and why."""
     made, reason = tree_copy.make_copy(str(WORK / "mutant"))
     if made is None:
         return None, reason
     copy = Path(made)
-    target = copy / "app/Sources/LayerRenderersGraphic.swift"
+    target = copy / "app/Sources" / file
     text = target.read_text()
-    if text.count(ANCHOR) != 1:
-        return None, f"the anchor occurs {text.count(ANCHOR)} times"
-    target.write_text(text.replace(ANCHOR, ANCHOR.replace("frame: frame,", "frame: frame + 1,")))
+    if text.count(anchor) != 1:
+        return None, f"the anchor occurs {text.count(anchor)} times in {file}"
+    target.write_text(text.replace(anchor, replacement))
     built = bounded.run(["make", "app"], 1500, cwd=str(copy))
     binary = copy / "build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut"
     if built["rc"] != 0 or not binary.exists():
@@ -1402,13 +1542,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=4879)
     parser.add_argument("--app", type=Path, default=APP)
-    parser.add_argument("--mutant", choices=["frame-plus-one"])
+    parser.add_argument("--mutant", choices=sorted(MUTANTS))
     args = parser.parse_args()
     shutil.rmtree(WORK, ignore_errors=True)
     WORK.mkdir(parents=True)
     if args.mutant:
-        print("G3b/G3c graphics — the frame-plus-one MUTANT (P2 must FAIL)", flush=True)
-        binary, why = build_mutant()
+        file, anchor, replacement, row = MUTANTS[args.mutant]
+        print(f"graphics — the {args.mutant} MUTANT ({row} must FAIL)", flush=True)
+        binary, why = build_mutant(file, anchor, replacement)
         if binary is None:
             print(f"  FAIL the mutant builds — {why}")
             print(f"mutant {args.mutant}: the control could not be performed — the copy was "
@@ -1422,17 +1563,29 @@ def main():
                 print(f"mutant {args.mutant}: the control could not be performed — the copy "
                       f"did not launch")
                 return 2
-            _, _, f30, f31 = run_p1_p2(client, WORK / "M.reelcut")
+            if args.mutant == "frame-plus-one":
+                _, _, f30, f31 = run_p1_p2(client, WORK / "M.reelcut")
+                why = ("P1 did not hold" if not rows.get("P1") else
+                       "frame 30 was not rendered" if f30 is None else
+                       "frame 31 was not rendered" if f31 is None else "")
+            elif args.mutant == "store-uncapped":
+                why = "" if run_g11(client, WORK / "WS.reelcut") else \
+                    "the 17 writes or the m00 control did not hold"
+            else:
+                wg = WORK / "WG.reelcut"
+                if not setup_bar(client, wg):
+                    why = "new_project and write_graphic bar did not hold"
+                elif args.mutant == "sheet-uncapped":
+                    why = "" if run_c7(client, wg) else "the 2-frame control did not draw"
+                else:
+                    why = "" if run_g10(client, wg) else "the reference for WG did not answer"
         finally:
             instance.stop()
-        why = ("P1 did not hold" if not rows.get("P1") else
-               "frame 30 was not rendered" if f30 is None else
-               "frame 31 was not rendered" if f31 is None else "")
         if why:
             print(f"mutant {args.mutant}: the control could not be performed — {why}")
             return 2
-        verdict = not rows.get("P2")
-        print("the mutant is CAUGHT: P1 held and P2 failed" if verdict
+        verdict = not rows.get(row)
+        print(f"the mutant is CAUGHT: {row} failed" if verdict
               else "the mutant was NOT caught")
         return 0 if verdict else 1
     print("G3b/G3c/G4a/G4b/G5b graphics — a graphic clip drawn, one failing, the agent's "

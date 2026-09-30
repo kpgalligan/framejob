@@ -21,7 +21,7 @@ extension AgentServer {
     func importGraphicFont(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let store = try graphicStore(document)
-        let (source, _) = try graphicImportSource(a)
+        let source = try graphicImportSource(a)
         let landed = try store.importFont(from: source)
         return try jsonResult([
             "path": landed.url.path, "name": source.lastPathComponent, "replaced": landed.replaced,
@@ -35,7 +35,7 @@ extension AgentServer {
     func importGraphicAsset(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let store = try graphicStore(document)
-        let (source, _) = try graphicImportSource(a)
+        let source = try graphicImportSource(a)
         let name = try stringArg(a, "name") ?? source.lastPathComponent
         let landed = try store.importAsset(from: source, as: name)
         return try jsonResult([
@@ -46,12 +46,12 @@ extension AgentServer {
     }
 
     /// `path`, `~` expanded: a regular file, or the sentence saying there is none.
-    private func graphicImportSource(_ a: [String: Any]) throws -> (url: URL, path: String) {
+    private func graphicImportSource(_ a: [String: Any]) throws -> URL {
         let path = (try requiredString(a, "path") as NSString).expandingTildeInPath
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory),
             !isDirectory.boolValue
         else { throw ToolError(message: "No file at \(path).") }
-        return (URL(fileURLWithPath: path), path)
+        return URL(fileURLWithPath: path)
     }
 }

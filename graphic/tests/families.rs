@@ -105,6 +105,27 @@ fn a_text_with_no_family_says_the_default_is_missing() {
 }
 
 #[test]
+fn an_explicit_default_family_is_named_not_called_absent() {
+    let lib = library();
+    for value in ["Times New Roman", "'Times New Roman'"] {
+        let (_, warnings) = render(&lib, &text(&format!(" font-family=\"{value}\"")), 320, 80);
+        assert_eq!(warnings.len(), 1, "{value}: {warnings:?}");
+        let message = &warnings[0].message;
+        assert!(
+            message.starts_with(
+                "font-family \"Times New Roman\" is not in the font set; the set has: "
+            ),
+            "{value}: {message}"
+        );
+        assert!(
+            !message.contains("has no font-family"),
+            "{value}: {message}"
+        );
+        names_every_family(&lib, message);
+    }
+}
+
+#[test]
 fn a_missing_family_in_a_sheet_is_seen() {
     let lib = library();
     let body = "<style>text{font-family:Nope}</style>\

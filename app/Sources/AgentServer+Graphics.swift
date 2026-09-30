@@ -159,8 +159,10 @@ extension AgentServer {
     /// opens the same file (`AppDelegate+GraphicMenu.swift`).
     ///
     /// The bundled `GraphicsAPI.md`, verbatim. Needs no open document, so
-    /// it never calls `target(a)`.
+    /// it calls `target(a)` only when given `project`, to refuse a path no
+    /// open project is at (spec §11 G-20 (e)).
     func graphicReference(_ a: [String: Any]) throws -> String {
+        if let project = a["project"], !(project is NSNull) { _ = try target(a) }
         guard let data = try? Data(contentsOf: GraphicStore.bundledReferenceURL) else {
             throw ToolError(
                 message: "The bundled reference GraphicsAPI.md is missing from the app's Resources")

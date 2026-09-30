@@ -74,20 +74,20 @@ pub fn rasterize(
         }
         seen.push(families);
         if families.as_slice() == [usvg::FontFamily::Named(options.font_family.clone())] {
-            for message in unparsed_family_warnings(svg, &set) {
+            for message in unparsed_family_warnings(svg, &set, &options.font_family) {
                 push(&mut warnings, message);
             }
         } else {
             push(&mut warnings, family_warning(families, &set));
         }
     }
+    let names = library.asset_names();
+    let assets = if names.is_empty() {
+        "(no assets)".to_string()
+    } else {
+        names.join(", ")
+    };
     for href in &probe.hrefs {
-        let names = library.asset_names();
-        let assets = if names.is_empty() {
-            "(no assets)".to_string()
-        } else {
-            names.join(", ")
-        };
         push(
             &mut warnings,
             format!("<image> href \"{href}\" is not an asset; the assets are: {assets}"),
@@ -158,10 +158,11 @@ fn family_warning(families: &[usvg::FontFamily], set: &str) -> String {
 }
 
 /// usvg falls back to its default family both when no `font-family` is
-/// given and when the value does not parse; this scan tells the two apart
-/// by reading every value usvg could have read — attributes, `style`
+/// given and when the value does not parse, and a value that names the
+/// default itself looks the same; this scan tells the three apart by
+/// reading every value usvg could have read — attributes, `style`
 /// attributes and `<style>` sheets — through usvg's own parsers.
-fn unparsed_family_warnings(svg: &str, set: &str) -> Vec<String> {
+fn unparsed_family_warnings(svg: &str, set: &str, default: &str) -> Vec<String> {
     let options = usvg::roxmltree::ParsingOptions {
         allow_dtd: true,
         ..Default::default()
@@ -193,8 +194,11 @@ fn unparsed_family_warnings(svg: &str, set: &str) -> Vec<String> {
         }
     }
     let mut messages: Vec<String> = Vec::new();
+    let only_default = [usvg::FontFamily::Named(default.to_string())];
+    let mut names_default = false;
     for value in values {
-        if svgtypes::parse_font_families(&value).is_ok() {
+        if let Ok(families) = svgtypes::parse_font_families(&value) {
+            names_default |= families.as_slice() == only_default;
             continue;
         }
         let message = unparsed_message(value.trim(), set);
@@ -202,8 +206,9 @@ fn unparsed_family_warnings(svg: &str, set: &str) -> Vec<String> {
             messages.push(message);
         }
     }
-    if messages.is_empty() {
-        let default = usvg::Options::default().font_family;
+    if messages.is_empty() && names_default {
+        messages.push(family_warning(&only_default, set));
+    } else if messages.is_empty() {
         messages.push(format!(
             "a <text> has no font-family (the default \"{default}\" is not in the font set); the set has: {set}"
         ));

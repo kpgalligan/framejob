@@ -279,6 +279,9 @@ eval("…")            → ReferenceError: eval is not defined
 - **Size**: a graphic draws at most 8192 pixels on a side.
 - **The answer**: `render` must return an SVG string. `undefined` is
   ``render returned undefined at frame 12 — did you forget `return`?``.
+  The string may be at most 8 MiB (8388608 bytes); a longer one is
+  `render returned 9000000 bytes at frame 12; the SVG may be at most
+  8388608 bytes`.
 
 ## Diagnostics
 
@@ -292,9 +295,10 @@ set for a problem found while drawing.
 
 Read `graphic_reference` once. `write_graphic {name, source}` answers `ok` and
 `diagnostics`: write again until `ok` is true. `render_graphic {name, frames}`
-draws up to 16 frames on a contact sheet with no clip; `add_graphic_clip {name}`
-places it, `render_frame` shows a frame, `set_graphic {patch: {props}}` changes
-it. `import_graphic_font {path}` answers `families`, the exact names
+draws up to 16 frames on a contact sheet with no clip, at most 134217728
+pixels of frames in all (two at 8192×8192, or sixteen at 3840×2160);
+`add_graphic_clip {name}` places it, `render_frame` shows a frame,
+`set_graphic {patch: {props}}` changes it. `import_graphic_font {path}` answers `families`, the exact names
 `font-family` must say; `import_graphic_asset {path}` adds a picture for
 `asset(name)`. `get_graphic` reads a module or names the folder, which your file
 tools may edit too; its `API.md` is this page, `API.d.ts` its types.

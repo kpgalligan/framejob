@@ -56,7 +56,11 @@ struct GraphicSheetCell {
 
 enum GraphicContactSheet {
     static let gap = 8, labelHeight = 24, maxWidthDefault = 2048, maxWidthMin = 64
-    static let maxFrames = 16, maxSide = 8192
+    static let maxFrames = 16, maxSide = GraphicLibrary.maxSide
+    /// The most pixels of frames a png sheet draws (spec §11 G-20 (d)):
+    /// every cell's raster is held until paint. Two 8192² frames, or
+    /// sixteen 3840×2160.
+    static let maxCellPixels = 2 * maxSide * maxSide
 
     /// Where every cell goes. Row-major from the top left, no outer margin.
     struct Layout {

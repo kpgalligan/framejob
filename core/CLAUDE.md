@@ -51,7 +51,10 @@ governs a module now.
   puts them on the grid after `check_text` has named what the caller sent.
 - `model_graphic.rs` — the graphic vocabulary (format version 10, road
   map 10): `GraphicProps` (`name`, `width`, `height`, `in`, `length`,
-  `props`) and `GRAPHIC_MIN_SIDE` / `GRAPHIC_MAX_SIDE` / `GRAPHIC_MAX_PROPS`,
+  `props`) and `GRAPHIC_MIN_SIDE` / `GRAPHIC_MAX_SIDE` / `GRAPHIC_MAX_PROPS`
+  (`GRAPHIC_MAX_SIDE` restates the engine's `MAX_SIDE` and the header's
+  `RC_GRAPHIC_MAX_SIDE`; `tests/graphic_ffi.rs`'s
+  `one_max_side_in_the_engine_the_core_and_the_header` pins the three),
   re-exported through `model_props.rs`; the FIELD `Clip.graphic` stays in
   `model.rs`. And the `pub(crate)` checks every writer shares: `check_name`
   (G-3's `^[a-z0-9][a-z0-9-]{0,62}$`, its clause `NAME_RULE` shared with

@@ -372,6 +372,12 @@ char *rc_export_settings(const RcProject *p, const char *preset_id, const char *
 typedef struct RcGraphicLibrary RcGraphicLibrary;
 typedef struct RcGraphic RcGraphic;
 
+/* The largest width or height a graphic draws at, in pixels (G-7): the
+ * engine's `MAX_SIDE` and the core's `GRAPHIC_MAX_SIDE`, which
+ * core/tests/graphic_ffi.rs pins equal to this. The app reads it as
+ * `GraphicLibrary.maxSide`. */
+#define RC_GRAPHIC_MAX_SIDE 8192
+
 /* A new, empty library. Never NULL. */
 RcGraphicLibrary *rc_graphic_library_new(void);
 

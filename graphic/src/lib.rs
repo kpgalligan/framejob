@@ -27,4 +27,4 @@ pub use measure::{measure_text, FontStyle, TextFont, TextMetrics};
 pub use module::Module;
 pub use props::overlay;
 pub use raster::{rasterize, MAX_SIDE};
-pub use runtime::{engine_count, svg, HEAP_BYTES, STACK_BYTES};
+pub use runtime::{engine_count, svg, HEAP_BYTES, STACK_BYTES, SVG_BYTES};

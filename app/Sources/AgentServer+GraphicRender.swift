@@ -24,7 +24,9 @@
 // by name, before the multi-frame refusal, since svg answers text and writes
 // no file. A frame at or past `durationInFrames` is DRAWN, not refused, with
 // `progress` clamped at 1: a clip longer than its length draws those frames
-// too (G-9, G-19 (b)).
+// too (G-9, G-19 (b)). A png sheet past `GraphicContactSheet.maxCellPixels`
+// of frames is refused once the size is known, before any frame is drawn
+// or any file written (G-20 (d)).
 
 import Foundation
 
@@ -88,6 +90,13 @@ extension AgentServer {
                 compiled.meta, "durationInFrames", name, in: 1...Int.max / Int(tick))
                 ?? Int((5 * canvas.fps.double).rounded(.up))
             return (compiled.module, width, height, canvas.fps, canvas, length)
+        }
+        let pixels = frames.count * context.width * context.height
+        if format == "png", pixels > GraphicContactSheet.maxCellPixels {
+            throw ToolError(
+                message: "A contact sheet draws at most \(GraphicContactSheet.maxCellPixels) px of "
+                    + "frames; \(frames.count) frame(s) of \(context.width)×\(context.height) are "
+                    + "\(pixels) px — ask for fewer frames or a smaller width and height.")
         }
 
         var reports: [GraphicReport] = []

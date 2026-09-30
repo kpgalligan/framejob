@@ -449,3 +449,20 @@ fn only_ffi_graphic_names_the_graphic_crate() {
     naming.sort();
     assert_eq!(naming, vec!["ffi_graphic.rs".to_string()]);
 }
+
+#[test]
+fn one_max_side_in_the_engine_the_core_and_the_header() {
+    // G-2 keeps `graphic` out of `model_graphic.rs`, so the core restates the
+    // engine's side cap, and the app reads the header's `#define`; this is
+    // the one place the three are compared.
+    assert_eq!(
+        graphic::MAX_SIDE,
+        reelcut_core::model_graphic::GRAPHIC_MAX_SIDE
+    );
+    let header = include_str!("../include/reelcut_core.h");
+    let stated = header
+        .lines()
+        .find_map(|line| line.strip_prefix("#define RC_GRAPHIC_MAX_SIDE "))
+        .expect("the header has a `#define RC_GRAPHIC_MAX_SIDE <n>` line");
+    assert_eq!(stated.trim().parse::<u32>().ok(), Some(graphic::MAX_SIDE));
+}

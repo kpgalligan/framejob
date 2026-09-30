@@ -4,7 +4,7 @@
 
 mod common;
 
-use graphic::{rasterize, Diagnostic, Module};
+use graphic::{rasterize, Diagnostic, Module, SVG_BYTES};
 
 use common::{shared, BUDGET_MS, FIXTURES};
 
@@ -64,6 +64,35 @@ fn a_string_that_is_not_svg_is_quoted() {
         "render returned a string that does not start with <svg at frame 3: \"<div>\""
     );
     assert_eq!(d.frame, Some(3));
+}
+
+fn of_length(length: usize) -> String {
+    format!(
+        "export function render(frame, props, ctx) {{ return \"<svg\" + \"x\".repeat({}); }}",
+        length - 4
+    )
+}
+
+#[test]
+fn an_svg_over_the_cap_is_refused_with_its_length() {
+    let d = failure(&of_length(SVG_BYTES + 1), 0);
+    assert_eq!(
+        d.message,
+        format!(
+            "render returned {} bytes at frame 0; the SVG may be at most {SVG_BYTES} bytes",
+            SVG_BYTES + 1
+        )
+    );
+    assert_eq!(d.frame, Some(0));
+}
+
+#[test]
+fn an_svg_at_the_cap_is_returned() {
+    let module = compile(&of_length(SVG_BYTES));
+    let ctx = common::ctx(0, 30.0, 150, 1920, 1080);
+    let (svg, _) = graphic::svg(&module, 0, &serde_json::json!({}), &ctx, BUDGET_MS)
+        .unwrap_or_else(|d| panic!("did not draw: {}", d.message));
+    assert_eq!(svg.len(), SVG_BYTES);
 }
 
 #[test]

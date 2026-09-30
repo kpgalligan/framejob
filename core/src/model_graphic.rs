@@ -28,9 +28,9 @@ use crate::time::Ticks;
 /// The smallest side a graphic draws at, in pixels.
 pub const GRAPHIC_MIN_SIDE: u32 = 1;
 
-/// The largest side a graphic draws at, in pixels. Restates the engine
-/// crate's `MAX_SIDE` and the app's `GraphicLibrary.maxSide`, which refuse
-/// the same number; G-2 forbids importing it from there.
+/// The largest side a graphic draws at, in pixels. Restates the engine's
+/// `MAX_SIDE` and the header's `RC_GRAPHIC_MAX_SIDE` (G-2 forbids importing
+/// it); `graphic_ffi.rs`'s `one_max_side_…` test pins the three equal.
 pub const GRAPHIC_MAX_SIDE: u32 = 8192;
 
 /// The most keys a stored `props` object may hold. Restates the engine

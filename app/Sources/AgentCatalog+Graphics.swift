@@ -107,7 +107,8 @@ extension AgentServer {
                 "Answers the whole graphics API — the module's shape, ctx, the schema's "
                     + "types, the standard library, fonts, the sandbox, limits and idioms — as "
                     + "Markdown, for an LLM to read once before writing a graphic. Needs no "
-                    + "project open. Help ▸ Graphics Reference opens the same file.",
+                    + "project open; a project, when given, must name an open one. Help ▸ "
+                    + "Graphics Reference opens the same file.",
                 [:]),
             tool(
                 "render_graphic",
@@ -122,6 +123,9 @@ extension AgentServer {
                     + "meta, else the canvas. svg takes no path, background or max_width, which "
                     + "are the png sheet's, and writes no file. A frame at or past "
                     + "durationInFrames is drawn, with progress 1, as a longer clip draws it. "
+                    + "A png sheet draws at most \(GraphicContactSheet.maxCellPixels) px of "
+                    + "frames (frames × width × height); past that the call is refused before "
+                    + "any frame is drawn. "
                     + "No inspector control mirrors it: a person looks at the preview well.",
                 [
                     "name": [
@@ -145,17 +149,17 @@ extension AgentServer {
                             + "a key left out draws with the schema's default.",
                     ],
                     "width": [
-                        "type": "integer", "minimum": 1, "maximum": 8192,
+                        "type": "integer", "minimum": 1, "maximum": GraphicLibrary.maxSide,
                         "description": "Width to draw at, in pixels. Default: meta.width, else "
                             + "the canvas.",
                     ],
                     "height": [
-                        "type": "integer", "minimum": 1, "maximum": 8192,
+                        "type": "integer", "minimum": 1, "maximum": GraphicLibrary.maxSide,
                         "description": "Height to draw at, in pixels. Default: meta.height, "
                             + "else the canvas.",
                     ],
                     "max_width": [
-                        "type": "integer", "minimum": 64, "maximum": 8192,
+                        "type": "integer", "minimum": 64, "maximum": GraphicLibrary.maxSide,
                         "description": "The widest the png sheet may be, in pixels. Default "
                             + "2048; 8192 keeps a 1920-wide graphic's two cells at full size. Not "
                             + "with format svg.",

@@ -1257,9 +1257,9 @@ private func takeDiagnostics(_ raw: UnsafeMutablePointer<CChar>?) -> [GraphicDia
 /// FREEZES it; an add after that throws. A module compiled against it keeps
 /// its fonts alive, so the two are freed in either order.
 final class GraphicLibrary {
-    /// The engine's `MAX_SIDE` (`graphic/src/raster.rs`): a larger side is
-    /// refused here, before a buffer is allocated for it.
-    static let maxSide = 8192
+    /// The header's `RC_GRAPHIC_MAX_SIDE`, pinned to the engine's `MAX_SIDE`:
+    /// a larger side is refused here, before a buffer is allocated for it.
+    static let maxSide = Int(RC_GRAPHIC_MAX_SIDE)
     fileprivate let handle: OpaquePointer
 
     init() { handle = rc_graphic_library_new() }

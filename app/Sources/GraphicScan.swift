@@ -23,10 +23,16 @@ struct GraphicScan: Equatable {
     /// The SHA-256 over the fonts then the assets, each name then bytes, in
     /// name order. The empty set hashes nothing.
     let libraryVersion: String
-    /// A file the scan skipped, in its own sentence.
+    /// A file the scan skipped, or a source it could not watch, in its own
+    /// sentence.
     let warnings: [String]
 
-    static let empty = GraphicScan(
-        modules: [:], fonts: [], assets: [],
-        libraryVersion: GraphicStore.hex(SHA256().finalize()), warnings: [])
+    static let empty = GraphicScan.empty(warnings: [])
+
+    /// Nothing found, with `warnings`: a package whose source did not arm.
+    static func empty(warnings: [String]) -> GraphicScan {
+        GraphicScan(
+            modules: [:], fonts: [], assets: [],
+            libraryVersion: GraphicStore.hex(SHA256().finalize()), warnings: warnings)
+    }
 }

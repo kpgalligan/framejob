@@ -283,9 +283,10 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   unmeasured, and so is resident memory while an animated 4K graphic plays.
 - **quickjs-ng 0.16.2 has no `Intl` and no `structuredClone`.**
   `formatNumber` exists for that reason (issue #39).
-- **Largest string `render` can return:** well under 50 MB. A 50 MB string
-  is built but cannot be read out of a 64 MB heap; the engine's own sentence
-  says so.
+- **Largest string `render` can return:** 8 MiB (`graphic::SVG_BYTES`,
+  spec §11 G-20 (c)); a longer one is the frame's error, naming its length.
+  A 50 MB string is built but cannot be read out of a 64 MB heap at all; the
+  engine's own sentence says so.
 - **Deliberately not built** (orig §7):
   - keyframed props (G-10);
   - `paste_attributes` for graphics;
@@ -300,11 +301,14 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
     `interpolateColors`;
   - generic CSS families such as `sans-serif`, which are warned like any
     missing name.
-- **The watcher:** each font and asset file has its own source, as a module
-  does, but a store arms at most 16 of them per pass, fonts first, in name
-  order; an in-place rewrite of a later one is seen at the next folder event
-  (spec §11 G-19 (c), which carries the descriptor arithmetic). Module
-  sources stay uncapped. The untitled graphics root is removed at close and
+- **The watcher:** each module, font and asset file has its own source, but
+  a store arms at most 16 of them per pass (`GraphicStore.fileSourceLimit`),
+  modules first, then fonts, then assets, each in name order; an in-place
+  rewrite of a later one is seen at the next pass (spec §11 G-19 (c), which
+  carries the descriptor arithmetic, and G-20 (a)). A source whose `open`
+  fails is a scan warning, "`<subject>` is not watched: open failed
+  (`<strerror>`)" (G-20 (b)), which nothing shows yet. The untitled graphics
+  root is removed at close and
   when the first save re-points the store; the untitled cache root at close
   only, never at the first save (G-19 (d)). `GraphicStore.drain()` is not
   re-entrant, so never call `rescan()` from a `.graphicsDidChange` observer
@@ -313,8 +317,11 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
 - **An agent cannot observe a module swap during an export over MCP:** the
   core's agent server is one thread, and `export` holds it.
 - **Constants restated across the G-2 boundary:** `MAX_SIDE` 8192 (the crate,
-  `model_graphic.rs`'s `GRAPHIC_MAX_SIDE`, and `GraphicLibrary.maxSide`) and
-  the 64-key limit. Change them together.
+  `model_graphic.rs`'s `GRAPHIC_MAX_SIDE`, and the header's
+  `RC_GRAPHIC_MAX_SIDE`, which `GraphicLibrary.maxSide` reads — the three
+  pinned equal by `core/tests/graphic_ffi.rs`'s
+  `one_max_side_in_the_engine_the_core_and_the_header`) and the 64-key
+  limit, which is still restated and must be changed together.
 - Fixed since: the export's compile gate walked one nest level, deeper nests
   caught only by the mid-export abort — it now walks every nest reached from
   the range, however deep (#73); the loudness reader was cancelled from main
@@ -331,6 +338,17 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   height, repeated parses and two asset-name builders (#106), each pinned by
   a row of `graphics_store_probe.py`, `graphics_menu_proof.py`,
   `graphics_inspector_proof.py` or `graphics_proof.py` made to fail once.
+  Issue batch B19 (2026-09-30) capped module sources with the library files'
+  (16 a store, modules first) and made a failed `open` a scan warning
+  (#172, G-20 (a), (b)); from #105 it named an explicit `font-family` equal
+  to usvg's default as missing rather than absent, built the asset list once
+  per rasterize, capped `render`'s SVG at 8 MiB and the png contact sheet at
+  134,217,728 px of frames, pinned `MAX_SIDE` in one test with the header's
+  `RC_GRAPHIC_MAX_SIDE`, made `graphic_reference` check a `project` it is
+  given, had the harness copy the manual, and dropped `graphicImportSource`'s
+  unused path (G-20 (c)–(e)). Pinned by `graphic/tests/families.rs` and
+  `render.rs`, `core/tests/graphic_ffi.rs`, `graphics_store_probe.py` W17
+  and `graphics_proof.py` C7, G10 and G11, each made to fail once.
 
 ## Open items
 
@@ -345,8 +363,12 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   - `validate` accepts a graphic clip with no description.
 
   Tracked in #72.
-- Small engine and tool refinements from the G1b–G5b reviews (the contact
-  sheet's peak memory, and others) — listed in #105.
+- Small engine and tool refinements from the G1b–G5b reviews — listed in
+  #105: named CSS colours and `hsl()`, generic families, `measureText`
+  honouring `xml:space`, asset-name validation at import, the `font`
+  shorthand scan, an LRU cap on `ENGINES`, per-scan font revalidation, an
+  export's graphic warnings, a warnings channel on `compile`, and surfacing
+  `GraphicScan.warnings`.
 - The not-built list (keyframed props, `paste_attributes`, revision history,
   HEVC with alpha, mattes, system fonts, path helpers, `delete_graphic` /
   `rename_graphic`) — tracked in #103.

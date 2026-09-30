@@ -6,6 +6,7 @@
 use rquickjs::Value;
 
 use crate::diagnostic::Diagnostic;
+use crate::runtime::SVG_BYTES;
 
 /// The pending exception of `e` as a Diagnostic; line and column from
 /// `stack`, preferring a frame in the module `name`.
@@ -82,10 +83,14 @@ pub(crate) fn budgeted(mut d: Diagnostic, expired: bool, budget_ms: u64) -> Diag
 }
 
 /// The SVG text `render` returned at `frame`, or the sentence naming what
-/// came back instead.
+/// came back instead; a string over `SVG_BYTES` is refused by its length.
 pub(crate) fn returned_svg(value: Value<'_>, frame: i64) -> Result<String, Diagnostic> {
     let message = if let Some(text) = value.as_string() {
         match text.to_string() {
+            Ok(text) if text.len() > SVG_BYTES => format!(
+                "render returned {} bytes at frame {frame}; the SVG may be at most {SVG_BYTES} bytes",
+                text.len()
+            ),
             Ok(text) if text.starts_with("<svg") => return Ok(text),
             Ok(text) => {
                 let head: String = text.chars().take(40).collect();

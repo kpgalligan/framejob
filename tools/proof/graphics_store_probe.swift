@@ -405,6 +405,37 @@ let w16Before = GraphicStore.holdsContent(w16)
 write("// x\n", w16.appendingPathComponent("x.js"))
 answer["w16"] = ["partial_only": w16Before, "with_module": GraphicStore.holdsContent(w16)]
 
+// MARK: - W17 — a source whose open fails is a scan warning (issue #172)
+
+let fs = GraphicStore(package: nil, seed: nil, bundledFonts: fontsDir)
+fs.start()
+mark = posts.count
+write("export function render() { return '<svg/>' } // W17\n",
+      fs.folderURL.appendingPathComponent("a.js"))
+row = ["setup": settle(mark, fs)]
+row["modules_before"] = fs.scan.modules.keys.sorted()
+// The soft limit set to the lowest free descriptor, so every open fails
+// with EMFILE until it is restored.
+var saved = rlimit()
+let gotLimit = getrlimit(RLIMIT_NOFILE, &saved) == 0
+let lowest = open("/dev/null", O_RDONLY)
+if lowest >= 0 { close(lowest) }
+var lowered = saved
+lowered.rlim_cur = rlim_t(max(lowest, 0))
+let setLimit = gotLimit && lowest >= 0 && setrlimit(RLIMIT_NOFILE, &lowered) == 0
+fs.rescan()
+let restored = setLimit ? setrlimit(RLIMIT_NOFILE, &saved) == 0 : false
+row["lowest"] = Int(lowest)
+row["limited"] = setLimit
+row["restored"] = restored
+row["warnings"] = fs.scan.warnings
+fs.rescan()
+row["control_warnings"] = fs.scan.warnings
+row["control_modules"] = fs.scan.modules.keys.sorted()
+answer["w17"] = row
+let failedOpenRoot = fs.folderURL
+fs.stop()
+
 // MARK: - W12 — stop() drops a pending pass and every source
 
 mark = posts.count
@@ -575,7 +606,8 @@ answer["c6"] = r6
 for leftover in [c5aRoot, c5bRoot, c6aRoot, c6bRoot].compactMap({ $0 }) {
     try? files.removeItem(at: leftover)
 }
-let roots = [s.folderURL, es.folderURL, libraryFolder] + [c2Root, c3Root].compactMap { $0 }
+let roots = [s.folderURL, es.folderURL, libraryFolder, failedOpenRoot]
+    + [c2Root, c3Root].compactMap { $0 }
 for root in roots { try? files.removeItem(at: root) }
 answer["roots_removed"] = roots.allSatisfy { !present($0) }
 

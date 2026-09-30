@@ -17,7 +17,7 @@ extension GraphicStore {
     static let bundledManualNames = ["GraphicsAPI.md", "GraphicsAPI.d.ts"]
 
     /// The directory holding `Fonts/`, which holds the manual too. The
-    /// harness and the probes copy no manual there, so for them
+    /// harness copies the manual there; the probes copy none, so for them
     /// `writeManual()` is a no-op.
     static func manualDirectory(besideFonts fonts: URL) -> URL {
         fonts.deletingLastPathComponent()

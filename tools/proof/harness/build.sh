@@ -11,7 +11,11 @@
 # than every source, this script's main.swift, this script itself (a change
 # to the build line makes the binary stale) and the staticlib — `make test`
 # / `cargo build --release` produce the staticlib; this script never runs
-# cargo or xcodebuild itself.
+# cargo or xcodebuild itself. On EVERY run, before that staleness exit,
+# docs/graphics-api.md and docs/graphics-api.d.ts are copied beside Fonts as
+# GraphicsAPI.md and GraphicsAPI.d.ts — the app bundle's names — so the
+# harness's stores write the manual (`GraphicStore+Manual.swift`) and an edit
+# to the docs alone reaches it.
 #
 #   tools/proof/harness/build.sh            # build if stale, print the path
 #   tools/proof/harness/build.sh --force    # rebuild regardless
@@ -32,6 +36,10 @@ sources=()
 for file in "$root"/app/Sources/*.swift; do
     case "$file" in */main.swift) ;; *) sources+=("$file") ;; esac
 done
+
+mkdir -p "$out"
+cp "$root/docs/graphics-api.md" "$out/GraphicsAPI.md"
+cp "$root/docs/graphics-api.d.ts" "$out/GraphicsAPI.d.ts"
 
 force=0
 [ "${1:-}" = "--force" ] && force=1
