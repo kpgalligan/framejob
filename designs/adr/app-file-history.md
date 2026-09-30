@@ -170,6 +170,21 @@ lenient-decoding rule.
   `Playback+Meter.swift` (598 → 546 lines; 551 with the seam; 595 with the fix, no fallback).
   `setPreviewQuality`, `init` and `makePreviewLayer` stay: they read the private `player`, and
   `phase8_chrome.py` counts `AVPlayer()` and `AVPlayerLayer(player:` in this file.
+- **A held scope change whose rebuild will not land drops the item (#185, issue batch B30).**
+  A held rebuild that FAILED cleared the hold and left the OUTGOING item on the player under the
+  new container's time, measured in the old one; and the empty-plan arm dropped the item but left
+  `restoring` set with the held time never heard. Both now drop the item and call
+  `endHoldWithoutItem()` (`Playback+Scope.swift`), which clears the hold and the seek flags and
+  reports the kept time once through `startSeek`'s no-item branch. The failure arm also clears
+  `built` and `builtPlanJSON`, so the next update rebuilds. Outside a hold both arms are as they
+  were: a failed rebuild keeps the previous item playing. The seam's block now takes an error,
+  which `finishRebuild` receives as the build's failure, so `scope_playhead_probe.py`'s S13 forces
+  a failed build, S14 the edit after it and S15 a container emptied under the hold; the rows that
+  expect a report now require one (`all_at`'s `at_least`). **The file paid first** by a pure move
+  gated alone: `seekAfterRebuild(to:)` to `Playback+Scope.swift`, with `isSeeking`,
+  `pendingSeek`, `restoring`, `rebuilding`, `holding`, `seekSerial`, `lastKnownTime` and
+  `startSeek(to:)` widened from `private` for that file alone (595 → 581 lines; 590 with the seam
+  and the fix).
 
 ### Export and still frames
 
@@ -350,7 +365,7 @@ Files that were split since the notes wrote them:
 | Notes named | Now also |
 |---|---|
 | `MediaCacheFiles` | `MediaPeakBuckets.swift`, `MediaImporter+Peaks.swift` (#23) |
-| `Playback` | `Playback+Meter.swift`, `Playback+PreviewQuality.swift`, `Playback+Step.swift` (B21) |
+| `Playback` | `Playback+Meter.swift`, `Playback+PreviewQuality.swift`, `Playback+Step.swift` (B21), `Playback+Scope.swift` (B30) |
 | `ReelCore` | `RecipeSource.swift`, `TextPatch.swift`, `MediaDescriptor.swift` |
 | `InspectorPane` | `InspectorSection.swift`, `InspectorSectionHeader.swift`, `InspectorSlider.swift`, `InspectorBinding+Writes.swift`, `InspectorNameField.swift` (#171) |
 | `ClipPane` | `ClipSelectionHeader.swift`, `ClipPane+Timing.swift` |

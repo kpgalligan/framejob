@@ -12,7 +12,11 @@
 // `Playback.rebuildHop` (nil in the app) stores the block a rebuild would hand
 // `DispatchQueue.main.async`, so a scope change can be held with its rebuild
 // in flight for as long as a row needs, and "one turn" is two calls with no
-// run-loop spin between them. The answer is one line, `ANSWER <json>`.
+// run-loop spin between them. The held block is run with `nil` (the build's own
+// result) or with `ProbeFault` (a failed build, issue batch B30, #185), and
+// `playback.onError` is replaced by a recorder that never forwards: the editor's
+// `NSApp.presentError` is app-modal and would stall the probe. The answer is one
+// line, `ANSWER <json>`.
 import AppKit
 import AVFoundation
 
@@ -59,6 +63,11 @@ editor.playback.onTimeChanged = { t in
     reports.append(t)
     forward?(t)
 }
+/// Every rebuild failure `onError` carried since the last clear. Not forwarded.
+var rebuildErrors: [String] = []
+editor.playback.onError = { error in
+    rebuildErrors.append(String(describing: error))
+}
 let timeline = editor.timeline!
 
 // The fixture: shape A at 0–1 s, shape B at 2–4 s, B nested into N at 2–4 s.
@@ -78,9 +87,12 @@ func nestClip() -> ClipSnapshot {
 
 // MARK: - The hold
 
+/// The error a failed build is forced with.
+struct ProbeFault: Error {}
+
 final class Hold {
     let lock = NSLock()
-    var block: (() -> Void)?
+    var block: (((any Error)?) -> Void)?
 }
 let hold = Hold()
 
@@ -98,8 +110,8 @@ func arm() {
 
 /// Waits (≤ 10 s) for the held block, then for five equal player reads 20 ms
 /// apart (≤ 3 s). Answers the block, or nil when none arrived.
-func waitHeld() -> (block: (() -> Void)?, settled: Bool) {
-    var block: (() -> Void)?
+func waitHeld() -> (block: (((any Error)?) -> Void)?, settled: Bool) {
+    var block: (((any Error)?) -> Void)?
     let deadline = Date().addingTimeInterval(10)
     while block == nil && Date() < deadline {
         RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.02))
@@ -122,8 +134,14 @@ func waitHeld() -> (block: (() -> Void)?, settled: Bool) {
     return (block, same >= 5)
 }
 
-func release(_ block: (() -> Void)?) {
-    block?()
+func release(_ block: (((any Error)?) -> Void)?) {
+    block?(nil)
+    editor.playback.rebuildHop = nil
+}
+
+/// Runs the held block as a FAILED build.
+func failHeld(_ block: (((any Error)?) -> Void)?) {
+    block?(ProbeFault())
     editor.playback.rebuildHop = nil
 }
 
@@ -282,6 +300,56 @@ s12["from"] = second / 2
 answer["S12"] = s12
 editor.playback.pause()
 spin(0.5)
+
+/// `state()` and where a held scope change left the player.
+func heldState() -> [String: Any] {
+    var s = state()
+    s["hasItem"] = player.currentItem != nil
+    s["builtPlanCleared"] = editor.playback.builtPlanJSON == nil
+    s["restoring"] = editor.playback.restoring
+    s["currentTime"] = editor.playback.currentTime
+    s["errors"] = rebuildErrors.count
+    return s
+}
+
+// S13 — timeline 3 s; held; enter N; the held build FAILS.
+atTimeline(3 * second)
+rebuildErrors = []
+arm()
+editor.enterNest(nestClip())
+held = waitHeld()
+let s13Held = held.block != nil
+failHeld(held.block)
+spin(settle)
+var s13 = heldState()
+s13["held"] = s13Held
+answer["S13"] = s13
+
+// S14 — then, inside N, an opacity edit on N's clips.
+reports = []
+rebuildErrors = []
+let inN = document.editedProject.snapshot.clips.map(\.id)
+document.applyEdit("Probe", .setVideo(clips: inN, patch: VideoPatch(opacity: 0.8)))
+spin(settle)
+var s14 = heldState()
+s14["planMatches"] = editor.playback.builtPlanJSON == document.editedProject.planJSON
+answer["S14"] = s14
+
+// S15 — timeline 3 s; held; enter N; with the block held, N's clips deleted
+// (its plan empties); the held block run (a stale generation, discarded).
+atTimeline(3 * second)
+rebuildErrors = []
+arm()
+editor.enterNest(nestClip())
+held = waitHeld()
+let s15Held = held.block != nil
+let emptied = document.editedProject.snapshot.clips.map(\.id)
+document.applyEdit("Probe", .delete(clips: emptied))
+release(held.block)
+spin(settle)
+var s15 = heldState()
+s15["held"] = s15Held
+answer["S15"] = s15
 
 document.close()
 spin(0.5)

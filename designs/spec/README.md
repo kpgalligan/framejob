@@ -35,7 +35,7 @@ this index gets its row in the same change.
 | [`07.3-frame-recipe.md`](07.3-frame-recipe.md) | 267 | The per-frame recipe the compositor draws: layers, nests, recipe options, burn-in. |
 | [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 41 | The spec's Swift file map (app/CLAUDE.md is the live one). |
 | [`07.5-compositor.md`](07.5-compositor.md) | 106 | The Metal compositor's passes, and transitions. |
-| [`07.6-playback-update-rules.md`](07.6-playback-update-rules.md) | 40 | What playback does after every edit: rebuild or refresh. |
+| [`07.6-playback-update-rules.md`](07.6-playback-update-rules.md) | 42 | What playback does after every edit: rebuild or refresh. |
 | [`07.7-import.md`](07.7-import.md) | 20 | `MediaImporter.probe` and the formats import accepts. |
 | [`07.8-export.md`](07.8-export.md) | 235 | Export: writers, formats, loudness, the queue. |
 | [`07.9-agent.md`](07.9-agent.md) | 527 | The MCP agent: one tool per op plus `scope`, the app-state tools, the dev tools, parity, the graphics loop, the lane, the helper, the assistant session, its prompt and the Assistant tab. |

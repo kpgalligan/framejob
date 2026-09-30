@@ -1,6 +1,6 @@
 import Foundation
 
-/// The level meter's half of `Playback`: the reading and the 30 Hz timer the
+/// The level meter's half of `Playback`: `meterInterval`, the reading and the 30 Hz timer the
 /// rate KVO arms and disarms. A pure move out of `Playback.swift`, which sat
 /// at the 600-line cap; the stored state (`built`, `meterTimer`) stays there
 /// because an extension cannot add stored properties.

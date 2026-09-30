@@ -565,6 +565,15 @@ def turned_corners(sw, sh, crop, scale, rot, x, y, w, h):
             for u, v in ((-ax, -ay), (ax, -ay), (ax, ay), (-ax, ay))]
 
 
+def clockwise_text(top_x, left_y):
+    """§4 row (b)'s message, each clause saying what was measured (#185): a
+    failing row reads "is NOT left of 370" where the old text said it was."""
+    left = "is" if top_x is not None and top_x < 370 else "is NOT"
+    above = "is" if left_y is not None and left_y < 180 else "is NOT"
+    return (f"…and it turns CLOCKWISE: the topmost ink row's mean column {top_x} {left} "
+            f"left of 370 and the leftmost ink column's mean row {left_y} {above} above 180")
+
+
 # ---- a motion patch ------------------------------------------------------
 #
 # `MotionProps.dictionary` always writes three keys and a `motion` patch
@@ -943,8 +952,7 @@ def during_part(mcp):
     top_x = sum(top_cols) / len(top_cols) if top_cols else None
     left_y = sum(left_rows) / len(left_rows) if left_rows else None
     check(top_x is not None and left_y is not None and top_x < 370 and left_y < 180,
-          f"…and it turns CLOCKWISE: the topmost ink row's mean column {top_x} is left of "
-          f"370 and the leftmost ink column's mean row {left_y} is above 180")
+          clockwise_text(top_x, left_y))
     wanted = min(corners, key=lambda p: p[1])[0]
     check(top_x is not None and abs(top_x - wanted) <= 3,
           f"…with that topmost column where the turned corners put it: {top_x} (wanted "

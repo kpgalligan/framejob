@@ -25,10 +25,22 @@ row needs them together. `playhead_echo_probe.py`'s instrument otherwise:
 `scope_playhead_probe.swift` compiled as `main.swift` against the whole of
 `app/Sources` with `harness/build.sh`'s swiftc line, `--sources PATH` to build
 the same probe over another tree (the pre-fix reference is
-`work/b21/prefix-sources/`, the tree with the seam and without the fix), a
-build failure or a missing answer scored as a FAILURE on every row. Every
-subprocess runs under `graphics_spike/bounded.py` (Rule H). The editor's own
-`playback.onTimeChanged` is wrapped to log every tick it carries.
+`work/b30/prefix-sources/`, the tree with issue batch B30's seam and rows and
+without its fix; the probe no longer builds over `work/b21/prefix-sources/`,
+whose `rebuildHop` block takes no error), a build failure or a missing answer
+scored as a FAILURE on every row. Every subprocess runs under
+`graphics_spike/bounded.py` (Rule H). The editor's own `playback.onTimeChanged`
+is wrapped to log every tick it carries, and `playback.onError` is replaced by
+a recorder that never forwards (the editor's alert is app-modal).
+
+Issue batch B30 (#185). A held scope change whose rebuild FAILS, or whose new
+container's plan is EMPTY, used to leave the outgoing item on the player under
+the new container's time, with `restoring` left set and the time unheard; the
+fix drops the item, keeps the time and hears it once
+(`Playback.endHoldWithoutItem`). The seam's block now takes an error: the probe
+runs it with `nil` (the build's own result) or with `ProbeFault` (a failed
+build). S13–S15 force both cases, and a row that expects a report now requires
+one (`all_at`'s `at_least`): an empty log used to pass.
 
 Fixture, rewritten every run under `work/scope-playhead/`: `scope.reelcut`,
 640 × 360 at 30 fps, black, one track, no clips — the probe itself adds shape A
@@ -39,7 +51,16 @@ Rows (B = predicted to fail before the fix; every other row is a CONTROL).
 "Held" = the rebuild's finishing block is stored, the probe waits for it and
 for the player to come to rest, then runs it. "Rests at t" = the document's
 playhead, the player's tick and the timeline's playhead all t. The log is
-every tick `onTimeChanged` carried since the row began.
+every tick `onTimeChanged` carried since the row began. "Kept at t" = the
+document's playhead, the timeline's playhead and `Playback.currentTime` all t,
+with no item on the player (so no player tick). S13 [B]: timeline 3 s, held,
+enter N, the held build FAILS → no item, the built plan cleared, `restoring`
+false, one error, kept at 1 s, heard at least once, every tick 1 s. S14 [B]:
+then an opacity edit on N's clips → an item again, the built plan N's, rests at
+1 s, every tick 1 s. S15 [B]: timeline 3 s, held, enter N, N's clips deleted
+with the block held (N's plan empties), the held block run (a stale
+generation) → no item, `restoring` false, kept at 1 s, heard at least once,
+every tick 1 s.
 
 Needs `swiftc`, `xcrun metal` and `core/target/release/libreelcut_core.a`. No
 port. Run from anywhere:
@@ -209,12 +230,19 @@ def run_probe(binary, package):
 # (predicted to fail before the fix) or "" (CONTROL).
 
 
-def all_at(log, t):
-    return all(x == t for x in log)
+def all_at(log, t, at_least=0):
+    """At least `at_least` reports, every one of them `t`."""
+    return len(log) >= at_least and all(x == t for x in log)
 
 
 def rests(s, t):
     return s["playhead"] == t and s["playerTicks"] == t and s["timeline"] == t
+
+
+def kept_at(s, t):
+    """No item on the player, so no player tick: the document, the timeline
+    and `Playback.currentTime`."""
+    return s["playhead"] == t and s["timeline"] == t and s["currentTime"] == t
 
 
 def rows():
@@ -226,17 +254,17 @@ def rows():
            "3 s; every tick 3 s",
            lambda a: a["S1"]["held"] and a["S1"]["duringHold"] == 3 * sec
            and a["S1"]["scope"] == 0 and rests(a["S1"], 3 * sec)
-           and all_at(a["S1"]["log"], 3 * sec), lambda a: a["S1"])
+           and all_at(a["S1"]["log"], 3 * sec, at_least=1), lambda a: a["S1"])
     # S2 and S5 were written as B rows and PASS on the pre-fix tree, on every
     # run (issue batch B21): the scope's rebuild lands before the seek in
     # flight, and the restore takes the last asked time. They are controls.
     yield ("S2", "", "inside at 0, one turn: setPlayhead(1 s), leave: rests at 3 s; every "
            "tick 3 s",
            lambda a: a["S2"]["scope"] == 0 and rests(a["S2"], 3 * sec)
-           and all_at(a["S2"]["log"], 3 * sec), lambda a: a["S2"])
+           and all_at(a["S2"]["log"], 3 * sec, at_least=1), lambda a: a["S2"])
     yield ("S3", "", "timeline 3 s, the rebuild held, enter N: rests at 1 s; every tick 1 s",
            lambda a: a["S3"]["held"] and a["S3"]["scope"] == 1 and rests(a["S3"], sec)
-           and all_at(a["S3"]["log"], sec), lambda a: a["S3"])
+           and all_at(a["S3"]["log"], sec, at_least=1), lambda a: a["S3"])
     yield ("S4", "B", "timeline 3 s, one turn: enter N, leave: the built plan is the "
            "timeline's; rests at 3 s",
            lambda a: a["S4"]["planMatches"] is True and a["S4"]["scope"] == 0
@@ -244,15 +272,15 @@ def rows():
     yield ("S5", "", "timeline 0.5 s, one turn: opacity on A, setPlayhead(3 s), enter N: "
            "rests at 1 s; every tick 1 s",
            lambda a: a["S5"]["scope"] == 1 and rests(a["S5"], sec)
-           and all_at(a["S5"]["log"], sec), lambda a: a["S5"])
+           and all_at(a["S5"]["log"], sec, at_least=1), lambda a: a["S5"])
     yield ("S6", "B", "timeline 1 s, one turn: opacity on A, setPlayhead(2 s): rests at 2 s; "
            "the log non-empty, every tick 2 s",
-           lambda a: rests(a["S6"], 2 * sec) and len(a["S6"]["log"]) > 0
-           and all_at(a["S6"]["log"], 2 * sec), lambda a: a["S6"])
+           lambda a: rests(a["S6"], 2 * sec)
+           and all_at(a["S6"]["log"], 2 * sec, at_least=1), lambda a: a["S6"])
     yield ("S7", "B", "timeline 1 s, a move of A held, one turn: the held block, "
            "setPlayhead(2 s): rests at 2 s; every tick 2 s",
            lambda a: a["S7"]["held"] and rests(a["S7"], 2 * sec)
-           and all_at(a["S7"]["log"], 2 * sec), lambda a: a["S7"])
+           and all_at(a["S7"]["log"], 2 * sec, at_least=1), lambda a: a["S7"])
     yield ("S8", "", "from 1 s, setPlayhead(0.5 s): 0.5 s in the log; rests at 0.5 s",
            lambda a: sec // 2 in a["S8"]["log"] and rests(a["S8"], sec // 2),
            lambda a: a["S8"])
@@ -261,6 +289,8 @@ def rows():
            lambda a: sec // 2 + a["frame"] in a["S9"]["log"]
            and a["S9"]["playhead"] == sec // 2 + a["frame"]
            and a["S9"]["timeline"] == sec // 2 + a["frame"], lambda a: a["S9"])
+    # S10 and S11 keep `at_least` 0: a restore that rests on the tick last
+    # reported is silent by design, so an empty log is the right answer there.
     yield ("S10", "", "at 1 s, an opacity edit on A: every tick 1 s; rests at 1 s",
            lambda a: all_at(a["S10"]["log"], sec) and rests(a["S10"], sec),
            lambda a: a["S10"])
@@ -275,6 +305,23 @@ def rows():
            and a["S12"]["playhead"] == a["S12"]["log"][-1],
            lambda a: {"count": len(a["S12"]["log"]), "first": a["S12"]["log"][:3],
                       "last": a["S12"]["log"][-3:], "playhead": a["S12"]["playhead"]})
+    yield ("S13", "B", "timeline 3 s, the rebuild held, enter N, the build FAILS: no item, the "
+           "built plan cleared, not restoring, one error; kept at 1 s; heard, every tick 1 s",
+           lambda a: a["S13"]["held"] and a["S13"]["hasItem"] is False
+           and a["S13"]["builtPlanCleared"] is True and a["S13"]["restoring"] is False
+           and a["S13"]["errors"] == 1 and a["S13"]["scope"] == 1 and kept_at(a["S13"], sec)
+           and all_at(a["S13"]["log"], sec, at_least=1), lambda a: a["S13"])
+    yield ("S14", "B", "then, inside N, an opacity edit on N's clips: an item, the built plan "
+           "N's; rests at 1 s; every tick 1 s",
+           lambda a: a["S14"]["hasItem"] is True and a["S14"]["planMatches"] is True
+           and a["S14"]["scope"] == 1 and rests(a["S14"], sec)
+           and all_at(a["S14"]["log"], sec), lambda a: a["S14"])
+    yield ("S15", "B", "timeline 3 s, the rebuild held, enter N, N's clips deleted, the held "
+           "block run: no item, not restoring; kept at 1 s; heard, every tick 1 s",
+           lambda a: a["S15"]["held"] and a["S15"]["hasItem"] is False
+           and a["S15"]["restoring"] is False and a["S15"]["scope"] == 1
+           and kept_at(a["S15"], sec) and all_at(a["S15"]["log"], sec, at_least=1),
+           lambda a: a["S15"])
 
 
 def main():

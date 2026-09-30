@@ -678,8 +678,8 @@ the key map behind it.
   (`dropHiddenSelection`, #68).
 
 **Playback and rendering.**
-- `Playback.swift` (+`Meter`, +`PreviewQuality`, +`Step`) — one `AVPlayer` over the plan's composition; the
-  transport, JKL, the rate KVO; `+Meter` is the level meter, moved out under
+- `Playback.swift` (+`Meter`, +`PreviewQuality`, +`Step`, +`Scope`) — one
+  `AVPlayer` over the plan's composition; the transport, JKL, the rate KVO; `+Meter` is the level meter, moved out under
   the size rule. **Only a seek someone ASKED for reports a time**:
   `seek(to:)` is that door, and Playback's own RESTORES — the rebuild's item
   swap and re-seek, the paused refresh's round trip — go through `startSeek`
@@ -689,7 +689,11 @@ the key map behind it.
   rebuild in flight lands there, heard once (#130, `scope_playhead_probe.py`);
   an asked seek that arrives while a restore is seeking is heard once, when it
   lands; `update`'s same-plan and empty-plan arms discard a rebuild in flight;
-  `rebuildHop` is the probe's seam, nil in the app; `report(_:)` is the one
+  a held scope change whose rebuild fails, or whose new plan is empty, drops
+  the item rather than leave the outgoing one, keeps its time and is heard
+  once (`endHoldWithoutItem` in `+Scope`, #185; the seek flags are internal
+  for `+Scope` alone); `rebuildHop` is the probe's seam, nil in the app, and
+  its block takes an error it delivers as the build's failure; `report(_:)` is the one
   caller of `onTimeChanged`. An echoed restore
   moved the playhead (0 and back on every rebuild), and the timeline reveals
   every moved playhead, so a clip drag yanked the view

@@ -21,7 +21,8 @@ import AppKit
 /// `LevelMeter.shared`. See `LevelMeter.swift` for why the meter is computed
 /// from the DSP tap rather than observed from a second one.
 /// The meter's read and its two switches live in `Playback+Meter.swift`.
-/// `previewComposition` lives in `Playback+PreviewQuality.swift`, `stepFrames` in `+Step`.
+/// `previewComposition` lives in `Playback+PreviewQuality.swift`, `stepFrames` in `+Step`,
+/// `seekAfterRebuild` in `+Scope`.
 ///
 /// Road map 2's phase 8 hung two more things off the player, and both are here
 /// because both are about the PLAYER rather than about the document: View ▸
@@ -61,11 +62,13 @@ final class Playback {
     /// item ends or stalls, which is why this is KVO and not a wrapper.
     var onRateChanged: ((Float) -> Void)?
     /// A rebuild that failed. Rare (a corrupt file mid-edit) and never fatal:
-    /// the previous item keeps playing.
+    /// the previous item keeps playing, except under a held scope change,
+    /// whose item is dropped (#185).
     var onError: ((any Error) -> Void)?
     /// The probe's seam (`scope_playhead_probe.py`), nil in the app: handed the block a rebuild
-    /// would give `DispatchQueue.main.async`, its holder runs it on main, once.
-    var rebuildHop: ((@escaping () -> Void) -> Void)?
+    /// would give `DispatchQueue.main.async`, its holder runs it on main, once — with `nil` for
+    /// the build's own result, or an error `finishRebuild` receives as the build's failure.
+    var rebuildHop: ((@escaping ((any Error)?) -> Void) -> Void)?
 
     /// The in/out range when one is set: playback wraps at its end (§4.4).
     var loopRange: (start: Ticks, duration: Ticks)?
@@ -106,22 +109,23 @@ final class Playback {
     /// `EditorViewController+PreviewQuality.swift` holds the enum, the aspect
     /// rule and the menu.
     private(set) var previewQuality = PreviewQuality.stored()
-    private var isSeeking = false
-    private var pendingSeek: Ticks?
+    /// The seek state is internal only so `Playback+Scope.swift` can write it; nothing else does.
+    var isSeeking = false
+    var pendingSeek: Ticks?
     /// A paused refresh asked for mid-seek: run when the seek lands, not dropped.
     private var refreshWanted = false
     /// True from a restore's first line until its last seek lands.
-    private var restoring = false
+    var restoring = false
     /// True from `startRebuild`'s dispatch until that generation lands or is discarded.
-    private var rebuilding = false
+    var rebuilding = false
     /// True from `seekAfterRebuild` until the rebuild it waits for lands, fails or is discarded.
-    private var holding = false
+    var holding = false
     /// The last tick `onTimeChanged` carried.
     private var reported: Ticks?
     /// Bumped by every `player.seek`; a completion for an older serial is
     /// ignored, so one the item swap cancelled cannot end a newer seek.
-    private var seekSerial = 0
-    private var lastKnownTime: Ticks = 0
+    var seekSerial = 0
+    var lastKnownTime: Ticks = 0
     private var timeObserver: Any?
     private var rateObservation: NSKeyValueObservation?
 
@@ -362,6 +366,7 @@ final class Playback {
         // graphics, text, shapes or images has no plan track, and the builder's
         // placeholder gives its item one to tick against (road map 10 §10.8).
         guard request.plan.duration > 0 else {
+            let held = holding
             generation += 1
             rebuilding = false
             holding = false
@@ -370,6 +375,7 @@ final class Playback {
             builtPlanJSON = request.planJSON
             builtAudioDSP = request.audioDSP
             player.replaceCurrentItem(with: nil)
+            if held { endHoldWithoutItem() }
             return
         }
 
@@ -391,10 +397,12 @@ final class Playback {
                 try CompositionBuilder.build(
                     plan: plan, planJSON: planJSON, urls: urls, recipeKey: key, metering: true)
             }
-            let finish: () -> Void = { [weak self] in
-                self?.finishRebuild(result, generation: generation, audioDSP: audioDSP)
+            let finish: ((any Error)?) -> Void = { [weak self] fault in
+                let outcome =
+                    fault.map { Result<BuiltComposition, any Error>.failure($0) } ?? result
+                self?.finishRebuild(outcome, generation: generation, audioDSP: audioDSP)
             }
-            if let hop = hop { hop(finish) } else { DispatchQueue.main.async(execute: finish) }
+            if let hop = hop { hop(finish) } else { DispatchQueue.main.async { finish(nil) } }
         }
     }
 
@@ -408,10 +416,13 @@ final class Playback {
         rebuilding = false
         switch result {
         case .failure(let error):
+            // A held scope change drops the outgoing item rather than keep it (#185).
             if holding {
-                holding = false
-                isSeeking = false
-                restoring = false
+                player.replaceCurrentItem(with: nil)
+                built = nil
+                builtPlanJSON = nil
+                builtAudioDSP = .empty
+                endHoldWithoutItem()
             }
             onError?(error)
         case .success(let composition):
@@ -500,26 +511,10 @@ final class Playback {
         startSeek(to: t)
     }
 
-    /// A scope change's seek (#130): `t` is in the container `update` was just handed, so the
-    /// OUTGOING item is neither sought nor heard, and a rebuild in flight lands there, heard once.
-    func seekAfterRebuild(to t: Ticks) {
-        seekSerial += 1
-        pendingSeek = nil
-        restoring = true
-        lastKnownTime = max(0, t)
-        guard rebuilding else {
-            isSeeking = false
-            startSeek(to: t)
-            return
-        }
-        holding = true
-        isSeeking = true
-    }
-
     /// One in-flight seek at a time, intermediates dropped (§7.6): a scrub
     /// generates far more positions than the decoder can serve, and queueing
     /// them all makes the preview lag seconds behind the pointer.
-    private func startSeek(to t: Ticks) {
+    func startSeek(to t: Ticks) {
         let clamped = max(0, t)
         lastKnownTime = clamped
         guard player.currentItem != nil else {

@@ -1,0 +1,35 @@
+import Foundation
+
+/// A scope change's half of `Playback` (#130): the seek that lands the player in the NEW
+/// container, and the end of a hold whose rebuild will not land (#185). The first is a pure
+/// move out of `Playback.swift` (issue batch B30), which sat at the 600-line cap; the seek
+/// state both write stays there, internal for this file alone, because an extension cannot
+/// add stored properties.
+extension Playback {
+    /// A scope change's seek (#130): `t` is in the container `update` was just handed, so the
+    /// OUTGOING item is neither sought nor heard, and a rebuild in flight lands there, heard once.
+    func seekAfterRebuild(to t: Ticks) {
+        seekSerial += 1
+        pendingSeek = nil
+        restoring = true
+        lastKnownTime = max(0, t)
+        guard rebuilding else {
+            isSeeking = false
+            startSeek(to: t)
+            return
+        }
+        holding = true
+        isSeeking = true
+    }
+
+    /// Ends a held scope change whose rebuild will not land — it failed, or the new plan is
+    /// empty — once the caller has dropped the item (#185): the held time is kept, and with no
+    /// item to seek, `startSeek` reports it once.
+    func endHoldWithoutItem() {
+        holding = false
+        isSeeking = false
+        restoring = false
+        pendingSeek = nil
+        startSeek(to: lastKnownTime)
+    }
+}

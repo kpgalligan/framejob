@@ -9157,3 +9157,77 @@ python3 tools/proof/relink_sheet_probe.py --mutant sheet-silent       # S2 FAIL,
 python3 tools/proof/relink_sheet_probe.py --mutant unreadable-at-once # S4 FAIL, exit 1
 python3 tools/proof/cache_pass_probe.py --mutant no-cancel-sleeper    # W1 FAIL, exit 1
 ```
+
+## Issue batch B30 — a held scope change that fails or empties (`scope_playhead_probe.py` S13–S15 and `all_at`'s `at_least`, `e2_proof.py` §4 (b)'s message; #185 items 1, 2, 4, 5 and 6)
+
+- **The fix** (`Playback.swift`, `Playback+Scope.swift`;
+  `designs/adr/app-file-history.md` "### Playback" has the long form). A held
+  scope change whose rebuild FAILED left the outgoing item on the player under
+  the new container's time; one whose new plan was EMPTY dropped the item but
+  left `restoring` set with the time never heard. Both now drop the item and
+  call `Playback.endHoldWithoutItem()`, which clears `holding`, `isSeeking`,
+  `restoring` and `pendingSeek` and reports the kept time once through
+  `startSeek`'s no-item branch. The failure arm also clears `built` and
+  `builtPlanJSON`, so the next update rebuilds. Outside a hold both arms are
+  unchanged. #185 item 3 (`set_scope` answering before the player lands) is
+  left as it is.
+- **The move, gated alone first**: `seekAfterRebuild(to:)` to
+  `Playback+Scope.swift`, with the eight members it writes widened from
+  `private` (`make typecheck`: 0 errors, 4 warnings, tsc clean). `wc -l
+  app/Sources/Playback.swift`: 595 → 581 after the move, 590 at the end;
+  `Playback+Scope.swift` 35.
+- **The seam** — `Playback.rebuildHop`'s block now takes an error: `nil` is the
+  build's own result, an error is delivered to `finishRebuild` as the build's
+  failure. `scope_playhead_probe.swift` holds it as `Hold.block`; `release(_:)`
+  runs it with `nil`, `failHeld(_:)` with `ProbeFault()`. `playback.onError` is
+  replaced by a recorder (`rebuildErrors`) that never forwards: the editor's
+  `NSApp.presentError` is app-modal and would stall the probe. The probe no
+  longer builds over `work/b21/prefix-sources/`; the pre-fix reference is now
+  `work/b30/prefix-sources/` (the tree with the seam and the rows, without the
+  fix).
+- **`all_at(log, t, at_least=0)`** (#185 item 4): an empty log used to pass
+  every "every tick t" row. S1, S2, S3, S5, S6 and S7 now require at least one
+  report (S6's `len(...) > 0` folded in); S10 and S11 keep 0, because a restore
+  resting on the tick last reported is silent by design. `kept_at(s, t)`: the
+  document's playhead, the timeline's and `Playback.currentTime` all `t`, for a
+  row with no item on the player.
+- **Rows** (after S12, in this order): **S13 [B]** timeline 3 s, held, enter
+  N, the held build FAILS → no item, `builtPlanJSON` nil, `restoring` false,
+  one error recorded, scope 1, kept at 1 s, log non-empty and every tick 1 s.
+  **S14 [B]** then, inside N, an opacity edit on N's clips → an item again, the
+  built plan N's, scope 1, rests at 1 s, every tick 1 s. **S15 [B]** timeline 3
+  s, held, enter N, N's clips deleted with the block still held (N's plan
+  empties), the held block run (a stale generation, discarded) → no item,
+  `restoring` false, scope 1, kept at 1 s, log non-empty and every tick 1 s.
+- **`e2_proof.py`** (#185 item 5): `clockwise_text(top_x, left_y)` is §4 row
+  (b)'s message, each clause "is" or "is NOT" as measured; the row's predicate
+  is unchanged.
+- **`Playback+Meter.swift`'s header** (#185 item 6) names `meterInterval`.
+
+Run on 2026-09-30:
+
+| Command | Answer |
+|---|---|
+| `scope_playhead_probe.py --sources tools/proof/work/b30/prefix-sources` | 13/16, exit 1: S13 FAIL (`hasItem` true, `builtPlanCleared` false, player 1800000 under a playhead of 600000, log []), S14 FAIL (log [1200000], rests at 1200000), S15 FAIL (`restoring` true, log []); S0–S12 pass |
+| `scope_playhead_probe.py` ×3 | 16/16, exit 0, each run; S13 and S15 log [600000], S14 log [] |
+| `scope_playhead_probe.py --sources tools/proof/work/b30/mutant-no-drop` (the failure arm's `player.replaceCurrentItem(with: nil)` deleted) | 15/16, exit 1: S13 FAIL alone (`hasItem` true) — caught |
+| `… --sources tools/proof/work/b30/mutant-no-restoring-clear` (`restoring = false` deleted from `endHoldWithoutItem`) | 14/16, exit 1: S13 and S15 FAIL (`restoring` true) — caught |
+| `… --sources tools/proof/work/b30/mutant-no-heard` (`startSeek(to: lastKnownTime)` deleted from `endHoldWithoutItem`) | 14/16, exit 1: S13 and S15 FAIL (log []) — caught |
+| the same mutant with `all_at` reverted to `all(x == t for x in log)` (in-process, no file written) | 16/16, exit 0 — the old predicate is blind to it |
+| `make typecheck` after the move alone, and at the end | 0 errors, 4 warnings, tsc clean, both times |
+| `make test`; `make app` | exit 0; BUILD SUCCEEDED |
+| `playhead_echo_probe.py`; `media_less_playback_probe.py` | 20/20; 32/32 |
+| `phase9_proof.py` ×3, a fresh instance of my own each (4861–4863) | 218/218, exit 0, each run; `grep "Reelcut: "` empty before and after |
+| `e2_proof.py 4864` (own instance) | 75/75, exit 0 |
+
+**#185's host note, its ffmpeg half**: re-run by the orchestrating agent
+session on 2026-09-30 at `f5ec6e9`, after ffmpeg 9.0.2 was reinstalled —
+`playhead_echo_probe.py` 20/20, `e2_proof.py` 75/75, `silence2_proof.py`
+100/100 (not re-run by this batch for that purpose; the first two ran above as
+regression checks). The note's `phase8_chrome.py` focus rows are not taken up
+here.
+
+```sh
+python3 tools/proof/scope_playhead_probe.py                                                # 16/16, exit 0
+python3 tools/proof/scope_playhead_probe.py --sources tools/proof/work/b30/prefix-sources  # S13–S15 FAIL, exit 1
+```
