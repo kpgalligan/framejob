@@ -1138,7 +1138,9 @@ free.
   for them** (`+Grants`, through `RecorderPanelController.grantDoors`, which
   a probe seals), both before the countdown; it orders OUT at
   `recordingDidStart` for every source and comes back only with a note. The
-  status item is the recording's whole chrome (Pause / Resume / Stop).
+  status item is the recording's chrome (Pause / Resume / Stop). File ▸
+  Pause/Resume Recording (`AppDelegate+Recording.swift`) is a second door to
+  the same two calls.
 
 **Recording.**
 - `RecordingSetup.swift` · `RecordingResult.swift` — the half a probe can
@@ -1155,7 +1157,9 @@ free.
   is stamped where it lands and hopped to main; each finds ITS segment by
   the output's identity. `onFinish` on the session is the one hook; `stop()`
   past idle JOINS the finishing under way; a microphone problem is
-  `micProblem` on a success, never the recording's failure.
+  `micProblem` on a success, never the recording's failure. A movie that will
+  not probe is LEFT OUT as `RecordingResult.unreadable`; only a recording with
+  no readable movie fails.
 - `RecordingLanding.swift` (+`Microphone`, +`Placing`) · `ProjectDocument+Recording.swift`
   — a `RecordingResult` and a document in, an UNSCOPED op list out; nothing
   here commits. Pictures land back to back on ONE track, every `add_clip`

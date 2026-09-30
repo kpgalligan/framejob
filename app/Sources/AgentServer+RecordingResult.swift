@@ -85,6 +85,9 @@ extension AgentServer {
     /// stand beside a `mic_path`: a second segment's failure leaves the
     /// first's file in place. `pauses` and `segments` are always present;
     /// `segments` has exactly one entry for a recording never paused.
+    /// `unreadable` (#97) is present only when a segment was LEFT OUT because
+    /// its movie would not probe: one entry per such segment, in order, with
+    /// its movie's `path`, the `kept_files` still on disk and the `reason`.
     static func recordingFields(
         _ result: RecordingResult, ids: [RecordingSegmentIds] = []
     ) -> [String: Any] {
@@ -106,6 +109,14 @@ extension AgentServer {
             fields["mic_duration"] = mic.duration
         }
         if let problem = result.micProblem { fields["mic_problem"] = problem }
+        if !result.unreadable.isEmpty {
+            fields["unreadable"] = result.unreadable.map { left -> [String: Any] in
+                [
+                    "path": left.moviePath, "kept_files": left.keptFiles,
+                    "reason": left.error.localizedDescription,
+                ]
+            }
+        }
         fields.merge(idFields(ids.first)) { _, new in new }
         return fields
     }
@@ -175,6 +186,13 @@ extension AgentServer {
             "The picture landed without its microphone — the microphone file could not be "
                 + "used: " + $0
         }
+    }
+
+    /// The result's own `note` clauses, in order: the segments left out as
+    /// unreadable (#97), then the microphone's. Both doors append these
+    /// after their own.
+    static func resultNotes(_ result: RecordingResult) -> [String] {
+        [result.unreadableNote, microphoneNote(result)].compactMap { $0 }
     }
 
     /// The ids a new project holds for every segment's files, read off its
@@ -304,10 +322,12 @@ extension AgentServer {
     /// `RecordingResult.filesClause` — every segment's movie comma-joined,
     /// then every microphone file that landed — the one spelling the panel's
     /// note uses too; with one segment the sentence is byte for byte R1's,
-    /// which `tools/proof/recording_proof.py` matches by shape.
+    /// which `tools/proof/recording_proof.py` matches by shape. A segment
+    /// left out as unreadable (#97) is named after it, its files too.
     static func savedButNotAdded(_ result: RecordingResult, _ error: any Error) -> ToolError {
         ToolError(
             message: "The recording was saved at \(result.filesClause) but could not "
-                + "be added: " + sentence(of: error))
+                + "be added: " + sentence(of: error)
+                + (result.unreadableNote.map { " " + $0 } ?? ""))
     }
 }

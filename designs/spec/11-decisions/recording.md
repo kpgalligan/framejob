@@ -93,14 +93,15 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   still learns nothing, and nothing joins the files afterwards.
 - **The recorder panel goes away when a recording starts, for every
   source, and comes back only with something to say** (R2). The menu bar's
-  status item is the recording's whole chrome — Pause Recording and Stop
-  Recording, then Resume Recording and Stop Recording while paused — and the
-  panel returns after the landing only when it was on screen as the
-  recording began and the landing's note is non-empty (a stop from the
-  SYSTEM's own indicator — Reelcut's item's Stop writes no note — a closed
-  target, a microphone problem, a refused resume, a file the landing could
-  not place, a failure). ⌥⌘N shows it again; while it is hidden, the quit
-  guard opens the item's menu rather than beeping.
+  status item is the recording's chrome — Pause Recording and Stop
+  Recording, then Resume Recording and Stop Recording while paused; File ▸
+  Pause Recording is a second door to pause (below) — and the panel returns
+  after the landing only when it was on screen as the recording began and
+  the landing's note is non-empty (a stop from the SYSTEM's own indicator —
+  Reelcut's item's Stop writes no note — a closed target, a segment left
+  out as unreadable, a microphone problem, a refused resume, a file the
+  landing could not place, a failure). ⌥⌘N shows it again; while it is
+  hidden, the quit guard opens the item's menu rather than beeping.
 - **The recorder panel takes key only from an active Reelcut** (#137,
   2026-09-29). Shown with Reelcut active (File ▸ New Recording…, ⌥⌘N, the
   welcome button), it comes to the front key, with Record on Return. Shown
@@ -109,3 +110,23 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   stays inactive, and the person's typing, Return included, stays in the
   app in front. A click on it still works without activating Reelcut
   (`.nonactivatingPanel`).
+- **A segment whose movie will not probe is left out** (#97, 2026-09-29).
+  The walker that probes a finished recording's segments skips it and goes
+  on; the result's `unreadable`, and the landing's note at both doors (the
+  panel's and `record_screen`'s), name it and the files it kept on disk.
+  Only a recording with NO readable movie fails: the first segment's error,
+  `namingFiles` naming every file, so one segment reads byte for byte as
+  before. A microphone failure the machine asked for — the segment's
+  `stoppedAt` set: a pause's or the stop's did-finish, e.g. −11805 for a
+  writer stopped before its first sample — is that segment's `micProblem`
+  only; `microphoneProblem`, the live note, is a microphone that dies
+  MID-segment.
+- **File ▸ Pause Recording** (#98, 2026-09-29). Directly under New
+  Recording…, retitled Resume Recording from the RECORDER's state, enabled
+  only while it is recording or paused, with no key. It is routed as Stop
+  is: the panel's own recording through the panel, any other (a tool's)
+  through the recorder. It has **no MCP mirror**: a pause is recorder
+  state, not a project edit, so spec §7.9's every-user-visible-edit rule
+  does not reach it (Settings' precedent); `record_screen`'s span is wall
+  clock and a pause is a person's act; and `perform_menu_item` reaches the
+  item in a Release build.

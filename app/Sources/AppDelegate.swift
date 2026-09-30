@@ -224,6 +224,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             // routes the stop to whichever door owns it.
             item.title = ScreenRecorder.shared.isRecording ? "Stop Recording" : "New Recording…"
         }
+        if item.action == #selector(pauseOrResumeRecording(_:)) {
+            // File ▸ Pause Recording (#98) reads the RECORDER, as the retitle
+            // above does, in the status item's own words, and is live only
+            // while a recording runs; `AppDelegate+Recording.swift` routes it.
+            item.title = RecorderStatusItem.menuTitles(paused: ScreenRecorder.shared.isPaused)[0]
+            return ScreenRecorder.shared.state == .recording || ScreenRecorder.shared.state == .paused
+        }
         if item.action == #selector(toggleAgentServer(_:)) {
             // The item carries the endpoint while it is up, so the address to
             // point a client at never has to be guessed.

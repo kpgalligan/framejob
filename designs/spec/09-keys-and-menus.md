@@ -34,7 +34,7 @@
 | ⌥⌘V | Paste Attributes — the copied clip's look onto the selection |
 | ⌘E | Export… |
 | ⌥⌘E | Save Frame… — the frame under the playhead as a PNG, JPEG or HEIC still (road map 2's phase 7a). Export…'s still-image sibling, under the same letter |
-| ⌥⌘N | New Recording… — the recorder panel (road map 3). The same item reads Stop Recording while one runs, paused included, and stops it; a nil-target action on `AppDelegate`, so it resolves with no document open, as New Project does. Pause Recording and Resume Recording have no menu item and no key — they are the status item's rows (R2) |
+| ⌥⌘N | New Recording… — the recorder panel (road map 3). The same item reads Stop Recording while one runs, paused included, and stops it; a nil-target action on `AppDelegate`, so it resolves with no document open, as New Project does. Pause Recording and Resume Recording are the status item's rows (R2) and File ▸ Pause Recording, directly under this item, retitled Resume Recording while paused, with no key (#98) |
 | ⌘, | Settings… — Reelcut ▸ Settings…, the app's one window for something PERSISTED beyond view state (road map 6 §5d): two panes, "Transcription", holding the AssemblyAI key, the region and a Verify button, and under it "Assistant" (road map 12 A2), holding the Anthropic key and the model (§11 AI-8, AI-11) with no Verify. macOS's own place for the item and its own key; the nudge pair below is the BARE `,` and `.`, so nothing is displaced. A nil-target selector on `AppDelegate`, so it resolves with no document open, as New Project does |
 | ⌥⌘I | Toggle inspector |
 | ⌃⌘A | View ▸ Assistant — show the inspector, pick its Assistant tab and focus the composer (road map 12 A2, §11 AI-4). ⌘A is Select All and ⌥⌘A Deselect All; ⌃⌘A was free. Not a toggle: pressed on the Assistant tab it only refocuses the composer |
@@ -67,7 +67,8 @@ person rather than to a document and the item has to work with no document
 open, Hide Reelcut, Hide Others, Show All, Quit Reelcut),
 File (New Project, New Recording… (road map 3 — directly under New
 Project with no separator, because both make a document out of nothing),
-Open…, Open Recent, Close, Save, Save As…,
+Pause Recording (#98 — under New Recording…, live only while a recording
+runs, retitled Resume Recording while paused, no key), Open…, Open Recent, Close, Save, Save As…,
 Add Media…, Import Captions… (M3), Generate Captions… and Export
 Captions… (road map 2's phase 4 — the three caption items sit
 together, in the order a caption track comes into being and leaves again,

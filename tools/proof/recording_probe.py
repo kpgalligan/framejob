@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Road map 3 — the recorder's APP half, measured: R1 (sections 1–8), R2's
 pause and resume (rows 3o–3t, section 4b, rows 5p–5u, 7d, and section 9),
-and the grants a press checks (section 10, spec §11 recording).
+the grants a press checks (section 10, spec §11 recording), and issue batch
+B17's unreadable segment and File ▸ Pause Recording (sections 11 and 12).
 
 Why a probe and not an MCP script. Three of the things R1a added have no
 caller a running binary can be asked to reach, and one of them is the row
@@ -142,11 +143,13 @@ URL); a stray output and a stray file changing nothing; `resume()` while
 recording `.notPaused`; a second pause; `stop()` while PAUSED beginning
 finishing as `.stopped` with the pause's stamp KEPT and no second
 `stopRecording`; and the walker, meeting segment 1's movie written EMPTY,
-failing the RECORDING (landing the readable one is deliberately not
-built) with `filesKept(finishFailed)` naming all four files comma-joined
-in segment order. 3p: a refused pause (the output never added, so the
-remove throws) rethrown as `.finishFailed` with the recorder STAYING
-`.recording` and nothing changed. 3q: a refused resume (the state paused
+LEAVING THAT SEGMENT OUT (issue batch B17, #97; until then it failed the
+recording): a `.success` of segment 0 alone with `pauses` 2, and
+`unreadable[0]` segment 1's movie with both its files kept, case
+`finishFailed`, the note ending " Its files are kept at <movie>, <mic>.".
+3p: a refused pause (the output never added, so the remove throws)
+rethrown as `.finishFailed` with the recorder STAYING `.recording` and
+nothing changed. 3q: a refused resume (the state paused
 BY THE PROBE with the output still attached, so the add throws) rethrown
 as `.startFailed` with the recorder STAYING `.paused`, no segment minted,
 no `startRecording`. 3r: a did-FAIL on a CLOSED segment (paused, its
@@ -507,6 +510,52 @@ structural over the comment-stripped source: `CGRequestScreenCaptureAccess(`,
 `RecordingSetup.swift`; `CGRequestScreenCaptureAccess(` only in
 `+Grants.swift`.
 
+Section 11 (`unreadable`, issue batch B17, #97) runs in its own process
+with `RCFFmpegImport` merged into the volatile argument domain as `never`
+before any probe, so an EMPTY `.mov` never reaches `FFmpegRewrap`'s
+consent alert; a readable "movie" is `writePNG`'s PNG. Over the Fake, mic
+on, every segment closed, `.paused`, then `stop`: U1 [PNG, EMPTY, PNG] → a
+`.success` of segments 0 and 2 in order, each with its microphone, `pauses`
+2, `unreadable` segment 1 alone with both its files kept and case
+`finishFailed`, the note "A segment was left out. <the probe's sentence>
+Its files are kept at <movie>, <mic>." exactly, and the stop's completion
+the same outcome, once. U2 [EMPTY, EMPTY] → `filesKept(finishFailed)`
+naming both movies, then both microphone files. U3 [EMPTY, PNG] with no
+microphone → a `.success` whose `path` and `startedAt` are the SECOND
+segment's. U4, pure: `UnreadableSegment("/x/a.mov", [], .timedOut)`'s
+sentence exactly, one with two files kept, and an empty list's note nil.
+U5: `landingNote(… unreadable:)` puts the sentence after the closed
+document and before the microphone, and `unreadable: nil` equals the R1
+call. U6: `recordingFields` carries `unreadable` —
+`[{path, kept_files, reason}]` — only when non-empty; `resultNotes` is
+[unreadable, microphone]; `savedButNotAdded` ends with the note, and a
+clean result's sentence is R1's. M1: a `.recording` Fake with a
+microphone, `pause()`, then a microphone did-finish carrying −11805 →
+`microphoneProblem` nil, `liveNote` empty, the segment's `micFailure`
+set; the screen's did-finish and `stop` → a `.success` whose segment 0
+`micProblem` begins "The microphone recording failed: " (3k stays the
+mid-segment control).
+
+Section 12 (`file_pause`, issue batch B17, #98 a and b) runs in its own
+process with the menu bar built by `applicationWillFinishLaunching`. F1:
+the item directly after New Recording… is "Pause Recording", action
+`pauseOrResumeRecording:`, nil target, no key, and exactly one item in the
+bar sends it. F2: `validateMenuItem` with `ScreenRecorder.shared.state`
+set by the probe — idle, arming and finishing disabled "Pause Recording";
+recording enabled "Pause Recording"; paused enabled "Resume Recording" —
+each the status item's own `menuTitles(paused:)[0]`. F3: a faked session
+on `ScreenRecorder.shared` (chrome-pause's shape) with the panel
+`.recording`: the action → both `.paused`; again → both `.recording`, two
+segments. F4: the panel idle, the recorder `.recording` (a tool's
+recording): the action pauses the recorder, the panel idle and not shown;
+again resumes it. F5: both idle → nothing changes. W0 prints the widths of
+"● 0:00" and "❚❚ 0:00". W1: every title for 0, 59, 61.9, 599, 3599, 3661
+and 35 999 s, both marks, fits: ceil(width) + 2 × `titleInset` ≤
+`itemLength`. W2: `itemLength` is that formula at `widestElapsed`, whose
+label is 9:59:59. W3, structural: `show()`'s comment-stripped body holds
+`statusItem(withLength: Self.itemLength)` and the file's code never says
+`variableLength` — the probe never puts the item up.
+
 **Measured 2026-09-28 against the tree with section 10: 983/983, with no
 row skipped** — section 9 RAN (a true preflight and two shareable
 displays). By section: the build row 1; section 1, 21; section 2, 242;
@@ -713,12 +762,47 @@ move. `window-row-unguarded` re-scored 181/183 (5k's two rows), 182/184 today; u
 sealed doors its fall-through meets no prompt. Emptying
 `stepAsideForSystemUI()` scores 183/184: the level row alone.
 
+**Issue batch B17's mutants** (sections 11 and 12, and 3o), measured
+2026-09-30 against the tree at 161/161 for `--only state,unreadable` and
+34/34 for `--only file_pause` (the selected run
+`--only state,unreadable,file_pause,landing,segments,chrome,chrome_pause,catalog,grants`
+scored 711/711, and the whole run 1045/1045 with no row skipped, section 9
+running). Three of them put back the code before the batch:
+
+  unreadable-fails-all  the walker's failure arm concludes with the
+                    segment's error again (ScreenRecorder+Finishing.swift) —
+                    147/161: 3o's two, U1's five, U3's two, U4's nil-note row
+                    and U6's four (both read U1's result, which is gone).
+  no-unreadable-note    `unreadableNote` always nil (RecordingResult.swift) —
+                    157/161: 3o's note, U1's note, U6's notes and
+                    savedButNotAdded.
+  boundary-promoted     the `stoppedAt == nil` clause dropped
+                    (ScreenRecorder+Delegates.swift) — 160/161: M1's
+                    microphoneProblem row.
+  pause-item-untitled   the validator arm's title line deleted
+                    (AppDelegate.swift) — 33/34: F2's paused row.
+  pause-item-enabled    the arm returns true (AppDelegate.swift) — 31/34:
+                    F2's idle, arming and finishing rows.
+  pause-route-recorder  the action's two panel arms deleted
+                    (AppDelegate+Recording.swift) — 33/34: F3's pause row.
+  status-variable-length  `Self.itemLength` → `NSStatusItem.variableLength`
+                    (RecorderStatusItem.swift) — 32/34: W3's two reads.
+  width-short-label     `widestElapsed` → 0 (RecorderStatusItem.swift) —
+                    27/34: W1's six titles from 59:59 up, W2's label row.
+
+`--sources` over `git archive HEAD` of the tree before the batch
+(`22b1a68`) scores 0/1 and exits 1: the probe names `unreadable`,
+`UnreadableSegment` and `pauseOrResumeRecording`, so it does not build
+there — a build failure, the three mutants above being the behavioural
+controls.
+
 6b's "one program" row, the tree's one failure when this file was first
 written, turned green when the harness literalised the six recorder keys
 in its pin map (R1's landing): both cross-builds are one program again.
 
     python3 tools/proof/recording_probe.py                 # the tree
     python3 tools/proof/recording_probe.py --only state,segments   # a subset
+    python3 tools/proof/recording_probe.py --only unreadable,file_pause   # B17's
     python3 tools/proof/recording_probe.py --mutant excludes
     python3 tools/proof/recording_probe.py --sources <dir> # any copy
     RC_APP_SOURCES=<dir> python3 tools/proof/recording_probe.py
@@ -1003,6 +1087,14 @@ func spell(_ outcome: Result<RecordingResult, Error>) -> [String: Any] {
                     "startedAt": segment.startedAt.timeIntervalSince1970,
                 ]
             },
+            // Issue batch B17 (#97): the segments left out, and their note.
+            "unreadable": result.unreadable.map { left -> [String: Any] in
+                [
+                    "moviePath": left.moviePath, "keptFiles": left.keptFiles,
+                    "case": caseName(left.error), "description": left.error.localizedDescription,
+                ]
+            },
+            "unreadableNote": result.unreadableNote as Any,
         ]
     case .failure(let error):
         var spelled: [String: Any] = ["kind": "failure", "description": error.localizedDescription]
@@ -1035,6 +1127,16 @@ func writePNG(_ url: URL) -> Bool {
 
 func emptyFile(_ url: URL) -> Bool {
     FileManager.default.createFile(atPath: url.path, contents: Data())
+}
+
+/// `RCFFmpegImport` pinned to never, MERGED into the volatile argument
+/// domain: a `.mov` the walker cannot read must never reach `FFmpegRewrap`'s
+/// consent alert (`MediaImporter.probeAllowingRewrap` offers a refused
+/// non-image to it), exactly as a person who said never would have it.
+func pinNeverRewrap() {
+    var domain = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+    domain[FFmpegRewrap.policyDefaultsKey] = FFmpegRewrap.Policy.never.rawValue
+    UserDefaults.standard.setVolatileDomain(domain, forName: UserDefaults.argumentDomain)
 }
 
 /// The microphone output the faked session carries: an
@@ -1806,13 +1908,8 @@ func state(_ request: [String: Any]) -> [String: Any] {
     // The driven half, in its own request so a fake that will not build
     // fails its rows and not the idle machine's.
     if request["drive"] as? Bool == true, let path = request["work"] as? String {
-        // A `.mov` the walker cannot read must never reach `FFmpegRewrap`'s
-        // consent alert (`MediaImporter.probeAllowingRewrap` offers a
-        // refused non-image to it): the policy is pinned to never for the
-        // life of this probe, exactly as a person who said never would have it.
-        UserDefaults.standard.setVolatileDomain(
-            [FFmpegRewrap.policyDefaultsKey: FFmpegRewrap.Policy.never.rawValue],
-            forName: UserDefaults.argumentDomain)
+        // The policy pinned to never for the life of this probe (the helper).
+        pinNeverRewrap()
         let work = URL(fileURLWithPath: path, isDirectory: true)
         out["join"] = scenarioJoin(work)
         out["oneShot"] = scenarioOneShot(work)
@@ -1903,6 +2000,169 @@ func state(_ request: [String: Any]) -> [String: Any] {
         "microphoneStatus": RecordingGrant.name(of: RecordingGrant.microphoneStatus),
         "bundleIdentifier": Bundle.main.bundleIdentifier as Any,
     ]
+    return out
+}
+
+// ---- mode "unreadable": a segment whose movie will not probe (#97) ---------
+
+/// U1–U3's shape: closed segments of a `.paused` session over the given
+/// movie fixtures — `true` a PNG "movie" `MediaImporter.probe` reads, `false`
+/// an EMPTY `.mov` it refuses — each with a microphone PNG when `mic`, then
+/// `stop`: the outcome as `onFinish` and the stop's completion receive it,
+/// and the raw result for U6's pure rows.
+func scenarioUnreadable(_ work: URL, _ tag: String, readable: [Bool], mic: Bool)
+    -> (out: [String: Any], result: RecordingResult?)
+{
+    var out: [String: Any] = [:]
+    let t0 = Date(timeIntervalSinceNow: -20)
+    var segments: [FakeSegment] = []
+    var movies: [String] = []
+    var mics: [String] = []
+    var written = true
+    for (index, ok) in readable.enumerated() {
+        let movie = work.appendingPathComponent("\(tag)-\(index)." + (ok ? "png" : "mov"))
+        let micURL = mic ? work.appendingPathComponent("\(tag)-\(index)-mic.png") : nil
+        written = written && (ok ? writePNG(movie) : emptyFile(movie))
+        if let micURL { written = written && writePNG(micURL) }
+        var segment = FakeSegment(movie: movie, mic: micURL, closed: true)
+        let start = t0.addingTimeInterval(Double(index) * 3)
+        segment.screenStart = start
+        segment.micStart = start
+        segment.stoppedAt = start.addingTimeInterval(2)
+        segments.append(segment)
+        movies.append(movie.path)
+        if let micURL { mics.append(micURL.path) }
+    }
+    out["written"] = written
+    out["movies"] = movies
+    out["mics"] = mics
+    out["startedAt"] = segments.map { $0.screenStart?.timeIntervalSince1970 ?? 0 }
+    let fake = Fake(segments: segments, mic: mic, state: .paused, folder: work)
+    var stops: [[String: Any]] = []
+    var raw: RecordingResult?
+    fake.recorder.stop { outcome in
+        stops.append(spell(outcome))
+        if case .success(let result) = outcome { raw = result }
+    }
+    out["settled"] = fake.settled()
+    out["onFinishCount"] = fake.finishes.count
+    out["onFinish"] = fake.finishes.first ?? [:]
+    out["stopCount"] = stops.count
+    out["stop"] = stops.first ?? [:]
+    return (out, raw)
+}
+
+/// M1: a microphone did-finish carrying an error for a segment the machine
+/// ASKED to stop — the pause's, −11805 for a writer stopped before its first
+/// sample — is that segment's `micFailure` and never the session's
+/// `microphoneProblem`; the stop then lands it as the segment's `micProblem`.
+func scenarioMicBoundary(_ work: URL) -> [String: Any] {
+    var out: [String: Any] = [:]
+    let movie = work.appendingPathComponent("boundary.png")
+    let mic = work.appendingPathComponent("boundary (Microphone).m4a")
+    out["written"] = writePNG(movie)
+    var first = FakeSegment(movie: movie, mic: mic)
+    let start = Date(timeIntervalSinceNow: -1.0)
+    first.screenStart = start
+    first.micStart = start
+    let fake = Fake(segments: [first], mic: true, state: .recording, folder: work)
+    out["attached"] = fake.attachFailure ?? "ok"
+    do {
+        try fake.recorder.pause()
+        out["pause"] = "ok"
+    } catch { out["pause"] = spellError(error) }
+    let error = NSError(
+        domain: AVFoundationErrorDomain, code: -11805,
+        userInfo: [NSLocalizedDescriptionKey: "Cannot Record"])
+    fake.micFinished(url: mic, error: error)
+    _ = spin(0.3) { false }
+    out["stateAfterMicFinish"] = fake.state
+    out["microphoneProblem"] = fake.recorder.microphoneProblem as Any
+    out["liveNote"] = RecorderPanelController.liveNote(
+        microphoneProblem: fake.recorder.microphoneProblem, resumeProblem: nil)
+    out["segment0"] = describeSegment(fake.segment(0))
+    fake.screenFinished(0)
+    _ = spin(0.2) { false }
+    out["stateAfterScreenFinish"] = fake.state
+    var stops: [[String: Any]] = []
+    fake.recorder.stop { stops.append(spell($0)) }
+    out["settled"] = fake.settled()
+    out["onFinishCount"] = fake.finishes.count
+    out["onFinish"] = fake.finishes.first ?? [:]
+    out["stopCount"] = stops.count
+    return out
+}
+
+/// U4–U6, pure: the sentence, the note, the landing's order and the tool's
+/// fields, notes and `savedButNotAdded` over U1's own result.
+func unreadablePure(_ result: RecordingResult?) -> [String: Any] {
+    var out: [String: Any] = [:]
+    out["timedOut"] = RecorderError.timedOut.localizedDescription
+    out["aloneSentence"] = UnreadableSegment(
+        moviePath: "/x/a.mov", keptFiles: [], error: .timedOut
+    ).sentence
+    out["keptSentence"] = UnreadableSegment(
+        moviePath: "/x/b.mov", keptFiles: ["/x/b.mov", "/x/b (Microphone).m4a"],
+        error: .finishFailed("The recording could not be read: x.")
+    ).sentence
+    out["closedSentence"] = RecorderPanelController.destinationClosedSentence
+    out["landing"] = [
+        "r1": RecorderPanelController.landingNote(
+            stoppedBy: .userStopped, chosen: .document(recipeKey: 1), landedAsNewProject: true,
+            micProblem: "Mic."),
+        "nil": RecorderPanelController.landingNote(
+            stoppedBy: .userStopped, chosen: .document(recipeKey: 1), landedAsNewProject: true,
+            micProblem: "Mic.", unreadable: nil),
+        "all": RecorderPanelController.landingNote(
+            stoppedBy: .userStopped, chosen: .document(recipeKey: 1), landedAsNewProject: true,
+            micProblem: "Mic.", resumeProblem: "Resume.", notes: ["Note one.", "Note two."],
+            unreadable: "Unreadable."),
+        "only": RecorderPanelController.landingNote(
+            stoppedBy: .stopped, chosen: .newProject, landedAsNewProject: false, micProblem: nil,
+            unreadable: "Unreadable."),
+    ]
+    guard let result else {
+        out["missing"] = true
+        return out
+    }
+    if let segment = result.segments.first {
+        let emptyNote = RecordingResult(
+            segments: result.segments, choice: result.choice, stoppedBy: .stopped, pauses: 0
+        ).unreadableNote
+        out["emptyNoteIsNil"] = emptyNote == nil
+        let micSegment = RecordingSegment(
+            descriptor: segment.descriptor, micDescriptor: nil, micOffset: 0,
+            startedAt: segment.startedAt, micProblem: "Mic gone.")
+        let both = RecordingResult(
+            segments: [micSegment], choice: result.choice, stoppedBy: .stopped, pauses: 1,
+            unreadable: result.unreadable)
+        let clean = RecordingResult(
+            segments: result.segments, choice: result.choice, stoppedBy: .stopped, pauses: 1)
+        out["unreadableNote"] = result.unreadableNote as Any
+        out["fieldsUnreadable"] = AgentServer.recordingFields(result)["unreadable"] ?? NSNull()
+        out["cleanHasUnreadable"] = AgentServer.recordingFields(clean)["unreadable"] != nil
+        out["notesBoth"] = AgentServer.resultNotes(both)
+        out["microphoneNoteBoth"] = AgentServer.microphoneNote(both) as Any
+        out["notesClean"] = AgentServer.resultNotes(clean)
+        let inner = AgentServer.ToolError(message: "a drag is in progress")
+        out["savedWith"] = AgentServer.savedButNotAdded(result, inner).message
+        out["savedClean"] = AgentServer.savedButNotAdded(clean, inner).message
+        out["filesClause"] = result.filesClause
+    }
+    return out
+}
+
+func unreadableMode(_ request: [String: Any]) -> [String: Any] {
+    var out: [String: Any] = [:]
+    pinNeverRewrap()
+    let work = URL(
+        fileURLWithPath: request["work"] as? String ?? NSTemporaryDirectory(), isDirectory: true)
+    let u1 = scenarioUnreadable(work, "u1", readable: [true, false, true], mic: true)
+    out["u1"] = u1.out
+    out["u2"] = scenarioUnreadable(work, "u2", readable: [false, false], mic: true).out
+    out["u3"] = scenarioUnreadable(work, "u3", readable: [false, true], mic: false).out
+    out["pure"] = unreadablePure(u1.result)
+    out["boundary"] = scenarioMicBoundary(work)
     return out
 }
 
@@ -3224,6 +3484,161 @@ func chromePause(_ request: [String: Any]) -> [String: Any] {
     return out
 }
 
+// ---- mode "file-pause": File ▸ Pause/Resume Recording, the item's width (#98) --
+
+/// A faked session on `ScreenRecorder.shared`, chrome-pause's shape: one open
+/// segment whose output is ADDED to a never-started, grant-less stream, so
+/// the recorder's real `pause()` / `resume()` run. Torn down by the next.
+func fakeSharedRecording(_ work: URL, _ name: String) -> String {
+    let shared = ScreenRecorder.shared
+    let movie = work.appendingPathComponent("\(name).png")
+    _ = writePNG(movie)
+    var choice = RecordingChoice()
+    choice.folder = work
+    let size = CGSize(width: 16, height: 16)
+    let configs = RecordingConfiguration.make(
+        choice, displayPointSize: size, scale: 1, outputURL: movie)
+    let stream = SCStream(filter: SCContentFilter(), configuration: configs.stream, delegate: shared)
+    let output = SCRecordingOutput(configuration: configs.output, delegate: shared)
+    var attached = "ok"
+    do { try stream.addRecordingOutput(output) } catch { attached = "\(error)" }
+    var first = ScreenRecorder.Segment(movieURL: movie, micURL: nil, output: output, addedAt: Date())
+    first.screenStartedAt = Date(timeIntervalSinceNow: -2)
+    shared.session = ScreenRecorder.Session(
+        choice: choice, displayPointSize: size, scale: 1, stream: stream, micSession: nil,
+        micOutput: nil, calledAt: Date(), onFinish: { _ in }, segments: [first])
+    shared.state = .recording
+    return attached
+}
+
+/// Back to idle with no session — a probe-only manipulation, chrome-pause's.
+func tearDownShared() {
+    let shared = ScreenRecorder.shared
+    shared.timer?.invalidate()
+    shared.timer = nil
+    shared.session = nil
+    shared.state = .idle
+    shared.stopCompletions = []
+    shared.pendingStop = false
+}
+
+func filePause(_ request: [String: Any]) -> [String: Any] {
+    var out: [String: Any] = [:]
+    let app = NSApplication.shared
+    app.setActivationPolicy(.prohibited)
+    UserDefaults.standard.setVolatileDomain([
+        RecorderPanelController.displayKey: 0, RecorderPanelController.microphoneKey: "",
+        RecorderPanelController.systemAudioKey: true, RecorderPanelController.showClicksKey: false,
+        RecorderPanelController.rateKey: 60, RecorderPanelController.sizeKey: "nominal",
+        "AgentServerEnabled": false,
+    ], forName: UserDefaults.argumentDomain)
+    let delegate = AppDelegate()
+    delegate.applicationWillFinishLaunching(
+        Notification(name: NSApplication.willFinishLaunchingNotification, object: app))
+    let work = URL(
+        fileURLWithPath: request["work"] as? String ?? NSTemporaryDirectory(), isDirectory: true)
+    let pauseAction = #selector(AppDelegate.pauseOrResumeRecording(_:))
+
+    // F1: the item, under New Recording…, and how many the bar holds.
+    func leaves(_ menu: NSMenu?) -> [NSMenuItem] {
+        (menu?.items ?? []).flatMap { [$0] + leaves($0.submenu) }
+    }
+    let fileItems = NSApp.mainMenu?.items.first { $0.title == "File" }?.submenu?.items ?? []
+    let newIndex = fileItems.firstIndex { $0.title == "New Recording…" } ?? -1
+    var next: [String: Any] = [:]
+    var fileItem: NSMenuItem?
+    if newIndex >= 0, fileItems.indices.contains(newIndex + 1) {
+        let item = fileItems[newIndex + 1]
+        fileItem = item
+        next = ["title": item.title, "key": item.keyEquivalent,
+                "action": item.action.map { NSStringFromSelector($0) } ?? "",
+                "hasTarget": item.target != nil, "separator": item.isSeparatorItem]
+    }
+    out["file"] = ["newRecordingIndex": newIndex, "next": next,
+                   "inBar": leaves(NSApp.mainMenu).filter { $0.action == pauseAction }.count]
+
+    // F2: the validator over each recorder state the probe sets.
+    let item = fileItem ?? NSMenuItem(title: "Pause Recording", action: pauseAction, keyEquivalent: "")
+    var validate: [[String: Any]] = []
+    let states: [ScreenRecorder.State] = [.idle, .arming, .finishing, .recording, .paused]
+    for state in states {
+        ScreenRecorder.shared.state = state
+        let enabled = delegate.validateMenuItem(item)
+        validate.append(["state": "\(state)", "enabled": enabled, "title": item.title])
+    }
+    ScreenRecorder.shared.state = .idle
+    out["validate"] = validate
+    out["menuTitles"] = [
+        "recording": RecorderStatusItem.menuTitles(paused: false)[0],
+        "paused": RecorderStatusItem.menuTitles(paused: true)[0],
+    ]
+
+    // F3: the panel's own recording, through the panel.
+    let panel = RecorderPanelController.shared
+    panel.window?.orderOut(nil)
+    panel.setNote("")
+    let attached3 = fakeSharedRecording(work, "f3")
+    panel.phase = .recording
+    delegate.pauseOrResumeRecording(nil)
+    let f3Paused = ["panel": "\(panel.phase)", "recorder": "\(ScreenRecorder.shared.state)"]
+    delegate.pauseOrResumeRecording(nil)
+    out["f3"] = [
+        "attached": attached3, "paused": f3Paused, "panel": "\(panel.phase)",
+        "recorder": "\(ScreenRecorder.shared.state)",
+        "segments": ScreenRecorder.shared.session?.segments.count ?? -1,
+    ]
+    tearDownShared()
+    panel.resumeProblem = nil
+    panel.phase = .idle
+
+    // F4: a recording the panel does not own (a tool's), through the recorder.
+    panel.window?.orderOut(nil)
+    let attached4 = fakeSharedRecording(work, "f4")
+    delegate.pauseOrResumeRecording(nil)
+    let f4Paused: [String: Any] = [
+        "panel": "\(panel.phase)", "recorder": "\(ScreenRecorder.shared.state)",
+        "visible": panel.window?.isVisible ?? false,
+    ]
+    delegate.pauseOrResumeRecording(nil)
+    out["f4"] = [
+        "attached": attached4, "paused": f4Paused, "panel": "\(panel.phase)",
+        "recorder": "\(ScreenRecorder.shared.state)",
+        "segments": ScreenRecorder.shared.session?.segments.count ?? -1,
+        "visible": panel.window?.isVisible ?? false,
+    ]
+    tearDownShared()
+
+    // F5: nothing recording — nothing changes.
+    delegate.pauseOrResumeRecording(nil)
+    out["f5"] = [
+        "panel": "\(panel.phase)", "recorder": "\(ScreenRecorder.shared.state)",
+        "session": ScreenRecorder.shared.session != nil,
+        "visible": panel.window?.isVisible ?? false,
+    ]
+
+    // W0–W2: the titles against the one length.
+    func width(_ elapsed: TimeInterval, _ paused: Bool) -> Double {
+        Double(RecorderStatusItem.title(elapsed: elapsed, paused: paused).size().width)
+    }
+    out["w0"] = ["recording": width(0, false), "paused": width(0, true)]
+    let elapsed = request["elapsed"] as? [Double] ?? []
+    out["widths"] = elapsed.flatMap { e in
+        [false, true].map { paused -> [String: Any] in
+            ["elapsed": e, "paused": paused, "width": width(e, paused),
+             "label": RecorderStatusItem.label(for: e)]
+        }
+    }
+    out["itemLength"] = Double(RecorderStatusItem.itemLength)
+    out["titleInset"] = Double(RecorderStatusItem.titleInset)
+    out["widestElapsed"] = RecorderStatusItem.widestElapsed
+    out["widestLabel"] = RecorderStatusItem.label(for: RecorderStatusItem.widestElapsed)
+    out["widestWidths"] = [
+        width(RecorderStatusItem.widestElapsed, false), width(RecorderStatusItem.widestElapsed, true),
+    ]
+    out["stateAfter"] = "\(ScreenRecorder.shared.state)"
+    return out
+}
+
 // ---- mode "welcome": the button row's geometry, from the live layout ------
 func welcome(_ request: [String: Any]) -> [String: Any] {
     var out: [String: Any] = [:]
@@ -3801,6 +4216,10 @@ do {
         answer = chrome(request)
     case "chrome-pause":
         answer = chromePause(request)
+    case "unreadable":
+        answer = unreadableMode(request)
+    case "file-pause":
+        answer = filePause(request)
     case "granted":
         answer = granted(request)
     case "welcome":
@@ -4416,14 +4835,18 @@ def section_state_r2(answer):
     check("3o: segment 1's files written EMPTY, its two did-finishes driven, the recorder settled",
           p.get("emptyWritten") is True and p.get("settled") is True,
           f"written {p.get('emptyWritten')}, settled {p.get('settled')}, state {p.get('stateAfterStop')!r}")
-    check("3o: the walker meets an unreadable second movie and fails the RECORDING (landing the "
-          "readable one is deliberately not built): filesKept(finishFailed) naming EVERY file — both "
-          "movies, then both microphone files, comma-joined in segment order",
-          fin.get("kind") == "failure" and fin.get("case") == "filesKept(finishFailed)"
-          and (fin.get("description") or "").startswith("The recording could not be read: ")
-          and (fin.get("description") or "").endswith(
-              f" The recording is at {paths[0]}, {paths[2]}; the microphone at {paths[1]}, {paths[3]}."),
-          f"got {fin!r}")
+    left = fin.get("unreadable") or []
+    check("3o: the walker meets an unreadable second movie and LEAVES THAT SEGMENT OUT (issue batch "
+          "B17, #97): a .success of the one readable segment (pause.png), pauses 2",
+          fin.get("kind") == "success" and fin.get("pauses") == 2
+          and [x.get("path") for x in fin.get("segments") or []] == [paths[0]], f"got {fin!r}")
+    check("3o: … unreadable[0] is segment 1's movie with both its files kept (movie, then "
+          "microphone), case finishFailed, and the note ends \" Its files are kept at <movie>, "
+          "<mic>.\"",
+          len(left) == 1 and left[0].get("moviePath") == paths[2]
+          and left[0].get("keptFiles") == [paths[2], paths[3]] and left[0].get("case") == "finishFailed"
+          and (fin.get("unreadableNote") or "").endswith(f" Its files are kept at {paths[2]}, {paths[3]}."),
+          f"unreadable {left!r}, note {fin.get('unreadableNote')!r}")
     check("3o: onFinish once, the stop's completion once, both the same outcome",
           p.get("onFinishCount") == 1 and p.get("stopCount") == 1 and p.get("stop") == fin,
           f"onFinish {p.get('onFinishCount')}, stop {p.get('stopCount')}")
@@ -4567,6 +4990,153 @@ def section_state_r2(answer):
           "the same result",
           all(abs(s.get("startedAt", 0) - x.get("screenStart", 1)) < 0.001 for s, x in zip(segs, wp))
           and w.get("stop") == fin, f"{[s.get('startedAt') for s in segs]}")
+
+
+# --------------------------------------------------------------------------
+# Section 11 — issue batch B17 (#97): a segment whose movie will not probe is
+# LEFT OUT; a microphone failure at a segment boundary stays that segment's.
+
+SYSTEM_STOP_SENTENCE = "Stopped from the system's screen-recording indicator; the recording was added."
+
+
+def section_unreadable(binary, sources):
+    print("\nSection 11 — issue batch B17 (#97): an unreadable segment is left out and named; a "
+          "boundary microphone failure is the segment's")
+    work = fresh_dir("unreadable")
+    answer, error = run_probe(binary, "unreadable", {"mode": "unreadable", "work": work})
+    check("11: the probe answers", answer is not None and not answer.get("error"),
+          error or (answer or {}).get("error", ""))
+    if not answer or answer.get("error"):
+        return
+
+    print("  U1 — [readable, EMPTY, readable], a microphone on every segment")
+    u1 = answer.get("u1") or {}
+    movies = u1.get("movies") or ["", "", ""]
+    mics = u1.get("mics") or ["", "", ""]
+    fin = u1.get("onFinish") or {}
+    segs = fin.get("segments") or []
+    left = fin.get("unreadable") or [{}]
+    check("U1: the fixtures were written — a PNG movie, an EMPTY .mov, a PNG movie, each with a "
+          "microphone PNG", u1.get("written") is True and len(movies) == 3 and len(mics) == 3,
+          f"{u1.get('written')}, {movies}, {mics}")
+    check("U1: stop() while paused settles a .success — the unreadable middle segment does not fail "
+          "the recording (unreadable-fails-all)",
+          u1.get("settled") is True and fin.get("kind") == "success", f"got {fin!r}")
+    check("U1: … of segments 0 and 2, in order, each with its microphone landed",
+          [x.get("path") for x in segs] == [movies[0], movies[2]]
+          and [x.get("micPath") for x in segs] == [mics[0], mics[2]], f"{segs}")
+    check("U1: … and pauses 2 — the presses, never the files", fin.get("pauses") == 2,
+          f"got {fin.get('pauses')}")
+    check("U1: unreadable names segment 1 alone — its movie, both its files kept (movie, then "
+          "microphone), case finishFailed",
+          len(fin.get("unreadable") or []) == 1 and left[0].get("moviePath") == movies[1]
+          and left[0].get("keptFiles") == [movies[1], mics[1]] and left[0].get("case") == "finishFailed",
+          f"{fin.get('unreadable')!r}")
+    reason = left[0].get("description") or ""
+    check("U1: the note is \"A segment was left out. The recording could not be read: <the probe's "
+          "words> Its files are kept at <movie>, <mic>.\" (no-unreadable-note)",
+          reason.startswith("The recording could not be read: ")
+          and fin.get("unreadableNote") == f"A segment was left out. {reason} Its files are kept at "
+          f"{movies[1]}, {mics[1]}.", f"got {fin.get('unreadableNote')!r}")
+    check("U1: onFinish once, the stop's completion once, the same outcome",
+          u1.get("onFinishCount") == 1 and u1.get("stopCount") == 1 and u1.get("stop") == fin,
+          f"onFinish {u1.get('onFinishCount')}, stop {u1.get('stopCount')}")
+
+    print("  U2 — [EMPTY, EMPTY]: no readable movie")
+    u2 = answer.get("u2") or {}
+    m2 = u2.get("movies") or ["", ""]
+    c2 = u2.get("mics") or ["", ""]
+    f2 = u2.get("onFinish") or {}
+    description = f2.get("description") or ""
+    check("U2: with NO readable movie the recording FAILS — filesKept(finishFailed), the first "
+          "segment's error, naming both movies then both microphone files",
+          u2.get("written") is True and u2.get("settled") is True and f2.get("kind") == "failure"
+          and f2.get("case") == "filesKept(finishFailed)"
+          and description.startswith("The recording could not be read: ")
+          and description.endswith(
+              f" The recording is at {m2[0]}, {m2[1]}; the microphone at {c2[0]}, {c2[1]}."),
+          f"got {f2!r}")
+    check("U2: onFinish once, the stop's completion once, the same outcome",
+          u2.get("onFinishCount") == 1 and u2.get("stopCount") == 1 and u2.get("stop") == f2,
+          f"onFinish {u2.get('onFinishCount')}, stop {u2.get('stopCount')}")
+
+    print("  U3 — [EMPTY, readable], no microphone")
+    u3 = answer.get("u3") or {}
+    m3 = u3.get("movies") or ["", ""]
+    s3 = u3.get("startedAt") or [0, 0]
+    f3 = u3.get("onFinish") or {}
+    l3 = f3.get("unreadable") or [{}]
+    check("U3: a .success of the one readable segment, whose path and startedAt — the RESULT's — are "
+          "the SECOND segment's",
+          u3.get("written") is True and u3.get("settled") is True and f3.get("kind") == "success"
+          and len(f3.get("segments") or []) == 1 and f3.get("path") == m3[1]
+          and abs((f3.get("startedAt") or 0) - s3[1]) < 0.001, f"got {f3!r}")
+    check("U3: … the first segment left out with its movie alone kept",
+          len(f3.get("unreadable") or []) == 1 and l3[0].get("moviePath") == m3[0]
+          and l3[0].get("keptFiles") == [m3[0]], f"{f3.get('unreadable')!r}")
+
+    print("  U4–U6 — pure")
+    pure = answer.get("pure") or {}
+    check("U4: UnreadableSegment(\"/x/a.mov\", no files, .timedOut).sentence is \"A segment was left "
+          "out. <.timedOut's sentence> It left no file on disk.\"",
+          bool(pure.get("timedOut")) and pure.get("aloneSentence")
+          == f"A segment was left out. {pure.get('timedOut')} It left no file on disk.",
+          f"got {pure.get('aloneSentence')!r}")
+    check("U4: … and with two files kept, \"… Its files are kept at /x/b.mov, /x/b (Microphone).m4a.\"",
+          pure.get("keptSentence") == "A segment was left out. The recording could not be read: x. "
+          "Its files are kept at /x/b.mov, /x/b (Microphone).m4a.", f"got {pure.get('keptSentence')!r}")
+    check("U4: a result with nothing left out has unreadableNote nil", pure.get("emptyNoteIsNil") is True,
+          f"{pure.get('emptyNoteIsNil')}")
+    landing = pure.get("landing") or {}
+    closed = pure.get("closedSentence") or ""
+    check("U5: landingNote's order — the stop's sentence, the closed document, UNREADABLE, the "
+          "microphone, the resume, the placement's notes",
+          bool(closed) and landing.get("all") == f"{SYSTEM_STOP_SENTENCE} {closed} Unreadable. Mic. "
+          "Resume. Note one. Note two.", f"got {landing.get('all')!r}")
+    check("U5: unreadable: nil is the R1 call, byte for byte",
+          landing.get("nil") == landing.get("r1") == f"{SYSTEM_STOP_SENTENCE} {closed} Mic.",
+          f"{landing.get('nil')!r} against {landing.get('r1')!r}")
+    check("U5: the unreadable sentence alone is the whole note", landing.get("only") == "Unreadable.",
+          f"got {landing.get('only')!r}")
+    note = pure.get("unreadableNote")
+    check("U6: record_screen's fields carry unreadable — [{path, kept_files, reason}] — for U1's result",
+          pure.get("fieldsUnreadable") == [{"path": movies[1], "kept_files": [movies[1], mics[1]],
+                                            "reason": reason}], f"got {pure.get('fieldsUnreadable')!r}")
+    check("U6: … and no unreadable key at all when nothing was left out",
+          pure.get("cleanHasUnreadable") is False, f"{pure.get('cleanHasUnreadable')}")
+    check("U6: resultNotes is [the unreadable note, the microphone note], in that order; [] for a "
+          "clean result",
+          bool(note) and bool(pure.get("microphoneNoteBoth"))
+          and pure.get("notesBoth") == [note, pure.get("microphoneNoteBoth")]
+          and pure.get("notesClean") == [], f"{pure.get('notesBoth')!r}, {pure.get('notesClean')!r}")
+    clause = pure.get("filesClause") or ""
+    check("U6: savedButNotAdded ends with the unreadable note; a clean result's sentence is R1's",
+          pure.get("savedWith") == f"The recording was saved at {clause} but could not be added: a "
+          f"drag is in progress {note}"
+          and pure.get("savedClean") == f"The recording was saved at {clause} but could not be added: "
+          "a drag is in progress", f"{pure.get('savedWith')!r}, {pure.get('savedClean')!r}")
+
+    print("  M1 — a microphone failure at a segment boundary")
+    b = answer.get("boundary") or {}
+    s0 = b.get("segment0") or {}
+    check("M1: a recording session with a microphone, its output attached, paused",
+          b.get("written") is True and b.get("attached") == "ok" and b.get("pause") == "ok",
+          f"{b.get('written')}, {b.get('attached')!r}, {b.get('pause')!r}")
+    check("M1: a microphone did-finish carrying −11805 for the PAUSED segment (stoppedAt set — asked "
+          "for) is that segment's micFailure, the recorder still paused",
+          (s0.get("micFailure") or "").startswith("The microphone recording failed: ")
+          and b.get("stateAfterMicFinish") == "paused", f"{s0}, {b.get('stateAfterMicFinish')!r}")
+    check("M1: … and NOT the session's microphoneProblem — the live note stays empty "
+          "(boundary-promoted)",
+          b.get("microphoneProblem") is None and b.get("liveNote") == "",
+          f"{b.get('microphoneProblem')!r}, {b.get('liveNote')!r}")
+    bf = b.get("onFinish") or {}
+    bs = bf.get("segments") or [{}]
+    check("M1: the stop lands a .success whose segment 0 micProblem begins \"The microphone recording "
+          "failed: \" — once to onFinish and once to the stop",
+          b.get("settled") is True and bf.get("kind") == "success" and len(bf.get("segments") or []) == 1
+          and (bs[0].get("micProblem") or "").startswith("The microphone recording failed: ")
+          and b.get("onFinishCount") == 1 and b.get("stopCount") == 1, f"{bf!r}")
 
 
 # --------------------------------------------------------------------------
@@ -5820,6 +6390,98 @@ def section_chrome_pause(binary, sources):
 
 
 # --------------------------------------------------------------------------
+# Section 12 — issue batch B17 (#98 a, b): File ▸ Pause/Resume Recording and
+# the status item's one fixed length.
+
+STATUS_ELAPSED = [0.0, 59.0, 61.9, 599.0, 3599.0, 3661.0, 35999.0]
+
+
+def section_file_pause(binary, sources):
+    print("\nSection 12 — issue batch B17 (#98 a, b): File ▸ Pause/Resume Recording — the item, its "
+          "validator and its route — and the status item's one fixed length")
+    work = fresh_dir("file-pause")
+    answer, error = run_probe(binary, "file-pause",
+                              {"mode": "file-pause", "work": work, "elapsed": STATUS_ELAPSED})
+    check("12: the probe answers", answer is not None and not answer.get("error"),
+          error or (answer or {}).get("error", ""))
+    if not answer or answer.get("error"):
+        return
+
+    f = answer.get("file") or {}
+    n = f.get("next") or {}
+    check("F1: the File menu's item directly after New Recording… is Pause Recording, action "
+          "pauseOrResumeRecording:, nil target, no key, not a separator",
+          f.get("newRecordingIndex", -1) >= 0 and n.get("title") == "Pause Recording"
+          and n.get("action") == "pauseOrResumeRecording:" and n.get("hasTarget") is False
+          and n.get("key") == "" and n.get("separator") is False, f"{f}")
+    check("F1: … and exactly one item in the whole bar sends it", f.get("inBar") == 1,
+          f"got {f.get('inBar')}")
+    titles = answer.get("menuTitles") or {}
+    rows = {v.get("state"): v for v in answer.get("validate") or []}
+    for state, enabled in [("idle", False), ("arming", False), ("finishing", False),
+                           ("recording", True), ("paused", True)]:
+        v = rows.get(state) or {}
+        want = titles.get("paused" if state == "paused" else "recording")
+        check(f"F2: validateMenuItem with the recorder {state} → enabled {enabled}, titled {want!r} — "
+              f"the status item's own menuTitles(paused:)[0]",
+              want in ("Pause Recording", "Resume Recording") and v.get("enabled") is enabled
+              and v.get("title") == want, f"{v}, titles {titles}")
+    f3 = answer.get("f3") or {}
+    p3 = f3.get("paused") or {}
+    check("F3: the panel's own recording — the action pauses THROUGH THE PANEL: panel and recorder "
+          "both .paused (pause-route-recorder)",
+          f3.get("attached") == "ok" and p3.get("panel") == "paused" and p3.get("recorder") == "paused",
+          f"{f3}")
+    check("F3: … and again resumes: both .recording, with TWO segments",
+          f3.get("panel") == "recording" and f3.get("recorder") == "recording"
+          and f3.get("segments") == 2, f"{f3}")
+    f4 = answer.get("f4") or {}
+    p4 = f4.get("paused") or {}
+    check("F4: a recording the panel does not own (a tool's) — the action pauses the RECORDER, the "
+          "panel idle and not shown",
+          f4.get("attached") == "ok" and p4.get("recorder") == "paused" and p4.get("panel") == "idle"
+          and p4.get("visible") is False, f"{f4}")
+    check("F4: … and again resumes the recorder — two segments, the panel still idle and hidden",
+          f4.get("recorder") == "recording" and f4.get("segments") == 2 and f4.get("panel") == "idle"
+          and f4.get("visible") is False, f"{f4}")
+    f5 = answer.get("f5") or {}
+    check("F5: with nothing recording the action changes nothing — both idle, no session, the panel "
+          "hidden",
+          f5.get("panel") == "idle" and f5.get("recorder") == "idle" and f5.get("session") is False
+          and f5.get("visible") is False, f"{f5}")
+    check("F: the recorder is idle once the probe tears its faked sessions down",
+          answer.get("stateAfter") == "idle", f"{answer.get('stateAfter')!r}")
+
+    w0 = answer.get("w0") or {}
+    print(f"  W0: '● 0:00' is {w0.get('recording')} pt wide and '{PAUSE_GLYPH} 0:00' "
+          f"{w0.get('paused')} pt (facts, not asserted)")
+    length = answer.get("itemLength") or 0
+    inset = answer.get("titleInset") or 0
+    widths = answer.get("widths") or []
+    check(f"W1: a width for each of {len(STATUS_ELAPSED)} times × both marks",
+          len(widths) == 2 * len(STATUS_ELAPSED), f"got {len(widths)}")
+    for row in widths:
+        need = math.ceil(row.get("width") or 0) + 2 * inset
+        mark = PAUSE_GLYPH if row.get("paused") else "●"
+        check(f"W1: '{mark} {row.get('label')}' needs {need:g} pt ≤ itemLength {length:g}",
+              0 < need <= length + 1e-9, f"width {row.get('width')}")
+    ww = answer.get("widestWidths") or []
+    check("W2: itemLength is the wider mark's title at widestElapsed, rounded up, plus 2 × titleInset "
+          "(6 pt)",
+          len(ww) == 2 and inset == 6
+          and abs(length - (max(math.ceil(w) for w in ww) + 2 * inset)) < 1e-9, f"{length}, {ww}, {inset}")
+    check("W2: widestElapsed is 35 999 s, labelled 9:59:59 (width-short-label)",
+          answer.get("widestElapsed") == 35999 and answer.get("widestLabel") == "9:59:59",
+          f"{answer.get('widestElapsed')}, {answer.get('widestLabel')!r}")
+    code = read_code(sources, "RecorderStatusItem.swift") or ""
+    show = "\n".join(function_body(code.splitlines(), "func show()") or [])
+    check("W3: show() puts the item up at statusItem(withLength: Self.itemLength) "
+          "(status-variable-length)", "statusItem(withLength: Self.itemLength)" in show, show)
+    check("W3: … and RecorderStatusItem.swift's CODE never says variableLength",
+          bool(code) and "variableLength" not in code)
+
+
+# --------------------------------------------------------------------------
 # Section 6 — the welcome window's cross-build (phase 5's pattern).
 #
 # PNG, in pure Python, and the pixel helpers: `phase5_chrome.py`'s, unchanged
@@ -6279,7 +6941,8 @@ def section_catalog(binary, sources):
     description = rs.get("description") or ""
     for phrase in ["Pause Recording", "Resume Recording", "Stop Recording", "pauses", "segments",
                    "started_at", "mic_offset", "mic_problem", "Add Recording Segments", "Add Microphone",
-                   "wall clock", "TOTAL", "user_stopped", "screen-recording indicator"]:
+                   "wall clock", "TOTAL", "user_stopped", "screen-recording indicator",
+                   "unreadable"]:
         check(f"7d: record_screen's description names {phrase!r} (R2d)", phrase in description,
               f"{len(description)} chars of description")
 
@@ -6985,6 +7648,53 @@ MUTANTS = {
         "            _ = RecordingGrant.screenRecordingPaneURL.map(doors.openSettings)\n"
         "            let opened = true\n",
         "the opener's answer ignored — the note claims System Settings is open when it did not open"),
+    # Issue batch B17 (#97, #98 a, b) — sections 11 and 12, and 3o.
+    "unreadable-fails-all": (
+        "ScreenRecorder+Finishing.swift",
+        "                let left = Self.leftOut(done, at: index, error)\n"
+        "                self.probeSegment(done, at: index + 1, landed: landed, skipped: skipped + [left])\n",
+        "                self.conclude(done, .failure(Self.unreadable(done, at: index, error)))\n",
+        "an unreadable segment fails the whole recording again (#97 undone — the code before B17)"),
+    "no-unreadable-note": (
+        "RecordingResult.swift",
+        "        unreadable.isEmpty ? nil : unreadable.map(\\.sentence).joined(separator: \" \")\n",
+        "        nil\n",
+        "unreadableNote always nil — a left-out segment is named at neither door"),
+    "boundary-promoted": (
+        "ScreenRecorder+Delegates.swift",
+        "                if self.microphoneProblem == nil, current.segments[index].stoppedAt == nil {\n",
+        "                if self.microphoneProblem == nil {\n",
+        "a segment-boundary microphone failure promoted to the session's microphoneProblem again "
+        "(the code before B17)"),
+    "pause-item-untitled": (
+        "AppDelegate.swift",
+        "            item.title = RecorderStatusItem.menuTitles(paused: ScreenRecorder.shared.isPaused)[0]\n",
+        "",
+        "File ▸ Pause Recording's validator arm never retitles — it reads Pause Recording while paused"),
+    "pause-item-enabled": (
+        "AppDelegate.swift",
+        "            return ScreenRecorder.shared.state == .recording || ScreenRecorder.shared.state == .paused\n",
+        "            return true\n",
+        "File ▸ Pause Recording enabled with no recording running"),
+    "pause-route-recorder": (
+        "AppDelegate+Recording.swift",
+        "        case .recording:\n"
+        "            panel.pauseRecording()\n"
+        "        case .paused:\n"
+        "            panel.resumeRecording()\n",
+        "",
+        "File ▸ Pause Recording pauses the panel's own recording behind the panel's back"),
+    "status-variable-length": (
+        "RecorderStatusItem.swift",
+        "        let item = NSStatusBar.system.statusItem(withLength: Self.itemLength)\n",
+        "        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)\n",
+        "the status item back at variableLength — it resizes as the time and the mark change "
+        "(the code before B17)"),
+    "width-short-label": (
+        "RecorderStatusItem.swift",
+        "    static let widestElapsed: TimeInterval = 35_999\n",
+        "    static let widestElapsed: TimeInterval = 0\n",
+        "the item sized for 0:00 — a longer label is wider than the item"),
 }
 
 
@@ -7012,9 +7722,9 @@ def prepare_mutant(name):
     return target
 
 
-SECTIONS = [section_files, section_configuration, section_state, section_landing, section_segments,
-            section_chrome, section_chrome_pause, section_welcome, section_catalog, section_host,
-            section_granted, section_grants]
+SECTIONS = [section_files, section_configuration, section_state, section_unreadable, section_landing,
+            section_segments, section_chrome, section_chrome_pause, section_file_pause,
+            section_welcome, section_catalog, section_host, section_granted, section_grants]
 
 
 def main():
@@ -7028,8 +7738,9 @@ def main():
                              "compile against it (overrides --sources)")
     parser.add_argument("--only",
                         help="a comma-separated subset of sections to run, by the name after "
-                             "`section_` (files, configuration, state, landing, segments, chrome, "
-                             "chrome_pause, welcome, catalog, host, granted, grants) — for "
+                             "`section_` (files, configuration, state, unreadable, landing, "
+                             "segments, chrome, chrome_pause, file_pause, welcome, catalog, host, "
+                             "granted, grants) — for "
                              "iterating on "
                              "one; the full run is what the counts in the docstring are")
     args = parser.parse_args()

@@ -370,6 +370,11 @@ To take a permission away again: System Settings ▸ Privacy & Security, or
 - **Expect:** in step 3 the New Recording panel is in front of TextEdit, TextEdit keeps the focus, the words and the Return land in TextEdit, and no countdown starts. In step 4 the panel closes without bringing Reelcut's windows forward. In step 5 the panel comes up key, with Record as its default button.
 - **Source:** #137; spec §11 recording.md (the recorder panel takes key only from an active Reelcut).
 
+**REC-8 — File ▸ Pause Recording, and the item's one width**
+- **Do:** 1. Start a recording from the panel. 2. Open the File menu: Pause Recording, then open it again: Resume Recording. 3. Watch Reelcut's menu bar item through the pause and resume, and past the first minute. 4. Repeat 2–3 with the menu bar in the light look and in the dark. 5. Stop.
+- **Expect:** the File item reads Pause Recording while recording and Resume Recording while paused, and is greyed out with no recording; each choice pauses or resumes as the item's own menu does (coral dot and running time, then the pause glyph and a frozen time). The item keeps one width throughout — the neighbouring menu bar items do not shift as the time ticks or the mark changes — and the title is never clipped, in either look.
+- **Source:** #98 (a, b); spec §11 recording.md (File ▸ Pause Recording).
+
 ## Assistant
 
 Needs your own Anthropic API key (Setup 3).

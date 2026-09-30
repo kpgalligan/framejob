@@ -13,11 +13,13 @@ import AppKit
 ///
 /// **Neither pause member is reachable from the panel's own controls.** The
 /// panel is off screen for every recording (decision 7), so Pause Recording
-/// and Resume Recording are rows of the status item's menu and nothing else;
-/// the item calls these through the closures `recordingDidStart` hands it,
-/// and the panel's phase — `.recording ⇄ .paused` — follows the recorder's
-/// own `pause()` / `resume()` (`ScreenRecorder+Pause.swift`), which are
-/// synchronous and throw. The phase moves only AFTER the call returns
+/// and Resume Recording are rows of the status item's menu, which calls
+/// these through the closures `recordingDidStart` hands it, and File ▸
+/// Pause/Resume Recording (`AppDelegate+Recording.swift`), the second door,
+/// which calls them for the panel's own recording (#98). The panel's
+/// phase — `.recording ⇄ .paused` — follows the recorder's own `pause()` /
+/// `resume()` (`ScreenRecorder+Pause.swift`), which are synchronous and
+/// throw. The phase moves only AFTER the call returns
 /// without throwing, so the panel never claims a state the recorder
 /// refused: a pause that could not close the segment's file leaves the
 /// recorder `.recording` and the panel with it, and a resume whose output
@@ -54,7 +56,8 @@ import AppKit
 extension RecorderPanelController {
     // MARK: - Pause and resume
 
-    /// The status item's Pause Recording. `.recording` → `.paused`; any
+    /// The status item's Pause Recording, and File ▸ Pause Recording's for
+    /// the panel's own recording. `.recording` → `.paused`; any
     /// other phase beeps — the row was clicked in the moment between a Stop
     /// and the item coming down — and so does any throw, `.alreadyPaused`
     /// among them (the header).
@@ -71,7 +74,8 @@ extension RecorderPanelController {
         }
     }
 
-    /// The status item's Resume Recording. `.paused` → `.recording`, with
+    /// The status item's Resume Recording, and File ▸ Resume Recording's.
+    /// `.paused` → `.recording`, with
     /// the refused-resume sentence cleared; any other phase beeps. A throw
     /// leaves the phase paused and keeps the recorder's sentence as
     /// `resumeProblem`, REPLACING an earlier one, redrawn into the note at

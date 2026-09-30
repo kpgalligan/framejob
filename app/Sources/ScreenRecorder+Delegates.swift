@@ -15,9 +15,10 @@ import ScreenCaptureKit
 /// (the pause's, landing after the resume — R0 q7: 5–25 ms) is that
 /// segment's flag and, while finishing, the wait's answer; what it is NOT
 /// is the recording's end. A did-FAIL is, whichever segment's output it
-/// names (a movie that will not probe fails the recording, so recording
-/// on is pointless), and a microphone did-finish carrying an error is that
-/// segment's `micFailure` and the session's `microphoneProblem`.
+/// names (a failed writer is `screenFailure`, the recording's), and a
+/// microphone did-finish carrying an error is that segment's `micFailure`
+/// — and the session's `microphoneProblem` only MID-segment (#97): at a
+/// boundary the machine asked for, it is that segment's alone.
 /// `Segment.stoppedAt` is what says a did-finish was asked for.
 
 // MARK: - The stream's delegate
@@ -115,9 +116,9 @@ extension ScreenRecorder: SCRecordingOutputDelegate {
     /// segment's `stoppedAt` says so — is the wait's answer while finishing
     /// and, before it, nothing more than the segment's own flag. One nobody
     /// asked for (the writer gave up) and EVERY failure — a closing file's
-    /// included, since a segment that will not probe fails the recording
-    /// and recording on into a doomed result helps nobody — end the
-    /// recording the way an external stop does. While arming, the start's
+    /// included, since a did-fail is `screenFailure`, which fails the
+    /// recording (a movie that merely will not probe is left out, #97) —
+    /// end the recording the way an external stop does. While arming, the start's
     /// completion reports it.
     private func outputEnded(asked: Bool) {
         switch state {
@@ -154,8 +155,11 @@ extension ScreenRecorder: AVCaptureFileOutputRecordingDelegate {
     /// segment's failure is on its own segment), the meter goes silent when
     /// it is the LATEST segment's (a closed segment's late error has nothing
     /// to silence), and `settle` will carry it on that segment. Badly while
-    /// arming is the same problem, seen earlier; badly while paused is the
-    /// pause's own did-finish gone wrong, on the same terms.
+    /// arming is the same problem, seen earlier. Badly for a segment whose
+    /// `stoppedAt` is set — a did-finish a pause or the stop ASKED for, e.g.
+    /// −11805 for a writer stopped before its first sample — is that
+    /// segment's `micFailure` and never `microphoneProblem` (#97): the other
+    /// segments' voices are on disk, and the live note would say otherwise.
     func fileOutput(
         _ output: AVCaptureFileOutput, didFinishRecordingTo outputFileURL: URL,
         from connections: [AVCaptureConnection], error: (any Error)?
@@ -173,7 +177,9 @@ extension ScreenRecorder: AVCaptureFileOutputRecordingDelegate {
             if !finishedWell, current.segments[index].micFailure == nil, let error {
                 let sentence = "The microphone recording failed: " + error.localizedDescription
                 self.session?.segments[index].micFailure = sentence
-                if self.microphoneProblem == nil { self.microphoneProblem = sentence }
+                if self.microphoneProblem == nil, current.segments[index].stoppedAt == nil {
+                    self.microphoneProblem = sentence
+                }
                 if index == current.lastIndex {
                     self.meter.publish(.silent, from: ObjectIdentifier(self))
                 }

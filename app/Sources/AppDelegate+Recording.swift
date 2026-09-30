@@ -16,9 +16,11 @@ import AppKit
 /// alike. While a recording runs — PAUSED included: `isRecording` is every
 /// state past idle — the same item reads "Stop Recording"
 /// (`AppDelegate.validateMenuItem` retitles it from `ScreenRecorder.shared`),
-/// and this action then stops instead of showing. Pause and Resume have no
-/// menu item here; they are the status item's rows (R2c), because a paused
-/// recording is one the person is standing in front of.
+/// and this action then stops instead of showing. File ▸ Pause Recording
+/// (#98), directly under it with no key, pauses and resumes: retitled
+/// Resume Recording from the recorder's state, live only while a recording
+/// runs, and routed as the Stop is below — a second door beside the status
+/// item's rows (R2c), for a person who looks in the File menu first.
 ///
 /// **Whose recording it is decides the route** (R1 review). The retitle reads
 /// the RECORDER, which is one object shared by the panel and the
@@ -29,7 +31,10 @@ import AppKit
 /// the panel, which lands it exactly as its Stop button would; anything else
 /// the recorder holds stops through `ScreenRecorder.shared.stop()` with no
 /// completion, and the session's `onFinish` — the tool's — lands it; and
-/// with nothing recording the panel is shown.
+/// with nothing recording the panel is shown. Pause Recording takes the
+/// same route: the panel's `.recording` / `.paused` through its own
+/// `pauseRecording()` / `resumeRecording()`, anything else through the
+/// recorder's `pause()` / `resume()`, whose refusal beeps.
 ///
 /// **The welcome button has its own action** (R2 review). It used to send
 /// `newRecording`, whose first arm is the Stop above — but the button's
@@ -49,6 +54,25 @@ extension AppDelegate {
                 ScreenRecorder.shared.stop()
             } else {
                 panel.show()
+            }
+        }
+    }
+
+    /// File ▸ Pause Recording / Resume Recording (the header). A tool's
+    /// status item follows at its own next 1 Hz tick.
+    @objc func pauseOrResumeRecording(_ sender: Any?) {
+        let panel = RecorderPanelController.shared
+        switch panel.phase {
+        case .recording:
+            panel.pauseRecording()
+        case .paused:
+            panel.resumeRecording()
+        default:
+            let recorder = ScreenRecorder.shared
+            do {
+                if recorder.isPaused { try recorder.resume() } else { try recorder.pause() }
+            } catch {
+                NSSound.beep()
             }
         }
     }

@@ -40,7 +40,7 @@ import AppKit
 /// an edit landing between the two on the same run-loop turn — and it is
 /// there because the alternative is a note that lies.
 ///
-/// **The note says five things, in order**, through `landingNote`, a pure
+/// **The note says six things, in order**, through `landingNote`, a pure
 /// function so a probe can pin every combination without a landing: how the
 /// recording ended when it was not this panel's own Stop (`.stopped` is the
 /// status item's Stop too; `.userStopped` is the SYSTEM's indicator, and the
@@ -48,7 +48,9 @@ import AppKit
 /// well); that the document the person CHOSE had closed, when the choice
 /// was a document and the landing opened a new project (R1 review — the
 /// fallback is exact, and a person who chose "Untitled 2" should not have
-/// to work out why a new window appeared instead); the microphone's
+/// to work out why a new window appeared instead); the segments left out
+/// because their movie would not probe (`unreadableNote`, #97), each naming
+/// the files it kept; the microphone's
 /// problem, when the recording is a `.success` whose `micProblem` is set —
 /// a success, not an error, so the picture lands first and the sentence
 /// follows it; a resume the recorder refused (`resumeProblem`, STATE on the
@@ -57,8 +59,8 @@ import AppKit
 /// Stop the note was empty and the reveal showed nothing, the opposite of
 /// what `+Pause.swift` promised); and the placement's own notes, one per
 /// file the landing could not place. `failedToLand` names every file
-/// through `filesClause` and carries the microphone's and the resume's
-/// sentences too.
+/// through `filesClause` and carries the unreadable segments', the
+/// microphone's and the resume's sentences too.
 ///
 /// **The panel comes back ONLY with something to say** (decision 7, R2c).
 /// It ordered out at `recordingDidStart` whatever the source, and each of
@@ -170,21 +172,23 @@ extension RecorderPanelController {
             Self.landingNote(
                 stoppedBy: result.stoppedBy, chosen: result.choice.destination,
                 landedAsNewProject: asNewProject, micProblem: result.micProblem,
-                resumeProblem: resumeProblem, notes: notes))
+                resumeProblem: resumeProblem, notes: notes, unreadable: result.unreadableNote))
         revealIfNoted()
     }
 
     /// The files are on disk whatever went wrong after them, so the note
     /// names every one (`filesClause`: each segment's movie, and the
-    /// microphone files that landed) — then what became of the microphone
-    /// and of a refused resume, when the result or the panel carries those
-    /// sentences — and the reveal last.
+    /// microphone files that landed) — then what became of an unreadable
+    /// segment, the microphone and a refused resume, when the result or the
+    /// panel carries those sentences — and the reveal last.
     private func failedToLand(_ result: RecordingResult, _ error: any Error) {
         phase = .idle
         var note =
             "The recording was saved at \(result.filesClause) but could not be added: "
             + error.localizedDescription
-        for sentence in [result.micProblem, resumeProblem].compactMap({ $0 }) {
+        for sentence in [result.unreadableNote, result.micProblem, resumeProblem]
+            .compactMap({ $0 })
+        {
             note += " " + sentence
         }
         setNote(note)
@@ -205,14 +209,15 @@ extension RecorderPanelController {
 
     /// The landing's note (the type doc): the stop's sentence unless the
     /// stop was this panel's own; the closed-document sentence when a chosen
-    /// document was gone by the time the recording ended; the microphone's
-    /// problem; a refused resume's sentence; then the placement's notes.
-    /// Empty for the ordinary case, so `setNote` hides the label. The two
-    /// R2 arguments are LAST and default, so the probe's R1 rows read as
-    /// they did.
+    /// document was gone by the time the recording ended; the unreadable
+    /// segments' sentences; the microphone's problem; a refused resume's
+    /// sentence; then the placement's notes. Empty for the ordinary case, so
+    /// `setNote` hides the label. The R2 arguments and #97's `unreadable`
+    /// are LAST and default, so the probe's R1 rows read as they did.
     static func landingNote(
         stoppedBy: StopReason, chosen: RecordingDestination, landedAsNewProject: Bool,
-        micProblem: String?, resumeProblem: String? = nil, notes: [String] = []
+        micProblem: String?, resumeProblem: String? = nil, notes: [String] = [],
+        unreadable: String? = nil
     ) -> String {
         var sentences: [String] = []
         switch stoppedBy {
@@ -229,6 +234,7 @@ extension RecorderPanelController {
         if case .document = chosen, landedAsNewProject {
             sentences.append(destinationClosedSentence)
         }
+        if let unreadable { sentences.append(unreadable) }
         if let micProblem { sentences.append(micProblem) }
         if let resumeProblem { sentences.append(resumeProblem) }
         sentences.append(contentsOf: notes)

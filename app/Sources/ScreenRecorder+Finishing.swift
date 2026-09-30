@@ -33,8 +33,10 @@ import ScreenCaptureKit
 /// picture landing without it. A microphone that dies MID-recording
 /// (finding 3) sets `microphoneProblem` at once, silences the meter and
 /// lets the picture record on; `stop` lands it. A movie that will not probe
-/// is the recording's failure whichever segment's it is — landing the
-/// readable ones is NOT built (road map 3, R2a).
+/// is LEFT OUT (#97): the walker goes on to the next segment and the result
+/// names it in `unreadable`, its files kept on disk and named; only a
+/// recording with NO readable movie fails — the first segment's error, every
+/// file named, so one segment's failure reads as it always did.
 ///
 /// **`settle` runs once** (finding 2): `Session.settling` is set on entry,
 /// `checkFinished` and the ceiling timer bail on it, and a callback that
@@ -120,36 +122,59 @@ extension ScreenRecorder {
         done.micSession?.stopRunning()
         meter.publish(.silent, from: ObjectIdentifier(self))
         if let failure = done.screenFailure { return conclude(done, .failure(failure)) }
-        probeSegment(done, at: 0, landed: [])
+        probeSegment(done, at: 0, landed: [], skipped: [])
     }
 
-    /// The walker: probes segment `index`'s movie — a failure is the
-    /// recording's, `unreadable` — then its microphone, appends the
-    /// `RecordingSegment` and moves to the next; past the last, concludes.
-    /// Sequential and recursive rather than concurrent, because each
-    /// probe's completion is on main and the order of `landed` IS the order
-    /// the landing places the clips in.
-    private func probeSegment(_ done: Session, at index: Int, landed: [RecordingSegment]) {
+    /// The walker: probes segment `index`'s movie — a failure LEAVES THE
+    /// SEGMENT OUT, `leftOut`, with no microphone probe — then its
+    /// microphone, appends the `RecordingSegment` and moves to the next;
+    /// past the last, concludes: a failure with the first left-out
+    /// segment's error when nothing landed, else a success carrying the
+    /// left-out ones. Sequential and recursive rather than concurrent,
+    /// because each probe's completion is on main and the order of `landed`
+    /// IS the order the landing places the clips in.
+    private func probeSegment(
+        _ done: Session, at index: Int, landed: [RecordingSegment],
+        skipped: [UnreadableSegment]
+    ) {
         guard index < done.segments.count else {
+            guard !landed.isEmpty else { return conclude(done, .failure(skipped[0].error)) }
             // The reason is read LIVE: an external stop whose did-finish
             // landed first writes it during the probe (`+Delegates.swift`'s
             // `.finishing` arm), after `settle` copied `done`.
             let result = RecordingResult(
                 segments: landed, choice: done.choice,
-                stoppedBy: session?.stoppedBy ?? done.stoppedBy, pauses: done.pauses)
+                stoppedBy: session?.stoppedBy ?? done.stoppedBy, pauses: done.pauses,
+                unreadable: skipped)
             return conclude(done, .success(result))
         }
         MediaImporter.probe(url: done.segments[index].movieURL) { [weak self] movie in
             guard let self else { return }
             switch movie {
             case .failure(let error):
-                self.conclude(done, .failure(Self.unreadable(done, at: index, error)))
+                let left = Self.leftOut(done, at: index, error)
+                self.probeSegment(done, at: index + 1, landed: landed, skipped: skipped + [left])
             case .success(let descriptor):
                 self.probeMicrophone(done, at: index, movie: descriptor) { [weak self] segment in
-                    self?.probeSegment(done, at: index + 1, landed: landed + [segment])
+                    self?.probeSegment(
+                        done, at: index + 1, landed: landed + [segment], skipped: skipped)
                 }
             }
         }
+    }
+
+    /// Segment `index`, left out: its movie as named, the files it left on
+    /// disk (movie, then microphone, each only if there) and `unreadable`'s
+    /// error for it.
+    private static func leftOut(_ done: Session, at index: Int, _ error: any Error)
+        -> UnreadableSegment
+    {
+        let segment = done.segments[index]
+        let kept = [segment.movieURL.path, segment.micURL?.path].compactMap { $0 }
+            .filter { FileManager.default.fileExists(atPath: $0) }
+        return UnreadableSegment(
+            moviePath: segment.movieURL.path, keptFiles: kept,
+            error: unreadable(done, at: index, error))
     }
 
     /// The microphone's half of one segment: no microphone → done; a writer

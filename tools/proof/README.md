@@ -8110,3 +8110,63 @@ Run on 2026-09-29:
 | `op_argument_proof.py 4944` | 152/152, exit 0 (alone on a fresh instance; run beside two other proofs it scored 149/152, the graphics root it waits for racing another instance's untitled project in the shared temporary folder) |
 | `op_catalog_proof.py 4945` | 23/23, exit 0 |
 | `cloud_captions_proof.py` | 171/171, exit 0 (before row 5's relink moved from the `say` AIFF to a copy of `AV.mov`: 165/166, row 5 raising on the kind refusal) |
+
+## Issue batch B17 — an unreadable segment is left out, File ▸ Pause Recording, a fixed-width status item (`recording_probe.py` sections 11 and 12, row 3o; #97, #98 a and b)
+
+The live `recording_proof.py` needs the Screen Recording grant, so the rows
+are `recording_probe.py`'s: a probe compiled from `app/Sources` over
+`harness/build.sh`'s swiftc line. Its docstring holds each row in full.
+
+- **Section 11 `unreadable` (#97)** — its own process, `RCFFmpegImport`
+  merged into the volatile argument domain as `never` before any probe; a
+  readable "movie" is a PNG, an unreadable one an EMPTY `.mov`. **U1**
+  [PNG, EMPTY, PNG] with a microphone on each → a `.success` of segments 0
+  and 2 with their microphones, `pauses` 2, `unreadable` segment 1 with both
+  its files and case `finishFailed`, and the note "A segment was left out.
+  <sentence> Its files are kept at <movie>, <mic>."; **U2** [EMPTY, EMPTY] →
+  `filesKept(finishFailed)` naming both movies then both microphone files;
+  **U3** [EMPTY, PNG] → the result's `path` and `startedAt` are the second
+  segment's; **U4** `UnreadableSegment.sentence` and a nil note; **U5**
+  `landingNote`'s order, `unreadable: nil` equal to the R1 call; **U6**
+  `record_screen`'s `unreadable` key only when non-empty, `resultNotes`'
+  order, `savedButNotAdded`'s tail; **M1** a microphone did-finish carrying
+  −11805 for a PAUSED segment is its `micFailure` and not
+  `microphoneProblem`, and lands as its `micProblem`.
+- **Row 3o re-aimed** — the empty second segment is left out: a `.success`
+  of `pause.png` alone, `unreadable[0]` naming both its files.
+- **Section 12 `file_pause` (#98 a, b)** — **F1** the File item after New
+  Recording…, action `pauseOrResumeRecording:`, nil target, no key, one in
+  the bar; **F2** the validator over idle, arming, finishing (disabled) and
+  recording, paused (enabled, "Pause Recording" / "Resume Recording" from
+  `menuTitles(paused:)`); **F3** the panel's own recording paused and
+  resumed through the panel; **F4** a recording the panel does not own
+  through the recorder; **F5** nothing recording, nothing changes; **W0**
+  prints the two 0:00 widths; **W1** every title from 0:00 to 9:59:59, both
+  marks, fits `itemLength`; **W2** `itemLength` is the formula at
+  `widestElapsed` (9:59:59); **W3** `show()` uses `Self.itemLength` and the
+  file never says `variableLength`.
+
+Mutants, each `--mutant <name> --only state,unreadable` (161 rows) or
+`--only file_pause` (34), all exit 1:
+
+| Mutant | Score | Rows failed |
+|---|---|---|
+| `unreadable-fails-all` (the code before the batch) | 147/161 | 3o's two, U1's five, U3's two, U4's nil note, U6's four |
+| `no-unreadable-note` | 157/161 | 3o's note, U1's note, U6's notes and `savedButNotAdded` |
+| `boundary-promoted` (the code before the batch) | 160/161 | M1's `microphoneProblem` row |
+| `pause-item-untitled` | 33/34 | F2 paused |
+| `pause-item-enabled` | 31/34 | F2 idle, arming, finishing |
+| `pause-route-recorder` | 33/34 | F3's pause row |
+| `status-variable-length` (the code before the batch) | 32/34 | W3's two |
+| `width-short-label` | 27/34 | W1's six titles from 59:59 up, W2's label |
+
+Run on 2026-09-30:
+
+| Command | Answer |
+|---|---|
+| `recording_probe.py --only state,unreadable,file_pause,landing,segments,chrome,chrome_pause,catalog,grants` | 711/711, exit 0 |
+| `recording_probe.py --sources work/b17-baseline/app/Sources --only unreadable,file_pause` (HEAD `22b1a68`) | 0/1, exit 1 — the probe does not build against the old tree (`RecordingResult` has no `unreadable`); the three "code before the batch" mutants are the behavioural controls |
+| `capture_spike/inventory.py --check` | 5/5, exit 0 |
+| `v2_menu.py 4917 --only H` (own instance on 4917) | 5 pass, 0 fail, 0 skip of 5, exit 0 |
+| `recording_proof.py 4871` (own instance) | 184/188, exit 1 — the four failures are the host's broken `ffmpeg` (`libx265.215.dylib` not loaded: the lane-E fixture and three `signalstats` reads); 2 tone rows skipped by name (the output is muted). The granted tier RAN: this terminal (tmux) held the grant |
+| `recording_probe.py` (the whole run) | 1045/1045, exit 0, no row skipped — section 9's granted tier RAN |

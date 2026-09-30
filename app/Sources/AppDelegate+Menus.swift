@@ -121,6 +121,9 @@ extension AppDelegate {
             item(
                 "New Recording…", #selector(AppDelegate.newRecording(_:)), "n",
                 [.command, .option]))
+        // Retitled Resume Recording and enabled only while a recording runs
+        // (`validateMenuItem`); no key (#98).
+        menu.addItem(item("Pause Recording", #selector(AppDelegate.pauseOrResumeRecording(_:))))
         menu.addItem(item("Open…", #selector(NSDocumentController.openDocument(_:)), "o"))
 
         // AppKit auto-populates a submenu whose sole item's action is

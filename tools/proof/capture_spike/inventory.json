@@ -58,6 +58,13 @@
    ],
    "note": "the recorder panel (RecorderPanelController.show), or stops a recording"
   },
+  "pauseOrResumeRecording:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/AppDelegate+Recording.swift `func pauseOrResumeRecording(`"
+   ],
+   "note": "pauses or resumes the recording in place (the panel's pauseRecording/resumeRecording, else ScreenRecorder.shared.pause/resume); no window, sheet or modal; disabled with no recording (#98)"
+  },
   "openDocument:": {
    "verdict": "framework",
    "code": [

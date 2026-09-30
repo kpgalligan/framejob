@@ -24,7 +24,10 @@ schema, §6 the op table, §7 the architecture.
   system picker), a microphone with a live meter, system audio, click rings,
   30 or 60 fps, point or pixel size, and where it lands — a new project, or
   an open document at its playhead. A 3-2-1 countdown, then a red dot with
-  the elapsed time in the menu bar carries Stop. The file is written to
+  the elapsed time in the menu bar carries Pause, Resume and Stop; File ▸
+  Pause Recording pauses and resumes too. A paused recording is one file
+  per stretch; a stretch whose file cannot be read is left out, and the
+  note names it and where its files are. The file is written to
   `~/Movies/Reelcut Recordings/` and imported as ordinary media (undo
   removes the clip, never the file); a microphone is a second file on its
   own Microphone track, aligned to the picture. A new project takes the

@@ -31,24 +31,23 @@ import ScreenCaptureKit
 /// the next has begun, and one `AVCaptureAudioFileOutput` writes every
 /// segment's file.
 ///
-/// **What a failed pair costs** is R1's posture, per segment: a movie that
-/// will not probe fails the RECORDING (`settle`, naming every file); a
-/// microphone file that will not is that segment's `micProblem`, and
-/// `resume()` asks the writer to record the next segment regardless — each
-/// is judged on its own file (q7: one poisoned writer failed every
-/// restarted file, and another day's did not). Landing the readable
-/// segments of a recording whose last one failed is the kinder rule and is
-/// deliberately NOT built (road map 3, R2a records the alternative).
+/// **What a failed pair costs** is R1's posture, per segment, softened for
+/// the movie (#97): a movie that will not probe LEAVES ITS SEGMENT OUT
+/// (`settle`, naming its kept files in `RecordingResult.unreadable`), and
+/// only a recording with no readable movie fails; a microphone file that
+/// will not probe is that segment's `micProblem`, and `resume()` asks the
+/// writer to record the next segment regardless — each is judged on its
+/// own file (q7: one poisoned writer failed every restarted file, and
+/// another day's did not).
 ///
-/// **Two limits the R2 review named and left.** A pause inside the ~10 ms
-/// between a resume's add and its output's did-start closes a file the
-/// writer may not have opened, and a movie that will not probe fails the
-/// recording at the stop — R1's posture above, every file named — rather
-/// than dropping the empty segment. And a microphone `startRecording`
-/// followed by `stopRecording` before its first sample answers −11805 with
-/// NO file (measured), which sets `microphoneProblem` for the SESSION —
-/// the panel writes its note once — although every other segment's voice
-/// is on disk and lands.
+/// **Two limits the R2 review named, and what became of them.** A pause
+/// inside the ~10 ms between a resume's add and its output's did-start
+/// closes a file the writer may not have opened; that empty segment is now
+/// left out and named rather than failing the recording (#97). And a
+/// microphone `startRecording` followed by `stopRecording` before its first
+/// sample answers −11805 with NO file (measured); that did-finish was ASKED
+/// for, so it is that segment's `micProblem` alone and no longer the
+/// session's `microphoneProblem` (#97) — every other segment's voice lands.
 extension ScreenRecorder {
     /// What one file pair owns: the two URLs, the output writing the movie,
     /// and the stamps the offset and `elapsed` are read from. `addedAt` is

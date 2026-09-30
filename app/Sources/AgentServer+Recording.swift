@@ -247,7 +247,7 @@ extension AgentServer {
     /// each door knows them by (the placement's lists, predicted before the
     /// commit; the new project's snapshot, read by path), and `note` is the
     /// door's sentences in order: `place: false`, a closed target, what the
-    /// landing could NOT place (each naming its file), the microphone.
+    /// landing could NOT place (each naming its file), then `resultNotes(result)`.
     private func land(_ result: RecordingResult, place: Bool) throws -> String {
         var fields: [String: Any]
         var notes: [String] = []
@@ -268,7 +268,7 @@ extension AgentServer {
                         + "place it with add_clip {track, media, at}.")
             }
             notes.append(contentsOf: placement.notes)
-            if let mic = Self.microphoneNote(result) { notes.append(mic) }
+            notes.append(contentsOf: Self.resultNotes(result))
             if !notes.isEmpty { fields["note"] = notes.joined(separator: " ") }
             let answer: String
             do {
@@ -304,7 +304,7 @@ extension AgentServer {
                         + "the first at 0.")
             }
             notes.append(contentsOf: landingNotes)
-            if let mic = Self.microphoneNote(result) { notes.append(mic) }
+            notes.append(contentsOf: Self.resultNotes(result))
             if !notes.isEmpty { fields["note"] = notes.joined(separator: " ") }
             fields["ok"] = true
             fields["project"] = summary(document)

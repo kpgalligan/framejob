@@ -56,6 +56,13 @@ import AppKit
 /// `RunLoop.main.add(_:forMode: .common)`, and `update(elapsed:paused:)` is
 /// then called under the open menu as it is at any other time.
 ///
+/// **One fixed length** (#98). The item is sized ONCE, `itemLength`: the
+/// widest title either mark makes at `widestElapsed` (9:59:59) plus
+/// `titleInset` each side, so the menu bar's other items never shift as the
+/// seconds tick, the hour appears or the mark flips between the dot and
+/// the pause glyph. A label past 9:59:59 is wider than that; it is not
+/// sized for.
+///
 /// The fonts are the SYSTEM's, not `DS`'s: the menu bar is the OS's chrome
 /// and a vendored face there would read as a foreign object. Monospaced
 /// digits so the label does not jitter as the seconds tick. The pause
@@ -66,6 +73,16 @@ final class RecorderStatusItem: NSObject {
     /// Two heavy vertical bars (U+275A). The panel's footnote spells a pause
     /// with the same glyph, from here, so the two never drift apart.
     static let pauseGlyph = "❚❚"
+    /// The longest time the item is sized for (the type doc).
+    static let widestElapsed: TimeInterval = 35_999
+    /// Room each side of the title inside the item.
+    static let titleInset: CGFloat = 6
+    /// The item's one length: the wider of the two marks' titles at
+    /// `widestElapsed`, rounded up, plus the insets (the type doc).
+    static let itemLength: CGFloat = [false, true].map { paused in
+        ceil(RecorderStatusItem.title(elapsed: widestElapsed, paused: paused).size().width)
+            + 2 * titleInset
+    }.reduce(0, max)
 
     private let onPause: () -> Void
     private let onResume: () -> Void
@@ -98,11 +115,11 @@ final class RecorderStatusItem: NSObject {
     /// Whether the item is in the menu bar.
     var isShowing: Bool { item != nil }
 
-    /// Puts the item up, at 0:00 with the RECORDING menu. A second call
-    /// while showing is a no-op.
+    /// Puts the item up, at 0:00 with the RECORDING menu and its one fixed
+    /// length. A second call while showing is a no-op.
     func show() {
         guard item == nil else { return }
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        let item = NSStatusBar.system.statusItem(withLength: Self.itemLength)
         item.menu = NSMenu(title: "Recording")
         self.item = item
         menuShowsPaused = false

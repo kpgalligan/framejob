@@ -761,7 +761,9 @@ def catalog_part(mcp):
                 "new_media", "new_clips", "new_tracks", "scope", "document_ops",
                 # R2d's three: the two keys always present, and the one only a
                 # segment carries.
-                "pauses", "segments", "started_at"):
+                "pauses", "segments", "started_at",
+                # Issue batch B17 (#97): present only when a segment was left out.
+                "unreadable"):
         check(re.search(rf"(?<![a-z_]){re.escape(key)}(?![a-z_])", description) is not None,
               f"…and names the result key {key}")
 

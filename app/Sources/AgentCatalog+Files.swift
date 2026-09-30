@@ -123,10 +123,12 @@ extension AgentServer {
         // `tools/proof/recording_proof.py` section 0 reads the phrases and
         // every result key off the finished string, so the keys are named
         // here exactly as `AgentServer+RecordingResult.swift` writes them.
+        // #97's unreadable paragraph is a third, for the same reason.
         let recordingPauseClause: String =
             "While it records, a status item in the menu bar shows the elapsed time with a "
             + "menu offering Pause Recording and Stop Recording — Resume Recording and Stop "
-            + "Recording while it is paused — and File ▸ Stop Recording works too. A "
+            + "Recording while it is paused — and File ▸ Pause Recording (Resume Recording "
+            + "while paused) and File ▸ Stop Recording work too. A "
             + "person's Stop from the menu bar or the File menu ends an agent's recording "
             + "EARLY and it still lands, with stopped_by: stopped — the same value the "
             + "tool's own stop at the span's end yields — and a duration shorter than the "
@@ -144,6 +146,12 @@ extension AgentServer {
             + "its own clip on the Microphone track at its own offset. segments carries one "
             + "entry per file (exactly one for an unpaused recording) and duration is the "
             + "TOTAL recorded across them. "
+        let recordingUnreadableClause: String =
+            "A segment whose movie will not read (an empty file, from a pause in the instant "
+            + "after a resume) is LEFT OUT rather than failing the recording: the readable "
+            + "segments land, and the result's unreadable lists each one left out — path, "
+            + "kept_files (what it left on disk) and reason — with the note naming them; "
+            + "only a recording with NO readable movie fails, naming every file. "
         let recordingResultClause: String =
             "The call blocks for seconds plus about a second of start and finish, and up to "
             + "75 s more if the writers are slow to close the files — 60 s more for each "
@@ -413,7 +421,7 @@ extension AgentServer {
                     + "Screen Recording grant, then the display or window lookup — where a "
                     + "console that is locked or asleep lists NO display and is refused as "
                     + "that, by name — then the recording itself. " + recordingPauseClause
-                    + recordingResultClause,
+                    + recordingUnreadableClause + recordingResultClause,
                 [
                     "seconds": [
                         "type": "number", "minimum": 1, "maximum": 600,
