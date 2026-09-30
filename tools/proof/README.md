@@ -8451,3 +8451,78 @@ and `grep "Reelcut: "` on its log printed nothing before and after each run:
 | `phase8_chrome.py` on this tree, and on a `git archive HEAD` tree | 144/150 both: the same six focus rows (the probe never became active: "attempt 1: active False, key 'nil', main 'nil'", ×3) — host state, not this change |
 | `make typecheck`; `make test`; `make app`; `wc -l app/Sources/Playback.swift` | 0 errors, 4 warnings, tsc clean; exit 0; BUILD SUCCEEDED; 595 |
 | `playhead_echo_probe.py` | 0/20, exit 1: its fixture's ffmpeg failed (`dyld[…]: Library not loaded: …libx265.215.dylib`) — the named host skip; S8–S11 are its rows without media |
+
+## Issue batch B22 — Remove Silences' notes name the clip (`silence2_proof.py` 4, 8c, 8d and 8e, `silence2_probe.py` 17; #107)
+
+`SilenceDetector.Outcome` answered by MEDIA only, so with one file behind two
+clips neither the sheet nor `detect_silence` could say which clip the mix made
+quiet or which fell back to the level test, and the sheet hedged ("…, unless
+the mix already turns it down far enough to be quiet."). This section
+supersedes the road map 4 sections' hedge wording above: those rows now read
+the per-clip sentences below.
+
+**The toll first.** `Span`, `Scope`, `Mode`, `Settings` and `Outcome` moved
+verbatim into `app/Sources/SilenceDetector+Vocabulary.swift` (586 → 435 and
+163 lines), gated alone: `make typecheck` 0 errors, 4 warnings, tsc clean;
+`inventory.py --check` 5/5.
+
+**The change.** `Outcome.answers` is one `VoiceAnswer` per scoped voice
+(clip, media, span, judged by level, waiting on the cache its quiet test reads
+after the floor, proposed by its OWN overlap test). `detect_silence` gains
+`judged_by_level_clips` (always) and `proposed_by_mix_clips` (when non-empty);
+its note names clips by id ("Clip 3 is proposed only where the mix already
+turns it down far enough to be quiet. Clips 3, 4 hold no voice and were judged
+by level."). The sheet names them by label, "<clip name> at <timecode>"
+("toneA.m4a at 00:00:00:00 holds no voice and is judged by level.";
+"…, except where the mix already turns {labelA} down far enough to be
+quiet.", where the probe checks the label but does not print it).
+
+**Rows.**
+
+- `silence2_proof.py` 4 (voice then tone): a new row, `judged_by_level_clips`
+  is the tone clip alone. 4 (waveform withheld, tone): the two note rows end
+  "Clip {clip} holds no voice and was judged by level." and "Clip {clip} is
+  proposed only where …". 8c ducked: "Clip {clip} holds spans that ARE
+  proposed here: the mix turns it down …". 8d (c): its last sentence is
+  "Clip {tone clip} holds no voice and was judged by level." B21's swap
+  mutant's anchor (`\(proposedHere.count)`) is untouched (`grep -c` 1) and the
+  mixed ending it swaps is byte-identical; the swap mutant was not re-run.
+- `silence2_proof.py` 8e (new, `twoclips_part`): `tone.wav` laid at 0 (a) and
+  12 s (b), nothing selected, caches landed, a ducked to 0.001, the waveform
+  removed, one `detect_silence`. (a) CONTROL both clips in scope, the media a
+  waveform waiter judged by level, no voice waiter; (b) CONTROL a span inside
+  a, none overlapping b; (c) `judged_by_level_clips == [a, b]`; (d)
+  `proposed_by_mix_clips == [a]`; (e) the whole note.
+- `silence2_probe.py` 17 (`ducked`): a second clip of `tone.wav` at 12 s, the
+  clip at 0 ducked; the two hedge rows are replaced by rows requiring the
+  waveform sentence naming the ducked clip's label, "2 clips hold no voice and
+  are judged by level: {labelA}, {labelB}.", no "unless the mix", and "What is
+  proposed inside {labelA} is quiet in the MIX …" with both caches gone. 17's
+  "stays plain" row now requires the plain sentence and no "except where the
+  mix". `main` catches ffmpeg's decode failure: 12d then SKIPs, naming "ffmpeg
+  could not decode clean.wav on this host" and the error, where the probe used
+  to die at its first line on this host.
+
+**Mutant M1** (rule R's words): in a `tree_copy` copy
+(`work/b22/m1`), the anchor line
+`let inside = spans.contains { $0.start < voice.end && voice.segment.start < $0.end }`
+(count 1) replaced by `let inside = proposed.contains(voice.segment.media)` —
+membership in the set `proposedMedia` is built from — then the copy's
+`make app`, its own instance, and the tree's `silence2_proof.py`.
+
+Run on 2026-09-30 (this host: ffmpeg and ffprobe are broken,
+`libx265.215.dylib` not loaded). Every instance was a fresh one of my own,
+and `grep "Reelcut: "` on its log printed nothing:
+
+| Command | Answer |
+|---|---|
+| `make typecheck`, `inventory.py --check` after the pure move alone | 0 errors, 4 warnings, tsc clean; 5/5 |
+| `silence2_proof.py 4872` on the pre-fix app (the pure move only, its `make app`) | 88/96 then ABORTED at section 11 (ffmpeg's PCM decode, SIGABRT): FAIL exactly the voice-then-tone clip row, 4's two note rows, 8c's ducked note row, 8d (c), 8e (c) (d) (e) — 8e (a) (b) pass |
+| `silence2_probe.py` on the pre-fix sources | 70/75, 1 skipped (12d, the ffmpeg decode): FAIL exactly 17's three new `duckedNoPeaks` rows and its two `duckedNoCaches` rows |
+| `silence2_proof.py 4872` on the fixed app | 96/96 then the same abort |
+| `phase3_silence_scope.py 4873` (a fresh instance) | 8/8 |
+| `silence2_probe.py` on the fixed sources | 75/75, 1 skipped (12d) |
+| `silence2_proof.py 4875` on M1 | 94/96 then the same abort: exactly 8e (d) (`[3, 4]`) and (e) ("Clips 3, 4 are proposed only where …") FAIL — caught |
+| `screens.py --only 14-remove-silences-sheet --port 4874 --out tools/proof/work/b22/screen14` | 6 pass, 0 fail, 0 skip of 6; 4 captures, 0 new problems; the sheet's note in both looks: "toneA.m4a at 00:00:00:00 holds no voice and is judged by level." |
+| `make test`; `make app`; `inventory.py --check` | exit 0; BUILD SUCCEEDED; 5/5 (the sheet's site re-pinned 527 → 529) |
+| `wc -l` SilenceDetector, +Vocabulary, SilenceSheetController, AgentServer+Silence | 450, 229, 556, 313 |

@@ -658,12 +658,33 @@ do {
         }
         answer["cachesLanded"] = manager.fileExists(atPath: speechBin.path)
             && manager.fileExists(atPath: peaksBin.path)
-        guard let clip = document.project.snapshot.clips.first?.id else {
+        // #107: a SECOND clip of the same file at 12 s, left un-ducked, so
+        // the notes must name the clip the mix made quiet rather than hedge
+        // about the media both clips share.
+        guard let first = document.project.snapshot.clips.first else {
             throw ProbeError.noClip
         }
+        let fps = document.project.snapshot.canvas.fps
+        document.applyEdit(
+            "Add Clip",
+            ReelOp.addClip(
+                track: first.track, media: mediaID,
+                at: ReelTime.snapToFrame(ReelTime.ticks(seconds: 12), fps: fps)))
+        document.selection = []
+        guard let ducked = document.project.snapshot.clips.first(where: { $0.start == 0 }),
+            let other = document.project.snapshot.clips.first(where: { $0.id != ducked.id })
+        else { throw ProbeError.noClip }
+        let clip = ducked.id
         document.applyEdit(
             "Volume", ReelOp.setAudioRaw(clips: [clip], patch: ["volume": 0.001]))
         spin(0.4)
+        let snapshot = document.project.snapshot
+        func label(_ c: ClipSnapshot) -> String {
+            "\(snapshot.name(of: c)) at "
+                + ReelTime.format(c.start, fps: snapshot.canvas.fps, frames: true)
+        }
+        answer["labelA"] = label(ducked)
+        answer["labelB"] = label(other)
 
         try? manager.removeItem(at: peaksBin)
         MediaImporter.postCacheChange(media: mediaID, kind: MediaImporter.peaksKind)
@@ -826,8 +847,11 @@ def wrapper_part(answer):
     return written
 
 
-def pin_part(written, samples_hash):
+def pin_part(written, samples_hash, decode_error=None):
     """`--pin` — the trace rewritten from THIS host's wrapper output."""
+    if samples_hash is None:
+        skip("--pin: ffmpeg could not decode clean.wav on this host", decode_error or "")
+        return
     trace = {
         "samples_sha256": samples_hash,
         "chunk_count": len(written),
@@ -841,8 +865,11 @@ def pin_part(written, samples_hash):
     print(f"pinned {TRACE}: {len(written)} chunks, samples sha256 {samples_hash[:16]}…")
 
 
-def trace_part(written, samples_hash):
+def trace_part(written, samples_hash, decode_error=None):
     section("12d — the pinned 32 ms trace")
+    if samples_hash is None:
+        skip("ffmpeg could not decode clean.wav on this host", decode_error or "")
+        return
     if not os.path.exists(TRACE):
         skip("silence2_trace.json is not in the tree — run with --pin")
         return
@@ -1027,8 +1054,10 @@ def sheet_part(answer):
     # `judgedByLevel` nor `voicePending` and the waveform line must stay
     # PLAIN. A build that hedges unconditionally fails this row.
     check("and the waveform line stays plain here — nothing in this file is judged "
-          "by the mix, so there is no hedge about it",
-          not any("unless the mix" in text for text in nopeaks.get("texts", [])),
+          "by the mix, so no clip is named as quiet by it",
+          any("Anything inside it that holds no voice is left alone until it lands." in text
+              for text in nopeaks.get("texts", []))
+          and not any("except where the mix" in text for text in nopeaks.get("texts", [])),
           f"{nopeaks.get('texts')}")
     # And the row the rejected fix would have failed: routing the waveform
     # branch through `promise(about:)` answers "quiet in the MIX" here,
@@ -1066,9 +1095,6 @@ def sheet_part(answer):
               f"{after.get('candidateSpans')}")
 
 
-HEDGE = "unless the mix already turns it down far enough to be quiet"
-
-
 def ducked_part(answer):
     """The second sceptic pass's finding 1, in its own process's own document.
 
@@ -1089,9 +1115,20 @@ def ducked_part(answer):
     check("and the note names the waveform as what it is waiting for",
           any("The waveform is still being analysed for" in text
               for text in nopeaks.get("texts", [])), f"{nopeaks.get('texts')}")
-    check("and it HEDGES that promise rather than denying the span underneath it — "
-          "the media is in `proposedMedia` and in `judgedByLevel`",
-          any(HEDGE in text for text in nopeaks.get("texts", [])),
+    label_a = answer.get("labelA", "(no label)")
+    label_b = answer.get("labelB", "(no label)")
+    waveform = ("Anything inside it that holds no voice is left alone until it lands, "
+                f"except where the mix already turns {label_a} down far enough to be quiet.")
+    check("and it names the DUCKED clip as the one the mix makes quiet, rather than "
+          "hedging about the file both clips share (#107)",
+          any(waveform in text for text in nopeaks.get("texts", [])),
+          f"{nopeaks.get('texts')}")
+    check("and it names both clips as judged by level, each by its label",
+          any(f"2 clips hold no voice and are judged by level: {label_a}, {label_b}."
+              in text for text in nopeaks.get("texts", [])),
+          f"{nopeaks.get('texts')}")
+    check("and no text hedges with \"unless the mix\"",
+          not any("unless the mix" in text for text in nopeaks.get("texts", [])),
           f"{nopeaks.get('texts')}")
 
     nocaches = answer.get("duckedNoCaches", {})
@@ -1103,11 +1140,15 @@ def ducked_part(answer):
           "printed and its own promise says the mix is what made it quiet",
           any("Speech is still being analysed for" in text
               for text in nocaches.get("texts", []))
-          and any("quiet in the MIX" in text for text in nocaches.get("texts", [])),
+          and any("quiet in the MIX" in text for text in nocaches.get("texts", []))
+          and any(f"What is proposed inside {label_a} is quiet in the MIX — turned down, "
+                  "faded or ducked — which neither cache can change." in text
+                  for text in nocaches.get("texts", [])),
           f"{nocaches.get('texts')}")
-    check("and the waveform line hedges here TOO, where the media is in `voicePending` "
-          "and never in `judgedByLevel` — a gate on `judgedByLevel` alone misses it",
-          any(HEDGE in text for text in nocaches.get("texts", [])),
+    check("and the waveform line names the ducked clip here TOO, where the media is in "
+          "`voicePending` and never in `judgedByLevel` — a gate on `judgedByLevel` "
+          "alone misses it",
+          any(waveform in text for text in nocaches.get("texts", [])),
           f"{nocaches.get('texts')}")
 
 
@@ -1119,7 +1160,12 @@ def main():
             print("\n0/1 checks passed")
             return 1
     make_fixtures()
-    samples_hash = hashlib.sha256(pcm(fixture("clean.wav"))).hexdigest()
+    try:
+        samples_hash = hashlib.sha256(pcm(fixture("clean.wav"))).hexdigest()
+        decode_error = None
+    except (subprocess.CalledProcessError, OSError) as error:
+        samples_hash = None
+        decode_error = f"{type(error).__name__}: {error}"
 
     binary, without, error = build_probe()
     check("the probe builds — an instrument that will not compile is a FAILURE here, "
@@ -1135,8 +1181,8 @@ def main():
         check("nothing threw inside it", "error" not in wrapper, wrapper.get("error", ""))
         written = wrapper_part(wrapper)
         if PIN:
-            pin_part(written, samples_hash)
-        trace_part(written, samples_hash)
+            pin_part(written, samples_hash, decode_error)
+        trace_part(written, samples_hash, decode_error)
 
     passes, error = run_probe(binary, "pass")
     check("the cache-pass run answers", passes is not None, error or "")

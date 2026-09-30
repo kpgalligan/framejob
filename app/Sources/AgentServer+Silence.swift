@@ -76,7 +76,13 @@ extension AgentServer {
             "mode": outcome.mode.rawValue,
             "voice_confidence": settings.voiceConfidence,
             "judged_by_level": outcome.judgedByLevel.map { Int($0) },
+            // The same answers by CLIP (#107): two clips of one file can be
+            // judged, and proposed, differently.
+            "judged_by_level_clips": outcome.judgedByLevelClips.map { Int($0) },
         ]
+        if !outcome.proposedByMixClips.isEmpty {
+            result["proposed_by_mix_clips"] = outcome.proposedByMixClips.map { Int($0) }
+        }
         var notes: [String] = []
         if let modeNote { notes.append(modeNote) }
         // Two things worth a sentence rather than a silent zero, because both
@@ -110,7 +116,8 @@ extension AgentServer {
             // faded, ducked or muted is quiet with nothing on disk at all and
             // its spans are right here (the reader review, road map 4 §8,
             // finding 2). Whatever the answer proposes inside is dropped from
-            // the promise and counted in its own clause.
+            // the promise, and the clips it is proposed inside are named in
+            // their own clause (#107).
             let proposedInside = waiter.intersection(outcome.proposedMedia)
             let blocked = waiter.subtracting(proposedInside)
             let waveformOnly = pendingUnion.subtracting(waiter)
@@ -122,11 +129,15 @@ extension AgentServer {
                     ? " Nothing inside them is proposed for removal."
                     : " Nothing inside \(blocked.count) of them is proposed for removal."
             }
-            if !proposedInside.isEmpty {
+            let mixInside = Self.clipIDs(outcome.mixAnswers(inside: waiter))
+            if mixInside.count == 1 {
                 waiting +=
-                    " \(Self.subject(proposedInside.count, of: pendingUnion.count, verb: "hold")) "
-                    + "spans that ARE proposed here: the mix turns them down far enough to be "
-                    + "quiet before either cache is asked."
+                    " Clip \(mixInside[0]) holds spans that ARE proposed here: the mix turns "
+                    + "it down far enough to be quiet before either cache is asked."
+            } else if mixInside.count > 1 {
+                waiting +=
+                    " Clips \(Self.listed(mixInside)) hold spans that ARE proposed here: the "
+                    + "mix turns them down far enough to be quiet before either cache is asked."
             }
             if !waveformOnly.isEmpty {
                 // The mirror image of the promise above, and it needs the
@@ -153,14 +164,21 @@ extension AgentServer {
                     + "WAVEFORM that has not landed, which in voice mode decides only a clip "
                     + "holding no voice" + ending
                 // And where those spans are the FLOOR's rather than the
-                // model's, say so: a clip of a by-level media is proposed
-                // without its waveform only because the mix already turned it
-                // down. No `voicePending` arm is needed here — a voice waiter
-                // is in `waiter` above and never in `waveformOnly`.
-                if !proposedHere.intersection(outcome.judgedByLevel).isEmpty {
+                // model's, name the clip (#107): a clip that holds no voice
+                // is proposed without its waveform only because the mix
+                // already turned it down, and another clip of the same file
+                // the mix left alone is not. No `voicePending` arm is needed
+                // here — a voice waiter is in `waiter` above and never in
+                // `waveformOnly`.
+                let mixOnly = Self.clipIDs(outcome.mixAnswers(inside: waveformOnly))
+                if mixOnly.count == 1 {
                     waiting +=
-                        " A clip there that holds no voice is proposed only where the mix "
-                        + "already turns it down far enough to be quiet."
+                        " Clip \(mixOnly[0]) is proposed only where the mix already turns it "
+                        + "down far enough to be quiet."
+                } else if mixOnly.count > 1 {
+                    waiting +=
+                        " Clips \(Self.listed(mixOnly)) are proposed only where the mix "
+                        + "already turns them down far enough to be quiet."
                 }
             }
             notes.append(waiting)
@@ -168,10 +186,12 @@ extension AgentServer {
         if !outcome.voicePending.isEmpty {
             result["voice_pending"] = outcome.voicePending.map { Int($0) }
         }
-        if !outcome.judgedByLevel.isEmpty {
+        let byLevel = outcome.judgedByLevelClips
+        if byLevel.count == 1 {
+            notes.append("Clip \(byLevel[0]) holds no voice and was judged by level.")
+        } else if byLevel.count > 1 {
             notes.append(
-                "\(outcome.judgedByLevel.count) media file(s) hold no voice in at least one "
-                    + "clip and were judged by level there.")
+                "Clips \(Self.listed(byLevel)) hold no voice and were judged by level.")
         }
         if !notes.isEmpty { result["note"] = notes.joined(separator: " ") }
         result["project"] = summary(document)
@@ -180,12 +200,20 @@ extension AgentServer {
 
     /// "that file" / "them" / "2 of them", so a clause about SOME of the
     /// waiters never says "the rest" of a sentence that was not printed
-    /// (the reader review, road map 4 §8, finding 4). `verb` is the third
-    /// person the clause needs when the subject is what HOLDS something.
-    private static func subject(_ count: Int, of total: Int, verb: String? = nil) -> String {
-        let noun = count == total ? (count == 1 ? "that file" : "them") : "\(count) of them"
-        guard let verb else { return noun }
-        return noun == "that file" ? "That file \(verb)s" : "\(noun) \(verb)"
+    /// (the reader review, road map 4 §8, finding 4).
+    private static func subject(_ count: Int, of total: Int) -> String {
+        count == total ? (count == 1 ? "that file" : "them") : "\(count) of them"
+    }
+
+    /// The distinct clip ids of some voices' answers, ascending — the tool
+    /// names a clip by id, as `Transcriber+Jobs` tags one (#107).
+    private static func clipIDs(_ answers: [SilenceDetector.VoiceAnswer]) -> [UInt32] {
+        Set(answers.map { $0.clip }).sorted()
+    }
+
+    /// "3, 7, 9".
+    private static func listed(_ ids: [UInt32]) -> String {
+        ids.map { String($0) }.joined(separator: ", ")
     }
 
     /// The three numbers, read in the sheet's own units and refused by name.

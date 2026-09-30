@@ -38,7 +38,10 @@ extension AgentServer {
                     + "no clip in scope covers is not a candidate at all: a hole in the timeline "
                     + "is not dead air. The result reports the scope and mode it used, and names "
                     + "any media whose analysis is still running rather than counting it silent — "
-                    + "the waveform, or in voice mode the speech.",
+                    + "the waveform, or in voice mode the speech. judged_by_level_clips names each "
+                    + "clip judged by level, and proposed_by_mix_clips each clip a range is "
+                    + "proposed inside only because the mix turns it down while its analysis is "
+                    + "still running.",
                 [
                     "clips": [
                         "type": "array", "items": ["type": "integer"], "minItems": 1,

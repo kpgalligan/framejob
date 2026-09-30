@@ -87,8 +87,9 @@ voice is present.
 - **The fallback is decided per voice (clip segment) over its own source window, not per media or
   whole file** (orig §4c, §8, the defect fixed 2026-09-19; spec §11). A file that is speech then
   music is judged by the model over one clip and by level over the other. `judgedByLevel` still
-  names **media**, because the notes name files a person can see. Its sentences say "in at least
-  one clip".
+  names **media**, as `judged_by_level` does. Since #107 (issue batch B22) `Outcome.answers` holds
+  each scoped voice's own answer, so the sheet's notes name the clip by its label ("<name> at
+  <timecode>") and `detect_silence` names it by id in `judged_by_level_clips` and the note.
 - **`voiceConfidence` defaults to 0.5, clamped to 0.1…0.9**, the range the model's authors say to
   tune inside. It is refused by name with `mode: "level"`: the app refuses a value it cannot use
   rather than dropping it (orig §4c, §4e).
@@ -104,9 +105,10 @@ voice is present.
   - `Outcome.proposedMedia` names the media that some proposed span lands inside. A note says
     "nothing is proposed" only for a waiter outside that set, because the gain floor can propose
     inside a media that has no cache.
-  - The sheet's waveform line uses `waveformPromise()`, which hedges. It does not use
-    `promise(about:)`: in the `afterPeaksGone` state that helper would answer "quiet in the MIX",
-    which is false there (mutant (e)).
+  - The sheet's waveform line uses `waveformPromise()`, which since #107 names by clip what the
+    mix makes quiet ("…, except where the mix already turns <label> down far enough to be quiet.")
+    instead of hedging. It still does not use `promise(about:)`: in the `afterPeaksGone` state that
+    helper would answer "quiet in the MIX", which is false there (mutant (e)).
 - **No op, schema, FFI or tool changes, and the core is untouched** (orig §4). `detect_silence`
   gained `mode`, `voice_confidence` and the result keys `mode`, `voice_confidence`,
   `judged_by_level` and `voice_pending`. The two waiters fold into `pending_peaks`. The sheet gained
@@ -120,6 +122,8 @@ voice is present.
   - `SilenceDetector+Walls.swift` (the nest walls and the frame snap, and later `refine`).
   - `AgentCatalog+Audio.swift` (`detect_silence`, `normalize_clip`), spliced back into the catalog
     at the same position so `tools/list` keeps its order.
+  - A third, later: `SilenceDetector+Vocabulary.swift` (`Span`, `Scope`, `Mode`, `Settings`,
+    `Outcome`), #107's pure move, gated alone before `VoiceAnswer` was added (issue batch B22).
 
 ## What it built — where it lives now
 
@@ -130,8 +134,10 @@ voice is present.
 - `app/Sources/MediaImporter+Speech.swift`: `speechIsCurrent` and `writeSpeech`. The call site is
   in `MediaImporter.swift`.
 - `app/Sources/MediaCacheFiles.swift`: `SpeechStamp`, the URLs and `speechKind`.
-- `app/Sources/SilenceDetector.swift`: `Mode`, the voice test, the per-voice fallback and
-  `Outcome`. It is at 586 of the 600 cap.
+- `app/Sources/SilenceDetector.swift`: the voice test, the per-voice fallback and each voice's
+  answer. It is at 450 of the 600 cap since #107.
+- `app/Sources/SilenceDetector+Vocabulary.swift`: `Span`, `Scope`, `Mode`, `Settings`, `Outcome`
+  and `VoiceAnswer` (#107).
 - `app/Sources/SilenceDetector+Walls.swift`: the walls, the snap and `refine`.
 - `app/Sources/SilenceSheetController.swift`: the Judge-by popup, the notes and `cacheChanged`.
 - `app/Sources/AgentServer+Silence.swift`: the handler.
@@ -167,10 +173,10 @@ Still true of the current code:
 - **The cache pass's `.bin` is not bit-identical to `probabilities(of:)` over the same file.** 30–70
   of 325 chunks differ by at most 0.0022, because `alwaysCopiesSampleData = false` changes the
   converter's block sizes. Every decision at 0.5 is the same (orig §8).
-- **The notes are media-granular.** They cannot name which clip the mix made quiet, so the sheet
-  hedges instead. A per-voice `Outcome` field would need a size toll, because `SilenceDetector` is
-  at 586 (orig §8 residue).
-- **Under a nest, `detect_silence`'s `clips` reports the inner clip's id.** The plan flattens nests.
+- **Under a nest, `detect_silence`'s `clips` reports the inner clip's id**, and so do
+  `judged_by_level_clips`, `proposed_by_mix_clips` and the notes' clip ids (#107; the sheet's
+  `VoiceAnswer.label` falls back to the media's name when the snapshot cannot find the id — not
+  measured under a nest). The plan flattens nests.
   The behaviour is consistent and is accepted back as a scope (orig §8, reader 3, not re-measured).
 - **A peaks edge shortfall of a full 10 ms bucket or more is never certified.** The waveform stays
   pending instead. A source change that keeps both file size and modification second is not
@@ -214,8 +220,6 @@ there (orig §6).
   on real footage. Tracked in #47.
 - README drift: `README.md`'s catalog file-map row omits `AgentCatalog+Audio`, `+Transitions`,
   `+Declarations` and `+Graphics`. Fixed by 2026-09-26: the row lists all four.
-- A per-voice `Outcome`, so the notes name a clip (optional; `SilenceDetector.swift` pays a toll
-  first). Tracked in #107.
 - Candidate: a transcript-level edit ("remove the ums and false starts"), which is where a network
   model would belong. Tracked in #92.
 

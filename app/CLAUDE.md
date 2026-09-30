@@ -1065,7 +1065,7 @@ free.
   lets the download run on (a decision). `init` takes `store`, `defaults`,
   `environment` and `languages` so a probe can build every one of those
   states.
-- `SilenceDetector.swift` (+`Walls`) · `SilenceSheetController.swift` ·
+- `SilenceDetector.swift` (+`Walls`, +`Vocabulary`) · `SilenceSheetController.swift` ·
   `SileroVAD.swift` · `MediaSpeech.swift` · `MediaPeaks.swift` — Remove
   Silences and `detect_silence`. The detector has a `Mode`, `voice` (default)
   or `level`, and is PURE and synchronous over `Input.read`'s snapshot so the
@@ -1074,7 +1074,10 @@ free.
   a muted, soloed-away, faded or ducked clip quiet in EITHER mode before the
   model is asked, and is not `peak × envelope`, the level test after it — then
   a voice whose source window holds no voice falls back to
-  level (its media named), then a media whose speech cache has not landed is
+  level (its clip named: `Outcome.answers` is one `VoiceAnswer` per scoped
+  voice — clip, media, span, judged by level, waiting on a cache, proposed —
+  from which the sheet and `detect_silence` name the clip, #107), then a media
+  whose speech cache has not landed is
   never quiet. A silenced clip is dropped from either scope rather than
   counted; a NEST is a wall. `SileroVAD` is the streaming Core ML wrapper over
   the vendored compiled model, NOT `async`, with one process-wide

@@ -72,157 +72,6 @@ import Foundation
 /// about the numbers changed when either moved.
 enum SilenceDetector {
 
-    // MARK: - Vocabulary
-
-    /// One quiet span of project time, in ticks. Half-open: `end` is the
-    /// first tick that is NOT removed, which is what the op's `[from, to]`
-    /// pair means too.
-    struct Span: Equatable {
-        let start: Ticks
-        let end: Ticks
-
-        var length: Ticks { max(0, end - start) }
-    }
-
-    /// Which clips the quiet test is taken over.
-    ///
-    /// The rule is an INTERSECTION — a tick is quiet only where every clip in
-    /// scope is quiet — so the scope is what stops a music bed under a
-    /// voiceover from being cut away with the pauses in the speech.
-    enum Scope: String, CaseIterable {
-        /// The clips the user has selected — their AUDIBLE segments only.
-        /// A selected clip that plays no sound, or none the mix lets
-        /// through, simply contributes none (`detect` says why).
-        case selected
-        /// Every audio segment whose track envelope is not identically zero
-        /// across it — i.e. everything actually audible in the mix.
-        case audible
-
-        var displayName: String {
-            switch self {
-            case .selected: return "Selected clips"
-            case .audible: return "All audible clips"
-            }
-        }
-    }
-
-    /// How a moment is judged quiet — road map 4's S1. `voice` asks the
-    /// cached Silero VAD probability (`cache/speech/<id>.bin`) and falls
-    /// back to `level` per VOICE whose source window holds no voice, or for
-    /// every media at once when the model cannot be used this process;
-    /// `level` is today's rule, byte for byte. A media whose speech cache
-    /// has NOT landed is judged by neither — see `Outcome.voicePending`.
-    enum Mode: String, CaseIterable {
-        case voice
-        case level
-
-        var displayName: String {
-            switch self {
-            case .voice: return "Voice"
-            case .level: return "Level"
-            }
-        }
-    }
-
-    /// The four numbers the sheet and the `detect_silence` tool both spell.
-    struct Settings: Equatable {
-        /// The level, in dBFS, at or under which a moment counts as quiet —
-        /// measured IN THE MIX (see the type's doc). −40 dBFS is roughly a
-        /// quiet room's tone under a spoken take: low enough that breath and
-        /// keyboard noise survive, high enough that a real pause reads as one.
-        var thresholdDB: Double
-        /// The shortest quiet run worth cutting. Half a second is about the
-        /// length of a deliberate pause in speech; anything shorter is the gap
-        /// between two words and removing it makes the delivery sound clipped.
-        var minLength: Ticks
-        /// How much of each end of a quiet run is KEPT, so a cut does not land
-        /// on the attack of the next word. A tenth of a second is three frames
-        /// at 30 fps — the smallest amount that reliably reads as breathing
-        /// room rather than as an edit.
-        var padding: Ticks
-        var scope: Scope
-        /// `voice` by default; the sheet opens in `level` when the model
-        /// cannot be used this process.
-        var mode: Mode
-        /// The Silero probability at or above which a moment counts as
-        /// speech, in `voice` mode. Read only in that mode — the tool
-        /// refuses it in `level`, named rather than silently ignored.
-        var voiceConfidence: Double
-
-        static let defaultThresholdDB = -40.0
-        static let defaultMinLength: Ticks = ReelTime.ticks(seconds: 0.5)
-        static let defaultPadding: Ticks = ReelTime.ticks(seconds: 0.1)
-        static let defaultVoiceConfidence = 0.5
-
-        /// The ranges the sheet's controls and the tool's arguments clamp to.
-        /// −80 dBFS is under any real recording's noise floor and −10 dBFS is
-        /// well into speech, so the two ends are "cut nothing" and "cut
-        /// almost everything" rather than arbitrary numbers.
-        static let thresholdRange = -80.0...(-10.0)
-        static let minLengthRange = 0.05...10.0
-        static let paddingRange = 0.0...2.0
-        static let voiceConfidenceRange = 0.1...0.9
-
-        init(
-            thresholdDB: Double = Settings.defaultThresholdDB,
-            minLength: Ticks = Settings.defaultMinLength,
-            padding: Ticks = Settings.defaultPadding,
-            scope: Scope = .audible,
-            mode: Mode = .voice,
-            voiceConfidence: Double = Settings.defaultVoiceConfidence
-        ) {
-            self.thresholdDB = thresholdDB
-            self.minLength = minLength
-            self.padding = padding
-            self.scope = scope
-            self.mode = mode
-            self.voiceConfidence = voiceConfidence
-        }
-    }
-
-    /// What one detection run found.
-    struct Outcome {
-        let spans: [Span]
-        /// The scope the run actually used — the sheet SAYS which, because
-        /// "nothing was found" and "nothing was looked at" are different
-        /// answers and the user cannot tell them apart otherwise.
-        let scope: Scope
-        /// Distinct clip ids that contributed a segment, sorted.
-        let clips: [UInt32]
-        /// Media in scope whose `cache/peaks/<id>.bin` has not been written
-        /// yet. Their segments are treated as NEVER quiet, so a project opened
-        /// a second ago proposes no cuts rather than proposing to delete a
-        /// whole clip because its waveform has not landed.
-        let pendingMedia: [UInt32]
-        /// Nest clips that held quiet the detector declined to propose, so
-        /// the sheet can say why it found fewer cuts than the timeline
-        /// looks like it holds. Empty is the ordinary answer.
-        let protectedNests: [UInt32]
-        /// The mode the run actually used — `settings.mode`, echoed back for
-        /// the same reason `scope` is.
-        let mode: Mode
-        /// Distinct media, in scope, with at least one scoped voice whose
-        /// source window holds no voice and was therefore judged by level
-        /// even in `voice` mode. Always `[]` in `level` mode.
-        let judgedByLevel: [UInt32]
-        /// Distinct media, in scope, whose `cache/speech/<id>.bin` has not
-        /// landed yet — never quiet by the model, and not judged by level
-        /// either: a missing cache must not read as silence. Always `[]` in
-        /// `level` mode.
-        let voicePending: [UInt32]
-        /// Distinct media a span in `spans` actually lands inside, sorted.
-        /// It is what the sheet and the tool make their "nothing inside is
-        /// proposed" promise about while a cache is still landing: the gain
-        /// FLOOR is asked before either cache (`isQuiet`), so a clip the mix
-        /// has turned down, faded or ducked is quiet with nothing on disk at
-        /// all, and the promise used to deny the ranges printed beside it
-        /// (the reader review, road map 4 §8, R3·1).
-        let proposedMedia: [UInt32]
-
-        var removed: Ticks { spans.reduce(0) { $0 + $1.length } }
-        var isEmpty: Bool { spans.isEmpty }
-    }
-
     // MARK: - Input
 
     /// One audio segment with everything the quiet test needs beside it.
@@ -405,13 +254,13 @@ enum SilenceDetector {
             return Outcome(
                 spans: [], scope: settings.scope, clips: [], pendingMedia: [],
                 protectedNests: [], mode: settings.mode, judgedByLevel: [], voicePending: [],
-                proposedMedia: [])
+                proposedMedia: [], answers: [])
         }
 
         // Road map 4's voice mode, judged PER VOICE: a window holding no
-        // voice falls back to level for its whole span and names its media,
-        // mixed or not; a pending cache is never quiet by the model. Both
-        // sets stay empty in `.level` mode.
+        // voice falls back to level for its whole span and names its media
+        // (and, through `answers`, its clip), mixed or not; a pending cache
+        // is never quiet by the model. Both sets stay empty in `.level` mode.
         var judgedByLevelMedia: Set<UInt32> = []
         var voicePendingMedia: Set<UInt32> = []
         let judged: [(voice: Voice, byLevel: Bool)] = scoped.map { voice in
@@ -502,12 +351,27 @@ enum SilenceDetector {
             scoped.filter { voice in
                 spans.contains { $0.start < voice.end && voice.segment.start < $0.end }
             }.map { $0.segment.media })
+        // And each voice's OWN answer (#107): its own overlap test, never
+        // the media's membership above, so of two clips of one file only the
+        // one a span lands inside is proposed. `waiting` is the cache
+        // `isQuiet` reads after the floor.
+        let answers = judged.map { entry -> VoiceAnswer in
+            let voice = entry.voice
+            let inside = spans.contains { $0.start < voice.end && voice.segment.start < $0.end }
+            let waiting =
+                settings.mode == .level || entry.byLevel
+                ? voice.peaks == nil : voice.speech == nil
+            return VoiceAnswer(
+                clip: voice.segment.clip, media: voice.segment.media,
+                span: Span(start: voice.segment.start, end: voice.end),
+                judgedByLevel: entry.byLevel, waiting: waiting, proposed: inside)
+        }.sorted { ($0.span.start, $0.clip) < ($1.span.start, $1.clip) }
         return Outcome(
             spans: spans,
             scope: settings.scope, clips: clips, pendingMedia: pending,
             protectedNests: walled, mode: settings.mode,
             judgedByLevel: judgedByLevelMedia.sorted(), voicePending: voicePendingMedia.sorted(),
-            proposedMedia: proposed.sorted())
+            proposedMedia: proposed.sorted(), answers: answers)
     }
 
     // MARK: - The quiet test

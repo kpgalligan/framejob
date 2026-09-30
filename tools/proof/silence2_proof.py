@@ -891,6 +891,11 @@ def tone_part(mcp, truth):
     check(
         answer["judged_by_level"] == [media2],
         f"the media is named in judged_by_level: {answer['judged_by_level']}")
+    check(
+        answer.get("judged_by_level_clips") == [laid[1][2]],
+        f"and judged_by_level_clips names the TONE clip alone, not the voice clip of "
+        f"the same file: {answer.get('judged_by_level_clips')} (tone clip {laid[1][2]}, "
+        f"voice clip {laid[0][2]})")
     present = [r for r in head
                if any(inside(r, pause, OVERRUN["clean"]) for pause in truth)]
     check(
@@ -941,8 +946,7 @@ def tone_part(mcp, truth):
             "Analysis is still running for 1 media file(s); call again in a moment. "
             "For that file it is the WAVEFORM that has not landed, which in voice mode "
             "decides only a clip holding no voice, and nothing inside them is proposed "
-            "here. 1 media file(s) hold no voice in at least one clip and were judged "
-            "by level there."),
+            f"here. Clip {clip} holds no voice and was judged by level."),
         f"and the clause says so in the whole sentence, rather than claiming spans "
         f"that are not there: {withheld.get('note')!r}")
     s.op("set_audio", clips=[clip], patch={"volume": 0.001})
@@ -956,9 +960,8 @@ def tone_part(mcp, truth):
             "Analysis is still running for 1 media file(s); call again in a moment. "
             "For that file it is the WAVEFORM that has not landed, which in voice mode "
             "decides only a clip holding no voice, so spans inside them ARE proposed "
-            "here. A clip there that holds no voice is proposed only where the mix "
-            "already turns it down far enough to be quiet. 1 media file(s) hold no "
-            "voice in at least one clip and were judged by level there."),
+            f"here. Clip {clip} is proposed only where the mix already turns it down far "
+            f"enough to be quiet. Clip {clip} holds no voice and was judged by level."),
         f"and the clause turns over to the proposed wording, with the mix named as "
         f"what made it quiet: {ducked.get('note')!r}")
     # NOTHING BELOW THIS in `tone_part`: the two rows above changed the
@@ -1322,7 +1325,7 @@ def waveform_part(mcp, truth):
     check(
         (ducked.get("note") or "") == (
             "Analysis is still running for 1 media file(s); call again in a moment. "
-            "That file holds spans that ARE proposed here: the mix turns them down far "
+            f"Clip {clip} holds spans that ARE proposed here: the mix turns it down far "
             "enough to be quiet before either cache is asked."),
         f"and the note counts it as proposed rather than promising nothing inside it "
         f"is: {ducked.get('note')!r}")
@@ -1378,10 +1381,70 @@ def mixed_part(mcp):
             "Analysis is still running for 3 media file(s); call again in a moment. "
             "For them it is the WAVEFORM that has not landed, which in voice mode decides "
             "only a clip holding no voice, so spans inside 2 of them ARE proposed here and "
-            "nothing inside the other 1 is. 1 media file(s) hold no voice in at least one "
-            "clip and were judged by level there."),
+            f"nothing inside the other 1 is. Clip {tone_clip} holds no voice and was judged "
+            "by level."),
         f"and the note's mixed ending counts the two proposed and the one not, in that "
         f"order: {answer.get('note')!r}")
+
+
+# ---- 8e. Two clips of one file, one quiet by the mix and one not ---------
+
+
+def twoclips_part(mcp):
+    """#107: the notes and the result name the CLIP, not the file.
+
+    One `tone.wav` laid twice — clip a at 0 and clip b at 12 s — holds no
+    voice, so both clips are judged by level; a is then ducked to 0.001 and
+    the waveform withheld. The FLOOR proposes a's span with nothing on disk
+    and nothing inside b is proposed, so the two clips of ONE media answer
+    differently: a media-granular answer cannot tell them apart, and a build
+    whose per-voice `proposed` reads the media's membership instead of the
+    clip's own overlap names b as proposed by the mix too (M1, (d) and (e))."""
+    print("\n8e — two clips of one file, one quiet by the mix and one not")
+    s = Session(mcp, "silence2-twoclips")
+    media, a = s.lay("tone.wav")
+    track = s.project()["tracks"][0]["id"]
+    b = s.op("add_clip", track=track, media=media, at=12 * SEC)["new_clips"][0]
+    s.op("set_selection", clips=[])
+    detect(s)
+    s.op("set_audio", clips=[a], patch={"volume": 0.001})
+    os.remove(os.path.join(s.path, "cache", "peaks", f"{media}.bin"))
+    answer = s.op("detect_silence")
+    check(
+        answer.get("clips") == sorted([a, b])
+        and answer.get("pending_peaks") == [media]
+        and "voice_pending" not in answer
+        and answer.get("judged_by_level") == [media],
+        f"CONTROL: both clips of the one media are in scope, the media a WAVEFORM "
+        f"waiter judged by level and not a voice one: clips {answer.get('clips')}, "
+        f"pending_peaks {answer.get('pending_peaks')}, voice_pending "
+        f"{answer.get('voice_pending')}, judged_by_level {answer.get('judged_by_level')} "
+        f"(clips {a}, {b}, media {media})")
+    placed = {c["id"]: (c["start"], c["start"] + c["duration"]) for c in s.project()["clips"]}
+    found = spans(answer)
+    a_span, b_span = placed[a], placed[b]
+    check(
+        any(r[0] >= a_span[0] and r[1] <= a_span[1] for r in found)
+        and not any(r[0] < b_span[1] and r[1] > b_span[0] for r in found),
+        f"CONTROL: a span lies inside the ducked clip {a_span} and none overlaps the "
+        f"other {b_span}: {show(found)}")
+    check(
+        answer.get("judged_by_level_clips") == sorted([a, b]),
+        f"judged_by_level_clips names BOTH clips: {answer.get('judged_by_level_clips')}")
+    check(
+        answer.get("proposed_by_mix_clips") == [a],
+        f"proposed_by_mix_clips names the ducked clip alone: "
+        f"{answer.get('proposed_by_mix_clips')} (clip {a})")
+    first, second = sorted([a, b])
+    check(
+        (answer.get("note") or "") == (
+            "Analysis is still running for 1 media file(s); call again in a moment. "
+            "For that file it is the WAVEFORM that has not landed, which in voice mode "
+            "decides only a clip holding no voice, so spans inside them ARE proposed here. "
+            f"Clip {a} is proposed only where the mix already turns it down far enough to "
+            f"be quiet. Clips {first}, {second} hold no voice and were judged by level."),
+        f"and the note names the ducked clip as the one the mix made quiet, and both as "
+        f"judged by level: {answer.get('note')!r}")
 
 
 # ---- 10b. The two durations ---------------------------------------------
@@ -1574,6 +1637,7 @@ def main():
     partial_part(mcp)
     waveform_part(mcp, truth)
     mixed_part(mcp)
+    twoclips_part(mcp)
     reversed_part(mcp)
     refusal_part(session)
     duration_part(mcp)

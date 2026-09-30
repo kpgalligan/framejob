@@ -234,7 +234,9 @@ lenient-decoding rule.
 
 - **The level fallback is keyed per scoped VOICE, not per media.** A file that is voice and then
   tone, split in two, used to have its voice clip judged by level too. `judgedByLevel` still names
-  MEDIA, and its sentences say "in at least one clip".
+  MEDIA (the media sets are kept, and `judged_by_level` with them); since #107 `Outcome.answers`
+  holds one `VoiceAnswer` per scoped voice, and the sheet's notes and `detect_silence` name the
+  CLIP from it.
 
 ### Inspector and Clip tab
 
@@ -351,6 +353,7 @@ Files that were split since the notes wrote them:
 | `VideoPane` | `VideoPane+Obscure.swift` |
 | `Transcriber` | `+Languages`, `+Jobs`, `+Extract`; `SpeechEngine.swift` |
 | `TranscribeSheetController` | `+Commit`, `+Cloud`, `+Download`, `+Style` |
+| `SilenceDetector` | `SilenceDetector+Vocabulary.swift` (#107) |
 
 `TimelineCaches` is a class inside `TimelineView.swift`.
 
@@ -395,7 +398,11 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   `addressed`, `checkDocumentLevelTicks`, `scopeLanding`, `scopeFailure`) against `set_scope` the
   tool (`setScope`, `nestScopePath`, `pathToClip`, `applyNestScope`, `commonPrefix`,
   `scopeReport`).
-- `SilenceDetector.swift`: must pay before a per-voice `Outcome` (#107).
+- `SilenceDetector.swift`: the quiet test (`gain`, `level`, `isQuiet`, `isAudible`) with `Voice`,
+  widened from private.
+- `SilenceSheetController.swift`: the menu command extension (`removeSilencesCommand`,
+  `validateSilenceAction`) into `EditorViewController+RemoveSilences.swift`, re-pinning
+  `inventory.json`'s site.
 - `CompositionBuilder.swift`: `audioParameters`.
 - `Playback.swift`: `onMain(_:)` to `Playback+Step.swift`, `private` dropped (a
   main hop holding no state; B21's named fallback, not taken). `player` stays private.

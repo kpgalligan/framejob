@@ -389,7 +389,7 @@
    "verdict": "sheet",
    "code": [
     "app/Sources/EditorViewController.swift `func removeSilences(`",
-    "app/Sources/SilenceSheetController.swift:527"
+    "app/Sources/SilenceSheetController.swift:529"
    ],
    "note": "presentAsSheet(SilenceSheetController); beeps with no audio"
   },
@@ -1155,7 +1155,7 @@
    ],
    "other_caller": ""
   },
-  "app/Sources/SilenceSheetController.swift:527": {
+  "app/Sources/SilenceSheetController.swift:529": {
    "token": "presentAsSheet",
    "func": "removeSilencesCommand",
    "reached_from": [

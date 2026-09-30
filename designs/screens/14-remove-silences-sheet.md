@@ -24,8 +24,8 @@ timeline closes over them as one edit, that quiet is measured in the mix, and
 that nothing inside a nest is cut. The controls: Judge by "Voice"; Level if no
 voice, a slider at "-40 dBFS"; Longer than "0.5" seconds; Keep at ends "0.1"
 seconds; and In "All audible clips". Below them, "No cuts" — this project has no
-quiet stretch long enough — and a grey note: "1 file(s) hold no voice in at least
-one clip and are judged by level there: toneA.m4a." At the foot, "markers keep
+quiet stretch long enough — and a grey note: "toneA.m4a at 00:00:00:00 holds no
+voice and is judged by level." At the foot, "markers keep
 their place" in small grey type, "Cancel", and a dimmed "Remove", since there is
 nothing to remove.
 

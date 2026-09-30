@@ -350,13 +350,16 @@ final class SilenceSheetController: NSViewController, NSTextFieldDelegate {
                 "Speech is still being analysed for \(listed). "
                     + promise(about: outcome.voicePending))
         }
-        if !outcome.judgedByLevel.isEmpty {
-            let names = outcome.judgedByLevel.compactMap { input.snapshot.media($0)?.name }
-            let listed = names.isEmpty
-                ? "\(outcome.judgedByLevel.count) file(s)" : names.joined(separator: ", ")
+        // Named by CLIP (#107): two clips of one file can be judged
+        // differently, so the file's name alone would not say which.
+        let byLevel = SilenceDetector.VoiceAnswer.labels(
+            outcome.answers.filter { $0.judgedByLevel }, in: input.snapshot)
+        if byLevel.count == 1 {
+            notes.append("\(byLevel[0]) holds no voice and is judged by level.")
+        } else if byLevel.count > 1 {
             notes.append(
-                "\(outcome.judgedByLevel.count) file(s) hold no voice in at least one clip "
-                    + "and are judged by level there: \(listed).")
+                "\(byLevel.count) clips hold no voice and are judged by level: "
+                    + byLevel.joined(separator: ", ") + ".")
         }
         if !outcome.protectedNests.isEmpty {
             // The detector will not propose a span that reaches into a nest
@@ -379,12 +382,13 @@ final class SilenceSheetController: NSViewController, NSTextFieldDelegate {
     /// down, faded, ducked or muted is quiet with nothing on disk at all and
     /// its spans are in the readout above this line (the reader review, road
     /// map 4 §8, finding 2). The tool's twin says the same in
-    /// `AgentServer+Silence`.
+    /// `AgentServer+Silence`. Since #107 it names the clips it is about.
     private func promise(about pending: [UInt32]) -> String {
-        pending.contains { outcome.proposedMedia.contains($0) }
-            ? "What is proposed inside is quiet in the MIX — turned down, faded or ducked — "
-                + "which neither cache can change."
-            : "Nothing inside is proposed for removal yet."
+        let labels = SilenceDetector.VoiceAnswer.labels(
+            outcome.mixAnswers(inside: Set(pending)), in: input.snapshot)
+        guard !labels.isEmpty else { return "Nothing inside is proposed for removal yet." }
+        return "What is proposed inside \(labels.joined(separator: ", ")) is quiet in the MIX "
+            + "— turned down, faded or ducked — which neither cache can change."
     }
 
     /// The VOICE-mode waveform line's own promise, which is narrower than
@@ -393,24 +397,22 @@ final class SilenceSheetController: NSViewController, NSTextFieldDelegate {
     /// landed for most of what is on screen, so a media whose waveform is
     /// late still has spans proposed inside it BY THE MODEL — `promise` would
     /// then answer "quiet in the MIX", which is false about a clip nothing
-    /// has turned down. What is true is a CONDITIONAL, and it is added only
-    /// where a clip of that media could be proposed without its waveform: the
-    /// media is one this answer proposes a span inside AND a clip of it holds
-    /// no voice (`judgedByLevel`) or its speech cache has not landed either
-    /// (`voicePending` — `SilenceDetector.detect` returns on a missing speech
-    /// cache BEFORE the by-level test, so a clip with neither cache on disk
-    /// is never in `judgedByLevel`). Both sets are media-granular, which is
-    /// why the sentence hedges instead of naming the clip.
+    /// has turned down. What is true is an EXCEPTION, named by clip (#107):
+    /// the clips of those media whose own answer is proposed while the cache
+    /// their quiet test reads is missing (`Outcome.mixAnswers`) — a clip that
+    /// holds no voice waiting on this waveform, or one whose speech cache has
+    /// not landed either (`SilenceDetector.detect` returns on a missing
+    /// speech cache BEFORE the by-level test, so such a clip is waiting on
+    /// its speech). Only the FLOOR can propose inside a waiting clip, so what
+    /// it names is what the mix made quiet, and a clip of the same file the
+    /// mix left alone is not named.
     private func waveformPromise() -> String {
         let plain = "Anything inside it that holds no voice is left alone until it lands"
-        let hedge = outcome.pendingMedia.contains { media in
-            outcome.proposedMedia.contains(media)
-                && (outcome.judgedByLevel.contains(media)
-                    || outcome.voicePending.contains(media))
-        }
-        return hedge
-            ? plain + ", unless the mix already turns it down far enough to be quiet."
-            : plain + "."
+        let labels = SilenceDetector.VoiceAnswer.labels(
+            outcome.mixAnswers(inside: Set(outcome.pendingMedia)), in: input.snapshot)
+        guard !labels.isEmpty else { return plain + "." }
+        return plain + ", except where the mix already turns "
+            + labels.joined(separator: ", ") + " down far enough to be quiet."
     }
 
     // MARK: - Controls
