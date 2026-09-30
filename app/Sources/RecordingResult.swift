@@ -67,9 +67,11 @@ struct RecordingSegment {
     }
 }
 
-/// A segment whose MOVIE would not probe, left out of the recording (#97):
-/// the movie as named, the files it left on disk at settle (movie, then
-/// microphone, each only if there), and the error `settle` built for it.
+/// A segment whose MOVIE would not probe, left out of the recording (#97),
+/// or a CLOSED segment whose writer failed after its stop, left out
+/// unprobed (#181): the movie as named, the files it left on disk at settle
+/// (movie, then microphone, each only if there), and the error `settle`
+/// built for it — the writer's own sentence for the second.
 /// `sentence` is what the panel's note and the tool's `note` say about it.
 struct UnreadableSegment {
     let moviePath: String
@@ -87,7 +89,8 @@ struct UnreadableSegment {
 /// What a recording ends as: its segments, in order — ONE for a recording
 /// never paused — and what `RecordingLanding` turns into ops, one clip per
 /// segment placed at the previous segment's end. `unreadable` is every
-/// segment whose movie would not probe, left out of `segments` and named in
+/// segment whose movie would not probe, or whose writer failed after the
+/// segment closed (#181), left out of `segments` and named in
 /// `unreadableNote` (#97); a recording with NO readable movie is a failure,
 /// never a result.
 ///
@@ -118,7 +121,8 @@ struct RecordingResult {
     /// never `segments.count − 1`: a pause with no resume before the Stop
     /// leaves ONE file and was still a pause (the R2 review: it read 0).
     let pauses: Int
-    /// The segments left out because their movie would not probe, in
+    /// The segments left out because their movie would not probe, or
+    /// because their writer failed after the segment closed (#181), in
     /// segment order; empty when every movie read.
     let unreadable: [UnreadableSegment]
     /// Every left-out segment's sentence, joined by a space; nil when none.

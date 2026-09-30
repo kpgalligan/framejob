@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Road map 3 — the recorder's APP half, measured: R1 (sections 1–8), R2's
 pause and resume (rows 3o–3t, section 4b, rows 5p–5u, 7d, and section 9),
-the grants a press checks (section 10, spec §11 recording), and issue batch
-B17's unreadable segment and File ▸ Pause Recording (sections 11 and 12).
+the grants a press checks (section 10, spec §11 recording), issue batch
+B17's unreadable segment and File ▸ Pause Recording (sections 11 and 12),
+and issue batch B27's closed segment's did-fail (3r, 3r2), the recorder's
+pause notification (F6, F7) and the countdown's meter (section 13).
 
 Why a probe and not an MCP script. Three of the things R1a added have no
 caller a running binary can be asked to reach, and one of them is the row
@@ -74,8 +76,9 @@ Section 3 (`state`): a fresh `ScreenRecorder()` — never `.shared` — starts
 idle with `isRecording` false and `elapsed` 0; `stop()` while idle completes
 with `RecorderError.notRecording` and leaves it idle; a second `stop()`
 answers the same, and one with no completion at all is accepted;
-`publishMicrophoneLevel()` while idle publishes NOTHING (observed through
-`meter.addObserver`, which fires once on subscription and must not fire
+`publishMicrophoneLevel()` while idle with nothing prepared publishes
+NOTHING (observed through `meter.addObserver`, which fires once on
+subscription and must not fire
 again); the meter is the recorder's own and not `LevelMeter.shared`;
 `RecordingGrant.microphoneRefusal` names the status word for
 `.notDetermined`, `.denied` and `.restricted`; the Screen Recording refusal
@@ -152,9 +155,21 @@ rethrown as `.finishFailed` with the recorder STAYING `.recording` and
 nothing changed. 3q: a refused resume (the state paused
 BY THE PROBE with the output still attached, so the add throws) rethrown
 as `.startFailed` with the recorder STAYING `.paused`, no segment minted,
-no `startRecording`. 3r: a did-FAIL on a CLOSED segment (paused, its
-did-finish still in flight) ending the recording, the open segment
-stamped and its writer stopped, the walker naming every file. 3s: the
+no `startRecording`. 3r (rewritten by issue batch B27, #181; until then
+it pinned the did-fail ENDING the recording): a did-FAIL on a CLOSED
+segment (paused, its did-finish still in flight, so built with
+`screenFinished = false` — the did-fail is what finishes it) leaves the
+recorder `.recording` with no `screenFailure` and no writer stopped, the
+segment's `outputFailure` the writer's sentence; `stop()` then stops the
+open segment's writer once, and ONE `.success` lands `closedfail1.png`
+alone with `pauses` 1 and `unreadable` segment 0 — both files kept, case
+`finishFailed`, "The recording failed: the writer gave up" — left out
+UNPROBED although its PNG would read. 3r2: segment 0 a NORMALLY closed
+segment (the Fake's default `screenFinished`), segment 1 open; a real
+`pause()`, then segment 1's did-fail → the recorder STAYS `.paused`, and
+still after its microphone's did-finish; `stop()` → a `.success` of
+segment 0 alone within `settled()`'s 5 s, `pauses` 2, `unreadable`
+segment 1 with both files. 3s: the
 pause's own did-finish inert, then an external `.userStopped` while paused
 landing ONE segment with `pauses` 1 — the count is STORED per press, never
 `segments − 1` (the R2 review: a pause with no resume before the stop read
@@ -381,7 +396,8 @@ process can drive: `recordingDidStart` hides the panel for EVERY source —
 note; `update` rebuilds the item's menu only when `paused` FLIPS and
 ignores the argument once `freeze()`d, which the tool's chrome calls too;
 the tick runs through `.paused` and passes `paused:`; `newRecording`
-names `.paused`; the tool passes the three closures and
+names `.paused`; the tool's chrome (`AgentServer+RecordingChrome.swift`
+since issue batch B27) passes the three closures and
 `paused: recorder.isPaused`; `show()`'s guard is unchanged; `+Pause.swift`
 keeps `resumeProblem` and clears it on a landed resume; `landed` passes
 `resumeProblem` and the notes, `failedToLand` names the files through
@@ -554,7 +570,38 @@ and 35 999 s, both marks, fits: ceil(width) + 2 × `titleInset` ≤
 `itemLength`. W2: `itemLength` is that formula at `widestElapsed`, whose
 label is 9:59:59. W3, structural: `show()`'s comment-stripped body holds
 `statusItem(withLength: Self.itemLength)` and the file's code never says
-`variableLength` — the probe never puts the item up.
+`variableLength` — the probe never puts the item up. **Issue batch B27
+(#181 item 4)**: F6 — a counting observer of
+`ScreenRecorder.pauseDidChangeNotification` (object `ScreenRecorder.shared`)
+installed before F3: F4's pause action posts ONCE, counted before any spin,
+with `isPaused` true inside the block; its resume action once more with
+`isPaused` false; F5 posts nothing (F3's panel-path posts are printed, not
+asserted). F7, structural over the comment-stripped
+`AgentServer+RecordingChrome.swift`: `show`'s body adds an observer for the
+notification with `object: recorder` whose block calls `tick()`, and
+`remove()` calls `removeObserver` — the item itself is never put up.
+
+Section 13 (`preroll`, issue batch B27, #98 c) runs in its own process and
+reads the Microphone status BEFORE touching a device, so it cannot prompt;
+with a status other than `.authorized`, or no qualifying device, its rows
+are SKIPPED BY NAME with their count (`preroll_rows_count`, the granted
+tier's counter). The device is the first of the app's own
+`DiscoverySession([.microphone, .external], .audio)` list whose transport
+is built in, else USB — never a virtual or aggregate input, which reads a
+flat floor. P0 prints the status word, the device and its transport. P1: a
+fresh `ScreenRecorder()` — never `.shared` — `prepareMicrophone(id)` →
+prepared for that device, running, `.idle`. P2: 30 polls at 1/30 s → max
+`peakLeft` above 1e-6 (−120 dBFS), `.idle` throughout. P3:
+`discardPreparedMicrophone()` → the reading silent, nothing prepared, and a
+later poll publishes nothing. P4: `RecorderPanelController.shared` — shown,
+the main display and the device selected, a `GrantSpy` granted and
+authorized — `record(nil)` → the countdown with the device prepared on
+`.shared` and nothing asked; 1.2 s later still counting, the recorder idle,
+and an observer on `ScreenRecorder.shared.meter` saw max `peakLeft` above
+1e-6. P5: `record(nil)` (Cancel) → the panel and the recorder idle, the
+session let go, the reading silent at once and 0.3 s later with no
+non-silent publish after the cancel. The countdown never reaches 0; the
+sealed doors are restored and the panel ordered out.
 
 **Measured 2026-09-28 against the tree with section 10: 983/983, with no
 row skipped** — section 9 RAN (a true preflight and two shareable
@@ -796,6 +843,34 @@ running). Three of them put back the code before the batch:
 there — a build failure, the three mutants above being the behavioural
 controls.
 
+**Issue batch B27's mutants** (3r, 3r2, F6, F7 and section 13), measured
+2026-09-30, each `--mutant <name>` with `--only preroll` (10 rows),
+`--only state` (141) or `--only file_pause` (39), against a tree scoring
+the whole run 1066/1066 with no row skipped (section 13 and section 9
+running). Three of them put back the code before the batch:
+
+  preroll-gated     publishMicrophoneLevel's idle arm deleted — the
+                    `.recording` gate again (ScreenRecorder+Microphone.swift)
+                    — 8/10: P2, P4's meter row.
+  preroll-no-tick   `armTick()` not called from beginCountdown
+                    (RecorderPanelController+Recording.swift) — 9/10: P4's
+                    meter row.
+  preroll-no-silence  the discard's silence deleted
+                    (ScreenRecorder+Microphone.swift) — 7/10: P3's silence
+                    row, P5's two.
+  closed-fail-fails-all  the did-fail's `stoppedAt` arm deleted
+                    (ScreenRecorder+Delegates.swift) — 133/141: 3r's four
+                    rows but the stop row, 3r2's four.
+  closed-fail-probed  the walker's `outputFailure` check deleted
+                    (ScreenRecorder+Finishing.swift) — 137/141: 3r's two
+                    result rows and 3r2's two (its segment 1 is a readable
+                    PNG too).
+  pause-no-post     the post in pause() deleted (ScreenRecorder+Pause.swift)
+                    — 38/39: F6's pause row.
+  chrome-no-observer  the chrome's addObserver deleted
+                    (AgentServer+RecordingChrome.swift) — 38/39: F7's show
+                    row.
+
 6b's "one program" row, the tree's one failure when this file was first
 written, turned green when the harness literalised the six recorder keys
 in its pin map (R1's landing): both cross-builds are one program again.
@@ -803,6 +878,7 @@ in its pin map (R1's landing): both cross-builds are one program again.
     python3 tools/proof/recording_probe.py                 # the tree
     python3 tools/proof/recording_probe.py --only state,segments   # a subset
     python3 tools/proof/recording_probe.py --only unreadable,file_pause   # B17's
+    python3 tools/proof/recording_probe.py --only state,file_pause,preroll   # B27's
     python3 tools/proof/recording_probe.py --mutant excludes
     python3 tools/proof/recording_probe.py --sources <dir> # any copy
     RC_APP_SOURCES=<dir> python3 tools/proof/recording_probe.py
@@ -945,6 +1021,7 @@ def function_body(lines, signature):
 PROBE_SOURCE = r'''
 import AVFoundation
 import AppKit
+import CoreAudio
 import CoreText
 import ScreenCaptureKit
 
@@ -1719,11 +1796,13 @@ func scenarioResumeRefused(_ work: URL) -> [String: Any] {
     return out
 }
 
-/// A did-fail on a CLOSED segment ends the recording: segment 0 was paused
-/// (stamped) but its did-finish is still in flight when its writer reports
-/// a failure instead; segment 1 is open. The failure begins finishing as
-/// `.stopped`, the open segment is stamped and its writer asked to stop,
-/// and the walker answers the recording's failure naming every file.
+/// A did-fail on a CLOSED segment is that segment's (issue batch B27, #181):
+/// segment 0 was paused (stamped) but its did-finish is still in flight —
+/// built with `screenFinished = false`, because its did-FAIL is what
+/// finishes it — when its writer reports a failure instead; segment 1 is
+/// open. The recording goes ON (still `.recording`, no `screenFailure`, no
+/// writer stopped); a `stop()` then finishes it and the walker leaves
+/// segment 0 out UNPROBED — its PNG would read — with the writer's sentence.
 func scenarioClosedFail(_ work: URL) -> [String: Any] {
     var out: [String: Any] = [:]
     let m0 = work.appendingPathComponent("closedfail0.png")
@@ -1743,12 +1822,57 @@ func scenarioClosedFail(_ work: URL) -> [String: Any] {
     fake.screenFailed(0, "the writer gave up")
     _ = spin(0.3) { false }
     out["stateAfterFail"] = fake.state
-    out["stoppedBy"] = fake.stoppedBy
+    out["screenFailure"] = fake.recorder.session?.screenFailure.map { caseName($0) } ?? "nil"
     out["segment0"] = describeSegment(fake.segment(0))
-    out["segment1"] = describeSegment(fake.segment(1))
-    out["micStops"] = fake.micOutput?.stops ?? -1
+    out["outputFailure0"] = fake.segment(0)?.outputFailure.map { spellError($0) } ?? "nil"
+    out["micStopsAfterFail"] = fake.micOutput?.stops ?? -1
+    var stops: [[String: Any]] = []
+    fake.recorder.stop { stops.append(spell($0)) }
+    out["stateAfterStop"] = fake.state
+    out["micStopsAfterStop"] = fake.micOutput?.stops ?? -1
     fake.screenFinished(1)
     fake.micFinished(url: x1, error: nil)
+    out["settled"] = fake.settled()
+    out["onFinishCount"] = fake.finishes.count
+    out["onFinish"] = fake.finishes.first ?? [:]
+    out["stopCount"] = stops.count
+    return out
+}
+
+/// The same routing from PAUSED (issue batch B27, #181): segment 0 is a
+/// NORMALLY closed segment whose did-finish has landed (the Fake's default
+/// `screenFinished`), segment 1 open. A real `pause()` closes segment 1,
+/// whose writer then reports a did-FAIL — the recorder STAYS `.paused`; its
+/// microphone's did-finish lands, and a `stop()` lands segment 0 alone with
+/// segment 1 left out. Only segment 1's did-fail and mic did-finish are driven.
+func scenarioClosedFailPaused(_ work: URL) -> [String: Any] {
+    var out: [String: Any] = [:]
+    let m0 = work.appendingPathComponent("closedfailpaused0.png")
+    let x0 = work.appendingPathComponent("closedfailpaused0-mic.png")
+    let m1 = work.appendingPathComponent("closedfailpaused1.png")
+    let x1 = work.appendingPathComponent("closedfailpaused1-mic.png")
+    out["written"] = writePNG(m0) && writePNG(x0) && writePNG(m1) && writePNG(x1)
+    out["paths"] = [m0.path, m1.path, x0.path, x1.path]
+    var closed = FakeSegment(movie: m0, mic: x0, closed: true)
+    closed.screenStart = Date(timeIntervalSinceNow: -5)
+    closed.stoppedAt = Date(timeIntervalSinceNow: -3)
+    var open = FakeSegment(movie: m1, mic: x1)
+    open.screenStart = Date(timeIntervalSinceNow: -2)
+    let fake = Fake(segments: [closed, open], mic: true, state: .recording, folder: work)
+    out["attached"] = fake.attachFailure ?? "ok"
+    do {
+        try fake.recorder.pause()
+        out["pause"] = "ok"
+    } catch { out["pause"] = spellError(error) }
+    fake.screenFailed(1, "the writer gave up while paused")
+    _ = spin(0.3) { false }
+    out["stateAfterFail"] = fake.state
+    out["screenFailure"] = fake.recorder.session?.screenFailure.map { caseName($0) } ?? "nil"
+    out["outputFailure1"] = fake.segment(1)?.outputFailure.map { spellError($0) } ?? "nil"
+    fake.micFinished(url: x1, error: nil)
+    _ = spin(0.2) { false }
+    out["stateAfterMic"] = fake.state
+    fake.recorder.stop()
     out["settled"] = fake.settled()
     out["onFinishCount"] = fake.finishes.count
     out["onFinish"] = fake.finishes.first ?? [:]
@@ -1921,6 +2045,7 @@ func state(_ request: [String: Any]) -> [String: Any] {
         out["pauseRefused"] = scenarioPauseRefused(work)
         out["resumeRefused"] = scenarioResumeRefused(work)
         out["closedFail"] = scenarioClosedFail(work)
+        out["closedFailPaused"] = scenarioClosedFailPaused(work)
         out["externalPaused"] = scenarioExternalPaused(work)
         out["systemStopPaused"] = scenarioSystemStopPaused(work)
         out["lateDidStart"] = scenarioLateDidStart(work)
@@ -3573,6 +3698,14 @@ func filePause(_ request: [String: Any]) -> [String: Any] {
         "paused": RecorderStatusItem.menuTitles(paused: true)[0],
     ]
 
+    // F6 (issue batch B27, #181): the recorder's pause notification, counted
+    // from before F3 — each post's `isPaused`, read INSIDE the block.
+    var posts: [Bool] = []
+    let postObserver = NotificationCenter.default.addObserver(
+        forName: ScreenRecorder.pauseDidChangeNotification, object: ScreenRecorder.shared,
+        queue: nil
+    ) { _ in posts.append(ScreenRecorder.shared.isPaused) }
+
     // F3: the panel's own recording, through the panel.
     let panel = RecorderPanelController.shared
     panel.window?.orderOut(nil)
@@ -3594,12 +3727,19 @@ func filePause(_ request: [String: Any]) -> [String: Any] {
     // F4: a recording the panel does not own (a tool's), through the recorder.
     panel.window?.orderOut(nil)
     let attached4 = fakeSharedRecording(work, "f4")
+    let f3Posts = posts
+    posts = []
     delegate.pauseOrResumeRecording(nil)
+    // Counted BEFORE any spin: the post is synchronous inside pause().
+    let f4PausePosts = posts
+    posts = []
     let f4Paused: [String: Any] = [
         "panel": "\(panel.phase)", "recorder": "\(ScreenRecorder.shared.state)",
         "visible": panel.window?.isVisible ?? false,
     ]
     delegate.pauseOrResumeRecording(nil)
+    let f4ResumePosts = posts
+    posts = []
     out["f4"] = [
         "attached": attached4, "paused": f4Paused, "panel": "\(panel.phase)",
         "recorder": "\(ScreenRecorder.shared.state)",
@@ -3609,12 +3749,17 @@ func filePause(_ request: [String: Any]) -> [String: Any] {
     tearDownShared()
 
     // F5: nothing recording — nothing changes.
+    posts = []
     delegate.pauseOrResumeRecording(nil)
     out["f5"] = [
         "panel": "\(panel.phase)", "recorder": "\(ScreenRecorder.shared.state)",
         "session": ScreenRecorder.shared.session != nil,
         "visible": panel.window?.isVisible ?? false,
     ]
+    out["f6"] = [
+        "f3": f3Posts, "f4Pause": f4PausePosts, "f4Resume": f4ResumePosts, "f5": posts.count,
+    ]
+    NotificationCenter.default.removeObserver(postObserver)
 
     // W0–W2: the titles against the one length.
     func width(_ elapsed: TimeInterval, _ paused: Bool) -> Double {
@@ -4187,6 +4332,127 @@ func grants(_ request: [String: Any]) -> [String: Any] {
     return out
 }
 
+// ---- mode "preroll": the countdown's meter (issue batch B27, #98 c) -------
+
+/// The first microphone of the app's OWN discovery list (the panel's rows,
+/// `ScreenRecorder.microphone(withID:)`'s session) whose transport is BUILT
+/// IN, else the first that is USB — never a virtual or aggregate input,
+/// which reads a flat floor.
+func prerollDevice() -> AVCaptureDevice? {
+    let devices = AVCaptureDevice.DiscoverySession(
+        deviceTypes: [.microphone, .external], mediaType: .audio, position: .unspecified
+    ).devices
+    func transport(_ device: AVCaptureDevice) -> UInt32 { UInt32(bitPattern: device.transportType) }
+    return devices.first { transport($0) == kAudioDeviceTransportTypeBuiltIn }
+        ?? devices.first { transport($0) == kAudioDeviceTransportTypeUSB }
+}
+
+/// P1–P3 on a fresh `ScreenRecorder()` — never `.shared` — then P4–P5
+/// through the PANEL on `.shared`, whose countdown is cancelled at 1.2 s so
+/// it never reaches 0 and nothing is recorded. The Microphone status is
+/// read BEFORE any device is touched, so nothing here can prompt.
+func preroll(_ request: [String: Any]) -> [String: Any] {
+    var out: [String: Any] = [:]
+    let status = RecordingGrant.microphoneStatus
+    out["status"] = RecordingGrant.name(of: status)
+    guard status == .authorized else {
+        out["skipped"] = "the Microphone status is \(RecordingGrant.name(of: status)), not "
+            + "authorized — a pre-roll level needs a running input, and a probe may not prompt"
+        return out
+    }
+    guard let device = prerollDevice() else {
+        out["skipped"] = "no built-in or USB microphone is connected (a virtual or aggregate "
+            + "input reads a flat floor, so it proves no level)"
+        return out
+    }
+    let id = device.uniqueID
+    out["device"] = device.localizedName
+    out["transport"] =
+        UInt32(bitPattern: device.transportType) == kAudioDeviceTransportTypeBuiltIn ? "built-in" : "USB"
+
+    // P1 — prepared on a fresh recorder.
+    let recorder = ScreenRecorder()
+    var published: [LevelMeterReading] = []
+    let watch = recorder.meter.addObserver { published.append($0) }
+    recorder.prepareMicrophone(id)
+    out["p1"] = [
+        "prepared": recorder.preparedMicrophone?.deviceID == id,
+        "running": recorder.preparedMicrophone?.session.isRunning ?? false,
+        "state": "\(recorder.state)",
+    ]
+    // P2 — 30 polls at 1/30 s, the panel's rate.
+    var peak: Float = 0
+    var idle = true
+    for _ in 0..<30 {
+        recorder.publishMicrophoneLevel()
+        peak = max(peak, recorder.meter.reading.peakLeft)
+        if recorder.state != .idle { idle = false }
+        RunLoop.main.run(until: Date().addingTimeInterval(1.0 / 30))
+    }
+    out["p2"] = ["maxPeakLeft": Double(peak), "idleThroughout": idle, "publishes": published.count]
+    // P3 — the discard publishes silence, and a later poll publishes nothing.
+    recorder.discardPreparedMicrophone()
+    let silentAfterDiscard = recorder.meter.reading.isSilent
+    let countAfterDiscard = published.count
+    recorder.publishMicrophoneLevel()
+    out["p3"] = [
+        "silent": silentAfterDiscard, "prepared": recorder.preparedMicrophone != nil,
+        "laterPublishes": published.count - countAfterDiscard,
+    ]
+    withExtendedLifetime(watch) {}
+
+    // P4 — the panel's countdown on `.shared`, metered by its own tick.
+    let app = NSApplication.shared
+    app.setActivationPolicy(.prohibited)
+    UserDefaults.standard.setVolatileDomain([
+        RecorderPanelController.displayKey: 0, RecorderPanelController.microphoneKey: "",
+        RecorderPanelController.systemAudioKey: true, RecorderPanelController.showClicksKey: false,
+        RecorderPanelController.rateKey: 60, RecorderPanelController.sizeKey: "nominal",
+        "AgentServerEnabled": false,
+    ], forName: UserDefaults.argumentDomain)
+    let shared = ScreenRecorder.shared
+    let panel = RecorderPanelController.shared
+    panel.show()
+    panel.selectDisplay(CGMainDisplayID())
+    panel.selectMicrophone(id)
+    let spy = GrantSpy()
+    spy.granted = true
+    spy.mic = .authorized
+    RecorderPanelController.grantDoors = spy.doors
+    var sharedReadings: [LevelMeterReading] = []
+    let sharedWatch = shared.meter.addObserver { sharedReadings.append($0) }
+    let chosen = panel.currentChoice().microphone ?? ""
+    panel.record(nil)
+    let phaseAtPress = "\(panel.phase)"
+    let preparedAtPress = shared.preparedMicrophone?.deviceID == id
+    _ = spin(1.2) { false }
+    let sharedPeak = sharedReadings.map(\.peakLeft).max() ?? 0
+    out["p4"] = [
+        "chosen": chosen == id, "phaseAtPress": phaseAtPress, "preparedAtPress": preparedAtPress,
+        "phase": "\(panel.phase)", "maxPeakLeft": Double(sharedPeak),
+        "recorderState": "\(shared.state)", "screenRequests": spy.screenRequests,
+        "micRequests": spy.micRequests,
+    ]
+    // P5 — Cancel: the bar goes dark and stays dark.
+    panel.record(nil)
+    let cancelIndex = sharedReadings.count
+    let p5Phase = "\(panel.phase)"
+    let p5Prepared = shared.preparedMicrophone != nil
+    let p5Silent = shared.meter.reading.isSilent
+    _ = spin(0.3) { false }
+    let after = sharedReadings[cancelIndex...]
+    out["p5"] = [
+        "phase": p5Phase, "prepared": p5Prepared, "silent": p5Silent,
+        "silentLater": shared.meter.reading.isSilent,
+        "nonSilentAfter": after.filter { !$0.isSilent }.count,
+        "recorderState": "\(shared.state)",
+    ]
+    withExtendedLifetime(sharedWatch) {}
+    RecorderPanelController.grantDoors = sealedDoors()
+    panel.window?.orderOut(nil)
+    return out
+}
+
 // ---- dispatch -------------------------------------------------------------
 let args = CommandLine.arguments
 guard args.count >= 3 else {
@@ -4230,6 +4496,8 @@ do {
         answer = host(request)
     case "grants":
         answer = grants(request)
+    case "preroll":
+        answer = preroll(request)
     default:
         answer["error"] = "unknown mode \"\(mode)\" — the binary predates the section asking"
     }
@@ -4884,24 +5152,65 @@ def section_state_r2(answer):
           and (rr.get("onFinish") or {}).get("kind") == "success" and rr.get("stopCount") == 1
           and len((rr.get("onFinish") or {}).get("segments") or []) == 1, f"{rr.get('onFinish')}")
 
-    print("  3r — a did-fail on a CLOSED segment")
+    print("  3r — a did-fail on a CLOSED segment is that segment's (issue batch B27, #181)")
     cf = answer.get("closedFail") or {}
     cpaths = cf.get("paths") or ["", "", "", ""]
-    check("3r: a did-fail on a CLOSED segment (paused; its did-finish still in flight) ends the "
-          "recording — finishing as .stopped, the failure on the session",
-          cf.get("attached") == "ok" and cf.get("stateAfterFail") == "finishing"
-          and cf.get("stoppedBy") == "stopped",
-          f"attached {cf.get('attached')!r}, {cf.get('stateAfterFail')!r}, {cf.get('stoppedBy')!r}")
-    check("3r: … the closed segment flagged finished; the OPEN segment stamped and its writer asked "
-          "to stop", (cf.get("segment0") or {}).get("screenFinished") is True
-          and (cf.get("segment1") or {}).get("stoppedAt") is not None and cf.get("micStops") == 1,
-          f"0 {cf.get('segment0')}, 1 {cf.get('segment1')}, stops {cf.get('micStops')}")
+    check("3r: a did-fail on a CLOSED segment (paused; its did-finish still in flight) does NOT end the "
+          "recording — still .recording, no screenFailure on the session (closed-fail-fails-all)",
+          cf.get("written") is True and cf.get("attached") == "ok"
+          and cf.get("stateAfterFail") == "recording" and cf.get("screenFailure") == "nil",
+          f"attached {cf.get('attached')!r}, {cf.get('stateAfterFail')!r}, {cf.get('screenFailure')!r}")
+    check("3r: … the closed segment flagged finished with its outputFailure the writer's sentence, and "
+          "no writer asked to stop",
+          (cf.get("segment0") or {}).get("screenFinished") is True
+          and cf.get("outputFailure0") == "finishFailed: The recording failed: the writer gave up"
+          and cf.get("micStopsAfterFail") == 0,
+          f"0 {cf.get('segment0')}, {cf.get('outputFailure0')!r}, stops {cf.get('micStopsAfterFail')}")
+    check("3r: stop() then finishes it — .finishing, the open segment's writer asked to stop once",
+          cf.get("stateAfterStop") == "finishing" and cf.get("micStopsAfterStop") == 1,
+          f"{cf.get('stateAfterStop')!r}, stops {cf.get('micStopsAfterStop')}")
     fin = cf.get("onFinish") or {}
-    check("3r: the walker answers the recording's failure naming every file",
-          cf.get("settled") is True and cf.get("onFinishCount") == 1
-          and fin.get("case") == "filesKept(finishFailed)"
-          and fin.get("description") == f"The recording failed: the writer gave up The recording is "
-          f"at {cpaths[0]}, {cpaths[1]}; the microphone at {cpaths[2]}, {cpaths[3]}.", f"got {fin!r}")
+    segs = fin.get("segments") or []
+    left = fin.get("unreadable") or []
+    u0 = left[0] if left else {}
+    check("3r: ONE .success — onFinish once, the completion once — of the OPEN segment alone "
+          "(closedfail1.png), pauses 1",
+          cf.get("settled") is True and cf.get("onFinishCount") == 1 and cf.get("stopCount") == 1
+          and fin.get("kind") == "success" and [x.get("path") for x in segs] == [cpaths[1]]
+          and fin.get("pauses") == 1, f"got {fin!r}")
+    check("3r: unreadable is the CLOSED segment — closedfail0.png, both files kept, case finishFailed, "
+          "\"The recording failed: the writer gave up\" — left out UNPROBED although its PNG would read "
+          "(closed-fail-probed)",
+          len(left) == 1 and u0.get("moviePath") == cpaths[0]
+          and u0.get("keptFiles") == [cpaths[0], cpaths[2]] and u0.get("case") == "finishFailed"
+          and u0.get("description") == "The recording failed: the writer gave up", f"got {left!r}")
+
+    print("  3r2 — a did-fail on the segment a pause just closed, while PAUSED (issue batch B27, #181)")
+    cp = answer.get("closedFailPaused") or {}
+    ppaths = cp.get("paths") or ["", "", "", ""]
+    check("3r2: a real pause(), then the closed segment's did-fail — the recorder STAYS .paused, no "
+          "screenFailure, the segment's outputFailure the writer's sentence (closed-fail-fails-all)",
+          cp.get("written") is True and cp.get("attached") == "ok" and cp.get("pause") == "ok"
+          and cp.get("stateAfterFail") == "paused" and cp.get("screenFailure") == "nil"
+          and cp.get("outputFailure1")
+          == "finishFailed: The recording failed: the writer gave up while paused",
+          f"{cp.get('pause')!r}, {cp.get('stateAfterFail')!r}, {cp.get('screenFailure')!r}, "
+          f"{cp.get('outputFailure1')!r}")
+    check("3r2: … still .paused once its microphone's did-finish lands",
+          cp.get("stateAfterMic") == "paused", f"{cp.get('stateAfterMic')!r}")
+    pfin = cp.get("onFinish") or {}
+    psegs = pfin.get("segments") or []
+    pleft = pfin.get("unreadable") or []
+    pu = pleft[0] if pleft else {}
+    check("3r2: stop() → ONE .success of segment 0 alone within settled()'s 5 s, pauses 2",
+          cp.get("settled") is True and cp.get("onFinishCount") == 1 and pfin.get("kind") == "success"
+          and [x.get("path") for x in psegs] == [ppaths[0]] and pfin.get("pauses") == 2, f"got {pfin!r}")
+    check("3r2: … unreadable is segment 1 with both its files kept, case finishFailed, the writer's "
+          "sentence",
+          len(pleft) == 1 and pu.get("moviePath") == ppaths[1]
+          and pu.get("keptFiles") == [ppaths[1], ppaths[3]] and pu.get("case") == "finishFailed"
+          and pu.get("description") == "The recording failed: the writer gave up while paused",
+          f"got {pleft!r}")
 
     print("  3s — an external stop while paused")
     ep = answer.get("externalPaused") or {}
@@ -6308,13 +6617,15 @@ def section_chrome_pause(binary, sources):
     status = read_code(sources, "RecorderStatusItem.swift")
     route = read_code(sources, "AppDelegate+Recording.swift")
     tool = read_code(sources, "AgentServer+Recording.swift")
+    tool_chrome = read_code(sources, "AgentServer+RecordingChrome.swift")
     pause = read_code(sources, "RecorderPanelController+Pause.swift")
     base = read_code(sources, "RecorderPanelController.swift")
     for name, code in [("+Recording", rec), ("+Landing", land), ("status item", status),
-                       ("+Recording (route)", route), ("AgentServer+Recording", tool), ("+Pause", pause),
+                       ("+Recording (route)", route), ("AgentServer+Recording", tool),
+                       ("AgentServer+RecordingChrome", tool_chrome), ("+Pause", pause),
                        ("base", base)]:
         check(f"5u: {name} is in the sources", code is not None)
-    if None in (rec, land, status, route, tool, pause, base):
+    if None in (rec, land, status, route, tool, tool_chrome, pause, base):
         return
     body = "\n".join(function_body(rec.splitlines(), "func recordingDidStart()") or [])
     check("5u: recordingDidStart hides the panel for EVERY source — hiddenForRecording = true and "
@@ -6348,8 +6659,9 @@ def section_chrome_pause(binary, sources):
     nr = "\n".join(function_body(route.splitlines(), "func newRecording(_ sender: Any?)") or [])
     check("5u: newRecording's panel arm names .paused beside .recording and .starting",
           "case .recording, .paused, .starting:" in nr, nr)
-    check("5u: the tool's RecordingToolChrome passes the three closures and paused: recorder.isPaused",
-          all(t in tool for t in ("onPause:", "onResume:", "onStop:", "paused: recorder.isPaused")))
+    check("5u: the tool's RecordingToolChrome (AgentServer+RecordingChrome.swift since B27) passes the "
+          "three closures and paused: recorder.isPaused",
+          all(t in tool_chrome for t in ("onPause:", "onResume:", "onStop:", "paused: recorder.isPaused")))
     check("5u: show()'s guard is unchanged — beeps while hiddenForRecording",
           "guard !hiddenForRecording else {" in base
           and "NSSound.beep()" in "\n".join(function_body(base.splitlines(), "func show()") or []))
@@ -6451,6 +6763,30 @@ def section_file_pause(binary, sources):
           and f5.get("visible") is False, f"{f5}")
     check("F: the recorder is idle once the probe tears its faked sessions down",
           answer.get("stateAfter") == "idle", f"{answer.get('stateAfter')!r}")
+
+    # Issue batch B27 (#181): the recorder's pause notification, which the
+    # tool's status item flips on.
+    f6 = answer.get("f6") or {}
+    print(f"  F6: the panel's own pause and resume (F3) posted {f6.get('f3')} (isPaused inside each "
+          f"block; a fact, not asserted)")
+    check("F6: F4's pause action — a recording the panel does not own — posts "
+          "ScreenRecorder.pauseDidChangeNotification ONCE, synchronously (counted before any spin), "
+          "isPaused true inside the block (pause-no-post)",
+          f6.get("f4Pause") == [True], f"{f6}")
+    check("F6: … the resume action posts once more, isPaused false inside the block",
+          f6.get("f4Resume") == [False], f"{f6}")
+    check("F6: F5's action with nothing recording posts nothing", f6.get("f5") == 0, f"{f6}")
+    chrome = read_code(sources, "AgentServer+RecordingChrome.swift") or ""
+    lines = chrome.splitlines()
+    show_body = "\n".join(function_body(lines, "func show(_ recorder: ScreenRecorder)") or [])
+    added = show_body.split("addObserver(", 1)[1].split("}", 1)[0] if "addObserver(" in show_body else ""
+    check("F7: RecordingToolChrome.show (AgentServer+RecordingChrome.swift, comment-stripped) adds an "
+          "observer for ScreenRecorder.pauseDidChangeNotification with object: recorder whose block "
+          "calls tick() (chrome-no-observer)",
+          "forName: ScreenRecorder.pauseDidChangeNotification" in added and "object: recorder" in added
+          and "tick()" in added, show_body)
+    remove_body = "\n".join(function_body(lines, "func remove()") or [])
+    check("F7: … and remove() calls removeObserver", "removeObserver" in remove_body, remove_body)
 
     w0 = answer.get("w0") or {}
     print(f"  W0: '● 0:00' is {w0.get('recording')} pt wide and '{PAUSE_GLYPH} 0:00' "
@@ -7397,6 +7733,93 @@ def section_grants(binary, sources):
 
 
 # --------------------------------------------------------------------------
+# Section 13 — issue batch B27 (#98 c): the countdown's meter, read from the
+# PREPARED capture session.
+
+PREROLL_FLOOR = 1e-6   # −120 dBFS: above it, a real input is delivering levels
+
+
+def preroll_rows(answer):
+    """Every row of section 13 over the probe's answer."""
+    p1 = answer.get("p1") or {}
+    check("P1: a fresh ScreenRecorder() — never .shared — prepareMicrophone(id) leaves the session "
+          "prepared for that device and running, the recorder still .idle",
+          p1.get("prepared") is True and p1.get("running") is True and p1.get("state") == "idle", f"{p1}")
+    p2 = answer.get("p2") or {}
+    check(f"P2: 30 polls at 1/30 s while IDLE publish the prepared session's level — max peakLeft "
+          f"> {PREROLL_FLOOR:g} (−120 dBFS), the state .idle throughout (preroll-gated)",
+          (p2.get("maxPeakLeft") or 0) > PREROLL_FLOOR and p2.get("idleThroughout") is True, f"{p2}")
+    p3 = answer.get("p3") or {}
+    check("P3: discardPreparedMicrophone() publishes silence while idle and forgets the session "
+          "(preroll-no-silence)",
+          p3.get("silent") is True and p3.get("prepared") is False, f"{p3}")
+    check("P3: … and a later poll, nothing prepared, publishes nothing",
+          p3.get("laterPublishes") == 0, f"{p3}")
+    p4 = answer.get("p4") or {}
+    check("P4: the PANEL's Record (spied grants: granted, authorized) starts the countdown with the "
+          "chosen microphone prepared on .shared, asking nothing",
+          p4.get("chosen") is True and str(p4.get("phaseAtPress", "")).startswith("countdown")
+          and p4.get("preparedAtPress") is True and p4.get("screenRequests") == 0
+          and p4.get("micRequests") == 0, f"{p4}")
+    check(f"P4: 1.2 s into the countdown — still counting, the recorder .idle — the panel's own tick "
+          f"has lit ScreenRecorder.shared.meter: max peakLeft > {PREROLL_FLOOR:g} "
+          f"(preroll-no-tick, preroll-gated)",
+          str(p4.get("phase", "")).startswith("countdown") and p4.get("recorderState") == "idle"
+          and (p4.get("maxPeakLeft") or 0) > PREROLL_FLOOR, f"{p4}")
+    p5 = answer.get("p5") or {}
+    check("P5: Cancel → the panel .idle, the shared recorder's session let go, the reading silent at "
+          "once (preroll-no-silence)",
+          p5.get("phase") == "idle" and p5.get("prepared") is False and p5.get("silent") is True
+          and p5.get("recorderState") == "idle", f"{p5}")
+    check("P5: … and still silent 0.3 s later, with no non-silent publish after the cancel",
+          p5.get("silentLater") is True and p5.get("nonSilentAfter") == 0, f"{p5}")
+
+
+def preroll_rows_count():
+    """Section 13's row count, taken as `granted_rows_count` takes the
+    granted tier's — the row code run over an empty answer with `check`
+    swapped for a counter — so a skip's number cannot drift from the rows."""
+    global check
+    real = check
+    counted = [0]
+
+    def counter(name, ok, detail=""):
+        counted[0] += 1
+
+    check = counter
+    try:
+        import io
+        import contextlib
+        with contextlib.redirect_stdout(io.StringIO()):
+            preroll_rows({})
+    finally:
+        check = real
+    return counted[0]
+
+
+def section_preroll(binary, sources):
+    print("\nSection 13 — issue batch B27 (#98 c): the countdown's meter, read from the PREPARED "
+          "capture session, and dark once it is let go")
+    answer, error = run_probe(binary, "preroll", {"mode": "preroll"})
+    check("13: the probe answers", answer is not None and not answer.get("error"),
+          error or (answer or {}).get("error", ""))
+    if not answer or answer.get("error"):
+        return
+    print(f"  P0: Microphone status {answer.get('status')}; device {answer.get('device')!r} "
+          f"({answer.get('transport')}) — facts, not asserted")
+    if answer.get("skipped"):
+        skip_rows(preroll_rows_count(), answer["skipped"])
+        return
+    preroll_rows(answer)
+
+    def dbfs(value):
+        return f"{20 * math.log10(value):.1f} dBFS" if value and value > 0 else "silent"
+    print(f"  P2/P4: max peakLeft {dbfs((answer.get('p2') or {}).get('maxPeakLeft'))} over the fresh "
+          f"recorder's 30 polls, {dbfs((answer.get('p4') or {}).get('maxPeakLeft'))} over the "
+          f"countdown's 1.2 s — facts, not asserted")
+
+
+# --------------------------------------------------------------------------
 # The mutants. Each is one string replaced in a COPY of the tree's
 # `app/Sources` under `work/`, and the replacement must match exactly once,
 # or the copy is not the mutant it claims to be (`phase9_chrome.py`'s
@@ -7695,6 +8118,60 @@ MUTANTS = {
         "    static let widestElapsed: TimeInterval = 35_999\n",
         "    static let widestElapsed: TimeInterval = 0\n",
         "the item sized for 0:00 — a longer label is wider than the item"),
+    # Issue batch B27 (#98 c, #181 items 1 and 4) — section 13, 3r/3r2, F6/F7.
+    "preroll-gated": (
+        "ScreenRecorder+Microphone.swift",
+        "        } else if state == .idle, let prepared = preparedMicrophone, prepared.session.isRunning {\n"
+        "            connection = prepared.output.connection(with: .audio)\n",
+        "",
+        "publishMicrophoneLevel's idle arm gone — the .recording gate restored, the countdown's bar dead "
+        "(the code before B27)"),
+    "preroll-no-tick": (
+        "RecorderPanelController+Recording.swift",
+        "        recorder.prepareMicrophone(currentChoice().microphone)\n"
+        "        armTick()\n",
+        "        recorder.prepareMicrophone(currentChoice().microphone)\n",
+        "beginCountdown no longer arms the tick — nothing polls the prepared session"),
+    "preroll-no-silence": (
+        "ScreenRecorder+Microphone.swift",
+        "        if state == .idle { meter.publish(.silent, from: ObjectIdentifier(self)) }\n",
+        "",
+        "discardPreparedMicrophone publishes no silence — the bar holds its level after a cancel"),
+    "closed-fail-fails-all": (
+        "ScreenRecorder+Delegates.swift",
+        "            if self.session?.segments[index].stoppedAt != nil {\n"
+        "                // A CLOSED segment's writer gave up (#181): that segment's\n"
+        "                // alone — the walker leaves it out — never the recording's.\n"
+        "                if self.session?.segments[index].outputFailure == nil {\n"
+        "                    self.session?.segments[index].outputFailure =\n"
+        "                        .finishFailed(\"The recording failed: \" + error.localizedDescription)\n"
+        "                }\n"
+        "                self.outputEnded(asked: true)\n"
+        "                return\n"
+        "            }\n",
+        "",
+        "a closed segment's did-fail fails the whole recording again (the code before B27)"),
+    "closed-fail-probed": (
+        "ScreenRecorder+Finishing.swift",
+        "        if let failure = done.segments[index].outputFailure {\n"
+        "            let left = Self.leftOut(done, at: index, reason: failure)\n"
+        "            return probeSegment(done, at: index + 1, landed: landed, skipped: skipped + [left])\n"
+        "        }\n",
+        "",
+        "the walker probes a segment whose writer failed after it closed — a movie that reads lands"),
+    "pause-no-post": (
+        "ScreenRecorder+Pause.swift",
+        "        meter.publish(.silent, from: ObjectIdentifier(self))\n"
+        "        NotificationCenter.default.post(name: Self.pauseDidChangeNotification, object: self)\n",
+        "        meter.publish(.silent, from: ObjectIdentifier(self))\n",
+        "pause() posts no pauseDidChangeNotification — a tool's item flips a second late"),
+    "chrome-no-observer": (
+        "AgentServer+RecordingChrome.swift",
+        "        observer = NotificationCenter.default.addObserver(\n"
+        "            forName: ScreenRecorder.pauseDidChangeNotification, object: recorder, queue: nil\n"
+        "        ) { [weak self] _ in self?.tick() }\n",
+        "",
+        "the tool's chrome observes nothing — its item flips only at the 1 Hz tick (the code before B27)"),
 }
 
 
@@ -7724,7 +8201,8 @@ def prepare_mutant(name):
 
 SECTIONS = [section_files, section_configuration, section_state, section_unreadable, section_landing,
             section_segments, section_chrome, section_chrome_pause, section_file_pause,
-            section_welcome, section_catalog, section_host, section_granted, section_grants]
+            section_welcome, section_catalog, section_host, section_granted, section_grants,
+            section_preroll]
 
 
 def main():
@@ -7740,7 +8218,7 @@ def main():
                         help="a comma-separated subset of sections to run, by the name after "
                              "`section_` (files, configuration, state, unreadable, landing, "
                              "segments, chrome, chrome_pause, file_pause, welcome, catalog, host, "
-                             "granted, grants) — for "
+                             "granted, grants, preroll) — for "
                              "iterating on "
                              "one; the full run is what the counts in the docstring are")
     args = parser.parse_args()

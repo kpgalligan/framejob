@@ -15,8 +15,8 @@ in both appearances (System Settings ▸ Appearance, Light then Dark).
 2. Open the Release app from the Finder, or with
    `open build/Build/Products/Release/Reelcut.app`. **Not from a terminal**:
    a terminal-launched app's permissions (Screen Recording, Microphone)
-   belong to the terminal, not to Reelcut. Only REC-3, REC-7 and HS-2
-   launch from a terminal on purpose.
+   belong to the terminal, not to Reelcut. Only REC-3, REC-7, REC-8's
+   step 6 and HS-2 launch from a terminal on purpose.
 3. Have to hand:
    - **Real footage**: a 1080p movie with sound, a long recording (twenty
      minutes or more), an AAC file and a WAV file.
@@ -376,9 +376,14 @@ To take a permission away again: System Settings ▸ Privacy & Security, or
 - **Source:** #137; spec §11 recording.md (the recorder panel takes key only from an active Reelcut).
 
 **REC-8 — File ▸ Pause Recording, and the item's one width**
-- **Do:** 1. Start a recording from the panel. 2. Open the File menu: Pause Recording, then open it again: Resume Recording. 3. Watch Reelcut's menu bar item through the pause and resume, and past the first minute. 4. Repeat 2–3 with the menu bar in the light look and in the dark. 5. Stop.
-- **Expect:** the File item reads Pause Recording while recording and Resume Recording while paused, and is greyed out with no recording; each choice pauses or resumes as the item's own menu does (coral dot and running time, then the pause glyph and a frozen time). The item keeps one width throughout — the neighbouring menu bar items do not shift as the time ticks or the mark changes — and the title is never clipped, in either look.
-- **Source:** #98 (a, b); spec §11 recording.md (File ▸ Pause Recording).
+- **Do:** 1. Start a recording from the panel. 2. Open the File menu: Pause Recording, then open it again: Resume Recording. 3. Watch Reelcut's menu bar item through the pause and resume, and past the first minute. 4. Repeat 2–3 with the menu bar in the light look and in the dark. 5. Stop. 6. Launch Reelcut from Terminal as in REC-7 (port 4817, the terminal holding Screen Recording); in a second Terminal tab, in the repository, run `python3 -c 'import sys; sys.path.insert(0, "tools/proof"); from mcp import MCP; MCP(4817).call("record_screen", seconds=20)'`; while it records, choose File ▸ Pause Recording, then File ▸ Resume Recording, watching the menu bar item.
+- **Expect:** the File item reads Pause Recording while recording and Resume Recording while paused, and is greyed out with no recording; each choice pauses or resumes as the item's own menu does (coral dot and running time, then the pause glyph and a frozen time). The item keeps one width throughout — the neighbouring menu bar items do not shift as the time ticks or the mark changes — and the title is never clipped, in either look. In step 6 the `record_screen` recording's item flips at each click, not up to a second later.
+- **Source:** #98 (a, b); #181 (item 4, step 6); spec §11 recording.md (File ▸ Pause Recording).
+
+**REC-9 — The microphone meter during the countdown**
+- **Do:** 1. File ▸ New Recording…, choose a real microphone (not a virtual device), press Record, and speak through the 3-2-1; stop the recording that follows from the menu bar item. 2. Press Record again for a second countdown and press Cancel during it. 3. Set the microphone to Off and press Record; Cancel.
+- **Expect:** in step 1 the panel's bar moves with your voice from the first second of the countdown, and rests at the room's floor when you are quiet. In step 2 the bar is empty the moment you cancel and stays empty. In step 3 the bar stays empty through the countdown. Both looks.
+- **Source:** #98 (c).
 
 ## Assistant
 

@@ -9018,3 +9018,64 @@ Not changed (residue, left for issues): the same import-time default in
 `playback_audio_proof.py`, `video_configuration_proof.py` and
 `export_cancel_proof.py` (no importer sets their globals), and
 `name_field_proof.py`'s `mutant baseline:` label.
+
+## Issue batch B27 — the countdown's mic meter, a closed segment's late did-fail, the tool's item flips at once, the ffmpeg row's cause (`recording_probe.py` 3r, 3r2, F6, F7 and section 13; `recording_proof.py` section 2; #98 c, #181 items 1, 4 and 5)
+
+The rows are `recording_probe.py`'s (a probe compiled from `app/Sources`
+over `harness/build.sh`'s swiftc line; its docstring holds each row in
+full), and one is `recording_proof.py`'s.
+
+- **3r rewritten (#181 item 1)** — a did-FAIL on a CLOSED segment (its
+  did-finish still in flight) no longer ends the recording: still
+  `.recording`, no `screenFailure`, no writer stopped, the segment's
+  `outputFailure` the writer's sentence; `stop()` then lands ONE `.success`
+  of the open segment with `unreadable` the closed one — both files kept,
+  case `finishFailed`, "The recording failed: the writer gave up" — left out
+  UNPROBED although its PNG would read. **3r2** the same from PAUSED: a real
+  `pause()`, then the just-closed segment's did-fail → still `.paused`;
+  `stop()` → segment 0 alone, `pauses` 2, segment 1 in `unreadable`.
+- **F6, F7 (#181 item 4)** — F6 counts `ScreenRecorder.pauseDidChangeNotification`
+  from before F3: F4's pause action posts once, synchronously, `isPaused`
+  true inside the block; its resume once more with `isPaused` false; F5
+  posts nothing. F7 reads `AgentServer+RecordingChrome.swift`
+  (`RecordingToolChrome`, moved there as a pure move): `show` observes the
+  notification with `object: recorder` and calls `tick()`; `remove()` calls
+  `removeObserver`. The item itself is never put up; REC-8 step 6 is the
+  person's check.
+- **Section 13 `preroll` (#98 c)** — its own process; the Microphone status
+  is read before any device, and a status other than `.authorized` or no
+  built-in/USB device skips its rows by name with their count. **P1–P3** on a
+  fresh `ScreenRecorder()`: prepared and running while idle; 30 polls at
+  1/30 s publish a level above 1e-6 (−120 dBFS); the discard publishes
+  silence and a later poll nothing. **P4–P5** through the panel on
+  `.shared`: Record under a granted, authorized `GrantSpy` → the countdown,
+  and 1.2 s in the panel's own tick has lit the shared meter; Cancel → idle,
+  the session let go, silent at once and 0.3 s later. REC-9 is the
+  person's look.
+- **`recording_proof.py` section 2 (#181 item 5)** — the gate is
+  `ffmpeg_runs()`: `ffmpeg -version` must RUN, and the one row always
+  scored names why not — not on PATH, `exited <rc>: <first stderr line>`,
+  or no answer within 30 s. Section 3 reads the chrome from
+  `AgentServer+RecordingChrome.swift`.
+
+Mutants, each `--mutant <name>` with `--only preroll` (10 rows),
+`--only state` (141) or `--only file_pause` (39), all exit 1:
+
+| Mutant | Score | Rows failed |
+|---|---|---|
+| `preroll-gated` (the code before the batch) | 8/10 | P2, P4's meter row |
+| `preroll-no-tick` | 9/10 | P4's meter row |
+| `preroll-no-silence` | 7/10 | P3's silence row, P5's two |
+| `closed-fail-fails-all` (the code before the batch) | 133/141 | 3r's four (all but the stop row), 3r2's four |
+| `closed-fail-probed` | 137/141 | 3r's two result rows, 3r2's two result rows |
+| `pause-no-post` | 38/39 | F6's pause row |
+| `chrome-no-observer` (the code before the batch) | 38/39 | F7's `show` row |
+
+Run on 2026-09-30:
+
+| Command | Answer |
+|---|---|
+| `recording_probe.py --only state,file_pause,chrome_pause,preroll` | 248/248, exit 0 |
+| `recording_probe.py` (the whole run) | 1066/1066, exit 0, no row skipped — section 9's granted tier and section 13 RAN; P0 the MacBook Pro Microphone (built-in); P2 and P4's max peak −32.0 dBFS |
+| `recording_proof.py 4873` (own instance) | 189/189, exit 0; 2 tone rows skipped by name (the output is muted). The ffmpeg row passed (`ffmpeg version 9.0.2`) and section 3's chrome rows scored |
+| `recording_proof.fixture_part(None)` with a stub `ffmpeg` first on PATH (prints the dyld line, exits 1) | one FAIL: "ffmpeg runs (`ffmpeg -version`: exited 1: dyld: Library not loaded: libx265.215.dylib) …" |

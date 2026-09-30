@@ -299,6 +299,10 @@ lenient-decoding rule.
   (#22).
 - **In `untitled(around:)`, the import count runs BEFORE the microphone edit.** Counted the other
   way round, one ⌘Z read clean and ⌘W closed the document without a prompt.
+- **`RecordingToolChrome` is `AgentServer+RecordingChrome.swift`** (issue batch B27): the named
+  cut out of `AgentServer+Recording.swift`, which sat at the 400-line cap, as a pure move with
+  `private` dropped, before the chrome took its observer of the recorder's
+  `pauseDidChangeNotification` (#181).
 
 ### Agent handlers (surviving after D1)
 
@@ -410,8 +414,6 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   main hop holding no state; B21's named fallback, not taken). `player` stays private.
 - `AppDelegate+Menus.swift`: a submenu builder out (the precedent is
   `AppDelegate+GraphicMenu.swift`).
-- `AgentServer+Recording.swift`: `RecordingToolChrome` (the status-item wrapper with `freeze()`)
-  out (road map 3 R2).
 - `Controls.swift`: held to the sync rule with Rasterize's copy (`app/CLAUDE.md` "Shared chrome");
   7 of its lines are the SH-2 fork of `drawBar` (#101).
 - `ReelOps.swift` is exempt (a table, one row per op). `TimelineView.swift`,

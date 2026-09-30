@@ -1217,8 +1217,9 @@ free.
   the output's identity. `onFinish` on the session is the one hook; `stop()`
   past idle JOINS the finishing under way; a microphone problem is
   `micProblem` on a success, never the recording's failure. A movie that will
-  not probe is LEFT OUT as `RecordingResult.unreadable`; only a recording with
-  no readable movie fails.
+  not probe, or a closed segment whose output reported a failure (#181), is
+  LEFT OUT as `RecordingResult.unreadable`; only a recording with no readable
+  movie fails.
 - `RecordingLanding.swift` (+`Microphone`, +`Placing`) · `ProjectDocument+Recording.swift`
   — a `RecordingResult` and a document in, an UNSCOPED op list out; nothing
   here commits. Pictures land back to back on ONE track, every `add_clip`
@@ -1232,8 +1233,9 @@ free.
   / `Media` / `Render` / `History` / `Silence` / `Captions` / `Audio` /
   `Background` / `Scope` / `Transitions` / `CloudCaptions` / `Recording` /
   `Graphics`
-  (+`RecordingArguments`, +`RecordingResult`) — the handlers, one file per
-  group. `+CloudCaptions` is `transcribe`'s CLOUD arm alone — the `engine`
+  (+`RecordingArguments`, +`RecordingResult`, +`RecordingChrome` —
+  `RecordingToolChrome`, the tool's status item, flipped by the recorder's
+  `pauseDidChangeNotification`) — the handlers, one file per group. `+CloudCaptions` is `transcribe`'s CLOUD arm alone — the `engine`
   reader, the three cloud-only arguments refused by name under `apple`, the
   vocabulary's trim/de-dup/cap, the credential and the endpoint read ABOVE
   the network, and the result keys; `+Captions` dispatches on `engine` and is

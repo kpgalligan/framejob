@@ -14,8 +14,10 @@ import ScreenCaptureKit
 /// no segment asked for, changes nothing. A did-FINISH for a CLOSED segment
 /// (the pause's, landing after the resume — R0 q7: 5–25 ms) is that
 /// segment's flag and, while finishing, the wait's answer; what it is NOT
-/// is the recording's end. A did-FAIL is, whichever segment's output it
-/// names (a failed writer is `screenFailure`, the recording's), and a
+/// is the recording's end. A did-FAIL for the segment still RECORDING is (a
+/// failed writer with a file open is `screenFailure`, the recording's); a
+/// did-FAIL for a CLOSED segment is that segment's `outputFailure` and, like
+/// its did-finish, the wait's answer — the walker leaves it out (#181). A
 /// microphone did-finish carrying an error is that segment's `micFailure`
 /// — and the session's `microphoneProblem` only MID-segment (#97): at a
 /// boundary the machine asked for, it is that segment's alone.
@@ -95,6 +97,16 @@ extension ScreenRecorder: SCRecordingOutputDelegate {
         DispatchQueue.main.async { [weak self] in
             guard let self, let index = self.session?.index(of: recordingOutput) else { return }
             self.session?.segments[index].screenFinished = true
+            if self.session?.segments[index].stoppedAt != nil {
+                // A CLOSED segment's writer gave up (#181): that segment's
+                // alone — the walker leaves it out — never the recording's.
+                if self.session?.segments[index].outputFailure == nil {
+                    self.session?.segments[index].outputFailure =
+                        .finishFailed("The recording failed: " + error.localizedDescription)
+                }
+                self.outputEnded(asked: true)
+                return
+            }
             if self.session?.screenFailure == nil {
                 let sentence = "The recording failed: " + error.localizedDescription
                 self.session?.screenFailure =
@@ -114,12 +126,13 @@ extension ScreenRecorder: SCRecordingOutputDelegate {
 
     /// A did-finish the machine ASKED for — a pause's, or the stop's; the
     /// segment's `stoppedAt` says so — is the wait's answer while finishing
-    /// and, before it, nothing more than the segment's own flag. One nobody
-    /// asked for (the writer gave up) and EVERY failure — a closing file's
-    /// included, since a did-fail is `screenFailure`, which fails the
-    /// recording (a movie that merely will not probe is left out, #97) —
-    /// end the recording the way an external stop does. While arming, the start's
-    /// completion reports it.
+    /// and, before it, nothing more than the segment's own flag; so is a
+    /// did-FAIL for such a CLOSED segment, which is its `outputFailure` and
+    /// leaves it out (#181). One nobody asked for (the writer gave up) and a
+    /// failure of the segment still RECORDING — `screenFailure`, which fails
+    /// the recording (a movie that merely will not probe is left out, #97) —
+    /// end the recording the way an external stop does. While arming, the
+    /// start's completion reports it.
     private func outputEnded(asked: Bool) {
         switch state {
         case .recording, .paused:

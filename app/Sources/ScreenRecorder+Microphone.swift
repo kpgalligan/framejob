@@ -53,10 +53,15 @@ extension ScreenRecorder {
             deviceID: id, session: built.session, output: built.output)
     }
 
-    /// MAIN THREAD. Stops and forgets a prepared session; a no-op without one.
+    /// MAIN THREAD. Stops and forgets a prepared session, if there is one.
+    /// While IDLE it also publishes silence (#98 c), prepared or not: the
+    /// countdown's meter read the prepared session, and a cancel, a close,
+    /// an abandoned or refused start and `failStart` (which idles first) all
+    /// come here, so the bar never holds a level for an input that is closed.
     func discardPreparedMicrophone() {
         preparedMicrophone?.session.stopRunning()
         preparedMicrophone = nil
+        if state == .idle { meter.publish(.silent, from: ObjectIdentifier(self)) }
     }
 
     /// `start`'s microphone: the prepared session when its device is
@@ -99,22 +104,32 @@ extension ScreenRecorder {
     // MARK: - The meter
 
     /// MAIN THREAD, from the panel's 30 Hz timer. Reads the microphone file
-    /// output's connection channels and publishes one reading; a no-op —
-    /// nothing published — while no microphone is recording (idle, arming,
-    /// PAUSED, finishing: the pause published the silence), and once the
-    /// LATEST segment's microphone has finished or failed (finding 3
-    /// published the silence then, and a dead connection must not light the
-    /// bar again; a closed segment's state is not this segment's). One
+    /// output's connection channels and publishes one reading: while
+    /// RECORDING, the recording's output; while IDLE with a PREPARED session
+    /// running, that session's output — the countdown's meter (#98 c: the
+    /// connection was measured reporting levels on a running session
+    /// before `startRecording`, 2026-09-30). A no-op — nothing published —
+    /// idle with nothing prepared, arming, PAUSED, finishing (the pause
+    /// published the silence), and once the LATEST segment's microphone has
+    /// finished or failed (finding 3 published the silence then, and a dead
+    /// connection must not light the bar again; a closed segment's state is
+    /// not this segment's). One
     /// channel is reported on both sides, `LevelMeterSink`'s rule for a
     /// mono track (R0 q6c: the connection exposes `averagePowerLevel` and
     /// `peakHoldLevel` in dB on every poll, so there is no sample buffer and
     /// no queue in it).
     func publishMicrophoneLevel() {
-        guard state == .recording, let current = session, !current.latest.micFinished,
-            current.latest.micFailure == nil, let output = current.micOutput,
-            let connection = output.connection(with: .audio),
-            let first = connection.audioChannels.first
-        else { return }
+        let connection: AVCaptureConnection?
+        if state == .recording, let current = session, !current.latest.micFinished,
+            current.latest.micFailure == nil, let output = current.micOutput
+        {
+            connection = output.connection(with: .audio)
+        } else if state == .idle, let prepared = preparedMicrophone, prepared.session.isRunning {
+            connection = prepared.output.connection(with: .audio)
+        } else {
+            connection = nil
+        }
+        guard let connection, let first = connection.audioChannels.first else { return }
         let second = connection.audioChannels.count > 1 ? connection.audioChannels[1] : first
         meter.publish(
             LevelMeterReading(

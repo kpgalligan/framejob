@@ -46,9 +46,13 @@ import ScreenCaptureKit
 /// `ScreenRecorder+Microphone.swift` says why — `startRunning()`'s first-use
 /// cost, up to 0.4 s of voice missing from the file) and discarded on cancel,
 /// on close and on a refused start, so an input never stays open past the
-/// recording it was for. **The tick shows a microphone problem the moment
-/// the recorder reports one**: the picture keeps recording, the meter goes
-/// silent, and the note says so rather than leaving a dead bar.
+/// recording it was for. **The meter moves during the countdown** (#98 c):
+/// `beginCountdown` arms the tick, which through `.countdown` and
+/// `.starting` does nothing but `publishMicrophoneLevel()`, read from the
+/// prepared session; the discard publishes the silence. **The tick shows a
+/// microphone problem the moment the recorder reports one**: the picture
+/// keeps recording, the meter goes silent, and the note says so rather than
+/// leaving a dead bar.
 ///
 /// **Two timers run in `.common` modes** — the countdown and the 30 Hz tick
 /// — because a status item's menu runs the run loop in event-tracking mode
@@ -127,11 +131,14 @@ extension RecorderPanelController {
     /// meanwhile, and a click on it or closing the panel ends the countdown
     /// with nothing started. The microphone the choice names is prepared
     /// here, after the grants and before the first second has passed, so its
-    /// start cost is paid while the numeral is still on screen.
+    /// start cost is paid while the numeral is still on screen — and the
+    /// tick is armed at once, so the meter reads that session through the
+    /// 3-2-1 (#98 c).
     func beginCountdown() {
         countdownTimer?.invalidate()
         phase = .countdown(Self.countdownSeconds)
         recorder.prepareMicrophone(currentChoice().microphone)
+        armTick()
         let timer = Timer(timeInterval: 1, repeats: true) { [weak self] timer in
             guard let self, case .countdown(let remaining) = self.phase else {
                 timer.invalidate()
@@ -276,18 +283,31 @@ extension RecorderPanelController {
 
     // MARK: - The tick
 
-    /// 30 Hz while recording or paused, in `.common` modes (the type doc):
-    /// the microphone's level into the panel's own meter
-    /// (`ScreenRecorder.publishMicrophoneLevel`, a no-op without a
-    /// microphone and while paused, the recorder having silenced the bar),
-    /// the elapsed time in the footnote and in the status item — with
+    /// 30 Hz from the countdown's start, in `.common` modes (the type doc).
+    /// Through `.countdown` and `.starting` it ONLY meters — the prepared
+    /// session's level (#98 c; the recorder publishes nothing while
+    /// arming, so the bar holds its last pre-roll level for that instant).
+    /// While recording or paused: the microphone's level into the panel's
+    /// own meter (`ScreenRecorder.publishMicrophoneLevel`, a no-op without
+    /// a microphone and while paused, the recorder having silenced the
+    /// bar), the elapsed time in the footnote and in the status item — with
     /// `paused`, which is what flips the item's menu — and a microphone
-    /// problem into the note.
+    /// problem into the note. `recordingDidStart` re-arms it.
     private func armTick() {
         tickTimer?.invalidate()
         let timer = Timer(timeInterval: 1.0 / 30, repeats: true) { [weak self] timer in
-            guard let self,
-                self.phase == .recording || self.phase == .paused || self.phase == .stopping
+            guard let self else {
+                timer.invalidate()
+                return
+            }
+            switch self.phase {
+            case .countdown, .starting:
+                self.recorder.publishMicrophoneLevel()
+                return
+            default:
+                break
+            }
+            guard self.phase == .recording || self.phase == .paused || self.phase == .stopping
             else {
                 timer.invalidate()
                 return

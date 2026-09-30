@@ -59,7 +59,8 @@ extension AppDelegate {
     }
 
     /// File ▸ Pause Recording / Resume Recording (the header). A tool's
-    /// status item follows at its own next 1 Hz tick.
+    /// status item flips at once, on the recorder's
+    /// `pauseDidChangeNotification` (#181).
     @objc func pauseOrResumeRecording(_ sender: Any?) {
         let panel = RecorderPanelController.shared
         switch panel.phase {

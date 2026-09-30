@@ -33,7 +33,9 @@ import ScreenCaptureKit
 /// picture landing without it. A microphone that dies MID-recording
 /// (finding 3) sets `microphoneProblem` at once, silences the meter and
 /// lets the picture record on; `stop` lands it. A movie that will not probe
-/// is LEFT OUT (#97): the walker goes on to the next segment and the result
+/// is LEFT OUT (#97), and so, unprobed, is a closed segment whose output
+/// reported a failure after its stop (#181, its `outputFailure` the reason):
+/// the walker goes on to the next segment and the result
 /// names it in `unreadable`, its files kept on disk and named; only a
 /// recording with NO readable movie fails — the first segment's error, every
 /// file named, so one segment's failure reads as it always did.
@@ -126,7 +128,9 @@ extension ScreenRecorder {
     }
 
     /// The walker: probes segment `index`'s movie — a failure LEAVES THE
-    /// SEGMENT OUT, `leftOut`, with no microphone probe — then its
+    /// SEGMENT OUT, `leftOut`, with no microphone probe, and a segment whose
+    /// output reported a failure after its stop (`outputFailure`, #181) is
+    /// left out the same way WITHOUT a probe — then its
     /// microphone, appends the `RecordingSegment` and moves to the next;
     /// past the last, concludes: a failure with the first left-out
     /// segment's error when nothing landed, else a success carrying the
@@ -148,6 +152,10 @@ extension ScreenRecorder {
                 unreadable: skipped)
             return conclude(done, .success(result))
         }
+        if let failure = done.segments[index].outputFailure {
+            let left = Self.leftOut(done, at: index, reason: failure)
+            return probeSegment(done, at: index + 1, landed: landed, skipped: skipped + [left])
+        }
         MediaImporter.probe(url: done.segments[index].movieURL) { [weak self] movie in
             guard let self else { return }
             switch movie {
@@ -163,18 +171,24 @@ extension ScreenRecorder {
         }
     }
 
-    /// Segment `index`, left out: its movie as named, the files it left on
-    /// disk (movie, then microphone, each only if there) and `unreadable`'s
-    /// error for it.
+    /// Segment `index`, left out for a movie that will not probe:
+    /// `unreadable`'s error for it.
     private static func leftOut(_ done: Session, at index: Int, _ error: any Error)
+        -> UnreadableSegment
+    {
+        leftOut(done, at: index, reason: unreadable(done, at: index, error))
+    }
+
+    /// Segment `index`, left out: its movie as named, the files it left on
+    /// disk (movie, then microphone, each only if there) and `reason` — a
+    /// probe's failure, or a closed segment's `outputFailure` (#181).
+    private static func leftOut(_ done: Session, at index: Int, reason: RecorderError)
         -> UnreadableSegment
     {
         let segment = done.segments[index]
         let kept = [segment.movieURL.path, segment.micURL?.path].compactMap { $0 }
             .filter { FileManager.default.fileExists(atPath: $0) }
-        return UnreadableSegment(
-            moviePath: segment.movieURL.path, keptFiles: kept,
-            error: unreadable(done, at: index, error))
+        return UnreadableSegment(moviePath: segment.movieURL.path, keptFiles: kept, error: reason)
     }
 
     /// The microphone's half of one segment: no microphone → done; a writer

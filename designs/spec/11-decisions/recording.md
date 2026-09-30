@@ -116,7 +116,13 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   panel's and `record_screen`'s), name it and the files it kept on disk.
   Only a recording with NO readable movie fails: the first segment's error,
   `namingFiles` naming every file, so one segment reads byte for byte as
-  before. A microphone failure the machine asked for — the segment's
+  before. A segment whose recording output reports a FAILURE after its
+  `stoppedAt` was set (a pause's or the stop's) is left out the same way
+  (#181, 2026-09-30): the failure is that segment's, the recording goes on
+  or finishes, and the walker leaves it out UNPROBED with the writer's
+  sentence as its `unreadable` reason. Only a did-fail for the segment
+  still recording (no `stoppedAt`) is the recording's failure. A
+  microphone failure the machine asked for — the segment's
   `stoppedAt` set: a pause's or the stop's did-finish, e.g. −11805 for a
   writer stopped before its first sample — is that segment's `micProblem`
   only; `microphoneProblem`, the live note, is a microphone that dies

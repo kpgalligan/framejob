@@ -86,8 +86,9 @@ extension AgentServer {
     /// first's file in place. `pauses` and `segments` are always present;
     /// `segments` has exactly one entry for a recording never paused.
     /// `unreadable` (#97) is present only when a segment was LEFT OUT because
-    /// its movie would not probe: one entry per such segment, in order, with
-    /// its movie's `path`, the `kept_files` still on disk and the `reason`.
+    /// its movie would not probe, or its writer failed after it closed (#181):
+    /// one entry per such segment, in order, with its movie's `path`, the
+    /// `kept_files` still on disk and the `reason`.
     static func recordingFields(
         _ result: RecordingResult, ids: [RecordingSegmentIds] = []
     ) -> [String: Any] {

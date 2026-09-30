@@ -69,6 +69,11 @@ count rather than passing vacuously.
   `set_speed` 2.0 with a render at 2.4 s (source 4.8 s, held) equal to it
   and a render at 0.4 s (source 0.8 s, frame 24) a DIFFERENT non-black
   frame. Every claim is an equality between renders, never a literal hash.
+  Its first row is the gate, always scored (issue batch B27, #181):
+  `ffmpeg -version` must RUN (`ffmpeg_runs()`), and a FAIL — never a skip —
+  names why: not on PATH, the exit code with ffmpeg's first stderr line (a
+  missing dylib), or no answer within 30 s. On PATH alone was not enough:
+  a broken install is on PATH and cannot run.
 * Section 3, the tool's SOURCE, read where no call can reach: the stop
   ceiling's derivation (`stopCeiling(segments:)` — `finishCeiling + 2 × 30 ×
   max(n, 1) + 5` over the segments the recorder holds, 75 s unpaused and
@@ -81,7 +86,8 @@ count rather than passing vacuously.
   range sentence, `path`'s trim, and R2's: the status item's THREE closures
   (Pause and Resume as the recorder's `pause()` / `resume()` under `try?`,
   Stop freezing the item's mark before the recorder's `stop()`, the tick
-  passing `elapsed` and `isPaused`), the finish timeout reading the
+  passing `elapsed` and `isPaused` — read in `RecordingToolChrome`, which
+  issue batch B27 moved to `AgentServer+RecordingChrome.swift`), the finish timeout reading the
   session's SEGMENTS — their count sizing the ceiling — and its sentence
   pluralised by count, `savedButNotAdded` built over
   `RecordingResult.filesClause`, which names every segment's movie and
@@ -917,10 +923,29 @@ def refusal_part(mcp):
 # ---- 2. the held last frame (lane E), which needs no grant ---------------
 
 
+def ffmpeg_runs():
+    """Whether `ffmpeg -version` runs, and why not (issue batch B27, #181):
+    `(True, <its first line>)`, else `(False, <why>)` — not on PATH, the exit
+    code with its first non-empty stderr line (a missing dylib), or no
+    answer within 30 s. On PATH is not enough: a broken install is there
+    and cannot run."""
+    try:
+        ran = subprocess.run(["ffmpeg", "-version"], capture_output=True, text=True, timeout=30)
+    except FileNotFoundError:
+        return False, "not on PATH"
+    except subprocess.TimeoutExpired:
+        return False, "did not answer -version within 30 s"
+    if ran.returncode != 0:
+        line = next((l.strip() for l in ran.stderr.splitlines() if l.strip()), "")
+        return False, f"exited {ran.returncode}: {line}"
+    return True, (ran.stdout.splitlines() or [""])[0]
+
+
 def fixture_part(mcp):
-    if shutil.which("ffmpeg") is None:
-        check(False, "ffmpeg is on PATH (tools/proof/README.md: needed at proof time) — the "
-                     "three fixture rows cannot run without it")
+    ok, why = ffmpeg_runs()
+    check(ok, f"ffmpeg runs (`ffmpeg -version`: {why}) — tools/proof/README.md: needed at proof "
+              f"time; the fixture rows cannot run without it")
+    if not ok:
         return
     os.makedirs(FIXTURES, exist_ok=True)
     made = subprocess.run(
@@ -1016,7 +1041,7 @@ def source_part():
           "the header no longer claims a second stop() mid-finish is .busy — it says it joins")
     # R2d: the item takes THREE closures now; R1's one-closure literal is the
     # text that moved.
-    chrome = tool.split("private final class RecordingToolChrome")[1]
+    chrome = source("AgentServer+RecordingChrome.swift").split("final class RecordingToolChrome")[1]
     check("RecorderStatusItem(" in chrome and "onPause:" in chrome and "onResume:" in chrome
           and ("onStop: { [weak self] in\n                self?.freeze()\n"
                "                ScreenRecorder.shared.stop()\n            })") in chrome

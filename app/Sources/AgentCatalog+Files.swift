@@ -148,7 +148,8 @@ extension AgentServer {
             + "TOTAL recorded across them. "
         let recordingUnreadableClause: String =
             "A segment whose movie will not read (an empty file, from a pause in the instant "
-            + "after a resume) is LEFT OUT rather than failing the recording: the readable "
+            + "after a resume), or whose writer failed after the segment closed, is LEFT OUT "
+            + "rather than failing the recording: the readable "
             + "segments land, and the result's unreadable lists each one left out — path, "
             + "kept_files (what it left on disk) and reason — with the note naming them; "
             + "only a recording with NO readable movie fails, naming every file. "

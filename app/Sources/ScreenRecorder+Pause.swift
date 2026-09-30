@@ -33,8 +33,11 @@ import ScreenCaptureKit
 ///
 /// **What a failed pair costs** is R1's posture, per segment, softened for
 /// the movie (#97): a movie that will not probe LEAVES ITS SEGMENT OUT
-/// (`settle`, naming its kept files in `RecordingResult.unreadable`), and
-/// only a recording with no readable movie fails; a microphone file that
+/// (`settle`, naming its kept files in `RecordingResult.unreadable`), as
+/// does a CLOSED segment whose output reports a did-FAIL after its stop
+/// (#181: its `outputFailure`, left out unprobed with the writer's
+/// sentence); only a recording with no readable movie fails, and only the
+/// OPEN segment's did-fail is the recording's; a microphone file that
 /// will not probe is that segment's `micProblem`, and `resume()` asks the
 /// writer to record the next segment regardless — each is judged on its
 /// own file (q7: one poisoned writer failed every restarted file, and
@@ -70,9 +73,18 @@ extension ScreenRecorder {
         var screenFinished = false
         var micFinished = false
         var micFailure: String?
+        /// The recording output's did-FAIL for a segment whose `stoppedAt`
+        /// was already set (#181): the segment's, never the recording's.
+        var outputFailure: RecorderError? = nil
     }
 
     var isPaused: Bool { state == .paused }
+
+    /// Posted, object the recorder, as the LAST thing a `pause()` or a
+    /// `resume()` that succeeded does — never on a throw — so a view of the
+    /// paused state (the tool's status item) flips at the moment from any
+    /// door rather than at its own next tick (#181).
+    static let pauseDidChangeNotification = Notification.Name("ReelcutRecorderPauseDidChange")
 
     /// MAIN THREAD, synchronous. `.recording` → `.paused`; `.paused` throws
     /// `.alreadyPaused` (`.notRecording`'s sentence would be false while
@@ -81,11 +93,11 @@ extension ScreenRecorder {
     /// did-finish lands on THAT segment, 5–25 ms later), stops the
     /// microphone's writer when there is one (likewise), stamps the
     /// segment's `stoppedAt`, counts the pause (`RecordingResult.pauses`),
-    /// silences the meter — and that is all: the stream keeps capturing. A
-    /// remove that throws is rethrown as `.finishFailed` — it is a file
-    /// that could not be closed — and the recorder STAYS `.recording` with
-    /// nothing changed, since the output is still attached and a Stop will
-    /// close it.
+    /// silences the meter, posts `pauseDidChangeNotification` — and that is
+    /// all: the stream keeps capturing. A remove that throws is rethrown as
+    /// `.finishFailed` — it is a file that could not be closed — and the
+    /// recorder STAYS `.recording` with nothing changed, since the output is
+    /// still attached and a Stop will close it.
     func pause() throws {
         guard state != .paused else { throw RecorderError.alreadyPaused }
         guard state == .recording, let current = session else {
@@ -107,6 +119,7 @@ extension ScreenRecorder {
         current.micOutput?.stopRecording()
         state = .paused
         meter.publish(.silent, from: ObjectIdentifier(self))
+        NotificationCenter.default.post(name: Self.pauseDidChangeNotification, object: self)
     }
 
     /// MAIN THREAD, synchronous. `.paused` → `.recording`; anything else
@@ -154,6 +167,7 @@ extension ScreenRecorder {
         if let micOutput = current.micOutput, let micURL = segment.micURL {
             micOutput.startRecording(to: micURL, outputFileType: .m4a, recordingDelegate: self)
         }
+        NotificationCenter.default.post(name: Self.pauseDidChangeNotification, object: self)
     }
 
     /// The resumed segment's movie: `RecordingFiles.uniqueURL`'s own rule —
