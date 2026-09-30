@@ -25,22 +25,41 @@ dummy key, `RC_ASSISTANT_BASE_URL` at the stand-in):
   X   the helper killed while asking: a new send is taken within 10 s and
       its marker lands; no file; the app lives
   K1  `proof-key` in no MCP answer and nowhere in the log
+  SX  (issue batch B15, #149; AI-16) Stop reaches a running export: on B, a
+      text clip of SX_SECONDS (an un-stopped h264 export of it takes over
+      10 s), the export asked about and allowed with `stop_after: 2`:
+      finished, `stopped_ms` ≥ 2000 and `waited_ms` − `stopped_ms` ≤ 5000,
+      the export's `tool_result` an error "The export was cancelled.", no
+      file 1 s later, no stand-in failure
+  ST  Stop reaches a running on-device transcribe: on C, a new project,
+      `speech_engine_proof.make_fixtures()`'s ten-minute WAV placed, the
+      model's `transcribe {place: false}` sent with `stop_after: 2`: finished,
+      the `tool_result` an error "The transcription was cancelled.",
+      `waited_ms` − `stopped_ms` ≤ 5000. When a setup `transcribe {place:
+      false}` over the pangram, in a project of its own, is refused as not
+      installed or not available, ST is a named host SKIP
+  SX and ST run last, after K1: row X counts exactly one helper child, and
+  they open sessions on B and C.
 Launch B, W: the same kind of turn with NO MCP server, through the launch
       default; the model setting reaches the stand-in (AI-11)
 Launch C, K2: AI-13 — the override set and no `-RCSecretFolder`: the session
       is refused for want of a key, the stand-in hears nothing, no helper runs
 
     python3 tools/proof/assistant_session_proof.py
-    python3 tools/proof/assistant_session_proof.py --mutant no-prepare   # W alone: FAILS
+    python3 tools/proof/assistant_session_proof.py --mutant no-prepare          # W: FAILS
+    python3 tools/proof/assistant_session_proof.py --mutant no-export-stop      # SX: FAILS
+    python3 tools/proof/assistant_session_proof.py --mutant no-transcribe-stop  # ST: FAILS
 
-The mutant copies the tree with `tree_copy.make_copy` into
-`work/assistant_session/mutant/tree`, deletes the `AgentLane.prepareAtLaunch()`
-line, runs `make app` there, and runs W against that app: the report must
-be `ok: false`, naming AI-3 (exit 1; 0 when it survives). A mutant that did
-not build could not perform the control (exit 2), and so (rule R, issue
-batch B13) could one whose W was never scored or was scored by a caught
-exception or a failed setup: `mutant <name>: the control could not be
-performed — <why>`, exit 2.
+A mutant copies the tree with `tree_copy.make_copy` into
+`work/assistant_session/mutant/tree`, deletes its one line (`MUTANTS`: the
+`AgentLane.prepareAtLaunch()` line in main.swift; the export's `onCancel`
+line; the transcribe's `onCancel` line), runs `make app` there, and runs its
+row against that app — W's report must be `ok: false`, naming AI-3; SX and
+ST run in a launch A of the mutant app — (exit 1; 0 when it survives). A
+mutant that did not build could not perform the control (exit 2), and so
+(rule R, issue batch B13) could one whose row was never scored, was a host
+skip, or was scored by a caught exception or a failed setup: `mutant <name>:
+the control could not be performed — <why>`, exit 2.
 
 Prints `<ID> ok|FAIL — <detail>` per row, then `n/m`. An instrument that
 cannot run is a scored FAIL. Safety: every child's environment has
@@ -86,6 +105,15 @@ CORE_TOOLS = ["get_project", "render_frame", "undo", "redo"]
 SEARCH_TOOL = "tool_search_tool_bm25"
 PORT_A, PORT_C = 4872, 4873
 WALL_PORT, WALL_MCP, WALL_TURN, WALL_REPORT, WALL_BUILD = 60, 300, 60, 150, 900
+SX_SECONDS, WALL_SX, WALL_ST, STOP_AFTER, WALL_STOPPED = 240, 180, 300, 2, 5000
+# name: (the file in app/Sources, the one line deleted, the row it must fail)
+MUTANTS = {
+    "no-prepare": ("main.swift", PREPARE, "W"),
+    "no-export-stop": ("AgentServer+Render.swift",
+                       "stop?.onCancel { [weak exporter] in exporter?.cancel() }", "SX"),
+    "no-transcribe-stop": ("AgentServer+Captions.swift",
+                           "AgentLane.shared.callCancel?.onCancel { token.cancel() }", "ST"),
+}
 BOUND_PORT = re.compile(r"listening on http://127\.0\.0\.1:(\d+)/mcp")
 
 
@@ -342,6 +370,7 @@ def row_t1(app, fake, ctx):
     a = app.must("new_project", path=os.path.join(ctx["folder"], "A.reelcut"))["saved"]
     b = app.must("new_project", path=os.path.join(ctx["folder"], "B.reelcut"))["saved"]
     ctx["A"] = a
+    ctx["B"] = b
     front = app.must("get_project").get("path")
     fake.scenario([use("toolu_t1", "add_marker", {"at": 1200000, "name": "A1 part 3"}),
                    say("T1: the marker is in.")])
@@ -551,6 +580,84 @@ def row_k1(app):
                                               f"{len(in_answers)}; in the log {in_log}")
 
 
+def stopped_turn(answer, tool, sentence):
+    """Problems with a turn Stop cut at `STOP_AFTER` s while `tool` ran."""
+    problems = []
+    stopped, waited = answer.get("stopped_ms"), answer.get("waited_ms")
+    if answer.get("state") != "finished":
+        problems.append(f"state {answer.get('state')}")
+    if not isinstance(stopped, int) or stopped < STOP_AFTER * 1000:
+        problems.append(f"stopped_ms {stopped}")
+    elif not isinstance(waited, int) or waited - stopped > WALL_STOPPED:
+        problems.append(f"waited_ms − stopped_ms {waited} − {stopped} > {WALL_STOPPED}")
+    results = tool_results(answer, tool)
+    if [(r.get("is_error"), r.get("summary")) for r in results] != [(True, sentence)]:
+        problems.append(f"{tool} results {[(r.get('is_error'), r.get('summary')) for r in results]}")
+    return problems
+
+
+def row_sx(app, fake, ctx):
+    b = ctx.get("B") or app.must(
+        "new_project", path=os.path.join(ctx["folder"], "B.reelcut"))["saved"]
+    app.must("add_text_clip", project=b, track=1, at=0, duration=SX_SECONDS * 600000)
+    path = os.path.join(ctx["folder"], "SX.mp4")
+    fake.scenario([use("toolu_sx", "export", {"preset": "h264", "path": path}),
+                   say("SX: stopped.")])
+    ok, sent = app.call("assistant_send", project=b, text="Export the long project (SX).",
+                        timeout=WALL_TURN)
+    if not ok or sent.get("state") != "asking":
+        return False, f"send: {sent if not ok else brief(sent)}; wanted asking"
+    ok, answer = app.call("assistant_answer", project=b, answer="allow", stop_after=STOP_AFTER,
+                          timeout=WALL_SX)
+    if not ok:
+        return False, f"allow with stop_after refused: {answer}"
+    time.sleep(1.0)  # an export that ran on would still be writing, or have written
+    exists = os.path.exists(path)
+    log = fake.log()
+    problems = stopped_turn(answer, "export", "The export was cancelled.")
+    if exists:
+        problems.append(f"{path} exists")
+    if log.get("failures"):
+        problems.append(f"failures {log['failures']}")
+    return not problems, (f"a {SX_SECONDS} s text clip (control: un-stopped, its h264 export "
+                          f"takes over 10 s); {brief(answer)}, stopped_ms "
+                          f"{answer.get('stopped_ms')}; export results "
+                          f"{[(r.get('is_error'), r.get('summary')) for r in tool_results(answer, 'export')]}"
+                          f"; file 1 s later {exists}"
+                          + ("" if not problems else " — " + "; ".join(problems)))
+
+
+def row_st(app, fake, ctx):
+    import speech_engine_proof  # the fixtures' one maker
+    pangram, ten, _, ten_seconds = speech_engine_proof.make_fixtures()
+    check = app.must("new_project", path=os.path.join(ctx["folder"], "C-check.reelcut"))["saved"]
+    track = app.must("get_project", project=check)["project"]["tracks"][0]["id"]
+    media = app.must("import_media", project=check, path=pangram)["media"]
+    app.must("add_clip", project=check, track=track, media=media, at=0)
+    ok, setup = app.call("transcribe", project=check, place=False)
+    if not ok:
+        if "not installed" in setup or "not available" in setup:
+            return None, f"on-device transcription on this Mac: {setup[:160]!r}"
+        return False, f"the setup transcribe over the pangram failed: {setup[:200]!r}"
+    c = app.must("new_project", path=os.path.join(ctx["folder"], "C.reelcut"))["saved"]
+    track = app.must("get_project", project=c)["project"]["tracks"][0]["id"]
+    media = app.must("import_media", project=c, path=ten)["media"]
+    app.must("add_clip", project=c, track=track, media=media, at=0)
+    fake.scenario([use("toolu_st", "transcribe", {"place": False}), say("ST: stopped.")])
+    ok, answer = app.call("assistant_send", project=c, text="Transcribe it (ST).",
+                          stop_after=STOP_AFTER, timeout=WALL_ST)
+    if not ok:
+        return False, f"assistant_send with stop_after refused: {answer}"
+    log = fake.log()
+    problems = stopped_turn(answer, "transcribe", "The transcription was cancelled.")
+    if log.get("failures"):
+        problems.append(f"failures {log['failures']}")
+    return not problems, (f"setup over the pangram answered; a {ten_seconds:.0f} s WAV; "
+                          f"{brief(answer)}, stopped_ms {answer.get('stopped_ms')}; transcribe "
+                          f"results {[(r.get('is_error'), r.get('summary')) for r in tool_results(answer, 'transcribe')]}"
+                          + ("" if not problems else " — " + "; ".join(problems)))
+
+
 # ---------------------------------------------------------------------------
 # Launch B (W) and launch C (K2).
 
@@ -628,23 +735,24 @@ def row_k2(app_path, fake):
 # The mutant.
 
 
-def build_mutant():
-    """(app path, None) or (None, reason): the tree copied, the prepare line
-    deleted from the copy's main.swift, `make app` run there."""
+def build_mutant(name):
+    """(app path, None) or (None, reason): the tree copied, the mutant's one
+    line deleted from the copy's file, `make app` run there."""
+    file, line, _ = MUTANTS[name]
     base = os.path.join(WORK, "mutant")
     shutil.rmtree(base, ignore_errors=True)
     root, reason = tree_copy.make_copy(os.path.join(base, "tree"))
     if root is None:
         return None, reason
-    main = os.path.join(root, "app", "Sources", "main.swift")
+    main = os.path.join(root, "app", "Sources", file)
     with open(main) as handle:
         lines = handle.read().splitlines(keepends=True)
-    hits = [l for l in lines if l.strip() == PREPARE]
+    hits = [l for l in lines if l.strip() == line]
     if len(hits) != 1:
-        return None, f"main.swift has {len(hits)} `{PREPARE}` lines, not 1"
+        return None, f"{file} has {len(hits)} `{line}` lines, not 1"
     with open(main, "w") as handle:
-        handle.write("".join(l for l in lines if l.strip() != PREPARE))
-    print(f"mutant: {PREPARE} deleted from the copy; make app (up to {WALL_BUILD} s)…",
+        handle.write("".join(l for l in lines if l.strip() != line))
+    print(f"mutant: {line} deleted from the copy's {file}; make app (up to {WALL_BUILD} s)…",
           flush=True)
     built = bounded.run(["make", "app"], WALL_BUILD, cwd=root, env=child_env())
     app = os.path.join(root, APP_PATH)
@@ -660,13 +768,18 @@ def build_mutant():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--mutant", choices=["no-prepare"],
-                        help="W alone, against a build without prepareAtLaunch(); must FAIL")
+    parser.add_argument("--mutant", choices=sorted(MUTANTS),
+                        help="its one row, against a build without its line; must FAIL")
     args = parser.parse_args()
     os.makedirs(WORK, exist_ok=True)
     results = []
+    skipped = []
 
     def score(row_id, ok, detail, *, instrument=False):
+        if ok is None:  # a named host skip, never a pass
+            skipped.append(row_id)
+            print(f"{row_id} SKIP — host: {detail}", flush=True)
+            return
         results.append((row_id, ok, instrument))
         print(f"{row_id} {'ok' if ok else 'FAIL'} — {detail}", flush=True)
 
@@ -682,14 +795,29 @@ def main():
         fake = Fake(os.path.join(WORK, "fake"))
         secrets = secret_folder()
         if args.mutant:
-            app, why = build_mutant()
+            named = MUTANTS[args.mutant][2]
+            app, why = build_mutant(args.mutant)
             if app is None:
-                score("W", False, f"the mutant did not build: {why}", instrument=True)
+                score(named, False, f"the mutant did not build: {why}", instrument=True)
                 print(f"0/1\nmutant {args.mutant}: the control could not be performed — "
                       f"the mutant did not build: {why}", flush=True)
                 return 2
-            guarded("W", lambda: (lambda ok, d: (ok, "(no prepareAtLaunch) " + d))
-                    (*row_w(app, fake, secrets)))
+            if named == "W":
+                guarded("W", lambda: (lambda ok, d: (ok, "(no prepareAtLaunch) " + d))
+                        (*row_w(app, fake, secrets)))
+            else:
+                folder = os.path.join(WORK, "mutant-a")
+                shutil.rmtree(folder, ignore_errors=True)
+                os.makedirs(folder)
+                mutant_app = App("A", app, ["-AgentServerEnabled", "YES", "-RCSecretFolder",
+                                            secrets], fake.base, port=PORT_A)
+                try:
+                    mutant_app.connect()
+                    function = row_sx if named == "SX" else row_st
+                    guarded(named, lambda: (lambda ok, d: (ok, f"({args.mutant}) " + d))
+                            (*function(mutant_app, fake, {"folder": folder})))
+                finally:
+                    mutant_app.stop()
         else:
             release = os.path.join(ROOT, APP_PATH)
             folder = os.path.join(WORK, "a")
@@ -709,9 +837,11 @@ def main():
                 guarded("S", row_s, app, fake, ctx)
                 guarded("X", row_x, app, fake, ctx)
                 guarded("K1", row_k1, app)
+                guarded("SX", row_sx, app, fake, ctx)
+                guarded("ST", row_st, app, fake, ctx)
             except Exception as error:  # noqa: BLE001
-                for row_id in ("A0", "T1", "T2", "R", "D", "E", "S", "X", "K1"):
-                    if row_id not in [r for r, _, _ in results]:
+                for row_id in ("A0", "T1", "T2", "R", "D", "E", "S", "X", "K1", "SX", "ST"):
+                    if row_id not in [r for r, _, _ in results] + skipped:
                         score(row_id, False, f"launch A could not run: {error}",
                               instrument=True)
             finally:
@@ -726,10 +856,13 @@ def main():
             fake.stop()
 
     passed = sum(1 for _, ok, _ in results if ok)
-    print(f"{passed}/{len(results)}", flush=True)
+    print(f"{passed}/{len(results)}" + (f", skipped {', '.join(skipped)}" if skipped else ""),
+          flush=True)
     if args.mutant:
+        named = MUTANTS[args.mutant][2]
         broken = [r for r, _, instrument in results if instrument]
-        why = ("W was never scored" if "W" not in [r for r, _, _ in results] else
+        why = (f"{named} was a host skip" if named in skipped else
+               f"{named} was never scored" if named not in [r for r, _, _ in results] else
                f"scored as instrument failures: {', '.join(broken)}" if broken else "")
         if why:
             print(f"mutant {args.mutant}: the control could not be performed — {why}",

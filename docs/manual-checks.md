@@ -380,9 +380,9 @@ Needs your own Anthropic API key (Setup 3).
 - **Source:** #159.
 
 **AS-2 — Allow, Deny and Stop**
-- **Do:** 1. Ask it to export; press Return; Deny. 2. Ask again; Allow. 3. Ask over an existing file. 4. Send something long and press Stop; ask for an export and press Stop while the question is up.
-- **Expect:** the row names the file ("export writes …", or "export REPLACES …"); Return does not answer, only a click does; Deny writes nothing and the model carries on; Allow writes the file; Send reads Stop while working, and Stop with a question pending writes nothing.
-- **Source:** #159.
+- **Do:** 1. Ask it to export; press Return; Deny. 2. Ask again; Allow. 3. Ask over an existing file. 4. Send something long and press Stop; ask for an export and press Stop while the question is up. 5. Ask for an export of a long project, Allow, and press Stop while it writes.
+- **Expect:** the row names the file ("export writes …", or "export REPLACES …"); Return does not answer, only a click does; Deny writes nothing and the model carries on; Allow writes the file; Send reads Stop while working, and Stop with a question pending writes nothing; Stop during the allowed export leaves no file at the path and the transcript's tool line reads `failed: The export was cancelled.`.
+- **Source:** #159; step 5 issue batch B15 (#149), spec §11 AI-16.
 
 **AS-3 — How the tab reads**
 - **Do:** Before saving a key, open the tab; then with a key, after a conversation, in light and dark.
@@ -398,6 +398,11 @@ Needs your own Anthropic API key (Setup 3).
 - **Do:** With your real key, open Reelcut ▸ Settings… and keep it beside the window; View ▸ Assistant (⌃⌘A). 1. Read the tab's Spend row. 2. Send two messages. 3. Clear; send one more.
 - **Expect:** the Spend row starts at "Nothing yet"; after the messages it equals the sum of those turns' `Cost:` lines ("$… · Reelcut's estimate"); Clear puts it back to "Nothing yet" and the next turn starts a new sum. Settings' month line ("<Month> <year> (UTC): $… over N responses.") grows with each response while it is open, without flickering to "Reading the spend ledger…", and is near the Anthropic Console's total for the same UTC days.
 - **Source:** road map 13 P4; spec §11 P-4, P-7.
+
+**AS-6 — A reply cut short**
+- **Do:** With your real key, ask for something long (a paragraph about each clip) and press Stop while the reply streams. Open `~/Library/Application Support/Reelcut/spend.jsonl`, then the Anthropic Console's usage for the same minutes.
+- **Expect:** the turn ends with `Cost: at least $… (a response was cut short) · Reelcut's estimate at LiteLLM prices (…)`; the ledger's last line carries `"partial": true`; the Console's charge for that request is at least that figure, and expect it above: the streamed output is not counted (spec §11 P-8).
+- **Source:** issue batch B15 (#162); spec §11 P-8.
 
 ## Host-state proof runs
 

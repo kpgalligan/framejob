@@ -115,3 +115,16 @@ in §6).
   unchanged prefix and the prompt cache; and the playhead and selection change between turns.
   Risk accepted: about sixty tokens on every message, and the block is the state at send time,
   so after its own edits the model re-reads with `get_project`.
+- **AI-16 — Stop stops a running `export` or on-device `transcribe`; any other running call
+  finishes.** Each call the session submits carries a per-call token through
+  `AgentLane.submit`, and Stop cancels the running call's token. The lane answers a call whose
+  token is already cancelled when it takes the lock "Cancelled by the user." without running it.
+  A running `export` links its token to `Exporter.cancel()`, which only sets flags (G-17's
+  cross-thread hazard does not arise; the writer removes its part-file), and an on-device
+  `transcribe` links it to its `Transcriber.CancelToken`, the transcribe sheet's own path; the
+  model gets the tool's own sentence ("The export was cancelled.", "The transcription was
+  cancelled."). Before this, Stop only stopped the helper's turn, and an export in flight wrote
+  its file to the end (#149). Risk accepted: `render_frame`, `render_graphic`, `import_media`
+  (an opt-in ffmpeg conversion included), `save_project`/`new_project` and the main-thread tools
+  run to their end; Clear, closing the window and a dead helper still let a running call finish,
+  its result dropped, as before; cloud `transcribe` is withheld (AI-7) and not linked.

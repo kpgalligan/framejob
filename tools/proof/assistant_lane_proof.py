@@ -22,6 +22,9 @@ probe".
           leaves an existing folder's mode, refuses a file in the path by
           name; `FileStore.write` and `AssistantSpend.record` go through it —
           all under this run's work folder
+  L13     (issue batch B15, #149; AI-16) a `submit` whose token was cancelled
+          before it took the lock answers "Cancelled by the user." and places
+          no marker; the same call with a live token places it
   C1      the control: `execute` on main mid-drag loses the marker, so the
           instrument can see #144
   M1      made to fail on purpose: L0 against a scratch copy of `main.swift`
@@ -37,7 +40,7 @@ probe".
                                                              # are expected to FAIL (exit 1)
     python3 tools/proof/assistant_lane_proof.py --mutant NAME
         # one of `MUTANTS` (one-queue → L10, no-env-fallback → L11,
-        # mode-0755 → L12): the probe built over a copy of app/Sources with
+        # mode-0755 → L12, no-lane-check → L13): the probe built over a copy of app/Sources with
         # one text replaced, its one row run and expected to FAIL (exit 1;
         # 0 when it survives). Exit 2 when the control could not be
         # performed: a copy that cannot be made or built, or a probe that
@@ -72,7 +75,8 @@ LIB = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
 PREPARE = "AgentLane.prepareAtLaunch()"
 WALL_BUILD, WALL_RUN = 900, 300
 
-PROBE_ROWS = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11", "L12", "C1"]
+PROBE_ROWS = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11", "L12", "L13",
+              "C1"]
 
 # The four files that make a folder under the support folder (#108).
 SUPPORT_CREATORS = ("SecretStore.swift", "ExportPresetsStore.swift", "FFmpegRewrap.swift",
@@ -86,6 +90,9 @@ MUTANTS = {
     "no-env-fallback": ("AssistantConfiguration.swift", "environment[environmentKey]",
                         'environment["RC_PROBE_UNSET"]', "L11"),
     "mode-0755": ("AppSupport.swift", "0o700", "0o755", "L12"),
+    "no-lane-check": ("AgentLane.swift",
+                      "if cancel?.isCancelled == true { return AssistantSession.cancelledResult }",
+                      "", "L13"),
 }
 
 

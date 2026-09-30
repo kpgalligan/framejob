@@ -31,6 +31,16 @@ Routes:
   `"input_tokens": <int>` (default 100), the usage's `input_tokens` in
   `message_start` and in the non-stream Message (road map 12 A3: a large
   figure makes the helper compact at the end of the turn).
+  A streamed reply may carry `"cut"` (issue batch B15, spec §11 P-8), a
+  response cut short: `"drop"` sends `message_start` and the content blocks
+  and then closes, with no `message_delta` and no `message_stop`; `"stall"`
+  sends `message_start`, then `message_delta` (output `"output_tokens"`,
+  default 10) BEFORE the content blocks — deliberately not the API's order,
+  which sends its one `message_delta` after the last block (P-8's accepted
+  risk); here the helper's `text_delta` proves that a delta it has processed
+  reaches the partial cost — then holds the connection open until the client
+  closes it or `"stall_seconds"` (default 30) pass. With no `"cut"` the bytes
+  are unchanged.
 * `GET /__control/log` answers
   `{"requests":[{"method","path","headers","body","bytes"}],"failures":[str]}`.
 
@@ -52,8 +62,11 @@ import argparse
 import http.server
 import json
 import os
+import select
+import socket
 import sys
 import threading
+import time
 
 ALLOWED_KEYS = {"proof-key", "wrong-key"}
 REDACTION = "<redacted: not an allow-listed dummy>"
@@ -114,13 +127,21 @@ def message_object(reply, index, model):
 
 
 def stream_events(reply, index, model):
-    """The SSE events of one scripted reply, in the Messages API's order."""
+    """The SSE events of one scripted reply, in the Messages API's order —
+    or, with `"cut"`, of a response cut short (the module's docstring)."""
+    cut = reply.get("cut")
     start = message_object(reply, index, model)
     start["content"] = []
     start["stop_reason"] = None
     start["usage"] = {"input_tokens": reply.get("input_tokens", 100), "output_tokens": 0,
                       "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0}
     events = [("message_start", {"type": "message_start", "message": start})]
+    if cut == "stall":
+        events.append(("message_delta", {"type": "message_delta",
+                                         "delta": {"stop_reason": reply.get("stop_reason"),
+                                                   "stop_sequence": None},
+                                         "usage": {"output_tokens":
+                                                   reply.get("output_tokens", 10)}}))
     for at, block in enumerate(reply.get("content", [])):
         if block.get("type") == "tool_use":
             opening = {"type": "tool_use", "id": block["id"], "name": block["name"],
@@ -135,6 +156,8 @@ def stream_events(reply, index, model):
         events.append(("content_block_delta", {"type": "content_block_delta", "index": at,
                                                "delta": delta}))
         events.append(("content_block_stop", {"type": "content_block_stop", "index": at}))
+    if cut in ("drop", "stall"):
+        return events
     events.append(("message_delta", {"type": "message_delta",
                                      "delta": {"stop_reason": reply.get("stop_reason"),
                                                "stop_sequence": None},
@@ -233,9 +256,21 @@ def make_handler(fake):
                     self.wfile.write(f"event: {name}\ndata: {json.dumps(data)}\n\n"
                                      .encode("utf-8"))
                 self.wfile.flush()
+                if reply.get("cut") == "stall":
+                    self._stall(float(reply.get("stall_seconds", 30)))
             except OSError:
                 pass
             self.close_connection = True
+
+        def _stall(self, seconds):
+            """Holds the connection until the client closes it or `seconds` pass."""
+            deadline = time.monotonic() + seconds
+            while time.monotonic() < deadline:
+                readable, _, _ = select.select([self.connection], [], [], 0.1)
+                if readable:
+                    if not self.connection.recv(1, socket.MSG_PEEK):
+                        return  # the client closed it
+                    time.sleep(0.1)
 
         def _control(self, method, path, raw):
             if path == "/__control/scenario" and method == "POST":

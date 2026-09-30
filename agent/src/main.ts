@@ -103,14 +103,15 @@ function setUpPrices(options: PriceOptions) {
   });
 }
 
-/** What one response cost, at the prices its turn started with. */
-function emitCost(message: BetaMessage, turnPrices: LoadedPrices) {
+/** What one response cost, at the prices its turn started with; `partial` for one cut short. */
+function emitCost(message: BetaMessage, turnPrices: LoadedPrices, partial?: true) {
   emit({
     type: "cost",
     model: message.model,
     usage: message.usage,
     cost: price(message.usage, message.model, turnPrices.table),
     prices: turnPrices.source,
+    ...(partial ? { partial } : {}),
   });
 }
 
@@ -272,11 +273,19 @@ async function runTurn(text: string) {
 
   let last: BetaMessage | undefined;
   let compacting = false;
+  // The response in flight, as its stream has reported it so far: priced as
+  // partial if the turn throws before `finalMessage` resolves (an object, so
+  // tsc does not narrow the property to `never` in the catch).
+  const inFlight: { message?: BetaMessage } = {};
   try {
     for await (const stream of runner) {
+      stream.on("streamEvent", (_event, snapshot) => {
+        inFlight.message = snapshot;
+      });
       stream.on("text", (delta) => emit({ type: "text_delta", text: delta }));
       stream.on("thinking", (delta) => emit({ type: "progress_delta", text: delta }));
       const message = await stream.finalMessage();
+      inFlight.message = undefined;
 
       if (compacting) {
         // The summary request the runner sent after the final reply.
@@ -320,6 +329,10 @@ async function runTurn(text: string) {
       emit({ type: "error", message: "The model declined this request." });
     }
   } catch (error) {
+    if (inFlight.message) {
+      emitCost(inFlight.message, turnPrices, true);
+      inFlight.message = undefined;
+    }
     if (!controller.signal.aborted) {
       emit({ type: "error", message: errorMessage(error) });
     }

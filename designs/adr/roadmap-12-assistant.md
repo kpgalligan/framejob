@@ -2,7 +2,7 @@
 
 - **Status:** Built and closed 2026-09-28. A0 the spike 2026-09-27 (`4f8d4ce`); A1 the lane (`08ab2ee`), the helper and its build (`68ccc20`) and the session (`5a88a57`) 2026-09-27; A2 the Assistant tab 2026-09-27 (`dae833a`); A3 the prompt 2026-09-27 (`172cf0c`, committed 2026-09-28); A4 `dist_check.py`'s helper rows and the close 2026-09-28 (uncommitted when this was written). Each phase was one litecode pipeline; A2's and A3's reader reviews each found one fix, landed in their commits.
 - **Original:** `archive/reelcut-roadmap-12.md` (1022 lines) is the full record. Sections cited below as "orig §x" refer to it.
-- **Spec decisions:** AI-1..AI-15 in spec §11 (`designs/spec/11-decisions/assistant.md`), which stay binding:
+- **Spec decisions:** AI-1..AI-16 in spec §11 (`designs/spec/11-decisions/assistant.md`), which stay binding:
   - AI-1: the assistant is a bundled helper, and the app never calls Anthropic itself.
   - AI-2: the helper owns no tools; every call goes through `AgentServer.execute` by way of one lane.
   - AI-3: the catalog and the gate are prepared at launch, not at `start()`.
@@ -18,6 +18,7 @@
   - AI-13: the one base-URL override is `RC_ASSISTANT_BASE_URL`, and with it set no key file is opened.
   - AI-14: a selection change that is not a click on a clip leaves the Assistant tab showing; a click still shows Clip.
   - AI-15: the window's live context rides on each person message; the system prompt is fixed for a session.
+  - AI-16: Stop stops a running `export` or on-device `transcribe`; any other running call finishes.
   The helper, the lane, the session, the prompt and the tab are specified in spec §7.9; the files are mapped in §7.4.
 
 ## Context
@@ -38,6 +39,7 @@ The user asked for an AI agent in the editor, "designed in the same way that the
 - **The pane holds views only, built once.** `AssistantPane` builds its one `AssistantView` in `init`, never in `makeSections()`; the session, the transcript's storage and the pending question live on the window's controller, so a rebuild keeps the composer's text and a floating window would be a new host (#160). (AI-4; orig §3e, §3h, §9)
 - **The tab stays up through the assistant's own selection changes.** Its calls change the selection mid-turn; only a click on a clip shows Clip (the tab probe's P5). (AI-14; orig §9)
 - **The prompt's facts are interpolated or checked, and the live context rides on the message.** The system prompt, search guide and compaction instructions are Swift literals whose backticked names, timescale, id kinds, topics and ask-first rows are held to the code by `make test` (F1–F7, each checker made to fail, M1–M4). The playhead, selection and open nest go in a `<reelcut_context>` block on each person message (S2), so the system prompt stays byte-stable for the cache and `agent/` stays one diff. (AI-15; orig §10)
+- **Stop reaches a running export or transcribe through a per-call token (issue batch B15, #149).** The session makes an `AgentCallCancel` per call and passes it to `AgentLane.submit`; Stop cancels it, the lane answers a call already cancelled when it takes the lock "Cancelled by the user." without running it (L13), and while a call runs `AgentLane.callCancel` is its token, which `export` links to `Exporter.cancel()` (flags only, G-17) and the on-device `transcribe` to its `Transcriber.CancelToken`. The session proof's SX (a 240 s text clip's export, allowed with `stop_after: 2`) and ST (a ten-minute WAV's transcribe) answer the tool's own cancelled sentence within 5 s of the Stop, each made to fail by its mutant. Every other running call still finishes. (AI-16)
 - **The spend cap is an upper bound.** `assistant_prompt_eval.py --live` prices at the priciest model `fallbacks: "default"` can bill: the worst POST $2.67, the floor $14.11, `SUGGESTED_CAP` $15; `--live` needs an explicit `--cap`. No spend was made; the live run is #157. (orig §10)
 
 ## What it built — where it lives now
@@ -62,7 +64,6 @@ The user asked for an AI agent in the editor, "designed in the same way that the
 
 - #145 the Distribution app is signed with `get-task-allow` beside `audio-input`.
 - #147 Rasterize takes §2's change (one diff).
-- #149 Stop does not interrupt a tool already running.
 - #151 Chat Settings are not offered.
 - #152 a question asked while the tab is hidden draws no attention.
 - #153 the transcript cannot be selected across entries.

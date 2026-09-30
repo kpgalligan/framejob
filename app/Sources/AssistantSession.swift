@@ -63,6 +63,8 @@ final class AssistantSession {
     /// The helper's tool requests not yet handed to the lane, oldest first.
     private var toolQueue: [[String: Any]] = []
     private var toolRunning = false
+    /// The running call's token, cancelled by Stop (AI-16).
+    private var runningCall: AgentCallCancel?
 
     static let cancelledResult =
         #"{"content":[{"type":"text","text":"Cancelled by the user."}],"isError":true}"#
@@ -187,12 +189,14 @@ final class AssistantSession {
 
     /// Stop: the helper aborts its request, a pending question is declined,
     /// and every call not yet run answers "Cancelled by the user.". Only
-    /// while busy or asking. A call the lane is already running finishes.
+    /// while busy or asking. A running `export` or on-device `transcribe` is
+    /// cancelled through its token; any other running call finishes (AI-16).
     func cancel() {
         guard phase == .busy || phase == .asking else { return }
         cancelRequested = true
         write(["type": "cancel"])
         decline(by: "stop")
+        runningCall?.cancel()
         for callID in toolQueue.compactMap({ $0["call_id"] as? String }) {
             writeResult(callID, Self.cancelledResult)
         }
@@ -290,8 +294,10 @@ final class AssistantSession {
             return runNextTool()
         }
         toolRunning = true
+        let stop = AgentCallCancel()
+        runningCall = stop
         AgentLane.shared.submit(
-            tool: name, argumentsJSON: arguments, document: document,
+            tool: name, argumentsJSON: arguments, document: document, cancel: stop,
             askFirst: { [weak self] question, reply in
                 // Released, closed or stopping: declined here, never dropped.
                 guard let self, !self.closed, !self.cancelRequested else {
@@ -304,6 +310,7 @@ final class AssistantSession {
                 DispatchQueue.main.async {
                     guard let self else { return }
                     self.toolRunning = false
+                    self.runningCall = nil
                     if !self.closed { self.writeResult(callID, result) }
                     self.runNextTool()
                 }
@@ -370,31 +377,5 @@ final class AssistantSession {
                 if process.isRunning { process.terminate() }
             }
         }
-    }
-}
-
-/// The helper's stdin. Touched only on the session's write queue, so a write
-/// after the close, or a second close, does nothing.
-private final class HelperInput {
-    private let handle: FileHandle
-    private var closed = false
-
-    init(_ handle: FileHandle) {
-        self.handle = handle
-    }
-
-    @available(*, unavailable) required init?(coder: NSCoder) {
-        fatalError("HelperInput does not support NSCoder")
-    }
-
-    func write(_ data: Data) {
-        guard !closed else { return }
-        try? handle.write(contentsOf: data)
-    }
-
-    func close() {
-        guard !closed else { return }
-        closed = true
-        try? handle.close()
     }
 }

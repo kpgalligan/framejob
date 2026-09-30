@@ -19,6 +19,9 @@ import AppKit
 /// **They answer when the turn is no longer busy** — finished, stopped on a
 /// question, closed — or at `timeout` ("running"). Never the key, never the
 /// model (AI-8, AI-11): `events` are the session's own, which carry neither.
+/// With `stop_after` the wait presses Stop once that many seconds have passed
+/// with the turn still running (`editor.assistantStop()`, the tab's forward;
+/// spec §11 AI-16), and `stopped_ms` says when.
 extension AgentServer {
 
     private static let assistantTimeoutDefault = 120.0
@@ -31,9 +34,10 @@ extension AgentServer {
             throw ToolError(message: "text must not be empty.")
         }
         let timeout = try assistantTimeout(a)
+        let stopAfter = try assistantStopAfter(a, timeout)
         let pane = try boolArg(a, "pane") ?? false
-        let (session, project, cursor) = try onMain {
-            () throws -> (AssistantSession, Any, Int) in
+        let (session, project, cursor, editor) = try onMain {
+            () throws -> (AssistantSession, Any, Int, EditorViewController) in
             let (editor, project) = try self.assistantEditor(a)
             // With `pane`, the tab must be showing BEFORE anything is opened.
             let view = try pane ? Self.visibleAssistantView(editor, "composer", \.composer) : nil
@@ -51,9 +55,10 @@ extension AgentServer {
                     message: "The assistant helper is not running; assistant_send again starts "
                         + "a new conversation.")
             }
-            return (session, project, cursor)
+            return (session, project, cursor, editor)
         }
-        return try jsonResult(assistantWait(session, project, cursor, timeout))
+        return try jsonResult(
+            assistantWait(session, project, cursor, timeout, stopAfter: stopAfter, editor: editor))
     }
 
     func assistantAnswer(_ a: [String: Any]) throws -> String {
@@ -64,9 +69,13 @@ extension AgentServer {
             throw ToolError(message: "answer must be allow, deny or stop (got \"\(raw)\").")
         }
         let timeout = try assistantTimeout(a)
+        let stopAfter = try assistantStopAfter(a, timeout)
+        guard stopAfter == nil || raw == "allow" else {
+            throw ToolError(message: "stop_after applies only with answer \"allow\".")
+        }
         let pane = try boolArg(a, "pane") ?? false
-        let (session, project, cursor) = try onMain {
-            () throws -> (AssistantSession, Any, Int) in
+        let (session, project, cursor, editor) = try onMain {
+            () throws -> (AssistantSession, Any, Int, EditorViewController) in
             let (editor, project) = try self.assistantEditor(a)
             guard let session = editor.assistant else {
                 throw ToolError(
@@ -93,9 +102,10 @@ extension AgentServer {
                     throw ToolError(message: Self.noQuestion)
                 }
             }
-            return (session, project, cursor)
+            return (session, project, cursor, editor)
         }
-        return try jsonResult(assistantWait(session, project, cursor, timeout))
+        return try jsonResult(
+            assistantWait(session, project, cursor, timeout, stopAfter: stopAfter, editor: editor))
     }
 
     private static let noQuestion =
@@ -191,6 +201,18 @@ extension AgentServer {
         return value
     }
 
+    /// `stop_after`, seconds: nil when absent, else 0.1…600 and under `timeout`.
+    private func assistantStopAfter(_ a: [String: Any], _ timeout: Double) throws -> Double? {
+        guard let value = try doubleArg(a, "stop_after") else { return nil }
+        guard value >= 0.1, value <= 600, value < timeout else {
+            let shown = Int(exactly: value).map(String.init) ?? String(value)
+            throw ToolError(
+                message: "stop_after must be between 0.1 and 600 seconds and less than timeout "
+                    + "(got \(shown)).")
+        }
+        return value
+    }
+
     /// The target's editor and its path (or null). Main thread.
     private func assistantEditor(_ a: [String: Any]) throws -> (EditorViewController, Any) {
         let document = try target(a)
@@ -204,26 +226,38 @@ extension AgentServer {
     }
 
     /// Waits, WITHOUT the lane's lock, until the session is not busy or
-    /// `timeout` passes, reading its phase on main every 50 ms; then answers
-    /// what happened since `cursor`.
+    /// `timeout` passes, reading its phase on main every 50 ms; once
+    /// `stopAfter` has passed with the phase busy or asking, it presses Stop,
+    /// once. Then answers what happened since `cursor`.
     private func assistantWait(
-        _ session: AssistantSession, _ project: Any, _ cursor: Int, _ timeout: Double
+        _ session: AssistantSession, _ project: Any, _ cursor: Int, _ timeout: Double,
+        stopAfter: Double?, editor: EditorViewController
     ) -> [String: Any] {
         let started = Date()
+        var stopped: Int?
         AgentLane.shared.releasingLock {
-            while onMain({ session.phase == .busy }),
-                Date().timeIntervalSince(started) < timeout
-            {
+            while true {
+                let elapsed = Date().timeIntervalSince(started)
+                let phase = onMain { session.phase }
+                if stopped == nil, let stopAfter, elapsed >= stopAfter,
+                    phase == .busy || phase == .asking
+                {
+                    stopped = Int((elapsed * 1000).rounded())
+                    onMain { editor.assistantStop() }
+                    continue
+                }
+                guard phase == .busy, elapsed < timeout else { break }
                 Thread.sleep(forTimeInterval: 0.05)
             }
         }
         let waited = Int((Date().timeIntervalSince(started) * 1000).rounded())
-        return onMain { Self.assistantReply(session, project, cursor, waited) }
+        return onMain { Self.assistantReply(session, project, cursor, waited, stopped) }
     }
 
     /// The tools' answer. Main thread.
     private static func assistantReply(
-        _ session: AssistantSession, _ project: Any, _ cursor: Int, _ waited: Int
+        _ session: AssistantSession, _ project: Any, _ cursor: Int, _ waited: Int,
+        _ stopped: Int?
     ) -> [String: Any] {
         let state: String
         switch session.phase {
@@ -249,6 +283,7 @@ extension AgentServer {
         return [
             "ok": true, "project": project, "state": state, "question": question,
             "text": text, "events": events, "waited_ms": waited,
+            "stopped_ms": stopped.map { $0 as Any } ?? NSNull(),
         ]
     }
 
@@ -264,8 +299,8 @@ extension AgentServer {
                 + "closed; past timeout it answers state running. The first call opens the "
                 + "window's session (the person's key and model, never an argument). Answers "
                 + "the streamed text joined, and every event since the call but the text and "
-                + "progress deltas. Refused while a turn is running: assistant_answer answers "
-                + "or stops it.",
+                + "progress deltas, and stopped_ms (null unless stop_after pressed Stop). "
+                + "Refused while a turn is running: assistant_answer answers or stops it.",
             [
                 "text": ["type": "string", "description": "The message, as the person types it."],
                 "timeout": [
@@ -278,6 +313,12 @@ extension AgentServer {
                         + "instead (default false). Refused, opening nothing, unless the tab "
                         + "is showing (select_inspector_tab {tab: \"assistant\"}).",
                 ],
+                "stop_after": [
+                    "type": "number",
+                    "description": "Press Stop, once, this many seconds into the wait if the "
+                        + "turn is still running, 0.1 to 600 and less than timeout (absent: "
+                        + "never).",
+                ],
             ], required: ["text"])
     }
 
@@ -289,8 +330,8 @@ extension AgentServer {
                 + "it \"The person declined: …\" — or stop the running turn, which declines a "
                 + "pending question and cancels the calls not yet run. Then waits and answers "
                 + "as assistant_send does. Refused, changing nothing: allow or deny with no "
-                + "question pending, stop with no turn running, and a window with no "
-                + "conversation.",
+                + "question pending, stop with no turn running, stop_after with any answer but "
+                + "allow, and a window with no conversation.",
             [
                 "answer": [
                     "type": "string", "enum": ["allow", "deny", "stop"],
@@ -305,6 +346,12 @@ extension AgentServer {
                     "description": "Answer through the Assistant tab's own Allow and Deny "
                         + "buttons, or its Send while it reads Stop (default false). Refused, "
                         + "changing nothing, when the control is not on screen.",
+                ],
+                "stop_after": [
+                    "type": "number",
+                    "description": "Press Stop, once, this many seconds into the wait if the "
+                        + "turn is still running, 0.1 to 600 and less than timeout (absent: "
+                        + "never); only with answer allow.",
                 ],
             ], required: ["answer"])
     }

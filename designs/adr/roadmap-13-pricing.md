@@ -2,7 +2,7 @@
 
 - **Status:** Built and closed 2026-09-28. P1 the price table and the price function (`79a8b56`); P2 the helper prices every response (`0f0a442`); P3 the proofs' ledger and the monthly budgets (`86162c2`); P4 spend in the UI and the close (uncommitted when this was written). Each phase was one litecode pipeline; P2's review found five nits and P3's three, each fixed in its phase.
 - **Original:** `archive/reelcut-roadmap-13.md` (415 lines) is the full record. Sections cited below as "orig §x" refer to it.
-- **Spec decisions:** P-1..P-7 in spec §11 (`designs/spec/11-decisions/pricing.md`), which stay binding:
+- **Spec decisions:** P-1..P-8 in spec §11 (`designs/spec/11-decisions/pricing.md`), which stay binding:
   - P-1: prices come from LiteLLM's table; only AssemblyAI's rate is hand-kept; Anthropic's page is the cross-check.
   - P-2: a call is priced from the response's own `usage` and `model`, per `iterations` entry; unknown is never $0.
   - P-3: budgets are dollars per calendar month per service ($25 Anthropic, $5 AssemblyAI), enforced by the proofs at the worst case.
@@ -10,6 +10,7 @@
   - P-5: the spend ledger and the price cache are the person's, in the spend folder; a proof never touches them.
   - P-6: the proofs' ledger is `~/Library/Application Support/Reelcut Proofs/spend.jsonl`; every paid proof request is reserved at its worst case there and refused past the month's budget.
   - P-7: the app shows the conversation's cost on the Assistant tab and the UTC month's, folded from the ledger, in Settings; unpriced and unreadable lines are counted, never $0.
+  - P-8: a response cut short is priced once, from what its stream had reported, and marked partial (issue batch B15, #162).
   The helper's prices and the two figures are specified in spec §7.9; the tab's Spend row in §4.3; the files are mapped in §7.4.
 
 ## Context
@@ -40,7 +41,7 @@ The user asked for three things: a spend budget, a price on every call the assis
 ## Known limits
 
 - **Every priced response has been the stand-in's**: no response from api.anthropic.com has been priced or recorded; AS-4 and AS-5 in `docs/manual-checks.md` hold the figures against the Anthropic Console with a real key.
-- **A response cut short by Stop or an error has no final usage and is not priced** (#162).
+- **A response cut short is a lower bound** (P-8's accepted risk): it is priced from `message_start`'s counts — its input and cache tokens, in practice none of its streamed output, because the API sends its one `message_delta` after the last content block — and marked `partial`; the turn line and the Spend figure say "at least", and Settings' month line sums it unflagged. How the API bills an aborted stream is manual check AS-6's.
 - **The month is UTC's**, so near a month's turn Settings' figure differs from the person's local calendar month by up to a day (P-7's accepted risk).
 - **Fast, priority/batch and US-only usage is `unknown` in the app** and counted at the dearest standard rates by the proofs (P-2, P-6).
 
@@ -48,7 +49,6 @@ The user asked for three things: a spend budget, a price on every call the assis
 
 - #147 Rasterize takes road map 12 §2's change and this road map's `pricing.ts` / `priceTable.ts`.
 - #157 the assistant's live evaluation with a key (`ready-for-human`).
-- #162 a response cut short by Stop or an error is not priced.
 - #164 reconcile the app's ledger with Anthropic's Admin usage-and-cost API.
 
 ## Where to look in the original

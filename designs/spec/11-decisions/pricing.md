@@ -79,3 +79,16 @@ and §5.
   is counted and said, never added as $0 (P-2); a line that cannot be read is counted and said; a
   launch with no spend folder (P-5) says it keeps no ledger. Risk accepted: near the turn of a
   month the UTC month differs from the person's local calendar month by up to a day.
+- **P-8 — A response cut short is priced once, from what its stream had reported, and marked
+  partial.** The helper holds the SDK's accumulating snapshot of the response in flight
+  (`message_start`'s counts and model, and each `message_delta`'s counts) until `finalMessage`
+  resolves. A turn that throws — Stop, a network error, an API error mid-stream — with one held
+  emits one `cost` with `partial: true`, at the turn's prices, before any `error`; a request that
+  failed before `message_start` emits none. A response is never priced both complete and partial.
+  The ledger line gains `"partial": true`; the turn line and the tab's Spend figure read "at
+  least"; Settings' month fold sums a partial line's dollars like any priced line, unflagged.
+  Before this, a response cut short was not priced at all (#162). Risk accepted: the figure is a
+  lower bound — the API sends its one `message_delta` after the last content block, so a response
+  cut short mid-stream is priced from `message_start`'s counts, its input and cache tokens, and in
+  practice none of its streamed output; how the API bills an aborted stream is manual check
+  AS-6's; the month line does not say that a line was partial.

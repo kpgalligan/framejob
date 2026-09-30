@@ -89,6 +89,9 @@ export type HelperEvent =
   | { type: "tool_results_cleared"; tool_uses: number; tokens: number }
   /** Once per configure: before `ready` if no refresh is due, else when it settles. */
   | { type: "prices"; source: PriceSource }
-  /** Per response, at the turn's prices: after message_done; for a summary, before compacted/compaction_failed. */
-  | { type: "cost"; model: string; usage: unknown; cost: Price; prices: PriceSource }
+  /**
+   * Per response, at the turn's prices: after message_done; for a summary, before compacted/compaction_failed.
+   * `partial`: a response cut short (a cancel or an error), priced from the usage its stream had reported, before any error.
+   */
+  | { type: "cost"; model: string; usage: unknown; cost: Price; prices: PriceSource; partial?: true }
   | { type: "turn_finished" };

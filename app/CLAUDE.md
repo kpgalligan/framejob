@@ -1272,7 +1272,16 @@ free.
   `releasingLock` runs a body with the lock released and relocks in a
   `defer`; its only callers are the two assistant dev tools, which `serve`
   runs under the lock on that thread and which wait for a turn whose own
-  `submit` calls need it.
+  `submit` calls need it. `submit` takes a per-call `AgentCallCancel`
+  (`cancel:`, nil by default; spec §11 AI-16). A call whose token is cancelled
+  when it takes the lock answers `AssistantSession.cancelledResult` and never
+  runs. While a submitted call runs, `callCancel` is its token (nil in
+  `serve`; written only in `answer`, under the lock, and cleared before the
+  unlock); `export` links it to `Exporter.cancel()` and the on-device
+  `transcribe` to its `Transcriber.CancelToken`, each through `onCancel`.
+  `AgentCallCancel` is NSLock-guarded: `cancel()` is main only and idempotent,
+  and runs each handler once, outside the lock; `onCancel` on a token already
+  cancelled runs the handler at once, on the caller's thread.
 - `AssistantToolTable.swift` — spec §11 AI-7's ONE table: withheld
   (`record_screen`; `transcribe` only with `engine: "assemblyai"`; every dev
   tool, from `AgentServer.devToolNames`) and ask-first (`export`,
@@ -1280,7 +1289,8 @@ free.
   row; the refusal sentence, the question (main only: the path the call
   writes, tilde-expanded, and whether a file is already there — "REPLACES")
   and the assistant's catalog, which drops only an unconditional withheld row.
-- `AssistantSession.swift` — one window's assistant conversation (road map
+- `AssistantSession.swift` · `AssistantHelperInput.swift` — one window's
+  assistant conversation (road map
   12 A1, spec §11 AI-1, AI-4, AI-5, AI-7), a port of Rasterize's
   `AssistantHelperSession`. `open(document:)` refuses, in order and each in
   its own sentence, a bad `RC_ASSISTANT_BASE_URL`, no key, a catalog not
@@ -1288,8 +1298,10 @@ free.
   prepares — AI-3 stays a trap that can fail), and no bundled helper; the
   helper gets exactly `HOME`, `TMPDIR` and `PATH=/usr/bin:/bin`, and the key
   only in the first stdin line, `configure`. Main only; every write goes
-  through the one serial `writeQueue` (`HelperInput`, so a write after the
-  close is nothing), `F_SETNOSIGPIPE` on the write end. Tool requests run ONE
+  through the one serial `writeQueue` (`HelperInput`, in
+  `AssistantHelperInput.swift`, a pure move out of this file (issue batch
+  B15), so a write after the close is nothing), `F_SETNOSIGPIPE` on the write
+  end. Tool requests run ONE
   at a time through `AgentLane.submit` (never `execute`), results spliced
   verbatim. `send` writes the person's text behind the window's live
   context, `AssistantPrompt.message(text, document:)` (AI-15; the
@@ -1302,7 +1314,9 @@ free.
   `self` is nil) — because an unanswered one holds its window's queue on the
   lane. `events` is append-only and never holds a `tool_request` or
   the key. `configure` merges `AssistantSpend.configureFields()` (road map
-  13 P2) — the one line that changed; the file stays at 400.
+  13 P2) — the one line that changed. Stop also cancels the running call's
+  token (`runningCall`, AI-16), so a running `export` or on-device
+  `transcribe` stops.
 - `AssistantSpend.swift` — what the assistant's responses cost, on the app's
   side (road map 13 P2, spec §11 P-4, P-5). `folder()` is P-5's whole
   decision: `-RCSpendFolder` (the argument domain alone, through
@@ -1311,16 +1325,22 @@ free.
   `price_cache` (the folder's `anthropic-prices.json`; with the override set
   only beside `-RCPriceFeed`) and `price_feed`. `ledgerLine` turns a `cost`
   event into `spend.jsonl`'s line — `time`, `service`, `model`, a
-  whitelisted `usage`, `dollars`, `unknown`, `rows`, `prices`, nothing else —
+  whitelisted `usage`, `dollars`, `unknown`, `rows`, `prices`, and
+  `partial: true` for a response cut short (spec §11 P-8, `isPartial`: a JSON true
+  only), nothing else —
   and `record` creates the folder (`AppSupport.ensureDirectory`, `0700`) and
   appends it with one `write`
   (`O_APPEND|O_CREAT`, 0600), answering a failure sentence. `toolView` is a
   `cost` as a dev tool may show it: `{type, cost: {kind, dollars|cause},
-  prices}`. `AssistantTurnCost` sums a turn's dollars and formats the
+  prices}`, plus `partial: true` for one cut short. `AssistantTurnCost` sums a
+  turn's dollars and formats the
   transcript line (`$%.4f`, `under $0.0001`, `unknown (…)`, the table's
   `day` in the local zone) and, summed over a conversation, the tab's Spend
   `figure` ("Nothing yet", "at least …", "unknown …", never $0) with its
-  `figureTooltip`. Road map 13 P4: `record` posts `didRecordNotification`
+  `figureTooltip`. A partial `cost` makes the turn line `Cost: at least $… (a
+  response was cut short) · …` and the figure `at least $… · Reelcut's
+  estimate` (`lowerBound`), unless a response was unknown, which keeps today's
+  words. Road map 13 P4: `record` posts `didRecordNotification`
   (object nil) exactly when it wrote a line; `number` (a JSON number, not a
   boolean) and `instant` (ISO 8601, whole or fractional seconds) are
   internal for the month's fold. **No pricing arithmetic**: the helper
@@ -1446,7 +1466,10 @@ free.
   while it reads Stop — refused by name, changing nothing, when the control
   is not in a window or is hidden. The pane check comes before the session
   opens, and the idle check before the click, so a pane send never clicks
-  Stop.
+  Stop. `stop_after` (seconds, 0.1…600 and less than `timeout`; on
+  `assistant_answer` only with `allow`) presses Stop once inside the wait,
+  through `editor.assistantStop()`, when the turn is still busy or asking, and
+  the answer carries `stopped_ms` (else null).
 - `DevAssistantLaunch.swift` — `-RCDevAssistantSend <text>
   -RCDevAssistantReport <path>`, a dev-only launch default (road map 12 A1),
   both from the argument domain alone: after launch, one turn in an untitled

@@ -76,8 +76,9 @@ enum AssistantSpend {
 
     /// The ledger line of a `cost` event, else nil: `time` (ISO 8601 UTC),
     /// `service`, `model`, the whitelisted `usage`, `dollars` (or null),
-    /// `unknown` (null or `{cause, detail}`), `rows` (only when priced) and
-    /// `prices` (`{kind, as_of, problem?}`). Nothing else.
+    /// `unknown` (null or `{cause, detail}`), `rows` (only when priced),
+    /// `prices` (`{kind, as_of, problem?}`) and `partial: true` for a response
+    /// cut short (spec §11 P-8), absent otherwise. Nothing else.
     static func ledgerLine(_ event: [String: Any], at time: Date) -> [String: Any]? {
         guard event["type"] as? String == "cost" else { return nil }
         let cost = event["cost"] as? [String: Any] ?? [:]
@@ -98,7 +99,16 @@ enum AssistantSpend {
                 "detail": cost["detail"] as? String ?? "the helper sent no price",
             ]
         }
+        if isPartial(event) { line["partial"] = true }
         return line
+    }
+
+    /// Whether `event` is a response cut short (P-8): only a JSON `true`.
+    static func isPartial(_ event: [String: Any]) -> Bool {
+        guard let flag = event["partial"] as? NSNumber,
+            CFGetTypeID(flag) == CFBooleanGetTypeID()
+        else { return false }
+        return flag.boolValue
     }
 
     /// Appends `event`'s ledger line to `spend.jsonl` in `folder`, creating
@@ -134,7 +144,7 @@ enum AssistantSpend {
 
     /// An event as a dev tool may return it (AI-8, AI-11: never the key or
     /// the model): a `cost` keeps only `{type, cost: {kind, dollars|cause},
-    /// prices}`; every other event is itself.
+    /// prices}` and `partial: true` for one cut short; every other event is itself.
     static func toolView(_ event: [String: Any]) -> [String: Any] {
         guard event["type"] as? String == "cost" else { return event }
         let cost = event["cost"] as? [String: Any] ?? [:]
@@ -144,7 +154,11 @@ enum AssistantSpend {
         } else {
             view["cause"] = cost["cause"] ?? NSNull()
         }
-        return ["type": "cost", "cost": view, "prices": prices(event["prices"])]
+        var kept: [String: Any] = [
+            "type": "cost", "cost": view, "prices": prices(event["prices"]),
+        ]
+        if isPartial(event) { kept["partial"] = true }
+        return kept
     }
 
     /// An ISO 8601 instant, with whole or fractional seconds; nil otherwise.
@@ -208,17 +222,20 @@ enum AssistantSpend {
 /// One turn's cost, summed from its `cost` events: the dollars the helper
 /// computed, the first response it could not price, and the table the last
 /// response was priced from. `line` is the transcript's `.meta` line; a turn
-/// with no `cost` event has none. Unknown is never shown as $0 (P-2).
+/// with no `cost` event has none. Unknown is never shown as $0 (P-2); a
+/// response cut short makes the priced amount "at least" (P-8).
 struct AssistantTurnCost: Equatable {
     private var responses = 0
     private var dollars = 0.0
     private var priced = false
     private var firstUnknown: String?
+    private var partial = false
     private var kind = "", asOf = "", problem: String?
 
     mutating func add(_ event: [String: Any]) {
         guard event["type"] as? String == "cost" else { return }
         responses += 1
+        if AssistantSpend.isPartial(event) { partial = true }
         let cost = event["cost"] as? [String: Any] ?? [:]
         if cost["kind"] as? String == "dollars", let value = cost["dollars"] as? Double {
             dollars += value
@@ -238,6 +255,8 @@ struct AssistantTurnCost: Equatable {
         if let firstUnknown {
             amount = "unknown (\(firstUnknown))"
             if priced { amount += Self.pricedPart(dollars) }
+        } else if partial {
+            amount = Self.lowerBound(dollars) + " (a response was cut short)"
         }
         let day = Self.day(asOf)
         var source: String
@@ -253,12 +272,15 @@ struct AssistantTurnCost: Equatable {
     }
 
     /// The Assistant tab's Spend row (spec §11 P-7): "Nothing yet" before any
-    /// response; the amount when every response was priced; "at least" the
-    /// priced part when one was not and the part shows; else "unknown".
+    /// response; the amount when every response was priced, "at least" it
+    /// when one was cut short; "at least" the priced part when one was not
+    /// priced and the part shows; else "unknown".
     var figure: String {
         guard responses > 0 else { return "Nothing yet" }
         let estimate = " · Reelcut's estimate"
-        if firstUnknown == nil { return Self.amount(dollars) + estimate }
+        if firstUnknown == nil {
+            return (partial ? Self.lowerBound(dollars) : Self.amount(dollars)) + estimate
+        }
         if dollars >= 0.000_05 { return "at least " + String(format: "$%.4f", dollars) + estimate }
         return "unknown" + estimate
     }
@@ -271,6 +293,11 @@ struct AssistantTurnCost: Equatable {
     static func amount(_ dollars: Double) -> String {
         if dollars > 0 && dollars < 0.000_05 { return "under $0.0001" }
         return String(format: "$%.4f", dollars)
+    }
+
+    /// A lower bound (P-8): `at least $%.4f`, or `amount` below $0.00005.
+    static func lowerBound(_ dollars: Double) -> String {
+        dollars < 0.000_05 ? amount(dollars) : "at least " + String(format: "$%.4f", dollars)
     }
 
     /// What the priced responses of a turn with an unknown one came to:

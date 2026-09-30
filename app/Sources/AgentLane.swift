@@ -40,6 +40,12 @@ final class AgentLane {
     private var queues: [ObjectIdentifier: LaneQueue] = [:]
     private let server: AgentServer
 
+    /// The token of the `submit` call running now, nil in `serve` (spec §11
+    /// AI-16). Written only in `answer`, under `lock`, and cleared before it
+    /// is released, so a handler reads it on its own (lane) thread before any
+    /// `onMain` hop and links its own cancel with `onCancel`.
+    private(set) var callCancel: AgentCallCancel?
+
     private init() {
         server = AgentServer.shared
     }
@@ -81,15 +87,17 @@ final class AgentLane {
     /// `completion` runs exactly once, on `document`'s serial queue (#148).
     /// A withheld tool is refused, and an ask-first one is put to `askFirst`
     /// BEFORE the lock, so a pending question never holds up an MCP caller,
-    /// nor another document's calls.
+    /// nor another document's calls. A call whose `cancel` is cancelled when
+    /// it takes the lock answers "Cancelled by the user." and never runs (AI-16).
     func submit(
         tool: String, argumentsJSON: String, document: ProjectDocument,
+        cancel: AgentCallCancel? = nil,
         askFirst: @escaping AssistantAskFirst,
         completion: @escaping (String) -> Void
     ) {
         let key = ObjectIdentifier(document)
         enter(key).async { [self] in
-            completion(answer(tool, argumentsJSON, document, askFirst))
+            completion(answer(tool, argumentsJSON, document, cancel, askFirst))
             leave(key)
         }
     }
@@ -118,7 +126,7 @@ final class AgentLane {
 
     private func answer(
         _ tool: String, _ argumentsJSON: String, _ document: ProjectDocument,
-        _ askFirst: @escaping AssistantAskFirst
+        _ cancel: AgentCallCancel?, _ askFirst: @escaping AssistantAskFirst
     ) -> String {
         let arguments =
             (try? JSONSerialization.jsonObject(with: Data(argumentsJSON.utf8)))
@@ -136,6 +144,9 @@ final class AgentLane {
         }
         lock.lock()
         defer { lock.unlock() }
+        if cancel?.isCancelled == true { return AssistantSession.cancelledResult }
+        callCancel = cancel
+        defer { callCancel = nil }
         return server.pinning(document) { route(tool, argumentsJSON) }
     }
 
@@ -199,6 +210,52 @@ final class AgentLane {
     static func gestureInProgress() -> Bool {
         assert(Thread.isMainThread)
         return AgentServer.shared.openProjects().contains { $0.isLiveEditing }
+    }
+}
+
+/// Stop's reach into the call it is running (spec §11 AI-16): the session
+/// makes one per call and cancels it on Stop; the lane never starts a call
+/// whose token is already cancelled, and a long-running handler links its own
+/// cancel to it with `onCancel`. Only the first `cancel()` runs the handlers.
+final class AgentCallCancel {
+    private let lock = NSLock()
+    private var cancelled = false
+    private var handlers: [() -> Void] = []
+
+    init() {}
+
+    @available(*, unavailable) required init?(coder: NSCoder) {
+        fatalError("AgentCallCancel does not support NSCoder")
+    }
+
+    /// Any thread.
+    var isCancelled: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return cancelled
+    }
+
+    /// Main only. Idempotent; each handler runs once, outside the lock, here.
+    func cancel() {
+        assert(Thread.isMainThread)
+        lock.lock()
+        let run = cancelled ? [] : handlers
+        cancelled = true
+        handlers = []
+        lock.unlock()
+        run.forEach { $0() }
+    }
+
+    /// Any thread. Already cancelled: `handler` runs at once, on this thread.
+    func onCancel(_ handler: @escaping () -> Void) {
+        lock.lock()
+        guard !cancelled else {
+            lock.unlock()
+            handler()
+            return
+        }
+        handlers.append(handler)
+        lock.unlock()
     }
 }
 

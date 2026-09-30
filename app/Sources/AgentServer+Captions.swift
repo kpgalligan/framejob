@@ -132,10 +132,13 @@ extension AgentServer {
             // Held on this stack for the whole call, as `export` holds its
             // `Exporter`.
             let transcriber = Transcriber()
+            // The assistant's Stop reaches the run through the sheet's own token (AI-16).
+            let token = Transcriber.CancelToken()
+            AgentLane.shared.callCancel?.onCancel { token.cancel() }
             do {
                 outcome = try transcriber.transcribe(
                     scope.jobs, language: language, frame: scope.frame, pages: pages,
-                    cancel: Transcriber.CancelToken())
+                    cancel: token)
             } catch {
                 // Every failure comes back in band, message and all —
                 // including "no speech was recognised", which is a true

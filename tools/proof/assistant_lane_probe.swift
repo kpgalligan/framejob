@@ -4,7 +4,9 @@
 // with the `ANTHROPIC_API_KEY` fallback (#150; AI-8, AI-13), on literal dummy
 // values only; L12, every support-folder level `AppSupport.ensureDirectory`
 // makes is 0700 and an existing one keeps its mode (#108), under this run's
-// work folder only.
+// work folder only. Issue batch B15's L13: a call whose token Stop cancelled
+// before it took the lock answers "Cancelled by the user." and never runs
+// (#149, spec §11 AI-16).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
 // `main.swift`, module `Reelcut`, against `libreelcut_core.a` —
@@ -743,13 +745,42 @@ func rowL12() {
             + (failed.isEmpty ? "" : "; failed: \(failed.joined(separator: "; "))"))
 }
 
+// MARK: - L13 (#149, AI-16): a call cancelled before the lock never runs
+
+func rowL13() {
+    closeAll()
+    let a = newDocument()
+    let hook = Hook()
+    let stopped = AgentCallCancel()
+    stopped.cancel()
+    let cancelled = Pending()
+    AgentLane.shared.submit(
+        tool: "add_marker", argumentsJSON: json(["at": 600_000, "name": "L13-stopped"]),
+        document: a, cancel: stopped, askFirst: hook.closure,
+        completion: { cancelled.set($0) })
+    let refused = wait(cancelled)
+    let live = Pending()
+    AgentLane.shared.submit(
+        tool: "add_marker", argumentsJSON: json(["at": 1_200_000, "name": "L13-live"]),
+        document: a, cancel: AgentCallCancel(), askFirst: hook.closure,
+        completion: { live.set($0) })
+    let ran = wait(live)
+    let names = markerNames(a)
+    let ok = refused == AssistantSession.cancelledResult && isError(refused)
+        && text(refused) == "Cancelled by the user." && !names.contains("L13-stopped")
+        && !isError(ran) && names.contains("L13-live") && hook.questions.isEmpty
+    row("L13", ok,
+        "cancelled token: \(brief(refused)); live token: \(brief(ran)); markers \(names)")
+}
+
 try? FileManager.default.createDirectory(atPath: work, withIntermediateDirectories: true)
 let steps: [(String, () -> Void)] = [
     ("L1", rowL1), ("L2", rowL2), ("L3", rowL3), ("L4", rowL4), ("L5", rowL5), ("L6", rowL6),
     ("L7", { waitRow("L7", { tool, arguments, _ in serve(tool, arguments) }) }),
     ("L8", { waitRow("L8", { tool, arguments, document in
         submit(tool, arguments, document, Hook()) }) }),
-    ("L9", rowL9), ("L10", rowL10), ("L11", rowL11), ("L12", rowL12), ("C1", rowC1),
+    ("L9", rowL9), ("L10", rowL10), ("L11", rowL11), ("L12", rowL12), ("L13", rowL13),
+    ("C1", rowC1),
 ]
 for (id, step) in steps where wanted(id) {
     step()

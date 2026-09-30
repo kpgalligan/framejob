@@ -19,6 +19,16 @@ price feed (`assistant_helper_proof`'s `Helper` and `configure`):
       first `cost` is bundled; the GET is released and `prices` (fetched)
       arrives; the tool call is answered and the turn's second `cost` is still
       bundled; the next turn's `cost` is fetched
+  H10 (issue batch B15, #162; P-8) a reply the stand-in cuts off (`"cut":
+      "drop"`): exactly one `cost`, `partial: true`, usage input 100 / output
+      0, prices.py's answer at the bundled table; an `error` after it;
+      `turn_finished`; no `message_done`
+  H11 a reply that stalls (`"cut": "stall"`), cancelled on its first
+      `text_delta`: one partial `cost` (input 100, output 10, prices.py's
+      answer), no `error`, `turn_finished` within 5 s of the cancel
+  H12 a `get_project` request cancelled while the app runs it, then answered
+      with the session's cancelled result: exactly one `cost`, no `partial`,
+      one POST, no `error` (a response already priced is never priced again)
 The Release app (`assistant_session_proof`'s `App`, `Fake`, `secret_folder`;
 `assistant_tab_proof`'s `Dump` and `open_tab`):
   L0  no `Reelcut: ` line
@@ -35,6 +45,9 @@ The Release app (`assistant_session_proof`'s `App`, `Fake`, `secret_folder`;
 The probe `spend_probe.swift` (over `app/Sources`, `build_probe`'s line):
   S1..S5  the line formats and `day`, the transcript's sum and resets, the
       ledger whitelist, `record`, P-5's table
+  S6  (P-8) `partial: true` in the ledger line and tool view only for a JSON
+      true; the "at least … (a response was cut short)" line and figure;
+      unknown + partial is the unknown line
 
     python3 tools/proof/spend_proof.py
     python3 tools/proof/spend_proof.py --mutant stale-refresh    # H2, H3 on a scratch agent/
@@ -43,12 +56,18 @@ The probe `spend_probe.swift` (over `app/Sources`, `build_probe`'s line):
     python3 tools/proof/spend_proof.py --mutant unknown-as-zero  # S rows over a Sources copy
                                                                 # rendering unknown as $0.0000:
                                                                 # S1 FAILs (exit 1)
+    python3 tools/proof/spend_proof.py --mutant no-partial       # H10..H12 on a scratch agent/
+                                                                # whose catch emits no partial
+                                                                # cost: H10, H11 FAIL (exit 1)
+    python3 tools/proof/spend_proof.py --mutant keep-unpriced    # H10..H12 on a scratch agent/
+                                                                # that keeps a priced response
+                                                                # in flight: H12 FAILs (exit 1)
 
 A mutant whose instrument did not build could not perform its control
 (exit 2); so, by rule R (issue batch B13), could one whose named row (H3,
 S1) was never scored, or that scored any row where its own comparison did
 not run (a probe that printed no row, an exception caught by `guarded`, a
-failed setup): `mutant <name>: the control could not be performed — <why>`,
+failed setup; `no-partial` names H10 and H11, `keep-unpriced` H12): `mutant <name>: the control could not be performed — <why>`,
 exit 2. A caught mutant exits 1, a surviving one 0. Prints `<ID> ok|FAIL — <detail>` per row, then `n/m`. An
 instrument that cannot run is a scored FAIL. No network: the feed is an
 in-process `http.server` on 127.0.0.1:0, the API is the stand-in, and every
@@ -90,11 +109,14 @@ PERSON = os.path.expanduser("~/Library/Application Support/Reelcut")
 MODEL = "claude-opus-5-5"
 PROOF_MODEL = "claude-proof-model"
 NO_CACHE = "no price cache is configured"
-LEDGER_KEYS = {"time", "service", "model", "usage", "dollars", "unknown", "rows", "prices"}
+LEDGER_KEYS = {"time", "service", "model", "usage", "dollars", "unknown", "rows", "prices",
+               "partial"}
 PORT_L1, PORT_L2 = 4897, 4898
 WALL_READY, WALL_TURN, WALL_CACHE, WALL_BUILD = 20, 60, 10, 900
 TOLERANCE = 1e-12
-PROBE_ROWS = ["S1", "S2", "S3", "S4", "S5"]
+PROBE_ROWS = ["S1", "S2", "S3", "S4", "S5", "S6"]
+CANCELLED = '{"content":[{"type":"text","text":"Cancelled by the user."}],"isError":true}'
+WALL_CANCEL = 5
 
 
 def child_env(extra=None):
@@ -471,8 +493,93 @@ def row_h9(helper_path, fake, feed, ctx):
     return good, "; ".join(notes)
 
 
+def cut(reply, how):
+    """`reply` cut short by the stand-in (`anthropic_fake.py`'s `"cut"`)."""
+    return dict(reply, cut=how)
+
+
+def row_h10(helper_path, fake, feed, ctx):
+    table = prices.load()
+    helper, ready = start(helper_path, fake, [cut(asp.say("H10: cut off."), "drop")])
+    try:
+        events, done = turn(helper, "H10.")
+    finally:
+        finish(helper)
+    found = costs(events)
+    types = [e.get("type") for e in events]
+    wrong = [priced_as(e, table) for e in found if priced_as(e, table)]
+    usage = (found[0].get("usage") or {}) if found else {}
+    first = types.index("cost") if "cost" in types else None
+    error_after = first is not None and "error" in types[first + 1:]
+    good = (done and len(found) == 1 and found[0].get("partial") is True
+            and usage.get("input_tokens") == 100 and usage.get("output_tokens") == 0
+            and not wrong and error_after and "message_done" not in types)
+    return good, (f"finished {done}; {len(found)} costs, partial "
+                  f"{[e.get('partial') for e in found]}, usage {usage}, "
+                  f"{[e.get('cost') for e in found]}; prices.py disagrees {wrong or 'nowhere'}; "
+                  f"events {types}")
+
+
+def row_h11(helper_path, fake, feed, ctx):
+    table = prices.load()
+    helper, ready = start(helper_path, fake, [cut(asp.say("H11: stalled."), "stall")])
+    try:
+        begin = len(helper.events)
+        helper.send({"type": "send", "text": "H11."})
+        delta = helper.wait_for("text_delta", WALL_TURN, after=begin)
+        if delta is None:
+            return False, "no text_delta before the wall"
+        helper.send({"type": "cancel"})
+        cancelled = time.monotonic()
+        done = helper.wait_for("turn_finished", WALL_TURN, after=begin)
+        took = time.monotonic() - cancelled
+        events = helper.events[begin:(done + 1) if done is not None else None]
+    finally:
+        finish(helper)
+    found = costs(events)
+    types = [e.get("type") for e in events]
+    wrong = [priced_as(e, table) for e in found if priced_as(e, table)]
+    usage = (found[0].get("usage") or {}) if found else {}
+    good = (done is not None and took <= WALL_CANCEL and len(found) == 1
+            and found[0].get("partial") is True and usage.get("input_tokens") == 100
+            and usage.get("output_tokens") == 10 and not wrong and "error" not in types)
+    return good, (f"turn_finished {took:.2f} s after the cancel (finished {done is not None}); "
+                  f"{len(found)} costs, partial {[e.get('partial') for e in found]}, usage "
+                  f"{usage}; prices.py disagrees {wrong or 'nowhere'}; events {types}")
+
+
+def row_h12(helper_path, fake, feed, ctx):
+    schema = {"type": "object", "properties": {}}
+    replies = [asp.use("toolu_h12", "get_project", {}), asp.say("H12: never said.")]
+    helper, ready = start(helper_path, fake, replies,
+                          tools=[{"name": "get_project", "description": "H12 get_project",
+                                  "inputSchema": schema}], core_tools=["get_project"])
+    try:
+        begin = len(helper.events)
+        helper.send({"type": "send", "text": "H12."})
+        request = helper.wait_for("tool_request", WALL_TURN, after=begin)
+        if request is None:
+            return False, "no tool_request before the wall"
+        helper.send({"type": "cancel"})
+        helper.send({"type": "tool_result", "call_id": helper.events[request]["call_id"],
+                     "result": json.loads(CANCELLED)})
+        done = helper.wait_for("turn_finished", WALL_TURN, after=begin)
+        events = helper.events[begin:(done + 1) if done is not None else None]
+    finally:
+        finish(helper)
+    found = costs(events)
+    types = [e.get("type") for e in events]
+    sent = asp.posts(fake.log())
+    good = (done is not None and len(found) == 1 and "partial" not in found[0]
+            and len(sent) == 1 and "error" not in types)
+    return good, (f"finished {done is not None}; {len(found)} costs, partial "
+                  f"{[e.get('partial') for e in found]}; {len(sent)} POSTs; events {types}")
+
+
 H_ROWS = [("H1", row_h1), ("H2", row_h2), ("H3", row_h3), ("H4", row_h4), ("H5", row_h5),
-          ("H6", row_h6), ("H7", row_h7), ("H8", row_h8), ("H9", row_h9)]
+          ("H6", row_h6), ("H7", row_h7), ("H8", row_h8), ("H9", row_h9), ("H10", row_h10),
+          ("H11", row_h11), ("H12", row_h12)]
+CUT_ROWS = H_ROWS[9:]
 
 
 # ---------------------------------------------------------------------------
@@ -652,6 +759,45 @@ def stale_helper():
     return helper, None
 
 
+# name: (the text in agent/src/main.ts, exactly once, what it becomes, the rows it names)
+HELPER_MUTANTS = {
+    "no-partial": ("      emitCost(inFlight.message, turnPrices, true);\n", "",
+                   ["H10", "H11"]),
+    "keep-unpriced": ("      const message = await stream.finalMessage();\n"
+                      "      inFlight.message = undefined;\n",
+                      "      const message = await stream.finalMessage();\n", ["H12"]),
+}
+
+
+def cut_helper(name):
+    """(helper path, None) or (None, reason): a scratch agent/ with one of
+    `HELPER_MUTANTS` applied to main.ts, built by its own build.sh into a
+    scratch bundle (`stale_helper`'s shape)."""
+    old, new, _ = HELPER_MUTANTS[name]
+    base = os.path.join(WORK, name)
+    shutil.rmtree(base, ignore_errors=True)
+    scratch = os.path.join(base, "agent")
+    shutil.copytree(AGENT, scratch, ignore=shutil.ignore_patterns("node_modules"))
+    path = os.path.join(scratch, "src", "main.ts")
+    with open(path) as f:
+        text = f.read()
+    if text.count(old) != 1:
+        return None, f"{old!r} occurs {text.count(old)} times in main.ts, not once"
+    with open(path, "w") as f:
+        f.write(text.replace(old, new))
+    target = os.path.join(base, "target")
+    os.makedirs(target)
+    built = bounded.run(["/bin/sh", os.path.join(scratch, "build.sh"), "helper"], WALL_BUILD,
+                        env=child_env({"TARGET_BUILD_DIR": target,
+                                       "CONTENTS_FOLDER_PATH": "Reelcut.app/Contents"}))
+    helper = os.path.join(target, "Reelcut.app", "Contents", "Helpers", "reelcut-agent")
+    if built["expired"] or built["rc"] != 0 or not os.path.exists(helper):
+        tail = [line for line in (built["stdout"] + built["stderr"]).splitlines()
+                if line.strip()][-3:]
+        return None, f"build.sh helper exit {built['rc']} (expired {built['expired']}): {tail}"
+    return helper, None
+
+
 def unknown_as_zero_sources():
     """(Sources path, None) or (None, reason): app/Sources copied, the cost
     line's unknown amount replaced by $0.0000."""
@@ -675,7 +821,8 @@ def unknown_as_zero_sources():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--mutant", choices=["stale-refresh", "unknown-as-zero"],
+    parser.add_argument("--mutant", choices=["stale-refresh", "unknown-as-zero",
+                                             *HELPER_MUTANTS],
                         help="a made-to-fail variant; its named row must FAIL (exit 1)")
     args = parser.parse_args()
     os.makedirs(WORK, exist_ok=True)
@@ -720,6 +867,18 @@ def main():
                 for row_id, function in H_ROWS[1:3]:
                     guarded(row_id, lambda f=function: (lambda ok, d: (
                         ok, "(REFRESH_AFTER_MS = 0) " + d))(*f(helper, fake, feed, ctx)))
+            elif args.mutant in HELPER_MUTANTS:
+                helper, why = cut_helper(args.mutant)
+                if helper is None:
+                    for row_id in HELPER_MUTANTS[args.mutant][2]:
+                        score(row_id, False, f"the mutant did not build: {why}",
+                              instrument=True)
+                    print(f"mutant {args.mutant}: the control could not be performed — "
+                          f"the mutant did not build: {why}", flush=True)
+                    return 2
+                for row_id, function in CUT_ROWS:
+                    guarded(row_id, lambda f=function: (lambda ok, d: (
+                        ok, f"({args.mutant}) " + d))(*f(helper, fake, feed, ctx)))
             else:
                 for row_id, function in H_ROWS:
                     guarded(row_id, function, HELPER, fake, feed, ctx)
@@ -739,14 +898,19 @@ def main():
     passed = sum(1 for _, ok, _ in results if ok)
     print(f"{passed}/{len(results)}", flush=True)
     if args.mutant:
-        named = {"stale-refresh": "H3", "unknown-as-zero": "S1"}[args.mutant]
+        named = {"stale-refresh": ["H3"], "unknown-as-zero": ["S1"],
+                 **{name: rows for name, (_, _, rows) in HELPER_MUTANTS.items()}}[args.mutant]
         broken = [r for r, _, instrument in results if instrument]
-        why = (f"{named} was never scored" if named not in [r for r, _, _ in results] else
+        unscored = [r for r in named if r not in [r for r, _, _ in results]]
+        why = (f"{', '.join(unscored)} never scored" if unscored else
                f"scored as instrument failures: {', '.join(broken)}" if broken else "")
         if why:
             print(f"mutant {args.mutant}: the control could not be performed — {why}",
                   flush=True)
             return 2
+        failed = [r for r, ok, _ in results if not ok]
+        print(f"mutant {args.mutant}: named {', '.join(named)}; FAIL {failed or 'none'}",
+              flush=True)
     return 0 if passed == len(results) else 1
 
 

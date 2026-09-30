@@ -7986,3 +7986,77 @@ peaks cached" in both looks on both apps.
 python3 tools/proof/cache_pass_probe.py                         # 11/11, exit 0
 python3 tools/proof/cache_pass_probe.py --mutant no-cancel      # R3 FAIL, exit 1
 ```
+
+## Issue batch B15 — Stop reaches a running export or transcribe, a cut-short response is priced (`assistant_lane_proof.py` L13, `spend_proof.py` H10–H12 and S6, `assistant_session_proof.py` SX and ST; #149 #162)
+
+Spec §11 AI-16 and P-8. The session makes an `AgentCallCancel` per call and
+Stop cancels it: the lane answers a call already cancelled when it takes the
+lock "Cancelled by the user." without running it, `export` links its token
+to `Exporter.cancel()` and the on-device `transcribe` to its
+`Transcriber.CancelToken`. The helper holds the SDK's snapshot of the
+response in flight and, when a turn throws with one held, emits one `cost`
+with `partial: true` before any `error`. `anthropic_fake.py` gains a reply's
+`"cut"`: `"drop"` (`message_start` and the blocks, then close) and
+`"stall"` (`message_start`, `message_delta` BEFORE the blocks — not the
+API's order — then held open until the client closes it or
+`"stall_seconds"` pass). `assistant_send` / `assistant_answer` gain
+`stop_after` (dev only), which presses Stop through
+`editor.assistantStop()` once, and answer `stopped_ms`. The new rows:
+
+- **`assistant_lane_probe.swift`** (in `make test`) — L13: a `submit` of
+  `add_marker` whose token was cancelled before submit answers `isError`
+  "Cancelled by the user." and places no marker; the same call with a live
+  token places it. `--mutant no-lane-check` deletes the lane's check.
+- **`spend_proof.py`** — H10 (`"cut": "drop"`: one `cost`, `partial: true`,
+  usage input 100 / output 0, prices.py's answer at the bundled table, an
+  `error` after it, `turn_finished`, no `message_done`), H11 (`"cut":
+  "stall"`, `cancel` on the first `text_delta`: one partial `cost`, input
+  100 / output 10, no `error`, `turn_finished` within 5 s), H12 (a
+  `get_project` request cancelled and answered with the session's cancelled
+  result: one `cost`, no `partial`, one POST, no `error`); `"partial"` joins
+  `LEDGER_KEYS`; S6 in `spend_probe.swift` (`partial: true` in the ledger
+  line and the tool view only for a JSON true — not for a complete event,
+  not for `"partial": 1`; "Cost: at least $0.0004 (a response was cut
+  short) · …", "at least $0.0004 · Reelcut's estimate", the under-$0.0001
+  forms, and unknown + partial equal to the unknown line and figure).
+  `--mutant no-partial` (the catch's `emitCost(…, true)` deleted) and
+  `--mutant keep-unpriced` (the clear after `finalMessage` deleted) run
+  H10–H12 over a scratch `agent/` built by its own `build.sh`.
+- **`assistant_session_proof.py`** — SX and ST, last in launch A, after K1.
+  SX: on B, a 240 s text clip; an export asked about and allowed with
+  `stop_after: 2`: finished, `stopped_ms` ≥ 2000, `waited_ms` − `stopped_ms`
+  ≤ 5000, the export's `tool_result` an error "The export was cancelled.",
+  no file 1 s later, no stand-in failure. ST: on C, a new project, the
+  ten-minute WAV of `speech_engine_proof.make_fixtures()` placed, the
+  model's `transcribe {place: false}` sent with `stop_after: 2`: finished,
+  "The transcription was cancelled.", within 5 s of the Stop; a setup
+  `transcribe {place: false}` over the pangram, in a project of its own,
+  refused as not installed or not available makes ST a named host SKIP (its
+  mutant then exits 2). `--mutant no-export-stop` and
+  `--mutant no-transcribe-stop` delete the handler's `onCancel` line in a
+  `tree_copy` and `make app` there, as `no-prepare` does, and run the row
+  in a launch A of that app.
+
+Run on 2026-09-29:
+
+| Command | Answer |
+|---|---|
+| `make typecheck` | 0 errors, 4 warnings, tsc silent (also after the `HelperInput` move alone) |
+| `make test` | exit 0; lane 18/18 (L0–L13, C1, M1, S1, M2), L13 "cancelled token: error: Cancelled by the user.; live token: ok … markers ["L13-live"]"; prompt 14/14; prices 27/27 |
+| `make app` | BUILD SUCCEEDED |
+| `assistant_lane_proof.py --mutant no-lane-check` | L13 FAIL: markers ["L13-stopped", "L13-live"], exit 1 |
+| `spend_proof.py` | 21/21 (H1–H12, L0–L2, S1–S6); H11 "turn_finished 0.06 s after the cancel" |
+| `spend_proof.py --mutant no-partial` | H10 FAIL ("0 costs"), H11 FAIL ("0 costs"), H12 ok; 1/3, exit 1 |
+| `spend_proof.py --mutant keep-unpriced` | H10 ok, H11 ok, H12 FAIL ("2 costs, partial [None, True]"); 2/3, exit 1 |
+| `assistant_session_proof.py` | 13/13; SX "2157 ms, stopped_ms 2038 … file 1 s later False", ST "2091 ms, stopped_ms 2038" |
+| `assistant_session_proof.py --mutant no-export-stop` | SX FAIL: "23051 ms, stopped_ms 2042", the export ok, the file there (the control: un-stopped, the 240 s clip's export ran 21 s past the Stop); 0/1, exit 1 |
+| `assistant_session_proof.py --mutant no-transcribe-stop` | ST FAIL: "waited_ms − stopped_ms 8777 − 2015 > 5000", the transcribe ok; 0/1, exit 1 |
+| `assistant_helper_proof.py` | 6/6 (P2d skip: no `--dist` given) |
+| `assistant_tab_proof.py` | 17/17 |
+| `spend_ui_proof.py` | 10/10 |
+
+**ST's margin is thin in time, not in kind.** Un-stopped, the ten-minute
+WAV transcribed in 8.8 s on this host, 6.8 s past the Stop against the 5 s
+bound; the mutant is also caught by its `tool_result` (an ok answer where the
+row wants "The transcription was cancelled."), which does not depend on the
+host's speed.

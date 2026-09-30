@@ -258,6 +258,7 @@ extension AgentServer {
     /// loudness and true peak, measured on the way through — for every format
     /// that has any, whether `loudness_lufs` was asked for or not.
     func exportProject(_ a: [String: Any]) throws -> String {
+        let stop = AgentLane.shared.callCancel  // the assistant's Stop (spec §11 AI-16)
         let presetID = try requiredString(a, "preset")
         let path = try requiredString(a, "path")
         let wholeProject = (try stringArg(a, "range") ?? "project").lowercased()
@@ -376,6 +377,7 @@ extension AgentServer {
                 box.value = result
                 semaphore.signal()
             }
+            stop?.onCancel { [weak exporter] in exporter?.cancel() }
         }
         guard semaphore.wait(timeout: .now() + 3600) == .success else {
             // Cancel on main AND let main hold the last reference: `Exporter`

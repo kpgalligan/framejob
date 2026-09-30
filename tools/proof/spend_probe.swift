@@ -17,6 +17,10 @@
 //   S3  the ledger line's whitelist
 //   S4  `record`: two lines at 0600, a nested folder created, a file refused
 //   S5  P-5's table over a `UserDefaults` answering the argument domain
+//   S6  (issue batch B15, #162; P-8) a response cut short: `partial: true` in
+//       the ledger line and the tool view only for a JSON true, the turn line
+//       and the Spend figure read "at least", and unknown + partial is the
+//       unknown line unchanged
 import Foundation
 
 var rows: [[String: Any]] = []
@@ -301,6 +305,67 @@ do {
     row("S5", p, "nothing set → the person's folder; -RCSpendFolder → it; the override → none; "
         + "the override + folder → the ledger only; + feed → the cache too; a persisted value "
         + "moves nothing")
+}
+
+// S6 — a response cut short (P-8).
+do {
+    var p: [String] = []
+    let day = AssistantTurnCost.day(bundledAsOf)
+    let at = Date(timeIntervalSince1970: 1_790_000_000)
+    func partial(_ event: [String: Any], _ flag: Any = true) -> [String: Any] {
+        var marked = event
+        marked["partial"] = flag
+        return marked
+    }
+    func serialized(_ object: [String: Any]?) -> String {
+        guard let object else { return "nil" }
+        return String(
+            data: (try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]))
+                ?? Data(), encoding: .utf8) ?? ""
+    }
+    let cut = partial(cost("dollars", dollars: 0.0004))
+    let whole = cost("dollars", dollars: 0.0004)
+    let one = partial(cost("dollars", dollars: 0.0004), 1)
+    let cutLine = serialized(AssistantSpend.ledgerLine(cut, at: at))
+    let cutView = serialized(AssistantSpend.toolView(cut))
+    check(&p, cutLine.contains("\"partial\":true"), true, "partial ledger line carries partial: true")
+    check(&p, cutView.contains("\"partial\":true"), true, "partial tool view carries partial: true")
+    for (label, event) in [("complete", whole), ("\"partial\": 1", one)] {
+        check(&p, AssistantSpend.ledgerLine(event, at: at)?["partial"] == nil, true,
+              "\(label): no partial key in the ledger line")
+        check(&p, AssistantSpend.toolView(event)["partial"] == nil, true,
+              "\(label): no partial key in the tool view")
+    }
+    check(&p, AssistantSpend.isPartial(one), false, "isPartial of \"partial\": 1")
+
+    var alone = AssistantTurnCost()
+    alone.add(cut)
+    check(&p, alone.line,
+          "Cost: at least $0.0004 (a response was cut short)" + tail + "bundled table of \(day))",
+          "partial line")
+    check(&p, alone.figure, "at least $0.0004 · Reelcut's estimate", "partial figure")
+    var tiny = AssistantTurnCost()
+    tiny.add(partial(cost("dollars", dollars: 0.00002)))
+    check(&p, tiny.line,
+          "Cost: under $0.0001 (a response was cut short)" + tail + "bundled table of \(day))",
+          "tiny partial line")
+    check(&p, tiny.figure, "under $0.0001 · Reelcut's estimate", "tiny partial figure")
+    var mixed = AssistantTurnCost()
+    mixed.add(cost("dollars", dollars: 0.0006))
+    mixed.add(cut)
+    check(&p, mixed.line,
+          "Cost: at least $0.0010 (a response was cut short)" + tail + "bundled table of \(day))",
+          "complete then partial line")
+    var unknownCut = AssistantTurnCost()
+    unknownCut.add(cost("unknown", detail: "first detail"))
+    unknownCut.add(partial(cost("dollars", dollars: 0.0006)))
+    var unknownWhole = AssistantTurnCost()
+    unknownWhole.add(cost("unknown", detail: "first detail"))
+    unknownWhole.add(cost("dollars", dollars: 0.0006))
+    check(&p, unknownCut.line, unknownWhole.line, "unknown + partial line")
+    check(&p, unknownCut.figure, unknownWhole.figure, "unknown + partial figure")
+    row("S6", p, "partial: true only for a JSON true; \(alone.line ?? "") | \(alone.figure) | "
+        + "\(tiny.figure) | unknown + partial: \(unknownCut.line ?? "")")
 }
 
 let answer = ["rows": rows]

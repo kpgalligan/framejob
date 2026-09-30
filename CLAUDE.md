@@ -96,7 +96,8 @@ agent/               the assistant helper (AI-1): Bun, the Anthropic SDK's Tool 
                        diff applied to both; NOT YET: Rasterize lacks road map 12 §2's
                        change, road map 13's pricing.ts / pricing.test.ts and P2's
                        priceTable.ts / priceTable.test.ts, the protocol's prices and
-                       cost events, and tsconfig's resolveJsonModule until #147 lands.
+                       cost events, #162's partial `cost`, and tsconfig's
+                       resolveJsonModule until #147 lands.
                        What the apps differ in arrives in `configure`
   prices/              anthropic.json (LiteLLM's Anthropic rows, $/MTok; written only by
                        `make prices` → update.py; bundled into the helper), cases.json
