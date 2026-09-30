@@ -283,8 +283,11 @@ rest — is a row in `docs/manual-checks.md`, which the owner runs.
 
 ## Seeing the chrome
 
-`screencapture` needs a Screen Recording grant the agent's terminal does not
-have, and it silently writes a black PNG. The way to LOOK at the chrome is
+`screencapture` needs a Screen Recording grant the agent's terminal may or
+may not have (it varies by host and session), and without it `screencapture`
+silently writes a black PNG. Assume neither: a proof that needs the grant
+probes for it and skips its granted tier by name, and a capture is never
+trusted until it is checked non-black. The way to LOOK at the chrome is
 **`tools/proof/harness/`**: it compiles every file in `app/Sources` except
 `main.swift` with a `main.swift` of its own, links the staticlib, opens a
 `.reelcut` package, puts an `EditorViewController` in an `NSWindow` and
