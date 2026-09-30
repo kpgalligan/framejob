@@ -27,7 +27,7 @@ The user asked for an AI agent in the editor, "designed in the same way that the
 
 ## Decisions
 
-- **The helper is taken whole, and is one diff with Rasterize's.** `agent/src/` is Rasterize's except for three domain constants moved into `configure` (`core_tools`, `search_guide`, `compaction_instructions`); `package.json` and `bun.lock` differ only in the name. With `rasterize-agent` renamed, `bun install --frozen-lockfile` passed, so the lock needs no regeneration (B2). Rasterize has not taken the change: the write into its tree was refused as a shared resource, and until #147 lands it is one diff behind. (AI-1; orig §2, §7 B, §8 part 2)
+- **The helper is taken whole, and is one diff with Rasterize's.** `agent/src/` is Rasterize's except for three domain constants moved into `configure` (`core_tools`, `search_guide`, `compaction_instructions`); `package.json` and `bun.lock` differ only in the name. With `rasterize-agent` renamed, `bun install --frozen-lockfile` passed, so the lock needs no regeneration (B2). Rasterize has not taken the change: the write into its tree was refused as a shared resource, and until kpgalligan/rasterize#325 (moved from #147) lands it is one diff behind. (AI-1; orig §2, §7 B, §8 part 2)
 - **The helper is signed with the hardened runtime and exactly `allow-jit`, in both bundles, and `make dist` checks it.** `agent/build.sh helper`, `project.yml`'s last post-build step, copies it to `Contents/Helpers/reelcut-agent` and signs it before Xcode signs the app; no bun fails the build. The helper is 57719424 bytes, `flags=0x10002(adhoc,runtime)`, entitlements exactly `{com.apple.security.cs.allow-jit: true}` (H1); re-signed with no entitlements it exits −5 with "Ran out of executable memory" (H6), so the entitlement is necessary. `dist_check.py` D6–D13 hold each bundle's helper to that contract (present, `runtime` in the flags, entitlements exact, no dev-tools marker), and `dist_check_mutants.py` makes each row fail on purpose, 11/11 cases. (AI-1; orig §7 H, §8 part 2, §11)
 - **Tool search, with four core tools.** The assistant's catalog is 84 tools and 219188 bytes, an estimated 54797–87675 tokens, entirely over the 10000 at which Anthropic's guidance turns to tool search (C3); none of Rasterize's core tools exists here, so A0's helper deferred all 85. Reelcut's core set is `get_project`, `render_frame`, `undo` and `redo`, loaded up front; every other tool is found by BM25 search, guided by A3's fourteen topics. (orig §7 C, §5 A1, §10)
 - **One lane for every tool call, never locked on main.** `AgentLane` holds one `NSLock` around every call from the MCP trampoline and the assistant session, so `callScope` and `callDocument` stay race-free; the eight `offMainTools` run in place and every other tool on main. L2: 20 concurrent calls, 10 `serve` and 10 `submit` to two documents, 0 errors, every marker on its own document. (AI-2; orig §3a, §3b, §8 part 1)
@@ -62,7 +62,7 @@ The user asked for an AI agent in the editor, "designed in the same way that the
 
 ## Open items
 
-- #147 Rasterize takes §2's change (one diff).
+- kpgalligan/rasterize#325 (moved from #147): Rasterize takes §2's change (one diff).
 - #151 Chat Settings are not offered.
 - #152 a question asked while the tab is hidden draws no attention.
 - #153 the transcript cannot be selected across entries.

@@ -97,7 +97,7 @@ agent/               the assistant helper (AI-1): Bun, the Anthropic SDK's Tool 
                        change, road map 13's pricing.ts / pricing.test.ts and P2's
                        priceTable.ts / priceTable.test.ts, the protocol's prices and
                        cost events, #162's partial `cost`, and tsconfig's
-                       resolveJsonModule until #147 lands.
+                       resolveJsonModule until kpgalligan/rasterize#325 lands.
                        What the apps differ in arrives in `configure`
   prices/              anthropic.json (LiteLLM's Anthropic rows, $/MTok; written only by
                        `make prices` → update.py; bundled into the helper), cases.json
