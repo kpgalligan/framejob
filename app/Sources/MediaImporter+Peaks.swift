@@ -64,11 +64,13 @@ extension MediaImporter {
         return merged
     }
 
+    @discardableResult
     static func writePeaks(
         for media: MediaSnapshot, asset: AVURLAsset, track: AVAssetTrack,
-        expectedRanges: [CMTimeRange], stamp: CacheStamp?, into cacheDir: URL
-    ) {
-        guard let reader = try? AVAssetReader(asset: asset) else { return }
+        expectedRanges: [CMTimeRange], stamp: CacheStamp?, into cacheDir: URL,
+        pass: CachePass? = nil
+    ) -> Bool {
+        guard let reader = try? AVAssetReader(asset: asset) else { return false }
         let output = AVAssetReaderTrackOutput(
             track: track,
             outputSettings: [
@@ -79,9 +81,9 @@ extension MediaImporter {
                 AVLinearPCMIsNonInterleaved: false,
             ])
         output.alwaysCopiesSampleData = false
-        guard reader.canAdd(output) else { return }
+        guard reader.canAdd(output) else { return false }
         reader.add(output)
-        guard reader.startReading() else { return }
+        guard reader.startReading() else { return false }
 
         var peaks = PeakBuckets(duration: media.duration)
         while let sample = output.copyNextSampleBuffer() {
@@ -91,26 +93,36 @@ extension MediaImporter {
         // Cancelling first would erase that distinction.
         let status = reader.status
         reader.cancelReading()
-        finishPeaks(peaks, status: status, expectedRanges: expectedRanges,
-                    for: media, stamp: stamp, into: cacheDir)
+        return finishPeaks(peaks, status: status, expectedRanges: expectedRanges,
+                           for: media, stamp: stamp, into: cacheDir, pass: pass)
     }
 
     /// The only publication path, shared by the actual reader and the probe.
+    /// The directory, the `.bin`, its marker (or the `.bin`'s removal) and
+    /// the post run inside one `CacheLedger.publish` — the directory too,
+    /// because a save's swap can take the one made before the wait; answers
+    /// whether it published.
+    @discardableResult
     static func finishPeaks(
         _ peaks: PeakBuckets, status: AVAssetReader.Status,
         expectedRanges: [CMTimeRange], for media: MediaSnapshot,
-        stamp: CacheStamp?, into cacheDir: URL
-    ) {
+        stamp: CacheStamp?, into cacheDir: URL, pass: CachePass? = nil
+    ) -> Bool {
         guard status == .completed, !peaks.failed, peaks.acceptedFrames > 0,
-            peaks.covers(expectedRanges), let stamp else { return }
+            peaks.covers(expectedRanges), let stamp else { return false }
         let file = peaksURL(for: media.id, in: cacheDir)
         let marker = peaksMarkerURL(for: media.id, in: cacheDir)
-        guard ensureDirectory(file.deletingLastPathComponent()) else { return }
-        guard (try? peaks.data.write(to: file, options: .atomic)) != nil else { return }
-        guard writeStamp(PeaksStamp(stamp), to: marker) else {
-            try? FileManager.default.removeItem(at: file)
-            return
+        var published = false
+        CacheLedger.shared.publish(in: cacheDir, for: pass) {
+            guard ensureDirectory(file.deletingLastPathComponent()) else { return }
+            guard (try? peaks.data.write(to: file, options: .atomic)) != nil else { return }
+            guard writeStamp(PeaksStamp(stamp), to: marker) else {
+                try? FileManager.default.removeItem(at: file)
+                return
+            }
+            postCacheChange(media: media.id, kind: peaksKind)
+            published = true
         }
-        postCacheChange(media: media.id, kind: peaksKind)
+        return published
     }
 }

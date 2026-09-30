@@ -43,78 +43,6 @@ enum MediaImporter {
         return try await probeAsset(url)
     }
 
-    /// The queue the completion-handler face probes on. A serial queue, not
-    /// the cooperative pool: a conversion (`FFmpegRewrap`) blocks its thread
-    /// for as long as ffmpeg runs, which is exactly what a cooperative
-    /// thread must never do, and serialising means a batch drop of four
-    /// unreadable files asks four questions in order rather than stacking
-    /// four alerts. `app/CLAUDE.md` names import as one of the documented
-    /// `DispatchQueue` seams.
-    private static let importQueue = DispatchQueue(
-        label: "com.kgalligan.reelcut.import", qos: .userInitiated)
-
-    /// The synchronous face of `probe` for the rest of the app: the result
-    /// arrives on the main thread, so the caller can go straight to
-    /// `add_media` + `add_clip` without ever writing `await`.
-    static func probe(
-        url: URL, completion: @escaping (Result<MediaDescriptor, any Error>) -> Void
-    ) {
-        importQueue.async {
-            let outcome = Result { try probeAllowingRewrap(url) }
-            DispatchQueue.main.async { completion(outcome) }
-        }
-    }
-
-    /// The AVFoundation probe plus spec §11's opt-in ffmpeg step, and the
-    /// body of both synchronous faces.
-    ///
-    /// The two halves are deliberately not nested inside `probe(url:)`.
-    /// `waitForProbe` puts a 30-second ceiling on AVFoundation, which is
-    /// right for reading headers and catastrophically wrong for a transcode;
-    /// `FFmpegRewrap.assist` therefore runs OUTSIDE it, unbounded, and its
-    /// result is probed with a fresh ceiling of its own. `assist` also needs
-    /// the main thread for its consent alert, which it can only have because
-    /// this function's callers are never the thread being waited on.
-    ///
-    /// Every one of the four import paths funnels through here — document
-    /// open (`ProjectDocument.readMediaFile`), File ▸ Add Media… and Finder
-    /// drops (`ProjectDocument.probeNext`), and the agent's `import_media`
-    /// (`AgentServer+Media.probe`) — so an MKV opens the same way in all of
-    /// them, and `assist` answering `nil` leaves all four with exactly the
-    /// failure they report on a machine that has no ffmpeg.
-    ///
-    /// **Known cost of the document-open path.** Three of those four callers
-    /// are already off the main thread, so ffmpeg runs with the UI live. The
-    /// fourth, `read(from:ofType:)`, is *allowed* to run on main (its own
-    /// comment says NSDocumentController does not always take the concurrent
-    /// read queue), and there it blocks: opening a WebM straight from the
-    /// Finder can beachball for the length of the encode. The consent alert
-    /// states the cost first, which is the mitigation available from here —
-    /// a progress sheet would need a seam in `ProjectDocument`, which owns
-    /// the sheet-presenting side of every long operation.
-    private static func probeAllowingRewrap(_ url: URL) throws -> MediaDescriptor {
-        do {
-            return try waitForProbe(url)
-        } catch let failure as ImportError where failure.invitesFFmpeg && !isImage(url) {
-            // Images are excluded because ImageIO's refusal means the picture
-            // is corrupt, not that the container is exotic — and a PNG is not
-            // something to hand to a video converter.
-            guard let rewrapped = try FFmpegRewrap.assist(url) else { throw failure }
-            do {
-                return try waitForProbe(rewrapped)
-            } catch {
-                // ffmpeg wrote a file AVFoundation still will not open. The
-                // conversion is cached by name, so leaving it there would
-                // hand the same broken result back for ever; throwing it away
-                // makes the next attempt a real attempt. The error reported
-                // is the ORIGINAL one, because the file the user chose is the
-                // one they are being told about.
-                FFmpegRewrap.discard(rewrapped)
-                throw failure
-            }
-        }
-    }
-
     /// Carries one probe's outcome across the semaphore in `waitForProbe`.
     /// Unchecked because the join is the synchronisation: the detached task
     /// writes it, signals, and never touches it again; the waiter reads it
@@ -123,27 +51,11 @@ enum MediaImporter {
         var outcome: Result<MediaDescriptor, any Error>?
     }
 
-    /// The BLOCKING face of `probe`, for `ProjectDocument.read(from:ofType:)`.
-    ///
-    /// That method is synchronous by contract and CAN run on the main thread
-    /// — NSDocumentController's open path does not always take the concurrent
-    /// read queue, and every agent tool call hops to main before it opens
-    /// anything. So this must never wait on the main actor. The obvious
-    /// spelling (a completion delivered through `MainActor.run`, joined with
-    /// a `DispatchGroup`) deadlocks exactly there: the waiter is holding the
-    /// one thread the completion needs, and the open dies on the timeout
-    /// instead of the file. Here the work runs on the cooperative pool and
-    /// the result comes back through a plain semaphore, so the waiting thread
-    /// is never the thread being waited on.
-    static func probeBlocking(url: URL) throws -> MediaDescriptor {
-        try probeAllowingRewrap(url)
-    }
-
     /// One AVFoundation probe, waited for from whatever thread called —
     /// `probeBlocking`'s original body, now shared with the
     /// completion-handler face and used twice per assisted import (once on
     /// the file the user chose, once on what ffmpeg made of it).
-    private static func waitForProbe(_ url: URL) throws -> MediaDescriptor {
+    static func waitForProbe(_ url: URL) throws -> MediaDescriptor {
         let box = ProbeBox()
         let semaphore = DispatchSemaphore(value: 0)
         Task.detached(priority: .userInitiated) {
@@ -254,54 +166,124 @@ enum MediaImporter {
     /// other: it can neither skip nor mark, and running is the conservative
     /// direction — the cache is made, and nothing certifies it.
     ///
-    /// Nothing cancels the task — not the document closing, not a save — so
-    /// a half-written strip is never a cancelled one. It is one of three,
-    /// and since a marker is written after the last frame and never before,
-    /// all three leave a strip with no marker for the next call to rebuild.
-    /// A FIRST SAVE while a pass runs: the task keeps writing into the
-    /// temporary directory it captured while `fileWrapper(ofType:)` copies
-    /// into the package only the frames that had landed, and nothing re-runs
-    /// the pass after a save. Process death. And a save of a TITLED document
-    /// straddling a pass, which SWAPS the package under it: NSDocument lists
-    /// `thumbs/<id>/` once for its lazy wrapper and swaps the new package in,
-    /// so a frame written between the listing and the swap goes with the old
-    /// directory while every frame after the swap lands by path in the new
-    /// one — holes the pass will never fill, which a marker written by path
-    /// would have certified for ever. `thumbnails` therefore checks, before
-    /// its marker, that every frame it wrote is still there (`stripHolds`)
-    /// and writes none when any is missing.
+    /// Nothing cancels the task but a pass asked for another file (below) —
+    /// not the document closing, not a save — and since a marker is written
+    /// after the last frame and never before, a pass cut short leaves a
+    /// strip with no marker for the next call to rebuild. A FIRST SAVE while
+    /// a pass runs: the task keeps writing into the temporary directory it
+    /// captured while `fileWrapper(ofType:)` copies into the package only
+    /// what had landed, and nothing re-runs the pass after a save. Process
+    /// death. And a save of a TITLED document, which lists the package for
+    /// its lazy `cache/` wrapper and SWAPS the new package in: no marker,
+    /// waveform or voice file is written between the save's `saveBegan` and
+    /// `saveEnded` (`ProjectDocument+CacheSaves.swift`,
+    /// `CacheLedger.publish`), so each lands by path in the package the save
+    /// swapped in. A frame is not held, so one written in that window goes
+    /// with the old package, and `thumbnails` then writes no marker
+    /// (`stripHolds`, inside the same `publish`).
     ///
     /// One pass per (cache directory, media id) at a time. Two passes for
     /// one media can be asked for in quick succession — open then relink,
-    /// relink twice, import then Consolidate — and used to run concurrently:
-    /// each thumbnail is written whole (ImageIO stages and renames), but
-    /// frames from two SOURCES could interleave in one `thumbs/<id>/`, and
-    /// under a marker the later-finishing pass would certify the mixed strip
-    /// until the source next changed. So the new task awaits the previous
-    /// pass's before it runs, and because each pass re-checks the marker at
-    /// its head, a queued redundant pass costs the no-op price above. The
-    /// bookkeeping is `CacheLedger` (`MediaCacheFiles.swift`, where nothing
+    /// relink twice, import then Consolidate — and frames from two SOURCES
+    /// interleaving in one `thumbs/<id>/` would be certified by the later
+    /// marker. So a pass for the SAME file awaits the one asked for before
+    /// it, in call order, and because each pass re-checks the marker at its
+    /// head, a queued redundant pass costs the no-op price above. A pass for
+    /// ANOTHER file supersedes: the ledger cancels the running task, the new
+    /// pass waits for it at most `CacheLedger.waitLimit` (`awaitPass`), and
+    /// the superseded pass writes nothing more, since every frame, head
+    /// clear and publication asks `pass.isCurrent()` first. So a pass stuck
+    /// on a stalled volume no longer holds a relink away from it. The
+    /// bookkeeping is `CacheLedger` (`MediaCacheLedger.swift`, where nothing
     /// awaits); the awaiting is here, inside the task, so this stays
-    /// synchronous. The tasks run in the order they were asked for, which
-    /// is load-bearing — the ledger's doc says why. The ledger's price: a
-    /// pass that never completes (a stalled network volume) holds every
-    /// later pass for that media behind it, a relink AWAY from the stalled
-    /// file included, where before the ledger the relink's pass ran beside
-    /// it and finished. The escape — cancel the previous pass when the URL
-    /// differs — is not built: it cannot reach a pass stuck inside one
-    /// AVFoundation call, and for a pass that is merely slow it brings back
-    /// the interleave the ledger exists to prevent.
+    /// synchronous.
+    ///
+    /// A waveform pass that published nothing is retried in the same task
+    /// after each of `peaksRetryDelays` while the pass is current
+    /// (`retryPeaks`), so a lost waveform does not wait for the next open.
     static func generateCaches(for media: MediaSnapshot, url: URL, in cacheDir: URL) {
-        CacheLedger.shared.enqueue(cacheDir: cacheDir, media: media.id) { previous, done in
+        CacheLedger.shared.enqueue(cacheDir: cacheDir, media: media.id, url: url) {
+            previous, bounded, pass in
             Task.detached(priority: .utility) {
-                await previous?.value
+                await awaitPass(previous, bounded: bounded)
+                guard pass.isCurrent() else {
+                    pass.done()
+                    return
+                }
                 // After the await: the stamp is of the file as THIS pass
                 // finds it, not as it was when the pass was asked for.
                 let stamp = CacheStamp.stamp(for: media, url: url)
-                await thumbnails(for: media, url: url, stamp: stamp, into: cacheDir)
-                await peaks(for: media, url: url, stamp: stamp, into: cacheDir)
-                await speech(for: media, url: url, stamp: stamp, into: cacheDir)
-                done()
+                await thumbnails(for: media, url: url, stamp: stamp, into: cacheDir, pass: pass)
+                let published = await peaks(
+                    for: media, url: url, stamp: stamp, into: cacheDir, pass: pass)
+                await speech(for: media, url: url, stamp: stamp, into: cacheDir, pass: pass)
+                if !published, pass.isCurrent() {
+                    await retryPeaks(for: media, url: url, into: cacheDir, pass: pass)
+                }
+                pass.done()
+            }
+        }
+    }
+
+    /// The waits between a failed waveform pass and its in-session retries.
+    static let peaksRetryDelays: [Duration] = [.seconds(2), .seconds(10)]
+
+    /// Waits for the pass enqueued before this one. Unbounded, it is the
+    /// same-file order. Bounded — the previous pass was superseded and
+    /// cancelled — it returns when that pass ends or `CacheLedger.waitLimit`
+    /// passes, whichever is first: a checked continuation resumed once by
+    /// whichever of two detached tasks gets there first. Not a task group or
+    /// `async let`, which would wait for the child still awaiting the stuck
+    /// task, and `Task.value` ignores cancellation.
+    private static func awaitPass(_ previous: Task<Void, Never>?, bounded: Bool) async {
+        guard let previous else { return }
+        guard bounded else {
+            await previous.value
+            return
+        }
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let once = ResumeOnce(continuation)
+            Task.detached {
+                await previous.value
+                once.resume()
+            }
+            Task.detached {
+                try? await Task.sleep(for: .seconds(CacheLedger.waitLimit))
+                once.resume()
+            }
+        }
+    }
+
+    /// Resumes its continuation exactly once, whichever caller is first.
+    private final class ResumeOnce: @unchecked Sendable {
+        private let lock = NSLock()
+        private var continuation: CheckedContinuation<Void, Never>?
+
+        init(_ continuation: CheckedContinuation<Void, Never>) {
+            self.continuation = continuation
+        }
+
+        func resume() {
+            lock.lock()
+            let pending = continuation
+            continuation = nil
+            lock.unlock()
+            pending?.resume()
+        }
+    }
+
+    /// The in-session retry of a waveform pass that published nothing: after
+    /// each delay (a cancellation ends the wait), while the pass is current,
+    /// with a fresh stamp, until one attempt publishes or finds it current.
+    private static func retryPeaks(
+        for media: MediaSnapshot, url: URL, into cacheDir: URL, pass: CachePass
+    ) async {
+        for delay in peaksRetryDelays {
+            do { try await Task.sleep(for: delay) } catch { return }
+            guard pass.isCurrent() else { return }
+            let stamp = CacheStamp.stamp(for: media, url: url)
+            if await peaks(for: media, url: url, stamp: stamp, into: cacheDir, pass: pass) {
+                return
             }
         }
     }
@@ -361,7 +343,8 @@ enum MediaImporter {
     /// is written after the loop, so the marker means "a pass over this file
     /// finished, and what it wrote is here" and nothing weaker.
     static func thumbnails(
-        for media: MediaSnapshot, url: URL, stamp: CacheStamp?, into cacheDir: URL
+        for media: MediaSnapshot, url: URL, stamp: CacheStamp?, into cacheDir: URL,
+        pass: CachePass? = nil
     ) async {
         guard media.hasVideo else { return }
         let directory = thumbsDirectory(for: media.id, in: cacheDir)
@@ -369,7 +352,7 @@ enum MediaImporter {
         // The head check. A nil stamp (the file cannot be stat'ed) never
         // skips, and never writes a marker below either.
         if let stamp, readStamp(at: marker) == stamp { return }
-        guard ensureDirectory(directory) else { return }
+        guard pass?.isCurrent() ?? true, ensureDirectory(directory) else { return }
         // What is on disk is the old film or a partial pass. The marker goes
         // first, then the frames (`clearThumbnails` says why in that order).
         // `replaced` rides the FIRST post of this pass and no other. The
@@ -385,10 +368,15 @@ enum MediaImporter {
 
         if media.kind == .image {
             if let image = decodeImage(url, maxPixelSize: Int(thumbnailHeight * 4)),
+                pass?.isCurrent() ?? true,
                 writeJPEG(image, to: directory.appendingPathComponent("0.jpg")) {
                 written.insert(0)
             }
-            if let stamp, stripHolds(written, in: directory) { writeStamp(stamp, to: marker) }
+            if let stamp {
+                CacheLedger.shared.publish(in: cacheDir, for: pass) {
+                    if stripHolds(written, in: directory) { writeStamp(stamp, to: marker) }
+                }
+            }
             // Posted whether or not the picture decoded: the old tile is
             // gone either way, and a memo still holding it would draw a
             // picture the package no longer has.
@@ -436,7 +424,7 @@ enum MediaImporter {
             width: max(16, (thumbnailHeight * aspect).rounded()), height: thumbnailHeight)
 
         var sinceLastPost = 0
-        for await result in generator.images(for: times) {
+        frames: for await result in generator.images(for: times) {
             var tiles = 1
             switch result {
             case .success(requestedTime: let requested, image: let image, actualTime: _):
@@ -450,9 +438,12 @@ enum MediaImporter {
                 let indices =
                     requested == lastTime
                     ? held : [Int(CompositionBuilder.ticks(requested) / ReelTime.perSecond)]
-                for index in indices
-                where writeJPEG(image, to: directory.appendingPathComponent("\(index).jpg")) {
-                    written.insert(index)
+                for index in indices {
+                    // A superseded pass writes no further frame.
+                    guard pass?.isCurrent() ?? true else { break frames }
+                    if writeJPEG(image, to: directory.appendingPathComponent("\(index).jpg")) {
+                        written.insert(index)
+                    }
                 }
                 tiles = indices.count
             case .failure:
@@ -478,8 +469,13 @@ enum MediaImporter {
         // package under the pass); otherwise NO marker, and the next open
         // rebuilds, exactly as before the marker existed. And only for a
         // stamp that exists; nothing certifies a strip made from a file that
-        // could not be measured.
-        if let stamp, stripHolds(written, in: directory) { writeStamp(stamp, to: marker) }
+        // could not be measured. The listing and the marker run inside one
+        // publication, which no announced save overlaps.
+        if let stamp {
+            CacheLedger.shared.publish(in: cacheDir, for: pass) {
+                if stripHolds(written, in: directory) { writeStamp(stamp, to: marker) }
+            }
+        }
         postCacheChange(media: media.id, kind: thumbsKind, replaced: replaced)
     }
 
@@ -521,25 +517,31 @@ enum MediaImporter {
     /// can fail, and a removed `.bin` is posted at once (`clearPeaks` says
     /// why: readers may memoize a waveform, so a withdrawal must invalidate
     /// it). No track, unusable extent, reader failure or incomplete decode
-    /// writes no marker or `.bin`; the next normal pass retries it.
+    /// writes no marker or `.bin`; `generateCaches` retries it in the same
+    /// session (`retryPeaks`). Answers true when there is nothing to make or
+    /// the waveform is current or published, false otherwise — a superseded
+    /// pass included.
+    @discardableResult
     static func peaks(
-        for media: MediaSnapshot, url: URL, stamp: CacheStamp?, into cacheDir: URL
-    ) async {
-        guard media.hasAudio, media.duration > 0 else { return }
-        if peaksAreCurrent(for: media, stamp: stamp, in: cacheDir) { return }
+        for media: MediaSnapshot, url: URL, stamp: CacheStamp?, into cacheDir: URL,
+        pass: CachePass? = nil
+    ) async -> Bool {
+        guard media.hasAudio, media.duration > 0 else { return true }
+        if peaksAreCurrent(for: media, stamp: stamp, in: cacheDir) { return true }
+        guard pass?.isCurrent() ?? true else { return false }
         if clearPeaks(for: media.id, in: cacheDir) {
             postCacheChange(media: media.id, kind: peaksKind)
         }
         let asset = AVURLAsset(url: url)
         guard let track = (try? await asset.loadTracks(withMediaType: .audio))?.first else {
-            return
+            return false
         }
         guard let trackRange = try? await track.load(.timeRange),
             let segments = try? await track.load(.segments),
             let expected = expectedPeaksRanges(trackRange: trackRange, segments: segments)
-        else { return }
-        writePeaks(for: media, asset: asset, track: track, expectedRanges: expected,
-                   stamp: stamp, into: cacheDir)
+        else { return false }
+        return writePeaks(for: media, asset: asset, track: track, expectedRanges: expected,
+                          stamp: stamp, into: cacheDir, pass: pass)
     }
 
     // MARK: - Speech
@@ -559,10 +561,12 @@ enum MediaImporter {
     /// unavailable this process (a nil bundle, an earlier thrown prediction) is
     /// not retried, so a project full of media pays for it once, not per file.
     static func speech(
-        for media: MediaSnapshot, url: URL, stamp: CacheStamp?, into cacheDir: URL
+        for media: MediaSnapshot, url: URL, stamp: CacheStamp?, into cacheDir: URL,
+        pass: CachePass? = nil
     ) async {
         guard media.hasAudio, media.duration > 0 else { return }
         guard !speechIsCurrent(for: media, stamp: stamp, in: cacheDir) else { return }
+        guard pass?.isCurrent() ?? true else { return }
         if clearSpeech(for: media.id, in: cacheDir) {
             postCacheChange(media: media.id, kind: speechKind, replaced: true)
         }
@@ -571,6 +575,7 @@ enum MediaImporter {
         guard let track = (try? await asset.loadTracks(withMediaType: .audio))?.first else {
             return
         }
-        writeSpeech(for: media, asset: asset, track: track, stamp: stamp, into: cacheDir)
+        writeSpeech(for: media, asset: asset, track: track, stamp: stamp, into: cacheDir,
+                    pass: pass)
     }
 }

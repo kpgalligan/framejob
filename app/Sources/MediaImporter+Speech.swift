@@ -41,7 +41,7 @@ extension MediaImporter {
     /// ever.
     static func writeSpeech(
         for media: MediaSnapshot, asset: AVURLAsset, track: AVAssetTrack, stamp: CacheStamp?,
-        into cacheDir: URL
+        into cacheDir: URL, pass: CachePass? = nil
     ) {
         guard let vad = SileroVAD.bundled() else { return }
         guard let reader = try? AVAssetReader(asset: asset) else { return }
@@ -118,10 +118,15 @@ extension MediaImporter {
         }
 
         let file = speechURL(for: media.id, in: cacheDir)
-        guard ensureDirectory(file.deletingLastPathComponent()) else { return }
         let data = probabilities.withUnsafeBufferPointer { Data(buffer: $0) }
-        guard (try? data.write(to: file, options: .atomic)) != nil else { return }
-        if let stamp { writeStamp(SpeechStamp(stamp), to: speechMarkerURL(for: media.id, in: cacheDir)) }
-        postCacheChange(media: media.id, kind: speechKind)
+        // The directory, the `.bin`, its marker and the post: one publication.
+        CacheLedger.shared.publish(in: cacheDir, for: pass) {
+            guard ensureDirectory(file.deletingLastPathComponent()) else { return }
+            guard (try? data.write(to: file, options: .atomic)) != nil else { return }
+            if let stamp {
+                writeStamp(SpeechStamp(stamp), to: speechMarkerURL(for: media.id, in: cacheDir))
+            }
+            postCacheChange(media: media.id, kind: speechKind)
+        }
     }
 }

@@ -121,7 +121,7 @@ detail there.
   W-6). It lives there, not in `InspectorPane.swift`, for the size rule.
 
 **The document.**
-- `ProjectDocument.swift` (+`DisplayStem`, +`Recording`, +`SelectedAction`, +`Import`, +`Graphics`, +`UndoGroup`)
+- `ProjectDocument.swift` (+`DisplayStem`, +`Recording`, +`SelectedAction`, +`Import`, +`Graphics`, +`UndoGroup`, +`CacheSaves`)
   — NSDocument, `.reelcut` package read/write, and the single mutation
   point (see Undo); `applyEdit`'s `.refused` arm beeps and then posts
   `projectDocumentDidRefuse` with the `ReelRefusal` (spec §11 CI-10), which
@@ -152,6 +152,9 @@ detail there.
   creates `cache/` — only if the package's date, read through a fresh `URL`
   before the create, is still `fileModificationDate`, so an outside change made before it is not absorbed — and that method re-reads the date through a fresh
   `URL`, because `fileURL` still holds the date it cached at open (#138).
+  `+CacheSaves` is the `save(to:ofType:for:completionHandler:)` override
+  every save funnels through, bracketing it with the cache ledger's
+  `saveBegan` / `saveEnded` (#115, #169).
   `+Import` is File ▸ Add Media… and every drop into an open project
   (`importMedia`, the probe chain and the one grouped commit). `+Graphics`
   is the document's side of the package's `graphics/`:
@@ -173,11 +176,11 @@ detail there.
   root goes at close ONLY, never at the first save, because the timeline and
   any pass in flight still hold its path (G-19 (d)).
 - `MediaImporter.swift` (+`Probe`, +`Speech`, +`Peaks`) ·
-  `MediaPeakBuckets.swift` · `MediaCacheFiles.swift` ·
+  `MediaPeakBuckets.swift` · `MediaCacheFiles.swift` · `MediaCacheLedger.swift` ·
   `FFmpegRewrap.swift` · `AppSupport.swift` — the import funnel and the
   three per-media caches (`thumbs/`, `peaks/`, `speech/`) inside the package.
   `async`/`await` is confined to `MediaImporter.swift`; the await-free halves
-  are the `+` files, `MediaPeakBuckets` and `MediaCacheFiles`. A cache is CURRENT when its
+  are the `+` files, `MediaPeakBuckets`, `MediaCacheFiles` and `MediaCacheLedger`. A cache is CURRENT when its
   `complete.json` marker matches `CacheStamp` (the source's size and
   modification second plus the constants that size the cache — no path, so a
   moved or consolidated package keeps its caches); the marker is written
@@ -186,9 +189,16 @@ detail there.
   selected-track decode, valid PCM coverage and a usable record-sized
   Float32 payload; legacy or malformed peaks are unavailable until rebuilt.
   A stale cache is deleted
-  first and a withdrawn peaks `.bin` is POSTED at once; passes for one media
-  run one at a time in call order through `CacheLedger` (an `NSLock`, not an
-  actor). The cache order is thumbnails → peaks → speech. `thumbnails` holds a
+  first and a withdrawn peaks `.bin` is POSTED at once; passes for one file
+  run one at a time in call order through `CacheLedger`
+  (`MediaCacheLedger.swift`, an `NSCondition`, not an actor); a pass asked for
+  another file cancels the earlier ones, which write nothing more and are
+  waited for at most 30 s; no marker, waveform or voice file is written while
+  a save of the package is in flight (`ProjectDocument+CacheSaves.swift`
+  announces every save, which stops counting 120 s after it began), and a save
+  waits for one being written; a failed waveform pass is retried in the
+  session after 2 s and 10 s. The cache order is thumbnails → peaks → speech.
+  `thumbnails` holds a
   video track's last frame past its end, from the track's last SAMPLE's time.
   `FFmpegRewrap` is opt-in (`-RCFFmpegImport always`), runs `Process` on a
   serial queue, and writes conversions under `AppSupport` — the ONE spelling
@@ -1629,7 +1639,8 @@ exception by asking — screen recording has a complete callback API and
 uses it. **`import Synchronization` is allowed only inside `LevelMeter.swift`**,
 whose `publish` runs on the audio render thread where a lock invites priority
 inversion and `main.async` allocates; every other cross-thread value is an
-`NSLock` or a main hop. `DispatchQueue` only at the documented seams: the
+`NSLock`, the cache ledger's `NSCondition`, or a main hop. `DispatchQueue`
+only at the documented seams: the
 compositor's render queue, the composition rebuild, import, the export
 progress timer, `Transcriber`'s serial queue, `CloudTranscriber`'s serial
 queue and the AssemblyAI client's delegate `OperationQueue` (spec §11's

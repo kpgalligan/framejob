@@ -201,8 +201,7 @@ history. The history moved into this record; the open items became GitHub issues
 ## Known limits
 
 The limits these closures recorded and did not fix are open issues: `relink_media` never
-re-probes (#63); the cache ledger's stuck pass and the `stripHolds` two-step (#115); the caption
-name `chart.png.srt` in the panel against `chart.srt` over MCP (#43).
+re-probes (#63); the caption name `chart.png.srt` in the panel against `chart.srt` over MCP (#43).
 
 ## Open items
 

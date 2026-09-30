@@ -178,13 +178,16 @@ lenient-decoding rule.
 
 ### Media import and caches
 
-- **`CacheLedger` is an `NSLock`, not an actor.** Each pass carries the URL resolved when it was
-  asked for. An actor reached through `Task` hops cannot promise that two hops arrive in order.
+- **`CacheLedger` (`MediaCacheLedger.swift`) is an `NSCondition`, not an actor.** Passes for one
+  file run in call order; a pass for another file cancels the earlier ones, which write nothing
+  more and are waited for at most 30 s; no marker, waveform or voice file is written while a save
+  of the package is in flight (`ProjectDocument+CacheSaves.swift`, at most 120 s a save); a failed
+  waveform pass is retried in the session after 2 s and 10 s (#115, #169).
 - **One stamp per pass, shared by both halves,** so the two markers cannot disagree about one
   file.
 - **`stripHolds`:** a marker is written only when at least one frame landed and every frame
-  written is still present. This closes the case where saving a titled document swaps the package
-  under a running pass.
+  written is still present, the listing and the marker inside one publication no announced save
+  overlaps; a frame lost to a save's swap leaves the strip unmarked until the next open.
 - **`replaced` rides only the FIRST post of a replacing pass.** Since 2026-09-19, speech's
   pre-decode withdrawal carries it too.
 - **The held tail uses the track's LAST SAMPLE time** (an `AVSampleCursor`), never the record's
@@ -335,9 +338,6 @@ Files that were split since the notes wrote them:
 Still true of the current code:
 
 - `relink_media` never re-probes, so a relink sizes the new strip from the old `duration`.
-- A pass stuck inside one AVFoundation call holds every later pass for that media. The escape was
-  argued and not built.
-- The `stripHolds` listing and the marker write are two steps apart.
 - A caption panel name such as `chart.png` becomes `chart.png.srt` in the panel and `chart.srt`
   over MCP.
 - `SileroVAD` marked unavailable never retries until relaunch.

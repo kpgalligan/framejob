@@ -435,7 +435,7 @@
     "app/Sources/EditorViewController+AddClips.swift `@objc func addImageBackground(_ sender: Any?) {`",
     "app/Sources/EditorViewController+AddClips.swift:163"
    ],
-   "note": "NSOpenPanel.beginSheetModal (images only, so the probe never asks ffmpeg: app/Sources/MediaImporter.swift `failure.invitesFFmpeg && !isImage(url)`)"
+   "note": "NSOpenPanel.beginSheetModal (images only, so the probe never asks ffmpeg: app/Sources/MediaImporter+Probe.swift `failure.invitesFFmpeg && !isImage(url)`)"
   },
   "addBlurredBackground:": {
    "verdict": "none",
@@ -1029,7 +1029,7 @@
     {
      "selector": "addMediaFiles:",
      "via": "app/Sources/EditorViewController.swift `document.importMedia(panel.urls)`",
-     "gate": "app/Sources/FFmpegRewrap.swift `decided == .ask && !canAsk` — policy ask and canAsk (false while AgentServerEnabled), after AVFoundation refuses a non-image file (app/Sources/MediaImporter.swift `failure.invitesFFmpeg && !isImage(url)`)"
+     "gate": "app/Sources/FFmpegRewrap.swift `decided == .ask && !canAsk` — policy ask and canAsk (false while AgentServerEnabled), after AVFoundation refuses a non-image file (app/Sources/MediaImporter+Probe.swift `failure.invitesFFmpeg && !isImage(url)`)"
     },
     {
      "selector": "openDocument:",

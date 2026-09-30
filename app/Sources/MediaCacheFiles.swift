@@ -320,11 +320,8 @@ extension MediaImporter {
     /// cannot see the swap, but it can see the holes — a frame it wrote that
     /// is not there — and a strip with holes it will never fill is exactly
     /// what a marker must not certify; without one the next open rebuilds,
-    /// as it did before the marker existed. The limit: this listing and the
-    /// marker's write are two steps, so a swap landing between them would
-    /// still certify. That window is one directory read wide, and it is as
-    /// small as it can be made without the document telling the pass about
-    /// its saves.
+    /// as it did before the marker existed. The listing and the marker run
+    /// inside one `CacheLedger.publish`, which no announced save overlaps.
     static func stripHolds(_ frames: Set<Int>, in directory: URL) -> Bool {
         guard !frames.isEmpty,
             let names = try? FileManager.default.contentsOfDirectory(atPath: directory.path)
@@ -389,53 +386,6 @@ extension MediaImporter {
         let file = speechURL(for: media, in: cacheDir)
         guard manager.fileExists(atPath: file.path) else { return false }
         return (try? manager.removeItem(at: file)) != nil
-    }
-
-    // MARK: - One pass per media
-
-    /// The bookkeeping under `generateCaches`'s one-pass-per-media rule: the
-    /// task a new pass must await, keyed by cache directory and media id,
-    /// and the ticket that lets a finished pass drop its own entry without
-    /// dropping a newer one. `enqueue` calls `make` UNDER the lock with the
-    /// previous task and a `done` to call last; `make` creates the task and
-    /// is the only place that awaits, which is why it is written in
-    /// `MediaImporter.swift` and this class is not.
-    ///
-    /// A lock rather than an actor, and the reason is ORDER. Each pass
-    /// carries the URL the media resolved to when it was asked for, so the
-    /// passes must run in the order they were asked for: an open's pass
-    /// queued BEHIND a relink's and run after it would rebuild the strip
-    /// from the OLD file and certify it. An actor is reached from
-    /// synchronous code only through a `Task` hop, and two hops from one
-    /// thread are not ordered; the lock is taken in call order, and each
-    /// task awaits exactly the one enqueued before it.
-    final class CacheLedger: @unchecked Sendable {
-        static let shared = CacheLedger()
-        private let lock = NSLock()
-        private var running: [String: (ticket: Int, task: Task<Void, Never>)] = [:]
-        private var nextTicket = 0
-
-        func enqueue(
-            cacheDir: URL, media: UInt32,
-            _ make: (Task<Void, Never>?, @escaping @Sendable () -> Void) -> Task<Void, Never>
-        ) {
-            let key = "\(cacheDir.standardizedFileURL.path)\u{0}\(media)"
-            lock.lock()
-            defer { lock.unlock() }
-            let previous = running[key]?.task
-            nextTicket += 1
-            let ticket = nextTicket
-            let done: @Sendable () -> Void = { [self] in finish(key, ticket: ticket) }
-            running[key] = (ticket, make(previous, done))
-        }
-
-        /// Drops the entry a finished pass made, unless a later pass has
-        /// already replaced it — that one is still owed its await.
-        private func finish(_ key: String, ticket: Int) {
-            lock.lock()
-            defer { lock.unlock() }
-            if running[key]?.ticket == ticket { running[key] = nil }
-        }
     }
 
     // MARK: - Small shared plumbing

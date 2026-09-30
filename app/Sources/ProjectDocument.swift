@@ -756,7 +756,7 @@ final class ProjectDocument: NSDocument {
         return directory
     }
 
-    private var intendedCacheDirectory: URL? {
+    var intendedCacheDirectory: URL? {
         if let fileURL = fileURL {
             return fileURL.appendingPathComponent(Self.cacheDirectoryName, isDirectory: true)
         }

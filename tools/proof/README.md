@@ -7915,3 +7915,74 @@ python3 tools/proof/cloud_spike/cloud_spike.py --selftest             # 29/29
 python3 tools/proof/export_cancel_proof.py --port 4913                # 7/7
 python3 tools/proof/export_cancel_proof.py --port 4913 --mutant no-loop-check   # M2 FAIL, exit 1
 ```
+
+## Issue batch B14 — cache passes: the stall, the save gate, the peaks retry (`cache_pass_probe.py`; #115 #169)
+
+`cache_pass_probe.py` builds `cache_pass_probe.swift` over `--sources`
+(`peaks_probe.py`'s swiftc line) and runs one scenario per process over
+copies of `media/toneA.m4a`, `A.mov` and `AV.mov` under
+`work/cache-pass/<tree|mutant-NAME>/`. It prints `<ID> pass|fail — <detail>`
+and `scores: N/M`. Rule R: a plain run exits 0 or 1 (a build failure is
+B0's FAIL); a `--mutant` run runs B0 and the rows it names (unless `--only`)
+and exits 1 caught, 0 survived, 2 not performed (a `before` text not found
+exactly once, the copy did not build, a named row not scored). A missing
+medium exits 2.
+
+| Row | What it forces | Passes when |
+|---|---|---|
+| B0 | — | the probe builds |
+| G0 | CONTROL, #169 reproduced: the package copied (a save's listing) BEFORE `generateCaches`(toneA), swapped in after the pass ended with its marker in the old package | the swapped-in package still has no peaks 5 s later |
+| G1 | `saveBegan`, the copy, `generateCaches`(toneA); swap, then `saveEnded` | for 5 s the old package gets no `.bin` or marker; a valid waveform (`loadPeaks` and the file's `PeaksStamp`) lands in the swapped-in one within 15 s |
+| G2 / G2c | `saveBegan`, `generateCaches`(A.mov); once the strip holds still 1 s, `3.jpg` deleted (G2 only), `saveEnded` | no thumbs marker while the save runs; after the pass none (G2) / the stamp (G2c) |
+| G3 | a real `ProjectDocument` (read from a package the probe wrote, `fileURL` set); a `publish` on its `cacheDirectory` held 2 s on a `Thread`; `save(to: fileURL, …, .saveOperation)` on main | the save returns no earlier than the hold ends, its completion arrives within 30 s, and a `publish` after it answers true in < 1 s |
+| S1a / S1b | AV.mov as `one.mov` and `two.mov` (mtime +10 s); a fake pass for `one.mov` enqueued through `enqueue` runs the real `thumbnails` then `peaks` with a `hold` that blocks once 2 frames are on disk; `generateCaches`(`two.mov`) while it is held | S1a: both markers are `two.mov`'s within 60 s. S1b: after the release, the thumbs and peaks marker bytes, the `.bin` bytes and every `.jpg`'s name and inode are unchanged |
+| R1 | a text file under toneA's record, `speech/<id>.bin` seeded; on the speech withdrawal post the file is atomically replaced with toneA's bytes | a valid waveform lands within 10 s |
+| R2 | a text file that stays one | the pass ends within 22 s, with no peaks |
+| R3 | R2's source; 4 s in, `generateCaches` of a toneA copy for the same media | a valid waveform lands ≤ 5 s later |
+
+"The pass ended" is read through a same-URL follower enqueued through the
+ledger after the pass (a same-URL pass never supersedes).
+
+**Scores** (`python3 tools/proof/cache_pass_probe.py`, 2026-09-29, the final
+tree): 11/11, exit 0 — G0 "pass ended 0.34 s; marker in the old package
+true; … the swapped-in package has no peaks 5 s later: true"; G1 "valid
+waveform in the swapped-in package 0.02 s after saveEnded"; G2 / G2c "10
+frames held still 1.13 s / 1.12 s; marker while the save ran: false … marker
+after: none / the stamp"; G3 "save returned 2.01 s after the call, after the
+hold ended: true; completion 0.02 s after return"; S1a "30.32 s"; S1b
+"changed: nothing"; R1 "valid waveform 2.29 s later"; R2 "the pass ended
+12.02 s"; R3 "0.31 s later".
+
+| `--mutant` | Edit | Result |
+|---|---|---|
+| `unbounded-wait` | `awaitPass(previous, bounded: false)` | S1a FAIL ("never"), caught, exit 1 |
+| `frame-check-ignored` | the loop's `guard pass?.isCurrent() … { break frames }` → `_ = pass?.isCurrent()` | S1b FAIL ("changed: 2.jpg, 3.jpg, 4.jpg"), caught, exit 1 |
+| `peaks-entry-ignored` | `peaks`' entry check → `_ = pass?.isCurrent()` | S1b FAIL ("changed: bin, peaks marker"), caught, exit 1 |
+| `publish-ignores-saves` | `while let expiry = saveExpiryLocked(directory), false {` | G1 FAIL (".bin or marker during the save: true … never after saveEnded"), G2 FAIL ("marker while the save ran: true … marker after: the stamp"), caught, exit 1 |
+| `save-unannounced` | no `saveBegan` / `saveEnded` in the override | G3 FAIL ("save returned 0.00 s … after the hold ended: false"), caught, exit 1 |
+| `no-retry` | the `retryPeaks` call removed | R1 FAIL ("valid waveform never"), caught, exit 1 |
+| `unbounded-retry` | the retry repeats its first delay forever | R2 FAIL ("the pass ended never"), caught, exit 1 |
+| `no-cancel` | `enqueue` does not cancel | R3 FAIL ("valid waveform never"), caught, exit 1 |
+
+**G0 reads as the reproduction of #169's probable cause.** A titled save
+lists `cache/` for its lazy wrapper, a pass publishes its waveform into the
+old package afterwards, and the swap drops it: the waveform is gone for the
+session, and nothing re-ran the pass. Forced here, not waited for; the
+incident's own package (a leftover `thumbs/10/.4.jpg-BlHH` beside no
+`peaks/15.*`) fits the same shape but is not proved to be it. G1 is the
+same interleaving with the save announced. Before the directory creation of
+`finishPeaks` moved inside its publication, G1 passed only through the
+retry (2.05 s after `saveEnded`): the `peaks/` directory made before the
+wait went with the old package.
+
+Also run for this batch: `remaining_probe.py` 142/146 on both the baseline
+sources and the tree, row for row the same (the four fails are the ffmpeg
+fixtures, a host skip); `remaining_proof.py` 79/79 and
+`save_project_proof.py` 9/9 on the baseline app and the new one;
+`screens.py --only 03-empty-editor,04-editor` 7/7 with "fixture demo:
+peaks cached" in both looks on both apps.
+
+```sh
+python3 tools/proof/cache_pass_probe.py                         # 11/11, exit 0
+python3 tools/proof/cache_pass_probe.py --mutant no-cancel      # R3 FAIL, exit 1
+```
