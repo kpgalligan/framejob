@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Road map 12 A4 — `dist_check.py`'s helper rows (D6–D13), each made to fail on purpose.
+"""Road map 12 A4 and #145 — `dist_check.py`'s helper rows (D6–D13) and D14, each made
+to fail on purpose.
 
     python3 tools/proof/dist_check_mutants.py [--release APP] [--dist APP]
 
@@ -7,16 +8,19 @@ Every case runs `dist_check.py` as a child with one side a SKELETON bundle,
 `work/dist_check_mutants/<case>/Reelcut.app`: `Contents/MacOS/Reelcut` a
 symlink to the real app's untouched binary, `Contents/Helpers/reelcut-agent`
 a COPY of the real helper (never a link), mutated and re-signed ad hoc. The
-other side is the real app. Nothing is written into `build/`.
+other side is the real app. Nothing is written into `build/`. The
+`app-entitlements` case is the one whole bundle: the real Distribution app
+`ditto`ed to `<case>/dist/Reelcut.app` and re-signed ad hoc with HEAD's pair
+(`audio-input` and `get-task-allow`, #145), which D14 must refuse.
 
 A case passes iff dist_check's FAIL ids equal the expected set exactly, its
-last line is `dist_check: <13 - |set|>/13`, and it exits 0 for an empty set
+last line is `dist_check: <14 - |set|>/14`, and it exits 0 for an empty set
 and 1 otherwise. `control` (both real) and `skeleton` (both skeletons,
 helpers copied untouched) expect nothing to fail: they prove the skeleton is
 not itself a failure. A setup command that fails (a copy, a `codesign`, the
 offset not found) is a scored FAIL naming it. Each case's directory is
-removed after scoring. The last line is `dist_check_mutants: <passed>/11`;
-the exit is 0 only at 11/11.
+removed after scoring. The last line is `dist_check_mutants: <passed>/12`;
+the exit is 0 only at 12/12.
 """
 
 import argparse
@@ -52,6 +56,7 @@ CASES = [
     ("no-entitlements-dist", ("dist",), "no-entitlements", {"D11"}),
     ("marker-release", ("release",), "marker", {"D12"}),
     ("marker-dist", ("dist",), "marker", {"D13"}),
+    ("app-entitlements-dist", ("dist",), "app-entitlements", {"D14"}),
 ]
 
 
@@ -75,6 +80,21 @@ def sign(path, *options):
 def skeleton(case_dir, side, real_app, mutation, needle):
     """A skeleton bundle for one side, its helper mutated; returns its path."""
     app = os.path.join(case_dir, side, "Reelcut.app")
+    if mutation == "app-entitlements":
+        try:
+            done = subprocess.run(["ditto", real_app, app], capture_output=True, timeout=300,
+                                  env=dist_check.child_env())
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise SetupError(f"ditto {real_app}: {error}")
+        if done.returncode != 0:
+            raise SetupError(f"ditto {real_app} exit {done.returncode}: "
+                             f"{done.stderr.decode('utf-8', 'replace').strip()[:300]}")
+        plist = os.path.join(case_dir, "app.plist")
+        with open(plist, "wb") as handle:
+            plistlib.dump({"com.apple.security.device.audio-input": True,
+                           "com.apple.security.get-task-allow": True}, handle)
+        sign(app, "--options", "runtime", "--entitlements", plist)
+        return app
     macos = os.path.join(app, "Contents", "MacOS")
     os.makedirs(macos)
     binary = os.path.join(real_app, "Contents", "MacOS", "Reelcut")

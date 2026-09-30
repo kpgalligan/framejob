@@ -61,8 +61,9 @@ app: rust project
 # Release's, which is its positive control; and each bundle's assistant helper
 # (Contents/Helpers/reelcut-agent) must be present, signed with the hardened
 # runtime, hold exactly the allow-jit entitlement and not hold the marker
-# (road map 12 A4, D6–D13). The file-wide
-# `unexport RC_ASSEMBLYAI_KEY` above covers this recipe too.
+# (road map 12 A4, D6–D13); and the Distribution app must be signed with
+# exactly the audio-input entitlement, never get-task-allow (#145, D14). The
+# file-wide `unexport RC_ASSEMBLYAI_KEY` above covers this recipe too.
 dist: app
 	xcodebuild -project $(APP).xcodeproj -scheme $(APP) -configuration Distribution \
 		-derivedDataPath $(BUILD_DIR) build

@@ -340,8 +340,9 @@ reversed in a commit message); run EVERY proof script when the FFI changes; meas
   through `mcp.schemas()`; the literals left are property names a check has to spell.
 - Stale doc comment: `app/Sources/ReelEdit.swift` still says refusals answer `.identity` "until road
   map 7's D2·3 gives them their sentences" — fixed by 2026-09-26 (`ReelEdit.swift:64`).
-- The Speed sheet showing a neighbour's dissolve rather than a length (a separate UI decision) —
-  tracked in #109.
+- ~~The Speed sheet showing a neighbour's dissolve rather than a length (a separate UI decision) —
+  tracked in #109.~~ Struck (issue batch B20): the readout names each clip the trial gives a
+  transition, and its length, one line each (`speed_sheet_probe.py`).
 - Person checks for parts 1–6 (playback, layout of the Speed sheet hint) — tracked in #47 and
   #48.
 

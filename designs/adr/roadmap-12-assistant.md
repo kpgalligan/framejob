@@ -54,7 +54,7 @@ The user asked for an AI agent in the editor, "designed in the same way that the
 ## Known limits
 
 - **Every turn has been against the stand-in**: nothing has reached api.anthropic.com, so whether a real model does the six asks right is unmeasured (#157), and end-of-turn compaction on the real API has never run (#161).
-- **Ad-hoc signing only**: no Developer ID, notarization or quarantine; the app itself carries `get-task-allow` (#145).
+- **Ad-hoc signing only**: no Developer ID, notarization or quarantine; the Release app carries `get-task-allow`; Distribution does not (#145, `dist_check.py` D14).
 - **`assistant_helper_proof.py` P1 skips** on a host with bun at a fixed path (`/opt/homebrew/bin`, `/usr/local/bin`), because `build.sh`'s own `PATH` finds it there.
 - **The mid-drag row is reachable in a probe only**: no MCP tool begins a gesture; L8 measures `submit`, the session's one door.
 - **F1 checks that a backticked token names something real**, not that the sentence around it is true.
@@ -62,7 +62,6 @@ The user asked for an AI agent in the editor, "designed in the same way that the
 
 ## Open items
 
-- #145 the Distribution app is signed with `get-task-allow` beside `audio-input`.
 - #147 Rasterize takes §2's change (one diff).
 - #151 Chat Settings are not offered.
 - #152 a question asked while the tab is hidden draws no attention.

@@ -776,7 +776,8 @@ def main():
           "400 000 against a limit of 1 000 000",
           (applied["before"], applied["after"]) == (1_000_000, 2_000_000)
           and applied["arm"] == "applied", json.dumps(applied))
-    check("…and B gains a cross dissolve it did not have, which the readout does not show",
+    check("…and B gains a cross dissolve it did not have, which the readout now names "
+          "(speed_sheet_probe.py)",
           five["bTransitionBefore"] is False and five["bTransitionAfter"] is True,
           json.dumps([five["bTransitionBefore"], five["bTransitionAfter"]]))
     refused = five["refused"]

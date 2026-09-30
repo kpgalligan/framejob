@@ -3404,8 +3404,8 @@ sections:
   answers: HELD TO THE FILE (6 220 000 → 3 100 000 at ×2, where the quotient
   it replaced printed 3 110 000); APPLIED INTO THE NEIGHBOUR (A at ×0.5
   overlaps B by 400 000 against a limit of 1 000 000, so it applies at its
-  full 2 000 000 and B gains a minted cross dissolve, which the readout does
-  not show); REFUSED (C at ×0.5 overlaps D by 1 000 000 against a limit of
+  full 2 000 000 and B gains a minted cross dissolve, which the readout now
+  names, `speed_sheet_probe.py`); REFUSED (C at ×0.5 overlaps D by 1 000 000 against a limit of
   600 000, so it reads 1 000 000 → 1 000 000 and `applying` answers the
   overlap rule's own sentence verbatim); and MIXED ([A, C] reads
   2 000 000 → 3 000 000, the applied clip's new length beside the refused
@@ -5843,13 +5843,19 @@ and prints the needle and both paths before its rows:
 - **D5** — the Distribution binary does not hold the needle;
 - **D6–D13** — each bundle's assistant helper: present, signed with the
   hardened runtime, entitlements exactly `allow-jit`, no needle (road map
-  12's A4, the last section of this file).
+  12's A4, the last section of this file);
+- **D14** (#145) — the Distribution app's entitlements, read through its
+  `realpath`ed executable with `codesign -d --entitlements - --xml`, are
+  exactly `{com.apple.security.device.audio-input: true}`: no
+  `get-task-allow`, which notarization refuses (`project.yml` sets
+  `CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO` for Distribution alone). Printed
+  last; no Distribution binary FAILs it ("no Distribution binary (D3)").
 
 No row is ever skipped: if D1 fails, D4, D5, D12 and D13 FAIL too, and so
 does each when its binary or helper is missing. The last line is
-`dist_check: <passed>/13`; the exit is 0 only at 13/13.
-`dist_check_mutants.py` makes each helper row fail on purpose; the last
-section of this file has its cases.
+`dist_check: <passed>/14`; the exit is 0 only at 14/14.
+`dist_check_mutants.py` makes each helper row and D14 fail on purpose; the
+A4 section of this file has its cases.
 
 **Why a marker and not the tool names.** Swift string literals of 15 UTF-8
 bytes or fewer are stored inline in the code of an `-O` binary, not as
@@ -5861,7 +5867,7 @@ optimised binary by the log line the flag-on `devTools()` writes, so a dev
 tool added to the seam needs no edit here.
 
 ```sh
-make dist                                                  # → dist_check: 13/13
+make dist                                                  # → dist_check: 14/14
 python3 tools/proof/dist_check.py [--release APP] [--dist APP]
 ```
 
@@ -6005,7 +6011,7 @@ spend ledger, spec §11 P-5; road map 13 P4). Before the first MCP call it:
 A build failure is a scored FAIL of the rows that need it; a call that throws
 where a row expected an answer fails the rest of that letter's rows by name.
 
-The 27 rows:
+The 28 rows:
 - **T**: both schemas (`{path, project}` and `{project}`, nothing required,
   no `scope`), the parity log, the marker count, and the gate on each tool.
 - **H**: the probe walks `AppDelegate().buildMainMenu()` with
@@ -6033,6 +6039,12 @@ The 27 rows:
   Marker"` with it gone. A refused `redo` fails the row with its text. It
   FAILED before the change ("There is nothing to redo"): the eager group an
   item that registers nothing still closed was a step, and cleared redo.
+  U3 (#176): the clip at 0 s selected, Add Marker at 3.5 s, then `undo`;
+  Clip ▸ Rename… opens the inline field and Edit ▸ Select All is performed on
+  it — its `target` must be a class whose name holds `Text` (else FAIL "no
+  text target") — then `redo` must answer `redone: "Add Marker"` (+1) and
+  `undo` `undone: "Add Marker"` (+0). It FAILED before the change ("There is
+  nothing to redo"): an `NSText` target always took the eager group.
 - **R**: the refusals — `undo:` (`framework`; its path read from the listing,
   since its validator retitles it "Undo Add Marker"), `newProject:`
   (`modal`), a disabled item, an unknown item and menu, a submenu, an empty
@@ -6055,7 +6067,8 @@ The 27 rows:
   runs after the sheet's `DispatchQueue.main.async`.
 
 It performs only Add Marker, Export…, Remove Track, Add Media… (the last three
-cancelled), Settings…, and View ▸ Zoom In and Zoom Out (U2), and never Quit,
+cancelled), Settings…, View ▸ Zoom In and Zoom Out (U2), and Clip ▸ Rename…
+with Edit ▸ Select All on its field (U3), and never Quit,
 Close, Save, Revert, Allow Agent Connections, New Recording or a Help item.
 
 **The cover** is up once a run, over B's frame, for about two seconds.
@@ -6881,7 +6894,7 @@ bundle under `work/dist_check_mutants/<case>/`: `Contents/MacOS/Reelcut` a
 symlink to the real app's untouched binary and the helper a COPY, mutated
 and re-signed ad hoc; nothing is written into `build/`. A case passes iff
 the FAIL ids equal its expected set exactly, the last line is
-`dist_check: <13 − |set|>/13` and the exit is 0 for an empty set, 1
+`dist_check: <14 − |set|>/14` and the exit is 0 for an empty set, 1
 otherwise; a failed setup step is a scored FAIL naming it.
 
 | Case | The mutation | Expected FAIL |
@@ -6893,11 +6906,12 @@ otherwise; a failed setup step is a scored FAIL naming it.
 | `extra-entitlement-release` / `-dist` | re-signed `--options runtime` with allow-jit plus `disable-library-validation` | D10 / D11 |
 | `no-entitlements-dist` | re-signed `--options runtime`, no entitlements | D11 |
 | `marker-release` / `-dist` | the needle written over the copy at the first `compaction_instructions`, re-signed as `build.sh` signs | D12 / D13 |
+| `app-entitlements-dist` (#145) | the whole Distribution app `ditto`ed to `<case>/dist/Reelcut.app` and re-signed ad hoc `--options runtime` with the pair it carried before B20, `audio-input` and `get-task-allow` | D14 |
 
 ```sh
-make dist                                                  # → dist_check: 13/13
-python3 tools/proof/dist_check_mutants.py [--release APP] [--dist APP]   # → dist_check_mutants: 11/11
-python3 tools/proof/dist_check.py --dist /nonexistent/Reelcut.app        # D3 D5 D7 D9 D11 D13 FAIL, 7/13, exit 1
+make dist                                                  # → dist_check: 14/14
+python3 tools/proof/dist_check_mutants.py [--release APP] [--dist APP]   # → dist_check_mutants: 12/12
+python3 tools/proof/dist_check.py --dist /nonexistent/Reelcut.app        # D3 D5 D7 D9 D11 D13 D14 FAIL, 7/14, exit 1
 ```
 
 **Measured 2026-09-28**, every command as `(unset ANTHROPIC_API_KEY
@@ -7843,7 +7857,7 @@ instrument failure is a scored FAIL, exit 1.
 
 | Runner | caught / survived / not performed |
 |---|---|
-| `assistant_lane_proof.py`, `assistant_tab_proof.py`, `assistant_helper_proof.py`, `assistant_prompt_proof.py`, `assistant_session_proof.py`, `spend_proof.py`, `budget_proof.py`, `prices_proof.py`, `prices_crosscheck.py`, `makefile_env_proof.py`, `export_cancel_proof.py`, `video_configuration_proof.py` | 1 / 0 / 2 |
+| `assistant_lane_proof.py`, `assistant_tab_proof.py`, `assistant_helper_proof.py`, `assistant_prompt_proof.py`, `assistant_session_proof.py`, `spend_proof.py`, `budget_proof.py`, `prices_proof.py`, `prices_crosscheck.py`, `makefile_env_proof.py`, `export_cancel_proof.py`, `video_configuration_proof.py`, `speed_sheet_probe.py` | 1 / 0 / 2 |
 | `spend_ui_proof.py` | 1 / 3 / 2 |
 | `graphics_proof.py`, `graphics_store_probe.py`, `words_picture_probe.py` | 0 / 1 / 2 |
 | `cloud_captions_proof.py`, `cloud_captions_probe.py` (`--mutant`, `--fake-mutant`), `recording_probe.py`, `phase9_chrome.py` — whole-suite mutants | the per-row count and a normal run's exit / 2 |
@@ -8299,3 +8313,52 @@ python3 tools/proof/graphics_store_probe.py --mutant silent-open    # → exit 0
 python3 tools/proof/graphics_proof.py --port 4891                   # C7, G10, G11
 python3 tools/proof/graphics_proof.py --port 4892 --mutant store-uncapped
 ```
+
+## Issue batch B20 — a text field's empty undo step, the Speed sheet's dissolve line, Distribution's entitlements (`v2_menu.py` U3, `speed_sheet_probe.py`, `dist_check.py` D14; #176 #109 #145)
+
+- **`v2_menu.py` U3 (#176)** — Edit ▸ Select All performed on Clip ▸
+  Rename…'s inline field leaves undo and redo as they were (the V2b section
+  has the row). `UIMenu.perform` now runs an `NSText` target's `copy:` and
+  `selectAll:` (`UIMenu.textReadOnlySelectors`) inside
+  `inUndoGroupIfRegistered`; `cut:` and `paste:` keep the eager group their
+  text view's own registration needs.
+- **`speed_sheet_probe.py` (#109)** — builds `speed_sheet_probe.swift` over
+  `harness/build.sh`'s swiftc line (`-D REELCUT_DEV_TOOLS`) into
+  `work/speed-sheet/` and drives the real sheet over `source_mirror_probe.py`
+  §5's fixture: `SpeedSheetController(document:clips:)`, its view loaded, the
+  rate set in the field whose delegate is the controller, and
+  `controlTextDidEndEditing(_:)` called; the readout is the label prefixed
+  `<n> clip`, split on newlines. Rows: B0 builds; P0 (control) [A] ×1 → one
+  line, `1 clip · 00:00:01:20 → 00:00:01:20`; P1 [A] ×0.5 → line 2 `clip
+  <B> gains a 0.67 s cross dissolve`; P2 [C] ×0.5, refused → one line; P3
+  [A, C] ×0.5 → `2 clips · …` then P1's line; P4 (control) A already at
+  ×0.5, then ×0.4 → one line whose lengths differ (a transition that only
+  lengthens is not named); P5 B given a wipe first, then [A] ×0.5 → line 2
+  `clip <B> gains a 0.67 s wipe`; H1 the hint's new text. Mutants
+  (`--mutant`, rule R 1 / 0 / 2): `no-gain-lines` (the readout joins no gain
+  line) must fail P1 P3 P5; `minted-only` (a clip that had a `transitionIn`
+  before counts as having had it) must fail P5.
+- **`dist_check.py` D14 (#145)** — the V0 and A4 sections have the row and
+  the `app-entitlements-dist` case. `project.yml` sets
+  `CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO` for Distribution alone (spec §11
+  V-1: Distribution is the shipping build; notarization refuses
+  `get-task-allow`); Debug and Release are unchanged.
+
+Run on 2026-09-30 (this host: ffmpeg is broken, `libx265.215.dylib` not
+loaded; nothing below needed it):
+
+| Command | Answer |
+|---|---|
+| `v2_menu.py 4861 --only U` on the baseline Release app (HEAD `3011aa0`, own instance) | 2 pass, 1 fail of 3, exit 1 — U3 "undo 'Add Marker' can_redo True; Rename…; Select All on NSTextView; ToolError: redo: There is nothing to redo. Only an undo makes a redo step." |
+| `v2_menu.py 4862 --only U` (own instance) | 3 pass, 0 fail, 0 skip of 3, exit 0 — U3 "Select All on NSTextView; redo 'Add Marker' → +1; undo 'Add Marker' → +0" |
+| `v2_menu.py 4862` (fresh own instance) | 28 pass, 0 fail, 0 skip of 28, exit 0; `grep "Reelcut: "` printed nothing |
+| `speed_sheet_probe.py --sources work/b20/baseline-src` | 4/8, exit 1 — P1, P3, P5 and H1 fail (one summary line each; the old hint) |
+| `speed_sheet_probe.py` | 8/8, exit 0 |
+| `speed_sheet_probe.py --mutant no-gain-lines` | 5/8, "caught — P1, P3, P5 failed", exit 1 |
+| `speed_sheet_probe.py --mutant minted-only` | 7/8, "caught — P5 failed", exit 1 |
+| `source_mirror_probe.py` | 40/40, exit 0 |
+| `dist_check.py --release work/b20/Reelcut-baseline.app --dist work/b20/Reelcut-baseline-dist.app` | 13/14, exit 1 — D14 alone: `{'com.apple.security.device.audio-input': True, 'com.apple.security.get-task-allow': True}` |
+| `make dist` | `dist_check: 14/14` |
+| `dist_check_mutants.py` | 12/12, exit 0; `app-entitlements-dist` FAIL {D14}, 13/14, rc 1 |
+| `dist_check.py --dist /nonexistent/Reelcut.app` | D3 D5 D7 D9 D11 D13 D14 FAIL, 7/14, exit 1 |
+| `codesign -d --entitlements - --xml` Distribution / Release | `audio-input` alone / `audio-input` and `get-task-allow` |

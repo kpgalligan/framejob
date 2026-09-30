@@ -1468,7 +1468,8 @@ free.
   `v2_menu.py` H5). It performs through
   `ProjectDocument.inUndoGroupIfRegistered`: an item's edits are one step
   (M3); an item that registers nothing leaves undo and redo untouched (#167,
-  `v2_menu.py` U2); an `NSText` target keeps the eager group.
+  `v2_menu.py` U2); an `NSText` target keeps the eager group except for
+  `copy:` and `selectAll:`, which change no text (#176, `v2_menu.py` U3).
 - `UIMenuTable.swift` — `UIMenu.verdicts`, one row per selector, a mirror of
   `tools/proof/capture_spike/inventory.json` in its order. `v2_menu.py`'s H2
   holds the two together, and H1 holds the inventory to the live menu, so a

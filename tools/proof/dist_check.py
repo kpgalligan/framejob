@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Road map 11 V0 and road map 12 A4 — the binary check `make dist` runs.
+"""Road map 11 V0, road map 12 A4 and #145 — the binary check `make dist` runs.
 
 The Distribution configuration is Release without the Swift condition
 `REELCUT_DEV_TOOLS` (spec §11 V-1), so its binary must hold none of the dev
@@ -26,7 +26,14 @@ rows check `runtime` in the CodeDirectory flags, not `adhoc`, so a Developer
 ID signature passes too. `codesign -dv` writes its display to stderr, so the
 flags are read there; the entitlements are read from stdout.
 
-The thirteen rows, none ever skipped:
+**The app's entitlements (#145).** Distribution is the build that ships
+(spec §11 V-1), and notarization refuses `get-task-allow`, which Xcode
+injects unless `CODE_SIGN_INJECT_BASE_ENTITLEMENTS` is off (`project.yml`
+turns it off for Distribution alone). D14 reads the Distribution app's
+signature through its executable, `realpath`ed so a skeleton's symlink reads
+the real app, and wants exactly `com.apple.security.device.audio-input`.
+
+The fourteen rows, none ever skipped:
 
 * D1 — the needle is read from the seam file: exactly one bare declaration
   line, ASCII, at least 16 UTF-8 bytes;
@@ -39,13 +46,16 @@ The thirteen rows, none ever skipped:
 * D8 / D9 — it is signed with the hardened runtime (`runtime` in the
   CodeDirectory flags) and `codesign --verify --strict` accepts it;
 * D10 / D11 — its entitlements are exactly `com.apple.security.cs.allow-jit`;
-* D12 / D13 — it does not hold the needle.
+* D12 / D13 — it does not hold the needle;
+* D14 — the Distribution app's entitlements are exactly
+  `com.apple.security.device.audio-input`.
 
 If D1 fails, D4, D5, D12 and D13 FAIL too, and so does each when its binary
-or helper is missing. A missing `codesign`, a timeout or output that does not
-parse FAILs the row with the reason. `tools/proof/dist_check_mutants.py`
-makes each helper row fail on purpose. The last line is
-`dist_check: <passed>/13`; the exit is 0 only at 13/13.
+or helper is missing; D14 FAILs when the Distribution binary is. A missing
+`codesign`, a timeout or output that does not parse FAILs the row with the
+reason. `tools/proof/dist_check_mutants.py` makes each helper row and D14 fail
+on purpose. The last line is `dist_check: <passed>/14`; the exit is 0 only at
+14/14.
 """
 
 import argparse
@@ -67,7 +77,9 @@ MIN_BYTES = 16
 # The assistant helper, inside each bundle; its one entitlement (agent/entitlements.plist).
 HELPER = os.path.join("Contents", "Helpers", "reelcut-agent")
 ENTITLEMENTS = {"com.apple.security.cs.allow-jit": True}
-TOTAL = 13
+# The Distribution app's one entitlement (#145): the microphone, never get-task-allow.
+APP_ENTITLEMENTS = {"com.apple.security.device.audio-input": True}
+TOTAL = 14
 # The CodeDirectory line's flags; `Executable Segment flags=0x1` has no parentheses.
 FLAGS = re.compile(r"flags=0x[0-9a-fA-F]+\(([^)]*)\)")
 TIMEOUT = 120
@@ -169,8 +181,8 @@ def helper_runtime(path):
     return True, f"flags ({match.group(1)})"
 
 
-def helper_entitlements(path):
-    """Whether the helper's entitlements are exactly ENTITLEMENTS."""
+def entitlements(path, want):
+    """Whether the code at `path` is signed with exactly the entitlements `want`."""
     shown, reason = run_codesign(["-d", "--entitlements", "-", "--xml", path])
     if shown is None:
         return False, reason
@@ -181,9 +193,14 @@ def helper_entitlements(path):
         held = plistlib.loads(shown.stdout)
     except Exception as error:  # plistlib raises several kinds on bad input
         return False, f"the entitlements do not parse ({type(error).__name__}: {error}) in {path}"
-    if held != ENTITLEMENTS:
+    if held != want:
         return False, f"entitlements {held!r} in {path}"
     return True, ""
+
+
+def helper_entitlements(path):
+    """Whether the helper's entitlements are exactly ENTITLEMENTS."""
+    return entitlements(path, ENTITLEMENTS)
 
 
 def main():
@@ -193,8 +210,8 @@ def main():
     arguments = parser.parse_args()
 
     needle, needle_reason = read_needle()
-    print("road map 11 V0 and road map 12 A4 — no dev tools in Distribution; "
-          "the helper signed in both\n")
+    print("road map 11 V0, road map 12 A4 and #145 — no dev tools in Distribution; "
+          "the helper signed in both; Distribution's entitlements\n")
     print(f"  needle:       {needle.decode('ascii') if needle else '(none)'}")
     print(f"  release:      {os.path.abspath(arguments.release)}")
     print(f"  distribution: {os.path.abspath(arguments.dist)}\n")
@@ -261,6 +278,14 @@ def main():
         else:
             count = helper.count(needle)
             check(name, count == 0, f"{count} occurrences in {helper_where}")
+
+    name = ("D14 the Distribution app's entitlements are exactly "
+            "com.apple.security.device.audio-input")
+    if dist is None:
+        check(name, False, "no Distribution binary (D3)")
+    else:
+        ok, detail = entitlements(os.path.realpath(dist_where), APP_ENTITLEMENTS)
+        check(name, ok, detail)
 
     print(f"\ndist_check: {passed}/{TOTAL}")
     return 0 if passed == TOTAL else 1

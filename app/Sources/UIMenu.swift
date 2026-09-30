@@ -35,12 +35,18 @@ import AppKit
 /// `registerUndo`, so there, and on any other document, `perform` keeps the
 /// eager group, `ProjectDocument.performGroupedEdit`'s discipline: event
 /// grouping off, begin, act, close exactly what it opened, restore — never a
-/// flush.
+/// flush. The exception is `textReadOnlySelectors`, which change no text and
+/// so register nothing: those run in `inUndoGroupIfRegistered` too (#176,
+/// `v2_menu.py` U3).
 enum UIMenu {
     /// V1's verdicts. `none` is spelled `.plain` so no `Optional.none`
     /// comparison is ever ambiguous.
     enum Verdict: String, CaseIterable { case plain = "none", sheet, window, modal, framework }
     enum Refusal: String { case noAction = "no_action", framework, modal, unclassified }
+
+    /// The selectors an NSText target answers without changing its text, so
+    /// without an undo registration (#176).
+    static let textReadOnlySelectors: Set<String> = ["copy:", "selectAll:"]
 
     /// A menu item that is not a submenu, and the titles leading to it.
     struct Leaf {
@@ -212,15 +218,18 @@ enum UIMenu {
     }
 
     /// Sends the item's action to `target`, its undo in one explicit group on
-    /// the window's document's manager (the header's **Undo.**). False when
-    /// nothing handled it.
+    /// the window's document's manager (the header's **Undo.**); an `NSText`
+    /// target's group is eager unless the selector is one of
+    /// `textReadOnlySelectors`. False when nothing handled it.
     static func perform(_ item: NSMenuItem, target: AnyObject, window: NSWindow?) -> Bool {
         guard let action = item.action else { return false }
         let document = window?.windowController?.document as? NSDocument
         guard let manager = document?.undoManager else {
             return NSApp.sendAction(action, to: target, from: item)
         }
-        if let document = document as? ProjectDocument, !(target is NSText) {
+        if let document = document as? ProjectDocument,
+            !(target is NSText) || textReadOnlySelectors.contains(NSStringFromSelector(action))
+        {
             return document.inUndoGroupIfRegistered {
                 NSApp.sendAction(action, to: target, from: item)
             }

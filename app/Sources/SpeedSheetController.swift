@@ -136,8 +136,9 @@ final class SpeedSheetController: NSViewController, NSTextFieldDelegate {
         view = makeSheetView(
             title: "Speed",
             hint: "Faster clips can leave gaps; slower clips can overlap. Later clips stay in "
-                + "place. Allowed overlaps may add a cross dissolve. If an overlap is not "
-                + "allowed, that clip stays unchanged; other selected clips can still change.",
+                + "place. A clip an allowed overlap reaches gains a transition, named below. "
+                + "If an overlap is not allowed, that clip stays unchanged; other selected "
+                + "clips can still change.",
             content: content,
             buttonRow: makeButtonRow(
                 cancel: cancelButton, apply: applyButton,
@@ -165,6 +166,25 @@ final class SpeedSheetController: NSViewController, NSTextFieldDelegate {
         clips.map { .setSpeed(clip: $0, rate: rate, keepPitch: keepPitch) }
     }
 
+    /// A clip a trial gives a transition it did not play before, and that
+    /// transition's length (#109).
+    struct GainedTransition: Equatable {
+        let clip: UInt32
+        let kind: TransitionKind
+        /// The overlap with its predecessor after the trial.
+        let duration: Ticks
+    }
+
+    /// The project once the sheet's ops have run — the ONE `applying` every
+    /// line of the readout is read off. A refusal still answers the project
+    /// with the refused clips as they were.
+    static func trial(
+        of clips: [UInt32], rate: Double, keepPitch: Bool, in project: ReelProject
+    ) -> ProjectSnapshot {
+        let ops = Self.ops(for: clips, rate: rate, keepPitch: keepPitch)
+        return ((try? project.applying(ops)).project ?? project).snapshot
+    }
+
     /// What the selection measures now, and what it measures once those ops
     /// have run — the two numbers the readout prints, both read off a project.
     ///
@@ -176,9 +196,14 @@ final class SpeedSheetController: NSViewController, NSTextFieldDelegate {
     static func lengths(
         of clips: [UInt32], rate: Double, keepPitch: Bool, in project: ReelProject
     ) -> (before: Ticks, after: Ticks) {
-        let snapshot = project.snapshot
-        let ops = Self.ops(for: clips, rate: rate, keepPitch: keepPitch)
-        let applied = ((try? project.applying(ops)).project ?? project).snapshot
+        lengths(
+            of: clips, before: project.snapshot,
+            after: trial(of: clips, rate: rate, keepPitch: keepPitch, in: project))
+    }
+
+    static func lengths(
+        of clips: [UInt32], before snapshot: ProjectSnapshot, after applied: ProjectSnapshot
+    ) -> (before: Ticks, after: Ticks) {
         var before: Ticks = 0
         var after: Ticks = 0
         for id in clips {
@@ -189,19 +214,67 @@ final class SpeedSheetController: NSViewController, NSTextFieldDelegate {
         return (before, after)
     }
 
-    /// "3 clips · 00:00:12:00 → 00:00:06:00".
+    /// Every clip, on a track holding one of `clips`, whose transition plays
+    /// in `after` and did not in `before` — a minted cross dissolve, or a
+    /// transition set earlier that an overlap now reaches. A transition plays
+    /// when the clip has one and overlaps its predecessor
+    /// (`VideoPane.overlap(before:)`'s idiom). Ordered by start, then id.
+    static func gainedTransitions(
+        of clips: [UInt32], before: ProjectSnapshot, after: ProjectSnapshot
+    ) -> [GainedTransition] {
+        func overlap(_ id: UInt32, in snapshot: ProjectSnapshot) -> Ticks {
+            guard let clip = snapshot.clip(id) else { return 0 }
+            let earlier = snapshot.clips(onTrack: clip.track).filter { $0.start < clip.start }
+            guard let previous = earlier.last else { return 0 }
+            return previous.end - clip.start
+        }
+        func effective(_ id: UInt32, in snapshot: ProjectSnapshot) -> Bool {
+            snapshot.clip(id)?.transitionIn != nil && overlap(id, in: snapshot) > 0
+        }
+        let tracks = Set(clips.compactMap { before.clip($0)?.track })
+        var gains: [(start: Ticks, gain: GainedTransition)] = []
+        for clip in after.clips where tracks.contains(clip.track) {
+            let id = clip.id
+            let had = effective(id, in: before)
+            guard !had, effective(id, in: after), let kind = clip.transitionIn?.kind else {
+                continue
+            }
+            let gain = GainedTransition(clip: id, kind: kind, duration: overlap(id, in: after))
+            gains.append((clip.start, gain))
+        }
+        return gains.sorted { ($0.start, $0.gain.clip) < ($1.start, $1.gain.clip) }.map(\.gain)
+    }
+
+    /// "clip 7 gains a 0.67 s cross dissolve".
+    static func gainLine(_ gain: GainedTransition) -> String {
+        "clip \(gain.clip) gains a \(String(format: "%.2f", ReelTime.seconds(gain.duration))) s "
+            + gain.kind.displayName.lowercased()
+    }
+
+    /// "3 clips · 00:00:12:00 → 00:00:06:00", then one `gainLine` per clip
+    /// the trial gives a transition — every line read off one trial handle.
+    static func readout(
+        of clips: [UInt32], rate: Double, keepPitch: Bool, in project: ReelProject
+    ) -> String {
+        let before = project.snapshot
+        let after = trial(of: clips, rate: rate, keepPitch: keepPitch, in: project)
+        let (from, to) = lengths(of: clips, before: before, after: after)
+        let fps = before.canvas.fps
+        let count = clips.count == 1 ? "1 clip" : "\(clips.count) clips"
+        let summary =
+            count + " · " + ReelTime.format(from, fps: fps, frames: true) + " → "
+            + ReelTime.format(to, fps: fps, frames: true)
+        let gains = gainedTransitions(of: clips, before: before, after: after)
+        return ([summary] + gains.map(gainLine)).joined(separator: "\n")
+    }
+
     private func syncReadout() {
         guard let project = document?.editedProject else {
             durationLabel.stringValue = ""
             return
         }
-        let (before, after) = Self.lengths(
+        durationLabel.stringValue = Self.readout(
             of: clips, rate: rate, keepPitch: keepPitch, in: project)
-        let fps = project.snapshot.canvas.fps
-        let count = clips.count == 1 ? "1 clip" : "\(clips.count) clips"
-        durationLabel.stringValue =
-            count + " · " + ReelTime.format(before, fps: fps, frames: true) + " → "
-            + ReelTime.format(after, fps: fps, frames: true)
     }
 
     // MARK: - Controls

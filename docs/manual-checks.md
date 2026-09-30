@@ -198,9 +198,9 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Source:** #50; #48.
 
 **CH-3 — The Speed sheet's hint**
-- **Do:** Select clips with a gap and an overlap between them; Clip ▸ Speed…; set a speed that one clip refuses.
-- **Expect:** the hint (gaps, allowed overlaps with a possible dissolve, a refused clip left unchanged) wraps readably.
-- **Source:** #48.
+- **Do:** Select clips with a gap and an overlap between them; Clip ▸ Speed…; set a speed that one clip refuses. Then set ×0.5 on a clip with a neighbour just after it.
+- **Expect:** the hint (gaps, a clip that gains a transition — named below — and a refused clip left unchanged) wraps readably; a line under the lengths names the neighbour and its transition's length, and the sheet grows to show every line unclipped.
+- **Source:** #48, #109.
 
 ## Sound and export
 
