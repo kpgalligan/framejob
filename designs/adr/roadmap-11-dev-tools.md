@@ -50,12 +50,12 @@ Two needs, one instrument: an agent should be able to look at the running app's 
 - **The spike's W4a–c depend on the display scale** (at scale 1 the overlay's core holds no translucent pixels and they pass), so the probe places its windows on a scale-2 screen and skips W4a–c by name without one.
 - **The catalog has been captured on one host**: a Dark system, scale 1, one external display. On it, `-RCDevAppearance light` differs from a forced-aqua launch only in the timeline's alternate lanes and scroller (97 786 px); which a real Light host matches is unmeasured (#139). The demo's Video track sits below the timeline's visible 300 pt in every editor capture.
 - **The offscreen harness is kept** for byte-identical proofs of states a package can describe; its preview well is also the canvas background.
+- **`perform_menu_item`'s settle is kept, though nothing known needs it** (owner's decision, 2026-09-30, #135). The answer waits for five agreeing reads of the sheet, the modal window and the visible windows (20 ms apart, at most 3 s) so a sheet that arrives after the action returns is in it. `v2_menu.py` L1 reaches the one known late sheet (the reverse-render progress sheet) and passes with the settle removed too, because that sheet is queued before the answer's own main hop. So no row fails without the settle: it is an untested safety margin of about 0.1 s per call, in the dev tools only (Distribution has none, spec §11 V-1).
 
 ## Open items
 
 - `recording_proof.py`'s microphone rows, failed on both builds with a Bluetooth input, owed a rerun with a wired or built-in input: #57 (V2a's figures added as a comment).
 - Re-run the capture spike: three bare `RunLoop.main.run` waits, and I rows against the grown inventory: #132.
-- The late-sheet row (`v2_menu.py` L1) exists, but its mutant clause does not hold: a settle removed still passes it: #135.
 - The catalog on a Light host and a second machine, and a Media-tab screen: #139.
 - `snapshot_ui` was the instrument for #131 (relink on open), which is not this road map's.
 
