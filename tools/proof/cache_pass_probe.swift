@@ -6,7 +6,7 @@
 // `main.swift`, module `Reelcut`, against `libreelcut_core.a` — the swiftc
 // line `peaks_probe.py` uses. One scenario per process:
 //
-//   cache_pass_probe <request.json> <G0|G1|G2|G2c|G3|S1|R1|R2|R3>
+//   cache_pass_probe <request.json> <G0|G1|G2|G2c|G3|S1|R1|R2|R3|W1>
 //
 // The request names `media` (a copy of tools/proof/media) and `work` (this
 // run's directory). The answer is one JSON object on stdout, `{"rows": [...]}`,
@@ -440,6 +440,35 @@ func retrySuperseded() {
         "a toneA copy asked for 4 s in: valid waveform \(seconds(landed)) later")
 }
 
+// MARK: - W1 — the bounded wait cancels its sleeper (issue batch B29, #178.6)
+
+/// A previous pass that ends in 0.3 s, waited for BOUNDED: the wait returns
+/// with it, and the sleeper `awaitPass` answers ends at once rather than
+/// sleeping out `CacheLedger.waitLimit`.
+func sleeperCancelled() {
+    let previous = Task<Void, Never>.detached { _ = try? await Task.sleep(for: .seconds(0.3)) }
+    let returned = Flag()
+    let answered = Flag()
+    let sleeperEnded = Flag()
+    Task.detached {
+        let sleeper = await MediaImporter.awaitPass(previous, bounded: true)
+        returned.set()
+        guard let sleeper else { return }
+        answered.set()
+        await sleeper.value
+        sleeperEnded.set()
+    }
+    let back = waitUntil(5) { returned.isSet }
+    _ = waitUntil(5) { sleeperEnded.isSet }
+    let end: Double? = {
+        guard let r = returned.at, let e = sleeperEnded.at else { return nil }
+        return e.timeIntervalSince(r)
+    }()
+    row("W1", back != nil && answered.isSet && end.map { $0 <= 2 } == true,
+        "the wait returned \(seconds(back)) after it was asked for; "
+        + "a sleeper answered: \(answered.isSet); it ended \(seconds(end)) after the return")
+}
+
 switch scenario {
 case "G0": waveformSave(announced: false)
 case "G1": waveformSave(announced: true)
@@ -450,6 +479,7 @@ case "S1": heldPass()
 case "R1": retryLands()
 case "R2": retryEnds()
 case "R3": retrySuperseded()
+case "W1": sleeperCancelled()
 default:
     FileHandle.standardError.write(Data("unknown scenario \(scenario)\n".utf8))
     exit(2)

@@ -2252,8 +2252,9 @@ post **140/141** (5d's "no later post" row).
 
 ## The cache marker over MCP (`remaining_proof.py`)
 
-`python3 tools/proof/remaining_proof.py [port]`, **76/76** (79/79 before
-issue batch B16 rewrote 1i), against a
+`python3 tools/proof/remaining_proof.py [port]`, **80/80** (79/79 before
+issue batch B16 rewrote 1i, 76/76 until issue batch B29 gave it four
+withdrawal rows), against a
 running instance on its own port (4834 by default). It is §2a's sentence —
 "a cache already on disk is not rebuilt" — claim by claim, on a SAVED
 package, because an untitled document's temporary cache directory is
@@ -2304,10 +2305,12 @@ then `relink_media` to a copy of `A`, which the relink RE-PROBES (spec §11
 #63) — the record says `has_audio` false with `A`'s duration, and
 `detect_silence` measures no clip (`clips: []`) with nothing pending rather
 than measuring the old file; relinked back, the `.bin` is byte-identical, both
-markers agree, and nothing is pending. The old `.bin`'s withdrawal, which 1i
-used to watch through a record that kept `has_audio`, has no MCP row since
-B16 (a file replaced in place keeps its record, and no tool replaces one):
-`remaining_probe.py`'s 5e is its one row. The first run of 1g scored a copy with NO media green — `project.json` is
+markers agree, and nothing is pending. Since B29 (#180.1) a pass for a media
+with no audio withdraws what the old file left, and 1i watches it again: `AV`'s
+speech `.bin` is there before the relink, and after it `AV`'s peaks `.bin` and
+marker and its speech `.bin` and marker are each GONE inside the 10 s cap and
+all four stay ABSENT across a 3 s sample; the timeline's notification is
+`remaining_probe.py`'s 5e. The first run of 1g scored a copy with NO media green — `project.json` is
 written only by a save — so 1g saves first and asserts both copies list the
 media; the check is kept.
 
@@ -2326,8 +2329,10 @@ for. The peaks head check deleted **75/79** — 1b through the `.bin`'s inode,
 1c's sampled peaks claim, 1g and 1h; the review of the first landing had
 noted no mutant covered that check. `clearPeaks` back to marker-only
 **76/79** — 1i's three: the `.bin` gone, absent across the window, and the
-detector reporting `AV` pending; those three rows went with B16's 1i, so that
-mutant is now caught by `remaining_probe.py`'s 5e alone. It opens THREE documents; relaunch between
+detector reporting `AV` pending; those three rows went with B16's 1i, and that
+mutant has not been run against B29's 1i. The two no-audio arms put back to
+their HEAD lines (B29's mutant) **77/80** — 1i's peaks pair gone, speech pair
+gone, and all four absent across the window. It opens THREE documents; relaunch between
 full runs. Phases 2, 3, 3-silence and 5, whose fixtures read the peaks path,
 were re-run against the same binary and still score 85, 121, 8 and 88.
 
@@ -8120,7 +8125,7 @@ instrument failure is a scored FAIL, exit 1.
 
 | Runner | caught / survived / not performed |
 |---|---|
-| `assistant_lane_proof.py`, `assistant_tab_proof.py`, `assistant_helper_proof.py`, `assistant_prompt_proof.py`, `assistant_session_proof.py`, `spend_proof.py`, `budget_proof.py`, `prices_proof.py`, `prices_crosscheck.py`, `makefile_env_proof.py`, `export_cancel_proof.py`, `video_configuration_proof.py`, `speed_sheet_probe.py`, `text_break_proof.py`, `name_field_proof.py` (`--baseline`, B23), `obscure_handles_probe.py` (`--baseline` and `--mutant`, B25), `cache_pass_probe.py` (`--mutant`, B14) and `assistant_compaction_proof.py` (`--mutant`, B26) | 1 / 0 / 2 |
+| `assistant_lane_proof.py`, `assistant_tab_proof.py`, `assistant_helper_proof.py`, `assistant_prompt_proof.py`, `assistant_session_proof.py`, `spend_proof.py`, `budget_proof.py`, `prices_proof.py`, `prices_crosscheck.py`, `makefile_env_proof.py`, `export_cancel_proof.py`, `video_configuration_proof.py`, `speed_sheet_probe.py`, `text_break_proof.py`, `name_field_proof.py` (`--baseline`, B23), `obscure_handles_probe.py` (`--baseline` and `--mutant`, B25), `cache_pass_probe.py` (`--mutant`, B14), `assistant_compaction_proof.py` (`--mutant`, B26) and `relink_sheet_probe.py` (`--mutant`, B29) | 1 / 0 / 2 |
 | `spend_ui_proof.py` | 1 / 3 / 2 |
 | `graphics_proof.py`, `graphics_store_probe.py`, `words_picture_probe.py` | 0 / 1 / 2 |
 | `cloud_captions_proof.py`, `cloud_captions_probe.py` (`--mutant`, `--fake-mutant`), `recording_probe.py`, `phase9_chrome.py` — whole-suite mutants | the per-row count and a normal run's exit / 2 |
@@ -9079,3 +9084,76 @@ Run on 2026-09-30:
 | `recording_probe.py` (the whole run) | 1066/1066, exit 0, no row skipped — section 9's granted tier and section 13 RAN; P0 the MacBook Pro Microphone (built-in); P2 and P4's max peak −32.0 dBFS |
 | `recording_proof.py 4873` (own instance) | 189/189, exit 0; 2 tone rows skipped by name (the output is muted). The ffmpeg row passed (`ffmpeg version 9.0.2`) and section 3's chrome rows scored |
 | `recording_proof.fixture_part(None)` with a stub `ffmpeg` first on PATH (prints the dyld line, exits 1) | one FAIL: "ffmpeg runs (`ffmpeg -version`: exited 1: dyld: Library not loaded: libx265.215.dylib) …" |
+
+## Issue batch B29 — media caches and relink: a silent file's stale caches, the sheet's refused sentences, the pass sleeper (`remaining_proof.py` 1i, `cache_pass_probe.py` W1, `relink_sheet_probe.py`; #180 items 1–3, #178 items 6–7)
+
+- **#180.1** — a pass for a media with no audio (a relink to a silent
+  file) withdraws the old file's peaks and speech `.bin` and markers while
+  the pass is current, and posts the change (`peaks` with no `replaced`,
+  `speech` with it). `remaining_proof.py` 1i asserts the withdrawal over MCP
+  again (the section above).
+- **#180.2** — the missing-media sheet's Relink alerts each refused
+  relink's sentence, in order, after its one grouped commit and the cache
+  pass (spec §11 #63, amended). The Media tab's Relink… keeps the fold's
+  beep and CI-10 strip.
+- **#178.6** — `awaitPass` cancels its 30 s sleeper once the bounded wait
+  returns, and returns it.
+
+`relink_sheet_probe.py [--sources DIR] [--mutant NAME] [--only IDS]` builds
+`relink_sheet_probe.swift` over `--sources` (`cache_pass_probe.py`'s swiftc
+line) and runs it once, killed at a 120 s wall, over copies of
+`media/toneA.m4a`, `toneB.m4a` and `A.mov` under
+`work/relink-sheet/<tree|mutant-NAME>/`. The fixture is an untitled
+`ProjectDocument` with three video media whose `path` names no file and
+whose `bookmark` is nil, in a window whose content is a bare host view
+controller. Exits follow rule R, as `cache_pass_probe.py`'s.
+
+| Row | Passes when |
+|---|---|
+| B0 | the probe builds |
+| C1 | CONTROL, run first: `relinkMedia` with no flag (the Media tab's door) of the first media to toneA posts exactly one `projectDocumentDidRefuse` with that relink's own refusal sentence, and no sheet attaches within 3 s |
+| S0 | CONTROL: `missingMedia` is 3 (the detail prints each `mediaURL(for:)`) |
+| S1 | after `chose` toneA, toneB and A.mov and a `performClick` on the sheet's Relink, the third media's path is the A.mov copy's within 20 s and the other two are unchanged; after the alerts the undo action is "Relink Media", and one undo restores the third's path and leaves `canUndo` false |
+| S2 | an alert sheet attaches holding the first media's sentence; after `endSheet` a second holding the second's; after that none within 2 s |
+| S3 | when the first alert attached, the project already held the third media's new path |
+| S4 | after S1's undo, a second sheet chooses a garbage `.png` (ImageIO refuses it; no ffmpeg question) for the first media, toneA for the second and A.mov for the third: an alert holding "Could not read unreadable.png.", held until the commit lands and 0.5 s more, then after `endSheet` a second holding the second media's sentence, none after that within 2 s, and the third media relinked |
+
+`cache_pass_probe.py`'s **W1**: a previous pass that ends in 0.3 s, waited
+for bounded through `MediaImporter.awaitPass`; the wait returns within 5 s,
+a sleeper is answered, and it ends within 2 s of the return.
+
+| `--mutant` | Edit | Result |
+|---|---|---|
+| `relink_sheet_probe.py --mutant sheet-silent` | `applyClicked` calls `document.relinkMedia(choices)` | S2 FAIL ("alert 1 false … texts []"), caught, exit 1 |
+| `relink_sheet_probe.py --mutant unreadable-at-once` | the sheet's unreadable file `present(error)`ed at once instead of held for the chain | S4 FAIL ("alerts 1 … alert 2 holds media 3's sentence false"), caught, exit 1 |
+| `cache_pass_probe.py --mutant no-cancel-sleeper` | `sleeper?.cancel()` → `_ = sleeper` | W1 FAIL ("a sleeper answered: true; it ended never after the return"), caught, exit 1 |
+| by hand: the two no-audio arms of `peaks` and `speech` put back to their HEAD lines, the app built in a `tree_copy` copy and launched on 4852 | `guard media.hasAudio, media.duration > 0 else { return true }` / `… else { return }` | `remaining_proof.py 4852`: 77/80, exit 1 — 1i's peaks pair GONE, speech pair GONE, and all four ABSENT ("across 1 samples … peaks.bin: None → (…)") |
+
+**Measured while building it**: `present(_:)` called once per refusal,
+back to back, shows ONE alert. AppKit builds the second error alert and
+never attaches it while the first is up, nor after the first ends
+(`relink_sheet_probe.py` on that tree: 5/6, S2 "alert 2 false"). So each
+next alert is asked for from the last one's `didPresent` callback
+(`presentRelinkRefusals` in `ProjectDocument+Import.swift`). The sheet's
+unreadable-file errors go through the same chain, ahead of the refusals: one
+presented at once was still up when the chain asked for its first alert, and
+that alert was dropped (the `unreadable-at-once` mutant). An S4 that ended
+the first alert at once scored that mutant as SURVIVED, since the alert was
+gone before the commit, so S4 holds it as a person would.
+
+Run on 2026-09-30:
+
+| Command | Answer |
+|---|---|
+| `relink_sheet_probe.py` | 7/7, exit 0 — S1 "relinked to the A.mov copy 0.31 s … undo action \"Relink Media\" … canUndo after: false"; S2 both alerts, "a third within 2 s: false"; S4 "alerts 2; alert 1 holds the unreadable file's error true; alert 2 holds media 3's sentence true" |
+| `cache_pass_probe.py` | 12/12, exit 0 — W1 "the wait returned 0.32 s … it ended 0.00 s after the return" |
+| `remaining_probe.py` on HEAD's `app/Sources` and on the tree | 170/170 and 170/170, exit 0, row for row the same |
+| `remaining_proof.py 4851` (own instance) | 80/80, exit 0, the parity grep empty |
+| `relink_proof.py 4853` (own instance) | 22/22, exit 0 |
+
+```sh
+python3 tools/proof/relink_sheet_probe.py                             # 7/7, exit 0
+python3 tools/proof/relink_sheet_probe.py --mutant sheet-silent       # S2 FAIL, exit 1
+python3 tools/proof/relink_sheet_probe.py --mutant unreadable-at-once # S4 FAIL, exit 1
+python3 tools/proof/cache_pass_probe.py --mutant no-cancel-sleeper    # W1 FAIL, exit 1
+```

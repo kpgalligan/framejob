@@ -106,11 +106,13 @@ in the order the remaining document argues it:
     before the relink, now measures no clip (`clips: []`) and has nothing
     pending, rather than measuring the old file's audio; relinked back, the
     `.bin` is byte-identical, both markers agree, and nothing is pending.
-    The old `.bin`'s withdrawal, which this row used to watch through a
-    record that kept `has_audio` after a relink, is no longer reachable
-    over MCP (a file replaced in place keeps its record, and no tool
-    replaces one); it and the timeline's notification are
-    `remaining_probe.py`'s 5e, which counts the post.
+    Since issue batch B29 (#180.1) a pass for a media with no audio
+    withdraws what the old file left, and 1i watches it again: AV's speech
+    `.bin` is there before the relink, and after it AV's peaks `.bin` and
+    marker and its speech `.bin` and marker are each GONE inside the 10 s
+    cap and all four stay ABSENT across a 3 s sample. The timeline's
+    notification of the withdrawal is `remaining_probe.py`'s 5e, which
+    counts the post for a file replaced in place.
 
 **One thing the first run of 1g taught, kept as a check**: the passes
 write the cache straight to disk but `project.json` is written only by a
@@ -168,9 +170,15 @@ takes `remaining_probe.py`'s 5e (**139/141** there). No survivors then.
 
 Since spec §11 #63 (issue batch B16) a relink re-probes, and 1i's three
 rows above were rewritten; the scores in the last two paragraphs are
-historical, against the 79 checks this file had. `clearPeaks` back to
-marker-only now SURVIVES this file and is caught by `remaining_probe.py`'s
-5e alone (tools/proof/README.md says the same).
+historical, against the 79 checks this file had. Issue batch B29 (#180.1)
+gave 1i four withdrawal rows back, and the file has **80** checks: 80/80
+on the tree's app, and the two no-audio arms put back to their HEAD lines
+(`guard media.hasAudio, media.duration > 0 else { return true }` /
+`… else { return }`, the app built in a `tree_copy` copy) score **77/80**,
+exit 1 — the peaks pair GONE, the speech pair GONE, and all four ABSENT
+across the window (`peaks.bin` present at the first sample). `clearPeaks`
+back to marker-only was not run against the 80 (tools/proof/README.md says
+the same).
 
 Nothing here decodes a picture and no `ffmpeg` runs at proof time. It opens
 THREE documents in the instance (one `new_project`, two `open_project`);
@@ -403,6 +411,12 @@ class Session:
 
     def peaks_marker(self, media, package=None):
         return os.path.join(package or self.path, "cache", "peaks", f"{media}.complete.json")
+
+    def speech_bin(self, media, package=None):
+        return os.path.join(package or self.path, "cache", "speech", f"{media}.bin")
+
+    def speech_marker(self, media, package=None):
+        return os.path.join(package or self.path, "cache", "speech", f"{media}.complete.json")
 
     def four(self, media, package=None):
         return {
@@ -824,6 +838,8 @@ def part_1i(s):
     av_file = session.media_rows()[av]["path"]
     bin_bytes = read_bytes(session.peaks_bin(av))
     check(bin_bytes is not None, "AV's `.bin` is there before the relink (the thing withdrawn)")
+    check(wait_until(lambda: os.path.exists(session.speech_bin(av)), MARKER_SECONDS) is not None,
+          "AV's speech `.bin` is there before the relink (the other thing withdrawn)")
     # A clip on AV, so `detect_silence` has something to measure, and one
     # answer BEFORE the relink so the pending claim below is a change and
     # not a state the detector was in already.
@@ -846,6 +862,24 @@ def part_1i(s):
                      == os.stat(a_for_av).st_size, REBUILD_SECONDS) is not None,
           "the thumbs marker is the video-only copy's — the task ran both halves, thumbs "
           "first, so the peaks half below has had its turn")
+    # #180.1: a pass for a media with no audio withdraws what the old file
+    # left, peaks and speech alike, rather than leaving it on disk.
+    withdrawn = {
+        "peaks.bin": session.peaks_bin(av), "peaks marker": session.peaks_marker(av),
+        "speech.bin": session.speech_bin(av), "speech marker": session.speech_marker(av),
+    }
+    check(wait_until(lambda: not os.path.exists(withdrawn["peaks.bin"])
+                     and not os.path.exists(withdrawn["peaks marker"]),
+                     REBUILD_SECONDS) is not None,
+          f"AV's peaks `.bin` and its marker are GONE inside the {REBUILD_SECONDS:.0f} s cap")
+    check(wait_until(lambda: not os.path.exists(withdrawn["speech.bin"])
+                     and not os.path.exists(withdrawn["speech marker"]),
+                     REBUILD_SECONDS) is not None,
+          f"AV's speech `.bin` and its marker are GONE inside the {REBUILD_SECONDS:.0f} s cap")
+    unmoved, samples, offender = sample_unmoved(
+        withdrawn, {name: None for name in withdrawn}, QUIET_SECONDS)
+    check(unmoved, f"across {samples} samples over {QUIET_SECONDS:.0f} s, all four stayed "
+          f"ABSENT{': ' + offender if offender else ''}")
     after = session.op("detect_silence", clips=[clip])
     check(after.get("clips") == [] and "pending_peaks" not in after,
           "`detect_silence` now measures no clip — AV has no audio to be quiet — and has "
@@ -866,11 +900,10 @@ def part_1i(s):
         REBUILD_SECONDS)
     check(settled is not None,
           "and `detect_silence` answers from the rebuilt peaks — nothing pending")
-    # What a tool CANNOT see: the old `.bin`'s withdrawal (a relink now
-    # re-probes, so the record no longer keeps an audio flag its file lacks)
-    # and that the timeline was told of it — a notification inside the
-    # process that `render_frame` never draws and no tool reads. Both are
-    # `remaining_probe.py`'s 5e, which counts the post.
+    # What a tool CANNOT see: that the timeline was told of the withdrawal
+    # above — a notification inside the process that `render_frame` never
+    # draws and no tool reads. It is `remaining_probe.py`'s 5e, which counts
+    # the post for a file replaced in place.
 
 
 def main():

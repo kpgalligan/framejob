@@ -73,23 +73,37 @@ extension ProjectDocument {
     /// core takes the file's duration, size, rate and flags from its probe,
     /// refuses a file of another kind in its own sentence, and holds a clip
     /// that runs past a shorter file's end to it.
-    func relinkMedia(_ choices: [(media: UInt32, url: URL)]) {
-        relinkNext(choices, index: 0, ops: [])
+    ///
+    /// `alertingRefusals` is the sheet's (#180): #88's fold answers a list
+    /// that applied with no refusal, so the ops are tried first on the
+    /// project as it stands, and after the commit and the cache pass each
+    /// refused sentence is presented, verbatim and in order, after each
+    /// unreadable file's error, which the sheet holds for the same chain.
+    /// The Media tab passes one op and keeps the default: the fold's beep
+    /// and CI-10 strip, and an unreadable file presented at once.
+    func relinkMedia(_ choices: [(media: UInt32, url: URL)], alertingRefusals: Bool = false) {
+        relinkNext(choices, index: 0, ops: [], unreadable: [], alertingRefusals: alertingRefusals)
     }
 
-    private func relinkNext(_ choices: [(media: UInt32, url: URL)], index: Int, ops: [ReelOp]) {
+    private func relinkNext(
+        _ choices: [(media: UInt32, url: URL)], index: Int, ops: [ReelOp],
+        unreadable: [any Error], alertingRefusals: Bool
+    ) {
         guard index < choices.count else {
-            guard !ops.isEmpty else { return }
+            guard !ops.isEmpty else { return presentRelinkRefusals(unreadable) }
+            let refusals = alertingRefusals ? relinkRefusals(ops) : []
             // The probe's completion is not an AppKit event: the grouped
             // entry point is mandatory (app/CLAUDE.md's undo pitfall).
             performGroupedEdit("Relink Media", ops)
             generateCaches()
+            presentRelinkRefusals(unreadable + refusals.map { RelinkRefusalAlert(refusal: $0) })
             return
         }
         let choice = choices[index]
         MediaImporter.probe(url: choice.url) { [weak self] result in
             guard let self = self else { return }
             var collected = ops
+            var failed = unreadable
             switch result {
             case .success(let descriptor):
                 collected.append(
@@ -97,10 +111,69 @@ extension ProjectDocument {
                         media: choice.media, path: descriptor.path,
                         bookmark: descriptor.bookmark, probe: descriptor))
             case .failure(let error):
-                // One unreadable file must not lose the rest of the sheet.
-                self.present(error)
+                // One unreadable file must not lose the rest of the sheet;
+                // the sheet's is held for the one-at-a-time chain, since an
+                // error sheet asked for while this one is up is dropped.
+                if alertingRefusals { failed.append(error) } else { self.present(error) }
             }
-            self.relinkNext(choices, index: index + 1, ops: collected)
+            self.relinkNext(
+                choices, index: index + 1, ops: collected, unreadable: failed,
+                alertingRefusals: alertingRefusals)
         }
+    }
+
+    /// Every refusal `ops` would meet, in order: walked over `project` as
+    /// `ReelProject.applying(_:)` walks a list, each op on the last applied
+    /// result. A throw ends the walk; the commit presents it.
+    private func relinkRefusals(_ ops: [ReelOp]) -> [ReelRefusal] {
+        var current = project
+        var refusals: [ReelRefusal] = []
+        for op in ops {
+            guard let edit = try? current.applying(op) else { break }
+            switch edit {
+            case .applied(let next): current = next
+            case .identity: break
+            case .refused(let refusal): refusals.append(refusal)
+            }
+        }
+        return refusals
+    }
+
+    /// Each alert (an unreadable file's error or a refusal), in order, one at
+    /// a time: AppKit drops an error sheet asked for while another is
+    /// attached (measured, `relink_sheet_probe.py` S2 and S4), so the next is
+    /// asked for when the last ends. With no window, `present(_:)` is
+    /// app-modal and so sequential.
+    private func presentRelinkRefusals(_ refusals: [any Error]) {
+        guard let alert = refusals.first else { return }
+        let rest = Array(refusals.dropFirst())
+        guard let window = windowForSheet else {
+            present(alert)
+            return presentRelinkRefusals(rest)
+        }
+        let context = Unmanaged.passRetained(RelinkRefusalsLeft(rest)).toOpaque()
+        presentError(alert, modalFor: window, delegate: self,
+                     didPresent: #selector(relinkRefusalDidEnd(_:contextInfo:)),
+                     contextInfo: context)
+    }
+
+    @objc private func relinkRefusalDidEnd(
+        _ didRecover: Bool, contextInfo: UnsafeMutableRawPointer?
+    ) {
+        guard let contextInfo else { return }
+        presentRelinkRefusals(Unmanaged<RelinkRefusalsLeft>.fromOpaque(contextInfo)
+            .takeRetainedValue().refusals)
+    }
+
+    /// The alerts still to show, carried through `contextInfo`.
+    private final class RelinkRefusalsLeft {
+        let refusals: [any Error]
+        init(_ refusals: [any Error]) { self.refusals = refusals }
+    }
+
+    /// One refused relink as an alert: the core's sentence, verbatim.
+    struct RelinkRefusalAlert: LocalizedError {
+        let refusal: ReelRefusal
+        var errorDescription: String? { refusal.reason }
     }
 }

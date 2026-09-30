@@ -34,7 +34,8 @@ extension MediaImporter {
         }
     }
 
-    /// One pass per (cache directory, media id) at a time, and no
+    /// One CURRENT pass per (cache directory, media id): a superseded pass
+    /// may still be finishing beside it, writing nothing more. And no
     /// publication while a save of the package is in flight.
     ///
     /// **Order.** Each pass carries the URL the media resolved to when it
@@ -197,6 +198,24 @@ extension MediaImporter {
             let live = began.filter { now.timeIntervalSince($0.value) < Self.saveLimit }
             saves[directory] = live.isEmpty ? nil : live
             return live.values.min().map { $0.addingTimeInterval(Self.saveLimit) }
+        }
+    }
+
+    /// Resumes its continuation exactly once, whichever caller is first.
+    final class ResumeOnce: @unchecked Sendable {
+        private let lock = NSLock()
+        private var continuation: CheckedContinuation<Void, Never>?
+
+        init(_ continuation: CheckedContinuation<Void, Never>) {
+            self.continuation = continuation
+        }
+
+        func resume() {
+            lock.lock()
+            let pending = continuation
+            continuation = nil
+            lock.unlock()
+            pending?.resume()
         }
     }
 }

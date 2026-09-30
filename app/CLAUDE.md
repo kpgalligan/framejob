@@ -160,7 +160,11 @@ detail there.
   tab's Relink… and the missing-media sheet's body (`relinkMedia(_:)`: each
   file probed through `MediaImporter.probe`, one grouped "Relink Media" edit
   carrying each descriptor as `relink_media`'s `probe`, spec §11 #63, then
-  `generateCaches()`). `+Graphics`
+  `generateCaches()`; the missing-media sheet's door then alerts each
+  unreadable file and each refused sentence (#180), one alert sheet at a
+  time, each asked for when the last ends — `presentRelinkRefusals`, since
+  AppKit drops an error sheet asked for while another is attached).
+  `+Graphics`
   is the document's side of the package's `graphics/`:
   `startGraphicStore()`, run from `makeWindowControllers()` and seeding an
   untitled document's root from `autosavedContentsFileURL/graphics`, and
@@ -193,7 +197,8 @@ detail there.
   selected-track decode, valid PCM coverage and a usable record-sized
   Float32 payload; legacy or malformed peaks are unavailable until rebuilt.
   A stale cache is deleted
-  first and a withdrawn peaks `.bin` is POSTED at once; passes for one file
+  first and a withdrawn peaks `.bin` is POSTED at once, and a media with no
+  audio withdraws its peaks and voice files the same way (#180); passes for one file
   run one at a time in call order through `CacheLedger`
   (`MediaCacheLedger.swift`, an `NSCondition`, not an actor); a pass asked for
   another file cancels the earlier ones, which write nothing more and are

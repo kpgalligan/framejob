@@ -128,8 +128,8 @@ final class RelinkSheetController: NSViewController {
 
     /// Records one choice and offers the rest of the folder to the entries
     /// still unmatched. Only a file that exists AND is not already spoken for
-    /// is taken.
-    private func chose(_ url: URL, for media: UInt32) {
+    /// is taken. Internal so a probe chooses without the Locate… panel.
+    func chose(_ url: URL, for media: UInt32) {
         replacements[media] = url
         let folder = url.deletingLastPathComponent()
         for entry in missing where entry.id != media && replacements[entry.id] == nil {
@@ -156,8 +156,8 @@ final class RelinkSheetController: NSViewController {
     /// cache pass follows — a different file rebuilds, the same file moved
     /// elsewhere is skipped (the stamp has no path), and so is every other
     /// media whose marker still matches. A file of another kind is refused
-    /// in the core's sentence, which the grouped edit drops when another
-    /// relink in it applied (#88's fold).
+    /// in the core's sentence, and each refused sentence is alerted after
+    /// the grouped edit, in order, even when another relink applied (#180).
     @objc private func applyClicked(_ sender: Any?) {
         let replacements = self.replacements
         let document = self.document
@@ -167,7 +167,7 @@ final class RelinkSheetController: NSViewController {
             guard let url = replacements[id] else { return nil }
             return (media: id, url: url)
         }
-        document.relinkMedia(choices)
+        document.relinkMedia(choices, alertingRefusals: true)
     }
 }
 

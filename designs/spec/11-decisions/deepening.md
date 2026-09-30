@@ -373,8 +373,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   kept. Stills keep `at` (D7-3). The overlap rule is not re-checked
   (D7-3): a shortened clip may hold a transition longer than half its
   length, and the next edit on that track refuses until it is fixed; that
-  risk is accepted. The missing-media sheet's single grouped edit drops a
-  refused relink's sentence when another relink applied (#88's fold). No
+  risk is accepted. The missing-media sheet alerts each refused relink's
+  sentence after its one grouped edit, #88's fold unchanged (#180). No
   persisted field changes; the format stays 10.
 - **#174 — One frame is the grid's own first frame at every rate, and the
   handle form counts grid frames.** `Project::frame` is `time::one_frame`,

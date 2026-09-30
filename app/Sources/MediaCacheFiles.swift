@@ -39,7 +39,8 @@ import UniformTypeIdentifiers
 /// Posted on the main thread when a media file's cache — its filmstrip
 /// thumbnails or its waveform peaks — has landed on disk and the timeline
 /// can now draw it, or, for peaks, has been WITHDRAWN: a rebuild removes
-/// the old `.bin` at its head and posts at once, so a `peaks` post means
+/// the old `.bin` at its head and posts at once, as does a pass for a media
+/// that no longer has audio (#180), so a `peaks` post means
 /// "re-read", and the re-read may find nothing until the pass lands. That
 /// is the point — readers consult the marker now, and withdrawing the old
 /// file also invalidates any memoized waveform until the pass publishes a
@@ -52,9 +53,9 @@ import UniformTypeIdentifiers
 /// `thumbs` for those, so an observer that never heard of the flag behaves
 /// exactly as it did; the timeline reads it to drop the decoded tiles it is
 /// holding, which are the old film's. The voice cache's withdrawal post
-/// (`MediaImporter.speech`, kind `speech`) is the flag's second carrier: it,
-/// too, opens a pass that replaces a file already on disk. `peaks` posts
-/// without it.
+/// (`MediaImporter.speech`, kind `speech`, at a stale head or for a media
+/// with no audio left) is the flag's second carrier: it, too, opens a pass
+/// that replaces a file already on disk. `peaks` posts without it.
 ///
 /// Thumbnails post repeatedly as they accumulate, so an observer must be
 /// cheap: mark the lane dirty and redraw, never rebuild the timeline.
@@ -74,8 +75,8 @@ extension MediaImporter {
     static let transcriptsKind = "transcripts"
     /// Present (and `true`) only on the first post from a pass that replaced
     /// a file that was on disk — a `thumbs` rebuild, or the `speech`
-    /// withdrawal at `MediaImporter.speech`'s head; absent otherwise, never
-    /// `false`.
+    /// withdrawal at `MediaImporter.speech`'s head, a media with no audio's
+    /// included; absent otherwise, never `false`.
     static let replacedKey = "replaced"
 
     // MARK: - Cache layout
@@ -292,7 +293,8 @@ extension MediaImporter {
     /// whether a `.bin` was REMOVED — the fact that requires a reader
     /// notification — and the pass posts at
     /// once when it was, so every memo drops the withdrawn floats and the
-    /// detector reports the media as pending rather than measuring them.
+    /// detector reports the media as pending rather than measuring them. A
+    /// media with no audio left (#180) runs it too, and posts the same way.
     static func clearPeaks(for media: UInt32, in cacheDir: URL) -> Bool {
         let manager = FileManager.default
         try? manager.removeItem(at: peaksMarkerURL(for: media, in: cacheDir))
@@ -379,7 +381,8 @@ extension MediaImporter {
     }
 
     /// `clearPeaks`' shape: the marker first, then the `.bin`. Returns
-    /// whether a `.bin` was removed.
+    /// whether a `.bin` was removed. A media with no audio left runs it too
+    /// (#180), and its post carries `replaced`, as the stale head's does.
     @discardableResult
     static func clearSpeech(for media: UInt32, in cacheDir: URL) -> Bool {
         let manager = FileManager.default

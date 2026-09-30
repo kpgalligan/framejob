@@ -182,7 +182,8 @@ enum MediaImporter {
     /// with the old package, and `thumbnails` then writes no marker
     /// (`stripHolds`, inside the same `publish`).
     ///
-    /// One pass per (cache directory, media id) at a time. Two passes for
+    /// One CURRENT pass per (cache directory, media id): a superseded pass may
+    /// still be finishing beside it, writing nothing more. Two passes for
     /// one media can be asked for in quick succession — open then relink,
     /// relink twice, import then Consolidate — and frames from two SOURCES
     /// interleaving in one `thumbs/<id>/` would be certified by the later
@@ -234,42 +235,31 @@ enum MediaImporter {
     /// passes, whichever is first: a checked continuation resumed once by
     /// whichever of two detached tasks gets there first. Not a task group or
     /// `async let`, which would wait for the child still awaiting the stuck
-    /// task, and `Task.value` ignores cancellation.
-    private static func awaitPass(_ previous: Task<Void, Never>?, bounded: Bool) async {
-        guard let previous else { return }
+    /// task, and `Task.value` ignores cancellation. The sleeper is cancelled
+    /// once the wait returns, and returned (nil when nothing slept) for a probe.
+    @discardableResult
+    static func awaitPass(
+        _ previous: Task<Void, Never>?, bounded: Bool
+    ) async -> Task<Void, Never>? {
+        guard let previous else { return nil }
         guard bounded else {
             await previous.value
-            return
+            return nil
         }
+        var sleeper: Task<Void, Never>?
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             let once = ResumeOnce(continuation)
             Task.detached {
                 await previous.value
                 once.resume()
             }
-            Task.detached {
+            sleeper = Task.detached {
                 try? await Task.sleep(for: .seconds(CacheLedger.waitLimit))
                 once.resume()
             }
         }
-    }
-
-    /// Resumes its continuation exactly once, whichever caller is first.
-    private final class ResumeOnce: @unchecked Sendable {
-        private let lock = NSLock()
-        private var continuation: CheckedContinuation<Void, Never>?
-
-        init(_ continuation: CheckedContinuation<Void, Never>) {
-            self.continuation = continuation
-        }
-
-        func resume() {
-            lock.lock()
-            let pending = continuation
-            continuation = nil
-            lock.unlock()
-            pending?.resume()
-        }
+        sleeper?.cancel()
+        return sleeper
     }
 
     /// The in-session retry of a waveform pass that published nothing: after
@@ -520,13 +510,19 @@ enum MediaImporter {
     /// writes no marker or `.bin`; `generateCaches` retries it in the same
     /// session (`retryPeaks`). Answers true when there is nothing to make or
     /// the waveform is current or published, false otherwise — a superseded
-    /// pass included.
+    /// pass included. A media with no audio (a relink to a silent file, #180)
+    /// withdraws and posts a `.bin` still on disk the same way, while current.
     @discardableResult
     static func peaks(
         for media: MediaSnapshot, url: URL, stamp: CacheStamp?, into cacheDir: URL,
         pass: CachePass? = nil
     ) async -> Bool {
-        guard media.hasAudio, media.duration > 0 else { return true }
+        guard media.hasAudio, media.duration > 0 else {
+            if pass?.isCurrent() ?? true, clearPeaks(for: media.id, in: cacheDir) {
+                postCacheChange(media: media.id, kind: peaksKind)
+            }
+            return true
+        }
         if peaksAreCurrent(for: media, stamp: stamp, in: cacheDir) { return true }
         guard pass?.isCurrent() ?? true else { return false }
         if clearPeaks(for: media.id, in: cacheDir) {
@@ -553,18 +549,25 @@ enum MediaImporter {
     ///
     /// Skipped when `speechIsCurrent` (`MediaImporter+Speech.swift`'s head
     /// check) says the marker, the model and the chunk size all still agree,
-    /// or when there is no audio at all. A stale cache is cleared and posted
-    /// at once — `clearSpeech`'s doc argues the order — and that withdrawal is
-    /// the first post of a pass replacing a `.bin` on disk, so it carries
-    /// `replaced` (§4g claim 14), the one way it differs from `peaks`'. Then
-    /// `SileroVAD.isAvailable` is asked exactly once: a model already marked
-    /// unavailable this process (a nil bundle, an earlier thrown prediction) is
-    /// not retried, so a project full of media pays for it once, not per file.
+    /// or when there is no audio at all, which while current withdraws and
+    /// posts a `.bin` left on disk as below (#180). A stale cache is cleared
+    /// and posted at once — `clearSpeech`'s doc argues the order — and that
+    /// withdrawal is the first post of a pass replacing a `.bin` on disk, so
+    /// it carries `replaced` (§4g claim 14), the one way it differs from
+    /// `peaks`'. Then `SileroVAD.isAvailable` is asked exactly once: a model
+    /// already marked unavailable this process (a nil bundle, an earlier
+    /// thrown prediction) is not retried, so a project full of media pays for
+    /// it once, not per file.
     static func speech(
         for media: MediaSnapshot, url: URL, stamp: CacheStamp?, into cacheDir: URL,
         pass: CachePass? = nil
     ) async {
-        guard media.hasAudio, media.duration > 0 else { return }
+        guard media.hasAudio, media.duration > 0 else {
+            if pass?.isCurrent() ?? true, clearSpeech(for: media.id, in: cacheDir) {
+                postCacheChange(media: media.id, kind: speechKind, replaced: true)
+            }
+            return
+        }
         guard !speechIsCurrent(for: media, stamp: stamp, in: cacheDir) else { return }
         guard pass?.isCurrent() ?? true else { return }
         if clearSpeech(for: media.id, in: cacheDir) {

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Issue batch B14 (#115, #169): the media cache passes' ledger, the save
-gate and the peaks retry, measured through the app's own sources.
+gate and the peaks retry, measured through the app's own sources; issue
+batch B29 (#178.6) added W1.
 
     python3 tools/proof/cache_pass_probe.py [--sources DIR] [--mutant NAME] [--only IDS]
 
@@ -24,6 +25,9 @@ Rows:
   R1   a waveform pass that failed is retried in the session and lands.
   R2   a pass whose retries all fail ends (no retry loop).
   R3   a pass for another file cancels a pass waiting to retry.
+  W1   a bounded wait (`awaitPass`) for a previous pass that ends in 0.3 s
+       returns within 5 s and its sleeper ends within 2 s of the return,
+       not after `CacheLedger.waitLimit` (#178.6).
 
 Exit (rule R): a plain run exits 0 iff every row passed and 1 when a row
 failed; a build failure is B0's FAIL there. A `--mutant` run exits 1 when
@@ -44,9 +48,9 @@ ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/cache-pass"
 MEDIA = ROOT / "tools/proof/media"
 NEEDED = ("toneA.m4a", "A.mov", "AV.mov")
-ROWS = ["B0", "G0", "G1", "G2", "G2c", "G3", "S1a", "S1b", "R1", "R2", "R3"]
+ROWS = ["B0", "G0", "G1", "G2", "G2c", "G3", "S1a", "S1b", "R1", "R2", "R3", "W1"]
 SCENARIO = {"G0": "G0", "G1": "G1", "G2": "G2", "G2c": "G2c", "G3": "G3",
-            "S1a": "S1", "S1b": "S1", "R1": "R1", "R2": "R2", "R3": "R3"}
+            "S1a": "S1", "S1b": "S1", "R1": "R1", "R2": "R2", "R3": "R3", "W1": "W1"}
 SCENARIO_WALL = 300
 
 # name: (the rows it must fail, [(file, before, after), ...])
@@ -78,6 +82,8 @@ MUTANTS = {
          "for delay in repeatElement(peaksRetryDelays[0], count: Int.max) {")]),
     "no-cancel": (["R3"], [
         ("MediaCacheLedger.swift", "previous.cancel()", "_ = previous")]),
+    "no-cancel-sleeper": (["W1"], [
+        ("MediaImporter.swift", "sleeper?.cancel()", "_ = sleeper")]),
 }
 
 
