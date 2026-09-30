@@ -7113,7 +7113,10 @@ Measured 2026-09-27: `--probe` 11/11; the default run 15/15 with 8 SKIP;
 `--wrong` fails E1–E6 (exit 1); `--cap 0.0001` prints the WARNING first,
 fails E1–E6 `cap:` and the stand-in logs 0 POSTs (exit 1); `--live` with no
 `--cap` exits 2 having launched nothing; the `bare-send` mutant's S2 FAILS
-(exit 1). The live run is owed (#157).
+(exit 1). The first live run (#157, 2026-09-30 at f5ec6e9, `--live --cap 20`,
+the key from `.secrets/`) scored 26/26 for $0.5272 settled: E1 $0.0930, E2
+$0.0064, E3 $0.0445, E4 $0.1310, E5 $0.1894, E6 $0.0630; H's worst POST
+priced $3.1885; K read 4402 files and found the key in none.
 
 ```sh
 python3 tools/proof/assistant_prompt_proof.py --probe                   # F1–F7, M1–M4 (make test)

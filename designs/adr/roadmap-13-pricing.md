@@ -48,7 +48,6 @@ The user asked for three things: a spend budget, a price on every call the assis
 ## Open items
 
 - kpgalligan/rasterize#325 (moved from #147): Rasterize takes road map 12 §2's change and this road map's `pricing.ts` / `priceTable.ts`.
-- #157 the assistant's live evaluation with a key (`ready-for-human`).
 - #164 reconcile the app's ledger with Anthropic's Admin usage-and-cost API.
 
 ## Where to look in the original

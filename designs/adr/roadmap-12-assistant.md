@@ -53,7 +53,7 @@ The user asked for an AI agent in the editor, "designed in the same way that the
 
 ## Known limits
 
-- **Every turn has been against the stand-in**: nothing has reached api.anthropic.com, so whether a real model does the six asks right is unmeasured (#157), and end-of-turn compaction on the real API has never run (#161).
+- **The six asks have run once against the real API** (#157, 2026-09-30 at f5ec6e9, `--live --cap 20`): 26/26, E1–E6 each right by `get_project` placement, $0.5272 settled at the table's own prices. End-of-turn compaction on the real API has never run (#161).
 - **Ad-hoc signing only**: no Developer ID, notarization or quarantine; the Release app carries `get-task-allow`; Distribution does not (#145, `dist_check.py` D14).
 - **`assistant_helper_proof.py` P1 skips** on a host with bun at a fixed path (`/opt/homebrew/bin`, `/usr/local/bin`), because `build.sh`'s own `PATH` finds it there.
 - **The mid-drag row is reachable in a probe only**: no MCP tool begins a gesture; L8 measures `submit`, the session's one door.
@@ -65,10 +65,6 @@ The user asked for an AI agent in the editor, "designed in the same way that the
 - kpgalligan/rasterize#325 (moved from #147): Rasterize takes §2's change (one diff).
 - #151 Chat Settings are not offered.
 - #152 a question asked while the tab is hidden draws no attention.
-- #153 the transcript cannot be selected across entries.
-- #154 the composer is single-line.
-- #157 the live evaluation with a key (`ready-for-human`).
-- #159 the person check: the tab with a real key (`ready-for-human`).
 - #160 candidate: the Assistant in a floating window.
 - #161 end-of-turn compaction against the real API.
 
