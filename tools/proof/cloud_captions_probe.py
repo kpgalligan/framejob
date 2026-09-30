@@ -35,7 +35,8 @@ Sections, by the name after `section_`:
   and a cancel during polling issuing the DELETE, against the fake.
 * `secrets` (5i·17 + R6-9's C rows + the loopback table) — `FileStore` in a
   temporary directory, `MemoryStore` everywhere else, the resolver's order,
-  and R6-9 (a), (b) and (c) by TYPE and path string only.
+  and R6-9 (a), (b) and (c) by TYPE and path string only; and `writeAll`'s
+  0 arm and bounded EINTR retry (17·zero, 17·endless, issue batch B34).
 * `cues` (5i·19) — the fifth rule at its boundaries through the harness.
 * `extract` — the WAV's byte-identity against the BASELINE tree (W), the
   FLAC's STREAMINFO, decode and determinism (F), the fallback (FB), and
@@ -79,7 +80,17 @@ Sections, by the name after `section_`:
   flight.
 * `cache_write` (CW) — the fetched transcript's initial JSON write and
   remote DELETE independently, including an unwritable cache, marker-only
-  failure, next-run janitor, zero-word throw, and production UI/MCP warnings.
+  failure, next-run janitor, zero-word throw, and production UI/MCP warnings;
+  and #187's items 1–4 (issue batch B34): no `remote_deleted` rewrite over a
+  first write that failed (CW1), `stampWritten` and the "could not be kept"
+  sentence (CW2), a negative `audio_duration` floored at 0 (CW3), and the
+  saturating sum that stays saturated (CW4).
+* `echo` (E, issue batch B34, #187 R2·1) — a server that names the key as
+  its model and its language (E1/E2: `<redacted>` in the report, both tool
+  keys, the note, the report card and the cache header), serves it as a word
+  (E3: refused, deleted, never written), or a cache file whose id IS the key
+  (E4: never sent by the janitor) — and `poll` refusing that id before any
+  request (E5).
 * `settings_verify` — delayed loopback Verify replies against actual Settings
   actions: unchanged, changed input, removal, region, and overlapping owners.
 * `drip` (DR, issue batch B24, #80) — a reply the fake DRIPS a byte every
@@ -110,9 +121,11 @@ import os
 import re
 import shutil
 import signal
+import stat
 import struct
 import subprocess
 import sys
+import threading
 import time
 import urllib.request
 
@@ -809,7 +822,7 @@ func modeRun(_ request: [String: Any]) -> [String: Any] {
                 "media": Int(row.media), "model": row.speechModelUsed ?? "<nil>",
                 "language": row.languageCode ?? "<nil>", "seconds": row.audioSeconds,
                 "format": row.format.rawValue, "transcriptWritten": row.transcriptWritten,
-                "remoteDeleted": row.remoteDeleted,
+                "stampWritten": row.stampWritten, "remoteDeleted": row.remoteDeleted,
             ]
         },
         "cached": report.cached.map { Int($0) },
@@ -1091,6 +1104,27 @@ func modeSecrets(_ request: [String: Any]) -> [String: Any] {
         eintr["otherCalls"] = calls
         close(second)
     }
+    // #187 item 6: a writer that answers 0 (with an unrelated errno left
+    // behind), and one interrupted for ever. Neither touches a descriptor.
+    var zeroCalls = 0
+    eintr["zeroReason"] = writeAll(
+        -1, Array("zero-dummy".utf8),
+        using: { _, _, _ in
+            zeroCalls += 1
+            errno = EACCES
+            return 0
+        }) ?? "<nil>"
+    eintr["zeroCalls"] = zeroCalls
+    var endlessCalls = 0
+    eintr["endlessReason"] = writeAll(
+        -1, Array("endless-dummy".utf8),
+        using: { _, _, _ in
+            endlessCalls += 1
+            errno = endlessCalls <= 1000 ? EINTR : EACCES
+            return -1
+        }) ?? "<nil>"
+    eintr["endlessCalls"] = endlessCalls
+    eintr["retryLimit"] = writeAllRetryLimit
     try? FileManager.default.removeItem(at: scratch)
     try? FileManager.default.removeItem(at: refused)
     answer["eintr"] = eintr
@@ -2226,6 +2260,7 @@ func chromeReport(_ request: [String: Any]) -> [String: Any] {
                 languageConfidence: (row["confidence"] as? NSNumber)?.doubleValue,
                 audioSeconds: (row["seconds"] as? NSNumber)?.intValue ?? 0, format: .flac,
                 transcriptWritten: row["transcriptWritten"] as? Bool ?? true,
+                stampWritten: row["stampWritten"] as? Bool ?? true,
                 remoteDeleted: row["remoteDeleted"] as? Bool ?? true))
     }
     report.cached = (request["cached"] as? [NSNumber] ?? []).map { $0.uint32Value }
@@ -3543,6 +3578,9 @@ def section_submission(binary, sources):
         ("malformed success", {"status": 200, "body": "{}"}),
         ("invalid success id", {"status": 200,
                                 "body": '{"id":"../../bad","status":"queued"}'}),
+        # #187 R2\u00b71: an id that repeats the key is never accepted.
+        ("key-shaped success id", {"status": 200,
+                                   "body": '{"id":"proof-key","status":"queued"}'}),
     ]
     for tag, submit in ambiguous:
         run(tag, [dict({"route": "submit"}, **submit),
@@ -3775,6 +3813,22 @@ def section_secrets(binary, sources):
     check("17: and every OTHER errno is still the sentence it was, on the first answer",
           eintr.get("otherErrno") == "Permission denied" and eintr.get("otherCalls") == 1,
           f"got {eintr.get('otherErrno')!r} after {eintr.get('otherCalls')!r} calls")
+    # #187 item 6: a write of 0 bytes, and an EINTR that never stops.
+    check("17\u00b7zero: a write that answers 0 is its own sentence, at once \u2014 not the "
+          "errno an earlier call left behind, and no retry",
+          eintr.get("zeroReason") == "no bytes were written" and eintr.get("zeroCalls") == 1,
+          f"got {eintr.get('zeroReason')!r} after {eintr.get('zeroCalls')!r} calls")
+    limit = eintr.get("retryLimit")
+    check("17\u00b7endless: an EINTR that never stops is retried `writeAllRetryLimit` times, "
+          "and the next one is answered as itself",
+          isinstance(limit, int)
+          and eintr.get("endlessReason") == "Interrupted system call"
+          and eintr.get("endlessCalls") == limit + 1,
+          f"got {eintr.get('endlessReason')!r} after {eintr.get('endlessCalls')!r} calls, "
+          f"limit {limit!r}")
+    check("17\u00b7endless: CONTROL \u2014 the limit is 100, and the writer would have answered "
+          "EINTR for 1000 calls, so the bound is what stopped it",
+          limit == 100, f"got {limit!r}")
 
     credential = answer.get("credential", {})
     check("17: with BOTH holding a dummy, the STORE wins (R6-5's order, R6-9 (d))",
@@ -4483,6 +4537,7 @@ def section_cache_write(binary, sources):
     dashboard = ("Its transcript could not be saved in the project, so Reelcut cannot "
                  "retry deleting it automatically. Delete it in your AssemblyAI dashboard.")
     retry = "it will be retried at the next run with an API key."
+    kept = "could not be kept in the project for reuse"
 
     for written in (False, True):
         for deleted in (False, True):
@@ -4520,6 +4575,14 @@ def section_cache_write(binary, sources):
                       f"file={os.path.isfile(transcript)}, marker={os.path.isfile(marker)}")
                 note = str(answer.get("cloudFields", {}).get("note", ""))
                 lines = " ".join(answer.get("cloudReportLines", []))
+                check(f"CW2: {tag} reports `stampWritten` exactly when the transcript was "
+                      "written",
+                      len(uploaded) == 1 and uploaded[0].get("stampWritten") is written,
+                      f"got {uploaded!r}")
+                check(f"CW2: {tag} says the transcript was not kept for reuse exactly when "
+                      "it was not written, in both production reports",
+                      (kept in note) is (not written) and (kept in lines) is (not written),
+                      f"note={note!r}, lines={lines!r}")
                 if deleted:
                     check(f"CW: {tag} confirmed DELETE needs no cleanup warning",
                           "not confirmed deleting" not in note
@@ -4580,6 +4643,13 @@ def section_cache_write(binary, sources):
     check("CW: a marker-only failure permits the next-run janitor DELETE",
           again is not None and bool(after) and after[0]["method"] == "DELETE",
           f"error={again_error!r}, after={after!r}")
+    note = str((answer or {}).get("cloudFields", {}).get("note", ""))
+    lines = " ".join((answer or {}).get("cloudReportLines", []))
+    check("CW2: a marker-only failure reports `stampWritten` false, and both production "
+          "reports say the transcript could not be kept for reuse",
+          answer is not None and row.get("stampWritten") is False
+          and kept in note and kept in lines,
+          f"row={row!r}, note={note!r}, lines={lines!r}")
 
     cache = fresh("cw-zero-words")
     with open(os.path.join(cache, "transcripts"), "w") as handle:
@@ -4622,6 +4692,271 @@ def section_cache_write(binary, sources):
           and "media 3" not in note
           and dashboard in str(mixed.get("failure", "")),
           f"error={error!r}, lines={lines!r}, note={note!r}")
+
+    # --- CW1 (#187 item 1): the `remote_deleted` rewrite happens only over a
+    # first write that LANDED. The planted file is immutable while the first
+    # write runs, and a watcher clears the flag as soon as the fake has seen
+    # the DELETE, which it holds for 2 s: a rewrite would now land.
+    cache = fresh("cw-rewrite")
+    folder = os.path.join(cache, "transcripts")
+    os.makedirs(folder)
+    transcript = os.path.join(folder, "1.json")
+    marker = os.path.join(folder, "1.complete.json")
+    with open(transcript, "w") as handle:
+        handle.write((UNDELETED_DOCUMENT % "t_old").replace(
+            '"remote_deleted":false', '"remote_deleted":true'))
+    with open(marker, "w") as handle:
+        handle.write('{"planted":true}')
+    with open(transcript, "rb") as handle:
+        planted_transcript = handle.read()
+    with open(marker, "rb") as handle:
+        planted_marker = handle.read()
+    cleared = threading.Event()
+    stop = threading.Event()
+
+    def clear_on_delete(fake):
+        deadline = time.time() + 30          # rule H
+        while time.time() < deadline and not stop.is_set():
+            try:
+                if any(r["method"] == "DELETE" for r in fake.log()["requests"]):
+                    os.chflags(transcript, 0)
+                    cleared.set()
+                    return
+            except (OSError, ValueError):
+                pass
+            sleep(0.05)
+
+    answer, error, log = None, "the fake did not start", {"requests": []}
+    os.chflags(transcript, stat.UF_IMMUTABLE)
+    try:
+        with Fake("cw-rewrite") as fake:
+            fake.scenario(stall={"route": "delete", "seconds": 2})
+            watcher = threading.Thread(target=clear_on_delete, args=(fake,), daemon=True)
+            watcher.start()
+            answer, error, _ = run_probe(binary, "cw-rewrite", {
+                "mode": "run", "base": fake.base, "key": DUMMY_KEY, "tuning": RUN_TUNING,
+                "cache": cache, "media": media, "jobs": jobs,
+            }, timeout=300)
+            log = fake.log()
+            stop.set()
+            watcher.join(timeout=5)
+    finally:
+        stop.set()
+        os.chflags(transcript, 0)
+    row = ((answer or {}).get("report", {}).get("uploaded") or [{}])[0]
+    check("CW1: a first write that failed is reported as neither written nor stamped, and "
+          "the DELETE as confirmed",
+          answer is not None and row.get("transcriptWritten") is False
+          and row.get("stampWritten") is False and row.get("remoteDeleted") is True,
+          f"error={error!r}, row={row!r}")
+    check("CW1: CONTROL — the watcher cleared the flag once the DELETE was logged, and "
+          "the fake held that DELETE for 2 s, so a rewrite after it would have landed",
+          cleared.is_set() and any(
+              r["method"] == "DELETE" and r.get("stalled_seconds") == 2
+              for r in log["requests"]),
+          f"cleared={cleared.is_set()}, requests={log['requests']!r}")
+    with open(transcript, "rb") as handle:
+        after_transcript = handle.read()
+    with open(marker, "rb") as handle:
+        after_marker = handle.read()
+    check("CW1: and the planted file and marker are byte for byte what was there — no "
+          "`remote_deleted` rewrite over a write that never landed",
+          after_transcript == planted_transcript and after_marker == planted_marker,
+          f"file {after_transcript[:120]!r}, marker {after_marker!r}")
+
+    # --- CW3 (#187 item 3): a negative `audio_duration` is floored at 0.
+    cache = fresh("cw-negative")
+    with Fake("cw-negative") as fake:
+        fake.scenario(audio_seconds=-5)
+        answer, error, _ = run_probe(binary, "cw-negative", {
+            "mode": "run", "base": fake.base, "key": DUMMY_KEY, "tuning": RUN_TUNING,
+            "cache": cache, "media": media, "jobs": jobs,
+        }, timeout=300)
+        log = fake.log()
+    row = ((answer or {}).get("report", {}).get("uploaded") or [{}])[0]
+    header = {}
+    try:
+        with open(os.path.join(cache, "transcripts", "1.json")) as handle:
+            header = json.load(handle)
+    except (OSError, ValueError):
+        pass
+    check("CW3: a served `audio_duration` of -5 is 0 in the report, in the tool's "
+          "`audio_seconds` and in the cache header",
+          answer is not None and row.get("seconds") == 0
+          and answer.get("cloudFields", {}).get("audio_seconds") == 0
+          and header.get("audio_duration") == 0,
+          f"error={error!r}, row={row!r}, "
+          f"fields={(answer or {}).get('cloudFields', {}).get('audio_seconds')!r}, "
+          f"header={header.get('audio_duration')!r}")
+    check("CW3: CONTROL — the fake really measured the upload at -5 seconds",
+          any(r.get("measured_seconds") == -5 for r in log["requests"]),
+          f"got {[r.get('measured_seconds') for r in log['requests']]!r}")
+
+    # --- CW4 (#187 item 4): one saturating reducer, and saturation sticks.
+    big = 2 ** 63 - 1
+    with Fake("cw-saturate") as fake:
+        fake.scenario()
+        saturated, error, _ = chrome_child(binary, fake, "cw-saturate", {
+            "op": "report", "detected": False, "names": {},
+            "uploaded": [{"media": 1, "seconds": big}, {"media": 2, "seconds": big},
+                         {"media": 3, "seconds": -2 ** 63}],
+        })
+    fields = (saturated or {}).get("fields", {})
+    failure = str((saturated or {}).get("failure", ""))
+    check("CW4: seconds of Int.max, Int.max and Int.min saturate at Int.max and STAY there, "
+          "in the tool's `audio_seconds` and in the bill sentence",
+          saturated is not None and fields.get("audio_seconds") == big
+          and "(9223372036854775807 audio seconds)" in failure,
+          f"error={error!r}, audio_seconds={fields.get('audio_seconds')!r}, "
+          f"failure={failure!r}")
+
+
+# The number of rows `section_echo` scores, for its one skip.
+ECHO_ROWS = 18
+
+
+def section_echo(binary, sources):
+    print("\nE. a server string that repeats the API key: filtered, refused, or never sent "
+          "(#187, R2·1)")
+    speech = make_fixture()
+    if speech is None:
+        skip_rows(ECHO_ROWS, "`say` is not on this host, so the echo rows have no audio to send")
+        return
+    media, jobs = run_media(speech, speech)
+    media, jobs = media[:1], jobs[:1]
+    redacted = "<redacted>"
+
+    def cache_files_with_key(cache):
+        found = []
+        for base, _, names in os.walk(cache):
+            for name in names:
+                path = os.path.join(base, name)
+                with open(path, "rb") as handle:
+                    if DUMMY_KEY.encode() in handle.read():
+                        found.append(path)
+        return found
+
+    # --- E1/E2: the model and the language the SERVER names are both the key.
+    cache = fresh("echo-E1")
+    with Fake("echo-E1") as fake:
+        fake.scenario(speech_model_used=DUMMY_KEY, language_code=DUMMY_KEY)
+        answer, error, out = run_probe(binary, "echo-E1", {
+            "mode": "run", "base": fake.base, "key": DUMMY_KEY, "tuning": RUN_TUNING,
+            "cache": cache, "media": media, "jobs": jobs,
+        }, timeout=300)
+    answer = answer or {}
+    row = (answer.get("report", {}).get("uploaded") or [{}])[0]
+    fields = answer.get("cloudFields", {})
+    note = str(fields.get("note", ""))
+    lines = " ".join(answer.get("cloudReportLines", []))
+    header = {}
+    try:
+        with open(os.path.join(cache, "transcripts", "1.json")) as handle:
+            header = json.load(handle)
+    except (OSError, ValueError):
+        pass
+    check("E1/E2: CONTROL — the run completed with one upload, so every string below "
+          "was read off a completed body",
+          answer.get("ok") is True and len(answer.get("report", {}).get("uploaded") or []) == 1,
+          f"error={error!r}, ok={answer.get('ok')!r}, message={answer.get('message')!r}")
+    models = fields.get("speech_model_used") or [{}]
+    check("E1: the model the server named is `<redacted>` in the report and in the tool's "
+          "`speech_model_used`",
+          row.get("model") == redacted and models[0].get("model") == redacted,
+          f"report={row.get('model')!r}, field={models!r}")
+    check("E1: and in the tool's `note` and the report card, with the key in neither",
+          f"with {redacted}" in note and f"with {redacted}" in lines
+          and DUMMY_KEY not in note and DUMMY_KEY not in lines,
+          f"note={note!r}, lines={lines!r}")
+    check("E1: and in the cache header",
+          header.get("speech_model_used") == redacted,
+          f"got {header.get('speech_model_used')!r}")
+    detected = fields.get("language_detected") or [{}]
+    check("E2: the language the server named is `<redacted>` in the report and in the "
+          "tool's `language_detected`",
+          row.get("language") == redacted and detected[0].get("code") == redacted,
+          f"report={row.get('language')!r}, field={detected!r}")
+    check("E2: and in the report card, with the key nowhere in it",
+          f"detected {redacted}" in lines and DUMMY_KEY not in lines, f"lines={lines!r}")
+    check("E2: and in the cache header",
+          header.get("language_code") == redacted, f"got {header.get('language_code')!r}")
+    check("E1/E2: the key is in neither the probe's stdout nor its stderr, nor in any file "
+          "under the cache",
+          DUMMY_KEY not in (out or "") and not cache_files_with_key(cache),
+          f"stdout/stderr has it: {DUMMY_KEY in (out or '')}; "
+          f"files: {cache_files_with_key(cache)!r}")
+
+    # --- E3: words that repeat the key are refused, never written.
+    cache = fresh("echo-E3")
+    with Fake("echo-E3") as fake:
+        fake.scenario(words=[
+            {"text": DUMMY_KEY, "start": 600, "end": 1120, "confidence": 0.98, "speaker": None},
+            {"text": "said", "start": 1180, "end": 1600, "confidence": 0.96, "speaker": None}])
+        answer, error, out = run_probe(binary, "echo-E3", {
+            "mode": "run", "base": fake.base, "key": DUMMY_KEY, "tuning": RUN_TUNING,
+            "cache": cache, "media": media, "jobs": jobs,
+        }, timeout=300)
+        log = fake.log()
+    answer = answer or {}
+    failure = str(answer.get("cloudFailure", ""))
+    served = [t["id"] for t in log["transcripts"]]
+    deletes = [r["path"] for r in log["requests"] if r["method"] == "DELETE"]
+    check("E3: words that repeat the key fail the run, with the refusal and without the key",
+          answer.get("ok") is False
+          and "the transcript's words repeat the API key" in failure
+          and DUMMY_KEY not in failure,
+          f"error={error!r}, ok={answer.get('ok')!r}, failure={failure!r}")
+    check("E3: and no `transcripts/1.json` was written",
+          not os.path.exists(os.path.join(cache, "transcripts", "1.json")),
+          f"found {os.listdir(cache)!r}")
+    check("E3: and the refused transcript was DELETEd",
+          len(served) == 1 and any(p.endswith("/" + served[0]) for p in deletes),
+          f"served={served!r}, deletes={deletes!r}")
+    check("E3: and the key is in neither the probe's stdout nor its stderr",
+          DUMMY_KEY not in (out or ""), "found in the probe's output")
+
+    # --- E4: a cache file whose id IS the key is never put on the wire.
+    cache = fresh("echo-E4")
+    folder = os.path.join(cache, "transcripts")
+    plant_undeleted(cache, [2])
+    keyed = os.path.join(folder, "1.json")
+    with open(keyed, "w") as handle:
+        handle.write(UNDELETED_DOCUMENT % DUMMY_KEY)
+    with open(keyed, "rb") as handle:
+        planted = handle.read()
+    with Fake("echo-E4") as fake:
+        fake.scenario()
+        answer, error, out = run_probe(binary, "echo-E4", {
+            "mode": "run", "base": fake.base, "key": DUMMY_KEY, "tuning": RUN_TUNING,
+            "cache": cache, "media": [], "jobs": [],
+        }, timeout=300)
+        log = fake.log()
+    deletes = [r["path"] for r in log["requests"] if r["method"] == "DELETE"]
+    report = (answer or {}).get("report", {})
+    check("E4: no DELETE path ends in the key",
+          answer is not None and not any(p.endswith("/" + DUMMY_KEY) for p in deletes),
+          f"error={error!r}, deletes={deletes!r}")
+    check("E4: CONTROL — the janitor ran: `DELETE /v2/transcript/t_owed2` was sent",
+          "/v2/transcript/t_owed2" in deletes, f"got {deletes!r}")
+    check("E4: and media 1 is in neither janitor list",
+          1 not in (report.get("janitorDeleted") or [])
+          and 1 not in (report.get("janitorFailed") or []),
+          f"got {report!r}")
+    with open(keyed, "rb") as handle:
+        after = handle.read()
+    check("E4: and its cache file is byte for byte what was planted",
+          after == planted, f"got {after[:120]!r}")
+    check("E4: and the key is not in the probe's stdout",
+          DUMMY_KEY not in (out or ""), "found in the probe's output")
+
+    # --- E5: `poll` refuses a key-shaped id before any request.
+    answer, error, _ = run_probe(binary, "echo-E5", {
+        "mode": "client", "call": "poll", "id": DUMMY_KEY, "tuning": FAST, "steps": []},
+        timeout=60)
+    check("E5: `poll` with an id that is the key answers `malformed` and sends nothing",
+          answer is not None and answer.get("error") == "malformed"
+          and answer.get("log") == [],
+          f"error={error!r}, answer={answer!r}")
 
 
 def section_run(binary, sources):
@@ -4965,7 +5300,15 @@ def section_drip(binary, sources):
         log = fake.log()
         entry = next((row for row in log["requests"] if row["path"] == "/v2/upload"), {})
         if answer is None:
-            check("DR1: the dripped-upload run answers", False, error)
+            # All three of DR1's rows, by their own names: a run that did not
+            # answer is three failures, not one (#187's DR scoring).
+            for name in ("DR1: a reply dripped a byte every 100 ms under a 1.5 s IDLE timeout "
+                         "is never timed out — the run completes",
+                         "DR1: and the drip is what the run waited on — it took at least "
+                         "6.0 s, four idle timeouts' worth",
+                         "DR1: CONTROL — the fake really dripped the whole reply, and the "
+                         "drip itself lasted at least 6.0 s"):
+                check(name, False, f"the dripped-upload run did not answer: {error}")
         else:
             print(f"  (DR1 measured: the run took {answer.get('seconds', 0):.2f} s; the fake "
                   f"dripped {entry.get('dripped')!r} bytes over "
@@ -4995,7 +5338,11 @@ def section_drip(binary, sources):
             "cache": fresh("drip-cache-DR0"), "media": one_media, "jobs": one_job},
             timeout=300)
         if answer is None:
-            check("DR0: the stalled-upload run answers", False, error)
+            for name in ("DR0: CONTROL — the same 1.5 s idle timeout against a socket that "
+                         "says NOTHING for 12 s fails the run with the timeout's own sentence",
+                         "DR0: CONTROL — and it ended in under 8.0 s, long before the stall "
+                         "did"):
+                check(name, False, f"the stalled-upload run did not answer: {error}")
         else:
             print(f"  (DR0 measured: the run took {answer.get('seconds', 0):.2f} s)")
             check("DR0: CONTROL — the same 1.5 s idle timeout against a socket that says "
@@ -6782,7 +7129,7 @@ MUTANTS = {
         'Z12 — the poll ceiling removed'),
     "any-id-on-the-wire": (
         "AssemblyAIClient.swift",
-        "        guard Self.isPlainIdentifier(id) else {\n"
+        "        guard isSendableIdentifier(id) else {\n"
         "            note(\"refusing to DELETE an id that is not one\")\n"
         "            return .notSent\n"
         "        }\n",
@@ -6803,7 +7150,10 @@ MUTANTS = {
         "the cache file)"),
     "eintr-unwritable": (
         "SecretStore.swift",
-        "        if written < 0, errno == EINTR { continue }\n",
+        "        if errno == EINTR, interruptions < writeAllRetryLimit {\n"
+        "            interruptions += 1\n"
+        "            continue\n"
+        "        }\n",
         "",
         "the EINTR retry removed \u2014 the reader review's H\u00b73, reverted (section 17's "
         "three EINTR rows)"),
@@ -6837,6 +7187,68 @@ MUTANTS = {
         "        configuration.timeoutIntervalForRequest = tuning.requestTimeout\n"
         "        configuration.timeoutIntervalForResource = tuning.requestTimeout\n",
         "a TOTAL deadline of one idle timeout on every request (DR1; DR0 still passes)"),
+    # Issue batch B34 (#187): one mutant per fix.
+    "rewrite-without-first-write": (
+        "CloudTranscriber+Media.swift",
+        "        if deleted && transcriptWritten {\n",
+        "        if deleted {\n",
+        "the `remote_deleted` rewrite made over a first write that failed \u2014 #187 "
+        "item 1 (CW1)"),
+    "stamp-answer-dropped": (
+        "CloudTranscriber+Media.swift",
+        "                stampWritten: stampWritten,\n",
+        "                stampWritten: true,\n",
+        "a failed marker write reported as landed \u2014 #187 item 2 (CW2)"),
+    "duration-unclamped": (
+        "CloudTranscriber+Media.swift",
+        "            audioDuration: max(\n"
+        "                0, fetched.response.audioDuration ?? Int(upload.seconds.rounded(.up))),\n",
+        "            audioDuration: fetched.response.audioDuration "
+        "?? Int(upload.seconds.rounded(.up)),\n",
+        "a negative `audio_duration` kept as served \u2014 #187 item 3 (CW3)"),
+    "saturation-not-sticky": (
+        "CloudTranscriber+Report.swift",
+        "sum.addingReportingOverflow(max(0, row.audioSeconds))",
+        "sum.addingReportingOverflow(row.audioSeconds)",
+        "the per-term floor removed, so a negative term pulls a saturated sum back "
+        "down \u2014 #187 item 4 (CW4)"),
+    "zero-write-errno": (
+        "SecretStore.swift",
+        "        if written == 0 { return \"no bytes were written\" }\n",
+        "",
+        "a write of 0 bytes answered with a stale errno \u2014 #187 item 6 (17\u00b7zero)"),
+    "eintr-unbounded": (
+        "SecretStore.swift",
+        "        if errno == EINTR, interruptions < writeAllRetryLimit {\n",
+        "        if errno == EINTR {\n",
+        "the EINTR retry unbounded again \u2014 #187 item 6 (17\u00b7endless)"),
+    "model-unfiltered": (
+        "CloudTranscriber+Media.swift",
+        "        let model = fetched.response.speechModelUsed.map(client.withoutCredential)\n",
+        "        let model = fetched.response.speechModelUsed\n",
+        "the served model kept with the key in it \u2014 #187 R2\u00b71 (E1)"),
+    "language-unfiltered": (
+        "CloudTranscriber+Media.swift",
+        "        let language = fetched.response.languageCode.map(client.withoutCredential)\n",
+        "        let language = fetched.response.languageCode\n",
+        "the served language kept with the key in it \u2014 #187 R2\u00b71 (E2)"),
+    "words-unrefused": (
+        "CloudTranscriber+Media.swift",
+        "        if client.carriesCredential(String(decoding: fetched.wordsJSON, as: UTF8.self))\n"
+        "            || file.words.contains(where: { client.carriesCredential($0.text) })\n"
+        "        {\n"
+        "            throw client.refusing(\n"
+        "                .malformed(\"the transcript's words repeat the API key\"), "
+        "id: fetched.response.id)\n"
+        "        }\n",
+        "",
+        "words that repeat the key written to the cache \u2014 #187 R2\u00b71 (E3)"),
+    "key-shaped-id-sent": (
+        "AssemblyAIClient+Session.swift",
+        "        Self.isPlainIdentifier(id) && !carriesCredential(id)\n",
+        "        Self.isPlainIdentifier(id)\n",
+        "`isSendableIdentifier` without its credential clause \u2014 #187 R2\u00b71 (E4, E5, "
+        "the submission section's key-shaped success id)"),
 }
 
 
@@ -6913,7 +7325,7 @@ SECTIONS = [section_mapping, section_jobs, section_stamp, section_keyless,
             section_client, section_submission,
             section_cancel,
             section_secrets, section_cues, section_extract, section_verbatim,
-            section_cache_write, section_run, section_drip,
+            section_cache_write, section_echo, section_run, section_drip,
             section_estimate, section_settings_verify, section_chrome, section_stop,
             section_hygiene]
 # The sections the HARNESS binary drives rather than the probe binary.
@@ -6935,8 +7347,8 @@ def main():
     parser.add_argument("--only",
                         help="a comma-separated subset of sections, by the name after "
                              "`section_` (mapping, jobs, stamp, client, submission, cancel, "
-                             "secrets, cues, extract, verbatim, cache_write, run, drip, "
-                             "estimate, settings_verify, chrome, stop, hygiene)")
+                             "secrets, cues, extract, verbatim, cache_write, echo, run, "
+                             "drip, estimate, settings_verify, chrome, stop, hygiene)")
     parser.add_argument("--wall", type=float, default=1800,
                         help="the whole run's wall-clock bound in seconds (rule H)")
     args = parser.parse_args()

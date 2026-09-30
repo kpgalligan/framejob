@@ -80,6 +80,21 @@ extension AssemblyAIClient {
         return bytes
     }
 
+    /// Whether `text` repeats this client's own credential — the question
+    /// `withoutCredential` answers by changing the text, asked without it.
+    func carriesCredential(_ text: String) -> Bool {
+        withoutCredential(text) != text
+    }
+
+    /// The ONE gate for a transcript id this client puts in a path (`poll`,
+    /// `delete`) or accepts from a submit reply or a recovery-list row: plain
+    /// (`isPlainIdentifier`) AND not the credential. An id that repeats the
+    /// key would put it in a request path and a log line, so it is never
+    /// sent and never accepted (#187, R2·1).
+    func isSendableIdentifier(_ id: String) -> Bool {
+        Self.isPlainIdentifier(id) && !carriesCredential(id)
+    }
+
     /// One `delete` before a throw, and the error to throw.
     func refusing(_ failure: ClientError, id: String) -> ClientError {
         delete(id: id)

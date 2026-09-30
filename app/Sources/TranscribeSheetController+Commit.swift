@@ -103,7 +103,8 @@ extension TranscribeSheetController {
     }
 
     /// The cloud run's extra lines, in a fixed order: R6-8's fallback, the
-    /// detected language, then what is still owed a delete.
+    /// detected language, what is still owed a delete, then any fetched
+    /// transcript that could not be kept for reuse.
     ///
     /// The owed list is `Report.deletionWarnings`'s rule: once per media
     /// id, because a media can be in `janitorFailed` (an id owed from an
@@ -136,6 +137,7 @@ extension TranscribeSheetController {
             }
         }
         lines.append(contentsOf: report.deletionWarnings { "“\(name($0))”" })
+        lines.append(contentsOf: report.cacheWarnings { "“\(name($0))”" })
         return lines
     }
 

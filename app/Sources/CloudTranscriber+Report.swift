@@ -27,6 +27,9 @@ extension CloudTranscriber {
             let format: Transcriber.UploadFormat
             /// Whether this fetched transcript's initial JSON write landed.
             let transcriptWritten: Bool
+            /// Whether the marker landed. Always false when
+            /// `transcriptWritten` is: the marker only follows its file.
+            let stampWritten: Bool
             /// Whether the remote transcript is confirmed gone (R6-4).
             let remoteDeleted: Bool
         }
@@ -46,6 +49,38 @@ extension CloudTranscriber {
         /// record of an id we still have to delete, and a fetch would
         /// overwrite it.
         var held: [UInt32] = []
+
+        /// What was billed: every uploaded media's `audioSeconds`, the one
+        /// reducer `AgentServer`'s bill sentence and its `audio_seconds` key
+        /// both read.
+        ///
+        /// SATURATING, because every term is the SERVER's own
+        /// `audio_duration` and `+` traps: two media answered
+        /// `9223372036854775807` killed the whole app after both had been
+        /// uploaded and billed (the reader review, §10.13 R1·1). Each term is
+        /// floored at 0 first, so the sum only grows and an overflow can only
+        /// be upward: `Int.max` is sticky, and a later negative term cannot
+        /// pull a saturated total back down (#187, item 4).
+        var billedSeconds: Int {
+            uploaded.reduce(0) { sum, row in
+                let (total, overflowed) = sum.addingReportingOverflow(max(0, row.audioSeconds))
+                return overflowed ? Int.max : total
+            }
+        }
+
+        /// One sentence per uploaded media whose marker did not land, in
+        /// `uploaded` order (#187, item 2).
+        ///
+        /// It states only what `fetch` knows and promises nothing about the
+        /// next run: on a `refresh` run over a current cache an older file
+        /// and marker equal to this stamp survive the failed write and are
+        /// served next time — the rule `AgentServer.billed`'s doc records
+        /// (issue #29).
+        func cacheWarnings(name: (UInt32) -> String) -> [String] {
+            uploaded.filter { !$0.stampWritten }.map {
+                "The transcript of \(name($0.media)) could not be kept in the project for reuse."
+            }
+        }
 
         /// Cleanup still owed, in stable per-media order. An ID can be
         /// retried only when its transcript JSON was saved in the project.

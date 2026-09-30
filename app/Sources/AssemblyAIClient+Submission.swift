@@ -17,7 +17,7 @@ extension AssemblyAIClient {
             }
         }
         if let response = try? JSONDecoder().decode(TranscriptResponse.self, from: reply.data),
-            Self.isPlainIdentifier(response.id)
+            isSendableIdentifier(response.id)
         {
             return response.id
         }
@@ -59,7 +59,7 @@ extension AssemblyAIClient {
                 continue
             }
             let matching = page.transcripts.filter { $0.audioURL == audioURL.absoluteString }
-            if matching.contains(where: { !Self.isPlainIdentifier($0.id) }) {
+            if matching.contains(where: { !isSendableIdentifier($0.id) }) {
                 throw ClientError.submissionUnresolved(authenticationStatus: nil)
             }
             let ids = Set(matching.map(\.id))

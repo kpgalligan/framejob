@@ -5027,6 +5027,78 @@ because the ffmpeg install is broken. The new rows use `say` and
 (`[Errno 2]`, `row_h ran to its end`). Row H is unchanged. RP's own copies go
 through `pair_copy`, which leaves `.sb-*` out and retries, up to three tries.
 
+### Issue batch B34 — cloud captions correctness from #187's second reading
+
+#187's R2·1 and items 1, 2, 3, 4 and 6, each a probe row made to fail by a
+mutant of its own, plus two instrument fixes: row H copies through
+`pair_copy`, and DR scores every row of a run that did not answer. **No live
+call was made and nothing was spent**: every row runs against
+`assemblyai_fake.py`, with `RC_ASSEMBLYAI_KEY` unset.
+
+```sh
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only cache_write,echo,secrets,submission
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --port-base 4975
+```
+
+- **R2·1, section `echo` (new).** E1/E2: the fake names the key as its
+  `speech_model_used` and `language_code`; both are `<redacted>` in the
+  report, `speech_model_used`, `language_detected`, the `note`, the report
+  card and the cache header, and the key is in no probe output and no cache
+  file. E3: words holding the key fail the media with "the transcript's
+  words repeat the API key", the transcript is DELETEd and nothing is
+  written. E4: a cache file whose id IS the key is never put on the wire by
+  the janitor (CONTROL: `t_owed2` beside it is). E5: `poll` refuses that id
+  with no request. The submission section's "key-shaped success id" row
+  recovers `t_own` instead of accepting it.
+- **Item 1, CW1.** An immutable planted `1.json` fails the first write; the
+  flag is cleared once the fake logs the DELETE it holds for 2 s (CONTROL),
+  and the file and marker stay byte for byte.
+- **Item 2, CW2.** `stampWritten` in every `cw-x-y` row and in
+  `cw-marker-only`, and "could not be kept in the project for reuse" in the
+  `note` and the report card exactly when the marker did not land.
+- **Item 3, CW3 and row O.** A served `audio_duration` of -5 is 0 in the
+  report, `audio_seconds` and the cache header (CONTROL: the fake measured
+  -5); row O's fourth trial, "one media at -5", answers 0 through the app.
+- **Item 4, CW4.** Seconds of Int.max, Int.max and Int.min stay at
+  9223372036854775807 in `audio_seconds` and in the bill sentence.
+- **Item 6, 17·zero and 17·endless.** A write of 0 answers "no bytes were
+  written" after one call; an endless EINTR answers "Interrupted system
+  call" after `writeAllRetryLimit + 1` calls (CONTROL: the limit is 100).
+
+**The run table** (2026-09-30, at `fa5e8c5` plus this batch):
+
+| Command | Printed answer |
+|---|---|
+| `make typecheck` | 0 errors, 4 warnings (the baseline); tsc clean |
+| `make test` | exit 0 |
+| `make app` | BUILD SUCCEEDED |
+| `cloud_captions_probe.py` (full) | **801/801**, exit 0, in 472 s. Baseline at `fa5e8c5` was 762/762; this batch adds 39 rows (E 18, CW 15, 17 3, R6-14 3) |
+| `cloud_captions_proof.py --port-base 4975` | **205/205**, exit 0, in 75 s. Baseline was 201/201; row O adds 4 |
+| `grep "Reelcut: " /tmp/reelcut-497[5-9].log` | nothing |
+| probe `--only cache_write --mutant rewrite-without-first-write` | 33/34, exit 1 (CW1) |
+| probe `--only cache_write --mutant stamp-answer-dropped` | 28/34, exit 1 (CW2 ×5, CW1) |
+| probe `--only cache_write --mutant duration-unclamped` | 33/34, exit 1 (CW3) |
+| probe `--only cache_write --mutant saturation-not-sticky` | 33/34, exit 1 (CW4) |
+| probe `--only secrets --mutant zero-write-errno` | 42/43, exit 1 (17·zero) |
+| probe `--only secrets --mutant eintr-unbounded` | 42/43, exit 1 (17·endless) |
+| probe `--only secrets --mutant eintr-unwritable` (re-aimed) | 41/43, exit 1 |
+| probe `--only echo,submission --mutant model-unfiltered` | 110/115, exit 1 (E1) |
+| probe `--only echo,submission --mutant language-unfiltered` | 110/115, exit 1 (E2) |
+| probe `--only echo,submission --mutant words-unrefused` | 113/115, exit 1 (E3) |
+| probe `--only echo,submission --mutant key-shaped-id-sent` | 110/115, exit 1 (E4, E5, R6-14) |
+| probe `--only run,echo --mutant any-id-on-the-wire` (re-aimed) | 63/68, exit 1 (I, E4) |
+| proof `--mutant audio-seconds-plus` (re-aimed at `billedSeconds`) | 179/184, exit 1 (row O) |
+| proof `--mutant marker-over-stale-file` (re-aimed at `stampWritten`) | 203/205, exit 1 (row M) |
+| DR with every `run_probe` forced to answer nothing (a CONTROL) | `0 5`: DR1's three rows and DR0's two, failed by their own names |
+
+No mutant run exited 2.
+
+**Run the two cloud instruments one after the other, never at once.** Both
+leave and look for `reelcut-upload-*` in the same `NSTemporaryDirectory()`:
+a baseline run of both in parallel failed six probe rows (KL's three, R6-14's
+three cancel rows) and the proof's row T on each other's extracts. Run
+alone, the same tree scored 762/762 and 201/201.
+
 ### Road map 7 part 6 — core argument contract
 
 Run `python3 tools/proof/op_contract_proof.py` from the repository root. It

@@ -1431,9 +1431,7 @@ def row_h(instance, fake):
         return
     with open(path, "w") as handle:
         handle.write(text[:found.start(1)] + str(40_000 * SEC) + text[found.end(1):])
-    copy = os.path.join(WORK, f"rowH-long-{os.getpid()}.reelcut")
-    shutil.rmtree(copy, ignore_errors=True)
-    shutil.copytree(session.path, copy)
+    copy = pair_copy(session.path, "rowH-long")
     scenario(fake)
     before = temp_uploads()
     opened = instance.mcp.call("open_project", path=copy)
@@ -1722,14 +1720,16 @@ def row_o(instance, fake):
     both had been uploaded and billed: the MCP socket closed with no answer and
     the process was gone. The row is three trials so the arithmetic is pinned
     rather than guessed — one media at the maximum and two at half of it both
-    have to come back, or a build that simply refused the key would pass."""
+    have to come back, or a build that simply refused the key would pass. A
+    fourth (issue batch B34, #187 item 3): one media answered `-5` bills 0."""
     print("\nO. a hostile `audio_duration` cannot kill the app (the reader review, R1\u00b71)")
     speech, second = fixtures()
     big = 2 ** 63 - 1
     for tag, seconds, two, expected in (
             ("one media at Int.max", big, False, big),
             ("two media at half of it", big // 2, True, 2 * (big // 2)),
-            ("two media at Int.max", big, True, big)):
+            ("two media at Int.max", big, True, big),
+            ("one media at -5", -5, False, 0)):
         scenario(fake, audio_seconds=seconds)
         session = Session(instance, "rowO-" + tag.replace(" ", "-"))
         session.add(session.media_of(speech), at=0)
@@ -2145,20 +2145,19 @@ CLOUD_MUTANTS = {
         "refusal)"),
     "marker-over-stale-file": (
         "app/Sources/CloudTranscriber+Media.swift",
-        '        if transcriptWritten {\n'
-        '            MediaTranscript.writeStamp(stamp, for: media.id, in: cacheDirectory)\n'
-        '        }\n',
-        '        MediaTranscript.writeStamp(stamp, for: media.id, in: cacheDirectory)\n',
+        '        let stampWritten = transcriptWritten\n'
+        '            && MediaTranscript.writeStamp(stamp, for: media.id, in: cacheDirectory)\n',
+        '        let stampWritten = MediaTranscript.writeStamp(stamp, for: media.id, in: cacheDirectory)\n'
+        '            && transcriptWritten\n',
         "`write`'s answer discarded again \u2014 the reader review's R1\u00b73 (row M: a marker "
         "stamped over a cache file the write never replaced)"),
     "audio-seconds-plus": (
-        "app/Sources/AgentServer+CloudCaptions.swift",
-        '            "audio_seconds": report.uploaded.reduce(0) { sum, row in\n'
-        '                let (total, overflowed) = sum.addingReportingOverflow(row.audioSeconds)\n'
-        '                guard overflowed else { return total }\n'
-        '                return row.audioSeconds > 0 ? Int.max : Int.min\n'
-        '            },\n',
-        '            "audio_seconds": report.uploaded.reduce(0) { $0 + $1.audioSeconds },\n',
+        "app/Sources/CloudTranscriber+Report.swift",
+        '            uploaded.reduce(0) { sum, row in\n'
+        '                let (total, overflowed) = sum.addingReportingOverflow(max(0, row.audioSeconds))\n'
+        '                return overflowed ? Int.max : total\n'
+        '            }\n',
+        '            uploaded.reduce(0) { $0 + $1.audioSeconds }\n',
         "the saturating sum reverted to `+` \u2014 the reader review's R1\u00b71 (row O: the "
         "app dies on two media the server answered `9223372036854775807` for)"),
     "endpoint-whole-url": (

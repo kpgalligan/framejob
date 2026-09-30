@@ -903,18 +903,27 @@ free.
   serial queue and the main-thread completion; `transcribe` is the
   synchronous body — the janitor FIRST, the jobs grouped by MEDIA, each
   media classified cached / HELD / to upload, then each job's words cut out
-  of its media's one transcript. `+Report` holds what the `Outcome` has no room
-  for (`uploaded` with the initial transcript-write result, `cached`,
+  of its media's one transcript. `+Report` holds what the `Outcome` has no
+  room for (`uploaded` with the transcript-write and marker-write results,
+  `transcriptWritten` and `stampWritten`, `cached`,
   `janitorDeleted`, `janitorFailed`, `janitorDeferred`, `held`) and owns the
   shared cleanup warning wording for the sheet and MCP result or failure.
+  `billedSeconds` is the ONE sum of `audioSeconds` — each term floored at 0,
+  saturating at `Int.max` — that the bill sentence and `audio_seconds` read;
+  `cacheWarnings` is one sentence per uploaded media whose marker did not
+  land, and promises nothing about the next run.
   A nil client admits only a nonempty, entirely
   current batch and skips janitor/network, retaining pending IDs as deferred.
   One media's failure is one media's problem
   and the run carries on, with exactly two exceptions: a CANCEL and a
   REFUSED KEY. `+Media` holds `retryDeletes` and `fetch` — the ten-hour
   refusal BEFORE the extract, the `defer` that removes the temporary audio on
-  every exit, the cache file written before its marker, and the DELETE last
-  with its answer recorded. Spec §11's R6-11: a media in this run's
+  every exit, the server's model and language filtered through
+  `withoutCredential`, `audio_duration` floored at 0, words that repeat the
+  key refused (the transcript deleted) before any write, the cache file
+  written before its marker, and the DELETE last with its answer recorded —
+  its `remote_deleted` rewrite only over a first write that landed (#187).
+  Spec §11's R6-11: a media in this run's
   `janitorFailed` is never fetched, since its cache file is the one record of
   the id still owed a delete.
 - `CloudEstimate.swift` — what a cloud run would COST and why, PURE: a
@@ -966,9 +975,12 @@ free.
   first file, with `withoutCredential(_:)` beside them: those three are the
   members that touch `credential`, and that helper keeps the three sentences
   the client RELAYS verbatim — a 402's, a 4xx's and a transcript's `error` —
-  from carrying a key a server echoed back. `delete` answers THREE states
-  (`deleted`, `failed`, `notSent`): an id that is not a plain identifier is
-  never put on the wire. `+Submission` owns the single paid submit and R6-14's
+  from carrying a key a server echoed back. `isSendableIdentifier`
+  (`+Session`: `isPlainIdentifier` AND not `carriesCredential`) is the ONE id
+  gate — `poll`, `delete`, a submit reply and a recovery-list row — so an id
+  that carries the key is never sent or accepted. `delete` answers THREE
+  states (`deleted`, `failed`, `notSent`): an id that is not sendable is never
+  put on the wire. `+Submission` owns the single paid submit and R6-14's
   bounded recovery: three newest-page looks for an exact uploaded URL, with
   no retry of the POST or requests by any unrelated id.
 - `AssemblyAIConfiguration.swift` · `AssemblyAILanguages.swift` ·

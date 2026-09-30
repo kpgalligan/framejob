@@ -188,11 +188,7 @@ extension AgentServer {
     /// §10.13).
     static func billed(_ report: CloudTranscriber.Report) -> String {
         guard !report.uploaded.isEmpty else { return "" }
-        let seconds = report.uploaded.reduce(0) { sum, row in
-            let (total, overflowed) = sum.addingReportingOverflow(row.audioSeconds)
-            guard overflowed else { return total }
-            return row.audioSeconds > 0 ? Int.max : Int.min
-        }
+        let seconds = report.billedSeconds
         let files = report.uploaded.count == 1 ? "1 media file" : "\(report.uploaded.count) media files"
         return " AssemblyAI had already been billed for \(files) (\(seconds) audio seconds) "
             + "before this failed."
@@ -200,6 +196,7 @@ extension AgentServer {
 
     static func cloudFailure(_ error: any Error, report: CloudTranscriber.Report) -> String {
         let warnings = report.deletionWarnings { "media \($0)" }
+            + report.cacheWarnings { "media \($0)" }
         return ([error.localizedDescription + billed(report)] + warnings)
             .joined(separator: "\n")
     }
@@ -230,7 +227,8 @@ extension AgentServer {
     /// run's own `Report` and from nothing else.
     ///
     /// `note` exists only when there is a part to put in it: R6-8's fallback
-    /// ran, a vocabulary was cut, or a remote delete is still owed. An empty
+    /// ran, a vocabulary was cut, a remote delete is still owed, or a
+    /// fetched transcript could not be kept for reuse. An empty
     /// note would be a key a caller has to read to learn nothing.
     ///
     /// `endpoint` is the HOST alone of the base URL the run's client spoke
@@ -248,21 +246,14 @@ extension AgentServer {
                 "AssemblyAI transcribed media \(row.media) with \(model), not \(preferred).")
         }
         parts.append(contentsOf: report.deletionWarnings { "media \($0)" })
+        parts.append(contentsOf: report.cacheWarnings { "media \($0)" })
 
         var fields: [String: Any] = [
             "engine": TranscriptionEngine.assemblyai.rawValue,
             "language": code ?? "auto",
             "uploaded": report.uploaded.map { Int($0.media) },
             "cached": report.cached.map { Int($0) },
-            // SATURATING, because every term is the SERVER's own
-            // `audio_duration` and `+` traps: two media answered
-            // `9223372036854775807` killed the whole app after both had
-            // been uploaded and billed (the reader review, §10.13 R1·1).
-            "audio_seconds": report.uploaded.reduce(0) { sum, row in
-                let (total, overflowed) = sum.addingReportingOverflow(row.audioSeconds)
-                guard overflowed else { return total }
-                return row.audioSeconds > 0 ? Int.max : Int.min
-            },
+            "audio_seconds": report.billedSeconds,
         ]
         let models: [[String: Any]] = report.uploaded.compactMap { row in
             guard let model = row.speechModelUsed else { return nil }

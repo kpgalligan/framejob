@@ -165,6 +165,14 @@ final class FileStore: SecretStore {
 /// refused it (the reader review, road map 6 §10.13, H·3). Every other errno
 /// is still the sentence it was.
 ///
+/// **The retry is bounded**: at most `writeAllRetryLimit` interruptions per
+/// call, and the next one answers `strerror(EINTR)`, so a writer that is
+/// interrupted for ever cannot hold the caller for ever (#187, item 6).
+///
+/// **A write of 0 bytes is its own sentence**, at once and with no retry:
+/// `write(2)` sets no `errno` when it answers 0, so `strerror(errno)` would
+/// report whatever an earlier call left there (#187, item 6).
+///
 /// `using` is the probe's seam and nothing else: its default IS `write(2)`,
 /// so the shipped path has one spelling, and a row can hand it a writer that
 /// answers `EINTR` once before the real one runs.
@@ -173,6 +181,7 @@ func writeAll(
     using write: (Int32, UnsafeRawPointer?, Int) -> Int = { Darwin.write($0, $1, $2) }
 ) -> String? {
     var offset = 0
+    var interruptions = 0
     while offset < bytes.count {
         let written = bytes.withUnsafeBytes { buffer -> Int in
             guard let base = buffer.baseAddress else { return -1 }
@@ -182,11 +191,18 @@ func writeAll(
             offset += written
             continue
         }
-        if written < 0, errno == EINTR { continue }
+        if written == 0 { return "no bytes were written" }
+        if errno == EINTR, interruptions < writeAllRetryLimit {
+            interruptions += 1
+            continue
+        }
         return String(cString: strerror(errno))
     }
     return nil
 }
+
+/// How many `EINTR`s one `writeAll` call retries before it answers one.
+let writeAllRetryLimit = 100
 
 /// The probe's store, and the empty store R6-9 hands an app that was pointed
 /// at a stand-in server. Nothing here touches disk, so no run of any

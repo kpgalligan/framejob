@@ -167,18 +167,35 @@ extension CloudTranscriber {
             })
 
         progress(.saving, 0, CloudProgress.detail(.saving, file: name))
+        // The SERVER's two strings, filtered once: each goes into the cache
+        // header, the report, the MCP `note` and the report card, and a
+        // server that echoes the key would put it in all four (#187, R2·1).
+        let model = fetched.response.speechModelUsed.map(client.withoutCredential)
+        let language = fetched.response.languageCode.map(client.withoutCredential)
         let header = MediaTranscript.Header(
             provider: MediaTranscript.provider, transcriptID: fetched.response.id,
-            requested: options, speechModelUsed: fetched.response.speechModelUsed,
-            languageCode: fetched.response.languageCode,
+            requested: options, speechModelUsed: model,
+            languageCode: language,
             languageConfidence: fetched.response.languageConfidence,
-            audioDuration: fetched.response.audioDuration ?? Int(upload.seconds.rounded(.up)),
+            // Floored at 0: a negative duration is no bill (#187, item 3).
+            audioDuration: max(
+                0, fetched.response.audioDuration ?? Int(upload.seconds.rounded(.up))),
             extractedSeconds: upload.seconds, uploadedFormat: upload.format.rawValue,
             // ALWAYS 0 — C0's q4 measured that an extract keeps a late audio
             // track's head, so a word's millisecond in the extract is its
             // millisecond in the media (`MediaTranscript.Header`'s own doc).
             audioTrackStartMs: 0, fetchedAt: Self.timestamp(), remoteDeleted: false)
         var file = try MediaTranscript.File(header: header, wordsJSON: fetched.wordsJSON)
+        // R6-3 keeps the served words VERBATIM, so words that repeat the key
+        // cannot be rewritten: they are refused, and the transcript deleted,
+        // before a byte is written (#187, R2·1). The decoded texts are read
+        // too, because an escaped key is not the key's bytes.
+        if client.carriesCredential(String(decoding: fetched.wordsJSON, as: UTF8.self))
+            || file.words.contains(where: { client.carriesCredential($0.text) })
+        {
+            throw client.refusing(
+                .malformed("the transcript's words repeat the API key"), id: fetched.response.id)
+        }
         // ONLY when the file really landed. `write` answers `false` for every
         // way it can fail, and discarding that answer stamped the marker over
         // a cache file that still held an EARLIER request's words: `isCurrent`
@@ -187,23 +204,30 @@ extension CloudTranscriber {
         // reader review, §10.13 R1·3). The comment above says the marker
         // comes second so it fails safe; this is what makes that true.
         let transcriptWritten = MediaTranscript.write(file, for: media.id, in: cacheDirectory)
-        if transcriptWritten {
-            MediaTranscript.writeStamp(stamp, for: media.id, in: cacheDirectory)
-        }
+        // Its answer is KEPT: a marker that did not land means this
+        // transcript was not kept for reuse, and the caller says so (#187,
+        // item 2).
+        let stampWritten = transcriptWritten
+            && MediaTranscript.writeStamp(stamp, for: media.id, in: cacheDirectory)
 
         let deleted = client.delete(id: fetched.response.id) == .deleted
-        if deleted {
+        // Only over a first write that LANDED. A rewrite after a failed one
+        // replaces whatever file was there — perhaps the one record of an
+        // older id still owed a delete — and records this delete in a file
+        // this request never wrote (#187, item 1; R6-15).
+        if deleted && transcriptWritten {
             file.header.remoteDeleted = true
             MediaTranscript.write(file, for: media.id, in: cacheDirectory)
         }
         return (
             file,
             Report.Uploaded(
-                media: media.id, speechModelUsed: fetched.response.speechModelUsed,
-                languageCode: fetched.response.languageCode,
+                media: media.id, speechModelUsed: model,
+                languageCode: language,
                 languageConfidence: fetched.response.languageConfidence,
                 audioSeconds: header.audioDuration, format: upload.format,
                 transcriptWritten: transcriptWritten,
+                stampWritten: stampWritten,
                 remoteDeleted: deleted)
         )
     }

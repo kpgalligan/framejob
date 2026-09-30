@@ -213,7 +213,7 @@ final class AssemblyAIClient {
         id: String, audioSeconds: Double, cancel: Transcriber.CancelToken? = nil,
         waited: ((TimeInterval) -> Void)? = nil
     ) throws -> Fetched {
-        guard Self.isPlainIdentifier(id) else {
+        guard isSendableIdentifier(id) else {
             throw ClientError.malformed("AssemblyAI answered an id that is not one")
         }
         let ceiling = tuning.pollCeiling(audioSeconds: audioSeconds)
@@ -290,7 +290,7 @@ final class AssemblyAIClient {
     /// the cache file — a delete this app never asked for.
     @discardableResult
     func delete(id: String) -> DeleteAnswer {
-        guard Self.isPlainIdentifier(id) else {
+        guard isSendableIdentifier(id) else {
             note("refusing to DELETE an id that is not one")
             return .notSent
         }
