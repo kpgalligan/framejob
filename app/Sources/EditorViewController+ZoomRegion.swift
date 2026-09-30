@@ -18,8 +18,8 @@ import AppKit
 /// has the shape it has: `EditorViewController+Eyedropper.swift` argues it in
 /// full and this file follows it deliberately rather than inventing a second
 /// shape for a modal canvas mode. The overlay's PRESENCE is the mode (an
-/// extension can hold no state, and the frozen canvas can take no seventh
-/// stored session); it is installed through `armCanvasMode`, the one place
+/// extension can hold no state, and a mode outlives a drag, so it is not a
+/// canvas session); it is installed through `armCanvasMode`, the one place
 /// that keeps two modal overlays from stacking; it takes first responder so
 /// Esc reaches it; it clears its callbacks before it is torn down from inside
 /// its own event handler; it hands focus back to the canvas overlay on the way

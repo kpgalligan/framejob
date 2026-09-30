@@ -347,7 +347,9 @@ the key map behind it.
   which ends every OTHER armed mode first; a third mode inherits that by being
   installed at all. The region frame reads the EVALUATED props (the opposite
   of every session in `CanvasSessions.swift`) because a region is drawn on
-  what is on screen; ⇧ during the drag chooses `fill`.
+  what is on screen; ⇧ during the drag chooses `fill`. Their overlays sit
+  above the canvas's region grips (CI-16) and take every press while armed;
+  the outlines stay drawn under them.
 - `EditorWindowController.swift`, `WelcomeWindowController.swift`,
   `AppDelegate.swift` (+`Menus`, +`Recording`, +`GraphicMenu` — the Insert
   menu's builder and Help ▸ Graphics Reference, `showGraphicsReference`, on
@@ -412,7 +414,7 @@ the key map behind it.
   `enabled.video`, which is the Detach switch.
 
 **Canvas.**
-- `PreviewCanvasView.swift` (frozen, 1107 lines) · `CanvasSessions.swift`
+- `PreviewCanvasView.swift` (frozen, 1124 lines) · `CanvasSessions.swift`
   · `PreviewCanvasView+TextEditFrame.swift` · `+TextEditKeys` — the picture at
   document size and the handle gestures. All coordinate mapping goes through
   `viewToCanvas` / `canvasToView`, and every handle maps through
@@ -429,6 +431,15 @@ the key map behind it.
   newline, Esc over changed text asks Cancel · Revert · Apply in a sheet
   whose Apply goes through `performGroupedEdit` (a sheet completion is
   outside an AppKit event).
+- `PreviewCanvasView+Obscure.swift` — the selected clip's obscure regions on
+  the canvas (spec §11 CI-16): outline, centre and eight resize grips drawn
+  through the layer's transform; hit test after the layer's own handles
+  (`CanvasHit.yieldsToObscureGrip`), no grip while the target's start list
+  and the drawn list differ in length (`obscureStartList`); cursor rects.
+- `CanvasObscureSession.swift` — the region-grip drag (spec §11 CI-16): the
+  whole `video.obscure` list with one entry replaced, through
+  `CanvasEditTarget.op(video:clip:)`, travel read through the box on screen
+  (`sourcePoint`), one "Move Region" / "Resize Region" step.
 - `CanvasEditTarget.swift` — what a gesture edits (spec §11 CI-13): the
   base, or the selected action's END state. It reaches the canvas as
   `editTarget` through two writers, `refreshCanvas` and
@@ -1630,6 +1641,9 @@ undo step; any off-event path goes through
 `ProjectDocument.performGroupedEdit`. It opens its explicit group only for an
 `.applied` answer (`commitEdit`, shared with `applyEdit`), so an identity, a
 refusal or an error leaves the stack — redo included — untouched (#59).
+`endLiveEdit(_:cancelled: true)` is the cancel path (Esc during a canvas
+drag, `PreviewCanvasView.onLiveCancel`): it puts the `beginLiveEdit` snapshot
+back and registers nothing, with no change count.
 **Do not "flush" the manager to grouping level zero** to close that group: the
 undo checkpoint `NSDocument` posts inside every save then raises, the
 exception is swallowed inside the file coordinator, and ⌘S and `save_project`

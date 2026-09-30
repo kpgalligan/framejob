@@ -331,3 +331,33 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   the handoff draws as a label, is this field at 20 pt, because the header
   is where a clip's own name is set. `DSField.style` (shared chrome, and
   Rasterize's) is unchanged.
+- **CI-16 — The selected clip's obscure regions are drawn and dragged on
+  the canvas; the layer's own handles outrank them, an armed modal mode's
+  overlay takes every press over them, and Esc cancels any canvas drag**
+  (kpgalligan/reelcut#85, 2026-09-30). With exactly one clip selected,
+  unlocked, outside crop mode and the text editor, each region of the list
+  AT THE PLAYHEAD (the recipe's `video.obscure`) is outlined as its box's
+  quad through the layer's scale, crop and rotation — an ellipse too, as its
+  box — with a move grip at its centre and the eight resize handles. The
+  grips exist only while the edit target's start list (CI-13) has as many
+  entries as the list drawn; otherwise the outlines are drawn with no grip,
+  because an index would name a different region (§5.4's list rule; §4.3:
+  adding or removing an entry writes the base). Press order: the rotation
+  grip, the endpoints and the eight scale handles first, as before; then
+  the region grips; then bodies. A region's inside is not a grip (a drag
+  there moves the clip), and a double-click never presses a grip. A drag
+  writes the WHOLE list with one entry replaced, never its length, through
+  CI-13's target: `set_video` at the base, `set_action_end` with the clip's
+  action selected. The list is the target's start state; the pointer's
+  travel is read in source pixels through the box on screen, as the region
+  band reads it. The centre moves the region; a handle moves the edges it
+  drives with the far ones pinned, ⌥ about the centre; each side stays in
+  [1, 20 000] px. No snapping. One undo step, "Move Region" or "Resize
+  Region". No new tool: `set_video` and `set_action_end` are the
+  capability. Esc during any canvas drag (move, scale, rotate, crop,
+  endpoint, region grip) puts the project back to the press's state with
+  no undo step; until #85 it kept the drag as a step named "Cancel". While
+  the region band or the eyedropper is armed, its overlay takes every
+  press; the outlines and grips stay drawn under it, as the layer's box and
+  handles do. Accepted: a grip under a layer handle is not reachable there,
+  and an ellipse is outlined as its box.

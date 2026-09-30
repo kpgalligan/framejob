@@ -48,6 +48,8 @@ final class PreviewCanvasView: NSView {
     var onLiveBegin: (() -> Void)?
     var onLiveUpdate: (([ReelOp]) -> Void)?
     var onLiveEnd: ((String) -> Void)?
+    /// Esc mid-drag: the press's state back, no undo step (spec §11 CI-16).
+    var onLiveCancel: (() -> Void)?
     var onEdit: ((String, [ReelOp]) -> Void)?
     /// An edit from a sheet's completion — outside an AppKit event — which
     /// the document groups itself.
@@ -86,7 +88,7 @@ final class PreviewCanvasView: NSView {
     /// tick: `editTarget` is rewritten while a drag is held — by `refreshCanvas`
     /// on each live tick and by `canvasPlayheadMoved` as playback enters a span —
     /// and a session's start state was read from the target it began with.
-    private(set) var gestureTarget = CanvasEditTarget.base
+    var gestureTarget = CanvasEditTarget.base
     /// Echoes `EditorViewController.snappingEnabled` (the N toggle).
     var snappingEnabled = true
     private(set) var cropMode = false
@@ -105,6 +107,7 @@ final class PreviewCanvasView: NSView {
     var rotating: CanvasRotateSession?
     var cropping: CanvasCropSession?
     var endpointDrag: CanvasEndpointSession?
+    var obscureDrag: CanvasObscureSession?
     var panning: CanvasPanSession?
 
     /// Built once per gesture: the candidate lists are an O(layers) sweep and
@@ -443,7 +446,13 @@ final class PreviewCanvasView: NSView {
             panning = CanvasPanSession(origin: point, base: panOffset, offset: panOffset)
             return
         }
-        switch hit(at: point) {
+        let found = hit(at: point)
+        if clicks < 2, found.yieldsToObscureGrip, let grab = obscureHit(at: point),
+           beginObscureDrag(grab, at: point) {
+            overlay.needsDisplay = true
+            return
+        }
+        switch found {
         case .empty:
             setCropMode(false)
             if !flags.contains(.shift) { clearSelection() }
@@ -514,6 +523,8 @@ final class PreviewCanvasView: NSView {
             session.update(unit: box.endpointUnit(canvasPoint))
             endpointDrag = session
             onLiveUpdate?([session.op])
+        } else if obscureDrag != nil {
+            continueObscureDrag(at: canvasPoint, flags: flags)
         }
         overlay.needsDisplay = true
     }
@@ -538,6 +549,9 @@ final class PreviewCanvasView: NSView {
         } else if endpointDrag != nil {
             endpointDrag = nil
             onLiveEnd?("Move Endpoint")
+        } else if let session = obscureDrag {
+            obscureDrag = nil
+            onLiveEnd?(session.undoName)
         }
         overlay.needsDisplay = true
         window?.invalidateCursorRects(for: overlay)
@@ -720,14 +734,15 @@ final class PreviewCanvasView: NSView {
     /// forever and the next edit merges into it.
     private func cancelGesture() -> Bool {
         guard moving != nil || scaling != nil || rotating != nil || cropping != nil
-            || endpointDrag != nil
+            || endpointDrag != nil || obscureDrag != nil
         else { return false }
         moving = nil
         scaling = nil
         rotating = nil
         cropping = nil
         endpointDrag = nil
-        onLiveEnd?("Cancel")
+        obscureDrag = nil
+        onLiveCancel?()
         overlay.needsDisplay = true
         return true
     }
@@ -835,6 +850,7 @@ final class PreviewCanvasView: NSView {
         for box in boxes where selection.contains(box.id) {
             strokeBox(box, emphasised: box.id == primaryBox?.id)
         }
+        drawObscureRegions()
         if let box = primaryBox, !box.locked, editingClip == nil {
             if cropMode {
                 drawHandles(
@@ -880,7 +896,7 @@ final class PreviewCanvasView: NSView {
         outer.stroke()
     }
 
-    private func drawHandles(_ points: [CGPoint], fill: NSColor) {
+    func drawHandles(_ points: [CGPoint], fill: NSColor) {
         let side = Self.handleSize
         for point in points {
             let centre = canvasToView(point)
@@ -961,7 +977,7 @@ final class PreviewCanvasView: NSView {
         path.stroke()
     }
 
-    private func polygon(_ points: [CGPoint]) -> NSBezierPath {
+    func polygon(_ points: [CGPoint]) -> NSBezierPath {
         let path = NSBezierPath()
         guard let first = points.first else { return path }
         path.move(to: canvasToView(first))
@@ -1057,6 +1073,7 @@ final class CanvasOverlayView: NSView {
 
     override func resetCursorRects() {
         guard let owner = canvas, let box = owner.primaryBox, !box.locked else { return }
+        for (rect, cursor) in owner.obscureCursorRects() { addCursorRect(rect, cursor: cursor) }
         let grab = PreviewCanvasView.handleGrab
         for handle in CanvasHandle.allCases {
             let centre = owner.canvasToView(box.handlePoint(handle))

@@ -120,8 +120,8 @@ Core: `core/src/model_query.rs`, `model_props.rs`, `model_regions.rs`, `model_te
 
 ## Known limits
 Still true of the code (verified 2026-09-26):
-- Stored obscure regions have no canvas handles; the band commits a rect only (ellipse via the
-  popup). Overlapping regions: the greater hiding wins, no blend. A pixelated region on a blurred
+- The obscure band commits a rect only (ellipse via the popup). Overlapping
+  regions: the greater hiding wins, no blend. A pixelated region on a blurred
   layer shows unblurred blocks; a region on a slated layer does nothing.
 - Adding or removing a filter/region inside an action writes BASE props (a different-length list
   cannot interpolate).
@@ -141,7 +141,8 @@ Still true of the code (verified 2026-09-26):
   `isReadyForDisplay`/`videoRect` are useless instruments, `displayedPixelBuffer` discriminates).
 Fixed since: the MCP decoder dropping misspelt/omitted keys in nested patches and partial list
 entries in end patches (road map 7's D1); the one-minute `SFSpeech` ceiling (W-8, `SpeechTranscriber`);
-the Remove Silences sheet's stale spans after an MCP relink (road map 4).
+the Remove Silences sheet's stale spans after an MCP relink (road map 4); the obscure regions'
+canvas grips (#85, CI-16).
 
 ## Open items
 - R1/R2 recorder person checks and `phase8_chrome.py`'s unlocked-console rows — tracked in #55
@@ -149,8 +150,7 @@ the Remove Silences sheet's stale spans after an MCP relink (road map 4).
 - `relink_media` re-probing (#63) and the panel/MCP caption-name spelling (`chart.png.srt` vs
   `chart.srt`, #43).
 - `AgentServer+Clips.swift` over the cap (856) — its seam is in `designs/adr/app-file-history.md` "Named next cuts".
-- Obscure-region canvas handles (#85);
-  `selectedMedia` pointing at a hidden row (#68); rename Escape / undo-merge (#69); the
+- `selectedMedia` pointing at a hidden row (#68); rename Escape / undo-merge (#69); the
   ~40-document deadlock (#40); 24-bit WAV/AIFF (#86).
 
 ## Where to look in the original

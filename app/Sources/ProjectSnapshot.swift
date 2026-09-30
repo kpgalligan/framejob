@@ -839,8 +839,8 @@ struct ObscureProps: Codable, Equatable {
     }
 
     /// The region as a rect in the same source-pixel space, centred on
-    /// `(x, y)` — `SpotlightProps.box`'s twin, and the seed for the canvas
-    /// handles phase 3c deliberately did not draw.
+    /// `(x, y)` — `SpotlightProps.box`'s twin, and what the canvas grips
+    /// are built on (spec §11 CI-16, `CanvasObscureSession.swift`).
     var box: CGRect {
         CGRect(x: x - width / 2, y: y - height / 2, width: width, height: height)
     }

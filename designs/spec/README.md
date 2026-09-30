@@ -17,8 +17,8 @@ this index gets its row in the same change.
 | [`03-window-layout.md`](03-window-layout.md) | 62 | The window's regions, as the design handoff specifies them. |
 | **§4 — The regions in detail** | | |
 | [`04.1-toolbar.md`](04.1-toolbar.md) | 26 | The toolbar. |
-| [`04.2-preview-canvas.md`](04.2-preview-canvas.md) | 67 | The preview canvas: selection, handles, crop and region modes, on-canvas text, snapping. |
-| [`04.3-inspector.md`](04.3-inspector.md) | 500 | The inspector: the Clip tab's sub-tabs, row marks, Reset/Clear; every video, audio, text and shape section; the Media, Document and Assistant tabs. |
+| [`04.2-preview-canvas.md`](04.2-preview-canvas.md) | 77 | The preview canvas: selection, handles, crop and region modes, on-canvas text, snapping. |
+| [`04.3-inspector.md`](04.3-inspector.md) | 499 | The inspector: the Clip tab's sub-tabs, row marks, Reset/Clear; every video, audio, text and shape section; the Media, Document and Assistant tabs. |
 | [`04.4-timeline.md`](04.4-timeline.md) | 193 | The timeline: its bar, the level meter, ruler, tracks, clip bodies, gestures, entering a nest. |
 | **§5 — Editing model** | | |
 | [`05.1-time.md`](05.1-time.md) | 23 | Ticks (600 000 per second), frame rates, snapping to the grid. |
@@ -41,9 +41,9 @@ this index gets its row in the same change.
 | [`07.9-agent.md`](07.9-agent.md) | 523 | The MCP agent: one tool per op plus `scope`, the app-state tools, the dev tools, parity, the graphics loop, the lane, the helper, the assistant session, its prompt and the Assistant tab. |
 | [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 76 | The spec's Rust module map (core/CLAUDE.md is the live one). |
 | [`08-repo-layout.md`](08-repo-layout.md) | 64 | Repo layout, build, conventions. |
-| [`09-keys-and-menus.md`](09-keys-and-menus.md) | 137 | The keyboard map and every menu, and keys proposed but not yet bound. |
+| [`09-keys-and-menus.md`](09-keys-and-menus.md) | 138 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 2332 in 13 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 2363 in 13 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

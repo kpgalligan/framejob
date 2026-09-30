@@ -1202,15 +1202,15 @@ final class ProjectDocument: NSDocument {
         projectDidChange(isLive: true)
     }
 
-    /// Registers ONE undo step from the `beginLiveEdit` snapshot to the
-    /// current handle — none when the gesture changed nothing, which is every
-    /// tick having been refused, an identity or invalid, since
-    /// `updateLiveEdit` replaces the handle only on `.applied` — then a final
-    /// `["isLive": false]` so listeners that skipped the ticks refresh once.
-    func endLiveEdit(_ actionName: String) {
+    /// ONE undo step from the `beginLiveEdit` snapshot to the current handle —
+    /// none when no tick applied (`updateLiveEdit` swaps only on `.applied`) —
+    /// or, `cancelled` (Esc on the canvas, spec §11 CI-16), the snapshot put
+    /// back with no step and no change count; then `["isLive": false]` either
+    /// way, so listeners that skipped the ticks refresh once.
+    func endLiveEdit(_ actionName: String, cancelled: Bool = false) {
         guard let base = liveEditBase else { return }
         liveEditBase = nil
-        if base !== project {
+        if cancelled { project = base } else if base !== project {
             registerUndo(restoring: base, actionName: actionName)
             countEditChange(.changeDone)
         }

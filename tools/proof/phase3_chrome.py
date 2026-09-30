@@ -186,6 +186,12 @@ RECTS = {
 INSPECTOR = Rect(
     "inspector", INSPECTOR_X, TOOLBAR + TAB, INSPECTOR_W,
     (TALL - TIMELINE_H) - (TOOLBAR + TAB))
+# The preview pane, at the tall window: left of the inspector, below the
+# toolbar, above the timeline. Since #85 (spec §11 CI-16) the selected clip's
+# regions are outlined on the canvas, so a render with more regions changes
+# pixels here too; every INSPECTOR claim below is measured over the
+# inspector's pixels alone.
+PREVIEW = Rect("preview", 0, TOOLBAR, INSPECTOR_X, (TALL - TIMELINE_H) - TOOLBAR)
 # The band the shift is solved over, in the two-region render: from just
 # above its tail (the Add Region · Place on Canvas row, measured at 963–985
 # pt, under Region 2's Size row, which ends at 956) for 200 pt, clear of the
@@ -611,7 +617,7 @@ def main():
           f"{images['plain-a'].width}x{images['plain-a'].height} "
           f"{images['plain-a'].channels}-channel, scale {scale:g}")
     print("rectangles (points):")
-    for rect in WASH + list(RECTS.values()) + [INSPECTOR, SHIFT_BAND]:
+    for rect in WASH + list(RECTS.values()) + [INSPECTOR, PREVIEW, SHIFT_BAND]:
         print(f"   {rect}")
     print(f"   candidate spans: {CANDIDATES} s; one region is "
           f"{REGION_ROWS} × {ROW_PITCH} = {REGION_HEIGHT} pt of rows")
@@ -693,20 +699,26 @@ def main():
     # 5. The Obscure section, closed — the header summary reads the list.
     print("\n5. the Obscure section, as it ships (closed) — the summary reads the data")
     header_band = None
-    for tag, other, what in (
-        ("closed-one", "closed-none", "one region vs an empty list"),
-        ("closed-blur", "closed-one", "blur vs pixelate — the same COUNT, another kind"),
-        ("closed-two", "closed-one", "two regions vs one"),
+    for tag, other, what, outlined in (
+        ("closed-one", "closed-none", "one region vs an empty list", True),
+        ("closed-blur", "closed-one", "blur vs pixelate — the same COUNT, another kind", False),
+        ("closed-two", "closed-one", "two regions vs one", True),
     ):
-        diff = changed_pixels(images[tag], images[other])
+        whole = changed_pixels(images[tag], images[other])
+        diff = inside(whole, INSPECTOR, scale)
         boxes = clusters(diff)
-        print(f"\n   {what}: {len(diff)} changed pixels in {len(boxes)} clusters:")
+        print(f"\n   {what}: {len(whole)} changed pixels, {len(diff)} in the inspector in "
+              f"{len(boxes)} clusters:")
         print(describe(boxes, scale, limit=8))
         check(f"{what} changes pixels", bool(diff))
-        stray = outside(diff, [INSPECTOR], scale)
-        check("and every one of them is inside the inspector", not stray,
+        stray = outside(whole, [INSPECTOR, PREVIEW], scale)
+        check("and every one of them is inside the inspector or the preview", not stray,
               "" if not stray else f"{len(stray)} px elsewhere:\n"
               + describe(clusters(stray), scale))
+        if outlined:
+            shown = inside(whole, PREVIEW, scale)
+            check("and it changes the preview too — the region outlines on the canvas (#85)",
+                  bool(shown), f"{len(shown)} px inside {PREVIEW}")
         top, bottom = extent(diff, scale)
         # Re-measured in place 2026-09-23 (road map 9 phase 3b, spec §11
         # CI-9): Reset now shows only while the list differs from its empty
@@ -729,14 +741,16 @@ def main():
 
     # 6. The Obscure section, open — the ROWS.
     print("\n6. the Obscure section, open — the rows grow with the list")
-    closed = changed_pixels(images["closed-two"], images["closed-one"])
-    diff = changed_pixels(images["open-two"], images["open-one"])
+    closed = inside(changed_pixels(images["closed-two"], images["closed-one"]), INSPECTOR, scale)
+    whole = changed_pixels(images["open-two"], images["open-one"])
+    diff = inside(whole, INSPECTOR, scale)
     boxes = clusters(diff)
-    print(f"      {len(diff)} changed pixels in {len(boxes)} clusters:")
+    print(f"      {len(whole)} changed pixels, {len(diff)} in the inspector in {len(boxes)} "
+          "clusters:")
     print(describe(boxes, scale, limit=10))
     check("a second region changes pixels with the section open", bool(diff))
-    stray = outside(diff, [INSPECTOR], scale)
-    check("every one of them is inside the inspector", not stray,
+    stray = outside(whole, [INSPECTOR, PREVIEW], scale)
+    check("every one of them is inside the inspector or the preview", not stray,
           "" if not stray else f"{len(stray)} px elsewhere:\n" + describe(clusters(stray), scale))
     check("and far more of them than the closed section moved — that is the rows",
           len(diff) > 20 * len(closed),

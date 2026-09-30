@@ -14,6 +14,7 @@
 | ↩ (canvas text editor) | Apply the text and leave the editor; ⇧↩, ⌘↩, ⌥↩ or ⌃↩ insert a new line (§11 K-2) |
 | esc (canvas text editor) | Leave an unchanged edit; with the text changed, ask Cancel / Revert / Apply (§11 K-2) |
 | esc (timeline rename field) | Close the field and keep the old name; no undo step. Return, Tab or a click elsewhere commits, as its own undo step even when that click also edits |
+| esc (canvas drag) | Cancel the drag in progress — move, scale, rotate, crop, endpoint or region grip: the project goes back to the press's state, with no undo step (§11 CI-16) |
 | ⌘⌫ | Ripple delete (selection, or the in/out range) |
 | ⇧⌘F | Freeze frame |
 | ⌥⌘D | Detach audio |

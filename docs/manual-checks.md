@@ -150,6 +150,11 @@ the same way.
 - **Expect:** every key acts with no beep and no click first.
 - **Source:** #60, #61.
 
+**TL-14 — Obscure regions on the canvas**
+- **Do:** 1. On a rotated, scaled clip with two obscure regions, select the clip and drag a region's centre, a corner and an edge. 2. ⌥-drag an edge. 3. Press Esc mid-drag of a region, then mid-drag of the clip itself. 4. ⌘Z each drag. 5. Repeat 1 with an action selected. 6. Press Place on Canvas.
+- **Expect:** the dashed outlines sit on the hidden areas and turn with the clip; the cursors change over the grips; a drag has no jump or lag; each Esc puts the drag back with no step (Edit ▸ Undo names the step before it); each drag is one "Move Region" or "Resize Region" step; with an action selected the region animates to where it was dragged; the outlines stay drawn under the band.
+- **Source:** #85.
+
 ## Clip tab and action lane
 
 Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Action, ⌥⌘K).

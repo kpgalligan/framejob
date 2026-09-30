@@ -8117,7 +8117,7 @@ instrument failure is a scored FAIL, exit 1.
 
 | Runner | caught / survived / not performed |
 |---|---|
-| `assistant_lane_proof.py`, `assistant_tab_proof.py`, `assistant_helper_proof.py`, `assistant_prompt_proof.py`, `assistant_session_proof.py`, `spend_proof.py`, `budget_proof.py`, `prices_proof.py`, `prices_crosscheck.py`, `makefile_env_proof.py`, `export_cancel_proof.py`, `video_configuration_proof.py`, `speed_sheet_probe.py`, `text_break_proof.py` and `name_field_proof.py` (`--baseline`, B23) | 1 / 0 / 2 |
+| `assistant_lane_proof.py`, `assistant_tab_proof.py`, `assistant_helper_proof.py`, `assistant_prompt_proof.py`, `assistant_session_proof.py`, `spend_proof.py`, `budget_proof.py`, `prices_proof.py`, `prices_crosscheck.py`, `makefile_env_proof.py`, `export_cancel_proof.py`, `video_configuration_proof.py`, `speed_sheet_probe.py`, `text_break_proof.py`, `name_field_proof.py` (`--baseline`, B23) and `obscure_handles_probe.py` (`--baseline` and `--mutant`, B25) | 1 / 0 / 2 |
 | `spend_ui_proof.py` | 1 / 3 / 2 |
 | `graphics_proof.py`, `graphics_store_probe.py`, `words_picture_probe.py` | 0 / 1 / 2 |
 | `cloud_captions_proof.py`, `cloud_captions_probe.py` (`--mutant`, `--fake-mutant`), `recording_probe.py`, `phase9_chrome.py` — whole-suite mutants | the per-row count and a normal run's exit / 2 |
@@ -8857,4 +8857,40 @@ Run on 2026-09-30 against HEAD0 `2e78a25`, every instance my own:
 | `graphics_inspector_proof.py --port 4881` | 59/59, exit 0 (Z1: no `Reelcut: ` line) |
 | `graphics_inspector_proof.py --mutant name-height --port 4881` | exit 0, MUTANT PASS: exactly I14 and I17 FAIL |
 | `screens.py --port 4882 --only 05-clip-picture,07-clip-graphic,11-document-inspector`, on HEAD0 and on the fix | 8 pass of 8, 0 new problems, both |
+| `make typecheck`; `make test`; `make app` | 0 errors, 4 warnings, tsc clean; exit 0; BUILD SUCCEEDED |
+
+## Issue batch B25 — obscure regions on the canvas (obscure_handles_probe.py; #85)
+
+`obscure_handles_probe.swift` is compiled AS `main.swift` over `app/Sources`
+minus the app's `main.swift` on `harness/build.sh`'s swiftc line
+(`-D REELCUT_DEV_TOOLS`), with `Compositor.metal` built beside it, and calls
+only what HEAD0 `ffae505` already had: a grip is found from the region's own
+box through `CanvasLayerBox.canvasPoint(source:)` and `canvasToView`, never
+through the new code. It runs `AgentLane.prepareAtLaunch()` first, with
+`ANTHROPIC_API_KEY` and `RC_ASSEMBLYAI_KEY` popped. Every row opens its own
+editor in the app's window (content 1600 × 1000, `.prohibited`) and closes
+it. Gestures go through `beginGesture` / `continueGesture` / `endGesture`;
+Esc is a keyCode-53 `NSEvent` through `handleKey`. The four packages and the
+rows (F0 D0 D1 M1 M2 M3 X0 X1 T1 G1 C1 C2 L1, then the harness photos H1/H2
+on a plain run) are in the runner's docstring. A travel of dv view points is
+`ds = R(−θ)(dv / k) / s` source pixels (θ 30°, s 0.6, k the canvas's points
+per pixel), tolerance 0.01 px. `--baseline <commit>` builds the same probe
+over `git archive <commit> app/Sources`, and `--mutant` edits a copy. Both
+follow rule R: 1 caught, 0 survived, 2 not performed. The six mutants are
+`no-draw` (D1 G1), `canvas-delta` (M1 M2 M3), `no-live-end` (M1 M2),
+`grips-first` (C2), `no-count-gate` (G1) and `cancel-commits` (X0 X1).
+`phase3_chrome.py` now allows changed pixels in the preview pane as well as
+the inspector. Every inspector claim is measured over the inspector's pixels
+only, and two new rows require "one vs none" and "two vs one" to change
+the preview (the outlines, #85).
+
+Run on 2026-09-30 against HEAD0 `ffae505`, every instance my own:
+
+| Command | Answer |
+|---|---|
+| `obscure_handles_probe.py` | 16/16, exit 0 |
+| `obscure_handles_probe.py --baseline ffae505…` | exit 1, BASELINE CAUGHT: exactly D1 M1 M2 M3 X0 X1 T1 G1 L1 fail; F0 D0 C1 C2 pass |
+| `--mutant no-draw` / `canvas-delta` / `no-live-end` / `grips-first` / `no-count-gate` / `cancel-commits` | exit 1 each, caught (failures: D1 G1 / L1 M1 M2 M3 T1 / L1 M1 M2 M3 T1 / C2 / G1 / X0 X1) |
+| `phase3_chrome.py` on HEAD0 (a worktree) and on the fix | 33/33; 35/35 |
+| `clip_inspector6_proof.py` (port 4851) | 25/25, K3's parity row: no `Reelcut: ` line |
 | `make typecheck`; `make test`; `make app` | 0 errors, 4 warnings, tsc clean; exit 0; BUILD SUCCEEDED |

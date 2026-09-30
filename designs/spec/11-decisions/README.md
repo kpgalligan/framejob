@@ -18,7 +18,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | [`deepening.md`](deepening.md) | 391 | **Deepening (road map 7).** D2-1, D3-1, #21, #22, D4-1..D4-6, D7-1..D7-3, #42, #88, #63, #174: how ops refuse, the op table, the gate, the source window, time envelopes, one-delta shifts on the canvas's grid, the non-edits that speak, a relink that re-probes, one frame on the grid. |
 | [`cloud-captions.md`](cloud-captions.md) | 277 | **Cloud captions (road map 6).** R6-1..R6-18: AssemblyAI, keys, deletion, recovery, refusal precedence, a dripping server. |
 | [`word-captions.md`](word-captions.md) | 123 | **Word captions (road map 8).** W-1..W-11. |
-| [`chrome-inspector-keys.md`](chrome-inspector-keys.md) | 333 | **Chrome, the clip inspector and keys (the sharp pass, road map 9, #35).** SH-1..SH-3, CI-1..CI-15, K-1..K-3. |
+| [`chrome-inspector-keys.md`](chrome-inspector-keys.md) | 363 | **Chrome, the clip inspector and keys (the sharp pass, road map 9, #35).** SH-1..SH-3, CI-1..CI-16, K-1..K-3. |
 | [`graphics.md`](graphics.md) | 405 | **Graphics (road map 10).** G-1..G-20. |
 | [`dev-tools.md`](dev-tools.md) | 27 | **Dev tools (road map 11).** V-1..V-3: the `REELCUT_DEV_TOOLS` flag and `make dist`, dev tools as ordinary tools, capture by `cacheDisplay`. |
 | [`assistant.md`](assistant.md) | 148 | **The Assistant (road map 12).** AI-1..AI-17: the bundled helper, one lane, the catalog at launch, the fourth tab, the window's own project, W-9's reach, withheld and ask-first tools, the key, history, undo, the model, a call mid-gesture, the base-URL override, the tab kept on a selection change, the live context on each message, Stop reaching a running export or transcribe, the selectable transcript and the multi-line composer. |
@@ -133,6 +133,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | CI-13 | The canvas's handles follow the mode | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
 | CI-14 | `set_action_end.off` keys an optional property OFF at the end | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
 | CI-15 | Every sub-row carries `mixed`, and the collapse is the one animation | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
+| CI-16 | The selected clip's obscure regions are drawn and dragged on the canvas; the layer's own handles outrank them, an armed modal mode's overlay takes every press over them, and Esc cancels any canvas drag | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
 | K-1 | Space is the transport's unless the first responder is typing or claims it | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
 | K-2 | In the canvas text editor Return applies, a modified Return is a new line, and Esc asks before dropping a change | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
 | K-3 | The canvas text editor lays its text out with the renderer's attributes at view scale; an UPPERCASE text is edited as typed | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
