@@ -9,7 +9,10 @@ import AppKit
 /// `DS.border` stroke, 7 pt padding, the line centred vertically — drawn by
 /// `InspectorNameFieldCell`, not a layer border, so it follows the appearance
 /// and a `cacheDisplay` capture holds it. It pins its own height at
-/// `DS.controlHeight`, one constraint, which the clip header re-pins.
+/// `DS.controlHeight`, one constraint, which the clip header re-pins. Its
+/// alignment rect is its frame (no insets), so a constraint places the box
+/// where it places a value field's, and the text and the field editor move
+/// with it (kpgalligan/reelcut#186).
 final class InspectorNameField: NSTextField, OptionControl, NSTextFieldDelegate {
     private let read: () -> String
     private let write: (String) -> Void
@@ -22,6 +25,8 @@ final class InspectorNameField: NSTextField, OptionControl, NSTextFieldDelegate 
         get { InspectorNameFieldCell.self }
         set {}
     }
+
+    override var alignmentRectInsets: NSEdgeInsets { NSEdgeInsets() }
 
     init(
         read: @escaping () -> String, write: @escaping (String) -> Void,

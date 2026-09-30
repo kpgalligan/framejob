@@ -5,6 +5,7 @@ centred (spec §11 SH-3).
 
     python3 tools/proof/name_field_proof.py
     python3 tools/proof/name_field_proof.py --baseline <commit>
+    python3 tools/proof/name_field_proof.py --mutant NAME
 
 **The probe**, `name_field_probe.swift`, compiled AS `main.swift` over every
 file in `app/Sources` but the app's own `main.swift` on `harness/build.sh`'s
@@ -33,6 +34,14 @@ in `work/name-field/probe/`:
      a control: the rule skips a field whose cell wraps, and the unfixed field
      (not single-line, a wrapping cell) wrapped a long name out of sight.
 
+Then (B32, #186 item 4) an `OptionFieldControl` joins the host under the
+name field, at the same leading constraint:
+
+  N13 the name field's box starts within 0.5 pt of the number field's
+      (its alignment rect is its frame): scanning right from x 12 at each
+      view's mid-height, the first pixel more than 6 from the host's
+      background at x 5.
+
 A probe that dies scores every row it did not write as FAIL.
 
 **The harness** (`harness/build.sh`, the tree's own build, 1440 × 1500) over a
@@ -47,7 +56,16 @@ exit 1 is CAUGHT — exactly N1–N7 and N9 fail in each look and N8 passes in
 both; 0
 is SURVIVED; 2 is NOT PERFORMED (the archive, the build or a run failed, a
 row was never written, or a control failed), printed as `mutant baseline:
-the control could not be performed — <why>`.
+the control could not be performed — <why>`. N13 (`B32_ROWS`) is left out
+of that verdict; its catch is the mutant.
+
+`--mutant NAME` builds the same probe over a copy of `app/Sources` in
+`work/name-field/mutant-<name>/` with one edit to `InspectorNameField.swift`
+(`MUTANTS`; no harness) and follows rule R: 1 caught when every row it names
+failed in both looks, 0 survived when one passed, 2 not performed (an anchor
+not found exactly once, the build or a run failed, a row was never written,
+or a control failed). `frame-insets` deletes the `alignmentRectInsets`
+override: N13 must fail.
 """
 
 import json
@@ -82,10 +100,24 @@ ROW_NAMES = [
     "N7 the name field has exactly one height constraint of its own, DS.controlHeight",
     "N8 the layout dump finds no problem with \"Director of Photography\" (a CONTROL)",
     "N9 the layout dump finds a name wider than the field truncated",
+    "N13 the name field's box starts where a number field's box under the same leading "
+    "constraint starts, within 0.5 pt",
 ]
+# B32's row: left out of `--baseline`'s verdict; its catch is the mutant.
+B32_ROWS = ROW_NAMES[9:]
 ROWS = [f"{name} [{look}]" for look in LOOKS for name in ROW_NAMES]
+B32_LOOK_ROWS = [f"{name} [{look}]" for look in LOOKS for name in B32_ROWS]
 BASELINE_EXPECTED = [f"{name} [{look}]" for look in LOOKS for name in ROW_NAMES
-                     if "(a CONTROL)" not in name]
+                     if "(a CONTROL)" not in name and name not in B32_ROWS]
+
+N13 = ROW_NAMES[9]
+FIELD = "InspectorNameField.swift"
+
+# name: (the rows it must fail in both looks, [(file, before, after), ...])
+MUTANTS = {
+    "frame-insets": ([N13], [
+        (FIELD, "    override var alignmentRectInsets: NSEdgeInsets { NSEdgeInsets() }\n", "")]),
+}
 
 RESULTS = []  # (name, ok, instrument)
 
@@ -144,7 +176,7 @@ def build_probe(sources, out):
 
 
 def probe_checks(sources, out):
-    print("\n1 — the probe: N1–N9, light and dark")
+    print("\n1 — the probe: N1–N9 and N13, light and dark")
     binary, error = build_probe(sources, out)
     check("the probe builds over app/Sources", binary is not None, error or "",
           instrument=binary is None)
@@ -280,7 +312,7 @@ def baseline(commit):
     instruments = [n for n, ok, inst in RESULTS if inst and not ok]
     if instruments:
         return not_performed(f"instrument failures {instruments[:4]}, {elapsed:.0f} s")
-    failed = sorted(n for n, ok, _ in RESULTS if not ok)
+    failed = sorted(n for n, ok, _ in RESULTS if not ok and n not in B32_LOOK_ROWS)
     controls = [n for n in failed if "(a CONTROL)" in n]
     if controls:
         return not_performed(f"controls failed on {commit}: {controls}, {elapsed:.0f} s")
@@ -293,9 +325,65 @@ def baseline(commit):
     return 0
 
 
+def mutate(sources, name, dest):
+    """A copy of `sources` with the mutant's edits; the reason when a
+    `before` text is not found exactly once."""
+    shutil.copytree(sources, dest)
+    for file, before, after in MUTANTS[name][1]:
+        path = os.path.join(dest, file)
+        text = open(path).read() if os.path.exists(path) else ""
+        if text.count(before) != 1:
+            return f"{file}: `{before.strip()}` found {text.count(before)} times"
+        with open(path, "w") as f:
+            f.write(text.replace(before, after))
+    return None
+
+
+def mutant(name):
+    began = time.time()
+    here = os.path.join(WORK, f"mutant-{name}")
+    if os.path.exists(here):
+        shutil.rmtree(here)
+    os.makedirs(here)
+
+    def not_performed(why):
+        print(f"mutant {name}: the control could not be performed — {why}")
+        return 2
+
+    sources = os.path.join(here, "Sources")
+    why = mutate(os.path.join(ROOT, "app", "Sources"), name, sources)
+    if why:
+        return not_performed(why)
+    print(f"MUTANT {name}: app/Sources in {os.path.relpath(sources, ROOT)}")
+    probe_checks(sources, os.path.join(here, "out"))
+    elapsed = time.time() - began
+    instruments = [n for n, ok, inst in RESULTS if inst and not ok]
+    if instruments:
+        return not_performed(f"instrument failures {instruments[:4]}, {elapsed:.0f} s")
+    failed = sorted(n for n, ok, _ in RESULTS if not ok)
+    controls = [n for n in failed if "(a CONTROL)" in n]
+    if controls:
+        return not_performed(f"controls failed: {controls}, {elapsed:.0f} s")
+    named = [f"{row} [{look}]" for look in LOOKS for row in MUTANTS[name][0]]
+    survived = [n for n in named if n not in failed]
+    if survived:
+        print(f"mutant {name}: SURVIVED — {survived} passed (all failures: {failed}), "
+              f"{elapsed:.0f} s")
+        return 0
+    print(f"mutant {name}: caught — {len(named)} named rows failed (all failures: {failed}), "
+          f"{elapsed:.0f} s")
+    return 1
+
+
 def main():
     if len(sys.argv) == 3 and sys.argv[1] == "--baseline":
         return baseline(sys.argv[2])
+    if len(sys.argv) == 3 and sys.argv[1] == "--mutant":
+        if sys.argv[2] not in MUTANTS:
+            print(f"mutant {sys.argv[2]}: the control could not be performed — no such "
+                  f"mutant; one of {sorted(MUTANTS)}")
+            return 2
+        return mutant(sys.argv[2])
     if len(sys.argv) != 1:
         sys.exit(__doc__)
     print("#171 — the inspector's name field is the inspector's value field")

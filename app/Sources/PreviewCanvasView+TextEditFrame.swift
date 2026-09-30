@@ -11,14 +11,18 @@ import AppKit
 ///
 /// The frame is the source of truth, not the text view: both resizable flags
 /// are off, so AppKit's own `sizeToFit` cannot grow the editor past the box.
-/// The wrap width follows from the frame (`widthTracksTextView`) less two
-/// margins, each in view points at the box's own scale: the container inset
-/// takes back the 2 canvas pixels the frame stands outside the box, and the
-/// line-fragment padding the backdrop's padding and the outline's overshoot
-/// (`LayerRenderers.textInsets`, the margin the measured size includes). What
-/// is left is the width CoreText lays the text in, so a fixed-width text
-/// breaks where the render breaks it and an auto-sized one does not wrap —
-/// measured: with a fixed 2 pt inset, an auto-sized "Hello " wrapped.
+/// The wrap width is set from the same unrounded width the frame is given,
+/// not tracked from the frame (`widthTracksTextView` is off): AppKit aligns
+/// the frame to backing pixels, which could widen the wrap by up to a pixel
+/// and keep a word the render breaks (kpgalligan/reelcut#186). That width
+/// loses two margins, each in view points at the box's own scale: the
+/// container inset takes back the 2 canvas pixels the frame stands outside
+/// the box, and the line-fragment padding the backdrop's padding and the
+/// outline's overshoot (`LayerRenderers.textInsets`, the margin the measured
+/// size includes). What is left is the width CoreText lays the text in, so
+/// a fixed-width text breaks where the render breaks it and an auto-sized
+/// one does not wrap — measured: with a fixed 2 pt inset, an auto-sized
+/// "Hello " wrapped.
 ///
 /// Inside that frame the text is laid out in the render's own attributes
 /// (spec §11 K-3, kpgalligan/reelcut#117): `LayerRenderers.textAttributes` at
@@ -38,7 +42,7 @@ extension PreviewCanvasView {
                 .insetBy(dx: -2, dy: -2))
         editor.isHorizontallyResizable = false
         editor.isVerticallyResizable = false
-        editor.textContainer?.widthTracksTextView = true
+        editor.textContainer?.widthTracksTextView = false
         editor.textContainerInset = NSSize(width: 2 * canvasScale, height: 2 * canvasScale)
         editor.textContainer?.lineFragmentPadding =
             LayerRenderers.textInsets(typed).x * box.video.scale * canvasScale
@@ -55,6 +59,9 @@ extension PreviewCanvasView {
         default: x = rect.minX
         }
         editor.frame = CGRect(x: x, y: rect.minY, width: width, height: height)
+        editor.textContainer?.containerSize = NSSize(
+            width: width - 2 * editor.textContainerInset.width,
+            height: CGFloat.greatestFiniteMagnitude)
     }
 
     /// The live editor to the box its string will have, in the render's

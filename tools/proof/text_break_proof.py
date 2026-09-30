@@ -4,6 +4,7 @@ render does (spec §11 K-3).
 
     python3 tools/proof/text_break_proof.py
     python3 tools/proof/text_break_proof.py --baseline <commit>
+    python3 tools/proof/text_break_proof.py --mutant NAME
 
 One instrument, the probe `text_break_probe.swift`, compiled AS `main.swift`
 over every file in `app/Sources` but the app's own `main.swift` on
@@ -13,7 +14,10 @@ that will not build is a scored FAILURE, never an exit). In the app's own
 window it opens the in-canvas editor over one text clip per fixture and
 compares the editor's line STARTS with the render's
 (`LayerRenderers.layout(for:)`), typing by key events through
-`NSWindow.sendEvent` and applying through the canvas's `onEdit`:
+`NSWindow.sendEvent` and applying through the canvas's `onEdit`. The split
+is pinned (an argument-domain inspector width 304, timeline height 300,
+inspector shown) and every window is set to content 1600 × 1000 before its
+editor opens (B32):
 
   E0 (control) the font resolves;
   E1 plain, left, fixed width: the render has ≥ 3 lines, and the line starts
@@ -25,8 +29,9 @@ compares the editor's line STARTS with the render's
      than 5 %, a control): equal;
   E5 `line_spacing` 1.8: line starts equal (control), and each line pitch
      within 1 pt of the render's × scale;
-  E6 size 12 at video scale 0.6: size × scale < 8 pt (control), the frame
-     the box + 2 px within 1 pt (control), line starts equal;
+  E6 size 12 at video scale 0.6, 240 px wide: size × scale < 8 pt
+     (control), the frame the box + 2 px within 1 pt (control), line starts
+     equal — the detail prints the editor's wrap width and width × scale;
   E7 `case: upper` (control, K-3's premise): the editor holds `content`, not
      `laidContent`, before and after "ab" is typed;
   E8 E2's fixture emptied by Delete over the select-all (empty and first
@@ -45,6 +50,14 @@ CAUGHT — exactly the rows in `BASELINE_EXPECTED` fail and every other row
 passes; 0 is SURVIVED; 2 is NOT PERFORMED (the archive, the build or the run
 failed, a row was never written, or a CONTROL failed), printed as
 `mutant baseline: the control could not be performed — <why>`.
+
+`--mutant NAME` builds the same probe over a copy of `app/Sources` in
+`work/text-break/mutant-<name>/` with one edit (`MUTANTS`), and follows rule
+R: 1 caught when every row it names failed, 0 survived when one passed, 2
+not performed (an anchor not found exactly once, the build or the run
+failed, a row was never written, or a CONTROL failed). `pre-fix-width` puts
+`widthTracksTextView` back on and deletes the `containerSize` lines (#186
+item 1): E6's line-start row must fail.
 """
 
 import json
@@ -96,6 +109,19 @@ ROWS = [
     "E9 after typing \" again\": the editor still lays out exactly one line",
 ]
 
+E6_STARTS = "E6 size 12: the editor's line starts equal the render's"
+FRAME = "PreviewCanvasView+TextEditFrame.swift"
+
+# name: (the rows it must fail, [(file, before, after), ...])
+MUTANTS = {
+    "pre-fix-width": ([E6_STARTS], [
+        (FRAME, "        editor.textContainer?.widthTracksTextView = false",
+         "        editor.textContainer?.widthTracksTextView = true"),
+        (FRAME, "        editor.textContainer?.containerSize = NSSize(\n"
+                "            width: width - 2 * editor.textContainerInset.width,\n"
+                "            height: CGFloat.greatestFiniteMagnitude)\n", "")]),
+}
+
 # What the unfixed editor gets wrong; every other row passes on both trees.
 BASELINE_EXPECTED = [
     "E2 tracking 24: the editor's line starts equal the render's",
@@ -125,11 +151,6 @@ def format_version():
 
 
 SENTENCE = "The quick brown fox jumps over the lazy dog while the band plays on"
-# E6's width is 260 px because the editor's frame is aligned to backing pixels
-# (#36's rule, unchanged here), so its wrap width can stand up to about 1 px
-# wider than the render's. Measured: at 240 px the render's second line with
-# its next word is 240.04 px, and the editor kept the word. At 260 px no line
-# with its next word comes within 3.9 px of the wrap width.
 SMALL = ("Small print runs on and on across the box, line after line, so the editor "
          "has many lines to break at twelve pixels, far under the old eight point clamp, "
          "and every one of them must break where the render breaks it, word for word, "
@@ -166,7 +187,7 @@ def packages():
 
     # At video scale 0.6 the view size is near 5 pt, far enough under the old
     # 8 pt clamp that the clamped font breaks elsewhere.
-    small = text_clip(SMALL, width=260.0, size=12.0)
+    small = text_clip(SMALL, width=240.0, size=12.0)
     small["video"]["scale"] = 0.6
     return {
         "fonts": os.path.join(ROOT, "app", "Resources", "Fonts"),
@@ -301,9 +322,64 @@ def baseline(commit):
     return 0
 
 
+def mutate(sources, name, dest):
+    """A copy of `sources` with the mutant's edits; the reason when a
+    `before` text is not found exactly once."""
+    shutil.copytree(sources, dest)
+    for file, before, after in MUTANTS[name][1]:
+        path = os.path.join(dest, file)
+        text = open(path).read() if os.path.exists(path) else ""
+        if text.count(before) != 1:
+            return f"{file}: `{before.strip()}` found {text.count(before)} times"
+        with open(path, "w") as f:
+            f.write(text.replace(before, after))
+    return None
+
+
+def mutant(name):
+    began = time.time()
+    here = os.path.join(WORK, f"mutant-{name}")
+    if os.path.exists(here):
+        shutil.rmtree(here)
+    os.makedirs(here)
+
+    def not_performed(why):
+        print(f"mutant {name}: the control could not be performed — {why}")
+        return 2
+
+    sources = os.path.join(here, "Sources")
+    why = mutate(os.path.join(ROOT, "app", "Sources"), name, sources)
+    if why:
+        return not_performed(why)
+    print(f"MUTANT {name}: app/Sources in {os.path.relpath(sources, ROOT)}")
+    probe_checks(sources, os.path.join(here, "out"), packages())
+    elapsed = time.time() - began
+    instruments = [n for n, ok, inst in RESULTS if inst and not ok]
+    if instruments:
+        return not_performed(f"instrument failures {instruments}, {elapsed:.0f} s")
+    failed = sorted(n for n, ok, _ in RESULTS if not ok)
+    controls = [n for n in failed if "(a CONTROL)" in n]
+    if controls:
+        return not_performed(f"controls failed: {controls}, {elapsed:.0f} s")
+    named = MUTANTS[name][0]
+    survived = [n for n in named if n not in failed]
+    if survived:
+        print(f"mutant {name}: SURVIVED — {survived} passed (all failures: {failed}), "
+              f"{elapsed:.0f} s")
+        return 0
+    print(f"mutant {name}: caught — {named} failed (all failures: {failed}), {elapsed:.0f} s")
+    return 1
+
+
 def main():
     if len(sys.argv) == 3 and sys.argv[1] == "--baseline":
         return baseline(sys.argv[2])
+    if len(sys.argv) == 3 and sys.argv[1] == "--mutant":
+        if sys.argv[2] not in MUTANTS:
+            print(f"mutant {sys.argv[2]}: the control could not be performed — no such "
+                  f"mutant; one of {sorted(MUTANTS)}")
+            return 2
+        return mutant(sys.argv[2])
     if len(sys.argv) != 1:
         sys.exit(__doc__)
     print("#117 — the canvas text editor breaks lines where the render does")

@@ -8125,7 +8125,7 @@ instrument failure is a scored FAIL, exit 1.
 
 | Runner | caught / survived / not performed |
 |---|---|
-| `assistant_lane_proof.py`, `assistant_tab_proof.py`, `assistant_helper_proof.py`, `assistant_prompt_proof.py`, `assistant_session_proof.py`, `spend_proof.py`, `budget_proof.py`, `prices_proof.py`, `prices_crosscheck.py`, `makefile_env_proof.py`, `export_cancel_proof.py`, `video_configuration_proof.py`, `speed_sheet_probe.py`, `text_break_proof.py`, `name_field_proof.py` (`--baseline`, B23), `obscure_handles_probe.py` (`--baseline` and `--mutant`, B25), `cache_pass_probe.py` (`--mutant`, B14), `assistant_compaction_proof.py` (`--mutant`, B26) and `relink_sheet_probe.py` (`--mutant`, B29) | 1 / 0 / 2 |
+| `assistant_lane_proof.py`, `assistant_tab_proof.py`, `assistant_helper_proof.py`, `assistant_prompt_proof.py`, `assistant_session_proof.py`, `spend_proof.py`, `budget_proof.py`, `prices_proof.py`, `prices_crosscheck.py`, `makefile_env_proof.py`, `export_cancel_proof.py`, `video_configuration_proof.py`, `speed_sheet_probe.py`, `text_break_proof.py` and `name_field_proof.py` (each `--baseline`, B23; `--mutant`, B32), `obscure_handles_probe.py` (`--baseline` and `--mutant`, B25), `cache_pass_probe.py` (`--mutant`, B14), `assistant_compaction_proof.py` (`--mutant`, B26) and `relink_sheet_probe.py` (`--mutant`, B29) | 1 / 0 / 2 |
 | `spend_ui_proof.py` | 1 / 3 / 2 |
 | `graphics_proof.py`, `graphics_store_probe.py`, `words_picture_probe.py` | 0 / 1 / 2 |
 | `cloud_captions_proof.py`, `cloud_captions_probe.py` (`--mutant`, `--fake-mutant`), `recording_probe.py`, `phase9_chrome.py` — whole-suite mutants | the per-row count and a normal run's exit / 2 |
@@ -9263,4 +9263,91 @@ Run on 2026-09-30:
 cd core && cargo test --release --test graphic_ffi                        # 13 passed
 python3 tools/proof/graphics_proof.py --port 4931                         # 45/45
 python3 tools/proof/graphics_proof.py --port 4934 --mutant store-uncapped # exit 0
+```
+
+## Issue batch B32 — the canvas editor's wrap width, the name field's box, the obscure lookups, F0's split, the harness playhead (`text_break_proof.py` E6 and `--mutant`, `name_field_proof.py` N13 and `--mutant`, `obscure_handles_probe.py` F0; #186 items 1 and 4, #188 items 1, 2, 4 and 5)
+
+- **#186 item 1** (`PreviewCanvasView+TextEditFrame.swift`): the editor's
+  wrap width no longer tracks the frame. `widthTracksTextView` is off and the
+  container is set to the same unrounded `width` the frame is given, less
+  `2 × textContainerInset.width`, straight after the frame, so the frame's
+  alignment to backing pixels no longer widens the wrap. E6 is back at
+  240 px; its detail prints the editor's wrap width
+  (`textContainer.size.width − 2 × lineFragmentPadding`) beside
+  `width × video.scale × canvasScale`: 80.533 pt and 80.533 pt on the fix,
+  81.763 pt and 80.533 pt under `--mutant pre-fix-width`, whose editor then
+  broke at [0, 48, 98, 146, 186, 232] against the render's [0, 48, 92, 140,
+  180, 223].
+- **#186 item 4** (`InspectorNameField.swift`): `alignmentRectInsets` is
+  zero, so the drawn box is the layout rect. N13 scans right from x 12 at each
+  view's mid-height for the first pixel more than 6 from the host's
+  background: the name field's box and a number field's under the same
+  leading constraint both start at x 20.00 on the fix; under `--mutant
+  frame-insets` the name field's starts at 18.00 (`field.frame` (18, 20, 174,
+  22), alignment rect (20, 20, 170, 22)). N13 is left out of `--baseline`'s
+  verdict (`B32_ROWS`); on 2e78a25, whose field had a layer border, it passed.
+- **#188 item 2** (`PreviewCanvasView+Obscure.swift`): `obscureHit` and
+  `obscureCursorRects` return at once for a clip with no regions, before
+  `obscureStartList` asks `editTarget.start`.
+- **#188 item 1**: `obscure_handles_probe.swift` and `text_break_probe.swift`
+  pin the split before `AppDelegate()` — an argument-domain
+  `ReelcutInspectorWidth` 304, `ReelcutTimelineHeight` 300,
+  `ReelcutInspectorCollapsed` false — and `text_break_probe` sets each
+  window's content to 1600 × 1000 before its editor opens. F0's detail ends
+  with `margin <shortest edge − 24> pt`: 23.0 pt.
+- **#188 item 4**: spec 04.2's CI-16 bullet is five lines; the file is 72
+  lines, and `designs/spec/README.md`'s row says so.
+- **#188 item 5, the harness playhead**, measured at `12869d4` (committed
+  HEAD, `app/Sources` and `core` clean) with a scratch copy of
+  `harness/main.swift` in `work/b32/harness-measure/` (three `measure:`
+  stderr lines; `onTimeChanged` wrapped), over
+  `work/obscure-handles/fixtures/regions.reelcut` with `light 1440 862 0 1 1
+  clip`: `after contentViewController, document.playhead 600000`, then
+  `report 0`, then `before png, playheadSeconds 1.0, document.playhead 0,
+  timecodeField 00:00:00:00`. **The harness's `playheadSec` does not hold**:
+  Playback's first report (0 ticks, the new item's time) reaches
+  `EditorViewController.playbackTimeChanged`, which writes
+  `document.playhead = 0`, so this picture, asked for at 1 s, was taken at 0.
+  The same path runs for every harness caller that passes a playhead.
+- **Two items were not fixed**, each built as specified, measured, and
+  reverted; the patch of the specified state is
+  `work/b32/specd-full-186-2-3.diff`. **#186 item 2**: E10's control
+  ("😀 Hello world": the storage's font at index 0 is not the render's) FAILED
+  on the fix — `storage SourceSans3-Roman_SemiBold, render
+  SourceSans3-Roman_SemiBold`. The storage keeps the requested font at index
+  0 (the editor lays out through `textLayoutManager`, TextKit 2), so HEAD's
+  comparison would find them equal and skip the rewrite. With the check deleted
+  (`--mutant always-rewrite`) the keystroke row counted 3 whole-storage
+  attribute edits for "ab", 0 on the fix; the mutant is not performed because
+  the control failed. **#186 item 3**: at HEAD the field editor already draws
+  the placeholder itself, 2 pt below the rest line (N11 at `12869d4`: rest
+  rows 6.00–14.50, editing 8.00–16.50, light). Drawing it from the cell as
+  well drew "Marker" twice (editing rows 6.00–16.50). The residue is the 2 pt
+  jump, not a missing placeholder. N12 also read `needsDisplay` false right
+  after `insertText("i")` with `controlTextDidChange`'s `needsDisplay = true`
+  in place.
+
+Run on 2026-09-30, the fix over `12869d4`, every instance my own:
+
+| Command | Answer |
+|---|---|
+| `make typecheck`; `make test`; `make app` | 0 errors, 4 warnings, tsc clean; exit 0 (`inventory.py --check` 5/5); BUILD SUCCEEDED |
+| `text_break_proof.py` | 24/24, exit 0 (E6 at 240 px) |
+| `text_break_proof.py --mutant pre-fix-width` | exit 1, caught: E6's line-start row alone FAILS |
+| `text_break_proof.py --baseline 2e78a25` | exit 1, BASELINE CAUGHT: exactly the 6 expected rows FAIL |
+| `name_field_proof.py` | 27/27, exit 0 |
+| `name_field_proof.py --mutant frame-insets` | exit 1, caught: N13 FAILS in both looks and nothing else |
+| `name_field_proof.py --baseline 2e78a25` | exit 1, BASELINE CAUGHT: exactly the 16 expected rows FAIL |
+| `obscure_handles_probe.py` | 16/16, exit 0; F0 margin 23.0 pt |
+| `obscure_handles_probe.py --baseline ffae505` | exit 1, BASELINE CAUGHT: exactly D1 M1 M2 M3 X0 X1 T1 G1 L1 fail |
+| `obscure_handles_probe.py --mutant no-count-gate` / `grips-first` | exit 1 each, caught: G1 / C2 |
+| `graphics_inspector_proof.py --port 4863` | 59/59, exit 0 (Z1: no `Reelcut: ` line) |
+| `screens.py --port 4861 --only 05-clip-picture,…,10-clip-clip-tab --compare` (before: `12869d4`) | 11 pass of 11, 0 new problems; 0/24 byte-identical, every difference in the inspector's name fields: y 38–57 (the header's) on five screens, y 38–295 on 07 (the header's and the two string property fields), each box 2 pt narrower on both sides |
+| `name_field_proof.py --mutant` `no-editing-placeholder` / `cell-string` / `no-text-redisplay`; `text_break_proof.py --mutant always-rewrite`, on the final tree | exit 2 each, not performed: no such mutant (their items reverted) |
+| the spec'd #186 items 2 and 3, before the revert | `text_break_proof.py` 25/26 (E10's control FAIL); `--mutant always-rewrite` exit 2; `name_field_proof.py` 29/35 (N11, N12, N14 FAIL in both looks) |
+
+```sh
+python3 tools/proof/text_break_proof.py                          # 24/24
+python3 tools/proof/text_break_proof.py --mutant pre-fix-width   # exit 1, E6 FAILS
+python3 tools/proof/name_field_proof.py --mutant frame-insets    # exit 1, N13 FAILS
 ```

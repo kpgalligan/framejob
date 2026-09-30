@@ -21,6 +21,10 @@
 // fill sampled 3 pt in from its right edge; "HHHH" has no descender, so the
 // ink rows' extent is the cap height.
 //
+// After N9 (B32, #186 item 4), an `OptionFieldControl` with the number
+// field's arguments joins the host at leading 20, top 60 (`below`, N13),
+// captured as b32-rest.
+//
 // One JSON object on `<out dir>/answer-<look>.json`: `rows` (name, ok,
 // detail), rewritten after every row.
 import AppKit
@@ -343,6 +347,46 @@ do {
           "problems " + kinds(long) + "; " + longWidth + "; the cell " + wraps + ", " + single)
     field.stringValue = "HHHH"
     field.isEditable = true
+}
+
+// B32 (#186 item 4): a number field under the name field, for N13.
+let below = OptionFieldControl(
+    width: 80, unit: " px", decimals: 0, min: 0, max: 100,
+    read: { 24 }, write: { _ in }, enabled: { true }, onEdit: {})
+below.translatesAutoresizingMaskIntoConstraints = false
+host.addSubview(below)
+NSLayoutConstraint.activate([
+    below.leadingAnchor.constraint(equalTo: host.leadingAnchor, constant: 20),
+    below.topAnchor.constraint(equalTo: host.topAnchor, constant: 60),
+])
+below.refresh()
+spin(0.1)
+let b32Rest = capture("b32-rest")
+
+// N13 — the name field's box starts where a number field's does under the
+// same leading constraint.
+do {
+    func column(_ view: NSView) -> CGFloat? {
+        guard let shot = b32Rest else { return nil }
+        let y = Int(view.frame.midY * shot.scale)
+        let background = shot.pixel(Int(5 * shot.scale), y)
+        let start = Int(12 * shot.scale)
+        let end = Int(view.frame.maxX * shot.scale)
+        guard start < end else { return nil }
+        for x in start..<end where far(shot.pixel(x, y), background, 6) {
+            return CGFloat(x) / shot.scale
+        }
+        return nil
+    }
+    let a = column(field)
+    let b = column(below)
+    var ok = false
+    if let a, let b { ok = abs(a - b) <= 0.5 }
+    check("N13 the name field's box starts where a number field's box under the same leading "
+            + "constraint starts, within 0.5 pt", ok,
+          String(format: "name field's box from x %.2f, number field's from x %.2f; ",
+                 a ?? -1, b ?? -1)
+            + "field.frame \(field.frame), alignmentRect \(field.alignmentRect(forFrame: field.frame))")
 }
 
 exit(0)

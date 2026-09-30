@@ -24,6 +24,12 @@
 // probe that dies leaves the rows it did score and the proof scores the rest
 // as FAIL.
 //
+// The split is pinned before `AppDelegate()` (B32, #188 item 1): an
+// argument-domain `ReelcutInspectorWidth` 304, `ReelcutTimelineHeight` 300
+// and `ReelcutInspectorCollapsed` false, so the canvas's scale does not
+// follow whatever this user's defaults last saved; and every window is set
+// to content 1600 × 1000 before its editor opens.
+//
 // A line START is the UTF-16 offset a laid-out line begins at. The editor's
 // are read from `textLayoutManager` when the view has one (TextKit 2 —
 // reading `layoutManager` would switch the view to TextKit 1), else from
@@ -45,6 +51,10 @@ let request = (try? JSONSerialization.jsonObject(
 let out = URL(fileURLWithPath: CommandLine.arguments[2])
 let app = NSApplication.shared
 app.setActivationPolicy(.prohibited)
+UserDefaults.standard.setVolatileDomain(
+    ["ReelcutInspectorWidth": 304.0, "ReelcutTimelineHeight": 300.0,
+     "ReelcutInspectorCollapsed": false],
+    forName: UserDefaults.argumentDomain)
 let delegate = AppDelegate()
 delegate.applicationWillFinishLaunching(
     Notification(name: NSApplication.willFinishLaunchingNotification, object: app))
@@ -188,9 +198,14 @@ func open(_ key: String, label: String) -> Session? {
     guard let window = document.windowControllers.first?.window,
           let editor = window.contentViewController as? EditorViewController,
           let canvas = walk(editor.view).first(where: { $0 is PreviewCanvasView })
-            as? PreviewCanvasView,
-          let box = canvas.box(for: clipID)
+            as? PreviewCanvasView
     else {
+        check("\(label) the editor window, its canvas and the clip's box open", false)
+        return nil
+    }
+    window.setContentSize(NSSize(width: 1600, height: 1000))
+    spin(0.5)
+    guard let box = canvas.box(for: clipID) else {
         check("\(label) the editor window, its canvas and the clip's box open", false)
         return nil
     }
@@ -319,8 +334,15 @@ if let s = open("small", label: "E6 size 12:"), let props = s.box.clip.text {
             + "(a CONTROL)", off <= 1,
           String(format: "off by %.2f pt; editor ", off) + text(frame) + ", box + 2 px "
             + text(want))
+    // The wrap width the editor lays out in, against the box's own width in
+    // view points (#186 item 1): what E6 compares at 240 px.
+    let container = s.field.textContainer
+    let wrap = (container?.size.width ?? 0) - 2 * (container?.lineFragmentPadding ?? 0)
+    let boxWidth = CGFloat(props.width ?? 0) * s.scale
     startsRow("E6 size 12: the editor's line starts equal the render's",
-              editor: editorLines(s.field), render: renderStarts(props))
+              editor: editorLines(s.field), render: renderStarts(props),
+              extra: String(format: "; the editor's wrap width %.3f pt, width × scale %.3f pt",
+                            wrap, boxWidth))
     close(s)
 }
 

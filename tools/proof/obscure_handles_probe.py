@@ -33,7 +33,9 @@ Rows:
   F0  CONTROL: every package opens, the box is at rotation 30 and scale 0.6,
       the lists read back (short's end list has one entry), every region edge
       on screen is ≥ 24 pt, and cover's topRight grip is within 0.5 pt of the
-      layer's topRight handle.
+      layer's topRight handle. The split is pinned (an argument-domain
+      inspector width 304, timeline height 300, inspector shown; B32), and
+      the detail ends with the margin, the shortest edge − 24 pt.
   D0  CONTROL: nothing selected, the overlay has alpha 0 within ±1 px of each
       region edge's ¼ and ¾ points and each centre.
   D1  selected: the same points all carry ink.

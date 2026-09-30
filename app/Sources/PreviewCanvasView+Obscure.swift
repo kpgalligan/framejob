@@ -37,7 +37,9 @@ extension PreviewCanvasView {
     /// `handleGrab` by the larger axis distance; a tie goes to the higher
     /// index (the region drawn later), then to the earlier grip.
     func obscureHit(at point: CGPoint) -> ObscureRegionHit? {
-        guard obscureStartList != nil, let box = obscureBox else { return nil }
+        guard let box = obscureBox, !box.video.obscure.isEmpty, obscureStartList != nil else {
+            return nil
+        }
         var best: (hit: ObscureRegionHit, distance: CGFloat)?
         for (index, region) in box.video.obscure.enumerated() {
             for grip in ObscureGrip.all {
@@ -127,7 +129,9 @@ extension PreviewCanvasView {
     /// A `handleGrab` square at every grip (view space), empty while the
     /// grips do not exist.
     func obscureCursorRects() -> [(rect: CGRect, cursor: NSCursor)] {
-        guard obscureStartList != nil, let box = obscureBox else { return [] }
+        guard let box = obscureBox, !box.video.obscure.isEmpty, obscureStartList != nil else {
+            return []
+        }
         let grab = Self.handleGrab
         var rects: [(rect: CGRect, cursor: NSCursor)] = []
         for region in box.video.obscure {

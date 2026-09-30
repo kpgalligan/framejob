@@ -17,7 +17,7 @@ this index gets its row in the same change.
 | [`03-window-layout.md`](03-window-layout.md) | 62 | The window's regions, as the design handoff specifies them. |
 | **§4 — The regions in detail** | | |
 | [`04.1-toolbar.md`](04.1-toolbar.md) | 26 | The toolbar. |
-| [`04.2-preview-canvas.md`](04.2-preview-canvas.md) | 77 | The preview canvas: selection, handles, crop and region modes, on-canvas text, snapping. |
+| [`04.2-preview-canvas.md`](04.2-preview-canvas.md) | 72 | The preview canvas: selection, handles, crop and region modes, on-canvas text, snapping. |
 | [`04.3-inspector.md`](04.3-inspector.md) | 499 | The inspector: the Clip tab's sub-tabs, row marks, Reset/Clear; every video, audio, text and shape section; the Media, Document and Assistant tabs. |
 | [`04.4-timeline.md`](04.4-timeline.md) | 193 | The timeline: its bar, the level meter, ruler, tracks, clip bodies, gestures, entering a nest. |
 | **§5 — Editing model** | | |

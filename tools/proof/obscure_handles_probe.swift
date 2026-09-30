@@ -22,8 +22,12 @@
 //   short    `action` with the end `{video: {obscure: [R0]}}` instead
 //   cover    one rect region (0, 0) 760 × 420 — the cropped rect itself
 // Every row opens its own editor in the app's window (content 1600 × 1000)
-// and closes it. Gestures go through `beginGesture` / `continueGesture` /
-// `endGesture` at view points; Esc is a keyCode-53 `NSEvent` through
+// and closes it. The split is pinned before `AppDelegate()` (B32, #188 item
+// 1): an argument-domain `ReelcutInspectorWidth` 304, `ReelcutTimelineHeight`
+// 300 and `ReelcutInspectorCollapsed` false, so F0's shortest edge does not
+// follow whatever this user's defaults last saved. Gestures go through
+// `beginGesture` / `continueGesture` / `endGesture` at view points; Esc is a
+// keyCode-53 `NSEvent` through
 // `handleKey`. The answer is ONE line on stdout, `ANSWER {"rows": [...]}`,
 // each row an ID, ok and detail.
 import AppKit
@@ -39,6 +43,10 @@ let request = (try? JSONSerialization.jsonObject(
     ?? [:]
 let app = NSApplication.shared
 app.setActivationPolicy(.prohibited)
+UserDefaults.standard.setVolatileDomain(
+    ["ReelcutInspectorWidth": 304.0, "ReelcutTimelineHeight": 300.0,
+     "ReelcutInspectorCollapsed": false],
+    forName: UserDefaults.argumentDomain)
 let delegate = AppDelegate()
 delegate.applicationWillFinishLaunching(
     Notification(name: NSApplication.willFinishLaunchingNotification, object: app))
@@ -314,6 +322,7 @@ func alphas(_ values: [CGFloat]) -> String {
 do {
     var ok = true
     var details: [String] = []
+    var shortest = CGFloat.infinity
     for (key, playhead, action) in [("regions", 1.0, nil), ("action", 3.0, UInt32(3)),
                                     ("short", 3.0, UInt32(3)), ("cover", 1.0, nil)]
         as [(String, Double, UInt32?)] {
@@ -332,6 +341,7 @@ do {
                 return hypot(b.x - a.x, b.y - a.y)
             }
         }
+        shortest = min(shortest, lengths.min() ?? 0)
         let project = parse(editor.json)
         let base = list(video(project))?.count ?? -1
         let end = list(endVideo(project))?.count
@@ -369,7 +379,8 @@ do {
                 + extra)
         close(editor)
     }
-    row("F0", ok, details.joined(separator: "; "))
+    row("F0", ok, details.joined(separator: "; ")
+            + String(format: "; margin %.1f pt", Double(shortest - 24)))
 }
 
 // MARK: - D0 / D1 the outlines are drawn only while the clip is selected
