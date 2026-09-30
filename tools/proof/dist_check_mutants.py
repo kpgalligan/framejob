@@ -180,7 +180,8 @@ def main():
     real = {"release": os.path.abspath(arguments.release),
             "dist": os.path.abspath(arguments.dist)}
 
-    print("road map 12 A4 — dist_check's helper rows, each made to fail on purpose\n")
+    print("road map 12 A4 and #145 — dist_check's helper rows (D6–D13) and D14, "
+          "each made to fail on purpose\n")
     print(f"  release:      {real['release']}")
     print(f"  distribution: {real['dist']}\n")
     needle, reason = dist_check.read_needle()

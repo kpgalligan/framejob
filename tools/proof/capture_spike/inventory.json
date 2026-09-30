@@ -1067,14 +1067,14 @@
    "reached_after": [],
    "other_caller": "app/Sources/GraphicPane+Source.swift:216 — refuse(), after the name alert above, on a bad or taken name"
   },
-  "app/Sources/MediaPaneCommands.swift:192": {
+  "app/Sources/MediaPaneCommands.swift:180": {
    "token": "beginSheetModal",
    "func": "relink",
    "reached_from": [],
    "reached_after": [],
    "other_caller": "app/Sources/MediaRowView.swift `func relinkMedia(` — a Media tab row's Relink… item"
   },
-  "app/Sources/MediaPaneCommands.swift:248": {
+  "app/Sources/MediaPaneCommands.swift:224": {
    "token": "beginSheetModal",
    "func": "remove",
    "reached_from": [],

@@ -4,9 +4,10 @@ the running app.
 
     python3 tools/proof/v2_menu.py <port> [--log PATH] [--only LETTERS]
 
-`--only` takes row letters (`T,H,N,D,U,R,S,L`); omitted, every row runs. The app
-is the Release build on `<port>`, launched with the V2b spec's Verification
-line (V2a's pinned defaults plus `-RCSecretFolder` under
+`--only` takes row letters (`T,H,N,D,U,R,S,L`); omitted, every row runs.
+`--only H` needs no app: the H rows are the probe's, and no MCP client is
+made (issue batch B28). The app is the Release build on `<port>`, launched
+with the V2b spec's Verification line (V2a's pinned defaults plus `-RCSecretFolder` under
 `work/v2_menu/secrets` and `-RCSpendFolder` under `work/v2_menu/spend` —
 it opens Settings, whose month line would otherwise read the person's
 ledger, spec §11 P-5), fresh for each run; `--log` defaults to
@@ -765,7 +766,7 @@ def main():
     if "H" in only:
         rows_h(probe, probe_error)
 
-    mcp = MCP(args.port, timeout=120)
+    mcp = MCP(args.port, timeout=120) if only - {"H"} else None
     if "T" in only:
         guarded("T", rows_t, mcp, log)
     if only & set("NDURS"):

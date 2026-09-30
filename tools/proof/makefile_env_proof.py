@@ -53,16 +53,23 @@ row failed (caught) and 0 when none did (it survived); a copy that could
 not be made or a build that failed performs no control and exits 2 (rule R,
 issue batch B13), printing `mutant <name>: the control could not be
 performed — <why>`. Without `--mutant` either is a scored FAIL, exit 1.
+`make app` runs through `bounded.run` in its own session, so a build that
+passes `--wall` has its whole process group killed (rule H, issue batch
+B28): `make` and `xcodebuild` die with the group, while what `xcodebuild`'s
+build service starts in its own process groups (`swift-frontend`,
+build-phase scripts) can outlive it.
 """
 
 import argparse
 import os
 import shutil
-import subprocess
 import sys
 import time
 
 import tree_copy
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "graphics_spike"))
+import bounded  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 WORK = os.path.join(ROOT, "tools", "proof", "work", "makefile-env")
@@ -140,14 +147,14 @@ def build(root, wall):
     binary = os.path.join(root, "build", "Build", "Products", "Release", "Reelcut.app",
                           "Contents", "MacOS", "Reelcut")
     started = time.time()
-    try:
-        run = subprocess.run(["make", "app"], cwd=root, capture_output=True, text=True,
-                             env=child_env(), timeout=wall, stdin=subprocess.DEVNULL)
-    except subprocess.TimeoutExpired:
+    run = bounded.run(["make", "app"], wall, cwd=root, env=child_env())
+    if run["expired"]:
         return None, f"the copy's `make app` passed its {wall:.0f} s wall"
-    if run.returncode != 0:
-        errors = [line for line in run.stdout.splitlines() if "error:" in line]
-        return None, "`make app` failed:\n      " + "\n      ".join(errors[:6] or ["(none)"])
+    if run["rc"] != 0:
+        errors = [line for line in run["stdout"].splitlines() if "error:" in line]
+        last = [line for line in run["stderr"].strip().splitlines() if line.strip()][-1:]
+        lines = errors[:6] or last or ["(none)"]
+        return None, "`make app` failed:\n      " + "\n      ".join(lines)
     if not os.path.exists(binary):
         return None, f"`make app` succeeded and wrote no binary at {binary}"
     print(f"  built {binary} in {time.time() - started:.0f} s")

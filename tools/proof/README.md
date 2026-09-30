@@ -8120,7 +8120,7 @@ instrument failure is a scored FAIL, exit 1.
 
 | Runner | caught / survived / not performed |
 |---|---|
-| `assistant_lane_proof.py`, `assistant_tab_proof.py`, `assistant_helper_proof.py`, `assistant_prompt_proof.py`, `assistant_session_proof.py`, `spend_proof.py`, `budget_proof.py`, `prices_proof.py`, `prices_crosscheck.py`, `makefile_env_proof.py`, `export_cancel_proof.py`, `video_configuration_proof.py`, `speed_sheet_probe.py`, `text_break_proof.py`, `name_field_proof.py` (`--baseline`, B23), `obscure_handles_probe.py` (`--baseline` and `--mutant`, B25) and `assistant_compaction_proof.py` (`--mutant`, B26) | 1 / 0 / 2 |
+| `assistant_lane_proof.py`, `assistant_tab_proof.py`, `assistant_helper_proof.py`, `assistant_prompt_proof.py`, `assistant_session_proof.py`, `spend_proof.py`, `budget_proof.py`, `prices_proof.py`, `prices_crosscheck.py`, `makefile_env_proof.py`, `export_cancel_proof.py`, `video_configuration_proof.py`, `speed_sheet_probe.py`, `text_break_proof.py`, `name_field_proof.py` (`--baseline`, B23), `obscure_handles_probe.py` (`--baseline` and `--mutant`, B25), `cache_pass_probe.py` (`--mutant`, B14) and `assistant_compaction_proof.py` (`--mutant`, B26) | 1 / 0 / 2 |
 | `spend_ui_proof.py` | 1 / 3 / 2 |
 | `graphics_proof.py`, `graphics_store_probe.py`, `words_picture_probe.py` | 0 / 1 / 2 |
 | `cloud_captions_proof.py`, `cloud_captions_probe.py` (`--mutant`, `--fake-mutant`), `recording_probe.py`, `phase9_chrome.py` — whole-suite mutants | the per-row count and a normal run's exit / 2 |
@@ -8953,3 +8953,68 @@ The live run's turn 1 compacted from 18,998 to about 884 tokens (C2), and its
 `make test`. Run it only when a change is likely to break compaction (the
 helper, the SDK, `AssistantPrompt.compactionInstructions`, the session's
 `configure`).
+
+## Issue batch B28 — proof runners: rule R exits, call-time defaults, stray bits (#177 #179 #181 #184 #186 #188)
+
+- **#177.1** `assistant_tab_proof.build_probe` and `assistant_lane_proof.build_probe`
+  take `sources=None, probe_dir=None` and read the module's `SOURCES` /
+  `PROBE_DIR` at call time, so an importer that sets them is heard. B13's
+  explicit arguments in `spend_proof.py` and `spend_ui_proof.py` stay; their
+  comment says the globals are now read too.
+- **#177.2** `makefile_env_proof.build` runs `make app` through `bounded.run`
+  (its own session, `killpg(SIGKILL)` on expiry). At HEAD a `--wall 30` run
+  left `xcodebuild` (parent 1) and a `swift-frontend` compiling in the copy;
+  after it, `make` and `xcodebuild` die with their group. What `xcodebuild`'s
+  build service starts in its OWN process groups is not in that group: across
+  three `--wall 30` runs, the scan straight after listed such processes each
+  time; twice they were gone by a second scan, once a `swift-frontend`
+  (parent 1, its own group) was still compiling and was killed by hand. The
+  kill was not widened; that is residue, left for an issue.
+- **#177.3** `words_picture_probe.py`'s always-true `built` flag and its
+  `built True, ` in the survivor line are gone.
+- **#179.3** `spend_proof.py`'s `--mutant` verdict is `mutant_verdict`, over
+  `MUTANT_ROWS`: caught (exit 1, `mutant <m>: caught — <rows> failed`) only
+  when every row the mutant names FAILed; a named row that passed is a
+  survivor (exit 0, `SURVIVED — <rows> passed`), whatever else failed. Not
+  performed stays exit 2.
+- **#181.6** `v2_menu.py --only H` makes no MCP client and needs no app (at
+  HEAD it scored H1–H5 and then died on `Connection refused`, exit 1).
+- **#184.4** `speed_sheet_probe.py`: an answer that is not a JSON object, or
+  lacks `clips.B` or `P5clips.B` (`answer_gaps`), is no answer — every row
+  but B0 fails `no row: the answer lacks …` and is not scored, so a plain run
+  exits 1 and a `--mutant` run 2. At HEAD the three stubbed stdouts below
+  raised `KeyError` / `TypeError`.
+- **#184.5** `dist_check_mutants.py`'s banner names #145, D6–D13 and D14.
+- **#184.6** The rule R table's first row names `cache_pass_probe.py`.
+- **#186.5** `capture_spike/inventory.json` re-pins
+  `MediaPaneCommands.swift:192` → `:180` and `:248` → `:224`, the lines K1
+  printed; no other key moved.
+- **#188.3** `obscure_handles_probe.py` labels a not-performed line
+  `baseline <rev>` (`tree` without either flag), no longer `mutant baseline`.
+
+Run on 2026-09-30 against HEAD `96b40e6`, every process my own:
+
+| Command | Answer |
+|---|---|
+| `build_probe` stub (scratch `SOURCES` with `Marker.swift`, `bounded.run` recording argv) | HEAD: `tab TREE`, `lane TREE`; after: `tab scratch`, `lane scratch` |
+| `spend_proof.mutant_verdict`, six hand-fed result lists | `[0, 1, 0, 1, 2, 2]` |
+| `speed_sheet_probe.main` with `build` stubbed to print `{"P0":{"lines":["x"]}}`, `null`, `"fatal error"` | HEAD: `KeyError 'clips'`, `TypeError` ×2 (plain and `--mutant no-gain-lines` alike); after: each plain run 1/8 exit 1 with `no row: the answer lacks clips.B, P5clips.B`, each mutant run exit 2 `row(s) not scored: P1, P3, P5` |
+| `spend_proof.py --mutant no-partial` | 1/3, `caught — H10, H11 failed`, exit 1 |
+| `spend_proof.py --mutant keep-unpriced` | 2/3, `caught — H12 failed`, exit 1 |
+| `spend_proof.py --mutant unknown-as-zero` | 5/6, `caught — S1 failed`, exit 1 |
+| `assistant_tab_proof.py --mutant tab-types` | P9 FAIL, 0/1, exit 1 |
+| `assistant_lane_proof.py --mutant mode-0755` | L12 FAILS (expected), exit 1 |
+| `speed_sheet_probe.py`; `--mutant minted-only` | 8/8 exit 0; 7/8 `caught — P5 failed` exit 1 |
+| `obscure_handles_probe.py --baseline 0000000`; `--mutant grips-first` | `baseline 0000000: the control could not be performed — git archive 0000000 failed: …` exit 2; 13/14 `caught — C2 failed` exit 1 |
+| `v2_menu.py 4899 --only H`, nothing on 4899 | HEAD: H1–H5 pass, then `URLError … Connection refused`, exit 1; after: `5 pass, 0 fail, 0 skip of 5`, exit 0 |
+| `words_picture_probe.py --mutant ignore-word` | `MUTANT PASS: ignore-word — 3 row(s) FAILED in the copy, 620 s`, exit 0 |
+| `dist_check_mutants.py` | the new banner; 12/12, exit 0 |
+| `makefile_env_proof.py --mutant no-unexport --wall 30` | exit 2, `passed its 30 s wall` (HEAD and after); scan after, HEAD: `xcodebuild` and a `swift-frontend` still running (killed by hand); after: see #177.2 above |
+| `makefile_env_proof.py --mutant no-unexport` | 2/3, exit 1 (the AssemblyAI row FAILs in the copy) |
+| `capture_spike/inventory.py --check` | 5/5, K1 `every pin at its own line` |
+| `make test` | exit 0 (`assistant_lane_proof.py` 18/18, `assistant_prompt_proof.py --probe` 14/14, `prices_proof.py` 27/27, `budget_proof.py` 23/23, `inventory.py --check` 5/5) |
+
+Not changed (residue, left for issues): the same import-time default in
+`playback_audio_proof.py`, `video_configuration_proof.py` and
+`export_cancel_proof.py` (no importer sets their globals), and
+`name_field_proof.py`'s `mutant baseline:` label.

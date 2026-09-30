@@ -67,12 +67,17 @@ A mutant whose instrument did not build could not perform its control
 (exit 2); so, by rule R (issue batch B13), could one whose named row (H3,
 S1) was never scored, or that scored any row where its own comparison did
 not run (a probe that printed no row, an exception caught by `guarded`, a
-failed setup; `no-partial` names H10 and H11, `keep-unpriced` H12): `mutant <name>: the control could not be performed — <why>`,
-exit 2. A caught mutant exits 1, a surviving one 0. Prints `<ID> ok|FAIL — <detail>` per row, then `n/m`. An
-instrument that cannot run is a scored FAIL. No network: the feed is an
-in-process `http.server` on 127.0.0.1:0, the API is the stand-in, and every
-child has `ANTHROPIC_API_KEY` and `RC_ASSEMBLYAI_KEY` popped. The only key is
-the dummy `proof-key`. Rule H: only this script's processes are killed.
+failed setup; `no-partial` names H10 and H11, `keep-unpriced` H12):
+`mutant <name>: the control could not be performed — <why>`, exit 2. A
+mutant is caught only when every row it names FAILed — `mutant <name>:
+caught — <rows> failed`, exit 1; when any named row passed it survived —
+`mutant <name>: SURVIVED — <rows> passed`, exit 0 (issue batch B28; a FAIL
+in a row it does not name no longer counts). Prints `<ID> ok|FAIL —
+<detail>` per row, then `n/m`. An instrument that cannot run is a scored
+FAIL. No network: the feed is an in-process `http.server` on 127.0.0.1:0,
+the API is the stand-in, and every child has `ANTHROPIC_API_KEY` and
+`RC_ASSEMBLYAI_KEY` popped. The only key is the dummy `proof-key`. Rule H:
+only this script's processes are killed.
 """
 
 import argparse
@@ -700,9 +705,7 @@ def rows_s(score, sources=None, label=""):
     atp.PROBE_DIR = probe_dir
     atp.PROBE_SWIFT = PROBE_SWIFT
     atp.SOURCES = sources or os.path.join(ROOT, "app", "Sources")
-    # Passed, not left to the defaults: `build_probe`'s defaults were bound
-    # when assistant_tab_proof was imported, so the two assignments above do
-    # not reach them (issue batch B13).
+    # Passed explicitly; `build_probe` also reads these globals at call time (B28).
     binary, why = atp.build_probe(atp.SOURCES, probe_dir)
     if binary is None:
         for row_id in PROBE_ROWS:
@@ -767,6 +770,10 @@ HELPER_MUTANTS = {
                       "      inFlight.message = undefined;\n",
                       "      const message = await stream.finalMessage();\n", ["H12"]),
 }
+
+# mutant: the rows it names; caught only when every one of them FAILed.
+MUTANT_ROWS = {"stale-refresh": ["H3"], "unknown-as-zero": ["S1"],
+               **{name: rows for name, (_, _, rows) in HELPER_MUTANTS.items()}}
 
 
 def cut_helper(name):
@@ -898,20 +905,31 @@ def main():
     passed = sum(1 for _, ok, _ in results if ok)
     print(f"{passed}/{len(results)}", flush=True)
     if args.mutant:
-        named = {"stale-refresh": ["H3"], "unknown-as-zero": ["S1"],
-                 **{name: rows for name, (_, _, rows) in HELPER_MUTANTS.items()}}[args.mutant]
-        broken = [r for r, _, instrument in results if instrument]
-        unscored = [r for r in named if r not in [r for r, _, _ in results]]
-        why = (f"{', '.join(unscored)} never scored" if unscored else
-               f"scored as instrument failures: {', '.join(broken)}" if broken else "")
-        if why:
-            print(f"mutant {args.mutant}: the control could not be performed — {why}",
-                  flush=True)
-            return 2
-        failed = [r for r, ok, _ in results if not ok]
-        print(f"mutant {args.mutant}: named {', '.join(named)}; FAIL {failed or 'none'}",
-              flush=True)
+        return mutant_verdict(args.mutant, results)
     return 0 if passed == len(results) else 1
+
+
+def mutant_verdict(mutant, results):
+    """Rule R for a `--mutant` run over `main`'s `(row_id, ok, instrument)`
+    list: 2 when a named row went unscored or any row is an instrument
+    failure, 1 when every row `MUTANT_ROWS` names FAILed (caught), else 0
+    (survived)."""
+    named = MUTANT_ROWS[mutant]
+    broken = [r for r, _, instrument in results if instrument]
+    unscored = [r for r in named if r not in [r for r, _, _ in results]]
+    why = (f"{', '.join(unscored)} never scored" if unscored else
+           f"scored as instrument failures: {', '.join(broken)}" if broken else "")
+    if why:
+        print(f"mutant {mutant}: the control could not be performed — {why}", flush=True)
+        return 2
+    failed = [r for r, ok, _ in results if not ok]
+    print(f"mutant {mutant}: named {', '.join(named)}; FAIL {failed or 'none'}", flush=True)
+    survived = [r for r, ok, _ in results if ok and r in named]
+    if survived:
+        print(f"mutant {mutant}: SURVIVED — {', '.join(survived)} passed", flush=True)
+        return 0
+    print(f"mutant {mutant}: caught — {', '.join(named)} failed", flush=True)
+    return 1
 
 
 if __name__ == "__main__":

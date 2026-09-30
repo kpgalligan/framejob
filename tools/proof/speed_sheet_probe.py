@@ -30,6 +30,10 @@ failed; a build failure is B0's FAIL there. A `--mutant` run exits 1 when
 every row the mutant names failed (caught), 0 when one passed (survived),
 and 2 when the control could not be performed: the copy's `before` text not
 found exactly once, the copy did not build, or a named row was not scored.
+An answer that is not a JSON object, or that lacks `clips.B` or
+`P5clips.B`, is no answer (issue batch B28): every row but B0 fails as
+`no row: the answer lacks …` and is not scored, so a plain run exits 1 and
+a `--mutant` run 2.
 """
 import argparse
 import json
@@ -105,6 +109,19 @@ def mutate(sources, name, dest):
     return None
 
 
+def answer_gaps(answer):
+    """The members of `clips.B` and `P5clips.B` the answer lacks — each
+    path's parent must be an object holding the key; a non-object answer
+    lacks both."""
+    gaps = []
+    for path in ("clips.B", "P5clips.B"):
+        parent, key = path.split(".")
+        holder = answer.get(parent) if isinstance(answer, dict) else None
+        if not (isinstance(holder, dict) and key in holder):
+            gaps.append(path)
+    return gaps
+
+
 def judge(answer):
     """{row: (ok, detail)} for every row but B0."""
     results = {}
@@ -176,8 +193,12 @@ def main():
             ran = run([str(binary)], RUN_WALL)
             (here / "stderr.txt").write_text(ran.stderr)
             answer = json.loads(ran.stdout)
-            if "error" in answer:
+            if not isinstance(answer, dict):
+                why, answer = "the answer lacks " + ", ".join(answer_gaps(answer)), None
+            elif "error" in answer:
                 why, answer = f"the probe stopped: {answer['error']}", None
+            if answer is not None and (gaps := answer_gaps(answer)):
+                why, answer = "the answer lacks " + ", ".join(gaps), None
         except subprocess.TimeoutExpired:
             why = f"no answer within {RUN_WALL} s"
         except ValueError:

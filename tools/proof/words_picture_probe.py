@@ -252,12 +252,11 @@ def mutant(name):
               f"{DEADLINE} s ({elapsed:.0f} s)")
         return 2
     caught = not all(rows[2:])
-    built = True
     if caught:
         print(f"MUTANT PASS: {name} — {rows.count(False)} row(s) FAILED in the copy, "
               f"{elapsed:.0f} s")
         return 0
-    print(f"MUTANT FAILURE: {name} — built {built}, caught {caught}, {elapsed:.0f} s")
+    print(f"MUTANT FAILURE: {name} — caught {caught}, {elapsed:.0f} s")
     return 1
 
 

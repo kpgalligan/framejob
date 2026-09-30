@@ -316,7 +316,8 @@ def main():
     if here.exists():
         shutil.rmtree(here)
     here.mkdir(parents=True)
-    label = f"mutant {args.mutant}" if args.mutant else "mutant baseline"
+    label = (f"mutant {args.mutant}" if args.mutant else
+             f"baseline {args.baseline}" if args.baseline else "tree")
 
     def not_performed(why):
         print(f"{label}: the control could not be performed — {why}")

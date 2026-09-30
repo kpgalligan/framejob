@@ -323,9 +323,7 @@ def rows_probe(score, sources=None, label=""):
     atp.PROBE_DIR = probe_dir
     atp.PROBE_SWIFT = PROBE_SWIFT
     atp.SOURCES = sources or os.path.join(ROOT, "app", "Sources")
-    # Passed, not left to the defaults: `build_probe`'s defaults were bound
-    # when assistant_tab_proof was imported, so the two assignments above do
-    # not reach them (issue batch B13).
+    # Passed explicitly; `build_probe` also reads these globals at call time (B28).
     binary, why = atp.build_probe(atp.SOURCES, probe_dir)
     if binary is None:
         for row_id in PROBE_ROWS:
