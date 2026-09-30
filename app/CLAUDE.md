@@ -940,8 +940,10 @@ free.
   — and a probe row compares them.
 - `CloudProgress.swift` — the cloud run's one number and the words beside it,
   PURE: a share per media TO UPLOAD (cached and held media have none), the
-  four phases at 0.25 / 0.65 / 0.95, the wait advancing on the clock against
-  q8's 147× and holding, and the four detail lines. The run publishes
+  four phases at 0.25 / 0.65 / 0.95, the submit holding at the upload's end
+  (0.65) with a line of its own, the wait advancing on the clock against q8's
+  147× and holding, and the five detail lines, a count under a megabyte spelt
+  `<1`. The run publishes
   `max(previous, computed)`.
 - `AssemblyAITranscript.swift` — the wire VALUES, and
   `TranscriptOptions.keyterms`, the ONE spelling of the vocabulary's
@@ -980,7 +982,13 @@ free.
   gate — `poll`, `delete`, a submit reply and a recovery-list row — so an id
   that carries the key is never sent or accepted. `delete` answers THREE
   states (`deleted`, `failed`, `notSent`): an id that is not sendable is never
-  put on the wire. `+Submission` owns the single paid submit and R6-14's
+  put on the wire. `delete(id:cancel:)` reads the run's token as a STOP and
+  never attaches it: a DELETE is cut `deleteAfterStop` (2 s) of wall clock
+  after the later of the Stop and its own start and answers `failed`, owed
+  like any other (R6-19); `send`'s `stop`/`grace` and `+Session`'s
+  `waitForReply` are that bound. `+Session` also holds `ClientError`'s two
+  readings, `isRetriable` and `shortName`, moved out at the cap. `+Submission`
+  owns the single paid submit and R6-14's
   bounded recovery: three newest-page looks for an exact uploaded URL, with
   no retry of the POST or requests by any unrelated id.
 - `AssemblyAIConfiguration.swift` · `AssemblyAILanguages.swift` ·

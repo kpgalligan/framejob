@@ -50,6 +50,10 @@ final class AssemblyAIClient {
         var submitRecoveryAttempts: Int = 3
         var submitRecoveryDelay: TimeInterval = 2.5
         var submitRecoveryTimeout: TimeInterval = 5
+        /// How long a DELETE runs on after a Stop, in wall clock from the
+        /// later of the Stop and its own start (R6-19): above C0's slowest
+        /// DELETE, so a Stop during a submit or a wait still deletes.
+        var deleteAfterStop: TimeInterval = 2
 
         static let shipped = Tuning(
             pollInterval: 3, pollCeilingFloor: 300, pollCeilingDivisor: 49, uploadRetries: 1,
@@ -200,7 +204,7 @@ final class AssemblyAIClient {
     /// cancelled.
     ///
     /// **Every throwing exit deletes the transcript first** (R6-4): one
-    /// `delete(id:)`, best effort, before the throw. A transcript AssemblyAI
+    /// `delete(id:cancel:)`, best effort, before the throw. A transcript AssemblyAI
     /// is still making, or has made and nobody read, is one it keeps
     /// indefinitely, and this is the one place that knows its id.
     ///
@@ -220,33 +224,40 @@ final class AssemblyAIClient {
         let started = Date()
         var failures = 0
         while true {
-            if cancel?.isCancelled == true { throw refusing(.cancelled, id: id) }
-            if Date().timeIntervalSince(started) > ceiling { throw refusing(.timedOut, id: id) }
+            if cancel?.isCancelled == true { throw refusing(.cancelled, id: id, cancel: cancel) }
+            if Date().timeIntervalSince(started) > ceiling {
+                throw refusing(.timedOut, id: id, cancel: cancel)
+            }
             let reply = send(request("GET", path: "/v2/transcript/\(id)"), cancel: cancel)
             if let failure = classify(reply) {
-                guard failure.isRetriable else { throw refusing(failure, id: id) }
+                guard failure.isRetriable else { throw refusing(failure, id: id, cancel: cancel) }
                 failures += 1
                 note("poll \(id) failed (\(failure.shortName)), \(failures) in a row")
-                if failures > tuning.pollFailuresTolerated { throw refusing(failure, id: id) }
+                if failures > tuning.pollFailuresTolerated {
+                    throw refusing(failure, id: id, cancel: cancel)
+                }
             } else {
                 failures = 0
                 guard
                     let response = try? JSONDecoder().decode(
                         TranscriptResponse.self, from: reply.data)
-                else { throw refusing(.malformed("the transcript did not decode"), id: id) }
+                else {
+                    throw refusing(
+                        .malformed("the transcript did not decode"), id: id, cancel: cancel)
+                }
                 if response.status == "error" {
                     throw refusing(
                         .transcript(
                             withoutCredential(
                                 response.error ?? "AssemblyAI could not transcribe it")),
-                        id: id)
+                        id: id, cancel: cancel)
                 }
                 if response.status == "completed" {
-                    try requireEchoedID(response, polled: id)
+                    try requireEchoedID(response, polled: id, cancel: cancel)
                     guard let words = wordsBytes(in: reply.data) else {
                         throw refusing(
                             .malformed("the transcript came back completed with no words array"),
-                            id: id)
+                            id: id, cancel: cancel)
                     }
                     return Fetched(response: response, wordsJSON: words)
                 }
@@ -288,15 +299,23 @@ final class AssemblyAIClient {
     /// `failed` would put the media in `janitorFailed` and R6-11 would HOLD
     /// it for ever over a string, and `deleted` would report — and write into
     /// the cache file — a delete this app never asked for.
+    ///
+    /// **`cancel` is read as a STOP and never attached** (R6-19). Attaching
+    /// would cancel the DELETE at the press, orphaning the transcript of
+    /// every Stop during a submit or a wait; instead the DELETE is cut
+    /// `deleteAfterStop` of wall clock after the later of the Stop and its
+    /// own start, and a cut one is `failed` — owed, as any failed one is. No
+    /// default: every caller names the token it has, or nil.
     @discardableResult
-    func delete(id: String) -> DeleteAnswer {
+    func delete(id: String, cancel: Transcriber.CancelToken?) -> DeleteAnswer {
         guard isSendableIdentifier(id) else {
             note("refusing to DELETE an id that is not one")
             return .notSent
         }
         var request = self.request("DELETE", path: "/v2/transcript/\(id)")
         request.timeoutInterval = tuning.deleteTimeout
-        return classify(send(request)) == nil ? .deleted : .failed
+        let reply = send(request, stop: cancel, grace: tuning.deleteAfterStop)
+        return classify(reply) == nil ? .deleted : .failed
     }
 
     // MARK: - One request
@@ -320,10 +339,16 @@ final class AssemblyAIClient {
     }
 
     /// Builds the task, hands the delegate its sink, waits. The wait has no
-    /// deadline of its own: `timeoutIntervalForRequest` is the bound, and a
-    /// second one here would leave a task running with nobody to read it.
+    /// deadline of its own but a Stop's: `timeoutIntervalForRequest` is the
+    /// idle bound, and a second one here would leave a task running with
+    /// nobody to read it. A token is read one of two ways: `cancel` is
+    /// ATTACHED, so a Stop cancels the task at the press; `stop` never is —
+    /// `waitForReply` cuts the task `grace` seconds after it is first seen
+    /// set and still waits for its completion. Only `delete` passes a `stop`
+    /// (R6-19).
     func send(
         _ request: URLRequest, file: URL? = nil, cancel: Transcriber.CancelToken? = nil,
+        stop: Transcriber.CancelToken? = nil, grace: TimeInterval = 0,
         progress: ((Int64, Int64) -> Void)? = nil
     ) -> Reply {
         let task =
@@ -332,7 +357,7 @@ final class AssemblyAIClient {
         let sink = delegate.open(task.taskIdentifier, progress: progress)
         cancel?.attach(task)
         task.resume()
-        sink.done.wait()
+        waitForReply(sink.done, task: task, stop: stop, grace: grace)
         cancel?.release()
         let reply = delegate.close(task.taskIdentifier)
         note("\(request.httpMethod ?? "?") \(request.url?.path ?? "?") → "
@@ -364,36 +389,5 @@ final class AssemblyAIClient {
         let reply = send(request("GET", path: "/v2/transcript", query: "limit=1"))
         if let failure = classify(reply) { return .failure(failure) }
         return .success(())
-    }
-}
-
-extension AssemblyAIClient.ClientError {
-    /// Whether one more attempt could answer differently: a server fault, a
-    /// dropped connection or a timeout. Never a refused key or request, an
-    /// account problem or a cancel — those answer the same way for ever and
-    /// a retry after one costs a second upload for nothing.
-    var isRetriable: Bool {
-        switch self {
-        case .noNetwork, .server, .timedOut: return true
-        default: return false
-        }
-    }
-
-    /// The case's name for a log line, with no sentence in it: a relayed
-    /// sentence may quote a URL.
-    var shortName: String {
-        switch self {
-        case .noNetwork: return "noNetwork"
-        case .keyRefused(let code): return "keyRefused(\(code))"
-        case .account: return "account"
-        case .request: return "request"
-        case .server(let code): return "server(\(code))"
-        case .transcript: return "transcript"
-        case .redirected(let code): return "redirected(\(code))"
-        case .timedOut: return "timedOut"
-        case .cancelled: return "cancelled"
-        case .malformed: return "malformed"
-        case .submissionUnresolved: return "submissionUnresolved"
-        }
     }
 }

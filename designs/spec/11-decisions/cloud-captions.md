@@ -275,3 +275,25 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   Accepted because the far end is AssemblyAI or a relay speaking its
   protocol (R6-6), and a total deadline would fail a large upload on a slow
   line; C2 revisits it. DECLINED for now: a per-request resource timeout.
+- **R6-19 — A Stop bounds a DELETE; it never skips one.** The three
+  DELETEs a keyed run sends — the janitor's (`retryDeletes`), `refusing`'s
+  on every throwing exit of `poll` and of `fetch`'s refusal, and `fetch`'s
+  own after the write — read the run's cancel token, and none is cancelled
+  at the press: the token is read as a STOP, never attached to the task.
+  A DELETE is cut `deleteAfterStop` = 2 s of WALL CLOCK after the later of
+  the Stop and its own start. 2 s is above C0's slowest DELETE (1.70 s), so
+  a Stop during a submit or a wait still deletes the transcript it
+  orphaned (rows ST·submit, ST·wait); wall clock, because a server that
+  drips resets an idle timeout on every byte and would stretch any bound
+  read from one (R6-18). A cut DELETE answers `failed` and is owed under
+  R6-4 unchanged: the janitor's stays in its file with `remote_deleted:
+  false` and puts its media in `janitorFailed` (R6-11 holds it); `fetch`'s
+  writes `remote_deleted: false`, is reported, and is retried by the next
+  keyed run, or R6-4's dashboard sentence names it when its file did not
+  land. `poll`'s cut DELETE has no cache file and is reported nowhere, as
+  any failed DELETE there already was — a defect, not a decision. Nothing
+  else changes: no other request gains a total deadline, the submit still
+  takes no token (R6-14, R6-18), and MCP `transcribe`'s cloud arm still
+  has no Stop, so its DELETEs run as before. DECLINED: cancelling a DELETE
+  at the press, which would orphan the transcript of every Stop during a
+  submit or a wait (issue batch B35, #187 item 5).

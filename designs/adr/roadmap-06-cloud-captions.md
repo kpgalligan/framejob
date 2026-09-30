@@ -310,7 +310,8 @@ The proofs live in `tools/proof/`:
 - **A server that drips holds a request for as long as it drips** (R6-18, accepted). The only
   timeout is the idle one, which every byte resets: a reply dripped a byte every 100 ms under a
   1.5 s idle timeout was waited out (`cloud_captions_probe.py` DR1). Stop ends a dripping upload
-  or poll; a submit takes no token, and MCP `transcribe` has no Stop.
+  or poll; a submit takes no token, and MCP `transcribe` has no Stop. A DELETE runs on for at
+  most 2 s after a Stop and is then left owed (R6-19, issue batch B35).
 - **Submit recovery covers only the newest 200 transcripts and three looks.** A crash between POST
   and reply cannot be recovered. There is no durable pending-submission journal and no account-wide
   janitor.

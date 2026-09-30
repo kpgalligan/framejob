@@ -5099,6 +5099,81 @@ a baseline run of both in parallel failed six probe rows (KL's three, R6-14's
 three cancel rows) and the proof's row T on each other's extracts. Run
 alone, the same tree scored 762/762 and 201/201.
 
+### Issue batch B35 — cloud captions: a Stop bounds an in-flight DELETE; the submit line
+
+#187's item 5 and the Transcribe sheet's submit line (spec §11 R6-19). Every
+DELETE a keyed run sends — the janitor's, `refusing`'s, `fetch`'s — reads the
+run's token as a STOP: never cut at the press, cut `deleteAfterStop` (2 s) of
+wall clock after the later of the Stop and its own start, answering `failed`
+and so owed under R6-4. The sheet's detail line names the submit
+(`Submitting <file>`, at the upload's end) and spells a count under a
+megabyte `<1`. **No live call was made and nothing was spent**: every row
+runs against `assemblyai_fake.py`, with `RC_ASSEMBLYAI_KEY` unset.
+
+```sh
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only client,cancel,run,stop
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --port-base 4985
+```
+
+- **Section `client`.** `Tuning.shipped.deleteAfterStop` is R6-19's 2.
+- **Section `cancel`, SD1–SD3** (`deleteTimeout` 5, `deleteAfterStop` 1).
+  SD1: a Stop 0.5 s into a DELETE whose reply the fake drips a byte every
+  100 ms answers `failed` 1.56 s after the call (CONTROL: the drip began and
+  never finished). SD2: a token cancelled BEFORE a DELETE the fake stalls
+  0.5 s still answers `deleted`, and the fake deleted the id (CONTROL: it
+  waited ≥ 0.45 s). SD3: a Stop during polling against a dripping DELETE
+  answers `cancelled` in 1.58 s (CONTROL: one DELETE, dripping).
+- **Section `run`.** P: two table rows for `.submitting` (the oracle holds
+  it at 0.65 of the media's slice); P·small, the seven pinned lines
+  (`0 MB of 0`, `0 MB of <1`, `<1 MB of <1`, `<1 MB of 1`, `1 MB of 1`,
+  `41 MB of 115`, `Submitting intro.mov`); the run's bands gain
+  `Submitting` at 0.65; P·submit, per media, `Submitting <file>` after its
+  last Uploading line and before its first Waiting line, at
+  `base + share × 0.65`. J3: a Stop 0.3 s after the janitor's DELETE
+  arrives, its 22-byte 404 dripped a byte a second, ends the run
+  `cancelled` in 1.6 s with media 11 in `janitorFailed`, nothing in
+  `janitorDeleted`, "it will be retried at the next run with an API key"
+  on the card, and `11.json` byte for byte (CONTROL: one DELETE, dripping).
+- **Section `stop`.** ST·drip (new): Stop during `fetch`'s DELETE, dripped
+  every 100 ms, finished 2.14 s after the press with the file and marker
+  cached, `remote_deleted` false and the retry sentence on the card.
+  ST·submit's new row: the detail at the press was `Submitting
+  speech.aiff` (it read `Uploading speech.aiff · 0 MB of 0` before this
+  batch); `chromeStop` turns the run loop once for 0.05 s before reading
+  it. **ST·save's stall went from 3 s to 1 s**, and its Stop→finish from
+  3.01 s to 0.96 s: a 3 s stall outlasts R6-19's 2 s bound, which would cut
+  the DELETE and make the row's `remote_deleted: true` claim false; at 1 s
+  the DELETE lands inside the bound, which is what the row is about. Its
+  band is now 0.5–2.5 s (was 1.0–8.0).
+
+**The run table** (2026-09-30, at `a861f8c` plus this batch):
+
+| Command | Printed answer |
+|---|---|
+| `make typecheck` | 0 errors, 4 warnings (the baseline); tsc clean |
+| `make test` | exit 0 |
+| `make app` | BUILD SUCCEEDED |
+| `cloud_captions_probe.py` (full) | **826/826**, exit 0, in 506 s. Baseline at `a861f8c` was 801/801 in 554 s; this batch adds 25 rows (client 1, cancel 6, run 11, stop 7) |
+| `cloud_captions_proof.py --port-base 4985` | **205/205**, exit 0, in 80 s. Baseline was 205/205 in 88 s |
+| `grep "Reelcut: " /tmp/reelcut-498[5-9].log` | nothing |
+| probe `--only cancel,run,stop --mutant delete-deaf-to-stop` | 93/101, exit 1 (SD1 ×2, SD3, J3, ST·drip ×4) |
+| probe `--only cancel,run,stop --mutant delete-cut-at-once` | 90/101, exit 1 (16's poll-cancel DELETE, SD1, SD2 ×2, SD3's CONTROL, ST·save ×3, ST·submit, ST·wait, ST·drip) |
+| probe `--only cancel,run,stop --mutant janitor-stop-dropped` | 100/101, exit 1 (J3) |
+| probe `--only cancel,run,stop --mutant refusing-stop-dropped` | 100/101, exit 1 (SD3) |
+| probe `--only cancel,run,stop --mutant fetch-stop-dropped` | 97/101, exit 1 (ST·drip ×4) |
+| probe `--only cancel,run,stop --mutant submit-line-missing` | 98/101, exit 1 (P·submit ×2, ST·submit's detail) |
+| probe `--only cancel,run,stop --mutant sub-megabyte-rounds` | 100/101, exit 1 (P·small) |
+| probe `--only client,cancel,stop --mutant z2-throw-without-delete` (re-aimed) | 72/85, exit 1 |
+| probe `--only client,cancel,stop --mutant z12-no-ceiling` (re-aimed) | 84/86, exit 1 |
+| probe `--only client,cancel,stop --mutant cancel-orphans-transcript` (re-aimed) | 81/85, exit 1 |
+| probe `--only client,cancel,stop --mutant echoed-id-trusted` (re-aimed) | 83/85, exit 1 |
+| probe `--only echo --mutant words-unrefused` (re-aimed) | 17/19, exit 1 (E3 ×2) |
+| proof `--mutant no-delete` (re-aimed) | 176/192, exit 1 |
+
+No mutant run exited 2. The proof's `z2-throw-without-delete` and
+`z12-no-ceiling` were re-aimed at the same texts as the probe's and pass
+the anchor check (each text occurs once); they were not run.
+
 ### Road map 7 part 6 — core argument contract
 
 Run `python3 tools/proof/op_contract_proof.py` from the repository root. It

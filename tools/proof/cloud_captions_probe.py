@@ -32,7 +32,11 @@ Sections, by the name after `section_`:
 * `client` (5i·15) — the retry, the backoff, the tolerated polls, the
   ceiling, every §5c status, and the four `words` shapes, over `URLProtocol`.
 * `cancel` (5i·16) — a 16 MB upload cancelled at its first progress callback,
-  and a cancel during polling issuing the DELETE, against the fake.
+  and a cancel during polling issuing the DELETE, against the fake; and
+  R6-19's bound on a DELETE (issue batch B35): a Stop mid-drip cuts it
+  `deleteAfterStop` later as `failed` (SD1), a token cancelled before it
+  still lets a stalled DELETE finish (SD2), and a Stop during polling
+  deletes and ends inside the bound against a dripping DELETE (SD3).
 * `secrets` (5i·17 + R6-9's C rows + the loopback table) — `FileStore` in a
   temporary directory, `MemoryStore` everywhere else, the resolver's order,
   and R6-9 (a), (b) and (c) by TYPE and path string only; and `writeAll`'s
@@ -77,7 +81,10 @@ Sections, by the name after `section_`:
   of its media's share, holding at the 0.95 point; and the temporary
   `reelcut-upload-*` a cancelled, a failed and a 401'd run leave behind,
   which is none, with a CONTROL that one was there while the body was in
-  flight.
+  flight. Issue batch B35 added the submit's own line (P·submit, at the
+  upload's end), the sub-megabyte spellings (P·small), and J3: a Stop
+  during the janitor's dripping DELETE cuts it inside R6-19's bound and
+  leaves it owed.
 * `cache_write` (CW) — the fetched transcript's initial JSON write and
   remote DELETE independently, including an unwritable cache, marker-only
   failure, next-run janitor, zero-word throw, and production UI/MCP warnings;
@@ -101,6 +108,8 @@ Sections, by the name after `section_`:
   through the button, once the fake has seen the upload, the submit, a poll
   or the DELETE: how long the card took to finish, what it says, and what the
   fake and the cache were left holding. Row 18 holds the extract stage.
+  Issue batch B35 added ST·drip, a Stop during `fetch`'s dripping DELETE cut
+  by R6-19's 2 s and reported owed, and ST·submit's detail line.
 
 Host-state inputs: `say` for the fixture, `ffmpeg` for the FLAC decode row's
 second decoder (the row names which decoder answered and `AVAudioFile` always
@@ -386,6 +395,8 @@ func makeClient(_ request: [String: Any], stub: Bool) -> AssemblyAIClient? {
         tuning.pollFailuresTolerated =
             (given["pollFailuresTolerated"] as? NSNumber)?.intValue ?? tuning.pollFailuresTolerated
         tuning.deleteTimeout = (given["deleteTimeout"] as? NSNumber)?.doubleValue ?? tuning.deleteTimeout
+        tuning.deleteAfterStop =
+            (given["deleteAfterStop"] as? NSNumber)?.doubleValue ?? tuning.deleteAfterStop
         tuning.requestTimeout = (given["requestTimeout"] as? NSNumber)?.doubleValue ?? tuning.requestTimeout
         tuning.submitRecoveryAttempts =
             (given["submitRecoveryAttempts"] as? NSNumber)?.intValue ?? tuning.submitRecoveryAttempts
@@ -774,6 +785,33 @@ func modeRun(_ request: [String: Any]) -> [String: Any] {
             }
         }
     }
+    // Issue batch B35: a Stop `after` seconds after the fake has first seen a
+    // request with `method` and a path starting `pathPrefix`.
+    if let watch = request["cancelAtRequest"] as? [String: Any],
+        let base = request["base"] as? String,
+        let logURL = URL(string: base + "/__control/log")
+    {
+        let method = watch["method"] as? String ?? ""
+        let prefix = watch["pathPrefix"] as? String ?? ""
+        let after = (watch["after"] as? NSNumber)?.doubleValue ?? 0
+        Thread.detachNewThread {
+            for _ in 0..<3000 {
+                if let data = try? Data(contentsOf: logURL),
+                    let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                    let rows = object["requests"] as? [[String: Any]],
+                    rows.contains(where: {
+                        ($0["method"] as? String) == method
+                            && (($0["path"] as? String) ?? "").hasPrefix(prefix)
+                    })
+                {
+                    Thread.sleep(forTimeInterval: after)
+                    token.cancel()
+                    return
+                }
+                Thread.sleep(forTimeInterval: 0.01)
+            }
+        }
+    }
     let startedAt = Date()
 
     var published: [[Any]] = []
@@ -857,6 +895,7 @@ func runTable(_ request: [String: Any]) -> [String: Any] {
         switch row["phase"] as? String ?? "" {
         case "extracting": phase = .extracting
         case "uploading": phase = .uploading
+        case "submitting": phase = .submitting
         case "waiting": phase = .waiting
         default: phase = .saving
         }
@@ -888,6 +927,19 @@ func runTable(_ request: [String: Any]) -> [String: Any] {
                                  total: 115_000_000),
             CloudProgress.detail(.waiting, file: "intro.mov", waited: 34.2),
             CloudProgress.detail(.saving, file: "intro.mov"),
+        ],
+        // Issue batch B35: the sub-megabyte spellings and the submit's line.
+        "smallDetails": [
+            CloudProgress.detail(.uploading, file: "intro.mov", sent: 0, total: 0),
+            CloudProgress.detail(.uploading, file: "intro.mov", sent: 0, total: 412_000),
+            CloudProgress.detail(.uploading, file: "intro.mov", sent: 412_000, total: 412_000),
+            CloudProgress.detail(
+                .uploading, file: "intro.mov", sent: 999_999, total: 1_400_000),
+            CloudProgress.detail(
+                .uploading, file: "intro.mov", sent: 1_000_000, total: 1_400_000),
+            CloudProgress.detail(
+                .uploading, file: "intro.mov", sent: 41_000_000, total: 115_000_000),
+            CloudProgress.detail(.submitting, file: "intro.mov"),
         ],
     ]
 }
@@ -949,6 +1001,7 @@ func modeClient(_ request: [String: Any]) -> [String: Any] {
         "submitRecoveryAttempts": shipped.submitRecoveryAttempts,
         "submitRecoveryDelay": shipped.submitRecoveryDelay,
         "submitRecoveryTimeout": shipped.submitRecoveryTimeout,
+        "deleteAfterStop": shipped.deleteAfterStop,
         "ceilingShort": shipped.pollCeiling(audioSeconds: 10),
         "ceilingHour": shipped.pollCeiling(audioSeconds: 3600),
         "ceilingTenHours": shipped.pollCeiling(audioSeconds: 36000),
@@ -995,8 +1048,44 @@ func modeCancel(_ request: [String: Any]) -> [String: Any] {
         answer["callbacks"] = callbacks
         return answer
     }
+    // R6-19 (issue batch B35): one DELETE of an id the fake served, with the
+    // token cancelled before the call (`cancelFirst`) or `cancelAfter`
+    // seconds after it starts, and how long the call took.
+    if request["scenario"] as? String == "delete" {
+        do {
+            let file = temporaryDirectory("canceldelete").appendingPathComponent("tiny.bin")
+            try? Data(repeating: 1, count: 1024).write(to: file)
+            let uploaded = try client.upload(file: file)
+            let id = try client.submit(
+                TranscriptRequest(audioURL: uploaded, options: makeOptions(nil)))
+            answer["transcriptID"] = id
+            let called = Date()
+            if request["cancelFirst"] as? Bool == true {
+                token.cancel()
+            } else {
+                let after = (request["cancelAfter"] as? NSNumber)?.doubleValue ?? 0.5
+                Thread.detachNewThread {
+                    Thread.sleep(forTimeInterval: after)
+                    token.cancel()
+                }
+            }
+            let deleted = client.delete(id: id, cancel: token)
+            answer["elapsed"] = Date().timeIntervalSince(called)
+            switch deleted {
+            case .deleted: answer["answer"] = "deleted"
+            case .failed: answer["answer"] = "failed"
+            case .notSent: answer["answer"] = "notSent"
+            }
+            answer["ok"] = true
+        } catch {
+            answer["ok"] = false
+            for (key, value) in describe(error) { answer[key] = value }
+        }
+        return answer
+    }
     // Polling: a real upload and submit first, so the fake has served an id
     // the DELETE can be checked against.
+    let started = Date()
     do {
         let file = temporaryDirectory("cancelpoll").appendingPathComponent("tiny.bin")
         try? Data(repeating: 1, count: 1024).write(to: file)
@@ -1015,6 +1104,7 @@ func modeCancel(_ request: [String: Any]) -> [String: Any] {
         answer["ok"] = false
         for (key, value) in describe(error) { answer[key] = value }
     }
+    answer["elapsed"] = Date().timeIntervalSince(started)
     return answer
 }
 '''
@@ -1951,6 +2041,9 @@ func chromeStop(_ request: [String: Any]) -> [String: Any] {
         if sheet.didFinish { break }
         RunLoop.current.run(until: Date().addingTimeInterval(0.025))
     }
+    // One turn of the run loop first, so a detail the run published just
+    // before the request the fake saw has reached the label (issue batch B35).
+    RunLoop.current.run(until: Date().addingTimeInterval(0.05))
     answer["reached"] = reached
     answer["finishedBeforeStop"] = sheet.didFinish
     answer["detailAtStop"] = sheet.detailLabel.stringValue
@@ -3338,6 +3431,8 @@ def section_client(binary, sources):
     for key, value in want.items():
         check(f"15: Tuning.shipped.{key} is §8's {value}", got.get(key) == value,
               f"got {got.get(key)!r}")
+    check("15: Tuning.shipped.deleteAfterStop is R6-19's 2", got.get("deleteAfterStop") == 2,
+          f"got {got.get('deleteAfterStop')!r}")
     check("15: pollCeiling is max(300, seconds / 49) — 300 for 10 s, 300 for an hour, "
           "36000/49 for ten hours",
           [got.get("ceilingShort"), got.get("ceilingHour"),
@@ -3741,6 +3836,79 @@ def section_cancel(binary, sources):
                  if row["method"] == "GET" and row["path"].startswith("/v2/transcript/")]
         check("16: the poll loop did run before the cancel (a cancel is not a first-poll "
               "refusal)", len(polls) >= 2, f"{len(polls)} polls")
+
+    # --- SD: R6-19 (issue batch B35). A DELETE reads the run's token as a
+    # STOP: never cut at the press, cut `deleteAfterStop` after the later of
+    # the Stop and its own start. `deleteTimeout` 5 is an IDLE bound a drip
+    # resets on every byte, so only the Stop's bound can end SD1 and SD3.
+    tuning = {"deleteTimeout": 5, "deleteAfterStop": 1, "requestTimeout": 20}
+    with Fake("stop-delete-drip") as fake:
+        fake.scenario(drip={"route": "delete", "interval_ms": 100})
+        answer, error, _ = run_probe(binary, "stop-delete-drip", {
+            "mode": "cancel", "scenario": "delete", "base": fake.base, "key": DUMMY_KEY,
+            "cancelAfter": 0.5, "tuning": tuning}, timeout=120)
+        log = fake.log()
+    if answer is None:
+        check("SD1: the dripping-DELETE row answers", False, error)
+    else:
+        elapsed = answer.get("elapsed")
+        print(f"  (SD1 measured: the DELETE answered {answer.get('answer')!r} after "
+              f"{elapsed if elapsed is None else round(elapsed, 2)} s)")
+        check("SD1: a Stop 0.5 s into a DELETE whose reply drips cuts it `deleteAfterStop` "
+              "(1 s) later, and it answers `failed` — 1.3 ≤ elapsed ≤ 2.5 s",
+              answer.get("answer") == "failed" and elapsed is not None
+              and 1.3 <= elapsed <= 2.5,
+              f"got {answer.get('answer')!r} after {elapsed!r} s, "
+              f"{answer.get('error')!r} {answer.get('message')!r}")
+        deletes = [row for row in log["requests"] if row["method"] == "DELETE"]
+        check("SD1: CONTROL — the fake had begun dripping the DELETE's reply and never "
+              "finished it, so the cut is what ended the call",
+              len(deletes) == 1 and (deletes[0].get("dripped") or 0) >= 1
+              and deletes[0].get("drip_complete") is False,
+              f"got {[(r['path'], r.get('dripped'), r.get('drip_complete')) for r in deletes]!r}")
+
+    with Fake("stop-delete-first") as fake:
+        fake.scenario(stall={"route": "delete", "seconds": 0.5})
+        answer, error, _ = run_probe(binary, "stop-delete-first", {
+            "mode": "cancel", "scenario": "delete", "base": fake.base, "key": DUMMY_KEY,
+            "cancelFirst": True, "tuning": tuning}, timeout=120)
+        log = fake.log()
+    if answer is None:
+        check("SD2: the pre-cancelled DELETE row answers", False, error)
+    else:
+        served = answer.get("transcriptID")
+        check("SD2: a DELETE whose token was cancelled BEFORE it started is still sent and "
+              "answers `deleted`, and the fake deleted the id it served",
+              answer.get("answer") == "deleted" and bool(served)
+              and served in log.get("deleted", []),
+              f"got {answer.get('answer')!r}, served {served!r}, "
+              f"deleted {log.get('deleted')!r}")
+        elapsed = answer.get("elapsed")
+        check("SD2: CONTROL — it waited out the fake's 0.5 s stall (elapsed ≥ 0.45 s), so "
+              "it was not cut at the press",
+              elapsed is not None and elapsed >= 0.45, f"got {elapsed!r} s")
+
+    with Fake("stop-delete-poll") as fake:
+        fake.scenario(never_complete=True, drip={"route": "delete", "interval_ms": 100})
+        answer, error, _ = run_probe(binary, "stop-delete-poll", {
+            "mode": "cancel", "scenario": "poll", "base": fake.base, "key": DUMMY_KEY,
+            "cancelAfter": 0.5, "tuning": dict(tuning, pollInterval=0.2)}, timeout=120)
+        log = fake.log()
+    if answer is None:
+        check("SD3: the poll-then-drip row answers", False, error)
+    else:
+        elapsed = answer.get("elapsed")
+        print(f"  (SD3 measured: the poll answered {answer.get('error')!r} after "
+              f"{elapsed if elapsed is None else round(elapsed, 2)} s)")
+        check("SD3: a Stop during polling is `cancelled`, and `refusing`'s dripping DELETE "
+              "is cut inside the bound — elapsed ≤ 2.5 s",
+              answer.get("error") == "cancelled" and elapsed is not None and elapsed <= 2.5,
+              f"got {answer.get('error')!r} after {elapsed!r} s")
+        deletes = [row for row in log["requests"] if row["method"] == "DELETE"]
+        check("SD3: CONTROL — `refusing` sent ONE DELETE and the fake had begun dripping "
+              "its reply",
+              len(deletes) == 1 and (deletes[0].get("dripped") or 0) >= 1,
+              f"got {[(r['path'], r.get('dripped')) for r in deletes]!r}")
 
 
 # --------------------------------------------------------------------------
@@ -4969,11 +5137,13 @@ def section_run(binary, sources):
         ("one media, extracting at 0", [10.0], 0, "extracting", 0),
         ("one media, extracting done", [10.0], 0, "extracting", 1),
         ("one media, half uploaded", [10.0], 0, "uploading", 0.5),
+        ("one media, submitting", [10.0], 0, "submitting", 0),
         ("one media, the wait complete", [10.0], 0, "waiting", 1),
         ("one media, saved", [10.0], 0, "saving", 1),
         ("two media, the first's wait", [10.0, 30.0], 0, "waiting", 1),
         ("two media, the second's wait", [10.0, 30.0], 1, "waiting", 1),
         ("two media, the second saved", [10.0, 30.0], 1, "saving", 1),
+        ("two media, the second submitting", [10.0, 30.0], 1, "submitting", 0.5),
         ("within past 1 is clamped", [10.0], 0, "uploading", 5),
         ("within below 0 is clamped", [10.0], 0, "uploading", -5),
         ("nothing to upload has no share", [], 0, "saving", 1),
@@ -5013,10 +5183,17 @@ def section_run(binary, sources):
                                         "Waiting for AssemblyAI · 34 s",
                                         "Saving intro.mov"],
               f"got {answer.get('details')!r}")
+        small = ["Uploading intro.mov · 0 MB of 0", "Uploading intro.mov · 0 MB of <1",
+                 "Uploading intro.mov · <1 MB of <1", "Uploading intro.mov · <1 MB of 1",
+                 "Uploading intro.mov · 1 MB of 1", "Uploading intro.mov · 41 MB of 115",
+                 "Submitting intro.mov"]
+        check("P·small: a count under a megabyte is spelt `<1`, never 0 or 1, and the submit "
+              "names its file (issue batch B35)",
+              answer.get("smallDetails") == small, f"got {answer.get('smallDetails')!r}")
 
     speech = make_fixture()
     if speech is None:
-        skip_rows(14, "`say` is not on this host, so the run rows have no audio to send")
+        skip_rows(22, "`say` is not on this host, so the run rows have no audio to send")
         return
     second = os.path.join(os.path.dirname(speech), "speech-b.aiff")
     if not os.path.exists(second):
@@ -5065,6 +5242,7 @@ def section_run(binary, sources):
             share = [0.25, 0.75]
             base = [0.0, 0.25]
             bands = [("Extracting", 0.0, 0.25), ("Uploading", 0.25, 0.65),
+                     ("Submitting", 0.65, 0.65),
                      ("Waiting for AssemblyAI", 0.65, 0.95), ("Saving", 0.95, 1.0)]
             bad = []
             for index, row in enumerate(answer.get("progress", [])):
@@ -5110,6 +5288,26 @@ def section_run(binary, sources):
                   and any(d.startswith("Waiting for AssemblyAI · ") for d in details)
                   and any(d.startswith("Saving ") for d in details),
                   f"got {sorted(set(details))!r}")
+            # P·submit (issue batch B35): each media's submit has its own line,
+            # after its upload and before its wait, at the upload's end.
+            rows = answer.get("progress", [])
+            for which, file_name in enumerate(["speech.aiff", "speech-b.aiff"]):
+                uploads_at = [i for i, (_, d) in enumerate(rows)
+                              if d.startswith(f"Uploading {file_name} ")]
+                submits_at = [i for i, (_, d) in enumerate(rows)
+                              if d == f"Submitting {file_name}"]
+                after = uploads_at[-1] if uploads_at else len(rows)
+                waits_at = [i for i, (_, d) in enumerate(rows)
+                            if i > after and d.startswith("Waiting for AssemblyAI")]
+                want = base[which] + share[which] * 0.65
+                check(f"P·submit: \"Submitting {file_name}\" is published after its last "
+                      f"Uploading line and before its first Waiting line, at "
+                      f"{base[which]} + {share[which]} × 0.65",
+                      len(submits_at) == 1 and bool(uploads_at) and bool(waits_at)
+                      and uploads_at[-1] < submits_at[0] < waits_at[0]
+                      and abs(rows[submits_at[0]][0] - want) <= 1e-9,
+                      f"uploading at {uploads_at[-1:]!r}, submitting at {submits_at!r} "
+                      f"({[rows[i] for i in submits_at]!r}), first wait at {waits_at[:1]!r}")
 
     one_media, one_job = media[:1], jobs[:1]
 
@@ -5178,6 +5376,54 @@ def section_run(binary, sources):
               "no longer pays",
               (answer.get("seconds") or 0) >= 3 * 5 - 1,
               f"the run took {answer.get('seconds')!r} s")
+
+    # --- J3 (issue batch B35, R6-19): a Stop DURING the janitor's DELETE. The
+    # fake drips its 22-byte 404 a byte a second, which an idle timeout never
+    # ends; the Stop's bound does, and the DELETE is owed like any failed one.
+    janitor_drip = fresh("run-janitor-drip")
+    plant_undeleted(janitor_drip, [11])
+    planted = open(os.path.join(janitor_drip, "transcripts", "11.json"), "rb").read()
+    with Fake("run-janitor-drip") as fake:
+        fake.scenario(drip={"route": "delete", "interval_ms": 1000})
+        answer, error, _ = run_probe(binary, "run-janitor-drip", {
+            "mode": "run", "base": fake.base, "key": DUMMY_KEY,
+            "tuning": dict(RUN_TUNING, deleteAfterStop=1),
+            "cache": janitor_drip, "media": one_media, "jobs": one_job,
+            "cancelAtRequest": {"method": "DELETE", "pathPrefix": "/v2/transcript/",
+                                "after": 0.3}}, timeout=300)
+        log = fake.log()
+    if answer is None:
+        check("J3: the Stop-during-the-janitor run answers", False, error)
+    else:
+        took = answer.get("seconds")
+        print(f"  (J3 measured: the run ended {took if took is None else round(took, 2)} s "
+              f"after it started)")
+        check("J3: a Stop during the janitor's DELETE ends the run `cancelled`",
+              answer.get("ok") is False
+              and "cancelled" in str(answer.get("message", "")).lower(),
+              f"got ok={answer.get('ok')!r} {answer.get('message')!r}")
+        check("J3: inside R6-19's bound \u2014 the run took ≤ 2.5 s, where the drip alone "
+              "would have held it 22 s",
+              (answer.get("seconds") or 99) <= 2.5, f"the run took {answer.get('seconds')!r} s")
+        report = answer.get("report", {})
+        check("J3: the cut DELETE is `failed` \u2014 media 11 in `janitorFailed`, nothing in "
+              "`janitorDeleted`",
+              report.get("janitorFailed") == [11] and report.get("janitorDeleted") == [],
+              f"got failed {report.get('janitorFailed')!r}, "
+              f"deleted {report.get('janitorDeleted')!r}")
+        check("J3: and it is reported owed \u2014 \"it will be retried at the next run with "
+              "an API key\"",
+              any("it will be retried at the next run with an API key" in line
+                  for line in answer.get("cloudReportLines") or []),
+              f"got {answer.get('cloudReportLines')!r}")
+        check("J3: and its cache file is byte for byte what was planted, the one record of "
+              "the id still owed",
+              open(os.path.join(janitor_drip, "transcripts", "11.json"), "rb").read()
+              == planted)
+        deletes = [row for row in log["requests"] if row["method"] == "DELETE"]
+        check("J3: CONTROL \u2014 ONE DELETE, and the fake had begun dripping its reply",
+              len(deletes) == 1 and (deletes[0].get("dripped") or 0) >= 1,
+              f"got {[(r['path'], r.get('dripped')) for r in deletes]!r}")
 
     # --- I: a cache file's `transcript_id` is somebody ELSE's string (the
     # reader review's R3\u00b71). It rides inside a `.reelcut` package, so a
@@ -5370,6 +5616,7 @@ def progress_oracle(row):
         return 0
     base = sum(shares[:index])
     low, high = {"extracting": (0.0, 0.25), "uploading": (0.25, 0.65),
+                 "submitting": (0.65, 0.65),
                  "waiting": (0.65, 0.95), "saving": (0.95, 1.0)}[row["phase"]]
     part = min(max(row["within"], 0), 1)
     value = high if part >= 1 else (low if part <= 0 else low + (high - low) * part)
@@ -6534,13 +6781,18 @@ def section_chrome(binary, sources):
 
 CANCELLED = "The transcription was cancelled."
 # (row, scenario, the request Stop waits for, Stop→finish low, high). The
-# upload stall outlives its child, so it runs last.
+# upload stall outlives its child, so it runs last. Issue batch B35 (R6-19):
+# a DELETE now runs on for at most `deleteAfterStop` (2 s) after a Stop, so
+# save's stall is 1 s — under the bound, so the DELETE still lands — where it
+# was 3 s, which the bound would now cut; drip is a DELETE the bound DOES cut.
 STOP_ROWS = [
-    ("save", {"stall": {"route": "delete", "seconds": 3}}, "DELETE", "/v2/transcript/",
-     1.0, 8.0),
+    ("save", {"stall": {"route": "delete", "seconds": 1}}, "DELETE", "/v2/transcript/",
+     0.5, 2.5),
     ("submit", {"stall": {"route": "submit", "seconds": 6}}, "POST", "/v2/transcript",
      3.0, 11.0),
     ("wait", {"never_complete": True}, "GET", "/v2/transcript/", None, 5.0),
+    ("drip", {"drip": {"route": "delete", "interval_ms": 100}}, "DELETE", "/v2/transcript/",
+     1.5, 3.5),
     ("upload", {"stall": {"route": "upload", "seconds": 30}}, "POST", "/v2/upload",
      None, 5.0),
 ]
@@ -6551,8 +6803,8 @@ def section_stop(binary, sources):
           "(B24, #80)")
     fixture = make_fixture()
     if fixture is None:
-        skip_rows(5 * len(STOP_ROWS), "`say` is not on this host, so the Stop rows have no "
-                                      "audio to send")
+        skip_rows(5 * len(STOP_ROWS) + 2, "`say` is not on this host, so the Stop rows have "
+                                          "no audio to send")
         return
     with Fake("stop") as fake:
         for tag, scenario, method, prefix, low, high in STOP_ROWS:
@@ -6607,6 +6859,11 @@ def section_stop(binary, sources):
                 ok = len(submits_) == 1 and len(polls) >= 1 and all_deleted
                 claim = ("one submit, at least one poll, and the transcript is deleted "
                          "on the way out")
+            elif tag == "drip":
+                ok = (len(deletes) == 1 and (deletes[0].get("dripped") or 0) >= 1
+                      and deletes[0].get("drip_complete") is False)
+                claim = ("one DELETE, whose reply the fake had begun dripping and never "
+                         "finished — R6-19's 2 s cut it")
             else:
                 ok = len(uploads_) == 1 and not submits_
                 claim = "one upload and NO submit — nothing was paid for"
@@ -6621,12 +6878,29 @@ def section_stop(binary, sources):
                       f"got file={row.get('transcriptCached')!r} "
                       f"marker={row.get('markerCached')!r} "
                       f"remoteDeleted={row.get('remoteDeleted')!r}")
+            elif tag == "drip":
+                check(f"{name}: and the transcript LANDED with its DELETE owed — the file "
+                      "and its marker are in the cache and `remote_deleted` is false",
+                      row.get("transcriptCached") is True and row.get("markerCached") is True
+                      and row.get("remoteDeleted") is False,
+                      f"got file={row.get('transcriptCached')!r} "
+                      f"marker={row.get('markerCached')!r} "
+                      f"remoteDeleted={row.get('remoteDeleted')!r}")
+                check(f"{name}: and the card says so — \"it will be retried at the next "
+                      "run with an API key.\"",
+                      "it will be retried at the next run with an API key." in status,
+                      f"got {status!r}")
             else:
                 check(f"{name}: and nothing landed in the cache — no transcript file, "
                       "no marker",
                       row.get("transcriptCached") is False and row.get("markerCached") is False,
                       f"got file={row.get('transcriptCached')!r} "
                       f"marker={row.get('markerCached')!r}")
+            if tag == "submit":
+                want = "Submitting " + os.path.basename(fixture)
+                check(f"{name}: and the card's detail line at the press was \"{want}\" "
+                      "(issue batch B35)",
+                      row.get("detailAtStop") == want, f"got {row.get('detailAtStop')!r}")
 
 
 def png_size(data):
@@ -7084,7 +7358,7 @@ MUTANTS = {
         'Z1 — the redirect FOLLOWED, so the authorization header goes to whatever host the Location named'),
     "z2-throw-without-delete": (
         "AssemblyAIClient+Session.swift",
-        '        delete(id: id)\n',
+        '        delete(id: id, cancel: cancel)\n',
         '',
         'Z2 — `refusing` no longer DELETEs before it throws (R6-4)'),
     "z3-extract-kept": (
@@ -7124,7 +7398,9 @@ MUTANTS = {
         'Z10 — R6-13 broken: a held media priced as an upload'),
     "z12-no-ceiling": (
         "AssemblyAIClient.swift",
-        '            if Date().timeIntervalSince(started) > ceiling { throw refusing(.timedOut, id: id) }\n',
+        '            if Date().timeIntervalSince(started) > ceiling {\n'
+        '                throw refusing(.timedOut, id: id, cancel: cancel)\n'
+        '            }\n',
         '',
         'Z12 — the poll ceiling removed'),
     "any-id-on-the-wire": (
@@ -7138,7 +7414,7 @@ MUTANTS = {
         "reverted (row I)"),
     "echoed-id-trusted": (
         "AssemblyAIClient.swift",
-        "                    try requireEchoedID(response, polled: id)\n",
+        "                    try requireEchoedID(response, polled: id, cancel: cancel)\n",
         "",
         "#71's id check removed (section 15's two echoed-id rows)"),
     "refused-id-reported-as-deleted": (
@@ -7177,7 +7453,7 @@ MUTANTS = {
         "(ST\u00b7upload)"),
     "cancel-orphans-transcript": (
         "AssemblyAIClient.swift",
-        "            if cancel?.isCancelled == true { throw refusing(.cancelled, id: id) }\n",
+        "            if cancel?.isCancelled == true { throw refusing(.cancelled, id: id, cancel: cancel) }\n",
         "            if cancel?.isCancelled == true { throw ClientError.cancelled }\n",
         "a Stop heard in `poll` throws without deleting the transcript (ST\u00b7submit, "
         "ST\u00b7wait)"),
@@ -7239,7 +7515,8 @@ MUTANTS = {
         "        {\n"
         "            throw client.refusing(\n"
         "                .malformed(\"the transcript's words repeat the API key\"), "
-        "id: fetched.response.id)\n"
+        "id: fetched.response.id,\n"
+        "                cancel: cancel)\n"
         "        }\n",
         "",
         "words that repeat the key written to the cache \u2014 #187 R2\u00b71 (E3)"),
@@ -7249,6 +7526,46 @@ MUTANTS = {
         "        Self.isPlainIdentifier(id)\n",
         "`isSendableIdentifier` without its credential clause \u2014 #187 R2\u00b71 (E4, E5, "
         "the submission section's key-shaped success id)"),
+    # Issue batch B35 (#187 item 5, R6-19): a Stop bounds a DELETE; the
+    # submit's line.
+    "delete-deaf-to-stop": (
+        "AssemblyAIClient.swift",
+        "        let reply = send(request, stop: cancel, grace: tuning.deleteAfterStop)\n",
+        "        let reply = send(request, stop: nil, grace: tuning.deleteAfterStop)\n",
+        "`delete` deaf to a Stop, so a dripping DELETE holds the run (SD1, SD3, J3, "
+        "ST\u00b7drip)"),
+    "delete-cut-at-once": (
+        "AssemblyAIClient.swift",
+        "        let reply = send(request, stop: cancel, grace: tuning.deleteAfterStop)\n",
+        "        let reply = send(request, cancel: cancel)\n",
+        "the token ATTACHED to the DELETE, so a Stop cuts it at the press (SD2, 16's "
+        "poll-cancel DELETE, ST\u00b7save, ST\u00b7submit, ST\u00b7wait)"),
+    "janitor-stop-dropped": (
+        "CloudTranscriber+Media.swift",
+        "            switch client.delete(id: row.transcriptID, cancel: cancel) {\n",
+        "            switch client.delete(id: row.transcriptID, cancel: nil) {\n",
+        "the janitor's DELETE handed no token (J3)"),
+    "refusing-stop-dropped": (
+        "AssemblyAIClient+Session.swift",
+        "        delete(id: id, cancel: cancel)\n",
+        "        delete(id: id, cancel: nil)\n",
+        "`refusing`'s DELETE handed no token (SD3)"),
+    "fetch-stop-dropped": (
+        "CloudTranscriber+Media.swift",
+        "        let deleted = client.delete(id: fetched.response.id, cancel: cancel) == .deleted\n",
+        "        let deleted = client.delete(id: fetched.response.id, cancel: nil) == .deleted\n",
+        "`fetch`'s DELETE handed no token (ST\u00b7drip)"),
+    "submit-line-missing": (
+        "CloudTranscriber+Media.swift",
+        "        progress(.submitting, 0, CloudProgress.detail(.submitting, file: name))\n",
+        "",
+        "the submit's own detail line never published (P\u00b7submit, ST\u00b7submit's "
+        "detail row)"),
+    "sub-megabyte-rounds": (
+        "CloudProgress.swift",
+        "        if bytes < 1_000_000 { return \"<1\" }\n",
+        "",
+        "a count under a megabyte rounded to 0 or 1 again (P\u00b7small)"),
 }
 
 

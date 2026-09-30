@@ -2054,7 +2054,7 @@ CLOUD_MUTANTS = {
         "the stamp comparison deleted — every run uploads (row 5)"),
     "no-delete": (
         "app/Sources/CloudTranscriber+Media.swift",
-        "        let deleted = client.delete(id: fetched.response.id) == .deleted\n",
+        "        let deleted = client.delete(id: fetched.response.id, cancel: cancel) == .deleted\n",
         "        let deleted = false\n",
         "the remote DELETE removed (rows 2, 4)"),
     "no-janitor": (
@@ -2094,7 +2094,7 @@ CLOUD_MUTANTS = {
         'Z1 — the redirect FOLLOWED, so the authorization header goes to whatever host the Location named'),
     "z2-throw-without-delete": (
         "app/Sources/AssemblyAIClient+Session.swift",
-        '        delete(id: id)\n',
+        '        delete(id: id, cancel: cancel)\n',
         '',
         'Z2 — `refusing` no longer DELETEs before it throws (R6-4)'),
     "z3-extract-kept": (
@@ -2119,7 +2119,9 @@ CLOUD_MUTANTS = {
         "Z9 — the window's end made inclusive, so a split's halves double a word"),
     "z12-no-ceiling": (
         "app/Sources/AssemblyAIClient.swift",
-        '            if Date().timeIntervalSince(started) > ceiling { throw refusing(.timedOut, id: id) }\n',
+        '            if Date().timeIntervalSince(started) > ceiling {\n'
+        '                throw refusing(.timedOut, id: id, cancel: cancel)\n'
+        '            }\n',
         '',
         'Z12 — the poll ceiling removed'),
     "silent-about-the-bill": (

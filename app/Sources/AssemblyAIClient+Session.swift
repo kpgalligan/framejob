@@ -4,8 +4,12 @@ import Foundation
 
 /// What a reply MEANS and who delivers it: `Reply`, the status classifier,
 /// the two readers that cut a served body apart, the one-delete-then-throw
-/// helper, the cancellable wait, the log line — and `SessionDelegate`, the
-/// object `URLSession` calls back on its own one-wide queue.
+/// helper, the cancellable wait, the wait for a reply that a Stop bounds
+/// (`waitForReply`, R6-19), the log line — and `SessionDelegate`, the
+/// object `URLSession` calls back on its own one-wide queue. At the foot,
+/// `ClientError`'s two readings, `isRetriable` and `shortName`: a pure move
+/// out of `AssemblyAIClient.swift`, which stood at 399 lines against the
+/// cap when a DELETE learned to read a Stop (issue batch B35).
 ///
 /// It is beside `AssemblyAIClient.swift` rather than in it because that file
 /// holds road map 6 §5c's five calls and §8's numbers and stood at 487 lines
@@ -96,8 +100,10 @@ extension AssemblyAIClient {
     }
 
     /// One `delete` before a throw, and the error to throw.
-    func refusing(_ failure: ClientError, id: String) -> ClientError {
-        delete(id: id)
+    func refusing(
+        _ failure: ClientError, id: String, cancel: Transcriber.CancelToken?
+    ) -> ClientError {
+        delete(id: id, cancel: cancel)
         return failure
     }
 
@@ -110,12 +116,14 @@ extension AssemblyAIClient {
     /// never be sent, or would move the DELETE to a transcript this run
     /// never made. Refusing here keeps the id `fetch` stores and deletes the
     /// submitted one, and `refusing` deletes the POLLED id, which is plain.
-    func requireEchoedID(_ response: TranscriptResponse, polled id: String) throws {
+    func requireEchoedID(
+        _ response: TranscriptResponse, polled id: String, cancel: Transcriber.CancelToken?
+    ) throws {
         guard response.id != id else { return }
         throw refusing(
             .malformed(
                 "the transcript came back completed under an id other than the one polled"),
-            id: id)
+            id: id, cancel: cancel)
     }
 
     /// Waits in slices of at most a tenth of a second, reading the token
@@ -128,6 +136,35 @@ extension AssemblyAIClient {
             let slice = min(0.1, left)
             Thread.sleep(forTimeInterval: slice)
             left -= slice
+        }
+    }
+
+    /// Waits for `done`, and with a `stop` token bounds the wait (R6-19).
+    /// The token is read at the start and after every slice of at most a
+    /// tenth of a second; once `grace` seconds of wall clock have passed
+    /// since the first reading that saw it set, the task is cancelled and
+    /// its completion — which a cancel always delivers — is waited for, so
+    /// no task is left running with nobody to read it. Wall clock, because a
+    /// server that drips resets the idle timeout on every byte (R6-18). No
+    /// `stop` is `done.wait()`, exactly as before. No queue, timer or
+    /// thread: `sleep(_:cancel:)`'s slices, on the calling thread.
+    func waitForReply(
+        _ done: DispatchSemaphore, task: URLSessionTask, stop: Transcriber.CancelToken?,
+        grace: TimeInterval
+    ) {
+        guard let stop else {
+            done.wait()
+            return
+        }
+        var stoppedAt: Date? = stop.isCancelled ? Date() : nil
+        while true {
+            if let stoppedAt, Date().timeIntervalSince(stoppedAt) >= grace {
+                task.cancel()
+                done.wait()
+                return
+            }
+            if done.wait(timeout: .now() + 0.1) == .success { return }
+            if stoppedAt == nil, stop.isCancelled { stoppedAt = Date() }
         }
     }
 
@@ -220,6 +257,37 @@ extension AssemblyAIClient {
             completionHandler: @escaping (URLRequest?) -> Void
         ) {
             completionHandler(nil)
+        }
+    }
+}
+
+extension AssemblyAIClient.ClientError {
+    /// Whether one more attempt could answer differently: a server fault, a
+    /// dropped connection or a timeout. Never a refused key or request, an
+    /// account problem or a cancel — those answer the same way for ever and
+    /// a retry after one costs a second upload for nothing.
+    var isRetriable: Bool {
+        switch self {
+        case .noNetwork, .server, .timedOut: return true
+        default: return false
+        }
+    }
+
+    /// The case's name for a log line, with no sentence in it: a relayed
+    /// sentence may quote a URL.
+    var shortName: String {
+        switch self {
+        case .noNetwork: return "noNetwork"
+        case .keyRefused(let code): return "keyRefused(\(code))"
+        case .account: return "account"
+        case .request: return "request"
+        case .server(let code): return "server(\(code))"
+        case .transcript: return "transcript"
+        case .redirected(let code): return "redirected(\(code))"
+        case .timedOut: return "timedOut"
+        case .cancelled: return "cancelled"
+        case .malformed: return "malformed"
+        case .submissionUnresolved: return "submissionUnresolved"
         }
     }
 }
