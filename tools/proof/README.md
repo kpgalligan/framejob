@@ -6511,7 +6511,7 @@ python3 tools/proof/assistant_session_proof.py --mutant no-prepare   # W FAIL, e
 
 ## Road map 12's A2 — the Assistant tab (assistant_tab_proof.py, assistant_tab_probe.swift)
 
-The inspector's fourth tab (spec §11 AI-4, AI-7, AI-8, AI-11, AI-14), read
+The inspector's fourth tab (spec §11 AI-4, AI-7, AI-8, AI-11, AI-14, AI-17), read
 back two ways: a probe for the arithmetic and structure no script reaches,
 and the built Release app driven through the tab's OWN controls. It works in
 `work/assistant_tab/` and reuses `assistant_session_proof.py`'s stand-in,
@@ -6554,6 +6554,41 @@ and `RC_ASSISTANT_BASE_URL=http://127.0.0.1:9`:
   model posts nothing; a new model writes the suite and posts `model`, and the
   same text again posts nothing; in a `SettingsWindowController` the
   Transcription heading is still first and the Assistant pane last.
+- **P9** (issue batch B18, #154, spec §11 AI-17) an `AssistantView` in a
+  window of its own, `EditorViewController.minInspectorWidth` less a legacy
+  scroller wide, built once light and once dark (`NSApp.appearance` set
+  before building): ⇧/⌥/⌃/⌘Return between "a" … "e" through the composer's
+  own `keyDown` leave exactly `"a\nb\nc\nd\ne"` (no U+2028, nothing
+  sent), ⇧ keypad Enter a `"\n"`; Tab and ⇧Tab leave the string unchanged;
+  the field is 26 pt empty, strictly taller through five lines and the same
+  at six; with every kind of entry, a cost, a question and five lines,
+  `UISnapshotLayout.report` finds no problem, and
+  `work/assistant_tab/probe/looks/assistant-light|dark.png` is written (over
+  the window background, since `cacheDisplay` draws views only; a layer
+  border, the field's included, is not in a `cacheDisplay` capture); a bare
+  Return sends the whole text once and the field is "" at 26 pt again.
+- **P10** (#153, AI-17) the transcript is ONE text view: `reload` of five
+  kinds (the person's two lines) gives it the texts joined by `"\n"`; the
+  layout dump's `assistant.entry.<kind>` part records are those kinds and
+  texts in order, parented to the `AssistantTranscriptView` record, tops
+  never decreasing; `.appended` then `.extended` of the newest posts ONE
+  `didProcessEditing` at or past that entry's start, the earlier parts
+  unchanged; a selection across entries 0–1, written in the view's own
+  writable types to a private pasteboard, reads back as plain text with the
+  `"\n"`; the writable types are exactly the one plain-string type
+  (`NSStringPboardType`: `writeSelection` answers false for `.string`,
+  measured); `.cleared` leaves no text and no part; a secure field being
+  edited puts its text in no record, and the composer's record reads its
+  string.
+- **P11** (AI-17) the composer's undo is its own, in a real editor window:
+  the window's undo manager IS the document's, and before typing the
+  document has nothing to undo and is not edited (controls); typing "abc"
+  through `keyDown` leaves both so and gives the composer an undo; with a
+  "P11 marker" step on the document's manager, `undo:` from the composer
+  (`tryToPerform`) undoes typing, the marker unrun and still the document's
+  undo; `string = "x"` drops the composer's undo. Measured on the way:
+  `NSWindow`'s own `undo:` reads the WINDOW's manager, so without the
+  composer's own `undo:` the document's marker ran.
 
 **Live A** (`-AgentServerEnabled YES`, port 4874, `proof-key` in
 `-RCSecretFolder`, `RC_ASSISTANT_BASE_URL` at the stand-in,
@@ -6580,6 +6615,11 @@ and `RC_ASSISTANT_BASE_URL=http://127.0.0.1:9`:
 - **L6** with the Media tab showing, `assistant_send {pane: true}` is refused
   `… select_inspector_tab {tab: "assistant"} first.` and the stand-in hears
   nothing.
+- **L7** (#154, AI-17) `assistant_send {pane: true}` of two lines, a blank
+  one and an indented one: `finished`; one `POST /v1/messages`, whose last
+  user text ends with `</reelcut_context>\n` and the text, intact; the
+  dump's last person entry is the text; the composer is empty; no layout
+  problem in the tab.
 - **K** `proof-key` in no MCP answer, no layout dump and not the log.
 
 **Launch B**, **N1** (the variable set, NO `-RCSecretFolder`: no key, AI-13;
@@ -6593,15 +6633,43 @@ the ONE `session.onEvent =` line deleted from
 L2 alone: L2 must FAIL (the transcript holds only the person's line) and the
 run exits 1; a copy that did not build exits 2.
 
+**Mutant `flatten-send`** (issue batch B18): the same tree copy with
+`send()` joining the composer's lines with spaces before it trims
+(`TREE_MUTANTS`), `make app` there, then `open_tab` and L7 alone: L7 must
+FAIL. **Mutants `modified-return-sends`, `tab-types`, `no-entry-parts`,
+`shared-undo`** (`MUTANTS`, each replacement made exactly once in a copy of
+`app/Sources`, the probe built over it): `.newline`'s arm calls
+`onReturn?()` (P9), `insertTab` calls `super.insertTab` (P9),
+`snapshotParts()` returns `[]` (P10), the composer's `undoManager` is
+`super.undoManager` (P11); each scores its row alone and must FAIL. Rule R:
+exit 1 caught, 0 survived, 2 not performed — a mutant probe that did not
+build, or printed no row for its row, is an instrument failure (exit 2).
+
 Measured 2026-09-27: 16/16; the mutant's L2 FAILS with entries `['person:
 …']` and Send still reading Stop (exit 1). In this agent's shell sandbox the
 process-group kill at cleanup is refused (`PermissionError`, from `killpg` —
 the unchanged session proof hits it too), so these proofs were run outside
 it.
 
+Measured 2026-09-30 (issue batch B18), each run bounded by `perl -e 'alarm
+shift; exec @ARGV'` (1800 s, 3000 s for a tree mutant), inside the agent's
+sandbox this time with no `killpg` refusal: 21/21, exit 0; `flatten-send`
+L7 FAIL (the helper got `L7 first line. L7 second line.     L7 indented, …`),
+0/1, exit 1; `modified-return-sends` P9 FAIL (the four modified Returns
+SENT "a" … "d", the string "e"), exit 1; `tab-types` P9 FAIL (`"tabs\t"`),
+exit 1; `no-entry-parts` P10 FAIL (no part records), exit 1; `shared-undo`
+P11 FAIL (typing reached the document's manager: canUndo true), exit 1;
+`no-close-decline` P8 FAIL, exit 1; `no-forward` L2 FAIL, exit 1.
+
 ```sh
-python3 tools/proof/assistant_tab_proof.py                        # 16/16
-python3 tools/proof/assistant_tab_proof.py --mutant no-forward    # L2 FAIL, exit 1
+python3 tools/proof/assistant_tab_proof.py                                  # 21/21
+python3 tools/proof/assistant_tab_proof.py --mutant no-forward             # L2 FAIL, exit 1
+python3 tools/proof/assistant_tab_proof.py --mutant flatten-send           # L7 FAIL, exit 1
+python3 tools/proof/assistant_tab_proof.py --mutant no-close-decline       # P8 FAIL, exit 1
+python3 tools/proof/assistant_tab_proof.py --mutant modified-return-sends  # P9 FAIL, exit 1
+python3 tools/proof/assistant_tab_proof.py --mutant tab-types              # P9 FAIL, exit 1
+python3 tools/proof/assistant_tab_proof.py --mutant no-entry-parts         # P10 FAIL, exit 1
+python3 tools/proof/assistant_tab_proof.py --mutant shared-undo            # P11 FAIL, exit 1
 ```
 
 ## Road map 12's A3 — the prompt (assistant_prompt_proof.py, assistant_prompt_probe.swift, assistant_prompt_eval.py)

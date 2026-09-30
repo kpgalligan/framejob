@@ -37,7 +37,10 @@ yet" on Clear. A hairline under the two rows separates them from the transcript,
 which fills the middle of the tab and is empty. At the foot: "Add your Anthropic API key in Settings to use
 the assistant." over two lines, and under it a small bordered "Open Settings…"
 button. With a key set, the foot is instead a message field whose placeholder
-reads "Ask about or edit this project…" with a blue "Send" button beside it, and
+reads "Ask about or edit this project…" with a blue "Send" button beside it; the
+field is one line tall and grows a line at a time to five as ⇧Return adds lines,
+then scrolls, and the transcript above it is one text that can be selected across
+entries; and
 while the assistant asks before writing a file, a row above the field reads "The
 assistant asks first:" with the tool and the path, and "Allow" and "Deny" buttons.
 

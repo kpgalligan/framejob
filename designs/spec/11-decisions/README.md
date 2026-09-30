@@ -21,7 +21,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) | 306 | **Chrome, the clip inspector and keys (the sharp pass, road map 9, #35).** SH-1, SH-2, CI-1..CI-15, K-1, K-2. |
 | [`graphics.md`](graphics.md) | 368 | **Graphics (road map 10).** G-1..G-19. |
 | [`dev-tools.md`](dev-tools.md) | 27 | **Dev tools (road map 11).** V-1..V-3: the `REELCUT_DEV_TOOLS` flag and `make dist`, dev tools as ordinary tools, capture by `cacheDisplay`. |
-| [`assistant.md`](assistant.md) | 130 | **The Assistant (road map 12).** AI-1..AI-16: the bundled helper, one lane, the catalog at launch, the fourth tab, the window's own project, W-9's reach, withheld and ask-first tools, the key, history, undo, the model, a call mid-gesture, the base-URL override, the tab kept on a selection change, the live context on each message, Stop reaching a running export or transcribe. |
+| [`assistant.md`](assistant.md) | 148 | **The Assistant (road map 12).** AI-1..AI-17: the bundled helper, one lane, the catalog at launch, the fourth tab, the window's own project, W-9's reach, withheld and ask-first tools, the key, history, undo, the model, a call mid-gesture, the base-URL override, the tab kept on a selection change, the live context on each message, Stop reaching a running export or transcribe, the selectable transcript and the multi-line composer. |
 | [`pricing.md`](pricing.md) | 94 | **Pricing and spend (road map 13).** P-1..P-8: LiteLLM's table as the feed, a call priced from its own `usage` and `model` (per iteration), monthly dollar budgets per service, the app's spend as its own, the spend folder (ledger and price cache) that a proof never touches, the proofs' own ledger and how a paid proof request is held to the month's budget in it, and the two figures the app shows (the conversation's on the Assistant tab, the UTC month's in Settings), and a response cut short priced once and marked partial. |
 
 ## Every decision
@@ -171,6 +171,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | AI-14 | A selection change that is not a click on a clip leaves the Assistant tab showing; a click still shows Clip | [`assistant.md`](assistant.md) |
 | AI-15 | The window's live context rides on each person message; the system prompt is fixed for a session | [`assistant.md`](assistant.md) |
 | AI-16 | Stop stops a running `export` or on-device `transcribe`; any other running call finishes | [`assistant.md`](assistant.md) |
+| AI-17 | The transcript is one selectable text, and the composer is multi-line with K-2's Return | [`assistant.md`](assistant.md) |
 | P-1 | Prices come from LiteLLM's table; only AssemblyAI's rate is hand-kept; Anthropic's page is the cross-check | [`pricing.md`](pricing.md) |
 | P-2 | A call is priced from the response's own `usage` and `model`, per `iterations` entry; unknown is never $0 | [`pricing.md`](pricing.md) |
 | P-3 | Budgets are dollars per calendar month per service, enforced by the proofs at the worst case | [`pricing.md`](pricing.md) |

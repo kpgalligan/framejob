@@ -2,7 +2,8 @@ import AppKit
 
 /// Every view of the Assistant tab (road map 12 A2): the context meter and
 /// Clear along the top, the conversation's Spend row under them (road map 13
-/// P4), the transcript, the ask-first row, and the composer
+/// P4), the transcript (one selectable text, spec §11 AI-17), the ask-first
+/// row, and the composer — a text view that grows from one line to five —
 /// whose Send becomes Stop — or, with no key, a pointer at Settings.
 ///
 /// **It holds no conversation** (spec §11 AI-4): the transcript is
@@ -15,8 +16,9 @@ import AppKit
 ///
 /// **Return never answers a question.** Allow and Deny are
 /// `OptionButtonControl`s, which take a click and no key; Send has no key
-/// equivalent; the composer's Return sends only while idle and beeps
-/// otherwise. Stop is a click on Send while it reads Stop.
+/// equivalent; the composer's bare Return (`onReturn`) sends only while idle
+/// and beeps otherwise, and a modified Return is a new line (AI-17, K-2).
+/// Stop is a click on Send while it reads Stop.
 final class AssistantView: NSView {
     static let placeholder = "Ask about or edit this project…"
     static let questionHeading = "The assistant asks first:"
@@ -35,7 +37,7 @@ final class AssistantView: NSView {
 
     // MARK: - Views
 
-    let composer = NSTextField()
+    var composer: AssistantComposerTextView { composerField.textView }
     let sendButton: AccentButton
     let allowButton: OptionButtonControl
     let denyButton: OptionButtonControl
@@ -47,7 +49,7 @@ final class AssistantView: NSView {
     private let meter = AssistantContextMeterView()
     private let spend = AssistantConversationCostView()
     private let transcript = AssistantTranscriptView()
-    private let scroll = NSScrollView()
+    private let composerField = AssistantComposerField()
     private let questionHeadingLabel = NSTextField(labelWithString: AssistantView.questionHeading)
     private let questionRow = NSStackView()
     private let composerRow = NSStackView()
@@ -112,16 +114,11 @@ final class AssistantView: NSView {
         denyButton.setAccessibilityIdentifier("assistant.deny")
         settingsButton.setAccessibilityIdentifier("assistant.settings")
 
-        DSField.style(composer, font: DS.sans(12))
-        composer.placeholderString = Self.placeholder
-        composer.target = self
-        composer.action = #selector(composerReturn(_:))
-        composer.cell?.sendsActionOnEndEditing = false
-        composer.cell?.isScrollable = true
-        composer.cell?.wraps = false
+        composer.placeholder = Self.placeholder
+        composer.onReturn = { [weak self] in self?.composerReturn() }
         composer.setAccessibilityIdentifier("assistant.composer")
-        composer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        composer.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        composerField.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        composerField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         sendButton.widthAnchor.constraint(equalToConstant: 64).isActive = true
 
         questionHeadingLabel.font = DS.sans(11)
@@ -147,9 +144,10 @@ final class AssistantView: NSView {
             questionRow.addArrangedSubview(view)
         }
         composerRow.orientation = .horizontal
-        composerRow.alignment = .centerY
+        composerRow.alignment = .bottom
+        composerRow.distribution = .fill
         composerRow.spacing = 6
-        composerRow.addArrangedSubview(composer)
+        composerRow.addArrangedSubview(composerField)
         composerRow.addArrangedSubview(sendButton)
         noKeyRow.orientation = .vertical
         noKeyRow.alignment = .leading
@@ -175,19 +173,12 @@ final class AssistantView: NSView {
         questionRow.isHidden = true
         noKeyRow.isHidden = true
 
-        scroll.documentView = transcript
-        scroll.hasVerticalScroller = true
-        scroll.autohidesScrollers = true
-        scroll.drawsBackground = false
-        scroll.borderType = .noBorder
-        transcript.translatesAutoresizingMaskIntoConstraints = false
-
         let top = NSStackView(views: [meter, clearButton])
         top.orientation = .horizontal
         top.alignment = .centerY
         top.spacing = 8
         let rule = AssistantRule()
-        for view in [top, spend, rule, scroll, foot] as [NSView] {
+        for view in [top, spend, rule, transcript, foot] as [NSView] {
             view.translatesAutoresizingMaskIntoConstraints = false
             addSubview(view)
         }
@@ -202,14 +193,11 @@ final class AssistantView: NSView {
             rule.leadingAnchor.constraint(equalTo: leadingAnchor),
             rule.trailingAnchor.constraint(equalTo: trailingAnchor),
             rule.heightAnchor.constraint(equalToConstant: 1),
-            scroll.topAnchor.constraint(equalTo: rule.bottomAnchor),
-            scroll.leadingAnchor.constraint(equalTo: leadingAnchor),
-            scroll.trailingAnchor.constraint(equalTo: trailingAnchor),
-            scroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 60),
-            transcript.topAnchor.constraint(equalTo: scroll.contentView.topAnchor),
-            transcript.leadingAnchor.constraint(equalTo: scroll.contentView.leadingAnchor),
-            transcript.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
-            foot.topAnchor.constraint(equalTo: scroll.bottomAnchor, constant: 8),
+            transcript.topAnchor.constraint(equalTo: rule.bottomAnchor),
+            transcript.leadingAnchor.constraint(equalTo: leadingAnchor),
+            transcript.trailingAnchor.constraint(equalTo: trailingAnchor),
+            transcript.heightAnchor.constraint(greaterThanOrEqualToConstant: 60),
+            foot.topAnchor.constraint(equalTo: transcript.bottomAnchor, constant: 8),
             foot.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Self.inset),
             foot.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Self.inset),
             foot.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -Self.inset),
@@ -278,7 +266,7 @@ final class AssistantView: NSView {
 
     /// Return in the composer: a send while idle, a beep otherwise — never an
     /// answer, and never a Stop.
-    @objc private func composerReturn(_ sender: Any?) {
+    private func composerReturn() {
         guard shownPhase == .idle || shownPhase == .closed else {
             NSSound.beep()
             return
@@ -287,11 +275,10 @@ final class AssistantView: NSView {
     }
 
     private func send() {
-        let text = composer.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let text = composer.string.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         guard onSend?(text) == true else { return }
-        composer.stringValue = ""
-        composer.currentEditor()?.string = ""
+        composer.string = ""
     }
 
     @objc private func clearClicked(_ sender: Any?) {

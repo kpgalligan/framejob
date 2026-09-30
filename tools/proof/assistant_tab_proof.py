@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """The Assistant tab — road map 12 A2 (spec §11 AI-4, AI-7, AI-8, AI-11,
-AI-14).
+AI-14, AI-17).
 
 P — the probe `assistant_tab_probe.swift`, compiled over `app/Sources` minus
 `main.swift` on `harness/build.sh`'s swiftc line (`-D REELCUT_DEV_TOOLS`; a
@@ -32,6 +32,29 @@ with a DUMMY key in a `-RCSecretFolder` of its own,
       exactly one `answer` after the question, `{allowed: false, by:
       "close"}`, the window's next lane call answered within 10 s, no file;
       and no failure in the stand-in's log
+  P9  (AI-17, #154) the composer at the inspector's minimum width less a
+      legacy scroller, light then dark: ⇧/⌥/⌃/⌘Return type "a\nb\nc\nd\ne"
+      (no U+2028, nothing sent), ⇧ keypad Enter a "\n"; Tab and ⇧Tab type
+      nothing; 26 pt empty, strictly taller through five lines, the sixth
+      unchanged; every kind, a cost, a question and five lines lay out with
+      no problem, and `probe/looks/assistant-light|dark.png` is written; a
+      bare Return sends the whole text once and the field is "" at 26 pt
+  P10 (AI-17, #153) the transcript is one text view: the entries joined by
+      "\n"; the layout dump's `assistant.entry.<kind>` parts in order,
+      parented to the transcript, tops never decreasing; `.extended` of the
+      newest is one storage edit at or past its start, the earlier parts
+      unchanged; a selection across entries 0–1, written in the view's own
+      writable types to a private pasteboard, reads back as plain text; the
+      writable types are the one plain-string type; `.cleared` leaves no text
+      and no part; a secure field being edited leaks into no record, and the
+      composer's record reads its string
+  P11 (AI-17) the composer's undo is its own, in a real editor window (the
+      window's undo manager being the document's, and the document clean
+      with nothing to undo, are controls): typing "abc" leaves the
+      document's canUndo and edited state alone and gives the composer an
+      undo; `undo:` from the composer undoes typing and leaves a "P11
+      marker" step on the document's stack unrun; a set string drops the
+      composer's undo
 
 Live A (`-AgentServerEnabled YES`, the dummy `proof-key` in `-RCSecretFolder`,
 `RC_ASSISTANT_BASE_URL` at `anthropic_fake.py`, port 4874), every turn through
@@ -54,23 +77,40 @@ the tab's own controls (`assistant_send` / `assistant_answer` with `pane`):
   L5  Stop through the pane while asking: no file, `Declined (stop): …`
   L6  `pane: true` with the Media tab showing is refused by name, and the
       stand-in hears nothing
+  L7  (AI-17, #154) a multi-line message through the pane (two lines, a
+      blank one, an indented one): finished; one POST whose last user text
+      ends with `</reelcut_context>\n` and the text, intact; the dump's last
+      person entry is the text; the composer is empty; no tab problem
   K   `proof-key` in no MCP answer, no layout dump and not the log
 Launch B (the override set, no `-RCSecretFolder`: no key, AI-13):
   N1  View ▸ Assistant shows the no-key sentence and Open Settings…, and no
       composer
 
     python3 tools/proof/assistant_tab_proof.py
-    python3 tools/proof/assistant_tab_proof.py --mutant no-forward        # L2 alone: FAILS
-    python3 tools/proof/assistant_tab_proof.py --mutant no-close-decline  # P8 alone: FAILS
+    python3 tools/proof/assistant_tab_proof.py --mutant no-forward             # L2 alone: FAILS
+    python3 tools/proof/assistant_tab_proof.py --mutant flatten-send           # L7 alone: FAILS
+    python3 tools/proof/assistant_tab_proof.py --mutant no-close-decline       # P8 alone: FAILS
+    python3 tools/proof/assistant_tab_proof.py --mutant modified-return-sends  # P9 alone: FAILS
+    python3 tools/proof/assistant_tab_proof.py --mutant tab-types              # P9 alone: FAILS
+    python3 tools/proof/assistant_tab_proof.py --mutant no-entry-parts         # P10 alone: FAILS
+    python3 tools/proof/assistant_tab_proof.py --mutant shared-undo            # P11 alone: FAILS
 
 `no-forward` copies the tree with `tree_copy.make_copy` into
 `work/assistant_tab/mutant/tree`, deletes the `session.onEvent =` line from
 `EditorViewController+Assistant.swift`, runs `make app` there, and runs L1's
 steps and L2 against that app: L2 must FAIL (exit 1; 0 when it survives). A
-copy that did not build could not perform the control (exit 2). `no-close-decline` builds the
+copy that did not build could not perform the control (exit 2). `flatten-send`
+is the same tree copy with `send()` joining the composer's lines with spaces
+before it trims (`TREE_MUTANTS`), and runs L7 alone after `open_tab`: L7 must
+FAIL. `no-close-decline` builds the
 probe over a copy of `app/Sources` in `work/assistant_tab/mutants/` with
 `close()`'s `decline(by: "close")` line removed (`MUTANTS`), and runs P8
-alone: P8 must FAIL (exit 1); no build, or no such line, exits 2. Rule R
+alone: P8 must FAIL (exit 1); no build, or no such line, exits 2. The P9,
+P10 and P11 mutants (`MUTANTS`: `.newline`'s arm calls `onReturn`, `insertTab`
+calls `super`, `snapshotParts()` returns `[]`, the composer's `undoManager`
+is `super`'s) build the probe the same way and score their row alone; a
+probe that did not build, or printed no row for it, is an instrument failure
+(exit 2). Rule R
 (issue batch B13): a mutant run whose row was never scored, or that scored
 any row by a path where the row's own comparison did not run (the probe
 printed no P8 row, an exception caught by `guarded`, the launch or the
@@ -112,10 +152,33 @@ HELPER = os.path.join(RELEASE, "Contents", "Helpers", "reelcut-agent")
 FORWARD = "session.onEvent ="
 PORT_A, PORT_B = 4874, 4877
 WALL_BUILD, WALL_RUN, WALL_TURN = 900, 300, 60
-PROBE_ROWS = ["P1", "P2", "P3", "P4", "P5", "P6", "P7"]
+PROBE_ROWS = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P9", "P10", "P11"]
 # name: (file in app/Sources, before — exactly once, after, row)
-MUTANTS = {"no-close-decline": ("AssistantSession.swift", '        decline(by: "close")\n', "",
-                                "P8")}
+MUTANTS = {
+    "no-close-decline": ("AssistantSession.swift", '        decline(by: "close")\n', "", "P8"),
+    "modified-return-sends": ("AssistantComposer.swift",
+                              "        case .newline: insertNewline(nil)\n",
+                              "        case .newline: onReturn?()\n", "P9"),
+    "tab-types": ("AssistantComposer.swift", "        window?.selectNextKeyView(sender)\n",
+                  "        super.insertTab(sender)\n", "P9"),
+    "no-entry-parts": ("AssistantTranscriptView.swift",
+                       "    func snapshotParts() -> [UISnapshotPart] {\n",
+                       "    func snapshotParts() -> [UISnapshotPart] {\n        return []\n", "P10"),
+    "shared-undo": ("AssistantComposer.swift",
+                    "    override var undoManager: UndoManager? { ownUndoManager }\n",
+                    "    override var undoManager: UndoManager? { super.undoManager }\n", "P11"),
+}
+# name: (file in app/Sources, before — exactly once, after, row): a tree copy built with
+# `make app`, its row run live against it
+TREE_MUTANTS = {
+    "flatten-send": ("AssistantView.swift",
+                     "        let text = composer.string.trimmingCharacters(in: "
+                     ".whitespacesAndNewlines)\n",
+                     "        let text = composer.string.split(separator: \"\\n\")"
+                     ".joined(separator: \" \")\n"
+                     "            .trimmingCharacters(in: .whitespacesAndNewlines)\n", "L7"),
+}
+L7_TEXT = "L7 first line.\nL7 second line.\n\n    L7 indented, after a blank line."
 STOP_TEXT = 'select_inspector_tab {tab: "assistant"} first'
 
 
@@ -189,14 +252,20 @@ def probe_secrets():
     return folder
 
 
-def rows_p(score):
-    binary, why = build_probe()
+def rows_p(score, binary=None, only=None):
+    """The probe's rows (`only`: just those, for a mutant run, where a row
+    the probe did not print is an instrument failure, rule R)."""
+    wanted = only or PROBE_ROWS
     if binary is None:
-        for row_id in PROBE_ROWS:
-            score(row_id, False, f"the probe did not build: {why}")
-        return
+        binary, why = build_probe()
+        if binary is None:
+            for row_id in wanted:
+                score(row_id, False, f"the probe did not build: {why}",
+                      instrument=only is not None)
+            return
     ran = bounded.run([binary, "-RCSecretFolder", probe_secrets(),
-                       "-ReelcutInspectorCollapsed", "NO"], WALL_RUN, cwd=PROBE_DIR,
+                       "-ReelcutInspectorCollapsed", "NO"], WALL_RUN,
+                      cwd=os.path.dirname(binary),
                       env=child_env({"RC_ASSISTANT_BASE_URL": "http://127.0.0.1:9"}))
     answer = None
     for line in ran["stdout"].splitlines():
@@ -208,10 +277,11 @@ def rows_p(score):
     with open(os.path.join(WORK, "probe-answer.json"), "w") as f:
         json.dump(answer, f, indent=1, sort_keys=True)
     got = {r["id"]: r for r in (answer or {}).get("rows", [])}
-    for row_id in PROBE_ROWS:
+    for row_id in wanted:
         r = got.get(row_id)
         if r is None:
-            score(row_id, False, f"no row: {why if answer is None else 'not answered'}")
+            score(row_id, False, f"no row: {why if answer is None else 'not answered'}",
+                  instrument=only is not None)
         else:
             score(row_id, bool(r["ok"]), r["detail"])
 
@@ -251,7 +321,7 @@ def row_p8(score, fake, secrets, binary=None):
 
 def mutant_probe(name):
     """(binary, None): the probe built over a copy of app/Sources with the
-    mutant's `before` removed once; or (None, reason)."""
+    mutant's `before` replaced by its `after`, once; or (None, reason)."""
     file, before, after, _ = MUTANTS[name]
     base = os.path.join(WORK, "mutants", name)
     sources = os.path.join(base, "Sources")
@@ -505,6 +575,41 @@ def row_l6(app, fake, ctx):
                   f"requests {len(heard)}")
 
 
+def row_l7(app, fake, ctx):
+    """L7 (AI-17, #154): a multi-line message through the pane reaches the
+    helper intact."""
+    a = ctx["A"]
+    fake.scenario([asp.say("L7: read.")])
+    ok, answer = app.call("assistant_send", project=a, text=L7_TEXT, pane=True,
+                          timeout=WALL_TURN)
+    if not ok:
+        return False, f"assistant_send (pane) refused: {answer}"
+    posts = asp.posts(fake.log())
+    last = None
+    if len(posts) == 1 and isinstance(posts[0].get("body"), dict):
+        messages = posts[0]["body"].get("messages") or []
+        if messages and messages[-1].get("role") == "user":
+            content = messages[-1].get("content")
+            if isinstance(content, str):
+                last = content
+            else:
+                texts = [b.get("text") for b in content or [] if b.get("type") == "text"]
+                last = texts[-1] if texts else None
+    intact = isinstance(last, str) and last.endswith("</reelcut_context>\n" + L7_TEXT)
+    dump = Dump(app, a, "l7")
+    ctx["dumps"].append(dump.text)
+    person = [t for k, t in dump.entries() if k == "person"]
+    composer = dump.shown_text("assistant.composer")
+    problems = dump.tab_problems()
+    good = (answer.get("state") == "finished" and len(posts) == 1 and intact
+            and person and person[-1] == L7_TEXT and composer == "" and not problems)
+    tail = (last or "")[-(len(L7_TEXT) + 22):]
+    return good, (f"{asp.brief(answer)}; POSTs {len(posts)}; the last user text ends with "
+                  f"the context block and the text, intact {intact} ({tail!r}); last person "
+                  f"entry {(person[-1] if person else None)!r}; composer {composer!r}; "
+                  f"problems in the tab {problems[:2]}")
+
+
 def row_k(app, ctx):
     in_answers = sum(1 for text in app.answers if asp.KEY in text)
     in_dumps = sum(1 for text in ctx["dumps"] if asp.KEY in text)
@@ -541,22 +646,36 @@ def row_n1(fake):
 # The mutant.
 
 
-def build_mutant():
+def build_mutant(name="no-forward"):
+    """(app, None): `make app` over a tree copy with the mutant applied —
+    no-forward's `session.onEvent =` line deleted, any other name's
+    `TREE_MUTANTS` replacement made exactly once; or (None, reason)."""
     base = os.path.join(WORK, "mutant")
     shutil.rmtree(base, ignore_errors=True)
     root, reason = tree_copy.make_copy(os.path.join(base, "tree"))
     if root is None:
         return None, reason
-    glue = os.path.join(root, "app", "Sources", "EditorViewController+Assistant.swift")
-    with open(glue) as handle:
-        lines = handle.read().splitlines(keepends=True)
-    hits = [l for l in lines if l.strip().startswith(FORWARD)]
-    if len(hits) != 1:
-        return None, f"the glue has {len(hits)} `{FORWARD}` lines, not 1"
-    with open(glue, "w") as handle:
-        handle.write("".join(l for l in lines if not l.strip().startswith(FORWARD)))
-    print(f"mutant: `{FORWARD}` deleted from the copy; make app (up to {asp.WALL_BUILD} s)…",
-          flush=True)
+    if name == "no-forward":
+        glue = os.path.join(root, "app", "Sources", "EditorViewController+Assistant.swift")
+        with open(glue) as handle:
+            lines = handle.read().splitlines(keepends=True)
+        hits = [l for l in lines if l.strip().startswith(FORWARD)]
+        if len(hits) != 1:
+            return None, f"the glue has {len(hits)} `{FORWARD}` lines, not 1"
+        with open(glue, "w") as handle:
+            handle.write("".join(l for l in lines if not l.strip().startswith(FORWARD)))
+        done = f"`{FORWARD}` deleted from the copy"
+    else:
+        file, before, after, _ = TREE_MUTANTS[name]
+        path = os.path.join(root, "app", "Sources", file)
+        text = open(path).read() if os.path.exists(path) else ""
+        count = text.count(before)
+        if count != 1:
+            return None, f"{file} holds {before!r} {count} times, not once"
+        with open(path, "w") as handle:
+            handle.write(text.replace(before, after))
+        done = f"{name} applied to the copy's {file}"
+    print(f"mutant: {done}; make app (up to {asp.WALL_BUILD} s)…", flush=True)
     built = bounded.run(["make", "app"], asp.WALL_BUILD, cwd=root, env=child_env())
     app = os.path.join(root, asp.APP_PATH)
     if built["expired"] or built["rc"] != 0 or not os.path.exists(os.path.join(app, asp.BINARY)):
@@ -571,10 +690,13 @@ def build_mutant():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--mutant", choices=["no-forward", "no-close-decline"],
+    parser.add_argument("--mutant", choices=sorted(["no-forward", *MUTANTS, *TREE_MUTANTS]),
                         help="no-forward: L2 alone, against a build without the session's "
-                             "event forward; no-close-decline: P8 alone, against a probe "
-                             "whose close() declines nothing; each must FAIL")
+                             "event forward; flatten-send: L7 alone, against a build whose "
+                             "send() joins the lines; no-close-decline: P8, "
+                             "modified-return-sends and tab-types: P9, no-entry-parts: P10, "
+                             "shared-undo: P11, each alone against a probe built over the "
+                             "mutated sources; each must FAIL")
     args = parser.parse_args()
     os.makedirs(WORK, exist_ok=True)
     results = []
@@ -609,6 +731,35 @@ def main():
             row_p8(lambda row_id, ok, detail, **kw: score(row_id, ok, f"(mutant {args.mutant}) "
                                                                    + detail, **kw),
                    fake, secrets, binary)
+        elif args.mutant in MUTANTS:
+            row_id = MUTANTS[args.mutant][3]
+            binary, why = mutant_probe(args.mutant)
+            if binary is None:
+                score(row_id, False, f"(mutant {args.mutant}) the control could not be "
+                                     f"performed: {why}", instrument=True)
+                print(f"0/1\nmutant {args.mutant}: the control could not be performed — "
+                      f"the probe was not built: {why}", flush=True)
+                return 2
+            rows_p(lambda r, ok, detail, **kw: score(r, ok, f"(mutant {args.mutant}) " + detail,
+                                                     **kw),
+                   binary, only=[row_id])
+        elif args.mutant in TREE_MUTANTS:
+            built, why = build_mutant(args.mutant)
+            if built is None:
+                score("L7", False, f"the mutant did not build: {why}", instrument=True)
+                print(f"0/1\nmutant {args.mutant}: the control could not be performed — "
+                      f"the mutant did not build: {why}", flush=True)
+                return 2
+            app = asp.App("mutant", built, ["-AgentServerEnabled", "YES", "-RCSecretFolder",
+                                            secrets, "-ReelcutInspectorCollapsed", "NO"],
+                          fake.base, port=PORT_A)
+            try:
+                app.connect()
+                open_tab(app, ctx)
+                guarded("L7", lambda: (lambda ok, d: (ok, f"(mutant {args.mutant}) " + d))
+                        (*row_l7(app, fake, ctx)))
+            finally:
+                app.stop()
         elif args.mutant:
             built, why = build_mutant()
             if built is None:
@@ -636,7 +787,7 @@ def main():
             app = asp.App("A", RELEASE, ["-AgentServerEnabled", "YES", "-RCSecretFolder",
                                          secrets, "-ReelcutInspectorCollapsed", "NO"],
                           fake.base, port=PORT_A)
-            live = ("L0", "L1", "L2", "L3", "L4", "L5", "L6", "K")
+            live = ("L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "K")
             try:
                 app.connect()
                 guarded("L0", row_l0, app, ctx)
@@ -646,6 +797,7 @@ def main():
                 guarded("L4", row_l4, app, fake, ctx)
                 guarded("L5", row_l5, app, fake, ctx)
                 guarded("L6", row_l6, app, fake, ctx)
+                guarded("L7", row_l7, app, fake, ctx)
                 guarded("K", row_k, app, ctx)
             except Exception as error:  # noqa: BLE001
                 for row_id in live:
@@ -665,8 +817,9 @@ def main():
     passed = sum(1 for _, ok, _ in results if ok)
     print(f"{passed}/{len(results)}", flush=True)
     if args.mutant:
-        why = not_performed({"no-forward": "L2", "no-close-decline": "P8"}[args.mutant],
-                            results)
+        rows = {"no-forward": "L2", **{name: m[3] for name, m in MUTANTS.items()},
+                **{name: m[3] for name, m in TREE_MUTANTS.items()}}
+        why = not_performed(rows[args.mutant], results)
         if why:
             print(f"mutant {args.mutant}: the control could not be performed — {why}",
                   flush=True)

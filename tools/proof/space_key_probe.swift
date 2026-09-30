@@ -288,15 +288,14 @@ if let (document, editor, window) = openEditor() {
     editor.showAssistant(nil)
     spin(0.3)
     let composer = editor.assistantView?.composer
-    let composing = composer.map { $0.currentEditor() != nil
-        && window.firstResponder === $0.currentEditor() } ?? false
+    let composing = composer.map { window.firstResponder === $0 } ?? false
     send(key(window: window))
-    let typedH = (window.firstResponder as? NSTextView)?.string ?? "(not a text view)"
+    let typedH = composer?.string ?? "(no composer)"
     let playingH = held()
     check("S2h the Assistant tab's composer being typed into: the Space is typed, play stays "
             + "paused",
           composing && typedH == " " && !playingH,
-          "composer is first responder \(composing); field editor string \"\(typedH)\"; "
+          "composer is first responder \(composing); composer string \"\(typedH)\"; "
             + "isPlaying \(playingH); tab \(editor.inspector?.tab.title ?? "none")")
     window.makeFirstResponder(editor.view)
     paused()

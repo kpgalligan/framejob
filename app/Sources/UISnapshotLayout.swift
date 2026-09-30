@@ -27,7 +27,15 @@ import AppKit
 /// `problems` means the app's own views are clean.
 ///
 /// **A secure field's text never leaves it**: its `text` and a truncation's
-/// detail are `null` for any `NSSecureTextField` (Settings' key field).
+/// detail are `null` for any `NSSecureTextField` (Settings' key field), and a
+/// field editor's (the text view that edits a field, a secure one included)
+/// is `null` too; an ordinary text view's `text` is its string.
+///
+/// **A view that draws several things in one view names them as parts**
+/// (`UISnapshotParts`; the Assistant tab's transcript, whose entries are
+/// ranges of one text view, spec §11 AI-17): one record each, class
+/// `UISnapshotPart`, right after the view's own record and before its
+/// subviews, parented to it. A part never produces a problem.
 enum UISnapshotLayout {
     static let tolerance: CGFloat = 0.5
 
@@ -58,6 +66,22 @@ enum UISnapshotLayout {
                 "intrinsic": [metric(intrinsic.width), metric(intrinsic.height)],
                 "text": UISnapshot.orNull(text(of: view)),
             ])
+            if let named = view as? UISnapshotParts {
+                for part in named.snapshotParts() {
+                    views.append([
+                        "i": views.count,
+                        "parent": index,
+                        "depth": depth + 1,
+                        "class": "UISnapshotPart",
+                        "id": part.id,
+                        "frame": partRect(part.rect, of: view, in: root),
+                        "hidden": hidden,
+                        "ambiguous": false,
+                        "intrinsic": [-1, -1],
+                        "text": String(part.text.prefix(200)),
+                    ])
+                }
+            }
             if !hidden {
                 for (kind, detail) in findings(view, isRoot: parent < 0, ambiguous: ambiguous) {
                     var detail = detail
@@ -151,13 +175,38 @@ enum UISnapshotLayout {
         value == NSView.noIntrinsicMetric ? -1 : UISnapshot.round2(value)
     }
 
-    /// A label's or a button's text, first 200 characters; never a secure
-    /// field's.
+    /// A part's rect, in `view`'s own coordinates, as `UISnapshot.rect`'s
+    /// [x, top, w, h] in `root`'s.
+    private static func partRect(_ rect: NSRect, of view: NSView, in root: NSView) -> [Double] {
+        let r = view.convert(rect, to: root)
+        let top = root.isFlipped ? r.minY : root.bounds.height - r.maxY
+        return [r.minX, top, r.width, r.height].map { UISnapshot.round2($0) }
+    }
+
+    /// A label's, a button's or a text view's text, first 200 characters;
+    /// never a secure field's, and never a field editor's.
     private static func text(of view: NSView) -> String? {
         if view is NSSecureTextField { return nil }
         if let field = view as? NSTextField { return String(field.stringValue.prefix(200)) }
         if let button = view as? NSButton { return String(button.title.prefix(200)) }
+        if let textView = view as? NSTextView, !textView.isFieldEditor {
+            return String(textView.string.prefix(200))
+        }
         return nil
     }
+}
+
+/// A view that names what it draws, for the layout dump, in place of
+/// subviews it does not have.
+protocol UISnapshotParts: AnyObject {
+    func snapshotParts() -> [UISnapshotPart]
+}
+
+/// One named part: its identifier, its text, and its rect in the naming
+/// view's own coordinates.
+struct UISnapshotPart: Equatable {
+    let id: String
+    let text: String
+    let rect: NSRect
 }
 #endif

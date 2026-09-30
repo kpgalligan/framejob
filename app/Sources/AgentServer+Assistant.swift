@@ -136,16 +136,17 @@ extension AgentServer {
         return view
     }
 
-    /// The composer set to `text` (any edit ended) and Send clicked, as the
-    /// person would. Refused when the composer still holds the text after.
+    /// The composer set to `text` (any marked text committed first) and Send
+    /// clicked, as the person would. Refused when the composer still holds
+    /// the text after.
     private static func sendThroughComposer(
         _ view: AssistantView, _ text: String, _ editor: EditorViewController
     ) throws {
-        if view.composer.currentEditor() != nil { view.window?.endEditing(for: view.composer) }
-        view.composer.stringValue = text
+        if view.composer.hasMarkedText() { view.composer.unmarkText() }
+        view.composer.string = text
         editor.assistantRefresh()
         view.sendButton.performClick(nil)
-        guard view.composer.stringValue != text else {
+        guard view.composer.string != text else {
             throw ToolError(
                 message: "The Assistant tab's Send did not take the message, so nothing was "
                     + "sent.")

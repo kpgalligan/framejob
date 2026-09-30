@@ -61,10 +61,12 @@ schema, §6 the op table, §7 the architecture.
 - **Inspector** with four tabs — Clip, Media, Document and **Assistant**
   (View ▸ Assistant, ⌃⌘A): a conversation with a built-in assistant that
   edits the window's project with the same tools an agent uses, each call
-  its own undo step. It streams its reply and a line per tool call, asks
+  its own undo step. It streams its reply and a line per tool call — one
+  text you can select and copy across entries — asks
   before it writes a file — naming the file, and saying REPLACES when one is
   already there — and waits for Allow or Deny (a click; Return never answers);
-  Send becomes Stop while it works, Clear starts over, and a meter shows how
+  Return sends and ⇧Return starts a new line, the message field growing to
+  five lines; Send becomes Stop while it works, Clear starts over, and a meter shows how
   full the conversation is. It runs on your own Anthropic API key and the
   model you choose (claude-opus-5-5 unless you pick another), both set in
   Settings' Assistant pane; changing either starts a new conversation. It
@@ -348,7 +350,7 @@ Makefile              Build orchestration
 | `EditorViewController.swift` + `EditorViewController+{Timeline,Canvas,Inspector,Export}.swift` | wiring in the base file, features in extensions |
 | `AgentServer.swift` + `AgentServer+{Arguments,Gate,Parity,Project,Clips,Tracks,Media,Render,History,Silence,Captions,CloudCaptions,Audio,Background,Transitions,Scope,Recording,RecordingArguments,RecordingResult,Graphics,GraphicImports,GraphicRender,DevTools}.swift` · `AgentCatalog.swift` + `AgentCatalog+{Clips,Files,Captions,Audio,Transitions,Graphics,Declarations}.swift` | the MCP endpoint, its handlers, and the tool catalog |
 | `AgentLane.swift` · `AssistantToolTable.swift` · `AssistantSession.swift` · `AssistantConfiguration.swift` · `AssistantPrompt.swift` · `AssistantLiveContext.swift` · `AssistantSpend.swift` | the one door every tool call goes through (a lock, one call at a time, and the wait for mouse-up), and the table of tools the assistant may not call or must ask about first; the assistant's per-window session over the bundled helper, its key, base URL and model, its core tools and prompt texts, the live context each message carries, and what each response cost (the spend ledger, the price cache's place, the turn's cost line) |
-| `AssistantView.swift` · `AssistantTranscriptView.swift` · `AssistantTranscript.swift` · `AssistantContextMeter.swift` · `AssistantSettingsPane.swift` · `EditorViewController+Assistant.swift` | the Assistant tab's views, which hold no conversation; the transcript the window keeps; the context meter; Settings' Assistant pane (key and model); and the glue between the tab and the window's session |
+| `AssistantView.swift` · `AssistantTranscriptView.swift` · `AssistantComposer.swift` · `AssistantTranscript.swift` · `AssistantContextMeter.swift` · `AssistantSettingsPane.swift` · `EditorViewController+Assistant.swift` | the Assistant tab's views, which hold no conversation; the multi-line message field, with its own undo; the transcript the window keeps; the context meter; Settings' Assistant pane (key and model); and the glue between the tab and the window's session |
 | `RecordingSetup.swift` · `ScreenRecorder.swift` (with `+Finishing` and `+Content`) · `RecordingLanding.swift` · `ProjectDocument+Recording.swift` · `RecorderPanelController.swift` (with `+Rows` and `+Recording`) · `RecorderStatusItem.swift` · `AppDelegate+Recording.swift` · `AgentServer+Recording.swift` | screen recording (road map 3): the values, the session over ScreenCaptureKit and a second `AVCaptureSession` for the microphone, the landing as ordinary media, the floating non-activating panel with its countdown and meter, the menu-bar status item, and the `record_screen` tool |
 | `AppDelegate.swift` · `EditorWindowController.swift` · `WelcomeWindowController.swift` · `main.swift` | menus (nil-target selectors), window, welcome |
 | `SpeedSheetController.swift` · `RelinkSheetController.swift` · `SilenceSheetController.swift` (with `SilenceDetector.swift` behind it) · `TranscribeSheetController.swift` (+`Cloud` `Commit`) · `SettingsWindowController.swift` | the remaining dialogs, and Reelcut ▸ Settings… |

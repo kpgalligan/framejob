@@ -409,6 +409,11 @@ Needs your own Anthropic API key (Setup 3).
 - **Expect:** the turn ends with `Cost: at least $… (a response was cut short) · Reelcut's estimate at LiteLLM prices (…)`; the ledger's last line carries `"partial": true`; the Console's charge for that request is at least that figure, and expect it above: the streamed output is not counted (spec §11 P-8).
 - **Source:** issue batch B15 (#162); spec §11 P-8.
 
+**AS-7 — Selecting the conversation, and a message of several lines**
+- **Do:** In light, then dark, after a turn with a tool call: 1. Drag from inside a reply down into the next person line and a tool line; ⌘C; paste into TextEdit. 2. In the composer type a line, ⇧Return, another, ⌥Return, a third, and keep adding lines past five. 3. Press Return. 4. With an input method that composes (Japanese, say), start a word so it is underlined and press Return. 5. Send something long and, while it is working, type in the composer and press Return.
+- **Expect:** 1. the drag selects across entries, and the paste is plain text (no fonts or colours), each entry starting on its own line. 2. each modified Return starts a new line; the field grows a line at a time up to five, then holds its height and scrolls. 3. the whole message is sent, lines intact, and the field is one line again. 4. Return commits the word and sends nothing. 5. Return beeps and the text stays.
+- **Source:** issue batch B18 (#153, #154); spec §11 AI-17 and K-2.
+
 ## Host-state proof runs
 
 Scripts that need a state no agent session has. Run from a terminal on an

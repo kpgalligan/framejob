@@ -580,7 +580,7 @@ the key map behind it.
   control a person TYPES into must live outside `structureSignature` and be
   applied to views that already exist (`MediaPane.arrange()` is the shape).
 - `AssistantPane.swift` · `AssistantView.swift` · `AssistantTranscriptView.swift`
-  · `AssistantTranscript.swift` · `AssistantContextMeter.swift` — the
+  · `AssistantComposer.swift` · `AssistantTranscript.swift` · `AssistantContextMeter.swift` — the
   Assistant tab (road map 12 A2, spec §11 AI-4). The pane builds its ONE
   `AssistantView` in `init`, never in `makeSections()` (a rebuild would take
   the composer's first responder), calls `onAssistantView` with it, and is
@@ -600,14 +600,22 @@ the key map behind it.
   window later calls `attachAssistant` with the same view. **Return never
   answers**: Allow and Deny are `OptionButtonControl`s (a click, no key), Send
   is a 64 pt `AccentButton` with no key equivalent that reads Stop while busy
-  or asking, and the composer's Return sends only while idle and beeps
-  otherwise. No spinner (the harness settles). A label's frame is 2 pt wider
+  or asking, and the composer's bare Return sends only while idle and beeps
+  otherwise; a modified Return is a new line (spec §11 AI-17, K-2). No spinner
+  (the harness settles). A label's frame is 2 pt wider
   than its text each side, and a row that holds a wrapping label is inset by 2
   pt; `snapshot_ui`'s outside_superview rule measures alignment rects since
   #140 and no longer needs the inset, which is kept. `AssistantTranscriptView`
-  is
-  the flipped document view, one selectable label per entry with
-  `preferredMaxLayoutWidth` set in `layout()`; `AssistantContextMeterView`
+  is a scroll view owning ONE non-editable, selectable TextKit 1 text view
+  (spec §11 AI-17): each entry is a UTF-16 range of its one text (`spans`),
+  one "\n" between entries, so a selection and a plain-text copy cross entries
+  — its writable type is the legacy `NSStringPboardType`, because
+  `writeSelection` answers false for `.string` (measured, B18); `.extended`
+  inserts only the new suffix into its own entry's range; `entryLayout()`
+  gives each entry's rect in the view's coordinates, and the layout dump reads
+  the entries as parts it names (`UISnapshotParts`, dev only), which
+  `assistant_tab_proof.py`'s `no-entry-parts` mutant empties;
+  `AssistantContextMeterView`
   the inline meter and `figures(_:)`, its three sentences;
   `AssistantConversationCostView` (the same file, road map 13 P4, spec §11
   P-7) the Spend row 6 pt under the meter and Clear, the rule under it:
@@ -615,6 +623,24 @@ the key map behind it.
   and `apply`'s `.conversationCost` set. Accessibility ids
   `assistant.composer|send|allow|deny|question|clear|settings|nokey|spend` and
   `assistant.entry.<kind>` are what the proofs read.
+- `AssistantComposer.swift` — the Assistant tab's composer (spec §11
+  AI-17). `AssistantComposerTextView` is a plain-text `NSTextView`: its
+  `keyDown` is `TextEditKey.route` — a bare Return or keypad Enter is
+  `onReturn`, a modified Return `insertNewline`, nothing routed while an
+  input method has marked text; `insertTab` / `insertBacktab` move focus
+  and never type a tab; and its undo is its OWN `UndoManager`, through a
+  one-line `undoManager` override, because an editor window's manager IS
+  the document's and typing would otherwise land on the project's stack.
+  It also answers `undo:` and `redo:` itself (validated in
+  `validateUserInterfaceItem`), because `NSWindow`'s own `undo:` reads the
+  WINDOW's manager (measured, `assistant_tab_probe` P11). A set `string`
+  (a send, the dev tools' pane path) drops its undo history.
+  `AssistantComposerField` is its scroll view: DSField's 1 pt layer border,
+  26 pt for one line plus one line height per further line up to five,
+  then scrolling; it refits on every change and on a width change.
+  `assistant_tab_proof.py`'s `modified-return-sends`, `tab-types` and
+  `shared-undo` mutants edit its `.newline` arm, `insertTab`'s body and
+  the override, each exactly once.
 - `MediaPane.swift` · `MediaRowView.swift` (a row and the drag it starts,
   with `MediaDropMode` read from `NSEvent.modifierFlags` at the drop) ·
   `MediaPaneCommands.swift` · `MediaListFilter.swift` (the find band as a
@@ -1469,7 +1495,8 @@ free.
   `AssistantSpend.toolView` (road map 13 P2). `assistant_send` without `pane`
   sends through `EditorViewController.assistantSend`, so the transcript gets
   the person's line; with `pane` (road map 12 A2) both tools go through the
-  Assistant tab's own controls — the composer and a `performClick` on Send,
+  Assistant tab's own controls — the composer (its `string` set, any marked
+  text committed first) and a `performClick` on Send,
   Allow's or Deny's `mouseDown` with a synthesized click at its centre, Send
   while it reads Stop — refused by name, changing nothing, when the control
   is not in a window or is hidden. The pane check comes before the session
@@ -1508,7 +1535,11 @@ free.
   (`alignmentRect(forFrame:)`), so a label pinned flush is clean, except under
   an `NSClipView` or at zero area (the frame's); truncated,
   except when wrapping. Problems on `_NS…` views go to `private_problems`. A
-  secure field's text is never written. It is pure over an `NSView` tree, so
+  secure field's text is never written, nor a field editor's; an ordinary text
+  view's text is. A view that `is UISnapshotParts` adds one `UISnapshotPart`
+  record per part it names (id, text, rect), after its own record and before
+  its subviews, never a problem (the Assistant tab's transcript, spec §11
+  AI-17). It is pure over an `NSView` tree, so
   `tools/proof/v2_layout_probe.swift` calls it.
 - `AgentServer+Arguments.swift` — the shared argument vocabulary
   (`intArg`, `timeArg`, `rangesArg`, `rawPatchArg`, …), each refusing a

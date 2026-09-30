@@ -1,5 +1,5 @@
 // Road map 12 A2 — the Assistant tab's probe (spec §11 AI-4, AI-8, AI-11,
-// AI-14).
+// AI-14, AI-17).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
 // `main.swift`, module `Reelcut`, against `libreelcut_core.a` —
@@ -13,7 +13,9 @@
 // proof points `RC_ASSISTANT_BASE_URL` at its stand-in (`anthropic_fake.py`),
 // scripted to ask for `export` to `<path>` (#150).
 //
-//   assistant_tab_probe                 P1–P7
+//   assistant_tab_probe                 P1–P7, P9–P11 (P9 writes
+//                                       looks/assistant-light|dark.png under
+//                                       the working folder)
 //   assistant_tab_probe --close <path>  P8
 //
 // Prints exactly one stdout line:
@@ -30,6 +32,22 @@
 //       strongly so `deinit` cannot stand in, is closed and the question
 //       answered once `{allowed: false, by: "close"}`; the window's next lane
 //       call answers; no file at the path
+//   P9  (AI-17, #154) the composer at the inspector's minimum width less a
+//       legacy scroller, light then dark: ⇧/⌥/⌃/⌘Return and ⇧ keypad Enter
+//       insert "\n" and send nothing; Tab and ⇧Tab type nothing; 26 pt empty,
+//       strictly taller through five lines, the sixth unchanged; every kind,
+//       a cost, a question and five lines lay out with no problem; a bare
+//       Return sends the whole text once and the field is "" at 26 pt again
+//   P10 (AI-17, #153) the transcript is one text: the entries joined by
+//       "\n"; the dump's `assistant.entry.<kind>` parts in order, parented to
+//       the transcript, tops never decreasing; an extension is one edit at or
+//       past its entry's start, the earlier parts unchanged; a selection
+//       across entries 0–1 copies as plain text; `.cleared` leaves no text
+//       and no part; a secure field being edited leaks into no record, and
+//       the composer's record reads its string
+//   P11 (AI-17) the composer's undo is its own: typing leaves the document's
+//       canUndo and edited state alone; `undo:` from the composer undoes
+//       typing and not a document step; a set string drops the history
 import AppKit
 
 final class ProbeDocumentController: NSDocumentController {
@@ -205,14 +223,13 @@ func rowP3(_ editor: EditorViewController, _ window: NSWindow) {
     spin(0.3)
     let tab = editor.inspector?.tab
     let composer = editor.assistantView?.composer
-    let focused = composer.map { $0.currentEditor() != nil
-        && window.firstResponder === $0.currentEditor() } ?? false
+    let focused = composer.map { window.firstResponder === $0 } ?? false
     let shown = composer.map { !$0.isHiddenOrHasHiddenAncestor && $0.window === window } ?? false
     row(
         "P3", tab == .assistant && focused && shown,
         "tab before \(before), after \(tab?.title ?? "none"); view attached "
             + "\(editor.assistantView != nil); composer on screen \(shown), first responder "
-            + "\(focused); placeholder \"\(composer?.placeholderString ?? "")\"")
+            + "\(focused); placeholder \"\(composer?.placeholder ?? "")\"")
 }
 
 // MARK: - P4 Return never answers
@@ -239,15 +256,15 @@ func rowP4() {
 
     // The control: idle, Return sends and empties the composer.
     view.show(phase: .idle, question: nil)
-    view.composer.stringValue = "hi"
+    view.composer.string = "hi"
     window.makeFirstResponder(view.composer)
     if let event = key(36, "\r", window) { window.sendEvent(event) }
-    let controlSent = sends == ["hi"] && view.composer.stringValue.isEmpty
+    let controlSent = sends == ["hi"] && view.composer.string.isEmpty
 
     let question = AssistantQuestion(tool: "export", path: "/tmp/P4.mp4", exists: false)
     view.show(phase: .asking, question: question)
     window.layoutIfNeeded()
-    view.composer.stringValue = "while asking"
+    view.composer.string = "while asking"
     window.makeFirstResponder(view.composer)
     if let event = key(36, "\r", window) { window.sendEvent(event) }
     let returnQuiet = answers.isEmpty && sends == ["hi"] && stops == 0
@@ -489,6 +506,354 @@ func rowP8(_ path: String) {
     withExtendedLifetime(session) {}
 }
 
+// MARK: - P9 the composer's keys, growth and layout (AI-17)
+
+func walk(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(walk) }
+
+func keyEvent(
+    _ keyCode: UInt16, _ characters: String, _ flags: NSEvent.ModifierFlags = [],
+    _ window: NSWindow
+) -> NSEvent? {
+    NSEvent.keyEvent(
+        with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0,
+        windowNumber: window.windowNumber, context: nil, characters: characters,
+        charactersIgnoringModifiers: characters, isARepeat: false, keyCode: keyCode)
+}
+
+/// `text` typed through the composer's own `keyDown`, one key per character.
+func typeKeys(_ text: String, into composer: NSTextView, _ window: NSWindow) {
+    let codes: [Character: UInt16] = [
+        "a": 0, "s": 1, "d": 2, "f": 3, "h": 4, "g": 5, "z": 6, "x": 7, "c": 8, "v": 9,
+        "b": 11, "q": 12, "w": 13, "e": 14, "r": 15, "y": 16, "t": 17, "o": 31, "u": 32,
+        "i": 34, "p": 35, "l": 37, "j": 38, "k": 40, "n": 45, "m": 46, " ": 49,
+    ]
+    for character in text {
+        if let event = keyEvent(codes[character] ?? 0, String(character), [], window) {
+            composer.keyDown(with: event)
+        }
+    }
+}
+
+/// The panel's own background under the view, so a capture shows the look
+/// (`cacheDisplay` draws views, never the window's background).
+final class P9Backdrop: NSView {
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor.windowBackgroundColor.setFill()
+        bounds.fill()
+    }
+}
+
+func p9Look(_ look: String, _ appearance: NSAppearance.Name) -> (Bool, String) {
+    NSApp.appearance = NSAppearance(named: appearance)
+    defer { NSApp.appearance = nil }
+    let width = EditorViewController.minInspectorWidth
+        - NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy)
+    let window = NSWindow(
+        contentRect: NSRect(x: 0, y: 0, width: width, height: 600), styleMask: [.titled],
+        backing: .buffered, defer: false)
+    let backdrop = P9Backdrop(frame: NSRect(x: 0, y: 0, width: width, height: 600))
+    let view = AssistantView()
+    view.frame = backdrop.bounds
+    view.autoresizingMask = [.width, .height]
+    backdrop.addSubview(view)
+    window.contentView = backdrop
+    var sends: [String] = []
+    view.onSend = { text in
+        sends.append(text)
+        return true
+    }
+    view.show(hasKey: true)
+    view.show(phase: .idle, question: nil)
+    window.layoutIfNeeded()
+    let composer = view.composer
+    guard let field = composer.enclosingScrollView as? AssistantComposerField else {
+        return (false, "\(look): the composer is not in an AssistantComposerField")
+    }
+    window.makeFirstResponder(composer)
+    var notes: [String] = []
+
+    // Modified Returns are new lines; nothing is sent.
+    typeKeys("a", into: composer, window)
+    for (flag, letter) in [
+        (NSEvent.ModifierFlags.shift, "b"), (.option, "c"), (.control, "d"), (.command, "e"),
+    ] {
+        if let event = keyEvent(36, "\r", flag, window) { composer.keyDown(with: event) }
+        typeKeys(letter, into: composer, window)
+    }
+    let modified = composer.string
+    let modifiedOK = modified == "a\nb\nc\nd\ne" && !modified.contains("\u{2028}")
+        && sends.isEmpty
+    notes.append("⇧/⌥/⌃/⌘Return → \(modified.debugDescription) (want \"a\\nb\\nc\\nd\\ne\", no "
+        + "U+2028), sends \(sends.count)")
+    composer.string = "f"
+    composer.setSelectedRange(NSRange(location: 1, length: 0))
+    if let event = keyEvent(76, "\u{3}", [.shift, .numericPad], window) {
+        composer.keyDown(with: event)
+    }
+    let enter = composer.string
+    let enterOK = enter == "f\n" && sends.isEmpty
+    notes.append("⇧ keypad Enter → \(enter.debugDescription)")
+
+    // Tab and ⇧Tab move focus; they type nothing.
+    composer.string = "tabs"
+    window.makeFirstResponder(composer)
+    composer.setSelectedRange(NSRange(location: 4, length: 0))
+    if let event = keyEvent(48, "\t", [], window) { composer.keyDown(with: event) }
+    window.makeFirstResponder(composer)
+    if let event = keyEvent(48, "\u{19}", [.shift], window) { composer.keyDown(with: event) }
+    let tabbed = composer.string
+    let tabOK = tabbed == "tabs"
+    notes.append("Tab, ⇧Tab → \(tabbed.debugDescription)")
+    window.makeFirstResponder(composer)
+
+    // 26 pt empty, strictly taller through five lines, the sixth unchanged.
+    composer.string = ""
+    window.layoutIfNeeded()
+    let empty = field.frame.height
+    var heights: [CGFloat] = []
+    for count in 1...6 {
+        composer.string = (1...count).map { "line \($0)" }.joined(separator: "\n")
+        window.layoutIfNeeded()
+        heights.append(field.frame.height)
+    }
+    let grows = heights[0] == AssistantComposerField.oneLineHeight
+        && zip(heights[0..<4], heights[1..<5]).allSatisfy { $0 < $1 } && heights[5] == heights[4]
+    let heightOK = empty == AssistantComposerField.oneLineHeight && grows
+    notes.append("heights empty \(empty), lines 1–6 \(heights)")
+
+    // Every kind, a cost, a question and five lines: no layout problem.
+    var cost = AssistantTurnCost()
+    cost.add([
+        "type": "cost", "cost": ["kind": "dollars", "dollars": 0.0018] as [String: Any],
+        "prices": ["kind": "bundled", "as_of": "2026-09-01"],
+    ])
+    view.reload(
+        [
+            .init(kind: .person, text: "Put a marker at two seconds,\nthen export it."),
+            .init(kind: .reply, text: "Done: the marker is at 2 s and the export is written."),
+            .init(kind: .progress, text: "Thinking about the timeline"),
+            .init(kind: .meta, text: "add_marker (at: 1200000, name: P9)"),
+            .init(kind: .error, text: "The assistant helper stopped."),
+        ],
+        usage: AssistantContextUsage(), cost: cost)
+    let question = AssistantQuestion(tool: "export", path: "/tmp/P9.mp4", exists: false)
+    view.show(phase: .idle, question: question)
+    composer.string = (1...5).map { "line \($0)" }.joined(separator: "\n")
+    window.layoutIfNeeded()
+    view.layoutSubtreeIfNeeded()
+    let report = UISnapshotLayout.report(root: view, skipping: nil)
+    let problems = report["problems"] as? [[String: Any]] ?? []
+    notes.append("layout problems \(problems.count) \(String(describing: problems.prefix(3)))")
+    let folder = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        .appendingPathComponent("looks")
+    try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let png = folder.appendingPathComponent("assistant-\(look).png")
+    try? FileManager.default.removeItem(at: png)
+    var written = false
+    if let rep = backdrop.bitmapImageRepForCachingDisplay(in: backdrop.bounds) {
+        backdrop.cacheDisplay(in: backdrop.bounds, to: rep)
+        if let data = rep.representation(using: .png, properties: [:]) {
+            written = (try? data.write(to: png)) != nil
+        }
+    }
+    notes.append("\(png.lastPathComponent) written \(written)")
+
+    // A bare Return sends the whole text once and empties the field.
+    view.show(phase: .idle, question: nil)
+    let whole = composer.string
+    window.makeFirstResponder(composer)
+    if let event = keyEvent(36, "\r", [], window) { composer.keyDown(with: event) }
+    window.layoutIfNeeded()
+    let sentOK = sends == [whole] && composer.string.isEmpty
+        && field.frame.height == AssistantComposerField.oneLineHeight
+    notes.append("bare Return sent \(sends.map { $0.debugDescription }), composer "
+        + "\(composer.string.debugDescription) at \(field.frame.height) pt")
+    window.orderOut(nil)
+    let ok = modifiedOK && enterOK && tabOK && heightOK && problems.isEmpty && written && sentOK
+    return (ok, "\(look): " + notes.joined(separator: "; "))
+}
+
+func rowP9() {
+    let light = p9Look("light", .aqua)
+    let dark = p9Look("dark", .darkAqua)
+    row("P9", light.0 && dark.0, light.1 + " | " + dark.1)
+}
+
+// MARK: - P10 the transcript: one text, its parts, a copy across entries
+
+func rowP10() {
+    let window = NSWindow(
+        contentRect: NSRect(x: 0, y: 0, width: 304, height: 520), styleMask: [.titled],
+        backing: .buffered, defer: false)
+    let root = NSView(frame: NSRect(x: 0, y: 0, width: 304, height: 520))
+    let view = AssistantView()
+    view.frame = root.bounds
+    view.autoresizingMask = [.width, .height]
+    root.addSubview(view)
+    let secure = NSSecureTextField(frame: NSRect(x: 4, y: 4, width: 120, height: 22))
+    root.addSubview(secure)
+    window.contentView = root
+    view.show(hasKey: true)
+    window.layoutIfNeeded()
+    guard let transcript = walk(view).first(where: { $0 is AssistantTranscriptView })
+        as? AssistantTranscriptView
+    else {
+        row("P10", false, "no AssistantTranscriptView in the view")
+        return
+    }
+    var notes: [String] = []
+    let entries: [AssistantEntry] = [
+        .init(kind: .person, text: "First line of the person,\nand its second line."),
+        .init(kind: .reply, text: "A reply."),
+        .init(kind: .progress, text: "Thinking"),
+        .init(kind: .meta, text: "add_marker (at: 1200000, name: P10)"),
+        .init(kind: .error, text: "The assistant helper stopped."),
+    ]
+    view.reload(entries, usage: AssistantContextUsage(), cost: AssistantTurnCost())
+    window.layoutIfNeeded()
+    let joined = entries.map(\.text).joined(separator: "\n")
+    let textOK = transcript.textView.string == joined
+    notes.append("the text is the entries joined by \\n \(textOK)")
+
+    func parts() -> (records: [[String: Any]], parentOK: Bool) {
+        let report = UISnapshotLayout.report(root: root, skipping: nil)
+        let views = report["views"] as? [[String: Any]] ?? []
+        let owner = views.first { $0["class"] as? String == "AssistantTranscriptView" }?["i"]
+            as? Int
+        let records = views.filter { ($0["id"] as? String)?.hasPrefix("assistant.entry.") == true }
+        let parentOK = owner != nil && records.allSatisfy { $0["parent"] as? Int == owner }
+        return (records, parentOK)
+    }
+    let (records, parentOK) = parts()
+    let got = records.map { (($0["id"] as? String) ?? "", ($0["text"] as? String) ?? "") }
+    let want = entries.map { ("assistant.entry.\($0.kind.rawValue)", $0.text) }
+    let recordsOK = got.count == want.count && zip(got, want).allSatisfy { $0 == $1 }
+    let tops = records.compactMap { ($0["frame"] as? [Double])?[1] }
+    let topsOK = tops.count == records.count && zip(tops, tops.dropFirst()).allSatisfy { $0 <= $1 }
+    notes.append("records \(got.map { $0.0.replacingOccurrences(of: "assistant.entry.", with: "") }) "
+        + "(as wanted \(recordsOK)), parented to the transcript \(parentOK), tops \(tops) "
+        + "never decrease \(topsOK)")
+
+    // An extension edits only the newest entry's range.
+    view.apply(.appended(AssistantEntry(kind: .reply, text: "Hel")))
+    let before = transcript.snapshotParts()
+    let start = (transcript.textView.string as NSString).length - 3
+    var posted: [NSRange] = []
+    let token = NotificationCenter.default.addObserver(
+        forName: NSTextStorage.didProcessEditingNotification,
+        object: transcript.textView.textStorage, queue: nil
+    ) { note in
+        if let storage = note.object as? NSTextStorage { posted.append(storage.editedRange) }
+    }
+    view.apply(.extended(index: 5, text: "Hello, world."))
+    NotificationCenter.default.removeObserver(token)
+    let after = transcript.snapshotParts()
+    let extendOK = posted.count == 1 && (posted.first?.location ?? -1) >= start
+        && before.count == 6 && after.count == 6 && Array(before[0..<5]) == Array(after[0..<5])
+        && after[5].text == "Hello, world."
+    notes.append("extend: \(posted.count) edit(s) at \(posted.map { "\($0)" }) (entry starts at "
+        + "\(start)), earlier parts unchanged \(before.count == 6 && Array(before.prefix(5)) == Array(after.prefix(5)))")
+
+    // A selection across entries 0–1 copies as plain text.
+    let firstLength = (entries[0].text as NSString).length
+    let selection = NSRange(location: firstLength - 5, length: 5 + 1 + 4)
+    transcript.textView.setSelectedRange(selection)
+    let wanted = (transcript.textView.string as NSString).substring(with: selection)
+    // What Copy writes: the selection in the view's writable types, to a
+    // private pasteboard (never the person's). NSTextView writes plain text
+    // by the legacy name; `.string` is what the pasteboard reads it back as.
+    let plain = NSPasteboard.PasteboardType("NSStringPboardType")
+    let types = transcript.textView.writablePasteboardTypes
+    let board = NSPasteboard(name: NSPasteboard.Name("com.kgalligan.reelcut.p10." + UUID().uuidString))
+    board.clearContents()
+    let wrote = transcript.textView.writeSelection(to: board, types: types)
+    let copied = board.string(forType: .string)
+    let rich = board.types?.contains(where: { $0 == .rtf || $0 == .rtfd }) == true
+    board.releaseGlobally()
+    let copyOK = wrote && copied == wanted && wanted.contains("\n") && !rich
+    let typesOK = types == [plain]
+    notes.append("copy across 0–1 \(copied.debugDescription) (want \(wanted.debugDescription)); "
+        + "writable types \(types.map(\.rawValue))")
+
+    // Cleared: no text and no part.
+    view.apply(.cleared)
+    let (clearedRecords, _) = parts()
+    let clearedOK = transcript.textView.string.isEmpty && clearedRecords.isEmpty
+    notes.append("cleared: text \(transcript.textView.string.debugDescription), parts "
+        + "\(clearedRecords.count)")
+
+    // A secure field being edited: its text in no record; the composer's is read.
+    secure.stringValue = "p10-secret"
+    window.makeFirstResponder(secure)
+    let editing = secure.currentEditor() != nil
+    view.composer.string = "p10 composer"
+    let report = UISnapshotLayout.report(root: root, skipping: nil)
+    let views = report["views"] as? [[String: Any]] ?? []
+    let leaked = views.contains { ($0["text"] as? String)?.contains("p10-secret") == true }
+    let composerText = views.first { $0["id"] as? String == "assistant.composer" }?["text"]
+        as? String
+    let secureOK = editing && !leaked && composerText == "p10 composer"
+    notes.append("secure field being edited \(editing), its text in a record \(leaked); the "
+        + "composer's record \(composerText.debugDescription)")
+    window.orderOut(nil)
+    row("P10", textOK && recordsOK && parentOK && topsOK && extendOK && copyOK && typesOK
+        && clearedOK && secureOK, notes.joined(separator: "; "))
+}
+
+// MARK: - P11 the composer's undo is its own
+
+final class P11Marker {
+    var ran = false
+}
+
+func rowP11() {
+    guard let (document, editor, window) = newEditor() else {
+        row("P11", false, "the editor did not open")
+        return
+    }
+    editor.showAssistant(nil)
+    spin(0.3)
+    guard let composer = editor.assistantView?.composer, let manager = document.undoManager
+    else {
+        row("P11", false, "no composer, or no document undo manager")
+        return
+    }
+    window.makeFirstResponder(composer)
+    var notes: [String] = []
+    let shared = window.undoManager === manager
+    let canUndoBefore = manager.canUndo
+    let editedBefore = document.isDocumentEdited
+    let controls = shared && !canUndoBefore && !editedBefore
+    notes.append("controls: the window's undo manager is the document's \(shared); before "
+        + "typing canUndo \(canUndoBefore), edited \(editedBefore)")
+    typeKeys("abc", into: composer, window)
+    spin(0.3)
+    let own = composer.undoManager !== manager
+    let quiet = manager.canUndo == canUndoBefore && document.isDocumentEdited == editedBefore
+    let typedUndo = composer.undoManager?.canUndo == true
+    notes.append("typed \(composer.string.debugDescription): own manager \(own); document canUndo "
+        + "\(manager.canUndo), edited \(document.isDocumentEdited); composer canUndo \(typedUndo)")
+    let marker = P11Marker()
+    manager.registerUndo(withTarget: marker) { $0.ran = true }
+    manager.setActionName("P11 marker")
+    spin(0.2)
+    let performed = composer.tryToPerform(Selector(("undo:")), with: nil)
+    spin(0.1)
+    let text = composer.string
+    let prefix = text.count < 3 && "abc".hasPrefix(text)
+    let markerKept = !marker.ran && manager.canUndo && manager.undoActionName == "P11 marker"
+    notes.append("undo: performed \(performed), composer \(text.debugDescription) (a strict prefix "
+        + "of abc \(prefix)), marker ran \(marker.ran), document canUndo \(manager.canUndo) "
+        + "\"\(manager.undoActionName)\"")
+    composer.string = "x"
+    let dropped = composer.undoManager?.canUndo == false
+    notes.append("string = \"x\" drops the composer's undo \(dropped)")
+    row("P11", controls && own && quiet && typedUndo && performed && prefix && markerKept && dropped,
+        notes.joined(separator: "; "))
+    manager.removeAllActions()
+    withExtendedLifetime(document) {}
+}
+
 // MARK: - Run
 
 let arguments = CommandLine.arguments
@@ -510,6 +875,9 @@ if let closePath {
         for id in ["P3", "P4", "P5", "P6"] { row(id, false, "the editor did not open") }
     }
     rowP7()
+    rowP9()
+    rowP10()
+    rowP11()
 }
 
 let body: [String: Any] = ["rows": rows]

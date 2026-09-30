@@ -128,3 +128,21 @@ in §6).
   (an opt-in ffmpeg conversion included), `save_project`/`new_project` and the main-thread tools
   run to their end; Clear, closing the window and a dead helper still let a running call finish,
   its result dropped, as before; cloud `transcribe` is withheld (AI-7) and not linked.
+- **AI-17 — The transcript is one selectable text, and the composer is multi-line with K-2's
+  Return** (issue batch B18, #153, #154). The transcript is one non-editable text view: the
+  entries in order, one "\n" between them, so a selection and a plain-text copy cross entries;
+  a reply that is still extending edits only its own range. The layout dump reads the entries
+  as parts the transcript names (id `assistant.entry.<kind>`, text, rect), since one text view
+  has no subview per entry. The composer grows from one line to five, then scrolls. A bare
+  Return or keypad Enter (⇪ allowed) sends while idle and beeps otherwise; it never answers a
+  question. Return with ⇧, ⌘, ⌥ or ⌃ inserts "\n", K-2's rule through the same
+  `TextEditKey.route`; nothing is routed while an input method has marked text. Tab and ⇧Tab
+  move focus, as the single-line field's did; they never type a tab into the message. The
+  composer's typing undo is its OWN `UndoManager`: ⌘Z in the composer undoes typing, and typing
+  never lands on the document's stack, never dirties the document and never enters
+  `registerUndo`'s grouping (AI-10, app/CLAUDE.md's Undo); a programmatic set of its text (a
+  send, the dev tools' pane path) drops that undo history. "No undo" was not chosen: a text
+  view that does not register undo still answers ⌘Z through the window's manager, which is the
+  document's, so ⌘Z while typing would undo a project edit. Risk accepted: accessibility sees
+  one text area, not one element per entry; and the scroll to the newest line still runs on
+  every change, so it can move a drag-selection during a streaming reply.
