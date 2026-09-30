@@ -90,8 +90,9 @@ final class AgentServer {
 
     /// The tools whose handler runs on the SERVER thread instead of the main
     /// one, because each WAITS for something the main thread has to deliver or
-    /// must not be doing. `import_media` waits on a probe whose completion
-    /// `MediaImporter` posts to the main thread and `save_project` /
+    /// must not be doing. `import_media` and `relink_media` (spec §11, #63)
+    /// wait on a probe whose completion `MediaImporter` posts to the main
+    /// thread and `save_project` /
     /// `new_project` on NSDocument's asynchronous save, both of which a
     /// main-thread wait would deadlock against; `render_frame` and `export`
     /// block on decode and encode, and freezing the UI for a whole write is
@@ -109,8 +110,8 @@ final class AgentServer {
     /// `export_captions` are all absent: each reads or writes a file on the
     /// main thread and each says so in its own handler.
     private static let productOffMainTools: Set<String> = [
-        "import_media", "render_frame", "export", "save_project", "new_project", "transcribe",
-        "record_screen", "render_graphic",
+        "import_media", "relink_media", "render_frame", "export", "save_project", "new_project",
+        "transcribe", "record_screen", "render_graphic",
     ]
     // The dev tools' members join here (AgentServer+DevTools.swift).
     static let offMainTools = productOffMainTools.union(devOffMainTools)

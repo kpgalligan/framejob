@@ -15,7 +15,8 @@
 //! calculated exactly instead, in whole frames of the canvas's own grid
 //! counted back from the cut (`time::frames_within`, spec §11 #42), so a
 //! shift of `k` frames is `time::frames_back(cut, k) − cut` and not
-//! `k` times `Project::frame`'s 1/30 s fallback. Pairwise half-shorter
+//! `k` times `Project::frame` (the first frame's length, which is not
+//! every frame's at such a rate, spec §11 #174). Pairwise half-shorter
 //! checks also enforce the non-adjacent rule for positive durations: if A
 //! reaches C across B,
 //! either B ends before C (then A covers all B), or A/B staying within

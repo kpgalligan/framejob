@@ -74,9 +74,9 @@ the same way.
 - **Source:** #47.
 
 **PB-6 — A saved project opens quickly; a relinked clip updates on screen**
-- **Do:** 1. Save a project holding the long recording; quit; reopen it. 2. Move one of a project's media files to another folder; reopen the project; relink it in the Relink… sheet it offers.
-- **Expect:** the reopen is quick, with no long re-analysis. After relinking, the clip's filmstrip redraws with the file's frames.
-- **Source:** #47.
+- **Do:** 1. Save a project holding the long recording; quit; reopen it. 2. Move one of a project's media files to another folder; reopen the project; relink it in the Relink… sheet it offers. 3. In the Media tab, Relink… a 10 s media to `AV.mov`.
+- **Expect:** the reopen is quick, with no long re-analysis. After relinking, the clip's filmstrip redraws with the file's frames. After step 3, the row reads 5 s, and the whole-file clip ends at 5 s.
+- **Source:** #47; step 3, #63.
 
 **PB-7 — Waveforms have no gaps**
 - **Do:** 1. Import an AAC file, a WAV file and a recording made by Reelcut. 2. Look at each clip's waveform at M and L track height. 3. On the long recording, open Clip ▸ Remove Silences… while it is still being analysed.

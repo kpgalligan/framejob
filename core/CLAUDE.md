@@ -90,7 +90,8 @@ governs a module now.
   POSITIONS `trim_end` / `roll` and `trim_start` / `roll` /
   `head_handle_frames` clamp to (positions, so not a `SourceBound`);
   `duration_resnapped` is what every RE-SNAP of a media duration writes
-  (`resnap`, `paste` twice, `unnest`) and `duration_at_speed` what
+  (`resnap`, `paste` twice, `unnest`, `relink_media`'s hold to a shorter file)
+  and `duration_at_speed` what
   `set_speed` writes. No local clamp anywhere else. A measurement is a
   `SourceBound` and not an `Option`,
   because `None` meant "unbounded, apply no clamp" to a trim and "no handle
@@ -106,7 +107,10 @@ governs a module now.
   public tick/index result. `frames_in` (whole grid frames in a length),
   `frames_back` (the grid position k frames before the frame nearest a
   position) and `frames_within` (the most whole frames back from a position
-  that stay within a span) count on the canvas's own grid at a rate the
+  that stay within a span), `frames_between` (the whole grid frames between
+  two positions) and `one_frame` (the grid's own first frame, which
+  `Project::frame` is at every rate, 1/30 s only at a degenerate rate; spec
+  §11 #174) count on the canvas's own grid at a rate the
   timescale does not divide (spec §11 #42).
 - `time_bounds.rs` — the single structural-time admission checker and
   `MAX_STORED_TICKS`: ±9,000,000,000,000,000 for stored media, markers,
@@ -266,7 +270,19 @@ governs a module now.
   clip sits in. The canvas left here at road map 7's D2·3 toll. `clip_list`
   is the ONE spelling of the clips a `with_clips` refusal names — three ids
   and then a count, so a media used by two hundred clips still answers a
-  sentence a caller can read — shared by `remove_track` and `remove_media`.
+  sentence a caller can read — shared by `remove_track` and `remove_media`. It
+  keeps `MEDIA_KEYS` and `check_media_fields` (the post-schema checks a media
+  record passes, in one order and one set of sentences), which
+  `edit_relink.rs` reads for a relink's probe; `relink_media` itself moved to
+  `edit_relink.rs`.
+- `edit_relink.rs` — `relink_media` (spec §11 #63): points a media at another
+  file and, given the new file's `probe` (the host's `MediaImporter.probe`
+  descriptor minus `path` and `bookmark`), takes its duration, size, rate and
+  flags, refuses a file of another kind in its own sentence, and holds every
+  `media`-source clip of it, on the timeline and in every stored nest, whose
+  duration runs past the new file's window to `source_window.rs`'s
+  `duration_resnapped`. No probe keeps the record (Consolidate, the open-time
+  re-anchor).
 - `edit_canvas.rs` — the document's own shape: `set_canvas` and the three
   things it does to the rest of the document — `check_dimension` (a
   dimension is even, because H.264 encodes in macroblocks), `rescale` (a

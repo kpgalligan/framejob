@@ -173,7 +173,7 @@
 //! | `remove_marker` | Removes the marker. |
 //! | `set_canvas` | `rescale_clips`, false when absent, multiplies every clip's `x`, `y` and `scale` by the size ratio; an fps change re-snaps top-level and stored-nest clip starts, source-bounded durations, action spans, present base motion/text timings and a graphic's `in` and `length`, plus top-level markers, to the new grid (spec §11, D7-3, G-18). A marker a coarser grid lands on a tick an earlier stored marker already holds is dropped; size-only and same-fps edits do not resnap. |
 //! | `add_media` | Appends the `media[]` element of spec §5.2 minus its `id` (the host probes the file). A path already in the list changes nothing. |
-//! | `relink_media` | Points a media at another file; an absent or `null` bookmark clears the stale one. |
+//! | `relink_media` | Points a media at another file; an absent or `null` bookmark clears the stale one. The `probe` the host fills is the new file's descriptor minus `path` and `bookmark`: the media takes its duration, size, rate and flags, a file of another kind is refused, and a media clip running past a shorter file's end is held to it (spec §11, #63). No `probe` keeps the record. |
 //! | `remove_media` | Refuses while clips still reference it unless `with_clips`, which removes those clips too. |
 //!
 //! ### Results
@@ -609,6 +609,8 @@ pub enum Op {
         path: String,
         #[serde(default)]
         bookmark: Option<String>,
+        #[serde(default)]
+        probe: Option<Value>,
     },
     RemoveMedia {
         media: u32,
@@ -890,7 +892,8 @@ impl Project {
                 media,
                 path,
                 bookmark,
-            } => self.relink_media(*media, path, bookmark.as_deref()),
+                probe,
+            } => self.relink_media(*media, path, bookmark.as_deref(), probe.as_ref()),
             Op::RemoveMedia { media, with_clips } => self.remove_media(*media, *with_clips),
         }
     }

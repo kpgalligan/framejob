@@ -60,6 +60,15 @@ struct MediaDescriptor: Equatable {
         if let bookmark = bookmark { d["bookmark"] = bookmark }
         return d
     }
+
+    /// The descriptor as `relink_media`'s `probe`: `dictionary` minus
+    /// `path` and `bookmark`, which are the op's own arguments (§11, #63).
+    var probeDictionary: [String: Any] {
+        var d = dictionary
+        d.removeValue(forKey: "path")
+        d.removeValue(forKey: "bookmark")
+        return d
+    }
 }
 
 // MARK: - Media files

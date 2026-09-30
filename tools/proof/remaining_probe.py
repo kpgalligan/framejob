@@ -145,9 +145,9 @@ text files the script writes under a movie's name and an image's:
   * 5c: an IMAGE record over a text file with a `0.jpg` seeded — the old
     tile cleared, no marker, and exactly ONE post carrying `replaced`, on
     the decode-failure path.
-  * 5d: `A.mov` under a 20 s record with a `0.jpg` seeded — a relink never
-    re-probes, so a record longer than its file is a state the app can be
-    in. The ten seconds past the picture are HELD (5f's cure: one decode of
+  * 5d: `A.mov` under a 20 s record with a `0.jpg` seeded — a file replaced
+    in place keeps its record, so a record longer than its file is a state
+    the app can be in. The ten seconds past the picture are HELD (5f's cure: one decode of
     the track's last frame, written under each — twenty tiles, where they
     used to fail as holes with only the one at 10 s landing inside the
     tolerance), and the every-16 post counts TILES, so ONE replacing pass
@@ -698,9 +698,10 @@ func staletile(_ request: [String: Any]) -> [String: Any] {
 //              AVFoundation cannot open — a pass that writes nothing.
 //   image      an IMAGE record over a text file, with a `0.jpg` seeded — a
 //              relink whose decode fails, with the old tile on disk.
-//   twice      A.mov under a 20 s record, with a `0.jpg` seeded. A relink
-//              never re-probes, so a record longer than its file is a state
-//              the app can be in. The ten seconds past the picture are HELD
+//   twice      A.mov under a 20 s record, with a `0.jpg` seeded. A file
+//              replaced in place keeps its record, so a record longer than
+//              its file is a state the app can be in. The ten seconds past
+//              the picture are HELD
 //              (one decode of the track's last frame, written under each —
 //              twenty tiles; before road map 3 they failed as holes, only
 //              the one at 10 s landing inside the tolerance), and the
@@ -708,8 +709,8 @@ func staletile(_ request: [String: Any]) -> [String: Any] {
 //              result and after the loop — two posts from one replacing
 //              pass, which no fixture of the right length can give.
 //   withdrawn  AV.mov's peaks built; then the same record over a video-only
-//              file (a relink to a file with no audio track, `hasAudio` still
-//              true on the record); then AV.mov again.
+//              file (a file with no audio track replaced in place, which
+//              keeps its record, `hasAudio` still true); then AV.mov again.
 //   short      a file whose picture ends at 1 s under 5 s of sound (the
 //              script makes it), under the 5 s record `import_media` gives
 //              it — the held tail; then the sound-only `toneA.m4a` under its
@@ -1848,9 +1849,10 @@ def section_pass(binary, sources):
           and len(peaks_posts(built)) == 1,
           f"bin={built.get('binExists')} marker={built.get('peaksMarker')} "
           f"posts={built.get('posts')}")
-    check("the same record over a VIDEO-ONLY file (a relink to a file with no audio track; "
-          "`hasAudio` still true, since a relink never re-probes): the `.bin` is GONE — "
-          "`clearPeaks` removed it at the head, before the track load that returns early",
+    check("the same record over a VIDEO-ONLY file (a file with no audio track replaced in "
+          "place; `hasAudio` still true, since a file replaced in place keeps its record): "
+          "the `.bin` is GONE — `clearPeaks` removed it at the head, before the track load "
+          "that returns early",
           gone.get("binExists") is False, f"binExists={gone.get('binExists')}")
     check("  and its marker with it, so nothing vouches for a file that is not there",
           gone.get("peaksMarker") is False, f"marker present={gone.get('peaksMarker')}")

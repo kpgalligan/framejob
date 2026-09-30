@@ -149,22 +149,25 @@ final class RelinkSheetController: NSViewController {
         dismiss(self)
     }
 
-    /// Every chosen file as ONE undo step, then a cache pass: a relinked
-    /// entry's marker is compared against the file it now points at — a
-    /// different file rebuilds, the same file moved elsewhere is skipped
-    /// (the stamp has no path), and every other media whose marker still
-    /// matches is skipped too.
+    /// Every chosen file, in id order, through `ProjectDocument.relinkMedia`
+    /// (spec §11, #63): each is probed as import probes it, so an entry takes
+    /// its file's duration, size, rate and flags and a clip past a shorter
+    /// file's end is held to it; every probed relink is ONE undo step, and a
+    /// cache pass follows — a different file rebuilds, the same file moved
+    /// elsewhere is skipped (the stamp has no path), and so is every other
+    /// media whose marker still matches. A file of another kind is refused
+    /// in the core's sentence, which the grouped edit drops when another
+    /// relink in it applied (#88's fold).
     @objc private func applyClicked(_ sender: Any?) {
         let replacements = self.replacements
         let document = self.document
         dismiss(self)
         guard let document = document, !replacements.isEmpty else { return }
-        let ops = replacements.keys.sorted().compactMap { id -> ReelOp? in
+        let choices = replacements.keys.sorted().compactMap { id -> (media: UInt32, url: URL)? in
             guard let url = replacements[id] else { return nil }
-            return .relinkMedia(media: id, path: url.path, bookmark: bookmarkString(for: url))
+            return (media: id, url: url)
         }
-        document.applyEdit("Relink Media", ops)
-        document.generateCaches()
+        document.relinkMedia(choices)
     }
 }
 

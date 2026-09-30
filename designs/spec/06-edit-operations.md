@@ -485,9 +485,12 @@ many clips`, `too many tracks`, `nests are more than 8 deep at nest N`.
   ratio. Changing fps normalizes top-level and every stored nest's clip starts, source-bounded
   durations, action spans, present base motion/text timing and a graphic's `in` and `length`, plus
   top-level markers (§11, D7-3, G-18·b). Size-only and same-fps edits leave legacy timing alone.
-- **`add_media {descriptor}` → returns the id · `relink_media {media, path, bookmark?}` ·
+- **`add_media {descriptor}` → returns the id · `relink_media {media, path, bookmark?, probe?}` ·
   `remove_media {media, with_clips=false}`** — The descriptor is the `media[]` element minus `id`;
-  the host probes the file.
+  the host probes the file. `relink_media`'s `probe` is the new file's descriptor minus `path` and
+  `bookmark`, filled by the host: the media takes its duration, size, rate and flags, a file of
+  another kind is refused, and a media clip that runs past a shorter file's end is held to it; an
+  absent `probe` keeps the record (§11, #63).
 
 **This table is the SEMANTICS half of the op table, and it has a second
 half.** What an op MEANS is written here and in `core/src/edit.rs`'s module

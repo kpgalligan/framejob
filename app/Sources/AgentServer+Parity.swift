@@ -169,7 +169,8 @@ extension AgentServer {
     /// tool does not publish.
     ///
     /// The union is the core's row exactly today, less the two graphic ops'
-    /// `schema` — all sixteen rows name an argument the table publishes, or
+    /// `schema` and `relink_media`'s `probe` — all seventeen rows name an
+    /// argument the table publishes, or
     /// a KIND, or a NAME — and it is
     /// written as a union anyway because the declarations list is where a
     /// deliberate difference belongs. A row naming an argument the core has

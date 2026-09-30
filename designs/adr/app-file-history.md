@@ -337,7 +337,6 @@ Files that were split since the notes wrote them:
 
 Still true of the current code:
 
-- `relink_media` never re-probes, so a relink sizes the new strip from the old `duration`.
 - A caption panel name such as `chart.png` becomes `chart.png.srt` in the panel and `chart.srt`
   over MCP.
 - `SileroVAD` marked unavailable never retries until relaunch.
@@ -393,7 +392,7 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   lanes").
 - A person drags a clip and sees no flash to 0 and no jump. Tracked in #48 ("Dragging a clip
   leaves the timeline still").
-- `relink_media` re-probe (#63) and caption-name agreement (#43).
+- Caption-name agreement (#43).
 - Rasterize's `BlockSliderCell.drawBar` still has the SH-2 defect upstream. Tracked in #101.
 - SH-1: square `StickerButton` or move its callers ("a phase of its own"). Tracked in #100.
 - Pause/Resume live only in a status item that macOS can hide (#98); two open documents at one

@@ -5,10 +5,11 @@
 //! Four things are asserted here that the shipped suite never reached:
 //!
 //! - **The written positions land on the FRAME GRID at a canvas rate that
-//!   does not divide the timescale.** `Project::frame` is a FALLBACK of
-//!   1/30 s there (`time::frame_duration` answers `None` unless
-//!   `600 000 × den / num` is whole), and `add_transition` is the only op
-//!   in the crate that MULTIPLIES by it to make a position.
+//!   does not divide the timescale.** `time::frame_duration` answers `None`
+//!   there (unless `600 000 × den / num` is whole), so `add_transition`
+//!   counts and steps whole frames of the grid itself (`time::frames_in`,
+//!   `frames_between`, `frames_back`; spec §11 #174) rather than
+//!   multiplying a frame length to make a position.
 //! - **A handle says what the SOURCE holds, not what the timeline in front
 //!   of the incoming clip has.** A request longer than that ran the clip's
 //!   start past tick 0, which reordered the trial pair, passed the overlap
@@ -37,7 +38,7 @@ const FRAME: i64 = 20_000;
 
 /// A hard cut at 6 s on a canvas running at **7 fps** — a rate whose frame
 /// is 600 000 / 7 = 85 714.28… ticks, so `time::frame_duration` cannot
-/// express it and `Project::frame` falls back to 20 000.
+/// express it and `Project::frame` is the grid's own first frame, 85 714.
 ///
 /// Every stored time here IS on the 7 fps grid (1 200 000 is frame 14,
 /// 3 600 000 is frame 42), so anything off it afterwards was put there by
@@ -187,11 +188,11 @@ fn frame_at_7fps(t: i64) -> f64 {
 
 #[test]
 fn at_a_rate_the_timescale_does_not_divide_both_clips_still_land_on_the_grid() {
-    // Sixty-one FALLBACK frames (1 220 000 ticks): an odd count, so the
-    // centred split is 31 on the incoming clip and 30 on the outgoing, and
-    // 31 × 20 000 is not a multiple of the 7 fps frame. Taking the
-    // extension as `count × frame` moved clip 11's start to 2 980 000 —
-    // frame 34.77, a time `time.rs` says the model never holds.
+    // Sixty-one 1/30 s frames (1 220 000 ticks), fourteen whole frames of
+    // the 7 fps grid: centred, seven on each side. Taking the extension as
+    // `count × frame` of the old 1/30 s fallback (31 × 20 000 on the
+    // incoming side) moved clip 11's start to 2 980 000 — frame 34.77, a
+    // time `time.rs` says the model never holds.
     let after = odd_rate().apply(&add(11, 61 * FRAME)).value();
 
     for id in [10u64, 11] {

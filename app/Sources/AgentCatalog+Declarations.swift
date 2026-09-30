@@ -123,14 +123,14 @@ struct AgentDeclaration {
 extension AgentServer {
 
     /// Every declaration, in one list (`AgentDeclaration`'s doc has the rule
-    /// an entry has to pass). Sixteen rows over seven kinds of difference:
+    /// an entry has to pass). Seventeen rows over seven kinds of difference:
     /// two bare-string shorthands, one reading of a whole JSON kind, two
     /// nulls that mean something, one range the core clamps to rather than
     /// refusing, one the APP refuses outside where the core's kind is
     /// looser, four times the tool takes from the app what the op would
     /// have made the caller send, and three times a list the tool will not
-    /// accept empty although the op reads one, and twice an argument only
-    /// the app can fill, which the tool does not publish at all.
+    /// accept empty although the op reads one, and three times an argument
+    /// only the app can fill, which the tool does not publish at all.
     ///
     /// **Two rows narrow rather than widen, and they are the same rule read
     /// the other way.** `set_speed.rate` and `set_canvas.fps` each publish a
@@ -278,6 +278,12 @@ extension AgentServer {
             .argument("schema", of: "set_graphic"), requirement: .filledByTheApp,
             why: "add_graphic_clip's reason: the app sends the schema of the module the "
                 + "patch names, else of the one module every clip is drawn by."),
+        AgentDeclaration(
+            .argument("probe", of: "relink_media"), requirement: .filledByTheApp,
+            why: "G-4's shape (spec §11, #63): the host probes `path` as import_media does "
+                + "and sends the descriptor with the op, so a caller's own probe could only "
+                + "disagree with the file; the tool does not publish it and the gate refuses "
+                + "one as a stranger."),
     ]
 
     /// One op tool's declared input: the core's published structure, each

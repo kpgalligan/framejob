@@ -334,7 +334,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
     {duration} ticks is too short to make at the cut before clip {clip};
     pass a duration of at least {one} ticks`, `one` being the smallest
     duration that passes (20000 at 30 fps, 85714 at 7 fps, 20020 at
-    5994/100, where the handle form also needs one `Project::frame`). The
+    5994/100, where the handle form also needs one `Project::frame`;
+    **Amended 2026-09-29, by #174**: 10010 at 5994/100, both forms). The
     app cannot reach it at 30 fps: both the inspector and MCP send grid
     values.
 
@@ -350,3 +351,41 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   tool sends a list that can be partly refused (`refusal_proof.py` §3).
   Detach Audio over a mixed selection is the one app path that drops a
   sentence.
+- **#63 — A relink takes the new file's probe, and a media clip whose
+  window runs past the file's end is held to it.** `relink_media` takes an
+  optional `probe`, the media descriptor of the new file, from import's own
+  `MediaImporter.probe`, with ffmpeg's opt-in step. All three doors take it
+  — the Media tab's Relink…, the missing-media sheet and the
+  `relink_media` tool — and the tool does not publish it: the host probes
+  `path`, G-4's shape. An absent `probe` keeps the record, because
+  Consolidate and the open-time re-anchor point at a copy of the same file.
+  The entry takes `duration`, `width`, `height`, `fps` and the three flags;
+  a different `kind` is refused, because each clip's source kind was
+  chosen from it. **Declined: LEAVE**, which breaks #22 at a new writer,
+  because the plan's last-line clamp would resample or hold a frame.
+  **Declined: REFUSE**, which turns the recovery path for moved media into
+  a refusal over one clip. **Chosen, CLAMP**: each `media`-source clip of
+  that media, on the timeline and in every stored nest, orphans included
+  (D7-3's walk), whose duration exceeds `source_length_on_timeline`'s
+  `Timeline` value gets `duration_resnapped` (D4-4). Everything else on the
+  clip is kept (`trim_end`'s posture). The one-frame floor wins (D4-3), so
+  a clip whose `in` is past the new end is one frame long with its `in`
+  kept. Stills keep `at` (D7-3). The overlap rule is not re-checked
+  (D7-3): a shortened clip may hold a transition longer than half its
+  length, and the next edit on that track refuses until it is fixed; that
+  risk is accepted. The missing-media sheet's single grouped edit drops a
+  refused relink's sentence when another relink applied (#88's fold). No
+  persisted field changes; the format stays 10.
+- **#174 — One frame is the grid's own first frame at every rate, and the
+  handle form counts grid frames.** `Project::frame` is `time::one_frame`,
+  the first grid boundary after tick 0: 85714 ticks at 7 fps and 10010 at
+  5994/100. It falls back to 1/30 s only at a degenerate rate, which
+  `validate` refuses. Every minimum and floor that reads it follows: a
+  clip's, an action's, a transition's. `add_transition`'s handle form
+  counts its request, both handles, its ceiling and both neighbour rooms
+  in whole frames of the grid (`time::frames_in`, `time::frames_between`),
+  and its two edges step from inward grid bases (`time::frames_back`), as
+  #42's ripple form does. At a rate that divides the timescale, with
+  positions on the grid, nothing moves. **Accepted**: at 7 fps, an edge
+  clamped one frame from another (the trims, `roll`) may sit a tick off
+  the grid. That is #42's class, and D7-3 restores it.

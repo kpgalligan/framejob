@@ -1173,11 +1173,17 @@ extension ReelOp {
     }
 
     /// Points a media entry at a new file after a move — the Relink… path.
-    static func relinkMedia(media: UInt32, path: String, bookmark: String? = nil) -> ReelOp {
+    /// `probe` is the new file's descriptor (spec §11, #63): the entry takes
+    /// its duration, size, rate and flags, and a clip past a shorter file's
+    /// end is held to it. Without one the record is kept.
+    static func relinkMedia(
+        media: UInt32, path: String, bookmark: String? = nil, probe: MediaDescriptor? = nil
+    ) -> ReelOp {
         var a = OpArgs()
         a.put("media", media)
         a.put("path", path)
         a.put("bookmark", bookmark)
+        a.put("probe", probe?.probeDictionary)
         return ReelOp(name: "relink_media", args: a.values)
     }
 

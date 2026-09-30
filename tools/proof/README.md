@@ -2225,8 +2225,8 @@ runs the SAME pass untouched and asserts all ten frames, the marker, and
 IMAGE record over a text file with a seeded `0.jpg`: the tile is cleared, no
 marker, exactly one post carrying `replaced` (the decode-failure path posts
 too); **5d** makes ONE replacing pass post twice by running `A.mov` under a
-20 s RECORD — `relink_media` never re-probes, so a record longer than its
-file is a state the app can be in; the ten seconds past the picture are HELD
+20 s RECORD — a file replaced in place keeps its record, so a record longer
+than its file is a state the app can be in; the ten seconds past the picture are HELD
 at the track's last frame since road map 3 (5f) — twenty tiles where there
 were eleven and nine holes, the row its unclamped mutant fails — and asserts
 `replaced` on the first post and on no later one; **5e** builds `AV.mov`'s peaks, runs the same record over a
@@ -2252,7 +2252,8 @@ post **140/141** (5d's "no later post" row).
 
 ## The cache marker over MCP (`remaining_proof.py`)
 
-`python3 tools/proof/remaining_proof.py [port]`, **79/79**, against a
+`python3 tools/proof/remaining_proof.py [port]`, **76/76** (79/79 before
+issue batch B16 rewrote 1i), against a
 running instance on its own port (4834 by default). It is §2a's sentence —
 "a cache already on disk is not rebuilt" — claim by claim, on a SAVED
 package, because an untitled document's temporary cache directory is
@@ -2297,14 +2298,16 @@ rebuilt at a measured latency inside it; `consolidate_media` leaves the
 marker MATCHING the consolidated file — measured on this machine, `copyItem`
 preserves `st_mtime_ns` to the nanosecond, so nothing is rebuilt and the
 markers are untouched, which the script asserts and prints (a rebuild would
-also have been correct; only a stale marker is wrong); and **1i**, the
-withdrawal over MCP: a clip on `AV`, `detect_silence` answering, then
-`relink_media` to a copy of `A` (the record keeps `has_audio`; the pass finds
-no track and returns early) — the `.bin` is GONE inside the cap and stays
-absent with its marker across the window, `detect_silence` names `AV` in
-`pending_peaks` and proposes nothing rather than measuring the old file, and
-relinking back brings a byte-identical `.bin` and the detector's answer with
-it. The first run of 1g scored a copy with NO media green — `project.json` is
+also have been correct; only a stale marker is wrong); and **1i**, a relink
+to a file with no audio track: a clip on `AV`, `detect_silence` answering,
+then `relink_media` to a copy of `A`, which the relink RE-PROBES (spec §11
+#63) — the record says `has_audio` false with `A`'s duration, and
+`detect_silence` measures no clip (`clips: []`) with nothing pending rather
+than measuring the old file; relinked back, the `.bin` is byte-identical, both
+markers agree, and nothing is pending. The old `.bin`'s withdrawal, which 1i
+used to watch through a record that kept `has_audio`, has no MCP row since
+B16 (a file replaced in place keeps its record, and no tool replaces one):
+`remaining_probe.py`'s 5e is its one row. The first run of 1g scored a copy with NO media green — `project.json` is
 written only by a save — so 1g saves first and asserts both copies list the
 media; the check is kept.
 
@@ -2323,7 +2326,8 @@ for. The peaks head check deleted **75/79** — 1b through the `.bin`'s inode,
 1c's sampled peaks claim, 1g and 1h; the review of the first landing had
 noted no mutant covered that check. `clearPeaks` back to marker-only
 **76/79** — 1i's three: the `.bin` gone, absent across the window, and the
-detector reporting `AV` pending. It opens THREE documents; relaunch between
+detector reporting `AV` pending; those three rows went with B16's 1i, so that
+mutant is now caught by `remaining_probe.py`'s 5e alone. It opens THREE documents; relaunch between
 full runs. Phases 2, 3, 3-silence and 5, whose fixtures read the peaks path,
 were re-run against the same binary and still score 85, 121, 8 and 88.
 
@@ -4504,7 +4508,9 @@ row, never as a traceback, because a mutant's score is the measurement.
 
 **Host-state inputs.** `media/speech.mov` (road map 4's fixture; this file's
 own section says how to make it) and `say` for the second media, without
-which row 5's relink arms and row 6 skip BY NAME. `ffmpeg`, when it is on
+which row 6 skips BY NAME; row 5's relink points at a copy of `media/AV.mov`,
+because a relink keeps a media's kind (spec §11 #63) and the `say` AIFF is
+audio. `ffmpeg`, when it is on
 PATH, is row 2's second FLAC decoder; `AVAudioFile` always runs and the row
 names which answered. Three free loopback ports, and one free port per fake.
 
@@ -8060,3 +8066,47 @@ WAV transcribed in 8.8 s on this host, 6.8 s past the Stop against the 5 s
 bound; the mutant is also caught by its `tool_result` (an ok answer where the
 row wants "The transcription was cancelled."), which does not depend on the
 host's speed.
+
+## Issue batch B16 — a relink that re-probes (`relink_proof.py`; #63 #174)
+
+`python3 tools/proof/relink_proof.py [port] [log path]` is spec §11 #63 over
+MCP, in `remaining_proof.py`'s idiom (`check`, `section`, a raise scored as
+one failure), against a running instance on its own port (4942 by default).
+Every claim is read back through `get_project`. Copies of the test media go
+under `work/relink/`, named by pid, and an earlier pid's are swept at start.
+No `ffmpeg` runs. It opens one document.
+
+- **R0** — the parity log is clean; `relink_media`'s schema publishes no
+  `probe` (the host fills it, G-4's shape) and still publishes `media`,
+  `path` and `bookmark`; a call that sends `probe` is refused by the gate,
+  naming it.
+- **R1** — copies of `A.mov` (10 s, video only) and `AV.mov` (5 s, video and
+  audio, the REFERENCE the relink is read against) imported; three clips of
+  A's media: X whole, Y with its `in` trimmed to 4 200 000, Z with its
+  duration trimmed to 1 200 000.
+- **R2** — A's media relinked to a second copy of `AV.mov`: the tool answers
+  the probed duration; the record reads the reference's duration,
+  `has_audio` true and the new copy's path; X ends at that duration snapped
+  down to 20 000; Y, whose `in` is past the new end, is 20 000 ticks with its
+  `in` kept; Z is unchanged.
+- **R3** — `undo` restores the record and all three clips.
+- **R4** — a relink to a copy of `toneA.m4a` is refused in the core's
+  sentence (`media N is video media and … is audio: …`), the project
+  unchanged. **R5** — a relink to a `.txt` answers "Could not read …", the
+  project unchanged. **R6** — an explicit nest `scope` gets "relink_media has
+  no meaning inside nest N".
+
+**The mutant is HEAD before the batch** (`0195cd0`), built into
+`work/b16/Reelcut-baseline.app` before any edit: it must exit 1 with R2's
+duration row failing.
+
+Run on 2026-09-29:
+
+| Command | Answer |
+|---|---|
+| `relink_proof.py 4941` (the baseline app) | 13/22, exit 1: R2's tool duration (None), the record's duration (6000000 against 3000000), `has_audio`, X's end (6000000), Y (1800000); R4's refusal and "unchanged" (the audio file relinked); R5's refusal and "unchanged" (the `.txt` relinked) |
+| `relink_proof.py 4942` | 22/22, exit 0 |
+| `remaining_proof.py 4943` | 76/76, exit 0 |
+| `op_argument_proof.py 4944` | 152/152, exit 0 (alone on a fresh instance; run beside two other proofs it scored 149/152, the graphics root it waits for racing another instance's untitled project in the shared temporary folder) |
+| `op_catalog_proof.py 4945` | 23/23, exit 0 |
+| `cloud_captions_proof.py` | 171/171, exit 0 (before row 5's relink moved from the `say` AIFF to a copy of `AV.mov`: 165/166, row 5 raising on the kind refusal) |

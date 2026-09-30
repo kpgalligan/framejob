@@ -1,5 +1,6 @@
 // app/Sources/ProjectDocument+Import.swift — File > Add Media… and every drop
-// into an open project: the probe chain and the one grouped commit.
+// into an open project, and the Media tab's and the missing-media sheet's
+// relinks: the probe chain and the one grouped commit, for both.
 //
 // A pure move out of `ProjectDocument.swift` (road map 10, G3a), which is
 // over the ~600-line cap and gave this up before taking the `graphics/`
@@ -59,5 +60,47 @@ extension ProjectDocument {
         let added = project.snapshot.media.filter { !before.contains($0.id) }
         generateCaches()
         return added.map { $0.id }
+    }
+
+    // MARK: - Relink (spec §11, #63)
+
+    /// The Media tab's Relink… and the missing-media sheet's Relink: each
+    /// chosen file is probed in order through import's own
+    /// `MediaImporter.probe` (ffmpeg's opt-in step included), an unreadable
+    /// one is presented and skipped, and every probed relink commits as ONE
+    /// undo step, then the cache pass. The path and bookmark are the
+    /// descriptor's — the rewrapped `.mov` when ffmpeg converted — and the
+    /// core takes the file's duration, size, rate and flags from its probe,
+    /// refuses a file of another kind in its own sentence, and holds a clip
+    /// that runs past a shorter file's end to it.
+    func relinkMedia(_ choices: [(media: UInt32, url: URL)]) {
+        relinkNext(choices, index: 0, ops: [])
+    }
+
+    private func relinkNext(_ choices: [(media: UInt32, url: URL)], index: Int, ops: [ReelOp]) {
+        guard index < choices.count else {
+            guard !ops.isEmpty else { return }
+            // The probe's completion is not an AppKit event: the grouped
+            // entry point is mandatory (app/CLAUDE.md's undo pitfall).
+            performGroupedEdit("Relink Media", ops)
+            generateCaches()
+            return
+        }
+        let choice = choices[index]
+        MediaImporter.probe(url: choice.url) { [weak self] result in
+            guard let self = self else { return }
+            var collected = ops
+            switch result {
+            case .success(let descriptor):
+                collected.append(
+                    .relinkMedia(
+                        media: choice.media, path: descriptor.path,
+                        bookmark: descriptor.bookmark, probe: descriptor))
+            case .failure(let error):
+                // One unreadable file must not lose the rest of the sheet.
+                self.present(error)
+            }
+            self.relinkNext(choices, index: index + 1, ops: collected)
+        }
     }
 }

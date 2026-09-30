@@ -29,6 +29,7 @@ pub mod edit_insert;
 pub mod edit_nest;
 pub mod edit_paste;
 pub mod edit_props;
+pub mod edit_relink;
 pub mod edit_split;
 pub mod edit_time;
 pub mod edit_track;

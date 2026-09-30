@@ -232,7 +232,8 @@ impl Project {
                 // of a file: EVERY site that writes a media clip's window
                 // reads one bound (spec §11, #22 and D4-2 to D4-5) —
                 // `add_clip`'s whole length, `trim_end`, `roll`, `resnap`,
-                // `set_speed`, `paste`'s two loops, `unnest` and
+                // `set_speed`, `paste`'s two loops, `unnest`,
+                // `relink_media`'s hold to a shorter file (#63) and
                 // `add_background`'s plate. So this clamp is the LAST line
                 // of defence rather than the ordinary path, and what still
                 // reaches it is hand-written JSON putting `in` outside the

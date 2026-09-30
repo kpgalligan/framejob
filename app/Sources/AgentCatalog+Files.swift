@@ -227,10 +227,13 @@ extension AgentServer {
                 ["descriptor": "The media entry to add; only path is required."]),
             opTool(
                 "relink_media",
-                "Points a media entry at a file that moved — the Relink… sheet. Every clip using "
-                    + "it comes back; a bookmark for the new location is stored so the next move "
-                    + "is followed automatically. get_project's missing_media names the entries "
-                    + "that need this.",
+                "Points a media entry at a file that moved — the Relink… sheet. The host probes "
+                    + "the new file as import_media does, and the entry takes that file's "
+                    + "duration, size, frame rate and audio/video/alpha flags. A file of another "
+                    + "kind (audio for a video entry, say) is refused. A clip that runs past the "
+                    + "end of a shorter file is shortened to end with it. A bookmark for the new "
+                    + "location is stored so the next move is followed automatically. "
+                    + "get_project's missing_media names the entries that need this.",
                 [
                     "media": "Media id.",
                     "path": "Where the file is now.",

@@ -27,7 +27,7 @@ use crate::model_words::rebase_words;
 use crate::outcome::Outcome;
 use crate::recipe_graphic::graphic_advanced;
 use crate::source_window::source_advanced;
-use crate::time::{frames_in, snap_up_to_frame, Ticks};
+use crate::time::{frames_back, frames_between, frames_in, Ticks};
 use crate::transition::overlap_limit;
 use crate::transition_search::{largest_passing, reduced_split};
 
@@ -185,12 +185,14 @@ impl Project {
     ///    unbounded for the sourceless kinds, and
     ///    `max(0, nest.duration() − A.duration)` for a nest, past which it
     ///    would draw nothing.
-    /// 3. Convert to whole FRAMES, the request snapped down and each handle
-    ///    floored inward. This happens BEFORE the split: snapping two half
-    ///    extensions separately would lose the odd frame (1.5 + 1.5 frames
-    ///    snap to 1 + 1). The request is also held to
-    ///    `(A.duration + B.duration) / 3·frame`, the most the overlap rule
-    ///    could pass at ANY split, so the search stays within the clips.
+    /// 3. Convert to whole FRAMES of the canvas's grid (spec §11 #174):
+    ///    the request counted down (`time::frames_in`) and each handle
+    ///    counted inward (`time::frames_between`). This happens BEFORE the
+    ///    split: snapping two half extensions separately would lose the odd
+    ///    frame (1.5 + 1.5 frames snap to 1 + 1). The request is also held
+    ///    to the frames in `(A.duration + B.duration) / 3`, the most the
+    ///    overlap rule could pass at ANY split, so the search stays within
+    ///    the clips.
     /// 4. Split by `align`. Under `center` the odd frame goes to B, and a
     ///    side that cannot supply its share passes the shortfall to the
     ///    other side — up to that side's own handle — before the total
@@ -202,9 +204,8 @@ impl Project {
     ///    old larger-side decrement path has a single passing boundary
     ///    once this affected track is valid, so `transition_search` finds
     ///    its greatest passing total in at most 64 trials. Each trial's
-    ///    two extensions are read off the frame
-    ///    GRID, not taken as a multiple of [`Project::frame`], which is a
-    ///    fallback at a rate that does not divide the timescale.
+    ///    two extensions step whole grid frames from INWARD grid bases
+    ///    (`time::frames_back`), as #42's ripple form does.
     /// 7. Nothing left to give — below one frame — is a refusal. A request
     ///    that is itself under one frame never gets here: it is refused
     ///    after the preflight in [`transition_too_short`]'s words.
@@ -281,20 +282,18 @@ impl Project {
         if let Err(why) = self.check_overlap_rule(&[], later.track, &[]) {
             return Ok(Outcome::Refused(why));
         }
-        // Under one frame of the real grid, or of the fallback `frame` the
-        // arithmetic below still divides by (5994/100: 10010 is a grid frame
-        // and a zero `requested`), is too short; `one` passes both.
+        // Under one frame of the canvas's grid is too short, and `one`, the
+        // grid's own first frame, is the least that passes (spec §11 #174).
         let fps = self.canvas.fps;
-        let frame = self.frame();
-        if frames_in(duration, fps) < 1 || duration / frame < 1 {
-            let one = snap_up_to_frame(1, fps).max(snap_up_to_frame(frame, fps));
+        if frames_in(duration, fps) < 1 {
+            let one = self.frame();
             return Ok(Outcome::Refused(transition_too_short(clip, duration, one)));
         }
 
         // 2 and 3. The handles, floored to whole frames. `None` is
         //    UNBOUNDED, which is not the same as a handle of zero.
-        let head_frames = self.head_handle_frames(&later, frame);
-        let tail_frames = self.tail_handle_frames(&earlier, frame);
+        let head_frames = self.head_handle_frames(&later);
+        let tail_frames = self.tail_handle_frames(&earlier);
 
         // 3. The request, snapped down to whole frames before it is split,
         //    and held to the most the overlap rule could EVER pass. That
@@ -320,8 +319,11 @@ impl Project {
         //    `validate` accepts. That is the worse half of what this
         //    ceiling closes (108 of the 981 answers a differential sweep
         //    of it moved; road map 5 §12).
-        let requested = duration / frame;
-        let ceiling = earlier.duration.saturating_add(later.duration).max(0) / (3 * frame);
+        let requested = frames_in(duration, fps);
+        let ceiling = frames_in(
+            earlier.duration.saturating_add(later.duration).max(0) / 3,
+            fps,
+        );
         let split = requested.min(ceiling);
 
         // 4. The split, and `center`'s shortfall moving sides.
@@ -350,36 +352,34 @@ impl Project {
         // 5. The neighbours. A may not reach B's successor, and B may not
         //    reach A's predecessor. Both are closed form.
         if let Some(next_clip) = ordered.get(index + 1) {
-            let room = next_clip.start.saturating_sub(clip_end(&earlier)).max(0) / frame;
+            let room = frames_between(clip_end(&earlier), next_clip.start, fps).max(0);
             a = a.min(room);
         }
         if let Some(before) = index.checked_sub(2).and_then(|i| ordered.get(i)) {
-            let room = later.start.saturating_sub(clip_end(before)).max(0) / frame;
+            let room = frames_between(clip_end(before), later.start, fps).max(0);
             b = b.min(room);
         }
 
         // 6 and 7. The same larger-side reduction path, searched by total.
-        //    The two extensions are read off the frame GRID rather than
-        //    taken as `count × frame`: [`Project::frame`] is a FALLBACK of
-        //    1/30 s at a canvas rate whose frame is not a whole number of
-        //    ticks (7 fps, or 5994/100 as a file sometimes spells 59.94),
-        //    and a multiple of it is not a grid position there, so the op
-        //    that MULTIPLIES would store the sub-frame start `time.rs` says
-        //    the model never holds. Both are snapped INWARD, and for a
-        //    position ON the grid at a rate that divides the timescale —
-        //    every position the model holds — they are exactly `a × frame`
-        //    and `b × frame`. For one that is not, the request's first
+        //    Each extension is whole GRID frames stepped from an inward base
+        //    — A's end snapped down, B's start snapped up — never `count ×`
+        //    a frame: at a canvas rate whose frame is not a whole number of
+        //    ticks (7 fps, or 5994/100 as a file sometimes spells 59.94) a
+        //    multiple of it is not a grid position, and the model never
+        //    holds a sub-frame start (`time.rs`). For a position ON the grid
+        //    at a rate that divides the timescale they are exactly
+        //    `a × frame` and `b × frame`. For one that is not, the first
         //    frame is partly spent landing the edge on the grid, which is
         //    `time::snap_up_to_frame`'s own argument for a BOUND.
         let a_end = clip_end(&earlier);
+        let (tail_base, head_base) = (self.snapped_down(a_end), self.snapped_up(later.start));
         let extension = |a: Ticks, b: Ticks| {
-            let tail = self
-                .snapped_down(a_end.saturating_add(a * frame))
+            let tail = frames_back(tail_base, a.saturating_neg(), fps)
                 .saturating_sub(a_end)
                 .max(0);
             let head = later
                 .start
-                .saturating_sub(self.snapped_up(later.start.saturating_sub(b * frame)))
+                .saturating_sub(frames_back(head_base, b, fps))
                 .max(0);
             (tail, head)
         };
@@ -403,7 +403,6 @@ impl Project {
             // it was. The number in it is the request in whole FRAMES of
             // the canvas's grid (`time::frames_in`), the unit a caller
             // has to change.
-            let requested = frames_in(duration, fps);
             return Ok(Outcome::Refused(format!(
                 "the cut before clip {clip} has no room for an overlap: the {requested} \
                      frames asked for clamp to nothing against the two clips' unused \
@@ -440,7 +439,7 @@ impl Project {
     /// How many whole frames the INCOMING clip could be extended backward
     /// by, or `None` for a source with no window at all. See
     /// [`Project::add_transition`] step 2 for why a nest answers `Some(0)`.
-    fn head_handle_frames(&self, clip: &Clip, frame: Ticks) -> Option<Ticks> {
+    fn head_handle_frames(&self, clip: &Clip) -> Option<Ticks> {
         // The earliest start the handle allows, snapped INWARD, so the
         // count is whole frames of material that is really there even when
         // the clip's own start is not on the grid — `source_window.rs`'s
@@ -450,12 +449,12 @@ impl Project {
             Source::Nest { .. } => self.snapped_up(clip.start),
             _ => self.earliest_start_on_grid(clip)?,
         };
-        Some(clip.start.saturating_sub(earliest).max(0) / frame)
+        Some(frames_between(earliest, clip.start, self.canvas.fps).max(0))
     }
 
     /// How many whole frames the OUTGOING clip could be extended forward
     /// by, or `None` for a source with no window at all.
-    fn tail_handle_frames(&self, clip: &Clip, frame: Ticks) -> Option<Ticks> {
+    fn tail_handle_frames(&self, clip: &Clip) -> Option<Ticks> {
         let tail = match clip.source {
             Source::Nest { project, .. } => self
                 .nest(project)
@@ -470,7 +469,7 @@ impl Project {
         };
         let end = clip_end(clip);
         let latest = self.snapped_down(end.saturating_add(tail));
-        Some(latest.saturating_sub(end).max(0) / frame)
+        Some(frames_between(end, latest, self.canvas.fps).max(0))
     }
 
     /// Sets the transition's CURVE and whether it crossfades the sound

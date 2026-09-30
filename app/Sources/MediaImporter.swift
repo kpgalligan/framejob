@@ -384,12 +384,12 @@ enum MediaImporter {
             return
         }
 
-        // `media.duration` is the RECORD's, and `relink_media` never
-        // re-probes (`core/src/edit_track.rs` replaces path and bookmark
-        // only), so a relink to a file of another length sizes this strip —
-        // and `peaks`' bucket count — from the old duration. Pre-existing,
-        // recorded here rather than fixed: the marker rebuilds the strip on
-        // a relink, at the old length — a longer file's tail is HELD below.
+        // `media.duration` is the RECORD's, and a file replaced in place
+        // keeps its record, so a file of another length at the old path
+        // sizes this strip — and `peaks`' bucket count — from the old
+        // duration. Recorded here rather than fixed: the marker rebuilds the
+        // strip for the changed file, at the old length — a longer file's
+        // tail is HELD below.
         let seconds = max(
             1,
             min(maxThumbnails, Int((Double(media.duration) / Double(ReelTime.perSecond)).rounded(.up))))

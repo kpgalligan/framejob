@@ -41,7 +41,8 @@
 //! D4-2 to D4-5). A site that writes a DURATION measures the window from
 //! tick 0 — [`Project::longest_duration_on_grid`], and through it
 //! [`Project::duration_resnapped`] (`set_canvas`'s re-snap, `paste`'s two
-//! loops, `unnest`) and [`Project::duration_at_speed`] (`set_speed`);
+//! loops, `unnest`, `relink_media`'s hold to a shorter file, spec §11 #63)
+//! and [`Project::duration_at_speed`] (`set_speed`);
 //! `whole_media_length` is the same measurement of a whole file. A site
 //! that writes an END measures it from the clip's OWN start —
 //! [`Project::latest_end_on_grid`], which `trim_end` and `roll` clamp
@@ -329,11 +330,11 @@ impl Project {
     /// duration on this document's grid, at least one frame, and never
     /// longer than the window the file still holds (spec §11, D4-4).
     ///
-    /// `set_canvas`'s re-snap, `paste`'s clip loop, `paste`'s nest absorb
-    /// and `unnest` all write this one number. The one-frame floor is
-    /// applied LAST and so wins over the bound: a media shorter than a
-    /// canvas frame still leaves a clip a frame long, which is one of the
-    /// cases `evaluate.rs`'s last-line clamp stays for.
+    /// `set_canvas`'s re-snap, `paste`'s clip loop, `paste`'s nest absorb,
+    /// `unnest` and `relink_media`'s hold (#63) all write this one number.
+    /// The one-frame floor is applied LAST and so wins over the bound: a
+    /// media shorter than a canvas frame still leaves a clip a frame long,
+    /// which is one of the cases `evaluate.rs`'s last-line clamp stays for.
     ///
     /// Preconditions: the clip's media resolves in `self` (an unmeasurable
     /// window is simply not clamped), and a degenerate `speed` has already

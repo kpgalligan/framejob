@@ -103,13 +103,11 @@ impl Project {
         time::snap_down_to_frame(t, self.canvas.fps)
     }
 
-    /// One frame of canvas time — the shortest a clip or an action may be.
-    /// A degenerate canvas rate falls back to 1/30 s so the minimum is
-    /// never zero.
+    /// One frame of canvas time — the shortest a clip or an action may be:
+    /// the grid's own first frame at every rate (`time::one_frame`, spec
+    /// §11 #174), and 1/30 s only at a degenerate rate, so never zero.
     pub(crate) fn frame(&self) -> Ticks {
-        time::frame_duration(self.canvas.fps)
-            .unwrap_or(TIMESCALE / 30)
-            .max(1)
+        time::one_frame(self.canvas.fps)
     }
 
     pub(crate) fn require_clip(&self, id: u32) -> Result<&Clip, String> {

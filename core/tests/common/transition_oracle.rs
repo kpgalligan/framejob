@@ -41,8 +41,35 @@ fn down(t: i64, fps: i64) -> i64 {
     }
 }
 
+/// The frame `t` is nearest on the canvas grid: `round(t·fps/600000)`.
+fn index(t: i64, fps: i64) -> i64 {
+    round(i128::from(t) * i128::from(fps), 600_000) as i64
+}
+
+/// The tick frame `k` begins at: `round(k·600000/fps)`.
+fn tick(k: i64, fps: i64) -> i64 {
+    round(i128::from(k) * 600_000, i128::from(fps)) as i64
+}
+
+/// Whole grid frames in a non-negative length, counted one by one.
+fn frames_in(length: i64, fps: i64) -> i64 {
+    let mut k = 0;
+    while tick(k + 1, fps) <= length {
+        k += 1;
+    }
+    k
+}
+
+/// Whole grid frames lying inside `[from, to]`, counted one by one.
+fn frames_inside(from: i64, to: i64, fps: i64) -> i64 {
+    (index(from, fps) - 2..=index(to, fps) + 2)
+        .filter(|&k| tick(k, fps) >= from && tick(k + 1, fps) <= to)
+        .count() as i64
+}
+
 /// Enumerates the historical larger-side decrement, including split,
-/// redistribution, neighbour bounds, and inward rational grid conversion.
+/// redistribution, neighbour bounds, and inward rational grid conversion,
+/// every count in whole frames of the canvas's own grid (spec §11 #174).
 /// `None` is an unbounded source handle; supplied caps are fixture facts.
 fn old_path(
     project: &Value,
@@ -58,7 +85,7 @@ fn old_path(
     let b_start = int(b, "/start");
     let b_duration = int(b, "/duration");
     let fps = project.pointer("/canvas/fps/0").unwrap().as_i64().unwrap();
-    let mut split = (asked / FRAME).min((a_duration + b_duration) / (3 * FRAME));
+    let mut split = frames_in(asked, fps).min(frames_in((a_duration + b_duration) / 3, fps));
     let (want_tail, want_head) = match align {
         "before" => (0, split),
         "after" => (split, 0),
@@ -81,7 +108,11 @@ fn old_path(
         .iter()
         .find(|clip| clip["id"] == 13)
     {
-        tail = tail.min((int(next, "/start") - (a_start + a_duration)).max(0) / FRAME);
+        tail = tail.min(frames_inside(
+            a_start + a_duration,
+            int(next, "/start"),
+            fps,
+        ));
     }
     if let Some(previous) = project["clips"]
         .as_array()
@@ -89,14 +120,14 @@ fn old_path(
         .iter()
         .find(|clip| clip["id"] == 12)
     {
-        head = head
-            .min((b_start - (int(previous, "/start") + int(previous, "/duration"))).max(0) / FRAME);
+        let previous_end = int(previous, "/start") + int(previous, "/duration");
+        head = head.min(frames_inside(previous_end, b_start, fps));
     }
     split = tail + head;
     loop {
-        let tail_ticks =
-            (down(a_start + a_duration + tail * FRAME, fps) - (a_start + a_duration)).max(0);
-        let head_ticks = (b_start - up(b_start - head * FRAME, fps)).max(0);
+        let a_end = a_start + a_duration;
+        let tail_ticks = (tick(index(down(a_end, fps), fps) + tail, fps) - a_end).max(0);
+        let head_ticks = (b_start - tick(index(up(b_start, fps), fps) - head, fps)).max(0);
         if split == 0
             || (tail_ticks + 2 * head_ticks <= a_duration
                 && 2 * tail_ticks + head_ticks <= b_duration)

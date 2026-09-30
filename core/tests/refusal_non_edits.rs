@@ -252,23 +252,30 @@ fn a_transition_under_one_frame_names_the_shortest_that_passes_in_both_forms() {
 }
 
 #[test]
-fn at_5994_over_100_the_handle_form_asks_for_a_frame_the_arithmetic_can_use() {
-    // 10 010 ticks is one frame of the real grid, but the handle form still
-    // divides by `Project::frame`'s 1/30 s fallback, where it is none. So
-    // the shortest duration that passes is 20 020, two grid frames — and it
-    // does pass.
+fn at_5994_over_100_one_grid_frame_passes_in_both_forms() {
+    // 10 010 ticks is one frame of the real grid, and both forms count on
+    // that grid (spec §11 #174): a tick less is too short and names it, and
+    // it passes.
     let project = doc(
         [5994, 100],
         &[50],
         json!([shape(30, 50, 0, 1201201), shape(31, 50, 1201201, 1201201)]),
     );
-    project.refuses_with(
-        &json!({"op": "add_transition", "clip": 31, "duration": 10010}),
-        "a transition of 10010 ticks is too short to make at the cut before clip 31; \
-         pass a duration of at least 20020 ticks",
-    );
-    let after = project
-        .apply(&json!({"op": "add_transition", "clip": 31, "duration": 20020}))
-        .value();
-    assert!(start(&after, 31) < 1_201_201, "the incoming clip grew back");
+    for ripple in [false, true] {
+        project.refuses_with(
+            &json!({"op": "add_transition", "clip": 31, "duration": 10009, "ripple": ripple}),
+            "a transition of 10009 ticks is too short to make at the cut before clip 31; \
+             pass a duration of at least 10010 ticks",
+        );
+        let after = project
+            .apply(
+                &json!({"op": "add_transition", "clip": 31, "duration": 10010,
+                           "ripple": ripple}),
+            )
+            .value();
+        assert!(
+            start(&after, 31) < 1_201_201,
+            "ripple {ripple}: the incoming clip grew back"
+        );
+    }
 }

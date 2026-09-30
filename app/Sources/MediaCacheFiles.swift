@@ -121,8 +121,8 @@ extension MediaImporter {
     ///
     /// Existence alone could never be the test. `thumbs/<id>/` and
     /// `peaks/<id>.bin` are named by a media ID, and an id outlives the file
-    /// behind it — Relink… keeps the id and changes only the path
-    /// (`core/src/edit_track.rs`), so the directory of a relinked media is
+    /// behind it — Relink… keeps the id and changes the file
+    /// (`core/src/edit_relink.rs`), so the directory of a relinked media is
     /// already there, holding the OLD film's frames, and a pass that skipped
     /// on existence would leave them there for ever: a wrong picture, and
     /// wrong edits, because Remove Silences and Normalize read the peaks of
@@ -144,9 +144,9 @@ extension MediaImporter {
     /// which halves exist; and the three generator constants, so a build
     /// that changes any of them invalidates every cache written under the
     /// old value rather than serving a 160 px strip to a lane that asked for
-    /// 200. The record's fields, not the file's: `relink_media` never
-    /// re-probes, so a relink to a longer file keeps the old `duration`, and
-    /// the strip it sizes is the old length — a pre-existing limit
+    /// 200. The record's fields, not the file's: a file replaced in place
+    /// keeps its record, so a longer file at the old path keeps the old
+    /// `duration`, and the strip it sizes is the old length — a limit
     /// (`thumbnails` records it) that the marker inherits rather than fixes.
     ///
     /// NOT in it, deliberately: the path. The tree's two digests
@@ -286,8 +286,9 @@ extension MediaImporter {
     /// Normalize) and the Media row all read through it, and each memoises
     /// what it read as a hit. The old file must be withdrawn rather than
     /// left for a later marker to recertify after a pass
-    /// that returned early (a relink to a file with no audio track leaves
-    /// `hasAudio` true on the record and returns at the track load). Returns
+    /// that returned early (a file replaced in place by one with no audio
+    /// track keeps its record, `hasAudio` true, and returns at the track
+    /// load). Returns
     /// whether a `.bin` was REMOVED — the fact that requires a reader
     /// notification — and the pass posts at
     /// once when it was, so every memo drops the withdrawn floats and the

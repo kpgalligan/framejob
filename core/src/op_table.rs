@@ -310,7 +310,8 @@ pub const OP_TABLE: [OpRow; OP_COUNT] = [
          opt("rescale_clips", Boolean), opt("fit_new_clips", Boolean),
          opt("timecode_frames", Boolean)]),
     op("add_media", &[req("descriptor", Object)]),
-    op("relink_media", &[req("media", Id), req("path", Text), opt("bookmark", Text)]),
+    op("relink_media",
+       &[req("media", Id), req("path", Text), opt("bookmark", Text), opt("probe", Object)]),
     op("remove_media", &[req("media", Id), opt("with_clips", Boolean)]),
 ];
 

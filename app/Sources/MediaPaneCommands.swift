@@ -153,32 +153,20 @@ extension MediaPane {
 
     /// Relink… — the offer a project whose media has moved opens with (§5.6).
     ///
-    /// **This is the THIRD of three relink paths, and every one of them owes
-    /// the cache pass.** A relinked file is a file this project has never
-    /// read: there is no filmstrip, no thumbnail and no peaks on disk for it,
-    /// and nothing downstream of an edit makes them — neither `applyEdit` nor
-    /// `performGroupedEdit` touches `generateCaches()`, and only the open path
-    /// and the import path otherwise call it. So the row would come back with
-    /// a name and no picture, the timeline clip with a blank body, and Remove
-    /// Silences with no peaks to read. `RelinkSheetController.applyClicked`
-    /// has always called it and `AgentServer.relinkMedia` calls it on the line
-    /// after its edit; this path is the one that did not, from the day the row
-    /// menu got the item. A fourth inherits the duty.
-    ///
-    /// It is the WHOLE pass rather than this one file, which is the other two
-    /// paths' shape and is deliberate here: `ProjectDocument.generateCaches`
-    /// is the app's one spelling of "make what is missing", the relink SHEET
-    /// relinks several files in a single step and so could use nothing
-    /// narrower, and a per-media entry point invented for this one call site
-    /// would be a second answer to that question. What the whole pass costs
-    /// is what the function's doc now says: a stat, a marker read per half
-    /// and a `fileExists` per media whose completion marker still matches its
-    /// file, and a rebuild for the one whose file just changed, all in a
-    /// detached utility-priority task. It used to re-decode every media on every call — phase 8
-    /// measured a filmstrip frame's modification date moving on a second pass
-    /// — which `MediaImporter.CacheStamp` ended. A relink is a rare,
-    /// deliberate act — one panel, one file — and every one of the three
-    /// paths leaves the same caches behind.
+    /// **One of three relink paths, and all three probe the new file and
+    /// owe the cache pass** (spec §11, #63). The chosen file goes to
+    /// `ProjectDocument.relinkMedia`, the body this path shares with the
+    /// missing-media sheet: import's own probe, so the entry takes the file's
+    /// duration, size, rate and flags, a file of another kind is refused in
+    /// the core's sentence and a clip past a shorter file's end is held to
+    /// it; one grouped undo step; then `ProjectDocument.generateCaches`, the
+    /// app's one spelling of "make what is missing", because a relinked file
+    /// may be one this project has never read — no filmstrip, thumbnail or
+    /// peaks on disk — and nothing downstream of an edit makes them. The
+    /// agent's `relink_media` (`AgentServer.relinkMedia`) probes and passes
+    /// the same way. What the pass costs is its own doc's: a stat, a marker
+    /// read per half and a `fileExists` per media whose marker still matches,
+    /// and a rebuild for the one whose file just changed.
     func relink(_ media: UInt32) {
         guard let entry = binding.snapshot.media(media), let window = window else {
             NSSound.beep()
@@ -191,19 +179,7 @@ extension MediaPane {
         panel.message = "Choose the file for “\(entry.name)”."
         panel.beginSheetModal(for: window) { response in
             guard response == .OK, let url = panel.url else { return }
-            // A sheet's completion is not an AppKit event: the grouped entry
-            // point is mandatory here (app/CLAUDE.md's undo pitfall).
-            binding.applyGrouped(
-                "Relink Media",
-                [
-                    .relinkMedia(
-                        media: media, path: url.path, bookmark: bookmarkString(for: url))
-                ])
-            // The edit is synchronous all the way down (`onGroupedEdit` →
-            // `ProjectDocument.performGroupedEdit` → `applyEdit`), so the
-            // document is already holding the new path by this line and the
-            // pass generates against the file that was just chosen.
-            binding.document?.generateCaches()
+            binding.document?.relinkMedia([(media: media, url: url)])
         }
     }
 

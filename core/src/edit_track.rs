@@ -38,7 +38,8 @@ const MEDIA_DIMENSION_MAX: u32 = 65536;
 /// MINUS `id`. Spelled out rather than derived from a serialized [`Media`],
 /// because the point of the list is to NAME a misspelled key — serde would
 /// silently drop `"widht"` and leave the user with a zero-width media.
-const MEDIA_KEYS: [&str; 10] = [
+/// `edit_relink.rs` reads it too, for a relink's probe.
+pub(crate) const MEDIA_KEYS: [&str; 10] = [
     "path",
     "bookmark",
     "kind",
@@ -87,6 +88,49 @@ fn clip_list(ids: &[u32]) -> String {
         (Some((last, front)), 0) => format!("clips {} and {last}", front.join(", ")),
         (Some(_), more) => format!("clips {} and {more} more", named.join(", ")),
     }
+}
+
+/// The checks a media record's fields must pass once the descriptor has
+/// matched the schema — `add_media`'s, and a relink probe's
+/// (`edit_relink.rs`), in one order and one set of sentences: an empty
+/// path, a negative duration, a media with pixels whose size or rate is not
+/// usable.
+pub(crate) fn check_media_fields(media: &Media) -> Result<(), String> {
+    if media.path.trim().is_empty() {
+        return Err("media path must not be empty".to_string());
+    }
+    if media.duration < 0 {
+        return Err(format!(
+            "media duration must not be negative, not {}",
+            media.duration
+        ));
+    }
+    // Size and rate are only meaningful for a media with pixels: an
+    // audio file legitimately reports 0×0. A drawing media with a zero
+    // dimension would make `fit_scale` and the frame recipe's
+    // `source_size` meaningless.
+    let draws = media.has_video || matches!(media.kind, MediaKind::Image);
+    if draws {
+        if media.width == 0 || media.height == 0 {
+            return Err(format!(
+                "a media with pixels must have a positive width and height, not {}x{}",
+                media.width, media.height
+            ));
+        }
+        if media.width > MEDIA_DIMENSION_MAX || media.height > MEDIA_DIMENSION_MAX {
+            return Err(format!(
+                "media dimensions must be at most {MEDIA_DIMENSION_MAX}, not {}x{}",
+                media.width, media.height
+            ));
+        }
+    }
+    if media.has_video && !media.fps.is_valid() {
+        return Err(format!(
+            "a media with video must have a frame rate with non-zero terms, not [{}, {}]",
+            media.fps.num, media.fps.den
+        ));
+    }
+    Ok(())
 }
 
 // ---- the ops -------------------------------------------------------------
@@ -404,42 +448,8 @@ impl Project {
         let media: Media = serde_json::from_value(with_id)
             .map_err(|e| format!("media descriptor does not match the schema: {e}"))?;
 
+        check_media_fields(&media)?;
         let path = media.path.trim().to_string();
-        if path.is_empty() {
-            return Err("media path must not be empty".to_string());
-        }
-        if media.duration < 0 {
-            return Err(format!(
-                "media duration must not be negative, not {}",
-                media.duration
-            ));
-        }
-        // Size and rate are only meaningful for a media with pixels: an
-        // audio file legitimately reports 0×0. A drawing media with a zero
-        // dimension would make `fit_scale` and the frame recipe's
-        // `source_size` meaningless.
-        let draws = media.has_video || matches!(media.kind, MediaKind::Image);
-        if draws {
-            if media.width == 0 || media.height == 0 {
-                return Err(format!(
-                    "a media with pixels must have a positive width and height, not {}x{}",
-                    media.width, media.height
-                ));
-            }
-            if media.width > MEDIA_DIMENSION_MAX || media.height > MEDIA_DIMENSION_MAX {
-                return Err(format!(
-                    "media dimensions must be at most {MEDIA_DIMENSION_MAX}, not {}x{}",
-                    media.width, media.height
-                ));
-            }
-        }
-        if media.has_video && !media.fps.is_valid() {
-            return Err(format!(
-                "a media with video must have a frame rate with non-zero terms, not [{}, {}]",
-                media.fps.num, media.fps.den
-            ));
-        }
-
         if self.media.iter().any(|m| m.path == path) {
             return Ok(Outcome::Identity);
         }
@@ -452,37 +462,6 @@ impl Project {
         // `relink` think the file had been located once.
         record.bookmark = record.bookmark.filter(|b| !b.trim().is_empty());
         next.media.push(record);
-        self.finish(next)
-    }
-
-    /// Points a media at a new file — Relink… after the original moved
-    /// (spec §5.6).
-    ///
-    /// A `bookmark` of `None` CLEARS the stored one rather than keeping it:
-    /// a bookmark resolves to the file it was made from, so the old one
-    /// would point straight back at the file the user is replacing.
-    ///
-    /// `Err` for an unknown media or an empty path.
-    pub fn relink_media(
-        &self,
-        media: u32,
-        path: &str,
-        bookmark: Option<&str>,
-    ) -> Result<Outcome, String> {
-        self.require_media(media)?;
-        let path = path.trim();
-        if path.is_empty() {
-            return Err("media path must not be empty".to_string());
-        }
-
-        let mut next = self.clone();
-        if let Some(found) = next.media.iter_mut().find(|m| m.id == media) {
-            found.path = path.to_string();
-            found.bookmark = bookmark
-                .map(str::trim)
-                .filter(|given| !given.is_empty())
-                .map(|given| given.to_string());
-        }
         self.finish(next)
     }
 

@@ -270,23 +270,52 @@ extension AgentServer {
     // MARK: - Relinking and removing
 
     /// `relink_media` — Relink… (`RelinkSheetController`, and the Media tab's
-    /// row menu). A bookmark is made for the new file here, so the link
-    /// survives a later move exactly as the sheet's does.
+    /// row menu, both through `ProjectDocument.relinkMedia`). The new file
+    /// is probed as `import_media` probes it and the descriptor fills the
+    /// op's `probe` (spec §11, #63), so the entry takes the file's duration,
+    /// size, rate and flags, a file of another kind is refused in the core's
+    /// sentence, and a clip past a shorter file's end is held to it.
+    ///
+    /// **Runs on the server thread** (`AgentServer.offMainTools`), for
+    /// `importMedia`'s reason: the probe's completion arrives on main. The
+    /// path stored is the DESCRIPTOR's (an ffmpeg rewrap stores the `.mov`),
+    /// and so is the bookmark unless the caller gave one for that same file:
+    /// a caller's bookmark of the original beside a rewrapped path would
+    /// make `mediaURL`, which resolves the bookmark first, open the file the
+    /// record does not name.
     func relinkMedia(_ a: [String: Any]) throws -> String {
-        let document = try target(a)
-        let media = try mediaArg(a, "media", document)
+        let (document, media) = try onMain {
+            let document = try self.target(a)
+            return (document, try self.mediaArg(a, "media", document))
+        }
         let path = try requiredString(a, "path")
         let url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
         guard FileManager.default.fileExists(atPath: url.path) else {
             throw ToolError(message: "No file at \(url.path)")
         }
-        let bookmark = try stringArg(a, "bookmark") ?? bookmarkString(for: url)
-        let result = try editResult(
-            document, "Relink Media",
-            [.relinkMedia(media: media.id, path: url.path, bookmark: bookmark)],
-            ["media": Int(media.id), "path": url.path])
-        document.generateCaches()
-        return result
+        let given = try stringArg(a, "bookmark")
+        let descriptor = try probe(url)
+        let bookmark = descriptor.path == url.path ? given ?? descriptor.bookmark
+            : descriptor.bookmark
+        return try onMain {
+            let result = try self.editResult(
+                document, "Relink Media",
+                [
+                    .relinkMedia(
+                        media: media.id, path: descriptor.path, bookmark: bookmark,
+                        probe: descriptor)
+                ],
+                [
+                    "media": Int(media.id), "path": descriptor.path,
+                    "kind": descriptor.kind.rawValue, "duration": descriptor.duration,
+                    "width": descriptor.width, "height": descriptor.height,
+                    "fps": [descriptor.fps.num, descriptor.fps.den],
+                    "has_video": descriptor.hasVideo, "has_audio": descriptor.hasAudio,
+                    "has_alpha": descriptor.hasAlpha,
+                ])
+            document.generateCaches()
+            return result
+        }
     }
 
     /// `remove_media` — the Media tab's row menu (`MediaPane.remove`). Media

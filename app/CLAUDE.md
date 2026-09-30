@@ -156,7 +156,11 @@ detail there.
   every save funnels through, bracketing it with the cache ledger's
   `saveBegan` / `saveEnded` (#115, #169).
   `+Import` is File ▸ Add Media… and every drop into an open project
-  (`importMedia`, the probe chain and the one grouped commit). `+Graphics`
+  (`importMedia`, the probe chain and the one grouped commit), and the Media
+  tab's Relink… and the missing-media sheet's body (`relinkMedia(_:)`: each
+  file probed through `MediaImporter.probe`, one grouped "Relink Media" edit
+  carrying each descriptor as `relink_media`'s `probe`, spec §11 #63, then
+  `generateCaches()`). `+Graphics`
   is the document's side of the package's `graphics/`:
   `startGraphicStore()`, run from `makeWindowControllers()` and seeding an
   untitled document's root from `autosavedContentsFileURL/graphics`, and

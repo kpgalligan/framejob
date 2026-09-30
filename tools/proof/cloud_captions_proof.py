@@ -54,8 +54,8 @@ Road map 6 §5i's rows 1–11, plus four of this pipeline's own:
 
 Three instances, each on its own port with its own fake, each killed by its
 own PID in a `finally`, each with a row that `grep "Reelcut: "` finds nothing
-in its log. Host-state inputs: `media/speech.mov`, `say` for the second
-fixture, `ffmpeg` for row 2's second decoder (the row names which decoders
+in its log. Host-state inputs: `media/speech.mov` and `media/AV.mov`, `say`
+for the second fixture, `ffmpeg` for row 2's second decoder (the row names which decoders
 answered and `AVAudioFile` always runs), and free loopback ports.
 
 `--mutant <name>` builds a COPY of the tree with `tree_copy.make_copy` —
@@ -433,8 +433,9 @@ class Session:
 
 def fixtures():
     """`media/speech.mov`, and the probe's `say` fixture as a SECOND file —
-    a different media over a different path, which is what rows 2, 5, 6 and
-    11 need to tell two uploads apart."""
+    a different media over a different path, which is what rows 2, 6 and 11
+    need to tell two uploads apart. Row 5's relink cannot use it: a relink
+    keeps a media's kind (spec §11 #63), so that row copies `AV.mov`."""
     speech = os.path.join(MEDIA, "speech.mov")
     if not os.path.exists(speech):
         return None, None
@@ -1027,7 +1028,7 @@ def row_recovery(instance, fake):
 
 def row_five(instance, fake):
     print("\n5. the cache, `refresh`, a relink and back, a split pair, and the five refusals")
-    speech, second = fixtures()
+    speech, _ = fixtures()
     scenario(fake)
     session = Session(instance, "row5")
     media = session.media_of(speech)
@@ -1049,19 +1050,21 @@ def row_five(instance, fake):
           len(uploads(fake.log())) == 2 and forced.get("uploaded") == [media],
           f"got {len(uploads(fake.log()))} uploads, {forced.get('uploaded')!r}")
 
-    if second is None:
-        skip_rows(2, "`say` is not on this host, so row 5's relink has nowhere to point")
-    else:
-        session.op("relink_media", media=media, path=second)
-        relinked = session.op("transcribe", engine="assemblyai", place=False)
-        check("5: a relink to a DIFFERENT file re-transcribes — the stamp is the source's",
-              relinked.get("uploaded") == [media] and len(uploads(fake.log())) == 3,
-              f"got {relinked.get('uploaded')!r}, {len(uploads(fake.log()))} uploads")
-        session.op("relink_media", media=media, path=speech)
-        back = session.op("transcribe", engine="assemblyai", place=False)
-        check("5: and a relink BACK uploads again — one transcript per media, not a history",
-              back.get("uploaded") == [media] and len(uploads(fake.log())) == 4,
-              f"got {back.get('uploaded')!r}, {len(uploads(fake.log()))} uploads")
+    # A relink points at a file of the media's own kind (spec §11 #63), and
+    # `speech.mov` is a video, so the DIFFERENT file is a copy of `AV.mov` —
+    # a video with sound — and not the `say` AIFF the other rows use.
+    other = os.path.join(fresh("row5-relink"), "AV.mov")
+    shutil.copy2(os.path.join(MEDIA, "AV.mov"), other)
+    session.op("relink_media", media=media, path=other)
+    relinked = session.op("transcribe", engine="assemblyai", place=False)
+    check("5: a relink to a DIFFERENT file re-transcribes — the stamp is the source's",
+          relinked.get("uploaded") == [media] and len(uploads(fake.log())) == 3,
+          f"got {relinked.get('uploaded')!r}, {len(uploads(fake.log()))} uploads")
+    session.op("relink_media", media=media, path=speech)
+    back = session.op("transcribe", engine="assemblyai", place=False)
+    check("5: and a relink BACK uploads again — one transcript per media, not a history",
+          back.get("uploaded") == [media] and len(uploads(fake.log())) == 4,
+          f"got {back.get('uploaded')!r}, {len(uploads(fake.log()))} uploads")
 
     # A split pair, a later `in`, and the refusals.
     whole = session.op("transcribe", engine="assemblyai", clips=[clip], place=False)

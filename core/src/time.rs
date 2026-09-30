@@ -215,9 +215,21 @@ pub fn snap_down_to_frame(t: Ticks, fps: Fps) -> Ticks {
     }
 }
 
-/// Ticks in one 1/30 s frame: what the three counts below fall back to at a
-/// degenerate rate, the same fallback as `Project::frame`.
+/// Ticks in one 1/30 s frame: what [`one_frame`] and the counts below fall
+/// back to at a degenerate rate.
 const FALLBACK_FRAME: i64 = TIMESCALE / 30;
+
+/// One frame of the grid: the first boundary after tick 0, at least a tick.
+/// At a rate that divides the timescale it is [`frame_duration`]; at one
+/// that does not it is the grid's own first frame — 85 714 ticks at 7 fps,
+/// 10 010 at 5994/100 — and never a 1/30 s stand-in (spec §11 #174).
+/// Degenerate rate: `TIMESCALE / 30`.
+pub fn one_frame(fps: Fps) -> Ticks {
+    if !fps.is_valid() {
+        return FALLBACK_FRAME;
+    }
+    snap_up_to_frame(1, fps).max(1)
+}
 
 /// The whole frames of the grid in a LENGTH: the greatest `k` with
 /// `tick_at_frame(k) ≤ length` (negative for a negative length). At a rate
@@ -238,11 +250,27 @@ pub fn frames_in(length: Ticks, fps: Fps) -> i64 {
 /// The grid position `frames` whole frames before the frame nearest `from`:
 /// `tick_at_frame(frame_index(from) − frames)`. On the grid at every rate,
 /// and `from − frames × frame` at a rate that divides the timescale with
-/// `from` on the grid. Degenerate rate: `from − frames × (TIMESCALE / 30)`.
+/// `from` on the grid; a negative count steps forward. Degenerate rate:
+/// `from − frames × (TIMESCALE / 30)`.
 pub fn frames_back(from: Ticks, frames: i64, fps: Fps) -> Ticks {
     match frame_index_wide(from, fps) {
         Some(index) => tick_at_frame_wide(index - i128::from(frames), fps).unwrap_or(from),
         None => clamp_ticks(i128::from(from) - i128::from(frames) * i128::from(FALLBACK_FRAME)),
+    }
+}
+
+/// The whole grid frames that lie between two positions: the frames from
+/// the first boundary at or after `from` to the last at or before `to`,
+/// `frame_index(snap_down(to)) − frame_index(snap_up(from))` — 0 or less
+/// when none does. What a handle or a room measured between two positions
+/// holds in whole frames of the canvas's grid (spec §11 #174). Degenerate
+/// rate: `(to − from).div_euclid(TIMESCALE / 30)`.
+pub fn frames_between(from: Ticks, to: Ticks, fps: Fps) -> i64 {
+    let first = frame_index_wide(snap_up_to_frame(from, fps), fps);
+    let last = frame_index_wide(snap_down_to_frame(to, fps), fps);
+    match (first, last) {
+        (Some(first), Some(last)) => clamp_ticks(last - first),
+        _ => to.saturating_sub(from).div_euclid(FALLBACK_FRAME),
     }
 }
 
