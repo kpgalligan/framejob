@@ -270,6 +270,12 @@ final class CloudTranscriber {
                         bar.fraction(media: index, phase: .saving, within: 1),
                         CloudProgress.detail(.saving, file: entry.name))
                 } catch {
+                    // R6-20: a transcript refused after it was made, whose
+                    // DELETE failed, is owed with no file to retry it from;
+                    // everything below reads the refusal's own `ClientError`.
+                    let refusal = error as? AssemblyAIClient.Refusal
+                    if refusal?.deletion == .failed { report.refusedUndeleted.append(id) }
+                    let error: any Error = refusal?.failure ?? error
                     if let client = error as? AssemblyAIClient.ClientError,
                         case .submissionUnresolved(let authenticationStatus) = client,
                         cancel.isCancelled || authenticationStatus != nil

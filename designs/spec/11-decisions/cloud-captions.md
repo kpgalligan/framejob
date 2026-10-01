@@ -295,9 +295,33 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   writes `remote_deleted: false`, is reported, and is retried by the next
   keyed run, or R6-4's dashboard sentence names it when its file did not
   land. `poll`'s cut DELETE has no cache file and is reported nowhere, as
-  any failed DELETE there already was — a defect, not a decision. Nothing
+  any failed DELETE there already was — a defect, not a decision. Fixed by
+  R6-20 (issue batch B43, #201). Nothing
   else changes: no other request gains a total deadline, the submit still
   takes no token (R6-14, R6-18), and MCP `transcribe`'s cloud arm still
   has no Stop, so its DELETEs run as before. DECLINED: cancelling a DELETE
   at the press, which would orphan the transcript of every Stop during a
   submit or a wait (issue batch B35, #187 item 5).
+- **R6-20 — A transcript refused after it was made, whose DELETE failed, is
+  reported for the dashboard and never retried.** It covers every
+  `refusing`: `poll`'s throwing exits (R6-19's cut DELETE among them),
+  `requireEchoedID`, and `fetch`'s refusal of words that repeat the key.
+  The DELETE's answer rides on the thrown `Refusal`, and the run keeps the
+  media in `Report.refusedUndeleted`, so the report card, the MCP `note` and
+  the failure text all say R6-4's dashboard sentence for it ("Delete it in
+  your AssemblyAI dashboard"), once per media, and never the retry sentence.
+  There is no retry because no file holds the id. A DELETE that answered,
+  or was never sent, is owed nothing. DECLINED: writing the media's cache
+  file as a tombstone, which would replace a current transcript or an older
+  id still owed a delete (R6-11). DECLINED: a second persisted id list,
+  which R6-11 already declined (issue batch B43, #201).
+- **R6-21 — A cached transcript is not re-checked for the key when it is
+  read (accepted).** Since issue batch B34 (a861f8c, 2026-09-30) a
+  transcript whose words carry the key is refused before any write. Before
+  B34 only a server that put the key in the words could have made such a
+  file, and the stand-in does that only in the probe's section `echo` row
+  E3, which B34 itself added. Reelcut has never been released (R6-5,
+  2026-09-30). R6-16 serves a current batch with no key at all, where no
+  check is possible. DECLINED: a read-time check when a key is present,
+  which would make one package current with a key and stale without one,
+  and turn a cache hit into a paid re-fetch (issue batch B43, #200 item 1).

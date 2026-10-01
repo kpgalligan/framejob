@@ -915,7 +915,9 @@ free.
   of its media's one transcript. `+Report` holds what the `Outcome` has no
   room for (`uploaded` with the transcript-write and marker-write results,
   `transcriptWritten` and `stampWritten`, `cached`,
-  `janitorDeleted`, `janitorFailed`, `janitorDeferred`, `held`) and owns the
+  `janitorDeleted`, `janitorFailed`, `janitorDeferred`, `held`, and
+  `refusedUndeleted` — a transcript refused after it was made whose DELETE
+  failed, owed to the dashboard with no retry, R6-20) and owns the
   shared cleanup warning wording for the sheet and MCP result or failure.
   `billedSeconds` is the ONE sum of `audioSeconds` — each term floored at 0,
   saturating at `Int.max` — that the bill sentence and `audio_seconds` read;
@@ -923,13 +925,16 @@ free.
   land, and promises nothing about the next run.
   A nil client admits only a nonempty, entirely
   current batch and skips janitor/network, retaining pending IDs as deferred.
-  One media's failure is one media's problem
-  and the run carries on, with exactly two exceptions: a CANCEL and a
-  REFUSED KEY. `+Media` holds `retryDeletes` and `fetch` — the ten-hour
+  One media's failure is one media's problem (the catch first records a
+  `Refusal` whose DELETE `failed` in `refusedUndeleted`, then reads its
+  `ClientError`) and the run carries on, with exactly two exceptions: a CANCEL
+  and a REFUSED KEY. `+Media` holds `retryDeletes` and `fetch` — the ten-hour
   refusal BEFORE the extract, the `defer` that removes the temporary audio on
   every exit, the server's model and language filtered through
-  `withoutCredential`, `audio_duration` floored at 0, words that repeat the
-  key refused (the transcript deleted) before any write, the cache file
+  `withoutCredential` and then bounded at 64 Unicode scalars (`bounded`,
+  `serverStringLimit`, #200), `audio_duration` floored at 0, words any of
+  whose decoded strings (`TranscriptWord.stringFields`) repeat the key refused
+  (the transcript deleted) before any write, the cache file
   written before its marker, and the DELETE last with its answer recorded —
   its `remote_deleted` rewrite only over a first write that landed (#187).
   Spec §11's R6-11: a media in this run's
@@ -959,7 +964,9 @@ free.
   trim/de-duplicate/cap that the sheet's field and the tool's argument share:
   `TranscriptOptions`,
   `TranscriptRequest` (whose `encode` is the whole wire body — `language_code`
-  absent for auto, `keyterms_prompt` absent when empty), `TranscriptWord`,
+  absent for auto, `keyterms_prompt` absent when empty), `TranscriptWord`
+  (with `stringFields`, every String field by `Mirror`, which `fetch` reads
+  for the key),
   `TranscriptResponse` and `JSONValueRange`. `TranscriptStamp.swift` owns the
   cache marker: `TranscriptSourceStamp` projects `CacheStamp` to size,
   modification second, duration and audio presence, then pairs those with
@@ -976,7 +983,10 @@ free.
   answers nil, so a 3xx is `.redirected` and the credential reaches no other
   host; an upload retries once on a 5xx or a transport error and never on a
   4xx or after a cancel; `poll` sleeps in ≤ 0.1 s slices that read the token
-  and EVERY throwing exit deletes the transcript first. A `completed` body
+  and EVERY throwing exit deletes the transcript first — `refusing`
+  (`+Session`) answers a `Refusal` carrying that DELETE's answer
+  (`deleted`/`failed`/`notSent`), which `CloudTranscriber.transcribe` unwraps
+  before reading its `ClientError` (R6-20). A `completed` body
   whose `words` is absent, null or not an array is `.malformed`, never an
   empty transcript; `[]` is zero words. A `completed` body whose `id` is not
   the polled id is `.malformed` too (`requireEchoedID` in `+Session`, #71), so

@@ -4225,6 +4225,12 @@ env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only keyl
 env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --sources /Users/kevingalligan/.codex/litecode/reelcut/fix-remaining-bugs-series/03-issue-30/baseline/app/Sources --only stamp
 ```
 
+Every run first takes the cloud instruments' lock (row L, issue batch B43):
+an exclusive `flock` on `<getconf DARWIN_USER_TEMP_DIR>/reelcut-cloud-captions.lock`,
+which `cloud_captions_proof.py` and `word_captions_proof.py` take too. It
+waits up to `--lock-wait` seconds (default 3600), prints the wait, and
+starts `--wall` only once the lock is held.
+
 The `submission` section checks one POST and exact uploaded-URL selection
 through dropped, timed-out, server and unreadable replies; first-page lag,
 malformed or hostile rows, auth refusals and bounded exhaustion. Its
@@ -5107,7 +5113,10 @@ No mutant run exited 2.
 leave and look for `reelcut-upload-*` in the same `NSTemporaryDirectory()`:
 a baseline run of both in parallel failed six probe rows (KL's three, R6-14's
 three cancel rows) and the proof's row T on each other's extracts. Run
-alone, the same tree scored 762/762 and 201/201.
+alone, the same tree scored 762/762 and 201/201. Since issue batch B43 the
+three cloud instruments take turns through one lock (row L, below), so a
+second one launched beside a first waits for it rather than sharing its
+folder.
 
 ### Issue batch B35 — cloud captions: a Stop bounds an in-flight DELETE; the submit line
 
@@ -5183,6 +5192,91 @@ env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --port-base
 No mutant run exited 2. The proof's `z2-throw-without-delete` and
 `z12-no-ceiling` were re-aimed at the same texts as the probe's and pass
 the anchor check (each text occurs once); they were not run.
+
+### Issue batch B43 — cloud captions residue: a refused transcript's DELETE answer, every word string, bounded server strings, one lock
+
+#200 and #201 (spec §11 R6-20, R6-21). `refusing` answers a `Refusal`
+carrying its DELETE's answer, and a `failed` one puts the media in
+`Report.refusedUndeleted`, which `deletionWarnings` reports with R6-4's
+dashboard sentence and never the retry one (R6-20). `fetch` reads every
+decoded string of a word for the key (`TranscriptWord.stringFields`: the
+text and the speaker today), and bounds the model and the language the
+server names at 64 Unicode scalars — 63 and "…" — after filtering them.
+The probe's section `cancel` no longer returns early, so SD1–SD3 are scored
+whatever the poll-cancel row answered. The probe, the proof and
+`word_captions_proof.py` take turns through one `flock` (row L). Caches
+written before B34 are not re-checked (R6-21, accepted). **No live call was
+made and nothing was spent**: every row runs against `assemblyai_fake.py`,
+with `RC_ASSEMBLYAI_KEY` unset.
+
+```sh
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --port-base 4975
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/word_captions_proof.py 4891
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only echo --mutant speaker-unchecked
+```
+
+- **L** (all three instruments). An exclusive `flock` on
+  `<getconf DARWIN_USER_TEMP_DIR>/reelcut-cloud-captions.lock`, polled about
+  once a second for up to `--lock-wait` seconds (default 3600), holding
+  `<pid> <script>` once held. The probe and the proof take it before a
+  mutant is prepared or built; `word_captions_proof.py` before its binary
+  check, its fake and its instance. `--wall` and the printed seconds start
+  once it is held. Not `TMPDIR`: `NSTemporaryDirectory()` ignores it on this
+  host (measured 2026-09-25, above), so a per-run `TMPDIR` would change
+  nothing.
+- **Section `cancel`.** 16·R: the poll-cancel's refusal carries `deleted`.
+  SD3·R: SD3's cut DELETE is `failed`.
+- **Section `cache_write`, RF1–RF4.** RF1: an `error` transcript whose
+  DELETE answers 500 always is `refusedUndeleted == [1]`, with the
+  dashboard sentence in `cloudFailure` and on the card and the retry
+  sentence in neither (CONTROL: one DELETE, of the served id). RF2, a
+  CONTROL: the same with the DELETE answering owes nothing. RF3: E3's key
+  words with the DELETE failing — `[1]`, the dashboard sentence, and the key
+  in no output. RF4: a Stop 0.3 s after the first poll, `never_complete`,
+  DELETE 500 — `cancelled`, `[1]`, and the dashboard sentence on the card.
+- **Section `echo`, E6–E8.** E6: a word whose `speaker` is the key, served
+  ESCAPED through the fake's new `words_json` key, is refused, nothing is
+  written and the transcript is DELETEd (CONTROL: the served bytes lack
+  `proof-key`). E7, a CONTROL: a speaker one letter off completes and
+  `1.json`'s words are the served bytes, escape and all. E8: a
+  5000-character model and language are 63 characters and "…" in the
+  report, both tool keys, the note, the card and the cache header
+  (CONTROL: 64 characters are kept whole).
+- **The proof, RF·MCP** (instance C, after row 6). An `error` transcript
+  whose DELETE answers 500: `transcribe`'s refusal holds the dashboard
+  sentence for that media and no retry promise, and the fake logged the
+  DELETE; its CONTROL with the DELETE answering has no dashboard sentence.
+
+**The run table** (2026-10-01, at `0ed6911` plus this batch):
+
+| Command | Printed answer |
+|---|---|
+| `make typecheck` | 0 errors, 4 warnings (the baseline); tsc clean |
+| `make test` | exit 0 |
+| `make app` | BUILD SUCCEEDED |
+| `cloud_captions_probe.py` (full, alone) | **847/847**, exit 0, in 497 s; waited 0.0 s for the lock |
+| `cloud_captions_proof.py --port-base 4975` (alone) | **209/209**, exit 0, in 78 s; waited 0.0 s |
+| `word_captions_proof.py 4891` (alone) | **20/20**, exit 0, in 10 s; waited 0.0 s |
+| `grep "Reelcut: " /tmp/reelcut-497[5-9].log /tmp/reelcut-4891.log` | nothing |
+| the probe (background) and the proof `--port-base 4975` (foreground) launched together | proof waited 0.0 s, 209/209, exit 0, in 80 s; probe **waited 80.6 s**, 847/847, exit 0, in 151 s |
+| proof `--lock-wait 0` while that probe held the lock (a CONTROL) | 0/1, exit 1: `L` FAIL, "still held by 85031 cloud_captions_probe.py" |
+| `word_captions_proof.py 4891 --lock-wait 0` while that probe held the lock (a CONTROL) | 0/1, exit 1: `L` FAIL naming the same holder; no instance launched (`/tmp/reelcut-4891.log` untouched) |
+| probe `--only echo --mutant speaker-unchecked` | 29/30, exit 1 (E6) |
+| probe `--only echo --mutant model-unbounded` | 27/30, exit 1 (E8's three model rows) |
+| probe `--only echo --mutant language-unbounded` | 27/30, exit 1 (E8's three language rows) |
+| probe `--only cancel,cache_write --mutant refusal-answer-dropped` | 53/58, exit 1 (RF1 ×2, RF3, RF4 ×2) |
+| probe `--only cancel --mutant poll-cancel-traps` (a CONTROL) | 10/12, exit 1: the poll-cancel and SD3 rows "answers" FAIL on the trap, and SD1 ×2 and SD2 ×2 printed and scored ok |
+| probe `--only client,cancel,echo,stop --mutant z2-throw-without-delete` (re-aimed) | 99/116, exit 1 (15 ×9, 16's DELETE, 16·R, SD3's CONTROL, SD3·R, E3, E6, ST·submit, ST·wait) |
+| probe `--only cancel --mutant refusing-stop-dropped` (re-aimed) | 15/17, exit 1 (SD3, SD3·R) |
+| probe `--only echo --mutant words-unrefused` (re-aimed) | 27/30, exit 1 (E3 ×2, E6) |
+| probe `--only echo --mutant model-unfiltered` (re-aimed) | 25/30, exit 1 (E1 ×3, E2's card, E1/E2's output) |
+| probe `--only echo --mutant language-unfiltered` (re-aimed) | 25/30, exit 1 (E1's note and card, E2 ×3, E1/E2's output) |
+| proof `--mutant refusal-answer-dropped` | 208/209, exit 1 (RF·MCP) |
+
+No mutant run exited 2. The proof now takes `z2-throw-without-delete` and
+`refusal-answer-dropped` from the probe's table rather than spelling them a
+second time; its own Z2 spelling is gone.
 
 ### Road map 7 part 6 — core argument contract
 
@@ -5931,10 +6025,14 @@ on "when place is true" (nit 4: "place" is a substring of "replace"); G6 `apple`
 `one_word` over the `say` pangram; G7 `tools/list`; G8 `speech.mov` split
 at its midpoint, then `highlight` — no `trimmed`, no `skipped`, every page
 inside one clip — and `pill` with `replace: true`. Then `grep "Reelcut: "`
-on its log.
+on its log. Row L (issue batch B43) comes first: G3's cloud engine writes
+`reelcut-upload-*`, so the proof takes the cloud probe's lock before it
+launches anything, waiting up to `--lock-wait` seconds (default 3600); an
+expired wait is a scored FAIL naming the holder, with no instance launched.
 
 ```sh
-env -u RC_ASSEMBLYAI_KEY python3 tools/proof/word_captions_proof.py 4891   # → 19/19
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/word_captions_proof.py 4891   # → 20/20
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/word_captions_proof.py 4891 --lock-wait 0
 ```
 
 

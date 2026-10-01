@@ -27,10 +27,17 @@ MCP, and kills both by PID in a `finally`:
 * **G8** two ABUTTING clips — `speech.mov` split at its midpoint — under
   `apple` + `highlight`: no `trimmed`, no `skipped`, every page inside one
   clip, both clips read; then `pill` with `replace: true` replaces that track.
+* **L** (issue batch B43, #200 item 4) `cloud_captions_probe.py`'s
+  `hold_cloud_lock`, taken first: G3's cloud engine writes
+  `reelcut-upload-*` into the one temporary folder the cloud probe and proof
+  use, so the three take turns. `--lock-wait` (default 3600 s) bounds the
+  wait; an expired wait is a scored FAIL naming the holder, and exit 1 with
+  no instance launched.
 
-    python3 tools/proof/word_captions_proof.py <port>
+    python3 tools/proof/word_captions_proof.py <port> [--lock-wait SECONDS]
 """
 
+import argparse
 import json
 import os
 import re
@@ -41,7 +48,7 @@ import sys
 import time
 
 from mcp import MCP, ToolError
-from cloud_captions_probe import Fake, child_env
+from cloud_captions_probe import Fake, child_env, hold_cloud_lock
 from e1_proof import decode_png
 from speech_engine_proof import make_fixtures
 
@@ -369,9 +376,26 @@ def g8(instance):
 
 
 def main():
-    if len(sys.argv) != 2:
-        sys.exit(__doc__)
-    port = int(sys.argv[1])
+    parser = argparse.ArgumentParser(
+        description=__doc__.split("\n")[0],
+        usage="word_captions_proof.py <port> [--lock-wait SECONDS]")
+    parser.add_argument("port", type=int, help="the port this proof's Reelcut binds")
+    parser.add_argument("--lock-wait", type=float, default=3600,
+                        help="how long to wait for the cloud instruments' lock, in seconds "
+                             "(issue batch B43; rule H)")
+    args = parser.parse_args()
+    port = args.port
+    # L (issue batch B43, #200 item 4): held before anything else, and kept
+    # open until `main` returns.
+    lock, waited, holder = hold_cloud_lock(args.lock_wait)
+    print(f"  (waited {waited:.1f} s for the cloud instruments' lock)")
+    check("L: the cloud instruments' lock is held \u2014 "
+          + (f"by this run, {holder}" if lock else f"still held by {holder} after "
+             f"--lock-wait {args.lock_wait:.0f} s"),
+          lock is not None, holder)
+    if lock is None:
+        print(f"\n{passed}/{passed + failed} checks passed in {waited:.0f} s")
+        return 1
     started = time.time()
     os.makedirs(WORK, exist_ok=True)
     print("road map 8 W4a — word-caption generation, over MCP\n")

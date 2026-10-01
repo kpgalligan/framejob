@@ -16,6 +16,16 @@ to replace not found exactly once, or the probe or harness not built — it
 prints `mutant <name>: the control could not be performed — <why>` and exits
 2 (rule R, issue batch B13).
 
+**L** (issue batch B43, #200 item 4): before a mutant is prepared or
+anything is built, the run takes an exclusive `flock` on
+`<getconf DARWIN_USER_TEMP_DIR>/reelcut-cloud-captions.lock` — the lock this
+probe, `cloud_captions_proof.py` and `word_captions_proof.py` take turns
+through, because all three make the app write `reelcut-upload-*` into one
+`NSTemporaryDirectory()` that ignores `TMPDIR`. It waits up to
+`--lock-wait` seconds (default 3600), prints the wait, and starts `--wall`
+once it holds the lock; a wait that expires is a scored FAIL naming the
+holder, and the run exits 1 with nothing built.
+
 Sections, by the name after `section_`:
 
 * `mapping` (5i·12) — THE MAPPING at its boundaries: a word straddling `in`,
@@ -37,6 +47,9 @@ Sections, by the name after `section_`:
   `deleteAfterStop` later as `failed` (SD1), a token cancelled before it
   still lets a stalled DELETE finish (SD2), and a Stop during polling
   deletes and ends inside the bound against a dripping DELETE (SD3).
+  Issue batch B43 (#201): the refusal carries its DELETE's answer —
+  `deleted` for the poll-cancel (16·R), `failed` for SD3's cut one (SD3·R)
+  — and SD1–SD3 run and score whatever the poll-cancel row answered.
 * `secrets` (5i·17 + R6-9's C rows + the loopback table) — `FileStore` in a
   temporary directory, `MemoryStore` everywhere else, the resolver's order,
   and R6-9 (a), (b) and (c) by TYPE and path string only; and `writeAll`'s
@@ -91,13 +104,21 @@ Sections, by the name after `section_`:
   and #187's items 1–4 (issue batch B34): no `remote_deleted` rewrite over a
   first write that failed (CW1), `stampWritten` and the "could not be kept"
   sentence (CW2), a negative `audio_duration` floored at 0 (CW3), and the
-  saturating sum that stays saturated (CW4).
+  saturating sum that stays saturated (CW4). Issue batch B43 (#201, R6-20):
+  a transcript refused after it was made whose DELETE answered 500 is in
+  `refusedUndeleted` with the dashboard sentence and never the retry one —
+  an `error` transcript (RF1), its CONTROL with the DELETE answering (RF2),
+  words that repeat the key (RF3), and a Stop during polling (RF4).
 * `echo` (E, issue batch B34, #187 R2·1) — a server that names the key as
   its model and its language (E1/E2: `<redacted>` in the report, both tool
   keys, the note, the report card and the cache header), serves it as a word
   (E3: refused, deleted, never written), or a cache file whose id IS the key
   (E4: never sent by the janitor) — and `poll` refusing that id before any
-  request (E5).
+  request (E5). Issue batch B43 (#200): a word whose SPEAKER is the key,
+  served escaped so its bytes lack it, is refused (E6), with a CONTROL one
+  letter off that completes byte for byte (E7); and a 5000-character model
+  and language are cut to 63 characters and "…" everywhere they land, with
+  a CONTROL that 64 are kept whole (E8).
 * `settings_verify` — delayed loopback Verify replies against actual Settings
   actions: unchanged, changed input, removal, region, and overlapping owners.
 * `drip` (DR, issue batch B24, #80) — a reply the fake DRIPS a byte every
@@ -123,6 +144,7 @@ import argparse
 import base64
 import contextlib
 import difflib
+import fcntl
 import hashlib
 import json
 import math
@@ -207,6 +229,55 @@ def sleep(seconds):
     """Foreground `sleep` is blocked in this environment; this is the
     in-process wait every bounded loop here uses."""
     time.sleep(seconds)
+
+
+# Issue batch B43 (#200 item 4): the one lock the three instruments that
+# write `reelcut-upload-*` take turns through — this probe,
+# `cloud_captions_proof.py` and `word_captions_proof.py`. The app names its
+# extracts in `NSTemporaryDirectory()`, which ignores `TMPDIR` on this host
+# (`README.md`, measured 2026-09-25), so two runs at once share one folder
+# and one row T. The lock is in the per-user folder every worktree shares,
+# and `flock` is released when its process dies.
+LOCK_NAME = "reelcut-cloud-captions.lock"
+
+
+def hold_cloud_lock(wait_seconds):
+    """An exclusive `flock` on `<DARWIN_USER_TEMP_DIR>/LOCK_NAME`, polled
+    about once a second for up to `wait_seconds` (rule H). Answers (the open
+    handle, or None when the wait expired; the seconds waited; the holder's
+    text). The caller keeps the handle open for as long as it runs."""
+    started = time.time()
+    try:
+        folder = subprocess.run(["getconf", "DARWIN_USER_TEMP_DIR"], capture_output=True,
+                                text=True, env=child_env(), timeout=30,
+                                stdin=subprocess.DEVNULL).stdout.strip()
+    except (OSError, subprocess.TimeoutExpired) as problem:
+        return None, time.time() - started, f"`getconf DARWIN_USER_TEMP_DIR` failed: {problem}"
+    if not folder:
+        return None, time.time() - started, "`getconf DARWIN_USER_TEMP_DIR` answered nothing"
+    path = os.path.join(folder, LOCK_NAME)
+    try:
+        handle = open(path, "a+", encoding="utf-8")
+    except OSError as problem:
+        return None, time.time() - started, f"the lock file {path} could not be opened: {problem}"
+    while True:
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            break
+        except BlockingIOError:
+            waited = time.time() - started
+            if waited >= wait_seconds:
+                handle.seek(0)
+                holder = handle.read().strip() or "a holder that wrote no name"
+                handle.close()
+                return None, waited, f"{holder} (in {path})"
+            sleep(min(1.0, max(0.05, wait_seconds - waited)))
+    me = f"{os.getpid()} {os.path.basename(sys.argv[0])}"
+    handle.seek(0)
+    handle.truncate()
+    handle.write(me)
+    handle.flush()
+    return handle, time.time() - started, me
 
 
 # --------------------------------------------------------------------------
@@ -411,6 +482,19 @@ func makeClient(_ request: [String: Any], stub: Bool) -> AssemblyAIClient? {
 }
 
 func describe(_ error: any Error) -> [String: Any] {
+    // Issue batch B43 (#201, R6-20): a refusal carries what its DELETE answered.
+    if let refusal = error as? AssemblyAIClient.Refusal {
+        let deletion: String
+        switch refusal.deletion {
+        case .deleted: deletion = "deleted"
+        case .failed: deletion = "failed"
+        case .notSent: deletion = "notSent"
+        }
+        return [
+            "error": refusal.failure.shortName, "message": refusal.localizedDescription,
+            "deletion": deletion,
+        ]
+    }
     if let client = error as? AssemblyAIClient.ClientError {
         return ["error": client.shortName, "message": client.localizedDescription]
     }
@@ -868,6 +952,7 @@ func modeRun(_ request: [String: Any]) -> [String: Any] {
         "janitorFailed": report.janitorFailed.map { Int($0) },
         "janitorDeferred": report.janitorDeferred.map { Int($0) },
         "held": report.held.map { Int($0) },
+        "refusedUndeleted": report.refusedUndeleted.map { Int($0) },
     ]
     answer["cloudFields"] = AgentServer.cloudFields(report, code: nil, endpoint: nil, notes: [])
     let names = media.mapValues { $0.name }
@@ -3821,21 +3906,26 @@ def section_cancel(binary, sources):
             "mode": "cancel", "scenario": "poll", "base": fake.base, "key": DUMMY_KEY,
             "cancelAfter": 0.8, "tuning": {"pollInterval": 0.2, "requestTimeout": 20}},
             timeout=120)
+        # Issue batch B43 (#201): no early return — SD1–SD3 below are scored
+        # on their own whatever this row answered.
         if answer is None:
             check("16: the poll-cancel row answers", False, error)
-            return
-        check("16: a cancel during polling is `cancelled`", answer.get("error") == "cancelled",
-              f"got {answer.get('error')!r} / {answer.get('message')!r}")
-        served = answer.get("transcriptID")
-        log = fake.log()
-        deletes = [row for row in log["requests"] if row["method"] == "DELETE"]
-        check("16: and the cancel issued a DELETE of the id the fake served",
-              len(deletes) == 1 and served and deletes[0]["path"].endswith(served),
-              f"served {served!r}, deletes {[r['path'] for r in deletes]!r}")
-        polls = [row for row in log["requests"]
-                 if row["method"] == "GET" and row["path"].startswith("/v2/transcript/")]
-        check("16: the poll loop did run before the cancel (a cancel is not a first-poll "
-              "refusal)", len(polls) >= 2, f"{len(polls)} polls")
+        else:
+            check("16: a cancel during polling is `cancelled`",
+                  answer.get("error") == "cancelled",
+                  f"got {answer.get('error')!r} / {answer.get('message')!r}")
+            served = answer.get("transcriptID")
+            log = fake.log()
+            deletes = [row for row in log["requests"] if row["method"] == "DELETE"]
+            check("16: and the cancel issued a DELETE of the id the fake served",
+                  len(deletes) == 1 and served and deletes[0]["path"].endswith(served),
+                  f"served {served!r}, deletes {[r['path'] for r in deletes]!r}")
+            polls = [row for row in log["requests"]
+                     if row["method"] == "GET" and row["path"].startswith("/v2/transcript/")]
+            check("16: the poll loop did run before the cancel (a cancel is not a first-poll "
+                  "refusal)", len(polls) >= 2, f"{len(polls)} polls")
+            check("16·R: and the refusal carries that DELETE's answer, `deleted` (R6-20)",
+                  answer.get("deletion") == "deleted", f"got {answer.get('deletion')!r}")
 
     # --- SD: R6-19 (issue batch B35). A DELETE reads the run's token as a
     # STOP: never cut at the press, cut `deleteAfterStop` after the later of
@@ -3909,6 +3999,8 @@ def section_cancel(binary, sources):
               "its reply",
               len(deletes) == 1 and (deletes[0].get("dripped") or 0) >= 1,
               f"got {[(r['path'], r.get('dripped')) for r in deletes]!r}")
+        check("SD3·R: and the refusal carries the cut DELETE's answer, `failed` (R6-20)",
+              answer.get("deletion") == "failed", f"got {answer.get('deletion')!r}")
 
 
 # --------------------------------------------------------------------------
@@ -4978,9 +5070,85 @@ def section_cache_write(binary, sources):
           f"error={error!r}, audio_seconds={fields.get('audio_seconds')!r}, "
           f"failure={failure!r}")
 
+    # --- RF (issue batch B43, #201, R6-20): a transcript refused after it
+    # was made, whose DELETE failed, is owed with no file to retry it from —
+    # so it is reported for the dashboard and never promised a retry.
+    def refused_run(tag, scenario, extra=None):
+        with Fake(tag) as fake:
+            fake.scenario(**scenario)
+            answer, error, out = run_probe(binary, tag, dict({
+                "mode": "run", "base": fake.base, "key": DUMMY_KEY, "tuning": RUN_TUNING,
+                "cache": fresh(tag), "media": media, "jobs": jobs,
+            }, **(extra or {})), timeout=300)
+            log = fake.log()
+        answer = answer or {}
+        failure = str(answer.get("cloudFailure", ""))
+        lines = " ".join(answer.get("cloudReportLines", []))
+        owed = answer.get("report", {}).get("refusedUndeleted")
+        return answer, error, out, log, failure, lines, owed
+
+    delete_fails = [{"route": "delete", "status": 500, "times": -1}]
+    errored = "The audio could not be transcribed."
+    answer, error, _, log, failure, lines, owed = refused_run(
+        "rf1", {"transcript_error": errored, "fail": delete_fails})
+    check("RF1: a transcript that ended in `error`, whose DELETE answered 500, is in "
+          "`refusedUndeleted`",
+          answer.get("ok") is False and owed == [1],
+          f"error={error!r}, ok={answer.get('ok')!r}, owed={owed!r}, "
+          f"message={answer.get('message')!r}")
+    check("RF1: and the dashboard sentence is in the failure text and on the card, the "
+          "retry sentence in neither",
+          dashboard in failure and dashboard in lines
+          and retry not in failure and retry not in lines,
+          f"failure={failure!r}, lines={lines!r}")
+    served = [t["id"] for t in log["transcripts"]]
+    deletes = [r["path"] for r in log["requests"] if r["method"] == "DELETE"]
+    check("RF1: CONTROL — the fake logged ONE DELETE, of the id it served",
+          len(served) == 1 and len(deletes) == 1 and deletes[0].endswith("/" + served[0]),
+          f"served={served!r}, deletes={deletes!r}")
+
+    answer, error, _, log, failure, lines, owed = refused_run(
+        "rf2", {"transcript_error": errored})
+    check("RF2: CONTROL — the same refusal with the DELETE answering owes nothing: "
+          "`refusedUndeleted` empty and no dashboard sentence",
+          answer.get("ok") is False and owed == []
+          and dashboard not in failure and dashboard not in lines
+          and errored in failure,
+          f"error={error!r}, owed={owed!r}, failure={failure!r}, lines={lines!r}")
+
+    answer, error, out, log, failure, lines, owed = refused_run("rf3", {
+        "fail": delete_fails,
+        "words": [
+            {"text": DUMMY_KEY, "start": 600, "end": 1120, "confidence": 0.98, "speaker": None},
+            {"text": "said", "start": 1180, "end": 1600, "confidence": 0.96, "speaker": None}]})
+    check("RF3: words that repeat the key, whose DELETE answered 500 — `refusedUndeleted` "
+          "is [1] and the dashboard sentence is on the card and in the failure text",
+          answer.get("ok") is False and owed == [1]
+          and "the transcript's words repeat the API key" in failure
+          and dashboard in failure and dashboard in lines,
+          f"error={error!r}, owed={owed!r}, failure={failure!r}, lines={lines!r}")
+    check("RF3: and the key is in no output — the failure text, the card, the probe's "
+          "stdout and stderr",
+          DUMMY_KEY not in failure and DUMMY_KEY not in lines and DUMMY_KEY not in (out or ""),
+          f"failure has it: {DUMMY_KEY in failure}; lines: {DUMMY_KEY in lines}; "
+          f"output: {DUMMY_KEY in (out or '')}")
+
+    answer, error, _, log, failure, lines, owed = refused_run(
+        "rf4", {"never_complete": True, "fail": delete_fails},
+        {"cancelAtRequest": {"method": "GET", "pathPrefix": "/v2/transcript/",
+                             "after": 0.3}})
+    check("RF4: a Stop during polling, whose DELETE answered 500, ends the run `cancelled` "
+          "with the media in `refusedUndeleted`",
+          answer.get("ok") is False and answer.get("cancelled") is True
+          and "cancelled" in str(answer.get("message", "")).lower() and owed == [1],
+          f"error={error!r}, ok={answer.get('ok')!r}, message={answer.get('message')!r}, "
+          f"owed={owed!r}")
+    check("RF4: and the card's lines carry the dashboard sentence, not the retry one",
+          dashboard in lines and retry not in lines, f"lines={lines!r}")
+
 
 # The number of rows `section_echo` scores, for its one skip.
-ECHO_ROWS = 18
+ECHO_ROWS = 28
 
 
 def section_echo(binary, sources):
@@ -5125,6 +5293,123 @@ def section_echo(binary, sources):
           answer is not None and answer.get("error") == "malformed"
           and answer.get("log") == [],
           f"error={error!r}, answer={answer!r}")
+
+    # --- E6/E7 (issue batch B43, #200): every decoded string of a word is
+    # read for the key, not only its text. The speaker is served ESCAPED, so
+    # the served bytes never hold the key's own bytes and only the decoded
+    # field can find it.
+    def escaped_words(speaker):
+        return ('[{"text":"Hello","start":600,"end":1120,"confidence":0.98,'
+                '"speaker":"' + speaker + '"},'
+                '{"text":"there","start":1180,"end":1600,"confidence":0.96,'
+                '"speaker":"A"}]')
+
+    def words_run(tag, speaker):
+        cache = fresh(tag)
+        with Fake(tag) as fake:
+            fake.scenario(words_json=escaped_words(speaker))
+            served_bytes = fake.words()
+            answer, error, out = run_probe(binary, tag, {
+                "mode": "run", "base": fake.base, "key": DUMMY_KEY, "tuning": RUN_TUNING,
+                "cache": cache, "media": media, "jobs": jobs,
+            }, timeout=300)
+            log = fake.log()
+        return cache, served_bytes, answer or {}, error, out, log
+
+    cache, served_bytes, answer, error, out, log = words_run(
+        "echo-E6", DUMMY_KEY.replace("-", "\\u002d"))
+    failure = str(answer.get("cloudFailure", ""))
+    served = [t["id"] for t in log["transcripts"]]
+    deletes = [r["path"] for r in log["requests"] if r["method"] == "DELETE"]
+    check("E6: a word whose SPEAKER is the key (served escaped) fails the run with the "
+          "refusal, no `transcripts/1.json`, and the transcript DELETEd",
+          answer.get("ok") is False
+          and "the transcript's words repeat the API key" in failure
+          and DUMMY_KEY not in failure
+          and not os.path.exists(os.path.join(cache, "transcripts", "1.json"))
+          and len(served) == 1 and any(p.endswith("/" + served[0]) for p in deletes),
+          f"error={error!r}, ok={answer.get('ok')!r}, failure={failure!r}, "
+          f"served={served!r}, deletes={deletes!r}")
+    check("E6: CONTROL — the served bytes lack `proof-key`, so only the decoded speaker "
+          "could have refused them",
+          bool(served_bytes) and DUMMY_KEY.encode() not in served_bytes
+          and b"\\u002d" in served_bytes,
+          f"served {served_bytes!r}")
+
+    cache, served_bytes, answer, error, out, log = words_run(
+        "echo-E7", "proof\\u002dkez")
+    written = b""
+    try:
+        with open(os.path.join(cache, "transcripts", "1.json"), "rb") as handle:
+            written = handle.read()
+    except OSError:
+        pass
+    check("E7: CONTROL — a speaker one letter off the key completes, and `1.json`'s words "
+          "are byte-equal to the served bytes, escape and all",
+          answer.get("ok") is True and bool(served_bytes)
+          and written.endswith(b',"words":' + served_bytes + b"}"),
+          f"error={error!r}, ok={answer.get('ok')!r}, message={answer.get('message')!r}, "
+          f"served={served_bytes!r}, written tail={written[-200:]!r}")
+
+    # --- E8 (issue batch B43, #200): the model and the language the server
+    # names are bounded at 64 scalars — 63 and "…" — everywhere they land.
+    def bounded_run(tag, model, language):
+        cache = fresh(tag)
+        with Fake(tag) as fake:
+            fake.scenario(speech_model_used=model, language_code=language)
+            answer, error, _ = run_probe(binary, tag, {
+                "mode": "run", "base": fake.base, "key": DUMMY_KEY, "tuning": RUN_TUNING,
+                "cache": cache, "media": media, "jobs": jobs,
+            }, timeout=300)
+        header = {}
+        try:
+            with open(os.path.join(cache, "transcripts", "1.json")) as handle:
+                header = json.load(handle)
+        except (OSError, ValueError):
+            pass
+        answer = answer or {}
+        return (answer, error, (answer.get("report", {}).get("uploaded") or [{}])[0],
+                answer.get("cloudFields", {}), header)
+
+    answer, error, row, fields, header = bounded_run("echo-E8", "m" * 5000, "l" * 5000)
+    note = str(fields.get("note", ""))
+    lines = " ".join(answer.get("cloudReportLines", []))
+    cut_model, cut_language = "m" * 63 + "\u2026", "l" * 63 + "\u2026"
+    models = fields.get("speech_model_used") or [{}]
+    detected = fields.get("language_detected") or [{}]
+    check("E8: a 5000-character model is 63 characters and \"\u2026\" in the report and the "
+          "tool's `speech_model_used`",
+          answer.get("ok") is True and row.get("model") == cut_model
+          and models[0].get("model") == cut_model,
+          f"error={error!r}, ok={answer.get('ok')!r}, report={str(row.get('model'))[:80]!r} "
+          f"({len(str(row.get('model')))} chars), field={str(models)[:120]!r}")
+    check("E8: and in the tool's `note` and the report card, never 64 of them in a row",
+          f"with {cut_model}," in note and f"with {cut_model}," in lines
+          and "m" * 64 not in note and "m" * 64 not in lines,
+          f"note={note[:200]!r}, lines={lines[:200]!r}")
+    check("E8: and in the cache header's `speech_model_used`",
+          header.get("speech_model_used") == cut_model,
+          f"got {str(header.get('speech_model_used'))[:80]!r}")
+    check("E8: a 5000-character language is 63 characters and \"\u2026\" in the report and "
+          "the tool's `language_detected`",
+          answer.get("ok") is True and row.get("language") == cut_language
+          and detected[0].get("code") == cut_language,
+          f"report={str(row.get('language'))[:80]!r}, field={str(detected)[:120]!r}")
+    check("E8: and on the report card, never 64 of them in a row",
+          f"detected {cut_language}" in lines and "l" * 64 not in lines,
+          f"lines={lines[:200]!r}")
+    check("E8: and in the cache header's `language_code`",
+          header.get("language_code") == cut_language,
+          f"got {str(header.get('language_code'))[:80]!r}")
+
+    answer, error, row, fields, header = bounded_run("echo-E8-control", "k" * 64, "j" * 64)
+    check("E8: CONTROL — a 64-character model and language are kept whole, in the report "
+          "and the cache header",
+          answer.get("ok") is True and row.get("model") == "k" * 64
+          and row.get("language") == "j" * 64
+          and header.get("speech_model_used") == "k" * 64
+          and header.get("language_code") == "j" * 64,
+          f"error={error!r}, row={row!r}, header model={header.get('speech_model_used')!r}")
 
 
 def section_run(binary, sources):
@@ -7356,10 +7641,12 @@ MUTANTS = {
         '            completionHandler(nil)\n',
         '            completionHandler(request)\n',
         'Z1 — the redirect FOLLOWED, so the authorization header goes to whatever host the Location named'),
+    # Re-aimed by issue batch B43: `refusing` answers a `Refusal` carrying the
+    # DELETE's answer, so Z2's spelling is "no DELETE, answered `notSent`".
     "z2-throw-without-delete": (
         "AssemblyAIClient+Session.swift",
-        '        delete(id: id, cancel: cancel)\n',
-        '',
+        '        Refusal(failure: failure, deletion: delete(id: id, cancel: cancel))\n',
+        '        Refusal(failure: failure, deletion: .notSent)\n',
         'Z2 — `refusing` no longer DELETEs before it throws (R6-4)'),
     "z3-extract-kept": (
         "CloudTranscriber+Media.swift",
@@ -7500,18 +7787,21 @@ MUTANTS = {
         "the EINTR retry unbounded again \u2014 #187 item 6 (17\u00b7endless)"),
     "model-unfiltered": (
         "CloudTranscriber+Media.swift",
-        "        let model = fetched.response.speechModelUsed.map(client.withoutCredential)\n",
-        "        let model = fetched.response.speechModelUsed\n",
+        "        let model = fetched.response.speechModelUsed.map(client.withoutCredential)"
+        ".map(Self.bounded)\n",
+        "        let model = fetched.response.speechModelUsed.map(Self.bounded)\n",
         "the served model kept with the key in it \u2014 #187 R2\u00b71 (E1)"),
     "language-unfiltered": (
         "CloudTranscriber+Media.swift",
-        "        let language = fetched.response.languageCode.map(client.withoutCredential)\n",
-        "        let language = fetched.response.languageCode\n",
+        "        let language = fetched.response.languageCode.map(client.withoutCredential)"
+        ".map(Self.bounded)\n",
+        "        let language = fetched.response.languageCode.map(Self.bounded)\n",
         "the served language kept with the key in it \u2014 #187 R2\u00b71 (E2)"),
     "words-unrefused": (
         "CloudTranscriber+Media.swift",
         "        if client.carriesCredential(String(decoding: fetched.wordsJSON, as: UTF8.self))\n"
-        "            || file.words.contains(where: { client.carriesCredential($0.text) })\n"
+        "            || file.words.contains(where: { $0.stringFields.contains(where: "
+        "client.carriesCredential) })\n"
         "        {\n"
         "            throw client.refusing(\n"
         "                .malformed(\"the transcript's words repeat the API key\"), "
@@ -7547,9 +7837,9 @@ MUTANTS = {
         "the janitor's DELETE handed no token (J3)"),
     "refusing-stop-dropped": (
         "AssemblyAIClient+Session.swift",
-        "        delete(id: id, cancel: cancel)\n",
-        "        delete(id: id, cancel: nil)\n",
-        "`refusing`'s DELETE handed no token (SD3)"),
+        "        Refusal(failure: failure, deletion: delete(id: id, cancel: cancel))\n",
+        "        Refusal(failure: failure, deletion: delete(id: id, cancel: nil))\n",
+        "`refusing`'s DELETE handed no token (SD3, SD3\u00b7R)"),
     "fetch-stop-dropped": (
         "CloudTranscriber+Media.swift",
         "        let deleted = client.delete(id: fetched.response.id, cancel: cancel) == .deleted\n",
@@ -7566,6 +7856,37 @@ MUTANTS = {
         "        if bytes < 1_000_000 { return \"<1\" }\n",
         "",
         "a count under a megabyte rounded to 0 or 1 again (P\u00b7small)"),
+    # Issue batch B43 (#200, #201, R6-20): one mutant per fix, and a CONTROL.
+    "speaker-unchecked": (
+        "AssemblyAITranscript.swift",
+        "        Mirror(reflecting: self).children.compactMap { $0.value as? String }\n",
+        "        [text]\n",
+        "only a word's text read for the key, as before #200 (E6)"),
+    "model-unbounded": (
+        "CloudTranscriber+Media.swift",
+        "        let model = fetched.response.speechModelUsed.map(client.withoutCredential)"
+        ".map(Self.bounded)\n",
+        "        let model = fetched.response.speechModelUsed.map(client.withoutCredential)\n",
+        "the served model kept at any length (E8's model rows)"),
+    "language-unbounded": (
+        "CloudTranscriber+Media.swift",
+        "        let language = fetched.response.languageCode.map(client.withoutCredential)"
+        ".map(Self.bounded)\n",
+        "        let language = fetched.response.languageCode.map(client.withoutCredential)\n",
+        "the served language kept at any length (E8's language rows)"),
+    "refusal-answer-dropped": (
+        "CloudTranscriber.swift",
+        "                    if refusal?.deletion == .failed { report.refusedUndeleted.append(id) }\n",
+        "",
+        "a refused transcript's failed DELETE dropped from the report, as before #201 "
+        "(RF1, RF3, RF4; the proof's RF\u00b7MCP)"),
+    "poll-cancel-traps": (
+        "AssemblyAIClient.swift",
+        "            if cancel?.isCancelled == true { throw refusing(.cancelled, id: id, "
+        "cancel: cancel) }\n",
+        "            if cancel?.isCancelled == true { fatalError(\"poll-cancel-traps\") }\n",
+        "CONTROL \u2014 the poll-cancel child dies with no answer, and SD1\u2013SD3 are "
+        "still printed and scored (#201)"),
 }
 
 
@@ -7663,14 +7984,17 @@ def main():
                              "edited); refused together with --mutant")
     parser.add_argument("--only",
                         help="a comma-separated subset of sections, by the name after "
-                             "`section_` (mapping, jobs, stamp, client, submission, cancel, "
-                             "secrets, cues, extract, verbatim, cache_write, echo, run, "
-                             "drip, estimate, settings_verify, chrome, stop, hygiene)")
+                             "`section_` ("
+                             + ", ".join(s.__name__.removeprefix("section_") for s in SECTIONS)
+                             + ")")
     parser.add_argument("--wall", type=float, default=1800,
-                        help="the whole run's wall-clock bound in seconds (rule H)")
+                        help="the whole run's wall-clock bound in seconds (rule H), counted "
+                             "from the moment the lock is held")
+    parser.add_argument("--lock-wait", type=float, default=3600,
+                        help="how long to wait for the cloud instruments' lock, in seconds "
+                             "(issue batch B43; rule H)")
     args = parser.parse_args()
 
-    started = time.time()
     sources = os.path.abspath(args.sources)
     sections = SECTIONS
     if args.only:
@@ -7685,6 +8009,19 @@ def main():
     if args.mutant and args.fake_mutant:
         sys.exit("--mutant and --fake-mutant are two different mutants and are refused "
                  "together: a cell measures one thing")
+    # L (issue batch B43, #200 item 4): one cloud instrument at a time, held
+    # before a mutant is prepared or anything is built, and the clock starts
+    # once it is held.
+    lock, waited, holder = hold_cloud_lock(args.lock_wait)
+    print(f"  (waited {waited:.1f} s for the cloud instruments' lock)")
+    check(f"L: the cloud instruments' lock is held — "
+          + (f"by this run, {holder}" if lock else f"still held by {holder} after "
+             f"--lock-wait {args.lock_wait:.0f} s"),
+          lock is not None, holder)
+    if lock is None:
+        print(f"\n{passed}/{passed + failed} checks passed in {waited:.0f} s")
+        return 1
+    started = time.time()
     if args.fake_mutant:
         prepare_fake_mutant(args.fake_mutant)
     if args.mutant:

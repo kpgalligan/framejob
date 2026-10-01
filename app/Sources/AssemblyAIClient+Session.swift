@@ -4,9 +4,10 @@ import Foundation
 
 /// What a reply MEANS and who delivers it: `Reply`, the status classifier,
 /// the two readers that cut a served body apart, the one-delete-then-throw
-/// helper, the cancellable wait, the wait for a reply that a Stop bounds
-/// (`waitForReply`, R6-19), the log line — and `SessionDelegate`, the
-/// object `URLSession` calls back on its own one-wide queue. At the foot,
+/// helper and the `Refusal` it answers (R6-20), the cancellable wait, the
+/// wait for a reply that a Stop bounds (`waitForReply`, R6-19), the log
+/// line — and `SessionDelegate`, the object `URLSession` calls back on its
+/// own one-wide queue. At the foot,
 /// `ClientError`'s two readings, `isRetriable` and `shortName`: a pure move
 /// out of `AssemblyAIClient.swift`, which stood at 399 lines against the
 /// cap when a DELETE learned to read a Stop (issue batch B35).
@@ -99,12 +100,23 @@ extension AssemblyAIClient {
         Self.isPlainIdentifier(id) && !carriesCredential(id)
     }
 
-    /// One `delete` before a throw, and the error to throw.
+    /// A transcript refused after AssemblyAI made it, and what refusing's
+    /// DELETE of it answered (#201, R6-20). It reads as `failure`'s own
+    /// sentence; `CloudTranscriber.transcribe` records a `failed` deletion
+    /// in `Report.refusedUndeleted` and then reads `failure` alone.
+    struct Refusal: LocalizedError, Equatable {
+        let failure: ClientError
+        let deletion: DeleteAnswer
+
+        var errorDescription: String? { failure.errorDescription }
+    }
+
+    /// One `delete` before a throw, and the error to throw, carrying that
+    /// delete's answer.
     func refusing(
         _ failure: ClientError, id: String, cancel: Transcriber.CancelToken?
-    ) -> ClientError {
-        delete(id: id, cancel: cancel)
-        return failure
+    ) -> Refusal {
+        Refusal(failure: failure, deletion: delete(id: id, cancel: cancel))
     }
 
     /// A `completed` body must name the id that was polled, or it is

@@ -49,6 +49,10 @@ extension CloudTranscriber {
         /// record of an id we still have to delete, and a fetch would
         /// overwrite it.
         var held: [UInt32] = []
+        /// Media whose transcript was refused after AssemblyAI made it and
+        /// whose DELETE answered `failed`. No file holds its id, so it is
+        /// owed with no retry (R6-20).
+        var refusedUndeleted: [UInt32] = []
 
         /// What was billed: every uploaded media's `audioSeconds`, the one
         /// reducer `AgentServer`'s bill sentence and its `audio_seconds` key
@@ -113,6 +117,7 @@ extension CloudTranscriber {
             for row in uploaded where !row.remoteDeleted {
                 append(row.media, written: row.transcriptWritten)
             }
+            for id in refusedUndeleted { append(id, written: false) }
             return warnings
         }
     }

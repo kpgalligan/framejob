@@ -10,6 +10,7 @@ the environment — or, for row 1's no-key arm, nothing at all.
 
     env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py
     env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --mutant no-hold
+    env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --lock-wait 0
 
 Road map 6 §5i's rows 1–11, plus five of this pipeline's own:
 
@@ -55,6 +56,16 @@ Road map 6 §5i's rows 1–11, plus five of this pipeline's own:
   seven refusals, each cell ONE check — the winner's own sentence line for
   line, no loser's words, and the fake's log delta — after seven
   single-ingredient CONTROLS.
+* **RF·MCP** (issue batch B43, #201; spec §11 R6-20) on instance C after
+  row 6: a transcript that ends in `error` whose DELETE answers 500 —
+  `transcribe`'s refusal says R6-4's dashboard sentence for that media, and
+  the fake logged the DELETE; its CONTROL with the DELETE answering says no
+  such thing.
+* **L** (issue batch B43, #200 item 4) the probe's `hold_cloud_lock`, taken
+  before a mutant is built or an instance launched, so this proof, the
+  probe and `word_captions_proof.py` never write `reelcut-upload-*` into
+  one temporary folder at once. `--lock-wait` (default 3600 s) bounds the
+  wait; an expired wait is a scored FAIL naming the holder, and exit 1.
 
 Five instances, each on its own port with its own fake, each killed by its
 own PID in a `finally`, each with a row that `grep "Reelcut: "` finds nothing
@@ -105,7 +116,8 @@ import tree_copy
 
 from cloud_captions_probe import (
     HARNESS_MAIN, PROBE_SOURCE, TREE_SOURCES, Fake, MUTANTS, build, child_env,
-    differences_between, make_fixture, population, run_cues, run_probe, wav_samples, word)
+    differences_between, hold_cloud_lock, make_fixture, population, run_cues, run_probe,
+    wav_samples, word)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 HERE = os.path.join(ROOT, "tools", "proof")
@@ -1195,6 +1207,53 @@ def row_six(instance, fake):
 
 
 # --------------------------------------------------------------------------
+# Row RF·MCP (issue batch B43, #201, spec §11 R6-20)
+
+
+def row_refused_owed(instance, fake):
+    """A transcript refused after it was made, whose DELETE failed, has no
+    file to retry it from: `transcribe`'s refusal says R6-4's dashboard
+    sentence for that media, and its CONTROL with the DELETE answering
+    says nothing of the kind."""
+    print("\nRF\u00b7MCP. a refused transcript whose DELETE failed is owed to the dashboard "
+          "(R6-20)")
+    speech, _ = fixtures()
+    dashboard = ("Its transcript could not be saved in the project, so Reelcut cannot "
+                 "retry deleting it automatically. Delete it in your AssemblyAI dashboard.")
+    errored = "The audio could not be transcribed."
+    for failing in (True, False):
+        session = Session(instance, "rf-mcp-" + ("owed" if failing else "control"))
+        one = session.media_of(speech)
+        session.add(one, at=0, duration=3 * SEC)
+        given = {"transcript_error": errored}
+        if failing:
+            given["fail"] = [{"route": "delete", "status": 500, "times": -1}]
+        scenario(fake, **given)
+        text = session.error("transcribe", engine="assemblyai", place=False) or ""
+        log = fake.log()
+        served = [row["id"] for row in log.get("transcripts", [])]
+        sent = [row["path"] for row in deletes(log)]
+        owed = (f"AssemblyAI has not confirmed deleting the transcript of media {one}. "
+                + dashboard)
+        if failing:
+            check("RF\u00b7MCP: an `error` transcript whose DELETE answered 500 \u2014 "
+                  "`transcribe`'s refusal holds the dashboard sentence for that media, and "
+                  "no retry promise",
+                  errored in text and owed in text
+                  and "it will be retried at the next run" not in text,
+                  f"got {text!r}")
+            check("RF\u00b7MCP: and the fake logged the DELETE of the transcript it served",
+                  len(served) == 1 and len(sent) == 1 and sent[0].endswith("/" + served[0]),
+                  f"served={served!r}, deletes={sent!r}")
+        else:
+            check("RF\u00b7MCP: CONTROL \u2014 the same refusal with the DELETE answering "
+                  "has no dashboard sentence",
+                  errored in text and dashboard not in text
+                  and len(sent) == 1,
+                  f"got {text!r}, deletes={sent!r}")
+
+
+# --------------------------------------------------------------------------
 # Row 7 — speakers, vocabulary, and the readers at their extremes
 
 
@@ -2092,11 +2151,6 @@ CLOUD_MUTANTS = {
         '            completionHandler(nil)\n',
         '            completionHandler(request)\n',
         'Z1 — the redirect FOLLOWED, so the authorization header goes to whatever host the Location named'),
-    "z2-throw-without-delete": (
-        "app/Sources/AssemblyAIClient+Session.swift",
-        '        delete(id: id, cancel: cancel)\n',
-        '',
-        'Z2 — `refusing` no longer DELETEs before it throws (R6-4)'),
     "z3-extract-kept": (
         "app/Sources/CloudTranscriber+Media.swift",
         '        defer { try? FileManager.default.removeItem(at: upload.url) }\n',
@@ -2191,9 +2245,12 @@ CLOUD_MUTANTS["engine-before-scope"] = (
     "        // The scope, the jobs and the frame in ONE main-thread hop, so every\n",
     "`engine` read before the scope — R6-17's first two places behind the third "
     "(RP's R1×R3 and R2×R3)")
-# Three come straight from the probe's own table rather than being spelled a
-# second time here (road map 6 §10.9 aimed them).
-for _name in ("mapping-no-in", "no-retry", "no-fifth-rule"):
+# These come straight from the probe's own table rather than being spelled a
+# second time here (road map 6 §10.9 aimed the first three; issue batch B43
+# moved Z2 here when `refusing` began answering a `Refusal`, and added
+# `refusal-answer-dropped` for RF·MCP).
+for _name in ("mapping-no-in", "no-retry", "no-fifth-rule", "z2-throw-without-delete",
+              "refusal-answer-dropped"):
     _file, _before, _after, _what = MUTANTS[_name]
     CLOUD_MUTANTS[_name] = ("app/Sources/" + _file, _before, _after, _what)
 
@@ -2261,7 +2318,11 @@ def main():
                              "the TREE's binary \u2014 a mutant of the INSTRUMENT, which builds "
                              "nothing; refused together with --mutant")
     parser.add_argument("--wall", type=float, default=1800,
-                        help="the whole run's wall-clock bound in seconds (rule H)")
+                        help="the whole run's wall-clock bound in seconds (rule H), counted "
+                             "from the moment the lock is held")
+    parser.add_argument("--lock-wait", type=float, default=3600,
+                        help="how long to wait for the cloud instruments' lock, in seconds "
+                             "(issue batch B43; rule H)")
     parser.add_argument("--live", action="store_true",
                         help="road map 6 §5i's rows 20 and 21 against the REAL service "
                              "INSTEAD of rows 1-11 — this SPENDS money, under "
@@ -2270,7 +2331,6 @@ def main():
                              "(spec §11 P-6)")
     args = parser.parse_args()
 
-    started = time.time()
     os.makedirs(WORK, exist_ok=True)
     print("road map 6 C1 pipeline 3 — the cloud engine, over MCP, against the stand-in\n")
 
@@ -2278,6 +2338,18 @@ def main():
         print("--mutant and --fake-mutant are two different mutants and are refused "
               "together: a cell measures one thing")
         return 2
+    # L (issue batch B43, #200 item 4): the probe's lock, held before a mutant
+    # is built or an instance launched; the clock starts once it is held.
+    lock, waited, holder = hold_cloud_lock(args.lock_wait)
+    print(f"  (waited {waited:.1f} s for the cloud instruments' lock)")
+    check("L: the cloud instruments' lock is held \u2014 "
+          + (f"by this run, {holder}" if lock else f"still held by {holder} after "
+             f"--lock-wait {args.lock_wait:.0f} s"),
+          lock is not None, holder)
+    if lock is None:
+        print(f"\n{passed}/{passed + failed} checks passed in {waited:.0f} s")
+        return 1
+    started = time.time()
     if args.fake_mutant:
         cloud_captions_probe.prepare_fake_mutant(args.fake_mutant)
 
@@ -2369,6 +2441,7 @@ def main():
                 fake_folders.append(fake_c.folder)
                 with Instance("C", port_base + 2, fake_c, binary) as c:
                     run_row(row_six, c, fake_c)
+                    run_row(row_refused_owed, c, fake_c)
                     run_row(row_eleven, c, fake_c)
                     run_row(row_h, c, fake_c)
                     run_row(row_t, c, fake_c)

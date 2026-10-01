@@ -44,6 +44,12 @@ The scenario, replaced whole by `POST /__control/scenario` (which also resets
 the counters):
 
     words                        the array to serve, serialised ONCE
+    words_json                   a string: served VERBATIM as the `words`
+                                 bytes (and by `GET /__control/words`) in
+                                 place of `words`, which becomes its
+                                 `json.loads` for the body's `text` — what
+                                 an escape in a served string needs (issue
+                                 batch B43, #200)
     polls_before_complete        how many GETs answer `processing` first
     never_complete               every GET answers `processing`
     transcript_error             a string: the transcript ends in `error`
@@ -166,6 +172,11 @@ class Scenario:
         # what a poll serves are the same bytes by construction rather than
         # by two encoders agreeing.
         self.words_bytes = json.dumps(self.words).encode("utf-8")
+        # B43 (#200): bytes no encoder here would write — an escaped string.
+        words_json = given.get("words_json")
+        if words_json is not None:
+            self.words = json.loads(words_json)
+            self.words_bytes = words_json.encode("utf-8")
         self.polls_before_complete = int(given.get("polls_before_complete", 0))
         self.never_complete = bool(given.get("never_complete", False))
         self.transcript_error = given.get("transcript_error")

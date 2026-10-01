@@ -175,8 +175,10 @@ extension CloudTranscriber {
         // The SERVER's two strings, filtered once: each goes into the cache
         // header, the report, the MCP `note` and the report card, and a
         // server that echoes the key would put it in all four (#187, R2·1).
-        let model = fetched.response.speechModelUsed.map(client.withoutCredential)
-        let language = fetched.response.languageCode.map(client.withoutCredential)
+        // Then bounded, and in that order, so a cut never splits the key
+        // into a piece the filter no longer recognises (#200).
+        let model = fetched.response.speechModelUsed.map(client.withoutCredential).map(Self.bounded)
+        let language = fetched.response.languageCode.map(client.withoutCredential).map(Self.bounded)
         let header = MediaTranscript.Header(
             provider: MediaTranscript.provider, transcriptID: fetched.response.id,
             requested: options, speechModelUsed: model,
@@ -193,10 +195,11 @@ extension CloudTranscriber {
         var file = try MediaTranscript.File(header: header, wordsJSON: fetched.wordsJSON)
         // R6-3 keeps the served words VERBATIM, so words that repeat the key
         // cannot be rewritten: they are refused, and the transcript deleted,
-        // before a byte is written (#187, R2·1). The decoded texts are read
-        // too, because an escaped key is not the key's bytes.
+        // before a byte is written (#187, R2·1). Every decoded string of a
+        // word is read too (`stringFields`: the text and the speaker today),
+        // because an escaped key is not the key's bytes (#200).
         if client.carriesCredential(String(decoding: fetched.wordsJSON, as: UTF8.self))
-            || file.words.contains(where: { client.carriesCredential($0.text) })
+            || file.words.contains(where: { $0.stringFields.contains(where: client.carriesCredential) })
         {
             throw client.refusing(
                 .malformed("the transcript's words repeat the API key"), id: fetched.response.id,
@@ -236,6 +239,23 @@ extension CloudTranscriber {
                 stampWritten: stampWritten,
                 remoteDeleted: deleted)
         )
+    }
+
+    /// The most Unicode scalars a string the SERVER names — the model and
+    /// the language — may keep in the report, the cache header, the MCP
+    /// answer and the report card (#200).
+    static let serverStringLimit = 64
+
+    /// At most `serverStringLimit` Unicode scalars: a longer string is its
+    /// first 63 scalars + "…" (U+2026). Not in `withoutCredential`, because
+    /// the relayed 4xx and `error` sentences stay whole (R6-3, q5's sentence
+    /// verbatim).
+    static func bounded(_ text: String) -> String {
+        let scalars = text.unicodeScalars
+        guard scalars.count > serverStringLimit else { return text }
+        var kept = String.UnicodeScalarView(scalars.prefix(serverStringLimit - 1))
+        kept.append("\u{2026}")
+        return String(kept)
     }
 
     /// `fetched_at`, ISO-8601 in UTC — the one spelling of a time in the
