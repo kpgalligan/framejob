@@ -65,8 +65,9 @@ Sections, by the name after `section_`:
   run and `CloudTranscriber`'s one caller (S), the credential never appearing
   in a child's output (K), and this file's own `env=` discipline.
 * `jobs` (R6-10) — a clip `speed` the OPS cannot write and the CORE's reader
-  accepts, spliced into a project's JSON text and read back through
-  `ReelProject.from(json:)`, then driven through `Transcriber.jobs` and both
+  refuses, spliced into a project's JSON text and refused by
+  `ReelProject.from(json:)` naming the clip and the value, then decoded
+  WITHOUT the reader and driven through `Transcriber.jobs` and both
   mappings. ONE CHILD PROCESS PER SPEED: an unclamped `Ticks(_:)` traps, and
   a trap has to be that speed's own scored failure.
 * `estimate` (row 14) — `CloudEstimate` with no disk in it: §8's two dated
@@ -704,7 +705,7 @@ func modeStamp(_ request: [String: Any]) -> [String: Any] {
 '''
 
 PROBE_JOBS = r'''
-// MARK: - R6-10: a speed only a hand-written file can carry
+// MARK: - R6-10: a speed the ops cannot write and the reader refuses
 
 /// One SPEED per process, and that is the whole design of this mode.
 ///
@@ -716,12 +717,13 @@ PROBE_JOBS = r'''
 ///
 /// The project is built from OPS — one audio media, one clip at `in` = 1 s
 /// for 1 s (`source_mirror_probe.py`'s recipe) — and then its JSON TEXT has
-/// the clip's `speed` value replaced and is read back through
-/// `ReelProject.from(json:)`, which is the CORE's own reader. That is the
-/// point: the ops cannot write these speeds (`edit_clip.rs` clamps to
-/// 0.1–10) and the reader does not refuse them, so the file is exactly the
-/// one a person can hand the app, and "the reader accepts it" is a row
-/// rather than an assumption.
+/// the clip's `speed` value replaced and is handed to
+/// `ReelProject.from(json:)`, which is the CORE's own reader. The ops cannot
+/// write these speeds (`edit_clip_timing.rs` clamps to 0.1–10) and the
+/// reader refuses them (R6-10, amended by #41), so "the reader refuses it,
+/// naming the clip and the value" is a row rather than an assumption. The
+/// clamps R6-10 keeps as a second layer are then fed a snapshot DECODED
+/// WITHOUT the reader — `ReelJSON.decode` over the same patched text.
 func modeJobs(_ request: [String: Any]) -> [String: Any] {
     // `ProjectDocument` is an `NSDocument`; it draws nothing and no event
     // loop is started, but the class needs the shared application to exist.
@@ -765,20 +767,23 @@ func modeJobs(_ request: [String: Any]) -> [String: Any] {
 
     var answer: [String: Any] = [
         "speedText": text, "maxSourceTicks": Transcriber.maxSourceTicks,
-        "writtenSpeed": String(json[found.upperBound..<end]),
+        "writtenSpeed": String(json[found.upperBound..<end]), "clip": Int(added.id),
     ]
-    let reread: ReelProject
     do {
-        reread = try ReelProject.from(json: patched)
+        _ = try ReelProject.from(json: patched)
+        answer["readerAccepted"] = true
     } catch {
         answer["readerAccepted"] = false
         answer["readerMessage"] = error.localizedDescription
+    }
+    // Either way, the second layer is fed the snapshot decoded WITHOUT the
+    // reader, so the clamps are measured whatever the reader answered.
+    guard let snapshot = ReelJSON.decode(ProjectSnapshot.self, from: patched) else {
+        answer["error"] = "the patched text did not decode as a ProjectSnapshot"
         return answer
     }
-    answer["readerAccepted"] = true
-    let snapshot = reread.snapshot
     guard let clip = snapshot.clips.first else {
-        answer["error"] = "the re-read project has no clip"
+        answer["error"] = "the decoded project has no clip"
         return answer
     }
     answer["speed"] = String(clip.speed)
@@ -2900,7 +2905,7 @@ def section_mapping(binary, sources):
              "sourceLength": 1500 * TICKS_PER_MS, "start": 1500 * TICKS_PER_MS,
              "duration": 1500 * TICKS_PER_MS, "speed": 1.0}
     # R6-10. A clip whose `start` is within ten million ticks of Int64.max,
-    # played at a speed only a hand-written `project.json` can carry: every
+    # played at a speed the reader now refuses (R6-10, amended by #41): every
     # offset the mapping computes for it is larger than `Ticks` holds, and
     # every answer must still land inside the clip. Asked of BOTH twins —
     # `words` is the cloud mapping's, `projected` the on-device one's.
@@ -3067,16 +3072,19 @@ def section_mapping(binary, sources):
 
 
 # --------------------------------------------------------------------------
-# Section `jobs` — R6-10, a speed the ops cannot write and the reader accepts
+# Section `jobs` — R6-10, a speed the ops cannot write and the reader refuses
 
-# The four speeds, each with the text that goes into the project's JSON and
-# the Python float of it. `1e300` and `greatestFiniteMagnitude` overflow the
-# SOURCE LENGTH; `1e-300` and `leastNonzeroMagnitude` overflow the OFFSET.
+# The four speeds, each with the text that goes into the project's JSON, the
+# Python float of it, and the core's own spelling of it in the reader's
+# refusal (serde_json's, which is not Python's: a literal, never derived).
+# `1e300` and `greatestFiniteMagnitude` overflow the SOURCE LENGTH; `1e-300`
+# and `leastNonzeroMagnitude` overflow the OFFSET.
 JOB_SPEEDS = [
-    ("1e300", "1e300", 1e300),
-    ("greatestFiniteMagnitude", "1.7976931348623157e308", sys.float_info.max),
-    ("1e-300", "1e-300", 1e-300),
-    ("leastNonzeroMagnitude", "5e-324", 5e-324),
+    ("1e300", "1e300", 1e300, "1e+300"),
+    ("greatestFiniteMagnitude", "1.7976931348623157e308", sys.float_info.max,
+     "1.7976931348623157e+308"),
+    ("1e-300", "1e-300", 1e-300, "1e-300"),
+    ("leastNonzeroMagnitude", "5e-324", 5e-324, "5e-324"),
 ]
 
 JOB_WORDS = [
@@ -3090,14 +3098,14 @@ JOB_WORDS = [
 
 
 def section_jobs(binary, sources):
-    print("\nR6-10. a hand-written `speed` the ops cannot write, through the CORE's reader, "
-          "`Transcriber.jobs` and both mappings")
+    print("\nR6-10. a `speed` the ops cannot write and the CORE's reader refuses, then "
+          "decoded without the reader through `Transcriber.jobs` and both mappings")
     check("R6-10: 4096 × maxSourceTicks is under 2^63 — the bound is chosen so the sheet's "
           "sum over MAX_CLIPS jobs cannot overflow",
           4096 * 1_000_000_000_000_000 < 2**63,
           f"4096 × 1e15 = {4096 * 10**15}, 2^63 = {2**63}")
 
-    for name, text, value in JOB_SPEEDS:
+    for name, text, value, said in JOB_SPEEDS:
         # ONE CHILD PER SPEED: `Ticks(_:)` on an out-of-range `Double` traps,
         # and a trap is a crash, so it has to be this speed's own failure.
         answer, error, _ = run_probe(binary, "jobs-" + name,
@@ -3108,48 +3116,57 @@ def section_jobs(binary, sources):
                   False, error)
             continue
         check(f"jobs: speed {name} answers", "error" not in answer, answer.get("error", ""))
-        check(f"jobs: the CORE's reader accepts a project whose clip speed is {text}",
-              answer.get("readerAccepted") is True,
-              f"got {answer.get('readerMessage')!r}")
-        check(f"jobs: and it arrived as itself ({text})",
+        expected = f"clip {answer.get('clip')}'s speed {said} is outside ×0.1–×10"
+        check(f"jobs: the CORE's reader REFUSES a project whose clip speed is {text}, "
+              f"naming the clip and the value",
+              answer.get("readerAccepted") is False
+              and answer.get("readerMessage") == expected,
+              f"got accepted={answer.get('readerAccepted')!r}, "
+              f"message {answer.get('readerMessage')!r}\n       want {expected!r}")
+        check(f"jobs: decoded without the reader, it arrived as itself ({text})",
               answer.get("speed", "").replace("+", "") == repr(value).replace("+", "")
               or float(answer.get("speed", "nan")) == value,
               f"got {answer.get('speed')!r}")
         rows = answer.get("jobs", [])
-        check(f"jobs: speed {name} makes exactly one job — none of `jobs`'s five refusals "
-              f"fires on a finite positive speed", len(rows) == 1,
+        check(f"jobs: speed {name}, decoded without the reader, makes exactly one job — "
+              f"none of `jobs`'s five refusals fires on a finite positive speed",
+              len(rows) == 1,
               f"got {len(rows)} jobs, problems {answer.get('problems')!r}")
         if len(rows) != 1:
             continue
         job = rows[0]
         if value > 1:
-            check(f"jobs: speed {name} bounds the source length to maxSourceTicks (1e15), "
-                  f"not to Ticks.max and not to the clip's duration",
+            check(f"jobs: speed {name}, decoded without the reader, bounds the source "
+                  f"length to maxSourceTicks (1e15), not to Ticks.max and not to the "
+                  f"clip's duration",
                   job.get("sourceLength") == 1_000_000_000_000_000,
                   f"got {job.get('sourceLength')!r}")
         else:
-            check(f"jobs: speed {name} falls back to the clip's own duration — the product "
-                  f"is below one tick", job.get("sourceLength") == job.get("duration"),
+            check(f"jobs: speed {name}, decoded without the reader, falls back to the "
+                  f"clip's own duration — the product is below one tick",
+                  job.get("sourceLength") == job.get("duration"),
                   f"got {job.get('sourceLength')!r}, duration {job.get('duration')!r}")
-        check(f"jobs: speed {name} leaves `sourceIn` inside 0…maxSourceTicks",
+        check(f"jobs: speed {name}, decoded without the reader, leaves `sourceIn` inside "
+              f"0…maxSourceTicks",
               0 <= job.get("sourceIn", -1) <= 1_000_000_000_000_000,
               f"got {job.get('sourceIn')!r}")
 
         mine = dict(job, speed=value)
         want = oracle(mine, JOB_WORDS)
-        check(f"jobs: speed {name} — the mapping answers the {len(want)} words Python "
-              f"computes from the sourceLength it was given",
+        check(f"jobs: speed {name}, decoded without the reader — the mapping answers the "
+              f"{len(want)} words Python computes from the sourceLength it was given",
               job.get("words") == want,
               f"got {job.get('words')!r}\n       want {want!r}")
         limit = job["start"] + job["duration"]
-        check(f"jobs: speed {name} — every placed tick, both twins, is inside "
-              f"[{job['start']}, {limit}]",
+        check(f"jobs: speed {name}, decoded without the reader — every placed tick, both "
+              f"twins, is inside [{job['start']}, {limit}]",
               all(job["start"] <= w["start"] <= limit and job["start"] <= w["end"] <= limit
                   for w in job.get("words", []))
               and all(job["start"] <= t <= limit for t in job.get("projected", [])),
               f"got {job.get('words')!r} / {job.get('projected')!r}")
         wanted = [projected(mine, t) for t in SECONDS]
-        check(f"jobs: speed {name} — the on-device twin answers the ticks Python computed",
+        check(f"jobs: speed {name}, decoded without the reader — the on-device twin "
+              f"answers the ticks Python computed",
               job.get("projected") == wanted,
               f"got {job.get('projected')!r}\n       want {wanted!r}")
 

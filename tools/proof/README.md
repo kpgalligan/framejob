@@ -44,8 +44,15 @@ only that process. After `make app`, run
 matching alternate `.app` for an isolated mutation build. It writes temporary
 `.reelcut` packages, checks named refusal of oversized saved values and the
 next valid open in the same process, renders an admitted control, then checks
-edit rejection, undo/redo and save/reopen. It refuses a fallback MCP port,
-checks the startup parity log before and after, and exits nonzero for a crash,
+edit rejection, undo/redo and save/reopen. Its speed rows (spec §11 R6-10,
+amended by #41) then open packages whose clip `speed` is 1e300, 1e-300,
+10.000000000000002 or 0.09999999999999998, or a nested clip's 1e300: each is
+refused with the core's whole sentence, value spelled as serde_json spells it
+(`clip 4's speed 1e+300 is outside ×0.1–×10`), the `project.json` bytes are
+unchanged and a control opens after it; 0.1 and 10.0 open and read back. Run
+on 2026-10-01: every row `ok` and the pass line, no parity complaint. It
+refuses a fallback MCP port, checks the startup parity log before and after,
+and exits nonzero for a crash,
 timeout, build mismatch or failed row. The Rust companion
 `core/tests/transition_bounded.rs` runs long searches in child processes with
 hard 5-second and 30-second watchdogs; the parent kills only its own child.
@@ -4305,9 +4312,11 @@ run DID print, on the fix-pass tree, is each section's own total:
 **27/27**.
 
 Thirteen sections: `mapping` (5i·12), `jobs` (spec §11's R6-10 — a clip `speed`
-the OPS cannot write and the CORE's reader accepts, spliced into a project's
-JSON text, read back through `ReelProject.from(json:)` and driven through
-`Transcriber.jobs` and both mappings, ONE CHILD PROCESS PER SPEED because an
+the OPS cannot write and the CORE's reader refuses, spliced into a project's
+JSON text, refused by `ReelProject.from(json:)` naming the clip and the value
+(#41), then decoded WITHOUT the reader and driven through `Transcriber.jobs`
+and both mappings — 39/39 over `--only jobs` on 2026-10-01 — ONE CHILD
+PROCESS PER SPEED because an
 unclamped `Ticks(_:)` traps and a trap has to be that speed's own scored
 failure), `stamp` (13), `client` (15, over an injected `URLProtocol` with no
 socket), `cancel` (16, against the fake), `secrets` (17 and R6-9's three
@@ -4411,7 +4420,7 @@ exactly once (2026-09-20, against 186):
 | `stamp-drops-field` | `speaker_labels` dropped from the stamp | 185/186 |
 | `no-speed-guard` | the degenerate-speed guard removed from the mapping | 14/15 over `--only mapping` |
 | `no-speed-clamp` | R6-10's clamp removed from `Transcriber.placed` | 1/2 over `--only mapping` — it TRAPS at the first request, which is the point |
-| `no-length-clamp` | R6-10's bound removed from `Transcriber.contentLength` | 28/30 over `--only jobs` |
+| `no-length-clamp` | R6-10's bound removed from `Transcriber.contentLength` | 29/31 over `--only jobs` (2026-10-01, after #41: 1e300 traps and greatestFiniteMagnitude's source-length row fails) |
 
 **Host-state inputs.** `say` makes the speech fixture (road map 4's text) and
 its absence skips the whole `extract` section by name. `ffmpeg`, when it is

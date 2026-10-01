@@ -128,6 +128,11 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   holds a speed in ×0.1 – ×10), `evaluate.rs`'s clamp covers what it can
   produce, and reading it as "empty" would freeze an edge over a field no
   trim can fix. No persisted field changes, so `RC_FORMAT_VERSION` stays 8.
+  **Amended 2026-10-01 by R6-10's amendment (#41):** `validate` now refuses
+  a speed outside ×0.1–×10 on read and in every edit's `finish`, so a
+  speed-made `Unmeasured` window is reachable by no file and no edit. The
+  reading stays as the defence it describes, pinned at the `SourceBound`
+  level in `core/tests/source_window.rs` and `source_edges.rs`.
 - **D4-3 — `set_speed` snaps NEAREST and is then held to the bound AT THE
   NEW RATE.** #22's own trade applied to speed. Measured before the change:
   a whole-file clip of a 6 233 613-tick media at ×2 had a duration of

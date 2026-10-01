@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Saved-package admission and same-process MCP survival for D7-1.
+"""Saved-package admission and same-process MCP survival for D7-1, and for
+the reader's speed bound (spec §11 R6-10, amended by #41): a clip speed
+outside ×0.1–×10 is refused by name and value, the package is not
+rewritten, and both bounds themselves open.
 
 Owns its Reelcut process. A nonzero exit scores a startup, timeout, crash,
 parity or assertion failure; no caller's app process is touched.
@@ -152,6 +155,63 @@ def run(mcp, where):
     print("ok valid edit, rejected edit, undo/redo, save and reopen")
 
 
+def speeds_base(speed):
+    p = base()
+    p["media"] = [{"id": 20, "path": "/missing.mov", "kind": "video",
+                   "duration": 30 * FRAME}]
+    p["clips"].append({"id": 4, "track": 1, "start": 2 * FRAME, "duration": FRAME,
+                       "speed": speed,
+                       "source": {"kind": "media", "media": 20, "in": 0},
+                       "video": {}})
+    p["next_id"] = 21
+    return p
+
+
+def run_speeds(mcp, where):
+    # Each row carries the core's spelling of the value as a LITERAL: it is
+    # serde_json's, which is not Python's, so it is never derived here.
+    refused = []
+    for name, speed, said in [("speed-1e300", 1e300, "1e+300"),
+                              ("speed-1e-300", 1e-300, "1e-300"),
+                              ("speed-over", 10.000000000000002, "10.000000000000002"),
+                              ("speed-under", 0.09999999999999998, "0.09999999999999998")]:
+        refused.append((name, speeds_base(speed),
+                        f"clip 4's speed {said} is outside ×0.1–×10"))
+    p = speeds_base(1.0)
+    p["nests"] = [{"id": 30, "tracks": [{"id": 31}],
+                   "clips": [{"id": 32, "track": 31, "start": 0, "duration": FRAME,
+                              "speed": 1e300,
+                              "source": {"kind": "media", "media": 20, "in": 0},
+                              "video": {}}]}]
+    p["next_id"] = 33
+    refused.append(("speed-nested", p,
+                    "clip 32 in nest 30's speed 1e+300 is outside ×0.1–×10"))
+
+    for name, document, sentence in refused:
+        original = package(where, name, document)
+        with open(os.path.join(original, "project.json"), "rb") as stream:
+            before = stream.read()
+        try:
+            mcp.call("open_project", path=original)
+            raise AssertionError(name + " opened unexpectedly")
+        except ToolError as error:
+            message = str(error)
+            assert sentence in message, (name, sentence, message)
+        with open(os.path.join(original, "project.json"), "rb") as stream:
+            assert stream.read() == before, name + " was rewritten"
+        control = package(where, "after-" + name, base())
+        mcp.call("open_project", path=control)
+        assert project(mcp)["clips"][0]["text"]["content"] == "Survived"
+        print("ok", name, "named refusal and subsequent valid open")
+
+    for name, speed in [("speed-min", 0.1), ("speed-max", 10.0)]:
+        saved = package(where, name, speeds_base(speed))
+        mcp.call("open_project", path=saved)
+        read = [c for c in project(mcp)["clips"] if c["id"] == 4]
+        assert len(read) == 1 and read[0]["speed"] == speed, (name, read)
+        print("ok", name, "opens and reads back", speed)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=5350)
@@ -187,6 +247,7 @@ def main():
                 assert bound == args.port, f"requested port {args.port}, bound {bound}"
                 mcp = MCP(bound, timeout=20)
                 run(mcp, work)
+                run_speeds(mcp, work)
                 parity(log_path)
                 assert app.poll() is None, "app exited during proof"
                 print("extreme time proof passed; no parity complaints")

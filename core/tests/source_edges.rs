@@ -15,7 +15,7 @@
 use serde_json::{json, Value};
 
 mod common;
-use common::{by_id, int, source_in, Handle, Outcome};
+use common::{by_id, int, source_in, Handle};
 
 /// Ticks per second (spec §5.1), written out rather than imported so a
 /// change to `time::TIMESCALE` fails this file instead of moving with it.
@@ -156,21 +156,28 @@ fn a_far_right_trim_of_an_off_grid_clip_still_lands_on_the_grid() {
 }
 
 #[test]
-fn a_trim_end_on_an_unmeasurable_window_is_still_unbounded() {
-    // D4-2's second half, pinned: a hand-written clip at speed 0 has a
-    // window that exists and cannot be measured, and the tail clamp reads
-    // that as NO CLAMP — "empty" would freeze an edge over a field no trim
-    // can fix. `evaluate.rs`'s last-line clamp is what covers the result.
-    let handle = Handle::from_value(&project(
+fn a_trim_end_on_an_unmeasurable_window_is_refused_and_still_read_unbounded() {
+    // D4-2's second half, pinned: a clip at speed 0 — reachable by no file
+    // since R6-10's amendment (#41), so the reader refuses it and the
+    // project is built against the library directly — has a window that
+    // exists and cannot be measured, and the tail clamp reads that as NO
+    // CLAMP: "empty" would freeze an edge over a field no trim can fix. The
+    // edit itself is refused by `finish`, which still sees the speed.
+    let value = project(
         vec![video(1, 1_100_000)],
         vec![clip(40, 1, 200_000, 10 * FRAME_30, 0, 0.0)],
-    ));
-    match handle.try_apply(&json!({"op": "trim_end", "clip": 40, "to": 3_200_000})) {
-        Ok(Outcome::Applied(next)) => assert_eq!(
-            placement(&next.value(), 40),
-            (200_000, 3_000_000),
-            "the tail clamp did not run"
-        ),
-        other => panic!("trim_end on an unmeasured window should apply, got {other:?}"),
-    }
+    );
+    let sentence = "clip 40's speed 0.0 is outside ×0.1–×10";
+    assert_eq!(
+        Handle::try_from_value(&value).err().as_deref(),
+        Some(sentence)
+    );
+    let direct: reelcut_core::Project =
+        serde_json::from_value(value).expect("the JSON itself is well formed");
+    assert_eq!(
+        direct.apply(r#"{"op":"trim_end","clip":40,"to":3200000}"#),
+        Err(sentence.to_string())
+    );
+    let clip = direct.clip(40).expect("clip 40 is in the fixture");
+    assert_eq!(direct.longest_duration_on_grid(clip).or_unbounded(), None);
 }

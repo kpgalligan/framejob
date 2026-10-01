@@ -147,6 +147,28 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   DECLINED: bounding `speed` in `Project::validate`. The core stays untouched by this feature, and a
   reader that began refusing files it has always accepted would be a
   format change dressed as a fix.
+  **Amended 2026-10-01, by the owner's decision of 2026-09-30 (#41): the
+  reader refuses an out-of-range `speed`, and the clamps above stay as a
+  second layer.**
+  - `Project::validate`'s `check_clips` (`core/src/model_query.rs`) refuses
+    any clip whose `speed` is outside `SPEED_MIN`..=`SPEED_MAX`. That covers
+    the timeline and every nest, and every source kind.
+  - The bounds are `core/src/edit_clip_timing.rs`'s constants: `set_speed`
+    clamps to them and `rate_stretch` stays inside them. The reader reads
+    them, not a copy, so widening the range (#190) moves the reader with it.
+  - The sentence names the clip and the value as JSON spells it:
+    `clip 12's speed 250.0 is outside ×0.1–×10`.
+  - It refuses rather than clamps. As D7-1 does for times, the file fails to
+    open at any format version and is not rewritten.
+  - A person sees the sentence through `ReelCoreError` in NSDocument's
+    open-failure alert, and an agent through `open_project`. `finish` runs
+    the same `validate`, so no edit can produce such a clip.
+  - No persisted key changes, so `RC_FORMAT_VERSION` stays 10.
+  - The premise "because the reader does not" now reads "and the reader
+    refuses one too". Every clamp and bound above is KEPT unchanged as
+    defence in depth. `cloud_captions_probe.py`'s `jobs` rows feed them a
+    snapshot decoded without the reader.
+  - The DECLINED sentence above is overturned.
 - **R6-11 — A media whose remote delete this run could not confirm is not
   uploaded again in this run.** `cache/transcripts/<id>.json` is the ONLY
   record of a remote transcript's id — `MediaTranscript.undeleted`

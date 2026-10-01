@@ -354,7 +354,7 @@ enum MediaTranscript {
     ///
     /// The clamp itself is `Transcriber.placed`'s, which is the one door
     /// both mappings convert through (R6-10): a FINITE but tiny `speed` —
-    /// which the ops cannot write and a hand-edited `project.json` can —
+    /// which the ops cannot write and the reader refuses (#41) —
     /// divides into an offset larger than `Ticks` holds, and the bound has
     /// to be applied in `Double` before the conversion rather than after it.
     private static func project(_ source: Ticks, in job: Transcriber.Job) -> Ticks {

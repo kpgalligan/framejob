@@ -15,8 +15,8 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | [`recording.md`](recording.md) | 138 | **Screen recording (road map 3).** The recorder: what is in and out, files, grants, pause. |
 | [`silence.md`](silence.md) | 49 | **Remove Silences (road map 4).** Silero VAD, its grid and cache, voice mode; S1-23. |
 | [`effects-motion.md`](effects-motion.md) | 60 | **Transitions and motion (road map 5).** R5-1..R5-5, E2-27. |
-| [`deepening.md`](deepening.md) | 411 | **Deepening (road map 7).** D2-1, D3-1, #21, #22, D4-1..D4-6, D7-1..D7-3, #42, #88, #63, #174, #40, #43: how ops refuse, the op table, the gate, the source window, time envelopes, one-delta shifts on the canvas's grid, the non-edits that speak, a relink that re-probes, one frame on the grid, a tool that closes a document, a path one open document holds, a caption name's own extension. |
-| [`cloud-captions.md`](cloud-captions.md) | 327 | **Cloud captions (road map 6).** R6-1..R6-21: AssemblyAI, keys, deletion, recovery, refusal precedence, a dripping server, a Stop's bound on a DELETE, a refused transcript's failed DELETE reported for the dashboard, cached transcripts not re-checked for the key. |
+| [`deepening.md`](deepening.md) | 416 | **Deepening (road map 7).** D2-1, D3-1, #21, #22, D4-1..D4-6, D7-1..D7-3, #42, #88, #63, #174, #40, #43: how ops refuse, the op table, the gate, the source window, time envelopes, one-delta shifts on the canvas's grid, the non-edits that speak, a relink that re-probes, one frame on the grid, a tool that closes a document, a path one open document holds, a caption name's own extension. |
+| [`cloud-captions.md`](cloud-captions.md) | 349 | **Cloud captions (road map 6).** R6-1..R6-21: AssemblyAI, keys, deletion, recovery, refusal precedence, a dripping server, a Stop's bound on a DELETE, a refused transcript's failed DELETE reported for the dashboard, cached transcripts not re-checked for the key. |
 | [`word-captions.md`](word-captions.md) | 123 | **Word captions (road map 8).** W-1..W-11. |
 | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) | 363 | **Chrome, the clip inspector and keys (the sharp pass, road map 9, #35).** SH-1..SH-3, CI-1..CI-16, K-1..K-3. |
 | [`graphics.md`](graphics.md) | 405 | **Graphics (road map 10).** G-1..G-20. |
@@ -98,7 +98,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | R6-7 | No `async` exception | [`cloud-captions.md`](cloud-captions.md) |
 | R6-8 | A fallback to Universal-2 is allowed and REPORTED | [`cloud-captions.md`](cloud-captions.md) |
 | R6-9 | A proof-launched app never opens the person's stored key | [`cloud-captions.md`](cloud-captions.md) |
-| R6-10 | The caption path clamps a clip's `speed` at BOTH ends, because the reader does not | [`cloud-captions.md`](cloud-captions.md) |
+| R6-10 | The caption path clamps a clip's `speed` at BOTH ends, because the reader does not — amended by #41: the reader refuses a speed outside ×0.1–×10, and the clamps stay | [`cloud-captions.md`](cloud-captions.md) |
 | R6-11 | A media whose remote delete this run could not confirm is not uploaded again in this run | [`cloud-captions.md`](cloud-captions.md) |
 | R6-12 | The key and the region are a PERSON's settings, and no tool reads or writes either | [`cloud-captions.md`](cloud-captions.md) |
 | R6-13 | The estimate never counts a HELD media as "to upload", and never hides its price | [`cloud-captions.md`](cloud-captions.md) |

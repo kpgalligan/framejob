@@ -18,10 +18,12 @@
 //! here, so a change in the module fails these tests instead of moving with
 //! them. Op arguments are `core/src/op_table.rs`'s.
 
+use reelcut_core::source_window::SourceBound;
+use reelcut_core::{Outcome, Project};
 use serde_json::{json, Value};
 
 mod common;
-use common::{array, by_id, int, source_in, Handle, Outcome};
+use common::{array, by_id, int, source_in, Handle};
 
 // ---- the oracle's own constants ------------------------------------------
 
@@ -139,6 +141,25 @@ fn still_at(value: &Value) -> i64 {
 fn placement(value: &Value, clip: u64) -> (i64, i64) {
     let found = by_id(value, "/clips", clip);
     (int(found, "/start"), int(found, "/duration"))
+}
+
+/// A project the FFI's reader refuses with `sentence`, built against the
+/// library directly instead, so the readings below can still be pinned
+/// (the precedent is `evaluate_tests.rs`'s absent-media slate).
+fn refused_then_built(value: &Value, sentence: &str) -> Project {
+    assert_eq!(
+        Handle::try_from_value(value).err().as_deref(),
+        Some(sentence)
+    );
+    serde_json::from_value(value.clone()).expect("the JSON itself is well formed")
+}
+
+/// The project an op applied, as the value its file would hold.
+fn applied(answer: Result<Outcome, String>) -> Value {
+    match answer {
+        Ok(Outcome::Applied(next)) => serde_json::to_value(&next).expect("a project serializes"),
+        other => panic!("this op was expected to apply, got {other:?}"),
+    }
 }
 
 // ---- (a) the six movers are ONE equation ---------------------------------
@@ -327,18 +348,22 @@ fn the_window_slipped_to_its_tail_stop_ends_exactly_at_the_end_of_the_file() {
 // ---- (e) D4-1: one content length, and the plan obeys it -----------------
 
 #[test]
-fn a_clip_whose_source_length_rounds_under_a_tick_falls_back_to_one_to_one() {
+fn a_sub_tick_speed_is_refused_and_its_content_length_falls_back_to_one_to_one() {
     // Spec §11's D4-1. 200 000 ticks at ×0.000001 is 0.2 ticks of source —
-    // under one tick, reachable only by hand-written JSON, since every op
-    // holds a speed in ×0.1 – ×10. The ONE content length answers the 1:1
-    // fallback, 200 000, and the plan reads that function rather than its
-    // own copy, which answered 1.
-    let handle = Handle::from_value(&project(
-        [30, 1],
-        OVERHANG,
-        vec![clip(40, 5, 0, 10 * FRAME_30, 0, 1e-6)],
-    ));
-    let plan = handle.plan();
+    // under one tick, reachable by no file since R6-10's amendment (#41):
+    // the reader refuses the speed, and every op holds one in ×0.1 – ×10.
+    // So the project is built against the library directly, and the ONE
+    // content length still answers the 1:1 fallback, 200 000, and the plan
+    // reads that function rather than its own copy, which answered 1.
+    let project = refused_then_built(
+        &project(
+            [30, 1],
+            OVERHANG,
+            vec![clip(40, 5, 0, 10 * FRAME_30, 0, 1e-6)],
+        ),
+        "clip 40's speed 1e-6 is outside ×0.1–×10",
+    );
+    let plan = project.composition_plan();
     for group in ["video_tracks", "audio_tracks"] {
         assert_eq!(
             int(&segment_of(&plan, group, 40), "/source_duration"),
@@ -349,9 +374,7 @@ fn a_clip_whose_source_length_rounds_under_a_tick_falls_back_to_one_to_one() {
 
     // And the three ops that read the same function agree with it: at ×1
     // the clip is exactly as long as the source it was already showing.
-    let value = handle
-        .apply(&json!({"op": "set_speed", "clip": 40, "rate": 1.0}))
-        .value();
+    let value = applied(project.apply(r#"{"op":"set_speed","clip":40,"rate":1.0}"#));
     assert_eq!(
         placement(&value, 40),
         (0, 10 * FRAME_30),
@@ -362,68 +385,76 @@ fn a_clip_whose_source_length_rounds_under_a_tick_falls_back_to_one_to_one() {
 // ---- (f) an UNMEASURED window, read both ways ----------------------------
 
 #[test]
-fn an_unmeasured_window_is_empty_to_a_head_clamp_and_unbounded_to_a_tail_one() {
-    // A hand-written media clip at speed 0: the window is there, the
-    // arithmetic is not. The two readings are named at the call sites, and
-    // they are opposite.
-    let handle = Handle::from_value(&project(
-        [30, 1],
-        OVERHANG,
-        vec![clip(50, 5, 200_000, 10 * FRAME_30, 0, 0.0)],
-    ));
+fn an_unmeasured_window_is_refused_and_read_empty_at_the_head_and_unbounded_at_the_tail() {
+    // A media clip at speed 0, reachable by no file since R6-10's amendment
+    // (#41): the window is there, the arithmetic is not. The two readings
+    // are named at the call sites, and they are opposite; they are pinned
+    // here at the `SourceBound` level, since every edit's `finish` now
+    // refuses a result that still carries the speed.
+    let project = refused_then_built(
+        &project(
+            [30, 1],
+            OVERHANG,
+            vec![clip(50, 5, 200_000, 10 * FRAME_30, 0, 0.0)],
+        ),
+        "clip 50's speed 0.0 is outside ×0.1–×10",
+    );
+    let clip = project.clip(50).expect("clip 50 is in the fixture");
 
     // EMPTY at the head: the front edge may not move left at all, so a drag
     // to the far left is a valid op that changes nothing.
-    match handle.try_apply(&json!({"op": "trim_start", "clip": 50, "to": 0})) {
+    match project.apply(r#"{"op":"trim_start","clip":50,"to":0}"#) {
         Ok(Outcome::Identity) => {}
         other => panic!("trim_start on an unmeasured head should be an identity, got {other:?}"),
     }
-
-    // UNBOUNDED at the tail: no clamp is applied at all, so the end edge
-    // goes where it was asked to — well past the 1 100 000 ticks the file
-    // holds, which a MEASURED window would never have allowed.
-    let value = handle
-        .apply(&json!({"op": "trim_end", "clip": 50, "to": 3_200_000}))
-        .value();
     assert_eq!(
-        placement(&value, 50),
-        (200_000, 3_000_000),
-        "the tail clamp did not run"
+        project.source_head_on_timeline(clip),
+        SourceBound::Unmeasured
     );
+    assert_eq!(project.source_head_on_timeline(clip).or_empty(), Some(0));
+
+    // UNBOUNDED at the tail: no clamp is applied at all — and the edit that
+    // would carry the speed into a new project is refused by `finish`.
+    assert_eq!(
+        project.apply(r#"{"op":"trim_end","clip":50,"to":3200000}"#),
+        Err("clip 50's speed 0.0 is outside ×0.1–×10".to_string())
+    );
+    assert_eq!(
+        project.longest_duration_on_grid(clip),
+        SourceBound::Unmeasured
+    );
+    assert_eq!(project.longest_duration_on_grid(clip).or_unbounded(), None);
 }
 
 #[test]
-fn an_unmeasured_window_gives_a_transition_no_tail() {
-    // Clip 60 is the outgoing clip and its speed is 0, so its tail handle
-    // is EMPTY rather than unbounded — the reading `add_transition` step 2
-    // takes. Clip 61 has ten frames of head. Two frames are asked for
-    // centred: one frame's share cannot come off clip 60, so the shortfall
-    // moves to clip 61 and the WHOLE overlap comes out of its head.
-    let handle = Handle::from_value(&project(
-        [30, 1],
-        OVERHANG,
-        vec![
-            clip(60, 6, 0, 10 * FRAME_30, 0, 0.0),
-            clip(61, 6, 200_000, 20 * FRAME_30, 200_000, 1.0),
-        ],
-    ));
-    let value = handle
-        .apply(&json!({"op": "add_transition", "clip": 61, "duration": 2 * FRAME_30}))
-        .value();
-    assert_eq!(
-        placement(&value, 60),
-        (0, 10 * FRAME_30),
-        "the outgoing clip gave nothing: an unmeasured window has no tail"
+fn an_unmeasured_window_is_refused_and_gives_a_transition_no_tail() {
+    // Clip 60 is the outgoing clip and its speed is 0, reachable by no file
+    // since R6-10's amendment (#41), so its tail handle is EMPTY rather than
+    // unbounded — the reading `add_transition` step 2 takes. The edit itself
+    // is refused by `finish`, which still sees the speed.
+    let project = refused_then_built(
+        &project(
+            [30, 1],
+            OVERHANG,
+            vec![
+                clip(60, 6, 0, 10 * FRAME_30, 0, 0.0),
+                clip(61, 6, 200_000, 20 * FRAME_30, 200_000, 1.0),
+            ],
+        ),
+        "clip 60's speed 0.0 is outside ×0.1–×10",
     );
     assert_eq!(
-        placement(&value, 61),
-        (200_000 - 2 * FRAME_30, 22 * FRAME_30),
-        "the incoming clip supplied both frames"
+        project.apply(&format!(
+            r#"{{"op":"add_transition","clip":61,"duration":{}}}"#,
+            2 * FRAME_30
+        )),
+        Err("clip 60's speed 0.0 is outside ×0.1–×10".to_string())
     );
+    let outgoing = project.clip(60).expect("clip 60 is in the fixture");
     assert_eq!(
-        source_in(&value, 61),
-        200_000 - 2 * FRAME_30,
-        "and its in point walked back by the two frames at ×1"
+        project.longest_duration_on_grid(outgoing).or_empty(),
+        Some(0),
+        "an unmeasured window has no tail"
     );
 }
 
