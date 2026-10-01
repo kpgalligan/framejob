@@ -7,8 +7,10 @@ through [`11-decisions/README.md`](11-decisions/README.md).
 
 **Never read the whole spec.** Read this index, then only the file for the section you need.
 For a decision, look its ID up in `11-decisions/README.md`, or grep this directory
-(`grep -rn "W-8 —" designs/spec/`). A file that grows past ~500 lines splits by subsection, and
-this index gets its row in the same change.
+(`grep -rn "W-8 —" designs/spec/`). A file that grows past ~500 lines splits by subsection into
+lettered files that keep its number (§4.3 is `04.3a` and `04.3b`, §7.9 is `07.9a` and `07.9b`);
+a citation of the bare number names them together, and this index gets their rows in the same
+change.
 
 | File | Lines | Read it for |
 |---|---|---|
@@ -18,7 +20,8 @@ this index gets its row in the same change.
 | **§4 — The regions in detail** | | |
 | [`04.1-toolbar.md`](04.1-toolbar.md) | 26 | The toolbar. |
 | [`04.2-preview-canvas.md`](04.2-preview-canvas.md) | 72 | The preview canvas: selection, handles, crop and region modes, on-canvas text, snapping. |
-| [`04.3-inspector.md`](04.3-inspector.md) | 499 | The inspector: the Clip tab's sub-tabs, row marks, Reset/Clear; every video, audio, text and shape section; the Media, Document and Assistant tabs. |
+| [`04.3a-inspector-clip-tab.md`](04.3a-inspector-clip-tab.md) | 348 | The inspector's tab strip and its Clip tab: the sub-tabs and pinned block, the selection header and name field, sections, row marks, Reset/Clear; every video, audio, text and shape section. |
+| [`04.3b-inspector-media-document-assistant.md`](04.3b-inspector-media-document-assistant.md) | 156 | The inspector's Media tab (find band, rows, drags, Consolidate, import, generate and export captions), Document tab and Assistant tab. |
 | [`04.4-timeline.md`](04.4-timeline.md) | 193 | The timeline: its bar, the level meter, ruler, tracks, clip bodies, gestures, entering a nest. |
 | **§5 — Editing model** | | |
 | [`05.1-time.md`](05.1-time.md) | 23 | Ticks (600 000 per second), frame rates, snapping to the grid. |
@@ -38,12 +41,13 @@ this index gets its row in the same change.
 | [`07.6-playback-update-rules.md`](07.6-playback-update-rules.md) | 42 | What playback does after every edit: rebuild or refresh. |
 | [`07.7-import.md`](07.7-import.md) | 20 | `MediaImporter.probe` and the formats import accepts. |
 | [`07.8-export.md`](07.8-export.md) | 235 | Export: writers, formats, loudness, the queue. |
-| [`07.9-agent.md`](07.9-agent.md) | 528 | The MCP agent: one tool per op plus `scope`, the app-state tools, the dev tools, parity, the graphics loop, the lane, the helper, the assistant session, its prompt and the Assistant tab. |
+| [`07.9a-agent-tools.md`](07.9a-agent-tools.md) | 379 | The MCP agent's tools: one tool per op plus `scope`, the parity check and the argument gate, the app-state tools, lenient decoding, the graphics loop, the dev tools, the port. |
+| [`07.9b-agent-lane-assistant.md`](07.9b-agent-lane-assistant.md) | 154 | The agent lane every tool call goes through, the bundled helper, the assistant session (its key, prices and spend), its prompt, and the Assistant tab as the session's door. |
 | [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 76 | The spec's Rust module map (core/CLAUDE.md is the live one). |
 | [`08-repo-layout.md`](08-repo-layout.md) | 64 | Repo layout, build, conventions. |
 | [`09-keys-and-menus.md`](09-keys-and-menus.md) | 138 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 2378 in 13 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 2407 in 13 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 
