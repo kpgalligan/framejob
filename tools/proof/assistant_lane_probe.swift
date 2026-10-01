@@ -319,7 +319,7 @@ func rowL3() {
 func rowL4() {
     closeAll()
     let d = newDocument()
-    let hook = Hook([true, true, true])
+    let hook = Hook([true, true, true, true])
     let cases: [(String, [String: Any], String)] = [
         ("record_screen", [:],
          "record_screen is not available to the assistant: Recording is a person at the "
@@ -332,6 +332,10 @@ func rowL4() {
         ("snapshot_ui", [:],
          "snapshot_ui is not available to the assistant: a developer tool (spec §11 V-1): "
             + "Distribution has none, and the assistant sees one catalog in both builds."),
+        ("close_project", [:],
+         "close_project is not available to the assistant: Closing a project closes the "
+            + "window this conversation lives in (AI-5); the person closes it with File ▸ "
+            + "Close (⌘W)."),
     ]
     var ok = true
     var details: [String] = []
@@ -430,12 +434,14 @@ func rowL6() {
     // assistant is handed, or the helper would be told to load a stranger.
     let missingCore = AssistantPrompt.coreTools.filter { !names.contains($0) }
     let ok = !dev.isEmpty && !names.contains("record_screen") && names.isDisjoint(with: dev)
+        && !names.contains("close_project")
         && names.contains("transcribe") && names.contains("export") && missingCore.isEmpty
     measure["l6"] = ["catalog": tools.count, "assistant": names.count, "dev": dev.sorted(),
                      "core_tools": AssistantPrompt.coreTools]
     row("L6", ok,
         "\(tools.count) tools → \(names.count) for the assistant; record_screen "
-            + "\(names.contains("record_screen")), dev tools \(dev.sorted()) present "
+            + "\(names.contains("record_screen")), close_project "
+            + "\(names.contains("close_project")), dev tools \(dev.sorted()) present "
             + "\(!names.isDisjoint(with: dev)), transcribe \(names.contains("transcribe")), "
             + "export \(names.contains("export")), core tools \(AssistantPrompt.coreTools) "
             + "missing \(missingCore)")

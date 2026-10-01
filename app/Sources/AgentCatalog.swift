@@ -51,9 +51,9 @@ extension AgentServer {
     /// free: with several projects open a call would otherwise be ambiguous,
     /// and the property costs nothing when only one is.
     ///
-    /// **Its own callers are the twenty-six APP-STATE tools** — the ones
+    /// **Its own callers are the twenty-seven APP-STATE tools** — the ones
     /// with no op behind them, which have no row in the core's table to
-    /// print and so spell their arguments out here: the ten of the Projects
+    /// print and so spell their arguments out here: the eleven of the Projects
     /// group below (`open_project` … `redo`), the two composites of
     /// `AgentCatalog+Audio.swift` (`detect_silence`, `normalize_clip`), the
     /// eight `fileTools` returns (`import_media`, `import_captions`,
@@ -64,7 +64,7 @@ extension AgentServer {
     /// `graphic_reference`, `render_graphic`, `import_graphic_font`,
     /// `import_graphic_asset`). Every
     /// op tool is `opTool`'s since road map 7's D3·4, and `opTool` goes
-    /// through here, so this is still where all eighty-five get `project`
+    /// through here, so this is still where all eighty-six get `project`
     /// and where all fifty-nine get `scope`.
     ///
     /// Internal rather than private for one reason and no other: three other
@@ -126,7 +126,7 @@ extension AgentServer {
     /// map 7's D3·4 — the clip and action rows, the two transitions, the
     /// two graphics, the three raw media ops, the tracks, the markers and the canvas — so no
     /// tool anywhere declares an argument's type, its vocabulary or its
-    /// required-ness by hand. What is left in `tool` is the twenty-six app-state
+    /// required-ness by hand. What is left in `tool` is the twenty-seven app-state
     /// tools, which have no op to read.
     func opTool(
         _ name: String, _ description: String, _ prose: [String: String]
@@ -161,7 +161,7 @@ extension AgentServer {
     /// tools, and the startup parity check asks that each of them has a tool
     /// AND that the tool declares the property. One list, so the three
     /// cannot disagree — and a `static let`, so the FFI call and the JSON
-    /// decode behind it happen once per process instead of eighty-five
+    /// decode behind it happen once per process instead of eighty-six
     /// times per catalog build.
     ///
     /// **An empty answer is a silent catastrophe, so it is not allowed to be
@@ -285,7 +285,8 @@ extension AgentServer {
                     + "Project. With path it is saved there straight away (a .reelcut extension "
                     + "is added if missing) so later calls can name it; without one it stays an "
                     + "untitled draft until save_project. Change the size and rate afterwards "
-                    + "with set_canvas.",
+                    + "with set_canvas. A path another open project holds is refused, and "
+                    + "nothing is created; close_project closes that one first.",
                 [
                     "path": [
                         "type": "string",
@@ -296,12 +297,28 @@ extension AgentServer {
                 "save_project",
                 "Saves the project. A project that has never been saved — a new_project with no "
                     + "path, or a movie opened as one — needs a path; passing a path always "
-                    + "writes there (Save As). Returns once the package is really on disk.",
+                    + "writes there (Save As). Returns once the package is really on disk. A "
+                    + "path another open project holds is refused; close_project closes that "
+                    + "one first.",
                 [
                     "path": [
                         "type": "string",
                         "description": "Where to write the .reelcut package. Required the first "
                             + "time; otherwise the project is written back to its own file.",
+                    ]
+                ]),
+            tool(
+                "close_project",
+                "Closes a project and its window — File ▸ Close (⌘W). A project with unsaved "
+                    + "changes (get_project's unsaved_changes) is refused unless discard is "
+                    + "true, and so is a window with a sheet open; nothing is written, so "
+                    + "save_project first to keep the changes. A later call naming the closed "
+                    + "project's path is refused. open_project closes nothing.",
+                [
+                    "discard": [
+                        "type": "boolean",
+                        "description": "Close even with unsaved changes, losing them. Default "
+                            + "false.",
                     ]
                 ]),
             tool(

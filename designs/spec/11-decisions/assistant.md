@@ -60,6 +60,8 @@ in §6).
   every row; the helper never sees a withheld tool, and the lane refuses one if it is called
   anyway. Risk accepted: recording and cloud transcription stay menu-only, and every file
   written costs a click.
+  **Amended 2026-10-01, by #40**: `close_project` is withheld, always: closing a project
+  closes the window the conversation lives in (AI-5).
 - **AI-8 — The key is the person's own, and is R6-5 and R6-12's key in everything but the
   vendor.** It lives in `SecretStore` under `anthropic-key`; the one override is
   `ANTHROPIC_API_KEY`, read only as R6-5 amended says. It is never a tool argument, a launch

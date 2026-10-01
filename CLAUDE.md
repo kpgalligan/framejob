@@ -199,8 +199,8 @@ else is what bloats files:
   (`AgentServer+Parity.swift`). What it cannot see is a CALL, which two
   things guard at dispatch: the argument GATE in `AgentServer+Gate.swift`
   compares the caller's keys to the schema the tool published and refuses a
-  stranger by name, for all eighty-five product tools (and the dev tools, road map 11),
-  before any handler runs;
+  stranger by name, for all eighty-six product tools (and the dev tools, road
+  map 11), before any handler runs;
   and the throwing helpers in `AgentServer+Arguments.swift` refuse a value a
   handler cannot read by name rather than dropping it.
 - **A file at the ~600-line cap gives something up before it takes anything
@@ -248,8 +248,8 @@ The log line names the port it actually bound (a taken port falls back to an
 ephemeral one). Drive it with any MCP client over streamable HTTP at
 `http://127.0.0.1:<port>/mcp`: one tool per §6 op, each taking the `scope`
 envelope key, plus the app-state tools — `open_project`, `new_project`,
-`save_project`, `get_project`, `import_media`, `import_captions`,
-`export_captions`, `transcribe`, `consolidate_media`, `detect_silence`,
+`save_project`, `close_project`, `get_project`, `import_media`,
+`import_captions`, `export_captions`, `transcribe`, `consolidate_media`, `detect_silence`,
 `normalize_clip`, `set_playhead`, `set_range`, `set_selection`, `set_scope`,
 `undo`, `redo`, `render_frame`, `export`, `record_screen`, `write_graphic`,
 `get_graphic`, `graphic_reference`, `render_graphic`, `import_graphic_font`
@@ -274,8 +274,9 @@ sample-for-sample comparison of two exports decoded to PCM (which needs
 `ffmpeg` at proof time). Its README says how to make the test media, run
 one, and which scores are known host-state skips (a locked console, a
 Bluetooth output). Add the next phase's proof there rather than writing a
-throwaway. An instance DEADLOCKS somewhere past forty open documents,
-because nothing closes one: relaunch between proof sessions.
+throwaway. An instance DEADLOCKS somewhere past forty documents open at once:
+a proof that closes what it opens (`close_project`) can share an instance, and
+one that does not relaunches between proof sessions.
 
 Spec §10's per-step verifications are the acceptance tests. What no script
 can answer — step 4's "the clip plays with audio", step 5's 60 fps, and the

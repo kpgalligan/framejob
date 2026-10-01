@@ -1330,8 +1330,8 @@ free.
   from the core's published table (`Self.opSchemas` over `rc_op_schemas`).
   **Every one of the fifty-nine op tools is `opTool`'s** and carries no
   `"type"`, no `"enum"` and no hand-written required list; `tool`'s remaining
-  callers are the twenty-six APP-STATE tools, which have no op behind them
-  and so nothing to read from the table — the ten of the Projects group,
+  callers are the twenty-seven APP-STATE tools, which have no op behind them
+  and so nothing to read from the table — the eleven of the Projects group,
   `AgentCatalog+Audio.swift`'s two composites and
   `AgentCatalog+Captions.swift`'s three, spliced back at the two points they
   left, the five other file tools, `record_screen` among them, and
@@ -1361,8 +1361,8 @@ free.
   `AgentServer+Scope.swift` with the feature it is about; all five assert in
   debug, log `Reelcut: ` in release and start the server either way.
   `AgentServer+Gate.swift` is the CALL-time half of the same contract
-  (kpgalligan/reelcut#21): one comparison in `dispatch`, for all eighty-five product
-  tools, of a caller's keys against the schema the tool published, every
+  (kpgalligan/reelcut#21): one comparison in `dispatch`, for all eighty-six
+  product tools, of a caller's keys against the schema the tool published, every
   stranger refused by name — the tool, the strangers and the whole of what it
   takes — before the scope or any handler reads a thing. Its map is read once
   from the catalog string `prepareCatalog()` built at launch (spec §11 AI-3),
@@ -1408,8 +1408,8 @@ free.
   and runs each handler once, outside the lock; `onCancel` on a token already
   cancelled runs the handler at once, on the caller's thread.
 - `AssistantToolTable.swift` — spec §11 AI-7's ONE table: withheld
-  (`record_screen`; `transcribe` only with `engine: "assemblyai"`; every dev
-  tool, from `AgentServer.devToolNames`) and ask-first (`export`,
+  (`record_screen`; `close_project`; `transcribe` only with
+  `engine: "assemblyai"`; every dev tool, from `AgentServer.devToolNames`) and ask-first (`export`,
   `export_captions`, `save_project`, `consolidate_media`), a reason on every
   row; the refusal sentence, the question (main only: the path the call
   writes, tilde-expanded, and whether a file is already there — "REPLACES")

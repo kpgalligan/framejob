@@ -380,17 +380,12 @@ Files that were split since the notes wrote them:
 
 Still true of the current code:
 
-- A caption panel name such as `chart.png` becomes `chart.png.srt` in the panel and `chart.srt`
-  over MCP.
 - `SileroVAD` marked unavailable never retries until relaunch.
 - macOS hides status items that do not fit the menu bar, and Pause/Resume live nowhere else. "●"
   and "❚❚" differ in width, so the bar shifts at a pause.
 - The picture and the microphone are ONE op list. A microphone track the caps refuse takes the
   picture down with it.
 - `place: false` stores no microphone offsets.
-- An explicit `project` path matches with `documents.first(where:)`. When `new_project` /
-  `save_project` leave two open documents at one path, an unspecified one answers, and there is no
-  close tool. Scripts use a fresh name per run.
 - A second `PostEffects` meter tap cannot be built: there is one `audioTapProcessor` per input.
 - Closing the transcribe sheet mid-download lets the download run on (a decision).
 - The playhead echo has no MCP drive: no tool reads the live player's reports.
@@ -441,11 +436,9 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   lanes").
 - A person drags a clip and sees no flash to 0 and no jump. Tracked in #48 ("Dragging a clip
   leaves the timeline still").
-- Caption-name agreement (#43).
 - Rasterize's `BlockSliderCell.drawBar` still has the SH-2 defect upstream. Tracked in #101.
 - SH-1: square `StickerButton` or move its callers ("a phase of its own"). Tracked in #100.
-- Pause/Resume live only in a status item that macOS can hide (#98); two open documents at one
-  path have no close tool (#40).
+- Pause/Resume live only in a status item that macOS can hide (#98).
 
 ## Where to look in the original
 

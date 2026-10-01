@@ -21,10 +21,8 @@ import AppKit
 /// here would turn the first into `Board v1.2.reelcut.srt`, and a document
 /// somebody has literally named `talk.srt` keeps its suffix and is offered
 /// `talk.srt.srt` — the honest answer for a pathological name, and the file
-/// `AgentServer.destinationURL` writes for that path (`srt` is replaceable
-/// there, so over MCP it is `talk.srt`; the panel's rule and the tool's part
-/// company only on a name that carries another of the app's own containers,
-/// and that divergence is pinned by the probe rather than papered over).
+/// `AgentServer.captionDestinationURL` writes for that path (`srt` is replaceable
+/// there, so over MCP it is `talk.srt`).
 ///
 /// It is an extension in its own file because `ProjectDocument.swift` is over
 /// the ~600-line cap and should not take on code, and a pure function because

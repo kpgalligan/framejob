@@ -334,8 +334,9 @@ must print nothing before a proof run means anything.
 
 **The EXACT tool count belongs to the newest phase's script**, because it is
 what tells a stale binary on the port from the build under test: road map 7's
-`op_argument_proof.py` asserts **85** since road map 10's G4b (82 from G4a,
-79 from G3b, 77 from D3·5), and every script before it keeps
+`op_argument_proof.py` asserts **86** since issue batch B44's `close_project`
+(85 from road map 10's G4b, 82 from G4a, 79 from G3b, 77 from D3·5), and
+every script before it keeps
 a floor — phases 1 to 9's 63, 65, 68, 70, 71, 73, 73, 73 and 74, and road map
 3's 75 — so a later phase's tools never fail an older proof.
 That exact count is of PRODUCT tools: road map 11's dev tools are in a Release
@@ -382,9 +383,11 @@ only check that notices. `check` never stops a run, so that build goes on to
 fail every check that names either tool and then ABORTS at 4b's first
 `export_captions`; the mutation paragraph below has the whole list.
 
-**Relaunch the instance between proof sessions.** Nothing closes a document —
-there is no such tool — so every project a proof makes stays open, and each
-open document costs about five threads and fifteen megabytes (measured:
+**Relaunch the instance between proof sessions.** The proofs before issue
+batch B44 close nothing they open, so every project such a proof makes stays
+open. `close_project` (B44, spec §11 #40) closes one; `close_project_proof.py`
+closed sixty in a row on one instance, its thread count 13 before and 18
+after. Each open document costs about five threads and fifteen megabytes (measured:
 fifteen more documents took one instance from 174 threads and 509 MB to 254
 and 734 MB). All three proofs run in sequence against one fresh instance with
 room to spare — 26 documents, 197 threads — but somewhere past forty, which
@@ -2110,10 +2113,11 @@ not changed.
 
 ## The remaining-work probe (`remaining_probe.py`)
 
-`python3 tools/proof/remaining_probe.py`, **170/170** (141 when it landed; 156
+`python3 tools/proof/remaining_probe.py`, **176/176** (141 when it landed; 156
 with road map 3's 5f, the held tail over a 1 s-picture / 5 s-sound fixture;
 170 with the fix wave's sparse shape, three frames 25 s apart under 60 s of
-sound, and its all-sync twin). No port, no window
+sound, and its all-sync twin; 176 with issue batch B44's `chart.png`
+destination row and 1e's fifth site). No port, no window
 server grant, and no media beyond `media/A.mov` (sections 2, 3 and 5),
 `AV.mov`, `B.mov` and `toneA.m4a` (section 5) plus the fixtures 5f MAKES with
 `ffmpeg` at proof time under `work/remaining-probe-files/pass/` — 1 s of
@@ -2128,7 +2132,7 @@ FAILURE rather than an exit — for the items in
 `archive/reelcut-remaining.md` that are APP arithmetic or an app PICTURE no
 tool reaches. One section per item, and one binary answering all of them by
 a request `mode`, so the next item adds a `case` and a `section_…` without
-touching the others: section 1 is §2b's naming (70 checks with the build
+touching the others: section 1 is §2b's naming (76 checks with the build
 check), sections 2–5 are §2a's cache marker on the app side and road map
 3's held tail seen from the strip (100).
 `--sources DIR` (or `RC_APP_SOURCES`, the spelling `phase9_chrome.py` uses
@@ -2140,8 +2144,8 @@ Both sites the item named are PANEL-only —
 when the Format popup moves, and
 `exportCaptionsCommand` seeds that field from the document's title — and the
 MCP path never comes near either: `export_captions` goes through
-`AgentServer.destinationURL`, which strips only a member of
-`replaceableExtensions` and appends otherwise, so `{path: "Board v1.2"}` wrote
+`AgentServer.captionDestinationURL` (before B44, `destinationURL`), which
+strips only a member of its set and appends otherwise, so `{path: "Board v1.2"}` wrote
 `Board v1.2.srt` before the fix and after it, and an MCP check for that name
 passes against the unfixed build. What can see it is the shape
 `FrameWriter.renamed` chose in phase 7 for the same defect, a pure function of
@@ -2151,7 +2155,8 @@ second list, and fourteen rows, of which `Board v1.2` + SubRip →
 `Board v1.2.srt` is the one a bare `deletingPathExtension` fails; a foreign
 extension is KEPT (`talk.txt` → `talk.txt.srt`, the file the tool writes for
 that path), the suffix is compared lower-cased, and `chart.png` + SubRip →
-`chart.png.srt` pins the recorded divergence from MCP's `chart.srt`. **1b**:
+`chart.png.srt` is the name MCP writes too since B44 (spec §11 #43; it wrote
+`chart.srt` before). **1b**:
 `FrameWriter.renamed`, nine rows over the same shape — its docstring has said
 since phase 7 that a probe compiled from `app/Sources` calls it with a table
 of names, and none did until this one. **1c**:
@@ -2163,18 +2168,22 @@ live documents — a fresh `ProjectDocument()` and one told it lives at
 `Board v1.2.reelcut` — because a static function nobody calls is not a fix.
 **1e** is a STRUCTURAL read, and it is there because a behavioural probe
 cannot see whether a panel's private method calls the helper: it reads the
-four function bodies out of the sources it compiled and asserts each names its
+five function bodies out of the sources it compiled (B44 added the tool's
+`exportCaptions`, which must call `captionDestinationURL(`) and asserts each names its
 helper and carries no `deletingPathExtension` of its own, and that each file
 holds exactly the bare count it is allowed. `phase7_chrome.py`'s
 `destinationProperties != nil` is the precedent, and it is weaker than a
-behaviour and said to be. **1f** pins the one rule three documents state and
-nothing had checked — `knownExtensions` ⊆ `AgentServer.replaceableExtensions`,
-without which the panel and the tool would name one file two ways: rows built
-FROM `knownExtensions` (not a second list) call `destinationURL` with each
-member asked for as the other format, upper-case too, and assert the strip
-(`x.srt` + WebVTT → `x.vtt`, `x.vtt` + SubRip → `x.srt`) against a non-member's
-append (`x.txt` + SubRip → `x.txt.srt`), plus a coverage check that every
-member read off the type has a row.
+behaviour and said to be. **1f** pins the tool's half of the one rule:
+since B44 (spec §11 #43) `export_captions` replaces exactly
+`knownExtensions`, through `AgentServer.captionDestinationURL`, so the panel
+and the tool name one file one way. Rows built FROM `knownExtensions` (not a
+second list) call `captionDestinationURL` with each member asked for as the
+other format, upper-case too, and assert the strip (`x.srt` + WebVTT →
+`x.vtt`, `x.vtt` + SubRip → `x.srt`) against a non-member's append (`x.txt` +
+SubRip → `x.txt.srt`, and `chart.png` + SubRip → `chart.png.srt`, which
+`replaceableExtensions` would make `chart.srt`), plus a coverage check that
+every member read off the type has a row. Before B44 the rows called
+`destinationURL` and pinned `knownExtensions` ⊆ `replaceableExtensions`.
 
 Made to fail, four ways, each a copy of `app/Sources` under
 `work/remainingprobe/mutants/` and the script pointed at it with `--sources`;
@@ -2194,7 +2203,14 @@ correct helpers beside it is the unfixed defect with a proof next to it.
 `no-vtt` (`vtt` removed from `replaceableExtensions`) scores **106/108** and
 takes exactly the two `x.vtt` + SubRip rows — the pair the tree had never
 pinned, since `phase4_proof.py` asks a `.srt` path for WebVTT and nothing had
-asked a `.vtt` path for SubRip. The probe builds in about 45 s and the tree's
+asked a `.vtt` path for SubRip (measured when 1f read `destinationURL`).
+B44's two, scored at 176: `caption-shared` (`captionDestinationURL` on the
+two-argument `destinationURL`) scores **175/176** and takes only 1f's
+`chart.png` row; `export-unwired` (`exportCaptions` back on the
+two-argument `destinationURL`) scores **175/176** and takes only 1e's
+`exportCaptions` call row. HEAD's `app/Sources` before B44 is a scored build
+failure, **0/1** (`type 'AgentServer' has no member
+'captionDestinationURL'`). The probe builds in about 45 s and the tree's
 cached binary is reused across runs.
 
 Sections 2–5 are the half of §2a's completion marker that a running instance
@@ -9969,4 +9985,71 @@ list), while the shell still survived through the ancestor rule.
 python3 tools/proof/recording_probe.py --only file_pause                          # 46/46
 python3 tools/proof/recording_probe.py --mutant finish-no-post --only file_pause  # exit 1, F8
 (unset ANTHROPIC_API_KEY RC_ASSEMBLYAI_KEY; python3 tools/proof/makefile_env_proof.py)   # 4/4
+```
+
+## Issue batch B44 — `close_project`, held-path refusals, the caption name rule (`close_project_proof.py`, `remaining_probe.py` 1e and 1f, `assistant_lane_proof.py --mutant close-ask-first`; #40, #43)
+
+- **`close_project {discard?}` (#40, spec §11 #40).** File ▸ Close over MCP
+  (`AgentServer+Project.swift`'s `closeProject`, on main): a window with a
+  sheet attached is refused first, then unsaved changes unless `discard:
+  true`; it closes through `ProjectDocument.close()` and writes nothing.
+  `new_project {path}` and `save_project {path}` refuse a path another open
+  document holds (`documentHolding`, `refuseHeldPath`), `new_project` before
+  it creates anything; a save to the document's own file stays a plain save
+  (#138). The assistant never sees the tool (AI-7, amended): a `.withheld`
+  row in `AssistantToolTable.swift`.
+- **The caption name rule (#43, spec §11 #43).** `export_captions` writes
+  `AgentServer.captionDestinationURL(path, format:)`, which replaces only
+  `CaptionExporter.knownExtensions` — the panel's rule — so `chart.png` is
+  `chart.png.srt` both ways. The other tools keep `replaceableExtensions`.
+- **Counts.** 86 product tools (`op_argument_proof.py`), twenty-seven
+  app-state tools (`phase9_proof.py`, `recording_proof.py`,
+  `recording_probe.py`'s `APP_STATE_TOOLS`).
+
+`close_project_proof.py <port> [--log PATH]` needs a fresh Release instance.
+T1 parity log; K1 schema; C1 sixty `new_project` → `close_project` cycles;
+C2 every closed path refused by `get_project`, no editor window left,
+`open_project` with no `already_open`; C3 threads after C1 under before plus
+64; D1 the unsaved refusal's exact sentence; D2 `discard: true` and the disk;
+H1 the sheet refusal (`perform_menu_item ["File", "Export…"]`, then
+`cancel_sheet`); S3 (control, run first) a save to A's own path; S1 and S2
+the held-path sentence for `save_project` (two spellings) and `new_project`;
+E1 `export_captions {path: …/chart.png}`. D1 and D2 run behind an autosave
+guard that retries a marker at a fresh `at` when `get_project` already reads
+`unsaved_changes: false`, printing `<ID> retry <n>: autosave landed`.
+
+Run on 2026-10-01, the change over `068b99f`:
+
+| Command | Result |
+|---|---|
+| `make typecheck` | 0 errors, 4 warnings (the baseline), tsc clean |
+| `make test` | exit 0; `assistant_lane_proof.py` 18/18 (L4 and L6 name `close_project`); `assistant_prompt_proof.py --probe` F1–F8 ok; `inventory.py --check` 5/5 |
+| `make app` | BUILD SUCCEEDED; `grep "Reelcut: "` empty on every instance below |
+| `close_project_proof.py 4866` | 12/12, exit 0; C3 threads 13 → 18; 0 autosave retries |
+| `close_project_proof.py`, build A: `no-dirty-check` + `no-sheet-check` + `export-unwired` | 9/12, exit 1: D1, H1, E1 |
+| `close_project_proof.py`, build B: `discard-unread` + `no-held-check` | 9/12, exit 1: D2, S1, S2 (S3 passes) |
+| `close_project_proof.py`, `window-only` as `document.windowControllers.forEach { $0.close() }` | 12/12, exit 0 — survives: AppKit closes the document with its last window controller, and C2's sixty refusals show it left the controller |
+| `close_project_proof.py`, `window-only` as `removeWindowController` then `close()` | 10/12, exit 1: C2 (sixty paths still answer, `open_project` says `already_open`), D2 (`get_project` still answers) — C1 passes: its answers are the same |
+| `op_argument_proof.py 4852` | 153/153, exit 0, EXACTLY 86 product tools |
+| `phase9_proof.py 4853` | 218/218, exit 0 |
+| `recording_proof.py 4854` | 189/189, exit 0; the tone rows (2) skipped by name: the default output is a Bluetooth device |
+| `recording_probe.py --only catalog` | 29/29, exit 0 |
+| `remaining_probe.py` | 176/176, exit 0 |
+| `remaining_probe.py --sources <HEAD's app/Sources>` | 0/1, exit 1: the probe does not build (`no member 'captionDestinationURL'`) |
+| `remaining_probe.py --sources <caption-shared>` | 175/176, exit 1: 1f's `chart.png` row |
+| `remaining_probe.py --sources <export-unwired>` | 175/176, exit 1: 1e's `exportCaptions` call row |
+| `assistant_lane_proof.py --mutant close-ask-first` | exit 1: L4 fails (`close_project: refused as written false; hook called 1 times`) |
+
+Controls, which no mutant fails: T1, K1, C3, S3. Every D1 and D2 in these
+runs closed on its first attempt; no run printed a retry. S2's editor-window
+count is blind: under `no-held-check`, whose `new_project {path: A}` was
+answered, `snapshot_ui` still counted 3 editor windows before and after, so S2
+fails that mutant on its sentence alone. (Pins `CaptionExporter.swift:519` and
+`:539` in `capture_spike/inventory.json` were re-keyed to 514 and 534 by the
+orchestrator after the doc comment above them shrank.)
+
+```sh
+python3 tools/proof/close_project_proof.py 4866                    # 12/12, fresh instance
+python3 tools/proof/remaining_probe.py                             # 176/176
+python3 tools/proof/assistant_lane_proof.py --mutant close-ask-first   # exit 1, L4
 ```

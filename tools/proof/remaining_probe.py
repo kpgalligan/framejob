@@ -15,8 +15,10 @@ PANEL-only: `CaptionExportOptions.formatChanged` rewrites the save panel's
 name field when the Format popup moves, and `exportCaptionsCommand` seeds
 that field from the document's title. A save panel cannot be driven over MCP
 or put up offscreen, and the MCP path never comes near either site —
-`export_captions` goes through `AgentServer.destinationURL`, which strips
-only a member of `replaceableExtensions` and appends otherwise, so
+`export_captions` goes through `AgentServer.captionDestinationURL`, which
+strips only a member of `CaptionExporter.knownExtensions` and appends
+otherwise (spec §11 #43; before B44 it was `destinationURL` over
+`replaceableExtensions`, which treats `Board v1.2` the same way), so
 `{path: "Board v1.2"}` wrote `Board v1.2.srt` before the fix and after it.
 An MCP check for that name therefore PASSES against the unfixed build and
 cannot be its evidence. What can is the shape `FrameWriter.renamed` chose in
@@ -43,26 +45,26 @@ Section 1 (naming) runs three helpers over that kind of table:
     a table of names", and none did until this one: `grep renamed( tools/`
     found only the definition and its one caller. The same table shape
     closes that gap here, and the docstring now names this file.
-  * `AgentServer.destinationURL` — the MCP side of the one rule (1f). Three
-    docs state that `CaptionExporter.knownExtensions` is a SUBSET of
-    `AgentServer.replaceableExtensions`, and until this row nothing pinned
-    it: the set is `private`, `phase4_proof.py` sends a `.srt` path asked
-    for as `vtt` and no script anywhere sends a `.vtt` path asked for as
-    `srt`, so `vtt`'s membership was pinned by nothing. `destinationURL`
-    is internal and a probe over `app/Sources` reaches it, so the table
-    asks, for EVERY member of `knownExtensions`, that `x.<member>` asked
-    for as the other format is stripped and replaced (`x.srt` + vtt →
-    `x.vtt`, `x.vtt` + srt → `x.srt`, upper-case too) while a non-member
-    is appended to (`x.txt` + srt → `x.txt.srt`), and a structural check
-    that the rows cover the whole set the probe read off the type — so a
-    third caption format would fail here by name until it joined the
-    other list.
+  * `AgentServer.captionDestinationURL` — the MCP side of the one rule
+    (1f). Since B44 (spec §11 #43) `export_captions` replaces exactly
+    `CaptionExporter.knownExtensions`, the panel's set, and keeps any other
+    extension as part of the name; before it the tool went through
+    `destinationURL` over `replaceableExtensions`, and the two parted
+    company on `chart.png`. The helper is internal and a probe over
+    `app/Sources` reaches it, so the table asks, for EVERY member of
+    `knownExtensions`, that `x.<member>` asked for as the other format is
+    stripped and replaced (`x.srt` + vtt → `x.vtt`, `x.vtt` + srt →
+    `x.srt`, upper-case too) while a non-member is appended to (`x.txt` +
+    srt → `x.txt.srt`, `chart.png` + srt → `chart.png.srt`, the row the old
+    set fails), and a structural check that the rows cover the whole set
+    the probe read off the type — so a third caption format would fail
+    here by name until it had a row.
 
 And one thing no behavioural probe can see, read STRUCTURALLY (1e): that
-the four sites actually CALL the helpers. A correct `displayStem(of:)` with
+the five sites actually CALL the helpers. A correct `displayStem(of:)` with
 `exportCaptionsCommand` still stripping bare is the unfixed defect with a
 proof beside it, and every one of those sites is a panel's private method
-or the line that seeds one — so 1e reads the four function bodies out of
+or the line that seeds one — so 1e reads the five function bodies out of
 the sources it compiled and asserts each names its helper and none carries
 a `deletingPathExtension` of its own. `phase7_chrome.py`'s
 `destinationProperties != nil` is the precedent for a source read where
@@ -79,11 +81,15 @@ which is why the static table is the killer and the live read is a wiring
 check); and `exportCaptionsCommand` alone put back on the bare strip with
 both helpers intact (only 1e fails, which is what 1e is for). The scores
 belong in `archive/reelcut-remaining.md` §2b's record and in `README.md`'s
-section for this file, beside the tree's own count. A fourth mutant is
-1f's: `"vtt"` removed from `replaceableExtensions` scores **106/108** —
-exactly the two `x.vtt` + srt rows (`x.vtt.srt` comes back, the doubled
-name the subset rule exists to prevent), while every row about `srt` still
-passes, which is precisely the half the tree had pinned before. 1f's
+section for this file, beside the tree's own count. A fourth mutant was
+1f's, when 1f read `destinationURL`: `"vtt"` removed from
+`replaceableExtensions` scored **106/108** — exactly the two `x.vtt` + srt
+rows. Since B44 1f reads `captionDestinationURL`, and its two mutants are
+`caption-shared` (the helper on the two-argument `destinationURL`, which
+fails only 1f's `chart.png` row) and `export-unwired` (`exportCaptions` back
+on the two-argument form, which fails only 1e's `exportCaptions` call row,
+the fifth site); against HEAD's `app/Sources` before B44 the probe does not
+build, a scored failure. Their scores are in `README.md`'s B44 section. 1f's
 coverage check is about the SCRIPT, not the build — it fails when a member
 of `knownExtensions` has no strip row here — so no build mutant takes it.
 
@@ -350,17 +356,21 @@ func naming(_ request: [String: Any]) -> [String: Any] {
     out["frameExtensions"] = Dictionary(
         uniqueKeysWithValues: FrameWriter.Format.allCases.map { ($0.rawValue, $0.fileExtension) })
 
-    // 1f. The MCP side of the one rule: `AgentServer.destinationURL` over
-    // paths whose suffix is a caption spelling or is not. `replaceableExtensions`
-    // is private; the function that consults it is not, and its answer's
-    // last path component is the name that would be written.
+    // 1f. The MCP side of the one rule: `AgentServer.captionDestinationURL`
+    // (what `export_captions` writes) over paths whose suffix is a caption
+    // spelling or is not; its answer's last path component is the name that
+    // would be written.
     let destinations = request["destinations"] as? [[String: Any]] ?? []
     out["destinations"] = destinations.map { row -> [String: Any] in
         let path = row["path"] as? String ?? ""
-        let ext = row["extension"] as? String ?? ""
+        let name = row["format"] as? String ?? ""
+        guard let format = CaptionExporter.Format(rawValue: name) else {
+            return ["path": path, "format": name, "error": "no caption format \(name)"]
+        }
         return [
-            "path": path, "extension": ext,
-            "written": AgentServer.destinationURL(path, extension: ext).lastPathComponent,
+            "path": path, "format": name,
+            "written": AgentServer.captionDestinationURL(path, format: format)
+                .lastPathComponent,
         ]
     }
 
@@ -1040,17 +1050,16 @@ CAPTION_ROWS = [
      "why": "a caption spelling is replaced"},
     {"name": "talk.vtt", "format": "srt", "fallback": "X", "expect": "talk.srt"},
     {"name": "talk.SRT", "format": "vtt", "fallback": "X", "expect": "talk.vtt",
-     "why": "the suffix is compared lower-cased, as `destinationURL` compares"},
+     "why": "the suffix is compared lower-cased, as `captionDestinationURL` compares"},
     {"name": "Board v1.2.srt", "format": "vtt", "fallback": "X", "expect": "Board v1.2.vtt"},
     {"name": "talk.txt", "format": "srt", "fallback": "X", "expect": "talk.txt.srt",
-     "why": "a foreign extension is part of the NAME — `destinationURL` writes "
+     "why": "a foreign extension is part of the NAME — `captionDestinationURL` writes "
             "`talk.txt.srt` for the same path over MCP"},
     {"name": "shot.final", "format": "vtt", "fallback": "X", "expect": "shot.final.vtt",
      "why": "a bare strip answers `shot.vtt`"},
     {"name": "chart.png", "format": "srt", "fallback": "X", "expect": "chart.png.srt",
      "why": "another of the app's OWN containers is not a caption spelling — "
-            "the one row where the panel (keeps) and MCP (`chart.srt`, `png` being "
-            "replaceable there) part company, pinned as a recorded limit"},
+            "kept, as MCP keeps it since spec §11 #43 (1f's `chart.png` row)"},
     {"name": "", "format": "srt", "fallback": "X", "expect": "X.srt",
      "why": "an emptied field falls back to the document's stem"},
     {"name": ".srt", "format": "vtt", "fallback": "X", "expect": ".srt.vtt",
@@ -1080,7 +1089,7 @@ FRAME_ROWS = [
      "why": "a dot-leading name has no extension to Foundation"},
 ]
 
-# 1f. `destinationURL` rows are BUILT from `CaptionExporter.knownExtensions`
+# 1f. `captionDestinationURL` rows are BUILT from `CaptionExporter.knownExtensions`
 # rather than typed: one strip-and-replace pair per member, in both cases,
 # and one append row per member for a suffix outside the set. The set the
 # rows were built from is compared against the set the probe read off the
@@ -1090,18 +1099,22 @@ def destination_rows(known):
     for member in sorted(known):
         others = sorted(set(known) - {member}) or [member]
         for other in others:
-            rows.append({"path": f"/tmp/x.{member}", "extension": other,
+            rows.append({"path": f"/tmp/x.{member}", "format": other,
                          "expect": f"x.{other}",
-                         "why": f"`{member}` is a member of `replaceableExtensions`, so it "
+                         "why": f"`{member}` is a member of `knownExtensions`, so it "
                                 f"is STRIPPED and `{other}` put in its place — not "
                                 f"`x.{member}.{other}`"})
-            rows.append({"path": f"/tmp/x.{member.upper()}", "extension": other,
+            rows.append({"path": f"/tmp/x.{member.upper()}", "format": other,
                          "expect": f"x.{other}",
                          "why": "membership is read lower-cased"})
-        rows.append({"path": "/tmp/x.txt", "extension": member,
+        rows.append({"path": "/tmp/x.txt", "format": member,
                      "expect": f"x.txt.{member}",
                      "why": "a suffix outside the set is part of the NAME and the "
                             "extension is appended — the other half of the rule"})
+    rows.append({"path": "/tmp/chart.png", "format": "srt", "expect": "chart.png.srt",
+                 "why": "another of the app's OWN containers is part of the name — the "
+                        "panel's rule (spec §11 #43); over `replaceableExtensions` it is "
+                        "`chart.srt`"})
     return rows
 
 
@@ -1135,7 +1148,7 @@ def section_naming(binary, sources):
         "caption": [{k: r[k] for k in ("name", "format", "fallback")} for r in CAPTION_ROWS],
         "frame": [{k: r[k] for k in ("name", "format", "fallback")} for r in FRAME_ROWS],
         "stems": [r["name"] for r in STEM_ROWS],
-        "destinations": [{k: r[k] for k in ("path", "extension")} for r in destinations],
+        "destinations": [{k: r[k] for k in ("path", "format")} for r in destinations],
         "dir": os.path.dirname(binary),
     }
     answer, error = run_probe(binary, "naming", request)
@@ -1187,15 +1200,14 @@ def section_naming(binary, sources):
     check("and its title really was one of the two spellings the helper is for",
           named_name in ("Board v1.2.reelcut", "Board v1.2"), f"{named_name!r}")
 
-    print("\n  1f. `AgentServer.destinationURL` — `knownExtensions` ⊆ `replaceableExtensions`, "
-          "pinned")
+    print("\n  1f. `AgentServer.captionDestinationURL` — replaces exactly `knownExtensions`")
     check_table("destination", destinations, answer.get("destinations", []),
-                ("path", "extension"), "written")
+                ("path", "format"), "written")
     stripped = {r["path"].rsplit(".", 1)[1].lower() for r in destinations
                 if r["expect"].count(".") == 1}
     check("the rows above strip-and-replace EVERY member of the set the probe read off "
           "`CaptionExporter.knownExtensions` — a third format would fail here by name "
-          "until it joined `replaceableExtensions`",
+          "until it had a row",
           set(answer.get("captionKnown", [])) <= stripped,
           f"members {answer.get('captionKnown')}, rows strip {sorted(stripped)}")
 
@@ -1212,9 +1224,10 @@ SITES = [
     ("CaptionExporter.swift", "func exportCaptionsCommand()", "document.displayStem"),
     ("EditorViewController+SaveFrame.swift", "func saveFrameCommand()", "document.displayStem"),
     ("ExportSheetController.swift", "private func suggestedName(", ".displayStem"),
+    ("AgentServer+Captions.swift", "func exportCaptions(", "captionDestinationURL("),
 ]
 
-# Where a bare `deletingPathExtension` MAY stand in the four files: the two
+# Where a bare `deletingPathExtension` MAY stand in the five files: the two
 # helpers, once each. Comments are stripped before counting, because the
 # doc comments name the bare call in order to argue against it.
 BARE_ALLOWED = {
@@ -1222,6 +1235,7 @@ BARE_ALLOWED = {
     "ProjectDocument+DisplayStem.swift": 1,
     "EditorViewController+SaveFrame.swift": 0,
     "ExportSheetController.swift": 0,
+    "AgentServer+Captions.swift": 0,
 }
 
 
@@ -1249,7 +1263,7 @@ def function_body(lines, signature):
 
 
 def section_wiring(sources):
-    print("\n  1e. the wiring — a structural read of the four sites (no probe can press a panel)")
+    print("\n  1e. the wiring — a structural read of the five sites (no probe can press a panel)")
     texts = {}
     for name in BARE_ALLOWED:
         path = os.path.join(sources, name)

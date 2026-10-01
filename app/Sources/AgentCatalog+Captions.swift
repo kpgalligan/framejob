@@ -245,7 +245,9 @@ extension AgentServer {
                     "path": [
                         "type": "string",
                         "description": "Where to write, e.g. ~/Movies/talk.srt. The folder "
-                            + "must exist.",
+                            + "must exist. A trailing .srt or .vtt is replaced by the format's "
+                            + "own; any other extension is kept as part of the name (chart.png "
+                            + "→ chart.png.srt).",
                     ],
                     "format": captionFormatProperty,
                 ], required: ["path"]),

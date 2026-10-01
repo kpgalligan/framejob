@@ -389,3 +389,23 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   positions on the grid, nothing moves. **Accepted**: at 7 fps, an edge
   clamped one frame from another (the trims, `roll`) may sit a tick off
   the grid. That is #42's class, and D7-3 restores it.
+- **#40 — `close_project` closes a document as File ▸ Close does;
+  `save_project {path}` and `new_project {path}` refuse a path another open
+  document holds.** `open_project` closes nothing. A window with a sheet
+  attached is refused first: the sheet is window-modal work in progress,
+  the rule `handleEditorKey` follows (`EditorViewController.swift`).
+  Unsaved changes are refused unless `discard: true`, and the tool never
+  writes the package. Under autosave in place, "unsaved" means "not yet
+  autosaved", and that is all `discard` loses. A closed path named later is
+  refused by name. The held-path check runs after `destinationURL`,
+  compares canonically, and comes before `new_project` creates anything,
+  which removes two documents at one path at its source. A save to the
+  document's own file stays a plain save (#138). The tool is withheld from
+  the assistant (AI-7, amended). Risk accepted: an agent that wants a path
+  another document holds closes that document first.
+- **#43 — `export_captions` replaces only `srt`/`vtt` (`knownExtensions`)
+  in a name; any other extension is part of it (`chart.png` →
+  `chart.png.srt`), which is the panel's rule.** The other tools keep
+  `replaceableExtensions`, `srt` and `vtt` included, so a still or a movie
+  named `.srt` is still renamed. Risk accepted: `talk.mp4` becomes
+  `talk.mp4.srt`.

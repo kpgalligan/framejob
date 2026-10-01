@@ -84,7 +84,7 @@
    "code": [
     "app/Sources/AppDelegate+Menus.swift `#selector(NSWindow.performClose(_:))`"
    ],
-   "note": "NSWindow.performClose(_:) — closes the window; an edited document's review is AppKit's sheet"
+   "note": "NSWindow.performClose(_:) — closes the window; an edited document's review is AppKit's sheet; the close_project tool is the capability"
   },
   "saveDocument:": {
    "verdict": "framework",
@@ -135,7 +135,7 @@
    "verdict": "sheet",
    "code": [
     "app/Sources/EditorViewController.swift `func exportCaptions(`",
-    "app/Sources/CaptionExporter.swift:519"
+    "app/Sources/CaptionExporter.swift:514"
    ],
    "note": "NSSavePanel.beginSheetModal; beeps with no text track"
   },
@@ -717,7 +717,7 @@
    "reached_after": [],
    "other_caller": "app/Sources/AppDelegate.swift `func applicationDidFinishLaunching(` — applicationDidFinishLaunching with AgentServerEnabled set; app/Sources/AppDelegate.swift `try AgentServer.shared.start()` — only when start() throws"
   },
-  "app/Sources/CaptionExporter.swift:519": {
+  "app/Sources/CaptionExporter.swift:514": {
    "token": "beginSheetModal",
    "func": "exportCaptionsCommand",
    "reached_from": [
@@ -726,7 +726,7 @@
    "reached_after": [],
    "other_caller": ""
   },
-  "app/Sources/CaptionExporter.swift:539": {
+  "app/Sources/CaptionExporter.swift:534": {
    "token": "beginSheetModal",
    "func": "exportCaptions",
    "reached_from": [],

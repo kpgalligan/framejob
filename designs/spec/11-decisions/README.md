@@ -15,13 +15,13 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | [`recording.md`](recording.md) | 138 | **Screen recording (road map 3).** The recorder: what is in and out, files, grants, pause. |
 | [`silence.md`](silence.md) | 49 | **Remove Silences (road map 4).** Silero VAD, its grid and cache, voice mode; S1-23. |
 | [`effects-motion.md`](effects-motion.md) | 60 | **Transitions and motion (road map 5).** R5-1..R5-5, E2-27. |
-| [`deepening.md`](deepening.md) | 391 | **Deepening (road map 7).** D2-1, D3-1, #21, #22, D4-1..D4-6, D7-1..D7-3, #42, #88, #63, #174: how ops refuse, the op table, the gate, the source window, time envelopes, one-delta shifts on the canvas's grid, the non-edits that speak, a relink that re-probes, one frame on the grid. |
+| [`deepening.md`](deepening.md) | 411 | **Deepening (road map 7).** D2-1, D3-1, #21, #22, D4-1..D4-6, D7-1..D7-3, #42, #88, #63, #174, #40, #43: how ops refuse, the op table, the gate, the source window, time envelopes, one-delta shifts on the canvas's grid, the non-edits that speak, a relink that re-probes, one frame on the grid, a tool that closes a document, a path one open document holds, a caption name's own extension. |
 | [`cloud-captions.md`](cloud-captions.md) | 327 | **Cloud captions (road map 6).** R6-1..R6-21: AssemblyAI, keys, deletion, recovery, refusal precedence, a dripping server, a Stop's bound on a DELETE, a refused transcript's failed DELETE reported for the dashboard, cached transcripts not re-checked for the key. |
 | [`word-captions.md`](word-captions.md) | 123 | **Word captions (road map 8).** W-1..W-11. |
 | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) | 363 | **Chrome, the clip inspector and keys (the sharp pass, road map 9, #35).** SH-1..SH-3, CI-1..CI-16, K-1..K-3. |
 | [`graphics.md`](graphics.md) | 405 | **Graphics (road map 10).** G-1..G-20. |
 | [`dev-tools.md`](dev-tools.md) | 27 | **Dev tools (road map 11).** V-1..V-3: the `REELCUT_DEV_TOOLS` flag and `make dist`, dev tools as ordinary tools, capture by `cacheDisplay`. |
-| [`assistant.md`](assistant.md) | 162 | **The Assistant (road map 12).** AI-1..AI-18: the bundled helper, one lane, the catalog at launch, the fourth tab, the window's own project, W-9's reach, withheld and ask-first tools, the key, history, undo, the model, a call mid-gesture, the base-URL override, the tab kept on a selection change, the live context on each message, Stop reaching a running export or transcribe, the selectable transcript and the multi-line composer, and the dev-only compaction threshold a proof lowers. |
+| [`assistant.md`](assistant.md) | 164 | **The Assistant (road map 12).** AI-1..AI-18: the bundled helper, one lane, the catalog at launch, the fourth tab, the window's own project, W-9's reach, withheld and ask-first tools, the key, history, undo, the model, a call mid-gesture, the base-URL override, the tab kept on a selection change, the live context on each message, Stop reaching a running export or transcribe, the selectable transcript and the multi-line composer, and the dev-only compaction threshold a proof lowers. |
 | [`pricing.md`](pricing.md) | 94 | **Pricing and spend (road map 13).** P-1..P-8: LiteLLM's table as the feed, a call priced from its own `usage` and `model` (per iteration), monthly dollar budgets per service, the app's spend as its own, the spend folder (ledger and price cache) that a proof never touches, the proofs' own ledger and how a paid proof request is held to the month's budget in it, and the two figures the app shows (the conversation's on the Assistant tab, the UTC month's in Settings), and a response cut short priced once and marked partial. |
 
 ## Every decision
@@ -87,6 +87,8 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | #88 | A non-edit a rule declined names the rule's value; a clamp that lands where the clip was stays an identity; a list that applied answers applied — amended by #174 | [`deepening.md`](deepening.md) |
 | #63 | A relink takes the new file's probe, and a media clip whose window runs past the file's end is held to it | [`deepening.md`](deepening.md) |
 | #174 | One frame is the grid's own first frame at every rate, and the handle form counts grid frames | [`deepening.md`](deepening.md) |
+| #40 | `close_project` closes a document as File ▸ Close does; `save_project {path}` and `new_project {path}` refuse a path another open document holds | [`deepening.md`](deepening.md) |
+| #43 | `export_captions` replaces only `srt`/`vtt` in a name; any other extension is part of it | [`deepening.md`](deepening.md) |
 | R6-1 | The cloud engine is a second engine behind the same command, never a second command | [`cloud-captions.md`](cloud-captions.md) |
 | R6-2 | Audio leaves the machine only by name, with the price in front of the person | [`cloud-captions.md`](cloud-captions.md) |
 | R6-3 | The transcript is a per-media asset in the package | [`cloud-captions.md`](cloud-captions.md) |
@@ -170,7 +172,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | AI-4 | The Assistant is the inspector's fourth tab: Clip, Media, Document, Assistant | [`assistant.md`](assistant.md) |
 | AI-5 | The assistant edits its own window's project | [`assistant.md`](assistant.md) |
 | AI-6 | W-9 governs automatic styling, not a person's request | [`assistant.md`](assistant.md) |
-| AI-7 | What the assistant may not call, and what it must ask about first | [`assistant.md`](assistant.md) |
+| AI-7 | What the assistant may not call, and what it must ask about first — amended by #40 | [`assistant.md`](assistant.md) |
 | AI-8 | The key is the person's own, and is R6-5 and R6-12's key in everything but the vendor | [`assistant.md`](assistant.md) |
 | AI-9 | History is append-only, and end-of-turn compaction is the one rewrite | [`assistant.md`](assistant.md) |
 | AI-10 | Each tool call the assistant makes is its own undo step | [`assistant.md`](assistant.md) |
