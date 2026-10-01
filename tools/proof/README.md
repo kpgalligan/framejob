@@ -7275,7 +7275,12 @@ and `RC_ASSISTANT_BASE_URL=http://127.0.0.1:9`:
   shows a rung of `figureLadder` that fits its frame, ends `" · Reelcut's
   estimate"` once a response is counted, its tooltip `figureTooltip`; the
   row's width is the same for all seven; at 480 (the control) each shows
-  `figure` exactly, fitting.
+  `figure` exactly, fitting. (B54, #207) The probe runs with `--fonts
+  app/Resources/Fonts`, which registers the shipped faces for every mode, and
+  P15 also needs the label's face to be `IBMPlexMono-Regular`, `--fonts` given
+  and the shipped `IBMPlexMono-Regular.ttf` registered (true, or "already
+  registered", 105). The face's file is reported and not scored, because Plex
+  Mono is also installed in `/Library/Fonts` on this host.
 
 **Live A** (`-AgentServerEnabled YES`, port 4874, `proof-key` in
 `-RCSecretFolder`, `RC_ASSISTANT_BASE_URL` at the stand-in,
@@ -7343,7 +7348,9 @@ transcript's `setFrameSize` sets `minSize = .zero` (P12),
 **`no-width-refit`** — the composer field's `layout()` no longer calls
 `fit()` (P13), and **`tall-placeholder`** — `placeholderRect` is 40 pt high
 again (P13); and (B47, #203) **`full-spend-only`** — the Spend row always
-shows `cost.figure` (P15). Each
+shows `cost.figure` (P15); and (B54, #207) **`no-plex`** — `DS.mono`'s
+regular face is named `NoSuchFace-Regular` (`Theme.swift`), so it takes its
+`.monospacedSystemFont` fallback (P15). Each
 scores its row alone and must FAIL. Rule R:
 exit 1 caught, 0 survived, 2 not performed — a mutant probe that did not
 build, or printed no row for its row, is an instrument failure (exit 2).
@@ -7395,6 +7402,7 @@ python3 tools/proof/assistant_tab_proof.py --mutant no-badge-app           # L8 
 python3 tools/proof/assistant_tab_proof.py --mutant no-close-decline       # P8 FAIL, exit 1
 python3 tools/proof/assistant_tab_proof.py --mutant no-badge               # P14 FAIL, exit 1
 python3 tools/proof/assistant_tab_proof.py --mutant full-spend-only        # P15 FAIL, exit 1
+python3 tools/proof/assistant_tab_proof.py --mutant no-plex                # P15 FAIL, exit 1
 python3 tools/proof/assistant_tab_proof.py --mutant modified-return-sends  # P9 FAIL, exit 1
 python3 tools/proof/assistant_tab_proof.py --mutant tab-types              # P9 FAIL, exit 1
 python3 tools/proof/assistant_tab_proof.py --mutant no-entry-parts         # P10 FAIL, exit 1
@@ -8580,7 +8588,7 @@ instrument failure is a scored FAIL, exit 1.
 
 | Runner | caught / survived / not performed |
 |---|---|
-| `assistant_lane_proof.py`, `assistant_tab_proof.py`, `assistant_helper_proof.py`, `assistant_prompt_proof.py`, `assistant_session_proof.py`, `spend_proof.py`, `budget_proof.py`, `prices_proof.py`, `prices_crosscheck.py`, `makefile_env_proof.py`, `export_cancel_proof.py`, `video_configuration_proof.py`, `speed_sheet_probe.py`, `text_break_proof.py` and `name_field_proof.py` (each `--baseline`, B23; `--mutant`, B32), `obscure_handles_probe.py` (`--baseline` and `--mutant`, B25), `cache_pass_probe.py` (`--mutant`, B14), `assistant_compaction_proof.py` (`--mutant`, B26), `relink_sheet_probe.py` (`--mutant`, B29) and `menu_undo_probe.py` (`--mutant`, B51) | 1 / 0 / 2 |
+| `assistant_lane_proof.py`, `assistant_tab_proof.py`, `assistant_helper_proof.py`, `assistant_prompt_proof.py`, `assistant_session_proof.py`, `spend_proof.py`, `budget_proof.py`, `prices_proof.py`, `prices_crosscheck.py`, `makefile_env_proof.py`, `export_cancel_proof.py`, `video_configuration_proof.py`, `speed_sheet_probe.py`, `text_break_proof.py` and `name_field_proof.py` (each `--baseline`, B23; `--mutant`, B32), `obscure_handles_probe.py` (`--baseline` and `--mutant`, B25), `cache_pass_probe.py` (`--mutant`, B14), `assistant_compaction_proof.py` (`--mutant`, B26), `relink_sheet_probe.py` (`--mutant`, B29), `menu_undo_probe.py` (`--mutant`, B51) and `assistant_clearing_proof.py` (`--mutant`, B54) | 1 / 0 / 2 |
 | `spend_ui_proof.py` | 1 / 3 / 2 |
 | `graphics_proof.py`, `graphics_store_probe.py`, `words_picture_probe.py` | 0 / 1 / 2 |
 | `cloud_captions_proof.py`, `cloud_captions_probe.py` (`--mutant`, `--fake-mutant`), `recording_probe.py`, `phase9_chrome.py` — whole-suite mutants | the per-row count and a normal run's exit / 2 |
@@ -11011,3 +11019,105 @@ python3 tools/proof/playhead_echo_probe.py                                      
 python3 tools/proof/playhead_echo_probe.py --sources tools/proof/work/b53/head/app/Sources     # twice·1 FAILS
 python3 tools/proof/clip_inspector7_proof.py --mutant tag-frozen                               # MUTANT PASS
 ```
+
+## Issue batch B54 — P15 measures in the shipped faces, and a capped live proof that the API accepts tool-result clearing (`assistant_tab_proof.py` P15 and `--mutant no-plex`; `assistant_clearing_proof.py` X0–X4, H, K and `--mutant clearing-off`; #207, #208)
+
+- **P15's faces (#207).** `assistant_tab_probe.swift`'s `registerShippedFonts`
+  runs once, before the mode dispatch, for every mode. It registers every
+  `.ttf` and `.otf` in `--fonts <dir>` for the process, which replaces the
+  `--badge` branch's own loop. `rows_p` now passes `--fonts app/Resources/Fonts`
+  (`FONTS`, which `row_p14` uses too). P15 also needs the label's face to be
+  `IBMPlexMono-Regular`, `--fonts` given, and the shipped
+  `IBMPlexMono-Regular.ttf` registered. Registered means the call answered
+  true, or false with `kCTFontManagerErrorAlreadyRegistered` (105). The
+  detail starts `face … (wanted IBMPlexMono-Regular) …; fonts …;
+  IBMPlexMono-Regular.ttf registered …; font file …`. The file is reported and
+  not scored, because Plex Mono is also installed in `/Library/Fonts` on this
+  host. The default run printed `face IBMPlexMono-Regular (wanted
+  IBMPlexMono-Regular) true; fonts …/app/Resources/Fonts;
+  IBMPlexMono-Regular.ttf registered true; font file
+  …/app/Resources/Fonts/IBMPlexMono-Regular.ttf`.
+- **P9, P12 and P13 in Source Sans 3.** The default run now has Source Sans 3
+  registered (the host has only `SourceSansPro-*`), so these rows measured in
+  the shipped face for the first time. All three passed, and none was
+  repinned.
+- **`--mutant no-plex`** (`MUTANTS`, `Theme.swift:129`): `DS.mono`'s regular
+  face is named `NoSuchFace-Regular`, so it takes its real fallback,
+  `.monospacedSystemFont`. P15 FAILED on the face guard alone: `face
+  .AppleSystemUIFontMonospaced-Regular (wanted IBMPlexMono-Regular) false;
+  … font file none`. Every fit, ladder, tooltip and width check in its detail
+  still passed. Without the face guard, the fallback face would have passed P15.
+- **The clearing proof (#208, spec §11 AI-20).** `assistant_clearing_proof.py`
+  (port 4886, `work/assistant_clearing/`) launches one Release app with
+  `-ReelcutAssistantAutoCompact NO -ReelcutAssistantClearToolResults YES`. It
+  points the app at `ClearingRelay`, a subclass of
+  `assistant_prompt_eval.Relay`, and sends two turns through `assistant_send`
+  without `pane`: "Add a marker called Alpha at 1 second." and "Add a marker
+  called Beta at 2 seconds." The rows are listed in its docstring.
+  - **The relay lowers the forwarded `max_tokens` to 8,000.** The helper always
+    asks for 32,000 (`agent/src/main.ts`). Spec §11 P-6 reserves each POST at
+    the body's bytes / 3 at $20/MTok plus `max_tokens` at $50/MTok. A helper
+    body of about 227 KB therefore reserves about $3.17, and under `--cap 3`
+    the relay would refuse every POST unchanged. At 8,000 the worst case is
+    about $1.91 (the rehearsal's H printed a worst POST of $1.9270).
+  - **X3 proves that the rewrite is the only change to turn A's bodies.** It
+    compares each body as the app sent it (`relay.sent`) with the body
+    forwarded (`relay.exchanges`). The rehearsal printed, for both turn-A
+    POSTs, `max_tokens 32000 → 8000, keys that differ ['max_tokens'], the rest
+    identical True`.
+  - **Turn B carries a lowered edit.** On turn B the relay also replaces
+    `context_management.edits` with `[LOWERED_EDIT]` (trigger 1,000 input
+    tokens, keep 1 tool use, no `clear_at_least`). This is the only way $3 can
+    show the API clearing, because the shipped trigger is 150,000 tokens. X4
+    SKIPs, naming the API's message, if the API refuses that edit with a 400.
+- **`anthropic_fake.py`.** A reply may carry `"context_management"`. It is
+  copied to the final `message_delta` (not to `message_start`, and not on a
+  `"cut"` reply) and to the non-stream Message. A reply without it keeps its
+  bytes. The rehearsal's turn-B reply carries `applied_edits` with one
+  `clear_tool_uses_20250919`, and the helper reported it as
+  `tool_results_cleared` (`tool_uses` 1, `tokens` 1200).
+
+Run on 2026-10-01, the change over `5293283`:
+
+| Command | Result |
+|---|---|
+| `make app` | BUILD SUCCEEDED |
+| `assistant_tab_proof.py` | 26/26, exit 0 |
+| `assistant_tab_proof.py --mutant no-plex` | P15 FAIL, 0/1, exit 1 |
+| `assistant_tab_proof.py --mutant full-spend-only` | P15 FAIL, 0/1, exit 1 (four rungs `fits false`; face guard true) |
+| `assistant_clearing_proof.py --rehearse` | 6/6 pass, 1 skipped (K), exit 0; floor $2.85 |
+| `--rehearse --refused` | 5/5 pass, 2 skipped (X4 `the API does not allow the lowered edit: context_management.edits.0.trigger: rehearsal refusal`, K), exit 0 |
+| `--rehearse --cap 0.0001` | WARNING printed; X1–X4 FAIL `cap:`, 2/6, exit 1 |
+| `--mutant clearing-off` | X1 FAIL (`context_management null, beta False`), `the mutant was caught`, exit 1 |
+| `assistant_settings_proof.py` | 3/3, exit 0 |
+| `assistant_compaction_proof.py --rehearse` | 8/8 pass, 1 skipped, exit 0 |
+
+```sh
+python3 tools/proof/assistant_tab_proof.py                                  # 26/26
+python3 tools/proof/assistant_tab_proof.py --mutant no-plex                 # P15 FAIL, exit 1
+python3 tools/proof/assistant_clearing_proof.py --rehearse                  # 6/6, K skipped
+python3 tools/proof/assistant_clearing_proof.py --rehearse --refused        # X4 SKIP, exit 0
+python3 tools/proof/assistant_clearing_proof.py --mutant clearing-off       # X1 FAIL, exit 1
+python3 tools/proof/assistant_clearing_proof.py --live --cap 3              # needs the key; spends
+```
+
+### Live run
+
+Run once on 2026-10-01 by the orchestrator, after review, with the owner's OK
+(#208): `perl -e 'alarm shift; exec @ARGV' 1200 python3 tools/proof/assistant_clearing_proof.py --live --cap 3`
+→ **7/7 pass, 0 skipped, exit 0; $0.1252 settled** (turn A $0.0928, turn B
+$0.0324), the month's first Anthropic spend of the $25.00 budget.
+
+| Row | Printed |
+|---|---|
+| X0 | `Reelcut: ` lines [] |
+| X1 | 2 turn-A and 2 turn-B POSTs as the app sent them, each with `{"edits": [CLEAR_EDIT]}` and the `context-management-2025-06-27` beta |
+| X2 | turn-A statuses [200, 200]; last stop_reason `end_turn`; no error events; the marker landed; replies' `context_management` `{"applied_edits": []}` (under the 150,000-token trigger, so nothing to clear: the API ACCEPTED the app's own request) |
+| X3 | both POSTs: `max_tokens 32000 → 8000`, keys that differ `['max_tokens']`, the rest identical |
+| X4 | turn-B statuses [200, 200]; applied edits `[{"type": "clear_tool_uses_20250919", "cleared_input_tokens": 93, "cleared_tool_uses": 1}]`; the app's `tool_results_cleared` event `{tool_uses: 1, tokens: 93}`: the API CLEARED, and the app heard it |
+| H | worst POST priced $1.9343; every POST within 256,000 bytes |
+| K | key present; 12 files read; holding it: [] |
+
+So AI-20's clearing is proven against the real API at both levels: the
+app's exact request is accepted (turn A), and with the trigger lowered the
+API clears a tool result and the app reports it (turn B).

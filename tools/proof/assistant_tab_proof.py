@@ -6,7 +6,8 @@ P — the probe `assistant_tab_probe.swift`, compiled over `app/Sources` minus
 `main.swift` on `harness/build.sh`'s swiftc line (`-D REELCUT_DEV_TOOLS`; a
 probe that does not build is a scored FAIL on every P row), with the Release
 build's helper copied to `<probe dir>/Contents/Helpers/reelcut-agent`, run
-with a DUMMY key in a `-RCSecretFolder` of its own,
+with `--fonts app/Resources/Fonts` (the shipped faces registered, #207), a
+DUMMY key in a `-RCSecretFolder` of its own,
 `-ReelcutInspectorCollapsed NO` and `RC_ASSISTANT_BASE_URL=http://127.0.0.1:9`:
   P1  the transcript's mapping over a scripted event list (runs, every
       sentence, usage, the three answers)
@@ -91,7 +92,10 @@ with a DUMMY key in a `-RCSecretFolder` of its own,
       shows a rung of `figureLadder` that fits its frame, ending " ·
       Reelcut's estimate" once a response is counted, its tooltip
       `figureTooltip`, the row's width the same for all seven; at 480 (the
-      control) each shows `figure`, fitting
+      control) each shows `figure`, fitting; and (#207) the label's face is
+      IBMPlexMono-Regular, `--fonts` was given and the shipped
+      IBMPlexMono-Regular.ttf registered (the face's file reported, not
+      scored: Plex Mono is also installed in /Library/Fonts on this host)
 
 Live A (`-AgentServerEnabled YES`, the dummy `proof-key` in `-RCSecretFolder`,
 `RC_ASSISTANT_BASE_URL` at `anthropic_fake.py`, port 4874), every turn through
@@ -135,6 +139,7 @@ Launch B (the override set, no `-RCSecretFolder`: no key, AI-13):
     python3 tools/proof/assistant_tab_proof.py --mutant no-close-decline       # P8 alone: FAILS
     python3 tools/proof/assistant_tab_proof.py --mutant no-badge               # P14 alone: FAILS
     python3 tools/proof/assistant_tab_proof.py --mutant full-spend-only        # P15 alone: FAILS
+    python3 tools/proof/assistant_tab_proof.py --mutant no-plex                # P15 alone: FAILS
     python3 tools/proof/assistant_tab_proof.py --mutant modified-return-sends  # P9 alone: FAILS
     python3 tools/proof/assistant_tab_proof.py --mutant tab-types              # P9 alone: FAILS
     python3 tools/proof/assistant_tab_proof.py --mutant no-entry-parts         # P10 alone: FAILS
@@ -164,7 +169,8 @@ is `super`'s; issue batch B37, #182: the meter always shows the full
 figure, the transcript's `setFrameSize` sets a zero minimum size, the
 composer field's `layout()` does not call `fit()`, `placeholderRect` is
 40 pt high; issue batch B47, #203: the Spend row always shows the full
-figure)
+figure; issue batch B54, #207: `DS.mono`'s regular face named
+`NoSuchFace-Regular`, so it takes its `.monospacedSystemFont` fallback)
 build the probe the same way and score their row alone; a
 probe that did not build, or printed no row for it, is an instrument failure
 (exit 2). Rule R
@@ -206,6 +212,7 @@ SOURCES = os.path.join(ROOT, "app", "Sources")
 LIB = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
 RELEASE = os.path.join(ROOT, asp.APP_PATH)
 HELPER = os.path.join(RELEASE, "Contents", "Helpers", "reelcut-agent")
+FONTS = os.path.join(ROOT, "app", "Resources", "Fonts")
 FORWARD = "session.onEvent ="
 PORT_A, PORT_B = 4874, 4877
 WALL_BUILD, WALL_RUN, WALL_TURN = 900, 300, 60
@@ -246,6 +253,10 @@ MUTANTS = {
                         "        if figureLabel.stringValue != shown "
                         "{ figureLabel.stringValue = shown }\n",
                         "        figureLabel.stringValue = cost.figure\n", "P15"),
+    "no-plex": ("Theme.swift",
+                '        let name = weight == .regular ? "IBMPlexMono-Regular" : "IBMPlexMono-Medium"\n',
+                '        let name = weight == .regular ? "NoSuchFace-Regular" : "IBMPlexMono-Medium"\n',
+                "P15"),
 }
 # name: (file in app/Sources, before — exactly once, after, row): a tree copy built with
 # `make app`, its row run live against it
@@ -347,7 +358,7 @@ def rows_p(score, binary=None, only=None):
                 score(row_id, False, f"the probe did not build: {why}",
                       instrument=only is not None)
             return
-    ran = bounded.run([binary, "-RCSecretFolder", probe_secrets(),
+    ran = bounded.run([binary, "--fonts", FONTS, "-RCSecretFolder", probe_secrets(),
                        "-ReelcutInspectorCollapsed", "NO"], WALL_RUN,
                       cwd=os.path.dirname(binary),
                       env=child_env({"RC_ASSISTANT_BASE_URL": "http://127.0.0.1:9"}))
@@ -418,8 +429,7 @@ def row_p14(score, fake, secrets, binary=None):
                    asp.say("P14: declined."),
                    asp.use("toolu_p14b", "export", {"preset": "h264", "path": path}),
                    asp.say("P14: stopped.")])
-    ran = bounded.run([binary, "--badge", path, "--fonts",
-                       os.path.join(ROOT, "app", "Resources", "Fonts"),
+    ran = bounded.run([binary, "--badge", path, "--fonts", FONTS,
                        "-RCSecretFolder", secrets, "-ReelcutInspectorCollapsed", "NO"],
                       WALL_RUN, cwd=os.path.dirname(binary),
                       env=child_env({"RC_ASSISTANT_BASE_URL": fake.base}))
@@ -848,7 +858,7 @@ def main():
                              "event forward; flatten-send: L7 alone, against a build whose "
                              "send() joins the lines; no-badge-app: L8 alone, against a build "
                              "that never sets the Assistant tab's dot; no-close-decline: P8, "
-                             "no-badge: P14, full-spend-only: P15, "
+                             "no-badge: P14, full-spend-only and no-plex: P15, "
                              "modified-return-sends, tab-types and full-figure-only: P9, "
                              "no-entry-parts: P10, shared-undo: P11, short-transcript: P12, "
                              "no-width-refit and tall-placeholder: P13, each alone against a probe built over the "

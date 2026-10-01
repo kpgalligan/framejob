@@ -9,13 +9,16 @@
 // `Bundle.main.bundleURL` is its own folder) and runs it with a DUMMY key in
 // `-RCSecretFolder`, `-ReelcutInspectorCollapsed NO`, and
 // `RC_ASSISTANT_BASE_URL=http://127.0.0.1:9` (nothing listens there; no row
-// here sends a message). Under `--close <path>` it runs P8 ALONE, and the
-// proof points `RC_ASSISTANT_BASE_URL` at its stand-in (`anthropic_fake.py`),
-// scripted to ask for `export` to `<path>` (#150). Under `--badge <path>
-// --fonts <dir>` it registers every face in `<dir>` and runs P14 ALONE, against
-// the stand-in scripted to ask for `export` to `<path>` twice (#152).
+// here sends a message). In every mode it first registers every face in
+// `--fonts <dir>` (the app's `app/Resources/Fonts`; a bare binary has no
+// `ATSApplicationFontsPath`), so each row measures in the shipped faces (#207).
+// Under `--close <path>` it runs P8 ALONE, and the proof points
+// `RC_ASSISTANT_BASE_URL` at its stand-in (`anthropic_fake.py`), scripted to
+// ask for `export` to `<path>` (#150). Under `--badge <path> --fonts <dir>` it
+// runs P14 ALONE, against the stand-in scripted to ask for `export` to
+// `<path>` twice (#152).
 //
-//   assistant_tab_probe                 P1–P7, P9–P13, P15 (P9 writes
+//   assistant_tab_probe --fonts <dir>   P1–P7, P9–P13, P15 (P9 writes
 //                                       looks/assistant-light|dark.png under
 //                                       the working folder)
 //   assistant_tab_probe --close <path>  P8
@@ -79,7 +82,10 @@
 //       unknown): the label shows a rung of `figureLadder` that fits its
 //       frame, ends " · Reelcut's estimate" once a response is counted, its
 //       tooltip `figureTooltip`; the row's width the same for all seven; at
-//       480 (the control) each shows `figure`
+//       480 (the control) each shows `figure`; and (#207) the label's face is
+//       IBMPlexMono-Regular, `--fonts` was given, and the shipped
+//       IBMPlexMono-Regular.ttf registered (the face's file is reported, not
+//       scored: Plex Mono is also installed in /Library/Fonts on this host)
 import AppKit
 import CoreText
 
@@ -1218,6 +1224,34 @@ func rowP14(_ path: String) {
 
 // MARK: - P15 the Spend row at the inspector's minimum width (#203)
 
+/// The shipped faces' registration (#207), set once before the mode dispatch.
+var shippedFonts: (directory: String?, notes: [String], plexRegistered: Bool) = (nil, [], false)
+
+/// Registers every `.ttf` and `.otf` in `--fonts <dir>` for the process, as
+/// the harness's `registerFonts` does. IBMPlexMono-Regular.ttf counts as
+/// registered when the call answers true or answers "already registered" (105).
+func registerShippedFonts(_ arguments: [String]) -> (
+    directory: String?, notes: [String], plexRegistered: Bool
+) {
+    guard let index = arguments.firstIndex(of: "--fonts"), index + 1 < arguments.count else {
+        return (nil, ["no --fonts"], false)
+    }
+    let fonts = URL(fileURLWithPath: arguments[index + 1])
+    var notes: [String] = []
+    var plexRegistered = false
+    let names = ((try? FileManager.default.contentsOfDirectory(atPath: fonts.path)) ?? []).sorted()
+    for name in names where name.hasSuffix(".ttf") || name.hasSuffix(".otf") {
+        var error: Unmanaged<CFError>?
+        let done = CTFontManagerRegisterFontsForURL(
+            fonts.appendingPathComponent(name) as CFURL, .process, &error)
+        let code = error.map { CFErrorGetCode($0.takeRetainedValue()) }
+        let registered = done || code == CTFontManagerError.alreadyRegistered.rawValue
+        if name == "IBMPlexMono-Regular.ttf" { plexRegistered = registered }
+        notes.append("\(name) \(done ? "registered" : "error \(code.map(String.init) ?? "none")")")
+    }
+    return (fonts.path, notes, plexRegistered)
+}
+
 func p15Costs() -> [(String, AssistantTurnCost)] {
     func event(_ cost: [String: Any], partial: Bool = false) -> [String: Any] {
         var made: [String: Any] = [
@@ -1269,8 +1303,17 @@ func rowP15() {
     }
     let label = spend.figureLabel
     let suffix = " · Reelcut's estimate"
-    var ok = true
-    var notes = ["font \(label.font?.fontName ?? "none")"]
+    let wantedFace = "IBMPlexMono-Regular"
+    let face = label.font?.fontName ?? "none"
+    let faceOK = face == wantedFace
+    let fontFile = label.font.flatMap {
+        CTFontCopyAttribute($0 as CTFont, kCTFontURLAttribute) as? URL
+    }?.path ?? "none"
+    var ok = faceOK && shippedFonts.directory != nil && shippedFonts.plexRegistered
+    var notes = [
+        "face \(face) (wanted \(wantedFace)) \(faceOK); fonts \(shippedFonts.directory ?? "none"); "
+            + "IBMPlexMono-Regular.ttf registered \(shippedFonts.plexRegistered); font file \(fontFile)",
+    ] + shippedFonts.notes
     var widths: [CGFloat] = []
     for (name, cost) in p15Costs() {
         view.reload([], usage: AssistantContextUsage(), cost: cost)
@@ -1315,19 +1358,13 @@ let badgePath: String? = arguments.firstIndex(of: "--badge").flatMap { index in
     index + 1 < arguments.count ? arguments[index + 1] : nil
 }
 
+// The shipped faces first, for every mode, as the harness's `registerFonts`
+// does: a bare binary has no `ATSApplicationFontsPath` (#207).
+shippedFonts = registerShippedFonts(arguments)
+
 if let closePath {
     rowP8(closePath)
 } else if let badgePath {
-    // The shipped faces first, as the harness's `registerFonts` does: a bare
-    // binary has no `ATSApplicationFontsPath`, and P14's geometry is in them.
-    if let index = arguments.firstIndex(of: "--fonts"), index + 1 < arguments.count {
-        let fonts = URL(fileURLWithPath: arguments[index + 1])
-        for name in (try? FileManager.default.contentsOfDirectory(atPath: fonts.path)) ?? []
-        where name.hasSuffix(".ttf") || name.hasSuffix(".otf") {
-            CTFontManagerRegisterFontsForURL(
-                fonts.appendingPathComponent(name) as CFURL, .process, nil)
-        }
-    }
     rowP14(badgePath)
 } else {
     rowP1()

@@ -51,6 +51,13 @@ Routes:
   "cache_read_input_tokens"}`, which becomes `usage.iterations` in the final
   `message_delta` and in the non-stream Message. A reply with neither keeps
   its bytes.
+  A reply may also carry `"context_management"` (issue batch B54, #208), the
+  API's report of the edits it applied, e.g. `{"applied_edits":
+  [{"type":"clear_tool_uses_20250919","cleared_tool_uses":1,
+  "cleared_input_tokens":1200}]}`: streamed, it is a top-level
+  `"context_management"` of the final `message_delta` (not on a `"cut"`
+  reply); in a non-stream Message, a top-level key. A reply without it keeps
+  its bytes.
 * `GET /__control/log` answers
   `{"requests":[{"method","path","headers","body","bytes"}],"failures":[str]}`.
 
@@ -138,6 +145,8 @@ def message_object(reply, index, model):
                          "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0}}
     if "iterations" in reply:
         message["usage"]["iterations"] = reply["iterations"]
+    if "context_management" in reply:
+        message["context_management"] = reply["context_management"]
     return message
 
 
@@ -148,6 +157,7 @@ def stream_events(reply, index, model):
     start = message_object(reply, index, model)
     start["content"] = []
     start["stop_reason"] = None
+    start.pop("context_management", None)  # only on the final message_delta
     start["usage"] = {"input_tokens": reply.get("input_tokens", 100), "output_tokens": 0,
                       "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0}
     events = [("message_start", {"type": "message_start", "message": start})]
@@ -180,10 +190,12 @@ def stream_events(reply, index, model):
     final_usage = {"output_tokens": 10}
     if "iterations" in reply:
         final_usage["iterations"] = reply["iterations"]
-    events.append(("message_delta", {"type": "message_delta",
-                                     "delta": {"stop_reason": reply.get("stop_reason"),
-                                               "stop_sequence": None},
-                                     "usage": final_usage}))
+    final_delta = {"type": "message_delta",
+                   "delta": {"stop_reason": reply.get("stop_reason"), "stop_sequence": None},
+                   "usage": final_usage}
+    if "context_management" in reply:
+        final_delta["context_management"] = reply["context_management"]
+    events.append(("message_delta", final_delta))
     events.append(("message_stop", {"type": "message_stop"}))
     return events
 
