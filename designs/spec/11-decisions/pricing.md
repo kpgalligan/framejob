@@ -87,8 +87,10 @@ and §5.
   failed before `message_start` emits none. A response is never priced both complete and partial.
   The ledger line gains `"partial": true`; the turn line and the tab's Spend figure read "at
   least"; Settings' month fold sums a partial line's dollars like any priced line, unflagged.
-  Before this, a response cut short was not priced at all (#162). Risk accepted: the figure is a
-  lower bound — the API sends its one `message_delta` after the last content block, so a response
-  cut short mid-stream is priced from `message_start`'s counts, its input and cache tokens, and in
-  practice none of its streamed output; how the API bills an aborted stream is manual check
-  AS-6's; the month line does not say that a line was partial.
+  Where the tab's full figure does not fit its row, it reads "≥" for "at least" and "<" for
+  "under", still ending "· Reelcut's estimate" (issue batch B47, #203). Before this, a response
+  cut short was not priced at all (#162). Risk accepted: the figure is a lower bound — the API
+  sends its one `message_delta` after the last content block, so a response cut short mid-stream
+  is priced from `message_start`'s counts, its input and cache tokens, and in practice none of its
+  streamed output; how the API bills an aborted stream is manual check AS-6's; the month line does
+  not say that a line was partial.

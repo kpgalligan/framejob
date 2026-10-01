@@ -339,7 +339,8 @@ the key map behind it.
   glue: `installAssistant(on:)` from `installInspector`, `attachAssistant`
   wiring the view's five intents as one-line forwards, `assistantRefresh()`
   — run LAST in every path that can change the phase or the question, since
-  `AssistantSession.send` goes busy and emits nothing — `assistantSend`
+  `AssistantSession.send` goes busy and emits nothing, and the Assistant tab's
+  dot's one writer (`inspector?.showAssistantBadge`, AI-19) — `assistantSend`
   (false = not taken, the composer keeps the text), Stop, Allow/Deny, Clear,
   View ▸ Assistant ⌃⌘A `showAssistant`, and `assistantConfigurationDidChange`,
   which ends the conversation with a note on a Settings key or model change;
@@ -474,7 +475,9 @@ the key map behind it.
   `ClipPane.forgetSubTab()` whenever the selection's ids change, spec §11
   CI-5; a changed selection switches to Clip only from the Media and
   Document tabs, never from the Assistant tab, and `clipPicked()` from any,
-  spec §11 AI-14; `onAssistantView` hands the editor the Assistant tab's view)
+  spec §11 AI-14; `onAssistantView` hands the editor the Assistant tab's view;
+  `assistantBadge`, the Assistant tab's question dot, installed over the strip
+  as the root's last subview, spec §11 AI-19)
   · `InspectorClipView.swift` (the inspector scroll view's clip view,
   installed first: a width change re-lays its document view, so a pane follows
   an autohiding legacy scroller, #142) · `InspectorRefusalStrip.swift` (spec
@@ -482,7 +485,11 @@ the key map behind it.
   core's sentence verbatim, remembered with the `editedProject` handle it
   was shown under and cleared on the first refresh under another handle or
   a click; `showRefusal` is the editor's forward of
-  `projectDocumentDidRefuse`) · `InspectorPane.swift`
+  `projectDocumentDidRefuse`) · `InspectorTabBadge.swift` (spec §11 AI-19: the
+  Assistant tab's question dot, a passive view over the tab strip — `hitTest`
+  nil — mirroring `PanelTabsView.tabRect`'s arithmetic, since `Controls.swift`
+  is not forked; `showAssistantBadge(_:)` is its inspector-side setter) ·
+  `InspectorPane.swift`
   (the pane base — `pinnedBlock` is the header `makeHeader()` built, never
   stacked — the row builders, whose four typed ones derive a row's DEFAULT
   from its own `read` and `ops` unless `resets: false`, and
@@ -652,8 +659,10 @@ the key map behind it.
   does not fit; the tooltip always the full one; `full-figure-only`'s target);
   `AssistantConversationCostView` (the same file, road map 13 P4, spec §11
   P-7) the Spend row 6 pt under the meter and Clear, the rule under it:
-  `AssistantTurnCost.figure` of `conversationCost`, which `reload(_:usage:cost:)`
-  and `apply`'s `.conversationCost` set. Accessibility ids
+  the first rung of `AssistantTurnCost.figureLadder` of `conversationCost`
+  that fits beside its title ("≥"/"<" for "at least"/"under", still ending "·
+  Reelcut's estimate", spec §11 P-8; the tooltip stays `figureTooltip`), which
+  `reload(_:usage:cost:)` and `apply`'s `.conversationCost` set. Accessibility ids
   `assistant.composer|send|allow|deny|question|clear|settings|nokey|spend` and
   `assistant.entry.<kind>` are what the proofs read.
 - `AssistantComposer.swift` — the Assistant tab's composer (spec §11
@@ -671,8 +680,9 @@ the key map behind it.
   `AssistantComposerField` is its scroll view: DSField's 1 pt layer border,
   26 pt for one line plus one line height per further line up to five,
   then scrolling; it refits on every change and on a width change (in
-  `layout()`, which P13 scores and `no-width-refit` removes; #182 item 3 is
-  open); the placeholder is drawn in `placeholderRect`, one line high.
+  `layout()`, which P13 scores and `no-width-refit` removes; #182 item 3 is an
+  accepted limit since B47: a refit from `AssistantView.layout()` lagged a
+  pass); the placeholder is drawn in `placeholderRect`, one line high.
   `assistant_tab_proof.py`'s `modified-return-sends`, `tab-types`,
   `shared-undo` and `tall-placeholder` mutants edit its `.newline` arm,
   `insertTab`'s body, the override and `placeholderRect`'s height, each

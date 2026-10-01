@@ -1,5 +1,5 @@
 // Road map 12 A2 — the Assistant tab's probe (spec §11 AI-4, AI-8, AI-11,
-// AI-14, AI-17).
+// AI-14, AI-17, AI-19).
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
 // `main.swift`, module `Reelcut`, against `libreelcut_core.a` —
@@ -11,12 +11,16 @@
 // `RC_ASSISTANT_BASE_URL=http://127.0.0.1:9` (nothing listens there; no row
 // here sends a message). Under `--close <path>` it runs P8 ALONE, and the
 // proof points `RC_ASSISTANT_BASE_URL` at its stand-in (`anthropic_fake.py`),
-// scripted to ask for `export` to `<path>` (#150).
+// scripted to ask for `export` to `<path>` (#150). Under `--badge <path>
+// --fonts <dir>` it registers every face in `<dir>` and runs P14 ALONE, against
+// the stand-in scripted to ask for `export` to `<path>` twice (#152).
 //
-//   assistant_tab_probe                 P1–P7, P9–P13 (P9 writes
+//   assistant_tab_probe                 P1–P7, P9–P13, P15 (P9 writes
 //                                       looks/assistant-light|dark.png under
 //                                       the working folder)
 //   assistant_tab_probe --close <path>  P8
+//   assistant_tab_probe --badge <path> --fonts <dir>
+//                                       P14 (writes looks/badge-light.png)
 //
 // Prints exactly one stdout line:
 //   ANSWER {"rows":[{"id","ok","detail"}]}
@@ -58,8 +62,26 @@
 //   P13 (#182 item 4) the composer's placeholder rect is one line high at
 //       the text's origin; and with a 41-character message the field is one
 //       line at 480, two at the minimum width, one at 480 again, one pass
-//       each (a guard of today's refit in layout(); #182 item 3 is open)
+//       each (a guard of the refit in the field's layout(); #182 item 3 is
+//       accepted: a refit from AssistantView.layout() lagged a pass in B47)
+//   P14 (#152, AI-19) light, in a real editor window: before any send the tab
+//       is Clip, the Assistant tab never built, the dot hidden; asking, it
+//       shows on Clip, Media and Assistant; Deny hides it at once and it stays
+//       hidden once idle; a second question shows it and Stop hides it; in
+//       Source Sans 3 at 280 and 480 pt the dot is inside the Assistant tab,
+//       ≥ 1 pt from its trailing edge and ≥ 1 pt right of the title; the
+//       inspector drawn with the dot hidden and with it removed is
+//       byte-identical, and with it shown differs only inside the dot's rect
+//       (outset 1 pt); no file at the path
+//   P15 (#203) the Spend row at the inspector's minimum width less a legacy
+//       scroller, light, for seven costs (none; priced 0.0018 and 0.00002;
+//       partial 0.1234 and 12.3456; unknown alone; priced 0.0123 then
+//       unknown): the label shows a rung of `figureLadder` that fits its
+//       frame, ends " · Reelcut's estimate" once a response is counted, its
+//       tooltip `figureTooltip`; the row's width the same for all seven; at
+//       480 (the control) each shows `figure`
 import AppKit
+import CoreText
 
 final class ProbeDocumentController: NSDocumentController {
     override var defaultType: String? { ProjectDocument.projectTypeIdentifier }
@@ -979,7 +1001,7 @@ func rowP12() {
     row("P12", ok, notes.joined(separator: "; "))
 }
 
-// MARK: - P13 the placeholder's height (#182 item 4) and the width refit, in layout() today
+// MARK: - P13 the placeholder's height (#182 item 4) and the width refit in the field's layout()
 
 func rowP13() {
     NSApp.appearance = NSAppearance(named: .aqua)
@@ -1025,7 +1047,7 @@ func rowP13() {
     let rect = composer.placeholderRect
     let placeholderOK = !composer.placeholder.isEmpty && rect.height == lineHeight
         && rect.minY == composer.textContainerOrigin.y && rect.width > 0
-    // A guard of today's refit in the field's layout() (#182 item 3 is open):
+    // A guard of the refit in the field's layout() (#182 item 3, accepted in B47):
     // one line, two at the narrow width, one again, each after one pass.
     let heightsOK = wide == one && narrowHeight == one + lineHeight && back == one
     window.orderOut(nil)
@@ -1038,15 +1060,275 @@ func rowP13() {
             + trace.joined(separator: ", "))
 }
 
+// MARK: - P14 the Assistant tab's question dot (#152, AI-19)
+
+/// The bytes of `view` drawn by `cacheDisplay`, with its pixel geometry.
+struct P14Capture {
+    let rep: NSBitmapImageRep
+    let bytes: [UInt8]
+}
+
+func p14Capture(_ view: NSView) -> P14Capture? {
+    guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return nil }
+    view.cacheDisplay(in: view.bounds, to: rep)
+    guard let data = rep.bitmapData else { return nil }
+    let count = rep.bytesPerRow * rep.pixelsHigh
+    return P14Capture(rep: rep, bytes: Array(UnsafeBufferPointer(start: data, count: count)))
+}
+
+/// Pixels of `a` and `b` that differ, counted inside and outside `inside`
+/// (a pixel rect: columns x, rows from the top).
+func p14Differences(_ a: P14Capture, _ b: P14Capture, inside: NSRect) -> (Int, Int) {
+    let stride = a.rep.bitsPerPixel / 8
+    var within = 0
+    var outside = 0
+    for row in 0..<a.rep.pixelsHigh {
+        for column in 0..<a.rep.pixelsWide {
+            let at = row * a.rep.bytesPerRow + column * stride
+            if a.bytes[at..<(at + stride)] == b.bytes[at..<(at + stride)] { continue }
+            if inside.contains(NSPoint(x: CGFloat(column) + 0.5, y: CGFloat(row) + 0.5)) {
+                within += 1
+            } else {
+                outside += 1
+            }
+        }
+    }
+    return (within, outside)
+}
+
+func rowP14(_ path: String) {
+    try? FileManager.default.removeItem(atPath: path)
+    NSApp.appearance = NSAppearance(named: .aqua)
+    defer { NSApp.appearance = nil }
+    guard let (_, editor, _) = newEditor(), let inspector = editor.inspector else {
+        row("P14", false, "the editor or its inspector did not open")
+        return
+    }
+    let badge = inspector.assistantBadge
+    var notes: [String] = []
+    var ok = true
+    func check(_ name: String, _ good: Bool, _ detail: String) {
+        ok = ok && good
+        notes.append("\(name) \(good ? "ok" : "FAIL"): \(detail)")
+    }
+    func shown() -> Bool { !badge.isHiddenOrHasHiddenAncestor }
+    func phase() -> String { editor.assistant.map { "\($0.phase)" } ?? "no session" }
+
+    // (a) before any send.
+    check("(a)", inspector.tab == .clip && editor.assistantView == nil && !shown(),
+          "tab \(inspector.tab), assistantView nil \(editor.assistantView == nil), "
+            + "badge shown \(shown())")
+
+    // (b) asking: shown on Clip, Media and Assistant.
+    let sent = editor.assistantSend("Export the project (P14 one).")
+    var deadline = Date().addingTimeInterval(30)
+    while editor.assistant?.phase != .asking && Date() < deadline { spin(0.05) }
+    let asking = editor.assistant?.phase == .asking
+    let onClip = shown() && inspector.tab == .clip
+    inspector.select(.media)
+    let onMedia = shown() && inspector.tab == .media
+    inspector.select(.assistant)
+    spin(0.1)
+    let onAssistant = shown() && inspector.tab == .assistant
+    check("(b)", sent && asking && onClip && onMedia && onAssistant,
+          "sent \(sent), asking in 30 s \(asking) (phase \(phase())); shown on Clip \(onClip), "
+            + "on Media \(onMedia), on Assistant \(onAssistant)")
+
+    // (c) Deny: hidden at once, and still hidden once idle.
+    editor.assistantAnswer(false)
+    let deniedHidden = !shown()
+    deadline = Date().addingTimeInterval(30)
+    while editor.assistant?.phase != .idle && Date() < deadline { spin(0.05) }
+    let idle = editor.assistant?.phase == .idle
+    check("(c)", deniedHidden && idle && !shown(),
+          "hidden at Deny \(deniedHidden); idle in 30 s \(idle) (phase \(phase())); hidden "
+            + "\(!shown())")
+
+    // (d) a second question, then Stop.
+    let again = editor.assistantSend("Export the project (P14 two).")
+    deadline = Date().addingTimeInterval(30)
+    while editor.assistant?.phase != .asking && Date() < deadline { spin(0.05) }
+    let askingAgain = editor.assistant?.phase == .asking && shown()
+    let phaseAgain = phase()
+    editor.assistantStop()
+    let stoppedHidden = !shown()
+    check("(d)", again && askingAgain && stoppedHidden,
+          "sent \(again), asking and shown \(askingAgain) (phase \(phaseAgain)); hidden at "
+            + "Stop \(stoppedHidden) (phase \(phase()))")
+
+    // (e) geometry, in the shipped Source Sans 3.
+    let registered = NSFont(name: "SourceSans3-SemiBold", size: 12) != nil
+    var geometry: [String] = []
+    var geometryOK = registered
+    for width in [EditorViewController.minInspectorWidth, 480] {
+        let tab = InspectorTabBadge.tabRect(stripWidth: width, stripHeight: DS.tabHeight)
+        let title = InspectorTabBadge.titleRect(stripWidth: width, stripHeight: DS.tabHeight)
+        let dot = InspectorTabBadge.dotRect(stripWidth: width, stripHeight: DS.tabHeight)
+        let inside = tab.contains(dot) && tab.maxX - dot.maxX >= 1
+        let clear = dot.minX >= title.maxX + 1
+        geometryOK = geometryOK && inside && clear
+        geometry.append("at \(width): tab \(tab), title \(title), dot \(dot) (inside with ≥ 1 pt "
+            + "to the trailing edge \(inside), ≥ 1 pt right of the title \(clear))")
+    }
+    check("(e)", geometryOK,
+          "SourceSans3-SemiBold registered \(registered); " + geometry.joined(separator: "; "))
+
+    // (f) pixels: shown (A), hidden (B), removed (C).
+    let root = inspector.view
+    root.layoutSubtreeIfNeeded()
+    // The dot's rect in the root, read while the badge is still in it.
+    let dot = badge.convert(
+        InspectorTabBadge.dotRect(stripWidth: badge.bounds.width, stripHeight: badge.bounds.height),
+        to: root
+    ).insetBy(dx: -1, dy: -1)
+    inspector.showAssistantBadge(true)
+    let a = p14Capture(root)
+    inspector.showAssistantBadge(false)
+    let b = p14Capture(root)
+    badge.removeFromSuperview()
+    let c = p14Capture(root)
+    if let a, let b, let c {
+        let scale = CGFloat(a.rep.pixelsWide) / root.bounds.width
+        let top = root.isFlipped ? dot.minY : root.bounds.height - dot.maxY
+        let pixels = NSRect(x: dot.minX * scale, y: top * scale, width: dot.width * scale,
+                            height: dot.height * scale)
+        let sameBC = b.bytes == c.bytes
+        let (within, outside) = p14Differences(a, b, inside: pixels)
+        let folder = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            .appendingPathComponent("looks")
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let png = folder.appendingPathComponent("badge-light.png")
+        try? FileManager.default.removeItem(at: png)
+        let written = a.rep.representation(using: .png, properties: [:])
+            .map { (try? $0.write(to: png)) != nil } ?? false
+        check("(f)", sameBC && within > 0 && outside == 0 && written,
+              "\(a.rep.pixelsWide)×\(a.rep.pixelsHigh) px; hidden and removed byte-identical "
+                + "\(sameBC); shown vs hidden: \(within) px differ inside the dot's rect "
+                + "\(pixels) (want > 0), \(outside) outside (want 0); \(png.lastPathComponent) "
+                + "written \(written)")
+    } else {
+        check("(f)", false, "a capture failed (A \(a != nil), B \(b != nil), C \(c != nil))")
+    }
+
+    // (g) nothing written.
+    let noFile = !FileManager.default.fileExists(atPath: path)
+    check("(g)", noFile, "no file at \(path) \(noFile)")
+    row("P14", ok, notes.joined(separator: "; "))
+}
+
+// MARK: - P15 the Spend row at the inspector's minimum width (#203)
+
+func p15Costs() -> [(String, AssistantTurnCost)] {
+    func event(_ cost: [String: Any], partial: Bool = false) -> [String: Any] {
+        var made: [String: Any] = [
+            "type": "cost", "cost": cost, "prices": ["kind": "bundled", "as_of": "2026-09-01"],
+        ]
+        if partial { made["partial"] = true }
+        return made
+    }
+    func priced(_ dollars: Double) -> [String: Any] { ["kind": "dollars", "dollars": dollars] }
+    let unknown: [String: Any] = ["kind": "unknown", "cause": "model", "detail": "no price"]
+    func made(_ events: [[String: Any]]) -> AssistantTurnCost {
+        var cost = AssistantTurnCost()
+        for item in events { cost.add(item) }
+        return cost
+    }
+    return [
+        ("none", AssistantTurnCost()),
+        ("priced 0.0018", made([event(priced(0.0018))])),
+        ("priced 0.00002", made([event(priced(0.000_02))])),
+        ("partial 0.1234", made([event(priced(0.1234), partial: true)])),
+        ("partial 12.3456", made([event(priced(12.3456), partial: true)])),
+        ("unknown alone", made([event(unknown)])),
+        ("priced 0.0123 then unknown", made([event(priced(0.0123)), event(unknown)])),
+    ]
+}
+
+func rowP15() {
+    NSApp.appearance = NSAppearance(named: .aqua)
+    defer { NSApp.appearance = nil }
+    let narrow = EditorViewController.minInspectorWidth
+        - NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy)
+    let window = NSWindow(
+        contentRect: NSRect(x: 0, y: 0, width: narrow, height: 600), styleMask: [.titled],
+        backing: .buffered, defer: false)
+    let backdrop = P9Backdrop(frame: NSRect(x: 0, y: 0, width: narrow, height: 600))
+    let view = AssistantView()
+    view.frame = backdrop.bounds
+    view.autoresizingMask = [.width, .height]
+    backdrop.addSubview(view)
+    window.contentView = backdrop
+    view.show(hasKey: true)
+    view.show(phase: .idle, question: nil)
+    window.layoutIfNeeded()
+    guard let spend = walk(view).first(where: { $0 is AssistantConversationCostView })
+        as? AssistantConversationCostView
+    else {
+        row("P15", false, "no AssistantConversationCostView in the view")
+        return
+    }
+    let label = spend.figureLabel
+    let suffix = " · Reelcut's estimate"
+    var ok = true
+    var notes = ["font \(label.font?.fontName ?? "none")"]
+    var widths: [CGFloat] = []
+    for (name, cost) in p15Costs() {
+        view.reload([], usage: AssistantContextUsage(), cost: cost)
+        window.layoutIfNeeded()
+        let shown = label.stringValue
+        let fits = label.intrinsicContentSize.width <= label.frame.width + 0.5
+        let ends = name == "none" ? shown == "Nothing yet" : shown.hasSuffix(suffix)
+        let tip = label.toolTip == AssistantTurnCost.figureTooltip
+        let inLadder = cost.figureLadder.contains(shown)
+        ok = ok && fits && ends && tip && inLadder
+        widths.append(spend.frame.width)
+        notes.append("\(name) \"\(shown)\" (\(shown.count) characters; intrinsic "
+            + "\(label.intrinsicContentSize.width) in \(label.frame.width), fits \(fits); "
+            + "ends as wanted \(ends); in the ladder \(inLadder); tooltip \(tip))")
+    }
+    let steady = widths.allSatisfy { abs($0 - widths[0]) <= 0.5 }
+    ok = ok && steady
+    notes.append("at \(narrow) the row's widths \(widths) (equal \(steady))")
+    window.setContentSize(NSSize(width: 480, height: 600))
+    window.layoutIfNeeded()
+    for (name, cost) in p15Costs() {
+        view.reload([], usage: AssistantContextUsage(), cost: cost)
+        window.layoutIfNeeded()
+        let shown = label.stringValue
+        let full = shown == cost.figure
+        let fits = label.intrinsicContentSize.width <= label.frame.width + 0.5
+        ok = ok && full && fits
+        notes.append("control at 480: \(name) \"\(shown)\" (the full figure \(full), intrinsic "
+            + "\(label.intrinsicContentSize.width) in \(label.frame.width))")
+    }
+    window.orderOut(nil)
+    row("P15", ok, notes.joined(separator: "; "))
+}
+
 // MARK: - Run
 
 let arguments = CommandLine.arguments
 let closePath: String? = arguments.firstIndex(of: "--close").flatMap { index in
     index + 1 < arguments.count ? arguments[index + 1] : nil
 }
+let badgePath: String? = arguments.firstIndex(of: "--badge").flatMap { index in
+    index + 1 < arguments.count ? arguments[index + 1] : nil
+}
 
 if let closePath {
     rowP8(closePath)
+} else if let badgePath {
+    // The shipped faces first, as the harness's `registerFonts` does: a bare
+    // binary has no `ATSApplicationFontsPath`, and P14's geometry is in them.
+    if let index = arguments.firstIndex(of: "--fonts"), index + 1 < arguments.count {
+        let fonts = URL(fileURLWithPath: arguments[index + 1])
+        for name in (try? FileManager.default.contentsOfDirectory(atPath: fonts.path)) ?? []
+        where name.hasSuffix(".ttf") || name.hasSuffix(".otf") {
+            CTFontManagerRegisterFontsForURL(
+                fonts.appendingPathComponent(name) as CFURL, .process, nil)
+        }
+    }
+    rowP14(badgePath)
 } else {
     rowP1()
     rowP2()
@@ -1064,6 +1346,7 @@ if let closePath {
     rowP11()
     rowP12()
     rowP13()
+    rowP15()
 }
 
 let body: [String: Any] = ["rows": rows]

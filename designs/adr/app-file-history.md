@@ -391,6 +391,12 @@ Still true of the current code:
 - The playhead echo has no MCP drive: no tool reads the live player's reports.
 - The canvas text editor shows an UPPERCASE text as typed, so a capital wider than its letter can
   wrap where the render does not; a rotated clip is edited axis-aligned (spec §11 K-3, #117).
+- `AssistantComposerField` refits on a width change inside its own `layout()`; moving the refit to
+  its `setFrameSize` (B37) or to `AssistantView.layout()` (B47) lagged one pass (#182 item 3,
+  accepted). B47's P13, one `layoutIfNeeded()` each with the 41-character message: 26.0 pt at
+  480 (want 26.0), 26.0 at 263.0 (want 41.0), 41.0 at 480 again (want 26.0); the height
+  constant 26.0, 26.0, 41.0 against text view widths 390.0, 156.0, 390.0 (inferred, not
+  measured: the nested field's frame is not yet the new width when `AssistantView.layout()` runs).
 
 ## Named next cuts
 

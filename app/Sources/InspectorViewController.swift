@@ -76,6 +76,8 @@ final class InspectorViewController: NSViewController {
     /// The foot under the scroll view and the refusal strip it hosts (CI-10).
     let footContainer = NSStackView()
     let refusalStrip = InspectorRefusalStrip()
+    /// The Assistant tab's question dot, over the strip (spec §11 AI-19).
+    let assistantBadge = InspectorTabBadge()
     private var scroll: NSScrollView!
     private var panes: [InspectorTab: InspectorPaneView] = [:]
     private var currentPane: InspectorPaneView?
@@ -146,6 +148,7 @@ final class InspectorViewController: NSViewController {
             footContainer.bottomAnchor.constraint(equalTo: root.bottomAnchor),
             footCollapse,
         ])
+        assistantBadge.install(over: tabsContainer, in: root)
         view = root
         buildTabs()
     }

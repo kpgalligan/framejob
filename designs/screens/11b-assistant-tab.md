@@ -43,6 +43,8 @@ then scrolls, and the transcript above it is one text that can be selected acros
 entries; and
 while the assistant asks before writing a file, a row above the field reads "The
 assistant asks first:" with the tool and the path, and "Allow" and "Deny" buttons.
+While that question waits, a small dot in the accent colour sits just right of the
+word Assistant in the tab strip, whichever tab is showing.
 
 In the light capture the tab strip and the panel are white with black text, the
 Assistant tab a white cell with a blue underline, the context and spend rows' text

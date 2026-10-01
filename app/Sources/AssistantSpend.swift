@@ -285,6 +285,19 @@ struct AssistantTurnCost: Equatable {
         return "unknown" + estimate
     }
 
+    /// The Spend row's spellings, longest first (spec §11 P-7, P-8):
+    /// ["Nothing yet"] before any response; else [figure], plus, when figure
+    /// starts "at least " or "under ", figure with that prefix replaced by
+    /// "≥" or "<" (no space). Every rung after a response ends
+    /// " · Reelcut's estimate".
+    var figureLadder: [String] {
+        let full = figure
+        for (long, short) in [("at least ", "≥"), ("under ", "<")] where full.hasPrefix(long) {
+            return [full, short + full.dropFirst(long.count)]
+        }
+        return [full]
+    }
+
     static let figureTooltip =
         "What this conversation's responses cost at LiteLLM prices, as Reelcut estimates it. "
         + "The Anthropic Console shows what your account was billed."

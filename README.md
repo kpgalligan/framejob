@@ -65,6 +65,7 @@ schema, §6 the op table, §7 the architecture.
   text you can select and copy across entries — asks
   before it writes a file — naming the file, and saying REPLACES when one is
   already there — and waits for Allow or Deny (a click; Return never answers);
+  the Assistant tab's title wears a dot while it waits, whichever tab is showing;
   Return sends and ⇧Return starts a new line, the message field growing to
   five lines; Send becomes Stop while it works, Clear starts over, and a meter shows how
   full the conversation is. It runs on your own Anthropic API key and the

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """The Assistant tab — road map 12 A2 (spec §11 AI-4, AI-7, AI-8, AI-11,
-AI-14, AI-17).
+AI-14, AI-17, AI-19).
 
 P — the probe `assistant_tab_probe.swift`, compiled over `app/Sources` minus
 `main.swift` on `harness/build.sh`'s swiftc line (`-D REELCUT_DEV_TOOLS`; a
@@ -70,7 +70,28 @@ with a DUMMY key in a `-RCSecretFolder` of its own,
       one line high at the text container's origin; and with a 41-character
       message the field is one line high at 480, two at the minimum width
       less a legacy scroller, one at 480 again, one `layoutIfNeeded()` each
-      (a guard of today's refit in `layout()`; #182 item 3 is open)
+      (a guard of the refit in the field's `layout()`; #182 item 3 is
+      accepted: a refit from `AssistantView.layout()` lagged a pass in B47)
+  P14 (#152, AI-19) the probe run alone under `--badge <path> --fonts
+      app/Resources/Fonts`, against the stand-in scripted to ask for
+      `export` to `work/assistant_tab/p14/P14.mp4` twice, light, in a real
+      editor window: before any send the tab is Clip, the Assistant tab never
+      built and the dot hidden; asking, the dot shows on Clip, then Media,
+      then Assistant; Deny hides it at once and it stays hidden once idle; a
+      second question shows it and Stop hides it; in Source Sans 3 (the
+      registration checked) at 280 and 480 pt the dot is inside the
+      Assistant tab with ≥ 1 pt to its trailing edge and ≥ 1 pt right of the
+      title; the inspector drawn with the dot hidden and with the badge
+      removed is byte-identical, and with it shown differs inside the dot's
+      rect (outset 1 pt) and nowhere else (`probe/looks/badge-light.png`); no
+      file; and no failure in the stand-in's log
+  P15 (#203) the Spend row at the inspector's minimum width less a legacy
+      scroller, light, for seven costs — none; priced 0.0018 and 0.00002;
+      partial 0.1234 and 12.3456; unknown alone; priced 0.0123 then unknown —
+      shows a rung of `figureLadder` that fits its frame, ending " ·
+      Reelcut's estimate" once a response is counted, its tooltip
+      `figureTooltip`, the row's width the same for all seven; at 480 (the
+      control) each shows `figure`, fitting
 
 Live A (`-AgentServerEnabled YES`, the dummy `proof-key` in `-RCSecretFolder`,
 `RC_ASSISTANT_BASE_URL` at `anthropic_fake.py`, port 4874), every turn through
@@ -97,6 +118,11 @@ the tab's own controls (`assistant_send` / `assistant_answer` with `pane`):
       blank one, an indented one): finished; one POST whose last user text
       ends with `</reelcut_context>\n` and the text, intact; the dump's last
       person entry is the text; the composer is empty; no tab problem
+  L8  (AI-19, #152) a question through the pane: the dump's
+      `inspector.assistant.badge` visible on the Assistant tab, and on the
+      Clip tab with no layout problem on it; `assistant_answer deny` (no
+      pane): finished, the dot present and hidden, no file; then back to the
+      Assistant tab
   K   `proof-key` in no MCP answer, no layout dump and not the log
 Launch B (the override set, no `-RCSecretFolder`: no key, AI-13):
   N1  View ▸ Assistant shows the no-key sentence and Open Settings…, and no
@@ -105,7 +131,10 @@ Launch B (the override set, no `-RCSecretFolder`: no key, AI-13):
     python3 tools/proof/assistant_tab_proof.py
     python3 tools/proof/assistant_tab_proof.py --mutant no-forward             # L2 alone: FAILS
     python3 tools/proof/assistant_tab_proof.py --mutant flatten-send           # L7 alone: FAILS
+    python3 tools/proof/assistant_tab_proof.py --mutant no-badge-app           # L8 alone: FAILS
     python3 tools/proof/assistant_tab_proof.py --mutant no-close-decline       # P8 alone: FAILS
+    python3 tools/proof/assistant_tab_proof.py --mutant no-badge               # P14 alone: FAILS
+    python3 tools/proof/assistant_tab_proof.py --mutant full-spend-only        # P15 alone: FAILS
     python3 tools/proof/assistant_tab_proof.py --mutant modified-return-sends  # P9 alone: FAILS
     python3 tools/proof/assistant_tab_proof.py --mutant tab-types              # P9 alone: FAILS
     python3 tools/proof/assistant_tab_proof.py --mutant no-entry-parts         # P10 alone: FAILS
@@ -122,16 +151,20 @@ steps and L2 against that app: L2 must FAIL (exit 1; 0 when it survives). A
 copy that did not build could not perform the control (exit 2). `flatten-send`
 is the same tree copy with `send()` joining the composer's lines with spaces
 before it trims (`TREE_MUTANTS`), and runs L7 alone after `open_tab`: L7 must
-FAIL. `no-close-decline` builds the
+FAIL; `no-badge-app` is the same tree copy with `assistantRefresh()`'s
+`showAssistantBadge` line deleted, and runs L8 alone after `open_tab`: L8
+must FAIL. `no-close-decline` builds the
 probe over a copy of `app/Sources` in `work/assistant_tab/mutants/` with
 `close()`'s `decline(by: "close")` line removed (`MUTANTS`), and runs P8
-alone: P8 must FAIL (exit 1); no build, or no such line, exits 2. The P9 to
-P13 mutants (`MUTANTS`: `.newline`'s arm calls `onReturn`, `insertTab`
+alone: P8 must FAIL (exit 1); no build, or no such line, exits 2; `no-badge`
+deletes the same `showAssistantBadge` line and runs P14 alone, the same way,
+against the stand-in. The P9 to P13 and P15 mutants (`MUTANTS`: `.newline`'s arm calls `onReturn`, `insertTab`
 calls `super`, `snapshotParts()` returns `[]`, the composer's `undoManager`
 is `super`'s; issue batch B37, #182: the meter always shows the full
 figure, the transcript's `setFrameSize` sets a zero minimum size, the
 composer field's `layout()` does not call `fit()`, `placeholderRect` is
-40 pt high)
+40 pt high; issue batch B47, #203: the Spend row always shows the full
+figure)
 build the probe the same way and score their row alone; a
 probe that did not build, or printed no row for it, is an instrument failure
 (exit 2). Rule R
@@ -177,6 +210,10 @@ FORWARD = "session.onEvent ="
 PORT_A, PORT_B = 4874, 4877
 WALL_BUILD, WALL_RUN, WALL_TURN = 900, 300, 60
 PROBE_ROWS = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P9", "P10", "P11", "P12", "P13"]
+PROBE_ROWS += ["P15"]
+BADGE = "inspector.assistant.badge"
+# EditorViewController+Assistant.swift's one write of the Assistant tab's dot (AI-19)
+BADGE_LINE = ("        inspector?.showAssistantBadge(assistant?.pendingQuestion != nil)\n", "")
 # name: (file in app/Sources, before — exactly once, after, row)
 MUTANTS = {
     "no-close-decline": ("AssistantSession.swift", '        decline(by: "close")\n', "", "P8"),
@@ -204,6 +241,11 @@ MUTANTS = {
     "tall-placeholder": ("AssistantComposer.swift",
                          "        let height = AssistantComposerField.lineHeight(font ?? DS.sans(12))\n",
                          "        let height: CGFloat = 40\n", "P13"),
+    "no-badge": ("EditorViewController+Assistant.swift", *BADGE_LINE, "P14"),
+    "full-spend-only": ("AssistantContextMeter.swift",
+                        "        if figureLabel.stringValue != shown "
+                        "{ figureLabel.stringValue = shown }\n",
+                        "        figureLabel.stringValue = cost.figure\n", "P15"),
 }
 # name: (file in app/Sources, before — exactly once, after, row): a tree copy built with
 # `make app`, its row run live against it
@@ -214,6 +256,7 @@ TREE_MUTANTS = {
                      "        let text = composer.string.split(separator: \"\\n\")"
                      ".joined(separator: \" \")\n"
                      "            .trimmingCharacters(in: .whitespacesAndNewlines)\n", "L7"),
+    "no-badge-app": ("EditorViewController+Assistant.swift", *BADGE_LINE, "L8"),
 }
 L7_TEXT = "L7 first line.\nL7 second line.\n\n    L7 indented, after a blank line."
 STOP_TEXT = 'select_inspector_tab {tab: "assistant"} first'
@@ -357,6 +400,42 @@ def row_p8(score, fake, secrets, binary=None):
                            f"{ran['stderr'].strip()[-300:]}", instrument=True)
     else:
         score("P8", bool(r["ok"]) and not failures,
+              f"{r['detail']}; stand-in failures {failures[:2]}")
+
+
+def row_p14(score, fake, secrets, binary=None):
+    """P14: the probe under `--badge`, against the stand-in (#152, AI-19)."""
+    if binary is None:
+        binary, why = build_probe()
+        if binary is None:
+            score("P14", False, f"the probe did not build: {why}", instrument=True)
+            return
+    folder = os.path.join(WORK, "p14")
+    shutil.rmtree(folder, ignore_errors=True)
+    os.makedirs(folder)
+    path = os.path.join(folder, "P14.mp4")
+    fake.scenario([asp.use("toolu_p14a", "export", {"preset": "h264", "path": path}),
+                   asp.say("P14: declined."),
+                   asp.use("toolu_p14b", "export", {"preset": "h264", "path": path}),
+                   asp.say("P14: stopped.")])
+    ran = bounded.run([binary, "--badge", path, "--fonts",
+                       os.path.join(ROOT, "app", "Resources", "Fonts"),
+                       "-RCSecretFolder", secrets, "-ReelcutInspectorCollapsed", "NO"],
+                      WALL_RUN, cwd=os.path.dirname(binary),
+                      env=child_env({"RC_ASSISTANT_BASE_URL": fake.base}))
+    answer = None
+    for line in ran["stdout"].splitlines():
+        if line.startswith("ANSWER "):
+            answer = json.loads(line[len("ANSWER "):])
+    with open(os.path.join(folder, "probe-answer.json"), "w") as f:
+        json.dump(answer, f, indent=1, sort_keys=True)
+    r = {r["id"]: r for r in (answer or {}).get("rows", [])}.get("P14")
+    failures = fake.log().get("failures", [])
+    if r is None:
+        score("P14", False, f"no row (exit {ran['rc']}, expired {ran['expired']}): "
+                            f"{ran['stderr'].strip()[-300:]}", instrument=True)
+    else:
+        score("P14", bool(r["ok"]) and not failures,
               f"{r['detail']}; stand-in failures {failures[:2]}")
 
 
@@ -651,6 +730,39 @@ def row_l7(app, fake, ctx):
                   f"problems in the tab {problems[:2]}")
 
 
+def row_l8(app, fake, ctx):
+    """L8 (AI-19, #152): the Assistant tab's dot while a question waits, on
+    the Clip tab too; gone once it is answered."""
+    a = ctx["A"]
+    path = os.path.join(ctx["folder"], "L8.mp4")
+    sentence = f"export writes {path}"
+    asking, why = pane_export(app, fake, ctx, "l8", path, sentence)
+    if asking is None:
+        return False, why
+    on_assistant = asking.visible(BADGE)
+    app.must("select_inspector_tab", project=a, tab="clip")
+    clip = Dump(app, a, "l8-clip")
+    ctx["dumps"].append(clip.text)
+    on_clip = clip.visible(BADGE)
+    badge_views = {v["i"] for v in clip.by_id(BADGE)}
+    badge_problems = [p for p in clip.problems if p.get("view") in badge_views]
+    ok, answer = app.call("assistant_answer", project=a, answer="deny", timeout=WALL_TURN)
+    if not ok:
+        app.must("select_inspector_tab", project=a, tab="assistant")
+        return False, f"deny refused: {answer}"
+    after = Dump(app, a, "l8-after")
+    ctx["dumps"].append(after.text)
+    present = bool(after.by_id(BADGE))
+    hidden = present and not after.visible(BADGE)
+    no_file = not os.path.exists(path)
+    app.must("select_inspector_tab", project=a, tab="assistant")
+    good = (on_assistant and on_clip and not badge_problems and answer.get("state") == "finished"
+            and present and hidden and no_file)
+    return good, (f"asking on the Assistant tab: dot visible {on_assistant}; on Clip: visible "
+                  f"{on_clip}, problems on it {badge_problems[:2]}; deny: {asp.brief(answer)}; "
+                  f"after: dot present {present}, hidden {hidden}; no file {no_file}")
+
+
 def row_k(app, ctx):
     in_answers = sum(1 for text in app.answers if asp.KEY in text)
     in_dumps = sum(1 for text in ctx["dumps"] if asp.KEY in text)
@@ -734,7 +846,9 @@ def main():
     parser.add_argument("--mutant", choices=sorted(["no-forward", *MUTANTS, *TREE_MUTANTS]),
                         help="no-forward: L2 alone, against a build without the session's "
                              "event forward; flatten-send: L7 alone, against a build whose "
-                             "send() joins the lines; no-close-decline: P8, "
+                             "send() joins the lines; no-badge-app: L8 alone, against a build "
+                             "that never sets the Assistant tab's dot; no-close-decline: P8, "
+                             "no-badge: P14, full-spend-only: P15, "
                              "modified-return-sends, tab-types and full-figure-only: P9, "
                              "no-entry-parts: P10, shared-undo: P11, short-transcript: P12, "
                              "no-width-refit and tall-placeholder: P13, each alone against a probe built over the "
@@ -762,17 +876,20 @@ def main():
         shutil.rmtree(folder, ignore_errors=True)
         os.makedirs(folder)
         ctx = {"folder": folder, "dumps": []}
-        if args.mutant == "no-close-decline":
+        stand_in_rows = {"P8": row_p8, "P14": row_p14}
+        if args.mutant in MUTANTS and MUTANTS[args.mutant][3] in stand_in_rows:
+            row_id = MUTANTS[args.mutant][3]
             binary, why = mutant_probe(args.mutant)
             if binary is None:
-                score("P8", False, f"(mutant {args.mutant}) the control could not be "
-                                   f"performed: {why}", instrument=True)
+                score(row_id, False, f"(mutant {args.mutant}) the control could not be "
+                                     f"performed: {why}", instrument=True)
                 print(f"0/1\nmutant {args.mutant}: the control could not be performed — "
                       f"the probe was not built: {why}", flush=True)
                 return 2
-            row_p8(lambda row_id, ok, detail, **kw: score(row_id, ok, f"(mutant {args.mutant}) "
-                                                                   + detail, **kw),
-                   fake, secrets, binary)
+            stand_in_rows[row_id](
+                lambda r, ok, detail, **kw: score(r, ok, f"(mutant {args.mutant}) " + detail,
+                                                  **kw),
+                fake, secrets, binary)
         elif args.mutant in MUTANTS:
             row_id = MUTANTS[args.mutant][3]
             binary, why = mutant_probe(args.mutant)
@@ -786,20 +903,24 @@ def main():
                                                      **kw),
                    binary, only=[row_id])
         elif args.mutant in TREE_MUTANTS:
+            row_id = TREE_MUTANTS[args.mutant][3]
             built, why = build_mutant(args.mutant)
             if built is None:
-                score("L7", False, f"the mutant did not build: {why}", instrument=True)
+                score(row_id, False, f"the mutant did not build: {why}", instrument=True)
                 print(f"0/1\nmutant {args.mutant}: the control could not be performed — "
                       f"the mutant did not build: {why}", flush=True)
                 return 2
-            app = asp.App("mutant", built, ["-AgentServerEnabled", "YES", "-RCSecretFolder",
-                                            secrets, "-ReelcutInspectorCollapsed", "NO"],
+            # One log per mutant, so each launch's "Reelcut: " grep is kept.
+            app = asp.App(f"mutant-{args.mutant}", built,
+                          ["-AgentServerEnabled", "YES", "-RCSecretFolder",
+                           secrets, "-ReelcutInspectorCollapsed", "NO"],
                           fake.base, port=PORT_A)
             try:
                 app.connect()
                 open_tab(app, ctx)
-                guarded("L7", lambda: (lambda ok, d: (ok, f"(mutant {args.mutant}) " + d))
-                        (*row_l7(app, fake, ctx)))
+                tree_row = {"L7": row_l7, "L8": row_l8}[row_id]
+                guarded(row_id, lambda: (lambda ok, d: (ok, f"(mutant {args.mutant}) " + d))
+                        (*tree_row(app, fake, ctx)))
             finally:
                 app.stop()
         elif args.mutant:
@@ -809,8 +930,10 @@ def main():
                 print(f"0/1\nmutant {args.mutant}: the control could not be performed — "
                       f"the mutant did not build: {why}", flush=True)
                 return 2
-            app = asp.App("mutant", built, ["-AgentServerEnabled", "YES", "-RCSecretFolder",
-                                            secrets, "-ReelcutInspectorCollapsed", "NO"],
+            # One log per mutant, so each launch's "Reelcut: " grep is kept.
+            app = asp.App(f"mutant-{args.mutant}", built,
+                          ["-AgentServerEnabled", "YES", "-RCSecretFolder",
+                           secrets, "-ReelcutInspectorCollapsed", "NO"],
                           fake.base, port=PORT_A)
             try:
                 app.connect()
@@ -826,10 +949,15 @@ def main():
             except Exception as error:  # noqa: BLE001 — an instrument that cannot run is a FAIL
                 score("P8", False, f"the instrument could not run: {type(error).__name__}: "
                                    f"{error}", instrument=True)
+            try:
+                row_p14(score, fake, secrets)
+            except Exception as error:  # noqa: BLE001 — an instrument that cannot run is a FAIL
+                score("P14", False, f"the instrument could not run: {type(error).__name__}: "
+                                    f"{error}", instrument=True)
             app = asp.App("A", RELEASE, ["-AgentServerEnabled", "YES", "-RCSecretFolder",
                                          secrets, "-ReelcutInspectorCollapsed", "NO"],
                           fake.base, port=PORT_A)
-            live = ("L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "K")
+            live = ("L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "K")
             try:
                 app.connect()
                 guarded("L0", row_l0, app, ctx)
@@ -840,6 +968,7 @@ def main():
                 guarded("L5", row_l5, app, fake, ctx)
                 guarded("L6", row_l6, app, fake, ctx)
                 guarded("L7", row_l7, app, fake, ctx)
+                guarded("L8", row_l8, app, fake, ctx)
                 guarded("K", row_k, app, ctx)
             except Exception as error:  # noqa: BLE001
                 for row_id in live:

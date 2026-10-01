@@ -437,7 +437,12 @@ Needs your own Anthropic API key (Setup 3).
 **AS-8 — The tab at its narrowest**
 - **Do:** With a real key, after a turn: 1. Drag the inspector to its narrowest and back, watching the Context figures, and hover them. 2. In a short conversation, click below the last entry, then drag from there up into it. 3. Type a message that wraps to two lines at the narrowest width, and drag the inspector slowly wider and narrower. 4. Empty the composer at the narrowest width.
 - **Expect:** 1. The figures are full when there is room, and shorter ("N / L · P%", then "P%") as the inspector narrows. They are never cut off with "…", and the tooltip reads the full figure. 2. The click clears the selection, and the drag selects up from the end. 3. The field follows the width, two lines while the message wraps and one line when it does not, with no jump or flicker. 4. The placeholder sits on one line.
-- **Source:** #182 (items 1, 2 and 4; step 3 watches item 3, not fixed in B37), issue batch B37.
+- **Source:** #182 (items 1, 2 and 4; step 3 watches item 3, an accepted limit since B47, where a refit from `AssistantView.layout()` lagged a pass as B37's had), issue batches B37 and B47.
+
+**AS-9 — A question while another tab shows**
+- **Do:** With a real key, light then dark: View ▸ Assistant; ask for an export; while the question is up click Clip, Media, Document, then Assistant and Deny; repeat and press Stop; repeat and Allow; with a question up drag the inspector to its narrowest.
+- **Expect:** a small accent dot right of "Assistant" in the strip while the question waits, on every tab, never touching the word at the narrowest width; a click on the tab only shows it; the dot goes at Deny, Stop and Allow; Return in the composer answers nothing.
+- **Source:** issue batch B47 (#152); spec §11 AI-19.
 
 ## Host-state proof runs
 

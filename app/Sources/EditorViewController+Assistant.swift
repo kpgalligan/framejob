@@ -86,8 +86,10 @@ extension EditorViewController {
         assistantRefresh()
     }
 
-    /// The phase and the question, pushed to the view.
+    /// The phase and the question, pushed to the view, and the Assistant
+    /// tab's question dot (spec §11 AI-19) to the inspector.
     func assistantRefresh() {
+        inspector?.showAssistantBadge(assistant?.pendingQuestion != nil)
         assistantView?.show(
             phase: assistant?.phase ?? .idle, question: assistant?.pendingQuestion)
     }

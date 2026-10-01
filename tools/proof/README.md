@@ -7151,7 +7151,7 @@ python3 tools/proof/assistant_session_proof.py --mutant no-prepare   # W FAIL, e
 
 ## Road map 12's A2 — the Assistant tab (assistant_tab_proof.py, assistant_tab_probe.swift)
 
-The inspector's fourth tab (spec §11 AI-4, AI-7, AI-8, AI-11, AI-14, AI-17), read
+The inspector's fourth tab (spec §11 AI-4, AI-7, AI-8, AI-11, AI-14, AI-17, AI-19), read
 back two ways: a probe for the arithmetic and structure no script reaches,
 and the built Release app driven through the tab's OWN controls. It works in
 `work/assistant_tab/` and reuses `assistant_session_proof.py`'s stand-in,
@@ -7248,8 +7248,32 @@ and `RC_ASSISTANT_BASE_URL=http://127.0.0.1:9`:
   `placeholderRect` is one line height high, at the text container's origin,
   and wider than 0; and the field for a 41-character message is one line
   high at 480, two at the minimum width less a legacy scroller and one at
-  480 again, one `layoutIfNeeded()` each — a guard of today's refit inside
-  `layout()` (#182 item 3 is open).
+  480 again, one `layoutIfNeeded()` each — a guard of the refit inside the
+  field's `layout()` (#182 item 3 accepted in issue batch B47, where a refit
+  from `AssistantView.layout()` lagged a pass).
+- **P14** (issue batch B47, #152, spec §11 AI-19) the probe ALONE under
+  `--badge <path> --fonts app/Resources/Fonts` (every face registered, as
+  the harness's `registerFonts`), against the stand-in scripted to ask for
+  `export` to `work/assistant_tab/p14/P14.mp4` twice, light, in a real
+  editor window: before any send the tab is Clip, `assistantView` nil and
+  the dot hidden; asking, the dot shows on Clip, then Media, then
+  Assistant; `assistantAnswer(false)` hides it at once and it stays hidden
+  once idle; a second question shows it and `assistantStop()` hides it; with
+  `SourceSans3-SemiBold` registered, at strip widths 280 and 480 the
+  `dotRect` is inside the Assistant tab's `tabRect` with ≥ 1 pt to its
+  trailing edge and ≥ 1 pt right of the `titleRect`; `cacheDisplay` of the
+  inspector with the dot hidden and with the badge removed is
+  byte-identical, and with it shown differs inside the dot's rect (outset
+  1 pt) and nowhere else, written to `probe/looks/badge-light.png`; no
+  file; and no failure in the stand-in's log.
+- **P15** (B47, #203) an `AssistantView` at the minimum width less a legacy
+  scroller (P9's window and backdrop), light, `reload`ed with seven costs —
+  none; priced 0.0018; priced 0.00002; partial 0.1234; partial 12.3456;
+  unknown alone; priced 0.0123 then unknown: the `assistant.spend` label
+  shows a rung of `figureLadder` that fits its frame, ends `" · Reelcut's
+  estimate"` once a response is counted, its tooltip `figureTooltip`; the
+  row's width is the same for all seven; at 480 (the control) each shows
+  `figure` exactly, fitting.
 
 **Live A** (`-AgentServerEnabled YES`, port 4874, `proof-key` in
 `-RCSecretFolder`, `RC_ASSISTANT_BASE_URL` at the stand-in,
@@ -7281,6 +7305,11 @@ and `RC_ASSISTANT_BASE_URL=http://127.0.0.1:9`:
   user text ends with `</reelcut_context>\n` and the text, intact; the
   dump's last person entry is the text; the composer is empty; no layout
   problem in the tab.
+- **L8** (B47, #152, AI-19) a question through the pane: the dump's
+  `inspector.assistant.badge` visible on the Assistant tab; after
+  `select_inspector_tab {tab: "clip"}` visible with no layout problem on
+  it; `assistant_answer {answer: "deny"}` without `pane`: `finished`, the
+  dot present and hidden, no file; then back to the Assistant tab.
 - **K** `proof-key` in no MCP answer, no layout dump and not the log.
 
 **Launch B**, **N1** (the variable set, NO `-RCSecretFolder`: no key, AI-13;
@@ -7297,7 +7326,11 @@ run exits 1; a copy that did not build exits 2.
 **Mutant `flatten-send`** (issue batch B18): the same tree copy with
 `send()` joining the composer's lines with spaces before it trims
 (`TREE_MUTANTS`), `make app` there, then `open_tab` and L7 alone: L7 must
-FAIL. **Mutants `modified-return-sends`, `tab-types`, `no-entry-parts`,
+FAIL. **Mutant `no-badge-app`** (issue batch B47): the same tree copy with
+`assistantRefresh()`'s `showAssistantBadge` line deleted, then `open_tab`
+and L8 alone: L8 must FAIL. **Mutant `no-badge`**: that deletion in a copy
+of `app/Sources`, the probe built over it, P14 alone against the stand-in.
+**Mutants `modified-return-sends`, `tab-types`, `no-entry-parts`,
 `shared-undo`** (`MUTANTS`, each replacement made exactly once in a copy of
 `app/Sources`, the probe built over it): `.newline`'s arm calls
 `onReturn?()` (P9), `insertTab` calls `super.insertTab` (P9),
@@ -7307,7 +7340,8 @@ FAIL. **Mutants `modified-return-sends`, `tab-types`, `no-entry-parts`,
 transcript's `setFrameSize` sets `minSize = .zero` (P12),
 **`no-width-refit`** — the composer field's `layout()` no longer calls
 `fit()` (P13), and **`tall-placeholder`** — `placeholderRect` is 40 pt high
-again (P13). Each
+again (P13); and (B47, #203) **`full-spend-only`** — the Spend row always
+shows `cost.figure` (P15). Each
 scores its row alone and must FAIL. Rule R:
 exit 1 caught, 0 survived, 2 not performed — a mutant probe that did not
 build, or printed no row for its row, is an instrument failure (exit 2).
@@ -7352,10 +7386,13 @@ exit 1;
 `no-entry-parts` P10 FAIL, exit 1 each.
 
 ```sh
-python3 tools/proof/assistant_tab_proof.py                                  # 23/23
+python3 tools/proof/assistant_tab_proof.py                                  # 26/26
 python3 tools/proof/assistant_tab_proof.py --mutant no-forward             # L2 FAIL, exit 1
 python3 tools/proof/assistant_tab_proof.py --mutant flatten-send           # L7 FAIL, exit 1
+python3 tools/proof/assistant_tab_proof.py --mutant no-badge-app           # L8 FAIL, exit 1
 python3 tools/proof/assistant_tab_proof.py --mutant no-close-decline       # P8 FAIL, exit 1
+python3 tools/proof/assistant_tab_proof.py --mutant no-badge               # P14 FAIL, exit 1
+python3 tools/proof/assistant_tab_proof.py --mutant full-spend-only        # P15 FAIL, exit 1
 python3 tools/proof/assistant_tab_proof.py --mutant modified-return-sends  # P9 FAIL, exit 1
 python3 tools/proof/assistant_tab_proof.py --mutant tab-types              # P9 FAIL, exit 1
 python3 tools/proof/assistant_tab_proof.py --mutant no-entry-parts         # P10 FAIL, exit 1
@@ -10134,4 +10171,69 @@ orchestrator after the doc comment above them shrank.)
 python3 tools/proof/close_project_proof.py 4866                    # 12/12, fresh instance
 python3 tools/proof/remaining_probe.py                             # 176/176
 python3 tools/proof/assistant_lane_proof.py --mutant close-ask-first   # exit 1, L4
+```
+
+## Issue batch B47 — the Assistant tab's question dot, the Spend row at the minimum width, the composer's refit (`assistant_tab_proof.py` P13–P15, L8 and `--mutant no-badge`, `no-badge-app`, `full-spend-only`; #152, #203, #182 item 3)
+
+- **The dot (#152, spec §11 AI-19).** `InspectorTabBadge.swift` lays a
+  passive view over the inspector's tab strip, the root's last subview, and
+  draws a 6 pt accent dot 3 pt right of "Assistant" (`PanelTabsView.tabRect`'s
+  arithmetic mirrored; `Controls.swift` untouched). `assistantRefresh()`'s
+  first statement sets it from the session's `pendingQuestion`. P14 drives
+  it in a probe editor against the stand-in; L8 reads it back through
+  `snapshot_ui` in the built app.
+- **The Spend row (#203, spec §11 P-8).** P15 was added before any Spend
+  change and measured four of its seven costs truncating at 263 pt (280 less
+  a legacy scroller; the label's frame 200.5 pt, IBM Plex Mono): "under
+  $0.0001 · Reelcut's estimate" 204.0, "at least $0.1234 · Reelcut's
+  estimate" 222.0, "at least $12.3456 · Reelcut's estimate" 228.0, "at least
+  $0.0123 · Reelcut's estimate" 222.0 (intrinsic widths); "Nothing yet"
+  66.0, "$0.0018 · …" 168.0 and "unknown · …" 168.0 fitted. P-8 gained one
+  sentence, then `AssistantTurnCost.figureLadder` and the cost view's
+  fitting: the short rung reads "<$0.0001 · Reelcut's estimate" (174.0 in
+  178.0), "≥$0.1234 · …" (174.0 in 178.0), "≥$12.3456 · …" (180.0 in
+  184.0), "≥$0.0123 · …" (174.0 in 178.0); the row 243.0 pt wide for all
+  seven; at 480 every cost shows its full `figure`. P-7's contingency rung
+  (" · estimate") was not needed.
+- **The composer's refit (#182 item 3, accepted).** The attempt —
+  `AssistantComposerField.refitIfWidthChanged()` called from
+  `AssistantView.layout()`, the field's own `layout()` override deleted —
+  printed in P13: 26.0 pt at 480 (want 26.0), 26.0 at 263.0 (want 41.0),
+  41.0 at 480 again (want 26.0); the height constant 26.0, 26.0, 41.0
+  against text view widths 390.0, 156.0, 390.0. Both files were restored to
+  HEAD; `no-width-refit` is unchanged; the limit is in
+  `designs/adr/app-file-history.md`'s "Known limits".
+
+Run on 2026-10-01, the change over `8d64a11`, each command bounded by
+`perl -e 'alarm shift; exec @ARGV'`:
+
+| Command | Result |
+|---|---|
+| `make typecheck` | 0 errors, 4 warnings (the baseline), tsc clean |
+| `make test` | exit 0 |
+| `make app` | BUILD SUCCEEDED |
+| `assistant_tab_proof.py` | 26/26, exit 0; `grep "Reelcut: "` empty in `app-A.log` and `app-B.log` |
+| `--mutant no-badge` | P14 FAIL: (b) shown on Clip, Media and Assistant false; (d) shown false; 0/1, exit 1 |
+| `--mutant no-badge-app` | L8 FAIL: the dot visible false on the Assistant tab and on Clip; 0/1, exit 1 |
+| `--mutant full-spend-only` | P15 FAIL: the four full figures above truncating in 200.5; 0/1, exit 1 |
+| `--mutant no-width-refit` | P13 FAIL (26.0 pt at 263.0); exit 1 |
+| `--mutant full-figure-only` / `tall-placeholder` / `modified-return-sends` / `tab-types` / `shared-undo` / `no-entry-parts` / `short-transcript` | P9 / P13 / P9 / P9 / P11 / P10 / P12 FAIL, exit 1 each |
+| `--mutant no-close-decline` / `flatten-send` / `no-forward` | P8 / L7 / L2 FAIL, exit 1 each |
+| `spend_ui_proof.py` | 10/10, exit 0 (C2's full figures at 304) |
+| `clip_inspector2_proof.py` | 32/32 checks, exit 0 |
+| `screens.py --only 11b-assistant-tab` | 6 pass, 0 fail, 0 skip; 4 captures, 0 new problems; `Reelcut: ` lines 0 light and dark |
+
+P14 printed, at strip widths 280 and 480 in Source Sans 3: the Assistant
+tab (210.0, 0.0, 70.0, 32.0) and (360.0, 0.0, 120.0, 32.0), its title
+46.66 pt wide at x 221.67 and 396.67 (P14 printed 46.655923828125, 221.67203808593752
+and 396.6720380859375), the dot at x 271.0 and 446.0, y 13.0;
+the inspector 608×1438 px drawn with the dot shown differed from it hidden
+in 124 px, all inside the dot's rect, and hidden equalled removed byte for
+byte.
+
+```sh
+python3 tools/proof/assistant_tab_proof.py                          # 26/26
+python3 tools/proof/assistant_tab_proof.py --mutant no-badge        # P14 FAIL, exit 1
+python3 tools/proof/assistant_tab_proof.py --mutant no-badge-app    # L8 FAIL, exit 1
+python3 tools/proof/assistant_tab_proof.py --mutant full-spend-only # P15 FAIL, exit 1
 ```

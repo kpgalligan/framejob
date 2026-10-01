@@ -131,11 +131,14 @@ final class AssistantContextMeterView: NSView {
 
 /// The Assistant tab's Spend row (road map 13 P4, spec §11 P-7): a "Spend"
 /// micro label and what the conversation has cost so far, as Reelcut
-/// estimates it (`AssistantTurnCost.figure`), laid out like the meter's
-/// label row.
+/// estimates it (`AssistantTurnCost.figure`, or its shorter rung where that
+/// does not fit, P-8), laid out like the meter's label row.
 final class AssistantConversationCostView: NSView {
     private let title = NSTextField(labelWithString: "")
     let figureLabel = NSTextField(labelWithString: "")
+    private var cost = AssistantTurnCost()
+    /// Measures a rung in the label's font; never in the hierarchy.
+    private let measure = NSTextField(labelWithString: "")
 
     init() {
         super.init(frame: .zero)
@@ -143,6 +146,7 @@ final class AssistantConversationCostView: NSView {
         title.setContentHuggingPriority(.required, for: .horizontal)
         title.setContentCompressionResistancePriority(.required, for: .horizontal)
         figureLabel.font = DS.mono(10)
+        measure.font = DS.mono(10)
         figureLabel.textColor = DS.textFaint
         figureLabel.lineBreakMode = .byTruncatingTail
         figureLabel.alignment = .right
@@ -172,7 +176,25 @@ final class AssistantConversationCostView: NSView {
     }
 
     func update(_ cost: AssistantTurnCost) {
-        figureLabel.stringValue = cost.figure
+        self.cost = cost
+        showFittingFigure()
+    }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        showFittingFigure()
+    }
+
+    /// The first rung of `figureLadder` that fits beside the title, or the
+    /// last when none does (spec §11 P-8) — the meter's shape and its 12 pt.
+    private func showFittingFigure() {
+        let ladder = cost.figureLadder
+        let room = bounds.width - title.intrinsicContentSize.width - 12
+        let shown = ladder.first { rung in
+            measure.stringValue = rung
+            return measure.intrinsicContentSize.width <= room
+        } ?? ladder[ladder.count - 1]
+        if figureLabel.stringValue != shown { figureLabel.stringValue = shown }
     }
 }
 

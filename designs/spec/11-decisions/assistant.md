@@ -162,3 +162,15 @@ in §6).
   API (`assistant_compaction_proof.py`). Risk accepted: the proof shows summaries of tens of
   thousands of tokens, not of 300 000; and #151's person setting, when it lands, will not remove
   the knob.
+- **AI-19 — While the window's assistant waits on an ask-first question, the Assistant tab's
+  title wears a dot, whichever tab is showing** (issue batch B47, #152; the owner's choice,
+  2026-09-30: "badge the Assistant tab's title"). The dot is its own view over the strip
+  (`InspectorTabBadge`), just right of the title, in the accent colour; `PanelTabsView` is not
+  forked (Controls.swift's sync rule). It shows exactly while the window's session has a
+  `pendingQuestion`, set by `assistantRefresh()`, which runs after every question and answer, so
+  it goes off at Allow, Deny, Stop, Clear, a key or model change, the helper's exit and the
+  window's close. It shows on the Assistant tab too, so it depends on the session alone. It is
+  passive: it takes no click (a click on the tab only shows the tab) and no key, so Return still
+  never answers (AI-17, K-2); the tab never switches itself and no note appears. Risk accepted:
+  a collapsed inspector shows no dot (no strip is on screen), and another window shows nothing —
+  a question in one window draws no attention in the others.
