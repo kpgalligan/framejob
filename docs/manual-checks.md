@@ -459,6 +459,30 @@ Needs your own Anthropic API key (Setup 3).
 - **Expect:** a small accent dot right of "Assistant" in the strip while the question waits, on every tab, never touching the word at the narrowest width; a click on the tab only shows it; the dot goes at Deny, Stop and Allow; Return in the composer answers nothing.
 - **Source:** issue batch B47 (#152); spec §11 AI-19.
 
+## Agent connections
+
+Whether an MCP client refetches its tool list when a stdio server says it
+changed (road map 14's MC1, question 3). The fixture is the spike's stub
+server, which has two tools only after it sends
+`notifications/tools/list_changed`. Run
+`python3 tools/proof/mc1_spike/mc1_spike.py --only q3` once first: it writes
+`tools/proof/work/mc1_spike/q3/ac-mcp.json`, a scratch configuration naming
+the stub with `--mode during-call`, whose log is
+`tools/proof/work/mc1_spike/q3/ac-stub.jsonl`. Each run is your own spend
+on your own account, never the spike's.
+
+**AC-1 — Claude Code refetches after `list_changed`**
+- **Do:** 1. Delete `ac-stub.jsonl` if it is there. 2. In a terminal, `claude --mcp-config tools/proof/work/mc1_spike/q3/ac-mcp.json --strict-mcp-config`. 3. Ask it to call the `probe_wait` tool of the `mc1-stub` server, and when that answers, to call `probe_new`. 4. Quit, and read `ac-stub.jsonl`.
+- **Expect:** among the log's lines (it also holds `notifications/initialized` and any other calls the client makes), in this order: `initialize`, `tools/list`, the `tools/call` of `probe_wait`, the `"dir": "out"` notification, then a second `tools/list`; then a `tools/call` of `probe_new`. The log holds only what the stub received and the notifications it sent, never its answers, so that `probe_new` answered `probe_new answered` is seen in the client.
+- **Answer:** did a second `tools/list` follow the notification, and was `probe_new` callable in the same session?
+- **Source:** road map 14 MC1 (q3, rows T1–T3 and D1).
+
+**AC-2 — Claude Desktop refetches after `list_changed`**
+- **Do:** 1. Delete `ac-stub.jsonl` if it is there. 2. Copy the `mc1-stub` entry of `ac-mcp.json` into the `mcpServers` of Claude Desktop's `~/Library/Application Support/Claude/claude_desktop_config.json` and restart Claude Desktop. 3. In a new chat, ask it to call `probe_wait`, then `probe_new`. 4. Read `ac-stub.jsonl`. 5. Remove the `mc1-stub` entry and restart Claude Desktop.
+- **Expect:** as AC-1: a second `tools/list` after the notification, and `probe_new` called and answered.
+- **Answer:** did a second `tools/list` follow the notification, and was `probe_new` callable in the same chat?
+- **Source:** road map 14 MC1 (q3, rows T1–T3 and D1).
+
 ## Host-state proof runs
 
 Scripts that need a state no agent session has. Run from a terminal on an

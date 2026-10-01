@@ -10720,3 +10720,26 @@ python3 tools/proof/menu_undo_probe.py                             # 5/5, exit 0
 python3 tools/proof/menu_undo_probe.py --mutant no-own-manager-guard  # M2 FAIL, exit 1
 python3 tools/proof/menu_undo_probe.py --mutant own-manager-bare-send # F1 FAIL, exit 1
 ```
+
+## Road map 14 — the MC1 spike (`mc1_spike/`)
+
+The spike behind MC2's socket and MC3's `reelcut-mcp`: whether an Xcode
+script phase can write the catalog snapshot into the bundle before signing,
+in Release and Distribution, and the runtime fallback's cost (q1); what a
+background `open -n -g` launch costs and shows, cold, warm and quarantined
+(q2); whether Claude Code refetches on `notifications/tools/list_changed`,
+from its docs and a stdio stub, with no model call (q3); and the socket
+path's length and `tiny_http`'s `http_unix` against existing files (q4).
+`tools/proof/mc1_spike/README.md` has the rows and the instruments; **the
+answers are in `designs/reelcut-roadmap-14.md`'s MC1 record**. q1 builds only
+in a `tree_copy.py` copy (`work/mc1_spike/tree`), which alone gets the
+`-RCWriteCatalog` hook and the phase that ad-hoc signs the just-linked
+(unsigned: `-no_adhoc_codesign`) executable in place and runs it; q2 launches that copy's Release product from paths
+under `work/mc1_spike/` and signals only those pids. The stub
+(`mc1_spike/stub_mcp.py`) is the fixture of `docs/manual-checks.md` AC-1 and
+AC-2.
+
+```sh
+python3 tools/proof/mc1_spike/mc1_spike.py                 # q4, q1, q2, q3, then Z1
+python3 tools/proof/mc1_spike/mc1_spike.py --only q4       # a subset; the other rows carry forward
+```

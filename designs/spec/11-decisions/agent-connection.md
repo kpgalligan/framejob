@@ -7,18 +7,20 @@ The road map that makes these is in progress: `designs/reelcut-roadmap-14.md`, w
 "Decisions" section words them and whose "What exists" section holds the tree they change.
 
 - **MC-1 — The agent server listens only on a Unix socket,
-  `~/Library/Application Support/Reelcut/agent.sock`, and always, while the app runs.** No TCP
-  listener and no switch. Only processes running as the person can reach a socket in a `0700`
+  `~/Library/Application Support/Reelcut/Agent/agent.sock`, and always, while the app runs.** No
+  TCP listener and no switch. Only processes running as the person can reach a socket in a `0700`
   folder, and those can already read and write everything Reelcut can, so the switch guarded
   nothing a socket leaves open; TCP's only remaining users were the proofs. Risk accepted: any
   process running as the person can drive Reelcut while it runs, with no way to turn that off,
   and a client that speaks only HTTP-over-TCP cannot connect without the stdio helper.
-- **MC-2 — The socket is bound only in a folder that is `0700` and owned by the person, and only
-  by the first instance.** A later instance that can CONNECT to an existing socket leaves it
-  alone and binds none (it logs why); one that is REFUSED treats the file as a crash's leftover,
-  unlinks it and binds. The owner unlinks it at quit. A folder that is group- or
-  world-accessible is reported and the socket is not bound — the folder's mode is the whole
-  access control, so a wrong mode is not worked around.
+- **MC-2 — The socket is bound only in its own `Agent` subfolder of the support folder, made
+  `0700` by `AppSupport.ensureDirectory`; the mode-and-owner check is of that folder, and the
+  support folder's own mode is not checked (#108). It is bound only by the first instance.** A
+  later instance that can CONNECT to an existing socket leaves it alone and binds none (it logs
+  why); one that is REFUSED treats the file as a crash's leftover, unlinks it and binds. The
+  owner unlinks it at quit. A folder that is group- or world-accessible is reported and the
+  socket is not bound — the folder's mode is the whole access control, so a wrong mode is not
+  worked around.
 - **MC-3 — External MCP clients reach Reelcut through `reelcut-mcp`, a stdio server inside the
   bundle.** It is the one supported client configuration; `README.md` gives the command. A Rust
   binary (no AppKit, no runtime to install), not the app's own binary run with a flag.

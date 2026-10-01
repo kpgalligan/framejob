@@ -10,8 +10,8 @@ it, a proof's included.
 
 The shape, agreed with the user 2026-10-01:
 
-- **The agent server listens on a Unix socket in the app's `0700` support folder, always, and
-  nowhere else.** No TCP listener, no menu switch.
+- **The agent server listens on a Unix socket in its own `0700` `Agent` subfolder of the app's
+  support folder, always, and nowhere else.** No TCP listener, no menu switch.
 - **External clients reach it through `reelcut-mcp`**, a small stdio MCP server in the app
   bundle (`Contents/Helpers/`, beside the assistant's helper). It answers `initialize` and
   `tools/list` itself, from a catalog snapshot built into the bundle, and **launches Reelcut, in
@@ -62,18 +62,20 @@ choice: this road map removes the listener.
 A new file `designs/spec/11-decisions/agent-connection.md`, with its rows in the index.
 
 - **MC-1 — The agent server listens only on a Unix socket,
-  `~/Library/Application Support/Reelcut/agent.sock`, and always, while the app runs.** No TCP
-  listener and no switch. Only processes running as the person can reach a socket in a `0700`
+  `~/Library/Application Support/Reelcut/Agent/agent.sock`, and always, while the app runs.** No
+  TCP listener and no switch. Only processes running as the person can reach a socket in a `0700`
   folder, and those can already read and write everything Reelcut can, so the switch guarded
   nothing a socket leaves open; TCP's only remaining users were the proofs. Risk accepted: any
   process running as the person can drive Reelcut while it runs, with no way to turn that off,
   and a client that speaks only HTTP-over-TCP cannot connect without the stdio helper.
-- **MC-2 — The socket is bound only in a folder that is `0700` and owned by the person, and
-  only by the first instance.** A later instance that can CONNECT to an existing socket leaves
-  it alone and binds none (it logs why); one that is REFUSED treats the file as a crash's
-  leftover, unlinks it and binds. The owner unlinks it at quit. A folder that is group- or
-  world-accessible is reported and the socket is not bound — the folder's mode is the whole
-  access control, so a wrong mode is not worked around.
+- **MC-2 — The socket is bound only in its own `Agent` subfolder of the support folder, made
+  `0700` by `AppSupport.ensureDirectory`; the mode-and-owner check is of that folder, and the
+  support folder's own mode is not checked (#108). It is bound only by the first instance.** A
+  later instance that can CONNECT to an existing socket leaves it alone and binds none (it logs
+  why); one that is REFUSED treats the file as a crash's leftover, unlinks it and binds. The
+  owner unlinks it at quit. A folder that is group- or world-accessible is reported and the
+  socket is not bound — the folder's mode is the whole access control, so a wrong mode is not
+  worked around.
 - **MC-3 — External MCP clients reach Reelcut through `reelcut-mcp`, a stdio server inside
   the bundle.** It is the one supported client configuration; `README.md` gives the command.
   A Rust binary (no AppKit, no runtime to install), not the app's own binary run with a flag.
@@ -138,7 +140,8 @@ The answers go in this road map's MC1 record and bind MC2 and MC3.
   `ReelCore.swift` in lockstep. TCP stays for this phase only, so every existing proof keeps
   running while the socket is proved.
 - The app binds the socket at every launch (MC-1), at `AppSupport`'s folder plus
-  `agent.sock` or `RC_AGENT_SOCKET`, under MC-2's rules: ensure the folder, check its mode and
+  `Agent/agent.sock` or `RC_AGENT_SOCKET`, under MC-2's rules: ensure the `Agent` folder
+  (`AppSupport.ensureDirectory`, `0700`), check its mode and
   owner, try to connect, unlink a refused file, bind, `chmod 0600`, unlink at
   `applicationWillTerminate` only the path this instance bound. A refusal logs one line; it is
   not an alert, since no person asked for anything. **Not** the `Reelcut: ` prefix, which
@@ -249,3 +252,158 @@ the index) print 6; the Lines cells equal `wc -l`; §7.9a shows both the MC cita
 `RC_AGENT_PORT`; "Default port 4817" no longer appears under `designs/spec/`; a
 whitespace-normalised comparison of the six bullets against this document's text matches, with
 the MC-5 edit applied. Owed: nothing from MC0; MC1 is next.
+
+### MC1 — spike: the snapshot, the launch and the client (2026-10-01)
+
+The instrument is `tools/proof/mc1_spike/` (its README has the rows). `python3
+tools/proof/mc1_spike/mc1_spike.py` exited 0 with 39 rows: 22 pass, 16 answered and 1 fail
+(L4, below). There were no `error` rows and no skips. The B7c, L0 and T3 controls passed. q1–q3's
+figures are from that run, and q4's from the `--only q4` run straight after it (exit 0). The
+figures are in `tools/proof/work/mc1_spike/answers.json`. **The spike made no model call and no
+API request, and spent $0.** Its builds and launches ran while other sessions were building Reelcut
+and Rasterize on the same machine, so every timing below was taken under that contention.
+
+**1. The snapshot (q1): yes, if the phase signs first. This binds MC3.**
+- Xcode links the app with `-Xlinker -no_adhoc_codesign`, because it signs the bundle later. So at
+  script-phase time `$TARGET_BUILD_DIR/$EXECUTABLE_PATH` is not linker-signed: `codesign -dv`
+  reports "code object is not signed at all".
+- arm64 kills an unsigned exec. The first attempt, which ran the binary as it stood, exited 137 in
+  about 15 ms and failed the Release, incremental and Distribution builds.
+- The answer (request addendum 4) is a phase that first runs `codesign -s - -f
+  "$TARGET_BUILD_DIR/$EXECUTABLE_PATH"` (the executable only, ad hoc, in place) and then runs it
+  with `-RCWriteCatalog`. It is not a signed copy in `$DERIVED_FILE_DIR`: a lone executable has no
+  bundle, and the snapshot's version comes from `Bundle.main`. Xcode's CodeSign step re-signs the
+  bundle afterwards.
+- With that phase, in the tree copy:
+  - The full `make app` passed in 120.1 s wall, of which the phase took 903 ms (95 ms of it the
+    ad-hoc sign) (B2).
+  - The incremental `make app` passed in 32.1 s, phase 370 ms, sign 57 ms (B3).
+  - The Distribution `xcodebuild` passed in 88.8 s, phase 756 ms, sign 66 ms (B4).
+  - Each anchor was found exactly once (B1).
+- Both snapshots parse as `{version, tools}` at the bundle's `0.1.0` (B5). Release's has 92 tools
+  (240 829 bytes) and Distribution's 86 (232 416 bytes). Release's names all six `devHandlers`
+  keys and Distribution's names none (B6).
+- `codesign --verify --strict --deep` passes on both bundles (B7). A copy with one byte of the
+  snapshot changed fails it: "a sealed resource is missing or invalid" (B7c, control).
+  `dist_check.py` gives 14/14 on the two bundles (B8).
+- Each product's final signature is Xcode's, not the phase's (B12). Its CDHash differs from the one
+  the phase printed. The Info.plist is bound (29 entries), resources are sealed (version 2, 13
+  rules, 35 files) and the flags read `adhoc,runtime`, in both Release and Distribution.
+- No `Reelcut: ` line appeared in any phase's writer output (B11).
+- Release's snapshot `tools` equals a live instance's `tools/list` as JSON values (B9). They are
+  **not byte-equal** when compactly re-serialised in their own key order, and are byte-equal with
+  sorted keys. The catalog string's object key order differs between processes. B10 shows the same
+  between the build's snapshot and four runtime writes.
+  - **MC3's proof, and the proxy's own "a live list differs from the one this session was last
+    given" test before it sends `notifications/tools/list_changed`, must therefore compare as JSON
+    values or with sorted keys**, not as raw bytes, unless MC3 makes the writer emit sorted keys;
+    a byte test would send every session a spurious `list_changed`.
+- The fallback (the bundle's binary run with `-RCWriteCatalog`) took 0.807 s on a fresh copy and
+  0.094, 0.093 and 0.085 s on warm runs. Every run exited 0 with output JSON-equal to the build's
+  (B10). It is not needed, because the build-time snapshot works.
+
+**2. The launch (q2): about a second, in the background.** TCP stood in for the socket. Times run
+from just before `open -n -g` to the first answered `initialize`, polled every 50 ms.
+- Cold, on three fresh `ditto` copies (L1): 1.069, 1.087 and 1.087 s. There was no `purge`, which
+  needs root.
+- Warm, on one copy (L2): 0.474, 0.518 and 0.533 s, after a 1.059 s priming launch.
+- **The wait MC3 adopts is a fixed 60 s with an env override.** L7 passes: 3 × max(L1) = 3.261 s,
+  well under 60 s, so MC3's text is unchanged.
+- No launch log holds a `Reelcut: ` line (L6, 8 logs). The console was unlocked (H0).
+- **Reelcut was never the frontmost app in any of the seven measured launches** (L4's
+  `reelcut_ever_frontmost` is empty).
+- L4 itself scored **fail**, 6/7. In `cold-…-3` the frontmost app changed from Finder to Brave
+  Browser between the answer and +2 s, which is the person at the machine rather than Reelcut. Its
+  per-launch pids are in `answers.json`.
+- Each launch had one on-screen layer-0 window, 720 × 632, both at the answer and at +2 s
+  (L5). **A background launch shows a window without activating the app**; MC3's
+  manual check is where a person judges whether that is acceptable.
+- A copy with `com.apple.quarantine` set (L3):
+  - `spctl --assess --type execute` reported "rejected" (rc 3).
+  - `open` returned 0, but no process appeared and nothing answered within 60 s.
+  - CoreServicesUIAgent had no on-screen window at the end of the wait. As far as that measures,
+    **the quarantined launch left no Gatekeeper dialog**; it simply did not start.
+  - This is an ad-hoc-signed, unnotarized build. A notarized Distribution build is not measured.
+
+**3. The client (q3).**
+- Claude Code's MCP page, <https://code.claude.com/docs/en/mcp> (D1, fetched 2026-10-01, the
+  running client being `2.1.287 (Claude Code)` per C1), says: "Claude Code supports MCP
+  list_changed notifications, allowing MCP servers to dynamically update their available tools,
+  prompts, and resources without requiring you to disconnect and reconnect. When an MCP server
+  sends a list_changed notification, Claude Code automatically refreshes the available
+  capabilities from that server."
+  - The page also says that, on its v2 runtime, list_changed arrives over a stream the client holds
+    open, from servers on the newer protocol revision. That is about HTTP servers; a stdio server's
+    notifications share its stdout.
+- The stub stdio server behaves as MC3's proxy must. `initialize` advertises `listChanged: true`;
+  `tools/list` gives `[probe_wait]`; the `probe_wait` call delivers
+  `notifications/tools/list_changed` before its own answer; a second `tools/list` gives both tools;
+  and the log holds every inbound message (T1).
+  - In `unprompted` mode the notification comes 2.005 s after the first `tools/list` answer (T2).
+  - In `silent` mode nothing comes within 8 s (T3, control).
+- Whether Claude Code and Claude Desktop actually refetch from a stdio server needs a running
+  client with a model. **Owed** as `docs/manual-checks.md` AC-1 (Claude Code) and AC-2 (Claude
+  Desktop), the person's own runs against the stub. Until AC-1 answers, MC3 assumes the documented
+  refetch for Claude Code and nothing for Claude Desktop.
+
+**4. The socket (q4), and what MC2 must do.**
+- **Path length** (S1, S2): binding at 103 bytes succeeds, and at 104 and 105 bytes fails with
+  "path must be shorter than SUN_LEN". **103 bytes is the budget.**
+  - The product path is 73 bytes on this host. A `/Users/<name>` home fits names up to 43 bytes.
+  - `$TMPDIR` plus `reelcut-XXXXXXXX/agent.sock` is 76 bytes.
+  - `<worktree>/tools/proof/work/<12 chars>/agent.sock` is exactly 103 bytes on this worktree. **A
+    proof's `RC_AGENT_SOCKET` must therefore live under `$TMPDIR` (a `mkdtemp`), not under
+    `tools/proof/work/`**, and MC2 should refuse a path over 103 bytes by name.
+- A fresh bind's socket file is mode 755 under umask 022 (S3), so MC2's `chmod 0600` is needed.
+- Binding over a live server's path (S4), over a SIGKILLed server's leftover file (S5) and over a
+  regular file (S6) all fail with "Address already in use (os error 48)". `tiny_http` never unlinks
+  first. The leftover's `connect` is refused (ECONNREFUSED), and a regular file is left intact.
+  - **So MC2's connect-first-then-unlink-a-refused-file is required.** What MC2 does with a
+    non-socket file at the path is for MC2's spec to settle against MC-2, which says only that a
+    refused file is unlinked: no row measured a `connect` to a regular file.
+- **S7: `tiny_http` 0.12's `Server` `Drop` unlinks its path unconditionally.** Server A was bound,
+  its path unlinked, B bound at the same path, and A dropped. A's drop removed B's file, and B was
+  then unreachable (NotFound). MC2 must therefore:
+  - never drop a second `Server` bound at a path another instance now holds;
+  - not rely on `Drop` alone for "unlink only the path this instance bound";
+  - keep the listener alive for the app's life and unlink at `applicationWillTerminate` only after
+    checking the file is still its own (for example, by inode).
+- `server_addr().to_ip()` is `None` for a unix listener (S9). The TCP code's `.to_ip()…port()`
+  must not be reused for the socket, since `start` would return an error.
+- A POST over the socket is answered `HTTP/1.1 200 OK` (S8). `unblock()` then join returns in
+  0.023 ms (S10).
+
+**The support folder (S11), and the §11 amendment.**
+- `~/Library/Application Support/Reelcut/` is `0755` on this host, owned by the person, and has no
+  `Agent/`. `AppSupport.ensureDirectory` leaves an existing folder's mode alone (#108). MC-2 as
+  first worded (bound only in a `0700` folder) would therefore never bind here.
+- Per request addendum 1, the socket now lives in its own `Agent` subfolder, which
+  `ensureDirectory` makes `0700`, and MC-2's mode-and-owner check is of that folder. The files
+  edited:
+  - `designs/spec/11-decisions/agent-connection.md`: MC-1's path, now
+    `~/Library/Application Support/Reelcut/Agent/agent.sock`, and MC-2's folder. The file is now 45
+    lines.
+  - `designs/spec/11-decisions/README.md`: the file row (45 lines, "its own `0700` `Agent`
+    subfolder of the support folder") and the MC-1 and MC-2 rows.
+  - `designs/spec/07.9a-agent-tools.md`: the path and "its own `0700` `Agent` subfolder",
+    re-wrapped. It is still 402 lines.
+  - `designs/spec/README.md`: `11-decisions/` is now 2680 lines in 14 files.
+  - This document: the opening shape bullet, "Decisions" MC-1 and MC-2 (whitespace-normalised
+    equal to §11's), and MC2's socket bullet (`Agent/agent.sock`, ensured by `ensureDirectory` at
+    `0700`).
+  - MC-3..MC-6 are untouched, including MC-4's lock "in the support folder".
+
+**Side effects.**
+- The copy's "Build Rust Core" step recompiled the tree's own `core/target` (gitignored), so it was
+  not a no-op. Most likely the xcodebuild environment differs from `make rust`'s; this was not
+  investigated.
+- The first attempt (before addendum 4) ran two `open -n -g` launches of an unsigned copy, which
+  never started.
+- An empty `/tmp/mc1q4try` is left from a manual trial.
+- Nothing was created under `~/Library/Application Support/Reelcut/`, and nothing was registered
+  in any Claude configuration. Only pids whose command line holds `tools/proof/work/mc1_spike/`
+  were signalled, and Z1 found none left.
+
+**Owed:** AC-1 and AC-2 (the person's). Nothing else from MC1. MC2 is next, carrying S7, S9, the
+103-byte budget and the `$TMPDIR` rule for proof sockets; MC3 carries the signing phase, the 60 s
+wait and B9's JSON-value comparison.

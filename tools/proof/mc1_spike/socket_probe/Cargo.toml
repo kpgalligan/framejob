@@ -1,0 +1,19 @@
+[package]
+name = "socket_probe"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Road map 14 MC1's scratch crate (tools/proof/mc1_spike/README.md, q4): what
+# tiny_http 0.12's `Server::http_unix` does on this host. Not a product crate:
+# its own workspace, so the core's never sees it. Built `--offline`; the lock
+# pins tiny_http 0.12.0, as core/Cargo.lock does.
+[workspace]
+
+[[bin]]
+name = "socket_probe"
+path = "src/main.rs"
+
+[dependencies]
+tiny_http = "0.12"
+serde_json = "1"
