@@ -8,7 +8,7 @@ through [`11-decisions/README.md`](11-decisions/README.md).
 **Never read the whole spec.** Read this index, then only the file for the section you need.
 For a decision, look its ID up in `11-decisions/README.md`, or grep this directory
 (`grep -rn "W-8 —" designs/spec/`). A file that grows past ~500 lines splits by subsection into
-lettered files that keep its number (§4.3 is `04.3a` and `04.3b`, §7.9 is `07.9a` and `07.9b`);
+lettered files that keep its number (§4.3 is `04.3a` and `04.3b`, §6 is `06a`, `06b` and `06c`, §7.9 is `07.9a` and `07.9b`);
 a citation of the bare number names them together, and this index gets their rows in the same
 change.
 
@@ -30,7 +30,10 @@ change.
 | [`05.4-actions.md`](05.4-actions.md) | 81 | Actions (keyframed segments): what they target, how lists interpolate, a stored `null` as off. |
 | [`05.5-purity-and-undo.md`](05.5-purity-and-undo.md) | 40 | An edit's three answers, purity, undo. |
 | [`05.6-persistence.md`](05.6-persistence.md) | 147 | The package on disk: Consolidate, bookmarks, reversed assets, caches and their markers, transcripts. |
-| [`06-edit-operations.md`](06-edit-operations.md) | 508 | Every op's exact semantics (the arguments half is `core/src/op_table.rs`). |
+| **§6 — Edit operations: exact semantics** | | |
+| [`06a-edit-operations-shared-rules.md`](06a-edit-operations-shared-rules.md) | 82 | The rules every op shares: caller ticks snapped to the frame grid, an omitted argument against `null`, how to read a "refuses", the one way a patch is read, and the `scope` envelope key (the view project, the seven ops that are an error with a scope, the checks on the merged parent). |
+| [`06b-edit-operations-clips.md`](06b-edit-operations-clips.md) | 342 | Every clip op: add, insert and overwrite, the two backgrounds; move and the overlap rule; the trims, roll, slip, rate stretch, speed and reverse; split, the ripple deletes and range cuts; freeze, detach, duplicate, paste and paste attributes; nest and unnest; the patch ops; the transition ops. |
+| [`06c-edit-operations-actions-tracks-media.md`](06c-edit-operations-actions-tracks-media.md) | 92 | The action ops (the zoom action, end patches and `off`); the track, marker, canvas and media ops; and the op table's two halves (the arguments half is `core/src/op_table.rs`). |
 | **§7 — Architecture: Rust decides, AVFoundation and Metal do** | | |
 | [`07-architecture.md`](07-architecture.md) | 25 | The Rust/platform split in one page. |
 | [`07.1-ffi-surface.md`](07.1-ffi-surface.md) | 116 | The `rc_*` exports and their contracts. |
@@ -47,7 +50,7 @@ change.
 | [`08-repo-layout.md`](08-repo-layout.md) | 64 | Repo layout, build, conventions. |
 | [`09-keys-and-menus.md`](09-keys-and-menus.md) | 138 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 2407 in 13 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 2411 in 13 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

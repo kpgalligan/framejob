@@ -181,7 +181,7 @@ extension AgentServer {
             + "for the frontmost one.",
     ]
 
-    /// The envelope's one non-argument key (spec §6's preamble,
+    /// The envelope's one non-argument key (spec §6a,
     /// `core/src/scope.rs`), carried by every op tool and by nothing else.
     private static let scopeProperty: [String: Any] = [
         "type": "integer", "minimum": 0,

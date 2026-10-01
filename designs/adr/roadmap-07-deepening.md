@@ -287,7 +287,7 @@ reversed in a commit message); run EVERY proof script when the FFI changes; meas
   `source_mirror_probe.py`, `frame_grid_proof.py`, `op_contract_proof.py`, `reference_build.py`
   (+ `reference_build_selftest.py`); `mcp.py` gained `schemas()`.
 - Documents: `CONTEXT.md` (Op, Patch, Identity, Refusal, Op table, Argument); spec §5.2, §5.5,
-  §6 preamble ("how to read a 'refuses'"), §7.9, §7.10.
+  §6a ("how to read a 'refuses'"), §7.9, §7.10.
 
 ## Known limits
 
