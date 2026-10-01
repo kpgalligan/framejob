@@ -9538,3 +9538,52 @@ Run on 2026-09-30, the change over `a861f8c`, every instance my own:
 | `recording_probe.py` (the whole run) | 1096/1096, exit 0, no row skipped — section 9's granted tier and section 13 RAN. The first whole run scored 1094/1096: two of 9a's timing rows (elapsed 2.76 s for "about 2 s"; a segment of 912 200 ticks for 600 000 ± 250 000) under a load average near 9 from other work on the host; `--only granted` then failed 9b's movie length alone (855 000), and HEAD's own probe over `git archive a861f8c`'s sources failed two 9b timing rows the same way (41/43), so the rows are the host's timing and not the change; the second whole run passed every row |
 | `recording_proof.py 4817` (own instance; `grep "Reelcut: "` printed nothing) | 192/192, exit 0; 2 tone rows skipped by name (the output is muted) |
 | `screens.py --only 16-recorder-panel` | 6 pass, 0 fail, 0 skip of 6, exit 0 — P2 pass, `16-recorder-panel` pass (2 captures, 0 new problems) |
+
+## Issue #127 — parallel graphic export (`graphics_prefetch_proof.py`)
+
+An `ExportWriter` export rasterizes its graphics ahead on worker threads
+(`app/Sources/GraphicPrefetch.swift`, spec §11 G-21); the compositor stays
+the one writer and uses a worker's raster only on a pool miss whose texture
+key matches its own. The proof launches two owned instances one after the
+other on `--port` (OFF with `-ReelcutGraphicPrefetchOff YES`, ON without),
+logs under `work/graphics-prefetch/`, every child under
+`graphics_spike/bounded.py`. Its fixture, made over MCP and saved: a 30 fps
+canvas; `heavy` (moving gradient, `feGaussianBlur`, an `<image>` of the
+imported `red.png`, bundled-font text) on two overlapping clips with
+different props; `static`; `stepped` (`Math.floor(frame / 2)`); each 4 s,
+over a 5 s shape clip. Movies are `prores_422`, compared with
+`video_configuration_proof.py`'s `same_movie`.
+
+- **S0** CONTROL: two OFF exports masked-equal. **S1** the ON export
+  masked-equal to S0's. **S2** ON's `[reelcut] graphic prefetch: …` line:
+  hits > 0 and ≥ 95% of hits + mismatched + missed. **S3** no such line in
+  OFF's log. **S4** ON, `throw10` beside a heavy clip: `export` errors naming
+  "throw10" and "frame 10", no file, the session's line within 10 s.
+- **S5** `graphics_prefetch_probe.swift` (built like
+  `graphics_proof.build_pin_probe` into `work/graphics-prefetch-probe`), off
+  then on, `prores_422` at 25 fps from tick 140 000: both succeed with `fps`
+  [25, 1] and `start` 144 000, the movies masked-equal, ON's stderr line at
+  ≥ 95% hits. The frame-rate override has no MCP argument, so this is the
+  one row through `ExportWriter.videoComposition`'s variant.
+- **S6** MEASURED: OFF and ON wall seconds. **Z1** no `Reelcut: ` in any log.
+- `--mutant worker-frame-plus-one` (the worker asks `svg` for `frame + 1`)
+  must fail S2; `--mutant unguarded` (that plus `take`'s texture-key
+  comparison removed) must fail S1. Exit 0 caught, 1 survived, 2 control
+  not performed.
+- `--bench PACKAGE [--preset h264]` exports a COPY under `work/` OFF then ON
+  and prints the load average before each, both walls, ON's line and the
+  masked comparison; scored only on both exports succeeding.
+
+Run on 2026-09-30 over `7b55beb`, every instance my own, on a 12-CPU host
+whose load average from other work ran 47–270:
+
+| Command | Answer |
+|---|---|
+| `make typecheck`; `make app`; `make test`; `make lint` | 0 errors, 4 warnings (the AVFoundation baseline), tsc clean; BUILD SUCCEEDED; exit 0 (a first run failed `graphic/tests/determinism.rs`'s 250 ms budget at frame 293 while a mutant built; the rerun passed); exit 0 |
+| `graphics_prefetch_proof.py --port 4931` | 7/7, exit 0; S2 301 hits, 0 mismatched, 0 missed; S5 246 hits; S6 OFF 16.7 s, ON 3.46 s |
+| `--mutant worker-frame-plus-one` | S2 FAIL (38 hits, 263 mismatched, 12.62%), caught, exit 0 |
+| `--mutant unguarded` | S1 FAIL (35 381 035 vs 35 371 307 bytes), caught, exit 0 |
+| `graphics_proof.py --port 4934` | 45/45, exit 0 |
+| `export_cancel_proof.py --port 4935 --only gate` | G1, G2, Z1 ok, exit 0 |
+| `--bench parive-promo.reelcut` (h264) | OFF 360.1 s, ON 47.34 s; 3 596 hits, 0 mismatched, 0 missed; masked DIFFERENT, as two OFF h264 exports also are |
+| `--bench … --preset prores_422` | OFF 445.75 s, ON 43.31 s; 3 596 hits; masked equal |

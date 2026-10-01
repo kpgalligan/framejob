@@ -764,6 +764,23 @@ the key map behind it.
   own text in the graphic pool, never the last good frame; a raster's
   warnings ride in `Rendered.warnings` so a pool hit still reports them.
   Only no set and a failed upload are nil.
+- `GraphicPrefetch.swift` — an export's graphics rasterized AHEAD on worker
+  threads (spec §11 G-21, #127): only an `ExportWriter` export with a
+  pinned set and a graphic in range. `activeProcessorCount − 1` Foundation
+  `Thread`s (8 MiB stacks, their QuickJS engines dying with them) walk
+  `range.start + i × frameDuration` on the export's key, reading only
+  `RecipeSource.recipe(for:at:)` and `GraphicRegistry.resolve` (the pin,
+  G-13), and fill `Slot`s — exactly `LayerRenderers.graphic`'s inputs —
+  with a texture key and a raster; at most `4 × workers` slots and 1 GiB
+  held. `LayerRenderersGraphic` asks `take` on a pool MISS and uses the
+  raster only when the worker's texture key equals its own, else rasterizes
+  as before; a pool hit `discard`s the slot. The compositor still runs
+  `svg`, records every report and draws every card (G-8), so the file is
+  the serial path's. One `NSCondition` guards everything; a worker never
+  waits holding an unfinished entry, so `take`'s wait always ends.
+  `ReelcutGraphicPrefetchOff` (YES) is the measurement switch; each session
+  logs one `[reelcut] graphic prefetch: …` line once it is stopped and its
+  last worker has exited.
 - `Compositor.swift` · `CompositorEffects.swift` · `Resources/Shaders/Compositor.metal`
   — the per-layer pass. The uniform block's field ORDER is a contract with the
   shader checked only by reading both, so change them in one edit; it is 104
@@ -838,6 +855,9 @@ the key map behind it.
   not compile or is missing, refuses before the destination is touched), and
   ABORTS on a recorded failure: `pollProgress` cancels and `finish` removes
   the file and answers `.graphicFailed`, whatever the pipeline said.
+  `startWriting` starts the graphic prefetch (`startGraphicPrefetch`, G-21)
+  after the pipeline is picked, and `finish` and `deinit` `stop` it on the
+  line before each `unpin`.
   **`ExportWriter.cancel()` and `Exporter.cancel()` only set flags**; the
   measurement's loop cancels its own reader, and the writer's reader and
   writer are cancelled in `allInputsFinished`, after every pump has left its
@@ -1770,7 +1790,8 @@ exception by asking — screen recording has a complete callback API and
 uses it. **`import Synchronization` is allowed only inside `LevelMeter.swift`**,
 whose `publish` runs on the audio render thread where a lock invites priority
 inversion and `main.async` allocates; every other cross-thread value is an
-`NSLock`, the cache ledger's `NSCondition`, or a main hop. `DispatchQueue`
+`NSLock`, the cache ledger's `NSCondition`, the prefetch's `NSCondition`, or
+a main hop. `DispatchQueue`
 only at the documented seams: the
 compositor's render queue, the composition rebuild, import, the export
 progress timer, `Transcriber`'s serial queue, `CloudTranscriber`'s serial
@@ -1786,7 +1807,8 @@ handlers, the coalesced pass and the outbox; main publishes through
 hop, the agent lane's per-document serial queues (`AgentLane.swift`), the
 assistant session's write queue (`AssistantSession.swift`), and the spend-month
 queue (`AssistantSpendMonth.queue`, Settings' ledger fold, answered by a
-main hop). The recorder adds
+main hop), and — not a queue but a seam all the same — the graphic
+prefetch's worker `Thread`s (`GraphicPrefetch.swift`, G-21). The recorder adds
 NO queue of its own:
 framework callbacks are stamped where they land and hopped to main. Colors,
 fonts and metrics come from `DS` tokens; shared controls go in

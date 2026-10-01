@@ -19,7 +19,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | [`cloud-captions.md`](cloud-captions.md) | 277 | **Cloud captions (road map 6).** R6-1..R6-18: AssemblyAI, keys, deletion, recovery, refusal precedence, a dripping server. |
 | [`word-captions.md`](word-captions.md) | 123 | **Word captions (road map 8).** W-1..W-11. |
 | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) | 363 | **Chrome, the clip inspector and keys (the sharp pass, road map 9, #35).** SH-1..SH-3, CI-1..CI-16, K-1..K-3. |
-| [`graphics.md`](graphics.md) | 405 | **Graphics (road map 10).** G-1..G-20. |
+| [`graphics.md`](graphics.md) | 439 | **Graphics (road map 10).** G-1..G-21. |
 | [`dev-tools.md`](dev-tools.md) | 27 | **Dev tools (road map 11).** V-1..V-3: the `REELCUT_DEV_TOOLS` flag and `make dist`, dev tools as ordinary tools, capture by `cacheDisplay`. |
 | [`assistant.md`](assistant.md) | 162 | **The Assistant (road map 12).** AI-1..AI-18: the bundled helper, one lane, the catalog at launch, the fourth tab, the window's own project, W-9's reach, withheld and ask-first tools, the key, history, undo, the model, a call mid-gesture, the base-URL override, the tab kept on a selection change, the live context on each message, Stop reaching a running export or transcribe, the selectable transcript and the multi-line composer, and the dev-only compaction threshold a proof lowers. |
 | [`pricing.md`](pricing.md) | 94 | **Pricing and spend (road map 13).** P-1..P-8: LiteLLM's table as the feed, a call priced from its own `usage` and `model` (per iteration), monthly dollar budgets per service, the app's spend as its own, the spend folder (ledger and price cache) that a proof never touches, the proofs' own ledger and how a paid proof request is held to the month's budget in it, and the two figures the app shows (the conversation's on the Assistant tab, the UTC month's in Settings), and a response cut short priced once and marked partial. |
@@ -159,6 +159,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | G-18 | A graphic's own timeline moves with a transition's head and crosses a frame grid; a graphic with no description is tolerated | [`graphics.md`](graphics.md) |
 | G-19 | render_graphic's svg takes no sheet arguments and draws past the length; the library files' watch is capped; the untitled roots are removed | [`graphics.md`](graphics.md) |
 | G-20 | Every file source shares G-19 (c)'s limit, modules first; a failed open is a scan warning; render answers at most 8 MiB of SVG; the png sheet draws at most 134,217,728 px; graphic_reference checks a project it is given | [`graphics.md`](graphics.md) |
+| G-21 | An export rasterizes its graphics ahead on worker threads; the compositor stays the one writer and the texture key decides | [`graphics.md`](graphics.md) |
 | V-1 | Dev tools are compiled only under `REELCUT_DEV_TOOLS`; Distribution ships without them | [`dev-tools.md`](dev-tools.md) |
 | V-2 | A dev tool is not an op, but goes through the catalog, gate and parity check like any tool | [`dev-tools.md`](dev-tools.md) |
 | V-3 | Screens are captured with `cacheDisplay`, never ScreenCaptureKit | [`dev-tools.md`](dev-tools.md) |

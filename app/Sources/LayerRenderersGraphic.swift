@@ -71,11 +71,22 @@ extension LayerRenderers {
         let width = Int(size.width), height = Int(size.height)
         let key = LayerRenderers.textureKey(
             svg: drawn.svg, width: width, height: height, libraryVersion: set.libraryVersion)
+        let slot = GraphicPrefetch.Slot(
+            name: name, frame: frame, width: width, height: height, propsJSON: propsJSON,
+            ctxJSON: ctxJSON)
         var refused: [GraphicDiagnostic]?
+        var made = false
         let rendered = cached(key, graphic: true) {
+            made = true
             let raster: GraphicRaster
             do {
-                raster = try set.library.rasterize(drawn.svg, width: width, height: height)
+                if let prefetched = GraphicPrefetch.shared.take(
+                    recipeKey, slot: slot, textureKey: key)
+                {
+                    raster = try prefetched.get()
+                } else {
+                    raster = try set.library.rasterize(drawn.svg, width: width, height: height)
+                }
             } catch {
                 refused = Self.diagnostics(of: error)
                 return nil
@@ -84,6 +95,7 @@ extension LayerRenderers {
             uploaded.warnings = raster.warnings
             return uploaded
         }
+        if !made { GraphicPrefetch.shared.discard(recipeKey, slot: slot) }
         if let refused = refused {
             return failed(name, frame: frame, refused, size: size, recipeKey: recipeKey)
         }

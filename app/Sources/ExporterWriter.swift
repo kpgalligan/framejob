@@ -651,7 +651,7 @@ final class ExportWriter {
     /// configuration with the asked-for `frameDuration` samples the same
     /// timeline at the asked-for instants (#91); the recipes are evaluated per
     /// frame at whatever tick is requested, so nothing else has to know.
-    private static func videoComposition(
+    static func videoComposition(
         _ built: BuiltComposition, settings: ExportSettings
     ) -> AVVideoComposition {
         let fps = settings.fps

@@ -403,3 +403,37 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   still answers when no project is open. Why: every tool publishes
   `project` (§7.9), so refusing the key would contradict the schema, and
   ignoring it would pass a wrong path in silence.
+- **G-21 — An export rasterizes its graphics ahead on worker threads; the
+  compositor stays the one writer and the texture key decides** (issue
+  #127, 2026-09-30).
+  (a) **Where.** Only the `ExportWriter` path, with a pinned set and a
+  graphic clip in the export's range (`Exporter.graphicNames`). Not GIF or
+  APNG (`ImageSequenceWriter`), `render_frame`, Save Frame, the eyedropper,
+  `render_graphic` or the preview.
+  (b) **What a worker does.** `GraphicPrefetch` starts
+  `activeProcessorCount − 1` threads (at least one). They walk the export's
+  frames at `range.start + i × frameDuration` on the export's own key. The
+  grid is anchored at `range.start` because the core snaps the start onto
+  the export's own grid from 0 (`core/src/export.rs`), at the export's rate
+  after any override. A worker reads the recipe through
+  `RecipeSource.recipe(for:at:)` and draws only `GraphicRegistry.resolve`'s
+  pinned set for that key (G-13). For each graphic layer the compositor
+  would draw (opacity above 0, module compiled) it runs `svg`, computes the
+  texture key and rasterizes. It records nothing and draws no card.
+  (c) **What the compositor still does.** It runs `svg` itself for every
+  graphic layer, records every warning and failure, and draws every error
+  card (G-8). It uses a prefetched raster only on a pool miss, and only
+  when the worker's texture key equals its own. Otherwise it rasterizes
+  as before, so the file is byte-identical to the serial path's (G-5).
+  (d) **Bounds.** At most `4 × workers` slots and 1 GiB of rasters are held
+  ahead; a worker waits while either is reached. Every `start` has its
+  `stop` in `Exporter.finish` and `deinit`, beside the unpin.
+  (e) **The switch.** `ReelcutGraphicPrefetchOff` (a Bool default; YES is
+  the serial path) is a measurement switch, not a setting.
+  (f) **Risk accepted.** Each graphic's JavaScript runs twice per frame,
+  once on a worker and once on the compositor. A repeated SVG is
+  rasterized by a worker once per recent-key window (the pool's six keys),
+  plus once for each later frame whose worker reached it before an earlier
+  frame's worker did. Why: the compositor's queue is serial, and the
+  rasterization is most of a heavy graphic's time; moving only the raster
+  keeps G-8's reports and G-5's purity where they were.
