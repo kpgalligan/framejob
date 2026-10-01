@@ -83,6 +83,11 @@ the same way.
 - **Expect:** no gap or flat tail where there is sound. While decoding, the sheet names the file ("The waveform is still being analysed for …") until the decode finishes.
 - **Source:** #47 (#23).
 
+**PB-8 — A project whose media moved opens and offers Relink**
+- **Do:** Use the installed or current build, and note which `Reelcut.app` actually opened the file (its path in the Dock menu or Activity Monitor). 1. Save a project with two clips; quit. Move the `.reelcut` and its media together into a new folder, then open it from the Finder with right-click ▸ Open With ▸ Reelcut. 2. Move a media file while the project is OPEN in Reelcut, wait for an autosave, quit, and reopen it. 3. Move a media file to another volume (an external drive or a disk image), unmount it, and reopen the project.
+- **Expect:** each time, the project opens. Media that is still findable plays. Media that is gone shows slates, with the Missing media sheet offering Locate… and Relink. Never an open failure, a hang or a crash.
+- **Source:** #131 (the owner's report of 2026-09-26, not reproduced by the agents). On a failure, add to #131 which app opened the file and exactly what happened: an alert and its text, a hang, a crash, or no window.
+
 ## Timeline, canvas and keys
 
 **TL-1 — Timeline basics**
@@ -424,15 +429,15 @@ Needs your own Anthropic API key (Setup 3).
 - **Expect:** 1. the drag selects across entries, and the paste is plain text (no fonts or colours), each entry starting on its own line. 2. each modified Return starts a new line; the field grows a line at a time up to five, then holds its height and scrolls. 3. the whole message is sent, lines intact, and the field is one line again. 4. Return commits the word and sends nothing. 5. Return beeps and the text stays.
 - **Source:** issue batch B18 (#153, #154); spec §11 AI-17 and K-2.
 
-## Host-state proof runs
-
-Scripts that need a state no agent session has. Run from a terminal on an
-unlocked Mac; paste each score into the issue in the Source.
-
 **AS-8 — The tab at its narrowest**
 - **Do:** With a real key, after a turn: 1. Drag the inspector to its narrowest and back, watching the Context figures, and hover them. 2. In a short conversation, click below the last entry, then drag from there up into it. 3. Type a message that wraps to two lines at the narrowest width, and drag the inspector slowly wider and narrower. 4. Empty the composer at the narrowest width.
 - **Expect:** 1. The figures are full when there is room, and shorter ("N / L · P%", then "P%") as the inspector narrows. They are never cut off with "…", and the tooltip reads the full figure. 2. The click clears the selection, and the drag selects up from the end. 3. The field follows the width, two lines while the message wraps and one line when it does not, with no jump or flicker. 4. The placeholder sits on one line.
 - **Source:** #182 (items 1, 2 and 4; step 3 watches item 3, not fixed in B37), issue batch B37.
+
+## Host-state proof runs
+
+Scripts that need a state no agent session has. Run from a terminal on an
+unlocked Mac; paste each score into the issue in the Source.
 
 **HS-1 — The chrome dispatch rows need an unlocked console**
 - **Do:** `python3 tools/proof/phase8_chrome.py` with the screen unlocked.
@@ -449,3 +454,13 @@ unlocked Mac; paste each score into the issue in the Source.
 - **Do:** Set the output to the built-in speakers; `python3 tools/proof/mixed_audio_probe.py`.
 - **Expect:** section 4 passes (so far only measured on Bluetooth).
 - **Source:** #51 (#34).
+
+**HS-4 — The screen catalog on a Mac whose system look is Light**
+- **Do:** 1. Set System Settings ▸ Appearance to Light. 2. `python3 tools/proof/screens.py`. 3. Compare its light PNGs with the latest catalog run from a Dark host (under `tools/proof/work/screens/`, captured with `-RCDevAppearance light`), e.g. with `python3 -c` over two PNGs or any image-diff tool.
+- **Expect:** the run passes. On the Dark host, `-RCDevAppearance light` and `-NSRequiresAquaSystemAppearance YES` differed only in the timeline's alternate lanes (grey 140 against 139) and its vertical scroller track (233 against 255). Record which of the two a real Light host matches. Explain any other difference in the screen's prose, or file it.
+- **Source:** #139 (road map 11's V3).
+
+**HS-5 — The screen catalog on a second display**
+- **Do:** Run `python3 tools/proof/screens.py` on a display at a different scale from the usual one, e.g. a Mac's built-in Retina screen (scale 2); every run so far was at scale 1 on one external display.
+- **Expect:** the run passes. Screens and prose that depend on the host are noted in the screen's prose, or filed.
+- **Source:** #139 (road map 11's V3).

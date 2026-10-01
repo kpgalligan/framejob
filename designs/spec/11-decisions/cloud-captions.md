@@ -53,6 +53,10 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   key. The user deferred C2 until an integrated AI offering is designed;
   the relay-token alternative above remains future scope (road map 6
   §10.18).
+  **Updated 2026-09-30:** the plan is to open-source Reelcut, with every AI
+  feature bring-your-own-key (the AssemblyAI key here, the assistant's
+  Anthropic key under AI-8). No Reelcut-run relay is planned; C2 stays iced
+  (#125), and the owner called a change to this "increasingly unlikely".
 - **R6-6 — The protocol boundary is the base URL and the credential.** The
   client speaks AssemblyAI's REST API to `AssemblyAIConfiguration`'s base
   URL; the stand-in server, the EU endpoint and a same-protocol relay are
