@@ -337,7 +337,7 @@ fn every_closed_vocabulary_answers_with_its_own_members() {
 /// about the range and nothing else.
 ///
 /// **A bound nothing enforces must not be published**, which is the half
-/// this test is really for: `set_speed`'s `rate` CLAMPS to 0.1–10 rather
+/// this test is really for: `set_speed`'s `rate` CLAMPS to 0.1–1000 rather
 /// than refusing, so a row that published it would fail here at the first
 /// probe — the core would apply 0.05 and say nothing.
 ///

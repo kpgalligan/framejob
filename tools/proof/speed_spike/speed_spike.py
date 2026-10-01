@@ -12,8 +12,10 @@ a hard wall-clock bound, and an expiry is the row's answer.
 H0      host: model and CPU, macOS, load, other `MacOS/Reelcut` PIDs (load is
         repeated on every timed row).
 B0      scratch core: `core/` and `graphic/` copied to work/speed_spike/tree/,
-        `SPEED_MAX` 10.0 → 1000.0 exactly once, `diff -ru` printed (exactly
-        that line), `cargo build --release --offline` (bound 1800 s).
+        HEAD's one `SPEED_MAX` line (matched by pattern, whatever its value)
+        replaced by `= 1000.0;`, `diff -ru` printed (exactly that line, or no
+        line at all when HEAD already says 1000.0, as it has since B52b),
+        `cargo build --release --offline` (bound 1800 s).
 B1      metallib + probe build (`-O -whole-module-optimization`, bound 1800 s).
 S.<src> ffprobe facts: `loop` (the longest real recording looped to 3600 s
         with `-c copy`, with its own microphone file) and `loopv` (its video
@@ -40,9 +42,11 @@ C0      `git status --porcelain` of the product directories, before = after.
 `--rows` names the families SCORED; their prerequisites are made regardless.
 Exit 0 every row answered, 1 an instrument failed. `--stock-core` is the
 mutant (rule R): no scratch tree, the probe linked to `core/target/release`
-(HEAD, `SPEED_MAX` 10) in its own folder, its rows in
-`results-stock-core.json`; exit 1 caught (T120/T1000 read back 10), 0
-survived, 2 not performed.
+(HEAD) in its own folder, its rows in `results-stock-core.json`; exit 1
+caught (T120/T1000 read back HEAD's `SPEED_MAX`), 0 survived, 2 not
+performed. When HEAD's `SPEED_MAX` is already ≥ 1000 (since B52b, #190) the
+stock core is no mutant: the mode says so and exits 2 before building
+anything.
 """
 
 import argparse
@@ -67,7 +71,7 @@ PROBE_SOURCE = ROOT / "tools/proof/speed_spike/speed_probe.swift"
 RECORDINGS = Path.home() / "Movies/Reelcut Recordings"
 SPEECH_AIFF = ROOT / "tools/proof/media/speech.aiff"
 HOUR = 3600
-SPEED_LINE = "pub(crate) const SPEED_MAX: f64 = 10.0;"
+SPEED_PATTERN = re.compile(r"^pub\(crate\) const SPEED_MAX: f64 = ([0-9.]+);$", re.MULTILINE)
 SPEED_SCRATCH = "pub(crate) const SPEED_MAX: f64 = 1000.0;"
 LOOP_RATES = [1, 10, 120, 1000]
 LOOPV_RATES = [120, 1000]
@@ -335,6 +339,12 @@ def sync_tree(source, target, edits=None):
         dest.write_bytes(data)
 
 
+def head_speed_lines():
+    """HEAD's `edit_clip_timing.rs` and every match of its `SPEED_MAX` line."""
+    text = (ROOT / "core/src/edit_clip_timing.rs").read_text()
+    return text, list(SPEED_PATTERN.finditer(text))
+
+
 def scratch_core(score):
     for crate in ("core", "graphic"):
         (TREE / crate).mkdir(parents=True, exist_ok=True)
@@ -343,12 +353,13 @@ def scratch_core(score):
             dest = TREE / crate / name
             if not dest.exists() or dest.read_bytes() != data:
                 dest.write_bytes(data)
-    text = (ROOT / "core/src/edit_clip_timing.rs").read_text()
-    if text.count(SPEED_LINE) != 1:
-        emit("B0", "FAIL", f"`{SPEED_LINE}` occurs {text.count(SPEED_LINE)} times, not once",
-             instrument=True)
+    text, found = head_speed_lines()
+    if len(found) != 1:
+        emit("B0", "FAIL", f"`{SPEED_PATTERN.pattern}` matches {len(found)} times in HEAD's "
+             "edit_clip_timing.rs, not once", instrument=True)
         return None
-    edits = {"edit_clip_timing.rs": text.replace(SPEED_LINE, SPEED_SCRATCH).encode()}
+    head_line = found[0].group(0)
+    edits = {"edit_clip_timing.rs": SPEED_PATTERN.sub(SPEED_SCRATCH, text, count=1).encode()}
     sync_tree(ROOT / "core/src", TREE / "core/src", edits)
     sync_tree(ROOT / "core/include", TREE / "core/include")
     sync_tree(ROOT / "graphic/src", TREE / "graphic/src")
@@ -356,13 +367,16 @@ def scratch_core(score):
     print(diff["stdout"].rstrip(), flush=True)
     changed = [line for line in diff["stdout"].splitlines()
                if line[:1] in "+-" and not line.startswith(("+++", "---"))]
-    one_line = changed == ["-" + SPEED_LINE, "+" + SPEED_SCRATCH]
+    unchanged = head_line == SPEED_SCRATCH
+    one_line = changed == ([] if unchanged else ["-" + head_line, "+" + SPEED_SCRATCH])
     env = bounded.child_env()
     env.pop("CARGO_TARGET_DIR", None)
     built = run(["cargo", "build", "--release", "--offline"], 1800, cwd=TREE / "core", env=env)
     lib = TREE / "core/target/release/libreelcut_core.a"
     ok = one_line and built["rc"] == 0 and lib.exists()
-    detail = (f"diff: {len(changed)} changed lines, exactly the SPEED_MAX line: {one_line} · "
+    which = ("none expected, HEAD already says 1000.0" if unchanged
+             else f"exactly `{head_line}` → 1000.0")
+    detail = (f"diff: {len(changed)} changed lines, {which}: {one_line} · "
               f"cargo rc {built['rc']} in {built['seconds']:.0f} s"
               + (" EXPIRED" if built["expired"] else ""))
     if not ok and built["rc"] != 0:
@@ -813,6 +827,18 @@ def main():
     if unknown:
         print(f"unknown row families {sorted(unknown)}")
         return 1
+    head_max = None
+    if args.stock_core:
+        found = head_speed_lines()[1]
+        if len(found) != 1:
+            print(f"mutant stock-core: not performed — HEAD's SPEED_MAX line matches "
+                  f"{len(found)} times, not once")
+            return 2
+        head_max = float(found[0].group(1))
+        if head_max >= 1000:
+            print(f"mutant stock-core: not performed — HEAD's SPEED_MAX is already {head_max:g}, "
+                  "so the stock core is no mutant")
+            return 2
     started = time.monotonic()
     results["argv"] = sys.argv[1:]
     results["stock_core"] = args.stock_core
@@ -907,7 +933,7 @@ def main():
         def speeds(h):
             return sorted({c["speed"] for c in ((h.get("data") or {}).get("timeline") or {})
                            .get("clips", [])})
-        caught = all(h["status"] == "FAIL" and speeds(h) == [10.0] for h in high)
+        caught = all(h["status"] == "FAIL" and speeds(h) == [head_max] for h in high)
         print(f"mutant stock-core: {'CAUGHT' if caught else 'SURVIVED'} — T120/T1000 read back "
               f"{[speeds(h) for h in high]} in {elapsed:.0f} s", flush=True)
         save()

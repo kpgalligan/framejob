@@ -196,6 +196,17 @@ char *rc_op_names(void);
  * A query — no handle, nothing persisted changes, and never NULL. */
 char *rc_op_schemas(void);
 
+/* Every number about a clip's speed, as a JSON object:
+ *   {"min":0.1,"max":1000.0,"audio_max":12.0}
+ * "min"/"max" are the range set_speed clamps to and the reader refuses
+ * outside; "audio_max" is the speed above which the composition plan leaves
+ * a clip's audio out, in both pitch modes (spec §11 #190). The core
+ * is the one home of these numbers; the host reads them here.
+ *
+ * A query — no handle, nothing persisted changes, and never NULL. Freed with
+ * rc_string_free. */
+char *rc_speed_limits(void);
+
 /* --------------------------------------------------------------- queries */
 
 /* End of the last clip, in ticks. 0 for an empty project or NULL. */

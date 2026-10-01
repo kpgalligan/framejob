@@ -113,7 +113,8 @@ schema, §6 the op table, §7 the architecture.
   with its span washed down the clip and shaded on the ruler.
 - **Editing**: move, nudge, trim, slip, roll, split, delete, lift, ripple
   delete (one range, or many at once), close gap, insert time, insert and
-  overwrite, duplicate, speed, freeze frame, detach audio, transitions,
+  overwrite, duplicate, speed (×0.1–×1000, or fit to a duration),
+  freeze frame, detach audio, transitions,
   actions, markers, tracks, canvas size and rate; a clip's own name and
   colour label (Clip ▸ Rename…, Clip ▸ Label ▸; a clip with no name of
   its own is called what it shows), solo (Track ▸ Solo — the other tracks

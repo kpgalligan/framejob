@@ -46,6 +46,8 @@
 //!    occupied, back to front, which is what makes a nest look the same
 //!    after it is made as it did before.
 
+use std::borrow::Cow;
+
 use serde::Serialize;
 
 use crate::format::MAX_NEST_DEPTH;
@@ -163,6 +165,26 @@ impl<'a> Instance<'a> {
             .map(|e| (e.clip, e.start, e.end))
             .chain(std::iter::once((self.clip, self.start, self.end)))
     }
+}
+
+/// The clip as the plan must see it: itself for a timeline clip, and a copy
+/// placed at project time — shortened if the nest clip showing it ended
+/// first — for a nested one.
+///
+/// Only the TAIL is ever cut, which is why there is no in-point arithmetic
+/// here. The timeline gives its clips no window, so a nest clip is never
+/// itself head-clipped, so its contents' first frames are never before the
+/// window it hands them; the same argument then holds one level down. Give
+/// `Source::Nest` an in point one day and this is where the `trim_start`
+/// arithmetic belongs.
+pub(crate) fn lifted<'a>(instance: &Instance<'a>) -> Cow<'a, Clip> {
+    if instance.start == instance.clip.start && instance.duration() == instance.clip.duration {
+        return Cow::Borrowed(instance.clip);
+    }
+    let mut clip = instance.clip.clone();
+    clip.start = instance.start;
+    clip.duration = instance.duration();
+    Cow::Owned(clip)
 }
 
 impl Project {

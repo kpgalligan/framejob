@@ -99,7 +99,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   disk, and road map 6 §5i·1's "key unset → refused by name" row could
   not pass at all.
 - **R6-10 — The caption path clamps a clip's `speed` at BOTH ends, because
-  the reader does not.** A clip's `speed` is bounded to 0.1–10 by the OPS
+  the reader does not.** A clip's `speed` is bounded to 0.1–10 (×0.1 – ×1000
+  since #190) by the OPS
   and by nothing else: `core/src/edit_clip_timing.rs`'s `SPEED_MIN`/`SPEED_MAX`
   make `set_speed` clamp and `rate_stretch` an identity outside the range,
   while `Project::validate` (`core/src/model_query.rs:189`) checks a clip's
@@ -157,7 +158,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
     clamps to them and `rate_stretch` stays inside them. The reader reads
     them, not a copy, so widening the range (#190) moves the reader with it.
   - The sentence names the clip and the value as JSON spells it:
-    `clip 12's speed 250.0 is outside ×0.1–×10`.
+    `clip 12's speed 2500.0 is outside ×0.1–×1000`.
   - It refuses rather than clamps. As D7-1 does for times, the file fails to
     open at any format version and is not rewritten.
   - A person sees the sentence through `ReelCoreError` in NSDocument's

@@ -126,6 +126,16 @@ pub fn cases(fps: [u32; 2], f: i64) -> Vec<TickCase> {
             ],
         ),
         applied(
+            "set_speed.duration",
+            "duration",
+            one.clone(),
+            json!({"op":"set_speed","clip":10,"duration":off(15,f)}),
+            vec![
+                ("/clips/0/duration", json!(16 * f)),
+                ("/clips/0/speed", json!(1.25)),
+            ],
+        ),
+        applied(
             "slip.delta",
             "delta",
             one.clone(),

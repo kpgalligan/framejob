@@ -122,6 +122,7 @@ func requirement(_ requirement: AgentDeclaration.Requirement) -> String {
     case .theCores: return "theCores"
     case .required: return "required"
     case .optional: return "optional"
+    case .filledByTheApp: return "filledByTheApp"
     }
 }
 answer["declarations"] = AgentServer.declarations.map { declaration in

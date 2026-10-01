@@ -43,7 +43,7 @@ use reelcut_core::ffi_query::{
     rc_export_presets, rc_export_settings, rc_export_sizes, rc_op_names, rc_op_schemas,
     rc_project_clip_state, rc_project_composition_plan, rc_project_duration,
     rc_project_frame_recipe, rc_project_frame_recipe_opts, rc_project_snap_candidates,
-    rc_snap_resolve,
+    rc_snap_resolve, rc_speed_limits,
 };
 use reelcut_core::format::RC_FORMAT_VERSION;
 
@@ -2054,6 +2054,12 @@ fn sweep_every_export_with_nulls() -> Vec<String> {
     let schemas = take_string(unsafe { rc_op_schemas() }).expect("op schemas are never NULL");
     assert_contains(&schemas, "\"add_shape_clip\"");
     cover("rc_op_schemas");
+
+    // rc_speed_limits takes no pointers either — `core/tests/speed_x1000.rs`
+    // is where its contents are checked.
+    let limits = take_string(unsafe { rc_speed_limits() }).expect("limits are never NULL");
+    assert_contains(&limits, "\"audio_max\"");
+    cover("rc_speed_limits");
 
     let presets = take_string(unsafe { rc_export_presets() }).expect("presets are never NULL");
     assert_contains(&presets, "\"h264\"");

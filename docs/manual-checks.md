@@ -250,6 +250,24 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Expect:** the sheet reopens on the last choices and the preset restores them; the queue is listed once, with per-row progress and Cancel; the saved frame matches the preview; the movie plays in QuickTime with sound.
 - **Source:** #51; spec §10 step 10.
 
+**SE-6 — A ×120 preview is watchable**
+- **Do:** 1. Put an hour-long recording on the timeline. 2. In the Clip tab's Speed section, type 120 into Rate, or Fit to 30 s. 3. Play it from the start to the end.
+- **Expect:** the picture moves through the hour with only short stalls. B52a measured 841 of 869 frames shown, with one 3.4 s stall, on the development machine.
+- **Answer:** is a ×120 preview good enough to scan a recording by?
+- **Source:** #190.
+
+**SE-7 — The ×1000 preview and export**
+- **Do:** 1. Set the same hour-long recording to ×1000 (Clip ▸ Speed… ▸ 1000, or Fit to 3.6 s). 2. Play it. 3. Export it as H.264 and play the movie in QuickTime Player.
+- **Expect:** the preview does NOT keep up (B52a measured 14 of 936 frames and a 30 s stall) and the export takes a long time (about 25 minutes for 32 s in B52a's run), but the export finishes and plays.
+- **Answer:** are the ×1000 preview and export acceptable as they are (the owner's later test, spec §11 #190)?
+- **Source:** #190.
+
+**SE-8 — Audio at and above the ceiling, and Fit to**
+- **Do:** 1. On a clip of speech, set ×12 with Keep pitch on and play it; then turn Keep pitch off and play it again. 2. Set ×13, with Keep pitch on and then off; play each and read the Speed section. 3. Type a length into Fit to and press Return.
+- **Expect:** at ×12 the audio plays in both pitch modes and sounds like sped-up speech; at ×13 the clip is silent in both modes and the Speed section says "Audio is silent above ×12"; Fit to commits, the clip takes the typed length, and Rate shows the new rate.
+- **Answer:** does the speech at the ceiling sound right?
+- **Source:** #190.
+
 ## Captions
 
 **CAP-1 — Text reveals and legibility**

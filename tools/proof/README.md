@@ -10831,3 +10831,88 @@ python3 tools/proof/speed_spike/speed_spike.py --stock-core --rows H,S,T   # CAU
 python3 tools/proof/speed_spike/speed_spike.py                            # 5585 s on this host; exit 0
 python3 tools/proof/speed_spike/speed_spike.py --rows A                    # the audio sweep alone, with its L rows
 ```
+
+## Issue batch B52b — the ×1000 speed build (`speed_limits_probe`; #190 part 2)
+
+### What it proves
+
+A clip's speed runs ×0.1–×1000, and above ×12, in both pitch modes, the plan
+leaves the clip's audio out (spec §11 #190). `speed_limits_probe.py` (the
+runner) and `speed_limits_probe.swift` (compiled as `main.swift` over every
+other `app/Sources` file on `speed_spike.py`'s `build_probe` line) call the
+app's own `ReelSpeed.limits`, `SpeedSheetController`'s statics,
+`VideoPane.silentAudioNote`, `ReelProject.applying`, `ReelExport.settings`
+and `Exporter`. No app instance and no MCP call. Every child runs through
+`graphics_spike/bounded.py`; every export has a 120 s deadline (runner bound
+180 s) and must FINISH. The fixtures are generated: `tone_180.mov` and
+`tone_600.mov`, 320x180 testsrc2 with a 200 Hz sine. "Sound" is an RMS
+≥ −40 dB; "nothing" is an audio stream that ends by 2.05 s or a peak
+≤ −80 dB after it.
+
+**Why ×12, not B52a's ×24/×32.** The h264 export's loudness pass
+("Measuring loudness…") never finished, in the probe's export mode:
+
+| Shape (on `tone_180.mov`) | ×12 | ×14 | ×15 | ×16 | ×20 | ×24 | ×32 |
+|---|---|---|---|---|---|---|---|
+| keep pitch, the clip alone | 2.8 s | 3.4 s | stall | stall (also 600 s, and trimmed to 2 s) | stall | stall | — |
+| varispeed, the clip alone | 2.4 s | — | — | 3.8 s (600 s: 7.7 s) | stall | stall | stall |
+| after a 2 s ×1 clip, keep pitch | 2.9 s | — | — | 2.8 s | — | 3.3 s | — |
+| after a 2 s ×1 clip, varispeed | 2.5 s | — | — | 2.7 s | — | 2.3 s | stall (5 of 5) |
+
+"Stall" is a 45–120 s deadline with the export still measuring loudness. B52a's
+own binary stalls the same way at ×24 alone in both modes. The owner chose
+×12, a margin below both stalls; B52a's mixer limits are background only.
+
+### Plain run (2026-10-01, `python3 tools/proof/speed_limits_probe.py`, 156 s, exit 0)
+
+| Row | Printed |
+|---|---|
+| B0 | HEAD: cargo build --release rc 0 |
+| K1 | `cargo test --test speed_x1000`: 12 passed |
+| B1 | metallib + probe built in 108 s (-O -wmo) |
+| F0 / F1 | tone_180.mov 180.0 s / tone_600.mov 600.0 s, (320, 180), audio True |
+| U1 | limits (0.1, 1000, 12); sheet range [0.1, 1000]; presets [0.25, 0.5, 1, 1.5, 2, 4, 10, 100] |
+| U2 | ×1 k: None; ×12 k: None; ×12 v: None; ×12.5 k and ×12.5 v: 'Audio is silent above ×12' |
+| E1 (CONTROL) | 1:2:k: success in 0.8 s · RMS [0,2) −24.10 |
+| E2 / E3 | 12:0:k / 12:0:v on 180 s: success in 2.5 / 2.4 s · audio to 15.12 / 15.00 s, RMS −24.14 / −24.11 |
+| E4 / E5 | 1:2:k,12:0:k / 1:2:v,12:0:v: success in 2.9 / 2.5 s · RMS after 2.05 s −24.12 / −24.09 |
+| E6 / E7 | 12:0:k / 12:0:v on 600 s: success in 6.7 / 7.0 s · audio to 50.11 / 50.00 s, RMS −24.11 / −24.09 |
+| E8 / E9 | 1:2:k,13:0:k / 1:2:v,13:0:v: success in 2.1 s · audio ends at 2.0 |
+| E10 | 13:0:k: success in 1.7 s · 415 video frames, no audio stream |
+| E11 | 1:2:k,100:0:k: success in 1.9 s · audio ends at 2.0 |
+| E12 | 1000:0:v: success in 1.5 s · 5 video frames, no audio stream |
+| E13 | 1:2:k,12:0:v (the pitch split): success in 2.6 s · RMS after 2.05 s −24.09 |
+| E14 | 20:0:v: success in 1.8 s · 270 video frames, no audio stream |
+| E15 / E17 | 12:2:k / 12:2:v (the trimmed start): success in 0.8 s · RMS −24.66 / −24.24 |
+| E16 | 16:0:k: success in 1.6 s · 337 video frames, no audio stream |
+
+### Mutants (rule R)
+
+| Mutant | Edit | Named rows | Result |
+|---|---|---|---|
+| `ceiling-16` | `AUDIO_SPEED_MAX` 12.0 → 16.0 | U1, U2, E8, E9, E10, E16 | CAUGHT, exit 1 (348 s): U1 limits (0.1, 1000, 16); U2 notes None at ×12.5; E8/E9 peak after 2.05 s −18.63 / −19.86 dB; E10 audio stream True; E16 deadline in 120.0 s |
+| `no-audio-limit` | 12.0 → 1000.0 | U1, U2, E8, E9, E10, E14, E16 | CAUGHT, exit 1 (403 s) |
+| `no-pitch-split` | `!match_pitch ||` → `true ||` | K1 | CAUGHT, exit 1 (6 s): `each_plan_audio_track_has_one_pitch` and the ducking pin failed |
+
+`no-pitch-split` is scored by the core tests alone: at ×12 no export depends
+on the split (E13 passes either way), so it builds no probe. The first
+derivation of `no-audio-limit` also named E11 and E12 and SURVIVED (exit 0):
+above ×32 the export drops the audio by itself (B52a), so ×100 and ×1000
+cannot see the ceiling. The named rows were re-derived to the ones that can;
+its other seven rows had failed in that run too.
+
+### The spike at the new HEAD
+
+`speed_spike.py`'s B0 matches HEAD's `SPEED_MAX` line by pattern now:
+
+| Command | Result |
+|---|---|
+| `speed_spike.py --rows H,S,T` | exit 0 in 156 s; B0 "diff: 0 changed lines, none expected, HEAD already says 1000.0: True"; T1/T10 read back [1]/[10] (29.989 s), T120.loop/loopv [120] (29.989 s), T1000.loop/loopv [1000] (32.301 s); host load 67.88–92.11 |
+| `speed_spike.py --rows H,S,T --stock-core` | exit 2: "mutant stock-core: not performed — HEAD's SPEED_MAX is already 1000, so the stock core is no mutant" |
+
+```sh
+python3 tools/proof/speed_limits_probe.py                            # exit 0
+python3 tools/proof/speed_limits_probe.py --mutant ceiling-16        # exit 1
+python3 tools/proof/speed_limits_probe.py --mutant no-audio-limit    # exit 1
+python3 tools/proof/speed_limits_probe.py --mutant no-pitch-split    # exit 1
+```

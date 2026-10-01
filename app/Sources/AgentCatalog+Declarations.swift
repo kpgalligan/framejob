@@ -202,12 +202,14 @@ extension AgentServer {
         // ---- a range the core clamps to rather than refusing --------------
 
         AgentDeclaration(
-            .argument("rate", of: "set_speed"), alsoKeys: ["minimum": 0.1, "maximum": 10],
-            why: "The core CLAMPS a rate into 0.1–10 rather than refusing outside it "
-                + "(core/src/edit_clip.rs), so the range is not a rule the table may publish "
-                + "and it is guidance the tool gives instead. What the core does refuse is a "
-                + "non-positive or non-finite rate, which no JSON-Schema bound this table "
-                + "carries can say; the handler refuses it by name first."),
+            .argument("rate", of: "set_speed"),
+            alsoKeys: ["minimum": ReelSpeed.limits.min, "maximum": ReelSpeed.limits.max],
+            why: "The core CLAMPS a rate into \(ReelSpeed.limits.min)–\(ReelSpeed.limits.max) "
+                + "rather than refusing outside it (core/src/edit_clip_timing.rs, published by "
+                + "rc_speed_limits), so the range is not a rule the table may publish and it is "
+                + "guidance the tool gives instead. What the core does refuse is a non-positive "
+                + "or non-finite rate, which no JSON-Schema bound this table carries can say; "
+                + "the handler refuses it by name first."),
 
         // ---- a bound the app refuses outside and the core does not ---------
 

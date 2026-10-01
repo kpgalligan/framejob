@@ -357,7 +357,7 @@ impl Project {
     /// on a copy running at `rate`, because that is the speed the segment
     /// will play at and the one the invariant has to hold for. A quotient
     /// that is not finite leaves the duration alone. `rate` arrives already
-    /// clamped to ×0.1 – ×10.
+    /// clamped to `SPEED_MIN`–`SPEED_MAX`.
     pub(crate) fn duration_at_speed(&self, clip: &Clip, rate: f64) -> Ticks {
         let scaled = self.content_length_in_source(clip) as f64 / rate;
         if !scaled.is_finite() {

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Saved-package admission and same-process MCP survival for D7-1, and for
 the reader's speed bound (spec §11 R6-10, amended by #41): a clip speed
-outside ×0.1–×10 is refused by name and value, the package is not
+outside ×0.1–×1000 is refused by name and value, the package is not
 rewritten, and both bounds themselves open.
 
 Owns its Reelcut process. A nonzero exit scores a startup, timeout, crash,
@@ -173,10 +173,10 @@ def run_speeds(mcp, where):
     refused = []
     for name, speed, said in [("speed-1e300", 1e300, "1e+300"),
                               ("speed-1e-300", 1e-300, "1e-300"),
-                              ("speed-over", 10.000000000000002, "10.000000000000002"),
+                              ("speed-over", 1000.0000000000002, "1000.0000000000002"),
                               ("speed-under", 0.09999999999999998, "0.09999999999999998")]:
         refused.append((name, speeds_base(speed),
-                        f"clip 4's speed {said} is outside ×0.1–×10"))
+                        f"clip 4's speed {said} is outside ×0.1–×1000"))
     p = speeds_base(1.0)
     p["nests"] = [{"id": 30, "tracks": [{"id": 31}],
                    "clips": [{"id": 32, "track": 31, "start": 0, "duration": FRAME,
@@ -185,7 +185,7 @@ def run_speeds(mcp, where):
                               "video": {}}]}]
     p["next_id"] = 33
     refused.append(("speed-nested", p,
-                    "clip 32 in nest 30's speed 1e+300 is outside ×0.1–×10"))
+                    "clip 32 in nest 30's speed 1e+300 is outside ×0.1–×1000"))
 
     for name, document, sentence in refused:
         original = package(where, name, document)
@@ -204,7 +204,7 @@ def run_speeds(mcp, where):
         assert project(mcp)["clips"][0]["text"]["content"] == "Survived"
         print("ok", name, "named refusal and subsequent valid open")
 
-    for name, speed in [("speed-min", 0.1), ("speed-max", 10.0)]:
+    for name, speed in [("speed-min", 0.1), ("speed-max", 1000.0)]:
         saved = package(where, name, speeds_base(speed))
         mcp.call("open_project", path=saved)
         read = [c for c in project(mcp)["clips"] if c["id"] == 4]

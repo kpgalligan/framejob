@@ -74,7 +74,7 @@ pub enum Outcome {
     /// refusal**, deliberately (§11 #88): the clamped edge ops in
     /// `edit_edge.rs` and `edit_clip.rs` — a slip or a roll the clamps
     /// reduce to nothing, a trim whose two clamps crossed, a rate stretch
-    /// outside ×0.1 – ×10 — each a clamp that landed on where the clip
+    /// outside `SPEED_MIN`–`SPEED_MAX` — each a clamp that landed on where the clip
     /// already was, which is the case where an identity is also the honest
     /// answer (kpgalligan/reelcut#8, decision 3); and the unreachable misses
     /// — a clip absent from its own track's list in `add_transition` and

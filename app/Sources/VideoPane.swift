@@ -956,46 +956,4 @@ final class VideoPane: InspectorPaneView {
                     enabled: on),
             ])
     }
-
-    // MARK: Speed
-
-    /// Speed is a clip-level op, not a patch: `set_speed` takes one clip and
-    /// re-times its actions (§6), so the selection becomes one op each and the
-    /// whole batch is a single undo step.
-    ///
-    /// Reverse used to sit here, next to Rate, because both re-time the same
-    /// source. It now sits in the Clip tab's Timing section with In, Out and
-    /// Duration, which is what the redesign asks for and reads better anyway:
-    /// Rate is how fast, Reverse is which way, and the duration readout the
-    /// two of them share belongs with the edges it is measured between.
-    func speedSection() -> InspectorSection {
-        let binding = self.binding
-        func rate() -> Double {
-            let value = binding.primary?.speed ?? 1
-            return value > 0 ? value : 1
-        }
-        func speedOps(_ next: Double, keepPitch: Bool?) -> [ReelOp] {
-            binding.clips.filter { $0.source.hasSourceBound }
-                .map { .setSpeed(clip: $0.id, rate: next, keepPitch: keepPitch) }
-        }
-        return InspectorSection(
-            id: "video.speed", title: "Speed",
-            summary: { String(format: "%.2f×", rate()) },
-            reset: { binding.apply("Set Speed", speedOps(1, keepPitch: nil)) },
-            differs: { rate() != 1 },
-            defaultExpanded: false,
-            rows: [
-                inspectorValueRow(
-                    "Rate", binding, name: "Set Speed", unit: "×", decimals: 2, min: 0.1, max: 10,
-                    quick: [0.5, 1, 2, 4], slider: false,
-                    read: rate,
-                    ops: { speedOps($0, keepPitch: nil) },
-                    mixed: { binding.mixed { $0.speed } }, resets: false),
-                inspectorCheckRow(
-                    "Keep pitch", binding, name: "Keep Pitch",
-                    read: { binding.audioProps.keepPitch },
-                    ops: { value in speedOps(rate(), keepPitch: value) },
-                    mixed: { binding.mixedAudio { $0.keepPitch } }),
-            ])
-    }
 }

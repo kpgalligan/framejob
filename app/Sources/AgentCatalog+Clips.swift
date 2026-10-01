@@ -69,6 +69,7 @@ extension AgentServer {
         let shapeNames = ShapeKind.allCases.map { $0.rawValue }
         let filterNames = FilterKind.allCases.map { $0.rawValue }
         let obscureNames = ObscureKind.allCases.map { $0.rawValue }
+        let speed = ReelSpeed.limits  // set_speed's numbers, all the core's (spec §11 #190)
         // The obscure list's clause, kept as its own explicitly-typed local
         // rather than spliced into the video chain below: that chain already
         // carries a non-literal operand and is one of the three expressions
@@ -508,20 +509,19 @@ extension AgentServer {
                 ]),
             opTool(
                 "set_speed",
-                "Changes a clip's playback rate — Clip ▸ Speed…. The duration follows (source "
-                    + "length ÷ rate, snapped and then held to what the file holds at the new "
-                    + "rate, so a whole-file clip can come out a frame short); actions keep "
-                    + "their place. Rate is clamped to 0.1–10. Any non-media clip is an error.",
+                String(
+                    format: "Changes a clip's playback rate — Clip ▸ Speed… — or fits it to a "
+                        + "duration — the Speed section's Fit to: give rate or duration, exactly "
+                        + "one. Any non-media clip is an error. The duration follows (source "
+                        + "length ÷ rate, snapped and held to what the file holds); actions keep "
+                        + "their place. Rate is clamped to %g–%g. Above ×%g, with or without "
+                        + "keep_pitch, the clip's audio is left out of the mix.", speed.min,
+                    speed.max, speed.audioMax),
                 [
                     "clip": clipDescription,
-                    // The 0.1–10 range is a declared row, not a bound here:
-                    // the core CLAMPS to it rather than refusing outside it,
-                    // so the op table may not publish it
-                    // (`AgentCatalog+Declarations.swift`).
-                    "rate": "1 = normal, 2 = twice as fast (half as long), 0.5 = "
-                        + "slow motion.",
-                    "keep_pitch": "Keep the audio's pitch while the speed changes "
-                        + "(default: the clip's current setting).",
+                    "rate": "1 = normal, 2 = twice as fast (half as long), 0.5 = slow motion.",
+                    "duration": "The length to fit the clip to, instead of a rate \(ticks)",
+                    "keep_pitch": "Keep the audio's pitch at the new speed (default: as it is).",
                 ]),
             opTool(
                 "set_reversed",

@@ -2,7 +2,8 @@
 //! `rc_project_composition_plan`, `rc_project_frame_recipe`,
 //! `rc_project_frame_recipe_opts`, `rc_project_clip_state`,
 //! `rc_project_snap_candidates`, `rc_snap_resolve`, `rc_op_names`,
-//! `rc_op_schemas` and the three `rc_export_*` queries in the header).
+//! `rc_op_schemas`, `rc_speed_limits` and the three `rc_export_*` queries in
+//! the header).
 //!
 //! Thin shims only, all of them pure: a query never changes the project
 //! and never allocates a handle. Every JSON answer here is COMPACT, unlike
@@ -24,6 +25,7 @@ use std::ptr;
 use serde_json::Value;
 
 use crate::edit;
+use crate::edit_clip_timing::speed_limits;
 use crate::export;
 use crate::ffi_util::{
     fallible_op, out_string, project_get, project_json, read_cstr, read_opt_cstr,
@@ -250,6 +252,32 @@ pub unsafe extern "C" fn rc_op_schemas() -> *mut c_char {
             "listing op schemas",
             ptr::null_mut(),
             || Ok(op_schema::op_schemas().to_string()),
+            out_string,
+        )
+    }
+}
+
+/// Every number about a clip's speed, as JSON:
+/// `{"min":0.1,"max":1000.0,"audio_max":12.0}` — the range `set_speed`
+/// clamps to and the reader enforces, and the speed above which the plan
+/// leaves a clip's audio out, in both pitch modes (spec §11 #190). The one
+/// home of those numbers is `crate::edit_clip_timing`; the app reads them
+/// here and types none.
+///
+/// A query — no handle, nothing persisted changes, and never NULL.
+///
+/// # Safety
+/// Takes no pointers; declared `unsafe` only so the whole exported surface
+/// reads the same way. The returned string is freed with
+/// [`crate::ffi::rc_string_free`].
+#[no_mangle]
+pub unsafe extern "C" fn rc_speed_limits() -> *mut c_char {
+    unsafe {
+        fallible_op(
+            ptr::null_mut(),
+            "listing speed limits",
+            ptr::null_mut(),
+            || Ok(speed_limits().to_string()),
             out_string,
         )
     }

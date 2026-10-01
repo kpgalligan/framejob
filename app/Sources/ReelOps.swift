@@ -551,15 +551,23 @@ extension ReelOp {
 
     /// Media sources only; actions keep their clip-relative fraction.
     ///
+    /// Give a `rate` or a `duration`, exactly one: the core answers both or
+    /// neither with an error (spec §11 #190). A `duration` is the Fit arm —
+    /// the rate becomes whatever plays the clip's content in that length.
+    /// Either rate is clamped to `ReelSpeed.limits`.
+    ///
     /// The duration the core writes is `source length / rate` snapped to a
     /// frame and then held to what the file still holds AT THE NEW RATE
     /// (spec §11, D4-3), so a clip sitting at the tail of its file can come
     /// back up to a frame shorter than the arithmetic asked for — and ×2
     /// then ×1 there is not an identity.
-    static func setSpeed(clip: UInt32, rate: Double, keepPitch: Bool? = nil) -> ReelOp {
+    static func setSpeed(
+        clip: UInt32, rate: Double? = nil, duration: Ticks? = nil, keepPitch: Bool? = nil
+    ) -> ReelOp {
         var a = OpArgs()
         a.put("clip", clip)
         a.put("rate", rate)
+        a.put("duration", duration)
         a.put("keep_pitch", keepPitch)
         return ReelOp(name: "set_speed", args: a.values)
     }

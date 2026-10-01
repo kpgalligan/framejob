@@ -17,11 +17,14 @@ detail there.
 - `ReelCore.swift` — the **only** home for `rc_*` calls: `ReelProject`
   (handle + lazily decoded `ProjectSnapshot`; `json`, `snapshot` and
   `planJSON` are memoised PER HANDLE, so keep handles rather than minting
-  them), timecode, snapping, export presets/sizes/settings, the
-  `dictionary` extensions on the property types and the typed patches —
+  them), timecode, snapping, export presets/sizes/settings, `SpeedLimits`
+  / `ReelSpeed.limits` (the core's speed range and audio ceiling — no Swift
+  file types a speed bound) and the typed patches —
   except `TextPatch` (with `case`, `words` and `word_style`), which is
   `TextPatch.swift`'s, moved out so it could grow. `word_style` has ONE
-  app-side writer, `CaptionLayout.place` (W-10).
+  app-side writer, `CaptionLayout.place` (W-10). The `dictionary`
+  extensions on the property types are `OpDictionaries.swift`'s (a pure
+  move, #190).
   The graphics engine's wrappers are here too: `GraphicLibrary` (`addFont`,
   `addAsset`, `rasterize`, `families()`; frozen by its first compile,
   rasterize or `families()`) and
@@ -569,7 +572,8 @@ the key map behind it.
   (CI-12: the lane's hatch, fades and wedges as geometry by the timeline's
   own gates, drawn under the bands; `Curve.laneName`; `CurveGlyphView`,
   beside the Curve popup because `OptionPopupControl` is not forked) · `VideoPane.swift` (+`Transition`,
-  +`Motion`, +`Obscure` — the Obscure section, a pure move) · `AudioPane.swift` · `TextPane.swift` · `ShapePane.swift` ·
+  +`Motion`, +`Obscure` — the Obscure section, a pure move; +`Speed` — the
+  Speed section, Fit to and the "Audio is silent above ×12" note, #190) · `AudioPane.swift` · `TextPane.swift` · `ShapePane.swift` ·
   `GraphicPane.swift` (the Graphic sub-tab, road map 10 §5j, spec §11 G-15:
   a factory `ClipPane` calls when EVERY selected clip is a graphic; the
   shared module from `GraphicRegistry.entry(named:for:)`, main only, never a

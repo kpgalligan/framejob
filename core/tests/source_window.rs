@@ -351,7 +351,7 @@ fn the_window_slipped_to_its_tail_stop_ends_exactly_at_the_end_of_the_file() {
 fn a_sub_tick_speed_is_refused_and_its_content_length_falls_back_to_one_to_one() {
     // Spec §11's D4-1. 200 000 ticks at ×0.000001 is 0.2 ticks of source —
     // under one tick, reachable by no file since R6-10's amendment (#41):
-    // the reader refuses the speed, and every op holds one in ×0.1 – ×10.
+    // the reader refuses the speed, and every op holds one in ×0.1 – ×1000.
     // So the project is built against the library directly, and the ONE
     // content length still answers the 1:1 fallback, 200 000, and the plan
     // reads that function rather than its own copy, which answered 1.
@@ -361,7 +361,7 @@ fn a_sub_tick_speed_is_refused_and_its_content_length_falls_back_to_one_to_one()
             OVERHANG,
             vec![clip(40, 5, 0, 10 * FRAME_30, 0, 1e-6)],
         ),
-        "clip 40's speed 1e-6 is outside ×0.1–×10",
+        "clip 40's speed 1e-6 is outside ×0.1–×1000",
     );
     let plan = project.composition_plan();
     for group in ["video_tracks", "audio_tracks"] {
@@ -397,7 +397,7 @@ fn an_unmeasured_window_is_refused_and_read_empty_at_the_head_and_unbounded_at_t
             OVERHANG,
             vec![clip(50, 5, 200_000, 10 * FRAME_30, 0, 0.0)],
         ),
-        "clip 50's speed 0.0 is outside ×0.1–×10",
+        "clip 50's speed 0.0 is outside ×0.1–×1000",
     );
     let clip = project.clip(50).expect("clip 50 is in the fixture");
 
@@ -417,7 +417,7 @@ fn an_unmeasured_window_is_refused_and_read_empty_at_the_head_and_unbounded_at_t
     // would carry the speed into a new project is refused by `finish`.
     assert_eq!(
         project.apply(r#"{"op":"trim_end","clip":50,"to":3200000}"#),
-        Err("clip 50's speed 0.0 is outside ×0.1–×10".to_string())
+        Err("clip 50's speed 0.0 is outside ×0.1–×1000".to_string())
     );
     assert_eq!(
         project.longest_duration_on_grid(clip),
@@ -441,14 +441,14 @@ fn an_unmeasured_window_is_refused_and_gives_a_transition_no_tail() {
                 clip(61, 6, 200_000, 20 * FRAME_30, 200_000, 1.0),
             ],
         ),
-        "clip 60's speed 0.0 is outside ×0.1–×10",
+        "clip 60's speed 0.0 is outside ×0.1–×1000",
     );
     assert_eq!(
         project.apply(&format!(
             r#"{{"op":"add_transition","clip":61,"duration":{}}}"#,
             2 * FRAME_30
         )),
-        Err("clip 60's speed 0.0 is outside ×0.1–×10".to_string())
+        Err("clip 60's speed 0.0 is outside ×0.1–×1000".to_string())
     );
     let outgoing = project.clip(60).expect("clip 60 is in the fixture");
     assert_eq!(

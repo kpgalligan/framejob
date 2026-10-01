@@ -121,7 +121,7 @@
 //! | `lift_range` | `ripple_delete_range` without the close: every unlocked clip is split at both bounds and the middles removed, and nothing moves. A reversed range is the same range. |
 //! | `insert_time` | Opens a hole: every unlocked clip, and every marker, at or after `at` moves right by `length`. |
 //! | `close_gap` | Closes the empty span on `track` that contains `at`, bounded by the nearest clip edges there: everything from its far side shifts left by its length, across every unlocked track. Refuses on a locked `track`, on an `at` that is on a clip, with no clip after the gap, and when the shift would break the overlap rule — a gap closes fully or not at all. |
-//! | `set_speed` | `duration = content length / rate` (rate clamped to 0.1–10), snapped NEAREST and then held to what the file still holds AT THAT RATE, so the segment plays at exactly `rate` (spec §11, D4-3); actions keep their clip-relative fraction. A non-media source is an `Err`, not a refusal — see "The non-media rule" under Results. |
+//! | `set_speed` | Two arms, exactly one given: a `rate`, or a `duration` to fit, which is snapped, held to a frame and turned into `content length / duration` (the current duration keeps the current rate). Both or neither is an `Err`. Either rate is clamped to `SPEED_MIN`–`SPEED_MAX`; then `duration = content length / rate`, snapped NEAREST and held to what the file still holds AT THAT RATE, so the segment plays at exactly `rate` (spec §11, D4-3); actions keep their clip-relative fraction. Above `AUDIO_SPEED_MAX` (×12, both pitch modes) the plan leaves the clip's audio out (spec §11, #190). A non-media source is an `Err`, not a refusal — see "The non-media rule" under Results. |
 //! | `set_reversed` | Plays the media back to front, or forward again. A FACT about the clip, not a plan change: Swift substitutes a pre-rendered reversed asset (spec §11). The in point is measured in the direction the clip plays, so reversing keeps `in` and therefore shows different frames. A non-media source is an `Err`, not a refusal. |
 //! | `freeze_frame` | `split` at `at`, `insert_time(at, duration)` (2 s when absent), then a `still` of that source frame with the clip's video props evaluated at `at`. |
 //! | `detach_audio` | Clears the clip's `enabled.audio` and puts an audio-only twin on the track below, inserting a track when there is none. Refuses, naming why, on a clip with no audio to detach: not a media clip, media with no audio track, or audio already switched off. |
@@ -367,7 +367,10 @@ pub enum Op {
     },
     SetSpeed {
         clip: u32,
-        rate: f64,
+        #[serde(default)]
+        rate: Option<f64>,
+        #[serde(default)]
+        duration: Option<Ticks>,
         #[serde(default)]
         keep_pitch: Option<bool>,
     },
@@ -778,8 +781,9 @@ impl Project {
             Op::SetSpeed {
                 clip,
                 rate,
+                duration,
                 keep_pitch,
-            } => self.set_speed(*clip, *rate, *keep_pitch),
+            } => self.set_speed(*clip, *rate, *duration, *keep_pitch),
             Op::SetReversed { clip, reversed } => self.set_reversed(*clip, *reversed),
             Op::FreezeFrame { clip, at, duration } => self.freeze_frame(*clip, *at, *duration),
             Op::DetachAudio { clip } => self.detach_audio(*clip),

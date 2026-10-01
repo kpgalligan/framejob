@@ -31,15 +31,15 @@
 //! A project with no nests gets exactly one instance per clip, so this is
 //! not a second path — it is the only one.
 
-use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 use serde::Serialize;
 use serde_json::{Map, Value};
 
 use crate::audio::{Ducker, Voice};
+use crate::edit_clip_timing::AUDIO_SPEED_MAX;
 use crate::model::{Clip, Project, Source};
-use crate::nest::Instance;
+use crate::nest::{lifted, Instance};
 use crate::time::{self, Ticks, TIMESCALE};
 
 /// First video and first audio composition track id. Small, stable
@@ -160,17 +160,26 @@ pub(crate) struct Assignment<'a> {
 ///
 /// With the overlap rule (§6: at most one neighbour per side, at most half
 /// the shorter clip) two tracks per timeline track is the most a timeline
-/// clip can ever need. A nest clip is the exception: it stands for a whole
+/// clip can ever need — four on an audio track whose overlapping clips mix
+/// both pitch settings (`match_pitch` below). A nest clip is the exception: it stands for a whole
 /// stack, so it needs as many as the nest's own tracks do.
+///
+/// With `match_pitch` (audio) a track is free only if its last segment has
+/// the same `keep_pitch`, so every plan audio track has ONE `pitch`, Swift's
+/// first-segment read of it holds, and each clip keeps its own pitch setting
+/// (spec §11 #190, #211).
 fn place<'a>(
     tracks: &mut Vec<CompTrack<'a>>,
     next_id: &mut u32,
     segment: Segment,
     voice: Option<Voice<'a>>,
+    match_pitch: bool,
 ) -> u32 {
-    let free = tracks
-        .iter()
-        .position(|t| t.segments.last().is_none_or(|s| s.end() <= segment.start));
+    let free = tracks.iter().position(|t| {
+        t.segments.last().is_none_or(|s| {
+            s.end() <= segment.start && (!match_pitch || s.keep_pitch == segment.keep_pitch)
+        })
+    });
     match free.and_then(|i| tracks.get_mut(i)) {
         Some(track) => {
             track.segments.push(segment);
@@ -188,26 +197,6 @@ fn place<'a>(
             id
         }
     }
-}
-
-/// The clip as the plan must see it: itself for a timeline clip, and a copy
-/// placed at project time — shortened if the nest clip showing it ended
-/// first — for a nested one.
-///
-/// Only the TAIL is ever cut, which is why there is no in-point arithmetic
-/// here. The timeline gives its clips no window, so a nest clip is never
-/// itself head-clipped, so its contents' first frames are never before the
-/// window it hands them; the same argument then holds one level down. Give
-/// `Source::Nest` an in point one day and this is where the `trim_start`
-/// arithmetic belongs.
-fn lifted<'a>(instance: &Instance<'a>) -> Cow<'a, Clip> {
-    if instance.start == instance.clip.start && instance.duration() == instance.clip.duration {
-        return Cow::Borrowed(instance.clip);
-    }
-    let mut clip = instance.clip.clone();
-    clip.start = instance.start;
-    clip.duration = instance.duration();
-    Cow::Owned(clip)
 }
 
 impl Project {
@@ -325,7 +314,7 @@ impl Project {
                     continue;
                 };
                 if media.has_video && instance.shows_video() {
-                    let id = place(&mut video, &mut next_video, segment, None);
+                    let id = place(&mut video, &mut next_video, segment, None, false);
                     assignment.video_of.insert(instance.path(), id);
                 }
                 // A `still` is a FROZEN PICTURE. Its segment is one source
@@ -342,13 +331,20 @@ impl Project {
                 // property edit and never rebuilds the composition. A solo
                 // is the same envelope, judged against the container's
                 // track set — which for the timeline is `self.tracks`, the
-                // one set the instance does not carry.
-                if media.has_audio && instance.plays_audio() && !frozen {
+                // one set the instance does not carry. Above
+                // `AUDIO_SPEED_MAX` a clip's audio is left out: an export's
+                // loudness pass never finishes there (spec §11 #190).
+                if media.has_audio
+                    && instance.plays_audio()
+                    && !frozen
+                    && clip.speed <= AUDIO_SPEED_MAX
+                {
                     place(
                         &mut audio,
                         &mut next_audio,
                         segment,
                         Some(Voice::of(&self.tracks, instance)),
+                        true,
                     );
                 }
             }

@@ -18,8 +18,8 @@ import Foundation
 /// moved with it.
 ///
 /// **Why anything here is bounded at all — spec §11's R6-10.** A clip's
-/// `speed` is bounded to 0.1–10 by the OPS (`core/src/edit_clip_timing.rs`'s
-/// `SPEED_MIN`/`SPEED_MAX`: `set_speed` clamps, `rate_stretch` is an
+/// `speed` is bounded to `SPEED_MIN`/`SPEED_MAX` by the OPS
+/// (`core/src/edit_clip_timing.rs`: `set_speed` clamps, `rate_stretch` is an
 /// identity outside) and, since R6-10's amendment (#41), by the reader too
 /// — `Project::validate`'s `check_clips` refuses a clip outside them — so
 /// no opened project reaches this code with a tiny or huge speed. The
@@ -135,9 +135,9 @@ extension Transcriber {
     /// It does NOT saturate where the core saturates. The core's cast tops
     /// out at `i64::MAX`; this one tops out at `maxSourceTicks`, for the
     /// reason that constant's own doc gives — Swift sums this answer and the
-    /// core does not. Every speed the ops can write (0.1–10) is orders of
-    /// magnitude below the bound and answers exactly what it always did;
-    /// R6-10 keeps it for speeds the reader now refuses (#41). The
+    /// core does not. Every speed the ops can write (`SPEED_MIN`/`SPEED_MAX`)
+    /// is orders of magnitude below the bound and answers exactly what it
+    /// always did; R6-10 keeps it for speeds the reader now refuses (#41). The
     /// clamp is applied in `Double`: `Ticks(_:)` traps on an out-of-range
     /// one. The degenerate fallback is unchanged and is bounded too, since a
     /// hand-written `duration` can be as large as `Ticks` allows.

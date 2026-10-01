@@ -29,8 +29,9 @@
 //! promise false in the one direction a caller could not see. So
 //! `set_canvas`'s two dimensions carry one — `edit_canvas.rs` refuses
 //! outside 16–16384 by name — and `set_speed`'s `rate`, which refuses a
-//! non-positive rate and then clamps 0.1–10, carries none: the clamp is
-//! the app's to say, in the tool prose that already says it.
+//! non-positive rate and then clamps to `SPEED_MIN`–`SPEED_MAX`, carries
+//! none: the clamp is the app's to say, in the tool prose that already says
+//! it.
 //!
 //! A bound is SOURCED from the constant that enforces it and never retyped
 //! here, which is what `core/tests/op_table.rs` checks by putting each end
@@ -254,7 +255,8 @@ pub const OP_TABLE: [OpRow; OP_COUNT] = [
     op("lift_range", &[req("from", Ticks), req("to", Ticks)]),
     op("insert_time", &[req("at", Ticks), req("length", Ticks)]),
     op("close_gap", &[req("track", Id), req("at", Ticks)]),
-    op("set_speed", &[req("clip", Id), req("rate", Number), opt("keep_pitch", Boolean)]),
+    op("set_speed",
+       &[req("clip", Id), opt("rate", Number), opt("duration", Ticks), opt("keep_pitch", Boolean)]),
     op("set_reversed", &[req("clip", Id), req("reversed", Boolean)]),
     op("freeze_frame", &[req("clip", Id), req("at", Ticks), opt("duration", Ticks)]),
     op("detach_audio", &[req("clip", Id)]),

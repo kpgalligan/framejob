@@ -44,11 +44,13 @@ final class SpeedSheetController: NSViewController, NSTextFieldDelegate {
         checkboxWithTitle: "Preserve pitch", target: nil, action: nil)
     private let durationLabel = NSTextField(wrappingLabelWithString: "")
 
-    /// §6 clamps the rate to ×0.1–×10; the field refuses outside it rather
-    /// than letting the core silently clamp a number the user typed.
-    static let rateRange = 0.1...10.0
-    /// The rates the pull-down offers, a screencast editor's set.
-    static let presets: [Double] = [0.25, 0.5, 1, 1.5, 2, 4]
+    /// §6 clamps the rate to the core's `ReelSpeed.limits`; the field refuses
+    /// outside them rather than letting the core silently clamp a number the
+    /// user typed.
+    static let rateRange = ReelSpeed.limits.range
+    /// The rates the pull-down offers: a screencast editor's set, then ×10 and ×100
+    /// for a long recording (spec §11 #190).
+    static let presets: [Double] = [0.25, 0.5, 1, 1.5, 2, 4, 10, 100]
 
     init(document: ProjectDocument, clips: [UInt32]) {
         self.document = document
@@ -142,7 +144,12 @@ final class SpeedSheetController: NSViewController, NSTextFieldDelegate {
             content: content,
             buttonRow: makeButtonRow(
                 cancel: cancelButton, apply: applyButton,
-                leading: [sheetFootnote("×0.1 – ×10")]))
+                leading: [
+                    sheetFootnote(
+                        String(
+                            format: "×%g – ×%g", Self.rateRange.lowerBound,
+                            Self.rateRange.upperBound))
+                ]))
         syncReadout()
     }
 

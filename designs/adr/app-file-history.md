@@ -368,10 +368,10 @@ Files that were split since the notes wrote them:
 |---|---|
 | `MediaCacheFiles` | `MediaPeakBuckets.swift`, `MediaImporter+Peaks.swift` (#23) |
 | `Playback` | `Playback+Meter.swift`, `Playback+PreviewQuality.swift`, `Playback+Step.swift` (B21), `Playback+Scope.swift` (B30) |
-| `ReelCore` | `RecipeSource.swift`, `TextPatch.swift`, `MediaDescriptor.swift` |
+| `ReelCore` | `RecipeSource.swift`, `TextPatch.swift`, `MediaDescriptor.swift`, `OpDictionaries.swift` (#190) |
 | `InspectorPane` | `InspectorSection.swift`, `InspectorSectionHeader.swift`, `InspectorSlider.swift`, `InspectorBinding+Writes.swift`, `InspectorNameField.swift` (#171) |
 | `ClipPane` | `ClipSelectionHeader.swift`, `ClipPane+Timing.swift` |
-| `VideoPane` | `VideoPane+Obscure.swift` |
+| `VideoPane` | `VideoPane+Obscure.swift`, `VideoPane+Speed.swift` (#190) |
 | `Transcriber` | `+Languages`, `+Jobs`, `+Extract`; `SpeechEngine.swift` |
 | `TranscribeSheetController` | `+Commit`, `+Cloud`, `+Download`, `+Style` |
 | `SilenceDetector` | `SilenceDetector+Vocabulary.swift` (#107) |
@@ -408,8 +408,9 @@ to pay a toll starts from it. A file not listed has no named seam yet.
 
 - `ProjectSnapshot.swift`: a property group's snapshot types out, whole. The precedents are
   `TextProps.swift` and `ProjectSnapshot+Graphic.swift`.
-- `ReelCore.swift`: the `dictionary` extensions (the media helpers already went to
-  `MediaDescriptor.swift`). It stays the only file that calls `rc_*`.
+- `ReelCore.swift`: the typed patches (`// MARK: - Typed patches`). The `dictionary` extensions
+  went to `OpDictionaries.swift` in issue batch B52b (#190), the media helpers earlier to
+  `MediaDescriptor.swift`. It stays the only file that calls `rc_*`.
 - `ProjectDocument.swift`: stored properties cannot move; the natural cut is the media/reverse
   machinery, in the shape of `+DisplayStem`, `+Import`, `+Graphics`.
 - `InspectorPane.swift`: the precedents are `InspectorSection.swift`, `InspectorSlider.swift` and

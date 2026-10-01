@@ -213,7 +213,7 @@ The size rule is in the root `CLAUDE.md` and `core/CLAUDE.md`; which modules are
 
 ## Open items
 
-- `actions.rs` is at 592 of ~600 (and `recipe.rs` 596, `evaluate.rs` 593). The original's plan is that the next addition first cuts
+- `actions.rs` is at 592 of ~600 (and `recipe.rs` 596, `evaluate.rs` 590 since B52b moved `lifted` to `nest.rs`). The original's plan is that the next addition first cuts
   `clamp_video` and its helpers to an `actions_clamp.rs` (see "Named next cuts").
 
 ## Where to look in the original

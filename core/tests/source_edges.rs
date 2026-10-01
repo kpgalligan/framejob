@@ -167,7 +167,7 @@ fn a_trim_end_on_an_unmeasurable_window_is_refused_and_still_read_unbounded() {
         vec![video(1, 1_100_000)],
         vec![clip(40, 1, 200_000, 10 * FRAME_30, 0, 0.0)],
     );
-    let sentence = "clip 40's speed 0.0 is outside ×0.1–×10";
+    let sentence = "clip 40's speed 0.0 is outside ×0.1–×1000";
     assert_eq!(
         Handle::try_from_value(&value).err().as_deref(),
         Some(sentence)

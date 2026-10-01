@@ -205,7 +205,9 @@ governs a module now.
   `edit_nest.rs`'s `unnest` and `edit_background.rs`'s timed plate. Over
   the cap, known debt (below).
 - `edit_clip_timing.rs` — `trim_start`, `trim_end`, `rate_stretch`, `set_speed`,
-  their speed bounds and clip-relative action rescaling.
+  their speed bounds and clip-relative action rescaling; `AUDIO_SPEED_MAX`
+  (×12, spec §11 #190) and `speed_limits`, which `rc_speed_limits` publishes;
+  `set_speed` takes a `rate` or a `duration` (Fit to duration), exactly one.
   `trim_start` advances a graphic's `in` through `graphic_advanced` (no speed,
   no head bound, saturating at 0); `trim_end` leaves `length` alone.
 - `edit_commit.rs` — the placement commit protocol: replacements preserve
@@ -389,7 +391,9 @@ governs a module now.
   not enumerate timeline frames; final placements still pass
   `check_overlap_rule`.
 - `evaluate.rs` — `composition_plan()` (A/B assignment, instruction tiling)
-  and the `assign()` the recipe shares with it.
+  and the `assign()` the recipe shares with it. `assign` leaves a clip's audio
+  out above `AUDIO_SPEED_MAX`, and `place` gives every plan audio track ONE
+  `pitch` (#190, #211).
 - `recipe.rs` · `recipe_text.rs` — `frame_recipe(t)`: the layer list at one
   instant. `RecipeLayer` is the twenty keys of a layer written in ONE place
   (`RecipeLayer.init(from:)` on the Swift side defaults a missing key
@@ -454,7 +458,8 @@ governs a module now.
   floats.
 - `nest.rs` — flattening a nest into the clips it stands for and the
   transform they inherit; `evaluate.rs`, `recipe.rs` and `audio.rs` all
-  consume its instances rather than `Project::clips`.
+  consume its instances rather than `Project::clips`; `lifted`, the clip as
+  the plan sees it, lives here too.
 - `audio.rs` · `audio_duck.rs` · `audio_crossfade.rs` — envelopes: fades,
   volume actions, mute and solo (both ZERO envelopes; solo is judged per
   container in `Voice::of` — muted, or some track in the set soloed and this
@@ -483,6 +488,7 @@ governs a module now.
   only; shared plumbing lives in `ffi_util.rs`, never copy-pasted.
   `ffi_query.rs`'s rule: a query never allocates a handle and has no
   `err_out`, which is why `rc_project_scoped` lives in `ffi.rs`.
+  `rc_speed_limits` is its answer for the speed range and the audio ceiling.
 - `ffi_graphic.rs` — the ten `rc_graphic_*` exports (road map 10 §5e)
   and the ONLY module of `core/src/` that names the `graphic` crate (spec
   §11 G-2; `core/tests/graphic_ffi.rs` reads `core/src/` to hold it). An

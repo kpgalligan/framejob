@@ -1,4 +1,4 @@
-//! The reader bounds a clip's `speed` to the ops' ×0.1 – ×10 (spec §11
+//! The reader bounds a clip's `speed` to the ops' ×0.1 – ×1000 (spec §11
 //! R6-10, amended by #41): `Project::validate` refuses any clip outside
 //! `SPEED_MIN..=SPEED_MAX`, on the timeline and in a nest, naming the clip
 //! and the value as JSON spells it — on read, through the FFI, and in every
@@ -62,14 +62,14 @@ fn the_reader_refuses_a_timeline_speed_outside_the_ops_range() {
         (1e-300, "1e-300"),
         (f64::MAX, "1.7976931348623157e+308"),
         (5e-324, "5e-324"),
-        (10.000000000000002, "10.000000000000002"),
+        (1000.0000000000002, "1000.0000000000002"),
         (0.09999999999999998, "0.09999999999999998"),
         (0.0, "0.0"),
         (-1.0, "-1.0"),
     ] {
         let mut p = fixture();
         p["clips"][0]["speed"] = json!(speed);
-        refuse(&p, &format!("clip 3's speed {said} is outside ×0.1–×10"));
+        refuse(&p, &format!("clip 3's speed {said} is outside ×0.1–×1000"));
     }
     // At every format version: the refusal is not a format change, and the
     // file is never migrated into acceptance.
@@ -78,7 +78,7 @@ fn the_reader_refuses_a_timeline_speed_outside_the_ops_range() {
             let mut p = fixture();
             p["version"] = json!(version);
             p["clips"][0]["speed"] = json!(speed);
-            refuse(&p, &format!("clip 3's speed {said} is outside ×0.1–×10"));
+            refuse(&p, &format!("clip 3's speed {said} is outside ×0.1–×1000"));
         }
     }
 }
@@ -87,12 +87,12 @@ fn the_reader_refuses_a_timeline_speed_outside_the_ops_range() {
 fn the_reader_refuses_a_nested_speed_and_names_the_nest() {
     let mut p = fixture();
     p["nests"][0]["clips"][0]["speed"] = json!(1e300);
-    refuse(&p, "clip 8 in nest 6's speed 1e+300 is outside ×0.1–×10");
+    refuse(&p, "clip 8 in nest 6's speed 1e+300 is outside ×0.1–×1000");
 }
 
 #[test]
 fn both_bounds_themselves_open() {
-    for speed in [0.1, 10.0] {
+    for speed in [0.1, 1000.0] {
         let mut p = fixture();
         p["clips"][0]["speed"] = json!(speed);
         let h = Handle::from_value(&p);
@@ -102,7 +102,7 @@ fn both_bounds_themselves_open() {
 
 #[test]
 fn the_ops_clamp_and_the_readers_bound_agree() {
-    for (rate, landed) in [(40.0, 10.0), (0.05, 0.1)] {
+    for (rate, landed) in [(4000.0, 1000.0), (0.05, 0.1)] {
         let h = Handle::from_value(&fixture())
             .apply(&json!({"op": "set_speed", "clip": 3, "rate": rate}));
         let reopened = Handle::try_from_json(&h.to_json())
@@ -118,11 +118,11 @@ fn no_edit_can_carry_an_out_of_range_speed() {
     // `finish` runs the same `validate`, so the edit is an error rather
     // than a project nobody could open again.
     let mut p = fixture();
-    p["clips"][0]["speed"] = json!(50.0);
+    p["clips"][0]["speed"] = json!(5000.0);
     let project: reelcut_core::Project =
         serde_json::from_value(p).expect("the JSON itself is well formed");
     assert_eq!(
         project.apply(r#"{"op":"move_clip","clips":[3],"delta":20000}"#),
-        Err("clip 3's speed 50.0 is outside ×0.1–×10".to_string())
+        Err("clip 3's speed 5000.0 is outside ×0.1–×1000".to_string())
     );
 }

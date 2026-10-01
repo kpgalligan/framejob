@@ -150,11 +150,16 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   locked `track`, on an `at` that is on a clip, when there is no clip after the gap, and when the
   shift would break the overlap rule — a gap closes fully or not at all, because a partial close
   leaves the user unable to tell whether the op ran. Markers do not move.
-- **`set_speed {clip, rate, keep_pitch?}`** — `duration = source_len / rate`, snapped to the NEAREST
+- **`set_speed {clip, rate?, duration?, keep_pitch?}`** — Two arms, exactly one given; both or
+  neither is an **error** (§11 #190). `rate` sets the rate. `duration` FITS the clip: it is snapped,
+  held to one frame, and turned into the rate `source_len / duration`; the clip's current duration
+  keeps its current rate, so only a `keep_pitch` change can apply. Either rate is clamped to
+  ×0.1–×1000. Then `duration = source_len / rate`, snapped to the NEAREST
   frame and then held to what the file still holds AT THE NEW RATE, so `in + duration × rate ≤
   media.duration` and the segment plays at exactly `rate` (§11, D4-3); the one-frame floor still
   wins over that bound. Actions keep their clip-relative *fraction* of the clip. Media sources only,
-  an **error** on any other kind (as `rate_stretch`). Rate is clamped to ×0.1–×10.
+  an **error** on any other kind (as `rate_stretch`), and a `duration` ≤ 0 is an error. Above ×12,
+  with or without keep pitch, the plan leaves the clip's audio out (§7.2).
 - **`set_reversed {clip, reversed}`** — Plays the media back to front, or forward again. The core
   does no pixel work, so this changes neither the plan nor the recipe: Swift substitutes a
   pre-rendered reversed asset for that media's segments (§11). `in` is measured in the direction the

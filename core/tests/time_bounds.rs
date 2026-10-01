@@ -96,7 +96,7 @@ fn endpoints_are_checked_in_wide_arithmetic() {
 #[test]
 fn old_versions_bound_speeds_and_negative_values_keep_their_reading() {
     for version in [1, 2, 7, 8] {
-        for speed in [0.1, 10.0] {
+        for speed in [0.1, 1000.0] {
             let mut p = fixture();
             p["version"] = json!(version);
             p["clips"][0]["speed"] = json!(speed);

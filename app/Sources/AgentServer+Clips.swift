@@ -300,17 +300,17 @@ extension AgentServer {
 
     // MARK: - Speed and stills
 
-    /// `set_speed` — Clip ▸ Speed… (`SpeedSheetController`). Media sources
-    /// only, and the core clamps the rate to ×0.1–×10.
+    /// `set_speed` — Clip ▸ Speed… (`SpeedSheetController`) and the Speed section's Fit to.
     func setSpeed(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clip = try clipArg(a, "clip", document)
-        guard let rate = try doubleArg(a, "rate"), rate.isFinite, rate > 0 else {
+        let rate = try doubleArg(a, "rate"), duration = try optionalTimeArg(a, "duration", document)
+        if let rate, !(rate.isFinite && rate > 0) {
             throw ToolError(message: "rate must be a positive number (1 = normal speed).")
         }
-        return try editResult(
-            document, "Speed",
-            [.setSpeed(clip: clip.id, rate: rate, keepPitch: try boolArg(a, "keep_pitch"))])
+        let keepPitch = try boolArg(a, "keep_pitch")
+        return try editResult(document, "Speed", [
+            .setSpeed(clip: clip.id, rate: rate, duration: duration, keepPitch: keepPitch)])
     }
 
     /// `set_reversed` — Clip ▸ Reverse. Media sources only, and nothing on the

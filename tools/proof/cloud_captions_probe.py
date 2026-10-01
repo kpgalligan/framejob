@@ -734,7 +734,7 @@ PROBE_JOBS = r'''
 /// for 1 s (`source_mirror_probe.py`'s recipe) — and then its JSON TEXT has
 /// the clip's `speed` value replaced and is handed to
 /// `ReelProject.from(json:)`, which is the CORE's own reader. The ops cannot
-/// write these speeds (`edit_clip_timing.rs` clamps to 0.1–10) and the
+/// write these speeds (`edit_clip_timing.rs` clamps to 0.1–1000) and the
 /// reader refuses them (R6-10, amended by #41), so "the reader refuses it,
 /// naming the clip and the value" is a row rather than an assumption. The
 /// clamps R6-10 keeps as a second layer are then fed a snapshot DECODED
@@ -3227,7 +3227,7 @@ def section_jobs(binary, sources):
                   False, error)
             continue
         check(f"jobs: speed {name} answers", "error" not in answer, answer.get("error", ""))
-        expected = f"clip {answer.get('clip')}'s speed {said} is outside ×0.1–×10"
+        expected = f"clip {answer.get('clip')}'s speed {said} is outside ×0.1–×1000"
         check(f"jobs: the CORE's reader REFUSES a project whose clip speed is {text}, "
               f"naming the clip and the value",
               answer.get("readerAccepted") is False

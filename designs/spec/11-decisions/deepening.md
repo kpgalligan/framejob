@@ -96,7 +96,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   `.max(1)` covers what is left. The observable difference is the
   THRESHOLD: `> 0.0` in the plan against `>= 1.0` in the reader. For a
   finite `0 < duration × speed < 1` — under one tick of source, reachable
-  by hand-written JSON only, since every op holds speed in ×0.1 – ×10 and a
+  by hand-written JSON only, since every op holds speed in ×0.1 – ×10 (×0.1 – ×1000 since #190) and a
   duration at a frame or more — the plan's `source_duration` was 1 and is
   now `min(duration, remaining).max(1)`, which is the 1:1 fallback `slip`,
   `set_speed`, `rate_stretch` and the app's `Transcriber.contentLength`
@@ -125,11 +125,11 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   `source_length_on_timeline`'s and is not written twice.
   **`trim_end` on an `Unmeasured` window STAYS unbounded**: it is reachable
   by hand-written JSON only (`validate` refuses unknown media and every op
-  holds a speed in ×0.1 – ×10), `evaluate.rs`'s clamp covers what it can
+  holds a speed in ×0.1 – ×10, ×0.1 – ×1000 since #190), `evaluate.rs`'s clamp covers what it can
   produce, and reading it as "empty" would freeze an edge over a field no
   trim can fix. No persisted field changes, so `RC_FORMAT_VERSION` stays 8.
   **Amended 2026-10-01 by R6-10's amendment (#41):** `validate` now refuses
-  a speed outside ×0.1–×10 on read and in every edit's `finish`, so a
+  a speed outside ×0.1–×10 (×0.1 – ×1000 since #190) on read and in every edit's `finish`, so a
   speed-made `Unmeasured` window is reachable by no file and no edit. The
   reading stays as the defence it describes, pinned at the `SourceBound`
   level in `core/tests/source_window.rs` and `source_edges.rs`.
@@ -346,7 +346,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
 
   **What stays an identity**: §5.5's two families (an empty selection; a
   clamp that landed where the clip already was — `roll`'s and `slip`'s
-  clamps, a trim whose clamps crossed, a rate stretch outside ×0.1 – ×10),
+  clamps, a trim whose clamps crossed, a rate stretch outside ×0.1 – ×10,
+  ×0.1 – ×1000 since #190),
   the unreachable `position` misses in `add_transition` and
   `set_transition_duration`, and `close_gap`'s `end <= start` guard, which
   no `at` reaches. **The list fold is unchanged** (`ReelEdit.swift`'s
@@ -414,3 +415,61 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   `replaceableExtensions`, `srt` and `vtt` included, so a still or a movie
   named `.srt` is still renamed. Risk accepted: `talk.mp4` becomes
   `talk.mp4.srt`.
+- **#190 — A clip's speed runs ×0.1–×1000; above ×12, in both pitch modes,
+  the plan leaves the clip's audio out, and the inspector says so.** The
+  range replaces ×10 in R6-10, D4-1 and D4-2: `SPEED_MIN` and `SPEED_MAX`
+  (`core/src/edit_clip_timing.rs`) are 0.1 and 1000, `set_speed` clamps to
+  them, `rate_stretch` stays inside them, and the reader refuses a speed
+  outside them. **What B52a measured** (`tools/proof/README.md`'s B52a
+  section): preview at ×120 showed 841 of 869 frames with a 3.445 s stall;
+  preview at ×1000, 14 of 936 frames with a 30.285 s stall; export at ×120
+  took 157.0 s for 30 s of output; export at ×1000 took 1480.5–1624.5 s for
+  32.3 s in the earlier complete run. **The owner's decisions of
+  2026-10-01:** keep ×1000, accept that the preview cannot keep up past
+  about ×120, and test it later (`docs/manual-checks.md`, SE-7); and leave a
+  clip's audio out above ×12, in both pitch modes.
+  - **Why ×12.** An h264 export's loudness pass ("Measuring loudness…")
+    never finishes once a clip's audio plays fast enough (B52b's notes; all
+    on a 320x180 200 Hz tone). First round, at B52a's ×24/×32: a lone
+    180 s clip missed a 45–60 s deadline at ×20 and ×24 in either pitch
+    mode and at ×28 varispeed (B52a's binary does the same at ×24), and after a 2 s ×1
+    clip a ×32 varispeed clip missed 120 s every time, while ×24 (both
+    modes) and ×31 varispeed finished there. Second round, at ×16: a
+    keep-pitch clip that starts its audio track stalled at ×15 and ×16
+    (180 s, 600 s, and trimmed to 2 s), while ×14 (3.4 s) and ×12 (2.8 s)
+    finished, as did ×16 varispeed and every ×16 after a ×1 clip. ×12
+    leaves a margin below both stalls; `tools/proof/README.md`'s B52b
+    section proves ×12 finishes in both modes and every shape. **Background,
+    not the ceiling:** B52a's mixer limits — L.speech.spectral = 24 (the
+    spectral algorithm hangs at ×31–×32) and L.speech.time_domain =
+    L.speech.off = 32 (above ×32 no algorithm produces audio) — hold only
+    for the mixer and an audio-only export, and are retired as the
+    product's ceiling. The one number is `AUDIO_SPEED_MAX` = 12.0.
+  - **The ceiling rule:** `assign` (`core/src/evaluate.rs`) places a clip's
+    audio segment only when its speed is at or below `AUDIO_SPEED_MAX`. The
+    video segment, the recipe and persisted state do not change, so crossing
+    the ceiling is a plan difference and nothing else. The Speed section
+    shows "Audio is silent above ×12" under the first selected clip that has
+    crossed it.
+  - **One pitch per plan audio track.** `place` puts an audio segment only
+    on a track whose last segment has the same `keep_pitch`, so every plan
+    audio track has one `pitch`, `CompositionBuilder`'s first-segment read
+    of the algorithm is correct, and each clip's own pitch setting holds
+    (#211). With the ceiling at ×12 no hang depends on it. **Accepted
+    cost:** `audio_ramps` exempts only duckers on the voice's own
+    COMPOSITION track, so a neighbour abutting a ducking clip on the same
+    timeline track, with the other pitch mode, now sits on another
+    composition track and is ducked by the ducker's extent and release.
+    Today's exemption already depends on A/B placement (an overlapping
+    neighbour on the B lane is ducked), so it is accepted, not avoided, and
+    pinned in `core/tests/speed_x1000.rs`.
+  - **The Fit arm:** `set_speed` takes a `rate` or a `duration`, exactly one;
+    a duration is snapped to the grid, held to a frame, and turned into the
+    rate that plays the clip's content in it, which is then clamped like any
+    rate. The current duration keeps the current rate (no phantom step). The
+    Speed section's "Fit to" row sends it, and the Speed sheet's presets gain
+    ×10 and ×100.
+  - **One home for the numbers:** `speed_limits()` publishes
+    `{"min":0.1,"max":1000.0,"audio_max":12.0}` through `rc_speed_limits`,
+    and no Swift file types a speed bound. No persisted field changes; the
+    format stays 10.

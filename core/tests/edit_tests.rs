@@ -1681,11 +1681,11 @@ fn set_speed_keeps_each_actions_clip_relative_fraction() {
     // The rate is clamped to the inspector's range rather than refused, and
     // a rate that is not a positive number is an error.
     let clamped = project
-        .apply(&json!({"op": "set_speed", "clip": 10, "rate": 40.0}))
+        .apply(&json!({"op": "set_speed", "clip": 10, "rate": 4000.0}))
         .value();
     close(
         num(by_id(&clamped, "/clips", 10), "/speed"),
-        10.0,
+        1000.0,
         "the clamped rate",
     );
     assert_contains(
@@ -1712,9 +1712,9 @@ fn rate_stretch_makes_the_content_fill_the_new_length() {
         );
     }
 
-    // Outside ×0.1 – ×10 the drag is refused, as is a length under a frame.
-    project.refuses(&json!({"op": "rate_stretch", "clip": 10, "to_end": 300000}));
-    project.refuses(&json!({"op": "rate_stretch", "clip": 10, "to_end": 10000}));
+    // Outside ×0.1 – ×1000 the drag is refused, as is a length under a frame.
+    project.refuses(&json!({"op": "rate_stretch", "clip": 10, "to_end": 90000000}));
+    project.refuses(&json!({"op": "rate_stretch", "clip": 10, "to_end": 9000}));
     assert_contains(
         &general().errors(&json!({"op": "rate_stretch", "clip": 30, "to_end": 1200000})),
         "clip 30 is not a media clip",

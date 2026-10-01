@@ -8,13 +8,32 @@ use crate::recipe_graphic::graphic_advanced;
 use crate::source_window::source_advanced;
 use crate::time::Ticks;
 
-/// Speed range, matching the inspector's ×0.1 – ×10 (spec §4.3). Outside
-/// it, `scaleTimeRange` and the time-pitch unit stop producing anything
-/// anyone wants to watch. Three readers: `set_speed` clamps to it,
-/// `rate_stretch` stays inside it, and `Project::validate` refuses a clip
-/// outside it (spec §11 R6-10, amended by #41).
+/// Speed range, `SPEED_MIN`–`SPEED_MAX` (spec §4.3, §11 #190). Three
+/// readers: `set_speed` clamps to it, `rate_stretch` stays inside it, and
+/// `Project::validate` refuses a clip outside it (spec §11 R6-10, amended by
+/// #41). The app reads it through `rc_speed_limits` and never retypes it.
 pub(crate) const SPEED_MIN: f64 = 0.1;
-pub(crate) const SPEED_MAX: f64 = 10.0;
+pub(crate) const SPEED_MAX: f64 = 1000.0;
+
+/// The fastest a clip's audio still plays, in both pitch modes (spec §11
+/// #190, the owner's decision of 2026-10-01). Above it the plan leaves the
+/// clip's audio segment out (`evaluate.rs`); the video still runs to
+/// `SPEED_MAX`. Chosen with a margin below a measured stall: an h264
+/// export's loudness pass never finishes for a keep-pitch clip that starts
+/// its audio track from ×15, nor in either mode from about ×20; ×12 and ×14
+/// finish. B52a's mixer limits (×24 spectral, ×32 varispeed) hold only for
+/// the mixer and an audio-only export, and are not the product's ceiling.
+pub(crate) const AUDIO_SPEED_MAX: f64 = 12.0;
+
+/// Every number about speed, as `rc_speed_limits` publishes it:
+/// `{"min":0.1,"max":1000.0,"audio_max":12.0}`.
+pub(crate) fn speed_limits() -> serde_json::Value {
+    serde_json::json!({
+        "min": SPEED_MIN,
+        "max": SPEED_MAX,
+        "audio_max": AUDIO_SPEED_MAX,
+    })
+}
 
 impl Project {
     /// Scales every action's span with the clip, so an action keeps the
@@ -122,8 +141,8 @@ impl Project {
     /// source range it shows: `speed = source_len / (to_end - start)`
     /// (spec §6). Media sources only.
     ///
-    /// Refuses when the resulting rate falls outside ×0.1 – ×10, when the
-    /// new length is under a frame, or when the placement breaks the
+    /// Refuses when the resulting rate falls outside `SPEED_MIN`–`SPEED_MAX`,
+    /// when the new length is under a frame, or when the placement breaks the
     /// overlap rule. Actions keep their clip-relative fraction.
     pub fn rate_stretch(&self, clip: u32, to_end: Ticks) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
@@ -152,24 +171,62 @@ impl Project {
     /// D4-3), actions keeping their clip-relative fraction (spec §6). Media
     /// sources only; `keep_pitch`, when given, sets the time-pitch flag.
     ///
-    /// The rate is clamped to the inspector's ×0.1 – ×10 rather than
-    /// refused, because a slider or an MCP call that asks for ×20 wants the
-    /// fastest thing available. `Err` for a non-media clip or a rate that
-    /// is not a positive finite number; refuses on an overlap-rule
-    /// violation.
+    /// Takes a `rate` or a `duration`, exactly one (spec §11 #190). A
+    /// duration is the Fit arm: snapped to the grid, held to a frame, and
+    /// turned into the rate that plays the clip's content in it; the current
+    /// duration keeps the current rate, so it makes no phantom step.
+    ///
+    /// Either rate is clamped to `SPEED_MIN`–`SPEED_MAX` rather than
+    /// refused, because a slider or an MCP call that asks for more wants the
+    /// fastest thing available. `Err` for both or neither, a non-media clip,
+    /// a rate that is not a positive finite number or a duration that is not
+    /// positive; refuses on an overlap-rule violation.
     pub fn set_speed(
         &self,
         clip: u32,
-        rate: f64,
+        rate: Option<f64>,
+        duration: Option<Ticks>,
         keep_pitch: Option<bool>,
     ) -> Result<Outcome, String> {
+        match (rate, duration) {
+            (Some(_), Some(_)) => {
+                return Err(format!(
+                    "set_speed takes a rate or a duration, not both (clip {clip})"
+                ))
+            }
+            (None, None) => {
+                return Err(format!(
+                    "set_speed takes a rate or a duration (clip {clip})"
+                ))
+            }
+            _ => {}
+        }
         let target = self.require_clip(clip)?.clone();
         if !matches!(target.source, Source::Media { .. }) {
             return Err(format!("clip {clip} is not a media clip"));
         }
-        if !(rate.is_finite() && rate > 0.0) {
-            return Err(format!("speed must be a positive number, not {rate}"));
+        if let Some(rate) = rate {
+            if !(rate.is_finite() && rate > 0.0) {
+                return Err(format!("speed must be a positive number, not {rate}"));
+            }
         }
+        if let Some(duration) = duration {
+            if duration <= 0 {
+                return Err(format!("duration must be positive, not {duration}"));
+            }
+        }
+        let rate = match (rate, duration) {
+            (Some(rate), _) => rate,
+            (None, Some(duration)) => {
+                let d = self.snapped(duration).max(self.frame());
+                if d == target.duration {
+                    target.speed
+                } else {
+                    self.content_length_in_source(&target) as f64 / d as f64
+                }
+            }
+            (None, None) => target.speed,
+        };
         let rate = rate.clamp(SPEED_MIN, SPEED_MAX);
 
         let mut moved = target.clone();
