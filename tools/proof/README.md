@@ -10606,3 +10606,228 @@ python3 tools/proof/menu_undo_probe.py                             # 5/5, exit 0
 python3 tools/proof/menu_undo_probe.py --mutant no-own-manager-guard  # M2 FAIL, exit 1
 python3 tools/proof/menu_undo_probe.py --mutant own-manager-bare-send # F1 FAIL, exit 1
 ```
+
+## Issue batch B52a — the ×1000 speed spike (`speed_spike/`; #190 part 1)
+
+### What ran
+
+`speed_spike/speed_spike.py` (the runner) and `speed_spike/speed_probe.swift`
+(an in-process instrument compiled as `main.swift` over every other
+`app/Sources` file, `-O -whole-module-optimization`, with `Fonts`,
+`Blank.mp4` and a `default.metallib` beside it). The probe CALLS the app's
+`ReelProject.applying`, `MediaImporter.waitForProbe`, `CompositionBuilder`
+(`build`, `fill`, `audioParameters`), `Playback.previewComposition`,
+`LevelMeterTrack.mix`, `ReelExport.settings` and `Exporter`; it mirrors only
+`Playback`'s private player and item lines (`Playback.swift:138-139`,
+`:432-444`, plus `player.volume = 0` and an `AVPlayerItemVideoOutput`) and
+`ExporterLoudness`'s private float mix output and its reader range. It links a
+SCRATCH core: B0 copied `core/` and `graphic/` to
+`work/speed_spike/tree/` and `diff -ru` printed exactly one changed line,
+`-pub(crate) const SPEED_MAX: f64 = 10.0;` / `+… = 1000.0;`. No product file
+changed; no app instance was launched and no MCP call was made.
+
+**The source is a looped real recording, not an hour recorded for the
+spike.** Recording the owner's screen for an hour captures whatever the owner
+is doing, unasked. So `loop` is the recorder's own bitstream — `Screen
+Recording 2026-09-24 at 11.33.28.mov` (118.230 s), the longest `.mov` in
+`~/Movies/Reelcut Recordings/` — looped with `-stream_loop 30 … -c copy -t
+3600` and muxed with its own microphone file, `… (Microphone).m4a`, also
+`-c copy`. A dense 118 s recording looped is also the harder decode test than
+an idle screen, which the recorder writes as sparse VFR. `loopv` is the same
+file's video stream alone (`-map 0:v:0 -c copy`), so a video failure can be
+told from an audio one. The owner's files were only read.
+
+| Row | Printed |
+|---|---|
+| H0 | Mac14,6 · Apple M2 Max · macOS 26.5.1 · load { 6.90 9.64 16.48 } · other MacOS/Reelcut PIDs 1 |
+| S.loop | 3600.110 s · hevc/hvc1 2560x1440 · r 60000/1001 avg 10432100/360011 · 104321 packets, 1766 keyframes · 8901965257 bytes · audio aac 48000 Hz 1 ch 3600.000000 s |
+| S.loopv | the same video facts · 8840368552 bytes · audio none |
+| B0 | exactly the SPEED_MAX line; cargo rc 0 (49 s on the first build) |
+| B1 | metallib + probe built in 100 s (-O -wmo) |
+
+**The host was shared.** Other sessions loaded the machine throughout; the
+1-minute load printed beside the timed rows ran from 5.16 to 68.38. Every
+timed row prints its own load; the timings below are this host's under that
+load, not a quiet machine's.
+
+The timeline is built through the ops: `set_canvas` to the first media's
+probed size and rate — 2560x1440 @ [28977, 1000], the recorder's VFR average
+— `add_media`, then per pass `add_clip` at the cursor and `set_speed`. ×1 and
+×10 are CONTROLS, trimmed to 30 s; at ×120 one pass (the hour once) and at
+×1000 nine passes (nine hours of source in 32.301 s).
+
+### Timelines
+
+`speed_spike.py` (the full run; `work/speed_spike/full.log`):
+
+| Row | Clips | Speeds read back | Duration |
+|---|---|---|---|
+| T1.loop (CONTROL) | 1 | [1] | 29.989 s |
+| T10.loop (CONTROL) | 1 | [10] | 29.989 s |
+| T120.loop / T120.loopv | 1 | [120] | 29.989 s |
+| T1000.loop / T1000.loopv | 9 | [1000] | 32.301 s |
+
+The mutant, `--stock-core --rows H,S,T` (the probe linked to HEAD's
+`core/target/release`, `SPEED_MAX` 10): T1 and T10 ok; T120.loop and
+T120.loopv FAIL reading back [10] over 360.010 s, T1000.loop and T1000.loopv
+FAIL reading back [10] over 3240.087 s; "mutant stock-core: CAUGHT", exit 1.
+
+### Preview
+
+Each row plays the timeline once through the app's player and item at ×1
+wall time, polled every ≤ 5 ms (`speed_spike.py`, `full.log`):
+
+| Row | Wall to end (timeline) | Delivered / expected | Black | Longest stall | Meter peak |
+|---|---|---|---|---|---|
+| P1.loop (CONTROL) | 30.785 s (29.989 s) | 869 / 869.0 | 0 | 0.794 s | -22.5 dB |
+| P10.loop (CONTROL) | 30.681 s (29.989 s) | 869 / 869.0 | 0 | 0.686 s | -18.8 dB |
+| P120.loop | 33.758 s (29.989 s) | 844 / 869.0 | 0 | 3.763 s | -120 dB |
+| P120.loopv | 33.439 s (29.989 s) | 841 / 869.0 | 0 | 3.445 s | null (no audio) |
+| P1000.loop | 64.074 s (32.301 s) | 14 / 936.0 | 0 | 31.780 s | -120 dB |
+| P1000.loopv | 62.592 s (32.301 s) | 14 / 936.0 | 0 | 30.285 s | null (no audio) |
+
+Every row reached readyToPlay and the end, with 0 waiting entries and no
+error. At ×120 the picture plays, with a 3.445–3.763 s stall and 841–844 of 869 frames.
+**At ×1000 it does not play**: 14 frames in 936, the clock held for 30.285 s and 31.780 s,
+and the end reached at about twice the timeline's length — the video-only
+copy the same as the one with audio, so it is the picture, not the sound.
+The meter's -120 dB at ×120 and ×1000 is the preview's audio: silence.
+
+### Export
+
+`h264`, one export per process (`speed_spike.py`, `full.log`), then
+`ffprobe`, `blackdetect` and `astats` on the file:
+
+| Row | Outcome | Wall | Video stream | Black | Audio stream |
+|---|---|---|---|---|---|
+| E1.loop (CONTROL) | success | 5.6 s | 29.99 s, 869 frames | 0 | 29.989313 s, RMS -45.13 dB |
+| E10.loop (CONTROL) | success | 14.4 s | 29.99 s, 869 frames | 0 | 30.101417 s, RMS -46.58 dB |
+| E120.loop | success | 169.8 s | 29.99 s, 869 frames | 0 | **none** |
+| E120.loopv | success | 157.0 s | 29.99 s, 869 frames | 0 | none (no source audio) |
+| E1000.loop | not run: stopped by the owner for time (the probe was killed at 598.8 s, before it answered) | | | | |
+| E1000.loopv | not run: stopped by the owner for time | | | | |
+
+An earlier complete run of the same command and the same probe binary
+(`work/speed_spike/full-attempt2.log`, before the owner stopped the final
+one) printed E1000.loop "success in 1624.5 s … video_duration 32.301667,
+video_frames 936, audio_duration None, black_s 0" and E1000.loopv "success in
+1480.5 s … video_duration 32.3, video_frames 936, black_s 0". Those are that
+run's numbers; the final run has none for ×1000.
+
+**With the microphone track, the ×120 movie came out with no audio stream at
+all**, and no error: the loudness pass ran ("Measuring loudness…" from 0.3 s
+to 7.3 s) and the write dropped the track.
+
+### Audio: the time-pitch limit
+
+Each A row puts one segment of r × 2 s of source into 2 s through the app's
+`fill` and `audioParameters`, reads it through a float mix output, and counts
+only the frames inside [0, 2 s) (the mix output hands back whole buffers:
+98304 read for 96000 at ×2). `works` = completed, frames within ±1 %, RMS
+within 6 dB of the same fixture and algorithm at ×1, and (sine,
+spectral/time_domain) frequency within ±5 % of ×1. `speed_spike.py`,
+`full.log`:
+
+| Rates | spectral (keep pitch) | time_domain | off (varispeed) |
+|---|---|---|---|
+| ×1–×24 | 96000 frames; speech RMS -19.11 → -21.87 dB; sine 1000.0 → 986.0 Hz | 96000 frames | 96000 frames |
+| ×31, ×32 | **the reader never returns: expired at the 300 s bound**, both fixtures | 96000 frames; sine 966.0 / 979.2 Hz | 96000 frames |
+| ×33, ×40, ×48, ×64, ×120, ×1000 | reader completed, **0 frames** | completed, 0 frames | completed, 0 frames |
+
+| Row | L |
+|---|---|
+| L.speech.spectral | 24 (first failure ×31: reader expired) |
+| L.speech.time_domain | 32 (first failure ×33: frames 0) |
+| L.speech.off | 32 (first failure ×33: frames 0) |
+| L.sine.spectral | 24 (first failure ×31: reader expired) |
+| L.sine.time_domain | 32 (first failure ×33: frames 0) |
+| L.sine.off | CONTROL (Nyquist: varispeed puts the 1 kHz tone at 1000·r Hz, 24 kHz at ×24) 16 (first failure ×24: RMS -38.76 vs r=1 -24.09) |
+
+A.noise.spectral.1 (CONTROL): 96000 frames, RMS -21.44 dB, flatness 0.1067.
+Speech under varispeed stays at RMS -19.48 to -19.62 dB through ×32 while its
+flatness rises from 0.0254 to 0.6518 — sound, increasingly noise-like.
+`grep -n "1/32"` in the MacOSX26.2 SDK's `AVAudioProcessingSettings.h`
+printed lines 37, 41 and 45, "Variable rate from 1/32 to 32." for all three
+algorithms: confirmed, except that spectral stops at ×24 here, not ×32 — at
+×31 and ×32 it does not fail, it HANGS.
+
+**The product path** (X rows: `speech_2100` at ×r, keep pitch `k` or not
+`v`, trimmed to 2 s, exported `audio_m4a`):
+
+| Row | Outcome |
+|---|---|
+| X.k.1 / X.v.1 (CONTROL) | success in 0.5 / 0.4 s, file 2.048 s, RMS -19.11 dB |
+| X.k.32 | **deadline in 540.0 s** — the keep-pitch export hangs |
+| X.v.32 | success in 0.4 s, file 2.048 s, RMS -20.31 dB, flatness 0.1989 |
+| X.k.33, X.k.120, X.k.1000, X.v.33, X.v.120, X.v.1000 | failure in 0.3–0.7 s: "The operation could not be completed" |
+
+So above ×32 a clip's audio makes an audio-only export FAIL and a movie
+export silently LOSE its audio track (E120.loop), and at ×31–×32 with keep
+pitch the export never finishes.
+
+### Verdict
+
+Computed from the rows the final run answered, after the owner stopped it
+(`work/speed_spike/verdict-final.log`), judged on `loopv` with `loop`'s P1
+and E1 (black 0 each) as the black controls:
+
+```
+V 120 preview: copes
+           with audio (loop): copes
+V 120 export: copes
+           with audio (loop): copes
+V 1000 preview: cannot cope (longest stall 30.29 s ≥ 5)
+           with audio (loop): cannot cope (longest stall 31.78 s ≥ 5)
+V 1000 export: not judged (not run: stopped by the owner for time)
+           with audio (loop): not judged (not run: stopped by the owner for time)
+  VERDICT: STOP — ×1000 preview on loopv: longest stall 30.29 s ≥ 5
+  ok      C0  git status --porcelain -- app core graphic agent designs docs Makefile project.yml equal before and after: True (0 lines)
+```
+
+The earlier complete run printed the same preview verdict ("V 1000 preview:
+cannot cope (longest stall 30.09 s ≥ 5)") and "V 1000 export: copes". The
+"with audio … copes" export lines read the video only: E120.loop's file has
+no audio stream.
+
+### Back to the owner
+
+**STOP: the preview cannot cope at ×1000.** On the video-only hour, P1000
+delivered 14 of 936 frames, the clock held for 30.285 s (31.780 s with the
+microphone track), and 32.301 s of timeline took 62.592 s of wall time to
+reach its end. #190 says that goes back to the owner rather than an agent
+choosing a smaller ceiling, so this batch proposes none. At ×120 the preview
+copes (841 of 869 frames, a 3.445 s stall) and the export copes (157.0 s for
+30 s, no black). The ×1000 export was not measured to the end in the final
+run; the earlier complete run took 1624.5 s with audio and 1480.5 s without
+for 32.301 s of timeline.
+
+Whatever ceiling the owner chooses, the audio measurements stand on their
+own and B52b needs them: no time-pitch algorithm produces anything above
+×32 (`L.speech.time_domain` and `L.speech.off` = 32), spectral — what keep
+pitch sets — stops at ×24 and HANGS at ×31 and ×32 (`L.speech.spectral` =
+24), and the product's exports already show it: keep pitch at ×32 never
+finishes, any audio above ×32 fails an audio-only export and silently drops a
+movie's audio track. A ceiling above ×24 therefore needs B52b's audio rule —
+above the measured `L.speech.<mode>` for the clip's pitch mode (×24 with keep
+pitch, ×32 without) the clip's audio leaves the composition plan — before the
+ceiling moves.
+
+### Commands
+
+Run on 2026-10-01 over `2b5d433`, every child bounded, no app instance:
+
+| Command | Result |
+|---|---|
+| `git status --porcelain -- app core graphic agent designs docs Makefile project.yml` | empty before and after |
+| `python3 -m py_compile tools/proof/speed_spike/speed_spike.py` | exit 0 |
+| `cd core && cargo build --release` | Finished (HEAD's staticlib, for the mutant) |
+| `speed_spike.py --stock-core --rows H,S,T` | T120/T1000 FAIL reading back [10]; "mutant stock-core: CAUGHT", exit 1 |
+| `speed_spike.py` | stopped by the owner during E1000.loop (exit 143); every row before it answered, 0 instrument failures; E1000.loop and E1000.loopv not run |
+| `speed_spike.py` (the earlier complete run, `full-attempt2.log`) | 129 rows, instrument failures [] in 5585 s, exit 0 |
+| `git diff --stat HEAD -- app core graphic agent` | prints nothing |
+
+```sh
+python3 tools/proof/speed_spike/speed_spike.py --stock-core --rows H,S,T   # CAUGHT, exit 1
+python3 tools/proof/speed_spike/speed_spike.py                            # 5585 s on this host; exit 0
+python3 tools/proof/speed_spike/speed_spike.py --rows A                    # the audio sweep alone, with its L rows
+```
