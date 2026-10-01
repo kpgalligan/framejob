@@ -20,7 +20,7 @@ count rather than passing vacuously.
   added two, and the exact count belongs to road map 7's
   `op_argument_proof.py` at 77 (`tools/proof/README.md`'s handover) — with
   `record_screen` declaring exactly its
-  ten arguments plus the injected `project`, `seconds` its only required
+  eleven arguments plus the injected `project`, `seconds` its only required
   one, and NO `scope`: it is an app-state tool like `transcribe`, and
   `AgentCatalog.tool` injects `scope` for the core's op names only. Exactly
   55 tools carry `scope` (that 55 is `rc_op_names` read through
@@ -375,7 +375,7 @@ APP_STATE_TOOLS = {
 # them.
 RECORD_PROPERTIES = {
     "display", "window", "seconds", "microphone", "system_audio", "show_clicks", "rate",
-    "size", "place", "path",
+    "size", "place", "path", "include_reelcut_windows",
 }
 
 # `RecordingGrant.screenRecordingPaneSentence`, verbatim — the PREFIX of
@@ -734,7 +734,7 @@ def catalog_part(mcp):
     schema = schemas.get("record_screen", {"properties": {}})
     declared = set(schema.get("properties", {}))
     check(declared == RECORD_PROPERTIES | {"project"},
-          "record_screen declares exactly its ten arguments plus the injected project: "
+          "record_screen declares exactly its eleven arguments plus the injected project: "
           f"{sorted(declared - RECORD_PROPERTIES - {'project'})} unexpected, "
           f"{sorted((RECORD_PROPERTIES | {'project'}) - declared)} missing")
     check(schema.get("required") == ["seconds"],
@@ -746,7 +746,8 @@ def catalog_part(mcp):
     for name, kind in (("seconds", "number"), ("display", "integer"), ("window", "integer"),
                        ("rate", "integer"), ("size", "string"), ("path", "string"),
                        ("microphone", "boolean"), ("system_audio", "boolean"),
-                       ("show_clicks", "boolean"), ("place", "boolean")):
+                       ("show_clicks", "boolean"), ("place", "boolean"),
+                       ("include_reelcut_windows", "boolean")):
         check(schema["properties"].get(name, {}).get("type") == kind,
               f"{name} is declared {kind}")
     check(schema["properties"].get("rate", {}).get("enum") == [30, 60],
@@ -817,6 +818,9 @@ def refusal_part(mcp):
             "size huge is refused listing both")
     refused({"seconds": 2, "display": -1}, "display must be 0 or more (got -1).",
             "a negative display index is refused before any lookup")
+    refused({"seconds": 2, "include_reelcut_windows": "yes"},
+            "include_reelcut_windows must be true or false.",
+            "a non-boolean include_reelcut_windows is refused by type")
 
     # A `project` naming nothing open: `target(_:)`'s own sentence, which
     # must STAND — never a silent fall-through to a fresh document. The
@@ -856,6 +860,9 @@ def refusal_part(mcp):
     refused({"seconds": 2, "size": "huge", "display": 99},
             'size must be one of nominal, best (got "huge").',
             "ORDER: size huge wins over display 99")
+    refused({"seconds": 2, "include_reelcut_windows": "yes", "display": 99},
+            "include_reelcut_windows must be true or false.",
+            "ORDER: a non-boolean include_reelcut_windows wins over display 99")
     message = refusal(mcp, "record_screen",
                       {"seconds": 2, "rate": 24, "project": "/nowhere/x.reelcut"})
     check(message == "rate must be 30 or 60 (got 24).",

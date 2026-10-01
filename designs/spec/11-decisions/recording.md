@@ -136,3 +136,17 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   does not reach it (Settings' precedent); `record_screen`'s span is wall
   clock and a pause is a person's act; and `perform_menu_item` reaches the
   item in a Release build.
+- **Include Reelcut windows** (2026-09-30). The panel's checkbox under
+  Source, off by default, kept in `ReelcutRecordingIncludeReelcutWindows`;
+  `record_screen`'s `include_reelcut_windows` mirrors it, default false.
+  Off is today's rule: a display recording excludes Reelcut's application
+  (R0 q3), and the picker lists none of its windows. On, a display
+  recording excludes no application. The one exception is a recording the
+  PANEL started, which excludes the panel's own window: the panel stays on
+  screen until `recordingDidStart`, after the capture's completion, and the
+  file's first frame is written 86–107 ms before that completion (R0 q2).
+  The picker lists Reelcut's windows but not the panel. Pictures only:
+  Reelcut's sound stays out (`excludesCurrentProcessAudio`). A window
+  source is unaffected: `window` records the window it names, and a window
+  already picked stays picked — the box governs the NEXT picker. The tool
+  excludes no window.

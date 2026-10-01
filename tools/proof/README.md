@@ -9473,3 +9473,68 @@ Run on 2026-09-30, the change over `ecdcbb0`, every instance my own:
 | `speed_sheet_probe.py --mutant minted-only` | 9/10, "caught — P5 failed", exit 1 (P5 read `clip 7's wipe grows to 0.67 s`) |
 | `source_mirror_probe.py` | 40/40, exit 0 |
 | `v2_menu.py 4863` (fresh own instance) | 28 pass, 0 fail, 0 skip of 28, exit 0 — U3 "field editors 1 → 0 after delete; undo 'Delete' → clips 2"; `grep "Reelcut: "` printed nothing |
+
+## Include Reelcut windows — the recorder panel's checkbox and `record_screen`'s `include_reelcut_windows` (`recording_probe.py` section 14, 1f, 5d, 7c; `recording_proof.py` sections 0 and 1; spec §11 recording.md)
+
+The rows are `recording_probe.py`'s (a probe compiled from `app/Sources`
+over `harness/build.sh`'s swiftc line; its docstring holds each row in
+full), and three are `recording_proof.py`'s.
+
+- **Section 14 `exclusion`** — its own process, the six older
+  `ReelcutRecording…` keys pinned and the seventh,
+  `ReelcutRecordingIncludeReelcutWindows`, not pinned and removed from
+  `UserDefaults.standard` before and after the rows. **X1**:
+  `RecordingExclusion.make` over four cases — off with a bundle → that
+  bundle, no window; off with no bundle → nothing; on with the panel's
+  window 42 → no bundle, window 42; on with no panel window (the tool's
+  door) → nothing. **X2**: the shared panel with the key absent → the
+  checkbox off and the choice false; titled "Include Reelcut windows", its
+  target the panel, its action `controlChanged:`, in the panel's window; on
+  and `controlChanged` → the key true and the choice true; off with no
+  action, then `restoreChoices()` → on. **X3**: disabled at
+  `.countdown(3)` and `.recording`, enabled at `.idle`. **X4**, structural
+  over the comment-stripped sources: `presentPicker` sets
+  `excludedBundleIDs` / `excludedWindowIDs` from `recordingExclusion(` and
+  never names `Bundle.main.bundleIdentifier`; `startRecording` passes
+  `excluding:`, built from `choice.includeReelcutWindows` above the
+  `shareableContent` closure; `recordScreen` reads
+  `"include_reelcut_windows"` above `screenRecordingGranted` and passes it to
+  `RecordingExclusion.make(` (with `panelWindowID: nil`) and to
+  `RecordingChoice(`; `filter`'s display arm holds `excludingApplications:`
+  and `excludingWindows:`.
+- **1f, 5d, 7c** — `RecordingChoice()`'s `includeReelcutWindows` is false;
+  the panel's row reads false and its title; `out["keys"]` lists seven, the
+  harness pins all seven by value (`"ReelcutRecordingIncludeReelcutWindows":
+  false`, a literal) and `screens.py`'s `PINS` carries it for P2;
+  `record_screen` declares `include_reelcut_windows`. Every probe mode that
+  pins the six keys pins the seventh false.
+- **`recording_proof.py`** — `include_reelcut_windows` is declared
+  `boolean` (eleven arguments plus `project`), `{"seconds": 2,
+  "include_reelcut_windows": "yes"}` → `include_reelcut_windows must be true
+  or false.`, and the ORDER row with `"display": 99` added answers the same
+  sentence.
+- What no script reads is the PICTURE: a granted-tier pixel measurement of
+  Reelcut's windows in a recording is out of scope, and REC-10 in
+  `docs/manual-checks.md` is the person's check.
+
+Mutants, each `--mutant <name> --only exclusion` (28 rows, the build row
+among them), all exit 1:
+
+| Mutant | Score | Rows failed |
+|---|---|---|
+| `exclusion-ignores-include` (the code before) | 26/28 | X1's two include rows |
+| `choice-drops-include` | 27/28 | X2's choice-after-on row |
+| `persist-drops-include` | 26/28 | X2's key-after-on and restored rows |
+| `lock-drops-include` | 26/28 | X3's countdown and recording rows |
+| `tool-ignores-include` | 27/28 | X4's `RecordingExclusion.make(` row |
+
+Run on 2026-09-30, the change over `a861f8c`, every instance my own:
+
+| Command | Answer |
+|---|---|
+| `make typecheck`; `make test`; `make app` | 0 errors, 4 warnings (the AVFoundation baseline), tsc clean; exit 0; BUILD SUCCEEDED |
+| `recording_probe.py --only files,configuration,chrome,catalog,exclusion` | 439/439, exit 0 |
+| `recording_probe.py --only exclusion` | 28/28, exit 0 |
+| `recording_probe.py` (the whole run) | 1096/1096, exit 0, no row skipped — section 9's granted tier and section 13 RAN. The first whole run scored 1094/1096: two of 9a's timing rows (elapsed 2.76 s for "about 2 s"; a segment of 912 200 ticks for 600 000 ± 250 000) under a load average near 9 from other work on the host; `--only granted` then failed 9b's movie length alone (855 000), and HEAD's own probe over `git archive a861f8c`'s sources failed two 9b timing rows the same way (41/43), so the rows are the host's timing and not the change; the second whole run passed every row |
+| `recording_proof.py 4817` (own instance; `grep "Reelcut: "` printed nothing) | 192/192, exit 0; 2 tone rows skipped by name (the output is muted) |
+| `screens.py --only 16-recorder-panel` | 6 pass, 0 fail, 0 skip of 6, exit 0 — P2 pass, `16-recorder-panel` pass (2 captures, 0 new problems) |

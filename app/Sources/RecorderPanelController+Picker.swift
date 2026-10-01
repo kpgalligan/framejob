@@ -15,14 +15,19 @@ import ScreenCaptureKit
 extension RecorderPanelController {
     // MARK: - The window picker
 
-    /// `SCContentSharingPicker` in single-window mode, Reelcut's own windows
-    /// excluded from the LIST — `excludedBundleIDs` is documented "for
-    /// picking" and says nothing about capture (R0 q3), which is why R1 hid
-    /// the panel for a picked window alone; since R2 every recording hides
-    /// it (decision 7), and the exclusion is about the list only. The
-    /// observer is added once; the picker is activated for the presentation
-    /// and deactivated when it answers.
+    /// `SCContentSharingPicker` in single-window mode, what
+    /// `recordingExclusion(includeReelcutWindows:)` names excluded from the
+    /// LIST — Reelcut's application with Include Reelcut windows off, the
+    /// panel's own window alone with it on (spec §11 recording.md).
+    /// `excludedBundleIDs` is documented "for picking" and says nothing about
+    /// capture (R0 q3), which is why R1 hid the panel for a picked window
+    /// alone; since R2 every recording hides it (decision 7), and the
+    /// exclusion is about the list only. The observer is added once; the
+    /// picker is activated for the presentation and deactivated when it
+    /// answers.
     func presentPicker() {
+        let exclusion = recordingExclusion(
+            includeReelcutWindows: includeReelcutCheckbox.state == .on)
         let picker = SCContentSharingPicker.shared
         if !pickerObserved {
             picker.add(self)
@@ -30,10 +35,23 @@ extension RecorderPanelController {
         }
         var configuration = SCContentSharingPickerConfiguration()
         configuration.allowedPickerModes = [.singleWindow]
-        configuration.excludedBundleIDs = [Bundle.main.bundleIdentifier].compactMap { $0 }
+        configuration.excludedBundleIDs = exclusion.bundleIDs
+        configuration.excludedWindowIDs = exclusion.windowIDs.map { Int($0) }
         picker.defaultConfiguration = configuration
         picker.isActive = true
         picker.present(using: .window)
+    }
+
+    /// What a display recording and the picker leave out (spec §11
+    /// recording.md, Include Reelcut windows): Reelcut's application with
+    /// the box off; with it on, the panel's own window, which is on screen
+    /// until `recordingDidStart` — after the file's first frame (R0 q2).
+    func recordingExclusion(includeReelcutWindows: Bool) -> RecordingExclusion {
+        let number = window?.windowNumber ?? 0
+        return RecordingExclusion.make(
+            includeReelcutWindows: includeReelcutWindows,
+            ownBundleID: Bundle.main.bundleIdentifier,
+            panelWindowID: number > 0 ? CGWindowID(clamping: number) : nil)
     }
 
     /// Back to the display the person last chose (the persisted one), with

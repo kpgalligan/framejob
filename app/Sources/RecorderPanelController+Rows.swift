@@ -12,7 +12,7 @@ import ScreenCaptureKit
 /// `SCShareableContent`** — listing shareable content needs the Screen
 /// Recording grant, and the panel must open, show the displays and explain
 /// the refusal without one; the `CGDirectDisplayID` each row carries is what
-/// `ScreenRecorder.filter(for:in:)` looks up once the grant is there. And
+/// `ScreenRecorder.filter(for:in:excluding:)` looks up once the grant is there. And
 /// **every popup built from model objects carries the object in
 /// `representedObject` and is read from `selectedItem`**: a display id, a
 /// microphone's `uniqueID`, a document's `recipeKey` — never an index, and
@@ -35,6 +35,9 @@ extension RecorderPanelController {
             toggle.target = self
             toggle.action = #selector(controlChanged(_:))
         }
+        includeReelcutCheckbox.font = DS.sans(13)
+        includeReelcutCheckbox.target = self
+        includeReelcutCheckbox.action = #selector(controlChanged(_:))
         for rate in Self.rates {
             let item = NSMenuItem(title: "\(rate) fps", action: nil, keyEquivalent: "")
             item.tag = rate
@@ -62,6 +65,7 @@ extension RecorderPanelController {
 
         let grid = NSGridView(views: [
             [fieldLabel("Source:"), sourcePopup],
+            [NSGridCell.emptyContentView, includeReelcutCheckbox],
             [fieldLabel("Microphone:"), microphoneRow],
             [fieldLabel("System Audio:"), systemAudioSwitch],
             [fieldLabel("Show Clicks:"), showClicksSwitch],
@@ -256,6 +260,7 @@ extension RecorderPanelController {
         } else {
             choice.source = .display(selectedDisplayID)
         }
+        choice.includeReelcutWindows = includeReelcutCheckbox.state == .on
         choice.microphone = microphonePopup.selectedItem?.representedObject as? String
         choice.systemAudio = systemAudioSwitch.state == .on
         choice.showClicks = showClicksSwitch.state == .on
@@ -284,6 +289,8 @@ extension RecorderPanelController {
             forKey: Self.microphoneKey)
         defaults.set(systemAudioSwitch.state == .on, forKey: Self.systemAudioKey)
         defaults.set(showClicksSwitch.state == .on, forKey: Self.showClicksKey)
+        defaults.set(
+            includeReelcutCheckbox.state == .on, forKey: Self.includeReelcutWindowsKey)
         defaults.set(currentChoice().rate, forKey: Self.rateKey)
         defaults.set(currentChoice().resolution.rawValue, forKey: Self.sizeKey)
     }
@@ -306,6 +313,8 @@ extension RecorderPanelController {
             ? RecordingChoice().systemAudio : defaults.bool(forKey: Self.systemAudioKey)
         systemAudioSwitch.state = systemAudio ? .on : .off
         showClicksSwitch.state = defaults.bool(forKey: Self.showClicksKey) ? .on : .off
+        includeReelcutCheckbox.state =
+            defaults.bool(forKey: Self.includeReelcutWindowsKey) ? .on : .off
         let rate = defaults.integer(forKey: Self.rateKey)
         _ = ratePopup.selectItem(withTag: Self.rates.contains(rate) ? rate : RecordingChoice().rate)
         let size = defaults.string(forKey: Self.sizeKey) ?? ""

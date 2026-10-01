@@ -433,9 +433,10 @@ extension AgentServer {
                         "type": "integer", "minimum": 0,
                         "description": "Which display, as an index into the shareable "
                             + "displays with 0 the MAIN display (default 0). Reelcut's own "
-                            + "windows are always left out of a display recording, so the "
-                            + "app's panel and editor are never in the picture. Exclusive "
-                            + "with window.",
+                            + "windows are left out of a display recording unless "
+                            + "include_reelcut_windows is true, so by default the app's "
+                            + "panel and editor are not in the picture. Exclusive with "
+                            + "window.",
                     ],
                     "window": [
                         "type": "integer", "minimum": 0,
@@ -464,6 +465,14 @@ extension AgentServer {
                         "type": "boolean",
                         "description": "Draw a circle around each mouse click (default "
                             + "false). The cursor itself is always in the picture.",
+                    ],
+                    // The recorder panel's Include Reelcut windows checkbox.
+                    "include_reelcut_windows": [
+                        "type": "boolean",
+                        "description": "Put Reelcut's own windows — the editor, the preview — "
+                            + "in a DISPLAY recording (default false, which leaves them out). "
+                            + "Reelcut's own sound stays out either way, and with window it "
+                            + "changes nothing: that window is recorded on its own.",
                     ],
                     "rate": [
                         "type": "integer", "enum": [30, 60],

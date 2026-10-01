@@ -167,11 +167,14 @@ extension RecorderPanelController {
 
     /// The choice as the controls stand, then the filter: a picked window's
     /// is the picker's own; a display's is built from the shareable content
-    /// and excludes Reelcut's own application (`ScreenRecorder.filter(for:in:)`),
-    /// which keeps the document windows out of a display recording's
-    /// picture. One attempt, numbered and bounded (the type doc).
+    /// and leaves out what `recordingExclusion(includeReelcutWindows:)`
+    /// names (`ScreenRecorder.filter(for:in:excluding:)`) — Reelcut's own
+    /// application, which keeps the document windows out of a display
+    /// recording's picture, or with Include Reelcut windows on the panel's
+    /// window alone. One attempt, numbered and bounded (the type doc).
     private func startRecording() {
         let choice = currentChoice()
+        let exclusion = recordingExclusion(includeReelcutWindows: choice.includeReelcutWindows)
         startGeneration += 1
         let generation = startGeneration
         launched = false
@@ -193,7 +196,8 @@ extension RecorderPanelController {
                 self.startFailed(error)
             case .success(let content):
                 do {
-                    let filter = try ScreenRecorder.filter(for: choice.source, in: content)
+                    let filter = try ScreenRecorder.filter(
+                        for: choice.source, in: content, excluding: exclusion)
                     self.launch(filter: filter, choice: choice)
                 } catch {
                     self.startFailed(error)

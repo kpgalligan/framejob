@@ -385,6 +385,11 @@ To take a permission away again: System Settings ▸ Privacy & Security, or
 - **Expect:** in step 1 the panel's bar moves with your voice from the first second of the countdown, and rests at the room's floor when you are quiet. In step 2 the bar is empty the moment you cancel and stays empty. In step 3 the bar stays empty through the countdown. Both looks.
 - **Source:** #98 (c).
 
+**REC-10 — Include Reelcut windows**
+- **Do:** 1. Open a project, File ▸ New Recording…, leave Include Reelcut windows off, and record the display showing the editor for 5 s. 2. Tick Include Reelcut windows and record again. 3. Choose Window… in Source with the box off, then with it on. 4. Quit, relaunch, and reopen the panel.
+- **Expect:** the first file holds no Reelcut window. The second shows the editor from its first frame. The New Recording panel is in neither. The picker offers no Reelcut window with the box off; with it on, it offers the editor but not the panel. The box keeps its setting.
+- **Source:** spec §11 recording.md (Include Reelcut windows).
+
 ## Assistant
 
 Needs your own Anthropic API key (Setup 3).

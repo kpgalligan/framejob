@@ -71,6 +71,7 @@ enum RecordingDestination: Equatable {
 /// `AVCaptureDevice.uniqueID`, nil for off; `rate` is 30 or 60.
 struct RecordingChoice: Equatable {
     var source: RecordingSource = .display(CGMainDisplayID())
+    var includeReelcutWindows: Bool = false
     var microphone: String? = nil
     var systemAudio: Bool = true
     var showClicks: Bool = false

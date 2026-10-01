@@ -100,7 +100,7 @@ import ScreenCaptureKit
 /// the row on screen and the destination in the choice agree.
 ///
 /// Every choice persists under a `ReelcutRecording…` key (written on change,
-/// read on show); the harness pins all six on `ReelcutExportChoice`'s terms.
+/// read on show); the harness pins all seven on `ReelcutExportChoice`'s terms.
 /// `.picked` is the one source that cannot persist — a filter is not a
 /// value — so a reopened panel with a picked window keeps the row only while
 /// the filter is still held.
@@ -115,6 +115,7 @@ final class RecorderPanelController: NSWindowController {
     static let showClicksKey = "ReelcutRecordingShowClicks"
     static let rateKey = "ReelcutRecordingRate"
     static let sizeKey = "ReelcutRecordingSize"
+    static let includeReelcutWindowsKey = "ReelcutRecordingIncludeReelcutWindows"
 
     // MARK: - Metrics and vocabulary
 
@@ -148,6 +149,8 @@ final class RecorderPanelController: NSWindowController {
     // The controls — internal rather than private because the recording flow
     // lives in an extension in another file, and `private` does not cross one.
     let sourcePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    let includeReelcutCheckbox = NSButton(
+        checkboxWithTitle: "Include Reelcut windows", target: nil, action: nil)
     let microphonePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     let meterView = LevelMeterView(meter: ScreenRecorder.shared.meter)
     let systemAudioSwitch = NSSwitch()

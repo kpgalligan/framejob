@@ -155,6 +155,7 @@ PINS = [(key, _plist(value)) for key, value in [
     ("ReelcutRecordingShowClicks", False),
     ("ReelcutRecordingRate", 60),
     ("ReelcutRecordingSize", "nominal"),
+    ("ReelcutRecordingIncludeReelcutWindows", False),
     ("ReelcutCaptionEngine", "apple"),
     ("ReelcutAssemblyAIRegion", "us"),
     ("ReelcutCaptionStyle", "subtitles"),

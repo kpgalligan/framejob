@@ -135,7 +135,7 @@ extension RecorderPanelController {
         let idle = phase == .idle
         let controls: [NSControl] = [
             sourcePopup, microphonePopup, ratePopup, sizePopup, destinationPopup,
-            systemAudioSwitch, showClicksSwitch,
+            systemAudioSwitch, showClicksSwitch, includeReelcutCheckbox,
         ]
         for control in controls { control.isEnabled = idle }
         var countdown: String?

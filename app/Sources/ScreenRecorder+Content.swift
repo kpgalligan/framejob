@@ -10,8 +10,8 @@ import ScreenCaptureKit
 /// `getExcludingDesktopWindows(_:onScreenWindowsOnly:completionHandler:)`
 /// (there is no `getShareableContent` in Swift and `current` is
 /// `async`-only), `SCStreamError.Code` (there is no `SCError`),
-/// `SCContentFilter(display:excludingApplications:exceptingWindows:)` and
-/// `(desktopIndependentWindow:)`, `AVCaptureDevice.DeviceType.microphone`
+/// `SCContentFilter(display:excludingApplications:exceptingWindows:)`,
+/// `(display:excludingWindows:)` and `(desktopIndependentWindow:)`, `AVCaptureDevice.DeviceType.microphone`
 /// and `.external` (`.builtInMicrophone` is a deprecation warning at 15.0).
 /// There is no geometry helper here: the FILTER's `contentRect` and
 /// `pointPixelScale` are the one geometry source (`ScreenRecorder.start`),
@@ -46,16 +46,19 @@ extension ScreenRecorder {
         }
     }
 
-    /// The programmatic filter. A display source ALWAYS excludes Reelcut's
-    /// own application (R0 q3: that removes 99.19 % of the excluded
-    /// application's window pixels against a 0 % noise floor), so the panel
-    /// can stay on screen; a bare probe has no bundle identifier and then
-    /// excludes nothing rather than crashing. A window source is the window
-    /// alone. A `.picked` source carries the picker's filter and has none to
-    /// build.
-    static func filter(for source: RecordingSource, in content: SCShareableContent) throws
-        -> SCContentFilter
-    {
+    /// The programmatic filter. A display source leaves out what the
+    /// `RecordingExclusion` names: by default Reelcut's own application (R0
+    /// q3: that removes 99.19 % of the excluded application's window pixels
+    /// against a 0 % noise floor), so the panel can stay on screen; with
+    /// Include Reelcut windows on, no application and only the windows it
+    /// lists (the panel's own). A bare probe has no bundle identifier and
+    /// then excludes nothing rather than crashing. A window source is the
+    /// window alone. A `.picked` source carries the picker's filter and has
+    /// none to build.
+    static func filter(
+        for source: RecordingSource, in content: SCShareableContent,
+        excluding exclusion: RecordingExclusion
+    ) throws -> SCContentFilter {
         switch source {
         case .display(let id):
             guard let display = content.displays.first(where: { $0.displayID == id }) else {
@@ -63,11 +66,15 @@ extension ScreenRecorder {
                     "No display with id \(id) is shareable; the displays are "
                         + content.displays.map { "\($0.displayID)" }.joined(separator: ", ") + ".")
             }
-            let own = Bundle.main.bundleIdentifier.map { bundle in
-                content.applications.filter { $0.bundleIdentifier == bundle }
-            } ?? []
-            return SCContentFilter(
-                display: display, excludingApplications: own, exceptingWindows: [])
+            if !exclusion.bundleIDs.isEmpty {
+                let apps = content.applications.filter {
+                    exclusion.bundleIDs.contains($0.bundleIdentifier)
+                }
+                return SCContentFilter(
+                    display: display, excludingApplications: apps, exceptingWindows: [])
+            }
+            let windows = content.windows.filter { exclusion.windowIDs.contains($0.windowID) }
+            return SCContentFilter(display: display, excludingWindows: windows)
         case .window(let id):
             guard let window = content.windows.first(where: { $0.windowID == id }) else {
                 throw RecorderError.startFailed("No window with id \(id) is shareable.")
@@ -131,5 +138,28 @@ enum RecordingMeter {
     static func linear(fromDecibels dB: Float) -> Float {
         guard dB.isFinite else { return 0 }
         return min(1, max(0, powf(10, dB / 20)))
+    }
+}
+
+// MARK: - What a display recording leaves out
+
+/// The one decision both doors and the picker read (spec §11 recording.md,
+/// Include Reelcut windows). Off: Reelcut's application, whole (no bundle
+/// identifier → nothing). On: no application, and the panel's own window
+/// when the panel started the recording (none → nothing). Pure, so the
+/// probe pins it.
+struct RecordingExclusion: Equatable {
+    /// Applications left out whole.
+    let bundleIDs: [String]
+    /// Single windows left out.
+    let windowIDs: [CGWindowID]
+
+    static func make(
+        includeReelcutWindows: Bool, ownBundleID: String?, panelWindowID: CGWindowID?
+    ) -> RecordingExclusion {
+        if includeReelcutWindows {
+            return RecordingExclusion(bundleIDs: [], windowIDs: panelWindowID.map { [$0] } ?? [])
+        }
+        return RecordingExclusion(bundleIDs: ownBundleID.map { [$0] } ?? [], windowIDs: [])
     }
 }
