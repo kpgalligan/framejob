@@ -99,6 +99,9 @@ Built by `screens.py` on the first screen that names one, into
   - `shape` — an ellipse, 5 s;
   - `tone` — `media/toneA.m4a` (a 440 Hz tone, about 5 s).
 
+  `demo` also imports `media/toneB.m4a` (an 880 Hz tone, about 5 s) with no
+  clip, so the Media tab has an unused row.
+
   `demo` is ready once both sound clips' (`video`'s and `tone`'s) peaks are
   cached: `screens.py` polls `detect_silence` in level mode until it answers
   no `pending_peaks`, so every capture draws the Music clip's waveform band.

@@ -186,15 +186,22 @@ NOT_SHOWN = {
                                    "once; read only by a press of Record, which no screen makes",
 }
 
-# Filed layout defects, each named by its issue. A problem's text is
-# `views[problem.view].text`.
-KNOWN = {}
+# Filed layout defects, each named by its issue, and deliberate findings,
+# each named by why. A problem's text is `views[problem.view].text`; an
+# `overhang` key must equal the problem's `detail.overhang` exactly.
+KNOWN = {
+    # MediaPane.bar's doc comment: the Media pane's section bars are pinned
+    # 10 pt past each side of the inset so the rule spans the panel; 10b's
+    # prose names the three per capture.
+    "deliberate: MediaPane.bar's 10 pt overhang": {
+        "kind": "outside_superview", "class": "BarView", "overhang": [10, 0, 10, 0]},
+}
 
 FIXTURES = {
     "empty": {"path": os.path.join(FIXTURE_DIR, "Empty.reelcut"), "clips": []},
     "demo": {"path": os.path.join(FIXTURE_DIR, "Demo.reelcut"),
              "clips": ["video", "text", "graphic", "shape", "tone"],
-             "media": ["speech.mov", "toneA.m4a"], "sound": ["video", "tone"]},
+             "media": ["speech.mov", "toneA.m4a", "toneB.m4a"], "sound": ["video", "tone"]},
 }
 CANVAS = {"width": 960, "height": 540, "fps": [30, 1], "background": [0.0, 0.0, 0.0, 1.0],
           "fit_new_clips": True}
@@ -380,6 +387,8 @@ def _demo_ops(mcp, path):
     tone = _call(mcp, "import_media", path, path=os.path.join(MEDIA, "toneA.m4a"))
     _call(mcp, "add_clip", path, media=_media_id(tone), track=tracks["Music"], at=0)
     ids["tone"] = clip_on("Music")
+    # Imported last, so every earlier media and clip id is unchanged.
+    _media_id(_call(mcp, "import_media", path, path=os.path.join(MEDIA, "toneB.m4a")))
     return ids
 
 
@@ -903,6 +912,8 @@ class Run:
 
 def matches(known, problem, text):
     if problem.get("kind") != known["kind"] or problem.get("class") != known["class"]:
+        return False
+    if "overhang" in known and (problem.get("detail") or {}).get("overhang") != known["overhang"]:
         return False
     prefix = known.get("text_prefix")
     return prefix is None or (text or "").startswith(prefix)

@@ -198,9 +198,9 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 ## Chrome and looks
 
 **CH-1 — The zoom slider and square controls**
-- **Do:** 1. Drag the timeline's zoom knob. 2. Look at the Export button, S/M/L, the Snap box and fields, then open a sheet (Export…) with its rounded buttons.
-- **Expect:** a grey track, a white (dark) or black (light) block knob beside the accent fill; the knob drags smoothly. The square controls sit comfortably beside the sheets' rounded buttons.
-- **Source:** #50 (spec §11 SH-1, SH-2).
+- **Do:** 1. Drag the timeline's zoom knob. 2. Look at the Export button, S/M/L, the Snap box and fields, then open a sheet (Export…).
+- **Expect:** a grey track, a white (dark) or black (light) block knob beside the accent fill; the knob drags smoothly. The toolbar's square controls and the sheets' square buttons read as one family.
+- **Source:** #50, #100 (spec §11 SH-2, SH-4).
 
 **CH-2 — States and hovers no proof renders**
 - **Do:** 1. Hover and press ghost (borderless) buttons. 2. Find a disabled slider. 3. Hover every control with a tooltip. 4. Switch Timeline Track Height S / M / L.
@@ -211,6 +211,11 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Do:** Select clips with a gap and an overlap between them; Clip ▸ Speed…; set a speed that one clip refuses. Then set ×0.5 on a clip with a neighbour just after it.
 - **Expect:** the hint (gaps, a clip that gains a transition — named below — and a refused clip left unchanged) wraps readably; a line under the lengths names the neighbour and its transition's length, and the sheet grows to show every line unclipped.
 - **Source:** #48, #109.
+
+**CH-4 — The square buttons**
+- **Do:** 1. Close every document so Welcome shows, then open Reelcut ▸ Settings…. 2. In a project: File ▸ Export…, Clip ▸ Speed…, Clip ▸ Remove Silences…, File ▸ Generate Captions…, File ▸ Consolidate Media…, File ▸ New Recording…, Window ▸ Export Queue. 3. In each, hover every button, press and hold one, and look at a disabled one (Settings' Remove with no key set).
+- **Expect:** square buttons with no shadow. The blue one lightens slightly on hover, and the outlined one takes a faint grey fill. A press shrinks the button a little about its centre, and a disabled one is dimmed. No title is clipped and no row is cramped or off-centre, in both appearances.
+- **Source:** #100 (spec §11 SH-4).
 
 ## Sound and export
 

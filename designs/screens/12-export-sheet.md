@@ -32,5 +32,5 @@ grey type on the left, then the buttons "Add to Queue", "Cancel" and "Export…"
 
 In the light capture the sheet is white with black text; the pop-ups are
 light-grey pills, the dimmed number fields white boxes with pale grey numbers,
-"Add to Queue" and "Cancel" white buttons with a black outline and a hard black
-shadow, and "Export…" blue.
+"Add to Queue" and "Cancel" white square buttons with a thin black outline and
+no shadow, and "Export…" a flat blue block.

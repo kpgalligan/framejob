@@ -1696,8 +1696,10 @@ divergences, each recorded: `makeButtonRow` gives its `leading` views
 compression resistance `.defaultLow`, so a footnote gives way before a button
 (#141); `OptionFieldControl.finishEditing` returns first
 responder to `window.contentView` (#60) where Rasterize's copy keeps
-`makeFirstResponder(nil)`; `StickerButton` still has its pill, the one
-place `Controls.swift` lags Rasterize (spec §11 SH-1, owed); and
+`makeFirstResponder(nil)`; every `updateTrackingAreas` in `Controls.swift` and
+`OptionControls.swift` removes only the view's own areas (`area.owner ===
+self`), where Rasterize's removes them all and the tooltip with them (spec §11
+SH-4; kpgalligan/rasterize#335); and
 `BlockSliderCell.drawBar` dims through the context's alpha rather than
 `withAlphaComponent`, the one deliberate fork (SH-2) — Rasterize's spelling
 paints the translucent `DS.border` track opaque in the knob's own ink.

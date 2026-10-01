@@ -15,12 +15,12 @@ enum DS {
     static var selectionFill: NSColor { .controlAccentColor.withAlphaComponent(0.22) }
     static var border: NSColor { .separatorColor }
     static var borderStrong: NSColor { .tertiaryLabelColor }
-    /// The crisp offset block behind sticker controls.
-    static var stickerShadow: NSColor { .shadowColor }
     static var textStrong: NSColor { .labelColor }
     static var textMuted: NSColor { .secondaryLabelColor }
     static var textFaint: NSColor { .tertiaryLabelColor }
     static var accent: NSColor { .controlAccentColor }
+    /// The primary button's hover fill: the accent lifted toward white.
+    static var accentHover: NSColor { accent.blended(withFraction: 0.12, of: .white) ?? accent }
     static var onAccent: NSColor { .white }
     static var canvasVoid: NSColor { .underPageBackgroundColor }
 

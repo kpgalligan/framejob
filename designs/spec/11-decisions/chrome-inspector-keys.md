@@ -10,7 +10,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   `ExportSheet`, `Consolidate`, `RecorderPanel`) and `recording_probe.py`
   §6 measures its 2 pt shadow margins against a reference build. Squaring
   it (Rasterize's shape) or moving its callers is a phase of its own; it is
-  the one place `Controls.swift` lags Rasterize.
+  the one place `Controls.swift` lags Rasterize. Superseded by SH-4 (#100,
+  2026-09-30).
 - **SH-2 — `BlockSliderCell.drawBar` is forked from Rasterize's copy** (the
   sharp pass, 2026-09-23; the user's call: the handoff is a guideline, and a
   working Reelcut wins). Rasterize's cell dims its two fills with
@@ -361,3 +362,23 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   press; the outlines and grips stay drawn under it, as the layer's box and
   handles do. Accepted: a grip under a layer handle is not reachable there,
   and an ellipse is outlined as its box.
+- **SH-4 — `StickerButton` is Rasterize's square block, drawn in place;
+  supersedes SH-1** (kpgalligan/reelcut#100, the owner, 2026-09-30). The
+  class, its name, its `init(title:style:target:action:)` and all 28 calls
+  in 13 files stay. Its drawing and `intrinsicContentSize` are Rasterize's:
+  a block on `bounds.insetBy(0.5)` at `DS.buttonRadius`, with no shadow and
+  no margin. It is ⌈title width⌉ + 32 by 28 pt, 6 pt narrower and shorter
+  than the pill. Primary fills `DS.accent`, or `DS.accentHover` while
+  hovered (the accent 12 % toward white, Rasterize's token), with no stroke.
+  Secondary fills `DS.chromeBackground`, adds `DS.hoverFill` while hovered,
+  and strokes 1 pt of `DS.borderStrong`. A press scales the drawing 0.97
+  about the centre; disabled is 42 %. `DS.stickerShadow` goes with its one
+  caller. One difference stays: `updateTrackingAreas` removes only the
+  view's own areas (`area.owner === self`), because removing them all
+  deletes a tooltip. Rasterize's copy still removes them all
+  (kpgalligan/rasterize#335, item 4). A window loses 6 pt per row of these
+  buttons. The welcome window's centred column moves 3 pt, which
+  `recording_probe.py` §6 scores against its pre-button reference. The sharp
+  handoff says to delete `StickerButton` once it has no callers. That is not
+  followed: the class has callers everywhere, and the square shape is what
+  that line was after.

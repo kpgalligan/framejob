@@ -18,7 +18,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | [`deepening.md`](deepening.md) | 416 | **Deepening (road map 7).** D2-1, D3-1, #21, #22, D4-1..D4-6, D7-1..D7-3, #42, #88, #63, #174, #40, #43: how ops refuse, the op table, the gate, the source window, time envelopes, one-delta shifts on the canvas's grid, the non-edits that speak, a relink that re-probes, one frame on the grid, a tool that closes a document, a path one open document holds, a caption name's own extension. |
 | [`cloud-captions.md`](cloud-captions.md) | 368 | **Cloud captions (road map 6).** R6-1..R6-22: AssemblyAI, keys, deletion, recovery, refusal precedence, a dripping server, a Stop's bound on a DELETE, a refused transcript's failed DELETE reported for the dashboard, cached transcripts not re-checked for the key, speaker colours on Subtitles. |
 | [`word-captions.md`](word-captions.md) | 123 | **Word captions (road map 8).** W-1..W-11. |
-| [`chrome-inspector-keys.md`](chrome-inspector-keys.md) | 363 | **Chrome, the clip inspector and keys (the sharp pass, road map 9, #35).** SH-1..SH-3, CI-1..CI-16, K-1..K-3. |
+| [`chrome-inspector-keys.md`](chrome-inspector-keys.md) | 384 | **Chrome, the clip inspector and keys (the sharp pass, road map 9, #35).** SH-1..SH-4, CI-1..CI-16, K-1..K-3. |
 | [`graphics.md`](graphics.md) | 405 | **Graphics (road map 10).** G-1..G-20. |
 | [`dev-tools.md`](dev-tools.md) | 27 | **Dev tools (road map 11).** V-1..V-3: the `REELCUT_DEV_TOOLS` flag and `make dist`, dev tools as ordinary tools, capture by `cacheDisplay`. |
 | [`assistant.md`](assistant.md) | 202 | **The Assistant (road map 12).** AI-1..AI-20: the bundled helper, one lane, the catalog at launch, the fourth tab, the window's own project, W-9's reach, withheld and ask-first tools, the key, history, undo, the model, a call mid-gesture, the base-URL override, the tab kept on a selection change, the live context on each message, Stop reaching a running export or transcribe, the selectable transcript and the multi-line composer, the dev-only compaction threshold a proof lowers, the dot on the Assistant tab's title while a question waits, and the person's chat settings. |
@@ -122,7 +122,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | W-9 | No language model chooses words — amended by AI-6 | [`word-captions.md`](word-captions.md) |
 | W-10 | `set_text` can patch `case`, `words` and `word_style` | [`word-captions.md`](word-captions.md) |
 | W-11 | Karaoke's two lines, the bundled caption faces and the 80 % shrink floor are confirmed | [`word-captions.md`](word-captions.md) |
-| SH-1 | `StickerButton` keeps its pill | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
+| SH-1 | `StickerButton` keeps its pill — superseded by SH-4 | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
 | SH-2 | `BlockSliderCell.drawBar` is forked from Rasterize's copy | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
 | CI-1 | The selected action is the SIXTH piece of view state | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
 | CI-2 | The editing target is the selected action, not the playhead | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
@@ -144,6 +144,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | K-2 | In the canvas text editor Return applies, a modified Return is a new line, and Esc asks before dropping a change | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
 | K-3 | The canvas text editor lays its text out with the renderer's attributes at view scale; an UPPERCASE text is edited as typed | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
 | SH-3 | An inspector name field is the inspector's value field | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
+| SH-4 | `StickerButton` is Rasterize's square block, drawn in place | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
 | G-1 | A graphic is a SOURCE, not an effect; R5-1 stands for effects | [`graphics.md`](graphics.md) |
 | G-2 | The engine is a separate Rust crate; the core crate keeps its two rules | [`graphics.md`](graphics.md) |
 | G-3 | A graphic's source is a FILE in the package, and is not an undo step | [`graphics.md`](graphics.md) |

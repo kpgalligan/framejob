@@ -26,5 +26,5 @@ track", then "Cancel" and a blue "Generate".
 
 In the light capture the sheet is white with black text; the pop-ups are
 light-grey pills, the sample-caption box keeps its dark picture and black band,
-"Cancel" is a white button with a black outline and a hard black shadow, and
-"Generate" stays blue.
+"Cancel" is a white square button with a thin black outline and no shadow, and
+"Generate" a flat blue block.

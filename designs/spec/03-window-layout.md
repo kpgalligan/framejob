@@ -7,8 +7,8 @@ visible boundary. That handoff's README is the normative source for the
 metrics; this section is the summary. The sharp pass in
 `designs/design_handoff_reelcut_sharp/` (2026-09-23) then squared every
 chrome corner (a clip keeps 2 pt) and gave the zoom slider a block knob; its
-README is normative for radii and the knob, with the deviations in §11 SH-1
-and SH-2.
+README is normative for radii and the knob, with the deviation in §11 SH-2
+(SH-4 squared `StickerButton`, superseding SH-1).
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────┐

@@ -63,5 +63,6 @@ account was billed."
 In the light capture the ground is white and the headings, labels, status
 lines and the month's line black; the paragraphs and the word "tokens" are
 mid-grey, the key, model and threshold fields white boxes with grey borders,
-the Region pop-up a light-grey pill, and "Account Page" a white button with a
-black outline and a hard black shadow.
+the Region pop-up a light-grey pill, "Account Page" a white square button with a
+thin black outline and no shadow, the two Saves flat blue blocks, and the dimmed
+Remove and Verify grey-outlined with grey titles.

@@ -7,10 +7,11 @@
   points to one of its headed sections or file-map rows, quoted by name.
 - **Spec decisions:** relies on D4-6 (the reversed mirror has one home, in the app), R2-1 (one
   composition audio track per source format), K-1 / K-2 (Space, and the text editor's Return/Esc),
-  SH-1 / SH-2 (`StickerButton` keeps its pill; `drawBar` forked from Rasterize), CI-1, CI-5..CI-10
-  (Clip tab: selected action, sub-tabs, marks, Reset/Clear, refusal strip), W-8 / W-10 (on-device
-  `SpeechTranscriber`; one `word_style` writer), R6-3, R6-7, R6-9..R6-13 (cloud captions). None of
-  these was introduced here. The notes file only recorded what they did to each file.
+  SH-2 / SH-4 (`drawBar` forked from Rasterize; `StickerButton` squared in place, its owner-filtered
+  tracking areas kept), CI-1, CI-5..CI-10 (Clip tab: selected action, sub-tabs, marks, Reset/Clear,
+  refusal strip), W-8 / W-10 (on-device `SpeechTranscriber`; one `word_style` writer), R6-3, R6-7,
+  R6-9..R6-13 (cloud captions). None of these was introduced here. The notes file only recorded what
+  they did to each file.
 
 ## Context
 
@@ -352,8 +353,9 @@ lenient-decoding rule.
 
 ### Shared chrome
 
-- **`Controls.swift` sits over the cap (651) by the sync rule.** `BlockSlider` was copied verbatim
-  from Rasterize. SH-2 is its only fork. SH-1 leaves `StickerButton` as it is.
+- **`Controls.swift` sits over the cap (648) by the sync rule.** `BlockSlider` was copied verbatim
+  from Rasterize. SH-2 is its only fork. SH-4 (#100) squared `StickerButton` in place to
+  Rasterize's drawing; its owner-filtered tracking areas stay.
 
 ## What it built — where it lives now
 
@@ -442,8 +444,8 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   lanes").
 - A person drags a clip and sees no flash to 0 and no jump. Tracked in #48 ("Dragging a clip
   leaves the timeline still").
-- Rasterize's `BlockSliderCell.drawBar` still has the SH-2 defect upstream. Tracked in #101.
-- SH-1: square `StickerButton` or move its callers ("a phase of its own"). Tracked in #100.
+- Rasterize's `BlockSliderCell.drawBar` still has the SH-2 defect upstream. Tracked in
+  kpgalligan/rasterize#335 (moved from #101).
 - Pause/Resume live only in a status item that macOS can hide (#98).
 
 ## Where to look in the original

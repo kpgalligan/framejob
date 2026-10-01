@@ -6839,7 +6839,9 @@ scored. Exit 0 iff no row failed. A screen fails on a front-block problem
 README's "Running one" recipe), a tool error, a failed `expect` (its files
 deleted), or a sheet left attached (closed with `cancel_sheet`; one that will
 not close fails every later screen). Layout problems are classified against
-`KNOWN` (empty since #70 was fixed) and new ones are reported, never scored.
+`KNOWN` (no filed defect since #70 was fixed; one deliberate finding, the Media
+pane's section bars' 10 pt `BarView` overhang, `MediaPane.bar`) and new ones
+are reported, never scored.
 
 **Outputs** in `<out>`: `<id>.<capture>.<light|dark>.png` and `.layout.json`,
 `screens.md`, `results.json` (the rows and, per capture, its PNG's sha256, scale,
@@ -10312,4 +10314,84 @@ python3 tools/proof/assistant_settings_proof.py --mutant fixed-settings        #
 python3 tools/proof/assistant_settings_proof.py --mutant no-live-settings      # CS2 FAIL, exit 1
 python3 tools/proof/assistant_settings_proof.py --mutant settings-ends         # CS2 FAIL, exit 1
 python3 tools/proof/assistant_settings_proof.py --mutant fixed-settings-app    # CS3 FAIL, exit 1
+```
+
+## Issue batch B49 — square StickerButton and the Media-tab screen (recording_probe.py §6, two mutants; screens.py 10b; #100, #194)
+
+**What changed.** Spec §11 SH-4 supersedes SH-1: `StickerButton` draws
+Rasterize's square block in place (`Controls.swift`, its `updateTrackingAreas`
+still owner-filtered) and is ⌈title width⌉ + 32 by 28 pt, 6 pt narrower and
+shorter than the pill; `DS.stickerShadow` is gone and `DS.accentHover` is
+Rasterize's token. No caller changed.
+
+**`recording_probe.py` §6** is re-pinned against the same reference (the
+pickaxe's pre-button tree, `a4c476f3^` = `c1dce5f01840`, still the pill).
+6a reads `⌈tw⌉ + 32 × 28` intrinsics, the row 362 pt wide from x 179 at top
+397, and a new row: each button's `corner` (1.5, 1.5) and `middle`
+(1.5, mid-height) samples from its own `cacheDisplay` bitmap are opaque and
+equal. 6d reads the diff only inside the reference row's band (x 0–720,
+y 394–428 pt): light 22954 px, dark 24308 px, one cluster each at x
+179.5–541.0, y 395.0–426.0 pt — the new row's x-span with the primary's fill
+0.5 pt in, and the pill row's ink 3 pt higher; the row's top derived from
+the band's bottom edge is 397.0. Above the band every pixel row equals the
+reference's 6 rows higher (y 6–788 px) and below it the reference's 6 rows
+lower (y 856–1194 px), with no tolerance: the welcome column re-centres by
+exactly 3 pt. The old "nothing outside the row changed" row is gone, since
+the column now moves. A 6d row scores that the probe answered a row top at
+all; without one the section fails it and stops rather than raising.
+
+**Mutants**, each `--mutant <name> --only welcome` (35 rows; the tree 35/35):
+
+- `sticker-pill-size` (the pill's `+ 6` back in `intrinsicContentSize`) —
+  28/35, exit 1: 6a's intrinsic, laid-out and tall rows, and 6d's two (iv)
+  rows in each appearance, because the probe's own laid-out top (394) no
+  longer matches the tree's render.
+- `sticker-round` (radius `body.height / 2`) — 34/35, exit 1: 6a's corner row.
+
+**`cloud_captions_probe.py` row 18**: Settings is 460 × 793 points (measured
+`(920, 1586)` at scale 2; it was 805), 12 pt shorter for its 2 rows of
+`StickerButton`s.
+
+**`screens.py`.** `demo` imports `media/toneB.m4a` last, with no clip, and
+`designs/screens/10b-media-tab.md` captures the Media tab with "3 items".
+10b passes in both looks, with 12 layout problems: the Media pane's three
+`BarView` bands overhang their section rows by 10 pt each side, three per
+capture. `MediaPane.bar` does that on purpose so the rule spans the panel,
+and the screen's prose says so; `KNOWN` lists it as a deliberate finding
+(`outside_superview`, `BarView`, overhang exactly `[10, 0, 10, 0]`), so a
+full run prints "new problems: 0". Against the HEAD baseline
+(`work/b49/screens-before`, 22/22, digest `0eee0c6f…`), `--compare` finds
+38/56 PNGs byte-identical: every capture of 03–11b, and 14's timeline. The
+18 that differ are exactly the screens that hold a `StickerButton`: 01's
+two (48926 / 50912 px in the button row and the re-centred column), 02 at
+920 × 1586 (was 1610), 12 at 840 × 1330 (1342), 13 at 578 (590), 14's sheet
+at 870 (882), 15 at 932 (944) and 16 at 1000 × 792 (804), plus 10b's four,
+which exist in one run only.
+
+Run on 2026-10-01, the change over `d568906`:
+
+| Command | Result |
+|---|---|
+| `screens.py --out work/b49/screens-before` (HEAD, before any edit) | 22 pass, 0 fail, 0 skip; 0 new problems; exit 0 |
+| `make typecheck` | 0 errors, 4 warnings (the baseline), tsc clean |
+| `make test` | exit 0 |
+| `make app` | BUILD SUCCEEDED |
+| `wc -l Controls.swift Theme.swift` | 648, 222 |
+| `recording_probe.py --only chrome,chrome_pause,welcome` | 212/212, exit 0 |
+| `--mutant sticker-pill-size --only welcome` | 28/35, exit 1 |
+| `--mutant sticker-round --only welcome` | 34/35, exit 1 |
+| `section_welcome` driven with a probe answer of no buttons | 7 rows fail, the section returns; without the `laid_top is None` return it raised `TypeError` |
+| `cloud_captions_probe.py --only chrome` | 76/77 before the re-pin (row 18 measured `(920, 1586)`), 77/77 after, exit 0 |
+| `screens.py --only 10b-media-tab` | 6 pass, 0 fail, 0 skip; 0 new problems (the overhang's 12 known); exit 0 |
+| `screens.py --compare work/b49/screens-before` | 23 pass, 0 fail, 0 skip; compare 38/56 byte-identical; exit 0 (12 new problems, 10b's, before the `KNOWN` entry) |
+| `screens.py` (full, with the `KNOWN` entry) | 23 pass, 0 fail, 0 skip; new problems: 0; exit 0 |
+| `v3_tools.py` | 8/8, exit 0 |
+| harness `welcome`, `settings`, `transcribe` in both looks | six PNGs; no clipped title or misaligned row |
+
+```sh
+python3 tools/proof/recording_probe.py --only chrome,chrome_pause,welcome      # 212/212
+python3 tools/proof/recording_probe.py --mutant sticker-pill-size --only welcome   # 28/35, exit 1
+python3 tools/proof/recording_probe.py --mutant sticker-round --only welcome       # 34/35, exit 1
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only chrome  # 77/77
+python3 tools/proof/screens.py --only 10b-media-tab
 ```

@@ -36,6 +36,6 @@ with their clips. With no cuts found, nothing on the timeline is marked.
 
 In the light capture the sheet is white with black text; the pop-ups are
 light-grey pills, the two number fields white boxes, the level slider a pale grey
-track with a white knob, "Cancel" a white button with a black outline and a hard
-black shadow, and the dimmed Remove pale blue. The timeline is white, with the
-Shapes and Titles lanes mid-grey behind their clips.
+track with a white knob, "Cancel" a white square button with a thin black outline
+and no shadow, and the dimmed Remove a pale blue block. The timeline is white,
+with the Shapes and Titles lanes mid-grey behind their clips.

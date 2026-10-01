@@ -2,11 +2,11 @@ import AppKit
 
 // MARK: - StickerButton
 
-/// The house button: a pill with a 1.5px border and the crisp
-/// `2px 2px 0` sticker shadow. Hover lifts 1px up-left and grows the shadow
-/// to 4px; press translates down-right and drops the shadow. Primary style
-/// is the system accent with white text; secondary is the window background
-/// with strong text.
+/// The house button: a square block at `DS.buttonRadius`, no shadow. Primary
+/// style is the system accent (lifted toward white on hover) with white text
+/// and no stroke; secondary is the chrome background with a 1pt strong
+/// border, strong text and the faint hover fill. Press scales to 0.97 about
+/// the centre; disabled dims to 42%.
 final class StickerButton: NSButton {
     enum Style {
         case primary
@@ -16,7 +16,6 @@ final class StickerButton: NSButton {
     private let style: Style
     private var hovered = false
 
-    /// Body height 28 plus 2px top/left margin and 4px max shadow room.
     private static let bodyHeight: CGFloat = 28
 
     init(title: String, style: Style, target: AnyObject?, action: Selector?) {
@@ -40,7 +39,7 @@ final class StickerButton: NSButton {
 
     override var intrinsicContentSize: NSSize {
         let textWidth = title.size(withAttributes: [.font: font ?? DS.sans(13)]).width
-        return NSSize(width: ceil(textWidth) + 32 + 6, height: Self.bodyHeight + 6)
+        return NSSize(width: ceil(textWidth) + 32, height: Self.bodyHeight)
     }
 
     override func updateTrackingAreas() {
@@ -74,39 +73,38 @@ final class StickerButton: NSButton {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        let pressed = isHighlighted && isEnabled
-        let rest = NSRect(
-            x: 2, y: 2, width: bounds.width - 6, height: Self.bodyHeight)
-        let body: NSRect
-        let shadowGap: CGFloat
-        if pressed {
-            body = rest.offsetBy(dx: 3, dy: 3)
-            shadowGap = 0
-        } else if hovered && isEnabled {
-            body = rest.offsetBy(dx: -1, dy: -1)
-            shadowGap = 4
-        } else {
-            body = rest
-            shadowGap = 2
-        }
-        let radius = body.height / 2
+        let body = bounds.insetBy(dx: 0.5, dy: 0.5)
         let alpha: CGFloat = isEnabled ? 1 : 0.42
-
-        if shadowGap > 0 && isEnabled {
-            let shadowPath = NSBezierPath(
-                roundedRect: body.offsetBy(dx: shadowGap, dy: shadowGap),
-                xRadius: radius, yRadius: radius)
-            DS.stickerShadow.setFill()
-            shadowPath.fill()
+        let hot = hovered && isEnabled
+        let context = NSGraphicsContext.current?.cgContext
+        let pressed = isHighlighted && isEnabled
+        if pressed {
+            context?.saveGState()
+            context?.translateBy(x: bounds.midX, y: bounds.midY)
+            context?.scaleBy(x: 0.97, y: 0.97)
+            context?.translateBy(x: -bounds.midX, y: -bounds.midY)
+        }
+        defer {
+            if pressed { context?.restoreGState() }
         }
 
-        let path = NSBezierPath(roundedRect: body, xRadius: radius, yRadius: radius)
-        (style == .primary ? DS.accent : DS.chromeBackground)
-            .withAlphaComponent(alpha).setFill()
-        path.fill()
-        path.lineWidth = 1.5
-        DS.borderStrong.withAlphaComponent(alpha).setStroke()
-        path.stroke()
+        let path = NSBezierPath(
+            roundedRect: body, xRadius: DS.buttonRadius, yRadius: DS.buttonRadius)
+        switch style {
+        case .primary:
+            (hot ? DS.accentHover : DS.accent).withAlphaComponent(alpha).setFill()
+            path.fill()
+        case .secondary:
+            DS.chromeBackground.withAlphaComponent(alpha).setFill()
+            path.fill()
+            if hot {
+                DS.hoverFill.setFill()
+                path.fill()
+            }
+            path.lineWidth = 1
+            DS.borderStrong.withAlphaComponent(alpha).setStroke()
+            path.stroke()
+        }
 
         let textColor = (style == .primary ? DS.onAccent : DS.textStrong)
             .withAlphaComponent(alpha)
@@ -126,10 +124,9 @@ final class StickerButton: NSButton {
 /// The house call-to-action: a flat accent rectangle with an optional leading
 /// symbol. Hover lightens the fill; that is the whole state model.
 ///
-/// Deliberately **not** `StickerButton`: the sticker pill with its 1.5px
-/// border and offset shadow was retired in the Rasterize redesign, and the
-/// window chrome follows — square-ish, flat, quiet. `StickerButton` stays for
-/// the sheets and the welcome screen, which are not chrome.
+/// Deliberately **not** `StickerButton`: this is the toolbar's 26 pt
+/// call-to-action with a leading symbol, where `StickerButton` is the sheets'
+/// 28 pt block with a title alone.
 ///
 /// `fill` is the rectangle's ink and defaults to `DS.accent`, so the toolbar's
 /// Export button — the one caller before road map 3 — draws byte for byte what
