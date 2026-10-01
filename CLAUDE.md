@@ -39,7 +39,7 @@ comment citing "road map N §x" refers to the archived original.
 | `docs/manual-checks.md` | **What only a person at the machine can confirm**, as a standing list the owner runs periodically and before every release — not open work, so not an issue. A change that creates such a check adds or edits its row in the same change. |
 | `designs/adr/` | One condensed decision record per closed road map, survey or file history: why the code is the shape it is. Start with the one for the area: `roadmap-03` the recorder · `roadmap-04` `detect_silence` · `roadmap-05` transitions and `video.motion` · `roadmap-06` transcription (C2, the relay, designed and deferred) · `roadmap-07` how a patch is checked, what an op answers, where its arguments are written down, the source window, the argument gate · `roadmap-08` word captions · `roadmap-09` the Clip tab, the action lane, band drags · `roadmap-10` graphics · `roadmap-11` the dev tools (snapshot_ui, perform_menu_item, the screen catalog) and `make dist` · `roadmap-12` the assistant (the bundled helper, the agent lane, withheld and ask-first tools, the Assistant tab and its prompt) · `roadmap-13` pricing and spend (LiteLLM's table, the price function in the helper and the proofs, the spend ledger, the proofs' budgets, the tab's and Settings' spend figures) · `app-file-history` / `core-file-history` why a file or module is cut where it is, and its named next cut · `rust-build-settings` why release builds are incremental with no LTO · `effects-survey` E3–E9 (deferred by the user) and **the Concat rule: it is AGPL-3.0; none of its code, shaders, chains or colour tables may be carried over** · `remaining-closed` the debts already paid. |
 | `designs/design_handoff_reelcut/` | The shipped chrome cleanup and identity; its README is normative for the redesign's metrics. |
-| `designs/design_handoff_reelcut_sharp/` | The sharp pass (2026-09-23): square chrome, 2 pt clips, the zoom slider's block knob. Its README is normative for radii and the knob, with spec §11 SH-1 and SH-2 as the deviations. |
+| `designs/design_handoff_reelcut_sharp/` | The sharp pass (2026-09-23): square chrome, 2 pt clips, the zoom slider's block knob. Its README is normative for radii and the knob, with spec §11 SH-2 as the deviation (SH-4 squared `StickerButton`, superseding SH-1). |
 | `designs/design_handoff_clip_inspector/` | The clip inspector handoff road map 9 built from; `designs/adr/roadmap-09-clip-inspector.md` records the deviations. |
 | `designs/screens/` | The screen catalog (road map 11's V3). One file per screen: a JSON front block (the fixture, the MCP steps that reach it, the captures) and prose for a designer. `tools/proof/screens.py` captures them light and dark into `tools/proof/work/screens/<date>/screens.md`; its `README.md` has the format and how to add a screen. |
 | `agent/prices/` | The price table (spec §11 P-1, P-2, P-5): `anthropic.json` is LiteLLM's Anthropic rows in $/MTok with the LiteLLM commit it came from, written only by `make prices` and bundled into the helper, which refreshes its own daily copy into the spend folder (`agent/src/priceTable.ts`); `cases.json` the hand-checked cases `agent/src/pricing.ts` and `tools/proof/prices.py` both answer; `reduce_cases.json` the LiteLLM document both reducers (`update.py`, `priceTable.ts`) answer. `designs/adr/roadmap-13-pricing.md` holds the record. |
@@ -199,8 +199,8 @@ else is what bloats files:
   (`AgentServer+Parity.swift`). What it cannot see is a CALL, which two
   things guard at dispatch: the argument GATE in `AgentServer+Gate.swift`
   compares the caller's keys to the schema the tool published and refuses a
-  stranger by name, for all eighty-five product tools (and the dev tools, road map 11),
-  before any handler runs;
+  stranger by name, for all eighty-six product tools (and the dev tools, road
+  map 11), before any handler runs;
   and the throwing helpers in `AgentServer+Arguments.swift` refuse a value a
   handler cannot read by name rather than dropping it.
 - **A file at the ~600-line cap gives something up before it takes anything
@@ -248,8 +248,8 @@ The log line names the port it actually bound (a taken port falls back to an
 ephemeral one). Drive it with any MCP client over streamable HTTP at
 `http://127.0.0.1:<port>/mcp`: one tool per §6 op, each taking the `scope`
 envelope key, plus the app-state tools — `open_project`, `new_project`,
-`save_project`, `get_project`, `import_media`, `import_captions`,
-`export_captions`, `transcribe`, `consolidate_media`, `detect_silence`,
+`save_project`, `close_project`, `get_project`, `import_media`,
+`import_captions`, `export_captions`, `transcribe`, `consolidate_media`, `detect_silence`,
 `normalize_clip`, `set_playhead`, `set_range`, `set_selection`, `set_scope`,
 `undo`, `redo`, `render_frame`, `export`, `record_screen`, `write_graphic`,
 `get_graphic`, `graphic_reference`, `render_graphic`, `import_graphic_font`
@@ -274,8 +274,9 @@ sample-for-sample comparison of two exports decoded to PCM (which needs
 `ffmpeg` at proof time). Its README says how to make the test media, run
 one, and which scores are known host-state skips (a locked console, a
 Bluetooth output). Add the next phase's proof there rather than writing a
-throwaway. An instance DEADLOCKS somewhere past forty open documents,
-because nothing closes one: relaunch between proof sessions.
+throwaway. An instance DEADLOCKS somewhere past forty documents open at once:
+a proof that closes what it opens (`close_project`) can share an instance, and
+one that does not relaunches between proof sessions.
 
 Spec §10's per-step verifications are the acceptance tests. What no script
 can answer — step 4's "the clip plays with audio", step 5's 60 fps, and the

@@ -25,4 +25,4 @@ button with a record symbol.
 
 In the light capture the panel is white with black text; the pop-ups are
 light-grey pills, the off switch a pale grey track, the level meter two pale grey
-bars, and "Close" a white button with a black outline and a hard black shadow.
+bars, and "Close" a white square button with a thin black outline and no shadow.

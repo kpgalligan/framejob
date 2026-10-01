@@ -44,8 +44,15 @@ only that process. After `make app`, run
 matching alternate `.app` for an isolated mutation build. It writes temporary
 `.reelcut` packages, checks named refusal of oversized saved values and the
 next valid open in the same process, renders an admitted control, then checks
-edit rejection, undo/redo and save/reopen. It refuses a fallback MCP port,
-checks the startup parity log before and after, and exits nonzero for a crash,
+edit rejection, undo/redo and save/reopen. Its speed rows (spec §11 R6-10,
+amended by #41) then open packages whose clip `speed` is 1e300, 1e-300,
+10.000000000000002 or 0.09999999999999998, or a nested clip's 1e300: each is
+refused with the core's whole sentence, value spelled as serde_json spells it
+(`clip 4's speed 1e+300 is outside ×0.1–×10`), the `project.json` bytes are
+unchanged and a control opens after it; 0.1 and 10.0 open and read back. Run
+on 2026-10-01: every row `ok` and the pass line, no parity complaint. It
+refuses a fallback MCP port, checks the startup parity log before and after,
+and exits nonzero for a crash,
 timeout, build mismatch or failed row. The Rust companion
 `core/tests/transition_bounded.rs` runs long searches in child processes with
 hard 5-second and 30-second watchdogs; the parent kills only its own child.
@@ -334,8 +341,9 @@ must print nothing before a proof run means anything.
 
 **The EXACT tool count belongs to the newest phase's script**, because it is
 what tells a stale binary on the port from the build under test: road map 7's
-`op_argument_proof.py` asserts **85** since road map 10's G4b (82 from G4a,
-79 from G3b, 77 from D3·5), and every script before it keeps
+`op_argument_proof.py` asserts **86** since issue batch B44's `close_project`
+(85 from road map 10's G4b, 82 from G4a, 79 from G3b, 77 from D3·5), and
+every script before it keeps
 a floor — phases 1 to 9's 63, 65, 68, 70, 71, 73, 73, 73 and 74, and road map
 3's 75 — so a later phase's tools never fail an older proof.
 That exact count is of PRODUCT tools: road map 11's dev tools are in a Release
@@ -382,9 +390,11 @@ only check that notices. `check` never stops a run, so that build goes on to
 fail every check that names either tool and then ABORTS at 4b's first
 `export_captions`; the mutation paragraph below has the whole list.
 
-**Relaunch the instance between proof sessions.** Nothing closes a document —
-there is no such tool — so every project a proof makes stays open, and each
-open document costs about five threads and fifteen megabytes (measured:
+**Relaunch the instance between proof sessions.** The proofs before issue
+batch B44 close nothing they open, so every project such a proof makes stays
+open. `close_project` (B44, spec §11 #40) closes one; `close_project_proof.py`
+closed sixty in a row on one instance, its thread count 13 before and 18
+after. Each open document costs about five threads and fifteen megabytes (measured:
 fifteen more documents took one instance from 174 threads and 509 MB to 254
 and 734 MB). All three proofs run in sequence against one fresh instance with
 room to spare — 26 documents, 197 threads — but somewhere past forty, which
@@ -2110,10 +2120,11 @@ not changed.
 
 ## The remaining-work probe (`remaining_probe.py`)
 
-`python3 tools/proof/remaining_probe.py`, **170/170** (141 when it landed; 156
+`python3 tools/proof/remaining_probe.py`, **176/176** (141 when it landed; 156
 with road map 3's 5f, the held tail over a 1 s-picture / 5 s-sound fixture;
 170 with the fix wave's sparse shape, three frames 25 s apart under 60 s of
-sound, and its all-sync twin). No port, no window
+sound, and its all-sync twin; 176 with issue batch B44's `chart.png`
+destination row and 1e's fifth site). No port, no window
 server grant, and no media beyond `media/A.mov` (sections 2, 3 and 5),
 `AV.mov`, `B.mov` and `toneA.m4a` (section 5) plus the fixtures 5f MAKES with
 `ffmpeg` at proof time under `work/remaining-probe-files/pass/` — 1 s of
@@ -2128,7 +2139,7 @@ FAILURE rather than an exit — for the items in
 `archive/reelcut-remaining.md` that are APP arithmetic or an app PICTURE no
 tool reaches. One section per item, and one binary answering all of them by
 a request `mode`, so the next item adds a `case` and a `section_…` without
-touching the others: section 1 is §2b's naming (70 checks with the build
+touching the others: section 1 is §2b's naming (76 checks with the build
 check), sections 2–5 are §2a's cache marker on the app side and road map
 3's held tail seen from the strip (100).
 `--sources DIR` (or `RC_APP_SOURCES`, the spelling `phase9_chrome.py` uses
@@ -2140,8 +2151,8 @@ Both sites the item named are PANEL-only —
 when the Format popup moves, and
 `exportCaptionsCommand` seeds that field from the document's title — and the
 MCP path never comes near either: `export_captions` goes through
-`AgentServer.destinationURL`, which strips only a member of
-`replaceableExtensions` and appends otherwise, so `{path: "Board v1.2"}` wrote
+`AgentServer.captionDestinationURL` (before B44, `destinationURL`), which
+strips only a member of its set and appends otherwise, so `{path: "Board v1.2"}` wrote
 `Board v1.2.srt` before the fix and after it, and an MCP check for that name
 passes against the unfixed build. What can see it is the shape
 `FrameWriter.renamed` chose in phase 7 for the same defect, a pure function of
@@ -2151,7 +2162,8 @@ second list, and fourteen rows, of which `Board v1.2` + SubRip →
 `Board v1.2.srt` is the one a bare `deletingPathExtension` fails; a foreign
 extension is KEPT (`talk.txt` → `talk.txt.srt`, the file the tool writes for
 that path), the suffix is compared lower-cased, and `chart.png` + SubRip →
-`chart.png.srt` pins the recorded divergence from MCP's `chart.srt`. **1b**:
+`chart.png.srt` is the name MCP writes too since B44 (spec §11 #43; it wrote
+`chart.srt` before). **1b**:
 `FrameWriter.renamed`, nine rows over the same shape — its docstring has said
 since phase 7 that a probe compiled from `app/Sources` calls it with a table
 of names, and none did until this one. **1c**:
@@ -2163,18 +2175,22 @@ live documents — a fresh `ProjectDocument()` and one told it lives at
 `Board v1.2.reelcut` — because a static function nobody calls is not a fix.
 **1e** is a STRUCTURAL read, and it is there because a behavioural probe
 cannot see whether a panel's private method calls the helper: it reads the
-four function bodies out of the sources it compiled and asserts each names its
+five function bodies out of the sources it compiled (B44 added the tool's
+`exportCaptions`, which must call `captionDestinationURL(`) and asserts each names its
 helper and carries no `deletingPathExtension` of its own, and that each file
 holds exactly the bare count it is allowed. `phase7_chrome.py`'s
 `destinationProperties != nil` is the precedent, and it is weaker than a
-behaviour and said to be. **1f** pins the one rule three documents state and
-nothing had checked — `knownExtensions` ⊆ `AgentServer.replaceableExtensions`,
-without which the panel and the tool would name one file two ways: rows built
-FROM `knownExtensions` (not a second list) call `destinationURL` with each
-member asked for as the other format, upper-case too, and assert the strip
-(`x.srt` + WebVTT → `x.vtt`, `x.vtt` + SubRip → `x.srt`) against a non-member's
-append (`x.txt` + SubRip → `x.txt.srt`), plus a coverage check that every
-member read off the type has a row.
+behaviour and said to be. **1f** pins the tool's half of the one rule:
+since B44 (spec §11 #43) `export_captions` replaces exactly
+`knownExtensions`, through `AgentServer.captionDestinationURL`, so the panel
+and the tool name one file one way. Rows built FROM `knownExtensions` (not a
+second list) call `captionDestinationURL` with each member asked for as the
+other format, upper-case too, and assert the strip (`x.srt` + WebVTT →
+`x.vtt`, `x.vtt` + SubRip → `x.srt`) against a non-member's append (`x.txt` +
+SubRip → `x.txt.srt`, and `chart.png` + SubRip → `chart.png.srt`, which
+`replaceableExtensions` would make `chart.srt`), plus a coverage check that
+every member read off the type has a row. Before B44 the rows called
+`destinationURL` and pinned `knownExtensions` ⊆ `replaceableExtensions`.
 
 Made to fail, four ways, each a copy of `app/Sources` under
 `work/remainingprobe/mutants/` and the script pointed at it with `--sources`;
@@ -2194,7 +2210,14 @@ correct helpers beside it is the unfixed defect with a proof next to it.
 `no-vtt` (`vtt` removed from `replaceableExtensions`) scores **106/108** and
 takes exactly the two `x.vtt` + SubRip rows — the pair the tree had never
 pinned, since `phase4_proof.py` asks a `.srt` path for WebVTT and nothing had
-asked a `.vtt` path for SubRip. The probe builds in about 45 s and the tree's
+asked a `.vtt` path for SubRip (measured when 1f read `destinationURL`).
+B44's two, scored at 176: `caption-shared` (`captionDestinationURL` on the
+two-argument `destinationURL`) scores **175/176** and takes only 1f's
+`chart.png` row; `export-unwired` (`exportCaptions` back on the
+two-argument `destinationURL`) scores **175/176** and takes only 1e's
+`exportCaptions` call row. HEAD's `app/Sources` before B44 is a scored build
+failure, **0/1** (`type 'AgentServer' has no member
+'captionDestinationURL'`). The probe builds in about 45 s and the tree's
 cached binary is reused across runs.
 
 Sections 2–5 are the half of §2a's completion marker that a running instance
@@ -4225,6 +4248,12 @@ env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only keyl
 env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --sources /Users/kevingalligan/.codex/litecode/reelcut/fix-remaining-bugs-series/03-issue-30/baseline/app/Sources --only stamp
 ```
 
+Every run first takes the cloud instruments' lock (row L, issue batch B43):
+an exclusive `flock` on `<getconf DARWIN_USER_TEMP_DIR>/reelcut-cloud-captions.lock`,
+which `cloud_captions_proof.py` and `word_captions_proof.py` take too. It
+waits up to `--lock-wait` seconds (default 3600), prints the wait, and
+starts `--wall` only once the lock is held.
+
 The `submission` section checks one POST and exact uploaded-URL selection
 through dropped, timed-out, server and unreadable replies; first-page lag,
 malformed or hostile rows, auth refusals and bounded exhaustion. Its
@@ -4283,9 +4312,11 @@ run DID print, on the fix-pass tree, is each section's own total:
 **27/27**.
 
 Thirteen sections: `mapping` (5i·12), `jobs` (spec §11's R6-10 — a clip `speed`
-the OPS cannot write and the CORE's reader accepts, spliced into a project's
-JSON text, read back through `ReelProject.from(json:)` and driven through
-`Transcriber.jobs` and both mappings, ONE CHILD PROCESS PER SPEED because an
+the OPS cannot write and the CORE's reader refuses, spliced into a project's
+JSON text, refused by `ReelProject.from(json:)` naming the clip and the value
+(#41), then decoded WITHOUT the reader and driven through `Transcriber.jobs`
+and both mappings — 39/39 over `--only jobs` on 2026-10-01 — ONE CHILD
+PROCESS PER SPEED because an
 unclamped `Ticks(_:)` traps and a trap has to be that speed's own scored
 failure), `stamp` (13), `client` (15, over an injected `URLProtocol` with no
 socket), `cancel` (16, against the fake), `secrets` (17 and R6-9's three
@@ -4389,7 +4420,7 @@ exactly once (2026-09-20, against 186):
 | `stamp-drops-field` | `speaker_labels` dropped from the stamp | 185/186 |
 | `no-speed-guard` | the degenerate-speed guard removed from the mapping | 14/15 over `--only mapping` |
 | `no-speed-clamp` | R6-10's clamp removed from `Transcriber.placed` | 1/2 over `--only mapping` — it TRAPS at the first request, which is the point |
-| `no-length-clamp` | R6-10's bound removed from `Transcriber.contentLength` | 28/30 over `--only jobs` |
+| `no-length-clamp` | R6-10's bound removed from `Transcriber.contentLength` | 29/31 over `--only jobs` (2026-10-01, after #41: 1e300 traps and greatestFiniteMagnitude's source-length row fails) |
 
 **Host-state inputs.** `say` makes the speech fixture (road map 4's text) and
 its absence skips the whole `extract` section by name. `ffmpeg`, when it is
@@ -4641,10 +4672,12 @@ already there. **No live call was made and nothing was spent.**
 (unset ANTHROPIC_API_KEY RC_ASSEMBLYAI_KEY; python3 tools/proof/makefile_env_proof.py)
 (unset ANTHROPIC_API_KEY RC_ASSEMBLYAI_KEY; python3 tools/proof/makefile_env_proof.py --mutant no-unexport)
 (unset ANTHROPIC_API_KEY RC_ASSEMBLYAI_KEY; python3 tools/proof/makefile_env_proof.py --mutant no-unexport-anthropic)
+(unset ANTHROPIC_API_KEY RC_ASSEMBLYAI_KEY; python3 tools/proof/makefile_env_proof.py --no-sweep --wall 30)   # the sweep's CONTROL
 ```
 
-**3/3** on the tree, and **2/3** under each mutant (road map 12 A1 part 2
-added the Anthropic key). It builds a tree COPY at
+**4/4** on the tree and **3/4** under `--mutant no-unexport` (issue batch
+B42's runs, 2026-10-01, 587 files read; road map 12 A1 part 2 added the
+Anthropic key, and B42 the sweep row). It builds a tree COPY at
 `tools/proof/work/makefile-env/tree` with `tree_copy.make_copy`: `app/`,
 `project.yml` and `Makefile` are copied; every other build input
 `project.yml` names is a SYMLINK to the tree's (`core` already built, so the
@@ -4659,12 +4692,20 @@ searches every file under the copy's `build/` and `Reelcut.xcodeproj/`
 nothing else; the person's own values are never read, printed or searched
 for.
 
-Three rows:
+Four rows:
 - The copy's `make app` made `Reelcut.app`'s binary. A failed build holds
   nothing, and "no file holds the dummy" would be true of it for the wrong
   reason.
-- **No file of 553 holds the AssemblyAI dummy.**
-- **No file of 553 holds the Anthropic dummy.**
+- No process whose cwd or command line lies under the copy outlives its
+  `make app` (#191). After `make app` returns — built, failed or past its
+  `--wall` — the SWEEP SIGKILLs every process whose cwd (`lsof`) or command
+  line (`ps`) names the copy, and rescans every second until two scans in a
+  row find none or 30 s pass. It never selects by name, and spares this
+  run's own ancestors and any process older than this run's `make app`.
+  `--no-sweep` is its CONTROL: the row is scored on one scan straight after
+  `make app` returns, and the sweep runs afterwards anyway.
+- **No file of 587 holds the AssemblyAI dummy.**
+- **No file of 587 holds the Anthropic dummy.**
 
 Each `unexport` directive is asserted to occur exactly once in the tree's
 `Makefile`. `--mutant no-unexport` removes `unexport RC_ASSEMBLYAI_KEY` in
@@ -5097,7 +5138,243 @@ No mutant run exited 2.
 leave and look for `reelcut-upload-*` in the same `NSTemporaryDirectory()`:
 a baseline run of both in parallel failed six probe rows (KL's three, R6-14's
 three cancel rows) and the proof's row T on each other's extracts. Run
-alone, the same tree scored 762/762 and 201/201.
+alone, the same tree scored 762/762 and 201/201. Since issue batch B43 the
+three cloud instruments take turns through one lock (row L, below), so a
+second one launched beside a first waits for it rather than sharing its
+folder.
+
+### Issue batch B35 — cloud captions: a Stop bounds an in-flight DELETE; the submit line
+
+#187's item 5 and the Transcribe sheet's submit line (spec §11 R6-19). Every
+DELETE a keyed run sends — the janitor's, `refusing`'s, `fetch`'s — reads the
+run's token as a STOP: never cut at the press, cut `deleteAfterStop` (2 s) of
+wall clock after the later of the Stop and its own start, answering `failed`
+and so owed under R6-4. The sheet's detail line names the submit
+(`Submitting <file>`, at the upload's end) and spells a count under a
+megabyte `<1`. **No live call was made and nothing was spent**: every row
+runs against `assemblyai_fake.py`, with `RC_ASSEMBLYAI_KEY` unset.
+
+```sh
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only client,cancel,run,stop
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --port-base 4985
+```
+
+- **Section `client`.** `Tuning.shipped.deleteAfterStop` is R6-19's 2.
+- **Section `cancel`, SD1–SD3** (`deleteTimeout` 5, `deleteAfterStop` 1).
+  SD1: a Stop 0.5 s into a DELETE whose reply the fake drips a byte every
+  100 ms answers `failed` 1.56 s after the call (CONTROL: the drip began and
+  never finished). SD2: a token cancelled BEFORE a DELETE the fake stalls
+  0.5 s still answers `deleted`, and the fake deleted the id (CONTROL: it
+  waited ≥ 0.45 s). SD3: a Stop during polling against a dripping DELETE
+  answers `cancelled` in 1.58 s (CONTROL: one DELETE, dripping).
+- **Section `run`.** P: two table rows for `.submitting` (the oracle holds
+  it at 0.65 of the media's slice); P·small, the seven pinned lines
+  (`0 MB of 0`, `0 MB of <1`, `<1 MB of <1`, `<1 MB of 1`, `1 MB of 1`,
+  `41 MB of 115`, `Submitting intro.mov`); the run's bands gain
+  `Submitting` at 0.65; P·submit, per media, `Submitting <file>` after its
+  last Uploading line and before its first Waiting line, at
+  `base + share × 0.65`. J3: a Stop 0.3 s after the janitor's DELETE
+  arrives, its 22-byte 404 dripped a byte a second, ends the run
+  `cancelled` in 1.6 s with media 11 in `janitorFailed`, nothing in
+  `janitorDeleted`, "it will be retried at the next run with an API key"
+  on the card, and `11.json` byte for byte (CONTROL: one DELETE, dripping).
+- **Section `stop`.** ST·drip (new): Stop during `fetch`'s DELETE, dripped
+  every 100 ms, finished 2.14 s after the press with the file and marker
+  cached, `remote_deleted` false and the retry sentence on the card.
+  ST·submit's new row: the detail at the press was `Submitting
+  speech.aiff` (it read `Uploading speech.aiff · 0 MB of 0` before this
+  batch); `chromeStop` turns the run loop once for 0.05 s before reading
+  it. **ST·save's stall went from 3 s to 1 s**, and its Stop→finish from
+  3.01 s to 0.96 s: a 3 s stall outlasts R6-19's 2 s bound, which would cut
+  the DELETE and make the row's `remote_deleted: true` claim false; at 1 s
+  the DELETE lands inside the bound, which is what the row is about. Its
+  band is now 0.5–2.5 s (was 1.0–8.0).
+
+**The run table** (2026-09-30, at `a861f8c` plus this batch):
+
+| Command | Printed answer |
+|---|---|
+| `make typecheck` | 0 errors, 4 warnings (the baseline); tsc clean |
+| `make test` | exit 0 |
+| `make app` | BUILD SUCCEEDED |
+| `cloud_captions_probe.py` (full) | **826/826**, exit 0, in 506 s. Baseline at `a861f8c` was 801/801 in 554 s; this batch adds 25 rows (client 1, cancel 6, run 11, stop 7) |
+| `cloud_captions_proof.py --port-base 4985` | **205/205**, exit 0, in 80 s. Baseline was 205/205 in 88 s |
+| `grep "Reelcut: " /tmp/reelcut-498[5-9].log` | nothing |
+| probe `--only cancel,run,stop --mutant delete-deaf-to-stop` | 93/101, exit 1 (SD1 ×2, SD3, J3, ST·drip ×4) |
+| probe `--only cancel,run,stop --mutant delete-cut-at-once` | 90/101, exit 1 (16's poll-cancel DELETE, SD1, SD2 ×2, SD3's CONTROL, ST·save ×3, ST·submit, ST·wait, ST·drip) |
+| probe `--only cancel,run,stop --mutant janitor-stop-dropped` | 100/101, exit 1 (J3) |
+| probe `--only cancel,run,stop --mutant refusing-stop-dropped` | 100/101, exit 1 (SD3) |
+| probe `--only cancel,run,stop --mutant fetch-stop-dropped` | 97/101, exit 1 (ST·drip ×4) |
+| probe `--only cancel,run,stop --mutant submit-line-missing` | 98/101, exit 1 (P·submit ×2, ST·submit's detail) |
+| probe `--only cancel,run,stop --mutant sub-megabyte-rounds` | 100/101, exit 1 (P·small) |
+| probe `--only client,cancel,stop --mutant z2-throw-without-delete` (re-aimed) | 72/85, exit 1 |
+| probe `--only client,cancel,stop --mutant z12-no-ceiling` (re-aimed) | 84/86, exit 1 |
+| probe `--only client,cancel,stop --mutant cancel-orphans-transcript` (re-aimed) | 81/85, exit 1 |
+| probe `--only client,cancel,stop --mutant echoed-id-trusted` (re-aimed) | 83/85, exit 1 |
+| probe `--only echo --mutant words-unrefused` (re-aimed) | 17/19, exit 1 (E3 ×2) |
+| proof `--mutant no-delete` (re-aimed) | 176/192, exit 1 |
+
+No mutant run exited 2. The proof's `z2-throw-without-delete` and
+`z12-no-ceiling` were re-aimed at the same texts as the probe's and pass
+the anchor check (each text occurs once); they were not run.
+
+### Issue batch B43 — cloud captions residue: a refused transcript's DELETE answer, every word string, bounded server strings, one lock
+
+#200 and #201 (spec §11 R6-20, R6-21). `refusing` answers a `Refusal`
+carrying its DELETE's answer, and a `failed` one puts the media in
+`Report.refusedUndeleted`, which `deletionWarnings` reports with R6-4's
+dashboard sentence and never the retry one (R6-20). `fetch` reads every
+decoded string of a word for the key (`TranscriptWord.stringFields`: the
+text and the speaker today), and bounds the model and the language the
+server names at 64 Unicode scalars — 63 and "…" — after filtering them.
+The probe's section `cancel` no longer returns early, so SD1–SD3 are scored
+whatever the poll-cancel row answered. The probe, the proof and
+`word_captions_proof.py` take turns through one `flock` (row L). Caches
+written before B34 are not re-checked (R6-21, accepted). **No live call was
+made and nothing was spent**: every row runs against `assemblyai_fake.py`,
+with `RC_ASSEMBLYAI_KEY` unset.
+
+```sh
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --port-base 4975
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/word_captions_proof.py 4891
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only echo --mutant speaker-unchecked
+```
+
+- **L** (all three instruments). An exclusive `flock` on
+  `<getconf DARWIN_USER_TEMP_DIR>/reelcut-cloud-captions.lock`, polled about
+  once a second for up to `--lock-wait` seconds (default 3600), holding
+  `<pid> <script>` once held. The probe and the proof take it before a
+  mutant is prepared or built; `word_captions_proof.py` before its binary
+  check, its fake and its instance. `--wall` and the printed seconds start
+  once it is held. Not `TMPDIR`: `NSTemporaryDirectory()` ignores it on this
+  host (measured 2026-09-25, above), so a per-run `TMPDIR` would change
+  nothing.
+- **Section `cancel`.** 16·R: the poll-cancel's refusal carries `deleted`.
+  SD3·R: SD3's cut DELETE is `failed`.
+- **Section `cache_write`, RF1–RF4.** RF1: an `error` transcript whose
+  DELETE answers 500 always is `refusedUndeleted == [1]`, with the
+  dashboard sentence in `cloudFailure` and on the card and the retry
+  sentence in neither (CONTROL: one DELETE, of the served id). RF2, a
+  CONTROL: the same with the DELETE answering owes nothing. RF3: E3's key
+  words with the DELETE failing — `[1]`, the dashboard sentence, and the key
+  in no output. RF4: a Stop 0.3 s after the first poll, `never_complete`,
+  DELETE 500 — `cancelled`, `[1]`, and the dashboard sentence on the card.
+- **Section `echo`, E6–E8.** E6: a word whose `speaker` is the key, served
+  ESCAPED through the fake's new `words_json` key, is refused, nothing is
+  written and the transcript is DELETEd (CONTROL: the served bytes lack
+  `proof-key`). E7, a CONTROL: a speaker one letter off completes and
+  `1.json`'s words are the served bytes, escape and all. E8: a
+  5000-character model and language are 63 characters and "…" in the
+  report, both tool keys, the note, the card and the cache header
+  (CONTROL: 64 characters are kept whole).
+- **The proof, RF·MCP** (instance C, after row 6). An `error` transcript
+  whose DELETE answers 500: `transcribe`'s refusal holds the dashboard
+  sentence for that media and no retry promise, and the fake logged the
+  DELETE; its CONTROL with the DELETE answering has no dashboard sentence.
+
+**The run table** (2026-10-01, at `0ed6911` plus this batch):
+
+| Command | Printed answer |
+|---|---|
+| `make typecheck` | 0 errors, 4 warnings (the baseline); tsc clean |
+| `make test` | exit 0 |
+| `make app` | BUILD SUCCEEDED |
+| `cloud_captions_probe.py` (full, alone) | **847/847**, exit 0, in 497 s; waited 0.0 s for the lock |
+| `cloud_captions_proof.py --port-base 4975` (alone) | **209/209**, exit 0, in 78 s; waited 0.0 s |
+| `word_captions_proof.py 4891` (alone) | **20/20**, exit 0, in 10 s; waited 0.0 s |
+| `grep "Reelcut: " /tmp/reelcut-497[5-9].log /tmp/reelcut-4891.log` | nothing |
+| the probe (background) and the proof `--port-base 4975` (foreground) launched together | proof waited 0.0 s, 209/209, exit 0, in 80 s; probe **waited 80.6 s**, 847/847, exit 0, in 151 s |
+| proof `--lock-wait 0` while that probe held the lock (a CONTROL) | 0/1, exit 1: `L` FAIL, "still held by 85031 cloud_captions_probe.py" |
+| `word_captions_proof.py 4891 --lock-wait 0` while that probe held the lock (a CONTROL) | 0/1, exit 1: `L` FAIL naming the same holder; no instance launched (`/tmp/reelcut-4891.log` untouched) |
+| probe `--only echo --mutant speaker-unchecked` | 29/30, exit 1 (E6) |
+| probe `--only echo --mutant model-unbounded` | 27/30, exit 1 (E8's three model rows) |
+| probe `--only echo --mutant language-unbounded` | 27/30, exit 1 (E8's three language rows) |
+| probe `--only cancel,cache_write --mutant refusal-answer-dropped` | 53/58, exit 1 (RF1 ×2, RF3, RF4 ×2) |
+| probe `--only cancel --mutant poll-cancel-traps` (a CONTROL) | 10/12, exit 1: the poll-cancel and SD3 rows "answers" FAIL on the trap, and SD1 ×2 and SD2 ×2 printed and scored ok |
+| probe `--only client,cancel,echo,stop --mutant z2-throw-without-delete` (re-aimed) | 99/116, exit 1 (15 ×9, 16's DELETE, 16·R, SD3's CONTROL, SD3·R, E3, E6, ST·submit, ST·wait) |
+| probe `--only cancel --mutant refusing-stop-dropped` (re-aimed) | 15/17, exit 1 (SD3, SD3·R) |
+| probe `--only echo --mutant words-unrefused` (re-aimed) | 27/30, exit 1 (E3 ×2, E6) |
+| probe `--only echo --mutant model-unfiltered` (re-aimed) | 25/30, exit 1 (E1 ×3, E2's card, E1/E2's output) |
+| probe `--only echo --mutant language-unfiltered` (re-aimed) | 25/30, exit 1 (E1's note and card, E2 ×3, E1/E2's output) |
+| proof `--mutant refusal-answer-dropped` | 208/209, exit 1 (RF·MCP) |
+
+No mutant run exited 2. The proof now takes `z2-throw-without-delete` and
+`refusal-answer-dropped` from the probe's table rather than spelling them a
+second time; its own Z2 spelling is gone.
+
+### Issue batch B46 — speaker colours on Subtitles (#93)
+
+Spec §11 R6-22. With Speakers on, each speaker's Subtitles cues are placed in
+`CaptionStyle.speakerPalette`'s white, yellow, cyan, green, by first
+appearance in timeline order; a cue with no speaker writes no `color`. The
+fake gains `speaker_words`, served (bytes and `text`) only to a transcript
+whose request had `speaker_labels: true`. **No live call was made and
+nothing was spent**: every row runs against `assemblyai_fake.py`, with
+`RC_ASSEMBLYAI_KEY` unset.
+
+```sh
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only speakers
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only speakers --mutant speaker-label-only
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only speakers --fake-mutant speaker-labels-ignored
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --mutant speaker-palette-shifted
+```
+
+- **The probe's section `speakers`** (SP1–SP4, mode `speakers` and chrome
+  op `speakers`). SP1: seven Subtitles cues emitted out of time order, keyed
+  by time `(1,B) (1,A) (1,B) (2,A) (2,C) (1,C)` and one with no speaker,
+  place white, yellow, white, cyan, green, white, and the nil cue's patch
+  has no `color` key; every expectation is computed in Python. SP2: each of
+  the five word styles places the same ops with speakers as with them
+  stripped. SP3: the same `PROBE_SOURCE` built against
+  `BASELINE_TREE_SPEAKERS` (`ef54f48e`, B46's starting working tree, a tree
+  object written with a temporary index) with
+  `-D CLOUD_PROBE_BEFORE_SPEAKERS`: nil-speaker cues, Subtitles and
+  Highlight, place byte-identical ops; CONTROL, SP1's speaker cues do not.
+  A baseline that will not build is a scored FAIL. SP4: the Generate
+  Captions sheet itself (Engine AssemblyAI, Style Subtitles, Speakers set,
+  `startClicked`) against the fake's `speaker_words`: Speakers on leaves
+  caption clips white then yellow in `editedProject.json`, with a CONTROL
+  that the submit asked for `speaker_labels: true`; Speakers off leaves
+  project JSON byte-equal to the baseline probe's same run.
+- **The proof's row SC** (instance C, after row B), over `speech.mov` at 5 s
+  and row 7's A/B split. SC1: `transcribe {speakers: true}` places "Hello
+  there" `[1,1,1,1]` and "everyone welcome back" `[1,1,0,1]`. SC2: each
+  cue's midpoint rendered, then `undo` and the same ticks; glyph pixels
+  (differing, max(R,G) ≥ 200) measured 1327 for the white cue, all blue-rich
+  (B ≥ 200), and 2769 for the yellow, none; pinned at ≥ 50 % and ≤ 5 %.
+  SC3: `speakers` absent places the same `text` objects as a control
+  session with no `speaker_words`, all white. SC4: one speaker throughout
+  places the control's `text` objects and renders its frame byte for byte.
+- **What the persisted project cannot see.** It cannot tell an explicit
+  white from an absent `color`: `TextProps`' default colour is white
+  (`core/src/model_text.rs:109`) and `color` is always serialised. So SP4
+  and SC cannot see a nil-speaker cue given palette[0]; only the ops-level
+  rows SP1 and SP3 can, which is why `speaker-colour-on-nil` targets those
+  two alone.
+
+**The run table** (2026-10-01, at `b6e4636` plus this batch):
+
+| Command | Printed answer |
+|---|---|
+| `make typecheck` | 0 errors, 4 warnings (the baseline); tsc clean |
+| `make lint`, `make test` | exit 0 |
+| `make app` | BUILD SUCCEEDED |
+| `cloud_captions_probe.py` (full) | **861/861**, exit 0, in 402 s |
+| `cloud_captions_probe.py --only speakers` | 16/16, exit 0 |
+| probe `--only speakers --mutant speaker-colour-dropped` | 13/16, exit 1 (SP1's colours, SP3's CONTROL, SP4·on) |
+| probe `--only speakers --mutant speaker-colour-on-nil` | 14/16, exit 1 (SP1's nil cue, SP3·subtitles) |
+| probe `--only speakers --mutant speaker-label-only` | 15/16, exit 1 (SP1's colours) |
+| probe `--only speakers --mutant speaker-colour-word-styles` | 11/16, exit 1 (SP2 ×5) |
+| probe `--only speakers --fake-mutant speaker-labels-ignored` | 15/16, exit 1 (SP4·off) |
+| `cloud_captions_proof.py` (full) | **213/213**, exit 0, in 86 s; every instance's `grep "Reelcut: "` empty |
+| proof `--mutant speaker-palette-shifted` | 210/213, exit 1 (SC1, SC2, SC4) |
+| proof `--fake-mutant speaker-labels-ignored` | 212/213, exit 1 (SC3) |
+| `word_captions_proof.py 4871` | 20/20, exit 0 |
+| `word_captions_probe.py` | 15/15, exit 0 |
+| `word_captions_chrome.py` | 31/31, exit 0 |
+
+No mutant run exited 2.
 
 ### Road map 7 part 6 — core argument contract
 
@@ -5846,10 +6123,14 @@ on "when place is true" (nit 4: "place" is a substring of "replace"); G6 `apple`
 `one_word` over the `say` pangram; G7 `tools/list`; G8 `speech.mov` split
 at its midpoint, then `highlight` — no `trimmed`, no `skipped`, every page
 inside one clip — and `pill` with `replace: true`. Then `grep "Reelcut: "`
-on its log.
+on its log. Row L (issue batch B43) comes first: G3's cloud engine writes
+`reelcut-upload-*`, so the proof takes the cloud probe's lock before it
+launches anything, waiting up to `--lock-wait` seconds (default 3600); an
+expired wait is a scored FAIL naming the holder, with no instance launched.
 
 ```sh
-env -u RC_ASSEMBLYAI_KEY python3 tools/proof/word_captions_proof.py 4891   # → 19/19
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/word_captions_proof.py 4891   # → 20/20
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/word_captions_proof.py 4891 --lock-wait 0
 ```
 
 
@@ -6558,7 +6839,9 @@ scored. Exit 0 iff no row failed. A screen fails on a front-block problem
 README's "Running one" recipe), a tool error, a failed `expect` (its files
 deleted), or a sheet left attached (closed with `cancel_sheet`; one that will
 not close fails every later screen). Layout problems are classified against
-`KNOWN` (empty since #70 was fixed) and new ones are reported, never scored.
+`KNOWN` (no filed defect since #70 was fixed; one deliberate finding, the Media
+pane's section bars' 10 pt `BarView` overhang, `MediaPane.bar`) and new ones
+are reported, never scored.
 
 **Outputs** in `<out>`: `<id>.<capture>.<light|dark>.png` and `.layout.json`,
 `screens.md`, `results.json` (the rows and, per capture, its PNG's sha256, scale,
@@ -6870,7 +7153,7 @@ python3 tools/proof/assistant_session_proof.py --mutant no-prepare   # W FAIL, e
 
 ## Road map 12's A2 — the Assistant tab (assistant_tab_proof.py, assistant_tab_probe.swift)
 
-The inspector's fourth tab (spec §11 AI-4, AI-7, AI-8, AI-11, AI-14, AI-17), read
+The inspector's fourth tab (spec §11 AI-4, AI-7, AI-8, AI-11, AI-14, AI-17, AI-19), read
 back two ways: a probe for the arithmetic and structure no script reaches,
 and the built Release app driven through the tab's OWN controls. It works in
 `work/assistant_tab/` and reuses `assistant_session_proof.py`'s stand-in,
@@ -6895,7 +7178,9 @@ and `RC_ASSISTANT_BASE_URL=http://127.0.0.1:9`:
   `Declined (stop):` with the question's sentence; the error), the usage,
   two `extended` changes, `argumentSummary`'s `""` / 70-character cut, and
   Clear and `endConversation` keeping the window size.
-- **P2** the meter's three figures.
+- **P2** the meter's three figures, and (issue batch B37, #182) its three
+  ladders — 5,000 of 200,000, 5,000 with no limit, nothing reported — each
+  exactly its rungs.
 - **P3** `showAssistant`: the Assistant tab, the composer first responder.
 - **P4** on an `AssistantView` in a window of its own: an idle Return sends
   and empties the composer (the control); with a question shown, Return
@@ -6920,12 +7205,20 @@ and `RC_ASSISTANT_BASE_URL=http://127.0.0.1:9`:
   own `keyDown` leave exactly `"a\nb\nc\nd\ne"` (no U+2028, nothing
   sent), ⇧ keypad Enter a `"\n"`; Tab and ⇧Tab leave the string unchanged;
   the field is 26 pt empty, strictly taller through five lines and the same
-  at six; with every kind of entry, a cost, a question and five lines,
+  at six; with every kind of entry, a usage reported (5,000 of 200,000;
+  issue batch B37, #182), a cost, a question and five lines,
   `UISnapshotLayout.report` finds no problem, and
   `work/assistant_tab/probe/looks/assistant-light|dark.png` is written (over
   the window background, since `cacheDisplay` draws views only; a layer
   border, the field's included, is not in a `cacheDisplay` capture); a bare
   Return sends the whole text once and the field is "" at 26 pt again.
+  Then (B37, #182) the meter at that width, each usage through
+  `apply(.usage)` and one `layoutIfNeeded()`: for 5,000 / 200,000,
+  123,456 / 1,000,000 and 5,000 with no limit the `assistant.context` label
+  shows a rung of `figureLadder` whose intrinsic width fits its frame, never
+  the full figure for the first, with the full figure as its tooltip, and the
+  meter's own width is the same for all three; widened to 480 (the control)
+  it shows the full figure, fitting.
 - **P10** (#153, AI-17) the transcript is ONE text view: `reload` of five
   kinds (the person's two lines) gives it the texts joined by `"\n"`; the
   layout dump's `assistant.entry.<kind>` part records are those kinds and
@@ -6948,6 +7241,41 @@ and `RC_ASSISTANT_BASE_URL=http://127.0.0.1:9`:
   undo; `string = "x"` drops the composer's undo. Measured on the way:
   `NSWindow`'s own `undo:` reads the WINDOW's manager, so without the
   composer's own `undo:` the document's marker ran.
+- **P12** (issue batch B37, #182) one person entry in an `AssistantView`
+  304 wide, the window 520, 720 then 420 pt high, one `layoutIfNeeded()`
+  each: the transcript's text view is as tall as its clip view, and the
+  point 4 pt above the clip view's bottom centre — below the entry, the
+  control — hit-tests to the text view, not the clip view.
+- **P13** (B37, #182 item 4) light, at 480 wide: the composer emptied, its
+  `placeholderRect` is one line height high, at the text container's origin,
+  and wider than 0; and the field for a 41-character message is one line
+  high at 480, two at the minimum width less a legacy scroller and one at
+  480 again, one `layoutIfNeeded()` each — a guard of the refit inside the
+  field's `layout()` (#182 item 3 accepted in issue batch B47, where a refit
+  from `AssistantView.layout()` lagged a pass).
+- **P14** (issue batch B47, #152, spec §11 AI-19) the probe ALONE under
+  `--badge <path> --fonts app/Resources/Fonts` (every face registered, as
+  the harness's `registerFonts`), against the stand-in scripted to ask for
+  `export` to `work/assistant_tab/p14/P14.mp4` twice, light, in a real
+  editor window: before any send the tab is Clip, `assistantView` nil and
+  the dot hidden; asking, the dot shows on Clip, then Media, then
+  Assistant; `assistantAnswer(false)` hides it at once and it stays hidden
+  once idle; a second question shows it and `assistantStop()` hides it; with
+  `SourceSans3-SemiBold` registered, at strip widths 280 and 480 the
+  `dotRect` is inside the Assistant tab's `tabRect` with ≥ 1 pt to its
+  trailing edge and ≥ 1 pt right of the `titleRect`; `cacheDisplay` of the
+  inspector with the dot hidden and with the badge removed is
+  byte-identical, and with it shown differs inside the dot's rect (outset
+  1 pt) and nowhere else, written to `probe/looks/badge-light.png`; no
+  file; and no failure in the stand-in's log.
+- **P15** (B47, #203) an `AssistantView` at the minimum width less a legacy
+  scroller (P9's window and backdrop), light, `reload`ed with seven costs —
+  none; priced 0.0018; priced 0.00002; partial 0.1234; partial 12.3456;
+  unknown alone; priced 0.0123 then unknown: the `assistant.spend` label
+  shows a rung of `figureLadder` that fits its frame, ends `" · Reelcut's
+  estimate"` once a response is counted, its tooltip `figureTooltip`; the
+  row's width is the same for all seven; at 480 (the control) each shows
+  `figure` exactly, fitting.
 
 **Live A** (`-AgentServerEnabled YES`, port 4874, `proof-key` in
 `-RCSecretFolder`, `RC_ASSISTANT_BASE_URL` at the stand-in,
@@ -6979,6 +7307,11 @@ and `RC_ASSISTANT_BASE_URL=http://127.0.0.1:9`:
   user text ends with `</reelcut_context>\n` and the text, intact; the
   dump's last person entry is the text; the composer is empty; no layout
   problem in the tab.
+- **L8** (B47, #152, AI-19) a question through the pane: the dump's
+  `inspector.assistant.badge` visible on the Assistant tab; after
+  `select_inspector_tab {tab: "clip"}` visible with no layout problem on
+  it; `assistant_answer {answer: "deny"}` without `pane`: `finished`, the
+  dot present and hidden, no file; then back to the Assistant tab.
 - **K** `proof-key` in no MCP answer, no layout dump and not the log.
 
 **Launch B**, **N1** (the variable set, NO `-RCSecretFolder`: no key, AI-13;
@@ -6995,12 +7328,23 @@ run exits 1; a copy that did not build exits 2.
 **Mutant `flatten-send`** (issue batch B18): the same tree copy with
 `send()` joining the composer's lines with spaces before it trims
 (`TREE_MUTANTS`), `make app` there, then `open_tab` and L7 alone: L7 must
-FAIL. **Mutants `modified-return-sends`, `tab-types`, `no-entry-parts`,
+FAIL. **Mutant `no-badge-app`** (issue batch B47): the same tree copy with
+`assistantRefresh()`'s `showAssistantBadge` line deleted, then `open_tab`
+and L8 alone: L8 must FAIL. **Mutant `no-badge`**: that deletion in a copy
+of `app/Sources`, the probe built over it, P14 alone against the stand-in.
+**Mutants `modified-return-sends`, `tab-types`, `no-entry-parts`,
 `shared-undo`** (`MUTANTS`, each replacement made exactly once in a copy of
 `app/Sources`, the probe built over it): `.newline`'s arm calls
 `onReturn?()` (P9), `insertTab` calls `super.insertTab` (P9),
 `snapshotParts()` returns `[]` (P10), the composer's `undoManager` is
-`super.undoManager` (P11); each scores its row alone and must FAIL. Rule R:
+`super.undoManager` (P11); and (issue batch B37, #182) **`full-figure-only`**
+— the meter always shows `figures(usage)` (P9), **`short-transcript`** — the
+transcript's `setFrameSize` sets `minSize = .zero` (P12),
+**`no-width-refit`** — the composer field's `layout()` no longer calls
+`fit()` (P13), and **`tall-placeholder`** — `placeholderRect` is 40 pt high
+again (P13); and (B47, #203) **`full-spend-only`** — the Spend row always
+shows `cost.figure` (P15). Each
+scores its row alone and must FAIL. Rule R:
 exit 1 caught, 0 survived, 2 not performed — a mutant probe that did not
 build, or printed no row for its row, is an instrument failure (exit 2).
 
@@ -7020,15 +7364,45 @@ exit 1; `no-entry-parts` P10 FAIL (no part records), exit 1; `shared-undo`
 P11 FAIL (typing reached the document's manager: canUndo true), exit 1;
 `no-close-decline` P8 FAIL, exit 1; `no-forward` L2 FAIL, exit 1.
 
+Measured 2026-09-30 (issue batch B37), each run bounded by `perl -e 'alarm
+shift; exec @ARGV' 1800`. Before any `app/Sources` change, with only P9's
+usage reported: 20/21, P9 FAIL with one `truncated` problem on the figures
+label ("5,000 of 200,000 tokens · 2.5%", intrinsic 180.0 in a 152.5 frame),
+light and dark. After: 23/23, exit 0; P9's meter showed "5,000 / 200,000 ·
+2.5%" (132.0 in 136.0), "12.3%" and "5,000 tokens", the meter 209.0 wide for
+all three, and at 480 the full figure (180.0 in 184.0); P12's text view was
+418.0, 618.0 and 318.0 in clip views of the same heights, each hit on the
+text view; P13's `placeholderRect` was 15.0 high at y 5.0, and over the
+composer's unchanged `layout()` refit the field was 26.0 pt at 480, 41.0
+pt at the minimum width (the text view 173.0 wide), 26.0 pt at 480 again
+(scored from B37's review on).
+With the refit moved to the field's `setFrameSize` (B37's design for #182
+item 3, then reverted) an interim run traced 26.0, then 26.0 at the minimum
+width with the constraint already 41.0, then 41.0 back at 480: the frame
+followed one pass late. `full-figure-only` P9 FAIL, exit 1;
+`short-transcript` P12 FAIL (the text view 31.0 in a 418.0 clip view),
+exit 1; `no-width-refit` P13 FAIL (26.0 pt at the minimum width, the
+text view 156.0 wide), exit 1; `tall-placeholder` P13 FAIL (height 40.0),
+exit 1;
+`modified-return-sends` P9, `tab-types` P9, `shared-undo` P11 and
+`no-entry-parts` P10 FAIL, exit 1 each.
+
 ```sh
-python3 tools/proof/assistant_tab_proof.py                                  # 21/21
+python3 tools/proof/assistant_tab_proof.py                                  # 26/26
 python3 tools/proof/assistant_tab_proof.py --mutant no-forward             # L2 FAIL, exit 1
 python3 tools/proof/assistant_tab_proof.py --mutant flatten-send           # L7 FAIL, exit 1
+python3 tools/proof/assistant_tab_proof.py --mutant no-badge-app           # L8 FAIL, exit 1
 python3 tools/proof/assistant_tab_proof.py --mutant no-close-decline       # P8 FAIL, exit 1
+python3 tools/proof/assistant_tab_proof.py --mutant no-badge               # P14 FAIL, exit 1
+python3 tools/proof/assistant_tab_proof.py --mutant full-spend-only        # P15 FAIL, exit 1
 python3 tools/proof/assistant_tab_proof.py --mutant modified-return-sends  # P9 FAIL, exit 1
 python3 tools/proof/assistant_tab_proof.py --mutant tab-types              # P9 FAIL, exit 1
 python3 tools/proof/assistant_tab_proof.py --mutant no-entry-parts         # P10 FAIL, exit 1
 python3 tools/proof/assistant_tab_proof.py --mutant shared-undo            # P11 FAIL, exit 1
+python3 tools/proof/assistant_tab_proof.py --mutant full-figure-only       # P9 FAIL, exit 1
+python3 tools/proof/assistant_tab_proof.py --mutant short-transcript       # P12 FAIL, exit 1
+python3 tools/proof/assistant_tab_proof.py --mutant no-width-refit         # P13 FAIL, exit 1
+python3 tools/proof/assistant_tab_proof.py --mutant tall-placeholder       # P13 FAIL, exit 1
 ```
 
 ## Road map 12's A3 — the prompt (assistant_prompt_proof.py, assistant_prompt_probe.swift, assistant_prompt_eval.py)
@@ -8206,7 +8580,7 @@ instrument failure is a scored FAIL, exit 1.
 
 | Runner | caught / survived / not performed |
 |---|---|
-| `assistant_lane_proof.py`, `assistant_tab_proof.py`, `assistant_helper_proof.py`, `assistant_prompt_proof.py`, `assistant_session_proof.py`, `spend_proof.py`, `budget_proof.py`, `prices_proof.py`, `prices_crosscheck.py`, `makefile_env_proof.py`, `export_cancel_proof.py`, `video_configuration_proof.py`, `speed_sheet_probe.py`, `text_break_proof.py` and `name_field_proof.py` (each `--baseline`, B23; `--mutant`, B32), `obscure_handles_probe.py` (`--baseline` and `--mutant`, B25), `cache_pass_probe.py` (`--mutant`, B14), `assistant_compaction_proof.py` (`--mutant`, B26) and `relink_sheet_probe.py` (`--mutant`, B29) | 1 / 0 / 2 |
+| `assistant_lane_proof.py`, `assistant_tab_proof.py`, `assistant_helper_proof.py`, `assistant_prompt_proof.py`, `assistant_session_proof.py`, `spend_proof.py`, `budget_proof.py`, `prices_proof.py`, `prices_crosscheck.py`, `makefile_env_proof.py`, `export_cancel_proof.py`, `video_configuration_proof.py`, `speed_sheet_probe.py`, `text_break_proof.py` and `name_field_proof.py` (each `--baseline`, B23; `--mutant`, B32), `obscure_handles_probe.py` (`--baseline` and `--mutant`, B25), `cache_pass_probe.py` (`--mutant`, B14), `assistant_compaction_proof.py` (`--mutant`, B26), `relink_sheet_probe.py` (`--mutant`, B29) and `menu_undo_probe.py` (`--mutant`, B51) | 1 / 0 / 2 |
 | `spend_ui_proof.py` | 1 / 3 / 2 |
 | `graphics_proof.py`, `graphics_store_probe.py`, `words_picture_probe.py` | 0 / 1 / 2 |
 | `cloud_captions_proof.py`, `cloud_captions_probe.py` (`--mutant`, `--fake-mutant`), `recording_probe.py`, `phase9_chrome.py` — whole-suite mutants | the per-row count and a normal run's exit / 2 |
@@ -9587,3 +9961,762 @@ whose load average from other work ran 47–270:
 | `export_cancel_proof.py --port 4935 --only gate` | G1, G2, Z1 ok, exit 0 |
 | `--bench parive-promo.reelcut` (h264) | OFF 360.1 s, ON 47.34 s; 3 596 hits, 0 mismatched, 0 missed; masked DIFFERENT, as two OFF h264 exports also are |
 | `--bench … --preset prores_422` | OFF 445.75 s, ON 43.31 s; 3 596 hits; masked equal |
+
+## Issue batch B38 — the assistant Stop residue: ST's hour fixture, K1 last with its `key-echo` control, `transcribe`'s first-statement read (`assistant_session_proof.py` ST, K1, `--mutant key-echo`; #179 items 1, 2 and 4)
+
+- **#179 item 4** (`AgentServer+Captions.swift`): `transcribe(_:)` reads
+  `AgentLane.shared.callCancel` into `stop` as its first statement, as
+  `exportProject` does, and the `.apple` arm links `stop?.onCancel {
+  token.cancel() }`. The cloud arm does not link it (AI-7 withholds it).
+- **#179 item 1** (ST): the placed file is `long.wav`, `ST_COPIES` (6)
+  copies of `speech_engine_proof.make_fixtures()`'s `ten.wav` in its own
+  channels, width and rate — about 3600 s (the run printed 3625 s) and about 116 MB
+  in the gitignored `work/assistant_session/` — written through
+  `long.wav.part` and `os.replace` only after the setup transcribe answered
+  (a host skip writes nothing), and reused only when its channels, width,
+  rate and frame count all match. A transcribe that ignores Stop now fails
+  ST on its time bound alone: `--mutant no-transcribe-stop` must fail ST
+  with `waited_ms − stopped_ms … > 5000` (`LATE`) in its detail, or the run
+  exits 2 (the fixture ran out within the bound on that host).
+- **#179 item 2** (K1): launch A's order is A0, T1, T2, R, D, E, S, X, SX,
+  ST, K1, so K1 reads SX's and ST's answers too. `--mutant key-echo` is a
+  stand-in control with no build: launch A of the Release app with SX's and
+  ST's first replies carrying a text block `key-echo control: proof-key`
+  (`use(…, said=…)`), which reaches the dev tools' `text`; W and K2 do not
+  run, and K1 must FAIL.
+- `mutant_verdict` (rule R): 2 when the named row was skipped, never scored,
+  any row is an instrument failure, or the named row FAILed without the text
+  `MUTANTS` requires; 1 when the named row FAILed; 0 when it passed.
+
+Run on 2026-09-30, the change over `38a38ee`, every instance my own (another
+session's DerivedData Reelcut was left alone):
+
+| Command | Answer |
+|---|---|
+| `make typecheck`; `make test`; `make app` | 0 errors, 4 warnings (3 `CompositionBuilder.swift`, 1 `Exporter.swift`), tsc clean; exit 0; BUILD SUCCEEDED |
+| `py_compile`; the hand-fed `mutant_verdict` list (7 cases); `grep -c 'stop?.onCancel { token.cancel() }'` | silent; all `True`; `1` |
+| `assistant_session_proof.py` | 13/13, exit 0 — K1 printed after ST; ST "a 3625 s WAV (6 × ten.wav)", 2097 ms, stopped_ms 2042, `(True, 'The transcription was cancelled.')`; SX 2128 ms, stopped_ms 2021; K1 "37 MCP answers, the key in 0"; A0 no `Reelcut: ` line |
+| `--mutant no-transcribe-stop` | built in 127 s; ST FAIL — "waited_ms − stopped_ms 43468 − 2052 > 5000", the transcribe answered `is_error` False with cues; 0/1, "caught — ST failed", exit 1 |
+| `--mutant no-export-stop` | built in 151 s; SX FAIL — "waited_ms − stopped_ms 22892 − 2047 > 5000", the export answered ok, file 1 s later True; 0/1, "caught — SX failed", exit 1 |
+| `--mutant key-echo` | 10/11 — A0 to ST ok (ST's text 'key-echo control: proof-key'), K1 FAIL "37 MCP answers, the key in 2; in the log False"; "caught — K1 failed", exit 1 |
+
+## Issue batch B39 — the harness playhead (`harness_playhead_proof.py` P0–P3, S0, S1 and `--mutant`, `e2_chrome.py` (b), `clip_inspector4_probe.swift` R7, `phase5_chrome.py` §3b; #198)
+
+- **The fix** (`harness/main.swift`): straight after the 12-turn settle,
+  under `if playheadSeconds != 0`, the harness calls
+  `controller.setPlayhead(Ticks(playheadSeconds * 600_000))` and then
+  `Harness.applySelectAction(selectActionSpec, to: document, refreshing:
+  controller)`. Playback's first `report(0)` had written
+  `document.playhead = 0` during the settle (B32, #188 item 5), so every
+  render asked for at a non-zero playhead was taken at 0. The new
+  `Harness.applySelectAction` (inside `#if !HARNESS_REFERENCE_BUILD`) maps
+  the index through `ActionBands.ordered`, calls `document.selectAction`
+  and then `controller?.viewStateDidChange()`. It never calls the editor's
+  `selectAction(_:)`, because that moves the playhead to the action's end.
+  The early site now calls it with `refreshing: nil`. `setPlayhead` stays
+  outside the `#if`, because both reference trees (`65d43ae^`, `a4c476f^`)
+  have it. A caller at playhead 0 runs exactly the code it ran before. The
+  header's `selectAction` paragraph is reworded in its own seven lines, so
+  `pinDefaults` is still at `:291`.
+- **`harness_playhead_proof.py`** builds one fixture, `hp.reelcut`: a grey
+  6 s card with action A (id 3, 0.5–1.5 s, opacity 0.5) and action B (id 4,
+  2.0–3.5 s, x 100). It makes five renders (dark, 1440 × 862, size 1, Clip),
+  as (select, playhead, action): `zero` (−1, 0), `two-a` and `two-b` (−1, 2),
+  `inside` (0, 3, "0") and `outside` (0, 5, "0"). The rows:
+  - P0 (control): `two-a` and `two-b` are byte-identical.
+  - P1: `zero` and `two-a` differ.
+  - P2: below y 598 every changed pixel is within 6 pt of x 132 or x 216,
+    and each of those columns holds at least one.
+  - P3: the toolbar (y < 44) holds changed pixels.
+  - S0 (control): in `outside`, A's lane sample (193, 653) differs from B's
+    (277, 653).
+  - S1: `inside`'s two samples equal `outside`'s.
+
+  The mutants (rule R: 1 caught, 0 survived, 2 not performed) each strip one
+  anchor line from a copy, `work/harness-playhead/mutant-<name>/main.swift`,
+  which is compiled last on `build.sh`'s swiftc line. `no-late-playhead`
+  strips the `setPlayhead` line and must fail P1, P2 and P3. `no-reselect`
+  strips the late `applySelectAction` line and must fail S1.
+- **The three strengthened rows.** Each was made to FAIL on HEAD before the
+  fix, and each passes after it. Each site is judged by whether its row's
+  CLAIM held at 0 s:
+  - **`e2_chrome.py` (b)**, "…with the playhead inside an ACTION it writes
+    the clip's BASE motion". `PROBE_SOURCE`'s `editor()` now calls
+    `controller.setPlayhead(playhead)` after its spin. (b)'s answer carries
+    `playhead`, and the row requires `TICKS // 2`. On HEAD it printed
+    `playhead 0`. **Its claim was unaffected**: the `action` and
+    `zero-action` fixtures' only action spans [0, 1 s), so 0 s was inside an
+    action as well. The playhead term is a regression guard on the playhead
+    holding. It does not mean the row passed vacuously before. `zeroAction`
+    (0.5 s) goes through the same `editor()` and is unaffected for the same
+    reason.
+  - **`clip_inspector4_probe.swift` R7** (affected). `setPlayhead(at(1.0))`
+    and `spin(0.3)` now run after the editor opens. `held = document.playhead`
+    is read before `addActionAtPlayheadCommand()`, and the first R7 check
+    requires `held == at(1.0)`. On HEAD it FAILED with `playhead 0`. The
+    refusal it heard then was `action 3 on clip 2 already runs from 300000
+    to 900000 ticks, and two actions on one clip may not overlap`. That was
+    a new action at 0 s overlapping action 3, not Add Action inside action
+    1's span: `chrome`'s first action starts at 0.5 s, so 0 s is outside
+    every span.
+  - **`phase5_chrome.py` §3b's first check** (affected). It now scores
+    `moved`, the pixels outside the bar that differ between `now-a` and
+    `now-shifted` (one build). Before, it compared `was-a`, from another
+    build, which differs everywhere whether or not the playhead moved. On
+    HEAD it FAILED with `0 px outside the bar against now-a`, while the
+    `was-a` diff still printed 299136 px outside the bar. After the fix it
+    is 1146 px. The `was-a` diff, its print and the second check are
+    unchanged.
+- **The survey.**
+  - **Re-run (non-zero playhead):**
+    - `clip_inspector_proof.py` (5 s), `clip_inspector2_proof.py` (5 s),
+      `clip_inspector3_proof.py` (1 s), `clip_inspector4_proof.py` (5 s,
+      1 s), `clip_inspector5_proof.py` (5 s, 3 s), `sharp_chrome.py` (2 s),
+      `words_picture_chrome.py` (1 s), `obscure_handles_probe.py` H1/H2
+      (1 s) and `phase5_chrome.py` §3b (2 s).
+  - **Re-run (cross-builds of this `main.swift` against an old tree):**
+    - `phase5_chrome.py` (`65d43ae^`) and `recording_probe.py --only
+      welcome` (`a4c476f^`). Both reference trees still build.
+  - **Not re-run (playhead 0):**
+    - `e1_chrome`, `e2_chrome`'s renders, `phase2/3/4/6/7/8_chrome`,
+      `graphics_inspector_proof` and `name_field_proof`. The late block
+      does not run at 0.
+  - **Embedded editors that write `document.playhead` early:**
+    - `e2_chrome.py` `editor()`, through (b) and `zeroAction`: fixed, and
+      unaffected in claim.
+    - `clip_inspector4_probe.swift` R7: fixed, and affected.
+    - `clip_inspector6_probe.swift`'s three K1 editors (5.0 s) and
+      `capture_spike/probe_well.swift` `harnessCase` (1 s): Residue.
+  - **Not affected:**
+    - `phase9_chrome.py` uses a bare `TimelineView`.
+    - `phase9_probe.py` and `recording_probe.py` rows 2/4 use a bare
+      `ProjectDocument`.
+    - The `clipPane`/S4 helpers use an `InspectorViewController` only.
+    - `graphics_menu_probe.swift` writes after its editor has settled.
+- **What moved in the re-runs**, all inside unchanged scores:
+  - `sharp_chrome.py`'s clip-corner rows: D_0 and D_1 now read the clip
+    corner rather than the coral playhead line at x 132. Dark went from
+    `(227, 110, 75), (227, 110, 75)` to `(30, 30, 30), (58, 94, 105)`.
+    Light went from the same coral pair to `(255, 255, 255), (69, 106, 117)`.
+    The rows still pass.
+  - `clip_inspector3_proof.py` H2/H3 (1 s): the coral run on Opacity's rail
+    moved from x 2659 px to 2617 px, and the rail's mint count went from
+    80 px to 78 px.
+  - `obscure_handles_probe.py` H1/H2: each pair is still byte-identical,
+    and the PNGs changed size (light 243480 → 243384 bytes, dark 246036 →
+    246376).
+  - `phase5_chrome.py` §3b's `was-a` diff went from 306138 px (299136
+    outside the bar, 24 clusters) to 307076 px (300074, 26 clusters).
+  - Nothing else's log changed beyond build times.
+- **Residue:**
+  - **`clip_inspector5_proof.py` D2** ("…selected after the drop, the
+    playhead parked at clip start + 2.5 s") FAILED in 3 of 4 runs:
+    `selected 4, playhead 2.5000 s`. It failed before the fix, passed in the
+    after run, and failed in both re-runs on the final tree. D2 is a row of
+    `clip_inspector5_probe.swift`, which is compiled over `app/Sources`
+    without the harness's `main.swift`, so this batch does not reach it.
+    The drop parks the playhead at 2.5 s, where action 3's new end meets
+    action 4's start. The row is not fixed here.
+  - `clip_inspector6_probe.swift`'s K1 editors: 0 s and 5 s are both outside
+    every span of its `chrome` fixture, and each block moves the playhead
+    itself before it measures.
+  - `capture_spike/probe_well.swift` `harnessCase` is a closed spike, and
+    its rows classify the well, not the time.
+
+Run on 2026-09-30 into 2026-10-01, the change over `de880c7`, one proof at
+a time. Logs are in `work/b39/{before,step3,after}/`. The before run's
+harness rebuild (217 s) was caused by a staticlib newer than the harness
+(B41's), not by this batch:
+
+| Command | Before (HEAD) | After |
+|---|---|---|
+| `harness/build.sh` | built in 217 s, exit 0 | built in 123 s, exit 0 |
+| `harness_playhead_proof.py` | 3/6, exit 1 (P1, P2, P3 FAIL: 0 px differ) | 6/6, exit 0 (1149 px; 515 at x 132, 462 at x 216, 0 elsewhere; 172 in the toolbar) |
+| `--mutant no-late-playhead` | — | 3/6, "caught — P1, P2, P3 failed", exit 1 |
+| `--mutant no-reselect` | — | 5/6, "caught — S1 failed", exit 1 (`inside` A (75, 132, 129), B (126, 211, 178)) |
+| `clip_inspector_proof.py` | 39/39, exit 0 | 39/39, exit 0 |
+| `clip_inspector2_proof.py` | 32/32, exit 0 | 32/32, exit 0 |
+| `clip_inspector3_proof.py` | 31/31, exit 0 | 31/31, exit 0 |
+| `clip_inspector4_proof.py` | 46/46, exit 0; strengthened, unfixed: 45/46, exit 1 (R7) | 46/46, exit 0 |
+| `clip_inspector5_proof.py` | 36/37, exit 1 (D2) | 37/37, exit 0; two re-runs 36/37, exit 1 (D2) |
+| `sharp_chrome.py` | 29/29, exit 0 | 29/29, exit 0 |
+| `words_picture_chrome.py` | 5/5, exit 0 | 5/5, exit 0 |
+| `obscure_handles_probe.py` | 16/16, exit 0 | 16/16, exit 0 |
+| `e2_chrome.py` | 52/52, exit 0; strengthened, unfixed: 51/52, exit 1 ((b)) | 52/52, exit 0 |
+| `phase5_chrome.py` | 81/81, exit 0; strengthened, unfixed: 80/81, exit 1 (§3b) | 81/81, exit 0; "the reference tree built" PASS |
+| `recording_probe.py --only welcome` | 29/29, exit 0 | 29/29, exit 0; 6b and "compiled with this tree's own harness" ok |
+
+```sh
+python3 tools/proof/harness_playhead_proof.py                               # 6/6
+python3 tools/proof/harness_playhead_proof.py --mutant no-late-playhead     # exit 1, P1 P2 P3 FAIL
+python3 tools/proof/harness_playhead_proof.py --mutant no-reselect          # exit 1, S1 FAILS
+```
+
+## Issue batch B42 — proof-runner and recorder residue (`makefile_env_proof.py`'s sweep and `--no-sweep`, five runners' call-time defaults, the `--baseline` label, `recording_probe.py` F8–F10 and three mutants, `recording_proof.py`'s PCM sentence; #191, #193)
+
+- **`makefile_env_proof.py`'s sweep (#191 item 1).** `bounded.run` kills
+  the copy's `make app` process group at `--wall`, but what `xcodebuild`'s
+  build service starts (`swift-frontend` among them) is in other groups.
+  After `make app` returns, `sweep(root, since)` SIGKILLs every process
+  whose cwd or command line lies under the copy. It rescans every second
+  until two scans in a row find none or 30 s pass. `copy_processes` takes
+  one `ps -A -ww -o pid=,ppid=,etime=,command=` scan and `lsof`'s cwds. It
+  never selects by name. It spares this process and its whole `ppid` chain,
+  and any process whose `etime` exceeds the time since `make app` began
+  plus 2 s. The new row is "no process whose cwd or command line lies
+  under the copy outlives its `make app`". `--no-sweep` scores that row on
+  one scan taken before any kill.
+- **Call-time defaults (#191 item 2).** `build_probe(sources=None,
+  probe_dir=None)` in `playback_audio_proof.py`,
+  `video_configuration_proof.py` (new global `PROBE_DIR`) and
+  `export_cancel_proof.py` (new global `SOURCES`), B28's shape.
+  `mixed_audio_probe.make_media(directory=None)` and
+  `capture_spike/inventory.py`'s `grep_sites`, `line_of`, `_file_lines`,
+  `enclosing_func`, `resolve` and `check` (`sources=None` / `root=None`)
+  read `WORK` / `SOURCES` / `ROOT` when called. Explicit callers are
+  unchanged.
+- **The `--baseline` label (#191 item 3).** `name_field_proof.py` and
+  `text_break_proof.py` print `baseline <commit>: the control could not be
+  performed — <why>`, not `mutant baseline: …`.
+- **The recorder (#193).** `ScreenRecorder.finishingDidBeginNotification`
+  is posted by `beginFinishing` once the state is `.finishing`, just before
+  `stopCapture`. `RecordingToolChrome.show` observes it and calls
+  `freeze()`, so File ▸ Stop Recording over a tool's paused recording keeps
+  the item's pause glyph and frozen time (manual check REC-8 step 7).
+  `beginCountdown()` clears a stale `resumeProblem`. `recording_proof.py`'s
+  PCM row names ffmpeg's cause through `pcm_failure(silent, loud)`.
+
+Run on 2026-10-01, the change over `125f101`:
+
+| Command | Result |
+|---|---|
+| `recording_probe.py --only file_pause` | 46/46, exit 0 |
+| `--mutant finish-no-post --only file_pause` | 45/46, exit 1 (F8's stop row) |
+| `--mutant chrome-no-freeze --only file_pause` | 45/46, exit 1 (F9's show row) |
+| `--mutant countdown-keeps-resume-problem --only file_pause` | 45/46, exit 1 (F10's cleared row) |
+| `--mutant chrome-no-observer --only file_pause` | 45/46, exit 1 (F7's show row) |
+| `recording_probe.py` (whole run) | 1073/1073, exit 0, no row skipped |
+| `recording_proof.py 4842` | 189/189, exit 0; the tone rows (2) skipped by name: the host's output is muted |
+| `pcm_failure(None, None)`, a stub `ffmpeg` that exits 1 | "… ffmpeg does not run (`ffmpeg -version`: exited 1: dyld: Library not loaded: stub)" |
+| `pcm_failure(None, {…})` / `pcm_failure(None, None)`, real PATH | "… ffmpeg runs (ffmpeg version 9.0.2 …) and the silent recording did not decode" / "… and neither recording decoded" |
+| `makefile_env_proof.py --wall 30`, ×3 | sweep row ok each time (killed 2, 1, 1 PIDs); the independent `ps` / `lsof` scan after each printed nothing; exit 1 (the build row: the 30 s wall) |
+| `makefile_env_proof.py --no-sweep --wall 30` (CONTROL) | run 1: the scan found 0, row ok; run 2: row FAIL naming PID 46599 (`swift-frontend -frontend -emit-pcm -module-name Foundation …`), exit 1 |
+| `makefile_env_proof.py` | 4/4, exit 0, 587 files read, the sweep killed 0 |
+| `makefile_env_proof.py --mutant no-unexport` | 3/4, exit 1 (the AssemblyAI row) |
+| spared controls (a `perl -e 'sleep 900' <copy>/x` started 6 s before a `--wall 30` run inside `zsh -c '…; echo shell-survived <copy>'`) | `shell-survived` and `sleeper-alive` printed; with the sleeper started 2 s before, it was killed (see below) |
+| `name_field_proof.py --baseline 0000000`, `text_break_proof.py --baseline 0000000` | `baseline 0000000: the control could not be performed — git archive 0000000 failed: …`, exit 2 each |
+| `name_field_proof.py` | 27/27, exit 0 |
+| `playback_audio_proof.py` | 9/9, exit 0 |
+| `video_configuration_proof.py 4843 capture <dir>` | C1, C2 ok, exit 0 |
+| `export_cancel_proof.py --port 4844 --only cancel --runs 5` | M0, M1, M2, Z1 ok (4/4), exit 0 |
+
+The age rule's slack is 2 s on top of `ps`'s whole-second `etime`, and the
+proof's own work before `make app` takes about 0.2 s. So a process started
+less than about 3 s before the proof runs is not spared by age. A sleeper
+started 2 s before was killed (PIDs 49595 and 50375 in that run's kill
+list), while the shell still survived through the ancestor rule.
+
+```sh
+python3 tools/proof/recording_probe.py --only file_pause                          # 46/46
+python3 tools/proof/recording_probe.py --mutant finish-no-post --only file_pause  # exit 1, F8
+(unset ANTHROPIC_API_KEY RC_ASSEMBLYAI_KEY; python3 tools/proof/makefile_env_proof.py)   # 4/4
+```
+
+## Issue batch B44 — `close_project`, held-path refusals, the caption name rule (`close_project_proof.py`, `remaining_probe.py` 1e and 1f, `assistant_lane_proof.py --mutant close-ask-first`; #40, #43)
+
+- **`close_project {discard?}` (#40, spec §11 #40).** File ▸ Close over MCP
+  (`AgentServer+Project.swift`'s `closeProject`, on main): a window with a
+  sheet attached is refused first, then unsaved changes unless `discard:
+  true`; it closes through `ProjectDocument.close()` and writes nothing.
+  `new_project {path}` and `save_project {path}` refuse a path another open
+  document holds (`documentHolding`, `refuseHeldPath`), `new_project` before
+  it creates anything; a save to the document's own file stays a plain save
+  (#138). The assistant never sees the tool (AI-7, amended): a `.withheld`
+  row in `AssistantToolTable.swift`.
+- **The caption name rule (#43, spec §11 #43).** `export_captions` writes
+  `AgentServer.captionDestinationURL(path, format:)`, which replaces only
+  `CaptionExporter.knownExtensions` — the panel's rule — so `chart.png` is
+  `chart.png.srt` both ways. The other tools keep `replaceableExtensions`.
+- **Counts.** 86 product tools (`op_argument_proof.py`), twenty-seven
+  app-state tools (`phase9_proof.py`, `recording_proof.py`,
+  `recording_probe.py`'s `APP_STATE_TOOLS`).
+
+`close_project_proof.py <port> [--log PATH]` needs a fresh Release instance.
+T1 parity log; K1 schema; C1 sixty `new_project` → `close_project` cycles;
+C2 every closed path refused by `get_project`, no editor window left,
+`open_project` with no `already_open`; C3 threads after C1 under before plus
+64; D1 the unsaved refusal's exact sentence; D2 `discard: true` and the disk;
+H1 the sheet refusal (`perform_menu_item ["File", "Export…"]`, then
+`cancel_sheet`); S3 (control, run first) a save to A's own path; S1 and S2
+the held-path sentence for `save_project` (two spellings) and `new_project`;
+E1 `export_captions {path: …/chart.png}`. D1 and D2 run behind an autosave
+guard that retries a marker at a fresh `at` when `get_project` already reads
+`unsaved_changes: false`, printing `<ID> retry <n>: autosave landed`.
+
+Run on 2026-10-01, the change over `068b99f`:
+
+| Command | Result |
+|---|---|
+| `make typecheck` | 0 errors, 4 warnings (the baseline), tsc clean |
+| `make test` | exit 0; `assistant_lane_proof.py` 18/18 (L4 and L6 name `close_project`); `assistant_prompt_proof.py --probe` F1–F8 ok; `inventory.py --check` 5/5 |
+| `make app` | BUILD SUCCEEDED; `grep "Reelcut: "` empty on every instance below |
+| `close_project_proof.py 4866` | 12/12, exit 0; C3 threads 13 → 18; 0 autosave retries |
+| `close_project_proof.py`, build A: `no-dirty-check` + `no-sheet-check` + `export-unwired` | 9/12, exit 1: D1, H1, E1 |
+| `close_project_proof.py`, build B: `discard-unread` + `no-held-check` | 9/12, exit 1: D2, S1, S2 (S3 passes) |
+| `close_project_proof.py`, `window-only` as `document.windowControllers.forEach { $0.close() }` | 12/12, exit 0 — survives: AppKit closes the document with its last window controller, and C2's sixty refusals show it left the controller |
+| `close_project_proof.py`, `window-only` as `removeWindowController` then `close()` | 10/12, exit 1: C2 (sixty paths still answer, `open_project` says `already_open`), D2 (`get_project` still answers) — C1 passes: its answers are the same |
+| `op_argument_proof.py 4852` | 153/153, exit 0, EXACTLY 86 product tools |
+| `phase9_proof.py 4853` | 218/218, exit 0 |
+| `recording_proof.py 4854` | 189/189, exit 0; the tone rows (2) skipped by name: the default output is a Bluetooth device |
+| `recording_probe.py --only catalog` | 29/29, exit 0 |
+| `remaining_probe.py` | 176/176, exit 0 |
+| `remaining_probe.py --sources <HEAD's app/Sources>` | 0/1, exit 1: the probe does not build (`no member 'captionDestinationURL'`) |
+| `remaining_probe.py --sources <caption-shared>` | 175/176, exit 1: 1f's `chart.png` row |
+| `remaining_probe.py --sources <export-unwired>` | 175/176, exit 1: 1e's `exportCaptions` call row |
+| `assistant_lane_proof.py --mutant close-ask-first` | exit 1: L4 fails (`close_project: refused as written false; hook called 1 times`) |
+
+Controls, which no mutant fails: T1, K1, C3, S3. Every D1 and D2 in these
+runs closed on its first attempt; no run printed a retry. S2's editor-window
+count is blind: under `no-held-check`, whose `new_project {path: A}` was
+answered, `snapshot_ui` still counted 3 editor windows before and after, so S2
+fails that mutant on its sentence alone. (Pins `CaptionExporter.swift:519` and
+`:539` in `capture_spike/inventory.json` were re-keyed to 514 and 534 by the
+orchestrator after the doc comment above them shrank.)
+
+```sh
+python3 tools/proof/close_project_proof.py 4866                    # 12/12, fresh instance
+python3 tools/proof/remaining_probe.py                             # 176/176
+python3 tools/proof/assistant_lane_proof.py --mutant close-ask-first   # exit 1, L4
+```
+
+## Issue batch B47 — the Assistant tab's question dot, the Spend row at the minimum width, the composer's refit (`assistant_tab_proof.py` P13–P15, L8 and `--mutant no-badge`, `no-badge-app`, `full-spend-only`; #152, #203, #182 item 3)
+
+- **The dot (#152, spec §11 AI-19).** `InspectorTabBadge.swift` lays a
+  passive view over the inspector's tab strip, the root's last subview, and
+  draws a 6 pt accent dot 3 pt right of "Assistant" (`PanelTabsView.tabRect`'s
+  arithmetic mirrored; `Controls.swift` untouched). `assistantRefresh()`'s
+  first statement sets it from the session's `pendingQuestion`. P14 drives
+  it in a probe editor against the stand-in; L8 reads it back through
+  `snapshot_ui` in the built app.
+- **The Spend row (#203, spec §11 P-8).** P15 was added before any Spend
+  change and measured four of its seven costs truncating at 263 pt (280 less
+  a legacy scroller; the label's frame 200.5 pt, IBM Plex Mono): "under
+  $0.0001 · Reelcut's estimate" 204.0, "at least $0.1234 · Reelcut's
+  estimate" 222.0, "at least $12.3456 · Reelcut's estimate" 228.0, "at least
+  $0.0123 · Reelcut's estimate" 222.0 (intrinsic widths); "Nothing yet"
+  66.0, "$0.0018 · …" 168.0 and "unknown · …" 168.0 fitted. P-8 gained one
+  sentence, then `AssistantTurnCost.figureLadder` and the cost view's
+  fitting: the short rung reads "<$0.0001 · Reelcut's estimate" (174.0 in
+  178.0), "≥$0.1234 · …" (174.0 in 178.0), "≥$12.3456 · …" (180.0 in
+  184.0), "≥$0.0123 · …" (174.0 in 178.0); the row 243.0 pt wide for all
+  seven; at 480 every cost shows its full `figure`. P-7's contingency rung
+  (" · estimate") was not needed.
+- **The composer's refit (#182 item 3, accepted).** The attempt —
+  `AssistantComposerField.refitIfWidthChanged()` called from
+  `AssistantView.layout()`, the field's own `layout()` override deleted —
+  printed in P13: 26.0 pt at 480 (want 26.0), 26.0 at 263.0 (want 41.0),
+  41.0 at 480 again (want 26.0); the height constant 26.0, 26.0, 41.0
+  against text view widths 390.0, 156.0, 390.0. Both files were restored to
+  HEAD; `no-width-refit` is unchanged; the limit is in
+  `designs/adr/app-file-history.md`'s "Known limits".
+
+Run on 2026-10-01, the change over `8d64a11`, each command bounded by
+`perl -e 'alarm shift; exec @ARGV'`:
+
+| Command | Result |
+|---|---|
+| `make typecheck` | 0 errors, 4 warnings (the baseline), tsc clean |
+| `make test` | exit 0 |
+| `make app` | BUILD SUCCEEDED |
+| `assistant_tab_proof.py` | 26/26, exit 0; `grep "Reelcut: "` empty in `app-A.log` and `app-B.log` |
+| `--mutant no-badge` | P14 FAIL: (b) shown on Clip, Media and Assistant false; (d) shown false; 0/1, exit 1 |
+| `--mutant no-badge-app` | L8 FAIL: the dot visible false on the Assistant tab and on Clip; 0/1, exit 1 |
+| `--mutant full-spend-only` | P15 FAIL: the four full figures above truncating in 200.5; 0/1, exit 1 |
+| `--mutant no-width-refit` | P13 FAIL (26.0 pt at 263.0); exit 1 |
+| `--mutant full-figure-only` / `tall-placeholder` / `modified-return-sends` / `tab-types` / `shared-undo` / `no-entry-parts` / `short-transcript` | P9 / P13 / P9 / P9 / P11 / P10 / P12 FAIL, exit 1 each |
+| `--mutant no-close-decline` / `flatten-send` / `no-forward` | P8 / L7 / L2 FAIL, exit 1 each |
+| `spend_ui_proof.py` | 10/10, exit 0 (C2's full figures at 304) |
+| `clip_inspector2_proof.py` | 32/32 checks, exit 0 |
+| `screens.py --only 11b-assistant-tab` | 6 pass, 0 fail, 0 skip; 4 captures, 0 new problems; `Reelcut: ` lines 0 light and dark |
+
+P14 printed, at strip widths 280 and 480 in Source Sans 3: the Assistant
+tab (210.0, 0.0, 70.0, 32.0) and (360.0, 0.0, 120.0, 32.0), its title
+46.66 pt wide at x 221.67 and 396.67 (P14 printed 46.655923828125, 221.67203808593752
+and 396.6720380859375), the dot at x 271.0 and 446.0, y 13.0;
+the inspector 608×1438 px drawn with the dot shown differed from it hidden
+in 124 px, all inside the dot's rect, and hidden equalled removed byte for
+byte.
+
+```sh
+python3 tools/proof/assistant_tab_proof.py                          # 26/26
+python3 tools/proof/assistant_tab_proof.py --mutant no-badge        # P14 FAIL, exit 1
+python3 tools/proof/assistant_tab_proof.py --mutant no-badge-app    # L8 FAIL, exit 1
+python3 tools/proof/assistant_tab_proof.py --mutant full-spend-only # P15 FAIL, exit 1
+```
+
+## Issue batch B48 — the assistant's chat settings (assistant_settings_proof.py CS1–CS3, four mutants; #151)
+
+Settings' Assistant pane gained "Compact when context reaches N tokens" (on,
+300,000) and "Clear old tool results past 150,000 tokens" (off), spec §11
+AI-20 (amending AI-9 and AI-18). `python3 tools/proof/assistant_settings_proof.py`
+(port 4885) builds `assistant_settings_probe.swift` over `app/Sources` on
+`assistant_tab_proof.build_probe`'s line and runs it against the stand-in with
+`assistant_session_proof.secret_folder()`'s `proof-key`:
+
+- **CS1** — `AssistantChatSettings` over a fresh suite and the pane over it.
+  Printed: empty `{auto_compact_tokens: 300000, clear_tool_results: false}`;
+  stored 19999 and 900001 read 300000, 20000 and 900000 kept;
+  `settingsJSON(defaults: suite)` over (false, 40000, true)
+  `{auto_compact_tokens: null, clear_tool_results: true}`; the pane starts on,
+  "300,000", off; "40,000" stores 40000 and posts `["settings"]`, the same
+  again posts nothing, "10000" shows "40,000" again; each box posts once; the
+  probe's `clearTriggerTokens` 150000 equals `agent/src/main.ts`'s
+  `CLEAR_TRIGGER_TOKENS` 150000.
+- **CS2** — a real editor's session: turn 1 (50,000 input tokens) did not
+  compact; the pane on `.standard` posted `["settings", "settings"]`, the
+  session the same object, phase idle, entries 3 → 3; turn 2 compacted once,
+  `used 50010`; turn 3 (950,000) did not compact after the box went off. The
+  stand-in saw 4 POSTs: POST 1 without `context_management` or the
+  `context-management-2025-06-27` beta; POSTs 2 and 4 with the
+  `clear_tool_uses_20250919` edit (trigger 150000 input tokens, keep 5 tool
+  uses, at least 50000) and the beta; POST 3 with `compaction`.
+- **CS3** — the Release app with `-ReelcutAssistantAutoCompact NO
+  -ReelcutAssistantClearToolResults YES -RCDevAssistantAutoCompact 1`: state
+  finished, compaction events `['compaction_started', 'compacted']`, 2 POSTs,
+  the first with the clear edit and the beta, the second with `compaction`;
+  `Reelcut: ` lines 0.
+
+Mutants (each run printed its row FAIL, `caught`, exit 1):
+`fixed-settings` (`AssistantConfiguration.swift`'s `settingsJSON` reads
+`AssistantChatSettings()`) → CS1 FAIL, `settingsJSON(defaults: suite)` printed
+`{auto_compact_tokens: 300000, clear_tool_results: false}`;
+`no-live-settings` → CS2 FAIL, turn 2 `compaction events []` and 5 POSTs, none
+with `context_management`; `settings-ends` → CS2 FAIL, `the same session
+false, phase closed, entries 3 → 4`; `fixed-settings-app` (the same edit,
+`make app` in a `tree_copy` tree, built in 108 s) → CS3 FAIL, POST 1
+`context_management null, beta False`.
+
+**`CHAT_PINS`.** `assistant_session_proof.App` now appends
+`-ReelcutAssistantAutoCompact YES -ReelcutAssistantAutoCompactTokens 300000
+-ReelcutAssistantClearToolResults NO` for each key a launch does not set, so
+no `App` launch (the session, tab, prompt, compaction and spend proofs, and
+the paid evals) reads the person's own chat settings. `screens.py`'s `PINS`
+and `harness/main.swift`'s `pinDefaults` pin the same three keys. The
+chrome section's Settings window is now 460 × 805 points (measured
+`(920, 1610)` at scale 2; it was 677).
+
+Run on 2026-10-01, the change over `b1f95d6`:
+
+| Command | Result |
+|---|---|
+| `make typecheck` | 0 errors, 4 warnings (the baseline), tsc clean |
+| `make test` | exit 0 |
+| `make app` | BUILD SUCCEEDED |
+| `assistant_settings_proof.py` | 3/3, exit 0 |
+| `--mutant fixed-settings` / `no-live-settings` / `settings-ends` / `fixed-settings-app` | CS1 / CS2 / CS2 / CS3 FAIL, exit 1 each |
+| `assistant_tab_proof.py` | 26/26, exit 0 |
+| `assistant_session_proof.py` | 12/13 at first, exit 1: T2 FAIL (`missing ['close_project']`), the same T2 detail as a run of HEAD `b1f95d6` exported and built apart — its oracle predated #40's withheld `close_project`. With T2's oracle withholding `close_project` too (the orchestrator's fix in this batch): 13/13, exit 0 (T2 "85 tools") |
+| `assistant_prompt_proof.py` | 18/18 pass, 8 skipped (`--live` not asked), exit 0 |
+| `assistant_compaction_proof.py --rehearse` | 8/8 pass, 1 skipped, exit 0 |
+| `spend_ui_proof.py` | 10/10, exit 0 |
+| `cloud_captions_probe.py --only chrome` | 77/77 checks, exit 0 |
+| `screens.py --only 02-settings` | 6 pass, 0 fail, 0 skip; 2 captures, 0 new problems; `Reelcut: ` lines 0 light and dark |
+
+```sh
+python3 tools/proof/assistant_settings_proof.py                               # 3/3
+python3 tools/proof/assistant_settings_proof.py --mutant fixed-settings        # CS1 FAIL, exit 1
+python3 tools/proof/assistant_settings_proof.py --mutant no-live-settings      # CS2 FAIL, exit 1
+python3 tools/proof/assistant_settings_proof.py --mutant settings-ends         # CS2 FAIL, exit 1
+python3 tools/proof/assistant_settings_proof.py --mutant fixed-settings-app    # CS3 FAIL, exit 1
+```
+
+## Issue batch B49 — square StickerButton and the Media-tab screen (recording_probe.py §6, two mutants; screens.py 10b; #100, #194)
+
+**What changed.** Spec §11 SH-4 supersedes SH-1: `StickerButton` draws
+Rasterize's square block in place (`Controls.swift`, its `updateTrackingAreas`
+still owner-filtered) and is ⌈title width⌉ + 32 by 28 pt, 6 pt narrower and
+shorter than the pill; `DS.stickerShadow` is gone and `DS.accentHover` is
+Rasterize's token. No caller changed.
+
+**`recording_probe.py` §6** is re-pinned against the same reference (the
+pickaxe's pre-button tree, `a4c476f3^` = `c1dce5f01840`, still the pill).
+6a reads `⌈tw⌉ + 32 × 28` intrinsics, the row 362 pt wide from x 179 at top
+397, and a new row: each button's `corner` (1.5, 1.5) and `middle`
+(1.5, mid-height) samples from its own `cacheDisplay` bitmap are opaque and
+equal. 6d reads the diff only inside the reference row's band (x 0–720,
+y 394–428 pt): light 22954 px, dark 24308 px, one cluster each at x
+179.5–541.0, y 395.0–426.0 pt — the new row's x-span with the primary's fill
+0.5 pt in, and the pill row's ink 3 pt higher; the row's top derived from
+the band's bottom edge is 397.0. Above the band every pixel row equals the
+reference's 6 rows higher (y 6–788 px) and below it the reference's 6 rows
+lower (y 856–1194 px), with no tolerance: the welcome column re-centres by
+exactly 3 pt. The old "nothing outside the row changed" row is gone, since
+the column now moves. A 6d row scores that the probe answered a row top at
+all; without one the section fails it and stops rather than raising.
+
+**Mutants**, each `--mutant <name> --only welcome` (35 rows; the tree 35/35):
+
+- `sticker-pill-size` (the pill's `+ 6` back in `intrinsicContentSize`) —
+  28/35, exit 1: 6a's intrinsic, laid-out and tall rows, and 6d's two (iv)
+  rows in each appearance, because the probe's own laid-out top (394) no
+  longer matches the tree's render.
+- `sticker-round` (radius `body.height / 2`) — 34/35, exit 1: 6a's corner row.
+
+**`cloud_captions_probe.py` row 18**: Settings is 460 × 793 points (measured
+`(920, 1586)` at scale 2; it was 805), 12 pt shorter for its 2 rows of
+`StickerButton`s.
+
+**`screens.py`.** `demo` imports `media/toneB.m4a` last, with no clip, and
+`designs/screens/10b-media-tab.md` captures the Media tab with "3 items".
+10b passes in both looks, with 12 layout problems: the Media pane's three
+`BarView` bands overhang their section rows by 10 pt each side, three per
+capture. `MediaPane.bar` does that on purpose so the rule spans the panel,
+and the screen's prose says so; `KNOWN` lists it as a deliberate finding
+(`outside_superview`, `BarView`, overhang exactly `[10, 0, 10, 0]`), so a
+full run prints "new problems: 0". Against the HEAD baseline
+(`work/b49/screens-before`, 22/22, digest `0eee0c6f…`), `--compare` finds
+38/56 PNGs byte-identical: every capture of 03–11b, and 14's timeline. The
+18 that differ are exactly the screens that hold a `StickerButton`: 01's
+two (48926 / 50912 px in the button row and the re-centred column), 02 at
+920 × 1586 (was 1610), 12 at 840 × 1330 (1342), 13 at 578 (590), 14's sheet
+at 870 (882), 15 at 932 (944) and 16 at 1000 × 792 (804), plus 10b's four,
+which exist in one run only.
+
+Run on 2026-10-01, the change over `d568906`:
+
+| Command | Result |
+|---|---|
+| `screens.py --out work/b49/screens-before` (HEAD, before any edit) | 22 pass, 0 fail, 0 skip; 0 new problems; exit 0 |
+| `make typecheck` | 0 errors, 4 warnings (the baseline), tsc clean |
+| `make test` | exit 0 |
+| `make app` | BUILD SUCCEEDED |
+| `wc -l Controls.swift Theme.swift` | 648, 222 |
+| `recording_probe.py --only chrome,chrome_pause,welcome` | 212/212, exit 0 |
+| `--mutant sticker-pill-size --only welcome` | 28/35, exit 1 |
+| `--mutant sticker-round --only welcome` | 34/35, exit 1 |
+| `section_welcome` driven with a probe answer of no buttons | 7 rows fail, the section returns; without the `laid_top is None` return it raised `TypeError` |
+| `cloud_captions_probe.py --only chrome` | 76/77 before the re-pin (row 18 measured `(920, 1586)`), 77/77 after, exit 0 |
+| `screens.py --only 10b-media-tab` | 6 pass, 0 fail, 0 skip; 0 new problems (the overhang's 12 known); exit 0 |
+| `screens.py --compare work/b49/screens-before` | 23 pass, 0 fail, 0 skip; compare 38/56 byte-identical; exit 0 (12 new problems, 10b's, before the `KNOWN` entry) |
+| `screens.py` (full, with the `KNOWN` entry) | 23 pass, 0 fail, 0 skip; new problems: 0; exit 0 |
+| `v3_tools.py` | 8/8, exit 0 |
+| harness `welcome`, `settings`, `transcribe` in both looks | six PNGs; no clipped title or misaligned row |
+
+```sh
+python3 tools/proof/recording_probe.py --only chrome,chrome_pause,welcome      # 212/212
+python3 tools/proof/recording_probe.py --mutant sticker-pill-size --only welcome   # 28/35, exit 1
+python3 tools/proof/recording_probe.py --mutant sticker-round --only welcome       # 34/35, exit 1
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only chrome  # 77/77
+python3 tools/proof/screens.py --only 10b-media-tab
+```
+
+## Issue batch B50 — the header hover, the "clip" tag, the name field's placeholder (clip_inspector7_proof.py, name_field_proof.py N15–N20; #102, #199)
+
+**What changed.** #102: a section header's hover is `InspectorHeaderHoverBand`,
+a second `DS.hoverFill` (composited `.sourceOver`) over the rest band, the
+header's first subview, pinned above the rule; `mouseEntered` / `mouseExited`
+set `isHovered` at once and the band's alpha directly inside
+`DS.animate(DS.hoverDuration)` (spec §11 CI-15, amended). Normalize's row is
+`[normalize, InspectorClipTag(binding:)]`: a boxed mono 9 "clip", hidden
+unless an action is selected. #199: `InspectorNameField` keeps its
+placeholder in a string of its own (`placeholderString` and
+`placeholderAttributedString` overridden), so the field editor has none to
+draw; the cell draws it at rest and under an empty field editor, and
+`textDidChange` redisplays the field.
+
+**`clip_inspector7_proof.py`** — the probe (H1–H6, T1–T3) and the harness
+(C1–C4), no MCP section. On the change, 15/15. H3 printed an `opacity`
+animation of `Optional(0.14)` on enter and on exit, so Approach step 4's
+fallback was not needed. H6 read (2, 2) hovered `[255, 255, 255, 48]`
+against rest `[255, 255, 255, 25]` (the probe sets no appearance), the
+rule's row (55 px) equal.
+H5's band frame (0, 0, 304, 27) in a 304 × 28 header. T3: intrinsic
+(32, 17) = formula; (0.5, h/2) alpha 0.098, (2, 2) alpha 0. The C renders
+(`work/clip-inspector7/`): with action 0 the boxed "clip" follows Normalize,
+with none it is gone. Against the same renders from a harness built over
+HEAD's `app/Sources` (`work/clip-inspector7/head-harness/`), C3 and C4 (no
+action) are byte-identical, and C1 and C2 differ only in one cluster, x
+1218–1250, y 376.5–393.5 pt (623 px light, 664 px dark): the tag. The
+headers at rest are unchanged.
+
+| Mutant | Exit | The row that failed, as printed |
+|---|---|---|
+| `no-tracking` | 0, MUTANT PASS | H2: own areas 0 |
+| `unanimated` | 0, MUTANT PASS | H3: keys [], opacity duration nil |
+| `ignores-reduce-motion` | 0, MUTANT PASS | H4: keys ["opacity"] after each call |
+| `band-hit` | 0, MUTANT PASS | H5: hit InspectorHeaderHoverBand |
+| `band-blank` | 0, MUTANT PASS | H6: (2, 2) hovered [255, 255, 255, 25], rest the same |
+| `tag-hidden` | 0, MUTANT PASS | T1: hidden true |
+| `tag-always` | 0, MUTANT PASS | T2: hidden false |
+| `tag-blank` | 0, MUTANT PASS | T3: (0.5, h/2) alpha 0, interior drawn false |
+
+**`name_field_proof.py` N15–N20** — two fields at leading 220, width 170,
+placeholder "Marker": `empty` ("", top 100) and `named` ("Director of
+Photography", top 140). Placeholder ink is > 20 from the sampled fill, with
+its peak channel distance. On the unmodified tree (log kept in
+`work/name-field/b50-head.log`), 31/39: N16, N17, N18 and N20 FAILED in both
+looks — N16 light: rest rows 6.00–14.50, editing rows 8.00–16.50 (the field
+editor's own placeholder, 2 pt low), peak 109 both; dark 5.50–14.50 against
+7.50–16.50. On the change, 39/39: N16 editing rows 6.00–14.50, peak 109
+(light), 5.50–14.50, peak 130 (dark).
+
+**N19 and N20, and B32's `needsDisplay` note.** The field's own
+`needsDisplay` getter reads false in this window even straight after
+`needsDisplay = true` (measured: set directly on the field, and on the
+host, both read false; a plain `NSView` beside them read true), while its
+layer's `needsDisplay()` reads true. That is why B32's N12 read false after
+`insertText("i")` with `needsDisplay = true` in place: it read the view's
+getter. N19 and N20 therefore read the layer: after `display()` false (N19,
+the control), after the insert true on the change and false with the
+`textDidChange` override deleted (`no-redisplay`). The override is
+load-bearing: without it nothing dirties the field when its editor's text
+changes.
+
+| Mutant | Exit | Failures, as printed (light) |
+|---|---|---|
+| `frame-insets` | 1, caught | N13 only |
+| `cell-placeholder` | 1, caught | N16 and N18 (and N17): editing rows 6.00–16.50 — two copies |
+| `rest-only` | 1, caught | N16 and N17 (and N18): no placeholder ink under the editor |
+| `always-placeholder` | 1, caught | N17 only: typed ink to 41.00 |
+| `no-redisplay` | 1, caught | N20 only: layer.needsDisplay() false after the insert |
+
+Run on 2026-10-01, the change over `10d88ea`, every instance my own:
+
+| Command | Answer |
+|---|---|
+| `make typecheck` (HEAD, before any edit; and on the change) | 0 errors, 4 warnings, tsc clean |
+| `make test` | exit 0 |
+| `make app` | BUILD SUCCEEDED |
+| `name_field_proof.py` (unmodified tree / change) | 31/39, exit 1 / 39/39, exit 0 |
+| `clip_inspector7_proof.py` | 15/15, exit 0 |
+| `clip_inspector_proof.py` | 39/39, exit 0 (two earlier runs 38/39: S1's move row read a clip time of −600000; the same probe built over HEAD's sources failed it once in three runs) |
+| `clip_inspector2_proof.py` … `clip_inspector4_proof.py` | 32/32, 31/31, 46/46 |
+| `clip_inspector5_proof.py` | 36/37, exit 1: D2's "selected after the drop" row (selected 4, playhead 2.5000 s); it fails the same over HEAD's sources (filed as #204) |
+| `clip_inspector6_proof.py` (port 4851) | 25/25, exit 0 |
+| `graphics_inspector_proof.py` (port 4887) | 59/59, exit 0 |
+| `wc -l` the four Swift files | 281, 406, 455, 225 |
+
+```sh
+python3 tools/proof/clip_inspector7_proof.py                         # 15/15
+python3 tools/proof/clip_inspector7_proof.py --mutant band-blank     # MUTANT PASS
+python3 tools/proof/name_field_proof.py                              # 39/39
+python3 tools/proof/name_field_proof.py --mutant no-redisplay        # exit 1, N20 FAILS
+```
+
+## Issue batch B51 — one alert queue per document, the composer's menu-tool undo (relink_sheet_probe.py A1–A5, menu_undo_probe.py; #195, #184 item 2)
+
+- **#195** — every `ProjectDocument.present(_:)` goes through one
+  per-document queue (`ProjectDocument+Alerts.swift`, `DocumentAlertQueue`):
+  one alert sheet at a time, each asked for a main-queue turn after the last
+  one's `didPresent` or the window's last `didEndSheetNotification`, and
+  only while no sheet is attached; with no window, app-modal at once. B29's
+  `presentRelinkRefusals` chain is gone: both relink doors `present` an
+  unreadable file at once, and the commit `present`s each refusal in order.
+  Item 4 (the `RelinkRefusalsLeft` leak on close) falls out — nothing is
+  retained through `contextInfo` any more; no row.
+- **#184 item 2** — `UIMenu.perform` opens no eager document undo group
+  when the target's own `undoManager` is not the document's: the Assistant
+  composer, and every field editor, which answers its own
+  `NSCellUndoManager` (M1). Such a target's text undo lands on its own
+  manager, so a document group round its Cut or Paste could only be empty
+  and clear redo; a target whose manager IS the document's is unchanged
+  (`v2_menu.py` U1–U3). That covers the vetoed field too (V1). On a
+  `ProjectDocument` such a target's action still runs in
+  `inUndoGroupIfRegistered`, so a document edit committed during it (a
+  `controlTextDidChange` commit) is one step and leaves no implicit group
+  open (F1, added by the review's finding 1).
+
+`relink_sheet_probe.py` gains five rows after S4 (its wall is now 240 s). An
+"alert" is an attached sheet that is not a relink sheet, A4's bare sheet or
+A5's blocker, and has not been seen already.
+
+| Row | Passes when |
+|---|---|
+| A1 | (#195.1) `importMedia` of two garbage `.png`s: an alert holding "Could not read unreadable-1.png." within 20 s, held until the completion has run and 0.5 s more; after `endSheet` one holding "…unreadable-2.png." within 10 s; none more within 2 s |
+| A2 | (#195.2) the Media tab's door, `relinkMedia` of one garbage `.png`: one alert holding its error within 20 s, held 0.5 s; none more within 2 s |
+| A3 | (#195.3) the sheet's door, toneA for the first media and A.mov for an id no media holds: alert 1 holds what the project's `applying` of those ops throws, within 20 s, held 0.5 s; alert 2 the first media's refusal within 10 s; none more within 2 s; every media's path unchanged |
+| A4 | a bare `NSViewController` sheet is up, `present(E1)`, the sheet dismissed 1 s later: E1's alert within 5 s; after `endSheet`, `present(E2)` shows E2's within 2 s; none more within 2 s |
+| A5 | as A4 with an `NSAlert` attached by `beginSheetModal(for:)` as the blocker, ended with `endSheet` 1 s later (the queue is not jammed) |
+
+`menu_undo_probe.py [--sources DIR] [--mutant NAME] [--only IDS]` builds
+`menu_undo_probe.swift` with `relink_sheet_probe.py`'s swiftc line plus
+`-D REELCUT_DEV_TOOLS` and runs it once, killed at a 120 s wall, under
+`work/menu-undo/<tree|mutant-NAME>/`; no media. The fixture is
+`relink_sheet_probe`'s window with no media. It copies the general
+pasteboard before its Cut and puts it back only if no one else wrote it
+since, and prints `pasteboard: restored` or `left: <why>`. Exits follow rule R.
+
+| Row | Passes when |
+|---|---|
+| B0 | the probe builds |
+| M1 | CONTROL: the window's `undoManager` is the document's; an editable `NSTextField`'s field editor answers a manager of its own (AppKit's `NSCellUndoManager`) and so does `AssistantComposerField().textView`, neither the document's; with the composer first responder, `UIMenu.target` of `cut:` is that text view; one applied edit undone leaves canUndo false, canRedo true |
+| M2 | (#184.2) the composer holds "hello", all selected; `UIMenu.perform` runs Cut then Paste on `UIMenu.target`'s answer: the text goes "" then "hello", the composer's own manager can undo, and the document's canUndo, canRedo, redoActionName and groupingLevel are as before |
+| V1 | RECORD: a field whose delegate's `control(_:textShouldBeginEditing:)` answers false, holding "hello", first responder, all selected, the document's redo re-armed; Cut then Paste through `UIMenu.perform`. Passes when the field still reads "hello"; the detail prints the document's undo state before and after each |
+| F1 | a field whose delegate commits two ungrouped document edits (`applyEdit`) in `controlTextDidChange`, first responder, all selected; Paste through `UIMenu.perform` on its field editor, then one grouped edit: the document's groupingLevel is back where it began after the Paste, one undo takes back only the later edit (canUndo true, undo "Field Commit"), and a second takes back both of the field's commits, the stack where it was before |
+
+**Measured on the unmodified tree** (`app/Sources` at `921dd15`, the probes
+added, no app edit):
+- `relink_sheet_probe.py`: 8/12, exit 1. A1 FAIL "alerts 1; completion ran
+  at 0.29 s … texts [["Could not read unreadable-1.png."]]"; A2 pass
+  "alerts 1; a second within 2 s: false" (the Media tab's door measured not
+  to drop); A3 FAIL "alerts 1 … texts [["no media with id 1004"]]" (the
+  refusal after it never attached); A4 FAIL and A5 FAIL, each "blocker
+  attached: 0.00 s; alerts 0; E1's attached never after its present" — an
+  error sheet asked for over a bare sheet or an alert sheet is never shown,
+  even after the blocker ends.
+- `menu_undo_probe.py`: 2/4, exit 1. M1 FAIL: "window's undoManager is the
+  document's: true; the field first responder true, its editor present
+  (first responder NSTextView), its manager the document's: false (another,
+  NSCellUndoManager, the field's own: false); the composer first responder
+  true, its manager another: true; cut:'s target the composer: true". M2
+  FAIL: "before: canUndo false, canRedo true … redo \"Add Track\" …; after
+  Cut: text \"\"; canUndo true, canRedo false … redo \"\"". V1 pass (RECORD):
+  "before: canUndo true, canRedo true … redo \"Add Track\"; after Cut: text
+  \"hello\"; canUndo true, canRedo false … redo \"\"; after Paste: text
+  \"hello\"; canUndo true, canRedo false". `pasteboard: restored`.
+
+**M1 restated.** As first written, M1 asked that the field editor answer
+the document's manager; on the unmodified tree it answered its own
+`NSCellUndoManager` (printed above), so the guard covers every text field's
+field editor as well as the composer. M1 now states that measured fact.
+
+**Measured on the change**: `menu_undo_probe.py` 4/4, exit 0 — M2 "the
+document's state unchanged: true … after Cut: text \"\"; canUndo false,
+canRedo true … redo \"Add Track\""; V1 "after Cut: text \"hello\";
+canUndo false, canRedo true … redo \"Add Track\"; after Paste … canUndo
+false, canRedo true" — no empty step, redo kept. After the review's
+finding 1 (the guard's arm runs in `inUndoGroupIfRegistered` on a
+`ProjectDocument`), 5/5 — F1 "after Paste: commits 1; canUndo true … undo
+\"Field Commit\" … groupingLevel 0; … after one undo: canUndo true …
+undo \"Field Commit\", redo \"Later Edit\"".
+
+| `--mutant` | Edit | Result |
+|---|---|---|
+| `relink_sheet_probe.py --mutant queue-off` | `present(_:)`'s window arm calls `presentError(error, modalFor: window, delegate: nil, …)` at once | S2, S4, A1, A3 FAIL, caught, exit 1 |
+| `relink_sheet_probe.py --mutant no-sheet-wait` | the drain's `if window.attachedSheet != nil {` → `if false {` | A4 and A5 FAIL ("alerts 0; E1's attached never"), caught, exit 1 — both had failed on the unmodified tree |
+| `relink_sheet_probe.py --mutant sheet-silent` | `applyClicked` calls `document.relinkMedia(choices)` | S2 FAIL, caught, exit 1 |
+| `menu_undo_probe.py --mutant no-own-manager-guard` | the guard's condition gains `, false` | M2 FAIL ("the document's state unchanged: false … after Cut … canUndo true, canRedo false"), caught, exit 1 |
+| `menu_undo_probe.py --mutant own-manager-bare-send` | the guard's `ProjectDocument` arm sends with no pending group | F1 FAIL ("after Paste … groupingLevel 1; after the later edit … groupingLevel 1; after one undo: canUndo false … redo \"Field Commit\"" — the field's commits and the later edit merged into one step), caught, exit 1 |
+
+The B29 mutant `unreadable-at-once` is deleted: its `before` text is gone.
+
+Run on 2026-10-01, the change over `921dd15`, every instance my own:
+
+| Command | Answer |
+|---|---|
+| `make typecheck` | 0 errors, 4 warnings, tsc clean |
+| `make test` | exit 0 |
+| `make app` | BUILD SUCCEEDED |
+| `inventory.py --check` | 5/5 — "I2 and I3 clean over 46 grep sites and 46 pins" |
+| `relink_sheet_probe.py` | 12/12, exit 0 — A1 "alerts 2 … texts [["Could not read unreadable-1.png."], ["Could not read unreadable-2.png."]]"; A4 and A5 "alerts 2; E1's attached 1.55 s after its present" |
+| `menu_undo_probe.py` | 4/4, exit 0, `pasteboard: restored`; after finding 1, 5/5 |
+| `v2_menu.py 4892 --only U` (own instance) | 3 pass, 0 fail, 0 skip of 3, exit 0; after finding 1, the same on 4893 |
+
+```sh
+python3 tools/proof/relink_sheet_probe.py                          # 12/12, exit 0
+python3 tools/proof/relink_sheet_probe.py --mutant queue-off       # S2 S4 A1 A3 FAIL, exit 1
+python3 tools/proof/relink_sheet_probe.py --mutant no-sheet-wait   # A4 A5 FAIL, exit 1
+python3 tools/proof/menu_undo_probe.py                             # 5/5, exit 0
+python3 tools/proof/menu_undo_probe.py --mutant no-own-manager-guard  # M2 FAIL, exit 1
+python3 tools/proof/menu_undo_probe.py --mutant own-manager-bare-send # F1 FAIL, exit 1
+```

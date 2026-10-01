@@ -54,6 +54,9 @@ enum CaptionLayout {
     /// from every other producer: `words`, one per whitespace token of
     /// `text` in TIMELINE ticks; `size`, a lone word's shrunk font size;
     /// `width`, the box a lone word too wide even at the floor wraps in.
+    /// `speaker` is nil from every producer but `CaptionCues.build`, and a
+    /// Subtitles cue that carries one is placed in its palette colour
+    /// (spec §11 R6-22).
     struct Cue: Equatable {
         let start: Ticks
         let end: Ticks
@@ -62,10 +65,12 @@ enum CaptionLayout {
         let words: [CaptionCues.Word]?
         let size: Double?
         let width: Double?
+        let speaker: Speaker?
 
         init(
             start: Ticks, end: Ticks, text: String, tag: String,
-            words: [CaptionCues.Word]? = nil, size: Double? = nil, width: Double? = nil
+            words: [CaptionCues.Word]? = nil, size: Double? = nil, width: Double? = nil,
+            speaker: Speaker? = nil
         ) {
             self.start = start
             self.end = end
@@ -74,7 +79,15 @@ enum CaptionLayout {
             self.words = words
             self.size = size
             self.width = width
+            self.speaker = speaker
         }
+    }
+
+    /// Who said a cue: a label within ONE media's transcript (R6-3), since
+    /// AssemblyAI letters each file's speakers afresh (spec §11 R6-22).
+    struct Speaker: Hashable {
+        let media: UInt32?
+        let label: String
     }
 
     /// A cue its producer refused, or one placement gave up on.
@@ -202,6 +215,7 @@ enum CaptionLayout {
         let words: [CaptionCues.Word]?
         let size: Double?
         let width: Double?
+        let speaker: Speaker?
     }
 
     /// Everything a caption run will do, computed against `project` and
@@ -217,7 +231,9 @@ enum CaptionLayout {
     /// never be refused by the overlap rule.
     ///
     /// `style` is the caption style (road map 8's W4a). `.subtitles` is the
-    /// Caption preset and the code path this function always had; a word
+    /// Caption preset and the code path this function always had, byte for
+    /// byte for a cue with no speaker; a speaker's cue adds its palette
+    /// `color` (`CaptionStyle.speakerColors`, spec §11 R6-22). A word
     /// style writes `style.pagePatch` per page — the props the pager measured,
     /// at the page's own size (a shrunk one or the style's), with its wrap
     /// width and its `words` in CLIP time — and puts the batch at the style's
@@ -242,7 +258,8 @@ enum CaptionLayout {
             let end = ReelTime.snapToFrame(cue.end, fps: canvas.fps)
             return Placed(
                 tag: cue.tag, order: index, start: start, end: max(end, start + frame),
-                text: cue.text, words: cue.words, size: cue.size, width: cue.width)
+                text: cue.text, words: cue.words, size: cue.size, width: cue.width,
+                speaker: cue.speaker)
         }
         placed.sort { $0.start == $1.start ? $0.order < $1.order : $0.start < $1.start }
 
@@ -310,8 +327,10 @@ enum CaptionLayout {
                 font: preset.font, size: (height * preset.sizeFraction).rounded(),
                 align: preset.align, valign: "middle", backdrop: .some(preset.backdrop),
                 width: .some(Double(canvas.width) * wrapFraction))
-            for cue in kept {
+            let colors = CaptionStyle.speakerColors(kept.map(\.speaker))
+            for (cue, color) in zip(kept, colors) {
                 base.content = cue.text
+                base.color = color
                 ops.append(
                     .addTextClip(
                         track: destination, at: cue.start, duration: cue.end - cue.start,
@@ -462,10 +481,13 @@ enum CaptionCues {
     /// soft-wraps it on the canvas. For the same reason the hard `"\n"` this
     /// puts between the two lines is advisory: it is a break CoreText will
     /// honour, inside a box that may add more.
+    ///
+    /// Each cue carries its words' speaker with `media`, the transcript's
+    /// own, so `place` can colour it (spec §11 R6-22).
     static func build(
-        from words: [Word], frame: Ticks, clip: UInt32? = nil
+        from words: [Word], frame: Ticks, clip: UInt32? = nil, media: UInt32? = nil
     ) -> [CaptionLayout.Cue] {
-        var raw: [(start: Ticks, end: Ticks, lines: [String])] = []
+        var raw: [(start: Ticks, end: Ticks, lines: [String], speaker: String?)] = []
         var lines: [String] = []
         var start: Ticks = 0
         var end: Ticks = 0
@@ -473,7 +495,7 @@ enum CaptionCues {
 
         func flush() {
             guard !lines.isEmpty else { return }
-            raw.append((start, end, lines))
+            raw.append((start, end, lines, speaker))
             lines = []
         }
 
@@ -541,7 +563,8 @@ enum CaptionCues {
         return raw.map { entry in
             CaptionLayout.Cue(
                 start: entry.start, end: entry.end, text: entry.lines.joined(separator: "\n"),
-                tag: tag(at: entry.start, clip: clip))
+                tag: tag(at: entry.start, clip: clip),
+                speaker: entry.speaker.map { CaptionLayout.Speaker(media: media, label: $0) })
         }
     }
 

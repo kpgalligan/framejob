@@ -60,6 +60,8 @@ in §6).
   every row; the helper never sees a withheld tool, and the lane refuses one if it is called
   anyway. Risk accepted: recording and cloud transcription stay menu-only, and every file
   written costs a click.
+  **Amended 2026-10-01, by #40**: `close_project` is withheld, always: closing a project
+  closes the window the conversation lives in (AI-5).
 - **AI-8 — The key is the person's own, and is R6-5 and R6-12's key in everything but the
   vendor.** It lives in `SecretStore` under `anthropic-key`; the one override is
   `ANTHROPIC_API_KEY`, read only as R6-5 amended says. It is never a tool argument, a launch
@@ -71,6 +73,10 @@ in §6).
   rule, for the same reasons: Opus 5.5 rejects replayed thinking after an edited prefix, and an
   unchanged prefix keeps the cache warm; compaction runs only at the end of a turn, past a
   threshold (§1). Risk accepted: old renders stay in context until compaction.
+  **Amended 2026-10-01, by AI-20 (#151)**: compaction can be turned off or its threshold
+  changed in Settings, and with "Clear old tool results" on, the API's clearing is a second
+  rewrite — of what the model sees in a request past 150 000 tokens, possibly mid-turn, not of
+  the helper's history. Each clearing breaks the prompt cache once.
 - **AI-10 — Each tool call the assistant makes is its own undo step,** exactly as an MCP call
   is. A turn is not grouped, and the Edit menu names the step as it would for the same call
   from MCP (§6.4). Risk accepted: a ten-call turn is ten Undos.
@@ -160,3 +166,37 @@ in §6).
   API (`assistant_compaction_proof.py`). Risk accepted: the proof shows summaries of tens of
   thousands of tokens, not of 300 000; and #151's person setting, when it lands, will not remove
   the knob.
+  **Amended 2026-10-01, by AI-20 (#151)**: the knob replaces the person's threshold (300 000
+  unless changed in Settings), and wins even with compaction turned off.
+- **AI-19 — While the window's assistant waits on an ask-first question, the Assistant tab's
+  title wears a dot, whichever tab is showing** (issue batch B47, #152; the owner's choice,
+  2026-09-30: "badge the Assistant tab's title"). The dot is its own view over the strip
+  (`InspectorTabBadge`), just right of the title, in the accent colour; `PanelTabsView` is not
+  forked (Controls.swift's sync rule). It shows exactly while the window's session has a
+  `pendingQuestion`, set by `assistantRefresh()`, which runs after every question and answer, so
+  it goes off at Allow, Deny, Stop, Clear, a key or model change, the helper's exit and the
+  window's close. It shows on the Assistant tab too, so it depends on the session alone. It is
+  passive: it takes no click (a click on the tab only shows the tab) and no key, so Return still
+  never answers (AI-17, K-2); the tab never switches itself and no note appears. Risk accepted:
+  a collapsed inspector shows no dot (no strip is on screen), and another window shows nothing —
+  a question in one window draws no attention in the others.
+- **AI-20 — The chat settings are the person's, in Settings' Assistant pane, and a change
+  reaches an open conversation without ending it** (issue batch B48, #151; the owner,
+  2026-09-30: "Yes, make these settings available to the user"). They are Rasterize's two:
+  "Compact when context reaches N tokens", on, N a whole number from 20 000 to 900 000, 300 000
+  by default (AI-9); and "Clear old tool results past 150,000 tokens", off, acting past the
+  helper's fixed `CLEAR_TRIGGER_TOKENS` (150 000, `agent/src/main.ts`). They live in
+  `UserDefaults` under `ReelcutAssistantAutoCompact`, `ReelcutAssistantAutoCompactTokens` and
+  `ReelcutAssistantClearToolResults` (`AssistantChatSettings`); like the model, no tool reads or
+  writes them (AI-11's reason). A stored value outside the range reads as 300 000; a typed one
+  beeps and the field shows the stored value again. `configure.settings` carries
+  `auto_compact_tokens` (null when compaction is off) and `clear_tool_results`. A change applies
+  at once, with no Save, and is written to every open session as `{type: "settings"}`: it ends
+  nothing, unlike a key or model change. The helper reads the threshold at each turn's end and
+  fixes clearing when a turn starts, so a change made mid-turn applies the threshold at that
+  turn's end and clearing from the next turn. Risk accepted: with compaction off, requests fail
+  at the model's window until Clear; with clearing on, the model may re-fetch a result it lost;
+  and no proof has sent `context_management` to the real API — every live and stand-in run so
+  far configured clearing off (`assistant_helper_proof.py`, `spend_proof.py`, the spike) and the
+  unchanged helper builds the request, so a capped live clearing proof is owed, and the owner
+  decides its spend.

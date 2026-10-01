@@ -49,7 +49,7 @@ app/Sources` in `work/text-break/baseline/` and follows rule R: exit 1 is
 CAUGHT — exactly the rows in `BASELINE_EXPECTED` fail and every other row
 passes; 0 is SURVIVED; 2 is NOT PERFORMED (the archive, the build or the run
 failed, a row was never written, or a CONTROL failed), printed as
-`mutant baseline: the control could not be performed — <why>`.
+`baseline <commit>: the control could not be performed — <why>`.
 
 `--mutant NAME` builds the same probe over a copy of `app/Sources` in
 `work/text-break/mutant-<name>/` with one edit (`MUTANTS`), and follows rule
@@ -291,7 +291,7 @@ def baseline(commit):
     os.makedirs(tree)
 
     def not_performed(why):
-        print(f"mutant baseline: the control could not be performed — {why}")
+        print(f"baseline {commit}: the control could not be performed — {why}")
         return 2
 
     archive = subprocess.run(["git", "-C", ROOT, "archive", commit, "app/Sources"],

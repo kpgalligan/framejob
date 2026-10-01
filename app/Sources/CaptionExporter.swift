@@ -270,12 +270,11 @@ enum CaptionExporter {
     /// the question a set here answers is "did THIS popup write the suffix on
     /// this name", and the only suffixes a caption panel ever puts on a name
     /// are these two; a still's `.png` is `FrameWriter`'s to replace and a
-    /// caption panel handed `chart.png` keeps it, as it keeps `.txt`. Its two
-    /// spellings are the `srt` and `vtt` rows of
-    /// `AgentServer.replaceableExtensions`, and they have to be a SUBSET of
-    /// that set — see `renamed`; `tools/proof/remaining_probe.py`'s 1f
-    /// builds a row from each member here and asks `destinationURL`, so
-    /// the rule is pinned rather than stated.
+    /// caption panel handed `chart.png` keeps it, as it keeps `.txt`. It is
+    /// also the set `export_captions` replaces
+    /// (`AgentServer.captionDestinationURL`, spec §11 #43);
+    /// `tools/proof/remaining_probe.py`'s 1f builds a row from each member
+    /// here and asks that function, so the rule is pinned rather than stated.
     static let knownExtensions = Set(Format.allCases.map { $0.rawValue })
 
     /// A save panel's name field rewritten for a newly chosen format: the
@@ -291,27 +290,23 @@ enum CaptionExporter {
     /// `("shot.final" as NSString)`'s is "shot".
     ///
     /// A foreign extension is KEPT: `talk.txt` under SubRip is `talk.txt.srt`,
-    /// because `txt` is part of the name by `AgentServer.destinationURL`'s
-    /// rule — it strips only a member of `replaceableExtensions` and appends
-    /// otherwise — and `talk.txt.srt` is the file `export_captions` writes for
-    /// that same path, so the panel and the tool agree about what the name
-    /// means. The suffix is compared lower-cased, as `destinationURL`
+    /// because `txt` is part of the name by `AgentServer.captionDestinationURL`'s
+    /// rule — it strips only a member of `knownExtensions` and appends otherwise
+    /// — and `talk.txt.srt` is the file `export_captions` writes for that same
+    /// path, so the panel and the tool agree about what the name
+    /// means. The suffix is compared lower-cased, as `captionDestinationURL`
     /// compares, so `talk.SRT` under WebVTT is `talk.vtt` and not
     /// `talk.SRT.vtt`; a dot-leading name has no extension to Foundation
     /// (`.srt` under WebVTT is `.srt.vtt`), which is pinned rather than
-    /// special-cased. The one place the two rules part company is a name
-    /// carrying another of the app's OWN containers — `chart.png` under
-    /// SubRip is `chart.png.srt` here and `chart.srt` over MCP, since `png`
-    /// is replaceable there and not a caption spelling — and that is a
-    /// recorded limit, not a case to widen the set for: a wider set is
-    /// exactly the bare strip with a longer list.
+    /// special-cased. `chart.png` under SubRip is `chart.png.srt` both here
+    /// and over MCP.
     ///
     /// It is a pure function of a string and lives HERE rather than in
     /// `CaptionExportOptions` for `FrameWriter.renamed`'s reason: an
     /// accessory view's private method is reachable by no proof this project
     /// can write, because a save panel cannot be driven over MCP or
     /// offscreen, and the MCP path never comes near it — `export_captions`
-    /// goes through `destinationURL`, which was right all along, so an MCP
+    /// goes through `captionDestinationURL`, which this function mirrors, so an MCP
     /// check for `Board v1.2` passes against a build with the bare strip in
     /// it. `tools/proof/remaining_probe.py` compiles `app/Sources` and calls
     /// this with a table of names instead.

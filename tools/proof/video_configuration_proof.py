@@ -61,6 +61,7 @@ SOURCES = os.path.join(ROOT, "app", "Sources")
 RESOURCES = os.path.join(ROOT, "app", "Resources")
 PROBE_SWIFT = os.path.join(HERE, "video_configuration_probe.swift")
 PROBE_WORK = os.path.join(HERE, "work", "video_configuration_probe")
+PROBE_DIR = os.path.join(PROBE_WORK, "tree")
 LIB = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
 A_MOV = os.path.join(ROOT, "tools", "proof", "media", "A.mov")
 WRITTEN = re.compile(r"Written to (\S+\.png)\.")
@@ -173,8 +174,12 @@ def mutant_sources(name):
     return target, None
 
 
-def build_probe(sources=SOURCES, probe_dir=os.path.join(PROBE_WORK, "tree")):
-    """(binary, None) or (None, reason). Rebuilt only when stale."""
+def build_probe(sources=None, probe_dir=None):
+    """(binary, None) or (None, reason). Rebuilt only when stale. `None` for
+    either argument means the module's `SOURCES` / `PROBE_DIR`, read at call
+    time, so an importer that sets them is heard."""
+    sources = SOURCES if sources is None else sources
+    probe_dir = PROBE_DIR if probe_dir is None else probe_dir
     os.makedirs(probe_dir, exist_ok=True)
     binary = os.path.join(probe_dir, "video_configuration_probe")
     entry = os.path.join(probe_dir, "main.swift")

@@ -203,6 +203,13 @@ final class AssistantSession {
         toolQueue = []
     }
 
+    /// Settings' chat settings changed (AI-20): the helper takes them without
+    /// ending the conversation. Nothing once closed.
+    func updateSettings(_ settings: [String: Any]) {
+        guard !closed else { return }
+        write(["type": "settings", "settings": settings])
+    }
+
     /// Idempotent. Closing stdin ends the helper; one still running 2 s later
     /// is terminated.
     func close() {

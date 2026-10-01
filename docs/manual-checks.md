@@ -74,14 +74,19 @@ the same way.
 - **Source:** #47.
 
 **PB-6 — A saved project opens quickly; a relinked clip updates on screen**
-- **Do:** 1. Save a project holding the long recording; quit; reopen it. 2. Move one of a project's media files to another folder; reopen the project; relink it in the Relink… sheet it offers. 3. In the Media tab, Relink… a 10 s media to `AV.mov`. 4. Move two of a project's video files away and reopen it; in the Missing media sheet Locate… `toneA.m4a` for one and a video file for the other; press Relink. 5. In the Media tab, Relink… a media with sound (a clip on it showing a waveform) to `A.mov`.
-- **Expect:** the reopen is quick, with no long re-analysis. After relinking, the clip's filmstrip redraws with the file's frames. After step 3, the row reads 5 s, and the whole-file clip ends at 5 s. After step 4, the video file relinks, and then an alert sheet shows the refusal in the core's own words ("… is video media and … is audio: relink it to a file of the same kind …"); with two refused files, a second alert follows the first once it is dismissed. After step 5, the clip's waveform goes at once.
-- **Source:** #47; step 3, #63; steps 4–5, #180.
+- **Do:** 1. Save a project holding the long recording; quit; reopen it. 2. Move one of a project's media files to another folder; reopen the project; relink it in the Relink… sheet it offers. 3. In the Media tab, Relink… a 10 s media to `AV.mov`. 4. Move two of a project's video files away and reopen it; in the Missing media sheet Locate… `toneA.m4a` for one and a video file for the other; press Relink. 5. In the Media tab, Relink… a media with sound (a clip on it showing a waveform) to `A.mov`. 6. File ▸ Add Media… two files that are not media (two text files renamed `.png`).
+- **Expect:** the reopen is quick, with no long re-analysis. After relinking, the clip's filmstrip redraws with the file's frames. After step 3, the row reads 5 s, and the whole-file clip ends at 5 s. After step 4, the video file relinks, and then an alert sheet shows the refusal in the core's own words ("… is video media and … is audio: relink it to a file of the same kind …"); with two refused files, a second alert follows the first once it is dismissed. After step 5, the clip's waveform goes at once. After step 6, an alert names the first file, and once it is dismissed a second names the other.
+- **Source:** #47; step 3, #63; steps 4–5, #180; step 6, #195.
 
 **PB-7 — Waveforms have no gaps**
 - **Do:** 1. Import an AAC file, a WAV file and a recording made by Reelcut. 2. Look at each clip's waveform at M and L track height. 3. On the long recording, open Clip ▸ Remove Silences… while it is still being analysed.
 - **Expect:** no gap or flat tail where there is sound. While decoding, the sheet names the file ("The waveform is still being analysed for …") until the decode finishes.
 - **Source:** #47 (#23).
+
+**PB-8 — A project whose media moved opens and offers Relink**
+- **Do:** Use the installed or current build, and note which `Reelcut.app` actually opened the file (its path in the Dock menu or Activity Monitor). 1. Save a project with two clips; quit. Move the `.reelcut` and its media together into a new folder, then open it from the Finder with right-click ▸ Open With ▸ Reelcut. 2. Move a media file while the project is OPEN in Reelcut, wait for an autosave, quit, and reopen it. 3. Move a media file to another volume (an external drive or a disk image), unmount it, and reopen the project.
+- **Expect:** each time, the project opens. Media that is still findable plays. Media that is gone shows slates, with the Missing media sheet offering Locate… and Relink. Never an open failure, a hang or a crash.
+- **Source:** #131 (the owner's report of 2026-09-26, not reproduced by the agents). On a failure, add to #131 which app opened the file and exactly what happened: an alert and its text, a hang, a crash, or no window.
 
 ## Timeline, canvas and keys
 
@@ -190,12 +195,17 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Expect:** the change lands on the action's END state while the box is drawn at the playhead (accepted by design; judge whether it is tolerable); a text width drag starts from the end width; a shape box still resizes; unchecking shows ◆ "at end". Collapse is instant with Reduce motion, animated (about a quarter second) without; auto-open is always instant.
 - **Source:** #49 phase 5; spec §11 CI-13.
 
+**CT-7 — Section header hover and the "clip" tag**
+- **Do:** 1. Window in front, move slowly onto and off several Clip-tab section headers. 2. Repeat with System Settings ▸ Accessibility ▸ Display ▸ Reduce motion on, then off. 3. Select an audio clip, open Sound ▸ Volume, select an action on it.
+- **Expect:** a header darkens one step with a quick fade, instantly with Reduce motion; its title, marks, summary and Reset/Clear stay legible; rows never darken. With an action selected a small boxed "clip" follows Normalize; with none it is gone.
+- **Source:** #102 (spec §11 CI-15, amended).
+
 ## Chrome and looks
 
 **CH-1 — The zoom slider and square controls**
-- **Do:** 1. Drag the timeline's zoom knob. 2. Look at the Export button, S/M/L, the Snap box and fields, then open a sheet (Export…) with its rounded buttons.
-- **Expect:** a grey track, a white (dark) or black (light) block knob beside the accent fill; the knob drags smoothly. The square controls sit comfortably beside the sheets' rounded buttons.
-- **Source:** #50 (spec §11 SH-1, SH-2).
+- **Do:** 1. Drag the timeline's zoom knob. 2. Look at the Export button, S/M/L, the Snap box and fields, then open a sheet (Export…).
+- **Expect:** a grey track, a white (dark) or black (light) block knob beside the accent fill; the knob drags smoothly. The toolbar's square controls and the sheets' square buttons read as one family.
+- **Source:** #50, #100 (spec §11 SH-2, SH-4).
 
 **CH-2 — States and hovers no proof renders**
 - **Do:** 1. Hover and press ghost (borderless) buttons. 2. Find a disabled slider. 3. Hover every control with a tooltip. 4. Switch Timeline Track Height S / M / L.
@@ -206,6 +216,11 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Do:** Select clips with a gap and an overlap between them; Clip ▸ Speed…; set a speed that one clip refuses. Then set ×0.5 on a clip with a neighbour just after it.
 - **Expect:** the hint (gaps, a clip that gains a transition — named below — and a refused clip left unchanged) wraps readably; a line under the lengths names the neighbour and its transition's length, and the sheet grows to show every line unclipped.
 - **Source:** #48, #109.
+
+**CH-4 — The square buttons**
+- **Do:** 1. Close every document so Welcome shows, then open Reelcut ▸ Settings…. 2. In a project: File ▸ Export…, Clip ▸ Speed…, Clip ▸ Remove Silences…, File ▸ Generate Captions…, File ▸ Consolidate Media…, File ▸ New Recording…, Window ▸ Export Queue. 3. In each, hover every button, press and hold one, and look at a disabled one (Settings' Remove with no key set).
+- **Expect:** square buttons with no shadow. The blue one lightens slightly on hover, and the outlined one takes a faint grey fill. A press shrinks the button a little about its centre, and a disabled one is dimmed. No title is clipped and no row is cramped or off-centre, in both appearances.
+- **Source:** #100 (spec §11 SH-4).
 
 ## Sound and export
 
@@ -287,6 +302,11 @@ Needs your own AssemblyAI key (Setup 3).
 - **Expect:** the other-language run completes and its report card says which model answered; the ten-hour run completes; the out-of-credit run shows the balance sentence.
 - **Source:** #53.
 
+**CC-4 — Speaker colours**
+- **Do:** 1. Generate Captions with AssemblyAI, Speakers on, Subtitles, over a two-person recording. 2. Generate again with Pill.
+- **Expect:** each voice reads in its own colour (white, then yellow), legible over the band; Pill ignores it; the Speakers row reads whole.
+- **Source:** #93.
+
 ## Silence, transitions and motion
 
 **SIL-1 — Remove Silences by voice, listened to**
@@ -330,9 +350,9 @@ Uses the three `tools/proof/work/playback-check/` projects (Setup 3).
 - **Source:** #56.
 
 **GR-4 — The Title and marker name fields**
-- **Do:** 1. Insert ▸ Graphic ▸ Lower Third, select it, open Clip ▸ Graphic. 2. Press M, then open the Document tab.
-- **Expect:** the Title field is the height of the number fields, and the marker's name field is the height of the Rate row's controls, in both appearances. Both are filled and bordered like the number fields, with their text centred vertically, in both appearances; clicking into either moves no text.
-- **Source:** #106, #171.
+- **Do:** 1. Insert ▸ Graphic ▸ Lower Third, select it, open Clip ▸ Graphic. 2. Press M, then open the Document tab. 3. In the Document tab, click into a marker's name field, select all, delete, then type a letter.
+- **Expect:** the Title field is the height of the number fields, and the marker's name field is the height of the Rate row's controls, in both appearances. Both are filled and bordered like the number fields, with their text centred vertically, in both appearances; clicking into either moves no text. With the name deleted, a grey "Marker" sits where the text sat and did not move on the click; the first letter typed replaces it at once.
+- **Source:** #106, #171, #199.
 
 ## Screen recording
 
@@ -376,9 +396,9 @@ To take a permission away again: System Settings ▸ Privacy & Security, or
 - **Source:** #137; spec §11 recording.md (the recorder panel takes key only from an active Reelcut).
 
 **REC-8 — File ▸ Pause Recording, and the item's one width**
-- **Do:** 1. Start a recording from the panel. 2. Open the File menu: Pause Recording, then open it again: Resume Recording. 3. Watch Reelcut's menu bar item through the pause and resume, and past the first minute. 4. Repeat 2–3 with the menu bar in the light look and in the dark. 5. Stop. 6. Launch Reelcut from Terminal as in REC-7 (port 4817, the terminal holding Screen Recording); in a second Terminal tab, in the repository, run `python3 -c 'import sys; sys.path.insert(0, "tools/proof"); from mcp import MCP; MCP(4817).call("record_screen", seconds=20)'`; while it records, choose File ▸ Pause Recording, then File ▸ Resume Recording, watching the menu bar item.
-- **Expect:** the File item reads Pause Recording while recording and Resume Recording while paused, and is greyed out with no recording; each choice pauses or resumes as the item's own menu does (coral dot and running time, then the pause glyph and a frozen time). The item keeps one width throughout — the neighbouring menu bar items do not shift as the time ticks or the mark changes — and the title is never clipped, in either look. In step 6 the `record_screen` recording's item flips at each click, not up to a second later.
-- **Source:** #98 (a, b); #181 (item 4, step 6); spec §11 recording.md (File ▸ Pause Recording).
+- **Do:** 1. Start a recording from the panel. 2. Open the File menu: Pause Recording, then open it again: Resume Recording. 3. Watch Reelcut's menu bar item through the pause and resume, and past the first minute. 4. Repeat 2–3 with the menu bar in the light look and in the dark. 5. Stop. 6. Launch Reelcut from Terminal as in REC-7 (port 4817, the terminal holding Screen Recording); in a second Terminal tab, in the repository, run `python3 -c 'import sys; sys.path.insert(0, "tools/proof"); from mcp import MCP; MCP(4817).call("record_screen", seconds=20)'`; while it records, choose File ▸ Pause Recording, then File ▸ Resume Recording, watching the menu bar item. 7. Run the `record_screen` line again; choose File ▸ Pause Recording, then File ▸ Stop Recording, and watch the item until it goes away.
+- **Expect:** the File item reads Pause Recording while recording and Resume Recording while paused, and is greyed out with no recording; each choice pauses or resumes as the item's own menu does (coral dot and running time, then the pause glyph and a frozen time). The item keeps one width throughout — the neighbouring menu bar items do not shift as the time ticks or the mark changes — and the title is never clipped, in either look. In step 6 the `record_screen` recording's item flips at each click, not up to a second later. In step 7 the item keeps the pause glyph and its frozen time until it disappears; the coral dot never returns.
+- **Source:** #98 (a, b); #181 (item 4, step 6); #193 (item 1, step 7); spec §11 recording.md (File ▸ Pause Recording).
 
 **REC-9 — The microphone meter during the countdown**
 - **Do:** 1. File ▸ New Recording…, choose a real microphone (not a virtual device), press Record, and speak through the 3-2-1; stop the recording that follows from the menu bar item. 2. Press Record again for a second countdown and press Cancel during it. 3. Set the microphone to Off and press Record; Cancel.
@@ -429,6 +449,16 @@ Needs your own Anthropic API key (Setup 3).
 - **Expect:** 1. the drag selects across entries, and the paste is plain text (no fonts or colours), each entry starting on its own line. 2. each modified Return starts a new line; the field grows a line at a time up to five, then holds its height and scrolls. 3. the whole message is sent, lines intact, and the field is one line again. 4. Return commits the word and sends nothing. 5. Return beeps and the text stays.
 - **Source:** issue batch B18 (#153, #154); spec §11 AI-17 and K-2.
 
+**AS-8 — The tab at its narrowest**
+- **Do:** With a real key, after a turn: 1. Drag the inspector to its narrowest and back, watching the Context figures, and hover them. 2. In a short conversation, click below the last entry, then drag from there up into it. 3. Type a message that wraps to two lines at the narrowest width, and drag the inspector slowly wider and narrower. 4. Empty the composer at the narrowest width.
+- **Expect:** 1. The figures are full when there is room, and shorter ("N / L · P%", then "P%") as the inspector narrows. They are never cut off with "…", and the tooltip reads the full figure. 2. The click clears the selection, and the drag selects up from the end. 3. The field follows the width, two lines while the message wraps and one line when it does not, with no jump or flicker. 4. The placeholder sits on one line.
+- **Source:** #182 (items 1, 2 and 4; step 3 watches item 3, an accepted limit since B47, where a refit from `AssistantView.layout()` lagged a pass as B37's had), issue batches B37 and B47.
+
+**AS-9 — A question while another tab shows**
+- **Do:** With a real key, light then dark: View ▸ Assistant; ask for an export; while the question is up click Clip, Media, Document, then Assistant and Deny; repeat and press Stop; repeat and Allow; with a question up drag the inspector to its narrowest.
+- **Expect:** a small accent dot right of "Assistant" in the strip while the question waits, on every tab, never touching the word at the narrowest width; a click on the tab only shows it; the dot goes at Deny, Stop and Allow; Return in the composer answers nothing.
+- **Source:** issue batch B47 (#152); spec §11 AI-19.
+
 ## Host-state proof runs
 
 Scripts that need a state no agent session has. Run from a terminal on an
@@ -449,3 +479,13 @@ unlocked Mac; paste each score into the issue in the Source.
 - **Do:** Set the output to the built-in speakers; `python3 tools/proof/mixed_audio_probe.py`.
 - **Expect:** section 4 passes (so far only measured on Bluetooth).
 - **Source:** #51 (#34).
+
+**HS-4 — The screen catalog on a Mac whose system look is Light**
+- **Do:** 1. Set System Settings ▸ Appearance to Light. 2. `python3 tools/proof/screens.py`. 3. Compare its light PNGs with the latest catalog run from a Dark host (under `tools/proof/work/screens/`, captured with `-RCDevAppearance light`), e.g. with `python3 -c` over two PNGs or any image-diff tool.
+- **Expect:** the run passes. On the Dark host, `-RCDevAppearance light` and `-NSRequiresAquaSystemAppearance YES` differed only in the timeline's alternate lanes (grey 140 against 139) and its vertical scroller track (233 against 255). Record which of the two a real Light host matches. Explain any other difference in the screen's prose, or file it.
+- **Source:** #139 (road map 11's V3).
+
+**HS-5 — The screen catalog on a second display**
+- **Do:** Run `python3 tools/proof/screens.py` on a display at a different scale from the usual one, e.g. a Mac's built-in Retina screen (scale 2); every run so far was at scale 1 on one external display.
+- **Expect:** the run passes. Screens and prose that depend on the host are noted in the screen's prose, or filed.
+- **Source:** #139 (road map 11's V3).

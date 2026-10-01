@@ -40,11 +40,22 @@ final class AssistantTranscriptView: NSScrollView {
         textView.autoresizingMask = [.width]
         textView.frame = NSRect(origin: .zero, size: contentSize)
         documentView = textView
+        // Adopting it runs the text view's `sizeToFit`, which leaves its
+        // origin at minus its new height (measured, #182); put it back at 0.
+        textView.setFrameOrigin(.zero)
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError("AssistantTranscriptView does not support NSCoder")
+    }
+
+    /// The text view is never shorter than the clip view, so a click below a
+    /// short transcript lands in the text (#182).
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        textView.minSize = NSSize(width: 0, height: contentSize.height)
+        textView.sizeToFit()
     }
 
     // MARK: - Drawing the transcript

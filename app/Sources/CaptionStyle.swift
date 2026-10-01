@@ -16,7 +16,9 @@ import Foundation
 ///
 /// `.subtitles` is here so a caller has one vocabulary for the choice. Its
 /// rows are never read for placement: `place` takes today's Caption-preset
-/// path for it, byte for byte, and `CaptionCues.build` makes its cues.
+/// path for it, byte for byte for a cue with no speaker (a speaker's cue
+/// adds its `speakerColors` entry, spec §11 R6-22), and `CaptionCues.build`
+/// makes its cues.
 ///
 /// A word style's page is ONE page in three places: `textProps` is what the
 /// pager measures and what the sheet previews, and `pagePatch`, built from
@@ -80,6 +82,25 @@ enum CaptionStyle: String, CaseIterable {
 
     /// The base colour: white for every style.
     var color: RGBA { [1, 1, 1, 1] }
+
+    /// Spec §11 R6-22's palette, broadcast subtitling's white, yellow, cyan
+    /// and green: a Subtitles cue's colour by its speaker. A named table,
+    /// with no setting.
+    static let speakerPalette: [RGBA] = [[1, 1, 1, 1], [1, 1, 0, 1], [0, 1, 1, 1], [0, 1, 0, 1]]
+
+    /// One entry per input, in input order: nil for a nil speaker; else the
+    /// palette entry of that speaker's first-appearance index (distinct
+    /// non-nil speakers counted in input order) modulo 4. A nil speaker
+    /// takes no slot.
+    static func speakerColors(_ speakers: [CaptionLayout.Speaker?]) -> [RGBA?] {
+        var slots: [CaptionLayout.Speaker: Int] = [:]
+        return speakers.map { speaker in
+            guard let speaker = speaker else { return nil }
+            let slot = slots[speaker] ?? slots.count
+            slots[speaker] = slot
+            return speakerPalette[slot % speakerPalette.count]
+        }
+    }
 
     /// A black outline's width in em, or nil for none.
     var outlineEm: Double? {

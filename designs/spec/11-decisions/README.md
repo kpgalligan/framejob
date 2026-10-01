@@ -15,14 +15,14 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | [`recording.md`](recording.md) | 152 | **Screen recording (road map 3).** The recorder: what is in and out, files, grants, pause. |
 | [`silence.md`](silence.md) | 49 | **Remove Silences (road map 4).** Silero VAD, its grid and cache, voice mode; S1-23. |
 | [`effects-motion.md`](effects-motion.md) | 60 | **Transitions and motion (road map 5).** R5-1..R5-5, E2-27. |
-| [`deepening.md`](deepening.md) | 391 | **Deepening (road map 7).** D2-1, D3-1, #21, #22, D4-1..D4-6, D7-1..D7-3, #42, #88, #63, #174: how ops refuse, the op table, the gate, the source window, time envelopes, one-delta shifts on the canvas's grid, the non-edits that speak, a relink that re-probes, one frame on the grid. |
-| [`cloud-captions.md`](cloud-captions.md) | 277 | **Cloud captions (road map 6).** R6-1..R6-18: AssemblyAI, keys, deletion, recovery, refusal precedence, a dripping server. |
+| [`deepening.md`](deepening.md) | 416 | **Deepening (road map 7).** D2-1, D3-1, #21, #22, D4-1..D4-6, D7-1..D7-3, #42, #88, #63, #174, #40, #43: how ops refuse, the op table, the gate, the source window, time envelopes, one-delta shifts on the canvas's grid, the non-edits that speak, a relink that re-probes, one frame on the grid, a tool that closes a document, a path one open document holds, a caption name's own extension. |
+| [`cloud-captions.md`](cloud-captions.md) | 368 | **Cloud captions (road map 6).** R6-1..R6-22: AssemblyAI, keys, deletion, recovery, refusal precedence, a dripping server, a Stop's bound on a DELETE, a refused transcript's failed DELETE reported for the dashboard, cached transcripts not re-checked for the key, speaker colours on Subtitles. |
 | [`word-captions.md`](word-captions.md) | 123 | **Word captions (road map 8).** W-1..W-11. |
-| [`chrome-inspector-keys.md`](chrome-inspector-keys.md) | 363 | **Chrome, the clip inspector and keys (the sharp pass, road map 9, #35).** SH-1..SH-3, CI-1..CI-16, K-1..K-3. |
+| [`chrome-inspector-keys.md`](chrome-inspector-keys.md) | 390 | **Chrome, the clip inspector and keys (the sharp pass, road map 9, #35).** SH-1..SH-4, CI-1..CI-16, K-1..K-3. |
 | [`graphics.md`](graphics.md) | 439 | **Graphics (road map 10).** G-1..G-21. |
 | [`dev-tools.md`](dev-tools.md) | 27 | **Dev tools (road map 11).** V-1..V-3: the `REELCUT_DEV_TOOLS` flag and `make dist`, dev tools as ordinary tools, capture by `cacheDisplay`. |
-| [`assistant.md`](assistant.md) | 162 | **The Assistant (road map 12).** AI-1..AI-18: the bundled helper, one lane, the catalog at launch, the fourth tab, the window's own project, W-9's reach, withheld and ask-first tools, the key, history, undo, the model, a call mid-gesture, the base-URL override, the tab kept on a selection change, the live context on each message, Stop reaching a running export or transcribe, the selectable transcript and the multi-line composer, and the dev-only compaction threshold a proof lowers. |
-| [`pricing.md`](pricing.md) | 94 | **Pricing and spend (road map 13).** P-1..P-8: LiteLLM's table as the feed, a call priced from its own `usage` and `model` (per iteration), monthly dollar budgets per service, the app's spend as its own, the spend folder (ledger and price cache) that a proof never touches, the proofs' own ledger and how a paid proof request is held to the month's budget in it, and the two figures the app shows (the conversation's on the Assistant tab, the UTC month's in Settings), and a response cut short priced once and marked partial. |
+| [`assistant.md`](assistant.md) | 202 | **The Assistant (road map 12).** AI-1..AI-20: the bundled helper, one lane, the catalog at launch, the fourth tab, the window's own project, W-9's reach, withheld and ask-first tools, the key, history, undo, the model, a call mid-gesture, the base-URL override, the tab kept on a selection change, the live context on each message, Stop reaching a running export or transcribe, the selectable transcript and the multi-line composer, the dev-only compaction threshold a proof lowers, the dot on the Assistant tab's title while a question waits, and the person's chat settings. |
+| [`pricing.md`](pricing.md) | 96 | **Pricing and spend (road map 13).** P-1..P-8: LiteLLM's table as the feed, a call priced from its own `usage` and `model` (per iteration), monthly dollar budgets per service, the app's spend as its own, the spend folder (ledger and price cache) that a proof never touches, the proofs' own ledger and how a paid proof request is held to the month's budget in it, and the two figures the app shows (the conversation's on the Assistant tab, the UTC month's in Settings), and a response cut short priced once and marked partial. |
 
 ## Every decision
 
@@ -88,6 +88,8 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | #88 | A non-edit a rule declined names the rule's value; a clamp that lands where the clip was stays an identity; a list that applied answers applied — amended by #174 | [`deepening.md`](deepening.md) |
 | #63 | A relink takes the new file's probe, and a media clip whose window runs past the file's end is held to it | [`deepening.md`](deepening.md) |
 | #174 | One frame is the grid's own first frame at every rate, and the handle form counts grid frames | [`deepening.md`](deepening.md) |
+| #40 | `close_project` closes a document as File ▸ Close does; `save_project {path}` and `new_project {path}` refuse a path another open document holds | [`deepening.md`](deepening.md) |
+| #43 | `export_captions` replaces only `srt`/`vtt` in a name; any other extension is part of it | [`deepening.md`](deepening.md) |
 | R6-1 | The cloud engine is a second engine behind the same command, never a second command | [`cloud-captions.md`](cloud-captions.md) |
 | R6-2 | Audio leaves the machine only by name, with the price in front of the person | [`cloud-captions.md`](cloud-captions.md) |
 | R6-3 | The transcript is a per-media asset in the package | [`cloud-captions.md`](cloud-captions.md) |
@@ -97,7 +99,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | R6-7 | No `async` exception | [`cloud-captions.md`](cloud-captions.md) |
 | R6-8 | A fallback to Universal-2 is allowed and REPORTED | [`cloud-captions.md`](cloud-captions.md) |
 | R6-9 | A proof-launched app never opens the person's stored key | [`cloud-captions.md`](cloud-captions.md) |
-| R6-10 | The caption path clamps a clip's `speed` at BOTH ends, because the reader does not | [`cloud-captions.md`](cloud-captions.md) |
+| R6-10 | The caption path clamps a clip's `speed` at BOTH ends, because the reader does not — amended by #41: the reader refuses a speed outside ×0.1–×10, and the clamps stay | [`cloud-captions.md`](cloud-captions.md) |
 | R6-11 | A media whose remote delete this run could not confirm is not uploaded again in this run | [`cloud-captions.md`](cloud-captions.md) |
 | R6-12 | The key and the region are a PERSON's settings, and no tool reads or writes either | [`cloud-captions.md`](cloud-captions.md) |
 | R6-13 | The estimate never counts a HELD media as "to upload", and never hides its price | [`cloud-captions.md`](cloud-captions.md) |
@@ -106,6 +108,10 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | R6-16 | A current transcript batch may be reused without credentials | [`cloud-captions.md`](cloud-captions.md) |
 | R6-17 | `transcribe`'s seven refusals have one precedence, and the answer is the winner's own sentence | [`cloud-captions.md`](cloud-captions.md) |
 | R6-18 | A request's only timeout is an idle one; a server that drips holds it for as long as it drips (accepted) | [`cloud-captions.md`](cloud-captions.md) |
+| R6-19 | A Stop bounds a DELETE; it never skips one | [`cloud-captions.md`](cloud-captions.md) |
+| R6-20 | A transcript refused after it was made, whose DELETE failed, is reported for the dashboard and never retried | [`cloud-captions.md`](cloud-captions.md) |
+| R6-21 | A cached transcript is not re-checked for the key when it is read (accepted) | [`cloud-captions.md`](cloud-captions.md) |
+| R6-22 | With Speakers on, each speaker's Subtitles cues are their own colour, and nothing else marks them | [`cloud-captions.md`](cloud-captions.md) |
 | W-1 | A word caption is an ordinary text clip holding one PAGE | [`word-captions.md`](word-captions.md) |
 | W-2 | `text.words` is one `{start, end}` per whitespace token of `content`, and the core is the one counter | [`word-captions.md`](word-captions.md) |
 | W-3 | Word times are clip time, and they move with the content, not with the clip's length | [`word-captions.md`](word-captions.md) |
@@ -117,7 +123,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | W-9 | No language model chooses words — amended by AI-6 | [`word-captions.md`](word-captions.md) |
 | W-10 | `set_text` can patch `case`, `words` and `word_style` | [`word-captions.md`](word-captions.md) |
 | W-11 | Karaoke's two lines, the bundled caption faces and the 80 % shrink floor are confirmed | [`word-captions.md`](word-captions.md) |
-| SH-1 | `StickerButton` keeps its pill | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
+| SH-1 | `StickerButton` keeps its pill — superseded by SH-4 | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
 | SH-2 | `BlockSliderCell.drawBar` is forked from Rasterize's copy | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
 | CI-1 | The selected action is the SIXTH piece of view state | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
 | CI-2 | The editing target is the selected action, not the playhead | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
@@ -133,12 +139,13 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | CI-12 | The Clip tab's lane carries the clip's transition hatch, fades and motion wedges, and its Curve popup a glyph and the short names | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
 | CI-13 | The canvas's handles follow the mode | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
 | CI-14 | `set_action_end.off` keys an optional property OFF at the end | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
-| CI-15 | Every sub-row carries `mixed`, and the collapse is the one animation | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
+| CI-15 | Every sub-row carries `mixed`, and the collapse is the one animation — amended by #102: a section header's hover fades too | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
 | CI-16 | The selected clip's obscure regions are drawn and dragged on the canvas; the layer's own handles outrank them, an armed modal mode's overlay takes every press over them, and Esc cancels any canvas drag | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
 | K-1 | Space is the transport's unless the first responder is typing or claims it | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
 | K-2 | In the canvas text editor Return applies, a modified Return is a new line, and Esc asks before dropping a change | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
 | K-3 | The canvas text editor lays its text out with the renderer's attributes at view scale; an UPPERCASE text is edited as typed | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
 | SH-3 | An inspector name field is the inspector's value field | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
+| SH-4 | `StickerButton` is Rasterize's square block, drawn in place | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
 | G-1 | A graphic is a SOURCE, not an effect; R5-1 stands for effects | [`graphics.md`](graphics.md) |
 | G-2 | The engine is a separate Rust crate; the core crate keeps its two rules | [`graphics.md`](graphics.md) |
 | G-3 | A graphic's source is a FILE in the package, and is not an undo step | [`graphics.md`](graphics.md) |
@@ -169,9 +176,9 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | AI-4 | The Assistant is the inspector's fourth tab: Clip, Media, Document, Assistant | [`assistant.md`](assistant.md) |
 | AI-5 | The assistant edits its own window's project | [`assistant.md`](assistant.md) |
 | AI-6 | W-9 governs automatic styling, not a person's request | [`assistant.md`](assistant.md) |
-| AI-7 | What the assistant may not call, and what it must ask about first | [`assistant.md`](assistant.md) |
+| AI-7 | What the assistant may not call, and what it must ask about first — amended by #40 | [`assistant.md`](assistant.md) |
 | AI-8 | The key is the person's own, and is R6-5 and R6-12's key in everything but the vendor | [`assistant.md`](assistant.md) |
-| AI-9 | History is append-only, and end-of-turn compaction is the one rewrite | [`assistant.md`](assistant.md) |
+| AI-9 | History is append-only, and end-of-turn compaction is the one rewrite — amended by AI-20 | [`assistant.md`](assistant.md) |
 | AI-10 | Each tool call the assistant makes is its own undo step | [`assistant.md`](assistant.md) |
 | AI-11 | The default model is `claude-opus-5-5` at medium effort | [`assistant.md`](assistant.md) |
 | AI-12 | A tool call that arrives during a live gesture waits for mouse-up, then runs | [`assistant.md`](assistant.md) |
@@ -180,7 +187,9 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | AI-15 | The window's live context rides on each person message; the system prompt is fixed for a session | [`assistant.md`](assistant.md) |
 | AI-16 | Stop stops a running `export` or on-device `transcribe`; any other running call finishes | [`assistant.md`](assistant.md) |
 | AI-17 | The transcript is one selectable text, and the composer is multi-line with K-2's Return | [`assistant.md`](assistant.md) |
-| AI-18 | A proof lowers the end-of-turn compaction threshold with the dev-only launch default `-RCDevAssistantAutoCompact <tokens>`; the shipped threshold stays 300 000 | [`assistant.md`](assistant.md) |
+| AI-18 | A proof lowers the end-of-turn compaction threshold with the dev-only launch default `-RCDevAssistantAutoCompact <tokens>`; the shipped threshold stays 300 000 — amended by AI-20 | [`assistant.md`](assistant.md) |
+| AI-19 | While the window's assistant waits on an ask-first question, the Assistant tab's title wears a dot, whichever tab is showing | [`assistant.md`](assistant.md) |
+| AI-20 | The chat settings are the person's, in Settings' Assistant pane, and a change reaches an open conversation without ending it | [`assistant.md`](assistant.md) |
 | P-1 | Prices come from LiteLLM's table; only AssemblyAI's rate is hand-kept; Anthropic's page is the cross-check | [`pricing.md`](pricing.md) |
 | P-2 | A call is priced from the response's own `usage` and `model`, per `iterations` entry; unknown is never $0 | [`pricing.md`](pricing.md) |
 | P-3 | Budgets are dollars per calendar month per service, enforced by the proofs at the worst case | [`pricing.md`](pricing.md) |

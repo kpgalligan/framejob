@@ -10,6 +10,7 @@ the environment — or, for row 1's no-key arm, nothing at all.
 
     env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py
     env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --mutant no-hold
+    env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --lock-wait 0
 
 Road map 6 §5i's rows 1–11, plus five of this pipeline's own:
 
@@ -55,6 +56,25 @@ Road map 6 §5i's rows 1–11, plus five of this pipeline's own:
   seven refusals, each cell ONE check — the winner's own sentence line for
   line, no loser's words, and the fake's log delta — after seven
   single-ingredient CONTROLS.
+* **RF·MCP** (issue batch B43, #201; spec §11 R6-20) on instance C after
+  row 6: a transcript that ends in `error` whose DELETE answers 500 —
+  `transcribe`'s refusal says R6-4's dashboard sentence for that media, and
+  the fake logged the DELETE; its CONTROL with the DELETE answering says no
+  such thing.
+* **SC** (issue batch B46, #93; spec §11 R6-22) on instance C after row B:
+  `speech.mov` at 5 s against the fake's `speaker_words` (row 7's A/B
+  split). SC1 `transcribe {speakers: true}` places "Hello there" white and
+  "everyone welcome back" yellow; SC2 renders each cue's midpoint, then
+  `undo` and the same ticks, and reads the glyph pixels (differing, with
+  max(R,G) >= 200) blue-rich for the first and blue-poor for the second;
+  SC3 with `speakers` absent places what a control session without
+  `speaker_words` places, all white; SC4 one speaker throughout places the
+  control's `text` objects and renders its frame byte for byte.
+* **L** (issue batch B43, #200 item 4) the probe's `hold_cloud_lock`, taken
+  before a mutant is built or an instance launched, so this proof, the
+  probe and `word_captions_proof.py` never write `reelcut-upload-*` into
+  one temporary folder at once. `--lock-wait` (default 3600 s) bounds the
+  wait; an expired wait is a scored FAIL naming the holder, and exit 1.
 
 Five instances, each on its own port with its own fake, each killed by its
 own PID in a `finally`, each with a row that `grep "Reelcut: "` finds nothing
@@ -105,7 +125,9 @@ import tree_copy
 
 from cloud_captions_probe import (
     HARNESS_MAIN, PROBE_SOURCE, TREE_SOURCES, Fake, MUTANTS, build, child_env,
-    differences_between, make_fixture, population, run_cues, run_probe, wav_samples, word)
+    differences_between, hold_cloud_lock, make_fixture, population, run_cues, run_probe,
+    wav_samples, word)
+from e1_proof import decode_png
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 HERE = os.path.join(ROOT, "tools", "proof")
@@ -1195,6 +1217,53 @@ def row_six(instance, fake):
 
 
 # --------------------------------------------------------------------------
+# Row RF·MCP (issue batch B43, #201, spec §11 R6-20)
+
+
+def row_refused_owed(instance, fake):
+    """A transcript refused after it was made, whose DELETE failed, has no
+    file to retry it from: `transcribe`'s refusal says R6-4's dashboard
+    sentence for that media, and its CONTROL with the DELETE answering
+    says nothing of the kind."""
+    print("\nRF\u00b7MCP. a refused transcript whose DELETE failed is owed to the dashboard "
+          "(R6-20)")
+    speech, _ = fixtures()
+    dashboard = ("Its transcript could not be saved in the project, so Reelcut cannot "
+                 "retry deleting it automatically. Delete it in your AssemblyAI dashboard.")
+    errored = "The audio could not be transcribed."
+    for failing in (True, False):
+        session = Session(instance, "rf-mcp-" + ("owed" if failing else "control"))
+        one = session.media_of(speech)
+        session.add(one, at=0, duration=3 * SEC)
+        given = {"transcript_error": errored}
+        if failing:
+            given["fail"] = [{"route": "delete", "status": 500, "times": -1}]
+        scenario(fake, **given)
+        text = session.error("transcribe", engine="assemblyai", place=False) or ""
+        log = fake.log()
+        served = [row["id"] for row in log.get("transcripts", [])]
+        sent = [row["path"] for row in deletes(log)]
+        owed = (f"AssemblyAI has not confirmed deleting the transcript of media {one}. "
+                + dashboard)
+        if failing:
+            check("RF\u00b7MCP: an `error` transcript whose DELETE answered 500 \u2014 "
+                  "`transcribe`'s refusal holds the dashboard sentence for that media, and "
+                  "no retry promise",
+                  errored in text and owed in text
+                  and "it will be retried at the next run" not in text,
+                  f"got {text!r}")
+            check("RF\u00b7MCP: and the fake logged the DELETE of the transcript it served",
+                  len(served) == 1 and len(sent) == 1 and sent[0].endswith("/" + served[0]),
+                  f"served={served!r}, deletes={sent!r}")
+        else:
+            check("RF\u00b7MCP: CONTROL \u2014 the same refusal with the DELETE answering "
+                  "has no dashboard sentence",
+                  errored in text and dashboard not in text
+                  and len(sent) == 1,
+                  f"got {text!r}, deletes={sent!r}")
+
+
+# --------------------------------------------------------------------------
 # Row 7 — speakers, vocabulary, and the readers at their extremes
 
 
@@ -1622,6 +1691,152 @@ def row_b(instance, fake):
               f"got {json.loads(read(target).decode()).get('words')!r}")
     finally:
         os.chflags(target, 0)
+
+
+# --------------------------------------------------------------------------
+# Row SC — speaker colours on Subtitles (issue batch B46, #93, spec §11 R6-22)
+
+# Row 7's A/B split of `WORDS`: `start < 1700` is A.
+SPEAKER_WORDS = [dict(one, speaker="A" if one["start"] < 1700 else "B") for one in WORDS]
+WHITE, YELLOW = [1, 1, 1, 1], [1, 1, 0, 1]
+# SC2's glyph test, MEASURED on this tree's renders (2026-10-01) and pinned:
+# a glyph pixel is one that differs between the frame with the captions and
+# the same tick after `undo`, with max(R, G) >= 200. Measured: the white
+# cue's 1327 glyph pixels were all blue-rich (B >= 200), the yellow cue's
+# 2769 none; the pins sit well inside both.
+GLYPH_RG = 200
+GLYPH_BLUE = 200
+WHITE_BLUE_SHARE_MIN = 0.5
+YELLOW_BLUE_SHARE_MAX = 0.05
+
+
+def caption_clips(session):
+    """The text clips on the Captions tracks, by start."""
+    project = session.project()
+    tracks = {t["id"] for t in project["tracks"] if re.fullmatch(r"Captions( \d+)?", t["name"])}
+    return sorted((c for c in project["clips"] if c["track"] in tracks),
+                  key=lambda c: c["start"])
+
+
+def on_grid(session, tick):
+    """`tick` floored onto the canvas's frame grid."""
+    num, den = session.project()["canvas"]["fps"]
+    return (tick * num // (SEC * den)) * SEC * den // num
+
+
+def glyph_share(captioned, bare):
+    """(glyph pixels, how many of them are blue-rich) between two decoded
+    frames of one size."""
+    width, height, _, channels, rows = captioned
+    _, _, _, _, rows_bare = bare
+    count = blue = 0
+    for y in range(height):
+        row, row_bare = rows[y], rows_bare[y]
+        if row == row_bare:
+            continue
+        for x in range(width):
+            at = x * channels
+            if row[at:at + channels] == row_bare[at:at + channels]:
+                continue
+            r, g, b = row[at], row[at + 1], row[at + 2]
+            if max(r, g) >= GLYPH_RG:
+                count += 1
+                if b >= GLYPH_BLUE:
+                    blue += 1
+    return count, blue
+
+
+def row_sc(instance, fake):
+    print("\nSC. speaker colours on Subtitles through the built app (issue batch B46, #93, "
+          "R6-22)")
+    speech, _ = fixtures()
+    folder = fresh("rowSC")
+    opened = []
+
+    def session_with(name, **given):
+        scenario(fake, **given)
+        session = Session(instance, name)
+        opened.append(session)
+        session.add(session.media_of(speech), at=0, duration=5 * SEC)
+        return session
+
+    def render(session, tick, name):
+        path = os.path.join(folder, f"{name}.png")
+        session.op("render_frame", t=tick, path=path)
+        return path
+
+    try:
+        # --- SC1 ----------------------------------------------------------
+        session = session_with("rowSC1", speaker_words=SPEAKER_WORDS)
+        session.op("transcribe", engine="assemblyai", speakers=True, style="subtitles")
+        clips = caption_clips(session)
+        got = [(c["text"].get("content"), c["text"].get("color")) for c in clips]
+        check("SC1: `transcribe {speakers: true}` over two speakers places two caption "
+              "clips, \"Hello there\" white then \"everyone welcome back\" yellow",
+              got == [("Hello there", WHITE), ("everyone welcome back", YELLOW)],
+              f"got {got!r}")
+
+        # --- SC2 ----------------------------------------------------------
+        ticks = [on_grid(session, c["start"] + c["duration"] // 2) for c in clips]
+        shown = [render(session, t, f"sc2-{i}") for i, t in enumerate(ticks)]
+        session.op("undo")
+        bare = [render(session, t, f"sc2-{i}-undone") for i, t in enumerate(ticks)]
+        shares = [glyph_share(decode_png(a), decode_png(b)) for a, b in zip(shown, bare)]
+        detail = (f"glyph pixels (differ, max(R,G) >= {GLYPH_RG}) and blue-rich (B >= "
+                  f"{GLYPH_BLUE}) per cue: {shares!r}; pinned: white >= "
+                  f"{WHITE_BLUE_SHARE_MIN:.0%} blue-rich, yellow <= "
+                  f"{YELLOW_BLUE_SHARE_MAX:.0%}")
+        print(f"  (SC2 measured: {detail})")
+        ok = (len(shares) == 2 and all(count > 0 for count, _ in shares)
+              and shares[0][1] / shares[0][0] >= WHITE_BLUE_SHARE_MIN
+              and shares[1][1] / shares[1][0] <= YELLOW_BLUE_SHARE_MAX)
+        check("SC2: rendered, the first cue's glyphs are white (blue-rich) and the "
+              "second's yellow (blue-poor), each against the same tick after `undo`",
+              ok, detail)
+
+        # --- SC3 ----------------------------------------------------------
+        off = session_with("rowSC3", speaker_words=SPEAKER_WORDS)
+        off.op("transcribe", engine="assemblyai", style="subtitles")
+        off_texts = [c["text"] for c in caption_clips(off)]
+        control = session_with("rowSC3c")
+        control.op("transcribe", engine="assemblyai", style="subtitles")
+        control_clips = caption_clips(control)
+        control_texts = [c["text"] for c in control_clips]
+        check("SC3: `speakers` absent over the same scenario — every caption clip's `text` "
+              "equals a control session's whose scenario has no `speaker_words`, all "
+              "white",
+              off_texts and off_texts == control_texts
+              and all(t.get("color") == WHITE for t in off_texts),
+              f"got {[(t.get('content'), t.get('color')) for t in off_texts]!r}, control "
+              f"{[(t.get('content'), t.get('color')) for t in control_texts]!r}")
+
+        # --- SC4 ----------------------------------------------------------
+        alone = [dict(one, speaker="A") for one in WORDS]
+        one = session_with("rowSC4", speaker_words=alone)
+        one.op("transcribe", engine="assemblyai", speakers=True, style="subtitles")
+        one_clips = caption_clips(one)
+        one_texts = [c["text"] for c in one_clips]
+        same_text = bool(one_texts) and one_texts == control_texts
+        same_frame = False
+        frame_detail = "no caption clip to render"
+        if same_text and control_clips:
+            tick = on_grid(control, control_clips[0]["start"] + control_clips[0]["duration"] // 2)
+            mine = read(render(one, tick, "sc4"))
+            theirs = read(render(control, tick, "sc4-control"))
+            same_frame = bool(mine) and mine == theirs
+            frame_detail = f"{len(mine)} and {len(theirs)} bytes at tick {tick}"
+        check("SC4: one speaker throughout, `speakers: true` — the caption `text` objects "
+              "equal SC3's control and the render at the cue's midpoint is byte-equal to "
+              "the control's",
+              same_text and same_frame,
+              f"text {[(t.get('content'), t.get('color')) for t in one_texts]!r}; "
+              f"{frame_detail}")
+    finally:
+        for session in opened:
+            try:
+                session.op("close_project", discard=True)
+            except ToolError:
+                pass
 
 
 def row_e(instance, fake):
@@ -2054,7 +2269,7 @@ CLOUD_MUTANTS = {
         "the stamp comparison deleted — every run uploads (row 5)"),
     "no-delete": (
         "app/Sources/CloudTranscriber+Media.swift",
-        "        let deleted = client.delete(id: fetched.response.id) == .deleted\n",
+        "        let deleted = client.delete(id: fetched.response.id, cancel: cancel) == .deleted\n",
         "        let deleted = false\n",
         "the remote DELETE removed (rows 2, 4)"),
     "no-janitor": (
@@ -2092,11 +2307,6 @@ CLOUD_MUTANTS = {
         '            completionHandler(nil)\n',
         '            completionHandler(request)\n',
         'Z1 — the redirect FOLLOWED, so the authorization header goes to whatever host the Location named'),
-    "z2-throw-without-delete": (
-        "app/Sources/AssemblyAIClient+Session.swift",
-        '        delete(id: id)\n',
-        '',
-        'Z2 — `refusing` no longer DELETEs before it throws (R6-4)'),
     "z3-extract-kept": (
         "app/Sources/CloudTranscriber+Media.swift",
         '        defer { try? FileManager.default.removeItem(at: upload.url) }\n',
@@ -2119,7 +2329,9 @@ CLOUD_MUTANTS = {
         "Z9 — the window's end made inclusive, so a split's halves double a word"),
     "z12-no-ceiling": (
         "app/Sources/AssemblyAIClient.swift",
-        '            if Date().timeIntervalSince(started) > ceiling { throw refusing(.timedOut, id: id) }\n',
+        '            if Date().timeIntervalSince(started) > ceiling {\n'
+        '                throw refusing(.timedOut, id: id, cancel: cancel)\n'
+        '            }\n',
         '',
         'Z12 — the poll ceiling removed'),
     "silent-about-the-bill": (
@@ -2178,6 +2390,13 @@ CLOUD_MUTANTS = {
         '    static let shippedModels = ["universal-2"]\n',
         "`speech_models` pinned to Universal-2 (row 2)"),
 }
+# Issue batch B46 (#93, R6-22): the first speaker takes yellow (SC1, SC2, SC4).
+CLOUD_MUTANTS["speaker-palette-shifted"] = (
+    "app/Sources/CaptionStyle.swift",
+    "            let slot = slots[speaker] ?? slots.count\n",
+    "            let slot = slots[speaker] ?? slots.count + 1\n",
+    "the speaker palette shifted one place, so the first speaker takes yellow "
+    "(SC1, SC2, SC4)")
 # Issue batch B24 (#80): `engine` read before the scope — R1 and R2 would
 # then lose to R3 (RP's R1×R3 and R2×R3 cells).
 CLOUD_MUTANTS["engine-before-scope"] = (
@@ -2189,9 +2408,12 @@ CLOUD_MUTANTS["engine-before-scope"] = (
     "        // The scope, the jobs and the frame in ONE main-thread hop, so every\n",
     "`engine` read before the scope — R6-17's first two places behind the third "
     "(RP's R1×R3 and R2×R3)")
-# Three come straight from the probe's own table rather than being spelled a
-# second time here (road map 6 §10.9 aimed them).
-for _name in ("mapping-no-in", "no-retry", "no-fifth-rule"):
+# These come straight from the probe's own table rather than being spelled a
+# second time here (road map 6 §10.9 aimed the first three; issue batch B43
+# moved Z2 here when `refusing` began answering a `Refusal`, and added
+# `refusal-answer-dropped` for RF·MCP).
+for _name in ("mapping-no-in", "no-retry", "no-fifth-rule", "z2-throw-without-delete",
+              "refusal-answer-dropped"):
     _file, _before, _after, _what = MUTANTS[_name]
     CLOUD_MUTANTS[_name] = ("app/Sources/" + _file, _before, _after, _what)
 
@@ -2259,7 +2481,11 @@ def main():
                              "the TREE's binary \u2014 a mutant of the INSTRUMENT, which builds "
                              "nothing; refused together with --mutant")
     parser.add_argument("--wall", type=float, default=1800,
-                        help="the whole run's wall-clock bound in seconds (rule H)")
+                        help="the whole run's wall-clock bound in seconds (rule H), counted "
+                             "from the moment the lock is held")
+    parser.add_argument("--lock-wait", type=float, default=3600,
+                        help="how long to wait for the cloud instruments' lock, in seconds "
+                             "(issue batch B43; rule H)")
     parser.add_argument("--live", action="store_true",
                         help="road map 6 §5i's rows 20 and 21 against the REAL service "
                              "INSTEAD of rows 1-11 — this SPENDS money, under "
@@ -2268,7 +2494,6 @@ def main():
                              "(spec §11 P-6)")
     args = parser.parse_args()
 
-    started = time.time()
     os.makedirs(WORK, exist_ok=True)
     print("road map 6 C1 pipeline 3 — the cloud engine, over MCP, against the stand-in\n")
 
@@ -2276,6 +2501,18 @@ def main():
         print("--mutant and --fake-mutant are two different mutants and are refused "
               "together: a cell measures one thing")
         return 2
+    # L (issue batch B43, #200 item 4): the probe's lock, held before a mutant
+    # is built or an instance launched; the clock starts once it is held.
+    lock, waited, holder = hold_cloud_lock(args.lock_wait)
+    print(f"  (waited {waited:.1f} s for the cloud instruments' lock)")
+    check("L: the cloud instruments' lock is held \u2014 "
+          + (f"by this run, {holder}" if lock else f"still held by {holder} after "
+             f"--lock-wait {args.lock_wait:.0f} s"),
+          lock is not None, holder)
+    if lock is None:
+        print(f"\n{passed}/{passed + failed} checks passed in {waited:.0f} s")
+        return 1
+    started = time.time()
     if args.fake_mutant:
         cloud_captions_probe.prepare_fake_mutant(args.fake_mutant)
 
@@ -2367,6 +2604,7 @@ def main():
                 fake_folders.append(fake_c.folder)
                 with Instance("C", port_base + 2, fake_c, binary) as c:
                     run_row(row_six, c, fake_c)
+                    run_row(row_refused_owed, c, fake_c)
                     run_row(row_eleven, c, fake_c)
                     run_row(row_h, c, fake_c)
                     run_row(row_t, c, fake_c)
@@ -2374,6 +2612,7 @@ def main():
                     run_row(row_m, c, fake_c)
                     run_row(row_e, c, fake_c)
                     run_row(row_b, c, fake_c)
+                    run_row(row_sc, c, fake_c)
         # RP (issue batch B24, #80): two instances of their own, so C is not
         # loaded further (an instance deadlocks past ~40 open documents).
         if time.time() - started > args.wall:

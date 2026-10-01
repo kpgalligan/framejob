@@ -44,6 +44,18 @@ The scenario, replaced whole by `POST /__control/scenario` (which also resets
 the counters):
 
     words                        the array to serve, serialised ONCE
+    words_json                   a string: served VERBATIM as the `words`
+                                 bytes (and by `GET /__control/words`) in
+                                 place of `words`, which becomes its
+                                 `json.loads` for the body's `text` — what
+                                 an escape in a served string needs (issue
+                                 batch B43, #200)
+    speaker_words                an array like `words`, serialised ONCE: a
+                                 completed transcript serves it (bytes and
+                                 `text`) iff its submitted request had
+                                 `speaker_labels: true`, else `words` (issue
+                                 batch B46, #93). `GET /__control/words`
+                                 still answers `words`
     polls_before_complete        how many GETs answer `processing` first
     never_complete               every GET answers `processing`
     transcript_error             a string: the transcript ends in `error`
@@ -166,6 +178,15 @@ class Scenario:
         # what a poll serves are the same bytes by construction rather than
         # by two encoders agreeing.
         self.words_bytes = json.dumps(self.words).encode("utf-8")
+        # B43 (#200): bytes no encoder here would write — an escaped string.
+        words_json = given.get("words_json")
+        if words_json is not None:
+            self.words = json.loads(words_json)
+            self.words_bytes = words_json.encode("utf-8")
+        # B46 (#93): what a transcript asked for WITH speaker labels gets.
+        self.speaker_words = given.get("speaker_words")
+        self.speaker_words_bytes = (None if self.speaker_words is None
+                                    else json.dumps(self.speaker_words).encode("utf-8"))
         self.polls_before_complete = int(given.get("polls_before_complete", 0))
         self.never_complete = bool(given.get("never_complete", False))
         self.transcript_error = given.get("transcript_error")
@@ -288,11 +309,17 @@ class Fake:
 
     def completed_bytes(self, tid):
         """A completed body with the scenario's `words` spliced in as BYTES,
-        so what the client reads is what `GET /__control/words` answers."""
+        so what the client reads is what `GET /__control/words` answers —
+        or its `speaker_words`, when given and this transcript's request had
+        `speaker_labels: true` (B46)."""
         head = json.dumps(self.body(tid, "completed"))[:-1].encode("utf-8")
-        text = " ".join(str(w.get("text", "")) for w in self.scenario.words)
+        words, words_bytes = self.scenario.words, self.scenario.words_bytes
+        labelled = self.transcripts[tid]["request"].get("speaker_labels") is True
+        if self.scenario.speaker_words is not None and labelled:
+            words, words_bytes = self.scenario.speaker_words, self.scenario.speaker_words_bytes
+        text = " ".join(str(w.get("text", "")) for w in words)
         return (head + b',"text":' + json.dumps(text).encode("utf-8")
-                + b',"words":' + self.scenario.words_bytes + b"}")
+                + b',"words":' + words_bytes + b"}")
 
     def deleted_bytes(self, tid):
         """q6's sentinel. `words` is `null` — this fake's own choice, argued

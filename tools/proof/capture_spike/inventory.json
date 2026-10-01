@@ -84,7 +84,7 @@
    "code": [
     "app/Sources/AppDelegate+Menus.swift `#selector(NSWindow.performClose(_:))`"
    ],
-   "note": "NSWindow.performClose(_:) — closes the window; an edited document's review is AppKit's sheet"
+   "note": "NSWindow.performClose(_:) — closes the window; an edited document's review is AppKit's sheet; the close_project tool is the capability"
   },
   "saveDocument:": {
    "verdict": "framework",
@@ -127,7 +127,7 @@
    "verdict": "sheet",
    "code": [
     "app/Sources/EditorViewController.swift `func generateCaptions(`",
-    "app/Sources/TranscribeSheetController+Commit.swift:180"
+    "app/Sources/TranscribeSheetController+Commit.swift:182"
    ],
    "note": "presentAsSheet(TranscribeSheetController); beeps with no transcribable clip"
   },
@@ -135,7 +135,7 @@
    "verdict": "sheet",
    "code": [
     "app/Sources/EditorViewController.swift `func exportCaptions(`",
-    "app/Sources/CaptionExporter.swift:519"
+    "app/Sources/CaptionExporter.swift:514"
    ],
    "note": "NSSavePanel.beginSheetModal; beeps with no text track"
   },
@@ -717,7 +717,7 @@
    "reached_after": [],
    "other_caller": "app/Sources/AppDelegate.swift `func applicationDidFinishLaunching(` — applicationDidFinishLaunching with AgentServerEnabled set; app/Sources/AppDelegate.swift `try AgentServer.shared.start()` — only when start() throws"
   },
-  "app/Sources/CaptionExporter.swift:519": {
+  "app/Sources/CaptionExporter.swift:514": {
    "token": "beginSheetModal",
    "func": "exportCaptionsCommand",
    "reached_from": [
@@ -726,7 +726,7 @@
    "reached_after": [],
    "other_caller": ""
   },
-  "app/Sources/CaptionExporter.swift:539": {
+  "app/Sources/CaptionExporter.swift:534": {
    "token": "beginSheetModal",
    "func": "exportCaptions",
    "reached_from": [],
@@ -1135,12 +1135,12 @@
    ],
    "other_caller": "app/Sources/ProjectDocument.swift `func retryReversedMedia(` — the Video tab's Render Reverse button; app/Sources/ReverseRenderer.swift `document?.ensureReversedMedia()` — after the sheet closes"
   },
-  "app/Sources/ProjectDocument.swift:1332": {
+  "app/Sources/ProjectDocument+Alerts.swift:27": {
    "token": "presentError",
    "func": "present",
    "reached_from": [],
    "reached_after": [],
-   "other_caller": "app/Sources/ProjectDocument.swift `func present(` — present(_:) for a document with no window; perform_menu_item reaches editor actions only through a window"
+   "other_caller": "app/Sources/ProjectDocument+Alerts.swift `func present(` — present(_:) for a document with no window; perform_menu_item reaches editor actions only through a window"
   },
   "app/Sources/RelinkSheetController.swift:123": {
    "token": "beginSheetModal",
@@ -1164,7 +1164,7 @@
    "reached_after": [],
    "other_caller": ""
   },
-  "app/Sources/TranscribeSheetController+Commit.swift:180": {
+  "app/Sources/TranscribeSheetController+Commit.swift:182": {
    "token": "presentAsSheet",
    "func": "generateCaptionsCommand",
    "reached_from": [

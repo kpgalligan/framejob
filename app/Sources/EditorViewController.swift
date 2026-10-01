@@ -419,8 +419,8 @@ final class EditorViewController: NSViewController {
     }
 
     private func playbackFailed(_ error: any Error) {
-        // A failed rebuild is never fatal — the previous item keeps playing —
-        // so it reports and stops there.
+        // A failed rebuild is never fatal — the previous item keeps playing, or is dropped under
+        // a held scope change, whose new time is kept (#185) — so it reports and stops there.
         NSApp.presentError(error)
     }
 

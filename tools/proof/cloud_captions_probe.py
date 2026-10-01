@@ -16,6 +16,16 @@ to replace not found exactly once, or the probe or harness not built — it
 prints `mutant <name>: the control could not be performed — <why>` and exits
 2 (rule R, issue batch B13).
 
+**L** (issue batch B43, #200 item 4): before a mutant is prepared or
+anything is built, the run takes an exclusive `flock` on
+`<getconf DARWIN_USER_TEMP_DIR>/reelcut-cloud-captions.lock` — the lock this
+probe, `cloud_captions_proof.py` and `word_captions_proof.py` take turns
+through, because all three make the app write `reelcut-upload-*` into one
+`NSTemporaryDirectory()` that ignores `TMPDIR`. It waits up to
+`--lock-wait` seconds (default 3600), prints the wait, and starts `--wall`
+once it holds the lock; a wait that expires is a scored FAIL naming the
+holder, and the run exits 1 with nothing built.
+
 Sections, by the name after `section_`:
 
 * `mapping` (5i·12) — THE MAPPING at its boundaries: a word straddling `in`,
@@ -32,12 +42,30 @@ Sections, by the name after `section_`:
 * `client` (5i·15) — the retry, the backoff, the tolerated polls, the
   ceiling, every §5c status, and the four `words` shapes, over `URLProtocol`.
 * `cancel` (5i·16) — a 16 MB upload cancelled at its first progress callback,
-  and a cancel during polling issuing the DELETE, against the fake.
+  and a cancel during polling issuing the DELETE, against the fake; and
+  R6-19's bound on a DELETE (issue batch B35): a Stop mid-drip cuts it
+  `deleteAfterStop` later as `failed` (SD1), a token cancelled before it
+  still lets a stalled DELETE finish (SD2), and a Stop during polling
+  deletes and ends inside the bound against a dripping DELETE (SD3).
+  Issue batch B43 (#201): the refusal carries its DELETE's answer —
+  `deleted` for the poll-cancel (16·R), `failed` for SD3's cut one (SD3·R)
+  — and SD1–SD3 run and score whatever the poll-cancel row answered.
 * `secrets` (5i·17 + R6-9's C rows + the loopback table) — `FileStore` in a
   temporary directory, `MemoryStore` everywhere else, the resolver's order,
   and R6-9 (a), (b) and (c) by TYPE and path string only; and `writeAll`'s
   0 arm and bounded EINTR retry (17·zero, 17·endless, issue batch B34).
 * `cues` (5i·19) — the fifth rule at its boundaries through the harness.
+* `speakers` (SP, issue batch B46, #93, spec §11 R6-22) — speaker colours on
+  Subtitles through the probe's `speakers` mode: cues emitted out of time
+  order take white, yellow, cyan, green by first appearance in TIME order,
+  "A" in two media is two speakers, a fifth cycles to white, and a cue with
+  no speaker writes no `color` (SP1); the five word styles place the same ops
+  with speakers as without (SP2); nil-speaker cues place byte-identical ops
+  to the same probe built against B46's starting tree with
+  `-D CLOUD_PROBE_BEFORE_SPEAKERS`, with a CONTROL that speaker cues do not
+  (SP3); and the Generate Captions sheet's own path against the fake's
+  `speaker_words`: Speakers on reads white then yellow, Speakers off is the
+  baseline's project JSON byte for byte (SP4).
 * `extract` — the WAV's byte-identity against the BASELINE tree (W), the
   FLAC's STREAMINFO, decode and determinism (F), the fallback (FB), and
   `wholeAsset` against an explicit range (Q).
@@ -48,8 +76,9 @@ Sections, by the name after `section_`:
   run and `CloudTranscriber`'s one caller (S), the credential never appearing
   in a child's output (K), and this file's own `env=` discipline.
 * `jobs` (R6-10) — a clip `speed` the OPS cannot write and the CORE's reader
-  accepts, spliced into a project's JSON text and read back through
-  `ReelProject.from(json:)`, then driven through `Transcriber.jobs` and both
+  refuses, spliced into a project's JSON text and refused by
+  `ReelProject.from(json:)` naming the clip and the value, then decoded
+  WITHOUT the reader and driven through `Transcriber.jobs` and both
   mappings. ONE CHILD PROCESS PER SPEED: an unclamped `Ticks(_:)` traps, and
   a trap has to be that speed's own scored failure.
 * `estimate` (row 14) — `CloudEstimate` with no disk in it: §8's two dated
@@ -77,20 +106,31 @@ Sections, by the name after `section_`:
   of its media's share, holding at the 0.95 point; and the temporary
   `reelcut-upload-*` a cancelled, a failed and a 401'd run leave behind,
   which is none, with a CONTROL that one was there while the body was in
-  flight.
+  flight. Issue batch B35 added the submit's own line (P·submit, at the
+  upload's end), the sub-megabyte spellings (P·small), and J3: a Stop
+  during the janitor's dripping DELETE cuts it inside R6-19's bound and
+  leaves it owed.
 * `cache_write` (CW) — the fetched transcript's initial JSON write and
   remote DELETE independently, including an unwritable cache, marker-only
   failure, next-run janitor, zero-word throw, and production UI/MCP warnings;
   and #187's items 1–4 (issue batch B34): no `remote_deleted` rewrite over a
   first write that failed (CW1), `stampWritten` and the "could not be kept"
   sentence (CW2), a negative `audio_duration` floored at 0 (CW3), and the
-  saturating sum that stays saturated (CW4).
+  saturating sum that stays saturated (CW4). Issue batch B43 (#201, R6-20):
+  a transcript refused after it was made whose DELETE answered 500 is in
+  `refusedUndeleted` with the dashboard sentence and never the retry one —
+  an `error` transcript (RF1), its CONTROL with the DELETE answering (RF2),
+  words that repeat the key (RF3), and a Stop during polling (RF4).
 * `echo` (E, issue batch B34, #187 R2·1) — a server that names the key as
   its model and its language (E1/E2: `<redacted>` in the report, both tool
   keys, the note, the report card and the cache header), serves it as a word
   (E3: refused, deleted, never written), or a cache file whose id IS the key
   (E4: never sent by the janitor) — and `poll` refusing that id before any
-  request (E5).
+  request (E5). Issue batch B43 (#200): a word whose SPEAKER is the key,
+  served escaped so its bytes lack it, is refused (E6), with a CONTROL one
+  letter off that completes byte for byte (E7); and a 5000-character model
+  and language are cut to 63 characters and "…" everywhere they land, with
+  a CONTROL that 64 are kept whole (E8).
 * `settings_verify` — delayed loopback Verify replies against actual Settings
   actions: unchanged, changed input, removal, region, and overlapping owners.
 * `drip` (DR, issue batch B24, #80) — a reply the fake DRIPS a byte every
@@ -101,6 +141,8 @@ Sections, by the name after `section_`:
   through the button, once the fake has seen the upload, the submit, a poll
   or the DELETE: how long the card took to finish, what it says, and what the
   fake and the cache were left holding. Row 18 holds the extract stage.
+  Issue batch B35 added ST·drip, a Stop during `fetch`'s dripping DELETE cut
+  by R6-19's 2 s and reported owed, and ST·submit's detail line.
 
 Host-state inputs: `say` for the fixture, `ffmpeg` for the FLAC decode row's
 second decoder (the row names which decoder answered and `AVAudioFile` always
@@ -114,6 +156,7 @@ import argparse
 import base64
 import contextlib
 import difflib
+import fcntl
 import hashlib
 import json
 import math
@@ -145,6 +188,10 @@ BASELINE_TREE = "515e6a8032071626f8c2a77030db4b249495602b"
 # Pipeline 3's final working tree — c1-chrome's baseline, and what the
 # `project.yml` row compares against.
 BASELINE_TREE_C1CHROME = "c9b8043522c5a91b6045102d182758fd5859d153"
+
+# B46's starting working tree — the speakers section's baseline, and what
+# SP3 and SP4's off arm compare today's placement against.
+BASELINE_TREE_SPEAKERS = "ef54f48e08e72bf6e3e6a48a78bf4431cae83018"
 
 # road map 4's fixture text, so the speech is the one every other proof uses.
 SPEECH_TEXT = (
@@ -198,6 +245,55 @@ def sleep(seconds):
     """Foreground `sleep` is blocked in this environment; this is the
     in-process wait every bounded loop here uses."""
     time.sleep(seconds)
+
+
+# Issue batch B43 (#200 item 4): the one lock the three instruments that
+# write `reelcut-upload-*` take turns through — this probe,
+# `cloud_captions_proof.py` and `word_captions_proof.py`. The app names its
+# extracts in `NSTemporaryDirectory()`, which ignores `TMPDIR` on this host
+# (`README.md`, measured 2026-09-25), so two runs at once share one folder
+# and one row T. The lock is in the per-user folder every worktree shares,
+# and `flock` is released when its process dies.
+LOCK_NAME = "reelcut-cloud-captions.lock"
+
+
+def hold_cloud_lock(wait_seconds):
+    """An exclusive `flock` on `<DARWIN_USER_TEMP_DIR>/LOCK_NAME`, polled
+    about once a second for up to `wait_seconds` (rule H). Answers (the open
+    handle, or None when the wait expired; the seconds waited; the holder's
+    text). The caller keeps the handle open for as long as it runs."""
+    started = time.time()
+    try:
+        folder = subprocess.run(["getconf", "DARWIN_USER_TEMP_DIR"], capture_output=True,
+                                text=True, env=child_env(), timeout=30,
+                                stdin=subprocess.DEVNULL).stdout.strip()
+    except (OSError, subprocess.TimeoutExpired) as problem:
+        return None, time.time() - started, f"`getconf DARWIN_USER_TEMP_DIR` failed: {problem}"
+    if not folder:
+        return None, time.time() - started, "`getconf DARWIN_USER_TEMP_DIR` answered nothing"
+    path = os.path.join(folder, LOCK_NAME)
+    try:
+        handle = open(path, "a+", encoding="utf-8")
+    except OSError as problem:
+        return None, time.time() - started, f"the lock file {path} could not be opened: {problem}"
+    while True:
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            break
+        except BlockingIOError:
+            waited = time.time() - started
+            if waited >= wait_seconds:
+                handle.seek(0)
+                holder = handle.read().strip() or "a holder that wrote no name"
+                handle.close()
+                return None, waited, f"{holder} (in {path})"
+            sleep(min(1.0, max(0.05, wait_seconds - waited)))
+    me = f"{os.getpid()} {os.path.basename(sys.argv[0])}"
+    handle.seek(0)
+    handle.truncate()
+    handle.write(me)
+    handle.flush()
+    return handle, time.time() - started, me
 
 
 # --------------------------------------------------------------------------
@@ -386,6 +482,8 @@ func makeClient(_ request: [String: Any], stub: Bool) -> AssemblyAIClient? {
         tuning.pollFailuresTolerated =
             (given["pollFailuresTolerated"] as? NSNumber)?.intValue ?? tuning.pollFailuresTolerated
         tuning.deleteTimeout = (given["deleteTimeout"] as? NSNumber)?.doubleValue ?? tuning.deleteTimeout
+        tuning.deleteAfterStop =
+            (given["deleteAfterStop"] as? NSNumber)?.doubleValue ?? tuning.deleteAfterStop
         tuning.requestTimeout = (given["requestTimeout"] as? NSNumber)?.doubleValue ?? tuning.requestTimeout
         tuning.submitRecoveryAttempts =
             (given["submitRecoveryAttempts"] as? NSNumber)?.intValue ?? tuning.submitRecoveryAttempts
@@ -400,6 +498,19 @@ func makeClient(_ request: [String: Any], stub: Bool) -> AssemblyAIClient? {
 }
 
 func describe(_ error: any Error) -> [String: Any] {
+    // Issue batch B43 (#201, R6-20): a refusal carries what its DELETE answered.
+    if let refusal = error as? AssemblyAIClient.Refusal {
+        let deletion: String
+        switch refusal.deletion {
+        case .deleted: deletion = "deleted"
+        case .failed: deletion = "failed"
+        case .notSent: deletion = "notSent"
+        }
+        return [
+            "error": refusal.failure.shortName, "message": refusal.localizedDescription,
+            "deletion": deletion,
+        ]
+    }
     if let client = error as? AssemblyAIClient.ClientError {
         return ["error": client.shortName, "message": client.localizedDescription]
     }
@@ -609,7 +720,7 @@ func modeStamp(_ request: [String: Any]) -> [String: Any] {
 '''
 
 PROBE_JOBS = r'''
-// MARK: - R6-10: a speed only a hand-written file can carry
+// MARK: - R6-10: a speed the ops cannot write and the reader refuses
 
 /// One SPEED per process, and that is the whole design of this mode.
 ///
@@ -621,12 +732,13 @@ PROBE_JOBS = r'''
 ///
 /// The project is built from OPS — one audio media, one clip at `in` = 1 s
 /// for 1 s (`source_mirror_probe.py`'s recipe) — and then its JSON TEXT has
-/// the clip's `speed` value replaced and is read back through
-/// `ReelProject.from(json:)`, which is the CORE's own reader. That is the
-/// point: the ops cannot write these speeds (`edit_clip.rs` clamps to
-/// 0.1–10) and the reader does not refuse them, so the file is exactly the
-/// one a person can hand the app, and "the reader accepts it" is a row
-/// rather than an assumption.
+/// the clip's `speed` value replaced and is handed to
+/// `ReelProject.from(json:)`, which is the CORE's own reader. The ops cannot
+/// write these speeds (`edit_clip_timing.rs` clamps to 0.1–10) and the
+/// reader refuses them (R6-10, amended by #41), so "the reader refuses it,
+/// naming the clip and the value" is a row rather than an assumption. The
+/// clamps R6-10 keeps as a second layer are then fed a snapshot DECODED
+/// WITHOUT the reader — `ReelJSON.decode` over the same patched text.
 func modeJobs(_ request: [String: Any]) -> [String: Any] {
     // `ProjectDocument` is an `NSDocument`; it draws nothing and no event
     // loop is started, but the class needs the shared application to exist.
@@ -670,20 +782,23 @@ func modeJobs(_ request: [String: Any]) -> [String: Any] {
 
     var answer: [String: Any] = [
         "speedText": text, "maxSourceTicks": Transcriber.maxSourceTicks,
-        "writtenSpeed": String(json[found.upperBound..<end]),
+        "writtenSpeed": String(json[found.upperBound..<end]), "clip": Int(added.id),
     ]
-    let reread: ReelProject
     do {
-        reread = try ReelProject.from(json: patched)
+        _ = try ReelProject.from(json: patched)
+        answer["readerAccepted"] = true
     } catch {
         answer["readerAccepted"] = false
         answer["readerMessage"] = error.localizedDescription
+    }
+    // Either way, the second layer is fed the snapshot decoded WITHOUT the
+    // reader, so the clamps are measured whatever the reader answered.
+    guard let snapshot = ReelJSON.decode(ProjectSnapshot.self, from: patched) else {
+        answer["error"] = "the patched text did not decode as a ProjectSnapshot"
         return answer
     }
-    answer["readerAccepted"] = true
-    let snapshot = reread.snapshot
     guard let clip = snapshot.clips.first else {
-        answer["error"] = "the re-read project has no clip"
+        answer["error"] = "the decoded project has no clip"
         return answer
     }
     answer["speed"] = String(clip.speed)
@@ -774,6 +889,33 @@ func modeRun(_ request: [String: Any]) -> [String: Any] {
             }
         }
     }
+    // Issue batch B35: a Stop `after` seconds after the fake has first seen a
+    // request with `method` and a path starting `pathPrefix`.
+    if let watch = request["cancelAtRequest"] as? [String: Any],
+        let base = request["base"] as? String,
+        let logURL = URL(string: base + "/__control/log")
+    {
+        let method = watch["method"] as? String ?? ""
+        let prefix = watch["pathPrefix"] as? String ?? ""
+        let after = (watch["after"] as? NSNumber)?.doubleValue ?? 0
+        Thread.detachNewThread {
+            for _ in 0..<3000 {
+                if let data = try? Data(contentsOf: logURL),
+                    let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                    let rows = object["requests"] as? [[String: Any]],
+                    rows.contains(where: {
+                        ($0["method"] as? String) == method
+                            && (($0["path"] as? String) ?? "").hasPrefix(prefix)
+                    })
+                {
+                    Thread.sleep(forTimeInterval: after)
+                    token.cancel()
+                    return
+                }
+                Thread.sleep(forTimeInterval: 0.01)
+            }
+        }
+    }
     let startedAt = Date()
 
     var published: [[Any]] = []
@@ -830,6 +972,7 @@ func modeRun(_ request: [String: Any]) -> [String: Any] {
         "janitorFailed": report.janitorFailed.map { Int($0) },
         "janitorDeferred": report.janitorDeferred.map { Int($0) },
         "held": report.held.map { Int($0) },
+        "refusedUndeleted": report.refusedUndeleted.map { Int($0) },
     ]
     answer["cloudFields"] = AgentServer.cloudFields(report, code: nil, endpoint: nil, notes: [])
     let names = media.mapValues { $0.name }
@@ -857,6 +1000,7 @@ func runTable(_ request: [String: Any]) -> [String: Any] {
         switch row["phase"] as? String ?? "" {
         case "extracting": phase = .extracting
         case "uploading": phase = .uploading
+        case "submitting": phase = .submitting
         case "waiting": phase = .waiting
         default: phase = .saving
         }
@@ -888,6 +1032,19 @@ func runTable(_ request: [String: Any]) -> [String: Any] {
                                  total: 115_000_000),
             CloudProgress.detail(.waiting, file: "intro.mov", waited: 34.2),
             CloudProgress.detail(.saving, file: "intro.mov"),
+        ],
+        // Issue batch B35: the sub-megabyte spellings and the submit's line.
+        "smallDetails": [
+            CloudProgress.detail(.uploading, file: "intro.mov", sent: 0, total: 0),
+            CloudProgress.detail(.uploading, file: "intro.mov", sent: 0, total: 412_000),
+            CloudProgress.detail(.uploading, file: "intro.mov", sent: 412_000, total: 412_000),
+            CloudProgress.detail(
+                .uploading, file: "intro.mov", sent: 999_999, total: 1_400_000),
+            CloudProgress.detail(
+                .uploading, file: "intro.mov", sent: 1_000_000, total: 1_400_000),
+            CloudProgress.detail(
+                .uploading, file: "intro.mov", sent: 41_000_000, total: 115_000_000),
+            CloudProgress.detail(.submitting, file: "intro.mov"),
         ],
     ]
 }
@@ -949,6 +1106,7 @@ func modeClient(_ request: [String: Any]) -> [String: Any] {
         "submitRecoveryAttempts": shipped.submitRecoveryAttempts,
         "submitRecoveryDelay": shipped.submitRecoveryDelay,
         "submitRecoveryTimeout": shipped.submitRecoveryTimeout,
+        "deleteAfterStop": shipped.deleteAfterStop,
         "ceilingShort": shipped.pollCeiling(audioSeconds: 10),
         "ceilingHour": shipped.pollCeiling(audioSeconds: 3600),
         "ceilingTenHours": shipped.pollCeiling(audioSeconds: 36000),
@@ -995,8 +1153,44 @@ func modeCancel(_ request: [String: Any]) -> [String: Any] {
         answer["callbacks"] = callbacks
         return answer
     }
+    // R6-19 (issue batch B35): one DELETE of an id the fake served, with the
+    // token cancelled before the call (`cancelFirst`) or `cancelAfter`
+    // seconds after it starts, and how long the call took.
+    if request["scenario"] as? String == "delete" {
+        do {
+            let file = temporaryDirectory("canceldelete").appendingPathComponent("tiny.bin")
+            try? Data(repeating: 1, count: 1024).write(to: file)
+            let uploaded = try client.upload(file: file)
+            let id = try client.submit(
+                TranscriptRequest(audioURL: uploaded, options: makeOptions(nil)))
+            answer["transcriptID"] = id
+            let called = Date()
+            if request["cancelFirst"] as? Bool == true {
+                token.cancel()
+            } else {
+                let after = (request["cancelAfter"] as? NSNumber)?.doubleValue ?? 0.5
+                Thread.detachNewThread {
+                    Thread.sleep(forTimeInterval: after)
+                    token.cancel()
+                }
+            }
+            let deleted = client.delete(id: id, cancel: token)
+            answer["elapsed"] = Date().timeIntervalSince(called)
+            switch deleted {
+            case .deleted: answer["answer"] = "deleted"
+            case .failed: answer["answer"] = "failed"
+            case .notSent: answer["answer"] = "notSent"
+            }
+            answer["ok"] = true
+        } catch {
+            answer["ok"] = false
+            for (key, value) in describe(error) { answer[key] = value }
+        }
+        return answer
+    }
     // Polling: a real upload and submit first, so the fake has served an id
     // the DELETE can be checked against.
+    let started = Date()
     do {
         let file = temporaryDirectory("cancelpoll").appendingPathComponent("tiny.bin")
         try? Data(repeating: 1, count: 1024).write(to: file)
@@ -1015,6 +1209,7 @@ func modeCancel(_ request: [String: Any]) -> [String: Any] {
         answer["ok"] = false
         for (key, value) in describe(error) { answer[key] = value }
     }
+    answer["elapsed"] = Date().timeIntervalSince(started)
     return answer
 }
 '''
@@ -1621,6 +1816,7 @@ func modeChrome(_ request: [String: Any]) -> [String: Any] {
     case "keyless": return chromeKeyless(request)
     case "menu": return chromeMenu(request)
     case "stop": return chromeStop(request)
+    case "speakers": return chromeSpeakers(request)
     default: return ["error": "this probe does not know the chrome op \(request["op"] ?? "")"]
     }
 }
@@ -1951,6 +2147,9 @@ func chromeStop(_ request: [String: Any]) -> [String: Any] {
         if sheet.didFinish { break }
         RunLoop.current.run(until: Date().addingTimeInterval(0.025))
     }
+    // One turn of the run loop first, so a detail the run published just
+    // before the request the fake saw has reached the label (issue batch B35).
+    RunLoop.current.run(until: Date().addingTimeInterval(0.05))
     answer["reached"] = reached
     answer["finishedBeforeStop"] = sheet.didFinish
     answer["detailAtStop"] = sheet.detailLabel.stringValue
@@ -2370,6 +2569,100 @@ func chromeMenu(_ request: [String: Any]) -> [String: Any] {
 }
 """
 
+PROBE_SPEAKERS = r'''
+// MARK: - Speakers (issue batch B46, #93, spec §11 R6-22)
+
+/// `CaptionLayout.place` over cues given as JSON, each with an optional
+/// `speaker` of `{media, label}`, in a named style, on a fresh project (and
+/// an optional `canvas` of `[width, height]`), answering the ops as their
+/// JSON text. A binary built with `CLOUD_PROBE_BEFORE_SPEAKERS` — against
+/// B46's starting tree, which has no `Cue.speaker` — reads every speaker as
+/// absent, so one request is answered by two trees (SP3).
+func modeSpeakers(_ request: [String: Any]) -> [String: Any] {
+    _ = NSApplication.shared
+    var cues: [CaptionLayout.Cue] = []
+    for (index, row) in (request["cues"] as? [[String: Any]] ?? []).enumerated() {
+        let start = ticks(row["start"])
+        let end = ticks(row["end"])
+        let text = row["text"] as? String ?? ""
+        let tag = "cue \(index)"
+        #if CLOUD_PROBE_BEFORE_SPEAKERS
+        cues.append(CaptionLayout.Cue(start: start, end: end, text: text, tag: tag))
+        #else
+        let speaker = (row["speaker"] as? [String: Any]).map {
+            CaptionLayout.Speaker(
+                media: ($0["media"] as? NSNumber)?.uint32Value, label: $0["label"] as? String ?? "")
+        }
+        cues.append(
+            CaptionLayout.Cue(start: start, end: end, text: text, tag: tag, speaker: speaker))
+        #endif
+    }
+    guard let style = CaptionStyle(rawValue: request["style"] as? String ?? "subtitles") else {
+        return ["error": "this probe knows no caption style \(request["style"] ?? "")"]
+    }
+    var project = ProjectDocument().project
+    if let canvas = request["canvas"] as? [NSNumber], canvas.count == 2 {
+        let op = ReelOp.setCanvas(width: canvas[0].intValue, height: canvas[1].intValue)
+        guard let sized = try? project.applying([op]).project else {
+            return ["error": "the canvas would not apply"]
+        }
+        project = sized
+    }
+    do {
+        let plan = try CaptionLayout.place(cues, in: project, style: style)
+        return ["ops": plan.ops.map(\.json)]
+    } catch {
+        return ["error": "place threw: \(error.localizedDescription)"]
+    }
+}
+
+/// Presents with no animation, so a clean `finish` has a presenter to
+/// `dismiss` from (`word_captions_sheet_probe.swift` S5's `StillAnimator`).
+final class SpeakersStillAnimator: NSObject, NSViewControllerPresentationAnimator {
+    func animatePresentation(of viewController: NSViewController, from: NSViewController) {}
+    func animateDismissal(of viewController: NSViewController, from: NSViewController) {}
+}
+
+/// SP4: the Generate Captions sheet's own path — Engine AssemblyAI, Style
+/// Subtitles, Speakers from the request, Generate through `startClicked`, a
+/// bounded wait on `didFinish` — answering the project JSON the commit left,
+/// the string `get_project` decodes.
+func chromeSpeakers(_ request: [String: Any]) -> [String: Any] {
+    guard let built = chromeDocument(request) else {
+        return ["error": "the speakers fixture would not build"]
+    }
+    let wall = (request["wall"] as? NSNumber)?.doubleValue ?? 120
+    let sheet = TranscribeSheetController(
+        document: built.document, store: MemoryStore(request["key"] as? String ?? "proof-key"),
+        defaults: chromeSuite(request), environment: [:], languages: probeLanguages)
+    _ = sheet.view
+    let host = NSViewController()
+    host.view = NSView()
+    host.present(sheet, animator: SpeakersStillAnimator())
+    if let index = sheet.enginePopup.itemArray.firstIndex(where: {
+        $0.representedObject as? String == TranscriptionEngine.assemblyai.rawValue
+    }) { sheet.enginePopup.selectItem(at: index) }
+    sheet.perform(NSSelectorFromString("engineChanged:"), with: nil)
+    if let index = sheet.stylePopup.itemArray.firstIndex(where: {
+        $0.representedObject as? String == CaptionStyle.subtitles.rawValue
+    }) { sheet.stylePopup.selectItem(at: index) }
+    sheet.perform(NSSelectorFromString("styleChanged:"), with: nil)
+    sheet.speakersCheckbox.state = (request["speakers"] as? Bool ?? false) ? .on : .off
+    sheet.controlChanged(nil)
+    sheet.startClicked(nil)
+    let deadline = Date().addingTimeInterval(wall)
+    while Date() < deadline, !sheet.didFinish {
+        RunLoop.current.run(until: Date().addingTimeInterval(0.025))
+    }
+    return [
+        "didStart": sheet.didStart, "didFinish": sheet.didFinish,
+        "status": sheet.statusLabel.stringValue,
+        "speakersOn": sheet.speakersCheckbox.state == .on,
+        "project": built.document.editedProject.json,
+    ]
+}
+'''
+
 PROBE_MAIN = r'''
 // MARK: - Entry
 
@@ -2398,6 +2691,7 @@ case "hygiene": answer = modeHygiene(request)
 case "extract": answer = modeExtract(request)
 case "estimate": answer = modeEstimate(request)
 case "chrome": answer = modeChrome(request)
+case "speakers": answer = modeSpeakers(request)
 default:
     // A mode this binary does not know is answered BY NAME, so a stale
     // binary is a scored failure with a reason rather than a silent pass.
@@ -2412,7 +2706,7 @@ FileManager.default.createFile(atPath: arguments[2], contents: encoded)
 
 PROBE_SOURCE = (PROBE_HEAD + PROBE_MAPPING + PROBE_JOBS + PROBE_RUN + PROBE_CLIENT
                 + PROBE_SECRETS + PROBE_VERBATIM + PROBE_EXTRACT + PROBE_ESTIMATE
-                + PROBE_CHROME + PROBE_MAIN)
+                + PROBE_CHROME + PROBE_SPEAKERS + PROBE_MAIN)
 
 
 # --------------------------------------------------------------------------
@@ -2722,7 +3016,7 @@ def section_mapping(binary, sources):
              "sourceLength": 1500 * TICKS_PER_MS, "start": 1500 * TICKS_PER_MS,
              "duration": 1500 * TICKS_PER_MS, "speed": 1.0}
     # R6-10. A clip whose `start` is within ten million ticks of Int64.max,
-    # played at a speed only a hand-written `project.json` can carry: every
+    # played at a speed the reader now refuses (R6-10, amended by #41): every
     # offset the mapping computes for it is larger than `Ticks` holds, and
     # every answer must still land inside the clip. Asked of BOTH twins —
     # `words` is the cloud mapping's, `projected` the on-device one's.
@@ -2889,16 +3183,19 @@ def section_mapping(binary, sources):
 
 
 # --------------------------------------------------------------------------
-# Section `jobs` — R6-10, a speed the ops cannot write and the reader accepts
+# Section `jobs` — R6-10, a speed the ops cannot write and the reader refuses
 
-# The four speeds, each with the text that goes into the project's JSON and
-# the Python float of it. `1e300` and `greatestFiniteMagnitude` overflow the
-# SOURCE LENGTH; `1e-300` and `leastNonzeroMagnitude` overflow the OFFSET.
+# The four speeds, each with the text that goes into the project's JSON, the
+# Python float of it, and the core's own spelling of it in the reader's
+# refusal (serde_json's, which is not Python's: a literal, never derived).
+# `1e300` and `greatestFiniteMagnitude` overflow the SOURCE LENGTH; `1e-300`
+# and `leastNonzeroMagnitude` overflow the OFFSET.
 JOB_SPEEDS = [
-    ("1e300", "1e300", 1e300),
-    ("greatestFiniteMagnitude", "1.7976931348623157e308", sys.float_info.max),
-    ("1e-300", "1e-300", 1e-300),
-    ("leastNonzeroMagnitude", "5e-324", 5e-324),
+    ("1e300", "1e300", 1e300, "1e+300"),
+    ("greatestFiniteMagnitude", "1.7976931348623157e308", sys.float_info.max,
+     "1.7976931348623157e+308"),
+    ("1e-300", "1e-300", 1e-300, "1e-300"),
+    ("leastNonzeroMagnitude", "5e-324", 5e-324, "5e-324"),
 ]
 
 JOB_WORDS = [
@@ -2912,14 +3209,14 @@ JOB_WORDS = [
 
 
 def section_jobs(binary, sources):
-    print("\nR6-10. a hand-written `speed` the ops cannot write, through the CORE's reader, "
-          "`Transcriber.jobs` and both mappings")
+    print("\nR6-10. a `speed` the ops cannot write and the CORE's reader refuses, then "
+          "decoded without the reader through `Transcriber.jobs` and both mappings")
     check("R6-10: 4096 × maxSourceTicks is under 2^63 — the bound is chosen so the sheet's "
           "sum over MAX_CLIPS jobs cannot overflow",
           4096 * 1_000_000_000_000_000 < 2**63,
           f"4096 × 1e15 = {4096 * 10**15}, 2^63 = {2**63}")
 
-    for name, text, value in JOB_SPEEDS:
+    for name, text, value, said in JOB_SPEEDS:
         # ONE CHILD PER SPEED: `Ticks(_:)` on an out-of-range `Double` traps,
         # and a trap is a crash, so it has to be this speed's own failure.
         answer, error, _ = run_probe(binary, "jobs-" + name,
@@ -2930,48 +3227,57 @@ def section_jobs(binary, sources):
                   False, error)
             continue
         check(f"jobs: speed {name} answers", "error" not in answer, answer.get("error", ""))
-        check(f"jobs: the CORE's reader accepts a project whose clip speed is {text}",
-              answer.get("readerAccepted") is True,
-              f"got {answer.get('readerMessage')!r}")
-        check(f"jobs: and it arrived as itself ({text})",
+        expected = f"clip {answer.get('clip')}'s speed {said} is outside ×0.1–×10"
+        check(f"jobs: the CORE's reader REFUSES a project whose clip speed is {text}, "
+              f"naming the clip and the value",
+              answer.get("readerAccepted") is False
+              and answer.get("readerMessage") == expected,
+              f"got accepted={answer.get('readerAccepted')!r}, "
+              f"message {answer.get('readerMessage')!r}\n       want {expected!r}")
+        check(f"jobs: decoded without the reader, it arrived as itself ({text})",
               answer.get("speed", "").replace("+", "") == repr(value).replace("+", "")
               or float(answer.get("speed", "nan")) == value,
               f"got {answer.get('speed')!r}")
         rows = answer.get("jobs", [])
-        check(f"jobs: speed {name} makes exactly one job — none of `jobs`'s five refusals "
-              f"fires on a finite positive speed", len(rows) == 1,
+        check(f"jobs: speed {name}, decoded without the reader, makes exactly one job — "
+              f"none of `jobs`'s five refusals fires on a finite positive speed",
+              len(rows) == 1,
               f"got {len(rows)} jobs, problems {answer.get('problems')!r}")
         if len(rows) != 1:
             continue
         job = rows[0]
         if value > 1:
-            check(f"jobs: speed {name} bounds the source length to maxSourceTicks (1e15), "
-                  f"not to Ticks.max and not to the clip's duration",
+            check(f"jobs: speed {name}, decoded without the reader, bounds the source "
+                  f"length to maxSourceTicks (1e15), not to Ticks.max and not to the "
+                  f"clip's duration",
                   job.get("sourceLength") == 1_000_000_000_000_000,
                   f"got {job.get('sourceLength')!r}")
         else:
-            check(f"jobs: speed {name} falls back to the clip's own duration — the product "
-                  f"is below one tick", job.get("sourceLength") == job.get("duration"),
+            check(f"jobs: speed {name}, decoded without the reader, falls back to the "
+                  f"clip's own duration — the product is below one tick",
+                  job.get("sourceLength") == job.get("duration"),
                   f"got {job.get('sourceLength')!r}, duration {job.get('duration')!r}")
-        check(f"jobs: speed {name} leaves `sourceIn` inside 0…maxSourceTicks",
+        check(f"jobs: speed {name}, decoded without the reader, leaves `sourceIn` inside "
+              f"0…maxSourceTicks",
               0 <= job.get("sourceIn", -1) <= 1_000_000_000_000_000,
               f"got {job.get('sourceIn')!r}")
 
         mine = dict(job, speed=value)
         want = oracle(mine, JOB_WORDS)
-        check(f"jobs: speed {name} — the mapping answers the {len(want)} words Python "
-              f"computes from the sourceLength it was given",
+        check(f"jobs: speed {name}, decoded without the reader — the mapping answers the "
+              f"{len(want)} words Python computes from the sourceLength it was given",
               job.get("words") == want,
               f"got {job.get('words')!r}\n       want {want!r}")
         limit = job["start"] + job["duration"]
-        check(f"jobs: speed {name} — every placed tick, both twins, is inside "
-              f"[{job['start']}, {limit}]",
+        check(f"jobs: speed {name}, decoded without the reader — every placed tick, both "
+              f"twins, is inside [{job['start']}, {limit}]",
               all(job["start"] <= w["start"] <= limit and job["start"] <= w["end"] <= limit
                   for w in job.get("words", []))
               and all(job["start"] <= t <= limit for t in job.get("projected", [])),
               f"got {job.get('words')!r} / {job.get('projected')!r}")
         wanted = [projected(mine, t) for t in SECONDS]
-        check(f"jobs: speed {name} — the on-device twin answers the ticks Python computed",
+        check(f"jobs: speed {name}, decoded without the reader — the on-device twin "
+              f"answers the ticks Python computed",
               job.get("projected") == wanted,
               f"got {job.get('projected')!r}\n       want {wanted!r}")
 
@@ -3338,6 +3644,8 @@ def section_client(binary, sources):
     for key, value in want.items():
         check(f"15: Tuning.shipped.{key} is §8's {value}", got.get(key) == value,
               f"got {got.get(key)!r}")
+    check("15: Tuning.shipped.deleteAfterStop is R6-19's 2", got.get("deleteAfterStop") == 2,
+          f"got {got.get('deleteAfterStop')!r}")
     check("15: pollCeiling is max(300, seconds / 49) — 300 for 10 s, 300 for an hour, "
           "36000/49 for ten hours",
           [got.get("ceilingShort"), got.get("ceilingHour"),
@@ -3726,21 +4034,101 @@ def section_cancel(binary, sources):
             "mode": "cancel", "scenario": "poll", "base": fake.base, "key": DUMMY_KEY,
             "cancelAfter": 0.8, "tuning": {"pollInterval": 0.2, "requestTimeout": 20}},
             timeout=120)
+        # Issue batch B43 (#201): no early return — SD1–SD3 below are scored
+        # on their own whatever this row answered.
         if answer is None:
             check("16: the poll-cancel row answers", False, error)
-            return
-        check("16: a cancel during polling is `cancelled`", answer.get("error") == "cancelled",
-              f"got {answer.get('error')!r} / {answer.get('message')!r}")
-        served = answer.get("transcriptID")
+        else:
+            check("16: a cancel during polling is `cancelled`",
+                  answer.get("error") == "cancelled",
+                  f"got {answer.get('error')!r} / {answer.get('message')!r}")
+            served = answer.get("transcriptID")
+            log = fake.log()
+            deletes = [row for row in log["requests"] if row["method"] == "DELETE"]
+            check("16: and the cancel issued a DELETE of the id the fake served",
+                  len(deletes) == 1 and served and deletes[0]["path"].endswith(served),
+                  f"served {served!r}, deletes {[r['path'] for r in deletes]!r}")
+            polls = [row for row in log["requests"]
+                     if row["method"] == "GET" and row["path"].startswith("/v2/transcript/")]
+            check("16: the poll loop did run before the cancel (a cancel is not a first-poll "
+                  "refusal)", len(polls) >= 2, f"{len(polls)} polls")
+            check("16·R: and the refusal carries that DELETE's answer, `deleted` (R6-20)",
+                  answer.get("deletion") == "deleted", f"got {answer.get('deletion')!r}")
+
+    # --- SD: R6-19 (issue batch B35). A DELETE reads the run's token as a
+    # STOP: never cut at the press, cut `deleteAfterStop` after the later of
+    # the Stop and its own start. `deleteTimeout` 5 is an IDLE bound a drip
+    # resets on every byte, so only the Stop's bound can end SD1 and SD3.
+    tuning = {"deleteTimeout": 5, "deleteAfterStop": 1, "requestTimeout": 20}
+    with Fake("stop-delete-drip") as fake:
+        fake.scenario(drip={"route": "delete", "interval_ms": 100})
+        answer, error, _ = run_probe(binary, "stop-delete-drip", {
+            "mode": "cancel", "scenario": "delete", "base": fake.base, "key": DUMMY_KEY,
+            "cancelAfter": 0.5, "tuning": tuning}, timeout=120)
         log = fake.log()
+    if answer is None:
+        check("SD1: the dripping-DELETE row answers", False, error)
+    else:
+        elapsed = answer.get("elapsed")
+        print(f"  (SD1 measured: the DELETE answered {answer.get('answer')!r} after "
+              f"{elapsed if elapsed is None else round(elapsed, 2)} s)")
+        check("SD1: a Stop 0.5 s into a DELETE whose reply drips cuts it `deleteAfterStop` "
+              "(1 s) later, and it answers `failed` — 1.3 ≤ elapsed ≤ 2.5 s",
+              answer.get("answer") == "failed" and elapsed is not None
+              and 1.3 <= elapsed <= 2.5,
+              f"got {answer.get('answer')!r} after {elapsed!r} s, "
+              f"{answer.get('error')!r} {answer.get('message')!r}")
         deletes = [row for row in log["requests"] if row["method"] == "DELETE"]
-        check("16: and the cancel issued a DELETE of the id the fake served",
-              len(deletes) == 1 and served and deletes[0]["path"].endswith(served),
-              f"served {served!r}, deletes {[r['path'] for r in deletes]!r}")
-        polls = [row for row in log["requests"]
-                 if row["method"] == "GET" and row["path"].startswith("/v2/transcript/")]
-        check("16: the poll loop did run before the cancel (a cancel is not a first-poll "
-              "refusal)", len(polls) >= 2, f"{len(polls)} polls")
+        check("SD1: CONTROL — the fake had begun dripping the DELETE's reply and never "
+              "finished it, so the cut is what ended the call",
+              len(deletes) == 1 and (deletes[0].get("dripped") or 0) >= 1
+              and deletes[0].get("drip_complete") is False,
+              f"got {[(r['path'], r.get('dripped'), r.get('drip_complete')) for r in deletes]!r}")
+
+    with Fake("stop-delete-first") as fake:
+        fake.scenario(stall={"route": "delete", "seconds": 0.5})
+        answer, error, _ = run_probe(binary, "stop-delete-first", {
+            "mode": "cancel", "scenario": "delete", "base": fake.base, "key": DUMMY_KEY,
+            "cancelFirst": True, "tuning": tuning}, timeout=120)
+        log = fake.log()
+    if answer is None:
+        check("SD2: the pre-cancelled DELETE row answers", False, error)
+    else:
+        served = answer.get("transcriptID")
+        check("SD2: a DELETE whose token was cancelled BEFORE it started is still sent and "
+              "answers `deleted`, and the fake deleted the id it served",
+              answer.get("answer") == "deleted" and bool(served)
+              and served in log.get("deleted", []),
+              f"got {answer.get('answer')!r}, served {served!r}, "
+              f"deleted {log.get('deleted')!r}")
+        elapsed = answer.get("elapsed")
+        check("SD2: CONTROL — it waited out the fake's 0.5 s stall (elapsed ≥ 0.45 s), so "
+              "it was not cut at the press",
+              elapsed is not None and elapsed >= 0.45, f"got {elapsed!r} s")
+
+    with Fake("stop-delete-poll") as fake:
+        fake.scenario(never_complete=True, drip={"route": "delete", "interval_ms": 100})
+        answer, error, _ = run_probe(binary, "stop-delete-poll", {
+            "mode": "cancel", "scenario": "poll", "base": fake.base, "key": DUMMY_KEY,
+            "cancelAfter": 0.5, "tuning": dict(tuning, pollInterval=0.2)}, timeout=120)
+        log = fake.log()
+    if answer is None:
+        check("SD3: the poll-then-drip row answers", False, error)
+    else:
+        elapsed = answer.get("elapsed")
+        print(f"  (SD3 measured: the poll answered {answer.get('error')!r} after "
+              f"{elapsed if elapsed is None else round(elapsed, 2)} s)")
+        check("SD3: a Stop during polling is `cancelled`, and `refusing`'s dripping DELETE "
+              "is cut inside the bound — elapsed ≤ 2.5 s",
+              answer.get("error") == "cancelled" and elapsed is not None and elapsed <= 2.5,
+              f"got {answer.get('error')!r} after {elapsed!r} s")
+        deletes = [row for row in log["requests"] if row["method"] == "DELETE"]
+        check("SD3: CONTROL — `refusing` sent ONE DELETE and the fake had begun dripping "
+              "its reply",
+              len(deletes) == 1 and (deletes[0].get("dripped") or 0) >= 1,
+              f"got {[(r['path'], r.get('dripped')) for r in deletes]!r}")
+        check("SD3·R: and the refusal carries the cut DELETE's answer, `failed` (R6-20)",
+              answer.get("deletion") == "failed", f"got {answer.get('deletion')!r}")
 
 
 # --------------------------------------------------------------------------
@@ -4058,25 +4446,26 @@ def make_fixture():
     return speech if os.path.exists(speech) else None
 
 
-def baseline_sources():
-    """`git archive <tree> app/Sources` into `work/`, so row W compares the
-    WAV two TREES wrote rather than two runs of one."""
-    target = os.path.join(WORK, "baseline")
+def baseline_sources(tree=BASELINE_TREE, folder="baseline"):
+    """`git archive <tree> app/Sources` into `work/<folder>`, so row W
+    compares the WAV two TREES wrote rather than two runs of one — and the
+    speakers section (issue batch B46) the ops two trees placed."""
+    target = os.path.join(WORK, folder)
     marker = os.path.join(target, ".tree")
-    if os.path.exists(marker) and open(marker).read().strip() == BASELINE_TREE:
+    if os.path.exists(marker) and open(marker).read().strip() == tree:
         return os.path.join(target, "app", "Sources"), None
     shutil.rmtree(target, ignore_errors=True)
     os.makedirs(target)
-    archive = subprocess.run(["git", "-C", ROOT, "archive", BASELINE_TREE, "app/Sources"],
+    archive = subprocess.run(["git", "-C", ROOT, "archive", tree, "app/Sources"],
                              capture_output=True, env=child_env(), timeout=120)
     if archive.returncode != 0:
-        return None, f"git archive {BASELINE_TREE[:8]} failed: {archive.stderr.decode()[:200]}"
+        return None, f"git archive {tree[:8]} failed: {archive.stderr.decode()[:200]}"
     unpack = subprocess.run(["tar", "-x", "-C", target], input=archive.stdout,
                             capture_output=True, env=child_env(), timeout=120)
     if unpack.returncode != 0:
         return None, f"unpacking the baseline failed: {unpack.stderr.decode()[:200]}"
     with open(marker, "w") as f:
-        f.write(BASELINE_TREE)
+        f.write(tree)
     return os.path.join(target, "app", "Sources"), None
 
 
@@ -4416,6 +4805,194 @@ TRICKY_WORDS = [
      "confidence": 1.0, "speaker": "B"},
     {"text": "tiny", "start": 2300, "end": 2400, "confidence": 1e-3, "speaker": "B"},
 ]
+
+
+# --------------------------------------------------------------------------
+# SP — speaker colours on Subtitles (issue batch B46, #93, spec §11 R6-22)
+
+# R6-22's palette, spelled here from the decision's own words rather than read
+# from `CaptionStyle.speakerPalette`, so the rows are an oracle.
+SPEAKER_PALETTE = [[1, 1, 1, 1], [1, 1, 0, 1], [0, 1, 1, 1], [0, 1, 0, 1]]
+
+# SP1's cues in TIME order, each keyed (media, label) or None — the same label
+# in two media, a speaker returning, a fifth distinct speaker cycling back to
+# white, and one cue with no speaker at all.
+SPEAKER_KEYS = [(1, "B"), (1, "A"), (1, "B"), (2, "A"), (2, "C"), (1, "C"), None]
+# The order the cues are EMITTED in, so placement's sort is what puts them in
+# time order and the colours follow the timeline, not the producer.
+SPEAKER_EMIT_ORDER = [3, 0, 6, 1, 5, 2, 4]
+
+# SP4's served words: the proof's `WORDS`, and the same words split A/B where
+# row 7 splits them (`start < 1700` is A).
+SPEAKER_PLAIN_WORDS = [
+    {"text": "Hello", "start": 600, "end": 1120, "confidence": 0.98, "speaker": None},
+    {"text": "there", "start": 1180, "end": 1600, "confidence": 0.96, "speaker": None},
+    {"text": "everyone", "start": 1700, "end": 2400, "confidence": 0.91, "speaker": None},
+    {"text": "welcome", "start": 3000, "end": 3600, "confidence": 0.93, "speaker": None},
+    {"text": "back", "start": 3700, "end": 4100, "confidence": 0.95, "speaker": None},
+]
+SPEAKER_SPLIT_WORDS = [dict(one, speaker="A" if one["start"] < 1700 else "B")
+                       for one in SPEAKER_PLAIN_WORDS]
+
+
+def expected_speaker_colours(keys):
+    """R6-22 recomputed: in timeline order, a speaker's colour is the palette
+    entry of its first-appearance index among the distinct speakers, modulo
+    four; a cue with no speaker has none and takes no slot."""
+    slots, out = {}, []
+    for key in keys:
+        if key is None:
+            out.append(None)
+            continue
+        slot = slots.setdefault(key, len(slots))
+        out.append(SPEAKER_PALETTE[slot % len(SPEAKER_PALETTE)])
+    return out
+
+
+def speaker_cue_rows(with_speakers=True):
+    """SP1's seven cues as the probe's `speakers` mode reads them, in
+    `SPEAKER_EMIT_ORDER`. Every time is on the 30 fps grid."""
+    rows = []
+    for index in SPEAKER_EMIT_ORDER:
+        key = SPEAKER_KEYS[index]
+        start = index * SECOND + SECOND // 2
+        speaker = None
+        if with_speakers and key is not None:
+            speaker = {"media": key[0], "label": key[1]}
+        rows.append({"start": start, "end": start + 4 * SECOND // 5,
+                     "text": f"cue {index}", "speaker": speaker})
+    return rows
+
+
+def text_clip_patches(answer):
+    """The `text` of every `add_text_clip` in a `speakers` answer, by content."""
+    out = {}
+    for one in (answer or {}).get("ops", []):
+        op = json.loads(one)
+        if op.get("op") == "add_text_clip":
+            out[op.get("text", {}).get("content")] = op.get("text", {})
+    return out
+
+
+def placed_captions(project_json):
+    """The text clips of a project's JSON, by start: (content, color)."""
+    project = json.loads(project_json)
+    clips = [c for c in project.get("clips", []) if isinstance(c.get("text"), dict)]
+    clips.sort(key=lambda c: c.get("start", 0))
+    return [(c["text"].get("content"), c["text"].get("color")) for c in clips]
+
+
+def section_speakers(binary, sources):
+    print("\nSP. speaker colours on Subtitles (issue batch B46, #93, R6-22)")
+
+    def place(tag, rows, style, probe=binary):
+        answer, error, _ = run_probe(probe, f"speakers-{tag}",
+                                     {"mode": "speakers", "cues": rows, "style": style})
+        if answer is not None and "error" in answer:
+            return None, answer["error"]
+        return answer, error
+
+    # --- SP1: Subtitles, out of time order --------------------------------
+    rows = speaker_cue_rows()
+    answer, error = place("sp1", rows, "subtitles")
+    patches = text_clip_patches(answer)
+    want = expected_speaker_colours(SPEAKER_KEYS)
+    got = [patches.get(f"cue {index}", {}).get("color") for index in range(len(SPEAKER_KEYS))]
+    names = ["white" if c == [1, 1, 1, 1] else "yellow" if c == [1, 1, 0, 1]
+             else "cyan" if c == [0, 1, 1, 1] else "green" if c == [0, 1, 0, 1] else repr(c)
+             for c in want[:-1]]
+    check("SP1: Subtitles cues emitted OUT of time order take R6-22's colours by first "
+          f"appearance in TIME order — {', '.join(names)} (the fifth speaker cycles)",
+          answer is not None and len(patches) == len(SPEAKER_KEYS) and got[:-1] == want[:-1],
+          error or f"got {got!r}, want {want!r}")
+    nil_patch = patches.get(f"cue {len(SPEAKER_KEYS) - 1}")
+    check("SP1: and the cue with no speaker writes no `color` key at all",
+          nil_patch is not None and "color" not in nil_patch,
+          error or f"got {nil_patch!r}")
+
+    # --- SP2: the five word styles ignore speakers ------------------------
+    stripped = speaker_cue_rows(with_speakers=False)
+    for style in ("highlight", "pill", "karaoke", "build", "one_word"):
+        with_answer, with_error = place(f"sp2-{style}", rows, style)
+        bare_answer, bare_error = place(f"sp2-{style}-bare", stripped, style)
+        check(f"SP2·{style}: the ops with speakers are byte for byte the ops with them "
+              "stripped — a word style keeps its own colours",
+              with_answer is not None and bare_answer is not None
+              and with_answer.get("ops") and with_answer.get("ops") == bare_answer.get("ops"),
+              with_error or bare_error or "the ops differ")
+
+    # --- SP3: nil speakers place exactly what B46's starting tree placed --
+    base_dir, base_error = baseline_sources(BASELINE_TREE_SPEAKERS, "baseline-speakers")
+    baseline = None
+    if base_dir is not None:
+        baseline, base_error = build(base_dir, PROBE_SOURCE, "probe", "cloudprobe",
+                                     defines=("CLOUD_PROBE_BEFORE_SPEAKERS",))
+    check(f"SP3: the B46-baseline probe builds against {BASELINE_TREE_SPEAKERS[:8]} with "
+          "-D CLOUD_PROBE_BEFORE_SPEAKERS — a baseline that will not build is a FAILURE",
+          baseline is not None, base_error or "")
+    if baseline is not None:
+        for style in ("subtitles", "highlight"):
+            today, today_error = place(f"sp3-{style}-today", stripped, style)
+            before, before_error = place(f"sp3-{style}-baseline", stripped, style,
+                                         probe=baseline)
+            check(f"SP3·{style}: cues with no speaker place byte-identical ops to B46's "
+                  "starting tree",
+                  today is not None and before is not None and today.get("ops")
+                  and today.get("ops") == before.get("ops"),
+                  today_error or before_error or "the ops differ")
+        today, today_error = place("sp3-control-today", rows, "subtitles")
+        before, before_error = place("sp3-control-baseline", rows, "subtitles",
+                                     probe=baseline)
+        check("SP3: CONTROL — SP1's speaker cues DO place differently today than in "
+              "B46's starting tree, so the comparison above can see a colour",
+              today is not None and before is not None and today.get("ops")
+              and before.get("ops") and today.get("ops") != before.get("ops"),
+              today_error or before_error or "the ops are equal")
+
+    # --- SP4: the sheet's own path ----------------------------------------
+    fixture = make_fixture()
+    if fixture is None:
+        skip_rows(3, "`say` is not on this host, so SP4 has no audio to send")
+        return
+    with Fake("speakers") as fake:
+        def sheet_run(tag, speakers, probe):
+            fake.scenario(words=SPEAKER_PLAIN_WORDS, speaker_words=SPEAKER_SPLIT_WORDS)
+            row, error, _ = chrome_child(probe, fake, tag, {
+                "op": "speakers", "fixture": fixture, "key": DUMMY_KEY,
+                "speakers": speakers, "wall": 120}, timeout=300)
+            submitted = [r.get("json") or {} for r in fake.log()["requests"]
+                         if r["method"] == "POST" and r["path"] == "/v2/transcript"]
+            if row is not None and "error" in row:
+                return None, row["error"], submitted
+            return row, error, submitted
+
+        on, on_error, on_submitted = sheet_run("speakers-on", True, binary)
+        captions = placed_captions(on["project"]) if on and on.get("project") else []
+        check("SP4·on: CONTROL — the sheet's run finished and its one submit asked for "
+              "`speaker_labels: true`",
+              on is not None and on.get("didFinish") is True and len(on_submitted) == 1
+              and on_submitted[0].get("speaker_labels") is True,
+              on_error or f"got {on!r}, submits {on_submitted!r}")
+        check("SP4·on: Speakers on, Subtitles — the two caption clips read white then "
+              "yellow in the project JSON",
+              [c for _, c in captions] == [[1, 1, 1, 1], [1, 1, 0, 1]]
+              and [t for t, _ in captions] == ["Hello there", "everyone welcome back"],
+              on_error or f"got {captions!r}")
+
+        off, off_error, off_submitted = sheet_run("speakers-off", False, binary)
+        before = None
+        before_error = "the B46-baseline probe did not build"
+        if baseline is not None:
+            before, before_error, _ = sheet_run("speakers-off-baseline", False, baseline)
+        check("SP4·off: Speakers off — the project JSON is byte-equal to B46's starting "
+              "tree's same run (and the submit did not ask for speaker labels)",
+              off is not None and before is not None and off.get("didFinish") is True
+              and off_submitted and off_submitted[0].get("speaker_labels") is not True
+              and off.get("project") and off.get("project") == before.get("project"),
+              off_error or before_error
+              or f"today {placed_captions((off or {}).get('project') or '{}')!r}, "
+                 f"baseline {placed_captions((before or {}).get('project') or '{}')!r}, "
+                 f"submits {off_submitted!r}")
 
 
 def section_verbatim(binary, sources):
@@ -4810,9 +5387,85 @@ def section_cache_write(binary, sources):
           f"error={error!r}, audio_seconds={fields.get('audio_seconds')!r}, "
           f"failure={failure!r}")
 
+    # --- RF (issue batch B43, #201, R6-20): a transcript refused after it
+    # was made, whose DELETE failed, is owed with no file to retry it from —
+    # so it is reported for the dashboard and never promised a retry.
+    def refused_run(tag, scenario, extra=None):
+        with Fake(tag) as fake:
+            fake.scenario(**scenario)
+            answer, error, out = run_probe(binary, tag, dict({
+                "mode": "run", "base": fake.base, "key": DUMMY_KEY, "tuning": RUN_TUNING,
+                "cache": fresh(tag), "media": media, "jobs": jobs,
+            }, **(extra or {})), timeout=300)
+            log = fake.log()
+        answer = answer or {}
+        failure = str(answer.get("cloudFailure", ""))
+        lines = " ".join(answer.get("cloudReportLines", []))
+        owed = answer.get("report", {}).get("refusedUndeleted")
+        return answer, error, out, log, failure, lines, owed
+
+    delete_fails = [{"route": "delete", "status": 500, "times": -1}]
+    errored = "The audio could not be transcribed."
+    answer, error, _, log, failure, lines, owed = refused_run(
+        "rf1", {"transcript_error": errored, "fail": delete_fails})
+    check("RF1: a transcript that ended in `error`, whose DELETE answered 500, is in "
+          "`refusedUndeleted`",
+          answer.get("ok") is False and owed == [1],
+          f"error={error!r}, ok={answer.get('ok')!r}, owed={owed!r}, "
+          f"message={answer.get('message')!r}")
+    check("RF1: and the dashboard sentence is in the failure text and on the card, the "
+          "retry sentence in neither",
+          dashboard in failure and dashboard in lines
+          and retry not in failure and retry not in lines,
+          f"failure={failure!r}, lines={lines!r}")
+    served = [t["id"] for t in log["transcripts"]]
+    deletes = [r["path"] for r in log["requests"] if r["method"] == "DELETE"]
+    check("RF1: CONTROL — the fake logged ONE DELETE, of the id it served",
+          len(served) == 1 and len(deletes) == 1 and deletes[0].endswith("/" + served[0]),
+          f"served={served!r}, deletes={deletes!r}")
+
+    answer, error, _, log, failure, lines, owed = refused_run(
+        "rf2", {"transcript_error": errored})
+    check("RF2: CONTROL — the same refusal with the DELETE answering owes nothing: "
+          "`refusedUndeleted` empty and no dashboard sentence",
+          answer.get("ok") is False and owed == []
+          and dashboard not in failure and dashboard not in lines
+          and errored in failure,
+          f"error={error!r}, owed={owed!r}, failure={failure!r}, lines={lines!r}")
+
+    answer, error, out, log, failure, lines, owed = refused_run("rf3", {
+        "fail": delete_fails,
+        "words": [
+            {"text": DUMMY_KEY, "start": 600, "end": 1120, "confidence": 0.98, "speaker": None},
+            {"text": "said", "start": 1180, "end": 1600, "confidence": 0.96, "speaker": None}]})
+    check("RF3: words that repeat the key, whose DELETE answered 500 — `refusedUndeleted` "
+          "is [1] and the dashboard sentence is on the card and in the failure text",
+          answer.get("ok") is False and owed == [1]
+          and "the transcript's words repeat the API key" in failure
+          and dashboard in failure and dashboard in lines,
+          f"error={error!r}, owed={owed!r}, failure={failure!r}, lines={lines!r}")
+    check("RF3: and the key is in no output — the failure text, the card, the probe's "
+          "stdout and stderr",
+          DUMMY_KEY not in failure and DUMMY_KEY not in lines and DUMMY_KEY not in (out or ""),
+          f"failure has it: {DUMMY_KEY in failure}; lines: {DUMMY_KEY in lines}; "
+          f"output: {DUMMY_KEY in (out or '')}")
+
+    answer, error, _, log, failure, lines, owed = refused_run(
+        "rf4", {"never_complete": True, "fail": delete_fails},
+        {"cancelAtRequest": {"method": "GET", "pathPrefix": "/v2/transcript/",
+                             "after": 0.3}})
+    check("RF4: a Stop during polling, whose DELETE answered 500, ends the run `cancelled` "
+          "with the media in `refusedUndeleted`",
+          answer.get("ok") is False and answer.get("cancelled") is True
+          and "cancelled" in str(answer.get("message", "")).lower() and owed == [1],
+          f"error={error!r}, ok={answer.get('ok')!r}, message={answer.get('message')!r}, "
+          f"owed={owed!r}")
+    check("RF4: and the card's lines carry the dashboard sentence, not the retry one",
+          dashboard in lines and retry not in lines, f"lines={lines!r}")
+
 
 # The number of rows `section_echo` scores, for its one skip.
-ECHO_ROWS = 18
+ECHO_ROWS = 28
 
 
 def section_echo(binary, sources):
@@ -4958,6 +5611,123 @@ def section_echo(binary, sources):
           and answer.get("log") == [],
           f"error={error!r}, answer={answer!r}")
 
+    # --- E6/E7 (issue batch B43, #200): every decoded string of a word is
+    # read for the key, not only its text. The speaker is served ESCAPED, so
+    # the served bytes never hold the key's own bytes and only the decoded
+    # field can find it.
+    def escaped_words(speaker):
+        return ('[{"text":"Hello","start":600,"end":1120,"confidence":0.98,'
+                '"speaker":"' + speaker + '"},'
+                '{"text":"there","start":1180,"end":1600,"confidence":0.96,'
+                '"speaker":"A"}]')
+
+    def words_run(tag, speaker):
+        cache = fresh(tag)
+        with Fake(tag) as fake:
+            fake.scenario(words_json=escaped_words(speaker))
+            served_bytes = fake.words()
+            answer, error, out = run_probe(binary, tag, {
+                "mode": "run", "base": fake.base, "key": DUMMY_KEY, "tuning": RUN_TUNING,
+                "cache": cache, "media": media, "jobs": jobs,
+            }, timeout=300)
+            log = fake.log()
+        return cache, served_bytes, answer or {}, error, out, log
+
+    cache, served_bytes, answer, error, out, log = words_run(
+        "echo-E6", DUMMY_KEY.replace("-", "\\u002d"))
+    failure = str(answer.get("cloudFailure", ""))
+    served = [t["id"] for t in log["transcripts"]]
+    deletes = [r["path"] for r in log["requests"] if r["method"] == "DELETE"]
+    check("E6: a word whose SPEAKER is the key (served escaped) fails the run with the "
+          "refusal, no `transcripts/1.json`, and the transcript DELETEd",
+          answer.get("ok") is False
+          and "the transcript's words repeat the API key" in failure
+          and DUMMY_KEY not in failure
+          and not os.path.exists(os.path.join(cache, "transcripts", "1.json"))
+          and len(served) == 1 and any(p.endswith("/" + served[0]) for p in deletes),
+          f"error={error!r}, ok={answer.get('ok')!r}, failure={failure!r}, "
+          f"served={served!r}, deletes={deletes!r}")
+    check("E6: CONTROL — the served bytes lack `proof-key`, so only the decoded speaker "
+          "could have refused them",
+          bool(served_bytes) and DUMMY_KEY.encode() not in served_bytes
+          and b"\\u002d" in served_bytes,
+          f"served {served_bytes!r}")
+
+    cache, served_bytes, answer, error, out, log = words_run(
+        "echo-E7", "proof\\u002dkez")
+    written = b""
+    try:
+        with open(os.path.join(cache, "transcripts", "1.json"), "rb") as handle:
+            written = handle.read()
+    except OSError:
+        pass
+    check("E7: CONTROL — a speaker one letter off the key completes, and `1.json`'s words "
+          "are byte-equal to the served bytes, escape and all",
+          answer.get("ok") is True and bool(served_bytes)
+          and written.endswith(b',"words":' + served_bytes + b"}"),
+          f"error={error!r}, ok={answer.get('ok')!r}, message={answer.get('message')!r}, "
+          f"served={served_bytes!r}, written tail={written[-200:]!r}")
+
+    # --- E8 (issue batch B43, #200): the model and the language the server
+    # names are bounded at 64 scalars — 63 and "…" — everywhere they land.
+    def bounded_run(tag, model, language):
+        cache = fresh(tag)
+        with Fake(tag) as fake:
+            fake.scenario(speech_model_used=model, language_code=language)
+            answer, error, _ = run_probe(binary, tag, {
+                "mode": "run", "base": fake.base, "key": DUMMY_KEY, "tuning": RUN_TUNING,
+                "cache": cache, "media": media, "jobs": jobs,
+            }, timeout=300)
+        header = {}
+        try:
+            with open(os.path.join(cache, "transcripts", "1.json")) as handle:
+                header = json.load(handle)
+        except (OSError, ValueError):
+            pass
+        answer = answer or {}
+        return (answer, error, (answer.get("report", {}).get("uploaded") or [{}])[0],
+                answer.get("cloudFields", {}), header)
+
+    answer, error, row, fields, header = bounded_run("echo-E8", "m" * 5000, "l" * 5000)
+    note = str(fields.get("note", ""))
+    lines = " ".join(answer.get("cloudReportLines", []))
+    cut_model, cut_language = "m" * 63 + "\u2026", "l" * 63 + "\u2026"
+    models = fields.get("speech_model_used") or [{}]
+    detected = fields.get("language_detected") or [{}]
+    check("E8: a 5000-character model is 63 characters and \"\u2026\" in the report and the "
+          "tool's `speech_model_used`",
+          answer.get("ok") is True and row.get("model") == cut_model
+          and models[0].get("model") == cut_model,
+          f"error={error!r}, ok={answer.get('ok')!r}, report={str(row.get('model'))[:80]!r} "
+          f"({len(str(row.get('model')))} chars), field={str(models)[:120]!r}")
+    check("E8: and in the tool's `note` and the report card, never 64 of them in a row",
+          f"with {cut_model}," in note and f"with {cut_model}," in lines
+          and "m" * 64 not in note and "m" * 64 not in lines,
+          f"note={note[:200]!r}, lines={lines[:200]!r}")
+    check("E8: and in the cache header's `speech_model_used`",
+          header.get("speech_model_used") == cut_model,
+          f"got {str(header.get('speech_model_used'))[:80]!r}")
+    check("E8: a 5000-character language is 63 characters and \"\u2026\" in the report and "
+          "the tool's `language_detected`",
+          answer.get("ok") is True and row.get("language") == cut_language
+          and detected[0].get("code") == cut_language,
+          f"report={str(row.get('language'))[:80]!r}, field={str(detected)[:120]!r}")
+    check("E8: and on the report card, never 64 of them in a row",
+          f"detected {cut_language}" in lines and "l" * 64 not in lines,
+          f"lines={lines[:200]!r}")
+    check("E8: and in the cache header's `language_code`",
+          header.get("language_code") == cut_language,
+          f"got {str(header.get('language_code'))[:80]!r}")
+
+    answer, error, row, fields, header = bounded_run("echo-E8-control", "k" * 64, "j" * 64)
+    check("E8: CONTROL — a 64-character model and language are kept whole, in the report "
+          "and the cache header",
+          answer.get("ok") is True and row.get("model") == "k" * 64
+          and row.get("language") == "j" * 64
+          and header.get("speech_model_used") == "k" * 64
+          and header.get("language_code") == "j" * 64,
+          f"error={error!r}, row={row!r}, header model={header.get('speech_model_used')!r}")
+
 
 def section_run(binary, sources):
     print("\nP/T. the cloud run: the progress arithmetic, and the temporary extracts a "
@@ -4969,11 +5739,13 @@ def section_run(binary, sources):
         ("one media, extracting at 0", [10.0], 0, "extracting", 0),
         ("one media, extracting done", [10.0], 0, "extracting", 1),
         ("one media, half uploaded", [10.0], 0, "uploading", 0.5),
+        ("one media, submitting", [10.0], 0, "submitting", 0),
         ("one media, the wait complete", [10.0], 0, "waiting", 1),
         ("one media, saved", [10.0], 0, "saving", 1),
         ("two media, the first's wait", [10.0, 30.0], 0, "waiting", 1),
         ("two media, the second's wait", [10.0, 30.0], 1, "waiting", 1),
         ("two media, the second saved", [10.0, 30.0], 1, "saving", 1),
+        ("two media, the second submitting", [10.0, 30.0], 1, "submitting", 0.5),
         ("within past 1 is clamped", [10.0], 0, "uploading", 5),
         ("within below 0 is clamped", [10.0], 0, "uploading", -5),
         ("nothing to upload has no share", [], 0, "saving", 1),
@@ -5013,10 +5785,17 @@ def section_run(binary, sources):
                                         "Waiting for AssemblyAI · 34 s",
                                         "Saving intro.mov"],
               f"got {answer.get('details')!r}")
+        small = ["Uploading intro.mov · 0 MB of 0", "Uploading intro.mov · 0 MB of <1",
+                 "Uploading intro.mov · <1 MB of <1", "Uploading intro.mov · <1 MB of 1",
+                 "Uploading intro.mov · 1 MB of 1", "Uploading intro.mov · 41 MB of 115",
+                 "Submitting intro.mov"]
+        check("P·small: a count under a megabyte is spelt `<1`, never 0 or 1, and the submit "
+              "names its file (issue batch B35)",
+              answer.get("smallDetails") == small, f"got {answer.get('smallDetails')!r}")
 
     speech = make_fixture()
     if speech is None:
-        skip_rows(14, "`say` is not on this host, so the run rows have no audio to send")
+        skip_rows(22, "`say` is not on this host, so the run rows have no audio to send")
         return
     second = os.path.join(os.path.dirname(speech), "speech-b.aiff")
     if not os.path.exists(second):
@@ -5065,6 +5844,7 @@ def section_run(binary, sources):
             share = [0.25, 0.75]
             base = [0.0, 0.25]
             bands = [("Extracting", 0.0, 0.25), ("Uploading", 0.25, 0.65),
+                     ("Submitting", 0.65, 0.65),
                      ("Waiting for AssemblyAI", 0.65, 0.95), ("Saving", 0.95, 1.0)]
             bad = []
             for index, row in enumerate(answer.get("progress", [])):
@@ -5110,6 +5890,26 @@ def section_run(binary, sources):
                   and any(d.startswith("Waiting for AssemblyAI · ") for d in details)
                   and any(d.startswith("Saving ") for d in details),
                   f"got {sorted(set(details))!r}")
+            # P·submit (issue batch B35): each media's submit has its own line,
+            # after its upload and before its wait, at the upload's end.
+            rows = answer.get("progress", [])
+            for which, file_name in enumerate(["speech.aiff", "speech-b.aiff"]):
+                uploads_at = [i for i, (_, d) in enumerate(rows)
+                              if d.startswith(f"Uploading {file_name} ")]
+                submits_at = [i for i, (_, d) in enumerate(rows)
+                              if d == f"Submitting {file_name}"]
+                after = uploads_at[-1] if uploads_at else len(rows)
+                waits_at = [i for i, (_, d) in enumerate(rows)
+                            if i > after and d.startswith("Waiting for AssemblyAI")]
+                want = base[which] + share[which] * 0.65
+                check(f"P·submit: \"Submitting {file_name}\" is published after its last "
+                      f"Uploading line and before its first Waiting line, at "
+                      f"{base[which]} + {share[which]} × 0.65",
+                      len(submits_at) == 1 and bool(uploads_at) and bool(waits_at)
+                      and uploads_at[-1] < submits_at[0] < waits_at[0]
+                      and abs(rows[submits_at[0]][0] - want) <= 1e-9,
+                      f"uploading at {uploads_at[-1:]!r}, submitting at {submits_at!r} "
+                      f"({[rows[i] for i in submits_at]!r}), first wait at {waits_at[:1]!r}")
 
     one_media, one_job = media[:1], jobs[:1]
 
@@ -5178,6 +5978,54 @@ def section_run(binary, sources):
               "no longer pays",
               (answer.get("seconds") or 0) >= 3 * 5 - 1,
               f"the run took {answer.get('seconds')!r} s")
+
+    # --- J3 (issue batch B35, R6-19): a Stop DURING the janitor's DELETE. The
+    # fake drips its 22-byte 404 a byte a second, which an idle timeout never
+    # ends; the Stop's bound does, and the DELETE is owed like any failed one.
+    janitor_drip = fresh("run-janitor-drip")
+    plant_undeleted(janitor_drip, [11])
+    planted = open(os.path.join(janitor_drip, "transcripts", "11.json"), "rb").read()
+    with Fake("run-janitor-drip") as fake:
+        fake.scenario(drip={"route": "delete", "interval_ms": 1000})
+        answer, error, _ = run_probe(binary, "run-janitor-drip", {
+            "mode": "run", "base": fake.base, "key": DUMMY_KEY,
+            "tuning": dict(RUN_TUNING, deleteAfterStop=1),
+            "cache": janitor_drip, "media": one_media, "jobs": one_job,
+            "cancelAtRequest": {"method": "DELETE", "pathPrefix": "/v2/transcript/",
+                                "after": 0.3}}, timeout=300)
+        log = fake.log()
+    if answer is None:
+        check("J3: the Stop-during-the-janitor run answers", False, error)
+    else:
+        took = answer.get("seconds")
+        print(f"  (J3 measured: the run ended {took if took is None else round(took, 2)} s "
+              f"after it started)")
+        check("J3: a Stop during the janitor's DELETE ends the run `cancelled`",
+              answer.get("ok") is False
+              and "cancelled" in str(answer.get("message", "")).lower(),
+              f"got ok={answer.get('ok')!r} {answer.get('message')!r}")
+        check("J3: inside R6-19's bound \u2014 the run took ≤ 2.5 s, where the drip alone "
+              "would have held it 22 s",
+              (answer.get("seconds") or 99) <= 2.5, f"the run took {answer.get('seconds')!r} s")
+        report = answer.get("report", {})
+        check("J3: the cut DELETE is `failed` \u2014 media 11 in `janitorFailed`, nothing in "
+              "`janitorDeleted`",
+              report.get("janitorFailed") == [11] and report.get("janitorDeleted") == [],
+              f"got failed {report.get('janitorFailed')!r}, "
+              f"deleted {report.get('janitorDeleted')!r}")
+        check("J3: and it is reported owed \u2014 \"it will be retried at the next run with "
+              "an API key\"",
+              any("it will be retried at the next run with an API key" in line
+                  for line in answer.get("cloudReportLines") or []),
+              f"got {answer.get('cloudReportLines')!r}")
+        check("J3: and its cache file is byte for byte what was planted, the one record of "
+              "the id still owed",
+              open(os.path.join(janitor_drip, "transcripts", "11.json"), "rb").read()
+              == planted)
+        deletes = [row for row in log["requests"] if row["method"] == "DELETE"]
+        check("J3: CONTROL \u2014 ONE DELETE, and the fake had begun dripping its reply",
+              len(deletes) == 1 and (deletes[0].get("dripped") or 0) >= 1,
+              f"got {[(r['path'], r.get('dripped')) for r in deletes]!r}")
 
     # --- I: a cache file's `transcript_id` is somebody ELSE's string (the
     # reader review's R3\u00b71). It rides inside a `.reelcut` package, so a
@@ -5370,6 +6218,7 @@ def progress_oracle(row):
         return 0
     base = sum(shares[:index])
     low, high = {"extracting": (0.0, 0.25), "uploading": (0.25, 0.65),
+                 "submitting": (0.65, 0.65),
                  "waiting": (0.65, 0.95), "saving": (0.95, 1.0)}[row["phase"]]
     part = min(max(row["within"], 0), 1)
     value = high if part >= 1 else (low if part <= 0 else low + (high - low) * part)
@@ -6515,16 +7364,18 @@ def section_chrome(binary, sources):
               one[0] == two[0] and one[0] != b"", "the two renders differ")
     check("18: light and dark differ — both appearances really were rendered",
           taken[("light", 1)][0] != taken[("dark", 1)][0], "the two appearances are equal")
-    # 677, not 340, since road map 12 A2 (610) and road map 13 P4 (677):
-    # Settings' Assistant pane sits under the Transcription pane in the same
-    # stack, with the month's spend line and its note under its buttons, and
-    # the window grows to fit it.
+    # 793, not 340, since road map 12 A2 (610), road map 13 P4 (677), issue
+    # batch B48 (805, measured) and B49 (793, measured): Settings' Assistant
+    # pane sits under the Transcription pane in the same stack, with its chat
+    # settings (AI-20) under the model, the month's spend line and its note
+    # under its buttons, and the window grows to fit it; spec §11 SH-4's square
+    # StickerButton took 6 pt off each of its 2 button rows.
     size = png_size(taken[("light", 1)][0])
     scale = (size[0] / 460.0) if size else 0
-    check(f"18: the PNG is the window's content — 460 × 677 points at the display's backing "
+    check(f"18: the PNG is the window's content — 460 × 793 points at the display's backing "
           f"scale (measured {size!r}, scale {scale:g})",
-          size is not None and size[0] % 460 == 0 and size[1] % 677 == 0
-          and size[0] // 460 == size[1] // 677 and size[0] // 460 >= 1,
+          size is not None and size[0] % 460 == 0 and size[1] % 793 == 0
+          and size[0] // 460 == size[1] // 793 and size[0] // 460 >= 1,
           f"got {size!r}")
 
 
@@ -6534,13 +7385,18 @@ def section_chrome(binary, sources):
 
 CANCELLED = "The transcription was cancelled."
 # (row, scenario, the request Stop waits for, Stop→finish low, high). The
-# upload stall outlives its child, so it runs last.
+# upload stall outlives its child, so it runs last. Issue batch B35 (R6-19):
+# a DELETE now runs on for at most `deleteAfterStop` (2 s) after a Stop, so
+# save's stall is 1 s — under the bound, so the DELETE still lands — where it
+# was 3 s, which the bound would now cut; drip is a DELETE the bound DOES cut.
 STOP_ROWS = [
-    ("save", {"stall": {"route": "delete", "seconds": 3}}, "DELETE", "/v2/transcript/",
-     1.0, 8.0),
+    ("save", {"stall": {"route": "delete", "seconds": 1}}, "DELETE", "/v2/transcript/",
+     0.5, 2.5),
     ("submit", {"stall": {"route": "submit", "seconds": 6}}, "POST", "/v2/transcript",
      3.0, 11.0),
     ("wait", {"never_complete": True}, "GET", "/v2/transcript/", None, 5.0),
+    ("drip", {"drip": {"route": "delete", "interval_ms": 100}}, "DELETE", "/v2/transcript/",
+     1.5, 3.5),
     ("upload", {"stall": {"route": "upload", "seconds": 30}}, "POST", "/v2/upload",
      None, 5.0),
 ]
@@ -6551,8 +7407,8 @@ def section_stop(binary, sources):
           "(B24, #80)")
     fixture = make_fixture()
     if fixture is None:
-        skip_rows(5 * len(STOP_ROWS), "`say` is not on this host, so the Stop rows have no "
-                                      "audio to send")
+        skip_rows(5 * len(STOP_ROWS) + 2, "`say` is not on this host, so the Stop rows have "
+                                          "no audio to send")
         return
     with Fake("stop") as fake:
         for tag, scenario, method, prefix, low, high in STOP_ROWS:
@@ -6607,6 +7463,11 @@ def section_stop(binary, sources):
                 ok = len(submits_) == 1 and len(polls) >= 1 and all_deleted
                 claim = ("one submit, at least one poll, and the transcript is deleted "
                          "on the way out")
+            elif tag == "drip":
+                ok = (len(deletes) == 1 and (deletes[0].get("dripped") or 0) >= 1
+                      and deletes[0].get("drip_complete") is False)
+                claim = ("one DELETE, whose reply the fake had begun dripping and never "
+                         "finished — R6-19's 2 s cut it")
             else:
                 ok = len(uploads_) == 1 and not submits_
                 claim = "one upload and NO submit — nothing was paid for"
@@ -6621,12 +7482,29 @@ def section_stop(binary, sources):
                       f"got file={row.get('transcriptCached')!r} "
                       f"marker={row.get('markerCached')!r} "
                       f"remoteDeleted={row.get('remoteDeleted')!r}")
+            elif tag == "drip":
+                check(f"{name}: and the transcript LANDED with its DELETE owed — the file "
+                      "and its marker are in the cache and `remote_deleted` is false",
+                      row.get("transcriptCached") is True and row.get("markerCached") is True
+                      and row.get("remoteDeleted") is False,
+                      f"got file={row.get('transcriptCached')!r} "
+                      f"marker={row.get('markerCached')!r} "
+                      f"remoteDeleted={row.get('remoteDeleted')!r}")
+                check(f"{name}: and the card says so — \"it will be retried at the next "
+                      "run with an API key.\"",
+                      "it will be retried at the next run with an API key." in status,
+                      f"got {status!r}")
             else:
                 check(f"{name}: and nothing landed in the cache — no transcript file, "
                       "no marker",
                       row.get("transcriptCached") is False and row.get("markerCached") is False,
                       f"got file={row.get('transcriptCached')!r} "
                       f"marker={row.get('markerCached')!r}")
+            if tag == "submit":
+                want = "Submitting " + os.path.basename(fixture)
+                check(f"{name}: and the card's detail line at the press was \"{want}\" "
+                      "(issue batch B35)",
+                      row.get("detailAtStop") == want, f"got {row.get('detailAtStop')!r}")
 
 
 def png_size(data):
@@ -7082,10 +7960,12 @@ MUTANTS = {
         '            completionHandler(nil)\n',
         '            completionHandler(request)\n',
         'Z1 — the redirect FOLLOWED, so the authorization header goes to whatever host the Location named'),
+    # Re-aimed by issue batch B43: `refusing` answers a `Refusal` carrying the
+    # DELETE's answer, so Z2's spelling is "no DELETE, answered `notSent`".
     "z2-throw-without-delete": (
         "AssemblyAIClient+Session.swift",
-        '        delete(id: id)\n',
-        '',
+        '        Refusal(failure: failure, deletion: delete(id: id, cancel: cancel))\n',
+        '        Refusal(failure: failure, deletion: .notSent)\n',
         'Z2 — `refusing` no longer DELETEs before it throws (R6-4)'),
     "z3-extract-kept": (
         "CloudTranscriber+Media.swift",
@@ -7124,7 +8004,9 @@ MUTANTS = {
         'Z10 — R6-13 broken: a held media priced as an upload'),
     "z12-no-ceiling": (
         "AssemblyAIClient.swift",
-        '            if Date().timeIntervalSince(started) > ceiling { throw refusing(.timedOut, id: id) }\n',
+        '            if Date().timeIntervalSince(started) > ceiling {\n'
+        '                throw refusing(.timedOut, id: id, cancel: cancel)\n'
+        '            }\n',
         '',
         'Z12 — the poll ceiling removed'),
     "any-id-on-the-wire": (
@@ -7138,7 +8020,7 @@ MUTANTS = {
         "reverted (row I)"),
     "echoed-id-trusted": (
         "AssemblyAIClient.swift",
-        "                    try requireEchoedID(response, polled: id)\n",
+        "                    try requireEchoedID(response, polled: id, cancel: cancel)\n",
         "",
         "#71's id check removed (section 15's two echoed-id rows)"),
     "refused-id-reported-as-deleted": (
@@ -7177,7 +8059,7 @@ MUTANTS = {
         "(ST\u00b7upload)"),
     "cancel-orphans-transcript": (
         "AssemblyAIClient.swift",
-        "            if cancel?.isCancelled == true { throw refusing(.cancelled, id: id) }\n",
+        "            if cancel?.isCancelled == true { throw refusing(.cancelled, id: id, cancel: cancel) }\n",
         "            if cancel?.isCancelled == true { throw ClientError.cancelled }\n",
         "a Stop heard in `poll` throws without deleting the transcript (ST\u00b7submit, "
         "ST\u00b7wait)"),
@@ -7224,22 +8106,26 @@ MUTANTS = {
         "the EINTR retry unbounded again \u2014 #187 item 6 (17\u00b7endless)"),
     "model-unfiltered": (
         "CloudTranscriber+Media.swift",
-        "        let model = fetched.response.speechModelUsed.map(client.withoutCredential)\n",
-        "        let model = fetched.response.speechModelUsed\n",
+        "        let model = fetched.response.speechModelUsed.map(client.withoutCredential)"
+        ".map(Self.bounded)\n",
+        "        let model = fetched.response.speechModelUsed.map(Self.bounded)\n",
         "the served model kept with the key in it \u2014 #187 R2\u00b71 (E1)"),
     "language-unfiltered": (
         "CloudTranscriber+Media.swift",
-        "        let language = fetched.response.languageCode.map(client.withoutCredential)\n",
-        "        let language = fetched.response.languageCode\n",
+        "        let language = fetched.response.languageCode.map(client.withoutCredential)"
+        ".map(Self.bounded)\n",
+        "        let language = fetched.response.languageCode.map(Self.bounded)\n",
         "the served language kept with the key in it \u2014 #187 R2\u00b71 (E2)"),
     "words-unrefused": (
         "CloudTranscriber+Media.swift",
         "        if client.carriesCredential(String(decoding: fetched.wordsJSON, as: UTF8.self))\n"
-        "            || file.words.contains(where: { client.carriesCredential($0.text) })\n"
+        "            || file.words.contains(where: { $0.stringFields.contains(where: "
+        "client.carriesCredential) })\n"
         "        {\n"
         "            throw client.refusing(\n"
         "                .malformed(\"the transcript's words repeat the API key\"), "
-        "id: fetched.response.id)\n"
+        "id: fetched.response.id,\n"
+        "                cancel: cancel)\n"
         "        }\n",
         "",
         "words that repeat the key written to the cache \u2014 #187 R2\u00b71 (E3)"),
@@ -7249,6 +8135,116 @@ MUTANTS = {
         "        Self.isPlainIdentifier(id)\n",
         "`isSendableIdentifier` without its credential clause \u2014 #187 R2\u00b71 (E4, E5, "
         "the submission section's key-shaped success id)"),
+    # Issue batch B35 (#187 item 5, R6-19): a Stop bounds a DELETE; the
+    # submit's line.
+    "delete-deaf-to-stop": (
+        "AssemblyAIClient.swift",
+        "        let reply = send(request, stop: cancel, grace: tuning.deleteAfterStop)\n",
+        "        let reply = send(request, stop: nil, grace: tuning.deleteAfterStop)\n",
+        "`delete` deaf to a Stop, so a dripping DELETE holds the run (SD1, SD3, J3, "
+        "ST\u00b7drip)"),
+    "delete-cut-at-once": (
+        "AssemblyAIClient.swift",
+        "        let reply = send(request, stop: cancel, grace: tuning.deleteAfterStop)\n",
+        "        let reply = send(request, cancel: cancel)\n",
+        "the token ATTACHED to the DELETE, so a Stop cuts it at the press (SD2, 16's "
+        "poll-cancel DELETE, ST\u00b7save, ST\u00b7submit, ST\u00b7wait)"),
+    "janitor-stop-dropped": (
+        "CloudTranscriber+Media.swift",
+        "            switch client.delete(id: row.transcriptID, cancel: cancel) {\n",
+        "            switch client.delete(id: row.transcriptID, cancel: nil) {\n",
+        "the janitor's DELETE handed no token (J3)"),
+    "refusing-stop-dropped": (
+        "AssemblyAIClient+Session.swift",
+        "        Refusal(failure: failure, deletion: delete(id: id, cancel: cancel))\n",
+        "        Refusal(failure: failure, deletion: delete(id: id, cancel: nil))\n",
+        "`refusing`'s DELETE handed no token (SD3, SD3\u00b7R)"),
+    "fetch-stop-dropped": (
+        "CloudTranscriber+Media.swift",
+        "        let deleted = client.delete(id: fetched.response.id, cancel: cancel) == .deleted\n",
+        "        let deleted = client.delete(id: fetched.response.id, cancel: nil) == .deleted\n",
+        "`fetch`'s DELETE handed no token (ST\u00b7drip)"),
+    "submit-line-missing": (
+        "CloudTranscriber+Media.swift",
+        "        progress(.submitting, 0, CloudProgress.detail(.submitting, file: name))\n",
+        "",
+        "the submit's own detail line never published (P\u00b7submit, ST\u00b7submit's "
+        "detail row)"),
+    "sub-megabyte-rounds": (
+        "CloudProgress.swift",
+        "        if bytes < 1_000_000 { return \"<1\" }\n",
+        "",
+        "a count under a megabyte rounded to 0 or 1 again (P\u00b7small)"),
+    # Issue batch B43 (#200, #201, R6-20): one mutant per fix, and a CONTROL.
+    "speaker-unchecked": (
+        "AssemblyAITranscript.swift",
+        "        Mirror(reflecting: self).children.compactMap { $0.value as? String }\n",
+        "        [text]\n",
+        "only a word's text read for the key, as before #200 (E6)"),
+    "model-unbounded": (
+        "CloudTranscriber+Media.swift",
+        "        let model = fetched.response.speechModelUsed.map(client.withoutCredential)"
+        ".map(Self.bounded)\n",
+        "        let model = fetched.response.speechModelUsed.map(client.withoutCredential)\n",
+        "the served model kept at any length (E8's model rows)"),
+    "language-unbounded": (
+        "CloudTranscriber+Media.swift",
+        "        let language = fetched.response.languageCode.map(client.withoutCredential)"
+        ".map(Self.bounded)\n",
+        "        let language = fetched.response.languageCode.map(client.withoutCredential)\n",
+        "the served language kept at any length (E8's language rows)"),
+    "refusal-answer-dropped": (
+        "CloudTranscriber.swift",
+        "                    if refusal?.deletion == .failed { report.refusedUndeleted.append(id) }\n",
+        "",
+        "a refused transcript's failed DELETE dropped from the report, as before #201 "
+        "(RF1, RF3, RF4; the proof's RF\u00b7MCP)"),
+    "poll-cancel-traps": (
+        "AssemblyAIClient.swift",
+        "            if cancel?.isCancelled == true { throw refusing(.cancelled, id: id, "
+        "cancel: cancel) }\n",
+        "            if cancel?.isCancelled == true { fatalError(\"poll-cancel-traps\") }\n",
+        "CONTROL \u2014 the poll-cancel child dies with no answer, and SD1\u2013SD3 are "
+        "still printed and scored (#201)"),
+    # Issue batch B46 (#93, R6-22): speaker colours on Subtitles.
+    "speaker-colour-dropped": (
+        "CaptionLayout.swift",
+        "                base.color = color\n",
+        "",
+        "the Subtitles colour assignment removed (SP1, SP3's CONTROL, SP4\u00b7on)"),
+    "speaker-colour-on-nil": (
+        "CaptionStyle.swift",
+        "            guard let speaker = speaker else { return nil }\n",
+        "            guard let speaker = speaker else { return speakerPalette[0] }\n",
+        "a cue with no speaker given palette[0] (SP1, SP3; the persisted project "
+        "cannot tell it from an absent colour)"),
+    "speaker-label-only": (
+        "CaptionStyle.swift",
+        "            let slot = slots[speaker] ?? slots.count\n"
+        "            slots[speaker] = slot\n",
+        "            let byLabel = CaptionLayout.Speaker(media: nil, label: speaker.label)\n"
+        "            let slot = slots[byLabel] ?? slots.count\n"
+        "            slots[byLabel] = slot\n",
+        "`speakerColors` keyed by the label alone, so \"A\" in two media is one "
+        "speaker (SP1)"),
+    "speaker-colour-word-styles": (
+        "CaptionLayout.swift",
+        "                        text: style.pagePatch(\n"
+        "                            content: cue.text, size: cue.size ?? base, width: cue.width,\n"
+        "                            words: words)))\n",
+        "                        text: { () -> TextPatch in\n"
+        "                            var patch = style.pagePatch(\n"
+        "                                content: cue.text, size: cue.size ?? base, "
+        "width: cue.width,\n"
+        "                                words: words)\n"
+        "                            if let at = kept.firstIndex(where: { $0.order == cue.order }),\n"
+        "                                let color = CaptionStyle.speakerColors(kept.map(\\.speaker))[at]\n"
+        "                            {\n"
+        "                                patch.color = color\n"
+        "                            }\n"
+        "                            return patch\n"
+        "                        }()))\n",
+        "a word style's page takes its cue's speaker colour (SP2)"),
 }
 
 
@@ -7268,6 +8264,13 @@ FAKE_MUTANTS: dict[str, tuple[str, str, str]] = {
         '                threading.Event().wait(entry["stalled_seconds"])\n',
         "                pass\n",
         "B24 \u2014 the fake's `stall` answering at once (DR0, ST\u00b7submit, ST\u00b7save)"),
+    # Issue batch B46 (#93): `speaker_words` served whatever `speaker_labels`
+    # said (SP4\u00b7off; the proof's SC3).
+    "speaker-labels-ignored": (
+        '        labelled = self.transcripts[tid]["request"].get("speaker_labels") is True\n',
+        "        labelled = True\n",
+        "B46 \u2014 the fake serving `speaker_words` whatever `speaker_labels` said "
+        "(SP4\u00b7off, SC3)"),
 }
 
 
@@ -7324,7 +8327,8 @@ def prepare_mutant(name):
 SECTIONS = [section_mapping, section_jobs, section_stamp, section_keyless,
             section_client, section_submission,
             section_cancel,
-            section_secrets, section_cues, section_extract, section_verbatim,
+            section_secrets, section_cues, section_speakers, section_extract,
+            section_verbatim,
             section_cache_write, section_echo, section_run, section_drip,
             section_estimate, section_settings_verify, section_chrome, section_stop,
             section_hygiene]
@@ -7346,14 +8350,17 @@ def main():
                              "edited); refused together with --mutant")
     parser.add_argument("--only",
                         help="a comma-separated subset of sections, by the name after "
-                             "`section_` (mapping, jobs, stamp, client, submission, cancel, "
-                             "secrets, cues, extract, verbatim, cache_write, echo, run, "
-                             "drip, estimate, settings_verify, chrome, stop, hygiene)")
+                             "`section_` ("
+                             + ", ".join(s.__name__.removeprefix("section_") for s in SECTIONS)
+                             + ")")
     parser.add_argument("--wall", type=float, default=1800,
-                        help="the whole run's wall-clock bound in seconds (rule H)")
+                        help="the whole run's wall-clock bound in seconds (rule H), counted "
+                             "from the moment the lock is held")
+    parser.add_argument("--lock-wait", type=float, default=3600,
+                        help="how long to wait for the cloud instruments' lock, in seconds "
+                             "(issue batch B43; rule H)")
     args = parser.parse_args()
 
-    started = time.time()
     sources = os.path.abspath(args.sources)
     sections = SECTIONS
     if args.only:
@@ -7368,6 +8375,19 @@ def main():
     if args.mutant and args.fake_mutant:
         sys.exit("--mutant and --fake-mutant are two different mutants and are refused "
                  "together: a cell measures one thing")
+    # L (issue batch B43, #200 item 4): one cloud instrument at a time, held
+    # before a mutant is prepared or anything is built, and the clock starts
+    # once it is held.
+    lock, waited, holder = hold_cloud_lock(args.lock_wait)
+    print(f"  (waited {waited:.1f} s for the cloud instruments' lock)")
+    check(f"L: the cloud instruments' lock is held — "
+          + (f"by this run, {holder}" if lock else f"still held by {holder} after "
+             f"--lock-wait {args.lock_wait:.0f} s"),
+          lock is not None, holder)
+    if lock is None:
+        print(f"\n{passed}/{passed + failed} checks passed in {waited:.0f} s")
+        return 1
+    started = time.time()
     if args.fake_mutant:
         prepare_fake_mutant(args.fake_mutant)
     if args.mutant:

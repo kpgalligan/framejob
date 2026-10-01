@@ -1,7 +1,9 @@
 //! The reference an agent reads, `docs/graphics-api.md` (road map 10 §5i),
 //! evaluated so it cannot rot away from the engine: every ```` ```js ````
 //! block runs, every standard-library name is in it, every bundled family
-//! is named, and the sandbox's three sentences are quoted word for word.
+//! is named, the sandbox's three sentences are quoted word for word, and the
+//! schema limits it and its typings state are the engine's `MAX_PROPS`,
+//! `MAX_STRING` and `MAX_OPTIONS`.
 //!
 //! A block that `export`s is a whole module: it compiles and draws frames 0
 //! and 30. Any other block is the body of a `render(frame, props, ctx)` with
@@ -13,7 +15,7 @@ mod common;
 
 use std::fs;
 
-use graphic::Module;
+use graphic::{Module, MAX_OPTIONS, MAX_PROPS, MAX_STRING};
 
 use common::{shared, BUDGET_MS};
 
@@ -197,4 +199,25 @@ fn the_reference_names_every_bundled_family_and_the_sandbox_sentences() {
             "the reference does not quote {sentence:?}"
         );
     }
+}
+
+#[test]
+fn the_reference_states_the_engine_schema_limits() {
+    let text = doc();
+    for stated in [
+        format!("At most {MAX_PROPS} keys."),
+        format!("at most {MAX_STRING} characters"),
+        format!("`options`: 1–{MAX_OPTIONS} strings"),
+    ] {
+        assert!(
+            text.contains(&stated),
+            "docs/graphics-api.md does not state {stated:?}"
+        );
+    }
+    let typings = fs::read_to_string(TYPINGS).expect("docs/graphics-api.d.ts");
+    let stated = format!("at most {MAX_PROPS} keys");
+    assert!(
+        typings.contains(&stated),
+        "docs/graphics-api.d.ts does not state {stated:?}"
+    );
 }

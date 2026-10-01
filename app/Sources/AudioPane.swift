@@ -31,6 +31,8 @@ final class AudioPane: InspectorPaneView {
         // writes the clip's volume and nothing else, and `ClipPane.makeSections`
         // would need editing for a seventh section — which is the omission
         // nothing type-checks and which has now bitten two phases in a row.
+        // With an action selected the boxed "clip" tag follows it
+        // (`InspectorClipTag`, #102): it writes the clip whatever is selected.
         let normalize = OptionButtonControl(
             title: "Normalize",
             action: { [weak self] in self?.normalize() },
@@ -85,7 +87,7 @@ final class AudioPane: InspectorPaneView {
                     read: { binding.audioProps.muted },
                     ops: { binding.ops(audio: AudioPatch(muted: $0)) },
                     mixed: { binding.mixedAudio { $0.muted } }),
-                inspectorButtonRow([normalize]),
+                inspectorButtonRow([normalize, InspectorClipTag(binding: binding)]),
             ])
     }
 

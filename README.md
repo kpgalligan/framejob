@@ -63,51 +63,54 @@ schema, §6 the op table, §7 the architecture.
   (View ▸ Assistant, ⌃⌘A): a conversation with a built-in assistant that
   edits the window's project with the same tools an agent uses, each call
   its own undo step. It streams its reply and a line per tool call — one
-  text you can select and copy across entries — asks
-  before it writes a file — naming the file, and saying REPLACES when one is
-  already there — and waits for Allow or Deny (a click; Return never answers);
-  Return sends and ⇧Return starts a new line, the message field growing to
-  five lines; Send becomes Stop while it works, Clear starts over, and a meter shows how
-  full the conversation is. It runs on your own Anthropic API key and the
-  model you choose (claude-opus-5-5 unless you pick another), both set in
-  Settings' Assistant pane; changing either starts a new conversation. It
-  will not record the screen or send audio to the cloud transcriber (File ▸
-  Generate Captions… does that, with the price in front of you), and each
-  message tells it the playhead, the selection and the open nest as they
-  stand when you send. Each turn ends with what it cost — Reelcut's own
-  estimate at LiteLLM's prices, naming the table's date, and "unknown"
-  rather than $0 when a response could not be priced — and every response
-  is one line in `spend.jsonl` in Reelcut's Application Support folder
-  (tokens and dollars, never your key or the conversation). The tab's Spend
-  row shows what the conversation has cost since you last cleared it, and
-  Settings' Assistant pane what this calendar month has cost (the month in
-  UTC, as the ledger records it), both Reelcut's own estimate: the
-  Anthropic Console is the truth for what your account was billed. The
-  Clip tab is a
-  selection header — the clip's name, editable there for a single clip and
-  the one place a name can be cleared back to what the clip shows, with its
-  label dot — and the clip's **action lane**: its actions as numbered bands
-  you click to select and drag to move (or drag by an end to resize — on
-  the timeline's bands too, one undo step), over the clip's transition,
-  fades and motion presets, with Zoom to Region, Zoom Back and Add Action,
-  and the selected action's start, length, curve and Remove — pinned above the
-  scroll view with a row of sub-tabs the selection's kind earns (Text or
-  Shape, Picture, Sound, and Clip for timing, speed, transitions and motion
-  presets; a mint `◆N` marks a tab the selected action keys), over that
-  tab's sections, each collapsible. Every field shows and writes the clip's base
-  props — or, while an action is selected, that action's END state, read
-  at its end tick; unchecking a switch there (a shadow, an outline) keys it
-  off at the action's end. Each row is marked ◆ (the action keys it), ◇ (another
-  action does), ○ (it follows a keyed value) or ⊘ (actions cannot animate
-  it), and a slider shows the value at the playhead as a coral tick.
-  A section offers Reset only while it differs from its default, and Clear
-  (taking its keys out of the selected action) while that action keys it;
-  a keyed row's ◆ becomes a × on hover, a right-click offers Remove from
-  action, Go to action and Reset to default, and an edit the project
-  refuses says why at the inspector's foot.
-  Playing or scrubbing INTO an action selects it; esc or
-  the lane's Clip chip leaves it, and ⌫ removes it. The timeline draws each
-  clip's actions in a lane under its name, the selected one solid mint
+  text you can select and copy across entries — asks before it writes a file
+  — naming the file, and saying REPLACES when one is already there — and
+  waits for Allow or Deny (a click; Return never answers); the Assistant
+  tab's title wears a dot while it waits, whichever tab is showing; Return
+  sends and ⇧Return starts a new line, the message field growing to five
+  lines; Send becomes Stop while it works, Clear starts over, and a meter
+  shows how full the conversation is. It runs on your own Anthropic API key
+  and the model you choose (claude-opus-5-5 unless you pick another), both
+  set in Settings' Assistant pane; changing either starts a new
+  conversation. The same pane sets when a long conversation is compacted
+  into a summary (at 300,000 tokens unless you change it, or never) and
+  whether Anthropic may clear old tool results from the model's view;
+  changing those keeps the conversation going. It will not record the screen
+  or send audio to the cloud transcriber (File ▸ Generate Captions… does
+  that, with the price in front of you), and each message tells it the
+  playhead, the selection and the open nest as they stand when you send.
+  Each turn ends with what it cost — Reelcut's own estimate at LiteLLM's
+  prices, naming the table's date, and "unknown" rather than $0 when a
+  response could not be priced — and every response is one line in
+  `spend.jsonl` in Reelcut's Application Support folder (tokens and dollars,
+  never your key or the conversation). The tab's Spend row shows what the
+  conversation has cost since you last cleared it, and Settings' Assistant
+  pane what this calendar month has cost (the month in UTC, as the ledger
+  records it), both Reelcut's own estimate: the Anthropic Console is the
+  truth for what your account was billed. The Clip tab is a selection header
+  — the clip's name, editable there for a single clip and the one place a
+  name can be cleared back to what the clip shows, with its label dot — and
+  the clip's **action lane**: its actions as numbered bands you click to
+  select and drag to move (or drag by an end to resize — on the timeline's
+  bands too, one undo step), over the clip's transition, fades and motion
+  presets, with Zoom to Region, Zoom Back and Add Action, and the selected
+  action's start, length, curve and Remove — pinned above the scroll view
+  with a row of sub-tabs the selection's kind earns (Text or Shape, Picture,
+  Sound, and Clip for timing, speed, transitions and motion presets; a mint
+  `◆N` marks a tab the selected action keys), over that tab's sections, each
+  collapsible. Every field shows and writes the clip's base props — or,
+  while an action is selected, that action's END state, read at its end
+  tick; unchecking a switch there (a shadow, an outline) keys it off at the
+  action's end. Each row is marked ◆ (the action keys it), ◇ (another action
+  does), ○ (it follows a keyed value) or ⊘ (actions cannot animate it), and
+  a slider shows the value at the playhead as a coral tick. A section offers
+  Reset only while it differs from its default, and Clear (taking its keys
+  out of the selected action) while that action keys it; a keyed row's ◆
+  becomes a × on hover, a right-click offers Remove from action, Go to
+  action and Reset to default, and an edit the project refuses says why at
+  the inspector's foot. Playing or scrubbing INTO an action selects it; esc
+  or the lane's Clip chip leaves it, and ⌫ removes it. The timeline draws
+  each clip's actions in a lane under its name, the selected one solid mint
   with its span washed down the clip and shaded on the ruler.
 - **Editing**: move, nudge, trim, slip, roll, split, delete, lift, ripple
   delete (one range, or many at once), close gap, insert time, insert and
@@ -161,6 +164,8 @@ schema, §6 the op table, §7 the architecture.
   can reuse the whole batch without an API key or network request. Pending
   remote deletion remains recorded and is reported as deferred; a later run
   with the originating account and region's key retries safe deletion IDs.
+  With AssemblyAI's Speakers on, Subtitles put each speaker in their own
+  colour — white, yellow, cyan, green.
   Either engine can also make **word captions**, the large one-row style of
   shorts and reels, in one of five styles — Highlight, Pill, Karaoke, Build
   and One Word — where each page is filled to the width it will actually
@@ -351,7 +356,7 @@ Makefile              Build orchestration
 | `EditorViewController.swift` + `EditorViewController+{Timeline,Canvas,Inspector,Export}.swift` | wiring in the base file, features in extensions |
 | `AgentServer.swift` + `AgentServer+{Arguments,Gate,Parity,Project,Clips,Tracks,Media,Render,History,Silence,Captions,CloudCaptions,Audio,Background,Transitions,Scope,Recording,RecordingArguments,RecordingResult,Graphics,GraphicImports,GraphicRender,DevTools}.swift` · `AgentCatalog.swift` + `AgentCatalog+{Clips,Files,Captions,Audio,Transitions,Graphics,Declarations}.swift` | the MCP endpoint, its handlers, and the tool catalog |
 | `AgentLane.swift` · `AssistantToolTable.swift` · `AssistantSession.swift` · `AssistantConfiguration.swift` · `AssistantPrompt.swift` · `AssistantLiveContext.swift` · `AssistantSpend.swift` | the one door every tool call goes through (a lock, one call at a time, and the wait for mouse-up), and the table of tools the assistant may not call or must ask about first; the assistant's per-window session over the bundled helper, its key, base URL and model, its core tools and prompt texts, the live context each message carries, and what each response cost (the spend ledger, the price cache's place, the turn's cost line) |
-| `AssistantView.swift` · `AssistantTranscriptView.swift` · `AssistantComposer.swift` · `AssistantTranscript.swift` · `AssistantContextMeter.swift` · `AssistantSettingsPane.swift` · `EditorViewController+Assistant.swift` | the Assistant tab's views, which hold no conversation; the multi-line message field, with its own undo; the transcript the window keeps; the context meter; Settings' Assistant pane (key and model); and the glue between the tab and the window's session |
+| `AssistantView.swift` · `AssistantTranscriptView.swift` · `AssistantComposer.swift` · `AssistantTranscript.swift` · `AssistantContextMeter.swift` · `AssistantSettingsPane.swift` · `EditorViewController+Assistant.swift` | the Assistant tab's views, which hold no conversation; the multi-line message field, with its own undo; the transcript the window keeps; the context meter; Settings' Assistant pane (key, model and chat settings); and the glue between the tab and the window's session |
 | `RecordingSetup.swift` · `ScreenRecorder.swift` (with `+Finishing` and `+Content`) · `RecordingLanding.swift` · `ProjectDocument+Recording.swift` · `RecorderPanelController.swift` (with `+Rows` and `+Recording`) · `RecorderStatusItem.swift` · `AppDelegate+Recording.swift` · `AgentServer+Recording.swift` | screen recording (road map 3): the values, the session over ScreenCaptureKit and a second `AVCaptureSession` for the microphone, the landing as ordinary media, the floating non-activating panel with its countdown and meter, the menu-bar status item, and the `record_screen` tool |
 | `AppDelegate.swift` · `EditorWindowController.swift` · `WelcomeWindowController.swift` · `main.swift` | menus (nil-target selectors), window, welcome |
 | `SpeedSheetController.swift` · `RelinkSheetController.swift` · `SilenceSheetController.swift` (with `SilenceDetector.swift` behind it) · `TranscribeSheetController.swift` (+`Cloud` `Commit`) · `SettingsWindowController.swift` | the remaining dialogs, and Reelcut ▸ Settings… |
@@ -451,15 +456,16 @@ hue rather than paints with it, is the one `[r, g, b]` in the model.
 | Tool | |
 |---|---|
 | `open_project {path}` | a `.reelcut` package, or any movie/sound/picture, which opens as a new untitled project around it |
-| `new_project {path?}` | a blank 1920×1080 / 30 fps project, saved straight away when given a path |
-| `save_project {path?}` | returns once the package is really on disk |
+| `new_project {path?}` | a blank 1920×1080 / 30 fps project, saved straight away when given a path; a path another open project has is refused, and nothing is created |
+| `save_project {path?}` | returns once the package is really on disk; a path another open project has is refused |
+| `close_project {discard?}` | closes a project and its window (File ▸ Close, ⌘W). Unsaved changes are refused unless `discard: true`, and so is a window with a sheet open; it writes nothing |
 | `get_project` | the whole §5.2 JSON, plus the playhead, selection and in/out range that live only in the app |
 | `import_media {path}` | probes a file and returns the **new media id**; `add_clip` then places it |
 | `import_captions {path, track?}` | an SRT file as text clips (File ▸ Import Captions…) |
 | `consolidate_media {}` | copies every referenced file into the package (File ▸ Consolidate Media…) |
 | `record_screen {seconds, display?, window?, microphone?, system_audio?, show_clicks?, include_reelcut_windows?, rate?, size?, place?, path?}` | records a display (index, 0 = main) or a window (a `CGWindowID`) for `seconds` and lands it as a clip at the target document's playhead — or as an untitled document rated at `rate` when nothing is open (File ▸ New Recording…). `microphone` records the default microphone to a second file on a Microphone track; `path` is a FOLDER override; `include_reelcut_windows` puts Reelcut's own windows in a display recording, which leaves them out by default. It reads the two grants and never asks: the refusal names the System Settings pane, and a shell-launched instance runs under its TERMINAL's grants |
-| `transcribe {clips?, language?, place?, engine?, speakers?, vocabulary?, refresh?, style?, replace?}` | speech recognition into caption clips (File ▸ Generate Captions…). Returns the cues in ticks whether or not it places them, and `place: false` changes nothing at all. `style` is `subtitles` (the default) or a word caption style — `highlight`, `pill`, `karaoke`, `build`, `one_word` — whose pages are filled to a measured width and whose cues carry their `words`; `replace: true` swaps out the caption tracks it would have made over the same clips in the same undo step and lists them under `replaced`. `engine` is `apple` (the default, on this Mac, nothing uploaded) or `assemblyai` (the whole audio of each media file goes to AssemblyAI and is billed; the transcript is cached in the package and deleted at the far end). The on-device engine needs no grant and has no length limit; a language whose model is not installed on this Mac is refused by name and never downloaded by the tool — a person installs it from the sheet's Download row. `speakers`, `vocabulary` and `refresh` apply only to the cloud engine and are refused by name without it |
-| `export_captions {track?, path, format?}` | one text track out as `.srt` or `.vtt` (File ▸ Export Captions…). The track is never guessed — with no all-text track, or more than one, it refuses and lists the candidates |
+| `transcribe {clips?, language?, place?, engine?, speakers?, vocabulary?, refresh?, style?, replace?}` | speech recognition into caption clips (File ▸ Generate Captions…). Returns the cues in ticks whether or not it places them, and `place: false` changes nothing at all. `style` is `subtitles` (the default) or a word caption style — `highlight`, `pill`, `karaoke`, `build`, `one_word` — whose pages are filled to a measured width and whose cues carry their `words`; `replace: true` swaps out the caption tracks it would have made over the same clips in the same undo step and lists them under `replaced`. `engine` is `apple` (the default, on this Mac, nothing uploaded) or `assemblyai` (the whole audio of each media file goes to AssemblyAI and is billed; the transcript is cached in the package and deleted at the far end). The on-device engine needs no grant and has no length limit; a language whose model is not installed on this Mac is refused by name and never downloaded by the tool — a person installs it from the sheet's Download row. `speakers`, `vocabulary` and `refresh` apply only to the cloud engine and are refused by name without it; with `speakers` and `subtitles`, each speaker's cues take their own colour |
+| `export_captions {track?, path, format?}` | one text track out as `.srt` or `.vtt` (File ▸ Export Captions…). The track is never guessed — with no all-text track, or more than one, it refuses and lists the candidates. A trailing `.srt` or `.vtt` in `path` becomes the format's own; any other extension is kept, as the save panel keeps it (`chart.png` → `chart.png.srt`) |
 | `detect_silence {clips?, mode?, voice_confidence?, threshold_db?, min_length?, padding?}` | the quiet spans of the timeline, which `ripple_delete_ranges` then cuts — the same detector Clip ▸ Remove Silences… uses, so an agent and the sheet propose the same cuts. It changes nothing. `mode` is `voice` (the default, the cached Silero probability against `voice_confidence`) or `level`; either way a moment the mix envelope alone puts under `threshold_db` is quiet, so mute and solo are already in the answer, and the result names any file still being analysed and any clip judged by level |
 | `normalize_clip {clips, peak_db?}` | sets each clip's volume so its own loudest moment lands at `peak_db` (default −1 dBFS) — the Volume section's Normalize button and Clip ▸ Normalize. Measured from the waveform cache over the part that plays, so it knows nothing about the volume, fades, ducking, mute or solo already on the clip; it replaces the volume rather than multiplying it, writes the clip's base level even inside an action, and leaves `muted` alone. One gain per clip, one undo step, and what it could not measure comes back under `skipped` |
 | `set_playhead {t}` | moves the playhead and seeks the preview |

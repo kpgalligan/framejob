@@ -1,8 +1,10 @@
 import AppKit
 
-/// The agent's project-level tools (spec §7.9): open, new, save, read, and
-/// the playhead. Everything here mirrors a File-menu command or the transport,
-/// and every edit goes through `ProjectDocument` exactly as the UI's does.
+/// The agent's project-level tools (spec §7.9): open, new, save, close, read,
+/// and the playhead. Everything here mirrors a File-menu command or the
+/// transport, and every edit goes through `ProjectDocument` exactly as the UI's
+/// does. A path another open document holds is never written by `new_project`
+/// or `save_project` (spec §11 #40): `close_project` closes that one first.
 extension AgentServer {
 
     // MARK: - Opening
@@ -24,11 +26,7 @@ extension AgentServer {
         // path a project is known by is `AgentServer.path(of:)`. Compared
         // canonically, as in `target(_:)`: two spellings of one file that
         // failed to match here would open the SAME file twice.
-        let canonical = Self.canonical(url.path)
-        if let existing = openProjects().first(where: {
-            guard let open = Self.path(of: $0) else { return false }
-            return open == url.path || Self.canonical(open) == canonical
-        }) {
+        if let existing = documentHolding(url, except: nil) {
             // Bring it forward, as double-clicking an already-open document
             // does — otherwise `target` would still resolve a later-opened
             // project and the next call would edit the wrong one.
@@ -54,8 +52,14 @@ extension AgentServer {
     /// 1920×1080 / 30 fps project. With `path` it is saved there straight
     /// away, so the agent has a file to name in later calls; without one it
     /// stays an untitled draft and `save_project {path}` finishes the job.
+    /// A path another open document holds is refused BEFORE anything is
+    /// created (spec §11 #40), so two documents never share one file.
     func newProject(_ a: [String: Any]) throws -> String {
+        let url = try stringArg(a, "path").map {
+            Self.destinationURL($0, extension: ProjectDocument.projectFileExtension)
+        }
         let document = try onMain { () throws -> ProjectDocument in
+            if let url { try self.refuseHeldPath(url, except: nil, tool: "new_project") }
             guard let document = try NSDocumentController.shared
                 .openUntitledDocumentAndDisplay(true) as? ProjectDocument
             else {
@@ -63,10 +67,9 @@ extension AgentServer {
             }
             return document
         }
-        guard let path = try stringArg(a, "path") else {
+        guard let url else {
             return try onMain { try self.jsonResult(["project": self.summary(document)]) }
         }
-        let url = Self.destinationURL(path, extension: ProjectDocument.projectFileExtension)
         try save(document, to: url, operation: .saveAsOperation)
         return try onMain {
             try self.jsonResult(["saved": url.path, "project": self.summary(document)])
@@ -80,7 +83,8 @@ extension AgentServer {
     /// it and optional everywhere else; passing one writes there, the way
     /// Save As does — unless it names the document's own file, however
     /// spelled (`canonical`), which is a plain save: Save As onto itself
-    /// would re-spell the document's path as the caller wrote it (#138).
+    /// would re-spell the document's path as the caller wrote it (#138). Any
+    /// other path another open document holds is refused (spec §11 #40).
     func saveProject(_ a: [String: Any]) throws -> String {
         let document = try onMain { try self.target(a) }
         let existing = onMain { document.fileURL }
@@ -92,6 +96,7 @@ extension AgentServer {
                     try self.jsonResult(["saved": existing.path, "project": self.summary(document)])
                 }
             }
+            try onMain { try self.refuseHeldPath(url, except: document, tool: "save_project") }
             try save(document, to: url, operation: .saveAsOperation)
             return try onMain {
                 try self.jsonResult(["saved": url.path, "project": self.summary(document)])
@@ -106,6 +111,31 @@ extension AgentServer {
         return try onMain {
             try self.jsonResult(["saved": url.path, "project": self.summary(document)])
         }
+    }
+
+    /// The open document whose file is `url` — the path `get_project` reports
+    /// for it, `fileURL` or the movie it was built from — compared exactly and
+    /// canonically, as `target(_:)` compares: two spellings of one file that
+    /// failed to match would put two documents at one path. `except` is
+    /// skipped (`===`), for a save that is that document's own. Main only.
+    func documentHolding(_ url: URL, except: ProjectDocument?) -> ProjectDocument? {
+        let canonical = Self.canonical(url.path)
+        return openProjects().first { document in
+            if let except, document === except { return false }
+            guard let open = Self.path(of: document) else { return false }
+            return open == url.path || Self.canonical(open) == canonical
+        }
+    }
+
+    /// Refuses a write to a path another open document holds (spec §11 #40),
+    /// naming that document and the way out. Main only, so `save_project` and
+    /// `new_project` call it inside `onMain`.
+    func refuseHeldPath(_ url: URL, except: ProjectDocument?, tool: String) throws {
+        guard let holder = documentHolding(url, except: except) else { return }
+        throw ToolError(
+            message: "Another open project (\(holder.displayName ?? "Untitled")) is at "
+                + "\(url.path), so \(tool) did not write there: close_project closes it, "
+                + "or pass another path.")
     }
 
     /// Writes `document` and WAITS for NSDocument's asynchronous save to
@@ -155,11 +185,11 @@ extension AgentServer {
     /// likely to type out of habit. Everything else is part of the name.
     ///
     /// `srt` and `vtt` joined the list when `export_captions` landed, because
-    /// after it they satisfy the set's own description: they are containers
-    /// this app writes. Without them `export_captions {path: "talk.srt",
-    /// format: "vtt"}` would write `talk.srt.vtt`, which is exactly the
-    /// doubled name the paragraph above says the replacement exists to
-    /// prevent.
+    /// they are containers this app writes. `export_captions` no longer reads
+    /// this set (spec §11 #43): it replaces only
+    /// `CaptionExporter.knownExtensions`, through `captionDestinationURL`, as
+    /// the save panel does. The two stay here for the other tools, so a still
+    /// or a movie named `talk.srt` is renamed rather than doubled.
     ///
     /// The five image containers joined it in road map 2's phase 7a, on the
     /// same terms and for two reasons rather than one. The new one:
@@ -178,6 +208,14 @@ extension AgentServer {
     ]
 
     static func destinationURL(_ path: String, extension ext: String) -> URL {
+        destinationURL(path, extension: ext, replacing: replaceableExtensions)
+    }
+
+    /// `destinationURL` over a caller's own set of replaceable extensions:
+    /// `export_captions` passes `CaptionExporter.knownExtensions` (#43).
+    static func destinationURL(
+        _ path: String, extension ext: String, replacing replaceable: Set<String>
+    ) -> URL {
         let expanded = (path as NSString).expandingTildeInPath
         let url = URL(fileURLWithPath: expanded)
         let current = url.pathExtension
@@ -187,9 +225,43 @@ extension AgentServer {
         // "Talk v1.mp4", silently dropping a character the caller typed on
         // purpose. Anything not on this list is treated as part of the name
         // and the extension is appended to it.
-        let base = Self.replaceableExtensions.contains(current.lowercased())
+        let base = replaceable.contains(current.lowercased())
             ? url.deletingPathExtension() : url
         return base.appendingPathExtension(ext)
+    }
+
+    // MARK: - Closing
+
+    /// `close_project` — File ▸ Close (⌘W; spec §11 #40). It runs on main,
+    /// as the menu item does, and closes through `ProjectDocument.close()`,
+    /// which releases the recipe key and the graphic store; it never writes
+    /// the package. A window with a sheet attached is refused first, because
+    /// the sheet is window-modal work in progress (`handleEditorKey`'s rule);
+    /// then unsaved changes, unless `discard: true`. Under autosave in place
+    /// "unsaved" means "not yet autosaved", and that is all `discard` loses.
+    func closeProject(_ a: [String: Any]) throws -> String {
+        let discard = try boolArg(a, "discard") ?? false
+        let document = try target(a)
+        let name = document.displayName ?? "Untitled"
+        let path = Self.path(of: document)
+        let edited = document.isDocumentEdited
+        if document.windowControllers.contains(where: { $0.window?.attachedSheet != nil }) {
+            throw ToolError(
+                message: "\(name) has a sheet open on its window, so close_project left it "
+                    + "open: finish or cancel the sheet first.")
+        }
+        if edited && !discard {
+            throw ToolError(
+                message: "\(name) has unsaved changes, so close_project left it open: "
+                    + "save_project saves them, or close_project with discard: true closes "
+                    + "it and loses them.")
+        }
+        document.close()
+        return try jsonResult(
+            [
+                "ok": true, "closed": name, "path": path ?? NSNull(),
+                "discarded_changes": edited,
+            ])
     }
 
     // MARK: - Reading

@@ -27,13 +27,16 @@ import Foundation
 /// 1.0. The wait is the only one with no honest completion signal — a poll
 /// answers `processing` or it does not — so it advances on the CLOCK against
 /// q8's measured 147× real time and HOLDS at 0.95 rather than pretending to
-/// finish.
+/// finish. The submit, between the upload and the wait, has no span of its
+/// own: it is one request whose only progress is its answer, so it holds at
+/// the upload's end, 0.65, with a detail line of its own naming the file.
 struct CloudProgress {
 
     /// Where one media is in its own slice.
     enum Phase: Equatable {
         case extracting
         case uploading
+        case submitting
         case waiting
         case saving
     }
@@ -88,6 +91,7 @@ struct CloudProgress {
         switch phase {
         case .extracting: span = (0, Self.extractEnd)
         case .uploading: span = (Self.extractEnd, Self.uploadEnd)
+        case .submitting: span = (Self.uploadEnd, Self.uploadEnd)
         case .waiting: span = (Self.uploadEnd, Self.waitEnd)
         case .saving: span = (Self.waitEnd, 1)
         }
@@ -114,11 +118,13 @@ struct CloudProgress {
 
     /// §5a's detail line — the phase and the file, plus the megabytes for an
     /// upload and the seconds for a wait, so a stuck queue is visible rather
-    /// than silent.
+    /// than silent. Five lines: the submit names its file too.
     ///
     /// Megabytes are 1 000 000 bytes, the unit a service's own dashboard
     /// counts in, and they are whole numbers: a tenth of a megabyte moving
-    /// once a second is noise, not information.
+    /// once a second is noise, not information. A count under one megabyte
+    /// is `<1`, never a 0 or a 1 it is not, so a small file's upload does
+    /// not read `0 MB of 0`.
     static func detail(
         _ phase: Phase, file: String, sent: Int64 = 0, total: Int64 = 0,
         waited: TimeInterval = 0
@@ -128,6 +134,8 @@ struct CloudProgress {
             return "Extracting \(file)"
         case .uploading:
             return "Uploading \(file) · \(megabytes(sent)) MB of \(megabytes(total))"
+        case .submitting:
+            return "Submitting \(file)"
         case .waiting:
             return "Waiting for AssemblyAI · \(Int(max(0, waited.rounded()))) s"
         case .saving:
@@ -135,7 +143,9 @@ struct CloudProgress {
         }
     }
 
-    private static func megabytes(_ bytes: Int64) -> Int {
-        Int((Double(max(0, bytes)) / 1_000_000).rounded())
+    private static func megabytes(_ bytes: Int64) -> String {
+        if bytes <= 0 { return "0" }
+        if bytes < 1_000_000 { return "<1" }
+        return String(Int((Double(bytes) / 1_000_000).rounded()))
     }
 }

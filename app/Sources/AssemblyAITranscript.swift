@@ -142,6 +142,17 @@ struct TranscriptWord: Codable, Equatable {
     let speaker: String?
 }
 
+extension TranscriptWord {
+    /// Every String and non-nil String? stored property, read by Mirror in
+    /// declaration order, so a String field added later is checked with no
+    /// further edit (today: text, speaker). `fetch` asks each one whether it
+    /// repeats the key (#200, R2·1).
+    var stringFields: [String] {
+        // A `String?` holding a value casts to `String`; a nil one does not.
+        Mirror(reflecting: self).children.compactMap { $0.value as? String }
+    }
+}
+
 /// `GET /v2/transcript/{id}`'s body, in the fields this app reads. Every one
 /// past `id` and `status` is optional because a `queued` transcript carries
 /// almost none of them and a decoder that demanded them would fail the first

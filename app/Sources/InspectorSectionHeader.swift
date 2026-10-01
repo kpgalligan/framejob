@@ -25,10 +25,24 @@ final class InspectorSectionHeader: NSView {
     /// unreadable. Clear is always built; Reset only for a section with one.
     private weak var resetButton: NSView?
     private weak var clearButton: NSView?
+    /// The hover (#102, spec §11 CI-15 as amended): a second `DS.hoverFill`
+    /// over the rest band, faded by its alpha, since a band drawn in
+    /// `draw(_:)` cannot fade. The first subview, so Reset and Clear sit
+    /// above it; it stops above the rule.
+    let hoverBand = InspectorHeaderHoverBand()
+    private(set) var isHovered = false
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         wantsLayer = true
+        hoverBand.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(hoverBand)
+        NSLayoutConstraint.activate([
+            hoverBand.leadingAnchor.constraint(equalTo: leadingAnchor),
+            hoverBand.trailingAnchor.constraint(equalTo: trailingAnchor),
+            hoverBand.topAnchor.constraint(equalTo: topAnchor),
+            hoverBand.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -1),
+        ])
     }
 
     @available(*, unavailable)
@@ -104,6 +118,35 @@ final class InspectorSectionHeader: NSView {
 
     override func mouseDown(with event: NSEvent) {
         onToggle?()
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        // Owner-filtered: a tooltip is a tracking area too (app/CLAUDE.md).
+        for area in trackingAreas where area.owner === self { removeTrackingArea(area) }
+        addTrackingArea(
+            NSTrackingArea(
+                rect: bounds, options: [.mouseEnteredAndExited, .activeInKeyWindow],
+                owner: self, userInfo: nil))
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        setHovered(true)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        setHovered(false)
+    }
+
+    /// The state at once, the band's alpha through `DS.animate` — set
+    /// directly inside it, never through `animator()`, which animates even
+    /// outside a group and so would ignore Reduce Motion.
+    private func setHovered(_ hovered: Bool) {
+        guard hovered != isHovered else { return }
+        isHovered = hovered
+        DS.animate(DS.hoverDuration) {
+            hoverBand.alphaValue = hovered ? 1 : 0
+        }
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -207,5 +250,32 @@ final class InspectorSectionHeader: NSView {
         text.draw(
             in: NSRect(x: left, y: bounds.midY - height / 2, width: right - left, height: height),
             withAttributes: attributes)
+    }
+}
+
+/// The section header's hover band: `DS.hoverFill` over the header's own,
+/// one step darker, shown and hidden by its alpha. Clicks pass through to
+/// the header.
+final class InspectorHeaderHoverBand: NSView {
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        alphaValue = 0
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("InspectorHeaderHoverBand does not support NSCoder")
+    }
+
+    override var isFlipped: Bool { true }
+
+    override func draw(_ dirtyRect: NSRect) {
+        DS.hoverFill.setFill()
+        bounds.fill(using: .sourceOver)
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        nil
     }
 }

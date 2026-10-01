@@ -121,7 +121,7 @@ detail there.
   W-6). It lives there, not in `InspectorPane.swift`, for the size rule.
 
 **The document.**
-- `ProjectDocument.swift` (+`DisplayStem`, +`Recording`, +`SelectedAction`, +`Import`, +`Graphics`, +`UndoGroup`, +`CacheSaves`)
+- `ProjectDocument.swift` (+`DisplayStem`, +`Recording`, +`SelectedAction`, +`Import`, +`Graphics`, +`UndoGroup`, +`CacheSaves`, +`Alerts`)
   — NSDocument, `.reelcut` package read/write, and the single mutation
   point (see Undo); `applyEdit`'s `.refused` arm beeps and then posts
   `projectDocumentDidRefuse` with the `ReelRefusal` (spec §11 CI-10), which
@@ -161,10 +161,13 @@ detail there.
   file probed through `MediaImporter.probe`, one grouped "Relink Media" edit
   carrying each descriptor as `relink_media`'s `probe`, spec §11 #63, then
   `generateCaches()`; the missing-media sheet's door then alerts each
-  unreadable file and each refused sentence (#180), one alert sheet at a
-  time, each asked for when the last ends — `presentRelinkRefusals`, since
-  AppKit drops an error sheet asked for while another is attached).
-  `+Graphics`
+  unreadable file and each refused sentence (#180) through `present(_:)`).
+  `+Alerts` is `present(_:)`: every error the document shows waits in one
+  queue (`DocumentAlertQueue`) and shows one alert sheet at a time, each asked
+  for a main-queue turn after the last one's `didPresent` or the window's last
+  sheet end, and only while no sheet is attached, since AppKit drops an error
+  sheet asked for while another is attached (#195, `relink_sheet_probe.py`
+  A1–A5); with no window, it is app-modal at once. `+Graphics`
   is the document's side of the package's `graphics/`:
   `startGraphicStore()`, run from `makeWindowControllers()` and seeding an
   untitled document's root from `autosavedContentsFileURL/graphics`, and
@@ -339,10 +342,13 @@ the key map behind it.
   glue: `installAssistant(on:)` from `installInspector`, `attachAssistant`
   wiring the view's five intents as one-line forwards, `assistantRefresh()`
   — run LAST in every path that can change the phase or the question, since
-  `AssistantSession.send` goes busy and emits nothing — `assistantSend`
+  `AssistantSession.send` goes busy and emits nothing, and the Assistant tab's
+  dot's one writer (`inspector?.showAssistantBadge`, AI-19) — `assistantSend`
   (false = not taken, the composer keeps the text), Stop, Allow/Deny, Clear,
   View ▸ Assistant ⌃⌘A `showAssistant`, and `assistantConfigurationDidChange`,
-  which ends the conversation with a note on a Settings key or model change;
+  whose first arm writes a `settings` change to the live session
+  (`updateSettings(settingsJSON())`) and returns, and which otherwise ends the
+  conversation with a note on a Settings key or model change;
   the frozen file stores `assistantTranscript` and a weak `assistantView`),
   `+Export` (the
   dialogs), `+SaveFrame` (⌥⌘E; renders off-main on `frameGrabQueue`; passes
@@ -463,7 +469,9 @@ the key map behind it.
   12 A2) before `assistant` was added.
 - `InspectorNameField.swift` — a pure move out of `InspectorPane.swift`:
   the one-line name field, drawn by `InspectorNameFieldCell` as the value
-  field is (spec §11 SH-3).
+  field is (spec §11 SH-3); its placeholder is kept off the cell, which draws
+  it at rest and under an empty field editor, so the field editor draws none
+  (#199).
 - `InspectorViewController.swift` (frozen: the tab strip, and the PINNED
   container between it and the scroll view that hosts a pane's
   `pinnedBlock`, one generation retired like the strip; the FOOT container
@@ -474,7 +482,9 @@ the key map behind it.
   `ClipPane.forgetSubTab()` whenever the selection's ids change, spec §11
   CI-5; a changed selection switches to Clip only from the Media and
   Document tabs, never from the Assistant tab, and `clipPicked()` from any,
-  spec §11 AI-14; `onAssistantView` hands the editor the Assistant tab's view)
+  spec §11 AI-14; `onAssistantView` hands the editor the Assistant tab's view;
+  `assistantBadge`, the Assistant tab's question dot, installed over the strip
+  as the root's last subview, spec §11 AI-19)
   · `InspectorClipView.swift` (the inspector scroll view's clip view,
   installed first: a width change re-lays its document view, so a pane follows
   an autohiding legacy scroller, #142) · `InspectorRefusalStrip.swift` (spec
@@ -482,7 +492,11 @@ the key map behind it.
   core's sentence verbatim, remembered with the `editedProject` handle it
   was shown under and cleared on the first refresh under another handle or
   a click; `showRefusal` is the editor's forward of
-  `projectDocumentDidRefuse`) · `InspectorPane.swift`
+  `projectDocumentDidRefuse`) · `InspectorTabBadge.swift` (spec §11 AI-19: the
+  Assistant tab's question dot, a passive view over the tab strip — `hitTest`
+  nil — mirroring `PanelTabsView.tabRect`'s arithmetic, since `Controls.swift`
+  is not forked; `showAssistantBadge(_:)` is its inspector-side setter) ·
+  `InspectorPane.swift`
   (the pane base — `pinnedBlock` is the header `makeHeader()` built, never
   stacked — the row builders, whose four typed ones derive a row's DEFAULT
   from its own `read` and `ops` unless `resets: false`, and
@@ -506,22 +520,25 @@ the key map behind it.
   `header` and folded `marks` readable — `differs` from an explicit closure
   else the rows' defaults, `editing` the selected action's number when a
   row animates — `clear()`, `reveal()` which writes no preference and is
-  instant, the header click's `toggle()`, the redesign's one animation,
+  instant, the header click's `toggle()`, the collapse animation,
   through `DS.animate(DS.stateDuration)` (unanimated under Reduce Motion,
   spec §11 CI-15; the state is set at once), and
   `didToggle`, called by the header's click alone; and `KeyedReveal`,
   `ClipPane`'s auto-open, CI-8) · `InspectorSectionHeader.swift` (a pure
   move, then CI-9: the `◆N` / ◇ / ⊘, the one trailing slot — Clear while
   editing an action that keys the section, else Reset while it differs —
-  `buttonTitle`, and `summaryInk`'s three tiers; the summary stops short of
-  the VISIBLE button) ·
+  `buttonTitle`, and `summaryInk`'s three tiers; the hover band
+  (`InspectorHeaderHoverBand`, a second `DS.hoverFill` faded through
+  `DS.animate(DS.hoverDuration)`, CI-15 amended by #102); the summary stops
+  short of the VISIBLE button) ·
   `InspectorMarks.swift` (spec §11 CI-7: `RowMark`, `SectionMarks`,
   `InspectorRowDefault` (CI-9), the
   14 pt `InspectorMarkGutter` that is the FIRST view of every
   `inspectorRow` — blank at `.none`, so it must stay first for the refresh
   walk to reach it before the controls whose label ink and layer border it
   sets; hovered while keyed it draws × and a click removes the row's keys —
-  `InspectorRowTag` ("at end", "now …"), and the binding's mark
+  `InspectorRowTag` ("at end", "now …"), `InspectorClipTag` (Normalize's boxed
+  "clip" while an action is selected, #102), and the binding's mark
   queries, `selectedActionNumber`, `actionID(number:)` and `clearOps`, the
   ONE `set_action_end` of nulls; a row's paths come from the ops it WRITES,
   `writes:` / `follows:`, and an un-annotated row is `.none`, never ⊘) ·
@@ -641,13 +658,21 @@ the key map behind it.
   inserts only the new suffix into its own entry's range; `entryLayout()`
   gives each entry's rect in the view's coordinates, and the layout dump reads
   the entries as parts it names (`UISnapshotParts`, dev only), which
-  `assistant_tab_proof.py`'s `no-entry-parts` mutant empties;
+  `assistant_tab_proof.py`'s `no-entry-parts` mutant empties; its
+  `setFrameSize` holds the text view's minimum height at the clip view's, so a
+  click below a short transcript reaches the text (`short-transcript` zeroes
+  it), and `init` puts the text view's origin back at 0 after `documentView`
+  (adopting it left the origin at minus its height, #182);
   `AssistantContextMeterView`
-  the inline meter and `figures(_:)`, its three sentences;
+  the inline meter, `figures(_:)` (its three sentences) and `figureLadder(_:)`
+  (the shorter rungs it shows, chosen in `setFrameSize`, when the full one
+  does not fit; the tooltip always the full one; `full-figure-only`'s target);
   `AssistantConversationCostView` (the same file, road map 13 P4, spec §11
   P-7) the Spend row 6 pt under the meter and Clear, the rule under it:
-  `AssistantTurnCost.figure` of `conversationCost`, which `reload(_:usage:cost:)`
-  and `apply`'s `.conversationCost` set. Accessibility ids
+  the first rung of `AssistantTurnCost.figureLadder` of `conversationCost`
+  that fits beside its title ("≥"/"<" for "at least"/"under", still ending "·
+  Reelcut's estimate", spec §11 P-8; the tooltip stays `figureTooltip`), which
+  `reload(_:usage:cost:)` and `apply`'s `.conversationCost` set. Accessibility ids
   `assistant.composer|send|allow|deny|question|clear|settings|nokey|spend` and
   `assistant.entry.<kind>` are what the proofs read.
 - `AssistantComposer.swift` — the Assistant tab's composer (spec §11
@@ -664,10 +689,14 @@ the key map behind it.
   (a send, the dev tools' pane path) drops its undo history.
   `AssistantComposerField` is its scroll view: DSField's 1 pt layer border,
   26 pt for one line plus one line height per further line up to five,
-  then scrolling; it refits on every change and on a width change.
-  `assistant_tab_proof.py`'s `modified-return-sends`, `tab-types` and
-  `shared-undo` mutants edit its `.newline` arm, `insertTab`'s body and
-  the override, each exactly once.
+  then scrolling; it refits on every change and on a width change (in
+  `layout()`, which P13 scores and `no-width-refit` removes; #182 item 3 is an
+  accepted limit since B47: a refit from `AssistantView.layout()` lagged a
+  pass); the placeholder is drawn in `placeholderRect`, one line high.
+  `assistant_tab_proof.py`'s `modified-return-sends`, `tab-types`,
+  `shared-undo` and `tall-placeholder` mutants edit its `.newline` arm,
+  `insertTab`'s body, the override and `placeholderRect`'s height, each
+  exactly once.
 - `MediaPane.swift` · `MediaRowView.swift` (a row and the drag it starts,
   with `MediaDropMode` read from `NSEvent.modifierFlags` at the drop) ·
   `MediaPaneCommands.swift` · `MediaListFilter.swift` (the find band as a
@@ -880,8 +909,9 @@ free.
   SRT brings its own. `Word.speaker` defaults to nil, so every caller
   that knows nothing about speakers is byte-identical to what it was.
   `place` takes a `CaptionStyle`: `.subtitles` is the Caption-preset
-  path, byte for byte; a word style writes `CaptionStyle.pagePatch` per
-  page — the pager's own props at the page's size (a shrunk one or the
+  path, byte for byte for a cue with no speaker (a speaker's cue adds its
+  palette `color`, spec §11 R6-22); a word style writes
+  `CaptionStyle.pagePatch` per page — the pager's own props at the page's size (a shrunk one or the
   style's), its wrap `width`, and the cue's `words` in CLIP time — at the
   style's `y`. `replacing` removes caption tracks WITH
   their clips as the plan's FIRST ops (a removal mints no id, so the
@@ -894,7 +924,8 @@ free.
   min(W, H)), `y` (of H), outline, `word_style`, `maxWords`, `maxLines`,
   `textProps`, the ONE construction the pager
   measures and the sheet previews, and `pagePatch`, the patch `place` writes,
-  built from it — so a committed page is the measured one and a shrunk
+  built from it, and `speakerPalette` / `speakerColors`, R6-22's four colours
+  by first appearance — so a committed page is the measured one and a shrunk
   page's outline is em × its own size. A GENERATION choice, not an inspector preset;
   `defaultsKey` is the sheet's remembered style, read when the Style popup
   is built and written by `styleChanged`; the tool never reads it (R6-2
@@ -926,7 +957,9 @@ free.
   of its media's one transcript. `+Report` holds what the `Outcome` has no
   room for (`uploaded` with the transcript-write and marker-write results,
   `transcriptWritten` and `stampWritten`, `cached`,
-  `janitorDeleted`, `janitorFailed`, `janitorDeferred`, `held`) and owns the
+  `janitorDeleted`, `janitorFailed`, `janitorDeferred`, `held`, and
+  `refusedUndeleted` — a transcript refused after it was made whose DELETE
+  failed, owed to the dashboard with no retry, R6-20) and owns the
   shared cleanup warning wording for the sheet and MCP result or failure.
   `billedSeconds` is the ONE sum of `audioSeconds` — each term floored at 0,
   saturating at `Int.max` — that the bill sentence and `audio_seconds` read;
@@ -934,13 +967,16 @@ free.
   land, and promises nothing about the next run.
   A nil client admits only a nonempty, entirely
   current batch and skips janitor/network, retaining pending IDs as deferred.
-  One media's failure is one media's problem
-  and the run carries on, with exactly two exceptions: a CANCEL and a
-  REFUSED KEY. `+Media` holds `retryDeletes` and `fetch` — the ten-hour
+  One media's failure is one media's problem (the catch first records a
+  `Refusal` whose DELETE `failed` in `refusedUndeleted`, then reads its
+  `ClientError`) and the run carries on, with exactly two exceptions: a CANCEL
+  and a REFUSED KEY. `+Media` holds `retryDeletes` and `fetch` — the ten-hour
   refusal BEFORE the extract, the `defer` that removes the temporary audio on
   every exit, the server's model and language filtered through
-  `withoutCredential`, `audio_duration` floored at 0, words that repeat the
-  key refused (the transcript deleted) before any write, the cache file
+  `withoutCredential` and then bounded at 64 Unicode scalars (`bounded`,
+  `serverStringLimit`, #200), `audio_duration` floored at 0, words any of
+  whose decoded strings (`TranscriptWord.stringFields`) repeat the key refused
+  (the transcript deleted) before any write, the cache file
   written before its marker, and the DELETE last with its answer recorded —
   its `remote_deleted` rewrite only over a first write that landed (#187).
   Spec §11's R6-11: a media in this run's
@@ -960,15 +996,19 @@ free.
   — and a probe row compares them.
 - `CloudProgress.swift` — the cloud run's one number and the words beside it,
   PURE: a share per media TO UPLOAD (cached and held media have none), the
-  four phases at 0.25 / 0.65 / 0.95, the wait advancing on the clock against
-  q8's 147× and holding, and the four detail lines. The run publishes
+  four phases at 0.25 / 0.65 / 0.95, the submit holding at the upload's end
+  (0.65) with a line of its own, the wait advancing on the clock against q8's
+  147× and holding, and the five detail lines, a count under a megabyte spelt
+  `<1`. The run publishes
   `max(previous, computed)`.
 - `AssemblyAITranscript.swift` — the wire VALUES, and
   `TranscriptOptions.keyterms`, the ONE spelling of the vocabulary's
   trim/de-duplicate/cap that the sheet's field and the tool's argument share:
   `TranscriptOptions`,
   `TranscriptRequest` (whose `encode` is the whole wire body — `language_code`
-  absent for auto, `keyterms_prompt` absent when empty), `TranscriptWord`,
+  absent for auto, `keyterms_prompt` absent when empty), `TranscriptWord`
+  (with `stringFields`, every String field by `Mirror`, which `fetch` reads
+  for the key),
   `TranscriptResponse` and `JSONValueRange`. `TranscriptStamp.swift` owns the
   cache marker: `TranscriptSourceStamp` projects `CacheStamp` to size,
   modification second, duration and audio presence, then pairs those with
@@ -985,7 +1025,10 @@ free.
   answers nil, so a 3xx is `.redirected` and the credential reaches no other
   host; an upload retries once on a 5xx or a transport error and never on a
   4xx or after a cancel; `poll` sleeps in ≤ 0.1 s slices that read the token
-  and EVERY throwing exit deletes the transcript first. A `completed` body
+  and EVERY throwing exit deletes the transcript first — `refusing`
+  (`+Session`) answers a `Refusal` carrying that DELETE's answer
+  (`deleted`/`failed`/`notSent`), which `CloudTranscriber.transcribe` unwraps
+  before reading its `ClientError` (R6-20). A `completed` body
   whose `words` is absent, null or not an array is `.malformed`, never an
   empty transcript; `[]` is zero words. A `completed` body whose `id` is not
   the polled id is `.malformed` too (`requireEchoedID` in `+Session`, #71), so
@@ -1000,7 +1043,13 @@ free.
   gate — `poll`, `delete`, a submit reply and a recovery-list row — so an id
   that carries the key is never sent or accepted. `delete` answers THREE
   states (`deleted`, `failed`, `notSent`): an id that is not sendable is never
-  put on the wire. `+Submission` owns the single paid submit and R6-14's
+  put on the wire. `delete(id:cancel:)` reads the run's token as a STOP and
+  never attaches it: a DELETE is cut `deleteAfterStop` (2 s) of wall clock
+  after the later of the Stop and its own start and answers `failed`, owed
+  like any other (R6-19); `send`'s `stop`/`grace` and `+Session`'s
+  `waitForReply` are that bound. `+Session` also holds `ClientError`'s two
+  readings, `isRetriable` and `shortName`, moved out at the cap. `+Submission`
+  owns the single paid submit and R6-14's
   bounded recovery: three newest-page looks for an exact uploaded URL, with
   no retry of the POST or requests by any unrelated id.
 - `AssemblyAIConfiguration.swift` · `AssemblyAILanguages.swift` ·
@@ -1209,7 +1258,11 @@ free.
   no account link (AI-1), holds the model (blank is AI-11's default), and is
   the ONE poster of `AssistantConfiguration.didChangeNotification` —
   `key` on Save and Remove, `model` only when `AssistantConfiguration.model`
-  actually changes. Road map 13 P4 (spec §11 P-7) ends the pane with the
+  actually changes, and `settings` only when `AssistantChatSettings` actually
+  changes (the compaction box, its threshold field, the clearing box; applied
+  at once, no Save; a threshold outside the range beeps and shows the stored
+  value again; the field is never written while it is being edited, AI-20).
+  Road map 13 P4 (spec §11 P-7) ends the pane with the
   UTC month's spend (`spendLabel`, `settings.assistant.spend`) and its note
   (`spendNoteLabel`, `settings.assistant.spendnote`); the spend folder is a
   third FACTORY, `spendFolder:` (`AssistantSpend.folder()` by default, an
@@ -1279,7 +1332,8 @@ free.
   `Graphics`
   (+`RecordingArguments`, +`RecordingResult`, +`RecordingChrome` —
   `RecordingToolChrome`, the tool's status item, flipped by the recorder's
-  `pauseDidChangeNotification`) — the handlers, one file per group. `+CloudCaptions` is `transcribe`'s CLOUD arm alone — the `engine`
+  `pauseDidChangeNotification` and frozen at its
+  `finishingDidBeginNotification`) — the handlers, one file per group. `+CloudCaptions` is `transcribe`'s CLOUD arm alone — the `engine`
   reader, the three cloud-only arguments refused by name under `apple`, the
   vocabulary's trim/de-dup/cap, the credential and the endpoint read ABOVE
   the network, and the result keys; `+Captions` dispatches on `engine` and is
@@ -1322,8 +1376,8 @@ free.
   from the core's published table (`Self.opSchemas` over `rc_op_schemas`).
   **Every one of the fifty-nine op tools is `opTool`'s** and carries no
   `"type"`, no `"enum"` and no hand-written required list; `tool`'s remaining
-  callers are the twenty-six APP-STATE tools, which have no op behind them
-  and so nothing to read from the table — the ten of the Projects group,
+  callers are the twenty-seven APP-STATE tools, which have no op behind them
+  and so nothing to read from the table — the eleven of the Projects group,
   `AgentCatalog+Audio.swift`'s two composites and
   `AgentCatalog+Captions.swift`'s three, spliced back at the two points they
   left, the five other file tools, `record_screen` among them, and
@@ -1353,8 +1407,8 @@ free.
   `AgentServer+Scope.swift` with the feature it is about; all five assert in
   debug, log `Reelcut: ` in release and start the server either way.
   `AgentServer+Gate.swift` is the CALL-time half of the same contract
-  (kpgalligan/reelcut#21): one comparison in `dispatch`, for all eighty-five product
-  tools, of a caller's keys against the schema the tool published, every
+  (kpgalligan/reelcut#21): one comparison in `dispatch`, for all eighty-six
+  product tools, of a caller's keys against the schema the tool published, every
   stranger refused by name — the tool, the strangers and the whole of what it
   takes — before the scope or any handler reads a thing. Its map is read once
   from the catalog string `prepareCatalog()` built at launch (spec §11 AI-3),
@@ -1400,8 +1454,8 @@ free.
   and runs each handler once, outside the lock; `onCancel` on a token already
   cancelled runs the handler at once, on the caller's thread.
 - `AssistantToolTable.swift` — spec §11 AI-7's ONE table: withheld
-  (`record_screen`; `transcribe` only with `engine: "assemblyai"`; every dev
-  tool, from `AgentServer.devToolNames`) and ask-first (`export`,
+  (`record_screen`; `close_project`; `transcribe` only with
+  `engine: "assemblyai"`; every dev tool, from `AgentServer.devToolNames`) and ask-first (`export`,
   `export_captions`, `save_project`, `consolidate_media`), a reason on every
   row; the refusal sentence, the question (main only: the path the call
   writes, tilde-expanded, and whether a file is already there — "REPLACES")
@@ -1423,8 +1477,9 @@ free.
   verbatim. `send` writes the person's text behind the window's live
   context, `AssistantPrompt.message(text, document:)` (AI-15; the
   transcript keeps the bare text), and sets busy BEFORE its write, so the
-  phase reads `busy` the moment it returns true; `turn_started` does not
-  clear `cancelRequested`.
+  phase reads `busy` the moment it returns true; `turn_started` does not clear
+  `cancelRequested`. `updateSettings(_:)` writes `{type: "settings"}` to the
+  helper (AI-20); it does nothing once closed, and it ends nothing.
   **Every question is answered exactly once** — Allow/Deny, Stop, `close`,
   the helper's exit, `deinit`, and a hop that reaches a closed, cancelling or
   released session (the `askFirst` closure is `[weak self]` and REPLIES when
@@ -1481,10 +1536,17 @@ free.
   EMPTY `MemoryStore`; else the one `AppSupport.directory` line. The store
   first, `ANTHROPIC_API_KEY` second. `model()` is `ReelcutAssistantModel`,
   else `claude-opus-5-5`; no tool reads or writes it. `didChangeNotification`
-  (`userInfo[changeKey]` "key" or "model") is posted by Settings' Assistant
-  pane alone. `settingsJSON()` sends `autoCompactTokens` (300 000, AI-9), or
-  in a dev build `-RCDevAssistantAutoCompact <tokens>` from the argument
-  domain (AI-18).
+  (`userInfo[changeKey]` "key", "model" or "settings") is posted by Settings'
+  Assistant pane alone. `AssistantChatSettings` is the person's chat settings
+  (spec §11 AI-20): `ReelcutAssistantAutoCompact` (absent = on),
+  `ReelcutAssistantAutoCompactTokens` (a whole number in 20 000–900 000;
+  absent or outside = `defaultCompactTokens`, 300 000, the one such constant,
+  AI-9) and `ReelcutAssistantClearToolResults` (absent = off), with `load`,
+  `save` and `helperJSON` (null tokens when off); no tool reads or writes
+  them. `settingsJSON()` sends `AssistantChatSettings.load(from:)`'s
+  `helperJSON` (read there exactly once). In a dev build,
+  `-RCDevAssistantAutoCompact <tokens>` from the argument domain replaces the
+  threshold, even with compaction off (AI-18 as amended).
 - `AssistantPrompt.swift` — the core tools loaded up front (`get_project`,
   `render_frame`, `undo`, `redo`; the lane probe's L6 holds each to the
   assistant's catalog), the system prompt, the search guide, the compaction
@@ -1547,7 +1609,13 @@ free.
   `ProjectDocument.inUndoGroupIfRegistered`: an item's edits are one step
   (M3); an item that registers nothing leaves undo and redo untouched (#167,
   `v2_menu.py` U2); an `NSText` target keeps the eager group except for
-  `copy:` and `selectAll:`, which change no text (#176, `v2_menu.py` U3).
+  `copy:` and `selectAll:`, which change no text (#176, `v2_menu.py` U3); a
+  target whose own `undoManager` is not the document's — the Assistant
+  composer, and every field editor, which answers its own
+  `NSCellUndoManager` — gets no eager group, and on a `ProjectDocument` runs
+  in `inUndoGroupIfRegistered`, so its Cut and Paste leave no empty step and a
+  document edit it commits is one step (#184, `menu_undo_probe.py` M1, M2, V1,
+  F1).
 - `UIMenuTable.swift` — `UIMenu.verdicts`, one row per selector, a mirror of
   `tools/proof/capture_spike/inventory.json` in its order. `v2_menu.py`'s H2
   holds the two together, and H1 holds the inventory to the live menu, so a
@@ -1662,8 +1730,10 @@ divergences, each recorded: `makeButtonRow` gives its `leading` views
 compression resistance `.defaultLow`, so a footnote gives way before a button
 (#141); `OptionFieldControl.finishEditing` returns first
 responder to `window.contentView` (#60) where Rasterize's copy keeps
-`makeFirstResponder(nil)`; `StickerButton` still has its pill, the one
-place `Controls.swift` lags Rasterize (spec §11 SH-1, owed); and
+`makeFirstResponder(nil)`; every `updateTrackingAreas` in `Controls.swift` and
+`OptionControls.swift` removes only the view's own areas (`area.owner ===
+self`), where Rasterize's removes them all and the tooltip with them (spec §11
+SH-4; kpgalligan/rasterize#335); and
 `BlockSliderCell.drawBar` dims through the context's alpha rather than
 `withAlphaComponent`, the one deliberate fork (SH-2) — Rasterize's spelling
 paints the translucent `DS.border` track opaque in the knob's own ink.
@@ -1752,9 +1822,9 @@ follow the canonical shape: `target(a)` → validate ids → `performGroupedEdit
 is a decision: Preview Quality, the preview window, the export queue, the
 Media tab's search and sort, the Assistant tab (view state; the dev tool
 `select_inspector_tab` shows it in a Release build, and the assistant's own
-calls already are tool calls) and Settings' Assistant pane (the key and the
-model are the person's, spec §11 AI-8, AI-11) get no mirror, because they
-edit no project and `set_selection` / `export` already are the capability.
+calls already are tool calls) and Settings' Assistant pane (the key, the model
+and the chat settings are the person's, spec §11 AI-8, AI-11, AI-20) get no
+mirror, because they edit no project and `set_selection` / `export` already are the capability.
 Opening System Settings at a grant's pane (the recorder panel) is no edit
 and gets no mirror; `record_screen` refuses by name instead (spec §11
 recording).
@@ -1804,7 +1874,7 @@ this entry rather than growing the list), `ScreenRecorder.shareableContent`'s
 global hop, `GraphicStore`'s serial queue (its file-system sources'
 handlers, the coalesced pass and the outbox; main publishes through
 `drain()` and never waits on it but by `queue.sync`), the cache's main
-hop, the agent lane's per-document serial queues (`AgentLane.swift`), the
+hop, the alert queue's main hop (`ProjectDocument+Alerts.swift`), the agent lane's per-document serial queues (`AgentLane.swift`), the
 assistant session's write queue (`AssistantSession.swift`), and the spend-month
 queue (`AssistantSpendMonth.queue`, Settings' ledger fold, answered by a
 main hop), and — not a queue but a seam all the same — the graphic

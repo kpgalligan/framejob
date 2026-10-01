@@ -7,10 +7,11 @@
   points to one of its headed sections or file-map rows, quoted by name.
 - **Spec decisions:** relies on D4-6 (the reversed mirror has one home, in the app), R2-1 (one
   composition audio track per source format), K-1 / K-2 (Space, and the text editor's Return/Esc),
-  SH-1 / SH-2 (`StickerButton` keeps its pill; `drawBar` forked from Rasterize), CI-1, CI-5..CI-10
-  (Clip tab: selected action, sub-tabs, marks, Reset/Clear, refusal strip), W-8 / W-10 (on-device
-  `SpeechTranscriber`; one `word_style` writer), R6-3, R6-7, R6-9..R6-13 (cloud captions). None of
-  these was introduced here. The notes file only recorded what they did to each file.
+  SH-2 / SH-4 (`drawBar` forked from Rasterize; `StickerButton` squared in place, its owner-filtered
+  tracking areas kept), CI-1, CI-5..CI-10 (Clip tab: selected action, sub-tabs, marks, Reset/Clear,
+  refusal strip), W-8 / W-10 (on-device `SpeechTranscriber`; one `word_style` writer), R6-3, R6-7,
+  R6-9..R6-13 (cloud captions). None of these was introduced here. The notes file only recorded what
+  they did to each file.
 
 ## Context
 
@@ -352,8 +353,9 @@ lenient-decoding rule.
 
 ### Shared chrome
 
-- **`Controls.swift` sits over the cap (651) by the sync rule.** `BlockSlider` was copied verbatim
-  from Rasterize. SH-2 is its only fork. SH-1 leaves `StickerButton` as it is.
+- **`Controls.swift` sits over the cap (648) by the sync rule.** `BlockSlider` was copied verbatim
+  from Rasterize. SH-2 is its only fork. SH-4 (#100) squared `StickerButton` in place to
+  Rasterize's drawing; its owner-filtered tracking areas stay.
 
 ## What it built — where it lives now
 
@@ -380,22 +382,23 @@ Files that were split since the notes wrote them:
 
 Still true of the current code:
 
-- A caption panel name such as `chart.png` becomes `chart.png.srt` in the panel and `chart.srt`
-  over MCP.
 - `SileroVAD` marked unavailable never retries until relaunch.
 - macOS hides status items that do not fit the menu bar, and Pause/Resume live nowhere else. "●"
   and "❚❚" differ in width, so the bar shifts at a pause.
 - The picture and the microphone are ONE op list. A microphone track the caps refuse takes the
   picture down with it.
 - `place: false` stores no microphone offsets.
-- An explicit `project` path matches with `documents.first(where:)`. When `new_project` /
-  `save_project` leave two open documents at one path, an unspecified one answers, and there is no
-  close tool. Scripts use a fresh name per run.
 - A second `PostEffects` meter tap cannot be built: there is one `audioTapProcessor` per input.
 - Closing the transcribe sheet mid-download lets the download run on (a decision).
 - The playhead echo has no MCP drive: no tool reads the live player's reports.
 - The canvas text editor shows an UPPERCASE text as typed, so a capital wider than its letter can
   wrap where the render does not; a rotated clip is edited axis-aligned (spec §11 K-3, #117).
+- `AssistantComposerField` refits on a width change inside its own `layout()`; moving the refit to
+  its `setFrameSize` (B37) or to `AssistantView.layout()` (B47) lagged one pass (#182 item 3,
+  accepted). B47's P13, one `layoutIfNeeded()` each with the 41-character message: 26.0 pt at
+  480 (want 26.0), 26.0 at 263.0 (want 41.0), 41.0 at 480 again (want 26.0); the height
+  constant 26.0, 26.0, 41.0 against text view widths 390.0, 156.0, 390.0 (inferred, not
+  measured: the nested field's frame is not yet the new width when `AssistantView.layout()` runs).
 
 ## Named next cuts
 
@@ -441,11 +444,9 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   lanes").
 - A person drags a clip and sees no flash to 0 and no jump. Tracked in #48 ("Dragging a clip
   leaves the timeline still").
-- Caption-name agreement (#43).
-- Rasterize's `BlockSliderCell.drawBar` still has the SH-2 defect upstream. Tracked in #101.
-- SH-1: square `StickerButton` or move its callers ("a phase of its own"). Tracked in #100.
-- Pause/Resume live only in a status item that macOS can hide (#98); two open documents at one
-  path have no close tool (#40).
+- Rasterize's `BlockSliderCell.drawBar` still has the SH-2 defect upstream. Tracked in
+  kpgalligan/rasterize#335 (moved from #101).
+- Pause/Resume live only in a status item that macOS can hide (#98).
 
 ## Where to look in the original
 

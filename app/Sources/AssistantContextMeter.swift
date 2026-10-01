@@ -20,6 +20,9 @@ final class AssistantContextMeterView: NSView {
     private let bar = AssistantContextBar()
     private let title = NSTextField(labelWithString: "")
     let figuresLabel = NSTextField(labelWithString: "")
+    private var usage = AssistantContextUsage()
+    /// Measures a rung in the label's font; never in the hierarchy.
+    private let measure = NSTextField(labelWithString: "")
 
     init() {
         super.init(frame: .zero)
@@ -27,6 +30,7 @@ final class AssistantContextMeterView: NSView {
         title.setContentHuggingPriority(.required, for: .horizontal)
         title.setContentCompressionResistancePriority(.required, for: .horizontal)
         figuresLabel.font = DS.mono(10)
+        measure.font = DS.mono(10)
         figuresLabel.textColor = DS.textFaint
         figuresLabel.lineBreakMode = .byTruncatingTail
         figuresLabel.alignment = .right
@@ -60,8 +64,28 @@ final class AssistantContextMeterView: NSView {
     }
 
     func update(_ usage: AssistantContextUsage) {
-        figuresLabel.stringValue = Self.figures(usage)
+        self.usage = usage
+        figuresLabel.toolTip = Self.figures(usage)
+        showFittingFigure()
         bar.fraction = Self.fraction(usage)
+    }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        showFittingFigure()
+    }
+
+    /// The first rung of `figureLadder` that fits beside the title, or the
+    /// last when none does. The 12 is the constraints' 2 pt inset, 8 pt gap
+    /// and 2 pt inset.
+    private func showFittingFigure() {
+        let ladder = Self.figureLadder(usage)
+        let room = bounds.width - title.intrinsicContentSize.width - 12
+        let shown = ladder.first { rung in
+            measure.stringValue = rung
+            return measure.intrinsicContentSize.width <= room
+        } ?? ladder[ladder.count - 1]
+        if figuresLabel.stringValue != shown { figuresLabel.stringValue = shown }
     }
 
     /// "Nothing reported yet", "N of L tokens · P%", or "N tokens (window
@@ -80,6 +104,25 @@ final class AssistantContextMeterView: NSView {
         }
     }
 
+    /// The figures from longest to shortest: `figures(_:)` first, then
+    /// "N / L · P%" and "P%", or "N tokens".
+    static func figureLadder(_ usage: AssistantContextUsage) -> [String] {
+        let used = usage.used.formatted()
+        switch (usage.reported, usage.limit) {
+        case (false, _):
+            return ["Nothing reported yet"]
+        case (true, let limit?) where limit > 0:
+            let percent = (fraction(usage) * 100)
+                .formatted(.number.precision(.fractionLength(0...1)))
+            return [
+                "\(used) of \(limit.formatted()) tokens · \(percent)%",
+                "\(used) / \(limit.formatted()) · \(percent)%", "\(percent)%",
+            ]
+        case (true, _):
+            return ["\(used) tokens (window size unknown)", "\(used) tokens"]
+        }
+    }
+
     private static func fraction(_ usage: AssistantContextUsage) -> Double {
         guard usage.reported, let limit = usage.limit, limit > 0 else { return 0 }
         return min(1, Double(usage.used) / Double(limit))
@@ -88,11 +131,14 @@ final class AssistantContextMeterView: NSView {
 
 /// The Assistant tab's Spend row (road map 13 P4, spec §11 P-7): a "Spend"
 /// micro label and what the conversation has cost so far, as Reelcut
-/// estimates it (`AssistantTurnCost.figure`), laid out like the meter's
-/// label row.
+/// estimates it (`AssistantTurnCost.figure`, or its shorter rung where that
+/// does not fit, P-8), laid out like the meter's label row.
 final class AssistantConversationCostView: NSView {
     private let title = NSTextField(labelWithString: "")
     let figureLabel = NSTextField(labelWithString: "")
+    private var cost = AssistantTurnCost()
+    /// Measures a rung in the label's font; never in the hierarchy.
+    private let measure = NSTextField(labelWithString: "")
 
     init() {
         super.init(frame: .zero)
@@ -100,6 +146,7 @@ final class AssistantConversationCostView: NSView {
         title.setContentHuggingPriority(.required, for: .horizontal)
         title.setContentCompressionResistancePriority(.required, for: .horizontal)
         figureLabel.font = DS.mono(10)
+        measure.font = DS.mono(10)
         figureLabel.textColor = DS.textFaint
         figureLabel.lineBreakMode = .byTruncatingTail
         figureLabel.alignment = .right
@@ -129,7 +176,25 @@ final class AssistantConversationCostView: NSView {
     }
 
     func update(_ cost: AssistantTurnCost) {
-        figureLabel.stringValue = cost.figure
+        self.cost = cost
+        showFittingFigure()
+    }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        showFittingFigure()
+    }
+
+    /// The first rung of `figureLadder` that fits beside the title, or the
+    /// last when none does (spec §11 P-8) — the meter's shape and its 12 pt.
+    private func showFittingFigure() {
+        let ladder = cost.figureLadder
+        let room = bounds.width - title.intrinsicContentSize.width - 12
+        let shown = ladder.first { rung in
+            measure.stringValue = rung
+            return measure.intrinsicContentSize.width <= room
+        } ?? ladder[ladder.count - 1]
+        if figureLabel.stringValue != shown { figureLabel.stringValue = shown }
     }
 }
 

@@ -40,7 +40,8 @@ probe".
                                                              # are expected to FAIL (exit 1)
     python3 tools/proof/assistant_lane_proof.py --mutant NAME
         # one of `MUTANTS` (one-queue → L10, no-env-fallback → L11,
-        # mode-0755 → L12, no-lane-check → L13): the probe built over a copy of app/Sources with
+        # mode-0755 → L12, no-lane-check → L13, close-ask-first → L4, B44's
+        # close_project as an ask-first row): the probe built over a copy of app/Sources with
         # one text replaced, its one row run and expected to FAIL (exit 1;
         # 0 when it survives). Exit 2 when the control could not be
         # performed: a copy that cannot be made or built, or a probe that
@@ -93,6 +94,8 @@ MUTANTS = {
     "no-lane-check": ("AgentLane.swift",
                       "if cancel?.isCancelled == true { return AssistantSession.cancelledResult }",
                       "", "L13"),
+    "close-ask-first": ("AssistantToolTable.swift", 'tool: "close_project", rule: .withheld',
+                        'tool: "close_project", rule: .askFirst', "L4"),
 }
 
 

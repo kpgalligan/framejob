@@ -186,7 +186,7 @@ final class RecorderPanelController: NSWindowController {
     var showWhenLanded = false
     /// The recorder's sentence for a resume it refused (`+Pause.swift`):
     /// REPLACED by each retry, cleared when a resume lands or the next
-    /// recording starts, one of the two parts the live note is rebuilt
+    /// countdown begins, one of the two parts the live note is rebuilt
     /// from, and a sentence the landing's note carries (`+Landing.swift`).
     var resumeProblem: String?
     /// Each press of Record is one attempt, numbered, and the completions

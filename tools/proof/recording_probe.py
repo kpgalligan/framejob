@@ -3,9 +3,12 @@
 pause and resume (rows 3o–3t, section 4b, rows 5p–5u, 7d, and section 9),
 the grants a press checks (section 10, spec §11 recording), issue batch
 B17's unreadable segment and File ▸ Pause Recording (sections 11 and 12),
-issue batch B27's closed segment's did-fail (3r, 3r2), the recorder's
+and issue batch B27's closed segment's did-fail (3r, 3r2), the recorder's
 pause notification (F6, F7) and the countdown's meter (section 13), and
-Include Reelcut windows (section 14, spec §11 recording.md).
+issue batch B42's finishing notification (F8, F9) and the countdown's
+cleared resumeProblem (F10), and issue batch B49's square `StickerButton`
+(section 6, re-pinned to spec §11 SH-4), and Include Reelcut windows
+(section 14, spec §11 recording.md).
 
 Why a probe and not an MCP script. Three of the things R1a added have no
 caller a running binary can be asked to reach, and one of them is the row
@@ -418,26 +421,36 @@ The reference is found by a pickaxe on the button's
 title (`git log -S"New Recording" -- app/Sources/WelcomeWindowController.swift`,
 the LAST hash + `^`; HEAD while the change is uncommitted), because the
 file's adding commit is the initial commit and `--diff-filter=A` would name
-the wrong tree. Both harnesses render `welcome` in both appearances; the
-score is the shape (1440×1200, four channels), a determinism pair (two
-renders of this tree, byte-identical), and then `extent(diff)` equal to the
-INK of the three-button row — the row itself is Σ over the three titles of
-(⌈textWidth⌉ + 38) + 2 × 12 spacing wide, 34 tall and centred at x = 360
-(`StickerButton.intrinsicContentSize` in `Controls.swift`, the stack's
-spacing in `WelcomeWindowController.swift`, the widths measured by the
-probe's own `welcome` mode with the vendored fonts registered), and the ink
-sits inside it by `StickerButton.draw`'s margins: 2 pt top and left less
-the 1.5 pt stroke's 0.75 overhang, the 2 pt sticker shadow bottom and
-right — so the ink is 30.75 pt tall and the row's y is DERIVED from the
-diff's bottom edge and compared with the laid-out frame. Nothing outside
-the row may change (a third button moves the other two, and the old row is
-inside the new one), the changed-pixel clusters are PRINTED and never
+the wrong tree. The reference's buttons are still the pill (spec §11 SH-1:
+⌈textWidth⌉ + 38 by 34); the tree's are SH-4's square block (issue batch
+B49, #100: ⌈textWidth⌉ + 32 by 28, on `bounds.insetBy(0.5)`). Both harnesses
+render `welcome` in both appearances. 6a reads the live layout through the
+probe's own `welcome` mode with the vendored fonts registered: each
+intrinsic size and frame, the row Σ (⌈textWidth⌉ + 32) + 2 × 12 wide,
+28 tall and centred at x = 360, and each button's own bitmap sampled at
+(1.5, 1.5) and (1.5, mid-height) — one opaque fill for a square block, a
+clear corner for a pill. 6c is the shape (1440×1200, four channels) and a
+determinism pair (two renders of this tree, byte-identical). 6d: the
+welcome column is centred on its height, so the 6 pt shorter row moves
+everything above it 3 pt down and everything below it 3 pt up. The diff is
+read inside the BAND of the reference's row — full width, 34 pt from the
+laid-out top less 3 — and its extent must be x from the row's left + 0.5
+(the primary's fill, no stroke) to its right (the secondary's 1 pt stroke)
+and y the pill row's ink 3 pt higher (1.25 to 32 pt down the band: the
+pill's 1.5 pt stroke overhang and its 2 pt shadow), the row's y DERIVED from
+that bottom edge and compared with the laid-out frame. Nothing in the band
+changes outside the new row's x-span. Above the band every pixel row must
+equal the reference's 3 pt higher, and below it the reference's 3 pt lower,
+the strips at the two edges equal in place — no tolerance; a mismatch
+prints its count and first rows. The old two-button row lies inside the
+band and the new row's x-span. The in-band clusters are PRINTED and never
 counted as one, and a scored row asks that the reference was compiled with
 this tree's own harness. A new mode that names a type absent from the old
 tree must respect the reference guard or the build fails by name. Section 6 renders
 through the TREE's harness (`build.sh` hard-codes `app/Sources`), whatever
-`--sources` says; the mutant that turns the button's action is caught by
-section 5's structural read, which is what a pixel cannot see.
+`--sources` says, so a `--mutant` changes only the probe — 6a's samples and
+layout; the mutant that turns the button's action is caught by section 5's
+structural read, which is what a pixel cannot see.
 
 Section 7 (`catalog`) is the toll's gate from the inside:
 `AgentServer.shared.catalogJSON()` — the very string the startup parity
@@ -581,6 +594,18 @@ asserted). F7, structural over the comment-stripped
 `AgentServer+RecordingChrome.swift`: `show`'s body adds an observer for the
 notification with `object: recorder` whose block calls `tick()`, and
 `remove()` calls `removeObserver` — the item itself is never put up.
+**Issue batch B42 (#193 items 1 and 2)**: F8 — a counting observer of
+`ScreenRecorder.finishingDidBeginNotification` (object
+`ScreenRecorder.shared`) installed before F3: F3–F5 post none; then a
+faked tool's recording, paused by the action, and File ▸ Stop Recording
+(`newRecording`) → ONE post, counted before any spin, with the recorder
+`finishing` inside the block; after the call the panel is idle and not
+shown and the recorder `.finishing`. F9, structural like F7: `show`'s body
+adds an observer for that notification with `object: recorder` whose block
+calls `freeze()`, and `remove()` calls `removeObserver(finishObserver)`.
+F10: a stale `resumeProblem` with the panel idle, `beginCountdown()` → nil,
+the phase read straight after a countdown; `cancelCountdown()` and
+`disarmTick()` → idle; the choice's microphone is printed, not asserted.
 
 Section 13 (`preroll`, issue batch B27, #98 c) runs in its own process and
 reads the Microphone status BEFORE touching a device, so it cannot prompt;
@@ -897,7 +922,35 @@ running). Three of them put back the code before the batch:
                     — 38/39: F6's pause row.
   chrome-no-observer  the chrome's addObserver deleted
                     (AgentServer+RecordingChrome.swift) — 38/39: F7's show
+                    row; 45/46 re-measured by B42.
+
+**Issue batch B42's mutants** (F8, F9, F10, #193), measured 2026-10-01,
+each `--mutant <name> --only file_pause` (46 rows), against a tree scoring
+46/46 there and the whole run 1073/1073 with no row skipped (section 9 and
+section 13 running). Each puts back the code before the batch:
+
+  finish-no-post    the post in beginFinishing deleted
+                    (ScreenRecorder+Finishing.swift) — 45/46: F8's stop row.
+  chrome-no-freeze  the chrome's finishing addObserver deleted
+                    (AgentServer+RecordingChrome.swift) — 45/46: F9's show
                     row.
+  countdown-keeps-resume-problem  beginCountdown's `resumeProblem = nil`
+                    deleted (RecorderPanelController+Recording.swift) —
+                    45/46: F10's cleared row.
+
+**Issue batch B49's mutants** (6a, #100, spec §11 SH-4), measured
+2026-10-01, each `--mutant <name> --only welcome` (35 rows), against a tree
+scoring 35/35 there and 212/212 for `--only chrome,chrome_pause,welcome`.
+Section 6's renders are the tree's whatever the mutant, so each is caught by
+the probe's own layout and samples:
+
+  sticker-pill-size  `intrinsicContentSize` takes the pill's 6 pt back
+                    (Controls.swift) — 28/35: 6a's intrinsic, laid-out and
+                    tall rows, and 6d's two (iv) rows in each appearance (the
+                    probe's laid-out top, 394, no longer matches the tree's
+                    render).
+  sticker-round     the block's radius is half its height (Controls.swift)
+                    — 34/35: 6a's corner row.
 
 **Include Reelcut windows' mutants** (section 14), measured 2026-09-30,
 each `--mutant <name> --only exclusion` (28 rows, the build row among
@@ -928,6 +981,8 @@ in its pin map (R1's landing): both cross-builds are one program again.
     python3 tools/proof/recording_probe.py --only unreadable,file_pause   # B17's
     python3 tools/proof/recording_probe.py --only state,file_pause,preroll   # B27's
     python3 tools/proof/recording_probe.py --only exclusion   # Include Reelcut windows
+    python3 tools/proof/recording_probe.py --only file_pause   # B42's
+    python3 tools/proof/recording_probe.py --only welcome   # B49's
     python3 tools/proof/recording_probe.py --mutant excludes
     python3 tools/proof/recording_probe.py --sources <dir> # any copy
     RC_APP_SOURCES=<dir> python3 tools/proof/recording_probe.py
@@ -3761,6 +3816,13 @@ func filePause(_ request: [String: Any]) -> [String: Any] {
         forName: ScreenRecorder.pauseDidChangeNotification, object: ScreenRecorder.shared,
         queue: nil
     ) { _ in posts.append(ScreenRecorder.shared.isPaused) }
+    // F8 (issue batch B42, #193): the recorder's finishing notification,
+    // counted from before F3 — the state read INSIDE each block.
+    var finishPosts: [String] = []
+    let finishObserver = NotificationCenter.default.addObserver(
+        forName: ScreenRecorder.finishingDidBeginNotification, object: ScreenRecorder.shared,
+        queue: nil
+    ) { _ in finishPosts.append("\(ScreenRecorder.shared.state)") }
 
     // F3: the panel's own recording, through the panel.
     let panel = RecorderPanelController.shared
@@ -3816,6 +3878,40 @@ func filePause(_ request: [String: Any]) -> [String: Any] {
         "f3": f3Posts, "f4Pause": f4PausePosts, "f4Resume": f4ResumePosts, "f5": posts.count,
     ]
     NotificationCenter.default.removeObserver(postObserver)
+
+    // F8 (b, c): File ▸ Stop Recording over a tool's PAUSED recording — the
+    // default arm's `ScreenRecorder.shared.stop()` posts the finishing
+    // notification once, synchronously, with the recorder `.finishing`.
+    let f8Before = finishPosts
+    finishPosts = []
+    panel.window?.orderOut(nil)
+    let attached8 = fakeSharedRecording(work, "f8")
+    delegate.pauseOrResumeRecording(nil)
+    let f8Paused = "\(ScreenRecorder.shared.state)"
+    delegate.newRecording(nil)
+    // Counted BEFORE any spin: the post is synchronous inside beginFinishing.
+    let f8StopPosts = finishPosts
+    out["f8"] = [
+        "before": f8Before, "attached": attached8, "paused": f8Paused, "stopPosts": f8StopPosts,
+        "panel": "\(panel.phase)", "visible": panel.window?.isVisible ?? false,
+        "recorder": "\(ScreenRecorder.shared.state)",
+    ]
+    tearDownShared()
+    NotificationCenter.default.removeObserver(finishObserver)
+
+    // F10 (#193): a new countdown clears a stale resumeProblem.
+    panel.phase = .idle
+    panel.resumeProblem = "F10 stale"
+    panel.beginCountdown()
+    let f10Problem: Any = panel.resumeProblem ?? NSNull()
+    let f10Phase = "\(panel.phase)"
+    panel.cancelCountdown()
+    panel.disarmTick()
+    out["f10"] = [
+        "problem": f10Problem, "phase": f10Phase, "after": "\(panel.phase)",
+        "microphone": panel.currentChoice().microphone ?? NSNull(),
+    ]
+    panel.window?.orderOut(nil)
 
     // W0–W2: the titles against the one length.
     func width(_ elapsed: TimeInterval, _ paused: Bool) -> Double {
@@ -3873,6 +3969,24 @@ func welcome(_ request: [String: Any]) -> [String: Any] {
         let frame = root.convert(button.bounds, from: button)
         let top = root.isFlipped ? frame.minY : root.bounds.height - frame.maxY
         let font = button.font ?? DS.sans(13, weight: .semibold)
+        // Issue batch B49 (#100): two raw samples of the button's own bitmap,
+        // `sharp_chrome.py`'s `pixel` — the pixel holding the POINT, top-left
+        // origin — 1.5 pt into the top-left corner and 1.5 pt in at mid-height.
+        // A square block's two are one opaque fill; a pill's corner is clear.
+        var corner: [Int] = []
+        var middle: [Int] = []
+        if let rep = button.bitmapImageRepForCachingDisplay(in: button.bounds) {
+            button.cacheDisplay(in: button.bounds, to: rep)
+            let scale = CGFloat(rep.pixelsWide) / button.bounds.width
+            let sample = { (x: CGFloat, y: CGFloat) -> [Int] in
+                var samples = [Int](repeating: 0, count: max(rep.samplesPerPixel, 4))
+                rep.getPixel(
+                    &samples, atX: Int((x * scale).rounded(.down)), y: Int((y * scale).rounded(.down)))
+                return Array(samples.prefix(rep.samplesPerPixel))
+            }
+            corner = sample(1.5, 1.5)
+            middle = sample(1.5, button.bounds.midY)
+        }
         return [
             "title": button.title,
             "textWidth": Double(button.title.size(withAttributes: [.font: font]).width),
@@ -3881,6 +3995,8 @@ func welcome(_ request: [String: Any]) -> [String: Any] {
             "frame": [Double(frame.minX), Double(top), Double(frame.width), Double(frame.height)],
             "font": font.fontName,
             "action": button.action.map { NSStringFromSelector($0) } ?? "",
+            "corner": corner,
+            "middle": middle,
         ]
     }
     out["spacing"] = Double((buttons.first?.superview as? NSStackView)?.spacing ?? -1)
@@ -6922,6 +7038,38 @@ def section_file_pause(binary, sources):
     remove_body = "\n".join(function_body(lines, "func remove()") or [])
     check("F7: … and remove() calls removeObserver", "removeObserver" in remove_body, remove_body)
 
+    # Issue batch B42 (#193): the recorder's finishing notification, which
+    # freezes the tool's status item at a stop from any door, and the stale
+    # resumeProblem a new countdown clears.
+    f8 = answer.get("f8") or {}
+    check("F8: F3–F5 (pauses, resumes, a teardown, an idle action) post no "
+          "ScreenRecorder.finishingDidBeginNotification", f8.get("before") == [], f"{f8}")
+    check("F8: File ▸ Stop Recording (newRecording) over a tool's PAUSED recording posts "
+          "finishingDidBeginNotification ONCE, synchronously (counted before any spin), the "
+          "recorder finishing inside the block (finish-no-post)",
+          f8.get("attached") == "ok" and f8.get("paused") == "paused"
+          and f8.get("stopPosts") == ["finishing"], f"{f8}")
+    check("F8: … and after the call the panel is idle and not shown, the recorder .finishing",
+          f8.get("panel") == "idle" and f8.get("visible") is False
+          and f8.get("recorder") == "finishing", f"{f8}")
+    segments = show_body.split("addObserver(")[1:]
+    finishing = next((part.split("}", 1)[0] for part in segments
+                      if "forName: ScreenRecorder.finishingDidBeginNotification" in part), "")
+    check("F9: RecordingToolChrome.show (comment-stripped) adds an observer for "
+          "ScreenRecorder.finishingDidBeginNotification with object: recorder whose block calls "
+          "freeze() (chrome-no-freeze)",
+          "object: recorder" in finishing and "freeze()" in finishing, show_body)
+    check("F9: … and remove() calls removeObserver on finishObserver",
+          "removeObserver(finishObserver)" in remove_body, remove_body)
+    f10 = answer.get("f10") or {}
+    print(f"  F10: the choice's microphone is {f10.get('microphone')!r} (a fact, not asserted)")
+    check("F10: beginCountdown() over a stale resumeProblem clears it "
+          "(countdown-keeps-resume-problem)", "problem" in f10 and f10.get("problem") is None,
+          f"{f10}")
+    check("F10: … the phase straight after is the countdown, and cancelCountdown() with "
+          "disarmTick() leaves the panel idle",
+          str(f10.get("phase", "")).startswith("countdown") and f10.get("after") == "idle", f"{f10}")
+
     w0 = answer.get("w0") or {}
     print(f"  W0: '● 0:00' is {w0.get('recording')} pt wide and '{PAUSE_GLYPH} 0:00' "
           f"{w0.get('paused')} pt (facts, not asserted)")
@@ -6961,17 +7109,22 @@ def section_file_pause(binary, sources):
 WELCOME_W = 720
 WELCOME_H = 600
 WELCOME_CENTER_X = 360               # the stack is centred on the content view
-STICKER_H = 34                       # StickerButton.bodyHeight 28 + 6
-STICKER_PAD = 32 + 6                 # intrinsicContentSize: ceil(textWidth) + 32 + 6
-# `StickerButton.draw` at rest: the body at (2, 2) with a 1.5 pt stroke
-# centred on its edge (0.75 outside), the sticker shadow offset by 2. So a
-# button's ink runs from 1.25 pt to (width − 2) across and from 1.25 to 32
-# down — a 30.75 pt tall band inside the 34 pt row.
-INK_LEFT = 2 - 0.75
-INK_TOP = 2 - 0.75
-INK_RIGHT_INSET = 2
-INK_BOTTOM = 28 + 2 + 2
-INK_H = INK_BOTTOM - INK_TOP
+STICKER_H = 28                       # StickerButton.bodyHeight (spec §11 SH-4)
+STICKER_PAD = 32                     # intrinsicContentSize: ceil(textWidth) + 32
+# The reference tree's pill (SH-1): bodyHeight 28 + 6, ceil(textWidth) + 32 + 6.
+WAS_STICKER_H = 34
+WAS_STICKER_PAD = 38
+# The welcome column is centred on its height, so a row 6 pt shorter moves
+# everything above it 3 pt down and everything below it 3 pt up.
+COLUMN_SHIFT = (WAS_STICKER_H - STICKER_H) / 2
+# `StickerButton.draw` now: a block on `bounds.insetBy(0.5)`. The primary
+# (leftmost) has no stroke, so its fill starts 0.5 pt in; the secondary
+# (rightmost) strokes 1 pt centred on that edge, reaching its frame.
+INK_LEFT = 0.5
+# The pill's ink: the body at (2, 2) with a 1.5 pt stroke centred on its edge
+# (0.75 outside), the sticker shadow offset by 2 — from 1.25 pt to 32 down.
+WAS_INK_TOP = 2 - 0.75
+WAS_INK_BOTTOM = 28 + 2 + 2
 PIXEL = 0.5                          # one Retina pixel — section 6 uses the render's own
 
 
@@ -7198,10 +7351,11 @@ def close(a, b, tolerance=PIXEL):
 
 def section_welcome(binary, sources):
     print("\nSection 6 — the welcome window against the tree one commit before the button: "
-          "the three-button row is all that changed")
+          "the three-button row and the column's 3 pt re-centring are all that changed")
     if os.path.realpath(sources) != os.path.realpath(TREE_SOURCES):
         print("  (this section renders the TREE through harness/build.sh, not --sources; a "
-              "mutant of the button is section 5's to catch)")
+              "--mutant changes only the probe's own 6a layout and samples, and the renders "
+              "stay the tree's)")
     os.makedirs(RENDERS, exist_ok=True)
 
     # The row's geometry from the live layout, with the fonts registered.
@@ -7240,6 +7394,11 @@ def section_welcome(binary, sources):
           f"frames {frames}")
     check(f"6a: … {STICKER_H} pt tall on one line",
           frames and all(close(f[1], laid_top, 0.01) and f[3] == STICKER_H for f in frames), f"{frames}")
+    corners = [(b.get("corner"), b.get("middle")) for b in buttons]
+    check("6a: each button's corner sample (1.5, 1.5) is opaque and equal to its middle sample "
+          "(1.5, mid-height) — a square block, not a pill (spec §11 SH-4)",
+          buttons and all(c and m and c[-1] == 255 and c == m for c, m in corners),
+          f"(corner, middle) {corners}")
     print(f"      the row: x {row_x:g}–{row_x + row_w:g}, top {laid_top}, widths {widths}, "
           f"recents listed {(answer or {}).get('recentCount')}")
     row = Rect("the button row", row_x, laid_top if laid_top is not None else 0, row_w, STICKER_H)
@@ -7308,41 +7467,75 @@ def section_welcome(binary, sources):
     check("6c: … and a different build from the reference, so the comparison is not a file "
           "against itself", not same_file(renders["now-light-a"], renders["was-light"]))
 
-    ink = Rect("the row's ink", row.x0 + INK_LEFT, row.y0 + INK_TOP,
-               row_w - INK_LEFT - INK_RIGHT_INSET, INK_H)
+    check("6d: the probe answered a button row, so there is a row top to place the reference "
+          "band from", laid_top is not None, "no buttons answered")
+    if laid_top is None:
+        return
+    was_top = laid_top - COLUMN_SHIFT          # the reference row's top, 3 pt higher
+    band = Rect("the reference row's band", 0, was_top, WELCOME_W, WAS_STICKER_H)
+    ink_x0, ink_x1 = row.x0 + INK_LEFT, row.x1
+    ink_y0, ink_y1 = was_top + WAS_INK_TOP, was_top + WAS_INK_BOTTOM
     print(f"      predicted: {row}")
-    print(f"      predicted: {ink}")
+    print(f"      predicted: {band}")
+    print(f"      predicted: the band's ink x {ink_x0:g}–{ink_x1:g}, y {ink_y0:g}–{ink_y1:g} pt")
+    shift = round(COLUMN_SHIFT * scale)        # the column's move in render pixel rows
+    band_top = round(band.y0 * scale)
+    band_bottom = round(band.y1 * scale)
+
+    def mismatches(now_img, was_img, ys, offset):
+        return [y for y in ys if now_img.rows[y] != was_img.rows[y + offset]]
+
     for appearance, was, tag in (("light", "was-light", "now-light-a"), ("dark", "was-dark", "now-dark")):
         diff = changed_pixels(images[was], images[tag])
         if diff is None:
             check(f"6d {appearance}: the two renders have one shape", False)
             continue
-        boxes = clusters(diff)
-        print(f"\n   {appearance}: {len(diff)} changed pixels in {len(boxes)} cluster(s) — printed, "
-              "never counted as one:")
+        in_band = [p for p in diff if band.contains(p[0], p[1], scale)]
+        boxes = clusters(in_band)
+        print(f"\n   {appearance}: {len(in_band)} changed pixels in the band in {len(boxes)} cluster(s) "
+              f"({len(diff)} in the whole render, the column's move included) — printed, never "
+              "counted as one:")
         print(describe(boxes, scale))
-        check(f"6d {appearance}: the third button changed SOMETHING", bool(diff))
-        box = extent(diff, scale)
-        print(f"      extent: {box}")
-        check(f"6d {appearance}: the diff's extent is the ink of the three-button row — x from "
-              f"{ink.x0:g} to {ink.x1:g} (the row less the 1.25 pt stroke overhang on the left and "
-              f"the 2 pt shadow on the right), within a pixel",
-              box is not None and close(box[0], ink.x0, pixel) and close(box[2], ink.x1, pixel), f"{box}")
-        check(f"6d {appearance}: … and {INK_H:g} pt tall — the {STICKER_H} pt row less the 2 pt top "
-              "margin the stroke reaches 0.75 into and the 2 pt under the shadow (StickerButton.draw)",
-              box is not None and close(box[3] - box[1], INK_H, pixel), f"{box[3] - box[1] if box else None}")
-        derived_top = (box[3] - INK_BOTTOM) if box else None
-        check(f"6d {appearance}: the row's y DERIVED from the diff's bottom edge ({derived_top}) is the "
-              f"laid-out row's ({laid_top})", close(derived_top, laid_top, pixel), f"{derived_top} vs {laid_top}")
-        stray = outside(diff, [row], scale)
-        check(f"6d {appearance}: nothing outside the row changed — the lockup, the headline, the "
-              "paragraph, Recent and the formats line are where they were",
+        check(f"6d {appearance}: (i) the third button changed SOMETHING in the band", bool(in_band))
+        stray = outside(in_band, [Rect("the row's x-span", row.x0, band.y0, row_w, WAS_STICKER_H)], scale)
+        check(f"6d {appearance}: (ii) nothing in the band changed outside the new row's x-span "
+              f"({row.x0:g}–{row.x1:g})",
               not stray, "" if not stray else f"{len(stray)} px elsewhere:\n" + describe(clusters(stray), scale))
-        old_w = row_w - widths[-1] - (spacing or 0)
-        old = Rect("the old two-button row", WELCOME_CENTER_X - old_w / 2, row.y0, old_w, STICKER_H)
-        check(f"6d {appearance}: the old two-button row ({old.x0:g}–{old.x1:g}) lies inside the new one, "
-              "so the extent is the new row's and not a union with something that moved elsewhere",
-              old.x0 >= row.x0 - 1e-9 and old.x1 <= row.x1 + 1e-9, f"{old} vs {row}")
+        box = extent(in_band, scale)
+        print(f"      extent: {box}")
+        check(f"6d {appearance}: (iii) the band's extent x is {ink_x0:g}–{ink_x1:g} — the primary's "
+              "fill 0.5 pt in on the left, the secondary's 1 pt stroke reaching its frame on the "
+              "right — within a pixel",
+              box is not None and close(box[0], ink_x0, pixel) and close(box[2], ink_x1, pixel), f"{box}")
+        check(f"6d {appearance}: (iv) … and its y is {ink_y0:g}–{ink_y1:g} — the pill row's ink, "
+              f"{COLUMN_SHIFT:g} pt higher — within a pixel",
+              box is not None and close(box[1], ink_y0, pixel) and close(box[3], ink_y1, pixel), f"{box}")
+        derived_top = (box[3] - WAS_INK_BOTTOM + COLUMN_SHIFT) if box else None
+        check(f"6d {appearance}: (iv) the row's y DERIVED from the band's bottom edge ({derived_top}) "
+              f"is the laid-out row's ({laid_top})", close(derived_top, laid_top, pixel),
+              f"{derived_top} vs {laid_top}")
+        now_img, was_img = images[tag], images[was]
+        height = now_img.height
+        above = mismatches(now_img, was_img, range(shift, band_top), -shift) \
+            + mismatches(now_img, was_img, range(0, shift), 0)
+        check(f"6d {appearance}: (v) above the band every pixel row is the reference's {shift} rows "
+              f"higher (y {shift}–{band_top}), and the first {shift} are equal in place — the "
+              "lockup, the headline and the paragraph moved down 3 pt and nothing else",
+              not above, f"{len(above)} rows differ, first y {sorted(above)[:12]}")
+        below = mismatches(now_img, was_img, range(band_bottom, height - shift), shift) \
+            + mismatches(now_img, was_img, range(height - shift, height), 0)
+        check(f"6d {appearance}: (v) below the band every pixel row is the reference's {shift} rows "
+              f"lower (y {band_bottom}–{height - shift}), and the last {shift} are equal in place — "
+              "Recent and the formats line moved up 3 pt and nothing else",
+              not below, f"{len(below)} rows differ, first y {sorted(below)[:12]}")
+        old_widths = [math.ceil(b.get("textWidth", 0)) + WAS_STICKER_PAD for b in buttons[:2]]
+        old_w = sum(old_widths) + (spacing or 0)
+        old = Rect("the old two-button row", WELCOME_CENTER_X - old_w / 2, was_top, old_w, WAS_STICKER_H)
+        check(f"6d {appearance}: (vi) the old two-button row ({old.x0:g}–{old.x1:g}, top {old.y0:g}) "
+              "lies inside the band and inside the new row's x-span, so the extent is the new row's "
+              "and not a union with something that moved elsewhere",
+              old.x0 >= row.x0 - 1e-9 and old.x1 <= row.x1 + 1e-9
+              and old.y0 >= band.y0 - 1e-9 and old.y1 <= band.y1 + 1e-9, f"{old} vs {row}, {band}")
 
 
 # --------------------------------------------------------------------------
@@ -7353,7 +7546,7 @@ APP_STATE_TOOLS = [
     "import_captions", "export_captions", "transcribe", "consolidate_media", "detect_silence",
     "normalize_clip", "set_playhead", "set_range", "set_selection", "set_scope", "undo", "redo",
     "render_frame", "export", "record_screen", "write_graphic", "get_graphic", "graphic_reference",
-    "render_graphic", "import_graphic_font", "import_graphic_asset",
+    "render_graphic", "import_graphic_font", "import_graphic_asset", "close_project",
 ]
 # `git show df6b916^:app/Sources/AgentCatalog.swift`'s last ten rows, in order.
 FILE_GROUP_ORDER = [
@@ -7386,7 +7579,7 @@ def section_catalog(binary, sources):
           len(ops) >= 55 and len(set(ops)) == len(ops), f"{len(ops)}")
     check("7a: the catalog has at least 75 tools, no name twice", len(names) >= 75 and len(set(names)) == len(names),
           f"{len(names)} names, {len(set(names))} distinct")
-    check("7a: they are the 55 ops plus the twenty-six app-state tools, record_screen among them",
+    check("7a: they are the 55 ops plus the twenty-seven app-state tools, record_screen among them",
           set(names) == set(ops) | set(APP_STATE_TOOLS), f"missing {sorted(set(ops) | set(APP_STATE_TOOLS) - set(names))}, "
           f"extra {sorted(set(names) - set(ops) - set(APP_STATE_TOOLS))}")
     check("7a: no app-state tool is also an op", not set(APP_STATE_TOOLS) & set(ops),
@@ -7400,7 +7593,7 @@ def section_catalog(binary, sources):
     without = [n for n in ops if not (by.get(n) or {}).get("hasScope")]
     check("7c: every op tool's schema declares `scope`", not without, f"without: {without}")
     with_scope = [n for n in APP_STATE_TOOLS if (by.get(n) or {}).get("hasScope")]
-    check("7c: none of the twenty-six app-state tools declares it", not with_scope, f"with: {with_scope}")
+    check("7c: none of the twenty-seven app-state tools declares it", not with_scope, f"with: {with_scope}")
     rs = by.get("record_screen") or {}
     check("7c: record_screen's schema has no `scope` key", rs and rs.get("hasScope") is False, f"{rs}")
     check(f"7c: record_screen declares exactly {RECORD_SCREEN_ARGUMENTS}",
@@ -8454,6 +8647,35 @@ MUTANTS = {
         "                    includeReelcutWindows: includeReelcut,\n",
         "                    includeReelcutWindows: false,\n",
         "record_screen reads include_reelcut_windows and excludes Reelcut anyway"),
+    # Issue batch B42 (#193 items 1 and 2) — F8, F9, F10.
+    "finish-no-post": (
+        "ScreenRecorder+Finishing.swift",
+        "        NotificationCenter.default.post(name: Self.finishingDidBeginNotification, object: self)\n",
+        "",
+        "beginFinishing posts no finishingDidBeginNotification — File ▸ Stop leaves a tool's item live"),
+    "chrome-no-freeze": (
+        "AgentServer+RecordingChrome.swift",
+        "        finishObserver = NotificationCenter.default.addObserver(\n"
+        "            forName: ScreenRecorder.finishingDidBeginNotification, object: recorder, queue: nil\n"
+        "        ) { [weak self] _ in self?.freeze() }\n",
+        "",
+        "the tool's chrome does not freeze at a finish it did not start (the code before B42)"),
+    "countdown-keeps-resume-problem": (
+        "RecorderPanelController+Recording.swift",
+        "        countdownTimer?.invalidate()\n        resumeProblem = nil\n",
+        "        countdownTimer?.invalidate()\n",
+        "beginCountdown keeps a stale resumeProblem (the code before B42)"),
+    # Issue batch B49 (#100, spec §11 SH-4) — 6a's samples and layout.
+    "sticker-pill-size": (
+        "Controls.swift",
+        "        return NSSize(width: ceil(textWidth) + 32, height: Self.bodyHeight)\n",
+        "        return NSSize(width: ceil(textWidth) + 32 + 6, height: Self.bodyHeight + 6)\n",
+        "StickerButton's intrinsic size takes the pill's 6 pt margins back (the code before B49)"),
+    "sticker-round": (
+        "Controls.swift",
+        "            roundedRect: body, xRadius: DS.buttonRadius, yRadius: DS.buttonRadius)\n",
+        "            roundedRect: body, xRadius: body.height / 2, yRadius: body.height / 2)\n",
+        "StickerButton's block is drawn with the pill's radius, half its height"),
 }
 
 

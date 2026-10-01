@@ -41,9 +41,11 @@ The crate's record is road map 10 §10.4.
   length, before the `<svg` check). The texts are load-bearing.
 - `host.rs` — the globals `__measureText`, `__assetNames`, `__warn`.
 - `props.rs` — `check_schema` (compile, strict), `overlay` (render,
-  lenient; every surprise a warning) and `MAX_PROPS`, a schema's key cap,
-  which the core restates as `GRAPHIC_MAX_PROPS` (`core/tests/graphic_ffi.rs`
-  pins the two).
+  lenient; every surprise a warning) and the schema's limits `MAX_PROPS`,
+  `MAX_OPTIONS`, `MAX_STRING` and `TYPES`, which the core restates as
+  `GRAPHIC_<X>` (`core/tests/graphic_ffi.rs` pins each pair;
+  `tests/reference.rs` pins the numbers the reference states, and its
+  typings' key cap).
 - `stdlib.js`, `noise.js` — §5c's standard library, evaluated as SCRIPTS
   (globals) before the sandbox; each under 400 lines.
 

@@ -201,7 +201,10 @@ extension AgentServer {
                     "speakers": [
                         "type": "boolean",
                         "description": "engine \"assemblyai\" only. Ask for speaker labels "
-                            + "(default false); a change of speaker then starts a new cue. "
+                            + "(default false); a change of speaker then starts a new cue, and "
+                            + "with style subtitles each speaker's cues take their own colour "
+                            + "(white, yellow, cyan, green in order of first appearance, then "
+                            + "again; a speaker is a label within one media file). "
                             + "Refused by name with engine \"apple\".",
                     ],
                     "vocabulary": [
@@ -245,7 +248,9 @@ extension AgentServer {
                     "path": [
                         "type": "string",
                         "description": "Where to write, e.g. ~/Movies/talk.srt. The folder "
-                            + "must exist.",
+                            + "must exist. A trailing .srt or .vtt is replaced by the format's "
+                            + "own; any other extension is kept as part of the name (chart.png "
+                            + "→ chart.png.srt).",
                     ],
                     "format": captionFormatProperty,
                 ], required: ["path"]),

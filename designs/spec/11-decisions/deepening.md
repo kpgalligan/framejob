@@ -128,6 +128,11 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   holds a speed in ×0.1 – ×10), `evaluate.rs`'s clamp covers what it can
   produce, and reading it as "empty" would freeze an edge over a field no
   trim can fix. No persisted field changes, so `RC_FORMAT_VERSION` stays 8.
+  **Amended 2026-10-01 by R6-10's amendment (#41):** `validate` now refuses
+  a speed outside ×0.1–×10 on read and in every edit's `finish`, so a
+  speed-made `Unmeasured` window is reachable by no file and no edit. The
+  reading stays as the defence it describes, pinned at the `SourceBound`
+  level in `core/tests/source_window.rs` and `source_edges.rs`.
 - **D4-3 — `set_speed` snaps NEAREST and is then held to the bound AT THE
   NEW RATE.** #22's own trade applied to speed. Measured before the change:
   a whole-file clip of a 6 233 613-tick media at ×2 had a duration of
@@ -389,3 +394,23 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   positions on the grid, nothing moves. **Accepted**: at 7 fps, an edge
   clamped one frame from another (the trims, `roll`) may sit a tick off
   the grid. That is #42's class, and D7-3 restores it.
+- **#40 — `close_project` closes a document as File ▸ Close does;
+  `save_project {path}` and `new_project {path}` refuse a path another open
+  document holds.** `open_project` closes nothing. A window with a sheet
+  attached is refused first: the sheet is window-modal work in progress,
+  the rule `handleEditorKey` follows (`EditorViewController.swift`).
+  Unsaved changes are refused unless `discard: true`, and the tool never
+  writes the package. Under autosave in place, "unsaved" means "not yet
+  autosaved", and that is all `discard` loses. A closed path named later is
+  refused by name. The held-path check runs after `destinationURL`,
+  compares canonically, and comes before `new_project` creates anything,
+  which removes two documents at one path at its source. A save to the
+  document's own file stays a plain save (#138). The tool is withheld from
+  the assistant (AI-7, amended). Risk accepted: an agent that wants a path
+  another document holds closes that document first.
+- **#43 — `export_captions` replaces only `srt`/`vtt` (`knownExtensions`)
+  in a name; any other extension is part of it (`chart.png` →
+  `chart.png.srt`), which is the panel's rule.** The other tools keep
+  `replaceableExtensions`, `srt` and `vtt` included, so a still or a movie
+  named `.srt` is still renamed. Risk accepted: `talk.mp4` becomes
+  `talk.mp4.srt`.

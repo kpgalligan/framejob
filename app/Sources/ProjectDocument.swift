@@ -1323,13 +1323,6 @@ final class ProjectDocument: NSDocument {
         playhead = max(0, playhead)
     }
 
-    /// Errors never crash and never go to the console alone: they land in a
-    /// sheet on the document's window when it has one.
-    func present(_ error: any Error) {
-        if let window = windowForSheet {
-            presentError(error, modalFor: window, delegate: nil, didPresent: nil, contextInfo: nil)
-        } else {
-            _ = presentError(error)
-        }
-    }
+    /// The alerts `present(_:)` holds until the last one ends (`+Alerts`).
+    var alertQueue = DocumentAlertQueue()
 }

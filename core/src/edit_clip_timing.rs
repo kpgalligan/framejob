@@ -10,9 +10,11 @@ use crate::time::Ticks;
 
 /// Speed range, matching the inspector's ×0.1 – ×10 (spec §4.3). Outside
 /// it, `scaleTimeRange` and the time-pitch unit stop producing anything
-/// anyone wants to watch.
-const SPEED_MIN: f64 = 0.1;
-const SPEED_MAX: f64 = 10.0;
+/// anyone wants to watch. Three readers: `set_speed` clamps to it,
+/// `rate_stretch` stays inside it, and `Project::validate` refuses a clip
+/// outside it (spec §11 R6-10, amended by #41).
+pub(crate) const SPEED_MIN: f64 = 0.1;
+pub(crate) const SPEED_MAX: f64 = 10.0;
 
 impl Project {
     /// Scales every action's span with the clip, so an action keeps the

@@ -14,6 +14,7 @@ same kind of value. The `Makefile` carries one directive per key,
     (unset ANTHROPIC_API_KEY RC_ASSEMBLYAI_KEY; python3 tools/proof/makefile_env_proof.py)
     (unset …; python3 tools/proof/makefile_env_proof.py --mutant no-unexport)
     (unset …; python3 tools/proof/makefile_env_proof.py --mutant no-unexport-anthropic)
+    (unset …; python3 tools/proof/makefile_env_proof.py --no-sweep)
 
 **It measures `app` ONLY, and says so.** `app` is the one recipe that runs
 `xcodebuild`, which is the one tool measured to write its environment down.
@@ -36,10 +37,12 @@ other build input `project.yml` names is a SYMLINK to the tree's (`core`
 already built, so `project.yml`'s pre-build `cargo build --release` is a
 no-op and the copy links the tree's `libreelcut_core.a`).
 
-The three rows:
+The four rows:
 
 * the build made `Reelcut.app`'s binary — a failed build holds nothing, and
   "no file holds the dummy" would be true of it for the wrong reason;
+* no process whose cwd or command line lies under the copy outlives its
+  `make app` (the sweep below);
 * no file under the copy's `build/` or `Reelcut.xcodeproj/` holds the
   AssemblyAI dummy's bytes;
 * no file there holds the Anthropic dummy's bytes.
@@ -50,19 +53,31 @@ COPY and its row FAILS; under `--mutant no-unexport-anthropic` the
 Anthropic one is, and that row FAILS. Those are the CONTROLS that this
 instrument can see a leak of either key at all. A mutant run exits 1 when a
 row failed (caught) and 0 when none did (it survived); a copy that could
-not be made or a build that failed performs no control and exits 2 (rule R,
+not be made, a build that failed or a sweep row that failed performs no
+control and exits 2 (rule R,
 issue batch B13), printing `mutant <name>: the control could not be
 performed — <why>`. Without `--mutant` either is a scored FAIL, exit 1.
 `make app` runs through `bounded.run` in its own session, so a build that
 passes `--wall` has its whole process group killed (rule H, issue batch
 B28): `make` and `xcodebuild` die with the group, while what `xcodebuild`'s
 build service starts in its own process groups (`swift-frontend`,
-build-phase scripts) can outlive it.
+build-phase scripts) is not in it. So after `make app` returns, the SWEEP
+(#191) SIGKILLs every process whose cwd (from `lsof`) or command line (from
+`ps`) lies under the copy, and rescans every second until two scans in a row
+find none or `SWEEP_SECONDS` pass; what is left is a FAIL naming each PID
+and command. It never selects by process name, and it spares this run's own
+ancestors (the shell that ran it may name the copy's path) and any process
+whose elapsed time shows it was running before this run's `make app` began.
+`--no-sweep` is the CONTROL: the row is scored on one scan taken straight
+after `make app` returns, before any kill, and the sweep runs afterwards
+anyway so the control leaves nothing running.
 """
 
 import argparse
 import os
+import re
 import shutil
+import signal
 import sys
 import time
 
@@ -73,6 +88,7 @@ import bounded  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 WORK = os.path.join(ROOT, "tools", "proof", "work", "makefile-env")
+SWEEP_SECONDS = 30
 
 # Each key: its dummy (recognisable, and nothing else in the tree or in any
 # SDK spells it), its directive as it stands in the tree's Makefile, the
@@ -161,6 +177,99 @@ def build(root, wall):
     return binary, None
 
 
+def _seconds(etime):
+    """`ps`'s `[[dd-]hh:]mm:ss` in seconds."""
+    days, _, clock = etime.strip().rpartition("-")
+    total = 0
+    for part in clock.split(":"):
+        total = total * 60 + int(part)
+    return total + (int(days) * 86400 if days else 0)
+
+
+def copy_processes(root, since):
+    """Every process whose cwd is the copy or under it, or whose command line
+    names the copy's path followed by `/`, whitespace or its end, as
+    `[(pid, command)]` — or None and why. Never this process or any of its
+    ancestors, and never a process that was running before `since` (the
+    `time.time()` this run's `make app` began)."""
+    scan = bounded.run(["ps", "-A", "-ww", "-o", "pid=,ppid=,etime=,command="], 60)
+    if scan["rc"] != 0:
+        return None, f"ps exited {scan['rc']}: {scan['stderr'].strip()[:200]}"
+    processes = {}
+    for line in scan["stdout"].splitlines():
+        parts = line.split(None, 3)
+        if len(parts) < 3:
+            continue
+        try:
+            pid, ppid, age = int(parts[0]), int(parts[1]), _seconds(parts[2])
+        except ValueError:
+            continue
+        processes[pid] = (ppid, age, parts[3] if len(parts) > 3 else "")
+    spared = set()
+    pid = os.getpid()
+    while pid > 1 and pid not in spared:
+        spared.add(pid)
+        if pid not in processes:
+            break
+        pid = processes[pid][0]
+    cwds = {}
+    current = None
+    for line in bounded.run(["lsof", "-n", "-P", "-w", "-d", "cwd", "-F", "pn"],
+                            60)["stdout"].splitlines():
+        if line.startswith("p"):
+            current = int(line[1:]) if line[1:].isdigit() else None
+        elif line.startswith("n") and current is not None:
+            cwds[current] = line[1:]
+    real = os.path.realpath(root)
+    named = re.compile("(?:" + "|".join(re.escape(path) for path in sorted({root, real}))
+                       + r")(?=/|\s|$)")
+    limit = time.time() - since + 2
+    found = []
+    for pid, (_, age, command) in sorted(processes.items()):
+        if pid in spared or age > limit:
+            continue
+        cwd = cwds.get(pid, "")
+        if cwd == real or cwd.startswith(real + "/") or named.search(command):
+            found.append((pid, command))
+    return found, None
+
+
+def sweep(root, since, seconds=SWEEP_SECONDS):
+    """SIGKILL every `copy_processes`, rescanning every second until two
+    scans in a row find none or `seconds` pass. Answers (killed PIDs, the
+    survivors as `[(pid, command)]`, None) or (killed, [], why) when a scan
+    could not be made."""
+    killed = []
+    deadline = time.monotonic() + seconds
+    empty = 0
+    while True:
+        found, why = copy_processes(root, since)
+        if found is None:
+            return killed, [], why
+        if not found:
+            empty += 1
+            if empty >= 2:
+                return killed, [], None
+        else:
+            empty = 0
+            if time.monotonic() >= deadline:
+                return killed, found, None
+            for pid, _ in found:
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                except (ProcessLookupError, PermissionError):
+                    pass  # gone, or not ours: it stays found and is named at the deadline
+                if pid not in killed:
+                    killed.append(pid)
+        time.sleep(1)
+
+
+def listed(processes):
+    """`pid command; …` on one line, so `not_performed`'s first line names them all."""
+    return "; ".join(f"{pid} {command[:160]}" for pid, command in processes[:8]) + (
+        f"; and {len(processes) - 8} more" if len(processes) > 8 else "")
+
+
 def holders(root):
     """For each dummy, every file under the copy's `build/` and
     `Reelcut.xcodeproj/` whose BYTES hold it, as paths relative to the copy.
@@ -196,6 +305,11 @@ def main():
                              "CONTROL, under which that key's leak row must FAIL")
     parser.add_argument("--wall", type=float, default=900,
                         help="the copy's `make app` wall-clock bound in seconds (rule H)")
+    parser.add_argument("--no-sweep", action="store_true",
+                        help="score the sweep row on one scan taken straight after `make app` "
+                             "returns, before any kill — the CONTROL, under which the row "
+                             "FAILS when a process outlives the build (the sweep still runs "
+                             "afterwards)")
     arguments = parser.parse_args()
 
     started = time.time()
@@ -209,13 +323,28 @@ def main():
         print(f"\n{passed}/{passed + failed} checks passed in {time.time() - started:.0f} s")
         return not_performed(arguments.mutant, reason)
 
+    since = time.time()
     binary, reason = build(root, arguments.wall)
+    if arguments.no_sweep:
+        left, why = copy_processes(root, since)
+        print(f"  --no-sweep: one scan straight after `make app` found "
+              f"{'no answer' if left is None else len(left)} process(es) of the copy")
+        killed, _, _ = sweep(root, since)
+        print(f"  the sweep after the control killed {len(killed)}: {killed}")
+        survivors = left or []
+    else:
+        killed, survivors, why = sweep(root, since)
+        print(f"  sweep: killed {len(killed)} process(es) of the copy: {killed}")
+    swept = not survivors and why is None
+    sweep_reason = why or ("still running: " + listed(survivors) if survivors else "")
     check("the copy's `make app` built Reelcut.app's binary — a failed build holds nothing, "
           "and \"no file holds the dummy\" would be true of it for the wrong reason",
           binary is not None, reason or "")
-    if binary is None:
+    check("no process whose cwd or command line lies under the copy outlives its `make app`",
+          swept, sweep_reason)
+    if binary is None or not swept:
         print(f"\n{passed}/{passed + failed} checks passed in {time.time() - started:.0f} s")
-        return not_performed(arguments.mutant, reason)
+        return not_performed(arguments.mutant, reason if binary is None else sweep_reason)
 
     found, scanned = holders(root)
     for one in KEYS:
@@ -229,7 +358,7 @@ def main():
 
 
 def not_performed(mutant, reason):
-    """A copy or build that failed: 2 under `--mutant` (rule R, issue batch
+    """A copy, build or sweep that failed: 2 under `--mutant` (rule R, issue batch
     B13 — the control could not be performed), the scored FAIL's 1 without."""
     if not mutant:
         return 1

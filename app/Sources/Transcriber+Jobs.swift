@@ -18,16 +18,16 @@ import Foundation
 /// moved with it.
 ///
 /// **Why anything here is bounded at all — spec §11's R6-10.** A clip's
-/// `speed` is bounded to 0.1–10 by the OPS (`core/src/edit_clip.rs`'s
+/// `speed` is bounded to 0.1–10 by the OPS (`core/src/edit_clip_timing.rs`'s
 /// `SPEED_MIN`/`SPEED_MAX`: `set_speed` clamps, `rate_stretch` is an
-/// identity outside) and NOT by the reader — `Project::validate`
-/// (`core/src/model_query.rs:189`) checks a clip's duration and its start
-/// and never its speed — so a hand-written `project.json` reaches this code
-/// with any finite positive speed, tiny or huge, and the two ends of the
-/// arithmetic fail in two different places: a huge speed overflows the
-/// SOURCE LENGTH here, and a tiny one overflows the OFFSET in the two
-/// mappings. Both clamp in `Double`, before the conversion, because a
-/// `Ticks(_:)` on an out-of-range `Double` traps.
+/// identity outside) and, since R6-10's amendment (#41), by the reader too
+/// — `Project::validate`'s `check_clips` refuses a clip outside them — so
+/// no opened project reaches this code with a tiny or huge speed. The
+/// clamps here stay as the second layer R6-10 keeps, because if one ever
+/// did, the two ends of the arithmetic would fail in two places: a huge
+/// speed overflows the SOURCE LENGTH here, and a tiny one overflows the
+/// OFFSET in the two mappings. Both clamp in `Double`, before the
+/// conversion, because a `Ticks(_:)` on an out-of-range `Double` traps.
 extension Transcriber {
 
     /// The ceiling on any source time this file answers: 1e15 ticks, about
@@ -137,7 +137,7 @@ extension Transcriber {
     /// reason that constant's own doc gives — Swift sums this answer and the
     /// core does not. Every speed the ops can write (0.1–10) is orders of
     /// magnitude below the bound and answers exactly what it always did;
-    /// R6-10 is about the speeds only a hand-written file can carry. The
+    /// R6-10 keeps it for speeds the reader now refuses (#41). The
     /// clamp is applied in `Double`: `Ticks(_:)` traps on an out-of-range
     /// one. The degenerate fallback is unchanged and is bounded too, since a
     /// hand-written `duration` can be as large as `Ticks` allows.

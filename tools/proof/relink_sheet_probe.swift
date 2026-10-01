@@ -22,6 +22,13 @@
 // The sheet never becomes key under `.prohibited`, so its Relink button is
 // pressed with `performClick` and an alert is ended with `endSheet`. S4 runs
 // a second sheet after S1's undo: an unreadable file, a refusal, A.mov.
+//
+// A1–A5 (issue batch B51, #195) run after S4, each counting the alerts that
+// attach — an alert is an attached sheet that is not a relink sheet, A4's
+// bare sheet or A5's blocker, and not one already seen: A1 Add Media… of two
+// unreadable files, A2 the Media tab's relink of one, A3 the sheet's relink
+// whose commit throws after a refusal, A4 `present(_:)` while a bare view
+// controller's sheet is up, A5 while an `NSAlert` sheet is up.
 import AppKit
 
 let arguments = CommandLine.arguments
@@ -297,5 +304,171 @@ row("S4", relink4 != nil && s4Seen.count == 2 && s4First && s4Second && !s4Third
     + "file's error \(s4First); alert 2 holds media \(m2)'s sentence \(s4Second); a third "
     + "within 2 s: \(s4Third); media \(m3) relinked: \(path(m3) == movie.path); texts "
     + "\(s4Texts); expected \(unreadableText ?? "<the file probed>") / \(sentence4 ?? "<none>")")
+
+// MARK: - A1–A5 — every error the document presents is shown (#195)
+
+/// An attached sheet that is none of `besides` (the relink sheets, a bare
+/// sheet, a blocker alert's window) and not in `seen`, within `limit` s.
+func newAlert(_ limit: Double, after seen: [NSWindow], besides: [NSWindow?] = [])
+    -> NSWindow?
+{
+    let others = [relinkWindow, relinkWindow4] + besides
+    var found: NSWindow?
+    _ = waitUntil(limit) {
+        if let attached = window.attachedSheet,
+            !others.contains(where: { $0 === attached }),
+            !seen.contains(where: { $0 === attached }) {
+            found = attached
+        }
+        return found != nil
+    }
+    return found
+}
+
+/// Ends `alert` and returns its texts.
+func end(_ alert: NSWindow) -> [String] {
+    let shown = texts(alert)
+    window.endSheet(alert, returnCode: .alertFirstButtonReturn)
+    return shown
+}
+
+func unreadable(_ name: String) -> (URL, String?) {
+    let url = work.appendingPathComponent(name)
+    try? Data("not a picture".utf8).write(to: url)
+    var text: String?
+    do { _ = try MediaImporter.probeBlocking(url: url) } catch { text = error.localizedDescription }
+    return (url, text)
+}
+
+func holds(_ shown: [String]?, _ text: String?) -> Bool {
+    guard let shown, let text else { return false }
+    return shown.contains(text)
+}
+
+let clear = waitUntil(3) { window.attachedSheet == nil }
+let preamble = "no sheet attached before A1: \(seconds(clear)); "
+let (bad1, bad1Text) = unreadable("unreadable-1.png")
+let (bad2, bad2Text) = unreadable("unreadable-2.png")
+
+// A1 (#195.1): File ▸ Add Media… of two unreadable files: both alerts.
+var a1Done: Double?
+let a1Start = Date()
+doc.importMedia([bad1, bad2]) { _ in a1Done = Date().timeIntervalSince(a1Start) }
+var a1Seen: [NSWindow] = []
+var a1Texts: [[String]] = []
+if let first = newAlert(20, after: []) {
+    a1Seen.append(first)
+    _ = waitUntil(20) { a1Done != nil }
+    _ = waitUntil(0.5) { false }
+    a1Texts.append(end(first))
+    if let second = newAlert(10, after: a1Seen) {
+        a1Seen.append(second)
+        a1Texts.append(end(second))
+    }
+}
+let a1Third = a1Seen.count == 2 ? newAlert(2, after: a1Seen) != nil : false
+row("A1", a1Seen.count == 2 && holds(a1Texts.first, bad1Text)
+        && holds(a1Texts.count > 1 ? a1Texts[1] : nil, bad2Text) && !a1Third,
+    preamble + "alerts \(a1Seen.count); completion ran at \(seconds(a1Done)); a third within "
+    + "2 s: \(a1Third); texts \(a1Texts); expected \(bad1Text ?? "<probed>") / "
+    + "\(bad2Text ?? "<probed>")")
+
+// A2 (#195.2): the Media tab's door, one unreadable file: one alert.
+doc.relinkMedia([(media: m1, url: bad1)])
+var a2Seen: [NSWindow] = []
+var a2Texts: [[String]] = []
+if let first = newAlert(20, after: []) {
+    a2Seen.append(first)
+    _ = waitUntil(0.5) { false }
+    a2Texts.append(end(first))
+}
+let a2Second = a2Seen.count == 1 ? newAlert(2, after: a2Seen) != nil : false
+row("A2", a2Seen.count == 1 && holds(a2Texts.first, bad1Text) && !a2Second,
+    "alerts \(a2Seen.count); a second within 2 s: \(a2Second); texts \(a2Texts); "
+    + "expected \(bad1Text ?? "<probed>")")
+
+// A3 (#195.3): the sheet's door, a commit that throws: its error, then the refusal.
+let a3Before = doc.project.snapshot.media.map { "\($0.id)=\($0.path)" }
+let noMedia = (doc.project.snapshot.media.map { $0.id }.max() ?? 0) + 1000
+var a3Thrown: String?
+var a3Refusal: String?
+if let tone = try? MediaImporter.probeBlocking(url: toneA),
+    let mov = try? MediaImporter.probeBlocking(url: movie)
+{
+    let ops: [ReelOp] = [
+        .relinkMedia(media: m1, path: tone.path, bookmark: tone.bookmark, probe: tone),
+        .relinkMedia(media: noMedia, path: mov.path, bookmark: mov.bookmark, probe: mov),
+    ]
+    do { _ = try doc.project.applying(ops) } catch { a3Thrown = error.localizedDescription }
+    a3Refusal = expected(m1, toneA)
+}
+doc.relinkMedia([(media: m1, url: toneA), (media: noMedia, url: movie)], alertingRefusals: true)
+var a3Seen: [NSWindow] = []
+var a3Texts: [[String]] = []
+if let first = newAlert(20, after: []) {
+    a3Seen.append(first)
+    _ = waitUntil(0.5) { false }
+    a3Texts.append(end(first))
+    if let second = newAlert(10, after: a3Seen) {
+        a3Seen.append(second)
+        a3Texts.append(end(second))
+    }
+}
+let a3Third = a3Seen.count == 2 ? newAlert(2, after: a3Seen) != nil : false
+let a3After = doc.project.snapshot.media.map { "\($0.id)=\($0.path)" }
+row("A3", a3Seen.count == 2 && holds(a3Texts.first, a3Thrown)
+        && holds(a3Texts.count > 1 ? a3Texts[1] : nil, a3Refusal) && !a3Third
+        && a3After == a3Before,
+    "alerts \(a3Seen.count); a third within 2 s: \(a3Third); paths unchanged: "
+    + "\(a3After == a3Before); texts \(a3Texts); expected \(a3Thrown ?? "<no throw>") / "
+    + "\(a3Refusal ?? "<no refusal>")")
+
+func probeError(_ text: String) -> NSError {
+    NSError(domain: "RelinkSheetProbe", code: 1, userInfo: [NSLocalizedDescriptionKey: text])
+}
+
+/// A4 and A5: `blocker` is up, E1 is presented, the blocker ends 1 s later;
+/// E1's alert, then E2's after it, then none.
+func blockedRow(_ id: String, _ blockerWindow: NSWindow?, _ endBlocker: () -> Void) {
+    let up = waitUntil(3) { window.attachedSheet != nil && window.attachedSheet === blockerWindow }
+    let presented = Date()
+    doc.present(probeError("probe alert one"))
+    _ = waitUntil(1) { false }
+    endBlocker()
+    var seen: [NSWindow] = []
+    var shown: [[String]] = []
+    var firstAt: Double?
+    if let first = newAlert(4, after: [], besides: [blockerWindow]) {
+        firstAt = Date().timeIntervalSince(presented)
+        seen.append(first)
+        shown.append(end(first))
+        _ = waitUntil(0.2) { false }
+        doc.present(probeError("probe alert two"))
+        if let second = newAlert(2, after: seen, besides: [blockerWindow]) {
+            seen.append(second)
+            shown.append(end(second))
+        }
+    }
+    let third = seen.count == 2 ? newAlert(2, after: seen, besides: [blockerWindow]) != nil : false
+    row(id, up != nil && seen.count == 2 && holds(shown.first, "probe alert one")
+            && holds(shown.count > 1 ? shown[1] : nil, "probe alert two") && !third,
+        "blocker attached: \(seconds(up)); alerts \(seen.count); E1's attached "
+        + "\(seconds(firstAt)) after its present; a third within 2 s: \(third); texts \(shown)")
+}
+
+// A4: a sheet that is not an alert (a bare view controller's).
+let bare = NSViewController()
+bare.view = NSView(frame: NSRect(x: 0, y: 0, width: 300, height: 200))
+_ = waitUntil(3) { window.attachedSheet == nil }
+host.presentAsSheet(bare)
+_ = waitUntil(3) { bare.view.window != nil }
+blockedRow("A4", bare.view.window) { host.dismiss(bare) }
+
+// A5: an alert sheet, the kind the `beginSheetModal(for:)` sites attach.
+_ = waitUntil(3) { window.attachedSheet == nil }
+let blocker = NSAlert()
+blocker.messageText = "probe blocker"
+blocker.beginSheetModal(for: window, completionHandler: nil)
+blockedRow("A5", blocker.window) { window.endSheet(blocker.window) }
 
 finish()

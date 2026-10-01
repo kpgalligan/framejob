@@ -133,9 +133,11 @@ extension RecorderPanelController {
     /// here, after the grants and before the first second has passed, so its
     /// start cost is paid while the numeral is still on screen — and the
     /// tick is armed at once, so the meter reads that session through the
-    /// 3-2-1 (#98 c).
+    /// 3-2-1 (#98 c). A `resumeProblem` left by the last recording is cleared
+    /// first, so its sentence does not carry into this one's note (#193).
     func beginCountdown() {
         countdownTimer?.invalidate()
+        resumeProblem = nil
         phase = .countdown(Self.countdownSeconds)
         recorder.prepareMicrophone(currentChoice().microphone)
         armTick()

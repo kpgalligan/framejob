@@ -17,6 +17,7 @@
 
 use std::collections::{HashMap, HashSet};
 
+use crate::edit_clip_timing::{SPEED_MAX, SPEED_MIN};
 use crate::format::{self, RC_FORMAT_VERSION};
 use crate::model::{Canvas, Clip, Marker, Media, Nest, Project, Source, Track};
 use crate::model_graphic::{check_name, NAME_RULE};
@@ -189,8 +190,8 @@ impl Project {
 
     /// Checks every invariant the rest of the crate assumes, naming the
     /// FIRST violation. Order: caps, the canvas, then id uniqueness across
-    /// media, tracks, clips, actions and markers, then per-clip references
-    /// and durations, then `next_id`.
+    /// media, tracks, clips, actions and markers, then per-clip references,
+    /// durations and speeds, then `next_id`.
     pub fn validate(&self) -> Result<(), String> {
         format::check_caps(self)?;
 
@@ -308,8 +309,10 @@ impl Project {
     }
 
     /// The invariants a clip must satisfy wherever it lives: the track it
-    /// names is in the SAME container, its times are sane, whatever it
-    /// references exists, and every action on it has a duration.
+    /// names is in the SAME container, its times are sane, its speed is
+    /// inside the ops' `SPEED_MIN..=SPEED_MAX` (spec §11 R6-10, amended by
+    /// #41), whatever it references exists, and every action on it has a
+    /// duration.
     ///
     /// `whose` names the container in the message — `""` on the timeline,
     /// `" in nest 12"` inside one — so a violation is reported where it
@@ -333,6 +336,15 @@ impl Project {
                 return Err(format!(
                     "clip {}{whose} has negative start {}",
                     clip.id, clip.start
+                ));
+            }
+            // Spelled as JSON spells it: `{}` writes 1e300 as 301 digits,
+            // and a NaN fails the range too.
+            if !(SPEED_MIN..=SPEED_MAX).contains(&clip.speed) {
+                return Err(format!(
+                    "clip {}{whose}'s speed {} is outside ×{SPEED_MIN}–×{SPEED_MAX}",
+                    clip.id,
+                    serde_json::Value::from(clip.speed)
                 ));
             }
             // Only the media-bound sources name a media; a nest names a

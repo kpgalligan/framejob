@@ -55,6 +55,13 @@ extension ScreenRecorder {
     /// question, asked in one place (finding 2).
     var isSettling: Bool { session?.settling ?? false }
 
+    /// Posted, object the recorder, by `beginFinishing` once the state is
+    /// `.finishing` and before anything there can settle — so a view of the
+    /// recording (the tool's status item) freezes at a stop from ANY door,
+    /// File ▸ Stop Recording over a tool's paused recording included (#193).
+    static let finishingDidBeginNotification =
+        Notification.Name("ReelcutRecorderFinishingDidBegin")
+
     /// The one finishing path, from `.recording` or `.paused`. `reason` is
     /// what `RecordingResult.stoppedBy` will say; a failure, if any, is
     /// already on the session. The meter goes silent HERE (finding 8), not
@@ -74,6 +81,8 @@ extension ScreenRecorder {
     /// a stream the system may already have stopped, which is unmeasured.
     /// Safe from `.recording` too: there `allFinished` is false unless the
     /// last output finished before the path began, and that file is closed.
+    /// `finishingDidBeginNotification` is posted just before `stopCapture`,
+    /// so its observers see `.finishing` before any synchronous `settle`.
     func beginFinishing(_ reason: StopReason) {
         guard state == .recording || state == .paused, let current = session else { return }
         timer?.invalidate()
@@ -85,6 +94,7 @@ extension ScreenRecorder {
             session?.segments[current.lastIndex].stoppedAt = Date()
             current.micOutput?.stopRecording()
         }
+        NotificationCenter.default.post(name: Self.finishingDidBeginNotification, object: self)
         current.stream.stopCapture { [weak self] _ in
             // The outputs' did-finishes are what say the files are closed;
             // an error here (a stream the system already stopped) changes

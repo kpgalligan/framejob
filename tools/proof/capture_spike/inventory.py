@@ -105,10 +105,12 @@ def token_of(match):
     return "runLoop"
 
 
-def grep_sites(sources=SOURCES):
+def grep_sites(sources=None):
     """{"app/Sources/<f>.swift:<line>": token} for every match on a line with
-    no `//` before it. `sources` is the folder read; the keys always name
-    `app/Sources/`, so a copy's are read under its own root by `line_of`."""
+    no `//` before it. `sources` is the folder read (None: `SOURCES`, read at
+    call time); the keys always name `app/Sources/`, so a copy's are read
+    under its own root by `line_of`."""
+    sources = SOURCES if sources is None else sources
     sites = {}
     for name in sorted(os.listdir(sources)):
         if not name.endswith(".swift"):
@@ -124,9 +126,11 @@ def grep_sites(sources=SOURCES):
 _lines = {}
 
 
-def line_of(ref, root=ROOT):
-    """The line `ref` names under `root`, or None. The cache is keyed by the
-    FULL path, so each root reads its own files."""
+def line_of(ref, root=None):
+    """The line `ref` names under `root` (None: `ROOT`, read at call time),
+    or None. The cache is keyed by the FULL path, so each root reads its own
+    files."""
+    root = ROOT if root is None else root
     path, number = ref.rsplit(":", 1)
     full = os.path.join(root, path)
     if full not in _lines:
@@ -147,15 +151,17 @@ def _forget(root):
         del _lines[full]
 
 
-def _file_lines(path, root=ROOT):
+def _file_lines(path, root=None):
     """Every line of `path` (under `root`) through `line_of`'s cache, or None."""
+    root = ROOT if root is None else root
     line_of(f"{path}:1", root)
     return _lines.get(os.path.join(root, path))
 
 
-def enclosing_func(ref, root=ROOT):
+def enclosing_func(ref, root=None):
     """The name of the nearest line at or above `ref`'s that does not start
     `//` and matches `FUNC` (`init` for an initializer); "" if none."""
+    root = ROOT if root is None else root
     path, number = ref.rsplit(":", 1)
     for n in range(int(number), 0, -1):
         line = line_of(f"{path}:{n}", root)
@@ -178,12 +184,13 @@ def _line_number(ref):
     return int(ref.rsplit(":", 1)[1])
 
 
-def resolve(sites, grep, root=ROOT):
+def resolve(sites, grep, root=None):
     """{inventory site ref: current ref}. The inventory's sites are grouped
     by (file, entry `token`, entry `func`) and the grep's by (file, grep
     token, `enclosing_func` under `root`); where a group's two counts agree
     they are paired in line order, and otherwise each inventory ref maps to
     itself."""
+    root = ROOT if root is None else root
     ours, theirs = {}, {}
     for ref, entry in sites.items():
         ours.setdefault((ref.rsplit(":", 1)[0], entry.get("token"), entry.get("func")),
@@ -202,10 +209,11 @@ def resolve(sites, grep, root=ROOT):
     return mapping
 
 
-def check(inventory, leaves, grep, root=ROOT):
+def check(inventory, leaves, grep, root=None):
     """Every problem, as (check, subject, why). `leaves` is the probe's
     list or None when the menu mode gave no answer. `root` is the tree the
-    refs are read under."""
+    refs are read under (None: `ROOT`, read at call time)."""
+    root = ROOT if root is None else root
     problems = []
     selectors = inventory.get("selectors", {})
     sites = inventory.get("sites", {})

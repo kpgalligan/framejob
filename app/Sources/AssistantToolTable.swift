@@ -49,6 +49,10 @@ enum AssistantToolTable {
             tool: "record_screen", rule: .withheld, onlyWith: nil,
             reason: "Recording is a person at the Record button (File ▸ New Recording…)."),
         AssistantToolRow(
+            tool: "close_project", rule: .withheld, onlyWith: nil,
+            reason: "Closing a project closes the window this conversation lives in (AI-5); the "
+                + "person closes it with File ▸ Close (⌘W)."),
+        AssistantToolRow(
             tool: "transcribe", rule: .withheld, onlyWith: (key: "engine", value: "assemblyai"),
             reason: "Audio leaves the machine only by name, with the price in front of the "
                 + "person (spec §11 R6-2). Use File ▸ Generate Captions…, which shows what is "

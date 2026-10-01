@@ -209,11 +209,11 @@ final class AgentServer {
         // one this tool published, or the call is refused here by name before
         // the scope or any handler reads a thing. It is here for the reason
         // the scope read below is — the one place that holds the name and
-        // the arguments of all eighty-five.
+        // the arguments of all eighty-six.
         try Self.checkArgumentNames(tool, a)
         // The envelope's `scope` is read ONCE, here, because this is the only
         // place that holds both the tool's name and its arguments for all
-        // eighty-five of them — a read inside each handler would be
+        // eighty-six of them — a read inside each handler would be
         // fifty-nine edit sites across the handler files, every one able to
         // forget. It is read for exactly the tools whose schema declares it
         // (`AgentCatalog.opNames`, the core's own op list), and a `scope` on
@@ -235,7 +235,7 @@ final class AgentServer {
     /// and `start()` checks the two sets match on every launch.
     ///
     /// One entry per row of the op table (spec §6, and the module doc of
-    /// `core/src/edit.rs`) plus the twenty-six tools that are not ops: the
+    /// `core/src/edit.rs`) plus the twenty-seven tools that are not ops: the
     /// project-level ones spec §7.9 names, the five view-state and history
     /// mirrors beside them (`set_range`, `set_selection`, `set_scope`,
     /// `undo`, `redo`), the composites later phases added —
@@ -253,6 +253,7 @@ final class AgentServer {
         "open_project": { $0.openProject },
         "new_project": { $0.newProject },
         "save_project": { $0.saveProject },
+        "close_project": { $0.closeProject },
         "get_project": { $0.getProject },
         "set_playhead": { $0.setPlayhead },
         "set_range": { $0.setRange },

@@ -310,7 +310,14 @@ The proofs live in `tools/proof/`:
 - **A server that drips holds a request for as long as it drips** (R6-18, accepted). The only
   timeout is the idle one, which every byte resets: a reply dripped a byte every 100 ms under a
   1.5 s idle timeout was waited out (`cloud_captions_probe.py` DR1). Stop ends a dripping upload
-  or poll; a submit takes no token, and MCP `transcribe` has no Stop.
+  or poll; a submit takes no token, and MCP `transcribe` has no Stop. A DELETE runs on for at
+  most 2 s after a Stop and is then left owed (R6-19, issue batch B35).
+- **A refused transcript whose DELETE failed is reported, never retried** (R6-20, issue batch
+  B43, #201). No file holds its id, so the card, the MCP `note` and the failure text name it with
+  R6-4's dashboard sentence and nothing retries the delete.
+- **Cached transcripts written before B34 are not re-checked for the key** (R6-21, accepted, issue
+  batch B43, #200). A transcript carrying the key has been refused before any write since B34;
+  a read-time check would make a package current with a key and stale without one.
 - **Submit recovery covers only the newest 200 transcripts and three looks.** A crash between POST
   and reply cannot be recovered. There is no durable pending-submission journal and no account-wide
   janitor.

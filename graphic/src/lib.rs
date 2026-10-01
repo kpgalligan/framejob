@@ -25,6 +25,6 @@ pub use diagnostic::{Diagnostic, Level};
 pub use library::{Face, Library};
 pub use measure::{measure_text, FontStyle, TextFont, TextMetrics};
 pub use module::Module;
-pub use props::{overlay, MAX_PROPS};
+pub use props::{overlay, MAX_OPTIONS, MAX_PROPS, MAX_STRING, TYPES};
 pub use raster::{rasterize, MAX_SIDE};
 pub use runtime::{engine_count, svg, HEAP_BYTES, STACK_BYTES, SVG_BYTES};

@@ -79,6 +79,7 @@ extension AgentServer {
     /// where it could do nothing. The tracks it replaces are found at
     /// COMMIT time, against the handle the plan is built on.
     func transcribe(_ a: [String: Any]) throws -> String {
+        let stop = AgentLane.shared.callCancel  // the assistant's Stop (spec §11 AI-16)
         // `importMedia`'s guard, restated: everything below assumes the main
         // thread is free, which is only true while this handler is not
         // standing on it.
@@ -134,7 +135,7 @@ extension AgentServer {
             let transcriber = Transcriber()
             // The assistant's Stop reaches the run through the sheet's own token (AI-16).
             let token = Transcriber.CancelToken()
-            AgentLane.shared.callCancel?.onCancel { token.cancel() }
+            stop?.onCancel { token.cancel() }
             do {
                 outcome = try transcriber.transcribe(
                     scope.jobs, language: language, frame: scope.frame, pages: pages,
@@ -393,10 +394,9 @@ extension AgentServer {
     /// The one thing this handler owns is the PATH, because a path is an
     /// argument rather than a caption question: the format is resolved first
     /// (an explicit `format` wins, else the path's own extension, else
-    /// SubRip) so `destinationURL` can replace a wrong extension rather than
-    /// append to it — `talk.srt` asked for as `vtt` is `talk.vtt`, not
-    /// `talk.srt.vtt`, which is why `srt` and `vtt` joined
-    /// `replaceableExtensions`.
+    /// SubRip) so `captionDestinationURL` can replace a wrong extension rather
+    /// than append to it — `talk.srt` asked for as `vtt` is `talk.vtt`, not
+    /// `talk.srt.vtt`.
     func exportCaptions(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         // The open container's, so the track this writes is the one
@@ -406,7 +406,7 @@ extension AgentServer {
         let expanded = (path as NSString).expandingTildeInPath
         let format = CaptionExporter.format(
             for: URL(fileURLWithPath: expanded), requested: try requestedFormat(a))
-        let url = Self.destinationURL(path, extension: format.rawValue)
+        let url = Self.captionDestinationURL(path, format: format)
         let folder = url.deletingLastPathComponent()
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: folder.path, isDirectory: &isDirectory),
@@ -441,6 +441,16 @@ extension AgentServer {
             "cues": outcome.cues.count,
             "project": summary(document),
         ])
+    }
+
+    /// The file `export_captions` writes for `path` (spec §11 #43): only a
+    /// trailing `srt` or `vtt` (`CaptionExporter.knownExtensions`) is
+    /// replaced by the format's own, and any other extension is part of the
+    /// name — `chart.png` is `chart.png.srt` — which is the save panel's rule
+    /// (`CaptionExporter.renamed`), so the panel and the tool agree.
+    static func captionDestinationURL(_ path: String, format: CaptionExporter.Format) -> URL {
+        destinationURL(
+            path, extension: format.rawValue, replacing: CaptionExporter.knownExtensions)
     }
 
     /// The `format` argument, refused BY NAME when it is not one of the two

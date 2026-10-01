@@ -30,5 +30,5 @@ and a blue "Apply".
 
 In the light capture the sheet is white with black text; the rate field is a
 white box, the Presets pop-up a light-grey pill, "Preserve pitch" a dark tick in a
-light-grey box, "Cancel" a white button with a black outline and a hard black
-shadow, and "Apply" blue.
+light-grey box, "Cancel" a white square button with a thin black outline and no
+shadow, and "Apply" a flat blue block.

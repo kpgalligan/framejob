@@ -53,6 +53,10 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   key. The user deferred C2 until an integrated AI offering is designed;
   the relay-token alternative above remains future scope (road map 6
   §10.18).
+  **Updated 2026-09-30:** the plan is to open-source Reelcut, with every AI
+  feature bring-your-own-key (the AssemblyAI key here, the assistant's
+  Anthropic key under AI-8). No Reelcut-run relay is planned; C2 stays iced
+  (#125), and the owner called a change to this "increasingly unlikely".
 - **R6-6 — The protocol boundary is the base URL and the credential.** The
   client speaks AssemblyAI's REST API to `AssemblyAIConfiguration`'s base
   URL; the stand-in server, the EU endpoint and a same-protocol relay are
@@ -143,6 +147,28 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   DECLINED: bounding `speed` in `Project::validate`. The core stays untouched by this feature, and a
   reader that began refusing files it has always accepted would be a
   format change dressed as a fix.
+  **Amended 2026-10-01, by the owner's decision of 2026-09-30 (#41): the
+  reader refuses an out-of-range `speed`, and the clamps above stay as a
+  second layer.**
+  - `Project::validate`'s `check_clips` (`core/src/model_query.rs`) refuses
+    any clip whose `speed` is outside `SPEED_MIN`..=`SPEED_MAX`. That covers
+    the timeline and every nest, and every source kind.
+  - The bounds are `core/src/edit_clip_timing.rs`'s constants: `set_speed`
+    clamps to them and `rate_stretch` stays inside them. The reader reads
+    them, not a copy, so widening the range (#190) moves the reader with it.
+  - The sentence names the clip and the value as JSON spells it:
+    `clip 12's speed 250.0 is outside ×0.1–×10`.
+  - It refuses rather than clamps. As D7-1 does for times, the file fails to
+    open at any format version and is not rewritten.
+  - A person sees the sentence through `ReelCoreError` in NSDocument's
+    open-failure alert, and an agent through `open_project`. `finish` runs
+    the same `validate`, so no edit can produce such a clip.
+  - No persisted key changes, so `RC_FORMAT_VERSION` stays 10.
+  - The premise "because the reader does not" now reads "and the reader
+    refuses one too". Every clamp and bound above is KEPT unchanged as
+    defence in depth. `cloud_captions_probe.py`'s `jobs` rows feed them a
+    snapshot decoded without the reader.
+  - The DECLINED sentence above is overturned.
 - **R6-11 — A media whose remote delete this run could not confirm is not
   uploaded again in this run.** `cache/transcripts/<id>.json` is the ONLY
   record of a remote transcript's id — `MediaTranscript.undeleted`
@@ -275,3 +301,68 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   Accepted because the far end is AssemblyAI or a relay speaking its
   protocol (R6-6), and a total deadline would fail a large upload on a slow
   line; C2 revisits it. DECLINED for now: a per-request resource timeout.
+- **R6-19 — A Stop bounds a DELETE; it never skips one.** The three
+  DELETEs a keyed run sends — the janitor's (`retryDeletes`), `refusing`'s
+  on every throwing exit of `poll` and of `fetch`'s refusal, and `fetch`'s
+  own after the write — read the run's cancel token, and none is cancelled
+  at the press: the token is read as a STOP, never attached to the task.
+  A DELETE is cut `deleteAfterStop` = 2 s of WALL CLOCK after the later of
+  the Stop and its own start. 2 s is above C0's slowest DELETE (1.70 s), so
+  a Stop during a submit or a wait still deletes the transcript it
+  orphaned (rows ST·submit, ST·wait); wall clock, because a server that
+  drips resets an idle timeout on every byte and would stretch any bound
+  read from one (R6-18). A cut DELETE answers `failed` and is owed under
+  R6-4 unchanged: the janitor's stays in its file with `remote_deleted:
+  false` and puts its media in `janitorFailed` (R6-11 holds it); `fetch`'s
+  writes `remote_deleted: false`, is reported, and is retried by the next
+  keyed run, or R6-4's dashboard sentence names it when its file did not
+  land. `poll`'s cut DELETE has no cache file and is reported nowhere, as
+  any failed DELETE there already was — a defect, not a decision. Fixed by
+  R6-20 (issue batch B43, #201). Nothing
+  else changes: no other request gains a total deadline, the submit still
+  takes no token (R6-14, R6-18), and MCP `transcribe`'s cloud arm still
+  has no Stop, so its DELETEs run as before. DECLINED: cancelling a DELETE
+  at the press, which would orphan the transcript of every Stop during a
+  submit or a wait (issue batch B35, #187 item 5).
+- **R6-20 — A transcript refused after it was made, whose DELETE failed, is
+  reported for the dashboard and never retried.** It covers every
+  `refusing`: `poll`'s throwing exits (R6-19's cut DELETE among them),
+  `requireEchoedID`, and `fetch`'s refusal of words that repeat the key.
+  The DELETE's answer rides on the thrown `Refusal`, and the run keeps the
+  media in `Report.refusedUndeleted`, so the report card, the MCP `note` and
+  the failure text all say R6-4's dashboard sentence for it ("Delete it in
+  your AssemblyAI dashboard"), once per media, and never the retry sentence.
+  There is no retry because no file holds the id. A DELETE that answered,
+  or was never sent, is owed nothing. DECLINED: writing the media's cache
+  file as a tombstone, which would replace a current transcript or an older
+  id still owed a delete (R6-11). DECLINED: a second persisted id list,
+  which R6-11 already declined (issue batch B43, #201).
+- **R6-21 — A cached transcript is not re-checked for the key when it is
+  read (accepted).** Since issue batch B34 (a861f8c, 2026-09-30) a
+  transcript whose words carry the key is refused before any write. Before
+  B34 only a server that put the key in the words could have made such a
+  file, and the stand-in does that only in the probe's section `echo` row
+  E3, which B34 itself added. Reelcut has never been released (R6-5,
+  2026-09-30). R6-16 serves a current batch with no key at all, where no
+  check is possible. DECLINED: a read-time check when a key is present,
+  which would make one package current with a key and stale without one,
+  and turn a cache hit into a paid re-fetch (issue batch B43, #200 item 1).
+- **R6-22 — With Speakers on, each speaker's Subtitles cues are their own
+  colour, and nothing else marks them** (issue batch B46, #93; the owner,
+  2026-09-30). Colour only, no label: AssemblyAI's "A"/"B" would read as a
+  bug (naming speakers is #192). The palette is
+  `CaptionStyle.speakerPalette`, broadcast subtitling's white, yellow,
+  cyan, green (`[1,1,1,1]`, `[1,1,0,1]`, `[0,1,1,1]`, `[0,1,0,1]`), a named
+  table with no setting, assigned in order of each speaker's first
+  appearance among the run's placed cues in timeline order, cycling after
+  four. A speaker is a label within ONE media's transcript (R6-3):
+  AssemblyAI letters each file's speakers afresh, so "A" in two media is
+  two speakers. Subtitles only: the five word styles keep their own
+  colours and still close a page at a speaker change. Automatic whenever
+  speaker labels are on: no checkbox, no `transcribe` argument; this
+  deliberately changes a Speakers run from all-white cues to coloured
+  ones. A cue with no speaker (the on-device engine, Speakers off, a word
+  AssemblyAI left unlabelled, an imported file) writes no colour and takes
+  no slot, so such a run places byte-identical clips and W-7's
+  byte-identical Subtitles still holds for it. Persisting speakers stays
+  rejected (road map 6).
