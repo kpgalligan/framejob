@@ -10609,6 +10609,14 @@ python3 tools/proof/menu_undo_probe.py --mutant own-manager-bare-send # F1 FAIL,
 
 ## Issue batch B52a — the ×1000 speed spike (`speed_spike/`; #190 part 1)
 
+**A historical measurement, not a check: never run it for an ordinary
+change.** It builds two hour-long movies (~18 GB) and a full run takes about
+95 minutes. It runs only with `--remeasure` (otherwise it exits 2, not
+performed), and only to re-measure the speed or audio ceilings: #212, or a
+change to `SPEED_MAX` / `AUDIO_SPEED_MAX`. A change to speed code is checked
+by B52b's `speed_limits_probe.py` below. The numbers here are from 2026-10-01
+and were taken without `--remeasure`, which was added afterwards.
+
 ### What ran
 
 `speed_spike/speed_spike.py` (the runner) and `speed_spike/speed_probe.swift`
@@ -10827,12 +10835,17 @@ Run on 2026-10-01 over `2b5d433`, every child bounded, no app instance:
 | `git diff --stat HEAD -- app core graphic agent` | prints nothing |
 
 ```sh
-python3 tools/proof/speed_spike/speed_spike.py --stock-core --rows H,S,T   # CAUGHT, exit 1
-python3 tools/proof/speed_spike/speed_spike.py                            # 5585 s on this host; exit 0
-python3 tools/proof/speed_spike/speed_spike.py --rows A                    # the audio sweep alone, with its L rows
+python3 tools/proof/speed_spike/speed_spike.py --remeasure --stock-core --rows H,S,T   # CAUGHT, exit 1 (exit 2 since B52b)
+python3 tools/proof/speed_spike/speed_spike.py --remeasure                            # 5585 s on this host; exit 0
+python3 tools/proof/speed_spike/speed_spike.py --remeasure --rows A                    # the audio sweep alone, with its L rows
 ```
 
 ## Issue batch B52b — the ×1000 speed build (`speed_limits_probe`; #190 part 2)
+
+Run `speed_limits_probe.py` (about 3 minutes, small generated sources) only
+when a change touches the speed range or the audio ceiling, how `evaluate.rs`
+assigns or places audio, `CompositionBuilder`'s audio parameters, or the
+export's loudness pass. It never needs the B52a spike's hour-long movies.
 
 ### What it proves
 

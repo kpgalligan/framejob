@@ -31,6 +31,12 @@ E1–E17  h264 exports of `R:S:k|v` timelines (deadline 120 s, runner bound
 
     python3 tools/proof/speed_limits_probe.py [--mutant ceiling-16|no-audio-limit|no-pitch-split]
 
+Run it (about 3 minutes, small generated sources) when a change touches the
+speed range or the audio ceiling (`edit_clip_timing.rs`), how `evaluate.rs`
+assigns or places audio, `CompositionBuilder`'s audio parameters, or the
+export's loudness pass — not on unrelated changes. It never needs
+`speed_spike.py`'s hour-long movies.
+
 A plain run exits 0 iff every row passed. A mutant (rule R) exits 1 when
 every named row failed (caught), 0 when one passed (survived), 2 when it
 could not be performed (an anchor not found exactly once, a build failure,

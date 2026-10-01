@@ -36,8 +36,15 @@ X.<k|v>.<r>  the product path: speech at ×r, keep pitch (k) or not (v),
 V       the verdicts at ×120 and ×1000, judged on `loopv` when it exists.
 C0      `git status --porcelain` of the product directories, before = after.
 
-    python3 tools/proof/speed_spike/speed_spike.py [--rows H,B,S,T,P,E,A,X,V,C]
-        [--loop-source PATH] [--stock-core]
+    python3 tools/proof/speed_spike/speed_spike.py --remeasure
+        [--rows H,B,S,T,P,E,A,X,V,C] [--loop-source PATH] [--stock-core]
+
+**A historical measurement, not a check.** It builds two hour-long movies
+(~18 GB) and a full run takes about 95 minutes. Run it only to RE-MEASURE the
+speed or audio ceilings: work on #212 (the loudness-pass stall) or a change
+to `SPEED_MAX` / `AUDIO_SPEED_MAX`. A change to speed code in general is
+`speed_limits_probe.py`'s to check, not this. Without `--remeasure` it runs
+nothing and exits 2 (not performed).
 
 `--rows` names the families SCORED; their prerequisites are made regardless.
 Exit 0 every row answered, 1 an instrument failed. `--stock-core` is the
@@ -821,7 +828,15 @@ def main():
     parser.add_argument("--rows", default=",".join(FAMILIES))
     parser.add_argument("--loop-source")
     parser.add_argument("--stock-core", action="store_true")
+    parser.add_argument("--remeasure", action="store_true")
     args = parser.parse_args()
+    if not args.remeasure:
+        print("speed spike: not performed — a historical measurement (B52a, #190) that builds "
+              "two hour-long movies (~18 GB) and runs up to ~95 minutes. Run it only to "
+              "re-measure the speed or audio ceilings (#212, or a change to SPEED_MAX / "
+              "AUDIO_SPEED_MAX), with --remeasure. Speed code in general is "
+              "tools/proof/speed_limits_probe.py's to check.")
+        return 2
     rows = {part.strip()[:1].upper() for part in args.rows.split(",") if part.strip()}
     unknown = rows - set(FAMILIES)
     if unknown:
