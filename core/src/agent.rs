@@ -104,12 +104,6 @@ impl AgentServer {
     }
 }
 
-/// Protocol revisions this server implements identically (tools-only
-/// servers are unchanged across them). An unknown requested version is
-/// answered with the newest we know, per the spec's negotiation rule.
-const SUPPORTED_VERSIONS: [&str; 3] = ["2024-11-05", "2025-03-26", "2025-06-18"];
-const LATEST_VERSION: &str = "2025-06-18";
-
 const MAX_BODY_BYTES: usize = 8 * 1024 * 1024;
 
 /// Starts the server on 127.0.0.1:`port` (0 picks an ephemeral port) and
@@ -278,11 +272,7 @@ fn handle_message(message: Value, config: &AgentConfig) -> Option<Value> {
                 .get("protocolVersion")
                 .and_then(Value::as_str)
                 .unwrap_or("");
-            let version = if SUPPORTED_VERSIONS.contains(&requested) {
-                requested
-            } else {
-                LATEST_VERSION
-            };
+            let version = crate::mcp_versions::negotiate(requested);
             rpc_result(
                 id,
                 json!({

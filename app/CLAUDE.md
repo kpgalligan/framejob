@@ -375,6 +375,8 @@ the key map behind it.
   the delegate), `main.swift` — the window,
   the no-document window, the launch/terminate flow and the whole menu bar
   (spec §9). Menu items are nil-target selectors down the responder chain.
+  `main.swift` also calls `AgentCatalogSnapshot.writeIfAsked()` straight
+  after `AgentLane.prepareAtLaunch()`, at `#if` depth 0.
 - `EditorWindow.swift` — the editor's `NSWindow` subclass: its `sendEvent`
   routes a bare Space to play/pause unless the first responder types or
   presses on it (spec §11 K-1), so Space never beeps when focus has fallen
@@ -1445,6 +1447,16 @@ free.
   before TCP's `stop()`) releases with no join. The mode check, the connect
   and the port arm are each one statement that `agent_socket_proof.py`'s
   mutants replace.
+- `AgentCatalogSnapshot.swift` — the build's catalog snapshot (road map
+  14's MC3, spec §11 MC-4): with `-RCWriteCatalog <path>`, read from the
+  ARGUMENT domain only, the launch writes `{"version":…,"tools":…}` — the
+  bundle's short version and `AgentServer.shared.preparedCatalog` verbatim —
+  atomically to `<path>` and exits before `NSApplicationMain`; a nil catalog
+  or a failed write is one stderr line, `reelcut catalog snapshot: …`, and
+  exit 1. `project.yml`'s "Write Agent Catalog" phase runs the just-built
+  binary (ad-hoc signed in place first) this way to put
+  `Contents/Resources/agent-catalog.json` in the bundle, which `reelcut-mcp`
+  lists from while no Reelcut runs; `dist_check.py` D21–D24 check it.
 - `AgentLane.swift` — every tool call's one door (road map 12 A1, spec §11
   AI-2, AI-3, AI-5, AI-12): the MCP trampoline's `serve` (server thread,
   synchronous) and the assistant session's `submit` (returns at once; one

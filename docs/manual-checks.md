@@ -483,6 +483,12 @@ on your own account, never the spike's.
 - **Answer:** did a second `tools/list` follow the notification, and was `probe_new` callable in the same chat?
 - **Source:** road map 14 MC1 (q3, rows T1–T3 and D1).
 
+**AC-3 — Claude Code reaches Reelcut through `reelcut-mcp`**
+- **Do:** 1. `make app`, then `python3 tools/proof/mcp_proxy_proof.py` once: it writes `tools/proof/work/mcp-proxy/ac-mcp.json`, a scratch configuration whose `reelcut` server is the tree's Release `Contents/Helpers/reelcut-mcp`, with no env. 2. Quit Reelcut (every copy). 3. In a terminal, `claude --mcp-config tools/proof/work/mcp-proxy/ac-mcp.json --strict-mcp-config`. 4. Ask it to list the `reelcut` server's tools (`/mcp`). 5. Ask it to call `get_project`. 6. Quit Claude Code, and quit the Reelcut it opened.
+- **Expect:** step 4 lists Reelcut's tools with no Reelcut launched (the Dock shows none). Step 5 opens Reelcut in the background — the terminal keeps focus — and the call answers in Reelcut's own words (with no project open, "No project is open…"). Per MC1's q3, a running Reelcut newer than the bundle the proxy came from shows its own tools after the first call; whether Claude Code refetches on `list_changed` is AC-1's question.
+- **Answer:** were the tools listed before Reelcut ran, and did the first call open Reelcut without taking focus from the terminal and answer?
+- **Source:** road map 14 MC3 (`mcp_proxy_proof.py` X1, X2; spec §11 MC-3, MC-4).
+
 ## Host-state proof runs
 
 Scripts that need a state no agent session has. Run from a terminal on an

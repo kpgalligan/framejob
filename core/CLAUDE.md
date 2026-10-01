@@ -488,6 +488,13 @@ governs a module now.
   while the claim `is_current`, and forgets the server otherwise; `release`
   (the quit path) unlinks only a current file and then forgets the whole
   listener — no unblock, no join — so a call in flight cannot hold a quit.
+  The protocol revisions it negotiates are `mcp_versions.rs`'s, not its own.
+- `mcp_versions.rs` — the MCP protocol revisions (`SUPPORTED_VERSIONS`,
+  `LATEST_VERSION`) and `negotiate` (the requested one when supported, else
+  the newest), moved out of `agent.rs` by road map 14's MC3 so ONE list
+  serves two readers: `agent.rs`'s `initialize` and `mcp-proxy/`, which
+  includes this file by `#[path]`. It therefore uses `std` alone and names
+  nothing of this crate (no `use crate::…`).
 - `ffi.rs` / `ffi_edit.rs` / `ffi_query.rs` / `ffi_agent.rs` — thin shims
   only; shared plumbing lives in `ffi_util.rs`, never copy-pasted.
   `ffi_query.rs`'s rule: a query never allocates a handle and has no

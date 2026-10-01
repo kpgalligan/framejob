@@ -478,3 +478,122 @@ Support/Reelcut/`; the scratch folders under `$TMPDIR` are removed at the end of
 
 **Owed:** nothing from MC2. A quit with a call in flight is not proved (out of this phase's
 scope). MC3 (`reelcut-mcp`) is next; MC4 owes the interim rule's deletion and the TCP pair's.
+
+### MC3 — `reelcut-mcp` (2026-10-01)
+
+External MCP clients now have their stdio server. Over `ba8ed00`:
+
+- **The versions.** `core/src/mcp_versions.rs` (std only) holds `SUPPORTED_VERSIONS`,
+  `LATEST_VERSION` and `negotiate`; `agent.rs` lost its two constants and its `initialize` calls
+  `negotiate` — nothing else in Rasterize's copy moved (MC5 files the Rasterize issue). The proxy
+  includes the same file by `#[path]`.
+- **The crate.** `mcp-proxy/` builds `reelcut-mcp` with `std` and `serde_json` only (`tiny_http`
+  0.12 as a dev-dependency, for the tests' stubs), every `src/` file under 400 lines (`session.rs`
+  314, `socket.rs` 210, `launch.rs` 142), `#![forbid(unsafe_code)]`, its rules in
+  `mcp-proxy/CLAUDE.md`. stdin is read by lines and each request runs on its own thread; stdout is
+  written under one lock, protocol only; stderr lines start `reelcut-mcp: `. `initialize` and
+  `ping` never touch the socket. `tools/list` is the app's when it answers within 5 s
+  (`LIST_READ_TIMEOUT`), else the snapshot's. `tools/call` launches the proxy's own bundle on
+  `Absent` (`NotFound` or `ConnectionRefused`). Anything else is forwarded, or `-32601` with no
+  app. The reader decodes `Content-Length` and chunked bodies, since `tiny_http` chunks the 240 KB
+  list. `list_changed` is sent after a forwarded call when a live list differs, AS A JSON VALUE,
+  from the one this session was last given (MC1's B9). `make test`, `make lint`, `make fmt` and
+  `make clean` cover the crate; `mcp-proxy/tests/stdio.rs` holds 14 black-box tests over the built
+  binary in a fake bundle; only one reaches the launch, and its bundle's executable is a script
+  that records its launch and exits without binding.
+- **The snapshot.** `app/Sources/AgentCatalogSnapshot.swift` is MC1's hook made product:
+  `-RCWriteCatalog <path>`, read from the argument domain only, writes `{version, tools}`
+  atomically and exits; a failure is one `reelcut catalog snapshot: …` line and exit 1.
+  `main.swift` calls it straight after `AgentLane.prepareAtLaunch()`, at `#if` depth 0 (the lane
+  proof's L0 still passes).
+- **The build.** `project.yml` gains two post-build phases after "Build Agent Helper". "Build MCP
+  Proxy" runs `cargo build --release`, copies the binary into `Contents/Helpers/` and signs it
+  `--options runtime` with `agent/build.sh helper`'s identity and timestamp rule and no
+  entitlements. "Write Agent Catalog" is MC1's phase minus its timing lines: the executable is
+  ad-hoc signed in place, run with `-RCWriteCatalog`, and the phase fails on a non-zero exit or any
+  `Reelcut: ` line. `tree_copy.py` needs no change: `project.yml` now spells `mcp-proxy/`, so every
+  mutant tree copy links it.
+- **The checks.** `dist_check.py` D15–D24 (`TOTAL = 24`): each bundle's proxy is present, has the
+  hardened runtime and no entitlements; each snapshot is at the bundle's
+  `CFBundleShortVersionString`; Release's names every flag-on `devHandlers` key (the positive
+  control) and Distribution's names none. `dist_check_mutants.py`'s skeletons carry
+  `Contents/Info.plist`, the proxy and the snapshot for every case, and it adds eight cases
+  (20 in all). The phase's proof is `tools/proof/mcp_proxy_proof.py` (X0–X10, X7b, Z1, Z2, and
+  two mutants). `docs/manual-checks.md` gains AC-3, with `work/mcp-proxy/ac-mcp.json` as its
+  fixture.
+
+**Deviations from this road map's MC3 text**, each decided in the phase's spec:
+- **The lock is held until the poll ends**, not released after the launch: released before it, a
+  second proxy's re-check finds nothing answering yet and launches a second instance. It is
+  `agent.launch.lock` BESIDE THE SOCKET, not in the support folder, so a proof's scratch socket
+  has its own lock.
+- **A session whose launch timed out launches no other** (the phase's objection 1). Its later
+  calls that find no socket answer the stranded sentence, so an instance that never binds is not
+  joined by another on every call. The review found that two concurrent calls in one session
+  both passed the `stranded` check before either launched, so the second launched again after the
+  first timed out; the check and the launch are now one critical section per session
+  (`Session.launching`), held by the stdio test
+  `concurrent_calls_in_one_session_launch_at_most_once_when_none_answers`, which fails without it
+  (both calls answer the timeout sentence).
+- **`tools/list` waits at most 5 s for the app** (objection 2). The app serves one request at a
+  time, so another client's long call would otherwise hold a listing indefinitely. The snapshot
+  answers instead and the next call checks the list.
+- **A scratch launch** (`RC_AGENT_SOCKET` set) also passes `-ApplePersistenceIgnoreState YES` and
+  writes the instance's stderr to `reelcut-launch.log` beside the socket. A launch for the person's
+  own socket passes neither.
+- **The snapshot is compared with the live list as JSON values, not bytes** (MC1's B9; X3).
+- **Public beyond the spec's interfaces:** `launch::TIMEOUT_OPENING` and
+  `launch::timeout_sentence()`, because `ensure_running` answers a `String` and `Session`
+  recognises a timeout by the sentence's opening (an `open` failure strands nothing, since
+  nothing was launched).
+- **`session::dispatch`** is the spec's per-line step (a blank line skipped, `-32700`, a batch
+  `-32600`, notifications and responses dropped, a thread per request), public so `run()` calls it.
+- **`-32600` for two cases the spec leaves open:** a JSON line that is neither an object nor an
+  array answers `a message must be a JSON object` with a null id, and a non-string `method`
+  answers `the method must be a string` with the request's id.
+- **A live `tools/list` with no `result.tools` array falls back to the snapshot**, the same as a
+  failed post.
+- **`list_changed` is always sent when the session was given no list yet** (last-given `None`),
+  as the spec literally says; that happens only after a `Started` launch in a session that never
+  listed.
+- **The proof removes its bundle copy** (`work/mcp-proxy/<run>/`) at the end when Z1 finds no
+  instance of it alive; a mutant's build tree is replaced by the next run of that mutant.
+- **Nothing it launches stays registered with LaunchServices.** `/usr/bin/open` registers the
+  bundle it opens, so a deleted copy stayed in LaunchServices' database as a `Reelcut.app` at a
+  path that no longer exists (the second review's nit, for the tests' fake bundle). The proof runs
+  `lsregister -u` on its copy before removing it, and a `launchable` fixture in
+  `mcp-proxy/tests/stdio.rs` does the same on drop; measured, a run of each now adds no
+  registration (`lsregister -dump` counted before and after). The registrations road map 14's
+  own earlier runs had left — 25 copies under `work/mc1_spike`, `work/mcp-proxy` and
+  `work/agent-socket` (MC2's mutant builds, which Xcode registers as it builds) — were
+  unregistered and their folders (2.9 GB) deleted by hand. Other proofs' copies are owed at MC5
+  as an issue.
+- Spec §11 MC-4 and MC-6 (`designs/spec/11-decisions/agent-connection.md`, now 54 lines) record
+  the lock's place, the stranded sentence and the scratch launch's two extras. Their index rows and
+  the file's Lines cell are updated, and `11-decisions/` is now 2689 lines in 14 files. This
+  document's "Decisions" section still words MC-4 and MC-6 as MC0 left them, so §11 is the fuller
+  text.
+
+**Checked**, every instance my own, no model call and no spend ($0):
+
+| Command | Answer |
+|---|---|
+| `cd mcp-proxy && cargo fmt --check && cargo test --release && cargo clippy --all-targets -- -D warnings` | clean; 14 passed (13, then the review's concurrency test); clean |
+| `cd core && cargo fmt --check && cargo test --release --test agent_socket` | clean; 7 passed |
+| `make typecheck`; `make lint`; `make test` | 0 errors, 4 warnings (the AVFoundation baseline), tsc clean; exit 0; exit 0 (lane 18/18, prompt 14/14, prices 27/27, budget 23/23, inventory 5/5) |
+| `make app`; `make dist` | BUILD SUCCEEDED; `dist_check: 24/24` (Release snapshot 92 tools, Distribution 86, both `0.1.0`; D23 6 of 6) |
+| `codesign --verify --strict --deep` on the Release app | exit 0 |
+| `dist_check_mutants.py` | 20/20 |
+| `mcp_proxy_proof.py` | 14/14 in 38 s: X2 answered in 0.49 s; X6 the timeout in 5.08 s, then the stranded sentence at once with no second instance; X7b the snapshot in 5.0 s |
+| `--mutant launch-on-list` | X1 FAIL (an instance and a socket after `tools/list`), caught, exit 0 |
+| `--mutant no-lock` | X4 FAIL (two instances), caught, exit 0 |
+| `agent_socket_proof.py --port 4941` | 14/14 |
+
+No build output and no launch log holds a `Reelcut: ` line. Nothing was created under
+`~/Library/Application Support/Reelcut/` (Z2: `Agent/`, `agent.sock` and `agent.launch.lock`
+absent before and after), nothing was registered with a Claude client, and the scratch folders
+under `$TMPDIR` are removed at the end of each run.
+
+**Owed:** AC-3 (the person's: Claude Code against the built bundle's proxy), with AC-1 and AC-2
+from MC1. MC4 is next: TCP goes, `mcp.py` moves to sockets, MC-5, Tools ▸ Copy MCP Command and
+the README's agent section (which still names TCP).

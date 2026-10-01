@@ -48,6 +48,7 @@ pub mod ffi_graphic;
 pub mod ffi_query;
 pub mod format;
 pub mod frame_grid;
+pub mod mcp_versions;
 pub mod model;
 pub mod model_graphic;
 pub mod model_motion;

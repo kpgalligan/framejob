@@ -29,7 +29,12 @@ The road map that makes these is in progress: `designs/reelcut-roadmap-14.md`, w
   app when there is one and from its bundle's catalog snapshot when there is not, and launches
   its OWN bundle, in the background (`open -n -g`), on the first `tools/call` that finds no
   socket — including after the person quits Reelcut mid-session. Two proxies that both find no
-  socket launch one instance between them (a lock in the support folder).
+  socket launch one instance between them: the lock is `agent.launch.lock` beside the socket,
+  held from the re-check until the launched instance answers or the wait ends. A session whose
+  launch timed out launches no other: its later calls that find no socket answer the timeout's
+  sentence plus "that instance may still be running, so this session will not launch another —
+  quit it and check <the socket's folder>", so an instance that never binds is not joined by
+  another on every call.
 - **MC-5 — A tool call never raises a modal question; a click still does.** "Nobody at the
   keyboard" stops being a launch-wide flag and becomes a property of the call: while the lane is
   running a tool call (`AgentLane`, which already tracks it), `FFmpegRewrap`'s `ask` means no
@@ -42,6 +47,8 @@ The road map that makes these is in progress: `designs/reelcut-roadmap-14.md`, w
 - **MC-6 — `RC_AGENT_SOCKET` overrides the socket path, and a proof always sets it.** No proof
   binds or deletes the person's socket, and `reelcut-mcp` honours the same variable, passing it
   to a Reelcut it launches (`open --env`), so a proof can drive the proxy against a scratch
-  instance. Until MC4, a launch that sets `RC_AGENT_PORT` and not `RC_AGENT_SOCKET` binds no
+  instance. Such a launch also passes `-ApplePersistenceIgnoreState YES` and writes the
+  instance's stderr to `reelcut-launch.log` beside the socket; a launch for the person's own
+  socket passes neither. Until MC4, a launch that sets `RC_AGENT_PORT` and not `RC_AGENT_SOCKET` binds no
   socket, because every proof of the era sets `RC_AGENT_PORT` and would otherwise bind the
   person's; MC4 deletes this rule with `RC_AGENT_PORT`.

@@ -13,4 +13,5 @@ DevAssistantLaunch.installIfAsked()
 // exists (spec §11 AI-3): the assistant needs the gate whether or not the MCP
 // server is ever started.
 AgentLane.prepareAtLaunch()
+AgentCatalogSnapshot.writeIfAsked()
 _ = NSApplicationMain(CommandLine.argc, CommandLine.unsafeArgv)

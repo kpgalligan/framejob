@@ -6466,14 +6466,18 @@ and prints the needle and both paths before its rows:
   `realpath`ed executable with `codesign -d --entitlements - --xml`, are
   exactly `{com.apple.security.device.audio-input: true}`: no
   `get-task-allow`, which notarization refuses (`project.yml` sets
-  `CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO` for Distribution alone). Printed
-  last; no Distribution binary FAILs it ("no Distribution binary (D3)").
+  `CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO` for Distribution alone); no
+  Distribution binary FAILs it ("no Distribution binary (D3)").
+- **D15–D24** (road map 14 MC3) — each bundle's MCP proxy and catalog
+  snapshot: the proxy present, hardened runtime, no entitlements; the
+  snapshot at the bundle's version, Release's naming every dev tool and
+  Distribution's none (the MC3 section of this file).
 
 No row is ever skipped: if D1 fails, D4, D5, D12 and D13 FAIL too, and so
-does each when its binary or helper is missing. The last line is
-`dist_check: <passed>/14`; the exit is 0 only at 14/14.
-`dist_check_mutants.py` makes each helper row and D14 fail on purpose; the
-A4 section of this file has its cases.
+does each when its binary, helper, proxy or snapshot is missing. The last
+line is `dist_check: <passed>/24`; the exit is 0 only at 24/24.
+`dist_check_mutants.py` makes each helper row, D14 and D15–D24 fail on
+purpose; the A4 and MC3 sections of this file have its cases.
 
 **Why a marker and not the tool names.** Swift string literals of 15 UTF-8
 bytes or fewer are stored inline in the code of an `-O` binary, not as
@@ -6485,7 +6489,7 @@ optimised binary by the log line the flag-on `devTools()` writes, so a dev
 tool added to the seam needs no edit here.
 
 ```sh
-make dist                                                  # → dist_check: 14/14
+make dist                                                  # → dist_check: 24/24
 python3 tools/proof/dist_check.py [--release APP] [--dist APP]
 ```
 
@@ -7632,9 +7636,9 @@ otherwise; a failed setup step is a scored FAIL naming it.
 | `app-entitlements-dist` (#145) | the whole Distribution app `ditto`ed to `<case>/dist/Reelcut.app` and re-signed ad hoc `--options runtime` with the pair it carried before B20, `audio-input` and `get-task-allow` | D14 |
 
 ```sh
-make dist                                                  # → dist_check: 14/14
-python3 tools/proof/dist_check_mutants.py [--release APP] [--dist APP]   # → dist_check_mutants: 12/12
-python3 tools/proof/dist_check.py --dist /nonexistent/Reelcut.app        # D3 D5 D7 D9 D11 D13 D14 FAIL, 7/14, exit 1
+make dist                                                  # → dist_check: 24/24
+python3 tools/proof/dist_check_mutants.py [--release APP] [--dist APP]   # → dist_check_mutants: 20/20
+python3 tools/proof/dist_check.py --dist /nonexistent/Reelcut.app        # D3 D5 D7 D9 D11 D13 D14 D16 D18 D20 D22 D24 FAIL, 12/24, exit 1
 ```
 
 **Measured 2026-09-28**, every command as `(unset ANTHROPIC_API_KEY
@@ -10816,3 +10820,92 @@ Run on 2026-10-01 over `ffe5a9f` plus the MC2 change, every instance my own:
 | `--mutant no-connect-first` | K4 FAIL (B "listening at …", dev/ino changed), caught, exit 0 |
 | `--mutant no-mode-check` | K8 FAIL (E "listening at …", a file made), caught, exit 0 |
 | `--mutant no-port-rule` | P1 FAIL (`port` planned `bind` of the default), caught, exit 0 |
+
+## Road map 14 — MC3, the proxy (`mcp_proxy_proof.py`)
+
+`reelcut-mcp` (`mcp-proxy/`, spec §11 MC-3, MC-4, MC-6) is the stdio MCP
+server bundled as `Contents/Helpers/reelcut-mcp`; `project.yml`'s "Write
+Agent Catalog" phase puts its snapshot, `Contents/Resources/agent-catalog.json`,
+in the bundle. The proof `ditto`s the Release app (`--app`) to
+`work/mcp-proxy/<run>/Reelcut.app` and drives that copy's proxy over stdin and
+stdout, as a client would; the copy is removed at the end unless Z1 finds an
+instance of it alive. Every socket is in its own
+`tempfile.mkdtemp(prefix="rcm-")` under `$TMPDIR`; an instance is any pid
+`pgrep -f <copy>/Contents/MacOS/Reelcut` prints, the only pids ever signalled
+(SIGTERM, SIGKILL after 10 s), and "N instances" counts pids new since the row
+began. Children run without `ANTHROPIC_API_KEY`, `RC_ASSEMBLYAI_KEY`,
+`CLAUDECODE` or `CLAUDE_CODE_ENTRYPOINT`, under `graphics_spike/bounded.py`
+where not interactive. Nothing under `~/Library/Application Support/Reelcut/`
+is created, written or unlinked (Z2 only `lstat`s), nothing is registered with
+a Claude client, and no model is called.
+
+- **X0** CONTROL: each socket path ≤ 103 bytes, under `$TMPDIR`, not under the
+  support folder. **X1** no instance: `initialize` (negotiated version,
+  `listChanged: true`, the bundle's version), `ping`, `tools/list` = the
+  snapshot's `tools` as JSON; 3 s later no instance and no socket file.
+- **X2** `tools/call get_project` with no instance: one instance, the app's
+  answer (no proxy sentence), the socket, and `reelcut-launch.log` beside it.
+  **X3** the proxy's forwarded `tools/list` and the proof's own
+  HTTP-over-AF_UNIX one each equal the snapshot as JSON values.
+- **X4** two proxies on a fresh socket, calls released together (a
+  `threading.Barrier`): both answer, exactly one instance. **X5** SIGKILL
+  X2's instance; the same proxy's next call launches exactly one and answers.
+- **X6** a `0755` folder, `RC_MCP_LAUNCH_WAIT=5`: the timeout sentence naming
+  the copy, the socket and `5 s`, in 5–15 s; a second call answers the
+  stranded sentence within 2 s and starts no second instance.
+- **X7** a `socketserver.UnixStreamServer` stub (one request at a time, a
+  connection closed before a request ignored) holds `tools/call` 5 s: a
+  `ping` sent 0.5 s in is answered before the call and within 1 s. **X7b**
+  the stub holds proxy A's call 10 s: proxy B's `tools/list` sent 0.5 s in
+  answers the snapshot within 4.5–7 s.
+- **X8** a list from the snapshot, then a stub listing other tools: the call is
+  followed by `notifications/tools/list_changed`; CONTROL: none within 3 s when
+  the stub lists the snapshot's tools with every object's keys reversed.
+- **X9** every stdout line of every proxy is JSON-RPC 2.0; **X10** no
+  `Reelcut: ` in any launch log; **Z1** no instance alive; **Z2** `lstat` of
+  the person's `Agent/`, `agent.sock` and `agent.launch.lock` unchanged.
+- It writes `work/mcp-proxy/ac-mcp.json`, `docs/manual-checks.md` AC-3's
+  fixture: `mcpServers.reelcut` with the TREE's Release proxy as its command.
+- `--mutant launch-on-list` (X1 must FAIL) and `--mutant no-lock` (X4 must
+  FAIL) copy `mcp-proxy/` (no `target/`) and `core/src/mcp_versions.rs` into
+  `work/mcp-proxy/mutant-<name>/`, replace one anchor found exactly once in
+  `mcp-proxy/src/` (`tools_list`'s `let answers = …` line; the
+  `lock.lock()` statement), `cargo build --release --offline`, put the binary
+  in a fresh bundle copy signed `--options runtime` ad hoc, re-sign the copy
+  `--preserve-metadata=entitlements,flags`, and run every row. Exit 0 caught,
+  1 survived, 2 control not performed.
+
+`dist_check.py` D15–D24 hold each bundle's proxy (present, hardened runtime,
+no entitlements) and snapshot (`{version, tools}` at `CFBundleShortVersionString`,
+Release naming every flag-on `devHandlers` key, Distribution none);
+`dist_check_mutants.py`'s skeletons now carry `Contents/Info.plist`, the proxy
+and the snapshot for every case, and its eight new cases are:
+
+| Case | The mutation | Expected FAIL |
+|---|---|---|
+| `no-proxy-release` / `-dist` | no proxy in the skeleton | D15 D17 D19 / D16 D18 D20 |
+| `proxy-no-runtime-dist` | the proxy re-signed ad hoc without `--options runtime` | D18 |
+| `proxy-entitlement-release` | the proxy re-signed `--options runtime` with allow-jit | D19 |
+| `no-snapshot-dist` | no snapshot | D22 D24 |
+| `snapshot-version-release` | the snapshot's `version` rewritten | D21 |
+| `dist-snapshot-in-release` / `release-snapshot-in-dist` | the other side's snapshot | D23 / D24 |
+
+```sh
+cd mcp-proxy && cargo test --release                       # 14 black-box tests over the built binary
+python3 tools/proof/mcp_proxy_proof.py
+python3 tools/proof/mcp_proxy_proof.py --mutant launch-on-list
+python3 tools/proof/mcp_proxy_proof.py --mutant no-lock
+python3 tools/proof/dist_check_mutants.py                   # → dist_check_mutants: 20/20
+```
+
+Run on 2026-10-01 over `ba8ed00` plus the MC3 change, every instance my own:
+
+| Command | Answer |
+|---|---|
+| `cd mcp-proxy && cargo fmt --check && cargo test --release && cargo clippy --all-targets -- -D warnings` | clean; 14 passed (13, then the review's concurrency test); clean |
+| `make typecheck`; `make lint`; `make test`; `make app`; `make dist` | 0 errors, 4 warnings, tsc clean; exit 0; exit 0; BUILD SUCCEEDED; `dist_check: 24/24` (Release snapshot 92 tools, Distribution 86, both 0.1.0) |
+| `dist_check_mutants.py` | 20/20 |
+| `mcp_proxy_proof.py` | 14/14 in 38 s (X2 answered in 0.49 s; X6 5.08 s then 0.0 s; X7b 5.0 s) |
+| `--mutant launch-on-list` | X1 FAIL (an instance and a socket after `tools/list`), caught, exit 0 |
+| `--mutant no-lock` | X4 FAIL (two instances), caught, exit 0 |
+| `agent_socket_proof.py --port 4941` | 14/14 |
