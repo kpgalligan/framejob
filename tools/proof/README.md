@@ -8580,7 +8580,7 @@ instrument failure is a scored FAIL, exit 1.
 
 | Runner | caught / survived / not performed |
 |---|---|
-| `assistant_lane_proof.py`, `assistant_tab_proof.py`, `assistant_helper_proof.py`, `assistant_prompt_proof.py`, `assistant_session_proof.py`, `spend_proof.py`, `budget_proof.py`, `prices_proof.py`, `prices_crosscheck.py`, `makefile_env_proof.py`, `export_cancel_proof.py`, `video_configuration_proof.py`, `speed_sheet_probe.py`, `text_break_proof.py` and `name_field_proof.py` (each `--baseline`, B23; `--mutant`, B32), `obscure_handles_probe.py` (`--baseline` and `--mutant`, B25), `cache_pass_probe.py` (`--mutant`, B14), `assistant_compaction_proof.py` (`--mutant`, B26) and `relink_sheet_probe.py` (`--mutant`, B29) | 1 / 0 / 2 |
+| `assistant_lane_proof.py`, `assistant_tab_proof.py`, `assistant_helper_proof.py`, `assistant_prompt_proof.py`, `assistant_session_proof.py`, `spend_proof.py`, `budget_proof.py`, `prices_proof.py`, `prices_crosscheck.py`, `makefile_env_proof.py`, `export_cancel_proof.py`, `video_configuration_proof.py`, `speed_sheet_probe.py`, `text_break_proof.py` and `name_field_proof.py` (each `--baseline`, B23; `--mutant`, B32), `obscure_handles_probe.py` (`--baseline` and `--mutant`, B25), `cache_pass_probe.py` (`--mutant`, B14), `assistant_compaction_proof.py` (`--mutant`, B26), `relink_sheet_probe.py` (`--mutant`, B29) and `menu_undo_probe.py` (`--mutant`, B51) | 1 / 0 / 2 |
 | `spend_ui_proof.py` | 1 / 3 / 2 |
 | `graphics_proof.py`, `graphics_store_probe.py`, `words_picture_probe.py` | 0 / 1 / 2 |
 | `cloud_captions_proof.py`, `cloud_captions_probe.py` (`--mutant`, `--fake-mutant`), `recording_probe.py`, `phase9_chrome.py` — whole-suite mutants | the per-row count and a normal run's exit / 2 |
@@ -10487,4 +10487,122 @@ python3 tools/proof/clip_inspector7_proof.py                         # 15/15
 python3 tools/proof/clip_inspector7_proof.py --mutant band-blank     # MUTANT PASS
 python3 tools/proof/name_field_proof.py                              # 39/39
 python3 tools/proof/name_field_proof.py --mutant no-redisplay        # exit 1, N20 FAILS
+```
+
+## Issue batch B51 — one alert queue per document, the composer's menu-tool undo (relink_sheet_probe.py A1–A5, menu_undo_probe.py; #195, #184 item 2)
+
+- **#195** — every `ProjectDocument.present(_:)` goes through one
+  per-document queue (`ProjectDocument+Alerts.swift`, `DocumentAlertQueue`):
+  one alert sheet at a time, each asked for a main-queue turn after the last
+  one's `didPresent` or the window's last `didEndSheetNotification`, and
+  only while no sheet is attached; with no window, app-modal at once. B29's
+  `presentRelinkRefusals` chain is gone: both relink doors `present` an
+  unreadable file at once, and the commit `present`s each refusal in order.
+  Item 4 (the `RelinkRefusalsLeft` leak on close) falls out — nothing is
+  retained through `contextInfo` any more; no row.
+- **#184 item 2** — `UIMenu.perform` opens no eager document undo group
+  when the target's own `undoManager` is not the document's: the Assistant
+  composer, and every field editor, which answers its own
+  `NSCellUndoManager` (M1). Such a target's text undo lands on its own
+  manager, so a document group round its Cut or Paste could only be empty
+  and clear redo; a target whose manager IS the document's is unchanged
+  (`v2_menu.py` U1–U3). That covers the vetoed field too (V1). On a
+  `ProjectDocument` such a target's action still runs in
+  `inUndoGroupIfRegistered`, so a document edit committed during it (a
+  `controlTextDidChange` commit) is one step and leaves no implicit group
+  open (F1, added by the review's finding 1).
+
+`relink_sheet_probe.py` gains five rows after S4 (its wall is now 240 s). An
+"alert" is an attached sheet that is not a relink sheet, A4's bare sheet or
+A5's blocker, and has not been seen already.
+
+| Row | Passes when |
+|---|---|
+| A1 | (#195.1) `importMedia` of two garbage `.png`s: an alert holding "Could not read unreadable-1.png." within 20 s, held until the completion has run and 0.5 s more; after `endSheet` one holding "…unreadable-2.png." within 10 s; none more within 2 s |
+| A2 | (#195.2) the Media tab's door, `relinkMedia` of one garbage `.png`: one alert holding its error within 20 s, held 0.5 s; none more within 2 s |
+| A3 | (#195.3) the sheet's door, toneA for the first media and A.mov for an id no media holds: alert 1 holds what the project's `applying` of those ops throws, within 20 s, held 0.5 s; alert 2 the first media's refusal within 10 s; none more within 2 s; every media's path unchanged |
+| A4 | a bare `NSViewController` sheet is up, `present(E1)`, the sheet dismissed 1 s later: E1's alert within 5 s; after `endSheet`, `present(E2)` shows E2's within 2 s; none more within 2 s |
+| A5 | as A4 with an `NSAlert` attached by `beginSheetModal(for:)` as the blocker, ended with `endSheet` 1 s later (the queue is not jammed) |
+
+`menu_undo_probe.py [--sources DIR] [--mutant NAME] [--only IDS]` builds
+`menu_undo_probe.swift` with `relink_sheet_probe.py`'s swiftc line plus
+`-D REELCUT_DEV_TOOLS` and runs it once, killed at a 120 s wall, under
+`work/menu-undo/<tree|mutant-NAME>/`; no media. The fixture is
+`relink_sheet_probe`'s window with no media. It copies the general
+pasteboard before its Cut and puts it back only if no one else wrote it
+since, and prints `pasteboard: restored` or `left: <why>`. Exits follow rule R.
+
+| Row | Passes when |
+|---|---|
+| B0 | the probe builds |
+| M1 | CONTROL: the window's `undoManager` is the document's; an editable `NSTextField`'s field editor answers a manager of its own (AppKit's `NSCellUndoManager`) and so does `AssistantComposerField().textView`, neither the document's; with the composer first responder, `UIMenu.target` of `cut:` is that text view; one applied edit undone leaves canUndo false, canRedo true |
+| M2 | (#184.2) the composer holds "hello", all selected; `UIMenu.perform` runs Cut then Paste on `UIMenu.target`'s answer: the text goes "" then "hello", the composer's own manager can undo, and the document's canUndo, canRedo, redoActionName and groupingLevel are as before |
+| V1 | RECORD: a field whose delegate's `control(_:textShouldBeginEditing:)` answers false, holding "hello", first responder, all selected, the document's redo re-armed; Cut then Paste through `UIMenu.perform`. Passes when the field still reads "hello"; the detail prints the document's undo state before and after each |
+| F1 | a field whose delegate commits two ungrouped document edits (`applyEdit`) in `controlTextDidChange`, first responder, all selected; Paste through `UIMenu.perform` on its field editor, then one grouped edit: the document's groupingLevel is back where it began after the Paste, one undo takes back only the later edit (canUndo true, undo "Field Commit"), and a second takes back both of the field's commits, the stack where it was before |
+
+**Measured on the unmodified tree** (`app/Sources` at `921dd15`, the probes
+added, no app edit):
+- `relink_sheet_probe.py`: 8/12, exit 1. A1 FAIL "alerts 1; completion ran
+  at 0.29 s … texts [["Could not read unreadable-1.png."]]"; A2 pass
+  "alerts 1; a second within 2 s: false" (the Media tab's door measured not
+  to drop); A3 FAIL "alerts 1 … texts [["no media with id 1004"]]" (the
+  refusal after it never attached); A4 FAIL and A5 FAIL, each "blocker
+  attached: 0.00 s; alerts 0; E1's attached never after its present" — an
+  error sheet asked for over a bare sheet or an alert sheet is never shown,
+  even after the blocker ends.
+- `menu_undo_probe.py`: 2/4, exit 1. M1 FAIL: "window's undoManager is the
+  document's: true; the field first responder true, its editor present
+  (first responder NSTextView), its manager the document's: false (another,
+  NSCellUndoManager, the field's own: false); the composer first responder
+  true, its manager another: true; cut:'s target the composer: true". M2
+  FAIL: "before: canUndo false, canRedo true … redo \"Add Track\" …; after
+  Cut: text \"\"; canUndo true, canRedo false … redo \"\"". V1 pass (RECORD):
+  "before: canUndo true, canRedo true … redo \"Add Track\"; after Cut: text
+  \"hello\"; canUndo true, canRedo false … redo \"\"; after Paste: text
+  \"hello\"; canUndo true, canRedo false". `pasteboard: restored`.
+
+**M1 restated.** As first written, M1 asked that the field editor answer
+the document's manager; on the unmodified tree it answered its own
+`NSCellUndoManager` (printed above), so the guard covers every text field's
+field editor as well as the composer. M1 now states that measured fact.
+
+**Measured on the change**: `menu_undo_probe.py` 4/4, exit 0 — M2 "the
+document's state unchanged: true … after Cut: text \"\"; canUndo false,
+canRedo true … redo \"Add Track\""; V1 "after Cut: text \"hello\";
+canUndo false, canRedo true … redo \"Add Track\"; after Paste … canUndo
+false, canRedo true" — no empty step, redo kept. After the review's
+finding 1 (the guard's arm runs in `inUndoGroupIfRegistered` on a
+`ProjectDocument`), 5/5 — F1 "after Paste: commits 1; canUndo true … undo
+\"Field Commit\" … groupingLevel 0; … after one undo: canUndo true …
+undo \"Field Commit\", redo \"Later Edit\"".
+
+| `--mutant` | Edit | Result |
+|---|---|---|
+| `relink_sheet_probe.py --mutant queue-off` | `present(_:)`'s window arm calls `presentError(error, modalFor: window, delegate: nil, …)` at once | S2, S4, A1, A3 FAIL, caught, exit 1 |
+| `relink_sheet_probe.py --mutant no-sheet-wait` | the drain's `if window.attachedSheet != nil {` → `if false {` | A4 and A5 FAIL ("alerts 0; E1's attached never"), caught, exit 1 — both had failed on the unmodified tree |
+| `relink_sheet_probe.py --mutant sheet-silent` | `applyClicked` calls `document.relinkMedia(choices)` | S2 FAIL, caught, exit 1 |
+| `menu_undo_probe.py --mutant no-own-manager-guard` | the guard's condition gains `, false` | M2 FAIL ("the document's state unchanged: false … after Cut … canUndo true, canRedo false"), caught, exit 1 |
+| `menu_undo_probe.py --mutant own-manager-bare-send` | the guard's `ProjectDocument` arm sends with no pending group | F1 FAIL ("after Paste … groupingLevel 1; after the later edit … groupingLevel 1; after one undo: canUndo false … redo \"Field Commit\"" — the field's commits and the later edit merged into one step), caught, exit 1 |
+
+The B29 mutant `unreadable-at-once` is deleted: its `before` text is gone.
+
+Run on 2026-10-01, the change over `921dd15`, every instance my own:
+
+| Command | Answer |
+|---|---|
+| `make typecheck` | 0 errors, 4 warnings, tsc clean |
+| `make test` | exit 0 |
+| `make app` | BUILD SUCCEEDED |
+| `inventory.py --check` | 5/5 — "I2 and I3 clean over 46 grep sites and 46 pins" |
+| `relink_sheet_probe.py` | 12/12, exit 0 — A1 "alerts 2 … texts [["Could not read unreadable-1.png."], ["Could not read unreadable-2.png."]]"; A4 and A5 "alerts 2; E1's attached 1.55 s after its present" |
+| `menu_undo_probe.py` | 4/4, exit 0, `pasteboard: restored`; after finding 1, 5/5 |
+| `v2_menu.py 4892 --only U` (own instance) | 3 pass, 0 fail, 0 skip of 3, exit 0; after finding 1, the same on 4893 |
+
+```sh
+python3 tools/proof/relink_sheet_probe.py                          # 12/12, exit 0
+python3 tools/proof/relink_sheet_probe.py --mutant queue-off       # S2 S4 A1 A3 FAIL, exit 1
+python3 tools/proof/relink_sheet_probe.py --mutant no-sheet-wait   # A4 A5 FAIL, exit 1
+python3 tools/proof/menu_undo_probe.py                             # 5/5, exit 0
+python3 tools/proof/menu_undo_probe.py --mutant no-own-manager-guard  # M2 FAIL, exit 1
+python3 tools/proof/menu_undo_probe.py --mutant own-manager-bare-send # F1 FAIL, exit 1
 ```

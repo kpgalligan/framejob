@@ -121,7 +121,7 @@ detail there.
   W-6). It lives there, not in `InspectorPane.swift`, for the size rule.
 
 **The document.**
-- `ProjectDocument.swift` (+`DisplayStem`, +`Recording`, +`SelectedAction`, +`Import`, +`Graphics`, +`UndoGroup`, +`CacheSaves`)
+- `ProjectDocument.swift` (+`DisplayStem`, +`Recording`, +`SelectedAction`, +`Import`, +`Graphics`, +`UndoGroup`, +`CacheSaves`, +`Alerts`)
   — NSDocument, `.reelcut` package read/write, and the single mutation
   point (see Undo); `applyEdit`'s `.refused` arm beeps and then posts
   `projectDocumentDidRefuse` with the `ReelRefusal` (spec §11 CI-10), which
@@ -161,10 +161,13 @@ detail there.
   file probed through `MediaImporter.probe`, one grouped "Relink Media" edit
   carrying each descriptor as `relink_media`'s `probe`, spec §11 #63, then
   `generateCaches()`; the missing-media sheet's door then alerts each
-  unreadable file and each refused sentence (#180), one alert sheet at a
-  time, each asked for when the last ends — `presentRelinkRefusals`, since
-  AppKit drops an error sheet asked for while another is attached).
-  `+Graphics`
+  unreadable file and each refused sentence (#180) through `present(_:)`).
+  `+Alerts` is `present(_:)`: every error the document shows waits in one
+  queue (`DocumentAlertQueue`) and shows one alert sheet at a time, each asked
+  for a main-queue turn after the last one's `didPresent` or the window's last
+  sheet end, and only while no sheet is attached, since AppKit drops an error
+  sheet asked for while another is attached (#195, `relink_sheet_probe.py`
+  A1–A5); with no window, it is app-modal at once. `+Graphics`
   is the document's side of the package's `graphics/`:
   `startGraphicStore()`, run from `makeWindowControllers()` and seeding an
   untitled document's root from `autosavedContentsFileURL/graphics`, and
@@ -1586,7 +1589,13 @@ free.
   `ProjectDocument.inUndoGroupIfRegistered`: an item's edits are one step
   (M3); an item that registers nothing leaves undo and redo untouched (#167,
   `v2_menu.py` U2); an `NSText` target keeps the eager group except for
-  `copy:` and `selectAll:`, which change no text (#176, `v2_menu.py` U3).
+  `copy:` and `selectAll:`, which change no text (#176, `v2_menu.py` U3); a
+  target whose own `undoManager` is not the document's — the Assistant
+  composer, and every field editor, which answers its own
+  `NSCellUndoManager` — gets no eager group, and on a `ProjectDocument` runs
+  in `inUndoGroupIfRegistered`, so its Cut and Paste leave no empty step and a
+  document edit it commits is one step (#184, `menu_undo_probe.py` M1, M2, V1,
+  F1).
 - `UIMenuTable.swift` — `UIMenu.verdicts`, one row per selector, a mirror of
   `tools/proof/capture_spike/inventory.json` in its order. `v2_menu.py`'s H2
   holds the two together, and H1 holds the inventory to the live menu, so a
@@ -1844,7 +1853,7 @@ this entry rather than growing the list), `ScreenRecorder.shareableContent`'s
 global hop, `GraphicStore`'s serial queue (its file-system sources'
 handlers, the coalesced pass and the outbox; main publishes through
 `drain()` and never waits on it but by `queue.sync`), the cache's main
-hop, the agent lane's per-document serial queues (`AgentLane.swift`), the
+hop, the alert queue's main hop (`ProjectDocument+Alerts.swift`), the agent lane's per-document serial queues (`AgentLane.swift`), the
 assistant session's write queue (`AssistantSession.swift`), and the spend-month
 queue (`AssistantSpendMonth.queue`, Settings' ledger fold, answered by a
 main hop). The recorder adds

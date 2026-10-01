@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """Issue batch B29 (#180.2): the missing-media sheet alerts each refused
 relink's sentence after its one grouped commit, measured through the app's
-own sources.
+own sources. Issue batch B51 (#195): every error the document presents is
+shown, one alert at a time (A1–A5).
 
     python3 tools/proof/relink_sheet_probe.py [--sources DIR] [--mutant NAME] [--only IDS]
 
 `relink_sheet_probe.swift` is built with `cache_pass_probe.py`'s swiftc line
 over `--sources` and run once, in a process of its own, over copies of
 `tools/proof/media/` under `tools/proof/work/relink-sheet/`, killed at a
-120 s wall. Prints `<ID> pass|fail — <detail>` per row, then `scores: N/M`.
+240 s wall. Prints `<ID> pass|fail — <detail>` per row, then `scores: N/M`.
 
 The fixture is an untitled document with three video media whose files are
 gone; the sheet chooses toneA.m4a for the first, toneB.m4a for the second
@@ -36,6 +37,32 @@ Rows:
        posts exactly one `projectDocumentDidRefuse` with the first media's
        sentence, and no sheet attaches within 3 s.
 
+The A rows run after S4. An "alert" is an attached sheet that is not a relink
+sheet, A4's bare sheet or A5's blocker, and has not been seen already.
+  A1   (#195.1) `importMedia` of two garbage `.png`s: an alert holding the
+       first's error within 20 s, held until the completion has run and
+       0.5 s more; after it ends, one holding the second's within 10 s; none
+       more within 2 s.
+  A2   (#195.2) the Media tab's door, one garbage `.png`: one alert holding
+       its error within 20 s, held 0.5 s; none more within 2 s.
+  A3   (#195.3) the sheet's door, toneA.m4a for the first media (refused)
+       and A.mov for an id no media holds: alert 1 holds the error the
+       project's `applying` of those ops throws, within 20 s, held 0.5 s;
+       alert 2 the first media's sentence within 10 s; none more within 2 s;
+       every media's path unchanged.
+  A4   a bare view controller's sheet is up, `present(E1)`, the sheet is
+       dismissed 1 s later: E1's alert within 5 s; after it ends,
+       `present(E2)` shows E2's within 2 s; none more within 2 s.
+  A5   as A4 with an `NSAlert` sheet (`beginSheetModal(for:)`) as the
+       blocker, ended with `endSheet` 1 s later: the queue is not jammed.
+
+Mutants (`--mutant`):
+  sheet-silent    the sheet's door passes no flag: must fail S2.
+  queue-off       `present(_:)` asks for the sheet at once, no queue: must
+                  fail S2, S4, A1 and A3.
+  no-sheet-wait   the drain ignores an attached sheet: must fail A4 and A5
+                  (the README records which failed on the unmodified tree).
+
 Exit (rule R): a plain run exits 0 iff every row passed and 1 when a row
 failed; a build failure is B0's FAIL there. A `--mutant` run exits 1 when
 every row the mutant names failed (caught), 0 when one passed (survived),
@@ -54,18 +81,21 @@ ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/relink-sheet"
 MEDIA = ROOT / "tools/proof/media"
 NEEDED = ("toneA.m4a", "toneB.m4a", "A.mov")
-ROWS = ["B0", "S0", "S1", "S2", "S3", "S4", "C1"]
-WALL = 120
+ROWS = ["B0", "S0", "S1", "S2", "S3", "S4", "C1", "A1", "A2", "A3", "A4", "A5"]
+WALL = 240
 
 # name: (the rows it must fail, [(file, before, after), ...])
 MUTANTS = {
     "sheet-silent": (["S2"], [
         ("RelinkSheetController.swift", "document.relinkMedia(choices, alertingRefusals: true)",
          "document.relinkMedia(choices)")]),
-    "unreadable-at-once": (["S4"], [
-        ("ProjectDocument+Import.swift",
-         "if alertingRefusals { failed.append(error) } else { self.present(error) }",
-         "self.present(error)")]),
+    "queue-off": (["S2", "S4", "A1", "A3"], [
+        ("ProjectDocument+Alerts.swift",
+         "alertQueue.waiting.append(error)\n        drainAlerts()",
+         "if let window = windowForSheet {\n            presentError(error, modalFor: window, "
+         "delegate: nil, didPresent: nil, contextInfo: nil)\n        }")]),
+    "no-sheet-wait": (["A4", "A5"], [
+        ("ProjectDocument+Alerts.swift", "if window.attachedSheet != nil {", "if false {")]),
 }
 
 

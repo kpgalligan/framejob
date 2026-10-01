@@ -31,13 +31,20 @@ import AppKit
 /// `inUndoGroupIfRegistered`: the explicit group opens at the item's first
 /// undo registration, so an item's edits are one step (M3), and an item that
 /// registers nothing — Zoom In — leaves undo and redo as they were (#167,
-/// `v2_menu.py` U2). An `NSText` target's typing undo bypasses
-/// `registerUndo`, so there, and on any other document, `perform` keeps the
-/// eager group, `ProjectDocument.performGroupedEdit`'s discipline: event
+/// `v2_menu.py` U2). An `NSText` target on the document's own manager has
+/// typing undo that bypasses `registerUndo`, so there, and for a target on
+/// the document's manager on any other document, `perform` keeps the eager
+/// group, `ProjectDocument.performGroupedEdit`'s discipline: event
 /// grouping off, begin, act, close exactly what it opened, restore — never a
 /// flush. The exception is `textReadOnlySelectors`, which change no text and
 /// so register nothing: those run in `inUndoGroupIfRegistered` too (#176,
-/// `v2_menu.py` U3).
+/// `v2_menu.py` U3). A target whose own `undoManager` is not the document's
+/// — the Assistant composer, and every field editor, which answers its own
+/// `NSCellUndoManager` — gets no eager group, since its text undo lands on
+/// its own manager and the group could only be empty (#184,
+/// `menu_undo_probe.py` M1, M2 and V1); on a `ProjectDocument` it runs in
+/// `inUndoGroupIfRegistered`, so a document edit it commits during the
+/// action (a `controlTextDidChange` commit) is still one step (F1).
 enum UIMenu {
     /// V1's verdicts. `none` is spelled `.plain` so no `Optional.none`
     /// comparison is ever ambiguous.
@@ -220,12 +227,21 @@ enum UIMenu {
     /// Sends the item's action to `target`, its undo in one explicit group on
     /// the window's document's manager (the header's **Undo.**); an `NSText`
     /// target's group is eager unless the selector is one of
-    /// `textReadOnlySelectors`. False when nothing handled it.
+    /// `textReadOnlySelectors`. A target with an undo manager of its own gets
+    /// no eager group, only `inUndoGroupIfRegistered` on a `ProjectDocument`.
+    /// False when nothing handled it.
     static func perform(_ item: NSMenuItem, target: AnyObject, window: NSWindow?) -> Bool {
         guard let action = item.action else { return false }
         let document = window?.windowController?.document as? NSDocument
         guard let manager = document?.undoManager else {
             return NSApp.sendAction(action, to: target, from: item)
+        }
+        if let own = (target as? NSResponder)?.undoManager, own !== manager {
+            // Its text undo is its own; a document edit it commits is one step.
+            guard let document = document as? ProjectDocument else {
+                return NSApp.sendAction(action, to: target, from: item)
+            }
+            return document.inUndoGroupIfRegistered { NSApp.sendAction(action, to: target, from: item) }
         }
         if let document = document as? ProjectDocument,
             !(target is NSText) || textReadOnlySelectors.contains(NSStringFromSelector(action))

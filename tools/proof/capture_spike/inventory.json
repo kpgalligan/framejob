@@ -1135,12 +1135,12 @@
    ],
    "other_caller": "app/Sources/ProjectDocument.swift `func retryReversedMedia(` — the Video tab's Render Reverse button; app/Sources/ReverseRenderer.swift `document?.ensureReversedMedia()` — after the sheet closes"
   },
-  "app/Sources/ProjectDocument.swift:1332": {
+  "app/Sources/ProjectDocument+Alerts.swift:27": {
    "token": "presentError",
    "func": "present",
    "reached_from": [],
    "reached_after": [],
-   "other_caller": "app/Sources/ProjectDocument.swift `func present(` — present(_:) for a document with no window; perform_menu_item reaches editor actions only through a window"
+   "other_caller": "app/Sources/ProjectDocument+Alerts.swift `func present(` — present(_:) for a document with no window; perform_menu_item reaches editor actions only through a window"
   },
   "app/Sources/RelinkSheetController.swift:123": {
    "token": "beginSheetModal",
