@@ -4,8 +4,11 @@ import AppKit
 /// core can do reaches the rest of Reelcut as typed Swift here: `ReelProject`
 /// (a handle plus its lazily decoded `ProjectSnapshot`), `ReelTime`,
 /// `ReelSnap`, `ReelExport`, the graphics engine's `GraphicLibrary` and
-/// `GraphicModule`, and the op ARGUMENTS an edit is built out of — the
-/// `dictionary` extensions on the §5.2 property types, and the typed patches.
+/// `GraphicModule`, `ReelAgentSocket`, and the op ARGUMENTS an edit is built
+/// out of — the typed patches. The `dictionary` extensions on the §5.2
+/// property types went to `PropsDictionaries.swift`, the payment this file
+/// owed at 1353 before road map 14's socket wrapper: they name no `rc_*`
+/// symbol.
 /// `ProjectSnapshot.swift` owns the read side of the same contract;
 /// `core/include/reelcut_core.h` is the contract itself.
 ///
@@ -731,113 +734,6 @@ extension ReelOp {
     }
 }
 
-// MARK: - Value types as op-JSON dictionaries
-
-/// These emit the model's own key names (§5.2). They live here rather than
-/// beside the types because op JSON is this file's business: nothing outside
-/// `ReelCore.swift` and `ReelOps.swift` ever writes an op argument.
-extension CropInsets {
-    var dictionary: [String: Any] { ["l": l, "t": t, "r": r, "b": b] }
-}
-
-extension ShadowProps {
-    var dictionary: [String: Any] {
-        ["color": color, "opacity": opacity, "blur": blur, "angle": angle, "distance": distance]
-    }
-}
-
-extension ColorAdjust {
-    var dictionary: [String: Any] {
-        ["brightness": brightness, "contrast": contrast, "saturation": saturation, "hue": hue]
-    }
-}
-
-extension ChromaProps {
-    var dictionary: [String: Any] {
-        ["key": key, "tolerance": tolerance, "softness": softness, "spill": spill]
-    }
-}
-
-extension FilterProps {
-    var dictionary: [String: Any] { ["kind": kind.rawValue, "amount": amount] }
-}
-
-extension ReflectionProps {
-    var dictionary: [String: Any] {
-        ["opacity": opacity, "height": height, "gap": gap, "falloff": falloff]
-    }
-}
-
-extension SpotlightProps {
-    var dictionary: [String: Any] {
-        [
-            "shape": shape.rawValue, "x": x, "y": y, "width": width, "height": height,
-            "feather": feather, "dim": dim, "zoom": zoom,
-        ]
-    }
-}
-
-extension ObscureProps {
-    var dictionary: [String: Any] {
-        [
-            "shape": shape.rawValue, "x": x, "y": y, "width": width, "height": height,
-            "feather": feather, "kind": kind.rawValue, "amount": amount,
-        ]
-    }
-}
-
-extension DuckProps {
-    var dictionary: [String: Any] { ["level": level, "attack": attack, "release": release] }
-}
-
-extension CompressorProps {
-    var dictionary: [String: Any] {
-        [
-            "threshold_db": thresholdDb, "ratio": ratio, "attack": attack, "release": release,
-            "makeup_db": makeupDb,
-        ]
-    }
-}
-
-extension OutlineProps {
-    var dictionary: [String: Any] { ["width": width, "color": color] }
-}
-
-extension BackdropProps {
-    var dictionary: [String: Any] { ["color": color, "padding": padding, "radius": radius] }
-}
-
-extension TextAnimation {
-    /// `in` and `out` are DURATIONS in ticks, not times, and the first of them
-    /// is a Swift keyword — which is why the Swift properties are
-    /// `inDuration` / `outDuration` and the model's key names are written out
-    /// here. The spelling is a contract with `core/src/model_props.rs`'s
-    /// `#[serde(rename = "in")]`, the same one `TextAnimation.CodingKeys`
-    /// keeps on the way back.
-    var dictionary: [String: Any] {
-        ["kind": kind.rawValue, "in": inDuration, "out": outDuration]
-    }
-}
-
-extension StrokeProps {
-    var dictionary: [String: Any] { ["width": width, "color": color] }
-}
-
-extension GradientStop {
-    var dictionary: [String: Any] { ["at": at, "color": color] }
-}
-
-extension Gradient {
-    /// The stops go out in the order they are HELD, not `sortedStops` — the
-    /// model does not police the order and the renderer sorts on the way to
-    /// `CGGradient`, so sorting here would silently rewrite a list the user
-    /// is in the middle of dragging through and make a stop jump back under
-    /// the pointer.
-    var dictionary: [String: Any] {
-        ["kind": kind.rawValue, "stops": stops.map { $0.dictionary }, "angle": angle]
-    }
-}
-
 // MARK: - Typed patches
 
 /// A sparse patch of video properties. Every field is optional and only the
@@ -1349,5 +1245,38 @@ final class GraphicModule {
         let diagnostics = takeDiagnostics(diag)
         guard let svg = takeString(out) else { throw GraphicFailure(diagnostics: diagnostics) }
         return (svg, diagnostics)
+    }
+}
+
+// MARK: - The agent socket
+
+/// The core's Unix-socket listener for the agent server (road map 14, spec
+/// §11 MC-1): the second server object beside `AgentServer.start()`'s TCP
+/// one, serving the same catalog through the same handler. Only the wrapper
+/// lives here, for the one-file rule above; the path, the MC-2 policy and
+/// the log lines are `AgentServer+Socket.swift`'s.
+enum ReelAgentSocket {
+    /// Binds at `path`, chmod 0600; throws the core's sentence. Never
+    /// unlinks a file already there, and a second bind in one process is
+    /// refused. `handler` and `context` must stay valid for the process's
+    /// life, because `release()` never joins.
+    static func start(
+        path: String, serverName: String, version: String, toolsJSON: String,
+        handler: RcAgentToolHandler, context: UnsafeMutableRawPointer?
+    ) throws {
+        var err: UnsafeMutablePointer<CChar>? = nil
+        let bound = rc_agent_socket_start(
+            path, serverName, version, toolsJSON, handler, context, &err)
+        if !bound {
+            throw ReelCoreError(
+                message: takeErrorMessage(err, fallback: "could not bind the agent socket"))
+        }
+    }
+
+    /// For quit: unlinks the socket file only if it is still this
+    /// listener's, then abandons the listener without a join. Safe when
+    /// none is bound.
+    static func release() {
+        rc_agent_socket_release()
     }
 }

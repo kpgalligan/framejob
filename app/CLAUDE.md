@@ -17,11 +17,14 @@ detail there.
 - `ReelCore.swift` — the **only** home for `rc_*` calls: `ReelProject`
   (handle + lazily decoded `ProjectSnapshot`; `json`, `snapshot` and
   `planJSON` are memoised PER HANDLE, so keep handles rather than minting
-  them), timecode, snapping, export presets/sizes/settings, the
-  `dictionary` extensions on the property types and the typed patches —
-  except `TextPatch` (with `case`, `words` and `word_style`), which is
-  `TextPatch.swift`'s, moved out so it could grow. `word_style` has ONE
-  app-side writer, `CaptionLayout.place` (W-10).
+  them), timecode, snapping, export presets/sizes/settings and the typed
+  patches — except `TextPatch` (with `case`, `words` and `word_style`), which
+  is `TextPatch.swift`'s, moved out so it could grow. `word_style` has ONE
+  app-side writer, `CaptionLayout.place` (W-10). `ReelAgentSocket` (road map
+  14's MC2) wraps `rc_agent_socket_start` / `_release`: `start` throws the
+  core's sentence, `release` is the quit's unlink-if-still-ours with no join.
+  The `dictionary` extensions on the property types went to
+  `PropsDictionaries.swift` (a pure move: they name no `rc_*` symbol).
   The graphics engine's wrappers are here too: `GraphicLibrary` (`addFont`,
   `addAsset`, `rasterize`, `families()`; frozen by its first compile,
   rasterize or `families()`) and
@@ -39,6 +42,11 @@ detail there.
   `rc_project_apply`'s TWO message channels**, in the header's own order — a
   sentence is a refusal, an error message is invalid input, neither written
   is an identity — answered as the `ReelEdit` below.
+- `PropsDictionaries.swift` — the `dictionary` extensions on the §5.2
+  property types (`CropInsets` … `Gradient`), the model's own key names; a
+  pure move out of `ReelCore.swift` (road map 14's MC2 toll). With
+  `ReelCore.swift` and `ReelOps.swift`, the only files that write an op
+  argument.
 - `ReelOps.swift` — `OpArgs`, `ReelOp` and one typed factory per row of
   `core/src/edit.rs`'s op table, plus a RAW factory beside the typed one at
   each door that takes a CALLER's own object — ELEVEN of them (`setVideoRaw`,
@@ -1421,6 +1429,22 @@ free.
   (`import_media`, `transcribe`, `record_screen`, `export`,
   `render_graphic`, …); the criterion
   is "waits on main", not "touches the disk".
+- `AgentServer+Socket.swift` — the agent server's Unix socket beside TCP
+  (road map 14's MC2, spec §11 MC-1, MC-2, MC-6). `socketPlan` is pure:
+  a non-empty `RC_AGENT_SOCKET`, else — until MC4 — no socket when
+  `RC_AGENT_PORT` is set (every proof of the era sets it), else
+  `AppSupport`'s `Agent/agent.sock`. `bindSocket` (first in
+  `applicationDidFinishLaunching`) runs `socketRefusal` — the folder made
+  through `AppSupport.ensureDirectory`, then a real folder this user owns
+  with no group or world bits; a socket at the path that ACCEPTS is left
+  alone, one that REFUSES is unlinked, anything else is left alone — then
+  `ReelAgentSocket.start` with the prepared catalog and the frozen file's
+  `agentToolTrampoline`. It never alerts: one log line, `Reelcut agent socket
+  listening at <path>` or `Reelcut agent socket not bound: <reason>`, never
+  the `Reelcut: ` prefix. `unbindSocket` (in `applicationWillTerminate`,
+  before TCP's `stop()`) releases with no join. The mode check, the connect
+  and the port arm are each one statement that `agent_socket_proof.py`'s
+  mutants replace.
 - `AgentLane.swift` — every tool call's one door (road map 12 A1, spec §11
   AI-2, AI-3, AI-5, AI-12): the MCP trampoline's `serve` (server thread,
   synchronous) and the assistant session's `submit` (returns at once; one

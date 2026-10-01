@@ -456,6 +456,23 @@ uint16_t rc_agent_server_start(uint16_t port, const char *server_name,
 /* Stops the server and joins its thread. Safe when none is running. */
 void rc_agent_server_stop(void);
 
+/* Binds the embedded MCP server's Unix-socket listener at `socket_path` (a
+ * second server object beside the TCP one, same catalog and handler
+ * contract), chmod 0600. True, or false with a message through `err_out`.
+ * One per process: a second start is an error ("agent socket already
+ * bound"). Never unlinks an existing file. */
+bool rc_agent_socket_start(const char *socket_path, const char *server_name,
+                           const char *server_version, const char *tools_json,
+                           RcAgentToolHandler handler, void *context, char **err_out);
+
+/* For quit. Takes the listener out of its slot and unlinks the socket file
+ * only if it is still the one this listener bound (same device and inode),
+ * then abandons the listener: its thread is neither unblocked nor joined, so
+ * a call in flight cannot hold the quit, and process exit ends it. `handler`
+ * and `context` must stay valid for the life of the process. Safe when none
+ * is bound. */
+void rc_agent_socket_release(void);
+
 #ifdef __cplusplus
 }
 #endif

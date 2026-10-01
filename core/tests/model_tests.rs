@@ -31,7 +31,8 @@ use reelcut_core::ffi::{
     rc_timecode_parse,
 };
 use reelcut_core::ffi_agent::{
-    rc_agent_server_start, rc_agent_server_stop, rc_agent_string_create,
+    rc_agent_server_start, rc_agent_server_stop, rc_agent_socket_release, rc_agent_socket_start,
+    rc_agent_string_create,
 };
 use reelcut_core::ffi_edit::rc_project_apply;
 use reelcut_core::ffi_graphic::{
@@ -2129,6 +2130,52 @@ fn sweep_every_export_with_nulls() -> Vec<String> {
     // Safe when none is running, which is the state the sweep is in.
     rc_agent_server_stop();
     cover("rc_agent_server_stop");
+
+    // The socket's NULL path is refused before anything is read or bound;
+    // a NULL name after a real path still binds nothing.
+    let mut err: *mut c_char = ptr::null_mut();
+    assert!(!unsafe {
+        rc_agent_socket_start(
+            ptr::null(),
+            ptr::null(),
+            ptr::null(),
+            ptr::null(),
+            unused_tool_handler,
+            ptr::null_mut(),
+            &mut err,
+        )
+    });
+    assert_eq!(take_string(err).as_deref(), Some("socket_path is NULL"));
+    let path = cstring("/nonexistent-rc-sweep/agent.sock");
+    let mut err: *mut c_char = ptr::null_mut();
+    assert!(!unsafe {
+        rc_agent_socket_start(
+            path.as_ptr(),
+            ptr::null(),
+            version.as_ptr(),
+            tools.as_ptr(),
+            unused_tool_handler,
+            ptr::null_mut(),
+            &mut err,
+        )
+    });
+    assert_eq!(take_string(err).as_deref(), Some("server_name is NULL"));
+    assert!(!unsafe {
+        rc_agent_socket_start(
+            ptr::null(),
+            ptr::null(),
+            ptr::null(),
+            ptr::null(),
+            unused_tool_handler,
+            ptr::null_mut(),
+            ptr::null_mut(),
+        )
+    });
+    cover("rc_agent_socket_start");
+
+    // Safe when none is bound.
+    rc_agent_socket_release();
+    cover("rc_agent_socket_release");
 
     // The graphics exports (`graphic_ffi.rs` checks what they draw). Every
     // `diag_out` failure is ONE error Diagnostic in a JSON array.

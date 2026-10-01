@@ -11,6 +11,9 @@ import Foundation
 /// holds `project.json` and `cache` and drops anything else on the next save —
 /// and neither is regenerable from the project, which is the pair of facts
 /// that puts both here rather than in the package or in `NSTemporaryDirectory`.
+/// A third, `Agent/`, holds the agent server's socket (road map 14, spec §11
+/// MC-1, MC-2): a `0700` folder of its own, because its mode is the socket's
+/// whole access control and this folder's own mode is left alone (#108).
 ///
 /// **Why it is a type and not two literals.** The path was spelled once, as
 /// `FFmpegRewrap.rewrapDirectory`, and privately: a second feature needing the
@@ -26,8 +29,8 @@ import Foundation
 /// that knows whether it is about to write — and it does so through
 /// `ensureDirectory`, the ONE creator of this folder and of any folder under
 /// it: `0700` at each level it makes, an existing folder left alone (#108).
-/// `FFmpegRewrap.convert`, `ExportPresetsStore.write`, `FileStore.write` and
-/// `AssistantSpend.record` all call it. Building a path must not have the side
+/// `FFmpegRewrap.convert`, `ExportPresetsStore.write`, `FileStore.write`,
+/// `AssistantSpend.record` and `AgentServer.bindSocket` all call it. Building a path must not have the side
 /// effect of littering the user's Library with empty folders for features
 /// they never used.
 enum AppSupport {

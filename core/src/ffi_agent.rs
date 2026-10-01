@@ -1,12 +1,17 @@
 //! C FFI for the embedded MCP agent server (`rc_agent_*` in the header).
 //!
-//! One server per process: `rc_agent_server_start` refuses to start a
-//! second. The host's tool handler is a C function pointer invoked from
-//! the server thread; its return value must come from
+//! Two listeners, each one per process in its own slot: the TCP server
+//! (`rc_agent_server_start` / `_stop`, `SERVER`) and the Unix socket
+//! (`rc_agent_socket_start` / `_release`, `SOCKET`, road map 14). A second
+//! start of either is refused. Both are built from the same
+//! [`AgentConfig`] (`host_config`), so they serve one catalog through one
+//! handler. The host's tool handler is a C function pointer invoked from
+//! either server thread; its return value must come from
 //! [`rc_agent_string_create`] so this side can reclaim the allocation.
 
 use std::ffi::{c_char, c_void, CStr, CString};
 use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::path::Path;
 use std::ptr;
 use std::sync::Mutex;
 
@@ -46,6 +51,34 @@ impl HostHandler {
 }
 
 static SERVER: Mutex<Option<AgentServer>> = Mutex::new(None);
+static SOCKET: Mutex<Option<AgentServer>> = Mutex::new(None);
+
+/// Reads the three strings both starts take and builds the
+/// [`AgentConfig`] around the host's handler: the one place the catalog is
+/// parsed and the handler wrapped, so the two listeners cannot differ.
+///
+/// # Safety
+/// String arguments must be NULL or valid NUL-terminated C strings.
+unsafe fn host_config(
+    server_name: *const c_char,
+    server_version: *const c_char,
+    tools_json: *const c_char,
+    handler: RcAgentToolHandler,
+    context: *mut c_void,
+) -> Result<AgentConfig, String> {
+    let name = unsafe { read_cstr(server_name, "server_name") }?;
+    let version = unsafe { read_cstr(server_version, "server_version") }?;
+    let tools_text = unsafe { read_cstr(tools_json, "tools_json") }?;
+    let tools: serde_json::Value = serde_json::from_str(&tools_text)
+        .map_err(|e| format!("tools_json is not valid JSON: {e}"))?;
+    let host = HostHandler { handler, context };
+    Ok(AgentConfig {
+        name,
+        version,
+        tools,
+        handler: Box::new(move |tool, arguments| host.call(tool, arguments)),
+    })
+}
 
 /// Allocates a NUL-terminated copy of `s` owned by this library, for tool
 /// handlers to return. Never freed by the caller: ownership passes back
@@ -88,11 +121,8 @@ pub unsafe extern "C" fn rc_agent_server_start(
     err_out: *mut *mut c_char,
 ) -> u16 {
     let body = || {
-        let name = unsafe { read_cstr(server_name, "server_name") }?;
-        let version = unsafe { read_cstr(server_version, "server_version") }?;
-        let tools_text = unsafe { read_cstr(tools_json, "tools_json") }?;
-        let tools: serde_json::Value = serde_json::from_str(&tools_text)
-            .map_err(|e| format!("tools_json is not valid JSON: {e}"))?;
+        let config =
+            unsafe { host_config(server_name, server_version, tools_json, handler, context) }?;
 
         let mut slot = SERVER
             .lock()
@@ -100,13 +130,6 @@ pub unsafe extern "C" fn rc_agent_server_start(
         if slot.is_some() {
             return Err("agent server already running".to_string());
         }
-        let host = HostHandler { handler, context };
-        let config = AgentConfig {
-            name,
-            version,
-            tools,
-            handler: Box::new(move |tool, arguments| host.call(tool, arguments)),
-        };
         let (bound, server) = agent::start(port, config)?;
         *slot = Some(server);
         Ok(bound)
@@ -130,5 +153,66 @@ pub extern "C" fn rc_agent_server_stop() {
     let server = catch_unwind(|| SERVER.lock().ok().and_then(|mut slot| slot.take()));
     if let Ok(Some(server)) = server {
         let _ = catch_unwind(AssertUnwindSafe(|| server.shutdown()));
+    }
+}
+
+/// Binds the embedded MCP server's Unix-socket listener at `socket_path` —
+/// a second server object beside the TCP one, with the same catalog and
+/// handler contract — chmod 0600. True, or false with a message through
+/// `err_out`. One per process: a second start is an error ("agent socket
+/// already bound"). Never unlinks an existing file.
+///
+/// # Safety
+/// String arguments must be valid NUL-terminated C strings; `err_out`
+/// must be NULL or a valid pointer to writable `*mut c_char`; `handler`
+/// and `context` must remain valid and callable from any thread for the
+/// life of the process, because [`rc_agent_socket_release`] never joins.
+#[no_mangle]
+pub unsafe extern "C" fn rc_agent_socket_start(
+    socket_path: *const c_char,
+    server_name: *const c_char,
+    server_version: *const c_char,
+    tools_json: *const c_char,
+    handler: RcAgentToolHandler,
+    context: *mut c_void,
+    err_out: *mut *mut c_char,
+) -> bool {
+    let body = || {
+        let path = unsafe { read_cstr(socket_path, "socket_path") }?;
+        let config =
+            unsafe { host_config(server_name, server_version, tools_json, handler, context) }?;
+
+        let mut slot = SOCKET
+            .lock()
+            .map_err(|_| "socket lock poisoned".to_string())?;
+        if slot.is_some() {
+            return Err("agent socket already bound".to_string());
+        }
+        let server = agent::start_socket(Path::new(&path), config)?;
+        *slot = Some(server);
+        Ok(())
+    };
+    unsafe {
+        fallible_op(
+            err_out,
+            "panic while binding agent socket",
+            false,
+            body,
+            |()| true,
+        )
+    }
+}
+
+/// For quit. Takes the listener out of its slot and unlinks the socket
+/// file only if it is still the one this listener bound (same device and
+/// inode), then abandons the listener: its thread is neither unblocked nor
+/// joined, so a call in flight cannot hold the quit, and process exit ends
+/// it. `handler` and `context` must stay valid for the life of the process.
+/// Safe when none is bound.
+#[no_mangle]
+pub extern "C" fn rc_agent_socket_release() {
+    let server = catch_unwind(|| SOCKET.lock().ok().and_then(|mut slot| slot.take()));
+    if let Ok(Some(server)) = server {
+        let _ = catch_unwind(AssertUnwindSafe(|| server.release()));
     }
 }

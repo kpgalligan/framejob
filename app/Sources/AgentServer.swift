@@ -1,17 +1,22 @@
 import AppKit
 
-/// Hosts the core's embedded MCP server (streamable HTTP on 127.0.0.1) and
-/// executes its tool calls against the open projects. The Rust side owns the
-/// protocol (`rc_agent_server_start`); this class owns the tool catalog and
-/// the dispatch, which runs on the main thread so every edit flows through
-/// the same `ProjectDocument` entry points as the UI — undoable, dirtying,
-/// and live in the window.
+/// Hosts the core's embedded MCP server (streamable HTTP) and executes its
+/// tool calls against the open projects. The Rust side owns the protocol
+/// (`rc_agent_server_start` for TCP on 127.0.0.1, `ReelAgentSocket` for the
+/// Unix socket); this class owns the tool catalog and the dispatch, which
+/// runs on the main thread so every edit flows through the same
+/// `ProjectDocument` entry points as the UI — undoable, dirtying, and live
+/// in the window.
 ///
-/// Point any MCP client at `http://127.0.0.1:<port>/mcp` — e.g.
+/// The socket (`AgentServer+Socket.swift`, road map 14, spec §11 MC-1) is
+/// bound at every launch, at `Agent/agent.sock` in the support folder or
+/// `RC_AGENT_SOCKET`, in a `0700` folder — except, until MC4, a launch that
+/// sets `RC_AGENT_PORT` without `RC_AGENT_SOCKET` (MC-6). Until MC4 a TCP listener sits
+/// beside it: point an MCP client at `http://127.0.0.1:<port>/mcp` — e.g.
 ///   goose session --with-streamable-http-extension "http://127.0.0.1:4817/mcp"
 ///
-/// The endpoint is unauthenticated: any local process may connect while it
-/// runs. It is off by default (Tools ▸ Allow Agent Connections), and on
+/// The TCP endpoint is unauthenticated: any local process may connect while
+/// it runs. It is off by default (Tools ▸ Allow Agent Connections), and on
 /// automatically when the app is launched with `-AgentServerEnabled YES`
 /// (spec §7.9).
 ///
@@ -127,9 +132,7 @@ final class AgentServer {
             ProcessInfo.processInfo.environment["RC_AGENT_PORT"]
             .flatMap(UInt16.init) ?? Self.defaultPort
         let catalog = try prepareCatalog()
-        let version =
-            Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-            ?? "0.0"
+        let version = Self.serverVersion
         let context = Unmanaged.passUnretained(self).toOpaque()
 
         var bound: UInt16 = 0
@@ -804,8 +807,9 @@ final class AgentBox<Value> {
 /// C callback for `RcAgentToolHandler`: hands the call to the lane, which
 /// takes its lock (what serialises every caller, AI-2), routes it to main or
 /// leaves an `offMainTools` member on this thread, and hands the result back
-/// as a core-owned string.
-private func agentToolTrampoline(
+/// as a core-owned string. Both listeners call it, TCP's and the socket's
+/// (`AgentServer+Socket.swift`), each from its own server thread.
+func agentToolTrampoline(
     _ context: UnsafeMutableRawPointer?,
     _ toolName: UnsafePointer<CChar>?,
     _ argumentsJSON: UnsafePointer<CChar>?

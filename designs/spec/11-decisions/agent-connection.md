@@ -42,4 +42,6 @@ The road map that makes these is in progress: `designs/reelcut-roadmap-14.md`, w
 - **MC-6 — `RC_AGENT_SOCKET` overrides the socket path, and a proof always sets it.** No proof
   binds or deletes the person's socket, and `reelcut-mcp` honours the same variable, passing it
   to a Reelcut it launches (`open --env`), so a proof can drive the proxy against a scratch
-  instance.
+  instance. Until MC4, a launch that sets `RC_AGENT_PORT` and not `RC_AGENT_SOCKET` binds no
+  socket, because every proof of the era sets `RC_AGENT_PORT` and would otherwise bind the
+  person's; MC4 deletes this rule with `RC_AGENT_PORT`.

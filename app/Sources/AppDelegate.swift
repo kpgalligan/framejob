@@ -31,11 +31,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return false
     }
 
-    /// The launch flag of spec §7.9: `-AgentServerEnabled YES` puts the value
-    /// in NSUserDefaults' argument domain, which is the same key the menu item
-    /// persists — so one read starts the server for a scripted launch and for
-    /// a user who left it on.
+    /// The agent socket first, at every launch (road map 14, spec §11 MC-1;
+    /// `AgentServer+Socket.swift` logs why when it binds none). Then the TCP
+    /// listener's launch flag of spec §7.9, until MC4: `-AgentServerEnabled
+    /// YES` puts the value in NSUserDefaults' argument domain, which is the
+    /// same key the menu item persists — so one read starts the server for a
+    /// scripted launch and for a user who left it on.
     func applicationDidFinishLaunching(_ notification: Notification) {
+        AgentServer.shared.bindSocket()
         if UserDefaults.standard.bool(forKey: AgentServer.enabledDefaultsKey) {
             startAgentServer()
         }
@@ -152,9 +155,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) { reply() }
     }
 
-    /// The server holds a pointer to its handler for as long as it runs, and
-    /// its thread must be joined before the process goes away.
+    /// The socket is released FIRST and is not joined: its file is unlinked
+    /// only while it is still this instance's, and its listener is abandoned
+    /// to process exit, so a call in flight cannot hold the quit (its handler
+    /// and context live for the process). Then `stop()` joins the TCP
+    /// listener's thread, as it always has; that join, and the hang behind an
+    /// in-flight call it can cause, goes with TCP in MC4.
     func applicationWillTerminate(_ notification: Notification) {
+        AgentServer.shared.unbindSocket()
         AgentServer.shared.stop()
     }
 

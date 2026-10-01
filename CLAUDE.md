@@ -240,7 +240,8 @@ session may have one running):
 
 ```sh
 make app
-(RC_AGENT_PORT=4817 ./build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut \
+(RC_AGENT_PORT=4817 RC_AGENT_SOCKET="$(mktemp -d)/agent.sock" \
+   ./build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut \
    -ApplePersistenceIgnoreState YES -AgentServerEnabled YES > /tmp/reelcut-4817.log 2>&1 &)
 ```
 

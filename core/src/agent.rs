@@ -5,14 +5,28 @@
 //! start, so this module stays generic: it knows the catalog it was given
 //! and nothing about documents.
 //!
-//! Transport notes: binds 127.0.0.1 only and answers every JSON-RPC POST
+//! Transport notes: two listeners speak the same HTTP through the same
+//! `serve` loop. [`start`] binds TCP on 127.0.0.1 only; [`start_socket`]
+//! binds a Unix socket at a path (road map 14, spec §11 MC-1), chmod 0600,
+//! never unlinking a file already there. Either answers every JSON-RPC POST
 //! with a single `application/json` response (the streamable-HTTP spec
 //! allows this in place of an SSE stream). Stateless — no session IDs are
 //! issued, and GET/DELETE report 405 as the spec directs for servers
 //! without server-push or client-terminated sessions.
+//!
+//! **A socket listener never lets `tiny_http`'s `Drop` run against a file
+//! that is no longer its own** (road map 14's MC1, S7): 0.12's `Server`
+//! drop connects to its path and unlinks it unconditionally, so a listener
+//! whose file was unlinked and re-bound by another instance would delete
+//! that instance's socket. The listener records the file's device and inode
+//! when it binds ([`SocketClaim`]); [`AgentServer::shutdown`] lets the drop
+//! run only while the file is still that one, and [`AgentServer::release`]
+//! unlinks it only then and abandons the listener without a join.
 
 use std::io::Read;
 use std::net::{Ipv4Addr, SocketAddrV4};
+use std::os::unix::fs::{MetadataExt, PermissionsExt};
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::thread::JoinHandle;
 
@@ -31,18 +45,62 @@ pub struct AgentConfig {
     pub handler: ToolHandler,
 }
 
+/// macOS's `sun_path` holds 104 bytes with the terminating NUL, so a socket
+/// path may be 103 bytes long (MC1's S1: 103 binds, 104 does not).
+pub const MAX_SOCKET_PATH_BYTES: usize = 103;
+
+/// The socket file a listener bound, by the device and inode `lstat` read
+/// straight after the bind: what "still this listener's file" means.
+pub struct SocketClaim {
+    path: PathBuf,
+    dev: u64,
+    ino: u64,
+}
+
+impl SocketClaim {
+    /// True while `lstat(path)` answers the device and inode the bind left
+    /// there. A file unlinked, or replaced by another listener's, is not.
+    pub fn is_current(&self) -> bool {
+        std::fs::symlink_metadata(&self.path)
+            .map(|meta| meta.dev() == self.dev && meta.ino() == self.ino)
+            .unwrap_or(false)
+    }
+}
+
 pub struct AgentServer {
     server: Arc<tiny_http::Server>,
     thread: Option<JoinHandle<()>>,
+    /// The socket file this listener bound; None for TCP.
+    claim: Option<SocketClaim>,
 }
 
 impl AgentServer {
-    /// Unblocks the accept loop and joins the serving thread.
+    /// Unblocks the accept loop and joins the serving thread. A socket
+    /// listener whose file is no longer its own is then forgotten rather
+    /// than dropped, so `tiny_http`'s `Drop` neither connects to nor unlinks
+    /// another listener's socket (S7); otherwise it drops, which unlinks its
+    /// own file.
     pub fn shutdown(mut self) {
         self.server.unblock();
         if let Some(thread) = self.thread.take() {
             let _ = thread.join();
         }
+        if self.claim.as_ref().is_some_and(|claim| !claim.is_current()) {
+            std::mem::forget(self.server);
+        }
+    }
+
+    /// For quit: unlinks the socket file only if it is still the one this
+    /// listener bound, then abandons the listener. Its thread is neither
+    /// unblocked nor joined and nothing is dropped, so a call in flight
+    /// cannot hold the caller; process exit ends the thread.
+    pub fn release(self) {
+        if let Some(claim) = &self.claim {
+            if claim.is_current() {
+                let _ = std::fs::remove_file(&claim.path);
+            }
+        }
+        std::mem::forget(self);
     }
 }
 
@@ -76,8 +134,58 @@ pub fn start(port: u16, config: AgentConfig) -> Result<(u16, AgentServer), Strin
         AgentServer {
             server,
             thread: Some(thread),
+            claim: None,
         },
     ))
+}
+
+/// Binds the server on a Unix socket at `path`, chmod 0600, and returns the
+/// running server with its claim on the file. A relative path and one over
+/// [`MAX_SOCKET_PATH_BYTES`] are refused by name. An existing file is never
+/// unlinked first: `tiny_http` refuses to bind over one (S4–S6), and whether
+/// a file at the path is a crash's leftover is the host's to decide (MC-2).
+pub fn start_socket(path: &Path, config: AgentConfig) -> Result<AgentServer, String> {
+    if !config.tools.is_array() {
+        return Err("tools catalog must be a JSON array".to_string());
+    }
+    let shown = path.display();
+    if !path.is_absolute() {
+        return Err(format!("socket path must be absolute: {shown}"));
+    }
+    let n = path.as_os_str().len();
+    if n > MAX_SOCKET_PATH_BYTES {
+        return Err(format!(
+            "socket path is {n} bytes; macOS allows {MAX_SOCKET_PATH_BYTES}: {shown}"
+        ));
+    }
+    let server =
+        tiny_http::Server::http_unix(path).map_err(|e| format!("could not bind {shown}: {e}"))?;
+    // A fresh bind's file takes the umask (0755 under 022, S3). On failure
+    // the server drops here, which unlinks the file this call just made.
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
+        .map_err(|e| format!("could not make {shown} 0600: {e}"))?;
+    let meta = match std::fs::symlink_metadata(path) {
+        Ok(meta) => meta,
+        Err(e) => {
+            // Whatever is at the path now may not be this bind's file, so
+            // the drop must not unlink it (S7).
+            std::mem::forget(server);
+            return Err(format!("could not read {shown}: {e}"));
+        }
+    };
+    let claim = SocketClaim {
+        path: path.to_path_buf(),
+        dev: meta.dev(),
+        ino: meta.ino(),
+    };
+    let server = Arc::new(server);
+    let accept = Arc::clone(&server);
+    let thread = std::thread::spawn(move || serve(accept, config));
+    Ok(AgentServer {
+        server,
+        thread: Some(thread),
+        claim: Some(claim),
+    })
 }
 
 enum Reply {

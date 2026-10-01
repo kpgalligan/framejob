@@ -408,8 +408,10 @@ to pay a toll starts from it. A file not listed has no named seam yet.
 
 - `ProjectSnapshot.swift`: a property group's snapshot types out, whole. The precedents are
   `TextProps.swift` and `ProjectSnapshot+Graphic.swift`.
-- `ReelCore.swift`: the `dictionary` extensions (the media helpers already went to
-  `MediaDescriptor.swift`). It stays the only file that calls `rc_*`.
+- `ReelCore.swift`: the typed patches (`VideoPatch`, `AudioPatch`, `ShapePatch`, `ClipPatch`),
+  as `TextPatch.swift` already went. The `dictionary` extensions seam is paid: road map 14's MC2
+  moved them to `PropsDictionaries.swift` before adding `ReelAgentSocket`, and the media helpers
+  went to `MediaDescriptor.swift` before that. It stays the only file that calls `rc_*`.
 - `ProjectDocument.swift`: stored properties cannot move; the natural cut is the media/reverse
   machinery, in the shape of `+DisplayStem`, `+Import`, `+Graphics`.
 - `InspectorPane.swift`: the precedents are `InspectorSection.swift`, `InspectorSlider.swift` and

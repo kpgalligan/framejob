@@ -136,8 +136,9 @@ The answers go in this road map's MC1 record and bind MC2 and MC3.
 - `agent.rs` gains a second listener on `Server::http_unix`, served by its own thread through
   the same `handle_request`. Calls still serialise through the lane (AI-2), so two listeners
   change nothing about ordering.
-- `rc_agent_server_start` takes a socket path (NULL for none) beside the port: Rust, header,
-  `ReelCore.swift` in lockstep. TCP stays for this phase only, so every existing proof keeps
+- A separate pair, `rc_agent_socket_start(path, …)` and `rc_agent_socket_release()`, beside
+  `rc_agent_server_start` / `_stop`, with a slot of its own: Rust, header, `ReelCore.swift`'s
+  `ReelAgentSocket` in lockstep. TCP stays for this phase only, so every existing proof keeps
   running while the socket is proved.
 - The app binds the socket at every launch (MC-1), at `AppSupport`'s folder plus
   `Agent/agent.sock` or `RC_AGENT_SOCKET`, under MC-2's rules: ensure the `Agent` folder
@@ -195,9 +196,14 @@ The answers go in this road map's MC1 record and bind MC2 and MC3.
   `connect`) and takes a path; every proof launches with a scratch `RC_AGENT_SOCKET` and drops
   `RC_AGENT_PORT` and `-AgentServerEnabled YES`. One launcher in `mcp.py` replaces the
   scripts' own, where that is a pure move.
-- `agent.rs` loses the TCP listener and `rc_agent_server_start` loses the port (Rust, header,
-  `ReelCore.swift`). `AgentServer` loses `port`, `defaultPort` and `enabledDefaultsKey`; its
-  "is running" becomes "bound the socket".
+- `agent.rs` loses the TCP listener, and `rc_agent_server_start` / `rc_agent_server_stop` are
+  deleted (Rust, header, `AgentServer.swift`'s calls); `rc_agent_socket_start` / `_release` stay.
+  `AgentServer` loses `port`, `defaultPort` and `enabledDefaultsKey`; its "is running" becomes
+  "bound the socket".
+- The interim port rule goes with `RC_AGENT_PORT`: `socketPlan`'s port arm, its `not bound` log
+  line, and `agent_socket_proof.py`'s P1 case and K10 row (and the `no-port-rule` mutant). With
+  `stop()` goes the TCP quit-join hang: `applicationWillTerminate` joins the TCP serve thread on
+  main, which an in-flight call that hops to main can hold.
 - Tools ▸ Allow Agent Connections goes, with `toggleAgentServer`, its validator and
   `startAgentServer`'s alert. **Tools ▸ Copy MCP Command takes its place** (agreed 2026-10-01):
   it puts on the general pasteboard the line that registers THIS copy of Reelcut with Claude
@@ -407,3 +413,68 @@ from just before `open -n -g` to the first answered `initialize`, polled every 5
 **Owed:** AC-1 and AC-2 (the person's). Nothing else from MC1. MC2 is next, carrying S7, S9, the
 103-byte budget and the `$TMPDIR` rule for proof sockets; MC3 carries the signing phase, the 60 s
 wait and B9's JSON-value comparison.
+
+### MC2 — the socket, beside TCP (2026-10-01)
+
+The app binds the agent server on a Unix socket at every launch, beside the TCP listener, under
+MC-1, MC-2 and MC1's findings. Over `ffe5a9f`:
+
+- **The toll first.** `ReelCore.swift` (1353 lines) gave up its `dictionary` extensions to
+  `PropsDictionaries.swift` (the 106-line section moved whole; only the section doc's "nothing outside"
+  sentence names the new file) before taking the wrapper, and `make typecheck` held its baseline
+  over the pure move alone. `app-file-history.md`'s named next cut for it is now the typed patches.
+- **Core.** `agent.rs` gains `start_socket` (absolute path, at most 103 bytes, `http_unix`, never
+  an unlink first, chmod 0600, then the claim and the serve thread), `SocketClaim` (the device and
+  inode `lstat` read after the bind) and `AgentServer::release`. `shutdown` lets `tiny_http`'s
+  `Drop` run only while the claim is current and forgets the server otherwise (S7).
+  `ffi_agent.rs` gains `rc_agent_socket_start` / `rc_agent_socket_release` in a `SOCKET` slot of
+  their own; `host_config` builds the `AgentConfig` for both starts. `core/tests/agent_socket.rs`
+  holds 7 tests, and `model_tests.rs`'s null sweep covers both exports.
+- **App.** `ReelAgentSocket` in `ReelCore.swift`; `AgentServer+Socket.swift` (188 lines) holds the
+  plan, MC-2's policy, the bind, the release and the two log lines (`Reelcut agent socket
+  listening at <path>`, `Reelcut agent socket not bound: <reason>`). `AgentServer.swift` (frozen)
+  took three wiring edits: the trampoline is internal, `start()` reads `serverVersion`, and the
+  header doc names the socket. `applicationDidFinishLaunching` calls `bindSocket()` first, and
+  `applicationWillTerminate` calls `unbindSocket()` before `stop()`.
+
+**Deviations from this road map's MC2 text**, each decided in the phase's spec:
+- **A separate FFI pair, not a socket argument on `rc_agent_server_start`.** The socket's quit is
+  a release without a join (below) while TCP's `stop()` keeps its join, and the Tools menu toggles
+  TCP without touching the socket, so each listener has its own slot. The MC2 and MC4 bullets
+  above now say so; MC4 deletes the TCP pair.
+- **The quit releases without a join.** `rc_agent_socket_release` unlinks the file only while it
+  is this listener's (same device and inode), then abandons the listener: its thread is neither
+  unblocked nor joined, so a call in flight that waits on main cannot hold the quit, and process
+  exit ends it. `AgentServer.shared`, the handler's context, lives for the process.
+- **The interim port rule (MC2..MC3).** A launch that sets `RC_AGENT_PORT` and not
+  `RC_AGENT_SOCKET` binds no socket and logs why: every proof of the era launches that way, and
+  without the rule each would bind the person's socket, against MC-6. It is recorded under spec
+  §11 MC-6, and MC4 deletes it with `RC_AGENT_PORT` (its arm, its log line, P1's case and K10).
+  Root `CLAUDE.md`'s launch line also gains `RC_AGENT_SOCKET="$(mktemp -d)/agent.sock"`.
+- **The non-socket rule.** A file at the path that is not a socket is left alone and nothing is
+  bound (`<path> exists and is not a socket; it is left alone`): MC-2 sanctions unlinking only a
+  socket that refuses a connection, and MC1 measured no `connect` to a regular file.
+- **The TCP `stop()` quit-join hang: removed by MC4.** `stop()` still joins the TCP serve thread
+  on main at quit, and a call in flight that hops to main can hold it. This phase does not change
+  it and no issue is filed, because MC4 deletes `stop()` with the listener.
+
+**Checked**, every instance my own, no model call and no spend ($0):
+
+| Command | Answer |
+|---|---|
+| `cd core && cargo fmt --check && cargo test --release --test agent_socket` | clean; 7 passed |
+| S7 mutant: `shutdown`'s `is_current` guard removed | `shutting_down_a_listener_whose_file_was_replaced_leaves_the_new_one` FAILED (6 passed, 1 failed) |
+| S7 mutant: `release`'s `is_current` check removed | `releasing_a_listener_whose_file_was_replaced_leaves_the_new_one` FAILED (6 passed, 1 failed) |
+| `make typecheck` | 0 errors, 4 warnings (the AVFoundation baseline), tsc clean; the same after the toll alone |
+| `make lint`; `make test`; `make app` | exit 0; exit 0 (the inventory's `--check` 5/5, its AppDelegate pins found at moved lines); BUILD SUCCEEDED |
+| `python3 tools/proof/agent_socket_proof.py --port 4941` | 14/14, exit 0: P1 5 cases; K2 240 631 bytes and 92 tools both ways; K6 and K7 quits in 0.14 s and 0.12 s; K10 `Agent/` and `agent.sock` absent before and after |
+| `… --port 4951 --mutant no-connect-first` | K4 FAIL (B listened at A's path, dev/ino changed), caught, exit 0 |
+| `… --port 4961 --mutant no-mode-check` | K8 FAIL (E listened in the `0755` folder), caught, exit 0 |
+| `… --mutant no-port-rule` | P1 FAIL (`RC_AGENT_PORT` alone planned the default), caught, exit 0; no app launched |
+
+The proof's first run scored K3 FAIL from the proof's own reading (a marker's key is `time`, not
+`at`); after that fix it scored 14/14. Nothing was created under `~/Library/Application
+Support/Reelcut/`; the scratch folders under `$TMPDIR` are removed at the end of each run.
+
+**Owed:** nothing from MC2. A quit with a call in flight is not proved (out of this phase's
+scope). MC3 (`reelcut-mcp`) is next; MC4 owes the interim rule's deletion and the TCP pair's.

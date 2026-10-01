@@ -10743,3 +10743,76 @@ AC-2.
 python3 tools/proof/mc1_spike/mc1_spike.py                 # q4, q1, q2, q3, then Z1
 python3 tools/proof/mc1_spike/mc1_spike.py --only q4       # a subset; the other rows carry forward
 ```
+
+## Road map 14 — MC2, the socket (`agent_socket_proof.py`)
+
+The app binds the agent server on a Unix socket at every launch
+(`app/Sources/AgentServer+Socket.swift`, spec §11 MC-1, MC-2, MC-6), beside
+the TCP listener MC4 removes. The proof launches its own instances one after
+another, each a `Popen` it owns with `-ApplePersistenceIgnoreState YES
+-AgentServerEnabled YES` and `RC_AGENT_PORT` = `--port` + k, and every one
+but K10's with `RC_AGENT_SOCKET` in a `tempfile.mkdtemp(prefix="rcs-")`
+folder under `$TMPDIR` (MC1: a path under `work/` can pass macOS's 103
+bytes). Logs are `work/agent-socket/<a…g>-<port>.log`; every other child
+runs under `graphics_spike/bounded.py`. HTTP over AF_UNIX is a local
+`http.client.HTTPConnection` subclass (MC4 moves it to `mcp.py`). Only the
+proof's own pids are signalled; a quit is a pid-targeted quit event
+(`osascript -l JavaScript`, `NSRunningApplication…terminate`). Nothing under
+`~/Library/Application Support/Reelcut/` is created, written or unlinked:
+K10 only `lstat`s.
+
+- **P1** `agent_socket_probe.swift` (built like
+  `export_cancel_proof.build_probe`, Swift sources and the staticlib only,
+  into `work/agent-socket/probe/`) prints `AgentServer.socketPlan` for five
+  cases: `{}` binds the default; `RC_AGENT_PORT` alone skips with the interim
+  rule's reason; port plus socket binds the socket; an empty
+  `RC_AGENT_SOCKET` binds the default; a nil default skips with "no
+  Application Support folder". A probe that will not build is a FAIL.
+- **K0** CONTROL: the scratch path ≤ 103 bytes, under `$TMPDIR`, not under
+  the support folder, its folder `0700`. **K1** A logs `listening at <path>`;
+  the file is a socket at `0600`. **K2** the raw `tools/list` body is
+  byte-equal over the socket and TCP. **K3** a marker added over the socket
+  is read back over TCP and one added over TCP over the socket.
+- **K4** B at the same path logs `not bound: another instance answers…`, the
+  file's dev and ino unchanged, A still answers. **K5** SIGKILL A (B
+  stopped): the leftover refuses `connect` (ECONNREFUSED) and C binds over
+  it. **K6** the proof unlinks C's file, D binds, C quits within 20 s, and D's
+  file keeps its inode and answers (MC1's S7 at the app's quit). **K7** D
+  quits within 20 s and its file is gone.
+- **K8** a `0755` folder: E logs `not bound` naming `0755`, no file. **K9** a
+  regular file at the path: F logs `not bound…not a socket`, bytes unchanged.
+- **K10**, run only when P1 is ok: G with `RC_AGENT_PORT` and no
+  `RC_AGENT_SOCKET` logs the interim rule, and the default `Agent/` folder and
+  `agent.sock` `lstat` the same before the launch and after its quit.
+- **Z1** no `Reelcut: ` in any log; **Z2** no proof pid alive.
+- `--mutant no-connect-first` (the `connect(2)` replaced by ECONNREFUSED;
+  K4 must FAIL) and `--mutant no-mode-check` (the folder-mode statement
+  removed; K8 must FAIL) build a `tree_copy.make_copy` copy by its own `make
+  app` and run every row on it. `--mutant no-port-rule` (the port arm
+  removed; P1 must FAIL) builds and runs ONLY the probe over a copy of
+  `app/Sources` — no app is launched, so the person's socket is never at
+  risk. Exit 0 caught, 1 survived, 2 control not performed.
+- The S7 guards are Rust, which `tree_copy` links rather than copies, so
+  their two mutants are made by hand against `cd core && cargo test
+  --release --test agent_socket`: `shutdown`'s `is_current` guard removed
+  fails `shutting_down_a_listener_whose_file_was_replaced_leaves_the_new_one`,
+  `release`'s fails `releasing_a_listener_whose_file_was_replaced_leaves_the_new_one`.
+
+```sh
+python3 tools/proof/agent_socket_proof.py --port 4941
+python3 tools/proof/agent_socket_proof.py --port 4951 --mutant no-connect-first
+python3 tools/proof/agent_socket_proof.py --port 4961 --mutant no-mode-check
+python3 tools/proof/agent_socket_proof.py --mutant no-port-rule
+```
+
+Run on 2026-10-01 over `ffe5a9f` plus the MC2 change, every instance my own:
+
+| Command | Answer |
+|---|---|
+| `cargo fmt --check`; `cargo test --release --test agent_socket` | clean; 7 passed |
+| the two hand-made S7 mutants | each fails its own S7 test, 6 passed 1 failed |
+| `make typecheck`; `make lint`; `make test`; `make app` | 0 errors, 4 warnings (the AVFoundation baseline), tsc clean; exit 0; exit 0; BUILD SUCCEEDED |
+| `agent_socket_proof.py --port 4941` | 14/14, exit 0 (K2 240 631 bytes, 92 tools; K6 C quit in 0.14 s; K10 `Agent/` absent before and after) |
+| `--mutant no-connect-first` | K4 FAIL (B "listening at …", dev/ino changed), caught, exit 0 |
+| `--mutant no-mode-check` | K8 FAIL (E "listening at …", a file made), caught, exit 0 |
+| `--mutant no-port-rule` | P1 FAIL (`port` planned `bind` of the default), caught, exit 0 |
