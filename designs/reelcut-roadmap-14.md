@@ -232,4 +232,20 @@ for Copy MCP Command other than a Tools menu that holds nothing else (the user's
 
 ## Record
 
-Nothing has landed.
+### MC0 — decisions (2026-10-01)
+
+MC-1..MC-6 are spec §11 in `designs/spec/11-decisions/agent-connection.md` (43 lines), each
+bullet this document's "Decisions" text re-wrapped, with one edit: MC-5's "the persisted-switch
+wrinkle above" names its referent, "(road map 14, "What exists")". Their rows are in
+`designs/spec/11-decisions/README.md`: the file's row after `pricing.md`'s, and six rows in
+"Every decision" after P-8. Spec §7.9a's closing paragraph now cites MC-1..MC-6 and keeps the
+TCP facts true until MC4: the build "also keeps a TCP listener, its only one until MC2 adds the
+socket beside it" (default port 4817, `RC_AGENT_PORT`, `-AgentServerEnabled YES`, under which
+`FFmpegRewrap`'s `ask` means no for the whole launch). The spec index's counts are current:
+`07.9a` at 402 lines ("the port" now "the transport"), `11-decisions/` at 2678 in 14 files (the
+old cell's 2628 in 13 plus the new file and the seven index rows). No code. Checked: both greps
+for MC rows (`^- **MC-[1-6] — ` in the decision file, `^| MC-[1-6] | …agent-connection.md` in
+the index) print 6; the Lines cells equal `wc -l`; §7.9a shows both the MC citation and
+`RC_AGENT_PORT`; "Default port 4817" no longer appears under `designs/spec/`; a
+whitespace-normalised comparison of the six bullets against this document's text matches, with
+the MC-5 edit applied. Owed: nothing from MC0; MC1 is next.
