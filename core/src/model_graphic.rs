@@ -38,11 +38,11 @@ pub const GRAPHIC_MAX_SIDE: u32 = 8192;
 /// it); `graphic_ffi.rs`'s `one_max_props_…` test pins the two equal.
 pub const GRAPHIC_MAX_PROPS: usize = 64;
 
-/// The engine's `MAX_OPTIONS` (an `enum` entry's) and `MAX_STRING` (in
-/// characters), and its six schema types in the order its refusal lists.
-const MAX_OPTIONS: usize = 32;
-const MAX_STRING: usize = 4096;
-const TYPES: [&str; 6] = ["string", "number", "boolean", "color", "enum", "asset"];
+/// The engine's `MAX_OPTIONS` (an `enum` entry's), `MAX_STRING` (in characters) and
+/// `TYPES` (its refusal's order), restated (G-2); `graphic_ffi.rs`'s `one_…` tests pin each.
+pub const GRAPHIC_MAX_OPTIONS: usize = 32;
+pub const GRAPHIC_MAX_STRING: usize = 4096;
+pub const GRAPHIC_TYPES: [&str; 6] = ["string", "number", "boolean", "color", "enum", "asset"];
 
 /// A bad module name's clause, for the ops and `validate` alike.
 pub(crate) const NAME_RULE: &str = "is not a module name (lowercase letters, digits and -, \
@@ -135,7 +135,7 @@ fn check_entry(key: &str, entry: &Value) -> Result<(), String> {
     let Some(kind) = entry.get("type").and_then(Value::as_str) else {
         return Err(format!("schema.{key} must be an object with a type"));
     };
-    if !TYPES.contains(&kind) {
+    if !GRAPHIC_TYPES.contains(&kind) {
         return Err(format!(
             "schema.{key}.type \"{kind}\" is not one of string, number, boolean, color, enum, asset"
         ));
@@ -145,7 +145,7 @@ fn check_entry(key: &str, entry: &Value) -> Result<(), String> {
             .get("options")
             .and_then(Value::as_array)
             .is_some_and(|o| {
-                (1..=MAX_OPTIONS).contains(&o.len()) && o.iter().all(Value::is_string)
+                (1..=GRAPHIC_MAX_OPTIONS).contains(&o.len()) && o.iter().all(Value::is_string)
             });
         if !good {
             return Err(format!("schema.{key}.options must be 1–32 strings"));
@@ -157,7 +157,7 @@ fn check_entry(key: &str, entry: &Value) -> Result<(), String> {
     let fits = match kind {
         "string" => default
             .as_str()
-            .is_some_and(|s| s.chars().count() <= MAX_STRING),
+            .is_some_and(|s| s.chars().count() <= GRAPHIC_MAX_STRING),
         "color" => default.is_string(),
         "number" => default.as_f64().is_some_and(f64::is_finite),
         "boolean" => default.is_boolean(),
@@ -289,9 +289,9 @@ fn check_range(key: &str, entry: &Value, number: f64, value: &Value) -> Result<(
 
 fn check_length(key: &str, text: &str) -> Result<(), String> {
     let count = text.chars().count();
-    if count > MAX_STRING {
+    if count > GRAPHIC_MAX_STRING {
         return Err(format!(
-            "props.{key} must be at most {MAX_STRING} characters, not {count}"
+            "props.{key} must be at most {GRAPHIC_MAX_STRING} characters, not {count}"
         ));
     }
     Ok(())

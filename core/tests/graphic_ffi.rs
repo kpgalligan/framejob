@@ -483,6 +483,39 @@ fn one_max_props_in_the_engine_and_the_core() {
 }
 
 #[test]
+fn one_max_options_in_the_engine_and_the_core() {
+    // G-2 keeps `graphic` out of `model_graphic.rs`, so the core restates the
+    // engine's cap on an `enum` entry's options; this is the one place the
+    // two are compared.
+    assert_eq!(
+        graphic::MAX_OPTIONS,
+        reelcut_core::model_graphic::GRAPHIC_MAX_OPTIONS
+    );
+}
+
+#[test]
+fn one_max_string_in_the_engine_and_the_core() {
+    // G-2 keeps `graphic` out of `model_graphic.rs`, so the core restates the
+    // engine's cap on a string's characters; this is the one place the two
+    // are compared.
+    assert_eq!(
+        graphic::MAX_STRING,
+        reelcut_core::model_graphic::GRAPHIC_MAX_STRING
+    );
+}
+
+#[test]
+fn one_type_list_in_the_engine_and_the_core() {
+    // G-2 keeps `graphic` out of `model_graphic.rs`, so the core restates the
+    // engine's schema types in its refusal's order; this is the one place the
+    // two are compared, as slices so a length change fails here, not the build.
+    assert_eq!(
+        graphic::TYPES.as_slice(),
+        reelcut_core::model_graphic::GRAPHIC_TYPES.as_slice()
+    );
+}
+
+#[test]
 fn the_app_texture_side_holds_the_largest_graphic() {
     // `LayerRenderers.bitmap(_:)` refuses a side over `maxTextureSide`, and a
     // failing graphic's error card is drawn through `bitmap(_:)` at the

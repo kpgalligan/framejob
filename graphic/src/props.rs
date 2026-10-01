@@ -9,11 +9,17 @@ use crate::diagnostic::Diagnostic;
 /// The most keys a module's schema may declare (G-4). The core restates it
 /// as `GRAPHIC_MAX_PROPS`, since G-2 forbids importing it there;
 /// `core/tests/graphic_ffi.rs`'s `one_max_props_in_the_engine_and_the_core`
-/// pins the two.
+/// pins the two, and `tests/reference.rs` pins the number the reference states.
 pub const MAX_PROPS: usize = 64;
-const MAX_OPTIONS: usize = 32;
-const MAX_STRING: usize = 4096;
-const TYPES: [&str; 6] = ["string", "number", "boolean", "color", "enum", "asset"];
+/// The most options an `enum` entry may list (G-4). The core restates it as
+/// `GRAPHIC_MAX_OPTIONS`, pinned in `core/tests/graphic_ffi.rs`.
+pub const MAX_OPTIONS: usize = 32;
+/// The most characters a `string` entry's default may hold (G-4). The core
+/// restates it as `GRAPHIC_MAX_STRING`, pinned in `core/tests/graphic_ffi.rs`.
+pub const MAX_STRING: usize = 4096;
+/// A schema entry's six types, in the order the refusal lists them (G-4). The
+/// core restates it as `GRAPHIC_TYPES`, pinned in `core/tests/graphic_ffi.rs`.
+pub const TYPES: [&str; 6] = ["string", "number", "boolean", "color", "enum", "asset"];
 
 /// §5c's rules for a schema, each refused in its own sentence.
 pub(crate) fn check_schema(schema: &Value) -> Result<(), Diagnostic> {

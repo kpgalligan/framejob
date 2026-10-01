@@ -322,12 +322,18 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   pinned equal by `core/tests/graphic_ffi.rs`'s
   `one_max_side_in_the_engine_the_core_and_the_header`), the 64-key limit
   (the crate's `MAX_PROPS` and `GRAPHIC_MAX_PROPS`, pinned equal by
-  `one_max_props_in_the_engine_and_the_core`), and the app's
+  `one_max_props_in_the_engine_and_the_core`), the engine's `MAX_OPTIONS`
+  (32), `MAX_STRING` (4096) and `TYPES` (the core's `GRAPHIC_MAX_OPTIONS`,
+  `GRAPHIC_MAX_STRING` and `GRAPHIC_TYPES`, pinned equal by
+  `one_max_options_…`, `one_max_string_…` and
+  `one_type_list_in_the_engine_and_the_core`), and the app's
   `LayerRenderers.maxTextureSide`, which `the_app_texture_side_holds_the_largest_graphic`
   reads from the Swift source and holds at or above `MAX_SIDE`, since a
-  graphic's error card is drawn at the graphic's own size (G-8).
-  `model_graphic.rs` still restates the engine's `MAX_OPTIONS` (32),
-  `MAX_STRING` (4096) and `TYPES` with no pin; those must be changed together.
+  graphic's error card is drawn at the graphic's own size (G-8). The
+  numbers `docs/graphics-api.md` states for `MAX_PROPS`, `MAX_STRING` and
+  `MAX_OPTIONS`, and the key cap `docs/graphics-api.d.ts` states, are pinned to
+  the engine's by `graphic/tests/reference.rs`'s
+  `the_reference_states_the_engine_schema_limits`.
 - Fixed since: the export's compile gate walked one nest level, deeper nests
   caught only by the mid-export abort — it now walks every nest reached from
   the range, however deep (#73); the loudness reader was cancelled from main
@@ -360,7 +366,18 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   test made to fail once, by a 65-key cap and a 4096 side), completed
   `watchSubject`'s doc, and replaced G11's 0.5 s settle with an in-place
   rewrite of `m00.js` polled until its revision is seen, then one coalesce
-  interval.
+  interval. Issue batch B41 (2026-09-30, #197, #189) exported the engine's
+  `MAX_OPTIONS`, `MAX_STRING` and `TYPES` and pinned each to the core's
+  `GRAPHIC_` restatement in `core/tests/graphic_ffi.rs`, and pinned the
+  numbers the reference and its typings state in `graphic/tests/reference.rs`
+  (each made to fail once: a 31-option engine cap failed both its pin and
+  the reference's, a 4095 core string cap and an `"image"` type their pins,
+  and each of the four stated numbers changed in turn the reference's), and
+  gave `sandbox.rs`'s `string_50mb` its own 2000 ms budget, since it is the
+  string-size refusal's case and not the deadline's (`while_true` is), and
+  under host load its 50 MB build ran past 250 ms: under 48 spinners five
+  runs marked loaded passed with its calls at 526.58–811.20 ms, and five loaded
+  runs with the budget set back to 250 failed it all five times.
 
 ## Open items
 

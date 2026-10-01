@@ -5,6 +5,10 @@
 //! (the SAME-ENGINE check); then its module is dropped and `lower-third`
 //! draws frame 0 on the same thread byte-identically to a fresh thread
 //! (the CONTROL).
+//!
+//! Every case runs under the shared `BUDGET_MS` (250 ms) except
+//! `string_50mb`, which runs under `SIZE_BUDGET_MS` (2000 ms): it is the
+//! string-size refusal's case, and `while_true` is the deadline's.
 
 mod common;
 
@@ -25,15 +29,21 @@ enum Expect {
     Refused(&'static str),
 }
 
+/// `string_50mb`'s budget. That case is for the string-size refusal, not the
+/// deadline (`while_true` is the deadline's case), and under host load its
+/// 50 MB build ran past 250 ms (#189: 236 ms, then 504 ms, at a load average
+/// of about 63), turning the size refusal into a budget error.
+const SIZE_BUDGET_MS: u64 = 2_000;
+
 const FUNCTION: &str =
     "Error: Function is not available in a graphic; the module is the one source of code";
 
-fn call(name: &str, module: &Module) -> Answer {
+fn call(name: &str, module: &Module, budget_ms: u64) -> Answer {
     let ctx = common::ctx(0, 30.0, 300, 1920, 1080);
     let started = Instant::now();
-    let answer = graphic::svg(module, 0, &serde_json::json!({}), &ctx, BUDGET_MS);
+    let answer = graphic::svg(module, 0, &serde_json::json!({}), &ctx, budget_ms);
     let ms = started.elapsed().as_secs_f64() * 1000.0;
-    assert!(ms < 1000.0, "the call took {ms:.2} ms");
+    assert!(ms < budget_ms as f64 * 4.0, "the call took {ms:.2} ms");
     println!("{name}: {ms:.2} ms");
     answer
         .map(|(svg, _)| svg)
@@ -50,9 +60,13 @@ fn control() -> String {
 }
 
 fn run(name: &str, head: &str, body: &str, expect: Expect) {
+    run_within(name, head, body, expect, BUDGET_MS);
+}
+
+fn run_within(name: &str, head: &str, body: &str, expect: Expect, budget_ms: u64) {
     let reference = std::thread::spawn(control).join().expect("a fresh thread");
     let source = case(head, body);
-    let compiled = Module::compile(shared(), name, &source, BUDGET_MS);
+    let compiled = Module::compile(shared(), name, &source, budget_ms);
     let module = match (compiled, &expect) {
         (Err(d), Expect::Refused(message)) => {
             assert_eq!(&d.message, message);
@@ -63,7 +77,7 @@ fn run(name: &str, head: &str, body: &str, expect: Expect) {
         (Ok(_), Expect::Refused(_)) => panic!("{name} compiled, and should not have"),
         (Ok(module), _) => module,
     };
-    let first = call(name, &module);
+    let first = call(name, &module, budget_ms);
     match (&first, &expect) {
         (Ok(svg), Expect::Contains(text)) => assert!(svg.contains(text), "{name}: {svg:.200}"),
         (Err((message, line, column, frame)), Expect::Error(expected, at)) => {
@@ -81,7 +95,7 @@ fn run(name: &str, head: &str, body: &str, expect: Expect) {
     }
     // The SAME-ENGINE check: frame N+1 after frame N's answer reuses the
     // runtime; it must answer identically.
-    let second = call(name, &module);
+    let second = call(name, &module, budget_ms);
     assert_eq!(second, first, "{name}: the second call on the same engine");
     drop(module);
     // The CONTROL, on this thread, after the case's engine is gone.
@@ -126,7 +140,7 @@ fn deep_recursion() {
 
 #[test]
 fn string_50mb() {
-    run(
+    run_within(
         "string_50mb",
         "",
         "return \"<svg\" + \"x\".repeat(5e7);",
@@ -134,6 +148,7 @@ fn string_50mb() {
             "render's string could not be read at frame 0 — is it tens of megabytes?",
             None,
         ),
+        SIZE_BUDGET_MS,
     );
 }
 
