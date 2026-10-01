@@ -79,6 +79,7 @@ extension AgentServer {
     /// where it could do nothing. The tracks it replaces are found at
     /// COMMIT time, against the handle the plan is built on.
     func transcribe(_ a: [String: Any]) throws -> String {
+        let stop = AgentLane.shared.callCancel  // the assistant's Stop (spec §11 AI-16)
         // `importMedia`'s guard, restated: everything below assumes the main
         // thread is free, which is only true while this handler is not
         // standing on it.
@@ -134,7 +135,7 @@ extension AgentServer {
             let transcriber = Transcriber()
             // The assistant's Stop reaches the run through the sheet's own token (AI-16).
             let token = Transcriber.CancelToken()
-            AgentLane.shared.callCancel?.onCancel { token.cancel() }
+            stop?.onCancel { token.cancel() }
             do {
                 outcome = try transcriber.transcribe(
                     scope.jobs, language: language, frame: scope.frame, pages: pages,

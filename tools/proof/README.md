@@ -9602,3 +9602,41 @@ Run on 2026-09-30, the change over `ecdcbb0`, every instance my own:
 | `speed_sheet_probe.py --mutant minted-only` | 9/10, "caught — P5 failed", exit 1 (P5 read `clip 7's wipe grows to 0.67 s`) |
 | `source_mirror_probe.py` | 40/40, exit 0 |
 | `v2_menu.py 4863` (fresh own instance) | 28 pass, 0 fail, 0 skip of 28, exit 0 — U3 "field editors 1 → 0 after delete; undo 'Delete' → clips 2"; `grep "Reelcut: "` printed nothing |
+
+## Issue batch B38 — the assistant Stop residue: ST's hour fixture, K1 last with its `key-echo` control, `transcribe`'s first-statement read (`assistant_session_proof.py` ST, K1, `--mutant key-echo`; #179 items 1, 2 and 4)
+
+- **#179 item 4** (`AgentServer+Captions.swift`): `transcribe(_:)` reads
+  `AgentLane.shared.callCancel` into `stop` as its first statement, as
+  `exportProject` does, and the `.apple` arm links `stop?.onCancel {
+  token.cancel() }`. The cloud arm does not link it (AI-7 withholds it).
+- **#179 item 1** (ST): the placed file is `long.wav`, `ST_COPIES` (6)
+  copies of `speech_engine_proof.make_fixtures()`'s `ten.wav` in its own
+  channels, width and rate — about 3600 s (the run printed 3625 s) and about 116 MB
+  in the gitignored `work/assistant_session/` — written through
+  `long.wav.part` and `os.replace` only after the setup transcribe answered
+  (a host skip writes nothing), and reused only when its channels, width,
+  rate and frame count all match. A transcribe that ignores Stop now fails
+  ST on its time bound alone: `--mutant no-transcribe-stop` must fail ST
+  with `waited_ms − stopped_ms … > 5000` (`LATE`) in its detail, or the run
+  exits 2 (the fixture ran out within the bound on that host).
+- **#179 item 2** (K1): launch A's order is A0, T1, T2, R, D, E, S, X, SX,
+  ST, K1, so K1 reads SX's and ST's answers too. `--mutant key-echo` is a
+  stand-in control with no build: launch A of the Release app with SX's and
+  ST's first replies carrying a text block `key-echo control: proof-key`
+  (`use(…, said=…)`), which reaches the dev tools' `text`; W and K2 do not
+  run, and K1 must FAIL.
+- `mutant_verdict` (rule R): 2 when the named row was skipped, never scored,
+  any row is an instrument failure, or the named row FAILed without the text
+  `MUTANTS` requires; 1 when the named row FAILed; 0 when it passed.
+
+Run on 2026-09-30, the change over `38a38ee`, every instance my own (another
+session's DerivedData Reelcut was left alone):
+
+| Command | Answer |
+|---|---|
+| `make typecheck`; `make test`; `make app` | 0 errors, 4 warnings (3 `CompositionBuilder.swift`, 1 `Exporter.swift`), tsc clean; exit 0; BUILD SUCCEEDED |
+| `py_compile`; the hand-fed `mutant_verdict` list (7 cases); `grep -c 'stop?.onCancel { token.cancel() }'` | silent; all `True`; `1` |
+| `assistant_session_proof.py` | 13/13, exit 0 — K1 printed after ST; ST "a 3625 s WAV (6 × ten.wav)", 2097 ms, stopped_ms 2042, `(True, 'The transcription was cancelled.')`; SX 2128 ms, stopped_ms 2021; K1 "37 MCP answers, the key in 0"; A0 no `Reelcut: ` line |
+| `--mutant no-transcribe-stop` | built in 127 s; ST FAIL — "waited_ms − stopped_ms 43468 − 2052 > 5000", the transcribe answered `is_error` False with cues; 0/1, "caught — ST failed", exit 1 |
+| `--mutant no-export-stop` | built in 151 s; SX FAIL — "waited_ms − stopped_ms 22892 − 2047 > 5000", the export answered ok, file 1 s later True; 0/1, "caught — SX failed", exit 1 |
+| `--mutant key-echo` | 10/11 — A0 to ST ok (ST's text 'key-echo control: proof-key'), K1 FAIL "37 MCP answers, the key in 2; in the log False"; "caught — K1 failed", exit 1 |
