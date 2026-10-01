@@ -262,7 +262,8 @@ extension AgentServer {
                 throw Self.savedButNotAdded(result, error)
             }
             fields = Self.recordingFields(
-                result, ids: Self.documentIds(result, placement: placement))
+                result, ids: Self.documentIds(result, placement: placement),
+                leftOutIds: Self.documentLeftOutIds(result, placement: placement))
             fields["landed"] = "document"
             if !place {
                 notes.append(
@@ -292,7 +293,9 @@ extension AgentServer {
             } catch {
                 throw Self.savedButNotAdded(result, error)
             }
-            fields = Self.recordingFields(result, ids: Self.newProjectIds(result, in: document))
+            fields = Self.recordingFields(
+                result, ids: Self.newProjectIds(result, in: document),
+                leftOutIds: Self.newProjectLeftOutIds(result, in: document))
             fields["landed"] = "new_project"
             if result.choice.destination != .newProject {
                 notes.append(

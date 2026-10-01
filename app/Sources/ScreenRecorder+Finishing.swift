@@ -138,10 +138,12 @@ extension ScreenRecorder {
     }
 
     /// The walker: probes segment `index`'s movie — a failure LEAVES THE
-    /// SEGMENT OUT, `leftOut`, with no microphone probe, and a segment whose
-    /// output reported a failure after its stop (`outputFailure`, #181) is
-    /// left out the same way WITHOUT a probe — then its
-    /// microphone, appends the `RecordingSegment` and moves to the next;
+    /// SEGMENT OUT, `leftOut`, and a segment whose output reported a failure
+    /// after its stop (`outputFailure`, #181) is left out the same way
+    /// WITHOUT a movie probe; either way its microphone file is then probed
+    /// (`probeLeftOutMicrophone`, #181 item 2), so a voice that reads lands in
+    /// the picture's slot, `position` the segments landed before it — then
+    /// its microphone, appends the `RecordingSegment` and moves to the next;
     /// past the last, concludes: a failure with the first left-out
     /// segment's error when nothing landed, else a success carrying the
     /// left-out ones. Sequential and recursive rather than concurrent,
@@ -164,14 +166,20 @@ extension ScreenRecorder {
         }
         if let failure = done.segments[index].outputFailure {
             let left = Self.leftOut(done, at: index, reason: failure)
-            return probeSegment(done, at: index + 1, landed: landed, skipped: skipped + [left])
+            return probeLeftOutMicrophone(done, at: index, left: left, position: landed.count) {
+                [weak self] left in
+                self?.probeSegment(done, at: index + 1, landed: landed, skipped: skipped + [left])
+            }
         }
         MediaImporter.probe(url: done.segments[index].movieURL) { [weak self] movie in
             guard let self else { return }
             switch movie {
             case .failure(let error):
                 let left = Self.leftOut(done, at: index, error)
-                self.probeSegment(done, at: index + 1, landed: landed, skipped: skipped + [left])
+                self.probeLeftOutMicrophone(done, at: index, left: left, position: landed.count) {
+                    [weak self] left in
+                    self?.probeSegment(done, at: index + 1, landed: landed, skipped: skipped + [left])
+                }
             case .success(let descriptor):
                 self.probeMicrophone(done, at: index, movie: descriptor) { [weak self] segment in
                     self?.probeSegment(
@@ -199,6 +207,31 @@ extension ScreenRecorder {
         let kept = [segment.movieURL.path, segment.micURL?.path].compactMap { $0 }
             .filter { FileManager.default.fileExists(atPath: $0) }
         return UnreadableSegment(moviePath: segment.movieURL.path, keptFiles: kept, error: reason)
+    }
+
+    /// A left-out segment's microphone file (#181 item 2, spec §11
+    /// recording): probed unless there is none, its writer reported its own
+    /// failure (`micFailure`) or the file is not on disk. `then` receives
+    /// `left` with `position` set and, when the file read, `micDescriptor`;
+    /// a probe that fails keeps it nil, the file still named in `keptFiles`.
+    private func probeLeftOutMicrophone(
+        _ done: Session, at index: Int, left: UnreadableSegment, position: Int,
+        then: @escaping (UnreadableSegment) -> Void
+    ) {
+        let placed = UnreadableSegment(
+            moviePath: left.moviePath, keptFiles: left.keptFiles, error: left.error,
+            position: position)
+        let segment = done.segments[index]
+        guard let micURL = segment.micURL, segment.micFailure == nil,
+            FileManager.default.fileExists(atPath: micURL.path)
+        else { return then(placed) }
+        MediaImporter.probe(url: micURL) { mic in
+            guard case .success(let descriptor) = mic else { return then(placed) }
+            then(
+                UnreadableSegment(
+                    moviePath: left.moviePath, keptFiles: left.keptFiles, error: left.error,
+                    micDescriptor: descriptor, position: position))
+        }
     }
 
     /// The microphone's half of one segment: no microphone → done; a writer
@@ -259,13 +292,15 @@ extension ScreenRecorder {
     /// sentence never sends a person to a path that holds nothing. With
     /// segments, every movie that exists comma-joined in order, and every
     /// microphone file likewise, so one segment's sentence is byte for byte
-    /// R1's; no movie on disk at all leaves the error as it was.
+    /// R1's; with no movie on disk the microphone files alone are named (a
+    /// readable voice is not lost, spec §11 recording), and no file on disk
+    /// at all leaves the error as it was.
     static func namingFiles(_ error: RecorderError, _ done: Session) -> RecorderError {
         let manager = FileManager.default
         let movies = done.segments.map(\.movieURL.path).filter { manager.fileExists(atPath: $0) }
-        guard !movies.isEmpty else { return error }
         let mics = done.segments.compactMap { $0.micURL?.path }
             .filter { manager.fileExists(atPath: $0) }
+        guard !movies.isEmpty || !mics.isEmpty else { return error }
         return .filesKept(
             error, movie: movies.joined(separator: ", "),
             microphone: mics.isEmpty ? nil : mics.joined(separator: ", "))

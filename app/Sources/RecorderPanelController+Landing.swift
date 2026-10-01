@@ -126,7 +126,8 @@ extension RecorderPanelController {
                 // segment that minted none is a nil entry, and its sentence
                 // is in `placement.notes`.
                 document.selection = Set(
-                    (placement.clipIds + placement.micClipIds).compactMap { $0 })
+                    (placement.clipIds + placement.micClipIds + placement.leftOutMicClipIds)
+                        .compactMap { $0 })
                 Self.editor(of: document)?.viewStateDidChange()
                 landed(result, asNewProject: false, notes: placement.notes)
             } catch {
@@ -164,15 +165,19 @@ extension RecorderPanelController {
     }
 
     /// Back to idle; the note is `landingNote`'s, over the placement's own
-    /// notes, and the reveal last.
+    /// notes — the unreadable segments' sentences followed by what became of
+    /// their readable voices (#181 item 2), said only here, on a landing
+    /// that succeeded — and the reveal last.
     private func landed(_ result: RecordingResult, asNewProject: Bool, notes: [String]) {
         phase = .idle
         rebuildDestinations()
+        let leftOut = [result.unreadableNote, result.leftOutVoiceNote].compactMap { $0 }
         setNote(
             Self.landingNote(
                 stoppedBy: result.stoppedBy, chosen: result.choice.destination,
                 landedAsNewProject: asNewProject, micProblem: result.micProblem,
-                resumeProblem: resumeProblem, notes: notes, unreadable: result.unreadableNote))
+                resumeProblem: resumeProblem, notes: notes,
+                unreadable: leftOut.isEmpty ? nil : leftOut.joined(separator: " ")))
         revealIfNoted()
     }
 

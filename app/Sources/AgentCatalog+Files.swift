@@ -151,7 +151,9 @@ extension AgentServer {
             + "after a resume), or whose writer failed after the segment closed, is LEFT OUT "
             + "rather than failing the recording: the readable "
             + "segments land, and the result's unreadable lists each one left out — path, "
-            + "kept_files (what it left on disk) and reason — with the note naming them; "
+            + "kept_files (what it left on disk), reason, and mic_path, mic_duration, mic_media "
+            + "and mic_clip when its microphone file reads, which lands without its picture in "
+            + "the slot the picture would have had — with the note naming them; "
             + "only a recording with NO readable movie fails, naming every file. "
         let recordingResultClause: String =
             "The call blocks for seconds plus about a second of start and finish, and up to "

@@ -6,8 +6,10 @@ B17's unreadable segment and File ▸ Pause Recording (sections 11 and 12),
 and issue batch B27's closed segment's did-fail (3r, 3r2), the recorder's
 pause notification (F6, F7) and the countdown's meter (section 13), and
 issue batch B42's finishing notification (F8, F9) and the countdown's
-cleared resumeProblem (F10), and issue batch B49's square `StickerButton`
-(section 6, re-pinned to spec §11 SH-4).
+cleared resumeProblem (F10), issue batch B49's square `StickerButton`
+(section 6, re-pinned to spec §11 SH-4), and issue batch B55's left-out
+segment's readable microphone (section 14, U7, and rows in U1, U2, U6 and
+3r; #181 item 2).
 
 Why a probe and not an MCP script. Three of the things R1a added have no
 caller a running binary can be asked to reach, and one of them is the row
@@ -167,7 +169,9 @@ segment's `outputFailure` the writer's sentence; `stop()` then stops the
 open segment's writer once, and ONE `.success` lands `closedfail1.png`
 alone with `pauses` 1 and `unreadable` segment 0 — both files kept, case
 `finishFailed`, "The recording failed: the writer gave up" — left out
-UNPROBED although its PNG would read. 3r2: segment 0 a NORMALLY closed
+UNPROBED although its PNG would read — while its microphone,
+`closedfail0-mic.png`, IS probed (issue batch B55, #181 item 2):
+`unreadable[0].micPath` is that file at `position` 0. 3r2: segment 0 a NORMALLY closed
 segment (the Fake's default `screenFinished`), segment 1 open; a real
 `pause()`, then segment 1's did-fail → the recorder STAYS `.paused`, and
 still after its microphone's did-finish; `stop()` → a `.success` of
@@ -548,17 +552,27 @@ on, every segment closed, `.paused`, then `stop`: U1 [PNG, EMPTY, PNG] → a
 2, `unreadable` segment 1 alone with both its files kept and case
 `finishFailed`, the note "A segment was left out. <the probe's sentence>
 Its files are kept at <movie>, <mic>." exactly, and the stop's completion
-the same outcome, once. U2 [EMPTY, EMPTY] → `filesKept(finishFailed)`
-naming both movies, then both microphone files. U3 [EMPTY, PNG] with no
+the same outcome, once — and (issue batch B55) segment 1's microphone PNG
+READ although its movie did not: `unreadable[0].micPath` is it, `position`
+1. U2 [EMPTY, EMPTY], every microphone a readable PNG → the recording
+still FAILS (spec §11 recording: no readable movie, no result) with
+`filesKept(finishFailed)` naming both movies, then both microphone files,
+and both microphone files are still on disk after it (`micsOnDisk`, B55).
+U7 (B55) [no movie file at all, twice], readable microphones →
+`filesKept(finishFailed)` ending " The microphone is at <mic 0>, <mic 1>."
+— `namingFiles` names the microphone files when no movie is on disk.
+U3 [EMPTY, PNG] with no
 microphone → a `.success` whose `path` and `startedAt` are the SECOND
 segment's. U4, pure: `UnreadableSegment("/x/a.mov", [], .timedOut)`'s
 sentence exactly, one with two files kept, and an empty list's note nil.
 U5: `landingNote(… unreadable:)` puts the sentence after the closed
 document and before the microphone, and `unreadable: nil` equals the R1
 call. U6: `recordingFields` carries `unreadable` —
-`[{path, kept_files, reason}]` — only when non-empty; `resultNotes` is
-[unreadable, microphone]; `savedButNotAdded` ends with the note, and a
-clean result's sentence is R1's. M1: a `.recording` Fake with a
+`[{path, kept_files, reason, mic_path, mic_duration}]` for U1's result,
+whose left-out microphone read (B55) — only when non-empty; `resultNotes`
+is [unreadable, the left-out voice's note, microphone] (B55);
+`savedButNotAdded` ends with the note and never says "was added to the
+project" (B55), and a clean result's sentence is R1's. M1: a `.recording` Fake with a
 microphone, `pause()`, then a microphone did-finish carrying −11805 →
 `microphoneProblem` nil, `liveNote` empty, the segment's `micFailure`
 set; the screen's did-finish and `stop` → a `.success` whose segment 0
@@ -627,6 +641,38 @@ and an observer on `ScreenRecorder.shared.meter` saw max `peakLeft` above
 session let go, the reading silent at once and 0.3 s later with no
 non-silent publish after the cancel. The countdown never reaches 0; the
 sealed doors are restored and the panel ordered out.
+
+Section 14 (`leftout`, issue batch B55, #181 item 2, spec §11 recording)
+runs in its own process with `ProbeDocumentController` first, as
+`segments` does, over results CONSTRUCTED with no stream: A a 5 s picture
+with a 5 s voice at offset 0, B left out with a 3 s voice that read, C a
+5 s picture with a 5 s voice, the choice at 60 fps. X1: a fresh document
+(30 fps) at playhead 0 — stretches [segment 0, B's voice, segment 1];
+picture A at 0; B's voice at 3 000 000, 1 800 000 long, `in` 0, on the
+Microphone track; picture C at 4 800 000 on A's track; C's voice at
+4 800 000; no picture clip in [3 000 000, 4 800 000); five media and five
+clips predicted and minted, both left-out lists included; "Add Recording",
+no note. X2: B at position 0, playhead 1 s — the voice at 600 000, picture
+A at 2 400 000, C at its end. X3: X1's result through `untitled(around:)`
+— the voice at clip 1's end, 1 800 000 long, on the Microphone track,
+picture C 1 800 000 after clip 1's end, "Add Recording Segments",
+`newProjectLeftOutIds` naming the voice, one undo leaving picture A alone.
+X4: B before a new project's only segment (no voice of its own) — media
+with no clip, `leadingVoiceNote`'s sentence in the notes, "Add
+Microphone" (and "Add Recording Segments" when B's voice did not read).
+X5: `place: false` — the voice's media in the left-out list, no clip. X6:
+`recordingFields`' `unreadable[0]` carries `mic_path`, `mic_duration`,
+`mic_media` and `mic_clip` (X1's ids); `resultNotes` is [unreadable, the
+voice's note]; `savedButNotAdded` never says "was added to the project";
+`record_screen`'s description says "without its picture". X7, the
+control: a left-out B whose voice did NOT read gives X1's document the
+byte-identical op list of the same result without B.
+
+**Measured 2026-10-01 by issue batch B55**, `--only
+state,unreadable,landing,segments,catalog,leftout`: 470/470 — the build
+row 1; section 3, 141; section 11, 30; section 4, 164; section 4b, 83;
+section 7, 28; section 14, 23. The `landing` and `segments` rows, unedited,
+are the control that a recording with no left-out voice lands as before.
 
 **Measured 2026-09-28 against the tree with section 10: 983/983, with no
 row skipped** — section 9 RAN (a true preflight and two shareable
@@ -924,6 +970,35 @@ the probe's own layout and samples:
   sticker-round     the block's radius is half its height (Controls.swift)
                     — 34/35: 6a's corner row.
 
+**Issue batch B55's mutants** (#181 item 2: section 14, U1, U6, U7 and
+3r), measured 2026-10-01 against the tree at 470/470 for `--only
+state,unreadable,landing,segments,catalog,leftout` (195/195 for `--only
+state,unreadable,leftout`, 31/31 for `--only unreadable`). Two put back the
+code before the batch:
+
+  leftout-mic-unprobed  a left-out segment's microphone never probed
+                    (ScreenRecorder+Finishing.swift) — 191/195 with `--only
+                    state,unreadable,leftout`: 3r's micPath row, U1's micPath
+                    row, U6's fields and notes rows.
+  leftout-no-gap    `slotLength` answers 0 (RecordingLanding+LeftOut.swift)
+                    — 190/195: X1's picture C, voice C and empty-slot rows,
+                    X2, X3's picture C.
+  leftout-voice-dropped  `stretches` omits every left-out voice
+                    (RecordingResult.swift) — 181/195: X1's six rows but A's
+                    and the undo name, X2, X3's three rows but the one-undo
+                    row, X4's two, X5, X6's ids row.
+  mics-unnamed      `namingFiles` names nothing when no movie is on disk
+                    (ScreenRecorder+Finishing.swift) — 30/31 with `--only
+                    unreadable`: U7.
+
+Two older mutants were RE-AIMED by B55, because the walker's two left-out
+arms now call `probeLeftOutMicrophone` before recursing:
+`unreadable-fails-all` (the probe-failure arm) re-scored 156/172 with
+`--only state,unreadable` — 3o's two, U1's six (its new micPath row
+among them), U3's two, U4's nil-note row and U6's five; and
+`closed-fail-probed` (the `outputFailure` arm) re-scored 137/142 with
+`--only state` — 3r's two result rows and its new micPath row, 3r2's two.
+
 6b's "one program" row, the tree's one failure when this file was first
 written, turned green when the harness literalised the six recorder keys
 in its pin map (R1's landing): both cross-builds are one program again.
@@ -934,6 +1009,7 @@ in its pin map (R1's landing): both cross-builds are one program again.
     python3 tools/proof/recording_probe.py --only state,file_pause,preroll   # B27's
     python3 tools/proof/recording_probe.py --only file_pause   # B42's
     python3 tools/proof/recording_probe.py --only welcome   # B49's
+    python3 tools/proof/recording_probe.py --only state,unreadable,leftout   # B55's
     python3 tools/proof/recording_probe.py --mutant excludes
     python3 tools/proof/recording_probe.py --sources <dir> # any copy
     RC_APP_SOURCES=<dir> python3 tools/proof/recording_probe.py
@@ -1224,6 +1300,8 @@ func spell(_ outcome: Result<RecordingResult, Error>) -> [String: Any] {
                 [
                     "moviePath": left.moviePath, "keptFiles": left.keptFiles,
                     "case": caseName(left.error), "description": left.error.localizedDescription,
+                    // Issue batch B55 (#181 item 2): its microphone, when it read.
+                    "micPath": left.micDescriptor?.path as Any, "position": left.position,
                 ]
             },
             "unreadableNote": result.unreadableNote as Any,
@@ -2187,12 +2265,14 @@ func state(_ request: [String: Any]) -> [String: Any] {
 
 /// U1–U3's shape: closed segments of a `.paused` session over the given
 /// movie fixtures — `true` a PNG "movie" `MediaImporter.probe` reads, `false`
-/// an EMPTY `.mov` it refuses — each with a microphone PNG when `mic`, then
+/// an EMPTY `.mov` it refuses (or, with `writeMovies` false, NO file at all —
+/// U7, issue batch B55) — each with a microphone PNG when `mic`, then
 /// `stop`: the outcome as `onFinish` and the stop's completion receive it,
+/// whether every microphone file is still on disk after it (`micsOnDisk`),
 /// and the raw result for U6's pure rows.
-func scenarioUnreadable(_ work: URL, _ tag: String, readable: [Bool], mic: Bool)
-    -> (out: [String: Any], result: RecordingResult?)
-{
+func scenarioUnreadable(
+    _ work: URL, _ tag: String, readable: [Bool], mic: Bool, writeMovies: Bool = true
+) -> (out: [String: Any], result: RecordingResult?) {
     var out: [String: Any] = [:]
     let t0 = Date(timeIntervalSinceNow: -20)
     var segments: [FakeSegment] = []
@@ -2202,7 +2282,7 @@ func scenarioUnreadable(_ work: URL, _ tag: String, readable: [Bool], mic: Bool)
     for (index, ok) in readable.enumerated() {
         let movie = work.appendingPathComponent("\(tag)-\(index)." + (ok ? "png" : "mov"))
         let micURL = mic ? work.appendingPathComponent("\(tag)-\(index)-mic.png") : nil
-        written = written && (ok ? writePNG(movie) : emptyFile(movie))
+        written = written && (ok ? writePNG(movie) : (writeMovies ? emptyFile(movie) : true))
         if let micURL { written = written && writePNG(micURL) }
         var segment = FakeSegment(movie: movie, mic: micURL, closed: true)
         let start = t0.addingTimeInterval(Double(index) * 3)
@@ -2229,6 +2309,8 @@ func scenarioUnreadable(_ work: URL, _ tag: String, readable: [Bool], mic: Bool)
     out["onFinish"] = fake.finishes.first ?? [:]
     out["stopCount"] = stops.count
     out["stop"] = stops.first ?? [:]
+    out["micsOnDisk"] = mics.allSatisfy { FileManager.default.fileExists(atPath: $0) }
+    out["moviesOnDisk"] = movies.filter { FileManager.default.fileExists(atPath: $0) }.count
     return (out, raw)
 }
 
@@ -2322,6 +2404,7 @@ func unreadablePure(_ result: RecordingResult?) -> [String: Any] {
         out["fieldsUnreadable"] = AgentServer.recordingFields(result)["unreadable"] ?? NSNull()
         out["cleanHasUnreadable"] = AgentServer.recordingFields(clean)["unreadable"] != nil
         out["notesBoth"] = AgentServer.resultNotes(both)
+        out["leftOutVoiceNote"] = both.leftOutVoiceNote as Any
         out["microphoneNoteBoth"] = AgentServer.microphoneNote(both) as Any
         out["notesClean"] = AgentServer.resultNotes(clean)
         let inner = AgentServer.ToolError(message: "a drag is in progress")
@@ -2341,6 +2424,9 @@ func unreadableMode(_ request: [String: Any]) -> [String: Any] {
     out["u1"] = u1.out
     out["u2"] = scenarioUnreadable(work, "u2", readable: [false, false], mic: true).out
     out["u3"] = scenarioUnreadable(work, "u3", readable: [false, true], mic: false).out
+    out["u7"] = scenarioUnreadable(
+        work, "u7", readable: [false, false], mic: true, writeMovies: false
+    ).out
     out["pure"] = unreadablePure(u1.result)
     out["boundary"] = scenarioMicBoundary(work)
     return out
@@ -3124,6 +3210,203 @@ func segments(_ request: [String: Any]) -> [String: Any] {
         ]
         d.close()
         return facts
+    }
+    out["documentsAfterClose"] = NSDocumentController.shared.documents.count
+    return out
+}
+
+// ---- mode "leftout": a left-out segment's readable voice (issue batch B55) ----
+
+/// Section 14's rows (#181 item 2, spec §11 recording): results CONSTRUCTED —
+/// no stream, no recording — of a 5 s picture A with a 5 s voice at offset
+/// 0, a left-out B whose 3 s voice read, and a 5 s C with a 5 s voice, landed
+/// in a fresh document (30 fps) and through `untitled(around:)` (60 fps).
+/// Every document row commits through the document's own door and reports
+/// what the core minted beside the prediction; the checks are the script's.
+func leftout(_ request: [String: Any]) -> [String: Any] {
+    let controller = ProbeDocumentController()
+    let app = NSApplication.shared
+    app.setActivationPolicy(.prohibited)
+    UserDefaults.standard.setVolatileDomain(
+        ["ApplePersistenceIgnoreState": true, "AgentServerEnabled": false,
+         "AppleShowScrollBars": "Always"],
+        forName: UserDefaults.argumentDomain)
+    var out: [String: Any] = [:]
+    out["controllerIsProbe"] = NSDocumentController.shared === controller
+    let tmp = URL(
+        fileURLWithPath: request["tempFolder"] as? String ?? NSTemporaryDirectory(),
+        isDirectory: true)
+    try? FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+    let second: Ticks = 600_000
+
+    func picture(_ name: String) -> MediaDescriptor {
+        MediaDescriptor(
+            path: tmp.appendingPathComponent("\(name).mov").path, kind: .video,
+            duration: 5 * second, width: 1728, height: 1118, fps: Fps(num: 24981, den: 1000),
+            hasVideo: true, hasAudio: false)
+    }
+    func mic(_ name: String, _ ticks: Ticks) -> MediaDescriptor {
+        MediaDescriptor(
+            path: tmp.appendingPathComponent("\(name) (Microphone).m4a").path, kind: .audio,
+            duration: ticks, hasAudio: true)
+    }
+    func segment(_ name: String, voice: Bool = true) -> RecordingSegment {
+        RecordingSegment(
+            descriptor: picture(name), micDescriptor: voice ? mic(name, 5 * second) : nil,
+            micOffset: 0, startedAt: Date())
+    }
+    func leftB(position: Int, voice: Bool = true) -> UnreadableSegment {
+        UnreadableSegment(
+            moviePath: tmp.appendingPathComponent("B.mov").path,
+            keptFiles: [tmp.appendingPathComponent("B.mov").path, mic("B", 3 * second).path],
+            error: .finishFailed("The recording could not be read: the probe's B."),
+            micDescriptor: voice ? mic("B", 3 * second) : nil, position: position)
+    }
+    func result(_ list: [RecordingSegment], _ left: [UnreadableSegment]) -> RecordingResult {
+        var choice = RecordingChoice()
+        choice.rate = 60
+        return RecordingResult(
+            segments: list, choice: choice, stoppedBy: .stopped,
+            pauses: list.count + left.count - 1, unreadable: left)
+    }
+    func stretchNames(_ r: RecordingResult) -> [String] {
+        r.stretches.map { stretch in
+            switch stretch {
+            case .segment(let k): return "segment\(k)"
+            case .voiceOnly(let i): return "voice\(i)"
+            }
+        }
+    }
+    func lists(_ p: RecordingLanding.Placement) -> [String: Any] {
+        [
+            "media": ids(p.mediaIds), "clips": ids(p.clipIds), "micMedia": ids(p.micMediaIds),
+            "micClips": ids(p.micClipIds), "leftOutMicMedia": ids(p.leftOutMicMediaIds),
+            "leftOutMicClips": ids(p.leftOutMicClipIds),
+        ]
+    }
+    func placed(_ d: ProjectDocument, _ p: RecordingLanding.Placement) -> [String: Any] {
+        var facts = commit(d, p)
+        facts["lists"] = lists(p)
+        facts["allClips"] = d.editedProject.snapshot.clips.map(describeClip)
+        facts["allTracks"] = d.editedProject.snapshot.tracks.map {
+            ["id": Int($0.id), "name": $0.name] as [String: Any]
+        }
+        return facts
+    }
+    func row(_ body: () throws -> [String: Any]) -> [String: Any] {
+        do { return try body() } catch { return ["error": "\(error)"] }
+    }
+    for name in ["A", "C"] {
+        try? Data("not a movie".utf8).write(to: tmp.appendingPathComponent("\(name).mov"))
+    }
+    for name in ["A", "B", "C"] {
+        try? Data("not audio".utf8).write(to: URL(fileURLWithPath: mic(name, 0).path))
+    }
+    let r1 = result([segment("A"), segment("C")], [leftB(position: 1)])
+    out["micB"] = mic("B", 3 * second).path
+    out["pathA"] = picture("A").path
+
+    // X1: a document at playhead 0 — B's voice in its slot, C after it.
+    var x1Placement: RecordingLanding.Placement?
+    out["X1"] = row {
+        let d = ProjectDocument()
+        let p = try RecordingLanding.placement(r1, in: d, place: true)
+        x1Placement = p
+        var facts = placed(d, p)
+        facts["stretches"] = stretchNames(r1)
+        return facts
+    }
+    // X2: B recorded FIRST (position 0), the playhead at 1 s.
+    out["X2"] = row {
+        let r = result([segment("A"), segment("C")], [leftB(position: 0)])
+        let d = ProjectDocument()
+        d.playhead = 1 * second
+        let p = try RecordingLanding.placement(r, in: d, place: true)
+        var facts = placed(d, p)
+        facts["stretches"] = stretchNames(r)
+        return facts
+    }
+    // X3: X1's result as a new project.
+    out["X3"] = row {
+        let (d, notes) = try ProjectDocument.untitled(around: r1)
+        let s = d.project.snapshot
+        var facts: [String: Any] = [:]
+        facts["notes"] = notes
+        facts["undoName"] = d.undoManager?.undoActionName ?? ""
+        facts["clips"] = s.clips.map(describeClip)
+        facts["tracks"] = s.tracks.map { ["id": Int($0.id), "name": $0.name] as [String: Any] }
+        facts["media"] = s.media.map { ["id": Int($0.id), "path": $0.path] as [String: Any] }
+        facts["leftOutIds"] = AgentServer.newProjectLeftOutIds(r1, in: d).map {
+            ["micMedia": $0.micMedia.map { Int($0) } ?? -1,
+             "micClip": $0.micClip.map { Int($0) } ?? -1]
+        }
+        d.undoManager?.undo()
+        let u = d.project.snapshot
+        facts["afterUndo"] = [
+            "clips": u.clips.map(describeClip), "media": u.media.count,
+            "tracks": u.tracks.count,
+        ]
+        d.close()
+        return facts
+    }
+    // X4: B before the only segment, which has no voice of its own.
+    let r4 = result([segment("A", voice: false)], [leftB(position: 0)])
+    out["X4"] = row {
+        let (d, notes) = try ProjectDocument.untitled(around: r4)
+        let s = d.project.snapshot
+        let facts: [String: Any] = [
+            "notes": notes, "undoName": d.undoManager?.undoActionName ?? "",
+            "clips": s.clips.map(describeClip),
+            "media": s.media.map { ["id": Int($0.id), "path": $0.path] as [String: Any] },
+            "leadingNote": RecordingLanding.leadingVoiceNote(
+                mic("B", 3 * second).path, before: picture("A").path),
+            "actionName": RecordingLanding.remainderActionName(for: r4),
+            "actionNameWithoutB": RecordingLanding.remainderActionName(
+                for: result([segment("A", voice: false)], [leftB(position: 0, voice: false)])),
+        ]
+        d.close()
+        return facts
+    }
+    // X5: place: false.
+    out["X5"] = row {
+        let d = ProjectDocument()
+        return placed(d, try RecordingLanding.placement(r1, in: d, place: false))
+    }
+    // X6: what the tool says about X1's landing.
+    out["X6"] = row {
+        guard let p = x1Placement else { return ["error": "X1 did not place"] }
+        let fields = AgentServer.recordingFields(
+            r1, ids: AgentServer.documentIds(r1, placement: p),
+            leftOutIds: AgentServer.documentLeftOutIds(r1, placement: p))
+        let inner = AgentServer.ToolError(message: "a drag is in progress")
+        var description = ""
+        let json = try AgentServer.shared.catalogJSON()
+        let tools = try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [[String: Any]] ?? []
+        for tool in tools where tool["name"] as? String == "record_screen" {
+            description = tool["description"] as? String ?? ""
+        }
+        return [
+            "unreadable": fields["unreadable"] ?? NSNull(),
+            "resultNotes": AgentServer.resultNotes(r1),
+            "leftOutVoiceNote": r1.leftOutVoiceNote as Any,
+            "unreadableNote": r1.unreadableNote as Any,
+            "saved": AgentServer.savedButNotAdded(r1, inner).message,
+            "description": description,
+        ]
+    }
+    // X7: a left-out B whose voice did NOT read — the control: nothing moves.
+    out["X7"] = row {
+        let withB = result([segment("A"), segment("C")], [leftB(position: 1, voice: false)])
+        let withoutB = result([segment("A"), segment("C")], [])
+        let d1 = ProjectDocument()
+        let d2 = ProjectDocument()
+        let p1 = try RecordingLanding.placement(withB, in: d1, place: true)
+        let p2 = try RecordingLanding.placement(withoutB, in: d2, place: true)
+        return [
+            "with": p1.ops.map { $0.json }, "without": p2.ops.map { $0.json },
+            "withNames": p1.ops.map { $0.name }, "withoutNames": p2.ops.map { $0.name },
+            "withLists": lists(p1), "withoutLists": lists(p2),
+        ]
     }
     out["documentsAfterClose"] = NSDocumentController.shared.documents.count
     return out
@@ -4594,6 +4877,8 @@ do {
         answer = landing(request)
     case "segments":
         answer = segments(request)
+    case "leftout":
+        answer = leftout(request)
     case "chrome":
         answer = chrome(request)
     case "chrome-pause":
@@ -5300,6 +5585,11 @@ def section_state_r2(answer):
           len(left) == 1 and u0.get("moviePath") == cpaths[0]
           and u0.get("keptFiles") == [cpaths[0], cpaths[2]] and u0.get("case") == "finishFailed"
           and u0.get("description") == "The recording failed: the writer gave up", f"got {left!r}")
+    check("3r: … and its microphone, closedfail0-mic.png, is probed although the segment is left out "
+          "— unreadable[0].micPath is that file, position 0 (issue batch B55, #181 item 2; "
+          "leftout-mic-unprobed)",
+          u0.get("micPath") == cpaths[2] and u0.get("position") == 0,
+          f"micPath {u0.get('micPath')!r}, position {u0.get('position')!r}")
 
     print("  3r2 — a did-fail on the segment a pause just closed, while PAUSED (issue batch B27, #181)")
     cp = answer.get("closedFailPaused") or {}
@@ -5463,11 +5753,17 @@ def section_unreadable(binary, sources):
           reason.startswith("The recording could not be read: ")
           and fin.get("unreadableNote") == f"A segment was left out. {reason} Its files are kept at "
           f"{movies[1]}, {mics[1]}.", f"got {fin.get('unreadableNote')!r}")
+    check("U1: … and its microphone READ although its movie did not — unreadable[0].micPath is "
+          "segment 1's microphone, position 1, the segments landed before it (issue batch B55, "
+          "#181 item 2; leftout-mic-unprobed)",
+          left[0].get("micPath") == mics[1] and left[0].get("position") == 1,
+          f"micPath {left[0].get('micPath')!r}, position {left[0].get('position')!r}")
     check("U1: onFinish once, the stop's completion once, the same outcome",
           u1.get("onFinishCount") == 1 and u1.get("stopCount") == 1 and u1.get("stop") == fin,
           f"onFinish {u1.get('onFinishCount')}, stop {u1.get('stopCount')}")
 
-    print("  U2 — [EMPTY, EMPTY]: no readable movie")
+    print("  U2 — [EMPTY, EMPTY], every microphone READABLE: no readable movie, so the recording "
+          "still fails (spec §11 recording, B55) and every file is kept")
     u2 = answer.get("u2") or {}
     m2 = u2.get("movies") or ["", ""]
     c2 = u2.get("mics") or ["", ""]
@@ -5484,6 +5780,22 @@ def section_unreadable(binary, sources):
     check("U2: onFinish once, the stop's completion once, the same outcome",
           u2.get("onFinishCount") == 1 and u2.get("stopCount") == 1 and u2.get("stop") == f2,
           f"onFinish {u2.get('onFinishCount')}, stop {u2.get('stopCount')}")
+    check("U2: … and the failure deleted no file — both readable microphone files are still on disk "
+          "for the person to import (B55)",
+          u2.get("micsOnDisk") is True and len(c2) == 2, f"{u2.get('micsOnDisk')}, {c2}")
+
+    print("  U7 — [no movie file at all, no movie file at all], every microphone readable (B55)")
+    u7 = answer.get("u7") or {}
+    c7 = u7.get("mics") or ["", ""]
+    f7 = u7.get("onFinish") or {}
+    d7 = f7.get("description") or ""
+    check("U7: with NO movie file on disk the failure still names each microphone file — "
+          "filesKept(finishFailed) ending \" The microphone is at <mic 0>, <mic 1>.\" (mics-unnamed)",
+          u7.get("written") is True and u7.get("settled") is True and u7.get("moviesOnDisk") == 0
+          and f7.get("kind") == "failure" and f7.get("case") == "filesKept(finishFailed)"
+          and d7.startswith("The recording could not be read: ")
+          and d7.endswith(f" The microphone is at {c7[0]}, {c7[1]}.") and u7.get("micsOnDisk") is True,
+          f"got {f7!r}, movies on disk {u7.get('moviesOnDisk')}")
 
     print("  U3 — [EMPTY, readable], no microphone")
     u3 = answer.get("u3") or {}
@@ -5524,15 +5836,22 @@ def section_unreadable(binary, sources):
     check("U5: the unreadable sentence alone is the whole note", landing.get("only") == "Unreadable.",
           f"got {landing.get('only')!r}")
     note = pure.get("unreadableNote")
-    check("U6: record_screen's fields carry unreadable — [{path, kept_files, reason}] — for U1's result",
-          pure.get("fieldsUnreadable") == [{"path": movies[1], "kept_files": [movies[1], mics[1]],
-                                            "reason": reason}], f"got {pure.get('fieldsUnreadable')!r}")
+    fu = pure.get("fieldsUnreadable")
+    fu0 = fu[0] if isinstance(fu, list) and len(fu) == 1 and isinstance(fu[0], dict) else {}
+    check("U6: record_screen's fields carry unreadable — [{path, kept_files, reason, mic_path, "
+          "mic_duration}] — for U1's result, its microphone having read (B55; no ids without a landing)",
+          sorted(fu0) == ["kept_files", "mic_duration", "mic_path", "path", "reason"]
+          and fu0.get("path") == movies[1] and fu0.get("kept_files") == [movies[1], mics[1]]
+          and fu0.get("reason") == reason and fu0.get("mic_path") == mics[1]
+          and isinstance(fu0.get("mic_duration"), int), f"got {fu!r}")
     check("U6: … and no unreadable key at all when nothing was left out",
           pure.get("cleanHasUnreadable") is False, f"{pure.get('cleanHasUnreadable')}")
-    check("U6: resultNotes is [the unreadable note, the microphone note], in that order; [] for a "
-          "clean result",
+    voice_note = f"The left-out segment's microphone, {mics[1]}, was added to the project without its picture."
+    check("U6: resultNotes is [the unreadable note, the left-out voice's note, the microphone note], in "
+          "that order; [] for a clean result (B55)",
           bool(note) and bool(pure.get("microphoneNoteBoth"))
-          and pure.get("notesBoth") == [note, pure.get("microphoneNoteBoth")]
+          and pure.get("leftOutVoiceNote") == voice_note
+          and pure.get("notesBoth") == [note, voice_note, pure.get("microphoneNoteBoth")]
           and pure.get("notesClean") == [], f"{pure.get('notesBoth')!r}, {pure.get('notesClean')!r}")
     clause = pure.get("filesClause") or ""
     check("U6: savedButNotAdded ends with the unreadable note; a clean result's sentence is R1's",
@@ -5540,6 +5859,10 @@ def section_unreadable(binary, sources):
           f"drag is in progress {note}"
           and pure.get("savedClean") == f"The recording was saved at {clause} but could not be added: "
           "a drag is in progress", f"{pure.get('savedWith')!r}, {pure.get('savedClean')!r}")
+    check("U6: … and a failed landing never says the voice was added — savedButNotAdded holds no "
+          "\"was added to the project\" (B55)",
+          "was added to the project" not in (pure.get("savedWith") or "x was added to the project"),
+          f"{pure.get('savedWith')!r}")
 
     print("  M1 — a microphone failure at a segment boundary")
     b = answer.get("boundary") or {}
@@ -7926,6 +8249,179 @@ def section_grants(binary, sources):
 
 
 # --------------------------------------------------------------------------
+# Section 14 — issue batch B55 (#181 item 2, spec §11 recording): a left-out
+# segment's readable microphone lands without its picture, in its slot.
+
+LEFTOUT_B_LEN = 3 * SEC                # B's voice, 3 s — its slot at 30 and 60 fps
+
+
+def leftout_clip(clips, media):
+    """The one clip whose source is `media`, or {} (none, or several)."""
+    hits = [c for c in clips if c.get("media") == media]
+    return hits[0] if len(hits) == 1 else {}
+
+
+def section_leftout(binary, sources):
+    print("\nSection 14 — issue batch B55 (#181 item 2): a left-out segment's readable voice lands in "
+          "its picture's slot, the picture track empty there")
+    tmp = fresh_dir("leftout")
+    answer, error = run_probe(binary, "leftout", {"mode": "leftout", "tempFolder": tmp})
+    check("14: the probe answers", answer is not None and not answer.get("error"),
+          error or (answer or {}).get("error", ""))
+    if not answer or answer.get("error"):
+        return
+    check("14: the shared controller is the probe's", answer.get("controllerIsProbe") is True,
+          f"{answer.get('controllerIsProbe')}")
+    mic_b = answer.get("micB") or "?"
+    path_a = answer.get("pathA") or "?"
+
+    print("  X1 — [A, left-out B (3 s voice), C] in a fresh document, playhead 0")
+    x1 = answer.get("X1") or {}
+    lists = x1.get("lists") or {}
+    clips = x1.get("allClips") or []
+    media = lists.get("media") or [-1, -1]
+    mic_media = lists.get("micMedia") or [-1, -1]
+    lo_media = (lists.get("leftOutMicMedia") or [-1])[0]
+    lo_clip = (lists.get("leftOutMicClips") or [-1])[0]
+    pic_a = leftout_clip(clips, media[0])
+    pic_c = leftout_clip(clips, media[1] if len(media) > 1 else -1)
+    voice_b = leftout_clip(clips, lo_media)
+    voice_c = leftout_clip(clips, mic_media[1] if len(mic_media) > 1 else -1)
+    tracks = {t.get("id"): t.get("name") for t in x1.get("allTracks") or []}
+    check("X1: the stretches are [segment 0, B's voice, segment 1] and the placement lands — no throw",
+          not x1.get("error") and x1.get("stretches") == ["segment0", "voice0", "segment1"],
+          f"{x1.get('error') or x1.get('stretches')}")
+    check("X1: picture A at 0, 3 000 000 long (5 s at 30 fps)",
+          pic_a.get("start") == 0 and pic_a.get("duration") == PICTURE_LEN, f"{pic_a}")
+    check("X1: B's voice at 3 000 000 — picture A's end — 1 800 000 long, `in` 0, on the "
+          "Microphone track (leftout-no-gap, leftout-voice-dropped)",
+          voice_b.get("start") == PICTURE_LEN and voice_b.get("duration") == LEFTOUT_B_LEN
+          and voice_b.get("in") == 0 and tracks.get(voice_b.get("track")) == "Microphone"
+          and voice_b.get("id") == lo_clip, f"{voice_b}, leftOut clip {lo_clip}")
+    check("X1: picture C at 4 800 000 — the slot's end — on picture A's track (leftout-no-gap, "
+          "leftout-voice-dropped)",
+          pic_c.get("start") == PICTURE_LEN + LEFTOUT_B_LEN and pic_c.get("track") == pic_a.get("track"),
+          f"{pic_c}")
+    check("X1: C's voice at 4 800 000 on the same Microphone track, `in` 0 — later segments keep "
+          "their timing against their own voices",
+          voice_c.get("start") == PICTURE_LEN + LEFTOUT_B_LEN and voice_c.get("in") == 0
+          and voice_c.get("track") == voice_b.get("track"), f"{voice_c}")
+    covering = [c for c in clips if c.get("track") == pic_a.get("track")
+                and c.get("start", 0) < PICTURE_LEN + LEFTOUT_B_LEN and c.get("end", 0) > PICTURE_LEN]
+    check("X1: no picture clip covers [3 000 000, 4 800 000) — the picture track is empty in the slot",
+          bool(pic_a) and not covering, f"{covering}")
+    predicted_media = sorted(m for m in media + mic_media + [lo_media] if m != -1)
+    predicted_clips = sorted(c for c in (lists.get("clips") or []) + (lists.get("micClips") or [])
+                             + (lists.get("leftOutMicClips") or []) if c != -1)
+    minted_clips = sorted(c.get("id") for c in x1.get("mintedClips") or [])
+    check("X1: predicted equals minted — five media and five clips, both left-out lists included",
+          predicted_media == sorted(x1.get("mintedMedia") or []) and len(predicted_media) == 5
+          and predicted_clips == minted_clips and len(minted_clips) == 5 and lo_media != -1
+          and lo_clip != -1,
+          f"media {predicted_media} vs {x1.get('mintedMedia')}, clips {predicted_clips} vs {minted_clips}")
+    check("X1: one undo step, \"Add Recording\", and no placement note",
+          x1.get("undoName") == ACTION_NAME and x1.get("notes") == [],
+          f"{x1.get('undoName')!r}, {x1.get('notes')}")
+
+    print("  X2 — B recorded first (position 0), playhead at 1 s")
+    x2 = answer.get("X2") or {}
+    l2 = x2.get("lists") or {}
+    c2 = x2.get("allClips") or []
+    m2 = l2.get("media") or [-1, -1]
+    v2 = leftout_clip(c2, (l2.get("leftOutMicMedia") or [-1])[0])
+    a2 = leftout_clip(c2, m2[0])
+    k2 = leftout_clip(c2, m2[1] if len(m2) > 1 else -1)
+    check("X2: B's voice at 600 000 (the playhead), 1 800 000 long; picture A at 2 400 000 and C at "
+          "its end (leftout-no-gap, leftout-voice-dropped)",
+          x2.get("stretches") == ["voice0", "segment0", "segment1"]
+          and v2.get("start") == SEC and v2.get("duration") == LEFTOUT_B_LEN
+          and a2.get("start") == SEC + LEFTOUT_B_LEN
+          and k2.get("start") == SEC + LEFTOUT_B_LEN + PICTURE_LEN,
+          f"{x2.get('error') or x2.get('stretches')}, voice {v2}, A {a2}, C {k2}")
+
+    print("  X3 — X1's result as a new project (60 fps)")
+    x3 = answer.get("X3") or {}
+    c3 = x3.get("clips") or []
+    by_path = {m.get("path"): m.get("id") for m in x3.get("media") or []}
+    pa3 = leftout_clip(c3, by_path.get(path_a, -2))
+    vb3 = leftout_clip(c3, by_path.get(mic_b, -2))
+    pc3 = [c for c in c3 if c.get("track") == pa3.get("track") and c.get("id") != pa3.get("id")]
+    tracks3 = {t.get("id"): t.get("name") for t in x3.get("tracks") or []}
+    check("X3: B's voice at clip 1's end, 1 800 000 long, on the Microphone track (leftout-no-gap, "
+          "leftout-voice-dropped)",
+          not x3.get("error") and bool(pa3) and vb3.get("start") == pa3.get("end")
+          and vb3.get("duration") == LEFTOUT_B_LEN and tracks3.get(vb3.get("track")) == "Microphone",
+          f"{x3.get('error') or ''} A {pa3}, voice {vb3}")
+    check("X3: picture C at clip 1's end + 1 800 000, on clip 1's track",
+          len(pc3) == 1 and pc3[0].get("start") == (pa3.get("end") or 0) + LEFTOUT_B_LEN, f"{pc3}")
+    check("X3: one undo step \"Add Recording Segments\"; newProjectLeftOutIds names B's voice",
+          x3.get("undoName") == "Add Recording Segments"
+          and x3.get("leftOutIds") == [{"micMedia": by_path.get(mic_b, -2), "micClip": vb3.get("id", -2)}],
+          f"{x3.get('undoName')!r}, {x3.get('leftOutIds')}")
+    after = x3.get("afterUndo") or {}
+    check("X3: one undo leaves picture A alone",
+          [c.get("media") for c in after.get("clips") or []] == [by_path.get(path_a, -2)]
+          and after.get("media") == 1, f"{after}")
+
+    print("  X4 — B recorded before a new project's only segment")
+    x4 = answer.get("X4") or {}
+    m4 = {m.get("path"): m.get("id") for m in x4.get("media") or []}
+    check("X4: B's voice lands as media with no clip, and the notes carry leadingVoiceNote's sentence "
+          "(leftout-voice-dropped)",
+          not x4.get("error") and mic_b in m4
+          and not [c for c in x4.get("clips") or [] if c.get("media") == m4.get(mic_b)]
+          and bool(x4.get("leadingNote")) and x4.get("leadingNote") in (x4.get("notes") or [])
+          and mic_b in (x4.get("leadingNote") or "") and path_a in (x4.get("leadingNote") or ""),
+          f"{x4.get('error') or ''} media {sorted(m4)}, notes {x4.get('notes')}")
+    check("X4: the step is \"Add Microphone\" — one segment plus a left-out voice; \"Add Recording "
+          "Segments\" when B's voice did not read",
+          x4.get("undoName") == MIC_ACTION_NAME and x4.get("actionName") == MIC_ACTION_NAME
+          and x4.get("actionNameWithoutB") == "Add Recording Segments",
+          f"{x4.get('undoName')!r}, {x4.get('actionName')!r}, {x4.get('actionNameWithoutB')!r}")
+
+    print("  X5 — place: false")
+    x5 = answer.get("X5") or {}
+    l5 = x5.get("lists") or {}
+    check("X5: B's voice media is in the left-out list and minted; no clip lands at all "
+          "(leftout-voice-dropped)",
+          not x5.get("error") and (l5.get("leftOutMicMedia") or [-1])[0] != -1
+          and (l5.get("leftOutMicMedia") or [-1])[0] in (x5.get("mintedMedia") or [])
+          and l5.get("leftOutMicClips") == [-1] and x5.get("mintedClips") == [],
+          f"{x5.get('error') or l5}, minted clips {x5.get('mintedClips')}")
+
+    print("  X6 — what record_screen says about X1's landing")
+    x6 = answer.get("X6") or {}
+    u6 = x6.get("unreadable")
+    e6 = u6[0] if isinstance(u6, list) and len(u6) == 1 and isinstance(u6[0], dict) else {}
+    check("X6: unreadable[0] carries mic_path, mic_duration, mic_media and mic_clip — X1's ids "
+          "(leftout-voice-dropped)",
+          e6.get("mic_path") == mic_b and e6.get("mic_duration") == LEFTOUT_B_LEN
+          and e6.get("mic_media") == lo_media and e6.get("mic_clip") == lo_clip and lo_clip != -1,
+          f"{x6.get('error') or e6}")
+    voice_note = f"The left-out segment's microphone, {mic_b}, was added to the project without its picture."
+    check("X6: resultNotes is [unreadable, the left-out voice's note]; savedButNotAdded says no "
+          "\"was added to the project\"",
+          x6.get("leftOutVoiceNote") == voice_note
+          and x6.get("resultNotes") == [x6.get("unreadableNote"), voice_note]
+          and "was added to the project" not in (x6.get("saved") or "x was added to the project"),
+          f"{x6.get('resultNotes')}, saved {x6.get('saved')!r}")
+    check("X6: record_screen's description says the voice lands \"without its picture\"",
+          "without its picture" in (x6.get("description") or ""), f"{len(x6.get('description') or '')} chars")
+
+    print("  X7 — the control: a left-out B whose voice did NOT read changes nothing")
+    x7 = answer.get("X7") or {}
+    check("X7: the op list is byte for byte the same result's without B, and so are the lists",
+          not x7.get("error") and bool(x7.get("with")) and x7.get("with") == x7.get("without")
+          and x7.get("withNames") == x7.get("withoutNames")
+          and (x7.get("withLists") or {}).get("leftOutMicMedia") == [-1]
+          and {k: v for k, v in (x7.get("withLists") or {}).items() if not k.startswith("leftOut")}
+          == {k: v for k, v in (x7.get("withoutLists") or {}).items() if not k.startswith("leftOut")},
+          f"{x7.get('error') or ''} {x7.get('withNames')} vs {x7.get('withoutNames')}")
+    check("14: every document the section opened is closed", answer.get("documentsAfterClose") == 0,
+          f"{answer.get('documentsAfterClose')}")
+
+
+# --------------------------------------------------------------------------
 # Section 13 — issue batch B27 (#98 c): the countdown's meter, read from the
 # PREPARED capture session.
 
@@ -8268,9 +8764,13 @@ MUTANTS = {
     "unreadable-fails-all": (
         "ScreenRecorder+Finishing.swift",
         "                let left = Self.leftOut(done, at: index, error)\n"
-        "                self.probeSegment(done, at: index + 1, landed: landed, skipped: skipped + [left])\n",
+        "                self.probeLeftOutMicrophone(done, at: index, left: left, position: landed.count) {\n"
+        "                    [weak self] left in\n"
+        "                    self?.probeSegment(done, at: index + 1, landed: landed, skipped: skipped + [left])\n"
+        "                }\n",
         "                self.conclude(done, .failure(Self.unreadable(done, at: index, error)))\n",
-        "an unreadable segment fails the whole recording again (#97 undone — the code before B17)"),
+        "an unreadable segment fails the whole recording again (#97 undone — the code before B17; "
+        "re-aimed by B55 at the arm that now probes the left-out microphone)"),
     "no-unreadable-note": (
         "RecordingResult.swift",
         "        unreadable.isEmpty ? nil : unreadable.map(\\.sentence).joined(separator: \" \")\n",
@@ -8348,10 +8848,14 @@ MUTANTS = {
         "ScreenRecorder+Finishing.swift",
         "        if let failure = done.segments[index].outputFailure {\n"
         "            let left = Self.leftOut(done, at: index, reason: failure)\n"
-        "            return probeSegment(done, at: index + 1, landed: landed, skipped: skipped + [left])\n"
+        "            return probeLeftOutMicrophone(done, at: index, left: left, position: landed.count) {\n"
+        "                [weak self] left in\n"
+        "                self?.probeSegment(done, at: index + 1, landed: landed, skipped: skipped + [left])\n"
+        "            }\n"
         "        }\n",
         "",
-        "the walker probes a segment whose writer failed after it closed — a movie that reads lands"),
+        "the walker probes a segment whose writer failed after it closed — a movie that reads lands "
+        "(re-aimed by B55 at the arm that now probes the left-out microphone)"),
     "pause-no-post": (
         "ScreenRecorder+Pause.swift",
         "        meter.publish(.silent, from: ObjectIdentifier(self))\n"
@@ -8394,6 +8898,29 @@ MUTANTS = {
         "            roundedRect: body, xRadius: DS.buttonRadius, yRadius: DS.buttonRadius)\n",
         "            roundedRect: body, xRadius: body.height / 2, yRadius: body.height / 2)\n",
         "StickerButton's block is drawn with the pill's radius, half its height"),
+    # Issue batch B55 (#181 item 2) — section 14, U1, U6, U7 and 3r.
+    "leftout-mic-unprobed": (
+        "ScreenRecorder+Finishing.swift",
+        "        guard let micURL = segment.micURL, segment.micFailure == nil,\n",
+        "        guard let micURL = segment.micURL, segment.micFailure == nil, position < 0,\n",
+        "a left-out segment's microphone is never probed — both left-out arms pass it through "
+        "(the code before B55)"),
+    "leftout-no-gap": (
+        "RecordingLanding+LeftOut.swift",
+        "        return max(0, SilenceDetector.snapDownToFrame(voice.duration, fps: fps))\n",
+        "        return max(0, SilenceDetector.snapDownToFrame(0, fps: fps))\n",
+        "slotLength answers 0 — the left-out voice takes no time on the picture track"),
+    "leftout-voice-dropped": (
+        "RecordingResult.swift",
+        "            unreadable.indices.filter { unreadable[$0].position == k && unreadable[$0].micDescriptor != nil }\n",
+        "            unreadable.indices.filter { _ in false }\n",
+        "stretches omits every left-out voice — a voice that read is never landed"),
+    "mics-unnamed": (
+        "ScreenRecorder+Finishing.swift",
+        "        guard !movies.isEmpty || !mics.isEmpty else { return error }\n",
+        "        guard !movies.isEmpty else { return error }\n",
+        "namingFiles names nothing when no movie is on disk, readable microphone files included "
+        "(the code before B55)"),
 }
 
 
@@ -8424,7 +8951,7 @@ def prepare_mutant(name):
 SECTIONS = [section_files, section_configuration, section_state, section_unreadable, section_landing,
             section_segments, section_chrome, section_chrome_pause, section_file_pause,
             section_welcome, section_catalog, section_host, section_granted, section_grants,
-            section_preroll]
+            section_preroll, section_leftout]
 
 
 def main():
@@ -8440,7 +8967,7 @@ def main():
                         help="a comma-separated subset of sections to run, by the name after "
                              "`section_` (files, configuration, state, unreadable, landing, "
                              "segments, chrome, chrome_pause, file_pause, welcome, catalog, host, "
-                             "granted, grants, preroll) — for "
+                             "granted, grants, preroll, leftout) — for "
                              "iterating on "
                              "one; the full run is what the counts in the docstring are")
     args = parser.parse_args()

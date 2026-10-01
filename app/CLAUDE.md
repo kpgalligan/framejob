@@ -1304,15 +1304,19 @@ free.
   past idle JOINS the finishing under way; a microphone problem is
   `micProblem` on a success, never the recording's failure. A movie that will
   not probe, or a closed segment whose output reported a failure (#181), is
-  LEFT OUT as `RecordingResult.unreadable`; only a recording with no readable
-  movie fails.
-- `RecordingLanding.swift` (+`Microphone`, +`Placing`) · `ProjectDocument+Recording.swift`
+  LEFT OUT as `RecordingResult.unreadable` with its readable microphone; only
+  a recording with no readable movie fails, naming every file on disk — the
+  microphone files alone when no movie is.
+- `RecordingLanding.swift` (+`Microphone`, +`Placing`, +`LeftOut`) · `ProjectDocument+Recording.swift`
   — a `RecordingResult` and a document in, an UNSCOPED op list out; nothing
   here commits. Pictures land back to back on ONE track, every `add_clip`
   READ BACK (at an inexact canvas rate a raw add snaps down into a one-tick
   overlap and a minted dissolve); each voice on one Microphone track at its
   picture's start minus its offset, floored at the previous voice's end.
-  `untitled(around:)`'s order is a contract, documented there.
+  A left-out segment's readable voice lands in its picture's slot on the
+  Microphone track, at offset 0, and the pictures after it start at the
+  slot's end (`+LeftOut`, #181). `untitled(around:)`'s order is a contract,
+  documented there.
 
 **The agent.**
 - `AgentServer.swift` (frozen) and `AgentServer+Project` / `Clips` / `Tracks`

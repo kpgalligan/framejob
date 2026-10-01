@@ -73,10 +73,27 @@ struct RecordingSegment {
 /// (movie, then microphone, each only if there), and the error `settle`
 /// built for it — the writer's own sentence for the second.
 /// `sentence` is what the panel's note and the tool's `note` say about it.
+/// `micDescriptor` is its microphone file, probed, when it reads (#181 item
+/// 2, spec §11 recording): the landing puts that voice in the picture's
+/// slot. `position` is how many of `RecordingResult.segments` were recorded
+/// before it — where that slot is among the landed segments.
 struct UnreadableSegment {
     let moviePath: String
     let keptFiles: [String]
     let error: RecorderError
+    let micDescriptor: MediaDescriptor?
+    let position: Int
+
+    init(
+        moviePath: String, keptFiles: [String], error: RecorderError,
+        micDescriptor: MediaDescriptor? = nil, position: Int = 0
+    ) {
+        self.moviePath = moviePath
+        self.keptFiles = keptFiles
+        self.error = error
+        self.micDescriptor = micDescriptor
+        self.position = position
+    }
 
     var sentence: String {
         "A segment was left out. " + error.localizedDescription
@@ -175,6 +192,48 @@ struct RecordingResult {
     }
 }
 
+/// One stretch of the recording's timeline, in recording order: a landed
+/// segment (an index into `segments`), or a left-out segment's readable
+/// voice with no picture (an index into `unreadable`) — #181 item 2.
+enum RecordingStretch: Equatable {
+    case segment(Int)
+    case voiceOnly(Int)
+}
+
+extension RecordingResult {
+    /// Every landed segment and every left-out voice that reads, in the
+    /// order they were recorded: before each segment `k`, the left-out
+    /// entries at `position == k` with a microphone (in `unreadable`'s
+    /// order), then the segment; after the last, those at `segments.count`.
+    /// With no left-out voice it is `.segment(0)…` exactly, so every landing
+    /// over it is the one before #181 item 2.
+    var stretches: [RecordingStretch] {
+        func voices(at k: Int) -> [RecordingStretch] {
+            unreadable.indices.filter { unreadable[$0].position == k && unreadable[$0].micDescriptor != nil }
+                .map { RecordingStretch.voiceOnly($0) }
+        }
+        var list: [RecordingStretch] = []
+        for k in segments.indices {
+            list += voices(at: k)
+            list.append(.segment(k))
+        }
+        return list + voices(at: segments.count)
+    }
+
+    /// What a landing that SUCCEEDED says about each left-out voice it
+    /// added, joined by a space; nil when no left-out segment's microphone
+    /// read. Never said by a failed landing (`savedButNotAdded`,
+    /// `failedToLand`), which `unreadableNote` alone serves.
+    var leftOutVoiceNote: String? {
+        let paths = unreadable.compactMap { $0.micDescriptor?.path }
+        guard !paths.isEmpty else { return nil }
+        return paths.map {
+            "The left-out segment's microphone, \($0), was added to the project without its "
+                + "picture."
+        }.joined(separator: " ")
+    }
+}
+
 /// `.busy` is `start()` while not idle, and nothing else answers it any
 /// more: a `stop()` in any state joins the finishing already under way
 /// (R1 review finding 1). `.notPaused` is `resume()` while not paused
@@ -186,7 +245,8 @@ struct RecordingResult {
 /// `.filesKept` wraps a failure reached once a file was on disk, so the
 /// panel's note and the tool's error carry the path with no change on their
 /// side (finding 6); with segments its `movie` and `microphone` strings are
-/// comma-joined lists, and the one-file sentence is byte for byte R1's.
+/// comma-joined lists, and the one-file sentence is byte for byte R1's; an
+/// EMPTY `movie` (no movie on disk) names the microphone files alone (B55).
 indirect enum RecorderError: Error, LocalizedError {
     case busy
     case notRecording
@@ -214,9 +274,12 @@ indirect enum RecorderError: Error, LocalizedError {
                 + "\(Int(ScreenRecorder.finishCeiling)) s."
         case .microphoneDevice(let why): return why
         case .filesKept(let inner, let movie, let microphone):
+            let base = inner.errorDescription ?? "The recording failed."
+            guard !movie.isEmpty else {
+                return microphone.map { base + " The microphone is at \($0)." } ?? base
+            }
             let clause = microphone.map { "; the microphone at \($0)" } ?? ""
-            return (inner.errorDescription ?? "The recording failed.")
-                + " The recording is at \(movie)\(clause)."
+            return base + " The recording is at \(movie)\(clause)."
         }
     }
 }

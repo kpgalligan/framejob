@@ -27,7 +27,8 @@ schema, §6 the op table, §7 the architecture.
   the elapsed time in the menu bar carries Pause, Resume and Stop; File ▸
   Pause Recording pauses and resumes too. A paused recording is one file
   per stretch; a stretch whose file cannot be read is left out, and the
-  note names it and where its files are. The file is written to
+  note names it and where its files are — and its microphone, when it
+  reads, still lands in the stretch's place. The file is written to
   `~/Movies/Reelcut Recordings/` and imported as ordinary media (undo
   removes the clip, never the file); a microphone is a second file on its
   own Microphone track, aligned to the picture. A new project takes the

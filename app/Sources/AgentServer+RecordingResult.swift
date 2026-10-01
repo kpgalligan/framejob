@@ -88,9 +88,13 @@ extension AgentServer {
     /// `unreadable` (#97) is present only when a segment was LEFT OUT because
     /// its movie would not probe, or its writer failed after it closed (#181):
     /// one entry per such segment, in order, with its movie's `path`, the
-    /// `kept_files` still on disk and the `reason`.
+    /// `kept_files` still on disk and the `reason` — and, when its
+    /// microphone file read (#181 item 2), `mic_path` and `mic_duration`,
+    /// with `mic_media` and `mic_clip` from `leftOutIds` (one entry per
+    /// left-out segment) when known.
     static func recordingFields(
-        _ result: RecordingResult, ids: [RecordingSegmentIds] = []
+        _ result: RecordingResult, ids: [RecordingSegmentIds] = [],
+        leftOutIds: [RecordingSegmentIds] = []
     ) -> [String: Any] {
         let first = result.segments[0]
         let movie = first.descriptor
@@ -111,11 +115,19 @@ extension AgentServer {
         }
         if let problem = result.micProblem { fields["mic_problem"] = problem }
         if !result.unreadable.isEmpty {
-            fields["unreadable"] = result.unreadable.map { left -> [String: Any] in
-                [
+            fields["unreadable"] = result.unreadable.enumerated().map { i, left -> [String: Any] in
+                var entry: [String: Any] = [
                     "path": left.moviePath, "kept_files": left.keptFiles,
                     "reason": left.error.localizedDescription,
                 ]
+                if let mic = left.micDescriptor {
+                    entry["mic_path"] = mic.path
+                    entry["mic_duration"] = mic.duration
+                }
+                let known = i < leftOutIds.count ? leftOutIds[i] : nil
+                if let id = known?.micMedia { entry["mic_media"] = Int(id) }
+                if let id = known?.micClip { entry["mic_clip"] = Int(id) }
+                return entry
             }
         }
         fields.merge(idFields(ids.first)) { _, new in new }
@@ -190,10 +202,11 @@ extension AgentServer {
     }
 
     /// The result's own `note` clauses, in order: the segments left out as
-    /// unreadable (#97), then the microphone's. Both doors append these
-    /// after their own.
+    /// unreadable (#97), the left-out voices that landed (#181 item 2), then
+    /// the microphone's. Both doors append these after their own, on a
+    /// landing that succeeded only.
     static func resultNotes(_ result: RecordingResult) -> [String] {
-        [result.unreadableNote, microphoneNote(result)].compactMap { $0 }
+        [result.unreadableNote, result.leftOutVoiceNote, microphoneNote(result)].compactMap { $0 }
     }
 
     /// The ids a new project holds for every segment's files, read off its
@@ -237,6 +250,34 @@ extension AgentServer {
                 media: k < placement.mediaIds.count ? placement.mediaIds[k] : nil,
                 clip: entry(placement.clipIds, k), micMedia: entry(placement.micMediaIds, k),
                 micClip: entry(placement.micClipIds, k))
+        }
+    }
+
+    /// The ids a DOCUMENT landing gives each left-out segment's voice (#181
+    /// item 2): the placement's two left-out lists, one entry per
+    /// `result.unreadable`, `micMedia` and `micClip` only.
+    static func documentLeftOutIds(
+        _ result: RecordingResult, placement: RecordingLanding.Placement
+    ) -> [RecordingSegmentIds] {
+        func entry(_ list: [UInt32?], _ i: Int) -> UInt32? { i < list.count ? list[i] : nil }
+        return result.unreadable.indices.map { i in
+            RecordingSegmentIds(
+                micMedia: entry(placement.leftOutMicMediaIds, i),
+                micClip: entry(placement.leftOutMicClipIds, i))
+        }
+    }
+
+    /// The ids a NEW project holds for each left-out segment's voice, read
+    /// off its snapshot by trimmed path as `newProjectIds` reads the
+    /// segments': a voice before the first segment is media with no clip.
+    static func newProjectLeftOutIds(
+        _ result: RecordingResult, in document: ProjectDocument
+    ) -> [RecordingSegmentIds] {
+        let snapshot = document.project.snapshot
+        return result.unreadable.map { left in
+            let micMedia = left.micDescriptor.flatMap { landedMedia(for: $0.path, in: snapshot) }
+            return RecordingSegmentIds(
+                micMedia: micMedia, micClip: micMedia.flatMap { landedClip(of: $0, in: snapshot) })
         }
     }
 

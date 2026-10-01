@@ -81,7 +81,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   Media… does. A recorder that deleted footage on ⌘Z would be the only
   destructive undo in the app. For a recording that opened as a new project
   the first segment IS the document and has no step; the rest is one step,
-  Add Microphone (one segment with a voice) or Add Recording Segments.
+  Add Microphone (one segment, with any voice — its own or a left-out
+  segment's) or Add Recording Segments.
 - **A paused recording is a SEQUENCE of files over ONE stream** (road map
   3's R2, 2026-09-12). ScreenCaptureKit has no pause: the only lever is
   removing the recording output — its file closes — and adding a fresh one
@@ -127,6 +128,40 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   writer stopped before its first sample — is that segment's `micProblem`
   only; `microphoneProblem`, the live note, is a microphone that dies
   MID-segment.
+- **A left-out segment's readable microphone lands without its picture**
+  (#181 item 2, 2026-10-01). When a segment is left out, the walker still
+  probes its microphone file, unless that segment's mic writer reported its
+  own failure (`micFailure`). A file that reads travels on the
+  `UnreadableSegment` with `position`, its place among the landed segments.
+  The landing puts the voice in its picture's SLOT: on the Microphone track,
+  at the point the picture sequence had reached, with offset 0 (there is no
+  picture to align it to), floored at the previous voice's end and
+  head-trimmed by the existing rule. The slot's length is the file's length
+  snapped down to the frame; the picture track stays empty for that
+  stretch, and the next picture starts at the slot's end, so later
+  segments keep their timing against their own voices. In a NEW project
+  the first readable segment is the document at 0, so a voice left out
+  before it lands as media only, with a sentence naming its file. The
+  left-out segment's own sentence is unchanged (it is also said when the
+  landing fails); only a landing that succeeded adds "The left-out
+  segment's microphone, <path>, was added to the project without its
+  picture." — the panel's note after the unreadable sentence, the tool's
+  `note` between the unreadable and microphone notes — and a failed landing
+  never says it. The tool's `unreadable` entry gains `mic_path` and
+  `mic_duration`, and `mic_media` and `mic_clip` when known; the panel
+  selects the voice's clip. The voice is part of the same grouped edit: Add
+  Recording, or in a new project Add Microphone when the document has one
+  segment and Add Recording Segments otherwise. **With NO readable movie
+  the recording still FAILS**, even when a microphone reads: a
+  `RecordingResult` is never empty of segments, and its `descriptor`,
+  `startedAt`, `filesClause` and `untitled(around:)` are the first
+  segment's picture, so a voice-only result would be a new result shape
+  through the walker, both doors and the landing. The voice is not lost:
+  the failure deletes no file, and `namingFiles` names every movie and then
+  every microphone file on disk — the microphone files alone ("The
+  microphone is at …") when no movie is on disk at all — so the person can
+  import it. A left-out segment whose voice does not read takes no time, as
+  before.
 - **File ▸ Pause Recording** (#98, 2026-09-29). Directly under New
   Recording…, retitled Resume Recording from the RECORDER's state, enabled
   only while it is recording or paused, with no key. It is routed as Stop

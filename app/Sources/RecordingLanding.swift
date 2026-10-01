@@ -78,6 +78,11 @@ struct RecordingLanding {
     /// with no clip 1 to follow), and every media with SOME clips — the
     /// third is what `notes` exists for, and each nil in the lists above has
     /// its sentence there.
+    ///
+    /// The two `leftOut…` lists have ONE entry per `RecordingResult.unreadable`
+    /// segment (#181 item 2): the media and the clip its readable voice
+    /// landed as, nil where it has no voice or minted no clip; empty for a
+    /// result with nothing left out.
     struct Placement {
         let ops: [ReelOp]
         let mediaIds: [UInt32]
@@ -85,6 +90,8 @@ struct RecordingLanding {
         let micMediaIds: [UInt32?]
         let micClipIds: [UInt32?]
         let notes: [String]
+        let leftOutMicMediaIds: [UInt32?]
+        let leftOutMicClipIds: [UInt32?]
 
         var mediaId: UInt32 { mediaIds[0] }
         var clipId: UInt32? { clipIds.first ?? nil }
@@ -93,19 +100,25 @@ struct RecordingLanding {
 
         init(
             ops: [ReelOp], mediaIds: [UInt32], clipIds: [UInt32?], micMediaIds: [UInt32?],
-            micClipIds: [UInt32?], notes: [String] = []
+            micClipIds: [UInt32?], notes: [String] = [], leftOutMicMediaIds: [UInt32?] = [],
+            leftOutMicClipIds: [UInt32?] = []
         ) {
             precondition(!mediaIds.isEmpty, "a Placement lands at least one segment's media")
             precondition(
                 clipIds.count == mediaIds.count && micMediaIds.count == mediaIds.count
                     && micClipIds.count == mediaIds.count,
                 "a Placement's four lists have one entry per segment")
+            precondition(
+                leftOutMicMediaIds.count == leftOutMicClipIds.count,
+                "a Placement's two left-out lists have one entry per left-out segment")
             self.ops = ops
             self.mediaIds = mediaIds
             self.clipIds = clipIds
             self.micMediaIds = micMediaIds
             self.micClipIds = micClipIds
             self.notes = notes
+            self.leftOutMicMediaIds = leftOutMicMediaIds
+            self.leftOutMicClipIds = leftOutMicClipIds
         }
     }
 
@@ -176,6 +189,14 @@ struct RecordingLanding {
     /// branch the track rule took. `place == false` lands every media (the
     /// microphones' included) with no clip at all.
     ///
+    /// **A left-out segment's readable voice** (#181 item 2, spec §11
+    /// recording) is a stretch of its own (`RecordingResult.stretches`): on
+    /// the picture side a GAP of its slot's length (`pictureStretches`), so
+    /// the pictures after it start at the slot's end, and on the microphone
+    /// side a voice at offset 0 at the slot's start, by the same floor rule
+    /// (`voices(of:)`); `split` reads the answers back per segment and per
+    /// left-out segment. With no left-out voice the list is the segments.
+    ///
     /// The playhead is nest-local while a nest is open, the ops are unscoped,
     /// and the trial stamps the document's scope on the container ops exactly
     /// as the commit will. Two refusals are thrown by name rather than
@@ -222,17 +243,24 @@ struct RecordingLanding {
         }
         var pictures: [Landed] = []
         if place {
+            let stretches = try pictureStretches(
+                of: result, mediaIds: mediaIds, in: trial, scope: scope)
             pictures = try addSequence(
-                mediaIds, from: document.playhead, scope: scope, to: &trial, ops: &ops,
+                stretches, from: document.playhead, scope: scope, to: &trial, ops: &ops,
                 notes: &notes)
         }
         let microphones = try addMicrophones(
-            result.segments, pictureStarts: place ? pictures.map { $0.at } : nil,
+            voices(of: result), pictureStarts: place ? pictures.map { $0.at } : nil,
             scope: scope, to: &trial, ops: &ops, notes: &notes)
+        let micMedia = split(microphones.media, of: result)
+        let micClips = split(microphones.clips, of: result)
         return Placement(
             ops: ops, mediaIds: mediaIds,
-            clipIds: place ? pictures.map { $0.clip?.id } : mediaIds.map { _ in nil },
-            micMediaIds: microphones.media, micClipIds: microphones.clips, notes: notes)
+            clipIds: place
+                ? split(pictures.map { $0.clip?.id }, of: result).segments
+                : mediaIds.map { _ in nil },
+            micMediaIds: micMedia.segments, micClipIds: micClips.segments, notes: notes,
+            leftOutMicMediaIds: micMedia.leftOut, leftOutMicClipIds: micClips.leftOut)
     }
 
     // MARK: - The steps, each applied purely and read back
@@ -281,10 +309,12 @@ struct RecordingLanding {
     /// document into a second attempt that added a track and then reported
     /// "too many tracks", the wrong cap, when the document was at both.
     /// `notes` takes the winning attempt's sentences (the same either way —
-    /// a picture too short for a frame is too short on any track).
+    /// a picture too short for a frame is too short on any track). The
+    /// sequence is the whole stretch list, a left-out voice's gap included,
+    /// so the rule sees every picture where it will land.
     private static func addSequence(
-        _ media: [UInt32], from at: Ticks, scope: UInt32?, to trial: inout ReelProject,
-        ops: inout [ReelOp], notes: inout [String]
+        _ stretches: [PictureStretch], from at: Ticks, scope: UInt32?,
+        to trial: inout ReelProject, ops: inout [ReelOp], notes: inout [String]
     ) throws -> [Landed] {
         let container = try view(of: trial, scope: scope).snapshot
         if let front = container.tracks.last?.id {
@@ -292,7 +322,7 @@ struct RecordingLanding {
             var attemptOps: [ReelOp] = []
             var attemptNotes: [String] = []
             if let placed = try placeBackToBack(
-                media, on: front, from: at, scope: scope, to: &attempt, ops: &attemptOps,
+                stretches, on: front, from: at, scope: scope, to: &attempt, ops: &attemptOps,
                 notes: &attemptNotes)
             {
                 trial = attempt
@@ -312,7 +342,7 @@ struct RecordingLanding {
         var attemptNotes: [String] = []
         guard
             let placed = try placeBackToBack(
-                media, on: track, from: at, scope: scope, to: &attempt, ops: &attemptOps,
+                stretches, on: track, from: at, scope: scope, to: &attempt, ops: &attemptOps,
                 notes: &attemptNotes)
         else {
             throw ReelCoreError(message: "The recording could not be placed on a new track.")

@@ -28,14 +28,26 @@ extension RecordingLanding {
     /// down — lands as media alone, with its sentence in `notes`, and
     /// the sequence carries on from the same point. nil when any `add_clip`
     /// refuses — the caller decides what a refusal means — and a throw is
-    /// the core's own sentence. Answers one `Landed` per media, in order.
+    /// the core's own sentence. A `.gap` (a left-out segment's voice, #181
+    /// item 2) places nothing: its `Landed` has no clip and starts where the
+    /// sequence had reached, and the next picture starts the gap's length
+    /// later. Answers one `Landed` per stretch, in order.
     static func placeBackToBack(
-        _ media: [UInt32], on track: UInt32, from at: Ticks, scope: UInt32?,
+        _ stretches: [PictureStretch], on track: UInt32, from at: Ticks, scope: UInt32?,
         to trial: inout ReelProject, ops: inout [ReelOp], notes: inout [String]
     ) throws -> [Landed]? {
         var placed: [Landed] = []
         var at = at
-        for id in media {
+        for stretch in stretches {
+            let id: UInt32
+            switch stretch {
+            case .gap(let length):
+                placed.append(Landed(clip: nil, at: at))
+                at += length
+                continue
+            case .picture(let media):
+                id = media
+            }
             let file = try mediaEntry(id, in: trial, scope: scope)
             let fps = try view(of: trial, scope: scope).snapshot.canvas.fps
             if let note = tooShortNote(file, at: fps) {

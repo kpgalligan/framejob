@@ -3,9 +3,10 @@
 // `RecordingLanding.swift` landed alone at the 400-line cap (R2's toll) and
 // then grown here: the names the microphone's track and the two undo steps
 // carry, `remainderPlacement` (everything a fresh untitled document does not
-// already hold), `addMicrophones` (every segment's voice on ONE back track,
-// by the floor rule) and `addMicrophoneClip`, the head-trim dance with every
-// step of it READ BACK. `addMedia`, `view`, `clip(_:in:scope:)` and
+// already hold), `addMicrophones` (every stretch's voice on ONE back track,
+// by the floor rule — a left-out segment's readable voice, #181 item 2,
+// among them, its stretches in `+LeftOut`) and `addMicrophoneClip`, the
+// head-trim dance with every step of it READ BACK. `addMedia`, `view`, `clip(_:in:scope:)` and
 // `trimmed` are internal in the base file for this one, and
 // `placeBackToBack`, `placeClip`, `mediaEntry`, `tooShortNote` and
 // `milliseconds` in `+Placing`, because `private` does not cross a file.
@@ -38,12 +39,15 @@ extension RecordingLanding {
     static let microphoneTrackName = "Microphone"
 
     /// Which of the two names `untitled(around:)`'s remainder edit takes:
-    /// "Add Microphone" for one segment with a microphone — R1's landing,
-    /// R1's name — and "Add Recording Segments" otherwise. A one-segment
-    /// recording with no microphone has no remainder and no step, and the
-    /// answer for it is never read.
+    /// "Add Microphone" for one segment with any voice — its own (R1's
+    /// landing, R1's name) or a left-out segment's — and "Add Recording
+    /// Segments" otherwise. A one-segment recording with no voice has no
+    /// remainder and no step, and the answer for it is never read.
     static func remainderActionName(for result: RecordingResult) -> String {
-        if result.segments.count == 1, result.segments[0].micDescriptor != nil {
+        if result.segments.count == 1,
+            result.segments[0].micDescriptor != nil
+                || result.unreadable.contains(where: { $0.micDescriptor != nil })
+        {
             return microphoneActionName
         }
         return segmentsActionName
@@ -82,12 +86,18 @@ extension RecordingLanding {
     /// several voices stacked each one under the last (the floor rule
     /// trimming a whole voice off) — a wrong sound where a Media-tab list
     /// is at least an honest one.
+    ///
+    /// **A left-out segment's readable voice** (#181 item 2) is a stretch:
+    /// after clip 1 a gap the later pictures skip and a voice at its start;
+    /// BEFORE clip 1, which is the document at 0, media only with
+    /// `leadingVoiceNote`; without clip 1, media only with `unplacedNote`.
     static func remainderPlacement(
         _ result: RecordingResult, in document: ProjectDocument
     ) throws -> Placement? {
         assert(Thread.isMainThread)
         let hasMicrophone = result.segments.contains { $0.micDescriptor != nil }
-        guard result.segments.count > 1 || hasMicrophone else { return nil }
+        let hasLeftOutVoice = result.unreadable.contains { $0.micDescriptor != nil }
+        guard result.segments.count > 1 || hasMicrophone || hasLeftOutVoice else { return nil }
         let path = trimmed(result.descriptor.path)
         let snapshot = document.editedProject.snapshot
         guard let mediaId = snapshot.media.first(where: { $0.path == path })?.id else {
@@ -105,21 +115,14 @@ extension RecordingLanding {
         for segment in result.segments.dropFirst() {
             mediaIds.append(try addMedia(segment.descriptor, to: &trial, ops: &ops))
         }
-        var pictures: [Landed] = []
+        var starts: [Ticks?]?
+        var clips: [UInt32?] = result.stretches.map { _ in nil }
         if let first = first {
-            pictures = [Landed(clip: first, at: first.start)]
-            let rest = Array(mediaIds.dropFirst())
-            if !rest.isEmpty {
-                guard
-                    let placed = try placeBackToBack(
-                        rest, on: first.track, from: first.end, scope: scope, to: &trial,
-                        ops: &ops, notes: &notes)
-                else {
-                    throw ReelCoreError(
-                        message: "The recording's later segments could not be placed after its first.")
-                }
-                pictures += placed
-            }
+            let placed = try remainderStretches(
+                result, after: first, mediaIds: mediaIds, firstPath: path, scope: scope,
+                to: &trial, ops: &ops, notes: &notes)
+            starts = placed.starts
+            clips = placed.clips
         } else {
             for segment in result.segments.dropFirst() {
                 notes.append(unplacedNote(segment.descriptor.path, behind: path))
@@ -127,24 +130,30 @@ extension RecordingLanding {
             for segment in result.segments {
                 if let mic = segment.micDescriptor { notes.append(unplacedNote(mic.path, behind: path)) }
             }
+            for left in result.unreadable {
+                if let mic = left.micDescriptor { notes.append(unplacedNote(mic.path, behind: path)) }
+            }
         }
         let microphones = try addMicrophones(
-            result.segments, pictureStarts: first == nil ? nil : pictures.map { $0.at },
+            voices(of: result), pictureStarts: starts,
             scope: scope, to: &trial, ops: &ops, notes: &notes)
-        let clipIds: [UInt32?] = first == nil ? mediaIds.map { _ in nil } : pictures.map { $0.clip?.id }
+        let micMedia = split(microphones.media, of: result)
+        let micClips = split(microphones.clips, of: result)
         return Placement(
-            ops: ops, mediaIds: mediaIds, clipIds: clipIds, micMediaIds: microphones.media,
-            micClipIds: microphones.clips, notes: notes)
+            ops: ops, mediaIds: mediaIds, clipIds: split(clips, of: result).segments,
+            micMediaIds: micMedia.segments, micClipIds: micClips.segments, notes: notes,
+            leftOutMicMediaIds: micMedia.leftOut, leftOutMicClipIds: micClips.leftOut)
     }
 
-    /// Every segment's microphone: each file's `add_media` in segment order,
-    /// then — when `pictureStarts` is given, one per segment — ONE new back
-    /// track and each voice's clip by the floor rule, in the same order. A
-    /// nil `pictureStarts` is `place: false`: the media land and no clip
-    /// does, R1's rule. Answers one media id and one clip id PER SEGMENT,
-    /// nil where the segment has no file, or where its voice minted no clip
-    /// — too short for a frame, or wholly under the previous voice, each
-    /// with its sentence in `notes`.
+    /// Every stretch's microphone (`voices(of:)`, one per segment and per
+    /// left-out voice): each file's `add_media` in order, then — when
+    /// `pictureStarts` is given, one per voice — ONE new back track and each
+    /// voice's clip by the floor rule, in the same order. A nil
+    /// `pictureStarts` is `place: false`: the media land and no clip does,
+    /// R1's rule; a nil ENTRY lands that voice as media only. Answers one
+    /// media id and one clip id PER VOICE, nil where it has no file, or
+    /// where it minted no clip — too short for a frame, or wholly under the
+    /// previous voice, each with its sentence in `notes`.
     ///
     /// **The floor.** Segment `k`'s voice belongs at `pictureStart_k −
     /// micOffset_k`, and with one voice that is R1's rule exactly, floored at
@@ -166,27 +175,27 @@ extension RecordingLanding {
     /// voice adds no empty track. Its id is `next_id` off the trial at that
     /// moment, unchanged by a discarded attempt.
     static func addMicrophones(
-        _ segments: [RecordingSegment], pictureStarts: [Ticks]?, scope: UInt32?,
+        _ voices: [Voice], pictureStarts: [Ticks?]?, scope: UInt32?,
         to trial: inout ReelProject, ops: inout [ReelOp], notes: inout [String]
     ) throws -> (media: [UInt32?], clips: [UInt32?]) {
         precondition(
-            pictureStarts.map { $0.count == segments.count } ?? true,
-            "one picture start per segment")
+            pictureStarts.map { $0.count == voices.count } ?? true,
+            "one picture start per voice")
         var media: [UInt32?] = []
-        for segment in segments {
-            if let mic = segment.micDescriptor {
+        for voice in voices {
+            if let mic = voice.descriptor {
                 media.append(try addMedia(mic, to: &trial, ops: &ops))
             } else {
                 media.append(nil)
             }
         }
-        let none: [UInt32?] = segments.map { _ in nil }
+        let none: [UInt32?] = voices.map { _ in nil }
         guard let starts = pictureStarts else { return (media, none) }
         var track: UInt32?
         var clips: [UInt32?] = []
         var floor: Ticks = 0
-        for (k, segment) in segments.enumerated() {
-            guard let id = media[k] else {
+        for (k, voice) in voices.enumerated() {
+            guard let id = media[k], let start = starts[k] else {
                 clips.append(nil)
                 continue
             }
@@ -207,7 +216,7 @@ extension RecordingLanding {
             }
             guard
                 let placed = try addMicrophoneClip(
-                    id, on: on, pictureAt: starts[k], offset: segment.micOffset, floor: floor,
+                    id, on: on, pictureAt: start, offset: voice.offset, floor: floor,
                     scope: scope, to: &attempt, ops: &attemptOps, notes: &notes)
             else {
                 clips.append(nil)
