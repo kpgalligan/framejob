@@ -60,11 +60,11 @@
 //                      narrowed pane is the whole of what phase 8c added.
 //   `selectAction`     the selected action (road map 9, spec §11 CI-1): an
 //                      index into `ActionBands.ordered` of the selected clip,
-//                      or "-" for none, applied AFTER the playhead through
-//                      `document.selectAction`. Absent leaves whatever the
-//                      playhead's entry selected. APPENDED, for
-//                      `tools/proof/clip_inspector_proof.py`; compiled out of
-//                      a `-D HARNESS_REFERENCE_BUILD` harness.
+//                      or "-" for none, applied through `document.selectAction`
+//                      before the editor exists and again after the late
+//                      playhead (#198). Absent leaves whatever the playhead's
+//                      entry selected. APPENDED, for `clip_inspector_proof.py`;
+//                      compiled out of a `-D HARNESS_REFERENCE_BUILD` harness.
 //   `subTab`           the Clip tab's sub-tab (road map 9 §3, spec §11 CI-5):
 //                      text|shape|picture|sound|clip, or "-"/absent for the
 //                      selection kind's default (its first tab). Applied after
@@ -963,6 +963,19 @@ extension Harness {
             return 2
         }
     }
+
+    /// The `selectAction` argument: an index into `ActionBands.ordered` of the
+    /// selected clip, through `document.selectAction` — never the editor's
+    /// `selectAction(_:)`, which moves the playhead to the action's end.
+    static func applySelectAction(
+        _ spec: String, to document: ProjectDocument, refreshing controller: EditorViewController?
+    ) {
+        guard !spec.isEmpty else { return }
+        let ordered = document.singleSelectedClip.map { ActionBands.ordered($0) } ?? []
+        let index = Int(spec) ?? -1
+        document.selectAction(ordered.indices.contains(index) ? ordered[index].id : nil)
+        controller?.viewStateDidChange()
+    }
 }
 #endif
 
@@ -1108,11 +1121,7 @@ if selectIndex >= 0, clips.indices.contains(selectIndex) {
 }
 document.playhead = Ticks(playheadSeconds * 600_000)
 #if !HARNESS_REFERENCE_BUILD
-if !selectActionSpec.isEmpty {
-    let ordered = document.singleSelectedClip.map { ActionBands.ordered($0) } ?? []
-    let index = Int(selectActionSpec) ?? -1
-    document.selectAction(ordered.indices.contains(index) ? ordered[index].id : nil)
-}
+Harness.applySelectAction(selectActionSpec, to: document, refreshing: nil)
 #endif
 let controller = EditorViewController(document: document)
 controller.trackHeight = sizeIndex
@@ -1130,6 +1139,17 @@ controller.refreshFromDocument(isLive: false)
 for _ in 0..<12 {
     RunLoop.current.run(until: Date().addingTimeInterval(0.05))
     controller.view.layoutSubtreeIfNeeded()
+}
+// #198: Playback's first report (0 ticks, the new item's time) reached
+// `playbackTimeChanged` during the turns above and wrote `document.playhead =
+// 0`, so the asked playhead is set again here through the editor's own path,
+// and `selectAction` after it, since the playhead's entry may select an action.
+// At 0 nothing runs: the report wrote the same tick.
+if playheadSeconds != 0 {
+    controller.setPlayhead(Ticks(playheadSeconds * 600_000))
+    #if !HARNESS_REFERENCE_BUILD
+    Harness.applySelectAction(selectActionSpec, to: document, refreshing: controller)
+    #endif
 }
 // The candidate wash is the sheet's own view state and is deliberately not
 // part of `TimelineView.update(...)`, so it is pushed in here — after the

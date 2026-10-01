@@ -567,6 +567,7 @@ func editor(_ path: String, select indices: [Int], playhead: Ticks? = nil)
     spin(1.2)
     let controller =
         document.windowControllers.first!.contentViewController as! EditorViewController
+    if let playhead { controller.setPlayhead(playhead) }
     // Motion presets is on the Clip sub-tab (road map 9 §3), where the rows
     // below look for it.
     controller.inspector?.selectClipSubTab(.clip)
@@ -646,7 +647,8 @@ do {
         break
     }
     spin(0.8)
-    answer["insideAction"] = ["picked": picked, "project": document.project.json]
+    answer["insideAction"] = ["picked": picked, "project": document.project.json,
+                              "playhead": Int(document.playhead)]
 }
 
 // ---- (c) a menu tag no builder writes -------------------------------------
@@ -1310,8 +1312,9 @@ def main():
     check("the section's In popup can be driven at all",
           inside["picked"] is True, str(inside["picked"]))
     check("…and with the playhead inside an ACTION it writes the clip's BASE motion",
-          (project_after["video"]["motion"] or {}).get("in", {}).get("kind") == "zoom_in",
-          str(project_after["video"]["motion"]))
+          (project_after["video"]["motion"] or {}).get("in", {}).get("kind") == "zoom_in"
+          and inside.get("playhead") == TICKS // 2,
+          f"playhead {inside.get('playhead')}; {project_after['video']['motion']}")
     check("…leaving the action's own end patch with no motion in it at all",
           all("motion" not in (a["end"].get("video") or {})
               for a in project_after["actions"]),

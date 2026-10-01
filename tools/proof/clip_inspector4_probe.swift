@@ -338,6 +338,8 @@ if let document = opened("chrome") {
     spin(1.2)
     let controller = document.windowControllers.first?.contentViewController
         as? EditorViewController
+    controller?.setPlayhead(at(1.0))
+    spin(0.3)
     let strip = controller?.inspector?.refusalStrip
     var heard: [String] = []
     let token = NotificationCenter.default.addObserver(
@@ -346,13 +348,15 @@ if let document = opened("chrome") {
         if let refusal = note.userInfo?["refusal"] as? ReelRefusal { heard.append(refusal.reason) }
     }
     let before = document.project
+    let held = document.playhead
     controller?.addActionAtPlayheadCommand()
     spin(0.3)
     let reason = heard.first ?? ""
     check("R7 Add Action inside action 1's span is refused: projectDocumentDidRefuse carries a "
             + "non-empty reason, and the project is the same handle",
-          controller != nil && heard.count == 1 && !reason.isEmpty && document.project === before,
-          "heard \(heard)")
+          controller != nil && heard.count == 1 && !reason.isEmpty && document.project === before
+            && held == at(1.0),
+          "heard \(heard), playhead \(held)")
     check("R7 … the editor's strip reads \"Refused: \" + that reason, and shows",
           strip?.text == "Refused: " + reason && strip?.isHidden == false,
           "strip '\(strip?.text ?? "nil")', hidden \(strip?.isHidden ?? true)")

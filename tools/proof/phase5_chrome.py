@@ -1536,9 +1536,10 @@ def main():
     print(f"      {len(diff)} changed pixels, {len(elsewhere)} of them outside the bar "
           f"in {len(clusters(elsewhere))} cluster(s)")
     print(describe(clusters(elsewhere), scale, limit=4))
+    moved = outside(changed_pixels(images["now-a"], shifted), [bar], scale)
     check("moving the playhead really did change the window outside the bar — without "
           "that this section agrees with anything",
-          bool(elsewhere), f"{len(elsewhere)} px outside the bar")
+          bool(moved), f"{len(moved)} px outside the bar against now-a")
     check("…and inside the bar the two builds still differ by exactly the meter's "
           "pixels, the same set section 3 measured — which is what makes sections 3, 5 "
           "and 6 survive a phase that redraws the inspector or the export sheet",

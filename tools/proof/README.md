@@ -9640,3 +9640,155 @@ session's DerivedData Reelcut was left alone):
 | `--mutant no-transcribe-stop` | built in 127 s; ST FAIL — "waited_ms − stopped_ms 43468 − 2052 > 5000", the transcribe answered `is_error` False with cues; 0/1, "caught — ST failed", exit 1 |
 | `--mutant no-export-stop` | built in 151 s; SX FAIL — "waited_ms − stopped_ms 22892 − 2047 > 5000", the export answered ok, file 1 s later True; 0/1, "caught — SX failed", exit 1 |
 | `--mutant key-echo` | 10/11 — A0 to ST ok (ST's text 'key-echo control: proof-key'), K1 FAIL "37 MCP answers, the key in 2; in the log False"; "caught — K1 failed", exit 1 |
+
+## Issue batch B39 — the harness playhead (`harness_playhead_proof.py` P0–P3, S0, S1 and `--mutant`, `e2_chrome.py` (b), `clip_inspector4_probe.swift` R7, `phase5_chrome.py` §3b; #198)
+
+- **The fix** (`harness/main.swift`): straight after the 12-turn settle,
+  under `if playheadSeconds != 0`, the harness calls
+  `controller.setPlayhead(Ticks(playheadSeconds * 600_000))` and then
+  `Harness.applySelectAction(selectActionSpec, to: document, refreshing:
+  controller)`. Playback's first `report(0)` had written
+  `document.playhead = 0` during the settle (B32, #188 item 5), so every
+  render asked for at a non-zero playhead was taken at 0. The new
+  `Harness.applySelectAction` (inside `#if !HARNESS_REFERENCE_BUILD`) maps
+  the index through `ActionBands.ordered`, calls `document.selectAction`
+  and then `controller?.viewStateDidChange()`. It never calls the editor's
+  `selectAction(_:)`, because that moves the playhead to the action's end.
+  The early site now calls it with `refreshing: nil`. `setPlayhead` stays
+  outside the `#if`, because both reference trees (`65d43ae^`, `a4c476f^`)
+  have it. A caller at playhead 0 runs exactly the code it ran before. The
+  header's `selectAction` paragraph is reworded in its own seven lines, so
+  `pinDefaults` is still at `:291`.
+- **`harness_playhead_proof.py`** builds one fixture, `hp.reelcut`: a grey
+  6 s card with action A (id 3, 0.5–1.5 s, opacity 0.5) and action B (id 4,
+  2.0–3.5 s, x 100). It makes five renders (dark, 1440 × 862, size 1, Clip),
+  as (select, playhead, action): `zero` (−1, 0), `two-a` and `two-b` (−1, 2),
+  `inside` (0, 3, "0") and `outside` (0, 5, "0"). The rows:
+  - P0 (control): `two-a` and `two-b` are byte-identical.
+  - P1: `zero` and `two-a` differ.
+  - P2: below y 598 every changed pixel is within 6 pt of x 132 or x 216,
+    and each of those columns holds at least one.
+  - P3: the toolbar (y < 44) holds changed pixels.
+  - S0 (control): in `outside`, A's lane sample (193, 653) differs from B's
+    (277, 653).
+  - S1: `inside`'s two samples equal `outside`'s.
+
+  The mutants (rule R: 1 caught, 0 survived, 2 not performed) each strip one
+  anchor line from a copy, `work/harness-playhead/mutant-<name>/main.swift`,
+  which is compiled last on `build.sh`'s swiftc line. `no-late-playhead`
+  strips the `setPlayhead` line and must fail P1, P2 and P3. `no-reselect`
+  strips the late `applySelectAction` line and must fail S1.
+- **The three strengthened rows.** Each was made to FAIL on HEAD before the
+  fix, and each passes after it. Each site is judged by whether its row's
+  CLAIM held at 0 s:
+  - **`e2_chrome.py` (b)**, "…with the playhead inside an ACTION it writes
+    the clip's BASE motion". `PROBE_SOURCE`'s `editor()` now calls
+    `controller.setPlayhead(playhead)` after its spin. (b)'s answer carries
+    `playhead`, and the row requires `TICKS // 2`. On HEAD it printed
+    `playhead 0`. **Its claim was unaffected**: the `action` and
+    `zero-action` fixtures' only action spans [0, 1 s), so 0 s was inside an
+    action as well. The playhead term is a regression guard on the playhead
+    holding. It does not mean the row passed vacuously before. `zeroAction`
+    (0.5 s) goes through the same `editor()` and is unaffected for the same
+    reason.
+  - **`clip_inspector4_probe.swift` R7** (affected). `setPlayhead(at(1.0))`
+    and `spin(0.3)` now run after the editor opens. `held = document.playhead`
+    is read before `addActionAtPlayheadCommand()`, and the first R7 check
+    requires `held == at(1.0)`. On HEAD it FAILED with `playhead 0`. The
+    refusal it heard then was `action 3 on clip 2 already runs from 300000
+    to 900000 ticks, and two actions on one clip may not overlap`. That was
+    a new action at 0 s overlapping action 3, not Add Action inside action
+    1's span: `chrome`'s first action starts at 0.5 s, so 0 s is outside
+    every span.
+  - **`phase5_chrome.py` §3b's first check** (affected). It now scores
+    `moved`, the pixels outside the bar that differ between `now-a` and
+    `now-shifted` (one build). Before, it compared `was-a`, from another
+    build, which differs everywhere whether or not the playhead moved. On
+    HEAD it FAILED with `0 px outside the bar against now-a`, while the
+    `was-a` diff still printed 299136 px outside the bar. After the fix it
+    is 1146 px. The `was-a` diff, its print and the second check are
+    unchanged.
+- **The survey.**
+  - **Re-run (non-zero playhead):**
+    - `clip_inspector_proof.py` (5 s), `clip_inspector2_proof.py` (5 s),
+      `clip_inspector3_proof.py` (1 s), `clip_inspector4_proof.py` (5 s,
+      1 s), `clip_inspector5_proof.py` (5 s, 3 s), `sharp_chrome.py` (2 s),
+      `words_picture_chrome.py` (1 s), `obscure_handles_probe.py` H1/H2
+      (1 s) and `phase5_chrome.py` §3b (2 s).
+  - **Re-run (cross-builds of this `main.swift` against an old tree):**
+    - `phase5_chrome.py` (`65d43ae^`) and `recording_probe.py --only
+      welcome` (`a4c476f^`). Both reference trees still build.
+  - **Not re-run (playhead 0):**
+    - `e1_chrome`, `e2_chrome`'s renders, `phase2/3/4/6/7/8_chrome`,
+      `graphics_inspector_proof` and `name_field_proof`. The late block
+      does not run at 0.
+  - **Embedded editors that write `document.playhead` early:**
+    - `e2_chrome.py` `editor()`, through (b) and `zeroAction`: fixed, and
+      unaffected in claim.
+    - `clip_inspector4_probe.swift` R7: fixed, and affected.
+    - `clip_inspector6_probe.swift`'s three K1 editors (5.0 s) and
+      `capture_spike/probe_well.swift` `harnessCase` (1 s): Residue.
+  - **Not affected:**
+    - `phase9_chrome.py` uses a bare `TimelineView`.
+    - `phase9_probe.py` and `recording_probe.py` rows 2/4 use a bare
+      `ProjectDocument`.
+    - The `clipPane`/S4 helpers use an `InspectorViewController` only.
+    - `graphics_menu_probe.swift` writes after its editor has settled.
+- **What moved in the re-runs**, all inside unchanged scores:
+  - `sharp_chrome.py`'s clip-corner rows: D_0 and D_1 now read the clip
+    corner rather than the coral playhead line at x 132. Dark went from
+    `(227, 110, 75), (227, 110, 75)` to `(30, 30, 30), (58, 94, 105)`.
+    Light went from the same coral pair to `(255, 255, 255), (69, 106, 117)`.
+    The rows still pass.
+  - `clip_inspector3_proof.py` H2/H3 (1 s): the coral run on Opacity's rail
+    moved from x 2659 px to 2617 px, and the rail's mint count went from
+    80 px to 78 px.
+  - `obscure_handles_probe.py` H1/H2: each pair is still byte-identical,
+    and the PNGs changed size (light 243480 → 243384 bytes, dark 246036 →
+    246376).
+  - `phase5_chrome.py` §3b's `was-a` diff went from 306138 px (299136
+    outside the bar, 24 clusters) to 307076 px (300074, 26 clusters).
+  - Nothing else's log changed beyond build times.
+- **Residue:**
+  - **`clip_inspector5_proof.py` D2** ("…selected after the drop, the
+    playhead parked at clip start + 2.5 s") FAILED in 3 of 4 runs:
+    `selected 4, playhead 2.5000 s`. It failed before the fix, passed in the
+    after run, and failed in both re-runs on the final tree. D2 is a row of
+    `clip_inspector5_probe.swift`, which is compiled over `app/Sources`
+    without the harness's `main.swift`, so this batch does not reach it.
+    The drop parks the playhead at 2.5 s, where action 3's new end meets
+    action 4's start. The row is not fixed here.
+  - `clip_inspector6_probe.swift`'s K1 editors: 0 s and 5 s are both outside
+    every span of its `chrome` fixture, and each block moves the playhead
+    itself before it measures.
+  - `capture_spike/probe_well.swift` `harnessCase` is a closed spike, and
+    its rows classify the well, not the time.
+
+Run on 2026-09-30 into 2026-10-01, the change over `de880c7`, one proof at
+a time. Logs are in `work/b39/{before,step3,after}/`. The before run's
+harness rebuild (217 s) was caused by a staticlib newer than the harness
+(B41's), not by this batch:
+
+| Command | Before (HEAD) | After |
+|---|---|---|
+| `harness/build.sh` | built in 217 s, exit 0 | built in 123 s, exit 0 |
+| `harness_playhead_proof.py` | 3/6, exit 1 (P1, P2, P3 FAIL: 0 px differ) | 6/6, exit 0 (1149 px; 515 at x 132, 462 at x 216, 0 elsewhere; 172 in the toolbar) |
+| `--mutant no-late-playhead` | — | 3/6, "caught — P1, P2, P3 failed", exit 1 |
+| `--mutant no-reselect` | — | 5/6, "caught — S1 failed", exit 1 (`inside` A (75, 132, 129), B (126, 211, 178)) |
+| `clip_inspector_proof.py` | 39/39, exit 0 | 39/39, exit 0 |
+| `clip_inspector2_proof.py` | 32/32, exit 0 | 32/32, exit 0 |
+| `clip_inspector3_proof.py` | 31/31, exit 0 | 31/31, exit 0 |
+| `clip_inspector4_proof.py` | 46/46, exit 0; strengthened, unfixed: 45/46, exit 1 (R7) | 46/46, exit 0 |
+| `clip_inspector5_proof.py` | 36/37, exit 1 (D2) | 37/37, exit 0; two re-runs 36/37, exit 1 (D2) |
+| `sharp_chrome.py` | 29/29, exit 0 | 29/29, exit 0 |
+| `words_picture_chrome.py` | 5/5, exit 0 | 5/5, exit 0 |
+| `obscure_handles_probe.py` | 16/16, exit 0 | 16/16, exit 0 |
+| `e2_chrome.py` | 52/52, exit 0; strengthened, unfixed: 51/52, exit 1 ((b)) | 52/52, exit 0 |
+| `phase5_chrome.py` | 81/81, exit 0; strengthened, unfixed: 80/81, exit 1 (§3b) | 81/81, exit 0; "the reference tree built" PASS |
+| `recording_probe.py --only welcome` | 29/29, exit 0 | 29/29, exit 0; 6b and "compiled with this tree's own harness" ok |
+
+```sh
+python3 tools/proof/harness_playhead_proof.py                               # 6/6
+python3 tools/proof/harness_playhead_proof.py --mutant no-late-playhead     # exit 1, P1 P2 P3 FAIL
+python3 tools/proof/harness_playhead_proof.py --mutant no-reselect          # exit 1, S1 FAILS
+```
