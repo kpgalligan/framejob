@@ -20,7 +20,7 @@ change.
 | **§4 — The regions in detail** | | |
 | [`04.1-toolbar.md`](04.1-toolbar.md) | 25 | The toolbar. |
 | [`04.2-preview-canvas.md`](04.2-preview-canvas.md) | 72 | The preview canvas: selection, handles, crop and region modes, on-canvas text, snapping. |
-| [`04.3a-inspector-clip-tab.md`](04.3a-inspector-clip-tab.md) | 350 | The inspector's tab strip and its Clip tab: the sub-tabs and pinned block, the selection header and name field, sections, row marks, Reset/Clear; every video, audio, text and shape section. |
+| [`04.3a-inspector-clip-tab.md`](04.3a-inspector-clip-tab.md) | 354 | The inspector's tab strip and its Clip tab: the sub-tabs and pinned block, the selection header and name field, sections, row marks, Reset/Clear; every video, audio, text and shape section. |
 | [`04.3b-inspector-media-document-assistant.md`](04.3b-inspector-media-document-assistant.md) | 158 | The inspector's Media tab (find band, rows, drags, Consolidate, import, generate and export captions), Document tab and Assistant tab. |
 | [`04.4-timeline.md`](04.4-timeline.md) | 193 | The timeline: its bar, the level meter, ruler, tracks, clip bodies, gestures, entering a nest. |
 | **§5 — Editing model** | | |
@@ -50,7 +50,7 @@ change.
 | [`08-repo-layout.md`](08-repo-layout.md) | 64 | Repo layout, build, conventions. |
 | [`09-keys-and-menus.md`](09-keys-and-menus.md) | 138 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 2572 in 13 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 2578 in 13 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

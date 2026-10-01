@@ -246,6 +246,52 @@ final class InspectorRowTag: NSTextField, OptionControl {
     }
 }
 
+/// The handoff's boxed mono 9 "clip" tag after a lone ⊘ button in an
+/// animatable section — Normalize, which writes the clip whatever action is
+/// selected (#102). Shown while an action is selected, CI-7's ⊘ condition.
+/// Its own view: `OptionButtonControl` is shared chrome and is not forked.
+final class InspectorClipTag: NSView, OptionControl {
+    static let text = "clip"
+    private weak var binding: InspectorBinding?
+
+    init(binding: InspectorBinding) {
+        self.binding = binding
+        super.init(frame: .zero)
+        toolTip = "Actions don't animate this. It changes the clip."
+        refresh()
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("InspectorClipTag does not support NSCoder")
+    }
+
+    override var isFlipped: Bool { true }
+
+    override var intrinsicContentSize: NSSize {
+        let width = Self.text.size(withAttributes: [.font: DS.mono(9)]).width
+        return NSSize(width: ceil(width) + 10, height: 17)
+    }
+
+    func refresh() {
+        isHidden = binding?.selectedAction == nil
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        DS.border.setStroke()
+        let box = NSBezierPath(rect: bounds.insetBy(dx: 0.5, dy: 0.5))
+        box.lineWidth = 1
+        box.stroke()
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: DS.mono(9), .foregroundColor: DS.textMuted,
+        ]
+        let size = Self.text.size(withAttributes: attributes)
+        Self.text.draw(
+            at: NSPoint(x: (bounds.width - size.width) / 2, y: (bounds.height - size.height) / 2),
+            withAttributes: attributes)
+    }
+}
+
 // MARK: - The mark queries
 
 extension InspectorBinding {

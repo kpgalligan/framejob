@@ -13,6 +13,13 @@ import AppKit
 /// alignment rect is its frame (no insets), so a constraint places the box
 /// where it places a value field's, and the text and the field editor move
 /// with it (kpgalligan/reelcut#186).
+///
+/// Its placeholder is kept off the cell, in a string of its own: the cell
+/// draws it, at rest and under an empty field editor, on the resting rows,
+/// and the field editor — which draws a cell's placeholder 2 pt lower — is
+/// given none. Every text change redisplays the field, so the placeholder
+/// goes with the first letter typed and comes back with the last deleted
+/// (kpgalligan/reelcut#199).
 final class InspectorNameField: NSTextField, OptionControl, NSTextFieldDelegate {
     private let read: () -> String
     private let write: (String) -> Void
@@ -20,6 +27,7 @@ final class InspectorNameField: NSTextField, OptionControl, NSTextFieldDelegate 
     /// property would be read as an override of it.
     private let isLive: () -> Bool
     private let onEdit: () -> Void
+    private var placeholder: String?
 
     override class var cellClass: AnyClass? {
         get { InspectorNameFieldCell.self }
@@ -27,6 +35,25 @@ final class InspectorNameField: NSTextField, OptionControl, NSTextFieldDelegate 
     }
 
     override var alignmentRectInsets: NSEdgeInsets { NSEdgeInsets() }
+
+    override var placeholderString: String? {
+        get { placeholder }
+        set {
+            placeholder = newValue
+            setAccessibilityPlaceholderValue(newValue)
+            needsDisplay = true
+        }
+    }
+
+    override var placeholderAttributedString: NSAttributedString? {
+        get { placeholderString.map { NSAttributedString(string: $0) } }
+        set { placeholderString = newValue?.string }
+    }
+
+    override func textDidChange(_ notification: Notification) {
+        super.textDidChange(notification)
+        needsDisplay = true
+    }
 
     init(
         read: @escaping () -> String, write: @escaping (String) -> Void,
@@ -146,17 +173,22 @@ final class InspectorNameFieldCell: NSTextFieldCell {
     /// out with — its line fragment padding and baseline, in the same line
     /// rect — so clicking in moves no glyph. Super's own rest drawing sits
     /// 1–2 pt below the field editor's line in this rect (measured: 2 pt at
-    /// 11 pt, 1 pt at 12 pt). Nothing is drawn while the field editor is
-    /// attached: it draws the text itself.
+    /// 11 pt, 1 pt at 12 pt). The placeholder is the FIELD's
+    /// (`InspectorNameField.placeholderString`, never the cell's), drawn here
+    /// at rest when the value is empty and, with the field editor attached,
+    /// when the editor's string is empty — on the same rows either way, and
+    /// once, since the field editor has none to draw. With the field editor
+    /// attached and holding text nothing is drawn: it draws the text itself.
     override func drawInterior(withFrame cellFrame: NSRect, in controlView: NSView) {
-        if (controlView as? NSTextField)?.currentEditor() != nil { return }
+        let editor = (controlView as? NSTextField)?.currentEditor()
+        let shown = editor.map { $0.string } ?? stringValue
+        let placeholder = (controlView as? InspectorNameField)?.placeholderString ?? ""
         let face = font ?? DS.sans(11)
         let text: NSMutableAttributedString
-        if !stringValue.isEmpty {
+        if !shown.isEmpty {
+            if editor != nil { return }
             text = NSMutableAttributedString(attributedString: attributedStringValue)
-        } else if let placeholder = placeholderAttributedString {
-            text = NSMutableAttributedString(attributedString: placeholder)
-        } else if let placeholder = placeholderString, !placeholder.isEmpty {
+        } else if !placeholder.isEmpty {
             text = NSMutableAttributedString(
                 string: placeholder,
                 attributes: [.font: face, .foregroundColor: NSColor.placeholderTextColor])

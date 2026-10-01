@@ -1,7 +1,7 @@
 # Road map 9 — the clip inspector redesign
 
 - **Status:** Built. Phases 1, 2, 3a and 3b on 2026-09-23; phases 4 and 5 on 2026-09-24. Closed.
-  What remains is a person's checks and some handoff items that were never built.
+  What remains is a person's checks.
 - **Original:** `archive/reelcut-roadmap-9.md` (1120 lines) is the full record; "orig §x" below
   refers to it. The handoff it implemented stays at `designs/design_handoff_clip_inspector/`.
   Its README is normative for metrics, inks and behaviour, except where the decisions below
@@ -142,6 +142,14 @@ commit, so the guards in the code are defensive.
 (CI-15). The collapse runs through `DS.animate`, which respects Reduce Motion. `reveal()` stays
 instant.
 
+**#102 (the owner, 2026-09-30): two unbuilt handoff items built, six struck.** A section
+header's hover is a second `DS.hoverFill` over its rest band. The rest band is already
+`DS.hoverFill`, so the same ink once more is the visible step, as Rasterize's secondary button
+lays it over `chromeBackground`. It is a subview whose alpha fades through
+`DS.animate(DS.hoverDuration)` (CI-15, amended), because a band drawn in `draw(_:)` cannot fade.
+Rows get no hover. Normalize, a lone ⊘ button in an animatable section, carries the handoff's
+boxed mono 9 "clip" tag while an action is selected (`InspectorClipTag`, its own view).
+
 **Harness pixel checks compare in the PNG's own colour space** (orig §2). The harness writes
 Display P3 on this host, where sRGB mint (92, 214, 176) becomes (126, 211, 178). The probe
 converts the inks and compares within ±1.
@@ -174,9 +182,10 @@ converts the inks and compares within ±1.
 - `app/Sources/OptionControls+Choices.swift`
 
 **Marks, defaults and Reset/Clear**
-- `app/Sources/InspectorMarks.swift` (`RowMark`, `InspectorRowDefault`, `clearOps`, `paths(of:)`)
+- `app/Sources/InspectorMarks.swift` (`RowMark`, `InspectorRowDefault`, `clearOps`, `paths(of:)`,
+  `InspectorClipTag`)
 - `app/Sources/InspectorSection.swift` (`KeyedReveal`, `clear()`)
-- `app/Sources/InspectorSectionHeader.swift`
+- `app/Sources/InspectorSectionHeader.swift` (the hover band)
 - `app/Sources/InspectorSlider.swift`
 - `app/Sources/InspectorRowMenu.swift`
 - `app/Sources/InspectorRefusalStrip.swift`
@@ -197,6 +206,8 @@ converts the inks and compares within ±1.
 - `tools/proof/clip_inspector{,2,3,4,5,6}_proof.py`, each with a `_probe.swift` and a
   `--mutant`.
 - Phase 5's `clip_inspector6_proof.py` has the mutants `target`, `live` and `push`.
+- `tools/proof/clip_inspector7_proof.py` (#102): the header hover and the "clip" tag, with eight
+  mutants.
 
 ## Known limits
 
@@ -222,15 +233,17 @@ converts the inks and compares within ±1.
 - A person checks each phase in the running app, in both appearances. Phases 1, 2, 3a, 3b, 4 and
   5 are tracked in #49, phase 1 written out in full (the lane and
   bands, the light ink, a real band click, and esc).
-- The handoff items never built are tracked in #102 as decisions to take up:
-  - the 64 pt label
-  - the dashed ⊘ border
-  - the boxed "clip" tag
-  - "now" on ○, colour and popup rows
-  - a keyed colour-well border
-  - `DS.textDim`
-  - hover states
-  - the 8/10 body padding
+- #102's items were decided by the owner on 2026-09-30. The "clip" tag and the header hover
+  were built (issue batch B50). Struck:
+  - the 64 pt label: CI-7's 76 pt stands, so long labels fit
+  - the dashed ⊘ border: it needs a dashed mode on every shared control, another fork from
+    Rasterize; the ⊘ mark and the section note carry the meaning
+  - "now …" on ○, colour and popup rows: the coral playhead tick covers the numeric rows, and
+    text after a popup is clutter
+  - a keyed colour-well border: the gutter's ◆ already marks the row
+  - `DS.textDim`: its only use was the dashed ⊘ label
+  - the 8/10 body padding: the current spacing passed the redesign review, and nobody would
+    notice
 
 ## Where to look in the original
 

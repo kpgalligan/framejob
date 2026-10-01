@@ -195,6 +195,11 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Expect:** the change lands on the action's END state while the box is drawn at the playhead (accepted by design; judge whether it is tolerable); a text width drag starts from the end width; a shape box still resizes; unchecking shows ◆ "at end". Collapse is instant with Reduce motion, animated (about a quarter second) without; auto-open is always instant.
 - **Source:** #49 phase 5; spec §11 CI-13.
 
+**CT-7 — Section header hover and the "clip" tag**
+- **Do:** 1. Window in front, move slowly onto and off several Clip-tab section headers. 2. Repeat with System Settings ▸ Accessibility ▸ Display ▸ Reduce motion on, then off. 3. Select an audio clip, open Sound ▸ Volume, select an action on it.
+- **Expect:** a header darkens one step with a quick fade, instantly with Reduce motion; its title, marks, summary and Reset/Clear stay legible; rows never darken. With an action selected a small boxed "clip" follows Normalize; with none it is gone.
+- **Source:** #102 (spec §11 CI-15, amended).
+
 ## Chrome and looks
 
 **CH-1 — The zoom slider and square controls**
@@ -345,9 +350,9 @@ Uses the three `tools/proof/work/playback-check/` projects (Setup 3).
 - **Source:** #56.
 
 **GR-4 — The Title and marker name fields**
-- **Do:** 1. Insert ▸ Graphic ▸ Lower Third, select it, open Clip ▸ Graphic. 2. Press M, then open the Document tab.
-- **Expect:** the Title field is the height of the number fields, and the marker's name field is the height of the Rate row's controls, in both appearances. Both are filled and bordered like the number fields, with their text centred vertically, in both appearances; clicking into either moves no text.
-- **Source:** #106, #171.
+- **Do:** 1. Insert ▸ Graphic ▸ Lower Third, select it, open Clip ▸ Graphic. 2. Press M, then open the Document tab. 3. In the Document tab, click into a marker's name field, select all, delete, then type a letter.
+- **Expect:** the Title field is the height of the number fields, and the marker's name field is the height of the Rate row's controls, in both appearances. Both are filled and bordered like the number fields, with their text centred vertically, in both appearances; clicking into either moves no text. With the name deleted, a grey "Marker" sits where the text sat and did not move on the click; the first letter typed replaces it at once.
+- **Source:** #106, #171, #199.
 
 ## Screen recording
 

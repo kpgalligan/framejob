@@ -466,7 +466,9 @@ the key map behind it.
   12 A2) before `assistant` was added.
 - `InspectorNameField.swift` — a pure move out of `InspectorPane.swift`:
   the one-line name field, drawn by `InspectorNameFieldCell` as the value
-  field is (spec §11 SH-3).
+  field is (spec §11 SH-3); its placeholder is kept off the cell, which draws
+  it at rest and under an empty field editor, so the field editor draws none
+  (#199).
 - `InspectorViewController.swift` (frozen: the tab strip, and the PINNED
   container between it and the scroll view that hosts a pane's
   `pinnedBlock`, one generation retired like the strip; the FOOT container
@@ -515,22 +517,25 @@ the key map behind it.
   `header` and folded `marks` readable — `differs` from an explicit closure
   else the rows' defaults, `editing` the selected action's number when a
   row animates — `clear()`, `reveal()` which writes no preference and is
-  instant, the header click's `toggle()`, the redesign's one animation,
+  instant, the header click's `toggle()`, the collapse animation,
   through `DS.animate(DS.stateDuration)` (unanimated under Reduce Motion,
   spec §11 CI-15; the state is set at once), and
   `didToggle`, called by the header's click alone; and `KeyedReveal`,
   `ClipPane`'s auto-open, CI-8) · `InspectorSectionHeader.swift` (a pure
   move, then CI-9: the `◆N` / ◇ / ⊘, the one trailing slot — Clear while
   editing an action that keys the section, else Reset while it differs —
-  `buttonTitle`, and `summaryInk`'s three tiers; the summary stops short of
-  the VISIBLE button) ·
+  `buttonTitle`, and `summaryInk`'s three tiers; the hover band
+  (`InspectorHeaderHoverBand`, a second `DS.hoverFill` faded through
+  `DS.animate(DS.hoverDuration)`, CI-15 amended by #102); the summary stops
+  short of the VISIBLE button) ·
   `InspectorMarks.swift` (spec §11 CI-7: `RowMark`, `SectionMarks`,
   `InspectorRowDefault` (CI-9), the
   14 pt `InspectorMarkGutter` that is the FIRST view of every
   `inspectorRow` — blank at `.none`, so it must stay first for the refresh
   walk to reach it before the controls whose label ink and layer border it
   sets; hovered while keyed it draws × and a click removes the row's keys —
-  `InspectorRowTag` ("at end", "now …"), and the binding's mark
+  `InspectorRowTag` ("at end", "now …"), `InspectorClipTag` (Normalize's boxed
+  "clip" while an action is selected, #102), and the binding's mark
   queries, `selectedActionNumber`, `actionID(number:)` and `clearOps`, the
   ONE `set_action_end` of nulls; a row's paths come from the ops it WRITES,
   `writes:` / `follows:`, and an un-annotated row is `.none`, never ⊘) ·

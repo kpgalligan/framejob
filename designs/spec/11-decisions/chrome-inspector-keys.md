@@ -273,6 +273,12 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   Rasterize's one door, which runs the change unanimated when the system's
   Reduce Motion is on. `reveal()` (an action's auto-open) stays instant;
   hover, bands and gutters are painted in `draw(_:)` and do not animate.
+  **Amended 2026-10-01, by #102** (the owner, 2026-09-30): a section
+  header is clickable, so it takes a hover. The hover is a second
+  `DS.hoverFill` over its band, faded in and out at `DS.hoverDuration`
+  (140 ms) through the same `DS.animate`, so it is instant under Reduce
+  Motion. Rows take none, because they are not clickable. Bands and gutters
+  still paint in `draw(_:)` and do not animate.
 - **K-1 — Space is the transport's unless the first responder is typing or
   claims it** (kpgalligan/reelcut#35, 2026-09-24). The editor window routes
   a bare Space key-down (⇧ and ⇪ allowed, any other modifier untouched)

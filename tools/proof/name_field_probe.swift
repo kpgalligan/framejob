@@ -25,6 +25,15 @@
 // field's arguments joins the host at leading 20, top 60 (`below`, N13),
 // captured as b32-rest.
 //
+// After N13 (B50, #199), two more `InspectorNameField`s join the host at
+// leading 220, width 170, placeholder "Marker": `empty` reading "" at top 100
+// and `named` reading "Director of Photography" at top 140, captured as
+// b50-rest, b50-editing, b50-typed, b50-deleted and b50-cleared. PLACEHOLDER
+// INK is a pixel more than 20 away, on some channel, from the field's sampled
+// fill (`placeholderTextColor` is 25 % ink, which the 60 cannot see in dark).
+// N19 and N20 run last, with the window ordered in, and order it out again;
+// they read the field's layer's `needsDisplay()`.
+//
 // One JSON object on `<out dir>/answer-<look>.json`: `rows` (name, ok,
 // detail), rewritten after every row.
 import AppKit
@@ -388,5 +397,197 @@ do {
                  a ?? -1, b ?? -1)
             + "field.frame \(field.frame), alignmentRect \(field.alignmentRect(forFrame: field.frame))")
 }
+
+// MARK: - B50 (#199): the placeholder on its resting rows while editing
+
+/// The placeholder ink's extent inside `view`: top, bottom, left and right
+/// edges in points of the host, inside the x window `from`–`to` (default
+/// 1 pt in from the view's edges) and 1 pt in from its top and bottom, and
+/// the peak channel distance from the fill; nil when there is none.
+struct Edges {
+    let top: CGFloat
+    let bottom: CGFloat
+    let left: CGFloat
+    let right: CGFloat
+    let peak: Int
+}
+
+func placeholderInk(in view: NSView, _ shot: Capture, from: CGFloat? = nil, to: CGFloat? = nil)
+    -> Edges?
+{
+    let frame = view.frame
+    let fill = shot.at(NSPoint(x: frame.maxX - 3, y: frame.midY))
+    let scale = shot.scale
+    let x0 = Int(((from ?? frame.minX + 1) * scale).rounded(.up))
+    let x1 = Int(((to ?? frame.maxX - 1) * scale).rounded(.down))
+    let y0 = Int(((frame.minY + 1) * scale).rounded(.up))
+    let y1 = Int(((frame.maxY - 1) * scale).rounded(.down))
+    guard x0 < x1, y0 < y1 else { return nil }
+    var top: Int?
+    var bottom = 0
+    var left = Int.max
+    var right = Int.min
+    var peak = 0
+    for y in y0..<y1 {
+        for x in x0..<x1 {
+            let pixel = shot.pixel(x, y)
+            guard far(pixel, fill, 20) else { continue }
+            if top == nil { top = y }
+            bottom = y + 1
+            left = min(left, x)
+            right = max(right, x + 1)
+            peak = max(peak, zip(pixel, fill).map { abs($0 - $1) }.max() ?? 0)
+        }
+    }
+    guard let t = top else { return nil }
+    return Edges(top: CGFloat(t) / scale, bottom: CGFloat(bottom) / scale,
+                 left: CGFloat(left) / scale, right: CGFloat(right) / scale, peak: peak)
+}
+
+/// `edges` less `origin`, as text.
+func describe(_ edges: Edges?, from origin: NSPoint) -> String {
+    guard let edges else { return "no placeholder ink" }
+    return String(format: "rows %.2f–%.2f, columns %.2f–%.2f, peak %d",
+                  edges.top - origin.y, edges.bottom - origin.y,
+                  edges.left - origin.x, edges.right - origin.x, edges.peak)
+}
+
+/// Whether `a` and `b`, each taken from its own origin, share top, bottom
+/// and right edges within 0.5 pt, and peak channel distance within 10 (one
+/// copy of the placeholder, not two).
+func sameEdges(_ a: Edges?, _ aOrigin: NSPoint, _ b: Edges?, _ bOrigin: NSPoint) -> Bool {
+    guard let a, let b else { return false }
+    return abs((a.top - aOrigin.y) - (b.top - bOrigin.y)) <= 0.5
+        && abs((a.bottom - aOrigin.y) - (b.bottom - bOrigin.y)) <= 0.5
+        && abs((a.right - aOrigin.x) - (b.right - bOrigin.x)) <= 0.5
+        && abs(a.peak - b.peak) <= 10
+}
+
+let empty = InspectorNameField(read: { "" }, write: { _ in }, enabled: { true }, onEdit: {})
+empty.placeholderString = "Marker"
+let named = InspectorNameField(
+    read: { "Director of Photography" }, write: { _ in }, enabled: { true }, onEdit: {})
+named.placeholderString = "Marker"
+for view in [empty, named] as [NSView] {
+    view.translatesAutoresizingMaskIntoConstraints = false
+    host.addSubview(view)
+}
+NSLayoutConstraint.activate([
+    empty.leadingAnchor.constraint(equalTo: host.leadingAnchor, constant: 220),
+    empty.topAnchor.constraint(equalTo: host.topAnchor, constant: 100),
+    empty.widthAnchor.constraint(equalToConstant: 170),
+    named.leadingAnchor.constraint(equalTo: host.leadingAnchor, constant: 220),
+    named.topAnchor.constraint(equalTo: host.topAnchor, constant: 140),
+    named.widthAnchor.constraint(equalToConstant: 170),
+])
+empty.refresh()
+named.refresh()
+spin(0.1)
+
+let b50Rest = capture("b50-rest")
+let emptyOrigin = empty.frame.origin
+
+// N15 (control) — the empty field at rest draws its placeholder.
+let restEdges = b50Rest.flatMap { placeholderInk(in: empty, $0) }
+check("N15 an empty field draws its placeholder \"Marker\" at rest (a CONTROL)",
+      restEdges != nil, describe(restEdges, from: emptyOrigin))
+
+/// The placeholder's measurement while the field editor is attached: from
+/// N15's left edge + 4 pt (clear of a caret at the origin) to the field's
+/// right edge − 1 pt, at the same offsets from `view`'s origin.
+func editingEdges(_ view: NSView, _ shot: Capture?) -> Edges? {
+    guard let shot, let rest = restEdges else { return nil }
+    let from = rest.left - emptyOrigin.x + view.frame.minX + 4
+    return placeholderInk(in: view, shot, from: from, to: view.frame.maxX - 1)
+}
+
+func editorString(_ view: NSTextField) -> String {
+    "editor \"\((view.currentEditor() as? NSTextView)?.string ?? "nil")\""
+}
+
+// N16 — the field editor attached, nothing typed: the placeholder sits on
+// its resting rows, once.
+let tookEmpty = window.makeFirstResponder(empty)
+spin(0.1)
+let emptyEditing = empty.currentEditor() != nil
+let editingInk = editingEdges(empty, capture("b50-editing"))
+check("N16 with the field editor attached and nothing typed, the placeholder is drawn once on "
+        + "its rest rows and right edge, within 0.5 pt",
+      tookEmpty && emptyEditing && sameEdges(editingInk, emptyOrigin, restEdges, emptyOrigin),
+      "first responder \(tookEmpty), editor \(emptyEditing); rest "
+        + describe(restEdges, from: emptyOrigin) + "; editing "
+        + describe(editingInk, from: emptyOrigin))
+
+// N17 — one letter typed hides it; deleted, N16 holds again.
+do {
+    let editor = empty.currentEditor() as? NSTextView
+    editor?.insertText("i", replacementRange: NSRange(location: NSNotFound, length: 0))
+    let typedEditor = editorString(empty)
+    let typed = capture("b50-typed").flatMap { placeholderInk(in: empty, $0) }
+    let typedGone = typed.map { t in restEdges.map { t.right <= $0.right - 10 } ?? false }
+        ?? false
+    editor?.deleteBackward(nil)
+    let deleted = editingEdges(empty, capture("b50-deleted"))
+    let back = sameEdges(deleted, emptyOrigin, restEdges, emptyOrigin)
+    check("N17 one letter typed: the placeholder is gone; deleted: N16 holds again",
+          editor != nil && typedGone && back,
+          "after the insert " + typedEditor + "; typed (whole interior) "
+            + describe(typed, from: emptyOrigin) + "; deleted "
+            + describe(deleted, from: emptyOrigin) + "; rest "
+            + describe(restEdges, from: emptyOrigin))
+    window.makeFirstResponder(nil)
+    spin(0.1)
+}
+
+// N18 — a named field cleared with the field editor attached draws the
+// placeholder as N16 does, not the old name.
+do {
+    let took = window.makeFirstResponder(named)
+    spin(0.1)
+    let editor = named.currentEditor() as? NSTextView
+    editor?.selectAll(nil)
+    editor?.deleteBackward(nil)
+    let cleared = editingEdges(named, capture("b50-cleared"))
+    let origin = named.frame.origin
+    check("N18 a named field cleared with the field editor attached draws the placeholder once on "
+            + "N15's rows and right edge, within 0.5 pt, and not the old name",
+          took && editor != nil && sameEdges(cleared, origin, restEdges, emptyOrigin),
+          "first responder \(took); " + editorString(named) + "; cleared "
+            + describe(cleared, from: origin) + "; N15 " + describe(restEdges, from: emptyOrigin))
+    window.makeFirstResponder(nil)
+    spin(0.1)
+}
+
+// N19 (control) and N20 — with the window ordered in, a display clears the
+// field's needsDisplay, and a letter typed into its field editor sets it.
+// Read on the field's LAYER (`layer.needsDisplay()`): the view's own getter
+// reads false here even straight after `needsDisplay = true` (measured, B50),
+// which is why B32's N12 read false after the insert.
+window.orderFrontRegardless()
+spin(0.2)
+func layerDirty(_ view: NSView) -> Bool? { view.layer?.needsDisplay() }
+do {
+    let took = window.makeFirstResponder(empty)
+    spin(0.1)
+    empty.display()
+    let clean = layerDirty(empty) == false
+    check("N19 with the window ordered in, display() leaves the empty field's needsDisplay false "
+            + "(a CONTROL)",
+          took && empty.currentEditor() != nil && clean,
+          "first responder \(took), editor \(empty.currentEditor() != nil); after display() "
+            + "layer.needsDisplay() \(String(describing: layerDirty(empty))), the view's getter "
+            + "\(empty.needsDisplay)")
+    let editor = empty.currentEditor() as? NSTextView
+    editor?.insertText("i", replacementRange: NSRange(location: NSNotFound, length: 0))
+    let marked = layerDirty(empty) == true
+    check("N20 a letter inserted into the field editor marks the field for display",
+          editor != nil && clean && marked,
+          "after the insert layer.needsDisplay() \(String(describing: layerDirty(empty))), the "
+            + "view's getter \(empty.needsDisplay); " + editorString(empty))
+    editor?.deleteBackward(nil)
+    window.makeFirstResponder(nil)
+    spin(0.1)
+}
+window.orderOut(nil)
 
 exit(0)

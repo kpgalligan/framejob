@@ -10395,3 +10395,96 @@ python3 tools/proof/recording_probe.py --mutant sticker-round --only welcome    
 env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only chrome  # 77/77
 python3 tools/proof/screens.py --only 10b-media-tab
 ```
+
+## Issue batch B50 — the header hover, the "clip" tag, the name field's placeholder (clip_inspector7_proof.py, name_field_proof.py N15–N20; #102, #199)
+
+**What changed.** #102: a section header's hover is `InspectorHeaderHoverBand`,
+a second `DS.hoverFill` (composited `.sourceOver`) over the rest band, the
+header's first subview, pinned above the rule; `mouseEntered` / `mouseExited`
+set `isHovered` at once and the band's alpha directly inside
+`DS.animate(DS.hoverDuration)` (spec §11 CI-15, amended). Normalize's row is
+`[normalize, InspectorClipTag(binding:)]`: a boxed mono 9 "clip", hidden
+unless an action is selected. #199: `InspectorNameField` keeps its
+placeholder in a string of its own (`placeholderString` and
+`placeholderAttributedString` overridden), so the field editor has none to
+draw; the cell draws it at rest and under an empty field editor, and
+`textDidChange` redisplays the field.
+
+**`clip_inspector7_proof.py`** — the probe (H1–H6, T1–T3) and the harness
+(C1–C4), no MCP section. On the change, 15/15. H3 printed an `opacity`
+animation of `Optional(0.14)` on enter and on exit, so Approach step 4's
+fallback was not needed. H6 read (2, 2) hovered `[255, 255, 255, 48]`
+against rest `[255, 255, 255, 25]` (the probe sets no appearance), the
+rule's row (55 px) equal.
+H5's band frame (0, 0, 304, 27) in a 304 × 28 header. T3: intrinsic
+(32, 17) = formula; (0.5, h/2) alpha 0.098, (2, 2) alpha 0. The C renders
+(`work/clip-inspector7/`): with action 0 the boxed "clip" follows Normalize,
+with none it is gone. Against the same renders from a harness built over
+HEAD's `app/Sources` (`work/clip-inspector7/head-harness/`), C3 and C4 (no
+action) are byte-identical, and C1 and C2 differ only in one cluster, x
+1218–1250, y 376.5–393.5 pt (623 px light, 664 px dark): the tag. The
+headers at rest are unchanged.
+
+| Mutant | Exit | The row that failed, as printed |
+|---|---|---|
+| `no-tracking` | 0, MUTANT PASS | H2: own areas 0 |
+| `unanimated` | 0, MUTANT PASS | H3: keys [], opacity duration nil |
+| `ignores-reduce-motion` | 0, MUTANT PASS | H4: keys ["opacity"] after each call |
+| `band-hit` | 0, MUTANT PASS | H5: hit InspectorHeaderHoverBand |
+| `band-blank` | 0, MUTANT PASS | H6: (2, 2) hovered [255, 255, 255, 25], rest the same |
+| `tag-hidden` | 0, MUTANT PASS | T1: hidden true |
+| `tag-always` | 0, MUTANT PASS | T2: hidden false |
+| `tag-blank` | 0, MUTANT PASS | T3: (0.5, h/2) alpha 0, interior drawn false |
+
+**`name_field_proof.py` N15–N20** — two fields at leading 220, width 170,
+placeholder "Marker": `empty` ("", top 100) and `named` ("Director of
+Photography", top 140). Placeholder ink is > 20 from the sampled fill, with
+its peak channel distance. On the unmodified tree (log kept in
+`work/name-field/b50-head.log`), 31/39: N16, N17, N18 and N20 FAILED in both
+looks — N16 light: rest rows 6.00–14.50, editing rows 8.00–16.50 (the field
+editor's own placeholder, 2 pt low), peak 109 both; dark 5.50–14.50 against
+7.50–16.50. On the change, 39/39: N16 editing rows 6.00–14.50, peak 109
+(light), 5.50–14.50, peak 130 (dark).
+
+**N19 and N20, and B32's `needsDisplay` note.** The field's own
+`needsDisplay` getter reads false in this window even straight after
+`needsDisplay = true` (measured: set directly on the field, and on the
+host, both read false; a plain `NSView` beside them read true), while its
+layer's `needsDisplay()` reads true. That is why B32's N12 read false after
+`insertText("i")` with `needsDisplay = true` in place: it read the view's
+getter. N19 and N20 therefore read the layer: after `display()` false (N19,
+the control), after the insert true on the change and false with the
+`textDidChange` override deleted (`no-redisplay`). The override is
+load-bearing: without it nothing dirties the field when its editor's text
+changes.
+
+| Mutant | Exit | Failures, as printed (light) |
+|---|---|---|
+| `frame-insets` | 1, caught | N13 only |
+| `cell-placeholder` | 1, caught | N16 and N18 (and N17): editing rows 6.00–16.50 — two copies |
+| `rest-only` | 1, caught | N16 and N17 (and N18): no placeholder ink under the editor |
+| `always-placeholder` | 1, caught | N17 only: typed ink to 41.00 |
+| `no-redisplay` | 1, caught | N20 only: layer.needsDisplay() false after the insert |
+
+Run on 2026-10-01, the change over `10d88ea`, every instance my own:
+
+| Command | Answer |
+|---|---|
+| `make typecheck` (HEAD, before any edit; and on the change) | 0 errors, 4 warnings, tsc clean |
+| `make test` | exit 0 |
+| `make app` | BUILD SUCCEEDED |
+| `name_field_proof.py` (unmodified tree / change) | 31/39, exit 1 / 39/39, exit 0 |
+| `clip_inspector7_proof.py` | 15/15, exit 0 |
+| `clip_inspector_proof.py` | 39/39, exit 0 (two earlier runs 38/39: S1's move row read a clip time of −600000; the same probe built over HEAD's sources failed it once in three runs) |
+| `clip_inspector2_proof.py` … `clip_inspector4_proof.py` | 32/32, 31/31, 46/46 |
+| `clip_inspector5_proof.py` | 36/37, exit 1: D2's "selected after the drop" row (selected 4, playhead 2.5000 s); it fails the same over HEAD's sources (filed as #204) |
+| `clip_inspector6_proof.py` (port 4851) | 25/25, exit 0 |
+| `graphics_inspector_proof.py` (port 4887) | 59/59, exit 0 |
+| `wc -l` the four Swift files | 281, 406, 455, 225 |
+
+```sh
+python3 tools/proof/clip_inspector7_proof.py                         # 15/15
+python3 tools/proof/clip_inspector7_proof.py --mutant band-blank     # MUTANT PASS
+python3 tools/proof/name_field_proof.py                              # 39/39
+python3 tools/proof/name_field_proof.py --mutant no-redisplay        # exit 1, N20 FAILS
+```
