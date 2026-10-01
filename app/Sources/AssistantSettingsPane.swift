@@ -1,8 +1,8 @@
 import AppKit
 
 /// Settings' Assistant pane (road map 12 A2): the person's Anthropic key
-/// (spec §11 AI-8) and the model (AI-11), under the Transcription pane in
-/// `SettingsWindowController`'s one stack.
+/// (spec §11 AI-8), the model (AI-11) and the chat settings (AI-20), under
+/// the Transcription pane in `SettingsWindowController`'s one stack.
 ///
 /// **It mirrors the Transcription pane's key handling, rule for rule.** The
 /// key is typed into a secure field and never shown back: a stored key is a
@@ -18,6 +18,12 @@ import AppKit
 /// its only poster — and each editor ends its session
 /// (`EditorViewController.assistantConfigurationDidChange`). A model commit
 /// that leaves `AssistantConfiguration.model` where it was posts nothing.
+///
+/// **A chat-settings change ends nothing** (AI-20). The compaction switch, its
+/// threshold and the clearing switch apply at once, with no Save, and post
+/// "settings" only when `AssistantChatSettings` actually changes; each
+/// editor writes them to its open session. A threshold outside the range
+/// beeps and the field shows the stored value again.
 ///
 /// The store is a FACTORY, as the Transcription pane's is, so the harness and
 /// the probes hand it a `MemoryStore` and no file is read or written.
@@ -47,6 +53,13 @@ final class AssistantSettingsPane: NSStackView, NSTextFieldDelegate {
     let headingLabel = NSTextField(labelWithString: AssistantSettingsPane.paneTitle)
     let keyField = NSSecureTextField()
     let modelField = NSTextField()
+    let compactBox = NSButton(checkboxWithTitle: "Compact when context reaches", target: nil, action: nil)
+    let compactTokensField = NSTextField()
+    let tokensLabel = NSTextField(labelWithString: "tokens")
+    let clearToolResultsBox = NSButton(
+        checkboxWithTitle:
+            "Clear old tool results past \(AssistantChatSettings.clearTriggerTokens.formatted()) tokens",
+        target: nil, action: nil)
     let statusLabel = NSTextField(wrappingLabelWithString: "")
     let explanationLabel = NSTextField(wrappingLabelWithString: "")
     let spendLabel = NSTextField(wrappingLabelWithString: "")
@@ -94,6 +107,24 @@ final class AssistantSettingsPane: NSStackView, NSTextFieldDelegate {
         modelField.cell?.sendsActionOnEndEditing = true
         modelField.widthAnchor.constraint(equalToConstant: 240).isActive = true
 
+        compactBox.font = DS.sans(13)
+        compactBox.target = self
+        compactBox.action = #selector(compactToggled(_:))
+        compactBox.setAccessibilityIdentifier("settings.assistant.compact")
+        DSField.style(compactTokensField)
+        compactTokensField.alignment = .right
+        compactTokensField.target = self
+        compactTokensField.action = #selector(compactTokensChanged(_:))
+        compactTokensField.cell?.sendsActionOnEndEditing = true
+        compactTokensField.widthAnchor.constraint(equalToConstant: 84).isActive = true
+        compactTokensField.setAccessibilityIdentifier("settings.assistant.compacttokens")
+        tokensLabel.font = DS.sans(13)
+        tokensLabel.textColor = DS.textMuted
+        clearToolResultsBox.font = DS.sans(13)
+        clearToolResultsBox.target = self
+        clearToolResultsBox.action = #selector(clearToolResultsToggled(_:))
+        clearToolResultsBox.setAccessibilityIdentifier("settings.assistant.cleartoolresults")
+
         statusLabel.font = DS.sans(12)
         statusLabel.textColor = DS.textMuted
         statusLabel.preferredMaxLayoutWidth = Self.textWidth
@@ -120,10 +151,12 @@ final class AssistantSettingsPane: NSStackView, NSTextFieldDelegate {
         alignment = .leading
         spacing = 12
         let buttons = row([saveButton, removeButton])
+        let compactRow = row([compactBox, compactTokensField, tokensLabel])
+        compactRow.spacing = 6
         let views: [NSView] = [
             headingLabel, row([fieldLabel("API key:"), keyField]),
-            row([fieldLabel("Model:"), modelField]), statusLabel, explanationLabel,
-            buttons, spendLabel, spendNoteLabel,
+            row([fieldLabel("Model:"), modelField]), compactRow, clearToolResultsBox,
+            statusLabel, explanationLabel, buttons, spendLabel, spendNoteLabel,
         ]
         for view in views { addArrangedSubview(view) }
         setCustomSpacing(16, after: buttons)
@@ -142,15 +175,29 @@ final class AssistantSettingsPane: NSStackView, NSTextFieldDelegate {
 
     // MARK: - Syncing
 
-    /// The placeholder, the model, and whether Remove can do anything. Never
-    /// writes `keyField.stringValue` (the Transcription pane's rule).
+    /// The placeholder, the model, the chat settings, and whether Remove can
+    /// do anything. Never writes `keyField.stringValue` (the Transcription
+    /// pane's rule).
     func sync() {
         let stored = store().read()
         keyField.placeholderString =
             stored != nil ? SettingsWindowController.maskedPlaceholder : Self.emptyPlaceholder
         removeButton?.isEnabled = stored != nil
         modelField.stringValue = defaults.string(forKey: AssistantConfiguration.modelKey) ?? ""
+        syncChatSettings()
         sayKeyState(stored: stored)
+    }
+
+    /// The stored chat settings; the threshold field is enabled only while
+    /// compaction is on, and never written while it is being edited.
+    private func syncChatSettings() {
+        let settings = AssistantChatSettings.load(from: defaults)
+        compactBox.state = settings.autoCompact ? .on : .off
+        clearToolResultsBox.state = settings.clearToolResults ? .on : .off
+        compactTokensField.isEnabled = settings.autoCompact
+        if compactTokensField.currentEditor() == nil {
+            compactTokensField.stringValue = settings.autoCompactTokens.formatted()
+        }
     }
 
     func controlTextDidChange(_ notification: Notification) {
@@ -265,21 +312,67 @@ final class AssistantSettingsPane: NSStackView, NSTextFieldDelegate {
         post("model")
     }
 
+    // MARK: - Chat settings (AI-20)
+
+    @objc func compactToggled(_ sender: Any?) {
+        var settings = AssistantChatSettings.load(from: defaults)
+        settings.autoCompact = compactBox.state == .on
+        commit(settings)
+    }
+
+    @objc func clearToolResultsToggled(_ sender: Any?) {
+        var settings = AssistantChatSettings.load(from: defaults)
+        settings.clearToolResults = clearToolResultsBox.state == .on
+        commit(settings)
+    }
+
+    /// The threshold field's commit (Return or leaving it). Outside the range
+    /// beeps and shows the stored value again, writing nothing.
+    @objc func compactTokensChanged(_ sender: Any?) {
+        var settings = AssistantChatSettings.load(from: defaults)
+        guard let tokens = Int(compactTokensField.stringValue.filter(\.isNumber)),
+            AssistantChatSettings.compactTokensRange.contains(tokens)
+        else {
+            NSSound.beep()
+            compactTokensField.stringValue = settings.autoCompactTokens.formatted()
+            return
+        }
+        settings.autoCompactTokens = tokens
+        commit(settings)
+        compactTokensField.stringValue = tokens.formatted()
+    }
+
+    /// Saves and posts "settings" only when `settings` differs from what is
+    /// stored; the controls show the stored settings after.
+    private func commit(_ settings: AssistantChatSettings) {
+        let changed = settings != AssistantChatSettings.load(from: defaults)
+        if changed { settings.save(to: defaults) }
+        syncChatSettings()
+        if changed { post("settings") }
+    }
+
     private func post(_ change: String) {
         NotificationCenter.default.post(
             name: AssistantConfiguration.didChangeNotification, object: self,
             userInfo: [AssistantConfiguration.changeKey: change])
     }
 
-    /// What the assistant sends and to whom, what it costs, and where the key
-    /// is kept.
+    /// What the assistant sends and to whom, what it costs, where the key is
+    /// kept, and what the chat settings do.
     static func explanation() -> String {
-        "The assistant sends your messages, the project's details and the frames it renders "
+        let range = AssistantChatSettings.compactTokensRange
+        return "The assistant sends your messages, the project's details and the frames it renders "
             + "to Anthropic, using your own API key; what it costs is billed to that key. It "
             + "asks before writing a file. The key is kept in a file only you can read and is "
             + "never shown again once it is saved. Leave the model blank for "
             + "\(AssistantConfiguration.defaultModel). Changing the key or the model starts "
-            + "a new conversation."
+            + "a new conversation. At the end of a turn past the compaction threshold "
+            + "(\(range.lowerBound.formatted()) to \(range.upperBound.formatted()) tokens; "
+            + "\(AssistantChatSettings.defaultCompactTokens.formatted()) by default), the "
+            + "conversation is replaced by a summary, and earlier renders don't survive it. "
+            + "Clearing lets Anthropic drop old tool results from what the model sees, even "
+            + "mid-turn (never tool search results), and each clearing costs a fresh "
+            + "prompt-cache write. Changing either keeps the conversation."
     }
 }
 

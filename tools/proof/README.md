@@ -10237,3 +10237,79 @@ python3 tools/proof/assistant_tab_proof.py --mutant no-badge        # P14 FAIL, 
 python3 tools/proof/assistant_tab_proof.py --mutant no-badge-app    # L8 FAIL, exit 1
 python3 tools/proof/assistant_tab_proof.py --mutant full-spend-only # P15 FAIL, exit 1
 ```
+
+## Issue batch B48 — the assistant's chat settings (assistant_settings_proof.py CS1–CS3, four mutants; #151)
+
+Settings' Assistant pane gained "Compact when context reaches N tokens" (on,
+300,000) and "Clear old tool results past 150,000 tokens" (off), spec §11
+AI-20 (amending AI-9 and AI-18). `python3 tools/proof/assistant_settings_proof.py`
+(port 4885) builds `assistant_settings_probe.swift` over `app/Sources` on
+`assistant_tab_proof.build_probe`'s line and runs it against the stand-in with
+`assistant_session_proof.secret_folder()`'s `proof-key`:
+
+- **CS1** — `AssistantChatSettings` over a fresh suite and the pane over it.
+  Printed: empty `{auto_compact_tokens: 300000, clear_tool_results: false}`;
+  stored 19999 and 900001 read 300000, 20000 and 900000 kept;
+  `settingsJSON(defaults: suite)` over (false, 40000, true)
+  `{auto_compact_tokens: null, clear_tool_results: true}`; the pane starts on,
+  "300,000", off; "40,000" stores 40000 and posts `["settings"]`, the same
+  again posts nothing, "10000" shows "40,000" again; each box posts once; the
+  probe's `clearTriggerTokens` 150000 equals `agent/src/main.ts`'s
+  `CLEAR_TRIGGER_TOKENS` 150000.
+- **CS2** — a real editor's session: turn 1 (50,000 input tokens) did not
+  compact; the pane on `.standard` posted `["settings", "settings"]`, the
+  session the same object, phase idle, entries 3 → 3; turn 2 compacted once,
+  `used 50010`; turn 3 (950,000) did not compact after the box went off. The
+  stand-in saw 4 POSTs: POST 1 without `context_management` or the
+  `context-management-2025-06-27` beta; POSTs 2 and 4 with the
+  `clear_tool_uses_20250919` edit (trigger 150000 input tokens, keep 5 tool
+  uses, at least 50000) and the beta; POST 3 with `compaction`.
+- **CS3** — the Release app with `-ReelcutAssistantAutoCompact NO
+  -ReelcutAssistantClearToolResults YES -RCDevAssistantAutoCompact 1`: state
+  finished, compaction events `['compaction_started', 'compacted']`, 2 POSTs,
+  the first with the clear edit and the beta, the second with `compaction`;
+  `Reelcut: ` lines 0.
+
+Mutants (each run printed its row FAIL, `caught`, exit 1):
+`fixed-settings` (`AssistantConfiguration.swift`'s `settingsJSON` reads
+`AssistantChatSettings()`) → CS1 FAIL, `settingsJSON(defaults: suite)` printed
+`{auto_compact_tokens: 300000, clear_tool_results: false}`;
+`no-live-settings` → CS2 FAIL, turn 2 `compaction events []` and 5 POSTs, none
+with `context_management`; `settings-ends` → CS2 FAIL, `the same session
+false, phase closed, entries 3 → 4`; `fixed-settings-app` (the same edit,
+`make app` in a `tree_copy` tree, built in 108 s) → CS3 FAIL, POST 1
+`context_management null, beta False`.
+
+**`CHAT_PINS`.** `assistant_session_proof.App` now appends
+`-ReelcutAssistantAutoCompact YES -ReelcutAssistantAutoCompactTokens 300000
+-ReelcutAssistantClearToolResults NO` for each key a launch does not set, so
+no `App` launch (the session, tab, prompt, compaction and spend proofs, and
+the paid evals) reads the person's own chat settings. `screens.py`'s `PINS`
+and `harness/main.swift`'s `pinDefaults` pin the same three keys. The
+chrome section's Settings window is now 460 × 805 points (measured
+`(920, 1610)` at scale 2; it was 677).
+
+Run on 2026-10-01, the change over `b1f95d6`:
+
+| Command | Result |
+|---|---|
+| `make typecheck` | 0 errors, 4 warnings (the baseline), tsc clean |
+| `make test` | exit 0 |
+| `make app` | BUILD SUCCEEDED |
+| `assistant_settings_proof.py` | 3/3, exit 0 |
+| `--mutant fixed-settings` / `no-live-settings` / `settings-ends` / `fixed-settings-app` | CS1 / CS2 / CS2 / CS3 FAIL, exit 1 each |
+| `assistant_tab_proof.py` | 26/26, exit 0 |
+| `assistant_session_proof.py` | 12/13 at first, exit 1: T2 FAIL (`missing ['close_project']`), the same T2 detail as a run of HEAD `b1f95d6` exported and built apart — its oracle predated #40's withheld `close_project`. With T2's oracle withholding `close_project` too (the orchestrator's fix in this batch): 13/13, exit 0 (T2 "85 tools") |
+| `assistant_prompt_proof.py` | 18/18 pass, 8 skipped (`--live` not asked), exit 0 |
+| `assistant_compaction_proof.py --rehearse` | 8/8 pass, 1 skipped, exit 0 |
+| `spend_ui_proof.py` | 10/10, exit 0 |
+| `cloud_captions_probe.py --only chrome` | 77/77 checks, exit 0 |
+| `screens.py --only 02-settings` | 6 pass, 0 fail, 0 skip; 2 captures, 0 new problems; `Reelcut: ` lines 0 light and dark |
+
+```sh
+python3 tools/proof/assistant_settings_proof.py                               # 3/3
+python3 tools/proof/assistant_settings_proof.py --mutant fixed-settings        # CS1 FAIL, exit 1
+python3 tools/proof/assistant_settings_proof.py --mutant no-live-settings      # CS2 FAIL, exit 1
+python3 tools/proof/assistant_settings_proof.py --mutant settings-ends         # CS2 FAIL, exit 1
+python3 tools/proof/assistant_settings_proof.py --mutant fixed-settings-app    # CS3 FAIL, exit 1
+```

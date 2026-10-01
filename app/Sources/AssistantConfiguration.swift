@@ -40,20 +40,18 @@ enum AssistantConfiguration {
     /// AI-11's default.
     static let defaultModel = "claude-opus-5-5"
 
-    /// The end-of-turn compaction threshold, in tokens (AI-9).
-    static let autoCompactTokens = 300_000
-
-    /// The helper's `ChatSettings` (`agent/src/protocol.ts`): compaction at
-    /// the end of a turn past `autoCompactTokens` (AI-9), and old tool results
-    /// kept. A dev build takes `-RCDevAssistantAutoCompact <tokens>` in its
-    /// place, for a proof (AI-18).
+    /// The helper's `ChatSettings` (`agent/src/protocol.ts`): the person's
+    /// chat settings from Settings' Assistant pane (AI-20). A dev build's
+    /// `-RCDevAssistantAutoCompact <tokens>` replaces the threshold, even
+    /// with compaction off, for a proof (AI-18).
     static func settingsJSON(defaults: UserDefaults = .standard) -> [String: Any] {
+        var json = AssistantChatSettings.load(from: defaults).helperJSON
         #if REELCUT_DEV_TOOLS
-        let tokens = devAutoCompactTokens(defaults: defaults) ?? autoCompactTokens
-        #else
-        let tokens = autoCompactTokens
+        if let tokens = devAutoCompactTokens(defaults: defaults) {
+            json["auto_compact_tokens"] = tokens
+        }
         #endif
-        return ["auto_compact_tokens": tokens, "clear_tool_results": false]
+        return json
     }
 
     /// Why the base-URL override cannot be used, in the sentence the session
@@ -133,20 +131,74 @@ enum AssistantConfiguration {
 
 extension AssistantConfiguration {
     /// Posted by Settings' Assistant pane, and only by it, when the key is
-    /// saved or removed or the model changes: each window's conversation
-    /// ends, since a session keeps what it was opened with (road map 12 A2).
+    /// saved or removed, the model changes or the chat settings change. A key
+    /// or model change ends each window's conversation, since a session keeps
+    /// what it was opened with (road map 12 A2); a chat-settings change is
+    /// written to each open session and ends nothing (AI-20).
     static let didChangeNotification = Notification.Name("ReelcutAssistantConfigurationDidChange")
 
-    /// The notification's `userInfo` key; its value is "key" or "model".
+    /// The notification's `userInfo` key; its value is "key", "model" or
+    /// "settings".
     static let changeKey = "change"
+}
+
+/// The person's chat settings (spec §11 AI-20), Rasterize's two under
+/// Reelcut's keys: end-of-turn compaction past a threshold (AI-9), and the
+/// API's clearing of old tool results past the helper's fixed trigger. Kept
+/// in `UserDefaults`; no tool reads or writes them (AI-11's reason).
+struct AssistantChatSettings: Equatable {
+    /// AI-9's threshold, and the one 300 000 in the app.
+    static let defaultCompactTokens = 300_000
+    static let compactTokensRange = 20_000...900_000
+    /// `agent/src/main.ts`'s `CLEAR_TRIGGER_TOKENS` (the settings proof's CS1).
+    static let clearTriggerTokens = 150_000
+    /// Bool; absent = true.
+    static let autoCompactKey = "ReelcutAssistantAutoCompact"
+    /// Int; absent or outside the range = the default.
+    static let autoCompactTokensKey = "ReelcutAssistantAutoCompactTokens"
+    /// Bool; absent = false.
+    static let clearToolResultsKey = "ReelcutAssistantClearToolResults"
+
+    var autoCompact = true
+    var autoCompactTokens = defaultCompactTokens
+    var clearToolResults = false
+
+    static func load(from defaults: UserDefaults = .standard) -> AssistantChatSettings {
+        var settings = AssistantChatSettings()
+        if defaults.object(forKey: autoCompactKey) != nil {
+            settings.autoCompact = defaults.bool(forKey: autoCompactKey)
+        }
+        if defaults.object(forKey: autoCompactTokensKey) != nil {
+            let tokens = defaults.integer(forKey: autoCompactTokensKey)
+            if compactTokensRange.contains(tokens) { settings.autoCompactTokens = tokens }
+        }
+        settings.clearToolResults = defaults.bool(forKey: clearToolResultsKey)
+        return settings
+    }
+
+    /// Writes all three keys.
+    func save(to defaults: UserDefaults = .standard) {
+        defaults.set(autoCompact, forKey: Self.autoCompactKey)
+        defaults.set(autoCompactTokens, forKey: Self.autoCompactTokensKey)
+        defaults.set(clearToolResults, forKey: Self.clearToolResultsKey)
+    }
+
+    /// `protocol.ts`'s `ChatSettings`: the threshold, or null when compaction
+    /// is off, and whether old tool results are cleared.
+    var helperJSON: [String: Any] {
+        [
+            "auto_compact_tokens": autoCompact ? autoCompactTokens as Any : NSNull(),
+            "clear_tool_results": clearToolResults,
+        ]
+    }
 }
 
 #if REELCUT_DEV_TOOLS
 extension AssistantConfiguration {
     /// `-RCDevAssistantAutoCompact <tokens>` — a dev-only LAUNCH default
     /// (spec §11 AI-18): the end-of-turn compaction threshold a proof lowers,
-    /// read from the argument domain alone. The shipped threshold is
-    /// `autoCompactTokens`.
+    /// read from the argument domain alone. It replaces the person's
+    /// threshold (`AssistantChatSettings`, AI-20).
     static let devAutoCompactArgument = "RCDevAssistantAutoCompact"
 
     /// The knob's tokens, or nil when it is absent. A value that is not a
@@ -156,7 +208,7 @@ extension AssistantConfiguration {
         else { return nil }
         if let tokens = Int(raw), tokens >= 1 { return tokens }
         let line = "\(devAutoCompactArgument) must be a whole number of tokens, 1 or more "
-            + "(got \"\(raw)\"); \(autoCompactTokens) is kept.\n"
+            + "(got \"\(raw)\"); it is ignored.\n"
         FileHandle.standardError.write(Data(line.utf8))
         return nil
     }

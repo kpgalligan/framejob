@@ -159,6 +159,9 @@ PINS = [(key, _plist(value)) for key, value in [
     ("ReelcutAssemblyAIRegion", "us"),
     ("ReelcutCaptionStyle", "subtitles"),
     ("ReelcutAssistantModel", ""),
+    ("ReelcutAssistantAutoCompact", True),
+    ("ReelcutAssistantAutoCompactTokens", 300000),
+    ("ReelcutAssistantClearToolResults", False),
     ("AppleShowScrollBars", "Always"),
 ]] + [(f"ReelcutInspectorSection.{sid}", _plist(collapsed))
       for sid, collapsed in sorted(SECTIONS.items())]

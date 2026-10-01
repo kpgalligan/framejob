@@ -343,7 +343,9 @@ the key map behind it.
   dot's one writer (`inspector?.showAssistantBadge`, AI-19) — `assistantSend`
   (false = not taken, the composer keeps the text), Stop, Allow/Deny, Clear,
   View ▸ Assistant ⌃⌘A `showAssistant`, and `assistantConfigurationDidChange`,
-  which ends the conversation with a note on a Settings key or model change;
+  whose first arm writes a `settings` change to the live session
+  (`updateSettings(settingsJSON())`) and returns, and which otherwise ends the
+  conversation with a note on a Settings key or model change;
   the frozen file stores `assistantTranscript` and a weak `assistantView`),
   `+Export` (the
   dialogs), `+SaveFrame` (⌥⌘E; renders off-main on `frameGrabQueue`; passes
@@ -1228,7 +1230,11 @@ free.
   no account link (AI-1), holds the model (blank is AI-11's default), and is
   the ONE poster of `AssistantConfiguration.didChangeNotification` —
   `key` on Save and Remove, `model` only when `AssistantConfiguration.model`
-  actually changes. Road map 13 P4 (spec §11 P-7) ends the pane with the
+  actually changes, and `settings` only when `AssistantChatSettings` actually
+  changes (the compaction box, its threshold field, the clearing box; applied
+  at once, no Save; a threshold outside the range beeps and shows the stored
+  value again; the field is never written while it is being edited, AI-20).
+  Road map 13 P4 (spec §11 P-7) ends the pane with the
   UTC month's spend (`spendLabel`, `settings.assistant.spend`) and its note
   (`spendNoteLabel`, `settings.assistant.spendnote`); the spend folder is a
   third FACTORY, `spendFolder:` (`AssistantSpend.folder()` by default, an
@@ -1443,8 +1449,9 @@ free.
   verbatim. `send` writes the person's text behind the window's live
   context, `AssistantPrompt.message(text, document:)` (AI-15; the
   transcript keeps the bare text), and sets busy BEFORE its write, so the
-  phase reads `busy` the moment it returns true; `turn_started` does not
-  clear `cancelRequested`.
+  phase reads `busy` the moment it returns true; `turn_started` does not clear
+  `cancelRequested`. `updateSettings(_:)` writes `{type: "settings"}` to the
+  helper (AI-20); it does nothing once closed, and it ends nothing.
   **Every question is answered exactly once** — Allow/Deny, Stop, `close`,
   the helper's exit, `deinit`, and a hop that reaches a closed, cancelling or
   released session (the `askFirst` closure is `[weak self]` and REPLIES when
@@ -1501,10 +1508,17 @@ free.
   EMPTY `MemoryStore`; else the one `AppSupport.directory` line. The store
   first, `ANTHROPIC_API_KEY` second. `model()` is `ReelcutAssistantModel`,
   else `claude-opus-5-5`; no tool reads or writes it. `didChangeNotification`
-  (`userInfo[changeKey]` "key" or "model") is posted by Settings' Assistant
-  pane alone. `settingsJSON()` sends `autoCompactTokens` (300 000, AI-9), or
-  in a dev build `-RCDevAssistantAutoCompact <tokens>` from the argument
-  domain (AI-18).
+  (`userInfo[changeKey]` "key", "model" or "settings") is posted by Settings'
+  Assistant pane alone. `AssistantChatSettings` is the person's chat settings
+  (spec §11 AI-20): `ReelcutAssistantAutoCompact` (absent = on),
+  `ReelcutAssistantAutoCompactTokens` (a whole number in 20 000–900 000;
+  absent or outside = `defaultCompactTokens`, 300 000, the one such constant,
+  AI-9) and `ReelcutAssistantClearToolResults` (absent = off), with `load`,
+  `save` and `helperJSON` (null tokens when off); no tool reads or writes
+  them. `settingsJSON()` sends `AssistantChatSettings.load(from:)`'s
+  `helperJSON` (read there exactly once). In a dev build,
+  `-RCDevAssistantAutoCompact <tokens>` from the argument domain replaces the
+  threshold, even with compaction off (AI-18 as amended).
 - `AssistantPrompt.swift` — the core tools loaded up front (`get_project`,
   `render_frame`, `undo`, `redo`; the lane probe's L6 holds each to the
   assistant's catalog), the system prompt, the search guide, the compaction
@@ -1772,9 +1786,9 @@ follow the canonical shape: `target(a)` → validate ids → `performGroupedEdit
 is a decision: Preview Quality, the preview window, the export queue, the
 Media tab's search and sort, the Assistant tab (view state; the dev tool
 `select_inspector_tab` shows it in a Release build, and the assistant's own
-calls already are tool calls) and Settings' Assistant pane (the key and the
-model are the person's, spec §11 AI-8, AI-11) get no mirror, because they
-edit no project and `set_selection` / `export` already are the capability.
+calls already are tool calls) and Settings' Assistant pane (the key, the model
+and the chat settings are the person's, spec §11 AI-8, AI-11, AI-20) get no
+mirror, because they edit no project and `set_selection` / `export` already are the capability.
 Opening System Settings at a grant's pane (the recorder panel) is no edit
 and gets no mirror; `record_screen` refuses by name instead (spec §11
 recording).

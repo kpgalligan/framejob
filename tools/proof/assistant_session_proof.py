@@ -76,7 +76,8 @@ text `MUTANTS` requires: `mutant <name>: the control could not be performed
 — <why>`, exit 2.
 
 Prints `<ID> ok|FAIL — <detail>` per row, then `n/m`. An instrument that
-cannot run is a scored FAIL. Safety: every child's environment has
+cannot run is a scored FAIL. Every `App` launch pins the chat settings
+(`CHAT_PINS`, AI-20) to their defaults unless its arguments set one. Safety: every child's environment has
 `ANTHROPIC_API_KEY` and `RC_ASSEMBLYAI_KEY` popped and none sets either; the
 only key is the dummy `proof-key`, in a 0600 `anthropic-key` in a 0700
 scratch folder; `RC_ASSISTANT_BASE_URL` always names the stand-in. Rule H:
@@ -135,6 +136,12 @@ MUTANTS: dict[str, tuple[str | None, str | None, str, str | None]] = {
     "key-echo": (None, None, "K1", None),
 }
 BOUND_PORT = re.compile(r"listening on http://127\.0\.0\.1:(\d+)/mcp")
+# The person's chat settings (spec §11 AI-20) at their defaults, as launch
+# arguments: `App` appends each one whose `-Key` its arguments do not set, so no
+# proof launch reads the person's own threshold or clearing switch.
+CHAT_PINS = [("-ReelcutAssistantAutoCompact", "YES"),
+             ("-ReelcutAssistantAutoCompactTokens", "300000"),
+             ("-ReelcutAssistantClearToolResults", "NO")]
 
 
 def child_env(extra=None):
@@ -238,6 +245,8 @@ class App:
         if port is not None:
             env["RC_AGENT_PORT"] = str(port)
         self.handle = open(self.log_path, "wb")
+        arguments = list(arguments) + [part for key, value in CHAT_PINS
+                                       if key not in arguments for part in (key, value)]
         self.child = subprocess.Popen(
             [os.path.join(app, BINARY), "-ApplePersistenceIgnoreState", "YES"] + arguments,
             stdout=self.handle, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, env=env,
@@ -439,7 +448,8 @@ def row_t2(app, ctx):
     tools = first.get("tools", [])
     names = [t.get("name") for t in tools]
     wanted = [SEARCH_TOOL] + [n for n in ctx["catalog"]
-                              if n != "record_screen" and n not in DEV_TOOLS]
+                              if n not in ("record_screen", "close_project")  # withheld (AI-7, #40)
+                              and n not in DEV_TOOLS]
     if names != wanted:
         extra = sorted(set(names) - set(wanted))
         missing = sorted(set(wanted) - set(names))

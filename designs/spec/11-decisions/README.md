@@ -21,7 +21,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) | 363 | **Chrome, the clip inspector and keys (the sharp pass, road map 9, #35).** SH-1..SH-3, CI-1..CI-16, K-1..K-3. |
 | [`graphics.md`](graphics.md) | 405 | **Graphics (road map 10).** G-1..G-20. |
 | [`dev-tools.md`](dev-tools.md) | 27 | **Dev tools (road map 11).** V-1..V-3: the `REELCUT_DEV_TOOLS` flag and `make dist`, dev tools as ordinary tools, capture by `cacheDisplay`. |
-| [`assistant.md`](assistant.md) | 176 | **The Assistant (road map 12).** AI-1..AI-19: the bundled helper, one lane, the catalog at launch, the fourth tab, the window's own project, W-9's reach, withheld and ask-first tools, the key, history, undo, the model, a call mid-gesture, the base-URL override, the tab kept on a selection change, the live context on each message, Stop reaching a running export or transcribe, the selectable transcript and the multi-line composer, the dev-only compaction threshold a proof lowers, and the dot on the Assistant tab's title while a question waits. |
+| [`assistant.md`](assistant.md) | 202 | **The Assistant (road map 12).** AI-1..AI-20: the bundled helper, one lane, the catalog at launch, the fourth tab, the window's own project, W-9's reach, withheld and ask-first tools, the key, history, undo, the model, a call mid-gesture, the base-URL override, the tab kept on a selection change, the live context on each message, Stop reaching a running export or transcribe, the selectable transcript and the multi-line composer, the dev-only compaction threshold a proof lowers, the dot on the Assistant tab's title while a question waits, and the person's chat settings. |
 | [`pricing.md`](pricing.md) | 96 | **Pricing and spend (road map 13).** P-1..P-8: LiteLLM's table as the feed, a call priced from its own `usage` and `model` (per iteration), monthly dollar budgets per service, the app's spend as its own, the spend folder (ledger and price cache) that a proof never touches, the proofs' own ledger and how a paid proof request is held to the month's budget in it, and the two figures the app shows (the conversation's on the Assistant tab, the UTC month's in Settings), and a response cut short priced once and marked partial. |
 
 ## Every decision
@@ -175,7 +175,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | AI-6 | W-9 governs automatic styling, not a person's request | [`assistant.md`](assistant.md) |
 | AI-7 | What the assistant may not call, and what it must ask about first — amended by #40 | [`assistant.md`](assistant.md) |
 | AI-8 | The key is the person's own, and is R6-5 and R6-12's key in everything but the vendor | [`assistant.md`](assistant.md) |
-| AI-9 | History is append-only, and end-of-turn compaction is the one rewrite | [`assistant.md`](assistant.md) |
+| AI-9 | History is append-only, and end-of-turn compaction is the one rewrite — amended by AI-20 | [`assistant.md`](assistant.md) |
 | AI-10 | Each tool call the assistant makes is its own undo step | [`assistant.md`](assistant.md) |
 | AI-11 | The default model is `claude-opus-5-5` at medium effort | [`assistant.md`](assistant.md) |
 | AI-12 | A tool call that arrives during a live gesture waits for mouse-up, then runs | [`assistant.md`](assistant.md) |
@@ -184,8 +184,9 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | AI-15 | The window's live context rides on each person message; the system prompt is fixed for a session | [`assistant.md`](assistant.md) |
 | AI-16 | Stop stops a running `export` or on-device `transcribe`; any other running call finishes | [`assistant.md`](assistant.md) |
 | AI-17 | The transcript is one selectable text, and the composer is multi-line with K-2's Return | [`assistant.md`](assistant.md) |
-| AI-18 | A proof lowers the end-of-turn compaction threshold with the dev-only launch default `-RCDevAssistantAutoCompact <tokens>`; the shipped threshold stays 300 000 | [`assistant.md`](assistant.md) |
+| AI-18 | A proof lowers the end-of-turn compaction threshold with the dev-only launch default `-RCDevAssistantAutoCompact <tokens>`; the shipped threshold stays 300 000 — amended by AI-20 | [`assistant.md`](assistant.md) |
 | AI-19 | While the window's assistant waits on an ask-first question, the Assistant tab's title wears a dot, whichever tab is showing | [`assistant.md`](assistant.md) |
+| AI-20 | The chat settings are the person's, in Settings' Assistant pane, and a change reaches an open conversation without ending it | [`assistant.md`](assistant.md) |
 | P-1 | Prices come from LiteLLM's table; only AssemblyAI's rate is hand-kept; Anthropic's page is the cross-check | [`pricing.md`](pricing.md) |
 | P-2 | A call is priced from the response's own `usage` and `model`, per `iterations` entry; unknown is never $0 | [`pricing.md`](pricing.md) |
 | P-3 | Budgets are dollars per calendar month per service, enforced by the proofs at the worst case | [`pricing.md`](pricing.md) |

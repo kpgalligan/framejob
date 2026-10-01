@@ -7364,16 +7364,17 @@ def section_chrome(binary, sources):
               one[0] == two[0] and one[0] != b"", "the two renders differ")
     check("18: light and dark differ — both appearances really were rendered",
           taken[("light", 1)][0] != taken[("dark", 1)][0], "the two appearances are equal")
-    # 677, not 340, since road map 12 A2 (610) and road map 13 P4 (677):
-    # Settings' Assistant pane sits under the Transcription pane in the same
-    # stack, with the month's spend line and its note under its buttons, and
-    # the window grows to fit it.
+    # 805, not 340, since road map 12 A2 (610), road map 13 P4 (677) and issue
+    # batch B48 (805, measured): Settings' Assistant pane sits under the
+    # Transcription pane in the same stack, with its chat settings (AI-20)
+    # under the model, the month's spend line and its note under its buttons,
+    # and the window grows to fit it.
     size = png_size(taken[("light", 1)][0])
     scale = (size[0] / 460.0) if size else 0
-    check(f"18: the PNG is the window's content — 460 × 677 points at the display's backing "
+    check(f"18: the PNG is the window's content — 460 × 805 points at the display's backing "
           f"scale (measured {size!r}, scale {scale:g})",
-          size is not None and size[0] % 460 == 0 and size[1] % 677 == 0
-          and size[0] // 460 == size[1] // 677 and size[0] // 460 >= 1,
+          size is not None and size[0] % 460 == 0 and size[1] % 805 == 0
+          and size[0] // 460 == size[1] // 805 and size[0] // 460 >= 1,
           f"got {size!r}")
 
 

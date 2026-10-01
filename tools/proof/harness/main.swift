@@ -386,6 +386,13 @@ enum Harness {
             // by ordinary use whenever a person chooses a model, and drawn by
             // the `settings` mode. Blank is AI-11's default.
             "ReelcutAssistantModel": "",
+            // The same pane's chat settings (`AssistantChatSettings`'s three
+            // keys, spec §11 AI-20), literals for the same reason: written by
+            // ordinary use whenever a person changes them, and drawn by the
+            // `settings` mode. These are the defaults.
+            "ReelcutAssistantAutoCompact": true,
+            "ReelcutAssistantAutoCompactTokens": 300_000,
+            "ReelcutAssistantClearToolResults": false,
             "AgentServerEnabled": false,
             // AppKit picks legacy (16 pt, always visible) or overlay scrollers
             // by whether a MOUSE is attached, and the inspector pane is 16 pt

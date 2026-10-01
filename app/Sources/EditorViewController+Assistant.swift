@@ -140,15 +140,21 @@ extension EditorViewController {
         assistantView?.focusComposer()
     }
 
-    /// Settings' Assistant pane saved or removed the key, or changed the
-    /// model. A session keeps what it was opened with, so the conversation
-    /// ends here and the next message opens a new one (as in Rasterize).
+    /// Settings' Assistant pane saved or removed the key, changed the model,
+    /// or changed the chat settings. A chat-settings change is written to the
+    /// live session, which goes on (AI-20). A session keeps the key and model
+    /// it was opened with, so on those the conversation ends here and the
+    /// next message opens a new one (as in Rasterize).
     @objc func assistantConfigurationDidChange(_ note: Notification) {
+        let change = note.userInfo?[AssistantConfiguration.changeKey] as? String
+        if change == "settings" {
+            assistant?.updateSettings(AssistantConfiguration.settingsJSON())
+            return
+        }
         assistantView?.show(hasKey: assistantHasKey)
         if let session = assistant {
             session.close()
             assistant = nil
-            let change = note.userInfo?[AssistantConfiguration.changeKey] as? String
             assistantTranscript.endConversation(
                 note: change == "model"
                     ? "The model is now \(AssistantConfiguration.model()); the next message "
