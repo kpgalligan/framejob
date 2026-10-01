@@ -10929,3 +10929,85 @@ python3 tools/proof/speed_limits_probe.py --mutant ceiling-16        # exit 1
 python3 tools/proof/speed_limits_probe.py --mutant no-audio-limit    # exit 1
 python3 tools/proof/speed_limits_probe.py --mutant no-pitch-split    # exit 1
 ```
+
+## Issue batch B53 — the paused playhead's late reports and the clip tag refreshed in place (`playhead_echo_probe.py` twice·1/twice·2, `clip_inspector5_probe` D2 and `clip_inspector_probe` S1 trails, `clip_inspector7_proof.py` T4 and `--mutant tag-frozen`; #204, #209)
+
+- **What was measured first (step 1, the tree at `c39efca`).** D2's "selected after the
+  drop" row and S1's "a moveClip that slides a span…" row now carry a report trail
+  in their detail: the editor's `playback.onTimeChanged` is wrapped, and every tick
+  it carries is logged as `<t> seeking <isSeeking> player <player tick>`, then
+  forwarded. One build of each proof (37/37, 39/39), then each probe binary rerun 8
+  times off it:
+  - **D2 failed 6 of 8** (runs 1, 2, 4, 5, 6, 8), every one with the same trail:
+    `selected 4, playhead 2.5000 s; reports: 1.5000 s seeking true player 1.5000 s;
+    2.5000 s seeking true player 2.5000 s`. While the seek to 2.5 s was in flight
+    the observer delivered 1.5 s (the action's end before the drag, a superseded
+    seek), the document took it, and the entry rule then walked 1.5 s → 2.5 s
+    into action 4. The two passing runs had an empty trail.
+  - **S1 failed 1 of 8** (run 3): `clip time under the playhead -600000, selected
+    nil; reports: 2.5000 s seeking true player 2.5000 s; 0.0000 s seeking false
+    player 0.0000 s`. The other seven heard 2.5 s once or twice. The trail cannot
+    say whether that 0 came from the observer or from a seek's landing.
+- **The forced order (step 2).** `playhead_echo_probe.swift`'s `twice` scenario asks
+  `setPlayhead(2 s)` then `setPlayhead(0.5 s)` from 1 s in ONE run-loop turn.
+  `twice·1` [B] (at least one report, every one 0.5 s) FAILED 3 of 3 on the
+  unfixed tree with the log `[1200000, 300000]`; `twice·2` (a CONTROL: the
+  document, the timeline and the player rest at 0.5 s) passed 3 of 3. The pure
+  move (step 3, `onMain` to `Playback+Step.swift`) scored the same: 21/22,
+  `twice·1` alone failing with `[1200000, 300000]`.
+- **The fix** (`Playback.swift`, 590 → 579 lines after the move, 587 after the
+  fix): while `player.rate == 0`, `timeAdvanced` hears a tick only when it equals
+  `currentTime` (where the player is or is seeking to) and differs from
+  `reported`; while playing nothing changed. `seekFinished` ends every seek the same
+  way: `restoring = false`, and the rest is reported once when it differs from
+  `reported`, an asked seek as well as a restore.
+- **Runs after the fix:**
+
+| Command | Result |
+|---|---|
+| `make typecheck` (after the move, and after the fix) | exit 0, 0 errors, the 4 baseline warnings, tsc clean |
+| `make app` | BUILD SUCCEEDED |
+| `playhead_echo_probe.py` | 23/23; `twice·1` log `[300000]`; `pause·1` ok |
+| `playhead_echo_probe.py --sources work/b53/head/app/Sources` (HEAD) | 21/22 before `pause·1` was added; `twice·1` FAILS, `[1200000, 300000]` |
+| `playhead_echo_probe.py`, the guard hand-tightened to `if player.rate == 0 { return }` (restored after) | 21/23; `pause·1` FAILS (document 1010036, player 1022677), `short·1` FAILS |
+| `scope_playhead_probe.py` | 16/16 |
+| `harness_playhead_proof.py` | 6/6 |
+| `clip_inspector5_proof.py` | 37/37 |
+| `clip_inspector_proof.py` | 39/39 |
+| `clip_inspector5_probe` × 8 | 0 failing rows in all 8; D2's trail empty (2) or `2.5000 s seeking true player 2.5000 s` (6) |
+| `clip_inspector_probe` × 8 | 0 failing rows in all 8; S1's trail empty (1) or `2.5000 s seeking true player 2.5000 s` (7) |
+| `clip_inspector7_proof.py` | 16/16, T4 included |
+| `--mutant tag-frozen` / `tag-hidden` / `tag-always` | MUTANT PASS: T4 / T1, T4 / T2, T4 |
+
+  The echo probe, HEAD against the fix (every other row passes on both):
+
+| Row | HEAD | Fix |
+|---|---|---|
+| `twice·1` [B] | FAIL `[1200000, 300000]` | ok `[300000]` |
+| `pause·1` | (added after this run) | ok |
+| the other 21 | ok | ok |
+
+- **`pause·1`** (a CONTROL, added at review): after play·1, `pause()` and a 0.5 s
+  spin, rate 0, the document, the timeline and the player tick agree and the
+  log's last report is the player tick. It covers the one paused transition no
+  seek follows, a user's pause mid-play: the paused guard must not drop the
+  pause's own callback. It has teeth: with the guard hand-tightened to
+  `if player.rate == 0 { return }` it FAILS with the document on the last
+  playing tick (1010036) and the player at 1022677 (`short·1` fails too).
+- **S1 is not proven fixed.** It failed 1 of 8 before and 0 of 8 after, which is
+  weak evidence at that rate. If that 0 came from a restore's landing with the
+  player really at 0, the new guard would not drop it.
+- **T4** (#209 item 2): one `ClipPane` with action 10 selected, then the action
+  cleared and reselected, each followed by `binding.invalidate()` and
+  `pane.refresh()`. The tag is read through `walk(pane)`, never `clipTags` or
+  `sections`, which rebuild. It needs exactly one tag each time, the SAME
+  instance, hidden false, true, false. The run reads `tags 1, same true` three
+  times, hidden `false; true; false`. `tag-frozen` (the first `refresh()` decides
+  for good) fails T4 alone. `tag-hidden` and `tag-always` now name T4 beside T1
+  and T2. CT-7 in `docs/manual-checks.md` drops its "clip" tag step.
+
+```sh
+python3 tools/proof/playhead_echo_probe.py                                                     # 23/23
+python3 tools/proof/playhead_echo_probe.py --sources tools/proof/work/b53/head/app/Sources     # twice·1 FAILS
+python3 tools/proof/clip_inspector7_proof.py --mutant tag-frozen                               # MUTANT PASS
+```

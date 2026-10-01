@@ -21,12 +21,16 @@ Two instruments, `clip_inspector6_proof.py`'s shape, with no MCP section
   at its centre answers the header; H6 (on) `cacheDisplay` of the header
   hovered and at rest differs at (2, 2) and is equal on the rule's row. Before
   each H3/H4 call and each H6 capture the band's layer is cleaned
-  (`removeAllAnimations()`, keys then empty, else the row fails). T1–T3 use
+  (`removeAllAnimations()`, keys then empty, else the row fails). T1–T4 use
   the `audio` fixture on Sound ▸ Volume: T1 with action 10 selected one
   visible `InspectorClipTag` right after an `OptionButtonControl`; T2 with no
   action selected it is hidden; T3 its intrinsic size is (⌈text width⌉ + 10,
   17) and, captured alone, its border is drawn, (2, 2) is clear and its text
-  is drawn.
+  is drawn; T4 (issue batch B53, #209) one pane refreshed in place — action
+  10 selected, cleared, reselected, each followed by `binding.invalidate()`
+  and `refresh()` — holds the SAME tag, read through a view walk (never a
+  rebuild), visible, hidden, visible. `tag-hidden` and `tag-always` fail T4
+  too; `tag-frozen` (the first `refresh()` decides for good) fails T4 alone.
 * **the harness** (`e2.build_harness()`, 1440 × 1500) over the same package,
   Sound ▸ Volume expanded: C1 (light) and C2 (dark) at 1.5 s with action 0
   selected, C3 (light) and C4 (dark) at 3 s with none. Each is rendered
@@ -77,6 +81,8 @@ T1 = ("T1 with action 10 selected, Sound ▸ Volume holds exactly one InspectorC
 T2 = "T2 with no action selected (playhead 3 s), the tag is hidden"
 T3 = ("T3 the tag's intrinsic size is (ceil(text width in mono 9) + 10, 17); captured alone, "
       "(0.5, h/2) is drawn, (2, 2) is clear and some interior pixel is drawn")
+T4 = ("T4 one pane refreshed in place: the same InspectorClipTag shows with action 10 selected, "
+      "hides when the action is cleared, shows again when 10 is reselected")
 
 MUTANTS = {
     "no-tracking": {
@@ -128,15 +134,28 @@ MUTANTS = {
         "file": MARKS,
         "anchor": "        isHidden = binding?.selectedAction == nil\n",
         "replacement": "        isHidden = true\n",
-        "expected": [T1],
+        "expected": [T1, T4],
         "note": "the tag's refresh always hides it",
     },
     "tag-always": {
         "file": MARKS,
         "anchor": "        isHidden = binding?.selectedAction == nil\n",
         "replacement": "        isHidden = false\n",
-        "expected": [T2],
+        "expected": [T2, T4],
         "note": "the tag's refresh always shows it",
+    },
+    "tag-frozen": {
+        "file": MARKS,
+        "anchor": ("    func refresh() {\n"
+                   "        isHidden = binding?.selectedAction == nil\n"
+                   "    }\n"),
+        "replacement": ("    private var frozen: Bool?\n"
+                        "    func refresh() {\n"
+                        "        if frozen == nil { frozen = binding?.selectedAction == nil }\n"
+                        "        isHidden = frozen ?? true\n"
+                        "    }\n"),
+        "expected": [T4],
+        "note": "the tag's first refresh decides it for good",
     },
     "tag-blank": {
         "file": MARKS,
@@ -158,7 +177,7 @@ MUTANTS = {
     },
 }
 PROBE_COUNTS = {"H1": 1, "H2": 1, "H3": 1, "H4": 1, "H5": 1, "H6": 1, "T1": 1, "T2": 1,
-                "T3": 1}
+                "T3": 1, "T4": 1}
 
 RESULTS = []
 
@@ -190,7 +209,7 @@ def build_probe(sources, out):
 
 
 def probe_checks(sources, out, paths):
-    print("\n1 — the probe: H1–H6 the header's hover, T1–T3 the \"clip\" tag")
+    print("\n1 — the probe: H1–H6 the header's hover, T1–T4 the \"clip\" tag")
     binary, error = build_probe(sources, out)
     check("the probe builds over app/Sources", binary is not None, error or "")
     if binary is None:
@@ -213,7 +232,7 @@ def probe_checks(sources, out, paths):
     with open(answer) as f:
         rows = json.load(f)["rows"]
     counts = {k: sum(1 for r in rows if r["name"].startswith(k + " ")) for k in PROBE_COUNTS}
-    check("the probe answers every row (H1–H6, T1–T3, one each) and no T0 fixture row",
+    check("the probe answers every row (H1–H6, T1–T4, one each) and no T0 fixture row",
           counts == PROBE_COUNTS and not any(r["name"].startswith("T0 ") for r in rows),
           f"{counts}")
     for row in rows:

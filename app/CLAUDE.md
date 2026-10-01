@@ -727,7 +727,12 @@ the key map behind it.
   once (`endHoldWithoutItem` in `+Scope`, #185; the seek flags are internal
   for `+Scope` alone); `rebuildHop` is the probe's seam, nil in the app, and
   its block takes an error it delivers as the build's failure; `report(_:)` is the one
-  caller of `onTimeChanged`. An echoed restore
+  caller of `onTimeChanged`. While paused, an observer callback is heard only
+  for the tick the player is at or seeking to, and only when it differs from
+  the last report — a late callback for a superseded seek or a swapped-out
+  item is dropped (#204, #209; `playhead_echo_probe.py` twice·1, pause·1) —
+  and every seek's landing reports its rest once when it differs. `+Step`
+  also holds the main hop `onMain`. An echoed restore
   moved the playhead (0 and back on every rebuild), and the timeline reveals
   every moved playhead, so a clip drag yanked the view
   (`playhead_echo_probe.py`). **A paused refresh is a one-tick round trip**

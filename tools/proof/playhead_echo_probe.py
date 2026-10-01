@@ -30,6 +30,16 @@ Rows (B = predicted to fail before the fix; M = no prediction, both trees'
 result recorded; every other row is a CONTROL). No row reads a picture, so
 every row is scored whatever the console state.
 
+Issue batch B53 (#204, #209) added `twice·1` [B] and `twice·2`: two asked
+seeks in ONE run-loop turn, `setPlayhead(2 s)` then `setPlayhead(0.5 s)`
+from 1 s, with no spin between (`scope_playhead_probe.py`'s "two calls in
+ONE turn"). `twice·1`: at least one report and every one 0.5 s — before the
+fix a late observer callback for the superseded 2 s seek was heard while
+paused. `twice·2` (a CONTROL): the document, the timeline and the player
+all rest at 0.5 s. `pause·1` (a CONTROL): after play·1's mid-play pause the
+document, the timeline and the player agree and the last report is the
+player's tick — the paused guard must not drop the pause's own callback.
+
 Needs `ffmpeg`, `swiftc`, `xcrun metal` and
 `core/target/release/libreelcut_core.a`. No port. Run from anywhere:
 
@@ -233,6 +243,13 @@ def rows():
     yield ("seek·1", "", "setPlayhead(2 s): a report of 2 s; the document and the player "
            "at 2 s", lambda a: 2 * sec in a["seek"]["log"] and rests(a["seek"], 2 * sec),
            lambda a: a["seek"])
+    yield ("twice·1", "B", "setPlayhead(2 s) then setPlayhead(0.5 s) in one turn: at least one "
+           "report, every one 0.5 s",
+           lambda a: len(a["twice"]["log"]) >= 1 and all_at(a["twice"]["log"], sec // 2),
+           lambda a: a["twice"]["log"])
+    yield ("twice·2", "", "… the document, the timeline and the player all rest at 0.5 s",
+           lambda a: rests(a["twice"], sec // 2) and a["twice"]["timeline"] == sec // 2,
+           lambda a: a["twice"])
     yield ("rebuild·1", "", "at 1 s, the live drag changed the built plan",
            lambda a: a["rebuild"]["changedPlan"] is True, lambda a: a["rebuild"]["changedPlan"])
     yield ("rebuild·2", "B", "the live drag's rebuilds: every report is 1 s",
@@ -269,6 +286,16 @@ def rows():
            and a["play"]["playhead"] == a["play"]["log"][-1],
            lambda a: {"count": len(a["play"]["log"]), "first": a["play"]["log"][:3],
                       "last": a["play"]["log"][-3:], "playhead": a["play"]["playhead"]})
+
+    yield ("pause·1", "", "paused mid-play after play·1: rate 0; the document, the timeline "
+           "and the player tick agree; the last report is the player tick",
+           lambda a: a["pause"]["rate"] == 0 and len(a["pause"]["log"]) > 0
+           and rests(a["pause"], a["pause"]["playerTicks"])
+           and a["pause"]["timeline"] == a["pause"]["playerTicks"]
+           and a["pause"]["log"][-1] == a["pause"]["playerTicks"],
+           lambda a: {"last": a["pause"]["log"][-3:], "playhead": a["pause"]["playhead"],
+                      "timeline": a["pause"]["timeline"],
+                      "playerTicks": a["pause"]["playerTicks"], "rate": a["pause"]["rate"]})
 
     def play2(a):
         p = a["play2"]

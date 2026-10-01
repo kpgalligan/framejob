@@ -159,6 +159,20 @@ if let (document, controller) = editor("shapes", select: [2]) {
 }
 
 if let (document, controller) = editor("move", select: [2]) {
+    // The report trail (#204, #209; B53): every tick the editor's playback carries from
+    // here on, with whether a seek was in flight and the player's own tick, then forwarded.
+    func secs(_ t: Ticks?) -> String {
+        t.map { String(format: "%.4f s", Double($0) / 600_000) } ?? "nil"
+    }
+    var reports: [String] = []
+    let playback = controller.playback
+    let forward = playback.onTimeChanged
+    playback.onTimeChanged = { [weak playback] t in
+        let seeking = playback?.isSeeking ?? false
+        let tick = playback?.playerLayer.player.map { CompositionBuilder.ticks($0.currentTime()) }
+        reports.append("\(secs(t)) seeking \(seeking) player \(secs(tick))")
+        forward?(t)
+    }
     controller.setPlayhead(at(2.5))
     let outside = document.selectedAction
     guard let clip = document.editedProject.snapshot.clip(2) else { exit(3) }
@@ -172,7 +186,8 @@ if let (document, controller) = editor("move", select: [2]) {
           outside == nil && under >= at(1.0) && under < at(2.0)
             && document.selectedAction == nil,
           "before \(describe(outside)), clip time under the playhead \(under), "
-            + "selected \(describe(document.selectedAction))")
+            + "selected \(describe(document.selectedAction)); reports: "
+            + reports.joined(separator: "; "))
 }
 
 // MARK: - S2 a selection change

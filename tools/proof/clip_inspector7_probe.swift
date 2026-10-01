@@ -381,6 +381,33 @@ if let (_, _, pane) = clipPane("audio", playhead: 1.5, action: 10), let tag = cl
           ok, notes.joined(separator: "; "))
 }
 
+// T4 — one pane refreshed in place (#209 item 2): the tag is read from `walk(pane)`, never
+// through `clipTags` / `sections`, which rebuild.
+if let (document, _, pane) = clipPane("audio", playhead: 1.5, action: 10),
+   let tag = clipTags(pane).first
+{
+    func read() -> (count: Int, same: Bool, hidden: Bool?) {
+        let found = walk(pane).compactMap { $0 as? InspectorClipTag }
+        return (found.count, found.first === tag, found.first?.isHidden)
+    }
+    let shown = read()
+    document.selectAction(nil)
+    pane.binding.invalidate()
+    pane.refresh()
+    let cleared = read()
+    document.selectAction(10)
+    pane.binding.invalidate()
+    pane.refresh()
+    let reselected = read()
+    let reads = [shown, cleared, reselected]
+    check("T4 one pane refreshed in place: the same InspectorClipTag shows with action 10 "
+            + "selected, hides when the action is cleared, shows again when 10 is reselected",
+          reads.allSatisfy { $0.count == 1 && $0.same }
+            && reads.map { $0.hidden } == [false, true, false],
+          reads.map { "tags \($0.count), same \($0.same), hidden "
+              + "\(String(describing: $0.hidden))" }.joined(separator: "; "))
+}
+
 unpin()
 let answer: [String: Any] = ["rows": rows]
 if let data = try? JSONSerialization.data(

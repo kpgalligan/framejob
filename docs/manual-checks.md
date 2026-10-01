@@ -195,10 +195,10 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Expect:** the change lands on the action's END state while the box is drawn at the playhead (accepted by design; judge whether it is tolerable); a text width drag starts from the end width; a shape box still resizes; unchecking shows ◆ "at end". Collapse is instant with Reduce motion, animated (about a quarter second) without; auto-open is always instant.
 - **Source:** #49 phase 5; spec §11 CI-13.
 
-**CT-7 — Section header hover and the "clip" tag**
-- **Do:** 1. Window in front, move slowly onto and off several Clip-tab section headers. 2. Repeat with System Settings ▸ Accessibility ▸ Display ▸ Reduce motion on, then off. 3. Select an audio clip, open Sound ▸ Volume, select an action on it.
-- **Expect:** a header darkens one step with a quick fade, instantly with Reduce motion; its title, marks, summary and Reset/Clear stay legible; rows never darken. With an action selected a small boxed "clip" follows Normalize; with none it is gone.
-- **Source:** #102 (spec §11 CI-15, amended).
+**CT-7 — Section header hover**
+- **Do:** 1. Window in front, move slowly onto and off several Clip-tab section headers. 2. Repeat with System Settings ▸ Accessibility ▸ Display ▸ Reduce motion on, then off.
+- **Expect:** a header darkens one step with a quick fade, instantly with Reduce motion; its title, marks, summary and Reset/Clear stay legible; rows never darken.
+- **Source:** #102 (spec §11 CI-15, amended); the "clip" tag is clip_inspector7_proof.py T1, T2, T4 since #209.
 
 ## Chrome and looks
 

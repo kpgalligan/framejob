@@ -293,6 +293,18 @@ if let (document, controller) = editor("chrome", select: [2]), let timeline = co
             && timeline.bandHover == nil,
           "\(hovers), after exit \(String(describing: timeline.bandHover))")
 
+    // The report trail (#204, #209; B53): every tick the editor's playback carries from
+    // here on, with whether a seek was in flight and the player's own tick, then forwarded.
+    var reports: [String] = []
+    let playback = controller.playback
+    let forward = playback.onTimeChanged
+    playback.onTimeChanged = { [weak playback] t in
+        let seeking = playback?.isSeeking ?? false
+        let tick = playback?.playerLayer.player.map { CompositionBuilder.ticks($0.currentTime()) }
+        reports.append("\(secs(t)) seeking \(seeking) player \(secs(tick))")
+        forward?(t)
+    }
+
     // D2: move +1 s in three ticks.
     drag(.action(clip: 2, action: 3), from: press,
          steps: [perSecond * 0.3, perSecond * 0.6, perSecond])
@@ -302,7 +314,7 @@ if let (document, controller) = editor("chrome", select: [2]), let timeline = co
     check("D2 … selected after the drop, the playhead parked at clip start + 2.5 s",
           document.selectedAction == 3 && document.playhead == at(2.5),
           "selected \(document.selectedAction.map { "\($0)" } ?? "nil"), playhead "
-            + secs(document.playhead))
+            + secs(document.playhead) + "; reports: " + reports.joined(separator: "; "))
     let name = undoName(document)
     document.undoManager?.undo()
     spin(0.3)

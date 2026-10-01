@@ -21,8 +21,8 @@ import AppKit
 /// `LevelMeter.shared`. See `LevelMeter.swift` for why the meter is computed
 /// from the DSP tap rather than observed from a second one.
 /// The meter's read and its two switches live in `Playback+Meter.swift`.
-/// `previewComposition` lives in `Playback+PreviewQuality.swift`, `stepFrames` in `+Step`,
-/// `seekAfterRebuild` in `+Scope`.
+/// `previewComposition` lives in `Playback+PreviewQuality.swift`, `stepFrames` and the main
+/// hop `onMain` in `+Step`, `seekAfterRebuild` in `+Scope`.
 ///
 /// Road map 2's phase 8 hung two more things off the player, and both are here
 /// because both are about the PLAYER rather than about the document: View ▸
@@ -55,8 +55,11 @@ final class Playback {
     /// paused refresh's round trip — which the observer reports too: a
     /// restore is silent while it runs and is heard once, when it lands, only
     /// if it rests somewhere other than the tick last carried (parked at the
-    /// end, a timeline shortened under the playhead). `report(_:)` is its one
-    /// caller.
+    /// end, a timeline shortened under the playhead). While PAUSED it carries
+    /// only the tick the player is at or seeking to, never one it carried
+    /// last: a late callback for a superseded seek or a swapped-out item is
+    /// dropped, and every seek's landing is heard once if it rests off the
+    /// last report (#204, #209). `report(_:)` is its one caller.
     var onTimeChanged: ((Ticks) -> Void)?
     /// Transport rate, including the rate AVFoundation sets itself when an
     /// item ends or stalls, which is why this is KVO and not a wrapper.
@@ -540,9 +543,10 @@ final class Playback {
     }
 
     /// One seek has landed: take the newest position that arrived while it
-    /// was in flight, if any, dropping the rest; then end a restore, heard
-    /// only if it rests off the tick last reported; then any paused refresh
-    /// waiting.
+    /// was in flight, if any, dropping the rest; else end it — a restore or an
+    /// asked seek alike — heard once only if it rests off the tick last
+    /// reported (the observer may have carried it already); then any paused
+    /// refresh waiting.
     private func seekFinished() {
         isSeeking = false
         if let next = pendingSeek {
@@ -550,11 +554,9 @@ final class Playback {
             startSeek(to: next)
             return
         }
-        if restoring {
-            restoring = false
-            let rest = currentTime
-            if rest != reported { report(rest) }
-        }
+        restoring = false
+        let rest = currentTime
+        if rest != reported { report(rest) }
         if refreshWanted { refreshPausedFrame() }
     }
 
@@ -566,25 +568,20 @@ final class Playback {
 
     // MARK: - Observers
 
+    /// The periodic observer. While playing every tick is heard. While paused
+    /// a tick is heard only when it is where the player is or is seeking to
+    /// (`currentTime`) and differs from the last report: AVFoundation can
+    /// deliver a callback late, for a seek since superseded or an item since
+    /// swapped out, and that one is dropped (#204, #209).
     private func timeAdvanced(_ time: CMTime) {
         if restoring { return }
         let ticks = max(0, CompositionBuilder.ticks(time))
+        if player.rate == 0, ticks != currentTime || ticks == reported { return }
         if !isSeeking { lastKnownTime = ticks }
         report(ticks)
         guard let loop = loopRange, player.rate != 0, loop.duration > 0,
             ticks >= loop.start + loop.duration
         else { return }
         seek(to: loop.start)
-    }
-
-    /// AVFoundation calls KVO and seek completions on whichever thread it
-    /// happens to be on. Everything here touches AppKit state, so hop when
-    /// needed — `OperationQueue.main`, not a new dispatch seam.
-    private func onMain(_ body: @escaping () -> Void) {
-        if Thread.isMainThread {
-            body()
-        } else {
-            OperationQueue.main.addOperation(body)
-        }
     }
 }

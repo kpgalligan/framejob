@@ -145,6 +145,13 @@ editor.setPlayhead(2 * second)
 spin(settle)
 answer["seek"] = state()
 
+// twice — setPlayhead(2 s) then setPlayhead(0.5 s) in one run-loop turn (#204, #209).
+start(at: second)
+editor.setPlayhead(2 * second)
+editor.setPlayhead(second / 2)
+spin(settle)
+answer["twice"] = state()
+
 // rebuild — a live drag, then a non-live move, at 1 s.
 start(at: second)
 let rebuildBefore = editor.playback.builtPlanJSON
@@ -210,6 +217,8 @@ play["from"] = second / 2
 answer["play"] = play
 editor.playback.pause()
 spin(0.5)
+// pause — a user's pause mid-play: the document lands on the player's rest (B53).
+answer["pause"] = state()
 
 // play·2 — a structural edit 0.6 s into play.
 start(at: second / 2)

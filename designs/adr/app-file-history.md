@@ -186,6 +186,21 @@ lenient-decoding rule.
   `pendingSeek`, `restoring`, `rebuilding`, `holding`, `seekSerial`, `lastKnownTime` and
   `startSeek(to:)` widened from `private` for that file alone (595 → 581 lines; 590 with the seam
   and the fix).
+- **While paused, a late observer callback is dropped (#204, #209 item 1, issue batch B53).**
+  AVFoundation can deliver a periodic-observer callback for a seek since superseded or an item
+  since swapped out, and `timeAdvanced` reported it, so `document.playhead` took a tick the player
+  was neither at nor seeking to: D2's drop heard 1.5 s then 2.5 s and selected action 4 (6 of 8
+  runs of `clip_inspector5_probe` at `c39efca`), and S1's move once heard 0 (1 of 8). While
+  `player.rate == 0` a tick is now heard only when it equals `currentTime` and differs from
+  `reported`; while playing nothing changed. Because the observer may now say nothing, every seek's
+  landing in `seekFinished` reports its rest once when it differs from `reported` — an asked seek
+  as well as a restore. `playhead_echo_probe.py`'s `twice·1` (two asked seeks in one turn) failed
+  3 of 3 before with `[1200000, 300000]` and passes after; `pause·1` (a user's pause mid-play
+  lands the document on the player's rest) passes, and fails with the guard hand-tightened to
+  `if player.rate == 0 { return }`. S1 (1 of 8 before, 0 of 8 after) is not shown fixed; see the
+  README's B53 record. **The file paid first** by a pure move
+  gated alone: `onMain(_:)` to `Playback+Step.swift`, `private` dropped (590 → 579 lines; 587
+  with the fix).
 
 ### Export and still frames
 
@@ -367,7 +382,7 @@ Files that were split since the notes wrote them:
 | Notes named | Now also |
 |---|---|
 | `MediaCacheFiles` | `MediaPeakBuckets.swift`, `MediaImporter+Peaks.swift` (#23) |
-| `Playback` | `Playback+Meter.swift`, `Playback+PreviewQuality.swift`, `Playback+Step.swift` (B21), `Playback+Scope.swift` (B30) |
+| `Playback` | `Playback+Meter.swift`, `Playback+PreviewQuality.swift`, `Playback+Step.swift` (B21; `onMain`, B53), `Playback+Scope.swift` (B30) |
 | `ReelCore` | `RecipeSource.swift`, `TextPatch.swift`, `MediaDescriptor.swift`, `OpDictionaries.swift` (#190) |
 | `InspectorPane` | `InspectorSection.swift`, `InspectorSectionHeader.swift`, `InspectorSlider.swift`, `InspectorBinding+Writes.swift`, `InspectorNameField.swift` (#171) |
 | `ClipPane` | `ClipSelectionHeader.swift`, `ClipPane+Timing.swift` |
@@ -429,8 +444,9 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   `validateSilenceAction`) into `EditorViewController+RemoveSilences.swift`, re-pinning
   `inventory.json`'s site.
 - `CompositionBuilder.swift`: `audioParameters`.
-- `Playback.swift`: `onMain(_:)` to `Playback+Step.swift`, `private` dropped (a
-  main hop holding no state; B21's named fallback, not taken). `player` stays private.
+- `Playback.swift`: `seekFinished()` and `report(_:)` to `Playback+Scope.swift`, with `reported`
+  and `refreshWanted` widened from `private` for that file alone (B30's shape). `player` stays
+  private.
 - `AppDelegate+Menus.swift`: a submenu builder out (the precedent is
   `AppDelegate+GraphicMenu.swift`).
 - `Controls.swift`: held to the sync rule with Rasterize's copy (`app/CLAUDE.md` "Shared chrome");
