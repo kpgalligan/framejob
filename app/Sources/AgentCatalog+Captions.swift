@@ -201,7 +201,10 @@ extension AgentServer {
                     "speakers": [
                         "type": "boolean",
                         "description": "engine \"assemblyai\" only. Ask for speaker labels "
-                            + "(default false); a change of speaker then starts a new cue. "
+                            + "(default false); a change of speaker then starts a new cue, and "
+                            + "with style subtitles each speaker's cues take their own colour "
+                            + "(white, yellow, cyan, green in order of first appearance, then "
+                            + "again; a speaker is a label within one media file). "
                             + "Refused by name with engine \"apple\".",
                     ],
                     "vocabulary": [

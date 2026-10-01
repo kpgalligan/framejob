@@ -292,6 +292,11 @@ Needs your own AssemblyAI key (Setup 3).
 - **Expect:** the other-language run completes and its report card says which model answered; the ten-hour run completes; the out-of-credit run shows the balance sentence.
 - **Source:** #53.
 
+**CC-4 — Speaker colours**
+- **Do:** 1. Generate Captions with AssemblyAI, Speakers on, Subtitles, over a two-person recording. 2. Generate again with Pill.
+- **Expect:** each voice reads in its own colour (white, then yellow), legible over the band; Pill ignores it; the Speakers row reads whole.
+- **Source:** #93.
+
 ## Silence, transitions and motion
 
 **SIL-1 — Remove Silences by voice, listened to**

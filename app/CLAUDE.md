@@ -869,8 +869,9 @@ free.
   SRT brings its own. `Word.speaker` defaults to nil, so every caller
   that knows nothing about speakers is byte-identical to what it was.
   `place` takes a `CaptionStyle`: `.subtitles` is the Caption-preset
-  path, byte for byte; a word style writes `CaptionStyle.pagePatch` per
-  page — the pager's own props at the page's size (a shrunk one or the
+  path, byte for byte for a cue with no speaker (a speaker's cue adds its
+  palette `color`, spec §11 R6-22); a word style writes
+  `CaptionStyle.pagePatch` per page — the pager's own props at the page's size (a shrunk one or the
   style's), its wrap `width`, and the cue's `words` in CLIP time — at the
   style's `y`. `replacing` removes caption tracks WITH
   their clips as the plan's FIRST ops (a removal mints no id, so the
@@ -883,7 +884,8 @@ free.
   min(W, H)), `y` (of H), outline, `word_style`, `maxWords`, `maxLines`,
   `textProps`, the ONE construction the pager
   measures and the sheet previews, and `pagePatch`, the patch `place` writes,
-  built from it — so a committed page is the measured one and a shrunk
+  built from it, and `speakerPalette` / `speakerColors`, R6-22's four colours
+  by first appearance — so a committed page is the measured one and a shrunk
   page's outline is em × its own size. A GENERATION choice, not an inspector preset;
   `defaultsKey` is the sheet's remembered style, read when the Style popup
   is built and written by `styleChanged`; the tool never reads it (R6-2

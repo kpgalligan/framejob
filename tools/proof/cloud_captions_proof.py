@@ -61,6 +61,15 @@ Road map 6 §5i's rows 1–11, plus five of this pipeline's own:
   `transcribe`'s refusal says R6-4's dashboard sentence for that media, and
   the fake logged the DELETE; its CONTROL with the DELETE answering says no
   such thing.
+* **SC** (issue batch B46, #93; spec §11 R6-22) on instance C after row B:
+  `speech.mov` at 5 s against the fake's `speaker_words` (row 7's A/B
+  split). SC1 `transcribe {speakers: true}` places "Hello there" white and
+  "everyone welcome back" yellow; SC2 renders each cue's midpoint, then
+  `undo` and the same ticks, and reads the glyph pixels (differing, with
+  max(R,G) >= 200) blue-rich for the first and blue-poor for the second;
+  SC3 with `speakers` absent places what a control session without
+  `speaker_words` places, all white; SC4 one speaker throughout places the
+  control's `text` objects and renders its frame byte for byte.
 * **L** (issue batch B43, #200 item 4) the probe's `hold_cloud_lock`, taken
   before a mutant is built or an instance launched, so this proof, the
   probe and `word_captions_proof.py` never write `reelcut-upload-*` into
@@ -118,6 +127,7 @@ from cloud_captions_probe import (
     HARNESS_MAIN, PROBE_SOURCE, TREE_SOURCES, Fake, MUTANTS, build, child_env,
     differences_between, hold_cloud_lock, make_fixture, population, run_cues, run_probe,
     wav_samples, word)
+from e1_proof import decode_png
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 HERE = os.path.join(ROOT, "tools", "proof")
@@ -1683,6 +1693,152 @@ def row_b(instance, fake):
         os.chflags(target, 0)
 
 
+# --------------------------------------------------------------------------
+# Row SC — speaker colours on Subtitles (issue batch B46, #93, spec §11 R6-22)
+
+# Row 7's A/B split of `WORDS`: `start < 1700` is A.
+SPEAKER_WORDS = [dict(one, speaker="A" if one["start"] < 1700 else "B") for one in WORDS]
+WHITE, YELLOW = [1, 1, 1, 1], [1, 1, 0, 1]
+# SC2's glyph test, MEASURED on this tree's renders (2026-10-01) and pinned:
+# a glyph pixel is one that differs between the frame with the captions and
+# the same tick after `undo`, with max(R, G) >= 200. Measured: the white
+# cue's 1327 glyph pixels were all blue-rich (B >= 200), the yellow cue's
+# 2769 none; the pins sit well inside both.
+GLYPH_RG = 200
+GLYPH_BLUE = 200
+WHITE_BLUE_SHARE_MIN = 0.5
+YELLOW_BLUE_SHARE_MAX = 0.05
+
+
+def caption_clips(session):
+    """The text clips on the Captions tracks, by start."""
+    project = session.project()
+    tracks = {t["id"] for t in project["tracks"] if re.fullmatch(r"Captions( \d+)?", t["name"])}
+    return sorted((c for c in project["clips"] if c["track"] in tracks),
+                  key=lambda c: c["start"])
+
+
+def on_grid(session, tick):
+    """`tick` floored onto the canvas's frame grid."""
+    num, den = session.project()["canvas"]["fps"]
+    return (tick * num // (SEC * den)) * SEC * den // num
+
+
+def glyph_share(captioned, bare):
+    """(glyph pixels, how many of them are blue-rich) between two decoded
+    frames of one size."""
+    width, height, _, channels, rows = captioned
+    _, _, _, _, rows_bare = bare
+    count = blue = 0
+    for y in range(height):
+        row, row_bare = rows[y], rows_bare[y]
+        if row == row_bare:
+            continue
+        for x in range(width):
+            at = x * channels
+            if row[at:at + channels] == row_bare[at:at + channels]:
+                continue
+            r, g, b = row[at], row[at + 1], row[at + 2]
+            if max(r, g) >= GLYPH_RG:
+                count += 1
+                if b >= GLYPH_BLUE:
+                    blue += 1
+    return count, blue
+
+
+def row_sc(instance, fake):
+    print("\nSC. speaker colours on Subtitles through the built app (issue batch B46, #93, "
+          "R6-22)")
+    speech, _ = fixtures()
+    folder = fresh("rowSC")
+    opened = []
+
+    def session_with(name, **given):
+        scenario(fake, **given)
+        session = Session(instance, name)
+        opened.append(session)
+        session.add(session.media_of(speech), at=0, duration=5 * SEC)
+        return session
+
+    def render(session, tick, name):
+        path = os.path.join(folder, f"{name}.png")
+        session.op("render_frame", t=tick, path=path)
+        return path
+
+    try:
+        # --- SC1 ----------------------------------------------------------
+        session = session_with("rowSC1", speaker_words=SPEAKER_WORDS)
+        session.op("transcribe", engine="assemblyai", speakers=True, style="subtitles")
+        clips = caption_clips(session)
+        got = [(c["text"].get("content"), c["text"].get("color")) for c in clips]
+        check("SC1: `transcribe {speakers: true}` over two speakers places two caption "
+              "clips, \"Hello there\" white then \"everyone welcome back\" yellow",
+              got == [("Hello there", WHITE), ("everyone welcome back", YELLOW)],
+              f"got {got!r}")
+
+        # --- SC2 ----------------------------------------------------------
+        ticks = [on_grid(session, c["start"] + c["duration"] // 2) for c in clips]
+        shown = [render(session, t, f"sc2-{i}") for i, t in enumerate(ticks)]
+        session.op("undo")
+        bare = [render(session, t, f"sc2-{i}-undone") for i, t in enumerate(ticks)]
+        shares = [glyph_share(decode_png(a), decode_png(b)) for a, b in zip(shown, bare)]
+        detail = (f"glyph pixels (differ, max(R,G) >= {GLYPH_RG}) and blue-rich (B >= "
+                  f"{GLYPH_BLUE}) per cue: {shares!r}; pinned: white >= "
+                  f"{WHITE_BLUE_SHARE_MIN:.0%} blue-rich, yellow <= "
+                  f"{YELLOW_BLUE_SHARE_MAX:.0%}")
+        print(f"  (SC2 measured: {detail})")
+        ok = (len(shares) == 2 and all(count > 0 for count, _ in shares)
+              and shares[0][1] / shares[0][0] >= WHITE_BLUE_SHARE_MIN
+              and shares[1][1] / shares[1][0] <= YELLOW_BLUE_SHARE_MAX)
+        check("SC2: rendered, the first cue's glyphs are white (blue-rich) and the "
+              "second's yellow (blue-poor), each against the same tick after `undo`",
+              ok, detail)
+
+        # --- SC3 ----------------------------------------------------------
+        off = session_with("rowSC3", speaker_words=SPEAKER_WORDS)
+        off.op("transcribe", engine="assemblyai", style="subtitles")
+        off_texts = [c["text"] for c in caption_clips(off)]
+        control = session_with("rowSC3c")
+        control.op("transcribe", engine="assemblyai", style="subtitles")
+        control_clips = caption_clips(control)
+        control_texts = [c["text"] for c in control_clips]
+        check("SC3: `speakers` absent over the same scenario — every caption clip's `text` "
+              "equals a control session's whose scenario has no `speaker_words`, all "
+              "white",
+              off_texts and off_texts == control_texts
+              and all(t.get("color") == WHITE for t in off_texts),
+              f"got {[(t.get('content'), t.get('color')) for t in off_texts]!r}, control "
+              f"{[(t.get('content'), t.get('color')) for t in control_texts]!r}")
+
+        # --- SC4 ----------------------------------------------------------
+        alone = [dict(one, speaker="A") for one in WORDS]
+        one = session_with("rowSC4", speaker_words=alone)
+        one.op("transcribe", engine="assemblyai", speakers=True, style="subtitles")
+        one_clips = caption_clips(one)
+        one_texts = [c["text"] for c in one_clips]
+        same_text = bool(one_texts) and one_texts == control_texts
+        same_frame = False
+        frame_detail = "no caption clip to render"
+        if same_text and control_clips:
+            tick = on_grid(control, control_clips[0]["start"] + control_clips[0]["duration"] // 2)
+            mine = read(render(one, tick, "sc4"))
+            theirs = read(render(control, tick, "sc4-control"))
+            same_frame = bool(mine) and mine == theirs
+            frame_detail = f"{len(mine)} and {len(theirs)} bytes at tick {tick}"
+        check("SC4: one speaker throughout, `speakers: true` — the caption `text` objects "
+              "equal SC3's control and the render at the cue's midpoint is byte-equal to "
+              "the control's",
+              same_text and same_frame,
+              f"text {[(t.get('content'), t.get('color')) for t in one_texts]!r}; "
+              f"{frame_detail}")
+    finally:
+        for session in opened:
+            try:
+                session.op("close_project", discard=True)
+            except ToolError:
+                pass
+
+
 def row_e(instance, fake):
     """The reader review's R2\u00b71 — a relayed sentence never carries the key.
 
@@ -2234,6 +2390,13 @@ CLOUD_MUTANTS = {
         '    static let shippedModels = ["universal-2"]\n',
         "`speech_models` pinned to Universal-2 (row 2)"),
 }
+# Issue batch B46 (#93, R6-22): the first speaker takes yellow (SC1, SC2, SC4).
+CLOUD_MUTANTS["speaker-palette-shifted"] = (
+    "app/Sources/CaptionStyle.swift",
+    "            let slot = slots[speaker] ?? slots.count\n",
+    "            let slot = slots[speaker] ?? slots.count + 1\n",
+    "the speaker palette shifted one place, so the first speaker takes yellow "
+    "(SC1, SC2, SC4)")
 # Issue batch B24 (#80): `engine` read before the scope — R1 and R2 would
 # then lose to R3 (RP's R1×R3 and R2×R3 cells).
 CLOUD_MUTANTS["engine-before-scope"] = (
@@ -2449,6 +2612,7 @@ def main():
                     run_row(row_m, c, fake_c)
                     run_row(row_e, c, fake_c)
                     run_row(row_b, c, fake_c)
+                    run_row(row_sc, c, fake_c)
         # RP (issue batch B24, #80): two instances of their own, so C is not
         # loaded further (an instance deadlocks past ~40 open documents).
         if time.time() - started > args.wall:

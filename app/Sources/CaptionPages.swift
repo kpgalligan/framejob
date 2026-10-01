@@ -116,10 +116,10 @@ enum CaptionPages {
     /// `.subtitles` is `CaptionCues.build`, untouched: no `lead`, no span.
     static func cues(
         from words: [CaptionCues.Word], span: Range<Ticks>, frame: Ticks, request: Request,
-        engine: TranscriptionEngine, clip: UInt32?
+        engine: TranscriptionEngine, clip: UInt32?, media: UInt32? = nil
     ) -> [CaptionLayout.Cue] {
         guard request.style.isWordStyle else {
-            return CaptionCues.build(from: words, frame: frame, clip: clip)
+            return CaptionCues.build(from: words, frame: frame, clip: clip, media: media)
         }
         return build(
             from: words, span: span, frame: frame, request: request, engine: engine, clip: clip)

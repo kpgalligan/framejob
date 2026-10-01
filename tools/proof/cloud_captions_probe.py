@@ -55,6 +55,17 @@ Sections, by the name after `section_`:
   and R6-9 (a), (b) and (c) by TYPE and path string only; and `writeAll`'s
   0 arm and bounded EINTR retry (17·zero, 17·endless, issue batch B34).
 * `cues` (5i·19) — the fifth rule at its boundaries through the harness.
+* `speakers` (SP, issue batch B46, #93, spec §11 R6-22) — speaker colours on
+  Subtitles through the probe's `speakers` mode: cues emitted out of time
+  order take white, yellow, cyan, green by first appearance in TIME order,
+  "A" in two media is two speakers, a fifth cycles to white, and a cue with
+  no speaker writes no `color` (SP1); the five word styles place the same ops
+  with speakers as without (SP2); nil-speaker cues place byte-identical ops
+  to the same probe built against B46's starting tree with
+  `-D CLOUD_PROBE_BEFORE_SPEAKERS`, with a CONTROL that speaker cues do not
+  (SP3); and the Generate Captions sheet's own path against the fake's
+  `speaker_words`: Speakers on reads white then yellow, Speakers off is the
+  baseline's project JSON byte for byte (SP4).
 * `extract` — the WAV's byte-identity against the BASELINE tree (W), the
   FLAC's STREAMINFO, decode and determinism (F), the fallback (FB), and
   `wholeAsset` against an explicit range (Q).
@@ -177,6 +188,10 @@ BASELINE_TREE = "515e6a8032071626f8c2a77030db4b249495602b"
 # Pipeline 3's final working tree — c1-chrome's baseline, and what the
 # `project.yml` row compares against.
 BASELINE_TREE_C1CHROME = "c9b8043522c5a91b6045102d182758fd5859d153"
+
+# B46's starting working tree — the speakers section's baseline, and what
+# SP3 and SP4's off arm compare today's placement against.
+BASELINE_TREE_SPEAKERS = "ef54f48e08e72bf6e3e6a48a78bf4431cae83018"
 
 # road map 4's fixture text, so the speech is the one every other proof uses.
 SPEECH_TEXT = (
@@ -1801,6 +1816,7 @@ func modeChrome(_ request: [String: Any]) -> [String: Any] {
     case "keyless": return chromeKeyless(request)
     case "menu": return chromeMenu(request)
     case "stop": return chromeStop(request)
+    case "speakers": return chromeSpeakers(request)
     default: return ["error": "this probe does not know the chrome op \(request["op"] ?? "")"]
     }
 }
@@ -2553,6 +2569,100 @@ func chromeMenu(_ request: [String: Any]) -> [String: Any] {
 }
 """
 
+PROBE_SPEAKERS = r'''
+// MARK: - Speakers (issue batch B46, #93, spec §11 R6-22)
+
+/// `CaptionLayout.place` over cues given as JSON, each with an optional
+/// `speaker` of `{media, label}`, in a named style, on a fresh project (and
+/// an optional `canvas` of `[width, height]`), answering the ops as their
+/// JSON text. A binary built with `CLOUD_PROBE_BEFORE_SPEAKERS` — against
+/// B46's starting tree, which has no `Cue.speaker` — reads every speaker as
+/// absent, so one request is answered by two trees (SP3).
+func modeSpeakers(_ request: [String: Any]) -> [String: Any] {
+    _ = NSApplication.shared
+    var cues: [CaptionLayout.Cue] = []
+    for (index, row) in (request["cues"] as? [[String: Any]] ?? []).enumerated() {
+        let start = ticks(row["start"])
+        let end = ticks(row["end"])
+        let text = row["text"] as? String ?? ""
+        let tag = "cue \(index)"
+        #if CLOUD_PROBE_BEFORE_SPEAKERS
+        cues.append(CaptionLayout.Cue(start: start, end: end, text: text, tag: tag))
+        #else
+        let speaker = (row["speaker"] as? [String: Any]).map {
+            CaptionLayout.Speaker(
+                media: ($0["media"] as? NSNumber)?.uint32Value, label: $0["label"] as? String ?? "")
+        }
+        cues.append(
+            CaptionLayout.Cue(start: start, end: end, text: text, tag: tag, speaker: speaker))
+        #endif
+    }
+    guard let style = CaptionStyle(rawValue: request["style"] as? String ?? "subtitles") else {
+        return ["error": "this probe knows no caption style \(request["style"] ?? "")"]
+    }
+    var project = ProjectDocument().project
+    if let canvas = request["canvas"] as? [NSNumber], canvas.count == 2 {
+        let op = ReelOp.setCanvas(width: canvas[0].intValue, height: canvas[1].intValue)
+        guard let sized = try? project.applying([op]).project else {
+            return ["error": "the canvas would not apply"]
+        }
+        project = sized
+    }
+    do {
+        let plan = try CaptionLayout.place(cues, in: project, style: style)
+        return ["ops": plan.ops.map(\.json)]
+    } catch {
+        return ["error": "place threw: \(error.localizedDescription)"]
+    }
+}
+
+/// Presents with no animation, so a clean `finish` has a presenter to
+/// `dismiss` from (`word_captions_sheet_probe.swift` S5's `StillAnimator`).
+final class SpeakersStillAnimator: NSObject, NSViewControllerPresentationAnimator {
+    func animatePresentation(of viewController: NSViewController, from: NSViewController) {}
+    func animateDismissal(of viewController: NSViewController, from: NSViewController) {}
+}
+
+/// SP4: the Generate Captions sheet's own path — Engine AssemblyAI, Style
+/// Subtitles, Speakers from the request, Generate through `startClicked`, a
+/// bounded wait on `didFinish` — answering the project JSON the commit left,
+/// the string `get_project` decodes.
+func chromeSpeakers(_ request: [String: Any]) -> [String: Any] {
+    guard let built = chromeDocument(request) else {
+        return ["error": "the speakers fixture would not build"]
+    }
+    let wall = (request["wall"] as? NSNumber)?.doubleValue ?? 120
+    let sheet = TranscribeSheetController(
+        document: built.document, store: MemoryStore(request["key"] as? String ?? "proof-key"),
+        defaults: chromeSuite(request), environment: [:], languages: probeLanguages)
+    _ = sheet.view
+    let host = NSViewController()
+    host.view = NSView()
+    host.present(sheet, animator: SpeakersStillAnimator())
+    if let index = sheet.enginePopup.itemArray.firstIndex(where: {
+        $0.representedObject as? String == TranscriptionEngine.assemblyai.rawValue
+    }) { sheet.enginePopup.selectItem(at: index) }
+    sheet.perform(NSSelectorFromString("engineChanged:"), with: nil)
+    if let index = sheet.stylePopup.itemArray.firstIndex(where: {
+        $0.representedObject as? String == CaptionStyle.subtitles.rawValue
+    }) { sheet.stylePopup.selectItem(at: index) }
+    sheet.perform(NSSelectorFromString("styleChanged:"), with: nil)
+    sheet.speakersCheckbox.state = (request["speakers"] as? Bool ?? false) ? .on : .off
+    sheet.controlChanged(nil)
+    sheet.startClicked(nil)
+    let deadline = Date().addingTimeInterval(wall)
+    while Date() < deadline, !sheet.didFinish {
+        RunLoop.current.run(until: Date().addingTimeInterval(0.025))
+    }
+    return [
+        "didStart": sheet.didStart, "didFinish": sheet.didFinish,
+        "status": sheet.statusLabel.stringValue,
+        "speakersOn": sheet.speakersCheckbox.state == .on,
+        "project": built.document.editedProject.json,
+    ]
+}
+'''
+
 PROBE_MAIN = r'''
 // MARK: - Entry
 
@@ -2581,6 +2691,7 @@ case "hygiene": answer = modeHygiene(request)
 case "extract": answer = modeExtract(request)
 case "estimate": answer = modeEstimate(request)
 case "chrome": answer = modeChrome(request)
+case "speakers": answer = modeSpeakers(request)
 default:
     // A mode this binary does not know is answered BY NAME, so a stale
     // binary is a scored failure with a reason rather than a silent pass.
@@ -2595,7 +2706,7 @@ FileManager.default.createFile(atPath: arguments[2], contents: encoded)
 
 PROBE_SOURCE = (PROBE_HEAD + PROBE_MAPPING + PROBE_JOBS + PROBE_RUN + PROBE_CLIENT
                 + PROBE_SECRETS + PROBE_VERBATIM + PROBE_EXTRACT + PROBE_ESTIMATE
-                + PROBE_CHROME + PROBE_MAIN)
+                + PROBE_CHROME + PROBE_SPEAKERS + PROBE_MAIN)
 
 
 # --------------------------------------------------------------------------
@@ -4335,25 +4446,26 @@ def make_fixture():
     return speech if os.path.exists(speech) else None
 
 
-def baseline_sources():
-    """`git archive <tree> app/Sources` into `work/`, so row W compares the
-    WAV two TREES wrote rather than two runs of one."""
-    target = os.path.join(WORK, "baseline")
+def baseline_sources(tree=BASELINE_TREE, folder="baseline"):
+    """`git archive <tree> app/Sources` into `work/<folder>`, so row W
+    compares the WAV two TREES wrote rather than two runs of one — and the
+    speakers section (issue batch B46) the ops two trees placed."""
+    target = os.path.join(WORK, folder)
     marker = os.path.join(target, ".tree")
-    if os.path.exists(marker) and open(marker).read().strip() == BASELINE_TREE:
+    if os.path.exists(marker) and open(marker).read().strip() == tree:
         return os.path.join(target, "app", "Sources"), None
     shutil.rmtree(target, ignore_errors=True)
     os.makedirs(target)
-    archive = subprocess.run(["git", "-C", ROOT, "archive", BASELINE_TREE, "app/Sources"],
+    archive = subprocess.run(["git", "-C", ROOT, "archive", tree, "app/Sources"],
                              capture_output=True, env=child_env(), timeout=120)
     if archive.returncode != 0:
-        return None, f"git archive {BASELINE_TREE[:8]} failed: {archive.stderr.decode()[:200]}"
+        return None, f"git archive {tree[:8]} failed: {archive.stderr.decode()[:200]}"
     unpack = subprocess.run(["tar", "-x", "-C", target], input=archive.stdout,
                             capture_output=True, env=child_env(), timeout=120)
     if unpack.returncode != 0:
         return None, f"unpacking the baseline failed: {unpack.stderr.decode()[:200]}"
     with open(marker, "w") as f:
-        f.write(BASELINE_TREE)
+        f.write(tree)
     return os.path.join(target, "app", "Sources"), None
 
 
@@ -4693,6 +4805,194 @@ TRICKY_WORDS = [
      "confidence": 1.0, "speaker": "B"},
     {"text": "tiny", "start": 2300, "end": 2400, "confidence": 1e-3, "speaker": "B"},
 ]
+
+
+# --------------------------------------------------------------------------
+# SP — speaker colours on Subtitles (issue batch B46, #93, spec §11 R6-22)
+
+# R6-22's palette, spelled here from the decision's own words rather than read
+# from `CaptionStyle.speakerPalette`, so the rows are an oracle.
+SPEAKER_PALETTE = [[1, 1, 1, 1], [1, 1, 0, 1], [0, 1, 1, 1], [0, 1, 0, 1]]
+
+# SP1's cues in TIME order, each keyed (media, label) or None — the same label
+# in two media, a speaker returning, a fifth distinct speaker cycling back to
+# white, and one cue with no speaker at all.
+SPEAKER_KEYS = [(1, "B"), (1, "A"), (1, "B"), (2, "A"), (2, "C"), (1, "C"), None]
+# The order the cues are EMITTED in, so placement's sort is what puts them in
+# time order and the colours follow the timeline, not the producer.
+SPEAKER_EMIT_ORDER = [3, 0, 6, 1, 5, 2, 4]
+
+# SP4's served words: the proof's `WORDS`, and the same words split A/B where
+# row 7 splits them (`start < 1700` is A).
+SPEAKER_PLAIN_WORDS = [
+    {"text": "Hello", "start": 600, "end": 1120, "confidence": 0.98, "speaker": None},
+    {"text": "there", "start": 1180, "end": 1600, "confidence": 0.96, "speaker": None},
+    {"text": "everyone", "start": 1700, "end": 2400, "confidence": 0.91, "speaker": None},
+    {"text": "welcome", "start": 3000, "end": 3600, "confidence": 0.93, "speaker": None},
+    {"text": "back", "start": 3700, "end": 4100, "confidence": 0.95, "speaker": None},
+]
+SPEAKER_SPLIT_WORDS = [dict(one, speaker="A" if one["start"] < 1700 else "B")
+                       for one in SPEAKER_PLAIN_WORDS]
+
+
+def expected_speaker_colours(keys):
+    """R6-22 recomputed: in timeline order, a speaker's colour is the palette
+    entry of its first-appearance index among the distinct speakers, modulo
+    four; a cue with no speaker has none and takes no slot."""
+    slots, out = {}, []
+    for key in keys:
+        if key is None:
+            out.append(None)
+            continue
+        slot = slots.setdefault(key, len(slots))
+        out.append(SPEAKER_PALETTE[slot % len(SPEAKER_PALETTE)])
+    return out
+
+
+def speaker_cue_rows(with_speakers=True):
+    """SP1's seven cues as the probe's `speakers` mode reads them, in
+    `SPEAKER_EMIT_ORDER`. Every time is on the 30 fps grid."""
+    rows = []
+    for index in SPEAKER_EMIT_ORDER:
+        key = SPEAKER_KEYS[index]
+        start = index * SECOND + SECOND // 2
+        speaker = None
+        if with_speakers and key is not None:
+            speaker = {"media": key[0], "label": key[1]}
+        rows.append({"start": start, "end": start + 4 * SECOND // 5,
+                     "text": f"cue {index}", "speaker": speaker})
+    return rows
+
+
+def text_clip_patches(answer):
+    """The `text` of every `add_text_clip` in a `speakers` answer, by content."""
+    out = {}
+    for one in (answer or {}).get("ops", []):
+        op = json.loads(one)
+        if op.get("op") == "add_text_clip":
+            out[op.get("text", {}).get("content")] = op.get("text", {})
+    return out
+
+
+def placed_captions(project_json):
+    """The text clips of a project's JSON, by start: (content, color)."""
+    project = json.loads(project_json)
+    clips = [c for c in project.get("clips", []) if isinstance(c.get("text"), dict)]
+    clips.sort(key=lambda c: c.get("start", 0))
+    return [(c["text"].get("content"), c["text"].get("color")) for c in clips]
+
+
+def section_speakers(binary, sources):
+    print("\nSP. speaker colours on Subtitles (issue batch B46, #93, R6-22)")
+
+    def place(tag, rows, style, probe=binary):
+        answer, error, _ = run_probe(probe, f"speakers-{tag}",
+                                     {"mode": "speakers", "cues": rows, "style": style})
+        if answer is not None and "error" in answer:
+            return None, answer["error"]
+        return answer, error
+
+    # --- SP1: Subtitles, out of time order --------------------------------
+    rows = speaker_cue_rows()
+    answer, error = place("sp1", rows, "subtitles")
+    patches = text_clip_patches(answer)
+    want = expected_speaker_colours(SPEAKER_KEYS)
+    got = [patches.get(f"cue {index}", {}).get("color") for index in range(len(SPEAKER_KEYS))]
+    names = ["white" if c == [1, 1, 1, 1] else "yellow" if c == [1, 1, 0, 1]
+             else "cyan" if c == [0, 1, 1, 1] else "green" if c == [0, 1, 0, 1] else repr(c)
+             for c in want[:-1]]
+    check("SP1: Subtitles cues emitted OUT of time order take R6-22's colours by first "
+          f"appearance in TIME order — {', '.join(names)} (the fifth speaker cycles)",
+          answer is not None and len(patches) == len(SPEAKER_KEYS) and got[:-1] == want[:-1],
+          error or f"got {got!r}, want {want!r}")
+    nil_patch = patches.get(f"cue {len(SPEAKER_KEYS) - 1}")
+    check("SP1: and the cue with no speaker writes no `color` key at all",
+          nil_patch is not None and "color" not in nil_patch,
+          error or f"got {nil_patch!r}")
+
+    # --- SP2: the five word styles ignore speakers ------------------------
+    stripped = speaker_cue_rows(with_speakers=False)
+    for style in ("highlight", "pill", "karaoke", "build", "one_word"):
+        with_answer, with_error = place(f"sp2-{style}", rows, style)
+        bare_answer, bare_error = place(f"sp2-{style}-bare", stripped, style)
+        check(f"SP2·{style}: the ops with speakers are byte for byte the ops with them "
+              "stripped — a word style keeps its own colours",
+              with_answer is not None and bare_answer is not None
+              and with_answer.get("ops") and with_answer.get("ops") == bare_answer.get("ops"),
+              with_error or bare_error or "the ops differ")
+
+    # --- SP3: nil speakers place exactly what B46's starting tree placed --
+    base_dir, base_error = baseline_sources(BASELINE_TREE_SPEAKERS, "baseline-speakers")
+    baseline = None
+    if base_dir is not None:
+        baseline, base_error = build(base_dir, PROBE_SOURCE, "probe", "cloudprobe",
+                                     defines=("CLOUD_PROBE_BEFORE_SPEAKERS",))
+    check(f"SP3: the B46-baseline probe builds against {BASELINE_TREE_SPEAKERS[:8]} with "
+          "-D CLOUD_PROBE_BEFORE_SPEAKERS — a baseline that will not build is a FAILURE",
+          baseline is not None, base_error or "")
+    if baseline is not None:
+        for style in ("subtitles", "highlight"):
+            today, today_error = place(f"sp3-{style}-today", stripped, style)
+            before, before_error = place(f"sp3-{style}-baseline", stripped, style,
+                                         probe=baseline)
+            check(f"SP3·{style}: cues with no speaker place byte-identical ops to B46's "
+                  "starting tree",
+                  today is not None and before is not None and today.get("ops")
+                  and today.get("ops") == before.get("ops"),
+                  today_error or before_error or "the ops differ")
+        today, today_error = place("sp3-control-today", rows, "subtitles")
+        before, before_error = place("sp3-control-baseline", rows, "subtitles",
+                                     probe=baseline)
+        check("SP3: CONTROL — SP1's speaker cues DO place differently today than in "
+              "B46's starting tree, so the comparison above can see a colour",
+              today is not None and before is not None and today.get("ops")
+              and before.get("ops") and today.get("ops") != before.get("ops"),
+              today_error or before_error or "the ops are equal")
+
+    # --- SP4: the sheet's own path ----------------------------------------
+    fixture = make_fixture()
+    if fixture is None:
+        skip_rows(3, "`say` is not on this host, so SP4 has no audio to send")
+        return
+    with Fake("speakers") as fake:
+        def sheet_run(tag, speakers, probe):
+            fake.scenario(words=SPEAKER_PLAIN_WORDS, speaker_words=SPEAKER_SPLIT_WORDS)
+            row, error, _ = chrome_child(probe, fake, tag, {
+                "op": "speakers", "fixture": fixture, "key": DUMMY_KEY,
+                "speakers": speakers, "wall": 120}, timeout=300)
+            submitted = [r.get("json") or {} for r in fake.log()["requests"]
+                         if r["method"] == "POST" and r["path"] == "/v2/transcript"]
+            if row is not None and "error" in row:
+                return None, row["error"], submitted
+            return row, error, submitted
+
+        on, on_error, on_submitted = sheet_run("speakers-on", True, binary)
+        captions = placed_captions(on["project"]) if on and on.get("project") else []
+        check("SP4·on: CONTROL — the sheet's run finished and its one submit asked for "
+              "`speaker_labels: true`",
+              on is not None and on.get("didFinish") is True and len(on_submitted) == 1
+              and on_submitted[0].get("speaker_labels") is True,
+              on_error or f"got {on!r}, submits {on_submitted!r}")
+        check("SP4·on: Speakers on, Subtitles — the two caption clips read white then "
+              "yellow in the project JSON",
+              [c for _, c in captions] == [[1, 1, 1, 1], [1, 1, 0, 1]]
+              and [t for t, _ in captions] == ["Hello there", "everyone welcome back"],
+              on_error or f"got {captions!r}")
+
+        off, off_error, off_submitted = sheet_run("speakers-off", False, binary)
+        before = None
+        before_error = "the B46-baseline probe did not build"
+        if baseline is not None:
+            before, before_error, _ = sheet_run("speakers-off-baseline", False, baseline)
+        check("SP4·off: Speakers off — the project JSON is byte-equal to B46's starting "
+              "tree's same run (and the submit did not ask for speaker labels)",
+              off is not None and before is not None and off.get("didFinish") is True
+              and off_submitted and off_submitted[0].get("speaker_labels") is not True
+              and off.get("project") and off.get("project") == before.get("project"),
+              off_error or before_error
+              or f"today {placed_captions((off or {}).get('project') or '{}')!r}, "
+                 f"baseline {placed_captions((before or {}).get('project') or '{}')!r}, "
+                 f"submits {off_submitted!r}")
 
 
 def section_verbatim(binary, sources):
@@ -7904,6 +8204,45 @@ MUTANTS = {
         "            if cancel?.isCancelled == true { fatalError(\"poll-cancel-traps\") }\n",
         "CONTROL \u2014 the poll-cancel child dies with no answer, and SD1\u2013SD3 are "
         "still printed and scored (#201)"),
+    # Issue batch B46 (#93, R6-22): speaker colours on Subtitles.
+    "speaker-colour-dropped": (
+        "CaptionLayout.swift",
+        "                base.color = color\n",
+        "",
+        "the Subtitles colour assignment removed (SP1, SP3's CONTROL, SP4\u00b7on)"),
+    "speaker-colour-on-nil": (
+        "CaptionStyle.swift",
+        "            guard let speaker = speaker else { return nil }\n",
+        "            guard let speaker = speaker else { return speakerPalette[0] }\n",
+        "a cue with no speaker given palette[0] (SP1, SP3; the persisted project "
+        "cannot tell it from an absent colour)"),
+    "speaker-label-only": (
+        "CaptionStyle.swift",
+        "            let slot = slots[speaker] ?? slots.count\n"
+        "            slots[speaker] = slot\n",
+        "            let byLabel = CaptionLayout.Speaker(media: nil, label: speaker.label)\n"
+        "            let slot = slots[byLabel] ?? slots.count\n"
+        "            slots[byLabel] = slot\n",
+        "`speakerColors` keyed by the label alone, so \"A\" in two media is one "
+        "speaker (SP1)"),
+    "speaker-colour-word-styles": (
+        "CaptionLayout.swift",
+        "                        text: style.pagePatch(\n"
+        "                            content: cue.text, size: cue.size ?? base, width: cue.width,\n"
+        "                            words: words)))\n",
+        "                        text: { () -> TextPatch in\n"
+        "                            var patch = style.pagePatch(\n"
+        "                                content: cue.text, size: cue.size ?? base, "
+        "width: cue.width,\n"
+        "                                words: words)\n"
+        "                            if let at = kept.firstIndex(where: { $0.order == cue.order }),\n"
+        "                                let color = CaptionStyle.speakerColors(kept.map(\\.speaker))[at]\n"
+        "                            {\n"
+        "                                patch.color = color\n"
+        "                            }\n"
+        "                            return patch\n"
+        "                        }()))\n",
+        "a word style's page takes its cue's speaker colour (SP2)"),
 }
 
 
@@ -7923,6 +8262,13 @@ FAKE_MUTANTS: dict[str, tuple[str, str, str]] = {
         '                threading.Event().wait(entry["stalled_seconds"])\n',
         "                pass\n",
         "B24 \u2014 the fake's `stall` answering at once (DR0, ST\u00b7submit, ST\u00b7save)"),
+    # Issue batch B46 (#93): `speaker_words` served whatever `speaker_labels`
+    # said (SP4\u00b7off; the proof's SC3).
+    "speaker-labels-ignored": (
+        '        labelled = self.transcripts[tid]["request"].get("speaker_labels") is True\n',
+        "        labelled = True\n",
+        "B46 \u2014 the fake serving `speaker_words` whatever `speaker_labels` said "
+        "(SP4\u00b7off, SC3)"),
 }
 
 
@@ -7979,7 +8325,8 @@ def prepare_mutant(name):
 SECTIONS = [section_mapping, section_jobs, section_stamp, section_keyless,
             section_client, section_submission,
             section_cancel,
-            section_secrets, section_cues, section_extract, section_verbatim,
+            section_secrets, section_cues, section_speakers, section_extract,
+            section_verbatim,
             section_cache_write, section_echo, section_run, section_drip,
             section_estimate, section_settings_verify, section_chrome, section_stop,
             section_hygiene]

@@ -347,3 +347,22 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   check is possible. DECLINED: a read-time check when a key is present,
   which would make one package current with a key and stale without one,
   and turn a cache hit into a paid re-fetch (issue batch B43, #200 item 1).
+- **R6-22 — With Speakers on, each speaker's Subtitles cues are their own
+  colour, and nothing else marks them** (issue batch B46, #93; the owner,
+  2026-09-30). Colour only, no label: AssemblyAI's "A"/"B" would read as a
+  bug (naming speakers is #192). The palette is
+  `CaptionStyle.speakerPalette`, broadcast subtitling's white, yellow,
+  cyan, green (`[1,1,1,1]`, `[1,1,0,1]`, `[0,1,1,1]`, `[0,1,0,1]`), a named
+  table with no setting, assigned in order of each speaker's first
+  appearance among the run's placed cues in timeline order, cycling after
+  four. A speaker is a label within ONE media's transcript (R6-3):
+  AssemblyAI letters each file's speakers afresh, so "A" in two media is
+  two speakers. Subtitles only: the five word styles keep their own
+  colours and still close a page at a speaker change. Automatic whenever
+  speaker labels are on: no checkbox, no `transcribe` argument; this
+  deliberately changes a Speakers run from all-white cues to coloured
+  ones. A cue with no speaker (the on-device engine, Speakers off, a word
+  AssemblyAI left unlabelled, an imported file) writes no colour and takes
+  no slot, so such a run places byte-identical clips and W-7's
+  byte-identical Subtitles still holds for it. Persisting speakers stays
+  rejected (road map 6).

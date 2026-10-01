@@ -5303,6 +5303,79 @@ No mutant run exited 2. The proof now takes `z2-throw-without-delete` and
 `refusal-answer-dropped` from the probe's table rather than spelling them a
 second time; its own Z2 spelling is gone.
 
+### Issue batch B46 — speaker colours on Subtitles (#93)
+
+Spec §11 R6-22. With Speakers on, each speaker's Subtitles cues are placed in
+`CaptionStyle.speakerPalette`'s white, yellow, cyan, green, by first
+appearance in timeline order; a cue with no speaker writes no `color`. The
+fake gains `speaker_words`, served (bytes and `text`) only to a transcript
+whose request had `speaker_labels: true`. **No live call was made and
+nothing was spent**: every row runs against `assemblyai_fake.py`, with
+`RC_ASSEMBLYAI_KEY` unset.
+
+```sh
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only speakers
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only speakers --mutant speaker-label-only
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only speakers --fake-mutant speaker-labels-ignored
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --mutant speaker-palette-shifted
+```
+
+- **The probe's section `speakers`** (SP1–SP4, mode `speakers` and chrome
+  op `speakers`). SP1: seven Subtitles cues emitted out of time order, keyed
+  by time `(1,B) (1,A) (1,B) (2,A) (2,C) (1,C)` and one with no speaker,
+  place white, yellow, white, cyan, green, white, and the nil cue's patch
+  has no `color` key; every expectation is computed in Python. SP2: each of
+  the five word styles places the same ops with speakers as with them
+  stripped. SP3: the same `PROBE_SOURCE` built against
+  `BASELINE_TREE_SPEAKERS` (`ef54f48e`, B46's starting working tree, a tree
+  object written with a temporary index) with
+  `-D CLOUD_PROBE_BEFORE_SPEAKERS`: nil-speaker cues, Subtitles and
+  Highlight, place byte-identical ops; CONTROL, SP1's speaker cues do not.
+  A baseline that will not build is a scored FAIL. SP4: the Generate
+  Captions sheet itself (Engine AssemblyAI, Style Subtitles, Speakers set,
+  `startClicked`) against the fake's `speaker_words`: Speakers on leaves
+  caption clips white then yellow in `editedProject.json`, with a CONTROL
+  that the submit asked for `speaker_labels: true`; Speakers off leaves
+  project JSON byte-equal to the baseline probe's same run.
+- **The proof's row SC** (instance C, after row B), over `speech.mov` at 5 s
+  and row 7's A/B split. SC1: `transcribe {speakers: true}` places "Hello
+  there" `[1,1,1,1]` and "everyone welcome back" `[1,1,0,1]`. SC2: each
+  cue's midpoint rendered, then `undo` and the same ticks; glyph pixels
+  (differing, max(R,G) ≥ 200) measured 1327 for the white cue, all blue-rich
+  (B ≥ 200), and 2769 for the yellow, none; pinned at ≥ 50 % and ≤ 5 %.
+  SC3: `speakers` absent places the same `text` objects as a control
+  session with no `speaker_words`, all white. SC4: one speaker throughout
+  places the control's `text` objects and renders its frame byte for byte.
+- **What the persisted project cannot see.** It cannot tell an explicit
+  white from an absent `color`: `TextProps`' default colour is white
+  (`core/src/model_text.rs:109`) and `color` is always serialised. So SP4
+  and SC cannot see a nil-speaker cue given palette[0]; only the ops-level
+  rows SP1 and SP3 can, which is why `speaker-colour-on-nil` targets those
+  two alone.
+
+**The run table** (2026-10-01, at `b6e4636` plus this batch):
+
+| Command | Printed answer |
+|---|---|
+| `make typecheck` | 0 errors, 4 warnings (the baseline); tsc clean |
+| `make lint`, `make test` | exit 0 |
+| `make app` | BUILD SUCCEEDED |
+| `cloud_captions_probe.py` (full) | **861/861**, exit 0, in 402 s |
+| `cloud_captions_probe.py --only speakers` | 16/16, exit 0 |
+| probe `--only speakers --mutant speaker-colour-dropped` | 13/16, exit 1 (SP1's colours, SP3's CONTROL, SP4·on) |
+| probe `--only speakers --mutant speaker-colour-on-nil` | 14/16, exit 1 (SP1's nil cue, SP3·subtitles) |
+| probe `--only speakers --mutant speaker-label-only` | 15/16, exit 1 (SP1's colours) |
+| probe `--only speakers --mutant speaker-colour-word-styles` | 11/16, exit 1 (SP2 ×5) |
+| probe `--only speakers --fake-mutant speaker-labels-ignored` | 15/16, exit 1 (SP4·off) |
+| `cloud_captions_proof.py` (full) | **213/213**, exit 0, in 86 s; every instance's `grep "Reelcut: "` empty |
+| proof `--mutant speaker-palette-shifted` | 210/213, exit 1 (SC1, SC2, SC4) |
+| proof `--fake-mutant speaker-labels-ignored` | 212/213, exit 1 (SC3) |
+| `word_captions_proof.py 4871` | 20/20, exit 0 |
+| `word_captions_probe.py` | 15/15, exit 0 |
+| `word_captions_chrome.py` | 31/31, exit 0 |
+
+No mutant run exited 2.
+
 ### Road map 7 part 6 — core argument contract
 
 Run `python3 tools/proof/op_contract_proof.py` from the repository root. It

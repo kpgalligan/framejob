@@ -305,7 +305,7 @@ final class CloudTranscriber {
                 cues.append(
                     contentsOf: CaptionPages.cues(
                         from: words, span: job.span, frame: frame, request: pages,
-                        engine: .assemblyai, clip: job.clip))
+                        engine: .assemblyai, clip: job.clip, media: job.media))
                 if words.isEmpty {
                     problems.append(
                         CaptionLayout.Problem(
