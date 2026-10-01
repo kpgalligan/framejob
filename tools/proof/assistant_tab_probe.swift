@@ -13,7 +13,7 @@
 // proof points `RC_ASSISTANT_BASE_URL` at its stand-in (`anthropic_fake.py`),
 // scripted to ask for `export` to `<path>` (#150).
 //
-//   assistant_tab_probe                 P1–P7, P9–P11 (P9 writes
+//   assistant_tab_probe                 P1–P7, P9–P13 (P9 writes
 //                                       looks/assistant-light|dark.png under
 //                                       the working folder)
 //   assistant_tab_probe --close <path>  P8
@@ -22,7 +22,7 @@
 //   ANSWER {"rows":[{"id","ok","detail"}]}
 //
 //   P1  the transcript's mapping over a scripted event list
-//   P2  the context meter's three figures
+//   P2  the context meter's three figures, and its three ladders
 //   P3  showAssistant: the tab shown, the composer first responder
 //   P4  a question shown: Return answers nothing; Allow / Deny answer once each
 //   P5  AI-14: a changed selection keeps the Assistant tab; a click shows Clip
@@ -36,8 +36,12 @@
 //       legacy scroller, light then dark: ⇧/⌥/⌃/⌘Return and ⇧ keypad Enter
 //       insert "\n" and send nothing; Tab and ⇧Tab type nothing; 26 pt empty,
 //       strictly taller through five lines, the sixth unchanged; every kind,
-//       a cost, a question and five lines lay out with no problem; a bare
-//       Return sends the whole text once and the field is "" at 26 pt again
+//       a usage reported, a cost, a question and five lines lay out with no
+//       problem; a bare Return sends the whole text once and the field is ""
+//       at 26 pt again; the meter (#182) shows a rung of its ladder that fits,
+//       never the full figure for 5,000 of 200,000, its tooltip the full
+//       figure, the meter's width the same for three usages; at 480 wide (the
+//       control) the full figure, fitting
 //   P10 (AI-17, #153) the transcript is one text: the entries joined by
 //       "\n"; the dump's `assistant.entry.<kind>` parts in order, parented to
 //       the transcript, tops never decreasing; an extension is one edit at or
@@ -48,6 +52,13 @@
 //   P11 (AI-17) the composer's undo is its own: typing leaves the document's
 //       canUndo and edited state alone; `undo:` from the composer undoes
 //       typing and not a document step; a set string drops the history
+//   P12 (#182) the transcript's text view fills its clip view at 520, 720
+//       and 420 pt high, so a click 4 pt above the clip view's bottom, below
+//       the one entry (the control), hits the text view
+//   P13 (#182 item 4) the composer's placeholder rect is one line high at
+//       the text's origin; and with a 41-character message the field is one
+//       line at 480, two at the minimum width, one at 480 again, one pass
+//       each (a guard of today's refit in layout(); #182 item 3 is open)
 import AppKit
 
 final class ProbeDocumentController: NSDocumentController {
@@ -210,9 +221,24 @@ func rowP2() {
     let percent = 2.5.formatted(.number.precision(.fractionLength(0...1)))
     let wantKnown = "\(5_000.formatted()) of \(200_000.formatted()) tokens · \(percent)%"
     let wantUnknown = "\(5_000.formatted()) tokens (window size unknown)"
+    let ladders = [
+        AssistantContextMeterView.figureLadder(
+            AssistantContextUsage(used: 5_000, limit: 200_000, reported: true)),
+        AssistantContextMeterView.figureLadder(
+            AssistantContextUsage(used: 5_000, limit: nil, reported: true)),
+        AssistantContextMeterView.figureLadder(AssistantContextUsage()),
+    ]
+    let wantLadders = [
+        [wantKnown, "\(5_000.formatted()) / \(200_000.formatted()) · \(percent)%", "\(percent)%"],
+        [wantUnknown, "\(5_000.formatted()) tokens"],
+        ["Nothing reported yet"],
+    ]
     row(
-        "P2", none == "Nothing reported yet" && known == wantKnown && unknown == wantUnknown,
-        "\"\(none)\"; \"\(known)\" (want \"\(wantKnown)\"); \"\(unknown)\"")
+        "P2",
+        none == "Nothing reported yet" && known == wantKnown && unknown == wantUnknown
+            && ladders == wantLadders,
+        "\"\(none)\"; \"\(known)\" (want \"\(wantKnown)\"); \"\(unknown)\"; ladders \(ladders) "
+            + "(want \(wantLadders))")
 }
 
 // MARK: - P3 showAssistant
@@ -543,6 +569,48 @@ final class P9Backdrop: NSView {
     }
 }
 
+/// P9's meter check at the window's current width, then the 480-wide control.
+func p9Meter(_ view: AssistantView, _ window: NSWindow) -> (Bool, String) {
+    guard let meter = walk(view).first(where: { $0 is AssistantContextMeterView })
+        as? AssistantContextMeterView
+    else { return (false, "meter: no AssistantContextMeterView in the view") }
+    let label = meter.figuresLabel
+    let u1 = AssistantContextUsage(used: 5_000, limit: 200_000, reported: true)
+    let u2 = AssistantContextUsage(used: 123_456, limit: 1_000_000, reported: true)
+    let u3 = AssistantContextUsage(used: 5_000, limit: nil, reported: true)
+    var ok = true
+    var notes: [String] = []
+    var widths: [CGFloat] = []
+    for (name, usage) in [("U1", u1), ("U2", u2), ("U3", u3)] {
+        view.apply(.usage(usage))
+        window.layoutIfNeeded()
+        let shown = label.stringValue
+        let inLadder = AssistantContextMeterView.figureLadder(usage).contains(shown)
+        let fits = label.intrinsicContentSize.width <= label.frame.width + 0.5
+        let tip = label.toolTip == AssistantContextMeterView.figures(usage)
+        let short = name != "U1" || shown != AssistantContextMeterView.figures(usage)
+        ok = ok && inLadder && fits && tip && short
+        widths.append(meter.frame.width)
+        notes.append("\(name) \"\(shown)\" (in the ladder \(inLadder), intrinsic "
+            + "\(label.intrinsicContentSize.width) in \(label.frame.width), tooltip full \(tip)"
+            + (name == "U1" ? ", not the full figure \(short)" : "") + ")")
+    }
+    let steady = widths.allSatisfy { abs($0 - widths[0]) <= 0.5 }
+    ok = ok && steady
+    notes.append("meter widths \(widths) (equal \(steady))")
+    view.apply(.usage(u1))
+    window.setContentSize(NSSize(width: 480, height: window.contentRect(
+        forFrameRect: window.frame).height))
+    window.layoutIfNeeded()
+    let wide = label.stringValue
+    let wideFull = wide == AssistantContextMeterView.figures(u1)
+    let wideFits = label.intrinsicContentSize.width <= label.frame.width + 0.5
+    ok = ok && wideFull && wideFits
+    notes.append("control at 480: \"\(wide)\" (the full figure \(wideFull), intrinsic "
+        + "\(label.intrinsicContentSize.width) in \(label.frame.width))")
+    return (ok, "meter: " + notes.joined(separator: ", "))
+}
+
 func p9Look(_ look: String, _ appearance: NSAppearance.Name) -> (Bool, String) {
     NSApp.appearance = NSAppearance(named: appearance)
     defer { NSApp.appearance = nil }
@@ -635,7 +703,7 @@ func p9Look(_ look: String, _ appearance: NSAppearance.Name) -> (Bool, String) {
             .init(kind: .meta, text: "add_marker (at: 1200000, name: P9)"),
             .init(kind: .error, text: "The assistant helper stopped."),
         ],
-        usage: AssistantContextUsage(), cost: cost)
+        usage: AssistantContextUsage(used: 5_000, limit: 200_000, reported: true), cost: cost)
     let question = AssistantQuestion(tool: "export", path: "/tmp/P9.mp4", exists: false)
     view.show(phase: .idle, question: question)
     composer.string = (1...5).map { "line \($0)" }.joined(separator: "\n")
@@ -668,8 +736,14 @@ func p9Look(_ look: String, _ appearance: NSAppearance.Name) -> (Bool, String) {
         && field.frame.height == AssistantComposerField.oneLineHeight
     notes.append("bare Return sent \(sends.map { $0.debugDescription }), composer "
         + "\(composer.string.debugDescription) at \(field.frame.height) pt")
+
+    // The meter at this width: a rung of the ladder that fits, the full
+    // figure in the tooltip; the meter's own width never follows the rung.
+    let (meterOK, meterNote) = p9Meter(view, window)
+    notes.append(meterNote)
     window.orderOut(nil)
     let ok = modifiedOK && enterOK && tabOK && heightOK && problems.isEmpty && written && sentOK
+        && meterOK
     return (ok, "\(look): " + notes.joined(separator: "; "))
 }
 
@@ -854,6 +928,116 @@ func rowP11() {
     withExtendedLifetime(document) {}
 }
 
+// MARK: - P12 the transcript's text view fills its clip view (#182)
+
+func rowP12() {
+    let window = NSWindow(
+        contentRect: NSRect(x: 0, y: 0, width: 304, height: 520), styleMask: [.titled],
+        backing: .buffered, defer: false)
+    let root = NSView(frame: NSRect(x: 0, y: 0, width: 304, height: 520))
+    let view = AssistantView()
+    view.frame = root.bounds
+    view.autoresizingMask = [.width, .height]
+    root.addSubview(view)
+    window.contentView = root
+    view.show(hasKey: true)
+    window.layoutIfNeeded()
+    guard let transcript = walk(view).first(where: { $0 is AssistantTranscriptView })
+        as? AssistantTranscriptView
+    else {
+        row("P12", false, "no AssistantTranscriptView in the view")
+        return
+    }
+    view.reload([.init(kind: .person, text: "One line.")], usage: AssistantContextUsage(),
+                cost: AssistantTurnCost())
+    var ok = true
+    var notes: [String] = []
+    for height in [520, 720, 420] as [CGFloat] {
+        window.setContentSize(NSSize(width: 304, height: height))
+        window.layoutIfNeeded()
+        let clip = transcript.contentView
+        let textHeight = transcript.textView.frame.height
+        let filled = abs(textHeight - clip.bounds.height) <= 0.5
+        // Window coordinates: y grows upward, so "above the bottom" is +4.
+        let clipInWindow = clip.convert(clip.bounds, to: nil)
+        let point = NSPoint(x: clipInWindow.midX, y: clipInWindow.minY + 4)
+        let entry = transcript.entryLayout().first?.rect ?? .zero
+        let entryInWindow = transcript.convert(entry, to: nil)
+        let below = !entry.isEmpty && point.y < entryInWindow.minY
+        let hit = transcript.superview.flatMap { superview in
+            transcript.hitTest(superview.convert(point, from: nil))
+        }
+        let hitText = hit === transcript.textView
+        ok = ok && filled && below && hitText
+        notes.append("\(Int(height)): text view \(textHeight) in a clip view of "
+            + "\(clip.bounds.height) (filled \(filled); text view frame \(transcript.textView.frame), "
+            + "clip bounds \(clip.bounds)); the point \(point) below the entry's "
+            + "\(entryInWindow) \(below) (the control); hitTest → "
+            + "\(hit.map { String(describing: type(of: $0)) } ?? "nil") (the text \(hitText))")
+    }
+    window.orderOut(nil)
+    row("P12", ok, notes.joined(separator: "; "))
+}
+
+// MARK: - P13 the placeholder's height (#182 item 4) and the width refit, in layout() today
+
+func rowP13() {
+    NSApp.appearance = NSAppearance(named: .aqua)
+    defer { NSApp.appearance = nil }
+    let narrow = EditorViewController.minInspectorWidth
+        - NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy)
+    let window = NSWindow(
+        contentRect: NSRect(x: 0, y: 0, width: 480, height: 600), styleMask: [.titled],
+        backing: .buffered, defer: false)
+    let backdrop = P9Backdrop(frame: NSRect(x: 0, y: 0, width: 480, height: 600))
+    let view = AssistantView()
+    view.frame = backdrop.bounds
+    view.autoresizingMask = [.width, .height]
+    backdrop.addSubview(view)
+    window.contentView = backdrop
+    view.show(hasKey: true)
+    view.show(phase: .idle, question: nil)
+    window.layoutIfNeeded()
+    let composer = view.composer
+    guard let field = composer.enclosingScrollView as? AssistantComposerField else {
+        row("P13", false, "the composer is not in an AssistantComposerField")
+        return
+    }
+    let lineHeight = AssistantComposerField.lineHeight(composer.font ?? DS.sans(12))
+    let one = AssistantComposerField.oneLineHeight
+    composer.string = "Put a marker at two seconds and then cut."
+    window.layoutIfNeeded()
+    let wide = field.frame.height
+    let constant = {
+        field.constraints.first { $0.firstAttribute == .height && $0.secondItem == nil }?
+            .constant ?? -1
+    }
+    var trace = ["480: constant \(constant()), text view width \(composer.frame.width)"]
+    window.setContentSize(NSSize(width: narrow, height: 600))
+    window.layoutIfNeeded()
+    let narrowHeight = field.frame.height
+    trace.append("narrow: constant \(constant()), text view width \(composer.frame.width)")
+    window.setContentSize(NSSize(width: 480, height: 600))
+    window.layoutIfNeeded()
+    let back = field.frame.height
+    trace.append("480 again: constant \(constant()), text view width \(composer.frame.width)")
+    composer.string = ""
+    let rect = composer.placeholderRect
+    let placeholderOK = !composer.placeholder.isEmpty && rect.height == lineHeight
+        && rect.minY == composer.textContainerOrigin.y && rect.width > 0
+    // A guard of today's refit in the field's layout() (#182 item 3 is open):
+    // one line, two at the narrow width, one again, each after one pass.
+    let heightsOK = wide == one && narrowHeight == one + lineHeight && back == one
+    window.orderOut(nil)
+    row("P13", placeholderOK && heightsOK,
+        "placeholder \"\(composer.placeholder)\"; placeholderRect \(rect) (want height "
+            + "\(lineHeight), minY \(composer.textContainerOrigin.y), width > 0); "
+            + "\"Put a marker at two seconds and then cut.\" after one layoutIfNeeded() each: "
+            + "at 480 \(wide) pt (want \(one)), at \(narrow) \(narrowHeight) pt (want "
+            + "\(one + lineHeight)), at 480 again \(back) pt (want \(one)); "
+            + trace.joined(separator: ", "))
+}
+
 // MARK: - Run
 
 let arguments = CommandLine.arguments
@@ -878,6 +1062,8 @@ if let closePath {
     rowP9()
     rowP10()
     rowP11()
+    rowP12()
+    rowP13()
 }
 
 let body: [String: Any] = ["rows": rows]

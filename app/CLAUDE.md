@@ -641,9 +641,15 @@ the key map behind it.
   inserts only the new suffix into its own entry's range; `entryLayout()`
   gives each entry's rect in the view's coordinates, and the layout dump reads
   the entries as parts it names (`UISnapshotParts`, dev only), which
-  `assistant_tab_proof.py`'s `no-entry-parts` mutant empties;
+  `assistant_tab_proof.py`'s `no-entry-parts` mutant empties; its
+  `setFrameSize` holds the text view's minimum height at the clip view's, so a
+  click below a short transcript reaches the text (`short-transcript` zeroes
+  it), and `init` puts the text view's origin back at 0 after `documentView`
+  (adopting it left the origin at minus its height, #182);
   `AssistantContextMeterView`
-  the inline meter and `figures(_:)`, its three sentences;
+  the inline meter, `figures(_:)` (its three sentences) and `figureLadder(_:)`
+  (the shorter rungs it shows, chosen in `setFrameSize`, when the full one
+  does not fit; the tooltip always the full one; `full-figure-only`'s target);
   `AssistantConversationCostView` (the same file, road map 13 P4, spec §11
   P-7) the Spend row 6 pt under the meter and Clear, the rule under it:
   `AssistantTurnCost.figure` of `conversationCost`, which `reload(_:usage:cost:)`
@@ -664,10 +670,13 @@ the key map behind it.
   (a send, the dev tools' pane path) drops its undo history.
   `AssistantComposerField` is its scroll view: DSField's 1 pt layer border,
   26 pt for one line plus one line height per further line up to five,
-  then scrolling; it refits on every change and on a width change.
-  `assistant_tab_proof.py`'s `modified-return-sends`, `tab-types` and
-  `shared-undo` mutants edit its `.newline` arm, `insertTab`'s body and
-  the override, each exactly once.
+  then scrolling; it refits on every change and on a width change (in
+  `layout()`, which P13 scores and `no-width-refit` removes; #182 item 3 is
+  open); the placeholder is drawn in `placeholderRect`, one line high.
+  `assistant_tab_proof.py`'s `modified-return-sends`, `tab-types`,
+  `shared-undo` and `tall-placeholder` mutants edit its `.newline` arm,
+  `insertTab`'s body, the override and `placeholderRect`'s height, each
+  exactly once.
 - `MediaPane.swift` · `MediaRowView.swift` (a row and the drag it starts,
   with `MediaDropMode` read from `NSEvent.modifierFlags` at the drop) ·
   `MediaPaneCommands.swift` · `MediaListFilter.swift` (the find band as a

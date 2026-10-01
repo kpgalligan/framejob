@@ -21,7 +21,7 @@ change.
 | [`04.1-toolbar.md`](04.1-toolbar.md) | 26 | The toolbar. |
 | [`04.2-preview-canvas.md`](04.2-preview-canvas.md) | 72 | The preview canvas: selection, handles, crop and region modes, on-canvas text, snapping. |
 | [`04.3a-inspector-clip-tab.md`](04.3a-inspector-clip-tab.md) | 348 | The inspector's tab strip and its Clip tab: the sub-tabs and pinned block, the selection header and name field, sections, row marks, Reset/Clear; every video, audio, text and shape section. |
-| [`04.3b-inspector-media-document-assistant.md`](04.3b-inspector-media-document-assistant.md) | 156 | The inspector's Media tab (find band, rows, drags, Consolidate, import, generate and export captions), Document tab and Assistant tab. |
+| [`04.3b-inspector-media-document-assistant.md`](04.3b-inspector-media-document-assistant.md) | 157 | The inspector's Media tab (find band, rows, drags, Consolidate, import, generate and export captions), Document tab and Assistant tab. |
 | [`04.4-timeline.md`](04.4-timeline.md) | 193 | The timeline: its bar, the level meter, ruler, tracks, clip bodies, gestures, entering a nest. |
 | **§5 — Editing model** | | |
 | [`05.1-time.md`](05.1-time.md) | 23 | Ticks (600 000 per second), frame rates, snapping to the grid. |

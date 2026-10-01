@@ -429,6 +429,11 @@ Needs your own Anthropic API key (Setup 3).
 Scripts that need a state no agent session has. Run from a terminal on an
 unlocked Mac; paste each score into the issue in the Source.
 
+**AS-8 — The tab at its narrowest**
+- **Do:** With a real key, after a turn: 1. Drag the inspector to its narrowest and back, watching the Context figures, and hover them. 2. In a short conversation, click below the last entry, then drag from there up into it. 3. Type a message that wraps to two lines at the narrowest width, and drag the inspector slowly wider and narrower. 4. Empty the composer at the narrowest width.
+- **Expect:** 1. The figures are full when there is room, and shorter ("N / L · P%", then "P%") as the inspector narrows. They are never cut off with "…", and the tooltip reads the full figure. 2. The click clears the selection, and the drag selects up from the end. 3. The field follows the width, two lines while the message wraps and one line when it does not, with no jump or flicker. 4. The placeholder sits on one line.
+- **Source:** #182 (items 1, 2 and 4; step 3 watches item 3, not fixed in B37), issue batch B37.
+
 **HS-1 — The chrome dispatch rows need an unlocked console**
 - **Do:** `python3 tools/proof/phase8_chrome.py` with the screen unlocked.
 - **Expect:** no skipped rows; section 4's six dispatch rows scored (the run is 150/150 unlocked).

@@ -6970,7 +6970,9 @@ and `RC_ASSISTANT_BASE_URL=http://127.0.0.1:9`:
   `Declined (stop):` with the question's sentence; the error), the usage,
   two `extended` changes, `argumentSummary`'s `""` / 70-character cut, and
   Clear and `endConversation` keeping the window size.
-- **P2** the meter's three figures.
+- **P2** the meter's three figures, and (issue batch B37, #182) its three
+  ladders — 5,000 of 200,000, 5,000 with no limit, nothing reported — each
+  exactly its rungs.
 - **P3** `showAssistant`: the Assistant tab, the composer first responder.
 - **P4** on an `AssistantView` in a window of its own: an idle Return sends
   and empties the composer (the control); with a question shown, Return
@@ -6995,12 +6997,20 @@ and `RC_ASSISTANT_BASE_URL=http://127.0.0.1:9`:
   own `keyDown` leave exactly `"a\nb\nc\nd\ne"` (no U+2028, nothing
   sent), ⇧ keypad Enter a `"\n"`; Tab and ⇧Tab leave the string unchanged;
   the field is 26 pt empty, strictly taller through five lines and the same
-  at six; with every kind of entry, a cost, a question and five lines,
+  at six; with every kind of entry, a usage reported (5,000 of 200,000;
+  issue batch B37, #182), a cost, a question and five lines,
   `UISnapshotLayout.report` finds no problem, and
   `work/assistant_tab/probe/looks/assistant-light|dark.png` is written (over
   the window background, since `cacheDisplay` draws views only; a layer
   border, the field's included, is not in a `cacheDisplay` capture); a bare
   Return sends the whole text once and the field is "" at 26 pt again.
+  Then (B37, #182) the meter at that width, each usage through
+  `apply(.usage)` and one `layoutIfNeeded()`: for 5,000 / 200,000,
+  123,456 / 1,000,000 and 5,000 with no limit the `assistant.context` label
+  shows a rung of `figureLadder` whose intrinsic width fits its frame, never
+  the full figure for the first, with the full figure as its tooltip, and the
+  meter's own width is the same for all three; widened to 480 (the control)
+  it shows the full figure, fitting.
 - **P10** (#153, AI-17) the transcript is ONE text view: `reload` of five
   kinds (the person's two lines) gives it the texts joined by `"\n"`; the
   layout dump's `assistant.entry.<kind>` part records are those kinds and
@@ -7023,6 +7033,17 @@ and `RC_ASSISTANT_BASE_URL=http://127.0.0.1:9`:
   undo; `string = "x"` drops the composer's undo. Measured on the way:
   `NSWindow`'s own `undo:` reads the WINDOW's manager, so without the
   composer's own `undo:` the document's marker ran.
+- **P12** (issue batch B37, #182) one person entry in an `AssistantView`
+  304 wide, the window 520, 720 then 420 pt high, one `layoutIfNeeded()`
+  each: the transcript's text view is as tall as its clip view, and the
+  point 4 pt above the clip view's bottom centre — below the entry, the
+  control — hit-tests to the text view, not the clip view.
+- **P13** (B37, #182 item 4) light, at 480 wide: the composer emptied, its
+  `placeholderRect` is one line height high, at the text container's origin,
+  and wider than 0; and the field for a 41-character message is one line
+  high at 480, two at the minimum width less a legacy scroller and one at
+  480 again, one `layoutIfNeeded()` each — a guard of today's refit inside
+  `layout()` (#182 item 3 is open).
 
 **Live A** (`-AgentServerEnabled YES`, port 4874, `proof-key` in
 `-RCSecretFolder`, `RC_ASSISTANT_BASE_URL` at the stand-in,
@@ -7075,7 +7096,13 @@ FAIL. **Mutants `modified-return-sends`, `tab-types`, `no-entry-parts`,
 `app/Sources`, the probe built over it): `.newline`'s arm calls
 `onReturn?()` (P9), `insertTab` calls `super.insertTab` (P9),
 `snapshotParts()` returns `[]` (P10), the composer's `undoManager` is
-`super.undoManager` (P11); each scores its row alone and must FAIL. Rule R:
+`super.undoManager` (P11); and (issue batch B37, #182) **`full-figure-only`**
+— the meter always shows `figures(usage)` (P9), **`short-transcript`** — the
+transcript's `setFrameSize` sets `minSize = .zero` (P12),
+**`no-width-refit`** — the composer field's `layout()` no longer calls
+`fit()` (P13), and **`tall-placeholder`** — `placeholderRect` is 40 pt high
+again (P13). Each
+scores its row alone and must FAIL. Rule R:
 exit 1 caught, 0 survived, 2 not performed — a mutant probe that did not
 build, or printed no row for its row, is an instrument failure (exit 2).
 
@@ -7095,8 +7122,31 @@ exit 1; `no-entry-parts` P10 FAIL (no part records), exit 1; `shared-undo`
 P11 FAIL (typing reached the document's manager: canUndo true), exit 1;
 `no-close-decline` P8 FAIL, exit 1; `no-forward` L2 FAIL, exit 1.
 
+Measured 2026-09-30 (issue batch B37), each run bounded by `perl -e 'alarm
+shift; exec @ARGV' 1800`. Before any `app/Sources` change, with only P9's
+usage reported: 20/21, P9 FAIL with one `truncated` problem on the figures
+label ("5,000 of 200,000 tokens · 2.5%", intrinsic 180.0 in a 152.5 frame),
+light and dark. After: 23/23, exit 0; P9's meter showed "5,000 / 200,000 ·
+2.5%" (132.0 in 136.0), "12.3%" and "5,000 tokens", the meter 209.0 wide for
+all three, and at 480 the full figure (180.0 in 184.0); P12's text view was
+418.0, 618.0 and 318.0 in clip views of the same heights, each hit on the
+text view; P13's `placeholderRect` was 15.0 high at y 5.0, and over the
+composer's unchanged `layout()` refit the field was 26.0 pt at 480, 41.0
+pt at the minimum width (the text view 173.0 wide), 26.0 pt at 480 again
+(scored from B37's review on).
+With the refit moved to the field's `setFrameSize` (B37's design for #182
+item 3, then reverted) an interim run traced 26.0, then 26.0 at the minimum
+width with the constraint already 41.0, then 41.0 back at 480: the frame
+followed one pass late. `full-figure-only` P9 FAIL, exit 1;
+`short-transcript` P12 FAIL (the text view 31.0 in a 418.0 clip view),
+exit 1; `no-width-refit` P13 FAIL (26.0 pt at the minimum width, the
+text view 156.0 wide), exit 1; `tall-placeholder` P13 FAIL (height 40.0),
+exit 1;
+`modified-return-sends` P9, `tab-types` P9, `shared-undo` P11 and
+`no-entry-parts` P10 FAIL, exit 1 each.
+
 ```sh
-python3 tools/proof/assistant_tab_proof.py                                  # 21/21
+python3 tools/proof/assistant_tab_proof.py                                  # 23/23
 python3 tools/proof/assistant_tab_proof.py --mutant no-forward             # L2 FAIL, exit 1
 python3 tools/proof/assistant_tab_proof.py --mutant flatten-send           # L7 FAIL, exit 1
 python3 tools/proof/assistant_tab_proof.py --mutant no-close-decline       # P8 FAIL, exit 1
@@ -7104,6 +7154,10 @@ python3 tools/proof/assistant_tab_proof.py --mutant modified-return-sends  # P9 
 python3 tools/proof/assistant_tab_proof.py --mutant tab-types              # P9 FAIL, exit 1
 python3 tools/proof/assistant_tab_proof.py --mutant no-entry-parts         # P10 FAIL, exit 1
 python3 tools/proof/assistant_tab_proof.py --mutant shared-undo            # P11 FAIL, exit 1
+python3 tools/proof/assistant_tab_proof.py --mutant full-figure-only       # P9 FAIL, exit 1
+python3 tools/proof/assistant_tab_proof.py --mutant short-transcript       # P12 FAIL, exit 1
+python3 tools/proof/assistant_tab_proof.py --mutant no-width-refit         # P13 FAIL, exit 1
+python3 tools/proof/assistant_tab_proof.py --mutant tall-placeholder       # P13 FAIL, exit 1
 ```
 
 ## Road map 12's A3 — the prompt (assistant_prompt_proof.py, assistant_prompt_probe.swift, assistant_prompt_eval.py)

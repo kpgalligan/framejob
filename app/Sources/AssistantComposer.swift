@@ -84,18 +84,23 @@ final class AssistantComposerTextView: NSTextView {
         needsDisplay = true
     }
 
+    /// Where the placeholder is drawn: one line high, at the text's origin.
+    var placeholderRect: NSRect {
+        let padding = textContainer?.lineFragmentPadding ?? 0
+        let origin = textContainerOrigin
+        let width = max(bounds.width - origin.x * 2 - padding * 2, 0)
+        let height = AssistantComposerField.lineHeight(font ?? DS.sans(12))
+        return NSRect(x: origin.x + padding, y: origin.y, width: width, height: height)
+    }
+
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         guard string.isEmpty, !placeholder.isEmpty else { return }
-        let padding = textContainer?.lineFragmentPadding ?? 0
-        let origin = textContainerOrigin
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font ?? DS.sans(12), .foregroundColor: NSColor.placeholderTextColor,
         ]
-        let width = max(bounds.width - origin.x * 2 - padding * 2, 0)
         (placeholder as NSString).draw(
-            with: NSRect(x: origin.x + padding, y: origin.y, width: width, height: 40),
-            options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine],
+            with: placeholderRect, options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine],
             attributes: attributes)
     }
 }
@@ -186,7 +191,7 @@ final class AssistantComposerField: NSScrollView {
         if height?.constant != wanted { height?.constant = wanted }
     }
 
-    private static func lineHeight(_ font: NSFont) -> CGFloat {
+    static func lineHeight(_ font: NSFont) -> CGFloat {
         NSLayoutManager().defaultLineHeight(for: font)
     }
 

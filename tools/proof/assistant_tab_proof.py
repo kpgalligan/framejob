@@ -10,7 +10,8 @@ with a DUMMY key in a `-RCSecretFolder` of its own,
 `-ReelcutInspectorCollapsed NO` and `RC_ASSISTANT_BASE_URL=http://127.0.0.1:9`:
   P1  the transcript's mapping over a scripted event list (runs, every
       sentence, usage, the three answers)
-  P2  the context meter's three figures
+  P2  the context meter's three figures, and its ladders for 5,000 of
+      200,000, 5,000 with no limit, and nothing reported (#182)
   P3  showAssistant (View ▸ Assistant's method): the tab, the composer first
       responder
   P4  a question shown: Return in the composer answers nothing (an idle
@@ -36,9 +37,15 @@ with a DUMMY key in a `-RCSecretFolder` of its own,
       legacy scroller, light then dark: ⇧/⌥/⌃/⌘Return type "a\nb\nc\nd\ne"
       (no U+2028, nothing sent), ⇧ keypad Enter a "\n"; Tab and ⇧Tab type
       nothing; 26 pt empty, strictly taller through five lines, the sixth
-      unchanged; every kind, a cost, a question and five lines lay out with
-      no problem, and `probe/looks/assistant-light|dark.png` is written; a
-      bare Return sends the whole text once and the field is "" at 26 pt
+      unchanged; every kind, a usage of 5,000 of 200,000, a cost, a question
+      and five lines lay out with no problem, and
+      `probe/looks/assistant-light|dark.png` is written; a bare Return sends
+      the whole text once and the field is "" at 26 pt; (#182) for 5,000 /
+      200,000, 123,456 / 1,000,000 and 5,000 with no limit, the meter's label
+      shows a rung of `figureLadder` (not the full figure for the first) that
+      fits its frame, its tooltip the full figure, and the meter's width is
+      the same for all three; at 480 wide (the control) it shows the full
+      figure, fitting
   P10 (AI-17, #153) the transcript is one text view: the entries joined by
       "\n"; the layout dump's `assistant.entry.<kind>` parts in order,
       parented to the transcript, tops never decreasing; `.extended` of the
@@ -55,6 +62,15 @@ with a DUMMY key in a `-RCSecretFolder` of its own,
       undo; `undo:` from the composer undoes typing and leaves a "P11
       marker" step on the document's stack unrun; a set string drops the
       composer's undo
+  P12 (#182) one person entry in a 304-wide window 520, 720 then 420 pt
+      high: the transcript's text view is as tall as its clip view, and a
+      point 4 pt above the clip view's bottom centre — below the entry (the
+      control) — hit-tests to the text view
+  P13 (#182 item 4) light: the composer emptied, its placeholder's rect is
+      one line high at the text container's origin; and with a 41-character
+      message the field is one line high at 480, two at the minimum width
+      less a legacy scroller, one at 480 again, one `layoutIfNeeded()` each
+      (a guard of today's refit in `layout()`; #182 item 3 is open)
 
 Live A (`-AgentServerEnabled YES`, the dummy `proof-key` in `-RCSecretFolder`,
 `RC_ASSISTANT_BASE_URL` at `anthropic_fake.py`, port 4874), every turn through
@@ -94,6 +110,10 @@ Launch B (the override set, no `-RCSecretFolder`: no key, AI-13):
     python3 tools/proof/assistant_tab_proof.py --mutant tab-types              # P9 alone: FAILS
     python3 tools/proof/assistant_tab_proof.py --mutant no-entry-parts         # P10 alone: FAILS
     python3 tools/proof/assistant_tab_proof.py --mutant shared-undo            # P11 alone: FAILS
+    python3 tools/proof/assistant_tab_proof.py --mutant full-figure-only       # P9 alone: FAILS
+    python3 tools/proof/assistant_tab_proof.py --mutant short-transcript       # P12 alone: FAILS
+    python3 tools/proof/assistant_tab_proof.py --mutant no-width-refit         # P13 alone: FAILS
+    python3 tools/proof/assistant_tab_proof.py --mutant tall-placeholder       # P13 alone: FAILS
 
 `no-forward` copies the tree with `tree_copy.make_copy` into
 `work/assistant_tab/mutant/tree`, deletes the `session.onEvent =` line from
@@ -105,10 +125,14 @@ before it trims (`TREE_MUTANTS`), and runs L7 alone after `open_tab`: L7 must
 FAIL. `no-close-decline` builds the
 probe over a copy of `app/Sources` in `work/assistant_tab/mutants/` with
 `close()`'s `decline(by: "close")` line removed (`MUTANTS`), and runs P8
-alone: P8 must FAIL (exit 1); no build, or no such line, exits 2. The P9,
-P10 and P11 mutants (`MUTANTS`: `.newline`'s arm calls `onReturn`, `insertTab`
+alone: P8 must FAIL (exit 1); no build, or no such line, exits 2. The P9 to
+P13 mutants (`MUTANTS`: `.newline`'s arm calls `onReturn`, `insertTab`
 calls `super`, `snapshotParts()` returns `[]`, the composer's `undoManager`
-is `super`'s) build the probe the same way and score their row alone; a
+is `super`'s; issue batch B37, #182: the meter always shows the full
+figure, the transcript's `setFrameSize` sets a zero minimum size, the
+composer field's `layout()` does not call `fit()`, `placeholderRect` is
+40 pt high)
+build the probe the same way and score their row alone; a
 probe that did not build, or printed no row for it, is an instrument failure
 (exit 2). Rule R
 (issue batch B13): a mutant run whose row was never scored, or that scored
@@ -152,7 +176,7 @@ HELPER = os.path.join(RELEASE, "Contents", "Helpers", "reelcut-agent")
 FORWARD = "session.onEvent ="
 PORT_A, PORT_B = 4874, 4877
 WALL_BUILD, WALL_RUN, WALL_TURN = 900, 300, 60
-PROBE_ROWS = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P9", "P10", "P11"]
+PROBE_ROWS = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P9", "P10", "P11", "P12", "P13"]
 # name: (file in app/Sources, before — exactly once, after, row)
 MUTANTS = {
     "no-close-decline": ("AssistantSession.swift", '        decline(by: "close")\n', "", "P8"),
@@ -167,6 +191,19 @@ MUTANTS = {
     "shared-undo": ("AssistantComposer.swift",
                     "    override var undoManager: UndoManager? { ownUndoManager }\n",
                     "    override var undoManager: UndoManager? { super.undoManager }\n", "P11"),
+    "full-figure-only": ("AssistantContextMeter.swift",
+                         "        if figuresLabel.stringValue != shown "
+                         "{ figuresLabel.stringValue = shown }\n",
+                         "        figuresLabel.stringValue = Self.figures(usage)\n", "P9"),
+    "short-transcript": ("AssistantTranscriptView.swift",
+                         "        textView.minSize = NSSize(width: 0, height: contentSize.height)\n",
+                         "        textView.minSize = .zero\n", "P12"),
+    "no-width-refit": ("AssistantComposer.swift",
+                       "        fittedWidth = bounds.width\n        fit()\n",
+                       "        fittedWidth = bounds.width\n", "P13"),
+    "tall-placeholder": ("AssistantComposer.swift",
+                         "        let height = AssistantComposerField.lineHeight(font ?? DS.sans(12))\n",
+                         "        let height: CGFloat = 40\n", "P13"),
 }
 # name: (file in app/Sources, before — exactly once, after, row): a tree copy built with
 # `make app`, its row run live against it
@@ -698,8 +735,9 @@ def main():
                         help="no-forward: L2 alone, against a build without the session's "
                              "event forward; flatten-send: L7 alone, against a build whose "
                              "send() joins the lines; no-close-decline: P8, "
-                             "modified-return-sends and tab-types: P9, no-entry-parts: P10, "
-                             "shared-undo: P11, each alone against a probe built over the "
+                             "modified-return-sends, tab-types and full-figure-only: P9, "
+                             "no-entry-parts: P10, shared-undo: P11, short-transcript: P12, "
+                             "no-width-refit and tall-placeholder: P13, each alone against a probe built over the "
                              "mutated sources; each must FAIL")
     args = parser.parse_args()
     os.makedirs(WORK, exist_ok=True)
