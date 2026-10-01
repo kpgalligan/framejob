@@ -55,7 +55,7 @@ app/Sources` in `work/name-field/baseline/` (no harness) and follows rule R:
 exit 1 is CAUGHT — exactly N1–N7 and N9 fail in each look and N8 passes in
 both; 0
 is SURVIVED; 2 is NOT PERFORMED (the archive, the build or a run failed, a
-row was never written, or a control failed), printed as `mutant baseline:
+row was never written, or a control failed), printed as `baseline <commit>:
 the control could not be performed — <why>`. N13 (`B32_ROWS`) is left out
 of that verdict; its catch is the mutant.
 
@@ -294,7 +294,7 @@ def baseline(commit):
     os.makedirs(tree)
 
     def not_performed(why):
-        print(f"mutant baseline: the control could not be performed — {why}")
+        print(f"baseline {commit}: the control could not be performed — {why}")
         return 2
 
     archive = subprocess.run(["git", "-C", ROOT, "archive", commit, "app/Sources"],

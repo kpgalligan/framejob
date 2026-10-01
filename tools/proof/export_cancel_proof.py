@@ -93,6 +93,7 @@ APP = ROOT / "build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut"
 PROBE_SOURCE = ROOT / "tools/proof/export_cancel_probe.swift"
 # Outside WORK, which every run empties, so an up-to-date probe is not rebuilt.
 PROBE_DIR = ROOT / "tools/proof/work/export-cancel-probe"
+SOURCES = ROOT / "app/Sources"
 A_MOV = ROOT / "tools/proof/media/A.mov"
 REWRAPPED = Path.home() / "Library/Application Support/Reelcut/Rewrapped"
 CALL_BOUND = 600
@@ -213,12 +214,16 @@ def tool_message(error, tool):
 
 # ---- the probe --------------------------------------------------------------
 
-def build_probe(sources=ROOT / "app/Sources", probe_dir=PROBE_DIR):
+def build_probe(sources=None, probe_dir=None):
     """`export_cancel_probe.swift` as `main.swift` over every other file in
     `sources`, on `harness/build.sh`'s swiftc line, with the app's `Fonts`,
     `Blank.mp4` and a `default.metallib` of `Compositor.metal` beside it, in
     `probe_dir`. Rebuilt only when stale — the sources, the entry, the
-    staticlib and both headers are its inputs. The binary, or None and why."""
+    staticlib and both headers are its inputs. The binary, or None and why.
+    `None` for either argument means the module's `SOURCES` / `PROBE_DIR`,
+    read at call time, so an importer that sets them is heard."""
+    sources = SOURCES if sources is None else sources
+    probe_dir = PROBE_DIR if probe_dir is None else probe_dir
     probe_dir.mkdir(parents=True, exist_ok=True)
     binary = probe_dir / "export_cancel_probe"
     entry = probe_dir / "main.swift"

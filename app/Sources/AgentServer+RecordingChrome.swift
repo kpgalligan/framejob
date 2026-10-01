@@ -23,7 +23,9 @@ import AppKit
 /// `tick()`, so the menu flips AT a pause or resume from ANY door — this
 /// menu, the panel's, File ▸ Pause Recording — and not at the timer's next
 /// turn (the item rebuilds its menu only when `paused` changes; #181).
-/// `remove` takes the observer down. The SPAN is wall clock, unchanged: a
+/// `show` also observes `finishingDidBeginNotification` and calls `freeze()`,
+/// so any stop, from any door, freezes the tool's item (#193). `remove`
+/// takes both observers down. The SPAN is wall clock, unchanged: a
 /// pause from the menu bar shortens what was recorded, and the result's
 /// `pauses` and `duration` say so.
 final class RecordingToolChrome {
@@ -31,6 +33,7 @@ final class RecordingToolChrome {
     private var timer: Timer?
     private var ended = false
     private var observer: NSObjectProtocol?
+    private var finishObserver: NSObjectProtocol?
 
     init() {}
 
@@ -60,6 +63,9 @@ final class RecordingToolChrome {
         observer = NotificationCenter.default.addObserver(
             forName: ScreenRecorder.pauseDidChangeNotification, object: recorder, queue: nil
         ) { [weak self] _ in self?.tick() }
+        finishObserver = NotificationCenter.default.addObserver(
+            forName: ScreenRecorder.finishingDidBeginNotification, object: recorder, queue: nil
+        ) { [weak self] _ in self?.freeze() }
         self.item = item
         tick()
         // `.common` modes, the panel's rule (`RecorderStatusItem`'s doc): under
@@ -87,6 +93,8 @@ final class RecordingToolChrome {
         ended = true
         if let observer { NotificationCenter.default.removeObserver(observer) }
         observer = nil
+        if let finishObserver { NotificationCenter.default.removeObserver(finishObserver) }
+        finishObserver = nil
         timer?.invalidate()
         timer = nil
         item?.remove()

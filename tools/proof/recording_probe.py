@@ -4,7 +4,9 @@ pause and resume (rows 3o–3t, section 4b, rows 5p–5u, 7d, and section 9),
 the grants a press checks (section 10, spec §11 recording), issue batch
 B17's unreadable segment and File ▸ Pause Recording (sections 11 and 12),
 and issue batch B27's closed segment's did-fail (3r, 3r2), the recorder's
-pause notification (F6, F7) and the countdown's meter (section 13).
+pause notification (F6, F7) and the countdown's meter (section 13), and
+issue batch B42's finishing notification (F8, F9) and the countdown's
+cleared resumeProblem (F10).
 
 Why a probe and not an MCP script. Three of the things R1a added have no
 caller a running binary can be asked to reach, and one of them is the row
@@ -580,6 +582,18 @@ asserted). F7, structural over the comment-stripped
 `AgentServer+RecordingChrome.swift`: `show`'s body adds an observer for the
 notification with `object: recorder` whose block calls `tick()`, and
 `remove()` calls `removeObserver` — the item itself is never put up.
+**Issue batch B42 (#193 items 1 and 2)**: F8 — a counting observer of
+`ScreenRecorder.finishingDidBeginNotification` (object
+`ScreenRecorder.shared`) installed before F3: F3–F5 post none; then a
+faked tool's recording, paused by the action, and File ▸ Stop Recording
+(`newRecording`) → ONE post, counted before any spin, with the recorder
+`finishing` inside the block; after the call the panel is idle and not
+shown and the recorder `.finishing`. F9, structural like F7: `show`'s body
+adds an observer for that notification with `object: recorder` whose block
+calls `freeze()`, and `remove()` calls `removeObserver(finishObserver)`.
+F10: a stale `resumeProblem` with the panel idle, `beginCountdown()` → nil,
+the phase read straight after a countdown; `cancelCountdown()` and
+`disarmTick()` → idle; the choice's microphone is printed, not asserted.
 
 Section 13 (`preroll`, issue batch B27, #98 c) runs in its own process and
 reads the Microphone status BEFORE touching a device, so it cannot prompt;
@@ -869,7 +883,21 @@ running). Three of them put back the code before the batch:
                     — 38/39: F6's pause row.
   chrome-no-observer  the chrome's addObserver deleted
                     (AgentServer+RecordingChrome.swift) — 38/39: F7's show
+                    row; 45/46 re-measured by B42.
+
+**Issue batch B42's mutants** (F8, F9, F10, #193), measured 2026-10-01,
+each `--mutant <name> --only file_pause` (46 rows), against a tree scoring
+46/46 there and the whole run 1073/1073 with no row skipped (section 9 and
+section 13 running). Each puts back the code before the batch:
+
+  finish-no-post    the post in beginFinishing deleted
+                    (ScreenRecorder+Finishing.swift) — 45/46: F8's stop row.
+  chrome-no-freeze  the chrome's finishing addObserver deleted
+                    (AgentServer+RecordingChrome.swift) — 45/46: F9's show
                     row.
+  countdown-keeps-resume-problem  beginCountdown's `resumeProblem = nil`
+                    deleted (RecorderPanelController+Recording.swift) —
+                    45/46: F10's cleared row.
 
 6b's "one program" row, the tree's one failure when this file was first
 written, turned green when the harness literalised the six recorder keys
@@ -879,6 +907,7 @@ in its pin map (R1's landing): both cross-builds are one program again.
     python3 tools/proof/recording_probe.py --only state,segments   # a subset
     python3 tools/proof/recording_probe.py --only unreadable,file_pause   # B17's
     python3 tools/proof/recording_probe.py --only state,file_pause,preroll   # B27's
+    python3 tools/proof/recording_probe.py --only file_pause   # B42's
     python3 tools/proof/recording_probe.py --mutant excludes
     python3 tools/proof/recording_probe.py --sources <dir> # any copy
     RC_APP_SOURCES=<dir> python3 tools/proof/recording_probe.py
@@ -3705,6 +3734,13 @@ func filePause(_ request: [String: Any]) -> [String: Any] {
         forName: ScreenRecorder.pauseDidChangeNotification, object: ScreenRecorder.shared,
         queue: nil
     ) { _ in posts.append(ScreenRecorder.shared.isPaused) }
+    // F8 (issue batch B42, #193): the recorder's finishing notification,
+    // counted from before F3 — the state read INSIDE each block.
+    var finishPosts: [String] = []
+    let finishObserver = NotificationCenter.default.addObserver(
+        forName: ScreenRecorder.finishingDidBeginNotification, object: ScreenRecorder.shared,
+        queue: nil
+    ) { _ in finishPosts.append("\(ScreenRecorder.shared.state)") }
 
     // F3: the panel's own recording, through the panel.
     let panel = RecorderPanelController.shared
@@ -3760,6 +3796,40 @@ func filePause(_ request: [String: Any]) -> [String: Any] {
         "f3": f3Posts, "f4Pause": f4PausePosts, "f4Resume": f4ResumePosts, "f5": posts.count,
     ]
     NotificationCenter.default.removeObserver(postObserver)
+
+    // F8 (b, c): File ▸ Stop Recording over a tool's PAUSED recording — the
+    // default arm's `ScreenRecorder.shared.stop()` posts the finishing
+    // notification once, synchronously, with the recorder `.finishing`.
+    let f8Before = finishPosts
+    finishPosts = []
+    panel.window?.orderOut(nil)
+    let attached8 = fakeSharedRecording(work, "f8")
+    delegate.pauseOrResumeRecording(nil)
+    let f8Paused = "\(ScreenRecorder.shared.state)"
+    delegate.newRecording(nil)
+    // Counted BEFORE any spin: the post is synchronous inside beginFinishing.
+    let f8StopPosts = finishPosts
+    out["f8"] = [
+        "before": f8Before, "attached": attached8, "paused": f8Paused, "stopPosts": f8StopPosts,
+        "panel": "\(panel.phase)", "visible": panel.window?.isVisible ?? false,
+        "recorder": "\(ScreenRecorder.shared.state)",
+    ]
+    tearDownShared()
+    NotificationCenter.default.removeObserver(finishObserver)
+
+    // F10 (#193): a new countdown clears a stale resumeProblem.
+    panel.phase = .idle
+    panel.resumeProblem = "F10 stale"
+    panel.beginCountdown()
+    let f10Problem: Any = panel.resumeProblem ?? NSNull()
+    let f10Phase = "\(panel.phase)"
+    panel.cancelCountdown()
+    panel.disarmTick()
+    out["f10"] = [
+        "problem": f10Problem, "phase": f10Phase, "after": "\(panel.phase)",
+        "microphone": panel.currentChoice().microphone ?? NSNull(),
+    ]
+    panel.window?.orderOut(nil)
 
     // W0–W2: the titles against the one length.
     func width(_ elapsed: TimeInterval, _ paused: Bool) -> Double {
@@ -6788,6 +6858,38 @@ def section_file_pause(binary, sources):
     remove_body = "\n".join(function_body(lines, "func remove()") or [])
     check("F7: … and remove() calls removeObserver", "removeObserver" in remove_body, remove_body)
 
+    # Issue batch B42 (#193): the recorder's finishing notification, which
+    # freezes the tool's status item at a stop from any door, and the stale
+    # resumeProblem a new countdown clears.
+    f8 = answer.get("f8") or {}
+    check("F8: F3–F5 (pauses, resumes, a teardown, an idle action) post no "
+          "ScreenRecorder.finishingDidBeginNotification", f8.get("before") == [], f"{f8}")
+    check("F8: File ▸ Stop Recording (newRecording) over a tool's PAUSED recording posts "
+          "finishingDidBeginNotification ONCE, synchronously (counted before any spin), the "
+          "recorder finishing inside the block (finish-no-post)",
+          f8.get("attached") == "ok" and f8.get("paused") == "paused"
+          and f8.get("stopPosts") == ["finishing"], f"{f8}")
+    check("F8: … and after the call the panel is idle and not shown, the recorder .finishing",
+          f8.get("panel") == "idle" and f8.get("visible") is False
+          and f8.get("recorder") == "finishing", f"{f8}")
+    segments = show_body.split("addObserver(")[1:]
+    finishing = next((part.split("}", 1)[0] for part in segments
+                      if "forName: ScreenRecorder.finishingDidBeginNotification" in part), "")
+    check("F9: RecordingToolChrome.show (comment-stripped) adds an observer for "
+          "ScreenRecorder.finishingDidBeginNotification with object: recorder whose block calls "
+          "freeze() (chrome-no-freeze)",
+          "object: recorder" in finishing and "freeze()" in finishing, show_body)
+    check("F9: … and remove() calls removeObserver on finishObserver",
+          "removeObserver(finishObserver)" in remove_body, remove_body)
+    f10 = answer.get("f10") or {}
+    print(f"  F10: the choice's microphone is {f10.get('microphone')!r} (a fact, not asserted)")
+    check("F10: beginCountdown() over a stale resumeProblem clears it "
+          "(countdown-keeps-resume-problem)", "problem" in f10 and f10.get("problem") is None,
+          f"{f10}")
+    check("F10: … the phase straight after is the countdown, and cancelCountdown() with "
+          "disarmTick() leaves the panel idle",
+          str(f10.get("phase", "")).startswith("countdown") and f10.get("after") == "idle", f"{f10}")
+
     w0 = answer.get("w0") or {}
     print(f"  W0: '● 0:00' is {w0.get('recording')} pt wide and '{PAUSE_GLYPH} 0:00' "
           f"{w0.get('paused')} pt (facts, not asserted)")
@@ -8172,6 +8274,24 @@ MUTANTS = {
         "        ) { [weak self] _ in self?.tick() }\n",
         "",
         "the tool's chrome observes nothing — its item flips only at the 1 Hz tick (the code before B27)"),
+    # Issue batch B42 (#193 items 1 and 2) — F8, F9, F10.
+    "finish-no-post": (
+        "ScreenRecorder+Finishing.swift",
+        "        NotificationCenter.default.post(name: Self.finishingDidBeginNotification, object: self)\n",
+        "",
+        "beginFinishing posts no finishingDidBeginNotification — File ▸ Stop leaves a tool's item live"),
+    "chrome-no-freeze": (
+        "AgentServer+RecordingChrome.swift",
+        "        finishObserver = NotificationCenter.default.addObserver(\n"
+        "            forName: ScreenRecorder.finishingDidBeginNotification, object: recorder, queue: nil\n"
+        "        ) { [weak self] _ in self?.freeze() }\n",
+        "",
+        "the tool's chrome does not freeze at a finish it did not start (the code before B42)"),
+    "countdown-keeps-resume-problem": (
+        "RecorderPanelController+Recording.swift",
+        "        countdownTimer?.invalidate()\n        resumeProblem = nil\n",
+        "        countdownTimer?.invalidate()\n",
+        "beginCountdown keeps a stale resumeProblem (the code before B42)"),
 }
 
 

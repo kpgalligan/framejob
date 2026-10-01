@@ -1276,7 +1276,8 @@ free.
   `Graphics`
   (+`RecordingArguments`, +`RecordingResult`, +`RecordingChrome` —
   `RecordingToolChrome`, the tool's status item, flipped by the recorder's
-  `pauseDidChangeNotification`) — the handlers, one file per group. `+CloudCaptions` is `transcribe`'s CLOUD arm alone — the `engine`
+  `pauseDidChangeNotification` and frozen at its
+  `finishingDidBeginNotification`) — the handlers, one file per group. `+CloudCaptions` is `transcribe`'s CLOUD arm alone — the `engine`
   reader, the three cloud-only arguments refused by name under `apple`, the
   vocabulary's trim/de-dup/cap, the credential and the endpoint read ABOVE
   the network, and the result keys; `+Captions` dispatches on `engine` and is

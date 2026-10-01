@@ -195,7 +195,9 @@ this order because the first row needs NO document open:
   true, `audio_tracks` 1; and then, while `afplay` plays a 30 s 1 kHz tone
   this script writes with the `wave` module, a second recording → the two
   files decoded to PCM (`ffmpeg`, a proof-time requirement here as it is
-  for `phase2_proof.py`) and read through a Goertzel filter at 1 kHz on
+  for `phase2_proof.py`; a decode failure names ffmpeg's cause, #193 —
+  whether `ffmpeg -version` runs and, when it does, which recording did not
+  decode) and read through a Goertzel filter at 1 kHz on
   PARSEVAL's scale: the 1 kHz SHARE of a file is 2·|X[k]|² / (n·Σx²), which
   a pure tone puts at 1.0 and noise near 2/n, with n truncated to a
   multiple of 48 so 1000 Hz sits exactly on a bin. The tone recording's
@@ -1369,6 +1371,23 @@ def tone_power(path):
     return tone_share(samples)
 
 
+def pcm_failure(silent, loud):
+    """The PCM row's sentence when a recording did not decode (#193): whether
+    ffmpeg runs (`ffmpeg_runs()`), and when it does, which recording did not
+    decode."""
+    ok, why = ffmpeg_runs()
+    if not ok:
+        return (f"the two recordings decoded to PCM — ffmpeg does not run "
+                f"(`ffmpeg -version`: {why})")
+    if silent is None and loud is None:
+        which = "neither recording decoded"
+    elif silent is None:
+        which = "the silent recording did not decode"
+    else:
+        which = "the tone recording did not decode"
+    return f"the two recordings decoded to PCM — ffmpeg runs ({why}) and {which}"
+
+
 def describe(measured):
     """`share s, RMS r` for a tone measurement, or `?` for none."""
     if measured is None:
@@ -1745,7 +1764,7 @@ def granted_rows(mcp, host):
         skip("the tone rows: the host's output is MUTED, so the tap gets the tone "
              "unreliably — unmute to score capture", TONE_CHECKS)
     elif silent is None or loud is None:
-        check(False, "the two recordings decoded to PCM (ffmpeg present, files readable)")
+        check(False, pcm_failure(silent, loud))
         skip("the tone rows: no PCM to measure", TONE_CHECKS - 1)
     else:
         check(loud["share"] >= 100 * max(silent["share"], 0.001),

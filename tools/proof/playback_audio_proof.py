@@ -94,8 +94,12 @@ def mutant_sources(name):
     return target, None
 
 
-def build_probe(sources=SOURCES, probe_dir=PROBE_DIR):
-    """(binary, None) or (None, reason). Rebuilt only when stale."""
+def build_probe(sources=None, probe_dir=None):
+    """(binary, None) or (None, reason). Rebuilt only when stale. `None` for
+    either argument means the module's `SOURCES` / `PROBE_DIR`, read at call
+    time, so an importer that sets them is heard."""
+    sources = SOURCES if sources is None else sources
+    probe_dir = PROBE_DIR if probe_dir is None else probe_dir
     os.makedirs(probe_dir, exist_ok=True)
     binary = os.path.join(probe_dir, "playback_audio_probe")
     entry = os.path.join(probe_dir, "main.swift")

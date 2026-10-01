@@ -142,8 +142,10 @@ TONES = {
 }
 
 
-def make_media(directory=WORK):
-    """The four tone files, written fresh every run. Answers None or why not."""
+def make_media(directory=None):
+    """The four tone files, written fresh every run. Answers None or why not.
+    `None` means the module's `WORK`, read at call time."""
+    directory = WORK if directory is None else directory
     os.makedirs(directory, exist_ok=True)
     for name, (tone, rate, channels, codec) in TONES.items():
         path = os.path.join(directory, name)

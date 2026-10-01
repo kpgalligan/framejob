@@ -4641,10 +4641,12 @@ already there. **No live call was made and nothing was spent.**
 (unset ANTHROPIC_API_KEY RC_ASSEMBLYAI_KEY; python3 tools/proof/makefile_env_proof.py)
 (unset ANTHROPIC_API_KEY RC_ASSEMBLYAI_KEY; python3 tools/proof/makefile_env_proof.py --mutant no-unexport)
 (unset ANTHROPIC_API_KEY RC_ASSEMBLYAI_KEY; python3 tools/proof/makefile_env_proof.py --mutant no-unexport-anthropic)
+(unset ANTHROPIC_API_KEY RC_ASSEMBLYAI_KEY; python3 tools/proof/makefile_env_proof.py --no-sweep --wall 30)   # the sweep's CONTROL
 ```
 
-**3/3** on the tree, and **2/3** under each mutant (road map 12 A1 part 2
-added the Anthropic key). It builds a tree COPY at
+**4/4** on the tree and **3/4** under `--mutant no-unexport` (issue batch
+B42's runs, 2026-10-01, 587 files read; road map 12 A1 part 2 added the
+Anthropic key, and B42 the sweep row). It builds a tree COPY at
 `tools/proof/work/makefile-env/tree` with `tree_copy.make_copy`: `app/`,
 `project.yml` and `Makefile` are copied; every other build input
 `project.yml` names is a SYMLINK to the tree's (`core` already built, so the
@@ -4659,12 +4661,20 @@ searches every file under the copy's `build/` and `Reelcut.xcodeproj/`
 nothing else; the person's own values are never read, printed or searched
 for.
 
-Three rows:
+Four rows:
 - The copy's `make app` made `Reelcut.app`'s binary. A failed build holds
   nothing, and "no file holds the dummy" would be true of it for the wrong
   reason.
-- **No file of 553 holds the AssemblyAI dummy.**
-- **No file of 553 holds the Anthropic dummy.**
+- No process whose cwd or command line lies under the copy outlives its
+  `make app` (#191). After `make app` returns — built, failed or past its
+  `--wall` — the SWEEP SIGKILLs every process whose cwd (`lsof`) or command
+  line (`ps`) names the copy, and rescans every second until two scans in a
+  row find none or 30 s pass. It never selects by name, and spares this
+  run's own ancestors and any process older than this run's `make app`.
+  `--no-sweep` is its CONTROL: the row is scored on one scan straight after
+  `make app` returns, and the sweep runs afterwards anyway.
+- **No file of 587 holds the AssemblyAI dummy.**
+- **No file of 587 holds the Anthropic dummy.**
 
 Each `unexport` directive is asserted to occur exactly once in the tree's
 `Makefile`. `--mutant no-unexport` removes `unexport RC_ASSEMBLYAI_KEY` in
@@ -9791,4 +9801,74 @@ harness rebuild (217 s) was caused by a staticlib newer than the harness
 python3 tools/proof/harness_playhead_proof.py                               # 6/6
 python3 tools/proof/harness_playhead_proof.py --mutant no-late-playhead     # exit 1, P1 P2 P3 FAIL
 python3 tools/proof/harness_playhead_proof.py --mutant no-reselect          # exit 1, S1 FAILS
+```
+
+## Issue batch B42 — proof-runner and recorder residue (`makefile_env_proof.py`'s sweep and `--no-sweep`, five runners' call-time defaults, the `--baseline` label, `recording_probe.py` F8–F10 and three mutants, `recording_proof.py`'s PCM sentence; #191, #193)
+
+- **`makefile_env_proof.py`'s sweep (#191 item 1).** `bounded.run` kills
+  the copy's `make app` process group at `--wall`, but what `xcodebuild`'s
+  build service starts (`swift-frontend` among them) is in other groups.
+  After `make app` returns, `sweep(root, since)` SIGKILLs every process
+  whose cwd or command line lies under the copy. It rescans every second
+  until two scans in a row find none or 30 s pass. `copy_processes` takes
+  one `ps -A -ww -o pid=,ppid=,etime=,command=` scan and `lsof`'s cwds. It
+  never selects by name. It spares this process and its whole `ppid` chain,
+  and any process whose `etime` exceeds the time since `make app` began
+  plus 2 s. The new row is "no process whose cwd or command line lies
+  under the copy outlives its `make app`". `--no-sweep` scores that row on
+  one scan taken before any kill.
+- **Call-time defaults (#191 item 2).** `build_probe(sources=None,
+  probe_dir=None)` in `playback_audio_proof.py`,
+  `video_configuration_proof.py` (new global `PROBE_DIR`) and
+  `export_cancel_proof.py` (new global `SOURCES`), B28's shape.
+  `mixed_audio_probe.make_media(directory=None)` and
+  `capture_spike/inventory.py`'s `grep_sites`, `line_of`, `_file_lines`,
+  `enclosing_func`, `resolve` and `check` (`sources=None` / `root=None`)
+  read `WORK` / `SOURCES` / `ROOT` when called. Explicit callers are
+  unchanged.
+- **The `--baseline` label (#191 item 3).** `name_field_proof.py` and
+  `text_break_proof.py` print `baseline <commit>: the control could not be
+  performed — <why>`, not `mutant baseline: …`.
+- **The recorder (#193).** `ScreenRecorder.finishingDidBeginNotification`
+  is posted by `beginFinishing` once the state is `.finishing`, just before
+  `stopCapture`. `RecordingToolChrome.show` observes it and calls
+  `freeze()`, so File ▸ Stop Recording over a tool's paused recording keeps
+  the item's pause glyph and frozen time (manual check REC-8 step 7).
+  `beginCountdown()` clears a stale `resumeProblem`. `recording_proof.py`'s
+  PCM row names ffmpeg's cause through `pcm_failure(silent, loud)`.
+
+Run on 2026-10-01, the change over `125f101`:
+
+| Command | Result |
+|---|---|
+| `recording_probe.py --only file_pause` | 46/46, exit 0 |
+| `--mutant finish-no-post --only file_pause` | 45/46, exit 1 (F8's stop row) |
+| `--mutant chrome-no-freeze --only file_pause` | 45/46, exit 1 (F9's show row) |
+| `--mutant countdown-keeps-resume-problem --only file_pause` | 45/46, exit 1 (F10's cleared row) |
+| `--mutant chrome-no-observer --only file_pause` | 45/46, exit 1 (F7's show row) |
+| `recording_probe.py` (whole run) | 1073/1073, exit 0, no row skipped |
+| `recording_proof.py 4842` | 189/189, exit 0; the tone rows (2) skipped by name: the host's output is muted |
+| `pcm_failure(None, None)`, a stub `ffmpeg` that exits 1 | "… ffmpeg does not run (`ffmpeg -version`: exited 1: dyld: Library not loaded: stub)" |
+| `pcm_failure(None, {…})` / `pcm_failure(None, None)`, real PATH | "… ffmpeg runs (ffmpeg version 9.0.2 …) and the silent recording did not decode" / "… and neither recording decoded" |
+| `makefile_env_proof.py --wall 30`, ×3 | sweep row ok each time (killed 2, 1, 1 PIDs); the independent `ps` / `lsof` scan after each printed nothing; exit 1 (the build row: the 30 s wall) |
+| `makefile_env_proof.py --no-sweep --wall 30` (CONTROL) | run 1: the scan found 0, row ok; run 2: row FAIL naming PID 46599 (`swift-frontend -frontend -emit-pcm -module-name Foundation …`), exit 1 |
+| `makefile_env_proof.py` | 4/4, exit 0, 587 files read, the sweep killed 0 |
+| `makefile_env_proof.py --mutant no-unexport` | 3/4, exit 1 (the AssemblyAI row) |
+| spared controls (a `perl -e 'sleep 900' <copy>/x` started 6 s before a `--wall 30` run inside `zsh -c '…; echo shell-survived <copy>'`) | `shell-survived` and `sleeper-alive` printed; with the sleeper started 2 s before, it was killed (see below) |
+| `name_field_proof.py --baseline 0000000`, `text_break_proof.py --baseline 0000000` | `baseline 0000000: the control could not be performed — git archive 0000000 failed: …`, exit 2 each |
+| `name_field_proof.py` | 27/27, exit 0 |
+| `playback_audio_proof.py` | 9/9, exit 0 |
+| `video_configuration_proof.py 4843 capture <dir>` | C1, C2 ok, exit 0 |
+| `export_cancel_proof.py --port 4844 --only cancel --runs 5` | M0, M1, M2, Z1 ok (4/4), exit 0 |
+
+The age rule's slack is 2 s on top of `ps`'s whole-second `etime`, and the
+proof's own work before `make app` takes about 0.2 s. So a process started
+less than about 3 s before the proof runs is not spared by age. A sleeper
+started 2 s before was killed (PIDs 49595 and 50375 in that run's kill
+list), while the shell still survived through the ancestor rule.
+
+```sh
+python3 tools/proof/recording_probe.py --only file_pause                          # 46/46
+python3 tools/proof/recording_probe.py --mutant finish-no-post --only file_pause  # exit 1, F8
+(unset ANTHROPIC_API_KEY RC_ASSEMBLYAI_KEY; python3 tools/proof/makefile_env_proof.py)   # 4/4
 ```
