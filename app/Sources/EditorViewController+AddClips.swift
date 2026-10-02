@@ -170,7 +170,7 @@ extension EditorViewController {
     /// arrives on the main thread (`MediaImporter.probe`, the seam that keeps
     /// `async` confined to that file), so an unreadable picture is reported in
     /// a sheet and nothing is placed.
-    private func addImageBackground(
+    func addImageBackground(
         from url: URL, into document: ProjectDocument, in window: NSWindow
     ) {
         MediaImporter.probe(url: url) { [weak self] result in
@@ -207,7 +207,7 @@ extension EditorViewController {
     /// steps for one command, and a ⌘Z that leaves the picture in the media
     /// list is the kind of half-undone state this app does not have anywhere
     /// else.
-    private func placeImageBackground(
+    func placeImageBackground(
         _ descriptor: MediaDescriptor, into document: ProjectDocument, in window: NSWindow
     ) {
         let before = document.editedProject.snapshot

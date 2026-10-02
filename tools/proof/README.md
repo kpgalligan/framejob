@@ -8664,7 +8664,7 @@ instrument failure is a scored FAIL, exit 1.
 
 | Runner | caught / survived / not performed |
 |---|---|
-| `assistant_lane_proof.py`, `assistant_tab_proof.py`, `assistant_helper_proof.py`, `assistant_prompt_proof.py`, `assistant_session_proof.py`, `spend_proof.py`, `budget_proof.py`, `prices_proof.py`, `prices_crosscheck.py`, `makefile_env_proof.py`, `export_cancel_proof.py`, `video_configuration_proof.py`, `speed_sheet_probe.py`, `text_break_proof.py` and `name_field_proof.py` (each `--baseline`, B23; `--mutant`, B32), `obscure_handles_probe.py` (`--baseline` and `--mutant`, B25), `cache_pass_probe.py` (`--mutant`, B14), `assistant_compaction_proof.py` (`--mutant`, B26), `relink_sheet_probe.py` (`--mutant`, B29), `menu_undo_probe.py` (`--mutant`, B51) and `assistant_clearing_proof.py` (`--mutant`, B54) | 1 / 0 / 2 |
+| `assistant_lane_proof.py`, `assistant_tab_proof.py`, `assistant_helper_proof.py`, `assistant_prompt_proof.py`, `assistant_session_proof.py`, `spend_proof.py`, `budget_proof.py`, `prices_proof.py`, `prices_crosscheck.py`, `makefile_env_proof.py`, `export_cancel_proof.py`, `video_configuration_proof.py`, `speed_sheet_probe.py`, `text_break_proof.py` and `name_field_proof.py` (each `--baseline`, B23; `--mutant`, B32), `obscure_handles_probe.py` (`--baseline` and `--mutant`, B25), `cache_pass_probe.py` (`--mutant`, B14), `assistant_compaction_proof.py` (`--mutant`, B26), `relink_sheet_probe.py` (`--mutant`, B29), `menu_undo_probe.py` (`--mutant`, B51), `assistant_clearing_proof.py` (`--mutant`, B54) and `sheet_queue_probe.py` (`--mutant`, B57) | 1 / 0 / 2 |
 | `spend_ui_proof.py` | 1 / 3 / 2 |
 | `graphics_proof.py`, `graphics_store_probe.py`, `words_picture_probe.py` | 0 / 1 / 2 |
 | `cloud_captions_proof.py`, `cloud_captions_probe.py` (`--mutant`, `--fake-mutant`), `recording_probe.py`, `phase9_chrome.py` — whole-suite mutants | the per-row count and a normal run's exit / 2 |
@@ -11197,3 +11197,192 @@ $0.0324), the month's first Anthropic spend of the $25.00 budget.
 So AI-20's clearing is proven against the real API at both levels: the
 app's exact request is accepted (turn A), and with the trigger lowered the
 API clears a tool result and the app reports it (turn B).
+
+## Issue batch B57 — sheet sites that bypass the document's alert queue (`sheet_queue_probe.py`; #210)
+
+#210 asked whether the 25 `beginSheetModal(for:)` sites in `app/Sources`,
+which attach straight to the editor window rather than through
+`ProjectDocument.present(_:)`'s queue (B51), can be asked for while another
+sheet is up, and lose or reorder an alert when they are. The batch measured
+it before changing anything: **every row passed on the baseline, so no site
+is routed.** `DocumentAlertQueue` keeps its B51 shape (no `Entry`, no
+`enqueueSheet`), relink's `queue-off` mutant keeps its text, and no
+`entry-at-once` mutant is defined. The one app change is three private
+methods made internal for the probe, with no behaviour change:
+`EditorViewController.frameSaved(_:in:)` (`+SaveFrame`),
+`addImageBackground(from:into:in:)` and `placeImageBackground(_:into:in:)`
+(`+AddClips`). Every `beginSheetModal` token stays in its function and on
+its line; `inventory.py --check` 5/5.
+
+- **`sheet_queue_probe.py [--sources DIR] [--mutant NAME] [--only IDS]`** —
+  no instance. `sheet_queue_probe.swift` is built with
+  `relink_sheet_probe.py`'s swiftc line and run once in its own process
+  under `tools/proof/work/sheet-queue/<tree|mutant-NAME>/`, with a 240 s
+  wall. Each row gets a fixture of its own: an untitled `ProjectDocument`,
+  with its `EditorViewController` as the content of a 1440×900 window
+  (`graphics_menu_probe.swift`'s set-up) whose `NSWindowController` is
+  added to the document, so `windowForSheet` is that window. The process
+  uses `.prohibited` activation. No media from `tools/proof/media`: the
+  probe writes its own garbage `.png` and a valid 4×4 PNG. E1 and E2 are
+  `present(_:)` of "probe alert one" and "probe alert two". An attached
+  sheet is ended with `endSheet` 0.3 s after it attaches, unless a row
+  holds it.
+  - **B0** the probe builds.
+  - **C0** (CONTROL) `windowForSheet` is the window, no sheet is attached,
+    and `addMediaFiles:` validates true.
+  - **V1** with E1 attached, each of `exportCaptions: importCaptions:
+    addImageBackground: addMediaFiles: consolidateMedia:
+    insertGraphicFromFile: addGraphicFont: addGraphicImage:
+    insertGraphicTemplate: setTransitionKind: saveFrame: removeTrack:`
+    validates false.
+  - **P1 / P2** a stand-in `NSOpenPanel` (P1) or `NSSavePanel` (P2) is
+    attached, then E1 is presented and waits. The panel is ended with
+    `.cancel`. Its completion handler records whether E1 is attached and
+    then asks for an `NSAlert` "probe handler". Passes when E1 was not
+    attached at the handler, and the handler's alert then E1 are shown in
+    that order, with none more within 2 s.
+  - **X1** (`ExportSheetController.swift:582`'s shape) a bare sheet is
+    presented and dismissed, an `NSSavePanel` sheet is asked for, then E1.
+    Passes when nothing but the panel attaches while it is up (1 s), and
+    after it ends E1 appears within 2 s, with none more.
+  - **S1–S4** E1 is attached, the site is called, E1 is held (2 s for S2,
+    1 s for the others), then E2 is presented and E1 is ended. Passes when
+    the sheets show [E1], [the site's text], [E2] in that order, with none
+    more within 2 s. S1 `frameSaved(.failure(NSError "probe frame"))`
+    (`+SaveFrame` :209). S2 `addImageBackground(from: garbage.png)`
+    (`+AddClips` :179); the text is what `MediaImporter.probeBlocking`
+    throws for the file. S3 `placeImageBackground` of the 4×4 PNG's
+    descriptor at `width = 70000` (`+AddClips` :236); the text is what
+    `add_media` throws. S4 `consolidateAfterSave(didSave: true)` on
+    the document given `fileURL = work/probe.reelcut` and no media
+    (`+Consolidate` :67); the text is what `MediaConsolidator.plan` throws.
+  - A P1, P2 or X1 panel that does not attach within 3 s is an instrument
+    failure (`instrument: panel did not attach within 3 s`), and so is an
+    E1 that does not attach within 5 s in V1 or S1–S4. Such a failure is
+    never the row's verdict. Exits follow rule R (1 / 0 / 2): a plain
+    run's instrument failure is a scored FAIL, exit 1, and a `--mutant`
+    run with any instrument failure exits 2.
+
+**The fixture is per row** (the spec had one for the whole run). The first
+`--mutant no-sheet-wait` run used one document and printed "S1–S4 fail —
+instrument: E1 did not attach within 5 s" with P1, P2 and X1 FAIL, then
+"the control could not be performed — instrument failure in S1, S2, S3,
+S4", exit 2. P1 had left that document's queue jammed (E1 was dropped while
+the handler's alert was up), so no later row's E1 could attach. With a
+fresh document per row, each row measures the queue on its own.
+
+### The 25 sites
+
+Lines are at HEAD 2967c65 (unchanged at 8fda7d5 and after this batch).
+Class A: reached only synchronously from a validated editor action or from
+a click or key in the editor window. The validator
+(`EditorViewController.swift`'s `validateUserInterfaceItem`, measured by
+V1) and the key guard refuse while any sheet is attached, and a
+document-modal sheet takes the parent window's mouse and key events. Class
+B: synchronous inside the completion handler of a panel on the editor
+window. Class C: after an async hop. V1 tests that ONE guard
+(`EditorViewController.swift:1042`, which refuses every action before its
+switch while a sheet is attached); C0 controls it through `addMediaFiles:`
+alone, since the other eleven may validate false on an empty document
+regardless of any sheet.
+
+| Site | Class | Reason | Row |
+|---|---|---|---|
+| `CaptionExporter.swift:514` (`exportCaptionsCommand`) | A | reached from `exportCaptions:` only | V1 |
+| `CaptionExporter.swift:534` (`exportCaptions(…)`) | B | synchronous in the save panel's completion; the queue asks only on a later main-queue turn | P2 (stand-in panel) |
+| `CaptionImporter.swift:387` (`importCaptionsCommand`) | A | reached from `importCaptions:` only | V1 |
+| `CaptionImporter.swift:408` (`importCaptions(from:into:in:)`) | B | synchronous in the open panel's completion | P1 (stand-in panel) |
+| `CaptionImporter.swift:420` (`importCaptions(from:into:in:)`) | B | as :408 | P1 (stand-in panel) |
+| `EditorViewController.swift:662` (`addMediaFiles:`) | A | the action itself; the file is frozen | V1 |
+| `EditorViewController+AddClips.swift:163` (`addImageBackground:`) | A | the action itself | V1 |
+| `EditorViewController+AddClips.swift:179` (`addImageBackground(from:into:in:)`) | C | after `MediaImporter.probe`'s hop; AppKit queues it behind the queue's alert, order kept | S2 |
+| `EditorViewController+AddClips.swift:231` (`placeImageBackground`) | C | the same function and hop as :236; not routed because S3 passed | S3 (shared) |
+| `EditorViewController+AddClips.swift:236` (`placeImageBackground`) | C | AppKit queues it behind the queue's alert, order kept | S3 |
+| `EditorViewController+Consolidate.swift:37` (`offerSaveBeforeConsolidating`) | A | reached from `consolidateMedia:` only | V1 |
+| `EditorViewController+Consolidate.swift:67` (`beginConsolidate`) | C (A from the menu) | after NSDocument's save callback (`consolidateAfterSave`); AppKit queues it behind the queue's alert, order kept | S4 |
+| `EditorViewController+Consolidate.swift:81` (`beginConsolidate`) | C (A from the menu) | the same function and hop as :67; S4 reaches :67, not :81 | S4 (shared) |
+| `EditorViewController+GraphicMenus.swift:45` (`insertGraphicFromFile:`) | A | the action itself | V1 |
+| `EditorViewController+GraphicMenus.swift:157` (`chooseGraphicFile`) | A | reached from `addGraphicFont:` / `addGraphicImage:` only | V1 |
+| `EditorViewController+GraphicMenus.swift:174` (`reportingGraphicFailure`) | A via `insertGraphicTemplate:`; B via a panel | synchronous in the action or in the open panel's completion | V1, P1 (stand-in panel) |
+| `EditorViewController+Inspector.swift:283` (`presentNoFootageForTransition`) | A | the menu (`setTransitionKind:`) and the Clip tab's controls | V1 (the menu); the tab's controls by event routing |
+| `EditorViewController+SaveFrame.swift:130` (`saveFrameCommand`) | A | reached from `saveFrame:` only | V1 |
+| `EditorViewController+SaveFrame.swift:209` (`frameSaved`) | C | after the frame grab queue's hop; AppKit queues it behind the queue's alert, order kept | S1 |
+| `EditorViewController+Timeline.swift:324` (`removeTrackCommand`) | A | the menu (`removeTrack:`) and the track header's context menu | V1 (the menu); the context menu by event routing |
+| `MediaPaneCommands.swift:180` (`relink`) | A | a Media tab row, a click in the editor window | event routing, no row |
+| `MediaPaneCommands.swift:224` (`remove`) | A | as :180 | event routing, no row |
+| `PreviewCanvasView+TextEditKeys.swift:56` (`escapeTextEditing`) | A | Esc in the canvas editor, behind the key guard | event routing, no row |
+| `RelinkSheetController.swift:123` (`locate`) | Other | attaches to the relink SHEET's own window, from its Locate… button; the queue attaches only to the editor window and waits there while the relink sheet is up | none: unreachable |
+| `ExportSheetController.swift:582` (`commit(queue:)`) | Other | asked over its own outgoing card on purpose; AppKit queues it | X1 |
+
+### Scores
+
+**Baseline** (the tree with the three visibility changes only, copied to
+the scratchpad and run with `--sources`): 10/10, exit 0.
+
+| Row | Printed |
+|---|---|
+| C0 | "windowForSheet is the window: true; no sheet attached: true; addMediaFiles: validates true" |
+| V1 | "E1 attached (probe alert one); validating true: none" |
+| P1 | "panel attached (the panel itself: true); E1 attached over it: false; at the handler attached: a sheet; sheets after the panel 2: [[probe handler], [probe alert one]]" |
+| P2 | the same as P1, word for word |
+| X1 | "a sheet other than the panel attached while it was up: false; sheets after the panel 1: [[probe alert one]]" |
+| S1 | "sheets 3: [[probe alert one], [probe frame], [probe alert two]]" |
+| S2 | "sheets 3: [[probe alert one], [Could not read garbage.png.], [probe alert two]]" |
+| S3 | "sheets 3: [[probe alert one], [media dimensions must be at most 65536, not 70000x4], [probe alert two]]" |
+| S4 | "sheets 3: [[probe alert one], [This project references no media files.], [probe alert two]]" |
+
+"At the handler attached: a sheet" means the panel itself was still the
+attached sheet when its completion ran, not E1. No P1, P2 or X1 panel
+failed to attach, so no row was removed and no site is unmeasured.
+
+**After** (the tree, the same source set): 10/10, exit 0, every detail
+the same as the baseline's.
+
+### Mutant (rule R)
+
+| `--mutant` | Edit | Result |
+|---|---|---|
+| `sheet_queue_probe.py --mutant no-sheet-wait` | the drain's `if window.attachedSheet != nil {` → `if false {` | S1–S4 FAIL ("sheets 2: [[probe alert one], [<the site's text>]]": E2 dropped), P1 and P2 FAIL ("sheets after the panel 1: [[probe handler]]": E1 dropped), X1 FAIL ("sheets after the panel 0: []"), caught, 1/8, exit 1 |
+
+So the S rows can fail, and they fail on the queue's wait for an attached
+sheet. On the baseline that wait is what keeps each site's alert in order:
+AppKit attaches the site's `NSAlert` after E1 ends, and the queue holds E2
+until it ends too.
+
+Run on 2026-10-01 over `8fda7d5`, every process my own:
+
+| Command | Answer |
+|---|---|
+| `make typecheck` | 0 errors, 4 warnings, tsc clean |
+| `make test` | exit 0 (`inventory.py --check` 5/5, "I2 and I3 clean over 46 grep sites and 46 pins; every pin at its own line") |
+| `make app` | BUILD SUCCEEDED |
+| `sheet_queue_probe.py --sources <baseline copy>` | 10/10, exit 0 |
+| `sheet_queue_probe.py` | 10/10, exit 0 |
+| `sheet_queue_probe.py --mutant no-sheet-wait` | caught, exit 1 |
+| `relink_sheet_probe.py` | 12/12, exit 0 |
+| `relink_sheet_probe.py --mutant queue-off` | S2 S4 A1 A3 FAIL, caught, exit 1 |
+| `relink_sheet_probe.py --mutant no-sheet-wait` | A4 A5 FAIL, caught, exit 1 |
+| `relink_sheet_probe.py --mutant sheet-silent` | S2 FAIL, caught, exit 1 |
+
+```sh
+python3 tools/proof/sheet_queue_probe.py                             # 10/10, exit 0
+python3 tools/proof/sheet_queue_probe.py --mutant no-sheet-wait      # S1-S4 P1 P2 X1 FAIL, exit 1
+python3 tools/proof/relink_sheet_probe.py                            # 12/12, exit 0
+```
+
+**CLAUDE.md edits owed**: none. `enqueueSheet` did not land, so
+app/CLAUDE.md's `+Alerts` entry stands.
+
+**Residue**
+- P1 and P2 measure stand-in panels with the handler shape of the Class B
+  sites, not CaptionImporter's, CaptionExporter's or GraphicMenus' own
+  panels, whose handlers run only after a file is chosen in a real panel.
+- The Class A sites behind a click or a key (MediaPaneCommands :180 and
+  :224, TextEditKeys :56, and the Clip tab's and track header's doors to
+  Inspector :283 and Timeline :324) rest on AppKit's event routing under a
+  document-modal sheet. No row drives a real event.
+- #210's last paragraph (the Assistant composer's undo grouping) is
+  dev-tools only and is not in this batch.
+
+**Issues not fixed**: none. X1 passed, so ExportSheetController (over the
+cap) needed no edit.

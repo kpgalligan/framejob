@@ -203,7 +203,7 @@ extension EditorViewController {
     /// person put it — and a failure is an alert on the window that asked.
     /// The whole path mutates nothing, so there is no undo step to group and
     /// none of `performGroupedEdit`'s off-event machinery applies.
-    private func frameSaved(_ result: Result<URL, Error>, in window: NSWindow) {
+    func frameSaved(_ result: Result<URL, Error>, in window: NSWindow) {
         guard case .failure(let error) = result else { return }
         let alert = NSAlert(error: error)
         alert.beginSheetModal(for: window, completionHandler: nil)
