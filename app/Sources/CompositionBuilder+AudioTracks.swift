@@ -175,4 +175,110 @@ extension CompositionBuilder {
         }
         return (inputParameters, meters)
     }
+
+    // MARK: - Audio
+
+    /// One input-parameter block per composition audio track: the plan's
+    /// piecewise-linear envelope as volume ramps, the time-pitch algorithm its
+    /// segments asked for, and — when any clip on the track asks for one, or
+    /// when this build is metering — the processing tap that runs pan, the
+    /// mono fold, the compressor and noise reduction (`AudioTap.swift`).
+    ///
+    /// **A track with nothing to do still gets no tap**, on an export. `dsp`
+    /// is nil, or its `isActive` is false, for every project that does not use
+    /// the four sample-level audio properties, and the object built here is
+    /// then exactly the one this function built before they existed. A
+    /// pass-through tap measures bit-transparent, so this is a
+    /// cost-and-clarity decision rather than a fidelity one — but it does mean
+    /// an untouched project's audio needs no argument about transparency at
+    /// all. A metering build breaks that rule deliberately and only for the
+    /// preview, where there is no file to be identical to.
+    ///
+    /// **`mono` IS expressed now**, in the tap, at the head of the Mix stage
+    /// (`AudioDSPChain.process`). It could not be expressed here in any case:
+    /// `AVMutableAudioMixInputParameters` applies gain over time and cannot
+    /// combine channels, which is why spec §7.2's old sentence about a
+    /// per-segment flag "Swift applies with `AVMutableAudioMixInputParameters`
+    /// where possible" described something the API cannot do — and the plan
+    /// carries no such flag either. A project that saved `mono: true` before
+    /// this landed does now sound different, which is the feature.
+    static func audioParameters(
+        for track: AVMutableCompositionTrack, segments: [PlanSegment], ramps: [PlanRamp]?,
+        dsp: AudioTrackDSP?, meter: LevelMeterSink?
+    ) -> AVAudioMixInputParameters {
+        let parameters = AVMutableAudioMixInputParameters(track: track)
+        if let pitch = segments.compactMap({ $0.pitch }).first {
+            switch pitch {
+            case "spectral": parameters.audioTimePitchAlgorithm = .spectral
+            case "off": parameters.audioTimePitchAlgorithm = .varispeed
+            case "time_domain": parameters.audioTimePitchAlgorithm = .timeDomain
+            default: break
+            }
+        }
+        let onset = segments.filter { $0.duration > 0 }.map(\.start).min()
+        for leg in volumeLegs(ramps: ramps ?? [], onset: onset) {
+            parameters.setVolumeRamp(
+                fromStartVolume: Float(leg.from), toEndVolume: Float(leg.to),
+                timeRange: CMTimeRange(start: time(leg.start), duration: time(leg.duration)))
+        }
+        if let tap = AudioTap.make(for: dsp, meter: meter) {
+            parameters.audioTapProcessor = tap
+        }
+        return parameters
+    }
+
+    /// One volume ramp as `audioParameters` sets it on a composition track:
+    /// a plan ramp, a plan ramp clipped at the hold's end, or the hold.
+    struct VolumeLeg: Equatable {
+        let start: Ticks
+        let duration: Ticks
+        let from: Double
+        let to: Double
+    }
+
+    /// The plan's ramps for one composition track, with the envelope's value
+    /// at the track's own first segment (`onset`) HELD from time 0 to it.
+    ///
+    /// **Why** (kpgalligan/reelcut#87, spec §11 #87; measured on a standalone
+    /// composition read at 48 kHz): before a track's first volume ramp an
+    /// audio-mix input sits at the default 1.0, and the host slews every
+    /// volume change by at most full scale per 1200 frames (25 ms), starting
+    /// AT the change — so a clip that opens its track muted or fading in
+    /// played its first 25 ms sliding down from 1.0. And a second format
+    /// family's track is handed the PLAN track's ramps, which carry the
+    /// earlier clips' gain up to its own first segment, where the same slide
+    /// followed. Holding the value at the onset from 0 leaves nothing to
+    /// slew there. Nothing at or after the hold's end changes, apart from a
+    /// leg that straddles it being clipped on its own line; nothing is added
+    /// before a segment that has sound before it on the same track, so a
+    /// shared track's hard cut keeps the slew — the accepted limit.
+    static func volumeLegs(ramps: [PlanRamp], onset: Ticks?) -> [VolumeLeg] {
+        let legs = ramps.filter { $0.duration > 0 }.map {
+            VolumeLeg(start: $0.start, duration: $0.duration, from: $0.from, to: $0.to)
+        }
+        guard let first = legs.first, let onset = onset else { return legs }
+        let holdEnd = max(onset, first.start)
+        guard holdEnd > 0 else { return legs }
+        let value: Double
+        if let holding = legs.first(where: {
+            $0.start <= holdEnd && holdEnd < $0.start + $0.duration
+        }) {
+            let u = Double(holdEnd - holding.start) / Double(holding.duration)
+            value = holding.from + (holding.to - holding.from) * u
+        } else {
+            value = legs.last(where: { $0.start + $0.duration <= holdEnd })?.to ?? first.from
+        }
+        var held = [VolumeLeg(start: 0, duration: holdEnd, from: value, to: value)]
+        for leg in legs {
+            let end = leg.start + leg.duration
+            if end <= holdEnd { continue }
+            if leg.start < holdEnd {
+                held.append(
+                    VolumeLeg(start: holdEnd, duration: end - holdEnd, from: value, to: leg.to))
+            } else {
+                held.append(leg)
+            }
+        }
+        return held
+    }
 }

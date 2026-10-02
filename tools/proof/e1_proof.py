@@ -2,7 +2,7 @@
 over MCP, and against a SECOND binary built from the tree as it stood before
 E1 landed.
 
-    python3 tools/proof/e1_proof.py [port=4825] [reference_port=4826]
+    python3 tools/proof/e1_proof.py [port=4825] [reference_port=4826] [--only audio]
 
 Every claim here is a placement read back through `get_project`, a BYTE
 comparison of two PNGs, or a sample-for-sample comparison of two decoded
@@ -48,9 +48,12 @@ the reference's `== 75` / `== 55` stay exact, because that tree is frozen.
   refusals, and one `undo` restoring `get_project` exactly.
 * **5** the audio crossfade, measured by projecting each tone onto its OWN
   frequency with a Goertzel filter in 25 ms windows — 11 cycles of 440 Hz and
-  22 of 880 Hz at 48 kHz, so neither leaks into the other's bin — ending at a
-  HARD CUT with the incoming clip muted, which is what scores the first
-  window's burst as the host's rather than the ramp's.
+  22 of 880 Hz at 48 kHz, so neither leaks into the other's bin — from each
+  overlap's FIRST window (B59, #87: every composition track holds its first
+  segment's gain from time 0); a muted clip alone on its own track, silent
+  from its first sample; and a HARD CUT with the incoming clip muted on ONE
+  composition track, the accepted limit (spec §11 #87), its edge printed.
+  `--only audio` runs section 0 and this section alone.
 * **6** Remove Silences never proposing a cut inside a transition.
 
 Fixtures: `tools/proof/media/`'s `toneA.m4a` (440 Hz), `toneB.m4a` (880 Hz),
@@ -1084,18 +1087,10 @@ def audio_part(mcp, reference):
           f"the two tones are there to measure: 440 at {a0:.0f}, 880 at {b0:.0f} "
           "(16-bit full scale is 32768)")
 
-    # **The first window is the HOST's, not the feature's.** AVFoundation
-    # does not apply a mix input's first volume point until some twelve
-    # milliseconds in, measured: the incoming clip's first ~20 ms play at
-    # full level whatever the ramp says — at a hard cut with the clip MUTED
-    # too, which is where this was pinned down and why it is not E1's. So
-    # every window from 25 ms on is scored, window 0 is PRINTED, and §12
-    # records it as a limit. **The hard cut is SCORED**, at the end of this
-    # section: the exclusion rests on that row and not on this paragraph.
     worst_out = worst_in = worst_sum = 0.0
     measured = 0
     edge_in = amplitude(start, 880) / b0
-    for k in range(1, 40):
+    for k in range(0, 40):
         at = start + 0.025 * k
         centre = at + 0.0125
         p = ease("ease_in_out", (centre - start) / 1.0)
@@ -1109,9 +1104,9 @@ def audio_part(mcp, reference):
         worst_sum = max(
             worst_sum,
             abs(10 * math.log10(max(out_ratio ** 2 + in_ratio ** 2, 1e-12))))
-    print(f"      (the mix edge: the incoming tone reads {edge_in:.3f} of full scale in "
-          f"the first 25 ms, where the ramp asks for {gain(ease('ease_in_out', 0.0125), True):.4f}"
-          " — a limit, measured at a hard cut too)")
+    check(edge_in < 0.05,
+          f"the incoming tone reads {edge_in:.3f} of full scale in the overlap's first 25 ms "
+          f"(< 0.05), where the ramp asks for {gain(ease('ease_in_out', 0.0125), True):.4f}")
     check(measured >= 20, f"{measured} windows carry an outgoing gain above 0.1")
     check(worst_out <= 0.3,
           f"the outgoing tone tracks cos(pπ/2) within {worst_out:.3f} dB (≤ 0.3)")
@@ -1123,9 +1118,9 @@ def audio_part(mcp, reference):
     pair.op("set_audio", clips=[b], patch={"muted": True})
     muted = pcm(pair.export_wav("muted"))
     loudest = max(
-        goertzel(mono_window(muted, start + 0.025 * k), 880, 48000) for k in range(1, 40))
+        goertzel(mono_window(muted, start + 0.025 * k), 880, 48000) for k in range(0, 40))
     check(db(loudest / 32768.0) < -60,
-          f"with the INCOMING clip muted the 880 tone is gone from 25 ms on: peak "
+          f"with the INCOMING clip muted the 880 tone is gone from its first window: peak "
           f"{db(loudest / 32768.0):.1f} dBFS (< −60)")
     tail = rms(mono_window(muted, 3.475)) / 32768.0
     check(db(tail) < -60,
@@ -1170,10 +1165,8 @@ def audio_part(mcp, reference):
           f"the outer overlap is [5, 6) ({outer['start']})")
     data = pcm(nest_session.export_wav("nested"))
 
-    # Window 0 excluded for the reason above: the mix's first ramp point does
-    # not take hold until ~12 ms in, at every overlap and at a hard cut.
     inner_worst = 0.0
-    for k in range(1, 40):
+    for k in range(0, 40):
         at = 2.5 + 0.025 * k
         p = ease("ease_in_out", (at + 0.0125 - 2.5) / 1.0)
         out_ratio = goertzel(mono_window(data, at), 440, 48000) / a0
@@ -1186,7 +1179,7 @@ def audio_part(mcp, reference):
           f"{inner_worst:.3f} dB (≤ 0.5)")
 
     outer_out = outer_in = 0.0
-    for k in range(1, 40):
+    for k in range(0, 40):
         at = 5.0 + 0.025 * k
         p = ease("ease_in_out", (at + 0.0125 - 5.0) / 1.0)
         out_ratio = goertzel(mono_window(data, at), 880, 48000) / b0
@@ -1200,15 +1193,34 @@ def audio_part(mcp, reference):
     check(outer_in <= 0.3,
           f"…and brings the new 440 in as sin: {outer_in:.3f} dB (≤ 0.3)")
 
-    # --- the same burst where there is NO ramp: a hard cut, the clip muted --
-    # This is the row the exclusion of window 0 rests on. The fixture is the
-    # §4 pair with no transition on it at all and the incoming clip MUTED, so
-    # nothing in E1 touches the cut and the mix is asked for silence from the
-    # incoming clip's first sample. If the first 25 ms still carry the tone
-    # here, the same 25 ms in the crossfade above are the host's mix and not
-    # the ramp's. This row has no ramp in it, so it guards nothing about a
-    # ramp: the cut's edge against the overlap's own first window is printed
-    # below, not scored.
+    # --- a muted clip alone on its own track (B59, #87) --------------------
+    # toneB is the only clip on its track and its composition track has no
+    # sound before it, so the hold carries its muted gain back to time 0 and
+    # nothing slews at its first sample.
+    own = Session(mcp, "e1-audio-owntrack")
+    own_track = own.tracks()[0]
+    own_a = own.place(own_track, own.media("toneA.m4a"), 0)
+    own.op("trim_end", clip=own_a, to=3 * SEC)
+    own_b = own.place(own.add_track(), own.media("toneB.m4a"), 3 * SEC)
+    own.op("set_audio", clips=[own_b], patch={"muted": True})
+    own_data = pcm(own.export_wav("owntrack-muted"))
+    own_edge = goertzel(mono_window(own_data, 3.0), 880, 48000)
+    own_rest = max(
+        goertzel(mono_window(own_data, 3.0 + 0.025 * k), 880, 48000) for k in range(1, 40))
+    check(db(own_edge / 32768.0) < -60 and db(own_rest / 32768.0) < -60,
+          f"a MUTED clip alone on its own track is silent from its first sample: its first "
+          f"25 ms read {db(own_edge / 32768.0):.1f} dBFS and every window after them "
+          f"{db(own_rest / 32768.0):.1f} dBFS (both < −60)")
+
+    # --- the accepted limit: a hard cut on ONE composition track ----------
+    # Spec §11 #87. The fixture is the §4 pair with no transition on it and
+    # the incoming clip MUTED, so the outgoing clip's 1.0 and the incoming
+    # clip's 0.0 meet on one composition track at the cut. AVFoundation slews
+    # every volume change on a track at full scale per 1200 frames (25 ms at
+    # 48 kHz), starting AT the change, so the incoming clip's first 25 ms
+    # still carry part of its tone. The owner accepted that on 2026-10-01;
+    # this row pins the limit's size and shape, and nothing is excluded
+    # anywhere because of it.
     cut = Session(mcp, "e1-audio-hardcut")
     cut_track = cut.tracks()[0]
     _, cut_b, _, _ = trimmed_pair(
@@ -1220,11 +1232,10 @@ def audio_part(mcp, reference):
         goertzel(mono_window(cut_data, 3.0 + 0.025 * k), 880, 48000) for k in range(1, 40))
     check(cut.clip(cut_b).get("transition_in") is None
           and cut_edge > 0.2 and db(cut_rest / 32768.0) < -60,
-          f"at a HARD CUT with the incoming clip MUTED — no transition, no ramp — its "
-          f"first 25 ms still carry {cut_edge:.3f} of the tone (> 0.2) and every window "
-          f"after them is {db(cut_rest / 32768.0):.1f} dBFS (< −60): the burst is the "
-          f"host's mix, which is why window 0 is excluded above "
-          f"(the overlap's own first window read {edge_in:.3f})")
+          f"the accepted limit, spec §11 #87: at a HARD CUT on ONE composition track with "
+          f"the incoming clip MUTED, its first 25 ms carry cut_edge {cut_edge:.3f} of the "
+          f"tone (> 0.2) — the host's slew of full scale per 1200 frames — and every window "
+          f"after them is {db(cut_rest / 32768.0):.1f} dBFS (< −60)")
 
 
 # ---- section 6: Remove Silences never cuts inside a transition ------------
@@ -1356,8 +1367,17 @@ def silence_part(mcp):
 
 
 def main():
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else 4825
-    reference_port = int(sys.argv[2]) if len(sys.argv) > 2 else 4826
+    args = sys.argv[1:]
+    only = None
+    if "--only" in args:
+        at = args.index("--only")
+        only = args[at + 1] if at + 1 < len(args) else None
+        if only != "audio":
+            print("usage: e1_proof.py [port=4825] [reference_port=4826] [--only audio]")
+            sys.exit(2)
+        del args[at:at + 2]
+    port = int(args[0]) if len(args) > 0 else 4825
+    reference_port = int(args[1]) if len(args) > 1 else 4826
     os.makedirs(WORK, exist_ok=True)
     print(f"E1 — transitions, second pass. Build on {port}, reference on {reference_port}.")
     mcp = MCP(port)
@@ -1369,6 +1389,11 @@ def main():
 
     reference = counts_part(mcp, reference, port, reference_port)
 
+    if only == "audio":
+        audio_part(mcp, reference)
+        finish()
+        return
+
     v6_wipe, _ = write_v6_pair(mcp, "e1-v6-wipe", "wipe")
     v6_dissolve, _ = write_v6_pair(mcp, "e1-v6-dissolve", "cross_dissolve")
 
@@ -1378,7 +1403,10 @@ def main():
     add_part(mcp)
     audio_part(mcp, reference)
     silence_part(mcp)
+    finish()
 
+
+def finish():
     print()
     if skipped:
         print("SKIPPED:")

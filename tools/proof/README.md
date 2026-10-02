@@ -2573,7 +2573,9 @@ the fix alike. The clock threshold is 0.4 s, not 0.8: on a Bluetooth output
 `split` leaves out 3.000–3.026 s (the measured span, 3.0000208–3.0249896 s, rounded up): the plan track's envelope steps 0 → 1 at the
 WAV's start, that step sits on `mixed`'s WAV track and not on `split`'s, and
 AVFoundation's mix smooths it over 1200 frames; outside it the two are
-byte-equal. `same`'s "one format" is one stream description, because two AAC
+byte-equal. Since issue batch B59 (#87) the WAV's composition track holds its
+first segment's gain from time 0, so the window is gone: `mixed` equals
+`split` over the whole file (max |Δ| 0; the B59 section). `same`'s "one format" is one stream description, because two AAC
 files are two format descriptions of one format.
 
 **37/37** on the fix. Over the baseline (`git archive 3e1bd19 app/Sources |
@@ -3818,12 +3820,16 @@ padding rather than the op.
   leaks into the other's bin — tracking `cos` and `sin` of the eased
   progress within 0.3 dB and summing flat within 0.5 dB; a muted incoming
   clip; a version-6 export sample-identical to the reference build's within
-  this build's own measured wobble (0); a nested pair, where the inner
-  overlap still obeys the law and the outer one fades the nest out; and a
-  HARD CUT with the incoming clip muted, which is what says the first 25 ms
-  the other rows skip belong to the host's mix — no transition and no ramp
-  there, and the same half-scale burst (0.496 of the tone, then −140 dBFS
-  from 25 ms on).
+  this build's own measured wobble (0); and a nested pair, where the inner
+  overlap still obeys the law and the outer one fades the nest out. Since
+  issue batch B59 (#87) every row scores from each overlap's FIRST window,
+  and the incoming tone's first 25 ms are scored on their own (0.002 of full
+  scale, < 0.05). Two rows follow: a muted clip alone on its own track,
+  silent from its first sample (−240.0 dBFS); and a HARD CUT with the
+  incoming clip muted on ONE composition track, the accepted limit (spec
+  §11 #87), which keeps its thresholds and prints its edge (`cut_edge`
+  0.496 of the tone, then −139.9 dBFS from 25 ms on). `--only audio` runs
+  section 0 and this section alone.
 * **6, Remove Silences.** A quiet run that crosses a cut is proposed with no
   transition there and wholly suppressed with one, the wall being the
   overlap widened by its own length; the answer's KEY SET is the same either
@@ -11469,3 +11475,61 @@ that cannot play.
 **Issues not fixed**: #132's activation half. Every row that needs
 activation skipped, so this run does not show whether `pump()` lets the
 probe activate.
+
+## Issue batch B59 — each composition audio track holds its first segment's gain from time 0; the shared-track slew is an accepted limit (`e1_proof.py` §5 and `--only audio`, `mixed_audio_proof.py` `mixed-muted`; #87)
+
+#87: a muted or fading-in clip exported its first ~25 ms at about half
+scale. The cause, measured by the batch's design spike on a standalone
+composition: an audio-mix input sits at the default 1.0 before its first
+volume ramp, and the host slews every volume change at full scale per 1200
+frames (25 ms at 48 kHz), starting AT the change. A second format family's
+composition track also carried the plan track's ramps up to its own first
+segment. `CompositionBuilder.volumeLegs` (`CompositionBuilder+AudioTracks.swift`)
+now holds each composition track's envelope at its own first segment's value
+from time 0. A gain change on ONE composition track with sound on both sides
+still slews; the owner accepted that on 2026-10-01 (spec §11 #87).
+
+**The file paid first.** `audioParameters` and its doc comment moved
+verbatim from `CompositionBuilder.swift` (585 → 535 lines) to
+`CompositionBuilder+AudioTracks.swift` (178 → 228), gated alone: `make
+typecheck` 0 errors and the 4 baseline warnings, `make app` BUILD SUCCEEDED.
+The hold brings `+AudioTracks` to 284.
+
+- **`e1_proof.py [port] [reference_port] [--only audio]`** — §5 now scores
+  from window 0 everywhere: the crossfade (with the incoming tone's first
+  25 ms as its own row, < 0.05 of full scale), the muted incoming clip, and
+  the nest's inner and outer overlaps. New row "own track": toneA on track
+  1 trimmed to 3 s, toneB muted alone on a new track at 3 s, silent
+  (< −60 dBFS) in its first 25 ms and every window after. The shared hard
+  cut keeps its fixture and thresholds and is now the limit row.
+  `--only audio` runs section 0 and §5; any other `--only` value exits 2.
+- **`mixed_audio_proof.py`** — `mixed` against `split` over the whole file
+  (one row replacing the two that left out 3.000–3.026 s), and
+  `mixed-muted`: `aac.m4a` at 0 and `pcm.wav` at the AAC clip's own
+  duration on one track, the WAV muted, silent in its first 25 ms and for
+  the 1.95 s after. 14 checks.
+
+Runs on 2026-10-01 over `84b5df9` with the pure move, instance on 4859 and
+the e1 reference build on 4860, both parity logs empty:
+
+| Run | Build | Result |
+|---|---|---|
+| `e1_proof.py 4859 4860 --only audio` | the move alone, no hold | 19/24, exit 1. FAIL: the incoming tone's first 25 ms 0.507 of full scale (< 0.05; the ramp asks for 0.0007); summed power 1.009 dB (≤ 0.5); the muted incoming clip's peak −27.0 dBFS (< −60); the nest's INNER summed power 1.009 dB (≤ 0.5); own track −27.2 dBFS in its first 25 ms. The limit row passed: `cut_edge` 0.496, then −139.9 dBFS. |
+| `mixed_audio_proof.py 4859` | the move alone, no hold | 12/14, exit 1. FAIL: `mixed` against `split`, max \|Δ\| 2855, differing from 3.0000208 s to 3.0249896 s; `mixed-muted`'s first 25 ms from 1.967 s, −28.8 dBFS. The next 1.95 s read −140.0 dBFS. |
+| `e1_proof.py 4859 4860` | the hold | 101/101, exit 0. §5: the incoming edge 0.002; summed power 0.170 dB; the muted incoming peak −81.6 dBFS; the version-6 export against the reference max \|Δ\| 0, 0 samples differ of 576000; the INNER 0.170 dB; own track −240.0 dBFS in its first 25 ms and after; the limit row `cut_edge` 0.496, then −139.9 dBFS. |
+| `mixed_audio_proof.py 4859` | the hold | 14/14, exit 0. `mixed` against `split` max \|Δ\| 0 over the whole file; `mixed-muted` −200.0 dBFS in the first 25 ms and after. |
+
+The no-hold failures are exactly the rows the hold is for, so each new or
+widened row was seen to fail before the fix.
+
+```sh
+perl -e 'alarm shift; exec @ARGV' 900 python3 tools/proof/e1_proof.py 4859 4860   # 101/101
+perl -e 'alarm shift; exec @ARGV' 300 python3 tools/proof/mixed_audio_proof.py 4859 # 14/14
+```
+
+**Not measured:** whether a processing tap (pan, the compressor, noise
+reduction, metering) changes the slew or the hold; the gap after which a
+step up on one composition track no longer slides (25 ms failed and 0.5 s
+held in the spike). **Residue:** a family-0 track whose first segment has no
+source (missing media, a pending reverse) ends its hold at that silent
+segment rather than at its first sounding one.

@@ -506,56 +506,6 @@ enum CompositionBuilder {
         return turns | (mirrored ? 4 : 0)
     }
 
-    // MARK: - Audio
-
-    /// One input-parameter block per composition audio track: the plan's
-    /// piecewise-linear envelope as volume ramps, the time-pitch algorithm its
-    /// segments asked for, and — when any clip on the track asks for one, or
-    /// when this build is metering — the processing tap that runs pan, the
-    /// mono fold, the compressor and noise reduction (`AudioTap.swift`).
-    ///
-    /// **A track with nothing to do still gets no tap**, on an export. `dsp`
-    /// is nil, or its `isActive` is false, for every project that does not use
-    /// the four sample-level audio properties, and the object built here is
-    /// then exactly the one this function built before they existed. A
-    /// pass-through tap measures bit-transparent, so this is a
-    /// cost-and-clarity decision rather than a fidelity one — but it does mean
-    /// an untouched project's audio needs no argument about transparency at
-    /// all. A metering build breaks that rule deliberately and only for the
-    /// preview, where there is no file to be identical to.
-    ///
-    /// **`mono` IS expressed now**, in the tap, at the head of the Mix stage
-    /// (`AudioDSPChain.process`). It could not be expressed here in any case:
-    /// `AVMutableAudioMixInputParameters` applies gain over time and cannot
-    /// combine channels, which is why spec §7.2's old sentence about a
-    /// per-segment flag "Swift applies with `AVMutableAudioMixInputParameters`
-    /// where possible" described something the API cannot do — and the plan
-    /// carries no such flag either. A project that saved `mono: true` before
-    /// this landed does now sound different, which is the feature.
-    static func audioParameters(
-        for track: AVMutableCompositionTrack, segments: [PlanSegment], ramps: [PlanRamp]?,
-        dsp: AudioTrackDSP?, meter: LevelMeterSink?
-    ) -> AVAudioMixInputParameters {
-        let parameters = AVMutableAudioMixInputParameters(track: track)
-        if let pitch = segments.compactMap({ $0.pitch }).first {
-            switch pitch {
-            case "spectral": parameters.audioTimePitchAlgorithm = .spectral
-            case "off": parameters.audioTimePitchAlgorithm = .varispeed
-            case "time_domain": parameters.audioTimePitchAlgorithm = .timeDomain
-            default: break
-            }
-        }
-        for ramp in ramps ?? [] where ramp.duration > 0 {
-            parameters.setVolumeRamp(
-                fromStartVolume: Float(ramp.from), toEndVolume: Float(ramp.to),
-                timeRange: CMTimeRange(start: time(ramp.start), duration: time(ramp.duration)))
-        }
-        if let tap = AudioTap.make(for: dsp, meter: meter) {
-            parameters.audioTapProcessor = tap
-        }
-        return parameters
-    }
-
     // MARK: - Time
 
     /// Ticks as a `CMTime` at the project's own timescale. NEVER through

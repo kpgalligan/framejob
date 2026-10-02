@@ -37,7 +37,7 @@ change.
 | **§7 — Architecture: Rust decides, AVFoundation and Metal do** | | |
 | [`07-architecture.md`](07-architecture.md) | 25 | The Rust/platform split in one page. |
 | [`07.1-ffi-surface.md`](07.1-ffi-surface.md) | 119 | The `rc_*` exports and their contracts. |
-| [`07.2-composition-plan.md`](07.2-composition-plan.md) | 126 | The composition plan: A/B assignment, speed and freeze, audio envelopes, instructions. |
+| [`07.2-composition-plan.md`](07.2-composition-plan.md) | 132 | The composition plan: A/B assignment, speed and freeze, audio envelopes, instructions. |
 | [`07.3-frame-recipe.md`](07.3-frame-recipe.md) | 267 | The per-frame recipe the compositor draws: layers, nests, recipe options, burn-in. |
 | [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 41 | The spec's Swift file map (app/CLAUDE.md is the live one). |
 | [`07.5-compositor.md`](07.5-compositor.md) | 106 | The Metal compositor's passes, and transitions. |
@@ -50,7 +50,7 @@ change.
 | [`08-repo-layout.md`](08-repo-layout.md) | 64 | Repo layout, build, conventions. |
 | [`09-keys-and-menus.md`](09-keys-and-menus.md) | 138 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 2698 in 13 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 2731 in 13 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

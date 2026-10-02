@@ -473,3 +473,35 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
     `{"min":0.1,"max":1000.0,"audio_max":12.0}` through `rc_speed_limits`,
     and no Swift file types a speed bound. No persisted field changes; the
     format stays 10.
+- **#87 — On one composition audio track, a gain change with sound on both
+  sides takes up to 25 ms — accepted; a track's first segment is held from
+  time 0.** AVFoundation's audio mix slews every volume change on an input
+  by at most full scale per 1200 frames (25 ms at 48 kHz), starting AT the
+  change, and an input sits at the default 1.0 before its first ramp.
+  Measured by B59's design spike on a standalone composition read at
+  48 kHz in 2 ms blocks: a step 1 → 0 at a cut reads 0.96 0.88 0.80 … 0.08
+  0.01 and is silent from cut + 1200 samples, and the same step mid-clip
+  slides the same way. **What is done:** `CompositionBuilder.volumeLegs`
+  holds each composition track's envelope at its own first segment's value
+  from time 0, per composition track as `addAudioTracks` builds it. That
+  includes a second source format's track, which carried the plan track's
+  ramps up to its own first segment. So a clip that opens its composition
+  track muted, fading in, or as a crossfade's incoming clip starts at the
+  gain it asks for: in B59's runs, e1's overlap edge went from 0.507 to
+  0.002 of full scale, a muted clip alone on its track from −27.2 to
+  −240.0 dBFS in its first 25 ms, and `mixed_audio_proof.py`'s muted WAV
+  after an AAC clip from −28.8 to −200.0 dBFS. The hold reaches the preview
+  too, because `Playback` and the exporter read the same `audioMix`.
+  **What is accepted:** every gain change on one composition track slides
+  for up to 25 ms. At a hard cut to a muted clip on the same track, e1's
+  limit row reads `cut_edge` 0.496 of the tone in the incoming clip's first
+  25 ms, then −139.9 dBFS. A volume or mute step mid-clip slides the same
+  way, and at a step up after a gap it is a 25 ms attack: the 0 → 1 step
+  at a WAV's start that `mixed_audio_proof.py` measured before B59 at
+  3.000–3.026 s (3.0000208–3.0249896 s). **Rejected:** starting the step
+  25 ms early, which silences the incoming clip at the cut but leaves the
+  OUTGOING clip reading 0.13 at cut − 4 ms and 0.04 at cut − 2 ms; an A/B
+  composition track per format family, so that no two clips share a track,
+  which changes family assignment (R2-1) for a 25 ms edge; and an envelope
+  applied in the processing tap, which breaks "no tap on an untouched
+  export". The owner decided this on 2026-10-01.

@@ -139,6 +139,13 @@ lenient-decoding rule.
   round them to even.
 - **Audio families: family 0 keeps the plan track's id.** Later families take ids from
   `firstExtraTrackID`. A segment with no readable source joins family 0 (R2-1, #34).
+- **Each composition audio track holds its first segment's gain from time 0 (#87, issue batch
+  B59).** `volumeLegs` in `CompositionBuilder+AudioTracks.swift` holds the envelope's value at the
+  track's own first segment from 0, because AVFoundation starts a mix input at 1.0 and slews every
+  volume change at full scale per 1200 frames; a hard cut on one composition track keeps the slew
+  (spec §11 #87). **The file paid first** by a pure move gated alone: `audioParameters` with its
+  doc comment to `CompositionBuilder+AudioTracks.swift` (`CompositionBuilder.swift` 585 → 535
+  lines; `+AudioTracks` 178 → 228, 284 with the hold).
 
 ### Playback
 
@@ -443,7 +450,8 @@ to pay a toll starts from it. A file not listed has no named seam yet.
 - `SilenceSheetController.swift`: the menu command extension (`removeSilencesCommand`,
   `validateSilenceAction`) into `EditorViewController+RemoveSilences.swift`, re-pinning
   `inventory.json`'s site.
-- `CompositionBuilder.swift`: `audioParameters`.
+- `CompositionBuilder.swift`: the orientation helpers (`orientationCodes`, `trackOrientations`,
+  `orientationCode`) to `CompositionBuilder+Orientation.swift`.
 - `Playback.swift`: `seekFinished()` and `report(_:)` to `Playback+Scope.swift`, with `reported`
   and `refreshWanted` widened from `private` for that file alone (B30's shape). `player` stays
   private.

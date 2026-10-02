@@ -769,7 +769,10 @@ the key map behind it.
   half: an audio plan track becomes one composition track per source stream
   format (spec §11 R2-1) — a tapped track that changes format part-way
   STALLS the player (kpgalligan/reelcut#34), so never feed one composition
-  track two formats.
+  track two formats. `+AudioTracks` also holds `audioParameters`, whose
+  `volumeLegs` holds each composition track's envelope at its first segment
+  from time 0: AVFoundation starts an input at 1.0 and slews every change at
+  full scale per 1200 frames (#87, §11 #87).
   `addPlaceholderIfNeeded` gives a plan with no video track but a duration
   a one-frame `Blank.mp4` track scaled across it. The preview's item, both
   export passes and the offline frame all rely on it for a media-less

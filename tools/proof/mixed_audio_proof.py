@@ -11,10 +11,11 @@ reaches. What this script claims is that the fix — one composition track per
 source format — leaves the EXPORT's sound unchanged: an AAC clip then a WAV
 on ONE track exports loud in both and silent between, the WAV at its own
 level, and sample-for-sample as the user's workaround (the WAV on a second
-track) exports, outside the 25 ms where AVFoundation's mix smooths the plan's
-envelope step at the WAV's start — that step sits on `mixed`'s WAV track
-(the plan track's ramps, gap included) and not on `split`'s, on the baseline
-and the fix alike.
+track) exports, over the WHOLE file: since B59 (#87) the WAV's composition
+track holds its own first segment's gain from time 0 rather than carrying the
+plan track's ramps up to it, so the 25 ms step at 3.000–3.026 s is gone. And
+`mixed-muted` — the same pair with the WAV MUTED — is silent from the WAV's
+first sample.
 
 Fixtures are `mixed_audio_probe.py`'s, written fresh by importing it (the
 `silence2` pattern). Needs `ffmpeg`. Run against an instance:
@@ -184,12 +185,26 @@ def main():
     s.place(front, wav, 3 * SEC)
     split = pcm(s.export_wav())
     windows("split", split, [0, 3])
-    ok, w = same(mixed, split, 1, outside=(3.0, 3.026))
-    check(ok, "mixed exports sample-for-sample as split does outside the envelope step at "
-              f"3.000–3.026 s (max |Δ| {w[0] if w else None} ≤ 1; the files differ from "
-              f"{w[1] if w else None} s to {w[2] if w else None} s)")
-    check(w is not None and (w[1] is None or (w[1] >= 3.0 and w[2] < 3.026)),
-          "…and nowhere outside 3.000–3.026 s")
+    ok, w = same(mixed, split, 1)
+    differ = f"; the files differ from {w[1]} s to {w[2]} s" if w and w[1] is not None else ""
+    check(ok, "mixed exports sample-for-sample as split does over the whole file "
+              f"(max |Δ| {w[0] if w else None} ≤ 1{differ})")
+
+    print("\nmixed-muted — the AAC clip then the WAV, MUTED, on ONE track")
+    u = Session(mcp, "mixed-audio-muted")
+    aac, wav = u.media("aac.m4a"), u.media("pcm.wav")
+    track = u.track_ids()[0]
+    first = u.place(track, aac, 0)
+    at = {c["id"]: c for c in u.project()["clips"]}[first]["duration"]
+    second = u.place(track, wav, at)
+    u.op("set_audio", clips=[second], patch={"muted": True})
+    muted = pcm(u.export_wav())
+    w = at / SEC
+    edge, rest = db(muted, w, w + 0.025), db(muted, w + 0.025, w + 1.975)
+    check(edge <= -60, f"mixed-muted: the WAV's first 25 ms from {w:.3f} s are silent "
+                       f"({edge:.1f} dBFS ≤ −60)")
+    check(rest <= -60, f"mixed-muted: silent from {w + 0.025:.3f} s to {w + 1.975:.3f} s "
+                       f"({rest:.1f} dBFS ≤ −60)")
 
     print("\nCONTROL same — two AAC clips of one format on one track")
     q = Session(mcp, "mixed-audio-same")
