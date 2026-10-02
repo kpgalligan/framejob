@@ -388,3 +388,21 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   handoff says to delete `StickerButton` once it has no callers. That is not
   followed: the class has callers everywhere, and the square shape is what
   that line was after.
+- **SH-5 — Settings' explanations are an info button's AppKit `NSPopover`,
+  which keeps its own rounded bubble** (issue batch B71, the owner,
+  2026-10-02). Each Settings section's heading carries an ⓘ
+  (`SettingsInfoButton`, the system "info.circle" symbol) in place of the
+  long grey paragraph under it, and the paragraph's text, sentence for
+  sentence, is the popover's: 13 pt in `DS.textStrong`, where the paragraph
+  was 11 pt in `DS.textFaint`. A deviation from the sharp handoff's square
+  radii, as SH-2 is one: a system popover gives the arrow, the
+  appearance-correct material, VoiceOver's reach and its dismissal for free,
+  and a plain `toolTip` cannot be styled (small, the system font). Resting
+  on the icon for `hoverDelay` (0.35 s) opens it, leaving closes a
+  hover-opened one, a press opens and holds it (promoting a hover-opened
+  one) and a press on a held one closes it; a press on the icon never
+  closes it through `.transient` (`popoverShouldClose` refuses that
+  mouse-down), so the press's action alone decides. The button has no
+  `toolTip`, which would double the popover; VoiceOver reads it as "About
+  <section>" with the text as its help. Accepted: one rounded shape in
+  square chrome.

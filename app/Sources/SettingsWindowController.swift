@@ -16,15 +16,20 @@ import AppKit
 /// the Window menu opens it, so AppKit's own row is the only way back to a
 /// window the person has buried.
 ///
-/// **Two panes, "Transcription" and "Assistant"** (road map 12 A2's
-/// `AssistantSettingsPane`, below the first). §5d's one pane was taken as a
-/// HEADING inside a window titled Settings rather than as a tab bar with one
-/// tab, and the second is a second heading in the same stack. The
-/// Transcription heading is the
-/// first arranged subview of the content, which is what makes the sentence
-/// the `transcribe` tool and its catalog entry both print — the one that
-/// sends a caller to Settings and then to Transcription — true without
-/// either of them being edited.
+/// **Two panes, "Assistant" then "Transcription"** (road map 12 A2's
+/// `AssistantSettingsPane`, then `transcriptionPane`), each a vertical stack
+/// and each one of `content`'s arranged subviews, 24 pt apart through
+/// `content.spacing`. §5d's one pane was taken as a HEADING inside a window
+/// titled Settings rather than as a tab bar with one tab. Each pane opens
+/// with `settingsSectionHeader` — its heading and a `SettingsInfoButton`
+/// whose popover holds its explanation (spec §11 SH-5). There is still a
+/// Transcription section, so the sentence the `transcribe` tool and its
+/// catalog entry both print — the one that sends a caller to Settings and
+/// then to Transcription — stays true without either of them being edited.
+/// **A later section is one more pane**: built the same way (a vertical stack
+/// opening with `settingsSectionHeader`) and put first with
+/// `content.insertArrangedSubview(pane, at: 0)`; the gap comes from
+/// `content.spacing`, so nothing else moves.
 ///
 /// **The key is never shown, never logged, and never in `UserDefaults`.**
 /// `sync()` writes a FIXED-LENGTH mask into the field's PLACEHOLDER when a
@@ -63,7 +68,9 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
     /// a mask as long as the key would leak its length.
     static let maskedPlaceholder = "••••••••••••••••"
     /// And when one is not.
-    static let emptyPlaceholder = "Paste your AssemblyAI API key"
+    static let emptyPlaceholder = "Paste your key"
+    /// The key row's label, which names the service the field does not.
+    static let keyLabel = "AssemblyAI API key:"
 
     /// Where a person gets a key and sees what they have spent.
     static let accountURL = "https://www.assemblyai.com/dashboard"
@@ -86,12 +93,16 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
     let keyField = NSSecureTextField()
     let regionPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     let statusLabel = NSTextField(wrappingLabelWithString: "")
-    let explanationLabel = NSTextField(wrappingLabelWithString: "")
-    /// The window's one stack: the heading is its first arranged subview,
-    /// which is the structural claim a probe reads.
+    /// The Transcription heading's ⓘ, holding `explanation()` (SH-5).
+    let infoButton = SettingsInfoButton(
+        section: SettingsWindowController.paneTitle,
+        infoText: SettingsWindowController.explanation())
+    /// The window's one stack: its arranged subviews are the panes, in order.
     let content = NSStackView()
-    /// Settings' Assistant pane, after the Transcription pane's buttons.
+    /// Settings' Assistant pane, `content`'s first.
     let assistantPane: AssistantSettingsPane
+    /// The Transcription pane, after the Assistant pane.
+    let transcriptionPane = NSStackView()
 
     private(set) var saveButton: NSButton!
     private(set) var removeButton: NSButton!
@@ -156,10 +167,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         statusLabel.font = DS.sans(12)
         statusLabel.textColor = DS.textMuted
         statusLabel.preferredMaxLayoutWidth = Self.windowWidth - Self.inset * 2
-        explanationLabel.stringValue = Self.explanation()
-        explanationLabel.font = DS.sans(11)
-        explanationLabel.textColor = DS.textFaint
-        explanationLabel.preferredMaxLayoutWidth = Self.windowWidth - Self.inset * 2
+        infoButton.setAccessibilityIdentifier("settings.transcription.info")
 
         saveButton = StickerButton(
             title: "Save", style: .primary, target: self, action: #selector(saveClicked(_:)))
@@ -171,7 +179,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
             title: "Account Page", style: .secondary, target: self,
             action: #selector(openAccount(_:)))
 
-        let keyRow = row([fieldLabel("API key:"), keyField])
+        let keyRow = row([fieldLabel(Self.keyLabel), keyField])
         let regionRow = row([fieldLabel("Region:"), regionPopup])
         // Hug at their content, so the column's leading alignment is their
         // one answer and not a tie with its width (#143). `buttons` is left
@@ -182,14 +190,20 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         spacer.setContentHuggingPriority(.defaultLow - 1, for: .horizontal)
         let buttons = row([saveButton, removeButton, verifyButton, spacer, accountButton])
 
+        transcriptionPane.orientation = .vertical
+        transcriptionPane.alignment = .leading
+        transcriptionPane.spacing = 12
+        let header = settingsSectionHeader(headingLabel, info: infoButton)
+        for view in [header, keyRow, regionRow, statusLabel, buttons] {
+            transcriptionPane.addArrangedSubview(view)
+        }
+
         content.orientation = .vertical
         content.alignment = .leading
-        content.spacing = 12
-        for view in [headingLabel, keyRow, regionRow, statusLabel, explanationLabel, buttons] {
-            content.addArrangedSubview(view)
+        content.spacing = 24
+        for pane in [assistantPane, transcriptionPane] {
+            content.addArrangedSubview(pane)
         }
-        content.addArrangedSubview(assistantPane)
-        content.setCustomSpacing(24, after: buttons)
         content.translatesAutoresizingMaskIntoConstraints = false
 
         let root = NSView(
@@ -342,18 +356,23 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         NSWorkspace.shared.open(url)
     }
 
-    /// §5d's paragraph of plain words: what leaves this Mac, that it is
-    /// deleted afterwards, what it costs, and where the account is.
+    /// §5d's plain words, the ⓘ's text in three paragraphs: what leaves
+    /// this Mac and that it is deleted afterwards, what it costs, and where
+    /// the key is kept.
     static func explanation() -> String {
-        "With AssemblyAI chosen in the Generate Captions sheet, the AUDIO of the files you "
-            + "are captioning is uploaded to AssemblyAI, transcribed, read back, and then "
-            + "deleted from AssemblyAI — Reelcut asks for the delete as soon as it has the "
-            + "words, and retries it at the start of the next run if it did not land. Nothing "
-            + "is uploaded until you press Generate, and captions made on this Mac never "
-            + "leave it. AssemblyAI's published rate is $\(AssemblyAIRates.perHour) an hour of "
-            + "audio, $\(AssemblyAIRates.speakersPerHour) more with Speakers on, read on "
-            + "\(AssemblyAIRates.readOn). The key is kept in a file only you can read and is "
-            + "never shown again once it is saved."
+        [
+            "With AssemblyAI chosen in the Generate Captions sheet, the AUDIO of the files you "
+                + "are captioning is uploaded to AssemblyAI, transcribed, read back, and then "
+                + "deleted from AssemblyAI — Reelcut asks for the delete as soon as it has the "
+                + "words, and retries it at the start of the next run if it did not land. "
+                + "Nothing is uploaded until you press Generate, and captions made on this Mac "
+                + "never leave it.",
+            "AssemblyAI's published rate is $\(AssemblyAIRates.perHour) an hour of audio, "
+                + "$\(AssemblyAIRates.speakersPerHour) more with Speakers on, read on "
+                + "\(AssemblyAIRates.readOn).",
+            "The key is kept in a file only you can read and is never shown again once it is "
+                + "saved.",
+        ].joined(separator: "\n\n")
     }
 }
 

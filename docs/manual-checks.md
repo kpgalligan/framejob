@@ -222,6 +222,11 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Expect:** square buttons with no shadow. The blue one lightens slightly on hover, and the outlined one takes a faint grey fill. A press shrinks the button a little about its centre, and a disabled one is dimmed. No title is clipped and no row is cramped or off-centre, in both appearances.
 - **Source:** #100 (spec §11 SH-4).
 
+**CH-5 — Settings' info buttons**
+- **Do:** 1. Reelcut ▸ Settings…; hover each ⓘ beside "Assistant" and "Transcription", then move off. 2. Flick the pointer across an ⓘ without stopping. 3. Click one, then click elsewhere. 4. Click one, then click the same ⓘ again. 5. Rest on one until it opens, then click it and move off. 6. With Keyboard navigation on (System Settings ▸ Keyboard), Tab to an ⓘ and press Space. 7. With VoiceOver on, move to each ⓘ. 8. Close Settings with a popover up. 9. Repeat in both appearances, with Reduce motion on and off.
+- **Expect:** a popover opens after a short beat, not on a flick across, and closes on leaving the icon; a second click on the ⓘ closes it (no flicker back open); a click on a hover-opened one keeps it open after the pointer leaves; the text is large and high-contrast, in short paragraphs, and wraps without clipping; VoiceOver says "About Assistant" / "About Transcription" and reads the text; the popover goes with the window.
+- **Source:** issue batch B71 (spec §11 SH-5).
+
 ## Sound and export
 
 **SE-1 — M3's inspector sections and sheets**
@@ -307,7 +312,7 @@ Needs your own AssemblyAI key (Setup 3).
 
 **CC-1 — Settings and Verify**
 - **Do:** 1. Reelcut ▸ Settings… (⌘, from a document window). 2. Paste a good key, Verify; then a bad one, Verify. 3. Save; Remove. 4. If your account has the EU region, choose `eu` and generate captions.
-- **Expect:** "Key accepted" for the good key, a clear sentence for the bad one; the button row is balanced and the paragraph reads; ⌘, never types a `,` nudge or into a rename; the key lands in a file in `~/Library/Application Support/Reelcut/`, and Remove feels final (the file goes). The EU region works.
+- **Expect:** "Key accepted" for the good key, a clear sentence for the bad one; the button row is balanced and each ⓘ's text reads; ⌘, never types a `,` nudge or into a rename; the key lands in a file in `~/Library/Application Support/Reelcut/`, and Remove feels final (the file goes). The EU region works.
 - **Source:** #53.
 
 **CC-2 — The sheet and a real recording**

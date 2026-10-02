@@ -1654,8 +1654,8 @@ constructor, exactly as `cloud_captions_probe.py`'s hygiene section holds it:
         spendFolder: { absentSpend })
 ```
 
-The window is 460 × 677 points now (`cloud_captions_probe.py`'s row 18
-measures it).
+The window is 460 × 529 points now (`cloud_captions_probe.py`'s row 18
+measures it; issue batch B71).
 
 Road map 8's W4b took a fifth render target, in `settings`' shape:
 
@@ -12127,3 +12127,46 @@ So every row #132 named has now answered. One first launch of the run in
 step 2 did not activate while the next launches did; it was not
 investigated, and a run that skips by `host: probe not active` is simply run
 again.
+
+## Issue batch B71 — Settings' sections reordered, key labels named, explanations in ⓘ popovers (`settings_layout_probe.py` B0, L1–L8; spec §11 SH-5)
+
+- **`settings_layout_probe.py`** builds `settings_layout_probe.swift` with
+  `menu_undo_probe.py`'s swiftc line (no `-D REELCUT_DEV_TOOLS`) over
+  `--sources`, into `work/settings-layout/`, and runs it once under a 120 s
+  wall. The fixture is `SettingsWindowController` over two `MemoryStore`s,
+  an empty environment, an absent spend folder and a scratch `UserDefaults`
+  suite, never shown. Every string a row compares is a literal. L1 the
+  panes' order (Assistant, then Transcription) and the 24 pt gap; L2 each
+  pane's header stack [heading, ⓘ]; L3 "Anthropic API key:" /
+  "AssemblyAI API key:", both placeholders "Paste your key", no bare
+  "API key:"; L4 each ⓘ's text, accessibility label and help, no tooltip,
+  and its popover label at 13 pt in `labelColor`; L5 no explanation left in
+  the window and the spend note still there; L6 a hover cancelled before
+  the delay; L7 the click policy (hover, held, closed) on a button in no
+  window; L8 the transient guard's hit test. Seven mutants, one per row
+  L1 and L3–L8 (`order-swapped`, `bare-label`, `grey-info`,
+  `paragraph-back`, `exit-keeps-pending`, `click-closes-hover`,
+  `guard-off`), exit 1 when caught (rule R).
+- `assistant_tab_probe.swift`'s P7 now reads the panes' order;
+  `cloud_captions_probe.py`'s row 18 reads `headingOpensPane`, the new
+  placeholder, and the window's height re-measured at 529 points.
+- `designs/screens/02-settings.md` expects both service-named key labels
+  and no bare "API key:". The popover itself is never captured; how it
+  looks and when it opens is `docs/manual-checks.md` CH-5.
+
+Runs on 2026-10-02 over `3feafc7` plus this batch.
+
+| Run | Result |
+|---|---|
+| `settings_layout_probe.py` | 9/9, exit 0 |
+| `settings_layout_probe.py --mutant <each of 7>` | each exit 1, caught: L1, L3, L4, L5, L6, L7, L8 failed in turn |
+| `cloud_captions_probe.py --only chrome,hygiene,settings_verify` | before the re-measure 147/148, exit 1 (`measured (460, 529), scale 1`); after it 148/148, exit 0 |
+| `assistant_tab_proof.py` | 26/26, exit 0 |
+| `assistant_settings_proof.py` / `spend_ui_proof.py` | 3/3 and 10/10, exit 0 |
+| `screens.py --only 02-settings` | 6 pass of 6, exit 0, light and dark |
+| `screens.py --only 02-settings --screens <copy expecting "API key:">` | the CONTROL: 02-settings fails light and dark, 5 pass 1 fail, exit 1 |
+
+```sh
+python3 tools/proof/settings_layout_probe.py
+python3 tools/proof/settings_layout_probe.py --mutant guard-off
+```

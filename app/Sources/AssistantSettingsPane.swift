@@ -1,8 +1,9 @@
 import AppKit
 
 /// Settings' Assistant pane (road map 12 A2): the person's Anthropic key
-/// (spec §11 AI-8), the model (AI-11) and the chat settings (AI-20), under
-/// the Transcription pane in `SettingsWindowController`'s one stack.
+/// (spec §11 AI-8), the model (AI-11) and the chat settings (AI-20), above
+/// the Transcription pane in `SettingsWindowController`'s one stack. Its
+/// heading carries a `SettingsInfoButton` holding `explanation()` (SH-5).
 ///
 /// **It mirrors the Transcription pane's key handling, rule for rule.** The
 /// key is typed into a secure field and never shown back: a stored key is a
@@ -37,7 +38,9 @@ import AppKit
 /// is visible. Only the latest refresh's answer is shown.
 final class AssistantSettingsPane: NSStackView, NSTextFieldDelegate {
     static let paneTitle = "Assistant"
-    static let emptyPlaceholder = "Paste your Anthropic API key"
+    static let emptyPlaceholder = "Paste your key"
+    /// The key row's label, which names the service the field does not.
+    static let keyLabel = "Anthropic API key:"
     /// The Settings window's width less its two insets.
     private static let textWidth: CGFloat = 420
 
@@ -61,7 +64,9 @@ final class AssistantSettingsPane: NSStackView, NSTextFieldDelegate {
             "Clear old tool results past \(AssistantChatSettings.clearTriggerTokens.formatted()) tokens",
         target: nil, action: nil)
     let statusLabel = NSTextField(wrappingLabelWithString: "")
-    let explanationLabel = NSTextField(wrappingLabelWithString: "")
+    /// The heading's ⓘ, holding `explanation()` (SH-5).
+    let infoButton = SettingsInfoButton(
+        section: AssistantSettingsPane.paneTitle, infoText: AssistantSettingsPane.explanation())
     let spendLabel = NSTextField(wrappingLabelWithString: "")
     let spendNoteLabel = NSTextField(wrappingLabelWithString: AssistantSpendMonth.note)
     private(set) var saveButton: NSButton!
@@ -128,10 +133,7 @@ final class AssistantSettingsPane: NSStackView, NSTextFieldDelegate {
         statusLabel.font = DS.sans(12)
         statusLabel.textColor = DS.textMuted
         statusLabel.preferredMaxLayoutWidth = Self.textWidth
-        explanationLabel.stringValue = Self.explanation()
-        explanationLabel.font = DS.sans(11)
-        explanationLabel.textColor = DS.textFaint
-        explanationLabel.preferredMaxLayoutWidth = Self.textWidth
+        infoButton.setAccessibilityIdentifier("settings.assistant.info")
 
         saveButton = StickerButton(
             title: "Save", style: .primary, target: self, action: #selector(saveClicked(_:)))
@@ -154,9 +156,10 @@ final class AssistantSettingsPane: NSStackView, NSTextFieldDelegate {
         let compactRow = row([compactBox, compactTokensField, tokensLabel])
         compactRow.spacing = 6
         let views: [NSView] = [
-            headingLabel, row([fieldLabel("API key:"), keyField]),
+            settingsSectionHeader(headingLabel, info: infoButton),
+            row([fieldLabel(Self.keyLabel), keyField]),
             row([fieldLabel("Model:"), modelField]), compactRow, clearToolResultsBox,
-            statusLabel, explanationLabel, buttons, spendLabel, spendNoteLabel,
+            statusLabel, buttons, spendLabel, spendNoteLabel,
         ]
         for view in views { addArrangedSubview(view) }
         setCustomSpacing(16, after: buttons)
@@ -357,22 +360,26 @@ final class AssistantSettingsPane: NSStackView, NSTextFieldDelegate {
             userInfo: [AssistantConfiguration.changeKey: change])
     }
 
-    /// What the assistant sends and to whom, what it costs, where the key is
-    /// kept, and what the chat settings do.
+    /// The ⓘ's text in three paragraphs: what the assistant sends and to
+    /// whom, what it costs and where the key is kept; the model; and what the
+    /// chat settings do.
     static func explanation() -> String {
         let range = AssistantChatSettings.compactTokensRange
-        return "The assistant sends your messages, the project's details and the frames it renders "
-            + "to Anthropic, using your own API key; what it costs is billed to that key. It "
-            + "asks before writing a file. The key is kept in a file only you can read and is "
-            + "never shown again once it is saved. Leave the model blank for "
-            + "\(AssistantConfiguration.defaultModel). Changing the key or the model starts "
-            + "a new conversation. At the end of a turn past the compaction threshold "
-            + "(\(range.lowerBound.formatted()) to \(range.upperBound.formatted()) tokens; "
-            + "\(AssistantChatSettings.defaultCompactTokens.formatted()) by default), the "
-            + "conversation is replaced by a summary, and earlier renders don't survive it. "
-            + "Clearing lets Anthropic drop old tool results from what the model sees, even "
-            + "mid-turn (never tool search results), and each clearing costs a fresh "
-            + "prompt-cache write. Changing either keeps the conversation."
+        return [
+            "The assistant sends your messages, the project's details and the frames it renders "
+                + "to Anthropic, using your own API key; what it costs is billed to that key. It "
+                + "asks before writing a file. The key is kept in a file only you can read and "
+                + "is never shown again once it is saved.",
+            "Leave the model blank for \(AssistantConfiguration.defaultModel). Changing the key "
+                + "or the model starts a new conversation.",
+            "At the end of a turn past the compaction threshold "
+                + "(\(range.lowerBound.formatted()) to \(range.upperBound.formatted()) tokens; "
+                + "\(AssistantChatSettings.defaultCompactTokens.formatted()) by default), the "
+                + "conversation is replaced by a summary, and earlier renders don't survive it. "
+                + "Clearing lets Anthropic drop old tool results from what the model sees, even "
+                + "mid-turn (never tool search results), and each clearing costs a fresh "
+                + "prompt-cache write. Changing either setting keeps the conversation.",
+        ].joined(separator: "\n\n")
     }
 }
 

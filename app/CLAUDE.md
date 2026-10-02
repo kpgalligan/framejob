@@ -1260,16 +1260,22 @@ free.
   `mediaURLs()` AND the document's compiled graphics (`Job.graphics`)
   captured at ENQUEUE. No MCP mirror: `export` called N times is
   the capability.
+- `SettingsInfoButton.swift` — Settings' ⓘ: an image-only `NSButton` whose
+  `NSPopover` shows a pane's explanation on hover (0.35 s) or press (SH-5),
+  its `infoState` (closed/hover/held) deciding a press and its
+  `popoverShouldClose` keeping `.transient` off the icon; owner-filtered
+  tracking area.
 - `SettingsWindowController.swift` — Reelcut ▸ Settings… ⌘,, the app's one
   window for something PERSISTED beyond view state, with
   `extension AppDelegate { showSettings }` at its foot
   (`CaptionImporter.swift`'s command-at-the-foot precedent, which is why
   `AppDelegate.swift` is untouched). `ExportQueueWindowController`'s mould.
   `+Verify` holds the Verify bookkeeping (pure move, #58).
-  Two panes: the `Transcription` HEADING that is the content stack's first
-  arranged subview — which is what makes the `transcribe` tool's and the
-  catalog's "Settings ▸ Transcription" sentence true without either being
-  edited. The key goes in through an `NSSecureTextField` and NEVER comes
+  Two panes as `content`'s arranged subviews, Assistant
+  (`AssistantSettingsPane`) then Transcription (`transcriptionPane`), 24 pt
+  apart; each opens with `settingsSectionHeader` (its heading and a
+  `SettingsInfoButton` holding its explanation, spec §11 SH-5). An MCP
+  section later is one more pane inserted at index 0. The key goes in through an `NSSecureTextField` and NEVER comes
   back out: `sync()` writes a FIXED-LENGTH mask into the field's
   PLACEHOLDER, never its `stringValue`. Save and Remove go through
   `AssemblyAIConfiguration.store()`, so R6-9's folder override holds; the
@@ -1282,8 +1288,8 @@ free.
   Verify enabled only when an effective credential exists and no current
   request is checking those same inputs.
   **No key set is not an error** anywhere in it. The second pane,
-  `AssistantSettingsPane.swift` (road map 12 A2), is appended after the
-  Transcription buttons (custom spacing 24) and synced in `show()`; the
+  `AssistantSettingsPane.swift` (road map 12 A2), is `content`'s first pane
+  and synced in `show()`; the
   window takes its store as a second FACTORY, `assistantStore:`
   (`AssistantConfiguration.store()` by default, a `MemoryStore` in the
   harness). It mirrors the Transcription pane's key rules (secure field,

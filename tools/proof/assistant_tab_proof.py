@@ -26,7 +26,8 @@ DUMMY key in a `-RCSecretFolder` of its own,
       empties the field, masks the placeholder and posts `key`; Remove; a
       model commit writes the suite and posts `model`; a commit that leaves
       the model where it was (`""` → claude-opus-5-5, the same text again)
-      posts nothing; the pane sits under the Transcription heading
+      posts nothing; the window's panes are the Assistant pane then the
+      Transcription pane (B71)
   P8  (#150) the probe run alone under `--close <path>`, against the
       stand-in scripted to ask for `export` to `work/assistant_tab/p8/P8.mp4`:
       the question `export writes <path>`; then `window.close()` with the

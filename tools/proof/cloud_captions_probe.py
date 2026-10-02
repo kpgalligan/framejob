@@ -2199,7 +2199,10 @@ func chromeSettings(_ request: [String: Any]) -> [String: Any] {
         "title": controller.window?.title ?? "<nil>",
         "paneTitle": SettingsWindowController.paneTitle,
         "heading": controller.headingLabel.stringValue,
-        "headingIsFirst": controller.content.arrangedSubviews.first === controller.headingLabel,
+        "headingOpensPane": controller.content.arrangedSubviews.contains(
+            where: { $0 === controller.transcriptionPane })
+            && (controller.transcriptionPane.arrangedSubviews.first as? NSStackView)?
+                .arrangedSubviews.first === controller.headingLabel,
         "regionRows": popupRows(controller.regionPopup),
         "emptyPlaceholder": controller.keyField.placeholderString ?? "<nil>",
         "emptyStatus": controller.statusLabel.stringValue,
@@ -7222,15 +7225,15 @@ def section_chrome(binary, sources):
         if settings is None:
             check("18: the Settings op answers", False, error)
         else:
-            check("18: the window is titled Settings and its content OPENS with the "
-                  "Transcription heading — which is what makes the tool's "
+            check("18: the window is titled Settings and its Transcription pane OPENS with "
+                  "the Transcription heading — which is what makes the tool's "
                   "\"Reelcut ▸ Settings ▸ Transcription\" true",
                   settings.get("title") == "Settings"
                   and settings.get("heading") == "Transcription"
                   and settings.get("paneTitle") == "Transcription"
-                  and settings.get("headingIsFirst") is True,
+                  and settings.get("headingOpensPane") is True,
                   f"got {settings.get('title')!r} / {settings.get('heading')!r} / "
-                  f"{settings.get('headingIsFirst')!r}")
+                  f"{settings.get('headingOpensPane')!r}")
             check("18: the Region popup is the two regions, carrying their raw values",
                   settings.get("regionRows") == [["us", "United States"],
                                                  ["eu", "European Union"]],
@@ -7238,7 +7241,7 @@ def section_chrome(binary, sources):
             check("18: with no key stored the field invites one and the status says so "
                   "PLAINLY — no key set is not an error",
                   settings.get("emptyStatus") == "No API key is set."
-                  and settings.get("emptyPlaceholder") == "Paste your AssemblyAI API key"
+                  and settings.get("emptyPlaceholder") == "Paste your key"
                   and settings.get("removeEnabledEmpty") is False,
                   f"got {settings.get('emptyStatus')!r} / "
                   f"{settings.get('emptyPlaceholder')!r}")
@@ -7276,7 +7279,7 @@ def section_chrome(binary, sources):
                   f"got {settings.get('removedExists')!r} / "
                   f"{settings.get('removedStatus')!r}")
             check("18: and the placeholder goes back to the empty one",
-                  settings.get("removedPlaceholder") == "Paste your AssemblyAI API key",
+                  settings.get("removedPlaceholder") == "Paste your key",
                   f"got {settings.get('removedPlaceholder')!r}")
             check("18: the region popup WRITES ReelcutAssemblyAIRegion and reads back",
                   settings.get("regionInSuite") == "eu"
@@ -7523,18 +7526,20 @@ def section_chrome(binary, sources):
               one[0] == two[0] and one[0] != b"", "the two renders differ")
     check("18: light and dark differ — both appearances really were rendered",
           taken[("light", 1)][0] != taken[("dark", 1)][0], "the two appearances are equal")
-    # 793, not 340, since road map 12 A2 (610), road map 13 P4 (677), issue
-    # batch B48 (805, measured) and B49 (793, measured): Settings' Assistant
-    # pane sits under the Transcription pane in the same stack, with its chat
-    # settings (AI-20) under the model, the month's spend line and its note
-    # under its buttons, and the window grows to fit it; spec §11 SH-4's square
-    # StickerButton took 6 pt off each of its 2 button rows.
+    # 529, not 340, since road map 12 A2 (610), road map 13 P4 (677), issue
+    # batch B48 (805, measured), B49 (793, measured) and B71 (529, measured):
+    # Settings' Assistant pane sits above the Transcription pane in the same
+    # stack, with its chat settings (AI-20) under the model, the month's spend
+    # line and its note under its buttons, and the window grows to fit it;
+    # spec §11 SH-4's square StickerButton took 6 pt off each of its 2 button
+    # rows, and B71 moved both long paragraphs into the headings' ⓘ popovers
+    # (SH-5).
     size = png_size(taken[("light", 1)][0])
     scale = (size[0] / 460.0) if size else 0
-    check(f"18: the PNG is the window's content — 460 × 793 points at the display's backing "
+    check(f"18: the PNG is the window's content — 460 × 529 points at the display's backing "
           f"scale (measured {size!r}, scale {scale:g})",
-          size is not None and size[0] % 460 == 0 and size[1] % 793 == 0
-          and size[0] // 460 == size[1] // 793 and size[0] // 460 >= 1,
+          size is not None and size[0] % 460 == 0 and size[1] % 529 == 0
+          and size[0] // 460 == size[1] // 529 and size[0] // 460 >= 1,
           f"got {size!r}")
 
 
