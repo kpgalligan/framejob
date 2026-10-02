@@ -6628,7 +6628,9 @@ screen when one exists, and without one W4a–c skip as
 `host: no scale-2 screen`. Since road map 11's V2b the inventory's site grep
 (`capture_spike/inventory.py`) also counts the APP-MODAL `presentError(` —
 `presentError(_:)` and `NSApp.presentError(_:)`, not the sheet form
-`presentError(_:modalFor:…)` — as a loop token.
+`presentError(_:modalFor:…)` — as a loop token. Since issue batch B70 the
+probe launches as `CaptureProbe.app` through `open` (`--route direct` runs
+the bare binary), and such a run takes keyboard focus for its length.
 
 ```sh
 python3 tools/proof/capture_spike/capture_spike.py [--only q1,q2,q3,q4] [--rebuild]
@@ -11714,7 +11716,8 @@ perl -e 'alarm shift; exec @ARGV' 900 python3 tools/proof/recording_probe.py --o
 
 #178 and #44 changed no code: they are recorded as accepted limits, spec
 §11 #178 and R6-24. **Not measured:** a pending-reverse lead segment (the
-same `sounding` rule covers it; no row reaches it), and e1_proof.py was not
+same `sounding` rule covers it; no row reaches it) (measured since B70:
+`pending-first`), and e1_proof.py was not
 re-run, because no fixture of it has a sourceless lead segment.
 
 ## Issue batch B62 — a speed change that silences a clip asks first, and an agent's answer says so (`speed_audio_probe.py`; #212)
@@ -12015,3 +12018,94 @@ perl -e 'alarm shift; exec @ARGV' 1200 python3 tools/proof/graphics_inspector_pr
 **Not covered:** how the headings look is GR-6's Source-section step in
 `docs/manual-checks.md`. No row there looks at the colour well with a named
 default; the batch's spec left a new row out of scope, so it is owed.
+
+## Issue batch B70 — the spec indexes checked, a pending-reverse lead measured, the capture probe as an app (`spec_index_proof.py`; `mixed_audio_proof.py` `pending-first` and `--mutant old-onset`; `capture_spike/` `--bundle-only`, `--route`, `--activation`; #220, #218, #132)
+
+- **#220 — `spec_index_proof.py`, a line of `make test`.** It checks the
+  Lines cells in `designs/spec/README.md` and `designs/spec/11-decisions/README.md`
+  against `wc -l` (the number of newline bytes). The `11-decisions/` folder
+  row must read `<N> in <M> files`, where N is every `*.md` in the folder
+  summed, its README included. Every link must exist, every spec file must
+  have exactly one row, and every subdirectory must have a folder row. A
+  problem names the index, the row and both numbers. `--selftest` copies
+  `designs/spec` to `work/spec_index/` and runs a CONTROL, which must show
+  0 problems, and four mutants, each on a fresh copy, which must show
+  exactly one problem naming its row: M1, the `07.6` cell +1; M2, the
+  folder cell's N +1; M3, the `deepening.md` cell +1; M4, a new empty
+  `zz-unindexed.md`. Recounted at HEAD `4d9b80a` (after B66 and B69):
+  `04.3a` 358 → 361, `06b` 348 → 354, `07.6` 42 → 46, `deepening.md`
+  556 → 584. The folder cell went from 3065 to 3066 in 13 files, because the
+  sentence this batch added to the decisions README is one line.
+- **#218 — `mixed_audio_proof.py` `pending-first`.** It sits between
+  `missing-first` and `CONTROL same`, on its own session. `aac.m4a` itself
+  (not a copy, and never altered) goes at 0 and `pcm.wav` at the AAC clip's
+  duration (no gap) on one track, with the WAV muted. **The hold:** the
+  session's `cache/reversed` is created as an EMPTY REGULAR FILE, then
+  `set_reversed` makes the AAC reversed, then the export runs. **Why it
+  holds:** `ReverseCache.existing` finds no file under `cache/reversed/`, so
+  the clip is in `ReverseResolution.pending`. The render that
+  `ensureReversedMedia` starts reaches `createDirectory(at: cache/reversed)`,
+  which throws because a file is there. `ReverseRenderer.run` turns that into
+  a failure, and `refusedReverseMedia` never retries it, so the clip stays
+  pending whether the job is still running or has failed. A forward read
+  would be the loud tone (`mixed`'s row), and a finished reverse would be the
+  same tone backwards, so only pending leaves the lead silent. The failed
+  render's sheet stays up on that session's window, and the session is never
+  saved. There are five rows. Three are CONTROLs: no `missing_media`;
+  `cache/reversed` still a regular file after the export; the lead silent
+  from 0.25 s to `at − 0.25`. The other two: the WAV silent in its first
+  25 ms, and silent from `at + 0.025` to `at + 1.975`. 22 checks.
+  `--mutant old-onset` puts back the pre-B61 onset (`git show 16d4934`:
+  `family.segments.filter { $0.duration > 0 }.map(\.start).min()`) in a tree
+  copy (`tree_copy.make_copy`, `work/mixed-audio-mutant`), with the anchor
+  asserted once, and builds it with the copy's own `make app`. It launches
+  the copy on its port, with the parity grep of its log required empty, runs
+  every row, and terminates only that child. Exit 0 means caught: both
+  first-25 ms rows FAIL while all four CONTROL rows pass. Exit 1 means it
+  survived, and exit 2 means the control could not be performed.
+- **#132 — the capture probe as a LaunchServices app.** Every spike run now
+  assembles `work/capture_spike/CaptureProbe.app` after the build (the
+  binary, the five resources, an `Info.plist`, an ad-hoc signature), and a
+  failed assembly fails B0 as `bundle: <why>`. Modes launch through
+  `open -n -W -F --stdout … --stderr … CaptureProbe.app --args <mode> …` by
+  default. On expiry, only the PIDs running the bundle's executable are
+  killed. `--route direct` is the bare binary, as before. The probe gains
+  `ProbeAppDelegate` (no untitled document on launch or reopen), fonts
+  through `ProjectDocument.bundledFontsDirectory`, and an `activation` mode
+  (`runActivation`, X0) that is not one of `rows.py`'s modes, so a full run
+  is still 38 rows with the same digest scheme. `--bundle-only` launches
+  nothing. It checks `plutil -lint`, `codesign --verify --strict`, that the
+  executable is the built binary, and that every resource is present. The
+  executable comparison is made with both signatures removed and
+  `__LINKEDIT`'s vmsize zeroed, because `codesign` replaces the linker's
+  signature and the removed one had rounded that field (2 bytes differed).
+  `--activation` runs the `activation` mode over `direct` (the CONTROL) and
+  `bundle`. **A bundle-route run takes keyboard focus** and puts the probe's
+  windows in front for its length (about 3 minutes in full), so run it only
+  when nobody is typing at the Mac. `--route direct` does not take focus.
+
+Runs on 2026-10-02 over `4d9b80a` plus this batch. The instance for the
+first proof ran on 4870, with an empty parity grep.
+
+| Run | Result |
+|---|---|
+| `spec_index_proof.py` | before the recount, 131/135, exit 1, with the four cells above named; after it, 135/135, exit 0 |
+| `spec_index_proof.py --selftest` | 5/5, exit 0. M1 `07.6-playback-update-rules.md reads 47, wc -l 46`; M2 `11-decisions/ reads 3067 in 13 files, wc -l 3066 in 13 files`; M3 `deepening.md reads 585, wc -l 584`; M4 `zz-unindexed.md has no row` |
+| `make test` | exit 0; the last line is 135/135 |
+| `mixed_audio_proof.py 4870` | 22/22, exit 0. `pending-first`: no `missing_media`, `cache/reversed` still a file, the lead −200.0 dBFS from 0.25 s to 1.717 s, the WAV −200.0 dBFS in its first 25 ms from 1.967 s and after |
+| `mixed_audio_proof.py 4871 --mutant old-onset` | exit 0, caught, 20/22. `missing-first` and `pending-first`'s first 25 ms each read −28.8 dBFS. Every CONTROL passed (the pending lead −200.0 dBFS), and the 1.95 s after read −140.0 dBFS |
+| `capture_spike.py --bundle-only --rebuild` | `bundle: ok …/CaptureProbe.app`, exit 0 |
+| `capture_spike.py --route direct` | 19 pass, 5 fail, 14 skip of 38, digest `087f333b…d15337`, exit 0. These are the 2026-10-02 foreground run's states, and B0 passed with the bundle assembled and signed |
+
+```sh
+python3 tools/proof/spec_index_proof.py --selftest
+perl -e 'alarm shift; exec @ARGV' 300 python3 tools/proof/mixed_audio_proof.py 4870   # 22/22
+perl -e 'alarm shift; exec @ARGV' 2400 python3 tools/proof/mixed_audio_proof.py 4871 --mutant old-onset   # exit 0
+perl -e 'alarm shift; exec @ARGV' 1500 python3 tools/proof/capture_spike/capture_spike.py --bundle-only --rebuild
+```
+
+**Owed: the two foreground runs over the bundle route,** `--activation
+--rebuild` and then, only if it exits 0, `--only q2,q3`. The orchestrator
+runs them only after the owner agrees that the Mac may take focus and says
+they are away. Until the bundle route answers active and key, #132 stays
+open.

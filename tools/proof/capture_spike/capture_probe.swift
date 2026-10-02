@@ -6,7 +6,7 @@
 // the same view classes as the app, optimised as Release is.
 //
 //     capture_probe <mode> <fixtures-dir> <png-dir>
-//     mode ∈ well | sheets | modal | menu | appearance | layout
+//     mode ∈ well | sheets | modal | menu | appearance | layout | activation
 //
 // It prints exactly one stdout line, `ANSWER <json>`:
 // `{"mode", "window": {...}, "rows": {"<ID>": {<measured> | "error"}}}`.
@@ -15,7 +15,7 @@ import AppKit
 let arguments = CommandLine.arguments
 guard arguments.count == 4 else {
     FileHandle.standardError.write(
-        "usage: capture_probe <well|sheets|modal|menu|appearance|layout> <fixtures> <png>\n"
+        "usage: capture_probe <well|sheets|modal|menu|appearance|layout|activation> <fixtures> <png>\n"
             .data(using: .utf8)!)
     exit(64)
 }
@@ -33,6 +33,7 @@ case "modal": result = ProbeSheets.runModal()
 case "menu": result = ProbeSheets.runMenu()
 case "appearance": result = ProbeAppearance.run(fixtures: fixtures, png: png)
 case "layout": result = ProbeLayout.run(fixtures: fixtures, png: png)
+case "activation": result = ProbeSupport.runActivation(fixtures: fixtures)
 default:
     FileHandle.standardError.write("unknown mode \(mode)\n".data(using: .utf8)!)
     exit(64)

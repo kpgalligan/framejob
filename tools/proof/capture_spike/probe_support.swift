@@ -6,12 +6,16 @@
 // - boot: the document controller, the `.regular` activation policy (the live
 //   app's), `finishLaunching`, the argument-domain pins
 //   (`harness/main.swift`'s `pinDefaults`, the keys the spike's windows
-//   draw), the app's fonts from `Fonts/` beside the binary;
+//   draw), the app's fonts from `ProjectDocument.bundledFontsDirectory`
+//   (`Contents/Resources/Fonts` in `CaptureProbe.app`, `Fonts/` beside a
+//   bare binary, whose `resourceURL` is its own folder), and
+//   `ProbeAppDelegate`, which opens no untitled document on launch or reopen;
 // - `ProbeEditor`: a package opened as the app opens one — `read`, `fileURL`,
 //   `makeWindowControllers`, `showWindows` — at a 1440 × 862 content size,
 //   placed on a backing-scale-2 screen when the host has one (`place`);
 // - activation: `NSApp.activate()`, `makeKeyAndOrderFront`, a ≤ 3 s poll for
-//   `NSApp.isActive && NSApp.keyWindow === window`;
+//   `NSApp.isActive && NSApp.keyWindow === window`; `runActivation`, the
+//   `activation` mode, answers it alone (issue batch B70, #132);
 // - the settle capture (`harness/main.swift`'s `png`): capture, spin 20 ms,
 //   capture again, until two consecutive captures are byte-identical;
 // - `ProbePixels`: a capture as top-down RGBA8, rect → capture-pixel mapping,
@@ -23,14 +27,26 @@ final class ProbeDocumentController: NSDocumentController {
     override var defaultType: String? { ProjectDocument.projectTypeIdentifier }
 }
 
+/// Launched as `CaptureProbe.app` through LaunchServices, the probe is sent
+/// open-untitled and reopen events; it answers both with no.
+final class ProbeAppDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldOpenUntitledFile(_ sender: NSApplication) -> Bool { false }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool)
+        -> Bool
+    { false }
+}
+
 typealias ProbeJSON = [String: Any]
 
 enum ProbeSupport {
     static var systemAppearance = "unknown"
+    static let appDelegate = ProbeAppDelegate()
 
     static func boot() {
         _ = ProbeDocumentController()
         let app = NSApplication.shared
+        app.delegate = appDelegate
         app.setActivationPolicy(.regular)
         app.finishLaunching()
         systemAppearance =
@@ -50,8 +66,7 @@ enum ProbeSupport {
                 "AppleShowScrollBars": "Always",
                 InspectorSection.collapsedKeyPrefix + "text.animation": false,
             ], forName: UserDefaults.argumentDomain)
-        let fonts = URL(fileURLWithPath: CommandLine.arguments[0]).deletingLastPathComponent()
-            .appendingPathComponent("Fonts")
+        let fonts = ProjectDocument.bundledFontsDirectory
         if let names = try? FileManager.default.contentsOfDirectory(atPath: fonts.path) {
             for name in names where name.hasSuffix(".ttf") || name.hasSuffix(".otf") {
                 CTFontManagerRegisterFontsForURL(
@@ -115,6 +130,23 @@ enum ProbeSupport {
             "active": NSApp.isActive, "active_ms": took.map { $0 as Any } ?? NSNull(),
             "key_is_editor": NSApp.keyWindow === window,
         ]
+    }
+
+    /// The `activation` mode: `well.reelcut` opened as every mode opens it,
+    /// then `activate` — whether this launch can become the active app with
+    /// the editor key, and how many windows it shows (one: no untitled one).
+    static func runActivation(fixtures: URL) -> (ProbeJSON, ProbeJSON) {
+        let e: ProbeEditor
+        do {
+            e = try ProbeEditor(
+                fixtures.appendingPathComponent("well.reelcut"), select: [2], playhead: 1)
+        } catch {
+            return (windowFacts(nil, activation: nil), ["X0": probeError("open failed: \(error)")])
+        }
+        var answer = activate(e.window)
+        let facts = windowFacts(e.window, activation: answer)
+        answer["visible_windows"] = NSApp.windows.filter { $0.isVisible }.count
+        return (facts, ["X0": answer])
     }
 
     /// The window facts every ANSWER carries; `activation` is `activate`'s

@@ -14,15 +14,46 @@ The probe is `capture_probe.swift` compiled as `main.swift` with every file in
 `harness/build.sh`'s swiftc line plus Release's `-O -wmo`. Each mode runs as
 its own bounded child (Rule H, `graphics_spike/bounded.py`): the build 1200 s,
 a mode 180 s, `modal` 60 s. Nothing here launches Reelcut.app or an MCP
-server, and nothing is killed but the spike's own children.
+server, and nothing is killed but the spike's own children and, on a
+bundle-route timeout, the processes running the bundle's own executable
+(`kill_bundled`).
+
+**How a mode launches (issue batch B70, #132).** After the build, every run
+assembles `work/capture_spike/CaptureProbe.app` (`bundle`): the binary as
+`Contents/MacOS/capture_probe`, `Fonts/`, `Blank.mp4`, `default.metallib`,
+`GraphicTemplates/` and `GraphicsAPI.md` in `Contents/Resources/`, an
+`Info.plist`, signed ad hoc; a failed assembly fails B0 as `bundle: <why>`.
+The default route, `--route bundle`, launches each mode through LaunchServices
+(`open -n -W -F --stdout … --stderr … CaptureProbe.app --args <mode> …`), so
+the probe is a real app that can become the active one; on its bound expiry
+exactly the PIDs running `CaptureProbe.app/Contents/MacOS/capture_probe` (only
+this spike launches that path) are killed. `--route direct` runs the bare
+binary as before, which never becomes active on this host, so its S and A
+rows skip with `host: probe not active`.
+
+**A bundle-route run takes keyboard focus** and puts the probe's windows in
+front for the length of the run (about 3 minutes in full), so run it only when
+nobody is typing at the Mac. `--route direct` does not take focus.
 
     python3 tools/proof/capture_spike/capture_spike.py [--only q1,q2,q3,q4] [--rebuild]
+                                                       [--route bundle|direct]
+    python3 tools/proof/capture_spike/capture_spike.py --bundle-only [--rebuild]
+    python3 tools/proof/capture_spike/capture_spike.py --activation [--rebuild]
 
 Prints one line per row, `scores:` and `digest:`; writes
 `work/capture_spike/answers.json`. Exit 0: every row has a state and no
 instrument or control row failed; 1: one did; 2: a row has no state.
-Run it with the terminal frontmost and nobody at the machine: the S and A
-rows need the probe to become the active app.
+
+`--bundle-only` builds, assembles and checks the bundle (`verify_bundle`:
+`plutil -lint`, `codesign --verify --strict`, the executable the built binary,
+every resource present) and launches nothing: `bundle: ok <app>` or one
+`bundle: FAIL <problem>` per problem, exit 0 or 1. `--activation` runs the
+probe's `activation` mode once over `direct` (the CONTROL, the route that
+never activated) and once over `bundle`, 60 s each, printing `activation
+<route>: active <bool> in <ms|None> ms, key <bool>, visible windows <n>`; exit
+0 when the bundle route answered active and key with exactly 1 visible window,
+1 when it answered otherwise, 2 when a route gave no answer. Neither reads or
+writes `answers.json`, and `activation` is not one of `rows.py`'s modes.
 """
 
 import argparse
@@ -30,8 +61,12 @@ import datetime
 import hashlib
 import json
 import os
+import plistlib
 import shutil
+import signal
+import struct
 import sys
+import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROOF = os.path.dirname(HERE)
@@ -49,6 +84,12 @@ PROBE = os.path.join(WORK, "probe")
 FIXTURES = os.path.join(WORK, "fixtures")
 PNG = os.path.join(WORK, "png")
 ANSWERS = os.path.join(WORK, "answers.json")
+APP = os.path.join(WORK, "CaptureProbe.app")
+BUNDLED = ("Fonts", "Blank.mp4", "default.metallib", "GraphicTemplates", "GraphicsAPI.md")
+INFO = {"CFBundleIdentifier": "com.kgalligan.reelcut.captureprobe",
+        "CFBundleExecutable": "capture_probe", "CFBundleName": "CaptureProbe",
+        "CFBundlePackageType": "APPL", "NSPrincipalClass": "NSApplication",
+        "LSMinimumSystemVersion": "26.0", "NSHighResolutionCapable": True}
 SOURCES = os.path.join(ROOT, "app", "Sources")
 FONTS = os.path.join(ROOT, "app", "Resources", "Fonts")
 PLACEHOLDER = os.path.join(ROOT, "app", "Resources", "Blank.mp4")
@@ -175,20 +216,158 @@ def build(force):
     return binary, None, record
 
 
-def run_mode(binary, mode):
+# ---------------------------------------------------------------------------
+# The bundle (#132): the probe as a LaunchServices app.
+
+
+def bundle(binary):
+    """`CaptureProbe.app` assembled afresh around `binary` and signed ad hoc.
+    The app's path, or None and why."""
+    try:
+        shutil.rmtree(APP, ignore_errors=True)
+        macos = os.path.join(APP, "Contents", "MacOS")
+        resources = os.path.join(APP, "Contents", "Resources")
+        os.makedirs(macos)
+        os.makedirs(resources)
+        shutil.copy2(binary, os.path.join(macos, "capture_probe"))
+        for name in BUNDLED:
+            source = os.path.join(PROBE, name)
+            if os.path.isdir(source):
+                shutil.copytree(source, os.path.join(resources, name))
+            else:
+                shutil.copy2(source, os.path.join(resources, name))
+        with open(os.path.join(APP, "Contents", "Info.plist"), "wb") as f:
+            plistlib.dump(INFO, f)
+    except OSError as error:
+        return None, f"assembly: {type(error).__name__}: {error}"
+    signed = bounded.run(["codesign", "--force", "--sign", "-", APP], 120)
+    if signed["rc"] != 0:
+        return None, (f"codesign exited {signed['rc']} (expired {signed['expired']}): "
+                      + signed["stderr"].strip()[-240:])
+    return APP, None
+
+
+def unsigned(path, folder):
+    """The bytes of the Mach-O at `path` with its signature removed (on a
+    scratch copy) and `__LINKEDIT`'s vmsize zeroed, or None. The vmsize is the
+    one field `--remove-signature` leaves as the signature it removed rounded
+    it: the linker's signature and the bundle's differ in size."""
+    copy = os.path.join(folder, os.path.basename(os.path.dirname(path)) + "-"
+                        + os.path.basename(path))
+    shutil.copy2(path, copy)
+    removed = bounded.run(["codesign", "--remove-signature", copy], 120)
+    if removed["rc"] != 0:
+        return None
+    with open(copy, "rb") as f:
+        data = bytearray(f.read())
+    if len(data) < 32 or struct.unpack_from("<I", data, 0)[0] != 0xFEEDFACF:
+        return None
+    ncmds = struct.unpack_from("<I", data, 16)[0]
+    offset = 32
+    for _ in range(ncmds):
+        cmd, size = struct.unpack_from("<II", data, offset)
+        if cmd == 0x19 and bytes(data[offset + 8:offset + 24]).rstrip(b"\0") == b"__LINKEDIT":
+            data[offset + 32:offset + 40] = bytes(8)
+        offset += size
+    return bytes(data)
+
+
+def verify_bundle(binary):
+    """The bundle's problems, empty when it is sound."""
+    problems = []
+    plist = os.path.join(APP, "Contents", "Info.plist")
+    linted = bounded.run(["plutil", "-lint", plist], 60)
+    if linted["rc"] != 0:
+        problems.append(f"plutil -lint: {(linted['stdout'] + linted['stderr']).strip()[-240:]}")
+    else:
+        with open(plist, "rb") as f:
+            read = plistlib.load(f)
+        if read != INFO:
+            problems.append(f"Info.plist reads {read}, not {INFO}")
+    verified = bounded.run(["codesign", "--verify", "--strict", APP], 120)
+    if verified["rc"] != 0:
+        problems.append(f"codesign --verify --strict exited {verified['rc']}: "
+                        + verified["stderr"].strip()[-240:])
+    inside = os.path.join(APP, "Contents", "MacOS", "capture_probe")
+    if not os.path.isfile(inside):
+        problems.append("Contents/MacOS/capture_probe is missing")
+    else:
+        # codesign rewrites the executable's own signature (the linker's ad-hoc
+        # one becomes the bundle's), so the bytes compared are both files'
+        # with their signatures removed (`unsigned`).
+        with tempfile.TemporaryDirectory(dir=WORK) as scratch:
+            a, b = unsigned(binary, scratch), unsigned(inside, scratch)
+            if a is None or b is None:
+                problems.append("codesign --remove-signature failed on a scratch copy, "
+                                "or it is not a 64-bit Mach-O")
+            elif a != b:
+                problems.append("Contents/MacOS/capture_probe is not the built binary "
+                                "(unsigned bytes differ)")
+    resources = os.path.join(APP, "Contents", "Resources")
+    for name in BUNDLED:
+        source, copied = os.path.join(PROBE, name), os.path.join(resources, name)
+        if not os.path.exists(copied):
+            problems.append(f"Contents/Resources/{name} is missing")
+        elif os.path.isdir(source):
+            want, got = sorted(os.listdir(source)), sorted(os.listdir(copied))
+            if want != got:
+                problems.append(f"Contents/Resources/{name} holds {len(got)} entries, "
+                                f"{PROBE}/{name} {len(want)}")
+    return problems
+
+
+def kill_bundled():
+    """SIGKILL exactly the processes running the bundle's executable (only
+    this spike launches that path). The PIDs killed."""
+    found = bounded.run(["pgrep", "-f", os.path.join(APP, "Contents", "MacOS", "capture_probe")],
+                        30)
+    pids = [int(p) for p in found["stdout"].split() if p.isdigit()]
+    for pid in pids:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    return pids
+
+
+
+def read_text(path):
+    """A file's text, or "" when it does not exist."""
+    if not os.path.exists(path):
+        return ""
+    with open(path) as handle:
+        return handle.read()
+
+def run_mode(binary, mode, route="bundle", seconds=None):
     png = os.path.join(PNG, mode)
     shutil.rmtree(png, ignore_errors=True)
     os.makedirs(png)
-    seconds = rowtable.MODE_TIMEOUT.get(mode, 180)
-    ran = bounded.run([binary, mode, FIXTURES, png], seconds, cwd=PROBE)
-    for line in ran["stdout"].splitlines():
+    seconds = seconds or rowtable.MODE_TIMEOUT.get(mode, 180)
+    if route == "direct":
+        ran = bounded.run([binary, mode, FIXTURES, png], seconds, cwd=PROBE)
+        stdout, stderr = ran["stdout"], ran["stderr"]
+    else:
+        out, err = os.path.join(PNG, f"{mode}.out"), os.path.join(PNG, f"{mode}.err")
+        for stale in (out, err):
+            if os.path.exists(stale):
+                os.remove(stale)
+        ran = bounded.run(["open", "-n", "-W", "-F", "--stdout", out, "--stderr", err, APP,
+                           "--args", mode, FIXTURES, png], seconds)
+        killed = kill_bundled() if ran["expired"] else []
+        stdout = read_text(out)
+        stderr = read_text(err) + ran["stderr"]
+    for line in stdout.splitlines():
         if line.startswith("ANSWER "):
             try:
                 return json.loads(line[len("ANSWER "):]), None, ran["seconds"]
             except json.JSONDecodeError as error:
                 return None, f"unreadable ANSWER: {error}", ran["seconds"]
-    why = (f"expired after {seconds} s and was killed" if ran["expired"]
-           else f"exit {ran['rc']}: {ran['stderr'].strip()[-240:]}")
+    if ran["expired"] and route != "direct":
+        why = (f"expired after {seconds} s; `open` was killed and so were the bundle's "
+               f"PIDs {killed}")
+    else:
+        why = (f"expired after {seconds} s and was killed" if ran["expired"]
+               else f"exit {ran['rc']}: {stderr.strip()[-240:]}")
     return None, why, ran["seconds"]
 
 
@@ -220,11 +399,69 @@ def score(rid, kind, measured, window, host, failure):
     return ("pass" if ok else "fail"), reason
 
 
+def bundle_only(rebuild):
+    """`--bundle-only`: build, assemble, verify; launches nothing."""
+    make_fixtures()
+    binary, why, _record = build(rebuild)
+    if binary is None:
+        print(f"bundle: FAIL the probe did not build: {why}")
+        return 1
+    app, why = bundle(binary)
+    if app is None:
+        print(f"bundle: FAIL {why}")
+        return 1
+    problems = verify_bundle(binary)
+    for problem in problems:
+        print(f"bundle: FAIL {problem}")
+    if not problems:
+        print(f"bundle: ok {app}")
+    return 0 if not problems else 1
+
+
+def activation(rebuild):
+    """`--activation`: the `activation` mode over `direct` (the CONTROL) and
+    over `bundle`, 60 s each. Takes keyboard focus."""
+    host = host_facts()
+    print(f"host: macOS {host['macos']} ({host['build']}), {host['hw_model']}, console locked "
+          f"{host['console_locked']}", flush=True)
+    make_fixtures()
+    binary, why, _record = build(rebuild)
+    if binary is None:
+        print(f"activation: the probe did not build: {why}")
+        return 2
+    app, why = bundle(binary)
+    if app is None:
+        print(f"activation: bundle: {why}")
+        return 2
+    answered = {}
+    for route in ("direct", "bundle"):
+        answer, why, _seconds = run_mode(binary, "activation", route=route, seconds=60)
+        x0 = (answer or {}).get("rows", {}).get("X0")
+        if x0 is None or "error" in x0:
+            print(f"activation {route}: no answer — {why or (x0 or {}).get('error')}")
+            continue
+        answered[route] = x0
+        print(f"activation {route}: active {x0.get('active')} in {x0.get('active_ms')} ms, "
+              f"key {x0.get('key_is_editor')}, visible windows {x0.get('visible_windows')}")
+    if len(answered) != 2:
+        return 2
+    b = answered["bundle"]
+    return 0 if (b.get("active") is True and b.get("key_is_editor") is True
+                 and b.get("visible_windows") == 1) else 1
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--only", default="q1,q2,q3,q4")
     parser.add_argument("--rebuild", action="store_true")
+    parser.add_argument("--route", choices=("bundle", "direct"), default="bundle")
+    parser.add_argument("--bundle-only", action="store_true")
+    parser.add_argument("--activation", action="store_true")
     options = parser.parse_args()
+    if options.bundle_only:
+        sys.exit(bundle_only(options.rebuild))
+    if options.activation:
+        sys.exit(activation(options.rebuild))
     only = [q.strip() for q in options.only.split(",") if q.strip()]
     previous = {}
     if os.path.exists(ANSWERS):
@@ -235,9 +472,15 @@ def main():
           f"{host['console_locked']}", flush=True)
     make_fixtures()
     binary, why, build_record = build(options.rebuild)
-    b0 = ("pass" if binary else "fail",
-          (f"built in {build_record['seconds']:.1f} s" if not build_record["cached"]
-           else "up to date") + (f"; {why}" if why else "") if binary else why)
+    app, bundled = (bundle(binary) if binary else (None, None))
+    if binary and app is None:
+        b0 = ("fail", f"bundle: {bundled}")
+    else:
+        b0 = ("pass" if binary else "fail",
+              (f"built in {build_record['seconds']:.1f} s" if not build_record["cached"]
+               else "up to date") + (f"; {why}" if why else "")
+              + f"; bundle {APP} assembled and signed" if binary else why)
+    print(f"route: {options.route}", flush=True)
 
     modes = [m for m in rowtable.MODES
              if any(m in rowtable.QUESTION_MODES[q] for q in only)]
@@ -246,8 +489,11 @@ def main():
         if binary is None:
             failures[mode] = "probe did not build"
             continue
+        if options.route == "bundle" and app is None:
+            failures[mode] = f"probe bundle was not assembled: {bundled}"
+            continue
         print(f"mode {mode}…", flush=True)
-        answer, why, seconds = run_mode(binary, mode)
+        answer, why, seconds = run_mode(binary, mode, route=options.route)
         mode_seconds[mode] = seconds
         if answer is None:
             failures[mode] = f"probe {mode} gave no answer: {why}"

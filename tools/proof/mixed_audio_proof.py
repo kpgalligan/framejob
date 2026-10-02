@@ -21,37 +21,69 @@ silent from the WAV's first sample too: the hold ends at the track's first
 SOUNDING segment, so the missing lead's empty time is held over rather than
 ending the hold at 0 and slewing the plan's 1 → 0 step at the cut (on the
 build before the fix that row failed; the numbers are in the README's B61
-record).
+record). And `pending-first` (#218, B70) — the AAC itself, held PENDING by its
+reverse, followed with no gap by the WAV MUTED, on ONE track — is silent from
+the WAV's first sample as well. The hold: an EMPTY REGULAR FILE at the
+session's `cache/reversed` before `set_reversed`, so no reversed file is found
+(`ReverseCache.existing`) and the render's `createDirectory` throws, which
+`ReverseRenderer.run` answers as a failure that is never retried; the source
+is untouched, so a forward read would be the loud tone (`mixed`'s row) and a
+finished reverse the same tone backwards. Its CONTROLs: no missing media,
+`cache/reversed` still a file after the export, and the lead's own span
+silent. The render's failure sheet stays up on that session's window.
 
 Fixtures are `mixed_audio_probe.py`'s, written fresh by importing it (the
 `silence2` pattern). Needs `ffmpeg`. Run against an instance:
 
     python3 tools/proof/mixed_audio_proof.py <port>
+    python3 tools/proof/mixed_audio_proof.py <port> --mutant old-onset
+
+`--mutant old-onset` builds a tree copy (`tree_copy.make_copy`, under
+`work/mixed-audio-mutant`) with the pre-B61 onset (`git show 16d4934`: the
+track's first segment of positive duration, sounding or not) in
+`CompositionBuilder+AudioTracks.swift`, the anchor asserted once, by the
+copy's own `make app`; launches it on `<port>` with its own log under `work/`;
+and runs every row against it. Exit 0 means caught: both `missing-first` and
+`pending-first`'s first-25 ms rows FAIL while both sections' CONTROL rows
+pass; 1 means it survived; 2 means the control could not be performed (the
+copy was not built or not launched, its log has a `Reelcut: ` parity line, or
+a CONTROL row failed). Only that child is ever terminated, by its PID.
 """
 
+import argparse
 import math
 import os
 import re
 import shutil
 import subprocess
 import sys
+import time
 from array import array
 
 import mixed_audio_probe as probe
 from mcp import MCP
 
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 4817
 HERE = os.path.dirname(os.path.abspath(__file__))
 WORK = os.path.join(HERE, "work")
+sys.path.insert(0, os.path.join(HERE, "graphics_spike"))
+import bounded  # noqa: E402
+import tree_copy  # noqa: E402
+
 SEC = 600_000
+
+MUTANTS = {"old-onset": ("CompositionBuilder+AudioTracks.swift",
+                         "onset: family.sounding.map(\\.lowerBound).min(),",
+                         "onset: family.segments.filter { $0.duration > 0 }.map(\\.start).min(),")}
 
 failures = []
 checks = 0
+results = []
 
 
 def check(ok, what):
     global checks
     checks += 1
+    results.append((ok, what))
     if ok:
         print(f"  ok   {what}")
     else:
@@ -154,15 +186,7 @@ def windows(label, data, clips):
                             f"({level:.1f} dBFS ≤ −60)")
 
 
-def main():
-    os.makedirs(WORK, exist_ok=True)
-    why = probe.make_media()
-    if why:
-        check(False, f"the fixtures were written: {why}")
-        print(f"\n{checks - len(failures)}/{checks} checks passed")
-        sys.exit(1)
-    mcp = MCP(PORT)
-
+def run(mcp):
     print("mixed — an AAC clip then a WAV on ONE track")
     m = Session(mcp, "mixed-audio")
     aac, wav = m.media("aac.m4a"), m.media("pcm.wav")
@@ -238,6 +262,39 @@ def main():
     check(rest <= -60, f"missing-first: silent from {w + 0.025:.3f} s to {w + 1.975:.3f} s "
                        f"({rest:.1f} dBFS ≤ −60)")
 
+    print("\npending-first — the AAC held PENDING by its reverse, then the WAV MUTED, on ONE track")
+    h = Session(mcp, "mixed-audio-pending")
+    aac, wav = h.media("aac.m4a"), h.media("pcm.wav")
+    track = h.track_ids()[0]
+    first = h.place(track, aac, 0)
+    # No gap, as missing-first: the core's envelope is 0 in a gap.
+    at = {c["id"]: c for c in h.project()["clips"]}[first]["duration"]
+    second = h.place(track, wav, at)
+    h.op("set_audio", clips=[second], patch={"muted": True})
+    # The hold: a FILE where the reverse's directory would go, so no reversed
+    # file is ever found and the render's createDirectory throws.
+    cache = os.path.join(h.path, "cache")
+    os.makedirs(cache, exist_ok=True)
+    hold = os.path.join(cache, "reversed")
+    open(hold, "wb").close()
+    h.op("set_reversed", clip=first, reversed=True)
+    missing = h.op("get_project").get("missing_media")
+    check(not missing, f"CONTROL pending-first: get_project has no missing_media ({missing})")
+    pending = pcm(h.export_wav())
+    held = os.path.isfile(hold) and not os.path.islink(hold)
+    check(held, f"CONTROL pending-first: after the export, cache/reversed is still a regular file "
+                f"({'file' if held else 'directory' if os.path.isdir(hold) else 'absent'})")
+    w = at / SEC
+    quiet = db(pending, 0.25, w - 0.25)
+    check(quiet <= -60, f"CONTROL pending-first: the pending lead is silent from 0.25 s to "
+                        f"{w - 0.25:.3f} s ({quiet:.1f} dBFS ≤ −60; a forward or finished "
+                        f"reverse read would be loud)")
+    edge, rest = db(pending, w, w + 0.025), db(pending, w + 0.025, w + 1.975)
+    check(edge <= -60, f"pending-first: the WAV's first 25 ms from {w:.3f} s are silent "
+                       f"({edge:.1f} dBFS ≤ −60)")
+    check(rest <= -60, f"pending-first: silent from {w + 0.025:.3f} s to {w + 1.975:.3f} s "
+                       f"({rest:.1f} dBFS ≤ −60)")
+
     print("\nCONTROL same — two AAC clips of one format on one track")
     q = Session(mcp, "mixed-audio-same")
     one, two = q.media("aac.m4a"), q.media("aac2.m4a")
@@ -246,6 +303,141 @@ def main():
     q.place(track, two, 3 * SEC)
     windows("same", pcm(q.export_wav()), [0, 3])
 
+
+def fixtures():
+    os.makedirs(WORK, exist_ok=True)
+    why = probe.make_media()
+    if why:
+        check(False, f"the fixtures were written: {why}")
+    return why
+
+
+def build_mutant(name):
+    """`graphics_proof.build_mutant`'s shape: a tree copy, the anchor asserted
+    once in `app/Sources/<file>` and replaced, the copy's own `make app`.
+    The binary, or None and why."""
+    file, anchor, replacement = MUTANTS[name]
+    made, reason = tree_copy.make_copy(os.path.join(WORK, "mixed-audio-mutant"))
+    if made is None:
+        return None, reason
+    target = os.path.join(made, "app", "Sources", file)
+    with open(target) as handle:
+        text = handle.read()
+    if text.count(anchor) != 1:
+        return None, f"the anchor occurs {text.count(anchor)} times in {file}"
+    with open(target, "w") as handle:
+        handle.write(text.replace(anchor, replacement))
+    built = bounded.run(["make", "app"], 1500, cwd=made)
+    binary = os.path.join(made, "build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut")
+    if built["rc"] != 0 or not os.path.exists(binary):
+        errors = [line for line in (built["stdout"] + built["stderr"]).splitlines()
+                  if "error:" in line]
+        return None, (f"make app rc {built['rc']} (expired {built['expired']}): "
+                      + ("\n      ".join(errors[:6]) or built["stdout"][-600:]))
+    return binary, ""
+
+
+class Instance:
+    """One owned app, by PID, on its own port (`graphics_proof.Instance`'s
+    shape); only this child is ever terminated."""
+
+    def __init__(self, app, port, log):
+        self.app, self.port, self.log = app, port, log
+        self.child = None
+        self.offset = 0
+
+    def start(self):
+        self.offset = os.path.getsize(self.log) if os.path.exists(self.log) else 0
+        with open(self.log, "a") as out:
+            self.child = subprocess.Popen(
+                [self.app, "-ApplePersistenceIgnoreState", "YES", "-AgentServerEnabled", "YES"],
+                stdin=subprocess.DEVNULL, stdout=out, stderr=out, start_new_session=True,
+                env=bounded.child_env({"RC_AGENT_PORT": str(self.port)}))
+        deadline = time.monotonic() + 60
+        while time.monotonic() < deadline:
+            time.sleep(0.25)
+            found = re.search(r"listening on http://127\.0\.0\.1:(\d+)/mcp", self.appended())
+            if found:
+                bound = int(found.group(1))
+                print(f"  instance PID {self.child.pid} on port {bound}", flush=True)
+                return bound
+        return None
+
+    def appended(self):
+        with open(self.log) as handle:
+            handle.seek(self.offset)
+            return handle.read()
+
+    def parity(self):
+        return [line for line in self.appended().splitlines() if "Reelcut: " in line]
+
+    def stop(self):
+        if self.child is None:
+            return
+        self.child.terminate()
+        try:
+            self.child.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            self.child.kill()
+            self.child.wait()
+        self.child = None
+
+
+def mutant(name, port):
+    print(f"mixed audio — the {name} MUTANT (both first-25 ms rows must FAIL)", flush=True)
+
+    def uncontrolled(why):
+        print(f"mutant {name}: the control could not be performed — {why}")
+        return 2
+
+    binary, why = build_mutant(name)
+    if binary is None:
+        print(f"  FAIL the mutant builds — {why}")
+        return uncontrolled(f"the copy was not built: {why}")
+    instance = Instance(binary, port, os.path.join(WORK, f"mixed-audio-mutant-{port}.log"))
+    try:
+        bound = instance.start()
+        if bound is None:
+            print("  FAIL the mutant launches")
+            return uncontrolled("the copy did not launch")
+        parity = instance.parity()
+        if parity:
+            return uncontrolled(f"its log has a parity line: {parity[0]}")
+        try:
+            run(MCP(bound, timeout=300))
+        except Exception as error:  # a run that cannot finish is not a verdict
+            return uncontrolled(f"the run raised {type(error).__name__}: {error}")
+        parity = instance.parity()
+    finally:
+        instance.stop()
+    print(f"\n{checks - len(failures)}/{checks} checks passed")
+    if parity:
+        return uncontrolled(f"its log has a parity line: {parity[0]}")
+    controls = [(ok, what) for ok, what in results
+                if what.startswith(("CONTROL missing-first:", "CONTROL pending-first:"))]
+    if len(controls) != 4 or not all(ok for ok, _ in controls):
+        bad = [what for ok, what in controls if not ok]
+        return uncontrolled(f"{len(controls)} CONTROL rows, failed: {bad}")
+    targets = {prefix: [ok for ok, what in results if what.startswith(prefix)]
+               for prefix in ("missing-first: the WAV's first 25 ms",
+                              "pending-first: the WAV's first 25 ms")}
+    caught = all(len(oks) == 1 and not oks[0] for oks in targets.values())
+    print(f"mutant {name}: " + ("caught — both first-25 ms rows FAIL, every CONTROL passes"
+                                if caught else f"survived — {targets}"))
+    return 0 if caught else 1
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    parser.add_argument("port", nargs="?", type=int, default=4817)
+    parser.add_argument("--mutant", choices=sorted(MUTANTS))
+    args = parser.parse_args()
+    if fixtures():
+        print(f"\n{checks - len(failures)}/{checks} checks passed")
+        sys.exit(2 if args.mutant else 1)
+    if args.mutant:
+        sys.exit(mutant(args.mutant, args.port))
+    run(MCP(args.port))
     passed = checks - len(failures)
     print(f"\n{passed}/{checks} checks passed")
     sys.exit(0 if not failures else 1)

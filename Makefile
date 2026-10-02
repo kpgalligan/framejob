@@ -27,10 +27,11 @@ rust:
 # `prices_proof.py` is road map 13 P1's price function: the Python reader and
 # the helper's `bun test` (agent/build.sh test) against one fixture file, no
 # network. `budget_proof.py` is P3's proofs' ledger and monthly budgets (spec
-# §11 P-6), over scratch ledgers only, no network. The last line checks the
+# §11 P-6), over scratch ledgers only, no network. `inventory.py --check` checks the
 # menu inventory's sites against app/Sources, each found by its token and
 # enclosing function rather than its line, and its other citations by
-# anchor; no app, no build.
+# anchor; no app, no build. `spec_index_proof.py` (issue batch B70) checks the
+# spec indexes' Lines cells against `wc -l` and a row for every spec file.
 test: rust
 	cd core && cargo test --release
 	cd graphic && cargo test --release
@@ -39,6 +40,7 @@ test: rust
 	python3 tools/proof/prices_proof.py
 	python3 tools/proof/budget_proof.py
 	python3 tools/proof/capture_spike/inventory.py --check
+	python3 tools/proof/spec_index_proof.py
 
 lint:
 	cd core && cargo clippy --all-targets -- -D warnings

@@ -17,10 +17,48 @@ what they changed in V2's text. What is here is how to run it again.
   `-O`, whole-module build.
 
 ```sh
-python3 tools/proof/capture_spike/capture_spike.py                  # all four
+python3 tools/proof/capture_spike/capture_spike.py                  # all four, over the bundle route
 python3 tools/proof/capture_spike/capture_spike.py --only q2,q4     # a subset; other rows carry forward
 python3 tools/proof/capture_spike/capture_spike.py --rebuild        # rebuild the probe regardless
+python3 tools/proof/capture_spike/capture_spike.py --route direct   # the bare binary; takes no focus
+python3 tools/proof/capture_spike/capture_spike.py --bundle-only    # build, assemble, check; launches nothing
+python3 tools/proof/capture_spike/capture_spike.py --activation     # the activation mode over both routes
 ```
+
+**How it launches (issue batch B70, #132).** Every run assembles
+`work/capture_spike/CaptureProbe.app` after the build: the binary as
+`Contents/MacOS/capture_probe`; `Fonts/`, `Blank.mp4`, `default.metallib`,
+`GraphicTemplates/` and `GraphicsAPI.md` in `Contents/Resources/`; an
+`Info.plist` (`com.kgalligan.reelcut.captureprobe`, `NSPrincipalClass
+NSApplication`, `LSMinimumSystemVersion 26.0`); signed ad hoc with
+`codesign --force --sign -`. A failed assembly or signing fails B0 as
+`bundle: <why>`. The default route, `--route bundle`, launches each mode
+through LaunchServices — `open -n -W -F --stdout <png>/<mode>.out --stderr
+<png>/<mode>.err CaptureProbe.app --args <mode> <fixtures> <png>` — so the
+probe is a real app that can be made the active one, and reads the `ANSWER`
+line from the `.out` file. `--route direct` runs the bare binary as every
+run before B70 did; on this host it never becomes active, so its S and A
+rows skip with `host: probe not active`. The probe finds its fonts through
+`ProjectDocument.bundledFontsDirectory` (a bare binary's `resourceURL` is its
+own folder, so the direct route reads the same `Fonts/`), and its
+`ProbeAppDelegate` answers LaunchServices' open-untitled and reopen events
+with no. `--bundle-only` checks the bundle without launching it:
+`plutil -lint`, `codesign --verify --strict`, the executable the built
+binary (compared with both signatures removed, since `codesign` rewrites the
+linker's), every resource present. `--activation` runs the probe's
+`activation` mode (`ProbeSupport.runActivation`: `well.reelcut` opened,
+`activate`, and the count of visible windows) over `direct`, the CONTROL,
+then `bundle`, 60 s each, and prints `activation <route>: active <bool> in
+<ms|None> ms, key <bool>, visible windows <n>`; exit 0 when the bundle route
+was active and key with exactly 1 visible window, 1 when not, 2 when a route
+gave no answer. Neither `--bundle-only` nor `--activation` reads or writes
+`answers.json`, and `activation` is not one of `rows.py`'s modes, so a full
+run is still 38 rows with the same digest scheme.
+
+**A bundle-route run takes keyboard focus** and puts the probe's windows in
+front for the length of the run (about 3 minutes in full; `--activation`
+about a minute and a half), so run it only when nobody is typing at the Mac.
+`--route direct` does not take focus.
 
 Needs `swiftc`, `xcrun metal` and `core/target/release/libreelcut_core.a`
 (`cd core && cargo build --release`). No port, no ffmpeg, no MCP.
@@ -44,12 +82,13 @@ a skip.
 
 | File | What it is |
 |---|---|
-| `capture_spike.py` | the runner: host facts, the two fixtures, the shader and the probe build (B0), one bounded child per mode, scoring, `answers.json`, the digest, the exit code |
+| `capture_spike.py` | the runner: host facts, the two fixtures, the shader and the probe build (B0), `CaptureProbe.app`'s assembly and signing (`bundle`, also B0) and its check (`verify_bundle`, `--bundle-only`), one bounded child per mode over the bundle route (`open`) or `--route direct`, scoring, `answers.json`, the digest, the exit code; `--activation` |
 | `rows.py` | the row table (ID, question, kind, mode) and one pure predicate per row over the probe's JSON; `host_skip` |
 | `inventory.py` | the site grep over `app/Sources`, the I1–I4 checks, the printed menu table; `--check` (a line of `make test`, no app) runs I2 and I3 over the tree as K1 with four CONTROLs, K2 (three lines put above every file holding a site or cited by an anchor), K3 (one rewritten site blanked), K4 (a site moved into a new `func b13Swap` at the file's end: the swap is reported) and K5 (one anchor given an invisible U+2063: reported) |
 | `inventory.json` | the hand-read inventory: every live menu selector's verdict (`none`, `sheet`, `window`, `modal`, `framework`) with the lines that present, and every grep site, with its enclosing `func`, traced to the selectors that reach it — `reached_from` (inside the action), `reached_after` (a completion, an async hop or a delegate callback, with its `via` and `gate`). Every citation is a SITE ref, `app/Sources/<F>.swift:<N>` naming a key of `sites`, or an ANCHORED ref, ``app/Sources/<F>.swift `<anchor>` ``, whose anchor is a piece of the line meant (a method's declaration, `func name(`, for a method) occurring exactly once in `<F>`; `baseline` is the tree (`git rev-parse HEAD^{tree}`) it was last read against |
-| `capture_probe.swift` | the probe's entry, copied to `work/capture_spike/probe/main.swift`: arguments, mode dispatch, the one `ANSWER` line |
-| `probe_support.swift` | boot (`.regular`, `finishLaunching`, the argument-domain pins, the app's fonts), `ProbeEditor` (a package opened as the app opens one, 1440 × 862), activation, the settle capture, capture-pixel mapping, masks and statistics |
+| `capture_probe.swift` | the probe's entry, copied to `work/capture_spike/probe/main.swift`: arguments, mode dispatch (the six scored modes and `activation`), the one `ANSWER` line |
+| `probe_support.swift` | boot (`.regular`, `ProbeAppDelegate` as `NSApp.delegate`, `finishLaunching`, the argument-domain pins, the app's fonts from `ProjectDocument.bundledFontsDirectory`), `ProbeEditor` (a package opened as the app opens one, 1440 × 862), activation and `runActivation` (the `activation` mode, X0), the settle capture, capture-pixel mapping, masks and statistics |
+| `work/capture_spike/CaptureProbe.app` | written by every run: the probe as a LaunchServices app, `Contents/MacOS/capture_probe` and the five resources in `Contents/Resources/`, `Info.plist`, an ad-hoc signature |
 | `probe_well.swift` | `well` — W0–W6 |
 | `probe_sheets.swift` | `sheets` (S0–S3), `modal` (S4) and `menu` (I1's leaves) |
 | `probe_appearance.swift` | `appearance` — A0–A7 |
@@ -69,7 +108,7 @@ swiftc -O -wmo -D REELCUT_DEV_TOOLS -sdk "$(xcrun --show-sdk-path --sdk macosx)"
 
 with `Fonts/`, `Blank.mp4`, a `default.metallib` of `Compositor.metal`,
 `GraphicTemplates/*.js` and `GraphicsAPI.md` beside it. By hand:
-`capture_probe <well|sheets|modal|menu|appearance|layout> <fixtures-dir> <png-dir>`
+`capture_probe <well|sheets|modal|menu|appearance|layout|activation> <fixtures-dir> <png-dir>`
 prints exactly one stdout line, `ANSWER <json>`.
 
 ## Rows
@@ -107,7 +146,11 @@ It never uses `screencapture` or ScreenCaptureKit (spec §11 V-3), never
 launches Reelcut.app or an MCP server, never changes anything under `app/`,
 `core/` or the build, and never kills a process it did not start: every child
 runs in its own process group under `graphics_spike/bounded.py` and only that
-group is killed on expiry (the build 1200 s, a mode 180 s, `modal` 60 s). It
+group is killed on expiry (the build 1200 s, a mode 180 s, `modal` 60 s). A
+bundle-route mode runs `open -W` in that group, but LaunchServices starts the
+probe outside it, so on expiry the runner also kills, by PID, exactly the
+processes `pgrep -f` finds running `CaptureProbe.app/Contents/MacOS/capture_probe`
+— a path only this spike launches — and names them in the reason. It
 performs no AppKit-owned action (Open…, Save As…, Revert, Close, Quit): those
 are `framework` rows, read and not run.
 
@@ -191,3 +234,38 @@ for 3 s, and the probe never became the active app. One explanation fits but
 is unmeasured: since macOS 14, `NSApp.activate()` is a request that the
 frontmost app must yield to (`yieldActivation`), and a child process of a
 terminal's shell is not handed activation the way V1's runs were.
+
+**B70's direct run and bundle check, 2026-10-02**, over HEAD `4d9b80a` plus
+issue batch B70 (the bundle, the routes, `ProbeAppDelegate`, the fonts
+through `ProjectDocument.bundledFontsDirectory`, the `activation` mode). The
+agent launched nothing over the bundle route. First
+`perl -e 'alarm shift; exec @ARGV' 1500 python3 tools/proof/capture_spike/capture_spike.py --bundle-only --rebuild`:
+the probe built in 107 s, then `bundle: ok
+…/work/capture_spike/CaptureProbe.app`, exit 0. Its first version compared
+the two executables byte for byte and failed, because `codesign --force
+--sign -` replaces the linker's ad-hoc signature with the bundle's. Even with
+both signatures removed, the two files differed in 2 bytes, inside
+`__LINKEDIT`'s vmsize, which the removed signature had rounded. The check now
+compares the two with their signatures removed and that one field zeroed.
+Then
+`perl -e 'alarm shift; exec @ARGV' 900 python3 tools/proof/capture_spike/capture_spike.py --route direct`:
+
+```
+host: macOS 26.5.1 (25F80), Mac14,6, console locked False
+scores: 19 pass, 5 fail, 14 skip of 38
+digest: 087f333be1afc9b66b9cdc0af5ec51df60fe1301dc2e581e2d3bd2cb97d15337
+mode seconds: layout 4.5, well 7.2, sheets 23.8, modal 2.1, menu 0.1, appearance 48.6
+```
+
+Exit 0. Every row is in the state #132's foreground run recorded, and the
+digest is the same. B0 passed as `up to date; bundle
+…/CaptureProbe.app assembled and signed`. The fails are W4a, W4b, W4c, L3
+and L7. S1a–S3 and A1–A7 skip with `host: probe not active`, which is what
+the direct route is expected to give: S0 `active False in None ms, key False,
+main False`, A0 `active False in None ms, key False`.
+
+**Owed: the two bundle-route runs.** They take focus, so the orchestrator
+runs them only after the owner says the Mac may take focus and that they are
+away: `--activation --rebuild` (about 2 minutes), then, only if that exits 0,
+`--only q2,q3` (about 15 minutes at most). Neither has run, and #132 stays
+open until the bundle route answers active and key.
