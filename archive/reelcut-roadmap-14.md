@@ -748,3 +748,51 @@ map 10), and `e1_proof.py` can never exit 0 while its reference build listens on
 (#215, this phase's). MC5 is next: the ADR, the archive
 move, the Rasterize issue, the issue for a later home for Copy MCP Command, and older proofs'
 LaunchServices registrations.
+
+### MC5 — closing (2026-10-01)
+
+The road map is closed under root `CLAUDE.md`'s closing rule. Over `20c947d`:
+
+- **The ADR.** `designs/adr/roadmap-14-agent-socket.md` condenses this document, with
+  `designs/adr/roadmap-13-pricing.md`'s headings and a "Where to look in the original" section.
+- **The move.** This document was `git mv`ed from `designs/` to `archive/reelcut-roadmap-14.md`
+  after this record was appended, and `archive/INDEX.md` gained its row after road map 13's.
+- **The pointers.**
+  - Root `CLAUDE.md`'s `designs/adr/` row lists `roadmap-14`.
+  - `core/CLAUDE.md`'s `agent.rs` entry says the module now differs from Rasterize's and names
+    the issue that offers the change.
+  - `mcp-proxy/CLAUDE.md` and spec §7.9a now name the ADR in place of this document.
+  - Spec §11's `agent-connection.md` header is worded as closed, the way `pricing.md`'s is, and
+    its index row drops "in progress".
+  - `tools/proof/README.md`, `tools/proof/mc1_spike/README.md` and `mc1_spike.py`'s docstring now
+    name `archive/reelcut-roadmap-14.md`'s MC1 record and the ADR.
+- **LaunchServices, measured before filing** (read-only `lsregister -dump`; nothing unregistered):
+  - 136 registrations have an identifier containing `reelcut`, 101 of them
+    `com.kgalligan.Reelcut`.
+  - 54 are at paths that no longer exist, 45 of those under agents' scratchpads. One of the 54 is
+    this worktree's `tools/proof/work/graphics-prefetch/mutant`.
+  - 82 are at existing paths, 61 of those under a `tools/proof/work/`.
+- **Issues filed**, each labelled `ai-drafted` and `low-priority`. No earlier issue matched any of
+  them (`gh issue list --state all --search`). The implementer's `gh issue create` was refused by
+  the permission check as a write to an outside system; the owner then approved all five, and
+  they were filed on 2026-10-02 from the drafted bodies.
+  - kpgalligan/rasterize#430: Take Reelcut's agent-server transport: a Unix socket only, no
+    TCP, and a stdio proxy (reelcut-mcp).
+  - #222: A home for Copy MCP Command other than a Tools menu that holds nothing else.
+  - #223: Proof build copies of Reelcut.app stay registered with LaunchServices after their
+    folders are deleted.
+  - #224: No proof quits Reelcut with an agent call in flight (the socket's
+    release-without-join). This is MC2's owed item.
+  - #225: A tree copy's "Build Rust Core" step rebuilds the tree's own core/target. This is
+    MC1's side effect, which contradicts `tree_copy.py`'s docstring.
+
+  Not refiled: #214, #215, kpgalligan/rasterize#325 and AC-1..AC-5. The TCP endpoint's missing
+  `Origin`/`Content-Type` checks are not filed, by the user's choice, since MC4 removed the
+  endpoint.
+- No code changed, so no build was run. No app was launched, and no model or API call was made
+  ($0).
+
+**Owed:**
+- AC-1..AC-5 in `docs/manual-checks.md` (the owner's).
+- The owner's own client: run `claude mcp remove reelcut -s local`, then the line Tools ▸ Copy
+  MCP Command gives. This is theirs to run, not an issue.

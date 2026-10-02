@@ -10757,7 +10757,7 @@ background `open -n -g` launch costs and shows, cold, warm and quarantined
 from its docs and a stdio stub, with no model call (q3); and the socket
 path's length and `tiny_http`'s `http_unix` against existing files (q4).
 `tools/proof/mc1_spike/README.md` has the rows and the instruments; **the
-answers are in `designs/reelcut-roadmap-14.md`'s MC1 record**. q1 builds only
+answers are in `archive/reelcut-roadmap-14.md`'s MC1 record (condensed in `designs/adr/roadmap-14-agent-socket.md`)**. q1 builds only
 in a `tree_copy.py` copy (`work/mc1_spike/tree`), which alone gets the
 `-RCWriteCatalog` hook and the phase that ad-hoc signs the just-linked
 (unsigned: `-no_adhoc_codesign`) executable in place and runs it; q2 launches that copy's Release product from paths

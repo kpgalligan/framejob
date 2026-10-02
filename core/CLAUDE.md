@@ -478,7 +478,9 @@ governs a module now.
   no partial value — never "the canvas is translucent".
 - `agent.rs` — embedded MCP server (streamable HTTP, tools only).
   **Generic** — knows nothing about video; the host registers the catalog
-  and a callback. Copied from Rasterize; do not add domain knowledge. One
+  and a callback. Copied from Rasterize; do not add domain knowledge. Since
+  road map 14 it differs from Rasterize's (a Unix socket only here; TCP with
+  `admit` there), and kpgalligan/rasterize#430 offers the change. One
   listener, `start_socket` (a Unix socket at an absolute path of at most
   `MAX_SOCKET_PATH_BYTES`, 103, chmod 0600, never unlinking a file already
   there), into the `serve` loop; road map 14's MC4 deleted the TCP `start`.

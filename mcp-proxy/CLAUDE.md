@@ -4,7 +4,7 @@ Applies to everything under `mcp-proxy/`, the crate that builds
 `reelcut-mcp`: the stdio MCP server bundled as
 `Reelcut.app/Contents/Helpers/reelcut-mcp`, which external MCP clients start
 (road map 14's MC3, spec §11 MC-3, MC-4, MC-6; the record is
-`designs/reelcut-roadmap-14.md`). Build commands are the root `CLAUDE.md`'s:
+`designs/adr/roadmap-14-agent-socket.md`). Build commands are the root `CLAUDE.md`'s:
 `make test` and `make lint` run this crate after the core and the graphics
 engine; `project.yml`'s "Build MCP Proxy" phase builds it, copies the binary
 into `Contents/Helpers/` and signs it `--options runtime` with no
