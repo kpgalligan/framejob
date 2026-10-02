@@ -2,16 +2,16 @@
 """Road map 11's V2b — `perform_menu_item` and `cancel_sheet`, proved against
 the running app.
 
-    python3 tools/proof/v2_menu.py <port> [--log PATH] [--only LETTERS]
+    python3 tools/proof/v2_menu.py <dir>/agent.sock [--log PATH] [--only LETTERS]
 
 `--only` takes row letters (`T,H,N,D,U,R,S,L`); omitted, every row runs.
 `--only H` needs no app: the H rows are the probe's, and no MCP client is
-made (issue batch B28). The app is the Release build on `<port>`, launched
+made (issue batch B28). The app is the Release build at the socket, launched
 with the V2b spec's Verification line (V2a's pinned defaults plus `-RCSecretFolder` under
 `work/v2_menu/secrets` and `-RCSpendFolder` under `work/v2_menu/spend` —
 it opens Settings, whose month line would otherwise read the person's
 ledger, spec §11 P-5), fresh for each run; `--log` defaults to
-`/tmp/reelcut-<port>.log`.
+`<dir>/reelcut.log`.
 
 **The cover.** The D rows put `v2_cover.swift`'s opaque, non-activating
 panel (built by `v2_snapshot.build_cover`) over project B's editor so it
@@ -50,8 +50,7 @@ Clip ▸ Rename… and Edit ▸ Select All on its field (U3: a text field's Sele
 All leaves undo and redo as they were, #176; the field is then closed by a
 `delete` of its clip, checked by counting the editor's field editors in two
 `snapshot_ui` layouts, and the delete undone, #184), plus the items it expects
-REFUSED — never Quit, Close, Save, Revert, Allow Agent Connections, New
-Recording or a Help item.
+REFUSED — never Quit, Close, Save, Revert, New Recording or a Help item.
 
 Rows print as `<ID> <pass|fail|skip> <I|C|A> — <reason>`, then `scores:` and
 `digest:` (sha256 of the sorted `ID=state` lines). Exit 0 iff no row failed.
@@ -74,7 +73,7 @@ import bounded  # noqa: E402
 import inventory  # noqa: E402
 import v2_snapshot as snapshot  # noqa: E402
 from dev_tools import DEV_TOOLS, dev_marker_count  # noqa: E402
-from mcp import MCP, ToolError  # noqa: E402
+from mcp import MCP, ToolError, log_beside, target  # noqa: E402
 from media_less_playback_probe import console_locked  # noqa: E402
 
 WORK = os.path.join(HERE, "work", "v2_menu")
@@ -787,12 +786,14 @@ def open_fixtures(mcp):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("port", type=int)
+    parser.add_argument("socket", nargs="?")
     parser.add_argument("--log")
     parser.add_argument("--only")
     args = parser.parse_args()
-    log = args.log or f"/tmp/reelcut-{args.port}.log"
     only = set(args.only.replace(" ", "").split(",")) if args.only else set("THNDURSL")
+    # `--only H` needs no app, so no socket either (issue batch B28).
+    socket_path = target([sys.argv[0], args.socket or ""]) if only - {"H"} else None
+    log = args.log or (log_beside(socket_path) if socket_path else None)
     selected = [rid for rid, _ in ROWS if rid[0] in only]
 
     shutil.rmtree(PNG, ignore_errors=True)
@@ -803,7 +804,7 @@ def main():
     if "H" in only:
         rows_h(probe, probe_error)
 
-    mcp = MCP(args.port, timeout=120) if only - {"H"} else None
+    mcp = MCP(socket_path, timeout=120) if only - {"H"} else None
     if "T" in only:
         guarded("T", rows_t, mcp, log)
     if only & set("NDURS"):

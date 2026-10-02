@@ -72,14 +72,17 @@ extension AgentServer {
     /// AVFoundation cannot read may be converted by ffmpeg first
     /// (`FFmpegRewrap.assist`), which legitimately takes as long as
     /// `FFmpegRewrap.longestConversion`, so a shorter wait would answer a
-    /// timeout while the conversion is still running.
+    /// timeout while the conversion is still running. A tool call never
+    /// asks the conversion question (spec §11 MC-5), so it passes
+    /// `mayAsk: false`, and a refusal ffmpeg could have helped names the
+    /// setting (`neverAsksSentence`).
     private func probe(_ url: URL) throws -> MediaDescriptor {
         guard !Thread.isMainThread else {
             throw ToolError(message: "Probing cannot run on the main thread.")
         }
         let semaphore = DispatchSemaphore(value: 0)
         let box = AgentBox<Result<MediaDescriptor, any Error>>()
-        MediaImporter.probe(url: url) { result in
+        MediaImporter.probe(url: url, mayAsk: false) { result in
             box.value = result
             semaphore.signal()
         }
@@ -92,8 +95,24 @@ extension AgentServer {
         do {
             return try outcome.get()
         } catch {
-            throw ToolError(message: error.localizedDescription)
+            guard let sentence = Self.neverAsksSentence(for: error, url: url) else {
+                throw ToolError(message: error.localizedDescription)
+            }
+            throw ToolError(message: error.localizedDescription + " " + sentence)
         }
+    }
+
+    /// What a tool call's refusal adds when an installed ffmpeg could have
+    /// converted the file but the policy is `ask`, which a call never asks
+    /// (spec §11 MC-5); nil otherwise.
+    static func neverAsksSentence(for error: any Error, url: URL) -> String? {
+        guard let failure = error as? MediaImporter.ImportError, failure.invitesFFmpeg,
+            !MediaImporter.isImage(url), FFmpegRewrap.policy == .ask,
+            FFmpegRewrap.tools() != nil
+        else { return nil }
+        return "An installed ffmpeg could convert it, but a tool call never asks "
+            + "(RCFFmpegImport is ask): launch Reelcut with -RCFFmpegImport always, "
+            + "or import it from the app's window."
     }
 
     // MARK: - Captions

@@ -394,7 +394,6 @@ enum Harness {
             "ReelcutAssistantAutoCompact": true,
             "ReelcutAssistantAutoCompactTokens": 300_000,
             "ReelcutAssistantClearToolResults": false,
-            "AgentServerEnabled": false,
             // AppKit picks legacy (16 pt, always visible) or overlay scrollers
             // by whether a MOUSE is attached, and the inspector pane is 16 pt
             // narrower under the legacy kind, which moves its header's right

@@ -50,9 +50,9 @@ import sys
 import time
 import zlib
 
-from mcp import MCP, ToolError
+from mcp import MCP, ToolError, target
 
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 4823
+SOCKET = target(sys.argv)
 HERE = os.path.dirname(os.path.abspath(__file__))
 MEDIA = os.path.join(HERE, "media")
 WORK = os.path.join(HERE, "work")
@@ -1425,7 +1425,7 @@ def schema_part(mcp):
 
 def main():
     os.makedirs(WORK, exist_ok=True)
-    mcp = MCP(PORT)
+    mcp = MCP(SOCKET)
 
     print("catalog")
     names = mcp.tools()

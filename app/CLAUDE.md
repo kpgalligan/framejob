@@ -220,7 +220,14 @@ detail there.
   session after 2 s and 10 s. The cache order is thumbnails → peaks → speech.
   `thumbnails` holds a
   video track's last frame past its end, from the track's last SAMPLE's time.
-  `FFmpegRewrap` is opt-in (`-RCFFmpegImport always`), runs `Process` on a
+  `FFmpegRewrap` is opt-in (`-RCFFmpegImport always`), and `assist`'s
+  `mayAsk` is the CALLER's (spec §11 MC-5): `MediaImporter.probe` requires
+  it, every click path passes `true`, a tool call's import passes `false`
+  (`import_media`, `relink_media`, `record_screen` through
+  `ScreenRecorder.start`), and `open_project` runs its synchronous
+  `makeDocument` inside `MediaImporter.withoutAsking`, a thread-scoped key
+  `probeBlocking` reads — never process-wide state, so a person's own
+  import still asks while a call runs. It runs `Process` on a
   serial queue, and writes conversions under `AppSupport` — the ONE spelling
   of `~/Library/Application Support/Reelcut/` — never in the package.
   `AppSupport.ensureDirectory` is the ONE creator of that folder and of any
@@ -375,6 +382,11 @@ the key map behind it.
   the delegate), `main.swift` — the window,
   the no-document window, the launch/terminate flow and the whole menu bar
   (spec §9). Menu items are nil-target selectors down the responder chain.
+  `AppDelegate.swift` binds the agent socket at launch and releases it at
+  quit, and answers Tools ▸ Copy MCP Command (`copyMCPCommand`, road map
+  14's MC4: the general pasteboard cleared and the `mcpCommand` line set as
+  `.string`; live with no document, enabled exactly while `mcpHelperURL` is
+  an executable file; not an edit, so no MCP mirror).
   `main.swift` also calls `AgentCatalogSnapshot.writeIfAsked()` straight
   after `AgentLane.prepareAtLaunch()`, at `#if` depth 0.
 - `EditorWindow.swift` — the editor's `NSWindow` subclass: its `sendEvent`
@@ -1422,7 +1434,7 @@ free.
   stranger refused by name — the tool, the strangers and the whole of what it
   takes — before the scope or any handler reads a thing. Its map is read once
   from the catalog string `prepareCatalog()` built at launch (spec §11 AI-3),
-  which `start()` then registers. What it cannot see is a
+  which `bindSocket()` then registers. What it cannot see is a
   declared argument no handler reads, which is the optional half of
   `op_argument_proof.py`'s section 3. `target(_:)` resolves the implicit
   document through `NSApp.orderedDocuments`, never `documents.first`, and an
@@ -1431,22 +1443,25 @@ free.
   (`import_media`, `transcribe`, `record_screen`, `export`,
   `render_graphic`, …); the criterion
   is "waits on main", not "touches the disk".
-- `AgentServer+Socket.swift` — the agent server's Unix socket beside TCP
-  (road map 14's MC2, spec §11 MC-1, MC-2, MC-6). `socketPlan` is pure:
-  a non-empty `RC_AGENT_SOCKET`, else — until MC4 — no socket when
-  `RC_AGENT_PORT` is set (every proof of the era sets it), else
-  `AppSupport`'s `Agent/agent.sock`. `bindSocket` (first in
+- `AgentServer+Socket.swift` — the agent server's Unix socket, its only
+  listener since road map 14's MC4 deleted TCP (MC2, spec §11 MC-1, MC-2,
+  MC-6). `socketPlan` is pure: a non-empty `RC_AGENT_SOCKET`, else
+  `AppSupport`'s `Agent/agent.sock`. `bindSocket` (all of
   `applicationDidFinishLaunching`) runs `socketRefusal` — the folder made
   through `AppSupport.ensureDirectory`, then a real folder this user owns
   with no group or world bits; a socket at the path that ACCEPTS is left
   alone, one that REFUSES is unlinked, anything else is left alone — then
   `ReelAgentSocket.start` with the prepared catalog and the frozen file's
-  `agentToolTrampoline`. It never alerts: one log line, `Reelcut agent socket
+  `agentToolTrampoline`, and sets `boundSocketPath` (`isRunning` reads it)
+  after a bind. It never alerts: one log line, `Reelcut agent socket
   listening at <path>` or `Reelcut agent socket not bound: <reason>`, never
-  the `Reelcut: ` prefix. `unbindSocket` (in `applicationWillTerminate`,
-  before TCP's `stop()`) releases with no join. The mode check, the connect
-  and the port arm are each one statement that `agent_socket_proof.py`'s
-  mutants replace.
+  the `Reelcut: ` prefix. `unbindSocket` (all of `applicationWillTerminate`)
+  releases with no join. `mcpHelperURL` is this bundle's own
+  `Contents/Helpers/reelcut-mcp` and `mcpCommand(helperPath:)` the
+  `claude mcp add --scope user reelcut -- '<path>'` line Tools ▸ Copy MCP
+  Command copies (each `'` written `'\''`). The mode check, the connect,
+  the listening line and `mcpHelperURL` are each one statement that
+  `agent_socket_proof.py`'s mutants replace.
 - `AgentCatalogSnapshot.swift` — the build's catalog snapshot (road map
   14's MC3, spec §11 MC-4): with `-RCWriteCatalog <path>`, read from the
   ARGUMENT domain only, the launch writes `{"version":…,"tools":…}` — the

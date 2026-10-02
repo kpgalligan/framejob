@@ -116,7 +116,6 @@ PROOF_MODEL = "claude-proof-model"
 NO_CACHE = "no price cache is configured"
 LEDGER_KEYS = {"time", "service", "model", "usage", "dollars", "unknown", "rows", "prices",
                "partial"}
-PORT_L1, PORT_L2 = 4897, 4898
 WALL_READY, WALL_TURN, WALL_CACHE, WALL_BUILD = 20, 60, 10, 900
 TOLERANCE = 1e-12
 PROBE_ROWS = ["S1", "S2", "S3", "S4", "S5", "S6"]
@@ -610,9 +609,9 @@ def row_l1(fake, feed, secrets, score):
     os.makedirs(os.path.dirname(spend))
     url = feed.url("/litellm.json")
     ctx = {"folder": os.path.join(WORK, "l1"), "dumps": []}
-    app = asp.App("L1", RELEASE, ["-AgentServerEnabled", "YES", "-RCSecretFolder", secrets,
+    app = asp.App("L1", RELEASE, ["-RCSecretFolder", secrets,
                                   "-RCSpendFolder", spend, "-RCPriceFeed", url,
-                                  "-ReelcutInspectorCollapsed", "NO"], fake.base, port=PORT_L1)
+                                  "-ReelcutInspectorCollapsed", "NO"], fake.base)
     try:
         app.connect()
         complaints = [line for line in app.log().splitlines() if "Reelcut: " in line]
@@ -671,9 +670,8 @@ def row_l1(fake, feed, secrets, score):
 def row_l2(fake, feed, secrets):
     before = person_state()
     gets = feed.count()
-    app = asp.App("L2", RELEASE, ["-AgentServerEnabled", "YES", "-RCSecretFolder", secrets,
-                                  "-RCPriceFeed", feed.url("/litellm.json")], fake.base,
-                  port=PORT_L2)
+    app = asp.App("L2", RELEASE, ["-RCSecretFolder", secrets,
+                                  "-RCPriceFeed", feed.url("/litellm.json")], fake.base)
     try:
         app.connect()
         complaints = [line for line in app.log().splitlines() if "Reelcut: " in line]

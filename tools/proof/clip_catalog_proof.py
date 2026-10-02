@@ -48,10 +48,11 @@ built BEFORE the first MCP call, so no swiftc runs while the proof is
 driving the app.
 
     make app
-    (RC_AGENT_PORT=4853 ./build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut \\
-       -ApplePersistenceIgnoreState YES -AgentServerEnabled YES > /tmp/reelcut-4853.log 2>&1 &)
-    grep "Reelcut: " /tmp/reelcut-4853.log     # must print nothing
-    python3 tools/proof/clip_catalog_proof.py 4853
+    d="$(mktemp -d)"; echo "$d"
+    (RC_AGENT_SOCKET="$d/agent.sock" ./build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut \\
+       -ApplePersistenceIgnoreState YES > "$d/reelcut.log" 2>&1 &)
+    grep "Reelcut: " <dir>/reelcut.log     # must print nothing
+    python3 tools/proof/clip_catalog_proof.py <dir>/agent.sock
 """
 
 import json
@@ -61,7 +62,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from mcp import MCP, ToolError  # noqa: E402
+from mcp import MCP, ToolError, target  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 WORK = os.path.join(ROOT, "tools", "proof", "work", "clip-catalog-probe")
@@ -262,7 +263,7 @@ def structure(property):
 
 
 def main():
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else 4853
+    socket_path = target(sys.argv)
     print("the clip tools, against the core's op table\n")
     binary, error = build_probe()
     check("the probe builds — an instrument that will not compile is a FAILURE here, "
@@ -280,7 +281,7 @@ def main():
     ops = set(answer["names"])
     declarations = answer["declarations"]
 
-    mcp = MCP(port)
+    mcp = MCP(socket_path)
     # One read of the catalog, kept both ways round: the ORDER is what finds
     # the clip group, and the map is what every check below reads. Both come
     # from `mcp.schemas()`, the shared accessor road map 7's D3·5 added, and

@@ -5,7 +5,7 @@
 The compositor stays the one writer and the texture key decides, so an
 export with the prefetch ON must be the serial path's file, and most of its
 graphic rasters must come from the workers. Two owned instances, one after
-the other on `--port`, launched and stopped by PID, logs under
+the other, each on a scratch socket, launched and stopped by PID, logs under
 `tools/proof/work/graphics-prefetch/`: OFF with `-ReelcutGraphicPrefetchOff
 YES`, ON without. Nothing else is ever killed. Every child runs under
 `graphics_spike/bounded.py`.
@@ -37,7 +37,7 @@ S5  the probe (`graphics_prefetch_probe.swift`, built like
 S6  MEASURED, not scored: OFF and ON wall seconds;
 Z1  `grep "Reelcut: "` over every log prints nothing.
 
-    python3 tools/proof/graphics_prefetch_proof.py [--port 4931] [--app PATH]
+    python3 tools/proof/graphics_prefetch_proof.py [--app PATH]
     python3 tools/proof/graphics_prefetch_proof.py --mutant worker-frame-plus-one
     python3 tools/proof/graphics_prefetch_proof.py --mutant unguarded
     python3 tools/proof/graphics_prefetch_proof.py --bench PACKAGE [--preset h264]
@@ -165,8 +165,9 @@ class Instance:
     """One owned app, by PID; `off` launches it with the prefetch's switch
     on. Each launch reads only the part of the log it appended."""
 
-    def __init__(self, app, port, log, off):
-        self.app, self.port, self.log, self.off = app, port, log, off
+    def __init__(self, app, log, off):
+        self.app, self.log, self.off = app, log, off
+        self.socket = mcp.scratch_socket()
         self.child = None
         logs.append(log)
 
@@ -175,20 +176,14 @@ class Instance:
         extra = ["-ReelcutGraphicPrefetchOff", "YES"] if self.off else []
         with open(self.log, "a") as out:
             self.child = subprocess.Popen(
-                [str(self.app), "-ApplePersistenceIgnoreState", "YES",
-                 "-AgentServerEnabled", "YES"] + extra,
+                [str(self.app), "-ApplePersistenceIgnoreState", "YES"] + extra,
                 stdin=subprocess.DEVNULL, stdout=out, stderr=out, start_new_session=True,
-                env=bounded.child_env({"RC_AGENT_PORT": str(self.port)}))
-        deadline = time.monotonic() + 60
-        while time.monotonic() < deadline:
-            time.sleep(0.25)
-            with open(self.log) as handle:
-                handle.seek(offset)
-                found = re.search(r"listening on http://127\.0\.0\.1:(\d+)/mcp", handle.read())
-            if found:
-                print(f"  {'OFF' if self.off else 'ON'} instance PID {self.child.pid} on port "
-                      f"{found.group(1)}", flush=True)
-                return mcp.MCP(int(found.group(1)), timeout=timeout)
+                env=bounded.child_env({"RC_AGENT_SOCKET": self.socket}))
+        if mcp.wait_listening(self.log, self.socket, child=self.child, seconds=60,
+                              offset=offset):
+            print(f"  {'OFF' if self.off else 'ON'} instance PID {self.child.pid} at "
+                  f"{self.socket}", flush=True)
+            return mcp.MCP(self.socket, timeout=timeout)
         return None
 
     def stop(self):
@@ -201,6 +196,7 @@ class Instance:
             self.child.kill()
             self.child.wait()
         self.child = None
+        mcp.remove_scratch(self.socket)
 
 
 def attempt(client, tool, arguments):
@@ -441,11 +437,11 @@ def run_s5(package):
 
 # ---- the rows ---------------------------------------------------------------
 
-def run_all(app, port):
+def run_all(app):
     package = WORK / "F.reelcut"
-    off_log, on_log = WORK / f"off-{port}.log", WORK / f"on-{port}.log"
+    off_log, on_log = WORK / "off.log", WORK / "on.log"
 
-    off = Instance(app, port, off_log, off=True)
+    off = Instance(app, off_log, off=True)
     walls = {}
     try:
         client = off.start()
@@ -459,7 +455,7 @@ def run_all(app, port):
                     else (False, f"a: {ok_a} {err_a!r}, b: {ok_b} {err_b!r}"))
     check("S0", made and ok_a and ok_b and same, f"CONTROL two OFF exports: {detail}")
 
-    on = Instance(app, port, on_log, off=False)
+    on = Instance(app, on_log, off=False)
     try:
         client = on.start()
         reopened = opened(client, package)
@@ -523,7 +519,7 @@ def build_mutant(name):
     return binary, ""
 
 
-def run_mutant(name, port):
+def run_mutant(name):
     row = MUTANTS[name][1]
     print(f"graphics prefetch — the {name} MUTANT ({row} must FAIL)", flush=True)
     binary, why = build_mutant(name)
@@ -532,10 +528,10 @@ def run_mutant(name, port):
               f"{why}")
         return 2
     package = WORK / "M.reelcut"
-    on_log = WORK / f"mutant-on-{port}.log"
+    on_log = WORK / "mutant-on.log"
     movie_off = None
     if name == "unguarded":
-        off = Instance(binary, port, WORK / f"mutant-off-{port}.log", off=True)
+        off = Instance(binary, WORK / "mutant-off.log", off=True)
         try:
             client = off.start()
             made, detail = fixture(client, package) if client else (False, "did not launch")
@@ -546,7 +542,7 @@ def run_mutant(name, port):
             print(f"mutant {name}: the control could not be performed — the OFF fixture or "
                   f"export did not hold: {detail} {err!r}")
             return 2
-    on = Instance(binary, port, on_log, off=False)
+    on = Instance(binary, on_log, off=False)
     try:
         client = on.start()
         if name == "unguarded":
@@ -573,7 +569,7 @@ def run_mutant(name, port):
     return 0 if caught else 1
 
 
-def run_bench(app, port, source, preset):
+def run_bench(app, source, preset):
     print(f"graphics prefetch — bench of {source} ({preset}), OFF then ON", flush=True)
     if not source.is_dir():
         print(f"bench FAIL — {source} is not a package")
@@ -582,8 +578,8 @@ def run_bench(app, port, source, preset):
     shutil.copytree(source, package, symlinks=True)
     results = {}
     for mode, off in (("off", True), ("on", False)):
-        log = WORK / f"bench-{mode}-{port}.log"
-        instance = Instance(app, port, log, off=off)
+        log = WORK / f"bench-{mode}.log"
+        instance = Instance(app, log, off=off)
         try:
             client = instance.start(timeout=BENCH_BOUND)
             ok_open = opened(client, package)
@@ -612,7 +608,6 @@ def run_bench(app, port, source, preset):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--port", type=int, default=4931)
     parser.add_argument("--app", type=Path, default=APP)
     parser.add_argument("--mutant", choices=sorted(MUTANTS))
     parser.add_argument("--bench", type=Path)
@@ -621,15 +616,15 @@ def main():
     shutil.rmtree(WORK, ignore_errors=True)
     WORK.mkdir(parents=True)
     if args.mutant:
-        return run_mutant(args.mutant, args.port)
+        return run_mutant(args.mutant)
     if not args.app.exists():
         print(f"the app is not built: {args.app}")
         return 1
     if args.bench:
-        return run_bench(args.app, args.port, args.bench.expanduser().resolve(), args.preset)
+        return run_bench(args.app, args.bench.expanduser().resolve(), args.preset)
     print("#127 graphics prefetch — an export's graphics rasterized ahead on worker threads, "
           "against the built app (proof)", flush=True)
-    run_all(args.app, args.port)
+    run_all(args.app)
     passed = sum(1 for name in ROWS if rows.get(name))
     print(f"{passed}/{len(ROWS)}")
     return 0 if passed == len(ROWS) else 1

@@ -634,13 +634,12 @@
    ],
    "note": "the preview window, shown or closed"
   },
-  "toggleAgentServer:": {
-   "verdict": "modal",
+  "copyMCPCommand:": {
+   "verdict": "none",
    "code": [
-    "app/Sources/AppDelegate.swift `func toggleAgentServer(`",
-    "app/Sources/AppDelegate.swift:212"
+    "app/Sources/AppDelegate.swift `func copyMCPCommand(`"
    ],
-   "note": "starting the server can fail, and the failure is NSAlert.runModal (:212) inside the call"
+   "note": "puts the claude mcp add line for the bundle's reelcut-mcp on the general pasteboard"
   },
   "performMiniaturize:": {
    "verdict": "framework",
@@ -707,15 +706,6 @@
    ],
    "reached_after": [],
    "other_caller": "app/Sources/WelcomeWindowController.swift `action: #selector(AppDelegate.newProject(_:)))` — the welcome window's New Project button"
-  },
-  "app/Sources/AppDelegate.swift:212": {
-   "token": "runModal",
-   "func": "startAgentServer",
-   "reached_from": [
-    "toggleAgentServer:"
-   ],
-   "reached_after": [],
-   "other_caller": "app/Sources/AppDelegate.swift `func applicationDidFinishLaunching(` — applicationDidFinishLaunching with AgentServerEnabled set; app/Sources/AppDelegate.swift `try AgentServer.shared.start()` — only when start() throws"
   },
   "app/Sources/CaptionExporter.swift:514": {
    "token": "beginSheetModal",
@@ -790,7 +780,7 @@
    "reached_after": [
     {
      "selector": "addImageBackground:",
-     "via": "app/Sources/EditorViewController+AddClips.swift `MediaImporter.probe(url: url) { [weak self] result in`",
+     "via": "app/Sources/EditorViewController+AddClips.swift `MediaImporter.probe(url: url, mayAsk: true) { [weak self] result in`",
      "gate": "app/Sources/EditorViewController+AddClips.swift `case .failure(let error):` — the probe fails"
     }
    ],
@@ -1028,7 +1018,7 @@
    ],
    "other_caller": ""
   },
-  "app/Sources/FFmpegRewrap.swift:470": {
+  "app/Sources/FFmpegRewrap.swift:462": {
    "token": "runModal",
    "func": "ask",
    "reached_from": [],
@@ -1036,15 +1026,15 @@
     {
      "selector": "addMediaFiles:",
      "via": "app/Sources/EditorViewController.swift `document.importMedia(panel.urls)`",
-     "gate": "app/Sources/FFmpegRewrap.swift `decided == .ask && !canAsk` — policy ask and canAsk (false while AgentServerEnabled), after AVFoundation refuses a non-image file (app/Sources/MediaImporter+Probe.swift `failure.invitesFFmpeg && !isImage(url)`)"
+     "gate": "app/Sources/FFmpegRewrap.swift `decided == .ask && !mayAsk` — policy ask and the caller's mayAsk (false for a tool call's import, §11 MC-5), after AVFoundation refuses a non-image file (app/Sources/MediaImporter+Probe.swift `failure.invitesFFmpeg && !isImage(url)`)"
     },
     {
      "selector": "openDocument:",
      "via": "app/Sources/ProjectDocument.swift `let descriptor = try MediaImporter.probeBlocking(url: url)`",
-     "gate": "app/Sources/FFmpegRewrap.swift `decided == .ask && !canAsk` — a movie opened as a project, as above"
+     "gate": "app/Sources/FFmpegRewrap.swift `decided == .ask && !mayAsk` — policy ask and the caller's mayAsk (false for a tool call's import, §11 MC-5): a movie opened as a project, as above"
     }
    ],
-   "other_caller": "app/Sources/EditorViewController+Inspector.swift `inspector.onImportFiles = { [weak self] urls in self?.document?.importMedia(urls) }` — the Media tab's import; app/Sources/AgentServer+Media.swift `MediaImporter.probe(url: url) { result in` — import_media (canAsk is false there); app/Sources/ScreenRecorder+Finishing.swift `MediaImporter.probe(url: done.segments[index].movieURL) { [weak self] movie in` — a finished recording's probe"
+   "other_caller": "app/Sources/EditorViewController+Inspector.swift `inspector.onImportFiles = { [weak self] urls in self?.document?.importMedia(urls) }` — the Media tab's import; app/Sources/AgentServer+Media.swift `MediaImporter.probe(url: url, mayAsk: false) { result in` — import_media (mayAsk is false there); app/Sources/ScreenRecorder+Finishing.swift `MediaImporter.probe(url: done.segments[index].movieURL, mayAsk: done.mayAsk) {` — a finished recording's probe"
   },
   "app/Sources/FileDropView.swift:52": {
    "token": "presentError",

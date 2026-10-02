@@ -7,7 +7,7 @@ session in `AssistantSession.swift`, driven over MCP by the dev tools
 `assistant_send` / `assistant_answer`, and WITHOUT the MCP server by the
 dev-only launch default `-RCDevAssistantSend` / `-RCDevAssistantReport`.
 
-Launch A (`-AgentServerEnabled YES`, a scratch `-RCSecretFolder` holding the
+Launch A (a scratch socket, a scratch `-RCSecretFolder` holding the
 dummy key, `RC_ASSISTANT_BASE_URL` at the stand-in):
   A0  no `Reelcut: ` line; the dev-tool marker counts len(DEV_TOOLS); the dev
       block is DEV_TOOLS + ["import_media"]
@@ -46,7 +46,8 @@ dummy key, `RC_ASSISTANT_BASE_URL` at the stand-in):
   SX and ST run after X: row X counts exactly one helper child, and they
   open sessions on B and C. K1 runs last so it reads their answers too
   (issue batch B38, #179).
-Launch B, W: the same kind of turn with NO MCP server, through the launch
+Launch B, W: the same kind of turn with NO MCP server — its scratch socket's
+      folder is 0755, so it logs `not bound` — through the launch
       default; the model setting reaches the stand-in (AI-11)
 Launch C, K2: AI-13 — the override set and no `-RCSecretFolder`: the session
       is refused for want of a key, the stand-in hears nothing, no helper runs
@@ -89,7 +90,6 @@ path before the app goes).
 import argparse
 import json
 import os
-import re
 import shutil
 import signal
 import subprocess
@@ -106,7 +106,7 @@ sys.path.insert(0, os.path.join(HERE, "graphics_spike"))
 import bounded  # noqa: E402
 import tree_copy  # noqa: E402
 from dev_tools import DEV_TOOLS, dev_marker_count  # noqa: E402
-from mcp import MCP  # noqa: E402
+from mcp import MCP, remove_scratch, scratch_socket, wait_listening  # noqa: E402
 
 WORK = os.path.join(HERE, "work", "assistant_session")
 FAKE = os.path.join(HERE, "anthropic_fake.py")
@@ -119,7 +119,6 @@ DEFAULT_MODEL = "claude-opus-5-5"
 PROOF_MODEL = "claude-proof-model"
 CORE_TOOLS = ["get_project", "render_frame", "undo", "redo"]
 SEARCH_TOOL = "tool_search_tool_bm25"
-PORT_A, PORT_C = 4872, 4873
 WALL_PORT, WALL_MCP, WALL_TURN, WALL_REPORT, WALL_BUILD = 60, 300, 60, 150, 900
 SX_SECONDS, WALL_SX, WALL_ST, STOP_AFTER, WALL_STOPPED = 240, 180, 300, 2, 5000
 ST_COPIES = 6  # long.wav: six copies of ten.wav, about 3600 s
@@ -135,7 +134,6 @@ MUTANTS: dict[str, tuple[str | None, str | None, str, str | None]] = {
                            "stop?.onCancel { token.cancel() }", "ST", LATE),
     "key-echo": (None, None, "K1", None),
 }
-BOUND_PORT = re.compile(r"listening on http://127\.0\.0\.1:(\d+)/mcp")
 # The person's chat settings (spec §11 AI-20) at their defaults, as launch
 # arguments: `App` appends each one whose `-Key` its arguments do not set, so no
 # proof launch reads the person's own threshold or clearing switch.
@@ -149,7 +147,6 @@ def child_env(extra=None):
     popped too; `pop` never binds either value to a name."""
     env = bounded.child_env(extra)
     env.pop("ANTHROPIC_API_KEY", None)
-    env.pop("RC_AGENT_PORT", None)
     return env
 
 
@@ -236,14 +233,17 @@ def helper_children(pid):
 
 
 class App:
-    """One Reelcut, in its own process group, logging to work/."""
+    """One Reelcut, in its own process group, logging to work/, on a scratch
+    socket (`mcp.scratch_socket`) whose folder is `folder_mode`: 0755 binds
+    nothing (MC-2), which is how a launch has no MCP server."""
 
-    def __init__(self, tag, app, arguments, base, port=None):
+    def __init__(self, tag, app, arguments, base, folder_mode=0o700):
         self.tag = tag
         self.log_path = os.path.join(WORK, f"app-{tag}.log")
-        env = child_env({"RC_ASSISTANT_BASE_URL": base})
-        if port is not None:
-            env["RC_AGENT_PORT"] = str(port)
+        self.socket_path = scratch_socket()
+        os.chmod(os.path.dirname(self.socket_path), folder_mode)
+        env = child_env({"RC_ASSISTANT_BASE_URL": base,
+                         "RC_AGENT_SOCKET": self.socket_path})
         self.handle = open(self.log_path, "wb")
         arguments = list(arguments) + [part for key, value in CHAT_PINS
                                        if key not in arguments for part in (key, value)]
@@ -262,16 +262,11 @@ class App:
             return ""
 
     def connect(self):
-        deadline = time.monotonic() + WALL_PORT
-        while time.monotonic() < deadline:
-            if self.child.poll() is not None:
-                raise RuntimeError(f"app {self.tag} exited {self.child.returncode} before a port")
-            found = BOUND_PORT.search(self.log())
-            if found:
-                self.mcp = MCP(int(found.group(1)), timeout=WALL_MCP)
-                return
-            time.sleep(0.2)
-        raise RuntimeError(f"app {self.tag} named no port in {WALL_PORT} s")
+        if not wait_listening(self.log_path, self.socket_path, child=self.child,
+                              seconds=WALL_PORT):
+            raise RuntimeError(f"app {self.tag} did not listen at {self.socket_path} in "
+                               f"{WALL_PORT} s (exit {self.child.poll()})")
+        self.mcp = MCP(self.socket_path, timeout=WALL_MCP)
 
     def call(self, tool, **arguments):
         """(ok, answer): the parsed JSON (or text) of a result, ok False for an
@@ -302,6 +297,7 @@ class App:
             except ProcessLookupError:
                 pass
         self.handle.close()
+        remove_scratch(self.socket_path)
 
 
 # ---------------------------------------------------------------------------
@@ -735,10 +731,10 @@ def row_w(app_path, fake, secrets):
     fake.scenario([use("toolu_w", "add_marker", {"at": 1200000, "name": "W marker"}),
                    say("W: done without a server.")])
     app = App("B", app_path,
-              ["-AgentServerEnabled", "NO", "-RCSecretFolder", secrets,
+              ["-RCSecretFolder", secrets,
                "-RCDevAssistantSend", "Put a marker at two seconds.",
                "-RCDevAssistantReport", report_path,
-               "-ReelcutAssistantModel", PROOF_MODEL], fake.base)
+               "-ReelcutAssistantModel", PROOF_MODEL], fake.base, folder_mode=0o755)
     try:
         deadline = time.monotonic() + WALL_REPORT
         while time.monotonic() < deadline and not os.path.exists(report_path):
@@ -763,7 +759,7 @@ def row_w(app_path, fake, secrets):
     posts_ok = bool(sent) and all((r.get("body") or {}).get("model") == PROOF_MODEL
                                   and credential(r) == KEY for r in sent)
     complaints = [l for l in log_text.splitlines() if "Reelcut: " in l]
-    listening = "listening on" in log_text
+    listening = "agent socket listening at" in log_text
     good = (report.get("ok") is True and report.get("server_running") is False
             and report.get("state") == "finished" and len(results) == 1
             and results[0].get("is_error") is False and (1200000, "W marker") in marks
@@ -779,7 +775,7 @@ def row_w(app_path, fake, secrets):
 
 
 def row_k2(app_path, fake):
-    app = App("C", app_path, ["-AgentServerEnabled", "YES"], fake.base, port=PORT_C)
+    app = App("C", app_path, [], fake.base)
     try:
         app.connect()
         fake.scenario([])
@@ -903,8 +899,7 @@ def main():
                 shutil.rmtree(folder, ignore_errors=True)
                 os.makedirs(folder)
                 mutant_ctx = {"folder": folder}
-                mutant_app = App("A", app, ["-AgentServerEnabled", "YES", "-RCSecretFolder",
-                                            secrets], fake.base, port=PORT_A)
+                mutant_app = App("A", app, ["-RCSecretFolder", secrets], fake.base)
                 try:
                     mutant_app.connect()
                     function = row_sx if named == "SX" else row_st
@@ -920,8 +915,7 @@ def main():
             ctx = {"folder": folder}
             if args.mutant == "key-echo":
                 ctx["echo"] = ECHO
-            app = App("A", release, ["-AgentServerEnabled", "YES", "-RCSecretFolder", secrets],
-                      fake.base, port=PORT_A)
+            app = App("A", release, ["-RCSecretFolder", secrets], fake.base)
             try:
                 app.connect()
                 guarded("A0", row_a0, app, ctx)

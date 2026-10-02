@@ -384,31 +384,40 @@ after editing `project.yml`, and don't commit the project file.
 
 ## AI agent access (MCP)
 
-Tools ▸ Allow Agent Connections hosts an MCP server (streamable HTTP) inside
-the app at `http://127.0.0.1:4817/mcp`. The menu item shows the live endpoint
-while it runs and remembers the setting across launches.
+Reelcut serves an MCP server (streamable HTTP) on a Unix socket it binds at
+every launch, `~/Library/Application Support/Reelcut/Agent/agent.sock`. An MCP
+client reaches it through `reelcut-mcp`, the stdio helper inside the bundle,
+which lists the tools without opening Reelcut and launches it in the
+background on the first tool call that finds it not running.
 
-To drive a build for verification, launch it with the agent already on — the
-`-AgentServerEnabled YES` flag lands in NSUserDefaults' argument domain, which
-is the same switch the menu flips, and `RC_AGENT_PORT` overrides the port (a
-port already in use falls back to an ephemeral one, and the log line names
-what it bound):
+**Tools ▸ Copy MCP Command** puts the line that registers the helper with
+Claude Code on the clipboard, with the path of the bundle you ran it from:
+
+```sh
+claude mcp add --scope user reelcut -- '/Applications/Reelcut.app/Contents/Helpers/reelcut-mcp'
+```
+
+Claude Desktop takes the same helper in its `claude_desktop_config.json`:
+
+```json
+{"mcpServers":{"reelcut":{"command":"/Applications/Reelcut.app/Contents/Helpers/reelcut-mcp"}}}
+```
+
+The socket is yours alone: its folder is `0700` and the socket `0600`, so
+only processes running as you can connect — and any of them can, while the
+app runs.
+
+To drive a build for verification, give it a socket of its own with
+`RC_AGENT_SOCKET`, so it never touches your own, and
+point `tools/proof/mcp.py`'s `MCP` or `reelcut-mcp` (with the same variable
+set) at that path:
 
 ```sh
 make app
-RC_AGENT_PORT=4817 \
-  build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut \
-  -AgentServerEnabled YES
+d="$(mktemp -d)"; echo "$d"
+(RC_AGENT_SOCKET="$d/agent.sock" build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut \
+   -ApplePersistenceIgnoreState YES > "$d/reelcut.log" 2>&1 &)
 ```
-
-Then point any MCP client at the endpoint:
-
-```sh
-goose session --with-streamable-http-extension "http://127.0.0.1:4817/mcp"
-```
-
-The endpoint is **unauthenticated**: any local process may connect while it
-runs. It is off by default.
 
 Calls run one at a time. A call made while you are dragging something in
 the window (a clip, a canvas handle, an inspector slider) waits for mouse-up

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Road map 8, W4a — word-caption GENERATION through the built binary.
 
-Launches its own Reelcut on the port given, pointed at its own
+Launches its own Reelcut on a scratch socket, pointed at its own
 `assemblyai_fake.py` (`-RCAssemblyAIEndpoint`, a scratch `-RCSecretFolder` and
 the dummy key `proof-key` — nothing here reaches AssemblyAI), drives it over
 MCP, and kills both by PID in a `finally`:
@@ -34,7 +34,7 @@ MCP, and kills both by PID in a `finally`:
   wait; an expired wait is a scored FAIL naming the holder, and exit 1 with
   no instance launched.
 
-    python3 tools/proof/word_captions_proof.py <port> [--lock-wait SECONDS]
+    python3 tools/proof/word_captions_proof.py [--lock-wait SECONDS]
 """
 
 import argparse
@@ -47,7 +47,7 @@ import subprocess
 import sys
 import time
 
-from mcp import MCP, ToolError
+from mcp import MCP, ToolError, log_beside, remove_scratch, scratch_socket, wait_listening
 from cloud_captions_probe import Fake, child_env, hold_cloud_lock
 from e1_proof import decode_png
 from speech_engine_proof import make_fixtures
@@ -58,7 +58,6 @@ WORK = os.path.join(HERE, "work", "word_captions")
 MEDIA = os.path.join(HERE, "media")
 BINARY = os.path.join(ROOT, "build", "Build", "Products", "Release", "Reelcut.app",
                       "Contents", "MacOS", "Reelcut")
-BOUND_PORT = re.compile(r"listening on http://127\.0\.0\.1:(\d+)/mcp")
 DUMMY = "proof-key"
 SEC = 600_000
 STYLES = ["subtitles", "highlight", "pill", "karaoke", "build", "one_word"]
@@ -94,33 +93,24 @@ def fresh(*parts):
 class Instance:
     """One Reelcut, started here and stopped here by its own PID."""
 
-    def __init__(self, port, fake):
-        self.log = f"/tmp/reelcut-{port}.log"
+    def __init__(self, fake):
+        self.socket = scratch_socket()
+        self.log = log_beside(self.socket)
         if os.path.exists(self.log):
             os.remove(self.log)
         self.handle = open(self.log, "wb")
         env = child_env()
         env["RC_ASSEMBLYAI_KEY"] = DUMMY
-        env["RC_AGENT_PORT"] = str(port)
-        argv = [BINARY, "-ApplePersistenceIgnoreState", "YES", "-AgentServerEnabled", "YES",
+        env["RC_AGENT_SOCKET"] = self.socket
+        argv = [BINARY, "-ApplePersistenceIgnoreState", "YES",
                 "-RCSecretFolder", fresh("secrets"), "-RCAssemblyAIEndpoint", fake.base]
         self.process = subprocess.Popen(argv, stdout=self.handle, stderr=subprocess.STDOUT,
                                         env=env, stdin=subprocess.DEVNULL)
-        self.port = self._await_port()
-        print(f"  (instance pid {self.process.pid} bound port {self.port}; log {self.log})")
-        self.mcp = MCP(self.port, timeout=300)
-
-    def _await_port(self, seconds=60):
-        deadline = time.time() + seconds
-        while time.time() < deadline:
-            if self.process.poll() is not None:
-                raise RuntimeError(f"the instance exited with {self.process.returncode}")
-            with open(self.log, "rb") as stream:
-                found = BOUND_PORT.search(stream.read().decode("utf-8", "replace"))
-            if found:
-                return int(found.group(1))
-            time.sleep(0.2)
-        raise RuntimeError(f"the instance never named a port in {self.log}")
+        if not wait_listening(self.log, self.socket, child=self.process, seconds=60):
+            raise RuntimeError(f"the instance did not listen at {self.socket} (exit "
+                               f"{self.process.poll()}) — {self.log}")
+        print(f"  (instance pid {self.process.pid} bound {self.socket}; log {self.log})")
+        self.mcp = MCP(self.socket, timeout=300)
 
     def parity(self):
         with open(self.log, "rb") as stream:
@@ -139,6 +129,7 @@ class Instance:
                 self.process.send_signal(signal.SIGKILL)
                 self.process.wait(timeout=10)
         self.handle.close()
+        remove_scratch(self.socket)
 
 
 class Session:
@@ -378,13 +369,11 @@ def g8(instance):
 def main():
     parser = argparse.ArgumentParser(
         description=__doc__.split("\n")[0],
-        usage="word_captions_proof.py <port> [--lock-wait SECONDS]")
-    parser.add_argument("port", type=int, help="the port this proof's Reelcut binds")
+        usage="word_captions_proof.py [--lock-wait SECONDS]")
     parser.add_argument("--lock-wait", type=float, default=3600,
                         help="how long to wait for the cloud instruments' lock, in seconds "
                              "(issue batch B43; rule H)")
     args = parser.parse_args()
-    port = args.port
     # L (issue batch B43, #200 item 4): held before anything else, and kept
     # open until `main` returns.
     lock, waited, holder = hold_cloud_lock(args.lock_wait)
@@ -403,7 +392,7 @@ def main():
         check("the built binary is there — run `make app` first", False, BINARY)
         return 1
     with Fake("word-captions") as fake:
-        instance = Instance(port, fake)
+        instance = Instance(fake)
         try:
             for row in (g7, g1_g2, g6, g8):
                 try:

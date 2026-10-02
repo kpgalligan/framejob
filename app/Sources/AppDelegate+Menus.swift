@@ -536,7 +536,7 @@ extension AppDelegate {
 
     private func toolsMenu() -> NSMenu {
         let menu = NSMenu(title: "Tools")
-        menu.addItem(item("Allow Agent Connections", #selector(toggleAgentServer(_:))))
+        menu.addItem(item("Copy MCP Command", #selector(copyMCPCommand(_:))))
         return menu
     }
 

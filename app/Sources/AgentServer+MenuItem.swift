@@ -308,7 +308,7 @@ extension AgentServer {
                 + "puts a sheet, the Settings window or a panel up for snapshot_ui. Refused, "
                 + "by name and running nothing: a disabled item, a submenu, an item AppKit "
                 + "owns (framework: Quit, Open…, Save, Close, Undo …), one that can run a "
-                + "modal loop (modal: New Project, Allow Agent Connections), one the inventory "
+                + "modal loop (modal: New Project), one the inventory "
                 + "does not classify, and one whose own target does not answer its action. "
                 + "The answer: the target, how long the action and the settle took, whether "
                 + "a sheet was attached when the action returned (sheet_at_return) and the "

@@ -123,9 +123,9 @@ import subprocess
 import sys
 import time
 
-from mcp import MCP, ToolError
+from mcp import MCP, ToolError, target
 
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 4951
+SOCKET = target(sys.argv)
 HERE = os.path.dirname(os.path.abspath(__file__))
 WORK = os.path.join(HERE, "work")
 FIXTURES = os.path.join(WORK, "fixtures")
@@ -1298,7 +1298,7 @@ def lpcm_part(mcp):
 def main():
     os.makedirs(WORK, exist_ok=True)
     write_fixtures()
-    mcp = MCP(PORT)
+    mcp = MCP(SOCKET)
     catalog_part(mcp)
     mono_part(mcp)
     nest_mono_part(mcp)

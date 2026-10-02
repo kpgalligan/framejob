@@ -32,8 +32,8 @@ import mcp as mcp_client                                             # noqa: E40
 import text_rows                                                     # noqa: E402
 from speech_rows import run_drained                                  # noqa: E402
 
-PORT = 4831
-LOG = f"/tmp/reelcut-{PORT}.log"
+SOCKET = mcp_client.scratch_socket()
+LOG = mcp_client.log_beside(SOCKET)
 OLD_TARGET = "15.0"
 NEW_TARGET = "26.0"
 OLD_TRIPLE = "arm64-apple-macos15.0"
@@ -233,7 +233,7 @@ def q7(work, say):
 # ---- q6's picture half ----------------------------------------------------
 
 class Instance:
-    """One owned app, by PID, on its own port. Never a pattern kill."""
+    """One owned app, by PID, on a scratch socket. Never a pattern kill."""
 
     def __init__(self, binary, say):
         self.say = say
@@ -245,28 +245,16 @@ class Instance:
         if os.path.exists(LOG):
             os.remove(LOG)
         environment = local_rows.child_env()
-        environment["RC_AGENT_PORT"] = str(PORT)
+        environment["RC_AGENT_SOCKET"] = SOCKET
         with open(LOG, "w") as log:
             self.child = subprocess.Popen(
-                [self.binary, "-ApplePersistenceIgnoreState", "YES",
-                 "-AgentServerEnabled", "YES"],
+                [self.binary, "-ApplePersistenceIgnoreState", "YES"],
                 stdin=subprocess.DEVNULL, stdout=log, stderr=log, env=environment,
                 start_new_session=True)
-        deadline = time.time() + 60
-        while time.time() < deadline:
-            time.sleep(0.5)
-            try:
-                with open(LOG) as handle:
-                    body = handle.read()
-            except OSError:
-                continue
-            # The log line is `Reelcut agent server listening on
-            # http://127.0.0.1:<port>/mcp`, and the port it names is the one it
-            # actually BOUND — a taken port falls back to an ephemeral one.
-            found = re.search(r"listening on http://127\.0\.0\.1:(\d+)/mcp", body)
-            if found:
-                self.port = int(found.group(1))
-                return self.port
+        # The log line is `Reelcut agent socket listening at <path>`.
+        if mcp_client.wait_listening(LOG, SOCKET, child=self.child, seconds=60):
+            self.port = SOCKET
+            return self.port
         return None
 
     def complaints(self):
@@ -286,6 +274,7 @@ class Instance:
             self.child.wait(timeout=30)
         except subprocess.TimeoutExpired:
             self.child.kill()
+        mcp_client.remove_scratch(SOCKET)
 
 
 def _digest(path):
@@ -306,7 +295,7 @@ def q6_picture(work, binary, say):
     if port is None:
         instance.stop()
         return {"state": "failed", "measured": {"log": LOG},
-                "reason": "the scratch app never named a port in its log"}
+                "reason": "the scratch app never named its socket in its log"}
     complaints = instance.complaints()
     measured = {"port": port, "parity_complaints": complaints, "faces": {}}
     if complaints:

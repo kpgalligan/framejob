@@ -64,7 +64,7 @@ Fixtures: made by the script into `work/silence2/fixtures/` when absent or on
 `--remake`, never into `media/` (`media/speech.aiff` is phase 4's different
 text). `say`, `ffmpeg` and `ffprobe` are needed at proof time.
 
-    python3 tools/proof/silence2_proof.py [port] [--remake]
+    python3 tools/proof/silence2_proof.py <dir>/agent.sock [--remake]
 """
 
 import math
@@ -78,9 +78,9 @@ import time
 from array import array
 from collections import namedtuple
 
-from mcp import MCP, ToolError
+from mcp import MCP, ToolError, target
 
-PORT = 4823
+SOCKET = None
 REMAKE = False
 
 
@@ -88,12 +88,13 @@ def read_arguments():
     """Read in `main`, not at import: `silence2_probe.py` IMPORTS this module
     for the fixture recipes — one spelling of `say`'s text and of the five
     mixes, not two — and its own argv is not this one's."""
-    global PORT, REMAKE
+    global SOCKET, REMAKE
     for argument in sys.argv[1:]:
         if argument == "--remake":
             REMAKE = True
         else:
-            PORT = int(argument)
+            SOCKET = argument
+    SOCKET = SOCKET or target([sys.argv[0]])
 
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -1586,7 +1587,7 @@ def phase3_part():
     print("\n5 — phase 3's own proofs, against this binary")
     for name, expected in (("phase3_proof.py", 121), ("phase3_silence_scope.py", 8)):
         result = subprocess.run(
-            [sys.executable, os.path.join(HERE, name), str(PORT)],
+            [sys.executable, os.path.join(HERE, name), SOCKET],
             capture_output=True, text=True)
         last = [line for line in result.stdout.splitlines() if "checks passed" in line]
         line = last[-1].strip() if last else "(no count line)"
@@ -1622,7 +1623,7 @@ def main():
                  "voicetone.wav", "mute.mov"):
         print(f"  {name}: {duration_text(fixture(name))}")
 
-    mcp = MCP(PORT)
+    mcp = MCP(SOCKET)
     names = mcp.tools()
     check(len(names) >= 77, f"the catalog holds 77 tools or more (got {len(names)})")
 

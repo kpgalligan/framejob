@@ -1,6 +1,5 @@
 //! The agent server's Unix-socket listener (road map 14's MC2): binding,
-//! the 0600 mode, the path limits, answering over the socket exactly what
-//! TCP answers, never binding over a live socket, and MC1's S7 — a listener
+//! the 0600 mode, the path limits, never binding over a live socket, and MC1's S7 — a listener
 //! whose file was unlinked and re-bound by another must not delete the new
 //! one, whether it is shut down or released. The last test drives the FFI
 //! pair; it is the only test that touches the process's socket slot.
@@ -13,7 +12,6 @@ mod common;
 
 use std::ffi::{c_char, c_void};
 use std::io::{Read, Write};
-use std::net::TcpStream;
 use std::os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt};
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
@@ -95,16 +93,8 @@ fn post_unix(path: &Path, body: &str) -> (String, String) {
     post_over(UnixStream::connect(path).expect("the socket accepts"), body)
 }
 
-fn post_tcp(port: u16, body: &str) -> (String, String) {
-    post_over(
-        TcpStream::connect(("127.0.0.1", port)).expect("the port accepts"),
-        body,
-    )
-}
-
 const INITIALIZE: &str =
     r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}"#;
-const TOOLS_LIST: &str = r#"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#;
 
 fn answers(path: &Path) -> bool {
     let (status, body) = post_unix(path, INITIALIZE);
@@ -133,22 +123,6 @@ fn binds_at_0600_and_answers_initialize_over_the_socket() {
     assert_eq!(value["result"]["serverInfo"]["version"], "9.9.9");
     server.shutdown();
     assert!(!path.exists(), "its own file is unlinked at shutdown");
-}
-
-#[test]
-fn tools_list_over_the_socket_is_byte_equal_to_tcp() {
-    let folder = Folder::new();
-    let path = folder.sock();
-    let socket = agent::start_socket(&path, config()).expect("the socket binds");
-    let (port, tcp) = agent::start(0, config()).expect("TCP binds");
-    let (unix_status, unix_body) = post_unix(&path, TOOLS_LIST);
-    let (tcp_status, tcp_body) = post_tcp(port, TOOLS_LIST);
-    assert_eq!(unix_status, tcp_status);
-    assert_eq!(unix_body.as_bytes(), tcp_body.as_bytes());
-    let value: Value = serde_json::from_str(&unix_body).expect("JSON");
-    assert_eq!(value["result"]["tools"], tools());
-    socket.shutdown();
-    tcp.shutdown();
 }
 
 #[test]

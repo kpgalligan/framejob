@@ -19,7 +19,7 @@ and the fix alike.
 Fixtures are `mixed_audio_probe.py`'s, written fresh by importing it (the
 `silence2` pattern). Needs `ffmpeg`. Run against an instance:
 
-    python3 tools/proof/mixed_audio_proof.py <port>
+    python3 tools/proof/mixed_audio_proof.py <dir>/agent.sock
 """
 
 import math
@@ -31,9 +31,9 @@ import sys
 from array import array
 
 import mixed_audio_probe as probe
-from mcp import MCP
+from mcp import MCP, target
 
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 4817
+SOCKET = target(sys.argv)
 HERE = os.path.dirname(os.path.abspath(__file__))
 WORK = os.path.join(HERE, "work")
 SEC = 600_000
@@ -154,7 +154,7 @@ def main():
         check(False, f"the fixtures were written: {why}")
         print(f"\n{checks - len(failures)}/{checks} checks passed")
         sys.exit(1)
-    mcp = MCP(PORT)
+    mcp = MCP(SOCKET)
 
     print("mixed — an AAC clip then a WAV on ONE track")
     m = Session(mcp, "mixed-audio")

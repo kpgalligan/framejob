@@ -1,12 +1,11 @@
 //! C FFI for the embedded MCP agent server (`rc_agent_*` in the header).
 //!
-//! Two listeners, each one per process in its own slot: the TCP server
-//! (`rc_agent_server_start` / `_stop`, `SERVER`) and the Unix socket
-//! (`rc_agent_socket_start` / `_release`, `SOCKET`, road map 14). A second
-//! start of either is refused. Both are built from the same
-//! [`AgentConfig`] (`host_config`), so they serve one catalog through one
+//! One listener per process, in one slot: the Unix socket
+//! (`rc_agent_socket_start` / `_release`, `SOCKET`, road map 14; MC4
+//! deleted the TCP server and its slot). A second start is refused. It is
+//! built from an [`AgentConfig`] (`host_config`), one catalog through one
 //! handler. The host's tool handler is a C function pointer invoked from
-//! either server thread; its return value must come from
+//! the server thread; its return value must come from
 //! [`rc_agent_string_create`] so this side can reclaim the allocation.
 
 use std::ffi::{c_char, c_void, CStr, CString};
@@ -50,12 +49,11 @@ impl HostHandler {
     }
 }
 
-static SERVER: Mutex<Option<AgentServer>> = Mutex::new(None);
 static SOCKET: Mutex<Option<AgentServer>> = Mutex::new(None);
 
-/// Reads the three strings both starts take and builds the
+/// Reads the three strings the start takes and builds the
 /// [`AgentConfig`] around the host's handler: the one place the catalog is
-/// parsed and the handler wrapped, so the two listeners cannot differ.
+/// parsed and the handler wrapped.
 ///
 /// # Safety
 /// String arguments must be NULL or valid NUL-terminated C strings.
@@ -98,67 +96,11 @@ pub unsafe extern "C" fn rc_agent_string_create(s: *const c_char) -> *mut c_char
     }
 }
 
-/// Starts the embedded MCP server on 127.0.0.1 (`port` 0 picks an
-/// ephemeral port) and returns the bound port, or 0 on failure with a
-/// message through `err_out`. `tools_json` must be the `tools/list`
-/// catalog as a JSON array. `handler` is called from the server thread
-/// for every `tools/call`; it must return a CallToolResult JSON object
-/// allocated with [`rc_agent_string_create`], or NULL for handler failure.
-///
-/// # Safety
-/// String arguments must be valid NUL-terminated C strings; `err_out`
-/// must be NULL or a valid pointer to writable `*mut c_char`; `handler`
-/// and `context` must remain valid and callable from any thread until
-/// `rc_agent_server_stop` returns.
-#[no_mangle]
-pub unsafe extern "C" fn rc_agent_server_start(
-    port: u16,
-    server_name: *const c_char,
-    server_version: *const c_char,
-    tools_json: *const c_char,
-    handler: RcAgentToolHandler,
-    context: *mut c_void,
-    err_out: *mut *mut c_char,
-) -> u16 {
-    let body = || {
-        let config =
-            unsafe { host_config(server_name, server_version, tools_json, handler, context) }?;
-
-        let mut slot = SERVER
-            .lock()
-            .map_err(|_| "server lock poisoned".to_string())?;
-        if slot.is_some() {
-            return Err("agent server already running".to_string());
-        }
-        let (bound, server) = agent::start(port, config)?;
-        *slot = Some(server);
-        Ok(bound)
-    };
-    unsafe {
-        fallible_op(
-            err_out,
-            "panic while starting agent server",
-            0,
-            body,
-            |bound| bound,
-        )
-    }
-}
-
-/// Stops the embedded MCP server and waits for its thread to exit. Safe
-/// to call when no server is running. After this returns, the handler
-/// and context passed to start are no longer used.
-#[no_mangle]
-pub extern "C" fn rc_agent_server_stop() {
-    let server = catch_unwind(|| SERVER.lock().ok().and_then(|mut slot| slot.take()));
-    if let Ok(Some(server)) = server {
-        let _ = catch_unwind(AssertUnwindSafe(|| server.shutdown()));
-    }
-}
-
-/// Binds the embedded MCP server's Unix-socket listener at `socket_path` —
-/// a second server object beside the TCP one, with the same catalog and
-/// handler contract — chmod 0600. True, or false with a message through
+/// Binds the embedded MCP server's Unix-socket listener at `socket_path`,
+/// chmod 0600. `tools_json` must be the `tools/list` catalog as a JSON
+/// array; `handler` is called from the server thread for every
+/// `tools/call` and must return a CallToolResult JSON object allocated
+/// with [`rc_agent_string_create`], or NULL for handler failure. True, or false with a message through
 /// `err_out`. One per process: a second start is an error ("agent socket
 /// already bound"). Never unlinks an existing file.
 ///

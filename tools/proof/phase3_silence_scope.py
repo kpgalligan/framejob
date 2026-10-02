@@ -28,7 +28,7 @@ the fix, so neither can pass against one.
 Media: `media/silence.mov` (the recipe is in README.md). No ffmpeg needed —
 nothing here is exported.
 
-    python3 tools/proof/phase3_silence_scope.py <port>
+    python3 tools/proof/phase3_silence_scope.py <dir>/agent.sock
 """
 
 import os
@@ -37,9 +37,9 @@ import shutil
 import sys
 import time
 
-from mcp import MCP, ToolError
+from mcp import MCP, ToolError, target
 
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 4823
+SOCKET = target(sys.argv)
 HERE = os.path.dirname(os.path.abspath(__file__))
 MEDIA = os.path.join(HERE, "media")
 WORK = os.path.join(HERE, "work")
@@ -118,7 +118,7 @@ def spans_of(answer):
 
 def main():
     os.makedirs(WORK, exist_ok=True)
-    mcp = MCP(PORT)
+    mcp = MCP(SOCKET)
     print("3a — the scope of Remove Silences")
     path, voice, music = build(mcp)
 

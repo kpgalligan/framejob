@@ -19,7 +19,7 @@
 // Prints exactly one stdout line:
 //   ANSWER {"rows":[{"id","ok","detail"}],"measure":{…}}
 //
-// Nothing here calls `AgentServer.start()`: the gate is filled only by
+// Nothing here binds the agent socket (`bindSocket()`): the gate is filled only by
 // `AgentLane.prepareAtLaunch()`, called at the top as `main.swift` calls it,
 // and skipped under `--no-prepare` (the made-to-fail run: L1 must then fail,
 // because the gate refuses `at` and `name` as arguments no tool published).

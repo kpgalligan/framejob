@@ -236,7 +236,7 @@ extension RecorderPanelController {
         startTimer = nil
         launched = true
         recorder.start(
-            filter: filter, choice: choice,
+            filter: filter, choice: choice, mayAsk: true,
             onFinish: { [weak self] outcome in self?.recordingEnded(outcome) }
         ) { [weak self] error in
             guard let self else { return }

@@ -8,12 +8,30 @@ from phase 2 an offscreen-chrome script beside it, and for the fixes
 `remaining_probe.py` offscreen — so a proof can be re-run after a later
 change rather than believed on the strength of a paragraph.
 
-`mcp.py` is a ~80-line MCP client (streamable HTTP, tools only) — enough to
+`mcp.py` is a small MCP client (streamable HTTP over the app's Unix socket,
+tools only, no dependencies) — `MCP("<dir>/agent.sock")` is enough to
 `initialize`, list the tools and call one: `call(tool, **args)`, or
 `call_with(tool, {…})` when an ARGUMENT is itself spelled `name`
 (`add_track`, `set_track`, `add_marker`, `set_marker`, `nest`), since
-`call`'s own first parameter is the tool's name. It has no dependencies.
+`call`'s own first parameter is the tool's name; given a port number it
+raises a `TypeError` naming MC4. It is also the launcher the proofs share
+(road map 14's MC4): `scratch_socket()` makes a `0700` folder under `$TMPDIR`
+and answers `<folder>/agent.sock` (refusing a path over 103 bytes),
+`launch(binary, …)` starts an instance there in its own session with
+`RC_AGENT_SOCKET` set, logging to `log_beside(socket)`, and waits for the
+socket's line (`wait_listening`), `socket_pid` finds the pid listening at a
+socket (`lsof -U`, read only), `target(argv)` is a proof's socket argument
+(else `$RC_AGENT_SOCKET`), `remove_scratch` deletes a scratch folder under the
+temp dir, and `LSREGISTER` is the one spelling of `lsregister`'s path. No proof
+binds the person's own socket (spec §11 MC-6).
 `harness/` is the offscreen renderer, described at the end.
+
+**Ports in records.** Road map 14's MC4 deleted the app's TCP listener.
+Before it every instance was reached on a TCP port, so the dated runs and
+result tables below name ports (`phase9_proof.py 4853`, `--port 4941`,
+`/tmp/reelcut-4823.log`): those are what ran then, and stay as written. Today
+a proof against a running instance takes the instance's socket path, and one
+that launches its own does so on a scratch socket.
 
 Each `phase<N>_proof.py` makes its own projects under `work/` from test media
 under `media/`, and every claim is one of three kinds: a placement read back
@@ -27,20 +45,20 @@ nothing here compares sizes or timestamps.
 ## Running one
 
 Road map 7 part 2's frame-grid proof owns a fresh Release app process. After
-`make app`, run `python3 tools/proof/frame_grid_proof.py --port 5514`;
+`make app`, run `python3 tools/proof/frame_grid_proof.py`;
 `--app PATH` selects a matching alternate `.app`. It opens a generated package,
 changes fps, pastes a nested payload, copies attributes and unnests, reading
 exact stored clip/property ticks after each edit. Each edit's complete
 before/after project is checked through one undo and redo, followed by a
-save/reopen check. It verifies the actual bound port and an empty startup
-parity log before and after, times out failed calls, and terminates only the
+save/reopen check. It waits for its own scratch socket's line and checks an
+empty startup parity log before and after, times out failed calls, and terminates only the
 process it launched. This is a stored-timing proof; it makes no pixel or
 audio claim. The FFI companion vectors are `frame_grid_canvas.rs` and
 `frame_grid_transfer.rs`.
 
 Road map 7 part 1's extreme-time proof launches its own Release app and owns
 only that process. After `make app`, run
-`python3 tools/proof/extreme_time_proof.py --port 5350`; `--app PATH` selects a
+`python3 tools/proof/extreme_time_proof.py`; `--app PATH` selects a
 matching alternate `.app` for an isolated mutation build. It writes temporary
 `.reelcut` packages, checks named refusal of oversized saved values and the
 next valid open in the same process, renders an admitted control, then checks
@@ -51,7 +69,7 @@ refused with the core's whole sentence, value spelled as serde_json spells it
 (`clip 4's speed 1e+300 is outside ×0.1–×10`), the `project.json` bytes are
 unchanged and a control opens after it; 0.1 and 10.0 open and read back. Run
 on 2026-10-01: every row `ok` and the pass line, no parity complaint. It
-refuses a fallback MCP port, checks the startup parity log before and after,
+launches on a scratch socket, checks the startup parity log before and after,
 and exits nonzero for a crash,
 timeout, build mismatch or failed row. The Rust companion
 `core/tests/transition_bounded.rs` runs long searches in child processes with
@@ -62,9 +80,9 @@ transition loop there to make the child watchdog fail. Restore the source and
 rerun green before recording a proof claim.
 
 Issue #34's pair makes its own media per run under `work/mixed-audio/`:
-`python3 tools/proof/mixed_audio_probe.py [--sources PATH]` (no port; its
+`python3 tools/proof/mixed_audio_probe.py [--sources PATH]` (no app; its
 section 4 is the proof of the fix) and `python3 tools/proof/mixed_audio_proof.py
-<port>` (the export path's regression guard); "Mixed audio formats on one
+<dir>/agent.sock` (the export path's regression guard); "Mixed audio formats on one
 track" below.
 
 Make the test media once (ffmpeg is not a product dependency — see spec §11
@@ -235,7 +253,7 @@ does not answer. `e1_chrome.py` builds the reference tree's own harness out
 of `tools/proof/work/e1-reference/tools/proof/harness/build.sh`, and takes
 `--reference DIR` for a copy kept somewhere else.
 
-Then launch YOUR OWN instance on YOUR OWN port and only ever kill that one
+Then launch YOUR OWN instance on YOUR OWN socket and only ever kill that one
 (`pgrep -f "MacOS/Reelcut"` lists them; another session may have one running).
 **A direct launch of the binary runs under the TERMINAL's grants** — road map
 3's R0 question 1, measured: TCC attributes a shell-launched
@@ -246,53 +264,56 @@ System Settings never reaches a proof's instance, and the terminal's own
 grants are what `record_screen` runs under. That is why `recording_proof.py`'s
 granted tier prints whose grant it ran under. To get an instance that is
 responsible for ITSELF — the shipped app's own grants, the way a person
-launches it — use `open` instead, which carries the port through `--env` and
+launches it — use `open` instead, which carries the socket through `--env` and
 the log through `--stdout`/`--stderr`:
 
 ```sh
-open -a ./build/Build/Products/Release/Reelcut.app --env RC_AGENT_PORT=4823 \
-   --stdout /tmp/reelcut-4823.log --stderr /tmp/reelcut-4823.log \
-   --args -ApplePersistenceIgnoreState YES -AgentServerEnabled YES
+d="$(mktemp -d)"; echo "$d"
+open -a ./build/Build/Products/Release/Reelcut.app --env RC_AGENT_SOCKET="$d/agent.sock" \
+   --stdout "$d/reelcut.log" --stderr "$d/reelcut.log" \
+   --args -ApplePersistenceIgnoreState YES
 ```
 
 (One trap: `open -a` of a bundle that already has an instance running
 ACTIVATES that instance rather than launching another.) The direct line
-below is still the one every script here is run against:
+below is still the one every script here is run against. It prints its
+folder; each later command names it literally, because a shell variable does
+not survive from one agent command to the next:
 
 ```sh
 make app
-(RC_AGENT_PORT=4823 ./build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut \
-   -ApplePersistenceIgnoreState YES -AgentServerEnabled YES > /tmp/reelcut-4823.log 2>&1 &)
-python3 tools/proof/phase1_proof.py 4823
-python3 tools/proof/phase2_proof.py 4823
-python3 tools/proof/phase3_proof.py 4823
-python3 tools/proof/phase3_silence_scope.py 4823
-python3 tools/proof/silence2_proof.py 4823
-python3 tools/proof/phase4_proof.py 4823
-python3 tools/proof/phase5_proof.py 4823
-python3 tools/proof/phase6_proof.py 4823
-python3 tools/proof/phase7_proof.py 4823
-python3 tools/proof/phase8_proof.py 4823
-python3 tools/proof/phase9_proof.py 4823
-python3 tools/proof/patch_door_proof.py 4823
-python3 tools/proof/refusal_proof.py 4823
-python3 tools/proof/clip_catalog_proof.py 4823
-python3 tools/proof/op_catalog_proof.py 4823
-python3 tools/proof/op_argument_proof.py 4823
-python3 tools/proof/e2_proof.py 4823
+d="$(mktemp -d)"; echo "$d"
+(RC_AGENT_SOCKET="$d/agent.sock" ./build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut \
+   -ApplePersistenceIgnoreState YES > "$d/reelcut.log" 2>&1 &)
+python3 tools/proof/phase1_proof.py <dir>/agent.sock
+python3 tools/proof/phase2_proof.py <dir>/agent.sock
+python3 tools/proof/phase3_proof.py <dir>/agent.sock
+python3 tools/proof/phase3_silence_scope.py <dir>/agent.sock
+python3 tools/proof/silence2_proof.py <dir>/agent.sock
+python3 tools/proof/phase4_proof.py <dir>/agent.sock
+python3 tools/proof/phase5_proof.py <dir>/agent.sock
+python3 tools/proof/phase6_proof.py <dir>/agent.sock
+python3 tools/proof/phase7_proof.py <dir>/agent.sock
+python3 tools/proof/phase8_proof.py <dir>/agent.sock
+python3 tools/proof/phase9_proof.py <dir>/agent.sock
+python3 tools/proof/patch_door_proof.py <dir>/agent.sock
+python3 tools/proof/refusal_proof.py <dir>/agent.sock
+python3 tools/proof/clip_catalog_proof.py <dir>/agent.sock
+python3 tools/proof/op_catalog_proof.py <dir>/agent.sock
+python3 tools/proof/op_argument_proof.py <dir>/agent.sock
+python3 tools/proof/e2_proof.py <dir>/agent.sock
 ```
 
-`e1_proof.py` is the one script that takes TWO ports — its own and the
+`e1_proof.py` is the one script that takes TWO sockets — its own and the
 reference build's — and it is run on its own instance, after the reference
-line above:
+line above. The reference tree predates MC4 and listens on TCP alone, so it
+does not answer at a socket and the cross-build rows skip by name:
 
 ```sh
-(RC_AGENT_PORT=4824 tools/proof/work/e1-reference/build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut \
-   -ApplePersistenceIgnoreState YES -AgentServerEnabled YES > /tmp/reelcut-4824.log 2>&1 &)
-python3 tools/proof/e1_proof.py 4823 4824
+python3 tools/proof/e1_proof.py <dir>/agent.sock <reference dir>/agent.sock
 ```
 
-Road map 5's other two instruments take no port at all — they are offscreen,
+Road map 5's other two instruments take no socket at all — they are offscreen,
 and are run beside the two above:
 
 ```sh
@@ -301,15 +322,15 @@ python3 tools/proof/e2_chrome.py
 ```
 
 **Phase 9 takes a SECOND argument**, the log path, defaulting to
-`/tmp/reelcut-<port>.log` — the path the launch line above writes. It is the
-only script that reads the log itself: the startup parity check logs and does
-not refuse, so phase 9's fourth part (every op tool declares `scope`) would
-leave a clean-looking server on the port, and the count of scope-declaring
+`<dir>/reelcut.log` beside the socket — the path the launch line above writes.
+It is the only script that reads the log itself: the startup parity check logs
+and does not refuse, so phase 9's fourth part (every op tool declares `scope`)
+would leave a clean-looking server on the socket, and the count of scope-declaring
 tools is re-derived over the wire beside it. **Phase 9 adds nothing to
 `media/` and needs no ffmpeg**; it reads `A.mov`, `AV.mov` and `B.mov`, which
 are already there.
 
-The offscreen scripts take no port and are run on their own —
+The offscreen scripts take no socket and are run on their own —
 `python3 tools/proof/phase2_chrome.py` and its successors through
 `phase9_chrome.py`, and beside them road map 5's `e1_chrome.py` and
 `e2_chrome.py`, each of which builds its own harness and its own probe from
@@ -334,10 +355,10 @@ that puts WINDOWS on screen — its
 the thing it measures.
 
 The last line is `<n>/<n> checks passed`, and the exit status is non-zero if
-any failed. The log's second line names the port the app actually bound (a
-taken port falls back to an ephemeral one), and the same log is where the
-startup parity check would complain — `grep "Reelcut: " /tmp/reelcut-4823.log`
-must print nothing before a proof run means anything.
+any failed. The log's `Reelcut agent socket listening at <dir>/agent.sock`
+line says the instance is up (`not bound: <reason>` says why not), and the same
+log is where the startup parity check would complain — `grep "Reelcut: "
+<dir>/reelcut.log` must print nothing before a proof run means anything.
 
 **The EXACT tool count belongs to the newest phase's script**, because it is
 what tells a stale binary on the port from the build under test: road map 7's
@@ -1201,9 +1222,9 @@ one answer phase 8 did change over the wire.
 **It is the only script here that LAUNCHES Reelcut**, and section 1 is why.
 `PreviewQuality.stored()` reads `UserDefaults.standard`, so a quality can be
 put into a running app through the ARGUMENT DOMAIN at launch, exactly as
-`-ApplePersistenceIgnoreState` and `-AgentServerEnabled` already travel. So the
-section starts TWO instances of the binary under test on `PORT + 1` and
-`PORT + 2` — one with the key absent (Full), one with `-ReelcutPreviewQuality 2`
+`-ApplePersistenceIgnoreState` already travels. So the section starts TWO
+instances of the binary under test, each on a scratch socket (`mcp.launch`) —
+one with the key absent (Full), one with `-ReelcutPreviewQuality 2`
 (Quarter) — builds the identical fixture through both, and byte-compares what
 comes out: three `render_frame` PNGs, an `apng` and a `gif` (both go through
 `ExporterImageSequence.swift`, which has no clock in it), and a `prores_422`
@@ -1323,7 +1344,7 @@ person's eyes: two builds agreeing byte for byte is an isolation claim, not a
 picture.
 
 `phase9_proof.py` is phase 9's MCP half (`python3 tools/proof/phase9_proof.py
-[port] [log path]`, **216/216** on 2026-09-19 — 214 when section 9 landed,
+<dir>/agent.sock [log path]`, **216/216** on 2026-09-19 — 214 when section 9 landed,
 and two rows more since road map 7, whose records carry the 216 — about seven
 seconds). It was 184 for the
 phase's own gate and twenty-eight checks short of what phase 9 measured: the
@@ -2275,7 +2296,7 @@ post **140/141** (5d's "no later post" row).
 
 ## The cache marker over MCP (`remaining_proof.py`)
 
-`python3 tools/proof/remaining_proof.py [port]`, **80/80** (79/79 before
+`python3 tools/proof/remaining_proof.py <dir>/agent.sock`, **80/80** (79/79 before
 issue batch B16 rewrote 1i, 76/76 until issue batch B29 gave it four
 withdrawal rows), against a
 running instance on its own port (4834 by default). It is §2a's sentence —
@@ -2381,7 +2402,7 @@ stopped and restarted per segment; `pause_resume(..., micDeviceContains:
 first row on a Bluetooth headset switched profiles mid-recording and poisoned
 the file output for every later file — a host fact, recorded in the road map.
 
-`python3 tools/proof/recording_proof.py [port]`, over MCP, in two tiers. The
+`python3 tools/proof/recording_proof.py <dir>/agent.sock`, over MCP, in two tiers. The
 HEADLESS tier always runs: the catalog at exactly 75 with `record_screen`
 declaring no `scope`, the refusals in the contract's ORDER (the caller's
 mistakes, the microphone grant by status word, a `project` naming nothing,
@@ -2770,7 +2791,7 @@ app/CLAUDE.md's undo pitfall.
 
 ## The patch door (`patch_door_proof.py`)
 
-`python3 tools/proof/patch_door_proof.py [port]`. **Named for the SEAM, not
+`python3 tools/proof/patch_door_proof.py <dir>/agent.sock`. **Named for the SEAM, not
 for a phase**, which is the one thing about it that is not the house shape:
 what it proves is the single door every caller-authored object comes through
 (`core/src/patch.rs`, `CONTEXT.md`'s **Patch**), and the doors arrive one
@@ -2851,7 +2872,7 @@ which every refusal at that door said.
 
 ## What an op answers (`refusal_proof.py`)
 
-`python3 tools/proof/refusal_proof.py [port]`. **Named for the SEAM, not for
+`python3 tools/proof/refusal_proof.py <dir>/agent.sock`. **Named for the SEAM, not for
 a phase**, as the patch door is: what it proves is the answer every edit
 comes back with (`core/src/outcome.rs`, `app/Sources/ReelEdit.swift`,
 `CONTEXT.md`'s **Op**), and the rules that can say WHY arrive one deepening
@@ -3001,7 +3022,7 @@ reading the core's own answer cannot make about itself.
 
 ## The clip tools against the table (`clip_catalog_proof.py`)
 
-`python3 tools/proof/clip_catalog_proof.py <port>`, against a running
+`python3 tools/proof/clip_catalog_proof.py <dir>/agent.sock`, against a running
 instance. Road map 7's D3·3 migrated the clip group's 43 op tools to PRINT
 the core's table instead of restating it, and this measures the identity
 that makes that safe from two independent sides: the CATALOG, read over MCP
@@ -3046,7 +3067,7 @@ own in `core/tests/op_table.rs`.
 
 ## Every op tool against the table (`op_catalog_proof.py`)
 
-`python3 tools/proof/op_catalog_proof.py <port>`, against a running
+`python3 tools/proof/op_catalog_proof.py <dir>/agent.sock`, against a running
 instance. Road map 7's D3·4 migrated the last fourteen op tools — the nine
 track, marker and canvas rows, the three raw media ops and the two
 transitions — so this measures the WHOLE catalog where `clip_catalog_proof.py`
@@ -3106,7 +3127,7 @@ behaviour stays.
 
 ## A stranger argument, put to all 82 (`op_argument_proof.py`)
 
-`python3 tools/proof/op_argument_proof.py <port>`, against a running
+`python3 tools/proof/op_argument_proof.py <dir>/agent.sock`, against a running
 instance. Road map 7's D3·5, then the **argument gate** of
 kpgalligan/reelcut#21, and **the script that owns the exact tool count**
 (77). **133/133** on 2026-09-20, when the frame-rate TERM rows landed;
@@ -3477,8 +3498,7 @@ day, which added four rows to the MCP half (three refusals and a schema row
 in claim 10) plus four at the foot of claim 4, and eleven to the probe (a
 new `ducked` process and two rows under `afterPeaksGone`).
 
-`python3 tools/proof/silence2_proof.py [port] [--remake]`, port 4823 by
-default, **91/91** (61 at the landing, 79 after the reader review, 83 after
+`python3 tools/proof/silence2_proof.py <dir>/agent.sock [--remake]`, **91/91** (61 at the landing, 79 after the reader review, 83 after
 the sceptic's pass), against a running instance. It makes
 its own fixtures (above), and then measures claims 1–11:
 
@@ -3771,8 +3791,8 @@ crossfade, and clips learning In / Out / During motion presets — and the four
 instruments §4e and §6e owe them, landed 2026-09-19 against the tree as it
 stood.
 
-`python3 tools/proof/e1_proof.py [port] [reference_port]`, 4825 and 4826 by
-default, **95/95** at the landing and **99/99** since the E1 reader review
+`python3 tools/proof/e1_proof.py <dir>/agent.sock [<reference dir>/agent.sock]`,
+**95/95** at the landing and **99/99** since the E1 reader review
 (road map 5 §12, R4·1) added §6(c), against TWO running instances: this build and the build
 at `1c3e92e` (the reference paragraph in "Running one" says how to make it).
 Fixtures are `media/`'s two tones, `AV.mov` and `silence.mov`, plus shape
@@ -3894,7 +3914,7 @@ hand-written version-6 package, and a probe built from `app/Sources`.
   the other clip exactly where it was rather than aborting the selection, and
   puts up no sheet.
 
-`python3 tools/proof/e2_proof.py [port]`, 4825 by default, **69/69** after
+`python3 tools/proof/e2_proof.py <dir>/agent.sock`, **69/69** after
 E2-27 (61/61 before it), one
 instance. Cards on a black backdrop; `NONE` is the same session with the
 motion cleared, re-rendered and put back, which is the control half the rows
@@ -3944,10 +3964,10 @@ here are measured against.
   kind through `get_project`, save and reopen, with first/last PNG bytes equal
   to the no-motion card. A one-frame Fade In changes the first frame; a
   two-frame Fade Out changes the last drawn frame; undo restores the stored
-  zeros and the matching PNGs. Run against an owned Release app on its bound
-  port, with an empty `rg 'Reelcut: ' /tmp/reelcut-<port>.log` parity scan.
+  zeros and the matching PNGs. Run against an owned Release app on its own
+  socket, with an empty `rg 'Reelcut: ' <dir>/reelcut.log` parity scan.
 
-`env RC_ASSEMBLYAI_KEY=proof-key python3 tools/proof/e2_chrome.py`, no port,
+`env RC_ASSEMBLYAI_KEY=proof-key python3 tools/proof/e2_chrome.py`, no socket,
 **52/52** after E2-27 (35/35 before it; 24/24 until the E2
   reader review of 2026-09-20 added nine rows, and its residue run two,
   `archive/reelcut-roadmap-5.md` §12).
@@ -4460,9 +4480,9 @@ row 1's no-key arm, nothing at all.
 ```sh
 env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py
 env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --mutant no-hold
-env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --port-base 5030
-env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --port-base 5470
-env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --mutant keyless-agent-requires-key --port-base 5480
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --mutant keyless-agent-requires-key
 ```
 
 R6-14's built-app row drops a submit reply, then repeats with one hidden
@@ -4480,9 +4500,9 @@ skips and no startup parity complaints in any owned app log.
 **115/115** on the tree, no skips, in 45–50 s, measured three times on
 2026-09-20, and again at **115/115 in 51 s** after c1-chrome (road map 6
 §10.11) — the row COUNT is unchanged on purpose, since that pipeline changed
-no tool, no schema and no op. `--binary` points at another build,
-`--port-base` (4955) moves the three instances, `--wall` (1800 s) bounds the
-run.
+no tool, no schema and no op. `--binary` points at another build, and
+`--wall` (1800 s) bounds the run; each instance takes a scratch socket of its
+own (MC4 deleted `--port-base`).
 
 **Every instance is now launched `-ReelcutCaptionEngine assemblyai`**, which
 pins the SHEET's memory of what a person last chose to the wrong answer for a
@@ -4576,7 +4596,7 @@ INSTEAD of rows 1–11, and the flag is off by default, so a routine proof run
 cannot spend a cent:
 
 ```sh
-python3 tools/proof/cloud_captions_proof.py --live --port-base 4980
+python3 tools/proof/cloud_captions_proof.py --live
 ```
 
 **What it spends.** One transcription of the eleven-second `say` fixture —
@@ -4621,7 +4641,7 @@ show), and the proof's own `Client`, for the read-backs the app cannot do.
 Every other child is `child_env()`'s environment, with the variable removed.
 The leak row compares IN PROCESS over the captured lines, every MCP answer
 and refusal, the package, the secret folder, `work/cloudlive/` and both
-instances' `/tmp/reelcut-<port>.log` files, and prints only a boolean.
+instances' logs (beside their scratch sockets), and prints only a boolean.
 
 **Two instances, both with no endpoint override** and with `-RCSecretFolder`
 pointed at an EMPTY directory, which is the arm of R6-9 that keeps the
@@ -4735,7 +4755,7 @@ the id of; `stall` on `delete` is what makes the janitor's bill measurable;
 
 ```sh
 env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --fake-mutant fake-logs-any-key --only hygiene
-env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --fake-mutant fake-logs-any-key --port-base 4990
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --fake-mutant fake-logs-any-key
 ```
 
 `--mutant` copies `app/` only and loads the fake from the working tree, so a
@@ -4825,7 +4845,7 @@ call was made and nothing was spent**: every row runs against
 
 ```sh
 env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only drip,stop
-env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --port-base 4955
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py
 ```
 
 **1. The 21 pairs of `transcribe`'s refusals: row RP in
@@ -5078,7 +5098,7 @@ call was made and nothing was spent**: every row runs against
 
 ```sh
 env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only cache_write,echo,secrets,submission
-env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --port-base 4975
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py
 ```
 
 - **R2·1, section `echo` (new).** E1/E2: the fake names the key as its
@@ -5156,7 +5176,7 @@ runs against `assemblyai_fake.py`, with `RC_ASSEMBLYAI_KEY` unset.
 
 ```sh
 env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only client,cancel,run,stop
-env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --port-base 4985
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py
 ```
 
 - **Section `client`.** `Tuning.shipped.deleteAfterStop` is R6-19's 2.
@@ -5236,8 +5256,8 @@ with `RC_ASSEMBLYAI_KEY` unset.
 
 ```sh
 env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py
-env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --port-base 4975
-env -u RC_ASSEMBLYAI_KEY python3 tools/proof/word_captions_proof.py 4891
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/word_captions_proof.py
 env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only echo --mutant speaker-unchecked
 ```
 
@@ -5418,11 +5438,11 @@ covered coarse fractional target is published and read back. Coarse metadata
 only limits edge-shortfall tolerance, not exact coverage. The truncated WAV is
 qualified against AVFoundation's physical track extent, not its original header.
 
-After `make app`, start a fresh owned Release app on port 5410 with
-`RC_ASSEMBLYAI_KEY` unset, `-ApplePersistenceIgnoreState YES` and
-`-AgentServerEnabled YES`; verify its log names that port and contains no
+After `make app`, start a fresh owned Release app on a scratch socket with
+`RC_ASSEMBLYAI_KEY` unset and `-ApplePersistenceIgnoreState YES` (CLAUDE.md's
+launch block); verify its log names that socket and contains no
 `Reelcut: ` parity complaint. Then run
-`python3 tools/proof/peaks_proof.py 5410`. The built-app checks use
+`python3 tools/proof/peaks_proof.py <dir>/agent.sock`. The built-app checks use
 `detect_silence` and `normalize_clip` to distinguish pending corrupt audio,
 real silence and an audible clip, verify unchanged project JSON on refusal,
 and reject an old false-silent cache before the next normal pass migrates it.
@@ -5540,8 +5560,8 @@ answers an expiry as `expired: True`. **q1 and q9 patch the core** —
 builds; `rows_build.revert()` always runs after them and writes `git diff
 c874069 --stat -- core app` and `git status --short -- core app`, both
 empty, into `answers.json`. q7 runs last, on the app built from the reverted
-tree, launches its own instance on port 4843 by PID and kills only that;
-`grep "Reelcut: " tools/proof/work/graphics_spike/reelcut-4843.log` must
+tree, launches its own instance on a scratch socket by PID and kills only that;
+`grep "Reelcut: " tools/proof/work/graphics_spike/reelcut.log` must
 print nothing. q7 measures the package with `media/` as the STAND-IN for
 `graphics/`, which the unchanged app's whitelist cannot keep; the
 `graphics/` run is the CONTROL, expected absent.
@@ -5628,9 +5648,9 @@ C4 FAILED — which it can only do through C4's unclosed half, since
 `close()` drops the store and breaks the cycle either way.
 
 **The proof.** `graphics_store_proof.py` is G0's q7 package rows against
-`graphics/` itself, with the built app: its own instance on its own port
-(default 4851), launched and stopped by PID, the log at
-`work/graphics-store/reelcut-<port>.log`. S2 `new_project {path}` leaves no
+`graphics/` itself, with the built app: its own instance on a scratch
+socket, launched and stopped by PID, the log at
+`work/graphics-store/reelcut.log`. S2 `new_project {path}` leaves no
 `graphics/`; S3 a `graphics/` made from outside while open is saved without
 "changed by another application"; S4 survives a relaunch and a save; S5 a
 Save As; S6 an autosave in place (15.1 s after the edit in the recorded
@@ -5656,8 +5676,8 @@ saved. The file has been changed by another application."
 ## Road map 10's G3b — a graphic clip drawn (`graphics_proof.py`)
 
 The registry, the compositor case and the two op tools against the BUILT
-app: its own instance on its own port (default 4879), launched and stopped
-by PID, the log at `work/graphics/reelcut-<port>.log`, every child bounded
+app: its own instance on a scratch socket, launched and stopped
+by PID, the log at `work/graphics/reelcut.log`, every child bounded
 and every wait a bounded poll. The modules are written outside a package and
 `mv`d into its `graphics/` from the shell. `bar.js` is the script's own —
 one rect at x = frame × 4, 100 wide, filled with `props.color`, no fonts, no
@@ -5689,7 +5709,7 @@ through P1 and P2, and exits 0 only if P1 held and P2 FAILED. The rows after
 P2 are relative, so a uniform +1 moves both sides of them.
 
 ```sh
-make app && python3 tools/proof/graphics_proof.py --port 4879          # → 14/14
+make app && python3 tools/proof/graphics_proof.py          # → 14/14
 python3 tools/proof/graphics_proof.py --mutant frame-plus-one          # exit 0 = P2 FAILED
 ```
 
@@ -5731,7 +5751,7 @@ A1 (the slate is opaque) and E1 (the export succeeded, a slate in place of
 the card) with them (16/21). Each was reverted and rebuilt.
 
 ```sh
-make app && python3 tools/proof/graphics_proof.py --port 4881          # → 21/21
+make app && python3 tools/proof/graphics_proof.py          # → 21/21
 python3 tools/proof/graphics_proof.py --mutant frame-plus-one          # exit 0 = P2 FAILED
 ```
 
@@ -5772,7 +5792,7 @@ file; (b) `writeManual()` deleted from `write()` and `ensureFolder()` — G2
 fell alone; (c) `holdsContent` counting regular files only — G8 fell alone.
 
 ```sh
-make app && python3 tools/proof/graphics_proof.py --port 4883          # → 29/29
+make app && python3 tools/proof/graphics_proof.py          # → 29/29
 python3 tools/proof/graphics_proof.py --mutant frame-plus-one          # exit 0 = P2 FAILED
 ```
 
@@ -5833,7 +5853,7 @@ deleted from `importGraphicAsset` — I2 fell alone; (d) `catchUpLibrary`
 deleted from `importGraphicFont` — I4 fell alone.
 
 ```sh
-make app && python3 tools/proof/graphics_proof.py --port 4883          # → 39/39
+make app && python3 tools/proof/graphics_proof.py          # → 39/39
 python3 tools/proof/graphics_proof.py --mutant frame-plus-one          # exit 0 = P2 FAILED
 ```
 
@@ -5851,8 +5871,8 @@ and kills nothing: `capture` on the CONTROL build's own instance, `compare`
 on a fresh instance of the build under test.
 
 ```sh
-python3 tools/proof/target_bump_proof.py <port> capture tools/proof/work/target-bump   # the control build
-python3 tools/proof/target_bump_proof.py <port> compare tools/proof/work/target-bump   # the build under test → 3/3
+python3 tools/proof/target_bump_proof.py <dir>/agent.sock capture tools/proof/work/target-bump   # the control build
+python3 tools/proof/target_bump_proof.py <dir>/agent.sock compare tools/proof/work/target-bump   # the build under test → 3/3
 ```
 
 ## Word captions, the core (`words_core_proof.py`)
@@ -5888,7 +5908,7 @@ the count comparison
 (`schema_v9::a_count_mismatch_is_an_error_in_the_rules_own_words`).
 
 ```sh
-python3 tools/proof/words_core_proof.py <port>                       # the build under test → 27/27
+python3 tools/proof/words_core_proof.py <dir>/agent.sock                       # the build under test → 27/27
 python3 tools/proof/words_core_proof.py --mutant hash-arm            # exit 0 = the named test FAILED
 python3 tools/proof/words_core_proof.py --mutant trim-rebase
 python3 tools/proof/words_core_proof.py --mutant count-check
@@ -5945,8 +5965,8 @@ The script makes its own fixtures under `work/speech_engine/` —
   `release-before-signal` (P8, which waits out its 60 s bound).
 
 ```sh
-python3 tools/proof/speech_engine_proof.py <port>                # MCP + probe + mutants
-python3 tools/proof/speech_engine_proof.py <port> --no-mutants   # MCP + probe
+python3 tools/proof/speech_engine_proof.py <dir>/agent.sock                # MCP + probe + mutants
+python3 tools/proof/speech_engine_proof.py <dir>/agent.sock --no-mutants   # MCP + probe
 ```
 
 ## Road map 8's W3 — the word-caption picture
@@ -5955,7 +5975,7 @@ W3 (road map 8 §10.7) taught the app to decode format version 9's `case`,
 `words` and `word_style` and the recipe's `word` / `word_pop`, and to draw a
 timed page. Four instruments; each launches nothing and kills nothing, and
 the two MCP ones run on a FRESH instance each, with
-`grep "Reelcut: " /tmp/reelcut-<port>.log` printing nothing first.
+`grep "Reelcut: " <dir>/reelcut.log` printing nothing first.
 
 ### The reveal toll, rendered (`reveal_toll_proof.py`)
 
@@ -5971,8 +5991,8 @@ whose frames were equal would prove nothing was animated; `compare` checks
 each byte for byte, `6/6`.
 
 ```sh
-python3 tools/proof/reveal_toll_proof.py <port> capture tools/proof/work/reveal-toll   # the control build
-python3 tools/proof/reveal_toll_proof.py <port> compare tools/proof/work/reveal-toll   # → 6/6
+python3 tools/proof/reveal_toll_proof.py <dir>/agent.sock capture tools/proof/work/reveal-toll   # the control build
+python3 tools/proof/reveal_toll_proof.py <dir>/agent.sock compare tools/proof/work/reveal-toll   # → 6/6
 ```
 
 ### The picture over MCP (`words_picture_proof.py`)
@@ -5991,7 +6011,7 @@ and `word_style (null or {mode: highlight|build`; R7 an UNTIMED page with a
 colour-only `word_style` equals its unstyled twin.
 
 ```sh
-python3 tools/proof/words_picture_proof.py <port>     # → 7/7
+python3 tools/proof/words_picture_proof.py <dir>/agent.sock     # → 7/7
 ```
 
 ### The arithmetic, in a probe (`words_picture_probe.py`, `words_picture_probe.swift`)
@@ -6129,8 +6149,8 @@ launches anything, waiting up to `--lock-wait` seconds (default 3600); an
 expired wait is a scored FAIL naming the holder, with no instance launched.
 
 ```sh
-env -u RC_ASSEMBLYAI_KEY python3 tools/proof/word_captions_proof.py 4891   # → 20/20
-env -u RC_ASSEMBLYAI_KEY python3 tools/proof/word_captions_proof.py 4891 --lock-wait 0
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/word_captions_proof.py   # → 20/20
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/word_captions_proof.py --lock-wait 0
 ```
 
 
@@ -6351,8 +6371,8 @@ it replaces the three packages. Built 2026-09-25 at `0ade58c`, with a
 
 One script with three instruments (road map 10 §10.9 G5a; spec §11 G-15):
 
-- **The fixture, over MCP.** One owned instance on its own port (default
-  4887; its log is `work/graphics-inspector/reelcut-<port>.log`) runs
+- **The fixture, over MCP.** One owned instance on a scratch socket (its
+  log is `work/graphics-inspector/reelcut.log`) runs
   `new_project`, `write_graphic six` (one schema entry of each type: a
   string whose default holds `{"}:`, a number 12–200, an unbounded number, a
   boolean, a colour defaulting to "#FF5A36", an enum and an asset; text drawn
@@ -6381,7 +6401,7 @@ One script with three instruments (road map 10 §10.9 G5a; spec §11 G-15):
 
 ```sh
 make app
-python3 tools/proof/graphics_inspector_proof.py --port 4887    # → 50/50
+python3 tools/proof/graphics_inspector_proof.py    # → 50/50
 python3 tools/proof/graphics_inspector_proof.py --mutant stale # exit 0 = the five I5 rows FAIL alone
 ```
 
@@ -6397,8 +6417,8 @@ Road map 10 §10.9 G5b; spec §11 G-16. Two instruments and one row:
 - **R1, the bundle.** The built app's `Contents/Resources/GraphicTemplates/`
   holds exactly the six modules of `graphic/tests/graphics/`, byte-equal
   (project.yml's "Copy Graphic Templates" script).
-- **The fixture, over MCP.** One owned instance on its own port (default
-  4889; its log is `work/graphics-menu/reelcut-<port>.log`) runs
+- **The fixture, over MCP.** One owned instance on a scratch socket (its
+  log is `work/graphics-menu/reelcut.log`) runs
   `new_project {path: GM}` and `save_project`: a package with NO module.
 - **The probe** is compiled as `main.swift` over `app/Sources` on
   `harness/build.sh`'s swiftc line, with `app/Resources/Fonts`,
@@ -6439,8 +6459,8 @@ grouped edit nested inside it and one undo took `lower-third-2` too.
 
 ```sh
 make app
-python3 tools/proof/graphics_menu_proof.py --port 4889    # → 14/14
-python3 tools/proof/graphics_proof.py --port 4883         # → 40/40
+python3 tools/proof/graphics_menu_proof.py    # → 14/14
+python3 tools/proof/graphics_proof.py         # → 40/40
 ```
 
 ## Road map 11's V0 — the dev tools are absent from Distribution (`dist_check.py`)
@@ -6481,9 +6501,10 @@ purpose; the A4 and MC3 sections of this file have its cases.
 
 **Why a marker and not the tool names.** Swift string literals of 15 UTF-8
 bytes or fewer are stored inline in the code of an `-O` binary, not as
-contiguous bytes: measured on the Release binary with
+contiguous bytes: measured on road map 11's Release binary with
 `LC_ALL=C grep -c -a -F`, `RC_AGENT_PORT` (13 bytes) and `unsaved_changes`
-(15) are found 0 times, `AgentServerEnabled` (18) once. A name like
+(15) are found 0 times, `AgentServerEnabled` (18) once (MC4 has since deleted
+both names). A name like
 `snapshot_ui` (11) could never be a needle. The marker is kept live in the
 optimised binary by the log line the flag-on `devTools()` writes, so a dev
 tool added to the seam needs no edit here.
@@ -6604,7 +6625,7 @@ yellow bound is B < 100 because the built-in Display P3 screen gives the
 fixture's sRGB yellow as [255, 255, 84].
 
 ```sh
-python3 tools/proof/v2_snapshot.py <port> [--log PATH] [--only T,N,O,C,F,A,L,P]
+python3 tools/proof/v2_snapshot.py <dir>/agent.sock [--log PATH] [--only T,N,O,C,F,A,L,P]
 ```
 
 `dev_tools.py` names the dev tools once (`DEV_TOOLS`, in catalog order: the
@@ -6708,7 +6729,7 @@ active`, a locked console as `host: console locked`; R6 skips as `host: no
 window-list item` when AppKit put no window in the Window menu.
 
 ```sh
-python3 tools/proof/v2_menu.py <port> [--log PATH] [--only T,H,N,D,U,R,S,L]
+python3 tools/proof/v2_menu.py <dir>/agent.sock [--log PATH] [--only T,H,N,D,U,R,S,L]
 ```
 
 ## Road map 11's V3 — the screen catalog (`screens.py`)
@@ -6721,22 +6742,24 @@ picture beside its prose and its layout problems — ready to attach to a design
 request.
 
 ```sh
-python3 tools/proof/screens.py [--port 4871] [--app build/Build/Products/Release/Reelcut.app] \
+python3 tools/proof/screens.py [--app build/Build/Products/Release/Reelcut.app] \
     [--screens designs/screens] [--out tools/proof/work/screens/<YYYY-MM-DD-HHMMSS>] \
     [--only ID,…] [--compare EARLIER_OUT]
 ```
 
 **The launch** (`screens.launch`, which `v3_tools.py` shares): the app's
-binary with `-ApplePersistenceIgnoreState YES -AgentServerEnabled YES
+binary with `-ApplePersistenceIgnoreState YES
 -RCSecretFolder <out>/../secrets -RCSpendFolder <out>/../spend
 -RCAssemblyAIEndpoint http://127.0.0.1:9 -NSRecentDocumentsLimit 0` and every
 `PINS` pair — the spend folder removed before each launch and never created,
 so Settings' month line is an empty month and the person's ledger is never
 read (spec §11 P-5, P-7); the environment without
-`RC_ASSEMBLYAI_KEY` and with `RC_AGENT_PORT`; stdin closed, stdout and stderr
-to `<out>/app.<look>.log` (`app.log` without a look), its own session; the port
-read from the log's `listening on` line. `stop()` terminates that pid and kills
-it after 10 s; nothing else is ever signalled.
+`RC_ASSEMBLYAI_KEY` and with `RC_AGENT_SOCKET` in a scratch folder
+(`mcp.scratch_socket`); stdin closed, stdout and stderr to
+`<out>/app.<look>.log` (`app.log` without a look), its own session; ready at
+the log's `agent socket listening at` line. `stop()` terminates that pid,
+kills it after 10 s and removes its scratch folder; nothing else is ever
+signalled.
 
 **One instance per look.** The walk runs twice, each time on a fresh instance:
 first launched with `-RCDevAppearance light`, then with `-RCDevAppearance
@@ -6762,7 +6785,7 @@ a light system. A real Light host was not available (the machine's setting was
 not changed).
 
 **The pins.** `PINS` is the offscreen harness's `pinDefaults`
-(`harness/main.swift:289-395`) minus `AgentServerEnabled`, as launch arguments
+(`harness/main.swift:289-395`), as launch arguments
 (booleans and numbers as plist fragments, `<false/>`, `<real>304</real>`), plus
 `ReelcutInspectorSection.<id>` for every section id in `app/Sources`
 (`SECTIONS`), each pinned to its FIRST-RUN state: collapsed unless
@@ -6884,7 +6907,7 @@ The proof of V3's two app additions: the dev tool `select_inspector_tab` and
 `screens.launch` (the same pins) and builds `screens.py`'s `demo` fixture.
 
 ```sh
-python3 tools/proof/v3_tools.py [--port 4872] [--app APP] [--only L,T,R]   # → 8/8
+python3 tools/proof/v3_tools.py [--app APP] [--only L,T,R]   # → 8/8
 ```
 
 - **L1**: as `screens.py`'s P1, plus the four dev tools in `dev_tools.py`'s
@@ -7081,7 +7104,7 @@ dev-only launch default `-RCDevAssistantSend` / `-RCDevAssistantReport`. It
 works in `work/assistant_session/`, posts each row's scenario to
 `/__control/scenario` and reads `/__control/log`, prints `<ID> ok|FAIL —
 <detail>` per row and then `n/m`, and scores an instrument that cannot run
-as a FAIL. Walls: a port in 60 s; MCP calls 300 s; each assistant `timeout`
+as a FAIL. Walls: the socket's line in 60 s; MCP calls 300 s; each assistant `timeout`
 60 s; the W report 150 s; the mutant build 900 s.
 
 Safety: every child's environment has `ANTHROPIC_API_KEY` and
@@ -7092,8 +7115,7 @@ Each app runs in its own process group; only the proof's own apps are
 killed, with the helper children each started (named by ppid and path,
 `ps -o pid=,ppid=,comm=`, before the app goes).
 
-Launch A (`-AgentServerEnabled YES`, port 4872, the scratch folder, the
-variable):
+Launch A (a scratch socket, the scratch folder, the variable):
 - **A0**: no `Reelcut: ` line; the dev-tool marker counts
   `len(DEV_TOOLS)` = 6; the dev block is `DEV_TOOLS + ["import_media"]`.
 - **T1** (AI-5, AI-10): `new_project` A then B (B frontmost). A scripted
@@ -7126,16 +7148,16 @@ variable):
   its scripted marker at 2400000 lands on A; no file at P_X; the app lives.
 - **K1**: `proof-key` is in no MCP answer of launch A and nowhere in its log.
 
-Launch B, **W** (`-AgentServerEnabled NO`, the launch default,
-`-ReelcutAssistantModel claude-proof-model`, the folder, the variable, no
-`RC_AGENT_PORT`): the report is `ok`, `server_running` false, `finished`,
+Launch B, **W** (the launch default, `-ReelcutAssistantModel
+claude-proof-model`, the folder, the variable, and a scratch socket whose
+folder is `0755`, so it logs `not bound`): the report is `ok`, `server_running` false, `finished`,
 with an `add_marker` `tool_result` `is_error` false and the marker in its
 `get_project`; the stand-in saw `GET /v1/models/claude-proof-model` and
 POSTs with that model and `proof-key`, no failures; the log has no
-`Reelcut: ` and no `listening on` line.
+`Reelcut: ` and no `agent socket listening at` line.
 
-Launch C, **K2** (AI-13: `-AgentServerEnabled YES`, port 4873, NO
-`-RCSecretFolder`, the variable set): after `new_project`, `assistant_send`
+Launch C, **K2** (AI-13: a scratch socket, NO `-RCSecretFolder`, the
+variable set): after `new_project`, `assistant_send`
 is refused "No Anthropic API key is set…"; the stand-in logged no request;
 the app has no helper child.
 
@@ -7281,7 +7303,7 @@ and `RC_ASSISTANT_BASE_URL=http://127.0.0.1:9`:
   row's width is the same for all seven; at 480 (the control) each shows
   `figure` exactly, fitting.
 
-**Live A** (`-AgentServerEnabled YES`, port 4874, `proof-key` in
+**Live A** (a scratch socket, `proof-key` in
 `-RCSecretFolder`, `RC_ASSISTANT_BASE_URL` at the stand-in,
 `-ReelcutInspectorCollapsed NO`), every turn through `assistant_send` /
 `assistant_answer` with `pane: true`, and the tab read back through
@@ -7455,7 +7477,7 @@ text clip "Welcome", two shapes, an action on the text clip, a marker, a
 `--probe` runs these alone (no app, no bun): it is a line of
 `make test`.
 
-**Launch S** (Release, port 4878, `-AgentServerEnabled YES`, `proof-key` in a
+**Launch S** (Release, a scratch socket, `proof-key` in a
 scratch `-RCSecretFolder`, `RC_ASSISTANT_BASE_URL` at the stand-in), in a
 saved project with a 6 s text clip (a playhead is clamped to the project's
 end):
@@ -7566,8 +7588,8 @@ relay and again with the report;
 H runs in rehearsal on the real helper's real bodies — only usage is
 scripted — so rehearsal is what shows the worst POST.
 
-Key safety: every child's environment has `ANTHROPIC_API_KEY`,
-`RC_ASSEMBLYAI_KEY` and `RC_AGENT_PORT` popped. The app and helper get only
+Key safety: every child's environment has `ANTHROPIC_API_KEY` and
+`RC_ASSEMBLYAI_KEY` popped. The app and helper get only
 `proof-key` over the existing stdin path; the real key leaves the runner
 only as the relay's `x-api-key` to the live API. Rule H: the proof's own
 process groups only, plus the helper children each app started.
@@ -8010,11 +8032,11 @@ Three fixes against the built app: the pre-export graphics gate follows nests
 however deep (#73), `import_media` waits as long as an ffmpeg conversion may
 run (`FFmpegRewrap.longestConversion` + 300 s, #67), and an export's Cancel
 during the loudness measurement only sets a flag, the measurement's own loop
-cancelling its reader (#74, spec §11 G-17). One owned instance on
-`--port` (4893), launched with `-ApplePersistenceIgnoreState YES
--AgentServerEnabled YES -RCFFmpegImport always -RCFFmpegPath
+cancelling its reader (#74, spec §11 G-17). One owned instance on a
+scratch socket, launched with `-ApplePersistenceIgnoreState YES
+-RCFFmpegImport always -RCFFmpegPath
 <work>/standin/ffmpeg` and stopped by PID; work in `work/export-cancel/`,
-its log `reelcut-<port>.log` there. Every child runs under
+its log `reelcut.log` there. Every child runs under
 `graphics_spike/bounded.py`. `--only gate,import,cancel` picks groups (Z1
 always runs); `--runs` (30) is M1's count.
 
@@ -8081,7 +8103,7 @@ Made to fail, each by hand, reverted and rebuilt after:
   crash seen here.
 
 ```sh
-python3 tools/proof/export_cancel_proof.py --port 4893          # 7/7
+python3 tools/proof/export_cancel_proof.py          # 7/7
 python3 tools/proof/export_cancel_proof.py --only gate,import    # G1 G2 I1 Z1
 python3 tools/proof/export_cancel_proof.py --only cancel --runs 5
 ```
@@ -8333,10 +8355,10 @@ loaded, so `graphics_proof.py`'s pixel rows fail for that reason alone):
 ```sh
 python3 tools/proof/graphics_store_probe.py                                  # → 22/22
 python3 tools/proof/graphics_store_probe.py --mutant cache-kept              # → MUTANT PASS
-python3 tools/proof/graphics_menu_proof.py --port 4871                       # → 16/16
-python3 tools/proof/graphics_inspector_proof.py --port 4872                  # → 59/59
-python3 tools/proof/graphics_inspector_proof.py --mutant title-height --port 4872
-python3 tools/proof/graphics_proof.py --port 4873                            # C5, C6, G8
+python3 tools/proof/graphics_menu_proof.py                       # → 16/16
+python3 tools/proof/graphics_inspector_proof.py                  # → 59/59
+python3 tools/proof/graphics_inspector_proof.py --mutant title-height
+python3 tools/proof/graphics_proof.py                            # C5, C6, G8
 ```
 
 ## Issue batch B9 — a lane queue per document, the session's two unproven paths, the prompt's literals, the support folder at 0700 (`assistant_lane_proof.py`, `assistant_tab_proof.py`, `assistant_prompt_proof.py`, `agent/`'s `bun test`; #148 #150 #158 #108)
@@ -8434,7 +8456,7 @@ opens at the item's first undo registration (#167).
 Verify bookkeeping moved to `SettingsWindowController+Verify.swift` as a pure
 move (#58).
 
-- **`save_project_proof.py <port> [--log PATH]`** — needs a fresh instance
+- **`save_project_proof.py <dir>/agent.sock [--log PATH]`** — needs a fresh instance
   per run. Each row writes its own version-9 package under
   `work/save_project/`, with no `cache/`. T1 checks the parity log. P0
   (control) checks that `cache/` exists after the open. P1 is an unedited
@@ -8485,8 +8507,8 @@ the document's own path. `grep "Reelcut: "` printed nothing on any launch
 log.
 
 ```sh
-python3 tools/proof/save_project_proof.py 4861        # fresh instance → 9/9
-python3 tools/proof/v2_menu.py 4862 --only U          # U1, U2
+python3 tools/proof/save_project_proof.py <dir>/agent.sock        # fresh instance → 9/9
+python3 tools/proof/v2_menu.py <dir>/agent.sock --only U          # U1, U2
 ```
 
 ## Issue batch B11 — nested reversed analysis, the meter's stale sink, `AVVideoComposition.Configuration` (`playback_audio_proof.py`, `playback_audio_probe.swift`, `video_configuration_proof.py`, `video_configuration_probe.swift`; #64 #65 #91)
@@ -8520,7 +8542,7 @@ nothing changes (#91). `make typecheck` falls from 7 warnings to 4.
   4 s the long track alone; M3 (control) F2 at 1 s both; M4 F1 at 7 s
   silent; M5 F1's two meters sound over [0, 2 s) and [3 s, 5 s). A mutant
   exits 1 only when exactly its rows fail.
-- **`video_configuration_proof.py <port> capture|compare <dir>`**,
+- **`video_configuration_proof.py <dir>/agent.sock capture|compare <dir>`**,
   `--mutant keep-frame-duration compare <dir>` — the caller owns the instance.
   `target_bump_proof.py`'s `document()` as `<dir>/frames.reelcut`; over MCP
   `render_frame` at its three ticks and `export` of `apng`, `gif`,
@@ -8559,8 +8581,8 @@ the changed build's log at launch and after `phase8_proof.py`.
 
 ```sh
 python3 tools/proof/playback_audio_proof.py                      # 9/9
-python3 tools/proof/video_configuration_proof.py 4861 capture <dir>   # on the control tree
-python3 tools/proof/video_configuration_proof.py 4861 compare <dir>   # 7/7
+python3 tools/proof/video_configuration_proof.py <dir>/agent.sock capture <dir>   # on the control tree
+python3 tools/proof/video_configuration_proof.py <dir>/agent.sock compare <dir>   # 7/7
 ```
 
 ## Issue batch B13 — proof tooling follow-ups: rule R, spike recovery, the inventory's citations, export cancel (#173 #170 #168 #165)
@@ -8727,8 +8749,8 @@ thirty on one run.
 ```sh
 python3 tools/proof/capture_spike/inventory.py --check                # 5/5
 python3 tools/proof/cloud_spike/cloud_spike.py --selftest             # 29/29
-python3 tools/proof/export_cancel_proof.py --port 4913                # 7/7
-python3 tools/proof/export_cancel_proof.py --port 4913 --mutant no-loop-check   # M2 FAIL, exit 1
+python3 tools/proof/export_cancel_proof.py                # 7/7
+python3 tools/proof/export_cancel_proof.py --mutant no-loop-check   # M2 FAIL, exit 1
 ```
 
 ## Issue batch B14 — cache passes: the stall, the save gate, the peaks retry (`cache_pass_probe.py`; #115 #169)
@@ -8878,9 +8900,9 @@ host's speed.
 
 ## Issue batch B16 — a relink that re-probes (`relink_proof.py`; #63 #174)
 
-`python3 tools/proof/relink_proof.py [port] [log path]` is spec §11 #63 over
+`python3 tools/proof/relink_proof.py <dir>/agent.sock [log path]` is spec §11 #63 over
 MCP, in `remaining_proof.py`'s idiom (`check`, `section`, a raise scored as
-one failure), against a running instance on its own port (4942 by default).
+one failure), against a running instance on its own socket.
 Every claim is read back through `get_project`. Copies of the test media go
 under `work/relink/`, named by pid, and an earlier pid's are swept at start.
 No `ffmpeg` runs. It opens one document.
@@ -9037,8 +9059,8 @@ loaded, so `graphics_proof.py`'s pixel rows fail for that reason alone):
 ```sh
 python3 tools/proof/graphics_store_probe.py                         # → 23/23
 python3 tools/proof/graphics_store_probe.py --mutant silent-open    # → exit 0
-python3 tools/proof/graphics_proof.py --port 4891                   # C7, G10, G11
-python3 tools/proof/graphics_proof.py --port 4892 --mutant store-uncapped
+python3 tools/proof/graphics_proof.py                   # C7, G10, G11
+python3 tools/proof/graphics_proof.py --mutant store-uncapped
 ```
 
 ## Issue batch B20 — a text field's empty undo step, the Speed sheet's dissolve line, Distribution's entitlements (`v2_menu.py` U3, `speed_sheet_probe.py`, `dist_check.py` D14; #176 #109 #145)
@@ -9720,8 +9742,8 @@ Run on 2026-09-30:
 
 ```sh
 cd core && cargo test --release --test graphic_ffi                        # 13 passed
-python3 tools/proof/graphics_proof.py --port 4931                         # 45/45
-python3 tools/proof/graphics_proof.py --port 4934 --mutant store-uncapped # exit 0
+python3 tools/proof/graphics_proof.py                         # 45/45
+python3 tools/proof/graphics_proof.py --mutant store-uncapped # exit 0
 ```
 
 ## Issue batch B32 — the canvas editor's wrap width, the name field's box, the obscure lookups, F0's split, the harness playhead (`text_break_proof.py` E6 and `--mutant`, `name_field_proof.py` N13 and `--mutant`, `obscure_handles_probe.py` F0; #186 items 1 and 4, #188 items 1, 2, 4 and 5)
@@ -9923,7 +9945,7 @@ An `ExportWriter` export rasterizes its graphics ahead on worker threads
 (`app/Sources/GraphicPrefetch.swift`, spec §11 G-21); the compositor stays
 the one writer and uses a worker's raster only on a pool miss whose texture
 key matches its own. The proof launches two owned instances one after the
-other on `--port` (OFF with `-ReelcutGraphicPrefetchOff YES`, ON without),
+other, each on a scratch socket (OFF with `-ReelcutGraphicPrefetchOff YES`, ON without),
 logs under `work/graphics-prefetch/`, every child under
 `graphics_spike/bounded.py`. Its fixture, made over MCP and saved: a 30 fps
 canvas; `heavy` (moving gradient, `feGaussianBlur`, an `<image>` of the
@@ -10245,7 +10267,7 @@ python3 tools/proof/recording_probe.py --mutant finish-no-post --only file_pause
   app-state tools (`phase9_proof.py`, `recording_proof.py`,
   `recording_probe.py`'s `APP_STATE_TOOLS`).
 
-`close_project_proof.py <port> [--log PATH]` needs a fresh Release instance.
+`close_project_proof.py <dir>/agent.sock [--log PATH]` needs a fresh Release instance.
 T1 parity log; K1 schema; C1 sixty `new_project` → `close_project` cycles;
 C2 every closed path refused by `get_project`, no editor window left,
 `open_project` with no `already_open`; C3 threads after C1 under before plus
@@ -10288,7 +10310,7 @@ fails that mutant on its sentence alone. (Pins `CaptionExporter.swift:519` and
 orchestrator after the doc comment above them shrank.)
 
 ```sh
-python3 tools/proof/close_project_proof.py 4866                    # 12/12, fresh instance
+python3 tools/proof/close_project_proof.py <dir>/agent.sock                    # 12/12, fresh instance
 python3 tools/proof/remaining_probe.py                             # 176/176
 python3 tools/proof/assistant_lane_proof.py --mutant close-ask-first   # exit 1, L4
 ```
@@ -10802,6 +10824,10 @@ K10 only `lstat`s.
   fails `shutting_down_a_listener_whose_file_was_replaced_leaves_the_new_one`,
   `release`'s fails `releasing_a_listener_whose_file_was_replaced_leaves_the_new_one`.
 
+MC4 rewrote this proof (K2, K10 and `no-port-rule` retired with TCP; K11–K13
+and four mutants added): its section, "Road map 14 — MC4, TCP goes", has the
+rows and the commands. The commands as MC2 ran them:
+
 ```sh
 python3 tools/proof/agent_socket_proof.py --port 4941
 python3 tools/proof/agent_socket_proof.py --port 4951 --mutant no-connect-first
@@ -10909,3 +10935,64 @@ Run on 2026-10-01 over `ba8ed00` plus the MC3 change, every instance my own:
 | `--mutant launch-on-list` | X1 FAIL (an instance and a socket after `tools/list`), caught, exit 0 |
 | `--mutant no-lock` | X4 FAIL (two instances), caught, exit 0 |
 | `agent_socket_proof.py --port 4941` | 14/14 |
+
+## Road map 14 — MC4, TCP goes (`agent_socket_proof.py`, `pasteboard_keep.swift`, `mcp.py`)
+
+The app's TCP listener, its FFI pair, `RC_AGENT_PORT`, `AgentServerEnabled`
+and MC-6's interim port rule are gone; the socket is the only listener, and
+Tools ▸ Copy MCP Command copies the `claude mcp add` line for the bundle's own
+`reelcut-mcp`. Every proof reaches an instance at its socket (`mcp.py`, above).
+`agent_socket_proof.py` keeps MC2's P1, K0, K1, K3–K9, Z1 and Z2 — P1's cases
+are now `{}`, `{RC_AGENT_SOCKET: s}`, an empty `RC_AGENT_SOCKET` and a nil
+default; K3 reads an edit back over a second connection; an instance is ready
+at its socket's line alone — and retires K2 (TCP byte-equality), K10 (the
+interim rule) and the `no-port-rule` mutant. It gains:
+
+- **K11** `lsof -nP -a -p <pid> -iTCP -sTCP:LISTEN` prints nothing for A.
+- **K12** (spec §11 MC-5) H, launched with `-RCFFmpegImport ask -RCFFmpegPath
+  <which ffmpeg>`, over an `MCP(…, timeout=20)` client: `import_media` of a 1 s
+  `testsrc` Matroska (`-c:v mpeg4`, made in H's scratch folder) answers
+  `isError` naming `Could not read` and `RCFFmpegImport` (the import half), and
+  `open_project` of the same file answers `isError` within 20 s (the open
+  half). No ffmpeg on the host is a FAIL.
+- **K13** Tools ▸ Copy MCP Command on K, with the person's clipboard kept:
+  `pasteboard_keep.swift` (AppKit alone, built into `work/agent-socket/`; a
+  build failure is a FAIL and touches nothing) saves every item and type into
+  K's scratch folder — exit 3, a type that cannot be read back, is a SKIP and
+  nothing else is done; then `new_project`, `perform_menu_item ["Tools", "Copy
+  MCP Command"]` and one `pbpaste`, which must equal `mcpCommand` for the
+  launched bundle's `Contents/Helpers/reelcut-mcp`, an executable file; then
+  `restore <file> <seen>`: 0 deletes the file, 4 (the clipboard changed
+  meanwhile) is a SKIP that leaves it as it is, 5 is a FAIL. On any exit but 0
+  the folder is kept and its path printed.
+- Six mutants, each a `tree_copy` copy built by its own `make app` with every
+  row run on it: `no-connect-first` (K4), `no-mode-check` (K8),
+  `tcp-listener` (K11: a POSIX listener on `127.0.0.1:0` after the
+  `listening at` line), `agent-asks` (K12's import half: `AgentServer+Media`'s
+  probe passes `mayAsk: true`), `open-asks` (K12's open half: `openProject`
+  calls `makeDocument` outside `withoutAsking`) and `fixed-path` (K13:
+  `mcpHelperURL` is `/Applications/Reelcut.app/…`). `lsregister -u` runs on a
+  copy's built app before its tree is replaced and at the end of its run.
+
+```sh
+python3 tools/proof/agent_socket_proof.py
+python3 tools/proof/agent_socket_proof.py --mutant no-connect-first   # K4 FAIL, exit 0
+python3 tools/proof/agent_socket_proof.py --mutant no-mode-check      # K8
+python3 tools/proof/agent_socket_proof.py --mutant tcp-listener       # K11
+python3 tools/proof/agent_socket_proof.py --mutant agent-asks         # K12, the import half
+python3 tools/proof/agent_socket_proof.py --mutant open-asks          # K12, the open half
+python3 tools/proof/agent_socket_proof.py --mutant fixed-path         # K13
+```
+
+Run on 2026-10-01 over `38b9487` plus the MC4 change, every instance my own (the
+whole phase's table of every proof's score is the road map's MC4 record):
+
+| Command | Answer |
+|---|---|
+| `agent_socket_proof.py` | 15/15 in 114 s (and 15/15 in 117 s again after the final `make app`): K11 `lsof` printed nothing; K12 import half `Could not read k12.mkv. An installed ffmpeg could convert it, but a tool call never asks (RCFFmpegImport is ask): …` in 0.01 s, open half `Could not read k12.mkv.` in 0.0 s; K13 the line for this tree's bundle, the clipboard (empty) restored, exit 0 |
+| `--mutant no-connect-first` | K4 FAIL, caught, exit 0 |
+| `--mutant no-mode-check` | K8 FAIL, caught, exit 0 |
+| `--mutant tcp-listener` | K11 FAIL (`TCP 127.0.0.1:50225 (LISTEN)`), caught, exit 0 |
+| `--mutant agent-asks` | K12 import half FAIL (`TimeoutError` at 20.04 s: the question was up), caught, exit 0 |
+| `--mutant open-asks` | K12 open half FAIL (`TimeoutError` at 20.0 s), the import half ok, caught, exit 0 |
+| `--mutant fixed-path` | K13 FAIL (the item disabled: no helper at `/Applications/Reelcut.app/…`), caught, exit 0 |

@@ -1,32 +1,31 @@
 #!/usr/bin/env python3
-"""Road map 14's MC2, against the built app: the agent server's Unix socket
-beside its TCP listener (spec §11 MC-1, MC-2, MC-6; MC1's S1–S10).
+"""Road map 14's MC2 and MC4, against the built app: the agent server's Unix
+socket, its only listener since MC4 deleted TCP (spec §11 MC-1, MC-2, MC-5,
+MC-6; MC1's S1–S10).
 
 Every instance is a `Popen` this script owns, launched with
-`-ApplePersistenceIgnoreState YES -AgentServerEnabled YES` and its own
-`RC_AGENT_PORT` (`--port` + k), and every one but K10's also gets
-`RC_AGENT_SOCKET` in a `tempfile.mkdtemp(prefix="rcs-")` folder under
-`$TMPDIR` (MC1: a path under `tools/proof/work/` can pass 103 bytes). Logs go
-to `tools/proof/work/agent-socket/<name>-<port>.log`; every other child (the
-probe's build, the probe, `osascript`, `make app`) runs under
-`graphics_spike/bounded.py`. HTTP over AF_UNIX is a local
-`http.client.HTTPConnection` subclass (MC4 moves it into `mcp.py`). Nothing
-is signalled but this script's own pids, and nothing under
-`~/Library/Application Support/Reelcut/` is created, written or unlinked —
-K10 only `lstat`s.
+`-ApplePersistenceIgnoreState YES` and `RC_AGENT_SOCKET` in a
+`tempfile.mkdtemp(prefix="rcs-")` folder under `$TMPDIR` (MC1: a path under
+`tools/proof/work/` can pass 103 bytes). An instance is ready when its log
+holds the socket's line alone. Logs go to
+`tools/proof/work/agent-socket/<name>.log`; every other child (the probe's
+build, the probe, `pasteboard_keep`, `osascript`, `lsof`, `ffmpeg`,
+`make app`) runs under `graphics_spike/bounded.py`. HTTP over AF_UNIX is
+`mcp.UnixHTTPConnection`. Nothing is signalled but this script's own pids,
+and nothing under `~/Library/Application Support/Reelcut/` is created,
+written or unlinked.
 
-P1  (probe) `AgentServer.socketPlan`: `.bind(default)` for `{}`; `.skip`
-    naming RC_AGENT_PORT for `{RC_AGENT_PORT: "4941"}`; `.bind(s)` for the
-    port plus socket `s`; `.bind(default)` for an empty RC_AGENT_SOCKET;
+P1  (probe) `AgentServer.socketPlan`: `.bind(default)` for `{}`; `.bind(s)`
+    for `{RC_AGENT_SOCKET: s}`; `.bind(default)` for an empty RC_AGENT_SOCKET;
     `.skip("no Application Support folder")` for `{}` with a nil default.
     `agent_socket_probe.swift`, built like `export_cancel_proof.build_probe`
     (Swift sources and the staticlib only) into `work/agent-socket/probe/`.
 K0  CONTROL: the scratch path is ≤ 103 bytes, under $TMPDIR, not under the
     person's support folder, and its folder is 0700.
 K1  A logs `listening at <path>`; the file is a socket, mode 0600.
-K2  the raw `tools/list` response body is byte-equal over the socket and TCP.
-K3  `new_project` (a scratch path); `add_marker` over the socket is read back
-    by `get_project` over TCP, and one over TCP is read back over the socket.
+K3  `new_project` (a scratch path); `add_marker` over one connection is read
+    back by `get_project` over a second, and one added over the second is
+    read back over the first.
 K4  B at the same path logs `not bound: another instance answers…`; the
     file's dev and ino are unchanged; A still answers over the socket.
 K5  SIGKILL A (B is stopped): the leftover refuses `connect`; C binds over it
@@ -39,29 +38,50 @@ K7  D quits the same way within 20 s; the file is gone.
 K8  E's folder is chmod 0755: E logs `not bound` naming 0755; no file exists.
 K9  F finds a regular file at its path: F logs `not bound…not a socket`; the
     file's bytes are unchanged.
-K10 run ONLY when P1 is ok: G with RC_AGENT_PORT and no RC_AGENT_SOCKET logs
-    `not bound: RC_AGENT_PORT is set…`, and `lstat` of the default `Agent/`
-    folder and `agent.sock` answer the same before the launch and after G's
-    quit (absent stays absent; present keeps dev and ino).
+K11 `lsof -nP -a -p <pid> -iTCP -sTCP:LISTEN` is empty for A (MC4: no TCP
+    listener).
+K12 (spec §11 MC-5) H, launched with `-RCFFmpegImport ask -RCFFmpegPath
+    <which ffmpeg>`, over an `MCP(..., timeout=20)` client: `import_media` of
+    a 1 s `testsrc` Matroska (`-c:v mpeg4`, made under H's scratch folder)
+    answers `isError` with `Could not read` and `RCFFmpegImport` in its text
+    (the import half); `open_project` of the same file answers `isError`
+    within 20 s (the open half). No ffmpeg on the host is a FAIL.
+K13 Tools ▸ Copy MCP Command, on K: `pasteboard_keep save` (built from
+    `pasteboard_keep.swift` into `work/agent-socket/`; a build failure is a
+    FAIL and touches nothing) keeps every clipboard item and type in K's
+    scratch folder — exit 3 is a SKIP, "the clipboard holds <type>, which
+    cannot be read back", and nothing else is done; then `new_project`,
+    `perform_menu_item ["Tools", "Copy MCP Command"]` and one `pbpaste`,
+    `seen`, which must be `mcpCommand` for the launched bundle's
+    `Contents/Helpers/reelcut-mcp`, an executable file; then `pasteboard_keep
+    restore <file> <seen>`: exit 0 deletes the file, exit 4 is a SKIP ("the
+    clipboard changed during K13; left as it is") only for a run that reached
+    the paste, exit 5 is a FAIL. A run that failed before the paste restores
+    against `mcpCommand` (what the item alone could have written) and is a
+    FAIL whatever restore answers. On any exit but 0 the folder is kept and
+    its path printed.
 Z1  no `Reelcut: ` in any log.  Z2  no proof pid alive.
 
-    python3 tools/proof/agent_socket_proof.py [--port 4941] [--app PATH]
-        [--mutant no-connect-first|no-mode-check|no-port-rule]
+    python3 tools/proof/agent_socket_proof.py [--app PATH]
+        [--mutant no-connect-first|no-mode-check|tcp-listener|agent-asks|
+                  open-asks|fixed-path]
 
-Any FAIL exits 1; an instrument that cannot run is a FAIL, never a skip.
-`--mutant no-connect-first` (K4 must FAIL) and `--mutant no-mode-check` (K8
-must FAIL) replace one anchor in `AgentServer+Socket.swift` in a
-`tree_copy.make_copy` copy built by its own `make app`, and run every row
-against that build. `--mutant no-port-rule` (P1 must FAIL) removes the port
-arm in a copy of `app/Sources` and builds and runs ONLY the probe — no app is
-launched, so the person's socket is never at risk. A mutant run exits 0 when
-its row FAILED (caught), 1 when it passed (survived), 2 when the control
-could not be performed.
+Any FAIL exits 1; an instrument that cannot run is a FAIL, never a skip; K13
+may be a named SKIP. Every mutant replaces one anchor in a
+`tree_copy.make_copy` copy built by its own `make app` and runs every row
+against that build: `no-connect-first` (K4 must FAIL), `no-mode-check` (K8),
+`tcp-listener` (K11: a POSIX listener on 127.0.0.1:0 after the socket's
+`listening at` line), `agent-asks` (K12's import half: `AgentServer+Media`'s
+probe passes `mayAsk: true`), `open-asks` (K12's open half: `openProject`
+calls `makeDocument` outside `withoutAsking`) and `fixed-path` (K13:
+`mcpHelperURL` is `/Applications/Reelcut.app/…`). `lsregister -u` is run on
+a copy's built app before its tree is replaced and at the end of its run. A
+mutant run exits 0 when its row FAILED (caught), 1 when it passed
+(survived), 2 when the control could not be performed.
 """
 
 import argparse
 import errno
-import http.client
 import json
 import os
 import re
@@ -79,36 +99,68 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
 sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
+import mcp  # noqa: E402
 import tree_copy  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/agent-socket"
 APP = ROOT / "build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut"
 PROBE_SOURCE = ROOT / "tools/proof/agent_socket_probe.swift"
+KEEP_SOURCE = ROOT / "tools/proof/pasteboard_keep.swift"
+KEEP = WORK / "pasteboard_keep"
 SOURCES = ROOT / "app/Sources"
 SUPPORT = Path.home() / "Library/Application Support/Reelcut"
 MAX_PATH = 103
 LAUNCH_BOUND = 60
 QUIT_BOUND = 20
-PORT_REASON = ("RC_AGENT_PORT is set and RC_AGENT_SOCKET is not; "
-               "a port-only launch binds no socket until MC4")
-# name → (the row it must fail, file in app/Sources, before — exactly once, after)
+K12_BOUND = 20
+NEVER_ASKS = "RCFFmpegImport"
+TCP_LISTENER = (
+    "        NSLog(\"Reelcut agent socket listening at %@\", path)\n"
+    "        let leaked = socket(AF_INET, SOCK_STREAM, 0)\n"
+    "        var leakedAddress = sockaddr_in()\n"
+    "        leakedAddress.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)\n"
+    "        leakedAddress.sin_family = sa_family_t(AF_INET)\n"
+    "        leakedAddress.sin_addr.s_addr = inet_addr(\"127.0.0.1\")\n"
+    "        leakedAddress.sin_port = 0\n"
+    "        _ = withUnsafePointer(to: &leakedAddress) { pointer in\n"
+    "            pointer.withMemoryRebound(to: sockaddr.self, capacity: 1) {\n"
+    "                bind(leaked, $0, socklen_t(MemoryLayout<sockaddr_in>.size))\n"
+    "            }\n"
+    "        }\n"
+    "        _ = listen(leaked, 1)\n")
+# name → (the row it must fail, the half of it (or None), file in app/Sources,
+# before — exactly once, after)
 MUTANTS = {
-    "no-connect-first": ("K4", "AgentServer+Socket.swift",
+    "no-connect-first": ("K4", None, "AgentServer+Socket.swift",
                          "        let answer = connectErrno(toSocketAt: path)\n",
                          "        let answer = ECONNREFUSED\n"),
-    "no-mode-check": ("K8", "AgentServer+Socket.swift",
+    "no-mode-check": ("K8", None, "AgentServer+Socket.swift",
                       "        if folderInfo.st_mode & 0o077 != 0 { return modeSentence(folder, "
                       "folderInfo.st_mode) }\n",
                       ""),
-    "no-port-rule": ("P1", "AgentServer+Socket.swift",
-                     "        if environment[\"RC_AGENT_PORT\"] != nil { return .skip(reason: "
-                     "portOnlyReason) }\n",
-                     ""),
+    "tcp-listener": ("K11", None, "AgentServer+Socket.swift",
+                     "        NSLog(\"Reelcut agent socket listening at %@\", path)\n",
+                     TCP_LISTENER),
+    "agent-asks": ("K12", "import", "AgentServer+Media.swift",
+                   "        MediaImporter.probe(url: url, mayAsk: false) { result in\n",
+                   "        MediaImporter.probe(url: url, mayAsk: true) { result in\n"),
+    "open-asks": ("K12", "open", "AgentServer+Project.swift",
+                  "        let made = try MediaImporter.withoutAsking {\n"
+                  "            try controller.makeDocument(withContentsOf: url, ofType: type)\n"
+                  "        }\n",
+                  "        let made = try controller.makeDocument(withContentsOf: url, ofType: type)\n"),
+    "fixed-path": ("K13", None, "AgentServer+Socket.swift",
+                   "        Bundle.main.bundleURL.appendingPathComponent(\"Contents/Helpers/reelcut-mcp\")\n",
+                   "        URL(fileURLWithPath: \"/Applications/Reelcut.app/Contents/Helpers/reelcut-mcp\")\n"),
 }
-ORDER = ["P1", "K0", "K1", "K2", "K3", "K4", "K5", "K6", "K7", "K8", "K9", "K10", "Z1", "Z2"]
+ORDER = ["P1", "K0", "K1", "K3", "K4", "K5", "K6", "K7", "K8", "K9", "K11", "K12", "K13",
+         "Z1", "Z2"]
 rows = {}
+skips = {}
+halves = {}
 INSTANCES = []
 SCRATCH = []
+KEPT = []
 
 
 def check(name, good, detail=""):
@@ -117,29 +169,17 @@ def check(name, good, detail=""):
           flush=True)
 
 
-# ---- HTTP over a socket or a port ---------------------------------------------
-
-class UnixHTTPConnection(http.client.HTTPConnection):
-    """`http.client` over AF_UNIX: the host is only the Host header."""
-
-    def __init__(self, path, timeout=30):
-        super().__init__("localhost", timeout=timeout)
-        self.socket_path = path
-
-    def connect(self):
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.settimeout(self.timeout)
-        sock.connect(self.socket_path)
-        self.sock = sock
+def skip(name, detail):
+    skips[name] = detail
+    print(f"  SKIP {name}  {detail}", flush=True)
 
 
-def post(where, body, timeout=60):
-    """One POST to /mcp: `where` is a socket path (str) or a TCP port (int).
+# ---- HTTP over the socket ---------------------------------------------------------
+
+def post(path, body, timeout=60):
+    """One POST to /mcp over the socket at `path`, on a connection of its own.
     Answers (status, raw body bytes)."""
-    if isinstance(where, int):
-        connection = http.client.HTTPConnection("127.0.0.1", where, timeout=timeout)
-    else:
-        connection = UnixHTTPConnection(where, timeout=timeout)
+    connection = mcp.UnixHTTPConnection(path, timeout=timeout)
     try:
         connection.request("POST", "/mcp", body=body, headers={
             "Content-Type": "application/json",
@@ -150,18 +190,18 @@ def post(where, body, timeout=60):
         connection.close()
 
 
-def rpc(where, method, params=None, request_id=1):
+def rpc(path, method, params=None, request_id=1, timeout=60):
     body = json.dumps({"jsonrpc": "2.0", "id": request_id, "method": method,
                        "params": params or {}}).encode()
-    status, raw = post(where, body)
+    status, raw = post(path, body, timeout=timeout)
     answer = json.loads(raw)
     if status != 200 or "error" in answer:
         raise RuntimeError(f"{method}: HTTP {status} {answer.get('error')}")
     return answer["result"]
 
 
-def call(where, tool, arguments):
-    result = rpc(where, "tools/call", {"name": tool, "arguments": arguments})
+def call(path, tool, arguments):
+    result = rpc(path, "tools/call", {"name": tool, "arguments": arguments})
     text = "".join(part.get("text", "") for part in result.get("content", [])
                    if part.get("type") == "text")
     if result.get("isError"):
@@ -204,25 +244,20 @@ def ident(path):
 # ---- instances ------------------------------------------------------------------
 
 class Instance:
-    """One owned app, by PID, on its own port and (maybe) its own socket."""
+    """One owned app, by PID, on its own scratch socket."""
 
-    def __init__(self, name, app, port, sock):
-        self.name, self.app, self.port, self.sock = name, app, port, sock
-        self.log = WORK / f"{name}-{port}.log"
+    def __init__(self, name, app, sock, extra=()):
+        self.name, self.app, self.sock, self.extra = name, app, sock, list(extra)
+        self.log = WORK / f"{name}.log"
         self.child = None
         self.socket_line = None
-        self.tcp_port = None
 
     def start(self):
         self.log.write_text("")
-        env = bounded.child_env({"RC_AGENT_PORT": str(self.port)})
-        env.pop("RC_AGENT_SOCKET", None)
-        if self.sock is not None:
-            env["RC_AGENT_SOCKET"] = self.sock
+        env = bounded.child_env({"RC_AGENT_SOCKET": self.sock})
         with open(self.log, "a") as out:
             self.child = subprocess.Popen(
-                [str(self.app), "-ApplePersistenceIgnoreState", "YES",
-                 "-AgentServerEnabled", "YES"],
+                [str(self.app), "-ApplePersistenceIgnoreState", "YES"] + self.extra,
                 stdin=subprocess.DEVNULL, stdout=out, stderr=out, start_new_session=True,
                 env=env)
         INSTANCES.append(self)
@@ -230,13 +265,11 @@ class Instance:
         while time.monotonic() < deadline:
             time.sleep(0.25)
             text = self.log.read_text(errors="replace")
-            tcp = re.search(r"listening on http://127\.0\.0\.1:(\d+)/mcp", text)
             line = re.search(r"Reelcut agent socket (listening at .*|not bound: .*)", text)
-            if tcp and line:
-                self.tcp_port = int(tcp.group(1))
+            if line:
                 self.socket_line = line.group(1).strip()
-                print(f"  {self.name}: PID {self.child.pid}, port {self.tcp_port}; "
-                      f"socket {self.socket_line}", flush=True)
+                print(f"  {self.name}: PID {self.child.pid}; socket {self.socket_line}",
+                      flush=True)
                 return True
             if self.child.poll() is not None:
                 break
@@ -324,31 +357,11 @@ def build_probe(sources, probe_dir):
     return binary, ""
 
 
-def mutant_sources(name):
-    """(WORK/mutant-<name>/Sources, "") — app/Sources copied with the
-    mutant's anchor replaced exactly once — or (None, why)."""
-    _, file, before, after = MUTANTS[name]
-    target = WORK / f"mutant-{name}" / "Sources"
-    try:
-        shutil.rmtree(target, ignore_errors=True)
-        target.mkdir(parents=True)
-        for path in sorted(SOURCES.glob("*.swift")):
-            shutil.copy2(path, target / path.name)
-        text = (target / file).read_text()
-        if text.count(before) != 1:
-            return None, f"{file} holds {before!r} {text.count(before)} times, not once"
-        (target / file).write_text(text.replace(before, after))
-    except OSError as error:
-        return None, f"the copy could not be made: {error}"
-    return target, ""
-
-
 def row_p1(sources, probe_dir):
-    """P1; answers the default socket path the probe printed (or None)."""
     binary, why = build_probe(sources, probe_dir)
     if binary is None:
         check("P1", False, f"the probe did not build: {why}")
-        return None
+        return
     ran = bounded.run([str(binary)], 60)
     try:
         lines = [json.loads(line) for line in ran["stdout"].splitlines() if line.strip()]
@@ -359,8 +372,7 @@ def row_p1(sources, probe_dir):
     default, scratch = meta.get("fixed_default"), meta.get("scratch_socket")
     want = {
         "empty": {"plan": "bind", "path": default},
-        "port": {"plan": "skip", "reason": PORT_REASON},
-        "port+socket": {"plan": "bind", "path": scratch},
+        "socket": {"plan": "bind", "path": scratch},
         "empty-socket": {"plan": "bind", "path": default},
         "nil-default": {"plan": "skip", "reason": "no Application Support folder"},
     }
@@ -372,12 +384,155 @@ def row_p1(sources, probe_dir):
     good = ran["rc"] == 0 and default is not None and not wrong
     check("P1", good, f"rc {ran['rc']}; " + ("; ".join(wrong) if wrong else
                                             f"{len(want)} cases as planned"))
-    return meta.get("path")
+
+
+# ---- K11, K12, K13 ----------------------------------------------------------------
+
+def row_k11(instance):
+    """No TCP listener in the launched instance's own pid."""
+    if not instance.alive():
+        check("K11", False, f"{instance.name} is not running")
+        return
+    listed = bounded.run(["lsof", "-nP", "-a", "-p", str(instance.child.pid), "-iTCP",
+                          "-sTCP:LISTEN"], 30)
+    lines = [line for line in listed["stdout"].splitlines() if line.strip()]
+    check("K11", not lines and not listed["expired"],
+          f"lsof rc {listed['rc']}; {len(lines)} lines {lines[:3]}")
+
+
+def k12_call(sock, tool, arguments):
+    """(isError, text, seconds) of one call over an MCP(…, timeout=K12_BOUND)
+    client; an expiry or a transport failure is (None, why, seconds)."""
+    started = time.monotonic()
+    try:
+        client = mcp.MCP(sock, timeout=K12_BOUND)
+        result = client._request("tools/call", {"name": tool, "arguments": arguments})
+    except Exception as error:  # an expiry is the answer
+        return None, f"{type(error).__name__}: {error}", round(time.monotonic() - started, 2)
+    text = "".join(part.get("text", "") for part in result.get("content", [])
+                   if part.get("type") == "text")
+    return bool(result.get("isError")), text, round(time.monotonic() - started, 2)
+
+
+def row_k12(app):
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        check("K12", False, "no ffmpeg on this host: the row needs one installed to be asked about")
+        return
+    folder = scratch_folder()
+    sock = os.path.join(folder, "agent.sock")
+    movie = os.path.join(folder, "k12.mkv")
+    made = bounded.run([ffmpeg, "-v", "error", "-y", "-f", "lavfi", "-i",
+                        "testsrc=duration=1:size=320x240:rate=30", "-c:v", "mpeg4", movie], 120)
+    if made["rc"] != 0 or not os.path.exists(movie):
+        check("K12", False, f"ffmpeg did not make the Matroska: rc {made['rc']} "
+                            f"{made['stderr'].strip()[-300:]}")
+        return
+    h = Instance("h", app, sock, ["-RCFFmpegImport", "ask", "-RCFFmpegPath", ffmpeg])
+    up = h.start()
+    if not up or h.socket_line != f"listening at {sock}":
+        check("K12", False, f"H did not bind: {h.socket_line!r}")
+        h.stop()
+        return
+    project = os.path.join(folder, "k12.reelcut")
+    try:
+        call(sock, "new_project", {"path": project})
+        error_i, text_i, seconds_i = k12_call(sock, "import_media",
+                                              {"project": project, "path": movie})
+        import_ok = error_i is True and "Could not read" in text_i and NEVER_ASKS in text_i
+        error_o, text_o, seconds_o = k12_call(sock, "open_project", {"path": movie})
+        open_ok = error_o is True and seconds_o <= K12_BOUND
+    except Exception as error:  # noqa: BLE001 — the setup's failure is the row's
+        check("K12", False, f"setup: {type(error).__name__}: {error}")
+        h.stop()
+        return
+    h.stop()
+    halves["import"], halves["open"] = import_ok, open_ok
+    check("K12", import_ok and open_ok,
+          f"import half {import_ok} (isError {error_i}, {seconds_i} s: {text_i[:240]!r}); "
+          f"open half {open_ok} (isError {error_o}, {seconds_o} s: {text_o[:160]!r})")
+
+
+def mcp_command(helper):
+    return "claude mcp add --scope user reelcut -- '" + helper.replace("'", "'\\''") + "'"
+
+
+def build_keep():
+    """`pasteboard_keep` from its source alone (AppKit, no app sources): the
+    binary, or None and why."""
+    WORK.mkdir(parents=True, exist_ok=True)
+    if KEEP.exists() and KEEP.stat().st_mtime > KEEP_SOURCE.stat().st_mtime:
+        return KEEP, ""
+    sdk = bounded.run(["xcrun", "--show-sdk-path", "--sdk", "macosx"], 60)["stdout"].strip()
+    built = bounded.run(["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0",
+                         str(KEEP_SOURCE), "-o", str(KEEP)], 600)
+    if built["rc"] != 0 or not KEEP.exists():
+        return None, f"swiftc rc {built['rc']}: {built['stderr'].strip()[-400:]}"
+    return KEEP, ""
+
+
+def row_k13(app):
+    keep, why = build_keep()
+    if keep is None:
+        check("K13", False, f"pasteboard_keep did not build (nothing touched): {why}")
+        return
+    folder = scratch_folder()
+    sock = os.path.join(folder, "agent.sock")
+    saved = os.path.join(folder, "clipboard.plist")
+    kept = bounded.run([str(keep), "save", saved], 60)
+    if kept["rc"] == 3:
+        said = kept["stdout"].strip()
+        kind = said[len("unreadable "):] if said.startswith("unreadable ") else said
+        skip("K13", f"the clipboard holds {kind}, which cannot be read back")
+        return
+    if kept["rc"] != 0:
+        check("K13", False, f"pasteboard_keep save rc {kept['rc']}: "
+                            f"{(kept['stdout'] + kept['stderr']).strip()[-300:]} (nothing touched)")
+        return
+    k = Instance("k", app, sock)
+    up = k.start()
+    seen, problem = None, None
+    try:
+        if not up or k.socket_line != f"listening at {sock}":
+            problem = f"K did not bind: {k.socket_line!r}"
+        else:
+            call(sock, "new_project", {"path": os.path.join(folder, "k13.reelcut")})
+            try:
+                performed = call(sock, "perform_menu_item", {"path": ["Tools", "Copy MCP Command"]})
+            except RuntimeError as error:
+                performed = f"refused: {error}"
+            pasted = bounded.run(["pbpaste"], 30)
+            seen = pasted["stdout"]
+    except Exception as error:  # noqa: BLE001 — scored below
+        problem = f"{type(error).__name__}: {error}"
+    finally:
+        k.stop()
+    helper = str(Path(app).resolve().parents[1] / "Helpers/reelcut-mcp")
+    executable = os.path.isfile(helper) and os.access(helper, os.X_OK)
+    want = mcp_command(helper)
+    # A run that never pasted can only have had the menu item write `want`:
+    # restore against that, so a copy made before a failure is still undone,
+    # and a clipboard nothing wrote is left alone (exit 4, the file kept).
+    restored = bounded.run([str(keep), "restore", saved, seen if seen is not None else want], 60)
+    if restored["rc"] == 0:
+        os.remove(saved)
+    else:
+        KEPT.append(folder)
+        print(f"  K13: restore exit {restored['rc']}; {folder} is kept", flush=True)
+    said = (restored["stdout"] + restored["stderr"]).strip()
+    if restored["rc"] == 4 and problem is None:
+        skip("K13", "the clipboard changed during K13; left as it is")
+        return
+    good = (problem is None and seen == want and executable and restored["rc"] == 0)
+    check("K13", good,
+          f"seen {seen!r} (want {want!r}); helper executable {executable}; "
+          f"perform {str(performed)[:120] if problem is None else problem!r}; "
+          f"restore rc {restored['rc']} {said[-160:]!r}")
 
 
 # ---- the K rows -------------------------------------------------------------------
 
-def run_rows(app, port, default_path):
+def run_rows(app):
     tmp = os.path.realpath(os.environ.get("TMPDIR") or tempfile.gettempdir())
     shared = scratch_folder()
     path = os.path.join(shared, "agent.sock")
@@ -387,12 +542,12 @@ def run_rows(app, port, default_path):
           and not real.startswith(str(SUPPORT.resolve()) + os.sep) and folder_mode == 0o700,
           f"{path} ({len(path.encode())} bytes), folder {oct(folder_mode)}")
     if not rows["K0"]:
-        for name in ORDER[2:12]:
+        for name in ORDER[2:13]:
             check(name, False, "not run: K0 failed")
         return
 
     # K1 — A binds.
-    a = Instance("a", app, port, path)
+    a = Instance("a", app, path)
     up = a.start()
     info = ident(path)
     is_sock = info is not None and stat.S_ISSOCK(info[2])
@@ -400,41 +555,35 @@ def run_rows(app, port, default_path):
     check("K1", up and a.socket_line == f"listening at {path}" and is_sock and mode == 0o600,
           f"line {a.socket_line!r}; socket {is_sock}; mode {oct(mode) if mode is not None else None}")
 
-    # K2 — the same tools/list bytes.
-    body = json.dumps({"jsonrpc": "2.0", "id": 7, "method": "tools/list", "params": {}}).encode()
-    try:
-        over_socket = post(path, body)
-        over_tcp = post(a.tcp_port, body)
-        tools = len(json.loads(over_socket[1])["result"]["tools"])
-        check("K2", over_socket[0] == over_tcp[0] == 200 and over_socket[1] == over_tcp[1],
-              f"{len(over_socket[1])} vs {len(over_tcp[1])} bytes, {tools} tools, "
-              f"status {over_socket[0]}/{over_tcp[0]}")
-    except Exception as error:
-        check("K2", False, f"{type(error).__name__}: {error}")
+    # K11 — A holds no TCP listener.
+    row_k11(a)
 
-    # K3 — an edit over one is read back over the other.
+    # K3 — an edit over one connection is read back over a second.
     project = str(WORK / f"k3-{os.getpid()}.reelcut")
     shutil.rmtree(project, ignore_errors=True)
     try:
-        call(path, "new_project", {"path": project})
-        call(path, "add_marker", {"project": project, "at": 600_000, "name": "via-socket"})
-        seen_tcp = call(a.tcp_port, "get_project", {"project": project})
-        call(a.tcp_port, "add_marker", {"project": project, "at": 1_200_000, "name": "via-tcp"})
-        seen_socket = call(path, "get_project", {"project": project})
+        first, second = mcp.MCP(path, timeout=60), mcp.MCP(path, timeout=60)
+        first.call("new_project", path=project)
+        first.call_with("add_marker", {"project": project, "at": 600_000, "name": "via-first"})
+        seen_second = second.call("get_project", project=project)
+        second.call_with("add_marker", {"project": project, "at": 1_200_000,
+                                        "name": "via-second"})
+        seen_first = first.call("get_project", project=project)
 
         def names(state):
             return {(m.get("name"), m.get("time"))
                     for m in (state.get("project") or {}).get("markers", [])}
-        first = ("via-socket", 600_000) in names(seen_tcp)
-        second = ("via-tcp", 1_200_000) in names(seen_socket)
-        check("K3", first and second,
-              f"socket's marker read over TCP {first}; TCP's read over the socket {second}")
+        one = ("via-first", 600_000) in names(seen_second)
+        two = ("via-second", 1_200_000) in names(seen_first)
+        check("K3", one and two,
+              f"the first connection's marker read over the second {one}; the second's read "
+              f"over the first {two}")
     except Exception as error:
         check("K3", False, f"{type(error).__name__}: {error}")
 
     # K4 — B finds A answering and binds none.
     before = ident(path)
-    b = Instance("b", app, port + 1, path)
+    b = Instance("b", app, path)
     b_up = b.start()
     after = ident(path)
     want_line = f"not bound: another instance answers at {path}; this one binds none"
@@ -448,7 +597,7 @@ def run_rows(app, port, default_path):
     b.stop()
     left = ident(path)
     refused = connect_errno(path) if left else None
-    c = Instance("c", app, port + 2, path)
+    c = Instance("c", app, path)
     c_up = c.start()
     c_answers = answers(path)
     check("K5", left is not None and stat.S_ISSOCK(left[2])
@@ -463,7 +612,7 @@ def run_rows(app, port, default_path):
         unlinked = True
     except OSError:
         unlinked = False
-    d = Instance("d", app, port + 3, path)
+    d = Instance("d", app, path)
     d_up = d.start()
     d_info = ident(path)
     c_exited, c_seconds, c_said = c.quit_event()
@@ -485,7 +634,7 @@ def run_rows(app, port, default_path):
     open_folder = scratch_folder()
     os.chmod(open_folder, 0o755)
     open_path = os.path.join(open_folder, "agent.sock")
-    e = Instance("e", app, port + 4, open_path)
+    e = Instance("e", app, open_path)
     e_up = e.start()
     e.stop()
     absent = ident(open_path) is None
@@ -497,7 +646,7 @@ def run_rows(app, port, default_path):
     file_path = os.path.join(file_folder, "agent.sock")
     payload = b"not a socket\n" + os.urandom(16)
     Path(file_path).write_bytes(payload)
-    f = Instance("f", app, port + 5, file_path)
+    f = Instance("f", app, file_path)
     f_up = f.start()
     f.stop()
     kept_bytes = Path(file_path).read_bytes() == payload if os.path.exists(file_path) else False
@@ -505,33 +654,17 @@ def run_rows(app, port, default_path):
     check("K9", f_up and f.socket_line == want_f and kept_bytes,
           f"F {f.socket_line!r}; bytes unchanged {kept_bytes}")
 
-    # K10 — a port-only launch leaves the person's socket path as it was.
-    if not rows.get("P1"):
-        check("K10", False, "not run: P1 failed")
-        return
-    if not default_path or Path(default_path) != SUPPORT / "Agent/agent.sock":
-        check("K10", False, f"the probe's default path {default_path!r} is not "
-              f"{SUPPORT / 'Agent/agent.sock'}")
-        return
-    agent_dir = str(SUPPORT / "Agent")
-    before_dir, before_sock = ident(agent_dir), ident(default_path)
-    g = Instance("g", app, port + 6, None)
-    g_up = g.start()
-    g_exited, g_seconds, g_said = g.quit_event() if g_up else (False, 0.0, "not up")
-    g.stop()
-    after_dir, after_sock = ident(agent_dir), ident(default_path)
+    # K12 — a tool call's import never asks (MC-5).
+    try:
+        row_k12(app)
+    except Exception as error:  # noqa: BLE001
+        check("K12", False, f"the row broke: {type(error).__name__}: {error}")
 
-    def same_as(one, two):
-        return (one is None and two is None) or (one is not None and two is not None
-                                                 and one[:2] == two[:2])
-    unchanged = same_as(before_dir, after_dir) and same_as(before_sock, after_sock)
-    check("K10", g_up and g.socket_line == f"not bound: {PORT_REASON}" and g_exited
-          and unchanged,
-          f"G {g.socket_line!r}; exited {g_exited} in {g_seconds} s ({g_said}); Agent/ "
-          f"{'absent' if before_dir is None else 'present'} → "
-          f"{'absent' if after_dir is None else 'present'}, agent.sock "
-          f"{'absent' if before_sock is None else 'present'} → "
-          f"{'absent' if after_sock is None else 'present'}; unchanged {unchanged}")
+    # K13 — Copy MCP Command, with the person's clipboard kept.
+    try:
+        row_k13(app)
+    except Exception as error:  # noqa: BLE001
+        check("K13", False, f"the row broke: {type(error).__name__}: {error}")
 
 
 def finish_z():
@@ -554,11 +687,27 @@ def finish_z():
     check("Z2", not alive, f"alive {alive}" if alive else f"{len(INSTANCES)} pids all gone")
 
 
+# ---- the mutants ------------------------------------------------------------------
+
+def built_app(tree):
+    return Path(tree) / "build/Build/Products/Release/Reelcut.app"
+
+
+def unregister(tree):
+    """`lsregister -u` on a copy's built app, when there is one."""
+    app = built_app(tree)
+    if app.exists():
+        done = bounded.run([mcp.LSREGISTER, "-u", str(app)], 60)
+        print(f"  lsregister -u {app}: rc {done['rc']}", flush=True)
+
+
 def build_mutant_app(name):
     """A tree copy with the mutant's anchor replaced once, built by its own
     `make app`: the binary, or None and why."""
-    _, file, before, after = MUTANTS[name]
-    made, reason = tree_copy.make_copy(str(WORK / f"mutant-{name}" / "tree"))
+    _, _, file, before, after = MUTANTS[name]
+    tree = WORK / f"mutant-{name}" / "tree"
+    unregister(tree)
+    made, reason = tree_copy.make_copy(str(tree))
     if made is None:
         return None, reason
     target = Path(made) / "app/Sources" / file
@@ -568,7 +717,7 @@ def build_mutant_app(name):
     target.write_text(text.replace(before, after))
     print(f"  mutant {name}: make app in {made}", flush=True)
     built = bounded.run(["make", "app"], 1500, cwd=made)
-    binary = Path(made) / "build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut"
+    binary = built_app(made) / "Contents/MacOS/Reelcut"
     if built["rc"] != 0 or not binary.exists():
         errors = [line for line in (built["stdout"] + built["stderr"]).splitlines()
                   if "error:" in line]
@@ -579,69 +728,60 @@ def build_mutant_app(name):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--port", type=int, default=4941)
     parser.add_argument("--app", type=Path, default=APP)
     parser.add_argument("--mutant", choices=sorted(MUTANTS))
     args = parser.parse_args()
     started = time.monotonic()
     WORK.mkdir(parents=True, exist_ok=True)
 
-    if args.mutant == "no-port-rule":
-        print("agent socket — the no-port-rule MUTANT (P1 must FAIL; probe only)", flush=True)
-        sources, why = mutant_sources(args.mutant)
-        if sources is None:
-            print(f"mutant no-port-rule: the control could not be performed — {why}")
-            return 2
-        binary, why = build_probe(sources, WORK / "mutant-no-port-rule" / "probe")
-        if binary is None:
-            print(f"mutant no-port-rule: the control could not be performed — the probe did "
-                  f"not build: {why}")
-            return 2
-        row_p1(sources, WORK / "mutant-no-port-rule" / "probe")
-        caught = rows.get("P1") is False
-        print(f"mutant no-port-rule: P1 {'FAIL — caught' if caught else 'ok — survived'} "
-              f"in {time.monotonic() - started:.0f} s")
-        return 0 if caught else 1
-
     app = args.app
     if args.mutant:
-        row = MUTANTS[args.mutant][0]
-        print(f"agent socket — the {args.mutant} MUTANT ({row} must FAIL)", flush=True)
+        row, half = MUTANTS[args.mutant][:2]
+        print(f"agent socket — the {args.mutant} MUTANT ({row}{f' {half} half' if half else ''} "
+              f"must FAIL)", flush=True)
         app, why = build_mutant_app(args.mutant)
         if app is None:
+            unregister(WORK / f"mutant-{args.mutant}" / "tree")
             print(f"mutant {args.mutant}: the control could not be performed — {why}")
             return 2
     else:
         print(f"agent socket — {app}", flush=True)
 
     try:
-        default_path = row_p1(SOURCES, WORK / "probe")
+        row_p1(SOURCES, WORK / "probe")
         if not Path(app).exists():
-            for name in ORDER[1:12]:
+            for name in ORDER[1:13]:
                 check(name, False, f"not run: no app at {app}")
         else:
-            run_rows(app, args.port, default_path)
+            run_rows(app)
     except Exception as error:  # an instrument that breaks is a FAIL, not an exit
         check("K?", False, f"the proof broke: {type(error).__name__}: {error}")
     finally:
         finish_z()
         for folder in SCRATCH:
+            if folder in KEPT:
+                print(f"  kept: {folder}", flush=True)
+                continue
             shutil.rmtree(folder, ignore_errors=True)
+        if args.mutant:
+            unregister(WORK / f"mutant-{args.mutant}" / "tree")
 
     seconds = time.monotonic() - started
     if args.mutant:
-        row = MUTANTS[args.mutant][0]
-        if row not in rows or not rows.get("K0", False):
+        row, half = MUTANTS[args.mutant][:2]
+        if row not in rows or not rows.get("K0", False) or (half and half not in halves):
             print(f"mutant {args.mutant}: the control could not be performed — "
-                  f"{row} was not scored or K0 failed")
+                  f"{row}{f' ({half} half)' if half else ''} was not scored or K0 failed")
             return 2
-        caught = rows[row] is False
-        print(f"mutant {args.mutant}: {row} {'FAIL — caught' if caught else 'ok — survived'} "
-              f"in {seconds:.0f} s")
+        caught = (halves.get(half) is False) if half else (rows[row] is False)
+        print(f"mutant {args.mutant}: {row}{f' {half} half' if half else ''} "
+              f"{'FAIL — caught' if caught else 'ok — survived'} in {seconds:.0f} s")
         return 0 if caught else 1
     passed = sum(1 for good in rows.values() if good)
-    print(f"{passed}/{len(rows)} in {seconds:.0f} s")
-    return 0 if all(rows.values()) and all(name in rows for name in ORDER) else 1
+    tail = f"; skipped {', '.join(f'{k}: {v}' for k, v in skips.items())}" if skips else ""
+    print(f"{passed}/{len(rows)} in {seconds:.0f} s{tail}")
+    complete = all(name in rows or name in skips for name in ORDER)
+    return 0 if all(rows.values()) and complete and set(skips) <= {"K13"} else 1
 
 
 if __name__ == "__main__":

@@ -2516,7 +2516,7 @@ func landing(_ request: [String: Any]) -> [String: Any] {
     let app = NSApplication.shared
     app.setActivationPolicy(.prohibited)
     UserDefaults.standard.setVolatileDomain(
-        ["ApplePersistenceIgnoreState": true, "AgentServerEnabled": false,
+        ["ApplePersistenceIgnoreState": true,
          "AppleShowScrollBars": "Always"],
         forName: UserDefaults.argumentDomain)
     var out: [String: Any] = [:]
@@ -2866,7 +2866,7 @@ func segments(_ request: [String: Any]) -> [String: Any] {
     let app = NSApplication.shared
     app.setActivationPolicy(.prohibited)
     UserDefaults.standard.setVolatileDomain(
-        ["ApplePersistenceIgnoreState": true, "AgentServerEnabled": false,
+        ["ApplePersistenceIgnoreState": true,
          "AppleShowScrollBars": "Always"],
         forName: UserDefaults.argumentDomain)
     var out: [String: Any] = [:]
@@ -3189,7 +3189,6 @@ func chrome(_ request: [String: Any]) -> [String: Any] {
         RecorderPanelController.systemAudioKey: true, RecorderPanelController.showClicksKey: false,
         RecorderPanelController.rateKey: 60, RecorderPanelController.sizeKey: "nominal",
         RecorderPanelController.includeReelcutWindowsKey: false,
-        "AgentServerEnabled": false,
     ], forName: UserDefaults.argumentDomain)
     // The one call that builds the menu: `buildMainMenu()` is private.
     let delegate = AppDelegate()
@@ -3497,7 +3496,6 @@ func chromePause(_ request: [String: Any]) -> [String: Any] {
         RecorderPanelController.systemAudioKey: true, RecorderPanelController.showClicksKey: false,
         RecorderPanelController.rateKey: 60, RecorderPanelController.sizeKey: "nominal",
         RecorderPanelController.includeReelcutWindowsKey: false,
-        "AgentServerEnabled": false,
     ], forName: UserDefaults.argumentDomain)
     let delegate = AppDelegate()
     delegate.applicationWillFinishLaunching(
@@ -3766,7 +3764,6 @@ func filePause(_ request: [String: Any]) -> [String: Any] {
         RecorderPanelController.systemAudioKey: true, RecorderPanelController.showClicksKey: false,
         RecorderPanelController.rateKey: 60, RecorderPanelController.sizeKey: "nominal",
         RecorderPanelController.includeReelcutWindowsKey: false,
-        "AgentServerEnabled": false,
     ], forName: UserDefaults.argumentDomain)
     let delegate = AppDelegate()
     delegate.applicationWillFinishLaunching(
@@ -4061,7 +4058,8 @@ func grantedRun(_ filter: SCContentFilter, _ choice: RecordingChoice, resume: Bo
     var startError: String?
     var started = false
     let t0 = Date()
-    recorder.start(filter: filter, choice: choice, onFinish: { finishes.append(spell($0)) }) {
+    recorder.start(filter: filter, choice: choice, mayAsk: true,
+                   onFinish: { finishes.append(spell($0)) }) {
         error in
         startError = error.map { $0.localizedDescription }
         started = true
@@ -4148,7 +4146,7 @@ func granted(_ request: [String: Any]) -> [String: Any] {
         RecorderPanelController.includeReelcutWindowsKey: false,
         RecordingFiles.folderDefaultsKey: folder.path,
         FFmpegRewrap.policyDefaultsKey: FFmpegRewrap.Policy.never.rawValue,
-        "ApplePersistenceIgnoreState": true, "AgentServerEnabled": false,
+        "ApplePersistenceIgnoreState": true,
         "AppleShowScrollBars": "Always",
     ], forName: UserDefaults.argumentDomain)
     var out: [String: Any] = [:]
@@ -4408,7 +4406,6 @@ func grants(_ request: [String: Any]) -> [String: Any] {
         RecorderPanelController.systemAudioKey: true, RecorderPanelController.showClicksKey: false,
         RecorderPanelController.rateKey: 60, RecorderPanelController.sizeKey: "nominal",
         RecorderPanelController.includeReelcutWindowsKey: false,
-        "AgentServerEnabled": false,
     ], forName: UserDefaults.argumentDomain)
     let panel = RecorderPanelController.shared
     // show() ONCE: in .idle it rebuilds the microphone popup, which would
@@ -4587,7 +4584,6 @@ func preroll(_ request: [String: Any]) -> [String: Any] {
         RecorderPanelController.systemAudioKey: true, RecorderPanelController.showClicksKey: false,
         RecorderPanelController.rateKey: 60, RecorderPanelController.sizeKey: "nominal",
         RecorderPanelController.includeReelcutWindowsKey: false,
-        "AgentServerEnabled": false,
     ], forName: UserDefaults.argumentDomain)
     let shared = ScreenRecorder.shared
     let panel = RecorderPanelController.shared
@@ -4657,7 +4653,6 @@ func exclusionMode(_ request: [String: Any]) -> [String: Any] {
         RecorderPanelController.displayKey: 0, RecorderPanelController.microphoneKey: "",
         RecorderPanelController.systemAudioKey: true, RecorderPanelController.showClicksKey: false,
         RecorderPanelController.rateKey: 60, RecorderPanelController.sizeKey: "nominal",
-        "AgentServerEnabled": false,
     ], forName: UserDefaults.argumentDomain)
     let key = RecorderPanelController.includeReelcutWindowsKey
     UserDefaults.standard.removeObject(forKey: key)
@@ -8356,7 +8351,7 @@ MUTANTS = {
         "RecorderPanelController+Grants.swift",
         "            requestScreen: { _ = CGRequestScreenCaptureAccess() },\n",
         "            requestScreen: { if Transcriber.canAsk { _ = CGRequestScreenCaptureAccess() } },\n",
-        "the grant ask gated on canAsk again — Record under -AgentServerEnabled shows a refusal "
+        "the grant ask gated on canAsk again — Record under a scripted agent launch shows a refusal "
         "for a button nobody but a person pressed (fix 1 undone)"),
     "no-handle-check": (
         "RecorderPanelController+Landing.swift",

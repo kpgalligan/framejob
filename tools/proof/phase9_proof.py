@@ -130,12 +130,12 @@ with that handle once it is open.
 decodes an exported movie.
 
 **The parity log.** `AgentServer`'s startup check logs and does not refuse,
-so a scope-less op tool would leave a clean-looking server on the port. Part
-4 of that check is re-derived over the wire in section 0 (the 55), and the
-log itself is read from `/tmp/reelcut-<port>.log` — the path
+so a scope-less op tool would leave a clean-looking server on the socket.
+Part 4 of that check is re-derived over the wire in section 0 (the 55), and
+the log itself is read from `<dir>/reelcut.log` beside the socket — the path
 `CLAUDE.md`'s own launch line writes — or from a second argument.
 
-    python3 tools/proof/phase9_proof.py [port] [log path]
+    python3 tools/proof/phase9_proof.py <dir>/agent.sock [log path]
 """
 
 import hashlib
@@ -146,11 +146,11 @@ import struct
 import sys
 import zlib
 
-from mcp import MCP, ToolError
+from mcp import MCP, ToolError, target, log_beside
 from dev_tools import DEV_TOOLS
 
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 4823
-LOG = sys.argv[2] if len(sys.argv) > 2 else f"/tmp/reelcut-{PORT}.log"
+SOCKET = target(sys.argv)
+LOG = sys.argv[2] if len(sys.argv) > 2 else log_beside(SOCKET)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 WORK = os.path.join(HERE, "work")
@@ -631,7 +631,7 @@ def catalog_part(mcp):
     if not os.path.exists(LOG):
         check(False,
               f"the startup parity log is empty — no log at {LOG}; CLAUDE.md's launch line "
-              "writes /tmp/reelcut-<port>.log, or pass the path as the second argument")
+              "writes <dir>/reelcut.log beside the socket, or pass the path as the second argument")
     else:
         with open(LOG, "r", errors="replace") as handle:
             complaints = [line.strip() for line in handle if "Reelcut: " in line]
@@ -1798,8 +1798,8 @@ def main():
                   "test media.")
             return 2
     os.makedirs(WORK, exist_ok=True)
-    mcp = MCP(PORT)
-    print(f"phase 9 — Inside the nest, against 127.0.0.1:{PORT}")
+    mcp = MCP(SOCKET)
+    print(f"phase 9 — Inside the nest, against {SOCKET}")
 
     section("0 — the catalog, and rc_op_names through it", catalog_part, mcp)
     section("1 — the oracle: inside-then-open equals open-then-inside", oracle_part, mcp)

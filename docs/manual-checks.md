@@ -391,12 +391,12 @@ To take a permission away again: System Settings ▸ Privacy & Security, or
 - **Source:** #55.
 
 **REC-7 — The panel shown from the background leaves your typing alone**
-- **Do:** 1. Launch Reelcut from Terminal as in CLAUDE.md's "Verifying a build" (port 4817) and open a project. 2. In a second Terminal tab, in the repository, run `sleep 5 && python3 -c 'import sys; sys.path.insert(0, "tools/proof"); from mcp import MCP; MCP(4817).call("perform_menu_item", path=["File", "New Recording…"])'`, then within the five seconds click into a TextEdit document. 3. When the panel appears, type a few words and press Return without clicking anything. 4. Click the panel's Close. 5. Click Reelcut's project window and press ⌥⌘N.
+- **Do:** 1. Launch Reelcut from Terminal as in CLAUDE.md's "Verifying a build" (a scratch socket; the block prints its folder, `<dir>`) and open a project. 2. In a second Terminal tab, in the repository, run `sleep 5 && python3 -c 'import sys; sys.path.insert(0, "tools/proof"); from mcp import MCP; MCP("<dir>/agent.sock").call("perform_menu_item", path=["File", "New Recording…"])'`, then within the five seconds click into a TextEdit document. 3. When the panel appears, type a few words and press Return without clicking anything. 4. Click the panel's Close. 5. Click Reelcut's project window and press ⌥⌘N.
 - **Expect:** in step 3 the New Recording panel is in front of TextEdit, TextEdit keeps the focus, the words and the Return land in TextEdit, and no countdown starts. In step 4 the panel closes without bringing Reelcut's windows forward. In step 5 the panel comes up key, with Record as its default button.
 - **Source:** #137; spec §11 recording.md (the recorder panel takes key only from an active Reelcut).
 
 **REC-8 — File ▸ Pause Recording, and the item's one width**
-- **Do:** 1. Start a recording from the panel. 2. Open the File menu: Pause Recording, then open it again: Resume Recording. 3. Watch Reelcut's menu bar item through the pause and resume, and past the first minute. 4. Repeat 2–3 with the menu bar in the light look and in the dark. 5. Stop. 6. Launch Reelcut from Terminal as in REC-7 (port 4817, the terminal holding Screen Recording); in a second Terminal tab, in the repository, run `python3 -c 'import sys; sys.path.insert(0, "tools/proof"); from mcp import MCP; MCP(4817).call("record_screen", seconds=20)'`; while it records, choose File ▸ Pause Recording, then File ▸ Resume Recording, watching the menu bar item. 7. Run the `record_screen` line again; choose File ▸ Pause Recording, then File ▸ Stop Recording, and watch the item until it goes away.
+- **Do:** 1. Start a recording from the panel. 2. Open the File menu: Pause Recording, then open it again: Resume Recording. 3. Watch Reelcut's menu bar item through the pause and resume, and past the first minute. 4. Repeat 2–3 with the menu bar in the light look and in the dark. 5. Stop. 6. Launch Reelcut from Terminal as in REC-7 (a scratch socket in `<dir>`, the terminal holding Screen Recording); in a second Terminal tab, in the repository, run `python3 -c 'import sys; sys.path.insert(0, "tools/proof"); from mcp import MCP; MCP("<dir>/agent.sock").call("record_screen", seconds=20)'`; while it records, choose File ▸ Pause Recording, then File ▸ Resume Recording, watching the menu bar item. 7. Run the `record_screen` line again; choose File ▸ Pause Recording, then File ▸ Stop Recording, and watch the item until it goes away.
 - **Expect:** the File item reads Pause Recording while recording and Resume Recording while paused, and is greyed out with no recording; each choice pauses or resumes as the item's own menu does (coral dot and running time, then the pause glyph and a frozen time). The item keeps one width throughout — the neighbouring menu bar items do not shift as the time ticks or the mark changes — and the title is never clipped, in either look. In step 6 the `record_screen` recording's item flips at each click, not up to a second later. In step 7 the item keeps the pause glyph and its frozen time until it disappears; the coral dot never returns.
 - **Source:** #98 (a, b); #181 (item 4, step 6); #193 (item 1, step 7); spec §11 recording.md (File ▸ Pause Recording).
 
@@ -489,6 +489,18 @@ on your own account, never the spike's.
 - **Answer:** were the tools listed before Reelcut ran, and did the first call open Reelcut without taking focus from the terminal and answer?
 - **Source:** road map 14 MC3 (`mcp_proxy_proof.py` X1, X2; spec §11 MC-3, MC-4).
 
+**AC-4 — Copy MCP Command's line registers Reelcut with Claude Code**
+- **Do:** 1. Open the Reelcut you use (an installed copy, or the tree's Release build) and choose Tools ▸ Copy MCP Command. 2. Paste the line into Terminal and run it. 3. Run `claude mcp list`.
+- **Expect:** step 2 answers that `reelcut` was added; step 3 lists `reelcut` with the pasted helper path and shows it connected.
+- **Answer:** did the pasted line run as it stood, and does `claude mcp list` show `reelcut` connected?
+- **Source:** road map 14 MC4 (`agent_socket_proof.py` K13; spec §9 Tools).
+
+**AC-5 — A person's own import still asks while an agent's call runs**
+- **Do:** 1. Launch Reelcut from Terminal as in CLAUDE.md's "Verifying a build", adding `-RCFFmpegImport ask` to its arguments (ffmpeg installed), and open a project with a few seconds of media on the timeline. 2. In a second Terminal tab, in the repository, start an export over MCP: `python3 -c 'import sys; sys.path.insert(0, "tools/proof"); from mcp import MCP; print(MCP("<dir>/agent.sock").call("export", preset="h264", path="/tmp/ac5.mp4"))'`. 3. While it runs, drag an `.mkv` from the Finder onto the timeline. 4. Cancel the question.
+- **Expect:** the conversion question ("Reelcut cannot open …", Repackage or Convert) appears for the dragged file while the export is still being written; the export finishes either way.
+- **Answer:** did the question appear during the agent's export?
+- **Source:** road map 14 MC4 (spec §11 MC-5: a click still asks; `agent_socket_proof.py` K12 holds the tool call's half).
+
 ## Host-state proof runs
 
 Scripts that need a state no agent session has. Run from a terminal on an
@@ -500,7 +512,7 @@ unlocked Mac; paste each score into the issue in the Source.
 - **Source:** #57.
 
 **HS-2 — The recorder's microphone rows with a wired or built-in microphone**
-- **Do:** 1. Set the default input to the built-in or a wired microphone (not Bluetooth), in System Settings ▸ Sound. 2. Give Terminal Screen Recording and Microphone permission. 3. Launch an instance on port 4817 as in CLAUDE.md's "Verifying a build"; run `python3 tools/proof/recording_proof.py 4817`.
+- **Do:** 1. Set the default input to the built-in or a wired microphone (not Bluetooth), in System Settings ▸ Sound. 2. Give Terminal Screen Recording and Microphone permission. 3. Launch an instance on a scratch socket as in CLAUDE.md's "Verifying a build" (it prints its folder, `<dir>`); run `python3 tools/proof/recording_proof.py <dir>/agent.sock`.
 - **Expect:** every microphone row passes (only the named Bluetooth-output skips).
 - **Answer:** should the proof skip its microphone rows by name on a Bluetooth input?
 - **Source:** #57.

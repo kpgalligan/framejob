@@ -2,10 +2,10 @@ import Foundation
 
 /// The agent server's Unix socket (road map 14's MC2, spec §11 MC-1, MC-2,
 /// MC-6): where it is bound, whether this instance may bind it, the bind,
-/// and its release at quit. The core's listener is the second server object
-/// beside `start()`'s TCP one (`ReelAgentSocket`), serving the same prepared
-/// catalog through the same trampoline, so a call from either listener goes
-/// through `AgentLane.serve`'s one lock (AI-2) and ordering is unchanged.
+/// its release at quit, and the line Tools ▸ Copy MCP Command copies. The
+/// core's listener (`ReelAgentSocket`) is the app's only one since MC4; it
+/// serves the prepared catalog through the trampoline, so every call goes
+/// through `AgentLane.serve`'s one lock (AI-2).
 ///
 /// **Bound at every launch, and never an alert.** No person asked for it,
 /// so a launch that cannot bind logs one line, `Reelcut agent socket not
@@ -14,10 +14,8 @@ import Foundation
 /// is the parity check's alone.
 ///
 /// **The path** (`socketPlan`) is `RC_AGENT_SOCKET` when it is set and not
-/// empty, else `AppSupport`'s folder plus `Agent/agent.sock`. Until MC4, a
-/// launch that sets `RC_AGENT_PORT` and not `RC_AGENT_SOCKET` binds no
-/// socket: every proof of the era launches that way, and MC-6 says no proof
-/// binds the person's socket. MC4 deletes that arm with `RC_AGENT_PORT`.
+/// empty, else `AppSupport`'s folder plus `Agent/agent.sock`. MC-6 says no
+/// proof binds the person's socket, so every proof sets `RC_AGENT_SOCKET`.
 ///
 /// **MC-2's policy** (`socketRefusal`), in order: the folder is made by
 /// `AppSupport.ensureDirectory` (`0700` at each level it makes) and must
@@ -43,12 +41,7 @@ extension AgentServer {
 
     static let socketEnvironmentKey = "RC_AGENT_SOCKET"
 
-    /// The interim rule's reason (MC2..MC3; MC4 deletes it with the port).
-    static let portOnlyReason =
-        "RC_AGENT_PORT is set and RC_AGENT_SOCKET is not; "
-        + "a port-only launch binds no socket until MC4"
-
-    /// The bundle's short version, or "0.0" — what both listeners report as
+    /// The bundle's short version, or "0.0" — what the listener reports as
     /// `serverInfo.version`.
     static var serverVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0"
@@ -65,7 +58,6 @@ extension AgentServer {
         if let path = environment[socketEnvironmentKey], !path.isEmpty {
             return .bind(path: path)
         }
-        if environment["RC_AGENT_PORT"] != nil { return .skip(reason: portOnlyReason) }
         guard let defaultPath else { return .skip(reason: "no Application Support folder") }
         return .bind(path: defaultPath)
     }
@@ -98,7 +90,21 @@ extension AgentServer {
             Self.logSocketNotBound(error.localizedDescription)
             return
         }
+        boundSocketPath = path
         NSLog("Reelcut agent socket listening at %@", path)
+    }
+
+    /// The bundled stdio helper (road map 14's MC3), inside this app's own
+    /// bundle wherever it was launched from.
+    static var mcpHelperURL: URL {
+        Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/reelcut-mcp")
+    }
+
+    /// The line Tools ▸ Copy MCP Command copies: Claude Code's `mcp add`
+    /// for the helper at `helperPath`, single-quoted for a POSIX shell.
+    static func mcpCommand(helperPath: String) -> String {
+        let quoted = helperPath.replacingOccurrences(of: "'", with: "'\\''")
+        return "claude mcp add --scope user reelcut -- '\(quoted)'"
     }
 
     /// For `applicationWillTerminate`: unlinks the socket only if it is

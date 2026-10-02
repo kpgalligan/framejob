@@ -76,19 +76,19 @@ Road map 6 §5i's rows 1–11, plus five of this pipeline's own:
   one temporary folder at once. `--lock-wait` (default 3600 s) bounds the
   wait; an expired wait is a scored FAIL naming the holder, and exit 1.
 
-Five instances, each on its own port with its own fake, each killed by its
-own PID in a `finally`, each with a row that `grep "Reelcut: "` finds nothing
-in its log: A, B and C, then **RP** (`port_base + 3`, keyed) and **RQ**
-(`port_base + 4`, no key, its own loopback fake) for row RP. Host-state
+Five instances, each on its own scratch socket (`mcp.scratch_socket`) with
+its own fake, each killed by its own PID in a `finally`, each with a row that
+`grep "Reelcut: "` finds nothing in its log (beside its socket): A, B and C,
+then **RP** (keyed) and **RQ** (no key, its own loopback fake) for row RP. Host-state
 inputs: `media/speech.mov` and `media/AV.mov`, `say`
 for the second fixture, `ffmpeg` for row 2's second decoder (the row names which decoders
-answered and `AVAudioFile` always runs), and free loopback ports.
+answered and `AVAudioFile` always runs), and a free loopback port for each fake.
 
 `--mutant <name>` builds a COPY of the tree with `tree_copy.make_copy` —
 `app/` and `agent/` copied, every other build input `project.yml` names a
 SYMLINK to the tree's, `core` already built — patches one text asserted to
 occur exactly once, runs the copy's `make app` under a 900 s wall, and runs every row
-against that binary on `--port-base 4960`. A mutant that survives is a
+against that binary. A mutant that survives is a
 finding about the ROW, not about the mutant. A mutant (or `--fake-mutant`)
 whose control could not be performed — the text to replace not found
 exactly once, or the copy not built — prints `mutant <name>: the control
@@ -112,7 +112,7 @@ import tempfile
 import threading
 import time
 
-from mcp import MCP, ToolError
+from mcp import MCP, ToolError, log_beside, remove_scratch, scratch_socket, wait_listening
 
 # The probe's instruments, imported rather than copied (road map 6 §10.9
 # built them; a second spelling of any of them is the drift this tree warns
@@ -149,7 +149,6 @@ INHERIT = object()
 # before anything is kept. `None` everywhere else, and the fake's dummy needs
 # no scrubbing.
 live_scrubber = None
-BOUND_PORT = re.compile(r"listening on http://127\.0\.0\.1:(\d+)/mcp")
 
 # The words the fake serves for every row that needs a transcript. Five of
 # them, inside the first five seconds of the fixture, spread so a split at
@@ -169,6 +168,9 @@ skips = []
 # Everything an MCP call answered, for row K and row X.
 transcript_of_the_run = []
 logs = {}
+# Every instance's scratch socket, removed once the run is over (row K
+# reads each instance's log, which sits beside its socket).
+SCRATCH = []
 
 
 def check(name, ok, detail=""):
@@ -225,19 +227,21 @@ def read(path):
 
 
 class Instance:
-    """One Reelcut on a port of its own, pointed at one fake.
+    """One Reelcut on a scratch socket of its own, pointed at one fake.
 
     **It kills only what it started** — `Popen`'s own pid, SIGTERM then
     SIGKILL. Nothing here reads `pgrep`: another session's instance is none
     of this script's business.
     """
 
-    def __init__(self, tag, port, fake, binary, key=DUMMY, live=False, endpoint=None):
+    def __init__(self, tag, fake, binary, key=DUMMY, live=False, endpoint=None):
         self.tag = tag
         self.fake = fake
         self.live = live
         self.secrets = fresh("secrets-" + tag)
-        self.log = f"/tmp/reelcut-{port}.log"
+        self.socket = scratch_socket()
+        SCRATCH.append(self.socket)
+        self.log = log_beside(self.socket)
         logs[tag] = self.log
         if os.path.exists(self.log):
             os.remove(self.log)
@@ -260,13 +264,13 @@ class Instance:
                 # The dummy, never the person's own: `child_env()` has already
                 # taken `RC_ASSEMBLYAI_KEY` out.
                 env["RC_ASSEMBLYAI_KEY"] = key
-        env["RC_AGENT_PORT"] = str(port)
+        env["RC_AGENT_SOCKET"] = self.socket
         # `-ReelcutCaptionEngine assemblyai` pins the SHEET's memory of
         # what a person last chose to the wrong answer for a tool, which
         # is what makes row 8 a real row: R6-2 says an agent call reads
         # that key never, and an instance where it reads "apple" could
         # not tell a build that obeys R6-2 from one that does not.
-        argv = [binary, "-ApplePersistenceIgnoreState", "YES", "-AgentServerEnabled", "YES",
+        argv = [binary, "-ApplePersistenceIgnoreState", "YES",
                 "-ReelcutCaptionEngine", "assemblyai", "-RCSecretFolder", self.secrets]
         if live:
             # NO endpoint override, so the client speaks to the region's own
@@ -294,8 +298,8 @@ class Instance:
             self.process = subprocess.Popen(
                 argv, stdout=self.handle, stderr=subprocess.STDOUT, env=env,
                 stdin=subprocess.DEVNULL)
-        self.port = self._await_port()
-        self.mcp = MCP(self.port, timeout=300)
+        self._await_socket()
+        self.mcp = MCP(self.socket, timeout=300)
 
     def _read_pty(self):
         """The live instance's stdout, line by line, in BYTES.
@@ -330,8 +334,8 @@ class Instance:
     def _line(self, raw):
         """One whole line: tested RAW for the key, then cleaned, then kept.
 
-        The log handle is flushed per line because `_await_port` polls that
-        file for the port.
+        The log handle is flushed per line because `_await_socket` polls that
+        file for the socket's line.
         """
         text = raw.decode("utf-8", errors="replace").replace("\r", "")
         if live_scrubber is not None:
@@ -358,18 +362,11 @@ class Instance:
         prefix = "AssemblyAI: "
         return [line[len(prefix):] for line in rows if line.startswith(prefix)]
 
-    def _await_port(self, seconds=60):
-        deadline = time.time() + seconds
-        while time.time() < deadline:
-            if self.process.poll() is not None:
-                raise RuntimeError(
-                    f"the {self.tag} instance exited with {self.process.returncode} before it "
-                    f"bound a port — {self.log}")
-            found = BOUND_PORT.search(read(self.log).decode("utf-8", "replace"))
-            if found:
-                return int(found.group(1))
-            time.sleep(0.2)
-        raise RuntimeError(f"the {self.tag} instance never named a port in {self.log}")
+    def _await_socket(self, seconds=60):
+        if not wait_listening(self.log, self.socket, child=self.process, seconds=seconds):
+            raise RuntimeError(
+                f"the {self.tag} instance did not listen at {self.socket} (exit "
+                f"{self.process.poll()}) — {self.log}")
 
     def parity(self):
         complaints = [line for line in read(self.log).decode("utf-8", "replace").splitlines()
@@ -2467,11 +2464,6 @@ def main():
     parser.add_argument("--binary", default=os.path.join(
         ROOT, "build", "Build", "Products", "Release", "Reelcut.app", "Contents", "MacOS",
         "Reelcut"))
-    parser.add_argument("--port-base", type=int, default=None,
-                        help="the first port an instance binds (default 4955, or 4960 "
-                             "under --mutant so a mutant run cannot collide with a tree "
-                             "run on the same host); an EXPLICIT flag is honoured under "
-                             "--mutant too")
     parser.add_argument("--mutant", choices=sorted(CLOUD_MUTANTS),
                         help="build a COPY of the tree with one text replaced and run every "
                              "row against it")
@@ -2517,10 +2509,6 @@ def main():
         cloud_captions_probe.prepare_fake_mutant(args.fake_mutant)
 
     binary = args.binary
-    # An explicit --port-base wins; absent, a mutant run moves off the
-    # tree run's ports of its own accord.
-    port_base = args.port_base if args.port_base is not None else (
-        4960 if args.mutant else 4955)
     if args.mutant:
         binary, error = build_mutant(args.mutant)
         if binary is None:
@@ -2556,10 +2544,10 @@ def main():
 
     if args.live:
         # Rows 20 and 21, and nothing else: the live module opens its own
-        # instances on `port_base + 3` and `+ 4`, against api.assemblyai.com.
+        # instances, against api.assemblyai.com.
         import cloud_captions_live
 
-        run_row(cloud_captions_live.run, sys.modules[__name__], binary, port_base, probe)
+        run_row(cloud_captions_live.run, sys.modules[__name__], binary, probe)
         tail = ""
         if skips:
             tail = (" (" + str(skipped) + " skipped by name — "
@@ -2575,7 +2563,7 @@ def main():
     try:
         with Fake("proof-a") as fake_a:
             fake_folders.append(fake_a.folder)
-            with Instance("A", port_base, fake_a, binary) as a:
+            with Instance("A", fake_a, binary) as a:
                 run_row(row_one_caller, a, fake_a)
                 run_row(row_two, a, fake_a, probe)
                 run_row(row_log, a, fake_a)
@@ -2596,13 +2584,13 @@ def main():
         else:
             with Fake("proof-b") as fake_b:
                 fake_folders.append(fake_b.folder)
-                with Instance("B", port_base + 1, fake_b, binary, key=None,
+                with Instance("B", fake_b, binary, key=None,
                               endpoint="http://remote.invalid") as b:
                     run_row(row_one_no_key, b, fake_b)
                     run_row(row_keyless_mcp, b, fake_b, keyless_seed)
             with Fake("proof-c") as fake_c:
                 fake_folders.append(fake_c.folder)
-                with Instance("C", port_base + 2, fake_c, binary) as c:
+                with Instance("C", fake_c, binary) as c:
                     run_row(row_six, c, fake_c)
                     run_row(row_refused_owed, c, fake_c)
                     run_row(row_eleven, c, fake_c)
@@ -2621,7 +2609,7 @@ def main():
             packages = None
             with Fake("proof-rp") as fake_rp:
                 fake_folders.append(fake_rp.folder)
-                with Instance("RP", port_base + 3, fake_rp, binary) as rp:
+                with Instance("RP", fake_rp, binary) as rp:
                     try:
                         packages = build_pair_packages(rp, fake_rp)
                     except Exception as problem:  # noqa: BLE001 — the fixture's answer
@@ -2630,7 +2618,7 @@ def main():
                     run_row(row_pairs, rp, fake_rp, packages)
             with Fake("proof-rq") as fake_rq:
                 fake_folders.append(fake_rq.folder)
-                with Instance("RQ", port_base + 4, fake_rq, binary, key=None) as rq:
+                with Instance("RQ", fake_rq, binary, key=None) as rq:
                     run_row(row_pairs_keyless, rq, fake_rq, packages)
         run_row(row_k, fake_folders)
     finally:
@@ -2647,4 +2635,9 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        code = main()
+    finally:
+        for scratch in SCRATCH:
+            remove_scratch(scratch)
+    sys.exit(code)

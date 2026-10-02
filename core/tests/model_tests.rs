@@ -31,8 +31,7 @@ use reelcut_core::ffi::{
     rc_timecode_parse,
 };
 use reelcut_core::ffi_agent::{
-    rc_agent_server_start, rc_agent_server_stop, rc_agent_socket_release, rc_agent_socket_start,
-    rc_agent_string_create,
+    rc_agent_socket_release, rc_agent_socket_start, rc_agent_string_create,
 };
 use reelcut_core::ffi_edit::rc_project_apply;
 use reelcut_core::ffi_graphic::{
@@ -1894,7 +1893,7 @@ fn strip_c_comments(src: &str) -> String {
     out
 }
 
-/// The tool handler `rc_agent_server_start` takes. The sweep never lets a
+/// The tool handler `rc_agent_socket_start` takes. The sweep never lets a
 /// server start, so this is never called.
 unsafe extern "C" fn unused_tool_handler(
     _context: *mut c_void,
@@ -2091,45 +2090,8 @@ fn sweep_every_export_with_nulls() -> Vec<String> {
     assert!(unsafe { rc_agent_string_create(ptr::null()) }.is_null());
     cover("rc_agent_string_create");
 
-    // A NULL name fails before any socket is bound, so the sweep never
-    // leaves a server running behind it.
     let version = cstring("0.1.0");
     let tools = cstring("[]");
-    let mut err: *mut c_char = ptr::null_mut();
-    assert_eq!(
-        unsafe {
-            rc_agent_server_start(
-                0,
-                ptr::null(),
-                version.as_ptr(),
-                tools.as_ptr(),
-                unused_tool_handler,
-                ptr::null_mut(),
-                &mut err,
-            )
-        },
-        0
-    );
-    assert_eq!(take_string(err).as_deref(), Some("server_name is NULL"));
-    assert_eq!(
-        unsafe {
-            rc_agent_server_start(
-                0,
-                ptr::null(),
-                ptr::null(),
-                ptr::null(),
-                unused_tool_handler,
-                ptr::null_mut(),
-                ptr::null_mut(),
-            )
-        },
-        0
-    );
-    cover("rc_agent_server_start");
-
-    // Safe when none is running, which is the state the sweep is in.
-    rc_agent_server_stop();
-    cover("rc_agent_server_stop");
 
     // The socket's NULL path is refused before anything is read or bound;
     // a NULL name after a real path still binds nothing.

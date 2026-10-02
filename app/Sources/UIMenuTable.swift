@@ -102,7 +102,7 @@ extension UIMenu {
         "setTrackHeight:": .plain,
         "setPreviewQuality:": .plain,
         "togglePreviewWindow:": .window,
-        "toggleAgentServer:": .modal,
+        "copyMCPCommand:": .plain,
         "performMiniaturize:": .framework,
         "performZoom:": .framework,
         "showExportQueue:": .window,

@@ -3,7 +3,7 @@
 
 Three parts, one score:
 
-* **MCP rows**, against the built app on the port given (launch it first; one
+* **MCP rows**, against the built app at the socket given (launch it first; one
   proof per fresh instance). `transcribe {engine: apple, place: false}` over
   the proof's own `say` fixtures: the pangram's words come back trimmed, a
   ten-minute file comes back WHOLE (no ceiling, no `truncated`), silence is
@@ -25,7 +25,7 @@ No model is downloaded: the not-installed rows pick fr-FR, de-DE, ja-JP and
 ko-KR in order and take the first that is refused as not installed; a host
 where all four are installed is a named SKIP, never a pass.
 
-    python3 tools/proof/speech_engine_proof.py <port> [--no-mutants]
+    python3 tools/proof/speech_engine_proof.py <dir>/agent.sock [--no-mutants]
 """
 import json
 import os
@@ -36,7 +36,7 @@ import sys
 import time
 import wave
 
-from mcp import MCP, ToolError
+from mcp import MCP, ToolError, target
 from silence2_proof import SPEECH_TEXT
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -167,9 +167,9 @@ def cue_rules(cues, frame):
     return bad
 
 
-def mcp_part(port, pangram, ten, silence, ten_seconds):
+def mcp_part(socket_path, pangram, ten, silence, ten_seconds):
     print("\nMCP rows — transcribe under engine apple")
-    mcp = MCP(port)
+    mcp = MCP(socket_path)
     s = Session(mcp, "pangram")
     clip = s.clip_of(pangram)
     before = s.text()
@@ -343,9 +343,9 @@ def mutant_part(pangram, ten):
 
 def main():
     arguments = [a for a in sys.argv[1:] if not a.startswith("--")]
-    port = int(arguments[0]) if arguments else 4871
+    socket_path = target([sys.argv[0]] + arguments)
     pangram, ten, silence, ten_seconds = make_fixtures()
-    mcp_part(port, pangram, ten, silence, ten_seconds)
+    mcp_part(socket_path, pangram, ten, silence, ten_seconds)
     probe_part(pangram, ten)
     if "--no-mutants" not in sys.argv:
         mutant_part(pangram, ten)

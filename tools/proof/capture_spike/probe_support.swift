@@ -46,7 +46,6 @@ enum ProbeSupport {
                 "ReelcutInspectorRescaleClips": false,
                 "ReelcutExportChoice": "",
                 "ReelcutPreviewQuality": 0,
-                "AgentServerEnabled": false,
                 "AppleShowScrollBars": "Always",
                 InspectorSection.collapsedKeyPrefix + "text.animation": false,
             ], forName: UserDefaults.argumentDomain)

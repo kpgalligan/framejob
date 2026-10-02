@@ -597,3 +597,154 @@ under `$TMPDIR` are removed at the end of each run.
 **Owed:** AC-3 (the person's: Claude Code against the built bundle's proxy), with AC-1 and AC-2
 from MC1. MC4 is next: TCP goes, `mcp.py` moves to sockets, MC-5, Tools ▸ Copy MCP Command and
 the README's agent section (which still names TCP).
+
+### MC4 — TCP goes (2026-10-01)
+
+The socket is the agent server's only listener. Over `38b9487`:
+
+- **Core.** `agent.rs` lost `start` (TCP on 127.0.0.1) and its two imports; its module doc names
+  one listener. `ffi_agent.rs` lost `rc_agent_server_start`, `rc_agent_server_stop` and the
+  `SERVER` slot; `SOCKET` is the one slot, and `rc_agent_socket_start`'s doc took over the handler
+  contract the TCP pair's carried. The header lost both declarations (`RC_FORMAT_VERSION` is
+  unchanged). `core/tests/agent_socket.rs` lost the TCP byte-equality test (6 tests), and
+  `model_tests.rs`'s null sweep both TCP exports. `AgentServer::shutdown` stays for S7's test.
+- **App, the transport.** `AgentServer.swift` (frozen; 825 → 777 lines) lost
+  `enabledDefaultsKey`, `defaultPort`, `port`, `start()` and `stop()`; `boundSocketPath`, written
+  by `bindSocket` after a bind, is what `isRunning` reads, so `DevAssistantLaunch`'s
+  `server_running` means "this launch bound the agent socket". `AgentServer+Socket.swift` lost
+  `portOnlyReason` and `socketPlan`'s port arm and gained `mcpHelperURL` (this bundle's own
+  `Contents/Helpers/reelcut-mcp`) and `mcpCommand(helperPath:)`. `AppDelegate.swift`'s launch
+  only binds and its quit only releases (the TCP quit-join hang is gone with `stop()`);
+  `toggleAgentServer`, `startAgentServer` and their validator arm are gone. **Tools ▸ Copy MCP
+  Command** (`copyMCPCommand`, enabled exactly while the helper is an executable file, live with
+  no document, no MCP mirror) clears the general pasteboard and sets the `claude mcp add --scope
+  user reelcut -- '<path>'` line, each `'` in the path written `'\''`. `UIMenuTable.swift` and
+  `capture_spike/inventory.json` carry `copyMCPCommand:` as `none` in the old row's place.
+- **App, MC-5 carried per call.** "May ask" is decided where a tool call hands work to the
+  importer, never read from process-wide state, so a person's own import still asks while a call
+  runs: `FFmpegRewrap.assist(_:mayAsk:)` replaces `canAsk` (767 → 761 lines),
+  `MediaImporter.probe(url:mayAsk:completion:)` requires the argument (every click path passes
+  `true`; `import_media` and `relink_media` pass `false`, and `record_screen` passes `false`
+  through `ScreenRecorder.start(…, mayAsk:)`, which `Session` carries to the finished movie's
+  probes), and `open_project` runs its synchronous `makeDocument` inside
+  `MediaImporter.withoutAsking`, a thread-scoped key `probeBlocking` reads. A tool call's refusal
+  of a file an installed ffmpeg could convert names the setting (`neverAsksSentence`).
+  `AgentLane.swift` is untouched.
+- **The proofs.** `mcp.py` speaks HTTP over the socket (`UnixHTTPConnection`; `MCP(<int>)`
+  raises a `TypeError` naming MC4) and is the shared launcher (`scratch_socket`,
+  `remove_scratch`, `log_beside`, `wait_listening`, `socket_pid`, `target`, `launch`,
+  `Launched`, `LSREGISTER`). Every proof that takes a running instance takes its socket; every
+  proof that launches its own does so on a scratch socket; the spikes' launches moved too (none
+  was run). `agent_socket_proof.py` retired K2, K10 and `no-port-rule`, and gained K11 (no TCP
+  listener), K12 (MC-5's two halves) and K13 (Copy MCP Command, with
+  `tools/proof/pasteboard_keep.swift` keeping the person's clipboard byte for byte) and four
+  mutants. The `AgentServerEnabled` pins left the harness and the probes.
+- **Documents.** Root `CLAUDE.md`'s launch block and its rule (the printed folder named
+  literally), the README's agent section (Copy MCP Command, `claude mcp add`, Claude Desktop's
+  JSON, the socket's owner-only access), `app/CLAUDE.md`, `core/CLAUDE.md`, spec §7.9a, §7.9b,
+  §9 (the Tools menu), §11 MC-5 and MC-6 with their index rows, the spec index's Lines cells,
+  `docs/manual-checks.md` (REC-7, REC-8 and HS-2 on a scratch socket; new AC-4 and AC-5),
+  `tools/proof/README.md` (`mcp.py`'s paragraph, every how-to-run line and launch block, a note
+  that the ports in dated records are what ran then, and an MC4 section) and `dist_check.py`'s
+  marker comment.
+
+**MC-5's mechanism sentence**, as spec §11 now words it: "for the import a tool call starts,
+decided where the call hands work to the importer (`import_media`, `relink_media`,
+`open_project`, `record_screen`), `FFmpegRewrap`'s `ask` means no and the stored policy decides
+alone, exactly as under `-AgentServerEnabled YES` before MC4".
+
+**Deviations from this road map's MC4 text**, each decided in the phase's spec:
+- **MC-5 is a property of the call, not of the lane.** The text above has `canAsk` read "a call is
+  running" from the lane; a process-wide flag would have made a person's own MKV import refuse
+  silently while any off-main tool call ran, against MC-5's "a click still does". The callers
+  decide instead (above), and K12 gained an `open_project` half.
+- **The TCP mutant is a fresh listener**, not the old one restored: `tcp-listener` adds a POSIX
+  `socket`/`bind 127.0.0.1:0`/`listen` after the `listening at` line and leaks it.
+- **`agent-asks` and `open-asks` replace a `can-ask` mutant**, one per place a call hands work to
+  the importer; `fixed-path` is the Copy MCP Command mutant.
+- **`mcp.launch` does not pop `RC_AGENT_PORT`** (the spec's interface says it does): the name is
+  in the phase's own clean-tree grep's scope, and the app no longer reads the variable, so the pop
+  would do nothing.
+- **Comments outside the spec's list** were corrected where they named a deleted function:
+  `AgentServer.swift`'s and root `CLAUDE.md`'s `start()` (the parity check now runs in
+  `prepareCatalog()`), `app/CLAUDE.md`'s gate entry, the trampoline's "both listeners" and
+  `AppDelegate`'s "as the agent-server item below is".
+- **Proof files outside the spec's list moved with what they call:** `cloud_captions_live.py`
+  (`cloud_captions_proof.Instance` lost the port) and `recording_probe.py`'s `recorder.start`
+  call (`mayAsk: true`, or the probe would not compile). The
+  `AgentServerEnabled` pins in `recording_probe.py` were nine sites, not five, plus one mutant
+  sentence; all went.
+
+**Checked**, every instance my own, no model call and no spend (**$0**). `lstat` of
+`~/Library/Application Support/Reelcut/Agent/` and `agent.sock`: absent before the first proof and
+after the last; `lsregister -dump` holds no registration under `tools/proof/work/agent-socket/`
+before or after; no scratch folder left under `$TMPDIR`; no instance of this tree left running.
+
+| Command | Answer |
+|---|---|
+| `cd core && cargo fmt --check && cargo test --release` | clean; every suite ok (`agent_socket` 6) |
+| `make test`; `make lint`; `make typecheck` | exit 0 (lane 18/18, prompt probe 14/14, prices 27/27, budget 23/23, inventory 5/5); exit 0; 0 errors, the 4 baseline warnings, tsc clean |
+| `make app`; `make dist` | BUILD SUCCEEDED; `dist_check: 24/24`; no `Reelcut: ` in either log |
+| `agent_socket_proof.py` | 15/15, twice (before and after the final `make app`); after the review's fixes, 15/15 again with a non-empty plain-text clipboard, restored (`restored 1 items`) — and K13 driven with its setup made to raise, before the copy and after it: a FAIL each time, never a SKIP, the clipboard untouched in the first and restored in the second |
+| `mcp_proxy_proof.py` | 14/14 in 39 s |
+| `v2_menu.py --only H`; `capture_spike/inventory.py --check` | 5 pass of 5; 5/5 (AppDelegate's two pins found at moved lines) |
+| the two greps of the phase's Verification | nothing |
+
+The mutants (each a `tree_copy` copy built by its own `make app`, every row run, `lsregister -u`
+before and after):
+
+| Mutant | Named row | Answer |
+|---|---|---|
+| `no-connect-first` | K4 | FAIL, caught, exit 0 |
+| `no-mode-check` | K8 | FAIL, caught, exit 0 |
+| `tcp-listener` | K11 | FAIL (`TCP 127.0.0.1:50225 (LISTEN)`), caught, exit 0 |
+| `agent-asks` | K12, the import half | FAIL (a 20 s timeout: the question was up), caught, exit 0 |
+| `open-asks` | K12, the open half | FAIL (a 20 s timeout), the import half ok, caught, exit 0 |
+| `fixed-path` | K13 | FAIL (the item disabled: no helper at the fixed path), caught, exit 0; again after the review's fixes, over a non-empty clipboard, which K13 restored |
+
+Every free proof this phase edited that drives an app, over sockets (a fresh instance per proof
+for the ones that take a running instance), against its last record:
+
+| Proof | MC4 | Last record |
+|---|---|---|
+| `phase1_proof.py` · `phase2_proof.py` · `phase3_proof.py` | 66/66 · 86/86 · 123/123 | 66/66 (2026-09-20, road map 7) · 86/86 · 123/123 (2026-09-22, road map 8) |
+| `phase3_silence_scope.py` | 8/8 | 8/8 (2026-09-30, B22) |
+| `phase4_proof.py` · `phase5_proof.py` · `phase6_proof.py` · `phase7_proof.py` | 83/83 · 88/88 · 168/168 · 92/92 | 83/83 (2026-09-24, road map 9) · 88/88 (2026-09-20) · 168/168 (2026-09-24) · 92/92 (2026-09-17) |
+| `phase8_proof.py` | 79/79 (its two instances on scratch sockets) | 75/76, the ProRes decode a host skip (2026-09-29, B11) |
+| `phase9_proof.py` | 218/218 | 218/218 (2026-10-01, B44) |
+| `silence2_proof.py` | 100/100 | 100/100 (2026-09-30, B30) |
+| `patch_door_proof.py` · `refusal_proof.py` | 261/261 · 145/145 | 261/261 (2026-09-24) · 116/116 (2026-09-22; rows added since without a record) |
+| `clip_catalog_proof.py` | **0/1**: its probe does not compile (`switch must be exhaustive` over `AgentDeclaration.Requirement`, which gained `.filledByTheApp` in road map 10) — not this phase's; nothing reached the app; #214 | 24/24 (2026-09-20, road map 7) |
+| `op_catalog_proof.py` · `op_argument_proof.py` | 23/23 · 153/153 (150/153 first, run beside the mutant builds: its graphics-root wait raced another instance's untitled project, as B16 recorded) | 23/23 (2026-09-29, B16) · 153/153 (2026-10-01, B44) |
+| `e1_proof.py` | 89/99, exit 1: every measured row ok; the 10 cross-build rows SKIP by name, because the reference tree (`1c3e92e`) listens on TCP alone and cannot answer at a socket; #215 | 99/99 (2026-09-24, road map 9) |
+| `e2_proof.py` · `mixed_audio_proof.py` | 75/75 · 13/13 | 75/75 (2026-09-30, B30) · 13/13 (2026-09-21) |
+| `peaks_proof.py` | 21/21 (1/3 first: its fixtures are `peaks_probe.py`'s, made next — that probe 79/80, its one FAIL the delayed-AAC row road map 4 also recorded) | 21/21 (road map 4) |
+| `relink_proof.py` · `remaining_proof.py` | 22/22 · 80/80 | 22/22 · 80/80 (2026-09-30, B29) |
+| `reveal_toll_proof.py` · `target_bump_proof.py` · `video_configuration_proof.py` | capture then compare on this build both times: 6/6 · 3/3 · 2/2 then 7/7 | 6/6 · 3/3 (2026-09-25) · 2/2, 7/7 (2026-09-29, B11), each against a control build |
+| `save_project_proof.py` · `close_project_proof.py` | 9 of 9 · 12 of 12 | 9/9 (2026-09-29, B14) · 12/12 (2026-10-01, B44) |
+| `speech_engine_proof.py` (with its mutants) | 35/35 | 35/35 (2026-09-23, road map 8); 29/29 `--no-mutants` (2026-09-29) |
+| `words_core_proof.py` · `words_picture_proof.py` | 27/27 · 7/7 | 27/27 (2026-09-29, B7) · 7/7 (2026-09-25) |
+| `recording_proof.py` | 192/192, the 2 tone rows skipped by name (the output is muted); 191/192 first — the granted instance's parity log was removed with its scratch folder before the row read it, so the folder now goes at the end | 189/189 (2026-10-01, B44); 192/192 (2026-09-30) |
+| `v2_snapshot.py` · `v2_menu.py` | 30 of 30 · 28 of 28 | 29 of 29 (2026-09-27, road map 11) · 28 of 28 (2026-09-30) |
+| `assistant_session_proof.py` · `assistant_tab_proof.py` · `assistant_settings_proof.py` | 13/13 (W: `not bound` in a `0755` folder, `server_running` false) · 26/26 · 3/3 | 13/13 · 26/26 · 3/3 (2026-10-01, B48) |
+| `assistant_compaction_proof.py --rehearse` · `assistant_prompt_proof.py --rehearse` | 8/8, 1 skipped · 25/25, 1 skipped | 8/8, 1 skipped (B48) · 18/18, 8 skipped, run without `--rehearse` (B48) |
+| `spend_proof.py` · `spend_ui_proof.py` | 21/21 · 10/10 | 21/21 (2026-09-29, B15) · 10/10 (2026-10-01, B48) |
+| `clip_inspector6_proof.py` | 25/25 | 25/25 (2026-10-01, B50) |
+| `cloud_captions_proof.py` · `word_captions_proof.py` | 213/213 · 20/20 | 213/213 · 20/20 (2026-10-01) |
+| `export_cancel_proof.py` | 7/7 in 548 s | 7/7 (2026-09-29, B13) |
+| `extreme_time_proof.py` · `frame_grid_proof.py` | the pass line each, no parity complaint | the same (2026-10-01) |
+| `graphics_proof.py` · `graphics_menu_proof.py` · `graphics_inspector_proof.py` | 45/45 · 16/16 · 59/59 | 45/45 (2026-09-30) · 16/16 (2026-09-29, B8) · 59/59 (2026-10-01, B50) |
+| `graphics_prefetch_proof.py` · `graphics_store_proof.py` | 7/7 · 9/9 | 7/7 (2026-09-30, #127) · 9/9 (2026-09-25) |
+| `screens.py` · `v3_tools.py` | 23 of 23 (22 of 23 first: P2 FAILED on three `static let …Key` literals neither pinned nor in `NOT_SHOWN` — `RC_AGENT_SOCKET` (MC2), `RCWriteCatalog` (MC3), `ReelcutGraphicPrefetchOff` (#127), two of them this road map's; all three are now in `NOT_SHOWN`, each with why no screen shows it) · 8 of 8 | 23 of 23 · 8 of 8 (2026-10-01, B49) |
+| `mcp_proxy_proof.py` | 14/14 | 14/14 (2026-10-01, MC3) |
+
+Not run: `graphics_playback_samples.py` (a sample builder with no score, hard-wired to the main
+checkout's paths), the spikes, and every `--live` run.
+
+**Owed:** AC-4 (Copy MCP Command's line in Terminal, then `claude mcp list`) and AC-5 (a
+person's own import asks while an agent's export runs), with AC-1..AC-3 from MC1 and MC3. Two
+proof failures are filed: `clip_catalog_proof.py`'s probe no longer compiles (#214, since road
+map 10), and `e1_proof.py` can never exit 0 while its reference build listens on TCP alone
+(#215, this phase's). MC5 is next: the ADR, the archive
+move, the Rasterize issue, the issue for a later home for Copy MCP Command, and older proofs'
+LaunchServices registrations.

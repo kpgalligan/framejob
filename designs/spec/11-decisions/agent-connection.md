@@ -36,9 +36,10 @@ The road map that makes these is in progress: `designs/reelcut-roadmap-14.md`, w
   quit it and check <the socket's folder>", so an instance that never binds is not joined by
   another on every call.
 - **MC-5 — A tool call never raises a modal question; a click still does.** "Nobody at the
-  keyboard" stops being a launch-wide flag and becomes a property of the call: while the lane is
-  running a tool call (`AgentLane`, which already tracks it), `FFmpegRewrap`'s `ask` means no
-  and the stored policy decides alone, exactly as under `-AgentServerEnabled YES` today;
+  keyboard" stops being a launch-wide flag and becomes a property of the call: for the import a
+  tool call starts, decided where the call hands work to the importer (`import_media`,
+  `relink_media`, `open_project`, `record_screen`), `FFmpegRewrap`'s `ask` means no and the
+  stored policy decides alone, exactly as under `-AgentServerEnabled YES` before MC4;
   `-RCFFmpegImport always` stays the way a scripted run asks for the conversion. This also
   covers a background-launched instance (MC-4), where an alert would bounce in the Dock with the
   agent's call held behind it, and it removes the persisted-switch wrinkle (road map 14, "What
@@ -49,6 +50,5 @@ The road map that makes these is in progress: `designs/reelcut-roadmap-14.md`, w
   to a Reelcut it launches (`open --env`), so a proof can drive the proxy against a scratch
   instance. Such a launch also passes `-ApplePersistenceIgnoreState YES` and writes the
   instance's stderr to `reelcut-launch.log` beside the socket; a launch for the person's own
-  socket passes neither. Until MC4, a launch that sets `RC_AGENT_PORT` and not `RC_AGENT_SOCKET` binds no
-  socket, because every proof of the era sets `RC_AGENT_PORT` and would otherwise bind the
-  person's; MC4 deletes this rule with `RC_AGENT_PORT`.
+  socket passes neither. An interim rule bound no socket for a launch that set `RC_AGENT_PORT`
+  and not `RC_AGENT_SOCKET`; MC4 deleted it with `RC_AGENT_PORT`.

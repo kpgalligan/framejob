@@ -5,12 +5,11 @@
 //! start, so this module stays generic: it knows the catalog it was given
 //! and nothing about documents.
 //!
-//! Transport notes: two listeners speak the same HTTP through the same
-//! `serve` loop. [`start`] binds TCP on 127.0.0.1 only; [`start_socket`]
-//! binds a Unix socket at a path (road map 14, spec §11 MC-1), chmod 0600,
-//! never unlinking a file already there. Either answers every JSON-RPC POST
-//! with a single `application/json` response (the streamable-HTTP spec
-//! allows this in place of an SSE stream). Stateless — no session IDs are
+//! Transport notes: one listener, [`start_socket`], binds a Unix socket at
+//! a path (road map 14, spec §11 MC-1), chmod 0600, never unlinking a file
+//! already there; road map 14's MC4 deleted the TCP one. It answers every
+//! JSON-RPC POST with a single `application/json` response (the
+//! streamable-HTTP spec allows this in place of an SSE stream). Stateless — no session IDs are
 //! issued, and GET/DELETE report 405 as the spec directs for servers
 //! without server-push or client-terminated sessions.
 //!
@@ -24,7 +23,6 @@
 //! unlinks it only then and abandons the listener without a join.
 
 use std::io::Read;
-use std::net::{Ipv4Addr, SocketAddrV4};
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -70,7 +68,7 @@ impl SocketClaim {
 pub struct AgentServer {
     server: Arc<tiny_http::Server>,
     thread: Option<JoinHandle<()>>,
-    /// The socket file this listener bound; None for TCP.
+    /// The socket file this listener bound.
     claim: Option<SocketClaim>,
 }
 
@@ -105,33 +103,6 @@ impl AgentServer {
 }
 
 const MAX_BODY_BYTES: usize = 8 * 1024 * 1024;
-
-/// Starts the server on 127.0.0.1:`port` (0 picks an ephemeral port) and
-/// returns the bound port with the running server.
-pub fn start(port: u16, config: AgentConfig) -> Result<(u16, AgentServer), String> {
-    if !config.tools.is_array() {
-        return Err("tools catalog must be a JSON array".to_string());
-    }
-    let addr = SocketAddrV4::new(Ipv4Addr::LOCALHOST, port);
-    let server = tiny_http::Server::http(addr)
-        .map_err(|e| format!("could not bind 127.0.0.1:{port}: {e}"))?;
-    let server = Arc::new(server);
-    let bound = server
-        .server_addr()
-        .to_ip()
-        .map(|a| a.port())
-        .ok_or_else(|| "server bound to a non-IP address".to_string())?;
-    let accept = Arc::clone(&server);
-    let thread = std::thread::spawn(move || serve(accept, config));
-    Ok((
-        bound,
-        AgentServer {
-            server,
-            thread: Some(thread),
-            claim: None,
-        },
-    ))
-}
 
 /// Binds the server on a Unix socket at `path`, chmod 0600, and returns the
 /// running server with its claim on the file. A relative path and one over

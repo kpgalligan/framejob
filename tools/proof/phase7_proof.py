@@ -153,9 +153,9 @@ import subprocess
 import sys
 import zlib
 
-from mcp import MCP, ToolError
+from mcp import MCP, ToolError, target
 
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 4823
+SOCKET = target(sys.argv)
 HERE = os.path.dirname(os.path.abspath(__file__))
 WORK = os.path.join(HERE, "work")
 
@@ -1108,8 +1108,8 @@ def main():
                   "with it and sections 3 and 5 read written files through them.")
             return 2
     os.makedirs(WORK, exist_ok=True)
-    mcp = MCP(PORT)
-    print(f"phase 7 — Output, against 127.0.0.1:{PORT}")
+    mcp = MCP(SOCKET)
+    print(f"phase 7 — Output, against {SOCKET}")
 
     section("0 — the two new instruments, scored before anything leans on them",
             instruments_part, mcp)

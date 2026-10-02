@@ -11,7 +11,7 @@ A3 (spec §11 AI-7, AI-9, AI-15).
           live context block's; F8 holds each ask-first row's reason to a
           write (#158). `--probe` runs these alone:
           no app, no bun — the line `make test` runs.
-Launch S (Release app, port 4878, `-AgentServerEnabled YES`, a dummy
+Launch S (Release app, a scratch socket, a dummy
 `-RCSecretFolder`, `RC_ASSISTANT_BASE_URL` at the stand-in):
   S0  no `Reelcut: ` line
   S1  POST 1's system is `system`, a blank line, `search_guide`
@@ -22,8 +22,8 @@ Launch S (Release app, port 4878, `-AgentServerEnabled YES`, a dummy
       and its `messages[0]` is turn 1's (append-only, AI-9)
   S3  a reply of 300000 input tokens makes the next POST, the summary,
       carry `compaction_instructions` verbatim
-The evaluation (`assistant_prompt_eval.py`, imported), launch E on port 4880
-through the relay:
+The evaluation (`assistant_prompt_eval.py`, imported), launch E on a scratch
+socket, through the relay:
   E1–E6  six asks, each in a project of its own, judged by `get_project`
           placement only; an E row whose session met the month's budget FAILs
           `budget: …`, one that met the cap `cap: …`
@@ -49,14 +49,14 @@ deleted first; `--month-spent D` (rehearsal only) seeds it with D dollars
 already spent this month, so `--month-spent 24.99` shows every E row refused
 `budget:` with nothing sent to the stand-in. `--mutant bare-send` builds a tree copy (`tree_copy.make_copy`, into
 `work/assistant_prompt/mutant/tree`) whose `send` writes the bare
-text and runs S2 against it (port 4881): it must FAIL (exit 1; 0 when it
+text and runs S2 against it: it must FAIL (exit 1; 0 when it
 survives); a copy that did not build exits 2, and so (rule R, issue batch
 B13) does a run whose S2 was never scored or was scored by a caught
 exception or a launch that could not run: `mutant <name>: the control could
 not be performed — <why>`.
 
-Safety: every child's environment has `ANTHROPIC_API_KEY`, `RC_ASSEMBLYAI_KEY`
-and `RC_AGENT_PORT` popped; the app and helper get only the dummy
+Safety: every child's environment has `ANTHROPIC_API_KEY` and
+`RC_ASSEMBLYAI_KEY` popped; the app and helper get only the dummy
 `proof-key`. The real key is read once, by `assistant_prompt_eval.anthropic_key`,
 and leaves this process only as the relay's `x-api-key` to the live API. Rule
 H: only this script's process groups are killed, with the helper children
@@ -84,7 +84,6 @@ SOURCES = os.path.join(ROOT, "app", "Sources")
 PROBE_SWIFT = os.path.join(HERE, "assistant_prompt_probe.swift")
 LIB = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
 WALL_BUILD, WALL_RUN, WALL_TURN = 900, 300, 60
-PORT_S, PORT_E, PORT_MUTANT = 4878, 4880, 4881
 PROBE_ROWS = ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "M1", "M2", "M3", "M4", "M5",
               "M6"]
 EVAL_ROWS = ["E1", "E2", "E3", "E4", "E5", "E6", "H", "K"]
@@ -96,7 +95,6 @@ def child_env():
     env = bounded.child_env()
     env.pop("ANTHROPIC_API_KEY", None)
     env.pop("RC_ASSEMBLYAI_KEY", None)  # bounded pops it too; this file does not rely on that
-    env.pop("RC_AGENT_PORT", None)
     return env
 
 
@@ -320,13 +318,12 @@ def row_s3(asp, app, fake, texts, ctx):
                                        f"compaction_instructions verbatim {carried}")
 
 
-def launch_s(asp, app_path, port, secrets, fake, texts, score, guarded, only_s2=False):
+def launch_s(asp, app_path, secrets, fake, texts, score, guarded, only_s2=False):
     folder = os.path.join(WORK, "s")
     shutil.rmtree(folder, ignore_errors=True)
     os.makedirs(folder)
     app = asp.App("S" if not only_s2 else "mutant", app_path,
-                  ["-AgentServerEnabled", "YES", "-RCSecretFolder", secrets], fake.base,
-                  port=port)
+                  ["-RCSecretFolder", secrets], fake.base)
     ctx = {}
     ids = ["S2"] if only_s2 else ["S0", "S2", "S1", "S3"]
     try:
@@ -469,7 +466,7 @@ def main():
                 print(f"0/1\nmutant {args.mutant}: the control could not be performed — "
                       f"the mutant did not build: {why}", flush=True)
                 return 2
-            launch_s(asp, app, PORT_MUTANT, secrets, fake, None, score, guarded, only_s2=True)
+            launch_s(asp, app, secrets, fake, None, score, guarded, only_s2=True)
         except Exception as error:  # noqa: BLE001 — an instrument that cannot run is a FAIL
             score("setup", False, f"the instrument could not run: {type(error).__name__}: "
                                   f"{error}", instrument=True)
@@ -485,7 +482,7 @@ def main():
     try:
         fake = asp.Fake(os.path.join(WORK, "fake"))
         secrets = asp.secret_folder()
-        launch_s(asp, release, PORT_S, secrets, fake, texts, score, guarded)
+        launch_s(asp, release, secrets, fake, texts, score, guarded)
 
         key = ev.anthropic_key() if args.live else None
         if args.live:
@@ -529,9 +526,8 @@ def main():
             os.makedirs(folder, exist_ok=True)
             posts_before = stand_in_posts()
             app = asp.App("E", release,
-                          ["-AgentServerEnabled", "YES", "-RCSecretFolder", secrets,
-                           "-ReelcutAssistantModel", "claude-opus-5-5"], relay.base,
-                          port=PORT_E)
+                          ["-RCSecretFolder", secrets,
+                           "-ReelcutAssistantModel", "claude-opus-5-5"], relay.base)
             try:
                 app.connect()
                 app.mcp.timeout = ev.TURN_SECONDS + 120

@@ -173,7 +173,7 @@ extension EditorViewController {
     private func addImageBackground(
         from url: URL, into document: ProjectDocument, in window: NSWindow
     ) {
-        MediaImporter.probe(url: url) { [weak self] result in
+        MediaImporter.probe(url: url, mayAsk: true) { [weak self] result in
             switch result {
             case .failure(let error):
                 NSAlert(error: error).beginSheetModal(for: window, completionHandler: nil)

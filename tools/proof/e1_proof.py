@@ -2,7 +2,7 @@
 over MCP, and against a SECOND binary built from the tree as it stood before
 E1 landed.
 
-    python3 tools/proof/e1_proof.py [port=4825] [reference_port=4826]
+    python3 tools/proof/e1_proof.py <dir>/agent.sock [<reference dir>/agent.sock]
 
 Every claim here is a placement read back through `get_project`, a BYTE
 comparison of two PNGs, or a sample-for-sample comparison of two decoded
@@ -14,7 +14,8 @@ silent, exactly as it did before `curve` and `audio` existed (spec §11,
 R5-2). "Exactly" is only checkable against a build that never had them, so
 the reference tree is `1c3e92e` — the commit before E1's first toll —
 extracted into `tools/proof/work/e1-reference`, built there, and launched on
-its own port. Its format version is SIX, so it refuses anything this build
+its own socket (a tree that old listens on TCP alone, so since road map
+14's MC4 it does not answer and the reference rows skip by name). Its format version is SIX, so it refuses anything this build
 saves; every fixture the two share is therefore hand-written back to version
 6 by `as_version`, which is also exactly the file a person who used the app
 last month has on disk.
@@ -75,7 +76,7 @@ import zlib
 from array import array
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from mcp import MCP, ToolError  # noqa: E402
+from mcp import MCP, ToolError, log_beside, target  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -642,11 +643,11 @@ def tool_counts(mcp):
     return tools, ops
 
 
-def log_is_clean(port):
-    """`grep "Reelcut: " /tmp/reelcut-<port>.log` printing nothing — the
+def log_is_clean(socket_path):
+    """`grep "Reelcut: " <dir>/reelcut.log` printing nothing — the
     prefix the startup parity check complains with. A log this script cannot
     find is not a pass."""
-    path = f"/tmp/reelcut-{port}.log"
+    path = log_beside(socket_path)
     if not os.path.exists(path):
         return False, f"{path} does not exist"
     with open(path, encoding="utf-8", errors="replace") as handle:
@@ -654,7 +655,7 @@ def log_is_clean(port):
     return not bad, "; ".join(bad[:3]) if bad else "clean"
 
 
-def counts_part(mcp, reference, port, reference_port):
+def counts_part(mcp, reference, socket_path, reference_socket):
     print("\n0 — the two instances, scored before anything is built on them")
     tools, ops = tool_counts(mcp)
     check(len(tools) >= TOOLS_FLOOR,
@@ -662,7 +663,7 @@ def counts_part(mcp, reference, port, reference_port):
           "— a FLOOR: op_argument_proof.py owns the exact count")
     check(len(ops) >= OPS_FLOOR,
           f"…of which at least {OPS_FLOOR} take the scope envelope ({len(ops)})")
-    ok, detail = log_is_clean(port)
+    ok, detail = log_is_clean(socket_path)
     check(ok, f"this build's parity log is empty ({detail})")
 
     if reference is None:
@@ -677,7 +678,7 @@ def counts_part(mcp, reference, port, reference_port):
           f"the reference build publishes exactly {REFERENCE_TOOLS} tools ({len(rtools)})")
     check(len(rops) == REFERENCE_OPS,
           f"…and exactly {REFERENCE_OPS} ops ({len(rops)}) — the two instances cannot be confused")
-    ok, detail = log_is_clean(reference_port)
+    ok, detail = log_is_clean(reference_socket)
     check(ok, f"the reference build's parity log is empty ({detail})")
     missing = sorted(set(tools) - set(rtools))
     print(f"      this build adds {len(missing)} tools over the reference: "
@@ -1356,18 +1357,19 @@ def silence_part(mcp):
 
 
 def main():
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else 4825
-    reference_port = int(sys.argv[2]) if len(sys.argv) > 2 else 4826
+    socket_path = target(sys.argv)
+    reference_socket = sys.argv[2] if len(sys.argv) > 2 else None
     os.makedirs(WORK, exist_ok=True)
-    print(f"E1 — transitions, second pass. Build on {port}, reference on {reference_port}.")
-    mcp = MCP(port)
+    print(f"E1 — transitions, second pass. Build at {socket_path}, reference at "
+          f"{reference_socket}.")
+    mcp = MCP(socket_path)
     try:
-        reference = MCP(reference_port)
-    except Exception as error:               # noqa: BLE001 — reported, never fatal
-        print(f"  (the reference instance on {reference_port} did not answer: {error})")
+        reference = MCP(target(sys.argv, 2, env_fallback=False))
+    except (Exception, SystemExit) as error:  # noqa: BLE001 — reported, never fatal
+        print(f"  (the reference instance at {reference_socket} did not answer: {error})")
         reference = None
 
-    reference = counts_part(mcp, reference, port, reference_port)
+    reference = counts_part(mcp, reference, socket_path, reference_socket)
 
     v6_wipe, _ = write_v6_pair(mcp, "e1-v6-wipe", "wipe")
     v6_dissolve, _ = write_v6_pair(mcp, "e1-v6-dissolve", "cross_dissolve")

@@ -178,7 +178,9 @@ extension AgentServer {
             finished.signal()
         }
         onMain {
-            recorder.start(filter: filter, choice: choice, onFinish: deliver) { error in
+            recorder.start(
+                filter: filter, choice: choice, mayAsk: false, onFinish: deliver
+            ) { error in
                 startBox.value = error.map { .failure($0) } ?? .success(())
                 started.signal()
             }

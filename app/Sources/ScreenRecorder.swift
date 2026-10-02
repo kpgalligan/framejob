@@ -144,6 +144,9 @@ final class ScreenRecorder: NSObject {
     /// arguments the first was built from.
     struct Session {
         let choice: RecordingChoice
+        /// Whether the finished movie's probe may ask the conversion
+        /// question: false for `record_screen` (spec §11 MC-5).
+        let mayAsk: Bool
         let displayPointSize: CGSize
         let scale: CGFloat
         let stream: SCStream
@@ -210,7 +213,7 @@ final class ScreenRecorder: NSObject {
     /// file output, then the stream, all in this one run-loop turn. The
     /// first segment is minted here, named by the call's own time.
     func start(
-        filter: SCContentFilter, choice: RecordingChoice,
+        filter: SCContentFilter, choice: RecordingChoice, mayAsk: Bool,
         onFinish: @escaping (Result<RecordingResult, Error>) -> Void,
         completion: @escaping (Error?) -> Void
     ) {
@@ -269,7 +272,8 @@ final class ScreenRecorder: NSObject {
         }
         microphoneProblem = nil
         session = Session(
-            choice: choice, displayPointSize: displayPointSize, scale: scale, stream: stream,
+            choice: choice, mayAsk: mayAsk, displayPointSize: displayPointSize, scale: scale,
+            stream: stream,
             micSession: mic?.session, micOutput: mic?.output, calledAt: calledAt,
             onFinish: onFinish,
             segments: [

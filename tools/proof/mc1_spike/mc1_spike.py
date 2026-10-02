@@ -59,6 +59,7 @@ sys.path.insert(0, os.path.join(PROOF, "graphics_spike"))
 sys.path.insert(0, PROOF)
 
 import bounded  # noqa: E402
+import mcp  # noqa: E402
 import tree_copy  # noqa: E402
 
 WORK = os.path.join(PROOF, "work", "mc1_spike")
@@ -556,8 +557,13 @@ def free_port():
         return probe.getsockname()[1]
 
 
-def post(port, payload, timeout=1.0):
-    connection = http.client.HTTPConnection("127.0.0.1", port, timeout=timeout)
+def post(where, payload, timeout=1.0):
+    """One POST to /mcp: `where` is a socket path (an instance since road map
+    14's MC4) or a port (L0's control, where nothing listens)."""
+    if isinstance(where, str):
+        connection = mcp.UnixHTTPConnection(where, timeout=timeout)
+    else:
+        connection = http.client.HTTPConnection("127.0.0.1", where, timeout=timeout)
     try:
         connection.request("POST", "/mcp", json.dumps(payload),
                            {"Content-Type": "application/json",
@@ -662,10 +668,10 @@ def launch(bundle, label, want_tools=False, bound=60.0):
     logs = os.path.join(WORK, "q2")
     os.makedirs(logs, exist_ok=True)
     log = os.path.join(logs, f"{label}.log")
-    port = free_port()
+    port = mcp.scratch_socket()
     before = windows(0)
-    argv = ["open", "-n", "-g", "--env", f"RC_AGENT_PORT={port}", "--stderr", log, bundle,
-            "--args", "-AgentServerEnabled", "YES", "-ApplePersistenceIgnoreState", "YES"]
+    argv = ["open", "-n", "-g", "--env", f"RC_AGENT_SOCKET={port}", "--stderr", log, bundle,
+            "--args", "-ApplePersistenceIgnoreState", "YES"]
     opened = {}
 
     def opener():
@@ -720,6 +726,7 @@ def launch(bundle, label, want_tools=False, bound=60.0):
             result["reelcut_lines"] = [line for line in handle if "Reelcut: " in line]
     except OSError:
         result["reelcut_lines"] = None
+    mcp.remove_scratch(port)
     return result
 
 

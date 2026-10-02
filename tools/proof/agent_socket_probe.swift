@@ -3,8 +3,8 @@
 // in app/Sources on harness/build.sh's swiftc line, it asks the app's own
 // `AgentServer.socketPlan` — the pure half of `bindSocket` — for each case
 // below and prints one JSON line per case, then one line with
-// `AgentServer.defaultSocketPath` (a path only; it creates nothing), which
-// K10 reads. Nothing here binds, connects or writes a file.
+// `AgentServer.defaultSocketPath` (a path only; it creates nothing). Nothing
+// here binds, connects or writes a file.
 
 import Foundation
 
@@ -13,8 +13,7 @@ let scratchSocket = "/probe/scratch/agent.sock"
 
 let cases: [(name: String, environment: [String: String], defaultPath: String?)] = [
     ("empty", [:], fixedDefault),
-    ("port", ["RC_AGENT_PORT": "4941"], fixedDefault),
-    ("port+socket", ["RC_AGENT_PORT": "4941", "RC_AGENT_SOCKET": scratchSocket], fixedDefault),
+    ("socket", ["RC_AGENT_SOCKET": scratchSocket], fixedDefault),
     ("empty-socket", ["RC_AGENT_SOCKET": ""], fixedDefault),
     ("nil-default", [:], nil),
 ]

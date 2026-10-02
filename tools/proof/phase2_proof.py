@@ -20,9 +20,9 @@ import subprocess
 import sys
 from array import array
 
-from mcp import MCP, ToolError
+from mcp import MCP, ToolError, target
 
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 4823
+SOCKET = target(sys.argv)
 HERE = os.path.dirname(os.path.abspath(__file__))
 MEDIA = os.path.join(HERE, "media")
 WORK = os.path.join(HERE, "work")
@@ -285,7 +285,7 @@ def strip_v3(text):
 
 def main():
     os.makedirs(WORK, exist_ok=True)
-    mcp = MCP(PORT)
+    mcp = MCP(SOCKET)
 
     # ---- A. the catalog ---------------------------------------------------
     print("catalog")

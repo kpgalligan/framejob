@@ -2,10 +2,10 @@
 """Issue batch B10 — `save_project` on a document the app has written
 `cache/` into (#138), proved against the running app.
 
-    python3 tools/proof/save_project_proof.py <port> [--log PATH]
+    python3 tools/proof/save_project_proof.py <dir>/agent.sock [--log PATH]
 
-`--log` defaults to `/tmp/reelcut-<port>.log`. The app is a Release build on
-`<port>`, FRESH for each run: every row writes its own package under
+`--log` defaults to `<dir>/reelcut.log`. The app is a Release build at the
+socket, FRESH for each run: every row writes its own package under
 `work/save_project/` (`v2_snapshot.write_package`'s shape at `"version": 9`,
 640×360 at 30 fps, one track, no clips, and NO `cache/`), and a package an
 instance already has open would answer `already_open`.
@@ -59,7 +59,7 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "capture_spike"))
 import v2_snapshot  # noqa: E402
 from e1_proof import format_version  # noqa: E402
-from mcp import MCP, ToolError  # noqa: E402
+from mcp import MCP, ToolError, log_beside, target  # noqa: E402
 
 WORK = os.path.join(HERE, "work", "save_project")
 CANVAS = {"width": 640, "height": 360, "fps": [30, 1], "background": [0.0, 0.0, 0.0, 1.0],
@@ -225,14 +225,15 @@ def guarded(rids, row, *args):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("port", type=int)
+    parser.add_argument("socket", nargs="?")
     parser.add_argument("--log")
     args = parser.parse_args()
-    log = args.log or f"/tmp/reelcut-{args.port}.log"
+    socket_path = target([sys.argv[0], args.socket or ""])
+    log = args.log or log_beside(socket_path)
     shutil.rmtree(WORK, ignore_errors=True)
     os.makedirs(WORK)
 
-    mcp = MCP(args.port, timeout=120)
+    mcp = MCP(socket_path, timeout=120)
     row_t1(log)
     guarded("P0", row_p0, mcp)
     guarded("P1", row_p1, mcp)

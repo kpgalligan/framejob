@@ -3,8 +3,8 @@
 (§10.6), §9a's G3 item 3 — G0's q7 package rows, run against `graphics/`
 itself rather than `media/` as the stand-in.
 
-One owned instance on its own port, launched and stopped by PID, with its log
-at `tools/proof/work/graphics-store/reelcut-<port>.log`; nothing else is
+One owned instance on a scratch socket, launched and stopped by PID, with its log
+at `tools/proof/work/graphics-store/reelcut.log`; nothing else is
 ever killed. Every child runs under `graphics_spike/bounded.py`, and every
 wait is a bounded poll.
 
@@ -28,7 +28,7 @@ S8  `new_project {path: P3}`, `add_track`, `save_project`: saved, and
 S9  the instance stopped, `mkdir P3/graphics` + `mv v.js` while closed,
     relaunched, `open_project`, `add_track`, `save_project`: saved, present.
 
-    python3 tools/proof/graphics_store_proof.py [--port 4851] [--app PATH]
+    python3 tools/proof/graphics_store_proof.py [--app PATH]
 
 Made to fail by hand once (road map 10 §10.6): the whitelist line in
 `fileWrapper(ofType:)` commented out and the app rebuilt, S3 reads ABSENT.
@@ -37,7 +37,6 @@ Made to fail by hand once (road map 10 §10.6): the whitelist line in
 import argparse
 import glob
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -64,34 +63,28 @@ def check(name, good, detail=""):
 
 
 class Instance:
-    """One owned app, by PID, on its own port; each launch reads only the part
-    of the log it appended."""
+    """One owned app, by PID, on a scratch socket of its own (the same one
+    for every relaunch); each launch reads only the part of the log it
+    appended."""
 
-    def __init__(self, app, port, log):
-        self.app, self.port, self.log = app, port, log
+    def __init__(self, app, log):
+        self.app, self.log = app, log
+        self.socket = mcp.scratch_socket()
         self.child = None
 
     def start(self):
         offset = self.log.stat().st_size if self.log.exists() else 0
+        os.makedirs(os.path.dirname(self.socket), mode=0o700, exist_ok=True)
         with open(self.log, "a") as out:
             self.child = subprocess.Popen(
-                [str(self.app), "-ApplePersistenceIgnoreState", "YES",
-                 "-AgentServerEnabled", "YES"],
+                [str(self.app), "-ApplePersistenceIgnoreState", "YES"],
                 stdin=subprocess.DEVNULL, stdout=out, stderr=out, start_new_session=True,
-                env=bounded.child_env({"RC_AGENT_PORT": str(self.port),
+                env=bounded.child_env({"RC_AGENT_SOCKET": self.socket,
                                        "TMPDIR": str(WORK / "tmp") + "/"}))
-        deadline = time.monotonic() + 60
-        while time.monotonic() < deadline:
-            time.sleep(0.25)
-            with open(self.log) as handle:
-                handle.seek(offset)
-                found = re.search(r"listening on http://127\.0\.0\.1:(\d+)/mcp", handle.read())
-            if found:
-                bound = int(found.group(1))
-                print(f"  instance PID {self.child.pid} on port {bound}", flush=True)
-                if bound != self.port:
-                    print(f"  (asked for {self.port}; a taken port fell back)", flush=True)
-                return mcp.MCP(bound, timeout=CALL_BOUND)
+        if mcp.wait_listening(self.log, self.socket, child=self.child, seconds=60,
+                              offset=offset):
+            print(f"  instance PID {self.child.pid} at {self.socket}", flush=True)
+            return mcp.MCP(self.socket, timeout=CALL_BOUND)
         return None
 
     def stop(self):
@@ -104,6 +97,7 @@ class Instance:
             self.child.kill()
             self.child.wait()
         self.child = None
+        mcp.remove_scratch(self.socket)
 
 
 def attempt(client, tool, arguments):
@@ -160,16 +154,16 @@ def complaints(log):
         return ["the log could not be read"]
 
 
-def run(app, port):
-    log = WORK / f"reelcut-{port}.log"
+def run(app):
+    log = WORK / "reelcut.log"
     p1, p1b, p2, p3 = (WORK / f"{n}.reelcut" for n in ("P1", "P1b", "P2", "P3"))
     texts = {n: f"export function render() {{ return '<svg/>' }} // {n}\n"
              for n in ("x.js", "y.js", "u.js", "v.js")}
-    instance = Instance(app, port, log)
+    instance = Instance(app, log)
     try:
         client = instance.start()
         if client is None:
-            check("S2 the app launches", False, "the app never logged its port")
+            check("S2 the app launches", False, "the app never logged its socket")
             return log
         made = attempt(client, "new_project", {"path": str(p1)})
         check("S2 new_project {path: P1} leaves P1/graphics ABSENT",
@@ -258,7 +252,6 @@ def run(app, port):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--port", type=int, default=4851)
     parser.add_argument("--app", type=Path, default=APP)
     args = parser.parse_args()
     print("G3a — the package's graphics/ folder against the built app (proof)", flush=True)
@@ -268,7 +261,7 @@ def main():
         return 1
     shutil.rmtree(WORK, ignore_errors=True)
     (WORK / "tmp").mkdir(parents=True)
-    log = run(args.app, args.port)
+    log = run(args.app)
     found = complaints(log)
     check("S1 grep \"Reelcut: \" over every launch's log prints nothing", found == [],
           f"{found[:5]}")

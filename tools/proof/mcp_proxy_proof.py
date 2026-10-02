@@ -91,7 +91,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
+sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
+from mcp import LSREGISTER  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/mcp-proxy"
 APP = ROOT / "build/Build/Products/Release/Reelcut.app"
@@ -99,13 +101,11 @@ SUPPORT = Path.home() / "Library/Application Support/Reelcut"
 PERSON_PATHS = [SUPPORT / "Agent", SUPPORT / "Agent/agent.sock",
                 SUPPORT / "Agent/agent.launch.lock"]
 PROXY_RELATIVE = "Contents/Helpers/reelcut-mcp"
-LSREGISTER = ("/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/"
-              "LaunchServices.framework/Versions/A/Support/lsregister")
 SNAPSHOT_RELATIVE = "Contents/Resources/agent-catalog.json"
 MAX_PATH = 103
 CALL_BOUND = 90
 DROP = ("ANTHROPIC_API_KEY", "RC_ASSEMBLYAI_KEY", "CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT",
-        "RC_AGENT_PORT", "RC_AGENT_SOCKET", "RC_MCP_LAUNCH_WAIT")
+        "RC_AGENT_SOCKET", "RC_MCP_LAUNCH_WAIT")
 # How a proxy-side failure of a call begins (mcp-proxy/src): an answer that
 # begins with none of these is the app's.
 PROXY_SENTENCES = ("Reelcut did not answer at ", "could not connect to Reelcut",

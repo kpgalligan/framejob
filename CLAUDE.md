@@ -197,7 +197,7 @@ else is what bloats files:
   files are the parent text for anything not settled here.
 - **Every user-visible edit gets an MCP mirror** (spec §7.9): a handler, a
   catalog entry, and a comment naming the UI path. The startup parity check
-  in `AgentServer.start()` has FIVE parts: catalog names against handler
+  in `AgentServer.prepareCatalog()` has FIVE parts: catalog names against handler
   names, every op in the core's table against the tools (through
   `rc_op_names`, with an explicit allow-list for ops that deliberately have
   none), each tool's schema shape, that every op tool declares `scope`, and
@@ -241,20 +241,28 @@ else is what bloats files:
 ## Verifying a build
 
 The app is verified by driving the built binary over MCP and comparing what
-it renders — not by reading code. Launch your own instance on your own port
+it renders — not by reading code. Launch your own instance on your own socket
 and only ever kill that one (`pgrep -f "MacOS/Reelcut"` lists them; another
 session may have one running):
 
 ```sh
 make app
-(RC_AGENT_PORT=4817 RC_AGENT_SOCKET="$(mktemp -d)/agent.sock" \
-   ./build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut \
-   -ApplePersistenceIgnoreState YES -AgentServerEnabled YES > /tmp/reelcut-4817.log 2>&1 &)
+d="$(mktemp -d)"; echo "$d"
+(RC_AGENT_SOCKET="$d/agent.sock" ./build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut \
+   -ApplePersistenceIgnoreState YES > "$d/reelcut.log" 2>&1 &)
 ```
 
-The log line names the port it actually bound (a taken port falls back to an
-ephemeral one). Drive it with any MCP client over streamable HTTP at
-`http://127.0.0.1:<port>/mcp`: one tool per §6 op, each taking the `scope`
+Each later command names the printed folder literally
+(`mcp.MCP("<dir>/agent.sock")`, `python3 tools/proof/phaseN_proof.py
+<dir>/agent.sock`, `grep "Reelcut: " <dir>/reelcut.log`), because a shell
+variable does not survive from one agent command to the next; stop it by the
+pid `mcp.socket_pid` answers.
+
+The log line `Reelcut agent socket listening at <dir>/agent.sock` says it is
+up (`not bound: <reason>` says why not). Drive it with `tools/proof/mcp.py`'s
+`mcp.MCP("<dir>/agent.sock")` (streamable HTTP over the Unix socket), or with
+the bundled stdio helper `reelcut-mcp` with `RC_AGENT_SOCKET` set to the same
+path: one tool per §6 op, each taking the `scope`
 envelope key, plus the app-state tools — `open_project`, `new_project`,
 `save_project`, `close_project`, `get_project`, `import_media`,
 `import_captions`, `export_captions`, `transcribe`, `consolidate_media`, `detect_silence`,
@@ -271,7 +279,7 @@ and the catalog are the authority for the counts; the parity check compares
 them at startup. `render_frame` writes a PNG and returns its path; `export`
 waits for the file.
 
-**Before trusting any MCP proof, `grep "Reelcut: " /tmp/reelcut-<port>.log`
+**Before trusting any MCP proof, `grep "Reelcut: " <dir>/reelcut.log`
 must print nothing** — that prefix is the startup parity check complaining.
 
 **`tools/proof/` holds the scripts that do this** — an MCP script per phase

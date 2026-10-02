@@ -556,7 +556,7 @@ def one_run(kind):
     if not os.path.exists(binary):
         record["error"] = "no app binary"
         return record
-    fake, child = None, None
+    fake, child, sock = None, None, None
     try:
         # (1) the stand-in, and the T scenario before anything can ask.
         fake, fake_port = start_fake(os.path.join(folder, "fake"))
@@ -566,31 +566,22 @@ def one_run(kind):
         # (2) the app, with screens.py's argv and a fresh secret folder.
         secrets = os.path.join(folder, "secrets")
         os.makedirs(secrets)
-        port = free_port()
-        argv = [binary, "-ApplePersistenceIgnoreState", "YES", "-AgentServerEnabled", "YES",
+        sock = mcp.scratch_socket()
+        argv = [binary, "-ApplePersistenceIgnoreState", "YES",
                 "-RCSecretFolder", secrets, "-RCAssemblyAIEndpoint", "http://127.0.0.1:9",
                 "-NSRecentDocumentsLimit", "0", "-RCAssistantSpikeLog", hook_log]
-        env = child_env({"RC_AGENT_PORT": str(port), "RC_ASSISTANT_BASE_URL": base})
+        env = child_env({"RC_AGENT_SOCKET": sock, "RC_ASSISTANT_BASE_URL": base})
         log_path = os.path.join(folder, "app.log")
         handle = open(log_path, "w")
         child = subprocess.Popen(argv, env=env, stdin=subprocess.DEVNULL, stdout=handle,
                                  stderr=subprocess.STDOUT, start_new_session=True)
         handle.close()
-        # (3) the bound port.
-        pattern = re.compile(r"listening on http://127\.0\.0\.1:(\d+)/mcp")
-        bound = None
-        deadline = time.monotonic() + WALL_LAUNCH
-        while time.monotonic() < deadline and bound is None:
-            if child.poll() is not None:
-                break
-            found = pattern.findall(open(log_path, errors="replace").read())
-            if found:
-                bound = int(found[-1])
-            else:
-                time.sleep(0.25)
+        # (3) the bound socket.
+        listening = mcp.wait_listening(log_path, sock, child=child, seconds=WALL_LAUNCH)
+        bound = sock if listening else None
         record["bound"] = bound
         if bound is None:
-            record["error"] = f"no port within {WALL_LAUNCH} s (exit {child.poll()})"
+            record["error"] = f"no socket within {WALL_LAUNCH} s (exit {child.poll()})"
             return record
         client = mcp.MCP(bound, timeout=WALL_EXPORT)
         # (4) the project the hook waits for.
@@ -630,6 +621,7 @@ def one_run(kind):
         record["helpers_ours"] = ours
         kill_group(child)
         kill_group(fake)
+        mcp.remove_scratch(sock)
         time.sleep(1.0)
         running = set(helper_processes(helper_path))
         left = [pid for pid in ours if pid in running]

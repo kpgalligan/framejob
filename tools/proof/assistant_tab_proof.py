@@ -93,8 +93,8 @@ with a DUMMY key in a `-RCSecretFolder` of its own,
       `figureTooltip`, the row's width the same for all seven; at 480 (the
       control) each shows `figure`, fitting
 
-Live A (`-AgentServerEnabled YES`, the dummy `proof-key` in `-RCSecretFolder`,
-`RC_ASSISTANT_BASE_URL` at `anthropic_fake.py`, port 4874), every turn through
+Live A (a scratch socket, the dummy `proof-key` in `-RCSecretFolder`,
+`RC_ASSISTANT_BASE_URL` at `anthropic_fake.py`), every turn through
 the tab's own controls (`assistant_send` / `assistant_answer` with `pane`):
   L0  no `Reelcut: ` line
   L1  `perform_menu_item View ▸ Assistant` shows the tab; the inspector dump
@@ -207,7 +207,6 @@ LIB = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
 RELEASE = os.path.join(ROOT, asp.APP_PATH)
 HELPER = os.path.join(RELEASE, "Contents", "Helpers", "reelcut-agent")
 FORWARD = "session.onEvent ="
-PORT_A, PORT_B = 4874, 4877
 WALL_BUILD, WALL_RUN, WALL_TURN = 900, 300, 60
 PROBE_ROWS = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P9", "P10", "P11", "P12", "P13"]
 PROBE_ROWS += ["P15"]
@@ -777,8 +776,7 @@ def row_k(app, ctx):
 
 
 def row_n1(fake):
-    app = asp.App("B", RELEASE, ["-AgentServerEnabled", "YES",
-                                 "-ReelcutInspectorCollapsed", "NO"], fake.base, port=PORT_B)
+    app = asp.App("B", RELEASE, ["-ReelcutInspectorCollapsed", "NO"], fake.base)
     try:
         app.connect()
         project = app.must("new_project").get("path")
@@ -912,9 +910,9 @@ def main():
                 return 2
             # One log per mutant, so each launch's "Reelcut: " grep is kept.
             app = asp.App(f"mutant-{args.mutant}", built,
-                          ["-AgentServerEnabled", "YES", "-RCSecretFolder",
+                          ["-RCSecretFolder",
                            secrets, "-ReelcutInspectorCollapsed", "NO"],
-                          fake.base, port=PORT_A)
+                          fake.base)
             try:
                 app.connect()
                 open_tab(app, ctx)
@@ -932,9 +930,9 @@ def main():
                 return 2
             # One log per mutant, so each launch's "Reelcut: " grep is kept.
             app = asp.App(f"mutant-{args.mutant}", built,
-                          ["-AgentServerEnabled", "YES", "-RCSecretFolder",
+                          ["-RCSecretFolder",
                            secrets, "-ReelcutInspectorCollapsed", "NO"],
-                          fake.base, port=PORT_A)
+                          fake.base)
             try:
                 app.connect()
                 open_tab(app, ctx)
@@ -954,9 +952,9 @@ def main():
             except Exception as error:  # noqa: BLE001 — an instrument that cannot run is a FAIL
                 score("P14", False, f"the instrument could not run: {type(error).__name__}: "
                                     f"{error}", instrument=True)
-            app = asp.App("A", RELEASE, ["-AgentServerEnabled", "YES", "-RCSecretFolder",
+            app = asp.App("A", RELEASE, ["-RCSecretFolder",
                                          secrets, "-ReelcutInspectorCollapsed", "NO"],
-                          fake.base, port=PORT_A)
+                          fake.base)
             live = ("L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "K")
             try:
                 app.connect()

@@ -11,10 +11,11 @@ bytes, and looks for ONE needle: the `devToolsMarker` literal declared in
 
 **Why a marker and not the tool names.** Swift string literals of 15 UTF-8
 bytes or fewer are stored inline in the code of an `-O` binary, not as
-contiguous bytes (`RC_AGENT_PORT`, 13, and `unsaved_changes`, 15, are found 0
-times in the Release binary; `AgentServerEnabled`, 18, once), so a short tool
-name could never be found in either build and an absence check on it would
-pass for nothing. The marker is at least 16 bytes, and the flag-on
+contiguous bytes (road map 11 measured a Release binary that still held two
+names road map 14's MC4 has since deleted: `RC_AGENT_PORT`, 13 bytes, found 0
+times, and `AgentServerEnabled`, 18, once; `unsaved_changes`, 15, 0 times), so
+a short tool name could never be found in either build and an absence check
+on it would pass for nothing. The marker is at least 16 bytes, and the flag-on
 `devTools()` logs it, which keeps the literal live in the optimised binary.
 
 **The helper (road map 12 A4).** Both bundles carry the assistant helper,

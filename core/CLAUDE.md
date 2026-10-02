@@ -478,12 +478,12 @@ governs a module now.
   no partial value — never "the canvas is translucent".
 - `agent.rs` — embedded MCP server (streamable HTTP, tools only).
   **Generic** — knows nothing about video; the host registers the catalog
-  and a callback. Copied from Rasterize; do not add domain knowledge. Two
-  transports through one `serve` loop: `start` (TCP on 127.0.0.1, until road
-  map 14's MC4) and `start_socket` (a Unix socket at an absolute path of at
-  most `MAX_SOCKET_PATH_BYTES`, 103, chmod 0600, never unlinking a file
-  already there). **`tiny_http` 0.12's `Server` drop unlinks its path
-  unconditionally (MC1's S7)**, so a socket listener records its file's
+  and a callback. Copied from Rasterize; do not add domain knowledge. One
+  listener, `start_socket` (a Unix socket at an absolute path of at most
+  `MAX_SOCKET_PATH_BYTES`, 103, chmod 0600, never unlinking a file already
+  there), into the `serve` loop; road map 14's MC4 deleted the TCP `start`.
+  **`tiny_http` 0.12's `Server` drop unlinks its path unconditionally (MC1's
+  S7)**, so a socket listener records its file's
   device and inode as a `SocketClaim`: `shutdown` lets the drop run only
   while the claim `is_current`, and forgets the server otherwise; `release`
   (the quit path) unlinks only a current file and then forgets the whole
@@ -499,10 +499,9 @@ governs a module now.
   only; shared plumbing lives in `ffi_util.rs`, never copy-pasted.
   `ffi_query.rs`'s rule: a query never allocates a handle and has no
   `err_out`, which is why `rc_project_scoped` lives in `ffi.rs`.
-  `ffi_agent.rs` has two slots, one listener each per process: `SERVER`
-  (`rc_agent_server_start` / `_stop`, TCP) and `SOCKET`
-  (`rc_agent_socket_start` / `_release`); both starts build their
-  `AgentConfig` through the one `host_config`, so the two serve one catalog
+  `ffi_agent.rs` has one slot, one listener per process: `SOCKET`
+  (`rc_agent_socket_start` / `_release`; MC4 deleted the TCP pair and its
+  slot), whose `AgentConfig` is built by `host_config`, one catalog
   through one handler.
 - `ffi_graphic.rs` — the ten `rc_graphic_*` exports (road map 10 §5e)
   and the ONLY module of `core/src/` that names the `graphic` crate (spec

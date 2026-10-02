@@ -8,11 +8,11 @@ The fixture is `target_bump_proof.py`'s `document()` — a media clip
 shape clip on three tracks — written as `<dir>/frames.reelcut` by `capture`
 and opened again by `compare`.
 
-    python3 tools/proof/video_configuration_proof.py <port> capture <dir>   # the CONTROL tree
-    python3 tools/proof/video_configuration_proof.py <port> compare <dir>   # the tree under test
+    python3 tools/proof/video_configuration_proof.py <socket> capture <dir>   # the CONTROL tree
+    python3 tools/proof/video_configuration_proof.py <socket> compare <dir>   # the tree under test
     python3 tools/proof/video_configuration_proof.py --mutant keep-frame-duration compare <dir>
 
-Over MCP (the caller owns the instance on <port>; nothing is launched or
+Over MCP (the caller owns the instance at <socket>; nothing is launched or
 killed): `render_frame` at the three ticks, and `export` of `apng`, `gif` and
 `prores_422` at the canvas's 30 fps. Through the probe
 (`video_configuration_probe.swift`, built as `export_cancel_proof.py`'s
@@ -54,7 +54,7 @@ ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "graphics_spike"))
 import bounded  # noqa: E402
-from mcp import MCP  # noqa: E402
+from mcp import MCP, target  # noqa: E402
 from target_bump_proof import TICKS, document, package  # noqa: E402
 
 SOURCES = os.path.join(ROOT, "app", "Sources")
@@ -272,12 +272,12 @@ def export(mcp, project, preset, path):
 
 # ---- the modes --------------------------------------------------------------
 
-def capture(port, where):
+def capture(socket_path, where):
     shutil.rmtree(where, ignore_errors=True)
     os.makedirs(where)
     package(where, "frames", document())
     project = os.path.join(where, "frames.reelcut")
-    mcp = MCP(port)
+    mcp = MCP(socket_path)
     mcp.call("open_project", path=project)
     for tick in TICKS:
         kept = os.path.join(where, f"t{tick}.png")
@@ -339,7 +339,7 @@ def compare_probe(where, binary, why, row_id="V7"):
     score(row_id, ok, "probe ProRes at 25 fps, masked, against the control: " + detail)
 
 
-def compare(port, where):
+def compare(socket_path, where):
     project = os.path.join(where, "frames.reelcut")
     if not os.path.isdir(project):
         sys.exit(f"no control package at {project}; run capture on the control tree first")
@@ -347,7 +347,7 @@ def compare(port, where):
     shutil.rmtree(out_dir, ignore_errors=True)
     os.makedirs(out_dir)
     started = time.time() - 1
-    mcp = MCP(port)
+    mcp = MCP(socket_path)
     mcp.call("open_project", path=project)
     for index, tick in enumerate(TICKS, 1):
         written = render(mcp, tick)
@@ -406,11 +406,11 @@ def main():
         sys.exit(run_mutant(args[1], os.path.abspath(args[3])))
     if len(args) != 3 or args[1] not in ("capture", "compare"):
         sys.exit(__doc__)
-    port, mode, where = int(args[0]), args[1], os.path.abspath(args[2])
+    socket_path, mode, where = target(args, 0), args[1], os.path.abspath(args[2])
     if mode == "capture":
-        capture(port, where)
+        capture(socket_path, where)
     else:
-        compare(port, where)
+        compare(socket_path, where)
     passed = sum(1 for _, ok, _ in rows if ok)
     print(f"{passed}/{len(rows)}", flush=True)
     sys.exit(0 if rows and passed == len(rows) else 1)

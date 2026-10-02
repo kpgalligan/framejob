@@ -2,7 +2,7 @@
 """The assistant's end-of-turn compaction, against the stand-in or the real
 API — issue batch B26 (#161; spec §11 AI-9, AI-18).
 
-One Release app (port 4883, `-AgentServerEnabled YES`, a dummy
+One Release app (a scratch socket, a dummy
 `-RCSecretFolder`, `-RCDevAssistantAutoCompact 1`, the Assistant tab open)
 is pointed at the relay of `assistant_prompt_eval.py` (imported), which
 forwards to the stand-in (`--rehearse`) or the real API (`--live`). Two turns
@@ -47,8 +47,7 @@ POST `budget:`. A turn a refused POST touched FAILs its rows naming `cap:` or
 `--cap` prints the headroom and exits 2 before launching anything.
 `--mutant extra-instruction` builds a tree copy (`tree_copy.make_copy`, into
 `work/assistant_compaction/mutant/tree`) whose session appends " Be brief."
-to the compaction instructions and runs the right rehearsal against it
-(port 4884): rule R — exit 1 when C3 FAILs, 0 when it passes, 2 when the copy,
+to the compaction instructions and runs the right rehearsal against it: rule R — exit 1 when C3 FAILs, 0 when it passes, 2 when the copy,
 anchor or build fails, C3 is never scored or any row is an instrument failure.
 
 Safety: the key is read once, by `assistant_prompt_eval.anthropic_key`, and
@@ -77,7 +76,6 @@ import prices  # noqa: E402
 import tree_copy  # noqa: E402
 
 WORK = os.path.join(HERE, "work", "assistant_compaction")
-PORT_C, PORT_MUTANT = 4883, 4884
 KNOB = 1
 SHIPPED = 300_000
 BURN_TO = 71
@@ -629,13 +627,13 @@ def print_report(ctx, relay, ledger):
           "every run", flush=True)
 
 
-def converse(asp, atp, app_path, port, secrets, relay, texts, folder, stand_in, wrong, key):
+def converse(asp, atp, app_path, secrets, relay, texts, folder, stand_in, wrong, key):
     """Launch, fixture, two turns and the rows C0–C6."""
     try:
         app = asp.App("C", app_path,
-                      ["-AgentServerEnabled", "YES", "-RCSecretFolder", secrets,
+                      ["-RCSecretFolder", secrets,
                        "-ReelcutInspectorCollapsed", "NO", "-ReelcutAssistantModel", MODEL,
-                       "-RCDevAssistantAutoCompact", str(KNOB)], relay.base, port=port)
+                       "-RCDevAssistantAutoCompact", str(KNOB)], relay.base)
     except Exception:
         relay.stop()  # the `finally` below is not reached; main scores the setup failure
         raise
@@ -765,7 +763,6 @@ def main():
 
     mode = "live" if args.live else ("mutant" if args.mutant else "rehearsal")
     release = os.path.join(ROOT, asp.APP_PATH)
-    port = PORT_C
     if args.mutant:
         try:
             release, why = build_mutant(asp, asp.child_env)
@@ -776,7 +773,6 @@ def main():
             print(f"0/1\nmutant {args.mutant}: the control could not be performed — the mutant "
                   f"did not build: {why}", flush=True)
             return 2
-        port = PORT_MUTANT
 
     key = None
     if args.live:
@@ -825,7 +821,7 @@ def main():
         print(spend.describe(), flush=True)
         secrets = asp.secret_folder()
         posts_before = app_.stand_in_posts()
-        ctx = converse(asp, atp, release, port, secrets, relay, texts, folder, fake,
+        ctx = converse(asp, atp, release, secrets, relay, texts, folder, fake,
                        args.wrong, key)
         if fake is not None:
             print(f"the stand-in logged {app_.stand_in_posts() - posts_before} POSTs", flush=True)

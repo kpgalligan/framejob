@@ -146,11 +146,11 @@ instant between the call and a minute after it — a formatter left in local
 time fails that row by the host's UTC offset wherever the host is not at
 UTC.
 
-With the grant, the tier launches a SECOND instance of the same binary on
-`GRANTED_PORT` with `-RCRecordingFolder` pointing into `work/recordings/`
+With the grant, the tier launches a SECOND instance of the same binary on a
+scratch socket (`mcp.launch`) with `-RCRecordingFolder` pointing into `work/recordings/`
 (`phase8_proof.py`'s `Instance`, copied whole), reads the Microphone grant
 off THAT instance (the one the microphone rows run on — it used to be read
-off the port instance, whose grant is a fact about another process), prints
+off the socket's instance, whose grant is a fact about another process), prints
 in its summary line the binary it launched and the RESPONSIBLE application
 of BOTH instances — the launchd-started ancestor of each, which is whose
 Screen Recording grant a direct launch runs under (R0 q1) — and asserts, in
@@ -299,7 +299,7 @@ And a microphone that FAILS mid-recording (the `mic_problem` answer with a
 sentence in it) needs a device to unplug: what is measured is that a
 microphone that lands carries no such key, and the source read of the key.
 
-    python3 tools/proof/recording_proof.py [port] [log path]
+    python3 tools/proof/recording_proof.py <dir>/agent.sock [log path]
 """
 
 import hashlib
@@ -317,12 +317,12 @@ import time
 import wave
 from datetime import datetime
 
-from mcp import MCP, ToolError
+import mcp as mcp_launch
+from mcp import MCP, ToolError, log_beside, remove_scratch, socket_pid, target
 from dev_tools import DEV_TOOLS
 
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 4895
-LOG = sys.argv[2] if len(sys.argv) > 2 else f"/tmp/reelcut-{PORT}.log"
-GRANTED_PORT = 4896
+SOCKET = target(sys.argv)
+LOG = sys.argv[2] if len(sys.argv) > 2 else log_beside(SOCKET)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 WORK = os.path.join(HERE, "work")
@@ -429,9 +429,7 @@ NOTHING_TO_UNDO = "There is nothing to undo."
 # `AgentServer+Render.swift`'s sentence, read the way every earlier script
 # reads it.
 FRAME_SENTENCE = re.compile(r"Written to (\S+\.png)\.")
-# `AgentServer.start()`'s two NSLog lines: the bound port, and the startup
-# parity check complaining — which must never appear.
-BOUND_PORT = re.compile(r"listening on http://127\.0\.0\.1:(\d+)/mcp")
+# The startup parity check complaining — which must never appear.
 PARITY = "Reelcut: "
 # Black, as ffmpeg's signalstats reports a video-range PNG rendered black.
 BLACK_YAVG = 16.0
@@ -658,47 +656,34 @@ def luma_average(png):
 
 
 class Instance:
-    """One Reelcut launched BY THIS SCRIPT, on a port of its own.
+    """One Reelcut launched BY THIS SCRIPT, on a scratch socket of its own.
 
     No proof script in this tree had ever launched the app before phase 8,
     and this one does it for one reason: `PreviewQuality` is read from
     `UserDefaults` at `Playback.init` and there is no tool that sets it, so
     the only way a proof can put a quality into a running Reelcut is the
-    argument domain at launch. `-ApplePersistenceIgnoreState` and
-    `-AgentServerEnabled` already travel that way (CLAUDE.md's launch line);
-    this adds one more argument to the same list.
+    argument domain at launch. `-ApplePersistenceIgnoreState` already
+    travels that way (CLAUDE.md's launch line); this adds one more argument
+    to the same list. The launch is `mcp.launch`.
 
     **It kills only what it started.** `subprocess.Popen`'s own pid, SIGTERM
     then SIGKILL, and nothing in this file ever reads `pgrep` — another
     session's instance is none of its business (`tools/proof/README.md`)."""
 
-    def __init__(self, tag, port, extra=()):
+    def __init__(self, tag, extra=()):
         self.tag = tag
-        self.log = f"/tmp/reelcut-recording-{tag}-{os.getpid()}.log"
+        self.started = mcp_launch.launch(BINARY, list(extra), env=dict(os.environ), seconds=45,
+                                         timeout=180)
+        self.process = self.started.child
+        self.socket = self.started.socket_path
+        self.log = self.started.log_path
         logs[tag] = self.log
-        self.handle = open(self.log, "wb")
-        env = dict(os.environ, RC_AGENT_PORT=str(port))
-        self.process = subprocess.Popen(
-            [BINARY, "-ApplePersistenceIgnoreState", "YES", "-AgentServerEnabled", "YES",
-             *extra],
-            stdout=self.handle, stderr=subprocess.STDOUT, env=env)
         launched.append(self)
-        self.port = self._await_port()
-        self.mcp = MCP(self.port, timeout=180)
-
-    def _await_port(self, seconds=45):
-        """The port the instance actually bound, off its own log."""
-        deadline = time.time() + seconds
-        while time.time() < deadline:
-            if self.process.poll() is not None:
-                raise RuntimeError(
-                    f"the {self.tag} instance exited with {self.process.returncode} before "
-                    f"it bound a port — {self.log}")
-            found = BOUND_PORT.search(read(self.log).decode("utf-8", "replace"))
-            if found:
-                return int(found.group(1))
-            time.sleep(0.2)
-        raise RuntimeError(f"the {self.tag} instance never named a port in {self.log}")
+        if self.started.client is None:
+            raise RuntimeError(
+                f"the {tag} instance did not bind its socket (rc {self.process.poll()}) — "
+                f"{self.log}")
+        self.mcp = self.started.client
 
     def stop(self):
         if self.process.poll() is None:
@@ -709,7 +694,6 @@ class Instance:
             if self.process.poll() is None:
                 self.process.send_signal(signal.SIGKILL)
                 self.process.wait(timeout=10)
-        self.handle.close()
 
 
 def stop_launched():
@@ -1333,17 +1317,6 @@ def responsible_application(pid=None):
     return name
 
 
-def listening_pid(port):
-    """The pid listening on `port` — the instance this script was handed,
-    which it did not launch and never touches; `lsof` is a READ."""
-    try:
-        out = subprocess.run(["lsof", "-nP", f"-iTCP:{port}", "-sTCP:LISTEN", "-t"],
-                             capture_output=True, text=True, timeout=20).stdout.split()
-    except (OSError, subprocess.SubprocessError):
-        return None
-    return int(out[0]) if out else None
-
-
 def size_matches(width, height, host, best):
     """The display's point size (pixels under `best`), allowing +1 on an odd
     dimension: the H.264 writer rounds up to even (R0 q4: 1117 → 1118)."""
@@ -1470,17 +1443,17 @@ def granted_tier(mcp):
     entitled = "com.apple.security.device.audio-input" in subprocess.run(
         ["codesign", "-d", "--entitlements", "-", APP], capture_output=True, text=True).stdout
 
-    instance = Instance("granted", GRANTED_PORT, extra=("-RCRecordingFolder", RUN))
+    instance = Instance("granted", extra=("-RCRecordingFolder", RUN))
     try:
         # The second precondition, read off the LAUNCHED instance — the one
         # the microphone rows run on — with the same never-records call.
         mic = refusal(instance.mcp, "record_screen",
                       {"seconds": 1, "microphone": True, "project": "/nowhere/x.reelcut"})
         authorized = mic is not None and NO_OPEN_PROJECT.match(mic) is not None
-        port_pid = listening_pid(PORT)
-        print(f"  granted tier: {BINARY} launched by this script on port {instance.port}, "
+        port_pid = socket_pid(SOCKET)
+        print(f"  granted tier: {BINARY} launched by this script at {instance.socket}, "
               f"under the grants of {responsible_application(instance.process.pid)}; the "
-              f"instance on port {PORT} (pid {port_pid}) runs under "
+              f"instance at {SOCKET} (pid {port_pid}) runs under "
               f"{responsible_application(port_pid) if port_pid else '?'}")
         skipped_inside, failed = run_rows("recording rows", GRANTED_CHECKS, granted_rows,
                                           instance.mcp, host)
@@ -1928,12 +1901,16 @@ def microphone_rows(mcp):
 def cleanup():
     for folder in (RUN, PROBE_FOLDER, DOCS, SELFTEST):
         shutil.rmtree(folder, ignore_errors=True)
+    # Each launched instance's scratch socket folder, with its log, once the
+    # parity checks have read it.
+    for instance in launched:
+        remove_scratch(instance.socket)
 
 
 def main():
     os.makedirs(WORK, exist_ok=True)
-    mcp = MCP(PORT, timeout=180)
-    print(f"road map 3, R1 and R2 — record_screen, against 127.0.0.1:{PORT}")
+    mcp = MCP(SOCKET, timeout=180)
+    print(f"road map 3, R1 and R2 — record_screen, against {SOCKET}")
     try:
         section("0 — the catalog: 75 or more, record_screen's arguments, no scope on it",
                 catalog_part, mcp)

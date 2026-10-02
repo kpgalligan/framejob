@@ -3,7 +3,7 @@
 AssemblyAI. Reached by `cloud_captions_proof.py --live` and by nothing else,
 so a routine proof run cannot spend money:
 
-    python3 tools/proof/cloud_captions_proof.py --live --port-base 4980
+    python3 tools/proof/cloud_captions_proof.py --live
 
 **The key** is read in one place, `cloud_spike/aai.py`'s `client_from_env`,
 which never returns the string: it goes into one `authorization` header
@@ -64,7 +64,7 @@ LIVE_ROW_COUNT = 37
 # The dummy arm — R6-9 proved against nothing billable, before the real key
 
 
-def dummy_arm(proof, client, binary, port, probe, ledger):
+def dummy_arm(proof, client, binary, probe, ledger):
     """An instance with the DUMMY key and NO endpoint override: the credential
     must resolve to the environment's dummy (the store's folder is empty), the
     real service must refuse it, and nothing may be submitted. `probe` is
@@ -77,7 +77,7 @@ def dummy_arm(proof, client, binary, port, probe, ledger):
     """
     print("\n20d. the dummy arm — R6-9's empty store, the environment's key, a real 401")
     rid = reserve(ledger, "20d", "dummy")
-    with proof.Instance("L0", port, None, binary, key=proof.DUMMY, live=True) as instance:
+    with proof.Instance("L0", None, binary, key=proof.DUMMY, live=True) as instance:
         before = sorted(os.listdir(instance.secrets))
         session = proof.Session(instance, "live-dummy")
         media = session.media_of(make_fixture())
@@ -352,7 +352,7 @@ def sweep(proof, instance, ledger, scrubber, state):
                 f"{ledger.total_seconds():.0f} planned seconds", not owed, f"owed {owed!r}")
 
 
-def run(proof, binary, port_base, probe):
+def run(proof, binary, probe):
     """The live rows, in the one order that spends nothing it need not."""
     at = proof.passed + proof.failed
     controls(proof)
@@ -395,13 +395,13 @@ def run(proof, binary, port_base, probe):
     instance = None
     state = {"since": 0, "returned": True, "session": None}
     try:
-        if not dummy_arm(proof, client, binary, port_base + 3, probe, ledger):
+        if not dummy_arm(proof, client, binary, probe, ledger):
             proof.skip_rows(left(), "the dummy arm did not hold (R6-9): a submit reached "
                                     "the wire under the dummy folder, so `cleanup` ran and "
                                     "the key WAS used \u2014 to delete what that submit made, "
                                     "and for nothing else")
             return
-        instance = proof.Instance("L1", port_base + 4, None, binary, key=proof.INHERIT,
+        instance = proof.Instance("L1", None, binary, key=proof.INHERIT,
                                   live=True)
         row_twenty(proof, instance, probe, ledger, client, make_fixture(), state)
         if state.get("ok"):
