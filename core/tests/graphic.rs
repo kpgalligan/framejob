@@ -382,6 +382,35 @@ fn a_colour_is_stored_as_lowercase_hex() {
 }
 
 #[test]
+fn a_colour_default_is_checked_against_the_colour_grammar() {
+    // G-25 (a): the same fixture as a schema's `color` DEFAULT. Every
+    // accepted text is a default `add_graphic_clip` takes; every refused one
+    // refuses the schema in the engine's sentence, `graphic/tests/module.rs`'s.
+    let text = std::fs::read_to_string(COLOURS).expect("graphic/tests/colours.json");
+    let fixture: Value = serde_json::from_str(&text).expect("the colour fixture is JSON");
+    let project = project();
+    let with = |default: &Value| {
+        let mut schema = schema();
+        schema["accent"]["default"] = default.clone();
+        add(json!({"schema": schema}))
+    };
+    let accepted = fixture["accepted"].as_array().expect("accepted");
+    assert!(!accepted.is_empty());
+    for case in accepted {
+        let after = project.apply(&with(&case[0]));
+        assert_eq!(array(&after.value(), "/clips").len(), 3, "{}", case[0]);
+    }
+    let refused = fixture["refused"].as_array().expect("refused");
+    assert!(!refused.is_empty());
+    for sent in refused {
+        assert_eq!(
+            project.errors(&with(sent)),
+            format!("schema.accent.default {sent} is not a color")
+        );
+    }
+}
+
+#[test]
 fn a_null_removes_its_key_and_the_rest_keep_their_order() {
     // `old` is a key the schema lacks, stored by an op without one.
     let stale = project().apply(&set_bare(json!({"props": {"old": 1, "tail": 2}})));

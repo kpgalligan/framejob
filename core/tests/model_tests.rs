@@ -26,9 +26,9 @@ use serde_json::{json, Value};
 
 use common::{array, assert_contains, at, cstring, expect_string, take_string, Handle};
 use reelcut_core::ffi::{
-    rc_project_clone, rc_project_free, rc_project_from_json, rc_project_new, rc_project_scoped,
-    rc_project_to_json, rc_string_free, rc_time_snap_to_frame, rc_timecode_format,
-    rc_timecode_parse,
+    rc_normalise_color, rc_project_clone, rc_project_free, rc_project_from_json, rc_project_new,
+    rc_project_scoped, rc_project_to_json, rc_string_free, rc_time_snap_to_frame,
+    rc_timecode_format, rc_timecode_parse,
 };
 use reelcut_core::ffi_agent::{
     rc_agent_server_start, rc_agent_server_stop, rc_agent_string_create,
@@ -2042,6 +2042,9 @@ fn sweep_every_export_with_nulls() -> Vec<String> {
     let text = cstring("00:00:01");
     assert!(unsafe { rc_timecode_parse(text.as_ptr(), 30, 1, ptr::null_mut()) });
     cover("rc_timecode_parse");
+
+    assert!(unsafe { rc_normalise_color(ptr::null()) }.is_null());
+    cover("rc_normalise_color");
 
     // rc_op_names takes no pointers at all, so "NULL-safe" here just means
     // it answers its documented never-NULL string.

@@ -79,6 +79,10 @@ optional.
 | `asset` | a file name in `graphics/assets/`, or `null` | `kind: "image"` |
 
 A schema that breaks a rule does not compile, and the error says which rule.
+A `color` entry's `default` must be a colour in the grammar
+`interpolateColors` lists below, or the module does not compile:
+`schema.accent.default "bluish" is not a color`. `props` receives the
+default as written, not normalised.
 `props` always has every schema key: a stored value replaces the default
 only when it fits the type. A value that does not fit is a WARNING, the
 default is drawn, and the frame still draws, e.g.

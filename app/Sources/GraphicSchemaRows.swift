@@ -11,14 +11,17 @@
 // **A value equal to the schema's default is written as `null`** (spec §11
 // G-15): the key leaves the stored props and the module draws its own
 // default, which is exactly what Reset writes too. A colour is "equal" by
-// its parsed channels, because the core accepts any string as a colour
-// default and normalises only stored values (`model_graphic.rs`).
+// its parsed channels, and a colour DEFAULT is read through the core's own
+// G-12 (`ReelColor.normalise`, spec §11 G-25), so a name or `hsl()` default
+// draws and matches as the colour it is; a default G-12 refuses does not
+// compile (`model_graphic.rs`, the engine's `props.rs`).
 
 import AppKit
 
 enum GraphicSchemaRows {
-    /// The swatch when a colour default does not parse as one of the four
-    /// hex forms (a named colour, `rgb()`): transparent black.
+    /// The swatch when a colour default is not a colour G-12 takes — which
+    /// compile refuses, so only a schema no compile checked reaches it:
+    /// transparent black.
     static let unparsedColor: RGBA = [0, 0, 0, 0]
 
     /// A JSON value from `JSONSerialization` as a prop value.
@@ -68,7 +71,10 @@ enum GraphicSchemaRows {
 
     /// The colour a `color` entry's default draws as in the well.
     static func defaultColor(_ entry: GraphicSchemaEntry) -> RGBA {
-        if case .string(let text) = entry.default, let color = rgba(css: text) { return color }
+        if case .string(let text) = entry.default, let hex = ReelColor.normalise(text),
+           let color = rgba(css: hex) {
+            return color
+        }
         return unparsedColor
     }
 

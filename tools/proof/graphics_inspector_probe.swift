@@ -240,12 +240,6 @@ check("I4 patchValue of a number equal to its default is NSNull; unequal is the 
 check("I4 .string(\"#ff5a36\") against the default \"#FF5A36\" is NSNull",
       GraphicSchemaRows.patchValue(
           .string("#ff5a36"), for: entry("color", .string("#FF5A36"))) is NSNull)
-let unparsed = GraphicSchemaRows.css(GraphicSchemaRows.unparsedColor)
-check("I4 .string(css(unparsedColor)) against the default \"white\" is NSNull",
-      GraphicSchemaRows.patchValue(.string(unparsed), for: entry("color", .string("white")))
-        is NSNull, unparsed)
-check("I4 defaultColor of \"white\" is [0, 0, 0, 0]",
-      GraphicSchemaRows.defaultColor(entry("color", .string("white"))) == [0, 0, 0, 0])
 let forms = ["#abc": "#aabbcc", "#abcd": "#aabbccdd", "#A1B2C3": "#a1b2c3",
              "#a1b2c380": "#a1b2c380"]
 let trips = forms.map { form, back -> String in
@@ -606,6 +600,93 @@ check("I19 Bad.js in graphics/ and store.rescan(): the Source section holds \"In
         && gone.note == nil && gone.row == nil && signatureAfter == signatureBefore,
       "written \(badWritten), shown \(shown), gone \(gone), signature changed "
         + "\(signatureWith != signatureBefore), back \(signatureAfter == signatureBefore)")
+
+// MARK: - I20 each Source group under a true heading (B69, #221)
+
+/// The Source section's note labels in view order, and the index (among
+/// the same views) of each, plus the first row whose label starts `head`.
+func sourceNotes(rowStarting head: String = "\u{0}") -> (notes: [String], at: [Int], row: Int?) {
+    guard let source = section("graphic.source") else { return ([], [], nil) }
+    let views = walk(source)
+    let found = views.enumerated().compactMap { index, view -> (String, Int)? in
+        guard let note = view as? InspectorNoteLabel, !note.isHidden else { return nil }
+        return (note.stringValue, index)
+    }
+    let row = views.firstIndex {
+        ($0 as? GraphicDiagnosticRow)?.label.stringValue.hasPrefix(head) == true
+    }
+    return (found.map(\.0), found.map(\.1), row)
+}
+let fontAnchor = " font-family=\"'Nope Sans'\""
+let fontAnchorCount = sixSource.components(separatedBy: fontAnchor).count - 1
+let cleanSix = sixSource.replacingOccurrences(
+    of: fontAnchor, with: " font-family=\"sans-serif\"")
+let compileHeading = "Compiling the module"
+let quietFrame = "No errors or warnings at the clip's first frame"
+// I5 removes the injected stale keys through their rows; nulled here too, so
+// a frame that warns about them cannot stand in for these rows' own claims.
+document.applyEdit("probe", [GraphicSchemaRows.op(
+    clips: clip().map { [$0] } ?? [], props: ["old": NSNull(), "zzz": NSNull()], schema: nil)])
+
+rewrite("six", "const logo = asset(\"x\");\n" + cleanSix)
+let warnedNotes = sourceNotes(rowStarting: assetHead)
+rewrite("six", sixSource)
+let assetBetween = warnedNotes.at.count == 2 && warnedNotes.row.map {
+    warnedNotes.at[0] < $0 && $0 < warnedNotes.at[1]
+} == true
+check("I20 a six with const logo = asset(\"x\") first and its font sans-serif: the Source "
+        + "section's notes are [Compiling the module, No errors or warnings at the clip's first "
+        + "frame], with the asset row between them",
+      fontAnchorCount == 1 && warnedNotes.notes == [compileHeading, quietFrame] && assetBetween,
+      "anchor \(fontAnchorCount)×, notes \(warnedNotes.notes), at \(warnedNotes.at), "
+        + "asset row \(warnedNotes.row.map(String.init) ?? "none")")
+
+rewrite("six", sixSource.replacingOccurrences(
+    of: "export const schema = {", with: "export const schema = { broken: ;"))
+let brokenNotes = sourceNotes()
+rewrite("six", sixSource)
+check("I20 b six rewritten to a syntax error: the Source section's notes are [Compiling the "
+        + "module]",
+      brokenNotes.notes == [compileHeading], "notes \(brokenNotes.notes)")
+
+let badAgain = (try? Data(sixSource.utf8).write(to: bad)) != nil
+rewrite("six", cleanSix)
+binding.invalidate()
+let folderNotes = sourceNotes()
+try? FileManager.default.removeItem(at: bad)
+rewrite("six", sixSource)
+binding.invalidate()
+check("I20 c Bad.js in graphics/ and six clean (sans-serif): the Source section's notes are "
+        + "[No errors or warnings at the clip's first frame, In the graphics folder]",
+      badAgain && folderNotes.notes == [quietFrame, "In the graphics folder"],
+      "written \(badAgain), notes \(folderNotes.notes)")
+
+// MARK: - I21 a colour default through the core's G-12 (B69, #219, G-25)
+
+let named = [("white", "#ffffff"), ("steelblue", "#4682b4"), ("hsl(120, 50%, 50%)", "#40bf40")]
+let drawnAs = named.map { text, hex -> String in
+    let color = GraphicSchemaRows.defaultColor(entry("color", .string(text)))
+    return "\(text) → \(GraphicSchemaRows.css(color)) (want \(hex))"
+}
+check("I21 a defaultColor of \"white\", \"steelblue\" and \"hsl(120, 50%, 50%)\" is "
+        + "rgba(css:) of #ffffff, #4682b4 and #40bf40",
+      named.allSatisfy { text, hex in
+          GraphicSchemaRows.defaultColor(entry("color", .string(text)))
+              == GraphicSchemaRows.rgba(css: hex)
+      },
+      drawnAs.joined(separator: ", "))
+let nulled = named.map { text, hex in
+    GraphicSchemaRows.patchValue(.string(hex), for: entry("color", .string(text))) is NSNull
+}
+let control = GraphicSchemaRows.patchValue(
+    .string("#000000"), for: entry("color", .string("steelblue"))) as? String
+check("I21 b patchValue of #ffffff, #4682b4 and #40bf40 against those defaults is NSNull; "
+        + "#000000 against steelblue is the string itself (CONTROL)",
+      nulled == [true, true, true] && control == "#000000",
+      "nulled \(nulled), control \(control ?? "nil")")
+check("I21 c defaultColor of \"bluish\" is unparsedColor",
+      GraphicSchemaRows.defaultColor(entry("color", .string("bluish")))
+        == GraphicSchemaRows.unparsedColor)
 
 // MARK: - I15 (last) two clips' asset names
 

@@ -39,7 +39,8 @@ The crate's record is road map 10 §10.4.
   module), §5b's limits, the interrupt deadline), the `thread_local!` map
   swept by `Weak` before each call, at most `ENGINES_PER_THREAD` (16, spec
   §11 G-21) engines with the least recently used evicted after the call,
-  `svg`, `engine_count`, `HEAP_BYTES`,
+  `svg`, `Engine::parse_colours` (the stdlib's `__parseColour` per text
+  under one deadline, storing nothing; G-25), `engine_count`, `HEAP_BYTES`,
   `STACK_BYTES`, `SVG_BYTES` (8 MiB, spec §11 G-20 (c)). The crate's one
   clock.
 - `sandbox.rs` — the sandbox script (G-5) and the loader that resolves no
@@ -51,7 +52,9 @@ The crate's record is road map 10 §10.4.
 - `host.rs` — the globals `__measureText`, `__assetNames`, `__warn` and
   `__namedColour` (svgtypes' named-colour table for the stdlib's colour
   parser).
-- `props.rs` — `check_schema` (compile, strict), `overlay` (render,
+- `props.rs` — `check_schema` (compile, strict; it takes a colour reader,
+  which `Module::compile` builds from `Engine::parse_colours` over the
+  schema's colour defaults, G-25 (a)), `overlay` (render,
   lenient; every surprise a warning) and the schema's limits `MAX_PROPS`,
   `MAX_OPTIONS`, `MAX_STRING` and `TYPES`, which the core restates as
   `GRAPHIC_<X>` (`core/tests/graphic_ffi.rs` pins each pair;

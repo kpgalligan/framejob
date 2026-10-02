@@ -1,5 +1,6 @@
-//! C FFI: project lifecycle and time (`rc_string_free`, `rc_project_*`,
-//! `rc_time_*`, `rc_timecode_*` in the header).
+//! C FFI: project lifecycle, time and colour (`rc_string_free`,
+//! `rc_project_*`, `rc_time_*`, `rc_timecode_*`, `rc_normalise_color` in the
+//! header).
 //!
 //! Thin shims only. Every export here is `#[no_mangle] pub unsafe extern
 //! "C"`, tolerates NULL first, keeps its `unsafe` blocks narrow, and routes
@@ -19,6 +20,7 @@ use std::ptr;
 use crate::ffi_util::{boxed, fallible_op, out_string, project_json, read_cstr};
 use crate::format;
 use crate::model::Project;
+use crate::model_color::normalise_color;
 use crate::time::{self, Fps};
 
 // ---- memory --------------------------------------------------------------
@@ -271,5 +273,32 @@ pub unsafe extern "C" fn rc_timecode_parse(
             true
         }
         _ => false,
+    }
+}
+
+// ---- colour --------------------------------------------------------------
+
+/// G-12's colour as lowercase `"#rrggbb"`, or `"#rrggbbaa"` when not opaque
+/// — what a stored `color` prop holds ([`normalise_color`]). NULL for a NULL
+/// or non-UTF-8 `text`, and for a text G-12 refuses. The inspector reads a
+/// schema's colour default through it (spec §11 G-25 (c)).
+///
+/// # Safety
+/// `text` must be NULL or a valid NUL-terminated C string. The returned
+/// string is freed with [`rc_string_free`].
+#[no_mangle]
+pub unsafe extern "C" fn rc_normalise_color(text: *const c_char) -> *mut c_char {
+    let body = || {
+        let text = unsafe { read_cstr(text, "text") }?;
+        normalise_color(&text).ok_or_else(|| format!("{text:?} is not a colour"))
+    };
+    unsafe {
+        fallible_op(
+            ptr::null_mut(),
+            "normalising a colour",
+            ptr::null_mut(),
+            body,
+            out_string,
+        )
     }
 }

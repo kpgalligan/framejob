@@ -275,6 +275,12 @@ char *rc_timecode_format(int64_t t, uint32_t fps_num, uint32_t fps_den, bool fra
  * false (and `*out` untouched) when the text is not a time. */
 bool rc_timecode_parse(const char *s, uint32_t fps_num, uint32_t fps_den, int64_t *out);
 
+/* ---------------------------------------------------------------- colour */
+
+/* A CSS colour (spec §11 G-12) as lowercase "#rrggbb", or "#rrggbbaa" when not opaque — what a
+   stored `color` prop holds. NULL when `text` is NULL or G-12 refuses it. Freed with rc_string_free. */
+char *rc_normalise_color(const char *text);
+
 /* ---------------------------------------------------------------- export */
 
 /* The export presets as a JSON array (spec 7.8), in menu order: one row per

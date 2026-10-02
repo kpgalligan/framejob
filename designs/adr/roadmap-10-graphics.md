@@ -490,6 +490,48 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   `ExportQueueRowView.toolTip(for:)`, did not build over that tree). The
   person's residue is GR-6 in `docs/manual-checks.md`.
 
+  Issue batch B69 (2026-10-02, #219 and #221) made a colour DEFAULT G-12's
+  under a new G-25, and gave each Source group a heading true of it. First,
+  as a pure move gated alone (`make typecheck` 0 errors, 4 warnings),
+  `ShapePatch` left `ReelCore.swift` (1280 → 1196 lines) for a new
+  `ShapePatch.swift`, the toll for the addition. #219 took the issue's
+  option 2, an FFI export: a Swift copy would have been a third
+  implementation of G-12, and hex defaults in `describe` would have changed
+  the schema an agent reads back, in a file (`ffi_graphic.rs`) at 399/400.
+  `rc_normalise_color` (`ffi.rs`, a new `colour` banner in the header) is
+  `normalise_color` over the FFI, NULL for NULL, non-UTF-8 or refused text;
+  `ReelColor.normalise` wraps it, and `GraphicSchemaRows.defaultColor` reads
+  a default through it, so a name or `hsl()` default draws in the well as
+  its colour and `patchValue` nulls a value equal to it. Compile now refuses
+  a default G-12 refuses, in the same sentence in both crates,
+  `schema.<key>.default "<text>" is not a color`: the core's `check_entry` by
+  `normalise_color`, the engine's by a reader `Module::compile` builds from
+  `Engine::parse_colours`, which calls the stdlib's own `__parseColour` once
+  per `colour_defaults` text under the compile's budget (`runtime.rs` 344 →
+  371). `props` still receive the default as written. Accepted: a top level
+  that reassigns `__parseColour` decides the engine's answer, bounded by the
+  budget (a looping one refuses the default rather than hanging). #221: the
+  Source section's compile rows sit under "Compiling the module" when there
+  are any; the first-frame note shows only when a frame was drawn, "No
+  errors or warnings at the clip's first frame" over no render rows and
+  "Checked at the clip's first frame" over some; "In the graphics folder"
+  is unchanged, as are the summary's counts. Pinned by
+  `core/tests/colour.rs` (2 tests), `core/tests/graphic.rs`'s
+  `a_colour_default_is_checked_against_the_colour_grammar`, the sweep's
+  `rc_normalise_color` line, `graphic/tests/module.rs`'s fixture and tamper
+  tests and `every_compile_sentence`'s `"bluish"`, and
+  `graphics_inspector_proof` I20–I21 (65/65, Z1 clean). Each was made to
+  fail once. With the core's arm back to `is_string()`, the
+  `add_graphic_clip` test applied a refused default; with the export
+  answering NULL, the fixture test failed at its first accepted case; with
+  the engine's arm back to `default.is_string()`, the fixture, tamper and sentence tests
+  failed. Mutants: `default-color-hex-only` failed I21 a and b,
+  `compile-heading-dropped` I20 a and b, and `first-frame-note-unconditional`
+  I20 b; `compile-warnings-dropped` and `folder-warnings-dropped` now fail
+  I20 a and I20 c beside I18 and I19. I20 a's six keeps a family
+  (`sans-serif`) where the spec stripped it: a `<text>` with none warns that
+  the default family is not in the set.
+
 ## Open items
 
 - G6 (prefetch plus parallel export against a before/after measurement) —

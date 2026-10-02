@@ -1,11 +1,13 @@
 // app/Sources/GraphicPane+Source.swift — the Graphic sub-tab's Source
 // section (road map 10 §5j, G5a): which module draws the clip, the three
 // buttons (Open in Editor, Reveal in Finder, Duplicate as New Graphic…), and
-// what the module says about the clip — its compile (an error, or what its
-// top level warned), and the clip's FIRST frame drawn and rasterized at the
-// clip's own size, so a missing font or a size mismatch shows here (G3c's
-// owed warning, road map 10 §10.6) — then what the graphics folder's scan
-// skipped or could not watch, each with Reveal (G-24 (b)).
+// what the module says about the clip, each group under its own heading
+// (#221): "Compiling the module" over its compile (an error, or what its top
+// level warned), when there is any; the clip's FIRST frame drawn and
+// rasterized at the clip's own size, when one was drawn, so a missing font
+// or a size mismatch shows here (G3c's owed warning, road map 10 §10.6); and
+// "In the graphics folder" over what the folder's scan skipped or could not
+// watch, each with Reveal (G-24 (b)).
 //
 // **The report is the paused frame's own two calls** — `module.svg` then
 // `library.rasterize` at `graphic.width × height`
@@ -82,16 +84,23 @@ extension GraphicPane {
             ]),
             inspectorButtonRow([duplicate]),
         ]
-        var diagnostics: [GraphicDiagnostic] = []
+        var report = GraphicClipReport.empty
         if let clip = binding.graphicClips.first, let document = binding.document {
             let version = GraphicRegistry.shared.snapshot(for: document.recipeKey)?.libraryVersion
-            let report = self.report(for: clip, first, libraryVersion: version ?? "")
-            diagnostics = report.compile + report.render
+            report = self.report(for: clip, first, libraryVersion: version ?? "")
         }
-        let checked = diagnostics.isEmpty
-            ? "No errors or warnings at the clip's first frame" : "Checked at the clip's first frame"
-        rows.append(InspectorNoteLabel { checked })
-        rows += diagnostics.map { GraphicDiagnosticRow($0, onOpen: open) }
+        let diagnostics = report.compile + report.render
+        if !report.compile.isEmpty {
+            rows.append(InspectorNoteLabel { "Compiling the module" })
+            rows += report.compile.map { GraphicDiagnosticRow($0, onOpen: open) }
+        }
+        if report.frame != nil {
+            let checked = report.render.isEmpty
+                ? "No errors or warnings at the clip's first frame"
+                : "Checked at the clip's first frame"
+            rows.append(InspectorNoteLabel { checked })
+            rows += report.render.map { GraphicDiagnosticRow($0, onOpen: open) }
+        }
         let folder = folderWarnings()
         if !folder.isEmpty {
             let reveal: () -> Void = { [weak self] in

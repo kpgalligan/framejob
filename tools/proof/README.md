@@ -11947,3 +11947,71 @@ perl -e 'alarm shift; exec @ARGV' 1200 python3 tools/proof/graphics_inspector_pr
 **Not covered:** how the sheet's line, the queue row at its default width
 and the tooltips look, and Reveal opening Finder, are GR-6 in
 `docs/manual-checks.md`.
+
+## Issue batch B69 — a colour default read through the core's G-12 and checked at compile; each Source group under a true heading (`core/tests/colour.rs`, `core/tests/graphic.rs`, `graphic/tests/module.rs`, `graphics_inspector_proof.py` I20–I21; #219, #221; spec §11 G-25)
+
+- **`core/tests/colour.rs`**: `rc_normalise_color` answers every accepted
+  text of `graphic/tests/colours.json` with its stored hex and every
+  refused one with NULL; NULL and non-UTF-8 text are NULL.
+  `model_tests.rs`'s NULL-safety sweep covers it.
+- **`core/tests/graphic.rs`**
+  `a_colour_default_is_checked_against_the_colour_grammar`: the same
+  fixture as `accent`'s schema default through `add_graphic_clip`, where
+  each accepted text applies and each refused one is the error
+  `schema.accent.default "<text>" is not a color`.
+- **`graphic/tests/module.rs`**:
+  - `colour_defaults_answer_the_shared_colour_fixture`: the 30 accepted
+    texts compile as one schema's defaults and reach `defaults()` as
+    written; each of the 21 refused ones is refused in the core's sentence.
+  - `a_tampered_colour_parser_is_bounded_by_the_budget`: a top level that
+    makes `__parseColour` loop refuses `"red"` inside the budget, and one
+    that accepts anything compiles `"bluish"` (G-25's accepted limit).
+  - `every_compile_sentence` gains `schema.a.default "bluish" is not a color`.
+- **`graphics_inspector_proof.py`** (the probe):
+  - **I4** lost its two rows that read `"white"` as unparsed.
+  - **I20 a–c** read the Source section's visible notes in view order. In
+    a, six has `const logo = asset("x");` first and its family made
+    `sans-serif`: `["Compiling the module", "No errors or warnings at the
+    clip's first frame"]`, with the asset row between them. In b, a syntax
+    error: `["Compiling the module"]`. In c, `Bad.js` sits in `graphics/` and
+    six is clean: `["No errors or warnings at the clip's first frame", "In
+    the graphics folder"]`. `old` and `zzz` are nulled first, so a frame
+    warning about them cannot decide the rows (the `stale` mutant showed it
+    could).
+  - **I21 a–c**: `defaultColor` of `"white"`, `"steelblue"` and
+    `"hsl(120, 50%, 50%)"` is `rgba(css:)` of `#ffffff`, `#4682b4` and
+    `#40bf40`; `patchValue` of each hex against its default is NSNull, and
+    `#000000` against `steelblue` is the string (CONTROL);
+    `defaultColor("bluish")` is `unparsedColor`.
+  - New mutants: `default-color-hex-only` (`ReelColor.normalise(text)` →
+    `Optional(text)`; I21 a and b), `compile-heading-dropped` (the
+    heading's append removed; I20 a and b), `first-frame-note-unconditional`
+    (`report.frame != nil` → `report.frame != nil || true`; I20 b).
+    `compile-warnings-dropped` now also fails I20 a, and
+    `folder-warnings-dropped` I20 c.
+
+Runs on 2026-10-02 over `c93d0d2` plus this batch:
+
+| Run | Result |
+|---|---|
+| `cd core && cargo test --release --test colour --test graphic --test model_tests` | 2, 28 and 31 passed. |
+| the core's `color` arm back to `default.is_string()` | `a_colour_default_is_checked_against_the_colour_grammar` failed: a refused default applied. |
+| `rc_normalise_color` answering NULL | `the_export_answers_the_shared_colour_fixture` failed at its first accepted case. |
+| `cd graphic && cargo test --release --test module` | 14 passed. |
+| the engine's `color` arm back to `default.is_string()` | 3 failed: the fixture, tamper and sentence tests. |
+| `graphics_inspector_proof.py --port 4891` | 65/65, exit 0, I1–I21 present, Z1 clean. |
+| `--mutant default-color-hex-only` | exit 0: I21 a and I21 b alone failed. |
+| `--mutant compile-heading-dropped` | exit 0: I20 a and I20 b alone failed. |
+| `--mutant first-frame-note-unconditional` | exit 0: I20 b alone failed (notes `["Compiling the module", "No errors or warnings at the clip's first frame"]`). |
+| `--mutant compile-warnings-dropped` | exit 0: I18 and I20 a failed. |
+| `--mutant folder-warnings-dropped` | exit 0: I19 and I20 c failed. |
+| `--mutant` `stale`, `entry-signature`, `step-decimals`, `name-height`, `merged-asset-names`, `no-schema-memo` | each exit 0, its own rows alone. |
+
+```sh
+perl -e 'alarm shift; exec @ARGV' 1500 python3 tools/proof/graphics_inspector_proof.py --port 4891
+perl -e 'alarm shift; exec @ARGV' 1200 python3 tools/proof/graphics_inspector_proof.py --mutant default-color-hex-only --port 4891
+```
+
+**Not covered:** how the headings look is GR-6's Source-section step in
+`docs/manual-checks.md`. No row there looks at the colour well with a named
+default; the batch's spec left a new row out of scope, so it is owed.

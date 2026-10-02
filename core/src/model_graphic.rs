@@ -3,7 +3,8 @@
 //! every writer of one shares: the module name rule (G-3), the side bound,
 //! the schema a module declares and the props checked against it (G-4),
 //! whose `color` props are stored through `model_color.rs`'s CSS colour
-//! normalisation (G-12).
+//! normalisation (G-12) — and whose `color` DEFAULTS are checked by it too,
+//! so a default G-12 refuses refuses the schema (G-25 (a)).
 //!
 //! A graphic is a source the model only DESCRIBES, as text and shape are.
 //! The core never reads the module (it has no filesystem), so the schema a
@@ -159,7 +160,7 @@ fn check_entry(key: &str, entry: &Value) -> Result<(), String> {
         "string" => default
             .as_str()
             .is_some_and(|s| s.chars().count() <= GRAPHIC_MAX_STRING),
-        "color" => default.is_string(),
+        "color" => default.as_str().and_then(normalise_color).is_some(),
         "number" => default.as_f64().is_some_and(f64::is_finite),
         "boolean" => default.is_boolean(),
         "enum" => options(entry).contains(default),

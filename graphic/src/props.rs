@@ -21,8 +21,12 @@ pub const MAX_STRING: usize = 4096;
 /// core restates it as `GRAPHIC_TYPES`, pinned in `core/tests/graphic_ffi.rs`.
 pub const TYPES: [&str; 6] = ["string", "number", "boolean", "color", "enum", "asset"];
 
-/// §5c's rules for a schema, each refused in its own sentence.
-pub(crate) fn check_schema(schema: &Value) -> Result<(), Diagnostic> {
+/// §5c's rules for a schema, each refused in its own sentence. `colour`
+/// answers whether G-12 takes a `color` entry's default (spec §11 G-25).
+pub(crate) fn check_schema(
+    schema: &Value,
+    colour: &dyn Fn(&str) -> bool,
+) -> Result<(), Diagnostic> {
     let Some(entries) = schema.as_object() else {
         return Err(Diagnostic::error("schema must be an object"));
     };
@@ -33,12 +37,26 @@ pub(crate) fn check_schema(schema: &Value) -> Result<(), Diagnostic> {
         )));
     }
     for (key, entry) in entries {
-        check_entry(key, entry).map_err(Diagnostic::error)?;
+        check_entry(key, entry, colour).map_err(Diagnostic::error)?;
     }
     Ok(())
 }
 
-fn check_entry(key: &str, entry: &Value) -> Result<(), String> {
+/// Each string `default` of a `type: "color"` entry, in schema order — what
+/// `check_schema`'s `colour` is asked about. Checks nothing else.
+pub(crate) fn colour_defaults(schema: &Value) -> Vec<String> {
+    let Some(entries) = schema.as_object() else {
+        return Vec::new();
+    };
+    entries
+        .values()
+        .filter(|entry| entry.get("type").and_then(Value::as_str) == Some("color"))
+        .filter_map(|entry| entry.get("default").and_then(Value::as_str))
+        .map(str::to_string)
+        .collect()
+}
+
+fn check_entry(key: &str, entry: &Value, colour: &dyn Fn(&str) -> bool) -> Result<(), String> {
     if !is_name(key) {
         return Err(format!(
             "schema key \"{key}\" is not a name (letters, digits and _, starting with a letter or _, at most 32 characters)"
@@ -70,6 +88,7 @@ fn check_entry(key: &str, entry: &Value) -> Result<(), String> {
         "string" => default
             .as_str()
             .is_some_and(|s| s.chars().count() <= MAX_STRING),
+        "color" => default.as_str().is_some_and(colour),
         _ => fits(kind, entry, default),
     };
     if !fits {

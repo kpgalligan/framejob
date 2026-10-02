@@ -171,6 +171,33 @@ impl Engine {
         }
     }
 
+    /// Whether the standard library's `__parseColour` takes each of `texts`
+    /// (G-12), under ONE deadline of `budget_ms`: a throw, or a call the
+    /// deadline had already passed, is false (spec §11 G-25). Stores nothing.
+    pub(crate) fn parse_colours(&self, texts: &[String], budget_ms: u64) -> Vec<bool> {
+        self.arm(budget_ms);
+        let answer = self.context.with(|ctx| {
+            let parse: Option<Function> = ctx.globals().get("__parseColour").ok();
+            texts
+                .iter()
+                .map(|text| {
+                    let deadline = *crate::library::lock(&self.deadline);
+                    let late = deadline.is_some_and(|at| Instant::now() > at);
+                    let Some(parse) = parse.as_ref().filter(|_| !late) else {
+                        return false;
+                    };
+                    let taken = parse.call::<_, Value>((text.as_str(),)).is_ok();
+                    if !taken {
+                        let _ = ctx.catch();
+                    }
+                    taken
+                })
+                .collect()
+        });
+        self.disarm();
+        answer
+    }
+
     /// One call of `render(frame, props, ctx)`; answers the SVG text and
     /// the warnings `__warn` collected during it.
     fn call(

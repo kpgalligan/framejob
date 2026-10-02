@@ -11,7 +11,7 @@ use sha2::{Digest, Sha256};
 
 use crate::diagnostic::Diagnostic;
 use crate::library::Library;
-use crate::props::{check_schema, overlay};
+use crate::props::{check_schema, colour_defaults, overlay};
 use crate::runtime::{adopt, Engine};
 
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
@@ -50,7 +50,11 @@ impl Module {
             .collect();
         let mut engine = Engine::new(&library)?;
         let exports = engine.load(name, source, budget_ms)?;
-        check_schema(&exports.schema)?;
+        let texts = colour_defaults(&exports.schema);
+        let ok = engine.parse_colours(&texts, budget_ms);
+        check_schema(&exports.schema, &|t| {
+            texts.iter().zip(&ok).any(|(s, k)| *k && s == t)
+        })?;
         if !exports.meta.is_object() {
             return Err(Diagnostic::error("meta must be an object"));
         }

@@ -2,7 +2,7 @@ import AppKit
 
 /// The ONLY file in the app that names an `rc_*` symbol. Everything the Rust
 /// core can do reaches the rest of Reelcut as typed Swift here: `ReelProject`
-/// (a handle plus its lazily decoded `ProjectSnapshot`), `ReelTime`,
+/// (a handle plus its lazily decoded `ProjectSnapshot`), `ReelTime`, `ReelColor`,
 /// `ReelSnap`, `ReelExport`, the graphics engine's `GraphicLibrary` and
 /// `GraphicModule`, and the op ARGUMENTS an edit is built out of — the typed
 /// patches. The `dictionary` extensions on the §5.2 property types are in
@@ -18,6 +18,8 @@ import AppKit
 /// reason: it names no `rc_*` symbol. `MediaDescriptor`, `mediaURL(for:)`
 /// and `bookmarkString(for:)` are in `MediaDescriptor.swift`, the payment it
 /// owed at 1440 again before the engine's family list, for the same reason.
+/// `ShapePatch` is in `ShapePatch.swift` (as `TextPatch` is in
+/// `TextPatch.swift`), the payment it owed at 1280 before `ReelColor`.
 /// Only `ReelOp.coreNames()` and `ReelOp.coreSchemas()` stayed behind — the
 /// op table read BACK, its names and its arguments — because they read
 /// `rc_op_names()` and `rc_op_schemas()` and the rule above admits no second
@@ -430,6 +432,19 @@ enum ReelTime {
     /// in the inspector (fades, ducking attack/release).
     static func seconds(_ t: Ticks) -> Double {
         Double(t) / Double(perSecond)
+    }
+}
+
+// MARK: - Colour
+
+/// G-12's colour grammar, the core's (spec §11 G-25 (c)): a schema's colour
+/// default as the inspector's well reads it, through the same
+/// `normalise_color` that stores a `color` prop — no third copy in Swift.
+enum ReelColor {
+    /// Lowercase `#rrggbb`, or `#rrggbbaa` when not opaque; nil when G-12
+    /// refuses `text`.
+    static func normalise(_ text: String) -> String? {
+        takeString(rc_normalise_color(text))
     }
 }
 
@@ -1001,90 +1016,6 @@ struct AudioPatch: Codable, Equatable {
             }
         }
         if let noiseReduction = noiseReduction { d["noise_reduction"] = noiseReduction }
-        return d
-    }
-
-    var isEmpty: Bool { dictionary.isEmpty }
-}
-
-/// A sparse patch of shape properties. Not `Codable`: unlike the other
-/// three it never appears inside an action's end patch (§5.4 patches cover
-/// video, audio and text only).
-///
-/// **`gradient` is a three-state double optional**, `stroke` and `fill`'s
-/// shape (phase 6): the model field is an `Option<Gradient>`, so `nil`
-/// leaves it alone, `.some(nil)` sends the explicit null that CLEARS it —
-/// which is the inspector's Reset, and the exact inverse of setting one,
-/// since a gradient never clears the `fill` underneath it — and
-/// `.some(value)` sets it.
-///
-/// It is a nested object, so the core MERGES it key by key into a stored
-/// one (§5.2). The writers here still send the whole gradient, and the
-/// reason is the OTHER case: a stored `null` is not an object, so turning a
-/// gradient on replaces the null with what the patch carries and the keys
-/// left out come from `Gradient::default()`. A section that knows every key
-/// is right whichever of the two a clip is in. Since deepening D1·4 a key
-/// misspelt inside a gradient is refused by the CORE, by its dotted path
-/// with the stop's index in it, at this door and every other.
-struct ShapePatch: Equatable {
-    var kind: ShapeKind?
-    var width: Double?
-    var height: Double?
-    var stroke: StrokeProps??
-    var fill: RGBA??
-    var arrowStart: Bool?
-    var arrowEnd: Bool?
-    var radius: Double?
-    var from: [Double]?
-    var to: [Double]?
-    var gradient: Gradient??
-
-    init(
-        kind: ShapeKind? = nil, width: Double? = nil, height: Double? = nil,
-        stroke: StrokeProps?? = nil, fill: RGBA?? = nil, arrowStart: Bool? = nil,
-        arrowEnd: Bool? = nil, radius: Double? = nil, from: [Double]? = nil,
-        to: [Double]? = nil, gradient: Gradient?? = nil
-    ) {
-        self.kind = kind
-        self.width = width
-        self.height = height
-        self.stroke = stroke
-        self.fill = fill
-        self.arrowStart = arrowStart
-        self.arrowEnd = arrowEnd
-        self.radius = radius
-        self.from = from
-        self.to = to
-        self.gradient = gradient
-    }
-
-    var dictionary: [String: Any] {
-        var d: [String: Any] = [:]
-        if let kind = kind { d["kind"] = kind.rawValue }
-        if let width = width { d["width"] = width }
-        if let height = height { d["height"] = height }
-        if let stroke = stroke {
-            if let stroke = stroke {
-                d["stroke"] = stroke.dictionary
-            } else {
-                d["stroke"] = NSNull()
-            }
-        }
-        if let fill = fill {
-            if let fill = fill { d["fill"] = fill } else { d["fill"] = NSNull() }
-        }
-        if let arrowStart = arrowStart { d["arrow_start"] = arrowStart }
-        if let arrowEnd = arrowEnd { d["arrow_end"] = arrowEnd }
-        if let radius = radius { d["radius"] = radius }
-        if let from = from { d["from"] = from }
-        if let to = to { d["to"] = to }
-        if let gradient = gradient {
-            if let gradient = gradient {
-                d["gradient"] = gradient.dictionary
-            } else {
-                d["gradient"] = NSNull()
-            }
-        }
         return d
     }
 

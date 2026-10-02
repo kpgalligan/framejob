@@ -28,9 +28,10 @@ I2  one row per type, with its control classes; the asset popup lists None
 I3  size 90 vs default 64: the gutter's default differs and its ops are
     `set_graphic {props: {size: null}}`; no stored size → no difference; the
     colour row, unstored, differs not and resets to `{color: null}`;
-I4  `patchValue`'s null rule (a number, "#ff5a36" vs "#FF5A36", the unparsed
-    swatch vs "white"), `defaultColor("white")`, the four hex forms
-    round-tripped and `css([1, 0.353, 0.212, 1]) == "#ff5a36"`;
+I4  `patchValue`'s null rule (a number, "#ff5a36" vs "#FF5A36"), the four hex
+    forms round-tripped and `css([1, 0.353, 0.212, 1]) == "#ff5a36"` (issue
+    batch B69 dropped its two rows that read "white" as unparsed: I21 now
+    reads it as the colour it is);
 I5  `staleKeys` sorted; the stale rows old then zzz; a syntax error makes every
     stored key stale and the Source section's compile row names line 2; each
     ⌫ removes its key;
@@ -71,6 +72,24 @@ I19 (B68, G-24 (b)) `Bad.js` written into the fixture's `graphics/` and
     folder" and after it a row labelled `graphics/Bad.js is not a module
     name…` whose button is "Reveal", and `structureSignature` changed; removed
     and rescanned: neither, and the signature is back (CONTROL);
+I20 (issue batch B69, #221) the Source section's notes, in view order, each
+    group under a heading true of it (hidden notes skipped): a) six rewritten
+    with `const logo = asset("x");` first and its `font-family="'Nope
+    Sans'"` made `font-family="sans-serif"` (the anchor asserted to occur
+    once; a text with NO family warns that the default is not in the set,
+    so the family is swapped, not stripped): ["Compiling the module", "No
+    errors or warnings at the clip's first frame"], the asset row between
+    them; b) six rewritten to a syntax error: ["Compiling the module"]; c)
+    `Bad.js` in `graphics/` and six clean (sans-serif): ["No errors or
+    warnings at the clip's first frame", "In the graphics folder"]; six
+    restored, and Bad.js removed, after each; `old` and `zzz` are nulled first,
+    so the rows do not lean on I5's removals;
+I21 (B69, #219, spec §11 G-25) a colour default through the core's G-12
+    (`rc_normalise_color`): a) `defaultColor` of "white", "steelblue" and
+    "hsl(120, 50%, 50%)" is `rgba(css:)` of "#ffffff", "#4682b4" and
+    "#40bf40"; b) `patchValue` of each hex against its default is NSNull, and
+    "#000000" against "steelblue" is the string itself (CONTROL); c)
+    `defaultColor("bluish")` is `unparsedColor`;
 I15 (B8, last) a second `six` clip; the two hold logo "a.png" and "b.png" and
     both are selected: the Logo popup is `["None", "red.png", "a.png",
     "b.png"]`, and the signature holds "red.png,a.png,b.png".
@@ -101,8 +120,16 @@ nothing else did:
                      signature row;
   no-schema-memo     `schema(_:)` never stores `schemaMemo` — I16;
   compile-warnings-dropped  the Source report's `compile: module.compileWarnings`
-                     is `compile: []` — I18 (B68);
-  folder-warnings-dropped   `folderWarnings()` answers `[]` — I19 (B68).
+                     is `compile: []` — I18 (B68) and I20 a (B69: its "Compiling
+                     the module" heading goes with the warning);
+  folder-warnings-dropped   `folderWarnings()` answers `[]` — I19 (B68) and I20 c
+                     (B69: its "In the graphics folder" heading goes too);
+  default-color-hex-only    `defaultColor` reads the default as hex only,
+                     skipping `ReelColor.normalise` — I21 a and I21 b (B69);
+  compile-heading-dropped   the "Compiling the module" note is not appended —
+                     I20 a and I20 b (B69);
+  first-frame-note-unconditional  the first-frame note is shown whatever
+                     `report.frame` is — I20 b (B69).
 """
 
 import argparse
@@ -191,14 +218,39 @@ MUTANTS = {
     "compile-warnings-dropped": (
         "GraphicPane+Source.swift", "compile: module.compileWarnings", "compile: []",
         ["I18 six rewritten with const logo = asset(\"x\") first: the Source section has a "
-         "warning row naming the asset; restored, none (CONTROL)"]),
+         "warning row naming the asset; restored, none (CONTROL)",
+         "I20 a six with const logo = asset(\"x\") first and its font sans-serif: the Source "
+         "section's notes are [Compiling the module, No errors or warnings at the clip's first "
+         "frame], with the asset row between them"]),
     "folder-warnings-dropped": (
         "GraphicPane.swift", "        binding.document?.graphicStore?.scan.warnings ?? []\n",
         "        []\n",
         ["I19 Bad.js in graphics/ and store.rescan(): the Source section holds \"In the "
          "graphics folder\" then a row naming graphics/Bad.js whose button is Reveal, and the "
          "signature changed; removed and rescanned, neither, and the signature is back "
-         "(CONTROL)"]),
+         "(CONTROL)",
+         "I20 c Bad.js in graphics/ and six clean (sans-serif): the Source section's notes are "
+         "[No errors or warnings at the clip's first frame, In the graphics folder]"]),
+    "default-color-hex-only": (
+        "GraphicSchemaRows.swift", "let hex = ReelColor.normalise(text)",
+        "let hex = Optional(text)",
+        ["I21 a defaultColor of \"white\", \"steelblue\" and \"hsl(120, 50%, 50%)\" is "
+         "rgba(css:) of #ffffff, #4682b4 and #40bf40",
+         "I21 b patchValue of #ffffff, #4682b4 and #40bf40 against those defaults is NSNull; "
+         "#000000 against steelblue is the string itself (CONTROL)"]),
+    "compile-heading-dropped": (
+        "GraphicPane+Source.swift",
+        "            rows.append(InspectorNoteLabel { \"Compiling the module\" })\n", "",
+        ["I20 a six with const logo = asset(\"x\") first and its font sans-serif: the Source "
+         "section's notes are [Compiling the module, No errors or warnings at the clip's first "
+         "frame], with the asset row between them",
+         "I20 b six rewritten to a syntax error: the Source section's notes are [Compiling the "
+         "module]"]),
+    "first-frame-note-unconditional": (
+        "GraphicPane+Source.swift", "        if report.frame != nil {\n",
+        "        if report.frame != nil || true {\n",
+        ["I20 b six rewritten to a syntax error: the Source section's notes are [Compiling the "
+         "module]"]),
 }
 
 RESULTS = []
@@ -308,7 +360,7 @@ def build_probe(sources, out):
 
 
 def probe_checks(sources, out, package):
-    print("\n1 — the probe: I1–I19", flush=True)
+    print("\n1 — the probe: I1–I21", flush=True)
     binary, error = build_probe(Path(sources), out)
     check("the probe builds over app/Sources", binary is not None, error or "")
     if binary is None:
@@ -325,8 +377,8 @@ def probe_checks(sources, out, package):
         check("the probe runs", False, (ran["stdout"] + ran["stderr"]).strip()[-600:])
         return
     probe_rows = json.loads(answer.read_text())["rows"]
-    present = all(any(r["name"].startswith(f"I{n} ") for r in probe_rows) for n in range(1, 20))
-    check("the probe answers every I-row (I1–I19 present)", present, f"{len(probe_rows)} rows")
+    present = all(any(r["name"].startswith(f"I{n} ") for r in probe_rows) for n in range(1, 22))
+    check("the probe answers every I-row (I1–I21 present)", present, f"{len(probe_rows)} rows")
     for row in probe_rows:
         check(row["name"], row["ok"], row["detail"])
 

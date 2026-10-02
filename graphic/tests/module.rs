@@ -186,6 +186,10 @@ fn every_compile_sentence() {
             "schema.a.default 0 is not a color",
         ),
         (
+            schema("{ a: { type: \"color\", default: \"bluish\" } }"),
+            "schema.a.default \"bluish\" is not a color",
+        ),
+        (
             schema("{ a: { type: \"enum\", default: \"c\", options: [\"a\", \"b\"] } }"),
             "schema.a.default \"c\" is not a enum",
         ),
@@ -234,6 +238,63 @@ fn every_compile_sentence() {
         )),
     )
     .unwrap();
+}
+
+/// G-12's one fixture, which `core/tests/colour.rs` and `graphic.rs` run
+/// through the core.
+const COLOURS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/colours.json");
+
+/// A `color` default is checked by the stdlib's own `__parseColour` at
+/// compile (spec §11 G-25 (a)): every accepted text compiles as a default,
+/// and every refused one is refused in the core's sentence. The default
+/// reaches `props` as written (G-25 (b)).
+#[test]
+fn colour_defaults_answer_the_shared_colour_fixture() {
+    let fixture: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(COLOURS).expect("tests/colours.json"))
+            .expect("the colour fixture is JSON");
+    let accepted = fixture["accepted"].as_array().expect("accepted");
+    let refused = fixture["refused"].as_array().expect("refused");
+    assert!(!accepted.is_empty() && !refused.is_empty());
+    let entry = |text: &serde_json::Value| format!("{{ type: \"color\", default: {text} }}");
+    let body: Vec<String> = accepted
+        .iter()
+        .enumerate()
+        .map(|(i, case)| format!("k{i}: {}", entry(&case[0])))
+        .collect();
+    let module = compile(
+        "accepted",
+        &format!("export const schema = {{ {} }};\n{RENDER}", body.join(", ")),
+    )
+    .unwrap_or_else(|d| panic!("{}", d.message));
+    for (i, case) in accepted.iter().enumerate() {
+        assert_eq!(module.defaults()[format!("k{i}")], case[0], "{case}");
+    }
+    for text in refused {
+        let d = refusal(&format!(
+            "export const schema = {{ a: {} }};\n{RENDER}",
+            entry(text)
+        ));
+        assert_eq!(d.message, format!("schema.a.default {text} is not a color"));
+    }
+}
+
+/// G-25's accepted limit: a top level that replaces the stdlib's
+/// `__parseColour` decides the engine's answer, but never hangs the compile
+/// — a replacement that loops is stopped by the compile's budget and the
+/// default is refused.
+#[test]
+fn a_tampered_colour_parser_is_bounded_by_the_budget() {
+    let schema = "export const schema = { a: { type: \"color\", default: \"red\" } };\n";
+    let d = refusal(&format!(
+        "globalThis.__parseColour = () => {{ while (true) {{}} }};\n{schema}{RENDER}"
+    ));
+    assert_eq!(d.message, "schema.a.default \"red\" is not a color");
+    let lenient = format!(
+        "globalThis.__parseColour = () => [0, 0, 0, 1];\n\
+         export const schema = {{ a: {{ type: \"color\", default: \"bluish\" }} }};\n{RENDER}"
+    );
+    compile("lenient", &lenient).unwrap_or_else(|d| panic!("{}", d.message));
 }
 
 #[test]

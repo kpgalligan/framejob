@@ -72,7 +72,10 @@ governs a module now.
   `rgb()`/`rgba()`, `hsl()`/`hsla()` and the CSS named colours, from
   svgtypes' table) to lowercase `#rrggbb[aa]`; out of range is refused,
   never clamped. The stdlib's `__parseColour` implements the same grammar,
-  and both suites read `graphic/tests/colours.json`.
+  and both suites read `graphic/tests/colours.json`. `rc_normalise_color`
+  (`ffi.rs`) exports it for the Inspector's colour defaults (spec §11 G-25
+  (c)), and `model_graphic.rs`'s `check_schema` refuses a `color` default
+  it refuses (G-25 (a)).
 - `model_query.rs` — reading a project: `Project::new`, id allocation, the
   `clip`/`track`/`media`/`marker`/`nest` lookups, `clips_on`, `duration`,
   `validate` with its nesting walk, and `source_size`. The three
@@ -492,7 +495,8 @@ governs a module now.
   only; shared plumbing lives in `ffi_util.rs`, never copy-pasted.
   `ffi_query.rs`'s rule: a query never allocates a handle and has no
   `err_out`, which is why `rc_project_scoped` lives in `ffi.rs`.
-  `rc_speed_limits` is its answer for the speed range and the audio ceiling.
+  `rc_speed_limits` is its answer for the speed range and the audio ceiling;
+  `rc_normalise_color` (`ffi.rs`) is the colour grammar's (G-25).
 - `ffi_graphic.rs` — the ten `rc_graphic_*` exports (road map 10 §5e)
   and the ONLY module of `core/src/` that names the `graphic` crate (spec
   §11 G-2; `core/tests/graphic_ffi.rs` reads `core/src/` to hold it). An

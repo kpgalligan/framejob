@@ -19,9 +19,11 @@ detail there.
   `planJSON` are memoised PER HANDLE, so keep handles rather than minting
   them), timecode, snapping, export presets/sizes/settings, `SpeedLimits`
   / `ReelSpeed.limits` (the core's speed range and audio ceiling — no Swift
-  file types a speed bound) and the typed patches —
-  except `TextPatch` (with `case`, `words` and `word_style`), which is
-  `TextPatch.swift`'s, moved out so it could grow. `word_style` has ONE
+  file types a speed bound), `ReelColor` (`rc_normalise_color`, G-25) and
+  the typed patches — except `TextPatch` (with `case`, `words` and
+  `word_style`), which is `TextPatch.swift`'s, moved out so it could grow,
+  and `ShapePatch`, `ShapePatch.swift`'s (a pure move, the toll for
+  `ReelColor`). `word_style` has ONE
   app-side writer, `CaptionLayout.place` (W-10). The `dictionary`
   extensions on the property types are `OpDictionaries.swift`'s (a pure
   move, #190).
@@ -610,10 +612,12 @@ the key map behind it.
   Duplicate as New Graphic… — `store.write`, `rescan()` inside the button's
   event, one `set_graphic {name}` step — and `report(for:)`, the compile's
   diagnostics plus the first frame rasterized at the clip's OWN size,
-  memoised and frozen during a live gesture; the compile's top-level
-  warnings lead the rows, then the folder's scan warnings under "In the
-  graphics folder", each with Reveal, G-24) · `GraphicSchemaRows.swift`
-  (pure, probe-callable: the schema in the MODULE's key order —
+  memoised and frozen during a live gesture; its groups sit under
+  "Compiling the module" (the compile's top-level warnings, when any), the
+  first-frame note (only when a frame was drawn) and "In the graphics
+  folder" (the scan's warnings, each with Reveal), G-24, #221) ·
+  `GraphicSchemaRows.swift` (pure, probe-callable; a colour default is read
+  through the core, `ReelColor.normalise`, G-25 (c): the schema in the MODULE's key order —
   `GraphicSchema.orderedKeys` (in `GraphicSchema.swift`) scans
   `describeJSON()`'s text because the
   registry's dictionary lost it — one row per schema type, stale rows

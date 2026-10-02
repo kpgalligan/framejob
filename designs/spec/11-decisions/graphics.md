@@ -553,3 +553,17 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   ahead of the loudness figures (the row truncates its tail, so a note on
   the end is the part a narrow window cuts). Each lists the warnings in its
   tooltip. A failed export answers as before.
+- **G-25 — A colour default is G-12's, checked at compile and read through
+  the core** (#219, 2026-10-02).
+  (a) A `color` entry's `default` that G-12 refuses fails compile in the
+  engine, by the stdlib's own `__parseColour` inline in `check_entry`, and
+  in the core's `check_schema`, by `normalise_color`. The sentence is
+  `schema.<key>.default "<text>" is not a color`.
+  (b) The module's `props` still receive the default as written.
+  (c) The Inspector reads a default through `rc_normalise_color`, so there
+  is no third implementation.
+  Accepted: a module whose top level reassigns a standard-library global
+  can make (a)'s engine check answer either way. The check runs under the
+  compile's budget, so it never hangs, and the core's check at
+  `set_graphic` still holds. A module that compiled before and has an
+  invalid default now shows a compile error.
