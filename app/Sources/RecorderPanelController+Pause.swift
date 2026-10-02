@@ -11,8 +11,10 @@ import AppKit
 /// draws: its `.paused` and `.stopping` arms are what the pause added, and
 /// `syncPhase` is its one caller besides the tick.
 ///
-/// **Neither pause member is reachable from the panel's own controls.** The
-/// panel is off screen for every recording (decision 7), so Pause Recording
+/// **Neither pause member is reachable from the panel's own controls** but
+/// in a voice-over, whose panel stays up with a Pause / Resume button
+/// (`+VoiceOver.swift`). The panel is off screen for every other recording
+/// (decision 7), so Pause Recording
 /// and Resume Recording are rows of the status item's menu, which calls
 /// these through the closures `recordingDidStart` hands it, and File ▸
 /// Pause/Resume Recording (`AppDelegate+Recording.swift`), the second door,
@@ -132,12 +134,8 @@ extension RecorderPanelController {
     /// locked while anything is in flight, the countdown numeral, the
     /// footnote, and the window refitted to whatever appeared or went.
     func syncPhase() {
-        let idle = phase == .idle
-        let controls: [NSControl] = [
-            sourcePopup, microphonePopup, ratePopup, sizePopup, destinationPopup,
-            systemAudioSwitch, showClicksSwitch,
-        ]
-        for control in controls { control.isEnabled = idle }
+        syncControlsEnabled()
+        syncPauseButton()
         var countdown: String?
         switch phase {
         case .idle:

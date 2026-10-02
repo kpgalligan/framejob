@@ -20,7 +20,8 @@ count rather than passing vacuously.
   added two, and the exact count belongs to road map 7's
   `op_argument_proof.py` at 77 (`tools/proof/README.md`'s handover) — with
   `record_screen` declaring exactly its
-  ten arguments plus the injected `project`, `seconds` its only required
+  eleven arguments (issue batch B66 added `source`, a string whose enum is
+  `["screen", "voice_over"]`) plus the injected `project`, `seconds` its only required
   one, and NO `scope`: it is an app-state tool like `transcribe`, and
   `AgentCatalog.tool` injects `scope` for the core's op names only. Exactly
   55 tools carry `scope` (that 55 is `rc_op_names` read through
@@ -30,7 +31,8 @@ count rather than passing vacuously.
   launching process — and for R2's: `Pause Recording` and `Resume Recording`
   (the status item's two menus), the `Add Recording Segments` undo step, and
   the result keys `pauses`, `segments` and `started_at` beside R1's
-  twenty-four. R2 adds no tool — there is deliberately no tool that pauses —
+  twenty-four, and B66's `voice_over`, `Microphone Only` and `Voice-over`.
+  R2 adds no tool — there is deliberately no tool that pauses —
   and the parity log is read too.
 * Section 1, the refusals, each asserted as the EXACT sentence, each leaving
   `get_project`'s whole answer byte-identical and pushing no undo step. And
@@ -60,6 +62,17 @@ count rather than passing vacuously.
   PREFIX — `RecordingGrant.screenRecordingPaneSentence` — because the
   refusal now ends with the launch clause under a shell launch (R0 q1: the
   grant that counts is the terminal's, and the sentence says whose).
+  Issue batch B66 (#99 phase 2) adds `source`'s rows, read right after
+  `seconds`: its three sentences exactly — an unknown value, the
+  screen-only arguments a voice-over refuses (`display` alone; `window`,
+  `size`, `system_audio` and `show_clicks` together, listed in schema
+  order), `microphone: false` — the ORDER around them (`seconds: 0` beats
+  `source: "x"`; the stranger sentence beats `rate: 24`; `rate: 24` alone
+  answered by rate), a `size: null` that is no stranger (the rate sentence
+  answers), and `{source: voice_over, project: /nowhere}` answered by the
+  microphone sentence where the grant is absent and by the project's
+  by-name refusal where it is not — the same branch the microphone row
+  took; it never records.
 * Section 2, the held last frame — lane E's `CompositionBuilder.heldTail`,
   which needs no grant: a fixture with 1 s of picture and 5 s of sound
   (`ffmpeg`, `testsrc2` + `sine`, NO `-shortest`) opened as a project, then
@@ -88,8 +101,12 @@ count rather than passing vacuously.
   Stop freezing the item's mark before the recorder's `stop()`, the tick
   passing `elapsed` and `isPaused` — read in `RecordingToolChrome`, which
   issue batch B27 moved to `AgentServer+RecordingChrome.swift`), the finish timeout reading the
-  session's SEGMENTS — their count sizing the ceiling — and its sentence
-  pluralised by count, `savedButNotAdded` built over
+  recorder's HELD segments (B66: `max(recorder.heldSegmentCount, 1)` for
+  the ceiling, `recorder.heldFilePaths` for the sentence, and no
+  `recorder.session` left in the tool's code) and its sentence
+  pluralised by count with "file" for a voice-over's and "movie" else, the
+  Screen Recording grant read in `recordScreen` only inside
+  `if kind == .screen {`, `savedButNotAdded` built over
   `RecordingResult.filesClause`, which names every segment's movie and
   every microphone file comma-joined,
   `pauses` and `segments` written unconditionally with `started_at` from an
@@ -244,6 +261,28 @@ this order because the first row needs NO document open:
   with `in` 0; and one within half a frame either way sends no trim and no
   delay, so that row is SKIPPED with its count and the number printed.
 
+**`--no-screen`** (issue batch B66) skips section 5 by name with its whole
+count (`SECTION5_CHECKS`, 69) and never calls `record_screen` for it — the
+flag a run that must not record the screen passes. Sections 0–4 and 6 run
+as ever.
+
+**Section 6, the voice-over** (issue batch B66, #99 phase 2): gated on the
+built app's `com.apple.security.device.audio-input` entitlement and on the
+never-recording `{seconds: 1, source: voice_over, project: /nowhere}`
+answering the project's by-name refusal — the Microphone grant passed on
+the port instance — else SKIPPED by name with `VOICE_CHECKS` (10). On a new
+document with the playhead at 2 s, `{seconds: 2, source: voice_over, path:
+work/recordings/<pid>-voice}`: answered; a dated `Voice-over <date> at
+<time>.m4a` in that folder, on disk; a duration of 1.5–3.0 s; `has_audio`
+true, `audio_tracks` 1, width and height 0; no `mic_path` or
+`mic_problem`, `mic_offset` 0; `pauses` 0 and one segment equal to the top
+level's path, duration, media and clip; `landed: document` with one each
+of `new_media`, `new_clips` and `new_tracks`; the clip on that new track,
+`tracks[0]`, named Microphone, at 1 200 000; one undo gives back the whole
+`get_project` answer with the file kept; and `{seconds: 1, place: false}`
+adds media alone, no clip and no `new_tracks`. Then the made-vs-promised
+self-check row. Three seconds of microphone in all, never the screen.
+
 Every file the tier writes lives under `work/recordings/<pid>-…` and is
 deleted at the end; the fixture movie and the compiled probe stay in
 `work/recordingproof/`, the way every earlier proof's fixtures do. The
@@ -300,6 +339,7 @@ sentence in it) needs a device to unplug: what is measured is that a
 microphone that lands carries no such key, and the source read of the key.
 
     python3 tools/proof/recording_proof.py [port] [log path]
+    python3 tools/proof/recording_proof.py [port] [log path] --no-screen   # B66: no screen recorded
 """
 
 import hashlib
@@ -320,8 +360,12 @@ from datetime import datetime
 from mcp import MCP, ToolError
 from dev_tools import DEV_TOOLS
 
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 4895
-LOG = sys.argv[2] if len(sys.argv) > 2 else f"/tmp/reelcut-{PORT}.log"
+# Positional arguments first, flags anywhere: `--no-screen` (issue batch B66)
+# skips section 5 by name — the one section that records the SCREEN.
+POSITIONAL = [arg for arg in sys.argv[1:] if not arg.startswith("--")]
+NO_SCREEN = "--no-screen" in sys.argv[1:]
+PORT = int(POSITIONAL[0]) if len(POSITIONAL) > 0 else 4895
+LOG = POSITIONAL[1] if len(POSITIONAL) > 1 else f"/tmp/reelcut-{PORT}.log"
 GRANTED_PORT = 4896
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -342,6 +386,8 @@ PROBE_FOLDER = os.path.join(RECORDINGS, f"{os.getpid()}-probe")
 DOCS = os.path.join(RECORDINGS, f"{os.getpid()}-docs")
 # The self-test's three WAVs, written and read through `wave` alone.
 SELFTEST = os.path.join(RECORDINGS, f"{os.getpid()}-selftest")
+# Section 6's voice-over files (issue batch B66), the tool's `path`.
+VOICE = os.path.join(RECORDINGS, f"{os.getpid()}-voice")
 
 SEC = 600_000
 
@@ -378,6 +424,8 @@ APP_STATE_TOOLS = {
 RECORD_PROPERTIES = {
     "display", "window", "seconds", "microphone", "system_audio", "show_clicks", "rate",
     "size", "place", "path",
+    # Issue batch B66 (#99 phase 2): what is recorded — the screen or a voice-over.
+    "source",
 }
 
 # `RecordingGrant.screenRecordingPaneSentence`, verbatim — the PREFIX of
@@ -454,6 +502,16 @@ TONE_CHECKS = 2
 # the second instance is launched; in the tier's promise, and in every
 # skip of the tier.
 DETECTION_CHECKS = 9
+# Section 5 whole, for `--no-screen`'s skip: the detection call's row, the
+# tier's promise above, and the launched instance's parity row and the
+# tier's self-check beside them.
+SECTION5_CHECKS = 1 + DETECTION_CHECKS + GRANTED_CHECKS + MIC_CHECKS + 2
+# Section 6's voice-over rows (issue batch B66, #99 phase 2), without its
+# self-check row; skipped by name with this count.
+VOICE_CHECKS = 10
+# `RecordingFiles.voiceOverStem`, made unique with ` (n)`.
+VOICE_NAME = re.compile(
+    r"^Voice-over \d{4}-\d{2}-\d{2} at \d{2}\.\d{2}\.\d{2}( \(\d+\))?\.m4a$")
 
 failures = []
 checks = 0
@@ -736,7 +794,7 @@ def catalog_part(mcp):
     schema = schemas.get("record_screen", {"properties": {}})
     declared = set(schema.get("properties", {}))
     check(declared == RECORD_PROPERTIES | {"project"},
-          "record_screen declares exactly its ten arguments plus the injected project: "
+          "record_screen declares exactly its eleven arguments plus the injected project: "
           f"{sorted(declared - RECORD_PROPERTIES - {'project'})} unexpected, "
           f"{sorted((RECORD_PROPERTIES | {'project'}) - declared)} missing")
     check(schema.get("required") == ["seconds"],
@@ -748,20 +806,25 @@ def catalog_part(mcp):
     for name, kind in (("seconds", "number"), ("display", "integer"), ("window", "integer"),
                        ("rate", "integer"), ("size", "string"), ("path", "string"),
                        ("microphone", "boolean"), ("system_audio", "boolean"),
-                       ("show_clicks", "boolean"), ("place", "boolean")):
+                       ("show_clicks", "boolean"), ("place", "boolean"),
+                       ("source", "string")):
         check(schema["properties"].get(name, {}).get("type") == kind,
               f"{name} is declared {kind}")
     check(schema["properties"].get("rate", {}).get("enum") == [30, 60],
           "rate's enum is [30, 60]")
     check(schema["properties"].get("size", {}).get("enum") == ["nominal", "best"],
           "size's enum is [nominal, best]")
+    check(schema["properties"].get("source", {}).get("enum") == ["screen", "voice_over"],
+          "source's enum is [screen, voice_over] (B66)")
     description = [tool for tool in listed if tool["name"] == "record_screen"][0]["description"]
     for phrase in ("File ▸ New Recording…", "Reelcut Recordings", "new_project", "Microphone",
                    "REFUSAL ORDER", "mic_problem", "Add Microphone", "launching process",
                    "Stop Recording", "The recording was saved at",
                    # R2d: the status item's two menus and the undo step a
                    # paused recording's remainder is named by.
-                   "Pause Recording", "Resume Recording", "Add Recording Segments"):
+                   "Pause Recording", "Resume Recording", "Add Recording Segments",
+                   # Issue batch B66 (#99 phase 2): the voice-over's door.
+                   "voice_over", "Microphone Only", "Voice-over"):
         check(phrase in description, f"the description says \"{phrase}\"")
     for key in ("path", "mic_path", "mic_duration", "mic_offset", "mic_problem", "media",
                 "mic_media", "clip", "mic_clip", "duration", "width", "height", "fps",
@@ -897,6 +960,46 @@ def refusal_part(mcp):
                       {"seconds": 0, "microphone": True, "project": "/nowhere/x.reelcut"})
               == "seconds must be 1…600 (got 0).",
               "ORDER: seconds 0 wins over the microphone stage either way")
+
+    # Issue batch B66 (#99 phase 2): `source`, read right after `seconds`.
+    # Its three sentences exactly, then the ORDER around them, then the
+    # grant the voice-over reads — the Microphone's alone.
+    voice_tail = " cannot be given — a voice-over records the microphone alone."
+    refused({"seconds": 2, "source": "x"}, 'source must be one of screen, voice_over (got "x").',
+            "an unknown source is refused listing both")
+    refused({"seconds": 2, "source": "voice_over", "display": 0},
+            "With source voice_over, display" + voice_tail,
+            "a voice-over refuses display by name")
+    refused({"seconds": 2, "source": "voice_over", "window": 5, "size": "best",
+             "system_audio": True, "show_clicks": True},
+            "With source voice_over, window, system_audio, show_clicks, size" + voice_tail,
+            "a voice-over refuses window, size, system_audio and show_clicks together, listed "
+            "in schema order")
+    refused({"seconds": 2, "source": "voice_over", "microphone": False},
+            "With source voice_over, microphone cannot be false — a voice-over records the "
+            "microphone alone.",
+            "a voice-over refuses microphone: false")
+    refused({"seconds": 0, "source": "x"}, "seconds must be 1…600 (got 0).",
+            "ORDER: seconds 0 wins over an unknown source")
+    refused({"seconds": 2, "source": "voice_over", "display": 0, "rate": 24},
+            "With source voice_over, display" + voice_tail,
+            "ORDER: the stranger sentence wins over rate 24")
+    refused({"seconds": 2, "source": "voice_over", "rate": 24}, "rate must be 30 or 60 (got 24).",
+            "ORDER: rate 24 alone, with source voice_over, is answered by rate")
+    refused({"seconds": 1, "source": "voice_over", "size": None, "rate": 24},
+            "rate must be 30 or 60 (got 24).",
+            "a JSON null is not given: size: null is no stranger, and rate answers")
+    message = refusal(mcp, "record_screen",
+                      {"seconds": 2, "source": "voice_over", "project": "/nowhere/x.reelcut"})
+    if named:
+        check(MIC_SENTENCE.match(message or "") is not None,
+              f"a voice-over reads the Microphone grant, absent here, before the project: "
+              f"{message!r}")
+    else:
+        check(message is not None and NO_OPEN_PROJECT.match(message) is not None,
+              f"a voice-over passes the Microphone grant (authorized for this shell) and the "
+              f"project's by-name refusal follows — no screen grant read, nothing recorded: "
+              f"{message!r}")
 
     # A window id nothing carries, and a display past the list, are answered
     # by the LOOKUP, which needs the grant: with it, the lookup's sentence
@@ -1076,20 +1179,34 @@ def source_part():
           "document — go through savedButNotAdded")
     # R2d: the finish timeout names EVERY segment's movie, and the sentence
     # is pluralised by count — with one movie it is R1's, byte for byte.
-    check("static func finishTimeoutSentence(movies: [String])" in result
-          and "Self.finishTimeoutSentence(movies: movies)" in tool
-          and "recorder.session?.segments.map(\\.movieURL.path)" in tool
-          and "let count = recorder.session?.segments.count ?? 1" in tool
-          and "session?.movieURL" not in tool,
-          "the finish timeout reads the session's SEGMENTS — their count for the ceiling, "
-          "their movies for the sentence — and the single movieURL R1 read is gone from the "
-          "tool")
+    # Issue batch B66 (#99 phase 2): the recorder's own `heldSegmentCount` /
+    # `heldFilePaths` — a screen recording's or a voice-over's — replace the
+    # tool's `recorder.session?` reads.
+    check("static func finishTimeoutSentence(movies: [String], voiceOver: Bool = false)" in result
+          and "Self.finishTimeoutSentence( movies: movies, voiceOver: choice.source == "
+              ".voiceOver)" in re.sub(r"\s+", " ", tool)
+          and "return recorder.heldFilePaths" in tool
+          and "let count = max(recorder.heldSegmentCount, 1)" in tool
+          and "recorder.session" not in code(tool) and "session?.movieURL" not in tool,
+          "the finish timeout reads the recorder's HELD segments — heldSegmentCount for the "
+          "ceiling, heldFilePaths for the sentence, a screen recording's movies or a "
+          "voice-over's files — and no recorder.session read is left in the tool's code")
     timeout = result.split("static func finishTimeoutSentence")[1].split("\n    }\n")[0]
-    check("case 1:" in timeout and "its movie is at \\(movies[0])." in timeout
-          and "its movies are at " in timeout and 'movies.joined(separator: ", ")' in timeout
+    check("case 1:" in timeout and "its \\(noun) is at \\(movies[0])." in timeout
+          and "its \\(noun)s are at " in timeout and 'movies.joined(separator: ", ")' in timeout
+          and 'let noun = voiceOver ? "file" : "movie"' in timeout
           and "stopCeiling(segments: movies.count)" in timeout,
           "…and its sentence is pluralised by count and states the ceiling it waited, sized "
-          "by the same count: one movie spelled as R1 spelled it, several comma-joined")
+          "by the same count: one movie spelled as R1 spelled it, several comma-joined, and "
+          "\"file\" for a voice-over's")
+    body = tool.split("func recordScreen(")[1].split("\n    // MARK: - The recording")[0]
+    gated = body.split("if kind == .screen {")
+    check(len(gated) == 2 and "RecordingGrant.screenRecordingGranted" not in gated[0]
+          and gated[1].count("RecordingGrant.screenRecordingGranted") == 1
+          and gated[1].index("RecordingGrant.screenRecordingGranted")
+          < gated[1].index("\n        }\n"),
+          "recordScreen reads RecordingGrant.screenRecordingGranted only inside "
+          "`if kind == .screen {` — a voice-over never reads the Screen Recording grant")
     saved = result.split("static func savedButNotAdded")[1].split("\n    }\n")[0]
     clause = source("RecordingResult.swift").split("var filesClause")[1].split("\n    }\n")[0]
     check("The recording was saved at \\(result.filesClause) but could " in saved
@@ -1918,8 +2035,152 @@ def microphone_rows(mcp):
 # ---- main ----------------------------------------------------------------
 
 
+# ---- 6. the voice-over (issue batch B66, #99 phase 2) --------------------
+
+
+def voice_tier(mcp):
+    """A real voice-over through `record_screen {source: voice_over}` on the
+    instance at `port`: the microphone alone, 3 s in all, into `VOICE`,
+    which the cleanup deletes. Gated on the built app's audio-input
+    entitlement and on the never-recording call below answering the
+    project's by-name refusal — the Microphone grant passed — and skipped by
+    name with `VOICE_CHECKS` otherwise. Never the screen."""
+    entitled = "com.apple.security.device.audio-input" in subprocess.run(
+        ["codesign", "-d", "--entitlements", "-", APP], capture_output=True, text=True).stdout
+    gate = refusal(mcp, "record_screen",
+                   {"seconds": 1, "source": "voice_over", "project": "/nowhere/x.reelcut"})
+    authorized = gate is not None and NO_OPEN_PROJECT.match(gate) is not None
+    if not (entitled and authorized):
+        skip("the voice-over rows: "
+             + ("the built app lacks com.apple.security.device.audio-input; "
+                if not entitled else "")
+             + ("the Microphone grant is not authorized for this instance "
+                f"({gate!r})" if not authorized else ""),
+             VOICE_CHECKS)
+        return
+    counted = checks
+    not_made, raised = run_rows("voice-over rows", VOICE_CHECKS, voice_rows, mcp)
+    ran = checks - counted
+    expected = VOICE_CHECKS - not_made + raised
+    check(ran == expected,
+          f"the voice-over rows made the {expected} checks their skip counts promise (made "
+          f"{ran}; {VOICE_CHECKS} promised, {not_made} skipped by name, {raised} added by a "
+          "raise)")
+
+
+def marker_names(marker, path):
+    """True when `marker` (`cache/peaks/` or `cache/speech/<id>.complete.json`)
+    exists and its stamp's `source` is `path`'s size and whole-second mtime
+    — the marker of THIS file, not of an earlier media an undo gave the same
+    id back for (`MediaCacheFiles.CacheStamp`, which both stamps wrap)."""
+    try:
+        with open(marker) as handle:
+            source = json.load(handle)["source"]
+        return (source["size"] == os.path.getsize(path)
+                and source["modified"] == math.floor(os.path.getmtime(path) + 0.5))
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+
+
+def close_after_caches(mcp, document, media, seconds=15):
+    """Waits (bounded) for each imported media's peaks and speech caches —
+    the last two writes of `MediaImporter.generateCaches`, in that order —
+    to land in the package, then closes the document, discarding — so no
+    cache write lands in `DOCS` after the cleanup has removed it (measured
+    2026-10-02: the voice document's `cache/peaks/` reappeared under a
+    deleted `DOCS`, and a WAV's `cache/speech/` landed after a close that
+    waited for peaks alone). `media` maps an id to its file, and a marker
+    counts only when its stamp names that file: an undo gives an id back,
+    so the `place: false` call's media reuses the undone one's id, and a
+    bare existence test was met at once by the undone media's marker
+    (measured 2026-10-02, review 2)."""
+    deadline = time.time() + seconds
+    wanted = [(os.path.join(document, "cache", kind, f"{m}.complete.json"), path)
+              for m, path in media.items() for kind in ("peaks", "speech")]
+    while time.time() < deadline and not all(marker_names(marker, path)
+                                             for marker, path in wanted):
+        time.sleep(0.2)
+    try:
+        mcp.call_with("close_project", {"project": document, "discard": True})
+    except ToolError as error:
+        print(f"  (could not close {document}: {error})")
+
+
+def voice_rows(mcp):
+    document = new_document(mcp, "voice")
+    media = {}
+    try:
+        voice_rows_in(mcp, document, media)
+    finally:
+        close_after_caches(mcp, document, media)
+
+
+def voice_rows_in(mcp, document, media):
+    mcp.call_with("set_playhead", {"project": document, "t": 2 * SEC})
+    before = fingerprint(mcp, document)
+    answer, message = attempt(
+        mcp, "record_screen",
+        {"seconds": 2, "source": "voice_over", "path": VOICE, "project": document})
+    check(message is None and isinstance(answer, dict),
+          f"{{seconds: 2, source: voice_over}} into a new document is answered: {message!r}")
+    answer = answer if isinstance(answer, dict) else {}
+    path = answer.get("path") or ""
+    media.update({m: path for m in answer.get("new_media") or []})
+    check(os.path.dirname(path) == VOICE and VOICE_NAME.match(os.path.basename(path)) is not None
+          and os.path.exists(path),
+          f"its path is a dated Voice-over <date> at <time>.m4a in the folder path names, on "
+          f"disk: {path!r}")
+    duration = answer.get("duration") or 0
+    check(1.5 * SEC <= duration <= 3.0 * SEC,
+          f"its duration is 1.5–3.0 s for a 2 s span: {duration / SEC:.3f} s")
+    check(answer.get("has_audio") is True and answer.get("audio_tracks") == 1
+          and answer.get("width") == 0 and answer.get("height") == 0,
+          f"has_audio true, audio_tracks 1, width and height 0 — no picture: "
+          f"{answer.get('has_audio')}, {answer.get('audio_tracks')}, "
+          f"{answer.get('width')}×{answer.get('height')}")
+    check("mic_path" not in answer and "mic_problem" not in answer
+          and answer.get("mic_offset") == 0,
+          f"no mic_path and no mic_problem — its voice IS the file — and mic_offset 0: "
+          f"{answer.get('mic_offset')!r}")
+    segments = answer.get("segments")
+    segment = segment_of(answer)
+    check(answer.get("pauses") == 0 and isinstance(segments, list) and len(segments) == 1
+          and all(segment.get(key) == answer.get(key)
+                  for key in ("path", "duration", "media", "clip"))
+          and answer.get("clip") is not None,
+          f"pauses 0 and one segment whose path, duration, media and clip are the top "
+          f"level's: {segment}")
+    check(answer.get("landed") == "document" and len(answer.get("new_media") or []) == 1
+          and len(answer.get("new_clips") or []) == 1 and len(answer.get("new_tracks") or []) == 1,
+          f"landed: document, with one each of new_media, new_clips and new_tracks: "
+          f"{answer.get('landed')}, {answer.get('new_media')}, {answer.get('new_clips')}, "
+          f"{answer.get('new_tracks')}")
+    reported = project(mcp, document)
+    tracks = reported["tracks"]
+    clip = next((c for c in reported["clips"] if c["id"] == answer.get("clip")), None)
+    check(clip is not None and bool(tracks) and clip["track"] == tracks[0]["id"]
+          and tracks[0]["name"] == "Microphone"
+          and tracks[0]["id"] in (answer.get("new_tracks") or [])
+          and clip["start"] == 2 * SEC,
+          f"the clip sits on that new track, tracks[0], named Microphone, at 1 200 000: "
+          f"{clip and (clip['track'], clip['start'])}, tracks {[t['name'] for t in tracks]}")
+    mcp.call_with("undo", {"project": document})
+    check(fingerprint(mcp, document) == before and os.path.exists(path),
+          "one undo gives back the whole get_project answer, and the file stays on disk")
+    second, message = attempt(
+        mcp, "record_screen",
+        {"seconds": 1, "source": "voice_over", "place": False, "path": VOICE,
+         "project": document})
+    second = second if isinstance(second, dict) else {}
+    media.update({m: second.get("path") or "" for m in second.get("new_media") or []})
+    check(message is None and second.get("media") is not None and "clip" not in second
+          and "new_tracks" not in second and len(second.get("new_media") or []) == 1,
+          f"{{seconds: 1, place: false}} adds the media alone — no clip, no new_tracks: "
+          f"{message or {k: second.get(k) for k in ('media', 'clip', 'new_tracks')}}")
+
+
 def cleanup():
-    for folder in (RUN, PROBE_FOLDER, DOCS, SELFTEST):
+    for folder in (RUN, PROBE_FOLDER, DOCS, SELFTEST, VOICE):
         shutil.rmtree(folder, ignore_errors=True)
 
 
@@ -1934,8 +2195,15 @@ def main():
         section("2 — the held last frame (lane E), which needs no grant", fixture_part, mcp)
         section("3 — the tool's source, read where no call can reach", source_part)
         section("4 — the tone arithmetic, self-tested on a synthesized trio", selftest_part)
-        section("5 — the granted tier: the host's facts, then a second instance of its own",
-                granted_tier, mcp)
+        if NO_SCREEN:
+            print("\n5 — the granted tier")
+            skip("section 5, the granted tier: --no-screen — this run records no screen, and "
+                 "record_screen is not called for it", SECTION5_CHECKS)
+        else:
+            section("5 — the granted tier: the host's facts, then a second instance of its own",
+                    granted_tier, mcp)
+        section("6 — the voice-over: the microphone alone, through record_screen's source",
+                voice_tier, mcp)
     finally:
         stop_launched()
         cleanup()

@@ -20,16 +20,21 @@ import ScreenCaptureKit
 ///
 /// **The refusal ORDER is the contract** (`transcribe`'s rule): the caller's
 /// own mistakes FIRST, so they stay reachable with no grant — `seconds`
-/// missing or outside 1…600, `display` with `window`, a `rate` or `size`
-/// outside the vocabulary, `microphone: true` with the Microphone grant
+/// missing or outside 1…600, then `source` (its value; for `voice_over`
+/// the screen-only arguments given, then `microphone: false`), `display`
+/// with `window`, a `rate` or `size` outside the vocabulary,
+/// `microphone: true` (implied by a voice-over) with the Microphone grant
 /// absent (the status WORD in the sentence), and a `project` naming nothing
 /// open, answered by `target(_:)`'s own sentence and never turned into a
-/// fresh document. Then the Screen Recording grant, read synchronously and
-/// named with the System Settings pane. Only then the display or window
-/// lookup, which cannot be asked without the grant — a list with NO display
-/// in it (a locked console) is named as that, not as an index out of range.
-/// `CGRequestScreenCaptureAccess` and the picker are never called, nor is
-/// System Settings opened (decision 4): the panel is where a person grants.
+/// fresh document. A voice-over stops there: it reads no other grant and
+/// looks nothing up (spec §11 recording, "A voice-over is a recording with
+/// no picture"). A screen recording then reads the Screen Recording grant,
+/// synchronously, named with the System Settings pane. Only then the
+/// display or window lookup, which cannot be asked without the grant — a
+/// list with NO display in it (a locked console) is named as that, not as
+/// an index out of range. `CGRequestScreenCaptureAccess` and the picker are
+/// never called, nor is System Settings opened (decision 4): the panel is
+/// where a person grants.
 ///
 /// **The target is `.document(recipeKey:)`**, resolved BEFORE the recording
 /// and looked up again AFTER it (`RecordingLanding.resolve`): a document that
@@ -90,15 +95,17 @@ extension AgentServer {
 
         // 1. The caller's own mistakes, every one before any grant is read.
         let seconds = try recordingSeconds(a)
-        let (displayIndex, windowID) = try recordingSourceArguments(a)
+        let kind = try recordingSourceKind(a)
+        let voiceOver = kind == .voiceOver
+        let (displayIndex, windowID) = voiceOver ? (0, nil) : try recordingSourceArguments(a)
         let rate = try intArg(a, "rate") ?? 60
         guard rate == 30 || rate == 60 else {
             throw ToolError(message: "rate must be 30 or 60 (got \(rate)).")
         }
-        let resolution = try recordingResolution(a)
-        let microphone = try boolArg(a, "microphone") ?? false
-        let systemAudio = try boolArg(a, "system_audio") ?? true
-        let showClicks = try boolArg(a, "show_clicks") ?? false
+        let resolution = voiceOver ? .nominal : try recordingResolution(a)
+        let microphone = voiceOver ? true : try boolArg(a, "microphone") ?? false
+        let systemAudio = voiceOver ? false : try boolArg(a, "system_audio") ?? true
+        let showClicks = voiceOver ? false : try boolArg(a, "show_clicks") ?? false
         let place = try boolArg(a, "place") ?? true
         let folder = try recordingFolder(a)
         if microphone {
@@ -111,20 +118,26 @@ extension AgentServer {
         // the grant, where `transcribe` answers its own id refusals.
         let destination = try onMain { try self.recordingDestination(a) }
 
-        // 2. The Screen Recording grant — read, never requested.
-        guard RecordingGrant.screenRecordingGranted else {
-            throw ToolError(message: RecordingGrant.screenRecordingRefusal)
-        }
+        // A voice-over has no picture: no grant but the Microphone's is
+        // read, and there is nothing to look up.
+        var source = RecordingSource.voiceOver
+        var filter: SCContentFilter?
+        if kind == .screen {
+            // 2. The Screen Recording grant — read, never requested.
+            guard RecordingGrant.screenRecordingGranted else {
+                throw ToolError(message: RecordingGrant.screenRecordingRefusal)
+            }
 
-        // 3. The content (unlistable without the grant) and the programmatic
-        //    filter — a display source always excludes Reelcut.
-        let content = try shareableContent()
-        let source = try recordingSource(displayIndex, windowID, in: content)
-        let filter: SCContentFilter
-        do {
-            filter = try ScreenRecorder.filter(for: source, in: content)
-        } catch {
-            throw ToolError(message: error.localizedDescription)
+            // 3. The content (unlistable without the grant) and the
+            //    programmatic filter — a display source always excludes
+            //    Reelcut.
+            let content = try shareableContent()
+            source = try recordingSource(displayIndex, windowID, in: content)
+            do {
+                filter = try ScreenRecorder.filter(for: source, in: content)
+            } catch {
+                throw ToolError(message: error.localizedDescription)
+            }
         }
 
         // 4. The choice; the microphone is the DEFAULT audio device.
@@ -153,9 +166,12 @@ extension AgentServer {
 
     // MARK: - The recording
 
-    /// Start, the span, stop. See the header for the hook and the waits.
+    /// Start, the span, stop. See the header for the hook and the waits. A
+    /// nil filter is a voice-over (`choice.source == .voiceOver`), started
+    /// through `startVoiceOver`, whose completion answers before it returns
+    /// and before its writer's did-start, which the span waits for first.
     private func record(
-        filter: SCContentFilter, choice: RecordingChoice, seconds: Double
+        filter: SCContentFilter?, choice: RecordingChoice, seconds: Double
     ) throws -> RecordingResult {
         let recorder = ScreenRecorder.shared
         let started = DispatchSemaphore(value: 0)
@@ -170,10 +186,17 @@ extension AgentServer {
             if box.value == nil { box.value = outcome }
             finished.signal()
         }
+        let startCompletion: (Error?) -> Void = { error in
+            startBox.value = error.map { .failure($0) } ?? .success(())
+            started.signal()
+        }
         onMain {
-            recorder.start(filter: filter, choice: choice, onFinish: deliver) { error in
-                startBox.value = error.map { .failure($0) } ?? .success(())
-                started.signal()
+            if let filter {
+                recorder.start(
+                    filter: filter, choice: choice, onFinish: deliver, completion: startCompletion)
+            } else {
+                recorder.startVoiceOver(
+                    choice: choice, onFinish: deliver, completion: startCompletion)
             }
         }
         // The recorder's own arm timer answers first; this bound is for a
@@ -187,6 +210,7 @@ extension AgentServer {
             throw ToolError(message: Self.startSentence(of: error))
         }
         onMain { chrome.show(recorder) }
+        if filter == nil { awaitVoiceOverDidStart(recorder, ended: box) }
 
         // The span: the recording runs on main's run loop, this thread waits,
         // and only `onFinish` — an external stop, a failure — wakes it early.
@@ -196,18 +220,20 @@ extension AgentServer {
             // wait had not budgeted for. The item freezes first (its doc).
             let segments = onMain { () -> Int in
                 chrome.freeze()
-                let count = recorder.session?.segments.count ?? 1
+                let count = max(recorder.heldSegmentCount, 1)
                 recorder.stop()
                 return count
             }
             guard finished.wait(timeout: .now() + Self.stopCeiling(segments: segments)) == .success
             else {
-                // The movies the recorder still holds — one per segment.
+                // The files the recorder still holds — one per segment.
                 let movies = onMain { () -> [String] in
                     chrome.remove()
-                    return recorder.session?.segments.map(\.movieURL.path) ?? []
+                    return recorder.heldFilePaths
                 }
-                throw ToolError(message: Self.finishTimeoutSentence(movies: movies))
+                throw ToolError(
+                    message: Self.finishTimeoutSentence(
+                        movies: movies, voiceOver: choice.source == .voiceOver))
             }
         }
         guard let outcome = box.value else {
@@ -217,6 +243,24 @@ extension AgentServer {
             return try outcome.get()
         } catch {
             throw ToolError(message: Self.sentence(of: error))
+        }
+    }
+
+    /// SERVER THREAD. A voice-over's start completion answers BEFORE its
+    /// writer's did-start, so a span counted from it comes out short by the
+    /// input's start-up time (a second on a Bluetooth input). This polls
+    /// `heldFirstStartedAt` through `onMain` until it lands, the recording
+    /// has already ended (`ended` written by `onFinish`), or
+    /// `ScreenRecorder.armCeiling` passes — past which the span runs as
+    /// before. A screen recording's start already answers after its arm.
+    private func awaitVoiceOverDidStart(
+        _ recorder: ScreenRecorder, ended: AgentBox<Result<RecordingResult, Error>>
+    ) {
+        let deadline = Date().addingTimeInterval(ScreenRecorder.armCeiling)
+        while Date() < deadline {
+            let waiting = onMain { recorder.heldFirstStartedAt == nil && ended.value == nil }
+            guard waiting else { return }
+            Thread.sleep(forTimeInterval: 0.02)
         }
     }
 
@@ -304,7 +348,8 @@ extension AgentServer {
             }
             if !place {
                 notes.append(
-                    "place: false has no meaning for a new project — the picture IS the "
+                    "place: false has no meaning for a new project — the "
+                        + (result.isVoiceOver ? "voice-over" : "picture") + " IS the "
                         + "document, so its clips are on the timeline, one per segment and "
                         + "the first at 0.")
             }

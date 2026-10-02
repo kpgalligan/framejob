@@ -21,6 +21,45 @@ extension AgentServer {
 
     // MARK: - The arguments
 
+    /// `source`: what is recorded — the screen (the default) or the
+    /// microphone alone (the panel's Microphone Only, spec §11 recording).
+    enum RecordingSourceKind: String, CaseIterable {
+        case screen
+        case voiceOver = "voice_over"
+    }
+
+    /// The arguments a voice-over refuses by name: everything that only a
+    /// picture or the stream reads.
+    static let voiceOverScreenOnlyArguments = ["display", "window", "system_audio", "show_clicks", "size"]
+
+    /// `source`, default `screen`; an unknown value refused with the
+    /// vocabulary. For `voice_over`, the screen-only arguments the caller
+    /// GAVE (a JSON null is not given, `scalarArg`'s rule) are refused
+    /// together, in `voiceOverScreenOnlyArguments` order, then
+    /// `microphone: false`.
+    func recordingSourceKind(_ a: [String: Any]) throws -> RecordingSourceKind {
+        guard let name = try stringArg(a, "source") else { return .screen }
+        guard let kind = RecordingSourceKind(rawValue: name) else {
+            let known = RecordingSourceKind.allCases.map { $0.rawValue }
+            throw ToolError(
+                message: "source must be one of " + known.joined(separator: ", ")
+                    + " (got \"\(name)\").")
+        }
+        guard kind == .voiceOver else { return kind }
+        let strangers = Self.voiceOverScreenOnlyArguments.filter { a[$0] != nil && !(a[$0] is NSNull) }
+        guard strangers.isEmpty else {
+            throw ToolError(
+                message: "With source voice_over, " + strangers.joined(separator: ", ")
+                    + " cannot be given — a voice-over records the microphone alone.")
+        }
+        if try boolArg(a, "microphone") == false {
+            throw ToolError(
+                message: "With source voice_over, microphone cannot be false — a voice-over "
+                    + "records the microphone alone.")
+        }
+        return kind
+    }
+
     /// `seconds`: required, 1…600. Spelled back as the caller sent it (`0`,
     /// not `0.0`) when it is whole.
     func recordingSeconds(_ a: [String: Any]) throws -> Double {

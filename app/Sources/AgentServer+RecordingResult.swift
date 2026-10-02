@@ -193,9 +193,11 @@ extension AgentServer {
     /// The `note` clause for a result some segment's microphone did not
     /// land for — the pictures are in the project and the answer must say
     /// what is missing. Over the JOINED problems, whose sentences name the
-    /// segment's file when one was left behind.
+    /// segment's file when one was left behind. A voice-over has no picture:
+    /// its problem — a microphone that stopped on its own — is said verbatim.
     static func microphoneNote(_ result: RecordingResult) -> String? {
-        result.micProblem.map {
+        if result.isVoiceOver { return result.micProblem }
+        return result.micProblem.map {
             "The picture landed without its microphone — the microphone file could not be "
                 + "used: " + $0
         }
@@ -338,8 +340,10 @@ extension AgentServer {
     /// all. The seconds it spells are the ceiling over `movies.count`, which
     /// is the number the wait used: the same count while the session is
     /// held (a stop removes no segment), and the one-segment number — the
-    /// wait's own `?? 1` — when the recorder had let the session go.
-    static func finishTimeoutSentence(movies: [String]) -> String {
+    /// wait's own `?? 1` — when the recorder had let the session go. A
+    /// voice-over's files are named "file", not "movie".
+    static func finishTimeoutSentence(movies: [String], voiceOver: Bool = false) -> String {
+        let noun = voiceOver ? "file" : "movie"
         let where_: String
         switch movies.count {
         case 0:
@@ -347,10 +351,10 @@ extension AgentServer {
                 "The recorder no longer holds the session, so the recording may already have "
                 + "finished without answering."
         case 1:
-            where_ = "The recording may still finish on its own; its movie is at \(movies[0])."
+            where_ = "The recording may still finish on its own; its \(noun) is at \(movies[0])."
         default:
             where_ =
-                "The recording may still finish on its own; its movies are at "
+                "The recording may still finish on its own; its \(noun)s are at "
                 + movies.joined(separator: ", ") + "."
         }
         return "record_screen asked the recorder to stop and it did not finish within "

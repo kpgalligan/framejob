@@ -11,7 +11,8 @@ cleared resumeProblem (F10), issue batch B49's square `StickerButton`
 segment's readable microphone (section 14, U7, and rows in U1, U2, U6 and
 3r; #181 item 2), and issue batch B64's voice-over (#99 phase 1: section 15
 with no grant, and its granted tier 15g, which records the MICROPHONE alone
-and never the screen).
+and never the screen), and issue batch B66's voice-over doors (#99 phase 2:
+V9, V10 and section 16, `voiceover_doors`).
 
 Why a probe and not an MCP script. Three of the things R1a added have no
 caller a running binary can be asked to reach, and one of them is the row
@@ -1058,6 +1059,55 @@ voiceover_granted` on a host whose Microphone grant reads authorized:
                     the start row and the finishing row, G2, G3. Caught on a
                     GRANTED host only: where 15g skips, nothing runs it.
 
+**Issue batch B66's rows, section and mutants** (#99 phase 2, the
+voice-over's doors and B64's review nits 2 and 3). Section 15 gains V9, a
+30 fps document filled to 64 tracks: segments of 5 000 and 4 000 ticks land
+with no throw as media alone (ops [add_media, add_media], clipIds
+[nil, nil], the two `tooShortNote`s, 64 tracks after the commit), while the
+control, 5 000 ticks and 2 s, still throws `too many tracks: 65 (max 64)`;
+and V10, a fresh `ScreenRecorder()` holding a hand-built `VoiceSession` (a
+`SpyAudioOutput`, a bare `AVCaptureSession`, one segment on a 1 s WAV
+written with `AVAudioFile`): a did-finish stamped BEFORE `stop()` is still
+the microphone stopping on its own (the sentence on a `.success`), one
+stamped after it is not (the control), and one stamped before `pause()`
+finishes the voice-over from paused (`pauses` 1, idle after). Section 16
+(`voiceover_doors`, Swift mode `voiceover-doors`, its own process) drives
+`RecorderPanelController.shared`, never shown, under a `GrantSpy` whose
+Screen Recording READ is counted: D1 the Source rows end "Window…" (tag 1)
+and "Microphone Only" (tag 2), screens + 3; D2 choosing it greys System
+Audio, Show Clicks and Size with their values kept, Microphone, Rate and
+Record Into live, the size note `voiceOverSizeNote`; D3 the display key
+(a sentinel) and the set of `ReelcutRecording…` keys unchanged, the row
+kept through `rebuildSources()` + `restoreChoices()`; D4 a display row
+brings the three back; D5 Microphone Off refuses with
+`microphoneOffSentence`, no screen read, no microphone request; D6 a
+microphone authorized with the screen absent counts down, no screen read or
+request, nothing opened; D7 the countdown's end is the recorder's own
+refusal for that choice (no device carries "probe-mic"), idle, never hidden
+— begun by the row itself when D6 did not reach it; D8 `hidesForRecording`;
+D9 the Pause / Resume button; D10 `record_screen`'s `recordingSourceKind`
+— nine calls, the exact sentences, a JSON null not a stranger; D11 the
+voice-over's `microphoneNote` and "its file is at". 5d now ends the Source
+rows at Microphone Only (screens + 3), 7c's arguments gain `source` and 7d's
+phrases `voice_over` and `Microphone Only`. Measured 2026-10-02, each
+`--mutant <name> --only voiceover,voiceover_doors`, against a tree at 66/66
+there:
+
+  voice-own-stop-asked  `unasked` back to `stoppedAt == nil`
+                    (ScreenRecorder+VoiceOverFinishing.swift) — 64/66: V10a,
+                    V10c.
+  voice-cap-trial-always  `canLand` → `true`
+                    (RecordingLanding+VoiceOver.swift) — 65/66: V9a.
+  voice-panel-hides     `hidesForRecording` → `{ true }`
+                    (RecorderPanelController+VoiceOver.swift) — 65/66: D8.
+  voice-screen-grant-read  `beginIfGranted`'s forward deleted
+                    (RecorderPanelController+Recording.swift) — 64/66: D5, D6.
+  voice-row-live        `screenOnly` → `idle`
+                    (RecorderPanelController+VoiceOver.swift) — 65/66: D2.
+  voice-strangers-admitted  `strangers` → `[]`
+                    (AgentServer+RecordingArguments.swift) — 64/66: D10's
+                    display row and its all-five row.
+
 Two older mutants were RE-AIMED by B55, because the walker's two left-out
 arms now call `probeLeftOutMicrophone` before recursing:
 `unreadable-fails-all` (the probe-failure arm) re-scored 156/172 with
@@ -1079,6 +1129,7 @@ in its pin map (R1's landing): both cross-builds are one program again.
     python3 tools/proof/recording_probe.py --only state,unreadable,leftout   # B55's
     python3 tools/proof/recording_probe.py --only leftout   # B61's
     python3 tools/proof/recording_probe.py --only voiceover,voiceover_granted   # B64's
+    python3 tools/proof/recording_probe.py --only voiceover,voiceover_doors   # B66's
     python3 tools/proof/recording_probe.py --mutant excludes
     python3 tools/proof/recording_probe.py --sources <dir> # any copy
     RC_APP_SOURCES=<dir> python3 tools/proof/recording_probe.py
@@ -4611,6 +4662,8 @@ final class GrantSpy {
     var launchd = true
     var mic: AVAuthorizationStatus = .authorized
     var openAnswer = true
+    /// Reads of the Screen Recording grant (issue batch B66's D5, D6).
+    var screenReads = 0
     var screenRequests = 0
     var micRequests = 0
     var remembered = 0
@@ -4619,7 +4672,10 @@ final class GrantSpy {
 
     var doors: RecorderGrantDoors {
         RecorderGrantDoors(
-            screenGranted: { self.granted },
+            screenGranted: {
+                self.screenReads += 1
+                return self.granted
+            },
             launchedByLaunchd: { self.launchd },
             requestScreen: { self.screenRequests += 1 },
             screenAsked: { self.asked },
@@ -4965,6 +5021,24 @@ func voiceOverResult(
         }, choice: choice, stoppedBy: .stopped, pauses: list.count - 1)
 }
 
+/// A silent mono 48 kHz WAV of `seconds` at `url`, written with
+/// `AVAudioFile` — a file `MediaImporter.probe` reads as audio (B66's V10).
+func writeWAV(_ url: URL, seconds: Double) -> Bool {
+    guard let format = AVAudioFormat(standardFormatWithSampleRate: 48_000, channels: 1) else {
+        return false
+    }
+    let frames = AVAudioFrameCount(48_000 * seconds)
+    guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames) else { return false }
+    buffer.frameLength = frames
+    do {
+        let file = try AVAudioFile(forWriting: url, settings: format.settings)
+        try file.write(from: buffer)
+    } catch {
+        return false
+    }
+    return true
+}
+
 func voiceover(_ request: [String: Any]) -> [String: Any] {
     let controller = ProbeDocumentController()
     let app = NSApplication.shared
@@ -5154,6 +5228,92 @@ func voiceover(_ request: [String: Any]) -> [String: Any] {
         facts["tracksAfter"] = tracks(d.project.snapshot)
         return facts
     }
+    // V9 (issue batch B66, nit 3): a 30 fps document at the 64-track cap.
+    func capped() -> ProjectDocument {
+        let d = ProjectDocument()
+        let have = d.project.snapshot.tracks.count
+        d.performGroupedEdit("fill", (have..<64).map { _ in ReelOp.addTrack(index: 0, name: "Fill") })
+        return d
+    }
+    out["V9"] = row {
+        let d = capped()
+        let a = voice("V9a", 5_000)
+        let b = voice("V9b", 4_000)
+        var facts: [String: Any] = [:]
+        facts["tracksBefore"] = d.project.snapshot.tracks.count
+        facts["canvasFps"] = fpsPair(d.project.snapshot.canvas.fps)
+        do {
+            let p = try RecordingLanding.placement(voiceOverResult([a, b]), in: d, place: true)
+            facts.merge(commit(d, p)) { _, new in new }
+            let fps = d.project.snapshot.canvas.fps
+            facts["expectedNotes"] = [a, b].map { v in
+                d.project.snapshot.media.first { $0.path == v.path }
+                    .flatMap { RecordingLanding.tooShortNote($0, at: fps) } ?? "<no media>"
+            }
+            facts["tracksAfter"] = d.project.snapshot.tracks.count
+        } catch {
+            facts["error"] = (error as? ReelCoreError)?.message ?? "\(error)"
+        }
+        let e = capped()
+        do {
+            _ = try RecordingLanding.placement(
+                voiceOverResult([voice("V9c", 5_000), voice("V9d", 2 * second)]), in: e, place: true)
+            facts["control"] = "no throw"
+        } catch {
+            facts["control"] = (error as? ReelCoreError)?.message ?? "\(error)"
+        }
+        return facts
+    }
+    // V10 (issue batch B66, nit 2): a writer's did-finish judged by when it
+    // ARRIVED, on a fresh recorder holding a hand-built voice session.
+    pinNeverRewrap()
+    func voiceRow(
+        _ name: String, _ drive: (ScreenRecorder, SpyAudioOutput, URL) -> [String: Any]
+    ) -> [String: Any] {
+        let wav = tmp.appendingPathComponent("\(name).wav")
+        guard writeWAV(wav, seconds: 1) else { return ["error": "the WAV could not be written"] }
+        let recorder = ScreenRecorder()
+        let spy = SpyAudioOutput()
+        var outcomes: [Result<RecordingResult, Error>] = []
+        var choice = RecordingChoice()
+        choice.source = .voiceOver
+        choice.microphone = "probe"
+        choice.folder = tmp
+        recorder.voiceSession = ScreenRecorder.VoiceSession(
+            choice: choice, micSession: AVCaptureSession(), micOutput: spy,
+            fileDelegate: VoiceOverFileDelegate(recorder: recorder),
+            onFinish: { outcomes.append($0) },
+            segments: [ScreenRecorder.VoiceSegment(url: wav, calledAt: Date())])
+        recorder.state = .recording
+        var facts = drive(recorder, spy, wav)
+        _ = spin(5) { !outcomes.isEmpty && recorder.state == .idle }
+        facts["outcomes"] = outcomes.count
+        facts["finalState"] = "\(recorder.state)"
+        if let first = outcomes.first { facts["outcome"] = spell(first) }
+        return facts
+    }
+    out["V10a"] = voiceRow("V10a") { recorder, spy, wav in
+        let before = Date()
+        Thread.sleep(forTimeInterval: 0.01)
+        recorder.stop()
+        recorder.voiceFileFinished(wav, output: spy, finishedWell: true, error: nil, at: before)
+        return [:]
+    }
+    out["V10b"] = voiceRow("V10b") { recorder, spy, wav in
+        recorder.stop()
+        Thread.sleep(forTimeInterval: 0.01)
+        recorder.voiceFileFinished(wav, output: spy, finishedWell: true, error: nil, at: Date())
+        return [:]
+    }
+    out["V10c"] = voiceRow("V10c") { recorder, spy, wav in
+        let before = Date()
+        Thread.sleep(forTimeInterval: 0.01)
+        var paused = "ok"
+        do { try recorder.pause() } catch { paused = spellError(error) }
+        let stateAfterPause = "\(recorder.state)"
+        recorder.voiceFileFinished(wav, output: spy, finishedWell: true, error: nil, at: before)
+        return ["pause": paused, "stateAfterPause": stateAfterPause]
+    }
     out["documentsAfterClose"] = NSDocumentController.shared.documents.count
     return out
 }
@@ -5283,6 +5443,233 @@ func voiceoverGranted(_ request: [String: Any]) -> [String: Any] {
     return out
 }
 
+// ---- mode "voiceover-doors": #99 phase 2 — the panel's row, the tool ----
+
+/// D1–D11 (issue batch B66) over `RecorderPanelController.shared`, NEVER
+/// shown, under a `GrantSpy`'s doors whose Screen Recording read is counted,
+/// and `AgentServer.shared`'s argument reader. The six `ReelcutRecording…`
+/// values are put back as they were at the end, so the probe's own defaults
+/// domain is left as it was found.
+func voiceoverDoors(_ request: [String: Any]) -> [String: Any] {
+    let app = NSApplication.shared
+    app.setActivationPolicy(.prohibited)
+    UserDefaults.standard.setVolatileDomain(["AgentServerEnabled": false], forName: UserDefaults.argumentDomain)
+    let keys = [
+        RecorderPanelController.displayKey, RecorderPanelController.microphoneKey,
+        RecorderPanelController.systemAudioKey, RecorderPanelController.showClicksKey,
+        RecorderPanelController.rateKey, RecorderPanelController.sizeKey,
+    ]
+    let originals = keys.map { UserDefaults.standard.object(forKey: $0) }
+    defer {
+        for (key, value) in zip(keys, originals) {
+            if let value { UserDefaults.standard.set(value, forKey: key) } else {
+                UserDefaults.standard.removeObject(forKey: key)
+            }
+        }
+    }
+    var out: [String: Any] = [:]
+    let panel = RecorderPanelController.shared
+    let spy = GrantSpy()
+    spy.granted = false
+    spy.mic = .authorized
+    RecorderPanelController.grantDoors = spy.doors
+    let fake = NSMenuItem(title: "Probe Microphone", action: nil, keyEquivalent: "")
+    fake.representedObject = "probe-mic"
+    panel.microphonePopup.menu?.addItem(fake)
+    func reset() {
+        panel.cancelCountdown()
+        panel.phase = .idle
+        panel.setNote("")
+    }
+    func voiceRow() -> NSMenuItem? { panel.sourcePopup.menu?.item(withTag: RecorderPanelController.voiceOverTag) }
+    func choose(_ item: NSMenuItem?) {
+        if let item { panel.sourcePopup.select(item) }
+        panel.controlChanged(panel.sourcePopup)
+    }
+    func screenOnly() -> [String: Any] {
+        [
+            "systemAudio": panel.systemAudioSwitch.isEnabled, "showClicks": panel.showClicksSwitch.isEnabled,
+            "size": panel.sizePopup.isEnabled,
+            "values": [
+                panel.systemAudioSwitch.state == .on ? 1 : 0, panel.showClicksSwitch.state == .on ? 1 : 0,
+                panel.sizePopup.indexOfSelectedItem,
+            ],
+        ]
+    }
+    func recordingKeys() -> [String] {
+        UserDefaults.standard.dictionaryRepresentation().keys.filter { $0.hasPrefix("ReelcutRecording") }.sorted()
+    }
+    out["visible"] = panel.window?.isVisible ?? true
+    out["shown"] = false
+
+    // D1 — the Source rows.
+    let items = panel.sourcePopup.itemArray
+    out["D1"] = [
+        "titles": items.suffix(2).map { $0.title }, "tags": items.suffix(2).map { $0.tag },
+        "count": items.count, "screens": NSScreen.screens.count,
+        "separatorIndex": items.firstIndex { $0.isSeparatorItem } ?? -1,
+    ]
+
+    // D2 — choosing it. A display row first, its values put in a known
+    // non-default state, so "unchanged" means something.
+    reset()
+    choose(panel.sourcePopup.item(at: 0))
+    panel.systemAudioSwitch.state = .off
+    panel.showClicksSwitch.state = .on
+    panel.sizePopup.selectItem(at: 1)
+    panel.persistChoices()
+    let before = screenOnly()
+    // D3's baseline: a sentinel in the display key, and the key set.
+    UserDefaults.standard.set(777, forKey: RecorderPanelController.displayKey)
+    let keysBefore = recordingKeys()
+    choose(voiceRow())
+    out["D2"] = [
+        "source": panel.currentChoice().source == .voiceOver, "selected": panel.voiceOverSelected,
+        "before": before, "after": screenOnly(),
+        "microphone": panel.microphonePopup.isEnabled, "rate": panel.ratePopup.isEnabled,
+        "destination": panel.destinationPopup.isEnabled, "sourceEnabled": panel.sourcePopup.isEnabled,
+        "sizeNote": panel.sizeNote.stringValue, "expectedNote": RecorderPanelController.voiceOverSizeNote,
+    ]
+
+    // D3 — session only: no key written for the row, and a rebuild keeps it.
+    let displayAfter = UserDefaults.standard.integer(forKey: RecorderPanelController.displayKey)
+    let keysAfter = recordingKeys()
+    panel.rebuildSources()
+    panel.restoreChoices()
+    out["D3"] = [
+        "display": displayAfter, "keysBefore": keysBefore, "keysAfter": keysAfter,
+        "kept": panel.voiceOverSelected, "keptSource": panel.currentChoice().source == .voiceOver,
+    ]
+
+    // D4 — a display row brings the three back.
+    choose(panel.sourcePopup.item(at: 0))
+    let d4 = screenOnly()
+    out["D4"] = [
+        "display": panel.currentChoice().source == .display(panel.selectedDisplayID),
+        "after": d4,
+    ]
+
+    // D5 — Microphone Only with Microphone Off.
+    reset()
+    choose(voiceRow())
+    panel.microphonePopup.selectItem(at: 0)
+    panel.record(nil)
+    out["D5"] = [
+        "phase": "\(panel.phase)", "note": panel.noteLabel.stringValue,
+        "expected": RecorderPanelController.microphoneOffSentence,
+        "screenReads": spy.screenReads, "screenRequests": spy.screenRequests,
+        "micRequests": spy.micRequests, "opened": spy.opened,
+    ]
+
+    // D6 — a microphone chosen and authorized, the screen grant absent.
+    reset()
+    panel.microphonePopup.select(fake)
+    panel.record(nil)
+    out["D6"] = [
+        "phase": "\(panel.phase)", "note": panel.noteLabel.stringValue,
+        "screenReads": spy.screenReads, "screenRequests": spy.screenRequests,
+        "micRequests": spy.micRequests, "opened": spy.opened,
+    ]
+
+    // D7 — the countdown runs out: the recorder's own refusal for that
+    // choice (no device carries "probe-mic"), the panel idle again. A
+    // countdown D6 did not reach is begun here, so the row reads the
+    // countdown's END whatever the press did; its screen reads are its own.
+    let readsBefore = spy.screenReads
+    var begunHere = false
+    if case .countdown = panel.phase {} else {
+        reset()
+        panel.microphonePopup.select(fake)
+        panel.beginCountdown()
+        begunHere = true
+    }
+    let choice = panel.currentChoice()
+    _ = spin(6) { panel.phase == .idle }
+    var expected = "unanswered"
+    ScreenRecorder().startVoiceOver(choice: choice, onFinish: { _ in }) { error in
+        expected = error?.localizedDescription ?? "nil"
+    }
+    out["D7"] = [
+        "phase": "\(panel.phase)", "note": panel.noteLabel.stringValue, "expected": expected,
+        "screenReads": spy.screenReads - readsBefore, "begunHere": begunHere,
+        "recorderIdle": ScreenRecorder.shared.state == .idle, "hidden": panel.hiddenForRecording,
+    ]
+    reset()
+
+    // D8 — which sources the panel hides for.
+    out["D8"] = [
+        "voiceOver": RecorderPanelController.hidesForRecording(.voiceOver),
+        "display": RecorderPanelController.hidesForRecording(.display(CGMainDisplayID())),
+        "window": RecorderPanelController.hidesForRecording(.window(1)),
+        "picked": RecorderPanelController.hidesForRecording(.picked),
+    ]
+
+    // D9 — the Pause / Resume button.
+    reset()
+    choose(voiceRow())
+    let idleHidden = panel.voiceOverPauseButton.isHidden
+    panel.phase = .recording
+    let recording: [String: Any] = [
+        "hidden": panel.voiceOverPauseButton.isHidden, "title": panel.voiceOverPauseButton.title,
+    ]
+    panel.phase = .paused
+    let paused: [String: Any] = [
+        "hidden": panel.voiceOverPauseButton.isHidden, "title": panel.voiceOverPauseButton.title,
+    ]
+    panel.phase = .idle
+    choose(panel.sourcePopup.item(at: 0))
+    panel.phase = .recording
+    let displayHidden = panel.voiceOverPauseButton.isHidden
+    panel.phase = .idle
+    out["D9"] = [
+        "idleHidden": idleHidden, "recording": recording, "paused": paused,
+        "displayHidden": displayHidden,
+    ]
+    reset()
+
+    // D10 — `record_screen`'s source reader.
+    func kind(_ a: [String: Any]) -> String {
+        do {
+            return "ok: " + (try AgentServer.shared.recordingSourceKind(a)).rawValue
+        } catch let error as AgentServer.ToolError {
+            return "error: " + error.message
+        } catch {
+            return "other: \(error)"
+        }
+    }
+    out["D10"] = [
+        "empty": kind([:]), "screen": kind(["source": "screen"]), "x": kind(["source": "x"]),
+        "display": kind(["source": "voice_over", "display": 0]),
+        "all": kind([
+            "source": "voice_over", "size": "best", "show_clicks": true, "system_audio": true,
+            "window": 5, "display": 1,
+        ]),
+        "micFalse": kind(["source": "voice_over", "microphone": false]),
+        "micTrue": kind(["source": "voice_over", "microphone": true]),
+        "sizeNull": kind(["source": "voice_over", "size": NSNull()]),
+        "displayNull": kind(["source": "voice_over", "display": NSNull()]),
+    ]
+
+    // D11 — what the tool's answer says for a voice-over.
+    var c = RecordingChoice()
+    c.source = .voiceOver
+    let problem = "The microphone stopped recording on its own: It reported no error. "
+        + "The voice-over ends where it stopped."
+    let result = RecordingResult(
+        segments: [
+            RecordingSegment(
+                descriptor: MediaDescriptor(path: "/nowhere/v.m4a", kind: .audio, duration: 600_000, hasAudio: true),
+                micDescriptor: nil, micOffset: 0, startedAt: Date(), micProblem: problem)
+        ], choice: c, stoppedBy: .stopped, pauses: 0)
+    out["D11"] = [
+        "note": AgentServer.microphoneNote(result) as Any, "problem": problem,
+        "timeout": AgentServer.finishTimeoutSentence(movies: ["/nowhere/v.m4a"], voiceOver: true),
+        "screenTimeout": AgentServer.finishTimeoutSentence(movies: ["/nowhere/v.mov"]),
+    ]
+    reset()
+    return out
+}
+
 // ---- dispatch -------------------------------------------------------------
 let args = CommandLine.arguments
 guard args.count >= 3 else {
@@ -5334,6 +5721,8 @@ do {
         answer = voiceover(request)
     case "voiceover-granted":
         answer = voiceoverGranted(request)
+    case "voiceover-doors":
+        answer = voiceoverDoors(request)
     default:
         answer["error"] = "unknown mode \"\(mode)\" — the binary predates the section asking"
     }
@@ -7079,7 +7468,7 @@ PANEL_ROWS = [
     ("floating", True), ("hidesOnDeactivate", False), ("excluded", True), ("released", False),
     ("delegateNil", True), ("title", "New Recording"), ("visible", False),
     ("destinationFirst", "New Project"), ("destinationCount", 1), ("microphoneFirst", "Off"),
-    ("sourceLast", "Window…"), ("sourceLastTag", 1), ("recordTitle", "Record"),
+    ("sourceLast", "Microphone Only"), ("sourceLastTag", 2), ("recordTitle", "Record"),
     ("recordFillIsClip", True), ("recordTargetIsPanel", True), ("rate", 60),
     ("resolution", "nominal"), ("systemAudio", True), ("showClicks", False),
     ("microphoneOff", True), ("newProject", True), ("mainDisplay", True), ("idle", True),
@@ -7131,8 +7520,8 @@ def section_chrome(binary, sources):
     p = answer.get("panel") or {}
     for key, want in PANEL_ROWS:
         check(f"5d: panel.{key} == {want!r}", p.get(key) == want, f"got {p.get(key)!r}")
-    check("5d: Source rows = NSScreen.screens + a separator + Window…",
-          p.get("sourceCount") == p.get("screens", -9) + 2
+    check("5d: Source rows = NSScreen.screens + a separator + Window… + Microphone Only (B66)",
+          p.get("sourceCount") == p.get("screens", -9) + 3
           and p.get("sourceSeparatorIndex") == p.get("screens"),
           f"count {p.get('sourceCount')}, screens {p.get('screens')}, separator at {p.get('sourceSeparatorIndex')}")
     check("5d: the window content is the card's size, 500 pt wide",
@@ -8179,7 +8568,7 @@ FILE_GROUP_ORDER = [
 ]
 RECORD_SCREEN_ARGUMENTS = [
     "display", "microphone", "path", "place", "project", "rate", "seconds", "show_clicks", "size",
-    "system_audio", "window",
+    "source", "system_audio", "window",
 ]
 
 
@@ -8229,7 +8618,7 @@ def section_catalog(binary, sources):
     for phrase in ["Pause Recording", "Resume Recording", "Stop Recording", "pauses", "segments",
                    "started_at", "mic_offset", "mic_problem", "Add Recording Segments", "Add Microphone",
                    "wall clock", "TOTAL", "user_stopped", "screen-recording indicator",
-                   "unreadable"]:
+                   "unreadable", "voice_over", "Microphone Only"]:
         check(f"7d: record_screen's description names {phrase!r} (R2d)", phrase in description,
               f"{len(description)} chars of description")
 
@@ -9129,8 +9518,180 @@ def section_voiceover(binary, sources):
     check("V8: a new FRONT track (index 1), not named \"Microphone\" — the picture rule",
           v8.get("ops") == VOICE_OPS and t8.get("index") == 1 and t8.get("name") != "Microphone"
           and len(minted8) == 1 and after8[-1:] == minted8, v8.get("error") or f"{t8}, {after8}")
+
+    print("  V9 — a 30 fps document at the 64-track cap (issue batch B66, nit 3)")
+    v9 = answer.get("V9") or {}
+    expected_notes = v9.get("expectedNotes") or []
+    check("V9: the document is 30 fps and holds 64 tracks before the landing",
+          v9.get("canvasFps") == [30, 1] and v9.get("tracksBefore") == 64,
+          f"{v9.get('canvasFps')}, {v9.get('tracksBefore')}")
+    check("V9a: 5 000 and 4 000 ticks → no throw, ops [add_media, add_media], clipIds [nil, nil], "
+          "notes the two tooShortNotes, 64 tracks after the commit (voice-cap-trial-always)",
+          not v9.get("error") and v9.get("ops") == ["add_media", "add_media"]
+          and (v9.get("predictedLists") or {}).get("clips") == [-1, -1]
+          and len(expected_notes) == 2 and "<no media>" not in expected_notes
+          and v9.get("notes") == expected_notes and v9.get("tracksAfter") == 64,
+          v9.get("error") or f"ops {v9.get('ops')}, clips {(v9.get('predictedLists') or {}).get('clips')}, "
+          f"notes {v9.get('notes')} want {expected_notes}, tracks {v9.get('tracksAfter')}")
+    check("V9b (control): 5 000 ticks and 2 s at the cap → throws too many tracks: 65 (max 64)",
+          "too many tracks: 65 (max 64)" in str(v9.get("control")), f"{v9.get('control')!r}")
+
+    print("  V10 — a did-finish judged by when it ARRIVED (issue batch B66, nit 2)")
+    own = ("The microphone stopped recording on its own: It reported no error. "
+           "The voice-over ends where it stopped.")
+
+    def first_segment(row):
+        segments = ((row.get("outcome") or {}).get("segments") or [{}])
+        return segments[0] if segments else {}
+
+    v10a = answer.get("V10a") or {}
+    o10a = v10a.get("outcome") or {}
+    check("V10a: stop(), then a did-finish that ARRIVED before it → one .success whose segment "
+          "says the microphone stopped on its own (voice-own-stop-asked)",
+          v10a.get("outcomes") == 1 and o10a.get("kind") == "success"
+          and first_segment(v10a).get("micProblem") == own,
+          v10a.get("error") or f"{v10a.get('outcomes')} outcomes, {o10a.get('kind')} "
+          f"{o10a.get('description') or ''}, micProblem {first_segment(v10a).get('micProblem')!r}")
+    v10b = answer.get("V10b") or {}
+    o10b = v10b.get("outcome") or {}
+    check("V10b (control): stop(), then a did-finish that arrived AFTER it → .success, no micProblem",
+          v10b.get("outcomes") == 1 and o10b.get("kind") == "success"
+          and first_segment(v10b).get("micProblem") is None,
+          v10b.get("error") or f"{v10b.get('outcomes')} outcomes, {o10b.get('kind')} "
+          f"{o10b.get('description') or ''}, micProblem {first_segment(v10b).get('micProblem')!r}")
+    v10c = answer.get("V10c") or {}
+    o10c = v10c.get("outcome") or {}
+    check("V10c: pause(), then a did-finish that arrived before it → the recorder finishes by itself: "
+          ".success, pauses 1, the on-its-own sentence, idle after (voice-own-stop-asked)",
+          v10c.get("pause") == "ok" and v10c.get("stateAfterPause") == "paused"
+          and v10c.get("outcomes") == 1 and o10c.get("kind") == "success" and o10c.get("pauses") == 1
+          and first_segment(v10c).get("micProblem") == own and v10c.get("finalState") == "idle",
+          v10c.get("error") or f"pause {v10c.get('pause')} → {v10c.get('stateAfterPause')}, "
+          f"{v10c.get('outcomes')} outcomes, {o10c.get('kind')}, pauses {o10c.get('pauses')}, "
+          f"micProblem {first_segment(v10c).get('micProblem')!r}, final {v10c.get('finalState')}")
     check("15: every document the section opened is closed", answer.get("documentsAfterClose") == 0,
           f"{answer.get('documentsAfterClose')}")
+
+
+VOICE_STRANGERS = ["display", "window", "system_audio", "show_clicks", "size"]
+VOICE_TAIL = " cannot be given — a voice-over records the microphone alone."
+
+
+def section_voiceover_doors(binary, sources):
+    print("\nSection 16 — #99 phase 2: the voice-over's doors — the panel's Microphone Only row "
+          "and record_screen's source (no grant; the panel never shown)")
+    answer, error = run_probe(binary, "voiceover-doors", {"mode": "voiceover-doors"})
+    check("16: the probe answers", answer is not None and not answer.get("error"),
+          error or (answer or {}).get("error", ""))
+    if not answer or answer.get("error"):
+        return
+    check("16: the panel is never shown", answer.get("visible") is False, f"{answer.get('visible')}")
+
+    d1 = answer.get("D1") or {}
+    check("D1: the Source rows end \"Window…\" (tag 1), \"Microphone Only\" (tag 2), with no "
+          "separator between",
+          d1.get("titles") == ["Window…", "Microphone Only"] and d1.get("tags") == [1, 2]
+          and d1.get("separatorIndex") == d1.get("screens"), f"{d1}")
+    check("D1: count = NSScreen.screens + 3", d1.get("count") == (d1.get("screens") or -9) + 3, f"{d1}")
+
+    d2 = answer.get("D2") or {}
+    before = d2.get("before") or {}
+    after = d2.get("after") or {}
+    check("D2: choosing it via controlChanged → currentChoice().source is .voiceOver",
+          d2.get("source") is True and d2.get("selected") is True, f"{d2}")
+    check("D2: System Audio, Show Clicks and Size disabled, their values unchanged (voice-row-live)",
+          after.get("systemAudio") is False and after.get("showClicks") is False
+          and after.get("size") is False and after.get("values") == before.get("values")
+          and before.get("systemAudio") is True and before.get("values") == [0, 1, 1],
+          f"before {before}, after {after}")
+    check("D2: Source, Microphone, Rate and Record Into stay enabled",
+          d2.get("sourceEnabled") is True and d2.get("microphone") is True
+          and d2.get("rate") is True and d2.get("destination") is True, f"{d2}")
+    check("D2: the size note reads voiceOverSizeNote",
+          d2.get("sizeNote") == d2.get("expectedNote") and bool(d2.get("expectedNote")),
+          f"{d2.get('sizeNote')!r}")
+
+    d3 = answer.get("D3") or {}
+    check("D3: the display key is not written for the row (the sentinel 777 kept), and the set of "
+          "ReelcutRecording… keys is unchanged — session only",
+          d3.get("display") == 777 and d3.get("keysBefore") == d3.get("keysAfter")
+          and len(d3.get("keysAfter") or []) == 6, f"{d3}")
+    check("D3: rebuildSources() + restoreChoices() keep the row",
+          d3.get("kept") is True and d3.get("keptSource") is True, f"{d3}")
+
+    d4 = answer.get("D4") or {}
+    a4 = d4.get("after") or {}
+    check("D4: a display row → source .display, the three enabled again",
+          d4.get("display") is True and a4.get("systemAudio") is True and a4.get("showClicks") is True
+          and a4.get("size") is True, f"{d4}")
+
+    d5 = answer.get("D5") or {}
+    check("D5: Record with Microphone Off → idle, the note microphoneOffSentence, 0 screen reads, "
+          "0 microphone requests (voice-screen-grant-read)",
+          d5.get("phase") == "idle" and d5.get("note") == d5.get("expected") and bool(d5.get("expected"))
+          and d5.get("screenReads") == 0 and d5.get("screenRequests") == 0
+          and d5.get("micRequests") == 0 and d5.get("opened") == [], f"{d5}")
+
+    d6 = answer.get("D6") or {}
+    check("D6: a microphone chosen and authorized, the screen grant absent → countdown(3), 0 screen "
+          "reads, 0 screen requests, nothing opened (voice-screen-grant-read)",
+          d6.get("phase") == "countdown(3)" and d6.get("screenReads") == 0
+          and d6.get("screenRequests") == 0 and d6.get("micRequests") == 0 and d6.get("opened") == [],
+          f"{d6}")
+
+    d7 = answer.get("D7") or {}
+    check("D7: the countdown run out → idle, the note exactly a fresh recorder's startVoiceOver "
+          "refusal for the same choice, still no screen read, the panel never hidden",
+          d7.get("phase") == "idle" and d7.get("note") == d7.get("expected")
+          and d7.get("expected") not in (None, "", "nil", "unanswered")
+          and d7.get("screenReads") == 0 and d7.get("recorderIdle") is True
+          and d7.get("hidden") is False, f"{d7}")
+
+    d8 = answer.get("D8") or {}
+    check("D8: hidesForRecording — false for .voiceOver, true for .display, .window, .picked "
+          "(voice-panel-hides)",
+          d8.get("voiceOver") is False and d8.get("display") is True and d8.get("window") is True
+          and d8.get("picked") is True, f"{d8}")
+
+    d9 = answer.get("D9") or {}
+    r9 = d9.get("recording") or {}
+    p9 = d9.get("paused") or {}
+    check("D9: the Pause button is hidden while idle", d9.get("idleHidden") is True, f"{d9}")
+    check("D9: Microphone Only + .recording → visible, \"Pause\"",
+          r9.get("hidden") is False and r9.get("title") == "Pause", f"{r9}")
+    check("D9: … + .paused → visible, \"Resume\"",
+          p9.get("hidden") is False and p9.get("title") == "Resume", f"{p9}")
+    check("D9: a display source + .recording → hidden", d9.get("displayHidden") is True, f"{d9}")
+
+    d10 = answer.get("D10") or {}
+    voice_tail_all = ("error: With source voice_over, " + ", ".join(VOICE_STRANGERS) + VOICE_TAIL)
+    rows = [
+        ("{} → .screen", "empty", "ok: screen"),
+        ("{source: screen} → .screen", "screen", "ok: screen"),
+        ("{source: x} → the vocabulary sentence", "x",
+         'error: source must be one of screen, voice_over (got "x").'),
+        ("{source: voice_over, display: 0} → display refused by name (voice-strangers-admitted)",
+         "display", "error: With source voice_over, display" + VOICE_TAIL),
+        ("all five strangers → named in voiceOverScreenOnlyArguments order "
+         "(voice-strangers-admitted)", "all", voice_tail_all),
+        ("{source: voice_over, microphone: false} → refused", "micFalse",
+         "error: With source voice_over, microphone cannot be false — a voice-over records "
+         "the microphone alone."),
+        ("{source: voice_over, microphone: true} → .voiceOver", "micTrue", "ok: voice_over"),
+        ("{source: voice_over, size: null} → .voiceOver (a null is not given)", "sizeNull",
+         "ok: voice_over"),
+        ("{source: voice_over, display: null} → .voiceOver", "displayNull", "ok: voice_over"),
+    ]
+    for label, key, want in rows:
+        check(f"D10: {label}", d10.get(key) == want, f"got {d10.get(key)!r}")
+
+    d11 = answer.get("D11") or {}
+    check("D11: microphoneNote of a voice-over result is its micProblem, verbatim",
+          d11.get("note") == d11.get("problem") and bool(d11.get("problem")), f"{d11.get('note')!r}")
+    check("D11: finishTimeoutSentence(movies: [p], voiceOver: true) says \"its file is at\"; the "
+          "screen's still says \"its movie is at\"",
+          "its file is at /nowhere/v.m4a" in (d11.get("timeout") or "")
+          and "its movie is at /nowhere/v.mov" in (d11.get("screenTimeout") or ""), f"{d11}")
 
 
 # The granted tier's probe embeds an Info.plist holding the microphone's
@@ -9764,6 +10325,38 @@ MUTANTS = {
         "        if voiceSession != nil { return try pauseVoiceOver() }\n",
         "",
         "pause() no longer forwards a voice-over — it reads the screen session and refuses"),
+    # #99 phase 2 (issue batch B66) — section 15's V9, V10 and section 16.
+    "voice-own-stop-asked": (
+        "ScreenRecorder+VoiceOverFinishing.swift",
+        "        let unasked = current.segments[index].stoppedAt.map { arrived < $0 } ?? true\n",
+        "        let unasked = current.segments[index].stoppedAt == nil\n",
+        "a did-finish is unasked only with no stoppedAt — one that arrived before a Pause or Stop "
+        "press reached main is taken as asked (the code before B66)"),
+    "voice-cap-trial-always": (
+        "RecordingLanding+VoiceOver.swift",
+        "        let canLand = shortNotes.contains { $0 == nil }\n",
+        "        let canLand = true\n",
+        "the Microphone track is tried even when no file can make a clip (the code before B66)"),
+    "voice-panel-hides": (
+        "RecorderPanelController+VoiceOver.swift",
+        "    static func hidesForRecording(_ source: RecordingSource) -> Bool { source != .voiceOver }\n",
+        "    static func hidesForRecording(_ source: RecordingSource) -> Bool { true }\n",
+        "the panel orders out for a voice-over too"),
+    "voice-screen-grant-read": (
+        "RecorderPanelController+Recording.swift",
+        "        if voiceOverSelected { return beginVoiceOverIfGranted() }\n",
+        "",
+        "Record with Microphone Only goes through the screen's press — the Screen Recording grant read"),
+    "voice-row-live": (
+        "RecorderPanelController+VoiceOver.swift",
+        "        let screenOnly = idle && !voiceOverSelected\n",
+        "        let screenOnly = idle\n",
+        "System Audio, Show Clicks and Size stay live with Microphone Only chosen"),
+    "voice-strangers-admitted": (
+        "AgentServer+RecordingArguments.swift",
+        "        let strangers = Self.voiceOverScreenOnlyArguments.filter { a[$0] != nil && !(a[$0] is NSNull) }\n",
+        "        let strangers = [String]()\n",
+        "record_screen takes the screen-only arguments with source voice_over and ignores them"),
 }
 
 
@@ -9794,7 +10387,8 @@ def prepare_mutant(name):
 SECTIONS = [section_files, section_configuration, section_state, section_unreadable, section_landing,
             section_segments, section_chrome, section_chrome_pause, section_file_pause,
             section_welcome, section_catalog, section_host, section_granted, section_grants,
-            section_preroll, section_leftout, section_voiceover, section_voiceover_granted]
+            section_preroll, section_leftout, section_voiceover, section_voiceover_granted,
+            section_voiceover_doors]
 
 
 def main():
@@ -9810,7 +10404,8 @@ def main():
                         help="a comma-separated subset of sections to run, by the name after "
                              "`section_` (files, configuration, state, unreadable, landing, "
                              "segments, chrome, chrome_pause, file_pause, welcome, catalog, host, "
-                             "granted, grants, preroll, leftout, voiceover, voiceover_granted) — for "
+                             "granted, grants, preroll, leftout, voiceover, voiceover_granted, "
+                             "voiceover_doors) — for "
                              "iterating on "
                              "one; the full run is what the counts in the docstring are")
     args = parser.parse_args()

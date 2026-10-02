@@ -2493,6 +2493,31 @@ re-scored at 857–875, section 10's eight at 171–183 of `--only chrome,grants
 184 (170–182 of 183 before 10e's level row; emptying the step-aside scores
 183/184, that row alone).
 
+**Issue batch B66 (#99 phase 2, the voice-over's doors).** `recording_probe.py`
+gains V9 and V10 in section 15 (the 64-track cap with every file under a
+frame lands media alone and tries no track; a writer's did-finish judged by
+when it ARRIVED, before or after a Stop or a Pause) and section 16,
+`voiceover_doors` (D1–D11: the panel's Microphone Only row, never shown,
+under a spy that counts Screen Recording READS; `record_screen`'s
+`recordingSourceKind`; the voice-over's note and timeout sentence); 5d's
+last Source row is now Microphone Only, 7c's arguments gain `source` and 7d's
+phrases `voice_over` and `Microphone Only`. Six mutants, each failing only
+its named rows (the probe's docstring). `recording_proof.py` gains
+`--no-screen`, which skips section 5 by name with its whole count (69) and
+never calls `record_screen` for it, the `source` rows in sections 0, 1 and
+3, and section 6, the voice-over tier: gated on the app's audio-input
+entitlement and a never-recording call that passes the Microphone grant,
+3 s of microphone into `work/recordings/<pid>-voice/` (deleted), the
+document closed once its peaks and speech caches land — a marker counts only
+when its stamp names its own file, since an undo gives a media id back —
+10 rows plus a self-check, skipped by name with 10 otherwise. Measured 2026-10-02: `recording_probe.py --only
+files,state,unreadable,landing,segments,chrome,chrome_pause,file_pause,catalog,grants,preroll,leftout,voiceover,voiceover_granted,voiceover_doors`
+**871/871**, no row skipped (15g ran); `--only voiceover,voiceover_doors`
+66/66; `recording_proof.py <port> <log> --no-screen` **148/148** with 69
+skipped by name, section 6's 2 s voice-over measuring 1.983 s now that the
+tool's span waits for the voice-over's did-start (it measured 1.192 s
+before, with AirPods Max as the default input).
+
 Worth knowing: the built app is ad-hoc signed, so its designated requirement
 is its cdhash and a Screen Recording or Microphone grant given to Reelcut.app
 (the `open -a` line) is for THAT build — after a rebuild remove and re-add it,

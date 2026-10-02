@@ -15,9 +15,10 @@ import ScreenCaptureKit
 /// running, `+Grants.swift` the two grants a press checks first and the
 /// one place System Settings is opened for them, `+Landing.swift`
 /// everything from the recording's end to the note that says where it
-/// went, `+Picker.swift` the window picker, and `+Pause.swift` the pause
+/// went, `+Picker.swift` the window picker, `+Pause.swift` the pause
 /// and the resume, the hidden recording's one door and the phases drawn
-/// (R2c). Seven files at the 400-line cap, and the
+/// (R2c), and `+VoiceOver.swift` the Source row "Microphone Only" (#99).
+/// Eight files at the 400-line cap, and the
 /// crossing members are internal for it, the tree's rule for a class split
 /// across files.
 ///
@@ -44,7 +45,8 @@ import ScreenCaptureKit
 /// Dock.
 ///
 /// **Visibility during a recording** (decision 7, R2c): the panel orders
-/// OUT at `recordingDidStart` for EVERY source, and the status item is the
+/// OUT at `recordingDidStart` for every source but Microphone Only (below),
+/// and the status item is the
 /// recording's whole chrome — Pause, Resume and Stop are its menu; File ▸
 /// Stop Recording still stops. R1 kept a DISPLAY recording's panel up, its
 /// filter excluding Reelcut (R0 q3), and hid only a PICKED window's; the
@@ -62,7 +64,11 @@ import ScreenCaptureKit
 /// the quit guard goes through `revealControls()` instead (`+Pause.swift`).
 /// **It takes key only from an active Reelcut** (spec §11, #137): shown from
 /// the background it is ordered front without key, so Return stays with
-/// the app in front.
+/// the app in front. **A voice-over stays UP** (#99): nothing is filmed, so
+/// the rows lock, the meter stays live, Record reads Stop with a Pause /
+/// Resume button beside it; Close takes the panel away and the recording
+/// carries on — the welcome button and the quit guard show the panel again,
+/// and ⌥⌘N (File ▸ Stop Recording) and the status item stop it.
 ///
 /// Two limits of that chrome, accepted (R2 review). With the panel hidden
 /// the status item is the ONLY Pause and Resume, and macOS drops a status
@@ -103,7 +109,7 @@ import ScreenCaptureKit
 /// read on show); the harness pins all six on `ReelcutExportChoice`'s terms.
 /// `.picked` is the one source that cannot persist — a filter is not a
 /// value — so a reopened panel with a picked window keeps the row only while
-/// the filter is still held.
+/// the filter is still held; Microphone Only persists for the session only.
 final class RecorderPanelController: NSWindowController {
     static let shared = RecorderPanelController()
 
@@ -165,6 +171,8 @@ final class RecorderPanelController: NSWindowController {
         action: #selector(record(_:)), fill: DS.meterClip)
     let closeButton = StickerButton(
         title: "Close", style: .secondary, target: nil, action: #selector(closePanel(_:)))
+    let voiceOverPauseButton = StickerButton(
+        title: "Pause", style: .secondary, target: nil, action: #selector(pauseButtonPressed(_:)))
     let card: NSView
 
     /// The picker's filter, held while the Source popup shows "Window
@@ -223,7 +231,9 @@ final class RecorderPanelController: NSWindowController {
                 + "added to the project you choose at the playhead, or opened as a new "
                 + "project at the rate you pick.",
             content: content,
-            buttonRow: makeButtonRow(cancel: closeButton, apply: recordButton, leading: [statusLabel]),
+            buttonRow: makeButtonRow(
+                cancel: closeButton, apply: recordButton, secondary: voiceOverPauseButton,
+                leading: [statusLabel]),
             width: Self.cardWidth)
         super.init(window: panel)
 
@@ -244,6 +254,7 @@ final class RecorderPanelController: NSWindowController {
         panel.contentView = root
         recordButton.target = self
         closeButton.target = self
+        voiceOverPauseButton.target = self
 
         rebuildSources()
         rebuildMicrophones()
@@ -279,6 +290,7 @@ final class RecorderPanelController: NSWindowController {
         }
         persistChoices()
         refreshSizeNote()
+        syncControlsEnabled()
     }
 
     @objc private func closePanel(_ sender: Any?) {

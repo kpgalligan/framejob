@@ -1313,7 +1313,8 @@ free.
   `addWindowController`, which would silence the save prompt on close. It
   forwards bare keys to `handleEditorKey`, the one key map.
 - `RecorderPanelController.swift` (+`Rows`, +`Recording`, +`Grants`,
-  +`Pause`, +`Landing`, +`Picker`) · `RecorderStatusItem.swift` — File ▸ New
+  +`Pause`, +`Landing`, +`Picker`, +`VoiceOver`) · `RecorderStatusItem.swift`
+  — File ▸ New
   Recording… A `.floating`, `.nonactivatingPanel` with `hidesOnDeactivate`
   false, ONE instance, no window delegate. `show()` makes it key only when
   Reelcut is active; from the background it is ordered front without key, so
@@ -1322,10 +1323,15 @@ free.
   two grants are requested, and the only place System Settings is opened
   for them** (`+Grants`, through `RecorderPanelController.grantDoors`, which
   a probe seals), both before the countdown; it orders OUT at
-  `recordingDidStart` for every source and comes back only with a note. The
+  `recordingDidStart` for every source but Microphone Only and comes back
+  only with a note. The
   status item is the recording's chrome (Pause / Resume / Stop). File ▸
   Pause/Resume Recording (`AppDelegate+Recording.swift`) is a second door to
-  the same two calls.
+  the same two calls. **A voice-over** (the Source row "Microphone Only",
+  session-only, `+VoiceOver`) never reads or asks the Screen Recording
+  grant, greys System Audio, Show Clicks and Size with their values kept,
+  refuses Microphone Off by a note, and keeps the panel UP: rows locked,
+  meter live, Record reading Stop, a Pause/Resume button beside it.
 
 **Recording.**
 - `RecordingSetup.swift` · `RecordingResult.swift` — the half a probe can
@@ -1351,7 +1357,8 @@ free.
   microphone's writer alone, one `.m4a` per segment named `Voice-over <date>
   at <time>`, its own `VoiceOverFileDelegate`; `stop()`, `elapsed`, `pause()`
   and `resume()` forward to it, there is no arming state, and a writer that
-  stops on its own ends it.
+  stops on its own — judged by when its report arrived, so a Pause or Stop
+  press that reached main first does not hide it — ends it.
 - `RecordingLanding.swift` (+`Microphone`, +`Placing`, +`LeftOut`,
   +`VoiceOver`) · `ProjectDocument+Recording.swift`
   — a `RecordingResult` and a document in, an UNSCOPED op list out; nothing

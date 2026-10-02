@@ -11,11 +11,14 @@ import AppKit
 /// ignored once the segment was stopped, so a span never runs backwards). A
 /// did-finish marks its segment finished and, when the file did not finish
 /// well (`AVErrorRecordingSuccessfullyFinishedKey` honoured), records the
-/// writer's sentence as its `failure`. A did-finish nobody asked for — the
-/// segment's `stoppedAt` still nil — is the microphone stopping on its own:
-/// it sets `stoppedOnItsOwn` BEFORE anything stamps `stoppedAt`, finished
-/// well or not, and, while recording, ends the voice-over, because nothing
-/// else is recording. What it wrote lands, with that segment's `micProblem`.
+/// writer's sentence as its `failure`. A did-finish nobody asked for — one
+/// that ARRIVED (stamped by the delegate where it lands) before the
+/// segment's `stoppedAt`, or with none — is the microphone stopping on its
+/// own, even when a Pause or Stop press reached main first: it sets
+/// `stoppedOnItsOwn` BEFORE anything stamps `stoppedAt`, finished well or
+/// not, and, while recording or paused, ends the voice-over, because
+/// nothing else is recording. What it wrote lands, with that segment's
+/// `micProblem`.
 ///
 /// **One finishing path**, from `.recording` or `.paused`: the open writer
 /// stamped and stopped, `.finishing`, the meter silent,
@@ -38,7 +41,8 @@ extension ScreenRecorder {
     }
 
     func voiceFileFinished(
-        _ url: URL, output: AVCaptureFileOutput, finishedWell: Bool, error: (any Error)?
+        _ url: URL, output: AVCaptureFileOutput, finishedWell: Bool, error: (any Error)?,
+        at arrived: Date
     ) {
         guard let current = voiceSession, current.micOutput === output,
             let index = current.index(of: url)
@@ -49,12 +53,15 @@ extension ScreenRecorder {
                 "The microphone recording failed: "
                 + (error?.localizedDescription ?? "it reported no error.")
         }
-        if current.segments[index].stoppedAt == nil {
+        let unasked = current.segments[index].stoppedAt.map { arrived < $0 } ?? true
+        if unasked {
             // Unasked: the marker goes on FIRST, before the finishing path
             // stamps `stoppedAt` and erases the only sign of it.
-            voiceSession?.segments[index].stoppedOnItsOwn =
-                error?.localizedDescription ?? "It reported no error."
-            if state == .recording { beginVoiceFinishing() }
+            if current.segments[index].stoppedOnItsOwn == nil {
+                voiceSession?.segments[index].stoppedOnItsOwn =
+                    error?.localizedDescription ?? "It reported no error."
+            }
+            if state == .recording || state == .paused { beginVoiceFinishing() }
         }
         checkVoiceFinished()
     }

@@ -26,7 +26,9 @@ extension RecordingLanding {
     /// `microphoneTrackName` and every file back to back from the playhead
     /// on it. A refusal on that new, empty track is thrown by name. The
     /// track and its clips are kept only when at least one clip landed —
-    /// every file under a frame adds media and notes alone. `clipIds` has
+    /// every file under a frame adds media and notes alone, and then no
+    /// `add_track` is even tried, so a document at the track cap does not
+    /// throw for a track nothing would land on. `clipIds` has
     /// one entry per segment; the two `mic…` lists are all nil (a
     /// voice-over's voice IS its descriptor); the two left-out lists have
     /// one nil per `unreadable` entry. The ops come back unscoped, the
@@ -44,7 +46,14 @@ extension RecordingLanding {
             mediaIds.append(try addMedia(segment.descriptor, to: &trial, ops: &ops))
         }
         var clipIds: [UInt32?] = mediaIds.map { _ in nil }
-        if place {
+        let fps = try view(of: trial, scope: scope).snapshot.canvas.fps
+        let shortNotes = try mediaIds.map {
+            tooShortNote(try mediaEntry($0, in: trial, scope: scope), at: fps)
+        }
+        let canLand = shortNotes.contains { $0 == nil }
+        if place && !canLand {
+            notes += shortNotes.compactMap { $0 }
+        } else if place {
             var attempt = trial
             let track = attempt.snapshot.nextId
             let addTrack = ReelOp.addTrack(index: 0, name: microphoneTrackName)

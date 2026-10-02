@@ -192,7 +192,16 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   to size the item for. **The panel STAYS UP during a voice-over** (the
   owner's choice), with its live microphone meter, since nothing is filmed:
   this amends the panel decision above, which now holds for every source
-  except Microphone Only. **The files** are
+  except Microphone Only. While a voice-over records, the panel keeps its
+  rows locked as for any recording, its meter live, its footnote the coral
+  dot (the pause glyph while paused) and the elapsed time, Record reading
+  Stop and a Pause/Resume button beside it. Close takes the panel away and
+  the recording carries on under the status item: the welcome button and
+  the quit guard show the panel again, and File ▸ Stop Recording (⌥⌘N,
+  retitled while any recording runs, `AppDelegate.swift`'s
+  `validateMenuItem`) and the status item stop the voice-over, as
+  `AppDelegate+Recording.swift`'s `newRecording` routes by the panel's
+  phase. **The files** are
   `~/Movies/Reelcut Recordings/Voice-over <date> at <time>.m4a`, one file
   per stretch between pauses, as a screen recording's are — never the
   capture output's own pause into one file, which is unmeasured here and
@@ -207,11 +216,19 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   or `"voice_over"`; with a voice-over the default microphone is implied,
   and `display`, `window`, `system_audio`, `show_clicks`, `size` and
   `microphone: false` are refused by name, and only the Microphone
-  permission is read. Not a new `record_voice_over` tool, which would
+  permission is read. The tool's refusal order is `seconds`, then `source`
+  (its value, then the screen-only arguments given — a JSON null is not
+  given — then `microphone: false`), then the existing argument checks,
+  the Microphone grant and `project`; for a voice-over nothing comes after
+  (no Screen Recording grant, no lookup). Not a new `record_voice_over` tool, which would
   change the tool count, the catalog order a probe reads, the assistant's
   withheld list and parity for one tool. **A microphone that stops on its
   own ends the voice-over** — nothing else is recording — and what it wrote
-  lands, the note saying so. **The result shape**: a voice-over ends as an
+  lands, the note saying so. Whether it stopped on its own is judged by
+  when its report ARRIVED: a did-finish stamped before the segment's
+  `stoppedAt` is still "on its own" when a Pause or Stop press reached the
+  main thread first, and it ends the voice-over from paused as from
+  recording. **The result shape**: a voice-over ends as an
   ordinary `RecordingResult` (`isVoiceOver` true). Each
   `RecordingSegment.descriptor` is that stretch's `.m4a`, probed, with
   `micDescriptor` nil, `micOffset` 0, and `startedAt` the writer's

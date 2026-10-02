@@ -114,6 +114,7 @@ extension RecorderPanelController {
     // MARK: - The grants
 
     private func beginIfGranted() {
+        if voiceOverSelected { return beginVoiceOverIfGranted() }
         if sourcePopup.selectedItem?.tag == Self.windowTag, pickedFilter == nil {
             setNote(Self.chooseWindowSentence)
             return
@@ -178,6 +179,8 @@ extension RecorderPanelController {
         let generation = startGeneration
         launched = false
         phase = .starting
+        // A voice-over has no lookup to bound (`+VoiceOver.swift`).
+        if choice.source == .voiceOver { return launchVoiceOver(choice) }
         startTimer?.invalidate()
         startTimer = Timer.scheduledTimer(
             withTimeInterval: ScreenRecorder.armCeiling, repeats: false
@@ -263,8 +266,10 @@ extension RecorderPanelController {
     /// `revealIfNoted` reads it). R1 hid it for a picked window only,
     /// because a display's filter excludes Reelcut (R0 q3); the user asked
     /// for the dialog to go away whatever is recorded, and the menu bar's
-    /// item is the recording's controls now.
-    private func recordingDidStart() {
+    /// item is the recording's controls now. A voice-over is the exception
+    /// (`hidesForRecording`): the panel stays as it was, so it is never
+    /// `hiddenForRecording` and `showWhenLanded` is simply whether it is up.
+    func recordingDidStart() {
         // A stop asked for while arming has moved the phase on; the end
         // comes through `recordingEnded`.
         guard phase == .starting else { return }
@@ -279,6 +284,7 @@ extension RecorderPanelController {
         statusItem = item
         armTick()
         showWhenLanded = window?.isVisible == true
+        guard Self.hidesForRecording(currentChoice().source) else { return }
         hiddenForRecording = true
         window?.orderOut(nil)
     }

@@ -12,7 +12,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | File | Lines | Holds |
 |---|---|---|
 | [`foundations.md`](foundations.md) | 106 | **Foundations (M1–M3, road map 2).** AVFoundation not ffmpeg, the compositor, one op entry point, overlap and ripple rules, ticks, `async` confinement, media by reference; R2-1. |
-| [`recording.md`](recording.md) | 227 | **Screen recording (road map 3).** The recorder: what is in and out, files, grants, pause, the voice-over. |
+| [`recording.md`](recording.md) | 244 | **Screen recording (road map 3).** The recorder: what is in and out, files, grants, pause, the voice-over. |
 | [`silence.md`](silence.md) | 49 | **Remove Silences (road map 4).** Silero VAD, its grid and cache, voice mode; S1-23. |
 | [`effects-motion.md`](effects-motion.md) | 60 | **Transitions and motion (road map 5).** R5-1..R5-5, E2-27. |
 | [`deepening.md`](deepening.md) | 556 | **Deepening (road map 7).** D2-1, D3-1, #21, #22, D4-1..D4-6, D7-1..D7-3, #42, #88, #63, #174, #40, #43, #190, #87, #86, #178: how ops refuse, the op table, the gate, the source window, time envelopes, one-delta shifts on the canvas's grid, the non-edits that speak, a relink that re-probes, one frame on the grid, a tool that closes a document, a path one open document holds, a caption name's own extension, a speed of ×0.1–×1000 and the audio ceiling above ×12, a gain change on one audio track slews over 25 ms, a normalised export gained in float and quantised once, the cache passes' save gate's five accepted limits. |

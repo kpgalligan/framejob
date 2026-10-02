@@ -197,6 +197,21 @@ extension AgentServer {
             + "leaves the picture, while a PAUSED recording's later segments and every "
             + "microphone clip are one step named Add Recording Segments, so undo leaves "
             + "the first picture alone in the document."
+        // #99's voice-over paragraph, hoisted for the same budget reason.
+        let recordingVoiceOverClause: String =
+            " A VOICE-OVER: source: \"voice_over\" records the DEFAULT microphone alone — the "
+            + "panel's Source row Microphone Only — with no picture, into files named "
+            + "Voice-over <date> at <time>.m4a, one file per stretch between pauses. Every "
+            + "file lands touching, from the playhead, on ONE new back track named "
+            + "Microphone, in one undo step (Add Recording); as a new project the first file "
+            + "IS the document, 1920×1080 at rate, and the later files touch it on its one "
+            + "track. display, window, system_audio, show_clicks and size are refused by "
+            + "name with source voice_over, and so is microphone: false (true is implied); "
+            + "source is read right after seconds, and only the Microphone grant is read — "
+            + "never the Screen Recording one. The result's path is the first .m4a, its "
+            + "width and height 0, with no mic_path, and mic_offset 0; a microphone that "
+            + "stops on its own ends the voice-over, what it wrote lands, and mic_problem "
+            + "and the note say so."
         var rows: [[String: Any]] = [
             // MARK: Media
 
@@ -426,12 +441,21 @@ extension AgentServer {
                     + "Screen Recording grant, then the display or window lookup — where a "
                     + "console that is locked or asleep lists NO display and is refused as "
                     + "that, by name — then the recording itself. " + recordingPauseClause
-                    + recordingUnreadableClause + recordingResultClause,
+                    + recordingUnreadableClause + recordingResultClause + recordingVoiceOverClause,
                 [
                     "seconds": [
                         "type": "number", "minimum": 1, "maximum": 600,
                         "description": "How long to record, 1…600 s. The call returns after "
                             + "the recording has finished, been probed and landed.",
+                    ],
+                    "source": [
+                        "type": "string",
+                        "enum": AgentServer.RecordingSourceKind.allCases.map(\.rawValue),
+                        "description": "What is recorded: screen (default) — a display or a "
+                            + "window — or voice_over, the default microphone alone with no "
+                            + "picture (the panel's Microphone Only). With voice_over, "
+                            + "display, window, system_audio, show_clicks, size and "
+                            + "microphone: false are refused by name.",
                     ],
                     "display": [
                         "type": "integer", "minimum": 0,

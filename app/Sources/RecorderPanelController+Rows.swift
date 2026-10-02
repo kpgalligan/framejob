@@ -105,12 +105,15 @@ extension RecorderPanelController {
     // MARK: - Sources, microphones, destinations
 
     /// One row per `NSScreen`, by `localizedName`, carrying its
-    /// `CGDirectDisplayID`; then "Window…", which presents the picker. Built
+    /// `CGDirectDisplayID`; then "Window…", which presents the picker, and
+    /// "Microphone Only" (`+VoiceOver.swift`). Built
     /// from `NSScreen` and NOT from `SCShareableContent`, because listing
     /// shareable content needs the Screen Recording grant and the panel must
-    /// open without one. Reselects the current display or the picked row.
+    /// open without one. Reselects Microphone Only, the picked row or the
+    /// current display.
     func rebuildSources() {
         let current = selectedDisplayID
+        let voiceOver = voiceOverSelected
         let picked = pickedFilter != nil && sourcePopup.selectedItem?.tag == Self.windowTag
         sourcePopup.removeAllItems()
         for screen in NSScreen.screens {
@@ -123,7 +126,13 @@ extension RecorderPanelController {
             title: picked ? "Window (picked)" : "Window…", action: nil, keyEquivalent: "")
         window.tag = Self.windowTag
         sourcePopup.menu?.addItem(window)
-        if picked {
+        let microphoneOnly = NSMenuItem(
+            title: Self.microphoneOnlyTitle, action: nil, keyEquivalent: "")
+        microphoneOnly.tag = Self.voiceOverTag
+        sourcePopup.menu?.addItem(microphoneOnly)
+        if voiceOver {
+            sourcePopup.select(microphoneOnly)
+        } else if picked {
             sourcePopup.select(window)
         } else {
             selectDisplay(current)
@@ -223,7 +232,7 @@ extension RecorderPanelController {
     }
 
     var selectedScreen: NSScreen? {
-        guard sourcePopup.selectedItem?.tag != Self.windowTag else { return nil }
+        guard sourcePopup.selectedItem?.tag != Self.windowTag, !voiceOverSelected else { return nil }
         let id = selectedDisplayID
         return NSScreen.screens.first { Self.displayID(of: $0) == id }
     }
@@ -251,7 +260,9 @@ extension RecorderPanelController {
     /// the row not reselected) falls back to the main display.
     func currentChoice() -> RecordingChoice {
         var choice = RecordingChoice()
-        if sourcePopup.selectedItem?.tag == Self.windowTag, pickedFilter != nil {
+        if voiceOverSelected {
+            choice.source = .voiceOver
+        } else if sourcePopup.selectedItem?.tag == Self.windowTag, pickedFilter != nil {
             choice.source = .picked
         } else {
             choice.source = .display(selectedDisplayID)
@@ -273,10 +284,11 @@ extension RecorderPanelController {
 
     /// Writes every control but the destination (a `recipeKey` is minted per
     /// process) and a picked window (a filter is not a value). The display
-    /// key is left alone while the Window row is selected.
+    /// key is left alone while the Window row or Microphone Only (a
+    /// session-only row) is selected.
     func persistChoices() {
         let defaults = UserDefaults.standard
-        if sourcePopup.selectedItem?.tag != Self.windowTag {
+        if sourcePopup.selectedItem?.tag != Self.windowTag, !voiceOverSelected {
             defaults.set(Int(selectedDisplayID), forKey: Self.displayKey)
         }
         defaults.set(
@@ -295,7 +307,7 @@ extension RecorderPanelController {
     /// the absence is tested by name).
     func restoreChoices() {
         let defaults = UserDefaults.standard
-        if pickedFilter == nil {
+        if pickedFilter == nil, !voiceOverSelected {
             let stored = defaults.integer(forKey: Self.displayKey)
             selectDisplay(stored > 0 ? CGDirectDisplayID(clamping: stored) : CGMainDisplayID())
         }
@@ -314,8 +326,13 @@ extension RecorderPanelController {
     }
 
     /// `1728×1117 points · 3456×2234 pixels` for the chosen display; a picked
-    /// window records at its own size, which the panel cannot know.
+    /// window records at its own size, which the panel cannot know; a
+    /// voice-over has no picture.
     func refreshSizeNote() {
+        if voiceOverSelected {
+            sizeNote.stringValue = Self.voiceOverSizeNote
+            return
+        }
         guard let screen = selectedScreen else {
             sizeNote.stringValue = "the picked window's own size"
             return

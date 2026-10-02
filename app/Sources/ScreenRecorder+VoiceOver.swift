@@ -227,6 +227,11 @@ extension ScreenRecorder {
         return session?.segments.count ?? 0
     }
 
+    /// A voice-over's first segment's did-start, nil until the writer
+    /// reports it (and for a screen recording, or idle). `record_screen`
+    /// waits for it before its span: `startVoiceOver` answers first.
+    var heldFirstStartedAt: Date? { voiceSession?.segments.first?.startedAt }
+
     /// The files the recorder holds, in order: a screen recording's movies,
     /// or a voice-over's `.m4a` files; empty idle.
     var heldFilePaths: [String] {
@@ -291,6 +296,9 @@ final class VoiceOverFileDelegate: NSObject, AVCaptureFileOutputRecordingDelegat
         _ output: AVCaptureFileOutput, didFinishRecordingTo outputFileURL: URL,
         from connections: [AVCaptureConnection], error: (any Error)?
     ) {
+        // Stamped here, as the did-start is: whether the stop was asked for
+        // is judged by when this report ARRIVED, not by when main reads it.
+        let at = Date()
         // A non-nil error can still mean a usable file: the key says so.
         let finishedWell =
             error == nil
@@ -298,7 +306,7 @@ final class VoiceOverFileDelegate: NSObject, AVCaptureFileOutputRecordingDelegat
                 == true
         DispatchQueue.main.async { [weak self] in
             self?.recorder?.voiceFileFinished(
-                outputFileURL, output: output, finishedWell: finishedWell, error: error)
+                outputFileURL, output: output, finishedWell: finishedWell, error: error, at: at)
         }
     }
 }
