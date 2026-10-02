@@ -151,6 +151,10 @@ final class Exporter {
     /// pipeline's `Result<URL, any Error>` instead would drag
     /// `ImageSequenceWriter` into a concept it has no audio to have.
     private(set) var loudnessReport: ExportLoudness?
+    /// Each distinct warning this export's graphics gave (G-24 (c)), set in
+    /// `finish` beside `loudnessReport` and before the unpin, whatever the
+    /// result, and read the same way; reset in `export`.
+    private(set) var graphicWarnings: [ExportGraphicWarning] = []
 
     /// Bytes for the measurement's sample buffers, grown once. Raw and
     /// 16-byte aligned rather than an `[UInt8]`, because the samples are
@@ -213,6 +217,7 @@ final class Exporter {
         setCancelRequested(false)
         setMeasureProgress(0)
         loudnessReport = nil
+        graphicWarnings = []
         pendingLoudness = nil
         progressHandler = progress
         completionHandler = completion
@@ -425,6 +430,7 @@ final class Exporter {
     private func finish(_ result: Result<URL, any Error>) {
         let result = Exporter.graphicOutcome(result, key: recipeKey, destination: destination)
         loudnessReport = pendingLoudness
+        graphicWarnings = Exporter.graphicWarnings(on: recipeKey)
         pendingLoudness = nil
         timer?.invalidate()
         timer = nil

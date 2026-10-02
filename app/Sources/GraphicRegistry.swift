@@ -24,8 +24,9 @@
 // the key's life however the document's own set changes. A key with no
 // set and no pin resolves nil and the layer draws the slate. A pin also
 // holds what the key's graphics REPORTED — the first failure in a slot of
-// its own, then up to 64 distinct warnings — for `render_frame`'s reply and
-// the export's abort.
+// its own, then up to 64 warnings distinct by graphic and messages, the
+// frame aside, so one graphic warning every frame keeps one (G-24 (c)) — for
+// `render_frame`'s reply, the export's abort and its `graphicWarnings`.
 
 import Foundation
 
@@ -188,8 +189,8 @@ final class GraphicRegistry {
 
     /// Keeps `report` against a pinned key; a no-op for any other key. A
     /// failure fills the failure slot if it is empty and is dropped
-    /// otherwise; a warning is appended unless an equal one is held or
-    /// `warningLimit` are. Any thread.
+    /// otherwise; a warning is appended unless the same one (`sameWarning`)
+    /// is held or `warningLimit` are. Any thread.
     func record(_ report: GraphicReport, for key: Int) {
         lock.lock()
         defer { lock.unlock() }
@@ -198,7 +199,8 @@ final class GraphicRegistry {
             guard pin.failure == nil else { return }
             pin.failure = report
         } else {
-            guard pin.warnings.count < Self.warningLimit, !pin.warnings.contains(report)
+            guard pin.warnings.count < Self.warningLimit,
+                !pin.warnings.contains(where: { Self.sameWarning($0, report) })
             else { return }
             pin.warnings.append(report)
         }
@@ -212,6 +214,12 @@ final class GraphicRegistry {
         defer { lock.unlock() }
         guard let pin = pins[key] else { return [] }
         return (pin.failure.map { [$0] } ?? []) + pin.warnings
+    }
+
+    /// One graphic's same warning at another frame: the name and every
+    /// diagnostic's located message equal, the frame aside (G-24 (c)).
+    static func sameWarning(_ a: GraphicReport, _ b: GraphicReport) -> Bool {
+        a.name == b.name && a.diagnostics.map(\.located) == b.diagnostics.map(\.located)
     }
 
     /// The pin's failure slot — the first failure it recorded. Any thread.
@@ -259,5 +267,16 @@ final class GraphicRegistry {
                     level: "error", message: error.localizedDescription, line: nil, column: nil, frame: nil)],
                 revision: file.revision)
         }
+    }
+}
+
+extension GraphicModule {
+    /// `describeJSON()`'s `warnings` — what the module's top level warned as
+    /// it loaded (G-21 (b), G-24 (a)) — decoded; `[]` when absent or
+    /// unreadable. Main or any thread.
+    var compileWarnings: [GraphicDiagnostic] {
+        struct Described: Decodable { let warnings: [GraphicDiagnostic]? }
+        let described = try? JSONDecoder().decode(Described.self, from: Data(describeJSON().utf8))
+        return described?.warnings ?? []
     }
 }

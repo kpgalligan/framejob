@@ -1262,7 +1262,7 @@ final class GraphicModule {
         return GraphicModule(library: library, handle: handle)
     }
 
-    /// `{"meta":…,"schema":…,"revision":…}`, the schema in the module's order.
+    /// `{"meta":…,"schema":…,"revision":…,"warnings":[…]}`, the schema in the module's order.
     func describeJSON() -> String {
         takeString(rc_graphic_describe(handle)) ?? "{}"
     }

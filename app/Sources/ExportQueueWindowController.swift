@@ -382,12 +382,7 @@ final class ExportQueueRowView: NSView {
     func update(_ job: ExportQueueController.Job) {
         nameLabel.stringValue = job.name
         statusLabel.stringValue = Self.status(job)
-        // The full path and what the file will be. The row is narrow and the
-        // name alone cannot say which of two exports of one project this is.
-        toolTip =
-            job.destination.path + "\n"
-            + "\(job.settings.container.uppercased()) · \(job.settings.width) × "
-            + "\(job.settings.height) · \(job.settings.fps.displayName) fps"
+        toolTip = Self.toolTip(for: job)
         bar.isHidden = job.state != .running
         bar.doubleValue = job.progress
         // The progress sheet's two buttons, on a row: Cancel while there is
@@ -395,6 +390,17 @@ final class ExportQueueRowView: NSView {
         // beside it for a file that actually landed.
         button.title = job.state.isFinished ? "Remove" : "Cancel"
         revealButton.isHidden = job.state != .completed || job.superseded
+    }
+
+    /// The full path and what the file will be — the row is narrow and the
+    /// name alone cannot say which of two exports of one project this is —
+    /// then each graphic warning a completed job gave, one per line.
+    static func toolTip(for job: ExportQueueController.Job) -> String {
+        let tip =
+            job.destination.path + "\n"
+            + "\(job.settings.container.uppercased()) · \(job.settings.width) × "
+            + "\(job.settings.height) · \(job.settings.fps.displayName) fps"
+        return Exporter.graphicWarningDetails(job.graphicWarnings).map { tip + "\n" + $0 } ?? tip
     }
 
     private static func status(_ job: ExportQueueController.Job) -> String {

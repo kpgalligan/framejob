@@ -456,7 +456,39 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   `addGraphicImage:`'s anchor became `@objc func addGraphicImage(`. The
   person's residue is GR-5 in `docs/manual-checks.md`: the sheet after the
   real open panel closes, in both appearances. Phase c2 (the three warning
-  sources) is still owed.
+  sources) is still owed. Issue batch B68 (2026-10-02, #105 part 3b, phase
+  c2) landed it under a new G-24, and #105 closes with it. First, as a pure
+  move gated alone (`make typecheck` 0 errors, 4 warnings), `loudnessResult`
+  left `AgentServer+Render.swift` (591 → 542 lines) for a new
+  `AgentServer+ExportResult.swift`. Compile: `rc_graphic_describe` answers
+  `Module::warnings()` as `warnings` after `revision` (no new export, no
+  format bump; `ffi_graphic.rs` 397 → 399), decoded by
+  `GraphicModule.compileWarnings` in `GraphicRegistry.swift`, so
+  `ReelCore.swift` gained no line; `write_graphic` and `get_graphic {name}`
+  answer them as `diagnostics` with `ok` true, and they lead the Source
+  section's rows. Scan: `get_graphic {}` answers `warnings`, and the Source
+  section lists them under "In the graphics folder", each with Reveal.
+  Accepted: a pass whose only change is a warning posts nothing (W7), so the
+  pane shows it at its next rebuild. Export: a pin keeps a warning once per
+  graphic and message set (`GraphicRegistry.sameWarning`), where before one
+  graphic warning every frame filled the 64 and hid every later one;
+  `Exporter.graphicWarnings`, published in `finish` before the unpin, feeds
+  `export`'s `graphic_warnings`, the progress sheet's finish line ("N
+  graphic warnings (hover for details).") and the queue row, whose count
+  sits right after "Exported “…”." because its label truncates its tail;
+  each tooltip lists them. Pinned by `core/tests/graphic_describe.rs` (2
+  tests; both failed before the key with no `warnings` in the text),
+  `graphics_proof` X1–X3 and Q4–Q5 (51/51, Z1 clean) and
+  `graphics_inspector_proof` I18–I19 (61/61). Each was made to fail once.
+  With `warnings-per-frame`, X1's export answered only `nofont`. With
+  `sheet-unwarned` and `queue-unwarned`, Q5's line ended `Exported
+  “q5-warnsheet.mov”.` and Q4's message was `Exported “q4-warnqueue.mov”.`.
+  With `compile-warnings-dropped` and `folder-warnings-dropped`, I18 and I19
+  alone failed. Against a build of HEAD plus only the pure move, X1 answered no
+  `graphic_warnings`, X2 `diagnostics` `[]` and X3 no `warnings` (43/51; Q1–Q5
+  failed there because the pin probe, which now calls
+  `ExportQueueRowView.toolTip(for:)`, did not build over that tree). The
+  person's residue is GR-6 in `docs/manual-checks.md`.
 
 ## Open items
 
@@ -471,9 +503,6 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   - `validate` accepts a graphic clip with no description.
 
   Tracked in #72.
-- Small engine and tool refinements from the G1b–G5b reviews — listed in
-  #105: an export's graphic warnings, a warnings channel on
-  `compile` (its FFI half), and surfacing `GraphicScan.warnings`.
 - The not-built list (keyframed props, `paste_attributes`, revision history,
   HEVC with alpha, mattes, system fonts, path helpers, `delete_graphic` /
   `rename_graphic`) — tracked in #103.

@@ -11847,3 +11847,78 @@ perl -e 'alarm shift; exec @ARGV' 1200 python3 tools/proof/graphics_menu_proof.p
 **Not covered:** the sheet after the real open panel closes, and its OK
 button, are GR-5 in `docs/manual-checks.md`. The alert's `.informational`
 style is checked only by reading the code.
+
+## Issue batch B68 — a graphic's warnings surfaced: compile, scan and export (`core/tests/graphic_describe.rs`, `graphics_proof.py` X1–X3 and Q4–Q5, `graphics_inspector_proof.py` I18–I19; #105 part 3b, phase c2; spec §11 G-24)
+
+- **`core/tests/graphic_describe.rs`** (empty library): a module whose top
+  level is `const logo = asset("x");` describes with one `warnings` entry
+  (`warning`, line, column and frame null, the message starting
+  `asset("x") is not in graphics/assets/`), `"revision":` before
+  `"warnings":` in the TEXT. CONTROL: a plain module answers
+  `"warnings":[]`.
+- **`graphics_proof.py`**:
+  - **X2** (on WG after G7): `write_graphic toplevel` of that module is ok
+    true with exactly that one warning as `diagnostics`; `get_graphic {name:
+    toplevel}` the same. CONTROL: `bar`'s diagnostics are `[]`.
+  - **X3** (WG): `get_graphic {}`'s `warnings` is `[]`; `Bad.js` mv'd in,
+    polled for at most 5 s until it is exactly `graphics/Bad.js ` + the
+    module-name rule; `rm`, polled until `[]`.
+  - **X1** (after E4, a fresh PW: `nofont.js` and `late.js`, a 3 s nofont
+    clip at 0 and a 1 s late clip at 3 s, saved): `export {preset:
+    prores_4444}` answers `graphic_warnings` of exactly nofont then late,
+    each naming its family, each frame within its clip. CONTROL: E4's reply
+    has no `graphic_warnings`.
+  - **Q4** (`graphics_pin_probe.swift warnqueue`, over PW, pinned): the job's
+    message starts `Exported “q4-warnqueue.mov”. 2 graphic warnings.` with no
+    `hover for details`, and `ExportQueueRowView.toolTip(for:)` lists
+    `"nofont" at frame …` (Nope Sans) and `"late" at frame …` (Late Sans).
+    CONTROL: Q1's `queue pin` message holds no "graphic warning".
+  - **Q5** (`warnsheet`): an `ExportProgressSheetController` with the set,
+    its view loaded and `viewDidAppear()` called, spun until the reflected
+    `didFinish`: the reflected `statusLabel` ends ` 2 graphic warnings (hover
+    for details).` and its toolTip lists the same two lines.
+  - `build_pin_probe` now takes a sources directory and an output directory,
+    and `run_probe` a package.
+  - Mutants (rule R, exit 0 = caught): `--mutant warnings-per-frame`
+    restores `!pin.warnings.contains(report)` in `GraphicRegistry.record`
+    (X1 must fail); `--probe-mutant sheet-unwarned` / `queue-unwarned`
+    launch the built app to make PW, build the pin probe over a scratch copy
+    of `app/Sources` with the sheet's / the queue's `graphicWarningSuffix(`
+    call replaced by `""` (asserted once) and run only Q5 / Q4.
+- **`graphics_inspector_proof.py`** (the probe): **I18** six rewritten with
+  `const logo = asset("x");` first gives the Source section exactly one
+  warning row naming the asset; restored, none (CONTROL). **I19** `Bad.js`
+  written into the fixture's `graphics/` and `store.rescan()`: the note "In
+  the graphics folder", then a row `graphics/Bad.js is not a module name…`
+  whose button is Reveal, and `structureSignature` changed; removed and
+  rescanned, neither, and the signature is back (CONTROL). The spec named
+  these I17 and I18; I17 was already the marker field's row. Mutants:
+  `compile-warnings-dropped` (`compile: module.compileWarnings` →
+  `compile: []`, I18 alone) and `folder-warnings-dropped`
+  (`folderWarnings()`'s body → `[]`, I19 alone).
+
+Runs on 2026-10-02 over `6c033ca` plus this batch:
+
+| Run | Result |
+|---|---|
+| `cd core && cargo test --release --test graphic_describe`, before the key | 2 failed: no `"warnings":` in `{"meta":{},"schema":{},"revision":"…"}`. |
+| the same, after | 2 passed. |
+| `graphics_proof.py --app <HEAD plus only the pure move>` | 43/51: X1 (no `graphic_warnings`), X2 (`diagnostics` `[]`), X3 (no `warnings`) failed; Q1–Q5 failed because the pin probe, which now calls `ExportQueueRowView.toolTip(for:)`, did not build over that tree. |
+| `graphics_proof.py` | 51/51, exit 0, Z1 clean. |
+| `--mutant warnings-per-frame` | exit 0: X1 failed; `graphic_warnings` held only `nofont`. |
+| `--probe-mutant sheet-unwarned` | exit 0: Q5 failed; the line was `Exported “q5-warnsheet.mov”.` |
+| `--probe-mutant queue-unwarned` | exit 0: Q4 failed; the message was `Exported “q4-warnqueue.mov”.` |
+| `graphics_inspector_proof.py` | 61/61, exit 0. |
+| `--mutant compile-warnings-dropped` | exit 0: I18 alone failed. |
+| `--mutant folder-warnings-dropped` | exit 0: I19 alone failed. |
+| `graphics_ffi_probe.py` | 9/9 (P3 included). |
+
+```sh
+perl -e 'alarm shift; exec @ARGV' 2400 python3 tools/proof/graphics_proof.py --mutant warnings-per-frame
+perl -e 'alarm shift; exec @ARGV' 2400 python3 tools/proof/graphics_proof.py --probe-mutant sheet-unwarned
+perl -e 'alarm shift; exec @ARGV' 1200 python3 tools/proof/graphics_inspector_proof.py --mutant folder-warnings-dropped
+```
+
+**Not covered:** how the sheet's line, the queue row at its default width
+and the tooltips look, and Reveal opening Finder, are GR-6 in
+`docs/manual-checks.md`.

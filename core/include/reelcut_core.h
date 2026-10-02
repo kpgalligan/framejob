@@ -419,9 +419,10 @@ void rc_graphic_library_free(RcGraphicLibrary *lib);
 RcGraphic *rc_graphic_compile(const RcGraphicLibrary *lib, const char *name, const char *source,
                               uint32_t budget_ms, char **diag_out);
 
-/* {"meta":…,"schema":…,"revision":…}: the module's exported meta and schema
- * in its own key order, and the SHA-256 of its source as 64 hex digits.
- * NULL only for a NULL graphic. */
+/* {"meta":…,"schema":…,"revision":…,"warnings":[…]}: the module's exported
+ * meta and schema in its own key order, the SHA-256 of its source as 64 hex
+ * digits, and what its top level warned as it loaded, shaped as `diag_out`'s
+ * entries ([] when none). NULL only for a NULL graphic. */
 char *rc_graphic_describe(const RcGraphic *g);
 
 /* The SVG of `frame`: `props_json` overlaid on the schema's defaults (NULL is

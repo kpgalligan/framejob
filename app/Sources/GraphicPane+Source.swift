@@ -1,9 +1,11 @@
 // app/Sources/GraphicPane+Source.swift — the Graphic sub-tab's Source
 // section (road map 10 §5j, G5a): which module draws the clip, the three
 // buttons (Open in Editor, Reveal in Finder, Duplicate as New Graphic…), and
-// what the module says about the clip — its compile, and the clip's FIRST
-// frame drawn and rasterized at the clip's own size, so a missing font or a
-// size mismatch shows here (G3c's owed warning, road map 10 §10.6).
+// what the module says about the clip — its compile (an error, or what its
+// top level warned), and the clip's FIRST frame drawn and rasterized at the
+// clip's own size, so a missing font or a size mismatch shows here (G3c's
+// owed warning, road map 10 §10.6) — then what the graphics folder's scan
+// skipped or could not watch, each with Reveal (G-24 (b)).
 //
 // **The report is the paused frame's own two calls** — `module.svg` then
 // `library.rasterize` at `graphic.width × height`
@@ -90,8 +92,25 @@ extension GraphicPane {
             ? "No errors or warnings at the clip's first frame" : "Checked at the clip's first frame"
         rows.append(InspectorNoteLabel { checked })
         rows += diagnostics.map { GraphicDiagnosticRow($0, onOpen: open) }
+        let folder = folderWarnings()
+        if !folder.isEmpty {
+            let reveal: () -> Void = { [weak self] in
+                guard let url = self?.binding.document?.graphicStore?.folderURL,
+                      FileManager.default.fileExists(atPath: url.path)
+                else { return NSSound.beep() }
+                NSWorkspace.shared.activateFileViewerSelecting([url])
+            }
+            rows.append(InspectorNoteLabel { "In the graphics folder" })
+            rows += folder.map {
+                GraphicDiagnosticRow(
+                    GraphicDiagnostic(
+                        level: "warning", message: $0, line: nil, column: nil, frame: nil),
+                    openTitle: "Reveal", help: "Reveal the graphics folder in Finder",
+                    onOpen: reveal)
+            }
+        }
         let errors = diagnostics.filter { $0.level == "error" }.count
-        let warnings = diagnostics.count - errors
+        let warnings = diagnostics.count - errors + folder.count
         return InspectorSection(
             id: "graphic.source", title: "Source",
             summary: {
@@ -158,7 +177,8 @@ extension GraphicPane {
         } catch {
             render += Self.diagnostics(of: error)
         }
-        let report = GraphicClipReport(compile: [], render: render, frame: frame)
+        let report = GraphicClipReport(
+            compile: module.compileWarnings, render: render, frame: frame)
         if reportMemo.count >= 64 { reportMemo.removeAll() }
         reportMemo[key] = report
         lastReports[clip.id] = report
@@ -239,13 +259,16 @@ extension GraphicPane {
 
 /// One diagnostic: "line L, column C — message", an error in the strong
 /// ink and a warning in the muted one. A click on it, or on its Open, opens
-/// the module in the editor.
+/// the module in the editor; a folder row's button is Reveal instead.
 final class GraphicDiagnosticRow: NSView {
     let diagnostic: GraphicDiagnostic
     private let onOpen: () -> Void
     let label = NSTextField(wrappingLabelWithString: "")
 
-    init(_ d: GraphicDiagnostic, onOpen: @escaping () -> Void) {
+    init(
+        _ d: GraphicDiagnostic, openTitle: String = "Open",
+        help: String = "Open the module in the editor", onOpen: @escaping () -> Void
+    ) {
         diagnostic = d
         self.onOpen = onOpen
         super.init(frame: .zero)
@@ -260,7 +283,7 @@ final class GraphicDiagnosticRow: NSView {
         label.preferredMaxLayoutWidth = 200
         label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         let open = OptionButtonControl(
-            title: "Open", action: { [weak self] in self?.onOpen() }, enabled: { true },
+            title: openTitle, action: { [weak self] in self?.onOpen() }, enabled: { true },
             onEdit: {})
         open.setContentHuggingPriority(.required, for: .horizontal)
         let row = NSStackView(views: [label, open])
@@ -276,7 +299,7 @@ final class GraphicDiagnosticRow: NSView {
                 equalTo: leadingAnchor, constant: InspectorMetrics.markGutter),
             row.trailingAnchor.constraint(equalTo: trailingAnchor),
         ])
-        toolTip = "Open the module in the editor"
+        toolTip = help
     }
 
     @available(*, unavailable)

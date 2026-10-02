@@ -321,7 +321,9 @@ Every problem comes back as `{level, message, line, column, frame}`.
 `level` is `"error"` (nothing drew) or `"warning"` (it drew anyway).
 `line` and `column` are the module's own, when known; for a timeout they
 are where the function begins, not the statement that ran long. `frame` is
-set for a problem found while drawing.
+set for a problem found while drawing. A warning from the module's top level
+(such as `asset("x")` outside `render`) has no frame, and comes back with the
+module's compile: `ok` is still `true`.
 
 ## Working over MCP
 
@@ -335,6 +337,10 @@ pixels of frames in all (two at 8192×8192, or sixteen at 3840×2160);
 `asset(name)`; its `name` is the one to use, and `renamed_from` says it was
 renamed. `get_graphic` reads a module or names the folder, which your file
 tools may edit too; its `API.md` is this page, `API.d.ts` its types.
+`get_graphic {}`'s `warnings` says what the folder's scan skipped or could
+not watch, such as a file whose name is not a module name. A successful
+`export` answers `graphic_warnings`, each distinct warning a graphic gave
+while the file was drawn, with its name and frame.
 
 ## Idioms
 

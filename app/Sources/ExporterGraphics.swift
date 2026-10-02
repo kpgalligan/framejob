@@ -97,6 +97,56 @@ extension Exporter {
         if let destination = destination { try? FileManager.default.removeItem(at: destination) }
         return .failure(graphicFailed(failure))
     }
+
+    /// The pin's non-failed reports, one per diagnostic; each (name,
+    /// message) once, its first frame kept, in arrival order (G-24 (c)).
+    static func graphicWarnings(from reports: [GraphicReport]) -> [ExportGraphicWarning] {
+        var seen = Set<[String]>()
+        var warnings: [ExportGraphicWarning] = []
+        for report in reports where !report.failed {
+            for diagnostic in report.diagnostics
+            where seen.insert([report.name, diagnostic.located]).inserted {
+                warnings.append(ExportGraphicWarning(
+                    name: report.name, frame: report.frame, message: diagnostic.located))
+            }
+        }
+        return warnings
+    }
+
+    /// `graphicWarnings(from:)` over what `key`'s pin holds; `[]` for nil.
+    static func graphicWarnings(on key: Int?) -> [ExportGraphicWarning] {
+        guard let key = key else { return [] }
+        return graphicWarnings(from: GraphicRegistry.shared.reports(for: key))
+    }
+
+    /// The count a finished export's line ends with: "" for none. `hover`
+    /// true (the progress sheet) adds "(hover for details)"; false is the
+    /// queue's row, whose label truncates its tail.
+    static func graphicWarningSuffix(
+        _ warnings: [ExportGraphicWarning], hover: Bool = true
+    ) -> String {
+        guard !warnings.isEmpty else { return "" }
+        let count = warnings.count == 1 ? "1 graphic warning" : "\(warnings.count) graphic warnings"
+        return " " + count + (hover ? " (hover for details)." : ".")
+    }
+
+    /// The tooltip's list, one line each: "\"<name>\" at frame F: <message>"
+    /// ("\"<name>\": <message>" with no frame); nil for none.
+    static func graphicWarningDetails(_ warnings: [ExportGraphicWarning]) -> String? {
+        guard !warnings.isEmpty else { return nil }
+        return warnings.map { warning in
+            let place = warning.frame.map { " at frame \($0)" } ?? ""
+            return "\"\(warning.name)\"\(place): \(warning.message)"
+        }.joined(separator: "\n")
+    }
+}
+
+/// One distinct warning a graphic gave while an export drew it: the graphic,
+/// the first frame (its own) it was given at, and the located message.
+struct ExportGraphicWarning: Equatable {
+    let name: String
+    let frame: Int?
+    let message: String
 }
 
 extension GraphicDiagnostic {

@@ -550,6 +550,63 @@ check("I17 the Document tab's marker InspectorNameField has exactly one height c
       markerField != nil && markerHeights == [DS.controlHeight],
       "field \(markerField != nil), heights \(markerHeights)")
 
+// MARK: - I18 a top-level warning in the Source section (B68, G-24 (a))
+
+func sourceRows() -> [GraphicDiagnosticRow] {
+    section("graphic.source").map { walk($0).compactMap { $0 as? GraphicDiagnosticRow } } ?? []
+}
+let assetHead = "asset(\"x\") is not in graphics/assets/"
+rewrite("six", "const logo = asset(\"x\");\n" + sixSource)
+let warnedRows = sourceRows().filter {
+    $0.diagnostic.level == "warning" && $0.label.stringValue.hasPrefix(assetHead)
+}
+let warnedLabels = sourceRows().map { $0.label.stringValue }
+rewrite("six", sixSource)
+let quietRows = sourceRows().filter { $0.label.stringValue.hasPrefix(assetHead) }
+check("I18 six rewritten with const logo = asset(\"x\") first: the Source section has a warning "
+        + "row naming the asset; restored, none (CONTROL)",
+      warnedRows.count == 1 && quietRows.isEmpty,
+      "rewritten \(warnedLabels.joined(separator: " ¶ ")); restored "
+        + "\(sourceRows().map { $0.label.stringValue }.joined(separator: " ¶ "))")
+
+// MARK: - I19 the folder's warnings in the Source section (B68, G-24 (b))
+
+let badHead = "graphics/Bad.js is not a module name"
+func folderRows() -> (note: Int?, row: Int?, button: String?) {
+    guard let source = section("graphic.source") else { return (nil, nil, nil) }
+    let views = walk(source)
+    let note = views.firstIndex { ($0 as? InspectorNoteLabel)?.stringValue == "In the graphics folder" }
+    let row = views.firstIndex {
+        ($0 as? GraphicDiagnosticRow)?.label.stringValue.hasPrefix(badHead) == true
+    }
+    let button = row.flatMap { index in
+        walk(views[index]).first { $0 is OptionButtonControl }
+            .flatMap { reflected($0, "title", as: String.self) }
+    }
+    return (note, row, button)
+}
+binding.invalidate()
+let signatureBefore = graphic.structureSignature
+let bad = store.folderURL.appendingPathComponent("Bad.js")
+let badWritten = (try? Data(sixSource.utf8).write(to: bad)) != nil
+store.rescan()
+binding.invalidate()
+let shown = folderRows()
+let signatureWith = graphic.structureSignature
+try? FileManager.default.removeItem(at: bad)
+store.rescan()
+binding.invalidate()
+let gone = folderRows()
+let signatureAfter = graphic.structureSignature
+check("I19 Bad.js in graphics/ and store.rescan(): the Source section holds \"In the graphics "
+        + "folder\" then a row naming graphics/Bad.js whose button is Reveal, and the signature "
+        + "changed; removed and rescanned, neither, and the signature is back (CONTROL)",
+      badWritten && shown.note != nil && shown.row != nil && (shown.note ?? 0) < (shown.row ?? 0)
+        && shown.button == "Reveal" && signatureWith != signatureBefore
+        && gone.note == nil && gone.row == nil && signatureAfter == signatureBefore,
+      "written \(badWritten), shown \(shown), gone \(gone), signature changed "
+        + "\(signatureWith != signatureBefore), back \(signatureAfter == signatureBefore)")
+
 // MARK: - I15 (last) two clips' asset names
 
 if let first = clip() {

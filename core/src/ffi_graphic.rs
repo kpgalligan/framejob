@@ -250,9 +250,10 @@ pub unsafe extern "C" fn rc_graphic_compile(
     }
 }
 
-/// The graphic as `{"meta":…,"schema":…,"revision":…}`: its exported `meta`
-/// and `schema` in the module's own key order, and the SHA-256 of its
-/// source. NULL only for NULL.
+/// The graphic as `{"meta":…,"schema":…,"revision":…,"warnings":[…]}`: its
+/// exported `meta` and `schema` in the module's own key order, the SHA-256 of
+/// its source, and what its top level warned as it loaded (G-24 (a)), shaped
+/// as `diag_out`'s entries, `[]` when none. NULL only for NULL.
 ///
 /// # Safety
 /// `g` must be NULL or a live handle from [`rc_graphic_compile`]. The string
@@ -268,6 +269,7 @@ pub unsafe extern "C" fn rc_graphic_describe(g: *const RcGraphic) -> *mut c_char
             "meta": module.meta(),
             "schema": module.schema(),
             "revision": module.revision(),
+            "warnings": module.warnings().iter().map(Diagnostic::to_json).collect::<Vec<_>>(),
         })
         .to_string())
     };

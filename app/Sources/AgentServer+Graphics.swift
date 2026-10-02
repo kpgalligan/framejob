@@ -132,8 +132,9 @@ extension AgentServer {
     /// (GraphicPane+Source.swift).
     ///
     /// With `name`, one module as the folder holds it now: its source, its
-    /// revision and its compile. Without, where the folder is and what it
-    /// holds.
+    /// revision and its compile. Without, where the folder is, what it
+    /// holds, and `warnings`: what its scan skipped or could not watch
+    /// (G-24 (b)).
     func getGraphic(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let store = try graphicStore(document)
@@ -144,6 +145,7 @@ extension AgentServer {
                 "modules": graphicsSummary(document),
                 "families": libraryFamilies(document),
                 "assets": store.scan.assets.map(\.name),
+                "warnings": store.scan.warnings,
             ])
         }
         guard let file = store.module(named: name) else {
@@ -209,7 +211,8 @@ extension AgentServer {
     }
 
     /// `{path, revision, ok, meta, schema, diagnostics, clips}` for a module
-    /// the scan holds.
+    /// the scan holds; a compiled module's diagnostics are what its top level
+    /// warned (G-24 (a)).
     private func moduleReport(named name: String, _ document: ProjectDocument) -> [String: Any] {
         let file = document.graphicStore?.module(named: name)
         var result: [String: Any] = [
@@ -218,11 +221,11 @@ extension AgentServer {
             "clips": clipsUsing(name, document),
         ]
         switch GraphicRegistry.shared.entry(named: name, for: document.recipeKey) {
-        case .compiled(_, _, let meta, let schema):
+        case .compiled(let module, _, let meta, let schema):
             result["ok"] = true
             result["meta"] = meta
             result["schema"] = schema
-            result["diagnostics"] = [[String: Any]]()
+            result["diagnostics"] = module.compileWarnings.map(Self.diagnosticJSON)
         case .failed(let diagnostics, _):
             result["ok"] = false
             result["meta"] = [String: Any]()

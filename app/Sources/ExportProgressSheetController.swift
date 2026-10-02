@@ -155,7 +155,12 @@ final class ExportProgressSheetController: NSViewController {
             // measured its own mix on the way through, so the numbers are a
             // report rather than a promise.
             let measured = exporter.loudnessReport.map { " \($0.summary)." } ?? ""
+            // What the graphics warned while the file was drawn: a count on
+            // the line, the list in its tooltip (G-24 (c)).
+            let warnings = exporter.graphicWarnings
             statusLabel.stringValue = "Exported “\(url.lastPathComponent)”.\(measured)"
+                + Exporter.graphicWarningSuffix(warnings)
+            statusLabel.toolTip = Exporter.graphicWarningDetails(warnings)
             statusLabel.textColor = DS.textStrong
             stopButton.title = "Close"
             revealButton.isHidden = false

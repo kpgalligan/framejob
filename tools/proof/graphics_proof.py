@@ -185,6 +185,31 @@ G8  (a fresh instance) an untitled `new_project`; its root from `get_graphic
     `save_project {path: NF}`: `NF/graphics/fonts/Anton-Regular.ttf` exists,
     no `.js`, `get_graphic {}` now names `NF/graphics`, existing, and the
     untitled root it named before the save no longer exists (B8, G-19 (d));
+X2  (issue batch B68, #105, spec §11 G-24 (a); on WG after G7) `write_graphic
+    {name: toplevel}` of `const logo = asset("x");` and a render returning
+    `svg(ctx, ``)`: ok true, `diagnostics` exactly one warning, frame and line
+    null, its message starting `asset("x") is not in graphics/assets/`;
+    `get_graphic {name: toplevel}` the same; CONTROL: `get_graphic {name:
+    bar}`'s diagnostics are `[]`;
+X3  (B68, G-24 (b); WG) `get_graphic {}`'s `warnings` is `[]`; `Bad.js` mv'd
+    in: polled for at most 5 s until `warnings` is exactly `graphics/Bad.js `
+    + the module-name rule; `rm`; polled for at most 5 s until `[]`;
+X1  (B68, G-24 (c); after E4, a fresh project PW: `nofont.js` and `late.js`,
+    NOFONT_JS with `Late Sans`; a 3 s nofont clip at 0 and a 1 s late clip at
+    3 s on one track; saved) `export {preset: prores_4444}`: `graphic_warnings`
+    is exactly two entries, nofont then late, each message naming its family,
+    each frame an int within its clip (0–89, 0–29). CONTROL: E4's reply has no
+    `graphic_warnings`;
+Q4  (B68; the pin probe over PW, pinned) `warnqueue`: the job completed, its
+    message starts `Exported “<file>”. 2 graphic warnings.` (the count before
+    any loudness figures) with no `hover for details`, and
+    `ExportQueueRowView.toolTip(for:)` holds a `"nofont" at frame ` line
+    naming Nope Sans and a `"late" at frame ` line naming Late Sans; CONTROL:
+    Q1's `queue pin` message holds no "graphic warning";
+Q5  (B68) `warnsheet`: an `ExportProgressSheetController(… graphics: set)`,
+    its view loaded and `viewDidAppear()` called, the run loop spun until the
+    reflected `didFinish`: the reflected `statusLabel` ends ` 2 graphic
+    warnings (hover for details).` and its toolTip holds Q4's two lines;
 Z1  `grep "Reelcut: "` over every launch's log prints nothing.
 
     python3 tools/proof/graphics_proof.py [--port 4879] [--app PATH]
@@ -192,6 +217,9 @@ Z1  `grep "Reelcut: "` over every launch's log prints nothing.
     python3 tools/proof/graphics_proof.py --mutant sheet-uncapped
     python3 tools/proof/graphics_proof.py --mutant reference-unchecked
     python3 tools/proof/graphics_proof.py --mutant store-uncapped
+    python3 tools/proof/graphics_proof.py --mutant warnings-per-frame
+    python3 tools/proof/graphics_proof.py --probe-mutant sheet-unwarned
+    python3 tools/proof/graphics_proof.py --probe-mutant queue-unwarned
 
 A mutant is built in a COPY of the tree from `tree_copy.make_copy` (`app/` and
 `agent/` copied, every other build input `project.yml` names linked) by
@@ -205,7 +233,13 @@ and a uniform +1 moves both sides of them, so they are not expected to fail.
 `reference-unchecked` removes `graphic_reference`'s `target` line (G10), and
 `store-uncapped` removes `.prefix(Self.fileSourceLimit)` from the store's
 file-arm loop (G11); C7's and G10's setup is `new_project` plus
-`write_graphic bar`. Exit 0 means the row FAILED in the mutant, which is the
+`write_graphic bar`. `warnings-per-frame` restores the pin's per-frame
+`!pin.warnings.contains(report)` in `GraphicRegistry.record` and is driven
+through X1 (late is lost behind 64 nofont frames). `--probe-mutant` launches
+the built app to make PW, builds the pin probe over a scratch copy of
+`app/Sources` with one anchor replaced — `sheet-unwarned` the sheet's
+`graphicWarningSuffix(` call (Q5), `queue-unwarned` the queue's (Q4), each
+→ `""` — and runs only that row. Exit 0 means the row FAILED in the mutant, which is the
 pass, and 1 that it survived. Exit 2 (rule R, issue batch B13) means the
 control could not be performed — the copy did not build or launch, the setup
 did not hold, or the row's own control half failed — printed as `mutant
@@ -246,9 +280,9 @@ RED, BLUE, BLACK = (255, 90, 54), (45, 127, 249), (0, 0, 0)
 BORDER, CARD = (230, 40, 40), (64, 8, 8)
 SECOND = 30 * FRAME
 ROWS = ["G6", "P1", "P2", "P3", "S1", "R1", "H1", "L1", "F1", "K1", "K2", "T1", "K3", "A1",
-        "G1", "G2", "G3", "G4", "G5", "G7", "G10", "C1", "C2", "C3", "C5", "C6", "C7", "I1", "I2",
+        "G1", "G2", "G3", "G4", "G5", "G7", "X2", "X3", "G10", "C1", "C2", "C3", "C5", "C6", "C7", "I1", "I2",
         "G9", "I3", "I4", "I5", "W1", "L2", "G11",
-        "G8", "E1", "C4", "E2", "E3", "E4", "Q1", "Q2", "Q3", "Z1"]
+        "G8", "E1", "C4", "E2", "E3", "E4", "X1", "Q1", "Q2", "Q3", "Q4", "Q5", "Z1"]
 DOC_MD = ROOT / "docs/graphics-api.md"
 DOC_DTS = ROOT / "docs/graphics-api.d.ts"
 ANCHOR = "frame: frame, propsJSON: propsJSON, ctxJSON: ctxJSON,"
@@ -266,6 +300,17 @@ MUTANTS = {
                        "        if format == \"png\", pixels < 0 {\n", "C7"),
     "reference-unchecked": ("AgentServer+Graphics.swift", REFERENCE_CHECK, "", "G10"),
     "store-uncapped": ("GraphicStore.swift", ".prefix(Self.fileSourceLimit)", "", "G11"),
+    "warnings-per-frame": ("GraphicRegistry.swift",
+                           "!pin.warnings.contains(where: { Self.sameWarning($0, report) })",
+                           "!pin.warnings.contains(report)", "X1"),
+}
+# name: (file in app/Sources, anchor, replacement, the row it must fail) — the
+# pin probe built over a scratch copy of app/Sources (B68, #105, G-24 (c)).
+PROBE_MUTANTS = {
+    "sheet-unwarned": ("ExportProgressSheetController.swift",
+                       "Exporter.graphicWarningSuffix(warnings)", '""', "Q5"),
+    "queue-unwarned": ("ExportQueueController.swift",
+                       "Exporter.graphicWarningSuffix(warnings, hover: false)", '""', "Q4"),
 }
 CAP = 134_217_728
 rows = {}
@@ -321,6 +366,12 @@ NEEDSFONT_JS = module(
 USESASSET_JS = module(
     '  return svg(ctx, `<image href="${asset("red.png")}" x="0" y="0" width="200" '
     'height="200"/>`);')
+LATE_JS = NOFONT_JS.replace("Nope Sans", "Late Sans")
+TOPLEVEL_JS = ('const logo = asset("x");\n'
+               "export function render(frame, props, ctx) {\n  return svg(ctx, ``);\n}\n")
+ASSET_HEAD = 'asset("x") is not in graphics/assets/'
+BAD_WARNING = ("graphics/Bad.js is not a module name (lowercase letters, digits and -, "
+               "starting with a letter or a digit, at most 63 characters)")
 OSWALD = Path("/Library/Fonts/Oswald-Medium.ttf")
 ARIAL = Path("/System/Library/Fonts/Supplemental/Arial.ttf")
 RED_PNG = ROOT / "graphic/tests/assets/red.png"
@@ -738,6 +789,7 @@ def run(app, port):
 
         run_a1(client, pa)
         run_g(client, wg, ng)
+        run_x2_x3(client, wg)
         run_g10(client, wg)
         run_c(client, wg)
         run_c7(client, wg)
@@ -751,6 +803,7 @@ def run(app, port):
         run_g8(client, nf)
         run_e(client, p1)
         run_e4(client, WORK / "E4.reelcut")
+        run_x1(client, WORK / "PW.reelcut")
         make_pq(client, WORK / "PQ.reelcut")
     finally:
         instance.stop()
@@ -1355,11 +1408,109 @@ def run_e4(client, package):
                                           "path": str(movie)})
     raw = decode_movie(movie, 2)
     found = movie_pixel(raw, 480, 540)
+    reply = exported.get("reply") if isinstance(exported.get("reply"), dict) else {}
     check("E4 a pin clip exported as prores_4444 over MCP: at 2 s (480,540) is RED — export "
-          "passes the document's set",
-          made and rcs == [0] and clip is not None and exported["ok"] and near(found, RED),
+          "passes the document's set; the reply has no graphic_warnings (X1's CONTROL)",
+          made and rcs == [0] and clip is not None and exported["ok"] and near(found, RED)
+          and "graphic_warnings" not in reply,
           f"clip {clip is not None} {why!r}, export {exported.get('error', 'ok')}, "
-          f"decoded {len(raw)} bytes, (480,540) {found}")
+          f"decoded {len(raw)} bytes, (480,540) {found}, "
+          f"graphic_warnings {reply.get('graphic_warnings', 'absent')}")
+
+
+def make_pw(client, package):
+    """PW, X1's and Q4/Q5's project: nofont.js and late.js (NOFONT_JS with
+    `Late Sans`), a 3 s nofont clip at 0 and a 1 s late clip at 3 s on one
+    track, saved. Whether it held, and what was done."""
+    made = attempt(client, "new_project", {"path": str(package)})
+    rcs = [mv_in(package / "graphics", name, text, make_folder=True)
+           for name, text in (("nofont.js", NOFONT_JS), ("late.js", LATE_JS))]
+    track = ((project_of(client, package) or {}).get("tracks") or [{}])[0].get("id")
+    first, why1 = land(client, package, "nofont", track, 0, {"duration": 3 * SECOND})
+    second, why2 = land(client, package, "late", track, 3 * SECOND, {"duration": SECOND})
+    saved = attempt(client, "save_project", {"project": str(package)})
+    held = (made["ok"] and rcs == [0, 0] and first is not None and second is not None
+            and saved["ok"])
+    return held, (f"new {made['ok']}, mv rcs {rcs}, nofont {first is not None} {why1!r}, "
+                  f"late {second is not None} {why2!r}, saved {saved['ok']}")
+
+
+def whole_in(value, top):
+    return isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= top
+
+
+def run_x1(client, package):
+    """X1 (issue batch B68, #105, G-24 (c)) — a successful export answers
+    each distinct warning once, a later graphic's not lost behind an earlier
+    one's every frame. Whether PW was made."""
+    held, setup = make_pw(client, package)
+    movie = WORK / "x1.mov"
+    exported = attempt(client, "export", {"project": str(package), "preset": "prores_4444",
+                                          "path": str(movie)})
+    reply = exported.get("reply") if isinstance(exported.get("reply"), dict) else {}
+    warnings = reply.get("graphic_warnings")
+    listed = warnings if isinstance(warnings, list) else []
+    names = [w.get("name") for w in listed if isinstance(w, dict)]
+    check("X1 PW exported as prores_4444: graphic_warnings is exactly nofont then late, each "
+          "message naming its family, each frame within its clip (0–89, 0–29)",
+          held and exported["ok"] and len(listed) == 2 and names == ["nofont", "late"]
+          and "Nope Sans" in str(listed[0].get("message"))
+          and "Late Sans" in str(listed[1].get("message"))
+          and whole_in(listed[0].get("frame"), 89) and whole_in(listed[1].get("frame"), 29),
+          f"setup: {setup}; export {exported.get('error', 'ok')}; graphic_warnings "
+          f"{warnings if warnings is not None else 'absent'}")
+    return held
+
+
+def await_warnings(client, wg, want, seconds):
+    """Polls `get_graphic {}` every 0.2 s until its `warnings` is `want`, or
+    `seconds` pass. The last `warnings` seen (None when absent)."""
+    deadline = time.monotonic() + seconds
+    while True:
+        got = attempt(client, "get_graphic", {"project": str(wg)})
+        seen = (got.get("reply") or {}).get("warnings") if got["ok"] else None
+        if seen == want or time.monotonic() >= deadline:
+            return seen
+        time.sleep(0.2)
+
+
+def run_x2_x3(client, wg):
+    """X2 and X3 (issue batch B68, #105, G-24 (a) and (b)) on WG after G7: a
+    module's top-level warning is its diagnostics with ok true; the folder's
+    scan warnings are get_graphic {}'s warnings."""
+    wrote = attempt(client, "write_graphic", {"project": str(wg), "name": "toplevel",
+                                              "source": TOPLEVEL_JS})
+    got = attempt(client, "get_graphic", {"project": str(wg), "name": "toplevel"})
+    plain = attempt(client, "get_graphic", {"project": str(wg), "name": "bar"})
+
+    def one_warning(answer):
+        reply = answer.get("reply") if answer["ok"] else None
+        found = (reply or {}).get("diagnostics") if isinstance(reply, dict) else None
+        return (isinstance(found, list) and len(found) == 1 and reply.get("ok") is True
+                and found[0].get("level") == "warning" and found[0].get("frame") is None
+                and found[0].get("line") is None
+                and str(found[0].get("message")).startswith(ASSET_HEAD))
+    check("X2 write_graphic toplevel (asset(\"x\") at the top level) is ok true with exactly one "
+          "warning, frame and line null, naming the asset; get_graphic {name: toplevel} the "
+          "same; CONTROL: get_graphic {name: bar}'s diagnostics are []",
+          one_warning(wrote) and one_warning(got) and plain["ok"]
+          and (plain.get("reply") or {}).get("diagnostics") == [],
+          f"write {wrote}, get {got}, bar diagnostics "
+          f"{(plain.get('reply') or {}).get('diagnostics') if plain['ok'] else plain}")
+
+    folder = wg / "graphics"
+    before = attempt(client, "get_graphic", {"project": str(wg)})
+    initial = (before.get("reply") or {}).get("warnings") if before["ok"] else None
+    rc = mv_in(folder, "Bad.js", bar())
+    seen = await_warnings(client, wg, [BAD_WARNING], 5)
+    removed = bounded.run(["rm", str(folder / "Bad.js")], 30)["rc"]
+    cleared = await_warnings(client, wg, [], 5)
+    check("X3 get_graphic {}'s warnings is []; Bad.js mv'd in: within 5 s it is exactly the "
+          "module-name rule for graphics/Bad.js; removed: within 5 s [] again",
+          before["ok"] and initial == [] and rc == 0 and seen == [BAD_WARNING]
+          and removed == 0 and cleared == [],
+          f"before {initial if initial is not None else 'absent'}, mv rc {rc}, seen {seen}, "
+          f"rm rc {removed}, after {cleared}")
 
 
 def make_pq(client, package):
@@ -1370,26 +1521,27 @@ def make_pq(client, package):
           f"saved {saved['ok']}", flush=True)
 
 
-def build_pin_probe():
+def build_pin_probe(sources_dir=ROOT / "app/Sources", out=PIN_PROBE_DIR):
     """`graphics_pin_probe.swift` as `main.swift` over every other file in
-    `app/Sources`, on `harness/build.sh`'s swiftc line, with the app's
-    `Fonts`, `Blank.mp4` and a `default.metallib` of `Compositor.metal`
-    beside it — `phase7_chrome.py`'s `build_probe` and `build_shader`. Rebuilt
-    only when stale. The binary, or None and why."""
-    PIN_PROBE_DIR.mkdir(parents=True, exist_ok=True)
-    binary = PIN_PROBE_DIR / "graphics_pin_probe"
-    entry = PIN_PROBE_DIR / "main.swift"
+    `sources_dir` (`app/Sources`, or a probe mutant's scratch copy), on
+    `harness/build.sh`'s swiftc line, into `out` with the app's `Fonts`,
+    `Blank.mp4` and a `default.metallib` of `Compositor.metal` beside it —
+    `phase7_chrome.py`'s `build_probe` and `build_shader`. Rebuilt only when
+    stale. The binary, or None and why."""
+    out.mkdir(parents=True, exist_ok=True)
+    binary = out / "graphics_pin_probe"
+    entry = out / "main.swift"
     if not entry.exists() or entry.read_text() != PIN_PROBE_SOURCE.read_text():
         entry.write_text(PIN_PROBE_SOURCE.read_text())
-    fonts = PIN_PROBE_DIR / "Fonts"
+    fonts = out / "Fonts"
     resources = ROOT / "app/Resources"
     if not fonts.is_dir() or (resources / "Fonts").stat().st_mtime > fonts.stat().st_mtime:
         shutil.rmtree(fonts, ignore_errors=True)
         shutil.copytree(resources / "Fonts", fonts)
-    if not (PIN_PROBE_DIR / "Blank.mp4").exists():
-        shutil.copy2(resources / "Blank.mp4", PIN_PROBE_DIR / "Blank.mp4")
+    if not (out / "Blank.mp4").exists():
+        shutil.copy2(resources / "Blank.mp4", out / "Blank.mp4")
     shader = resources / "Shaders/Compositor.metal"
-    metallib, air = PIN_PROBE_DIR / "default.metallib", PIN_PROBE_DIR / "Compositor.air"
+    metallib, air = out / "default.metallib", out / "Compositor.air"
     if not metallib.exists() or shader.stat().st_mtime > metallib.stat().st_mtime:
         step = bounded.run(["xcrun", "-sdk", "macosx", "metal", "-c", str(shader), "-o",
                             str(air)], 300)
@@ -1398,7 +1550,7 @@ def build_pin_probe():
                                 str(metallib)], 300)
         if step["rc"] != 0 or not metallib.exists():
             return None, f"the shader did not build: {step['stderr'][-400:]}"
-    sources = sorted(path for path in (ROOT / "app/Sources").glob("*.swift")
+    sources = sorted(path for path in Path(sources_dir).glob("*.swift")
                      if path.name != "main.swift")
     lib = ROOT / "core/target/release/libreelcut_core.a"
     if not lib.exists():
@@ -1419,26 +1571,31 @@ def build_pin_probe():
     return binary, ""
 
 
-def run_probe(binary, mode, pin, tag):
-    """One probe run over PQ: its JSON answer (or an error), and the decoded
-    frame at 1 s for the two export modes."""
+def run_probe(binary, mode, pin, tag, package=None):
+    """One probe run over `package` (PQ by default): its JSON answer (or an
+    error), and the decoded frame at 1 s for the two pin export modes."""
     if binary is None:
         return {"error": "the probe did not build"}, b""
     movie = WORK / f"{tag}.mov"
-    got = bounded.run([str(binary), str(WORK / "PQ.reelcut"), mode, pin, str(movie)], 600)
+    package = package or WORK / "PQ.reelcut"
+    got = bounded.run([str(binary), str(package), mode, pin, str(movie)], 600)
     try:
         answer = json.loads(got["stdout"].strip().splitlines()[-1])
     except (IndexError, ValueError):
         answer = {"error": f"rc {got['rc']}, expired {got['expired']}: "
                            f"{(got['stdout'] + got['stderr'])[-400:]}"}
-    raw = decode_movie(movie, 1) if mode != "hit" and movie.exists() else b""
+    raw = decode_movie(movie, 1) if mode in ("queue", "direct") and movie.exists() else b""
     return answer, raw
 
 
 def run_q(binary, why):
-    """Q1–Q3 through the probe; a probe that did not build fails all three."""
+    """Q1–Q3 through the probe; a probe that did not build fails all three.
+    Q1's `queue pin` message, Q4's CONTROL."""
+    queue_message = None
     for row, mode in (("Q1", "queue"), ("Q2", "direct")):
         pinned, raw = run_probe(binary, mode, "pin", f"{row.lower()}-pin")
+        if row == "Q1":
+            queue_message = pinned.get("message")
         control, raw_control = run_probe(binary, mode, "nopin", f"{row.lower()}-nopin")
         left, right = movie_pixel(raw, 480, 540), movie_pixel(raw, 1440, 540)
         bare = movie_pixel(raw_control, 480, 540)
@@ -1457,6 +1614,47 @@ def run_q(binary, why):
           any("Nope Sans" in m for m in first) and any("Nope Sans" in m for m in second)
           and hit.get("sameTexture") is True,
           f"{why}{hit}")
+    return queue_message
+
+
+def detail_lines(tip):
+    """Whether `tip` holds a `"nofont" at frame ` line naming Nope Sans and a
+    `"late" at frame ` line naming Late Sans."""
+    lines = str(tip or "").split("\n")
+    return all(any(line.startswith(f'"{name}" at frame ') and family in line for line in lines)
+               for name, family in (("nofont", "Nope Sans"), ("late", "Late Sans")))
+
+
+def run_q4(binary, why, control):
+    """Q4 (B68, G-24 (c)) — the queue's row over PW: the count straight after
+    the Exported sentence, and the list in the row's tooltip. `control` is
+    Q1's `queue pin` message (None when not run). The probe's answer."""
+    answer, _ = run_probe(binary, "warnqueue", "pin", "q4-warnqueue", WORK / "PW.reelcut")
+    message = str(answer.get("message", ""))
+    lead = "Exported “q4-warnqueue.mov”. 2 graphic warnings."
+    check("Q4 warnqueue: the completed job's message starts \"Exported “…”. 2 graphic warnings.\" "
+          "(the count before any loudness figures), no \"hover for details\"; the row's tooltip "
+          "lists nofont (Nope Sans) and late (Late Sans); CONTROL: Q1's queue pin message holds "
+          "no \"graphic warning\"",
+          answer.get("state") == "completed" and message.startswith(lead)
+          and "hover for details" not in message and detail_lines(answer.get("toolTip"))
+          and (control is None or "graphic warning" not in str(control)),
+          f"{why}{answer}; Q1's message {control!r}")
+    return answer
+
+
+def run_q5(binary, why):
+    """Q5 (B68, G-24 (c)) — the progress sheet over PW: the finish line ends
+    with the count and the hover note, its tooltip the list. The answer."""
+    answer, _ = run_probe(binary, "warnsheet", "pin", "q5-warnsheet", WORK / "PW.reelcut")
+    status = str(answer.get("status", ""))
+    check("Q5 warnsheet: the sheet's finish line ends \" 2 graphic warnings (hover for "
+          "details).\" and its tooltip lists nofont (Nope Sans) and late (Late Sans)",
+          answer.get("finished") is True and status.startswith("Exported “q5-warnsheet.mov”.")
+          and status.endswith(" 2 graphic warnings (hover for details).")
+          and detail_lines(answer.get("toolTip")),
+          f"{why}{answer}")
+    return answer
 
 
 def setup_bar(client, wg):
@@ -1606,14 +1804,62 @@ def build_mutant(file, anchor, replacement):
     return binary, ""
 
 
+def probe_mutant(app, port, name):
+    """`--probe-mutant NAME`: the built app makes PW, then the pin probe is
+    built over a scratch copy of `app/Sources` with ONE anchor replaced
+    (asserted once) and only that row is run. 0 when the row FAILED, 1 when
+    it survived, 2 when the control could not be performed."""
+    file, anchor, replacement, row = PROBE_MUTANTS[name]
+    print(f"graphics — the {name} PROBE MUTANT ({row} must FAIL)", flush=True)
+    if not app.exists():
+        print(f"probe mutant {name}: the control could not be performed — no app at {app}")
+        return 2
+    instance = Instance(app, port, WORK / f"reelcut-{port}.log")
+    try:
+        client = instance.start()
+        held, setup = make_pw(client, WORK / "PW.reelcut") if client else (False, "no launch")
+    finally:
+        instance.stop()
+    if not held:
+        print(f"probe mutant {name}: the control could not be performed — PW: {setup}")
+        return 2
+    scratch = WORK / "probe-mutant"
+    sources = scratch / "Sources"
+    shutil.copytree(ROOT / "app/Sources", sources)
+    target = sources / file
+    text = target.read_text()
+    if text.count(anchor) != 1:
+        print(f"probe mutant {name}: the control could not be performed — the anchor occurs "
+              f"{text.count(anchor)} times in {file}")
+        return 2
+    target.write_text(text.replace(anchor, replacement))
+    binary, why = build_pin_probe(sources, scratch / "probe")
+    if binary is None:
+        print(f"probe mutant {name}: the control could not be performed — {why}")
+        return 2
+    answer = run_q4(binary, "", None) if row == "Q4" else run_q5(binary, "")
+    settled = answer.get("state") == "completed" if row == "Q4" else answer.get("finished")
+    if not settled:
+        print(f"probe mutant {name}: the control could not be performed — the export did not "
+              f"complete: {answer}")
+        return 2
+    verdict = not rows.get(row)
+    print(f"the probe mutant is CAUGHT: {row} failed" if verdict
+          else "the probe mutant was NOT caught")
+    return 0 if verdict else 1
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=4879)
     parser.add_argument("--app", type=Path, default=APP)
     parser.add_argument("--mutant", choices=sorted(MUTANTS))
+    parser.add_argument("--probe-mutant", choices=sorted(PROBE_MUTANTS))
     args = parser.parse_args()
     shutil.rmtree(WORK, ignore_errors=True)
     WORK.mkdir(parents=True)
+    if args.probe_mutant:
+        return probe_mutant(args.app, args.port, args.probe_mutant)
     if args.mutant:
         file, anchor, replacement, row = MUTANTS[args.mutant]
         print(f"graphics — the {args.mutant} MUTANT ({row} must FAIL)", flush=True)
@@ -1639,6 +1885,9 @@ def main():
             elif args.mutant == "store-uncapped":
                 why = "" if run_g11(client, WORK / "WS.reelcut") else \
                     "the 17 writes, the m00 settle or the m00 control did not hold"
+            elif args.mutant == "warnings-per-frame":
+                why = "" if run_x1(client, WORK / "PW.reelcut") else \
+                    "PW (two modules, two clips, saved) was not made"
             else:
                 wg = WORK / "WG.reelcut"
                 if not setup_bar(client, wg):
@@ -1665,7 +1914,10 @@ def main():
         return 1
     log = run(args.app, args.port)
     binary, why = build_pin_probe()
-    run_q(binary, f"the probe did not build — {why}; " if binary is None else "")
+    because = f"the probe did not build — {why}; " if binary is None else ""
+    control = run_q(binary, because)
+    run_q4(binary, because, control)
+    run_q5(binary, because)
     found = complaints(log)
     check("Z1 grep \"Reelcut: \" over every launch's log prints nothing", found == [],
           f"{found[:5]}")

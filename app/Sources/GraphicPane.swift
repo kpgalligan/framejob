@@ -94,10 +94,17 @@ final class GraphicPane: InspectorPaneView {
         (binding.document?.graphicStore?.scan.assets.map(\.name) ?? []).sorted()
     }
 
+    /// What the graphics folder's scan skipped or could not watch, in its own
+    /// sentences — the Source section's folder rows (G-24 (b)).
+    func folderWarnings() -> [String] {
+        binding.document?.graphicStore?.scan.warnings ?? []
+    }
+
     /// The schema's entries whole (a default, bounds or options a row is
-    /// built from), the stale keys, each asset popup's names and the
-    /// diagnostics' messages. Stored values, the revision and the playhead
-    /// are NOT here: they are read fresh by `refresh()`.
+    /// built from), the stale keys, each asset popup's names, the
+    /// diagnostics' messages and the folder's warnings. Stored values, the
+    /// revision and the playhead are NOT here: they are read fresh by
+    /// `refresh()`.
     override var structureSignature: String {
         guard allGraphic else { return super.structureSignature + "|-" }
         let shared = self.shared()
@@ -114,6 +121,7 @@ final class GraphicPane: InspectorPaneView {
             }
             messages = [spell(report.compile), spell(report.render)]
         }
+        messages.append(folderWarnings().joined(separator: "¶"))
         return [
             super.structureSignature, shared?.name ?? "mixed", keys.joined(separator: ","),
             stale.joined(separator: ","), assetSignature(parsed?.schema),

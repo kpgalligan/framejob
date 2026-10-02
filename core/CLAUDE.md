@@ -505,7 +505,10 @@ governs a module now.
   `ffi_util.rs`'s `fallible_op_wrapped`. `rc_graphic_library_families`
   answers the frozen library's family names as JSON — the engine's own,
   which a `font-family` must match (CoreText names 13 of 2500 host fonts
-  differently) — and freezes it. At 397 of 400: the next export pays a toll,
+  differently) — and freezes it. `rc_graphic_describe` answers `{meta,
+  schema, revision, warnings}`, `warnings` being `Module::warnings()`
+  through `Diagnostic::to_json` (spec §11 G-24 (a)). At 399 of 400: the
+  next export pays a toll,
   and nothing crate-free is left in it (`diag_json`/`diag_error` name
   `Diagnostic`). `ffi_util.rs` holds the two crate-free helpers it gave up:
   `read_bytes` (a pointer and a length into an owned `Vec`, `bytes is NULL`

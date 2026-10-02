@@ -62,6 +62,15 @@ I16 (B8) after two signature reads `schemaMemo.key` is "six|<registry
 I17 (B8) a `DocumentPane(inspector:)` over the fixture with one marker added
     through `ReelOp.addMarker`: its marker `InspectorNameField` (placeholder
     "Marker") has exactly one height constraint of its own, `DS.controlHeight`;
+I18 (issue batch B68, #105, spec §11 G-24 (a)) six rewritten with `const logo
+    = asset("x");` first: the Source section has exactly one warning
+    `GraphicDiagnosticRow` whose label starts `asset("x") is not in
+    graphics/assets/`; six restored: none (CONTROL);
+I19 (B68, G-24 (b)) `Bad.js` written into the fixture's `graphics/` and
+    `store.rescan()`: the Source section holds the note "In the graphics
+    folder" and after it a row labelled `graphics/Bad.js is not a module
+    name…` whose button is "Reveal", and `structureSignature` changed; removed
+    and rescanned: neither, and the signature is back (CONTROL);
 I15 (B8, last) a second `six` clip; the two hold logo "a.png" and "b.png" and
     both are selected: the Logo popup is `["None", "red.png", "a.png",
     "b.png"]`, and the signature holds "red.png,a.png,b.png".
@@ -90,7 +99,10 @@ nothing else did:
   merged-asset-names the signature's asset names built from `storedProps()`,
                      the first clip's value winning, as before — I15's
                      signature row;
-  no-schema-memo     `schema(_:)` never stores `schemaMemo` — I16.
+  no-schema-memo     `schema(_:)` never stores `schemaMemo` — I16;
+  compile-warnings-dropped  the Source report's `compile: module.compileWarnings`
+                     is `compile: []` — I18 (B68);
+  folder-warnings-dropped   `folderWarnings()` answers `[]` — I19 (B68).
 """
 
 import argparse
@@ -176,6 +188,17 @@ MUTANTS = {
         ["I16 after two signature reads schemaMemo.key is \"six|<registry revision>\" and "
          "layerMemo holds the clip under document.editedProject; after a rewrite of six the "
          "key names the new revision"]),
+    "compile-warnings-dropped": (
+        "GraphicPane+Source.swift", "compile: module.compileWarnings", "compile: []",
+        ["I18 six rewritten with const logo = asset(\"x\") first: the Source section has a "
+         "warning row naming the asset; restored, none (CONTROL)"]),
+    "folder-warnings-dropped": (
+        "GraphicPane.swift", "        binding.document?.graphicStore?.scan.warnings ?? []\n",
+        "        []\n",
+        ["I19 Bad.js in graphics/ and store.rescan(): the Source section holds \"In the "
+         "graphics folder\" then a row naming graphics/Bad.js whose button is Reveal, and the "
+         "signature changed; removed and rescanned, neither, and the signature is back "
+         "(CONTROL)"]),
 }
 
 RESULTS = []
@@ -285,7 +308,7 @@ def build_probe(sources, out):
 
 
 def probe_checks(sources, out, package):
-    print("\n1 — the probe: I1–I17", flush=True)
+    print("\n1 — the probe: I1–I19", flush=True)
     binary, error = build_probe(Path(sources), out)
     check("the probe builds over app/Sources", binary is not None, error or "")
     if binary is None:
@@ -302,8 +325,8 @@ def probe_checks(sources, out, package):
         check("the probe runs", False, (ran["stdout"] + ran["stderr"]).strip()[-600:])
         return
     probe_rows = json.loads(answer.read_text())["rows"]
-    present = all(any(r["name"].startswith(f"I{n} ") for r in probe_rows) for n in range(1, 18))
-    check("the probe answers every I-row (I1–I17 present)", present, f"{len(probe_rows)} rows")
+    present = all(any(r["name"].startswith(f"I{n} ") for r in probe_rows) for n in range(1, 20))
+    check("the probe answers every I-row (I1–I19 present)", present, f"{len(probe_rows)} rows")
     for row in probe_rows:
         check(row["name"], row["ok"], row["detail"])
 

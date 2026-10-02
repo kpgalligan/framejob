@@ -447,8 +447,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   `graphics/fonts/`, `graphics/assets/`, `graphics/<file>`,
   `graphics/fonts/<file>`, `graphics/assets/<file>` or `the package`. Why:
   a source that did not arm was silent, so a store that stopped seeing
-  edits said nothing. Nothing shows scan warnings yet (#105); the warning
-  is recorded so the surface that shows them has it.
+  edits said nothing. G-24 (b) says where it shows.
   (c) **`render` answers at most 8 MiB of SVG** (`graphic::SVG_BYTES`);
   a longer string is the frame's error, naming its length. Why: the text
   is a preview pool key, crosses the FFI and an MCP reply, and is parsed
@@ -482,7 +481,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   kept on the `Module`** (`Module::warnings()`), in order and not
   de-duplicated. It is never attributed to a frame. A reload's copy is
   discarded. Before this the next call's `arm` cleared it, so it was lost.
-  Publishing it over the FFI and in the app is #105's later work.
+  G-24 (a) publishes it.
 - **G-22 — `measureText` and `textLines` take `xmlSpace`; whitespace-only
   text measures zero** (issue #105, 2026-10-02). A `font` object may carry
   `xmlSpace: "default"` (the default) or `"preserve"`, SVG's `xml:space`.
@@ -533,3 +532,24 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   (f) **A font file's verdict is reused** while its size, modification
   date and file number are unchanged: it is not read or validated again.
   Accepted: a rewrite that keeps all three is not seen until one changes.
+- **G-24 — A graphic's warnings show where its other messages do** (issue
+  #105, 2026-10-02; owner decision 3).
+  (a) **Compile**: `rc_graphic_describe` answers `Module::warnings()` as
+  `warnings`. They are the module's `diagnostics` in `write_graphic` and
+  `get_graphic` when `ok` is true, and they lead the Graphic sub-tab's
+  Source section rows.
+  (b) **Scan**: `get_graphic {}` answers `warnings`, the store's scan
+  warnings in their own sentences. The Source section lists them under an
+  "In the graphics folder" note, each with Reveal (the folder in Finder, a
+  beep when it is absent). Accepted: a pass whose only change is a warning
+  posts nothing (store probe W7 pins that), so the pane shows it at its
+  next rebuild.
+  (c) **Export**: a pin keeps a warning once per graphic and message set,
+  its first frame kept. Before this it was kept once per frame, so one
+  graphic that warned every frame filled the 64 and hid every later one. A
+  successful export answers `graphic_warnings`; the progress sheet's
+  finish line ends "N graphic warning(s) (hover for details).", and the
+  queue row reads "Exported “…”. N graphic warning(s)." with the count
+  ahead of the loudness figures (the row truncates its tail, so a note on
+  the end is the part a narrow window cuts). Each lists the warnings in its
+  tooltip. A failed export answers as before.

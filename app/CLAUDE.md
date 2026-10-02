@@ -246,7 +246,8 @@ detail there.
   a pass, modules first, then fonts, then assets, each in name order; spec §11
   G-19 (c), G-20 (a)); a source whose `open` fails is a scan warning,
   "`<subject>` is not watched: open failed (`<strerror>`)", `errno` copied
-  first (G-20 (b); `GraphicScan.warnings`, which nothing shows yet, #105);
+  first (G-20 (b); `GraphicScan.warnings`, shown by the Source section and `get_graphic {}`,
+  G-24 (b));
   every pass re-opens every source BY PATH and
   arms BEFORE it scans; events coalesce over 100 ms. The queue owns the diff
   and an outbox; main publishes in order through `drain()` (`scan`, the
@@ -609,7 +610,9 @@ the key map behind it.
   Duplicate as New Graphic… — `store.write`, `rescan()` inside the button's
   event, one `set_graphic {name}` step — and `report(for:)`, the compile's
   diagnostics plus the first frame rasterized at the clip's OWN size,
-  memoised and frozen during a live gesture) · `GraphicSchemaRows.swift`
+  memoised and frozen during a live gesture; the compile's top-level
+  warnings lead the rows, then the folder's scan warnings under "In the
+  graphics folder", each with Reveal, G-24) · `GraphicSchemaRows.swift`
   (pure, probe-callable: the schema in the MODULE's key order —
   `GraphicSchema.orderedKeys` (in `GraphicSchema.swift`) scans
   `describeJSON()`'s text because the
@@ -818,8 +821,9 @@ the key map behind it.
   `snapshot(for: recipeKey)`, captured on main): every `pin` has its `unpin`
   — `Exporter.finish` AND `deinit`, and `renderFrameReported`'s `defer`. A
   pin also keeps its REPORTS: the first failure in a slot of its own for the
-  pin's life, then at most 64 distinct warnings, so a warning can never
-  displace a failure. `LayerRenderersGraphic` hands the engine the core's
+  pin's life, then at most 64 warnings distinct by graphic and messages,
+  frame aside (`sameWarning`, G-24 (c)), so a warning can never displace a
+  failure. `GraphicModule.compileWarnings` decodes describe's `warnings`. `LayerRenderersGraphic` hands the engine the core's
   own `props_json` / `ctx_json` untouched and keys the texture by the SVG
   TEXT, the size and the library version, in `LayerRenderers`' separate
   six-entry graphic pool. A graphic that fails — no module, not compiled, a
@@ -903,6 +907,13 @@ the key map behind it.
   not compile or is missing, refuses before the destination is touched), and
   ABORTS on a recorded failure: `pollProgress` cancels and `finish` removes
   the file and answers `.graphicFailed`, whatever the pipeline said.
+  `Exporter.graphicWarnings` (`ExporterGraphics.swift`'s
+  `ExportGraphicWarning`, each (name, message) once with its first frame) is
+  published in `finish` before the unpin and read by the progress sheet
+  (count on the line, list in the tooltip), the queue (`Job.graphicWarnings`;
+  the count right after "Exported “…”." since the row truncates its tail;
+  `ExportQueueRowView.toolTip(for:)`) and `export`'s `graphic_warnings`
+  (G-24 (c)).
   **`ExportWriter.cancel()` and `Exporter.cancel()` only set flags**; the
   measurement's loop cancels its own reader, and the writer's reader and
   writer are cancelled in `allInputsFinished`, after every pump has left its
@@ -1358,7 +1369,7 @@ free.
 
 **The agent.**
 - `AgentServer.swift` (frozen) and `AgentServer+Project` / `Clips` / `Tracks`
-  / `Media` / `Render` / `History` / `Silence` / `Captions` / `Audio` /
+  / `Media` / `Render` / `ExportResult` / `History` / `Silence` / `Captions` / `Audio` /
   `Background` / `Scope` / `Transitions` / `CloudCaptions` / `Recording` /
   `Graphics`
   (+`RecordingArguments`, +`RecordingResult`, +`RecordingChrome` —
@@ -1372,8 +1383,9 @@ free.
   the three app-state ones — `write_graphic` (the store's one writer, then a
   synchronous `rescan()` so the reply is the compile of THAT text; a failed
   compile is `ok: false`, not an error; not undoable, never dirty, G-3),
-  `get_graphic` (one module, or the folder with `folder_exists`, the
-  engine's `families` and the `assets`) and
+  `get_graphic` (one module — a compiled one's `diagnostics` are its
+  top-level warnings — or the folder with `folder_exists`, the engine's
+  `families`, the `assets` and the scan's `warnings`, G-24) and
   `graphic_reference` (the bundled `GraphicsAPI.md`; it calls `target(a)` only
   when given a non-null `project`, so it answers with no project open and
   refuses a path no open project is at, G-20 (e)) — and `graphicsSummary`,

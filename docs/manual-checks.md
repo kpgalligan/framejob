@@ -377,6 +377,11 @@ Uses the three `tools/proof/work/playback-check/` projects (Setup 3).
 - **Expect:** once the open panel has closed, a sheet on the editor window reads `"#logo&mark.png" was added as "logo-mark.png": asset(name) cannot use the name it had.` (the second run says `logo-mark-2.png`); OK dismisses it, in both appearances.
 - **Source:** #105.
 
+**GR-6 — A graphic's warnings on the export sheet, the queue and the Source section**
+- **Do:** 1. In a project, write `graphics/nofont.js` drawing text in `font-family="'Nope Sans'"` and `graphics/late.js` the same in `'Late Sans'`; place a 3 s `nofont` clip, then a 1 s `late` clip after it. 2. File ▸ Export…, export it; hover the sheet's finish line. 3. Export it again with Add to Queue, open Window ▸ Export Queue at its default width and hover the finished row. 4. Add an audio clip under the graphics and Add to Queue once more; look at that row. 5. Put a file named `Bad.js` into the package's `graphics/` folder, select a graphic clip, open Clip ▸ Graphic ▸ Source (reselect the clip if the row is not there yet), and click Reveal. Repeat 2–5 in the other appearance.
+- **Expect:** the sheet's line reads `Exported “…”. 2 graphic warnings (hover for details).` and its tooltip lists `"nofont" at frame …` and `"late" at frame …`, each naming its font. Each queue row shows `Exported “…”. 2 graphic warnings.` visibly, straight after the Exported sentence and ahead of the loudness figures on the audio row, and its tooltip lists the two warnings under the path. The Source section shows "In the graphics folder" and a row reading `graphics/Bad.js is not a module name…`; Reveal shows the `graphics` folder selected in Finder. All of it in both appearances.
+- **Source:** #105.
+
 ## Screen recording
 
 Launch Reelcut from the Finder or Dock unless the check says otherwise.

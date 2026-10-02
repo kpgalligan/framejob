@@ -321,7 +321,9 @@ extension AgentServer {
                     + "the mix that was written, so they are what the file holds rather than "
                     + "what was asked for. A graphic clip whose module does not compile "
                     + "refuses the export before it starts; a graphic that fails during it "
-                    + "stops the export with no file left, naming the graphic and the frame.",
+                    + "stops the export with no file left, naming the graphic and the frame. "
+                    + "graphic_warnings [{name, frame, message}]: each distinct warning a "
+                    + "graphic gave while the file was drawn, absent when none.",
                 [
                     "preset": exportPresetProperty,
                     "path": [

@@ -181,6 +181,9 @@ final class ExportQueueController {
         /// a shared destination implies a shared project — a build that failed
         /// for job 2 would almost always have failed for job 1.
         var superseded: Bool = false
+        /// What the graphics warned while a COMPLETED job's file was drawn
+        /// (G-24 (c)): the row's count and its tooltip's list.
+        var graphicWarnings: [ExportGraphicWarning] = []
 
         /// What the row calls this job. The file name and not the path: the
         /// row is narrow, and the full path is the tooltip's job.
@@ -378,6 +381,7 @@ final class ExportQueueController {
         // measurement and then calls this, so the report is there now and only
         // now.
         let measured = exporter?.loudnessReport.map { " \($0.summary)." } ?? ""
+        let warnings = exporter?.graphicWarnings ?? []
         exporter = nil
         // The pin goes with the exporter, and from `pinnedProject` rather than
         // from the job, so that releasing it cannot depend on the job still
@@ -394,7 +398,11 @@ final class ExportQueueController {
             case .success(let url):
                 jobs[index].state = .completed
                 jobs[index].progress = 1
-                jobs[index].message = "Exported “\(url.lastPathComponent)”.\(measured)"
+                jobs[index].graphicWarnings = warnings
+                // The count BEFORE the loudness figures: the row truncates
+                // its tail (`ExportQueueRowView`).
+                jobs[index].message = "Exported “\(url.lastPathComponent)”."
+                    + Exporter.graphicWarningSuffix(warnings, hover: false) + measured
             case .failure(let error):
                 if case Exporter.ExportError.cancelled = error {
                     // A cancelled job leaves nothing behind, and this line is
