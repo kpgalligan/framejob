@@ -110,3 +110,61 @@ runs in its own process group under `graphics_spike/bounded.py` and only that
 group is killed on expiry (the build 1200 s, a mode 180 s, `modal` 60 s). It
 performs no AppKit-owned action (Open…, Save As…, Revert, Close, Quit): those
 are `framework` rows, read and not run.
+
+## Runs
+
+**B58, 2026-10-01**, over HEAD `69fa216` with the three bare run-loop waits
+(`probe_sheets.swift` :160 and :185, `probe_well.swift` :132) changed to
+`ProbeSupport.pump()`, run once as
+`perl -e 'alarm shift; exec @ARGV' 2700 python3 tools/proof/capture_spike/capture_spike.py --rebuild`
+from an agent's shell (the terminal was not known to be frontmost). It took
+about 3 minutes, and the probe build took 102 s.
+
+```
+host: macOS 26.5.1 (25F80), Mac14,6, console locked False
+scores: 18 pass, 6 fail, 14 skip of 38
+digest: db2236a5a71c6c23fe4d14ca14434a718afc2811507e39ebc6210748190f942e
+mode seconds: layout 4.5, well 7.2, sheets 23.7, modal 2.1, menu 0.1, appearance 48.6
+```
+
+Exit 1. V1's last run was 33 pass, 5 fail (W4a, W4b, W4c, S2c, L3) and
+0 skip of 38, with digest `3a35537e…d8587`. These rows changed state:
+
+| Row | V1 | B58 | Printed reason |
+|---|---|---|---|
+| S1a, S1b, S1c, S2a, S2b | pass | skip | `host: probe not active` |
+| S2c | fail | skip | `host: probe not active` |
+| S3 | pass | skip | `host: probe not active` |
+| A1–A7 | pass | skip | `host: probe not active` |
+| I4 | pass | **fail** (C) | `removed addActionAtPlayhead: and app/Sources/AppDelegate.swift:121; the checker reported [('I1', 'addActionAtPlayhead:'), ('I2', 'app/Sources/AppDelegate.swift:121'), ('I3', 'terminate:')]` |
+| L7 | pass | fail (A) | `note intrinsic 194.5 vs frame 271; 0 visible field(s) wider than their frame:` |
+
+S0 printed `active False in None ms, key False, main False`, and A0 printed
+`active False in None ms, key False`. The probe never became the active app,
+so the rows that need activation did not answer, and this run does not show
+whether `pump()` fixes activation (#132). I1–I3 passed: `I2 pass I — 0
+problem(s); 46 sites: beginSheetModal 25, popUp 2, presentAsSheet 8,
+presentError 5, runModal 6`.
+
+I4 was a control failure, and the checker was not at fault. `i4` removed
+the first site in sorted order, `app/Sources/AppDelegate.swift:121`, and
+expected exactly one I1 report and one I2 report. But `terminate:`'s `note`
+cites that same site by its SITE ref (added in `c5504fe`, after V1's run), so
+I3 also reported, correctly, that the citation now dangled.
+
+**The I rows brought up to the grown inventory, 2026-10-01.** `i4` now
+removes the first site in sorted order that no `code`, `note`, `via`, `gate`
+or `other_caller` cites by its line. Only the I family was re-run, by driving
+the built probe's `menu` mode through `capture_spike.run_mode` (its 180 s
+bound) and `inventory.run` over its leaves. No other mode ran,
+`answers.json` was not rewritten, and the scores and digest above are still
+this run's.
+
+| Row | Before | After |
+|---|---|---|
+| I1 | pass — `0 problem(s); 147 leaves, 95 live selectors, 95 rows` | the same |
+| I2 | pass — `0 problem(s); 46 sites: beginSheetModal 25, popUp 2, presentAsSheet 8, presentError 5, runModal 6` | the same |
+| I3 | pass — `0 problem(s); verdicts framework 16, modal 2, none 57, sheet 15, window 5` | the same |
+| I4 | fail C — `removed addActionAtPlayhead: and app/Sources/AppDelegate.swift:121; the checker reported [('I1', 'addActionAtPlayhead:'), ('I2', 'app/Sources/AppDelegate.swift:121'), ('I3', 'terminate:')]` | pass C — `removed addActionAtPlayhead: and app/Sources/CaptionExporter.swift:534; the checker reported [('I1', 'addActionAtPlayhead:'), ('I2', 'app/Sources/CaptionExporter.swift:534')]` |
+
+After the change, `inventory.py --check` prints 5/5 and exits 0.

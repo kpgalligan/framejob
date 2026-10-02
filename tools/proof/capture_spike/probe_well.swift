@@ -129,7 +129,7 @@ enum ProbeWell {
         let started = Date()
         var shown = layer.displayedPixelBuffer() != nil
         while !shown, Date().timeIntervalSince(started) < 5 {
-            RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.02))
+            ProbeSupport.pump()
             shown = layer.displayedPixelBuffer() != nil
         }
         rows["W0"] = [

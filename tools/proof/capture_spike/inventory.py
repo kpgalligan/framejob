@@ -37,7 +37,8 @@ not the sheet form `presentError(_:modalFor:…)`, which is not modal.
       row; a selector in the `reached_from` of a `runModal` or loop-token
       site is `modal` (`reached_after` never forces a verdict);
   I4  the checker over a copy missing one selector and one site reports
-      exactly those two.
+      exactly those two (the first selector no site references, and the
+      first site no citation names by its line).
 
 `python3 tools/proof/capture_spike/inventory.py --check` is a line of
 `make test`: no app, no probe, no build, in a fresh `work/inventory_check/`.
@@ -320,13 +321,24 @@ def check(inventory, leaves, grep, root=None):
 
 def i4(inventory, leaves, grep):
     """The checker over a copy missing one selector no site references and
-    one site: exactly those two reported."""
+    one site no citation names: exactly those two reported. A site some
+    `code`, `note`, `via`, `gate` or `other_caller` cites by its line would
+    also, rightly, be an I3 report for that citation."""
     referenced = set()
     for entry in inventory.get("sites", {}).values():
         referenced.update(entry.get("reached_from", []))
         referenced.update(a.get("selector") for a in entry.get("reached_after", []))
     spare = sorted(s for s in inventory.get("selectors", {}) if s not in referenced)
-    site = sorted(inventory.get("sites", {}))
+    texts = []
+    for row in inventory.get("selectors", {}).values():
+        texts += row.get("code", []) + [row.get("note")]
+    for entry in inventory.get("sites", {}).values():
+        texts += [entry.get("other_caller")]
+        for a in entry.get("reached_after", []):
+            texts += [a.get("via"), a.get("gate")]
+    cited = {f"{path}:{number}" for text in texts
+             for path, number, _anchor in citations(text) if number is not None}
+    site = sorted(s for s in inventory.get("sites", {}) if s not in cited)
     if not spare or not site or leaves is None:
         return False, "no selector or site to remove (or no leaves)", {}
     mutant = copy.deepcopy(inventory)

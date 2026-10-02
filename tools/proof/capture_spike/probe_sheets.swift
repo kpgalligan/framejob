@@ -157,7 +157,7 @@ enum ProbeSheets {
                 e.window.endSheet(sheet, returnCode: .cancel)
             }
             while e.window.attachedSheet != nil, Date().timeIntervalSince(closeStart) < 3 {
-                RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.02))
+                ProbeSupport.pump()
             }
             s2["closed"] = e.window.attachedSheet == nil
             s2["close_ms"] = ProbeSupport.ms(since: closeStart)
@@ -182,7 +182,7 @@ enum ProbeSheets {
         let modalNil = NSApp.modalWindow == nil
         let waitStart = Date()
         while window.attachedSheet == nil, Date().timeIntervalSince(waitStart) < 3 {
-            RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.02))
+            ProbeSupport.pump()
         }
         let sheet = window.attachedSheet
         return [

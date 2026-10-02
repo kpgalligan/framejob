@@ -11386,3 +11386,86 @@ app/CLAUDE.md's `+Alerts` entry stands.
 
 **Issues not fixed**: none. X1 passed, so ExportSheetController (over the
 cap) needed no edit.
+
+## Issue batch B58 — §7.7's import formats re-measured on macOS 26, and the capture spike's three waits (`formats_probe.py`; `capture_spike/` run once; #46, #132)
+
+#46 asked to re-measure §7.7's format list, which was last written for macOS
+15. The new probe asks the product's own question,
+`MediaImporter.waitForProbe` (AVFoundation, or ImageIO for an image, with
+no ffmpeg rewrap), about ffmpeg-made files. §7.7's last paragraph is now
+this run's table. For #132, the spike's three bare run-loop waits are now
+`ProbeSupport.pump()`, and the spike was run once.
+
+- **`formats_probe.py [--mutant junk-good]`** — no instance. It writes the
+  fixtures into `tools/proof/work/formats-probe/fixtures/` with
+  `ffmpeg -y -v error`, each 1 s at 128×72 (`testsrc2`, a 440 Hz `sine`), at
+  most 60 s each. `heic.heic` comes from `png.png` through `sips`, and
+  `junk.mov` is `random.Random(58).randbytes(4096)`. It builds
+  `formats_probe.swift` with every `app/Sources/*.swift` except `main.swift`
+  on `peaks_probe.py`'s swiftc line (B0, at most 600 s; a failed build is a
+  scored FAIL). It then runs the binary once over every fixture it made, at
+  most 300 s. The binary prints one `HOST` line
+  (`VTIsHardwareDecodeSupported` for AV1, VP9 and HEVC) and one `ROW` line
+  per file. The verdicts:
+  - `opens`: the probe answered, and so did the first-frame `AVAssetReader`
+    read (32BGRA), the first-buffer read (LPCM float32), or the
+    `CGImageSourceCreateImageAtIndex`, each bounded at 15 s.
+  - `probe-only`: the probe answered and the decode did not.
+  - `refused`: the probe threw.
+  - `not made`: ffmpeg could not write the fixture.
+  - `expired`: the binary's bound ran out before the file's row arrived.
+
+  C1: `mov_h264_aac.mov` opens. C2: `junk.mov` is refused.
+  `--mutant junk-good` hands C2 the C1 file. Exit 0 needs B0 and both
+  controls. WebP is not made, because this ffmpeg has no libwebp and `sips`
+  cannot write webp.
+
+Run on 2026-10-01 over `69fa216`, `host: macOS 26.5.1 (25F80), Apple M2 Max;
+hw_av1 False, hw_vp9 False, hw_hevc True`:
+
+| Rows | Verdict | Printed |
+|---|---|---|
+| V1 `mov_h264_aac.mov`, V2 `mp4_h264_aac.mp4` | opens | video 128x72, video+audio, 600000 ticks; decode first frame 128x72 BGRA; playable true |
+| V3 `m4v_h264.m4v`, V4 `mov_hevc.mov`, V5 `mp4_hevc.mp4`, V6 `mov_prores.mov`, V7 `mov_mjpeg.mov`, V8 `mp4_mpeg4.mp4`, V16 `ts_h264.ts` | opens | video 128x72, video, 600000 ticks; decode first frame 128x72 BGRA; playable true |
+| V15 `avi_mjpeg.avi` | opens | video 128x72, video, 599994 ticks; decode first frame 128x72 BGRA; playable true |
+| V9 `mp4_av1.mp4`, V10 `mp4_vp9.mp4` | probe-only | video 128x72, video, 600000 ticks; decode startReading: AVFoundationErrorDomain Code=-11833 "Cannot Decode" (underlying -12906, "The decoder required for this media cannot be found."); playable false |
+| V11 `mkv_h264.mkv`, V12 `mkv_av1.mkv`, V13 `webm_vp9.webm`, V14 `webm_vp8.webm` | refused | `unreadable(file://…)`; playable false |
+| A1 `m4a_aac.m4a` (586400 ticks), A2 `aac_adts.aac` (588000), A3 `mp3.mp3` (619200), A4 `wav.wav`, A5 `aiff.aiff`, A6 `caf_pcm.caf`, A7 `m4a_alac.m4a`, A8 `flac.flac`, A9 `ogg_opus.ogg`, A10 `ogg_vorbis.ogg` (600000 each) | opens | audio, decode first buffer 8192 frames float32; playable true |
+| P1 `png.png`, P2 `jpg.jpg`, P3 `tiff.tiff`, P4 `gif.gif`, P5 `bmp.bmp`, P6 `heic.heic` | opens | image 128x72, 0 ticks; decode CGImage 128x72 |
+| X1 `junk.mov` | refused | `unreadable(file://…)`; playable false |
+
+`controls: 2/2`, `rows: 33 made, 0 not made, 0 expired`, exit 0. With
+`--mutant junk-good` it printed `FAIL C2 mov_h264_aac.mov is refused:
+opens` and `controls: 1/2`, exit 1. P3 is an RGB TIFF (`-pix_fmt rgb24`).
+In this batch's first run, ffmpeg wrote testsrc2's yuv420p as a subsampled
+YCbCr TIFF, and `P3 tiff.tiff refused — unreadable(…)` was printed: ImageIO
+reads no pixel size from that file (`sips -g pixelWidth` prints `<nil>`).
+
+```sh
+python3 tools/proof/formats_probe.py                       # controls: 2/2, exit 0
+python3 tools/proof/formats_probe.py --mutant junk-good    # C2 FAIL, exit 1
+```
+
+**The capture spike, run once:** `perl -e 'alarm shift; exec @ARGV' 2700
+python3 tools/proof/capture_spike/capture_spike.py --rebuild` printed
+`scores: 18 pass, 6 fail, 14 skip of 38`, `digest:
+db2236a5a71c6c23fe4d14ca14434a718afc2811507e39ebc6210748190f942e`, exit 1.
+It skipped S1a–S3 and A1–A7 with `host: probe not active`, and failed I4 (a
+CONTROL) and L7 (an answer). I4 failed because the site it removed,
+`AppDelegate.swift:121`, is also cited in `terminate:`'s note, so I3 rightly
+reported that citation as well. `inventory.py`'s `i4` now removes the first
+site no citation names. Re-running only the I family (the probe's `menu`
+mode and `inventory.run`) printed `I4 pass C — removed
+addActionAtPlayhead: and app/Sources/CaptionExporter.swift:534`, with
+I1–I3 unchanged. `capture_spike/README.md`'s `## Runs` has each row that
+changed since V1 and I4's before and after. `inventory.py --check`: 5/5,
+exit 0.
+
+**Residue**: V9 `mp4_av1.mp4` and V10 `mp4_vp9.mp4` are `probe-only`.
+`MediaImporter.waitForProbe` accepts them, but neither decodes on this host
+(`Cannot Decode`, `isPlayable` false), so a plain import would admit a file
+that cannot play.
+
+**Issues not fixed**: #132's activation half. Every row that needs
+activation skipped, so this run does not show whether `pump()` lets the
+probe activate.

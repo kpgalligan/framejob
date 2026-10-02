@@ -42,7 +42,7 @@ change.
 | [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 41 | The spec's Swift file map (app/CLAUDE.md is the live one). |
 | [`07.5-compositor.md`](07.5-compositor.md) | 106 | The Metal compositor's passes, and transitions. |
 | [`07.6-playback-update-rules.md`](07.6-playback-update-rules.md) | 42 | What playback does after every edit: rebuild or refresh. |
-| [`07.7-import.md`](07.7-import.md) | 20 | `MediaImporter.probe` and the formats import accepts. |
+| [`07.7-import.md`](07.7-import.md) | 32 | `MediaImporter.probe` and the formats import accepts. |
 | [`07.8-export.md`](07.8-export.md) | 235 | Export: writers, formats, loudness, the queue. |
 | [`07.9a-agent-tools.md`](07.9a-agent-tools.md) | 392 | The MCP agent's tools: one tool per op plus `scope`, the parity check and the argument gate, the app-state tools, lenient decoding, the graphics loop, the dev tools, the port. |
 | [`07.9b-agent-lane-assistant.md`](07.9b-agent-lane-assistant.md) | 156 | The agent lane every tool call goes through, the bundled helper, the assistant session (its key, prices and spend), its prompt, and the Assistant tab as the session's door. |
