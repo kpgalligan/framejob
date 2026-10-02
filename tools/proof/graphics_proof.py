@@ -163,6 +163,13 @@ I4  a new IE, its `graphics/` holding no module: `import_graphic_font` of
     `needsfont` written after it renders lit pixels naming no Oswald (the
     store posts when the library moved even with no module, G5b, so the
     import's own `rescan()` rebuilds the library);
+I5  (issue batch B67, #105, spec §11 G-23; on IE after I4)
+    `import_graphic_asset {path: red.png, name: "#logo&mark.png"}` answers
+    `name` logo-mark.png, `renamed_from` "#logo&mark.png", `replaced` false;
+    again answers logo-mark-2.png; a module drawing `asset("logo-mark-2.png")`
+    renders (50,50) (255,0,0) naming no logo-mark-2.png; `name: "My Photo
+    (1).png"` answers that name and no `renamed_from`. Made to fail once
+    against the baseline build (B65's, before the rename);
 W1  a new IW, module-less: `get_graphic {}`'s families lack Oswald (CONTROL);
     from the SHELL `mkdir -p IW/graphics/fonts` and `cp` Oswald-Medium.ttf in;
     `get_graphic {}` polled for at most 5 s until its families hold Oswald;
@@ -240,7 +247,7 @@ BORDER, CARD = (230, 40, 40), (64, 8, 8)
 SECOND = 30 * FRAME
 ROWS = ["G6", "P1", "P2", "P3", "S1", "R1", "H1", "L1", "F1", "K1", "K2", "T1", "K3", "A1",
         "G1", "G2", "G3", "G4", "G5", "G7", "G10", "C1", "C2", "C3", "C5", "C6", "C7", "I1", "I2",
-        "G9", "I3", "I4", "W1", "L2", "G11",
+        "G9", "I3", "I4", "I5", "W1", "L2", "G11",
         "G8", "E1", "C4", "E2", "E3", "E4", "Q1", "Q2", "Q3", "Z1"]
 DOC_MD = ROOT / "docs/graphics-api.md"
 DOC_DTS = ROOT / "docs/graphics-api.d.ts"
@@ -1090,7 +1097,40 @@ def run_i(client, wg):
           and (lit or 0) > 0,
           f"new {made['ok']}, import {font}, write {wrote.get('ok')}, says {text!r}, lit {lit}")
 
+    run_i5(client, fresh)
     run_w1(client, WORK / "IW.reelcut")
+
+
+def run_i5(client, ie):
+    """I5 on IE: a name asset(name) cannot use is filed under a legal one,
+    which a module then draws (spec §11 G-23)."""
+    def imported(name):
+        got = attempt(client, "import_graphic_asset",
+                      {"project": str(ie), "path": str(RED_PNG), "name": name})
+        return got, got.get("reply") or {}
+    first, r1 = imported("#logo&mark.png")
+    second, r2 = imported("#logo&mark.png")
+    wrote = attempt(client, "write_graphic", {
+        "project": str(ie), "name": "usesrenamed",
+        "source": USESASSET_JS.replace('asset("red.png")', 'asset("logo-mark-2.png")')})
+    ok, text, image = sheet(client, ie, {"name": "usesrenamed", "frame": 0,
+                                         "background": "#000000", "max_width": 8192}, "i5")
+    drawn = rgb_at(image, 50, 50)
+    plain, r3 = imported("My Photo (1).png")
+    check("I5 import_graphic_asset name \"#logo&mark.png\" answers name logo-mark.png, "
+          "renamed_from \"#logo&mark.png\", replaced false; again logo-mark-2.png; a module "
+          "drawing asset(\"logo-mark-2.png\") renders (255,0,0) naming no warning; \"My Photo "
+          "(1).png\" answers no renamed_from",
+          first["ok"] and r1.get("name") == "logo-mark.png"
+          and r1.get("renamed_from") == "#logo&mark.png" and r1.get("replaced") is False
+          and second["ok"] and r2.get("name") == "logo-mark-2.png"
+          and r2.get("renamed_from") == "#logo&mark.png" and r2.get("replaced") is False
+          and wrote["ok"] and (wrote.get("reply") or {}).get("ok") is True
+          and ok and drawn == PURE_RED and "logo-mark-2.png" not in text
+          and plain["ok"] and r3.get("name") == "My Photo (1).png"
+          and "renamed_from" not in r3,
+          f"first {first}, second {second}, write {wrote.get('ok')}, says {text!r} (50,50) "
+          f"{drawn}, plain {plain}")
 
 
 def run_w1(client, iw):

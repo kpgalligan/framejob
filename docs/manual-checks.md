@@ -372,6 +372,11 @@ Uses the three `tools/proof/work/playback-check/` projects (Setup 3).
 - **Expect:** the Title field is the height of the number fields, and the marker's name field is the height of the Rate row's controls, in both appearances. Both are filled and bordered like the number fields, with their text centred vertically, in both appearances; clicking into either moves no text. With the name deleted, a grey "Marker" sits where the text sat and did not move on the click; the first letter typed replaces it at once.
 - **Source:** #106, #171, #199.
 
+**GR-5 — The renamed-image notice after the real panel**
+- **Do:** 1. Copy a PNG to the Desktop as `#logo&mark.png`. 2. In a project, File ▸ Add Image to Graphics…, choose it, Open. 3. Click OK. Repeat in the other appearance.
+- **Expect:** once the open panel has closed, a sheet on the editor window reads `"#logo&mark.png" was added as "logo-mark.png": asset(name) cannot use the name it had.` (the second run says `logo-mark-2.png`); OK dismisses it, in both appearances.
+- **Source:** #105.
+
 ## Screen recording
 
 Launch Reelcut from the Finder or Dock unless the check says otherwise.

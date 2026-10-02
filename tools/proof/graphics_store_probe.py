@@ -50,6 +50,23 @@ W17 (issue batch B19, #172) an untitled store holding `a.js`, settled:
     holds `graphics/ is not watched: open failed (Too many open files)`
     (spec §11 G-20 (b)); CONTROL: a second `rescan()` has no "is not
     watched" warning and lists `a`;
+W18 (issue batch B67, #105, spec §11 G-23 (f)) an untitled store with
+    `fonts/f.ttf` = a bundled face, its mtime pinned to a whole second,
+    settled; `stop()`, f.ttf overwritten IN PLACE (same inode) with as many
+    zero bytes, its mtime set back; `start()`: `scan.fonts` is ["f.ttf"]
+    holding the face's bytes and no `graphics/fonts/f.ttf:` warning (the
+    verdict was reused, the file not read); CONTROL: mtime +2 s, `rescan()`:
+    no fonts and one `graphics/fonts/f.ttf: ` warning;
+W19 (B67, G-23 (a)-(d)) `GraphicAssetName.legalized` over this file's table,
+    with `isLegal(x) == (legalized(x) == x)` and `isLegal(legalized(x))` on
+    each; `importAsset(as: "#logo&mark.png")` files `logo-mark.png`
+    (renamedFrom set, replaced false, listed); again files `logo-mark-2.png`
+    and leaves `logo-mark.png`'s bytes; `as: "logo-mark.png"` replaces with
+    no renamedFrom; a 300-byte name lands as 243 a's + `.png` (247 bytes),
+    then as 241 a's + `-2.png`; `renameNotice` is this file's literal;
+W20 (B67, G-23 (e)) `assets/#bad.png` and `assets/.dot.png` written to disk,
+    `rescan()`: neither is listed, the warnings are exactly `#bad.png`'s
+    sentence; CONTROL: `ok.png` beside them is listed;
 C1  a saved document's save carries graphics/x.js (the whitelist line);
 C2  an untitled document restored from autosave seeds its temporary root and
     its save carries graphics/x.js;
@@ -77,10 +94,13 @@ C6  an untitled document's `cacheDirectory` holding `transcripts/9.json`: after
     python3 tools/proof/graphics_store_probe.py --mutant cache-kept
     python3 tools/proof/graphics_store_probe.py --mutant no-library-file-sources
     python3 tools/proof/graphics_store_probe.py --mutant silent-open
+    python3 tools/proof/graphics_store_probe.py --mutant font-uncached
+    python3 tools/proof/graphics_store_probe.py --mutant asset-name-kept
+    python3 tools/proof/graphics_store_probe.py --mutant asset-name-unchecked
 
 A mutant is built from a COPY of `app/Sources` with one anchor, asserted to
 occur exactly once, replaced. Rule R: exit 0 means the row it names FAILED in
-the copy (C1's file ABSENT, W4, C4, W15, C5, C6, W14, W17) — caught; exit 1
+the copy (C1's file ABSENT, W4, C4, W15, C5, C6, W14, W17, W18, W19, W20) — caught; exit 1
 means it passed — survived; exit 2 means the control was not performed (the
 copy, the anchor or the build failed, or the probe gave no answer).
 `no-file-sources` drops the one file-arm loop (modules, fonts and assets,
@@ -88,7 +108,10 @@ spec §11 G-20 (a)); `no-library-file-sources` drops the fonts and assets from
 it; `silent-open` makes `arm`'s failure branch answer nil; `partial-left`
 drops the cleanup in `land`'s catch, `scratch-kept` empties
 `removeScratchRoot`, and `cache-kept` drops `stopGraphicStore`'s
-`removeTemporaryCacheDirectory()`.
+`removeTemporaryCacheDirectory()`. `font-uncached` makes a cached font
+verdict's identity comparison `false`; `asset-name-kept` replaces
+`importAsset`'s `legalized(name)` with `name`; `asset-name-unchecked` makes
+the scan's `isLegal` guard `true`.
 """
 
 import hashlib
@@ -110,8 +133,24 @@ DEADLINE = 600
 RULE = ("is not a module name (lowercase letters, digits and -, starting with a letter "
         "or a digit, at most 63 characters)")
 ROWS = ["W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8", "W9", "W10", "W11", "W12", "W13",
-        "W14", "W15", "W16", "W17", "C1", "C2", "C3", "C4", "C5", "C6"]
+        "W14", "W15", "W16", "W17", "W18", "W19", "W20", "C1", "C2", "C3", "C4", "C5", "C6"]
 UNWATCHED = "graphics/ is not watched: open failed (Too many open files)"
+ASSET_RULE = ("is not an asset name (no leading . or #; no / : \" ' < > & or control "
+              "character; at most 247 bytes)")
+NAME_TABLE = {
+    "#logo&mark.png": "logo-mark.png",
+    ".hidden.png": "hidden.png",
+    "My Photo (1).png": "My Photo (1).png",
+    "a\"b'c<d>e.png": "a-b-c-d-e.png",
+    "a&&b.png": "a-b.png",
+    "#&.png": "image.png",
+    "x\u0007y.PNG": "x-y.PNG",
+    "10:30.jpg": "10-30.jpg",
+    "é" * 200 + ".png": "é" * 121 + ".png",
+    "a" * 247 + ".png": "a" * 243 + ".png",
+    "logo.svg": "logo.svg",
+}
+NOTICE = '"#logo&mark.png" was added as "logo-mark.png": asset(name) cannot use the name it had.'
 
 rows = {}
 answer_seen = {}
@@ -279,6 +318,54 @@ def score(a, work):
           and not any("is not watched" in w for w in control)
           and w17.get("control_modules") == ["a"], f"{w17}")
 
+    w18 = a.get("w18", {})
+    control = w18.get("control_warnings")
+    check("W18 a font overwritten in place with its size, mtime and inode kept is not read "
+          "again: start() lists f.ttf with the face's bytes, no warning; CONTROL: mtime +2 s "
+          "and rescan() list no font and warn graphics/fonts/f.ttf",
+          w18.get("setup_fonts") == ["f.ttf"] and w18.get("face_bytes", 0) > 0
+          and w18.get("same_inode") is True and w18.get("same_mtime") is True
+          and w18.get("zeroed") is True and w18.get("fonts") == ["f.ttf"]
+          and w18.get("bytes_equal") is True
+          and not any(w.startswith("graphics/fonts/f.ttf:") for w in w18.get("warnings", []))
+          and w18.get("control_fonts") == [] and isinstance(control, list)
+          and len([w for w in control if w.startswith("graphics/fonts/f.ttf: ")]) == 1,
+          f"{w18}")
+
+    w19 = a.get("w19", {})
+    table = {r.get("name"): r for r in w19.get("table", [])}
+    long1, long2 = "a" * 243 + ".png", "a" * 241 + "-2.png"
+
+    def landed(r, name, renamed_from, replaced):
+        return (isinstance(r, dict) and r.get("name") == name
+                and r.get("renamed_from") == renamed_from and r.get("replaced") is replaced
+                and r.get("listed") is True and r.get("on_disk") is True)
+
+    check("W19 legalized matches the table and the invariant holds; #logo&mark.png is filed as "
+          "logo-mark.png then logo-mark-2.png (the first unchanged); a legal name replaces; a "
+          "300-byte name lands at 247 bytes, twice; the notice is the literal",
+          set(table) == set(NAME_TABLE)
+          and all(table[k].get("legalized") == v and table[k].get("invariant") is True
+                  for k, v in NAME_TABLE.items())
+          and table.get("é" * 200 + ".png", {}).get("bytes") == 246
+          and landed(w19.get("first"), "logo-mark.png", "#logo&mark.png", False)
+          and landed(w19.get("second"), "logo-mark-2.png", "#logo&mark.png", False)
+          and w19.get("first_bytes_unchanged") is True
+          and landed(w19.get("legal"), "logo-mark.png", None, True)
+          and landed(w19.get("long"), long1, "a" * 300 + ".png", False)
+          and w19["long"].get("bytes") == 247
+          and landed(w19.get("long_again"), long2, "a" * 300 + ".png", False)
+          and w19["long_again"].get("bytes") == 247
+          and w19.get("notice") == NOTICE,
+          f"{w19}")
+
+    w20 = a.get("w20", {})
+    check("W20 assets/#bad.png and .dot.png are not listed; the warnings are exactly #bad.png's "
+          "sentence; CONTROL: ok.png is listed",
+          w20.get("assets") == ["ok.png"]
+          and w20.get("warnings") == [f"graphics/assets/#bad.png {ASSET_RULE} and was skipped"]
+          and w20.get("on_disk") == ["#bad.png", ".dot.png", "ok.png"], f"{w20}")
+
     c1 = a.get("c1", {})
     check("C1 a saved document's save carries graphics/x.js",
           c1.get("child") is True and c1.get("present") is True
@@ -393,6 +480,18 @@ MUTANTS = {
         "ProjectDocument+Graphics.swift",
         "        graphicStore = nil\n        removeTemporaryCacheDirectory()\n",
         "        graphicStore = nil\n", "C6"),
+    "font-uncached": (
+        "GraphicStore+Fonts.swift",
+        "                cached.identity == identity\n",
+        "                false\n", "W18"),
+    "asset-name-kept": (
+        "GraphicStore+Import.swift",
+        "let legal = GraphicAssetName.legalized(name)",
+        "let legal = name", "W19"),
+    "asset-name-unchecked": (
+        "GraphicStore.swift",
+        "guard GraphicAssetName.isLegal(url.lastPathComponent) else",
+        "guard true else", "W20"),
     "strong-callback": (
         "ProjectDocument+Graphics.swift",
         "{ [weak self] in self?.packageContentsDidChangeOnDisk() }",

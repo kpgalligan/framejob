@@ -4,6 +4,7 @@ File…), File ▸ Add Font to Graphics… and Add Image to Graphics…, Help �
 Graphics Reference, against the built app and a probe.
 
     python3 tools/proof/graphics_menu_proof.py [--port 4889] [--app PATH]
+    python3 tools/proof/graphics_menu_proof.py --mutant notice-dropped
 
 **The fixture, over MCP** (one owned instance on its own port, launched and
 stopped by PID, its log at `work/graphics-menu/reelcut-<port>.log`):
@@ -55,6 +56,14 @@ M11 (issue batch B8, #75; on the first copy, after M9) `graphics/counter.js`
 M12 `insertGraphic` of a scratch `latin1.js` holding `// caf` and the byte
     0xE9 throws "<path> is not UTF-8 text — a graphic module must be UTF-8 JavaScript";
     `graphics/latin1.js` is absent and the clip count unchanged;
+M13 (issue batch B67, #105, spec §11 G-23 (d); on the first copy, before
+    M10) `red` copied into scratch as `#logo&mark.png`,
+    `controller.addGraphicImage(from:)` it: a sheet attaches within 3 s whose
+    non-empty text fields are exactly
+    `GraphicAssetName.renameNotice(from: "#logo&mark.png", to: "logo-mark.png")`,
+    and the scan lists `logo-mark.png`; CONTROL: `red` copied as `plain.png`
+    attaches no sheet in 0.5 s and is listed (the alert's style stays a code
+    read: a sheet's text fields do not show it);
 Z1  `grep "Reelcut: "` over the log prints nothing.
 
 Made to fail by hand (G5b's record): `|| outcome.library` removed from
@@ -62,6 +71,13 @@ Made to fail by hand (G5b's record): `|| outcome.library` removed from
 dropped from `graphicMenu()` fails M2; M7's run-loop turn removed fails M8.
 Issue batch B8: `holdsModule(named:)`'s disk check removed fails M11, and
 `String(decoding:as:)` restored in `insertGraphic` fails M12.
+
+`--mutant notice-dropped` builds the probe over a COPY of `app/Sources` with
+`addGraphicImage(from:)`'s `showGraphicNotice(` call, asserted to occur
+exactly once, replaced by a no-op, and runs the fixture and the probe. Rule R:
+exit 0 means M13 was answered and FAILED — caught; exit 1 means it passed —
+survived; exit 2 means the control was not performed (the copy, the anchor,
+the fixture or the build failed, or the probe gave no M13).
 """
 
 import argparse
@@ -69,6 +85,7 @@ import json
 import os
 import shutil
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -85,7 +102,11 @@ TEMPLATES = ROOT / "graphic/tests/graphics"
 REFERENCE = ROOT / "docs/graphics-api.md"
 OSWALD = Path("/Library/Fonts/Oswald-Medium.ttf")
 RED_PNG = ROOT / "graphic/tests/assets/red.png"
-PROBE_ROWS = ["M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12"]
+PROBE_ROWS = ["M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12", "M13"]
+NOTICE_FILE = "EditorViewController+GraphicMenus.swift"
+NOTICE_ANCHOR = ("            showGraphicNotice(GraphicAssetName.renameNotice(from: asked, "
+                 "to: landed.name))\n")
+NOTICE_NOOP = "            _ = asked\n"
 
 RESULTS = []
 
@@ -134,9 +155,10 @@ def bundle_check(app):
           f"{folder}: holds {held}, byte-equal {same}")
 
 
-def build_probe(out):
-    """`harness/build.sh`'s swiftc line with the probe as `main.swift`; the
-    three resources beside the binary. The binary, or None and the error."""
+def build_probe(out, sources=ROOT / "app/Sources"):
+    """`harness/build.sh`'s swiftc line with the probe as `main.swift` over
+    `sources`; the three resources beside the binary. The binary, or None and
+    the error."""
     lib = ROOT / "core/target/release/libreelcut_core.a"
     if not lib.exists():
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
@@ -146,7 +168,6 @@ def build_probe(out):
     if not entry.exists() or entry.read_text() != source:
         entry.write_text(source)
     binary = out / "graphics-menu-probe"
-    sources = ROOT / "app/Sources"
     swift = sorted(str(sources / n) for n in os.listdir(sources)
                    if n.endswith(".swift") and n != "main.swift")
     fresh = binary.exists() and all(
@@ -175,10 +196,9 @@ def build_probe(out):
     return binary, None
 
 
-def probe_checks(package):
-    print("\n1 — the probe: M1–M12", flush=True)
-    out = WORK / "probe"
-    binary, error = build_probe(out)
+def probe_checks(package, sources=ROOT / "app/Sources", out=WORK / "probe"):
+    print("\n1 — the probe: M1–M13", flush=True)
+    binary, error = build_probe(out, sources)
     check("M1 the probe builds over app/Sources", binary is not None, error or "")
     if binary is None:
         return
@@ -204,17 +224,57 @@ def probe_checks(package):
         return
     probe_rows = json.loads(answer.read_text())["rows"]
     present = all(any(r["name"].split()[0] == n for r in probe_rows) for n in PROBE_ROWS)
-    check("the probe answers every M-row (M2–M12 present)", present, f"{len(probe_rows)} rows")
+    check("the probe answers every M-row (M2–M13 present)", present, f"{len(probe_rows)} rows")
     for row in probe_rows:
         check(row["name"], row["ok"], row["detail"])
+
+
+def mutant(app, port):
+    """Rule R: 0 caught (M13 answered and FAILED), 1 survived, 2 the control
+    was not performed."""
+    with tempfile.TemporaryDirectory(prefix="reelcut-graphics-menu-notice-dropped-") as temp:
+        sources = Path(temp) / "Sources"
+        try:
+            shutil.copytree(ROOT / "app/Sources", sources)
+            text = (sources / NOTICE_FILE).read_text(encoding="utf-8")
+            count = text.count(NOTICE_ANCHOR)
+            if count != 1:
+                raise RuntimeError(f"anchor in {NOTICE_FILE}: expected once, found {count}")
+            (sources / NOTICE_FILE).write_text(text.replace(NOTICE_ANCHOR, NOTICE_NOOP),
+                                               encoding="utf-8")
+        except (OSError, RuntimeError) as error:
+            print(f"mutant notice-dropped: the control could not be performed — {error}")
+            return 2
+        print(f"MUTANT notice-dropped: {NOTICE_FILE}, anchor replaced once, in {sources}")
+        if not app.exists():
+            print(f"mutant notice-dropped: the control could not be performed — no app at {app}")
+            return 2
+        package, why, _ = fixture(app, port)
+        if package is None:
+            print(f"mutant notice-dropped: the control could not be performed — {why}")
+            return 2
+        probe_checks(package, sources, Path(temp) / "probe")
+    m13 = [ok for name, ok in RESULTS if name.split()[0] == "M13"]
+    if not m13:
+        print("mutant notice-dropped: the control could not be performed — no M13 answered")
+        return 2
+    if m13[0] is False:
+        failed = [name.split()[0] for name, ok in RESULTS if not ok]
+        print(f"MUTANT PASS: notice-dropped — M13 FAILED in the copy (failed: {', '.join(failed)})")
+        return 0
+    print("MUTANT FAILURE: notice-dropped — M13 passed")
+    return 1
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=4889)
     parser.add_argument("--app", default=str(APP))
+    parser.add_argument("--mutant", choices=["notice-dropped"])
     args = parser.parse_args()
     app = Path(args.app)
+    if args.mutant:
+        return mutant(app, args.port)
     print("Road map 10, G5b — the graphics menus and templates", flush=True)
     if not app.exists():
         check("the app is built", False, str(app))

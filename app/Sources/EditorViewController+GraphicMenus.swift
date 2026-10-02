@@ -65,8 +65,19 @@ extension EditorViewController {
             types: GraphicStore.assetExtensions,
             message: "Choose a picture (\(GraphicStore.assetKinds)) to add to this project's "
                 + "graphics."
-        ) { store, url in
-            _ = try store.importAsset(from: url, as: url.lastPathComponent)
+        ) { [weak self] _, url in try self?.addGraphicImage(from: url) }
+    }
+
+    /// Add Image's body, no panel: the picture filed under its own name, or
+    /// under a legal one with a sheet saying so (spec §11 G-23 (d)).
+    func addGraphicImage(from url: URL) throws {
+        guard let document = document, let store = document.graphicStore else {
+            throw ReelCoreError(
+                message: "This project has no graphics folder open (its window has not been made)")
+        }
+        let landed = try store.importAsset(from: url, as: url.lastPathComponent)
+        if let asked = landed.renamedFrom, view.window != nil {
+            showGraphicNotice(GraphicAssetName.renameNotice(from: asked, to: landed.name))
         }
     }
 
@@ -173,5 +184,14 @@ extension EditorViewController {
             }
             NSAlert(error: error).beginSheetModal(for: window, completionHandler: nil)
         }
+    }
+
+    /// An informational sheet on the editor's window saying `text`.
+    private func showGraphicNotice(_ text: String) {
+        guard let window = view.window else { return }
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = text
+        alert.beginSheetModal(for: window, completionHandler: nil)
     }
 }

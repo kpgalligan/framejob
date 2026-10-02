@@ -159,7 +159,7 @@
   "addGraphicImage:": {
    "verdict": "sheet",
    "code": [
-    "app/Sources/EditorViewController+GraphicMenus.swift `func addGraphicImage(`",
+    "app/Sources/EditorViewController+GraphicMenus.swift `@objc func addGraphicImage(`",
     "app/Sources/EditorViewController+GraphicMenus.swift:157"
    ],
    "note": "NSOpenPanel.beginSheetModal (chooseGraphicFile)"
@@ -942,6 +942,19 @@
      "selector": "addGraphicImage:",
      "via": "app/Sources/EditorViewController+GraphicMenus.swift `self?.reportingGraphicFailure { try body(store, url) }`",
      "gate": "app/Sources/EditorViewController+GraphicMenus.swift `try body()` — the import throws"
+    }
+   ],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+GraphicMenus.swift:195": {
+   "token": "beginSheetModal",
+   "func": "showGraphicNotice",
+   "reached_from": [],
+   "reached_after": [
+    {
+     "selector": "addGraphicImage:",
+     "via": "app/Sources/EditorViewController+GraphicMenus.swift `) { [weak self] _, url in try self?.addGraphicImage(from: url) }`",
+     "gate": "app/Sources/EditorViewController+GraphicMenus.swift `if let asked = landed.renamedFrom, view.window != nil {` — the picture's name was one asset(name) cannot use, so it was renamed (spec §11 G-23)"
     }
    ],
    "other_caller": ""

@@ -426,7 +426,37 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   `floor` failed the stdlib fixture test (the clamp also `interpolate.test.js`),
   and `textLines` writing no `xml:space`, quoting a generic, or
   `measureText` dropping `xmlSpace` each failed `text.test.js`.
-  `pins.json` passed unchanged.
+  `pins.json` passed unchanged. Issue batch B67 (2026-10-02, #105 part 3,
+  phase c1: the store only) added G-23. An asset's name must be one
+  `asset(name)` can use (no leading `.` or `#`, none of `/ : " ' < > &`, no
+  control scalar, at most 247 bytes, which is 255 less the `.partial` the
+  landing writes). `GraphicAssetName.swift` (pure) legalises a bad name as
+  `importAsset` copies it in, so `#logo&mark.png` becomes `logo-mark.png`.
+  A renamed copy never replaces: it takes `-2`, `-3`, … while the name is
+  held on the scan or on disk. `import_graphic_asset` answers the name used
+  and `renamed_from`, and File ▸ Add Image to Graphics… (its body moved into
+  `addGraphicImage(from:)`) shows an informational sheet. The scan skips an
+  illegal visible asset file with a warning. The font pass moved into
+  `GraphicStore+Fonts.swift` (`GraphicStore.swift` stays at 394 lines) and
+  keeps a verdict per file: a file whose size, modification date and file
+  number are unchanged is not read or validated again. Accepted limit: a
+  rewrite that keeps all three is not seen. Pinned by `graphics_store_probe`
+  W18–W20 (26/26), `graphics_menu_proof` M13 (17/17) and `graphics_proof`
+  I5 (46/46). Each was made to fail once. With `font-uncached`, W18's
+  start() listed no font and warned `graphics/fonts/f.ttf: font bytes
+  loaded no face`. With `asset-name-kept`, the copy landed as
+  `#logo&mark.png`, unlisted, and the 300-byte name threw. With
+  `asset-name-unchecked`, the scan listed `#bad.png` with no warning. With
+  `notice-dropped`, no sheet appeared within 3 s. Run against B65's build
+  (the baseline), I5 answered `name` `#logo&mark.png`, replaced it the
+  second time, and the render warned that `logo-mark-2.png` is not in
+  `graphics/assets/`. In that run G6, G2 and G10 also failed, because the
+  baseline bundles the `graphics-api.md` from before this batch.
+  `capture_spike/inventory.json` gained the notice's sheet site, and
+  `addGraphicImage:`'s anchor became `@objc func addGraphicImage(`. The
+  person's residue is GR-5 in `docs/manual-checks.md`: the sheet after the
+  real open panel closes, in both appearances. Phase c2 (the three warning
+  sources) is still owed.
 
 ## Open items
 
@@ -442,8 +472,7 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
 
   Tracked in #72.
 - Small engine and tool refinements from the G1b–G5b reviews — listed in
-  #105: asset-name validation at import, per-scan font
-  revalidation, an export's graphic warnings, a warnings channel on
+  #105: an export's graphic warnings, a warnings channel on
   `compile` (its FFI half), and surfacing `GraphicScan.warnings`.
 - The not-built list (keyframed props, `paste_attributes`, revision history,
   HEVC with alpha, mattes, system fonts, path helpers, `delete_graphic` /

@@ -230,8 +230,11 @@ detail there.
   `packageDidMove(to:)` from the `fileURL` setter, posting
   `.graphicsLocationDidChange`), the scan (each legal `*.js` with its
   SHA-256 revision, G-13; `fonts/` validated on a throwaway
-  `GraphicLibrary`; `assets/` with a 0-byte file warned and skipped) and
-  the watch. **`graphics/` is created on the app's first write, never at
+  `GraphicLibrary` once per file identity — size, modification date and
+  file number — in `GraphicStore+Fonts.swift`'s `validatedFonts`, whose
+  `fontVerdicts` is queue-confined and survives `stop()`/`start()` (spec
+  §11 G-23 (f)); `assets/` with a 0-byte file, or a name `asset(name)`
+  cannot use, warned and skipped, G-23 (e)) and the watch. **`graphics/` is created on the app's first write, never at
   open** (G-14): `ensureFolder()` is the ONE creator inside a package, and
   every app-side writer goes through `write(name:source:)` or it. While the
   folder is absent the store watches the PACKAGE directory, and the first
@@ -257,7 +260,10 @@ detail there.
   and `importFile` land through `land(at:writing:)`, whose `.partial` is
   removed on any failure; and `removeScratchRoot()`, which removes an untitled
   root after `stop()` — from `packageDidMove(to:)` and `stopGraphicStore()`
-  (G-19 (d)). **`drain()` is not
+  (G-19 (d)). `GraphicStore+Import.swift`'s `importAsset` files a name
+  `asset(name)` cannot use under `GraphicAssetName.legalized`, a renamed
+  copy taking `-2`, `-3`, … while `holdsAsset(named:)` (scan or disk) says
+  the name is held, and answers `name`/`renamedFrom` (G-23 (c), (d)). **`drain()` is not
   re-entrant: never call `rescan()` from a `.graphicsDidChange` observer.**
   `stop()` bumps a generation under `queue.sync`. `makeLibrary()` is a NEW
   builder every call (a library freezes on first use). It also writes the
@@ -266,7 +272,11 @@ detail there.
   `write()`; only when the bytes differ) — never a reason to create the
   folder (G-14).
 - `GraphicScan.swift` — `GraphicModuleFile`, `GraphicFile` and `GraphicScan`,
-  what one pass of the store found. `GraphicTemplates.swift` — pure: the
+  what one pass of the store found. `GraphicAssetName.swift` — pure: G-23's
+  asset-name rule (`isLegal`, `legalized`, `withSuffix`, `maxBytes` 247 —
+  255 less `.partial` — `rule`, `renameNotice`). `GraphicStore+Fonts.swift`
+  — `GraphicFontIdentity`, `GraphicFontVerdict` and the scan's font pass,
+  `validatedFonts(_:)`, queue only. `GraphicTemplates.swift` — pure: the
   bundled `GraphicTemplates/` modules (copied by `project.yml`'s post-build
   script), their titles from the file stem (never compiled — every chrome
   probe builds the menu bar) and a stem sanitised to a legal module name.
@@ -329,7 +339,10 @@ the key map behind it.
   `applyEdit`, the panels through `performGroupedEdit`; the shared body
   `insertGraphic(from:grouped:) throws` shows no dialog, and a module that
   does not compile stays on disk and places nothing — G-16; a file that is not
-  UTF-8 is refused by name before anything is written (#75)),
+  UTF-8 is refused by name before anything is written (#75); Add Image to
+  Graphics…'s body is `addGraphicImage(from:) throws` (no panel), which
+  shows `showGraphicNotice`'s informational sheet when the picture was
+  renamed, G-23 (d)),
   `+Clipboard` (⌘X/⌘C/⌘V over the `com.kgalligan.reelcut.clips` pasteboard,
   the `paste` op's payload; ⌥⌘V Paste Attributes with no `groups`),
   `+Edge` (slip, roll, close gap, insert, overwrite, the `,` / `.` nudge —

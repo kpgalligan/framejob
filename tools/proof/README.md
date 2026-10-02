@@ -11790,3 +11790,60 @@ the window's `defaultButtonCell`, which is what the probe reads. Without
 does not take clip and rate"). **Not covered:** the agent note's k ≥ 2 form
 (no MCP op tool sets two clips' speeds in one call), and whether the
 question reads well — SE-8 in `docs/manual-checks.md` now passes through it.
+
+## Issue batch B67 — asset names renamed at import, fonts validated once per file identity (`graphics_store_probe.py` W18–W20, `graphics_menu_proof.py` M13, `graphics_proof.py` I5; #105 part 3, phase c1; spec §11 G-23)
+
+- **`graphics_store_probe.py`** (over `app/Sources`, no app):
+  - **W18**: an untitled store, `fonts/f.ttf` = a bundled face with its mtime
+    pinned to a whole second. Settled, `stop()`, then f.ttf overwritten IN
+    PLACE (same inode) with as many zero bytes and its mtime set back.
+    `start()` lists `f.ttf` with the face's bytes and no warning, because
+    the verdict was reused. CONTROL: mtime +2 s, `rescan()`: no font and
+    one `graphics/fonts/f.ttf: ` warning.
+  - **W19**: `GraphicAssetName.legalized` over the probe's table, with the
+    invariant checked on each. `importAsset` files `#logo&mark.png` as
+    `logo-mark.png`, then as `logo-mark-2.png` (the first file unchanged).
+    A legal name replaces. A 300-byte name lands at 247 bytes, twice.
+    `renameNotice` equals its literal.
+  - **W20**: `assets/#bad.png` is skipped with exactly its warning, and
+    `.dot.png` stays silent. CONTROL: `ok.png` is listed.
+  - Mutants (rule R, exit 0 = caught):
+    - `font-uncached`: the cache hit's identity comparison → `false`. W18
+      must fail.
+    - `asset-name-kept`: `legalized(name)` → `name`. W19 must fail.
+    - `asset-name-unchecked`: the scan's `isLegal` guard → `true`. W20
+      must fail.
+- **`graphics_menu_proof.py` M13**: `controller.addGraphicImage(from:)` on
+  `#logo&mark.png`. Within 3 s a sheet attaches whose non-empty text fields
+  are exactly the rename notice, and `logo-mark.png` is listed. CONTROL:
+  `plain.png` attaches no sheet in 0.5 s. `--mutant notice-dropped` replaces
+  the `showGraphicNotice(` call with a no-op over a copy of `app/Sources`
+  (`build_probe` now takes the sources directory). Exit 0 means M13 FAILED.
+- **`graphics_proof.py` I5**, on I4's IE: `import_graphic_asset` with
+  `name: "#logo&mark.png"` answers `logo-mark.png` and `renamed_from`, and
+  the second time `logo-mark-2.png`. A module drawing
+  `asset("logo-mark-2.png")` renders (50,50) (255,0,0) with no warning.
+  `"My Photo (1).png"` answers no `renamed_from`.
+
+Runs on 2026-10-02 over `72f9ba7` plus this batch:
+
+| Run | Result |
+|---|---|
+| `graphics_store_probe.py` | 26/26. |
+| `--mutant font-uncached` | exit 0: W18 failed. `start()` listed no font and warned `graphics/fonts/f.ttf: font bytes loaded no face`. |
+| `--mutant asset-name-kept` | exit 0: W19 failed. The copy was filed as `#logo&mark.png` and not listed; the 300-byte name threw. |
+| `--mutant asset-name-unchecked` | exit 0: W20 failed. The scan listed `#bad.png, ok.png` with no warnings. |
+| `graphics_menu_proof.py` | 17/17, exit 0. |
+| `graphics_menu_proof.py --mutant notice-dropped` | exit 0: M13 failed (no sheet within 3 s). |
+| `graphics_proof.py` | 46/46, exit 0, Z1 clean. |
+| `graphics_proof.py --app <B65's build>` | 42/46: I5 failed (`name` `#logo&mark.png`, replaced the second time, the render warned that `logo-mark-2.png` is not in `graphics/assets/`). G6, G2 and G10 also failed, because that build bundles the reference from before this batch's edit to `docs/graphics-api.md`. |
+
+```sh
+perl -e 'alarm shift; exec @ARGV' 900 python3 tools/proof/graphics_store_probe.py
+perl -e 'alarm shift; exec @ARGV' 900 python3 tools/proof/graphics_store_probe.py --mutant font-uncached
+perl -e 'alarm shift; exec @ARGV' 1200 python3 tools/proof/graphics_menu_proof.py --mutant notice-dropped
+```
+
+**Not covered:** the sheet after the real open panel closes, and its OK
+button, are GR-5 in `docs/manual-checks.md`. The alert's `.informational`
+style is checked only by reading the code.

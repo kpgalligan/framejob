@@ -500,3 +500,36 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   what is drawn is what was measured. `graphic::TextFont.preserve_space`
   carries the flag in Rust, and `__measureText` takes it as its seventh
   argument (rquickjs 0.14's most).
+- **G-23 — An asset's name is one `asset(name)` can use; a bad one is
+  renamed as it is copied in and skipped by the scan; a font file unchanged
+  on disk is not read again** (issue #105, 2026-10-02).
+  (a) **A legal asset name** is non-empty, at most 247 UTF-8 bytes (APFS's
+  255 less the `.partial` that `GraphicStore.land(at:writing:)` writes
+  first), does not start with `.` or `#`, and holds no `/ : " ' < > &` and
+  no control scalar (U+0000–U+001F, U+007F–U+009F). Why: a leading `.` is
+  hidden from the scan, a leading `#` is an internal href to usvg, `data:`
+  routes to the data resolver, and `asset()` returns a known name unescaped
+  (`stdlib.js`), so a quote, `&` or `<` breaks the SVG.
+  (b) **Legalising** splits the name at its last `.`; in the stem it drops
+  leading characters that are `.`, `#` or forbidden and trailing forbidden
+  ones, and replaces each interior run of forbidden characters with one
+  `-`; an empty stem becomes `image`; the stem is cut by whole scalars to
+  fit 247 bytes. `#logo&mark.png` → `logo-mark.png`.
+  (c) **A renamed copy never replaces**: when the legal name is held (by
+  the scan or on disk) it takes `-2`, `-3`, … (the stem's tail cut by whole
+  scalars so the name stays within 247 bytes). A name that needed no
+  renaming keeps the replace it always had. An empty name and a name
+  holding `/` stay refused.
+  (d) **Both doors rename and say the name used**: `import_graphic_asset`
+  answers `name` (the name used) and `renamed_from` (the name asked for,
+  only when they differ); File ▸ Add Image to Graphics… shows an
+  informational sheet, "\"<from>\" was added as \"<to>\": asset(name)
+  cannot use the name it had."
+  (e) **The scan skips an illegal visible asset file** with the warning
+  `graphics/assets/<file> is not an asset name (no leading . or #; no / :
+  " ' < > & or control character; at most 247 bytes) and was skipped`.
+  Hidden files stay silent, as before; a 248–255-byte name on disk is now
+  skipped and warned.
+  (f) **A font file's verdict is reused** while its size, modification
+  date and file number are unchanged: it is not read or validated again.
+  Accepted: a rewrite that keeps all three is not seen until one changes.

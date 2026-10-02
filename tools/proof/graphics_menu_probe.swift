@@ -330,6 +330,52 @@ check("M12 insertGraphic of a latin1.js holding \"// caf\\xE9\" throws the UTF-8
       "thrown \(thrown12), written \(latinWritten), clips "
           + "\(document.project.snapshot.clips.count) vs \(clips12)")
 
+// MARK: - M13: Add Image's body renames a name asset(name) cannot use, and says so (#105)
+
+/// Pumps until `condition` holds or `limit` seconds pass; whether it held.
+func waitUntil(_ limit: Double, _ condition: () -> Bool) -> Bool {
+    let start = Date()
+    while Date().timeIntervalSince(start) < limit {
+        if condition() { return true }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+    }
+    return condition()
+}
+func walk(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(walk) }
+/// Every non-empty text field's string in a sheet's view tree.
+func texts(_ sheet: NSWindow) -> [String] {
+    (sheet.contentView.map(walk) ?? []).compactMap { ($0 as? NSTextField)?.stringValue }
+        .filter { !$0.isEmpty }
+}
+let oddCopy = scratch.appendingPathComponent("#logo&mark.png")
+let plainCopy = scratch.appendingPathComponent("plain.png")
+for copy in [oddCopy, plainCopy] {
+    try? FileManager.default.removeItem(at: copy)
+    try? FileManager.default.copyItem(at: red, to: copy)
+}
+var thrown13 = ""
+do { try controller.addGraphicImage(from: oddCopy) } catch { thrown13 = "\(error)" }
+let shown13 = waitUntil(3) { window.attachedSheet != nil }
+let sheet13 = window.attachedSheet
+let texts13 = sheet13.map(texts) ?? []
+let want13 = GraphicAssetName.renameNotice(from: "#logo&mark.png", to: "logo-mark.png")
+let listed13 = store.scan.assets.map(\.name)
+if let sheet13 = sheet13 { window.endSheet(sheet13) }
+spin(0.3)
+var thrownPlain = ""
+do { try controller.addGraphicImage(from: plainCopy) } catch { thrownPlain = "\(error)" }
+spin(0.5)
+let plainSheet = window.attachedSheet != nil
+let listedPlain = store.scan.assets.map(\.name)
+if let stray = window.attachedSheet { window.endSheet(stray) }
+check("M13 addGraphicImage(from: \"#logo&mark.png\") files logo-mark.png and attaches a sheet "
+      + "within 3 s whose text is exactly the rename notice; CONTROL: plain.png attaches no "
+      + "sheet in 0.5 s and is listed",
+      thrown13.isEmpty && shown13 && texts13 == [want13] && listed13.contains("logo-mark.png")
+          && thrownPlain.isEmpty && !plainSheet && listedPlain.contains("plain.png"),
+      "thrown \(thrown13), sheet \(shown13), texts \(texts13), assets \(listed13); plain: thrown "
+          + "\(thrownPlain), sheet \(plainSheet), assets \(listedPlain)")
+
 // MARK: - M10: the imports on a package with no module
 
 guard let bare = openDocument(bareURL) else { finish() }

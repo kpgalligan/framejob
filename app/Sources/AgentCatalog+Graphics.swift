@@ -204,8 +204,11 @@ extension AgentServer {
                     + "graphics/assets/ (creating the folders if they are absent), where a "
                     + "module draws it with <image href=\"${asset(name)}\">; answers every "
                     + "asset the folder now holds. Anything else, and an empty file, is "
-                    + "refused. A file of the same name is replaced (replaced is true). Not "
-                    + "undoable. Mirrors File ▸ Add Image to Graphics…",
+                    + "refused. A file of the same name is replaced (replaced is true). A name "
+                    + "asset(name) cannot use (a leading . or #, any of / : \" ' < > &, a control "
+                    + "character, more than 247 bytes) is filed under a legal one — name says "
+                    + "which, renamed_from what was asked; a renamed copy never replaces, it "
+                    + "takes -2, -3 and so on. Not undoable. Mirrors File ▸ Add Image to Graphics…",
                 [
                     "path": [
                         "type": "string",

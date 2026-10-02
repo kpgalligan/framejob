@@ -19,6 +19,11 @@
 // asked, so `families` is exactly what a `font-family` must say — CoreText
 // names some files differently (road map 10 §10.7 G4b measured 13 of 2500).
 // Not undoable and never dirty (G-3).
+//
+// **An asset's name is one `asset(name)` can use** (spec §11 G-23): a name
+// that is not is legalised (`GraphicAssetName`) and the copy filed under it,
+// taking `-2`, `-3`, … while that name is held (scan or disk), so a RENAMED
+// copy never replaces; the answer says the name used and the name asked for.
 
 import Foundation
 
@@ -69,9 +74,10 @@ extension GraphicStore {
 
     /// A picture copied into `graphics/assets/<name>`, then `rescan()`.
     /// `name` is what `asset(name)` says; its extension must be one of the
-    /// six. Main.
+    /// six. A name `asset(name)` cannot use is filed under a legal one
+    /// (`renamedFrom` is the name asked for), never replacing a file. Main.
     func importAsset(from source: URL, as name: String) throws
-        -> (url: URL, replaced: Bool, bytes: Int)
+        -> (url: URL, name: String, replaced: Bool, bytes: Int, renamedFrom: String?)
     {
         let path = source.path
         let kinds = Self.assetKinds
@@ -92,9 +98,26 @@ extension GraphicStore {
             throw ReelCoreError(
                 message: "\(path) is empty (0 bytes) — an asset must hold a \(kinds) image")
         }
-        let landed = try importNamed(source, Self.assetsFolderName, name)
+        let legal = GraphicAssetName.legalized(name)
+        var used = legal
+        if legal != name {
+            var n = 2
+            while holdsAsset(named: used) {
+                used = GraphicAssetName.withSuffix(legal, n)
+                n += 1
+            }
+        }
+        let landed = try importNamed(source, Self.assetsFolderName, used)
         rescan()
-        return (landed.url, landed.replaced, size)
+        return (landed.url, used, landed.replaced, size, used == name ? nil : name)
+    }
+
+    /// True when the scan lists `name` or `graphics/assets/<name>` is on disk.
+    func holdsAsset(named name: String) -> Bool {
+        scan.assets.contains { $0.name == name }
+            || FileManager.default.fileExists(
+                atPath: folderURL.appendingPathComponent(Self.assetsFolderName, isDirectory: true)
+                    .appendingPathComponent(name).path)
     }
 
     /// `importFile`, its failure said in a sentence naming the folder.

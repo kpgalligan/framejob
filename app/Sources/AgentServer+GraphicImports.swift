@@ -10,7 +10,9 @@
 // Both run on MAIN: the copy is one small file, and `rescan()` must be
 // called from main, from the handler — never from a `.graphicsDidChange`
 // observer, because `drain()` is not re-entrant. Not undoable and never
-// dirty (G-3), `write_graphic`'s posture.
+// dirty (G-3), `write_graphic`'s posture. An asset name `asset(name)` cannot
+// use is filed under a legal one (spec §11 G-23): `name` answers the name
+// used, and `renamed_from` the name asked for, only when the two differ.
 
 import Foundation
 
@@ -38,11 +40,13 @@ extension AgentServer {
         let source = try graphicImportSource(a)
         let name = try stringArg(a, "name") ?? source.lastPathComponent
         let landed = try store.importAsset(from: source, as: name)
-        return try jsonResult([
-            "path": landed.url.path, "name": name, "replaced": landed.replaced,
+        var result: [String: Any] = [
+            "path": landed.url.path, "name": landed.name, "replaced": landed.replaced,
             "bytes": landed.bytes, "assets": store.scan.assets.map(\.name),
             "note": Self.notUndoableNote,
-        ])
+        ]
+        if let asked = landed.renamedFrom { result["renamed_from"] = asked }
+        return try jsonResult(result)
     }
 
     /// `path`, `~` expanded: a regular file, or the sentence saying there is none.

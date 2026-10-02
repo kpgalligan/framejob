@@ -12,6 +12,7 @@
 // G-19 (c), G-20 (a)), has its own source; events are coalesced over 100 ms.
 // Every pass re-opens every source BY PATH (a save swaps inodes) and arms
 // BEFORE it scans. A source whose `open` fails is a scan warning (G-20 (b)).
+// An illegal asset name is warned and skipped; fonts are `+Fonts`' (G-23).
 //
 // **Threading.** One serial queue alone touches the queue-confined state; it
 // diffs, and main publishes in order through `drain()`. Main waits on the
@@ -104,6 +105,7 @@ final class GraphicStore {
     private var outbox: [Outcome] = []
     private var watchedPackage: URL?
     private var watchedFolder: URL
+    var fontVerdicts: [String: GraphicFontVerdict] = [:]  // queue-confined; key: standardized path
 
     /// `seed`: a folder whose entries are copied into the fresh untitled
     /// root at `start()` — an untitled document restored from autosave.
@@ -300,8 +302,14 @@ final class GraphicStore {
         let fontURLs = listing(fonts).filter {
             Self.fontExtensions.contains($0.pathExtension.lowercased())
         }
-        let assetURLs = listing(assets).filter {
-            Self.assetExtensions.contains($0.pathExtension.lowercased())
+        var assetURLs: [URL] = []
+        for url in listing(assets)
+        where Self.assetExtensions.contains(url.pathExtension.lowercased()) {
+            guard GraphicAssetName.isLegal(url.lastPathComponent) else {
+                warnings.append("\(Self.relative(url)) \(GraphicAssetName.rule) and was skipped")
+                continue
+            }
+            assetURLs.append(url)
         }
         for url in (moduleURLs + fontURLs + assetURLs).prefix(Self.fileSourceLimit) {
             if let unwatched = arm(url, folder: false, g) { warnings.append(unwatched) }
@@ -313,16 +321,8 @@ final class GraphicStore {
             modules[name] = GraphicModuleFile(
                 name: name, url: url, bytes: bytes, revision: Self.hex(SHA256.hash(data: bytes)))
         }
-        var fontFiles: [GraphicFile] = []
-        for url in fontURLs {
-            guard let bytes = try? Data(contentsOf: url) else { continue }
-            do {
-                try GraphicLibrary().addFont(bytes)
-                fontFiles.append(GraphicFile(name: url.lastPathComponent, url: url, bytes: bytes))
-            } catch {
-                warnings.append("\(Self.relative(url)): \(error.localizedDescription)")
-            }
-        }
+        let (fontFiles, fontWarnings) = validatedFonts(fontURLs)
+        warnings += fontWarnings
         var assetFiles: [GraphicFile] = []
         for url in assetURLs {
             guard let bytes = try? Data(contentsOf: url) else { continue }
@@ -345,7 +345,7 @@ final class GraphicStore {
     }
 
     /// `graphics/fonts/x.ttf` for a warning.
-    private static func relative(_ url: URL) -> String {
+    static func relative(_ url: URL) -> String {
         let parent = url.deletingLastPathComponent().lastPathComponent
         return "\(folderName)/\(parent)/\(url.lastPathComponent)"
     }

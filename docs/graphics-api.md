@@ -243,6 +243,13 @@ The href for a file in the project's `graphics/assets/` folder, for
 `<image href="…">`. A name that is not there is a warning naming the files
 that are; the image then does not draw.
 
+An asset's name must not start with `.` or `#`, must hold none of
+`/ : " ' < > &` and no control character, and is at most 247 bytes. A
+picture added under any other name is renamed as it is copied in —
+`#logo&mark.png` becomes `logo-mark.png`, then `logo-mark-2.png` if that is
+taken — and you are told the name to use. A file put in the folder by hand
+under such a name is skipped, with a warning.
+
 ```js
 const logo = `<image href="${asset("logo.png")}" x="40" y="40" width="200" height="200"/>`;
 ```
@@ -325,7 +332,8 @@ pixels of frames in all (two at 8192×8192, or sixteen at 3840×2160);
 `add_graphic_clip {name}` places it, `render_frame` shows a frame,
 `set_graphic {patch: {props}}` changes it. `import_graphic_font {path}` answers `families`, the exact names
 `font-family` must say; `import_graphic_asset {path}` adds a picture for
-`asset(name)`. `get_graphic` reads a module or names the folder, which your file
+`asset(name)`; its `name` is the one to use, and `renamed_from` says it was
+renamed. `get_graphic` reads a module or names the folder, which your file
 tools may edit too; its `API.md` is this page, `API.d.ts` its types.
 
 ## Idioms

@@ -436,6 +436,107 @@ answer["w17"] = row
 let failedOpenRoot = fs.folderURL
 fs.stop()
 
+// MARK: - W18 — a font unchanged on disk is not read again (spec §11 G-23 (f))
+
+func modified(_ url: URL) -> Date? {
+    (try? files.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
+}
+let ts = GraphicStore(package: nil, seed: nil, bundledFonts: fontsDir)
+ts.start()
+let fontRoot = ts.folderURL
+let tsFont = fontRoot.appendingPathComponent("fonts/f.ttf")
+let faceBytes = (try? Data(contentsOf: fontsDir.appendingPathComponent(
+    faces.first ?? "none.ttf"))) ?? Data()
+let pinned = Date(timeIntervalSince1970: 1_700_000_000)
+try? files.createDirectory(
+    at: fontRoot.appendingPathComponent("fonts"), withIntermediateDirectories: false)
+try? faceBytes.write(to: tsFont)
+try? files.setAttributes([.modificationDate: pinned], ofItemAtPath: tsFont.path)
+ts.rescan()
+pump(0.3)
+row = ["setup_fonts": ts.scan.fonts.map { $0.name }, "face_bytes": faceBytes.count]
+ts.stop()
+let tsInode = inode(tsFont)
+writeInPlace(Data(count: faceBytes.count), tsFont)
+try? files.setAttributes([.modificationDate: pinned], ofItemAtPath: tsFont.path)
+row["same_inode"] = tsInode == inode(tsFont)
+row["same_mtime"] = modified(tsFont) == pinned
+row["zeroed"] = (try? Data(contentsOf: tsFont)) == Data(count: faceBytes.count)
+ts.start()
+row["fonts"] = ts.scan.fonts.map { $0.name }
+row["bytes_equal"] = ts.scan.fonts.first?.bytes == faceBytes
+row["warnings"] = ts.scan.warnings
+try? files.setAttributes(
+    [.modificationDate: pinned.addingTimeInterval(2)], ofItemAtPath: tsFont.path)
+ts.rescan()
+row["control_fonts"] = ts.scan.fonts.map { $0.name }
+row["control_warnings"] = ts.scan.warnings
+answer["w18"] = row
+ts.stop()
+
+// MARK: - W19 — a name asset(name) cannot use is renamed at import (spec §11 G-23)
+
+let nameTable = [
+    "#logo&mark.png", ".hidden.png", "My Photo (1).png", "a\"b'c<d>e.png", "a&&b.png",
+    "#&.png", "x\u{07}y.PNG", "10:30.jpg", String(repeating: "é", count: 200) + ".png",
+    String(repeating: "a", count: 247) + ".png", "logo.svg",
+]
+row = ["table": nameTable.map { name -> [String: Any] in
+    let legal = GraphicAssetName.legalized(name)
+    return [
+        "name": name, "legalized": legal, "bytes": legal.utf8.count,
+        "invariant": GraphicAssetName.isLegal(name) == (legal == name)
+            && GraphicAssetName.isLegal(legal),
+    ]
+}]
+let ns = GraphicStore(package: nil, seed: nil, bundledFonts: fontsDir)
+ns.start()
+let otherPNGFile = work.appendingPathComponent("W19-other.png")
+try? otherPNG.write(to: otherPNGFile)
+func imported(_ source: URL, _ name: String) -> [String: Any] {
+    do {
+        let landed = try ns.importAsset(from: source, as: name)
+        return [
+            "name": landed.name, "renamed_from": landed.renamedFrom ?? NSNull(),
+            "replaced": landed.replaced, "listed": ns.scan.assets.contains { $0.name == landed.name },
+            "on_disk": present(landed.url), "bytes": landed.name.utf8.count,
+        ]
+    } catch {
+        return ["thrown": error.localizedDescription]
+    }
+}
+let longName = String(repeating: "a", count: 300) + ".png"
+row["first"] = imported(assetPNG, "#logo&mark.png")
+row["second"] = imported(otherPNGFile, "#logo&mark.png")
+row["first_bytes_unchanged"] = (try? Data(contentsOf: ns.folderURL.appendingPathComponent(
+    "assets/logo-mark.png"))) == (try? Data(contentsOf: assetPNG))
+row["legal"] = imported(assetPNG, "logo-mark.png")
+row["long"] = imported(assetPNG, longName)
+row["long_again"] = imported(assetPNG, longName)
+row["notice"] = GraphicAssetName.renameNotice(from: "#logo&mark.png", to: "logo-mark.png")
+row["assets"] = ns.scan.assets.map { $0.name }
+answer["w19"] = row
+let namesRoot = ns.folderURL
+ns.stop()
+
+// MARK: - W20 — the scan skips an illegal asset file with a warning (spec §11 G-23 (e))
+
+let bs = GraphicStore(package: nil, seed: nil, bundledFonts: fontsDir)
+bs.start()
+let badRoot = bs.folderURL
+try? files.createDirectory(
+    at: badRoot.appendingPathComponent("assets"), withIntermediateDirectories: false)
+for bad in ["#bad.png", ".dot.png", "ok.png"] {
+    try? files.copyItem(at: assetPNG, to: badRoot.appendingPathComponent("assets/\(bad)"))
+}
+bs.rescan()
+answer["w20"] = [
+    "assets": bs.scan.assets.map { $0.name }, "warnings": bs.scan.warnings,
+    "on_disk": ((try? files.contentsOfDirectory(
+        atPath: badRoot.appendingPathComponent("assets").path)) ?? []).sorted(),
+]
+bs.stop()
+
 // MARK: - W12 — stop() drops a pending pass and every source
 
 mark = posts.count
@@ -606,7 +707,7 @@ answer["c6"] = r6
 for leftover in [c5aRoot, c5bRoot, c6aRoot, c6bRoot].compactMap({ $0 }) {
     try? files.removeItem(at: leftover)
 }
-let roots = [s.folderURL, es.folderURL, libraryFolder, failedOpenRoot]
+let roots = [s.folderURL, es.folderURL, libraryFolder, failedOpenRoot, fontRoot, namesRoot, badRoot]
     + [c2Root, c3Root].compactMap { $0 }
 for root in roots { try? files.removeItem(at: root) }
 answer["roots_removed"] = roots.allSatisfy { !present($0) }
