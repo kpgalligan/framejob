@@ -168,3 +168,26 @@ this run's.
 | I4 | fail C — `removed addActionAtPlayhead: and app/Sources/AppDelegate.swift:121; the checker reported [('I1', 'addActionAtPlayhead:'), ('I2', 'app/Sources/AppDelegate.swift:121'), ('I3', 'terminate:')]` | pass C — `removed addActionAtPlayhead: and app/Sources/CaptionExporter.swift:534; the checker reported [('I1', 'addActionAtPlayhead:'), ('I2', 'app/Sources/CaptionExporter.swift:534')]` |
 
 After the change, `inventory.py --check` prints 5/5 and exits 0.
+
+**#132's foreground run, 2026-10-02**, over HEAD `7faf625`, run once as
+`perl -e 'alarm shift; exec @ARGV' 900 python3 tools/proof/capture_spike/capture_spike.py --rebuild`
+from the agent's shell, with the owner away from the Mac, the display on and
+the terminal running the agent session left in front.
+
+```
+host: macOS 26.5.1 (25F80), Mac14,6, console locked False
+scores: 19 pass, 5 fail, 14 skip of 38
+digest: 087f333be1afc9b66b9cdc0af5ec51df60fe1301dc2e581e2d3bd2cb97d15337
+mode seconds: layout 4.5, well 7.1, sheets 23.8, modal 2.1, menu 0.1, appearance 48.4
+```
+
+The runner exited 0. The fails are W4a, W4b, W4c, L3 and L7, the same rows
+for the same reasons as B58's run. I4 now passes in a full run. S1a–S3 and
+A1–A7 still skip with `host: probe not active`: S0 printed `active False in
+None ms, key False, main False`, and A0 printed `active False in None ms,
+key False`. **So nobody at the machine is not enough, and `pump()` does not
+fix activation.** `ProbeSupport.activate` calls `NSApp.activate()` and polls
+for 3 s, and the probe never became the active app. One explanation fits but
+is unmeasured: since macOS 14, `NSApp.activate()` is a request that the
+frontmost app must yield to (`yieldActivation`), and a child process of a
+terminal's shell is not handed activation the way V1's runs were.
