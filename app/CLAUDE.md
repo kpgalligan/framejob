@@ -313,6 +313,14 @@ the key map behind it.
   (esc, `case 27` in `handleEditorKey`, false when nothing was selected),
   removes the selected one, and selects what ⌥⌘K, Zoom to Region and Zoom
   Back just added.
+- `SpeedAudioDrop.swift` — the ×`audio_max` crossing (a trial through the
+  core), the question's and the agent note's copy, and its one alert sheet
+  (`ask`); every door that sets speed asks through it (#212, §11 #190).
+  `EditorViewController+SpeedAudio` holds the Speed section's and the rate
+  stretch's doors; the latter ends the live edit BEFORE asking (an autosave
+  must never write a speed Cancel then takes back) and re-applies the
+  frozen file's `lastLiveOps` on Set Speed, so it reads `ProjectDocument`'s
+  `private(set)` `liveEditBase`.
 - `+AddClips` (Add Text / Add Shape: the front track, else a new one;
   `addGeneratedClip` is internal and takes `grouped:` — `performGroupedEdit`
   when the edit lands outside the menu's event, as a panel's completion does),

@@ -149,6 +149,8 @@ final class EditorViewController: NSViewController {
     var snappingEnabled = true
     /// Timeline track height: 0 small, 1 medium, 2 large.
     var trackHeight = 1
+    /// The last rate-stretch tick that applied (`+SpeedAudio`).
+    var lastLiveOps: [ReelOp] = []
 
     private var didRestorePanes = false
     private var isAdjustingPanes = false

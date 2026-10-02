@@ -263,10 +263,10 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Source:** #190.
 
 **SE-8 — Audio at and above the ceiling, and Fit to**
-- **Do:** 1. On a clip of speech, set ×12 with Keep pitch on and play it; then turn Keep pitch off and play it again. 2. Set ×13, with Keep pitch on and then off; play each and read the Speed section. 3. Type a length into Fit to and press Return.
-- **Expect:** at ×12 the audio plays in both pitch modes and sounds like sped-up speech; at ×13 the clip is silent in both modes and the Speed section says "Audio is silent above ×12"; Fit to commits, the clip takes the typed length, and Rate shows the new rate.
+- **Do:** 1. On a clip of speech, set ×12 with Keep pitch on and play it; then turn Keep pitch off and play it again. 2. Set ×13 (the question "“N” will be silent at ×13." appears; answer Set Speed), with Keep pitch on and then off; play each and read the Speed section. 3. Type a length into Fit to and press Return.
+- **Expect:** at ×12 the audio plays in both pitch modes and sounds like sped-up speech; setting ×13 first shows the question, and Set Speed applies it; at ×13 the clip is silent in both modes and the Speed section says "Audio is silent above ×12"; Fit to commits, the clip takes the typed length, and Rate shows the new rate.
 - **Answer:** does the speech at the ceiling sound right?
-- **Source:** #190.
+- **Source:** #190, #212.
 
 ## Captions
 

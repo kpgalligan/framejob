@@ -328,14 +328,38 @@ final class SpeedSheetController: NSViewController, NSTextFieldDelegate {
     /// already what every clip has is not an edit — the core would return
     /// identity and `applyEdit` would beep at a dialog the user just
     /// confirmed, which reads as a refusal rather than as "nothing to do".
+    ///
+    /// A rate that takes a clip with sound above the audio ceiling asks first
+    /// (`SpeedAudioDrop`, #212), on this sheet's own window: Set Speed closes
+    /// the sheet and applies, Cancel leaves the sheet up with nothing applied.
     @objc private func applyClicked(_ sender: Any?) {
         let rate = self.rate
         let keepPitch = self.keepPitch
-        let document = self.document
-        dismiss(self)
-        guard ratesDiffer || rate != originalRate || keepPitch != originalKeepPitch else { return }
-        guard let document = document, !clips.isEmpty else { return }
-        document.applyEdit(
-            "Set Speed", Self.ops(for: clips, rate: rate, keepPitch: keepPitch))
+        guard ratesDiffer || rate != originalRate || keepPitch != originalKeepPitch else {
+            dismiss(self)
+            return
+        }
+        guard let document = self.document, !clips.isEmpty else {
+            dismiss(self)
+            return
+        }
+        let ops = Self.ops(for: clips, rate: rate, keepPitch: keepPitch)
+        let crossing = SpeedAudioDrop.crossing(applying: ops, to: document.editedProject)
+        guard !crossing.isEmpty else {
+            dismiss(self)
+            document.applyEdit("Set Speed", ops)
+            return
+        }
+        guard let window = view.window else {
+            NSSound.beep()
+            return
+        }
+        SpeedAudioDrop.ask(crossing, on: window) { [weak self, weak document] confirmed in
+            guard confirmed else { return }
+            if let self { self.dismiss(self) }
+            // A sheet's completion is not an AppKit event: the grouped entry
+            // point is mandatory here (app/CLAUDE.md's undo pitfall).
+            document?.performGroupedEdit("Set Speed", ops)
+        }
     }
 }

@@ -38,8 +38,8 @@ extension EditorViewController {
         timeline.onSelectionChanged = { [weak self] ids in self?.timelineSelected(ids) }
         timeline.onScrub = { [weak self] time in self?.timelineScrubbed(time) }
         timeline.onLiveBegin = { [weak self] in self?.document?.beginLiveEdit() }
-        timeline.onLiveUpdate = { [weak self] ops in self?.document?.updateLiveEdit(ops) }
-        timeline.onLiveEnd = { [weak self] name in self?.document?.endLiveEdit(name) }
+        timeline.onLiveUpdate = { [weak self] ops in self?.timelineLiveUpdated(ops) }
+        timeline.onLiveEnd = { [weak self] name in self?.timelineLiveEnded(name) }
         timeline.onEdit = { [weak self] name, ops in self?.document?.applyEdit(name, ops) }
         timeline.onGroupedEdit = { [weak self] name, ops in self?.document?.performGroupedEdit(name, ops) }
         timeline.onRemoveTrack = { [weak self] id in self?.removeTrackCommand(id) }

@@ -8671,7 +8671,7 @@ instrument failure is a scored FAIL, exit 1.
 
 | Runner | caught / survived / not performed |
 |---|---|
-| `assistant_lane_proof.py`, `assistant_tab_proof.py`, `assistant_helper_proof.py`, `assistant_prompt_proof.py`, `assistant_session_proof.py`, `spend_proof.py`, `budget_proof.py`, `prices_proof.py`, `prices_crosscheck.py`, `makefile_env_proof.py`, `export_cancel_proof.py`, `video_configuration_proof.py`, `speed_sheet_probe.py`, `text_break_proof.py` and `name_field_proof.py` (each `--baseline`, B23; `--mutant`, B32), `obscure_handles_probe.py` (`--baseline` and `--mutant`, B25), `cache_pass_probe.py` (`--mutant`, B14), `assistant_compaction_proof.py` (`--mutant`, B26), `relink_sheet_probe.py` (`--mutant`, B29), `menu_undo_probe.py` (`--mutant`, B51), `assistant_clearing_proof.py` (`--mutant`, B54) and `sheet_queue_probe.py` (`--mutant`, B57) | 1 / 0 / 2 |
+| `assistant_lane_proof.py`, `assistant_tab_proof.py`, `assistant_helper_proof.py`, `assistant_prompt_proof.py`, `assistant_session_proof.py`, `spend_proof.py`, `budget_proof.py`, `prices_proof.py`, `prices_crosscheck.py`, `makefile_env_proof.py`, `export_cancel_proof.py`, `video_configuration_proof.py`, `speed_sheet_probe.py`, `text_break_proof.py` and `name_field_proof.py` (each `--baseline`, B23; `--mutant`, B32), `obscure_handles_probe.py` (`--baseline` and `--mutant`, B25), `cache_pass_probe.py` (`--mutant`, B14), `assistant_compaction_proof.py` (`--mutant`, B26), `relink_sheet_probe.py` (`--mutant`, B29), `menu_undo_probe.py` (`--mutant`, B51), `assistant_clearing_proof.py` (`--mutant`, B54), `sheet_queue_probe.py` (`--mutant`, B57) and `speed_audio_probe.py` (`--mutant`, B62) | 1 / 0 / 2 |
 | `spend_ui_proof.py` | 1 / 3 / 2 |
 | `graphics_proof.py`, `graphics_store_probe.py`, `words_picture_probe.py` | 0 / 1 / 2 |
 | `cloud_captions_proof.py`, `cloud_captions_probe.py` (`--mutant`, `--fake-mutant`), `recording_probe.py`, `phase9_chrome.py` — whole-suite mutants | the per-row count and a normal run's exit / 2 |
@@ -11691,3 +11691,102 @@ perl -e 'alarm shift; exec @ARGV' 900 python3 tools/proof/recording_probe.py --o
 §11 #178 and R6-24. **Not measured:** a pending-reverse lead segment (the
 same `sounding` rule covers it; no row reaches it), and e1_proof.py was not
 re-run, because no fixture of it has a sourceless lead segment.
+
+## Issue batch B62 — a speed change that silences a clip asks first, and an agent's answer says so (`speed_audio_probe.py`; #212)
+
+Since B52b (spec §11 #190) a clip above `audio_max` (×12) has its audio left
+out of the plan. #212 asks for a question before a person's edit does that,
+and for an agent's answer to name the clips. `SpeedAudioDrop.swift` holds the
+crossing (read off the core's trial `applying`, never a rate computed in
+Swift), the copy (the owner's option B), and the app's one alert sheet for it
+(`ask`); `EditorViewController+SpeedAudio.swift` holds the inspector's door
+(`inspectorEdit`, behind `inspector.onEdit`) and the rate stretch's
+(`timelineLiveUpdated` / `timelineLiveEnded`); the Speed sheet's Apply asks on
+the sheet's own window; `AgentServer.editResult` merges `audio_left_out` /
+`audio_note`. A rate stretch that crosses is put back
+(`endLiveEdit(_:cancelled: true)`) BEFORE the question, so nothing is live
+while it is up. `inventory.py --check` 5/5 with the new
+`SpeedAudioDrop.swift` site (`ask`, reached after `showSpeedSheet:`).
+
+- **`speed_audio_probe.py [--sources DIR] [--mutant NAME] [--only IDS]`** —
+  no instance. `speed_audio_probe.swift` is built with
+  `sheet_queue_probe.py`'s swiftc line and run once in its own process under
+  `tools/proof/work/speed-audio/<tree|mutant-NAME>/`, with a 240 s wall and
+  `.prohibited` activation; `AgentLane.prepareAtLaunch()` runs first, as in
+  the app's `main.swift`, so the argument gate knows each tool's keys. Each
+  row gets a fixture of its own: an untitled `ProjectDocument` whose one
+  track holds A ("Alpha", 60 s, sound), B ("Bravo", 90 s, sound), N (no
+  sound), M (sound, audio turned off with `set_enabled`) and H (sound,
+  already ×20), media files written under the work folder so no Relink
+  sheet is offered; its `EditorViewController` is the content of a
+  1440×900 window owned by the document's window controller, and the
+  document is `NSDocumentController`'s, so `AgentServer.shared.execute`
+  edits it. The undo stack is emptied after set-up. Every expected sentence
+  is built from the batch's literal templates around
+  `ReelSpeed.limits.audioMax`, never from `SpeedAudioDrop`; a rate a row
+  expects that the core computes (Fit to, a stretch) is read off a trial
+  `applying` in the probe. A question is answered with
+  `endSheet(_:returnCode:)` (`.alertFirstButtonReturn` Set Speed,
+  `.alertSecondButtonReturn` Cancel), and its buttons are read as the
+  titles {Cancel, Set Speed} with Set Speed the window's
+  `defaultButtonCell`.
+  - **B0** the probe builds. **C0** (CONTROL) no sheet attached,
+    `windowForSheet` is the window, and the core's `audio_max` (12.0).
+  - **S1** the editor's own `presentSpeedSheet` on [A], ×20 typed into the
+    rate field, Apply (its button's own action): the one-clip question
+    attaches to the Speed sheet's window with nothing applied; Set Speed
+    gives A ×20, closes the sheet, `canUndo`, and the action is "Set
+    Speed". **S2** S1 answered Cancel: the same handle, no step, the Speed
+    sheet still attached.
+  - **S3** the sheet on [A, B, N] at ×20: "2 clips will be silent at ×20.";
+    Set Speed applies all three and one `undo()` puts all three back to ×1.
+  - **S5** (CONTROL) Apply with nothing changed: the sheet closes, no
+    question within 1 s, no step. **S4** (CONTROL) [A] at exactly
+    `audio_max`, [N] ×20, [M] ×20 and [H] ×30 each apply with no question
+    within 1 s.
+  - **I1** `inspector.onEdit("Set Speed", [set_speed A ×20])`: the question
+    on the editor window, nothing applied while it is up; Set Speed makes a
+    step named "Set Speed" that one undo removes. **I2** I1 answered
+    Cancel: the same handle, no step.
+  - **I3** Fit to (`VideoPane.fitOps([A], 3 s)`, "Fit to Duration"): the
+    question names A's trial rate; Set Speed applies. **I5** (added for the
+    owner's wording) Fit to over [A, B] — two lengths, ×20 and ×30: "2 clips
+    will be silent at their new speeds."; Set Speed applies both.
+    **I4** (CONTROL) a `set_audio` volume edit never asks.
+  - **R1** the timeline's `onLiveBegin`, `onLiveUpdate([rate_stretch A to
+    1/20 of its length])`, `onLiveEnd("Rate Stretch")`: while the question is
+    up `isLiveEditing` is false and `document.project` is the base handle
+    (`===`, what `fileWrapper` encodes); Set Speed gives A above the ceiling
+    and one step named "Rate Stretch". **R2** R1 answered Cancel: the base
+    handle, not live, no step. **R3** (CONTROL) a `trim_end` live end never
+    asks and commits.
+  - **A1** MCP `set_speed` A ×20: `audio_left_out` [A] and the exact
+    `audio_note`, no sheet within 1 s. **A2** `set_speed` N ×20: neither
+    key. **A3** `rate_stretch` B to 1/20 of its length: both keys.
+  - Mutants: `no-ask` (`clip.speed > limits.audioMax` → `false` in
+    `SpeedAudioDrop.swift`) must fail S1, S2, S3, I1, I2, I3, I5, R1, R2,
+    A1, A3; `cancel-applies` (`response == .alertFirstButtonReturn` →
+    `true`) must fail S2, I2, R2. Exits follow rule R (1 / 0 / 2).
+
+Runs on 2026-10-02 over `3446db6` plus this batch:
+
+| Run | Result |
+|---|---|
+| `speed_audio_probe.py` | 18/18, exit 0. |
+| `speed_audio_probe.py --mutant no-ask` | 1/12 (B0), exit 1: caught — every named row failed with "no question attached … within 3 s" (A1/A3: no `audio_*` keys). |
+| `speed_audio_probe.py --mutant cancel-applies` | 1/4 (B0), exit 1: caught — S2, I2, R2 failed (after Cancel the handle changed and `canUndo` true). |
+| `speed_sheet_probe.py`, `sheet_queue_probe.py` | unchanged full marks (see the batch's checks). |
+
+```sh
+perl -e 'alarm shift; exec @ARGV' 600 python3 tools/proof/speed_audio_probe.py   # 18/18
+perl -e 'alarm shift; exec @ARGV' 600 python3 tools/proof/speed_audio_probe.py --mutant no-ask   # exit 1
+perl -e 'alarm shift; exec @ARGV' 600 python3 tools/proof/speed_audio_probe.py --mutant cancel-applies   # exit 1
+```
+
+**Instrument notes.** An `NSAlert`'s buttons sit in its view tree right to
+left, and on macOS 26 neither carries a `\r` key equivalent: the default is
+the window's `defaultButtonCell`, which is what the probe reads. Without
+`AgentLane.prepareAtLaunch()` the gate refuses every argument ("set_speed
+does not take clip and rate"). **Not covered:** the agent note's k ≥ 2 form
+(no MCP op tool sets two clips' speeds in one call), and whether the
+question reads well — SE-8 in `docs/manual-checks.md` now passes through it.

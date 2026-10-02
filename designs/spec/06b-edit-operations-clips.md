@@ -84,7 +84,9 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   (§11 G-9).
 - **`rate_stretch {clip, to_end}`** — `speed = source_len / (to_end − start)`; duration follows.
   Media sources only — a non-media clip is an **error**, not a refusal, so an MCP caller gets a
-  message it can correct from (the UI never offers it).
+  message it can correct from (the UI never offers it). The audio ceiling is `set_speed`'s: the
+  timeline's ⌥-drag asks before it crosses, and the MCP answer carries `audio_left_out` /
+  `audio_note` (§11 #190's "The question").
 - **`slip {clip, delta}`** — Slides the source under a fixed clip: `in += delta × speed`, start and
   duration unchanged, so nothing downstream moves. `delta` is TIMELINE ticks; positive shows later
   material. Clamped so the window stays inside the media (`in ≥ 0`, `in + duration × speed ≤
@@ -159,7 +161,11 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   media.duration` and the segment plays at exactly `rate` (§11, D4-3); the one-frame floor still
   wins over that bound. Actions keep their clip-relative *fraction* of the clip. Media sources only,
   an **error** on any other kind (as `rate_stretch`), and a `duration` ≤ 0 is an error. Above ×12,
-  with or without keep pitch, the plan leaves the clip's audio out (§7.2).
+  with or without keep pitch, the plan leaves the clip's audio out (§7.2). The UI asks before an
+  edit takes a clip with sound from at or below ×12 to above it (the Speed sheet, the inspector's
+  Speed section); an agent gets no dialog, and the tool's answer instead carries `audio_left_out`
+  (the clip ids) and `audio_note` (a sentence naming them) whenever its edit crossed (§11 #190's
+  "The question").
 - **`set_reversed {clip, reversed}`** — Plays the media back to front, or forward again. The core
   does no pixel work, so this changes neither the plan nor the recipe: Swift substitutes a
   pre-rendered reversed asset for that media's segments (§11). `in` is measured in the direction the

@@ -40,7 +40,7 @@ extension EditorViewController {
 
         // One-line forwards only (app/CLAUDE.md): every body is a named method
         // on this controller or on the document.
-        inspector.onEdit = { [weak self] name, ops in self?.document?.applyEdit(name, ops) }
+        inspector.onEdit = { [weak self] name, ops in self?.inspectorEdit(name, ops) }
         inspector.onGroupedEdit = { [weak self] name, ops in
             self?.document?.performGroupedEdit(name, ops)
         }

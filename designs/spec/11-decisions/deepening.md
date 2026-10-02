@@ -473,6 +473,34 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
     `{"min":0.1,"max":1000.0,"audio_max":12.0}` through `rc_speed_limits`,
     and no Swift file types a speed bound. No persisted field changes; the
     format stays 10.
+  - **The question (#212, the owner's ask of 2026-10-01).** A person who
+    sets a speed that takes a clip with sound from at or below `audio_max`
+    to above it is asked first, once, on a sheet: "“N” will be silent at
+    ×S." (or "k clips will be silent at ×S." / "… at their new speeds."),
+    with Set Speed (the default) and Cancel — the owner's wording, option
+    B, 2026-10-02. **The doors:** the Speed sheet's Apply (the question on
+    the sheet's own window), the inspector's Speed section — Rate, its
+    presets, Keep pitch, Reset and Fit to — through `inspector.onEdit`, and
+    the timeline's ⌥-drag rate stretch at its live end
+    (`SpeedAudioDrop.swift`, `EditorViewController+SpeedAudio.swift`).
+    **The rule** is judged on the core's trial answer against `audio_max`
+    (D4-6), never a rate computed in Swift (D2-1): a media clip whose audio
+    is enabled, whose media has sound, that plays above `audio_max` after
+    the edit and at or below it before. **Not asked about:** a clip already
+    above, a clip without sound or with its audio off, and a clip new in
+    the answer — a paste, split, duplicate or detach mints it, and
+    `paste_attributes` carries no speed (`edit_paste.rs:79`). **Cancel adds
+    no undo step**, and one question covers every clip a multi-clip edit
+    takes over. **A rate stretch that crosses is put back before the
+    question** (`endLiveEdit(_:cancelled: true)`, no step, no change
+    count), so nothing is live while the question is up: a save writes the
+    base and an agent call is not held (AI-12). Set Speed re-applies the
+    gesture's last applied ops as one step named "Rate Stretch". **An agent
+    gets no dialog:** every op tool's answer gains `audio_left_out` (the
+    clip ids) and `audio_note` (a sentence naming them and the ceiling) when
+    its edit crossed, and neither key otherwise (`AgentServer.editResult`).
+    The export's loudness stall itself stays unfixed; ×12 keeps it
+    unreachable.
 - **#87 — On one composition audio track, a gain change with sound on both
   sides takes up to 25 ms — accepted; a track's first segment is held from
   time 0.** AVFoundation's audio mix slews every volume change on an input

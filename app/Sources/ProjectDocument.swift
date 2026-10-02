@@ -342,7 +342,7 @@ final class ProjectDocument: NSDocument {
     // MARK: - Live edits
 
     /// Snapshot taken by `beginLiveEdit`, consumed by `endLiveEdit`.
-    private var liveEditBase: ReelProject?
+    private(set) var liveEditBase: ReelProject?
 
     /// The media file this untitled document was built from, if any. Only
     /// used to name the draft and to point the save panel at the file's own

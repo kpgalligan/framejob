@@ -711,6 +711,9 @@ final class AgentServer {
         var result: [String: Any] = ["ok": true]
         result.merge(fields) { _, new in new }
         result.merge(Self.created(from: before, to: document.project.snapshot)) { _, new in new }
+        result.merge(SpeedAudioDrop.answerFields(from: before, to: document.project.snapshot)) {
+            _, new in new
+        }
         result.merge(landing) { _, new in new }
         result["project"] = summary(document)
         return try jsonResult(result)
