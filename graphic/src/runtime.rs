@@ -5,8 +5,13 @@
 //! A runtime never leaves the thread that made it: the map is a
 //! `thread_local!`, keyed by the module's id, and an entry whose `Module`
 //! has been dropped everywhere is swept before the next call on that
-//! thread. The deadline is the ONE clock in the crate's `src/`: it stops a
-//! call that runs too long and feeds no pixel.
+//! thread. The map holds at most `ENGINES_PER_THREAD` engines: each is
+//! stamped with a use counter when it is adopted, and the least recently
+//! used past the cap are evicted after the call, to be loaded again on
+//! their next frame (spec §11 G-21 (a)). What `__warn` collects while a
+//! module's top level evaluates is drained by `load` (G-21 (b)). The
+//! deadline is the ONE clock in the crate's `src/`: it stops a call that
+//! runs too long and feeds no pixel.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -30,14 +35,18 @@ pub const HEAP_BYTES: usize = 64 << 20;
 pub const STACK_BYTES: usize = 1 << 20;
 /// The most SVG `render` may answer, in bytes (spec §11 G-20 (c)).
 pub const SVG_BYTES: usize = 8 << 20;
+/// The most engines one thread holds (spec §11 G-21 (a)).
+pub const ENGINES_PER_THREAD: usize = 16;
 
 const STDLIB: &str = include_str!("stdlib.js");
 const NOISE: &str = include_str!("noise.js");
 
-/// A loaded module's `meta` and `schema`, as JSON.
+/// A loaded module's `meta` and `schema`, as JSON, and what `__warn`
+/// collected while its top level evaluated, in order.
 pub(crate) struct Exports {
     pub(crate) meta: serde_json::Value,
     pub(crate) schema: serde_json::Value,
+    pub(crate) warnings: Vec<String>,
 }
 
 /// Fields drop in DECLARATION order: the saved `render` before its
@@ -52,10 +61,19 @@ pub(crate) struct Engine {
     runtime: Runtime,
 }
 
-type Entry = (Weak<Inner>, Engine);
+/// The module, the use stamp of the entry's last adoption, its engine.
+type Entry = (Weak<Inner>, u64, Engine);
+
+/// This thread's engines by module id, and the use counter that stamps
+/// them — a count of adoptions, not a clock.
+#[derive(Default)]
+struct Engines {
+    map: HashMap<u64, Entry>,
+    uses: u64,
+}
 
 thread_local! {
-    static ENGINES: RefCell<HashMap<u64, Entry>> = RefCell::new(HashMap::new());
+    static ENGINES: RefCell<Engines> = RefCell::new(Engines::default());
 }
 
 fn engine_error(e: rquickjs::Error) -> Diagnostic {
@@ -115,7 +133,7 @@ impl Engine {
 
     /// Declares and evaluates `source` as the ES module `name`, unwrapped,
     /// keeps its `render`, and answers its `meta` and `schema` (`{}` when
-    /// not exported).
+    /// not exported) and the warnings its top level raised.
     pub(crate) fn load(
         &mut self,
         name: &str,
@@ -136,13 +154,18 @@ impl Engine {
                 .map_err(|_| Diagnostic::error("the module exports no `render` function"))?;
             let meta = export_json(&ctx, &module, "meta");
             let schema = export_json(&ctx, &module, "schema");
-            Ok((Persistent::save(&ctx, render), Exports { meta, schema }))
+            Ok((Persistent::save(&ctx, render), (meta, schema)))
         });
         let expired = self.disarm();
         match answer {
-            Ok((render, exports)) => {
+            Ok((render, (meta, schema))) => {
                 self.render = Some(render);
-                Ok(exports)
+                let warnings = self.warnings.borrow_mut().drain(..).collect();
+                Ok(Exports {
+                    meta,
+                    schema,
+                    warnings,
+                })
             }
             Err(d) => Err(budgeted(d, expired, budget_ms)),
         }
@@ -210,21 +233,47 @@ fn export_json<'js>(
 fn sweep(map: &mut HashMap<u64, Entry>) -> Vec<Entry> {
     let dead: Vec<u64> = map
         .iter()
-        .filter(|(_, (weak, _))| weak.strong_count() == 0)
+        .filter(|(_, (weak, _, _))| weak.strong_count() == 0)
         .map(|(id, _)| *id)
         .collect();
     dead.into_iter().filter_map(|id| map.remove(&id)).collect()
 }
 
-/// Keeps `engine` as this thread's engine for the module `inner`.
+/// Removes the least recently used entries while the map holds more than
+/// `ENGINES_PER_THREAD`, and answers them so the caller drops them outside
+/// the map's borrow. The entry adopted last holds the highest stamp, so it
+/// is never one of them.
+fn evict(map: &mut HashMap<u64, Entry>) -> Vec<Entry> {
+    let mut evicted = Vec::new();
+    while map.len() > ENGINES_PER_THREAD {
+        let oldest = map
+            .iter()
+            .min_by_key(|(_, (_, stamp, _))| *stamp)
+            .map(|(id, _)| *id);
+        match oldest.and_then(|id| map.remove(&id)) {
+            Some(entry) => evicted.push(entry),
+            None => break,
+        }
+    }
+    evicted
+}
+
+/// Keeps `engine` as this thread's engine for the module `inner`, stamped
+/// as the most recently used, and evicts past `ENGINES_PER_THREAD`.
 pub(crate) fn adopt(inner: &Arc<Inner>, engine: Engine) {
-    let dead = ENGINES.with(|map| {
-        let mut map = map.borrow_mut();
-        let dead = sweep(&mut map);
-        map.insert(inner.id, (Arc::downgrade(inner), engine));
-        dead
+    let (dead, evicted) = ENGINES.with(|engines| {
+        let mut engines = engines.borrow_mut();
+        let dead = sweep(&mut engines.map);
+        engines.uses += 1;
+        let stamp = engines.uses;
+        engines
+            .map
+            .insert(inner.id, (Arc::downgrade(inner), stamp, engine));
+        let evicted = evict(&mut engines.map);
+        (dead, evicted)
     });
     drop(dead);
+    drop(evicted);
 }
 
 /// Runs `f` on this thread's engine for `module`, building it by `load`
@@ -235,14 +284,15 @@ fn with_engine<T>(
     f: impl FnOnce(&mut Engine) -> Result<T, Diagnostic>,
 ) -> Result<T, Diagnostic> {
     let inner = module.inner();
-    let (dead, found) = ENGINES.with(|map| {
-        let mut map = map.borrow_mut();
-        let dead = sweep(&mut map);
-        (dead, map.remove(&inner.id))
+    let (dead, found) = ENGINES.with(|engines| {
+        let mut engines = engines.borrow_mut();
+        let dead = sweep(&mut engines.map);
+        let found = engines.map.remove(&inner.id);
+        (dead, found)
     });
     drop(dead);
     let mut engine = match found {
-        Some((_, engine)) => engine,
+        Some((_, _, engine)) => engine,
         None => {
             let mut engine = Engine::new(module.library())?;
             engine.load(module.name(), module.source(), budget_ms)?;
@@ -286,8 +336,9 @@ pub fn svg(
     Ok((text, warnings))
 }
 
-/// The engines held on THIS thread, including dropped modules' not yet
-/// swept by the next `svg`/`compile`.
+/// The engines held on THIS thread, at most `ENGINES_PER_THREAD` after
+/// any `svg`/`compile`, including dropped modules' not yet swept by the
+/// next one.
 pub fn engine_count() -> usize {
-    ENGINES.with(|map| map.borrow().len())
+    ENGINES.with(|engines| engines.borrow().map.len())
 }

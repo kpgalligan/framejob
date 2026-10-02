@@ -246,8 +246,9 @@ A graphic draws with the fonts bundled with Reelcut, plus any `.ttf` /
 | Montserrat | 800, 900 |
 | Source Sans 3 | variable, 200–900 |
 
-**Quote a family** in `font-family` when any word of it starts with a
-digit: `font-family="'Source Sans 3'"`. Unquoted, `Source Sans 3` is not a
+**Quote a family** in `font-family` or the `font` shorthand when any word
+of it starts with a digit: `font-family="'Source Sans 3'"`,
+`font: 48px 'Source Sans 3'`. Unquoted, `Source Sans 3` is not a
 valid family list and falls back to the default face. `textLines` quotes
 for you. A family the set lacks draws in the fallback face with a warning.
 

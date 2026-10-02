@@ -1,7 +1,8 @@
 //! The font-family warnings resvg never reports: a family no face answers
 //! (in an attribute, a sheet, or a nested SVG asset), a value that did not
-//! parse (from an attribute, a `style` attribute or a sheet), and a text
-//! with no family at all.
+//! parse (from an attribute, a `style` attribute or a sheet, or the family
+//! of a `font` shorthand in either of the last two), and a text with no
+//! family at all.
 
 mod common;
 
@@ -176,4 +177,59 @@ fn a_missing_family_inside_a_nested_svg_asset_is_seen() {
     assert!(warnings[0]
         .message
         .starts_with("font-family \"Nope\" is not in the font set"));
+}
+
+#[test]
+fn an_unquoted_digit_family_in_a_font_shorthand_says_to_quote_it() {
+    let lib = library();
+    let (_, warnings) = render(&lib, &text(" style=\"font: 40px Source Sans 3\""), 320, 80);
+    assert_eq!(warnings.len(), 1, "{warnings:?}");
+    let message = &warnings[0].message;
+    assert!(
+        message.starts_with(&format!(
+            "font-family=\"Source Sans 3\" {DIGIT}; the set has: "
+        )),
+        "{message}"
+    );
+    names_every_family(&lib, message);
+}
+
+#[test]
+fn an_unquoted_digit_family_in_a_sheets_font_shorthand_says_to_quote_it() {
+    let lib = library();
+    let body = "<style>text{font:40px Source Sans 3}</style>\
+                <text x=\"10\" y=\"56\">Hamburg</text>";
+    let (_, warnings) = render(&lib, &svg(320, 80, body), 320, 80);
+    assert_eq!(messages(&warnings).len(), 1, "{warnings:?}");
+    let message = &warnings[0].message;
+    assert!(message.contains(DIGIT), "{message}");
+    assert!(!message.contains("has no font-family"), "{message}");
+}
+
+#[test]
+fn a_quoted_digit_family_in_a_font_shorthand_draws_without_a_warning() {
+    let lib = library();
+    let (out, warnings) = render(
+        &lib,
+        &text(" style=\"font: 40px 'Source Sans 3'\""),
+        320,
+        80,
+    );
+    assert!(warnings.is_empty(), "{warnings:?}");
+    assert!(draws(&out));
+}
+
+#[test]
+fn a_font_xml_attribute_is_not_read_as_a_family() {
+    // usvg keeps `font="…"` as an attribute it never reads, so the text has
+    // no family and gets the default's sentence.
+    let lib = library();
+    let (_, warnings) = render(&lib, &text(" font=\"40px Source Sans 3\""), 320, 80);
+    assert_eq!(warnings.len(), 1, "{warnings:?}");
+    assert!(
+        warnings[0]
+            .message
+            .starts_with("a <text> has no font-family"),
+        "{warnings:?}"
+    );
 }

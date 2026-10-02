@@ -377,7 +377,22 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   string-size refusal's case and not the deadline's (`while_true` is), and
   under host load its 50 MB build ran past 250 ms: under 48 spinners five
   runs marked loaded passed with its calls at 526.58–811.20 ms, and five loaded
-  runs with the budget set back to 250 failed it all five times.
+  runs with the budget set back to 250 failed it all five times. Issue
+  batch B63 (2026-10-01, #105 part 1) had `raster.rs`'s unparsed-family scan
+  read a `font` shorthand's family in `style` attributes and sheets (not a
+  `font="…"` attribute, which usvg never reads), capped each thread at
+  `ENGINES_PER_THREAD` = 16 engines with the least recently used evicted
+  after the call and reloaded on its next frame (G-21 (a)), and kept the
+  warnings a module's top level raises on the `Module` as
+  `Module::warnings()` instead of losing them to the next call's `arm` (G-21
+  (b)); pinned by four new cases in `graphic/tests/families.rs` and three in
+  `module.rs`, each made to fail once: deleting the shorthand branch failed
+  the style-attribute and sheet cases with the "has no font-family"
+  sentence, reading the attribute failed the attribute case with the digit
+  sentence, no eviction left 40 engines (17 in the LRU case), a cap of 17
+  left 17, evicting by smallest module id or by newest stamp made m0 answer
+  1 not 3, evicting m15 made m1 answer 2 not 1, and a `load` that returned
+  no warnings left `warnings()` empty.
 
 ## Open items
 
@@ -394,10 +409,9 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   Tracked in #72.
 - Small engine and tool refinements from the G1b–G5b reviews — listed in
   #105: named CSS colours and `hsl()`, generic families, `measureText`
-  honouring `xml:space`, asset-name validation at import, the `font`
-  shorthand scan, an LRU cap on `ENGINES`, per-scan font revalidation, an
-  export's graphic warnings, a warnings channel on `compile`, and surfacing
-  `GraphicScan.warnings`.
+  honouring `xml:space`, asset-name validation at import, per-scan font
+  revalidation, an export's graphic warnings, a warnings channel on
+  `compile` (its FFI half), and surfacing `GraphicScan.warnings`.
 - The not-built list (keyframed props, `paste_attributes`, revision history,
   HEVC with alpha, mattes, system fonts, path helpers, `delete_graphic` /
   `rename_graphic`) — tracked in #103.

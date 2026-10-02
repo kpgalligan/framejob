@@ -1,10 +1,12 @@
 //! `Module::compile` (road map 10 §5c): the exports read in the module's
-//! key order, the revision, every compile sentence, and the per-thread
-//! engines swept when their module is dropped.
+//! key order, the revision, every compile sentence, the warnings a module's
+//! top level raises (spec §11 G-21 (b)), and the per-thread engines swept
+//! when their module is dropped and capped at `ENGINES_PER_THREAD`, least
+//! recently used evicted first (G-21 (a)).
 
 mod common;
 
-use graphic::{engine_count, Diagnostic, Module};
+use graphic::{engine_count, Diagnostic, Level, Module, ENGINES_PER_THREAD};
 use sha2::{Digest, Sha256};
 
 use common::{shared, BUDGET_MS};
@@ -288,4 +290,103 @@ fn a_module_draws_on_a_thread_that_did_not_compile_it() {
     .unwrap();
     assert_eq!(there.0, here);
     assert_eq!(there.1, 1);
+}
+
+fn draw(module: &Module) -> (String, Vec<Diagnostic>) {
+    let ctx = common::ctx(0, 30.0, 150, 1920, 1080);
+    graphic::svg(module, 0, &serde_json::json!({}), &ctx, BUDGET_MS).unwrap()
+}
+
+/// Forty live modules on one thread leave sixteen engines; an evicted one
+/// draws again, by a reload, the same SVG it drew first, and the count
+/// stays at the cap.
+#[test]
+fn a_thread_holds_at_most_sixteen_engines() {
+    std::thread::spawn(|| {
+        assert_eq!(ENGINES_PER_THREAD, 16);
+        let mut first = String::new();
+        let forty: Vec<Module> = (0..40)
+            .map(|i| {
+                let module = compile(&format!("m{i}"), RENDER).unwrap();
+                if i == 0 {
+                    first = draw(&module).0;
+                }
+                module
+            })
+            .collect();
+        assert_eq!(engine_count(), 16);
+        let again = draw(&forty[0]).0;
+        assert_eq!(engine_count(), 16);
+        assert_eq!(again.as_bytes(), first.as_bytes());
+    })
+    .join()
+    .expect("the thread finished");
+}
+
+/// The engine evicted is the least recently USED, not the first compiled:
+/// a counter module answers how many frames its engine has drawn, so a
+/// reload shows as a count that starts again at 1.
+#[test]
+fn the_least_recently_used_engine_is_evicted() {
+    const COUNTER: &str = "let calls = 0;\n\
+        export function render(f, p, ctx) { calls++; return svg(ctx, `<!--${calls}-->`); }\n";
+    let calls = |module: &Module| -> u32 {
+        let text = draw(module).0;
+        let start = text.find("<!--").expect("a count") + 4;
+        let end = start + text[start..].find("-->").expect("a count's end");
+        text[start..end].parse().expect("a number")
+    };
+    std::thread::spawn(move || {
+        let m0 = compile("m0", COUNTER).unwrap(); // stamp 1
+        assert_eq!(calls(&m0), 1); // stamp 2
+        let m1 = compile("m1", COUNTER).unwrap(); // stamp 3
+        assert_eq!(calls(&m1), 1); // stamp 4
+        let rest: Vec<Module> = (2..16) // stamps 5..18
+            .map(|i| compile(&format!("m{i}"), COUNTER).unwrap())
+            .collect();
+        assert_eq!(engine_count(), 16);
+        assert_eq!(calls(&m0), 2); // stamp 19
+        let m16 = compile("m16", COUNTER).unwrap(); // stamp 20: m1 (4) goes
+        assert_eq!(engine_count(), 16);
+        assert_eq!(calls(&m0), 3, "m0 was used after m1, so it was kept");
+        assert_eq!(
+            calls(&m1),
+            1,
+            "m1 was the least recently used, so it was evicted and reloaded"
+        );
+        drop((rest, m16));
+    })
+    .join()
+    .expect("the thread finished");
+}
+
+/// What `__warn` collects while the top level evaluates is the compile's,
+/// unframed, and never reaches a frame.
+#[test]
+fn a_top_level_warning_is_the_compiles() {
+    std::thread::spawn(|| {
+        let source = format!("const logo = asset(\"x\");\n{RENDER}");
+        let module = compile("top-level-asset", &source).unwrap();
+        let expected = format!(
+            "asset(\"x\") is not in graphics/assets/; the folder has: {}",
+            shared().asset_names().join(", ")
+        );
+        let warnings = module.warnings();
+        assert_eq!(warnings.len(), 1, "{warnings:?}");
+        assert_eq!(warnings[0].message, expected);
+        assert_eq!(warnings[0].level, Level::Warning);
+        assert_eq!(
+            (warnings[0].frame, warnings[0].line, warnings[0].column),
+            (None, None, None)
+        );
+        let (_, frame) = draw(&module);
+        assert!(
+            !frame.iter().any(|w| w.message.starts_with("asset(\"x\")")),
+            "{frame:?}"
+        );
+        let plain = compile("plain", RENDER).unwrap();
+        assert!(plain.warnings().is_empty(), "{:?}", plain.warnings());
+    })
+    .join()
+    .expect("the thread finished");
 }

@@ -161,7 +161,8 @@ fn family_warning(families: &[usvg::FontFamily], set: &str) -> String {
 /// given and when the value does not parse, and a value that names the
 /// default itself looks the same; this scan tells the three apart by
 /// reading every value usvg could have read — attributes, `style`
-/// attributes and `<style>` sheets — through usvg's own parsers.
+/// attributes and `<style>` sheets, and in the last two the family of a
+/// `font` shorthand — through usvg's own parsers.
 fn unparsed_family_warnings(svg: &str, set: &str, default: &str) -> Vec<String> {
     let options = usvg::roxmltree::ParsingOptions {
         allow_dtd: true,
@@ -175,9 +176,7 @@ fn unparsed_family_warnings(svg: &str, set: &str, default: &str) -> Vec<String> 
             }
             if let Some(style) = node.attribute("style") {
                 for declaration in simplecss::DeclarationTokenizer::from(style) {
-                    if declaration.name == "font-family" {
-                        values.push(declaration.value.to_string());
-                    }
+                    family_value(declaration.name, declaration.value, &mut values);
                 }
             }
             if node.tag_name().name() == "style" {
@@ -185,9 +184,7 @@ fn unparsed_family_warnings(svg: &str, set: &str, default: &str) -> Vec<String> 
                 let sheet = simplecss::StyleSheet::parse(&text);
                 for rule in &sheet.rules {
                     for declaration in &rule.declarations {
-                        if declaration.name == "font-family" {
-                            values.push(declaration.value.to_string());
-                        }
+                        family_value(declaration.name, declaration.value, &mut values);
                     }
                 }
             }
@@ -214,6 +211,19 @@ fn unparsed_family_warnings(svg: &str, set: &str, default: &str) -> Vec<String> 
         ));
     }
     messages
+}
+
+/// Keeps a CSS declaration's family: a `font-family` value as written, or
+/// a `font` shorthand's family when svgtypes parses it (a shorthand that
+/// does not parse is skipped, as usvg skips it).
+fn family_value(name: &str, value: &str, values: &mut Vec<String>) {
+    if name == "font-family" {
+        values.push(value.to_string());
+    } else if name == "font" {
+        if let Ok(shorthand) = svgtypes::FontShorthand::from_str(value) {
+            values.push(shorthand.font_family.trim().to_string());
+        }
+    }
 }
 
 /// svgtypes refuses a digit-leading word in an unquoted family name, so

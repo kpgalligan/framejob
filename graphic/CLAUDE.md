@@ -20,17 +20,20 @@ The crate's record is road map 10 §10.4.
 - `raster.rs` — `rasterize`, `MAX_SIDE`, the RGBA→BGRA row copy into the
   caller's strided buffer, and every warning text `rasterize` answers:
   missing family, unparseable `font-family` (the scan of attributes, `style`
-  attributes and `<style>` sheets), unknown href, data: URL, non-image
+  attributes and `<style>` sheets, and the family of a `font` shorthand in
+  a `style` attribute or sheet), unknown href, data: URL, non-image
   asset, size mismatch. The texts are load-bearing: tests match them and
   the app shows them on the clip.
 - `measure.rs` — `FontStyle`, `TextFont`, `TextMetrics`, `measure_text`.
 - `module.rs` — `Module` (`Send + Sync + Clone`, holds no QuickJS object):
   `compile`, the SHA-256 revision (G-13), `meta`/`schema` read through
   `JSON.stringify` in the module's key order (`{}` when not exported),
-  `defaults()`.
+  `defaults()`, its top-level warnings (`warnings()`, G-21 (b)).
 - `runtime.rs` — `Engine` (one QuickJS `Runtime` + `Context` per (thread,
   module), §5b's limits, the interrupt deadline), the `thread_local!` map
-  swept by `Weak` before each call, `svg`, `engine_count`, `HEAP_BYTES`,
+  swept by `Weak` before each call, at most `ENGINES_PER_THREAD` (16, spec
+  §11 G-21) engines with the least recently used evicted after the call,
+  `svg`, `engine_count`, `HEAP_BYTES`,
   `STACK_BYTES`, `SVG_BYTES` (8 MiB, spec §11 G-20 (c)). The crate's one
   clock.
 - `sandbox.rs` — the sandbox script (G-5) and the loader that resolves no

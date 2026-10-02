@@ -1,6 +1,7 @@
 //! A graphic's module, compiled once (road map 10 §5c): its source, its
-//! revision (G-13), and the `meta` and `schema` it exported, read out as
-//! JSON in the module's own key order. A `Module` holds no QuickJS object,
+//! revision (G-13), the `meta` and `schema` it exported, read out as
+//! JSON in the module's own key order, and the warnings its top level
+//! raised while compiling (G-21 (b)). A `Module` holds no QuickJS object,
 //! so it is `Send + Sync`; each thread that draws it keeps its own engine.
 
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -30,6 +31,7 @@ pub(crate) struct Inner {
     meta: serde_json::Value,
     schema: serde_json::Value,
     library: Arc<Library>,
+    warnings: Vec<Diagnostic>,
 }
 
 impl Module {
@@ -60,6 +62,11 @@ impl Module {
             meta: exports.meta,
             schema: exports.schema,
             library,
+            warnings: exports
+                .warnings
+                .into_iter()
+                .map(Diagnostic::warning)
+                .collect(),
         });
         adopt(&inner, engine);
         Ok(Module { inner })
@@ -90,6 +97,13 @@ impl Module {
     /// The exported `schema`, `{}` when there is none.
     pub fn schema(&self) -> &serde_json::Value {
         &self.inner.schema
+    }
+
+    /// The warnings the module's top level raised while compiling, in
+    /// order. Each has `Level::Warning` and `frame`, `line` and `column`
+    /// set to None (spec §11 G-21 (b)).
+    pub fn warnings(&self) -> &[Diagnostic] {
+        &self.inner.warnings
     }
 
     pub fn library(&self) -> &Arc<Library> {

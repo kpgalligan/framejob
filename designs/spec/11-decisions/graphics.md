@@ -403,3 +403,21 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   still answers when no project is open. Why: every tool publishes
   `project` (§7.9), so refusing the key would contradict the schema, and
   ignoring it would pass a wrong path in silence.
+- **G-21 — A thread holds at most 16 graphic engines, least recently used
+  dropped first; a module's top-level warnings are its compile's** (issue
+  #105, 2026-10-01).
+  (a) **`graphic::ENGINES_PER_THREAD` = 16.** A thread's map stamps each
+  engine with a use counter when it is adopted (after a compile or a
+  frame). It is not a clock. When an adoption takes the map past 16, the
+  least recently used entries are dropped after the call. An evicted
+  module is loaded again (stdlib, sandbox, top level) on its next frame on
+  that thread. Why: each engine may hold G-5's 64 MB heap, and before this
+  the map shrank only when a `Module` was dropped everywhere. Accepted: a
+  reload re-evaluates the top level, so a module that keeps module-level
+  state (already outside G-5) can restart its count.
+  (b) **What `__warn` collects while a module's top level evaluates**, e.g.
+  `asset("x")` outside `render`, **is drained when the module loads and
+  kept on the `Module`** (`Module::warnings()`), in order and not
+  de-duplicated. It is never attributed to a frame. A reload's copy is
+  discarded. Before this the next call's `arm` cleared it, so it was lost.
+  Publishing it over the FFI and in the app is #105's later work.
