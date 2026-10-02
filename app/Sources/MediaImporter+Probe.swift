@@ -24,6 +24,9 @@ extension MediaImporter {
         case unreadable(URL)
         case noTracks(URL)
         case timedOut(URL)
+        /// The video track's first frame will not decode here (spec §11
+        /// #216); the sentence names the codec (`DecoderSupport.refusal`).
+        case undecodable(URL, sentence: String)
 
         var errorDescription: String? {
             switch self {
@@ -33,6 +36,8 @@ extension MediaImporter {
                 return "\(url.lastPathComponent) has no video or audio the app can open."
             case .timedOut(let url):
                 return "Timed out reading \(url.lastPathComponent)."
+            case .undecodable(_, let sentence):
+                return sentence
             }
         }
 
@@ -47,11 +52,12 @@ extension MediaImporter {
         /// duration and no tracks; `FFmpegRewrap.plan` refuses a file that
         /// genuinely has no video and no audio, so a truly empty one keeps
         /// this message. `timedOut` is not: a stalled network mount will
-        /// stall ffmpeg too, and the second wait is not a kindness.
+        /// stall ffmpeg too, and the second wait is not a kindness. Nor is
+        /// `undecodable`: the refusal is final (spec §11 #216).
         var invitesFFmpeg: Bool {
             switch self {
             case .unreadable, .noTracks: return true
-            case .timedOut: return false
+            case .timedOut, .undecodable: return false
             }
         }
     }

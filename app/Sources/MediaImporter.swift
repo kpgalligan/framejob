@@ -66,7 +66,7 @@ enum MediaImporter {
             }
             semaphore.signal()
         }
-        // Generous, and only a backstop: a probe reads headers, not samples.
+        // Generous, and only a backstop: a probe reads headers and decodes one frame.
         // A file on a stalled network mount is the case this exists for.
         guard semaphore.wait(timeout: .now() + 30) == .success,
             let outcome = box.outcome
@@ -102,7 +102,14 @@ enum MediaImporter {
             width = Int(abs(mapped.width).rounded())
             height = Int(abs(mapped.height).rounded())
             fps = await frameRate(of: track)
-            hasAlpha = await hasAlphaChannel(track)
+            let descriptions = (try? await track.load(.formatDescriptions)) ?? []
+            hasAlpha = hasAlphaChannel(descriptions)
+            // One frame through the decoder: `isPlayable` says yes to files
+            // nothing here decodes (spec §11 #216).
+            guard DecoderSupport.decodesFirstFrame(of: track, in: asset) else {
+                throw ImportError.undecodable(url, sentence: DecoderSupport.refusal(
+                    fileName: url.lastPathComponent, descriptions: descriptions))
+            }
         }
 
         let kind: MediaKind = videoTracks.isEmpty ? .audio : .video
@@ -129,8 +136,7 @@ enum MediaImporter {
     /// Whether the codec carries alpha. The format description's own flag
     /// first (ProRes 4444 and animation-with-alpha set it); the codec type is
     /// the fallback for files whose writer omitted the extension.
-    private static func hasAlphaChannel(_ track: AVAssetTrack) async -> Bool {
-        guard let descriptions = try? await track.load(.formatDescriptions) else { return false }
+    private static func hasAlphaChannel(_ descriptions: [CMFormatDescription]) -> Bool {
         for description in descriptions {
             if let flag = CMFormatDescriptionGetExtension(
                 description, extensionKey: kCMFormatDescriptionExtension_ContainsAlphaChannel)
@@ -203,6 +209,7 @@ enum MediaImporter {
     /// after each of `peaksRetryDelays` while the pass is current
     /// (`retryPeaks`), so a lost waveform does not wait for the next open.
     static func generateCaches(for media: MediaSnapshot, url: URL, in cacheDir: URL) {
+        DecoderSupport.enable()
         CacheLedger.shared.enqueue(cacheDir: cacheDir, media: media.id, url: url) {
             previous, bounded, pass in
             Task.detached(priority: .utility) {

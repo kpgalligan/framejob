@@ -1,5 +1,8 @@
 import AppKit
 
+// The supplemental VP9 and AV1 decoders, before anything decodes (spec §11 #216).
+DecoderSupport.enable()
+
 // No storyboard and no @NSApplicationMain: the delegate is created and set
 // before NSApplicationMain so applicationWillFinishLaunching can build the
 // menu bar (AppDelegate.swift) before the first event is delivered.

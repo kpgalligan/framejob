@@ -88,6 +88,11 @@ the same way.
 - **Expect:** each time, the project opens. Media that is still findable plays. Media that is gone shows slates, with the Missing media sheet offering Locate… and Relink. Never an open failure, a hang or a crash.
 - **Source:** #131 (the owner's report of 2026-09-26, not reproduced by the agents). On a failure, add to #131 which app opened the file and exactly what happened: an alert and its text, a hang, a crash, or no window.
 
+**PB-9 — A VP9 MP4 plays, in sync, and scrubs**
+- **Do:** 1. Make a VP9 MP4 with sound, e.g. `ffmpeg -f lavfi -i testsrc2=size=1280x720:rate=30:duration=10 -f lavfi -i sine=frequency=440:duration=10 -c:v libvpx-vp9 -pix_fmt yuv420p -c:a aac vp9.mp4`, or use a VP9 download from the web in an MP4. 2. Drop it into a project and place it. 3. Play it in the preview, then scrub the playhead across it and step with ← and →.
+- **Expect:** it imports with no alert, plays with its sound in sync, and every scrub and step shows the right picture; the filmstrip fills in.
+- **Source:** #216 (issue batch B72; `codec_import_proof.py` scripts import, frames and export).
+
 ## Timeline, canvas and keys
 
 **TL-1 — Timeline basics**
@@ -522,3 +527,8 @@ unlocked Mac; paste each score into the issue in the Source.
 - **Do:** Run `python3 tools/proof/screens.py` on a display at a different scale from the usual one, e.g. a Mac's built-in Retina screen (scale 2); every run so far was at scale 1 on one external display.
 - **Expect:** the run passes. Screens and prose that depend on the host are noted in the screen's prose, or filed.
 - **Source:** #139 (road map 11's V3).
+
+**HS-6 — AV1 on an M3 or later Mac**
+- **Do:** On an M3 or later Mac: 1. `python3 tools/proof/formats_probe.py`. 2. `python3 tools/proof/codec_import_proof.py --port 4817`. 3. Drop an AV1 MP4 into a project and play it.
+- **Expect:** the formats probe prints `hw_av1 True` and the AV1 rows `opens` (`mp4_av1.mp4`; `mkv_av1.mkv` stays refused); the codec proof's R5 takes its M3 branch and passes; the AV1 clip plays and scrubs like any other. On an M1/M2 the same file is refused with "… is AV1 video, which needs an M3 or later Mac."
+- **Source:** #216 (issue batch B72; measured only on an M2 so far).

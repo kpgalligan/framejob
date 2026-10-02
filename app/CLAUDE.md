@@ -193,8 +193,14 @@ detail there.
   any pass in flight still hold its path (G-19 (d)).
 - `MediaImporter.swift` (+`Probe`, +`Speech`, +`Peaks`) ·
   `MediaPeakBuckets.swift` · `MediaCacheFiles.swift` · `MediaCacheLedger.swift` ·
-  `FFmpegRewrap.swift` · `AppSupport.swift` — the import funnel and the
-  three per-media caches (`thumbs/`, `peaks/`, `speech/`) inside the package.
+  `FFmpegRewrap.swift` · `AppSupport.swift` · `DecoderSupport.swift` — the
+  import funnel and the three per-media caches (`thumbs/`, `peaks/`,
+  `speech/`) inside the package. `DecoderSupport.swift` (await-free) is the
+  per-process opt-in to macOS's supplemental VP9 and AV1 decoders (`enable()`:
+  `main.swift`, `generateCaches`, `CompositionBuilder.firstTrack`, the harness
+  and the formats probe), the import's one-frame decode (`decodesFirstFrame`,
+  refusing only for `refusingErrorCodes`, -11833 and -11855) and the codec
+  refusal sentence (`refusal`), spec §11 #216.
   `async`/`await` is confined to `MediaImporter.swift`; the await-free halves
   are the `+` files, `MediaPeakBuckets`, `MediaCacheFiles` and `MediaCacheLedger`. A cache is CURRENT when its
   `complete.json` marker matches `CacheStamp` (the source's size and

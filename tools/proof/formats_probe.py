@@ -10,10 +10,20 @@ decode both answer), `probe-only` (probe answers, decode does not),
 or `expired` (the probe binary's bound ran out before its row arrived).
 
 Controls: C1 mov_h264_aac.mov opens; C2 junk.mov (4096 seeded random bytes)
-is refused. `--mutant junk-good` hands C2 the C1 file, so C2 must FAIL and
-the run exit 1. Every child runs under graphics_spike/bounded.py's `run`.
+is refused; C3 mp4_vp9.mp4 and C4 mp4_vp9_p2.mp4 open (the supplemental VP9
+decoder, spec §11 #216); C5 mp4_vp9_p1.mp4 is refused with exactly the
+Profile 1 sentence; C6 mp4_av1.mp4 is refused with exactly the M3 sentence
+when HOST hw_av1 is false, and opens when it is true; C7 mp4_h264_damaged.mp4
+(a decodable codec with its first GOP damaged) is not refused.
 
-    python3 tools/proof/formats_probe.py [--mutant junk-good]
+Mutants: `junk-good` hands C2 the C1 file, so C2 must FAIL. The source
+mutants build from an edited copy of app/Sources: `no-register` drops both
+supplemental-decoder registrations (C3, C4 FAIL), `no-decode-check` makes
+`decodesFirstFrame` answer true at its head (C5 FAIL, and C6 on an M1/M2),
+`refuse-any-failure` refuses on any AVFoundation reader error (C7 FAIL).
+Each must exit 1. Every child runs under graphics_spike/bounded.py's `run`.
+
+    python3 tools/proof/formats_probe.py [--mutant NAME]
 """
 import argparse
 import json
@@ -55,6 +65,11 @@ FIXTURE_ROWS = [
     ("V14", "webm_vp8.webm", "va", ["-c:v", "libvpx", *YUV, *VORBIS]),
     ("V15", "avi_mjpeg.avi", "v", ["-c:v", "mjpeg", "-pix_fmt", "yuvj420p"]),
     ("V16", "ts_h264.ts", "v", X264),
+    ("V17", "mp4_vp9_p2.mp4", "v", ["-c:v", "libvpx-vp9", "-pix_fmt", "yuv420p10le",
+                                    "-profile:v", "2"]),
+    ("V18", "mp4_vp9_p1.mp4", "v", ["-c:v", "libvpx-vp9", "-pix_fmt", "yuv444p",
+                                    "-profile:v", "1"]),
+    ("V19", "mp4_vp8.mp4", "v", ["-c:v", "libvpx", *YUV]),
     ("A1", "m4a_aac.m4a", "a", AAC),
     ("A2", "aac_adts.aac", "a", AAC),
     ("A3", "mp3.mp3", "a", ["-c:a", "libmp3lame"]),
@@ -73,6 +88,30 @@ FIXTURE_ROWS = [
     ("P4", "gif.gif", "v", ["-frames:v", "1"]),
     ("P5", "bmp.bmp", "v", ["-frames:v", "1"]),
 ]
+
+# name: [(file under app/Sources, before, after)]; each `before` must match
+# exactly once in the copy (cache_pass_probe.py's `mutate`).
+SOURCE_MUTANTS = {
+    "no-register": [
+        ("DecoderSupport.swift",
+         "VTRegisterSupplementalVideoDecoderIfAvailable(kCMVideoCodecType_VP9)", "_ = 0"),
+        ("DecoderSupport.swift",
+         "VTRegisterSupplementalVideoDecoderIfAvailable(kCMVideoCodecType_AV1)", "_ = 0"),
+    ],
+    "no-decode-check": [
+        ("DecoderSupport.swift",
+         "static func decodesFirstFrame(of track: AVAssetTrack, in asset: AVAsset) -> Bool {",
+         "static func decodesFirstFrame(of track: AVAssetTrack, in asset: AVAsset) -> Bool {\n"
+         "        return true"),
+    ],
+    "refuse-any-failure": [
+        ("DecoderSupport.swift", "Self.refusingErrorCodes.contains(code)", "true"),
+    ],
+}
+
+P1_SENTENCE = ("mp4_vp9_p1.mp4 is VP9 Profile 1 video, which this Mac cannot decode; "
+               "VP9 Profiles 0 and 2 import.")
+AV1_SENTENCE = "mp4_av1.mp4 is AV1 video, which needs an M3 or later Mac."
 
 
 def check(name, good, detail=""):
@@ -112,16 +151,52 @@ def make_fixtures():
     junk = FIXTURES / "junk.mov"
     junk.write_bytes(random.Random(58).randbytes(4096))
     rows.append(("X1", "junk.mov", junk, ""))
+    rows.append(make_damaged())
     return rows
 
 
-def build():
+def make_damaged():
+    """X2: an H.264 MP4 whose first GOP is overwritten just past the mdat
+    header with 2048 seeded random bytes — a codec this Mac decodes, with
+    damaged data (spec §11 #216: not refused)."""
+    name = "mp4_h264_damaged.mp4"
+    path = FIXTURES / name
+    result = bounded.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i",
+                          "testsrc2=size=640x360:rate=30:duration=1", *X264,
+                          "-movflags", "+faststart", str(path)], 60)
+    if result["rc"] or result["expired"] or not path.exists():
+        why = "expired after 60 s" if result["expired"] else tail(result["stderr"])
+        return ("X2", name, None, why)
+    data = bytearray(path.read_bytes())
+    at = data.find(b"mdat")
+    if at < 0 or at + 4 + 2048 > len(data):
+        return ("X2", name, None, "no mdat box with 2048 bytes after its header")
+    data[at + 4:at + 4 + 2048] = random.Random(72).randbytes(2048)
+    path.write_bytes(bytes(data))
+    return ("X2", name, path, "")
+
+
+def mutate(name, dest):
+    """A copy of app/Sources at `dest` with the mutant's edits; the reason
+    when a `before` text is not found exactly once, else None."""
+    if dest.exists():
+        shutil.rmtree(dest)
+    shutil.copytree(ROOT / "app/Sources", dest)
+    for file, before, after in SOURCE_MUTANTS[name]:
+        path = dest / file
+        text = path.read_text() if path.exists() else ""
+        if text.count(before) != 1:
+            return f"{file}: `{before}` found {text.count(before)} times"
+        path.write_text(text.replace(before, after))
+    return None
+
+
+def build(sources):
     WORK.mkdir(parents=True, exist_ok=True)
     entry = WORK / "main.swift"
     shutil.copyfile(ROOT / "tools/proof/formats_probe.swift", entry)
     binary = WORK / "formats-probe"
-    swift = sorted(str(p) for p in (ROOT / "app/Sources").glob("*.swift")
-                   if p.name != "main.swift")
+    swift = sorted(str(p) for p in sources.glob("*.swift") if p.name != "main.swift")
     if len(swift) < 100:
         return None, "app source set incomplete"
     sdk = bounded.run(["xcrun", "--show-sdk-path", "--sdk", "macosx"], 60)["stdout"].strip()
@@ -159,13 +234,21 @@ def describe(answer):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mutant", choices=["junk-good"])
+    parser.add_argument("--mutant", choices=["junk-good", *SOURCE_MUTANTS])
     args = parser.parse_args()
     cpu = bounded.run(["sysctl", "-n", "machdep.cpu.brand_string"], 30)["stdout"].strip()
+    sources = ROOT / "app/Sources"
+    if args.mutant in SOURCE_MUTANTS:
+        sources = WORK / f"Sources-{args.mutant}"
+        why = mutate(args.mutant, sources)
+        if why:
+            print(f"mutant {args.mutant}: the control could not be performed — {why}")
+            return 2
     rows = make_fixtures()
-    binary, problem = build()
-    if not check("B0 the probe builds from app/Sources", binary is not None, problem):
-        print("controls: 0/2")
+    binary, problem = build(sources)
+    if not check(f"B0 the probe builds from {sources.relative_to(ROOT)}",
+                 binary is not None, problem):
+        print("controls: 0/7")
         made = sum(1 for row in rows if row[2])
         print(f"rows: {made} made, {len(rows) - made} not made, 0 expired")
         return 1
@@ -209,17 +292,42 @@ def main():
             print(f"{row_id} {name} {entry['verdict']} — {describe(answer)}")
         table.append(entry)
     by_file = {entry["file"]: entry["verdict"] for entry in table}
+
+    def message(name):
+        return answers.get(name, {}).get("message")
+
+    def refused_with(name, sentence):
+        got = by_file.get(name, "missing")
+        good = got == "refused" and message(name) == sentence
+        return good, f"{got}: {message(name)!r}" if got == "refused" else got
+
     c2_file = "mov_h264_aac.mov" if args.mutant == "junk-good" else "junk.mov"
+    av1_hardware = host.get("hw_av1") is True
+    if av1_hardware:
+        c6 = (by_file.get("mp4_av1.mp4") == "opens", by_file.get("mp4_av1.mp4", "missing"))
+    else:
+        c6 = refused_with("mp4_av1.mp4", AV1_SENTENCE)
     controls = [
         check("C1 mov_h264_aac.mov opens", by_file.get("mov_h264_aac.mov") == "opens",
               by_file.get("mov_h264_aac.mov", "missing")),
         check(f"C2 {c2_file} is refused", by_file.get(c2_file) == "refused",
               by_file.get(c2_file, "missing")),
+        check("C3 mp4_vp9.mp4 opens", by_file.get("mp4_vp9.mp4") == "opens",
+              by_file.get("mp4_vp9.mp4", "missing")),
+        check("C4 mp4_vp9_p2.mp4 opens", by_file.get("mp4_vp9_p2.mp4") == "opens",
+              by_file.get("mp4_vp9_p2.mp4", "missing")),
+        check("C5 mp4_vp9_p1.mp4 is refused with the Profile 1 sentence",
+              *refused_with("mp4_vp9_p1.mp4", P1_SENTENCE)),
+        check("C6 mp4_av1.mp4 " + ("opens (hw_av1 true)" if av1_hardware
+                                   else "is refused with the M3 sentence (hw_av1 false)"), *c6),
+        check("C7 mp4_h264_damaged.mp4 is not refused",
+              by_file.get("mp4_h264_damaged.mp4") in ("opens", "probe-only"),
+              by_file.get("mp4_h264_damaged.mp4", "missing")),
     ]
     (WORK / "answers.json").write_text(json.dumps(
         {"host": host, "cpu": cpu, "mutant": args.mutant, "rows": table,
          "controls": controls}, indent=2) + "\n")
-    print(f"controls: {sum(controls)}/2")
+    print(f"controls: {sum(controls)}/{len(controls)}")
     print(f"rows: {counts['made']} made, {counts['not made']} not made, "
           f"{counts['expired']} expired")
     return 0 if all(controls) else 1

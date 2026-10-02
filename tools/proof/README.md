@@ -12170,3 +12170,93 @@ Runs on 2026-10-02 over `3feafc7` plus this batch.
 python3 tools/proof/settings_layout_probe.py
 python3 tools/proof/settings_layout_probe.py --mutant guard-off
 ```
+
+## Issue batch B72 — VP9 and AV1 in MP4 decode at import, and what will not decode is refused (`formats_probe.py` V17–V19, X2, C3–C7; `codec_import_proof.py` R0–R5; #216 stages 0 + 1; spec §11 #216)
+
+Every process now opts in to macOS's supplemental VP9 and AV1 decoders
+(`DecoderSupport.enable()`), and `probeAsset` decodes the first video frame
+(`DecoderSupport.decodesFirstFrame`). A file is refused as `undecodable`, in
+a sentence naming the codec and with no ffmpeg offer, only when the reader
+fails with -11833 (no decoder) or -11855 (undecodable media data).
+
+- **`formats_probe.py [--mutant NAME]`** — B58's probe, with four rows
+  more: V17 `mp4_vp9_p2.mp4` (`libvpx-vp9 -pix_fmt yuv420p10le -profile:v
+  2`), V18 `mp4_vp9_p1.mp4` (`-pix_fmt yuv444p -profile:v 1`), V19
+  `mp4_vp8.mp4` (`libvpx`; "not made" is a valid answer) and X2
+  `mp4_h264_damaged.mp4` (a 640×360 `libx264 -movflags +faststart` MP4 with
+  `random.Random(72).randbytes(2048)` written at the offset of `b"mdat"` +
+  4). The entry calls `DecoderSupport.enable()` before its `HOST` line, as
+  the app's `main.swift` does, and a refused row carries `message`, the
+  error's `localizedDescription`. Controls: C3 `mp4_vp9.mp4` opens; C4 V17
+  opens; C5 V18 is refused with exactly the Profile 1 sentence; C6
+  `mp4_av1.mp4` is refused with exactly the M3 sentence when `hw_av1` is
+  false and opens when it is true; C7 X2 is not `refused` (`opens` or
+  `probe-only`). The source mutants build from an edited copy of
+  `app/Sources` (`work/formats-probe/Sources-<mutant>`), each `before`
+  matching exactly once or the run answers 2: `no-register` replaces both
+  `VTRegisterSupplementalVideoDecoderIfAvailable(…)` calls with `_ = 0`,
+  `no-decode-check` makes `decodesFirstFrame` return true at its head,
+  `refuse-any-failure` replaces `Self.refusingErrorCodes.contains(code)` with
+  `true`.
+- **`codec_import_proof.py --port <port> [--mutant p1-as-p0|p0-as-p1]`** —
+  launches its own Release instance on `<port>` (frame_grid_proof.py's
+  launch) and kills only that one. Fixtures, made with ffmpeg in a
+  temporary directory: one 2 s AAC sine stream, copied into a 640×360 30 fps
+  2 s `testsrc2` VP9 Profile 0 MP4 and its H.264 twin; a VP9 Profile 1 MP4;
+  an AV1 MP4. R1 imports and places the VP9 P0 file; R2 renders 0.5 s twice
+  (byte-identical), 1.5 s (differs) and 2.5 s (differs) — a frame past the
+  timeline's end is refused ("No frame at 1500000 …" in the first run), so
+  2.5 s is taken over a second clip at 3 s, which `undo` removes; R3 exports
+  h264, ffmpeg decodes its frames at 0.5 s and 1.5 s to differing bytes, and
+  its s16le audio equals the twin's export; R4 the P1 import errors with
+  exactly the Profile 1 sentence and the media count holds; R5 AV1 by CPU
+  brand (M1/M2: exactly the M3 sentence; M3 or later: import and R2's
+  checks; another brand skipped by name); R0 no `Reelcut: ` line. Every
+  document is closed with `close_project`.
+
+Run on 2026-10-02 over `6682104` plus this batch's diff, `host: macOS 26.5.1
+(25F80), Apple M2 Max; hw_av1 False, hw_vp9 True, hw_hevc True`
+(`no-register` printed `hw_vp9 False`). The rows that changed from B58's
+table:
+
+| Rows | Verdict | Printed |
+|---|---|---|
+| V9 `mp4_av1.mp4` | refused | `undecodable(…, sentence: "mp4_av1.mp4 is AV1 video, which needs an M3 or later Mac.")`; playable false |
+| V10 `mp4_vp9.mp4`, V17 `mp4_vp9_p2.mp4` | opens | video 128x72, video, 600000 ticks; decode first frame 128x72 BGRA; playable true |
+| V18 `mp4_vp9_p1.mp4` | refused | `undecodable(…, sentence: "mp4_vp9_p1.mp4 is VP9 Profile 1 video, which this Mac cannot decode; VP9 Profiles 0 and 2 import.")`; playable true |
+| V19 `mp4_vp8.mp4` | not made | ffmpeg: "Nothing was written into output file, because at least one of its streams received no packets." |
+| X2 `mp4_h264_damaged.mp4` | probe-only | video 640x360, video, 600000 ticks; decode no sample buffer (status 3): AVFoundationErrorDomain Code=-11821 "Cannot Decode"; playable true |
+
+Every other row printed B58's verdict. `controls: 7/7`, `rows: 36 made, 1
+not made, 0 expired`, exit 0. The mutants:
+
+| Run | Printed | Exit |
+|---|---|---|
+| `--mutant junk-good` | `FAIL C2 mov_h264_aac.mov is refused: opens`, `controls: 6/7` | 1 |
+| `--mutant no-register` | `FAIL C3 mp4_vp9.mp4 opens: refused`, `FAIL C4 mp4_vp9_p2.mp4 opens: refused`, `controls: 5/7` | 1 |
+| `--mutant no-decode-check` | `FAIL C5 … Profile 1 sentence: probe-only`, `FAIL C6 … M3 sentence (hw_av1 false): probe-only`, `controls: 5/7` | 1 |
+| `--mutant refuse-any-failure` | `FAIL C7 mp4_h264_damaged.mp4 is not refused: refused` (X2's sentence: "mp4_h264_damaged.mp4 is 'avc1' video, which this Mac cannot decode."), `controls: 6/7` | 1 |
+
+`codec_import_proof.py --port 4872` printed R1 `(True, 640, 360, [30, 1],
+True)`, R2a–c ok, R3a "export h264 wrote 77236 bytes", R3b "691200 and
+691200 bytes, differ", R3c "audio s16le: 384000 vs the H.264 twin's 384000
+bytes, equal", R4 "error 'vp9_p1.mp4 is VP9 Profile 1 video, which this Mac
+cannot decode; VP9 Profiles 0 and 2 import.'; media 1 → 1", R5 "Apple M2
+Max: error 'av1.mp4 is AV1 video, which needs an M3 or later Mac.'; media 0
+→ 0", R0 ok, `passed 10/10`, exit 0. `--mutant p1-as-p0` printed `R1 FAIL —
+import refused: import_media: vp9_p1.mp4 is VP9 Profile 1 video, …` (R2 and
+R3 FAIL as "R1 placed no clip"), `passed 3/10`, exit 1. `--mutant p0-as-p1`
+printed `R4 FAIL — error 'Add Media made no change: the project is already
+in that state.'; media 1 → 1` (the P0 file was already the project's
+media), `passed 9/10`, exit 1. R5's M3 branch and the AV1 rows' `opens` are
+manual check HS-6.
+
+```sh
+python3 tools/proof/formats_probe.py                                # controls: 7/7, exit 0
+python3 tools/proof/formats_probe.py --mutant no-register           # C3, C4 FAIL, exit 1
+python3 tools/proof/formats_probe.py --mutant no-decode-check       # C5, C6 FAIL, exit 1
+python3 tools/proof/formats_probe.py --mutant refuse-any-failure    # C7 FAIL, exit 1
+python3 tools/proof/codec_import_proof.py --port 4872               # passed 10/10, exit 0
+python3 tools/proof/codec_import_proof.py --port 4872 --mutant p1-as-p0   # R1 FAIL, exit 1
+python3 tools/proof/codec_import_proof.py --port 4872 --mutant p0-as-p1   # R4 FAIL, exit 1
+```

@@ -349,7 +349,8 @@ enum CompositionBuilder {
     /// every caller through here is what keeps that trade to a single
     /// deprecation warning rather than one per call site.
     static func firstTrack(of asset: AVAsset, mediaType: AVMediaType) -> AVAssetTrack? {
-        asset.tracks(withMediaType: mediaType).first
+        DecoderSupport.enable()
+        return asset.tracks(withMediaType: mediaType).first
     }
 
     // MARK: - The held last frame

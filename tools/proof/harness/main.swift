@@ -1108,6 +1108,7 @@ if arguments[1] == "welcome" {
     }
 }
 
+DecoderSupport.enable()
 let document = ProjectDocument()
 do {
     try document.read(from: projectURL, ofType: "com.kgalligan.reelcut-project")

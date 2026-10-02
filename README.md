@@ -262,7 +262,10 @@ schema, §6 the op table, §7 the architecture.
 - **Playback** over an `AVComposition` built from the core's composition plan,
   with a Metal compositor drawing every frame from the core's frame recipe.
   A property-only edit re-renders the paused frame without rebuilding the
-  player (the plan JSON is compared as a string).
+  player (the plan JSON is compared as a string). VP9 video in an MP4 plays,
+  and AV1 too on an M3 or later Mac; a video this Mac cannot decode (AV1 on an
+  M1 or M2, VP9 Profile 1 or 3, VP8 in an MP4 or MOV) is refused at import with a sentence
+  naming its codec.
 - **Export** through an `AVAssetWriter` over the same composition, the
   format (H.264, HEVC, ProRes 422, ProRes 4444, M4A, WAV, AIFF, GIF, APNG)
   and the size chosen separately and both resolved by the core — the default

@@ -582,3 +582,30 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   the doc lines say one CURRENT pass per key. **The bound it keeps by
   design:** a relink away from a stuck pass starts only after the full
   30 s wait (S1a measured 30.32 s).
+- **#216 — Every Reelcut process opts in to macOS's supplemental VP9 and AV1
+  decoders, and an import of a video track is a one-frame decode** (issue
+  batch B72; the owner, 2026-10-02). `DecoderSupport.enable()` calls
+  `VTRegisterSupplementalVideoDecoderIfAvailable` for VP9 and AV1 once per
+  process: at launch, before a cache pass, before a composition looks up a
+  track, and in the harness and the formats probe. **What is accepted:** a
+  file whose first video frame decodes to 32BGRA through an `AVAssetReader`
+  — VP9 Profiles 0 and 2 in MP4 on every Apple-silicon Mac, AV1 on an M3 or
+  later — alongside everything that imported before. **What is refused**, at
+  `probeAsset`, as `ImportError.undecodable`, with nothing added and no undo
+  step: AV1 without hardware decode ("`<file>` is AV1 video, which needs an
+  M3 or later Mac."), VP9 Profile 1 or 3 ("`<file>` is VP9 Profile `<n>`
+  video, which this Mac cannot decode; VP9 Profiles 0 and 2 import."), VP8
+  ("`<file>` is VP8 video, which this Mac cannot decode.") and any other
+  codec with no decoder, named by its four-letter code. **Only a reader
+  failure whose error is `AVError.decoderNotFound` (-11833) or
+  `AVError.undecodableMediaData` (-11855) refuses** (`refusingErrorCodes`).
+  Damaged or truncated data in a codec this Mac decodes (measured: -11821,
+  -11880) imports as it did before; the check cannot and does not judge a
+  file's damage, and a track that yields no sample but completes imports.
+  **No bundled decoder:** AV1 software decoding is dropped and VP8 is out of
+  scope (the owner, 2026-10-02). **No ffmpeg offer** for `.undecodable`: the
+  refusal is final, since a rewrap would carry the same codec. **The risks
+  it accepts:** one extra frame decode per import, relink and recording
+  segment; VP9's alpha is lost in MP4; HDR VP9 is treated as HDR HEVC is;
+  AV1 on an M3 is unmeasured until manual check HS-6; AV1 media already in
+  a project on an M1/M2 still shows black, since nothing re-checks at open.

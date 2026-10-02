@@ -106,6 +106,9 @@ func decodeImage(_ url: URL) -> (Bool, String) {
     return (true, "CGImage \(image.width)x\(image.height)")
 }
 
+// The product's own opt-in to the supplemental VP9 and AV1 decoders (spec
+// §11 #216), as the app's main.swift makes it, before any row decodes.
+DecoderSupport.enable()
 let version = ProcessInfo.processInfo.operatingSystemVersion
 emit("HOST", [
     "macos": "\(version.majorVersion).\(version.minorVersion).\(version.patchVersion)",
@@ -124,6 +127,7 @@ for path in CommandLine.arguments.dropFirst() {
     } catch {
         row["probe"] = "error"
         row["error"] = String(describing: error)
+        row["message"] = error.localizedDescription
         row["decode"] = "n/a"
         row["decode_detail"] = "probe failed"
         if !MediaImporter.isImage(url) {
