@@ -20,10 +20,12 @@ detail there.
   them), timecode, snapping, export presets/sizes/settings, `SpeedLimits`
   / `ReelSpeed.limits` (the core's speed range and audio ceiling — no Swift
   file types a speed bound), `ReelColor` (`rc_normalise_color`, G-25) and
-  the typed patches — except `TextPatch` (with `case`, `words` and
-  `word_style`), which is `TextPatch.swift`'s, moved out so it could grow,
-  and `ShapePatch`, `ShapePatch.swift`'s (a pure move, the toll for
-  `ReelColor`). `word_style` has ONE
+  `ReelContainer` (`rc_container_*`, a WebM/Matroska file's index,
+  #216-R); the typed patches are `TypedPatches.swift`'s (`VideoPatch`,
+  `AudioPatch`, `ClipPatch`, the `ActionPatch` extension; a pure move, B73),
+  `TextPatch` (with `case`, `words` and `word_style`) is `TextPatch.swift`'s,
+  moved out so it could grow, and `ShapePatch` `ShapePatch.swift`'s (a pure
+  move, the toll for `ReelColor`). `word_style` has ONE
   app-side writer, `CaptionLayout.place` (W-10). The `dictionary`
   extensions on the property types are `OpDictionaries.swift`'s (a pure
   move, #190).
@@ -193,14 +195,22 @@ detail there.
   any pass in flight still hold its path (G-19 (d)).
 - `MediaImporter.swift` (+`Probe`, +`Speech`, +`Peaks`) ·
   `MediaPeakBuckets.swift` · `MediaCacheFiles.swift` · `MediaCacheLedger.swift` ·
-  `FFmpegRewrap.swift` · `AppSupport.swift` · `DecoderSupport.swift` — the
+  `FFmpegRewrap.swift` · `AppSupport.swift` · `DecoderSupport.swift` ·
+  `ContainerRewrap.swift` (+`Writer`) — the
   import funnel and the three per-media caches (`thumbs/`, `peaks/`,
   `speech/`) inside the package. `DecoderSupport.swift` (await-free) is the
   per-process opt-in to macOS's supplemental VP9 and AV1 decoders (`enable()`:
   `main.swift`, `generateCaches`, `CompositionBuilder.firstTrack`, the harness
   and the formats probe), the import's one-frame decode (`decodesFirstFrame`,
   refusing only for `refusingErrorCodes`, -11833 and -11855) and the codec
-  refusal sentence (`refusal`), spec §11 #216.
+  refusal sentence (`refusal`), spec §11 #216. `ContainerRewrap.swift`
+  (+`ContainerRewrapWriter.swift`, both await-free) opens a WebM or Matroska
+  file with no question (spec §11 #216-R): the core indexes it through
+  `ReelContainer`, the first video and audio streams are copied unchanged by
+  `AVAssetWriter` into `Rewrapped/` under `FFmpegRewrap.destination(for:)`'s
+  digest name, the free space is checked first, #216's codecs are refused
+  before the copy, and a codec the copy does not carry (`.unsupported`) alone
+  falls through to the opt-in ffmpeg step.
   `async`/`await` is confined to `MediaImporter.swift`; the await-free halves
   are the `+` files, `MediaPeakBuckets`, `MediaCacheFiles` and `MediaCacheLedger`. A cache is CURRENT when its
   `complete.json` marker matches `CacheStamp` (the source's size and
@@ -1933,7 +1943,8 @@ progress timer, `Transcriber`'s serial queue, `CloudTranscriber`'s serial
 queue and the AssemblyAI client's delegate `OperationQueue` (spec §11's
 R6-7), the transcribe sheet's Download row's KVO main hop
 (`DispatchQueue.main.async` from `Progress`'s `fractionCompleted`
-observation), `FFmpegRewrap`'s serial queue, the two one-frame render
+observation), `FFmpegRewrap`'s serial queue, the container rewrap's per-input writer
+queues (`ContainerRewrapWriter.swift`), the two one-frame render
 queues (`eyedropperQueue`, `frameGrabQueue` — a third one-frame render joins
 this entry rather than growing the list), `ScreenRecorder.shareableContent`'s
 global hop, `GraphicStore`'s serial queue (its file-system sources'

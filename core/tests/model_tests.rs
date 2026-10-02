@@ -25,6 +25,7 @@ use std::ptr;
 use serde_json::{json, Value};
 
 use common::{array, assert_contains, at, cstring, expect_string, take_string, Handle};
+use reelcut_core::container::RcContainerSample;
 use reelcut_core::ffi::{
     rc_normalise_color, rc_project_clone, rc_project_free, rc_project_from_json, rc_project_new,
     rc_project_scoped, rc_project_to_json, rc_string_free, rc_time_snap_to_frame,
@@ -32,6 +33,10 @@ use reelcut_core::ffi::{
 };
 use reelcut_core::ffi_agent::{
     rc_agent_server_start, rc_agent_server_stop, rc_agent_string_create,
+};
+use reelcut_core::ffi_container::{
+    rc_container_describe, rc_container_free, rc_container_open, rc_container_retime,
+    rc_container_sample, rc_container_sample_count,
 };
 use reelcut_core::ffi_edit::rc_project_apply;
 use reelcut_core::ffi_graphic::{
@@ -2280,6 +2285,24 @@ fn sweep_every_export_with_nulls() -> Vec<String> {
     unsafe { rc_graphic_library_free(ptr::null_mut()) };
     unsafe { rc_graphic_library_free(lib) };
     cover("rc_graphic_library_free");
+
+    let mut err: *mut c_char = ptr::null_mut();
+    assert!(unsafe { rc_container_open(ptr::null(), &mut err) }.is_null());
+    assert_eq!(take_string(err).as_deref(), Some("path is NULL"));
+    assert!(unsafe { rc_container_open(ptr::null(), ptr::null_mut()) }.is_null());
+    cover("rc_container_open");
+    assert!(unsafe { rc_container_describe(ptr::null()) }.is_null());
+    cover("rc_container_describe");
+    assert!(!unsafe { rc_container_retime(ptr::null_mut(), 30, 1) });
+    cover("rc_container_retime");
+    assert_eq!(unsafe { rc_container_sample_count(ptr::null(), 0) }, 0);
+    cover("rc_container_sample_count");
+    let mut sample = RcContainerSample::default();
+    assert!(!unsafe { rc_container_sample(ptr::null(), 0, 0, &mut sample) });
+    assert!(!unsafe { rc_container_sample(ptr::null(), 0, 0, ptr::null_mut()) });
+    cover("rc_container_sample");
+    unsafe { rc_container_free(ptr::null_mut()) };
+    cover("rc_container_free");
 
     swept.sort();
     swept.dedup();

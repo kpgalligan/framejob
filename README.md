@@ -265,7 +265,10 @@ schema, §6 the op table, §7 the architecture.
   player (the plan JSON is compared as a string). VP9 video in an MP4 plays,
   and AV1 too on an M3 or later Mac; a video this Mac cannot decode (AV1 on an
   M1 or M2, VP9 Profile 1 or 3, VP8 in an MP4 or MOV) is refused at import with a sentence
-  naming its codec.
+  naming its codec. A WebM or MKV file (VP9, AV1, H.264 or HEVC video with Opus
+  or AAC sound) opens with no question: its streams are copied, not re-encoded,
+  into a movie in `~/Library/Application Support/Reelcut/Rewrapped/`, after a
+  check that the copy fits on the disk.
 - **Export** through an `AVAssetWriter` over the same composition, the
   format (H.264, HEVC, ProRes 422, ProRes 4444, M4A, WAV, AIFF, GIF, APNG)
   and the size chosen separately and both resolved by the core — the default
@@ -526,8 +529,9 @@ that did not land is safe to retry.
 
 - **Rust decides, AVFoundation and Metal do.** No pixel or sample work happens
   in Rust and there is no ffmpeg dependency: the core owns the model, the ops,
-  the composition plan and the per-frame recipe; the platform decodes,
-  composites and encodes.
+  the composition plan and the per-frame recipe, and reads a WebM or Matroska
+  file's index for the import's copy; the platform decodes, composites and
+  encodes.
 - The FFI surface (`core/include/reelcut_core.h`) is an opaque, **immutable**
   `RcProject` handle. Every operation is pure — it returns a new handle and
   never mutates its input — which makes undo a stack of handles and makes

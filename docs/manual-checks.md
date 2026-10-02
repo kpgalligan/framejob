@@ -93,6 +93,11 @@ the same way.
 - **Expect:** it imports with no alert, plays with its sound in sync, and every scrub and step shows the right picture; the filmstrip fills in.
 - **Source:** #216 (issue batch B72; `codec_import_proof.py` scripts import, frames and export).
 
+**PB-10 — Real WebM and MKV files import, play in sync, scrub and export**
+- **Do:** 1. Get three real files: a YouTube VP9 WebM (e.g. from `yt-dlp -f 'bv*[ext=webm]+ba[ext=webm]'`), a Chrome screen recording (a page using `MediaRecorder`, or any site that saves a `.webm` recording) and an OBS recording saved as MKV with sound. On an M3 or later Mac, also an AV1 WebM. 2. Drop each into a project with no ffmpeg setting changed, and place it. 3. Play it, scrub across it and step with ← and →. 4. Export the project as H.264 and play the export.
+- **Expect:** each imports with no question and no alert, as a `.mov` under `~/Library/Application Support/Reelcut/Rewrapped/`. It plays with its sound in sync, every scrub and step shows a picture, and the export plays in sync. A file whose sound is Vorbis says it cannot be copied, naming Vorbis.
+- **Source:** #216 (issue batch B73, spec §11 #216-R; `container_rewrap_probe.py` and `container_import_proof.py` script generated files only).
+
 ## Timeline, canvas and keys
 
 **TL-1 — Timeline basics**

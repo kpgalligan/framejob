@@ -12,11 +12,11 @@ The Lines cell is `wc -l`, and `make test` checks it (`tools/proof/spec_index_pr
 
 | File | Lines | Holds |
 |---|---|---|
-| [`foundations.md`](foundations.md) | 106 | **Foundations (M1–M3, road map 2).** AVFoundation not ffmpeg, the compositor, one op entry point, overlap and ripple rules, ticks, `async` confinement, media by reference; R2-1. |
+| [`foundations.md`](foundations.md) | 108 | **Foundations (M1–M3, road map 2).** AVFoundation not ffmpeg, the compositor, one op entry point, overlap and ripple rules, ticks, `async` confinement, media by reference; R2-1. |
 | [`recording.md`](recording.md) | 244 | **Screen recording (road map 3).** The recorder: what is in and out, files, grants, pause, the voice-over. |
 | [`silence.md`](silence.md) | 49 | **Remove Silences (road map 4).** Silero VAD, its grid and cache, voice mode; S1-23. |
 | [`effects-motion.md`](effects-motion.md) | 60 | **Transitions and motion (road map 5).** R5-1..R5-5, E2-27. |
-| [`deepening.md`](deepening.md) | 611 | **Deepening (road map 7).** D2-1, D3-1, #21, #22, D4-1..D4-6, D7-1..D7-3, #42, #88, #63, #174, #40, #43, #190, #87, #86, #178, #216: how ops refuse, the op table, the gate, the source window, time envelopes, one-delta shifts on the canvas's grid, the non-edits that speak, a relink that re-probes, one frame on the grid, a tool that closes a document, a path one open document holds, a caption name's own extension, a speed of ×0.1–×1000 and the audio ceiling above ×12, a gain change on one audio track slews over 25 ms, a normalised export gained in float and quantised once, the cache passes' save gate's five accepted limits, the supplemental VP9/AV1 decoders and the one-frame import decode. |
+| [`deepening.md`](deepening.md) | 658 | **Deepening (road map 7).** D2-1, D3-1, #21, #22, D4-1..D4-6, D7-1..D7-3, #42, #88, #63, #174, #40, #43, #190, #87, #86, #178, #216, #216-R: how ops refuse, the op table, the gate, the source window, time envelopes, one-delta shifts on the canvas's grid, the non-edits that speak, a relink that re-probes, one frame on the grid, a tool that closes a document, a path one open document holds, a caption name's own extension, a speed of ×0.1–×1000 and the audio ceiling above ×12, a gain change on one audio track slews over 25 ms, a normalised export gained in float and quantised once, the cache passes' save gate's five accepted limits, the supplemental VP9/AV1 decoders and the one-frame import decode, and the WebM/Matroska rewrap. |
 | [`cloud-captions.md`](cloud-captions.md) | 404 | **Cloud captions (road map 6).** R6-1..R6-24: AssemblyAI, keys, deletion, recovery, refusal precedence, a dripping server, a Stop's bound on a DELETE, a refused transcript's failed DELETE reported for the dashboard, cached transcripts not re-checked for the key, speaker colours on Subtitles, server strings checked whole and bounded, a transcript id the key cannot delete holding its media. |
 | [`word-captions.md`](word-captions.md) | 123 | **Word captions (road map 8).** W-1..W-11. |
 | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) | 408 | **Chrome, the clip inspector and keys (the sharp pass, road map 9, #35).** SH-1..SH-5, CI-1..CI-16, K-1..K-3. |
@@ -29,7 +29,7 @@ The Lines cell is `wc -l`, and `make test` checks it (`tools/proof/spec_index_pr
 
 | ID | Decision | File |
 |---|---|---|
-| — | AVFoundation, not ffmpeg | [`foundations.md`](foundations.md) |
+| — | AVFoundation, not ffmpeg — amended by #216-R | [`foundations.md`](foundations.md) |
 | — | Custom compositor from day one | [`foundations.md`](foundations.md) |
 | — | `AVPlayerLayer` under an overlay view | [`foundations.md`](foundations.md) |
 | — | One JSON op entry point | [`foundations.md`](foundations.md) |
@@ -97,6 +97,7 @@ The Lines cell is `wc -l`, and `make test` checks it (`tools/proof/spec_index_pr
 | #86 | A normalised export reads the mix as float, gains it and quantises once to the unchanged 16-bit encoder format; an un-normalised export keeps the Int16 decode | [`deepening.md`](deepening.md) |
 | #178 | The cache passes' save gate has five accepted limits | [`deepening.md`](deepening.md) |
 | #216 | Every process opts in to the supplemental VP9 and AV1 decoders; an import of a video track is a one-frame decode, refused only for no decoder or undecodable data, with a sentence naming the codec and no ffmpeg offer | [`deepening.md`](deepening.md) |
+| #216-R | A WebM or Matroska file opens by a built-in rewrap: the core indexes it, Swift copies its first video and audio streams unchanged into a `.mov` under `Rewrapped/`, free space checked first, an undecodable codec refused before the copy and an uncopied one falling through to the opt-in ffmpeg step | [`deepening.md`](deepening.md) |
 | R6-1 | The cloud engine is a second engine behind the same command, never a second command | [`cloud-captions.md`](cloud-captions.md) |
 | R6-2 | Audio leaves the machine only by name, with the price in front of the person | [`cloud-captions.md`](cloud-captions.md) |
 | R6-3 | The transcript is a per-media asset in the package | [`cloud-captions.md`](cloud-captions.md) |

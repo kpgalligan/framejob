@@ -1,0 +1,511 @@
+#!/usr/bin/env python3
+"""Issue batch B73 — a WebM or Matroska file copied into a movie by the
+built-in rewrap (spec §11 #216-R), probed through the product's own
+`ContainerRewrap.rewrap`.
+
+Makes ffmpeg fixtures (640x360 `testsrc2`, 2 s, with a 440 Hz sine), builds
+container_rewrap_probe.swift with every app/Sources/*.swift except main.swift
+over harness/build.sh's swiftc line, and rewraps each into its own scratch
+destination under tools/proof/work/container-rewrap-probe/scratch/.
+
+Fixtures: P1 VP9+Opus WebM (no CodecPrivate) · P2 the same at 30000/1001 ·
+P3 H.264+AAC MKV (B-frames) · P4 HEVC+AAC MKV · P5 a `-live 1` WebM through
+a pipe (no Cues, no Duration) · P6 P1 cut at 60 % · P7 AV1+Opus · P8 VP9
+Profile 1 (yuv444p) · P9 VP8 · P10 VP9+Vorbis · P11 P1 with the free space
+set to required − 1, then to required · P12 P1 with `stopAfter: 10` · P13
+Opus in 60 ms packets · P14 Opus alone · P15 variable-rate VP9+Opus (0–13 ms
+of jitter, with `settb=1/1000` and `-enc_time_base:v 1/1000`, without which
+ffmpeg 9 regrids the jitter away) · P16 P1 into a destination whose folder
+does not exist yet · P17 H.264+AAC MKV and P18 VP9+Opus WebM whose sound is
+one 2 ms impulse at exactly 1.000 s · P19 a 20 s VP9+Opus WebM with
+`refuseAudioAt: 10`, its tenth audio packet declared 4096 bytes longer than
+its data, which fails the writer (-12703) some appends later, mid-copy.
+
+Rows (see `score`): W* written files probe at the right size, rate and sound
+with their atom; F* the exact-time frame 47 answers its own time; S5/S6/S14
+the live, cut and sound-only files; R7–R10 the refusals by sentence, with
+nothing written; N11 the space check; K12 no partial; A13 Opus 60 ms timing;
+V15 the variable-rate file (retime FALSE asserted first); D16 the new
+folder; X19 the refused append returns `.failed` within 60 s (a pump the
+failed writer never asks again must not hang the copy) and leaves nothing;
+T17/T18 the impulse decodes from the copy (AVFoundation) within 1 ms
+of where it decodes from the source (ffmpeg) — the sound's place against the
+picture; B*v frame 47's written bytes (its passthrough time moved onto the
+movie's timeline by the track's edit) equal the source's at the index entry
+with that time; B*a the whole written audio track, in order, equals the
+source's packets byte for byte (by PTS alone an AAC packet cannot be paired:
+the writer puts AAC's 2112 priming samples before its edit where ffmpeg's
+MKV has 1024, so T17 is what holds AAC's timing).
+
+Mutants edit a copy of app/Sources; each must fail exactly its rows (then
+MUTANT PASS, exit 0): no-retime, no-precheck, no-space-check, keep-partial,
+fixed-opus-frames, audio-dropped, fps-timescale-always, no-mkdir,
+offset-shift, deaf-pump (fails nothing), deaf-pump-unbounded-wait.
+
+    python3 tools/proof/container_rewrap_probe.py [--mutant NAME]
+"""
+import argparse
+import json
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
+import bounded  # noqa: E402
+
+WORK = ROOT / "tools/proof/work/container-rewrap-probe"
+FIX = WORK / "fixtures"
+SCRATCH = WORK / "scratch"
+
+
+def src(rate="30", seconds=2):
+    return ["-f", "lavfi", "-i", f"testsrc2=size=640x360:rate={rate}:duration={seconds}",
+            "-f", "lavfi", "-i", f"sine=frequency=440:sample_rate=48000:duration={seconds}"]
+
+
+VP9 = ["-c:v", "libvpx-vp9", "-pix_fmt", "yuv420p", "-b:v", "500k"]
+OPUS = ["-c:a", "libopus"]
+# settb and the encoder's 1 ms time base: without them ffmpeg 9 regrids the
+# jittered times to 1/30 s and the fixture snaps (measured).
+VFR = "settb=1/1000,setpts=(N/30+0.013*mod(N*7\\,5)/4)/TB"
+
+# An impulse at exactly 1.000 s, 2 ms long: where it decodes is where the
+# copy's sound sits against its picture.
+CLICK = ["-f", "lavfi", "-i",
+         "aevalsrc=if(between(t\\,1\\,1.002)\\,0.9\\,0):s=48000:c=stereo:d=2"]
+
+# id: (file, ffmpeg arguments after the inputs, inputs)
+FIXTURES = {
+    "P1": ("p1.webm", VP9 + OPUS, src()),
+    "P2": ("p2.webm", VP9 + OPUS, src("30000/1001")),
+    "P3": ("p3.mkv", ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-bf", "2", "-c:a", "aac"],
+           src()),
+    "P4": ("p4.mkv", ["-c:v", "libx265", "-pix_fmt", "yuv420p", "-c:a", "aac"], src()),
+    "P7": ("p7.webm", ["-c:v", "libsvtav1", "-pix_fmt", "yuv420p"] + OPUS, src()),
+    "P8": ("p8.webm", ["-c:v", "libvpx-vp9", "-pix_fmt", "yuv444p", "-profile:v", "1"] + OPUS,
+           src()),
+    "P9": ("p9.webm", ["-c:v", "libvpx", "-pix_fmt", "yuv420p"] + OPUS, src()),
+    "P10": ("p10.webm", VP9 + ["-c:a", "vorbis", "-strict", "-2", "-ac", "2"], src()),
+    "P13": ("p13.webm", VP9 + OPUS + ["-frame_duration", "60"], src()),
+    "P14": ("p14.webm", ["-vn"] + OPUS, src()),
+    "P17": ("p17.mkv", ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-bf", "2", "-c:a", "aac"],
+            src()[:4] + CLICK),
+    "P18": ("p18.webm", VP9 + OPUS, src()[:4] + CLICK),
+    # 20 s, so the refused packet fails the writer while both inputs still
+    # have samples to give (on 2 s it can surface only at the finish).
+    "P19": ("p19.webm", VP9 + ["-deadline", "realtime", "-cpu-used", "8"] + OPUS,
+            src(seconds=20)),
+    "P15": ("p15.webm", ["-vf", VFR, "-fps_mode", "vfr", "-enc_time_base:v", "1/1000"]
+            + VP9 + OPUS, src()),
+}
+
+DEAF = [("ContainerRewrapWriter.swift",
+         "guard shared.failure == nil, self.index < self.total else {",
+         "if writer?.status == .failed { return }\n"
+         "                guard shared.failure == nil, self.index < self.total else {"),
+        ("ContainerRewrapWriter.swift",
+         "guard self.input.append(buffer) else {",
+         "guard self.input.append(buffer) else { return }\n"
+         "                    guard true else {")]
+UNBOUNDED = ("ContainerRewrapWriter.swift",
+             "while group.wait(timeout: .now() + .milliseconds(50)) == .timedOut {",
+             "group.wait()\n        while group.wait(timeout: .now()) == .timedOut {")
+
+SOURCE_MUTANTS = {
+    "no-retime": [("ContainerRewrap.swift",
+                   "_ = container.retime(MediaImporter.rationalFrameRate(nominal))", "_ = 0")],
+    "no-precheck": [("ContainerRewrap.swift", "try precheck(description, source)",
+                     "if description.video?.fourcc == nil || description.audio?.fourcc == nil"
+                     " { try precheck(description, source) }")],
+    "no-space-check": [("ContainerRewrap.swift",
+                        "try checkSpace(for: description, source, at: destination,"
+                        " freeBytes: freeBytes)", "_ = 0")],
+    "keep-partial": [("ContainerRewrap.swift",
+                      "            try? manager.removeItem(at: partial)\n"
+                      "            if error is ContainerRewrapError { throw error }",
+                      "            if error is ContainerRewrapError { throw error }")],
+    "fixed-opus-frames": [("ContainerRewrapWriter.swift",
+                           "mVariableFramesInPacket: s.frames,",
+                           "mVariableFramesInPacket: s.frames == 0 ? 0 : 960,")],
+    "audio-dropped": [("ContainerRewrapWriter.swift",
+                       "if let audio = d.audio, audio.samples > 0 {",
+                       "if let audio = d.audio, audio.samples < 0 {")],
+    "fps-timescale-always": [("ContainerRewrapWriter.swift",
+                              "if let scale = CMTimeScale(exactly: video.timescale) {"
+                              " input.mediaTimeScale = scale }",
+                              "input.mediaTimeScale = CMTimeScale("
+                              "MediaImporter.rationalFrameRate(video.nominalFps ?? 30).num)")],
+    "no-mkdir": [("ContainerRewrap.swift",
+                  "try AppSupport.ensureDirectory(destination.deletingLastPathComponent())",
+                  "_ = 0")],
+    "offset-shift": [("ContainerRewrapWriter.swift", "try handle.seek(toOffset: s.offset)",
+                      "try handle.seek(toOffset: s.offset + 1)")],
+    # A failed writer asks each input again on macOS 26.5 and each pending
+    # append answers false (measured: with only the wait put back, P19 still
+    # returns), so the hang X19 guards needs an input that never acts on the
+    # failure: `deaf-pump` makes every pump return without finishing once
+    # the writer has failed — on a refused append or on its next call — and
+    # must fail nothing (the sliced wait halts them); with the wait put back
+    # to one unbounded `group.wait()` as well, P19 hangs.
+    "deaf-pump": DEAF,
+    "deaf-pump-unbounded-wait": DEAF + [UNBOUNDED],
+}
+
+# The rows each mutant must fail, and only those (measured on an M2 Max,
+# hw_av1 false; `no-precheck` adds R7 there, where AV1 would be copied).
+# `no-retime` also fails W3: an un-snapped H.264 track in ms probes as
+# 29985/1000. `audio-dropped` fails every row that reads sound, and X19,
+# whose refused packet is audio. `keep-partial` fails X19 too: its failed
+# copy leaves `p19.partial.mov`.
+EXPECTED = {
+    "no-retime": {"W3", "F1", "F2", "F3", "F4", "B1v", "B3v"},
+    "no-precheck": {"R7", "R8", "R9"},
+    "no-space-check": {"N11"},
+    "keep-partial": {"K12", "X19"},
+    "fixed-opus-frames": {"A13"},
+    "audio-dropped": {"W1", "W2", "W3", "W4", "S5", "S14", "A13", "T17", "T18", "B1a", "B3a",
+                      "X19"},
+    "fps-timescale-always": {"V15"},
+    "no-mkdir": {"D16"},
+    # A frame read one byte late no longer decodes, so the frame and impulse
+    # rows fail with the payload rows.
+    "offset-shift": {"B1v", "B1a", "B3v", "B3a", "F1", "F2", "F3", "F4", "T17", "T18"},
+    "deaf-pump": set(),
+    "deaf-pump-unbounded-wait": {"X19"},
+}
+
+PROFILE1 = ("p8.webm is VP9 Profile 1 video, which this Mac cannot decode; "
+            "VP9 Profiles 0 and 2 import.")
+VP8 = "p9.webm is VP8 video, which this Mac cannot decode."
+AV1 = "p7.webm is AV1 video, which needs an M3 or later Mac."
+VORBIS = "p10.webm has Vorbis audio, which Reelcut cannot copy out of a WebM or Matroska file."
+
+
+def tail(text, limit=300):
+    text = " ".join((text or "").split())
+    return text[-limit:] if text else "(no stderr)"
+
+
+def make_fixtures():
+    if FIX.exists():
+        shutil.rmtree(FIX)
+    FIX.mkdir(parents=True)
+    made, problems = {}, {}
+    for row_id, (name, args, inputs) in FIXTURES.items():
+        path = FIX / name
+        result = bounded.run(["ffmpeg", "-y", "-v", "error", *inputs, *args, str(path)], 120)
+        if result["rc"] or result["expired"] or not path.exists():
+            problems[row_id] = "expired" if result["expired"] else tail(result["stderr"])
+        else:
+            made[row_id] = path
+    live = FIX / "p5.webm"
+    with open(live, "wb") as out:
+        proc = subprocess.run(["ffmpeg", "-v", "error", *src(), *VP9, *OPUS, "-live", "1",
+                               "-f", "webm", "pipe:1"], stdout=out, stderr=subprocess.PIPE,
+                              timeout=120)
+    if proc.returncode == 0 and live.stat().st_size > 0:
+        made["P5"] = live
+    else:
+        problems["P5"] = tail(proc.stderr.decode(errors="replace"))
+    if "P1" in made:
+        whole = made["P1"].read_bytes()
+        cut = FIX / "p6.webm"
+        cut.write_bytes(whole[:len(whole) * 6 // 10])
+        made["P6"] = cut
+    return made, problems
+
+
+def build(sources):
+    WORK.mkdir(parents=True, exist_ok=True)
+    entry = WORK / "main.swift"
+    shutil.copyfile(ROOT / "tools/proof/container_rewrap_probe.swift", entry)
+    binary = WORK / "container-rewrap-probe"
+    swift = sorted(str(p) for p in sources.glob("*.swift") if p.name != "main.swift")
+    if len(swift) < 100:
+        return None, "app source set incomplete"
+    sdk = bounded.run(["xcrun", "--show-sdk-path", "--sdk", "macosx"], 60)["stdout"].strip()
+    result = bounded.run(["swiftc", "-D", "REELCUT_DEV_TOOLS", "-sdk", sdk,
+                          "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
+                          "-import-objc-header",
+                          str(ROOT / "app/Bridging/Reelcut-Bridging-Header.h"),
+                          "-L", str(ROOT / "core/target/release"), "-lreelcut_core",
+                          *swift, str(entry), "-o", str(binary)], 900)
+    if result["expired"]:
+        return None, "swiftc expired after 900 s"
+    if result["rc"]:
+        lines = [line for line in result["stderr"].splitlines() if ": error:" in line]
+        return None, "swiftc: " + "; ".join(lines[:8] or [tail(result["stderr"], 600)])
+    return binary, ""
+
+
+def mutate(name, dest):
+    if dest.exists():
+        shutil.rmtree(dest)
+    shutil.copytree(ROOT / "app/Sources", dest)
+    for file, before, after in SOURCE_MUTANTS[name]:
+        path = dest / file
+        text = path.read_text() if path.exists() else ""
+        if text.count(before) != 1:
+            return f"{file}: `{before}` found {text.count(before)} times"
+        path.write_text(text.replace(before, after))
+    return None
+
+
+def jobs_for(made):
+    if SCRATCH.exists():
+        shutil.rmtree(SCRATCH)
+    jobs = []
+
+    def job(row_id, fixture, **extra):
+        if fixture not in made:
+            return
+        out = SCRATCH / row_id / "out"
+        if row_id == "P16":
+            dest = out / "new" / "deeper" / "p16.mov"
+            (SCRATCH / row_id).mkdir(parents=True)
+        else:
+            out.mkdir(parents=True)
+            dest = out / f"{row_id.lower()}.mov"
+        jobs.append({"id": row_id, "source": str(made[fixture]), "dest": str(dest), **extra})
+
+    for row_id in ("P1", "P3"):
+        job(row_id, row_id, inspect=True, frame47=True, payload=True)
+    for row_id in ("P2", "P4"):
+        job(row_id, row_id, inspect=True, frame47=True)
+    for row_id in ("P5", "P6", "P13", "P14", "P15"):
+        job(row_id, row_id, inspect=True)
+    for row_id in ("P7", "P8", "P9", "P10"):
+        job(row_id, row_id, inspect=True)
+    for row_id in ("P17", "P18"):
+        job(row_id, row_id, click=True)
+    job("P11", "P1", free_delta=-1)
+    job("P11b", "P1", free_delta=0)
+    job("P12", "P1", stop_after=10)
+    job("P19", "P19", refuse_audio_at=10)
+    job("P16", "P1", inspect=True)
+    return jobs
+
+
+def ffprobe_video_duration(path):
+    """The source's video stream from ffprobe's packets: last pts plus its
+    duration, less the first pts."""
+    result = bounded.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                          "packet=pts_time,duration_time", "-of", "json", str(path)], 60)
+    packets = json.loads(result["stdout"] or "{}").get("packets", [])
+    times = sorted((float(p["pts_time"]), p.get("duration_time")) for p in packets
+                   if p.get("pts_time") not in (None, "N/A"))
+    if not times:
+        return None
+    last, duration = times[-1]
+    gap = times[-1][0] - times[-2][0] if len(times) > 1 else 0.0
+    last_duration = float(duration) if duration not in (None, "N/A") else gap
+    return last + last_duration - times[0][0]
+
+
+def decoded_click(path):
+    """When the source's sound, decoded by ffmpeg, first passes 0.3."""
+    if path is None:
+        return None
+    result = subprocess.run(["ffmpeg", "-v", "error", "-i", str(path), "-vn", "-f", "f32le",
+                             "-ac", "1", "-ar", "48000", "-"], capture_output=True, timeout=120)
+    samples = memoryview(result.stdout).cast("f")
+    for k, value in enumerate(samples):
+        if abs(value) > 0.3:
+            return k / 48000
+    return None
+
+
+def score(answers, made, problems, host):
+    results = []
+
+    def row(row_id, ok, detail):
+        results.append((row_id, bool(ok)))
+        print(("  ok   " if ok else "  FAIL ") + f"{row_id} {detail}", flush=True)
+
+    def get(job_id):
+        return answers.get(job_id, {})
+
+    def absent(row_id, job_id):
+        why = problems.get(job_id.rstrip("b"), "no answer")
+        row(row_id, False, f"{job_id}: {why}")
+
+    def written(row_id, job_id, fps, atom, kind="video"):
+        a = get(job_id)
+        if not a:
+            return absent(row_id, job_id)
+        p = a.get("probe", {})
+        tracks = a.get("tracks") or {}
+        atoms = (tracks.get("video") or {}).get("atoms", [])
+        shape = (a.get("rewrap"), p.get("width"), p.get("height"), p.get("fps"),
+                 p.get("has_audio"), atom in atoms)
+        row(row_id, shape == ("ok", 640, 360, fps, True, True),
+            f"{job_id}: rewrap, size, fps, has_audio, {atom} = {shape} {a.get('error', '')}")
+
+    written("W1", "P1", [30, 1], "vpcC")
+    written("W2", "P2", [30000, 1001], "vpcC")
+    written("W3", "P3", [30, 1], "avcC")
+    written("W4", "P4", [30, 1], "hvcC")
+    for n, job_id in ((1, "P1"), (2, "P2"), (3, "P3"), (4, "P4")):
+        a = get(job_id)
+        wanted, actual = a.get("frame47_wanted"), a.get("frame47_actual")
+        good = wanted is not None and actual is not None and abs(wanted - actual) < 1e-6
+        row(f"F{n}", good, f"{job_id}: frame 47 asked at {wanted}, answered {actual}")
+    full = (get("P1").get("probe") or {}).get("duration_ticks")
+    for row_id, job_id, check in (
+            ("S5", "P5", lambda p, t: p.get("has_video") and p.get("has_audio")),
+            ("S6", "P6", lambda p, t: full and 0 < p.get("duration_ticks", 0) < full),
+            ("S14", "P14", lambda p, t: p.get("kind") == "audio" and not p.get("has_video"))):
+        a = get(job_id)
+        if not a:
+            absent(row_id, job_id)
+            continue
+        p = a.get("probe") or {}
+        row(row_id, a.get("rewrap") == "ok" and check(p, a.get("tracks")),
+            f"{job_id}: rewrap {a.get('rewrap')} {a.get('error', '')}; probe {p}")
+
+    def refused(row_id, job_id, sentence, invites):
+        a = get(job_id)
+        if not a:
+            return absent(row_id, job_id)
+        e = a.get("error") or {}
+        good = (a.get("rewrap") == "error" and e.get("message") == sentence
+                and e.get("invites_ffmpeg") == invites and a.get("listing") == []
+                and not a.get("dest_exists"))
+        row(row_id, good, f"{job_id}: {e.get('type')} {e.get('message')!r}, invites ffmpeg "
+            f"{e.get('invites_ffmpeg')}; scratch {a.get('listing')}")
+
+    if host.get("hw_av1"):
+        a = get("P7")
+        row("R7", a.get("rewrap") == "ok" and (a.get("probe") or {}).get("has_video"),
+            f"P7 (hw_av1 true): {a.get('rewrap')} {a.get('error', '')}")
+    else:
+        refused("R7", "P7", AV1, False)
+    refused("R8", "P8", PROFILE1, False)
+    refused("R9", "P9", VP8, False)
+    refused("R10", "P10", VORBIS, True)
+
+    a, b = get("P11"), get("P11b")
+    if a and b:
+        sentence = (f"Not enough free space to open p1.webm: its video and sound need about "
+                    f"{a.get('need_text')} on “{a.get('volume')}”, which has "
+                    f"{a.get('free_text')} free. Nothing was copied.")
+        e = a.get("error") or {}
+        good = (e.get("type") == "noSpace" and e.get("message") == sentence
+                and a.get("listing") == [] and b.get("rewrap") == "ok")
+        row("N11", good, f"required − 1: {e.get('message')!r}, scratch {a.get('listing')}; "
+            f"required: {b.get('rewrap')} {b.get('error', '')}")
+    else:
+        absent("N11", "P11")
+    a = get("P12")
+    e = a.get("error") or {}
+    row("K12", a.get("rewrap") == "error" and e.get("type") == "failed"
+        and not a.get("partial_exists") and not a.get("dest_exists") and a.get("listing") == [],
+        f"P12: {e.get('type')} {e.get('message')!r}; scratch {a.get('listing')}")
+    a = get("P19")
+    e = a.get("error") or {}
+    row("X19", a.get("rewrap") == "error" and e.get("type") == "failed"
+        and "stopped after" not in (e.get("message") or "")
+        and not a.get("partial_exists") and not a.get("dest_exists") and a.get("listing") == [],
+        f"P19: {a.get('rewrap')} {e.get('type')} {e.get('message')!r}; scratch "
+        f"{a.get('listing')}")
+    a = get("P13")
+    tracks = a.get("tracks") or {}
+    video = (tracks.get("video") or {}).get("duration")
+    audio = (tracks.get("audio") or {}).get("duration")
+    row("A13", video is not None and audio is not None and audio >= video - 0.060,
+        f"P13: audio {audio} s against video {video} s")
+    a = get("P15")
+    source_duration = ffprobe_video_duration(made["P15"]) if "P15" in made else None
+    tracks = a.get("tracks") or {}
+    vt = tracks.get("video") or {}
+    checks = [a.get("retimed") is False, a.get("rewrap") == "ok",
+              vt.get("samples") == a.get("index_video_samples"),
+              source_duration is not None and vt.get("duration") is not None
+              and abs(vt["duration"] - source_duration) <= 0.002]
+    row("V15", all(checks), f"P15: retimed {a.get('retimed')} (must be false first), rewrap "
+        f"{a.get('rewrap')} {a.get('error', '')}, samples {vt.get('samples')} vs index "
+        f"{a.get('index_video_samples')}, duration {vt.get('duration')} vs ffprobe "
+        f"{source_duration}")
+    a = get("P16")
+    row("D16", a.get("rewrap") == "ok" and a.get("dest_exists"),
+        f"P16: {a.get('rewrap')} {a.get('error', '')}; destination exists "
+        f"{a.get('dest_exists')}")
+    for row_id, job_id in (("T17", "P17"), ("T18", "P18")):
+        a = get(job_id)
+        heard, source = a.get("click"), decoded_click(made.get(job_id))
+        row(row_id, heard is not None and source is not None and abs(heard - source) <= 0.001,
+            f"{job_id}: the impulse decodes at {heard} s from the copy, {source} s from the "
+            f"source (ffmpeg); {a.get('error', '')}")
+    for n, job_id in ((1, "P1"), (3, "P3")):
+        p = get(job_id).get("payload") or {}
+        row(f"B{n}v", p.get("video_found") and p.get("video_equal"),
+            f"{job_id}: frame 47's written bytes equal the source's: {p.get('video_found')}, "
+            f"{p.get('video_equal')} ({p.get('video_size')} bytes)")
+        row(f"B{n}a", p.get("audio_sequence_equal"),
+            f"{job_id}: every written audio packet, in order, less the "
+            f"{p.get('audio_prepended')} priming copies the writer put first, equals the "
+            f"source's ({p.get('audio_written')} written, {p.get('audio_source')} indexed); "
+            f"by PTS the packet nearest 1.0 s ({p.get('audio_time')} s) "
+            f"{'equals' if p.get('audio_equal') else 'is not'} the index's at "
+            f"{p.get('audio_index_time')} s")
+    return results
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--mutant", choices=list(SOURCE_MUTANTS))
+    args = parser.parse_args()
+    sources = ROOT / "app/Sources"
+    if args.mutant:
+        sources = WORK / f"Sources-{args.mutant}"
+        why = mutate(args.mutant, sources)
+        if why:
+            print(f"mutant {args.mutant}: the control could not be performed — {why}")
+            return 2
+    made, problems = make_fixtures()
+    for row_id, why in problems.items():
+        print(f"fixture {row_id} not made: {why}")
+    binary, problem = build(sources)
+    if binary is None:
+        print(f"  FAIL B0 the probe builds from {sources}: {problem}")
+        print("passed 0/1")
+        return 1
+    jobs = jobs_for(made)
+    job_file = WORK / "jobs.json"
+    job_file.write_text(json.dumps(jobs, indent=2))
+    result = bounded.run([str(binary), str(job_file)], 900)
+    host, answers = {}, {}
+    for line in result["stdout"].splitlines():
+        tag, _, body = line.partition(" ")
+        try:
+            parsed = json.loads(body) if tag in ("HOST", "ROW") else None
+        except json.JSONDecodeError:
+            continue
+        if tag == "HOST":
+            host = parsed
+        elif tag == "ROW":
+            answers[parsed["id"]] = parsed
+    print(f"host: macOS {host.get('macos', '?')}, hw_av1 {host.get('hw_av1')}")
+    if result["expired"]:
+        print(f"probe binary expired after 900 s; {len(answers)} rows received")
+    elif result["rc"]:
+        print(f"probe binary exited {result['rc']}: {tail(result['stderr'], 600)}")
+    (WORK / "answers.json").write_text(json.dumps({"host": host, "answers": answers},
+                                                  indent=2) + "\n")
+    results = score(answers, made, problems, host)
+    failed = {row_id for row_id, ok in results if not ok}
+    print(f"passed {len(results) - len(failed)}/{len(results)}")
+    if not args.mutant:
+        return 1 if failed else 0
+    expected = set(EXPECTED[args.mutant])
+    if args.mutant == "no-precheck" and host.get("hw_av1"):
+        expected.discard("R7")
+    verdict = "MUTANT PASS" if failed == expected else "MUTANT FAIL"
+    print(f"{verdict}: {args.mutant} failed {sorted(failed)}, expected {sorted(expected)}")
+    return 0 if failed == expected else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

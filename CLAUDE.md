@@ -85,7 +85,8 @@ make prices     # NETWORK: regenerate agent/prices/anthropic.json from LiteLLM (
 
 ```
 core/                Rust staticlib — the model, the ops, the plan, the recipe,
-  include/…_core.h     export settings, the generic MCP server. THE FFI CONTRACT
+  include/…_core.h     export settings, the generic MCP server, the index of a
+                       WebM/Matroska file being imported. THE FFI CONTRACT
   src/                 core/CLAUDE.md has the module map
   tests/               black-box, through the FFI
 graphic/             Rust crate — the graphics engine (road map 10): a Module run in
@@ -121,8 +122,8 @@ project.yml          xcodegen definition; Makefile; README.md (user-facing)
 ## Architecture
 
 **Rust decides, AVFoundation and Metal do** (spec §7). The core holds the
-project (JSON, spec §5.2), every edit, the composition plan and the per-frame
-recipe. Swift owns windows, gestures, undo, AVFoundation playback and export,
+project (JSON, spec §5.2), every edit, the composition plan, the per-frame
+recipe and the index of a WebM/Matroska file being imported. Swift owns windows, gestures, undo, AVFoundation playback and export,
 the Metal compositor, media import and its caches, and agent dispatch. No
 pixel or sample work in Rust; no ffmpeg dependency in the product.
 

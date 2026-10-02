@@ -185,19 +185,54 @@ extension MediaImporter {
             // Images are excluded because ImageIO's refusal means the picture
             // is corrupt, not that the container is exotic — and a PNG is not
             // something to hand to a video converter.
-            guard let rewrapped = try FFmpegRewrap.assist(url) else { throw failure }
-            do {
-                return try waitForProbe(rewrapped)
-            } catch {
-                // ffmpeg wrote a file AVFoundation still will not open. The
-                // conversion is cached by name, so leaving it there would
-                // hand the same broken result back for ever; throwing it away
-                // makes the next attempt a real attempt. The error reported
-                // is the ORIGINAL one, because the file the user chose is the
-                // one they are being told about.
-                FFmpegRewrap.discard(rewrapped)
-                throw failure
+            guard ContainerRewrap.isMatroska(url) else {
+                return try probeConverted(url, failure: failure)
             }
+            // A WebM or Matroska file is copied into a movie with no question
+            // (spec §11 #216-R). Only a codec the copy cannot carry goes on
+            // to the opt-in ffmpeg step; every other refusal is final.
+            do {
+                return try probeCopy(try ContainerRewrap.assist(url), of: url)
+            } catch let refusal as ContainerRewrapError where refusal.invitesFFmpeg {
+                return try probeConverted(url, failure: refusal)
+            }
+        }
+    }
+
+    /// The opt-in ffmpeg step, and its result probed; `failure` is what is
+    /// thrown when there is no conversion or it will not open.
+    private static func probeConverted(_ url: URL, failure: any Error) throws -> MediaDescriptor {
+        guard let rewrapped = try FFmpegRewrap.assist(url) else { throw failure }
+        do {
+            return try waitForProbe(rewrapped)
+        } catch {
+            // ffmpeg wrote a file AVFoundation still will not open. The
+            // conversion is cached by name, so leaving it there would
+            // hand the same broken result back for ever; throwing it away
+            // makes the next attempt a real attempt. The error reported
+            // is the ORIGINAL one, because the file the user chose is the
+            // one they are being told about.
+            FFmpegRewrap.discard(rewrapped)
+            throw failure
+        }
+    }
+
+    /// The built-in copy of `source` probed. A copy the one-frame decode
+    /// refuses is thrown away and refused in the source's name (#216's
+    /// backstop); any other failure throws the copy away too, so the next
+    /// import copies again rather than reuse a movie that will not open.
+    private static func probeCopy(_ copy: URL, of source: URL) throws -> MediaDescriptor {
+        do {
+            return try waitForProbe(copy)
+        } catch ImportError.undecodable(_, let sentence) {
+            FFmpegRewrap.discard(copy)
+            let copyName = copy.lastPathComponent
+            let named = sentence.hasPrefix(copyName)
+                ? source.lastPathComponent + sentence.dropFirst(copyName.count) : sentence
+            throw ImportError.undecodable(source, sentence: named)
+        } catch {
+            FFmpegRewrap.discard(copy)
+            throw ContainerRewrapError.failed(source, reason: "the copied movie could not be read")
         }
     }
 

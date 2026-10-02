@@ -497,6 +497,21 @@ governs a module now.
   `err_out`, which is why `rc_project_scoped` lives in `ffi.rs`.
   `rc_speed_limits` is its answer for the speed range and the audio ceiling;
   `rc_normalise_color` (`ffi.rs`) is the colour grammar's (G-25).
+- `container.rs` · `container_header.rs` · `container_blocks.rs` ·
+  `container_codec.rs` · `container_timing.rs` · `ffi_container.rs` — a WebM
+  or Matroska file being imported, read as an INDEX (spec §11 #216-R),
+  read-only, bounds-checked, no input may panic: `container_header.rs` the
+  EBML reading and the header before the first Cluster (a CodecPrivate over
+  1 MiB refused by name); `container_blocks.rs` the Cluster walk
+  (unknown-size Clusters end at the next level-1 element, three lacings,
+  payloads skipped, a truncated tail ends the index); `container_codec.rs`
+  codec ID → fourcc, the synthesised `vpcC`, the AAC ES_Descriptor, Opus TOC
+  counts; `container_timing.rs` raw and grid-snapped video times, decode
+  times by the largest reorder, audio in samples less CodecDelay,
+  laced-frame times, `required_bytes`; `container.rs` the first video and
+  audio track and `describe`/`retime`/`sample_count`/`sample`;
+  `ffi_container.rs` the six `rc_container_*` exports. The only payload read
+  is the first VP9 keyframe's header and each Opus packet's TOC.
 - `ffi_graphic.rs` — the ten `rc_graphic_*` exports (road map 10 §5e)
   and the ONLY module of `core/src/` that names the `graphic` crate (spec
   §11 G-2; `core/tests/graphic_ffi.rs` reads `core/src/` to hold it). An

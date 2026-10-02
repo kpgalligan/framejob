@@ -32,6 +32,9 @@
 // slice of it, so "never used here" says nothing about the helper.
 #![allow(dead_code)]
 
+/// The EBML / Matroska writer the container tests build their files with.
+pub mod ebml;
+
 use std::ffi::{c_char, CStr, CString};
 use std::ptr;
 

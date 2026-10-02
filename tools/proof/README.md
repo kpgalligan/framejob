@@ -12260,3 +12260,98 @@ python3 tools/proof/codec_import_proof.py --port 4872               # passed 10/
 python3 tools/proof/codec_import_proof.py --port 4872 --mutant p1-as-p0   # R1 FAIL, exit 1
 python3 tools/proof/codec_import_proof.py --port 4872 --mutant p0-as-p1   # R4 FAIL, exit 1
 ```
+
+## Issue batch B73 — WebM and Matroska open by a built-in rewrap (`container_rewrap_probe.py` W1–B3a and X19; `container_import_proof.py` M0–M6; #216 stage 2, phase 1; spec §11 #216-R)
+
+The core indexes a WebM or Matroska file (`rc_container_*`) and
+`ContainerRewrap` copies its first video and audio stream, unchanged, into
+`~/Library/Application Support/Reelcut/Rewrapped/<stem>-<16 hex>.mov` with
+`AVAssetWriter`; the import funnel takes that path with no question when
+AVFoundation refuses a file that begins with an EBML header.
+
+- **`container_rewrap_probe.py [--mutant NAME]`** — makes its fixtures with
+  ffmpeg (640×360 `testsrc2`, 2 s, a 440 Hz sine), builds
+  `container_rewrap_probe.swift` with every `app/Sources/*.swift` but
+  `main.swift` over the harness's swiftc line (`-D REELCUT_DEV_TOOLS`), and
+  calls `ContainerRewrap.rewrap` on each into its own scratch destination
+  under `work/container-rewrap-probe/scratch/`, each call on its own thread
+  and bounded at 60 s (a copy that has not returned is the row's `hung`).
+  Fixtures P1–P19 and rows W*, F*, S*, R7–R10, N11, K12, X19, A13, V15, D16,
+  T17/T18, B* are in its docstring.
+  Two departures from the design's text, each measured: P15 needs
+  `settb=1/1000` and `-enc_time_base:v 1/1000` (without them ffmpeg 9 wrote
+  the jittered times back onto 1/30 s and V15's fail-first `retime` row
+  failed on the fixture, as it was built to); and the payload rows read the
+  written movie through its edit — a passthrough read answers MEDIA times,
+  and the writer shifts a B-frame H.264 track's media one frame later so its
+  decode times start at 0 — while the audio row compares the whole track in
+  order, because AAC cannot be paired by PTS (the writer puts Apple's 2112
+  priming samples before its edit where ffmpeg's MKV has 1024). T17/T18,
+  added for that reason, hold the sound's place against the picture: an
+  impulse at 1.000 s decodes from the copy within 1 ms of where ffmpeg
+  decodes it from the source. Each source mutant edits a copy of
+  `app/Sources` (`work/container-rewrap-probe/Sources-<mutant>`), its
+  `before` text matching exactly once or the run answers 2, and must fail
+  exactly the rows `EXPECTED` names; then it prints `MUTANT PASS` and exits 0.
+  X19 (review fix, 2026-10-02): `rewrap`'s third seam, `refuseAudioAt`,
+  declares one audio packet 4096 bytes longer than its data, which fails the
+  writer (-12703) some appends later; P19 is a 20 s file so that lands
+  mid-copy (on the 2 s P1 it surfaced only at the finish in one run of
+  four). Measured on macOS 26.5.1: a failed writer asks each input again and
+  every pending append answers false, so the writer's old unbounded
+  `group.wait()` alone did not hang (an ad hoc `bare-unbounded-wait` run
+  scored 27/27). The hang needs a pump that never acts on the failure, which
+  `deaf-pump` makes (every pump returns without finishing once the writer
+  has failed); with the sliced wait it fails nothing, and with the wait also
+  put back to one `group.wait()` (`deaf-pump-unbounded-wait`) X19 answers
+  `hung` with `p19.partial.mov` left behind.
+- **`container_import_proof.py --port <port> [--mutant ffmpeg-copy]`** —
+  launches its own Release instance with `-RCFFmpegImport never` and kills
+  only that one; runs over the real `Rewrapped/` and removes only the
+  digest names it created there, parent-checked. `render_frame` snaps `t` to
+  the canvas grid, so M2 sets the canvas to five times the media's rate to
+  put ±0.4 frame on it.
+
+Run on 2026-10-02 over `901bb80` plus this batch's diff, macOS 26.5.1,
+Apple M2 Max, `hw_av1 False`; re-run after the review's fixes (X19 added)
+the same day. `container_rewrap_probe.py` printed `passed 27/27`, exit 0,
+among them X19 "error failed 'Could not copy p19.webm into a movie: The
+operation could not be completed.'; scratch []", W1 `('ok', 640, 360, [30, 1], True, True)`, W2
+`[30000, 1001]`, F1 "frame 47 asked at 1.5666666666666667, answered
+1.5666666666666667", F2 "asked at 1.5682333333333334, answered
+1.5682333333333334", N11 "need about 16.9 MB on “Macintosh HD”, which has
+16.9 MB free", A13 "audio 2.033333333333333 s against video 2 s", V15
+"retimed False …, samples 60 vs index 60, duration 2.0083333333333333 vs
+ffprobe 2.009", T17 and T18 "the impulse decodes at 1 s from the copy, 1.0 s
+from the source", B3a "95 written, 95 indexed". The mutants:
+
+| Run | Failed (all as expected) | Printed |
+|---|---|---|
+| `--mutant no-retime` | W3, F1–F4, B1v, B3v (F1 "answered 1.533", W3 `[29985, 1000]`) | `passed 20/27`, MUTANT PASS |
+| `--mutant no-precheck` | R7, R8, R9 (each written: `scratch ['p7.mov']`) | `passed 24/27`, MUTANT PASS |
+| `--mutant no-space-check` | N11 (`scratch ['p11.mov']`) | `passed 26/27`, MUTANT PASS |
+| `--mutant keep-partial` | K12, X19 (`scratch ['p12.partial.mov']`, `['p19.partial.mov']`) | `passed 25/27`, MUTANT PASS |
+| `--mutant fixed-opus-frames` | A13 ("audio 0.6733333333333333 s against video 2 s") | `passed 26/27`, MUTANT PASS |
+| `--mutant audio-dropped` | W1–W4, S5, S14, A13, T17, T18, B1a, B3a (every row that reads sound) and X19 (no audio to refuse: `ok`, `scratch ['p19.mov']`) | `passed 15/27`, MUTANT PASS |
+| `--mutant fps-timescale-always` | V15 ("duration 2 vs ffprobe 2.009") | `passed 26/27`, MUTANT PASS |
+| `--mutant no-mkdir` | D16 ("Could not copy p1.webm into a movie: Cannot create file.") | `passed 26/27`, MUTANT PASS |
+| `--mutant offset-shift` | B1v, B1a, B3v, B3a, and F1–F4, T17, T18 (a frame read a byte late no longer decodes) | `passed 17/27`, MUTANT PASS |
+| `--mutant deaf-pump` | none (the sliced wait halts the deaf pumps) | `passed 27/27`, MUTANT PASS |
+| `--mutant deaf-pump-unbounded-wait` | X19 ("hung", `scratch ['p19.partial.mov']`) | `passed 26/27`, MUTANT PASS |
+
+`container_import_proof.py --port 4873` printed M1 `(True, True, 640, 360,
+[30, 1], True)`, M2 and M2b "equals +0.4 frame and differs from −0.4
+frame", M3 "mtime unchanged", M4 "export 2.0 s, audio RMS 0.0882", M5a–c the
+VP8, Vorbis and AV1 sentences with "media 0 → 0; Rewrapped/ unchanged", M6
+"8 documents closed", M0 ok, `passed 10/10`, exit 0. `--mutant ffmpeg-copy`
+printed `M2 FAIL — p1-copy.mp4: frame 47 (t 940000) differs from +0.4 frame
+and equals −0.4 frame`, `passed 9/10`, MUTANT PASS, exit 0. B72's
+`formats_probe.py` (`controls: 7/7`) and `codec_import_proof.py --port 4874`
+(`passed 10/10`) still exit 0.
+
+```sh
+python3 tools/proof/container_rewrap_probe.py                          # passed 27/27, exit 0
+python3 tools/proof/container_rewrap_probe.py --mutant no-retime       # MUTANT PASS, exit 0 (each of the eleven)
+python3 tools/proof/container_import_proof.py --port 4873              # passed 10/10, exit 0
+python3 tools/proof/container_import_proof.py --port 4873 --mutant ffmpeg-copy   # M2 FAIL, MUTANT PASS, exit 0
+```

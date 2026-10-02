@@ -18,6 +18,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   and invalidates itself. `RCFFmpegImport` chooses the policy and
   `RCFFmpegPath` the binary; with neither ffmpeg nor a cached conversion
   the import fails exactly as it did before the feature existed.
+  Amended by #216-R: WebM and Matroska open by a built-in rewrap; ffmpeg
+  remains the opt-in step for what that does not copy.
 - **Custom compositor from day one** (M1 step 5). `AVVideoCompositing`
   has sharp edges — pixel-buffer pools, timing, `renderContextChanged`.
   Building the single-layer version first de-risks every later effect.

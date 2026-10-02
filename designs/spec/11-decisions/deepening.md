@@ -609,3 +609,50 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   segment; VP9's alpha is lost in MP4; HDR VP9 is treated as HDR HEVC is;
   AV1 on an M3 is unmeasured until manual check HS-6; AV1 media already in
   a project on an M1/M2 still shows black, since nothing re-checks at open.
+- **#216-R — A WebM or Matroska file is opened by a built-in rewrap, with no
+  question: the Rust core indexes the container and Swift copies its first
+  video and audio streams, unchanged, into a QuickTime movie** (issue batch
+  B73, #216 stage 2 phase 1; the owner, 2026-10-02). **The core reads the
+  container** (`container*.rs`, `ffi_container.rs`): it is byte parsing of
+  untrusted input, bounds-checked, panic-caught at the FFI and testable
+  black-box in `make test`, and the frame grid, the decode times, a laced
+  frame's time, the codec setup records and the space estimate are
+  DECISIONS. It opens the file read-only and reads no payload but the first
+  VP9 keyframe's header and each Opus packet's TOC. **Swift does the rest** (`ContainerRewrap.swift`,
+  `ContainerRewrapWriter.swift`): `AVAssetWriter` passthrough, the
+  destination and its folder, the free-space query and the refusals' words.
+  Neither side touches a pixel or a sample. **Its own walker, not
+  `matroska-demuxer`** (measured): the crate reads every payload and exposes
+  no file offsets, drops a BlockGroup's keyframe flag (`is_keyframe: None`),
+  and its frame-at-a-time order deadlocked a single-thread writer feed.
+  **Always `.mov`**, in `~/Library/Application Support/Reelcut/Rewrapped/`
+  beside ffmpeg's conversions, under `FFmpegRewrap.destination(for:)`'s
+  digest name, so a re-import reuses the copy: `AVAssetWriter` refuses
+  Vorbis in `.mp4`, which phase 2 needs, and vp09, av01, avc1, hvc1, Opus
+  and AAC all write to `.mov` and read back. **The space check comes first:**
+  the core's `required_bytes` (the copied payload, 64 bytes a sample and
+  16 MiB) is compared with `volumeAvailableCapacityForImportantUsage` on the
+  destination's nearest existing folder, and a copy that will not fit
+  writes nothing. **The pre-check:** the codec facts in the Tracks element
+  feed #216's sentences — VP8, AV1 without hardware decode, VP9 Profile 1
+  or 3 — so nothing is copied that would then be refused; #216's one-frame
+  decode stays as the backstop after the copy. **A codec that is not
+  copied** (Vorbis, FLAC, MP3, AC-3, MPEG-2 and the rest, or a compressed
+  or encrypted track) is refused in its own sentence and FALLS THROUGH to
+  the opt-in ffmpeg step; every other refusal is final. **Timing:** video
+  is snapped to its frame grid (`nominal_fps` from DefaultDuration, else
+  the median gap) when every frame is within a quarter frame of a grid
+  point and no two share one, and is written at that grid's timescale, so
+  an exact-time request lands on its frame; otherwise — most browser
+  recordings — the raw millisecond times and their timescale are kept.
+  Decode times are the sorted presentation times shifted back by the
+  largest reorder. Audio is timed in samples from the Block time less
+  CodecDelay; an Opus packet's sample count is its TOC's. A laced frame is
+  its Block's time plus the frames before it in the lace; a laced COPIED
+  video track with no DefaultDuration is refused at open. **What is
+  dropped:** every video and audio track after the first of each kind,
+  subtitles, chapters, attachments and VP9 alpha. **The risks it accepts:**
+  no progress or Cancel in this phase (a copy runs at about disk speed); a
+  document opened from the Finder blocks the main thread for the copy, as
+  ffmpeg's conversion already does; the Media tab names the copy, not the
+  original; the copy lives outside the package until Consolidate.

@@ -449,6 +449,77 @@ bool rc_graphic_rasterize(const RcGraphicLibrary *lib, const char *svg, uint32_t
 /* Releases a graphic. NULL-tolerant. */
 void rc_graphic_free(RcGraphic *g);
 
+/* ------------------------------------------------------------- container */
+
+/* A WebM or Matroska file being imported, read as an INDEX (spec §11
+ * #216-R) through `core/src/ffi_container.rs`: its first video and first
+ * audio track and where each frame's bytes lie, which the app copies
+ * unchanged into a QuickTime movie. The file is opened read-only; nothing
+ * is decoded. A truncated or damaged Cluster tail ends the index, so a cut
+ * file opens shorter.
+ *
+ * `rc_container_describe` answers, with exactly these keys:
+ *   {"doc_type":"webm"|"matroska", "required_bytes":N,
+ *    "video":null|{"codec_id","fourcc":"vp09"|"av01"|"avc1"|"hvc1"|"vp08"|null,
+ *      "encoded":bool,"width","height","atom":"vpcC"|"av1C"|"avcC"|"hvcC"|null,
+ *      "atom_hex","vp9_profile":int|null,"nominal_fps":f64|null,"timescale",
+ *      "grid":bool,"samples","bytes"},
+ *    "audio":null|{"codec_id","fourcc":"opus"|"aac "|null,"encoded":bool,
+ *      "sample_rate","channels","cookie_hex","frames_per_packet":0|1024,
+ *      "timescale","samples","bytes"}}
+ * A track is null when the file has none or none of its frames. `fourcc`
+ * null, or `encoded` (a ContentEncodings element), means the track is not
+ * copied: its `samples` and `bytes` are then 0. `required_bytes` is the
+ * copied payload + 64 × the copied samples + 16 MiB. `video.timescale` is
+ * the one the samples are in NOW: fps num after a `rc_container_retime`
+ * that answered true, else the raw timescale (1e9 / TimestampScale when
+ * exact, else 1000000). A sample's times are in its track's `timescale`;
+ * samples come in decode order. */
+#define RC_CONTAINER_VIDEO 0
+#define RC_CONTAINER_AUDIO 1
+
+typedef struct RcContainer RcContainer;
+
+typedef struct RcContainerSample {
+    uint64_t offset;
+    uint32_t size;
+    uint32_t frames; /* audio: samples in this packet (0 = describe's frames_per_packet); video: 0 */
+    int64_t pts;
+    int64_t dts;
+    int64_t duration; /* in the track's describe `timescale` */
+    bool sync;
+} RcContainerSample;
+
+/* Opens and indexes the whole file at `path`. NULL with a lowercase reason
+ * through `err_out` ("path is NULL", "it does not begin with an EBML
+ * header", "its DocType is “x”, not webm or matroska", "track N's
+ * CodecPrivate is B bytes, over the 1 MiB limit", "track N has laced video
+ * Blocks and no DefaultDuration, so its frames have no times", …). Freed
+ * with `rc_container_free`. */
+RcContainer *rc_container_open(const char *path, char **err_out);
+
+/* The JSON above. NULL only for NULL. */
+char *rc_container_describe(const RcContainer *container);
+
+/* Snaps the video to the fps_num/fps_den grid when every frame lies within
+ * a quarter frame of a grid point and no two share one: true, `grid` true,
+ * frame k at k × fps_den in a timescale of fps_num. Otherwise false and the
+ * raw times stay. False for NULL or a term outside 1…UINT32_MAX. Not to be
+ * called while another thread reads the container. */
+bool rc_container_retime(RcContainer *container, int64_t fps_num, int64_t fps_den);
+
+/* The copied samples of `track` (RC_CONTAINER_VIDEO or RC_CONTAINER_AUDIO);
+ * 0 for NULL, another track, or a track not copied. */
+uint64_t rc_container_sample_count(const RcContainer *container, uint32_t track);
+
+/* Writes sample `index` of `track` through `out`; false, `out` untouched,
+ * for NULL or an index past the count. */
+bool rc_container_sample(const RcContainer *container, uint32_t track, uint64_t index,
+                         RcContainerSample *out);
+
+/* Releases a container. NULL-tolerant. */
+void rc_container_free(RcContainer *container);
+
 /* ----------------------------------------------------------------- agent */
 
 /* C signature of the host tool handler. Called from the server thread for
