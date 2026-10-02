@@ -353,6 +353,11 @@ lenient-decoding rule.
   cut out of `AgentServer+Recording.swift`, which sat at the 400-line cap, as a pure move with
   `private` dropped, before the chrome took its observer of the recorder's
   `pauseDidChangeNotification` (#181).
+- **`Session` lives in `ScreenRecorder+Pause.swift`** (#99 phase 1, issue batch B64): moved whole,
+  as a pure move gated alone (typecheck at its baseline), because `ScreenRecorder.swift` stood at
+  399 lines against the 400-line cap and the voice-over needed a stored `voiceSession` and its
+  forwards there. The voice-over itself is two new files, `+VoiceOver` and
+  `+VoiceOverFinishing`; the base file ended at 371 lines.
 
 ### Agent handlers (surviving after D1)
 

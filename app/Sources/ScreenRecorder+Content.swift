@@ -52,7 +52,7 @@ extension ScreenRecorder {
     /// can stay on screen; a bare probe has no bundle identifier and then
     /// excludes nothing rather than crashing. A window source is the window
     /// alone. A `.picked` source carries the picker's filter and has none to
-    /// build.
+    /// build, and a `.voiceOver` source has no picture at all.
     static func filter(for source: RecordingSource, in content: SCShareableContent) throws
         -> SCContentFilter
     {
@@ -76,6 +76,9 @@ extension ScreenRecorder {
         case .picked:
             throw RecorderError.startFailed(
                 "A picked source carries the picker's own filter; none can be built here.")
+        case .voiceOver:
+            throw RecorderError.startFailed(
+                "A voice-over records the microphone alone; it has no filter to build.")
         }
     }
 

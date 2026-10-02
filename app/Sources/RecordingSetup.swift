@@ -42,10 +42,13 @@ import ScreenCaptureKit
 /// What is recorded. `.picked` is the panel's picker result, whose filter
 /// is carried beside the choice (`ScreenRecorder.start` takes the filter as
 /// its own argument), so the source enum never holds a framework object.
+/// `.voiceOver` is the microphone alone, no picture (spec §11 recording, #99):
+/// `ScreenRecorder.startVoiceOver` records it and `start` refuses it.
 enum RecordingSource: Equatable {
     case display(CGDirectDisplayID)
     case window(CGWindowID)
     case picked
+    case voiceOver
 }
 
 /// `nominal` records the display's POINT size, `best` its pixel size
@@ -126,6 +129,16 @@ enum RecordingFiles {
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = .current
         formatter.dateFormat = "'Screen Recording' yyyy-MM-dd 'at' HH.mm.ss"
+        return formatter.string(from: date)
+    }
+
+    /// `Voice-over 2026-10-02 at 09.15.04` — a voice-over's file, `stem(at:)`'s
+    /// spelling and pinning with its own lead word.
+    static func voiceOverStem(at date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        formatter.dateFormat = "'Voice-over' yyyy-MM-dd 'at' HH.mm.ss"
         return formatter.string(from: date)
     }
 

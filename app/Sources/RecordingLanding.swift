@@ -46,7 +46,8 @@
 // `mediaEntry`, `milliseconds` — is `RecordingLanding+Placing.swift`, the
 // same toll paid again when the read-backs arrived. `addMedia`, `view`,
 // `clip(_:in:scope:)` and `trimmed` are internal for them, because
-// `private` does not cross a file.
+// `private` does not cross a file. A VOICE-OVER's landing — every file on one
+// new back Microphone track — is `RecordingLanding+VoiceOver.swift`.
 
 import AppKit
 
@@ -232,6 +233,7 @@ struct RecordingLanding {
             throw ReelCoreError(
                 message: "A drag is in progress; the recording can be added when it ends.")
         }
+        if result.isVoiceOver { return try voiceOverPlacement(result, in: document, place: place) }
         let scope = document.scope
         var trial = document.project
         var ops: [ReelOp] = []

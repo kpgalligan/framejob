@@ -64,24 +64,33 @@ extension ScreenRecorder {
         if state == .idle { meter.publish(.silent, from: ObjectIdentifier(self)) }
     }
 
-    /// `start`'s microphone: the prepared session when its device is
-    /// `device` and it is still running (a device that went away meanwhile
-    /// stops its session), else a fresh one, which `start` will run. Either
-    /// way the prepared slot is empty afterwards — adopted, or discarded
-    /// because it was the wrong device.
+    /// `start`'s microphone: `adoptMicrophone(for:)`'s session and output,
+    /// with the `.m4a` beside the movie.
     func microphoneCapture(for device: AVCaptureDevice, beside movie: URL) throws
         -> MicrophoneCapture
     {
         let url = RecordingFiles.microphoneURL(beside: movie)
+        let adopted = try adoptMicrophone(for: device)
+        return (adopted.session, adopted.output, url)
+    }
+
+    /// The capture session for `device`: the prepared session when its
+    /// device is `device` and it is still running (a device that went away
+    /// meanwhile stops its session), else a fresh one, which the caller will
+    /// run. Either way the prepared slot is empty afterwards — adopted, or
+    /// discarded because it was the wrong device. `start` (through
+    /// `microphoneCapture`) and `startVoiceOver` both take theirs here.
+    func adoptMicrophone(for device: AVCaptureDevice) throws
+        -> (session: AVCaptureSession, output: AVCaptureAudioFileOutput)
+    {
         if let prepared = preparedMicrophone, prepared.deviceID == device.uniqueID,
             prepared.session.isRunning
         {
             preparedMicrophone = nil
-            return (prepared.session, prepared.output, url)
+            return (prepared.session, prepared.output)
         }
         discardPreparedMicrophone()
-        let built = try Self.microphoneSession(for: device)
-        return (built.session, built.output, url)
+        return try Self.microphoneSession(for: device)
     }
 
     /// The capture session for the second file: the device's input and an
@@ -113,14 +122,20 @@ extension ScreenRecorder {
     /// published the silence), and once the LATEST segment's microphone has
     /// finished or failed (finding 3 published the silence then, and a dead
     /// connection must not light the bar again; a closed segment's state is
-    /// not this segment's). One
+    /// not this segment's). A VOICE-OVER (`voiceSession`) is read the same
+    /// way: its output while recording and its last segment has neither
+    /// finished nor failed. One
     /// channel is reported on both sides, `LevelMeterSink`'s rule for a
     /// mono track (R0 q6c: the connection exposes `averagePowerLevel` and
     /// `peakHoldLevel` in dB on every poll, so there is no sample buffer and
     /// no queue in it).
     func publishMicrophoneLevel() {
         let connection: AVCaptureConnection?
-        if state == .recording, let current = session, !current.latest.micFinished,
+        if state == .recording, let voice = voiceSession, let last = voice.segments.last,
+            !last.finished, last.failure == nil
+        {
+            connection = voice.micOutput.connection(with: .audio)
+        } else if state == .recording, let current = session, !current.latest.micFinished,
             current.latest.micFailure == nil, let output = current.micOutput
         {
             connection = output.connection(with: .audio)

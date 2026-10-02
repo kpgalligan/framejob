@@ -1309,7 +1309,7 @@ free.
   reads, the step a press takes, the two pane URLs, the result types;
   nothing here prompts or opens.
 - `ScreenRecorder.swift` (+`Pause`, +`Delegates`, +`Microphone`,
-  +`Finishing`, +`Content`) — the machine `idle → arming → recording ⇄ paused
+  +`Finishing`, +`Content`, +`VoiceOver`, +`VoiceOverFinishing`) — the machine `idle → arming → recording ⇄ paused
   → finishing → idle`. **The microphone is a SECOND FILE** through an
   `AVCaptureSession`, because `SCRecordingOutput` folds it inseparably into
   the system track; its offset is measured per SEGMENT. **A pause is a
@@ -1322,8 +1322,14 @@ free.
   not probe, or a closed segment whose output reported a failure (#181), is
   LEFT OUT as `RecordingResult.unreadable` with its readable microphone; only
   a recording with no readable movie fails, naming every file on disk — the
-  microphone files alone when no movie is.
-- `RecordingLanding.swift` (+`Microphone`, +`Placing`, +`LeftOut`) · `ProjectDocument+Recording.swift`
+  microphone files alone when no movie is. **A voice-over is the same machine
+  with no stream** (#99): `voiceSession` instead of `session`, the
+  microphone's writer alone, one `.m4a` per segment named `Voice-over <date>
+  at <time>`, its own `VoiceOverFileDelegate`; `stop()`, `elapsed`, `pause()`
+  and `resume()` forward to it, there is no arming state, and a writer that
+  stops on its own ends it.
+- `RecordingLanding.swift` (+`Microphone`, +`Placing`, +`LeftOut`,
+  +`VoiceOver`) · `ProjectDocument+Recording.swift`
   — a `RecordingResult` and a document in, an UNSCOPED op list out; nothing
   here commits. Pictures land back to back on ONE track, every `add_clip`
   READ BACK (at an inexact canvas rate a raw add snaps down into a one-tick
@@ -1332,7 +1338,10 @@ free.
   A left-out segment's readable voice lands in its picture's slot on the
   Microphone track, at offset 0, and the pictures after it start at the
   slot's end (`+LeftOut`, #181). `untitled(around:)`'s order is a contract,
-  documented there.
+  documented there. A voice-over's files land back to back from the playhead
+  on ONE new back Microphone track, kept only when a clip lands on it
+  (`+VoiceOver`); as a new project, `untitled(around:)` and
+  `remainderPlacement` take it unchanged.
 
 **The agent.**
 - `AgentServer.swift` (frozen) and `AgentServer+Project` / `Clips` / `Tracks`

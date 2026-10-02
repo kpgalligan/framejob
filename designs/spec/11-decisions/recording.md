@@ -103,6 +103,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   out as unreadable, a microphone problem, a refused resume, a file the
   landing could not place, a failure). ⌥⌘N shows it again; while it is
   hidden, the quit guard opens the item's menu rather than beeping.
+  A voice-over (Microphone Only) is the exception: the panel stays up
+  (2026-10-02; "A voice-over is a recording with no picture", below).
 - **The recorder panel takes key only from an active Reelcut** (#137,
   2026-09-29). Shown with Reelcut active (File ▸ New Recording…, ⌥⌘N, the
   welcome button), it comes to the front key, with Record on Return. Shown
@@ -171,3 +173,55 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   does not reach it (Settings' precedent); `record_screen`'s span is wall
   clock and a pause is a person's act; and `perform_menu_item` reaches the
   item in a Release build.
+- **A voice-over is a recording with no picture** (#99, owner-approved
+  2026-10-02). It is the same recorder machine with no stream: the
+  microphone alone, through the `AVCaptureSession` the screen recorder
+  already writes its second file with. The door is a **Source popup row,
+  "Microphone Only"**, below "Window…" in File ▸ New Recording… — not a
+  separate File ▸ New Voice-over… command, which would be a second door (or
+  a second panel) for what is one row. With Microphone Only chosen, System
+  Audio, Show Clicks and Size grey out with their values kept, so the panel
+  does not jump (hiding them would resize the panel under the pointer);
+  Rate stays live, because it is a new project's rate; Record with
+  Microphone "Off" refuses with a note; and the Screen Recording permission
+  is neither checked nor asked for. The row persists for the session only,
+  as a picked window does. **The countdown and the status item are
+  unchanged**: the same 3-2-1 with the live meter, the same coral dot,
+  elapsed time and Pause/Resume/Stop menu — no microphone glyph in the menu
+  bar, since the dot already means "capturing" and a glyph is a third width
+  to size the item for. **The panel STAYS UP during a voice-over** (the
+  owner's choice), with its live microphone meter, since nothing is filmed:
+  this amends the panel decision above, which now holds for every source
+  except Microphone Only. **The files** are
+  `~/Movies/Reelcut Recordings/Voice-over <date> at <time>.m4a`, one file
+  per stretch between pauses, as a screen recording's are — never the
+  capture output's own pause into one file, which is unmeasured here and
+  would give Pause a second machine. **Landing in an open project**: every
+  file on ONE new back track named "Microphone", touching, from the
+  playhead, in one undo step "Add Recording" — where a screen recording's
+  microphone lands today — never the picture rule (the front track), and
+  never an existing Microphone track, since no rule says which track is
+  "the" voice track. **As a new project**: the first file is the document
+  (1920×1080 at the chosen rate), and later files touch it on its one
+  track. **MCP**: `record_screen` gains `source`, `"screen"` (the default)
+  or `"voice_over"`; with a voice-over the default microphone is implied,
+  and `display`, `window`, `system_audio`, `show_clicks`, `size` and
+  `microphone: false` are refused by name, and only the Microphone
+  permission is read. Not a new `record_voice_over` tool, which would
+  change the tool count, the catalog order a probe reads, the assistant's
+  withheld list and parity for one tool. **A microphone that stops on its
+  own ends the voice-over** — nothing else is recording — and what it wrote
+  lands, the note saying so. **The result shape**: a voice-over ends as an
+  ordinary `RecordingResult` (`isVoiceOver` true). Each
+  `RecordingSegment.descriptor` is that stretch's `.m4a`, probed, with
+  `micDescriptor` nil, `micOffset` 0, and `startedAt` the writer's
+  did-start (else the call). `micProblem` is set only on a segment whose
+  writer stopped on its own (never derived from a writer's failure or from
+  `stoppedAt`), as "The microphone stopped recording on its own: <desc> The
+  voice-over ends where it stopped.", where `<desc>` is that did-finish
+  error's `localizedDescription`, or "It reported no error." when there was
+  none. A file that will not probe is an `UnreadableSegment` whose
+  `moviePath` is its path, `keptFiles` the file if on disk, `micDescriptor`
+  nil. No readable file is a failure: the first left-out error wrapped as
+  `.filesKept(e, movie: "", microphone: <the files on disk, comma-joined>)`.
+  `stoppedBy` is always `.stopped`.

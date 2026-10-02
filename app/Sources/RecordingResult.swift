@@ -31,7 +31,9 @@ enum StopReason: Equatable {
 /// over one stream, and every segment carries its OWN offset, because R0 q7
 /// measured a different number for each resume).
 struct RecordingSegment {
-    /// The movie, probed through `MediaImporter.probe` (completion on main).
+    /// The movie, probed through `MediaImporter.probe` (completion on main);
+    /// for a voice-over (`RecordingResult.isVoiceOver`) that stretch's `.m4a`,
+    /// with `micDescriptor` nil and `micOffset` 0.
     let descriptor: MediaDescriptor
     /// The `.m4a`, probed, when a microphone was chosen AND this segment's
     /// file landed; nil otherwise, and `micProblem` says which.
@@ -52,7 +54,9 @@ struct RecordingSegment {
     /// device went away, or the file would not probe (R1 review finding 0:
     /// a microphone problem does not fail a recording whose picture is on
     /// disk). The sentence names the file when one was left behind.
-    /// `micDescriptor` is nil whenever this is set.
+    /// `micDescriptor` is nil whenever this is set. For a voice-over it is
+    /// set only on a segment whose writer stopped on its own (spec §11
+    /// recording, "A voice-over is a recording with no picture").
     let micProblem: String?
 
     init(
@@ -78,6 +82,7 @@ struct RecordingSegment {
 /// slot. `position` is how many of `RecordingResult.segments` were recorded
 /// before it — where that slot is among the landed segments.
 struct UnreadableSegment {
+    /// For a voice-over, the `.m4a` that would not probe.
     let moviePath: String
     let keptFiles: [String]
     let error: RecorderError
@@ -128,6 +133,9 @@ struct RecordingResult {
     var descriptor: MediaDescriptor { segments[0].descriptor }
     /// The FIRST segment's screen did-start, wall clock.
     var startedAt: Date { segments[0].startedAt }
+    /// A voice-over: the microphone alone, every segment's `descriptor` its
+    /// `.m4a` (spec §11 recording, #99).
+    var isVoiceOver: Bool { choice.source == .voiceOver }
     /// Every segment's microphone problem, in order, joined by a space; nil
     /// when no segment has one.
     var micProblem: String? {

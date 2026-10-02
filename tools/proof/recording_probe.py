@@ -9,7 +9,9 @@ issue batch B42's finishing notification (F8, F9) and the countdown's
 cleared resumeProblem (F10), issue batch B49's square `StickerButton`
 (section 6, re-pinned to spec §11 SH-4), and issue batch B55's left-out
 segment's readable microphone (section 14, U7, and rows in U1, U2, U6 and
-3r; #181 item 2).
+3r; #181 item 2), and issue batch B64's voice-over (#99 phase 1: section 15
+with no grant, and its granted tier 15g, which records the MICROPHONE alone
+and never the screen).
 
 Why a probe and not an MCP script. Three of the things R1a added have no
 caller a running binary can be asked to reach, and one of them is the row
@@ -1007,6 +1009,55 @@ of `remainderPlacement`'s unplaced-voice notes (RecordingLanding+Microphone
   unplaced-leftout-unnoted  a left-out segment's voice gets none — 26/27:
                     X8's notes row.
 
+**Issue batch B64's sections and mutants** (#99 phase 1, the voice-over;
+spec §11 recording, "A voice-over is a recording with no picture").
+Section 15 (`voiceover`, its own process, no grant): V1 `voiceOverStem` at
+the two fixed dates, and `nextVoiceOverURL` answering the free name, then
+` (2)` when that name is HELD, then ` (3)` when it is on disk and ` (2)` is
+held; V2 a fresh recorder refusing a `.display` choice and a nil
+microphone before `startVoiceOver` returns, staying idle, `heldSegmentCount`
+0 and `heldFilePaths` empty; V3 two voice segments (3 s, 2 s) in a 30 fps
+document whose one track holds [0, 10 s], the playhead at 2 s: ops
+[add_media, add_media, add_track, add_clip, add_clip], the track at index 0
+named "Microphone", the clips at 1 200 000 and 3 000 000, the predicted ids
+the minted ones, every `mic…` id nil, the front track unchanged, and one
+undo giving back the project JSON byte for byte; V4 `place: false` media
+only; V5 a 5 000-tick segment with no clip and its `tooShortNote`, and no
+`add_track` when every segment is under a frame; V6 inside an open nest,
+the ops unscoped and the clips on the nest's new back track; V7 a new
+project at rate 30 (1920×1080 [30, 1], clip 2 at clip 1's end on track 1,
+"Add Recording Segments", one undo leaving clip 1); V8, the control, the
+same descriptors with a `.display` source taking the picture rule (a new
+FRONT track). Section 15g (`voiceover_granted`) builds a SECOND binary with
+an `__TEXT,__info_plist` holding `NSMicrophoneUsageDescription` alone
+(`recording_spike.py`'s precedent), and is SKIPPED BY NAME with its row
+count unless the Microphone status reads `.authorized` and a default audio
+input exists — it never asks; a signal is scored as a failure. G1: start →
+1 s → pause (the notification; `elapsed` equal twice 0.5 s apart) → resume
+(`heldSegmentCount` 2) → 1 s → stop: one result, `isVoiceOver`, two on-disk
+`.m4a` segments with no picture, 0.6–1.6 s each, named by their own start
+(±1 s), `pauses` 1, `finishingDidBegin` once, idle after, a second start
+`.busy`; G2 start → 1 s → pause → 0.5 s → stop gives one segment, `pauses`
+1; G3 G1's result through `voiceOverPlacement` gives two touching clips on
+"Microphone". The files go under `work/` and are deleted. Measured
+2026-10-02, each `--mutant <name> --only voiceover,voiceover_granted`, against
+a tree at 30/30 for `--only voiceover` and 14/14 for `--only
+voiceover_granted` on a host whose Microphone grant reads authorized:
+
+  voice-front-track     `placement`'s forward to `voiceOverPlacement`
+                    deleted (RecordingLanding.swift) — 40/43: V3's track row
+                    and front-track row, V6's nest row.
+  voice-held-ignored    `nextVoiceOverURL` ignores `held`
+                    (ScreenRecorder+VoiceOver.swift) — 41/43: V1's held and
+                    on-disk rows.
+  voice-track-always    the Microphone track kept with no clip
+                    (RecordingLanding+VoiceOver.swift) — 42/43: V5's
+                    every-segment-short row.
+  voice-pause-unbranched  `pause()`'s forward deleted
+                    (ScreenRecorder+Pause.swift) — 35/43: G1's eight rows but
+                    the start row and the finishing row, G2, G3. Caught on a
+                    GRANTED host only: where 15g skips, nothing runs it.
+
 Two older mutants were RE-AIMED by B55, because the walker's two left-out
 arms now call `probeLeftOutMicrophone` before recursing:
 `unreadable-fails-all` (the probe-failure arm) re-scored 156/172 with
@@ -1027,6 +1078,7 @@ in its pin map (R1's landing): both cross-builds are one program again.
     python3 tools/proof/recording_probe.py --only welcome   # B49's
     python3 tools/proof/recording_probe.py --only state,unreadable,leftout   # B55's
     python3 tools/proof/recording_probe.py --only leftout   # B61's
+    python3 tools/proof/recording_probe.py --only voiceover,voiceover_granted   # B64's
     python3 tools/proof/recording_probe.py --mutant excludes
     python3 tools/proof/recording_probe.py --sources <dir> # any copy
     RC_APP_SOURCES=<dir> python3 tools/proof/recording_probe.py
@@ -4895,6 +4947,342 @@ func preroll(_ request: [String: Any]) -> [String: Any] {
     return out
 }
 
+// ---- mode "voiceover": #99 phase 1 — a voice-over's pure faces -----------
+
+/// The landing's fixtures for a voice-over: `.m4a` descriptors and a result
+/// whose every segment's descriptor is one, `micDescriptor` nil — the shape
+/// `ScreenRecorder+VoiceOverFinishing.swift` produces.
+func voiceOverResult(
+    _ list: [MediaDescriptor], source: RecordingSource = .voiceOver, rate: Int = 30
+) -> RecordingResult {
+    var choice = RecordingChoice()
+    choice.source = source
+    choice.rate = rate
+    choice.microphone = "probe"
+    return RecordingResult(
+        segments: list.map {
+            RecordingSegment(descriptor: $0, micDescriptor: nil, micOffset: 0, startedAt: Date())
+        }, choice: choice, stoppedBy: .stopped, pauses: list.count - 1)
+}
+
+func voiceover(_ request: [String: Any]) -> [String: Any] {
+    let controller = ProbeDocumentController()
+    let app = NSApplication.shared
+    app.setActivationPolicy(.prohibited)
+    UserDefaults.standard.setVolatileDomain(
+        ["ApplePersistenceIgnoreState": true, "AgentServerEnabled": false,
+         "AppleShowScrollBars": "Always"],
+        forName: UserDefaults.argumentDomain)
+    var out: [String: Any] = [:]
+    out["controllerIsProbe"] = NSDocumentController.shared === controller
+    let tmp = URL(
+        fileURLWithPath: request["tempFolder"] as? String ?? NSTemporaryDirectory(),
+        isDirectory: true)
+    try? FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+    let second: Ticks = 600_000
+
+    // V1: the stem and the held-aware free name.
+    out["stems"] = (request["stemDates"] as? [Double] ?? []).map { seconds -> [String: Any] in
+        ["seconds": seconds,
+         "stem": RecordingFiles.voiceOverStem(at: Date(timeIntervalSince1970: seconds))]
+    }
+    let names = tmp.appendingPathComponent("names", isDirectory: true)
+    try? FileManager.default.createDirectory(at: names, withIntermediateDirectories: true)
+    let nameDate = Date(timeIntervalSince1970: request["nameDate"] as? Double ?? 0)
+    let free = ScreenRecorder.nextVoiceOverURL(in: names, at: nameDate, holding: [])
+    let held = ScreenRecorder.nextVoiceOverURL(in: names, at: nameDate, holding: [free.path])
+    let onDisk = FileManager.default.createFile(atPath: free.path, contents: Data())
+    let third = ScreenRecorder.nextVoiceOverURL(in: names, at: nameDate, holding: [held.path])
+    out["v1"] = [
+        "free": free.path, "held": held.path, "third": third.path, "onDisk": onDisk,
+        "folder": names.path,
+    ]
+
+    // V2: the refusals a fresh recorder answers before returning.
+    let recorder = ScreenRecorder()
+    var finishes = 0
+    func refusal(_ choice: RecordingChoice) -> [String: Any] {
+        var answer: String?
+        recorder.startVoiceOver(
+            choice: choice, onFinish: { _ in finishes += 1 }, completion: { error in
+                answer = error.map(spellError) ?? "nil"
+            })
+        let beforeReturn = answer != nil
+        return ["answer": answer ?? "unanswered", "beforeReturn": beforeReturn,
+                "state": "\(recorder.state)"]
+    }
+    var display = RecordingChoice()
+    display.source = .display(CGMainDisplayID())
+    display.microphone = "probe"
+    display.folder = tmp
+    var noMic = RecordingChoice()
+    noMic.source = .voiceOver
+    noMic.microphone = nil
+    noMic.folder = tmp
+    out["v2"] = [
+        "display": refusal(display), "noMic": refusal(noMic),
+        "state": "\(recorder.state)", "isRecording": recorder.isRecording,
+        "voiceSession": recorder.voiceSession != nil, "session": recorder.session != nil,
+        "heldSegmentCount": recorder.heldSegmentCount, "heldFilePaths": recorder.heldFilePaths,
+        "finishes": finishes, "sentence": ScreenRecorder.voiceOverNeedsMicrophoneSentence,
+    ]
+
+    func voice(_ name: String, _ ticks: Ticks) -> MediaDescriptor {
+        MediaDescriptor(
+            path: tmp.appendingPathComponent("\(name).m4a").path, kind: .audio, duration: ticks,
+            hasAudio: true)
+    }
+    /// A 30 fps document with a 10 s clip at 0 on its one track, the
+    /// playhead at 2 s.
+    func seeded() -> ProjectDocument {
+        let d = ProjectDocument()
+        let blocker = MediaDescriptor(
+            path: "/nowhere/blocker.mov", kind: .video, duration: 10 * second, width: 640,
+            height: 360, fps: .thirty, hasVideo: true)
+        let t = d.project.snapshot.tracks[0].id
+        d.performGroupedEdit("seed", [.addMedia(descriptor: blocker)])
+        let bid = d.project.snapshot.media.last?.id ?? 0
+        d.performGroupedEdit("seed clip", [.addClip(track: t, media: bid, at: 0)])
+        d.playhead = 2 * second
+        return d
+    }
+    func tracks(_ s: ProjectSnapshot) -> [[String: Any]] {
+        s.tracks.map { ["id": Int($0.id), "name": $0.name] as [String: Any] }
+    }
+    func row(_ body: () throws -> [String: Any]) -> [String: Any] {
+        do { return try body() } catch { return ["error": "\(error)"] }
+    }
+    let pair = [voice("V1", 3 * second), voice("V2", 2 * second)]
+
+    // V3: two voice segments in a document whose front track is taken.
+    out["V3"] = row {
+        let d = seeded()
+        let beforeJSON = d.project.json
+        let before = d.project.snapshot
+        let p = try RecordingLanding.placement(voiceOverResult(pair), in: d, place: true)
+        var facts = commit(d, p)
+        let after = d.project.snapshot
+        facts["canvasFps"] = fpsPair(after.canvas.fps)
+        facts["tracksBefore"] = tracks(before)
+        facts["tracksAfter"] = tracks(after)
+        facts["blockerBefore"] = before.clips.map(describeClip)
+        facts["blockerAfter"] = after.clips.filter { c in before.clips.contains { $0.id == c.id } }
+            .map(describeClip)
+        facts["playhead"] = d.playhead
+        d.undoManager?.undo()
+        facts["undoRestores"] = d.project.json == beforeJSON
+        return facts
+    }
+    // V4: place false — media only.
+    out["V4"] = row {
+        let d = seeded()
+        return commit(d, try RecordingLanding.placement(voiceOverResult(pair), in: d, place: false))
+    }
+    // V5: a segment under a frame, then every segment under one.
+    out["V5"] = row {
+        let d = seeded()
+        let short = voice("V5short", 5_000)
+        let p = try RecordingLanding.placement(
+            voiceOverResult([short, voice("V5long", 2 * second)]), in: d, place: true)
+        var facts = commit(d, p)
+        let fps = d.project.snapshot.canvas.fps
+        facts["expectedNote"] =
+            d.project.snapshot.media.first { $0.path == short.path }
+            .flatMap { RecordingLanding.tooShortNote($0, at: fps) } ?? "<no media>"
+        let e = seeded()
+        let q = try RecordingLanding.placement(
+            voiceOverResult([voice("V5a", 5_000), voice("V5b", 4_000)]), in: e, place: true)
+        facts["allShort"] = commit(e, q)
+        return facts
+    }
+    // V6: inside an open nest.
+    out["V6"] = row {
+        let d = seeded()
+        let cid = d.project.snapshot.clips.last?.id ?? 0
+        d.performGroupedEdit("nest", [.nest(clips: [cid], name: "N")])
+        let s = d.project.snapshot
+        guard let nestClip = s.clips.first, let nest = s.nests.first else {
+            throw ReelCoreError(message: "no nest")
+        }
+        d.setNestPath([NestScopeStep(nest: nest.id, clip: nestClip.id)], playhead: 0, selection: [])
+        let outerBefore = d.project.snapshot
+        let p = try RecordingLanding.placement(voiceOverResult(pair), in: d, place: true)
+        var facts = commit(d, p)
+        let inner = d.editedProject.snapshot
+        let outer = d.project.snapshot
+        facts["scope"] = d.scope.map { Int($0) } ?? -1
+        facts["innerTracks"] = tracks(inner)
+        facts["innerClips"] = inner.clips.map(describeClip)
+        facts["outerClipsBefore"] = outerBefore.clips.count
+        facts["outerClips"] = outer.clips.count
+        facts["outerTracksBefore"] = outerBefore.tracks.count
+        facts["outerTracks"] = outer.tracks.count
+        facts["outerMediaBefore"] = outerBefore.media.count
+        facts["outerMedia"] = outer.media.count
+        facts["innerMedia"] = inner.media.count
+        return facts
+    }
+    // V7: a voice-over as a new project, at rate 30.
+    for name in ["V7a", "V7b"] {
+        try? Data("not audio".utf8).write(to: tmp.appendingPathComponent("\(name).m4a"))
+    }
+    out["V7"] = row {
+        let r = voiceOverResult([voice("V7a", 3 * second), voice("V7b", 2 * second)], rate: 30)
+        let (d, notes) = try ProjectDocument.untitled(around: r)
+        let s = d.project.snapshot
+        var facts: [String: Any] = [:]
+        facts["notes"] = notes
+        facts["canvas"] = [s.canvas.width, s.canvas.height]
+        facts["canvasFps"] = fpsPair(s.canvas.fps)
+        facts["clips"] = s.clips.map(describeClip)
+        facts["tracks"] = tracks(s)
+        facts["media"] = s.media.map { ["id": Int($0.id), "path": $0.path] as [String: Any] }
+        facts["undoName"] = d.undoManager?.undoActionName ?? ""
+        d.undoManager?.undo()
+        facts["afterUndo"] = d.project.snapshot.clips.map(describeClip)
+        d.close()
+        return facts
+    }
+    // V8 (control): the same descriptors with a screen source.
+    out["V8"] = row {
+        let d = seeded()
+        let before = d.project.snapshot
+        let p = try RecordingLanding.placement(
+            voiceOverResult(pair, source: .display(CGMainDisplayID())), in: d, place: true)
+        var facts = commit(d, p)
+        facts["tracksBefore"] = tracks(before)
+        facts["tracksAfter"] = tracks(d.project.snapshot)
+        return facts
+    }
+    out["documentsAfterClose"] = NSDocumentController.shared.documents.count
+    return out
+}
+
+// ---- mode "voiceover-granted": the real writer, microphone alone ---------
+
+/// G1–G3 on a fresh `ScreenRecorder()` — never `.shared` — over the default
+/// audio input. The Microphone status is READ first and the mode answers
+/// `skipped` unless it is `.authorized` and a default input exists: nothing
+/// here asks for a grant, and nothing touches the screen.
+func voiceoverGranted(_ request: [String: Any]) -> [String: Any] {
+    let controller = ProbeDocumentController()
+    let app = NSApplication.shared
+    app.setActivationPolicy(.prohibited)
+    UserDefaults.standard.setVolatileDomain(
+        ["ApplePersistenceIgnoreState": true, "AgentServerEnabled": false],
+        forName: UserDefaults.argumentDomain)
+    var out: [String: Any] = [:]
+    out["controllerIsProbe"] = NSDocumentController.shared === controller
+    let status = RecordingGrant.microphoneStatus
+    out["status"] = RecordingGrant.name(of: status)
+    guard status == .authorized else {
+        out["skipped"] = "the Microphone grant reads \(RecordingGrant.name(of: status)), not "
+            + "authorized — the probe never asks for it"
+        return out
+    }
+    guard let device = AVCaptureDevice.default(for: .audio) else {
+        out["skipped"] = "no default audio input device"
+        return out
+    }
+    out["device"] = device.localizedName
+    let folder = URL(
+        fileURLWithPath: request["folder"] as? String ?? NSTemporaryDirectory(), isDirectory: true)
+    var choice = RecordingChoice()
+    choice.source = .voiceOver
+    choice.microphone = device.uniqueID
+    choice.folder = folder
+    choice.rate = 30
+
+    func run(resume: Bool) -> (facts: [String: Any], result: RecordingResult?) {
+        let recorder = ScreenRecorder()
+        var pauseNotes = 0
+        var finishNotes = 0
+        let pauseWatch = NotificationCenter.default.addObserver(
+            forName: ScreenRecorder.pauseDidChangeNotification, object: recorder, queue: nil
+        ) { _ in pauseNotes += 1 }
+        let finishWatch = NotificationCenter.default.addObserver(
+            forName: ScreenRecorder.finishingDidBeginNotification, object: recorder, queue: nil
+        ) { _ in finishNotes += 1 }
+        defer {
+            NotificationCenter.default.removeObserver(pauseWatch)
+            NotificationCenter.default.removeObserver(finishWatch)
+        }
+        var facts: [String: Any] = [:]
+        var outcomes: [Result<RecordingResult, Error>] = []
+        var started = "unanswered"
+        recorder.startVoiceOver(
+            choice: choice, onFinish: { outcomes.append($0) },
+            completion: { started = $0.map(spellError) ?? "nil" })
+        facts["start"] = started
+        facts["stateAfterStart"] = "\(recorder.state)"
+        var busy = "unanswered"
+        recorder.startVoiceOver(
+            choice: choice, onFinish: { _ in }, completion: { busy = $0.map(spellError) ?? "nil" })
+        facts["busy"] = busy
+        _ = spin(1.0) { false }
+        do {
+            try recorder.pause()
+            facts["pause"] = "ok"
+        } catch { facts["pause"] = spellError(error) }
+        facts["stateAfterPause"] = "\(recorder.state)"
+        facts["pauseNotesAfterPause"] = pauseNotes
+        let e1 = recorder.elapsed
+        _ = spin(0.5) { false }
+        let e2 = recorder.elapsed
+        facts["elapsedPaused"] = [e1, e2]
+        if resume {
+            do {
+                try recorder.resume()
+                facts["resume"] = "ok"
+            } catch { facts["resume"] = spellError(error) }
+            facts["heldAfterResume"] = recorder.heldSegmentCount
+            facts["heldPaths"] = recorder.heldFilePaths
+            _ = spin(1.0) { false }
+        }
+        var stops = 0
+        recorder.stop { _ in stops += 1 }
+        _ = spin(15) { !outcomes.isEmpty && recorder.state == .idle }
+        _ = spin(0.3) { false }
+        facts["outcomes"] = outcomes.count
+        facts["stops"] = stops
+        facts["finishNotes"] = finishNotes
+        facts["pauseNotes"] = pauseNotes
+        facts["finalState"] = "\(recorder.state)"
+        facts["voiceSessionAfter"] = recorder.voiceSession != nil
+        var result: RecordingResult?
+        if let first = outcomes.first {
+            var spelled = spell(first)
+            if case .success(let r) = first {
+                result = r
+                spelled["isVoiceOver"] = r.isVoiceOver
+                spelled["onDisk"] = r.segments.map {
+                    FileManager.default.fileExists(atPath: $0.descriptor.path)
+                }
+            }
+            facts["outcome"] = spelled
+        }
+        return (facts, result)
+    }
+
+    let g1 = run(resume: true)
+    out["G1"] = g1.facts
+    out["G2"] = run(resume: false).facts
+    if let result = g1.result {
+        do {
+            let d = ProjectDocument()
+            let p = try RecordingLanding.voiceOverPlacement(result, in: d, place: true)
+            var facts = commit(d, p)
+            facts["tracksAfter"] = d.project.snapshot.tracks.map {
+                ["id": Int($0.id), "name": $0.name] as [String: Any]
+            }
+            out["G3"] = facts
+        } catch { out["G3"] = ["error": "\(error)"] }
+    } else {
+        out["G3"] = ["error": "G1 gave no result"]
+    }
+    return out
+}
+
 // ---- dispatch -------------------------------------------------------------
 let args = CommandLine.arguments
 guard args.count >= 3 else {
@@ -4942,6 +5330,10 @@ do {
         answer = grants(request)
     case "preroll":
         answer = preroll(request)
+    case "voiceover":
+        answer = voiceover(request)
+    case "voiceover-granted":
+        answer = voiceoverGranted(request)
     default:
         answer["error"] = "unknown mode \"\(mode)\" — the binary predates the section asking"
     }
@@ -8570,6 +8962,364 @@ def section_preroll(binary, sources):
 
 
 # --------------------------------------------------------------------------
+# Section 15 — #99 phase 1: the voice-over, the recorder's microphone-alone
+# mode (spec §11 recording, "A voice-over is a recording with no picture").
+
+VOICE_OPS = ["add_media", "add_media", "add_track", "add_clip", "add_clip"]
+VOICE_NAME_DATE = time.mktime((2026, 10, 2, 9, 15, 4, 0, 0, -1))
+
+
+def expected_voice_stem(seconds):
+    return time.strftime("Voice-over %Y-%m-%d at %H.%M.%S", time.localtime(seconds))
+
+
+def section_voiceover(binary, sources):
+    print("\nSection 15 — #99 phase 1: the voice-over's names, refusals and landing (no grant)")
+    tmp = fresh_dir("voiceover")
+    answer, error = run_probe(binary, "voiceover", {
+        "mode": "voiceover", "tempFolder": tmp, "stemDates": STEM_DATES,
+        "nameDate": VOICE_NAME_DATE})
+    check("15: the probe answers", answer is not None and not answer.get("error"),
+          error or (answer or {}).get("error", ""))
+    if not answer or answer.get("error"):
+        return
+    check("15: the shared controller is the probe's", answer.get("controllerIsProbe") is True,
+          f"{answer.get('controllerIsProbe')}")
+
+    print("  V1 — the stem and the free name")
+    stems = {s.get("seconds"): s.get("stem") for s in answer.get("stems") or []}
+    for seconds in STEM_DATES:
+        want = expected_voice_stem(seconds)
+        check(f"V1: voiceOverStem → {want!r}", stems.get(seconds) == want, f"got {stems.get(seconds)!r}")
+    v1 = answer.get("v1") or {}
+    folder = v1.get("folder") or "?"
+    stem = expected_voice_stem(VOICE_NAME_DATE)
+    free = os.path.join(folder, f"{stem}.m4a")
+    two = os.path.join(folder, f"{stem} (2).m4a")
+    three = os.path.join(folder, f"{stem} (3).m4a")
+    check("V1: nextVoiceOverURL over an empty folder, nothing held → <stem>.m4a",
+          v1.get("free") == free, f"{v1.get('free')!r}")
+    check("V1: … with that name HELD (not on disk) → <stem> (2).m4a (voice-held-ignored)",
+          v1.get("held") == two, f"{v1.get('held')!r}")
+    check("V1: … with <stem>.m4a on DISK and (2) held → <stem> (3).m4a (voice-held-ignored)",
+          v1.get("onDisk") is True and v1.get("third") == three, f"{v1}")
+
+    print("  V2 — a fresh recorder's refusals, answered before startVoiceOver returns")
+    v2 = answer.get("v2") or {}
+    display = v2.get("display") or {}
+    no_mic = v2.get("noMic") or {}
+    check("V2: a .display choice is refused (startFailed) before returning, the recorder idle",
+          str(display.get("answer", "")).startswith("startFailed: ")
+          and display.get("beforeReturn") is True and display.get("state") == "idle", f"{display}")
+    check("V2: a nil microphone is refused with voiceOverNeedsMicrophoneSentence before returning",
+          no_mic.get("answer") == f"startFailed: {v2.get('sentence')}"
+          and no_mic.get("beforeReturn") is True and no_mic.get("state") == "idle", f"{no_mic}")
+    check("V2: the recorder stays idle with no session, onFinish never called",
+          v2.get("state") == "idle" and v2.get("isRecording") is False
+          and v2.get("voiceSession") is False and v2.get("session") is False
+          and v2.get("finishes") == 0, f"{v2}")
+    check("V2: heldSegmentCount 0 and heldFilePaths empty",
+          v2.get("heldSegmentCount") == 0 and v2.get("heldFilePaths") == [], f"{v2}")
+
+    print("  V3 — two voice segments (3 s, 2 s), a 30 fps document whose front track holds "
+          "[0, 10 s], playhead 2 s")
+    v3 = answer.get("V3") or {}
+    ops = op_json(v3)
+    track_op = next((o for o in ops if o.get("op") == "add_track"), {})
+    check("V3: ops [add_media, add_media, add_track, add_clip, add_clip] (voice-front-track)",
+          v3.get("ops") == VOICE_OPS, v3.get("error") or f"{v3.get('ops')}")
+    check("V3: the document is 30 fps and the playhead is at 2 s",
+          v3.get("canvasFps") == [30, 1] and v3.get("playhead") == 2 * SEC,
+          f"{v3.get('canvasFps')}, {v3.get('playhead')}")
+    after = v3.get("tracksAfter") or []
+    minted_tracks = v3.get("mintedTracks") or []
+    check("V3: add_track at index 0 named \"Microphone\" — the new track is the BACK one "
+          "(voice-front-track)",
+          track_op.get("index") == 0 and track_op.get("name") == "Microphone"
+          and len(minted_tracks) == 1 and bool(after) and after[0] == minted_tracks[0]
+          and after[0].get("name") == "Microphone", f"{track_op}, after {after}")
+    clips = sorted(v3.get("mintedClips") or [], key=lambda c: c.get("start", 0))
+    check("V3: the clips start at 1 200 000 and 3 000 000, touching, on the new track, `in` 0, "
+          "no transition (voice-front-track)",
+          [c.get("start") for c in clips] == [2 * SEC, 5 * SEC]
+          and [c.get("duration") for c in clips] == [3 * SEC, 2 * SEC]
+          and all(c.get("track") == (minted_tracks or [{}])[0].get("id") for c in clips)
+          and all(c.get("in") == 0 and not c.get("transition") for c in clips), f"{clips}")
+    lists = v3.get("predictedLists") or {}
+    check("V3: the predicted media and clip ids are the minted ones",
+          lists.get("media") == v3.get("mintedMedia") and len(lists.get("media") or []) == 2
+          and sorted(lists.get("clips") or []) == sorted(c.get("id") for c in clips)
+          and len(clips) == 2, f"predicted {lists}, minted {v3.get('mintedMedia')} {clips}")
+    check("V3: every mic… id is nil",
+          lists.get("micMedia") == [-1, -1] and lists.get("micClips") == [-1, -1]
+          and (v3.get("predicted") or {}).get("micMedia") == -1
+          and (v3.get("predicted") or {}).get("micClip") == -1, f"{lists}")
+    before = v3.get("tracksBefore") or []
+    check("V3: the front track is unchanged — same track, same name, the 10 s clip where it was",
+          bool(before) and after[-1:] == before[-1:] and v3.get("blockerBefore") == v3.get("blockerAfter")
+          and len(v3.get("blockerBefore") or []) == 1, f"{before} → {after}")
+    check("V3: one undo step \"Add Recording\", and one undo gives back the project JSON byte for byte",
+          v3.get("undoName") == ACTION_NAME and v3.get("undoRestores") is True,
+          f"{v3.get('undoName')!r}, restores {v3.get('undoRestores')}")
+
+    print("  V4 — place: false")
+    v4 = answer.get("V4") or {}
+    check("V4: media only — ops [add_media, add_media], no clip, no track, every clip id nil",
+          v4.get("ops") == ["add_media", "add_media"] and v4.get("mintedClips") == []
+          and v4.get("mintedTracks") == [] and (v4.get("predictedLists") or {}).get("clips") == [-1, -1]
+          and len(v4.get("mintedMedia") or []) == 2, v4.get("error") or f"{v4}")
+
+    print("  V5 — a segment under a frame")
+    v5 = answer.get("V5") or {}
+    l5 = v5.get("predictedLists") or {}
+    check("V5: a 5 000-tick segment gets no clip and its tooShortNote; the 2 s one lands",
+          (l5.get("clips") or [0])[0] == -1 and len(v5.get("mintedClips") or []) == 1
+          and v5.get("notes") == [v5.get("expectedNote")] and "too short" in (v5.get("expectedNote") or ""),
+          v5.get("error") or f"clips {l5.get('clips')}, notes {v5.get('notes')}, want {v5.get('expectedNote')!r}")
+    short = v5.get("allShort") or {}
+    check("V5: every segment under a frame → no add_track is sent, no track, no clip, two notes "
+          "(voice-track-always)",
+          short.get("ops") == ["add_media", "add_media"] and short.get("mintedTracks") == []
+          and short.get("mintedClips") == [] and len(short.get("notes") or []) == 2,
+          short.get("error") or f"{short.get('ops')}, tracks {short.get('mintedTracks')}")
+
+    print("  V6 — inside an open nest")
+    v6 = answer.get("V6") or {}
+    inner = v6.get("innerTracks") or []
+    inner_clips = [c for c in v6.get("innerClips") or []
+                   if c.get("id") in [m.get("id") for m in v6.get("mintedClips") or []]]
+    check("V6: the ops come back unscoped and add_media lands in the document's one list",
+          v6.get("scopes") == [-1] * 5 and v6.get("scope", -1) != -1
+          and v6.get("outerMedia") == (v6.get("outerMediaBefore") or 0) + 2,
+          v6.get("error") or f"scopes {v6.get('scopes')}, scope {v6.get('scope')}, "
+          f"media {v6.get('outerMediaBefore')} → {v6.get('outerMedia')}")
+    check("V6: the clips sit on the NEST's new back track \"Microphone\", touching from the "
+          "nest-local playhead 0; the parent's clips and tracks unchanged",
+          v6.get("ops") == VOICE_OPS and bool(inner) and inner[0].get("name") == "Microphone"
+          and len(inner_clips) == 2 and all(c.get("track") == inner[0].get("id") for c in inner_clips)
+          and sorted(c.get("start") for c in inner_clips) == [0, 3 * SEC]
+          and v6.get("outerClips") == v6.get("outerClipsBefore")
+          and v6.get("outerTracks") == v6.get("outerTracksBefore"),
+          f"inner tracks {inner}, clips {inner_clips}, outer {v6.get('outerClips')}/"
+          f"{v6.get('outerTracks')}")
+
+    print("  V7 — a voice-over as a new project, rate 30")
+    v7 = answer.get("V7") or {}
+    c7 = sorted(v7.get("clips") or [], key=lambda c: c.get("start", 0))
+    check("V7: canvas 1920×1080 at [30, 1]",
+          v7.get("canvas") == [1920, 1080] and v7.get("canvasFps") == [30, 1],
+          v7.get("error") or f"{v7.get('canvas')} {v7.get('canvasFps')}")
+    first_track = (v7.get("tracks") or [{}])[0].get("id")
+    check("V7: clip 2 sits at clip 1's end on track 1 (the document's one track)",
+          len(c7) == 2 and c7[0].get("start") == 0 and c7[1].get("start") == c7[0].get("end")
+          and c7[0].get("track") == c7[1].get("track") == first_track
+          and len(v7.get("tracks") or []) == 1, f"{c7}, tracks {v7.get('tracks')}")
+    check("V7: the undo step is \"Add Recording Segments\", no note, and one undo leaves clip 1",
+          v7.get("undoName") == SEGMENTS_ACTION_NAME and v7.get("notes") == []
+          and len(v7.get("afterUndo") or []) == 1 and c7[:1]
+          and (v7.get("afterUndo") or [{}])[0].get("id") == c7[0].get("id"),
+          f"{v7.get('undoName')!r}, notes {v7.get('notes')}, after undo {v7.get('afterUndo')}")
+
+    print("  V8 — the control: the same descriptors with a .display source take the picture rule")
+    v8 = answer.get("V8") or {}
+    ops8 = op_json(v8)
+    t8 = next((o for o in ops8 if o.get("op") == "add_track"), {})
+    after8 = v8.get("tracksAfter") or []
+    minted8 = v8.get("mintedTracks") or []
+    check("V8: a new FRONT track (index 1), not named \"Microphone\" — the picture rule",
+          v8.get("ops") == VOICE_OPS and t8.get("index") == 1 and t8.get("name") != "Microphone"
+          and len(minted8) == 1 and after8[-1:] == minted8, v8.get("error") or f"{t8}, {after8}")
+    check("15: every document the section opened is closed", answer.get("documentsAfterClose") == 0,
+          f"{answer.get('documentsAfterClose')}")
+
+
+# The granted tier's probe embeds an Info.plist holding the microphone's
+# usage string ALONE (recording_spike.py's precedent): no bundle name, no
+# screen key — a voice-over never touches the screen.
+VOICE_INFO_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>NSMicrophoneUsageDescription</key><string>The Reelcut recording probe records a short voice-over to check the recorder.</string>
+</dict></plist>
+"""
+
+
+def build_voice_probe(sources):
+    """`build_probe`'s line with `-sectcreate __TEXT __info_plist` added, into a
+    directory of its own beside the tree's (or the mutant's), so the two
+    binaries never share a cache."""
+    here = probe_dir(sources) + "-voiceover"
+    os.makedirs(here, exist_ok=True)
+    binary = os.path.join(here, "recordingprobe")
+    entry = os.path.join(here, "main.swift")
+    plist = os.path.join(here, "Info.plist")
+    for path, text in ((entry, PROBE_SOURCE), (plist, VOICE_INFO_PLIST)):
+        if not os.path.exists(path) or open(path).read() != text:
+            with open(path, "w") as f:
+                f.write(text)
+    if not os.path.isdir(sources):
+        return None, f"{sources} is not a directory"
+    files = sorted(
+        os.path.join(sources, name)
+        for name in os.listdir(sources)
+        if name.endswith(".swift") and name != "main.swift")
+    lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
+    if not os.path.exists(lib):
+        return None, f"{lib} is missing — run `cd core && cargo build --release` first"
+    if os.path.exists(binary) and all(
+        os.path.getmtime(f) < os.path.getmtime(binary) for f in files + [entry, plist, lib]
+    ):
+        print(f"recording probe (voice-over): {binary} (up to date)")
+        return binary, None
+    sdk = subprocess.run(
+        ["xcrun", "--show-sdk-path", "--sdk", "macosx"], capture_output=True, text=True
+    ).stdout.strip()
+    start = time.time()
+    result = subprocess.run(
+        ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
+         "-import-objc-header", os.path.join(ROOT, "app", "Bridging", "Reelcut-Bridging-Header.h"),
+         "-L", os.path.dirname(lib), "-lreelcut_core"] + files + [entry]
+        + ["-Xlinker", "-sectcreate", "-Xlinker", "__TEXT", "-Xlinker", "__info_plist",
+           "-Xlinker", plist, "-o", binary],
+        capture_output=True, text=True)
+    if result.returncode != 0 or not os.path.exists(binary):
+        errors = [line for line in result.stderr.splitlines() if ": error:" in line]
+        return None, "swiftc failed:\n      " + "\n      ".join(errors[:6] or ["(no error lines)"])
+    print(f"recording probe (voice-over): {binary} (built in {time.time() - start:.1f} s)")
+    return binary, None
+
+
+def run_voice_probe(binary, request, timeout=120):
+    """`run_probe` for the granted tier, which also names a SIGNAL — a probe
+    killed by one is a scored failure, never a skip."""
+    here = os.path.dirname(binary)
+    req = os.path.join(here, "request-voiceover-granted.json")
+    out = os.path.join(here, "answer-voiceover-granted.json")
+    with open(req, "w") as f:
+        json.dump(request, f, indent=1)
+    if os.path.exists(out):
+        os.remove(out)
+    try:
+        result = subprocess.run([binary, req, out], capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        return None, f"the probe did not answer within {timeout} s"
+    if result.returncode < 0:
+        return None, f"the probe was killed by signal {-result.returncode}"
+    if result.returncode != 0 or not os.path.exists(out):
+        return None, (result.stderr.strip().splitlines() or ["(no output)"])[-1]
+    with open(out) as f:
+        return json.load(f), None
+
+
+def voice_stem_near(path, started):
+    """True when `path`'s file name is the voice-over stem of a second within
+    1 s of `started` — the name is the CALL's, the start the did-start's."""
+    name = os.path.basename(path or "")
+    return any(name.startswith(expected_voice_stem(started + d)) for d in (-1, 0, 1))
+
+
+def voiceover_granted_rows(answer):
+    """Every row of the granted tier over the probe's answer."""
+    g1 = answer.get("G1") or {}
+    o1 = g1.get("outcome") or {}
+    s1 = o1.get("segments") or []
+    check("G1: startVoiceOver completes nil and the recorder is .recording; a second start "
+          "mid-recording is .busy",
+          g1.get("start") == "nil" and g1.get("stateAfterStart") == "recording"
+          and str(g1.get("busy", "")).startswith("busy: "), f"{g1.get('start')}, {g1.get('busy')}")
+    check("G1: pause() after 1 s → .paused, pauseDidChangeNotification posted (voice-pause-unbranched)",
+          g1.get("pause") == "ok" and g1.get("stateAfterPause") == "paused"
+          and g1.get("pauseNotesAfterPause") == 1, f"{g1.get('pause')}, {g1.get('stateAfterPause')}")
+    e = g1.get("elapsedPaused") or [None, None]
+    check("G1: elapsed is equal twice 0.5 s apart while paused, and above 0",
+          e[0] is not None and e[0] == e[1] and e[0] > 0, f"{e}")
+    check("G1: resume() → heldSegmentCount 2, two different paths",
+          g1.get("resume") == "ok" and g1.get("heldAfterResume") == 2
+          and len(set(g1.get("heldPaths") or [])) == 2, f"{g1.get('resume')}, {g1.get('heldPaths')}")
+    check("G1: one result, isVoiceOver, 2 segments, pauses 1, the stop completion answered once",
+          g1.get("outcomes") == 1 and o1.get("kind") == "success" and o1.get("isVoiceOver") is True
+          and len(s1) == 2 and o1.get("pauses") == 1 and g1.get("stops") == 1,
+          f"{g1.get('outcomes')} outcomes, {o1.get('kind')} {o1.get('description') or ''}, "
+          f"{len(s1)} segments, pauses {o1.get('pauses')}")
+    check("G1: each segment an on-disk .m4a, no picture, 0.6–1.6 s",
+          len(s1) == 2 and all(str(s.get("path", "")).endswith(".m4a") for s in s1)
+          and (o1.get("onDisk") or []) == [True, True]
+          and all(s.get("hasVideo") is False for s in s1)
+          and all(0.6 <= (s.get("duration") or 0) / SEC <= 1.6 for s in s1),
+          f"{[(s.get('path'), s.get('duration'), s.get('hasVideo')) for s in s1]}, onDisk {o1.get('onDisk')}")
+    check("G1: each name is the stem of its own start (±1 s), and the two names differ",
+          len(s1) == 2 and all(voice_stem_near(s.get("path"), s.get("startedAt") or 0) for s in s1)
+          and s1[0].get("path") != s1[1].get("path"), f"{[(s.get('path'), s.get('startedAt')) for s in s1]}")
+    check("G1: finishingDidBeginNotification posted once; the recorder ends idle with no session",
+          g1.get("finishNotes") == 1 and g1.get("finalState") == "idle"
+          and g1.get("voiceSessionAfter") is False,
+          f"{g1.get('finishNotes')}, {g1.get('finalState')}, {g1.get('voiceSessionAfter')}")
+    g2 = answer.get("G2") or {}
+    o2 = g2.get("outcome") or {}
+    check("G2: start → 1 s → pause → 0.5 s → stop while paused gives 1 segment with pauses 1",
+          g2.get("outcomes") == 1 and o2.get("kind") == "success"
+          and len(o2.get("segments") or []) == 1 and o2.get("pauses") == 1
+          and g2.get("finalState") == "idle",
+          f"{g2.get('outcomes')} outcomes, {o2.get('kind')} {o2.get('description') or ''}, "
+          f"{len(o2.get('segments') or [])} segments, pauses {o2.get('pauses')}")
+    g3 = answer.get("G3") or {}
+    c3 = sorted(g3.get("mintedClips") or [], key=lambda c: c.get("start", 0))
+    tracks = {t.get("id"): t.get("name") for t in g3.get("tracksAfter") or []}
+    check("G3: G1's result through voiceOverPlacement gives two touching clips on \"Microphone\"",
+          g3.get("ops") == VOICE_OPS and len(c3) == 2 and c3[0].get("start") == 0
+          and c3[1].get("start") == c3[0].get("end")
+          and all(tracks.get(c.get("track")) == "Microphone" for c in c3),
+          g3.get("error") or f"{g3.get('ops')}, {c3}")
+
+
+def voiceover_granted_rows_count():
+    """The tier's row count, taken as `preroll_rows_count` takes section 13's."""
+    global check
+    real = check
+    counted = [0]
+
+    def counter(name, ok, detail=""):
+        counted[0] += 1
+
+    check = counter
+    try:
+        import io
+        import contextlib
+        with contextlib.redirect_stdout(io.StringIO()):
+            voiceover_granted_rows({})
+    finally:
+        check = real
+    return counted[0]
+
+
+def section_voiceover_granted(binary, sources):
+    print("\nSection 15g — #99 phase 1: a real voice-over, the microphone alone (granted tier; "
+          "never the screen)")
+    probe, error = build_voice_probe(sources)
+    check("15g: the voice-over probe builds, its Info.plist the microphone's usage string alone",
+          probe is not None, error or "")
+    if probe is None:
+        return
+    folder = fresh_dir("voiceover-granted")
+    answer, error = run_voice_probe(probe, {"mode": "voiceover-granted", "folder": folder})
+    try:
+        check("15g: the probe answers (a signal is a failure)",
+              answer is not None and not answer.get("error"),
+              error or (answer or {}).get("error", ""))
+        if not answer or answer.get("error"):
+            return
+        print(f"  G0: Microphone status {answer.get('status')}; default input "
+              f"{answer.get('device')!r} — facts, not asserted")
+        if answer.get("skipped"):
+            skip_rows(voiceover_granted_rows_count(), answer["skipped"])
+            return
+        voiceover_granted_rows(answer)
+    finally:
+        shutil.rmtree(folder, ignore_errors=True)
+    check("15g: the voice-over files are deleted", not os.path.exists(folder), folder)
+
+
+# --------------------------------------------------------------------------
 # The mutants. Each is one string replaced in a COPY of the tree's
 # `app/Sources` under `work/`, and the replacement must match exactly once,
 # or the copy is not the mutant it claims to be (`phase9_chrome.py`'s
@@ -8993,6 +9743,27 @@ MUTANTS = {
         "                if let mic = left.micDescriptor { notes.append(unplacedNote(mic.path, behind: path)) }\n",
         "                _ = left\n",
         "a left-out segment's voice lands as media with no clip and no note when clip 1 is missing"),
+    # #99 phase 1, the voice-over — section 15's V1, V3, V5 and 15g's G1.
+    "voice-front-track": (
+        "RecordingLanding.swift",
+        "        if result.isVoiceOver { return try voiceOverPlacement(result, in: document, place: place) }\n",
+        "",
+        "placement no longer forwards a voice-over — its files take the picture rule (the front track)"),
+    "voice-held-ignored": (
+        "ScreenRecorder+VoiceOver.swift",
+        "        while manager.fileExists(atPath: candidate.path) || held.contains(candidate.path) {\n",
+        "        while manager.fileExists(atPath: candidate.path) {\n",
+        "nextVoiceOverURL ignores the held names — a resume inside the second reuses a file name"),
+    "voice-track-always": (
+        "RecordingLanding+VoiceOver.swift",
+        "            if placed.contains(where: { $0.clip != nil }) {\n",
+        "            if !placed.isEmpty {\n",
+        "the Microphone track is kept with no clip on it"),
+    "voice-pause-unbranched": (
+        "ScreenRecorder+Pause.swift",
+        "        if voiceSession != nil { return try pauseVoiceOver() }\n",
+        "",
+        "pause() no longer forwards a voice-over — it reads the screen session and refuses"),
 }
 
 
@@ -9023,7 +9794,7 @@ def prepare_mutant(name):
 SECTIONS = [section_files, section_configuration, section_state, section_unreadable, section_landing,
             section_segments, section_chrome, section_chrome_pause, section_file_pause,
             section_welcome, section_catalog, section_host, section_granted, section_grants,
-            section_preroll, section_leftout]
+            section_preroll, section_leftout, section_voiceover, section_voiceover_granted]
 
 
 def main():
@@ -9039,7 +9810,7 @@ def main():
                         help="a comma-separated subset of sections to run, by the name after "
                              "`section_` (files, configuration, state, unreadable, landing, "
                              "segments, chrome, chrome_pause, file_pause, welcome, catalog, host, "
-                             "granted, grants, preroll, leftout) — for "
+                             "granted, grants, preroll, leftout, voiceover, voiceover_granted) — for "
                              "iterating on "
                              "one; the full run is what the counts in the docstring are")
     args = parser.parse_args()

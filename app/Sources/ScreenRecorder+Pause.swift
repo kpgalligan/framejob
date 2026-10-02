@@ -52,6 +52,47 @@ import ScreenCaptureKit
 /// for, so it is that segment's `micProblem` alone and no longer the
 /// session's `microphoneProblem` (#97) — every other segment's voice lands.
 extension ScreenRecorder {
+    /// Everything one recording owns, so a stale callback from a previous
+    /// session is told apart by object identity and the finishing path can
+    /// hand the probes a copy. The two failures are SEPARATE (finding 0):
+    /// a screen failure is what the caller receives, a microphone failure
+    /// is a `micProblem` on the segment whose file it cost, on a result
+    /// that still carries the picture. What one FILE PAIR owns is a
+    /// `Segment` (this file); `segments` holds them in
+    /// order — the first minted by `start`, each later one by `resume()` —
+    /// and is never empty. `displayPointSize` and `scale` are the geometry
+    /// `start` read off the filter, kept so `resume()` can ask
+    /// `RecordingConfiguration.make` for the next output on exactly the
+    /// arguments the first was built from.
+    struct Session {
+        let choice: RecordingChoice
+        let displayPointSize: CGSize
+        let scale: CGFloat
+        let stream: SCStream
+        let micSession: AVCaptureSession?
+        let micOutput: AVCaptureAudioFileOutput?
+        let calledAt: Date
+        /// Installed when the arm begins; called exactly once, at conclude.
+        let onFinish: (Result<RecordingResult, Error>) -> Void
+        /// Never empty. The last is the segment recording now or, paused,
+        /// the one just closed (`latest`).
+        var segments: [Segment]
+        /// Presses of `pause()`, STORED: `segments.count − 1` reads 0 for
+        /// a pause with no resume before the Stop (R2 review).
+        var pauses = 0
+        var captureStartedAt: Date?
+        var stoppedBy: StopReason = .stopped
+        /// A `stop()` ENDED this recording (while arming, recording or
+        /// paused). A stop that joined the finishing did not, and leaves
+        /// this false, so an external reason that arrives late is still
+        /// adopted (finding 7).
+        var stopAsked = false
+        var screenFailure: RecorderError?
+        var timedOut = false
+        /// `settle` has begun: one probe, one conclude (finding 2).
+        var settling = false
+    }
+
     /// What one file pair owns: the two URLs, the output writing the movie,
     /// and the stamps the offset and `elapsed` are read from. `addedAt` is
     /// the call that asked for the output — `start`'s, or the resume's
@@ -97,8 +138,10 @@ extension ScreenRecorder {
     /// all: the stream keeps capturing. A remove that throws is rethrown as
     /// `.finishFailed` — it is a file that could not be closed — and the
     /// recorder STAYS `.recording` with nothing changed, since the output is
-    /// still attached and a Stop will close it.
+    /// still attached and a Stop will close it. A voice-over's pause is
+    /// `pauseVoiceOver` (`+VoiceOver.swift`), forwarded first.
     func pause() throws {
+        if voiceSession != nil { return try pauseVoiceOver() }
         guard state != .paused else { throw RecorderError.alreadyPaused }
         guard state == .recording, let current = session else {
             throw RecorderError.notRecording
@@ -136,8 +179,10 @@ extension ScreenRecorder {
     /// restarted to the new file, stamped where the call is made; the
     /// did-starts are stamped where they land (`+Delegates.swift`). Never
     /// waits for the paused segment's did-finish (the header). A
-    /// microphone that failed on an earlier segment is asked again.
+    /// microphone that failed on an earlier segment is asked again. A
+    /// voice-over's resume is `resumeVoiceOver`, forwarded first.
     func resume() throws {
+        if voiceSession != nil { return try resumeVoiceOver() }
         guard state == .paused, let current = session else { throw RecorderError.notPaused }
         let at = Date()
         let movieURL = Self.nextMovieURL(for: current, at: at)
