@@ -3,7 +3,8 @@
 //! run on every group of every clip the paste brings — the payload's own and
 //! those inside the nests they show — BEFORE the clip's times are re-snapped,
 //! so a range error names the value the payload sent and the id the PAYLOAD
-//! gave the clip.
+//! gave the clip. A clip's speed outside ×0.1–×1000 is refused the same way,
+//! by paste's own check, before any group (issue #206).
 
 mod common;
 
@@ -161,4 +162,57 @@ fn a_payload_inside_every_range_still_lands_whole() {
     let value = pasted.value();
     assert_eq!(at(&value, "/nests/0/clips/0/video/scale"), &json!(5.0));
     assert_eq!(landed(&pasted).len(), 1);
+}
+
+/// A payload holding one text clip, id 7, at `speed`.
+fn text_clip_at(speed: f64) -> Value {
+    json!({"clips": [{"id": 7, "track": 0, "start": 0, "duration": 2 * SEC,
+                      "speed": speed, "source": {"kind": "text"}, "video": {},
+                      "text": {"content": "hi"}}]})
+}
+
+#[test]
+fn a_speed_above_the_range_names_the_payload_clip() {
+    assert_eq!(
+        destination().errors(&paste(text_clip_at(5000.0))),
+        "pasted clip 7: speed 5000.0 is outside ×0.1–×1000"
+    );
+}
+
+#[test]
+fn a_speed_below_the_range_names_the_payload_clip() {
+    assert_eq!(
+        destination().errors(&paste(text_clip_at(0.05))),
+        "pasted clip 7: speed 0.05 is outside ×0.1–×1000"
+    );
+}
+
+#[test]
+fn a_speed_inside_a_pasted_nest_names_its_own_payload_id() {
+    let payload = json!({
+        "clips": [{"id": 3, "track": 0, "start": 0, "duration": 2 * SEC,
+                   "source": {"kind": "nest", "project": 4}, "video": {}}],
+        "nests": [{
+            "id": 4, "name": "Group", "width": 1920, "height": 1080,
+            "tracks": [{"id": 5, "name": "Nested"}],
+            "clips": [{"id": 6, "track": 5, "start": 0, "duration": 2 * SEC,
+                       "speed": 5000.0, "source": {"kind": "text"},
+                       "video": {}, "text": {"content": "hi"}}]
+        }]
+    });
+    assert_eq!(
+        destination().errors(&paste(payload)),
+        "pasted clip 6: speed 5000.0 is outside ×0.1–×1000"
+    );
+}
+
+#[test]
+fn a_speed_at_either_end_of_the_range_pastes() {
+    // The control: the range's own ends land, and keep the speed they carried.
+    for speed in [0.1, 1000.0] {
+        let pasted = destination().apply(&paste(text_clip_at(speed)));
+        let clips = landed(&pasted);
+        assert_eq!(clips.len(), 1);
+        assert_eq!(clips[0]["speed"], json!(speed), "speed {speed} lands");
+    }
 }

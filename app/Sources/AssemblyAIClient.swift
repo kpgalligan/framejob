@@ -248,7 +248,7 @@ final class AssemblyAIClient {
                 if response.status == "error" {
                     throw refusing(
                         .transcript(
-                            withoutCredential(
+                            relayed(
                                 response.error ?? "AssemblyAI could not transcribe it")),
                         id: id, cancel: cancel)
                 }
@@ -368,10 +368,10 @@ final class AssemblyAIClient {
     /// A sentence the SERVER wrote, with this client's own credential taken
     /// out of it.
     ///
-    /// Three sentences are relayed verbatim — a 402's, a 4xx's and a
-    /// transcript's `error` — because AssemblyAI says the useful thing and a
-    /// second-hand paraphrase would be worse (R6-6). But "verbatim" is a
-    /// promise about somebody ELSE's text, and a server that echoes the
+    /// Three sentences are relayed as the service wrote them — a 402's, a
+    /// 4xx's and a transcript's `error` — as AssemblyAI says the useful thing
+    /// (R6-6); `relayed` (`+Session`) filters each here, then bounds it
+    /// (R6-23). But that text is somebody ELSE's, and a server echoing the
     /// `authorization` header it received puts the key in it: a stand-in
     /// answering `400 … for <the key>` put the credential straight into an
     /// MCP refusal, which `AgentServer+CloudCaptions.swift`'s header promises

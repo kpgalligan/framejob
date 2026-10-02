@@ -191,9 +191,10 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   refusal is an empty clip list; a malformed payload is an **error**. Every landed clip — the
   payload's own and those inside the nests it brings — first has every group pass
   `paste_attributes`' normalise-and-check on the values the payload sent (an empty motion lands as
-  `null`; a value out of range is an **error**, `pasted clip N: …`, N the payload's id), then has its
-  start, source-bounded duration, action spans, present base motion/text timings and a graphic's
-  `in` and `length` normalized to this document's grid, since the payload may come from another
+  `null`; a value out of range is an **error**, `pasted clip N: …`, N the payload's id; a speed
+  outside ×0.1–×1000 gets the same `pasted clip N: …` error), then has its start, source-bounded
+  duration, action spans, present base motion/text timings and a graphic's `in` and `length`
+  normalized to this document's grid, since the payload may come from another
   frame rate (§11, D7-3, G-18·b).
 - **`paste_attributes {clips, payload, groups?}`** — Copies the payload's EARLIEST clip's property
   groups onto each clip (at one start the front-most, then the lower id — never the array's first,

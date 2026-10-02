@@ -143,13 +143,39 @@ struct TranscriptWord: Codable, Equatable {
 }
 
 extension TranscriptWord {
-    /// Every String and non-nil String? stored property, read by Mirror in
-    /// declaration order, so a String field added later is checked with no
-    /// further edit (today: text, speaker). `fetch` asks each one whether it
-    /// repeats the key (#200, R2·1).
-    var stringFields: [String] {
-        // A `String?` holding a value casts to `String`; a nil one does not.
-        Mirror(reflecting: self).children.compactMap { $0.value as? String }
+    /// Every string literal of a served `words` array, in order, each decoded
+    /// from its JSON escapes: every object key and every string value, at any
+    /// depth, and every value of a repeated key — whether or not this type
+    /// reads the field. `fetch` asks each one whether it repeats the key
+    /// (#200, R6-23). A LEXICAL scan of the bytes, not a tree walk, because
+    /// `JSONSerialization` and `JSONDecoder` keep only a repeated key's first
+    /// value. Nil when a literal is unterminated or does not decode.
+    static func servedStrings(in wordsJSON: Data) -> [String]? {
+        let bytes = [UInt8](wordsJSON)
+        var strings: [String] = []
+        var index = 0
+        while index < bytes.count {
+            // Each `"` outside a string opens one.
+            guard bytes[index] == UInt8(ascii: "\"") else {
+                index += 1
+                continue
+            }
+            let open = index
+            index += 1
+            // A `\` skips the byte after it, so an escaped quote never closes.
+            while index < bytes.count, bytes[index] != UInt8(ascii: "\"") {
+                index += bytes[index] == UInt8(ascii: "\\") ? 2 : 1
+            }
+            guard index < bytes.count else { return nil }
+            let literal = Data(bytes[open...index])
+            guard
+                let decoded = (try? JSONSerialization.jsonObject(
+                    with: literal, options: .fragmentsAllowed)) as? String
+            else { return nil }
+            strings.append(decoded)
+            index += 1
+        }
+        return strings
     }
 }
 
@@ -162,7 +188,7 @@ struct TranscriptResponse: Codable, Equatable {
     /// `queued`, `processing`, `completed` or `error` (road map 6 §2).
     let status: String
     /// Set only with `status == "error"`; the service's own sentence, which
-    /// 5c relays verbatim.
+    /// 5c relays as written, key filtered out and bounded (`relayed`, R6-23).
     let error: String?
     let audioURL: String?
     /// R6-8: which model actually ran.

@@ -55,22 +55,48 @@ extension AssemblyAIClient {
         case 401, 403: return .keyRefused(code)
         case 402:
             return .account(
-                withoutCredential(sentence(in: reply.data) ?? "AssemblyAI answered \(code)"))
+                relayed(sentence(in: reply.data) ?? "AssemblyAI answered \(code)"))
         case 400..<500:
             return .request(
-                withoutCredential(sentence(in: reply.data) ?? "AssemblyAI answered \(code)"))
+                relayed(sentence(in: reply.data) ?? "AssemblyAI answered \(code)"))
         default: return .server(code)
         }
     }
 
-    /// AssemblyAI's own `error` sentence out of a body, relayed verbatim —
-    /// through `withoutCredential`, which is what makes "verbatim" a promise
-    /// about the SERVER's text and not about this client's key.
+    /// AssemblyAI's own `error` sentence out of a body, relayed as the
+    /// service wrote it — through `relayed`, which takes this client's key
+    /// out and then bounds it (R6-23), so the promise is about the SERVER's
+    /// words and not about this client's key or an endless body.
     private func sentence(in data: Data) -> String? {
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
             let text = object["error"] as? String, !text.isEmpty
         else { return nil }
         return text
+    }
+
+    /// The most Unicode scalars a sentence the SERVER wrote — a 402's, a
+    /// 4xx's, a transcript's `error` — keeps where the app relays it
+    /// (R6-23). A ceiling against a broken or hostile server, not a measured
+    /// length.
+    static let relayedSentenceLimit = 300
+
+    /// At most `limit` Unicode scalars: a longer string is its first
+    /// `limit - 1` scalars + "…" (U+2026). The one scalar cutter — the
+    /// relayed sentences here, and `CloudTranscriber.bounded`'s model and
+    /// language (R6-23).
+    static func bounded(_ text: String, limit: Int) -> String {
+        let scalars = text.unicodeScalars
+        guard scalars.count > limit else { return text }
+        var kept = String.UnicodeScalarView(scalars.prefix(limit - 1))
+        kept.append("\u{2026}")
+        return String(kept)
+    }
+
+    /// A sentence the server wrote, as the app relays it: the key filtered
+    /// out FIRST, then cut, so a cut never splits the key into a piece the
+    /// filter cannot see (R6-23).
+    func relayed(_ text: String) -> String {
+        Self.bounded(withoutCredential(text), limit: Self.relayedSentenceLimit)
     }
 
     /// The served bytes of a top-level `words` ARRAY, or nil when the key is

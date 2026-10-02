@@ -16,7 +16,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | [`silence.md`](silence.md) | 49 | **Remove Silences (road map 4).** Silero VAD, its grid and cache, voice mode; S1-23. |
 | [`effects-motion.md`](effects-motion.md) | 60 | **Transitions and motion (road map 5).** R5-1..R5-5, E2-27. |
 | [`deepening.md`](deepening.md) | 475 | **Deepening (road map 7).** D2-1, D3-1, #21, #22, D4-1..D4-6, D7-1..D7-3, #42, #88, #63, #174, #40, #43, #190: how ops refuse, the op table, the gate, the source window, time envelopes, one-delta shifts on the canvas's grid, the non-edits that speak, a relink that re-probes, one frame on the grid, a tool that closes a document, a path one open document holds, a caption name's own extension, a speed of ×0.1–×1000 and the audio ceiling above ×12. |
-| [`cloud-captions.md`](cloud-captions.md) | 369 | **Cloud captions (road map 6).** R6-1..R6-22: AssemblyAI, keys, deletion, recovery, refusal precedence, a dripping server, a Stop's bound on a DELETE, a refused transcript's failed DELETE reported for the dashboard, cached transcripts not re-checked for the key, speaker colours on Subtitles. |
+| [`cloud-captions.md`](cloud-captions.md) | 391 | **Cloud captions (road map 6).** R6-1..R6-23: AssemblyAI, keys, deletion, recovery, refusal precedence, a dripping server, a Stop's bound on a DELETE, a refused transcript's failed DELETE reported for the dashboard, cached transcripts not re-checked for the key, speaker colours on Subtitles, server strings checked whole and bounded. |
 | [`word-captions.md`](word-captions.md) | 123 | **Word captions (road map 8).** W-1..W-11. |
 | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) | 390 | **Chrome, the clip inspector and keys (the sharp pass, road map 9, #35).** SH-1..SH-4, CI-1..CI-16, K-1..K-3. |
 | [`graphics.md`](graphics.md) | 405 | **Graphics (road map 10).** G-1..G-20. |
@@ -113,6 +113,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | R6-20 | A transcript refused after it was made, whose DELETE failed, is reported for the dashboard and never retried | [`cloud-captions.md`](cloud-captions.md) |
 | R6-21 | A cached transcript is not re-checked for the key when it is read (accepted) | [`cloud-captions.md`](cloud-captions.md) |
 | R6-22 | With Speakers on, each speaker's Subtitles cues are their own colour, and nothing else marks them | [`cloud-captions.md`](cloud-captions.md) |
+| R6-23 | Every string a server sends is checked for the key whole, and every one the app relays is bounded | [`cloud-captions.md`](cloud-captions.md) |
 | W-1 | A word caption is an ordinary text clip holding one PAGE | [`word-captions.md`](word-captions.md) |
 | W-2 | `text.words` is one `{start, end}` per whitespace token of `content`, and the core is the one counter | [`word-captions.md`](word-captions.md) |
 | W-3 | Word times are clip time, and they move with the content, not with the clip's length | [`word-captions.md`](word-captions.md) |

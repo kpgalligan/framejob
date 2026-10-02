@@ -5376,6 +5376,82 @@ env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --mutant sp
 
 No mutant run exited 2.
 
+### Issue batch B56 — every served words string read for the key, relayed sentences bounded (#205)
+
+Spec §11 R6-23. `fetch` reads every string literal of the served `words`
+JSON for the key — `TranscriptWord.servedStrings(in:)`, a LEXICAL scan of
+the bytes that decodes each literal from its JSON escapes, so every object
+key and string value at any depth is seen, and every value of a repeated
+key (a `JSONSerialization` tree walk keeps only the first). It replaces
+B43's `TranscriptWord.stringFields` and its Mirror; the raw-bytes check is
+kept. The three sentences relayed as the service wrote them — a 402's, any
+other 4xx's, a transcript's `error` — go through `AssemblyAIClient.relayed`,
+which filters the key and THEN cuts to 300 Unicode scalars (299 and "…");
+`CloudTranscriber.bounded` (the model and the language, 64) now delegates
+to the same cutter, `AssemblyAIClient.bounded(_:limit:)`. #206 is core
+work with no probe row: a pasted clip's speed outside ×0.1–×1000 is refused
+as `pasted clip N: speed … is outside ×0.1–×1000`, N the payload's id
+(`core/tests/paste_checks.rs`). **No live call was made and nothing was
+spent**: every row runs against `assemblyai_fake.py` or `URLProtocol`, with
+`RC_ASSEMBLYAI_KEY` unset.
+
+```sh
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only client,echo
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only client,echo --mutant scan-skips-keys
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --port-base 4955
+```
+
+- **Section `client`, RS1–RS5** (over `URLProtocol`, the default
+  `proof-key`). RS1: a 402 whose sentence is 5000 characters is `account`,
+  its message 299 characters and "…". RS2: the same for a 400 (`request`).
+  RS3: a poll `error` of 5000 characters is `transcript`, cut the same way.
+  RS4, a CONTROL: a 300-character sentence is kept whole. RS5: `"x"*295 +
+  "proof-key" + "y"*10` is `("x"*295 + "<redacted>" + "y"*10)[:299] + "…"`,
+  with no `proo` after the x's. Every expectation is computed in Python.
+- **Section `echo`, E9–E14** (run mode, the fake's `words_json`, the key
+  served ESCAPED as `proof\u002dkey`). E9: an extra field `channel` holding
+  the key; E10: the key as a field NAME; E11: the key nested as
+  `{"extra":{"deep":[…]}}`; E14: a word repeating the key `x`, its LATER
+  value the key — each fails the run with the refusal, writes no
+  `transcripts/1.json`, DELETEs the transcript, and its served bytes lack
+  `proof-key` (E14's CONTROL also counts the two `"x":`). E12, a CONTROL: an
+  undecoded field one letter off completes and `1.json`'s words are the
+  served bytes. E13: a 5000-character transcript `error` is 299 characters
+  and "…" in `cloudFailure` and on the card, never 300 in a row. The card
+  of a FAILED run is the sheet's status — the error's own sentence, then
+  `cloudReportLines` (`TranscribeSheetController+Commit.swift`) — because
+  `cloudReportLines` alone never carries the failure; the row reads the two
+  joined. `ECHO_ROWS` is 36.
+- **Mutants.** New in a `# Issue batch B56` block: `words-unwalked`,
+  `scan-undecoded`, `scan-skips-keys`, `sentence-unbounded`,
+  `bound-before-filter`. `words-unrefused` is re-aimed at the new check
+  block (the scan's guard and the refusal). B43's `speaker-unchecked` is
+  RETIRED: its target, the Mirror in `stringFields`, is gone, and
+  `words-unwalked` and `scan-undecoded` both fail E6 in its place.
+
+**The run table** (2026-10-01, at `c763d63` plus this batch):
+
+| Command | Printed answer |
+|---|---|
+| `cd core && cargo test --release --test paste_checks`, the new tests on HEAD's core | 8 passed, 3 failed, exit 101: the three refusals named the ALLOCATED id (`clip 2's speed 5000.0 …`, `clip 4 in nest 2's speed 5000.0 …`) |
+| the same after the change | 11 passed, exit 0 |
+| `make lint`, `make test` | exit 0 |
+| `make typecheck` | 0 errors, 4 warnings (the baseline); tsc clean |
+| `make app` | BUILD SUCCEEDED |
+| `cloud_captions_probe.py --only client,echo` | **87/87**, exit 0 |
+| probe `--only client,echo --mutant words-unwalked` | 82/87, exit 1 (E6, E9, E10, E11, E14) |
+| probe `--only client,echo --mutant scan-undecoded` | 82/87, exit 1 (E6, E9, E10, E11, E14) |
+| probe `--only client,echo --mutant scan-skips-keys` | 86/87, exit 1 (E10) |
+| probe `--only client,echo --mutant sentence-unbounded` | 81/87, exit 1 (RS1, RS2, RS3, RS5, E13 ×2) |
+| probe `--only client,echo --mutant bound-before-filter` | 86/87, exit 1 (RS5) |
+| probe `--only client,echo --mutant words-unrefused` (re-aimed) | 80/87, exit 1 (E3 ×2, E6, E9, E10, E11, E14) |
+| `cloud_captions_probe.py` (full) | **874/874**, exit 0, in 647 s; waited 297.3 s for the lock (another session's run held it) |
+| `cloud_captions_proof.py --port-base 4955` | **213/213**, exit 0, in 86 s; waited 0.0 s |
+| `grep "Reelcut: " /tmp/reelcut-495[5-9].log` | nothing |
+
+No mutant run exited 2.
+
 ### Road map 7 part 6 — core argument contract
 
 Run `python3 tools/proof/op_contract_proof.py` from the repository root. It

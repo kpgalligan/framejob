@@ -39,6 +39,7 @@
 
 use serde_json::Value;
 
+use crate::edit_clip_timing::{SPEED_MAX, SPEED_MIN};
 use crate::export::describe;
 use crate::model::{BlendMode, Clip, Project, Source, TextProps, VideoProps};
 use crate::outcome::Outcome;
@@ -270,16 +271,26 @@ impl Project {
         Ok(())
     }
 
-    /// Every group of one clip `paste` is about to land, through
+    /// The clip's speed against `SPEED_MIN`–`SPEED_MAX`, then every group of
+    /// one clip `paste` is about to land, through
     /// [`Self::normalise_and_check_group`] in [`GROUPS`] order, so a payload
-    /// written by hand meets the bounds a patch does (issue #62). A failure
-    /// names the id the PAYLOAD gave the clip, the only one its writer
-    /// knows. The clip's own times are the caller's to re-snap, after this.
+    /// written by hand meets the bounds a patch does (issue #62, #206). A
+    /// failure names the id the PAYLOAD gave the clip, the only one its
+    /// writer knows. The callers have already reset a non-finite or
+    /// non-positive speed to 1. The clip's own times are the caller's to
+    /// re-snap, after this, at the speed checked here.
     pub(crate) fn normalise_and_check_pasted(
         &self,
         clip: &mut Clip,
         payload_id: u32,
     ) -> Result<(), String> {
+        // Spelled as JSON spells it, as `validate`'s speed sentence is.
+        if !(SPEED_MIN..=SPEED_MAX).contains(&clip.speed) {
+            return Err(format!(
+                "pasted clip {payload_id}: speed {} is outside ×{SPEED_MIN}–×{SPEED_MAX}",
+                serde_json::Value::from(clip.speed)
+            ));
+        }
         for group in GROUPS {
             self.normalise_and_check_group(clip, group)
                 .map_err(|why| format!("pasted clip {payload_id}: {why}"))?;

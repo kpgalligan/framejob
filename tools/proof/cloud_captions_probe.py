@@ -41,6 +41,10 @@ Sections, by the name after `section_`:
   HTTP request to prove reuse has no extra upload or paid submission.
 * `client` (5i·15) — the retry, the backoff, the tolerated polls, the
   ceiling, every §5c status, and the four `words` shapes, over `URLProtocol`.
+  Issue batch B56 (#205, R6-23): a 402's, a 4xx's and a transcript `error`'s
+  5000-character sentence cut to 299 characters and "…" (RS1–RS3), a
+  300-character one kept whole (RS4, CONTROL), and a key straddling the cut
+  filtered BEFORE it, so no piece of it survives (RS5).
 * `cancel` (5i·16) — a 16 MB upload cancelled at its first progress callback,
   and a cancel during polling issuing the DELETE, against the fake; and
   R6-19's bound on a DELETE (issue batch B35): a Stop mid-drip cuts it
@@ -130,7 +134,13 @@ Sections, by the name after `section_`:
   served escaped so its bytes lack it, is refused (E6), with a CONTROL one
   letter off that completes byte for byte (E7); and a 5000-character model
   and language are cut to 63 characters and "…" everywhere they land, with
-  a CONTROL that 64 are kept whole (E8).
+  a CONTROL that 64 are kept whole (E8). Issue batch B56 (#205, R6-23):
+  every string literal of the served words is read for the key, each served
+  escaped — a field `TranscriptWord` never decodes (E9), a field NAME
+  (E10), a nested value (E11), a repeated key's later value (E14, with a
+  CONTROL that the bytes lack the key) — with a CONTROL one letter off that
+  completes byte for byte (E12); and a 5000-character transcript `error` is
+  299 characters and "…" in the failure text and on the card (E13).
 * `settings_verify` — delayed loopback Verify replies against actual Settings
   actions: unchanged, changed input, removal, region, and overlapping owners.
 * `drip` (DR, issue batch B24, #80) — a reply the fake DRIPS a byte every
@@ -3826,6 +3836,60 @@ def section_client(binary, sources):
               f"got {row.get('error')!r} / {row.get('message')!r}, log {routes(log)!r}, "
               f"deletes {deleted!r}")
 
+    # RS (issue batch B56, #205, R6-23): the three sentences relayed as the
+    # service wrote them are cut to 300 Unicode scalars — 299 and "\u2026" —
+    # AFTER the key filter. Every expectation is computed here.
+    limit = 300
+
+    def cut(text):
+        return text if len(text) <= limit else text[:limit - 1] + "\u2026"
+
+    def relayed_row(tag, status, sentence):
+        return call(tag, {
+            "call": "verify", "tuning": FAST,
+            "steps": [{"route": "verify", "status": status,
+                       "body": json.dumps({"error": sentence})}]}) or {}
+
+    long_sentence = "s" * 5000
+    row = relayed_row("rs1-402", 402, long_sentence)
+    check("RS1: a 402 with a 5000-character sentence is `account`, its message 299 "
+          "characters and \"\u2026\"",
+          row.get("error") == "account" and row.get("message") == cut(long_sentence)
+          and len(row.get("message") or "") == limit,
+          f"got {row.get('error')!r} / {str(row.get('message'))[:80]!r} "
+          f"({len(row.get('message') or '')} chars)")
+    row = relayed_row("rs2-400", 400, long_sentence)
+    check("RS2: a 400 with a 5000-character sentence is `request`, its message cut the "
+          "same way",
+          row.get("error") == "request" and row.get("message") == cut(long_sentence),
+          f"got {row.get('error')!r} / {str(row.get('message'))[:80]!r} "
+          f"({len(row.get('message') or '')} chars)")
+    row = call("rs3-error", {
+        "call": "poll", "tuning": FAST,
+        "steps": [{"route": "poll", "status": 200,
+                   "body": json.dumps({"id": "t_probe", "status": "error",
+                                       "error": long_sentence})}]}) or {}
+    check("RS3: a transcript whose `error` is 5000 characters is `transcript`, its "
+          "message cut the same way",
+          row.get("error") == "transcript" and row.get("message") == cut(long_sentence),
+          f"got {row.get('error')!r} / {str(row.get('message'))[:80]!r} "
+          f"({len(row.get('message') or '')} chars)")
+    whole = "w" * limit
+    row = relayed_row("rs4-control", 400, whole)
+    check("RS4: CONTROL — a 300-character sentence is kept whole",
+          row.get("error") == "request" and row.get("message") == whole,
+          f"got {row.get('error')!r} / {str(row.get('message'))[:80]!r} "
+          f"({len(row.get('message') or '')} chars)")
+    keyed = "x" * 295 + DUMMY_KEY + "y" * 10
+    want = cut("x" * 295 + "<redacted>" + "y" * 10)
+    row = relayed_row("rs5-filter-first", 400, keyed)
+    message = row.get("message") or ""
+    check("RS5: a sentence whose key straddles the cut is filtered FIRST — "
+          "`<redacted>` cut, and no `proo` after the x's",
+          row.get("error") == "request" and message == want
+          and "x" * 295 + "proo" not in message,
+          f"got {row.get('error')!r} / tail {message[280:]!r}")
+
 
 # --------------------------------------------------------------------------
 # Section 16 — the cancel token, against the fake
@@ -5465,7 +5529,7 @@ def section_cache_write(binary, sources):
 
 
 # The number of rows `section_echo` scores, for its one skip.
-ECHO_ROWS = 28
+ECHO_ROWS = 36
 
 
 def section_echo(binary, sources):
@@ -5727,6 +5791,101 @@ def section_echo(binary, sources):
           and header.get("speech_model_used") == "k" * 64
           and header.get("language_code") == "j" * 64,
           f"error={error!r}, row={row!r}, header model={header.get('speech_model_used')!r}")
+
+    # --- E9–E14 (issue batch B56, #205, R6-23): every string literal of the
+    # served words is read for the key — a field `TranscriptWord` never
+    # decodes, a field NAME, a nested value, a repeated key's later value —
+    # each served ESCAPED, so the served bytes never hold the key's bytes.
+    escaped_key = DUMMY_KEY.replace("-", "\\u002d")
+
+    def served_run(tag, extra):
+        words_json = ('[{"text":"Hello","start":600,"end":1120,"confidence":0.98,'
+                      '"speaker":"A",' + extra + '},'
+                      '{"text":"there","start":1180,"end":1600,"confidence":0.96,'
+                      '"speaker":"A"}]')
+        cache = fresh(tag)
+        with Fake(tag) as fake:
+            fake.scenario(words_json=words_json)
+            served_bytes = fake.words()
+            answer, error, out = run_probe(binary, tag, {
+                "mode": "run", "base": fake.base, "key": DUMMY_KEY, "tuning": RUN_TUNING,
+                "cache": cache, "media": media, "jobs": jobs,
+            }, timeout=300)
+            log = fake.log()
+        return cache, served_bytes, answer or {}, error, out, log
+
+    def refused(label, tag, extra):
+        cache, served_bytes, answer, error, out, log = served_run(tag, extra)
+        failure = str(answer.get("cloudFailure", ""))
+        served = [t["id"] for t in log["transcripts"]]
+        deletes = [r["path"] for r in log["requests"] if r["method"] == "DELETE"]
+        check(f"{label} fails the run with the refusal, no `transcripts/1.json`, and the "
+              f"transcript DELETEd — its served bytes lacking `proof-key`",
+              answer.get("ok") is False
+              and "the transcript's words repeat the API key" in failure
+              and DUMMY_KEY not in failure and DUMMY_KEY not in (out or "")
+              and not os.path.exists(os.path.join(cache, "transcripts", "1.json"))
+              and len(served) == 1 and any(p.endswith("/" + served[0]) for p in deletes)
+              and bool(served_bytes) and DUMMY_KEY.encode() not in served_bytes,
+              f"error={error!r}, ok={answer.get('ok')!r}, failure={failure!r}, "
+              f"served={served!r}, deletes={deletes!r}, bytes={served_bytes[:200]!r}")
+        return served_bytes
+
+    refused("E9: a word with an extra field `channel` holding the key (served escaped)",
+            "echo-E9", '"channel":"' + escaped_key + '"')
+    refused("E10: a word with the key as a field NAME (served escaped)",
+            "echo-E10", '"' + escaped_key + '":"v"')
+    refused("E11: a word with the key nested in `extra.deep[0]` (served escaped)",
+            "echo-E11", '"extra":{"deep":["' + escaped_key + '"]}')
+
+    cache, served_bytes, answer, error, out, log = served_run(
+        "echo-E12", '"channel":"proof\\u002dkez"')
+    written = b""
+    try:
+        with open(os.path.join(cache, "transcripts", "1.json"), "rb") as handle:
+            written = handle.read()
+    except OSError:
+        pass
+    check("E12: CONTROL — an undecoded field one letter off the key completes, and "
+          "`1.json`'s words are byte-equal to the served bytes",
+          answer.get("ok") is True and bool(served_bytes)
+          and written.endswith(b',"words":' + served_bytes + b"}"),
+          f"error={error!r}, ok={answer.get('ok')!r}, message={answer.get('message')!r}, "
+          f"served={served_bytes!r}, written tail={written[-200:]!r}")
+
+    long_error = "q" * 5000
+    cut_error = "q" * 299 + "\u2026"
+    cache = fresh("echo-E13")
+    with Fake("echo-E13") as fake:
+        fake.scenario(transcript_error=long_error)
+        answer, error, _ = run_probe(binary, "echo-E13", {
+            "mode": "run", "base": fake.base, "key": DUMMY_KEY, "tuning": RUN_TUNING,
+            "cache": cache, "media": media, "jobs": jobs,
+        }, timeout=300)
+    answer = answer or {}
+    failure = str(answer.get("cloudFailure", ""))
+    # The card of a FAILED run is the sheet's status: the error's own sentence
+    # and then `cloudReportLines` (`TranscribeSheetController+Commit.swift`),
+    # which on their own never carry the failure.
+    card = "\n".join([str(answer.get("message", ""))] + answer.get("cloudReportLines", []))
+    check("E13: a 5000-character transcript `error` is 299 characters and \"\u2026\" in "
+          "the failure text, never 300 of them in a row",
+          answer.get("ok") is False and cut_error in failure and "q" * 300 not in failure,
+          f"error={error!r}, ok={answer.get('ok')!r}, failure={failure[:200]!r} "
+          f"({failure.count('q')} q)")
+    check("E13: and on the report card (the error's sentence, then the card's lines), "
+          "never 300 of them in a row",
+          cut_error in card and "q" * 300 not in card,
+          f"card={card[:200]!r} ({card.count('q')} q)")
+
+    served_bytes = refused(
+        "E14: a word that repeats a key, its LATER value the key (served escaped),",
+        "echo-E14", '"x":"y","x":"' + escaped_key + '"')
+    check("E14: CONTROL — the served bytes lack `proof-key` and do repeat the key `x`, so "
+          "only the scan's later value could have refused them",
+          bool(served_bytes) and DUMMY_KEY.encode() not in served_bytes
+          and served_bytes.count(b'"x":') == 2,
+          f"served {served_bytes!r}")
 
 
 def section_run(binary, sources):
@@ -8118,9 +8277,14 @@ MUTANTS = {
         "the served language kept with the key in it \u2014 #187 R2\u00b71 (E2)"),
     "words-unrefused": (
         "CloudTranscriber+Media.swift",
+        "        guard let served = TranscriptWord.servedStrings(in: fetched.wordsJSON) else {\n"
+        "            throw client.refusing(\n"
+        "                .malformed(\"the transcript's words did not decode\"), "
+        "id: fetched.response.id,\n"
+        "                cancel: cancel)\n"
+        "        }\n"
         "        if client.carriesCredential(String(decoding: fetched.wordsJSON, as: UTF8.self))\n"
-        "            || file.words.contains(where: { $0.stringFields.contains(where: "
-        "client.carriesCredential) })\n"
+        "            || served.contains(where: client.carriesCredential)\n"
         "        {\n"
         "            throw client.refusing(\n"
         "                .malformed(\"the transcript's words repeat the API key\"), "
@@ -8128,7 +8292,8 @@ MUTANTS = {
         "                cancel: cancel)\n"
         "        }\n",
         "",
-        "words that repeat the key written to the cache \u2014 #187 R2\u00b71 (E3)"),
+        "words that repeat the key written to the cache \u2014 #187 R2\u00b71 (E3 \u00d72, "
+        "E6, E9\u2013E11, E14)"),
     "key-shaped-id-sent": (
         "AssemblyAIClient+Session.swift",
         "        Self.isPlainIdentifier(id) && !carriesCredential(id)\n",
@@ -8176,11 +8341,6 @@ MUTANTS = {
         "",
         "a count under a megabyte rounded to 0 or 1 again (P\u00b7small)"),
     # Issue batch B43 (#200, #201, R6-20): one mutant per fix, and a CONTROL.
-    "speaker-unchecked": (
-        "AssemblyAITranscript.swift",
-        "        Mirror(reflecting: self).children.compactMap { $0.value as? String }\n",
-        "        [text]\n",
-        "only a word's text read for the key, as before #200 (E6)"),
     "model-unbounded": (
         "CloudTranscriber+Media.swift",
         "        let model = fetched.response.speechModelUsed.map(client.withoutCredential)"
@@ -8206,6 +8366,45 @@ MUTANTS = {
         "            if cancel?.isCancelled == true { fatalError(\"poll-cancel-traps\") }\n",
         "CONTROL \u2014 the poll-cancel child dies with no answer, and SD1\u2013SD3 are "
         "still printed and scored (#201)"),
+    # Issue batch B56 (#205, R6-23): every served string read for the key,
+    # and every relayed sentence bounded after the filter. B43's
+    # `speaker-unchecked` is retired with the Mirror it aimed at;
+    # `words-unwalked` and `scan-undecoded` cover E6.
+    "words-unwalked": (
+        "CloudTranscriber+Media.swift",
+        "        if client.carriesCredential(String(decoding: fetched.wordsJSON, as: UTF8.self))\n"
+        "            || served.contains(where: client.carriesCredential)\n"
+        "        {\n",
+        "        if client.carriesCredential(String(decoding: fetched.wordsJSON, as: UTF8.self))"
+        " {\n",
+        "only the served bytes read for the key, no decoded string (E6, E9\u2013E11, E14)"),
+    "scan-undecoded": (
+        "AssemblyAITranscript.swift",
+        "            strings.append(decoded)\n",
+        "            strings.append(String(decoding: literal, as: UTF8.self))\n",
+        "each literal collected as its raw bytes, escapes and all (E6, E9\u2013E11, E14)"),
+    "scan-skips-keys": (
+        "AssemblyAITranscript.swift",
+        "            strings.append(decoded)\n",
+        "            var after = index + 1\n"
+        "            while after < bytes.count, [0x20, 0x09, 0x0A, 0x0D].contains(bytes[after]) {\n"
+        "                after += 1\n"
+        "            }\n"
+        "            if after >= bytes.count || bytes[after] != UInt8(ascii: \":\") {\n"
+        "                strings.append(decoded)\n"
+        "            }\n",
+        "a literal followed by `:` \u2014 an object key \u2014 not collected (E10)"),
+    "sentence-unbounded": (
+        "AssemblyAIClient+Session.swift",
+        "        Self.bounded(withoutCredential(text), limit: Self.relayedSentenceLimit)\n",
+        "        withoutCredential(text)\n",
+        "the relayed sentences kept at any length (RS1\u2013RS3, RS5, E13)"),
+    "bound-before-filter": (
+        "AssemblyAIClient+Session.swift",
+        "        Self.bounded(withoutCredential(text), limit: Self.relayedSentenceLimit)\n",
+        "        withoutCredential(Self.bounded(text, limit: Self.relayedSentenceLimit))\n",
+        "a relayed sentence cut BEFORE the key filter, so a straddling key survives as "
+        "a piece (RS5)"),
     # Issue batch B46 (#93, R6-22): speaker colours on Subtitles.
     "speaker-colour-dropped": (
         "CaptionLayout.swift",

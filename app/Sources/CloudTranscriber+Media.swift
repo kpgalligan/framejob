@@ -195,11 +195,19 @@ extension CloudTranscriber {
         var file = try MediaTranscript.File(header: header, wordsJSON: fetched.wordsJSON)
         // R6-3 keeps the served words VERBATIM, so words that repeat the key
         // cannot be rewritten: they are refused, and the transcript deleted,
-        // before a byte is written (#187, R2·1). Every decoded string of a
-        // word is read too (`stringFields`: the text and the speaker today),
-        // because an escaped key is not the key's bytes (#200).
+        // before a byte is written (#187, R2·1). Every string literal of the
+        // served bytes is read too, decoded — every key and value at any
+        // depth, every value of a repeated key, read or not by
+        // `TranscriptWord` — because an escaped key is not the key's bytes
+        // (#200, R6-23). `wordsBytes` already decoded these words, so a
+        // scan that fails is a fail-safe refusal, not an expected path.
+        guard let served = TranscriptWord.servedStrings(in: fetched.wordsJSON) else {
+            throw client.refusing(
+                .malformed("the transcript's words did not decode"), id: fetched.response.id,
+                cancel: cancel)
+        }
         if client.carriesCredential(String(decoding: fetched.wordsJSON, as: UTF8.self))
-            || file.words.contains(where: { $0.stringFields.contains(where: client.carriesCredential) })
+            || served.contains(where: client.carriesCredential)
         {
             throw client.refusing(
                 .malformed("the transcript's words repeat the API key"), id: fetched.response.id,
@@ -247,15 +255,11 @@ extension CloudTranscriber {
     static let serverStringLimit = 64
 
     /// At most `serverStringLimit` Unicode scalars: a longer string is its
-    /// first 63 scalars + "…" (U+2026). Not in `withoutCredential`, because
-    /// the relayed 4xx and `error` sentences stay whole (R6-3, q5's sentence
-    /// verbatim).
+    /// first 63 scalars + "…" (U+2026), cut by the one scalar cutter. Not in
+    /// `withoutCredential`, because the relayed 4xx and `error` sentences
+    /// take their own, longer limit (`AssemblyAIClient.relayed`, R6-23).
     static func bounded(_ text: String) -> String {
-        let scalars = text.unicodeScalars
-        guard scalars.count > serverStringLimit else { return text }
-        var kept = String.UnicodeScalarView(scalars.prefix(serverStringLimit - 1))
-        kept.append("\u{2026}")
-        return String(kept)
+        AssemblyAIClient.bounded(text, limit: serverStringLimit)
     }
 
     /// `fetched_at`, ISO-8601 in UTC — the one spelling of a time in the

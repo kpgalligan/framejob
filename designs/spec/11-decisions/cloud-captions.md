@@ -367,3 +367,25 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   no slot, so such a run places byte-identical clips and W-7's
   byte-identical Subtitles still holds for it. Persisting speakers stays
   rejected (road map 6).
+- **R6-23 — Every string a server sends is checked for the key whole, and
+  every one the app relays is bounded** (issue batch B56, #205).
+  (a) `fetch` refuses words when any string literal in the served `words`
+  JSON repeats the key. The strings are found by a lexical scan of the
+  bytes and each is decoded from its JSON escapes, so every object key and
+  every string value is seen, at any depth, and every value of a repeated
+  key. The raw bytes are checked too. The refusal applies whether or not
+  `TranscriptWord` decodes the field: R6-3 keeps the bytes verbatim, so a
+  field Reelcut never reads would otherwise carry an escaped key onto
+  disk. The scan is lexical, not a `JSONSerialization` tree walk, because
+  a parser keeps only a repeated key's first value. This replaces B43's
+  decoded-fields check. R6-20 applies to the refusal.
+  (b) The model and language the server names are cut to 64 Unicode
+  scalars (63 + "…"). That is B43's rule (#200), recorded here.
+  (c) The three sentences relayed as the service wrote them (a 402, any
+  other 4xx, a transcript's `error`) are cut to 300 Unicode scalars (299 +
+  "…"). The cut comes after the key filter, so it never splits the key
+  into a piece the filter cannot see. 300 is a ceiling against a broken or
+  hostile server, not a measured length.
+  DECLINED: bounding inside `withoutCredential`, because the two kinds of
+  string take different limits. DECLINED: a tree walk (see (a)).
+  DECLINED: paraphrasing a sentence.

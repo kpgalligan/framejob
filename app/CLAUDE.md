@@ -964,7 +964,8 @@ free.
   every exit, the server's model and language filtered through
   `withoutCredential` and then bounded at 64 Unicode scalars (`bounded`,
   `serverStringLimit`, #200), `audio_duration` floored at 0, words any of
-  whose decoded strings (`TranscriptWord.stringFields`) repeat the key refused
+  whose served strings — every key and value at any depth, scanned from the
+  bytes (`TranscriptWord.servedStrings`, R6-23) — repeat the key refused
   (the transcript deleted) before any write, the cache file
   written before its marker, and the DELETE last with its answer recorded —
   its `remote_deleted` rewrite only over a first write that landed (#187).
@@ -996,8 +997,8 @@ free.
   `TranscriptOptions`,
   `TranscriptRequest` (whose `encode` is the whole wire body — `language_code`
   absent for auto, `keyterms_prompt` absent when empty), `TranscriptWord`
-  (with `stringFields`, every String field by `Mirror`, which `fetch` reads
-  for the key),
+  (with `servedStrings`, every string literal of a served `words` array
+  decoded by a lexical scan, which `fetch` reads for the key),
   `TranscriptResponse` and `JSONValueRange`. `TranscriptStamp.swift` owns the
   cache marker: `TranscriptSourceStamp` projects `CacheStamp` to size,
   modification second, duration and audio presence, then pairs those with
@@ -1027,7 +1028,8 @@ free.
   first file, with `withoutCredential(_:)` beside them: those three are the
   members that touch `credential`, and that helper keeps the three sentences
   the client RELAYS verbatim — a 402's, a 4xx's and a transcript's `error` —
-  from carrying a key a server echoed back. `isSendableIdentifier`
+  from carrying a key a server echoed back; `relayed` (`+Session`) then cuts
+  each to 300 Unicode scalars (R6-23). `isSendableIdentifier`
   (`+Session`: `isPlainIdentifier` AND not `carriesCredential`) is the ONE id
   gate — `poll`, `delete`, a submit reply and a recovery-list row — so an id
   that carries the key is never sent or accepted. `delete` answers THREE
