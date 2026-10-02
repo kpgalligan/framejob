@@ -389,3 +389,16 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   DECLINED: bounding inside `withoutCredential`, because the two kinds of
   string take different limits. DECLINED: a tree walk (see (a)).
   DECLINED: paraphrasing a sentence.
+- **R6-24 — A transcript id the person's key cannot delete holds its media
+  for ever (accepted)** (#44; the owner, 2026-10-01). `AssemblyAIClient
+  .delete` answers `.failed` for any non-2xx answer (`classify`), a 404
+  included, so a well-formed transcript id from another account puts its
+  media in `janitorFailed`, and R6-11 holds that media in every run, since
+  every run's DELETE fails again. What AssemblyAI answers for a foreign id
+  is unmeasured, and no one will measure it: that needs a second account.
+  **Why accepted:** every person uses their own key (R6-5, R6-12), so a
+  foreign id comes only from a hand-edited or imported cache file; the
+  risk is low. Also held by this entry: a malformed cache file's deletion
+  ids cannot be recovered, and a retry needs the originating account's or
+  region's key. Source: `archive/reelcut-roadmap-6.md` §10.10, §10.20.
+  Treating a 404 as deleted is not decided here.

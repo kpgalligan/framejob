@@ -15,8 +15,8 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | [`recording.md`](recording.md) | 173 | **Screen recording (road map 3).** The recorder: what is in and out, files, grants, pause. |
 | [`silence.md`](silence.md) | 49 | **Remove Silences (road map 4).** Silero VAD, its grid and cache, voice mode; S1-23. |
 | [`effects-motion.md`](effects-motion.md) | 60 | **Transitions and motion (road map 5).** R5-1..R5-5, E2-27. |
-| [`deepening.md`](deepening.md) | 527 | **Deepening (road map 7).** D2-1, D3-1, #21, #22, D4-1..D4-6, D7-1..D7-3, #42, #88, #63, #174, #40, #43, #190, #87, #86: how ops refuse, the op table, the gate, the source window, time envelopes, one-delta shifts on the canvas's grid, the non-edits that speak, a relink that re-probes, one frame on the grid, a tool that closes a document, a path one open document holds, a caption name's own extension, a speed of ×0.1–×1000 and the audio ceiling above ×12, a gain change on one audio track slews over 25 ms, a normalised export gained in float and quantised once. |
-| [`cloud-captions.md`](cloud-captions.md) | 391 | **Cloud captions (road map 6).** R6-1..R6-23: AssemblyAI, keys, deletion, recovery, refusal precedence, a dripping server, a Stop's bound on a DELETE, a refused transcript's failed DELETE reported for the dashboard, cached transcripts not re-checked for the key, speaker colours on Subtitles, server strings checked whole and bounded. |
+| [`deepening.md`](deepening.md) | 556 | **Deepening (road map 7).** D2-1, D3-1, #21, #22, D4-1..D4-6, D7-1..D7-3, #42, #88, #63, #174, #40, #43, #190, #87, #86, #178: how ops refuse, the op table, the gate, the source window, time envelopes, one-delta shifts on the canvas's grid, the non-edits that speak, a relink that re-probes, one frame on the grid, a tool that closes a document, a path one open document holds, a caption name's own extension, a speed of ×0.1–×1000 and the audio ceiling above ×12, a gain change on one audio track slews over 25 ms, a normalised export gained in float and quantised once, the cache passes' save gate's five accepted limits. |
+| [`cloud-captions.md`](cloud-captions.md) | 404 | **Cloud captions (road map 6).** R6-1..R6-24: AssemblyAI, keys, deletion, recovery, refusal precedence, a dripping server, a Stop's bound on a DELETE, a refused transcript's failed DELETE reported for the dashboard, cached transcripts not re-checked for the key, speaker colours on Subtitles, server strings checked whole and bounded, a transcript id the key cannot delete holding its media. |
 | [`word-captions.md`](word-captions.md) | 123 | **Word captions (road map 8).** W-1..W-11. |
 | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) | 390 | **Chrome, the clip inspector and keys (the sharp pass, road map 9, #35).** SH-1..SH-4, CI-1..CI-16, K-1..K-3. |
 | [`graphics.md`](graphics.md) | 405 | **Graphics (road map 10).** G-1..G-20. |
@@ -91,8 +91,9 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | #40 | `close_project` closes a document as File ▸ Close does; `save_project {path}` and `new_project {path}` refuse a path another open document holds | [`deepening.md`](deepening.md) |
 | #43 | `export_captions` replaces only `srt`/`vtt` in a name; any other extension is part of it | [`deepening.md`](deepening.md) |
 | #190 | A clip's speed runs ×0.1–×1000; above ×12, in both pitch modes, the plan leaves its audio out; one pitch per plan audio track; `set_speed` fits a duration | [`deepening.md`](deepening.md) |
-| #87 | On one composition audio track a gain change with sound on both sides takes up to 25 ms — accepted; a track's first segment is held from time 0 | [`deepening.md`](deepening.md) |
+| #87 | On one composition audio track a gain change with sound on both sides takes up to 25 ms — accepted; a track's first segment is held from time 0 — amended by #217 | [`deepening.md`](deepening.md) |
 | #86 | A normalised export reads the mix as float, gains it and quantises once to the unchanged 16-bit encoder format; an un-normalised export keeps the Int16 decode | [`deepening.md`](deepening.md) |
+| #178 | The cache passes' save gate has five accepted limits | [`deepening.md`](deepening.md) |
 | R6-1 | The cloud engine is a second engine behind the same command, never a second command | [`cloud-captions.md`](cloud-captions.md) |
 | R6-2 | Audio leaves the machine only by name, with the price in front of the person | [`cloud-captions.md`](cloud-captions.md) |
 | R6-3 | The transcript is a per-media asset in the package | [`cloud-captions.md`](cloud-captions.md) |
@@ -116,6 +117,7 @@ them, then the reasoning and the risk it accepts. Add its row here in the same c
 | R6-21 | A cached transcript is not re-checked for the key when it is read (accepted) | [`cloud-captions.md`](cloud-captions.md) |
 | R6-22 | With Speakers on, each speaker's Subtitles cues are their own colour, and nothing else marks them | [`cloud-captions.md`](cloud-captions.md) |
 | R6-23 | Every string a server sends is checked for the key whole, and every one the app relays is bounded | [`cloud-captions.md`](cloud-captions.md) |
+| R6-24 | A transcript id the person's key cannot delete holds its media for ever (accepted) | [`cloud-captions.md`](cloud-captions.md) |
 | W-1 | A word caption is an ordinary text clip holding one PAGE | [`word-captions.md`](word-captions.md) |
 | W-2 | `text.words` is one `{start, end}` per whitespace token of `content`, and the core is the one counter | [`word-captions.md`](word-captions.md) |
 | W-3 | Word times are clip time, and they move with the content, not with the clip's length | [`word-captions.md`](word-captions.md) |

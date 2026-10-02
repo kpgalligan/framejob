@@ -666,7 +666,12 @@ X5: `place: false` — the voice's media in the left-out list, no clip. X6:
 voice's note]; `savedButNotAdded` never says "was added to the project";
 `record_screen`'s description says "without its picture". X7, the
 control: a left-out B whose voice did NOT read gives X1's document the
-byte-identical op list of the same result without B.
+byte-identical op list of the same result without B. X8 (issue batch B61,
+#213): a new project whose only segment's picture A0 is 5 000 ticks — under
+one 60 fps frame, so the core mints no clip for it (the control, 4b·M's
+precedent) — with a 5 s voice of its own and B left out after it: both
+voices land as media with no clip, and the notes are exactly
+`unplacedNote`'s sentence for A0's voice, then for B's.
 
 **Measured 2026-10-01 by issue batch B55**, `--only
 state,unreadable,landing,segments,catalog,leftout`: 470/470 — the build
@@ -991,6 +996,17 @@ code before the batch:
                     (ScreenRecorder+Finishing.swift) — 30/31 with `--only
                     unreadable`: U7.
 
+**Issue batch B61's mutants** (#213: section 14's X8), measured
+2026-10-01 against the tree at 27/27 for `--only leftout`. Each removes one
+of `remainderPlacement`'s unplaced-voice notes (RecordingLanding+Microphone
+.swift) and is caught by X8's notes row alone:
+
+  unplaced-voice-unnoted    a segment's voice gets no `unplacedNote` when
+                    clip 1 is missing — 26/27 with `--only leftout`: X8's
+                    notes row.
+  unplaced-leftout-unnoted  a left-out segment's voice gets none — 26/27:
+                    X8's notes row.
+
 Two older mutants were RE-AIMED by B55, because the walker's two left-out
 arms now call `probeLeftOutMicrophone` before recursing:
 `unreadable-fails-all` (the probe-failure arm) re-scored 156/172 with
@@ -1010,6 +1026,7 @@ in its pin map (R1's landing): both cross-builds are one program again.
     python3 tools/proof/recording_probe.py --only file_pause   # B42's
     python3 tools/proof/recording_probe.py --only welcome   # B49's
     python3 tools/proof/recording_probe.py --only state,unreadable,leftout   # B55's
+    python3 tools/proof/recording_probe.py --only leftout   # B61's
     python3 tools/proof/recording_probe.py --mutant excludes
     python3 tools/proof/recording_probe.py --sources <dir> # any copy
     RC_APP_SOURCES=<dir> python3 tools/proof/recording_probe.py
@@ -3407,6 +3424,32 @@ func leftout(_ request: [String: Any]) -> [String: Any] {
             "withNames": p1.ops.map { $0.name }, "withoutNames": p2.ops.map { $0.name },
             "withLists": lists(p1), "withoutLists": lists(p2),
         ]
+    }
+    // X8 (issue batch B61, #213): a new project whose first picture the core
+    // refuses (5 000 ticks, under one 60 fps frame — 4b·M's precedent), with
+    // a voice of its own and a left-out B's voice — both media only, noted.
+    try? Data("not a movie".utf8).write(to: tmp.appendingPathComponent("A0.mov"))
+    try? Data("not audio".utf8).write(to: URL(fileURLWithPath: mic("A0", 0).path))
+    let shortA0 = MediaDescriptor(
+        path: tmp.appendingPathComponent("A0.mov").path, kind: .video,
+        duration: 5_000, width: 1728, height: 1118, fps: Fps(num: 24981, den: 1000),
+        hasVideo: true, hasAudio: false)
+    out["micA"] = mic("A0", 5 * second).path
+    out["pathA0"] = shortA0.path
+    out["X8"] = row {
+        let r8 = result(
+            [RecordingSegment(
+                descriptor: shortA0, micDescriptor: mic("A0", 5 * second), micOffset: 0,
+                startedAt: Date())],
+            [leftB(position: 1)])
+        let (d, notes) = try ProjectDocument.untitled(around: r8)
+        let s = d.project.snapshot
+        let facts: [String: Any] = [
+            "notes": notes, "clips": s.clips.map(describeClip),
+            "media": s.media.map { ["id": Int($0.id), "path": $0.path] as [String: Any] },
+        ]
+        d.close()
+        return facts
     }
     out["documentsAfterClose"] = NSDocumentController.shared.documents.count
     return out
@@ -8417,6 +8460,24 @@ def section_leftout(binary, sources):
           and {k: v for k, v in (x7.get("withLists") or {}).items() if not k.startswith("leftOut")}
           == {k: v for k, v in (x7.get("withoutLists") or {}).items() if not k.startswith("leftOut")},
           f"{x7.get('error') or ''} {x7.get('withNames')} vs {x7.get('withoutNames')}")
+
+    print("  X8 — a new project whose first picture the core refuses, its voice and B's (B61, #213)")
+    x8 = answer.get("X8") or {}
+    mic_a = answer.get("micA") or "?"
+    path_a0 = answer.get("pathA0") or "?"
+    c8 = x8.get("clips")
+    m8 = {m.get("path"): m.get("id") for m in x8.get("media") or []}
+    check("X8 control: the core minted no clip for the 5 000-tick first picture (clips == [])",
+          not x8.get("error") and c8 == [], f"{x8.get('error') or c8}")
+    check("X8: A0's voice and B's voice are in the media list, neither with a clip",
+          mic_a in m8 and mic_b in m8
+          and not [c for c in c8 or [] if c.get("media") in (m8.get(mic_a), m8.get(mic_b))],
+          f"media {sorted(m8)}, clips {c8}")
+    unplaced = "was added to the media list without a clip: {} has no clip on the timeline for it to follow."
+    want8 = [f"{mic_a} {unplaced.format(path_a0)}", f"{mic_b} {unplaced.format(path_a0)}"]
+    check("X8: the notes are exactly unplacedNote for A0's voice, then for B's — the segment's voice "
+          "first, then the left-out voice (unplaced-voice-unnoted, unplaced-leftout-unnoted)",
+          x8.get("notes") == want8, f"{x8.get('notes')} vs {want8}")
     check("14: every document the section opened is closed", answer.get("documentsAfterClose") == 0,
           f"{answer.get('documentsAfterClose')}")
 
@@ -8921,6 +8982,17 @@ MUTANTS = {
         "        guard !movies.isEmpty else { return error }\n",
         "namingFiles names nothing when no movie is on disk, readable microphone files included "
         "(the code before B55)"),
+    # Issue batch B61 (#213) — section 14's X8.
+    "unplaced-voice-unnoted": (
+        "RecordingLanding+Microphone.swift",
+        "                if let mic = segment.micDescriptor { notes.append(unplacedNote(mic.path, behind: path)) }\n",
+        "                _ = segment\n",
+        "a segment's voice lands as media with no clip and no note when clip 1 is missing"),
+    "unplaced-leftout-unnoted": (
+        "RecordingLanding+Microphone.swift",
+        "                if let mic = left.micDescriptor { notes.append(unplacedNote(mic.path, behind: path)) }\n",
+        "                _ = left\n",
+        "a left-out segment's voice lands as media with no clip and no note when clip 1 is missing"),
 }
 
 

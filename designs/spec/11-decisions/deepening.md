@@ -504,7 +504,12 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   composition track per format family, so that no two clips share a track,
   which changes family assignment (R2-1) for a 25 ms edge; and an envelope
   applied in the processing tap, which breaks "no tap on an untouched
-  export". The owner decided this on 2026-10-01.
+  export". The owner decided this on 2026-10-01. **Amended by #217**
+  (issue batch B61): the hold ends at the track's first SOUNDING segment,
+  one whose source resolved; a missing-media or pending-reverse segment
+  before it is held over, because it is empty time — `mixed_audio_proof.py`'s
+  `missing-first` row, whose muted WAV after a missing AAC copy read
+  −28.8 dBFS in its first 25 ms before the fix and −200.0 dBFS after.
 - **#86 — A normalised export reads the mix as float, gains it and
   quantises once to the unchanged 16-bit encoder format; an un-normalised
   export keeps the Int16 decode.** Before B60 the write pass decoded the mix
@@ -525,3 +530,27 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   with no gain) is what reports it. #86's part 2, a 24-bit WAV/AIFF option,
   is not decided here, and nothing here closes it off: the 16-bit output is
   one constant in `ExportAudioGain`.
+- **#178 — The cache passes' save gate has five accepted limits** (issue
+  batch B14, #115, #169; the owner, 2026-10-01). The save bracket is
+  `ProjectDocument+CacheSaves.swift` and the ledger `MediaCacheLedger.swift`
+  (`CacheLedger.publish`, `waitLimit` 30 s, `saveLimit` 120 s);
+  `cache_pass_probe.py` is the probe. (1) A first save or a Save As loses,
+  for the session, any cache file published after its listing: nothing
+  swaps, and nothing re-runs the passes after a save that moves
+  `cacheDirectory`. (2) Frames lost between a save's listing and its swap
+  leave the strip unmarked, with holes, until the next open. (3) The head
+  clears are not gated, so a withdrawal in that window is undone by the
+  swap until the pass publishes again. (4) A write that began before its
+  pass was superseded, and outlasts `waitLimit`, can land after the
+  successor's clear. (5) A save whose completion never arrives gates its
+  package's publications until `saveLimit`, 120 s after it began — the
+  undo-flush hang `app/CLAUDE.md` names; publications and peaks retries in
+  that window are lost for the session, and the expiry is not probed.
+  **Why accepted:** each is a cache — regenerable, never required to open
+  (§5.6) — lost or stale for at most the session, and each window is
+  bounded by a save or by the two limits. The review's two nits are not
+  limits: they landed in f5571fd (issue batch B29) — `awaitPass` cancels
+  its sleeper (`cache_pass_probe.py` W1, mutant `no-cancel-sleeper`) and
+  the doc lines say one CURRENT pass per key. **The bound it keeps by
+  design:** a relink away from a stuck pass starts only after the full
+  30 s wait (S1a measured 30.32 s).

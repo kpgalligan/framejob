@@ -11641,3 +11641,53 @@ gained export in these runs had its float read accepted, and no proof row
 reaches the refusal. A decoded buffer of zero frames is skipped on the gain
 path, as the old Int16 kernel passed it through; none was seen in these
 runs, so no proof row reaches that skip either.
+
+## Issue batch B61 — a composition track's hold ends at its first SOUNDING segment, and a refused first picture's voices are noted (`mixed_audio_proof.py` `missing-first`; `recording_probe.py` X8; #217, #213)
+
+#217 (B59's residue): a family-0 composition track whose first segment has
+no source (missing media, a pending reverse) ended its hold at that silent
+segment, so a muted clip after it still slewed down from the plan's 1.0 for
+25 ms. `audioParameters` now takes `onset` from its caller, and
+`addAudioTracks` passes the family's first sounding span
+(`family.sounding.map(\.lowerBound).min()`), the spans `fill` inserts media
+for. `CompositionBuilder+AudioTracks.swift` is 288 lines. The speed spike's
+one call passes `onset: nil` with `ramps: nil`, so it is unchanged. Spec §11
+#87 is amended by #217.
+
+#213: `remainderPlacement`'s two unplaced-voice notes — a segment's voice
+and a left-out segment's voice when clip 1 is missing — had no row.
+
+- **`mixed_audio_proof.py`** — `missing-first`: a copy of `aac.m4a`
+  (`gone-<pid>.m4a`) at 0 and `pcm.wav` at the copy's clip duration on one
+  track, the WAV muted, then the copy deleted. A control row that
+  `get_project`'s `missing_media` is the copy's id; the WAV silent
+  (≤ −60 dBFS) in its first 25 ms and the 1.95 s after. 17 checks.
+- **`recording_probe.py` section 14, X8** — a new project whose only
+  segment's picture is 5 000 ticks (under one 60 fps frame, so the core
+  mints no clip: the control row), with a 5 s voice of its own and a
+  left-out B's voice after it: both voices are media with no clip, and the
+  notes are exactly `unplacedNote`'s sentence for A0's voice, then B's.
+  Two mutants, `unplaced-voice-unnoted` and `unplaced-leftout-unnoted`,
+  each delete one of the two notes in a copy of
+  `RecordingLanding+Microphone.swift`. 27 rows under `--only leftout`.
+
+Runs on 2026-10-01 over `0095499`, instance on 4861 for each build, both
+parity logs empty:
+
+| Run | Build | Result |
+|---|---|---|
+| `mixed_audio_proof.py 4861` | HEAD, before the fix | 16/17, exit 1. FAIL: `missing-first`'s first 25 ms from 1.967 s, −28.8 dBFS. Its control passed (`missing_media` [2]); the next 1.95 s read −140.0 dBFS. |
+| `mixed_audio_proof.py 4861` | the fix | 17/17, exit 0. `missing-first` −200.0 dBFS in the first 25 ms and after; the 14 rows B59 left all pass, `mixed` against `split` max \|Δ\| 0. |
+| `recording_probe.py --only leftout` | the tree | 27/27, exit 0. |
+| `recording_probe.py --mutant unplaced-voice-unnoted --only leftout` | mutant | 26/27, exit 1. FAIL: X8's notes row. |
+| `recording_probe.py --mutant unplaced-leftout-unnoted --only leftout` | mutant | 26/27, exit 1. FAIL: X8's notes row. |
+
+```sh
+perl -e 'alarm shift; exec @ARGV' 300 python3 tools/proof/mixed_audio_proof.py 4861   # 17/17
+perl -e 'alarm shift; exec @ARGV' 900 python3 tools/proof/recording_probe.py --only leftout   # 27/27
+```
+
+#178 and #44 changed no code: they are recorded as accepted limits, spec
+§11 #178 and R6-24. **Not measured:** a pending-reverse lead segment (the
+same `sounding` rule covers it; no row reaches it), and e1_proof.py was not
+re-run, because no fixture of it has a sourceless lead segment.

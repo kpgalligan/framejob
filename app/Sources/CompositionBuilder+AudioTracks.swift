@@ -168,6 +168,7 @@ extension CompositionBuilder {
                 inputParameters.append(
                     audioParameters(
                         for: track, segments: family.segments, ramps: planTrack.ramps,
+                        onset: family.sounding.map(\.lowerBound).min(),
                         dsp: dsp.isEmpty
                             ? nil : AudioTrackDSP(segments: family.segments, parameters: dsp),
                         meter: sink))
@@ -204,7 +205,7 @@ extension CompositionBuilder {
     /// this landed does now sound different, which is the feature.
     static func audioParameters(
         for track: AVMutableCompositionTrack, segments: [PlanSegment], ramps: [PlanRamp]?,
-        dsp: AudioTrackDSP?, meter: LevelMeterSink?
+        onset: Ticks?, dsp: AudioTrackDSP?, meter: LevelMeterSink?
     ) -> AVAudioMixInputParameters {
         let parameters = AVMutableAudioMixInputParameters(track: track)
         if let pitch = segments.compactMap({ $0.pitch }).first {
@@ -215,7 +216,6 @@ extension CompositionBuilder {
             default: break
             }
         }
-        let onset = segments.filter { $0.duration > 0 }.map(\.start).min()
         for leg in volumeLegs(ramps: ramps ?? [], onset: onset) {
             parameters.setVolumeRamp(
                 fromStartVolume: Float(leg.from), toEndVolume: Float(leg.to),
@@ -237,7 +237,9 @@ extension CompositionBuilder {
     }
 
     /// The plan's ramps for one composition track, with the envelope's value
-    /// at the track's own first segment (`onset`) HELD from time 0 to it.
+    /// at the track's own first sounding segment (`onset`: one whose source
+    /// resolved; a missing or pending-reverse segment is empty time) HELD
+    /// from time 0 to it.
     ///
     /// **Why** (kpgalligan/reelcut#87, spec §11 #87; measured on a standalone
     /// composition read at 48 kHz): before a track's first volume ramp an
@@ -247,11 +249,13 @@ extension CompositionBuilder {
     /// played its first 25 ms sliding down from 1.0. And a second format
     /// family's track is handed the PLAN track's ramps, which carry the
     /// earlier clips' gain up to its own first segment, where the same slide
-    /// followed. Holding the value at the onset from 0 leaves nothing to
-    /// slew there. Nothing at or after the hold's end changes, apart from a
-    /// leg that straddles it being clipped on its own line; nothing is added
-    /// before a segment that has sound before it on the same track, so a
-    /// shared track's hard cut keeps the slew — the accepted limit.
+    /// followed. Holding the value at the onset — the first sounding segment
+    /// (one whose source resolved; a missing or pending-reverse segment is
+    /// empty time, #217) — from 0 leaves nothing to slew there. Nothing at
+    /// or after the hold's end changes, apart from a leg that straddles it
+    /// being clipped on its own line; nothing is added before a segment that
+    /// has sound before it on the same track, so a shared track's hard cut
+    /// keeps the slew — the accepted limit.
     static func volumeLegs(ramps: [PlanRamp], onset: Ticks?) -> [VolumeLeg] {
         let legs = ramps.filter { $0.duration > 0 }.map {
             VolumeLeg(start: $0.start, duration: $0.duration, from: $0.from, to: $0.to)

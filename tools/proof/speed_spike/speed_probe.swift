@@ -498,7 +498,7 @@ func runAudio() -> Never {
         fail("the composition did not build: \(error.localizedDescription)")
     }
     let parameters = CompositionBuilder.audioParameters(
-        for: track, segments: [segment], ramps: nil, dsp: nil, meter: nil)
+        for: track, segments: [segment], ramps: nil, onset: nil, dsp: nil, meter: nil)
     let mix = AVMutableAudioMix()
     mix.inputParameters = [parameters]
     answer["composition_s"] = finite(CMTimeGetSeconds(composition.duration))

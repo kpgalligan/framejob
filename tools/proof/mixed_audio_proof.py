@@ -15,7 +15,13 @@ track) exports, over the WHOLE file: since B59 (#87) the WAV's composition
 track holds its own first segment's gain from time 0 rather than carrying the
 plan track's ramps up to it, so the 25 ms step at 3.000–3.026 s is gone. And
 `mixed-muted` — the same pair with the WAV MUTED — is silent from the WAV's
-first sample.
+first sample. And `missing-first` (#217, B61) — a copy of the AAC whose file
+is then deleted, followed with no gap by the WAV MUTED, on ONE track — is
+silent from the WAV's first sample too: the hold ends at the track's first
+SOUNDING segment, so the missing lead's empty time is held over rather than
+ending the hold at 0 and slewing the plan's 1 → 0 step at the cut (on the
+build before the fix that row failed; the numbers are in the README's B61
+record).
 
 Fixtures are `mixed_audio_probe.py`'s, written fresh by importing it (the
 `silence2` pattern). Needs `ffmpeg`. Run against an instance:
@@ -204,6 +210,32 @@ def main():
     check(edge <= -60, f"mixed-muted: the WAV's first 25 ms from {w:.3f} s are silent "
                        f"({edge:.1f} dBFS ≤ −60)")
     check(rest <= -60, f"mixed-muted: silent from {w + 0.025:.3f} s to {w + 1.975:.3f} s "
+                       f"({rest:.1f} dBFS ≤ −60)")
+
+    print("\nmissing-first — a missing copy of the AAC, then the WAV MUTED, on ONE track")
+    for stale in os.listdir(probe.WORK):
+        if re.fullmatch(r"gone-\d+\.m4a", stale):
+            os.remove(os.path.join(probe.WORK, stale))
+    gone = f"gone-{os.getpid()}.m4a"
+    shutil.copyfile(os.path.join(probe.WORK, "aac.m4a"), os.path.join(probe.WORK, gone))
+    g = Session(mcp, "mixed-audio-missing")
+    copy, wav = g.media(gone), g.media("pcm.wav")
+    track = g.track_ids()[0]
+    first = g.place(track, copy, 0)
+    # No gap: the core's envelope is 0 in a gap, which would hide the slew.
+    at = {c["id"]: c for c in g.project()["clips"]}[first]["duration"]
+    second = g.place(track, wav, at)
+    g.op("set_audio", clips=[second], patch={"muted": True})
+    os.remove(os.path.join(probe.WORK, gone))
+    missing = g.op("get_project").get("missing_media")
+    check(missing == [copy], f"CONTROL missing-first: get_project's missing_media is the "
+                             f"copy's id ({missing} == {[copy]})")
+    lead = pcm(g.export_wav())
+    w = at / SEC
+    edge, rest = db(lead, w, w + 0.025), db(lead, w + 0.025, w + 1.975)
+    check(edge <= -60, f"missing-first: the WAV's first 25 ms from {w:.3f} s are silent "
+                       f"({edge:.1f} dBFS ≤ −60)")
+    check(rest <= -60, f"missing-first: silent from {w + 0.025:.3f} s to {w + 1.975:.3f} s "
                        f"({rest:.1f} dBFS ≤ −60)")
 
     print("\nCONTROL same — two AAC clips of one format on one track")
