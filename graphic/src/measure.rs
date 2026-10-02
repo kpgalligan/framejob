@@ -34,6 +34,9 @@ pub struct TextFont {
     pub weight: u16,
     pub style: FontStyle,
     pub letter_spacing: f64,
+    /// `xml:space="preserve"` on the probe `<text>` (G-22): runs of spaces
+    /// beside a drawn glyph count instead of collapsing.
+    pub preserve_space: bool,
 }
 
 /// A text's advance, its box about the baseline, and its ink.
@@ -71,7 +74,9 @@ impl TextMetrics {
 }
 
 /// Measures `text` in `font`, memoised in the library. Whitespace-only text
-/// measures zero; a family with no face in the set is an error naming it.
+/// measures zero under either `preserve_space` (G-22: usvg lays out no text
+/// node for a text with no outlines, preserved or not); a family with no
+/// face in the set is an error naming it.
 pub fn measure_text(
     library: &Library,
     text: &str,
@@ -103,6 +108,7 @@ pub fn measure_text(
         font.weight,
         font.style,
         font.letter_spacing.to_bits(),
+        font.preserve_space,
         text.to_string(),
     );
     if let Some(metrics) = library.memo_get(&key) {
@@ -123,13 +129,18 @@ fn measure_uncached(
     let svg = format!(
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{w}\" height=\"{h}\">\
          <text x=\"0\" y=\"{baseline}\" font-family=\"{family}\" font-size=\"{size}\" \
-         font-weight=\"{weight}\" font-style=\"{style}\" letter-spacing=\"{spacing}\">{t}</text></svg>",
+         font-weight=\"{weight}\" font-style=\"{style}\" letter-spacing=\"{spacing}\"{space}>{t}</text></svg>",
         w = (size * 64.0).ceil(),
         h = (size * 4.0).ceil(),
-        family = escape_xml(&format!("'{}'", font.family.replace('\'', ""))),
+        family = escape_xml(&family_value(&font.family)),
         weight = font.weight,
         style = font.style.as_css(),
         spacing = font.letter_spacing,
+        space = if font.preserve_space {
+            " xml:space=\"preserve\""
+        } else {
+            ""
+        },
         t = escape_xml(text),
     );
     let probe = Mutex::new(Probe::default());
@@ -155,6 +166,21 @@ fn measure_uncached(
         ink_x: ink.x() as f64,
         ink_width: ink.width() as f64,
     })
+}
+
+/// The CSS generic keywords as svgtypes reads them, case-sensitive as usvg
+/// matches them (G-6).
+const GENERIC_FAMILIES: [&str; 5] = ["serif", "sans-serif", "cursive", "fantasy", "monospace"];
+
+/// A generic keyword is written bare, so it is the keyword (G-6); any other
+/// family is quoted, so a digit-led word (`Source Sans 3`) parses — as
+/// `stdlib.js`'s `textLines` writes it.
+fn family_value(family: &str) -> String {
+    if GENERIC_FAMILIES.contains(&family) {
+        family.to_string()
+    } else {
+        format!("'{}'", family.replace('\'', ""))
+    }
 }
 
 fn find_text(group: &usvg::Group) -> Option<&usvg::Text> {

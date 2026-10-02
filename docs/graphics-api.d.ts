@@ -66,7 +66,11 @@ type Schema = Record<string, SchemaEntry>;
 
 /** What `measureText`, `wrapText`, `fitText` and `textLines` measure with. */
 interface Font {
-  /** Default "Montserrat". A family that is not installed throws. */
+  /**
+   * Default "Montserrat". A family that is not installed throws. The CSS
+   * generics "serif" (Source Serif 4), "sans-serif" (Source Sans 3) and
+   * "monospace" (IBM Plex Mono) are installed; "cursive" and "fantasy" are not.
+   */
   family?: string;
   /** Default 16. */
   size?: number;
@@ -76,6 +80,11 @@ interface Font {
   style?: string;
   /** Default 0. */
   letterSpacing?: number;
+  /**
+   * Default "default": runs of spaces collapse. "preserve" counts spaces
+   * beside a drawn glyph, and `textLines` writes `xml:space="preserve"`.
+   */
+  xmlSpace?: "default" | "preserve";
 }
 
 /** `measureText`'s answer. */
@@ -159,7 +168,11 @@ declare function spring(options: {
   to?: number;
 }): number;
 
-/** Blends colours in OKLab; `#rrggbb`, or `#rrggbbaa` when a colour has alpha. */
+/**
+ * Blends colours in OKLab; `#rrggbb`, or `#rrggbbaa` when a colour has alpha.
+ * Takes `#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`, `rgb()`, `rgba()`, `hsl()`,
+ * `hsla()` and the CSS colour names; a value out of range throws.
+ */
 declare function interpolateColors(value: number, input: number[], colors: string[]): string;
 
 /** A number in [0, 1) that depends only on `seed`. `Math.random` does not exist. */
@@ -185,7 +198,7 @@ declare function fitText(
   options?: { /** Default 8. */ min?: number; /** Default 400. */ max?: number },
 ): number;
 
-/** A `<text>` with one `<tspan>` per line, the family quoted. */
+/** A `<text>` with one `<tspan>` per line, the family quoted (a CSS generic bare). */
 declare function textLines(
   lines: string[],
   options?: {

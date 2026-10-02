@@ -34,6 +34,8 @@ export function render(frame, props, ctx) {
   assertEqual(interpolateColors(0, [0, 1], ["rgba(255, 0, 0, 0.5)", "#00ff00"]), "#ff000080", "alpha kept");
   assertEqual(interpolateColors(1, [0, 1], ["#ff000080", "#00ff00"]), "#00ff00ff", "alpha on every answer");
   assertEqual(interpolateColors(0.5, [0, 1], ["#abc", "#abc"]), "#aabbcc", "one colour stays itself");
-  assertThrows(() => interpolateColors(0, [0, 1], ["red", "#000"]), ['cannot parse colour "red"'], "a name");
+  assertThrows(() => interpolateColors(0, [0, 1], ["bluish", "#000"]), ['cannot parse colour "bluish"'], "not a name");
+  assertThrows(() => interpolateColors(0, [0, 1], ["rgb(300, 0, 0)", "#000"]),
+    ['cannot parse colour "rgb(300, 0, 0)"'], "refused, never clamped");
   return svg(ctx, "");
 }

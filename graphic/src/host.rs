@@ -1,7 +1,7 @@
 //! The host functions the standard library is built on (road map 10 §5c),
 //! installed as globals before `stdlib.js` runs: `__measureText`,
-//! `__assetNames` and `__warn`. What crosses back to JavaScript is JSON
-//! text; `stdlib.js` parses it.
+//! `__assetNames`, `__warn` and `__namedColour`. What crosses back to
+//! JavaScript is JSON text; `stdlib.js` parses it.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -13,7 +13,7 @@ use crate::diagnostic::Diagnostic;
 use crate::library::Library;
 use crate::measure::{measure_text, FontStyle, TextFont};
 
-/// Installs the three globals on `ctx`. `sink` collects `__warn`'s
+/// Installs the four globals on `ctx`. `sink` collects `__warn`'s
 /// messages for the engine that owns it.
 pub(crate) fn install(
     ctx: &rquickjs::Ctx<'_>,
@@ -30,7 +30,19 @@ pub(crate) fn install(
               size: f64,
               weight: f64,
               style: String,
-              letter_spacing: f64| {
+              letter_spacing: f64,
+              xml_space: String| {
+            // Seven parameters: rquickjs 0.14's `FromParams` maximum.
+            let preserve_space = match xml_space.as_str() {
+                "default" => false,
+                "preserve" => true,
+                other => {
+                    let message = format!(
+                        "measureText: xmlSpace must be \"default\" or \"preserve\", not \"{other}\""
+                    );
+                    return serde_json::json!({ "error": message }).to_string();
+                }
+            };
             let font = TextFont {
                 family,
                 size,
@@ -41,6 +53,7 @@ pub(crate) fn install(
                     _ => FontStyle::Normal,
                 },
                 letter_spacing,
+                preserve_space,
             };
             match measure_text(&fonts, &text, &font) {
                 Ok(metrics) => metrics.to_json().to_string(),
@@ -58,10 +71,26 @@ pub(crate) fn install(
         sink.borrow_mut().push(message);
     })
     .map_err(host_error)?;
+    let colour = Function::new(ctx.clone(), named_colour).map_err(host_error)?;
     let globals = ctx.globals();
     globals.set("__measureText", measure).map_err(host_error)?;
     globals.set("__assetNames", names).map_err(host_error)?;
+    globals.set("__namedColour", colour).map_err(host_error)?;
     globals.set("__warn", warn).map_err(host_error)
+}
+
+/// G-12's step 4 for `stdlib.js`'s `__parseColour`: a word of ASCII
+/// lowercase letters looked up in svgtypes' named-colour table (the one usvg
+/// draws `fill` with, and the core's `model_color.rs` reads), answered as
+/// JSON `[r, g, b, a]` in bytes, or `null` for any other text.
+fn named_colour(name: String) -> String {
+    if name.is_empty() || !name.bytes().all(|b| b.is_ascii_lowercase()) {
+        return "null".to_string();
+    }
+    match name.parse::<svgtypes::Color>() {
+        Ok(c) => serde_json::json!([c.red, c.green, c.blue, c.alpha]).to_string(),
+        Err(_) => "null".to_string(),
+    }
 }
 
 fn host_error(e: rquickjs::Error) -> Diagnostic {

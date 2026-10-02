@@ -19,7 +19,8 @@ fn the_bundled_families_sorted() {
             "Darker Grotesque",
             "IBM Plex Mono",
             "Montserrat",
-            "Source Sans 3"
+            "Source Sans 3",
+            "Source Serif 4"
         ]
     );
     assert!(lib.warnings().is_empty(), "{:?}", lib.warnings());
@@ -54,6 +55,11 @@ fn the_variable_faces_load_once() {
         .collect();
     assert_eq!(darker.len(), 1, "{darker:?}");
     assert_eq!(darker[0].weight, 300);
+    let serif: Vec<_> = faces
+        .iter()
+        .filter(|f| f.family == "Source Serif 4")
+        .collect();
+    assert_eq!(serif.len(), 1, "{serif:?}");
 }
 
 #[test]

@@ -2,6 +2,9 @@
 //! from bytes the caller read (G-2, G-6 — never `load_system_fonts`), its
 //! content version, the `measure_text` memo, and the usvg options every
 //! parse shares, whose resolvers record what resvg itself never reports.
+//! The generic families `serif`, `sans-serif` and `monospace` are named on
+//! the database (G-6), and a font is chosen from the text's OWN families
+//! only, never usvg's appended `serif` fallback.
 
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -13,8 +16,8 @@ use sha2::{Digest, Sha256};
 use crate::diagnostic::Diagnostic;
 use crate::measure::{FontStyle, TextMetrics};
 
-/// `(family, size bits, weight, style, letter-spacing bits, text)`.
-pub(crate) type MemoKey = (String, u64, u16, FontStyle, u64, String);
+/// `(family, size bits, weight, style, letter-spacing bits, preserve, text)`.
+pub(crate) type MemoKey = (String, u64, u16, FontStyle, u64, bool, String);
 
 /// The memo is cleared when it reaches this many entries.
 const MEMO_CAP: usize = 4096;
@@ -70,6 +73,11 @@ impl Library {
                 warnings.push(Diagnostic::warning(format!("font {index} loaded no face")));
             }
         }
+        // G-6's generics; `cursive` and `fantasy` keep fontdb's defaults,
+        // which the set lacks, so they are warned like any missing family.
+        db.set_serif_family("Source Serif 4");
+        db.set_sans_serif_family("Source Sans 3");
+        db.set_monospace_family("IBM Plex Mono");
         let mut families: Vec<String> = db
             .faces()
             .filter_map(|face| face.families.first().map(|(name, _)| name.clone()))
@@ -144,9 +152,8 @@ impl Library {
     /// answered from the asset map only, and every miss recorded in
     /// `probe`. `Options` is not `Clone`, so each call builds its own.
     pub(crate) fn options<'a>(&'a self, probe: &'a Mutex<Probe>) -> usvg::Options<'a> {
-        let inner = usvg::FontResolver::default_font_selector();
         let select_font: usvg::FontSelectionFn<'a> = Box::new(move |font, db| {
-            let id = inner(font, db);
+            let id = select_font(font, db);
             if id.is_none() {
                 lock(probe).families.push(font.families().to_vec());
             }
@@ -183,6 +190,48 @@ impl Library {
             ..usvg::Options::default()
         }
     }
+}
+
+/// usvg's `default_font_selector` without its last line: a query over the
+/// text's own families, the generics through the database's mapping. usvg
+/// appends `Family::Serif` as a fallback, which with `serif` mapped (G-6)
+/// would draw every missing family in Source Serif 4 and never warn. No
+/// lock is held here: the caller locks only for its own push.
+fn select_font(font: &usvg::Font, db: &fontdb::Database) -> Option<fontdb::ID> {
+    let families: Vec<fontdb::Family> = font
+        .families()
+        .iter()
+        .map(|family| match family {
+            usvg::FontFamily::Serif => fontdb::Family::Serif,
+            usvg::FontFamily::SansSerif => fontdb::Family::SansSerif,
+            usvg::FontFamily::Cursive => fontdb::Family::Cursive,
+            usvg::FontFamily::Fantasy => fontdb::Family::Fantasy,
+            usvg::FontFamily::Monospace => fontdb::Family::Monospace,
+            usvg::FontFamily::Named(name) => fontdb::Family::Name(name),
+        })
+        .collect();
+    let stretch = match font.stretch() {
+        usvg::FontStretch::UltraCondensed => fontdb::Stretch::UltraCondensed,
+        usvg::FontStretch::ExtraCondensed => fontdb::Stretch::ExtraCondensed,
+        usvg::FontStretch::Condensed => fontdb::Stretch::Condensed,
+        usvg::FontStretch::SemiCondensed => fontdb::Stretch::SemiCondensed,
+        usvg::FontStretch::Normal => fontdb::Stretch::Normal,
+        usvg::FontStretch::SemiExpanded => fontdb::Stretch::SemiExpanded,
+        usvg::FontStretch::Expanded => fontdb::Stretch::Expanded,
+        usvg::FontStretch::ExtraExpanded => fontdb::Stretch::ExtraExpanded,
+        usvg::FontStretch::UltraExpanded => fontdb::Stretch::UltraExpanded,
+    };
+    let style = match font.style() {
+        usvg::FontStyle::Normal => fontdb::Style::Normal,
+        usvg::FontStyle::Italic => fontdb::Style::Italic,
+        usvg::FontStyle::Oblique => fontdb::Style::Oblique,
+    };
+    db.query(&fontdb::Query {
+        families: &families,
+        weight: fontdb::Weight(font.weight()),
+        stretch,
+        style,
+    })
 }
 
 /// An asset's kind by its magic; anything that is not PNG, JPEG, GIF or

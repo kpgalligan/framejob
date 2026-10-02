@@ -129,3 +129,56 @@ fn load_time_warnings_are_discarded() {
     let (_, warnings) = call(&module, 0).unwrap();
     assert!(warnings.is_empty(), "{warnings:?}");
 }
+
+/// G-12's one fixture, which `core/tests/graphic.rs` runs through the core.
+const COLOURS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/colours.json");
+
+#[test]
+fn interpolate_colors_answers_the_shared_colour_fixture() {
+    let fixture: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(COLOURS).expect("tests/colours.json"))
+            .expect("the colour fixture is JSON");
+    let accepted = fixture["accepted"].as_array().expect("accepted");
+    let refused = fixture["refused"].as_array().expect("refused");
+    assert!(!accepted.is_empty() && !refused.is_empty());
+    let sent: Vec<&serde_json::Value> = accepted
+        .iter()
+        .map(|case| &case[0])
+        .chain(refused.iter())
+        .collect();
+    // Each colour at both ends of a segment answers itself: what the core
+    // would store for it, or the throw.
+    let source = format!(
+        "const SENT = {};\n\
+         export function render(frame, props, ctx) {{\n\
+           const answers = SENT.map((c) => {{\n\
+             try {{ return interpolateColors(0, [0, 1], [c, c]); }}\n\
+             catch (e) {{ return `threw: ${{e.message}}`; }}\n\
+           }});\n\
+           return svg(ctx, `<desc>${{escapeXml(JSON.stringify(answers))}}</desc>`);\n\
+         }}\n",
+        serde_json::Value::from(sent.iter().map(|v| (*v).clone()).collect::<Vec<_>>())
+    );
+    let module = compile(&source);
+    let (svg, warnings) = call(&module, 0).unwrap_or_else(|d| panic!("{}", d.message));
+    assert!(warnings.is_empty(), "{warnings:?}");
+    let body = &svg[svg.find("<desc>").expect("a desc") + 6..svg.find("</desc>").expect("its end")];
+    let unescaped = body
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&amp;", "&");
+    let answers: Vec<String> = serde_json::from_str(&unescaped).expect("the answers");
+    for (case, answer) in accepted.iter().zip(&answers) {
+        assert_eq!(answer, case[1].as_str().unwrap(), "{}", case[0]);
+    }
+    for (sent, answer) in refused.iter().zip(&answers[accepted.len()..]) {
+        let sent = sent.as_str().unwrap();
+        assert_eq!(
+            answer,
+            &format!("threw: interpolateColors: cannot parse colour \"{sent}\""),
+            "{sent:?}"
+        );
+    }
+}

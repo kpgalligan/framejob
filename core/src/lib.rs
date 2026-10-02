@@ -49,6 +49,7 @@ pub mod ffi_query;
 pub mod format;
 pub mod frame_grid;
 pub mod model;
+mod model_color;
 pub mod model_graphic;
 pub mod model_motion;
 pub mod model_props;

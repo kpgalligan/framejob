@@ -16,6 +16,9 @@ use common::{array, assert_contains, at, int, num, Handle, Outcome};
 use reelcut_core::model_graphic::{GRAPHIC_MAX_SIDE, GRAPHIC_MIN_SIDE};
 use reelcut_core::op_table::OP_TABLE;
 
+/// G-12's shared colour fixture, the engine's test file.
+const COLOURS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../graphic/tests/colours.json");
+
 /// Ticks per second (spec §5.1), written out rather than imported.
 const SEC: i64 = 600_000;
 
@@ -265,7 +268,8 @@ fn set_errs_naming_the_clip_the_key_and_the_value() {
     let project = project();
     let name_rule = "is not a module name (lowercase letters, digits and -, starting with a \
                      letter or a digit, at most 63 characters)";
-    let colour = "must be a CSS colour (#rgb, #rgba, #rrggbb, #rrggbbaa, rgb(), rgba())";
+    let colour = "must be a CSS colour (#rgb, #rgba, #rrggbb, #rrggbbaa, rgb(), rgba(), hsl(), \
+                  hsla() or a colour name)";
     // Laid out by hand, one case a line, as `op_table.rs`'s rows are.
     #[rustfmt::skip]
     let cases = [
@@ -283,7 +287,7 @@ fn set_errs_naming_the_clip_the_key_and_the_value() {
         (set(json!({"props": {"boxed": "yes"}})), "props.boxed must be a boolean, not \"yes\"".to_string()),
         (set(json!({"props": {"align": "middle"}})),
          "props.align must be one of left, center, right, not \"middle\"".to_string()),
-        (set(json!({"props": {"accent": "blue"}})), format!("props.accent {colour}, not \"blue\"")),
+        (set(json!({"props": {"accent": "bluish"}})), format!("props.accent {colour}, not \"bluish\"")),
         (set(json!({"props": {"title": "x".repeat(4097)}})),
          "props.title must be at most 4096 characters, not 4097".to_string()),
         (set(json!({"name": "Bad Name"})), format!("graphic name \"Bad Name\" {name_rule}")),
@@ -348,34 +352,31 @@ fn without_a_schema_only_the_shape_is_checked() {
 
 #[test]
 fn a_colour_is_stored_as_lowercase_hex() {
+    // G-12's one fixture, which `graphic/tests/stdlib.rs` runs through the
+    // standard library's `interpolateColors` too.
+    let text = std::fs::read_to_string(COLOURS).expect("graphic/tests/colours.json");
+    let fixture: Value = serde_json::from_str(&text).expect("the colour fixture is JSON");
     let project = project();
-    for (sent, stored) in [
-        ("#FF5A36", "#ff5a36"),
-        ("#f00", "#ff0000"),
-        ("#f008", "#ff000088"),
-        ("rgba(255, 0, 0, 0.5)", "#ff000080"),
-        ("rgb(255 0 0 / 50%)", "#ff000080"),
-        ("rgb(100%, 0%, 0%)", "#ff0000"),
-        ("#ff5a36ff", "#ff5a36"),
-        ("#FF5A3680", "#ff5a3680"),
-    ] {
+    let accepted = fixture["accepted"].as_array().expect("accepted");
+    assert!(!accepted.is_empty());
+    for case in accepted {
+        let (sent, stored) = (&case[0], &case[1]);
         let after = project.apply(&set(json!({"props": {"accent": sent}})));
         assert_eq!(
             at(&after.value(), "/clips/0/graphic/props/accent"),
-            &json!(stored),
+            stored,
             "{sent}"
         );
     }
-    for refused in [
-        "red",
-        "hsl(0, 100%, 50%)",
-        "#ff5a3",
-        "rgb(256, 0, 0)",
-        "rgb(1, 2)",
-    ] {
-        assert_contains(
-            &project.errors(&set(json!({"props": {"accent": refused}}))),
-            "must be a CSS colour",
+    let refused = fixture["refused"].as_array().expect("refused");
+    assert!(!refused.is_empty());
+    for sent in refused {
+        assert_eq!(
+            project.errors(&set(json!({"props": {"accent": sent}}))),
+            format!(
+                "props.accent must be a CSS colour (#rgb, #rgba, #rrggbb, #rrggbbaa, rgb(), \
+                 rgba(), hsl(), hsla() or a colour name), not {sent}"
+            ),
         );
     }
 }

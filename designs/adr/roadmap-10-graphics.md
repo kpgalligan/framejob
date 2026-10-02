@@ -392,7 +392,41 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   sentence, no eviction left 40 engines (17 in the LRU case), a cap of 17
   left 17, evicting by smallest module id or by newest stamp made m0 answer
   1 not 3, evicting m15 made m1 answer 2 not 1, and a `load` that returned
-  no warnings left `warnings()` empty.
+  no warnings left `warnings()` empty. Issue batch B65 (2026-10-02, #105
+  part 2) widened an author's vocabulary under amended G-6 and G-12 and a
+  new G-22. First, as a pure move landed and gated alone (`cargo test
+  --release` in `core/` and `make lint` green, `model_graphic.rs` 399 → 328
+  lines), `normalise_color` and its helpers left `model_graphic.rs` for a
+  new `core/src/model_color.rs`. Colours: G-12's one grammar — hex, `rgb()`
+  / `rgba()`, `hsl()` / `hsla()` and svgtypes 0.16.1's 147 CSS names plus
+  `transparent`, out of range refused and never clamped — implemented in
+  `model_color.rs` (svgtypes now a core dependency for its name table) and
+  in `stdlib.js`'s `__parseColour` (through a new host global,
+  `__namedColour`), both answering one hand-worked fixture,
+  `graphic/tests/colours.json` (30 accepted, 21 refused), from
+  `core/tests/graphic.rs` and `graphic/tests/stdlib.rs`; `interpolateColors`
+  now throws on an `rgb(300, 0, 0)` it used to clamp. Fonts: Source Serif 4
+  4.004 bundled (one variable face); `Library::new` maps `serif`,
+  `sans-serif` and `monospace` to Source Serif 4, Source Sans 3 and IBM
+  Plex Mono, and `select_font` became a `fontdb` query over the text's own
+  families, because usvg's default selector appends `serif` and would have
+  drawn every missing family in Source Serif 4 unwarned; a generic is
+  written bare by `measureText`'s probe and `textLines`. `measureText` takes
+  `xmlSpace` (G-22, `TextFont.preserve_space`, in the memo key; `"a  b"` in
+  Source Sans 3 at 64 px measured 80.448 default and 93.248 preserved), and
+  whitespace-only text measures zero under either value. Each new case was
+  made to fail once and reverted: the core clamping instead of refusing and
+  an hsl channel by `floor` failed the core's fixture test; no `set_*_family`
+  failed the generic-families case, usvg's default selector restored failed
+  `a_missing_family_is_named_with_the_set_and_draws_nothing`, a quoted
+  generic failed the generic measure case, the zero gated on
+  `!preserve_space` failed the preserved-whitespace case with the family
+  error, the flag left out of the memo key failed the preserve case,
+  `__namedColour` answering nothing, the JS clamp restored and a JS hsl
+  `floor` failed the stdlib fixture test (the clamp also `interpolate.test.js`),
+  and `textLines` writing no `xml:space`, quoting a generic, or
+  `measureText` dropping `xmlSpace` each failed `text.test.js`.
+  `pins.json` passed unchanged.
 
 ## Open items
 
@@ -408,8 +442,7 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
 
   Tracked in #72.
 - Small engine and tool refinements from the G1b–G5b reviews — listed in
-  #105: named CSS colours and `hsl()`, generic families, `measureText`
-  honouring `xml:space`, asset-name validation at import, per-scan font
+  #105: asset-name validation at import, per-scan font
   revalidation, an export's graphic warnings, a warnings channel on
   `compile` (its FFI half), and surfacing `GraphicScan.warnings`.
 - The not-built list (keyframed props, `paste_attributes`, revision history,

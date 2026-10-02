@@ -16,6 +16,10 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 serde_path_to_error = "0.1.20"
 tiny_http = "0.12"
+# The CSS named-colour table `model_color.rs` reads (G-12): usvg 0.48.1's own
+# pin, already in the lock through `graphic`, so a name the core stores is one
+# the engine draws.
+svgtypes = "0.16.1"
 # The motion-graphics engine (road map 10, G-2): only `ffi_graphic.rs` names it.
 graphic = { path = "../graphic" }
 

@@ -43,6 +43,7 @@ fn font(family: &str, size: f64, weight: u16) -> TextFont {
         weight,
         style: FontStyle::Normal,
         letter_spacing: 0.0,
+        preserve_space: false,
     }
 }
 
@@ -277,4 +278,60 @@ fn to_json_keys_are_in_order() {
         ]
     );
     assert_eq!(json["lineHeight"].as_f64(), Some(m.line_height));
+}
+
+#[test]
+fn a_generic_family_measures_as_its_mapped_face() {
+    let lib = library();
+    for (generic, face) in [
+        ("serif", "Source Serif 4"),
+        ("sans-serif", "Source Sans 3"),
+        ("monospace", "IBM Plex Mono"),
+    ] {
+        let a = measure_text(&lib, "Hamburg", &font(generic, 64.0, 400))
+            .unwrap_or_else(|e| panic!("{generic}: {}", e.message));
+        let b = measure_text(&lib, "Hamburg", &font(face, 64.0, 400)).unwrap();
+        assert_eq!(a, b, "{generic} against {face}");
+    }
+}
+
+#[test]
+fn preserved_spaces_count_and_the_flag_is_in_the_memo() {
+    // G-22. Default first, so a memo that ignored the flag would answer the
+    // collapsed width for the preserved call.
+    let lib = library();
+    let plain = font("Source Sans 3", 64.0, 400);
+    let preserved = TextFont {
+        preserve_space: true,
+        ..font("Source Sans 3", 64.0, 400)
+    };
+    let collapsed = measure_text(&lib, "a  b", &plain).unwrap();
+    let kept = measure_text(&lib, "a  b", &preserved).unwrap();
+    println!(
+        "\"a  b\": default {}, preserved {}",
+        collapsed.width, kept.width
+    );
+    assert_eq!(collapsed, measure_text(&lib, "a b", &plain).unwrap());
+    assert!(
+        kept.width > collapsed.width,
+        "{} vs {}",
+        kept.width,
+        collapsed.width
+    );
+}
+
+#[test]
+fn preserved_whitespace_only_measures_zero_as_default_does() {
+    let lib = library();
+    let preserved = TextFont {
+        preserve_space: true,
+        ..font("Montserrat", 64.0, 800)
+    };
+    let m = measure_text(&lib, "   ", &preserved)
+        .unwrap_or_else(|e| panic!("preserved whitespace: {}", e.message));
+    assert_eq!(m.width, 0.0);
+    assert_eq!(
+        m,
+        measure_text(&lib, "   ", &font("Montserrat", 64.0, 800)).unwrap()
+    );
 }

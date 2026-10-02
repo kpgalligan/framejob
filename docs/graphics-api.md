@@ -74,7 +74,7 @@ optional.
 | `string` | text, at most 4096 characters | `multiline: true` for a text area |
 | `number` | a finite number | `min`, `max`, `step` |
 | `boolean` | `true` / `false` | |
-| `color` | a CSS colour string: `"#ff5a36"`, `"rgb(255, 90, 54)"` | |
+| `color` | a CSS colour string: `"#ff5a36"`, `"rgb(255, 90, 54)"`, `"hsl(11, 100%, 61%)"`, `"tomato"` | |
 | `enum` | one of `options` | `options`: 1–32 strings |
 | `asset` | a file name in `graphics/assets/`, or `null` | `kind: "image"` |
 
@@ -134,11 +134,17 @@ const late = spring({ frame: frame - 12, fps: ctx.fps, stiffness: 180, from: 0.5
 ### `interpolateColors(value, input, colors)`
 
 Blends colours in OKLab and answers `#rrggbb` (or `#rrggbbaa` when a colour
-has alpha). Clamped outside `input`.
+has alpha). Clamped outside `input`. A colour is `#rgb`, `#rgba`, `#rrggbb`,
+`#rrggbbaa`, `rgb()` / `rgba()` (channels 0–255 or a percentage, alpha 0–1
+or a percentage), `hsl()` / `hsla()` (hue in degrees, saturation and
+lightness percentages), or one of the 147 CSS colour names or
+`transparent` — the same colours a `color` prop takes. A value out of range
+(`rgb(300, 0, 0)`) throws rather than being clamped.
 
 ```js
 const fill = interpolateColors(frame, [0, 60], ["#ff5a36", "#3666ff"]);
 const glass = interpolateColors(ctx.progress, [0, 1], ["rgba(255, 255, 255, 0)", "#ffffff"]);
+const sky = interpolateColors(ctx.progress, [0, 1], ["hsl(200, 80%, 30%)", "skyblue"]);
 ```
 
 ### `random(seed)`
@@ -163,16 +169,20 @@ const wobble = noise3D(7, 0.5, 0.5, ctx.time) * 20;
 
 ### `measureText(text, font)`
 
-`font` is `{family, size, weight, style, letterSpacing}` (defaults
-Montserrat, 16, 400, `"normal"`, 0). Answers `{width, ascent, descent,
-lineHeight, inkX, inkWidth}`: `width` is the advance (where the next word
-starts); `inkX` / `inkWidth` are the drawn glyphs. Spaces collapse as SVG
-draws them. A family that is not installed throws, naming the families that
-are.
+`font` is `{family, size, weight, style, letterSpacing, xmlSpace}`
+(defaults Montserrat, 16, 400, `"normal"`, 0, `"default"`). Answers
+`{width, ascent, descent, lineHeight, inkX, inkWidth}`: `width` is the
+advance (where the next word starts); `inkX` / `inkWidth` are the drawn
+glyphs. With `xmlSpace: "default"` runs of spaces collapse as SVG draws
+them; with `"preserve"` a run of spaces beside a drawn glyph counts, as
+`xml:space="preserve"` draws it, and any other value throws. Text that is
+only whitespace measures zero either way. A family that is not installed
+throws, naming the families that are.
 
 ```js
 const m = measureText("Hello", { family: "Montserrat", size: 64, weight: 800 });
 const boxWidth = m.width + 80;
+const gap = measureText("a  b", { family: "sans-serif", size: 48, xmlSpace: "preserve" });
 ```
 
 ### `wrapText(text, maxWidth, font)`
@@ -195,14 +205,19 @@ const size = fitText("BREAKING", ctx.width - 200, { family: "Anton" }, { max: 30
 
 ### `textLines(lines, {x, y, lineHeight, anchor, fill, font})`
 
-A `<text>` with one `<tspan>` per line, the family QUOTED for you.
+A `<text>` with one `<tspan>` per line, the family QUOTED for you (a CSS
+generic such as `sans-serif` is written bare, as it must be).
 `anchor` is `"start"`, `"middle"` or `"end"`; `lineHeight` defaults to
-1.2 × the size.
+1.2 × the size. A font with `xmlSpace: "preserve"` writes
+`xml:space="preserve"` on the `<text>`, so it draws the spaces `measureText`
+counted.
 
 ```js
 const font = { family: "Source Sans 3", size: 48, weight: 600 };
 const body = textLines(wrapText("Two short lines of text", 400, font),
   { x: 100, y: 200, anchor: "start", fill: "#ffffff", font });
+const code = textLines(["let  x = 1;"],
+  { x: 100, y: 300, font: { family: "monospace", size: 32, xmlSpace: "preserve" } });
 ```
 
 ### `escapeXml(s)`
@@ -245,12 +260,21 @@ A graphic draws with the fonts bundled with Reelcut, plus any `.ttf` /
 | IBM Plex Mono | 400, 500 |
 | Montserrat | 800, 900 |
 | Source Sans 3 | variable, 200–900 |
+| Source Serif 4 | variable, 200–900 |
+
+The CSS generic families draw in bundled faces: `serif` is Source Serif 4,
+`sans-serif` is Source Sans 3 and `monospace` is IBM Plex Mono. Write a
+generic unquoted (`font-family="sans-serif"`); quoted, it names a family
+called "sans-serif", which is not installed. `cursive` and `fantasy` are not
+installed.
 
 **Quote a family** in `font-family` or the `font` shorthand when any word
 of it starts with a digit: `font-family="'Source Sans 3'"`,
 `font: 48px 'Source Sans 3'`. Unquoted, `Source Sans 3` is not a
-valid family list and falls back to the default face. `textLines` quotes
-for you. A family the set lacks draws in the fallback face with a warning.
+valid family list: it draws nothing, with a warning. `textLines` quotes
+for you. A family the set lacks draws nothing, with a warning naming the
+families that are installed; in a list (`"Nope, Montserrat"`) the first
+installed family draws.
 
 ## The sandbox
 

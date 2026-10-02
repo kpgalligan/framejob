@@ -2,8 +2,8 @@
 //! [`GraphicProps`], what a graphic clip is drawn from, and the checks
 //! every writer of one shares: the module name rule (G-3), the side bound,
 //! the schema a module declares and the props checked against it (G-4),
-//! and the CSS colour normalisation a `color` prop is stored through
-//! (G-12).
+//! whose `color` props are stored through `model_color.rs`'s CSS colour
+//! normalisation (G-12).
 //!
 //! A graphic is a source the model only DESCRIBES, as text and shape are.
 //! The core never reads the module (it has no filesystem), so the schema a
@@ -23,6 +23,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use crate::export::describe;
+use crate::model_color::normalise_color;
 use crate::time::Ticks;
 
 /// The smallest side a graphic draws at, in pixels.
@@ -244,7 +245,7 @@ fn check_typed(key: &str, entry: &Value, value: &Value) -> Result<Value, String>
         }
         "color" => {
             let colour = value.as_str().and_then(normalise_color).ok_or_else(|| {
-                wrong("a CSS colour (#rgb, #rgba, #rrggbb, #rrggbbaa, rgb(), rgba())")
+                wrong("a CSS colour (#rgb, #rgba, #rrggbb, #rrggbbaa, rgb(), rgba(), hsl(), hsla() or a colour name)")
             })?;
             return Ok(Value::String(colour));
         }
@@ -324,76 +325,4 @@ pub(crate) fn check_count(props: &Map<String, Value>) -> Result<(), String> {
         ));
     }
     Ok(())
-}
-
-/// A CSS colour as `#rrggbb`, or `#rrggbbaa` when it is not opaque,
-/// lowercase (G-12). Takes the four hex forms in any case, and `rgb()` /
-/// `rgba()` with three or four components separated by commas, spaces or
-/// `/` — channels 0–255 or a percentage, alpha 0–1 or a percentage. Named
-/// colours and `hsl()` are not taken yet (road map 10 §10.5).
-pub(crate) fn normalise_color(text: &str) -> Option<String> {
-    let text = text.trim();
-    let channels = match text.strip_prefix('#') {
-        Some(hex) => hex_channels(hex)?,
-        None => function_channels(text)?,
-    };
-    let [r, g, b, a] = channels;
-    Some(if a == 255 {
-        format!("#{r:02x}{g:02x}{b:02x}")
-    } else {
-        format!("#{r:02x}{g:02x}{b:02x}{a:02x}")
-    })
-}
-
-fn hex_channels(hex: &str) -> Option<[u8; 4]> {
-    if !hex.chars().all(|c| c.is_ascii_hexdigit()) {
-        return None;
-    }
-    let digit = |i: usize| u8::from_str_radix(&hex[i..=i], 16).ok();
-    let pair = |i: usize| u8::from_str_radix(&hex[i..i + 2], 16).ok();
-    match hex.len() {
-        3 | 4 => {
-            let mut out = [255u8; 4];
-            for (i, slot) in out.iter_mut().enumerate().take(hex.len()) {
-                *slot = digit(i)? * 17;
-            }
-            Some(out)
-        }
-        6 | 8 => {
-            let mut out = [255u8; 4];
-            for (i, slot) in out.iter_mut().enumerate().take(hex.len() / 2) {
-                *slot = pair(i * 2)?;
-            }
-            Some(out)
-        }
-        _ => None,
-    }
-}
-
-fn function_channels(text: &str) -> Option<[u8; 4]> {
-    let lower = text.to_ascii_lowercase();
-    let inner = lower
-        .strip_prefix("rgba(")
-        .or_else(|| lower.strip_prefix("rgb("))?
-        .strip_suffix(')')?;
-    let parts: Vec<&str> = inner
-        .split(|c: char| c == ',' || c == '/' || c.is_whitespace())
-        .filter(|part| !part.is_empty())
-        .collect();
-    if !(3..=4).contains(&parts.len()) {
-        return None;
-    }
-    let mut out = [255u8; 4];
-    for (i, part) in parts.iter().enumerate() {
-        let unit = match part.strip_suffix('%') {
-            Some(percent) => percent.parse::<f64>().ok()? / 100.0,
-            None if i == 3 => part.parse::<f64>().ok()?,
-            None => part.parse::<f64>().ok()? / 255.0,
-        };
-        if !(0.0..=1.0).contains(&unit) {
-            return None;
-        }
-        out[i] = (unit * 255.0).round() as u8;
-    }
-    Some(out)
 }

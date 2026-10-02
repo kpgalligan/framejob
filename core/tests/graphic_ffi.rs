@@ -180,7 +180,7 @@ fn error_message(text: &str) -> String {
 #[test]
 fn a_library_takes_the_bundled_faces_and_refuses_a_non_font_an_empty_and_a_duplicate_asset() {
     let fonts = font_files();
-    assert_eq!(fonts.len(), 8, "the app bundles eight .ttf files");
+    assert_eq!(fonts.len(), 9, "the app bundles nine .ttf files");
     let lib = library();
     assert_eq!(
         add_font(lib, &[0u8; 16]).as_deref(),
@@ -387,7 +387,7 @@ fn families_answers_the_bundled_faces_sorted_and_freezes() {
     let lib = library();
     let text = take_string(unsafe { rc_graphic_library_families(lib) }).expect("a family list");
     let families: Value = serde_json::from_str(&text).unwrap_or_else(|e| panic!("{e}: {text}"));
-    // The eight files' own family names: six families, two duplicates dropped.
+    // The nine files' own family names: seven families, two duplicates dropped.
     assert_eq!(
         families,
         json!([
@@ -396,7 +396,8 @@ fn families_answers_the_bundled_faces_sorted_and_freezes() {
             "Darker Grotesque",
             "IBM Plex Mono",
             "Montserrat",
-            "Source Sans 3"
+            "Source Sans 3",
+            "Source Serif 4"
         ])
     );
     assert_eq!(add_font(lib, &fonts[0]).as_deref(), Some(FROZEN));

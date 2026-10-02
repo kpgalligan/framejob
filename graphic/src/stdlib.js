@@ -2,7 +2,7 @@
 // (G-2): the names and argument shapes follow Remotion's, none of its code
 // is here. Evaluated as a SCRIPT before `noise.js` and the sandbox, so every
 // declaration is a global. The host functions `__measureText`,
-// `__assetNames` and `__warn` are installed before it runs.
+// `__assetNames`, `__warn` and `__namedColour` are installed before it runs.
 
 function svg(ctx, body, options) {
   const o = options || {};
@@ -110,27 +110,57 @@ function spring(options) {
 
 // ---- colour ----------------------------------------------------------------
 
-// `#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`, `rgb(r, g, b)` and
-// `rgba(r, g, b, a)` → [r, g, b, a] with r, g, b in 0–255 and a in 0–1.
+// G-12's grammar, the second implementation of `core/src/model_color.rs`
+// (both answer `graphic/tests/colours.json`) → [r, g, b, a], r, g, b integer
+// bytes and a the alpha byte / 255, so it quantises as the core stores. A
+// value outside its range throws; nothing is clamped.
 function __parseColour(text) {
-  const s = String(text).trim().toLowerCase();
-  let m = /^#([0-9a-f]{3,8})$/.exec(s);
-  if (m && m[1].length !== 5 && m[1].length !== 7) {
-    let h = m[1];
+  const fail = () => {
+    throw new Error(`interpolateColors: cannot parse colour "${text}"`);
+  };
+  let s = String(text);
+  if (/[^\x00-\x7f]/.test(s)) fail();
+  s = s.replace(/^[ \t\n\f\r]+|[ \t\n\f\r]+$/g, "").toLowerCase();
+  const hex = /^#([0-9a-f]+)$/.exec(s);
+  if (hex) {
+    let h = hex[1];
+    if (![3, 4, 6, 8].includes(h.length)) fail();
     if (h.length <= 4) h = [...h].map((c) => c + c).join("");
     const byte = (k) => parseInt(h.slice(k, k + 2), 16);
-    return [byte(0), byte(2), byte(4), h.length === 8 ? byte(6) / 255 : 1];
+    return [byte(0), byte(2), byte(4), (h.length === 8 ? byte(6) : 255) / 255];
   }
-  m = /^rgba?\(\s*([^)]*)\)$/.exec(s);
-  if (m) {
-    const parts = m[1].split(/\s*,\s*/).map(Number);
-    if ((parts.length === 3 || parts.length === 4) && parts.every((p) => isFinite(p))) {
-      const clamp = (v, hi) => Math.max(0, Math.min(hi, v));
-      return [clamp(parts[0], 255), clamp(parts[1], 255), clamp(parts[2], 255),
-        parts.length === 4 ? clamp(parts[3], 1) : 1];
+  const call = /^(rgba?|hsla?)\((.*)\)$/s.exec(s);
+  if (call) {
+    const parts = call[2].split(/[,\/ \t\n\f\r]+/).filter((p) => p.length);
+    if (parts.length !== 3 && parts.length !== 4) fail();
+    const number = (p) => (/^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/.test(p) ? Number(p) : fail());
+    const unit = (u) => (u >= 0 && u <= 1 ? u : fail());
+    const byte = (u) => Math.round(u * 255);
+    const percent = (p) => (p.endsWith("%") ? number(p.slice(0, -1)) / 100 : fail());
+    const alpha = parts.length === 4
+      ? byte(unit(parts[3].endsWith("%") ? percent(parts[3]) : number(parts[3])))
+      : 255;
+    if (call[1].startsWith("rgb")) {
+      const channel = (p) => byte(unit(p.endsWith("%") ? percent(p) : number(p) / 255));
+      return [channel(parts[0]), channel(parts[1]), channel(parts[2]), alpha / 255];
     }
+    const hue = number(parts[0].endsWith("deg") ? parts[0].slice(0, -3) : parts[0]);
+    if (!isFinite(hue)) fail();
+    let h = hue % 360;
+    if (h < 0) h += 360;
+    const sat = unit(percent(parts[1]));
+    const l = unit(percent(parts[2]));
+    // The core's steps in the core's order (G-12), so both round one byte.
+    const a = sat * Math.min(l, 1 - l);
+    const channel = (n) => {
+      const k = (n + h / 30) % 12;
+      return byte(l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)));
+    };
+    return [channel(0), channel(8), channel(4), alpha / 255];
   }
-  throw new Error(`interpolateColors: cannot parse colour "${text}"`);
+  const named = JSON.parse(__namedColour(s));
+  if (!named) fail();
+  return [named[0], named[1], named[2], named[3] / 255];
 }
 
 function __toLinear(c) {
@@ -212,13 +242,14 @@ function random(seed) {
 
 // ---- text ------------------------------------------------------------------
 
-// The host measures and memoises (its key has letter-spacing in it); a
-// family the set lacks throws the host's sentence naming the families.
+// The host measures and memoises (its key has letter-spacing and xmlSpace
+// in it); a family the set lacks throws the host's sentence naming the
+// families, and an xmlSpace other than "default" / "preserve" its own (G-22).
 function measureText(text, font) {
-  const { family = "Montserrat", size = 16, weight = 400, style = "normal", letterSpacing = 0 } =
-    font || {};
+  const { family = "Montserrat", size = 16, weight = 400, style = "normal", letterSpacing = 0,
+    xmlSpace = "default" } = font || {};
   const m = JSON.parse(__measureText(String(text), String(family), Number(size), Number(weight),
-    String(style), Number(letterSpacing)));
+    String(style), Number(letterSpacing), String(xmlSpace)));
   if (m.error) throw new Error(m.error);
   return m;
 }
@@ -263,11 +294,19 @@ function fitText(text, maxWidth, font, options) {
 }
 
 // `<text>` + one `<tspan>` per line. The family is QUOTED (G-6), so a name
-// with a word that starts with a digit (`Source Sans 3`) parses.
+// with a word that starts with a digit (`Source Sans 3`) parses — except a
+// CSS generic keyword, written bare as `measureText`'s probe writes it.
+// `xmlSpace: "preserve"` is written on the `<text>` (G-22).
+const __GENERIC_FAMILIES = ["serif", "sans-serif", "cursive", "fantasy", "monospace"];
+
 function textLines(lines, options) {
   const o = options || {};
   const f = o.font || {};
-  const family = String(f.family || "Montserrat").replace(/'/g, "");
+  const name = String(f.family || "Montserrat");
+  const family = __GENERIC_FAMILIES.includes(name)
+    ? name
+    : `'${escapeXml(name.replace(/'/g, ""))}'`;
+  const space = f.xmlSpace === "preserve" ? ` xml:space="preserve"` : "";
   const anchor = o.anchor || "start";
   const size = f.size || 16;
   const lineHeight = o.lineHeight || size * 1.2;
@@ -276,8 +315,9 @@ function textLines(lines, options) {
     .map((l, i) => `<tspan x="${x}" dy="${i === 0 ? 0 : lineHeight}">${escapeXml(l)}</tspan>`)
     .join("");
   const fill = o.fill ? ` fill="${escapeXml(o.fill)}"` : "";
-  return `<text x="${x}" y="${o.y || 0}" font-family="'${escapeXml(family)}'" ` +
-    `font-size="${size}" font-weight="${f.weight || 400}" text-anchor="${anchor}"${fill}>${spans}</text>`;
+  return `<text x="${x}" y="${o.y || 0}" font-family="${family}" ` +
+    `font-size="${size}" font-weight="${f.weight || 400}" text-anchor="${anchor}"${fill}${space}>` +
+    `${spans}</text>`;
 }
 
 function escapeXml(s) {

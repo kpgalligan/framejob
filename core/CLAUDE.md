@@ -65,10 +65,14 @@ governs a module now.
   no module of the model may name the crate, G-2), `check_props` (by dotted
   path against the schema the op carries, shape only without one; a `null`
   is a removal and is never checked), `check_count` (on the map about to be
-  STORED) and `normalise_color` (G-12: hex and `rgb()`/`rgba()` to lowercase
-  `#rrggbb[aa]`). **A props map is changed only by `insert` and
+  STORED). **A props map is changed only by `insert` and
   `shift_remove`**: under `preserve_order`, `Map::remove` is `swap_remove`,
   and `Project ==` cannot see the reorder.
+- `model_color.rs` — `normalise_color`, G-12's colour grammar (hex,
+  `rgb()`/`rgba()`, `hsl()`/`hsla()` and the CSS named colours, from
+  svgtypes' table) to lowercase `#rrggbb[aa]`; out of range is refused,
+  never clamped. The stdlib's `__parseColour` implements the same grammar,
+  and both suites read `graphic/tests/colours.json`.
 - `model_query.rs` — reading a project: `Project::new`, id allocation, the
   `clip`/`track`/`media`/`marker`/`nest` lookups, `clips_on`, `duration`,
   `validate` with its nesting walk, and `source_size`. The three
@@ -532,7 +536,9 @@ names only the value. `graphic` (the path crate `../graphic`, road map
 10's motion-graphics engine), named by `ffi_graphic.rs` alone. It enables
 `serde_json`'s `preserve_order`, and a feature is unified across a path
 dependency, so the core's `serde_json` has it too; `Cargo.toml` spells it
-out. Dev: `sha2`, `graphic_ffi.rs`'s revision oracle.
+out. `svgtypes` 0.16.1 (usvg's own pin, already in the lock) for its
+named-colour table only, so a stored name agrees with what usvg draws
+(`model_color.rs`). Dev: `sha2`, `graphic_ffi.rs`'s revision oracle.
 
 **One implementation per algorithm.** Before writing time math, find the
 existing implementation and route through it. Shared constants have exactly

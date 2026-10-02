@@ -10,8 +10,30 @@ export function render(frame, props, ctx) {
   assertEqual(measureText("Hello").width, measureText("Hello", { family: "Montserrat", size: 16 }).width,
     "the defaults");
   assertThrows(() => measureText("Hi", { family: "Nope" }),
-    ["Nope", "Anton", "Bebas Neue", "Darker Grotesque", "IBM Plex Mono", "Montserrat", "Source Sans 3"],
+    ["Nope", "Anton", "Bebas Neue", "Darker Grotesque", "IBM Plex Mono", "Montserrat", "Source Sans 3",
+      "Source Serif 4"],
     "a family the set lacks");
+
+  // G-6: a generic keyword measures in the face it maps to, and is written bare.
+  const sans = { family: "sans-serif", size: 64, weight: 600 };
+  assertEqual(JSON.stringify(measureText("Hamburg", sans)),
+    JSON.stringify(measureText("Hamburg", Object.assign({}, sans, { family: "Source Sans 3" }))),
+    "sans-serif is Source Sans 3");
+  const generic = textLines(["x"], { font: sans });
+  assert(generic.includes(`font-family="sans-serif"`), `a generic is unquoted: ${generic}`);
+
+  // G-22: xmlSpace.
+  const plain = { family: "Source Sans 3", size: 64 };
+  const preserved = Object.assign({}, plain, { xmlSpace: "preserve" });
+  assert(measureText("a  b", preserved).width > measureText("a  b", plain).width,
+    "preserve keeps the second space");
+  assertEqual(measureText("a  b", Object.assign({}, plain, { xmlSpace: "default" })).width,
+    measureText("a b", plain).width, "default collapses");
+  const kept = textLines(["a  b"], { font: preserved });
+  assert(kept.includes(`xml:space="preserve"`), `textLines writes xml:space: ${kept}`);
+  assert(!textLines(["a  b"], { font: plain }).includes("xml:space"), "and only when asked");
+  assertThrows(() => measureText("a", Object.assign({}, plain, { xmlSpace: "keep" })),
+    ['measureText: xmlSpace must be "default" or "preserve", not "keep"'], "a bad xmlSpace");
 
   const word = "Supercalifragilisticexpialidocious";
   const lines = wrapText(word, 200, font);

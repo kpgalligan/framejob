@@ -16,7 +16,11 @@ The crate's record is road map 10 §10.4.
   `load_system_fonts`, G-6) and the asset map, their content `version`
   (SHA-256 with length prefixes), the `measure_text` memo, and the
   crate-private `options()` builder whose resolvers record into a `Probe`
-  what resvg never reports.
+  what resvg never reports. The generic families map to bundled faces
+  (`serif` Source Serif 4, `sans-serif` Source Sans 3, `monospace` IBM Plex
+  Mono, G-6), and `select_font` queries only the text's own families,
+  never usvg's appended serif fallback, so a missing family still draws
+  nothing and is warned.
 - `raster.rs` — `rasterize`, `MAX_SIDE`, the RGBA→BGRA row copy into the
   caller's strided buffer, and every warning text `rasterize` answers:
   missing family, unparseable `font-family` (the scan of attributes, `style`
@@ -24,7 +28,9 @@ The crate's record is road map 10 §10.4.
   a `style` attribute or sheet), unknown href, data: URL, non-image
   asset, size mismatch. The texts are load-bearing: tests match them and
   the app shows them on the clip.
-- `measure.rs` — `FontStyle`, `TextFont`, `TextMetrics`, `measure_text`.
+- `measure.rs` — `FontStyle`, `TextFont` (with `preserve_space`, the
+  `xmlSpace` key, G-22), `TextMetrics`, `measure_text`; a generic family
+  is written unquoted.
 - `module.rs` — `Module` (`Send + Sync + Clone`, holds no QuickJS object):
   `compile`, the SHA-256 revision (G-13), `meta`/`schema` read through
   `JSON.stringify` in the module's key order (`{}` when not exported),
@@ -42,7 +48,9 @@ The crate's record is road map 10 §10.4.
   position from `stack` (the module's own frame first), the budget's
   sentences, what `render` returned (a string over `SVG_BYTES` refused by its
   length, before the `<svg` check). The texts are load-bearing.
-- `host.rs` — the globals `__measureText`, `__assetNames`, `__warn`.
+- `host.rs` — the globals `__measureText`, `__assetNames`, `__warn` and
+  `__namedColour` (svgtypes' named-colour table for the stdlib's colour
+  parser).
 - `props.rs` — `check_schema` (compile, strict), `overlay` (render,
   lenient; every surprise a warning) and the schema's limits `MAX_PROPS`,
   `MAX_OPTIONS`, `MAX_STRING` and `TYPES`, which the core restates as
@@ -106,7 +114,9 @@ The crate's record is road map 10 §10.4.
   contract (the Diagnostic's and TextMetrics' keys; a module's schema).
 - `sha2`: the Library's content version.
 - `svgtypes` 0.16.1 (usvg 0.48.1's own pin): parse `font-family` exactly as
-  usvg does, so the scan agrees with usvg on what failed.
+  usvg does, so the scan agrees with usvg on what failed; and its
+  named-colour table (`__namedColour`), so a colour name means what usvg
+  draws.
 - `simplecss` 0.2 (usvg's own pin; usvg does not re-export it): read
   `<style>` sheets and `style` attributes as usvg does.
 - `rquickjs` 0.14.0 with `loader` only: quickjs-ng 0.16.2, vendored and

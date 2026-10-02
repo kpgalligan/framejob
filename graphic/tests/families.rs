@@ -233,3 +233,34 @@ fn a_font_xml_attribute_is_not_read_as_a_family() {
         "{warnings:?}"
     );
 }
+
+#[test]
+fn the_generic_families_draw_their_mapped_faces_without_a_warning() {
+    // G-6: serif, sans-serif and monospace are named on the font set.
+    let lib = library();
+    for (generic, face) in [
+        ("serif", "'Source Serif 4'"),
+        ("sans-serif", "'Source Sans 3'"),
+        ("monospace", "'IBM Plex Mono'"),
+    ] {
+        let (out, warnings) = render(&lib, &text(&format!(" font-family=\"{generic}\"")), 320, 80);
+        assert!(warnings.is_empty(), "{generic}: {warnings:?}");
+        assert!(draws(&out), "{generic} drew nothing");
+        let (named, _) = render(&lib, &text(&format!(" font-family=\"{face}\"")), 320, 80);
+        assert!(out == named, "{generic} is not drawn in {face}");
+    }
+}
+
+#[test]
+fn an_unmapped_generic_family_is_warned_like_a_missing_one() {
+    let lib = library();
+    let (out, warnings) = render(&lib, &text(" font-family=\"cursive\""), 320, 80);
+    assert_eq!(warnings.len(), 1, "{warnings:?}");
+    let message = &warnings[0].message;
+    assert!(
+        message.starts_with("font-family \"cursive\" is not in the font set; the set has: "),
+        "{message}"
+    );
+    names_every_family(&lib, message);
+    assert!(!draws(&out), "an unmapped generic drew");
+}
