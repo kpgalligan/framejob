@@ -12104,8 +12104,26 @@ perl -e 'alarm shift; exec @ARGV' 2400 python3 tools/proof/mixed_audio_proof.py 
 perl -e 'alarm shift; exec @ARGV' 1500 python3 tools/proof/capture_spike/capture_spike.py --bundle-only --rebuild
 ```
 
-**Owed: the two foreground runs over the bundle route,** `--activation
---rebuild` and then, only if it exits 0, `--only q2,q3`. The orchestrator
-runs them only after the owner agrees that the Mac may take focus and says
-they are away. Until the bundle route answers active and key, #132 stays
-open.
+**The bundle-route runs, 2026-10-02,** over HEAD `fca4978`, after the owner
+paused another session's UI tests and said they were away and the Mac could
+take focus.
+
+1. `--activation --rebuild` (the probe built in 109 s): `activation direct:
+   active False in None ms, key False, visible windows 1` and `activation
+   bundle: active True in 5 ms, key True, visible windows 1`. Exit 0. The
+   bundle route answers #132: a probe started from the agent's shell
+   activates once LaunchServices launches it as an app.
+2. `--only q2,q3`: `26 pass, 5 fail, 7 skip of 38`, digest `c1124e8f…3646e0`,
+   exit 0. q3 answered: A0 `active True in 1 ms, key True`, and A1–A7 all
+   pass. q2's `sheets` mode, the first mode launched, did NOT activate
+   (S0 `active False in None ms`), so S1a–S3 skipped again.
+3. `--only q2` once more, straight after: `32 pass, 6 fail, 0 skip of 38`,
+   digest `bfa8f197…49c72a`, exit 0. S0 `active True in 1 ms, key T…`;
+   S1a, S1b, S1c, S2a, S2b, S3 and S4 pass; S2c fails as in V1's runs (the
+   file panel, `1 colours`). The other five fails are W4a–c, L3 and L7, as
+   before.
+
+So every row #132 named has now answered. One first launch of the run in
+step 2 did not activate while the next launches did; it was not
+investigated, and a run that skips by `host: probe not active` is simply run
+again.
