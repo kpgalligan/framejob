@@ -974,10 +974,11 @@ peak is no headroom rather than infinite headroom (a −40 LUFS programme
 carrying an infinity is not boosted 26 dB), it still permits an
 ATTENUATION, and it does not read as "Silent", which is what a bare
 `isFinite` guard makes of it; and a mix measured PAST full scale says in its
-summary that it clipped before it was written, while one that merely came
-close does not. The last pair is the limit CLAUDE.md records — the write
-pass decodes to Int16, which saturates before the gain reaches it — made
-visible in the sentence the user reads rather than left in a paragraph.
+summary that it clipped before it was written only when it is written with
+NO gain, while the same mix normalised, and one that merely came close, do
+not. Since issue batch B60 (spec §11 #86) a normalised export is gained in
+float and quantised once, so only an un-normalised hot mix meets the 16-bit
+decode that saturates; the sentence the user reads says exactly that case.
 
 `phase7_chrome.py` is phase 7's offscreen half (`python3
 tools/proof/phase7_chrome.py`, no port, no media; renders, written stills,
@@ -11533,3 +11534,110 @@ step up on one composition track no longer slides (25 ms failed and 0.5 s
 held in the spike). **Residue:** a family-0 track whose first segment has no
 source (missing media, a pending reverse) ends its hold at that silent
 segment rather than at its first sounding one.
+
+## Issue batch B60 — a normalised export gains the float mix and quantises once (`export_gain_proof.py` G0–G5; `phase5_proof.py` 5d; `phase5_chrome.py` 9(d); #86 part 1)
+
+#86 part 1: the write pass decoded the mix to Int16 and applied the
+loudness gain to that, so a mix past full scale was clipped before the gain
+turned it down, and every normalised sample was rounded twice. Now a
+normalised export reads the mix through `ExportAudioGain.floatMixSettings`,
+the dictionary the measurement reads. `ExportAudioGain`
+(`ExporterAudioGain.swift`) multiplies each buffer by the gain, clips it and
+rounds it once into a new 16-bit buffer in the encoders' unchanged format.
+An un-normalised export keeps the Int16 decode and its bytes.
+`ExportLoudness.mixClipped` is now true only for a hot mix written with no
+gain (spec §11 #86). Part 2 (24-bit WAV/AIFF) is not in this batch.
+
+**The file paid first.** `ExporterWriter.swift`'s
+`// MARK: - Settings → AVFoundation` section moved verbatim to
+`ExporterWriter+Settings.swift` (1098 → 807 lines), with `private` dropped
+from the seven members `ExporterWriter.swift` calls. It was gated alone.
+The `diff` of the moved lines against HEAD printed nothing. `make
+typecheck` gave 0 errors and the 4 baseline warnings, and `make app`
+printed BUILD SUCCEEDED. `video_configuration_proof.py` `capture` gave
+2/2, and `--mutant keep-frame-duration`, whose patch now targets
+`ExporterWriter+Settings.swift`, printed "V7 FAIL" and exited 1, as
+expected. After step 2, `ExporterWriter.swift` is 782 lines and
+`Loudness.swift` 674 (from 742; `LoudnessInt16Gain` is gone).
+
+- **`export_gain_proof.py <port> --record <dir> | --against <dir>`** — the
+  caller owns the instance. `--record` runs on the build before the change
+  and writes `manifest.json` and every export's decoded PCM into `<dir>`.
+  `--against` runs on the build after it and compares. Fixtures are
+  `work/fixtures/gain_tone.wav` (L 0.5·sin 440 Hz, R 0.5·sin 660 Hz) and
+  `gain_quiet.wav` (0.02), 2 s, 48 kHz stereo s16, both from ffmpeg
+  `aevalsrc`. The seven presets with sound are `h264`, `hevc`,
+  `prores_422`, `prores_4444`, `audio_m4a`, `audio_wav` and `audio_aiff`
+  (the video rows at 640 × 360). Each gets these exports: `tone`
+  un-normalised twice, `toneoff` (the tone at `volume` 0.9) normalised down
+  to −23 LUFS / −1 dBTP, `quiet` (its clip at `volume` 0.9) normalised up
+  to −14 / −1, and `hot`
+  (the tone at `volume` 4, a +6 dBFS mix) at −14 / −1. One more
+  un-normalised `audio_wav` is taken of `hot`. Every export is decoded to
+  s16le by ffmpeg, and every project is closed with `close_project`. The
+  run takes about 8 s.
+  - **G0** (CONTROL), per preset: the two un-normalised exports decode
+    identically.
+  - **G4**, per preset, the hot normalised export: no decoded sample at
+    ±full scale, BS.1770-4 (`phase5_proof.integrated`) within ±0.5 LU of the
+    report, and no "clipped" in the summary.
+  - **G5**: the hot un-normalised WAV says "clipped" and holds full-scale
+    samples.
+  - **G1** (`--against`), per preset: the un-normalised decode is
+    byte-identical to the reference's. Where G0 failed, it is an instrument
+    failure instead.
+  - **G2** (down) and **G3** (up) on the LPCM rows: equal length and
+    max |Δ| ≤ 1 LSB (down) or ≤ ceil(g/2) + 1 LSB (up). G3 also needs at
+    least one differing sample. On the AAC rows the checks are
+    |ΔLUFS| ≤ 0.01 and difference RMS ≤ −55 dBFS.
+
+**Measured.** `--record` on the step-1 build gave 8/15, exit 1. G0 passed
+7/7, and G5 passed with 128240 full-scale samples. G4 FAILED 7/7, as it
+should on the unfixed build: −17.914 / −17.915 LUFS decoded against
+−13.995 reported, and the summary ended "measured on the mix, which clipped
+at +6.0 dBFS before it was written". `--against` on the step-2 build gave
+36/36, exit 0. G4 decoded −13.993 (AAC) / −13.995 (LPCM) LUFS, with 0
+full-scale samples and a summary "Peak −13.4 dBTP · −14.0 LUFS". G1 was
+byte-identical on all seven presets. With `down` on the 0.9-volume tone
+(after review; the reference re-recorded on the same step-1 bundle, again
+8/15 with G4 failing 7/7), G2 found 6080 of 192000 samples differing on
+each LPCM row, max |Δ| 1 LSB against the bound of 1, and on the AAC rows
+|ΔLUFS| 0.0012 and difference RMS −83.0 dBFS (gain −15.46 dB both builds).
+
+**Two departures from the spec, each with its measured figure.**
+- **The `quiet` clip, and the tone `down` exports, are at `volume` 0.9.**
+  With the spec's fixture at
+  volume 1.0, G3 found 0 of 192000 samples differing on every LPCM row,
+  and AAC |ΔLUFS| was 0.0000 (gain +20.59 dB both builds). A 16-bit source
+  at unity reads as k/32768 exactly in float, and the old path rounded k·g
+  the same way the new one does. At 0.9 the mix is off the 16-bit grid
+  (gain +21.5 dB). There, 176720 of 192000 samples differ, max |Δ| 6 LSB
+  against the bound of 7.
+- **The AAC RMS bound is −55 dBFS, not −70.** The step-2 run measured
+  −61.3 dBFS on G3's three AAC rows, with |ΔLUFS| 0.0037. The encoder's
+  INPUT differed by −79.3 dBFS (the `audio_wav` decodes), but AAC's own
+  coding error on that export (the m4a decode against the wav decode of the
+  same build) is −58.4 dBFS (−57.9 on the reference). So any change to the
+  input reads at about that level, and −70 cannot be met. ΔLUFS ≤ 0.01
+  still catches a wrong gain.
+
+**Which references moved.** No reference is committed anywhere, so no
+stored file moved. Exported bytes move only for NORMALISED exports, and
+only where the mix is off the 16-bit grid or past full scale. A 16-bit
+source at unity volume normalised down (−16.37 dB) or up (+20.59 dB) wrote
+identical PCM on every preset. The 0.9-volume mix normalised up moved by at
+most 6 LSB (G3), and normalised down by at most 1 LSB on 6080 of 192000
+samples (G2). The hot normalised mix moved from a clipped −17.91 LUFS to
+the reported −14.0. `phase5_proof.py` 90/90: its over-scale rows are
+inverted (normalised: no "clipped", the file within ±0.5 LU of the report
+at −14.0024 against −14.0023, 0 full-scale samples; un-normalised: "clipped"
+and 192480 full-scale samples). `phase5_chrome.py` 82/82: 9(d) adds the
+un-normalised hot case.
+
+**Residue.** A gained export has no 16-bit fallback. If the reader ever
+refused the float output, a normalised export would fail with "The audio
+mix could not be read for export." instead of writing clipped audio. Every
+gained export in these runs had its float read accepted, and no proof row
+reaches the refusal. A decoded buffer of zero frames is skipped on the gain
+path, as the old Int16 kernel passed it through; none was seen in these
+runs, so no proof row reaches that skip either.

@@ -126,8 +126,9 @@ Still true of the code (verified 2026-09-26):
 - Adding or removing a filter/region inside an action writes BASE props (a different-length list
   cannot interpolate).
 - A tent text animation whose `in` is tiny but non-zero reads `"in"` for its whole life.
-- Loudness: a mix over full scale is measured honestly (float) but written from an Int16 decode,
-  so it stays clipped; `ExportLoudness.mixClipped` reports it. WAV/AIFF are 16-bit only.
+- Loudness: a mix over full scale is measured honestly (float); an UN-normalised export of it is
+  written from an Int16 decode, so it stays clipped and `ExportLoudness.mixClipped` reports it. A
+  normalised one is gained in float since #86 part 1 (issue batch B60). WAV/AIFF are 16-bit only.
 - During a transition the inspector shows the model's blend while the frame composites `normal`;
   a blend inside a nest blends against the canvas below the whole nest.
 - The inline rename editor has no Escape and cannot clear a name (the Clip tab header can); a solo

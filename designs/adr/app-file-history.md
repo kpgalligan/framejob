@@ -234,6 +234,18 @@ lenient-decoding rule.
   bare `deletingPathExtension`. "Board v1.2" became "Board v1.jpg". Save Frame validates on
   `duration > 0`, so a text-only timeline can be saved. It reads the project in the panel's
   completion, because a panel is not a sheet and the document stays editable while it is open.
+- **`ExporterWriter.swift` paid first, then the gain went float (issue batch B60, #86 part 1).**
+  Its `// MARK: - Settings → AVFoundation` section moved verbatim to
+  `ExporterWriter+Settings.swift` (1098 → 807 lines), the seven members `ExporterWriter.swift`
+  calls losing `private`, gated alone by a `diff` against HEAD, `make typecheck`, `make app` and
+  `video_configuration_proof.py`'s `keep-frame-duration` mutant, which now patches the new file.
+  Then a normalised export reads the mix through `ExportAudioGain.floatMixSettings`, the
+  measurement's own dictionary, and `ExportAudioGain` (`ExporterAudioGain.swift`) gains, clips
+  and rounds each buffer once into a NEW 16-bit buffer. The reader's audio output is added in
+  `start` (`addAudioOutput`), because its format depends on the gain. `LoudnessInt16Gain` went,
+  and `mixClipped` is now true only for a hot mix written with no gain (spec §11 #86). An
+  un-normalised export reads the old Int16 decode: `export_gain_proof.py`'s G1 measured its
+  decode byte-identical per preset against the step-1 build.
 
 ### Media import and caches
 
@@ -437,7 +449,8 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   machinery, in the shape of `+DisplayStem`, `+Import`, `+Graphics`.
 - `InspectorPane.swift`: the precedents are `InspectorSection.swift`, `InspectorSlider.swift` and
   `InspectorBinding+Writes.swift`.
-- `ExporterWriter.swift`: the settings/encoder half.
+- `ExporterWriter.swift`: the chapter half (`ExportChapter`, `textFormat`, `chapterSamples`,
+  `chapterSample`) to `ExporterWriter+Chapters.swift`.
 - `OptionControls.swift`: the precedent is `OptionControls+Choices.swift`.
 - `VideoPane.swift`: a section out as an extension, the precedent `VideoPane+Obscure.swift`.
 - `AgentServer+Clips.swift`: the clip-placement handlers against the property doors.

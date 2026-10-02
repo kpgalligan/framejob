@@ -47,18 +47,20 @@ struct ExportChapter: Equatable {
 /// that `Playback` plays and `Exporter.renderFrame` samples — the custom
 /// `Compositor` runs here exactly as it does on screen, from the same frame
 /// recipes, through the same `RecipeSource` slot, and so do the audio mix's
-/// processing taps (`addAudio`). Nothing in this file draws a pixel; it moves
+/// processing taps (`addAudioOutput`). Nothing in this file draws a pixel; it moves
 /// what AVFoundation composed into an encoder and adds the three things a
 /// preset name cannot express: a chapter track, explicit bitrates, and an
 /// output size the sheet actually promised.
 ///
-/// **The one sample it touches** is the loudness normalisation's gain — one
-/// scalar multiply over the decoded 16-bit mix, applied here because this is
-/// where the export's samples exist and nowhere else: it is export-only by
-/// definition, so the preview and the file still share one description of
-/// the sound (the mix, the ramps and the taps) and differ only by a number
-/// the export was asked for. `Exporter` measured that number a moment
-/// earlier; `Loudness.swift` holds both halves of the arithmetic.
+/// **The one sample it touches** is the loudness normalisation's gain,
+/// applied here because this is where the export's samples exist: it is
+/// export-only by definition, so the preview and the file still share one
+/// description of the sound (the mix, the ramps and the taps) and differ only
+/// by a number the export was asked for. `Exporter` measured that number a
+/// moment earlier from a float read of the mix; a gained export reads the
+/// same float mix and `ExportAudioGain` multiplies and quantises it once to
+/// the 16-bit format every encoder here takes (spec §11 #86). An export with
+/// no gain reads the 16-bit decode it always read.
 ///
 /// **Why the read is a reader and not a second render.** The alternative —
 /// driving the compositor by hand over an `AVAssetImageGenerator`, one frame
@@ -120,22 +122,16 @@ final class ExportWriter {
     /// Called once, on the main thread, and then dropped.
     private var completion: ((Result<URL, any Error>) -> Void)?
 
-    /// The loudness normalisation's gain, as a linear multiplier on the
-    /// decoded 16-bit samples. 1 means there is none, and 1 is not a
-    /// multiply by one: `pump` never enters the gain path at all, so an
-    /// export that was not normalised is byte-identical to one from before
-    /// this file knew what loudness was — by construction rather than by
-    /// argument.
+    /// The loudness normalisation's gain, or nil when there is none — and
+    /// nil is not a multiply by one: the audio is then read as the 16-bit
+    /// decode and `pump` never enters the gain path, so an export that was
+    /// not normalised is byte-identical to one from before this file knew
+    /// what loudness was, by construction rather than by argument.
     ///
     /// Written once, on the main thread, between `init` and `start`; read
-    /// only on `audioQueue` afterwards. Not under the lock for that reason
-    /// and no other.
-    private var audioGain: Float = 1
-    private let gainKernel = LoudnessInt16Gain()
-    /// One sample buffer's samples, copied out and back. Grown on the audio
-    /// pump's own queue, in practice once.
-    private var gainScratch: UnsafeMutablePointer<Int16>?
-    private var gainScratchCount = 0
+    /// by `start` and then only on `audioQueue`. Not under the lock for that
+    /// reason and no other.
+    private var audioGain: ExportAudioGain?
 
     /// Builds the reader, the writer and every track, or throws the
     /// `Exporter.ExportError` the sheet should show. Nothing is read or
@@ -169,8 +165,6 @@ final class ExportWriter {
         fatalError("ExportWriter does not support NSCoder")
     }
 
-    deinit { gainScratch?.deallocate() }
-
     /// Multiplies every audio sample by `gain` on the way to the encoder —
     /// the second half of a loudness-normalised export (`Exporter`'s
     /// measurement pass is the first).
@@ -183,10 +177,11 @@ final class ExportWriter {
     /// A non-finite or non-positive gain is ignored rather than obeyed. A
     /// gain is a number derived from a measurement, and a measurement of
     /// digital silence is −∞; multiplying a file by that would be a silent
-    /// export reported as a success.
+    /// export reported as a success. A gain of exactly 1 is ignored too, so
+    /// it keeps the un-normalised read.
     func normalizeAudio(byLinearGain gain: Float) {
-        guard gain.isFinite, gain > 0 else { return }
-        audioGain = gain
+        guard gain.isFinite, gain > 0, gain != 1 else { return }
+        audioGain = ExportAudioGain(linearGain: gain)
     }
 
     // MARK: - Tracks
@@ -237,7 +232,8 @@ final class ExportWriter {
 
     /// The audio half: every composition audio track through the plan's mix.
     ///
-    /// **This one line is where the preview and the file agree about sound.**
+    /// **`addAudioOutput`'s `audioMix` line is where the preview and the file
+    /// agree about sound.**
     /// The mix carries the plan's volume envelope AND, for any track whose
     /// clips use pan, the compressor or noise reduction, the
     /// `MTAudioProcessingTap` that runs them (`AudioTap.swift`). Those taps
@@ -259,25 +255,16 @@ final class ExportWriter {
     /// A timeline with no audio at all is not an error — it is a silent
     /// movie, and the track is simply not added. It IS an error when the
     /// preset writes nothing else.
+    ///
+    /// This adds the writer INPUT only. The reader output is added by `start`
+    /// (`addAudioOutput`), because its format depends on the gain, which
+    /// arrives after `init`.
     private func addAudio(settings: ExportSettings) throws {
         let tracks = built.composition.tracks(withMediaType: .audio)
         guard !tracks.isEmpty else {
             if settings.isAudioOnly { throw Exporter.ExportError.emptyTimeline }
             return
         }
-        let output = AVAssetReaderAudioMixOutput(
-            audioTracks: tracks, audioSettings: Self.decodedAudioSettings)
-        output.audioMix = built.audioMix
-        // AVFoundation's own default, set here because the loudness gain
-        // rewrites these buffers IN PLACE and a shared one would be a
-        // surprise the other reader in this tree
-        // (`MediaImporter.peaks`, which turns it off) makes plausible.
-        output.alwaysCopiesSampleData = true
-        guard reader.canAdd(output) else {
-            throw Exporter.ExportError.failed("The audio mix could not be read for export.")
-        }
-        reader.add(output)
-
         let input = AVAssetWriterInput(
             mediaType: .audio, outputSettings: Self.audioSettings(settings))
         input.expectsMediaDataInRealTime = false
@@ -285,8 +272,26 @@ final class ExportWriter {
             throw Exporter.ExportError.presetUnavailable(Self.presetName(settings))
         }
         writer.add(input)
-        audioOutput = output
         audioInput = input
+    }
+
+    /// The mix's reader output: the 16-bit decode, or with a gain the float
+    /// mix the measurement read (`ExportAudioGain.floatMixSettings`). False
+    /// when the reader refuses it; there is no 16-bit fallback for a gained
+    /// export, because the gain would then meet a decode that already clipped.
+    private func addAudioOutput() -> Bool {
+        let output = AVAssetReaderAudioMixOutput(
+            audioTracks: built.composition.tracks(withMediaType: .audio),
+            audioSettings: audioGain == nil
+                ? Self.decodedAudioSettings : ExportAudioGain.floatMixSettings)
+        output.audioMix = built.audioMix
+        // AVFoundation's own default, kept explicit because the other reader
+        // in this tree (`MediaImporter.peaks`) turns it off.
+        output.alwaysCopiesSampleData = true
+        guard reader.canAdd(output) else { return false }
+        reader.add(output)
+        audioOutput = output
+        return true
     }
 
     /// The chapter track: a text track carrying one sample per chapter,
@@ -342,6 +347,11 @@ final class ExportWriter {
             report(.failure(Exporter.ExportError.cancelled))
             return
         }
+        if audioInput != nil, !addAudioOutput() {
+            report(.failure(Exporter.ExportError.failed(
+                "The audio mix could not be read for export.")))
+            return
+        }
         guard writer.startWriting() else {
             report(.failure(writer.error ?? Exporter.ExportError.failed(
                 "The file could not be opened for writing.")))
@@ -366,8 +376,7 @@ final class ExportWriter {
             // and it is the only pump that can carry a gain.
             pump(
                 input, from: output, on: audioQueue, group: group,
-                tracksProgress: videoInput == nil,
-                gain: audioGain == 1 ? nil : audioGain)
+                tracksProgress: videoInput == nil, gain: audioGain)
         }
         if let input = chapterInput {
             pumpChapters(input, on: chapterQueue, group: group)
@@ -420,7 +429,7 @@ final class ExportWriter {
     /// keeps an ordinary export on exactly the samples it had before.
     private func pump(
         _ input: AVAssetWriterInput, from output: AVAssetReaderOutput, on queue: DispatchQueue,
-        group: DispatchGroup, tracksProgress: Bool, gain: Float? = nil
+        group: DispatchGroup, tracksProgress: Bool, gain: ExportAudioGain? = nil
     ) {
         group.enter()
         var finished = false
@@ -438,7 +447,7 @@ final class ExportWriter {
                     stop()
                     return
                 }
-                guard let sample = output.copyNextSampleBuffer() else {
+                guard let decoded = output.copyNextSampleBuffer() else {
                     // Dry for one of three reasons: the range is written, the
                     // read was cancelled (which `allInputsFinished` reports),
                     // or the read failed — and only the last is ours to name.
@@ -451,17 +460,17 @@ final class ExportWriter {
                     stop()
                     return
                 }
-                let time = CMSampleBufferGetPresentationTimeStamp(sample) - self.range.start
+                let time = CMSampleBufferGetPresentationTimeStamp(decoded) - self.range.start
                 // A sample that starts before the range does not belong to
                 // this file. The reader clips to `timeRange`, so this is a
                 // boundary frame, not a common case.
                 guard time.isNumeric, time >= .zero else { continue }
-                // Before `retimed`, which returns a copy SHARING this
-                // buffer's samples (and, for an export that starts at zero,
-                // this very buffer): gaining the original gains whatever
-                // comes back, and gaining afterwards would depend on which
-                // of the two it was.
-                if let gain = gain, !self.applyGain(gain, to: sample) {
+                // An empty buffer has nothing to gain and is not malformed:
+                // it is skipped, as the old Int16 kernel passed it through.
+                if gain != nil, CMSampleBufferGetNumSamples(decoded) == 0 { continue }
+                // The gain makes a NEW 16-bit buffer from the float one,
+                // before `retimed`; with no gain the decode goes on as read.
+                guard let sample = gain == nil ? decoded : gain?.apply(to: decoded) else {
                     self.stopped(
                         with: Exporter.ExportError.failed(
                             "The loudness gain could not be applied to a sample."))
@@ -519,40 +528,6 @@ final class ExportWriter {
                 }
             }
         }
-    }
-
-    // MARK: - The loudness gain
-
-    /// Multiplies one audio sample buffer's 16-bit samples by `gain`, in
-    /// place. `audioQueue` only. False is a real failure — the caller stops
-    /// the export rather than appending ungained audio, because a file that
-    /// is half normalised is worse than one that is not written.
-    ///
-    /// Out and back through `CMBlockBufferCopyDataBytes` /
-    /// `CMBlockBufferReplaceDataBytes` rather than a pointer into the block:
-    /// a `CMBlockBuffer` may be several non-contiguous chunks, and both of
-    /// those walk them where `CMBlockBufferGetDataPointer` hands back the
-    /// first one and silently truncates (the trap `MediaImporter.peaks`
-    /// records). Two memcpys per buffer, no allocation after the first.
-    private func applyGain(_ gain: Float, to sample: CMSampleBuffer) -> Bool {
-        guard let block = CMSampleBufferGetDataBuffer(sample) else { return false }
-        let count = CMBlockBufferGetDataLength(block) / MemoryLayout<Int16>.size
-        guard count > 0 else { return true }
-        let bytes = count * MemoryLayout<Int16>.size
-        if gainScratchCount < count {
-            gainScratch?.deallocate()
-            gainScratch = .allocate(capacity: count)
-            gainScratchCount = count
-        }
-        guard let scratch = gainScratch else { return false }
-        guard CMBlockBufferCopyDataBytes(
-            block, atOffset: 0, dataLength: bytes, destination: scratch)
-            == kCMBlockBufferNoErr
-        else { return false }
-        guard gainKernel.scale(scratch, count: count, gain: gain) else { return false }
-        return CMBlockBufferReplaceDataBytes(
-            with: scratch, blockBuffer: block, offsetIntoDestination: 0, dataLength: bytes)
-            == kCMBlockBufferNoErr
     }
 
     // MARK: - Finishing
@@ -637,297 +612,6 @@ final class ExportWriter {
         guard let completion = completion else { return }
         self.completion = nil
         completion(result)
-    }
-
-    // MARK: - Settings → AVFoundation
-
-    /// The video composition to render through: the one the plan built,
-    /// unless the settings ask for a different frame rate.
-    ///
-    /// `CompositionBuilder` ticks the composition at the PROJECT's rate, and
-    /// the sheet's Frame-rate popup overrides `settings.fps` — which the
-    /// session path could not honour at all (a preset name carries no rate),
-    /// so the readout promised 25 fps and the file held 30. The builder's
-    /// configuration with the asked-for `frameDuration` samples the same
-    /// timeline at the asked-for instants (#91); the recipes are evaluated per
-    /// frame at whatever tick is requested, so nothing else has to know.
-    private static func videoComposition(
-        _ built: BuiltComposition, settings: ExportSettings
-    ) -> AVVideoComposition {
-        let fps = settings.fps
-        var configuration = built.videoConfiguration
-        guard fps.num > 0, fps.den > 0 else { return built.videoComposition }
-        configuration.frameDuration = CompositionBuilder.frameDuration(fps)
-        guard configuration.frameDuration != built.videoConfiguration.frameDuration
-        else { return built.videoComposition }
-        return AVVideoComposition(configuration: configuration)
-    }
-
-    /// Refuses an alpha-carrying export whose size would have to be PADDED
-    /// (road map 2, phase 7b; `Exporter.ExportError.alphaAspectMismatch`
-    /// carries the argument and the measurement).
-    ///
-    /// The composition renders at the canvas size and
-    /// `AVVideoScalingModeResizeAspect` fits it into the asked-for frame —
-    /// which is right for every other row, and destroys the alpha channel
-    /// when it has to pad: the picture comes back at alpha 0 and the bars at
-    /// alpha 255, the answer inverted. A pure SCALE is safe at any factor,
-    /// up or down, so what is refused is the aspect change and not the
-    /// resize.
-    ///
-    /// The test is the fit itself rather than a ratio comparison, because a
-    /// ratio needs a tolerance nobody can justify and this needs none: fit
-    /// the canvas into the box the way the encoder will, and if what comes
-    /// out is the box, there is no padding.
-    ///
-    /// **The box is `encodedSize`'s and not `settings`', and the difference
-    /// was a hole in this guard.** The encoder is handed
-    /// `AVVideoWidthKey`/`AVVideoHeightKey`, not the size the core resolved,
-    /// and a rounding there moves the BOX the canvas is fitted into — which
-    /// the comparison never saw. An odd-edged transparent document (legal:
-    /// `set_canvas` refuses an odd dimension, `Project::new` and `validate`
-    /// do not, so an odd-sized PNG opened as a document or an odd display
-    /// size gets one) passed at 1001 × 667 and was encoded at 1000 × 666,
-    /// reaching the padding path through the DEFAULT "Document size" row
-    /// with the guard silent. `encodedSize` is what closed it; asking it
-    /// here rather than `settings` is what keeps it closed if a later row
-    /// ever needs a rounding of its own.
-    ///
-    /// One pixel of slack on each edge stays, and it is a deliberate trade
-    /// rather than an oversight. It absorbs `export_size.rs`'s even-rounding
-    /// of a standard row's long edge — `fitted()` can miss the canvas's
-    /// exact aspect by a pixel, and refusing every standard row on such a
-    /// document would be a false refusal for a fault nobody can see. What it
-    /// costs is measured: a one-pixel pad puts ONE edge column at the
-    /// backdrop's alpha instead of the picture's (1001 × 667 fitted into
-    /// 1000 × 666 comes back with its right-hand column opaque where the
-    /// canvas is transparent), where the aspect change this refuses puts
-    /// whole BARS there.
-    private static func checkAlphaSurvivesTheSize(
-        _ settings: ExportSettings, canvas: CGSize
-    ) throws {
-        guard settings.alpha, canvas.width >= 1, canvas.height >= 1,
-            settings.width >= 1, settings.height >= 1
-        else { return }
-        let frame = encodedSize(settings)
-        let want = CGSize(width: frame.width, height: frame.height)
-        let scale = min(want.width / canvas.width, want.height / canvas.height)
-        let fitted = CGSize(width: canvas.width * scale, height: canvas.height * scale)
-        guard abs(fitted.width - want.width) > 1 || abs(fitted.height - want.height) > 1 else {
-            return
-        }
-        // The MESSAGE names the size that was ASKED for, not the box: it
-        // tells the person what to type instead, and a number they never
-        // typed in that sentence would read as the app's own arithmetic.
-        throw Exporter.ExportError.alphaAspectMismatch(
-            width: Int(canvas.width.rounded()), height: Int(canvas.height.rounded()),
-            wantWidth: settings.width, wantHeight: settings.height)
-    }
-
-    /// The frame the ENCODER is given, which is not always the size the core
-    /// resolved — and the ONE place that difference is decided, because a
-    /// second opinion about it is exactly what `checkAlphaSurvivesTheSize`
-    /// was missing.
-    ///
-    /// Dimensions are forced even because H.264 and HEVC require it; the
-    /// standard rows arrive even already (`export_size.rs`), so the rounding
-    /// bites only on a custom size or an odd-edged document.
-    ///
-    /// **ProRes 4444 keeps its odd edges, and that is the fix rather than a
-    /// preference.** Rounding an odd edge down moves the box, so
-    /// `AVVideoScalingModeResizeAspect` pads by the pixel the rounding took
-    /// away — and padding is the one thing an alpha export cannot survive.
-    /// Measured here (macOS 26.5.1, `AVAssetWriter` +
-    /// `AVVideoCodecType.proRes4444`): asked for 1001 × 667 the writer
-    /// accepts it and the file comes back `prores`, `yuva444p12le`,
-    /// 1001 × 667, with the transparent half at alpha 0 and the opaque half
-    /// at 255 — exact at every pixel; asked for 1000 × 666 with the same
-    /// 1001 × 667 picture it comes back with its right-hand column OPAQUE
-    /// where the canvas is transparent. So the one row that cannot afford
-    /// the rounding turns out not to need it.
-    /// Every other row keeps the rounding it has always had, ProRes 422
-    /// included — it does not need it either (measured: 1001 × 667 survives
-    /// as `yuv422p10le`), but changing the bytes a shipped row writes for a
-    /// case no proof covers is not this guard's business.
-    private static func encodedSize(_ settings: ExportSettings) -> (width: Int, height: Int) {
-        guard codecType(for: settings.codec) == .proRes4444 else {
-            return (evenDimension(settings.width), evenDimension(settings.height))
-        }
-        return (max(1, settings.width), max(1, settings.height))
-    }
-
-    /// The encoder settings for the picture.
-    ///
-    /// **Size.** The composition renders at the CANVAS size (§7.2), and the
-    /// core resolves the export size — the document's unless the sheet's
-    /// Size popup, its Custom fields or the `export` tool asked for another
-    /// — and they are not the same number; the session path simply dropped
-    /// the second one on the floor: the preset scaled to fit whatever it
-    /// liked, so the sheet's "1920 × 1080" was a wish. Here the encoder is
-    /// told the size the sheet promised and `AVVideoScalingModeResizeAspect`
-    /// fits the canvas inside it, letterboxing rather than distorting when
-    /// the two aspects differ. The frame itself is `encodedSize`'s answer —
-    /// the rounding lives there, with the argument for it and for the row
-    /// that is exempt, because `checkAlphaSurvivesTheSize` has to compare
-    /// against the same number.
-    ///
-    /// **Bitrate.** `settings.videoBitrate` when the core resolved one. When
-    /// it did not, a rate computed from the frame — bits per pixel per frame,
-    /// halved for HEVC — rather than none at all: with no
-    /// `AVVideoAverageBitRateKey` VideoToolbox picks a conservative default
-    /// that visibly under-runs a 4K timeline. ProRes gets neither: its rate
-    /// is a property of the profile.
-    private static func videoSettings(_ settings: ExportSettings) throws -> [String: Any] {
-        guard let codec = codecType(for: settings.codec) else {
-            throw Exporter.ExportError.presetUnavailable(presetName(settings))
-        }
-        let frame = encodedSize(settings)
-        var output: [String: Any] = [
-            AVVideoCodecKey: codec,
-            AVVideoWidthKey: frame.width,
-            AVVideoHeightKey: frame.height,
-            AVVideoScalingModeKey: AVVideoScalingModeResizeAspect,
-            // The compositor works in SDR sRGB/709 and tone-maps HDR sources
-            // on the way in (§7.5), so tagging the output 709 is a statement
-            // of what the pixels ARE, not a conversion.
-            AVVideoColorPropertiesKey: [
-                AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
-                AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
-                AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2,
-            ],
-        ]
-        guard codec != .proRes422, codec != .proRes4444 else { return output }
-
-        var compression: [String: Any] = [
-            AVVideoAverageBitRateKey: settings.videoBitrate.map { max(1, $0) }
-                ?? defaultVideoBitrate(settings, codec: codec),
-            // A keyframe at least every two seconds. Deliberate, not a
-            // default: an exported movie is scrubbed and re-cut, and
-            // VideoToolbox's own interval is long enough to make that
-            // painful.
-            AVVideoMaxKeyFrameIntervalDurationKey: 2.0,
-        ]
-        if settings.fps.double > 0 {
-            compression[AVVideoExpectedSourceFrameRateKey] = Int(settings.fps.double.rounded())
-        }
-        if codec == .h264 {
-            compression[AVVideoProfileLevelKey] = AVVideoProfileLevelH264HighAutoLevel
-        }
-        output[AVVideoCompressionPropertiesKey] = compression
-        return output
-    }
-
-    /// The core's codec name as an `AVVideoCodecType`. nil is a refusal, not
-    /// a fallback: writing H.264 because "vp9" was not understood would put a
-    /// file on disk that is not the one asked for.
-    private static func codecType(for codec: String) -> AVVideoCodecType? {
-        switch codec.lowercased() {
-        case "h264", "avc", "avc1": return .h264
-        case "hevc", "h265", "hvc1": return .hevc
-        case "prores_422", "prores", "prores422": return .proRes422
-        case "prores_4444", "prores4444": return .proRes4444
-        default: return nil
-        }
-    }
-
-    /// What to call the settings in a refusal: the core's preset id when it
-    /// gave one, else the codec that could not be written.
-    private static func presetName(_ settings: ExportSettings) -> String {
-        settings.preset.isEmpty ? settings.codec : settings.preset
-    }
-
-    /// Bits per second for a frame of this size at this rate. The constants
-    /// are the usual delivery figures — about 9 Mbps for 1080p30 H.264 and
-    /// half that for HEVC — clamped so a tiny canvas still gets a usable rate
-    /// and a huge one cannot ask for a file no disk wants.
-    private static func defaultVideoBitrate(
-        _ settings: ExportSettings, codec: AVVideoCodecType
-    ) -> Int {
-        let pixels = Double(max(1, settings.width)) * Double(max(1, settings.height))
-        let rate = settings.fps.double > 0 ? settings.fps.double : 30
-        let perPixel = codec == .hevc ? 0.07 : 0.14
-        return Int(min(max(pixels * rate * perPixel, 1_000_000), 200_000_000))
-    }
-
-    /// Even, and never zero — H.264 and HEVC macroblocks come in pairs.
-    /// `encodedSize` is the only caller and says which rows want it.
-    private static func evenDimension(_ value: Int) -> Int {
-        let clamped = max(2, value)
-        return clamped - (clamped % 2)
-    }
-
-    /// What comes OUT of the mix: 16-bit interleaved LPCM. The same format
-    /// the ProRes path writes, and one every encoder here takes without a
-    /// conversion in between.
-    ///
-    /// **It SATURATES, and it saturates before the loudness gain**, which is
-    /// the one place the two passes of a normalised export part company: the
-    /// measurement reads the same mix as 32-bit float (`ExporterLoudness`),
-    /// so a mix past full scale is measured whole and written clipped. The
-    /// alternative is decoding float here, and that changes the format
-    /// description every encoder in this file consumes — hence every existing
-    /// export's bytes — for a case a normalised export is turning DOWN
-    /// anyway. So the difference is reported rather than removed:
-    /// `ExportLoudness.mixClipped` is what says the figures are the mix's.
-    private static let decodedAudioSettings: [String: Any] = [
-        AVFormatIDKey: Int(kAudioFormatLinearPCM),
-        AVSampleRateKey: 48000,
-        AVNumberOfChannelsKey: 2,
-        AVLinearPCMBitDepthKey: 16,
-        AVLinearPCMIsFloatKey: false,
-        AVLinearPCMIsBigEndianKey: false,
-        AVLinearPCMIsNonInterleaved: false,
-    ]
-
-    /// The encoder settings for the sound: LPCM where the row asks for it, so
-    /// a master stays a master, and AAC everywhere else. `settings.audioBitrate`
-    /// when the core resolved one, else 192 kbps — stereo AAC's
-    /// transparent-enough rate and what the M1 presets landed on.
-    ///
-    /// **Two codecs mean LPCM, and the CONTAINER decides the byte order.**
-    /// ProRes has since M2 (§7.8 pairs the profile with uncompressed sound),
-    /// and phase 5's `audio_wav` / `audio_aiff` rows carry the codec `lpcm`
-    /// outright. The dictionary handed to the encoder is then literally
-    /// `decodedAudioSettings` — the same one the mix is read through, so
-    /// nothing is converted on the way — except for AIFF, which is
-    /// big-endian by definition where WAV and QuickTime are little. Getting
-    /// that flag wrong is not a subtle bug, and it was measured rather than
-    /// reasoned about: on macOS 26.5.1 `AVAssetWriter.canAdd` answers FALSE
-    /// for AAC settings into a `.wav` and FALSE for a little-endian LPCM
-    /// dictionary into an `.aiff`, so either mistake reaches the user as
-    /// `.presetUnavailable` for a format the table advertises. With the
-    /// branch as written, one twenty-second tone came out of both rows the
-    /// same size and decoded to identical PCM, sample for sample.
-    ///
-    /// A row whose codec is `lpcm` in a container this build has no rule for
-    /// still gets little-endian LPCM rather than AAC, because AAC in an
-    /// uncompressed container is the failure that reads as
-    /// `.presetUnavailable` and sends the reader looking at the preset table.
-    private static func audioSettings(_ settings: ExportSettings) -> [String: Any] {
-        let codec = settings.codec.lowercased()
-        guard codec == "lpcm" || codec.hasPrefix("prores") else {
-            return [
-                AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
-                AVSampleRateKey: 48000,
-                AVNumberOfChannelsKey: 2,
-                AVEncoderBitRateKey: settings.audioBitrate.map { max(1, $0) } ?? 192_000,
-            ]
-        }
-        guard settings.container.lowercased() == "aiff" else { return decodedAudioSettings }
-        var bigEndian = decodedAudioSettings
-        bigEndian[AVLinearPCMIsBigEndianKey] = true
-        return bigEndian
-    }
-
-    /// Whether this container can hold a chapter track (see `addChapters`).
-    /// The QuickTime family and nothing else: a chapter list is a text track
-    /// associated with the movie's own, and WAV, AIFF and the two image
-    /// formats have no track to associate it with.
-    private static func carriesChapters(_ settings: ExportSettings) -> Bool {
-        switch settings.container.lowercased() {
-        case "mov", "quicktime", "mp4", "m4v", "m4a": return true
-        default: return false
-        }
     }
 
     // MARK: - Chapter samples

@@ -505,3 +505,23 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   which changes family assignment (R2-1) for a 25 ms edge; and an envelope
   applied in the processing tap, which breaks "no tap on an untouched
   export". The owner decided this on 2026-10-01.
+- **#86 — A normalised export reads the mix as float, gains it and
+  quantises once to the unchanged 16-bit encoder format; an un-normalised
+  export keeps the Int16 decode.** Before B60 the write pass decoded the mix
+  to 16-bit integer and applied the loudness gain to that, so a mix past full
+  scale was clipped by the decode before the gain turned it down, and every
+  normalised sample was rounded twice. Now `ExportWriter` reads a gained
+  export through `ExportAudioGain.floatMixSettings`, the same dictionary the
+  measurement pass reads, so the gain is applied to the signal that was
+  measured. `ExportAudioGain` multiplies, clips and rounds to 16-bit once,
+  and the encoder gets the format it always got. **Why this shape:** the
+  encoders' input format does not change, and neither do any
+  un-normalised export's bytes. `export_gain_proof.py`'s G1 proves that
+  byte for byte, per audio preset, against a reference from the build
+  before. And the gain now sees what was measured: the true-peak ceiling is
+  at most 0 dBTP, so a gained hot mix cannot clip. **The risk it accepts:** an
+  un-normalised hot mix is still clipped by the Int16 decode, and
+  `ExportLoudness.mixClipped` (true only for a mix past full scale written
+  with no gain) is what reports it. #86's part 2, a 24-bit WAV/AIFF option,
+  is not decided here, and nothing here closes it off: the 16-bit output is
+  one constant in `ExportAudioGain`.

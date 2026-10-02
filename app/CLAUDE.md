@@ -859,14 +859,16 @@ the key map behind it.
   algebraically self-cancelling) and pan (constant-power, unity at centre).
   A track whose clips ask for none is bit-identical.
 - `Exporter.swift` · `ExporterLoudness.swift` · `ExporterSettings.swift` ·
-  `ExporterWriter.swift` · `ExporterImageSequence.swift` ·
+  `ExporterWriter.swift` · `ExporterWriter+Settings.swift` ·
+  `ExporterAudioGain.swift` · `ExporterImageSequence.swift` ·
   `ExporterErrors.swift` · `ExporterGraphics.swift` — the writer
   (`ExportWriter` REPLACED `AVAssetExportSession` so chapters, bitrate and
   size have one path) and the one-frame offline render. An export is TWO
   passes wherever the file holds sound: a measurement build of its own in
-  32-bit float, then the write with the gain applied to decoded Int16 (which
-  saturates BEFORE the gain: a mix that clips is measured honestly and still
-  clipped). `ExportWriter` refuses an alpha-carrying row at a PADDED size
+  32-bit float, then the write: un-normalised from a 16-bit decode (a mix
+  past full scale clips there, and `mixClipped` says so); normalised from the
+  same float decode the measurement read, gained and quantised once by
+  `ExportAudioGain` (#86). `ExportWriter` refuses an alpha-carrying row at a PADDED size
   (padding inverts the alpha; a pure scale is fine), testing the box the
   ENCODER is handed through `encodedSize`; `apng` FITS instead and must not
   grow the guard. GIF and APNG refuse past 600 frames rather than truncate.

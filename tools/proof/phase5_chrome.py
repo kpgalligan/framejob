@@ -1358,23 +1358,29 @@ def gain_checks():
           answers[2]["summary"] == "Silent" and answers[2]["gain_db"] == 0,
           f"summary “{answers[2]['summary']}”")
 
-    # (d) The mix the writer will clip. The measure pass reads float and the
-    # write pass decodes Int16, which saturates BEFORE the gain, so for a mix
-    # over full scale the report describes the mix and the file holds
-    # something else. It has to say so; `phase5_proof.py` measures the same
-    # thing end to end on a written file.
+    # (d) The mix the writer would clip. Since #86 a NORMALISED export reads
+    # the same float mix the measurement read and quantises once after the
+    # gain, so a hot mix with a gain is not clipped and is not reported so.
+    # Only a hot mix written with NO gain goes through the 16-bit decode,
+    # which saturates; that one must say so. `phase5_proof.py` measures both
+    # end to end on written files.
     answers = resolve(
         binary,
-        [case(2.4, 6.02, -14.0, -1.0), case(-6.7, -0.02, -14.0, -1.0)],
+        [case(2.4, 6.02, -14.0, -1.0), case(-6.7, -0.02, -14.0, -1.0),
+         case(2.4, 6.02, None)],
         "clipped")
-    check("a mix measured PAST full scale is reported as clipped — the write pass's "
-          "Int16 decode saturates before the gain reaches it, so these figures are the "
-          "mix's and the file's are worse",
-          answers[0]["mix_clipped"] and "clipped" in answers[0]["summary"],
+    check("a mix measured PAST full scale and normalised is NOT reported as clipped — "
+          "the gain is applied to the float mix before it is quantised",
+          not answers[0]["mix_clipped"] and "clipped" not in answers[0]["summary"],
           f"summary “{answers[0]['summary']}”")
     check("…and one that merely came close is not, so the sentence means something",
           not answers[1]["mix_clipped"] and "clipped" not in answers[1]["summary"],
           f"summary “{answers[1]['summary']}”")
+    check("…while the same hot mix written with NO gain is reported as clipped — the "
+          "16-bit decode saturates, so these figures are the mix's and the file's are "
+          "worse",
+          answers[2]["mix_clipped"] and "clipped" in answers[2]["summary"],
+          f"summary “{answers[2]['summary']}”")
 
 
 def main():

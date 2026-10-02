@@ -72,7 +72,7 @@ CONTAINERS = (b"moov", b"trak", b"mdia", b"edts", b"minf", b"stbl", b"udta")
 
 # name: (file in app/Sources, before — exactly once, after, row)
 MUTANTS = {
-    "keep-frame-duration": ("ExporterWriter.swift",
+    "keep-frame-duration": ("ExporterWriter+Settings.swift",
                             "return AVVideoComposition(configuration: configuration)",
                             "return built.videoComposition", "V7"),
 }

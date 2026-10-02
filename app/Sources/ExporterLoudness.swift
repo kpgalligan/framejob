@@ -38,29 +38,20 @@ extension Exporter {
 
     // MARK: - Measuring the mix
 
-    /// What the measurement READS. `ExportWriter.decodedAudioSettings` with
-    /// exactly one difference — 32-bit float where the writer takes 16-bit
-    /// integer — and it is spelled out here rather than shared because the
-    /// two dictionaries answer different questions and only one of them may
-    /// ever change: the writer's is the format description the encoder
-    /// consumes, so touching it changes every existing export's bytes.
+    /// What the measurement READS: `ExportAudioGain.floatMixSettings`, the
+    /// one float dictionary, and the same one the write pass reads whenever a
+    /// gain applies (spec §11 #86). So a normalised export's gain is applied
+    /// to exactly the signal measured here. An export with no gain is written
+    /// from `ExportWriter.decodedAudioSettings`, the 16-bit decode it always
+    /// had, so its bytes do not change.
     ///
     /// **Why float.** Int16 SATURATES. A mix hotter than full scale — which
     /// is exactly the material loudness normalisation exists for — would be
     /// measured clipped, and its true peak would be pinned at 0 dBTP by the
-    /// decode rather than by the signal.
-    ///
-    /// **And what that costs, which is a thing to know rather than a thing to
-    /// fix here.** The WRITE pass decodes the same mix to Int16 and applies
-    /// the gain to what comes out, so for a mix over full scale the two
-    /// passes read different signals and the file holds the clipped one. The
-    /// measurement is still the honest one — it is the only pass that can
-    /// SEE the overshoot — and `ExportLoudness.mixClipped` is what carries
-    /// the fact out to both consumers, so neither reports the mix's figures
-    /// as the file's. Making them agree instead would mean measuring what
-    /// the writer will write (and losing the overshoot) or writing what was
-    /// measured (and changing the format description the encoder consumes,
-    /// hence every existing export's bytes). Both were decided against.
+    /// decode rather than by the signal. Read as float, the overshoot is
+    /// measured whole, the true-peak ceiling turns it down, and the gained
+    /// file holds it unclipped. Only a hot mix written with NO gain is
+    /// clipped, by its 16-bit decode, and `ExportLoudness.mixClipped` says so.
     ///
     /// **Why the rate and the channel count are the writer's.** BS.1770-4
     /// sums weighted channel powers and left and right both carry 1.0, so
@@ -70,15 +61,7 @@ extension Exporter {
     /// is a silent 3 dB error.
     private static let measureSampleRate: Double = 48000
     private static let measureChannelCount = 2
-    private static let measureAudioSettings: [String: Any] = [
-        AVFormatIDKey: Int(kAudioFormatLinearPCM),
-        AVSampleRateKey: 48000,
-        AVNumberOfChannelsKey: 2,
-        AVLinearPCMBitDepthKey: 32,
-        AVLinearPCMIsFloatKey: true,
-        AVLinearPCMIsBigEndianKey: false,
-        AVLinearPCMIsNonInterleaved: false,
-    ]
+    private static let measureAudioSettings = ExportAudioGain.floatMixSettings
 
     /// The same, in the writer's own 16-bit integer. Nothing in this tree had
     /// asked an `AVAssetReaderAudioMixOutput` for float before phase 5, so

@@ -83,10 +83,12 @@ The five parts, and what each is measured with:
   0.002 dB apart — because a cap quantised to the nearest step lands over the
   ceiling for about half the measured peaks it could meet, so a single
   fixture answers "the true peak does not exceed the ceiling" by luck rather
-  than by construction. And a mix driven PAST full scale is exported, because
-  the measure pass reads float while the write pass decodes Int16, which
-  saturates before the gain: the file then holds a signal the measurement
-  never saw, and the report has to say whose numbers it is publishing.
+  than by construction. And a mix driven PAST full scale is exported both
+  ways. Normalised, the write pass reads the same float mix the measurement
+  read and quantises once after the gain (spec §11 #86), so the file holds no
+  full-scale sample, measures what the report says and is not called
+  clipped. Un-normalised, the 16-bit decode still clips it, and the report
+  has to say whose numbers it is publishing.
   `phase5_chrome.py`'s section 9 sweeps the same arithmetic 200 peaks at a
   time with no export in it at all.
 
@@ -1093,13 +1095,12 @@ def loudness_part(mcp):
         f"({[f'{x:g}' for x in nearest]})",
     )
 
-    # A mix past full scale, which is the one case where the report cannot be
-    # the file's. The measure pass reads 32-bit float on purpose; the write
-    # pass decodes the same mix to Int16, which SATURATES before the gain is
-    # applied. So the file holds the mix hard-clipped and then turned down,
-    # and every figure the phase publishes was computed from the other one.
-    # It has to say so.
-    print("\n5d — a mix past full scale: whose numbers the report is")
+    # A mix past full scale. The measure pass reads 32-bit float, and since
+    # #86 so does the write pass of a NORMALISED export: the gain is applied
+    # to the float mix and quantised once, so the file is the measured signal
+    # turned down, unclipped. Only the same mix written with NO gain goes
+    # through the 16-bit decode, which saturates, and that report must say so.
+    print("\n5d — a mix past full scale: gained in float, clipped only without a gain")
     o = Session(mcp, "phase5-overscale")
     hot_clip = o.place("half.wav")
     # A half-scale tone at the model's 4× ceiling: +6 dBFS of mix, which is
@@ -1114,17 +1115,28 @@ def loudness_part(mcp):
         f"pass reads float and saw {fmt(mix_peak)} dBFS before the gain",
     )
     check(
-        "clipped" in report["summary"],
-        f"and the report SAYS the mix clipped, in the one line both consumers show — "
-        f"the sheet's last line and this tool's summary ({report['summary']})",
+        "clipped" not in report["summary"],
+        f"the normalised export does NOT say the mix clipped: it was gained in float "
+        f"before it was quantised ({report['summary']})",
     )
     written = integrated(channels(hot))
     check(
-        written is not None
-        and abs(written - report["integrated_lufs"]) > 0.5,
-        f"…which it must, because the file this script decoded is {fmt(written)} LUFS "
-        f"against the {fmt(report['integrated_lufs'])} reported — further apart than the "
-        f"±0.5 LU an unqualified figure would be promising",
+        written is not None and abs(written - report["integrated_lufs"]) <= 0.5,
+        f"the file this script decoded measures {fmt(written)} LUFS against the "
+        f"{fmt(report['integrated_lufs'])} reported — within ±0.5 LU, so the figure is "
+        f"the file's",
+    )
+    full = sum(1 for s in samples(hot) if s in (-32768, 32767))
+    check(
+        full == 0,
+        f"and no decoded sample sits at full scale ({full} at −32768 or 32767)",
+    )
+    _, raw, raw_result = o.wav("hot-plain")
+    raw_full = sum(1 for s in samples(raw) if s in (-32768, 32767))
+    check(
+        "clipped" in raw_result["loudness"]["summary"] and raw_full > 0,
+        f"but the same mix exported WITHOUT a gain is clipped by the 16-bit decode and "
+        f"says so ({raw_full} full-scale samples; {raw_result['loudness']['summary']})",
     )
     check(
         "clipped" not in plain["loudness"]["summary"],

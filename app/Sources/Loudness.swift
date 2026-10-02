@@ -130,11 +130,12 @@ struct LoudnessReport: Equatable {
 /// the gain" IS what the file holds. Add a limiter, a soft clip or a
 /// fader-shaped ramp and the reported figure becomes a guess.
 ///
-/// **With one exception, and it is not one this file chose:** a mix that was
-/// already past full scale is clipped by the WRITE pass's Int16 decode before
-/// the gain is applied to it, so the file holds a signal the measurement pass
-/// never saw. `mixClipped` is that case, it is the only one, and `summary`
-/// names it rather than letting the figures pass as the file's.
+/// **With one exception:** a mix past full scale written with NO gain is
+/// clipped by the write pass's 16-bit decode, so the file holds a signal the
+/// measurement never saw. `mixClipped` is that case, it is the only one, and
+/// `summary` names it rather than letting the figures pass as the file's. A
+/// gained export reads the same float mix the measurement read and is
+/// quantised once, after the gain (spec §11 #86), so it is not clipped.
 struct ExportLoudness: Equatable {
     /// What the mix measured, before any gain.
     let measured: LoudnessReport
@@ -181,28 +182,21 @@ struct ExportLoudness: Equatable {
     var integratedLUFS: Double? { measured.integratedLUFS.map { $0 + gainDB } }
     var truePeakDBTP: Double { measured.truePeakDBTP + gainDB }
 
-    /// True when the mix passed full scale BEFORE any gain — the one case
-    /// where the two lines above describe the MIX and not the file.
+    /// True when the mix passed full scale and is written with NO gain — the
+    /// one case where the two lines above describe the MIX and not the file.
     ///
-    /// The measurement pass reads 32-bit float on purpose (`ExporterLoudness`
-    /// says why: a mix hotter than full scale is exactly the material
-    /// normalisation exists for, and an Int16 decode would pin its true peak
-    /// at 0 dBTP by the decode rather than by the signal), while the write
-    /// pass decodes that same mix to Int16 — which SATURATES — and applies
-    /// the gain to what comes out. So where the mix passes full scale the two
-    /// passes see different signals: the file holds the mix hard-clipped and
-    /// then turned down, whose true peak and integrated loudness are both a
-    /// decibel or more away from what was measured, and no arithmetic here
-    /// can carry one into the other, because a clip is not a gain.
+    /// The measurement reads 32-bit float on purpose (`ExporterLoudness` says
+    /// why), and so does the write pass whenever a gain applies (spec §11
+    /// #86), so a gained export is the measured signal turned down. An
+    /// export with no gain is written from the 16-bit decode, which
+    /// SATURATES: for a mix past full scale the file holds it hard-clipped,
+    /// and no arithmetic here can carry the measurement into that, because a
+    /// clip is not a gain. The decode is kept for those exports because
+    /// changing it would change every such file's bytes, so `summary` names
+    /// the overshoot and says whose numbers these are.
     ///
-    /// Neither pass can be moved without giving something up that was decided
-    /// (measure in Int16 and the over-scale peak is lost; write in float and
-    /// the format description the encoder consumes changes, which changes
-    /// every existing export's bytes), so what is fixed here is the REPORT:
-    /// `summary` names the overshoot and says whose numbers these are. What
-    /// must not survive is publishing the mix's figures as the file's in
-    /// silence.
-    var mixClipped: Bool { measured.samplePeakDBFS > 0 }
+    /// A gain of exactly 0 dB is `isUnity`, and the writer then applies none.
+    var mixClipped: Bool { measured.samplePeakDBFS > 0 && isUnity }
 
     /// The gain a `target` and a `ceiling` ask for over `measured`.
     ///
@@ -222,8 +216,8 @@ struct ExportLoudness: Equatable {
         // The cap is computed on TRUE peak rather than sample peak, and that
         // is what makes the write safe as well as honest: true peak is never
         // below sample peak, so a gain that keeps the true peak under the
-        // ceiling keeps every 16-bit sample inside full scale, and the
-        // saturation in `LoudnessInt16Gain` never has to fire.
+        // ceiling keeps every 16-bit sample inside full scale, and the clip
+        // in the writer's quantiser (`ExportAudioGain`) never has to fire.
         //
         // A peak that is not a finite number is NO headroom, which is the
         // safe answer and not the obvious one. −∞ cannot reach this line at
@@ -676,67 +670,5 @@ final class LoudnessMeter {
 
     private static func decibels(_ linear: Double) -> Double {
         linear > 0 ? 20 * log10(linear) : -.infinity
-    }
-}
-
-// MARK: - Applying a gain to 16-bit samples
-
-/// Scales interleaved 16-bit samples by a gain, rounding and saturating.
-///
-/// The export writer reads the mix as 16-bit LPCM and hands 16-bit LPCM to
-/// the encoder (`ExportWriter.decodedAudioSettings` is literally the same
-/// dictionary on both sides), so a normalisation gain is applied in that
-/// domain. Two things about that are worth stating rather than discovering:
-///
-/// - **It rounds, it does not truncate.** Truncation biases every sample
-///   toward zero and shows up as DC on quiet material. (`vDSP_vfixr16`
-///   rounds to the nearest, ties to even, which is the unbiased choice and
-///   the one the machine's rounding mode already makes.)
-/// - **It costs a fraction of a bit.** A −6 dB normalisation gives away one
-///   bit of a 16-bit intermediate — quantisation noise at about −90 dBFS,
-///   under the noise floor of anything that was recorded and below what the
-///   AAC encoder downstream will resolve. A file that needed 40 dB of gain
-///   would be a different conversation, and the true-peak cap is what stops
-///   the gain going the other way and clipping.
-///
-/// Not on the audio render thread: this runs on the export's own audio pump
-/// queue, so the scratch buffer may grow when a larger sample buffer arrives
-/// (in practice once, on the first one).
-final class LoudnessInt16Gain {
-    private var floats: UnsafeMutablePointer<Float>?
-    private var capacity = 0
-
-    init() {}
-
-    @available(*, unavailable) required init?(coder: NSCoder) {
-        fatalError("LoudnessInt16Gain does not support NSCoder")
-    }
-
-    deinit { floats?.deallocate() }
-
-    /// Multiplies `count` samples in place. Returns false only when the
-    /// scratch could not be sized, which the caller reports as a failed
-    /// write rather than silently appending ungained audio.
-    @discardableResult
-    func scale(_ samples: UnsafeMutablePointer<Int16>, count: Int, gain: Float) -> Bool {
-        guard count > 0 else { return true }
-        if capacity < count {
-            floats?.deallocate()
-            floats = .allocate(capacity: count)
-            capacity = count
-        }
-        guard let floats = floats else { return false }
-        var gain = gain
-        var low = Float(Int16.min)
-        var high = Float(Int16.max)
-        let n = vDSP_Length(count)
-        vDSP_vflt16(samples, 1, floats, 1, n)
-        vDSP_vsmul(floats, 1, &gain, floats, 1, n)
-        // Saturate before the conversion: `vDSP_vfixr16` wraps rather than
-        // clamps, so an over-range sample would come back as its own
-        // opposite — a click, not a clip.
-        vDSP_vclip(floats, 1, &low, &high, floats, 1, n)
-        vDSP_vfixr16(floats, 1, samples, 1, n)
-        return true
     }
 }

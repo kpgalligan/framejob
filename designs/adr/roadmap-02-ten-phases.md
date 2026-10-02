@@ -333,8 +333,9 @@ All of these were verified as still true on 2026-09-26.
 - **Sound:**
   - The meter is the sum of tracks × envelopes, not a device measurement.
   - Normalise sits under an animated volume, which overrides it for the action's span.
-  - The write pass decodes to Int16 BEFORE the gain, so a mix that clips stays clipped after
-    normalising (`ExporterWriter.swift:877`). WAV and AIFF are 16-bit only.
+  - An UN-normalised export is written from an Int16 decode, so a mix past full scale stays
+    clipped in it (`ExportLoudness.mixClipped` reports it). A normalised one is gained in float
+    since #86 part 1 (issue batch B60, spec §11 #86). WAV and AIFF are 16-bit only.
 - **Output:**
   - JPEG flattens alpha onto black. A ProRes 4444 export whose aspect changes is refused.
   - A burn-in timecode is non-drop, so at 29.97 it runs about 3.6 s behind the wall clock at the
@@ -367,7 +368,6 @@ All of these were verified as still true on 2026-09-26.
   export choice and the preview frame, and the queue window (P7/P8). Tracked in #47, #48, #51
   and #52.
 - **Tracked in GitHub issues (defects and candidates):**
-  - a float export write path, so a hot mix is not clipped by the Int16 decode (#86);
   - 24-bit WAV/AIFF through an `audio_bits` override (#86);
   - stored obscure regions drawn and draggable on the canvas (`canvasQuad` is the seed; #85);
   - `selectedMedia` pointing at a filtered-out row (#68);
