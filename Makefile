@@ -32,9 +32,12 @@ rust:
 # enclosing function rather than its line, and its other citations by
 # anchor; no app, no build. `spec_index_proof.py` (issue batch B70) checks the
 # spec indexes' Lines cells against `wc -l` and a row for every spec file.
+# `mcp-proxy` is road map 14's `reelcut-mcp`, its tests black-box over the
+# built binary's stdin and stdout.
 test: rust
 	cd core && cargo test --release
 	cd graphic && cargo test --release
+	cd mcp-proxy && cargo test --release
 	python3 tools/proof/assistant_lane_proof.py
 	python3 tools/proof/assistant_prompt_proof.py --probe
 	python3 tools/proof/prices_proof.py
@@ -45,10 +48,12 @@ test: rust
 lint:
 	cd core && cargo clippy --all-targets -- -D warnings
 	cd graphic && cargo clippy --all-targets -- -D warnings
+	cd mcp-proxy && cargo clippy --all-targets -- -D warnings
 
 fmt:
 	cd core && cargo fmt
 	cd graphic && cargo fmt
+	cd mcp-proxy && cargo fmt
 
 project:
 	xcodegen generate
@@ -64,8 +69,13 @@ app: rust project
 # (Contents/Helpers/reelcut-agent) must be present, signed with the hardened
 # runtime, hold exactly the allow-jit entitlement and not hold the marker
 # (road map 12 A4, D6–D13); and the Distribution app must be signed with
-# exactly the audio-input entitlement, never get-task-allow (#145, D14). The
-# file-wide `unexport RC_ASSEMBLYAI_KEY` above covers this recipe too.
+# exactly the audio-input entitlement, never get-task-allow (#145, D14); and
+# each bundle's MCP proxy (Contents/Helpers/reelcut-mcp) must be present,
+# signed with the hardened runtime and hold no entitlements, and its catalog
+# snapshot (Contents/Resources/agent-catalog.json) must be at the bundle's
+# version, Release's naming every dev tool and Distribution's none (road map
+# 14 MC3, D15–D24). The file-wide `unexport RC_ASSEMBLYAI_KEY` above covers
+# this recipe too.
 dist: app
 	xcodebuild -project $(APP).xcodeproj -scheme $(APP) -configuration Distribution \
 		-derivedDataPath $(BUILD_DIR) build
@@ -98,3 +108,4 @@ clean:
 	rm -rf $(BUILD_DIR) $(APP).xcodeproj app/Info.plist
 	cd core && cargo clean
 	cd graphic && cargo clean
+	cd mcp-proxy && cargo clean

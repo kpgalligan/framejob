@@ -55,7 +55,7 @@ Needs no ffmpeg. It reads `A.mov` and `AV.mov` from `media/`, which
 `tools/proof/README.md` says how to make. Run it as every other script here
 is run, on an instance of its OWN:
 
-    python3 tools/proof/refusal_proof.py <port>
+    python3 tools/proof/refusal_proof.py <dir>/agent.sock
 """
 
 import json
@@ -65,7 +65,7 @@ import shutil
 import sys
 import time
 
-from mcp import MCP, ToolError
+from mcp import MCP, ToolError, target
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MEDIA = os.path.join(HERE, "media")
@@ -930,13 +930,13 @@ def summary(aborted=None):
         sys.exit(1)
 
 
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 4823
+SOCKET = target(sys.argv)
 
 
 def main():
     os.makedirs(WORK, exist_ok=True)
-    mcp = MCP(PORT)
-    print(f"what an op answers, against 127.0.0.1:{PORT}")
+    mcp = MCP(SOCKET)
+    print(f"what an op answers, against {SOCKET}")
     overlap_rule(mcp)
     identity_says_only_that(mcp)
     several_ops(mcp)

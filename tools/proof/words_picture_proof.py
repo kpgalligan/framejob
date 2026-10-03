@@ -7,7 +7,7 @@ comparison of two `render_frame` PNGs of a hand-written version-9 package, or
 a sentence read back off `tools/list`; the arithmetic no script can reach (the
 box, the headroom, the ink) is `words_picture_probe.py`'s.
 
-    python3 tools/proof/words_picture_proof.py <port>
+    python3 tools/proof/words_picture_proof.py <dir>/agent.sock
 
 R1  two frames inside one word's hold, +0.20 s and +0.30 s after its start
     (WORD_POP is 0.12 s), are byte-identical;
@@ -18,8 +18,8 @@ R5  the four bundled faces and NoSuchFont-Black: five pairwise-distinct PNGs;
 R6  set_text's patch description names case, words and word_style;
 R7  an UNTIMED page with a colour-only word_style equals its unstyled twin.
 
-It launches nothing and kills nothing: the caller owns the instance on <port>,
-relaunched fresh, and has checked `grep "Reelcut: " /tmp/reelcut-<port>.log`
+It launches nothing and kills nothing: the caller owns the instance at the
+socket, relaunched fresh, and has checked `grep "Reelcut: " <dir>/reelcut.log`
 prints nothing.
 """
 
@@ -31,7 +31,7 @@ import shutil
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from mcp import MCP  # noqa: E402
+from mcp import MCP, target  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 WORK = os.path.join(HERE, "work", "words-picture")
@@ -194,11 +194,11 @@ def colour_only_row(mcp):
 
 
 def main():
-    if len(sys.argv) != 2 or not sys.argv[1].isdigit():
+    if len(sys.argv) != 2 or sys.argv[1].startswith("--"):
         sys.exit(__doc__)
     shutil.rmtree(WORK, ignore_errors=True)
     os.makedirs(WORK)
-    mcp = MCP(int(sys.argv[1]))
+    mcp = MCP(target(sys.argv))
     print("W3 — word captions, the picture")
     highlight_rows(mcp)
     build_row(mcp)

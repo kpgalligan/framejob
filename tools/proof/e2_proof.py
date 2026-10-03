@@ -1,6 +1,6 @@
 """Road map 5, E2 — motion presets, driven against the built binary over MCP.
 
-    python3 tools/proof/e2_proof.py [port=4825]
+    python3 tools/proof/e2_proof.py <dir>/agent.sock
 
 `video.motion` holds up to three presets — an arrival, a departure and a
 motion for the whole clip — that the CORE turns into placement at render
@@ -64,7 +64,7 @@ import sys
 import zlib
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from mcp import MCP, ToolError  # noqa: E402
+from mcp import MCP, ToolError, log_beside, target  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -654,7 +654,7 @@ def card_session(mcp, name, size=CANVAS, duration=4 * SEC, **props):
 # ---- section 0 -----------------------------------------------------------
 
 
-def instance_part(mcp, port):
+def instance_part(mcp, socket_path):
     print("\n0 — the instance")
     schemas = mcp.schemas()
     ops = [n for n, t in schemas.items()
@@ -663,7 +663,7 @@ def instance_part(mcp, port):
           f"at least {TOOLS_FLOOR} tools ({len(schemas)}) — E2 adds none, so this is a "
           "FLOOR and op_argument_proof.py owns the exact count")
     check(len(ops) >= OPS_FLOOR, f"…and at least {OPS_FLOOR} ops ({len(ops)})")
-    path = f"/tmp/reelcut-{port}.log"
+    path = log_beside(socket_path)
     bad = []
     if os.path.exists(path):
         with open(path, encoding="utf-8", errors="replace") as handle:
@@ -1279,11 +1279,11 @@ def zero_edges_part(mcp):
 
 
 def main():
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else 4825
+    socket_path = target(sys.argv)
     os.makedirs(WORK, exist_ok=True)
-    print(f"E2 — motion presets. Build on {port}.")
-    mcp = MCP(port)
-    instance_part(mcp, port)
+    print(f"E2 — motion presets. Build at {socket_path}.")
+    mcp = MCP(socket_path)
+    instance_part(mcp, socket_path)
     schema_part(mcp)
     slide_part(mcp)
     scale_part(mcp)

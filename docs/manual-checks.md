@@ -434,12 +434,12 @@ To take a permission away again: System Settings ▸ Privacy & Security, or
 - **Source:** #55.
 
 **REC-7 — The panel shown from the background leaves your typing alone**
-- **Do:** 1. Launch Reelcut from Terminal as in CLAUDE.md's "Verifying a build" (port 4817) and open a project. 2. In a second Terminal tab, in the repository, run `sleep 5 && python3 -c 'import sys; sys.path.insert(0, "tools/proof"); from mcp import MCP; MCP(4817).call("perform_menu_item", path=["File", "New Recording…"])'`, then within the five seconds click into a TextEdit document. 3. When the panel appears, type a few words and press Return without clicking anything. 4. Click the panel's Close. 5. Click Reelcut's project window and press ⌥⌘N.
+- **Do:** 1. Launch Reelcut from Terminal as in CLAUDE.md's "Verifying a build" (a scratch socket; the block prints its folder, `<dir>`) and open a project. 2. In a second Terminal tab, in the repository, run `sleep 5 && python3 -c 'import sys; sys.path.insert(0, "tools/proof"); from mcp import MCP; MCP("<dir>/agent.sock").call("perform_menu_item", path=["File", "New Recording…"])'`, then within the five seconds click into a TextEdit document. 3. When the panel appears, type a few words and press Return without clicking anything. 4. Click the panel's Close. 5. Click Reelcut's project window and press ⌥⌘N.
 - **Expect:** in step 3 the New Recording panel is in front of TextEdit, TextEdit keeps the focus, the words and the Return land in TextEdit, and no countdown starts. In step 4 the panel closes without bringing Reelcut's windows forward. In step 5 the panel comes up key, with Record as its default button.
 - **Source:** #137; spec §11 recording.md (the recorder panel takes key only from an active Reelcut).
 
 **REC-8 — File ▸ Pause Recording, and the item's one width**
-- **Do:** 1. Start a recording from the panel. 2. Open the File menu: Pause Recording, then open it again: Resume Recording. 3. Watch Reelcut's menu bar item through the pause and resume, and past the first minute. 4. Repeat 2–3 with the menu bar in the light look and in the dark. 5. Stop. 6. Launch Reelcut from Terminal as in REC-7 (port 4817, the terminal holding Screen Recording); in a second Terminal tab, in the repository, run `python3 -c 'import sys; sys.path.insert(0, "tools/proof"); from mcp import MCP; MCP(4817).call("record_screen", seconds=20)'`; while it records, choose File ▸ Pause Recording, then File ▸ Resume Recording, watching the menu bar item. 7. Run the `record_screen` line again; choose File ▸ Pause Recording, then File ▸ Stop Recording, and watch the item until it goes away.
+- **Do:** 1. Start a recording from the panel. 2. Open the File menu: Pause Recording, then open it again: Resume Recording. 3. Watch Reelcut's menu bar item through the pause and resume, and past the first minute. 4. Repeat 2–3 with the menu bar in the light look and in the dark. 5. Stop. 6. Launch Reelcut from Terminal as in REC-7 (a scratch socket in `<dir>`, the terminal holding Screen Recording); in a second Terminal tab, in the repository, run `python3 -c 'import sys; sys.path.insert(0, "tools/proof"); from mcp import MCP; MCP("<dir>/agent.sock").call("record_screen", seconds=20)'`; while it records, choose File ▸ Pause Recording, then File ▸ Resume Recording, watching the menu bar item. 7. Run the `record_screen` line again; choose File ▸ Pause Recording, then File ▸ Stop Recording, and watch the item until it goes away.
 - **Expect:** the File item reads Pause Recording while recording and Resume Recording while paused, and is greyed out with no recording; each choice pauses or resumes as the item's own menu does (coral dot and running time, then the pause glyph and a frozen time). The item keeps one width throughout — the neighbouring menu bar items do not shift as the time ticks or the mark changes — and the title is never clipped, in either look. In step 6 the `record_screen` recording's item flips at each click, not up to a second later. In step 7 the item keeps the pause glyph and its frozen time until it disappears; the coral dot never returns.
 - **Source:** #98 (a, b); #181 (item 4, step 6); #193 (item 1, step 7); spec §11 recording.md (File ▸ Pause Recording).
 
@@ -452,6 +452,10 @@ To take a permission away again: System Settings ▸ Privacy & Security, or
 - **Do:** 1. With no project open (the welcome window up), File ▸ New Recording…, choose Source ▸ Microphone Only and a real microphone (not a virtual device), Record Into New Project, and press Record. 2. Through the countdown and the recording, speak and watch the panel. 3. Press the panel's Pause, wait, then Resume and speak again. 4. Press Close; press the welcome window's New Recording… button. Press Close again, then ⌘Q. 5. Choose File ▸ Stop Recording (⌥⌘N). 6. In the project that opened, put the playhead a few seconds in; New Recording…, Microphone Only, Record Into that project, Record, speak, and stop from the menu bar item's Stop Recording. Then Edit ▸ Undo. 7. Choose Microphone Only with the microphone set to Off and press Record.
 - **Expect:** with Microphone Only chosen, System Audio, Show Clicks and Size grey out and keep their values; Rate stays live; no Screen Recording prompt or System Settings pane appears. In step 2 the panel stays up the whole time: its rows are locked, the meter moves with your voice, the footnote shows the coral dot and the running time, and Record reads Stop with Pause beside it. In step 3 the button reads Resume while paused (the pause glyph and a frozen time in the footnote) and Pause again after. In step 4 Close takes the panel away and the recording carries on under the menu bar item; the welcome button shows the panel again, and ⌘Q shows it again instead of quitting. In step 5 the recording stops and opens as a new project: two `Voice-over <date> at <time>.m4a` files in `~/Movies/Reelcut Recordings/`, touching from 0 on its one track — your voice in both, the paused stretch missing. In step 6 the voice-over lands on a new back track named Microphone, starting at the playhead; Undo removes the clip and the track in one step and leaves the file. In step 7 nothing starts and the note asks you to choose a microphone. Both looks.
 - **Source:** #99; spec §11 recording.md ("A voice-over is a recording with no picture").
+**REC-11 — Include Reelcut windows**
+- **Do:** 1. Open a project, File ▸ New Recording…, leave Include Reelcut windows off, and record the display showing the editor for 5 s. 2. Tick Include Reelcut windows and record again. 3. Choose Window… in Source with the box off, then with it on. 4. Quit, relaunch, and reopen the panel.
+- **Expect:** the first file holds no Reelcut window. The second shows the editor from its first frame. The New Recording panel is in neither. The picker offers no Reelcut window with the box off; with it on, it offers the editor but not the panel. The box keeps its setting.
+- **Source:** spec §11 recording.md (Include Reelcut windows).
 
 ## Assistant
 
@@ -502,6 +506,48 @@ Needs your own Anthropic API key (Setup 3).
 - **Expect:** a small accent dot right of "Assistant" in the strip while the question waits, on every tab, never touching the word at the narrowest width; a click on the tab only shows it; the dot goes at Deny, Stop and Allow; Return in the composer answers nothing.
 - **Source:** issue batch B47 (#152); spec §11 AI-19.
 
+## Agent connections
+
+Whether an MCP client refetches its tool list when a stdio server says it
+changed (road map 14's MC1, question 3). The fixture is the spike's stub
+server, which has two tools only after it sends
+`notifications/tools/list_changed`. Run
+`python3 tools/proof/mc1_spike/mc1_spike.py --only q3` once first: it writes
+`tools/proof/work/mc1_spike/q3/ac-mcp.json`, a scratch configuration naming
+the stub with `--mode during-call`, whose log is
+`tools/proof/work/mc1_spike/q3/ac-stub.jsonl`. Each run is your own spend
+on your own account, never the spike's.
+
+**AC-1 — Claude Code refetches after `list_changed`**
+- **Do:** 1. Delete `ac-stub.jsonl` if it is there. 2. In a terminal, `claude --mcp-config tools/proof/work/mc1_spike/q3/ac-mcp.json --strict-mcp-config`. 3. Ask it to call the `probe_wait` tool of the `mc1-stub` server, and when that answers, to call `probe_new`. 4. Quit, and read `ac-stub.jsonl`.
+- **Expect:** among the log's lines (it also holds `notifications/initialized` and any other calls the client makes), in this order: `initialize`, `tools/list`, the `tools/call` of `probe_wait`, the `"dir": "out"` notification, then a second `tools/list`; then a `tools/call` of `probe_new`. The log holds only what the stub received and the notifications it sent, never its answers, so that `probe_new` answered `probe_new answered` is seen in the client.
+- **Answer:** did a second `tools/list` follow the notification, and was `probe_new` callable in the same session?
+- **Source:** road map 14 MC1 (q3, rows T1–T3 and D1).
+
+**AC-2 — Claude Desktop refetches after `list_changed`**
+- **Do:** 1. Delete `ac-stub.jsonl` if it is there. 2. Copy the `mc1-stub` entry of `ac-mcp.json` into the `mcpServers` of Claude Desktop's `~/Library/Application Support/Claude/claude_desktop_config.json` and restart Claude Desktop. 3. In a new chat, ask it to call `probe_wait`, then `probe_new`. 4. Read `ac-stub.jsonl`. 5. Remove the `mc1-stub` entry and restart Claude Desktop.
+- **Expect:** as AC-1: a second `tools/list` after the notification, and `probe_new` called and answered.
+- **Answer:** did a second `tools/list` follow the notification, and was `probe_new` callable in the same chat?
+- **Source:** road map 14 MC1 (q3, rows T1–T3 and D1).
+
+**AC-3 — Claude Code reaches Reelcut through `reelcut-mcp`**
+- **Do:** 1. `make app`, then `python3 tools/proof/mcp_proxy_proof.py` once: it writes `tools/proof/work/mcp-proxy/ac-mcp.json`, a scratch configuration whose `reelcut` server is the tree's Release `Contents/Helpers/reelcut-mcp`, with no env. 2. Quit Reelcut (every copy). 3. In a terminal, `claude --mcp-config tools/proof/work/mcp-proxy/ac-mcp.json --strict-mcp-config`. 4. Ask it to list the `reelcut` server's tools (`/mcp`). 5. Ask it to call `get_project`. 6. Quit Claude Code, and quit the Reelcut it opened.
+- **Expect:** step 4 lists Reelcut's tools with no Reelcut launched (the Dock shows none). Step 5 opens Reelcut in the background — the terminal keeps focus — and the call answers in Reelcut's own words (with no project open, "No project is open…"). Per MC1's q3, a running Reelcut newer than the bundle the proxy came from shows its own tools after the first call; whether Claude Code refetches on `list_changed` is AC-1's question.
+- **Answer:** were the tools listed before Reelcut ran, and did the first call open Reelcut without taking focus from the terminal and answer?
+- **Source:** road map 14 MC3 (`mcp_proxy_proof.py` X1, X2; spec §11 MC-3, MC-4).
+
+**AC-4 — Copy MCP Command's line registers Reelcut with Claude Code**
+- **Do:** 1. Open the Reelcut you use (an installed copy, or the tree's Release build) and choose Tools ▸ Copy MCP Command. 2. Paste the line into Terminal and run it. 3. Run `claude mcp list`.
+- **Expect:** step 2 answers that `reelcut` was added; step 3 lists `reelcut` with the pasted helper path and shows it connected.
+- **Answer:** did the pasted line run as it stood, and does `claude mcp list` show `reelcut` connected?
+- **Source:** road map 14 MC4 (`agent_socket_proof.py` K13; spec §9 Tools).
+
+**AC-5 — A person's own import still asks while an agent's call runs**
+- **Do:** 1. Launch Reelcut from Terminal as in CLAUDE.md's "Verifying a build", adding `-RCFFmpegImport ask` to its arguments (ffmpeg installed), and open a project with a few seconds of media on the timeline. 2. In a second Terminal tab, in the repository, start an export over MCP: `python3 -c 'import sys; sys.path.insert(0, "tools/proof"); from mcp import MCP; print(MCP("<dir>/agent.sock").call("export", preset="h264", path="/tmp/ac5.mp4"))'`. 3. While it runs, drag onto the timeline from the Finder an `.mkv` whose video the built-in copy cannot carry, so it goes on to the ffmpeg question (since #216-R an H.264, VP9 or AV1 Matroska opens with no question; make one with `ffmpeg -f lavfi -i testsrc=duration=2 -c:v mpeg4 /tmp/ac5.mkv`). 4. Cancel the question.
+- **Expect:** the conversion question ("Reelcut cannot open …", Repackage or Convert) appears for the dragged file while the export is still being written; the export finishes either way.
+- **Answer:** did the question appear during the agent's export?
+- **Source:** road map 14 MC4 (spec §11 MC-5: a click still asks; `agent_socket_proof.py` K12 holds the tool call's half).
+
 ## Host-state proof runs
 
 Scripts that need a state no agent session has. Run from a terminal on an
@@ -513,7 +559,7 @@ unlocked Mac; paste each score into the issue in the Source.
 - **Source:** #57.
 
 **HS-2 — The recorder's microphone rows with a wired or built-in microphone**
-- **Do:** 1. Set the default input to the built-in or a wired microphone (not Bluetooth), in System Settings ▸ Sound. 2. Give Terminal Screen Recording and Microphone permission. 3. Launch an instance on port 4817 as in CLAUDE.md's "Verifying a build"; run `python3 tools/proof/recording_proof.py 4817`.
+- **Do:** 1. Set the default input to the built-in or a wired microphone (not Bluetooth), in System Settings ▸ Sound. 2. Give Terminal Screen Recording and Microphone permission. 3. Launch an instance on a scratch socket as in CLAUDE.md's "Verifying a build" (it prints its folder, `<dir>`); run `python3 tools/proof/recording_proof.py <dir>/agent.sock`.
 - **Expect:** every microphone row passes (only the named Bluetooth-output skips).
 - **Answer:** should the proof skip its microphone rows by name on a Bluetooth input?
 - **Source:** #57.
@@ -534,6 +580,6 @@ unlocked Mac; paste each score into the issue in the Source.
 - **Source:** #139 (road map 11's V3).
 
 **HS-6 — AV1 on an M3 or later Mac**
-- **Do:** On an M3 or later Mac: 1. `python3 tools/proof/formats_probe.py`. 2. `python3 tools/proof/codec_import_proof.py --port 4817`. 3. Drop an AV1 MP4 into a project and play it.
+- **Do:** On an M3 or later Mac: 1. `python3 tools/proof/formats_probe.py`. 2. `python3 tools/proof/codec_import_proof.py` (it launches its own instance on a scratch socket). 3. Drop an AV1 MP4 into a project and play it.
 - **Expect:** the formats probe prints `hw_av1 True` and the AV1 rows `opens` (`mp4_av1.mp4`; `mkv_av1.mkv` stays refused); the codec proof's R5 takes its M3 branch and passes; the AV1 clip plays and scrubs like any other. On an M1/M2 the same file is refused with "… is AV1 video, which needs an M3 or later Mac."
 - **Source:** #216 (issue batch B72; measured only on an M2 so far).

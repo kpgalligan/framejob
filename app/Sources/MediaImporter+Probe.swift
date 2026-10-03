@@ -5,8 +5,8 @@ import UniformTypeIdentifiers
 /// The await-free half of `MediaImporter`: the refusal type, the still-image
 /// question, the ImageIO probe of a still, and the rate table
 /// `rationalFrameRate` rounds a track's float onto. It also holds the
-/// probe's synchronous faces (`probe(url:completion:)`, `probeAllowingRewrap`,
-/// `probeBlocking`), which wait through `waitForProbe`. Nothing here touches
+/// probe's synchronous faces (`probe(url:mayAsk:completion:)`,
+/// `probeAllowingRewrap`, `probeBlocking`, with `withoutAsking`), which wait through `waitForProbe`. Nothing here touches
 /// AVFoundation's loading API — every `await` is in `MediaImporter.swift`,
 /// the one file that may (app/CLAUDE.md) — and every member keeps its
 /// `MediaImporter.` spelling at every call site, so the cut is invisible from
@@ -141,12 +141,13 @@ extension MediaImporter {
 
     /// The synchronous face of `probe` for the rest of the app: the result
     /// arrives on the main thread, so the caller can go straight to
-    /// `add_media` + `add_clip` without ever writing `await`.
+    /// `add_media` + `add_clip` without ever writing `await`. `mayAsk` is
+    /// the caller's: true for a person's click, false for a tool call's.
     static func probe(
-        url: URL, completion: @escaping (Result<MediaDescriptor, any Error>) -> Void
+        url: URL, mayAsk: Bool, completion: @escaping (Result<MediaDescriptor, any Error>) -> Void
     ) {
         importQueue.async {
-            let outcome = Result { try probeAllowingRewrap(url) }
+            let outcome = Result { try probeAllowingRewrap(url, mayAsk: mayAsk) }
             DispatchQueue.main.async { completion(outcome) }
         }
     }
@@ -169,6 +170,13 @@ extension MediaImporter {
     /// them, and `assist` answering `nil` leaves all four with exactly the
     /// failure they report on a machine that has no ffmpeg.
     ///
+    /// **Who may be asked is decided by the caller** (spec §11 MC-5), never
+    /// read from process-wide state: each place a tool call hands work to the
+    /// importer passes `mayAsk: false` (`import_media`, `relink_media`,
+    /// `record_screen`) or wraps its open in `withoutAsking` (`open_project`),
+    /// and every click path passes `true`, so a person's own import still
+    /// asks while a tool call runs.
+    ///
     /// **Known cost of the document-open path.** Three of those four callers
     /// are already off the main thread, so ffmpeg runs with the UI live. The
     /// fourth, `read(from:ofType:)`, is *allowed* to run on main (its own
@@ -178,7 +186,7 @@ extension MediaImporter {
     /// states the cost first, which is the mitigation available from here —
     /// a progress sheet would need a seam in `ProjectDocument`, which owns
     /// the sheet-presenting side of every long operation.
-    private static func probeAllowingRewrap(_ url: URL) throws -> MediaDescriptor {
+    private static func probeAllowingRewrap(_ url: URL, mayAsk: Bool) throws -> MediaDescriptor {
         do {
             return try waitForProbe(url)
         } catch let failure as ImportError where failure.invitesFFmpeg && !isImage(url) {
@@ -186,7 +194,7 @@ extension MediaImporter {
             // is corrupt, not that the container is exotic — and a PNG is not
             // something to hand to a video converter.
             guard ContainerRewrap.isMatroska(url) else {
-                return try probeConverted(url, failure: failure)
+                return try probeConverted(url, failure: failure, mayAsk: mayAsk)
             }
             // A WebM or Matroska file is copied into a movie with no question
             // (spec §11 #216-R). Only a codec the copy cannot carry goes on
@@ -194,15 +202,19 @@ extension MediaImporter {
             do {
                 return try probeCopy(try ContainerRewrap.assist(url), of: url)
             } catch let refusal as ContainerRewrapError where refusal.invitesFFmpeg {
-                return try probeConverted(url, failure: refusal)
+                return try probeConverted(url, failure: refusal, mayAsk: mayAsk)
             }
         }
     }
 
     /// The opt-in ffmpeg step, and its result probed; `failure` is what is
-    /// thrown when there is no conversion or it will not open.
-    private static func probeConverted(_ url: URL, failure: any Error) throws -> MediaDescriptor {
-        guard let rewrapped = try FFmpegRewrap.assist(url) else { throw failure }
+    /// thrown when there is no conversion or it will not open. `mayAsk` is
+    /// the caller's (spec §11 MC-5): a tool call's is false, so it never
+    /// raises the consent question.
+    private static func probeConverted(
+        _ url: URL, failure: any Error, mayAsk: Bool
+    ) throws -> MediaDescriptor {
+        guard let rewrapped = try FFmpegRewrap.assist(url, mayAsk: mayAsk) else { throw failure }
         do {
             return try waitForProbe(rewrapped)
         } catch {
@@ -247,8 +259,23 @@ extension MediaImporter {
     /// one thread the completion needs, and the open dies on the timeout
     /// instead of the file. Here the work runs on the cooperative pool and
     /// the result comes back through a plain semaphore, so the waiting thread
-    /// is never the thread being waited on.
+    /// is never the thread being waited on. It may ask unless this thread is
+    /// inside `withoutAsking`.
     static func probeBlocking(url: URL) throws -> MediaDescriptor {
-        try probeAllowingRewrap(url)
+        let quiet = Thread.current.threadDictionary[withoutAskingKey] as? Bool ?? false
+        return try probeAllowingRewrap(url, mayAsk: !quiet)
+    }
+
+    private static let withoutAskingKey = "com.kgalligan.reelcut.import.withoutAsking"
+
+    /// Runs `body` with `probeBlocking` on THIS thread never asking — the
+    /// scope a tool call's synchronous document open runs in (spec §11
+    /// MC-5). The prior value is put back on every exit.
+    static func withoutAsking<T>(_ body: () throws -> T) rethrows -> T {
+        let dictionary = Thread.current.threadDictionary
+        let prior = dictionary[withoutAskingKey]
+        dictionary[withoutAskingKey] = true
+        defer { dictionary[withoutAskingKey] = prior }
+        return try body()
     }
 }

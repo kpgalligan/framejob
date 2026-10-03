@@ -450,7 +450,10 @@ to pay a toll starts from it. A file not listed has no named seam yet.
 - `ReelCore.swift`: the typed patches moved to `TypedPatches.swift` in issue batch B73 (#216), a
   pure move gated alone before `ReelContainer` landed; no further seam is named. The `dictionary`
   extensions went to `OpDictionaries.swift` in issue batch B52b (#190), the media helpers earlier
-  to `MediaDescriptor.swift`. It stays the only file that calls `rc_*`.
+  to `MediaDescriptor.swift`. Road map 14's MC2 made the same `dictionary` move on its branch
+  (`PropsDictionaries.swift`) before adding `ReelAgentSocket`; the merge into main kept
+  `OpDictionaries.swift`, byte-identical but for its name. It stays the only file that calls
+  `rc_*`.
 - `ProjectDocument.swift`: stored properties cannot move; the natural cut is the media/reverse
   machinery, in the shape of `+DisplayStem`, `+Import`, `+Graphics`.
 - `InspectorPane.swift`: the precedents are `InspectorSection.swift`, `InspectorSlider.swift` and

@@ -20,7 +20,7 @@ import tempfile
 import time
 
 sys.path.insert(0, os.path.dirname(__file__))
-from mcp import MCP, ToolError  # noqa: E402
+from mcp import MCP, ToolError, remove_scratch, scratch_socket, wait_listening  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 M = 9_000_000_000_000_000
@@ -214,7 +214,6 @@ def run_speeds(mcp, where):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--port", type=int, default=5350)
     parser.add_argument("--app", default=os.path.join(ROOT, "build", "Build", "Products",
                                                      "Release", "Reelcut.app"))
     args = parser.parse_args()
@@ -223,29 +222,18 @@ def main():
         raise AssertionError("matching app binary is missing: " + binary)
     with tempfile.TemporaryDirectory(prefix="reelcut-extreme-") as work:
         log_path = os.path.join(work, "app.log")
+        socket_path = scratch_socket()
         with open(log_path, "w", encoding="utf-8") as log:
             env = os.environ.copy()
-            env["RC_AGENT_PORT"] = str(args.port)
+            env["RC_AGENT_SOCKET"] = socket_path
             env["RC_ASSEMBLYAI_KEY"] = "proof-key"
-            app = subprocess.Popen([binary, "-ApplePersistenceIgnoreState", "YES",
-                                    "-AgentServerEnabled", "YES"],
+            app = subprocess.Popen([binary, "-ApplePersistenceIgnoreState", "YES"],
                                    stdout=log, stderr=subprocess.STDOUT, env=env)
             try:
-                bound = None
-                until = time.monotonic() + 20
-                while time.monotonic() < until and app.poll() is None:
-                    lines = parity(log_path)
-                    for line in lines:
-                        found = re.search(r"agent server listening on http://127\.0\.0\.1:(\d+)/mcp", line)
-                        if found:
-                            bound = int(found.group(1))
-                            break
-                    if bound is not None:
-                        break
-                    time.sleep(0.1)
-                assert bound is not None, "app did not bind an MCP port"
-                assert bound == args.port, f"requested port {args.port}, bound {bound}"
-                mcp = MCP(bound, timeout=20)
+                bound = wait_listening(log_path, socket_path, child=app, seconds=20)
+                parity(log_path)
+                assert bound, f"app did not listen at {socket_path}"
+                mcp = MCP(socket_path, timeout=20)
                 run(mcp, work)
                 run_speeds(mcp, work)
                 parity(log_path)
@@ -259,6 +247,7 @@ def main():
                     except subprocess.TimeoutExpired:
                         app.kill()
                         app.wait(timeout=5)
+                remove_scratch(socket_path)
 
 
 if __name__ == "__main__":

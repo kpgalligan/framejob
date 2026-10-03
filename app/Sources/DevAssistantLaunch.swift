@@ -17,7 +17,8 @@ import AppKit
 /// **The report**, written once and atomically at the report path:
 /// `{"ok","error"|null,"server_running","state","text","events",
 /// "get_project"|null}` — the events without the text and progress deltas,
-/// never the key or the model (AI-8, AI-11).
+/// never the key or the model (AI-8, AI-11). `server_running` means this
+/// launch bound the agent socket.
 enum DevAssistantLaunch {
     static let sendKey = "RCDevAssistantSend"
     static let reportKey = "RCDevAssistantReport"

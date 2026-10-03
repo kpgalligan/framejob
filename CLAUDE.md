@@ -12,8 +12,10 @@ read them before writing code on that side:
   exports, format versioning, tests.
 - `app/CLAUDE.md` — Swift rules: file map (which files are frozen), undo and
   dirty tracking, agent parity, state flow, hygiene.
+- `mcp-proxy/CLAUDE.md` — `reelcut-mcp`'s rules: module map, stdout as
+  protocol only, what never launches Reelcut, the launch lock, tests.
 
-**These three files are the rulebook, and they hold no status and no
+**These files are the rulebook, and they hold no status and no
 history.** A road map in progress lives in `designs/`, and its own document
 holds each phase's record — what landed, what was measured, what its review
 found, what is owed — including the past of any file the phase changed. When
@@ -37,7 +39,7 @@ comment citing "road map N §x" refers to the archived original.
 | `designs/spec/` | **The normative spec, one file per section — never read it whole.** Start at its `README.md` (the index: each file, its size, what it answers), then read only the file you need; "spec §7.3" is `07.3-frame-recipe.md`. §5 schemas, §6 op table, §7 architecture, §9 keys and menus, §10 acceptance steps, §11 decisions already made — not to be re-litigated, indexed by ID in `11-decisions/README.md`. An ADR cites §11's IDs; it never replaces them. |
 | GitHub issues | **What is left**, and the one place it is kept: open defects, proof residue, candidates, accepted limits, work the user deferred (`gh issue list`), and one-off asks of the owner — a spend, a choice, a permission an agent was refused (`--label ready-for-human`). Nothing open is tracked in a document. |
 | `docs/manual-checks.md` | **What only a person at the machine can confirm**, as a standing list the owner runs periodically and before every release — not open work, so not an issue. A change that creates such a check adds or edits its row in the same change. |
-| `designs/adr/` | One condensed decision record per closed road map, survey or file history: why the code is the shape it is. Start with the one for the area: `roadmap-03` the recorder · `roadmap-04` `detect_silence` · `roadmap-05` transitions and `video.motion` · `roadmap-06` transcription (C2, the relay, designed and deferred) · `roadmap-07` how a patch is checked, what an op answers, where its arguments are written down, the source window, the argument gate · `roadmap-08` word captions · `roadmap-09` the Clip tab, the action lane, band drags · `roadmap-10` graphics · `roadmap-11` the dev tools (snapshot_ui, perform_menu_item, the screen catalog) and `make dist` · `roadmap-12` the assistant (the bundled helper, the agent lane, withheld and ask-first tools, the Assistant tab and its prompt) · `roadmap-13` pricing and spend (LiteLLM's table, the price function in the helper and the proofs, the spend ledger, the proofs' budgets, the tab's and Settings' spend figures) · `app-file-history` / `core-file-history` why a file or module is cut where it is, and its named next cut · `rust-build-settings` why release builds are incremental with no LTO · `effects-survey` E3–E9 (deferred by the user) and **the Concat rule: it is AGPL-3.0; none of its code, shaders, chains or colour tables may be carried over** · `remaining-closed` the debts already paid. |
+| `designs/adr/` | One condensed decision record per closed road map, survey or file history: why the code is the shape it is. Start with the one for the area: `roadmap-03` the recorder · `roadmap-04` `detect_silence` · `roadmap-05` transitions and `video.motion` · `roadmap-06` transcription (C2, the relay, designed and deferred) · `roadmap-07` how a patch is checked, what an op answers, where its arguments are written down, the source window, the argument gate · `roadmap-08` word captions · `roadmap-09` the Clip tab, the action lane, band drags · `roadmap-10` graphics · `roadmap-11` the dev tools (snapshot_ui, perform_menu_item, the screen catalog) and `make dist` · `roadmap-12` the assistant (the bundled helper, the agent lane, withheld and ask-first tools, the Assistant tab and its prompt) · `roadmap-13` pricing and spend (LiteLLM's table, the price function in the helper and the proofs, the spend ledger, the proofs' budgets, the tab's and Settings' spend figures) · `roadmap-14` the agent socket (the Unix socket, `reelcut-mcp` and its catalog snapshot, a tool call never asking, Copy MCP Command) · `app-file-history` / `core-file-history` why a file or module is cut where it is, and its named next cut · `rust-build-settings` why release builds are incremental with no LTO · `effects-survey` E3–E9 (deferred by the user) and **the Concat rule: it is AGPL-3.0; none of its code, shaders, chains or colour tables may be carried over** · `remaining-closed` the debts already paid. |
 | `designs/design_handoff_reelcut/` | The shipped chrome cleanup and identity; its README is normative for the redesign's metrics. |
 | `designs/design_handoff_reelcut_sharp/` | The sharp pass (2026-09-23): square chrome, 2 pt clips, the zoom slider's block knob. Its README is normative for radii and the knob, with spec §11 SH-2 as the deviation (SH-4 squared `StickerButton`, superseding SH-1). |
 | `designs/design_handoff_clip_inspector/` | The clip inspector handoff road map 9 built from; `designs/adr/roadmap-09-clip-inspector.md` records the deviations. |
@@ -50,8 +52,8 @@ comment citing "road map N §x" refers to the archived original.
 
 ```sh
 make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
-make test       # make rust, cd core && cargo test --release, cd graphic && cargo test --release (black-box tests), then tools/proof/assistant_lane_proof.py (the agent lane's probe, with the assistant's credential rows and the support folder's `0700` rows), tools/proof/assistant_prompt_proof.py --probe (the prompt texts' drift checks), tools/proof/prices_proof.py (the price function: prices.py and agent/'s `bun test` against agent/prices/cases.json, and update.py's reducer against reduce_cases.json, no network) and tools/proof/budget_proof.py (the proofs' ledger and the monthly budgets, over scratch ledgers, no network) and tools/proof/capture_spike/inventory.py --check (the menu inventory's sites, found by token and enclosing function, and its other citations, found by anchor, against app/Sources; no app) and tools/proof/spec_index_proof.py (the spec indexes' Lines cells against `wc -l`, and a row for every spec file; no app)
-make lint       # cargo clippy --all-targets -- -D warnings, in core/ then graphic/
+make test       # make rust, cd core && cargo test --release, cd graphic && cargo test --release, cd mcp-proxy && cargo test --release (black-box tests), then tools/proof/assistant_lane_proof.py (the agent lane's probe, with the assistant's credential rows and the support folder's `0700` rows), tools/proof/assistant_prompt_proof.py --probe (the prompt texts' drift checks), tools/proof/prices_proof.py (the price function: prices.py and agent/'s `bun test` against agent/prices/cases.json, and update.py's reducer against reduce_cases.json, no network) and tools/proof/budget_proof.py (the proofs' ledger and the monthly budgets, over scratch ledgers, no network) and tools/proof/capture_spike/inventory.py --check (the menu inventory's sites, found by token and enclosing function, and its other citations, found by anchor, against app/Sources; no app) and tools/proof/spec_index_proof.py (the spec indexes' Lines cells against `wc -l`, and a row for every spec file; no app)
+make lint       # cargo clippy --all-targets -- -D warnings, in core/, graphic/ then mcp-proxy/
 make typecheck  # swiftc -typecheck -D REELCUT_DEV_TOOLS of app/Sources/*.swift — the ONLY authoritative Swift check, then agent/'s `tsc --noEmit` (through bun)
 make project    # xcodegen generate (Reelcut.xcodeproj is generated; project.yml is the source of truth)
 make run        # make app, then launch
@@ -61,7 +63,7 @@ make prices     # NETWORK: regenerate agent/prices/anthropic.json from LiteLLM (
 
 - Single Rust test: `cd core && cargo test --release --test edge slip`
   (test-file name, then a name filter). Finish Rust work with `cargo fmt` in
-  `core/` (and `graphic/`) and a clean `make lint`.
+  `core/` (and `graphic/`, and `mcp-proxy/`) and a clean `make lint`.
 - There are no Swift unit tests. App-side verification is `make typecheck`
   plus driving the built app over MCP and the probes in `tools/proof/`.
 - `make typecheck` is fast; run it before `make app` (~90 s). Its baseline is
@@ -92,6 +94,11 @@ core/                Rust staticlib — the model, the ops, the plan, the recipe
 graphic/             Rust crate — the graphics engine (road map 10): a Module run in
   src/                 sandboxed QuickJS returns SVG per frame; rasterize (usvg →
   tests/               resvg → BGRA), measure_text. graphic/CLAUDE.md has its rules
+mcp-proxy/           Rust crate — `reelcut-mcp` (road map 14 MC3, spec §11 MC-3): the stdio
+  src/                 MCP server bundled in Contents/Helpers; answers initialize, ping and
+  tests/               tools/list itself (the build's catalog snapshot when no Reelcut runs),
+                       forwards the rest over the agent socket and launches its own bundle
+                       for a tools/call. std + serde_json; mcp-proxy/CLAUDE.md has its rules
 agent/               the assistant helper (AI-1): Bun, the Anthropic SDK's Tool Runner
   src/                 meant to be byte-identical to ~/devel/rasterize/agent/src/, one
                        diff applied to both; NOT YET: Rasterize lacks road map 12 §2's
@@ -191,7 +198,7 @@ else is what bloats files:
   files are the parent text for anything not settled here.
 - **Every user-visible edit gets an MCP mirror** (spec §7.9): a handler, a
   catalog entry, and a comment naming the UI path. The startup parity check
-  in `AgentServer.start()` has FIVE parts: catalog names against handler
+  in `AgentServer.prepareCatalog()` has FIVE parts: catalog names against handler
   names, every op in the core's table against the tools (through
   `rc_op_names`, with an explicit allow-list for ops that deliberately have
   none), each tool's schema shape, that every op tool declares `scope`, and
@@ -235,19 +242,28 @@ else is what bloats files:
 ## Verifying a build
 
 The app is verified by driving the built binary over MCP and comparing what
-it renders — not by reading code. Launch your own instance on your own port
+it renders — not by reading code. Launch your own instance on your own socket
 and only ever kill that one (`pgrep -f "MacOS/Reelcut"` lists them; another
 session may have one running):
 
 ```sh
 make app
-(RC_AGENT_PORT=4817 ./build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut \
-   -ApplePersistenceIgnoreState YES -AgentServerEnabled YES > /tmp/reelcut-4817.log 2>&1 &)
+d="$(mktemp -d)"; echo "$d"
+(RC_AGENT_SOCKET="$d/agent.sock" ./build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut \
+   -ApplePersistenceIgnoreState YES > "$d/reelcut.log" 2>&1 &)
 ```
 
-The log line names the port it actually bound (a taken port falls back to an
-ephemeral one). Drive it with any MCP client over streamable HTTP at
-`http://127.0.0.1:<port>/mcp`: one tool per §6 op, each taking the `scope`
+Each later command names the printed folder literally
+(`mcp.MCP("<dir>/agent.sock")`, `python3 tools/proof/phaseN_proof.py
+<dir>/agent.sock`, `grep "Reelcut: " <dir>/reelcut.log`), because a shell
+variable does not survive from one agent command to the next; stop it by the
+pid `mcp.socket_pid` answers.
+
+The log line `Reelcut agent socket listening at <dir>/agent.sock` says it is
+up (`not bound: <reason>` says why not). Drive it with `tools/proof/mcp.py`'s
+`mcp.MCP("<dir>/agent.sock")` (streamable HTTP over the Unix socket), or with
+the bundled stdio helper `reelcut-mcp` with `RC_AGENT_SOCKET` set to the same
+path: one tool per §6 op, each taking the `scope`
 envelope key, plus the app-state tools — `open_project`, `new_project`,
 `save_project`, `close_project`, `get_project`, `import_media`,
 `import_captions`, `export_captions`, `transcribe`, `consolidate_media`, `detect_silence`,
@@ -264,7 +280,7 @@ and the catalog are the authority for the counts; the parity check compares
 them at startup. `render_frame` writes a PNG and returns its path; `export`
 waits for the file.
 
-**Before trusting any MCP proof, `grep "Reelcut: " /tmp/reelcut-<port>.log`
+**Before trusting any MCP proof, `grep "Reelcut: " <dir>/reelcut.log`
 must print nothing** — that prefix is the startup parity check complaining.
 
 **`tools/proof/` holds the scripts that do this** — an MCP script per phase

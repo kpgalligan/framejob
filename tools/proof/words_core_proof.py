@@ -13,11 +13,11 @@ The recipe's `word` / `word_pop` keys are NOT reachable over MCP (no tool
 returns a recipe), so the recipe rows are `core/tests/words.rs`'s, through
 the FFI, and this script does not restate them.
 
-    python3 tools/proof/words_core_proof.py <port>
+    python3 tools/proof/words_core_proof.py <dir>/agent.sock
     python3 tools/proof/words_core_proof.py --mutant hash-arm|trim-rebase|count-check
 
 The first form launches nothing and kills nothing: the caller owns the
-instance on <port>, relaunched fresh. The second copies `core/` to a
+instance at the socket, relaunched fresh. The second copies `core/` to a
 temporary tree (op_contract_proof.py's pattern), breaks one thing there with
 an anchor that must occur exactly once, and runs the one test that should
 catch it with a bounded wall clock; exit 0 means that test FAILED in the
@@ -33,7 +33,7 @@ import sys
 import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from mcp import MCP, ToolError  # noqa: E402
+from mcp import MCP, ToolError, target  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
@@ -336,9 +336,9 @@ def save_and_reopen(s):
     check("…and re-opens equal", reopened["clips"] == s.project()["clips"])
 
 
-def run(port):
+def run(socket_path):
     os.makedirs(WORK, exist_ok=True)
-    mcp = MCP(port)
+    mcp = MCP(socket_path)
     print("W1b — word captions, the core (format version 9)")
     version_gate(mcp)
     s = Session(mcp, "words-core")
@@ -434,8 +434,8 @@ def mutant(name):
 def main():
     if len(sys.argv) == 3 and sys.argv[1] == "--mutant" and sys.argv[2] in MUTANTS:
         return mutant(sys.argv[2])
-    if len(sys.argv) == 2 and sys.argv[1].isdigit():
-        return run(int(sys.argv[1]))
+    if len(sys.argv) == 2 and not sys.argv[1].startswith("--"):
+        return run(target(sys.argv))
     sys.exit(__doc__)
 
 

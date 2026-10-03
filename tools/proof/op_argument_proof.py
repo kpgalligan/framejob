@@ -99,10 +99,11 @@ built BEFORE the first MCP call, so no swiftc runs while the proof is driving
 the app.
 
     make app
-    (RC_AGENT_PORT=4903 ./build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut \\
-       -ApplePersistenceIgnoreState YES -AgentServerEnabled YES > /tmp/reelcut-4903.log 2>&1 &)
-    grep "Reelcut: " /tmp/reelcut-4903.log     # must print nothing
-    python3 tools/proof/op_argument_proof.py 4903
+    d="$(mktemp -d)"; echo "$d"
+    (RC_AGENT_SOCKET="$d/agent.sock" ./build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut \\
+       -ApplePersistenceIgnoreState YES > "$d/reelcut.log" 2>&1 &)
+    grep "Reelcut: " <dir>/reelcut.log     # must print nothing
+    python3 tools/proof/op_argument_proof.py <dir>/agent.sock
 """
 
 import glob
@@ -114,7 +115,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from mcp import MCP, ToolError  # noqa: E402
+from mcp import MCP, ToolError, log_beside, target  # noqa: E402
 from dev_tools import DEV_TOOLS, dev_marker_count  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -458,8 +459,8 @@ def names_as_missing(text, argument):
 
 
 def main():
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else 4903
-    log = f"/tmp/reelcut-{port}.log"
+    socket_path = target(sys.argv)
+    log = log_beside(socket_path)
     print("a stranger argument, put to all eighty-two tools\n")
 
     binary, error = build_probe()
@@ -515,7 +516,7 @@ def main():
           verdicts.get("appState") == verdicts.get("clean"),
           f"{verdicts.get('appState')!r}")
 
-    mcp = MCP(port)
+    mcp = MCP(socket_path)
     tools = mcp.schemas()
 
     print("\n1 — the catalog's size, and the shipped binary's own parity log")
@@ -542,7 +543,7 @@ def main():
           f"{len(ops)} ops, missing tools: {sorted(ops - set(tools))}")
     complaints = parity_lines(log)
     check("the startup parity check logged nothing — all five parts, in the binary on the "
-          f"port ({log})", complaints == [],
+          f"socket ({log})", complaints == [],
           "no such log" if complaints is None else json.dumps(complaints)[:300])
 
     print("\n2 — every difference from the core's table is one the declarations list names")

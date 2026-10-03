@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Road map 11's V3 — the screen catalog, captured from a Reelcut of its own.
 
-    python3 tools/proof/screens.py [--port 4871] [--app APP] [--screens DIR]
+    python3 tools/proof/screens.py [--app APP] [--screens DIR]
         [--out DIR] [--only ID,…] [--compare EARLIER_OUT]
 
-It launches its OWN Release instance on `--port` (the log names the port it
-actually bound), with every `UserDefaults` key a captured screen draws pinned
+It launches its OWN Release instance on a scratch socket (`mcp.scratch_socket`;
+the log names the path it bound), with every `UserDefaults` key a captured screen draws pinned
 as a launch argument (`PINS`), an empty `-RCSecretFolder`, a `-RCSpendFolder`
 that does not exist (removed before each launch and never created, so
 Settings' month line is an empty month and the person's ledger is never read,
@@ -75,7 +75,7 @@ sys.path.insert(0, os.path.join(HERE, "graphics_spike"))
 import bounded  # noqa: E402
 import v2_snapshot  # noqa: E402
 from dev_tools import DEV_TOOLS, dev_marker_count  # noqa: E402
-from mcp import MCP, ToolError  # noqa: E402
+from mcp import MCP, ToolError, remove_scratch, scratch_socket, wait_listening  # noqa: E402
 
 SOURCES = os.path.join(ROOT, "app", "Sources")
 MEDIA = os.path.join(HERE, "media")
@@ -135,8 +135,7 @@ def _plist(value):
 
 
 # tools/proof/harness/main.swift:289-395's `pinDefaults` — every key and value
-# but `AgentServerEnabled` (the launch turns the server on) — plus each
-# section's collapsed state. Booleans and numbers go as plist fragments, which
+# — plus each section's collapsed state. Booleans and numbers go as plist fragments, which
 # the argument domain parses into typed values.
 PINS = [(key, _plist(value)) for key, value in [
     ("ReelcutInspectorWidth", 304.0),
@@ -155,6 +154,7 @@ PINS = [(key, _plist(value)) for key, value in [
     ("ReelcutRecordingShowClicks", False),
     ("ReelcutRecordingRate", 60),
     ("ReelcutRecordingSize", "nominal"),
+    ("ReelcutRecordingIncludeReelcutWindows", False),
     ("ReelcutCaptionEngine", "apple"),
     ("ReelcutAssemblyAIRegion", "us"),
     ("ReelcutCaptionStyle", "subtitles"),
@@ -184,6 +184,12 @@ NOT_SHOWN = {
                             "with it",
     "ReelcutScreenRecordingAsked": "whether the panel has put up the Screen Recording prompt "
                                    "once; read only by a press of Record, which no screen makes",
+    "RC_AGENT_SOCKET": "an environment variable, the agent server's socket path; each launch "
+                       "here sets it to a scratch socket, and nothing on screen shows it",
+    "RCWriteCatalog": "an argument-domain build step that writes the catalog snapshot and "
+                      "exits before any window; no screen launches with it",
+    "ReelcutGraphicPrefetchOff": "a measurement switch that draws every graphic on the "
+                                 "compositor's queue alone; no screen shows it",
 }
 
 # Filed layout defects, each named by its issue, and deliberate findings,
@@ -228,10 +234,10 @@ def log_path(out, look=None):
     return os.path.join(out, "app.log" if look is None else f"app.{look}.log")
 
 
-def launch(app, port, out, look=None):
-    """Start `app` with the pins, and with `look` as `-RCDevAppearance`;
-    answer the child and the port it bound. Raises LaunchError when no port
-    shows in the log within 60 s."""
+def launch(app, out, look=None):
+    """Start `app` with the pins, and with `look` as `-RCDevAppearance`, on a
+    scratch socket; answer the child and the socket it bound. Raises
+    LaunchError when the socket's line is not in the log within 60 s."""
     os.makedirs(out, exist_ok=True)
     secrets = os.path.join(os.path.dirname(os.path.abspath(out)), "secrets")
     shutil.rmtree(secrets, ignore_errors=True)
@@ -243,7 +249,7 @@ def launch(app, port, out, look=None):
     if os.path.exists(spend):
         raise LaunchError(f"{spend} is still there after it was removed")
     argv = [os.path.join(app, "Contents", "MacOS", "Reelcut"),
-            "-ApplePersistenceIgnoreState", "YES", "-AgentServerEnabled", "YES",
+            "-ApplePersistenceIgnoreState", "YES",
             "-RCSecretFolder", secrets, "-RCSpendFolder", spend,
             "-RCAssemblyAIEndpoint", "http://127.0.0.1:9",
             "-NSRecentDocumentsLimit", "0"]
@@ -251,7 +257,8 @@ def launch(app, port, out, look=None):
         argv += [f"-{key}", value]
     if look is not None:
         argv += [f"-{APPEARANCE_KEY}", look]
-    env = bounded.child_env({"RC_AGENT_PORT": str(port)})
+    socket_path = scratch_socket()
+    env = bounded.child_env({"RC_AGENT_SOCKET": socket_path})
     env.pop("ANTHROPIC_API_KEY", None)
     log = log_path(out, look)
     handle = open(log, "w")
@@ -260,30 +267,31 @@ def launch(app, port, out, look=None):
                                  stderr=subprocess.STDOUT, start_new_session=True)
     finally:
         handle.close()
-    deadline = time.monotonic() + 60
-    pattern = re.compile(r"listening on http://127\.0\.0\.1:(\d+)/mcp")
-    while time.monotonic() < deadline:
-        if child.poll() is not None:
-            raise LaunchError(f"the app exited ({child.returncode}) before binding a port; "
-                              f"see {log}")
-        found = pattern.findall(open(log, errors="replace").read())
-        if found:
-            return child, int(found[-1])
-        time.sleep(0.25)
+    SOCKETS[child.pid] = socket_path
+    if wait_listening(log, socket_path, child=child, seconds=60):
+        return child, socket_path
+    exited = child.poll()
     stop(child)
-    raise LaunchError(f"no port in {log} after 60 s")
+    if exited is not None:
+        raise LaunchError(f"the app exited ({exited}) before binding its socket; see {log}")
+    raise LaunchError(f"no socket line in {log} after 60 s")
+
+
+# pid -> the scratch socket its launch made, removed once that pid is stopped.
+SOCKETS = {}
 
 
 def stop(child):
-    """terminate(), then kill() after 10 s — that pid only."""
-    if child.poll() is not None:
-        return
-    child.terminate()
-    try:
-        child.wait(timeout=10)
-    except subprocess.TimeoutExpired:
-        child.kill()
-        child.wait()
+    """terminate(), then kill() after 10 s — that pid only — and its scratch
+    socket's folder removed."""
+    if child.poll() is None:
+        child.terminate()
+        try:
+            child.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            child.kill()
+            child.wait()
+    remove_scratch(SOCKETS.pop(child.pid, None))
 
 
 def parity_lines(out, look=None):
@@ -604,16 +612,16 @@ class Run:
 
     # -- P rows ------------------------------------------------------------
 
-    def row_p1(self, port, look):
+    def row_p1(self, look):
         self.begin(look)
         rid = f"P1.{look}"
         notes, ok = [], True
         try:
-            self.child, bound = launch(self.args.app, port, self.out, look)
+            self.child, bound = launch(self.args.app, self.out, look)
         except LaunchError as error:
             self.score(rid, "fail", f"launch: {error}")
             return f"launch: {error}"
-        print(f"app: pid {self.child.pid} port {bound}", flush=True)
+        print(f"app: pid {self.child.pid} socket {bound}", flush=True)
         try:
             self.mcp = MCP(bound, timeout=180)
             deadline = time.monotonic() + 15
@@ -632,7 +640,7 @@ class Run:
         marker = dev_marker_count(log_path(self.out, look))
         missing = [n for n in DEV_TOOLS if n not in tools]
         ok = alive and welcome and not parity and not missing and marker == len(DEV_TOOLS)
-        notes = [f"pid {self.child.pid} alive {alive}", f"port {bound}",
+        notes = [f"pid {self.child.pid} alive {alive}", f"socket {bound}",
                  f"welcome {welcome}", f"`Reelcut: ` lines {len(parity)}",
                  f"dev tools missing {missing}", f"marker count {marker} (want {len(DEV_TOOLS)})"]
         self.score(rid, "pass" if ok else "fail", "; ".join(notes))
@@ -1010,7 +1018,6 @@ def compare(out, earlier):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--port", type=int, default=4871)
     parser.add_argument("--app", default=DEFAULT_APP)
     parser.add_argument("--screens", default=DEFAULT_SCREENS)
     parser.add_argument("--out")
@@ -1035,7 +1042,7 @@ def main():
     try:
         run.row_p2()
         for look in LOOKS:
-            p1_error = run.row_p1(args.port, look)
+            p1_error = run.row_p1(look)
             menu = {}
             if not p1_error:
                 try:

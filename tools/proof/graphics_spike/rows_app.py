@@ -8,7 +8,7 @@ the app reads it at open only to re-anchor MISSING media by name, so a
 stray `.js` there is inert. `graphics/` is run once as the CONTROL,
 expected ABSENT after the save.
 
-One owned instance on port 4843, by PID; nothing else is ever killed."""
+One owned instance on a scratch socket, by PID; nothing else is ever killed."""
 
 import hashlib
 import os
@@ -25,38 +25,31 @@ from rows_local import REPO, SPIKE, WORK
 sys.path.insert(0, os.path.join(REPO, "tools", "proof"))
 import mcp  # noqa: E402
 
-PORT = 4843
-LOG = os.path.join(WORK, "reelcut-4843.log")
+LOG = os.path.join(WORK, "reelcut.log")
 Q7 = os.path.join(WORK, "q7")
 CALL_BOUND = 60
 
 
 class Instance:
-    """One owned app, by PID, on its own port; the log is appended across
-    launches, and each launch reads only what it appended."""
+    """One owned app, by PID, on a scratch socket of its own; the log is
+    appended across launches, and each launch reads only what it appended."""
 
     def __init__(self, say):
         self.say = say
         self.child = None
-        self.port = None
+        self.socket = mcp.scratch_socket()
 
     def start(self):
         offset = os.path.getsize(LOG) if os.path.exists(LOG) else 0
+        os.makedirs(os.path.dirname(self.socket), mode=0o700, exist_ok=True)
         with open(LOG, "a") as log:
             self.child = subprocess.Popen(
-                [APP_BINARY, "-ApplePersistenceIgnoreState", "YES", "-AgentServerEnabled", "YES"],
+                [APP_BINARY, "-ApplePersistenceIgnoreState", "YES"],
                 stdin=subprocess.DEVNULL, stdout=log, stderr=log,
-                env=bounded.child_env({"RC_AGENT_PORT": str(PORT)}), start_new_session=True)
-        deadline = time.time() + 60
-        while time.time() < deadline:
-            time.sleep(0.5)
-            with open(LOG) as handle:
-                handle.seek(offset)
-                found = re.search(r"listening on http://127\.0\.0\.1:(\d+)/mcp", handle.read())
-            if found:
-                self.port = int(found.group(1))
-                self.say(f"  q7: instance PID {self.child.pid} on port {self.port}")
-                return mcp.MCP(self.port, timeout=CALL_BOUND)
+                env=bounded.child_env({"RC_AGENT_SOCKET": self.socket}), start_new_session=True)
+        if mcp.wait_listening(LOG, self.socket, child=self.child, seconds=60, offset=offset):
+            self.say(f"  q7: instance PID {self.child.pid} at {self.socket}")
+            return mcp.MCP(self.socket, timeout=CALL_BOUND)
         return None
 
     def stop(self):
@@ -69,6 +62,7 @@ class Instance:
             self.child.kill()
             self.child.wait()
         self.child = None
+        mcp.remove_scratch(self.socket)
 
 
 def complaints():

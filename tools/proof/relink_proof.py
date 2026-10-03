@@ -35,7 +35,7 @@ test media, copied). Copies go under `work/relink/`, named by pid, and an
 earlier pid's are swept at start. It opens one document; relaunch between
 full runs, as every proof here asks.
 
-    python3 tools/proof/relink_proof.py [port] [log path]
+    python3 tools/proof/relink_proof.py <dir>/agent.sock [log path]
 """
 
 import os
@@ -43,10 +43,10 @@ import re
 import shutil
 import sys
 
-from mcp import MCP, ToolError
+from mcp import MCP, ToolError, target, log_beside
 
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 4942
-LOG = sys.argv[2] if len(sys.argv) > 2 else f"/tmp/reelcut-{PORT}.log"
+SOCKET = target(sys.argv)
+LOG = sys.argv[2] if len(sys.argv) > 2 else log_beside(SOCKET)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 WORK = os.path.join(HERE, "work", "relink")
@@ -150,7 +150,7 @@ def part_r0(s):
                               f"({len(complaints)} found)")
     else:
         check(False, f"the parity log at {LOG} exists (launch with "
-                     "`> /tmp/reelcut-<port>.log`, or pass it as the second argument)")
+                     "`> <dir>/reelcut.log`, or pass it as the second argument)")
     schema = s.mcp.schemas()["relink_media"]["inputSchema"]
     properties = set(schema.get("properties", {}))
     check("probe" not in properties,
@@ -274,8 +274,8 @@ def main():
     os.makedirs(WORK, exist_ok=True)
     sweep_earlier_runs()
     s = State()
-    s.mcp = MCP(PORT)
-    print(f"spec §11 #63 — relink re-probes, against 127.0.0.1:{PORT}")
+    s.mcp = MCP(SOCKET)
+    print(f"spec §11 #63 — relink re-probes, against {SOCKET}")
     section("R0 — the parity log, the schema and the gate", part_r0, s)
     section("R1 — A's copy, the reference, and three clips", part_r1, s)
     section("R2 — relinked to a 5 s file: the record and the clips", part_r2, s)

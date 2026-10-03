@@ -106,6 +106,7 @@ extension AgentServer {
         let microphone = voiceOver ? true : try boolArg(a, "microphone") ?? false
         let systemAudio = voiceOver ? false : try boolArg(a, "system_audio") ?? true
         let showClicks = voiceOver ? false : try boolArg(a, "show_clicks") ?? false
+        let includeReelcut = voiceOver ? false : try boolArg(a, "include_reelcut_windows") ?? false
         let place = try boolArg(a, "place") ?? true
         let folder = try recordingFolder(a)
         if microphone {
@@ -129,12 +130,17 @@ extension AgentServer {
             }
 
             // 3. The content (unlistable without the grant) and the
-            //    programmatic filter — a display source always excludes
-            //    Reelcut.
+            //    programmatic filter — a display source excludes Reelcut
+            //    unless `include_reelcut_windows`; the tool excludes no
+            //    window.
             let content = try shareableContent()
             source = try recordingSource(displayIndex, windowID, in: content)
             do {
-                filter = try ScreenRecorder.filter(for: source, in: content)
+                filter = try ScreenRecorder.filter(
+                    for: source, in: content,
+                    excluding: RecordingExclusion.make(
+                        includeReelcutWindows: includeReelcut,
+                        ownBundleID: Bundle.main.bundleIdentifier, panelWindowID: nil))
             } catch {
                 throw ToolError(message: error.localizedDescription)
             }
@@ -149,7 +155,8 @@ extension AgentServer {
             microphoneID = device.uniqueID
         }
         let choice = RecordingChoice(
-            source: source, microphone: microphoneID, systemAudio: systemAudio,
+            source: source, includeReelcutWindows: includeReelcut,
+            microphone: microphoneID, systemAudio: systemAudio,
             showClicks: showClicks, rate: rate, resolution: resolution,
             destination: destination, folder: folder ?? RecordingFiles.folder())
 
@@ -193,10 +200,12 @@ extension AgentServer {
         onMain {
             if let filter {
                 recorder.start(
-                    filter: filter, choice: choice, onFinish: deliver, completion: startCompletion)
+                    filter: filter, choice: choice, mayAsk: false, onFinish: deliver,
+                    completion: startCompletion)
             } else {
                 recorder.startVoiceOver(
-                    choice: choice, onFinish: deliver, completion: startCompletion)
+                    choice: choice, mayAsk: false, onFinish: deliver,
+                    completion: startCompletion)
             }
         }
         // The recorder's own arm timer answers first; this bound is for a

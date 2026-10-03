@@ -17,8 +17,8 @@ more through a PROBE built out of `app/Sources` (section 5 below).
 about effect.** `PreviewQuality` is persisted at `ReelcutPreviewQuality` in
 `UserDefaults`, and `PreviewQuality.stored()` reads
 `UserDefaults.standard` — so the setting can be put into a running app
-through the argument domain at launch, exactly as `-AgentServerEnabled` and
-`-ApplePersistenceIgnoreState` already are. This script therefore launches
+through the argument domain at launch, exactly as
+`-ApplePersistenceIgnoreState` already is. This script therefore launches
 **two instances of the same binary**, one with the key ABSENT (Full) and one
 with `-ReelcutPreviewQuality 2` (Quarter), drives the identical scripted
 sequence through both, and byte-compares what comes out:
@@ -155,11 +155,11 @@ one path is an identity edit and is refused.
 `swiftc` for section 0's enum and section 5's whole-app probe (which also
 needs `core/target/release/libreelcut_core.a` — `make test` builds it).
 
-Run it with a port that already holds an instance; it launches two more of
-its own (on `PORT + 1` and `PORT + 2`, falling back to whatever they bind)
-and kills only those two:
+Run it with the socket of an instance already up; it launches two more of
+its own (each on a scratch socket under `$TMPDIR`, `mcp.launch`) and kills
+only those two:
 
-    python3 tools/proof/phase8_proof.py 4861
+    python3 tools/proof/phase8_proof.py <dir>/agent.sock
 """
 
 import hashlib
@@ -174,9 +174,10 @@ import sys
 import time
 import zlib
 
-from mcp import MCP, ToolError
+import mcp as mcp_launch
+from mcp import MCP, ToolError, log_beside, remove_scratch, target
 
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 4861
+SOCKET = target(sys.argv)
 HERE = os.path.dirname(os.path.abspath(__file__))
 WORK = os.path.join(HERE, "work")
 MEDIA = os.path.join(HERE, "media")
@@ -224,11 +225,7 @@ BUNDLE_ID = "com.kgalligan.Reelcut"
 # read it.
 FRAME_SENTENCE = re.compile(r"Written to (\S+\.png)\.")
 
-# `AgentServer.start()`'s two NSLog lines. The first is how a launched
-# instance says which port it actually bound (a taken port falls back to an
-# ephemeral one); the second is the startup parity check complaining, and
-# must never appear.
-BOUND_PORT = re.compile(r"listening on http://127\.0\.0\.1:(\d+)/mcp")
+# The startup parity check complaining, which must never appear.
 PARITY = "Reelcut: "
 
 failures = []
@@ -375,41 +372,27 @@ class Instance:
     and this one does it for one reason: `PreviewQuality` is read from
     `UserDefaults` at `Playback.init` and there is no tool that sets it, so
     the only way a proof can put a quality into a running Reelcut is the
-    argument domain at launch. `-ApplePersistenceIgnoreState` and
-    `-AgentServerEnabled` already travel that way (CLAUDE.md's launch line);
-    this adds one more argument to the same list.
+    argument domain at launch. `-ApplePersistenceIgnoreState` already
+    travels that way (CLAUDE.md's launch line); this adds one more argument
+    to the same list. The launch is `mcp.launch`, on a scratch socket.
 
     **It kills only what it started.** `subprocess.Popen`'s own pid, SIGTERM
     then SIGKILL, and nothing in this file ever reads `pgrep` — another
     session's instance is none of its business (`tools/proof/README.md`)."""
 
-    def __init__(self, tag, port, extra=()):
+    def __init__(self, tag, extra=()):
         self.tag = tag
-        self.log = f"/tmp/reelcut-phase8-{tag}-{os.getpid()}.log"
+        self.started = mcp_launch.launch(BINARY, list(extra), env=dict(os.environ), seconds=45)
+        self.process = self.started.child
+        self.socket = self.started.socket_path
+        self.log = self.started.log_path
         logs[tag] = self.log
-        self.handle = open(self.log, "wb")
-        env = dict(os.environ, RC_AGENT_PORT=str(port))
-        self.process = subprocess.Popen(
-            [BINARY, "-ApplePersistenceIgnoreState", "YES", "-AgentServerEnabled", "YES",
-             *extra],
-            stdout=self.handle, stderr=subprocess.STDOUT, env=env)
         launched.append(self)
-        self.port = self._await_port()
-        self.mcp = MCP(self.port)
-
-    def _await_port(self, seconds=45):
-        """The port the instance actually bound, off its own log."""
-        deadline = time.time() + seconds
-        while time.time() < deadline:
-            if self.process.poll() is not None:
-                raise RuntimeError(
-                    f"the {self.tag} instance exited with {self.process.returncode} before "
-                    f"it bound a port — {self.log}")
-            found = BOUND_PORT.search(read(self.log).decode("utf-8", "replace"))
-            if found:
-                return int(found.group(1))
-            time.sleep(0.2)
-        raise RuntimeError(f"the {self.tag} instance never named a port in {self.log}")
+        if self.started.client is None:
+            raise RuntimeError(
+                f"the {tag} instance did not bind its socket (rc {self.process.poll()}) — "
+                f"{self.log}")
+        self.mcp = self.started.client
 
     def stop(self):
         if self.process.poll() is None:
@@ -420,7 +403,6 @@ class Instance:
             if self.process.poll() is None:
                 self.process.send_signal(signal.SIGKILL)
                 self.process.wait(timeout=10)
-        self.handle.close()
 
 
 def stop_launched():
@@ -706,10 +688,10 @@ def instrument_part():
 
 
 def isolation_part(mcp):
-    full = Instance("full", PORT + 1)
-    quarter = Instance("quarter", PORT + 2, extra=[f"-{DEFAULTS_KEY}", "2"])
-    check(full.port != quarter.port,
-          f"two instances of the SAME binary are up, on {full.port} and {quarter.port} — "
+    full = Instance("full")
+    quarter = Instance("quarter", extra=[f"-{DEFAULTS_KEY}", "2"])
+    check(full.socket != quarter.socket,
+          f"two instances of the SAME binary are up, at {full.socket} and {quarter.socket} — "
           "one with the preview-quality key absent, one launched at Quarter")
     for tag, instance in (("full", full), ("quarter", quarter)):
         names = instance.mcp.tools()
@@ -926,10 +908,10 @@ def catalog_part(mcp):
         complaints = parity_lines(logs.get(tag, ""))
         check(complaints == [],
               f"the {tag} instance this script launched left an empty parity log")
-    house = f"/tmp/reelcut-{PORT}.log"
+    house = log_beside(SOCKET)
     complaints = parity_lines(house)
     check(complaints in ([], None),
-          f"…and so did the instance on {PORT}, if it logged where the README says "
+          f"…and so did the instance at {SOCKET}, if it logged where the README says "
           f"({house}: {'no such file' if complaints is None else complaints})")
 
 
@@ -1231,8 +1213,8 @@ def main():
                   "ffmpeg line that writes it.")
             return 2
     os.makedirs(WORK, exist_ok=True)
-    mcp = MCP(PORT)
-    print(f"phase 8 — Viewing, against 127.0.0.1:{PORT}")
+    mcp = MCP(SOCKET)
+    print(f"phase 8 — Viewing, against {SOCKET}")
 
     try:
         section("0 — the launch mechanism, scored before section 1 leans on it",
@@ -1248,6 +1230,8 @@ def main():
                 player_part, mcp)
     finally:
         stop_launched()
+        for instance in launched:
+            remove_scratch(instance.socket)
 
     print(f"\n{checks - len(failures)}/{checks} checks passed")
     for what in failures:

@@ -37,7 +37,7 @@ extension ProjectDocument {
             completion?(added)
             return
         }
-        MediaImporter.probe(url: urls[index]) { [weak self] result in
+        MediaImporter.probe(url: urls[index], mayAsk: true) { [weak self] result in
             guard let self = self else { return }
             var collected = descriptors
             switch result {
@@ -101,7 +101,7 @@ extension ProjectDocument {
             return
         }
         let choice = choices[index]
-        MediaImporter.probe(url: choice.url) { [weak self] result in
+        MediaImporter.probe(url: choice.url, mayAsk: true) { [weak self] result in
             guard let self = self else { return }
             var collected = ops
             switch result {

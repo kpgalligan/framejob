@@ -38,15 +38,7 @@ extension Exporter {
         project: ReelProject, settings: ExportSettings, graphics: GraphicSet?
     ) -> ExportError? {
         guard let graphics = graphics, !settings.isAudioOnly else { return nil }
-        let range = settings.start..<(settings.start + settings.duration)
-        let snapshot = project.snapshot
-        var names = Set<String>()
-        var visited = Set<UInt32>()
-        for clip in snapshot.clips where clip.start < range.upperBound && clip.end > range.lowerBound {
-            if let graphic = clip.graphic { names.insert(graphic.name) }
-            guard let id = clip.source.nestID else { continue }
-            collectGraphicNames(inNest: id, of: snapshot, into: &names, visited: &visited)
-        }
+        let names = graphicNames(project: project, settings: settings)
         let refused = names.sorted().compactMap { name -> (name: String, message: String)? in
             switch graphics.modules[name] {
             case nil:
@@ -59,6 +51,38 @@ extension Exporter {
             }
         }
         return refused.isEmpty ? nil : .graphicsNotCompiled(refused)
+    }
+
+    /// The module names of every graphic clip the export draws: the top
+    /// level's in `settings`' range, plus every graphic clip of each nest
+    /// reached from a clip in the range, however deep.
+    static func graphicNames(project: ReelProject, settings: ExportSettings) -> Set<String> {
+        let range = settings.start..<(settings.start + settings.duration)
+        let snapshot = project.snapshot
+        var names = Set<String>()
+        var visited = Set<UInt32>()
+        for clip in snapshot.clips where clip.start < range.upperBound && clip.end > range.lowerBound {
+            if let graphic = clip.graphic { names.insert(graphic.name) }
+            guard let id = clip.source.nestID else { continue }
+            collectGraphicNames(inNest: id, of: snapshot, into: &names, visited: &visited)
+        }
+        return names
+    }
+
+    /// Starts the export's graphic prefetch (spec §11 G-26) — only for the
+    /// `ExportWriter` path, with a pinned set and a graphic in range — over
+    /// the range the writer reads at the frame duration it reads at.
+    /// `finish` and `deinit` stop it beside the unpin. Main thread.
+    static func startGraphicPrefetch(
+        key: Int?, project: ReelProject, graphics: GraphicSet?, built: BuiltComposition,
+        settings: ExportSettings, pipeline: any ExportPipeline
+    ) {
+        guard let key = key, graphics != nil, pipeline is ExportWriter, !settings.isAudioOnly,
+            !graphicNames(project: project, settings: settings).isEmpty
+        else { return }
+        GraphicPrefetch.shared.start(
+            key: key, range: Exporter.timeRange(settings, composition: built.composition),
+            frameDuration: ExportWriter.videoComposition(built, settings: settings).frameDuration)
     }
 
     /// Every graphic clip's module name in nest `id` and in each nest reached

@@ -23,8 +23,8 @@ Two instruments, `clip_inspector4_proof.py`'s shape:
   K6's other two rows live where their instruments are: the floored wall in
   `clip_inspector5_probe.swift`, the strip at two widths in
   `clip_inspector4_probe.swift`.
-* **the built app**, launched by this script on its own port
-  (`RC_AGENT_PORT`, default 4851) and driven over `mcp.py`. Rows K3:
+* **the built app**, launched by this script on a scratch socket
+  (`mcp.launch`) and driven over `mcp.py`. Rows K3:
   `set_action_end {off: ["video.shadow"]}` stores the null, the frame at the
   action's end is BYTE-identical to the same project with the base shadow
   removed and differs from the frame before; `off: ["video.opacity"]` and
@@ -54,7 +54,6 @@ under a mutant: it is the tree's binary, not the copy's.
 
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -65,6 +64,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2_chrome as e2  # noqa: E402  (clip, project, write_package, GREY)
 import clip_inspector_proof as ci  # noqa: E402  (action, media_clip, build_probe)
 import clip_inspector2_proof as ci2  # noqa: E402  (movie, text_clip)
+import mcp as mcp_launch  # noqa: E402
 from mcp import MCP, ToolError  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -73,7 +73,6 @@ WORK = os.path.join(HERE, "work", "clip-inspector6")
 PROBE_SWIFT = os.path.join(HERE, "clip_inspector6_probe.swift")
 APP = os.path.join(ROOT, "build", "Build", "Products", "Release", "Reelcut.app", "Contents",
                    "MacOS", "Reelcut")
-PORT = 4851
 TICKS = e2.TICKS
 SIX = 6 * TICKS
 
@@ -220,7 +219,7 @@ def probe_checks(sources, out, paths):
 
 
 K3_ROWS = [
-    "K3 the app binds its own port and its log carries no `Reelcut: ` line",
+    "K3 the app binds its own socket and its log carries no `Reelcut: ` line",
     "K3 set_action_end {off: [video.shadow]} on the shadowed card: get_project holds "
     "end.video.shadow == null",
     "K3 render_frame at the action's end (1.5 s) is BYTE-identical to the same project with the "
@@ -237,22 +236,10 @@ def parity_lines(log_path):
 
 
 def launch(log_path):
-    env = os.environ.copy()
-    env["RC_AGENT_PORT"] = str(PORT)
-    log = open(log_path, "w", encoding="utf-8")
-    process = subprocess.Popen([APP, "-ApplePersistenceIgnoreState", "YES",
-                                "-AgentServerEnabled", "YES"],
-                               stdout=log, stderr=subprocess.STDOUT, env=env)
-    bound = None
-    until = time.monotonic() + 30
-    while time.monotonic() < until and process.poll() is None and bound is None:
-        with open(log_path, encoding="utf-8", errors="replace") as text:
-            found = re.search(r"listening on http://127\.0\.0\.1:(\d+)/mcp", text.read())
-        if found:
-            bound = int(found.group(1))
-        else:
-            time.sleep(0.2)
-    return process, log, bound
+    if os.path.exists(log_path):
+        os.remove(log_path)
+    return mcp_launch.launch(APP, env=os.environ.copy(), log_path=log_path, seconds=30,
+                             timeout=120)
 
 
 def error_of(call):
@@ -271,15 +258,16 @@ def mcp_checks(chrome):
         return
     frames = os.path.join(WORK, "frames")
     os.makedirs(frames, exist_ok=True)
-    log_path = os.path.join(WORK, f"reelcut-{PORT}.log")
-    process, log, bound = launch(log_path)
+    log_path = os.path.join(WORK, "reelcut.log")
+    started = launch(log_path)
+    process = started.child
     try:
-        if bound is None:
+        if started.client is None:
             for name in K3_ROWS:
-                check(name, False, f"the app bound no port; log {log_path}")
+                check(name, False, f"the app bound no socket; log {log_path}")
             return
         time.sleep(0.5)
-        mcp = MCP(bound, timeout=120)
+        mcp = started.client
         mcp.call("open_project", path=chrome)
 
         def op(tool, **arguments):
@@ -320,8 +308,8 @@ def mcp_checks(chrome):
                                    offf=["video.shadow"]))
         check(K3_ROWS[5], gate is not None and "offf" in gate, f"{gate}")
         lines = parity_lines(log_path)
-        check(K3_ROWS[0], bound == PORT and not lines and process.poll() is None,
-              f"bound {bound}, parity lines {lines[:3]}")
+        check(K3_ROWS[0], not lines and process.poll() is None,
+              f"bound {started.socket_path}, parity lines {lines[:3]}")
     except (ToolError, RuntimeError, OSError, KeyError) as error:
         done = {name for name, _ in RESULTS}
         for name in K3_ROWS:
@@ -335,7 +323,7 @@ def mcp_checks(chrome):
             except subprocess.TimeoutExpired:
                 process.kill()
                 process.wait(timeout=5)
-        log.close()
+        mcp_launch.remove_scratch(started.socket_path)
 
 
 # ---------------------------------------------------------------------------

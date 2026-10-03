@@ -1,11 +1,14 @@
 """Issue batch B60 — a normalised export gains the float mix and quantises
 once (#86 part 1), proved per audio preset ACROSS two builds.
 
-    python3 tools/proof/export_gain_proof.py <port> --record <dir>
-    python3 tools/proof/export_gain_proof.py <port> --against <dir>
+    python3 tools/proof/export_gain_proof.py <dir>/agent.sock --record <dir>
+    python3 tools/proof/export_gain_proof.py <dir>/agent.sock --against <dir>
 
-Over MCP (the caller owns the instance on <port>; nothing is launched or
-killed). `--record` runs on the build BEFORE the change and writes
+Over MCP (the caller owns the instance at that socket, its `RC_AGENT_SOCKET`;
+nothing is launched or killed — and a build from before road map 14 listens
+on TCP alone, so a `--record` against one is no longer reachable: the
+record B60 took stands, and a new one is taken on a build that has the
+socket). `--record` runs on the build BEFORE the change and writes
 `manifest.json` and every export's decoded PCM into <dir>; `--against` runs
 on the build AFTER it and compares with <dir>. Both modes score the
 within-build rows.
@@ -273,16 +276,15 @@ def record(got, g0, where):
 
 def main():
     args = sys.argv[1:]
-    if len(args) != 3 or not re.fullmatch(r"\d+", args[0]) \
-            or args[1] not in ("--record", "--against"):
+    if len(args) != 3 or args[1] not in ("--record", "--against"):
         print(__doc__.split("\n\n")[1])
         return 2
-    port, mode, where = int(args[0]), args[1], os.path.abspath(args[2])
+    socket_path, mode, where = args[0], args[1], os.path.abspath(args[2])
     if mode == "--against" and not os.path.exists(os.path.join(where, "manifest.json")):
         print(f"no reference at {where}: run --record on the earlier build first")
         return 2
     write_fixtures()
-    got = run_exports(MCP(port))
+    got = run_exports(MCP(socket_path))
     g0 = within(got)
     if mode == "--record":
         record(got, g0, where)

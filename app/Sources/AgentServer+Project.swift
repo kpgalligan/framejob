@@ -35,9 +35,12 @@ extension AgentServer {
         }
         let controller = NSDocumentController.shared
         let type = try controller.typeForContents(of: url)
-        guard let document = try controller.makeDocument(withContentsOf: url, ofType: type)
-            as? ProjectDocument
-        else {
+        // A tool call never asks the conversion question (spec §11 MC-5):
+        // the read runs on this thread, inside the import's no-asking scope.
+        let made = try MediaImporter.withoutAsking {
+            try controller.makeDocument(withContentsOf: url, ofType: type)
+        }
+        guard let document = made as? ProjectDocument else {
             throw ToolError(
                 message: "\(url.lastPathComponent) did not open as a Reelcut project.")
         }

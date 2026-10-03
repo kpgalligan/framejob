@@ -659,7 +659,6 @@ func pinDefaults(_ extra: [String: Any] = [:]) {
     var pinned: [String: Any] = [
         PreviewQuality.defaultsKey: 0,
         "NSWindow Frame " + PreviewWindowController.frameAutosaveName: "",
-        "AgentServerEnabled": false,
         "AppleShowScrollBars": "Always",
         // The launch flag CLAUDE.md's own instructions pass to the app
         // (`-ApplePersistenceIgnoreState YES`), as a default rather than an

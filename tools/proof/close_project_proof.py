@@ -3,11 +3,11 @@
 §11 #40), and `export_captions`' caption name rule (#43, spec §11 #43),
 proved against the running app.
 
-    python3 tools/proof/close_project_proof.py <port> [--log PATH]
+    python3 tools/proof/close_project_proof.py <dir>/agent.sock [--log PATH]
 
-`--log` defaults to `/tmp/reelcut-<port>.log`. The app is a Release build
+`--log` defaults to `<dir>/reelcut.log`. The app is a Release build
 (the rows use the dev tools `snapshot_ui`, `perform_menu_item` and
-`cancel_sheet`) on `<port>`, FRESH for each run: every row writes its own
+`cancel_sheet`) at the socket, FRESH for each run: every row writes its own
 package under `work/close_project/`, wiped at the start.
 
 - **T1** — no `Reelcut: ` line in the log (the startup parity check).
@@ -69,7 +69,7 @@ import urllib.error
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from mcp import MCP, ToolError  # noqa: E402
+from mcp import MCP, ToolError, log_beside, socket_pid, target  # noqa: E402
 
 WORK = os.path.join(HERE, "work", "close_project")
 ROWS = ["T1", "K1", "C1", "C2", "C3", "D1", "D2", "H1", "S1", "S2", "S3", "E1"]
@@ -87,8 +87,8 @@ class App:
     """The MCP client with the wedge rule: after the first call that times
     out, every later call raises `Wedged` without touching the instance."""
 
-    def __init__(self, port):
-        self.mcp = MCP(port, timeout=60)
+    def __init__(self, socket_path):
+        self.mcp = MCP(socket_path, timeout=60)
         self.row = None
         self.wedged_at = None
 
@@ -126,17 +126,6 @@ def canonical(path):
 
 def package(name):
     return os.path.join(WORK, f"{name}.reelcut")
-
-
-def listening_pid(port):
-    """The pid listening on `port` (`recording_proof.py`'s, copied); `lsof`
-    is a READ."""
-    try:
-        out = subprocess.run(["lsof", "-nP", f"-iTCP:{port}", "-sTCP:LISTEN", "-t"],
-                             capture_output=True, text=True, timeout=20).stdout.split()
-    except (OSError, subprocess.SubprocessError):
-        return None
-    return int(out[0]) if out else None
 
 
 def thread_count(pid):
@@ -410,16 +399,17 @@ def guarded(app, rids, row, *args):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("port", type=int)
+    parser.add_argument("socket", nargs="?")
     parser.add_argument("--log")
     args = parser.parse_args()
-    log = args.log or f"/tmp/reelcut-{args.port}.log"
+    socket_path = target([sys.argv[0], args.socket or ""])
+    log = args.log or log_beside(socket_path)
     shutil.rmtree(WORK, ignore_errors=True)
     os.makedirs(WORK)
 
     row_t1(log)
-    app = App(args.port)
-    pid = listening_pid(args.port)
+    app = App(socket_path)
+    pid = socket_pid(socket_path)
     guarded(app, "K1", row_k1, app)
     paths = guarded(app, "C1,C3", row_c1_c3, app, pid)
     if paths:

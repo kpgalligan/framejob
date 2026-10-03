@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Road map 11's V2a — `snapshot_ui`, proved against the running app.
 
-    python3 tools/proof/v2_snapshot.py <port> [--log PATH] [--only LETTERS]
+    python3 tools/proof/v2_snapshot.py <dir>/agent.sock [--log PATH] [--only LETTERS]
 
 `--only` takes row letters (`T,N,O,C,F,A,L,P`); omitted, every row runs. The
-app is the Release build on `<port>`, launched with the pinned defaults of the
+app is the Release build at the socket, launched with the pinned defaults of the
 V2a spec's Verification (`-ReelcutInspectorWidth 304 -ReelcutTimelineHeight
-300 …`), fresh for each run; `--log` defaults to `/tmp/reelcut-<port>.log`.
+300 …`), fresh for each run; `--log` defaults to `<dir>/reelcut.log`.
 
 **The cover.** The O rows and F0 put an opaque, non-activating panel
 (`v2_cover.swift`, built here) over the editor window's frame so the editor
@@ -54,7 +54,7 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "graphics_spike"))
 import bounded  # noqa: E402
 from dev_tools import DEV_TOOLS, dev_marker_count  # noqa: E402
-from mcp import MCP, ToolError  # noqa: E402
+from mcp import MCP, ToolError, log_beside, target  # noqa: E402
 from media_less_playback_probe import console_locked  # noqa: E402
 
 WORK = os.path.join(HERE, "work", "v2_snapshot")
@@ -846,11 +846,12 @@ def rows_p(probe, probe_error):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("port", type=int)
+    parser.add_argument("socket", nargs="?")
     parser.add_argument("--log")
     parser.add_argument("--only")
     args = parser.parse_args()
-    log = args.log or f"/tmp/reelcut-{args.port}.log"
+    socket_path = target([sys.argv[0], args.socket or ""])
+    log = args.log or log_beside(socket_path)
     only = set(args.only.replace(" ", "").split(",")) if args.only else set("TNOCFALP")
     selected = [rid for rid, _ in ROWS if rid[0] in only]
 
@@ -862,7 +863,7 @@ def main():
     if "P" in only:
         rows_p(probe, probe_error)
 
-    mcp = MCP(args.port)
+    mcp = MCP(socket_path)
     if "T" in only:
         rows_t(mcp, log)
     if only & set("NOCFAL"):

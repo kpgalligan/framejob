@@ -125,7 +125,7 @@ extension ScreenRecorder {
     ) {
         guard index < done.segments.count else { return concludeVoice(done, landed, skipped) }
         let segment = done.segments[index]
-        MediaImporter.probe(url: segment.url) { [weak self] outcome in
+        MediaImporter.probe(url: segment.url, mayAsk: done.mayAsk) { [weak self] outcome in
             guard let self else { return }
             switch outcome {
             case .failure(let error):

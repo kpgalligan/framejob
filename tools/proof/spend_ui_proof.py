@@ -77,7 +77,6 @@ asp.WORK = WORK  # App, Fake and the secret folder write under this proof's fold
 atp.WORK = WORK  # and so do the layout dumps
 RELEASE = os.path.join(ROOT, asp.APP_PATH)
 PROBE_SWIFT = os.path.join(HERE, "spend_ui_probe.swift")
-PORT_U, PORT_U3 = 4899, 4893
 WALL_TURN, WALL_SETTLE = 60, 5
 PROBE_ROWS = ["M1", "M2", "M3", "C1", "C2", "C3"]
 PROBE_TZ = "America/Los_Angeles"
@@ -234,9 +233,9 @@ def rows_u(fake, secrets, score):
         f.write("\n".join(seed) + "\n")
     folder = os.path.join(WORK, "u")
     tab = {"folder": folder, "dumps": []}
-    app = asp.App("U", RELEASE, ["-AgentServerEnabled", "YES", "-RCSecretFolder", secrets,
+    app = asp.App("U", RELEASE, ["-RCSecretFolder", secrets,
                                  "-RCSpendFolder", spend, "-ReelcutInspectorCollapsed", "NO"],
-                  fake.base, port=PORT_U)
+                  fake.base)
     try:
         app.connect()
         complaints = [line for line in app.log().splitlines() if "Reelcut: " in line]
@@ -295,8 +294,8 @@ def rows_u(fake, secrets, score):
 
 def row_u3(fake, secrets, run_before):
     before = sp.person_state()
-    app = asp.App("U3", RELEASE, ["-AgentServerEnabled", "YES", "-RCSecretFolder", secrets],
-                  fake.base, port=PORT_U3)
+    app = asp.App("U3", RELEASE, ["-RCSecretFolder", secrets],
+                  fake.base)
     try:
         app.connect()
         complaints = [line for line in app.log().splitlines() if "Reelcut: " in line]

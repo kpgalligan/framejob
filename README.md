@@ -21,8 +21,9 @@ schema, §6 the op table, §7 the architecture.
   text, shape. Tracks stack back to front; `tracks[0]` is the back.
 - **Screen recording.** File ▸ New Recording… (⌥⌘N, or the welcome window's
   third button) opens a small floating panel: a display or a window (the
-  system picker), a microphone with a live meter, system audio, click rings,
-  30 or 60 fps, point or pixel size, and where it lands — a new project, or
+  system picker), whether Reelcut's own windows are in a display recording
+  (left out by default), a microphone with a live meter, system audio, click
+  rings, 30 or 60 fps, point or pixel size, and where it lands — a new project, or
   an open document at its playhead. A 3-2-1 countdown, then a red dot with
   the elapsed time in the menu bar carries Pause, Resume and Stop; File ▸
   Pause Recording pauses and resumes too. A paused recording is one file
@@ -335,6 +336,8 @@ app/
   Bridging/           Bridging header importing the Rust FFI header
 agent/                the assistant helper: Bun and the Anthropic SDK's Tool Runner,
                       built into Contents/Helpers/reelcut-agent (build.sh)
+mcp-proxy/            Rust crate — reelcut-mcp, the stdio MCP server MCP clients start,
+                      built into Contents/Helpers/reelcut-mcp
 designs/              spec/ — the accepted design and spec, one file per section;
                       adr/ — condensed records
 archive/              closed road maps, verbatim (INDEX.md)
@@ -380,7 +383,7 @@ Requires Xcode 26 or later (the macOS 26 SDK), Rust (cargo), [xcodegen](https://
 make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
 make dist       # make app, then the Distribution build (no dev tools; the assistant helper signed with the hardened runtime) → build/Build/Products/Distribution/Reelcut.app, checked
 make run        # build and launch
-make test       # Rust core and graphics tests, then the agent lane's proof (tools/proof/assistant_lane_proof.py), the prompt texts' checks (tools/proof/assistant_prompt_proof.py --probe), the price function in both readers (tools/proof/prices_proof.py, no network) and the proofs' ledger and monthly budgets (tools/proof/budget_proof.py, no network)
+make test       # Rust core, graphics and MCP proxy tests, then the agent lane's proof (tools/proof/assistant_lane_proof.py), the prompt texts' checks (tools/proof/assistant_prompt_proof.py --probe), the price function in both readers (tools/proof/prices_proof.py, no network) and the proofs' ledger and monthly budgets (tools/proof/budget_proof.py, no network)
 make lint       # cargo clippy --all-targets -D warnings
 make typecheck  # swiftc -typecheck of app/Sources — the ONLY authoritative Swift check, then agent/'s tsc --noEmit (through bun)
 make project    # xcodegen generate
@@ -392,31 +395,40 @@ after editing `project.yml`, and don't commit the project file.
 
 ## AI agent access (MCP)
 
-Tools ▸ Allow Agent Connections hosts an MCP server (streamable HTTP) inside
-the app at `http://127.0.0.1:4817/mcp`. The menu item shows the live endpoint
-while it runs and remembers the setting across launches.
+Reelcut serves an MCP server (streamable HTTP) on a Unix socket it binds at
+every launch, `~/Library/Application Support/Reelcut/Agent/agent.sock`. An MCP
+client reaches it through `reelcut-mcp`, the stdio helper inside the bundle,
+which lists the tools without opening Reelcut and launches it in the
+background on the first tool call that finds it not running.
 
-To drive a build for verification, launch it with the agent already on — the
-`-AgentServerEnabled YES` flag lands in NSUserDefaults' argument domain, which
-is the same switch the menu flips, and `RC_AGENT_PORT` overrides the port (a
-port already in use falls back to an ephemeral one, and the log line names
-what it bound):
+**Tools ▸ Copy MCP Command** puts the line that registers the helper with
+Claude Code on the clipboard, with the path of the bundle you ran it from:
+
+```sh
+claude mcp add --scope user reelcut -- '/Applications/Reelcut.app/Contents/Helpers/reelcut-mcp'
+```
+
+Claude Desktop takes the same helper in its `claude_desktop_config.json`:
+
+```json
+{"mcpServers":{"reelcut":{"command":"/Applications/Reelcut.app/Contents/Helpers/reelcut-mcp"}}}
+```
+
+The socket is yours alone: its folder is `0700` and the socket `0600`, so
+only processes running as you can connect — and any of them can, while the
+app runs.
+
+To drive a build for verification, give it a socket of its own with
+`RC_AGENT_SOCKET`, so it never touches your own, and
+point `tools/proof/mcp.py`'s `MCP` or `reelcut-mcp` (with the same variable
+set) at that path:
 
 ```sh
 make app
-RC_AGENT_PORT=4817 \
-  build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut \
-  -AgentServerEnabled YES
+d="$(mktemp -d)"; echo "$d"
+(RC_AGENT_SOCKET="$d/agent.sock" build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut \
+   -ApplePersistenceIgnoreState YES > "$d/reelcut.log" 2>&1 &)
 ```
-
-Then point any MCP client at the endpoint:
-
-```sh
-goose session --with-streamable-http-extension "http://127.0.0.1:4817/mcp"
-```
-
-The endpoint is **unauthenticated**: any local process may connect while it
-runs. It is off by default.
 
 Calls run one at a time. A call made while you are dragging something in
 the window (a clip, a canvas handle, an inspector slider) waits for mouse-up
@@ -473,7 +485,7 @@ hue rather than paints with it, is the one `[r, g, b]` in the model.
 | `import_media {path}` | probes a file and returns the **new media id**; `add_clip` then places it |
 | `import_captions {path, track?}` | an SRT file as text clips (File ▸ Import Captions…) |
 | `consolidate_media {}` | copies every referenced file into the package (File ▸ Consolidate Media…) |
-| `record_screen {seconds, source?, display?, window?, microphone?, system_audio?, show_clicks?, rate?, size?, place?, path?}` | records a display (index, 0 = main) or a window (a `CGWindowID`) for `seconds` and lands it as a clip at the target document's playhead — or as an untitled document rated at `rate` when nothing is open (File ▸ New Recording…). `microphone` records the default microphone to a second file on a Microphone track; `path` is a FOLDER override. `source: "voice_over"` records the default microphone alone (the panel's Microphone Only) onto a new back Microphone track, reading only the Microphone grant. It reads the grants and never asks: the refusal names the System Settings pane, and a shell-launched instance runs under its TERMINAL's grants |
+| `record_screen {seconds, source?, display?, window?, microphone?, system_audio?, show_clicks?, include_reelcut_windows?, rate?, size?, place?, path?}` | records a display (index, 0 = main) or a window (a `CGWindowID`) for `seconds` and lands it as a clip at the target document's playhead — or as an untitled document rated at `rate` when nothing is open (File ▸ New Recording…). `microphone` records the default microphone to a second file on a Microphone track; `path` is a FOLDER override; `include_reelcut_windows` puts Reelcut's own windows in a display recording, which leaves them out by default. `source: "voice_over"` records the default microphone alone (the panel's Microphone Only) onto a new back Microphone track, reading only the Microphone grant. It reads the grants and never asks: the refusal names the System Settings pane, and a shell-launched instance runs under its TERMINAL's grants |
 | `transcribe {clips?, language?, place?, engine?, speakers?, vocabulary?, refresh?, style?, replace?}` | speech recognition into caption clips (File ▸ Generate Captions…). Returns the cues in ticks whether or not it places them, and `place: false` changes nothing at all. `style` is `subtitles` (the default) or a word caption style — `highlight`, `pill`, `karaoke`, `build`, `one_word` — whose pages are filled to a measured width and whose cues carry their `words`; `replace: true` swaps out the caption tracks it would have made over the same clips in the same undo step and lists them under `replaced`. `engine` is `apple` (the default, on this Mac, nothing uploaded) or `assemblyai` (the whole audio of each media file goes to AssemblyAI and is billed; the transcript is cached in the package and deleted at the far end). The on-device engine needs no grant and has no length limit; a language whose model is not installed on this Mac is refused by name and never downloaded by the tool — a person installs it from the sheet's Download row. `speakers`, `vocabulary` and `refresh` apply only to the cloud engine and are refused by name without it; with `speakers` and `subtitles`, each speaker's cues take their own colour |
 | `export_captions {track?, path, format?}` | one text track out as `.srt` or `.vtt` (File ▸ Export Captions…). The track is never guessed — with no all-text track, or more than one, it refuses and lists the candidates. A trailing `.srt` or `.vtt` in `path` becomes the format's own; any other extension is kept, as the save panel keeps it (`chart.png` → `chart.png.srt`) |
 | `detect_silence {clips?, mode?, voice_confidence?, threshold_db?, min_length?, padding?}` | the quiet spans of the timeline, which `ripple_delete_ranges` then cuts — the same detector Clip ▸ Remove Silences… uses, so an agent and the sheet propose the same cuts. It changes nothing. `mode` is `voice` (the default, the cached Silero probability against `voice_confidence`) or `level`; either way a moment the mix envelope alone puts under `threshold_db` is quiet, so mute and solo are already in the answer, and the result names any file still being analysed and any clip judged by level |

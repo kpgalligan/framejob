@@ -11,12 +11,12 @@ partial-alpha transparency-layer path) and a two-line line_rise over a
 backdrop, all five live at every tick, each 5 s with `in` and `out` of 1 s —
 and compares the PNGs byte for byte.
 
-    python3 tools/proof/reveal_toll_proof.py <port> capture <dir>   # the CONTROL build
-    python3 tools/proof/reveal_toll_proof.py <port> compare <dir>   # the build under test
+    python3 tools/proof/reveal_toll_proof.py <socket> capture <dir>   # the CONTROL build
+    python3 tools/proof/reveal_toll_proof.py <socket> compare <dir>   # the build under test
 
 `capture` writes `<dir>/frames.reelcut` fresh and keeps `<dir>/t<tick>.png`;
 `compare` opens the SAME package and checks each render against those files.
-It launches nothing and kills nothing: the caller owns the instance on <port>.
+It launches nothing and kills nothing: the caller owns the instance at <socket>.
 `target_bump_proof.py` is the shape.
 """
 
@@ -28,7 +28,7 @@ import shutil
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from mcp import MCP  # noqa: E402
+from mcp import MCP, target  # noqa: E402
 
 SEC = 600_000
 SPAN = 5 * SEC
@@ -110,13 +110,13 @@ def sha(path):
 def main():
     if len(sys.argv) != 4 or sys.argv[2] not in ("capture", "compare"):
         sys.exit(__doc__)
-    port, mode, where = int(sys.argv[1]), sys.argv[2], os.path.abspath(sys.argv[3])
+    socket_path, mode, where = target(sys.argv), sys.argv[2], os.path.abspath(sys.argv[3])
     project = os.path.join(where, "frames.reelcut")
     if mode == "capture":
         shutil.rmtree(where, ignore_errors=True)
         os.makedirs(where)
         package(where, "frames", document())
-    mcp = MCP(port)
+    mcp = MCP(socket_path)
     mcp.call("open_project", path=project)
     kept_hashes = set()
     for tick in TICKS:

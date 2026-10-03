@@ -205,8 +205,8 @@ extension AgentServer {
             + "file lands touching, from the playhead, on ONE new back track named "
             + "Microphone, in one undo step (Add Recording); as a new project the first file "
             + "IS the document, 1920×1080 at rate, and the later files touch it on its one "
-            + "track. display, window, system_audio, show_clicks and size are refused by "
-            + "name with source voice_over, and so is microphone: false (true is implied); "
+            + "track. display, window, system_audio, show_clicks, size and "
+            + "include_reelcut_windows are refused by name with source voice_over, and so is microphone: false (true is implied); "
             + "source is read right after seconds, and only the Microphone grant is read — "
             + "never the Screen Recording one. The result's path is the first .m4a, its "
             + "width and height 0, with no mic_path, and mic_offset 0; a microphone that "
@@ -454,16 +454,18 @@ extension AgentServer {
                         "description": "What is recorded: screen (default) — a display or a "
                             + "window — or voice_over, the default microphone alone with no "
                             + "picture (the panel's Microphone Only). With voice_over, "
-                            + "display, window, system_audio, show_clicks, size and "
-                            + "microphone: false are refused by name.",
+                            + "display, window, system_audio, show_clicks, size, "
+                            + "include_reelcut_windows and microphone: false are refused "
+                            + "by name.",
                     ],
                     "display": [
                         "type": "integer", "minimum": 0,
                         "description": "Which display, as an index into the shareable "
                             + "displays with 0 the MAIN display (default 0). Reelcut's own "
-                            + "windows are always left out of a display recording, so the "
-                            + "app's panel and editor are never in the picture. Exclusive "
-                            + "with window.",
+                            + "windows are left out of a display recording unless "
+                            + "include_reelcut_windows is true, so by default the app's "
+                            + "panel and editor are not in the picture. Exclusive with "
+                            + "window.",
                     ],
                     "window": [
                         "type": "integer", "minimum": 0,
@@ -492,6 +494,14 @@ extension AgentServer {
                         "type": "boolean",
                         "description": "Draw a circle around each mouse click (default "
                             + "false). The cursor itself is always in the picture.",
+                    ],
+                    // The recorder panel's Include Reelcut windows checkbox.
+                    "include_reelcut_windows": [
+                        "type": "boolean",
+                        "description": "Put Reelcut's own windows — the editor, the preview — "
+                            + "in a DISPLAY recording (default false, which leaves them out). "
+                            + "Reelcut's own sound stays out either way, and with window it "
+                            + "changes nothing: that window is recorded on its own.",
                     ],
                     "rate": [
                         "type": "integer", "enum": [30, 60],

@@ -184,7 +184,7 @@ Nothing here decodes a picture and no `ffmpeg` runs at proof time. It opens
 THREE documents in the instance (one `new_project`, two `open_project`);
 relaunch between full runs, as every proof here asks.
 
-    python3 tools/proof/remaining_proof.py [port] [log path]
+    python3 tools/proof/remaining_proof.py <dir>/agent.sock [log path]
 """
 
 import json
@@ -194,10 +194,10 @@ import shutil
 import sys
 import time
 
-from mcp import MCP, ToolError
+from mcp import MCP, ToolError, target, log_beside
 
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 4834
-LOG = sys.argv[2] if len(sys.argv) > 2 else f"/tmp/reelcut-{PORT}.log"
+SOCKET = target(sys.argv)
+LOG = sys.argv[2] if len(sys.argv) > 2 else log_beside(SOCKET)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 WORK = os.path.join(HERE, "work")
@@ -491,7 +491,7 @@ def catalog_part(mcp):
         # can read has not shown the startup check is silent, and every
         # other claim here is read against a binary that check vouches for.
         check(False, f"the parity log at {LOG} exists — without it the startup check's "
-                     "silence cannot be read (launch with `> /tmp/reelcut-<port>.log`, or "
+                     "silence cannot be read (launch with `> <dir>/reelcut.log`, or "
                      "pass the log path as the second argument)")
     tools = set(mcp.tools())
     needed = {"new_project", "open_project", "import_media", "relink_media",
@@ -914,8 +914,8 @@ def main():
             return 2
     os.makedirs(WORK, exist_ok=True)
     sweep_earlier_runs()
-    mcp = MCP(PORT)
-    print(f"remaining §2a — the cache completion marker, against 127.0.0.1:{PORT}")
+    mcp = MCP(SOCKET)
+    print(f"remaining §2a — the cache completion marker, against {SOCKET}")
     section("0 — the parity log and the catalog", catalog_part, mcp)
     print("\n1 — the marker: not rebuilt, rebuilt, and which file it vouches for")
     s = State()

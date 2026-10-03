@@ -4,9 +4,10 @@ import AppKit
 /// core can do reaches the rest of Reelcut as typed Swift here: `ReelProject`
 /// (a handle plus its lazily decoded `ProjectSnapshot`), `ReelTime`, `ReelColor`,
 /// `ReelSnap`, `ReelExport`, the graphics engine's `GraphicLibrary` and
-/// `GraphicModule`, and the op ARGUMENTS an edit is built out of — the typed
-/// patches. The `dictionary` extensions on the §5.2 property types are in
-/// `OpDictionaries.swift`, for the same reason: they name no `rc_*` symbol.
+/// `GraphicModule`, `ReelAgentSocket`, and the op ARGUMENTS an edit is built
+/// out of — the typed patches. The `dictionary` extensions on the §5.2
+/// property types are in `OpDictionaries.swift`, for the same reason: they
+/// name no `rc_*` symbol.
 /// `ProjectSnapshot.swift` owns the read side of the same contract;
 /// `core/include/reelcut_core.h` is the contract itself.
 ///
@@ -961,5 +962,38 @@ final class GraphicModule {
         let diagnostics = takeDiagnostics(diag)
         guard let svg = takeString(out) else { throw GraphicFailure(diagnostics: diagnostics) }
         return (svg, diagnostics)
+    }
+}
+
+// MARK: - The agent socket
+
+/// The core's Unix-socket listener for the agent server (road map 14, spec
+/// §11 MC-1), the only listener since MC4 deleted the TCP one, serving the
+/// catalog through `AgentServer`'s handler. Only the wrapper
+/// lives here, for the one-file rule above; the path, the MC-2 policy and
+/// the log lines are `AgentServer+Socket.swift`'s.
+enum ReelAgentSocket {
+    /// Binds at `path`, chmod 0600; throws the core's sentence. Never
+    /// unlinks a file already there, and a second bind in one process is
+    /// refused. `handler` and `context` must stay valid for the process's
+    /// life, because `release()` never joins.
+    static func start(
+        path: String, serverName: String, version: String, toolsJSON: String,
+        handler: RcAgentToolHandler, context: UnsafeMutableRawPointer?
+    ) throws {
+        var err: UnsafeMutablePointer<CChar>? = nil
+        let bound = rc_agent_socket_start(
+            path, serverName, version, toolsJSON, handler, context, &err)
+        if !bound {
+            throw ReelCoreError(
+                message: takeErrorMessage(err, fallback: "could not bind the agent socket"))
+        }
+    }
+
+    /// For quit: unlinks the socket file only if it is still this
+    /// listener's, then abandons the listener without a join. Safe when
+    /// none is bound.
+    static func release() {
+        rc_agent_socket_release()
     }
 }

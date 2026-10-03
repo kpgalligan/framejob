@@ -533,17 +533,22 @@ typedef char *(*RcAgentToolHandler)(void *context, const char *tool_name,
  * handlers to return. Never freed by the caller. */
 char *rc_agent_string_create(const char *s);
 
-/* Starts the embedded MCP server on 127.0.0.1:`port` (0 picks an ephemeral
- * port) and returns the bound port, or 0 with a message through `err_out`.
- * `tools_json` is the `tools/list` catalog as a JSON array. One server per
- * process: a second start is an error. `handler` and `context` must stay
- * valid and callable from any thread until `rc_agent_server_stop` returns. */
-uint16_t rc_agent_server_start(uint16_t port, const char *server_name,
-                               const char *server_version, const char *tools_json,
-                               RcAgentToolHandler handler, void *context, char **err_out);
+/* Binds the embedded MCP server's Unix-socket listener at `socket_path`,
+ * chmod 0600. `tools_json` is the `tools/list` catalog as a JSON array.
+ * True, or false with a message through `err_out`.
+ * One per process: a second start is an error ("agent socket already
+ * bound"). Never unlinks an existing file. */
+bool rc_agent_socket_start(const char *socket_path, const char *server_name,
+                           const char *server_version, const char *tools_json,
+                           RcAgentToolHandler handler, void *context, char **err_out);
 
-/* Stops the server and joins its thread. Safe when none is running. */
-void rc_agent_server_stop(void);
+/* For quit. Takes the listener out of its slot and unlinks the socket file
+ * only if it is still the one this listener bound (same device and inode),
+ * then abandons the listener: its thread is neither unblocked nor joined, so
+ * a call in flight cannot hold the quit, and process exit ends it. `handler`
+ * and `context` must stay valid for the life of the process. Safe when none
+ * is bound. */
+void rc_agent_socket_release(void);
 
 #ifdef __cplusplus
 }

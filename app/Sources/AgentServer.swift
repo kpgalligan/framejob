@@ -1,19 +1,17 @@
 import AppKit
 
-/// Hosts the core's embedded MCP server (streamable HTTP on 127.0.0.1) and
-/// executes its tool calls against the open projects. The Rust side owns the
-/// protocol (`rc_agent_server_start`); this class owns the tool catalog and
-/// the dispatch, which runs on the main thread so every edit flows through
-/// the same `ProjectDocument` entry points as the UI — undoable, dirtying,
-/// and live in the window.
+/// Hosts the core's embedded MCP server (streamable HTTP over a Unix
+/// socket) and executes its tool calls against the open projects. The Rust
+/// side owns the protocol (`ReelAgentSocket`); this class owns the tool
+/// catalog and the dispatch, which runs on the main thread so every edit
+/// flows through the same `ProjectDocument` entry points as the UI —
+/// undoable, dirtying, and live in the window.
 ///
-/// Point any MCP client at `http://127.0.0.1:<port>/mcp` — e.g.
-///   goose session --with-streamable-http-extension "http://127.0.0.1:4817/mcp"
-///
-/// The endpoint is unauthenticated: any local process may connect while it
-/// runs. It is off by default (Tools ▸ Allow Agent Connections), and on
-/// automatically when the app is launched with `-AgentServerEnabled YES`
-/// (spec §7.9).
+/// The socket (`AgentServer+Socket.swift`, road map 14, spec §11 MC-1) is
+/// bound at every launch, at `Agent/agent.sock` in the support folder or
+/// `RC_AGENT_SOCKET`, in a `0700` folder; it is the only listener (MC4
+/// deleted TCP). A client reaches it through the bundled `reelcut-mcp`,
+/// whose line Tools ▸ Copy MCP Command puts on the clipboard.
 ///
 /// **This file is frozen at wiring** (app/CLAUDE.md): the lifecycle, the
 /// dispatch table, the edit and result helpers, and the trampoline. Every
@@ -25,14 +23,9 @@ import AppKit
 final class AgentServer {
     static let shared = AgentServer()
 
-    /// Doubles as the persisted preference and the launch flag: AppKit puts
-    /// `-AgentServerEnabled YES` into the argument domain, so one `bool`
-    /// read answers both (spec §7.9).
-    static let enabledDefaultsKey = "AgentServerEnabled"
-    static let defaultPort: UInt16 = 4817
-
-    private(set) var port: UInt16 = 0
-    var isRunning: Bool { port != 0 }
+    /// The socket path `bindSocket` bound, or nil; written only there.
+    var boundSocketPath: String?
+    var isRunning: Bool { boundSocketPath != nil }
 
     /// The nest the CURRENT tool call ASKED to edit inside — the envelope's
     /// `scope` (spec §6, `core/src/scope.rs`) — or nil, which means "wherever
@@ -81,8 +74,8 @@ final class AgentServer {
         let message: String
     }
 
-    /// A failure to START the server. This one IS user-facing (the menu item
-    /// puts it in an alert), so it carries a localized description.
+    /// A failure to build the catalog. Logged, never an alert: the socket's
+    /// bind reports it in its one log line.
     struct ToolFailure: LocalizedError {
         let message: String
         var errorDescription: String? { message }
@@ -118,47 +111,9 @@ final class AgentServer {
 
     // MARK: - Lifecycle
 
-    /// Starts on `RC_AGENT_PORT` or the default port, falling back to an
-    /// ephemeral port when that one is taken. Throws with a message on
-    /// failure.
-    func start() throws {
-        guard !isRunning else { return }
-        let preferred =
-            ProcessInfo.processInfo.environment["RC_AGENT_PORT"]
-            .flatMap(UInt16.init) ?? Self.defaultPort
-        let catalog = try prepareCatalog()
-        let version =
-            Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-            ?? "0.0"
-        let context = Unmanaged.passUnretained(self).toOpaque()
-
-        var bound: UInt16 = 0
-        var lastError = "could not start the agent server"
-        for candidate in [preferred, 0] where bound == 0 {
-            var err: UnsafeMutablePointer<CChar>? = nil
-            bound = rc_agent_server_start(
-                candidate, "reelcut", version, catalog, agentToolTrampoline, context, &err)
-            if let err = err {
-                lastError = String(cString: err)
-                rc_string_free(err)
-            }
-        }
-        guard bound != 0 else {
-            throw ToolFailure(message: lastError)
-        }
-        port = bound
-        NSLog("Reelcut agent server listening on http://127.0.0.1:%d/mcp", Int(bound))
-    }
-
-    func stop() {
-        guard isRunning else { return }
-        rc_agent_server_stop()
-        port = 0
-    }
-
     /// Builds the catalog, fills the gate and runs the parity check, once per
     /// launch (spec §11 AI-3): `AgentLane.prepareAtLaunch()` calls it from
-    /// `main.swift`, and `start()` gets the memoised string. Main only; a
+    /// `main.swift`, and `bindSocket()` gets the memoised string. Main only; a
     /// throw is not memoised.
     @discardableResult
     func prepareCatalog() throws -> String {
@@ -232,7 +187,7 @@ final class AgentServer {
     /// lives as long as the type — holds no reference back to the singleton.
     /// The single source of truth for what the server dispatches:
     /// `catalogJSON()` (AgentCatalog.swift) must describe exactly these names,
-    /// and `start()` checks the two sets match on every launch.
+    /// and `prepareCatalog()` checks the two sets match on every launch.
     ///
     /// One entry per row of the op table (spec §6, and the module doc of
     /// `core/src/edit.rs`) plus the twenty-seven tools that are not ops: the
@@ -244,7 +199,7 @@ final class AgentServer {
     /// six graphics tools (`write_graphic`, `get_graphic`,
     /// `graphic_reference`, `render_graphic`, `import_graphic_font`,
     /// `import_graphic_asset`). The count is
-    /// not decoration: `start()`'s parity check reads the core's own
+    /// not decoration: `prepareCatalog()`'s parity check reads the core's own
     /// `rc_op_names` and holds an explicit allow-list for the ops that
     /// deliberately have no tool, so a new tool that is not an op belongs in
     /// that sentence as well as in this table.
@@ -807,8 +762,9 @@ final class AgentBox<Value> {
 /// C callback for `RcAgentToolHandler`: hands the call to the lane, which
 /// takes its lock (what serialises every caller, AI-2), routes it to main or
 /// leaves an `offMainTools` member on this thread, and hands the result back
-/// as a core-owned string.
-private func agentToolTrampoline(
+/// as a core-owned string. The socket's listener calls it
+/// (`AgentServer+Socket.swift`), from its server thread.
+func agentToolTrampoline(
     _ context: UnsafeMutableRawPointer?,
     _ toolName: UnsafePointer<CChar>?,
     _ argumentsJSON: UnsafePointer<CChar>?

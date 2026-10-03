@@ -26,9 +26,11 @@ detail there.
   `TextPatch` (with `case`, `words` and `word_style`) is `TextPatch.swift`'s,
   moved out so it could grow, and `ShapePatch` `ShapePatch.swift`'s (a pure
   move, the toll for `ReelColor`). `word_style` has ONE
-  app-side writer, `CaptionLayout.place` (W-10). The `dictionary`
-  extensions on the property types are `OpDictionaries.swift`'s (a pure
-  move, #190).
+  app-side writer, `CaptionLayout.place` (W-10). `ReelAgentSocket` (road map
+  14's MC2) wraps `rc_agent_socket_start` / `_release`: `start` throws the
+  core's sentence, `release` is the quit's unlink-if-still-ours with no join.
+  The `dictionary` extensions on the property types are
+  `OpDictionaries.swift`'s (below).
   The graphics engine's wrappers are here too: `GraphicLibrary` (`addFont`,
   `addAsset`, `rasterize`, `families()`; frozen by its first compile,
   rasterize or `families()`) and
@@ -46,6 +48,13 @@ detail there.
   `rc_project_apply`'s TWO message channels**, in the header's own order — a
   sentence is a refusal, an error message is invalid input, neither written
   is an identity — answered as the `ReelEdit` below.
+- `OpDictionaries.swift` — the `dictionary` extensions on the §5.2
+  property types (`CropInsets` … `Gradient`), the model's own key names; a
+  pure move out of `ReelCore.swift` (#190, issue batch B52b; road map 14's
+  MC2 made the same move as `PropsDictionaries.swift`, and the merge kept
+  main's file). With
+  `ReelCore.swift` and `ReelOps.swift`, the only files that write an op
+  argument.
 - `ReelOps.swift` — `OpArgs`, `ReelOp` and one typed factory per row of
   `core/src/edit.rs`'s op table, plus a RAW factory beside the typed one at
   each door that takes a CALLER's own object — ELEVEN of them (`setVideoRaw`,
@@ -233,7 +242,14 @@ detail there.
   session after 2 s and 10 s. The cache order is thumbnails → peaks → speech.
   `thumbnails` holds a
   video track's last frame past its end, from the track's last SAMPLE's time.
-  `FFmpegRewrap` is opt-in (`-RCFFmpegImport always`), runs `Process` on a
+  `FFmpegRewrap` is opt-in (`-RCFFmpegImport always`), and `assist`'s
+  `mayAsk` is the CALLER's (spec §11 MC-5): `MediaImporter.probe` requires
+  it, every click path passes `true`, a tool call's import passes `false`
+  (`import_media`, `relink_media`, `record_screen` through
+  `ScreenRecorder.start`), and `open_project` runs its synchronous
+  `makeDocument` inside `MediaImporter.withoutAsking`, a thread-scoped key
+  `probeBlocking` reads — never process-wide state, so a person's own
+  import still asks while a call runs. It runs `Process` on a
   serial queue, and writes conversions under `AppSupport` — the ONE spelling
   of `~/Library/Application Support/Reelcut/` — never in the package.
   `AppSupport.ensureDirectory` is the ONE creator of that folder and of any
@@ -410,6 +426,13 @@ the key map behind it.
   the delegate), `main.swift` — the window,
   the no-document window, the launch/terminate flow and the whole menu bar
   (spec §9). Menu items are nil-target selectors down the responder chain.
+  `AppDelegate.swift` binds the agent socket at launch and releases it at
+  quit, and answers Tools ▸ Copy MCP Command (`copyMCPCommand`, road map
+  14's MC4: the general pasteboard cleared and the `mcpCommand` line set as
+  `.string`; live with no document, enabled exactly while `mcpHelperURL` is
+  an executable file; not an edit, so no MCP mirror).
+  `main.swift` also calls `AgentCatalogSnapshot.writeIfAsked()` straight
+  after `AgentLane.prepareAtLaunch()`, at `#if` depth 0.
 - `EditorWindow.swift` — the editor's `NSWindow` subclass: its `sendEvent`
   routes a bare Space to play/pause unless the first responder types or
   presses on it (spec §11 K-1), so Space never beeps when focus has fallen
@@ -851,6 +874,23 @@ the key map behind it.
   own text in the graphic pool, never the last good frame; a raster's
   warnings ride in `Rendered.warnings` so a pool hit still reports them.
   Only no set and a failed upload are nil.
+- `GraphicPrefetch.swift` — an export's graphics rasterized AHEAD on worker
+  threads (spec §11 G-26, #127): only an `ExportWriter` export with a
+  pinned set and a graphic in range. `activeProcessorCount − 1` Foundation
+  `Thread`s (8 MiB stacks, their QuickJS engines dying with them) walk
+  `range.start + i × frameDuration` on the export's key, reading only
+  `RecipeSource.recipe(for:at:)` and `GraphicRegistry.resolve` (the pin,
+  G-13), and fill `Slot`s — exactly `LayerRenderers.graphic`'s inputs —
+  with a texture key and a raster; at most `4 × workers` slots and 1 GiB
+  held. `LayerRenderersGraphic` asks `take` on a pool MISS and uses the
+  raster only when the worker's texture key equals its own, else rasterizes
+  as before; a pool hit `discard`s the slot. The compositor still runs
+  `svg`, records every report and draws every card (G-8), so the file is
+  the serial path's. One `NSCondition` guards everything; a worker never
+  waits holding an unfinished entry, so `take`'s wait always ends.
+  `ReelcutGraphicPrefetchOff` (YES) is the measurement switch; each session
+  logs one `[reelcut] graphic prefetch: …` line once it is stopped and its
+  last worker has exited.
 - `Compositor.swift` · `CompositorEffects.swift` · `Resources/Shaders/Compositor.metal`
   — the per-layer pass. The uniform block's field ORDER is a contract with the
   shader checked only by reading both, so change them in one edit; it is 104
@@ -927,6 +967,9 @@ the key map behind it.
   not compile or is missing, refuses before the destination is touched), and
   ABORTS on a recorded failure: `pollProgress` cancels and `finish` removes
   the file and answers `.graphicFailed`, whatever the pipeline said.
+  `startWriting` starts the graphic prefetch (`startGraphicPrefetch`, G-26)
+  after the pipeline is picked, and `finish` and `deinit` `stop` it on the
+  line before each `unpin`.
   `Exporter.graphicWarnings` (`ExporterGraphics.swift`'s
   `ExportGraphicWarning`, each (name, message) once with its first frame) is
   published in `finish` before the unpin and read by the progress sheet
@@ -1488,7 +1531,7 @@ free.
   stranger refused by name — the tool, the strangers and the whole of what it
   takes — before the scope or any handler reads a thing. Its map is read once
   from the catalog string `prepareCatalog()` built at launch (spec §11 AI-3),
-  which `start()` then registers. What it cannot see is a
+  which `bindSocket()` then registers. What it cannot see is a
   declared argument no handler reads, which is the optional half of
   `op_argument_proof.py`'s section 3. `target(_:)` resolves the implicit
   document through `NSApp.orderedDocuments`, never `documents.first`, and an
@@ -1497,6 +1540,35 @@ free.
   (`import_media`, `transcribe`, `record_screen`, `export`,
   `render_graphic`, …); the criterion
   is "waits on main", not "touches the disk".
+- `AgentServer+Socket.swift` — the agent server's Unix socket, its only
+  listener since road map 14's MC4 deleted TCP (MC2, spec §11 MC-1, MC-2,
+  MC-6). `socketPlan` is pure: a non-empty `RC_AGENT_SOCKET`, else
+  `AppSupport`'s `Agent/agent.sock`. `bindSocket` (all of
+  `applicationDidFinishLaunching`) runs `socketRefusal` — the folder made
+  through `AppSupport.ensureDirectory`, then a real folder this user owns
+  with no group or world bits; a socket at the path that ACCEPTS is left
+  alone, one that REFUSES is unlinked, anything else is left alone — then
+  `ReelAgentSocket.start` with the prepared catalog and the frozen file's
+  `agentToolTrampoline`, and sets `boundSocketPath` (`isRunning` reads it)
+  after a bind. It never alerts: one log line, `Reelcut agent socket
+  listening at <path>` or `Reelcut agent socket not bound: <reason>`, never
+  the `Reelcut: ` prefix. `unbindSocket` (all of `applicationWillTerminate`)
+  releases with no join. `mcpHelperURL` is this bundle's own
+  `Contents/Helpers/reelcut-mcp` and `mcpCommand(helperPath:)` the
+  `claude mcp add --scope user reelcut -- '<path>'` line Tools ▸ Copy MCP
+  Command copies (each `'` written `'\''`). The mode check, the connect,
+  the listening line and `mcpHelperURL` are each one statement that
+  `agent_socket_proof.py`'s mutants replace.
+- `AgentCatalogSnapshot.swift` — the build's catalog snapshot (road map
+  14's MC3, spec §11 MC-4): with `-RCWriteCatalog <path>`, read from the
+  ARGUMENT domain only, the launch writes `{"version":…,"tools":…}` — the
+  bundle's short version and `AgentServer.shared.preparedCatalog` verbatim —
+  atomically to `<path>` and exits before `NSApplicationMain`; a nil catalog
+  or a failed write is one stderr line, `reelcut catalog snapshot: …`, and
+  exit 1. `project.yml`'s "Write Agent Catalog" phase runs the just-built
+  binary (ad-hoc signed in place first) this way to put
+  `Contents/Resources/agent-catalog.json` in the bundle, which `reelcut-mcp`
+  lists from while no Reelcut runs; `dist_check.py` D21–D24 check it.
 - `AgentLane.swift` — every tool call's one door (road map 12 A1, spec §11
   AI-2, AI-3, AI-5, AI-12): the MCP trampoline's `serve` (server thread,
   synchronous) and the assistant session's `submit` (returns at once; one
@@ -1936,7 +2008,8 @@ exception by asking — screen recording has a complete callback API and
 uses it. **`import Synchronization` is allowed only inside `LevelMeter.swift`**,
 whose `publish` runs on the audio render thread where a lock invites priority
 inversion and `main.async` allocates; every other cross-thread value is an
-`NSLock`, the cache ledger's `NSCondition`, or a main hop. `DispatchQueue`
+`NSLock`, the cache ledger's `NSCondition`, the prefetch's `NSCondition`, or
+a main hop. `DispatchQueue`
 only at the documented seams: the
 compositor's render queue, the composition rebuild, import, the export
 progress timer, `Transcriber`'s serial queue, `CloudTranscriber`'s serial
@@ -1953,7 +2026,8 @@ handlers, the coalesced pass and the outbox; main publishes through
 hop, the alert queue's main hop (`ProjectDocument+Alerts.swift`), the agent lane's per-document serial queues (`AgentLane.swift`), the
 assistant session's write queue (`AssistantSession.swift`), and the spend-month
 queue (`AssistantSpendMonth.queue`, Settings' ledger fold, answered by a
-main hop). The recorder adds
+main hop), and — not a queue but a seam all the same — the graphic
+prefetch's worker `Thread`s (`GraphicPrefetch.swift`, G-26). The recorder adds
 NO queue of its own:
 framework callbacks are stamped where they land and hopped to main. Colors,
 fonts and metrics come from `DS` tokens; shared controls go in

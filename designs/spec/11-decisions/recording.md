@@ -214,8 +214,9 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   (1920×1080 at the chosen rate), and later files touch it on its one
   track. **MCP**: `record_screen` gains `source`, `"screen"` (the default)
   or `"voice_over"`; with a voice-over the default microphone is implied,
-  and `display`, `window`, `system_audio`, `show_clicks`, `size` and
-  `microphone: false` are refused by name, and only the Microphone
+  and `display`, `window`, `system_audio`, `show_clicks`, `size`,
+  `include_reelcut_windows` (added when the Include Reelcut windows decision
+  below met this one) and `microphone: false` are refused by name, and only the Microphone
   permission is read. The tool's refusal order is `seconds`, then `source`
   (its value, then the screen-only arguments given — a JSON null is not
   given — then `microphone: false`), then the existing argument checks,
@@ -242,3 +243,21 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   nil. No readable file is a failure: the first left-out error wrapped as
   `.filesKept(e, movie: "", microphone: <the files on disk, comma-joined>)`.
   `stoppedBy` is always `.stopped`.
+- **Include Reelcut windows** (2026-09-30). The panel's checkbox under
+  Source, off by default, kept in `ReelcutRecordingIncludeReelcutWindows`;
+  `record_screen`'s `include_reelcut_windows` mirrors it, default false.
+  Off is today's rule: a display recording excludes Reelcut's application
+  (R0 q3), and the picker lists none of its windows. On, a display
+  recording excludes no application. The one exception is a recording the
+  PANEL started, which excludes the panel's own window: the panel stays on
+  screen until `recordingDidStart`, after the capture's completion, and the
+  file's first frame is written 86–107 ms before that completion (R0 q2).
+  The picker lists Reelcut's windows but not the panel. Pictures only:
+  Reelcut's sound stays out (`excludesCurrentProcessAudio`). A window
+  source is unaffected: `window` records the window it names, and a window
+  already picked stays picked — the box governs the NEXT picker. The tool
+  excludes no window. **With a voice-over** (the decision above; the two met
+  when side-work merged into main, 2026-10-02) the box greys out with System
+  Audio, Show Clicks and Size, its value kept, and `record_screen` refuses
+  `include_reelcut_windows` by name with `source: "voice_over"`, as it does
+  the other screen-only arguments.

@@ -14,7 +14,8 @@ title bar.
 At the top, a paragraph: the recording is saved as a movie in the Reelcut
 Recordings folder and added to the chosen project at the playhead, or opened as a
 new project. The rows: Source, a pop-up naming the display to record ("Built-in
-Retina Display" on the machine that captured this); Microphone "Off", with an
+Retina Display" on the machine that captured this), and under it an
+unticked checkbox, "Include Reelcut windows"; Microphone "Off", with an
 empty level meter beside it; System Audio, a switch that is on (blue); Show
 Clicks, a switch that is off; Rate "60 fps"; Size "Nominal (points)", with the
 line "1728×1117 points · 3456×2234 pixels" under it — the recorded size of that

@@ -2,7 +2,7 @@
 """The assistant's tool-result clearing, against the stand-in or the real API
 — issue batch B54 (#208; spec §11 AI-20).
 
-One Release app (port 4886, `-AgentServerEnabled YES`, a dummy
+One Release app (on a scratch socket, spec §11 MC-6; a dummy
 `-RCSecretFolder`, `-ReelcutAssistantModel claude-opus-5-5`,
 `-ReelcutAssistantAutoCompact NO`, `-ReelcutAssistantClearToolResults YES`)
 is pointed at `ClearingRelay`, a subclass of `assistant_prompt_eval.py`'s
@@ -89,7 +89,6 @@ import assistant_tab_proof as atp  # noqa: E402
 import budget  # noqa: E402
 
 WORK = os.path.join(HERE, "work", "assistant_clearing")
-PORT = 4886
 MODEL = "claude-opus-5-5"
 BETA = "context-management-2025-06-27"
 CLEAR_EDIT = sp.CLEAR_EDIT
@@ -485,10 +484,10 @@ def converse(release, relay, folder, stand_in, clearing, key):
     """Launch, a fresh project, two turns and the rows X0–X4, H and K."""
     try:
         app = asp.App("X", release,
-                      ["-AgentServerEnabled", "YES", "-RCSecretFolder", asp.secret_folder(),
+                      ["-RCSecretFolder", asp.secret_folder(),
                        "-ReelcutAssistantModel", MODEL, "-ReelcutAssistantAutoCompact", "NO",
                        "-ReelcutAssistantClearToolResults", "YES" if clearing else "NO"],
-                      relay.base, port=PORT)
+                      relay.base)
     except Exception:
         relay.stop()  # the `finally` below is not reached; main scores the setup failure
         raise

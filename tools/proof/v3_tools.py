@@ -3,10 +3,10 @@
 against a Reelcut of its own: `select_inspector_tab` (a dev tool) and
 `snapshot_ui`'s `recorder` window kind.
 
-    python3 tools/proof/v3_tools.py [--port 4872] [--app APP] [--only L,T,R]
+    python3 tools/proof/v3_tools.py [--app APP] [--only L,T,R]
 
 It launches the Release app exactly as `screens.py` does (`screens.launch`:
-the same pins, an empty secret folder, the port from the log), builds the
+the same pins, an empty secret folder, a scratch socket), builds the
 `demo` fixture (`screens.build_fixture`) and writes its captures under
 `tools/proof/work/v3_tools/<stamp>/`. It kills only the process it started.
 
@@ -104,11 +104,11 @@ class Proof:
 
     def row_l1(self):
         try:
-            self.child, bound = screens.launch(self.args.app, self.args.port, self.out)
+            self.child, bound = screens.launch(self.args.app, self.out)
         except screens.LaunchError as error:
             score("L1", "fail", f"launch: {error}")
             return False
-        print(f"app: pid {self.child.pid} port {bound}", flush=True)
+        print(f"app: pid {self.child.pid} socket {bound}", flush=True)
         notes, ok = [], True
         try:
             self.mcp = MCP(bound, timeout=180)
@@ -305,7 +305,6 @@ class Proof:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--port", type=int, default=4872)
     parser.add_argument("--app", default=screens.DEFAULT_APP)
     parser.add_argument("--only")
     args = parser.parse_args()

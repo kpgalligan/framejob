@@ -69,12 +69,13 @@ Needs no ffmpeg and nothing in `media/` but `A.mov`, which
 `tools/proof/README.md` says how to make. Run it as every other script here
 is run:
 
-    python3 tools/proof/patch_door_proof.py <port>
+    python3 tools/proof/patch_door_proof.py <dir>/agent.sock
 """
 
 import os
 import sys
 
+from mcp import target  # noqa: E402
 from patch_door import MCP, WORK, ToolError, summary
 from patch_door_args import (
     background_clip_door, canvas_background_door, new_shape_clip_door,
@@ -84,13 +85,13 @@ from patch_door_patches import (
     action_end_door, audio_door, clip_door, shape_door, text_door, video_door,
 )
 
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 4823
+SOCKET = target(sys.argv)
 
 
 def main():
     os.makedirs(WORK, exist_ok=True)
-    mcp = MCP(PORT)
-    print(f"the patch door, against 127.0.0.1:{PORT}")
+    mcp = MCP(SOCKET)
+    print(f"the patch door, against {SOCKET}")
     video_door(mcp)
     audio_door(mcp)
     text_door(mcp)

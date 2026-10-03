@@ -171,7 +171,8 @@ extension ScreenRecorder {
                 self?.probeSegment(done, at: index + 1, landed: landed, skipped: skipped + [left])
             }
         }
-        MediaImporter.probe(url: done.segments[index].movieURL) { [weak self] movie in
+        MediaImporter.probe(url: done.segments[index].movieURL, mayAsk: done.mayAsk) {
+            [weak self] movie in
             guard let self else { return }
             switch movie {
             case .failure(let error):
@@ -225,7 +226,7 @@ extension ScreenRecorder {
         guard let micURL = segment.micURL, segment.micFailure == nil,
             FileManager.default.fileExists(atPath: micURL.path)
         else { return then(placed) }
-        MediaImporter.probe(url: micURL) { mic in
+        MediaImporter.probe(url: micURL, mayAsk: done.mayAsk) { mic in
             guard case .success(let descriptor) = mic else { return then(placed) }
             then(
                 UnreadableSegment(
@@ -250,7 +251,7 @@ extension ScreenRecorder {
             let problem = failure + Self.fileClause(micURL, "What it wrote is at")
             return then(Self.result(done, at: index, movie: movie, mic: nil, problem: problem))
         }
-        MediaImporter.probe(url: micURL) { mic in
+        MediaImporter.probe(url: micURL, mayAsk: done.mayAsk) { mic in
             switch mic {
             case .failure(let error):
                 let problem =

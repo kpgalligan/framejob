@@ -41,8 +41,9 @@ extension RecorderPanelController {
     /// Whether the panel orders out at `recordingDidStart` for `source`.
     static func hidesForRecording(_ source: RecordingSource) -> Bool { source != .voiceOver }
 
-    /// Every control unlocked only while idle; the three screen-only ones
-    /// greyed besides while Microphone Only is chosen, their values kept.
+    /// Every control unlocked only while idle; the four screen-only ones
+    /// (Include Reelcut windows among them, set only here) greyed besides
+    /// while Microphone Only is chosen, their values kept.
     func syncControlsEnabled() {
         let idle = phase == .idle
         let controls: [NSControl] = [
@@ -51,7 +52,10 @@ extension RecorderPanelController {
         ]
         for control in controls { control.isEnabled = idle }
         let screenOnly = idle && !voiceOverSelected
-        for control in [systemAudioSwitch, showClicksSwitch, sizePopup] as [NSControl] {
+        let screenControls: [NSControl] = [
+            systemAudioSwitch, showClicksSwitch, sizePopup, includeReelcutCheckbox,
+        ]
+        for control in screenControls {
             control.isEnabled = screenOnly
         }
     }
@@ -98,7 +102,7 @@ extension RecorderPanelController {
     func launchVoiceOver(_ choice: RecordingChoice) {
         launched = true
         recorder.startVoiceOver(
-            choice: choice,
+            choice: choice, mayAsk: true,
             onFinish: { [weak self] outcome in self?.recordingEnded(outcome) }
         ) { [weak self] error in
             guard let self else { return }

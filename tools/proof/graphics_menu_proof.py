@@ -3,11 +3,11 @@
 File…), File ▸ Add Font to Graphics… and Add Image to Graphics…, Help ▸
 Graphics Reference, against the built app and a probe.
 
-    python3 tools/proof/graphics_menu_proof.py [--port 4889] [--app PATH]
+    python3 tools/proof/graphics_menu_proof.py [--app PATH]
     python3 tools/proof/graphics_menu_proof.py --mutant notice-dropped
 
-**The fixture, over MCP** (one owned instance on its own port, launched and
-stopped by PID, its log at `work/graphics-menu/reelcut-<port>.log`):
+**The fixture, over MCP** (one owned instance on a scratch socket, launched and
+stopped by PID, its log at `work/graphics-menu/reelcut.log`):
 `new_project {path: GM}`, `save_project` — a package with NO module.
 
 R1  the built app's `Contents/Resources/GraphicTemplates/` holds exactly the
@@ -120,16 +120,16 @@ def check(name, ok, detail=""):
         print("       " + detail.splitlines()[0][:300], flush=True)
 
 
-def fixture(app, port):
+def fixture(app):
     """GM over MCP: a saved package with no module. Its path, or None and
     why; the log."""
     WORK.mkdir(parents=True, exist_ok=True)
     package = WORK / "GM.reelcut"
     shutil.rmtree(package, ignore_errors=True)
-    log = WORK / f"reelcut-{port}.log"
+    log = WORK / "reelcut.log"
     if log.exists():
         log.unlink()
-    instance = gp.Instance(app, port, log)
+    instance = gp.Instance(app, log)
     client = instance.start()
     try:
         if client is None:
@@ -229,7 +229,7 @@ def probe_checks(package, sources=ROOT / "app/Sources", out=WORK / "probe"):
         check(row["name"], row["ok"], row["detail"])
 
 
-def mutant(app, port):
+def mutant(app):
     """Rule R: 0 caught (M13 answered and FAILED), 1 survived, 2 the control
     was not performed."""
     with tempfile.TemporaryDirectory(prefix="reelcut-graphics-menu-notice-dropped-") as temp:
@@ -249,7 +249,7 @@ def mutant(app, port):
         if not app.exists():
             print(f"mutant notice-dropped: the control could not be performed — no app at {app}")
             return 2
-        package, why, _ = fixture(app, port)
+        package, why, _ = fixture(app)
         if package is None:
             print(f"mutant notice-dropped: the control could not be performed — {why}")
             return 2
@@ -268,13 +268,12 @@ def mutant(app, port):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--port", type=int, default=4889)
     parser.add_argument("--app", default=str(APP))
     parser.add_argument("--mutant", choices=["notice-dropped"])
     args = parser.parse_args()
     app = Path(args.app)
     if args.mutant:
-        return mutant(app, args.port)
+        return mutant(app)
     print("Road map 10, G5b — the graphics menus and templates", flush=True)
     if not app.exists():
         check("the app is built", False, str(app))
@@ -282,7 +281,7 @@ def main():
         return 1
     print("\n0 — the bundle and the fixture over MCP", flush=True)
     bundle_check(app)
-    package, why, log = fixture(app, args.port)
+    package, why, log = fixture(app)
     check("the fixture is made over MCP (new_project, save_project)", package is not None,
           why or "")
     if package is not None:

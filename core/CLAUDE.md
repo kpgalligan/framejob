@@ -490,13 +490,35 @@ governs a module now.
   no partial value — never "the canvas is translucent".
 - `agent.rs` — embedded MCP server (streamable HTTP, tools only).
   **Generic** — knows nothing about video; the host registers the catalog
-  and a callback. Copied from Rasterize; do not add domain knowledge.
+  and a callback. Copied from Rasterize; do not add domain knowledge. Since
+  road map 14 it differs from Rasterize's (a Unix socket only here; TCP with
+  `admit` there), and kpgalligan/rasterize#430 offers the change. One
+  listener, `start_socket` (a Unix socket at an absolute path of at most
+  `MAX_SOCKET_PATH_BYTES`, 103, chmod 0600, never unlinking a file already
+  there), into the `serve` loop; road map 14's MC4 deleted the TCP `start`.
+  **`tiny_http` 0.12's `Server` drop unlinks its path unconditionally (MC1's
+  S7)**, so a socket listener records its file's
+  device and inode as a `SocketClaim`: `shutdown` lets the drop run only
+  while the claim `is_current`, and forgets the server otherwise; `release`
+  (the quit path) unlinks only a current file and then forgets the whole
+  listener — no unblock, no join — so a call in flight cannot hold a quit.
+  The protocol revisions it negotiates are `mcp_versions.rs`'s, not its own.
+- `mcp_versions.rs` — the MCP protocol revisions (`SUPPORTED_VERSIONS`,
+  `LATEST_VERSION`) and `negotiate` (the requested one when supported, else
+  the newest), moved out of `agent.rs` by road map 14's MC3 so ONE list
+  serves two readers: `agent.rs`'s `initialize` and `mcp-proxy/`, which
+  includes this file by `#[path]`. It therefore uses `std` alone and names
+  nothing of this crate (no `use crate::…`).
 - `ffi.rs` / `ffi_edit.rs` / `ffi_query.rs` / `ffi_agent.rs` — thin shims
   only; shared plumbing lives in `ffi_util.rs`, never copy-pasted.
   `ffi_query.rs`'s rule: a query never allocates a handle and has no
   `err_out`, which is why `rc_project_scoped` lives in `ffi.rs`.
   `rc_speed_limits` is its answer for the speed range and the audio ceiling;
   `rc_normalise_color` (`ffi.rs`) is the colour grammar's (G-25).
+  `ffi_agent.rs` has one slot, one listener per process: `SOCKET`
+  (`rc_agent_socket_start` / `_release`; MC4 deleted the TCP pair and its
+  slot), whose `AgentConfig` is built by `host_config`, one catalog
+  through one handler.
 - `container.rs` · `container_header.rs` · `container_blocks.rs` ·
   `container_codec.rs` · `container_timing.rs` · `ffi_container.rs` — a WebM
   or Matroska file being imported, read as an INDEX (spec §11 #216-R),

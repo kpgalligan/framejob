@@ -24,7 +24,7 @@ The probe `assistant_settings_probe.swift` (over `app/Sources`,
        `context_management.edits[0]` the clear edit (trigger 150,000 input
        tokens, keep 5 tool uses, at least 50,000) and the beta; POST 3 with
        `compaction`, POST 4 without
-The Release app (`assistant_session_proof`'s `App`, port 4885), launched with
+The Release app (`assistant_session_proof`'s `App`, a scratch socket), launched with
 `-ReelcutAssistantAutoCompact NO -ReelcutAssistantClearToolResults YES
 -RCDevAssistantAutoCompact 1`:
   CS3  `new_project`, then `assistant_send` against a reply and a compaction
@@ -79,7 +79,6 @@ atp.WORK = WORK
 RELEASE = os.path.join(ROOT, asp.APP_PATH)
 PROBE_SWIFT = os.path.join(HERE, "assistant_settings_probe.swift")
 MAIN_TS = os.path.join(ROOT, "agent", "src", "main.ts")
-PORT_CS3 = 4885
 WALL_RUN, WALL_TURN = 300, 60
 PROBE_ROWS = ["CS1", "CS2"]
 BETA = "context-management-2025-06-27"
@@ -217,9 +216,9 @@ def row_cs3(app_path, fake, secrets, tag="CS3"):
     fake.scenario([asp.say("CS3: done."),
                    compaction_reply("CS3: the conversation so far, summarised.")])
     app = asp.App(tag, app_path,
-                  ["-AgentServerEnabled", "YES", "-RCSecretFolder", secrets,
+                  ["-RCSecretFolder", secrets,
                    "-ReelcutAssistantAutoCompact", "NO", "-ReelcutAssistantClearToolResults",
-                   "YES", "-RCDevAssistantAutoCompact", "1"], fake.base, port=PORT_CS3)
+                   "YES", "-RCDevAssistantAutoCompact", "1"], fake.base)
     try:
         app.connect()
         a = app.must("new_project", path=os.path.join(folder, "CS3.reelcut"))["saved"]

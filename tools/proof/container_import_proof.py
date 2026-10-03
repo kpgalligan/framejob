@@ -2,9 +2,10 @@
 """Issue batch B73 — a WebM or Matroska file imports by the built-in rewrap
 (spec §11 #216-R), proved over MCP on an instance this script launches.
 
-    python3 tools/proof/container_import_proof.py --port <port> [--mutant ffmpeg-copy]
+    python3 tools/proof/container_import_proof.py [--mutant ffmpeg-copy]
 
-Launches the Release build on <port> with `-RCFFmpegImport never` (so a
+Launches the Release build on a scratch socket of its own (spec §11 MC-6)
+with `-RCFFmpegImport never` (so a
 codec the copy refuses is never handed to a stored "always" policy) and
 kills only that process. It runs over the instance's REAL
 `~/Library/Application Support/Reelcut/Rewrapped/`: cleanup removes only the
@@ -50,7 +51,7 @@ import tempfile
 import time
 
 sys.path.insert(0, os.path.dirname(__file__))
-from mcp import MCP, ToolError  # noqa: E402
+from mcp import MCP, ToolError, remove_scratch, scratch_socket, wait_listening  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SEC = 600_000
@@ -258,7 +259,6 @@ def run(mcp, where, fixtures, mutant):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--mutant", choices=["ffmpeg-copy"])
     parser.add_argument("--app", default=os.path.join(ROOT, "build", "Build", "Products",
                                                      "Release", "Reelcut.app"))
@@ -271,27 +271,17 @@ def main():
     with tempfile.TemporaryDirectory(prefix="reelcut-container-import-") as work:
         fixtures = make_fixtures(work)
         log_path = os.path.join(work, "app.log")
+        socket_path = scratch_socket()
         with open(log_path, "w", encoding="utf-8") as log:
             env = os.environ.copy()
-            env["RC_AGENT_PORT"] = str(args.port)
-            app = subprocess.Popen([binary, "-ApplePersistenceIgnoreState", "YES",
-                                    "-AgentServerEnabled", "YES", "-RCFFmpegImport", "never"],
+            env["RC_AGENT_SOCKET"] = socket_path
+            app = subprocess.Popen([binary, "-ApplePersistenceIgnoreState", "YES", "-RCFFmpegImport", "never"],
                                    stdout=log, stderr=subprocess.STDOUT, env=env)
             try:
-                bound = None
-                until = time.monotonic() + 20
-                while time.monotonic() < until and app.poll() is None and bound is None:
-                    for line in check_parity(log_path)[0]:
-                        found = re.search(
-                            r"agent server listening on http://127\.0\.0\.1:(\d+)/mcp", line)
-                        if found:
-                            bound = int(found.group(1))
-                            break
-                    time.sleep(0.1)
-                if bound != args.port:
-                    print(f"instrument failure: asked for port {args.port}, bound {bound}")
+                if not wait_listening(log_path, socket_path, child=app, seconds=20):
+                    print(f"instrument failure: the app did not listen at {socket_path}")
                     return 2
-                run(MCP(bound, timeout=300), work, fixtures, args.mutant)
+                run(MCP(socket_path, timeout=300), work, fixtures, args.mutant)
                 complaints = check_parity(log_path)[1]
                 row("M0", not complaints,
                     "no `Reelcut: ` line in the log" if not complaints
@@ -304,6 +294,7 @@ def main():
                     except subprocess.TimeoutExpired:
                         app.kill()
                         app.wait(timeout=5)
+                remove_scratch(socket_path)
                 # Only the digest names this run created, directly inside
                 # Rewrapped/ (parent-checked), go.
                 for name in sorted(set(listing()) - before):

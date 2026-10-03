@@ -6,12 +6,12 @@ from pathlib import Path
 import shutil
 import sys
 import time
-from mcp import MCP, ToolError
+from mcp import MCP, ToolError, target
 
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/peaks-proof"
 FIXTURES = ROOT / "tools/proof/work/peaks-probe/fixtures"
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 5410
+SOCKET = target(sys.argv)
 passed = failed = 0
 
 
@@ -75,7 +75,7 @@ def main():
         shutil.rmtree(old)
     check("source probe fixtures exist", all((FIXTURES / name).exists() for name in
           ("corrupt.m4a", "silent48.wav", "stereo48.wav")))
-    mcp = MCP(PORT)
+    mcp = MCP(SOCKET)
     required = {"new_project", "import_media", "add_clip", "detect_silence",
                 "normalize_clip", "get_project", "open_project", "consolidate_media"}
     check("required tool names are published", required <= set(mcp.tools()))

@@ -8,9 +8,9 @@ G4b (§10.7), `render_graphic`'s contact sheet, the two imports and the loop
 end to end — and G5b (§10.9), W1: a font landed from the shell in a
 module-less `graphics/` reaches the library through the store's own post.
 
-One owned instance on its own port, launched and stopped by PID, with its log
-at `tools/proof/work/graphics/reelcut-<port>.log`; nothing else is ever
-killed. Every child runs under `graphics_spike/bounded.py`, and every wait is
+One owned instance on a scratch socket (`mcp.scratch_socket`), launched and
+stopped by PID, with its log at `tools/proof/work/graphics/reelcut.log`;
+nothing else is ever killed. Every child runs under `graphics_spike/bounded.py`, and every wait is
 a bounded poll. The G3 rows' modules are written OUTSIDE a package and `mv`d
 into its `graphics/` from the shell; the G rows write through `write_graphic`.
 `bar.js` is this
@@ -212,7 +212,7 @@ Q5  (B68) `warnsheet`: an `ExportProgressSheetController(… graphics: set)`,
     warnings (hover for details).` and its toolTip holds Q4's two lines;
 Z1  `grep "Reelcut: "` over every launch's log prints nothing.
 
-    python3 tools/proof/graphics_proof.py [--port 4879] [--app PATH]
+    python3 tools/proof/graphics_proof.py [--app PATH]
     python3 tools/proof/graphics_proof.py --mutant frame-plus-one
     python3 tools/proof/graphics_proof.py --mutant sheet-uncapped
     python3 tools/proof/graphics_proof.py --mutant reference-unchecked
@@ -379,31 +379,27 @@ PURE_RED = (255, 0, 0)
 
 
 class Instance:
-    """One owned app, by PID, on its own port; each launch reads only the part
-    of the log it appended."""
+    """One owned app, by PID, on a scratch socket of its own (the same one
+    for every relaunch); each launch reads only the part of the log it
+    appended."""
 
-    def __init__(self, app, port, log):
-        self.app, self.port, self.log = app, port, log
+    def __init__(self, app, log):
+        self.app, self.log = app, log
+        self.socket = mcp.scratch_socket()
         self.child = None
 
     def start(self):
         offset = self.log.stat().st_size if self.log.exists() else 0
+        os.makedirs(os.path.dirname(self.socket), mode=0o700, exist_ok=True)
         with open(self.log, "a") as out:
             self.child = subprocess.Popen(
-                [str(self.app), "-ApplePersistenceIgnoreState", "YES",
-                 "-AgentServerEnabled", "YES"],
+                [str(self.app), "-ApplePersistenceIgnoreState", "YES"],
                 stdin=subprocess.DEVNULL, stdout=out, stderr=out, start_new_session=True,
-                env=bounded.child_env({"RC_AGENT_PORT": str(self.port)}))
-        deadline = time.monotonic() + 60
-        while time.monotonic() < deadline:
-            time.sleep(0.25)
-            with open(self.log) as handle:
-                handle.seek(offset)
-                found = re.search(r"listening on http://127\.0\.0\.1:(\d+)/mcp", handle.read())
-            if found:
-                bound = int(found.group(1))
-                print(f"  instance PID {self.child.pid} on port {bound}", flush=True)
-                return mcp.MCP(bound, timeout=CALL_BOUND)
+                env=bounded.child_env({"RC_AGENT_SOCKET": self.socket}))
+        if mcp.wait_listening(self.log, self.socket, child=self.child, seconds=60,
+                              offset=offset):
+            print(f"  instance PID {self.child.pid} at {self.socket}", flush=True)
+            return mcp.MCP(self.socket, timeout=CALL_BOUND)
         return None
 
     def stop(self):
@@ -416,6 +412,7 @@ class Instance:
             self.child.kill()
             self.child.wait()
         self.child = None
+        mcp.remove_scratch(self.socket)
 
 
 def attempt(client, tool, arguments):
@@ -675,15 +672,15 @@ def run_p1_p2(client, p1):
     return clip, track, f30, f31
 
 
-def run(app, port):
-    log = WORK / f"reelcut-{port}.log"
+def run(app):
+    log = WORK / "reelcut.log"
     wg, ng, nf = (WORK / f"{n}.reelcut" for n in ("WG", "NG", "NF"))
     p1, p1b, p2, pf, pa = (WORK / f"{n}.reelcut" for n in ("P1", "P1b", "P2", "F", "A"))
-    instance = Instance(app, port, log)
+    instance = Instance(app, log)
     try:
         client = instance.start()
         if client is None:
-            check("P1 the app launches", False, "the app never logged its port")
+            check("P1 the app launches", False, "the app never logged its socket")
             return log
         run_g6(client, app)
         clip, track, f30, _ = run_p1_p2(client, p1)
@@ -1804,7 +1801,7 @@ def build_mutant(file, anchor, replacement):
     return binary, ""
 
 
-def probe_mutant(app, port, name):
+def probe_mutant(app, name):
     """`--probe-mutant NAME`: the built app makes PW, then the pin probe is
     built over a scratch copy of `app/Sources` with ONE anchor replaced
     (asserted once) and only that row is run. 0 when the row FAILED, 1 when
@@ -1814,7 +1811,7 @@ def probe_mutant(app, port, name):
     if not app.exists():
         print(f"probe mutant {name}: the control could not be performed — no app at {app}")
         return 2
-    instance = Instance(app, port, WORK / f"reelcut-{port}.log")
+    instance = Instance(app, WORK / "reelcut-probe-mutant.log")
     try:
         client = instance.start()
         held, setup = make_pw(client, WORK / "PW.reelcut") if client else (False, "no launch")
@@ -1851,7 +1848,6 @@ def probe_mutant(app, port, name):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--port", type=int, default=4879)
     parser.add_argument("--app", type=Path, default=APP)
     parser.add_argument("--mutant", choices=sorted(MUTANTS))
     parser.add_argument("--probe-mutant", choices=sorted(PROBE_MUTANTS))
@@ -1859,7 +1855,7 @@ def main():
     shutil.rmtree(WORK, ignore_errors=True)
     WORK.mkdir(parents=True)
     if args.probe_mutant:
-        return probe_mutant(args.app, args.port, args.probe_mutant)
+        return probe_mutant(args.app, args.probe_mutant)
     if args.mutant:
         file, anchor, replacement, row = MUTANTS[args.mutant]
         print(f"graphics — the {args.mutant} MUTANT ({row} must FAIL)", flush=True)
@@ -1869,7 +1865,7 @@ def main():
             print(f"mutant {args.mutant}: the control could not be performed — the copy was "
                   f"not built: {why}")
             return 2
-        instance = Instance(binary, args.port, WORK / f"reelcut-{args.port}.log")
+        instance = Instance(binary, WORK / "reelcut.log")
         try:
             client = instance.start()
             if client is None:
@@ -1912,7 +1908,7 @@ def main():
         print(f"  FAIL the app is not built: {args.app}")
         print(f"0/{len(ROWS)}")
         return 1
-    log = run(args.app, args.port)
+    log = run(args.app)
     binary, why = build_pin_probe()
     because = f"the probe did not build — {why}; " if binary is None else ""
     control = run_q(binary, because)

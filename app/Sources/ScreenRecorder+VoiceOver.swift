@@ -32,6 +32,9 @@ extension ScreenRecorder {
     /// is minted by `startVoiceOver`, each later one by `resumeVoiceOver`.
     struct VoiceSession {
         let choice: RecordingChoice
+        /// Whether a segment's probe may ask the conversion question:
+        /// false for `record_screen` (spec §11 MC-5).
+        let mayAsk: Bool
         let micSession: AVCaptureSession
         let micOutput: AVCaptureAudioFileOutput
         let fileDelegate: VoiceOverFileDelegate
@@ -84,7 +87,7 @@ extension ScreenRecorder {
     /// the state is `.recording` and the writer is asked to start; its
     /// did-start is stamped where it lands.
     func startVoiceOver(
-        choice: RecordingChoice,
+        choice: RecordingChoice, mayAsk: Bool,
         onFinish: @escaping (Result<RecordingResult, Error>) -> Void,
         completion: @escaping (Error?) -> Void
     ) {
@@ -132,7 +135,8 @@ extension ScreenRecorder {
         let url = Self.nextVoiceOverURL(in: choice.folder, at: calledAt, holding: [])
         let delegate = VoiceOverFileDelegate(recorder: self)
         voiceSession = VoiceSession(
-            choice: choice, micSession: capture.session, micOutput: capture.output,
+            choice: choice, mayAsk: mayAsk, micSession: capture.session,
+            micOutput: capture.output,
             fileDelegate: delegate, onFinish: onFinish,
             segments: [VoiceSegment(url: url, calledAt: calledAt)])
         state = .recording

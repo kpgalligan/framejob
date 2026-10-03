@@ -33,7 +33,7 @@ import Foundation
 /// converted file lands in Application Support and not in the `.reelcut`
 /// bundle.
 ///
-/// The orchestration is `assist(_:)`; `MediaImporter.probeAllowingRewrap` is
+/// The orchestration is `assist(_:mayAsk:)`; `MediaImporter.probeAllowingRewrap` is
 /// its only caller.
 enum FFmpegRewrap {
 
@@ -62,14 +62,6 @@ enum FFmpegRewrap {
 
     private static func remember(_ policy: Policy) {
         UserDefaults.standard.set(policy.rawValue, forKey: policyDefaultsKey)
-    }
-
-    /// Whether a modal question can actually be answered. An agent-driven app
-    /// (`-AgentServerEnabled YES`) has nobody at the keyboard to answer an
-    /// alert, so there the stored policy decides alone and `ask` means no; a
-    /// scripted run that wants the conversion says `-RCFFmpegImport always`.
-    private static var canAsk: Bool {
-        !UserDefaults.standard.bool(forKey: AgentServer.enabledDefaultsKey)
     }
 
     // MARK: - Errors
@@ -491,8 +483,10 @@ enum FFmpegRewrap {
     /// `MediaImporter`'s two synchronous faces, OUTSIDE the 30-second ceiling
     /// those put on the AVFoundation probe, because a transcode legitimately
     /// takes minutes and being killed at 30 seconds would be a bug rather
-    /// than a safeguard.
-    static func assist(_ source: URL) throws -> URL? {
+    /// than a safeguard. `mayAsk` is the CALLER's (spec §11 MC-5): false for
+    /// a tool call's import, where nobody is at the keyboard, so there the
+    /// stored policy decides alone and `ask` means no.
+    static func assist(_ source: URL, mayAsk: Bool) throws -> URL? {
         // Before ffmpeg is even looked for, and before the policy is even
         // read: a conversion already on disk is already paid for. The policy
         // governs whether ffmpeg RUNS, and reusing a finished file runs
@@ -501,10 +495,10 @@ enum FFmpegRewrap {
         if let existing = existingRewrap(of: source) { return existing }
 
         // Read once, and read BEFORE ffprobe is spawned: a user who said
-        // never, and an agent-driven app with nobody to ask, should cost
+        // never, and a tool call's import with nobody to ask, should cost
         // nothing beyond the `stat` above.
         let decided = policy
-        if decided == .never || (decided == .ask && !canAsk) { return nil }
+        if decided == .never || (decided == .ask && !mayAsk) { return nil }
         guard let tools = tools(), let plan = plan(for: source, with: tools) else { return nil }
         if decided == .ask, !consent(for: plan) { return nil }
 

@@ -3,10 +3,10 @@
 will not decode is refused at import with a sentence naming the codec
 (spec §11 #216), proved over MCP on an instance this script launches.
 
-    python3 tools/proof/codec_import_proof.py --port <port> [--mutant NAME]
+    python3 tools/proof/codec_import_proof.py [--mutant NAME]
 
-Launches the Release build on <port> (frame_grid_proof.py's launch, port
-and parity log) and kills only that process.
+Launches the Release build on a scratch socket of its own (spec §11 MC-6;
+frame_grid_proof.py's launch and parity log) and kills only that process.
 
 **Fixtures**, made with ffmpeg in a temporary directory: one 2 s AAC sine
 stream, copied into a 640×360 30 fps 2 s `testsrc2` VP9 Profile 0 MP4 and
@@ -44,7 +44,7 @@ import tempfile
 import time
 
 sys.path.insert(0, os.path.dirname(__file__))
-from mcp import MCP, ToolError  # noqa: E402
+from mcp import MCP, ToolError, remove_scratch, scratch_socket, wait_listening  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SEC = 600_000
@@ -259,7 +259,6 @@ def run(mcp, where, fixtures, mutant):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--mutant", choices=["p1-as-p0", "p0-as-p1"])
     parser.add_argument("--app", default=os.path.join(ROOT, "build", "Build", "Products",
                                                      "Release", "Reelcut.app"))
@@ -271,27 +270,17 @@ def main():
     with tempfile.TemporaryDirectory(prefix="reelcut-codec-import-") as work:
         fixtures = make_fixtures(work)
         log_path = os.path.join(work, "app.log")
+        socket_path = scratch_socket()
         with open(log_path, "w", encoding="utf-8") as log:
             env = os.environ.copy()
-            env["RC_AGENT_PORT"] = str(args.port)
-            app = subprocess.Popen([binary, "-ApplePersistenceIgnoreState", "YES",
-                                    "-AgentServerEnabled", "YES"],
+            env["RC_AGENT_SOCKET"] = socket_path
+            app = subprocess.Popen([binary, "-ApplePersistenceIgnoreState", "YES"],
                                    stdout=log, stderr=subprocess.STDOUT, env=env)
             try:
-                bound = None
-                until = time.monotonic() + 20
-                while time.monotonic() < until and app.poll() is None and bound is None:
-                    for line in check_parity(log_path)[0]:
-                        found = re.search(
-                            r"agent server listening on http://127\.0\.0\.1:(\d+)/mcp", line)
-                        if found:
-                            bound = int(found.group(1))
-                            break
-                    time.sleep(0.1)
-                if bound != args.port:
-                    print(f"instrument failure: asked for port {args.port}, bound {bound}")
+                if not wait_listening(log_path, socket_path, child=app, seconds=20):
+                    print(f"instrument failure: the app did not listen at {socket_path}")
                     return 2
-                run(MCP(bound, timeout=180), work, fixtures, args.mutant)
+                run(MCP(socket_path, timeout=180), work, fixtures, args.mutant)
                 complaints = check_parity(log_path)[1]
                 row("R0", not complaints,
                     "no `Reelcut: ` line in the log" if not complaints
@@ -304,6 +293,7 @@ def main():
                     except subprocess.TimeoutExpired:
                         app.kill()
                         app.wait(timeout=5)
+                remove_scratch(socket_path)
     passed = sum(1 for _, ok in rows if ok)
     scored = sum(1 for _, ok in rows if ok is not None)
     failed = sum(1 for _, ok in rows if ok is False)

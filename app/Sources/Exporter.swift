@@ -173,6 +173,7 @@ final class Exporter {
         timer?.invalidate()
         if let key = recipeKey {
             RecipeSource.shared.unregister(key)
+            GraphicPrefetch.shared.stop(key)
             GraphicRegistry.shared.unpin(key)
         }
         scratchStorage?.deallocate()
@@ -364,6 +365,8 @@ final class Exporter {
         if let loudness = loudness, !loudness.isUnity {
             (writer as? ExportWriter)?.normalizeAudio(byLinearGain: Float(loudness.linearGain))
         }
+        Exporter.startGraphicPrefetch(key: recipeKey, project: project, graphics: graphics,
+            built: built, settings: settings, pipeline: writer)
 
         startProgressTimer()
         progressHandler?(measureShare)
@@ -436,6 +439,7 @@ final class Exporter {
         timer = nil
         if let key = recipeKey {
             RecipeSource.shared.unregister(key)
+            GraphicPrefetch.shared.stop(key)
             GraphicRegistry.shared.unpin(key)
             recipeKey = nil
         }

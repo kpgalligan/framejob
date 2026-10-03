@@ -64,7 +64,7 @@ struct RecorderGrantDoors {
 /// open the Microphone pane and stop there, and a prompt's answer never
 /// opens it. Both readings happen BEFORE the countdown, so a countdown never
 /// ends in a prompt. An earlier draft gated both asks on a `canAsk` (since
-/// deleted with the speech grant) — false under `-AgentServerEnabled YES` —
+/// deleted with the speech grant) — false for a scripted agent launch —
 /// and the R1 review measured what that cost: under that flag the refusal
 /// note told the person to press the button they had just pressed, and a
 /// `notDetermined` microphone could never be granted from anywhere.

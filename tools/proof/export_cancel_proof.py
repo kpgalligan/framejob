@@ -5,10 +5,10 @@ legitimately run (#67), and an export's Cancel during the loudness
 measurement only sets a flag — the measurement's own loop cancels its reader
 (#74, spec §11 G-17).
 
-One owned instance on its own port, launched with
-`-ApplePersistenceIgnoreState YES -AgentServerEnabled YES
+One owned instance on a scratch socket (`mcp.scratch_socket`), launched with
+`-ApplePersistenceIgnoreState YES
 -RCFFmpegImport always -RCFFmpegPath <work>/standin/ffmpeg`, stopped by PID,
-its log at `tools/proof/work/export-cancel/reelcut-<port>.log`; nothing else
+its log at `tools/proof/work/export-cancel/reelcut.log`; nothing else
 is ever killed. Every child runs under `graphics_spike/bounded.py`. The M rows
 run `export_cancel_probe.swift`, an in-process instrument built like
 `graphics_proof.py`'s pin probe into `tools/proof/work/export-cancel-probe/`
@@ -46,7 +46,7 @@ M2  every M1 `latency` ≤ `LATENCY_BOUND` (2.0 s; 1.0 s before B13, when two
     full runs printed 0.889 s and 0.790 s).
 Z1  `grep "Reelcut: "` over this launch's log prints nothing.
 
-    python3 tools/proof/export_cancel_proof.py [--port 4893] [--app PATH]
+    python3 tools/proof/export_cancel_proof.py [--app PATH]
         [--only gate,import,cancel] [--runs 30] [--mutant NAME]
 
 `--mutant NAME` (implies `--only cancel`; the tree's app still builds the
@@ -72,7 +72,6 @@ import argparse
 import json
 import os
 import random
-import re
 import shutil
 import subprocess
 import sys
@@ -153,29 +152,24 @@ def check(name, good, detail="", *, instrument=False):
 
 
 class Instance:
-    """One owned app, by PID, on its own port."""
+    """One owned app, by PID, on a scratch socket of its own."""
 
-    def __init__(self, app, port, log):
-        self.app, self.port, self.log = app, port, log
+    def __init__(self, app, log):
+        self.app, self.log = app, log
+        self.socket = mcp.scratch_socket()
         self.child = None
 
     def start(self):
         with open(self.log, "a") as out:
             self.child = subprocess.Popen(
                 [str(self.app), "-ApplePersistenceIgnoreState", "YES",
-                 "-AgentServerEnabled", "YES", "-RCFFmpegImport", "always",
+                 "-RCFFmpegImport", "always",
                  "-RCFFmpegPath", str(STANDIN / "ffmpeg")],
                 stdin=subprocess.DEVNULL, stdout=out, stderr=out, start_new_session=True,
-                env=bounded.child_env({"RC_AGENT_PORT": str(self.port)}))
-        deadline = time.monotonic() + 60
-        while time.monotonic() < deadline:
-            time.sleep(0.25)
-            found = re.search(r"listening on http://127\.0\.0\.1:(\d+)/mcp",
-                              self.log.read_text(errors="replace"))
-            if found:
-                bound = int(found.group(1))
-                print(f"  instance PID {self.child.pid} on port {bound}", flush=True)
-                return mcp.MCP(bound, timeout=CALL_BOUND)
+                env=bounded.child_env({"RC_AGENT_SOCKET": self.socket}))
+        if mcp.wait_listening(self.log, self.socket, child=self.child, seconds=60):
+            print(f"  instance PID {self.child.pid} at {self.socket}", flush=True)
+            return mcp.MCP(self.socket, timeout=CALL_BOUND)
         return None
 
     def stop(self):
@@ -188,6 +182,7 @@ class Instance:
             self.child.kill()
             self.child.wait()
         self.child = None
+        mcp.remove_scratch(self.socket)
 
 
 def attempt(client, tool, arguments):
@@ -569,7 +564,6 @@ def run_cancel(binary, why, pkg, pkg_why, runs):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--port", type=int, default=4893)
     parser.add_argument("--app", type=Path, default=APP)
     parser.add_argument("--only", default="gate,import,cancel")
     parser.add_argument("--runs", type=int, default=30)
@@ -610,8 +604,8 @@ def main():
         if binary is None:
             print(f"  probe: did not build — {why}", flush=True)
 
-    log = WORK / f"reelcut-{args.port}.log"
-    instance = Instance(args.app, args.port, log)
+    log = WORK / "reelcut.log"
+    instance = Instance(args.app, log)
     pkg, pkg_why = None, "the instance did not start"
     try:
         client = instance.start()

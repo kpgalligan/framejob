@@ -30,7 +30,9 @@ extension AgentServer {
 
     /// The arguments a voice-over refuses by name: everything that only a
     /// picture or the stream reads.
-    static let voiceOverScreenOnlyArguments = ["display", "window", "system_audio", "show_clicks", "size"]
+    static let voiceOverScreenOnlyArguments = [
+        "display", "window", "system_audio", "show_clicks", "size", "include_reelcut_windows",
+    ]
 
     /// `source`, default `screen`; an unknown value refused with the
     /// vocabulary. For `voice_over`, the screen-only arguments the caller
@@ -166,7 +168,7 @@ extension AgentServer {
     }
 
     /// The source the two arguments name. A window id naming nothing
-    /// shareable is refused by `ScreenRecorder.filter(for:in:)`'s sentence.
+    /// shareable is refused by `ScreenRecorder.filter(for:in:excluding:)`'s sentence.
     /// An EMPTY display list is a fact about the host — the console is
     /// locked or every display is asleep (measured: a true preflight and
     /// zero displays, the night the proof was written) — and is named as

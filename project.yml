@@ -198,6 +198,50 @@ targets:
         # Bun rebuilds the helper in well under a second, so it runs every build.
         basedOnDependencyAnalysis: false
         script: /bin/sh "$PROJECT_DIR/agent/build.sh" helper
+      # The stdio MCP server external clients start (road map 14's MC3, spec
+      # §11 MC-3): mcp-proxy/ built by cargo, put in Contents/Helpers beside the
+      # assistant's helper and signed as agent/build.sh signs that one (the
+      # hardened runtime, no entitlements), before Xcode signs the app.
+      - name: Build MCP Proxy
+        basedOnDependencyAnalysis: false
+        script: |
+          set -e
+          export PATH="$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+          cd "$PROJECT_DIR/mcp-proxy"
+          cargo build --release
+          HELPERS="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/Helpers"
+          mkdir -p "$HELPERS"
+          cp "$PROJECT_DIR/mcp-proxy/target/release/reelcut-mcp" "$HELPERS/"
+          IDENTITY="${EXPANDED_CODE_SIGN_IDENTITY:--}"
+          TIMESTAMP=""
+          if [ "$IDENTITY" != "-" ]; then TIMESTAMP="--timestamp"; fi
+          codesign --force --options runtime $TIMESTAMP \
+            --sign "$IDENTITY" "$HELPERS/reelcut-mcp"
+      # The catalog snapshot reelcut-mcp lists from while no Reelcut runs
+      # (MC-4; MC1 q1): the just-linked executable, ad-hoc signed alone in place
+      # because the linker leaves it unsigned and arm64 kills an unsigned exec,
+      # run with -RCWriteCatalog (AgentCatalogSnapshot.swift). Xcode's CodeSign
+      # step re-signs the bundle after this phase. It fails on a non-zero exit
+      # and on any `Reelcut: ` line, the parity check complaining.
+      - name: Write Agent Catalog
+        basedOnDependencyAnalysis: false
+        script: |
+          set -e
+          out="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/agent-catalog.json"
+          exe="$TARGET_BUILD_DIR/$EXECUTABLE_PATH"
+          mkdir -p "$(dirname "$out")"
+          codesign -s - -f "$exe"
+          rc=0
+          output=$("$exe" -RCWriteCatalog "$out" 2>&1) || rc=$?
+          if [ -n "$output" ]; then printf '%s\n' "$output"; fi
+          if [ "$rc" -ne 0 ]; then
+            echo "error: the catalog writer exited $rc"
+            exit 1
+          fi
+          if printf '%s\n' "$output" | grep -q 'Reelcut: '; then
+            echo "error: the catalog writer's output holds the parity check's complaint"
+            exit 1
+          fi
 
 schemes:
   Reelcut:

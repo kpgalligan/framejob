@@ -13,17 +13,18 @@ The Lines cell is `wc -l`, and `make test` checks it (`tools/proof/spec_index_pr
 | File | Lines | Holds |
 |---|---|---|
 | [`foundations.md`](foundations.md) | 108 | **Foundations (M1–M3, road map 2).** AVFoundation not ffmpeg, the compositor, one op entry point, overlap and ripple rules, ticks, `async` confinement, media by reference; R2-1. |
-| [`recording.md`](recording.md) | 244 | **Screen recording (road map 3).** The recorder: what is in and out, files, grants, pause, the voice-over. |
+| [`recording.md`](recording.md) | 263 | **Screen recording (road map 3).** The recorder: what is in and out, files, grants, pause, the voice-over, Include Reelcut windows. |
 | [`silence.md`](silence.md) | 49 | **Remove Silences (road map 4).** Silero VAD, its grid and cache, voice mode; S1-23. |
 | [`effects-motion.md`](effects-motion.md) | 60 | **Transitions and motion (road map 5).** R5-1..R5-5, E2-27. |
 | [`deepening.md`](deepening.md) | 658 | **Deepening (road map 7).** D2-1, D3-1, #21, #22, D4-1..D4-6, D7-1..D7-3, #42, #88, #63, #174, #40, #43, #190, #87, #86, #178, #216, #216-R: how ops refuse, the op table, the gate, the source window, time envelopes, one-delta shifts on the canvas's grid, the non-edits that speak, a relink that re-probes, one frame on the grid, a tool that closes a document, a path one open document holds, a caption name's own extension, a speed of ×0.1–×1000 and the audio ceiling above ×12, a gain change on one audio track slews over 25 ms, a normalised export gained in float and quantised once, the cache passes' save gate's five accepted limits, the supplemental VP9/AV1 decoders and the one-frame import decode, and the WebM/Matroska rewrap. |
 | [`cloud-captions.md`](cloud-captions.md) | 404 | **Cloud captions (road map 6).** R6-1..R6-24: AssemblyAI, keys, deletion, recovery, refusal precedence, a dripping server, a Stop's bound on a DELETE, a refused transcript's failed DELETE reported for the dashboard, cached transcripts not re-checked for the key, speaker colours on Subtitles, server strings checked whole and bounded, a transcript id the key cannot delete holding its media. |
 | [`word-captions.md`](word-captions.md) | 123 | **Word captions (road map 8).** W-1..W-11. |
 | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) | 408 | **Chrome, the clip inspector and keys (the sharp pass, road map 9, #35).** SH-1..SH-5, CI-1..CI-16, K-1..K-3. |
-| [`graphics.md`](graphics.md) | 569 | **Graphics (road map 10).** G-1..G-25. |
+| [`graphics.md`](graphics.md) | 603 | **Graphics (road map 10).** G-1..G-26. |
 | [`dev-tools.md`](dev-tools.md) | 27 | **Dev tools (road map 11).** V-1..V-3: the `REELCUT_DEV_TOOLS` flag and `make dist`, dev tools as ordinary tools, capture by `cacheDisplay`. |
 | [`assistant.md`](assistant.md) | 202 | **The Assistant (road map 12).** AI-1..AI-20: the bundled helper, one lane, the catalog at launch, the fourth tab, the window's own project, W-9's reach, withheld and ask-first tools, the key, history, undo, the model, a call mid-gesture, the base-URL override, the tab kept on a selection change, the live context on each message, Stop reaching a running export or transcribe, the selectable transcript and the multi-line composer, the dev-only compaction threshold a proof lowers, the dot on the Assistant tab's title while a question waits, and the person's chat settings. |
 | [`pricing.md`](pricing.md) | 96 | **Pricing and spend (road map 13).** P-1..P-8: LiteLLM's table as the feed, a call priced from its own `usage` and `model` (per iteration), monthly dollar budgets per service, the app's spend as its own, the spend folder (ledger and price cache) that a proof never touches, the proofs' own ledger and how a paid proof request is held to the month's budget in it, and the two figures the app shows (the conversation's on the Assistant tab, the UTC month's in Settings), and a response cut short priced once and marked partial. |
+| [`agent-connection.md`](agent-connection.md) | 56 | **Reaching the agent server (road map 14).** MC-1..MC-6: a Unix socket in its own `0700` `Agent` subfolder of the support folder and no TCP listener or switch, who binds it and who unlinks it, the bundled `reelcut-mcp` stdio server and when it launches Reelcut, no modal question from a tool call, and the `RC_AGENT_SOCKET` override every proof sets. |
 
 ## Every decision
 
@@ -61,6 +62,7 @@ The Lines cell is `wc -l`, and `make test` checks it (`tools/proof/spec_index_pr
 | — | A left-out segment's readable microphone lands without its picture | [`recording.md`](recording.md) |
 | — | File ▸ Pause Recording | [`recording.md`](recording.md) |
 | — | A voice-over is a recording with no picture | [`recording.md`](recording.md) |
+| — | Include Reelcut windows | [`recording.md`](recording.md) |
 | — | The silence detector's second signal is a voice-activity model, and the model is Silero VAD v6.2.1 as a Core ML program | [`silence.md`](silence.md) |
 | — | Edges come from the model's own 32 ms grid, inward; the level rule is the judge only where no voice is found | [`silence.md`](silence.md) |
 | — | The probabilities are a per-media CACHE, never computed at feature time | [`silence.md`](silence.md) |
@@ -182,6 +184,7 @@ The Lines cell is `wc -l`, and `make test` checks it (`tools/proof/spec_index_pr
 | G-23 | An asset's name is one `asset(name)` can use; a bad one is renamed as it is copied in and skipped by the scan; a font file unchanged on disk is not read again | [`graphics.md`](graphics.md) |
 | G-24 | A graphic's warnings show where its other messages do: compile warnings in the module's diagnostics, scan warnings in `get_graphic {}` and the Source section, an export's in its answer, sheet and queue row | [`graphics.md`](graphics.md) |
 | G-25 | A colour default is G-12's: refused at compile by the engine and the core, read by the Inspector through `rc_normalise_color` | [`graphics.md`](graphics.md) |
+| G-26 | An export rasterizes its graphics ahead on worker threads; the compositor stays the one writer and the texture key decides | [`graphics.md`](graphics.md) |
 | V-1 | Dev tools are compiled only under `REELCUT_DEV_TOOLS`; Distribution ships without them | [`dev-tools.md`](dev-tools.md) |
 | V-2 | A dev tool is not an op, but goes through the catalog, gate and parity check like any tool | [`dev-tools.md`](dev-tools.md) |
 | V-3 | Screens are captured with `cacheDisplay`, never ScreenCaptureKit | [`dev-tools.md`](dev-tools.md) |
@@ -213,3 +216,9 @@ The Lines cell is `wc -l`, and `make test` checks it (`tools/proof/spec_index_pr
 | P-6 | The proofs' ledger is `~/Library/Application Support/Reelcut Proofs/spend.jsonl`; every paid proof request is reserved at its worst case there and refused past the month's budget | [`pricing.md`](pricing.md) |
 | P-7 | The app shows the conversation's cost on the Assistant tab and the UTC month's, folded from the ledger, in Settings; unpriced and unreadable lines are counted, never $0 | [`pricing.md`](pricing.md) |
 | P-8 | A response cut short is priced once, from what its stream had reported, and marked partial | [`pricing.md`](pricing.md) |
+| MC-1 | The agent server listens only on a Unix socket, `~/Library/Application Support/Reelcut/Agent/agent.sock`, always while the app runs; no TCP listener and no switch | [`agent-connection.md`](agent-connection.md) |
+| MC-2 | The socket is bound only in its own `Agent` subfolder of the support folder, made `0700` and checked for mode and owner (the support folder's own mode is not), and only by the first instance; a socket that answers is left alone, a refused one is a leftover and is unlinked | [`agent-connection.md`](agent-connection.md) |
+| MC-3 | External MCP clients reach Reelcut through `reelcut-mcp`, a Rust stdio server inside the bundle | [`agent-connection.md`](agent-connection.md) |
+| MC-4 | `reelcut-mcp` never launches Reelcut to answer `initialize` or `tools/list`; the first `tools/call` that finds no socket launches its own bundle in the background, one instance between proxies (`agent.launch.lock` beside the socket); a session whose launch timed out launches no other | [`agent-connection.md`](agent-connection.md) |
+| MC-5 | A tool call never raises a modal question; a click still does | [`agent-connection.md`](agent-connection.md) |
+| MC-6 | `RC_AGENT_SOCKET` overrides the socket path, a proof always sets it, and `reelcut-mcp` honours it and passes it on (with `-ApplePersistenceIgnoreState YES` and a launch log beside the socket); the interim port rule went with `RC_AGENT_PORT` in MC4 | [`agent-connection.md`](agent-connection.md) |

@@ -35,15 +35,16 @@ silent. The render's failure sheet stays up on that session's window.
 Fixtures are `mixed_audio_probe.py`'s, written fresh by importing it (the
 `silence2` pattern). Needs `ffmpeg`. Run against an instance:
 
-    python3 tools/proof/mixed_audio_proof.py <port>
-    python3 tools/proof/mixed_audio_proof.py <port> --mutant old-onset
+    python3 tools/proof/mixed_audio_proof.py <dir>/agent.sock
+    python3 tools/proof/mixed_audio_proof.py --mutant old-onset
 
 `--mutant old-onset` builds a tree copy (`tree_copy.make_copy`, under
 `work/mixed-audio-mutant`) with the pre-B61 onset (`git show 16d4934`: the
 track's first segment of positive duration, sounding or not) in
 `CompositionBuilder+AudioTracks.swift`, the anchor asserted once, by the
-copy's own `make app`; launches it on `<port>` with its own log under `work/`;
-and runs every row against it. Exit 0 means caught: both `missing-first` and
+copy's own `make app`; launches it on a scratch socket of its own
+(`mcp.launch`), logging beside that socket; and runs every row against it.
+Exit 0 means caught: both `missing-first` and
 `pending-first`'s first-25 ms rows FAIL while both sections' CONTROL rows
 pass; 1 means it survived; 2 means the control could not be performed (the
 copy was not built or not launched, its log has a `Reelcut: ` parity line, or
@@ -61,7 +62,8 @@ import time
 from array import array
 
 import mixed_audio_probe as probe
-from mcp import MCP
+import mcp as mcp_client
+from mcp import MCP, target
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 WORK = os.path.join(HERE, "work")
@@ -337,53 +339,16 @@ def build_mutant(name):
     return binary, ""
 
 
-class Instance:
-    """One owned app, by PID, on its own port (`graphics_proof.Instance`'s
-    shape); only this child is ever terminated."""
-
-    def __init__(self, app, port, log):
-        self.app, self.port, self.log = app, port, log
-        self.child = None
-        self.offset = 0
-
-    def start(self):
-        self.offset = os.path.getsize(self.log) if os.path.exists(self.log) else 0
-        with open(self.log, "a") as out:
-            self.child = subprocess.Popen(
-                [self.app, "-ApplePersistenceIgnoreState", "YES", "-AgentServerEnabled", "YES"],
-                stdin=subprocess.DEVNULL, stdout=out, stderr=out, start_new_session=True,
-                env=bounded.child_env({"RC_AGENT_PORT": str(self.port)}))
-        deadline = time.monotonic() + 60
-        while time.monotonic() < deadline:
-            time.sleep(0.25)
-            found = re.search(r"listening on http://127\.0\.0\.1:(\d+)/mcp", self.appended())
-            if found:
-                bound = int(found.group(1))
-                print(f"  instance PID {self.child.pid} on port {bound}", flush=True)
-                return bound
-        return None
-
-    def appended(self):
-        with open(self.log) as handle:
-            handle.seek(self.offset)
-            return handle.read()
-
-    def parity(self):
-        return [line for line in self.appended().splitlines() if "Reelcut: " in line]
-
-    def stop(self):
-        if self.child is None:
-            return
-        self.child.terminate()
-        try:
-            self.child.wait(timeout=30)
-        except subprocess.TimeoutExpired:
-            self.child.kill()
-            self.child.wait()
-        self.child = None
+def parity_lines(log_path):
+    """The startup parity check's complaints in the child's log."""
+    try:
+        with open(log_path, errors="replace") as handle:
+            return [line for line in handle.read().splitlines() if "Reelcut: " in line]
+    except OSError:
+        return []
 
 
-def mutant(name, port):
+def mutant(name):
     print(f"mixed audio — the {name} MUTANT (both first-25 ms rows must FAIL)", flush=True)
 
     def uncontrolled(why):
@@ -394,22 +359,25 @@ def mutant(name, port):
     if binary is None:
         print(f"  FAIL the mutant builds — {why}")
         return uncontrolled(f"the copy was not built: {why}")
-    instance = Instance(binary, port, os.path.join(WORK, f"mixed-audio-mutant-{port}.log"))
+    # One owned child on a scratch socket of its own (spec §11 MC-6), its
+    # log beside the socket; only this child is ever terminated.
+    instance = mcp_client.launch(binary, env=bounded.child_env(), timeout=300)
     try:
-        bound = instance.start()
-        if bound is None:
+        if instance.client is None:
             print("  FAIL the mutant launches")
             return uncontrolled("the copy did not launch")
-        parity = instance.parity()
+        print(f"  instance PID {instance.child.pid} at {instance.socket_path}", flush=True)
+        parity = parity_lines(instance.log_path)
         if parity:
             return uncontrolled(f"its log has a parity line: {parity[0]}")
         try:
-            run(MCP(bound, timeout=300))
+            run(instance.client)
         except Exception as error:  # a run that cannot finish is not a verdict
             return uncontrolled(f"the run raised {type(error).__name__}: {error}")
-        parity = instance.parity()
+        parity = parity_lines(instance.log_path)
     finally:
         instance.stop()
+        mcp_client.remove_scratch(instance.socket_path)
     print(f"\n{checks - len(failures)}/{checks} checks passed")
     if parity:
         return uncontrolled(f"its log has a parity line: {parity[0]}")
@@ -429,15 +397,16 @@ def mutant(name, port):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("port", nargs="?", type=int, default=4817)
+    parser.add_argument("socket", nargs="?",
+                        help="the running instance's RC_AGENT_SOCKET (else $RC_AGENT_SOCKET)")
     parser.add_argument("--mutant", choices=sorted(MUTANTS))
     args = parser.parse_args()
     if fixtures():
         print(f"\n{checks - len(failures)}/{checks} checks passed")
         sys.exit(2 if args.mutant else 1)
     if args.mutant:
-        sys.exit(mutant(args.mutant, args.port))
-    run(MCP(args.port))
+        sys.exit(mutant(args.mutant))
+    run(MCP(target([sys.argv[0], args.socket or ""])))
     passed = checks - len(failures)
     print(f"\n{passed}/{checks} checks passed")
     sys.exit(0 if not failures else 1)

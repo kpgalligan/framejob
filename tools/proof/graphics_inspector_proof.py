@@ -2,11 +2,11 @@
 """Road map 10, G5a — the Graphic sub-tab in the clip inspector (§5j; spec
 §11 G-15), against the built app, a probe and the offscreen harness.
 
-    python3 tools/proof/graphics_inspector_proof.py [--port 4887] [--app PATH]
-    python3 tools/proof/graphics_inspector_proof.py --mutant NAME [--port 4887]
+    python3 tools/proof/graphics_inspector_proof.py [--app PATH]
+    python3 tools/proof/graphics_inspector_proof.py --mutant NAME
 
-**The fixture, over MCP** (one owned instance on its own port, launched and
-stopped by PID, its log at `work/graphics-inspector/reelcut-<port>.log`):
+**The fixture, over MCP** (one owned instance on a scratch socket, launched and
+stopped by PID, its log at `work/graphics-inspector/reelcut.log`):
 `new_project {path: GI}`, `write_graphic six` — a module with one entry of
 every schema type: `title` a string whose default holds `{"}:`, `size` a
 number 12–200 step 1, `offset` an unbounded number, `showBox` a boolean,
@@ -269,16 +269,16 @@ def check(name, ok, detail=""):
 # The fixture.
 
 
-def fixture(app, port, work):
+def fixture(app, work):
     """The package over MCP, then the two stale keys injected on disk. The
     package's path, or None and why; the log."""
     work.mkdir(parents=True, exist_ok=True)
     package = work / "GI.reelcut"
     shutil.rmtree(package, ignore_errors=True)
-    log = work / f"reelcut-{port}.log"
+    log = work / "reelcut.log"
     if log.exists():
         log.unlink()
-    instance = gp.Instance(app, port, log)
+    instance = gp.Instance(app, log)
     client = instance.start()
     try:
         if client is None:
@@ -422,7 +422,7 @@ def harness_checks(package):
 # ---------------------------------------------------------------------------
 
 
-def mutant(app, port, name):
+def mutant(app, name):
     began = time.time()
     file, anchor, replacement, expected = MUTANTS[name]
     with tempfile.TemporaryDirectory(prefix=f"reelcut-graphics-inspector-{name}-") as temp:
@@ -436,7 +436,7 @@ def mutant(app, port, name):
             return 2
         path.write_text(text.replace(anchor, replacement, 1))
         print(f"MUTANT {name}: {file}, anchor replaced once, in {sources}", flush=True)
-        package, why, _ = fixture(app, port, temp / "fixture")
+        package, why, _ = fixture(app, temp / "fixture")
         if package is None:
             print(f"MUTANT FAILURE: the fixture was not made: {why}")
             return 1
@@ -456,16 +456,15 @@ def mutant(app, port, name):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--port", type=int, default=4887)
     parser.add_argument("--app", default=str(APP))
     parser.add_argument("--mutant", choices=sorted(MUTANTS))
     args = parser.parse_args()
     app = Path(args.app)
     if args.mutant:
-        return mutant(app, args.port, args.mutant)
+        return mutant(app, args.mutant)
     print("Road map 10, G5a — the Graphic sub-tab", flush=True)
     print("\n0 — the fixture over MCP", flush=True)
-    package, why, log = fixture(app, args.port, WORK)
+    package, why, log = fixture(app, WORK)
     check("the fixture is made over MCP (new_project, write_graphic, import_graphic_asset, "
           "add_graphic_clip, set_graphic, save_project)", package is not None, why or "")
     if package is not None:

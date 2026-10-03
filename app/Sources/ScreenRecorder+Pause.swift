@@ -66,6 +66,9 @@ extension ScreenRecorder {
     /// arguments the first was built from.
     struct Session {
         let choice: RecordingChoice
+        /// Whether the finished movie's probe may ask the conversion
+        /// question: false for `record_screen` (spec §11 MC-5).
+        let mayAsk: Bool
         let displayPointSize: CGSize
         let scale: CGFloat
         let stream: SCStream

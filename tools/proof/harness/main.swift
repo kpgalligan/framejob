@@ -340,14 +340,14 @@ enum Harness {
             // preview window at all, but ordinary use of the app writes this
             // key on every move and resize of one.
             "NSWindow Frame ReelcutPreviewWindow": "",
-            // The recorder panel's six remembered choices (road map 3, R1c:
+            // The recorder panel's seven remembered choices (road map 3, R1c:
             // `RecorderPanelController.<key>` — spelled as LITERALS here, because this
             // file must also compile against a tree from before the recorder existed
             // under `-D HARNESS_REFERENCE_BUILD`, the phase-5 cross-build), pinned to their first-run
             // values — the display 0 (the main one), no microphone, system
-            // audio ON (the one of the six whose absent-key reading is not
+            // audio ON (the one of the seven whose absent-key reading is not
             // the default, which the panel tests by name), clicks off, 60,
-            // nominal. NOTHING the harness photographs reads them: the panel
+            // nominal, Reelcut's windows left out. NOTHING the harness photographs reads them: the panel
             // is a floating `NSPanel` and never in the editor's content
             // view. Pinned on `ReelcutExportChoice`'s terms — written by
             // ORDINARY USE of the app on the machine that runs the proofs,
@@ -362,6 +362,7 @@ enum Harness {
             "ReelcutRecordingShowClicks": false,
             "ReelcutRecordingRate": 60,
             "ReelcutRecordingSize": "nominal",
+            "ReelcutRecordingIncludeReelcutWindows": false,
             // The two keys road map 6's chrome reads (`TranscriptionEngine.defaultsKey`
             // and `AssemblyAIConfiguration.regionKey` — spelled as LITERALS
             // here for the recorder keys' reason above, the phase-5
@@ -393,7 +394,6 @@ enum Harness {
             "ReelcutAssistantAutoCompact": true,
             "ReelcutAssistantAutoCompactTokens": 300_000,
             "ReelcutAssistantClearToolResults": false,
-            "AgentServerEnabled": false,
             // AppKit picks legacy (16 pt, always visible) or overlay scrollers
             // by whether a MOUSE is attached, and the inspector pane is 16 pt
             // narrower under the legacy kind, which moves its header's right
@@ -1108,7 +1108,12 @@ if arguments[1] == "welcome" {
     }
 }
 
+// The supplemental VP9/AV1 decoders (#216, issue batch B72). A tree from
+// before them has no `DecoderSupport`, so the call compiles out of a
+// `-D HARNESS_REFERENCE_BUILD` harness, the cross-builds' (recording_probe 6b).
+#if !HARNESS_REFERENCE_BUILD
 DecoderSupport.enable()
+#endif
 let document = ProjectDocument()
 do {
     try document.read(from: projectURL, ofType: "com.kgalligan.reelcut-project")

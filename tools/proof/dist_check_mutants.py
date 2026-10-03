@@ -1,29 +1,33 @@
 #!/usr/bin/env python3
-"""Road map 12 A4 and #145 — `dist_check.py`'s helper rows (D6–D13) and D14, each made
-to fail on purpose.
+"""Road map 12 A4, #145 and road map 14 MC3 — `dist_check.py`'s helper rows (D6–D13),
+D14 and the MCP proxy's and snapshot's rows (D15–D24), each made to fail on purpose.
 
     python3 tools/proof/dist_check_mutants.py [--release APP] [--dist APP]
 
 Every case runs `dist_check.py` as a child with one side a SKELETON bundle,
 `work/dist_check_mutants/<case>/Reelcut.app`: `Contents/MacOS/Reelcut` a
-symlink to the real app's untouched binary, `Contents/Helpers/reelcut-agent`
-a COPY of the real helper (never a link), mutated and re-signed ad hoc. The
+symlink to the real app's untouched binary, and COPIES (never links) of the
+real `Contents/Info.plist`, `Contents/Helpers/reelcut-agent`,
+`Contents/Helpers/reelcut-mcp` and `Contents/Resources/agent-catalog.json`,
+for every mutation: the helper or the proxy mutated and re-signed ad hoc, or
+the snapshot removed, re-versioned or swapped for the OTHER side's. The
 other side is the real app. Nothing is written into `build/`. The
 `app-entitlements` case is the one whole bundle: the real Distribution app
 `ditto`ed to `<case>/dist/Reelcut.app` and re-signed ad hoc with HEAD's pair
 (`audio-input` and `get-task-allow`, #145), which D14 must refuse.
 
 A case passes iff dist_check's FAIL ids equal the expected set exactly, its
-last line is `dist_check: <14 - |set|>/14`, and it exits 0 for an empty set
+last line is `dist_check: <24 - |set|>/24`, and it exits 0 for an empty set
 and 1 otherwise. `control` (both real) and `skeleton` (both skeletons,
-helpers copied untouched) expect nothing to fail: they prove the skeleton is
-not itself a failure. A setup command that fails (a copy, a `codesign`, the
-offset not found) is a scored FAIL naming it. Each case's directory is
-removed after scoring. The last line is `dist_check_mutants: <passed>/12`;
-the exit is 0 only at 12/12.
+helpers, proxies and snapshots copied untouched) expect nothing to fail: they
+prove the skeleton is not itself a failure. A setup command that fails (a
+copy, a `codesign`, the offset not found) is a scored FAIL naming it. Each
+case's directory is removed after scoring. The last line is
+`dist_check_mutants: <passed>/20`; the exit is 0 only at 20/20.
 """
 
 import argparse
+import json
 import os
 import plistlib
 import re
@@ -57,7 +61,16 @@ CASES = [
     ("marker-release", ("release",), "marker", {"D12"}),
     ("marker-dist", ("dist",), "marker", {"D13"}),
     ("app-entitlements-dist", ("dist",), "app-entitlements", {"D14"}),
+    ("no-proxy-release", ("release",), "no-proxy", {"D15", "D17", "D19"}),
+    ("no-proxy-dist", ("dist",), "no-proxy", {"D16", "D18", "D20"}),
+    ("proxy-no-runtime-dist", ("dist",), "proxy-no-runtime", {"D18"}),
+    ("proxy-entitlement-release", ("release",), "proxy-entitlement", {"D19"}),
+    ("no-snapshot-dist", ("dist",), "no-snapshot", {"D22", "D24"}),
+    ("snapshot-version-release", ("release",), "snapshot-version", {"D21"}),
+    ("dist-snapshot-in-release", ("release",), "other-snapshot", {"D23"}),
+    ("release-snapshot-in-dist", ("dist",), "other-snapshot", {"D24"}),
 ]
+OTHER = {"release": "dist", "dist": "release"}
 
 
 class SetupError(Exception):
@@ -77,8 +90,52 @@ def sign(path, *options):
                          f"{done.stderr.decode('utf-8', 'replace').strip()[:300]}")
 
 
-def skeleton(case_dir, side, real_app, mutation, needle):
-    """A skeleton bundle for one side, its helper mutated; returns its path."""
+def copy_in(source, target, mode=None):
+    """Copy one file of the real bundle into the skeleton; a failure is a SetupError."""
+    try:
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        shutil.copyfile(source, target)
+        if mode is not None:
+            os.chmod(target, mode)
+    except OSError as error:
+        raise SetupError(f"copy {source}: {error}")
+
+
+def proxy_and_snapshot(case_dir, app, real_app, other_app, mutation):
+    """The skeleton's Info.plist, MCP proxy and snapshot, each a COPY of the real
+    bundle's, the proxy or the snapshot mutated (road map 14 MC3, D15–D24)."""
+    copy_in(os.path.join(real_app, dist_check.INFO_PLIST),
+            os.path.join(app, dist_check.INFO_PLIST))
+    if mutation != "no-proxy":
+        proxy = os.path.join(app, dist_check.PROXY)
+        copy_in(os.path.join(real_app, dist_check.PROXY), proxy, 0o755)
+        if mutation == "proxy-no-runtime":
+            sign(proxy)
+        elif mutation == "proxy-entitlement":
+            extra = os.path.join(case_dir, "proxy.plist")
+            with open(extra, "wb") as handle:
+                plistlib.dump({"com.apple.security.cs.allow-jit": True}, handle)
+            sign(proxy, "--options", "runtime", "--entitlements", extra)
+    if mutation == "no-snapshot":
+        return
+    snapshot = os.path.join(app, dist_check.SNAPSHOT)
+    source = other_app if mutation == "other-snapshot" else real_app
+    copy_in(os.path.join(source, dist_check.SNAPSHOT), snapshot)
+    if mutation == "snapshot-version":
+        try:
+            with open(snapshot, encoding="utf-8") as handle:
+                value = json.load(handle)
+            value["version"] = "0.0.0-mutant"
+            with open(snapshot, "w", encoding="utf-8") as handle:
+                json.dump(value, handle)
+        except (OSError, ValueError, TypeError) as error:
+            raise SetupError(f"rewrite {snapshot}'s version: {error}")
+
+
+def skeleton(case_dir, side, real, mutation, needle):
+    """A skeleton bundle for one side, its helper, proxy or snapshot mutated;
+    returns its path."""
+    real_app = real[side]
     app = os.path.join(case_dir, side, "Reelcut.app")
     if mutation == "app-entitlements":
         try:
@@ -101,16 +158,12 @@ def skeleton(case_dir, side, real_app, mutation, needle):
     if not os.path.isfile(binary):
         raise SetupError(f"no binary at {binary}")
     os.symlink(binary, os.path.join(macos, "Reelcut"))
+    proxy_and_snapshot(case_dir, app, real_app, real[OTHER[side]], mutation)
     if mutation == "no-helper":
         return app
     source = os.path.join(real_app, dist_check.HELPER)
     helper = os.path.join(app, dist_check.HELPER)
-    os.makedirs(os.path.dirname(helper))
-    try:
-        shutil.copyfile(source, helper)
-        os.chmod(helper, 0o755)
-    except OSError as error:
-        raise SetupError(f"copy {source}: {error}")
+    copy_in(source, helper, 0o755)
     if mutation == "no-runtime":
         sign(helper, "--entitlements", AGENT_ENTITLEMENTS)
     elif mutation == "extra-entitlement":
@@ -142,7 +195,7 @@ def run_case(name, sides, mutation, expected, real, needle):
         apps = dict(real)
         try:
             for side in sides:
-                apps[side] = skeleton(case_dir, side, real[side], mutation, needle)
+                apps[side] = skeleton(case_dir, side, real, mutation, needle)
         except (SetupError, OSError) as error:
             return False, f"setup: {error}"
         try:
@@ -180,8 +233,8 @@ def main():
     real = {"release": os.path.abspath(arguments.release),
             "dist": os.path.abspath(arguments.dist)}
 
-    print("road map 12 A4 and #145 — dist_check's helper rows (D6–D13) and D14, "
-          "each made to fail on purpose\n")
+    print("road map 12 A4, #145 and road map 14 MC3 — dist_check's helper rows (D6–D13), "
+          "D14 and D15–D24, each made to fail on purpose\n")
     print(f"  release:      {real['release']}")
     print(f"  distribution: {real['dist']}\n")
     needle, reason = dist_check.read_needle()

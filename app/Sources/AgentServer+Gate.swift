@@ -58,8 +58,8 @@ extension AgentServer {
     private(set) static var publishedArguments: [String: Set<String>] = [:]
 
     /// Reads `catalog` — the string `catalogJSON()` answered, which
-    /// `prepareCatalog()` memoises and `start()` hands to
-    /// `rc_agent_server_start` — into `publishedArguments`. A
+    /// `prepareCatalog()` memoises and `bindSocket()` hands to
+    /// `ReelAgentSocket.start` — into `publishedArguments`. A
     /// tool the catalog does not describe, or describes with no properties,
     /// takes NOTHING: the parity check has already complained about that
     /// catalog, and a gate that waved a call through for want of a schema

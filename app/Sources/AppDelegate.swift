@@ -2,7 +2,7 @@ import AppKit
 
 /// The application delegate: the launch and terminate flow, the welcome
 /// window's place in it, the two document commands, the Export Queue window
-/// and the agent server switch.
+/// and Copy MCP Command.
 ///
 /// **The menu bar (spec §9) is `AppDelegate+Menus.swift`** — `buildMainMenu()`
 /// and every menu under it — cut out when this file crossed app/CLAUDE.md's
@@ -31,14 +31,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return false
     }
 
-    /// The launch flag of spec §7.9: `-AgentServerEnabled YES` puts the value
-    /// in NSUserDefaults' argument domain, which is the same key the menu item
-    /// persists — so one read starts the server for a scripted launch and for
-    /// a user who left it on.
+    /// The agent socket, at every launch (road map 14, spec §11 MC-1;
+    /// `AgentServer+Socket.swift` logs why when it binds none).
     func applicationDidFinishLaunching(_ notification: Notification) {
-        if UserDefaults.standard.bool(forKey: AgentServer.enabledDefaultsKey) {
-            startAgentServer()
-        }
+        AgentServer.shared.bindSocket()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -152,10 +148,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) { reply() }
     }
 
-    /// The server holds a pointer to its handler for as long as it runs, and
-    /// its thread must be joined before the process goes away.
+    /// The socket is released and not joined: its file is unlinked only
+    /// while it is still this instance's, and its listener is abandoned to
+    /// process exit, so a call in flight cannot hold the quit (its handler
+    /// and context live for the process).
     func applicationWillTerminate(_ notification: Notification) {
-        AgentServer.shared.stop()
+        AgentServer.shared.unbindSocket()
     }
 
     // MARK: - Documents
@@ -184,41 +182,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     // MARK: - Agent server
 
-    /// Tools > Allow Agent Connections: hosts an MCP endpoint on localhost so
-    /// an external agent can drive the editor (spec §7.9, default port 4817,
-    /// `RC_AGENT_PORT` overrides). Off by default; the preference persists
-    /// across launches, and the endpoint is unauthenticated while it runs.
-    @objc func toggleAgentServer(_ sender: Any?) {
-        if AgentServer.shared.isRunning {
-            AgentServer.shared.stop()
-            UserDefaults.standard.set(false, forKey: AgentServer.enabledDefaultsKey)
-        } else if startAgentServer() {
-            UserDefaults.standard.set(true, forKey: AgentServer.enabledDefaultsKey)
-        }
-    }
-
-    /// Starting can fail (a port in use with no ephemeral fallback left), and
-    /// that failure IS user-facing: an alert, not a beep, because the menu
-    /// item would otherwise just look stuck.
-    @discardableResult
-    private func startAgentServer() -> Bool {
-        do {
-            try AgentServer.shared.start()
-            return true
-        } catch {
-            let alert = NSAlert()
-            alert.messageText = "Could Not Start Agent Server"
-            alert.informativeText = error.localizedDescription
-            alert.runModal()
-            return false
-        }
+    /// Tools ▸ Copy MCP Command (road map 14's MC4): puts the `claude mcp
+    /// add` line for this bundle's own `reelcut-mcp` on the clipboard. Not an
+    /// edit, so no MCP mirror (spec §7.9); live with no document.
+    @objc func copyMCPCommand(_ sender: Any?) {
+        let line = AgentServer.mcpCommand(helperPath: AgentServer.mcpHelperURL.path)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(line, forType: .string)
     }
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         if item.action == #selector(newRecording(_:)) {
             // File ▸ New Recording… reads Stop Recording while one runs — the
-            // same item, retitled from live state exactly as the agent-server
-            // item below is (road map 3, R1c). The state read is the
+            // same item, retitled from live state (road map 3, R1c). The state read is the
             // RECORDER's, so the title also covers a recording the
             // `record_screen` tool started; `AppDelegate+Recording.swift`
             // routes the stop to whichever door owns it.
@@ -231,15 +207,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             item.title = RecorderStatusItem.menuTitles(paused: ScreenRecorder.shared.isPaused)[0]
             return ScreenRecorder.shared.state == .recording || ScreenRecorder.shared.state == .paused
         }
-        if item.action == #selector(toggleAgentServer(_:)) {
-            // The item carries the endpoint while it is up, so the address to
-            // point a client at never has to be guessed.
-            let server = AgentServer.shared
-            item.state = server.isRunning ? .on : .off
-            item.title =
-                server.isRunning
-                ? "Allow Agent Connections (127.0.0.1:\(server.port)/mcp)"
-                : "Allow Agent Connections"
+        if item.action == #selector(copyMCPCommand(_:)) {
+            // Live exactly while the bundle holds the helper it names.
+            return FileManager.default.isExecutableFile(atPath: AgentServer.mcpHelperURL.path)
         }
         if item.action == #selector(showGraphicsReference(_:)) {
             // Help ▸ Graphics Reference opens the bundled file, so it is live

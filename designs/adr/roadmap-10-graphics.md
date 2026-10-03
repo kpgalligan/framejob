@@ -135,11 +135,17 @@ JavaScript still runs every frame; it is the cheapest of the three costs
 (`LayerRenderers.graphicCacheLimit`), because a new 8–33 MB texture every
 frame would evict every text and shape texture from the shared pool of 64.
 
-**Parallel rendering, prefetch and a worker pool were not built (G6)** (orig
-§1, §9 G6). The compositor and export are serial, and q3 measured the six
-samples at a worst p95 of 7.62 ms per frame at 1080p, against a 12 ms line.
-At 4K, `title-card` measured 26 ms p95. The user played graphics at 4K on an
-M2 Max, saw no stutter, and deferred G6.
+**Parallel rendering, prefetch and a worker pool were not built in the road
+map (G6)** (orig §1, §9 G6). The compositor and export were serial, and q3
+measured the six samples at a worst p95 of 7.62 ms per frame at 1080p,
+against a 12 ms line. At 4K, `title-card` measured 26 ms p95. The user
+played graphics at 4K on an M2 Max, saw no stutter, and deferred G6. Since
+issue #127 (2026-09-30, spec §11 G-26) an `ExportWriter` export rasterizes
+its graphics ahead on worker threads (`GraphicPrefetch.swift`); the
+compositor stays serial and the one writer, uses a worker's raster only on a
+pool miss whose texture key matches its own, and still runs `svg`, records
+every report and draws every card, so the file is the serial path's.
+Playback prefetch and in-place raster are still not built.
 
 **The FFI is ten `rc_graphic_*` exports, and a library is a builder that
 FREEZES** at its first compile, rasterize or `families` call
@@ -281,6 +287,10 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   7.62 ms per frame; 4K `title-card` was 26 ms p95 (57 ms max). Rasterizing
   dominates, not the JavaScript. A slower machine or a heavier graphic is
   unmeasured, and so is resident memory while an animated 4K graphic plays.
+  An export's graphics are rasterized ahead on `activeProcessorCount − 1`
+  worker threads (G-26); each graphic's JavaScript then runs twice per frame
+  (worker and compositor), and resvg still decodes an embedded image inside
+  every render. Preview playback is still serial.
 - **quickjs-ng 0.16.2 has no `Intl` and no `structuredClone`.**
   `formatNumber` exists for that reason (issue #39).
 - **Largest string `render` can return:** 8 MiB (`graphic::SVG_BYTES`,
@@ -366,7 +376,23 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   test made to fail once, by a 65-key cap and a 4096 side), completed
   `watchSubject`'s doc, and replaced G11's 0.5 s settle with an in-place
   rewrite of `m00.js` polled until its revision is seen, then one coalesce
-  interval. Issue batch B41 (2026-09-30, #197, #189) exported the engine's
+  interval. Issue #127 (2026-09-30, spec §11 G-26) rasterizes an
+  `ExportWriter` export's graphics ahead on worker threads. Measured on a
+  12-CPU host (11 workers) under heavy load from other work:
+  `graphics_prefetch_proof.py`'s fixture (1080p, 150 frames, `prores_422`)
+  took 16.7 s serial and 3.46 s with the prefetch, byte-identical after
+  masking; the owner's `parive-promo` (a copy) took 360.1 s serial and
+  47.34 s with it as `h264` (load average 115 and 180 before each), and
+  445.75 s and 43.31 s as `prores_422` (load 270 and 84), the ProRes pair
+  byte-identical after masking. The `h264` pair differs after masking, and
+  so do two serial `h264` exports of the same copy (324.2 s and 412.52 s,
+  load 220), so that encoder is not byte-deterministic here. Every prefetched raster the compositor
+  asked for was used: 3 596 hits, 0 mismatched, 0 missed over 1 766 frames
+  with graphics. The load made the absolute times noisy, and the ratio
+  overstates the gain on an idle host. Pinned by
+  `graphics_prefetch_proof.py` (S0–S5, Z1) and its two mutants, each made to
+  fail once.
+  Issue batch B41 (2026-09-30, #197, #189) exported the engine's
   `MAX_OPTIONS`, `MAX_STRING` and `TYPES` and pinned each to the core's
   `GRAPHIC_` restatement in `core/tests/graphic_ffi.rs`, and pinned the
   numbers the reference and its typings state in `graphic/tests/reference.rs`
@@ -534,8 +560,9 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
 
 ## Open items
 
-- G6 (prefetch plus parallel export against a before/after measurement) —
-  deferred by the user; tracked in #127.
+- G6's rest — playback prefetch, in-place raster (`graphic/src/raster.rs`)
+  and a decoded-image cache past resvg's per-render decode — tracked in
+  #127. The export's parallel rasterization landed (G-26).
 - The person's watched checks: the playback-check projects with no video
   underneath, memory at 4K, and the error card in the live preview —
   tracked in #56.

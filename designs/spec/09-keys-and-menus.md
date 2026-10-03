@@ -117,7 +117,10 @@ same player in an `NSPanel` — a panel because a titled window would become MAI
 and every ⌘-item whose action lives on the editor would stop resolving while
 the preview was focused; its window sets `isExcludedFromWindowsMenu` for the
 export queue's reason and autosaves its frame, which the queue's deliberately
-does not, so it stays on the display it was put on)), Window (Minimize,
+does not, so it stays on the display it was put on)), Tools (Copy MCP Command —
+road map 14's MC4: the `claude mcp add` line for the bundle's own `reelcut-mcp`
+on the clipboard, live while the bundle holds the helper, with no key
+equivalent), Window (Minimize,
 Zoom, Export Queue — road map 2's phase 7e, the export sheet's Add to Queue
 button's other end, with no key equivalent because §9's "proposed, not yet
 bound" table claims no row for it and every bare letter belongs to the

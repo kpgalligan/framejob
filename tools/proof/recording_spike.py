@@ -144,15 +144,12 @@ import wave
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(ROOT, "tools", "proof"))
-from mcp import MCP  # noqa: E402
+from mcp import MCP, remove_scratch, scratch_socket, wait_listening  # noqa: E402
 
 WORK = os.path.join(ROOT, "tools", "proof", "work", "spike")
 APP = os.path.join(ROOT, "build", "Build", "Products", "Release", "Reelcut.app")
 BINARY = os.path.join(APP, "Contents", "MacOS", "Reelcut")
-PORT_LINE = re.compile(r"listening on http://127\.0\.0\.1:(\d+)/mcp")
 PARITY = "Reelcut: "
-DIRECT_PORT = 4890
-OPEN_PORT = 4891
 
 # ---------------------------------------------------------------------------
 # The probe. One Swift source, one mode per subprocess, one JSON line each.
@@ -1636,16 +1633,14 @@ def read_log(path):
         return ""
 
 
-def await_port(log, alive, seconds=45):
+def await_socket(log, socket_path, alive, seconds=45):
     deadline = time.time() + seconds
     while time.time() < deadline:
         if not alive():
-            return None, "the instance exited before it bound a port"
-        found = PORT_LINE.search(read_log(log))
-        if found:
-            return int(found.group(1)), None
-        time.sleep(0.2)
-    return None, f"no port line in {log} within {seconds} s"
+            return None, "the instance exited before it bound its socket"
+        if wait_listening(log, socket_path, seconds=0.5):
+            return socket_path, None
+    return None, f"no socket line in {log} within {seconds} s"
 
 
 def pid_alive(pid):
@@ -1675,16 +1670,15 @@ def kill_pid(pid, poll):
     return "SIGTERM"
 
 
-def instance_facts(binary, pid, log, port_wanted, alive):
+def instance_facts(binary, pid, log, socket_wanted, alive):
     facts = {"pid": pid}
-    port, error = await_port(log, alive)
-    facts["boundPort"] = port
+    bound, error = await_socket(log, socket_wanted, alive)
+    facts["boundSocket"] = bound
     if error:
-        facts["portError"] = error
-    facts["boundToRequestedPort"] = port == port_wanted
-    if port:
+        facts["socketError"] = error
+    if bound:
         try:
-            tools = MCP(port).tools()
+            tools = MCP(bound).tools()
             facts["mcpToolsList"] = len(tools)
         except Exception as error:  # noqa: BLE001 — a dead server is a fact to report
             facts["mcpError"] = repr(error)
@@ -1704,34 +1698,35 @@ def question_1(binary, shell):
     others = reelcut_pids()
     answer["instancesRunningBefore"] = sorted(others)
     launched = []
+    direct_socket, open_socket = scratch_socket(), scratch_socket()
     try:
         # (a) the README's direct line.
-        log_a = os.path.join(WORK, f"reelcut-{DIRECT_PORT}.log")
+        log_a = os.path.join(WORK, "reelcut-direct.log")
         with open(log_a, "wb") as handle:
             process = subprocess.Popen(
-                [BINARY, "-ApplePersistenceIgnoreState", "YES", "-AgentServerEnabled", "YES"],
+                [BINARY, "-ApplePersistenceIgnoreState", "YES"],
                 stdout=handle, stderr=subprocess.STDOUT,
-                env=dict(os.environ, RC_AGENT_PORT=str(DIRECT_PORT)))
+                env=dict(os.environ, RC_AGENT_SOCKET=direct_socket))
         launched.append(process.pid)
-        direct = {"launch": f"RC_AGENT_PORT={DIRECT_PORT} {os.path.relpath(BINARY, ROOT)} "
-                            "-ApplePersistenceIgnoreState YES -AgentServerEnabled YES > LOG 2>&1 &",
+        direct = {"launch": f"RC_AGENT_SOCKET={direct_socket} {os.path.relpath(BINARY, ROOT)} "
+                            "-ApplePersistenceIgnoreState YES > LOG 2>&1 &",
                   "log": log_a}
-        direct.update(instance_facts(binary, process.pid, log_a, DIRECT_PORT,
+        direct.update(instance_facts(binary, process.pid, log_a, direct_socket,
                                      lambda: process.poll() is None))
         direct["killed"] = kill_pid(process.pid, lambda: process.poll() is None)
         answer["direct"] = direct
         # (b) through LaunchServices, after (a) is gone — `open -a` of a bundle
         # with a running instance would activate that instance instead.
-        log_b = os.path.join(WORK, f"reelcut-{OPEN_PORT}.log")
+        log_b = os.path.join(WORK, "reelcut-open.log")
         open(log_b, "wb").close()
         before = reelcut_pids()
         opened = subprocess.run(
-            ["open", "-a", APP, "--env", f"RC_AGENT_PORT={OPEN_PORT}", "--stdout", log_b, "--stderr", log_b,
-             "--args", "-ApplePersistenceIgnoreState", "YES", "-AgentServerEnabled", "YES"],
+            ["open", "-a", APP, "--env", f"RC_AGENT_SOCKET={open_socket}", "--stdout", log_b,
+             "--stderr", log_b, "--args", "-ApplePersistenceIgnoreState", "YES"],
             capture_output=True, text=True, timeout=60)
-        via_open = {"launch": f"open -a {os.path.relpath(APP, ROOT)} --env RC_AGENT_PORT={OPEN_PORT} "
-                              "--stdout LOG --stderr LOG --args -ApplePersistenceIgnoreState YES "
-                              "-AgentServerEnabled YES",
+        via_open = {"launch": f"open -a {os.path.relpath(APP, ROOT)} --env "
+                              f"RC_AGENT_SOCKET={open_socket} "
+                              "--stdout LOG --stderr LOG --args -ApplePersistenceIgnoreState YES",
                     "log": log_b, "openExit": opened.returncode, "openStderr": opened.stderr.strip()}
         pid = None
         deadline = time.time() + 30
@@ -1745,7 +1740,8 @@ def question_1(binary, shell):
             via_open["error"] = "no new Reelcut pid appeared within 30 s of `open`"
         else:
             launched.append(pid)
-            via_open.update(instance_facts(binary, pid, log_b, OPEN_PORT, lambda: pid_alive(pid)))
+            via_open.update(instance_facts(binary, pid, log_b, open_socket,
+                                           lambda: pid_alive(pid)))
             via_open["killed"] = kill_pid(pid, lambda: pid_alive(pid))
         answer["viaOpen"] = via_open
     finally:
@@ -1755,6 +1751,8 @@ def question_1(binary, shell):
                     os.kill(pid, signal.SIGKILL)
                 except ProcessLookupError:
                     pass
+        remove_scratch(direct_socket)
+        remove_scratch(open_socket)
     answer["launchedPids"] = launched
     answer["instancesRunningAfter"] = sorted(reelcut_pids())
     direct_r = answer.get("direct", {}).get("responsible", {})

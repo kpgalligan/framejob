@@ -187,9 +187,9 @@ import sys
 import zlib
 from array import array
 
-from mcp import MCP, ToolError
+from mcp import MCP, ToolError, target
 
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 4823
+SOCKET = target(sys.argv)
 HERE = os.path.dirname(os.path.abspath(__file__))
 MEDIA = os.path.join(HERE, "media")
 WORK = os.path.join(HERE, "work")
@@ -1758,8 +1758,8 @@ def main():
               "decodes two exports.")
         return 2
     os.makedirs(WORK, exist_ok=True)
-    mcp = MCP(PORT)
-    print(f"phase 6 — Looks, against 127.0.0.1:{PORT}")
+    mcp = MCP(SOCKET)
+    print(f"phase 6 — Looks, against {SOCKET}")
     fixture_part(mcp)
     if failures:
         print("\nThe FIXTURE failed. Every number below it is a byte in a PNG, so "
