@@ -3,7 +3,9 @@
 Assistant above Transcription, each key label naming its service, each
 heading's ⓘ holding its pane's explanation (spec §11 SH-5) at 13 pt in the
 label colour, no long paragraph left in the window, and the ⓘ's hover and
-click policy — measured through the app's own sources.
+click policy — measured through the app's own sources. Issue batch B74
+(spec §11 MC-7) put the MCP pane first and added L9–L11: its order and
+visible text, Copy MCP Command's press, and its missing-helper state.
 
     python3 tools/proof/settings_layout_probe.py [--sources DIR] [--mutant NAME] [--only IDS]
 
@@ -13,15 +15,22 @@ process of its own, under `tools/proof/work/settings-layout/`, killed at a
 120 s wall. The fixture is `SettingsWindowController` over two
 `MemoryStore`s, an empty environment, an absent spend folder and a scratch
 `UserDefaults` suite, never shown; nothing on this Mac is read or written.
+L9 and L10 build a second controller whose MCP helper is "/bin/sh", L11 a
+third whose helper is "/nonexistent/reelcut-mcp", both over a private
+pasteboard (`com.kgalligan.reelcut.settings-layout-probe`, released at
+exit); the general pasteboard is never written.
 Every string a row compares is a literal, never the app's own constant.
 Prints `<ID> pass|fail — <detail>` per row, then `scores: N/M`.
 
 Rows:
   B0   the probe builds.
-  L1   `content.arrangedSubviews` is exactly [assistantPane,
+  L1   `content.arrangedSubviews` is exactly [mcpPane, assistantPane,
        transcriptionPane], in that order, and `content.spacing` is 24.
-  L2   each pane's first arranged subview is a stack of [headingLabel,
-       infoButton]; the headings read "Assistant" and "Transcription".
+  L2   the Assistant and Transcription panes' first arranged subview is a
+       stack of [headingLabel, infoButton], the headings reading "Assistant"
+       and "Transcription"; the MCP pane's first is its bare headingLabel
+       reading "MCP", and it holds no `SettingsInfoButton`; the window's
+       `initialFirstResponder` is the Assistant key field.
   L3   the row holding each key field opens with "Anthropic API key:" /
        "AssemblyAI API key:"; both empty placeholders read "Paste your key";
        no text field in the window reads exactly "API key:".
@@ -43,9 +52,26 @@ Rows:
   L8   the transient guard's hit test, on a button in an unshown window:
        `isOnIcon` is true at its centre, false 40 pt outside it, and false at
        its centre in another window.
+  L9   the MCP pane's arranged subviews are [heading, blurb 1, blurb 2,
+       helper, button, status]; the blurbs read the two literals at 13 pt in
+       `NSColor.labelColor`; the helper label reads "/bin/sh", is selectable
+       and has `preferredMaxLayoutWidth` 420; the button reads "Copy MCP
+       Command" and, after layout, sits below the last blurb in the root
+       view's coordinates.
+  L10  with "/bin/sh": the button is enabled and the status empty; after
+       `performClick` the private pasteboard holds
+       `claude mcp add --scope user reelcut -- '/bin/sh'` and the status
+       "Copied. Paste it into Terminal and press Return."; the general
+       pasteboard's `changeCount` is unchanged; `sync()` empties the status.
+  L11  with "/nonexistent/reelcut-mcp": the button is disabled, the status
+       reads "reelcut-mcp is missing from this copy of Reelcut.", and a
+       direct `copyClicked(nil)` leaves the private pasteboard's
+       `changeCount` unchanged.
 
 Mutants (`--mutant`), each a literal found exactly once in the written code:
-  order-swapped       the panes added Transcription first: must fail L1.
+  order-swapped       the panes added Transcription before Assistant: must
+                      fail L1.
+  mcp-last            the MCP pane added last: must fail L1.
   bare-label          the AssemblyAI label back to "API key:": must fail L3.
   grey-info           the popover's label in `DS.textFaint`: must fail L4.
   paragraph-back      a wrapping label holding the Transcription explanation
@@ -53,6 +79,10 @@ Mutants (`--mutant`), each a literal found exactly once in the written code:
   exit-keeps-pending  `mouseExited` does not cancel the hover: must fail L6.
   click-closes-hover  a press on a hover-opened popover closes it: must fail L7.
   guard-off           `isOnIcon` always answers false: must fail L8.
+  grey-blurb          the MCP blurb in `DS.textFaint`: must fail L9.
+  copy-unwired        Copy MCP Command's action nil: must fail L10.
+  always-enabled      `sync()` enables the button whether or not the helper
+                      is executable: must fail L11.
 
 Exit (rule R): a plain run exits 0 iff every row passed and 1 when a row
 failed; a build failure is B0's FAIL there. A `--mutant` run exits 1 when
@@ -69,15 +99,19 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/settings-layout"
-ROWS = ["B0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8"]
+ROWS = ["B0", "L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "L9", "L10", "L11"]
 WALL = 120
 
 # name: (the rows it must fail, [(file, before, after), ...])
 MUTANTS = {
     "order-swapped": (["L1"], [
         ("SettingsWindowController.swift",
-         "for pane in [assistantPane, transcriptionPane] {",
-         "for pane in [transcriptionPane, assistantPane] {")]),
+         "for pane in [mcpPane, assistantPane, transcriptionPane] {",
+         "for pane in [mcpPane, transcriptionPane, assistantPane] {")]),
+    "mcp-last": (["L1"], [
+        ("SettingsWindowController.swift",
+         "for pane in [mcpPane, assistantPane, transcriptionPane] {",
+         "for pane in [assistantPane, transcriptionPane, mcpPane] {")]),
     "bare-label": (["L3"], [
         ("SettingsWindowController.swift",
          'static let keyLabel = "AssemblyAI API key:"',
@@ -103,6 +137,18 @@ MUTANTS = {
         ("SettingsInfoButton.swift",
          "return bounds.contains(convert(locationInWindow, from: nil))",
          "return false")]),
+    "grey-blurb": (["L9"], [
+        ("MCPSettingsPane.swift",
+         "            label.textColor = DS.textStrong",
+         "            label.textColor = DS.textFaint")]),
+    "copy-unwired": (["L10"], [
+        ("MCPSettingsPane.swift",
+         "action: #selector(copyClicked(_:)))",
+         "action: nil)")]),
+    "always-enabled": (["L11"], [
+        ("MCPSettingsPane.swift",
+         "let present = FileManager.default.isExecutableFile(atPath: helperURL.path)",
+         "let present = true")]),
 }
 
 

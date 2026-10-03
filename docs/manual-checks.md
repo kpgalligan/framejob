@@ -237,6 +237,12 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Expect:** a popover opens after a short beat, not on a flick across, and closes on leaving the icon; a second click on the ⓘ closes it (no flicker back open); a click on a hover-opened one keeps it open after the pointer leaves; the text is large and high-contrast, in short paragraphs, and wraps without clipping; VoiceOver says "About Assistant" / "About Transcription" and reads the text; the popover goes with the window.
 - **Source:** issue batch B71 (spec §11 SH-5).
 
+**CH-6 — Settings' MCP section**
+- **Do:** 1. On a 13" display, open Reelcut ▸ Settings… in the light appearance and read the MCP section's blurb. 2. Press Copy MCP Command. 3. Repeat in the dark appearance.
+- **Expect:** the window fits on screen; the blurb is large and high-contrast; the button is below the blurb; nothing is selected or highlighted when Settings opens (the Assistant key field has focus); the status line appears after a press.
+- **Answer:** did the window fit, read clearly, open with nothing selected, and show the status line after the press, in both appearances?
+- **Source:** issue batch B74 (#222; `settings_layout_probe.py` L9, L10; spec §11 MC-7).
+
 ## Sound and export
 
 **SE-1 — M3's inspector sections and sheets**
@@ -537,10 +543,10 @@ on your own account, never the spike's.
 - **Source:** road map 14 MC3 (`mcp_proxy_proof.py` X1, X2; spec §11 MC-3, MC-4).
 
 **AC-4 — Copy MCP Command's line registers Reelcut with Claude Code**
-- **Do:** 1. Open the Reelcut you use (an installed copy, or the tree's Release build) and choose Tools ▸ Copy MCP Command. 2. Paste the line into Terminal and run it. 3. Run `claude mcp list`.
+- **Do:** 1. Open the Reelcut you use (an installed copy, or the tree's Release build), choose Reelcut ▸ Settings…, and under MCP press Copy MCP Command. 2. Paste the line into Terminal and run it. 3. Run `claude mcp list`.
 - **Expect:** step 2 answers that `reelcut` was added; step 3 lists `reelcut` with the pasted helper path and shows it connected.
 - **Answer:** did the pasted line run as it stood, and does `claude mcp list` show `reelcut` connected?
-- **Source:** road map 14 MC4 (`agent_socket_proof.py` K13; spec §9 Tools).
+- **Source:** `agent_socket_proof.py` K13; `settings_layout_probe.py` L10; spec §11 MC-7.
 
 **AC-5 — A person's own import still asks while an agent's call runs**
 - **Do:** 1. Launch Reelcut from Terminal as in CLAUDE.md's "Verifying a build", adding `-RCFFmpegImport ask` to its arguments (ffmpeg installed), and open a project with a few seconds of media on the timeline. 2. In a second Terminal tab, in the repository, start an export over MCP: `python3 -c 'import sys; sys.path.insert(0, "tools/proof"); from mcp import MCP; print(MCP("<dir>/agent.sock").call("export", preset="h264", path="/tmp/ac5.mp4"))'`. 3. While it runs, drag onto the timeline from the Finder an `.mkv` whose video the built-in copy cannot carry, so it goes on to the ffmpeg question (since #216-R an H.264, VP9 or AV1 Matroska opens with no question; make one with `ffmpeg -f lavfi -i testsrc=duration=2 -c:v mpeg4 /tmp/ac5.mkv`). 4. Cancel the question.

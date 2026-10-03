@@ -44,7 +44,7 @@ Nothing had been published, so nothing migrates. (orig opening, What exists)
 - **`tools/list` waits at most 5 s for the app,** then answers from the snapshot. The app serves one request at a time, so another client's long call would otherwise hold the listing up. (MC-4; orig Record ▸ MC3 deviations)
 - **The launch is `open -n -g` of the proxy's own bundle.** MC1 measured about 1.1 s cold and 0.5 s warm, never frontmost, and the proxy waits up to 60 s. A scratch launch adds `-ApplePersistenceIgnoreState YES` and a `reelcut-launch.log` beside the socket; a launch for the person's own socket adds neither. (MC-4, MC-6; orig Record ▸ MC1 q2, ▸ MC3)
 - **MC-5 is decided per call, not per lane.** A process-wide "a call is running" flag would make a person's own MKV import refuse silently while any tool call ran. Instead, `import_media`, `relink_media` and `record_screen` pass `mayAsk: false`, `open_project` runs inside `MediaImporter.withoutAsking`, and every click passes `true`. (MC-5; orig Record ▸ MC4 deviations)
-- **TCP and its switch were deleted, and Tools ▸ Copy MCP Command took their place.** MC4 deleted `rc_agent_server_start` / `_stop`, `RC_AGENT_PORT`, `AgentServerEnabled` and Tools ▸ Allow Agent Connections. The new item puts the `claude mcp add --scope user reelcut -- '<bundle>/Contents/Helpers/reelcut-mcp'` line on the pasteboard, with the path resolved from the running bundle. It is not an edit, so it has no MCP mirror. (MC-1, MC-3; orig Phases ▸ MC4, Record ▸ MC4)
+- **TCP and its switch were deleted, and Tools ▸ Copy MCP Command took their place.** MC4 deleted `rc_agent_server_start` / `_stop`, `RC_AGENT_PORT`, `AgentServerEnabled` and Tools ▸ Allow Agent Connections. The new item puts the `claude mcp add --scope user reelcut -- '<bundle>/Contents/Helpers/reelcut-mcp'` line on the pasteboard, with the path resolved from the running bundle. It is not an edit, so it has no MCP mirror. (MC-1, MC-3; orig Phases ▸ MC4, Record ▸ MC4) After the merge into main, issue batch B74 moved the item into a new MCP section at the top of Settings, which also shows the helper's path, and removed the Tools menu (spec §11 MC-7, #222).
 
 ## What it built — where it lives now
 
@@ -66,7 +66,7 @@ Nothing had been published, so nothing migrates. (orig opening, What exists)
   - `tools/proof/mcp.py` (284): HTTP over the socket, and the shared launcher.
   - `agent_socket_proof.py` (788): K1–K13 and the mutants.
   - `mcp_proxy_proof.py` (836): X0–X10, X7b, Z1 and Z2.
-  - `pasteboard_keep.swift` (93).
+  - `pasteboard_keep.swift` (93), deleted by B74: K13 now reads Settings through `snapshot_ui` and never touches the clipboard.
   - `mc1_spike/`: the spike, with its rows in `mc1_spike/README.md`.
   - `dist_check.py` (464) D15–D24: the proxy, its runtime and no entitlements, and the snapshots' version and dev tools.
 
@@ -82,7 +82,6 @@ Nothing had been published, so nothing migrates. (orig opening, What exists)
 
 ## Open items
 
-- #222: a home for Copy MCP Command other than a Tools menu that holds nothing else.
 - #223: proof build copies of `Reelcut.app` stay registered with LaunchServices after their folders are deleted.
 - #224: no proof quits Reelcut with an agent call in flight.
 - #225: a tree copy's "Build Rust Core" step rebuilds the tree's own `core/target`.

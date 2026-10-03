@@ -1072,7 +1072,8 @@ if arguments[1] == "settings" {
     let absentSpend = URL(fileURLWithPath: "/nonexistent/reelcut-harness-spend", isDirectory: true)
     let settings = SettingsWindowController(
         store: { MemoryStore() }, assistantStore: { MemoryStore() }, environment: [:],
-        spendFolder: { absentSpend })
+        spendFolder: { absentSpend },
+        mcpHelper: URL(fileURLWithPath: "/nonexistent/Reelcut.app/Contents/Helpers/reelcut-mcp"))
     settings.show()
     for _ in 0..<10 { RunLoop.current.run(until: Date().addingTimeInterval(0.05)) }
     guard let root = settings.window?.contentView else { exit(3) }

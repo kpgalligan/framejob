@@ -2,7 +2,7 @@ import Foundation
 
 /// The agent server's Unix socket (road map 14's MC2, spec §11 MC-1, MC-2,
 /// MC-6): where it is bound, whether this instance may bind it, the bind,
-/// its release at quit, and the line Tools ▸ Copy MCP Command copies. The
+/// its release at quit, and the line Settings' MCP section copies. The
 /// core's listener (`ReelAgentSocket`) is the app's only one since MC4; it
 /// serves the prepared catalog through the trampoline, so every call goes
 /// through `AgentLane.serve`'s one lock (AI-2).
@@ -100,7 +100,7 @@ extension AgentServer {
         Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/reelcut-mcp")
     }
 
-    /// The line Tools ▸ Copy MCP Command copies: Claude Code's `mcp add`
+    /// The line Settings' MCP section copies: Claude Code's `mcp add`
     /// for the helper at `helperPath`, single-quoted for a POSIX shell.
     static func mcpCommand(helperPath: String) -> String {
         let quoted = helperPath.replacingOccurrences(of: "'", with: "'\\''")

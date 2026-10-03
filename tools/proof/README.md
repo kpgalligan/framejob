@@ -1666,17 +1666,23 @@ Since road map 13 P4 the pane ends with the month's spend line, which
 the picture would hold their ledger (spec §11 P-5). The harness therefore
 hands the controller a spend folder that does not exist
 (`/nonexistent/reelcut-harness-spend`): the line is an empty month, answered
-synchronously, so two processes still render byte for byte the same. The
-constructor, exactly as `cloud_captions_probe.py`'s hygiene section holds it:
+synchronously, so two processes still render byte for byte the same. Since
+issue batch B74 the window opens with the MCP pane, which shows its helper's
+path; the harness hands it a fixed path that does not exist
+(`/nonexistent/Reelcut.app/Contents/Helpers/reelcut-mcp`), so the picture
+never depends on where the tree is checked out and always shows the disabled
+button and the missing-helper sentence. The constructor, exactly as
+`cloud_captions_probe.py`'s hygiene section holds it:
 
 ```swift
     let settings = SettingsWindowController(
         store: { MemoryStore() }, assistantStore: { MemoryStore() }, environment: [:],
-        spendFolder: { absentSpend })
+        spendFolder: { absentSpend },
+        mcpHelper: URL(fileURLWithPath: "/nonexistent/Reelcut.app/Contents/Helpers/reelcut-mcp"))
 ```
 
-The window is 460 × 529 points now (`cloud_captions_probe.py`'s row 18
-measures it; issue batch B71).
+The window is 460 × 780 points now (`cloud_captions_probe.py`'s row 18
+measures it; issue batch B74).
 
 Road map 8's W4b took a fifth render target, in `settings`' shape:
 
@@ -12495,6 +12501,69 @@ python3 tools/proof/container_rewrap_probe.py                          # passed 
 python3 tools/proof/container_rewrap_probe.py --mutant no-retime       # MUTANT PASS, exit 0 (each of the eleven)
 python3 tools/proof/container_import_proof.py --port 4873              # passed 10/10, exit 0
 python3 tools/proof/container_import_proof.py --port 4873 --mutant ffmpeg-copy   # M2 FAIL, MUTANT PASS, exit 0
+```
+
+## Issue batch B74 — Copy MCP Command moves into Settings' MCP section (`settings_layout_probe.py` L1, L2, L9–L11; `agent_socket_proof.py` K13; #222; spec §11 MC-7)
+
+Settings gets a first section, "MCP" (`MCPSettingsPane.swift`): a visible
+two-paragraph blurb, the bundled helper's path as selectable monospace text,
+the Copy MCP Command button and a status line. Tools ▸ Copy MCP Command and
+the Tools menu are gone, with `AppDelegate.copyMCPCommand`, its validator arm,
+its `UIMenuTable` row and its `inventory.json` entry.
+
+- **`settings_layout_probe.py`** — L1 now wants [mcpPane, assistantPane,
+  transcriptionPane]; L2 adds the MCP pane's bare heading "MCP", no ⓘ in it,
+  and the window's `initialFirstResponder` being the Assistant key field. L9
+  reads the MCP pane's order, its blurb literals at 13 pt in `labelColor`, the
+  helper label ("/bin/sh", selectable, 420 wide) and the button below the
+  blurb; L10 presses the button over a second controller whose helper is
+  `/bin/sh` and whose pasteboard is a private named one
+  (`com.kgalligan.reelcut.settings-layout-probe`, released at exit), reads the
+  line back from it, and checks the general pasteboard's `changeCount` did not
+  move; L11 builds a third with `/nonexistent/reelcut-mcp` (disabled, the
+  missing sentence, a direct `copyClicked` writes nothing). Four new mutants
+  (`mcp-last` L1, `grey-blurb` L9, `copy-unwired` L10, `always-enabled` L11);
+  `order-swapped`'s anchor gained `mcpPane, `.
+- **`agent_socket_proof.py` K13** no longer touches the clipboard: on K it
+  runs `new_project`, `perform_menu_item ["Reelcut", "Settings…"]` (its
+  `windows_opened` holds `settings`) and `snapshot_ui {window: "settings"}`,
+  and reads the layout dump: the heading, blurb 1, the helper path (the
+  launched bundle's resolved `Contents/Helpers/reelcut-mcp`), the button's
+  title, their tops strictly ordered above `settings.assistant.info`, and no
+  layout problem on them. `pasteboard_keep.swift` is deleted, and the proof
+  no longer allows any SKIP. The `fixed-path` mutant still fails K13.
+- The harness's `settings` mode passes a fixed absent helper
+  (`/nonexistent/Reelcut.app/Contents/Helpers/reelcut-mcp`), so its picture
+  does not depend on the checkout path; `cloud_captions_probe.py`'s hygiene
+  row holds the new constructor text and row 18 is re-pinned at 460 × 780
+  (measured twice, the same both times; under 800, so the window fits a
+  1440 × 900 display's menu bar). `assistant_tab_probe.swift`'s P7 reads three
+  panes with the Assistant pane second. `designs/screens/02-settings.md`
+  expects "Copy MCP Command" and blurb 1. How the section looks and the press
+  itself on a real screen are `docs/manual-checks.md` CH-6 and AC-4.
+
+Runs on 2026-10-03 over `41290b5` plus this batch.
+
+| Run | Result |
+|---|---|
+| `make typecheck` | 0 errors, the 4 baseline warnings, tsc clean |
+| `settings_layout_probe.py` | 12/12, exit 0 |
+| `settings_layout_probe.py --mutant <each of 5>` | each exit 1, caught: `order-swapped` L1, `mcp-last` L1, `grey-blurb` L9, `copy-unwired` L10, `always-enabled` L11 |
+| `cloud_captions_probe.py --only chrome` | before the re-pin 76/77, exit 1 (`measured (460, 780), scale 1`); after it 77/77 twice |
+| `cloud_captions_probe.py --only chrome,hygiene,settings_verify` | 148/148, exit 0 |
+| `agent_socket_proof.py` | 15/15, no SKIP, exit 0 (K13 tops `[20, 53, 163, 205, 285]`) |
+| `agent_socket_proof.py --mutant fixed-path` | K13 FAIL (helper `/Applications/Reelcut.app/…`), caught, exit 0 |
+| `v2_menu.py <dir>/agent.sock` (own instance, V2b's launch line) | 28 pass, 0 fail, 0 skip; H1 and H2 pass (94 rows each) |
+| `assistant_tab_proof.py` | 26/26, exit 0 |
+| `assistant_settings_proof.py` / `spend_ui_proof.py` | 3/3 and 10/10, exit 0 |
+| `screens.py --only 02-settings` | 6 pass of 6, exit 0, light and dark |
+| `make test` / `make lint` / `make app` | exit 0 each (`make test` on its third run: `mcp-proxy`'s `ping_is_answered_while_a_call_is_held` missed its 1 s bound twice inside `make test` and passed 3 of 3 alone) |
+
+```sh
+python3 tools/proof/settings_layout_probe.py
+python3 tools/proof/settings_layout_probe.py --mutant copy-unwired
+python3 tools/proof/agent_socket_proof.py
+python3 tools/proof/agent_socket_proof.py --mutant fixed-path
 ```
 ## Road map 14 — the MC1 spike (`mc1_spike/`)
 

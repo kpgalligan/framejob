@@ -427,10 +427,8 @@ the key map behind it.
   the no-document window, the launch/terminate flow and the whole menu bar
   (spec §9). Menu items are nil-target selectors down the responder chain.
   `AppDelegate.swift` binds the agent socket at launch and releases it at
-  quit, and answers Tools ▸ Copy MCP Command (`copyMCPCommand`, road map
-  14's MC4: the general pasteboard cleared and the `mcpCommand` line set as
-  `.string`; live with no document, enabled exactly while `mcpHelperURL` is
-  an executable file; not an edit, so no MCP mirror).
+  quit. Copy MCP Command is Settings' MCP pane's (`MCPSettingsPane.swift`,
+  spec §11 MC-7); there is no Tools menu.
   `main.swift` also calls `AgentCatalogSnapshot.writeIfAsked()` straight
   after `AgentLane.prepareAtLaunch()`, at `#if` depth 0.
 - `EditorWindow.swift` — the editor's `NSWindow` subclass: its `sendEvent`
@@ -1324,17 +1322,33 @@ free.
   its `infoState` (closed/hover/held) deciding a press and its
   `popoverShouldClose` keeping `.transient` off the icon; owner-filtered
   tracking area.
+- `MCPSettingsPane.swift` — Settings' MCP pane, the window's first (issue
+  batch B74, spec §11 MC-7): a bare heading (no ⓘ), a visible two-paragraph
+  blurb, the helper's path as selectable 12 pt monospace text, Copy MCP
+  Command and a status line. The helper URL and the pasteboard are
+  parameters (`AgentServer.mcpHelperURL` and `.general` through
+  `SettingsWindowController`'s defaults); the line is
+  `AgentServer.mcpCommand(helperPath:)`, never spelled here. `sync()`
+  enables the button exactly while the helper is executable, and says
+  `missingStatus` when it is not; a press writes the line and says
+  `copiedStatus` until the next `sync()`. Not an edit, so no MCP mirror.
 - `SettingsWindowController.swift` — Reelcut ▸ Settings… ⌘,, the app's one
   window for something PERSISTED beyond view state, with
   `extension AppDelegate { showSettings }` at its foot
   (`CaptionImporter.swift`'s command-at-the-foot precedent, which is why
   `AppDelegate.swift` is untouched). `ExportQueueWindowController`'s mould.
   `+Verify` holds the Verify bookkeeping (pure move, #58).
-  Two panes as `content`'s arranged subviews, Assistant
-  (`AssistantSettingsPane`) then Transcription (`transcriptionPane`), 24 pt
-  apart; each opens with `settingsSectionHeader` (its heading and a
-  `SettingsInfoButton` holding its explanation, spec §11 SH-5). An MCP
-  section later is one more pane inserted at index 0. The key goes in through an `NSSecureTextField` and NEVER comes
+  Three panes as `content`'s arranged subviews, MCP (`mcpPane`,
+  `MCPSettingsPane`, spec §11 MC-7), Assistant (`AssistantSettingsPane`)
+  then Transcription (`transcriptionPane`), 24 pt apart; the Assistant and
+  Transcription panes open with `settingsSectionHeader` (a heading and a
+  `SettingsInfoButton` holding its explanation, spec §11 SH-5), the MCP
+  pane with its bare heading. Two defaulted parameters build the MCP pane,
+  `mcpHelper:` (`AgentServer.mcpHelperURL`; the harness passes a fixed
+  absent path) and `pasteboard:` (`.general`; the probe passes a private
+  one); `show()` syncs it, and `initialFirstResponder` is the Assistant key
+  field so the selectable path never opens selected. A later section is one
+  more pane in `buildContent`'s list. The key goes in through an `NSSecureTextField` and NEVER comes
   back out: `sync()` writes a FIXED-LENGTH mask into the field's
   PLACEHOLDER, never its `stringValue`. Save and Remove go through
   `AssemblyAIConfiguration.store()`, so R6-9's folder override holds; the
@@ -1346,8 +1360,8 @@ free.
   captured at click time. Text edits, Save, Remove, sync and reopening keep
   Verify enabled only when an effective credential exists and no current
   request is checking those same inputs.
-  **No key set is not an error** anywhere in it. The second pane,
-  `AssistantSettingsPane.swift` (road map 12 A2), is `content`'s first pane
+  **No key set is not an error** anywhere in it. The Assistant pane,
+  `AssistantSettingsPane.swift` (road map 12 A2), is `content`'s second pane
   and synced in `show()`; the
   window takes its store as a second FACTORY, `assistantStore:`
   (`AssistantConfiguration.store()` by default, a `MemoryStore` in the
@@ -1555,8 +1569,8 @@ free.
   the `Reelcut: ` prefix. `unbindSocket` (all of `applicationWillTerminate`)
   releases with no join. `mcpHelperURL` is this bundle's own
   `Contents/Helpers/reelcut-mcp` and `mcpCommand(helperPath:)` the
-  `claude mcp add --scope user reelcut -- '<path>'` line Tools ▸ Copy MCP
-  Command copies (each `'` written `'\''`). The mode check, the connect,
+  `claude mcp add --scope user reelcut -- '<path>'` line Settings' MCP
+  pane copies (spec §11 MC-7; each `'` written `'\''`). The mode check, the connect,
   the listening line and `mcpHelperURL` are each one statement that
   `agent_socket_proof.py`'s mutants replace.
 - `AgentCatalogSnapshot.swift` — the build's catalog snapshot (road map
@@ -1971,7 +1985,8 @@ is a decision: Preview Quality, the preview window, the export queue, the
 Media tab's search and sort, the Assistant tab (view state; the dev tool
 `select_inspector_tab` shows it in a Release build, and the assistant's own
 calls already are tool calls) and Settings' Assistant pane (the key, the model
-and the chat settings are the person's, spec §11 AI-8, AI-11, AI-20) get no
+and the chat settings are the person's, spec §11 AI-8, AI-11, AI-20) and
+Settings' MCP pane (copies a line, edits nothing, MC-7) get no
 mirror, because they edit no project and `set_selection` / `export` already are the capability.
 Opening System Settings at a grant's pane (the recorder panel) is no edit
 and gets no mirror; `record_screen` refuses by name instead (spec §11

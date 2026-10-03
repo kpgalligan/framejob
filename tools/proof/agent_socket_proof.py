@@ -9,7 +9,7 @@ Every instance is a `Popen` this script owns, launched with
 `tools/proof/work/` can pass 103 bytes). An instance is ready when its log
 holds the socket's line alone. Logs go to
 `tools/proof/work/agent-socket/<name>.log`; every other child (the probe's
-build, the probe, `pasteboard_keep`, `osascript`, `lsof`, `ffmpeg`,
+build, the probe, `osascript`, `lsof`, `ffmpeg`,
 `make app`) runs under `graphics_spike/bounded.py`. HTTP over AF_UNIX is
 `mcp.UnixHTTPConnection`. Nothing is signalled but this script's own pids,
 and nothing under `~/Library/Application Support/Reelcut/` is created,
@@ -48,28 +48,25 @@ K12 (spec §11 MC-5) H, launched with `-RCFFmpegImport ask -RCFFmpegPath
     `Could not read` before the merge with main) and `RCFFmpegImport` in its
     text (the import half); `open_project` of the same file answers `isError`
     within 20 s (the open half). No ffmpeg on the host is a FAIL.
-K13 Tools ▸ Copy MCP Command, on K: `pasteboard_keep save` (built from
-    `pasteboard_keep.swift` into `work/agent-socket/`; a build failure is a
-    FAIL and touches nothing) keeps every clipboard item and type in K's
-    scratch folder — exit 3 is a SKIP, "the clipboard holds <type>, which
-    cannot be read back", and nothing else is done; then `new_project`,
-    `perform_menu_item ["Tools", "Copy MCP Command"]` and one `pbpaste`,
-    `seen`, which must be `mcpCommand` for the launched bundle's
-    `Contents/Helpers/reelcut-mcp`, an executable file; then `pasteboard_keep
-    restore <file> <seen>`: exit 0 deletes the file, exit 4 is a SKIP ("the
-    clipboard changed during K13; left as it is") only for a run that reached
-    the paste, exit 5 is a FAIL. A run that failed before the paste restores
-    against `mcpCommand` (what the item alone could have written) and is a
-    FAIL whatever restore answers. On any exit but 0 the folder is kept and
-    its path printed.
+K13 (spec §11 MC-7) Settings' MCP section, on K, with no clipboard
+    involved: `new_project` (a scratch path); `perform_menu_item ["Reelcut",
+    "Settings…"]`, whose `windows_opened` must include `settings`; then
+    `snapshot_ui {window: "settings"}` and its layout dump:
+    `settings.mcp.heading` reads "MCP", `settings.mcp.blurb.1` the first
+    paragraph's literal, `settings.mcp.helper` the launched bundle's resolved
+    `Contents/Helpers/reelcut-mcp` (an executable file of 200 characters or
+    fewer, snapshot_ui's text cap), and `settings.mcp.copy` "Copy MCP
+    Command"; their frame tops are strictly ordered heading < blurb.1 <
+    helper < copy < `settings.assistant.info`; none of those ids has a layout
+    problem. The press itself is `settings_layout_probe.py`'s L10.
 Z1  no `Reelcut: ` in any log.  Z2  no proof pid alive.
 
     python3 tools/proof/agent_socket_proof.py [--app PATH]
         [--mutant no-connect-first|no-mode-check|tcp-listener|agent-asks|
                   open-asks|fixed-path]
 
-Any FAIL exits 1; an instrument that cannot run is a FAIL, never a skip; K13
-may be a named SKIP. Every mutant replaces one anchor in a
+Any FAIL exits 1; an instrument that cannot run is a FAIL, never a skip, and
+no row may SKIP. Every mutant replaces one anchor in a
 `tree_copy.make_copy` copy built by its own `make app` and runs every row
 against that build: `no-connect-first` (K4 must FAIL), `no-mode-check` (K8),
 `tcp-listener` (K11: a POSIX listener on 127.0.0.1:0 after the socket's
@@ -107,8 +104,6 @@ import tree_copy  # noqa: E402
 WORK = ROOT / "tools/proof/work/agent-socket"
 APP = ROOT / "build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut"
 PROBE_SOURCE = ROOT / "tools/proof/agent_socket_probe.swift"
-KEEP_SOURCE = ROOT / "tools/proof/pasteboard_keep.swift"
-KEEP = WORK / "pasteboard_keep"
 SOURCES = ROOT / "app/Sources"
 SUPPORT = Path.home() / "Library/Application Support/Reelcut"
 MAX_PATH = 103
@@ -165,18 +160,12 @@ skips = {}
 halves = {}
 INSTANCES = []
 SCRATCH = []
-KEPT = []
 
 
 def check(name, good, detail=""):
     rows[name] = bool(good)
     print(("  ok   " if good else "  FAIL ") + name + (f"  {detail}" if detail else ""),
           flush=True)
-
-
-def skip(name, detail):
-    skips[name] = detail
-    print(f"  SKIP {name}  {detail}", flush=True)
 
 
 # ---- HTTP over the socket ---------------------------------------------------------
@@ -458,81 +447,55 @@ def row_k12(app):
           f"open half {open_ok} (isError {error_o}, {seconds_o} s: {text_o[:160]!r})")
 
 
-def mcp_command(helper):
-    return "claude mcp add --scope user reelcut -- '" + helper.replace("'", "'\\''") + "'"
-
-
-def build_keep():
-    """`pasteboard_keep` from its source alone (AppKit, no app sources): the
-    binary, or None and why."""
-    WORK.mkdir(parents=True, exist_ok=True)
-    if KEEP.exists() and KEEP.stat().st_mtime > KEEP_SOURCE.stat().st_mtime:
-        return KEEP, ""
-    sdk = bounded.run(["xcrun", "--show-sdk-path", "--sdk", "macosx"], 60)["stdout"].strip()
-    built = bounded.run(["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0",
-                         str(KEEP_SOURCE), "-o", str(KEEP)], 600)
-    if built["rc"] != 0 or not KEEP.exists():
-        return None, f"swiftc rc {built['rc']}: {built['stderr'].strip()[-400:]}"
-    return KEEP, ""
+K13_BLURB = ("An MCP client such as Claude Code uses Reelcut's tools through reelcut-mcp, a "
+             "helper inside this app. It reaches Reelcut over a local socket that only programs "
+             "you run can open.")
+K13_IDS = ["settings.mcp.heading", "settings.mcp.blurb.1", "settings.mcp.helper",
+           "settings.mcp.copy", "settings.assistant.info"]
 
 
 def row_k13(app):
-    keep, why = build_keep()
-    if keep is None:
-        check("K13", False, f"pasteboard_keep did not build (nothing touched): {why}")
-        return
     folder = scratch_folder()
     sock = os.path.join(folder, "agent.sock")
-    saved = os.path.join(folder, "clipboard.plist")
-    kept = bounded.run([str(keep), "save", saved], 60)
-    if kept["rc"] == 3:
-        said = kept["stdout"].strip()
-        kind = said[len("unreadable "):] if said.startswith("unreadable ") else said
-        skip("K13", f"the clipboard holds {kind}, which cannot be read back")
-        return
-    if kept["rc"] != 0:
-        check("K13", False, f"pasteboard_keep save rc {kept['rc']}: "
-                            f"{(kept['stdout'] + kept['stderr']).strip()[-300:]} (nothing touched)")
-        return
-    k = Instance("k", app, sock)
-    up = k.start()
-    seen, problem = None, None
-    try:
-        if not up or k.socket_line != f"listening at {sock}":
-            problem = f"K did not bind: {k.socket_line!r}"
-        else:
-            call(sock, "new_project", {"path": os.path.join(folder, "k13.reelcut")})
-            try:
-                performed = call(sock, "perform_menu_item", {"path": ["Tools", "Copy MCP Command"]})
-            except RuntimeError as error:
-                performed = f"refused: {error}"
-            pasted = bounded.run(["pbpaste"], 30)
-            seen = pasted["stdout"]
-    except Exception as error:  # noqa: BLE001 — scored below
-        problem = f"{type(error).__name__}: {error}"
-    finally:
-        k.stop()
     helper = str(Path(app).resolve().parents[1] / "Helpers/reelcut-mcp")
     executable = os.path.isfile(helper) and os.access(helper, os.X_OK)
-    want = mcp_command(helper)
-    # A run that never pasted can only have had the menu item write `want`:
-    # restore against that, so a copy made before a failure is still undone,
-    # and a clipboard nothing wrote is left alone (exit 4, the file kept).
-    restored = bounded.run([str(keep), "restore", saved, seen if seen is not None else want], 60)
-    if restored["rc"] == 0:
-        os.remove(saved)
-    else:
-        KEPT.append(folder)
-        print(f"  K13: restore exit {restored['rc']}; {folder} is kept", flush=True)
-    said = (restored["stdout"] + restored["stderr"]).strip()
-    if restored["rc"] == 4 and problem is None:
-        skip("K13", "the clipboard changed during K13; left as it is")
-        return
-    good = (problem is None and seen == want and executable and restored["rc"] == 0)
+    k = Instance("k", app, sock)
+    up = k.start()
+    try:
+        if not up or k.socket_line != f"listening at {sock}":
+            check("K13", False, f"K did not bind: {k.socket_line!r}")
+            return
+        project = call(sock, "new_project", {"path": os.path.join(folder, "k13.reelcut")})["saved"]
+        opened = call(sock, "perform_menu_item", {"project": project,
+                                                  "path": ["Reelcut", "Settings…"]})
+        kinds = [w.get("kind") for w in opened.get("windows_opened", [])]
+        answer = call(sock, "snapshot_ui", {"window": "settings",
+                                            "path": os.path.join(folder, "k13.png")})
+        with open(answer.get("layout_path")) as f:
+            layout = json.load(f)
+    finally:
+        k.stop()
+    views = [v for v in layout.get("views", []) if not v.get("hidden")]
+    found = {}
+    for identifier in K13_IDS:
+        match = [v for v in views if v.get("id") == identifier]
+        found[identifier] = match[0] if match else None
+    text = {i: (v or {}).get("text") for i, v in found.items()}
+    tops = [(v or {}).get("frame", [None, None])[1] for v in found.values()]
+    ordered = None not in tops and all(a < b for a, b in zip(tops, tops[1:]))
+    indices = {v["i"] for v in found.values() if v}
+    problems = [p for p in layout.get("problems", []) if p.get("view") in indices]
+    good = ("settings" in kinds and executable and len(helper) <= 200
+            and text["settings.mcp.heading"] == "MCP"
+            and text["settings.mcp.blurb.1"] == K13_BLURB
+            and text["settings.mcp.helper"] == helper
+            and text["settings.mcp.copy"] == "Copy MCP Command"
+            and ordered and not problems)
     check("K13", good,
-          f"seen {seen!r} (want {want!r}); helper executable {executable}; "
-          f"perform {str(performed)[:120] if problem is None else problem!r}; "
-          f"restore rc {restored['rc']} {said[-160:]!r}")
+          f"opened {kinds}; heading {text['settings.mcp.heading']!r}; blurb.1 exact "
+          f"{text['settings.mcp.blurb.1'] == K13_BLURB}; helper {text['settings.mcp.helper']!r} "
+          f"(want {helper!r}, executable {executable}, {len(helper)} characters); copy "
+          f"{text['settings.mcp.copy']!r}; tops {tops} ordered {ordered}; problems {problems[:3]}")
 
 
 # ---- the K rows -------------------------------------------------------------------
@@ -665,7 +628,7 @@ def run_rows(app):
     except Exception as error:  # noqa: BLE001
         check("K12", False, f"the row broke: {type(error).__name__}: {error}")
 
-    # K13 — Copy MCP Command, with the person's clipboard kept.
+    # K13 — Settings' MCP section (MC-7).
     try:
         row_k13(app)
     except Exception as error:  # noqa: BLE001
@@ -764,9 +727,6 @@ def main():
     finally:
         finish_z()
         for folder in SCRATCH:
-            if folder in KEPT:
-                print(f"  kept: {folder}", flush=True)
-                continue
             shutil.rmtree(folder, ignore_errors=True)
         if args.mutant:
             unregister(WORK / f"mutant-{args.mutant}" / "tree")
@@ -786,7 +746,7 @@ def main():
     tail = f"; skipped {', '.join(f'{k}: {v}' for k, v in skips.items())}" if skips else ""
     print(f"{passed}/{len(rows)} in {seconds:.0f} s{tail}")
     complete = all(name in rows or name in skips for name in ORDER)
-    return 0 if all(rows.values()) and complete and set(skips) <= {"K13"} else 1
+    return 0 if all(rows.values()) and complete and not skips else 1
 
 
 if __name__ == "__main__":

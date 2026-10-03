@@ -4,7 +4,10 @@
   "project": null,
   "steps": [{"call": "perform_menu_item", "args": {"path": ["Reelcut", "Settings…"]}}],
   "captures": [{"name": "window", "window": "settings"}],
-  "expect": [{"capture": "window", "visible_text": "Anthropic API key:"},
+  "expect": [{"capture": "window", "visible_text": "Copy MCP Command"},
+             {"capture": "window",
+              "visible_text": "An MCP client such as Claude Code uses Reelcut's tools through reelcut-mcp, a helper inside this app. It reaches Reelcut over a local socket that only programs you run can open."},
+             {"capture": "window", "visible_text": "Anthropic API key:"},
              {"capture": "window", "visible_text": "AssemblyAI API key:"},
              {"capture": "window", "visible_text": "No API key is set."},
              {"capture": "window", "visible_text": "Compact when context reaches"},
@@ -14,15 +17,32 @@
 }
 ```
 
-Settings (Reelcut ▸ Settings…) has two sections, one under the other: Assistant
-and Transcription. The first is where a person gives Reelcut an Anthropic API
-key, chooses the model for the Assistant tab, and sets how a long conversation
-is kept in bounds; the second is where they give it an AssemblyAI API key, so
-that the Generate Captions sheet can transcribe in the cloud instead of on this
-Mac.
+Settings (Reelcut ▸ Settings…) has three sections, one under the other: MCP,
+Assistant and Transcription. The first is where a person finds how to connect
+an MCP client such as Claude Code to Reelcut (spec §11 MC-7); the second is
+where they give Reelcut an Anthropic API key, choose the model for the
+Assistant tab, and set how a long conversation is kept in bounds; the third is
+where they give it an AssemblyAI API key, so that the Generate Captions sheet
+can transcribe in the cloud instead of on this Mac.
 
-Each section opens with its bold heading and, just after it, a small mid-grey
-ⓘ icon about the height of the heading's capitals, darkening while the pointer
+The "MCP" section opens with its bold heading alone, with no ⓘ. Under it, two
+short paragraphs in 13 pt black (white in dark), visible rather than in a
+popover: "An MCP client such as Claude Code uses Reelcut's tools through
+reelcut-mcp, a helper inside this app. It reaches Reelcut over a local socket
+that only programs you run can open." and "If Reelcut isn't running, the first
+tool call opens it in the background. To add Reelcut to Claude Code, copy the
+command and run it in Terminal." Then the helper's path inside this copy of
+the app, ending `Contents/Helpers/reelcut-mcp`, in 12 pt monospace black,
+selectable, wrapping by character when it is long. Then a "Copy MCP Command"
+button (a white square button with a thin outline), and under it an empty
+status line: after a press it reads "Copied. Paste it into Terminal and press
+Return.", and in a copy of Reelcut without the helper the button is dimmed and
+the line reads "reelcut-mcp is missing from this copy of Reelcut." Nothing in
+the section is selected when the window opens; the Anthropic key field has the
+focus.
+
+The Assistant and Transcription sections each open with their bold heading
+and, just after it, a small mid-grey ⓘ icon about the height of the heading's capitals, darkening while the pointer
 is on it. Resting on an ⓘ for about a third of a second opens a standard macOS
 popover under it — the rounded bubble with an arrow (spec §11 SH-5) — holding
 that section's explanation in 13 pt black (white in dark), in short
@@ -60,7 +80,8 @@ how many could not be priced or could not be read rather than counting them as
 nothing. Under it, in small grey: "Reelcut's own estimate at LiteLLM prices, from
 its spend ledger. The Anthropic Console shows what your account was billed."
 
-Under the "Transcription" heading, after a wider gap: an "AssemblyAI API key:"
+Under the "Transcription" heading, after a wider gap (the same gap separates
+MCP from Assistant): an "AssemblyAI API key:"
 field, empty, whose placeholder reads "Paste your key"; a "Region:" pop-up set
 to "United States"; and the status line "No API key is set." Along its bottom:
 "Save" (blue), "Remove" and "Verify" (both dimmed, since there is no key), and
@@ -71,10 +92,11 @@ pressed; captions made on this Mac never leave it; the published price and the
 date it was read; and that the key is kept in a file only the person can read
 and is never shown again once saved.
 
-No long grey paragraph is left in the window, so it is shorter than it was.
+No long grey paragraph is left in the window; the MCP section's blurb is its
+only paragraph, and it is black.
 
-In the light capture the ground is white and the headings, labels, status
-lines and the month's line black; the ⓘ icons, the spend note and the word
+In the light capture the ground is white and the headings, the MCP blurb and
+path, labels, status lines and the month's line black; the ⓘ icons, the spend note and the word
 "tokens" are mid-grey, the key, model and threshold fields white boxes with grey
 borders, the Region pop-up a light-grey pill, "Account Page" a white square
 button with a thin black outline and no shadow, the two Saves flat blue blocks,

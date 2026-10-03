@@ -49,7 +49,6 @@ extension AppDelegate {
         mainMenu.addItem(submenuItem(trackMenu()))
         mainMenu.addItem(submenuItem(markMenu()))
         mainMenu.addItem(submenuItem(viewMenu()))
-        mainMenu.addItem(submenuItem(toolsMenu()))
 
         let windowMenu = self.windowMenu()
         mainMenu.addItem(submenuItem(windowMenu))
@@ -531,12 +530,6 @@ extension AppDelegate {
                     quality.title, #selector(EditorViewController.setPreviewQuality(_:)),
                     quality.rawValue))
         }
-        return menu
-    }
-
-    private func toolsMenu() -> NSMenu {
-        let menu = NSMenu(title: "Tools")
-        menu.addItem(item("Copy MCP Command", #selector(copyMCPCommand(_:))))
         return menu
     }
 

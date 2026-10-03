@@ -16,20 +16,23 @@ import AppKit
 /// the Window menu opens it, so AppKit's own row is the only way back to a
 /// window the person has buried.
 ///
-/// **Two panes, "Assistant" then "Transcription"** (road map 12 A2's
-/// `AssistantSettingsPane`, then `transcriptionPane`), each a vertical stack
+/// **Three panes, "MCP", "Assistant" then "Transcription"** (issue batch
+/// B74's `MCPSettingsPane`, spec §11 MC-7; road map 12 A2's
+/// `AssistantSettingsPane`; then `transcriptionPane`), each a vertical stack
 /// and each one of `content`'s arranged subviews, 24 pt apart through
 /// `content.spacing`. §5d's one pane was taken as a HEADING inside a window
-/// titled Settings rather than as a tab bar with one tab. Each pane opens
-/// with `settingsSectionHeader` — its heading and a `SettingsInfoButton`
-/// whose popover holds its explanation (spec §11 SH-5). There is still a
-/// Transcription section, so the sentence the `transcribe` tool and its
-/// catalog entry both print — the one that sends a caller to Settings and
-/// then to Transcription — stays true without either of them being edited.
-/// **A later section is one more pane**: built the same way (a vertical stack
-/// opening with `settingsSectionHeader`) and put first with
-/// `content.insertArrangedSubview(pane, at: 0)`; the gap comes from
-/// `content.spacing`, so nothing else moves.
+/// titled Settings rather than as a tab bar with one tab. The Assistant and
+/// Transcription panes open with `settingsSectionHeader` — a heading and a
+/// `SettingsInfoButton` whose popover holds its explanation (spec §11 SH-5);
+/// the MCP pane opens with its bare heading and shows its blurb, because
+/// MC-7 asked for the text above its button. There is still a Transcription
+/// section, so the sentence the `transcribe` tool and its catalog entry both
+/// print — the one that sends a caller to Settings and then to Transcription
+/// — stays true without either of them being edited. The window's first
+/// responder is the Assistant key field, so the MCP pane's selectable path
+/// never opens selected. **A later section is one more pane**: a vertical
+/// stack, put in `buildContent`'s pane list where it belongs; the gap comes
+/// from `content.spacing`, so nothing else moves.
 ///
 /// **The key is never shown, never logged, and never in `UserDefaults`.**
 /// `sync()` writes a FIXED-LENGTH mask into the field's PLACEHOLDER when a
@@ -99,7 +102,9 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         infoText: SettingsWindowController.explanation())
     /// The window's one stack: its arranged subviews are the panes, in order.
     let content = NSStackView()
-    /// Settings' Assistant pane, `content`'s first.
+    /// Settings' MCP pane, `content`'s first (MC-7).
+    let mcpPane: MCPSettingsPane
+    /// Settings' Assistant pane, after the MCP pane.
     let assistantPane: AssistantSettingsPane
     /// The Transcription pane, after the Assistant pane.
     let transcriptionPane = NSStackView()
@@ -114,11 +119,14 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         assistantStore: @escaping () -> any SecretStore = { AssistantConfiguration.store() },
         defaults: UserDefaults = .standard,
         environment: [String: String] = ProcessInfo.processInfo.environment,
-        spendFolder: @escaping () -> URL? = { AssistantSpend.folder() }
+        spendFolder: @escaping () -> URL? = { AssistantSpend.folder() },
+        mcpHelper: URL = AgentServer.mcpHelperURL,
+        pasteboard: NSPasteboard = .general
     ) {
         self.store = store
         self.defaults = defaults
         self.environment = environment
+        mcpPane = MCPSettingsPane(helperURL: mcpHelper, pasteboard: pasteboard)
         assistantPane = AssistantSettingsPane(
             store: assistantStore, defaults: defaults, environment: environment,
             spendFolder: spendFolder)
@@ -130,6 +138,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         window.center()
         super.init(window: window)
         window.contentView = buildContent()
+        window.initialFirstResponder = assistantPane.keyField
         applyBackground()
         sync()
     }
@@ -201,7 +210,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
         content.orientation = .vertical
         content.alignment = .leading
         content.spacing = 24
-        for pane in [assistantPane, transcriptionPane] {
+        for pane in [mcpPane, assistantPane, transcriptionPane] {
             content.addArrangedSubview(pane)
         }
         content.translatesAutoresizingMaskIntoConstraints = false
@@ -239,6 +248,7 @@ final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
     func show() {
         applyBackground()
         sync()
+        mcpPane.sync()
         assistantPane.sync()
         assistantPane.refreshSpend()
         showWindow(nil)

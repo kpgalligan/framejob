@@ -634,13 +634,6 @@
    ],
    "note": "the preview window, shown or closed"
   },
-  "copyMCPCommand:": {
-   "verdict": "none",
-   "code": [
-    "app/Sources/AppDelegate.swift `func copyMCPCommand(`"
-   ],
-   "note": "puts the claude mcp add line for the bundle's reelcut-mcp on the general pasteboard"
-  },
   "performMiniaturize:": {
    "verdict": "framework",
    "code": [

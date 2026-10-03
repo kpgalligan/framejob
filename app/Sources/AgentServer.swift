@@ -11,7 +11,7 @@ import AppKit
 /// bound at every launch, at `Agent/agent.sock` in the support folder or
 /// `RC_AGENT_SOCKET`, in a `0700` folder; it is the only listener (MC4
 /// deleted TCP). A client reaches it through the bundled `reelcut-mcp`,
-/// whose line Tools ▸ Copy MCP Command puts on the clipboard.
+/// whose line Settings' MCP section copies (spec §11 MC-7).
 ///
 /// **This file is frozen at wiring** (app/CLAUDE.md): the lifecycle, the
 /// dispatch table, the edit and result helpers, and the trampoline. Every

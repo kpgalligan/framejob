@@ -372,7 +372,7 @@ Makefile              Build orchestration
 | `AssistantView.swift` · `AssistantTranscriptView.swift` · `AssistantComposer.swift` · `AssistantTranscript.swift` · `AssistantContextMeter.swift` · `AssistantSettingsPane.swift` · `EditorViewController+Assistant.swift` | the Assistant tab's views, which hold no conversation; the multi-line message field, with its own undo; the transcript the window keeps; the context meter; Settings' Assistant pane (key, model and chat settings); and the glue between the tab and the window's session |
 | `RecordingSetup.swift` · `ScreenRecorder.swift` (with `+Finishing` and `+Content`) · `RecordingLanding.swift` · `ProjectDocument+Recording.swift` · `RecorderPanelController.swift` (with `+Rows` and `+Recording`) · `RecorderStatusItem.swift` · `AppDelegate+Recording.swift` · `AgentServer+Recording.swift` | screen recording (road map 3): the values, the session over ScreenCaptureKit and a second `AVCaptureSession` for the microphone, the landing as ordinary media, the floating non-activating panel with its countdown and meter, the menu-bar status item, and the `record_screen` tool |
 | `AppDelegate.swift` · `EditorWindowController.swift` · `WelcomeWindowController.swift` · `main.swift` | menus (nil-target selectors), window, welcome |
-| `SpeedSheetController.swift` · `RelinkSheetController.swift` · `SilenceSheetController.swift` (with `SilenceDetector.swift` behind it) · `TranscribeSheetController.swift` (+`Cloud` `Commit`) · `SettingsWindowController.swift` | the remaining dialogs, and Reelcut ▸ Settings… |
+| `SpeedSheetController.swift` · `RelinkSheetController.swift` · `SilenceSheetController.swift` (with `SilenceDetector.swift` behind it) · `TranscribeSheetController.swift` (+`Cloud` `Commit`) · `SettingsWindowController.swift` · `MCPSettingsPane.swift` | the remaining dialogs, and Reelcut ▸ Settings… (with its MCP section) |
 | `Theme.swift` · `Controls.swift` · `OptionControls.swift` · `Sheets.swift` · `EditorChrome.swift` · `FileDropView.swift` | shared chrome, copied from Rasterize |
 
 ## Building
@@ -401,8 +401,9 @@ client reaches it through `reelcut-mcp`, the stdio helper inside the bundle,
 which lists the tools without opening Reelcut and launches it in the
 background on the first tool call that finds it not running.
 
-**Tools ▸ Copy MCP Command** puts the line that registers the helper with
-Claude Code on the clipboard, with the path of the bundle you ran it from:
+**Reelcut ▸ Settings… ▸ MCP — Copy MCP Command** puts the line that registers
+the helper with Claude Code on the clipboard, with the path of the bundle you
+ran it from; the section also shows the helper's path:
 
 ```sh
 claude mcp add --scope user reelcut -- '/Applications/Reelcut.app/Contents/Helpers/reelcut-mcp'

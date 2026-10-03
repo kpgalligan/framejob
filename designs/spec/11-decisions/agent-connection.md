@@ -54,3 +54,15 @@ holds the tree they changed in its "What exists" section.
   instance's stderr to `reelcut-launch.log` beside the socket; a launch for the person's own
   socket passes neither. An interim rule bound no socket for a launch that set `RC_AGENT_PORT`
   and not `RC_AGENT_SOCKET`; MC4 deleted it with `RC_AGENT_PORT`.
+- **MC-7 — Copy MCP Command is a button in Settings' MCP section, the window's first; the Tools
+  menu is gone** (#222, issue batch B74, the owner, 2026-10-02). The section holds a visible blurb
+  in two paragraphs — not an ⓘ, because the owner asked for a blurb above the button — saying how
+  an MCP client reaches Reelcut through `reelcut-mcp` (MC-1, MC-3) and that the first tool call
+  opens it in the background (MC-4); then the helper's path as selectable monospace text; then
+  the button, which copies MC-3's line through `AgentServer.mcpCommand`, the one spelling; then a
+  status line ("Copied. Paste it into Terminal and press Return." after a press). The button is
+  enabled exactly while the bundle's helper is an executable file; when it is not, the status
+  line says "reelcut-mcp is missing from this copy of Reelcut." The button is not an edit, so it
+  has no MCP mirror (spec §7.9). It is proved in two halves: a proof opens Settings with
+  `perform_menu_item` and reads the section with `snapshot_ui`, and the press belongs to a probe
+  over a private pasteboard, because no script caller can reach a Settings button.

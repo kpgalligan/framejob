@@ -1,7 +1,9 @@
 // Issue batch B71 — the Settings window's structure after the redesign:
 // Assistant above Transcription, each key label naming its service, each
 // heading's ⓘ holding its pane's explanation (spec §11 SH-5), no long
-// paragraph left in the window, and the ⓘ's hover and click policy.
+// paragraph left in the window, and the ⓘ's hover and click policy. Issue
+// batch B74 (spec §11 MC-7) put the MCP pane first and added L9–L11: its
+// order and text, Copy MCP Command's press, and its missing-helper state.
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
 // `main.swift`, module `Reelcut`, against `libreelcut_core.a`. One process,
@@ -11,12 +13,20 @@
 //
 // The fixture: `SettingsWindowController` over two `MemoryStore`s, an empty
 // environment, an absent spend folder and a scratch `UserDefaults` suite; the
-// window is never shown. Every string a row compares is a LITERAL, never the
-// app's own constant, so a changed constant is a changed answer. Rows:
-//   L1 `content`'s arranged subviews are exactly [assistantPane,
+// window is never shown. L9 and L10 build a second controller whose MCP
+// helper is "/bin/sh" and L11 a third whose helper is
+// "/nonexistent/reelcut-mcp", both over a private pasteboard
+// (`com.kgalligan.reelcut.settings-layout-probe`, released at exit); the
+// general pasteboard is never written. Every string a row compares is a
+// LITERAL, never the app's own constant, so a changed constant is a changed
+// answer. Rows:
+//   L1 `content`'s arranged subviews are exactly [mcpPane, assistantPane,
 //      transcriptionPane], and `content.spacing` is 24.
-//   L2 each pane opens with a stack of [headingLabel, infoButton], the
-//      headings reading "Assistant" and "Transcription".
+//   L2 the Assistant and Transcription panes open with a stack of
+//      [headingLabel, infoButton], the headings reading "Assistant" and
+//      "Transcription"; the MCP pane opens with its bare headingLabel reading
+//      "MCP" and holds no `SettingsInfoButton`; the window's
+//      `initialFirstResponder` is the Assistant key field.
 //   L3 the row holding each key field opens with "Anthropic API key:" /
 //      "AssemblyAI API key:"; both empty placeholders read "Paste your key";
 //      no text field in the window reads exactly "API key:".
@@ -30,12 +40,27 @@
 //      before the delay cancels it and nothing shows.
 //   L7 the click policy on a button in no window (state changes, no show).
 //   L8 the transient guard's hit test on a button in an unshown window.
+//   L9 the MCP pane's arranged subviews are [heading, blurb 1, blurb 2,
+//      helper, button, status]; the blurbs read the two literals at 13 pt in
+//      the label colour; the helper label reads "/bin/sh", is selectable and
+//      wraps at 420; the button reads "Copy MCP Command" and, after layout,
+//      sits below the last blurb in the root view's coordinates.
+//   L10 with "/bin/sh": the button is enabled and the status empty; a
+//      `performClick` puts `claude mcp add --scope user reelcut -- '/bin/sh'`
+//      on the private pasteboard and the copied sentence in the status; the
+//      general pasteboard's `changeCount` does not move; `sync()` empties the
+//      status.
+//   L11 with "/nonexistent/reelcut-mcp": the button is disabled, the status
+//      is the missing sentence, and a direct `copyClicked(nil)` leaves the
+//      private pasteboard's `changeCount` where it was.
 import AppKit
 
 let app = NSApplication.shared
 app.setActivationPolicy(.prohibited)
 
 var rows: [[String: Any]] = []
+/// The private pasteboard L10 and L11 write, released by `finish()`.
+var probePasteboard: NSPasteboard?
 func row(_ id: String, _ pass: Bool, _ detail: String) {
     rows.append(["id": id, "pass": pass, "detail": String(detail.prefix(1500))])
 }
@@ -45,6 +70,7 @@ func finish() -> Never {
     let data = (try? JSONSerialization.data(withJSONObject: answer, options: [.sortedKeys]))
         ?? Data("{}".utf8)
     FileHandle.standardOutput.write(data)
+    probePasteboard?.releaseGlobally()
     exit(0)
 }
 
@@ -93,12 +119,13 @@ let allFields = fields(in: root)
 
 do {
     let arranged = controller.content.arrangedSubviews
-    let ordered = arranged.count == 2 && arranged[0] === assistant
-        && arranged[1] === controller.transcriptionPane
+    let ordered = arranged.count == 3 && arranged[0] === controller.mcpPane
+        && arranged[1] === assistant && arranged[2] === controller.transcriptionPane
     let spacing = controller.content.spacing
     row("L1", ordered && spacing == 24,
         "arranged \(arranged.map { String(describing: type(of: $0)) }), "
-            + "assistant first \(arranged.first === assistant), "
+            + "mcp first \(arranged.first === controller.mcpPane), "
+            + "assistant second \(arranged.count > 1 && arranged[1] === assistant), "
             + "transcription last \(arranged.last === controller.transcriptionPane), spacing \(spacing)")
 }
 
@@ -118,8 +145,19 @@ do {
         of: controller.transcriptionPane, heading: controller.headingLabel, info: controller.infoButton)
     let aTitle = assistant.headingLabel.stringValue
     let tTitle = controller.headingLabel.stringValue
-    row("L2", aOK && tOK && aTitle == "Assistant" && tTitle == "Transcription",
-        "Assistant: \(aDetail), \"\(aTitle)\"; Transcription: \(tDetail), \"\(tTitle)\"")
+    let mcp = controller.mcpPane
+    let mFirst = mcp.arrangedSubviews.first === mcp.headingLabel
+    let mTitle = mcp.headingLabel.stringValue
+    func infoButtons(in view: NSView) -> Int {
+        (view is SettingsInfoButton ? 1 : 0) + view.subviews.reduce(0) { $0 + infoButtons(in: $1) }
+    }
+    let mInfo = infoButtons(in: mcp)
+    let responder = controller.window?.initialFirstResponder === assistant.keyField
+    row("L2", aOK && tOK && aTitle == "Assistant" && tTitle == "Transcription"
+            && mFirst && mTitle == "MCP" && mInfo == 0 && responder,
+        "Assistant: \(aDetail), \"\(aTitle)\"; Transcription: \(tDetail), \"\(tTitle)\"; "
+            + "MCP: heading first \(mFirst), \"\(mTitle)\", ⓘ buttons \(mInfo); "
+            + "initial first responder is the Assistant key field \(responder)")
 }
 
 // MARK: - L3 the key labels
@@ -257,6 +295,88 @@ do {
     } else {
         row("L8", false, "the window has no content view")
     }
+}
+
+// MARK: - L9 the MCP pane's order and text
+
+let pasteboard = NSPasteboard(name: NSPasteboard.Name("com.kgalligan.reelcut.settings-layout-probe"))
+probePasteboard = pasteboard
+let shController = SettingsWindowController(
+    store: { MemoryStore() }, assistantStore: { MemoryStore() }, defaults: suite,
+    environment: [:], spendFolder: { absentSpend },
+    mcpHelper: URL(fileURLWithPath: "/bin/sh"), pasteboard: pasteboard)
+let shPane = shController.mcpPane
+do {
+    let shRoot = shController.window?.contentView
+    shRoot?.layoutSubtreeIfNeeded()
+    let expectedOrder: [NSView] =
+        [shPane.headingLabel] + shPane.blurbLabels + [shPane.helperLabel, shPane.copyButton, shPane.statusLabel]
+    let arranged = shPane.arrangedSubviews
+    let ordered = arranged.count == expectedOrder.count
+        && zip(arranged, expectedOrder).allSatisfy { $0 === $1 }
+    let blurbs = [
+        "An MCP client such as Claude Code uses Reelcut's tools through reelcut-mcp, a helper inside "
+            + "this app. It reaches Reelcut over a local socket that only programs you run can open.",
+        "If Reelcut isn't running, the first tool call opens it in the background. To add Reelcut to "
+            + "Claude Code, copy the command and run it in Terminal.",
+    ]
+    let texts = shPane.blurbLabels.map(\.stringValue)
+    let styled = shPane.blurbLabels.allSatisfy {
+        $0.font?.pointSize == 13 && $0.textColor == NSColor.labelColor
+    }
+    let helper = shPane.helperLabel
+    let helperOK = helper.stringValue == "/bin/sh" && helper.isSelectable
+        && helper.preferredMaxLayoutWidth == 420
+    let title = shPane.copyButton.title
+    var below = false
+    var frames = "no root"
+    if let shRoot, let last = shPane.blurbLabels.last {
+        let button = shPane.copyButton.convert(shPane.copyButton.bounds, to: shRoot)
+        let blurb = last.convert(last.bounds, to: shRoot)
+        below = shRoot.isFlipped ? button.minY >= blurb.maxY : button.maxY <= blurb.minY
+        frames = "button \(button), last blurb \(blurb), flipped \(shRoot.isFlipped)"
+    }
+    row("L9", ordered && texts == blurbs && styled && helperOK && title == "Copy MCP Command" && below,
+        "order \(ordered) (\(arranged.count) views); blurbs equal \(texts == blurbs); 13 pt label colour "
+            + "\(styled); helper \"\(helper.stringValue)\" selectable \(helper.isSelectable) width "
+            + "\(helper.preferredMaxLayoutWidth); title \"\(title)\"; below \(below) (\(frames))")
+}
+
+// MARK: - L10 the press, with a helper
+
+do {
+    let enabled = shPane.copyButton.isEnabled
+    let emptyBefore = shPane.statusLabel.stringValue
+    let generalBefore = NSPasteboard.general.changeCount
+    shPane.copyButton.performClick(nil)
+    let copied = pasteboard.string(forType: .string) ?? "<nil>"
+    let status = shPane.statusLabel.stringValue
+    let generalAfter = NSPasteboard.general.changeCount
+    shPane.sync()
+    let statusAfterSync = shPane.statusLabel.stringValue
+    row("L10", enabled && emptyBefore == ""
+            && copied == "claude mcp add --scope user reelcut -- '/bin/sh'"
+            && status == "Copied. Paste it into Terminal and press Return."
+            && generalBefore == generalAfter && statusAfterSync == "",
+        "enabled \(enabled), status before \"\(emptyBefore)\"; copied \"\(copied)\"; status \"\(status)\"; "
+            + "general changeCount \(generalBefore) → \(generalAfter); after sync \"\(statusAfterSync)\"")
+}
+
+// MARK: - L11 the missing helper
+
+do {
+    let missing = SettingsWindowController(
+        store: { MemoryStore() }, assistantStore: { MemoryStore() }, defaults: suite,
+        environment: [:], spendFolder: { absentSpend },
+        mcpHelper: URL(fileURLWithPath: "/nonexistent/reelcut-mcp"), pasteboard: pasteboard)
+    let pane = missing.mcpPane
+    let disabled = !pane.copyButton.isEnabled
+    let status = pane.statusLabel.stringValue
+    let before = pasteboard.changeCount
+    pane.copyClicked(nil)
+    let after = pasteboard.changeCount
+    row("L11", disabled && status == "reelcut-mcp is missing from this copy of Reelcut." && before == after,
+        "disabled \(disabled); status \"\(status)\"; probe changeCount \(before) → \(after)")
 }
 
 UserDefaults().removePersistentDomain(forName: suiteName)

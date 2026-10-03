@@ -1,8 +1,8 @@
 import AppKit
 
 /// The application delegate: the launch and terminate flow, the welcome
-/// window's place in it, the two document commands, the Export Queue window
-/// and Copy MCP Command.
+/// window's place in it, the two document commands and the Export Queue
+/// window.
 ///
 /// **The menu bar (spec §9) is `AppDelegate+Menus.swift`** — `buildMainMenu()`
 /// and every menu under it — cut out when this file crossed app/CLAUDE.md's
@@ -180,17 +180,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         ])
     }
 
-    // MARK: - Agent server
-
-    /// Tools ▸ Copy MCP Command (road map 14's MC4): puts the `claude mcp
-    /// add` line for this bundle's own `reelcut-mcp` on the clipboard. Not an
-    /// edit, so no MCP mirror (spec §7.9); live with no document.
-    @objc func copyMCPCommand(_ sender: Any?) {
-        let line = AgentServer.mcpCommand(helperPath: AgentServer.mcpHelperURL.path)
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(line, forType: .string)
-    }
-
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         if item.action == #selector(newRecording(_:)) {
             // File ▸ New Recording… reads Stop Recording while one runs — the
@@ -206,10 +195,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             // while a recording runs; `AppDelegate+Recording.swift` routes it.
             item.title = RecorderStatusItem.menuTitles(paused: ScreenRecorder.shared.isPaused)[0]
             return ScreenRecorder.shared.state == .recording || ScreenRecorder.shared.state == .paused
-        }
-        if item.action == #selector(copyMCPCommand(_:)) {
-            // Live exactly while the bundle holds the helper it names.
-            return FileManager.default.isExecutableFile(atPath: AgentServer.mcpHelperURL.path)
         }
         if item.action == #selector(showGraphicsReference(_:)) {
             // Help ▸ Graphics Reference opens the bundled file, so it is live
