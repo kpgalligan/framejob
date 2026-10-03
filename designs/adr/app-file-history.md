@@ -452,7 +452,8 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   extensions went to `OpDictionaries.swift` in issue batch B52b (#190), the media helpers earlier
   to `MediaDescriptor.swift`. Road map 14's MC2 made the same `dictionary` move on its branch
   (`PropsDictionaries.swift`) before adding `ReelAgentSocket`; the merge into main kept
-  `OpDictionaries.swift`, byte-identical but for its name. It stays the only file that calls
+  `OpDictionaries.swift`, whose code is identical (only its
+  `import` and the doc comment's file name differ). It stays the only file that calls
   `rc_*`.
 - `ProjectDocument.swift`: stored properties cannot move; the natural cut is the media/reverse
   machinery, in the shape of `+DisplayStem`, `+Import`, `+Graphics`.
