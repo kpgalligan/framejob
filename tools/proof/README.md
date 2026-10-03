@@ -242,6 +242,15 @@ git archive 1c3e92e | tar -x -C tools/proof/work/e1-reference
 (cd tools/proof/work/e1-reference && make app)
 ```
 
+To re-extract it, unregister the old build with LaunchServices before the
+tree is deleted (B75, #223), then run the three lines above:
+
+```sh
+/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister \
+  -u tools/proof/work/e1-reference/build/Build/Products/Release/Reelcut.app
+rm -rf tools/proof/work/e1-reference
+```
+
 That build's format version is SIX and the core refuses a file from the
 future, so every fixture the two builds share is hand-written back to version
 6 (`as_version` in `e1_proof.py`, and the package `e1_chrome.py` writes) —
@@ -249,7 +258,15 @@ which is also exactly the file a person who used the app last month has on
 disk. It answers 75 tools and 55 ops where this build answers 77 and 57,
 which is how a row knows which instance it is talking to; `e1_proof.py`
 scores that first and SKIPS the cross-build rows by name if the reference
-does not answer. `e1_chrome.py` builds the reference tree's own harness out
+does not answer. The reference predates road map 14's socket and listens on
+TCP alone, so it is launched on an ephemeral port and `e1_proof.py` reaches
+it over TCP (`ReferenceMCP`, B75, #215), finding the port in its log:
+
+```sh
+r="$(mktemp -d)"; (RC_AGENT_PORT=0 tools/proof/work/e1-reference/build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut -ApplePersistenceIgnoreState YES -AgentServerEnabled YES > "$r/reelcut.log" 2>&1 &)
+```
+
+`e1_chrome.py` builds the reference tree's own harness out
 of `tools/proof/work/e1-reference/tools/proof/harness/build.sh`, and takes
 `--reference DIR` for a copy kept somewhere else.
 
@@ -304,13 +321,15 @@ python3 tools/proof/op_argument_proof.py <dir>/agent.sock
 python3 tools/proof/e2_proof.py <dir>/agent.sock
 ```
 
-`e1_proof.py` is the one script that takes TWO sockets — its own and the
-reference build's — and it is run on its own instance, after the reference
-line above. The reference tree predates MC4 and listens on TCP alone, so it
-does not answer at a socket and the cross-build rows skip by name:
+`e1_proof.py` takes its own socket and the reference build's LOG, and it is
+run on its own instance, after the reference line above. The reference tree
+predates MC4 and listens on TCP alone, so `e1_proof.py` reads the port it
+bound from that log (the last `listening on http://127.0.0.1:<port>/mcp`
+line) and reaches it over TCP; no log or no such line, and the cross-build
+rows skip by name:
 
 ```sh
-python3 tools/proof/e1_proof.py <dir>/agent.sock <reference dir>/agent.sock
+python3 tools/proof/e1_proof.py <dir>/agent.sock "$r/reelcut.log"
 ```
 
 Road map 5's other two instruments take no socket at all — they are offscreen,
@@ -3825,7 +3844,7 @@ crossfade, and clips learning In / Out / During motion presets — and the four
 instruments §4e and §6e owe them, landed 2026-09-19 against the tree as it
 stood.
 
-`python3 tools/proof/e1_proof.py <dir>/agent.sock [<reference dir>/agent.sock]`,
+`python3 tools/proof/e1_proof.py <dir>/agent.sock [<reference dir>/reelcut.log]`,
 **95/95** at the landing and **99/99** since the E1 reader review
 (road map 5 §12, R4·1) added §6(c), against TWO running instances: this build and the build
 at `1c3e92e` (the reference paragraph in "Running one" says how to make it).
@@ -8323,6 +8342,17 @@ the five inputs found and neither generated name; a copy's shape; `agent=False`
 leaves no `agent`; and the CONTROL that a `designs/` line in `project.yml`
 adds `designs`.
 
+**Copies of Reelcut.app and LaunchServices (B75, #223).** Xcode and
+`/usr/bin/open` register every `.app` they build or launch, and deleting the
+folder leaves the registration behind. So a proof removes a folder that can
+hold a built app through `tree_copy.remove_tree(path)`, which runs
+`lsregister -u` on every `*.app` under it (`unregister_apps`) before the
+`rmtree`; `make_copy` removes its `dest` the same way. A copy made by hand
+(`work/bNN/Reelcut-baseline.app`, a scratchpad copy) gets `lsregister -u`
+before it is deleted. `python3 tools/proof/stale_registrations.py` lists the
+Reelcut registrations whose path is gone (read only); `--unregister`, which
+is the owner's to run, unregisters only those, and never an existing path.
+
 The cloud mutants `silent-about-the-bill` (row B) and
 `marker-over-stale-file` (row M) are re-aimed at today's text; every
 `CLOUD_MUTANTS` before-text occurs exactly once in the tree.
@@ -12564,6 +12594,100 @@ python3 tools/proof/settings_layout_probe.py
 python3 tools/proof/settings_layout_probe.py --mutant copy-unwired
 python3 tools/proof/agent_socket_proof.py
 python3 tools/proof/agent_socket_proof.py --mutant fixed-path
+```
+
+## Issue batch B75 — proof-tooling cleanup (`mcp-proxy/tests/stdio.rs`; `project.yml`'s Build Rust Core; `tree_copy.py` T5, `stale_registrations.py`; `agent_socket_proof.py` K14; `e1_proof.py`'s `ReferenceMCP`; `recording_probe.py` `hide-picked-only`; #230 #225 #223 #224 #215 #229)
+
+Proof tooling and one `project.yml` line; no product code changes.
+
+- **#230, `ping_is_answered_while_a_call_is_held`.** Measured first, with
+  temporary timings in the old test: under `make test` the copied proxy's
+  first line came 0.65, 1.13 and 1.30 s after its spawn, and the ping took
+  340, 820 and 990 ms. Run alone, those were 0.31 s and under 0.5 ms. The
+  old test slept 300 ms after the spawn and then started the ping's 1 s
+  clock, so the clock was running before the proxy was reading stdin. The
+  test now sends `initialize` (id 0) and waits for its answer. A new
+  `holder` stub signals on a channel when the call reaches it (it replaces
+  the sleep), and then the ping is timed against `PING_BOUND`. After the
+  rewrite the ping took 0.18, 0.38 and 1.28 ms over three `make test` runs
+  (0.07–0.19 ms alone), so `PING_BOUND` stays 1 s and `CALL_HOLD` 3 s. The
+  ping mutant (`session.rs`'s `"ping"` arm made `{}`, reverted) fails it
+  with "no answer within 1s".
+- **#225, a copy's Build Rust Core rebuilt the tree's `core/target`.** Cargo's
+  reason (`CARGO_LOG=cargo::core::compiler::fingerprint=info`) is
+  `EnvVarChanged { name: "MACOSX_DEPLOYMENT_TARGET", old_value: None,
+  new_value: Some("26.0") }` on rquickjs-sys's build script, which makes
+  rquickjs-core, rquickjs, graphic and reelcut-core dirty in turn. The step's
+  environment, printed in a scratch `tree_copy` copy, has
+  `MACOSX_DEPLOYMENT_TARGET=26.0` and `SDKROOT=…/MacOSX26.2.sdk`. CC, CFLAGS,
+  HOST_CC and CRATE_CC_NO_DEFAULTS are unset, and the shell sets none of the
+  six. Before the fix, that copy's `make app` compiled the five crates in the
+  Makefile's `make rust` and again in the Xcode step (11.4 s); Build MCP
+  Proxy compiled nothing (0.21 s). The step now runs `env -u
+  MACOSX_DEPLOYMENT_TARGET -u SDKROOT cargo build --release`. After the fix,
+  the copy's Build Rust Core finished in 0.05 s and the staticlib's mtime did
+  not move.
+- **#223, LaunchServices.** `tree_copy.unregister_apps` and `remove_tree`
+  (the paragraph in B7's section). The removal sites now go through
+  `remove_tree`: the five assistant proofs' `base`, the assistant spike's
+  `build_app`, `graphics_prefetch_proof.py`'s and `graphics_proof.py`'s
+  `WORK`, `makefile_env_proof.py`'s `WORK`, `mc1_spike.py`'s `ditto`,
+  `mcp_proxy_proof.py`'s two, `cloud_spike/local_rows.bundle` (also
+  `words_spike/speech_rows.py`'s) and `capture_spike.bundle`. `e1_chrome.py`
+  and `phase8_chrome.py` delete no bundle. `tree_copy.py --selftest` adds T5
+  (no LaunchServices effect): a fake `.app` under `work/tree_copy/ls/` is
+  found, one under an `Intermediates.noindex/` is not, and `remove_tree`
+  leaves nothing. `stale_registrations.py` lists what is left. It is dry run
+  by default, and its `--selftest` (S1–S3) registers, deletes and
+  unregisters one bundle of its own in a `mkdtemp`, with a CONTROL that the
+  count outside that folder does not move. The existing stale entries are
+  NOT unregistered by this batch.
+- **#224, a quit with a call in flight: K14.** M saves a 600 s 1920×1080
+  rectangle (C1: `unsaved_changes` false, so no save sheet). One raw
+  `POST /mcp` of `export` follows, and 2 s later `select` shows nothing to
+  read (C2). Then the quit event: the pid-targeted
+  `NSRunningApplication.terminate` that K6 and K7 use, which is an Apple
+  event with no activation and no window. The agent's `export` is its own
+  `Exporter`, not the export queue, so no "An export is still being
+  written" alert can appear. The `waits-for-call` mutant joins a
+  `get_project` served on a background thread (async plus a semaphore) in
+  `applicationWillTerminate`.
+- **#215, the e1 reference.** The reference stays at `1c3e92e` and listens
+  on TCP. `mcp.py` gains a `_connection()` hook and stays AF_UNIX only.
+  `e1_proof.py`'s `ReferenceMCP` overrides the hook with TCP for the
+  reference alone. The second argument is now the reference's LOG, and
+  `reference_port` reads its last `listening on` line. The reference is
+  launched with `RC_AGENT_PORT=0` (the reference paragraph in "Running one").
+  `e1_chrome.py` never reaches an agent server.
+- **#229.** `hide-picked-only` now replaces the `hidesForRecording` guard
+  with `guard currentChoice().source == .picked else { return }`. Its
+  structural kill is 5u in `chrome_pause`. 9c's driven kill is in section 9
+  (`granted`), which needs the screen grant and puts the panel on screen, so
+  this batch did not run it.
+
+Runs on 2026-10-03 over `292a7dc` plus this batch.
+
+| Run | Result |
+|---|---|
+| `recording_probe.py --only chrome_pause` | 61/61, exit 0 |
+| `recording_probe.py --mutant hide-picked-only --only chrome_pause` | 60/61, 5u FAIL ("orderOut with no `.picked` in the body"), exit 1 |
+| `cargo test --release --test stdio ping_is_answered_while_a_call_is_held` | ok 3 of 3 (3.14–3.17 s); under the ping mutant FAILED, "no answer within 1s" |
+| `tree_copy.py --selftest` | 5/5, exit 0 |
+| `stale_registrations.py` | 143 Reelcut registrations: 56 at missing paths, 87 at existing ones; exit 0 |
+| `stale_registrations.py --selftest` | 3/3, exit 0 (S3: 143 outside before, 143 after) |
+| `agent_socket_proof.py` | 16/16, exit 0; K14: exited in 0.14 s, socket file gone, 0 bytes, closed by EOF |
+| `agent_socket_proof.py --mutant waits-for-call` | K6, K7 and K14 FAIL (K14: no exit in 20.01 s, file kept, 0 bytes, read timed out); caught, exit 0; `libreelcut_core.a`'s mtime unchanged across the run |
+| `e1_proof.py <dir>/agent.sock <ref>/reelcut.log` | 101/101, no SKIP, exit 0 (reference on an ephemeral port, 75 tools, parity log clean) |
+| `e1_chrome.py` | 21/21, exit 0 |
+| `make test` | exit 0, three runs in a row |
+| `make lint` / `make typecheck` | exit 0; 0 errors, the 4 baseline warnings, tsc clean |
+| `make app`, twice | BUILD SUCCEEDED each; the second compiled no crate in either cargo step |
+
+```sh
+python3 tools/proof/tree_copy.py --selftest
+python3 tools/proof/stale_registrations.py --selftest
+python3 tools/proof/agent_socket_proof.py
+python3 tools/proof/agent_socket_proof.py --mutant waits-for-call
 ```
 ## Road map 14 — the MC1 spike (`mc1_spike/`)
 

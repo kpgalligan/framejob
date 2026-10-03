@@ -59,11 +59,23 @@ K13 (spec §11 MC-7) Settings' MCP section, on K, with no clipboard
     Command"; their frame tops are strictly ordered heading < blurb.1 <
     helper < copy < `settings.assistant.info`; none of those ids has a layout
     problem. The press itself is `settings_layout_probe.py`'s L10.
+K14 (#224) a quit with an agent call in flight, by the same pid-targeted
+    quit event as K6 and K7 (`NSRunningApplication.terminate`: an Apple
+    event, no activation, no window). M: `new_project`, one 1920×1080
+    rectangle lasting 600 s, `save_project`; CONTROL C1: `get_project`'s
+    `unsaved_changes` is false, so no save sheet can appear (when it is not,
+    the row FAILs and M is stopped by SIGTERM, never by a quit event). Over a
+    raw AF_UNIX socket, one HTTP/1.1 `POST /mcp` (`Connection: close`) of
+    `tools/call export {preset: "h264"}`; 2 s later, CONTROL C2: `select`
+    shows nothing to read, so the call is still in flight. Then the quit
+    event: M exits within 20 s, its socket file is gone, and the raw
+    connection reads 0 bytes and closes by EOF or a reset (not a 10 s
+    timeout) — a clean failure, never a half answer.
 Z1  no `Reelcut: ` in any log.  Z2  no proof pid alive.
 
     python3 tools/proof/agent_socket_proof.py [--app PATH]
         [--mutant no-connect-first|no-mode-check|tcp-listener|agent-asks|
-                  open-asks|fixed-path]
+                  open-asks|fixed-path|waits-for-call]
 
 Any FAIL exits 1; an instrument that cannot run is a FAIL, never a skip, and
 no row may SKIP. Every mutant replaces one anchor in a
@@ -73,7 +85,13 @@ against that build: `no-connect-first` (K4 must FAIL), `no-mode-check` (K8),
 `listening at` line), `agent-asks` (K12's import half: `AgentServer+Media`'s
 probe passes `mayAsk: true`), `open-asks` (K12's open half: `openProject`
 calls `makeDocument` outside `withoutAsking`) and `fixed-path` (K13:
-`mcpHelperURL` is `/Applications/Reelcut.app/…`). `lsregister -u` is run on
+`mcpHelperURL` is `/Applications/Reelcut.app/…`) and `waits-for-call` (K14:
+`applicationWillTerminate` joins a `get_project` served on a background
+thread before it unbinds, so main waits on the lane lock the in-flight
+export holds, while the export's completion waits for main; K6 and K7 fail
+too, as expected. It is `async` plus a semaphore, never
+`DispatchQueue.global().sync`: GCD runs a `sync` block inline on the calling
+thread, so `serve` would see the main thread and skip the lock). `lsregister -u` is run on
 a copy's built app before its tree is replaced and at the end of its run. A
 mutant run exits 0 when its row FAILED (caught), 1 when it passed
 (survived), 2 when the control could not be performed.
@@ -84,6 +102,7 @@ import errno
 import json
 import os
 import re
+import select
 import shutil
 import signal
 import socket
@@ -152,9 +171,21 @@ MUTANTS = {
     "fixed-path": ("K13", None, "AgentServer+Socket.swift",
                    "        Bundle.main.bundleURL.appendingPathComponent(\"Contents/Helpers/reelcut-mcp\")\n",
                    "        URL(fileURLWithPath: \"/Applications/Reelcut.app/Contents/Helpers/reelcut-mcp\")\n"),
+    # A join: main waits while a real background thread waits on the lane
+    # lock, which the in-flight export holds; the export's completion is
+    # delivered on main (Exporter.swift), so the quit cannot complete. Not
+    # `DispatchQueue.global().sync`: GCD runs that block inline on main, and
+    # `serve` skips the lock on main (AgentLane.swift).
+    "waits-for-call": ("K14", None, "AppDelegate.swift",
+                       "        AgentServer.shared.unbindSocket()\n",
+                       "        let held = DispatchSemaphore(value: 0)\n"
+                       "        DispatchQueue.global().async { _ = AgentLane.shared.serve("
+                       "tool: \"get_project\", argumentsJSON: \"{}\"); held.signal() }\n"
+                       "        held.wait()\n"
+                       "        AgentServer.shared.unbindSocket()\n"),
 }
 ORDER = ["P1", "K0", "K1", "K3", "K4", "K5", "K6", "K7", "K8", "K9", "K11", "K12", "K13",
-         "Z1", "Z2"]
+         "K14", "Z1", "Z2"]
 rows = {}
 skips = {}
 halves = {}
@@ -498,6 +529,79 @@ def row_k13(app):
           f"{text['settings.mcp.copy']!r}; tops {tops} ordered {ordered}; problems {problems[:3]}")
 
 
+K14_SECONDS = 600
+K14_SEC = 600_000
+K14_READ_BOUND = 10
+
+
+def row_k14(app):
+    """A quit event with an `export` in flight over a raw socket."""
+    folder = scratch_folder()
+    sock = os.path.join(folder, "agent.sock")
+    m = Instance("m", app, sock)
+    up = m.start()
+    raw = None
+    try:
+        if not up or m.socket_line != f"listening at {sock}":
+            check("K14", False, f"M did not bind: {m.socket_line!r}")
+            return
+        project = call(sock, "new_project", {"path": os.path.join(folder, "k14.reelcut")})["saved"]
+        tracks = call(sock, "get_project", {"project": project})["project"].get("tracks", [])
+        if not tracks:
+            call(sock, "add_track", {"project": project})
+            tracks = call(sock, "get_project", {"project": project})["project"]["tracks"]
+        call(sock, "add_shape_clip", {
+            "project": project, "track": tracks[0]["id"], "at": 0,
+            "duration": K14_SECONDS * K14_SEC,
+            "shape": {"kind": "rectangle", "width": 1920, "height": 1080, "stroke": None,
+                      "fill": [192 / 255.0, 192 / 255.0, 192 / 255.0, 1.0]}})
+        call(sock, "save_project", {"project": project})
+        unsaved = call(sock, "get_project", {"project": project}).get("unsaved_changes")
+        if unsaved is not False:
+            check("K14", False, f"CONTROL C1: unsaved_changes {unsaved!r} after save_project "
+                                f"(M is stopped by SIGTERM, not a quit event)")
+            return
+        body = json.dumps({"jsonrpc": "2.0", "id": 14, "method": "tools/call", "params": {
+            "name": "export", "arguments": {"project": project, "preset": "h264",
+                                            "path": os.path.join(folder, "k14.mov")}}}).encode()
+        raw = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        raw.settimeout(10)
+        raw.connect(sock)
+        raw.sendall(b"POST /mcp HTTP/1.1\r\nHost: localhost\r\n"
+                    b"Content-Type: application/json\r\n"
+                    b"Accept: application/json, text/event-stream\r\n"
+                    b"Connection: close\r\n"
+                    + f"Content-Length: {len(body)}\r\n\r\n".encode() + body)
+        time.sleep(2)
+        readable, _, _ = select.select([raw], [], [], 0)
+        if readable:
+            check("K14", False, "CONTROL C2: the export's connection had bytes to read 2 s "
+                                "after it was sent — the call was not in flight at the quit")
+            return
+        exited, seconds, said = m.quit_event()
+        received, close = 0, "timeout"
+        raw.settimeout(K14_READ_BOUND)
+        try:
+            while True:
+                chunk = raw.recv(65536)
+                if not chunk:
+                    close = "EOF"
+                    break
+                received += len(chunk)
+        except ConnectionResetError:
+            close = "reset"
+        except socket.timeout:
+            close = "timeout"
+        gone = ident(sock) is None
+        check("K14", exited and gone and received == 0 and close in ("EOF", "reset"),
+              f"C1 saved; C2 in flight; M exited {exited} in {seconds} s ({said}); socket file "
+              f"gone {gone}; {received} bytes received; closed by {close}")
+    finally:
+        if raw is not None:
+            raw.close()
+        m.stop()
+
+
 # ---- the K rows -------------------------------------------------------------------
 
 def run_rows(app):
@@ -510,7 +614,7 @@ def run_rows(app):
           and not real.startswith(str(SUPPORT.resolve()) + os.sep) and folder_mode == 0o700,
           f"{path} ({len(path.encode())} bytes), folder {oct(folder_mode)}")
     if not rows["K0"]:
-        for name in ORDER[2:13]:
+        for name in ORDER[2:14]:
             check(name, False, "not run: K0 failed")
         return
 
@@ -634,6 +738,12 @@ def run_rows(app):
     except Exception as error:  # noqa: BLE001
         check("K13", False, f"the row broke: {type(error).__name__}: {error}")
 
+    # K14 — a quit with an agent call in flight (#224).
+    try:
+        row_k14(app)
+    except Exception as error:  # noqa: BLE001
+        check("K14", False, f"the row broke: {type(error).__name__}: {error}")
+
 
 def finish_z():
     for instance in INSTANCES:
@@ -718,7 +828,7 @@ def main():
     try:
         row_p1(SOURCES, WORK / "probe")
         if not Path(app).exists():
-            for name in ORDER[1:13]:
+            for name in ORDER[1:14]:
                 check(name, False, f"not run: no app at {app}")
         else:
             run_rows(app)

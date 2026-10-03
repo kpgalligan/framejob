@@ -133,7 +133,7 @@ def make_copy(mutant):
     """A COPY of the tree from `tree_copy.make_copy`, and a directive
     removed when the mutant asks for it. Answers the copy's root, or None
     and a reason."""
-    shutil.rmtree(WORK, ignore_errors=True)
+    tree_copy.remove_tree(WORK)
     root, reason = tree_copy.make_copy(os.path.join(WORK, "tree"))
     if root is None:
         return None, reason

@@ -93,6 +93,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
 sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
+import tree_copy  # noqa: E402
 from mcp import LSREGISTER  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/mcp-proxy"
@@ -694,7 +695,7 @@ def write_ac_fixture():
 def make_copy(app, run):
     """`ditto` the app to work/mcp-proxy/<run>/Reelcut.app; the path or None and why."""
     target = WORK / run / "Reelcut.app"
-    shutil.rmtree(target.parent, ignore_errors=True)
+    tree_copy.remove_tree(target.parent)
     target.parent.mkdir(parents=True)
     done = bounded.run(["ditto", str(app), str(target)], 300, env=child_env())
     if done["rc"] != 0:
@@ -706,7 +707,7 @@ def build_mutant(name, run, app):
     """The mutant's binary in a fresh bundle copy: the copy, or None and why."""
     _, file, before, after = MUTANTS[name]
     base = WORK / f"mutant-{name}"
-    shutil.rmtree(base, ignore_errors=True)
+    tree_copy.remove_tree(base)
     try:
         shutil.copytree(ROOT / "mcp-proxy", base / "mcp-proxy",
                         ignore=shutil.ignore_patterns("target"))

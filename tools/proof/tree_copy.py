@@ -22,12 +22,22 @@ can miss it (#146: `graphics_proof.py`'s copy missed `agent/` and `docs/`).
 `GENERATED` (`build`, `Reelcut.xcodeproj`) is never linked: a copy writes
 its own.
 
-`make_copy(dest, agent=True)`, in order: remove `dest`, make it; copy `app/`
+`make_copy(dest, agent=True)`, in order: remove `dest` (`remove_tree`), make it; copy `app/`
 without `Info.plist` or `*.entitlements`; copy `project.yml` and
 `Makefile`; when `agent`, copy `agent/` without `node_modules`; link every
 other build input. It answers `(dest, None)`, or `(None, reason)` on an
 `OSError`. `agent=False` is the assistant spike's, which splices
 Rasterize's `agent/` in its place.
+
+**A built app is unregistered before its folder goes** (#223). Xcode and
+`/usr/bin/open` register a `.app` with LaunchServices, and deleting the
+folder leaves the registration behind. `unregister_apps(path)` runs
+`lsregister -u` on every `*.app` holding `Contents/Info.plist` at or under
+`path` (never descending into a found `.app`, `Intermediates.noindex`,
+`node_modules` or `.git`, never following a symlink, never raising), and
+`remove_tree(path)` is it followed by `shutil.rmtree`. Every proof that
+deletes a folder that can hold a built `.app` deletes it through
+`remove_tree`.
 
 The selftest, in a fresh `work/tree_copy/`:
 
@@ -40,7 +50,10 @@ The selftest, in a fresh `work/tree_copy/`:
 * T3 — `agent=False` leaves no `agent`;
 * T4 (CONTROL) — the tree's `project.yml` text plus a line
   `cp "$PROJECT_DIR/designs/x" "$dest/"` also names `designs`: a new input
-  is seen.
+  is seen;
+* T5 — no LaunchServices effect: a fake `.app` (an `Info.plist` only) under
+  `work/tree_copy/ls/` is found by `unregister_apps`, one under an
+  `Intermediates.noindex/` is not, and `remove_tree` leaves nothing.
 
 An instrument that cannot run is a FAIL, never an exit.
 """
@@ -50,7 +63,10 @@ import filecmp
 import os
 import re
 import shutil
+import subprocess
 import sys
+
+import mcp
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 WORK = os.path.join(ROOT, "tools", "proof", "work", "tree_copy")
@@ -76,13 +92,60 @@ def build_inputs(project_yml=None):
     return found
 
 
+SKIPPED_DIRS = ("Intermediates.noindex", "node_modules", ".git")
+
+
+def unregister_apps(path):
+    """`lsregister -u` on every directory named `*.app` holding
+    `Contents/Info.plist` at or under `path`. Answers `[(app, rc)]`, `rc`
+    None on a timeout or an `OSError`; never raises."""
+    found = []
+    try:
+        path = os.fspath(path)
+        if not os.path.isdir(path) or os.path.islink(path):
+            return found
+        candidates = []
+        if path.rstrip("/").endswith(".app"):
+            candidates.append(path)
+        else:
+            for here, dirs, _files in os.walk(path, followlinks=False):
+                keep = []
+                for name in dirs:
+                    if name in SKIPPED_DIRS:
+                        continue
+                    full = os.path.join(here, name)
+                    if name.endswith(".app") and not os.path.islink(full):
+                        candidates.append(full)
+                        continue
+                    keep.append(name)
+                dirs[:] = keep
+        for app in candidates:
+            if not os.path.isfile(os.path.join(app, "Contents", "Info.plist")):
+                continue
+            try:
+                rc = subprocess.run([mcp.LSREGISTER, "-u", app], capture_output=True,
+                                    timeout=60).returncode
+            except (subprocess.TimeoutExpired, OSError):
+                rc = None
+            found.append((app, rc))
+    except Exception:  # never raises: a removal still goes ahead
+        pass
+    return found
+
+
+def remove_tree(path):
+    """`unregister_apps(path)`, then `shutil.rmtree(path, ignore_errors=True)`."""
+    unregister_apps(path)
+    shutil.rmtree(path, ignore_errors=True)
+
+
 def make_copy(dest, agent=True):
     """A copy of the tree at `dest` that the app builds in: `app/` (and,
     when `agent`, `agent/`) copied, `project.yml` and `Makefile` copied,
     every other build input a symlink. Answers `(dest, None)` or
     `(None, reason)`."""
     try:
-        shutil.rmtree(dest, ignore_errors=True)
+        remove_tree(dest)
         os.makedirs(dest)
         shutil.copytree(os.path.join(ROOT, "app"), os.path.join(dest, "app"),
                         ignore=shutil.ignore_patterns("Info.plist", "*.entitlements"))
@@ -195,6 +258,32 @@ def selftest():
     except Exception as error:
         row("T4", False, f"build_inputs raised {error!r}")
 
+    # T5 — no LaunchServices effect: fakes that were never registered
+    try:
+        ls = os.path.join(WORK, "ls")
+        plist = ('<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0"><dict>'
+                 '<key>CFBundleIdentifier</key><string>test.reelcut.treecopy.t5</string>'
+                 '</dict></plist>\n')
+        seen = os.path.join(ls, "Seen.app")
+        hidden = os.path.join(ls, "build", "Intermediates.noindex", "Hidden.app")
+        for app in (seen, hidden):
+            os.makedirs(os.path.join(app, "Contents"))
+            with open(os.path.join(app, "Contents", "Info.plist"), "w") as handle:
+                handle.write(plist)
+        found = [app for app, _rc in unregister_apps(ls)]
+        remove_tree(ls)
+        problems = []
+        if found != [seen]:
+            problems.append(f"unregister_apps found {found}, wanted only {seen}")
+        if os.path.lexists(ls):
+            problems.append(f"remove_tree left {ls}")
+        row("T5", not problems,
+            "; ".join(problems) if problems
+            else "the fake .app is found, the one in Intermediates.noindex is not, "
+                 "and remove_tree leaves nothing")
+    except Exception as error:
+        row("T5", False, f"the LaunchServices row raised {error!r}")
+
     print(f"{sum(rows)}/{len(rows)}")
     return 0 if all(rows) else 1
 
@@ -202,7 +291,7 @@ def selftest():
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--selftest", action="store_true",
-                        help="T1–T4 in a fresh work/tree_copy/")
+                        help="T1–T5 in a fresh work/tree_copy/")
     arguments = parser.parse_args(argv)
     if arguments.selftest:
         return selftest()

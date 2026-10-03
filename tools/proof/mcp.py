@@ -64,6 +64,10 @@ class MCP:
         )
         self._notify("notifications/initialized")
 
+    def _connection(self):
+        """The connection one request goes over: the instance's socket."""
+        return UnixHTTPConnection(self.socket_path, timeout=self.timeout)
+
     def _post(self, body, notify=False):
         data = json.dumps(body).encode()
         headers = {
@@ -72,7 +76,7 @@ class MCP:
         }
         if self.session:
             headers["Mcp-Session-Id"] = self.session
-        connection = UnixHTTPConnection(self.socket_path, timeout=self.timeout)
+        connection = self._connection()
         try:
             connection.request("POST", self.path, body=data, headers=headers)
             response = connection.getresponse()

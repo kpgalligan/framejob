@@ -77,6 +77,7 @@ sys.path.insert(0, HERE)
 import bounded  # noqa: E402
 import inventory  # noqa: E402
 import rows as rowtable  # noqa: E402
+import tree_copy  # noqa: E402
 from media_less_playback_probe import build_shader, console_locked  # noqa: E402
 
 WORK = os.path.join(PROOF, "work", "capture_spike")
@@ -224,7 +225,7 @@ def bundle(binary):
     """`CaptureProbe.app` assembled afresh around `binary` and signed ad hoc.
     The app's path, or None and why."""
     try:
-        shutil.rmtree(APP, ignore_errors=True)
+        tree_copy.remove_tree(APP)
         macos = os.path.join(APP, "Contents", "MacOS")
         resources = os.path.join(APP, "Contents", "Resources")
         os.makedirs(macos)

@@ -2,7 +2,7 @@
 over MCP, and against a SECOND binary built from the tree as it stood before
 E1 landed.
 
-    python3 tools/proof/e1_proof.py <dir>/agent.sock [<reference dir>/agent.sock] [--only audio]
+    python3 tools/proof/e1_proof.py <dir>/agent.sock [<reference dir>/reelcut.log] [--only audio]
 
 Every claim here is a placement read back through `get_project`, a BYTE
 comparison of two PNGs, or a sample-for-sample comparison of two decoded
@@ -13,9 +13,13 @@ move: a version-6 project's overlap must go on drawing linearly and sounding
 silent, exactly as it did before `curve` and `audio` existed (spec §11,
 R5-2). "Exactly" is only checkable against a build that never had them, so
 the reference tree is `1c3e92e` — the commit before E1's first toll —
-extracted into `tools/proof/work/e1-reference`, built there, and launched on
-its own socket (a tree that old listens on TCP alone, so since road map
-14's MC4 it does not answer and the reference rows skip by name). Its format version is SIX, so it refuses anything this build
+extracted into `tools/proof/work/e1-reference`, built there, and launched
+with `RC_AGENT_PORT=0`. A tree that old listens on TCP alone, and road map
+14's MC4 made `mcp.py` socket-only, so the reference alone is reached by
+`ReferenceMCP` over TCP (B75, #215): the second argument is the reference's
+LOG, and `reference_port` reads the port it bound from its last
+`listening on http://127.0.0.1:<port>/mcp` line. No log, or no such line,
+and the reference rows skip by name. Its format version is SIX, so it refuses anything this build
 saves; every fixture the two share is therefore hand-written back to version
 6 by `as_version`, which is also exactly the file a person who used the app
 last month has on disk.
@@ -66,6 +70,7 @@ have no handles at all, and `add_transition` is built from handles.
 """
 
 import hashlib
+import http.client
 import json
 import math
 import os
@@ -646,19 +651,43 @@ def tool_counts(mcp):
     return tools, ops
 
 
-def log_is_clean(socket_path):
-    """`grep "Reelcut: " <dir>/reelcut.log` printing nothing — the
-    prefix the startup parity check complains with. A log this script cannot
-    find is not a pass."""
-    path = log_beside(socket_path)
-    if not os.path.exists(path):
+class ReferenceMCP(MCP):
+    """The reference build alone, over TCP: the tree at 1c3e92e predates road
+    map 14's socket, and `mcp.py` stays socket-only for every other proof."""
+
+    def __init__(self, port, timeout=600):
+        self.port = port
+        MCP.__init__(self, f"127.0.0.1:{port}", timeout=timeout)
+
+    def _connection(self):
+        return http.client.HTTPConnection("127.0.0.1", self.port, timeout=self.timeout)
+
+
+def reference_port(log_path):
+    """The port of the LAST `listening on http://127.0.0.1:<port>/mcp` line
+    in the reference's log, or None (no log, or no such line)."""
+    try:
+        with open(log_path, encoding="utf-8", errors="replace") as handle:
+            found = re.findall(
+                r"Reelcut agent server listening on http://127\.0\.0\.1:(\d+)/mcp",
+                handle.read())
+    except (OSError, TypeError):
+        return None
+    return int(found[-1]) if found else None
+
+
+def log_is_clean(path):
+    """`grep "Reelcut: " <path>` printing nothing — the prefix the startup
+    parity check complains with. A log this script cannot find is not a
+    pass."""
+    if not path or not os.path.exists(path):
         return False, f"{path} does not exist"
     with open(path, encoding="utf-8", errors="replace") as handle:
         bad = [line.rstrip() for line in handle if "Reelcut: " in line]
     return not bad, "; ".join(bad[:3]) if bad else "clean"
 
 
-def counts_part(mcp, reference, socket_path, reference_socket):
+def counts_part(mcp, reference, socket_path, reference_log):
     print("\n0 — the two instances, scored before anything is built on them")
     tools, ops = tool_counts(mcp)
     check(len(tools) >= TOOLS_FLOOR,
@@ -666,7 +695,7 @@ def counts_part(mcp, reference, socket_path, reference_socket):
           "— a FLOOR: op_argument_proof.py owns the exact count")
     check(len(ops) >= OPS_FLOOR,
           f"…of which at least {OPS_FLOOR} take the scope envelope ({len(ops)})")
-    ok, detail = log_is_clean(socket_path)
+    ok, detail = log_is_clean(log_beside(socket_path))
     check(ok, f"this build's parity log is empty ({detail})")
 
     if reference is None:
@@ -681,7 +710,7 @@ def counts_part(mcp, reference, socket_path, reference_socket):
           f"the reference build publishes exactly {REFERENCE_TOOLS} tools ({len(rtools)})")
     check(len(rops) == REFERENCE_OPS,
           f"…and exactly {REFERENCE_OPS} ops ({len(rops)}) — the two instances cannot be confused")
-    ok, detail = log_is_clean(reference_socket)
+    ok, detail = log_is_clean(reference_log)
     check(ok, f"the reference build's parity log is empty ({detail})")
     missing = sorted(set(tools) - set(rtools))
     print(f"      this build adds {len(missing)} tools over the reference: "
@@ -1374,23 +1403,27 @@ def main():
         at = argv.index("--only")
         only = argv[at + 1] if at + 1 < len(argv) else None
         if only != "audio":
-            print("usage: e1_proof.py <dir>/agent.sock [<reference dir>/agent.sock] "
+            print("usage: e1_proof.py <dir>/agent.sock [<reference dir>/reelcut.log] "
                   "[--only audio]")
             sys.exit(2)
         del argv[at:at + 2]
     socket_path = target(argv)
-    reference_socket = argv[2] if len(argv) > 2 else None
+    reference_log = argv[2] if len(argv) > 2 else None
+    port = reference_port(reference_log)
     os.makedirs(WORK, exist_ok=True)
-    print(f"E1 — transitions, second pass. Build at {socket_path}, reference at "
-          f"{reference_socket}.")
+    print(f"E1 — transitions, second pass. Build at {socket_path}, reference log "
+          f"{reference_log} (port {port}).")
     mcp = MCP(socket_path)
-    try:
-        reference = MCP(target(argv, 2, env_fallback=False))
-    except (Exception, SystemExit) as error:  # noqa: BLE001 — reported, never fatal
-        print(f"  (the reference instance at {reference_socket} did not answer: {error})")
-        reference = None
+    reference = None
+    if port is None:
+        print(f"  (no reference port: {reference_log} is missing or names no listening line)")
+    else:
+        try:
+            reference = ReferenceMCP(port)
+        except Exception as error:  # noqa: BLE001 — reported, never fatal
+            print(f"  (the reference instance on port {port} did not answer: {error})")
 
-    reference = counts_part(mcp, reference, socket_path, reference_socket)
+    reference = counts_part(mcp, reference, socket_path, reference_log)
 
     if only == "audio":
         audio_part(mcp, reference)

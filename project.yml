@@ -148,7 +148,13 @@ targets:
           set -e
           export PATH="$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
           cd "$PROJECT_DIR/core"
-          cargo build --release
+          # Xcode exports MACOSX_DEPLOYMENT_TARGET and SDKROOT, a shell's
+          # `make rust` neither, and rquickjs-sys's build script reruns when
+          # MACOSX_DEPLOYMENT_TARGET changes: with them set, the shell build
+          # and this step rebuilt rquickjs-sys, graphic and core in turn, and
+          # a tree copy's step (its `core` is a symlink) rewrote the tree's
+          # core/target (#225). Unset, both builds are the same build.
+          env -u MACOSX_DEPLOYMENT_TARGET -u SDKROOT cargo build --release
         outputFiles:
           - $(PROJECT_DIR)/core/target/release/libreelcut_core.a
     # The graphics reference (road map 10's G4a): `graphic_reference` reads

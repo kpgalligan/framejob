@@ -813,7 +813,7 @@ def build_mutant(name="no-forward"):
     no-forward's `session.onEvent =` line deleted, any other name's
     `TREE_MUTANTS` replacement made exactly once; or (None, reason)."""
     base = os.path.join(WORK, "mutant")
-    shutil.rmtree(base, ignore_errors=True)
+    tree_copy.remove_tree(base)
     root, reason = tree_copy.make_copy(os.path.join(base, "tree"))
     if root is None:
         return None, reason

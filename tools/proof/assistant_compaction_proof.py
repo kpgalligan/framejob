@@ -693,7 +693,7 @@ def converse(asp, atp, app_path, secrets, relay, texts, folder, stand_in, wrong,
 
 def build_mutant(asp, child_env):
     base = os.path.join(WORK, "mutant")
-    shutil.rmtree(base, ignore_errors=True)
+    tree_copy.remove_tree(base)
     root, reason = tree_copy.make_copy(os.path.join(base, "tree"))
     if root is None:
         return None, reason

@@ -14,11 +14,17 @@ import os
 import plistlib
 import shutil
 import subprocess
+import sys
 import threading
 import time
 import http.server
 
 import aai
+
+PROOF = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROOF not in sys.path:
+    sys.path.insert(1, PROOF)
+import tree_copy  # noqa: E402
 
 TARGET = ["-O", "-target", "arm64-apple-macos26.0"]
 Q7_SERVICE = "com.reelcut.spike.q7"
@@ -93,7 +99,7 @@ def build(sources, out):
 def bundle(work, name, bundle_id, binary, ats):
     """An ad-hoc-signed `.app` around a probe, with or without an ATS key."""
     root = os.path.join(work, "bundles", f"{name}.app")
-    shutil.rmtree(root, ignore_errors=True)
+    tree_copy.remove_tree(root)
     os.makedirs(os.path.join(root, "Contents", "MacOS"))
     info = {"CFBundleExecutable": name, "CFBundleIdentifier": bundle_id, "CFBundleName": name,
             "CFBundlePackageType": "APPL", "CFBundleShortVersionString": "1.0",

@@ -801,7 +801,7 @@ def build_mutant(name):
     line deleted from the copy's file, `make app` run there."""
     file, line, _, _ = MUTANTS[name]
     base = os.path.join(WORK, "mutant")
-    shutil.rmtree(base, ignore_errors=True)
+    tree_copy.remove_tree(base)
     root, reason = tree_copy.make_copy(os.path.join(base, "tree"))
     if root is None:
         return None, reason

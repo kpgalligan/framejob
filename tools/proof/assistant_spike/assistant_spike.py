@@ -300,7 +300,7 @@ def error_lines(result):
 def build_app(kind):
     """`make app` (r) or the Makefile's Distribution line (d), in the copy."""
     app = APPS[kind]
-    shutil.rmtree(app, ignore_errors=True)
+    tree_copy.remove_tree(app)
     if kind == "r":
         argv = ["make", "app"]
     else:

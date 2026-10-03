@@ -816,7 +816,8 @@ mutant's own kills:
                        (RecorderStatusItem.swift) — 875/876: 5u's read of
                        update's body. Structural, and honestly so: the
                        probe never puts the item UP.
-  hide-picked-only     recordingDidStart's hide guarded on `.picked` again
+  hide-picked-only     recordingDidStart's hidesForRecording guard narrowed
+                       to `source == .picked`
                        (RecorderPanelController+Recording.swift) — 875/876:
                        5u's read; 9c's driven kill sits in the skipped tier.
   reveal-always        revealIfNoted's note test dropped
@@ -10300,15 +10301,9 @@ MUTANTS = {
         "the status item's menu not rebuilt when paused flips — Pause Recording stays while paused"),
     "hide-picked-only": (
         "RecorderPanelController+Recording.swift",
-        "        showWhenLanded = window?.isVisible == true\n"
-        "        hiddenForRecording = true\n"
-        "        window?.orderOut(nil)\n",
-        "        if currentChoice().source == .picked {\n"
-        "            showWhenLanded = window?.isVisible == true\n"
-        "            hiddenForRecording = true\n"
-        "            window?.orderOut(nil)\n"
-        "        }\n",
-        "the panel's hide narrowed back to a picked window (R1's rule; decision 7 undone)"),
+        "        guard Self.hidesForRecording(currentChoice().source) else { return }\n",
+        "        guard currentChoice().source == .picked else { return }\n",
+        "the panel's hide narrowed back to a picked window (decision 7 undone)"),
     "reveal-always": (
         "RecorderPanelController+Landing.swift",
         "        if showWhenLanded, !noteLabel.stringValue.isEmpty { window?.orderFront(nil) }\n",

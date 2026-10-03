@@ -613,7 +613,7 @@ def main():
     parser.add_argument("--bench", type=Path)
     parser.add_argument("--preset", default="h264")
     args = parser.parse_args()
-    shutil.rmtree(WORK, ignore_errors=True)
+    tree_copy.remove_tree(WORK)
     WORK.mkdir(parents=True)
     if args.mutant:
         return run_mutant(args.mutant)

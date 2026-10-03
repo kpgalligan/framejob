@@ -321,7 +321,7 @@ def bundle_version(bundle):
 
 
 def ditto(source, dest):
-    shutil.rmtree(os.path.dirname(dest), ignore_errors=True)
+    tree_copy.remove_tree(os.path.dirname(dest))
     os.makedirs(os.path.dirname(dest), exist_ok=True)
     return run(["ditto", source, dest], 300)
 

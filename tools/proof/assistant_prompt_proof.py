@@ -370,7 +370,7 @@ def stand_in_posts():
 
 def build_mutant(asp):
     base = os.path.join(WORK, "mutant")
-    shutil.rmtree(base, ignore_errors=True)
+    tree_copy.remove_tree(base)
     root, reason = tree_copy.make_copy(os.path.join(base, "tree"))
     if root is None:
         return None, reason

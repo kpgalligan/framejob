@@ -1852,7 +1852,7 @@ def main():
     parser.add_argument("--mutant", choices=sorted(MUTANTS))
     parser.add_argument("--probe-mutant", choices=sorted(PROBE_MUTANTS))
     args = parser.parse_args()
-    shutil.rmtree(WORK, ignore_errors=True)
+    tree_copy.remove_tree(WORK)
     WORK.mkdir(parents=True)
     if args.probe_mutant:
         return probe_mutant(args.app, args.probe_mutant)

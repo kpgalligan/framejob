@@ -272,6 +272,27 @@ fn lister(tools: Value, hold: Duration) -> Handler {
     )
 }
 
+/// As `lister`, but a call sends `()` on `arrived` BEFORE it sleeps `hold`,
+/// so a test knows the call is held in the app rather than guessing.
+fn holder(tools: Value, hold: Duration, arrived: std::sync::mpsc::Sender<()>) -> Handler {
+    let arrived = std::sync::Mutex::new(arrived);
+    Box::new(
+        move |message| match message.get("method").and_then(Value::as_str) {
+            Some("tools/list") => answer(message, json!({"tools": tools})),
+            Some("tools/call") => {
+                let _ = arrived.lock().expect("the sender").send(());
+                std::thread::sleep(hold);
+                answer(
+                    message,
+                    json!({"content": [{"type": "text", "text": "from the stub"}], "isError": false}),
+                )
+            }
+            _ => json!({"jsonrpc": "2.0", "id": message.get("id"),
+                    "error": {"code": -32601, "message": "stub"}}),
+        },
+    )
+}
+
 /// `value` as JSON text with every object's keys in REVERSE sorted order.
 fn reversed(value: &Value) -> String {
     match value {
@@ -428,25 +449,40 @@ fn no_list_changed_when_the_live_list_differs_only_in_key_order() {
     proxy.quiet(Duration::from_secs(2));
 }
 
+/// How long a ping may take while a call is held. Measured in B75 (#230):
+/// the old test slept 300 ms after spawning the copied binary and then
+/// timed the ping, so the clock started before the proxy read stdin; under
+/// `make test` its first exec took 0.65–1.30 s and the ping 340–990 ms
+/// (alone: 0.31 s and under 1 ms). This test waits for `initialize`'s
+/// answer and for the call to reach the stub instead, and its ping took
+/// 0.07–1.3 ms over three `make test` runs and three runs alone, so 1 s
+/// stays, with the margin for a loaded host.
+const PING_BOUND: Duration = Duration::from_secs(1);
+/// How long the stub holds the call; it must stay above `PING_BOUND` plus
+/// 2 s, so the ping's answer can only come first if it is answered on its
+/// own thread.
+const CALL_HOLD: Duration = Duration::from_secs(3);
+
 #[test]
 fn ping_is_answered_while_a_call_is_held() {
     let fixture = Fixture::new();
-    let _stub = Stub::start(
-        &fixture.socket,
-        lister(snapshot_tools(), Duration::from_secs(3)),
-    );
     let mut proxy = fixture.proxy();
+    proxy.request(0, "initialize", json!({"protocolVersion": "2025-03-26"}));
+    assert_eq!(proxy.next(Duration::from_secs(10))["id"], json!(0));
+    let (tx, rx) = channel();
+    let _stub = Stub::start(&fixture.socket, holder(snapshot_tools(), CALL_HOLD, tx));
     proxy.request(1, "tools/call", call_params());
-    std::thread::sleep(Duration::from_millis(300));
+    rx.recv_timeout(Duration::from_secs(10))
+        .expect("the call reaches the stub");
     let sent = Instant::now();
     proxy.request(2, "ping", json!({}));
-    let first = proxy.next(Duration::from_secs(1));
+    let first = proxy.next(PING_BOUND);
     assert_eq!(
         first["id"],
         json!(2),
         "the ping is answered before the call"
     );
-    assert!(sent.elapsed() < Duration::from_secs(1));
+    assert!(sent.elapsed() < PING_BOUND);
     let second = proxy.next(Duration::from_secs(10));
     assert_eq!(second["id"], json!(1));
 }
