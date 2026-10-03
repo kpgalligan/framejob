@@ -172,7 +172,8 @@ detail there.
   every save funnels through, bracketing it with the cache ledger's
   `saveBegan` / `saveEnded` (#115, #169).
   `+Import` is File ▸ Add Media… and every drop into an open project
-  (`importMedia`, the probe chain and the one grouped commit), and the Media
+  (`importMedia`, the probe chain and the one grouped commit), the opening
+  read's probe (`probeForOpening`, a cancelled copy as `.userCancelled`), and the Media
   tab's Relink… and the missing-media sheet's body (`relinkMedia(_:)`: each
   file probed through `MediaImporter.probe`, one grouped "Relink Media" edit
   carrying each descriptor as `relink_media`'s `probe`, spec §11 #63, then
@@ -205,8 +206,8 @@ detail there.
 - `MediaImporter.swift` (+`Probe`, +`Speech`, +`Peaks`) ·
   `MediaPeakBuckets.swift` · `MediaCacheFiles.swift` · `MediaCacheLedger.swift` ·
   `FFmpegRewrap.swift` · `AppSupport.swift` · `DecoderSupport.swift` ·
-  `ContainerRewrap.swift` (+`Writer`) — the
-  import funnel and the three per-media caches (`thumbs/`, `peaks/`,
+  `ContainerRewrap.swift` (+`Writer`) · `RewrapProgress.swift` ·
+  `RewrapProgressWindowController.swift` — the import funnel and the three per-media caches (`thumbs/`, `peaks/`,
   `speech/`) inside the package. `DecoderSupport.swift` (await-free) is the
   per-process opt-in to macOS's supplemental VP9 and AV1 decoders (`enable()`:
   `main.swift`, `generateCaches`, `CompositionBuilder.firstTrack`, the harness
@@ -219,7 +220,11 @@ detail there.
   `AVAssetWriter` into `Rewrapped/` under `FFmpegRewrap.destination(for:)`'s
   digest name, the free space is checked first, #216's codecs are refused
   before the copy, and a codec the copy does not carry (`.unsupported`) alone
-  falls through to the opt-in ffmpeg step.
+  falls through to the opt-in ffmpeg step. `RewrapProgress.swift` +
+  `RewrapProgressWindowController.swift`: a click door's copy reports to a
+  non-modal window shown after 1 s, which never takes the keyboard from a
+  Reelcut window, and Cancel removes the partial copy (spec §11 #228-P). A
+  tool call passes no watch.
   `async`/`await` is confined to `MediaImporter.swift`; the await-free halves
   are the `+` files, `MediaPeakBuckets`, `MediaCacheFiles` and `MediaCacheLedger`. A cache is CURRENT when its
   `complete.json` marker matches `CacheStamp` (the source's size and

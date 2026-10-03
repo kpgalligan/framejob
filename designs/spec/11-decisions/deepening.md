@@ -656,3 +656,43 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   document opened from the Finder blocks the main thread for the copy, as
   ffmpeg's conversion already does; the Media tab names the copy, not the
   original; the copy lives outside the package until Consolidate.
+- **#228-P — A person's WebM or Matroska copy shows its progress in a small
+  window with Cancel, and a tool call's copy shows nothing** (issue batch
+  B76, #228 part 1; the owner, 2026-10-03, O1–O8). **Every click door
+  reports:** File ▸ Add Media…, a drop into a project, the Media tab's and
+  the missing-media sheet's Relink (`ProjectDocument.probeNext` and
+  `relinkNext`, through `copyWatch`), and File ▸ Open, a Finder double-click
+  and a drop on the Dock or the welcome window (`readMediaFile`, through
+  `probeForOpening`). Each hands `ContainerRewrap.assist` a watch, called
+  once when a copy really starts (a reused copy calls none), and the copy
+  reports its bytes to a `RewrapProgress` (`RewrapProgress.swift`).
+  **The window** (`RewrapProgressWindowController.swift`) is a non-modal,
+  titled panel with no close box, the same for every door, titled
+  "Copying Movie", headed "Copying “`<file>`”", with the bar, "Reading the
+  file…" until the copy begins and then "`<copied>` of `<total>`", and one
+  Cancel button. **It appears only when the copy is still running 1 s after
+  it starts**, so a copy of a few hundred megabytes shows nothing. **It never
+  takes the keyboard from a Reelcut window:** while any window is key it is
+  ordered front and not made key, so typing and Escape keep reaching the
+  editor during an Add Media copy; it becomes key only when no window is
+  (File ▸ Open, a Finder double-click), or when the person clicks into it,
+  and only then does Escape cancel. It raises no modal and no sheet, and the
+  project stays usable. **Cancel** reads "Cancelling…" and is disabled; the
+  copy stops at once (each pump stops before its next sample, so at most the
+  append in flight lands), the half-written `.partial.mov` is deleted, the
+  file is not added and no alert appears; the other files of a multi-file
+  import or drop still land; File ▸ Open of the file opens no project (the
+  read answers `CocoaError(.userCancelled)`, which no door presents). A
+  Cancel while the index is still being read takes effect when the read
+  ends. **A re-import** reuses a finished copy silently; a cancelled copy
+  leaves nothing, so the next import copies again. **A tool call passes no
+  watch:** `import_media`, `relink_media`, `record_screen` and
+  `open_project` (which reads on the main thread inside `withoutAsking`,
+  where `probeBlocking` drops any watch and `probeForOpening` passes none on
+  main) show no window, wait as before and answer exactly as before. MC-5
+  holds: there is no MCP progress message and no way for an agent or the
+  person to cancel a tool call's copy. **The risks it accepts:** an agent's
+  `open_project` of a WebM still copies on the main thread and freezes the
+  window for the copy's length (O7, #231); a quit during a copy
+  leaves its `.partial.mov` in `Rewrapped/` until the next import of that
+  file removes it (O8); ffmpeg's opt-in conversion still shows no progress.

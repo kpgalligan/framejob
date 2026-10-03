@@ -13006,3 +13006,60 @@ Not run: the `agent_socket_proof.py` mutants (each builds a tree copy, and
 `agent-asks` / `open-asks` put the consent alert on screen), the paid
 `--live` proofs, `recording_probe.py`'s granted tiers, and the proofs that
 need `tools/proof/media/` (absent in this worktree).
+
+## Issue batch B76 — a WebM or Matroska copy's progress window and Cancel (`container_rewrap_probe.py` C20–C30 and five mutants; #228 part 1; spec §11 #228-P)
+
+Every click door's copy reports to a `RewrapProgress` and, past 1 s, to a
+non-modal "Copying Movie" window (`RewrapProgressWindowController`) whose
+Cancel stops the copy, deletes the partial movie and adds nothing, with no
+alert; a tool call passes no watch.
+
+- **`container_rewrap_probe.py`** gains one job of `kind: "cancel"` on P1
+  (P2 for C29's `.mov`), run after B73's rows; the rows are in its
+  docstring. The probe makes a `PresentCountingController` (an
+  `NSDocumentController` whose `presentError(_:)` counts and returns false)
+  before anything reads `NSDocumentController.shared`, and sets the
+  activation policy to `.prohibited`; C29 drives `ProjectDocument().importMedia`
+  with `ProjectDocument.copyWatch` wrapping the real watch and cancelling at
+  30 %, pumping `RunLoop.main`; C30 builds the window and presses its
+  Cancel, never ordering it front. Every `assist` row (C23–C27, C29)
+  removes the digest names it made through `FFmpegRewrap.discard`.
+  Measured (C29 under `present-cancel`): an untitled document's `present`
+  reaches the shared document controller's `presentError(_:)`, so the
+  count sees an alert the door would have shown. Measured (`keep-partial`):
+  a Cancel's `cancelWriting()` on a writer still writing deletes the movie
+  itself, so the mutant does not fail C21 — the caller's removal is what
+  K12 and X19 hold, where the writer has finished or already failed.
+
+Run on 2026-10-03 over `abb9d1f` plus this batch's diff, macOS 26.5.1,
+Apple M2 Max, `hw_av1 False`. `container_rewrap_probe.py` printed `passed
+38/38`, exit 0 — B73's 27 rows unchanged, and C20 "copied 115100 of 115100
+(described 115100), fraction 1, never decreasing over 13 readings", C21
+"cancelAt 0.3: cancelled 'Copying p1.webm was cancelled.'; last fraction
+0.3068288444830582; 1 appends after the Cancel (2 pumps); scratch []", C23
+"watch called 1, copy left False, partial False; again with none: ok,
+probes True", C25 "watch called 0, copy written True", C26 "userCancelled
+'The operation was cancelled.'", C27 "on main (True): ok, watch called 0",
+C28 "(True, False, False, False); detail ('Reading the file…', '400 MB of
+1 GB')", C29 "ids [2], media ['p2.mov'], presented 0, controllers live 1
+during and 0 after, copy left False, partial False", C30 "button
+'Cancelling…' enabled False, window visible False ('Copying Movie')". The
+mutants:
+
+| Run | Failed (all as expected) | Printed |
+|---|---|---|
+| `--mutant ignore-cancel` (the pump's cancel check removed) | C21 ("last fraction 1; 130 appends after the Cancel (2 pumps)") | `passed 37/38`, MUTANT PASS |
+| `--mutant no-user-cancelled` (`probeForOpening` rethrows the copy's error) | C26 ("cancelled 'Copying p1.webm was cancelled.'") | `passed 37/38`, MUTANT PASS |
+| `--mutant quiet-watch` (`probeBlocking` keeps the watch inside `withoutAsking`) | C25 ("error cancelled, watch called 1, copy written False") | `passed 37/38`, MUTANT PASS |
+| `--mutant present-cancel` (`isCancelledCopy` always false) | C28, C29 ("presented 1") | `passed 36/38`, MUTANT PASS |
+| `--mutant door-no-watch` (`probeNext` passes no watch) | C29 ("ids [2, 3], media ['p1-b94a1b0c158b896a.mov', 'p2.mov'], … controllers live 0 during") | `passed 37/38`, MUTANT PASS |
+| `--mutant keep-partial` (B73's) | K12, X19 — not C21, measured above | `passed 36/38`, MUTANT PASS |
+
+B73's `container_import_proof.py` printed M0–M6 ok, `passed 10/10`, exit 0,
+and `--mutant ffmpeg-copy` `M2 FAIL`, `passed 9/10`, MUTANT PASS, exit 0.
+
+```sh
+python3 tools/proof/container_rewrap_probe.py                            # passed 38/38, exit 0
+python3 tools/proof/container_rewrap_probe.py --mutant ignore-cancel     # MUTANT PASS, exit 0 (each of the six above)
+python3 tools/proof/container_import_proof.py                            # passed 10/10, exit 0
+```

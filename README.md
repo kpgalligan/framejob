@@ -269,7 +269,8 @@ schema, §6 the op table, §7 the architecture.
   naming its codec. A WebM or MKV file (VP9, AV1, H.264 or HEVC video with Opus
   or AAC sound) opens with no question: its streams are copied, not re-encoded,
   into a movie in `~/Library/Application Support/Reelcut/Rewrapped/`, after a
-  check that the copy fits on the disk.
+  check that the copy fits on the disk. A copy that takes more than a second
+  shows its progress in a small window whose Cancel stops it and adds nothing.
 - **Export** through an `AVAssetWriter` over the same composition, the
   format (H.264, HEVC, ProRes 422, ProRes 4444, M4A, WAV, AIFF, GIF, APNG)
   and the size chosen separately and both resolved by the core — the default

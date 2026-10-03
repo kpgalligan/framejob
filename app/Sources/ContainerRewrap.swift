@@ -35,7 +35,10 @@ enum ContainerRewrap {
     private static let lock = NSLock()
 
     /// The movie for `source`: a copy already on disk, else a new one.
-    static func assist(_ source: URL) throws -> URL {
+    /// `watch` is called once, on this thread, when a new copy starts, with
+    /// the progress the copy reports to and reads its Cancel from (spec §11
+    /// #228-P); a reused copy calls none, and a tool call passes none.
+    static func assist(_ source: URL, watch: RewrapWatch? = nil) throws -> URL {
         if let existing = FFmpegRewrap.existingRewrap(of: source) { return existing }
         guard let destination = FFmpegRewrap.destination(for: source) else {
             throw ContainerRewrapError.failed(source, reason: "the copy folder could not be found")
@@ -43,7 +46,10 @@ enum ContainerRewrap {
         lock.lock()
         defer { lock.unlock() }
         if FileManager.default.fileExists(atPath: destination.path) { return destination }
-        try rewrap(source, to: destination)
+        let progress = RewrapProgress(source: source)
+        watch?(progress)
+        defer { progress.finish() }
+        try rewrap(source, to: destination, progress: progress)
         return destination
     }
 
@@ -51,9 +57,12 @@ enum ContainerRewrap {
     /// for the volume's free space, `stopAfter` fails the copy after that
     /// many samples and `refuseAudioAt` has the writer refuse that audio
     /// sample — the three seams the probe drives; the app passes none.
+    /// `progress` is told the copy's size and each sample's bytes, and its
+    /// Cancel is read after the index opens, before the write and between
+    /// samples; a cancelled copy throws `.cancelled` with nothing left.
     static func rewrap(
         _ source: URL, to destination: URL, freeBytes: Int64? = nil, stopAfter: Int? = nil,
-        refuseAudioAt: Int? = nil
+        refuseAudioAt: Int? = nil, progress: RewrapProgress? = nil
     ) throws {
         let container: ReelContainer
         do {
@@ -62,6 +71,7 @@ enum ContainerRewrap {
             let reason = (error as? ReelCoreError)?.message ?? error.localizedDescription
             throw ContainerRewrapError.unreadable(source, reason: reason)
         }
+        if progress?.isCancelled == true { throw ContainerRewrapError.cancelled(source) }
         var description = try describe(container, source)
         if description.video == nil, description.audio == nil {
             throw MediaImporter.ImportError.noTracks(source)
@@ -72,6 +82,7 @@ enum ContainerRewrap {
             description = try describe(container, source)
         }
         try checkSpace(for: description, source, at: destination, freeBytes: freeBytes)
+        if progress?.isCancelled == true { throw ContainerRewrapError.cancelled(source) }
         do {
             try AppSupport.ensureDirectory(destination.deletingLastPathComponent())
         } catch {
@@ -80,10 +91,12 @@ enum ContainerRewrap {
         let manager = FileManager.default
         let partial = destination.deletingPathExtension().appendingPathExtension("partial.mov")
         try? manager.removeItem(at: partial)
+        progress?.begin(
+            totalBytes: (description.video?.bytes ?? 0) + (description.audio?.bytes ?? 0))
         do {
             try ContainerRewrapWriter.write(
                 container, description, from: source, to: partial, stopAfter: stopAfter,
-                refuseAudioAt: refuseAudioAt)
+                refuseAudioAt: refuseAudioAt, progress: progress)
             try manager.moveItem(at: partial, to: destination)
         } catch {
             try? manager.removeItem(at: partial)
@@ -207,6 +220,8 @@ enum ContainerRewrapError: LocalizedError {
     case noSpace(URL, sentence: String)
     case unreadable(URL, reason: String)
     case failed(URL, reason: String)
+    /// The person's Cancel (spec §11 #228-P); never presented.
+    case cancelled(URL)
 
     var errorDescription: String? {
         switch self {
@@ -216,6 +231,8 @@ enum ContainerRewrapError: LocalizedError {
             return "Could not read \(url.lastPathComponent): \(reason)."
         case .failed(let url, let reason):
             return "Could not copy \(url.lastPathComponent) into a movie: \(reason)."
+        case .cancelled(let url):
+            return "Copying \(url.lastPathComponent) was cancelled."
         }
     }
 

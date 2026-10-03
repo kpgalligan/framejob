@@ -98,6 +98,11 @@ the same way.
 - **Expect:** each imports with no question and no alert, as a `.mov` under `~/Library/Application Support/Reelcut/Rewrapped/`. It plays with its sound in sync, every scrub and step shows a picture, and the export plays in sync. A file whose sound is Vorbis says it cannot be copied, naming Vorbis.
 - **Source:** #216 (issue batch B73, spec §11 #216-R; `container_rewrap_probe.py` and `container_import_proof.py` script generated files only).
 
+**PB-11 — A long WebM or MKV copy shows its progress and can be cancelled**
+- **Do:** 1. Make or get a WebM or MKV of 2 GB or more (e.g. `ffmpeg -f lavfi -i testsrc2=size=1920x1080:rate=30:duration=1200 -f lavfi -i sine=frequency=440:duration=1200 -c:v libvpx-vp9 -b:v 12M -deadline realtime -cpu-used 8 -c:a libopus big.webm`); if a copy of it is already in `~/Library/Application Support/Reelcut/Rewrapped/`, delete it first. 2. In an open project with a text clip, choose File ▸ Add Media… and pick it with a short `.mov`; as soon as the window appears, double-click the text clip on the canvas and type, then press Escape. 3. Click into the copy window, press Escape. 4. Add the same file again and let it finish. 5. Delete its copy, quit, and open the file from the Finder with Open With ▸ Reelcut; press Cancel.
+- **Expect:** a small "Copying Movie" window appears about a second after the copy starts, naming the file, with a moving bar, "`<copied>` of `<total>`" and Cancel. It does not take the keyboard: the typing and the first Escape reach the text editor, and the copy goes on. After the click into the window, Escape cancels: the button reads "Cancelling…", the window closes, no alert appears, the `.mov` is added and the WebM is not, and `Rewrapped/` holds no `.partial.mov`. The second import shows the window and ends with the file added; a third import of it adds it at once with no window. The Finder open shows the window in front with the keyboard, and its Cancel opens no project and shows no alert.
+- **Source:** #228 (issue batch B76, spec §11 #228-P; `container_rewrap_probe.py` C20–C30 script the copy, the doors and the Cancel, never the window on screen).
+
 ## Timeline, canvas and keys
 
 **TL-1 — Timeline basics**

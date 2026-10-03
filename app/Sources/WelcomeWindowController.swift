@@ -200,7 +200,7 @@ final class WelcomeWindowController: NSWindowController {
         NSDocumentController.shared.openDocument(
             withContentsOf: urls[tag], display: true
         ) { _, _, error in
-            if let error = error {
+            if let error = error, (error as? CocoaError)?.code != .userCancelled {
                 NSApp.presentError(error)
             }
         }

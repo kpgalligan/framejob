@@ -143,11 +143,14 @@ extension MediaImporter {
     /// arrives on the main thread, so the caller can go straight to
     /// `add_media` + `add_clip` without ever writing `await`. `mayAsk` is
     /// the caller's: true for a person's click, false for a tool call's.
+    /// `watch` is too: a click door's sees a WebM or Matroska copy start
+    /// (spec §11 #228-P), and a tool call passes none.
     static func probe(
-        url: URL, mayAsk: Bool, completion: @escaping (Result<MediaDescriptor, any Error>) -> Void
+        url: URL, mayAsk: Bool, watch: RewrapWatch? = nil,
+        completion: @escaping (Result<MediaDescriptor, any Error>) -> Void
     ) {
         importQueue.async {
-            let outcome = Result { try probeAllowingRewrap(url, mayAsk: mayAsk) }
+            let outcome = Result { try probeAllowingRewrap(url, mayAsk: mayAsk, watch: watch) }
             DispatchQueue.main.async { completion(outcome) }
         }
     }
@@ -177,16 +180,19 @@ extension MediaImporter {
     /// and every click path passes `true`, so a person's own import still
     /// asks while a tool call runs.
     ///
-    /// **Known cost of the document-open path.** Three of those four callers
-    /// are already off the main thread, so ffmpeg runs with the UI live. The
-    /// fourth, `read(from:ofType:)`, is *allowed* to run on main (its own
-    /// comment says NSDocumentController does not always take the concurrent
-    /// read queue), and there it blocks: opening a WebM straight from the
-    /// Finder can beachball for the length of the encode. The consent alert
-    /// states the cost first, which is the mitigation available from here —
-    /// a progress sheet would need a seam in `ProjectDocument`, which owns
-    /// the sheet-presenting side of every long operation.
-    private static func probeAllowingRewrap(_ url: URL, mayAsk: Bool) throws -> MediaDescriptor {
+    /// **Known cost of the document-open path.** NSDocumentController reads
+    /// a person's File ▸ Open or Finder double-click on its concurrent read
+    /// queue (`canConcurrentlyReadDocuments`), so the main thread is free
+    /// for the built-in copy's progress window, which `watch` feeds and
+    /// whose Cancel stops the copy (spec §11 #228-P; `probeForOpening`
+    /// passes it there). An agent's `open_project` reads ON main inside
+    /// `withoutAsking`, where no watch is passed, and there a copy — or an
+    /// ffmpeg conversion, on any door, which reports no progress — blocks
+    /// the window for its length; ffmpeg's consent alert states the cost
+    /// first.
+    private static func probeAllowingRewrap(
+        _ url: URL, mayAsk: Bool, watch: RewrapWatch?
+    ) throws -> MediaDescriptor {
         do {
             return try waitForProbe(url)
         } catch let failure as ImportError where failure.invitesFFmpeg && !isImage(url) {
@@ -200,7 +206,7 @@ extension MediaImporter {
             // (spec §11 #216-R). Only a codec the copy cannot carry goes on
             // to the opt-in ffmpeg step; every other refusal is final.
             do {
-                return try probeCopy(try ContainerRewrap.assist(url), of: url)
+                return try probeCopy(try ContainerRewrap.assist(url, watch: watch), of: url)
             } catch let refusal as ContainerRewrapError where refusal.invitesFFmpeg {
                 return try probeConverted(url, failure: refusal, mayAsk: mayAsk)
             }
@@ -259,11 +265,11 @@ extension MediaImporter {
     /// one thread the completion needs, and the open dies on the timeout
     /// instead of the file. Here the work runs on the cooperative pool and
     /// the result comes back through a plain semaphore, so the waiting thread
-    /// is never the thread being waited on. It may ask unless this thread is
-    /// inside `withoutAsking`.
-    static func probeBlocking(url: URL) throws -> MediaDescriptor {
+    /// is never the thread being waited on. It may ask, and pass `watch`,
+    /// unless this thread is inside `withoutAsking`.
+    static func probeBlocking(url: URL, watch: RewrapWatch? = nil) throws -> MediaDescriptor {
         let quiet = Thread.current.threadDictionary[withoutAskingKey] as? Bool ?? false
-        return try probeAllowingRewrap(url, mayAsk: !quiet)
+        return try probeAllowingRewrap(url, mayAsk: !quiet, watch: quiet ? nil : watch)
     }
 
     private static let withoutAskingKey = "com.kgalligan.reelcut.import.withoutAsking"

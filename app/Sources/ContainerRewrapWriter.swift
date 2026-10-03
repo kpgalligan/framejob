@@ -29,9 +29,12 @@ enum ContainerRewrapWriter {
     /// leaving the short movie for the caller to remove; `refuseAudioAt`
     /// declares that audio sample 4096 bytes longer than its data, which
     /// fails the writer a few appends later (the probe's way to fail one).
+    /// `progress` is told each appended sample's bytes; its Cancel stops each
+    /// pump before its next sample, then the writer is cancelled and the
+    /// write throws `.cancelled` (spec §11 #228-P).
     static func write(
         _ c: ReelContainer, _ d: ContainerDescription, from source: URL, to partial: URL,
-        stopAfter: Int?, refuseAudioAt: Int? = nil
+        stopAfter: Int?, refuseAudioAt: Int? = nil, progress: RewrapProgress? = nil
     ) throws {
         let failed = { (reason: String) in ContainerRewrapError.failed(source, reason: reason) }
         let writer: AVAssetWriter
@@ -40,7 +43,8 @@ enum ContainerRewrapWriter {
         } catch {
             throw failed("the movie could not be started (\(error.localizedDescription))")
         }
-        let shared = PumpState(stopAfter: stopAfter, refuseAudioAt: refuseAudioAt)
+        let shared = PumpState(
+            stopAfter: stopAfter, refuseAudioAt: refuseAudioAt, progress: progress)
         var pumps: [Pump] = []
         defer { pumps.forEach { try? $0.handle.close() } }
         if let video = d.video, video.samples > 0 {
@@ -76,10 +80,16 @@ enum ContainerRewrapWriter {
         for pump in pumps { pump.run(writer, shared, group) }
         // In slices: once the writer has failed it may never ask the other
         // input for more, so that pump would never leave `group`. A failure
-        // halts every pump from here instead.
+        // halts every pump from here instead, and so does a Cancel.
         while group.wait(timeout: .now() + .milliseconds(50)) == .timedOut {
-            guard shared.failure != nil || writer.status == .failed else { continue }
+            guard shared.failure != nil || writer.status == .failed
+                || progress?.isCancelled == true
+            else { continue }
             pumps.forEach { $0.halt(group) }
+        }
+        if progress?.isCancelled == true {
+            writer.cancelWriting()
+            throw ContainerRewrapError.cancelled(source)
         }
         if writer.status == .failed || (shared.failure != nil && !shared.stopped) {
             writer.cancelWriting()
@@ -151,7 +161,8 @@ enum ContainerRewrapWriter {
     }
 }
 
-/// What both pumps share: the first failure, and the count `stopAfter` reads.
+/// What both pumps share: the first failure, the count `stopAfter` reads,
+/// and the copy's progress and Cancel.
 private final class PumpState {
     private let lock = NSLock()
     private var failureText: String?
@@ -159,10 +170,12 @@ private final class PumpState {
     private var stoppedByLimit = false
     let stopAfter: Int?
     let refuseAudioAt: Int?
+    let progress: RewrapProgress?
 
-    init(stopAfter: Int?, refuseAudioAt: Int?) {
+    init(stopAfter: Int?, refuseAudioAt: Int?, progress: RewrapProgress?) {
         self.stopAfter = stopAfter
         self.refuseAudioAt = refuseAudioAt
+        self.progress = progress
     }
 
     var failure: String? {
@@ -234,26 +247,30 @@ private final class Pump {
     }
 
     /// Feeds the input until the track is copied, a sample fails, the
-    /// other pump fails or `stopAfter` is reached; leaves `group` once.
+    /// other pump fails, the copy is cancelled or `stopAfter` is reached;
+    /// leaves `group` once.
     func run(_ writer: AVAssetWriter, _ shared: PumpState, _ group: DispatchGroup) {
         group.enter()
         input.requestMediaDataWhenReady(on: queue) { [weak self, weak writer] in
             guard let self else { return }
             while self.input.isReadyForMoreMediaData {
                 guard !self.finished else { return }
-                guard shared.failure == nil, self.index < self.total else {
+                guard shared.failure == nil, shared.progress?.isCancelled != true,
+                    self.index < self.total
+                else {
                     self.stop(group)
                     return
                 }
                 do {
                     let refused = self.track == ReelContainer.audio
                         && self.index == shared.refuseAudioAt
-                    let buffer = try self.sampleBuffer(self.index, refused: refused)
+                    let (buffer, size) = try self.sampleBuffer(self.index, refused: refused)
                     guard self.input.append(buffer) else {
                         shared.fail(writer?.error?.localizedDescription ?? "a sample was refused")
                         self.stop(group)
                         return
                     }
+                    shared.progress?.add(bytes: UInt64(size))
                 } catch {
                     shared.fail((error as? PumpFailure)?.description ?? error.localizedDescription)
                     self.stop(group)
@@ -279,9 +296,9 @@ private final class Pump {
         group.leave()
     }
 
-    /// Sample `i` of the track as a ready buffer of its own bytes; `refused`
-    /// declares an audio packet longer than its bytes.
-    private func sampleBuffer(_ i: Int, refused: Bool) throws -> CMSampleBuffer {
+    /// Sample `i` of the track as a ready buffer of its own bytes, and their
+    /// count; `refused` declares an audio packet longer than its bytes.
+    private func sampleBuffer(_ i: Int, refused: Bool) throws -> (CMSampleBuffer, UInt32) {
         guard let s = container.sample(track, at: i) else { throw PumpFailure.noSample(i) }
         try handle.seek(toOffset: s.offset)
         guard let bytes = try handle.read(upToCount: Int(s.size)), bytes.count == Int(s.size)
@@ -330,7 +347,7 @@ private final class Pump {
                 first, Unmanaged.passUnretained(kCMSampleAttachmentKey_NotSync).toOpaque(),
                 Unmanaged.passUnretained(kCFBooleanTrue).toOpaque())
         }
-        return buffer
+        return (buffer, s.size)
     }
 }
 

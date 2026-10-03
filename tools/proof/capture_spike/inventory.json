@@ -1036,7 +1036,7 @@
     },
     {
      "selector": "openDocument:",
-     "via": "app/Sources/ProjectDocument.swift `let descriptor = try MediaImporter.probeBlocking(url: url)`",
+     "via": "app/Sources/ProjectDocument.swift `let descriptor = try Self.probeForOpening(url)`",
      "gate": "app/Sources/FFmpegRewrap.swift `decided == .ask && !mayAsk` — policy ask and the caller's mayAsk (false for a tool call's import, §11 MC-5): a movie opened as a project, as above"
     }
    ],

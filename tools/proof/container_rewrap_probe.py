@@ -37,10 +37,29 @@ source's packets byte for byte (by PTS alone an AAC packet cannot be paired:
 the writer puts AAC's 2112 priming samples before its edit where ffmpeg's
 MKV has 1024, so T17 is what holds AAC's timing).
 
+Issue batch B76 (spec §11 #228-P), the copy's progress and Cancel, on P1
+(and P2 for C29's .mov): C20 a whole copy's `copiedBytes` never decreases
+and ends equal to `totalBytes`, the described video and audio bytes, at
+fraction 1; C21 `cancelAt = 0.3` throws `.cancelled`, leaves no partial and
+no movie, the last fraction under 1, at most one append per pump after the
+Cancel; C22 a Cancel before the copy writes nothing; C23 `assist` with a
+cancelling watch leaves no copy in `Rewrapped/`, and a second `assist`
+writes one that probes; C24 `probeBlocking(url:watch:)` off main passes the
+watch; C25 inside `withoutAsking` it never calls it and the copy lands; C26
+`ProjectDocument.probeForOpening` off main answers `CocoaError(.userCancelled)`;
+C27 on main it calls no watch; C28 `isCancelledCopy` and `detail(for:)`;
+C29 `importMedia([P1, a .mov])` with `copyWatch` cancelling at 30 %: one
+media lands, nothing reaches `presentError`, `RewrapProgressWindowController.live`
+held the copy's controller and is empty after; C30 the window's Cancel.
+Every `assist` row removes the digest names it made through
+`FFmpegRewrap.discard`.
+
 Mutants edit a copy of app/Sources; each must fail exactly its rows (then
 MUTANT PASS, exit 0): no-retime, no-precheck, no-space-check, keep-partial,
 fixed-opus-frames, audio-dropped, fps-timescale-always, no-mkdir,
-offset-shift, deaf-pump (fails nothing), deaf-pump-unbounded-wait.
+offset-shift, deaf-pump (fails nothing), deaf-pump-unbounded-wait; and B76's
+ignore-cancel, no-user-cancelled, quiet-watch, present-cancel and
+door-no-watch.
 
     python3 tools/proof/container_rewrap_probe.py [--mutant NAME]
 """
@@ -151,6 +170,21 @@ SOURCE_MUTANTS = {
     # to one unbounded `group.wait()` as well, P19 hangs.
     "deaf-pump": DEAF,
     "deaf-pump-unbounded-wait": DEAF + [UNBOUNDED],
+    # B76 (spec §11 #228-P).
+    "ignore-cancel": [("ContainerRewrapWriter.swift",
+                       "guard shared.failure == nil, shared.progress?.isCancelled != true,",
+                       "guard shared.failure == nil,")],
+    "no-user-cancelled": [("ProjectDocument+Import.swift",
+                           "throw CocoaError(.userCancelled)", "throw ContainerRewrapError"
+                           ".cancelled(url)")],
+    "quiet-watch": [("MediaImporter+Probe.swift", "watch: quiet ? nil : watch)",
+                     "watch: watch)")],
+    "present-cancel": [("ProjectDocument+Import.swift",
+                        "if case ContainerRewrapError.cancelled = error { return true }",
+                        "_ = error")],
+    "door-no-watch": [("ProjectDocument+Import.swift",
+                       "MediaImporter.probe(url: urls[index], mayAsk: true, watch: Self.copyWatch)",
+                       "MediaImporter.probe(url: urls[index], mayAsk: true)")],
 }
 
 # The rows each mutant must fail, and only those (measured on an M2 Max,
@@ -158,7 +192,11 @@ SOURCE_MUTANTS = {
 # `no-retime` also fails W3: an un-snapped H.264 track in ms probes as
 # 29985/1000. `audio-dropped` fails every row that reads sound, and X19,
 # whose refused packet is audio. `keep-partial` fails X19 too: its failed
-# copy leaves `p19.partial.mov`.
+# copy leaves `p19.partial.mov`. It does NOT fail C21 (B76, measured): a
+# Cancel's `cancelWriting()` on a writer still writing deletes the movie
+# itself, where X19's on a writer that has already failed does not, so
+# the caller's removal is what X19 and K12 hold and a Cancel leaves nothing
+# either way.
 EXPECTED = {
     "no-retime": {"W3", "F1", "F2", "F3", "F4", "B1v", "B3v"},
     "no-precheck": {"R7", "R8", "R9"},
@@ -174,6 +212,11 @@ EXPECTED = {
     "offset-shift": {"B1v", "B1a", "B3v", "B3a", "F1", "F2", "F3", "F4", "T17", "T18"},
     "deaf-pump": set(),
     "deaf-pump-unbounded-wait": {"X19"},
+    "ignore-cancel": {"C21"},
+    "no-user-cancelled": {"C26"},
+    "quiet-watch": {"C25"},
+    "present-cancel": {"C28", "C29"},
+    "door-no-watch": {"C29"},
 }
 
 PROFILE1 = ("p8.webm is VP9 Profile 1 video, which this Mac cannot decode; "
@@ -285,6 +328,11 @@ def jobs_for(made):
     job("P12", "P1", stop_after=10)
     job("P19", "P19", refuse_audio_at=10)
     job("P16", "P1", inspect=True)
+    if "P1" in made and "P2" in made:
+        cancel = SCRATCH / "cancel"
+        cancel.mkdir(parents=True)
+        jobs.append({"id": "CANCEL", "kind": "cancel", "source": str(made["P1"]),
+                     "p2": str(made["P2"]), "dest": str(cancel)})
     return jobs
 
 
@@ -450,7 +498,81 @@ def score(answers, made, problems, host):
             f"by PTS the packet nearest 1.0 s ({p.get('audio_time')} s) "
             f"{'equals' if p.get('audio_equal') else 'is not'} the index's at "
             f"{p.get('audio_index_time')} s")
+    score_cancel(get, row)
     return results
+
+
+def score_cancel(get, row):
+    """B76's rows C20–C30 (spec §11 #228-P)."""
+    def kind(a):
+        return (a.get("error") or {}).get("type")
+
+    a = get("C20")
+    row("C20", a.get("rewrap") == "ok" and a.get("monotonic") is True
+        and a.get("expected", 0) > 0 and a.get("copied") == a.get("total") == a.get("expected")
+        and a.get("fraction") == 1,
+        f"rewrap {a.get('rewrap')} {a.get('error', '')}; copied {a.get('copied')} of "
+        f"{a.get('total')} (described {a.get('expected')}), fraction {a.get('fraction')}, "
+        f"never decreasing over {a.get('readings')} readings: {a.get('monotonic')}")
+    a = get("C21")
+    fraction, late, pumps = a.get("fraction"), a.get("adds_after_cancel"), a.get("pumps")
+    row("C21", kind(a) == "cancelled" and not a.get("dest_exists")
+        and not a.get("partial_exists") and a.get("listing") == []
+        and fraction is not None and fraction < 1
+        and late is not None and pumps and late <= pumps,
+        f"cancelAt 0.3: {kind(a)} {(a.get('error') or {}).get('message')!r}; last fraction "
+        f"{fraction}; {late} appends after the Cancel ({pumps} pumps); scratch "
+        f"{a.get('listing')}")
+    a = get("C22")
+    row("C22", kind(a) == "cancelled" and a.get("listing") == [],
+        f"cancelled before: {kind(a)}; scratch {a.get('listing')}")
+    a = get("C23")
+    row("C23", kind(a) == "cancelled" and a.get("watch_calls") == 1
+        and a.get("copy_exists") is False and a.get("copy_partial_exists") is False
+        and a.get("second") == "ok" and a.get("second_exists") and a.get("second_probes"),
+        f"assist with a cancelling watch: {kind(a)}, watch called {a.get('watch_calls')}, "
+        f"copy left {a.get('copy_exists')}, partial {a.get('copy_partial_exists')}; again with "
+        f"none: {a.get('second')} {a.get('second_error', '')}, probes {a.get('second_probes')}")
+    a = get("C24")
+    row("C24", kind(a) == "cancelled" and a.get("watch_calls") == 1
+        and a.get("copy_exists") is False,
+        f"probeBlocking off main: {kind(a)}, watch called {a.get('watch_calls')}, copy left "
+        f"{a.get('copy_exists')}")
+    a = get("C25")
+    row("C25", a.get("rewrap") == "ok" and a.get("watch_calls") == 0
+        and a.get("copy_exists") is True,
+        f"probeBlocking inside withoutAsking: {a.get('rewrap')} {kind(a) or ''}, watch called "
+        f"{a.get('watch_calls')}, copy written {a.get('copy_exists')}")
+    a = get("C26")
+    row("C26", kind(a) == "userCancelled" and a.get("watch_calls") == 1
+        and a.get("copy_exists") is False,
+        f"probeForOpening off main: {kind(a)} {(a.get('error') or {}).get('message')!r}, watch "
+        f"called {a.get('watch_calls')}, copy left {a.get('copy_exists')}")
+    a = get("C27")
+    row("C27", a.get("on_main") is True and a.get("rewrap") == "ok" and a.get("watch_calls") == 0,
+        f"probeForOpening on main ({a.get('on_main')}): {a.get('rewrap')} {kind(a) or ''}, "
+        f"watch called {a.get('watch_calls')}")
+    a = get("C28")
+    facts = (a.get("cancelled"), a.get("failed"), a.get("no_space"), a.get("unreadable"))
+    details = (a.get("detail_before"), a.get("detail_after"))
+    row("C28", facts == (True, False, False, False)
+        and details == ("Reading the file…", "400 MB of 1 GB"),
+        f"isCancelledCopy cancelled/failed/noSpace/unreadable = {facts}; detail {details}")
+    a = get("C29")
+    row("C29", a.get("completed") is True and len(a.get("ids") or []) == 1
+        and a.get("media_paths") == ["p2.mov"] and a.get("presents") == 0
+        and a.get("max_live") == 1 and a.get("live_after") == 0
+        and a.get("copy_exists") is False and a.get("copy_partial_exists") is False,
+        f"importMedia([p1.webm, p2.mov]): completed {a.get('completed')}, ids {a.get('ids')}, "
+        f"media {a.get('media_paths')}, presented {a.get('presents')}, controllers live "
+        f"{a.get('max_live')} during and {a.get('live_after')} after, copy left "
+        f"{a.get('copy_exists')}, partial {a.get('copy_partial_exists')} "
+        f"{a.get('setup', '')}")
+    a = get("C30")
+    row("C30", a.get("cancelled") is True and a.get("title") == "Cancelling…"
+        and a.get("enabled") is False and a.get("visible") is False,
+        f"cancelCopy: cancelled {a.get('cancelled')}, button {a.get('title')!r} enabled "
+        f"{a.get('enabled')}, window visible {a.get('visible')} ({a.get('window_title')!r})")
 
 
 def main():

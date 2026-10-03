@@ -37,12 +37,15 @@ extension ProjectDocument {
             completion?(added)
             return
         }
-        MediaImporter.probe(url: urls[index], mayAsk: true) { [weak self] result in
+        MediaImporter.probe(url: urls[index], mayAsk: true, watch: Self.copyWatch) {
+            [weak self] result in
             guard let self = self else { return }
             var collected = descriptors
             switch result {
             case .success(let descriptor):
                 collected.append(descriptor)
+            case .failure(let error) where Self.isCancelledCopy(error):
+                break  // the person's Cancel: the file is left out, unannounced
             case .failure(let error):
                 // One unreadable file must not lose the rest of the drop.
                 self.present(error)
@@ -101,7 +104,8 @@ extension ProjectDocument {
             return
         }
         let choice = choices[index]
-        MediaImporter.probe(url: choice.url, mayAsk: true) { [weak self] result in
+        MediaImporter.probe(url: choice.url, mayAsk: true, watch: Self.copyWatch) {
+            [weak self] result in
             guard let self = self else { return }
             var collected = ops
             switch result {
@@ -110,6 +114,8 @@ extension ProjectDocument {
                     .relinkMedia(
                         media: choice.media, path: descriptor.path,
                         bookmark: descriptor.bookmark, probe: descriptor))
+            case .failure(let error) where Self.isCancelledCopy(error):
+                break  // the person's Cancel: this relink is left out, unannounced
             case .failure(let error):
                 // One unreadable file must not lose the rest of the sheet.
                 self.present(error)
@@ -140,5 +146,36 @@ extension ProjectDocument {
     struct RelinkRefusalAlert: LocalizedError {
         let refusal: ReelRefusal
         var errorDescription: String? { refusal.reason }
+    }
+
+    // MARK: - The copy's progress window (spec §11 #228-P)
+
+    /// The watch `probeNext` and `relinkNext` pass, so a WebM or Matroska
+    /// copy shows its progress window. Main-only; a probe wraps it, and the
+    /// app never reassigns it.
+    static var copyWatch: RewrapWatch = RewrapProgressWindowController.watch
+
+    /// `readMediaFile`'s probe: File ▸ Open, a Finder double-click and a
+    /// drop on the Dock or a window read on NSDocumentController's
+    /// concurrent queue, so a copy there shows the window. On the main
+    /// thread — an agent's `open_project` — no watch is passed. The
+    /// person's Cancel answers `CocoaError(.userCancelled)`, which opens no
+    /// project and which no door presents.
+    static func probeForOpening(
+        _ url: URL, watch: RewrapWatch? = RewrapProgressWindowController.watch
+    ) throws -> MediaDescriptor {
+        do {
+            return try MediaImporter.probeBlocking(
+                url: url, watch: Thread.isMainThread ? nil : watch)
+        } catch ContainerRewrapError.cancelled {
+            throw CocoaError(.userCancelled)
+        }
+    }
+
+    /// Whether `error` is the person's Cancel of a copy, which is never
+    /// presented.
+    static func isCancelledCopy(_ error: any Error) -> Bool {
+        if case ContainerRewrapError.cancelled = error { return true }
+        return false
     }
 }

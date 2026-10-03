@@ -15,13 +15,35 @@
 // scores them); a rewrap that has not returned in 60 s is `"hung"`.
 // `free_delta` stands in `required_bytes + free_delta` for the volume's free
 // space. stdout is line-buffered so every finished row survives a kill.
+//
+// Issue batch B76 (spec §11 #228-P): one job of `kind: "cancel"` ({source:
+// P1, p2: P2, dest: a scratch folder}) runs rows C20–C30 after the others —
+// the copy's progress and Cancel through `rewrap`, `assist`, the probe's
+// faces, `ProjectDocument.probeForOpening`, the Add Media door
+// (`importMedia`, with `PresentCountingController` counting what reaches
+// `presentError`) and the window's Cancel, which is never ordered front.
 
+import AppKit
 import AVFoundation
 import CoreMedia
 import Foundation
 import VideoToolbox
 
 setvbuf(stdout, nil, _IOLBF, 0)
+
+/// Counts every error presented through the document controller and shows
+/// none. Made before anything reads `NSDocumentController.shared`, so it is
+/// the shared one.
+final class PresentCountingController: NSDocumentController {
+    var presents = 0
+    override func presentError(_ error: any Error) -> Bool {
+        presents += 1
+        return false
+    }
+}
+let presentCounter = PresentCountingController()
+let probeApp = NSApplication.shared
+probeApp.setActivationPolicy(.prohibited)
 
 final class Box<T>: @unchecked Sendable {
     var value: T?
@@ -76,6 +98,7 @@ func errorFacts(_ error: any Error) -> [String: Any] {
         case .noSpace: facts["type"] = "noSpace"
         case .unreadable: facts["type"] = "unreadable"
         case .failed: facts["type"] = "failed"
+        case .cancelled: facts["type"] = "cancelled"
         }
         facts["invites_ffmpeg"] = e.invitesFFmpeg
     case let e as MediaImporter.ImportError:
@@ -84,6 +107,9 @@ func errorFacts(_ error: any Error) -> [String: Any] {
         case .noTracks: facts["type"] = "noTracks"
         default: facts["type"] = "import"
         }
+        facts["invites_ffmpeg"] = false
+    case let e as CocoaError:
+        facts["type"] = e.code == .userCancelled ? "userCancelled" : "cocoa"
         facts["invites_ffmpeg"] = false
     default:
         facts["type"] = "other"
@@ -269,7 +295,7 @@ emit("HOST", [
 let jobsData = try! Data(contentsOf: URL(fileURLWithPath: CommandLine.arguments[1]))
 let jobs = try! JSONSerialization.jsonObject(with: jobsData) as! [[String: Any]]
 
-for job in jobs {
+for job in jobs where job["kind"] == nil {
     let source = URL(fileURLWithPath: job["source"] as! String)
     let dest = URL(fileURLWithPath: job["dest"] as! String)
     var row: [String: Any] = ["id": job["id"] as! String]
@@ -417,4 +443,301 @@ for job in jobs {
         row["payload"] = payload
     }
     emit("ROW", row)
+}
+
+// MARK: - B76: the copy's progress and Cancel (C20–C30)
+
+/// `body` on its own thread, bounded: nil when it has not returned.
+func offMain<T>(_ seconds: Double = 60, _ body: @escaping () -> T) -> T? {
+    let box = Box<T>()
+    let done = DispatchSemaphore(value: 0)
+    Thread.detachNewThread {
+        box.value = body()
+        done.signal()
+    }
+    guard done.wait(timeout: .now() + seconds) == .success else { return nil }
+    return box.value
+}
+
+/// A watch that records each call and cancels at 30 %.
+final class WatchLog: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+    var calls: Int { lock.lock(); defer { lock.unlock() }; return count }
+    func cancelling(_ p: RewrapProgress) {
+        lock.lock(); count += 1; lock.unlock()
+        p.cancelAt = 0.3
+    }
+    func recording(_ p: RewrapProgress) {
+        lock.lock(); count += 1; lock.unlock()
+    }
+}
+
+func outcome(_ result: Result<Void, any Error>?) -> [String: Any] {
+    switch result {
+    case nil: return ["rewrap": "hung"]
+    case .success?: return ["rewrap": "ok"]
+    case .failure(let error)?: return ["rewrap": "error", "error": errorFacts(error)]
+    }
+}
+
+func listing(_ folder: URL) -> [String] {
+    (try? FileManager.default.contentsOfDirectory(atPath: folder.path))?.sorted() ?? []
+}
+
+func runCancelRows(_ job: [String: Any]) {
+    let manager = FileManager.default
+    let p1 = URL(fileURLWithPath: job["source"] as? String ?? "")
+    let p2 = URL(fileURLWithPath: job["p2"] as? String ?? "")
+    let scratch = URL(fileURLWithPath: job["dest"] as? String ?? "")
+    let described = index(p1)?.1
+    let expected = (described?.video?.bytes ?? 0) + (described?.audio?.bytes ?? 0)
+    let pumps = [described?.video?.samples ?? 0, described?.audio?.samples ?? 0]
+        .filter { $0 > 0 }.count
+    let copy = FFmpegRewrap.destination(for: p1)
+    let copyPartial = copy?.deletingPathExtension().appendingPathExtension("partial.mov")
+    func discardCopy() {
+        if let copy { FFmpegRewrap.discard(copy) }
+        if let copyPartial { FFmpegRewrap.discard(copyPartial) }
+    }
+    func copyFacts(_ row: inout [String: Any]) {
+        row["copy_exists"] = copy.map { manager.fileExists(atPath: $0.path) } ?? NSNull()
+        row["copy_partial_exists"] =
+            copyPartial.map { manager.fileExists(atPath: $0.path) } ?? NSNull()
+    }
+    func folder(_ id: String) -> URL {
+        let url = scratch.appendingPathComponent(id)
+        try? manager.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    // C20: a whole copy reports every byte, never going back.
+    do {
+        let dir = folder("C20")
+        let dest = dir.appendingPathComponent("c20.mov")
+        let p = RewrapProgress(source: p1)
+        let box = Box<Result<Void, any Error>>()
+        let done = DispatchSemaphore(value: 0)
+        Thread.detachNewThread {
+            box.value = Result { try ContainerRewrap.rewrap(p1, to: dest, progress: p) }
+            done.signal()
+        }
+        var seen: [UInt64] = []
+        let deadline = Date().addingTimeInterval(60)
+        var returned = false
+        while Date() < deadline {
+            seen.append(p.copiedBytes)
+            if done.wait(timeout: .now() + .milliseconds(1)) == .success {
+                returned = true
+                break
+            }
+        }
+        seen.append(p.copiedBytes)
+        var row: [String: Any] = outcome(returned ? box.value : nil)
+        row["id"] = "C20"
+        row["monotonic"] = zip(seen, seen.dropFirst()).allSatisfy { $0 <= $1 }
+        row["readings"] = seen.count
+        row["copied"] = p.copiedBytes
+        row["total"] = p.totalBytes
+        row["expected"] = expected
+        row["fraction"] = p.fraction ?? NSNull()
+        row["dest_exists"] = manager.fileExists(atPath: dest.path)
+        emit("ROW", row)
+    }
+
+    // C21: a Cancel at 30 % stops the copy and leaves nothing.
+    do {
+        let dir = folder("C21")
+        let dest = dir.appendingPathComponent("c21.mov")
+        let p = RewrapProgress(source: p1)
+        p.cancelAt = 0.3
+        var row = outcome(offMain { Result { try ContainerRewrap.rewrap(p1, to: dest, progress: p) } })
+        row["id"] = "C21"
+        row["fraction"] = p.fraction ?? NSNull()
+        row["adds_after_cancel"] = p.addsAfterCancel
+        row["pumps"] = pumps
+        row["dest_exists"] = manager.fileExists(atPath: dest.path)
+        row["partial_exists"] = manager.fileExists(
+            atPath: dest.deletingPathExtension().appendingPathExtension("partial.mov").path)
+        row["listing"] = listing(dir)
+        emit("ROW", row)
+    }
+
+    // C22: a Cancel before the copy writes nothing.
+    do {
+        let dir = folder("C22")
+        let dest = dir.appendingPathComponent("c22.mov")
+        let p = RewrapProgress(source: p1)
+        p.cancel()
+        var row = outcome(offMain { Result { try ContainerRewrap.rewrap(p1, to: dest, progress: p) } })
+        row["id"] = "C22"
+        row["listing"] = listing(dir)
+        emit("ROW", row)
+    }
+
+    // C23: `assist` with a cancelling watch, then again with none.
+    do {
+        discardCopy()
+        let log = WatchLog()
+        var row = outcome(offMain {
+            Result { _ = try ContainerRewrap.assist(p1, watch: log.cancelling) }
+        })
+        row["id"] = "C23"
+        row["watch_calls"] = log.calls
+        copyFacts(&row)
+        let second = offMain { Result { try ContainerRewrap.assist(p1) } }
+        switch second {
+        case .success(let url)?:
+            row["second"] = "ok"
+            row["second_exists"] = manager.fileExists(atPath: url.path)
+            row["second_probes"] = (try? MediaImporter.waitForProbe(url)) != nil
+        case .failure(let error)?:
+            row["second"] = "error"
+            row["second_error"] = errorFacts(error)
+        case nil:
+            row["second"] = "hung"
+        }
+        discardCopy()
+        emit("ROW", row)
+    }
+
+    // C24: the blocking face, off main, passes the watch.
+    do {
+        discardCopy()
+        let log = WatchLog()
+        var row = outcome(offMain {
+            Result { _ = try MediaImporter.probeBlocking(url: p1, watch: log.cancelling) }
+        })
+        row["id"] = "C24"
+        row["watch_calls"] = log.calls
+        copyFacts(&row)
+        discardCopy()
+        emit("ROW", row)
+    }
+
+    // C25: inside `withoutAsking` the watch is dropped and the copy lands.
+    do {
+        discardCopy()
+        let log = WatchLog()
+        var row = outcome(offMain {
+            Result {
+                _ = try MediaImporter.withoutAsking {
+                    try MediaImporter.probeBlocking(url: p1, watch: log.cancelling)
+                }
+            }
+        })
+        row["id"] = "C25"
+        row["watch_calls"] = log.calls
+        copyFacts(&row)
+        discardCopy()
+        emit("ROW", row)
+    }
+
+    // C26: `probeForOpening` off main answers the Cancel as userCancelled.
+    do {
+        discardCopy()
+        let log = WatchLog()
+        var row = outcome(offMain {
+            Result { _ = try ProjectDocument.probeForOpening(p1, watch: log.cancelling) }
+        })
+        row["id"] = "C26"
+        row["watch_calls"] = log.calls
+        copyFacts(&row)
+        discardCopy()
+        emit("ROW", row)
+    }
+
+    // C27: on main, `probeForOpening` passes no watch.
+    do {
+        discardCopy()
+        let log = WatchLog()
+        var row = outcome(Result { _ = try ProjectDocument.probeForOpening(p1, watch: log.recording) })
+        row["id"] = "C27"
+        row["watch_calls"] = log.calls
+        row["on_main"] = Thread.isMainThread
+        copyFacts(&row)
+        discardCopy()
+        emit("ROW", row)
+    }
+
+    // C28: which errors are a Cancel, and the detail line's two forms.
+    do {
+        let fresh = RewrapProgress(source: p1)
+        let before = RewrapProgressWindowController.detail(for: fresh)
+        fresh.begin(totalBytes: 1_000_000_000)
+        fresh.add(bytes: 400_000_000)
+        let after = RewrapProgressWindowController.detail(for: fresh)
+        emit("ROW", [
+            "id": "C28",
+            "cancelled": ProjectDocument.isCancelledCopy(ContainerRewrapError.cancelled(p1)),
+            "failed": ProjectDocument.isCancelledCopy(
+                ContainerRewrapError.failed(p1, reason: "x")),
+            "no_space": ProjectDocument.isCancelledCopy(
+                ContainerRewrapError.noSpace(p1, sentence: "x")),
+            "unreadable": ProjectDocument.isCancelledCopy(
+                MediaImporter.ImportError.unreadable(p1)),
+            "detail_before": before, "detail_after": after,
+        ])
+    }
+
+    // C29: the Add Media door — P1 cancelled at 30 %, a .mov beside it.
+    do {
+        discardCopy()
+        let dir = folder("C29")
+        let mov = dir.appendingPathComponent("p2.mov")
+        var row: [String: Any] = ["id": "C29"]
+        let made = offMain { Result { try ContainerRewrap.rewrap(p2, to: mov) } }
+        if case .success? = made {
+            let original = ProjectDocument.copyWatch
+            ProjectDocument.copyWatch = { p in
+                RewrapProgressWindowController.watch(p)
+                p.cancelAt = 0.3
+            }
+            let presentsBefore = presentCounter.presents
+            let document = ProjectDocument()
+            var ids: [UInt32]?
+            var maxLive = 0
+            document.importMedia([p1, mov]) { ids = $0 }
+            let deadline = Date().addingTimeInterval(60)
+            while ids == nil, Date() < deadline {
+                RunLoop.main.run(until: Date().addingTimeInterval(0.005))
+                maxLive = max(maxLive, RewrapProgressWindowController.live.count)
+            }
+            let settle = Date().addingTimeInterval(3)
+            while !RewrapProgressWindowController.live.isEmpty, Date() < settle {
+                RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+            }
+            ProjectDocument.copyWatch = original
+            let media = document.project.snapshot.media
+            row["completed"] = ids != nil
+            row["ids"] = (ids ?? []).map { Int($0) }
+            row["media_paths"] = media.map { URL(fileURLWithPath: $0.path).lastPathComponent }
+            row["presents"] = presentCounter.presents - presentsBefore
+            row["max_live"] = maxLive
+            row["live_after"] = RewrapProgressWindowController.live.count
+            copyFacts(&row)
+            document.close()
+        } else {
+            row["setup"] = outcome(made)
+        }
+        discardCopy()
+        emit("ROW", row)
+    }
+
+    // C30: the window's Cancel, never ordered front.
+    do {
+        let p = RewrapProgress(source: p1)
+        let controller = RewrapProgressWindowController(progress: p)
+        controller.cancelCopy(nil)
+        emit("ROW", [
+            "id": "C30", "cancelled": p.isCancelled, "title": controller.cancelButton.title,
+            "enabled": controller.cancelButton.isEnabled,
+            "visible": controller.window?.isVisible ?? NSNull(),
+            "window_title": controller.window?.title ?? NSNull(),
+        ])
+    }
+}
+
+if let cancelJob = jobs.first(where: { $0["kind"] as? String == "cancel" }) {
+    runCancelRows(cancelJob)
 }

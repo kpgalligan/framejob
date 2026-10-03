@@ -589,7 +589,7 @@ final class ProjectDocument: NSDocument {
     /// `open_project` arrives on main regardless — so a completion delivered
     /// through `MainActor.run` would deadlock against its own waiter.
     private func readMediaFile(at url: URL) throws {
-        let descriptor = try MediaImporter.probeBlocking(url: url)
+        let descriptor = try Self.probeForOpening(url)
         try adoptImported(descriptor, source: url)
     }
 
