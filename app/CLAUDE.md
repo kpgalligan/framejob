@@ -185,7 +185,8 @@ detail there.
   `+MissingCopies` re-copies, on open, a WebM/MKV copy that is missing or in
   the Trash from its recorded original (spec §11 #228-O), through
   `MediaImporter.probeBuiltInCopy` (never ffmpeg, never a question); a
-  main-thread read (an agent's `open_project`) passes no watch.
+  read on main or inside `withoutAsking` (an agent's `open_project`, off
+  main since #231) passes no watch.
   `+Alerts` is `present(_:)`: every error the document shows waits in one
   queue (`DocumentAlertQueue`) and shows one alert sheet at a time, each asked
   for a main-queue turn after the last one's `didPresent` or the window's last
@@ -225,7 +226,9 @@ detail there.
   file with no question (spec §11 #216-R): the core indexes it through
   `ReelContainer`, the first video and audio streams are copied unchanged by
   `AVAssetWriter` into `Rewrapped/` under `FFmpegRewrap.destination(for:)`'s
-  digest name, the free space is checked first, #216's codecs are refused
+  digest name, the movie's timescale the least common multiple of 600 and
+  the tracks' timescales (`ContainerRewrapWriter.movieTimeScale`, spec §11
+  #232), the free space is checked first, #216's codecs are refused
   before the copy, and a codec the copy does not carry (`.unsupported`) alone
   falls through to the opt-in ffmpeg step. `RewrapProgress.swift` +
   `RewrapProgressWindowController.swift`: a click door's copy reports to a
@@ -260,7 +263,8 @@ detail there.
   (`import_media`, `relink_media`, `record_screen` through
   `ScreenRecorder.start`), and `open_project` runs its synchronous
   `makeDocument` inside `MediaImporter.withoutAsking`, a thread-scoped key
-  `probeBlocking` reads — never process-wide state, so a person's own
+  `probeBlocking` and the re-copy on open read (`isWithoutAsking`), on the
+  lane's thread since #231 — never process-wide state, so a person's own
   import still asks while a call runs. It runs `Process` on a
   serial queue, and writes conversions under `AppSupport` — the ONE spelling
   of `~/Library/Application Support/Reelcut/` — never in the package.
@@ -1564,8 +1568,9 @@ free.
   explicit path through `AgentServer.canonical`. `offMainTools` names the
   handlers that wait for something the main thread must deliver
   (`import_media`, `transcribe`, `record_screen`, `export`,
-  `render_graphic`, …); the criterion
-  is "waits on main", not "touches the disk".
+  `render_graphic`, `open_project`, …); the criterion
+  is "waits on main" or, for `open_project`, "must not hold main for a
+  read" (spec §11 #231), not "touches the disk".
 - `AgentServer+Socket.swift` — the agent server's Unix socket, its only
   listener since road map 14's MC4 deleted TCP (MC2, spec §11 MC-1, MC-2,
   MC-6). `socketPlan` is pure: a non-empty `RC_AGENT_SOCKET`, else

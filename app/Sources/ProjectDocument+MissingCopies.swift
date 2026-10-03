@@ -6,8 +6,9 @@ import Foundation
 /// of a WebM or Matroska copy that is gone (spec §11 #228-O, O13 and Q3).
 ///
 /// Neither is an edit. Both run where `readPackage` runs — on
-/// NSDocumentController's read queue for a person's File ▸ Open, on the main
-/// thread inside `withoutAsking` for an agent's `open_project` — before the
+/// NSDocumentController's read queue for a person's File ▸ Open, on the
+/// lane's thread inside `withoutAsking` for an agent's `open_project` (spec
+/// §11 #231), on the main thread for a read AppKit runs there — before the
 /// document exists as far as AppKit is concerned, so they register no undo
 /// step, dirty nothing and show no alert; whatever save comes next writes
 /// the new paths out.
@@ -34,9 +35,9 @@ extension ProjectDocument {
     /// `mediaURL(for:)` still plays a copy from the Trash.
     ///
     /// Each copy shows #228-P's window after 1 s through `watch`, except on
-    /// the main thread, where no watch is passed: there the read is an
-    /// agent's `open_project` (MC-5), and the copy blocks the window for its
-    /// length (#231). Copies run one at a time (`ContainerRewrap.assist`'s
+    /// the main thread, where a window could not be shown, and inside
+    /// `withoutAsking`, an agent's `open_project` (MC-5, #231): no watch is
+    /// passed there. Copies run one at a time (`ContainerRewrap.assist`'s
     /// lock). A Cancel or any failure skips that media (Q3): a missing copy
     /// stays missing, with the slate, the badge and Relink…, and the next
     /// open tries again; a copy in the Trash keeps its path and bookmark.
@@ -47,7 +48,7 @@ extension ProjectDocument {
         _ project: ReelProject, watch: RewrapWatch? = RewrapProgressWindowController.watch,
         trashed: (URL) -> Bool = isTrashed
     ) -> ReelProject {
-        let shown = Thread.isMainThread ? nil : watch
+        let shown = Thread.isMainThread || MediaImporter.isWithoutAsking ? nil : watch
         var ops: [ReelOp] = []
         for media in project.snapshot.media where media.original != nil {
             let copy = mediaURL(for: media)

@@ -19,6 +19,12 @@ import CoreMedia
 /// NEVER set on the audio input, where it raises an Objective-C exception
 /// nothing can catch.
 ///
+/// The MOVIE timescale — the grid of each track's edit and duration, not of
+/// its samples — is the least common multiple of 600 and the written tracks'
+/// timescales (`movieTimeScale`, spec §11 #232), so a track that starts off
+/// the writer's default 1/600 s grid keeps its start. A copy already on disk
+/// is reused as it was written (#232's accepted limit).
+///
 /// One serial queue per input, as `requestMediaDataWhenReady` requires
 /// (feeding both in file order on one thread hung): `ExporterWriter.swift`'s
 /// pattern, where each queue owns its own source — here the input's own
@@ -50,6 +56,9 @@ enum ContainerRewrapWriter {
             stopAfter: stopAfter, refuseAudioAt: refuseAudioAt, progress: progress)
         var pumps: [Pump] = []
         defer { pumps.forEach { try? $0.handle.close() } }
+        var videoScale: Int64?
+        var audioScale: Int64?
+        var seconds = 0.0
         if let video = d.video, video.samples > 0 {
             let format = try videoFormat(video, failed)
             let input = AVAssetWriterInput(
@@ -58,6 +67,8 @@ enum ContainerRewrapWriter {
             pumps.append(try Pump(
                 c, ReelContainer.video, input, format, CMTimeScale(clamping: video.timescale),
                 source, label: "video"))
+            videoScale = video.timescale
+            seconds = max(seconds, end(c, ReelContainer.video, video.timescale, packet: 0))
         }
         if let audio = d.audio, audio.samples > 0 {
             let format = try audioFormat(audio, failed)
@@ -66,6 +77,10 @@ enum ContainerRewrapWriter {
             pumps.append(try Pump(
                 c, ReelContainer.audio, input, format, CMTimeScale(clamping: audio.timescale),
                 source, label: "audio"))
+            audioScale = audio.timescale
+            seconds = max(
+                seconds,
+                end(c, ReelContainer.audio, audio.timescale, packet: audio.framesPerPacket))
         }
         for pump in pumps {
             pump.input.expectsMediaDataInRealTime = false
@@ -75,6 +90,9 @@ enum ContainerRewrapWriter {
             writer.add(pump.input)
         }
         guard !pumps.isEmpty else { throw failed("it has nothing to copy") }
+        if let scale = movieTimeScale(video: videoScale, audio: audioScale, seconds: seconds) {
+            writer.movieTimeScale = scale
+        }
         guard writer.startWriting() else {
             throw failed(writer.error?.localizedDescription ?? "the movie could not be started")
         }
@@ -107,6 +125,51 @@ enum ContainerRewrapWriter {
             throw failed(writer.error?.localizedDescription ?? "the movie could not be finished")
         }
         if let failure = shared.failure { throw failed(failure) }
+    }
+
+    // MARK: - The movie timescale
+
+    /// The copy's movie timescale (spec §11 #232), or nil to leave the
+    /// writer's default. `video` and `audio` are the described timescale of
+    /// each track that is written; nil or not positive is absent. The first
+    /// of lcm(600, video, audio) and — with audio present — lcm(600, audio)
+    /// that holds a movie of `seconds` (and one more) in 31 bits; an lcm
+    /// that overflows does not fit. With neither track it answers 600, which
+    /// `write` never asks: it refuses a file with no track first.
+    static func movieTimeScale(video: Int64?, audio: Int64?, seconds: Double) -> CMTimeScale? {
+        let video = video.flatMap { $0 > 0 ? $0 : nil }
+        let audio = audio.flatMap { $0 > 0 ? $0 : nil }
+        var candidates = [lcm(lcm(600, video ?? 1), audio ?? 1)]
+        if let audio { candidates.append(lcm(600, audio)) }
+        for case let candidate? in candidates {
+            guard let scale = CMTimeScale(exactly: candidate),
+                (seconds + 1) * Double(scale) <= Double(Int32.max)
+            else { continue }
+            return scale
+        }
+        return nil
+    }
+
+    /// The least common multiple of two positive numbers; nil on overflow.
+    private static func lcm(_ a: Int64?, _ b: Int64) -> Int64? {
+        guard let a else { return nil }
+        var (x, y) = (a, b)
+        while y != 0 { (x, y) = (y, x % y) }
+        let (product, overflow) = (a / x).multipliedReportingOverflow(by: b)
+        return overflow ? nil : product
+    }
+
+    /// Where `track`'s last decode-order sample ends, in seconds: its later
+    /// time plus its duration for video, its time plus its sample count
+    /// (`packet` when it carries 0) for audio.
+    private static func end(
+        _ c: ReelContainer, _ track: UInt32, _ timescale: Int64, packet: Int
+    ) -> Double {
+        guard timescale > 0, let s = c.sample(track, at: c.count(track) - 1) else { return 0 }
+        let ticks = track == ReelContainer.video
+            ? Double(max(s.pts, s.dts)) + Double(s.duration)
+            : Double(s.pts) + Double(s.frames != 0 ? Int(s.frames) : packet)
+        return ticks / Double(timescale)
     }
 
     // MARK: - Format descriptions

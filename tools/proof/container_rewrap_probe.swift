@@ -30,6 +30,12 @@
 // P1, dest: a scratch folder}) runs rows O31–O43 last — a copy's original
 // through the probe, `MediaSnapshot.name`, `revealURL`, the row's tooltip,
 // `ProjectDocument.recopyingMissingCopies` and `read(from:ofType:)`.
+//
+// Issue batch B79 (spec §11 #232): every row also answers the described
+// timescale of each track the copy writes (`index_video_timescale`,
+// `index_audio_timescale`), which G24 holds each copy's `mvhd` timescale to;
+// one job of `kind: "timescale"` ({cases: [{video?, audio?, seconds}]})
+// answers `ContainerRewrapWriter.movieTimeScale` for each case, as row G25.
 
 import AppKit
 import AVFoundation
@@ -316,6 +322,10 @@ for job in jobs where job["kind"] == nil {
         row["retimed"] = retimed
         row["required"] = d.requiredBytes
         row["index_video_samples"] = d.video?.samples ?? 0
+        row["index_video_timescale"] =
+            d.video.flatMap { $0.samples > 0 ? $0.timescale as Any : nil } ?? NSNull()
+        row["index_audio_timescale"] =
+            d.audio.flatMap { $0.samples > 0 ? $0.timescale as Any : nil } ?? NSNull()
     } else {
         row["retimed"] = NSNull()
     }
@@ -455,6 +465,20 @@ for job in jobs where job["kind"] == nil {
         row["payload"] = payload
     }
     emit("ROW", row)
+}
+
+// MARK: - B79: the movie timescale's rule (G25)
+
+if let timescaleJob = jobs.first(where: { $0["kind"] as? String == "timescale" }) {
+    let cases = timescaleJob["cases"] as? [[String: Any]] ?? []
+    let answers: [Any] = cases.map { c in
+        let scale = ContainerRewrapWriter.movieTimeScale(
+            video: (c["video"] as? NSNumber)?.int64Value,
+            audio: (c["audio"] as? NSNumber)?.int64Value,
+            seconds: (c["seconds"] as? NSNumber)?.doubleValue ?? 0)
+        return scale.map { Int($0) as Any } ?? NSNull()
+    }
+    emit("ROW", ["id": "G25", "answers": answers])
 }
 
 // MARK: - B76: the copy's progress and Cancel (C20–C30)

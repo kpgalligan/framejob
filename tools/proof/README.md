@@ -13208,3 +13208,154 @@ python3 tools/proof/container_rewrap_probe.py --mutant no-original     # MUTANT 
 python3 tools/proof/container_import_proof.py                          # passed 14/14, exit 0
 python3 tools/proof/container_import_proof.py --mutant ffmpeg-copy     # MUTANT PASS, exit 0
 ```
+
+## Issue batch B79 — a rewrapped copy's movie timescale, and an agent's `open_project` read off main (`container_rewrap_probe.py` W23, F23, G24, G25 and `--mutant movie-600`; `agent_open_proof.py` A0–A7 and four mutants; `container_import_proof.py` M12; #232, #231; spec §11 #232, #231)
+
+`ContainerRewrapWriter.write` sets the copy's movie timescale to the least
+common multiple of 600 and its tracks' timescales
+(`ContainerRewrapWriter.movieTimeScale`, with a 31-bit guard and two
+fallbacks), and `open_project` is an `offMainTools` member whose read runs
+on the lane's thread inside `MediaImporter.withoutAsking`.
+
+- **`container_rewrap_probe.py`**: P23 is P2's video alone (`-an`). W23 it
+  probes 640×360 at `[30000, 1001]` with no sound; F23 its frame 47 answers
+  its own time; G24 reads each written copy's `mvhd` timescale out of the
+  file's own atoms in Python (P1, P2, P3, P14, P15, P23) and holds it to
+  `math.lcm(600, …)` of the track timescales the probe's own index reports
+  and to four literals; G25 is one job of `kind: "timescale"`, the function
+  over ten fixed cases. Mutant `movie-600` replaces the one assignment,
+  `writer.movieTimeScale = scale`, with `_ = scale`. `main-watch`'s anchor
+  is the new `shown` line, and its mutant keeps
+  `MediaImporter.isWithoutAsking ? nil : watch`.
+- **The click rows' bounds are measured.** Three baseline runs printed the
+  same four differences: T17, T18 and T20 "the impulse decodes at 1 s from
+  the copy, 1.0 s from the source (ffmpeg), |difference| 0.000000 s", and
+  T22 "decodes at 1.0213333333333334 s from the copy, 1.022 s on the
+  source's timeline (ffmpeg), |difference| 0.000667 s". Each bound is that
+  difference rounded up to the next 0.0001 s, 0.0001 at least
+  (`CLICK_BOUND`): 0.0001 s for T17, T18 and T20, 0.0007 s for T22, which
+  loses its 1/600 s term. Before #232 (`--mutant movie-600`) T22 printed
+  "decodes at 1.02 s from the copy, 1.022 s on the source's timeline
+  (ffmpeg), |difference| 0.002000 s" and the other three 0.000000 s.
+- **Measured: `movie-600` fails T22 as well as G24**, and no other click
+  row: T17, T18 and T20 read 0.000000 s with the writer's default timescale
+  too. G24 under it: every copy's `mvhd` reads 600.
+- **Measured: three older mutants fail the new rows.** `no-retime` also
+  fails F23 ("frame 47 asked at 1.5682333333333334, answered 1.568") and
+  G24 (the copy is written in the raw millisecond timescale, so P2's `mvhd`
+  reads 48000 and P23's 3000, while the probe's own index is snapped);
+  `offset-shift` also fails F23; `audio-dropped` also fails G24 (P1's `mvhd`
+  600, P2's 30000, and no P14 copy to read). Their EXPECTED sets are those
+  runs' sets. `audio-early` and `vorbis-as-aac` print their B77 sets
+  unchanged against the tightened bounds: `audio-early` still does not fail
+  T20.
+- **`agent_open_proof.py [--megabytes N] [--mutant NAME]`** (new, not a line
+  of `make test`) builds `agent_open_probe.swift` over `app/Sources` under
+  `tools/proof/work/agent-open-build/` and runs it, a `.prohibited` process
+  on `assistant_lane_probe.swift`'s pattern, once over a VP9+Opus WebM made
+  at proof time. The probe's `NSDocumentController` subclass answers
+  `typeForContents(of:)` and `documentClass(forType:)`, since a probe has no
+  Info.plist. A 10 ms timer on the main run loop counts, during each
+  `open_project` served from a background thread, its ticks, the ticks that
+  saw a `.partial.mov` in `Rewrapped/` and the ticks with
+  `RewrapProgressWindowController.live` non-empty. The rows are in its
+  docstring.
+- **Scratch home.** The script removes `tools/proof/work/agent-open/` at
+  start and at exit and runs every probe with
+  `CFFIXED_USER_HOME=<work>/home`; A0 printed "Rewrapped/ is
+  …/tools/proof/work/agent-open/home/Library/Application
+  Support/Reelcut/Rewrapped, inside the scratch home …: true". `ls -la` of
+  the owner's real `~/Library/Application Support/Reelcut/Rewrapped/` taken
+  before and after each of the three baseline runs compared equal (`cmp`),
+  and again after the four mutants.
+- **Size.** 256 MB was the first size tried and is the default: three
+  baseline runs at `--megabytes 256` (the fixture came to 278.8 MiB,
+  292310950 bytes) printed 107, 50 and 52 partial ticks for A2 and 69, 57
+  and 373 for A5, each at least 30. 512 and 1024 were not tried.
+- **Measured: the calls' lengths vary run to run.** A1 printed 3.018 s,
+  1.501 s and 1.403 s, and A4 1.187 s, 0.796 s and 9.504 s, over one
+  fixture size. The cause was not measured.
+- **Measured: `open-on-main` also fails A7.** With the read on main no tick
+  sees the partial ("0 main ticks saw the .partial.mov", 1 tick in the whole
+  call), so A7's stub is never added and the call opens the package.
+- **`container_import_proof.py` M12**: `open_project` of a fresh `p12.webm`
+  on the built app, which now reads off main.
+
+Run on 2026-10-03 over `88ee64b` plus this batch's diff, macOS 26.5.1,
+Apple M2 Max, `hw_av1 False`. `container_rewrap_probe.py` printed `passed
+60/60`, exit 0 — the 56 rows it had, W23 "('ok', 640, 360, [30000, 1001],
+False, True)", F23 "frame 47 asked at 1.5682333333333334, answered
+1.5682333333333334", G24 "P1 mvhd 48000 (lcm(600, [30, 48000]) = 48000,
+literal 48000); P2 mvhd 240000 (lcm(600, [30000, 48000]) = 240000, literal
+240000); P3 mvhd 48000 (lcm(600, [30, 48000]) = 48000); P14 mvhd 48000
+(lcm(600, [48000]) = 48000, literal 48000); P15 mvhd 48000 (lcm(600, [1000,
+48000]) = 48000); P23 mvhd 30000 (lcm(600, [30000]) = 30000, literal
+30000)" and G25 "(30, 48000, 2) -> 48000; (30000, 48000, 2) -> 240000;
+(30000, 48000, 10800) -> 48000; (None, 48000, 2) -> 48000; (30000, None, 2)
+-> 30000; (30, None, 2) -> 600; (1000, 44100, 2) -> 441000; (30000, 44100,
+600) -> 88200; (None, 48000, 72000) -> None; (1000000, None, 3600) ->
+None". The mutants, twenty-six of them, each MUTANT PASS, exit 0:
+
+| Run | Failed (all as expected) | Printed |
+|---|---|---|
+| `--mutant movie-600` (new) | G24 (every `mvhd` 600), T22 (0.002000 s against a bound of 0.0007 s) | `passed 58/60`, MUTANT PASS |
+| `--mutant main-watch` (re-anchored) | O37 ("watch called 1") | `passed 59/60`, MUTANT PASS |
+| `--mutant quiet-watch` | C25 ("error cancelled, watch called 1, copy written False") | `passed 59/60`, MUTANT PASS |
+| `--mutant no-retime` (widened) | its eight, F23, G24 | `passed 50/60`, MUTANT PASS |
+| `--mutant audio-dropped` (widened) | its seventeen, G24 | `passed 42/60`, MUTANT PASS |
+| `--mutant offset-shift` (widened) | its fourteen, F23 | `passed 45/60`, MUTANT PASS |
+| `--mutant audio-early` | T17 and T18 (0.021333 s), T22 (0.022000 s), B3a — not T20 | `passed 56/60`, MUTANT PASS |
+| `--mutant vorbis-as-aac` | W10, T20, T22, B10a | `passed 56/60`, MUTANT PASS |
+
+`no-precheck`, `no-space-check`, `keep-partial`, `fixed-opus-frames`,
+`fps-timescale-always`, `no-mkdir`, `deaf-pump` (failing nothing),
+`deaf-pump-unbounded-wait`, `ignore-cancel`, `no-user-cancelled`,
+`present-cancel`, `door-no-watch`, `no-original`, `copy-name`,
+`reveal-copy`, `no-recopy`, `recopy-any-file` and `trash-plays` each printed
+MUTANT PASS with their sets unchanged.
+
+`agent_open_proof.py` printed `passed 8/8`, exit 0, three times; the last
+run: A1 "already_open absent; media 1, path …/agent-open/home/Library/
+Application Support/Reelcut/Rewrapped/big-62da6377526e0003.mov on disk
+true; 1.403 s; 75 main ticks, 52 saw the .partial.mov, 0 saw a progress
+controller, longest gap 20 ms"; A2 "52 main ticks saw the .partial.mov
+during the call (at least 10 wanted)"; A3 "0 of 75 main ticks saw a
+progress controller"; A4 "project.json rewritten true; copy removed true; …
+on disk true, original …/agent-open/big.webm; 9.504 s; 385 main ticks, 373
+saw the .partial.mov, 0 saw a progress controller, longest gap 358 ms"; A5
+"373 main ticks"; A6 "0 of 385 main ticks"; A7 "a stub document added
+mid-read true; open_project {a4.reelcut}: already_open true …; 1 open
+documents at the package's path; 4.795 s; 277 main ticks, 265 saw the
+.partial.mov". Its mutants:
+
+| Run | Failed (all as expected) | Printed |
+|---|---|---|
+| `--mutant open-on-main` (`"open_project"` out of the off-main set) | A2 and A5 ("0 main ticks saw the .partial.mov"), A7 ("a stub document added mid-read false … already_open absent") | `passed 5/8`, MUTANT PASS |
+| `--mutant quiet-watch` (`probeBlocking` passes its watch inside `withoutAsking`) | A3 ("82 of 86 main ticks saw a progress controller") | `passed 7/8`, MUTANT PASS |
+| `--mutant recopy-agent-watch` (`shown` back to the main-thread test alone) | A6 ("67 of 67 main ticks saw a progress controller") | `passed 7/8`, MUTANT PASS |
+| `--mutant no-recheck` (step C adds without looking again) | A7 ("already_open absent … 2 open documents at the package's path") | `passed 7/8`, MUTANT PASS |
+
+`container_import_proof.py` printed M0–M12 ok, `passed 15/15`, exit 0 — M12
+"open_project answers keys ['project']; media 1, path
+'…/Rewrapped/p12-57139304c9c9ae15.mov' (in Rewrapped, named: True), original
+'…/p12.webm'", M9 "copy deleted True; open_project missing_media None", M0
+"no `Reelcut: ` line in the log" — and removed the five copies it made.
+`close_project_proof.py` printed `scores: 12 pass, 0 fail of 12` and
+`save_project_proof.py` `scores: 9 pass, 0 fail of 9`, each on a fresh
+instance of the built app on its own scratch socket, each log with no
+`Reelcut: ` line. `make test`, `make lint`, `make typecheck` (0 errors, the
+4 known warnings) and `make app` exited 0.
+
+A quit during an `open_project` read is not a row: #231 records it as
+argued from `agent_socket_proof.py`'s K14.
+
+```sh
+python3 tools/proof/container_rewrap_probe.py                             # passed 60/60, exit 0
+python3 tools/proof/container_rewrap_probe.py --mutant movie-600          # MUTANT PASS, exit 0 (each of the twenty-six)
+python3 tools/proof/agent_open_proof.py                                   # passed 8/8, exit 0
+python3 tools/proof/agent_open_proof.py --mutant open-on-main             # MUTANT PASS, exit 0 (each of the four)
+python3 tools/proof/container_import_proof.py                             # passed 15/15, exit 0
+python3 tools/proof/close_project_proof.py <dir>/agent.sock               # 12 pass, 0 fail
+python3 tools/proof/save_project_proof.py <dir>/agent.sock                # 9 pass, 0 fail
+python3 tools/proof/spec_index_proof.py                                   # 138/138 checks passed
+```

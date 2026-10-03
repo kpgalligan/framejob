@@ -158,7 +158,8 @@ extension ProjectDocument {
     /// `readMediaFile`'s probe: File ▸ Open, a Finder double-click and a
     /// drop on the Dock or a window read on NSDocumentController's
     /// concurrent queue, so a copy there shows the window. On the main
-    /// thread — an agent's `open_project` — no watch is passed. The
+    /// thread no watch is passed; an agent's `open_project` reads off main
+    /// inside `withoutAsking`, where `probeBlocking` drops it (#231). The
     /// person's Cancel answers `CocoaError(.userCancelled)`, which opens no
     /// project and which no door presents.
     static func probeForOpening(

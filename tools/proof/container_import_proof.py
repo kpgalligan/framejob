@@ -50,6 +50,11 @@ Rows:
   shows `original: null`.
 - **M11**: a saved project imports P1, then `consolidate_media`: the path is
   inside the package's `media/` and `original.path` = p1.webm.
+- **M12** (issue batch B79, spec §11 #231): `open_project` of a fresh
+  `p12.webm` (P1's arguments), which the built app reads off the main
+  thread, answers a project whose one media is `p12-<16 hex>.mov` directly
+  inside `Rewrapped/` with `original.path` = p12.webm; M6 closes it and the
+  cleanup removes its copy.
 
 `--mutant ffmpeg-copy` imports ffmpeg's `-c copy` MP4 of P1 in M2's place:
 M2 must fail (that copy lands frame 47 a frame early) and nothing else, and
@@ -103,6 +108,7 @@ def make_fixtures(where):
         "p7.webm": inputs() + ["-c:v", "libsvtav1", "-pix_fmt", "yuv420p", "-c:a", "libopus"],
         "p9.webm": inputs() + ["-c:v", "libvpx", "-pix_fmt", "yuv420p", "-c:a", "libopus"],
         "p10.webm": inputs() + vp9 + ["-c:a", "vorbis", "-strict", "-2", "-ac", "2"],
+        "p12.webm": inputs() + vp9 + ["-c:a", "libopus"],
     }
     paths = {}
     for name, arguments in table.items():
@@ -363,6 +369,22 @@ def run(mcp, where, fixtures, mutant):
         except ToolError as error:
             row("M7", False, f"refused: {error}")
         original_rows(mcp, where, fixtures, opened)
+        # M12 (B79): open_project of a WebM, read off the main thread.
+        p12 = fixtures["p12.webm"]
+        try:
+            answer = mcp.call("open_project", path=p12)
+            opened.append(p12)
+            media = mcp.call("get_project", project=p12)["project"]["media"]
+            path = media[0]["path"] if media else ""
+            original = (media[0].get("original") or {}).get("path") if media else None
+            named = (os.path.dirname(path) == REWRAPPED
+                     and bool(re.match(r"^p12-[0-9a-f]{16}\.mov$", os.path.basename(path))))
+            row("M12", "project" in answer and "already_open" not in answer
+                and len(media) == 1 and named and os.path.exists(path) and same(original, p12),
+                f"open_project answers keys {sorted(answer)}; media {len(media)}, path "
+                f"{path!r} (in Rewrapped, named: {named}), original {original!r}")
+        except (ToolError, KeyError) as error:
+            row("M12", False, f"{type(error).__name__}: {error}")
     finally:
         closed = True
         for path in opened:

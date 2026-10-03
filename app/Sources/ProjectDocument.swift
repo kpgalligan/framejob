@@ -585,8 +585,8 @@ final class ProjectDocument: NSDocument {
     /// `MediaImporter.probeBlocking`. That call is deliberately the one face
     /// of the probe that never touches the main actor: this method can and
     /// does run ON the main thread — `canConcurrentlyReadDocuments` only
-    /// governs NSDocumentController's asynchronous open path, and an agent
-    /// `open_project` arrives on main regardless — so a completion delivered
+    /// governs NSDocumentController's asynchronous open path, and a read
+    /// AppKit itself makes on main arrives there — so a completion delivered
     /// through `MainActor.run` would deadlock against its own waiter.
     private func readMediaFile(at url: URL) throws {
         let descriptor = try Self.probeForOpening(url)

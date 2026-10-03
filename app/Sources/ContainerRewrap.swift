@@ -31,7 +31,9 @@ enum ContainerRewrap {
     }
 
     /// Held across the existence re-check and the copy, so two imports of one
-    /// file copy it once.
+    /// file copy it once. Never held across a wait on the main thread (a
+    /// watch only posts to main, and a tool call passes none), so it cannot
+    /// deadlock against the agent lane's lock (spec §11 #231).
     private static let lock = NSLock()
 
     /// The movie for `source`: a copy already on disk, else a new one.

@@ -187,11 +187,13 @@ extension MediaImporter {
     /// queue (`canConcurrentlyReadDocuments`), so the main thread is free
     /// for the built-in copy's progress window, which `watch` feeds and
     /// whose Cancel stops the copy (spec §11 #228-P; `probeForOpening`
-    /// passes it there). An agent's `open_project` reads ON main inside
-    /// `withoutAsking`, where no watch is passed, and there a copy — or an
-    /// ffmpeg conversion, on any door, which reports no progress — blocks
-    /// the window for its length; ffmpeg's consent alert states the cost
-    /// first.
+    /// passes it there). An agent's `open_project` reads on the lane's
+    /// thread inside `withoutAsking` (spec §11 #231), where no watch is
+    /// passed: main is free, and the call waits the copy's length with no
+    /// window. A read AppKit itself runs ON main passes no watch either, and
+    /// there a copy — or an ffmpeg conversion, on any door, which reports no
+    /// progress — blocks the window for its length; ffmpeg's consent alert
+    /// states the cost first.
     private static func probeAllowingRewrap(
         _ url: URL, mayAsk: Bool, watch: RewrapWatch?
     ) throws -> MediaDescriptor {
@@ -270,8 +272,8 @@ extension MediaImporter {
     ///
     /// That method is synchronous by contract and CAN run on the main thread
     /// — NSDocumentController's open path does not always take the concurrent
-    /// read queue, and every agent tool call hops to main before it opens
-    /// anything. So this must never wait on the main actor. The obvious
+    /// read queue (an agent's `open_project` reads on the lane's thread,
+    /// spec §11 #231). So this must never wait on the main actor. The obvious
     /// spelling (a completion delivered through `MainActor.run`, joined with
     /// a `DispatchGroup`) deadlocks exactly there: the waiter is holding the
     /// one thread the completion needs, and the open dies on the timeout
@@ -280,15 +282,22 @@ extension MediaImporter {
     /// is never the thread being waited on. It may ask, and pass `watch`,
     /// unless this thread is inside `withoutAsking`.
     static func probeBlocking(url: URL, watch: RewrapWatch? = nil) throws -> MediaDescriptor {
-        let quiet = Thread.current.threadDictionary[withoutAskingKey] as? Bool ?? false
+        let quiet = isWithoutAsking
         return try probeAllowingRewrap(url, mayAsk: !quiet, watch: quiet ? nil : watch)
+    }
+
+    /// Whether this thread is inside `withoutAsking`.
+    static var isWithoutAsking: Bool {
+        Thread.current.threadDictionary[withoutAskingKey] as? Bool ?? false
     }
 
     private static let withoutAskingKey = "com.kgalligan.reelcut.import.withoutAsking"
 
-    /// Runs `body` with `probeBlocking` on THIS thread never asking — the
-    /// scope a tool call's synchronous document open runs in (spec §11
-    /// MC-5). The prior value is put back on every exit.
+    /// Runs `body` with `probeBlocking` on THIS thread never asking and
+    /// never passing a watch — the scope a tool call's synchronous document
+    /// open runs in, on the lane's thread (spec §11 MC-5, #231); the re-copy
+    /// on open reads it too (`isWithoutAsking`). The prior value is put back
+    /// on every exit.
     static func withoutAsking<T>(_ body: () throws -> T) rethrows -> T {
         let dictionary = Thread.current.threadDictionary
         let prior = dictionary[withoutAskingKey]

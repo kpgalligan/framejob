@@ -649,7 +649,10 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   largest reorder. Audio is timed in samples from the Block time less
   CodecDelay; an Opus packet's sample count is its TOC's. A laced frame is
   its Block's time plus the frames before it in the lace; a laced COPIED
-  video track with no DefaultDuration is refused at open. **What is
+  video track with no DefaultDuration is refused at open. **Amended by
+  #232** (issue batch B79): the movie's own timescale, the grid of each
+  track's edit and duration, is the least common multiple of 600 and the
+  tracks' timescales, where it was the writer's default 600. **What is
   dropped:** every video and audio track after the first of each kind,
   subtitles, chapters, attachments and VP9 alpha. **The risks it accepts:**
   no progress or Cancel in this phase (a copy runs at about disk speed); a
@@ -692,9 +695,13 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   where `probeBlocking` drops any watch and `probeForOpening` passes none on
   main) show no window, wait as before and answer exactly as before. MC-5
   holds: there is no MCP progress message and no way for an agent or the
-  person to cancel a tool call's copy. **The risks it accepts:** an agent's
+  person to cancel a tool call's copy. **Amended by #231** (issue batch
+  B79): `open_project` reads on the lane's thread, not main, still inside
+  `withoutAsking`, where `probeBlocking` drops any watch; it shows no window
+  and answers as before. **The risks it accepts:** an agent's
   `open_project` of a WebM still copies on the main thread and freezes the
-  window for the copy's length (O7, #231); a quit during a copy
+  window for the copy's length (O7, #231; amended by #231: it copies off
+  main and the windows stay usable); a quit during a copy
   leaves its `.partial.mov` in `Rewrapped/` until the next import of that
   file removes it (O8); ffmpeg's opt-in conversion still shows no progress.
 - **#228-V — A WebM or Matroska file's Vorbis sound is copied into the
@@ -731,7 +738,9 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   audio, which Reelcut cannot copy …") and falls through to the opt-in
   ffmpeg step. **The risks it accepts:** the movie's 1/600 s edit grid
   (a remuxed libvorbis click read 1.0017 s against ffmpeg's 1.003, 1.0027
-  with a 48 kHz movie timescale), which affects every copy (#232); no end
+  with a 48 kHz movie timescale), which affects every copy written before
+  #232 (amended by #232, issue batch B79: a copy written from then on has a
+  movie timescale that contains its tracks' grids); no end
   trim, so the copy's sound may run up to one packet past the source's
   (144384 samples decoded where ffmpeg decodes 144000); and the headers'
   parse on every open.
@@ -767,17 +776,102 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   still a Matroska file is copied again by the built-in copy only (never
   ffmpeg, never a question) and relinked to it with its probe, with no undo
   step, nothing dirtied and no alert. Each copy has #228-P's window after
-  1 s, unless the read is on the main thread. A Cancel or a failure skips
+  1 s, unless the read is on the main thread (amended by #231: or inside
+  `withoutAsking`, an agent's `open_project`). A Cancel or a failure skips
   that media: it opens missing (the slate, the badge, Relink…), with no
   alert, and the next open tries again (Q3); a copy in the Trash keeps
   playing from there. The Trash counts as gone for this re-copy only; every
   other reader of `mediaURL(for:)` is unchanged. **Tool calls:**
   `open_project` reads on main inside `withoutAsking`, so its re-copy shows
   no window and raises no question (MC-5) and blocks the main thread for the
-  copy's length (#231). `import_media` and `relink_media` answer
+  copy's length (#231). **Amended by #231** (issue batch B79): it reads on
+  the lane's thread inside `withoutAsking`, so its re-copy still shows no
+  window and raises no question, and main is free for its length.
+  `import_media` and `relink_media` answer
   `"original"`, the original's path, when one is recorded; `add_media`'s
   descriptor takes `original` as `{path, bookmark?}`; `get_project` carries
   it as the model's own JSON. **The risks it accepts:** a copy that is gone
   while its original has also moved stays missing until a Relink; a re-copy
-  on an agent's `open_project` freezes the window, as #228-P's does; the
+  on an agent's `open_project` freezes the window, as #228-P's does (amended
+  by #231: it no longer does); the
   copy's folder is still Application Support until #226.
+- **#232 — A WebM or Matroska copy's movie timescale is the least common
+  multiple of 600 and its tracks' timescales, so a track's start no longer
+  rounds to 1/600 s** (issue batch B79; amends #216-R's Timing and #228-V's
+  first risk). **The rule** (`ContainerRewrapWriter.movieTimeScale`, pure):
+  `video` and `audio` are the described `timescale` of each track that is
+  written, absent when the track is not written or its timescale is not
+  positive. The candidates, in order, are lcm(600, video, audio); then,
+  only when audio is present, lcm(600, audio); then none. The first
+  candidate `s` with (seconds + 1) × `s` ≤ 2³¹ − 1 is set as the writer's
+  `movieTimeScale` before `startWriting()`; none leaves the writer's default
+  alone. A video-only copy takes lcm(600, video), else none. Overflow in the
+  arithmetic is a candidate that does not fit. `seconds` is the largest,
+  over the written tracks, of the last decode-order sample's end —
+  max(pts, dts) + duration for video, pts + its sample count for audio (the
+  described `frames_per_packet` when the packet carries 0) — over the
+  track's timescale. **What does not change:** sample times stay in each
+  track's media timescale (`mediaTimeScale` on the video input, the sample
+  rate on audio, where it is never set); the movie timescale is only the
+  grid of each track's edit and duration. The new grid contains the old
+  1/600 grid and each track's own, so no time that was exact becomes
+  inexact. **The 31-bit guard** exists because what `AVAssetWriter` does
+  with a movie duration past it was not measured. **Accepted limit:** it
+  reaches only a copy written after it. `ContainerRewrap.assist` answers a
+  copy already on disk by its digest name (`FFmpegRewrap.existingRewrap`)
+  before the writer runs, so a file copied before #232 keeps its 1/600 grid
+  until that copy is deleted or copied again on open (#228-O); the name is
+  `FFmpegRewrap`'s and old copies are not invalidated here. **Measured**
+  (2026-10-03, macOS 26.5.1, Apple M2 Max; `python3
+  tools/proof/container_rewrap_probe.py`, three runs alike, and its
+  `--mutant movie-600`, which leaves the writer's default): each copy's
+  `mvhd` timescale, read from the file, is 48000 for VP9 at 30 fps with
+  Opus (P1), 240000 at 30000/1001 with Opus (P2), 48000 for H.264 with AAC
+  (P3), 48000 for Opus alone (P14), 48000 for a variable-rate file's
+  millisecond times with Opus (P15) and 30000 for 30000/1001 alone (P23),
+  and 600 for all six under the mutant (G24). A Vorbis click whose first
+  Block is at 0 ms (P22, T22) decodes at 1.021333 s from the copy against
+  ffmpeg's 1.022 s on the source's timeline, 0.000667 s apart; under the
+  mutant it decodes at 1.020 s, 0.002000 s apart. The other three clicks
+  (P17 AAC, P18 Opus, P20 Vorbis; T17, T18, T20) decode at 1.000 s against
+  1.000 s, 0.000000 s apart, with and without the mutant. The probe's
+  bounds are therefore 0.0007 s for T22 and 0.0001 s for the other three.
+- **#231 — An agent's `open_project` reads off the main thread and answers
+  when the read ends, with no window and no question** (issue batch B79;
+  amends #228-P's and #228-O's tool-call and risk sentences; MC-5 holds).
+  `open_project` is an `offMainTools` member, in three steps. **Step A, on
+  main** (`onMain`): the already-open answer, else the file's type. **Step
+  B, on the lane's thread inside `MediaImporter.withoutAsking`:**
+  `makeDocument(withContentsOf:ofType:)`, the whole read, as AppKit's own
+  concurrent read does it (`canConcurrentlyReadDocuments`). **Step C, on
+  main:** the holder re-check — a document that came to hold the path
+  during the read wins: the made document is closed, never added and never
+  shown, and the call answers `already_open` — then add, window
+  controllers, show, the recent note and the answer. `withoutAsking` is a
+  property of the reading thread and every reader of it runs synchronously
+  on that thread (`MediaImporter.isWithoutAsking`), so it covers the probe,
+  the copy, the ffmpeg policy and the re-copy on open, which passes no
+  watch inside it as it passes none on main. **During the wait:** main is
+  free — every window usable; the person may edit, open, close, quit;
+  every other tool call, MCP's or any window's assistant's, waits on the
+  lane's lock, as during `export` (AI-2); a quit ends the process with the
+  call unanswered, as `agent_socket_proof.py`'s K14 shows for `export`
+  (argued from that row, not measured for `open_project`), and leaves the
+  `.partial.mov` (#228-P O8). **The copy lock cannot deadlock:** it is
+  never held across a wait on main (a watch only posts to main, and a tool
+  call passes none), and the lane's lock is never taken on main or by a
+  person's import. **The risks it accepts:** no progress and no cancel for
+  the agent (MC-5); other tool calls wait the copy's length; a read AppKit
+  itself runs on main still copies there, with no window. **Measured**
+  (2026-10-03, macOS 26.5.1, Apple M2 Max; `python3
+  tools/proof/agent_open_proof.py`, a 278.8 MiB VP9+Opus WebM, a 10 ms
+  main-thread timer counting during each call, three runs): `open_project`
+  of the WebM answered in 3.018 s, 1.501 s and 1.403 s, with 107, 50 and 52
+  main-thread ticks that saw the copy's `.partial.mov` (A2); the re-copy on
+  `open_project` of its package answered in 1.187 s, 0.796 s and 9.504 s,
+  with 69, 57 and 373 such ticks (A5); no tick of either saw a progress
+  controller (A3, A6); and a document that took the package's path during
+  the read was answered as `already_open`, one document at the path (A7).
+  With `"open_project"` out of the off-main set (`--mutant open-on-main`) 0
+  ticks saw the partial in either call. On the built app,
+  `container_import_proof.py`'s M12 opens a WebM by `open_project`.

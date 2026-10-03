@@ -34,18 +34,20 @@ sentence and its ffmpeg offer); N11 the space check; K12 no partial; A13 Opus 60
 V15 the variable-rate file (retime FALSE asserted first); D16 the new
 folder; X19 the refused append returns `.failed` within 60 s (a pump the
 failed writer never asks again must not hang the copy) and leaves nothing;
-T17/T18/T20 the impulse decodes from the copy (AVFoundation) within 1 ms
-of where it decodes from the source (ffmpeg) — the sound's place against the
-picture; B*v frame 47's written bytes (its passthrough time moved onto the
-movie's timeline by the track's edit) equal the source's at the index entry
-with that time; B*a the whole written audio track, in order, equals the
+T17/T18/T20 the impulse decodes from the copy (AVFoundation) within its
+bound (`CLICK_BOUND`, B79) of where it decodes from the source (ffmpeg) —
+the sound's place against the picture; B*v frame 47's written bytes (its
+passthrough time moved onto the movie's timeline by the track's edit) equal
+the source's at the index entry with that time; B*a the whole written audio
+track, in order, equals the
 source's packets byte for byte (by PTS alone an AAC packet cannot be paired:
 the writer puts AAC's 2112 priming samples before its edit where ffmpeg's
 MKV has 1024, so T17 is what holds AAC's timing). B77: W10 also reads the
 written audio's subtype `vorb`; B10v/B10a are P10's payload rows; T22
-P22's impulse decodes from the copy within 1/600 s + 1 ms (the movie's edit
-grid, #232, and the Block's) of where ffmpeg places it on the source's
-timeline, which only the lead (spec §11 #228-V) makes true.
+P22's impulse decodes from the copy within its bound (`CLICK_BOUND`; until
+B79 1/600 s + 1 ms, the movie's old edit grid and the Block's) of where
+ffmpeg places it on the source's timeline, which only the lead (spec §11
+#228-V) makes true.
 
 Issue batch B76 (spec §11 #228-P), the copy's progress and Cancel, on P1
 (and P2 for C29's .mov): C20 a whole copy's `copiedBytes` never decreases
@@ -95,10 +97,25 @@ early) and vorbis-as-aac (the old Opus-or-AAC `mFormatID`); and B78's
 no-original, copy-name, reveal-copy, no-recopy, main-watch, recopy-any-file
 and trash-plays.
 
+Issue batch B79 (spec §11 #232), the copy's movie timescale: P23 is P2's
+video alone (`-an`: VP9 at 30000/1001). W23 it probes 640x360 at
+[30000, 1001] with no sound; F23 its frame 47 answers its own time; G24 the
+`mvhd` timescale Python reads out of each written copy (P1, P2, P3, P14,
+P15, P23) is `math.lcm(600, …)` of the track timescales the probe's own
+index reports, and the literal for P1 48000, P2 240000, P23 30000 and P14
+48000; G25 `ContainerRewrapWriter.movieTimeScale` over a fixed table of ten
+cases (one job of `kind: "timescale"`), the two fallbacks and both nils
+among them. T17/T18/T20/T22 each hold the impulse to a bound of its own
+(`CLICK_BOUND`), the largest difference three runs printed rounded up to
+0.0001 s, and T22's has no 1/600 s term. Mutant `movie-600` leaves the
+writer's default movie timescale; `main-watch` now drops only the
+main-thread half of the re-copy's guard.
+
     python3 tools/proof/container_rewrap_probe.py [--mutant NAME]
 """
 import argparse
 import json
+import math
 from pathlib import Path
 import shutil
 import subprocess
@@ -156,7 +173,25 @@ FIXTURES = {
             src(seconds=20)),
     "P15": ("p15.webm", ["-vf", VFR, "-fps_mode", "vfr", "-enc_time_base:v", "1/1000"]
             + VP9 + OPUS, src()),
+    # B79: P2's video alone.
+    "P23": ("p23.webm", VP9 + ["-an"], src("30000/1001")),
 }
+
+# B79 (spec §11 #232). G24: the copies whose `mvhd` timescale is read, and
+# the literal four of them must hold.
+MOVIE_SCALE_JOBS = ("P1", "P2", "P3", "P14", "P15", "P23")
+MOVIE_SCALES = {"P1": 48000, "P2": 240000, "P23": 30000, "P14": 48000}
+# G25: (video, audio, seconds) -> `movieTimeScale`'s answer.
+TIMESCALE_CASES = [
+    ((30, 48000, 2), 48000), ((30000, 48000, 2), 240000), ((30000, 48000, 10800), 48000),
+    ((None, 48000, 2), 48000), ((30000, None, 2), 30000), ((30, None, 2), 600),
+    ((1000, 44100, 2), 441000), ((30000, 44100, 600), 88200), ((None, 48000, 72000), None),
+    ((1000000, None, 3600), None),
+]
+# The most the impulse may decode away from the source's, in seconds: the
+# largest difference three runs printed on 2026-10-03 (0 for T17, T18 and
+# T20, 0.000667 for T22), rounded up to the next 0.0001 s, 0.0001 at least.
+CLICK_BOUND = {"T17": 0.0001, "T18": 0.0001, "T20": 0.0001, "T22": 0.0007}
 
 DEAF = [("ContainerRewrapWriter.swift",
          "guard shared.failure == nil, shared.progress?.isCancelled != true,",
@@ -244,7 +279,9 @@ SOURCE_MUTANTS = {
     "no-recopy": [("ProjectDocument+MissingCopies.swift",
                    "return recopyingMissingCopies(anchored)", "return anchored")],
     "main-watch": [("ProjectDocument+MissingCopies.swift",
-                    "let shown = Thread.isMainThread ? nil : watch", "let shown = watch")],
+                    "let shown = Thread.isMainThread || MediaImporter.isWithoutAsking"
+                    " ? nil : watch",
+                    "let shown = MediaImporter.isWithoutAsking ? nil : watch")],
     "recopy-any-file": [("ProjectDocument+MissingCopies.swift",
                          "guard let source = originalURL(for: media), "
                          "ContainerRewrap.isMatroska(source) else {",
@@ -252,6 +289,9 @@ SOURCE_MUTANTS = {
     "trash-plays": [("ProjectDocument+MissingCopies.swift",
                      "guard copy == nil || copy.map(trashed) == true else { continue }",
                      "guard copy == nil else { continue }")],
+    # B79 (spec §11 #232): the writer's default movie timescale.
+    "movie-600": [("ContainerRewrapWriter.swift", "writer.movieTimeScale = scale",
+                   "_ = scale")],
 }
 
 # The rows each mutant must fail, and only those (measured on an M2 Max,
@@ -279,20 +319,27 @@ SOURCE_MUTANTS = {
 # P22's first Block is at 0 ms: with the lead its copy's click reads 1.020 s
 # against ffmpeg's timeline 1.022, without it 1.000, so T22 holds the lead.
 # `vorbis-as-aac` fails W10 (no audio track is written), T20, T22 and B10a.
+#
+# B79 (measured on 2026-10-03): `no-retime` also fails F23, P23's frame 47,
+# and G24: the copy is written in the raw millisecond timescale (P2's `mvhd`
+# reads 48000 and P23's 3000) while the probe's own index is snapped.
+# `offset-shift` fails F23 with the other frame rows. `audio-dropped` fails
+# G24: with no audio input the timescale is the video's alone (P1's `mvhd`
+# reads 600, P2's 30000) and P14, sound alone, has no copy to read.
 EXPECTED = {
-    "no-retime": {"W3", "F1", "F2", "F3", "F4", "B1v", "B3v", "B10v"},
+    "no-retime": {"W3", "F1", "F2", "F3", "F4", "F23", "B1v", "B3v", "B10v", "G24"},
     "no-precheck": {"R7", "R8", "R9"},
     "no-space-check": {"N11"},
     "keep-partial": {"K12", "X19"},
     "fixed-opus-frames": {"A13"},
     "audio-dropped": {"W1", "W2", "W3", "W4", "W10", "S5", "S14", "A13", "T17", "T18", "T20",
-                      "T22", "B1a", "B3a", "B10a", "X19", "C20"},
+                      "T22", "B1a", "B3a", "B10a", "X19", "C20", "G24"},
     "fps-timescale-always": {"V15"},
     "no-mkdir": {"D16"},
     # A frame read one byte late no longer decodes, so the frame and impulse
     # rows fail with the payload rows.
-    "offset-shift": {"B1v", "B1a", "B3v", "B3a", "B10v", "B10a", "F1", "F2", "F3", "F4", "T17",
-                     "T18", "T20", "T22"},
+    "offset-shift": {"B1v", "B1a", "B3v", "B3a", "B10v", "B10a", "F1", "F2", "F3", "F4", "F23",
+                     "T17", "T18", "T20", "T22"},
     "deaf-pump": set(),
     "deaf-pump-unbounded-wait": {"X19"},
     "ignore-cancel": {"C21"},
@@ -312,6 +359,9 @@ EXPECTED = {
     "main-watch": {"O37"},
     "recopy-any-file": {"O41"},
     "trash-plays": {"O43"},
+    # B79 (measured on 2026-10-03): every copy's `mvhd` reads 600, and P22's
+    # impulse decodes at 1.020 s against ffmpeg's 1.022, past T22's bound.
+    "movie-600": {"G24", "T22"},
 }
 
 PROFILE1 = ("p8.webm is VP9 Profile 1 video, which this Mac cannot decode; "
@@ -440,7 +490,7 @@ def jobs_for(made):
     for row_id in ("P1", "P3"):
         job(row_id, row_id, inspect=True, frame47=True, payload=True)
     job("P10", "P10", inspect=True, payload=True)
-    for row_id in ("P2", "P4"):
+    for row_id in ("P2", "P4", "P23"):
         job(row_id, row_id, inspect=True, frame47=True)
     for row_id in ("P5", "P6", "P13", "P14", "P15"):
         job(row_id, row_id, inspect=True)
@@ -453,6 +503,10 @@ def jobs_for(made):
     job("P12", "P1", stop_after=10)
     job("P19", "P19", refuse_audio_at=10)
     job("P16", "P1", inspect=True)
+    # B79: the movie timescale's rule, on the fixed table.
+    jobs.append({"id": "TIMESCALE", "kind": "timescale",
+                 "cases": [{"video": v, "audio": a, "seconds": s}
+                           for (v, a, s), _ in TIMESCALE_CASES]})
     if "P1" in made:
         # B78: the original rows, on a scratch copy of P1 named o1.webm.
         jobs.append({"id": "ORIGINAL", "kind": "original", "source": str(made["P1"]),
@@ -498,6 +552,41 @@ def decoded_click(path, timeline=False):
     return None
 
 
+def mvhd_timescale(path):
+    """The movie timescale in `path`'s `moov`/`mvhd`, read from the file's own
+    atoms: the big-endian u32 12 bytes after the `mvhd` fourcc for version 0,
+    20 bytes after for version 1. None when there is no such atom."""
+    try:
+        data = Path(path).read_bytes()
+    except OSError:
+        return None
+
+    def atoms(start, end):
+        at = start
+        while at + 8 <= end:
+            size = int.from_bytes(data[at:at + 4], "big")
+            kind = data[at + 4:at + 8]
+            head = 8
+            if size == 1 and at + 16 <= end:
+                size, head = int.from_bytes(data[at + 8:at + 16], "big"), 16
+            elif size == 0:
+                size = end - at
+            if size < head or at + size > end:
+                return
+            yield kind, at + head, at + size
+            at += size
+
+    for kind, body, end in atoms(0, len(data)):
+        if kind != b"moov":
+            continue
+        for inner, at, inner_end in atoms(body, end):
+            if inner != b"mvhd" or at + 24 > inner_end:
+                continue
+            offset = at + (8 if data[at] == 0 else 16) + 4
+            return int.from_bytes(data[offset:offset + 4], "big")
+    return None
+
+
 def score(answers, made, problems, host):
     results = []
 
@@ -532,7 +621,18 @@ def score(answers, made, problems, host):
     written("W3", "P3", [30, 1], "avcC")
     written("W4", "P4", [30, 1], "hvcC")
     written("W10", "P10", [30, 1], "vpcC", subtype="vorb")
-    for n, job_id in ((1, "P1"), (2, "P2"), (3, "P3"), (4, "P4")):
+    # B79: P23, P2's video alone.
+    a = get("P23")
+    if a:
+        p = a.get("probe") or {}
+        atoms = ((a.get("tracks") or {}).get("video") or {}).get("atoms", [])
+        shape = (a.get("rewrap"), p.get("width"), p.get("height"), p.get("fps"),
+                 p.get("has_audio"), "vpcC" in atoms)
+        row("W23", shape == ("ok", 640, 360, [30000, 1001], False, True),
+            f"P23: rewrap, size, fps, has_audio, vpcC = {shape} {a.get('error', '')}")
+    else:
+        absent("W23", "P23")
+    for n, job_id in ((1, "P1"), (2, "P2"), (3, "P3"), (4, "P4"), (23, "P23")):
         a = get(job_id)
         wanted, actual = a.get("frame47_wanted"), a.get("frame47_actual")
         good = wanted is not None and actual is not None and abs(wanted - actual) < 1e-6
@@ -620,18 +720,21 @@ def score(answers, made, problems, host):
     for row_id, job_id in (("T17", "P17"), ("T18", "P18"), ("T20", "P20")):
         a = get(job_id)
         heard, source = a.get("click"), decoded_click(made.get(job_id))
-        row(row_id, heard is not None and source is not None and abs(heard - source) <= 0.001,
+        row(row_id, heard is not None and source is not None
+            and abs(heard - source) <= CLICK_BOUND[row_id],
             f"{job_id}: the impulse decodes at {heard} s from the copy, {source} s from the "
-            f"source (ffmpeg); {a.get('error', '')}")
+            f"source (ffmpeg){apart(heard, source)}, bound {CLICK_BOUND[row_id]:.4f} s; "
+            f"{a.get('error', '')}")
     # B77: P22's picture and sound both start 22 ms in, so the source's click
-    # is read on its timeline, within the movie's 1/600 s edit grid (#232)
-    # plus the Block's 1 ms: without the lead it decodes 22 ms early.
+    # is read on its timeline: without the lead it decodes 22 ms early. B79:
+    # the bound no longer carries the movie's 1/600 s edit grid (#232).
     a = get("P22")
     heard, source = a.get("click"), decoded_click(made.get("P22"), timeline=True)
     row("T22", heard is not None and source is not None
-        and abs(heard - source) <= 1 / 600 + 0.001,
+        and abs(heard - source) <= CLICK_BOUND["T22"],
         f"P22: the impulse decodes at {heard} s from the copy, {source} s on the source's "
-        f"timeline (ffmpeg); {a.get('error', '')}")
+        f"timeline (ffmpeg){apart(heard, source)}, bound {CLICK_BOUND['T22']:.4f} s; "
+        f"{a.get('error', '')}")
     for n, job_id in ((1, "P1"), (3, "P3"), (10, "P10")):
         p = get(job_id).get("payload") or {}
         row(f"B{n}v", p.get("video_found") and p.get("video_equal"),
@@ -644,9 +747,39 @@ def score(answers, made, problems, host):
             f"by PTS the packet nearest 1.0 s ({p.get('audio_time')} s) "
             f"{'equals' if p.get('audio_equal') else 'is not'} the index's at "
             f"{p.get('audio_index_time')} s")
+    score_timescale(get, row)
     score_cancel(get, row)
     score_original(get, row)
     return results
+
+
+def apart(heard, source):
+    """`, |difference| d s`, when both were read."""
+    if heard is None or source is None:
+        return ""
+    return f", |difference| {abs(heard - source):.6f} s"
+
+
+def score_timescale(get, row):
+    """B79's rows G24 and G25 (spec §11 #232)."""
+    facts, good = [], True
+    for job_id in MOVIE_SCALE_JOBS:
+        a = get(job_id)
+        scales = [s for s in (a.get("index_video_timescale"), a.get("index_audio_timescale"))
+                  if isinstance(s, int) and s > 0]
+        wanted = math.lcm(600, *scales) if a and scales else None
+        read = mvhd_timescale(SCRATCH / job_id / "out" / f"{job_id.lower()}.mov")
+        literal = MOVIE_SCALES.get(job_id)
+        good = good and read is not None and read == wanted and literal in (None, read)
+        facts.append(f"{job_id} mvhd {read} (lcm(600, {scales}) = {wanted}"
+                     + (f", literal {literal}" if literal else "") + ")")
+    row("G24", good, "each copy's movie timescale: " + "; ".join(facts))
+    answers = get("G25").get("answers")
+    wanted = [expected for _, expected in TIMESCALE_CASES]
+    shown = [f"{case} -> {got}" for (case, _), got in zip(TIMESCALE_CASES, answers or [])]
+    row("G25", answers == wanted,
+        f"movieTimeScale(video, audio, seconds): {'; '.join(shown) or answers}"
+        + ("" if answers == wanted else f"; wanted {wanted}"))
 
 
 def score_cancel(get, row):

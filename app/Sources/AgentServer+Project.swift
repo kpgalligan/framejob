@@ -15,40 +15,63 @@ extension AgentServer {
     /// untitled project sized and rated to it with the file as the first clip
     /// (spec §1), which is exactly what `ProjectDocument.read(from:ofType:)`
     /// does for a double-click.
+    ///
+    /// **Runs on the server thread** (`AgentServer.offMainTools`, spec §11
+    /// #231), in three steps, so a WebM's copy, a re-copy on open or an
+    /// ffmpeg conversion never holds the main thread: the already-open
+    /// answer and the file's type on main; the read here, as AppKit's own
+    /// concurrent read does it; then, on main, the document added and shown.
+    /// It answers when the read ends, with no window and no question (MC-5).
     func openProject(_ a: [String: Any]) throws -> String {
         let path = try requiredString(a, "path")
         let url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
         guard FileManager.default.fileExists(atPath: url.path) else {
             throw ToolError(message: "No file at \(url.path)")
         }
+        let controller = NSDocumentController.shared
         // An imported movie leaves its document UNTITLED (spec §1), so
         // NSDocumentController's own `document(for:)` cannot find it — the
         // path a project is known by is `AgentServer.path(of:)`. Compared
         // canonically, as in `target(_:)`: two spellings of one file that
         // failed to match here would open the SAME file twice.
-        if let existing = documentHolding(url, except: nil) {
-            // Bring it forward, as double-clicking an already-open document
-            // does — otherwise `target` would still resolve a later-opened
-            // project and the next call would edit the wrong one.
-            existing.showWindows()
-            return try jsonResult(["already_open": true, "project": summary(existing)])
+        let known: (answer: String?, type: String) = try onMain {
+            if let answer = try self.alreadyOpen(url) { return (answer, "") }
+            return (nil, try controller.typeForContents(of: url))
         }
-        let controller = NSDocumentController.shared
-        let type = try controller.typeForContents(of: url)
+        if let answer = known.answer { return answer }
         // A tool call never asks the conversion question (spec §11 MC-5):
         // the read runs on this thread, inside the import's no-asking scope.
         let made = try MediaImporter.withoutAsking {
-            try controller.makeDocument(withContentsOf: url, ofType: type)
+            try controller.makeDocument(withContentsOf: url, ofType: known.type)
         }
         guard let document = made as? ProjectDocument else {
             throw ToolError(
                 message: "\(url.lastPathComponent) did not open as a Reelcut project.")
         }
-        controller.addDocument(document)
-        document.makeWindowControllers()
-        document.showWindows()
-        controller.noteNewRecentDocumentURL(url)
-        return try jsonResult(["project": summary(document)])
+        return try onMain {
+            // A document that came to hold the path during the read wins:
+            // the one made here was never added and has no window.
+            if let answer = try self.alreadyOpen(url) {
+                document.close()
+                return answer
+            }
+            controller.addDocument(document)
+            document.makeWindowControllers()
+            document.showWindows()
+            controller.noteNewRecentDocumentURL(url)
+            return try self.jsonResult(["project": self.summary(document)])
+        }
+    }
+
+    /// `open_project`'s answer when an open document already holds `url`,
+    /// else nil. Main only.
+    private func alreadyOpen(_ url: URL) throws -> String? {
+        guard let existing = documentHolding(url, except: nil) else { return nil }
+        // Bring it forward, as double-clicking an already-open document
+        // does — otherwise `target` would still resolve a later-opened
+        // project and the next call would edit the wrong one.
+        existing.showWindows()
+        return try jsonResult(["already_open": true, "project": summary(existing)])
     }
 
     /// `new_project` — File ▸ New Project (`AppDelegate.newProject`): a blank
