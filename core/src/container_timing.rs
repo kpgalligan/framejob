@@ -4,7 +4,8 @@
 //! - **Laced frames.** Frame j of a lace is its Block's time plus the
 //!   durations of frames 0…j−1: DefaultDuration for video (a laced copied
 //!   video track without one is refused at open, `container.rs`), and
-//!   samples for audio — the Opus TOC's count or AAC's 1024.
+//!   samples for audio — the Opus TOC's count, the Vorbis packet's count by
+//!   the overlap rule, or AAC's 1024.
 //! - **Raw video times** are the file's own: in units of TimestampScale when
 //!   1e9 divides by it exactly (milliseconds for nearly every file), else
 //!   microseconds. A duplicate raw time moves one unit later, since two
@@ -25,8 +26,14 @@
 //!   time in presentation order, the last frame keeping DefaultDuration or
 //!   the gap before it.
 //! - **Audio** is timed in samples: `round((block − CodecDelay) × rate /
-//!   1e9)` plus the lace's samples before the frame; every packet is a sync
-//!   sample, and the writer trims what lands before zero (measured).
+//!   1e9)` plus the lace's samples before the frame, plus the track's
+//!   `lead`; every packet is a sync sample, and the writer trims what lands
+//!   before zero (measured). The lead is 0 but for Vorbis, whose every
+//!   packet moves later by packet 0's count, because packet 0 decodes to
+//!   nothing and the decoder's output starts at the track's first sample
+//!   time (measured: where the first Block is at 0 ms, a click ffmpeg
+//!   places at 1.022 s read 1.020 s with the lead and 1.000 s without;
+//!   spec §11 #228-V).
 
 use crate::container_blocks::Frame;
 use crate::time::Fps;
@@ -192,11 +199,19 @@ pub(crate) fn snapped_video(ns: &[i64], fps: Fps) -> Option<Timing> {
     })
 }
 
-/// Audio times in samples at `rate`, CodecDelay taken off and each laced
-/// frame placed after the samples before it in its Block.
-pub(crate) fn audio(frames: &[Frame], counts: &[u32], codec_delay: u64, rate: i64) -> Timing {
+/// Audio times in samples at `rate`, CodecDelay taken off, each laced
+/// frame placed after the samples before it in its Block, and every frame
+/// `lead` samples later.
+pub(crate) fn audio(
+    frames: &[Frame],
+    counts: &[u32],
+    codec_delay: u64,
+    rate: i64,
+    lead: i64,
+) -> Timing {
     let rate = i128::from(rate.max(1));
     let delay = i128::from(codec_delay);
+    let lead = i128::from(lead);
     let mut pts = Vec::with_capacity(frames.len());
     let mut into_lace: i128 = 0;
     for (f, count) in frames.iter().zip(counts) {
@@ -204,7 +219,7 @@ pub(crate) fn audio(frames: &[Frame], counts: &[u32], codec_delay: u64, rate: i6
             into_lace = 0;
         }
         let block = div_round((i128::from(f.ns) - delay) * rate, NS);
-        pts.push(narrow(block + into_lace));
+        pts.push(narrow(block + into_lace + lead));
         into_lace += i128::from(*count);
     }
     Timing {

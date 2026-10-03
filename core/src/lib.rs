@@ -21,6 +21,8 @@ mod container_blocks;
 mod container_codec;
 mod container_header;
 mod container_timing;
+mod container_vorbis;
+mod container_vorbis_setup;
 pub mod edit;
 pub mod edit_action;
 pub mod edit_background;

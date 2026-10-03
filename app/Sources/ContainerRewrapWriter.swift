@@ -8,8 +8,11 @@ import CoreMedia
 /// What was measured to make it work: the video's format description carries
 /// the core's `vpcC`/`av1C`/`avcC`/`hvcC`; an Opus cookie is OpusHead and
 /// each packet carries its own sample count (`mVariableFramesInPacket`, with
-/// `mFramesPerPacket` 0), where a fixed 960 mistimes 60 ms packets; an AAC
-/// cookie is the core's ES_Descriptor. The video input's `mediaTimeScale` is
+/// `mFramesPerPacket` 0), where a fixed 960 mistimes 60 ms packets; a Vorbis
+/// track is `vorb` with the Vorbis CodecPrivate (its three Xiph-laced
+/// headers) as the cookie and each packet's own count, as AVFoundation's Ogg
+/// reader describes it, and writes into `.mov` only (spec §11 #228-V); an
+/// AAC cookie is the core's ES_Descriptor. The video input's `mediaTimeScale` is
 /// the described timescale — the grid's numerator when the core snapped the
 /// track (without it 30000/1001 lands at 600, off the grid), the raw
 /// timescale otherwise (the numerator would merge frames 10 ms apart). It is
@@ -132,7 +135,9 @@ enum ContainerRewrapWriter {
     ) throws -> CMFormatDescription {
         var asbd = AudioStreamBasicDescription()
         asbd.mSampleRate = a.sampleRate
-        asbd.mFormatID = a.fourcc == "opus" ? kAudioFormatOpus : kAudioFormatMPEG4AAC
+        // 'opus' is kAudioFormatOpus and 'aac ' kAudioFormatMPEG4AAC; 'vorb'
+        // has no SDK constant.
+        asbd.mFormatID = ContainerRewrap.fourCharCode(a.fourcc ?? "")
         asbd.mChannelsPerFrame = UInt32(clamping: a.channels)
         asbd.mFramesPerPacket = UInt32(clamping: a.framesPerPacket)
         let cookie = data(hex: a.cookieHex)

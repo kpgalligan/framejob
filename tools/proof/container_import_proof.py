@@ -28,11 +28,15 @@ Rows:
   path, its mtime unchanged.
 - **M4**: P3 imports with `has_audio`; an H.264 export of its clip lasts
   2 s (±0.05) and its audio's RMS is over 0.01.
-- **M5**: VP8, Vorbis and AV1 answer their exact sentences with the media
-  count and the `Rewrapped/` listing unchanged; AV1 by `sysctl
+- **M5**: VP8 and AV1 answer their exact sentences with the media count
+  and the `Rewrapped/` listing unchanged; AV1 by `sysctl
   machdep.cpu.brand_string` (an M1/M2 refuses, an M3 or later imports, any
   other brand is skipped by name).
 - **M6**: every document is closed with `close_project`.
+- **M7** (issue batch B77, spec §11 #228-V): P10's Vorbis is copied: its
+  import answers `p10-<16 hex>.mov` directly inside `Rewrapped/` with
+  `has_audio`, and an H.264 export of its placed clip lasts 2 s (±0.05)
+  with an audio RMS over 0.01 (M4's helpers).
 
 `--mutant ffmpeg-copy` imports ffmpeg's `-c copy` MP4 of P1 in M2's place:
 M2 must fail (that copy lands frame 47 a frame early) and nothing else, and
@@ -228,9 +232,6 @@ def run(mcp, where, fixtures, mutant):
         # M5
         refusal_row(mcp, where, "M5a", fixtures["p9.webm"],
                     "p9.webm is VP8 video, which this Mac cannot decode.", opened)
-        refusal_row(mcp, where, "M5b", fixtures["p10.webm"],
-                    "p10.webm has Vorbis audio, which Reelcut cannot copy out of a WebM or "
-                    "Matroska file.", opened)
         brand = subprocess.run(["sysctl", "-n", "machdep.cpu.brand_string"], timeout=30,
                                capture_output=True, text=True).stdout.strip()
         family = re.match(r"Apple M(\d+)", brand)
@@ -246,6 +247,24 @@ def run(mcp, where, fixtures, mutant):
                 row("M5c", answer["has_video"], f"{brand}: AV1 imported, {answer['path']}")
             except ToolError as error:
                 row("M5c", False, f"{brand}: AV1 refused: {error}")
+        # M7 (B77): the Vorbis copy, by M4's measures.
+        p10 = new_project(mcp, where, "p10", opened)
+        try:
+            answer = mcp.call("import_media", project=p10, path=fixtures["p10.webm"])
+            named = (os.path.dirname(answer["path"]) == REWRAPPED
+                     and bool(re.match(r"^p10-[0-9a-f]{16}\.mov$",
+                                       os.path.basename(answer["path"]))))
+            place(mcp, p10, answer["media"])
+            target = os.path.join(where, "p10-export.mp4")
+            movie = mcp.call("export", project=p10, preset="h264", path=target,
+                             size=[640, 360])["path"]
+            seconds, rms = duration(movie), audio_rms(movie)
+            row("M7", named and answer["has_audio"] and seconds is not None
+                and abs(seconds - 2.0) <= 0.05 and rms > 0.01,
+                f"{answer['path']} (in Rewrapped, named: {named}); has_audio "
+                f"{answer['has_audio']}; export {seconds} s, audio RMS {rms:.4f}")
+        except ToolError as error:
+            row("M7", False, f"refused: {error}")
     finally:
         closed = True
         for path in opened:

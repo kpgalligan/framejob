@@ -9,12 +9,14 @@
 //! refuses the file in a sentence naming it, and a damaged or truncated
 //! Cluster tail ends the index (`container_blocks.rs`). The file is opened
 //! read-only and read through a buffered reader; the only payload bytes read
-//! are the first VP9 keyframe's header (its `vpcC`) and each Opus packet's
-//! first two bytes (its TOC, RFC 6716 §3.1), both through positioned reads.
+//! are the first VP9 keyframe's header (its `vpcC`), each Opus packet's
+//! first two bytes (its TOC, RFC 6716 §3.1) and each Vorbis packet's first
+//! byte (its mode, spec §11 #228-V), all through positioned reads.
 //!
 //! The EBML header, Segment, Info and Tracks are read by
 //! `container_header.rs`, the Cluster walk is `container_blocks.rs`, the
-//! codec records `container_codec.rs`, the times and the space estimate
+//! codec records `container_codec.rs`, the Vorbis headers and packet
+//! counts `container_vorbis.rs`, the times and the space estimate
 //! `container_timing.rs`, and the C surface `ffi_container.rs`.
 
 use std::fs::File;
@@ -26,6 +28,7 @@ use crate::container_blocks::{walk, Frame};
 use crate::container_codec as codec;
 use crate::container_header::{header, Entry, Source};
 use crate::container_timing::{self as timing, Timing};
+use crate::container_vorbis::Vorbis;
 use crate::time::Fps;
 
 /// `rc_container_sample`'s track argument for the video track.
@@ -273,23 +276,46 @@ fn video(src: &Source, e: &Entry, frames: Vec<Frame>, scale: u64) -> Result<Vide
 fn audio(src: &Source, e: &Entry, frames: Vec<Frame>) -> Audio {
     let fourcc = codec::audio_fourcc(&e.codec_id, &e.private);
     let opus = fourcc == Some("opus");
-    // Opus is always timed at 48 kHz, whatever the track's own rate says.
-    let rate = match e.rate {
+    // `audio_fourcc` said `vorb` only for headers that parse.
+    let vorbis = match fourcc {
+        Some("vorb") => Vorbis::parse(&e.private),
+        _ => None,
+    };
+    // Opus is always timed at 48 kHz, whatever the track's own rate says;
+    // Vorbis at its identification header's rate.
+    let rate = match (e.rate, &vorbis) {
+        (_, Some(v)) => i64::from(v.rate),
         _ if opus => 48_000,
-        r if r.is_finite() && r >= 1.0 => r.round().min(1e7) as i64,
+        (r, None) if r.is_finite() && r >= 1.0 => r.round().min(1e7) as i64,
         _ => 8000,
     };
+    let channels = vorbis
+        .as_ref()
+        .map_or(e.channels, |v| u64::from(v.channels));
     let copied = fourcc.is_some() && !e.encoded;
-    let counts: Vec<u32> = match (copied, opus) {
-        (false, _) => Vec::new(),
-        (true, true) => frames
+    let counts: Vec<u32> = match (copied, opus, &vorbis) {
+        (false, _, _) => Vec::new(),
+        (true, true, _) => frames
             .iter()
             .map(|f| codec::opus_samples(&src.read_at(f.offset, 2).unwrap_or_default()))
             .collect(),
-        (true, false) => vec![1024; frames.len()],
+        (true, false, Some(v)) => {
+            let first = |f: &Frame| {
+                src.read_at(f.offset, 1.min(f.size as usize))
+                    .and_then(|b| b.first().copied())
+            };
+            v.counts(&frames.iter().map(first).collect::<Vec<_>>())
+        }
+        (true, false, None) => vec![1024; frames.len()],
+    };
+    // Every Vorbis packet moves later by packet 0's count (spec §11
+    // #228-V); only a copied track has counts to read it from.
+    let lead = match (&vorbis, counts.first()) {
+        (Some(_), Some(n)) if copied => i64::from(*n),
+        _ => 0,
     };
     let timing = if copied {
-        timing::audio(&frames, &counts, e.codec_delay, rate)
+        timing::audio(&frames, &counts, e.codec_delay, rate, lead)
     } else {
         Timing::empty(rate)
     };
@@ -303,9 +329,9 @@ fn audio(src: &Source, e: &Entry, frames: Vec<Frame>) -> Audio {
         fourcc,
         encoded: e.encoded,
         rate,
-        channels: e.channels,
+        channels,
         cookie,
-        per_packet: opus,
+        per_packet: opus || vorbis.is_some(),
         frames,
         counts,
         timing,

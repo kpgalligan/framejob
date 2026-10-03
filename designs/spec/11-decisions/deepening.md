@@ -656,6 +656,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   document opened from the Finder blocks the main thread for the copy, as
   ffmpeg's conversion already does; the Media tab names the copy, not the
   original; the copy lives outside the package until Consolidate.
+  **Amended by #228-V** (issue batch B77): Vorbis is copied.
 - **#228-P — A person's WebM or Matroska copy shows its progress in a small
   window with Cancel, and a tool call's copy shows nothing** (issue batch
   B76, #228 part 1; the owner, 2026-10-03, O1–O8). **Every click door
@@ -696,3 +697,41 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   window for the copy's length (O7, #231); a quit during a copy
   leaves its `.partial.mov` in `Rewrapped/` until the next import of that
   file removes it (O8); ffmpeg's opt-in conversion still shows no progress.
+- **#228-V — A WebM or Matroska file's Vorbis sound is copied into the
+  rewrap's `.mov` unchanged, as Opus is** (issue batch B77, #228 part 2).
+  **The format:** subtype `vorb` with `mFramesPerPacket` 0, the track's
+  CodecPrivate — Matroska's Xiph-laced three header packets — verbatim as
+  the cookie, and no channel layout. AVFoundation's own Ogg reader describes
+  Vorbis the same way (cookie `02 1e 1c 01 'vorbis'…`); `AVAssetWriter`
+  writes it into `.mov` (`.mp4`: `canAdd` false), and the copy decodes
+  through `AVAssetReaderTrackOutput` and through `AVMutableComposition` +
+  `AVAssetReaderAudioMixOutput`, mono, stereo and six channels (measured,
+  macOS 26.5.1, ffmpeg 9.0.2, libvorbis 1.3.7). **The core reads the three
+  headers** (`container_vorbis.rs`): the identification header gives the
+  rate, the channels and the two block sizes; the setup header is walked to
+  its mode table for each mode's block flag. **Each packet carries its own
+  sample count**, by the overlap rule: n = prev/4 + cur/4, a packet's block
+  size read from its mode number. **Packet 0 is bs0/4 + its own
+  blocksize/4**, ffmpeg's convention (ffprobe reads 1024 for ffmpeg's
+  2048/2048 encoder and 128 for libvorbis's short first packet), because
+  the writer refuses a later append after a 0-frame packet (-11800/-12633);
+  counts of 32–2048 there all decode the whole stream. A packet whose mode
+  cannot be read — empty, not an audio packet, or past the mode table —
+  counts as a short block. **Every packet is placed lead = packet 0's count
+  later** than its Block time less CodecDelay, because packet 0 decodes to
+  nothing and AVFoundation starts the decoder's output at the track's first
+  sample time: on an ffmpeg WebM remuxed so its first Block is at 0 ms (its
+  picture 22 ms in), a click ffmpeg places at 1.022 s decoded at 1.020 s
+  shifted and at 1.000 s unshifted; where the first Block is at −21 ms, as
+  ffmpeg's encoder writes it, both decode at 1.000 s, the writer laying the
+  track out from 0 (the probe's T22 and T20). **Rate and channels come from the
+  identification header**, over the TrackEntry's; a rate of 0 or above
+  10,000,000 is unreadable, as the TrackEntry rate is capped today. **A
+  track whose headers do not parse** keeps #216-R's sentence ("… has Vorbis
+  audio, which Reelcut cannot copy …") and falls through to the opt-in
+  ffmpeg step. **The risks it accepts:** the movie's 1/600 s edit grid
+  (a remuxed libvorbis click read 1.0017 s against ffmpeg's 1.003, 1.0027
+  with a 48 kHz movie timescale), which affects every copy (#232); no end
+  trim, so the copy's sound may run up to one packet past the source's
+  (144384 samples decoded where ffmpeg decodes 144000); and the headers'
+  parse on every open.

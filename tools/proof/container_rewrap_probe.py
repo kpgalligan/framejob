@@ -20,22 +20,32 @@ does not exist yet · P17 H.264+AAC MKV and P18 VP9+Opus WebM whose sound is
 one 2 ms impulse at exactly 1.000 s · P19 a 20 s VP9+Opus WebM with
 `refuseAudioAt: 10`, its tenth audio packet declared 4096 bytes longer than
 its data, which fails the writer (-12703) some appends later, mid-copy.
+Issue batch B77 (spec §11 #228-V): P10's Vorbis is now copied; P20 VP9 +
+Vorbis whose sound is P17's impulse; P21 P10 with its one `\x05vorbis` (the
+setup header's magic) made `\x05vorbiz`, so its headers cannot be read;
+P22 P20's Vorbis through an Ogg and back beside P20's video, so the muxer
+moves both 22 ms later and the first audio Block is at 0 ms.
 
 Rows (see `score`): W* written files probe at the right size, rate and sound
 with their atom; F* the exact-time frame 47 answers its own time; S5/S6/S14
 the live, cut and sound-only files; R7–R10 the refusals by sentence, with
-nothing written; N11 the space check; K12 no partial; A13 Opus 60 ms timing;
+nothing written (R10 on P21: unreadable Vorbis headers keep #216-R's
+sentence and its ffmpeg offer); N11 the space check; K12 no partial; A13 Opus 60 ms timing;
 V15 the variable-rate file (retime FALSE asserted first); D16 the new
 folder; X19 the refused append returns `.failed` within 60 s (a pump the
 failed writer never asks again must not hang the copy) and leaves nothing;
-T17/T18 the impulse decodes from the copy (AVFoundation) within 1 ms
+T17/T18/T20 the impulse decodes from the copy (AVFoundation) within 1 ms
 of where it decodes from the source (ffmpeg) — the sound's place against the
 picture; B*v frame 47's written bytes (its passthrough time moved onto the
 movie's timeline by the track's edit) equal the source's at the index entry
 with that time; B*a the whole written audio track, in order, equals the
 source's packets byte for byte (by PTS alone an AAC packet cannot be paired:
 the writer puts AAC's 2112 priming samples before its edit where ffmpeg's
-MKV has 1024, so T17 is what holds AAC's timing).
+MKV has 1024, so T17 is what holds AAC's timing). B77: W10 also reads the
+written audio's subtype `vorb`; B10v/B10a are P10's payload rows; T22
+P22's impulse decodes from the copy within 1/600 s + 1 ms (the movie's edit
+grid, #232, and the Block's) of where ffmpeg places it on the source's
+timeline, which only the lead (spec §11 #228-V) makes true.
 
 Issue batch B76 (spec §11 #228-P), the copy's progress and Cancel, on P1
 (and P2 for C29's .mov): C20 a whole copy's `copiedBytes` never decreases
@@ -57,9 +67,10 @@ Every `assist` row removes the digest names it made through
 Mutants edit a copy of app/Sources; each must fail exactly its rows (then
 MUTANT PASS, exit 0): no-retime, no-precheck, no-space-check, keep-partial,
 fixed-opus-frames, audio-dropped, fps-timescale-always, no-mkdir,
-offset-shift, deaf-pump (fails nothing), deaf-pump-unbounded-wait; and B76's
+offset-shift, deaf-pump (fails nothing), deaf-pump-unbounded-wait; B76's
 ignore-cancel, no-user-cancelled, quiet-watch, present-cancel and
-door-no-watch.
+door-no-watch; and B77's audio-early (every audio packet 1024 samples
+early) and vorbis-as-aac (the old Opus-or-AAC `mFormatID`).
 
     python3 tools/proof/container_rewrap_probe.py [--mutant NAME]
 """
@@ -86,6 +97,8 @@ def src(rate="30", seconds=2):
 
 VP9 = ["-c:v", "libvpx-vp9", "-pix_fmt", "yuv420p", "-b:v", "500k"]
 OPUS = ["-c:a", "libopus"]
+# ffmpeg's native Vorbis encoder: experimental, and stereo only.
+VORBIS_ARGS = ["-c:a", "vorbis", "-strict", "-2", "-ac", "2"]
 # settb and the encoder's 1 ms time base: without them ffmpeg 9 regrids the
 # jittered times to 1/30 s and the fixture snaps (measured).
 VFR = "settb=1/1000,setpts=(N/30+0.013*mod(N*7\\,5)/4)/TB"
@@ -106,12 +119,14 @@ FIXTURES = {
     "P8": ("p8.webm", ["-c:v", "libvpx-vp9", "-pix_fmt", "yuv444p", "-profile:v", "1"] + OPUS,
            src()),
     "P9": ("p9.webm", ["-c:v", "libvpx", "-pix_fmt", "yuv420p"] + OPUS, src()),
-    "P10": ("p10.webm", VP9 + ["-c:a", "vorbis", "-strict", "-2", "-ac", "2"], src()),
+    "P10": ("p10.webm", VP9 + VORBIS_ARGS, src()),
     "P13": ("p13.webm", VP9 + OPUS + ["-frame_duration", "60"], src()),
     "P14": ("p14.webm", ["-vn"] + OPUS, src()),
     "P17": ("p17.mkv", ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-bf", "2", "-c:a", "aac"],
             src()[:4] + CLICK),
     "P18": ("p18.webm", VP9 + OPUS, src()[:4] + CLICK),
+    # B77: encoded directly, so the first decoded sample is at 0.
+    "P20": ("p20.webm", VP9 + VORBIS_ARGS, src()[:4] + CLICK),
     # 20 s, so the refused packet fails the writer while both inputs still
     # have samples to give (on 2 s it can surface only at the finish).
     "P19": ("p19.webm", VP9 + ["-deadline", "realtime", "-cpu-used", "8"] + OPUS,
@@ -121,9 +136,9 @@ FIXTURES = {
 }
 
 DEAF = [("ContainerRewrapWriter.swift",
-         "guard shared.failure == nil, self.index < self.total else {",
+         "guard shared.failure == nil, shared.progress?.isCancelled != true,",
          "if writer?.status == .failed { return }\n"
-         "                guard shared.failure == nil, self.index < self.total else {"),
+         "                guard shared.failure == nil, shared.progress?.isCancelled != true,"),
         ("ContainerRewrapWriter.swift",
          "guard self.input.append(buffer) else {",
          "guard self.input.append(buffer) else { return }\n"
@@ -185,6 +200,17 @@ SOURCE_MUTANTS = {
     "door-no-watch": [("ProjectDocument+Import.swift",
                        "MediaImporter.probe(url: urls[index], mayAsk: true, watch: Self.copyWatch)",
                        "MediaImporter.probe(url: urls[index], mayAsk: true)")],
+    # B77 (spec §11 #228-V). The AUDIO branch's time, its next line taken in
+    # so it matches once.
+    "audio-early": [("ContainerRewrapWriter.swift",
+                     "presentationTimeStamp: CMTime(value: s.pts, timescale: timescale),\n"
+                     "                packetDescriptions:",
+                     "presentationTimeStamp: CMTime(value: s.pts - 1024, timescale: timescale),\n"
+                     "                packetDescriptions:")],
+    "vorbis-as-aac": [("ContainerRewrapWriter.swift",
+                       "asbd.mFormatID = ContainerRewrap.fourCharCode(a.fourcc ?? \"\")",
+                       "asbd.mFormatID = a.fourcc == \"opus\" ? kAudioFormatOpus"
+                       " : kAudioFormatMPEG4AAC")],
 }
 
 # The rows each mutant must fail, and only those (measured on an M2 Max,
@@ -197,19 +223,35 @@ SOURCE_MUTANTS = {
 # itself, where X19's on a writer that has already failed does not, so
 # the caller's removal is what X19 and K12 hold and a Cancel leaves nothing
 # either way.
+#
+# B77 (measured on 2026-10-03): P10's B10v fails with B1v under `no-retime`
+# and `offset-shift`, and every P10/P20 sound row with the other sound rows
+# under `audio-dropped` and `offset-shift`. `audio-dropped` also fails C20,
+# a B76 row B76 did not re-measure against it: with no audio input the copy
+# reports only the video's bytes ("copied 95852 of 115100"). `audio-early`
+# fails T17, T18, T22 and B3a (an AAC packet moved before 0 is trimmed) but
+# not T20: P20's impulse decodes at 1.000 s with every audio packet 1024
+# samples early too. The writer lays a Vorbis track out back to back from
+# its first packet, which a time before 0 puts at 0 (the copy's packets read
+# 0, 1024, 2048, …), and P20's first Block is at −21 ms, so with the lead it
+# starts at 16 samples, without it before 0, and the decode is the same.
+# P22's first Block is at 0 ms: with the lead its copy's click reads 1.020 s
+# against ffmpeg's timeline 1.022, without it 1.000, so T22 holds the lead.
+# `vorbis-as-aac` fails W10 (no audio track is written), T20, T22 and B10a.
 EXPECTED = {
-    "no-retime": {"W3", "F1", "F2", "F3", "F4", "B1v", "B3v"},
+    "no-retime": {"W3", "F1", "F2", "F3", "F4", "B1v", "B3v", "B10v"},
     "no-precheck": {"R7", "R8", "R9"},
     "no-space-check": {"N11"},
     "keep-partial": {"K12", "X19"},
     "fixed-opus-frames": {"A13"},
-    "audio-dropped": {"W1", "W2", "W3", "W4", "S5", "S14", "A13", "T17", "T18", "B1a", "B3a",
-                      "X19"},
+    "audio-dropped": {"W1", "W2", "W3", "W4", "W10", "S5", "S14", "A13", "T17", "T18", "T20",
+                      "T22", "B1a", "B3a", "B10a", "X19", "C20"},
     "fps-timescale-always": {"V15"},
     "no-mkdir": {"D16"},
     # A frame read one byte late no longer decodes, so the frame and impulse
     # rows fail with the payload rows.
-    "offset-shift": {"B1v", "B1a", "B3v", "B3a", "F1", "F2", "F3", "F4", "T17", "T18"},
+    "offset-shift": {"B1v", "B1a", "B3v", "B3a", "B10v", "B10a", "F1", "F2", "F3", "F4", "T17",
+                     "T18", "T20", "T22"},
     "deaf-pump": set(),
     "deaf-pump-unbounded-wait": {"X19"},
     "ignore-cancel": {"C21"},
@@ -217,13 +259,15 @@ EXPECTED = {
     "quiet-watch": {"C25"},
     "present-cancel": {"C28", "C29"},
     "door-no-watch": {"C29"},
+    "audio-early": {"T17", "T18", "T22", "B3a"},
+    "vorbis-as-aac": {"W10", "T20", "T22", "B10a"},
 }
 
 PROFILE1 = ("p8.webm is VP9 Profile 1 video, which this Mac cannot decode; "
             "VP9 Profiles 0 and 2 import.")
 VP8 = "p9.webm is VP8 video, which this Mac cannot decode."
 AV1 = "p7.webm is AV1 video, which needs an M3 or later Mac."
-VORBIS = "p10.webm has Vorbis audio, which Reelcut cannot copy out of a WebM or Matroska file."
+VORBIS = "p21.webm has Vorbis audio, which Reelcut cannot copy out of a WebM or Matroska file."
 
 
 def tail(text, limit=300):
@@ -252,6 +296,35 @@ def make_fixtures():
         made["P5"] = live
     else:
         problems["P5"] = tail(proc.stderr.decode(errors="replace"))
+    if "P10" in made:
+        # B77: P10 with its setup header's magic broken, and nothing else.
+        whole = made["P10"].read_bytes()
+        found = whole.count(b"\x05vorbis")
+        if found == 1:
+            broken = FIX / "p21.webm"
+            broken.write_bytes(whole.replace(b"\x05vorbis", b"\x05vorbiz"))
+            made["P21"] = broken
+        else:
+            problems["P21"] = f"p10.webm holds b'\\x05vorbis' {found} times, not once"
+    if "P20" in made:
+        # B77: P20's Vorbis through an Ogg and back beside its own video, so
+        # the muxer moves both 22 ms later and the first audio Block is at 0.
+        ogg, remux = FIX / "p22.ogg", FIX / "p22.webm"
+        result = bounded.run(["ffmpeg", "-y", "-v", "error", "-i", str(made["P20"]), "-vn",
+                              "-c", "copy", str(ogg)], 120)
+        if not result["rc"] and not result["expired"]:
+            result = bounded.run(["ffmpeg", "-y", "-v", "error", "-i", str(made["P20"]), "-i",
+                                  str(ogg), "-map", "0:v", "-map", "1:a", "-c", "copy",
+                                  str(remux)], 120)
+        first = bounded.run(["ffprobe", "-v", "error", "-select_streams", "a", "-read_intervals",
+                             "%+#1", "-show_entries", "packet=pts", "-of", "csv=p=0",
+                             str(remux)], 60)["stdout"].strip() if remux.exists() else ""
+        if result["rc"] or result["expired"] or not remux.exists():
+            problems["P22"] = "expired" if result["expired"] else tail(result["stderr"])
+        elif first != "0":
+            problems["P22"] = f"p22.webm's first audio Block is at {first!r} ms, not 0"
+        else:
+            made["P22"] = remux
     if "P1" in made:
         whole = made["P1"].read_bytes()
         cut = FIX / "p6.webm"
@@ -315,13 +388,14 @@ def jobs_for(made):
 
     for row_id in ("P1", "P3"):
         job(row_id, row_id, inspect=True, frame47=True, payload=True)
+    job("P10", "P10", inspect=True, payload=True)
     for row_id in ("P2", "P4"):
         job(row_id, row_id, inspect=True, frame47=True)
     for row_id in ("P5", "P6", "P13", "P14", "P15"):
         job(row_id, row_id, inspect=True)
-    for row_id in ("P7", "P8", "P9", "P10"):
+    for row_id in ("P7", "P8", "P9", "P21"):
         job(row_id, row_id, inspect=True)
-    for row_id in ("P17", "P18"):
+    for row_id in ("P17", "P18", "P20", "P22"):
         job(row_id, row_id, click=True)
     job("P11", "P1", free_delta=-1)
     job("P11b", "P1", free_delta=0)
@@ -352,12 +426,16 @@ def ffprobe_video_duration(path):
     return last + last_duration - times[0][0]
 
 
-def decoded_click(path):
-    """When the source's sound, decoded by ffmpeg, first passes 0.3."""
+def decoded_click(path, timeline=False):
+    """When the source's sound, decoded by ffmpeg, first passes 0.3: from the
+    first decoded sample, or (`timeline`) on the file's own timeline, each
+    packet's samples placed at its time (`aresample=async=1:first_pts=0`)."""
     if path is None:
         return None
-    result = subprocess.run(["ffmpeg", "-v", "error", "-i", str(path), "-vn", "-f", "f32le",
-                             "-ac", "1", "-ar", "48000", "-"], capture_output=True, timeout=120)
+    placed = ["-af", "aresample=async=1:first_pts=0"] if timeline else []
+    result = subprocess.run(["ffmpeg", "-v", "error", "-i", str(path), "-vn", *placed,
+                             "-f", "f32le", "-ac", "1", "-ar", "48000", "-"],
+                            capture_output=True, timeout=120)
     samples = memoryview(result.stdout).cast("f")
     for k, value in enumerate(samples):
         if abs(value) > 0.3:
@@ -379,7 +457,7 @@ def score(answers, made, problems, host):
         why = problems.get(job_id.rstrip("b"), "no answer")
         row(row_id, False, f"{job_id}: {why}")
 
-    def written(row_id, job_id, fps, atom, kind="video"):
+    def written(row_id, job_id, fps, atom, subtype=None):
         a = get(job_id)
         if not a:
             return absent(row_id, job_id)
@@ -388,13 +466,17 @@ def score(answers, made, problems, host):
         atoms = (tracks.get("video") or {}).get("atoms", [])
         shape = (a.get("rewrap"), p.get("width"), p.get("height"), p.get("fps"),
                  p.get("has_audio"), atom in atoms)
-        row(row_id, shape == ("ok", 640, 360, fps, True, True),
-            f"{job_id}: rewrap, size, fps, has_audio, {atom} = {shape} {a.get('error', '')}")
+        heard = (tracks.get("audio") or {}).get("subtype")
+        row(row_id, shape == ("ok", 640, 360, fps, True, True)
+            and (subtype is None or heard == subtype),
+            f"{job_id}: rewrap, size, fps, has_audio, {atom} = {shape}"
+            + (f", audio subtype {heard!r}" if subtype else "") + f" {a.get('error', '')}")
 
     written("W1", "P1", [30, 1], "vpcC")
     written("W2", "P2", [30000, 1001], "vpcC")
     written("W3", "P3", [30, 1], "avcC")
     written("W4", "P4", [30, 1], "hvcC")
+    written("W10", "P10", [30, 1], "vpcC", subtype="vorb")
     for n, job_id in ((1, "P1"), (2, "P2"), (3, "P3"), (4, "P4")):
         a = get(job_id)
         wanted, actual = a.get("frame47_wanted"), a.get("frame47_actual")
@@ -432,7 +514,7 @@ def score(answers, made, problems, host):
         refused("R7", "P7", AV1, False)
     refused("R8", "P8", PROFILE1, False)
     refused("R9", "P9", VP8, False)
-    refused("R10", "P10", VORBIS, True)
+    refused("R10", "P21", VORBIS, True)
 
     a, b = get("P11"), get("P11b")
     if a and b:
@@ -480,13 +562,22 @@ def score(answers, made, problems, host):
     row("D16", a.get("rewrap") == "ok" and a.get("dest_exists"),
         f"P16: {a.get('rewrap')} {a.get('error', '')}; destination exists "
         f"{a.get('dest_exists')}")
-    for row_id, job_id in (("T17", "P17"), ("T18", "P18")):
+    for row_id, job_id in (("T17", "P17"), ("T18", "P18"), ("T20", "P20")):
         a = get(job_id)
         heard, source = a.get("click"), decoded_click(made.get(job_id))
         row(row_id, heard is not None and source is not None and abs(heard - source) <= 0.001,
             f"{job_id}: the impulse decodes at {heard} s from the copy, {source} s from the "
             f"source (ffmpeg); {a.get('error', '')}")
-    for n, job_id in ((1, "P1"), (3, "P3")):
+    # B77: P22's picture and sound both start 22 ms in, so the source's click
+    # is read on its timeline, within the movie's 1/600 s edit grid (#232)
+    # plus the Block's 1 ms: without the lead it decodes 22 ms early.
+    a = get("P22")
+    heard, source = a.get("click"), decoded_click(made.get("P22"), timeline=True)
+    row("T22", heard is not None and source is not None
+        and abs(heard - source) <= 1 / 600 + 0.001,
+        f"P22: the impulse decodes at {heard} s from the copy, {source} s on the source's "
+        f"timeline (ffmpeg); {a.get('error', '')}")
+    for n, job_id in ((1, "P1"), (3, "P3"), (10, "P10")):
         p = get(job_id).get("payload") or {}
         row(f"B{n}v", p.get("video_found") and p.get("video_equal"),
             f"{job_id}: frame 47's written bytes equal the source's: {p.get('video_found')}, "

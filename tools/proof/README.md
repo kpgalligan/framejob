@@ -13063,3 +13063,83 @@ python3 tools/proof/container_rewrap_probe.py                            # passe
 python3 tools/proof/container_rewrap_probe.py --mutant ignore-cancel     # MUTANT PASS, exit 0 (each of the six above)
 python3 tools/proof/container_import_proof.py                            # passed 10/10, exit 0
 ```
+
+## Issue batch B77 — a WebM or Matroska file's Vorbis sound is copied (`container_rewrap_probe.py` W10, B10v, B10a, T20, T22, R10 and two mutants; `container_import_proof.py` M7; #228 part 2; spec §11 #228-V)
+
+The core reads a Vorbis track's three headers (`container_vorbis.rs`, its
+setup walk `container_vorbis_setup.rs`), counts each packet by the overlap
+rule and places every packet packet 0's count later; the writer describes it
+as `vorb` with the CodecPrivate as the cookie. The core's numbers — the
+counts against ffmpeg's own parser on two real encoders' files, the lead,
+every setup section, each refusal, every strict prefix of a real setup
+header, hostile bytes — are `core/tests/container_vorbis.rs` and
+`container_vorbis_headers.rs` (`core/tests/fixtures/vorbis/PROVENANCE.md`).
+
+- **`container_rewrap_probe.py`**: P10 (VP9 + Vorbis) is now copied and gets
+  `inspect` and `payload`; W10 is W1's row plus the written audio's media
+  subtype `vorb` (`inspect` answers `subtype`); B10v/B10a are P10's payload
+  rows; P20 is VP9 + Vorbis over P17's impulse, encoded directly, and T20 its
+  click row; P21 is P10 with its one `\x05vorbis` made `\x05vorbiz`, and R10
+  now refuses it in #216-R's sentence with the ffmpeg offer. Two mutants:
+  `audio-early` (the writer's AUDIO `presentationTimeStamp` 1024 samples
+  early) and `vorbis-as-aac` (`mFormatID` back to Opus-or-AAC).
+- **Measured: `audio-early` does not fail T20; it fails T22.** P20's impulse
+  decodes at 1.000 s with every audio packet 1024 samples early as well as
+  with none: the writer lays a Vorbis track out back to back from its first
+  packet (ffprobe on the copy reads its packets at 0, 1024, 2048, …), and
+  P20's first Block is at −21 ms, so with the lead the track starts at 16
+  samples and without it before 0, and both decode the same. P22 is P20's
+  Vorbis through an Ogg and back beside P20's video (`-c copy`), so the
+  muxer moves both 22 ms later and the first audio Block is at 0 ms (the
+  fixture is not made, by name, if it is not). There the copy's click reads
+  1.020 s with the lead and 1.000 s without, against 1.022 s on the source's
+  timeline (ffmpeg with `aresample=async=1:first_pts=0`; the copy's video
+  starts at 0.022 s too). T22 allows 1/600 s + 1 ms, the movie's edit grid
+  (#232) and the Block's: the lead is right, and the 0.979 s the scout had
+  recorded for an unshifted copy of a −21 ms file is not what this writer
+  path gives (#228-V and `container_timing.rs` now cite these numbers).
+- `audio-dropped` now also fails C20, a B76 row that B76 did not re-measure
+  against it: with no audio input the copy reports only the video's bytes
+  ("copied 95852 of 115100").
+- `deaf-pump` and `deaf-pump-unbounded-wait` had printed "the control could
+  not be performed" (exit 2) since B76 added the cancel check to the pump's
+  guard; their `before` text is now that guard's first line,
+  `guard shared.failure == nil, shared.progress?.isCancelled != true,`, and
+  both print MUTANT PASS again (`deaf-pump` failing nothing, the
+  unbounded wait X19, "hung").
+
+Run on 2026-10-03 over `8a8a933` plus this batch's diff, macOS 26.5.1,
+Apple M2 Max, `hw_av1 False`. `container_rewrap_probe.py` printed `passed
+43/43`, exit 0 — B73's and B76's 38 rows, W10 "('ok', 640, 360, [30, 1],
+True, True), audio subtype 'vorb'", R10 "P21: unsupported 'p21.webm has
+Vorbis audio, which Reelcut cannot copy out of a WebM or Matroska file.',
+invites ffmpeg True; scratch []", T20 "the impulse decodes at 1 s from the
+copy, 1.0 s from the source (ffmpeg)", T22 "the impulse decodes at 1.02 s
+from the copy, 1.022 s on the source's timeline (ffmpeg)", B10v "True, True
+(1350 bytes)" and B10a "(95 written, 95 indexed)". The mutants:
+
+| Run | Failed (all as expected) | Printed |
+|---|---|---|
+| `--mutant audio-early` (new) | T17, T18 ("the impulse decodes at 0.9786666666666667 s"), T22 ("decodes at 1 s from the copy, 1.022 s on the source's timeline"), B3a ("94 written, 95 indexed") — not T20, measured above | `passed 39/43`, MUTANT PASS |
+| `--mutant vorbis-as-aac` (new) | W10 ("has_audio False … audio subtype None"), T20 and T22 ("decodes at None s"), B10a | `passed 39/43`, MUTANT PASS |
+| `--mutant audio-dropped` (widened) | B73's twelve, W10, T20, T22, B10a, C20 | `passed 26/43`, MUTANT PASS |
+| `--mutant offset-shift` (widened) | B73's ten, B10v, B10a, T20, T22 | `passed 29/43`, MUTANT PASS |
+| `--mutant no-retime` (widened) | B73's seven, B10v | `passed 35/43`, MUTANT PASS |
+| `--mutant fixed-opus-frames` | A13 (unchanged) | `passed 42/43`, MUTANT PASS |
+| `--mutant deaf-pump` (re-anchored) | nothing | `passed 43/43`, MUTANT PASS |
+| `--mutant deaf-pump-unbounded-wait` (re-anchored) | X19 ("hung None None") | `passed 42/43`, MUTANT PASS |
+
+`no-precheck`, `no-space-check`, `keep-partial`, `fps-timescale-always`,
+`no-mkdir` and B76's five each printed MUTANT PASS with their sets
+unchanged: eighteen mutants, each MUTANT PASS, exit 0.
+
+`container_import_proof.py`: M5b (Vorbis refused) is gone and M7 imports
+P10 — "p10-c7f5eec47ea075a3.mov (in Rewrapped, named: True); has_audio
+True; export 2.0 s, audio RMS 0.0625"; `passed 10/10`, exit 0, and
+`--mutant ffmpeg-copy` `M2 FAIL`, `passed 9/10`, MUTANT PASS, exit 0.
+
+```sh
+python3 tools/proof/container_rewrap_probe.py                          # passed 43/43, exit 0
+python3 tools/proof/container_rewrap_probe.py --mutant audio-early     # MUTANT PASS, exit 0 (each in the table)
+python3 tools/proof/container_import_proof.py                          # passed 10/10, exit 0
+```

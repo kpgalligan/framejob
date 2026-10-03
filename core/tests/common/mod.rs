@@ -34,6 +34,10 @@
 
 /// The EBML / Matroska writer the container tests build their files with.
 pub mod ebml;
+/// The Vorbis header and packet writer the Vorbis container tests use.
+pub mod vorbis;
+/// Its setup header's sections.
+pub mod vorbis_setup;
 
 use std::ffi::{c_char, CStr, CString};
 use std::ptr;

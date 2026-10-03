@@ -464,7 +464,7 @@ void rc_graphic_free(RcGraphic *g);
  *      "encoded":bool,"width","height","atom":"vpcC"|"av1C"|"avcC"|"hvcC"|null,
  *      "atom_hex","vp9_profile":int|null,"nominal_fps":f64|null,"timescale",
  *      "grid":bool,"samples","bytes"},
- *    "audio":null|{"codec_id","fourcc":"opus"|"aac "|null,"encoded":bool,
+ *    "audio":null|{"codec_id","fourcc":"opus"|"vorb"|"aac "|null,"encoded":bool,
  *      "sample_rate","channels","cookie_hex","frames_per_packet":0|1024,
  *      "timescale","samples","bytes"}}
  * A track is null when the file has none or none of its frames. `fourcc`
@@ -473,8 +473,10 @@ void rc_graphic_free(RcGraphic *g);
  * copied payload + 64 × the copied samples + 16 MiB. `video.timescale` is
  * the one the samples are in NOW: fps num after a `rc_container_retime`
  * that answered true, else the raw timescale (1e9 / TimestampScale when
- * exact, else 1000000). A sample's times are in its track's `timescale`;
- * samples come in decode order. */
+ * exact, else 1000000). For Vorbis (`"vorb"`, spec §11 #228-V),
+ * `sample_rate` and `channels` are the identification header's, and its
+ * `fourcc` is null when the headers cannot be read. A sample's times are in
+ * its track's `timescale`; samples come in decode order. */
 #define RC_CONTAINER_VIDEO 0
 #define RC_CONTAINER_AUDIO 1
 

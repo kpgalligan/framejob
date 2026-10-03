@@ -22,6 +22,9 @@
 // faces, `ProjectDocument.probeForOpening`, the Add Media door
 // (`importMedia`, with `PresentCountingController` counting what reaches
 // `presentError`) and the window's Cancel, which is never ordered front.
+//
+// Issue batch B77 (spec §11 #228-V): `inspect` also answers each track's
+// media subtype, so W10 can read the copied Vorbis track as `vorb`.
 
 import AppKit
 import AVFoundation
@@ -118,7 +121,8 @@ func errorFacts(_ error: any Error) -> [String: Any] {
     return facts
 }
 
-/// The written movie's tracks, through AVFoundation's loading API.
+/// The written movie's tracks, through AVFoundation's loading API: each
+/// one's range, timescale, atoms, media subtype (B77) and sample count.
 func inspect(_ url: URL) async -> [String: Any] {
     let asset = AVURLAsset(url: url)
     var facts: [String: Any] = [:]
@@ -135,6 +139,9 @@ func inspect(_ url: URL) async -> [String: Any] {
                 first, extensionKey: kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms)
                 as? [String: Any]
             entry["atoms"] = (atoms?.keys).map { Array($0).sorted() } ?? []
+            let code = CMFormatDescriptionGetMediaSubType(first)
+            entry["subtype"] = String(
+                decoding: [24, 16, 8, 0].map { UInt8((code >> $0) & 0xFF) }, as: UTF8.self)
         }
         if let reader = try? AVAssetReader(asset: asset) {
             let output = AVAssetReaderTrackOutput(track: track, outputSettings: nil)

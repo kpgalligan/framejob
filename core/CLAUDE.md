@@ -520,7 +520,8 @@ governs a module now.
   slot), whose `AgentConfig` is built by `host_config`, one catalog
   through one handler.
 - `container.rs` · `container_header.rs` · `container_blocks.rs` ·
-  `container_codec.rs` · `container_timing.rs` · `ffi_container.rs` — a WebM
+  `container_codec.rs` · `container_timing.rs` · `container_vorbis.rs` ·
+  `container_vorbis_setup.rs` · `ffi_container.rs` — a WebM
   or Matroska file being imported, read as an INDEX (spec §11 #216-R),
   read-only, bounds-checked, no input may panic: `container_header.rs` the
   EBML reading and the header before the first Cluster (a CodecPrivate over
@@ -530,10 +531,15 @@ governs a module now.
   codec ID → fourcc, the synthesised `vpcC`, the AAC ES_Descriptor, Opus TOC
   counts; `container_timing.rs` raw and grid-snapped video times, decode
   times by the largest reorder, audio in samples less CodecDelay,
-  laced-frame times, `required_bytes`; `container.rs` the first video and
+  laced-frame times, `required_bytes`, and Vorbis's lead (the first packet's
+  count); `container_vorbis.rs` the three Vorbis headers walked to the mode
+  table, each packet's count by the overlap rule (spec §11 #228-V), with
+  `container_vorbis_setup.rs` the setup header's walk (codebooks, floors,
+  residues, mappings, modes); `container.rs` the first video and
   audio track and `describe`/`retime`/`sample_count`/`sample`;
   `ffi_container.rs` the six `rc_container_*` exports. The only payload read
-  is the first VP9 keyframe's header and each Opus packet's TOC.
+  is the first VP9 keyframe's header, each Opus packet's TOC and each Vorbis
+  packet's first byte.
 - `ffi_graphic.rs` — the ten `rc_graphic_*` exports (road map 10 §5e)
   and the ONLY module of `core/src/` that names the `graphic` crate (spec
   §11 G-2; `core/tests/graphic_ffi.rs` reads `core/src/` to hold it). An

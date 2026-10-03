@@ -266,8 +266,8 @@ schema, §6 the op table, §7 the architecture.
   player (the plan JSON is compared as a string). VP9 video in an MP4 plays,
   and AV1 too on an M3 or later Mac; a video this Mac cannot decode (AV1 on an
   M1 or M2, VP9 Profile 1 or 3, VP8 in an MP4 or MOV) is refused at import with a sentence
-  naming its codec. A WebM or MKV file (VP9, AV1, H.264 or HEVC video with Opus
-  or AAC sound) opens with no question: its streams are copied, not re-encoded,
+  naming its codec. A WebM or MKV file (VP9, AV1, H.264 or HEVC video with Opus,
+  Vorbis or AAC sound) opens with no question: its streams are copied, not re-encoded,
   into a movie in `~/Library/Application Support/Reelcut/Rewrapped/`, after a
   check that the copy fits on the disk. A copy that takes more than a second
   shows its progress in a small window whose Cancel stops it and adds nothing.

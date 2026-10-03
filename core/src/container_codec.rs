@@ -10,14 +10,20 @@
 //!   record. `V_VP8` is `vp08`, named so the app can refuse it in #216's
 //!   sentence. Anything else is not copied.
 //! - **Audio.** `A_OPUS` is `opus` with OpusHead verbatim as its cookie.
-//!   `A_AAC` is `aac ` with an ES_Descriptor around the AudioSpecificConfig:
-//!   a bare AudioSpecificConfig wrote a movie with NO audio track and no
-//!   error (measured). `A_AAC/MPEG4/*`, with no CodecPrivate, and every
+//!   `A_VORBIS` is `vorb` with its CodecPrivate, the three Xiph-laced
+//!   headers, verbatim as its cookie — AVFoundation's own Ogg reader's
+//!   layout (measured) — when `container_vorbis.rs` can read the headers
+//!   (spec §11 #228-V). `A_AAC` is `aac ` with an ES_Descriptor around the
+//!   AudioSpecificConfig: a bare AudioSpecificConfig wrote a movie with NO
+//!   audio track and no error (measured). `A_AAC/MPEG4/*`, with no
+//!   CodecPrivate, a Vorbis track whose headers cannot be read, and every
 //!   other codec are not copied — the app names them and the opt-in ffmpeg
 //!   step may take them.
 //! - **Opus packet lengths** come from the TOC byte (RFC 6716 §3.1), because
 //!   a 60 ms packet timed at a fixed 960 samples mistimes the track
 //!   (measured).
+
+use crate::container_vorbis::Vorbis;
 
 /// The Colour element's four values the `vpcC` record carries.
 #[derive(Clone, Copy, Debug, Default)]
@@ -56,6 +62,7 @@ pub(crate) fn audio_fourcc(codec_id: &str, private: &[u8]) -> Option<&'static st
     match codec_id {
         "A_OPUS" if private.starts_with(b"OpusHead") => Some("opus"),
         "A_AAC" if !private.is_empty() => Some("aac "),
+        "A_VORBIS" if Vorbis::parse(private).is_some() => Some("vorb"),
         _ => None,
     }
 }
