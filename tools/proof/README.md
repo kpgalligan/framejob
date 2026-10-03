@@ -13143,3 +13143,68 @@ python3 tools/proof/container_rewrap_probe.py                          # passed 
 python3 tools/proof/container_rewrap_probe.py --mutant audio-early     # MUTANT PASS, exit 0 (each in the table)
 python3 tools/proof/container_import_proof.py                          # passed 10/10, exit 0
 ```
+
+## Issue batch B78 — a WebM or Matroska copy remembers its original (`container_rewrap_probe.py` O31–O43 and seven mutants; `container_import_proof.py` M8–M11; #228 part 3; spec §11 #228-O)
+
+The built-in copy records the file it was made from as the media's
+`original` (format version 11); `MediaSnapshot.name` reads it, Reveal in
+Finder opens it, the row's tooltip says where the copy lives, and
+`ProjectDocument.recopyingMissingCopies` copies a copy that is gone (or in
+the Trash) again on open. The core's half — the field, its normalisation,
+the relink's probe, paste, the schema and its key order — is
+`core/tests/media_original.rs` and `core/tests/schema_v11.rs`.
+
+- **`container_rewrap_probe.py`** gains one job of `kind: "original"` on a
+  scratch copy of P1 named `o1.webm`, run last; the rows are in its
+  docstring. O41's original is a scratch `.mov` with a movie put at its
+  digest name, so a re-copy without the Matroska guard would succeed
+  (`assist` reuses a movie at the digest name) and the guard is what O41
+  holds; a `.mov` original with nothing there fails the copy either way.
+  O42 asks FileManager for the home Trash's URL and never lists or writes
+  it; O43 holds the Trash case through the `trashed` seam on a scratch
+  `fakeTrash`. Every row discards the digest names it made.
+- **Measured: `no-original` also fails O40 and O43.** Their re-copy relinks
+  with a probe that, under the mutant, carries no original, which clears the
+  one the project held (`relink_media`'s rule).
+- **Measured (M9): a re-copy can land under another digest name.** The
+  original's bookmark resolves to the file's real path (`/private/var/…` for
+  the proof's `/var/folders/…` temporary directory), the digest is over the
+  path, and the probe records the resolved path as the new `original.path`.
+  On a path with no symlink in it the name is the same.
+
+Run on 2026-10-03 over `2f549ea` plus this batch's diff, macOS 26.5.1,
+Apple M2 Max, `hw_av1 False`. `container_rewrap_probe.py` printed `passed
+56/56`, exit 0 — B73's, B76's and B77's 43 rows, and O31 (a `Rewrapped/`
+path, the original with a bookmark, `probeDictionary` keeping `original`
+with no `path` or `bookmark`), O33 "name 'o1.webm'; with no original
+'o1-<16 hex>.mov'", O35's three tooltips, O36 "watch called 1, duration
+1208000/1208000, size 640x360", O37 "on main (True): watch called 0", O38
+"cancelAt 0.3: returned True, unchanged True, watch called 1, copy left
+False, partial False", O40 "missing []", O41 "unchanged True (original True,
+decoy True)", O42 "(True, False, False, True, True, False)" and O43 "with
+trashed false unchanged True". The mutants:
+
+| Run | Failed (all as expected) | Printed |
+|---|---|---|
+| `--mutant no-original` (`probeCopy` stamps nothing) | O31 ("original None with a bookmark False"), O33, O36, O40, O43 ("original None") | `passed 51/56`, MUTANT PASS |
+| `--mutant copy-name` (`name` reads `path` only) | O33 ("name 'o1-<16 hex>.mov'") | `passed 55/56`, MUTANT PASS |
+| `--mutant reveal-copy` (`revealURL` prefers the copy) | O34 (the copy before o1 is deleted) | `passed 55/56`, MUTANT PASS |
+| `--mutant no-recopy` (`repairingMedia` returns the re-anchored project) | O40 ("missing ['/nonexistent-b78/o1-<16 hex>.mov']") | `passed 55/56`, MUTANT PASS |
+| `--mutant main-watch` (the main-thread guard dropped) | O37 ("watch called 1") | `passed 55/56`, MUTANT PASS |
+| `--mutant recopy-any-file` (the Matroska guard dropped) | O41 ("unchanged False") | `passed 55/56`, MUTANT PASS |
+| `--mutant trash-plays` (the copy-gone guard reads `mediaURL(for:) == nil` only) | O43 (the path stays in `fakeTrash`) | `passed 55/56`, MUTANT PASS |
+
+`container_import_proof.py` printed M0–M11 ok, `passed 14/14`, exit 0 — M8
+"import answers original '…/p2.webm'; get_project path
+'…/Rewrapped/p2-<16 hex>.mov'", M9 "copy deleted True; open_project
+missing_media None; path '…/Rewrapped/p2-<16 hex>.mov' exists True", M10
+"to p1-copy.mp4 has original False; get_project original None", M11 "in the
+package's media/ True, original '…/p1.webm'" — and `--mutant ffmpeg-copy`
+`M2 FAIL`, `passed 13/14`, MUTANT PASS, exit 0.
+
+```sh
+python3 tools/proof/container_rewrap_probe.py                          # passed 56/56, exit 0
+python3 tools/proof/container_rewrap_probe.py --mutant no-original     # MUTANT PASS, exit 0 (each in the table)
+python3 tools/proof/container_import_proof.py                          # passed 14/14, exit 0
+python3 tools/proof/container_import_proof.py --mutant ffmpeg-copy     # MUTANT PASS, exit 0
+```

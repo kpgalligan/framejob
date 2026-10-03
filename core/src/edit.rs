@@ -172,8 +172,8 @@
 //! | `set_marker` | Omitted fields keep their value; the same one-marker-per-tick rule. |
 //! | `remove_marker` | Removes the marker. |
 //! | `set_canvas` | `rescale_clips`, false when absent, multiplies every clip's `x`, `y` and `scale` by the size ratio; an fps change re-snaps top-level and stored-nest clip starts, source-bounded durations, action spans, present base motion/text timings and a graphic's `in` and `length`, plus top-level markers, to the new grid (spec §11, D7-3, G-18). A marker a coarser grid lands on a tick an earlier stored marker already holds is dropped; size-only and same-fps edits do not resnap. |
-//! | `add_media` | Appends the `media[]` element of spec §5.2 minus its `id` (the host probes the file). A path already in the list changes nothing. |
-//! | `relink_media` | Points a media at another file; an absent or `null` bookmark clears the stale one. The `probe` the host fills is the new file's descriptor minus `path` and `bookmark`: the media takes its duration, size, rate and flags, a file of another kind is refused, and a media clip running past a shorter file's end is held to it (spec §11, #63). No `probe` keeps the record. |
+//! | `add_media` | Appends the `media[]` element of spec §5.2 minus its `id` (the host probes the file). A path already in the list changes nothing. An `original` (the WebM or Matroska file a playable copy was made from, spec §11 #228-O) is stored with its path trimmed; an empty one is an `Err`. |
+//! | `relink_media` | Points a media at another file; an absent or `null` bookmark clears the stale one. The `probe` the host fills is the new file's descriptor minus `path` and `bookmark`: the media takes its duration, size, rate and flags, a file of another kind is refused, and a media clip running past a shorter file's end is held to it (spec §11, #63). The probe's `original` replaces the stored one, so a probe without one clears it (#228-O). No `probe` keeps the record. |
 //! | `remove_media` | Refuses while clips still reference it unless `with_clips`, which removes those clips too. |
 //!
 //! ### Results

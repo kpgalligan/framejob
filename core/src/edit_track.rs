@@ -24,7 +24,9 @@
 use serde_json::Value;
 
 use crate::export::describe;
-use crate::model::{Clip, Marker, Media, MediaKind, Project, Source, Track, DEFAULT_MARKER_COLOR};
+use crate::model::{
+    Clip, Marker, Media, MediaKind, MediaOriginal, Project, Source, Track, DEFAULT_MARKER_COLOR,
+};
 use crate::outcome::Outcome;
 use crate::time::Ticks;
 
@@ -39,7 +41,7 @@ const MEDIA_DIMENSION_MAX: u32 = 65536;
 /// because the point of the list is to NAME a misspelled key — serde would
 /// silently drop `"widht"` and leave the user with a zero-width media.
 /// `edit_relink.rs` reads it too, for a relink's probe.
-pub(crate) const MEDIA_KEYS: [&str; 10] = [
+pub(crate) const MEDIA_KEYS: [&str; 11] = [
     "path",
     "bookmark",
     "kind",
@@ -50,6 +52,7 @@ pub(crate) const MEDIA_KEYS: [&str; 10] = [
     "has_video",
     "has_audio",
     "has_alpha",
+    "original",
 ];
 
 // ---- helpers -------------------------------------------------------------
@@ -90,11 +93,22 @@ fn clip_list(ids: &[u32]) -> String {
     }
 }
 
+/// A media's `original` as it is stored (spec §11 #228-O): the path
+/// trimmed, and a blank bookmark dropped, for the reason `add_media` drops
+/// a blank media bookmark. An empty path is left for `check_media_fields`
+/// to refuse by name. `add_media` and a relink's probe both read it.
+pub(crate) fn normalize_original(original: Option<MediaOriginal>) -> Option<MediaOriginal> {
+    original.map(|given| MediaOriginal {
+        path: given.path.trim().to_string(),
+        bookmark: given.bookmark.filter(|b| !b.trim().is_empty()),
+    })
+}
+
 /// The checks a media record's fields must pass once the descriptor has
 /// matched the schema — `add_media`'s, and a relink probe's
 /// (`edit_relink.rs`), in one order and one set of sentences: an empty
 /// path, a negative duration, a media with pixels whose size or rate is not
-/// usable.
+/// usable, an original with an empty path.
 pub(crate) fn check_media_fields(media: &Media) -> Result<(), String> {
     if media.path.trim().is_empty() {
         return Err("media path must not be empty".to_string());
@@ -129,6 +143,13 @@ pub(crate) fn check_media_fields(media: &Media) -> Result<(), String> {
             "a media with video must have a frame rate with non-zero terms, not [{}, {}]",
             media.fps.num, media.fps.den
         ));
+    }
+    if media
+        .original
+        .as_ref()
+        .is_some_and(|original| original.path.trim().is_empty())
+    {
+        return Err("media original path must not be empty".to_string());
     }
     Ok(())
 }
@@ -415,8 +436,9 @@ impl Project {
     ///
     /// `Err` for a descriptor that is not an object, an unknown or `id`
     /// key, a value that does not match the schema, an empty path, a
-    /// negative duration, or a media with pixels whose size or rate is not
-    /// usable.
+    /// negative duration, a media with pixels whose size or rate is not
+    /// usable, or an `original` with an empty path. An `original` (spec §11
+    /// #228-O) is stored with its path trimmed and a blank bookmark dropped.
     pub fn add_media(&self, descriptor: &Value) -> Result<Outcome, String> {
         let Value::Object(fields) = descriptor else {
             return Err(format!(
@@ -445,9 +467,10 @@ impl Project {
         if let Value::Object(map) = &mut with_id {
             map.insert("id".to_string(), Value::from(self.next_id));
         }
-        let media: Media = serde_json::from_value(with_id)
+        let mut media: Media = serde_json::from_value(with_id)
             .map_err(|e| format!("media descriptor does not match the schema: {e}"))?;
 
+        media.original = normalize_original(media.original);
         check_media_fields(&media)?;
         let path = media.path.trim().to_string();
         if self.media.iter().any(|m| m.path == path) {

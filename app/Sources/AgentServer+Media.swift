@@ -54,6 +54,9 @@ extension AgentServer {
                 "has_audio": descriptor.hasAudio,
                 "has_alpha": descriptor.hasAlpha,
             ]
+            // A WebM or Matroska copy's original (spec §11 #228-O): the
+            // file the caller named, which the media is named after.
+            if let original = descriptor.original { result["original"] = original.path }
             result["note"] =
                 "The file is in the project's media list but not on the timeline yet — place it "
                 + "with add_clip {track, media, at}."
@@ -252,7 +255,7 @@ extension AgentServer {
     private func mediaDescriptor(_ object: [String: Any]) throws -> MediaDescriptor {
         let allowed: Set<String> = [
             "path", "bookmark", "kind", "duration", "width", "height", "fps", "has_video",
-            "has_audio", "has_alpha",
+            "has_audio", "has_alpha", "original",
         ]
         let unknown = object.keys.filter { !allowed.contains($0) }.sorted()
         if let first = unknown.first {
@@ -288,7 +291,34 @@ extension AgentServer {
             fps: fps,
             hasVideo: try boolArg(object, "has_video") ?? (kind != .audio),
             hasAudio: try boolArg(object, "has_audio") ?? (kind == .audio),
-            hasAlpha: try boolArg(object, "has_alpha") ?? false)
+            hasAlpha: try boolArg(object, "has_alpha") ?? false,
+            original: try mediaOriginal(object["original"]))
+    }
+
+    /// A descriptor's `original` (spec §11 #228-O): `{path, bookmark?}`, or
+    /// nil when absent or null. Each wrong shape is refused by name.
+    private func mediaOriginal(_ raw: Any?) throws -> MediaOriginal? {
+        guard let raw = raw, !(raw is NSNull) else { return nil }
+        guard let object = raw as? [String: Any] else {
+            throw ToolError(
+                message: "descriptor.original must be a JSON object {path, bookmark?} — the "
+                    + "file a WebM or Matroska copy was made from.")
+        }
+        let allowed: Set<String> = ["path", "bookmark"]
+        if let first = object.keys.filter({ !allowed.contains($0) }).sorted().first {
+            throw ToolError(
+                message: "Unknown original key \"\(first)\" — allowed keys are "
+                    + allowed.sorted().joined(separator: ", ") + ".")
+        }
+        guard let path = object["path"] as? String else {
+            throw ToolError(message: "descriptor.original.path must be a string.")
+        }
+        let bookmark = object["bookmark"]
+        guard bookmark == nil || bookmark is NSNull || bookmark is String else {
+            throw ToolError(message: "descriptor.original.bookmark must be a string.")
+        }
+        return MediaOriginal(
+            path: (path as NSString).expandingTildeInPath, bookmark: bookmark as? String)
     }
 
     // MARK: - Relinking and removing
@@ -321,6 +351,16 @@ extension AgentServer {
         let descriptor = try probe(url)
         let bookmark = descriptor.path == url.path ? given ?? descriptor.bookmark
             : descriptor.bookmark
+        var fields: [String: Any] = [
+            "media": Int(media.id), "path": descriptor.path,
+            "kind": descriptor.kind.rawValue, "duration": descriptor.duration,
+            "width": descriptor.width, "height": descriptor.height,
+            "fps": [descriptor.fps.num, descriptor.fps.den],
+            "has_video": descriptor.hasVideo, "has_audio": descriptor.hasAudio,
+            "has_alpha": descriptor.hasAlpha,
+        ]
+        // The new original, when the file was a WebM or Matroska (#228-O).
+        if let original = descriptor.original { fields["original"] = original.path }
         return try onMain {
             let result = try self.editResult(
                 document, "Relink Media",
@@ -329,14 +369,7 @@ extension AgentServer {
                         media: media.id, path: descriptor.path, bookmark: bookmark,
                         probe: descriptor)
                 ],
-                [
-                    "media": Int(media.id), "path": descriptor.path,
-                    "kind": descriptor.kind.rawValue, "duration": descriptor.duration,
-                    "width": descriptor.width, "height": descriptor.height,
-                    "fps": [descriptor.fps.num, descriptor.fps.den],
-                    "has_video": descriptor.hasVideo, "has_audio": descriptor.hasAudio,
-                    "has_alpha": descriptor.hasAlpha,
-                ])
+                fields)
             document.generateCaches()
             return result
         }

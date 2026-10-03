@@ -64,13 +64,36 @@ held the copy's controller and is empty after; C30 the window's Cancel.
 Every `assist` row removes the digest names it made through
 `FFmpegRewrap.discard`.
 
+Issue batch B78 (spec §11 #228-O), a copy's original, on a scratch copy of
+P1 named o1.webm (one job of `kind: "original"`): O31 off main,
+`probeBlocking(o1)` answers a `Rewrapped/` path with `original.path` = o1
+and a bookmark, `dictionary["original"]` has that path and `probeDictionary`
+keeps `original` with no `path` or `bookmark`; O32 the copy's own probe has
+no original; O33 `MediaSnapshot.name` is "o1.webm", the path's with none;
+O34 `revealURL` is o1, then the copy once o1 is deleted; O35 the tooltip's
+three forms, exact; O36 off main with a recording watch,
+`recopyingMissingCopies` points a missing copy (`/nonexistent-b78/…`) at a
+new `Rewrapped/` copy, keeps the original, calls the watch once and takes
+O31's duration and size; O37 the same on main calls no watch; O38 a Cancel
+at 30 % leaves the same JSON and no copy or partial; O39 with o1 gone,
+unchanged; O40 `ProjectDocument().read(from:ofType:)` of a package holding
+O36's project, on main, ends with no missing media and the original kept;
+O41 a `.mov` original with a movie already at its digest name is not
+copied again; O42 `isInside`'s exact cases and `isTrashed` of the home
+Trash's `b78-probe.mov` (never listed or written) and of the copy; O43 a
+copy in a scratch `fakeTrash` through the `trashed` seam is copied again,
+and with `trashed` false left alone. Every row discards the digest names it
+made.
+
 Mutants edit a copy of app/Sources; each must fail exactly its rows (then
 MUTANT PASS, exit 0): no-retime, no-precheck, no-space-check, keep-partial,
 fixed-opus-frames, audio-dropped, fps-timescale-always, no-mkdir,
 offset-shift, deaf-pump (fails nothing), deaf-pump-unbounded-wait; B76's
 ignore-cancel, no-user-cancelled, quiet-watch, present-cancel and
-door-no-watch; and B77's audio-early (every audio packet 1024 samples
-early) and vorbis-as-aac (the old Opus-or-AAC `mFormatID`).
+door-no-watch; B77's audio-early (every audio packet 1024 samples
+early) and vorbis-as-aac (the old Opus-or-AAC `mFormatID`); and B78's
+no-original, copy-name, reveal-copy, no-recopy, main-watch, recopy-any-file
+and trash-plays.
 
     python3 tools/proof/container_rewrap_probe.py [--mutant NAME]
 """
@@ -211,6 +234,24 @@ SOURCE_MUTANTS = {
                        "asbd.mFormatID = ContainerRewrap.fourCharCode(a.fourcc ?? \"\")",
                        "asbd.mFormatID = a.fourcc == \"opus\" ? kAudioFormatOpus"
                        " : kAudioFormatMPEG4AAC")],
+    # B78 (spec §11 #228-O).
+    "no-original": [("MediaImporter+Probe.swift",
+                     "descriptor.original = MediaOriginal(of: source)", "_ = source")],
+    "copy-name": [("MediaSnapshot.swift", "((original?.path ?? path) as NSString)",
+                   "(path as NSString)")],
+    "reveal-copy": [("MediaDescriptor.swift", "originalURL(for: media) ?? mediaURL(for: media)",
+                     "mediaURL(for: media) ?? originalURL(for: media)")],
+    "no-recopy": [("ProjectDocument+MissingCopies.swift",
+                   "return recopyingMissingCopies(anchored)", "return anchored")],
+    "main-watch": [("ProjectDocument+MissingCopies.swift",
+                    "let shown = Thread.isMainThread ? nil : watch", "let shown = watch")],
+    "recopy-any-file": [("ProjectDocument+MissingCopies.swift",
+                         "guard let source = originalURL(for: media), "
+                         "ContainerRewrap.isMatroska(source) else {",
+                         "guard let source = originalURL(for: media) else {")],
+    "trash-plays": [("ProjectDocument+MissingCopies.swift",
+                     "guard copy == nil || copy.map(trashed) == true else { continue }",
+                     "guard copy == nil else { continue }")],
 }
 
 # The rows each mutant must fail, and only those (measured on an M2 Max,
@@ -261,6 +302,16 @@ EXPECTED = {
     "door-no-watch": {"C29"},
     "audio-early": {"T17", "T18", "T22", "B3a"},
     "vorbis-as-aac": {"W10", "T20", "T22", "B10a"},
+    # B78 (measured on 2026-10-03): `no-original` also fails O40 and O43,
+    # whose re-copy relinks with a probe that now carries no original, which
+    # clears the one the project held.
+    "no-original": {"O31", "O33", "O36", "O40", "O43"},
+    "copy-name": {"O33"},
+    "reveal-copy": {"O34"},
+    "no-recopy": {"O40"},
+    "main-watch": {"O37"},
+    "recopy-any-file": {"O41"},
+    "trash-plays": {"O43"},
 }
 
 PROFILE1 = ("p8.webm is VP9 Profile 1 video, which this Mac cannot decode; "
@@ -402,6 +453,10 @@ def jobs_for(made):
     job("P12", "P1", stop_after=10)
     job("P19", "P19", refuse_audio_at=10)
     job("P16", "P1", inspect=True)
+    if "P1" in made:
+        # B78: the original rows, on a scratch copy of P1 named o1.webm.
+        jobs.append({"id": "ORIGINAL", "kind": "original", "source": str(made["P1"]),
+                     "dest": str(SCRATCH / "original")})
     if "P1" in made and "P2" in made:
         cancel = SCRATCH / "cancel"
         cancel.mkdir(parents=True)
@@ -590,6 +645,7 @@ def score(answers, made, problems, host):
             f"{'equals' if p.get('audio_equal') else 'is not'} the index's at "
             f"{p.get('audio_index_time')} s")
     score_cancel(get, row)
+    score_original(get, row)
     return results
 
 
@@ -664,6 +720,89 @@ def score_cancel(get, row):
         and a.get("enabled") is False and a.get("visible") is False,
         f"cancelCopy: cancelled {a.get('cancelled')}, button {a.get('title')!r} enabled "
         f"{a.get('enabled')}, window visible {a.get('visible')} ({a.get('window_title')!r})")
+
+
+HINT = "Drag to a timeline track, or onto the canvas. Hold ⌥ to insert, ⇧⌥ to overwrite."
+TALK = "/Users/x/Movies/talk.webm"
+
+
+def score_original(get, row):
+    """B78's rows O31–O43 (spec §11 #228-O)."""
+    o1 = str(SCRATCH / "original" / "o1.webm")
+    a = get("O31")
+    row("O31", a.get("in_rewrapped") is True and a.get("original_path") == o1
+        and a.get("original_bookmark") is True and a.get("dictionary_original_path") == o1
+        and a.get("probe_original") is True and a.get("probe_path_or_bookmark") is False,
+        f"probeBlocking(o1.webm): path {a.get('path')!r} (Rewrapped {a.get('in_rewrapped')}), "
+        f"original {a.get('original_path')!r} with a bookmark {a.get('original_bookmark')}, "
+        f"dictionary's {a.get('dictionary_original_path')!r}; probeDictionary keeps original "
+        f"{a.get('probe_original')}, has path or bookmark {a.get('probe_path_or_bookmark')} "
+        f"{a.get('error', '')}")
+    a = get("O32")
+    row("O32", a.get("probed") is True and a.get("original_nil") is True
+        and a.get("dictionary_has_original") is False,
+        f"the copy's own probe: probed {a.get('probed')}, original nil {a.get('original_nil')}, "
+        f"dictionary has original {a.get('dictionary_has_original')}")
+    a = get("O33")
+    row("O33", a.get("name") == "o1.webm" and a.get("plain_name") == a.get("copy_name")
+        and a.get("copy_name"),
+        f"name {a.get('name')!r}; with no original {a.get('plain_name')!r} "
+        f"(the copy is {a.get('copy_name')!r})")
+    a = get("O34")
+    row("O34", a.get("before") == a.get("o1") and a.get("o1") and a.get("o1_gone") is True
+        and a.get("after") == a.get("copy") and a.get("copy"),
+        f"revealURL {a.get('before')!r} (o1 {a.get('o1')!r}); o1 deleted {a.get('o1_gone')}: "
+        f"{a.get('after')!r} (the copy {a.get('copy')!r})")
+    a = get("O35")
+    wanted = {"none": HINT,
+              "rewrapped": f"{TALK} — copied into Reelcut's Rewrapped folder.\n{HINT}",
+              "packaged": f"{TALK} — copied into this project's package.\n{HINT}"}
+    row("O35", a.get("hint") == HINT and all(a.get(k) == v for k, v in wanted.items()),
+        f"tooltips {[a.get(k) for k in ('none', 'rewrapped', 'packaged')]!r}")
+
+    def landed(a):
+        return a.get("path_exists") is True and a.get("in_rewrapped") is True
+
+    a = get("O36")
+    row("O36", a.get("set_up") is True and landed(a) and a.get("original_path") == o1
+        and a.get("watch_calls") == 1 and a.get("duration") == a.get("want_duration")
+        and a.get("width") == a.get("want_width") and a.get("height") == a.get("want_height"),
+        f"off main: path {a.get('path')!r} exists {a.get('path_exists')}, original "
+        f"{a.get('original_path')!r}, watch called {a.get('watch_calls')}, duration "
+        f"{a.get('duration')}/{a.get('want_duration')}, size {a.get('width')}x{a.get('height')}")
+    a = get("O37")
+    row("O37", a.get("on_main") is True and a.get("watch_calls") == 0 and landed(a),
+        f"on main ({a.get('on_main')}): watch called {a.get('watch_calls')}, path "
+        f"{a.get('path')!r} exists {a.get('path_exists')}")
+    a = get("O38")
+    row("O38", a.get("returned") is True and a.get("unchanged") is True
+        and a.get("copy_exists") is False and a.get("partial_exists") is False,
+        f"cancelAt 0.3: returned {a.get('returned')}, unchanged {a.get('unchanged')}, watch "
+        f"called {a.get('watch_calls')}, copy left {a.get('copy_exists')}, partial "
+        f"{a.get('partial_exists')}")
+    a = get("O39")
+    row("O39", a.get("o1_gone") is True and a.get("unchanged") is True,
+        f"original deleted {a.get('o1_gone')}: unchanged {a.get('unchanged')}")
+    a = get("O40")
+    row("O40", a.get("written") is True and a.get("read") == "ok" and a.get("missing") == []
+        and landed(a) and a.get("original_path") == o1,
+        f"read(from:ofType:) on main: {a.get('read')} {a.get('error', '')}; missing "
+        f"{a.get('missing')}, path {a.get('path')!r}, original {a.get('original_path')!r}")
+    a = get("O41")
+    row("O41", a.get("original_exists") is True and a.get("decoy_made") is True
+        and a.get("set_up") is True and a.get("unchanged") is True,
+        f"a .mov original with a movie at its digest name: unchanged {a.get('unchanged')} "
+        f"(original {a.get('original_exists')}, decoy {a.get('decoy_made')})")
+    a = get("O42")
+    facts = tuple(a.get(k) for k in ("inside", "sibling", "itself", "trash_found", "trashed",
+                                     "copy_trashed"))
+    row("O42", facts == (True, False, False, True, True, False),
+        f"isInside c/sibling/itself, Trash found, isTrashed Trash/copy = {facts}")
+    a = get("O43")
+    row("O43", a.get("held") is True and a.get("set_up") is True and landed(a)
+        and a.get("original_path") == o1 and a.get("kept_unchanged") is True,
+        f"a copy in fakeTrash: path {a.get('path')!r} exists {a.get('path_exists')}, original "
+        f"{a.get('original_path')!r}; with trashed false unchanged {a.get('kept_unchanged')}")
 
 
 def main():

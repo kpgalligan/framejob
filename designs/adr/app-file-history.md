@@ -446,7 +446,8 @@ What follows is only the SEAM each over-cap or at-edge file's record named, so t
 to pay a toll starts from it. A file not listed has no named seam yet.
 
 - `ProjectSnapshot.swift`: a property group's snapshot types out, whole. The precedents are
-  `TextProps.swift` and `ProjectSnapshot+Graphic.swift`.
+  `TextProps.swift`, `ProjectSnapshot+Graphic.swift` and `MediaSnapshot.swift` (issue batch
+  B78, a pure move gated alone before `original` landed).
 - `ReelCore.swift`: the typed patches moved to `TypedPatches.swift` in issue batch B73 (#216), a
   pure move gated alone before `ReelContainer` landed; no further seam is named. The `dictionary`
   extensions went to `OpDictionaries.swift` in issue batch B52b (#190), the media helpers earlier

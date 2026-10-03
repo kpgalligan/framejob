@@ -11,6 +11,7 @@
 
 mod common;
 
+use reelcut_core::format::RC_FORMAT_VERSION;
 use serde_json::{json, Value};
 
 use common::{at, text, Handle};
@@ -20,6 +21,20 @@ const SEC: i64 = 600_000;
 
 /// Road map 10 §5g's clip 40, as the writer writes it.
 const FIXTURE: &str = include_str!("fixtures/graphic_v10.json");
+
+/// `fixture` as the writer writes it today: its `"version": 10,` line
+/// stamped with the current version, once, and nothing else changed.
+fn current(fixture: &str) -> String {
+    assert!(
+        fixture.contains("\"version\": 10,"),
+        "the fixture's version line was not where expected"
+    );
+    fixture.replacen(
+        "\"version\": 10,",
+        &format!("\"version\": {RC_FORMAT_VERSION},"),
+        1,
+    )
+}
 
 /// `schema_v9.rs`'s page: one text clip whose group carries the three
 /// version-9 keys, written as a file of `version`.
@@ -74,7 +89,11 @@ fn written_keys(written: &str, opener: &str) -> Vec<String> {
 fn every_older_version_reads_with_graphic_null() {
     for version in [9, 8, 7, 6, 5, 4, 3, 2, 1] {
         let project = Handle::from_value(&page(version)).value();
-        assert_eq!(at(&project, "/version"), &json!(10), "version {version}");
+        assert_eq!(
+            at(&project, "/version"),
+            &json!(RC_FORMAT_VERSION),
+            "version {version}"
+        );
         assert_eq!(
             at(&project, "/clips/0/graphic"),
             &Value::Null,
@@ -87,7 +106,7 @@ fn every_older_version_reads_with_graphic_null() {
 fn a_version_9_page_keeps_every_text_key() {
     let before = page(9);
     let project = Handle::from_value(&before).value();
-    assert_eq!(at(&project, "/version"), &json!(10));
+    assert_eq!(at(&project, "/version"), &json!(RC_FORMAT_VERSION));
     assert_eq!(at(&project, "/clips/0/graphic"), &Value::Null);
     assert_eq!(
         text(&project, "/clips/0/text/content"),
@@ -105,16 +124,17 @@ fn a_version_9_page_keeps_every_text_key() {
 
 #[test]
 fn the_fixture_round_trips_byte_for_byte_twice() {
+    let expected = current(FIXTURE);
     let first = Handle::from_json(FIXTURE).to_json();
-    assert_eq!(first, FIXTURE, "the first write changed the bytes");
+    assert_eq!(first, expected, "the first write changed the bytes");
     let second = Handle::from_json(&first).to_json();
-    assert_eq!(second, FIXTURE, "the second write changed the bytes");
+    assert_eq!(second, expected, "the second write changed the bytes");
 }
 
 #[test]
 fn the_fixture_is_road_map_10s_clip() {
     let project = Handle::from_json(FIXTURE).value();
-    assert_eq!(at(&project, "/version"), &json!(10));
+    assert_eq!(at(&project, "/version"), &json!(RC_FORMAT_VERSION));
     assert_eq!(at(&project, "/clips/0/source"), &json!({"kind": "graphic"}));
     assert_eq!(
         at(&project, "/clips/0/graphic"),
@@ -163,7 +183,7 @@ fn props_come_back_in_the_files_order() {
     );
     let written = Handle::from_json(&swapped).to_json();
     assert_eq!(written_keys(&written, "\"props\": {"), ["accent", "title"]);
-    assert_eq!(written, swapped);
+    assert_eq!(written, current(&swapped));
 }
 
 // ---- validate ------------------------------------------------------------

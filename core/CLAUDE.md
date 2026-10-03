@@ -296,7 +296,8 @@ governs a module now.
   flags, refuses a file of another kind in its own sentence, and holds every
   `media`-source clip of it, on the timeline and in every stored nest, whose
   duration runs past the new file's window to `source_window.rs`'s
-  `duration_resnapped`. No probe keeps the record (Consolidate, the open-time
+  `duration_resnapped`. A probe's `original` replaces the stored one (none
+  clears it). No probe keeps the record (Consolidate, the open-time
   re-anchor).
 - `edit_canvas.rs` — the document's own shape: `set_canvas` and the three
   things it does to the rest of the document — `check_dimension` (a
@@ -638,7 +639,7 @@ Export names mirror the Rust method exactly.
 `RC_FORMAT_VERSION` in `format.rs` **and** the `#define` in
 `core/include/reelcut_core.h`; the reader must keep accepting every prior
 version; the writer enforces the reader's caps. A bump whose new fields all
-carry a serde default needs no migrate step (versions 3 through 10 have none)
+carry a serde default needs no migrate step (versions 3 through 11 have none)
 but still bumps, because unknown keys are ignored at every level by design
 and an older build would otherwise open the file, drop the new fields on read
 and write the loss back on the next save; a bump that changes a field's
@@ -654,6 +655,9 @@ literal**, so a bump edits `format.rs` and the header and no test or proof:
 - `schema_v3.rs`'s `the_header_states_the_same_format_version_as_the_core`
   holds the header's `#define` to `format.rs`'s constant, so a bump that
   moves only one of them fails `make test`.
+- The schema tests' and `model_tests.rs`'s `/version` assertions read
+  `RC_FORMAT_VERSION`; `schema_v10.rs`'s byte-for-byte round trips rewrite
+  the fixture's version line through its `current()` helper.
 - The proof scripts (`tools/proof/*_proof.py`) read the HEADER's number
   through a `format_version()` helper. `phase9`'s "one past" fixture is
   `format_version() + 1`, and its every-version loop runs up to the current

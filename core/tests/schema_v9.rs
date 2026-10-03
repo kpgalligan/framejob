@@ -14,6 +14,7 @@
 
 mod common;
 
+use reelcut_core::format::RC_FORMAT_VERSION;
 use serde_json::{json, Value};
 
 use common::{array, at, int, text, Handle};
@@ -83,7 +84,11 @@ fn set_text(patch: Value) -> Value {
 fn every_older_version_reads_with_the_three_keys_at_their_defaults() {
     for version in [9, 8, 7, 6, 5, 4, 3, 2, 1] {
         let project = Handle::from_value(&page(version, json!({}))).value();
-        assert_eq!(at(&project, "/version"), &json!(10), "version {version}");
+        assert_eq!(
+            at(&project, "/version"),
+            &json!(RC_FORMAT_VERSION),
+            "version {version}"
+        );
         assert_eq!(text(&project, "/clips/0/text/case"), "as_written");
         assert_eq!(at(&project, "/clips/0/text/words"), &json!([]));
         assert_eq!(at(&project, "/clips/0/text/word_style"), &Value::Null);

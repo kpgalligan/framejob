@@ -137,6 +137,19 @@ pub struct Media {
     pub has_audio: bool,
     #[serde(default)]
     pub has_alpha: bool,
+    #[serde(default)]
+    pub original: Option<MediaOriginal>,
+}
+
+/// The file a playable copy was made from (format version 11, spec §11
+/// #228-O): a WebM or Matroska file the app copied into a `.mov`. `path`
+/// and `bookmark` above are the copy's; these are the original's, which is
+/// what the app names, reveals and copies again when the copy is gone.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MediaOriginal {
+    pub path: String,
+    #[serde(default)]
+    pub bookmark: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

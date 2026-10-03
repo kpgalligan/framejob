@@ -171,7 +171,9 @@ extension MediaImporter {
     /// drops (`ProjectDocument.probeNext`), and the agent's `import_media`
     /// (`AgentServer+Media.probe`) — so an MKV opens the same way in all of
     /// them, and `assist` answering `nil` leaves all four with exactly the
-    /// failure they report on a machine that has no ffmpeg.
+    /// failure they report on a machine that has no ffmpeg. The built-in
+    /// copy records the file it was made from as the descriptor's
+    /// `original` (spec §11 #228-O), on every door alike.
     ///
     /// **Who may be asked is decided by the caller** (spec §11 MC-5), never
     /// read from process-wide state: each place a tool call hands work to the
@@ -235,13 +237,16 @@ extension MediaImporter {
         }
     }
 
-    /// The built-in copy of `source` probed. A copy the one-frame decode
+    /// The built-in copy of `source` probed, with `source` recorded as its
+    /// `original` (spec §11 #228-O). A copy the one-frame decode
     /// refuses is thrown away and refused in the source's name (#216's
     /// backstop); any other failure throws the copy away too, so the next
     /// import copies again rather than reuse a movie that will not open.
     private static func probeCopy(_ copy: URL, of source: URL) throws -> MediaDescriptor {
         do {
-            return try waitForProbe(copy)
+            var descriptor = try waitForProbe(copy)
+            descriptor.original = MediaOriginal(of: source)
+            return descriptor
         } catch ImportError.undecodable(_, let sentence) {
             FFmpegRewrap.discard(copy)
             let copyName = copy.lastPathComponent
@@ -252,6 +257,13 @@ extension MediaImporter {
             FFmpegRewrap.discard(copy)
             throw ContainerRewrapError.failed(source, reason: "the copied movie could not be read")
         }
+    }
+
+    /// The built-in copy of `source`, probed: the open-time re-copy of a
+    /// copy that is gone (`ProjectDocument.recopyingMissingCopies`, spec §11
+    /// #228-O). Never ffmpeg and never a question; `watch` as `assist`'s.
+    static func probeBuiltInCopy(of source: URL, watch: RewrapWatch?) throws -> MediaDescriptor {
+        try probeCopy(try ContainerRewrap.assist(source, watch: watch), of: source)
     }
 
     /// The BLOCKING face of `probe`, for `ProjectDocument.read(from:ofType:)`.

@@ -8,7 +8,8 @@
 //! file of another kind is refused, and every media clip of it whose window
 //! now runs past a SHORTER file's end is held to it. Without a probe the
 //! record is kept: Consolidate and the open-time re-anchor point at a copy
-//! of the same file.
+//! of the same file. A probe's `original` (spec §11 #228-O) replaces the
+//! stored one, so a probe without one clears it, and no probe keeps it.
 //!
 //! Cut out of `edit_track.rs`, which keeps the media list's other two ops
 //! and the two things this one shares with `add_media`: `MEDIA_KEYS` and
@@ -19,7 +20,7 @@ use std::mem;
 
 use serde_json::Value;
 
-use crate::edit_track::{check_media_fields, MEDIA_KEYS};
+use crate::edit_track::{check_media_fields, normalize_original, MEDIA_KEYS};
 use crate::export::describe;
 use crate::model::{Clip, Media, MediaKind, Project, Source};
 use crate::outcome::Outcome;
@@ -49,9 +50,10 @@ impl Project {
     /// `add_media` would refuse; then a REFUSAL for a file of another kind,
     /// because each clip's source kind was chosen from it.
     ///
-    /// A probed relink writes `duration`, `width`, `height`, `fps` and the
-    /// three flags, then holds each `media`-source clip of this media — on
-    /// the timeline and in every stored nest, orphans included — whose
+    /// A probed relink writes `duration`, `width`, `height`, `fps`, the
+    /// three flags and `original` (none in the probe clears it), then
+    /// holds each `media`-source clip of this media — on the timeline and
+    /// in every stored nest, orphans included — whose
     /// duration exceeds the window the file now holds to
     /// `duration_resnapped` (D4-4): on the grid, at least one frame, the
     /// frame floor winning for a clip whose `in` is past the new end.
@@ -99,6 +101,7 @@ impl Project {
                 found.has_video = new.has_video;
                 found.has_audio = new.has_audio;
                 found.has_alpha = new.has_alpha;
+                found.original = new.original.clone();
             }
         }
         if probed.is_some() {
@@ -154,8 +157,9 @@ fn read_probe(media: u32, path: &str, probe: &Value) -> Result<Media, String> {
     let mut record = fields.clone();
     record.insert("id".to_string(), Value::from(media));
     record.insert("path".to_string(), Value::from(path));
-    let record: Media = serde_json::from_value(Value::Object(record))
+    let mut record: Media = serde_json::from_value(Value::Object(record))
         .map_err(|e| format!("relink probe does not match the schema: {e}"))?;
+    record.original = normalize_original(record.original);
     check_media_fields(&record)?;
     Ok(record)
 }

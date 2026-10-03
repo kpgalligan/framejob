@@ -117,7 +117,8 @@ fn a_probe_sets_every_probed_field() {
         media_one(&relinked()),
         json!({"id": 1, "path": "/m/short.mov", "bookmark": "BM", "kind": "video",
                "duration": 3_000_000, "width": 1280, "height": 720, "fps": [25, 1],
-               "has_video": true, "has_audio": false, "has_alpha": true})
+               "has_video": true, "has_audio": false, "has_alpha": true,
+               "original": null})
     );
 }
 

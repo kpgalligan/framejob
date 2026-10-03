@@ -37,9 +37,10 @@ detail there.
   `GraphicModule` (`compile`, `describeJSON`, `svg`; it holds its library
   strongly), with `GraphicDiagnostic`, `GraphicFailure` (what a `diag_out`
   failure throws; `err_out` stays `ReelCoreError`) and `GraphicRaster`.
-  `MediaDescriptor`, `mediaURL(for:)` and `bookmarkString(for:)` are
-  `MediaDescriptor.swift`'s: a `media[]` element minus its id, and the
-  media-file resolvers; they call no `rc_*`.
+  `MediaDescriptor`, `MediaOriginal`, `mediaURL(for:)`, `originalURL(for:)`,
+  `revealURL(for:)` (the original, else the copy), `isTrashed` and
+  `bookmarkString(for:)` are `MediaDescriptor.swift`'s: a `media[]` element
+  minus its id, and the media-file resolvers; they call no `rc_*`.
   It is also where the op table is read BACK: `ReelOp.coreNames()` over
   `rc_op_names`, and `ReelOp.coreSchemas()` over `rc_op_schemas` — every
   op's ARGUMENTS as JSON Schema, keyed by op name, which
@@ -97,8 +98,10 @@ detail there.
   stop the list** — a later op still runs after one, exactly as after an
   identity — and the FIRST refusal is answered only when nothing applied.
 - `ProjectSnapshot.swift` · `TextProps.swift` · `MotionProps.swift` ·
-  `WordProps.swift` — the `Codable`, READ-ONLY mirror of spec §5.2 every view
-  draws from. **Its enums decode LENIENTLY**
+  `WordProps.swift` · `MediaSnapshot.swift` — the `Codable`, READ-ONLY mirror
+  of spec §5.2 every view draws from. `MediaSnapshot` (a pure move out of
+  `ProjectSnapshot.swift`) carries a WebM/MKV's `original`, and its `name` is
+  the one display-name spelling: the original's name when one is recorded. **Its enums decode LENIENTLY**
   — a misspelt kind becomes the first case, a `T??` field a clear — which is
   why a caller-authored object is never decoded through them (below). The
   one exception is `ClipSource`: an unknown `source.kind` THROWS, and
@@ -179,6 +182,10 @@ detail there.
   carrying each descriptor as `relink_media`'s `probe`, spec §11 #63, then
   `generateCaches()`; the missing-media sheet's door then alerts each
   unreadable file and each refused sentence (#180) through `present(_:)`).
+  `+MissingCopies` re-copies, on open, a WebM/MKV copy that is missing or in
+  the Trash from its recorded original (spec §11 #228-O), through
+  `MediaImporter.probeBuiltInCopy` (never ffmpeg, never a question); a
+  main-thread read (an agent's `open_project`) passes no watch.
   `+Alerts` is `present(_:)`: every error the document shows waits in one
   queue (`DocumentAlertQueue`) and shows one alert sheet at a time, each asked
   for a main-queue turn after the last one's `didPresent` or the window's last

@@ -452,7 +452,7 @@ fn full_project() -> Value {
     clips.push(clip40);
 
     json!({
-        "version": 10,
+        "version": RC_FORMAT_VERSION,
         "canvas": {
             "width": 1280, "height": 720, "fps": [30000, 1001],
             "background": [0.1, 0.2, 0.3, 1.0],
@@ -704,7 +704,7 @@ fn a_new_project_is_the_documented_empty_project() {
     assert_eq!(
         project.value(),
         json!({
-            "version": 10,
+            "version": RC_FORMAT_VERSION,
             "canvas": {
                 "width": 1280, "height": 720, "fps": [30000, 1001],
                 "background": [0.0, 0.0, 0.0, 1.0],
@@ -740,7 +740,7 @@ fn an_empty_object_is_an_empty_project() {
     assert_eq!(
         project,
         json!({
-            "version": 10,
+            "version": RC_FORMAT_VERSION,
             "canvas": {
                 "width": 1920, "height": 1080, "fps": [30, 1],
                 "background": [0.0, 0.0, 0.0, 1.0],
@@ -775,7 +775,7 @@ fn omitted_optional_keys_take_the_documented_defaults() {
     }))
     .value();
 
-    assert_eq!(at(&project, "/version"), &json!(10));
+    assert_eq!(at(&project, "/version"), &json!(RC_FORMAT_VERSION));
     // A file that never heard of nests reads as one with none, which is
     // what "every new field carries a serde default" buys.
     assert_eq!(at(&project, "/nests"), &json!([]));
@@ -784,7 +784,8 @@ fn omitted_optional_keys_take_the_documented_defaults() {
         &json!({
             "id": 4, "path": "/x.mov", "bookmark": null, "kind": "video",
             "duration": 0, "width": 0, "height": 0, "fps": [30, 1],
-            "has_video": false, "has_audio": false, "has_alpha": false
+            "has_video": false, "has_audio": false, "has_alpha": false,
+            "original": null
         }),
         "media defaults"
     );
@@ -1096,12 +1097,15 @@ fn every_prior_version_is_accepted_and_the_writer_stamps_the_current_one() {
     for version in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] {
         assert_eq!(
             Handle::from_value(&json!({ "version": version })).value()["version"],
-            json!(10),
+            json!(RC_FORMAT_VERSION),
             "version {version} did not read back as the current version"
         );
     }
     // Absent, the version defaults to current rather than to 0.
-    assert_eq!(Handle::from_json("{}").value()["version"], json!(10));
+    assert_eq!(
+        Handle::from_json("{}").value()["version"],
+        json!(RC_FORMAT_VERSION)
+    );
 }
 
 #[test]

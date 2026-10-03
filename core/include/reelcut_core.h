@@ -80,8 +80,14 @@ extern "C" {
  * module in the package's `graphics/` that draws it, its size, its own
  * timeline and its props in the caller's key order. It defaults to null,
  * so there is no migration step; an older build would drop every graphic
- * clip's description and leave a clip that draws nothing. */
-#define RC_FORMAT_VERSION 10
+ * clip's description and leave a clip that draws nothing.
+ *
+ * Version 11 is a copy's original: the media key `original`, last —
+ * `{path, bookmark}`, the WebM or Matroska file the app copied into a
+ * playable .mov, which the app names, reveals and copies again when the copy
+ * is gone. It defaults to null, so there is no migration step; an older
+ * build would drop it and leave nothing to copy the media again from. */
+#define RC_FORMAT_VERSION 11
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips

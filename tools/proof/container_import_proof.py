@@ -37,6 +37,19 @@ Rows:
   import answers `p10-<16 hex>.mov` directly inside `Rewrapped/` with
   `has_audio`, and an H.264 export of its placed clip lasts 2 s (±0.05)
   with an audio RMS over 0.01 (M4's helpers).
+- **M8** (issue batch B78, spec §11 #228-O): `import_media` of P2 answers
+  `original` = p2.webm, and `get_project`'s media has a `Rewrapped/` path and
+  `original.path` = p2.webm.
+- **M9**: M8's project saved and closed, its `project.json` media `path`
+  rewritten to `/nonexistent-b78/<copy name>` with `bookmark` null and the
+  `Rewrapped/` copy deleted: `open_project` answers no `missing_media`, a
+  `Rewrapped/` path that exists and `original.path` = p2.webm — the re-copy
+  on open, with no window and no question (MC-5).
+- **M10**: `relink_media` of that media to P3 answers `original` = p3.mkv;
+  to ffmpeg's `-c copy` MP4 of P1 it answers no `original` and `get_project`
+  shows `original: null`.
+- **M11**: a saved project imports P1, then `consolidate_media`: the path is
+  inside the package's `media/` and `original.path` = p1.webm.
 
 `--mutant ffmpeg-copy` imports ffmpeg's `-c copy` MP4 of P1 in M2's place:
 M2 must fail (that copy lands frame 47 a frame early) and nothing else, and
@@ -45,6 +58,7 @@ then it prints MUTANT PASS and exits 0. Rows print `<ID> ok|FAIL|skip —
 """
 
 import argparse
+import json
 import math
 import os
 import re
@@ -181,6 +195,89 @@ def refusal_row(mcp, where, row_id, path, sentence, opened):
             f"Rewrapped/ {'unchanged' if listing() == files else 'CHANGED'}")
 
 
+def same(a, b):
+    return a is not None and b is not None and os.path.realpath(a) == os.path.realpath(b)
+
+
+def first_media(mcp, project):
+    return mcp.call("get_project", project=project)["project"]["media"][0]
+
+
+def original_rows(mcp, where, fixtures, opened):
+    """B78's M8–M11 (spec §11 #228-O)."""
+    p2 = fixtures["p2.webm"]
+    # M8
+    m8 = new_project(mcp, where, "m8", opened)
+    try:
+        answer = mcp.call("import_media", project=m8, path=p2)
+        media = first_media(mcp, m8)
+        original = (media.get("original") or {}).get("path")
+        row("M8", same(answer.get("original"), p2)
+            and os.path.dirname(media["path"]) == REWRAPPED and same(original, p2),
+            f"import answers original {answer.get('original')!r}; get_project path "
+            f"{media['path']!r}, original {original!r}")
+    except ToolError as error:
+        row("M8", False, f"refused: {error}")
+        return
+    # M9
+    try:
+        mcp.call("save_project", project=m8)
+        mcp.call("close_project", project=m8)
+        opened.remove(m8)
+        json_path = os.path.join(m8, "project.json")
+        with open(json_path, encoding="utf-8") as stream:
+            document = json.load(stream)
+        copy = document["media"][0]["path"]
+        document["media"][0]["path"] = "/nonexistent-b78/" + os.path.basename(copy)
+        document["media"][0]["bookmark"] = None
+        with open(json_path, "w", encoding="utf-8") as stream:
+            json.dump(document, stream, indent=2)
+        deleted = False
+        if (DIGEST_NAME.match(os.path.basename(copy)) and os.path.dirname(copy) == REWRAPPED
+                and os.path.exists(copy)):
+            os.remove(copy)
+            deleted = True
+        opened_answer = mcp.call("open_project", path=m8)
+        opened.append(m8)
+        media = first_media(mcp, m8)
+        original = (media.get("original") or {}).get("path")
+        missing = opened_answer.get("project", {}).get("missing_media")
+        row("M9", deleted and missing is None and os.path.dirname(media["path"]) == REWRAPPED
+            and os.path.exists(media["path"]) and same(original, p2),
+            f"copy deleted {deleted}; open_project missing_media {missing}; path "
+            f"{media['path']!r} exists {os.path.exists(media['path'])}, original {original!r}")
+    except (ToolError, OSError, KeyError, ValueError) as error:
+        row("M9", False, f"{type(error).__name__}: {error}")
+    # M10
+    try:
+        media_id = first_media(mcp, m8)["id"]
+        to_mkv = mcp.call("relink_media", project=m8, media=media_id, path=fixtures["p3.mkv"])
+        to_mp4 = mcp.call("relink_media", project=m8, media=media_id,
+                          path=fixtures["p1-copy.mp4"])
+        after = first_media(mcp, m8)
+        row("M10", same(to_mkv.get("original"), fixtures["p3.mkv"])
+            and "original" not in to_mp4 and "original" in after
+            and after["original"] is None,
+            f"to p3.mkv answers original {to_mkv.get('original')!r}; to p1-copy.mp4 has "
+            f"original {'original' in to_mp4}; get_project original "
+            f"{after.get('original', 'ABSENT')!r}")
+    except ToolError as error:
+        row("M10", False, f"refused: {error}")
+    # M11
+    m11 = new_project(mcp, where, "m11", opened)
+    try:
+        mcp.call("import_media", project=m11, path=fixtures["p1.webm"])
+        mcp.call("consolidate_media", project=m11)
+        media = first_media(mcp, m11)
+        original = (media.get("original") or {}).get("path")
+        inside = same(os.path.dirname(media["path"]), os.path.join(m11, "media"))
+        row("M11", inside and same(original, fixtures["p1.webm"]),
+            f"after consolidate_media: path {media['path']!r} (in the package's media/ "
+            f"{inside}), original {original!r}")
+    except ToolError as error:
+        row("M11", False, f"refused: {error}")
+
+
 def run(mcp, where, fixtures, mutant):
     opened = []
     try:
@@ -265,6 +362,7 @@ def run(mcp, where, fixtures, mutant):
                 f"{answer['has_audio']}; export {seconds} s, audio RMS {rms:.4f}")
         except ToolError as error:
             row("M7", False, f"refused: {error}")
+        original_rows(mcp, where, fixtures, opened)
     finally:
         closed = True
         for path in opened:

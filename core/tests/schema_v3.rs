@@ -86,7 +86,7 @@ fn identified() -> Value {
 }
 
 fn assert_identity_defaults(project: &Value) {
-    assert_eq!(at(project, "/version"), &json!(10));
+    assert_eq!(at(project, "/version"), &json!(RC_FORMAT_VERSION));
     assert_eq!(at(project, "/clips/0/name"), &Value::Null);
     assert_eq!(at(project, "/clips/0/label"), &Value::Null);
     assert_eq!(at(project, "/tracks/0/solo"), &json!(false));
@@ -151,7 +151,7 @@ fn name_label_and_solo_round_trip_exactly() {
     // spaces: trimming is `set_clip`'s job, and a reader that tidied would
     // rewrite a file just by opening it.
     let written = Handle::from_value(&identified()).value();
-    assert_eq!(at(&written, "/version"), &json!(10));
+    assert_eq!(at(&written, "/version"), &json!(RC_FORMAT_VERSION));
     assert_eq!(text(&written, "/clips/0/name"), NAME);
     assert_eq!(text(&written, "/clips/0/label"), "blue");
     assert!(flag(&written, "/tracks/0/solo"));

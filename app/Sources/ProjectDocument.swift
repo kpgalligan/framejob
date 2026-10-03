@@ -533,7 +533,7 @@ final class ProjectDocument: NSDocument {
             throw ReelCoreError(
                 message: "\(url.lastPathComponent) does not contain a readable project.json.")
         }
-        project = Self.reanchoringConsolidatedMedia(try ReelProject.from(json: text), package: url)
+        project = Self.repairingMedia(try ReelProject.from(json: text), package: url)
         // Four of the five pieces of view state; the fifth is `nestPath`, and
         // it is `read(from:ofType:)`'s `clampViewState()` rather than a line
         // here — that method's doc says why the scope cannot be zeroed in
@@ -558,7 +558,7 @@ final class ProjectDocument: NSDocument {
     /// Not an edit. It runs on the read queue before the document exists as
     /// far as AppKit is concerned, registers no undo step and dirties
     /// nothing; the new paths are written out by whatever save comes next.
-    private static func reanchoringConsolidatedMedia(
+    static func reanchoringConsolidatedMedia(
         _ project: ReelProject, package: URL
     ) -> ReelProject {
         let directory = package.appendingPathComponent(mediaDirectoryName, isDirectory: true)

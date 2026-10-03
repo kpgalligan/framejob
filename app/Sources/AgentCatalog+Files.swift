@@ -222,7 +222,9 @@ extension AgentServer {
                     + "yet: place it with add_clip {track, media, at}. The result also reports "
                     + "what the probe found (kind, duration, display size, frame rate, whether "
                     + "it has video, audio or an alpha channel), which is what you need to place "
-                    + "and size it.",
+                    + "and size it. A WebM or Matroska file is copied into a .mov first: the "
+                    + "result's path is the copy and its original is the file you named, which "
+                    + "the media is named after.",
                 ["path": ["type": "string", "description": "Absolute or ~ path to the file."]],
                 required: ["path"]),
         ]
@@ -248,8 +250,10 @@ extension AgentServer {
                 "The raw op behind import_media: adds a media entry from a descriptor you "
                     + "supply — the media[] element of the project JSON minus its id (path, "
                     + "bookmark, kind, duration, width, height, fps [num, den], has_video, "
-                    + "has_audio, has_alpha). Probing files is the host's job, so unless you are "
-                    + "replaying a project's own JSON, call import_media and let it probe.",
+                    + "has_audio, has_alpha, original {path, bookmark?} — the WebM or Matroska "
+                    + "file a .mov copy was made from). Probing files is the host's job, so "
+                    + "unless you are replaying a project's own JSON, call import_media and let "
+                    + "it probe.",
                 ["descriptor": "The media entry to add; only path is required."]),
             opTool(
                 "relink_media",
@@ -258,7 +262,9 @@ extension AgentServer {
                     + "duration, size, frame rate and audio/video/alpha flags. A file of another "
                     + "kind (audio for a video entry, say) is refused. A clip that runs past the "
                     + "end of a shorter file is shortened to end with it. A bookmark for the new "
-                    + "location is stored so the next move is followed automatically. "
+                    + "location is stored so the next move is followed automatically. A WebM or "
+                    + "Matroska file is copied into a .mov first and recorded as the entry's new "
+                    + "original (the result's original); any other file clears it. "
                     + "get_project's missing_media names the entries that need this.",
                 [
                     "media": "Media id.",

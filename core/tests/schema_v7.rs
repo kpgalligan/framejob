@@ -44,6 +44,7 @@
 
 mod common;
 
+use reelcut_core::format::RC_FORMAT_VERSION;
 use serde_json::{json, Value};
 
 use common::{at, num, text, Handle};
@@ -138,7 +139,7 @@ fn set_transition(kind: Value) -> Value {
 // ---- reading older files -------------------------------------------------
 
 fn assert_file_default(project: &Value) {
-    assert_eq!(at(project, "/version"), &json!(10));
+    assert_eq!(at(project, "/version"), &json!(RC_FORMAT_VERSION));
     let transition = at(project, "/clips/1/transition_in");
     assert_eq!(text(transition, "/kind"), "wipe");
     assert_eq!(text(transition, "/curve"), "linear");
@@ -193,7 +194,7 @@ fn a_curve_and_a_crossfade_round_trip_exactly() {
     source["clips"][1]["transition_in"] =
         json!({ "kind": "wipe_up", "curve": "ease_out", "audio": true });
     let written = Handle::from_value(&source).value();
-    assert_eq!(at(&written, "/version"), &json!(10));
+    assert_eq!(at(&written, "/version"), &json!(RC_FORMAT_VERSION));
     assert_eq!(
         at(&written, "/clips/1/transition_in"),
         &json!({ "kind": "wipe_up", "curve": "ease_out", "audio": true }),

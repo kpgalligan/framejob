@@ -170,7 +170,15 @@ use crate::model::{Canvas, Project};
 /// which module, at what size, over which stretch of its timeline, with
 /// which props — leaving a clip that draws nothing and a file with nothing
 /// left in it to say what it drew.
-pub const RC_FORMAT_VERSION: u32 = 10;
+///
+/// Version 11 is a copy's original (spec §11 #228-O): the media key
+/// [`crate::model::Media::original`], placed last — the `{path, bookmark}`
+/// of the WebM or Matroska file the app copied into a playable `.mov`, which
+/// the app names, reveals and copies again when the copy is gone. It
+/// defaults to `None`, so there is no migration step; an older build would
+/// drop it and leave a media named after its copy, with nothing left to
+/// copy it again from.
+pub const RC_FORMAT_VERSION: u32 = 11;
 
 /// Reader caps, mirrored by the `RC_MAX_*` defines in the C header. They
 /// exist so a corrupt or generated file cannot make the app allocate

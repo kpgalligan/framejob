@@ -655,7 +655,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   no progress or Cancel in this phase (a copy runs at about disk speed); a
   document opened from the Finder blocks the main thread for the copy, as
   ffmpeg's conversion already does; the Media tab names the copy, not the
-  original; the copy lives outside the package until Consolidate.
+  original (amended by #228-O); the copy lives outside the package until Consolidate.
   **Amended by #228-V** (issue batch B77): Vorbis is copied.
 - **#228-P — A person's WebM or Matroska copy shows its progress in a small
   window with Cancel, and a tool call's copy shows nothing** (issue batch
@@ -735,3 +735,49 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   trim, so the copy's sound may run up to one packet past the source's
   (144384 samples decoded where ffmpeg decodes 144000); and the headers'
   parse on every open.
+- **#228-O — A WebM or Matroska copy remembers its original: the media
+  is named after it, Reveal in Finder opens it, a relink to another WebM
+  records the new one, and a copy that is gone is copied again on open**
+  (issue batch B78, #228 part 3; the owner, 2026-10-03, O10–O13 and Q1–Q4).
+  **What is stored:** the media key `original`, `{path, bookmark}`, last in
+  the media object, written `null` when there is none — format version 11,
+  because an older build would drop it. The built-in copy records it on the
+  descriptor (`MediaImporter.probeCopy`, the original's path and a
+  bookmark of it); `path` and `bookmark` stay the copy's, so everything that
+  plays, caches or consolidates reads the `.mov` as before. ffmpeg's opt-in
+  conversions record none and keep the `.mov`'s name (Q4). **Display:**
+  `MediaSnapshot.name` is the one spelling of a media's display name — the
+  original's last path component, else the path's — so the Media tab, clip
+  labels, the relink sheets, Consolidate's messages and the search all read
+  `talk.webm`. **The tooltip** of a Media tab row says where the copy lives,
+  on its own line above the drag hint: "`<original path>` — copied into
+  Reelcut's Rewrapped folder." while the copy's folder is
+  `…/Reelcut/Rewrapped`, and "`<original path>` — copied into this
+  project's package." otherwise, as after Consolidate (Q1, Q2). There is no
+  badge and no path line. **Reveal in Finder** opens the original, or the
+  copy when the original is gone (O11). **Relink:** the probe carries
+  `original`, so a relink to a WebM records the new original (copied again,
+  with #228-P's window) and a relink to any other file clears it (O12).
+  Consolidate and the open-time re-anchor relink with no probe and keep it;
+  Consolidate still copies the `.mov`, and the name stays the original's
+  (Q2). **The re-copy on open** (`ProjectDocument+MissingCopies.swift`,
+  after the re-anchor): a media whose copy is gone — `mediaURL(for:)`
+  resolves nothing, or resolves inside the Trash, where Finder's delete
+  moves the copy and its bookmark follows — whose original resolves and is
+  still a Matroska file is copied again by the built-in copy only (never
+  ffmpeg, never a question) and relinked to it with its probe, with no undo
+  step, nothing dirtied and no alert. Each copy has #228-P's window after
+  1 s, unless the read is on the main thread. A Cancel or a failure skips
+  that media: it opens missing (the slate, the badge, Relink…), with no
+  alert, and the next open tries again (Q3); a copy in the Trash keeps
+  playing from there. The Trash counts as gone for this re-copy only; every
+  other reader of `mediaURL(for:)` is unchanged. **Tool calls:**
+  `open_project` reads on main inside `withoutAsking`, so its re-copy shows
+  no window and raises no question (MC-5) and blocks the main thread for the
+  copy's length (#231). `import_media` and `relink_media` answer
+  `"original"`, the original's path, when one is recorded; `add_media`'s
+  descriptor takes `original` as `{path, bookmark?}`; `get_project` carries
+  it as the model's own JSON. **The risks it accepts:** a copy that is gone
+  while its original has also moved stays missing until a Relink; a re-copy
+  on an agent's `open_project` freezes the window, as #228-P's does; the
+  copy's folder is still Application Support until #226.

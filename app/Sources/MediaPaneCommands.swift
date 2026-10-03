@@ -142,9 +142,9 @@ extension MediaPane {
         inspector?.onCommand?(#selector(EditorViewController.revealSelectionInTimeline(_:)))
     }
 
-    /// The row menu's Reveal in Finder.
+    /// The row menu's Reveal in Finder: a copy's original, else the file.
     func reveal(_ media: UInt32) {
-        guard let entry = binding.snapshot.media(media), let url = mediaURL(for: entry) else {
+        guard let entry = binding.snapshot.media(media), let url = revealURL(for: entry) else {
             NSSound.beep()
             return
         }

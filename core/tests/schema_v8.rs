@@ -44,6 +44,7 @@
 
 mod common;
 
+use reelcut_core::format::RC_FORMAT_VERSION;
 use serde_json::{json, Value};
 
 use common::{array, at, num, text, Handle};
@@ -122,7 +123,7 @@ fn set_video(patch: Value) -> Value {
 // ---- reading older files -------------------------------------------------
 
 fn assert_no_motion(project: &Value) {
-    assert_eq!(at(project, "/version"), &json!(10));
+    assert_eq!(at(project, "/version"), &json!(RC_FORMAT_VERSION));
     assert_eq!(at(project, "/clips/0/video/motion"), &Value::Null);
     // The neighbours a version-8 reader adds nothing to, so a file that
     // gained one defaulted key gained ONLY that.
@@ -167,7 +168,7 @@ fn the_derived_default_is_the_absence_of_the_key() {
 #[test]
 fn a_full_motion_round_trips_exactly() {
     let written = Handle::from_value(&moving(8, Some(full_motion()))).value();
-    assert_eq!(at(&written, "/version"), &json!(10));
+    assert_eq!(at(&written, "/version"), &json!(RC_FORMAT_VERSION));
     assert_eq!(
         at(&written, "/clips/0/video/motion"),
         &full_motion(),

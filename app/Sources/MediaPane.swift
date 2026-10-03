@@ -295,6 +295,7 @@ final class MediaPane: InspectorPaneView {
         for row in rows {
             let visible = snapshot.media(row.media).map { filter.admits($0, in: snapshot) } ?? false
             if row.view.isHidden == visible { row.view.isHidden = !visible }
+            row.view.syncToolTip()
             if visible { shown += 1 }
         }
         let empty = shown == 0 && !rows.isEmpty

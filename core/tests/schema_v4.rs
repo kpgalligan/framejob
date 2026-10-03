@@ -53,6 +53,7 @@
 
 mod common;
 
+use reelcut_core::format::RC_FORMAT_VERSION;
 use serde_json::{json, Value};
 
 use common::{array, at, num, text, Handle};
@@ -125,7 +126,7 @@ fn hidden() -> Value {
 // ---- reading older files -------------------------------------------------
 
 fn assert_no_regions(project: &Value) {
-    assert_eq!(at(project, "/version"), &json!(10));
+    assert_eq!(at(project, "/version"), &json!(RC_FORMAT_VERSION));
     assert_eq!(at(project, "/clips/0/video/obscure"), &json!([]));
     // The neighbours a version-4 reader adds nothing to, so a file that
     // gained an empty list gained ONLY that.
@@ -155,7 +156,7 @@ fn a_version_two_file_and_a_version_one_file_read_the_same_way() {
 #[test]
 fn the_regions_round_trip_exactly() {
     let written = Handle::from_value(&hidden()).value();
-    assert_eq!(at(&written, "/version"), &json!(10));
+    assert_eq!(at(&written, "/version"), &json!(RC_FORMAT_VERSION));
 
     let regions = array(&written, "/clips/0/video/obscure");
     assert_eq!(regions.len(), 2, "both regions survived");

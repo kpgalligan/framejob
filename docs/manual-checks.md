@@ -103,6 +103,11 @@ the same way.
 - **Expect:** a small "Copying Movie" window appears about a second after the copy starts, naming the file, with a moving bar, "`<copied>` of `<total>`" and Cancel. It does not take the keyboard: the typing and the first Escape reach the text editor, and the copy goes on. After the click into the window, Escape cancels: the button reads "Cancelling…", the window closes, no alert appears, the `.mov` is added and the WebM is not, and `Rewrapped/` holds no `.partial.mov`. The second import shows the window and ends with the file added; a third import of it adds it at once with no window. The Finder open shows the window in front with the keyboard, and its Cancel opens no project and shows no alert.
 - **Source:** #228 (issue batch B76, spec §11 #228-P; `container_rewrap_probe.py` C20–C30 script the copy, the doors and the Cancel, never the window on screen).
 
+**PB-12 — A WebM or MKV keeps its own name, Reveal in Finder shows it, and a deleted copy comes back**
+- **Do:** 1. Make a WebM of 2 GB or more as in PB-11 (`big.webm`), or use PB-11's; delete any copy of it in `~/Library/Application Support/Reelcut/Rewrapped/`. 2. Add it to a project, place it and save. 3. Look at its row in the Media tab and at the clip's name on the timeline; hold the pointer over the row. 4. Right-click the row ▸ Reveal in Finder. 5. Quit. In the Finder, delete its `.mov` in `Rewrapped/` (Move to Trash; do NOT empty the Trash). 6. Open the project again; let the copy finish. 7. Play the clip.
+- **Expect:** the row and the clip are named `big.webm`, not `big-<16 hex>.mov`. The tooltip's first line is "`<the WebM's path>` — copied into Reelcut's Rewrapped folder.", above the drag hint. Reveal in Finder selects the WebM, not the `.mov`. On reopening, the "Copying Movie" window appears about a second in, and when it closes the project shows no missing badge and no Missing media sheet; the clip plays from a new `.mov` in `Rewrapped/` (Reveal in Finder still shows the WebM), and the `.mov` in the Trash is left there.
+- **Source:** #228 (issue batch B78, spec §11 #228-O; `container_rewrap_probe.py` O31–O43 and `container_import_proof.py` M8–M11 script the name, the tooltip text, the reveal URL and the re-copy, never the window, the tooltip or Finder on screen).
+
 ## Timeline, canvas and keys
 
 **TL-1 — Timeline basics**

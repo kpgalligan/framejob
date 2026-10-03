@@ -25,6 +25,11 @@
 //
 // Issue batch B77 (spec §11 #228-V): `inspect` also answers each track's
 // media subtype, so W10 can read the copied Vorbis track as `vorb`.
+//
+// Issue batch B78 (spec §11 #228-O): one job of `kind: "original"` ({source:
+// P1, dest: a scratch folder}) runs rows O31–O43 last — a copy's original
+// through the probe, `MediaSnapshot.name`, `revealURL`, the row's tooltip,
+// `ProjectDocument.recopyingMissingCopies` and `read(from:ofType:)`.
 
 import AppKit
 import AVFoundation
@@ -747,4 +752,293 @@ func runCancelRows(_ job: [String: Any]) {
 
 if let cancelJob = jobs.first(where: { $0["kind"] as? String == "cancel" }) {
     runCancelRows(cancelJob)
+}
+
+// MARK: - B78: a copy's original (O31–O43)
+
+/// Issue batch B78 (spec §11 #228-O): the original a copy remembers — its
+/// probe, its name, Reveal in Finder, the tooltip, the re-copy on open
+/// (`ProjectDocument.recopyingMissingCopies`) and its wiring through
+/// `read(from:ofType:)`, and the Trash test. `job` is {source: P1, dest: a
+/// scratch folder}; every row discards the digest names it made.
+func runOriginalRows(_ job: [String: Any]) {
+    let manager = FileManager.default
+    let p1 = URL(fileURLWithPath: job["source"] as? String ?? "")
+    let scratch = URL(fileURLWithPath: job["dest"] as? String ?? "")
+    try? manager.removeItem(at: scratch)
+    try? manager.createDirectory(at: scratch, withIntermediateDirectories: true)
+    let o1 = scratch.appendingPathComponent("o1.webm")
+    try? manager.copyItem(at: p1, to: o1)
+    let copy = FFmpegRewrap.destination(for: o1)
+    let copyPartial = copy?.deletingPathExtension().appendingPathExtension("partial.mov")
+    var madeElsewhere: [URL] = []
+    func discardCopies() {
+        if let copy { FFmpegRewrap.discard(copy) }
+        if let copyPartial { FFmpegRewrap.discard(copyPartial) }
+        for url in madeElsewhere { FFmpegRewrap.discard(url) }
+    }
+    func real(_ url: URL?) -> String? { url?.resolvingSymlinksInPath().path }
+    func inRewrapped(_ path: String) -> Bool {
+        (path as NSString).deletingLastPathComponent.hasSuffix("/Reelcut/Rewrapped")
+    }
+    func exists(_ path: String?) -> Bool { path.map { manager.fileExists(atPath: $0) } ?? false }
+    /// A one-media project: `descriptor` with `path` and `bookmark` swapped
+    /// in and `original` as given.
+    func project(
+        _ descriptor: MediaDescriptor, path: String, bookmark: String?, original: MediaOriginal?
+    ) -> ReelProject? {
+        var d = descriptor
+        d.path = path
+        d.bookmark = bookmark
+        d.original = original
+        guard let base = ReelProject.new(width: 640, height: 360, fps: .thirty) else { return nil }
+        return (try? base.applying(.addMedia(descriptor: d))).project
+    }
+    func mediaFacts(_ p: ReelProject?, _ row: inout [String: Any]) {
+        let media = p?.snapshot.media.first
+        row["path"] = media?.path ?? NSNull()
+        row["path_exists"] = exists(media?.path)
+        row["in_rewrapped"] = media.map { inRewrapped($0.path) } ?? false
+        row["original_path"] = media?.original?.path ?? NSNull()
+        row["duration"] = media.map { Int($0.duration) } ?? NSNull()
+        row["width"] = media?.width ?? NSNull()
+        row["height"] = media?.height ?? NSNull()
+    }
+
+    // O31: the built-in copy's descriptor records its original.
+    discardCopies()
+    let first = offMain { Result { try MediaImporter.probeBlocking(url: o1) } }
+    let probed: MediaDescriptor? = { if case .success(let d)? = first { return d }; return nil }()
+    do {
+        var row: [String: Any] = ["id": "O31", "o1": o1.path]
+        if let d = probed {
+            row["path"] = d.path
+            row["in_rewrapped"] = inRewrapped(d.path)
+            row["original_path"] = d.original?.path ?? NSNull()
+            row["original_bookmark"] = d.original?.bookmark != nil
+            row["dictionary_original_path"] =
+                (d.dictionary["original"] as? [String: Any])?["path"] ?? NSNull()
+            let probe = d.probeDictionary
+            row["probe_original"] = probe["original"] != nil
+            row["probe_path_or_bookmark"] = probe["path"] != nil || probe["bookmark"] != nil
+        } else if case .failure(let error)? = first {
+            row["error"] = errorFacts(error)
+        } else {
+            row["error"] = "hung"
+        }
+        emit("ROW", row)
+    }
+    guard let probed else { discardCopies(); return }
+    let copyURL = URL(fileURLWithPath: probed.path)
+
+    // O32: the probe of the copy itself records no original.
+    let plain: MediaDescriptor? = offMain { try? MediaImporter.probeBlocking(url: copyURL) } ?? nil
+    emit("ROW", [
+        "id": "O32", "probed": plain != nil, "original_nil": plain.map { $0.original == nil } ?? false,
+        "dictionary_has_original": plain.map { $0.dictionary["original"] != nil } ?? NSNull(),
+    ])
+
+    // O33: the snapshot's name is the original's; with none, the path's.
+    do {
+        let named = (try? ReelProject.new(width: 640, height: 360, fps: .thirty)?
+            .applying(.addMedia(descriptor: probed)))?.project
+        let unnamed: ReelProject? = plain.flatMap { d in
+            (try? ReelProject.new(width: 640, height: 360, fps: .thirty)?
+                .applying(.addMedia(descriptor: d)))?.project
+        }
+        emit("ROW", [
+            "id": "O33", "name": named?.snapshot.media.first?.name ?? NSNull(),
+            "plain_name": unnamed?.snapshot.media.first?.name ?? NSNull(),
+            "copy_name": copyURL.lastPathComponent,
+        ])
+    }
+
+    // O35: the tooltip's three forms.
+    do {
+        let original = MediaOriginal(path: "/Users/x/Movies/talk.webm")
+        let none = MediaSnapshot(id: 1, path: "/Users/x/Movies/talk.mov")
+        let rewrapped = MediaSnapshot(
+            id: 2, path: "/Users/x/Library/Application Support/Reelcut/Rewrapped/talk-0a.mov",
+            original: original)
+        let packaged = MediaSnapshot(
+            id: 3, path: "/Users/x/Edit.reelcut/media/talk-0a.mov", original: original)
+        emit("ROW", [
+            "id": "O35", "none": MediaRowView.toolTip(for: none),
+            "rewrapped": MediaRowView.toolTip(for: rewrapped),
+            "packaged": MediaRowView.toolTip(for: packaged), "hint": MediaRowView.dragHint,
+        ])
+    }
+
+    // O42: `isInside` and `isTrashed`, never listing or writing the Trash.
+    do {
+        let trash = try? manager.url(
+            for: .trashDirectory, in: .userDomainMask, appropriateFor: nil, create: false)
+        emit("ROW", [
+            "id": "O42",
+            "inside": isInside(
+                URL(fileURLWithPath: "/a/b/c.mov"), folder: URL(fileURLWithPath: "/a/b")),
+            "sibling": isInside(
+                URL(fileURLWithPath: "/a/bc/x.mov"), folder: URL(fileURLWithPath: "/a/b")),
+            "itself": isInside(URL(fileURLWithPath: "/a/b"), folder: URL(fileURLWithPath: "/a/b")),
+            "trash_found": trash != nil,
+            "trashed": trash.map { isTrashed($0.appendingPathComponent("b78-probe.mov")) }
+                ?? NSNull(),
+            "copy_trashed": isTrashed(copyURL),
+        ])
+    }
+
+    let missingPath = "/nonexistent-b78/" + copyURL.lastPathComponent
+    let o1Original = MediaOriginal(of: o1)
+    guard let missing = project(probed, path: missingPath, bookmark: nil, original: o1Original)
+    else {
+        emit("ROW", ["id": "O36", "set_up": false])
+        discardCopies()
+        return
+    }
+
+    // O36: off main, the missing copy is copied again, through the watch once.
+    do {
+        discardCopies()
+        let log = WatchLog()
+        let repaired = offMain(120) {
+            ProjectDocument.recopyingMissingCopies(missing, watch: log.recording)
+        }
+        var row: [String: Any] = ["id": "O36", "watch_calls": log.calls, "set_up": true]
+        mediaFacts(repaired, &row)
+        row["want_duration"] = Int(probed.duration)
+        row["want_width"] = probed.width
+        row["want_height"] = probed.height
+        emit("ROW", row)
+    }
+
+    // O37: on main, the watch is never called and the copy lands.
+    do {
+        discardCopies()
+        let log = WatchLog()
+        let repaired = ProjectDocument.recopyingMissingCopies(missing, watch: log.recording)
+        var row: [String: Any] = ["id": "O37", "watch_calls": log.calls, "on_main": Thread.isMainThread]
+        mediaFacts(repaired, &row)
+        emit("ROW", row)
+    }
+
+    // O38: a Cancel at 30 % leaves the project as it was and no copy.
+    do {
+        discardCopies()
+        let log = WatchLog()
+        let repaired = offMain(120) {
+            ProjectDocument.recopyingMissingCopies(missing, watch: log.cancelling)
+        }
+        emit("ROW", [
+            "id": "O38", "returned": repaired != nil, "watch_calls": log.calls,
+            "unchanged": repaired.map { $0.json == missing.json } ?? false,
+            "copy_exists": exists(copy?.path), "partial_exists": exists(copyPartial?.path),
+        ])
+    }
+
+    // O40: the wiring — `read(from:ofType:)` of a package on main.
+    do {
+        discardCopies()
+        let package = scratch.appendingPathComponent("o40.reelcut")
+        try? manager.createDirectory(at: package, withIntermediateDirectories: true)
+        let written = (try? missing.json.write(
+            to: package.appendingPathComponent("project.json"), atomically: true, encoding: .utf8))
+            != nil
+        let document = ProjectDocument()
+        var row: [String: Any] = ["id": "O40", "written": written]
+        do {
+            try document.read(from: package, ofType: ProjectDocument.projectTypeIdentifier)
+            row["read"] = "ok"
+            row["missing"] = document.missingMedia.map { $0.path }
+            mediaFacts(document.project, &row)
+        } catch {
+            row["read"] = "error"
+            row["error"] = errorFacts(error)
+        }
+        emit("ROW", row)
+    }
+
+    // O41: an original that is not a Matroska file is not copied again,
+    // even when a movie already sits under its digest name.
+    do {
+        let mov = scratch.appendingPathComponent("o41.mov")
+        try? manager.removeItem(at: mov)
+        _ = offMain(120) { try? MediaImporter.probeBlocking(url: o1) }
+        try? manager.copyItem(at: copyURL, to: mov)
+        discardCopies()
+        var row: [String: Any] = ["id": "O41", "original_exists": exists(mov.path)]
+        if let decoy = FFmpegRewrap.destination(for: mov) {
+            madeElsewhere.append(decoy)
+            try? manager.removeItem(at: decoy)
+            row["decoy_made"] = (try? manager.copyItem(at: mov, to: decoy)) != nil
+        }
+        let start = project(
+            probed, path: missingPath, bookmark: nil, original: MediaOriginal(of: mov))
+        row["set_up"] = start != nil
+        let repaired = start.flatMap { start in
+            offMain(120) { ProjectDocument.recopyingMissingCopies(start, watch: nil) }
+        }
+        row["unchanged"] = repaired.map { $0.json == start?.json } ?? false
+        emit("ROW", row)
+        for url in madeElsewhere { FFmpegRewrap.discard(url) }
+        madeElsewhere = []
+    }
+
+    // O43: a copy in the Trash (a scratch stand-in, through the seam).
+    do {
+        discardCopies()
+        let fakeTrash = scratch.appendingPathComponent("fakeTrash")
+        try? manager.createDirectory(at: fakeTrash, withIntermediateDirectories: true)
+        let held = fakeTrash.appendingPathComponent(copyURL.lastPathComponent)
+        try? manager.removeItem(at: held)
+        _ = offMain(120) { try? MediaImporter.probeBlocking(url: o1) }
+        let copied = (try? manager.copyItem(at: copyURL, to: held)) != nil
+        discardCopies()
+        let start = project(probed, path: held.path, bookmark: nil, original: o1Original)
+        let repaired = start.flatMap { start in
+            offMain(120) {
+                ProjectDocument.recopyingMissingCopies(
+                    start, watch: nil, trashed: { isInside($0, folder: fakeTrash) })
+            }
+        }
+        let kept = start.flatMap { start in
+            offMain(120) {
+                ProjectDocument.recopyingMissingCopies(start, watch: nil, trashed: { _ in false })
+            }
+        }
+        var row: [String: Any] = ["id": "O43", "held": copied, "set_up": start != nil]
+        mediaFacts(repaired, &row)
+        row["kept_unchanged"] = kept.map { $0.json == start?.json } ?? false
+        emit("ROW", row)
+    }
+
+    // O34: Reveal in Finder shows the original, then the copy once it is gone.
+    do {
+        discardCopies()
+        _ = offMain(120) { try? MediaImporter.probeBlocking(url: o1) }
+        let shown = project(probed, path: probed.path, bookmark: probed.bookmark, original: o1Original)
+        let media = shown?.snapshot.media.first
+        let before = media.flatMap(revealURL(for:))
+        try? manager.removeItem(at: o1)
+        let after = media.flatMap(revealURL(for:))
+        emit("ROW", [
+            "id": "O34", "before": real(before) ?? NSNull(), "after": real(after) ?? NSNull(),
+            "o1": real(o1) ?? NSNull(), "copy": real(copyURL) ?? NSNull(),
+            "o1_gone": !exists(o1.path),
+        ])
+    }
+
+    // O39: with the original gone, the project is left as it was.
+    do {
+        discardCopies()
+        let repaired = offMain(120) { ProjectDocument.recopyingMissingCopies(missing, watch: nil) }
+        emit("ROW", [
+            "id": "O39", "o1_gone": !exists(o1.path),
+            "unchanged": repaired.map { $0.json == missing.json } ?? false,
+        ])
+    }
+    discardCopies()
+}
+
+if let originalJob = jobs.first(where: { $0["kind"] as? String == "original" }) {
+    runOriginalRows(originalJob)
 }

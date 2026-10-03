@@ -71,10 +71,31 @@ final class MediaRowView: NSView, NSDraggingSource {
         self.pane = pane
         super.init(frame: .zero)
         wantsLayer = true
-        // The row is a drag source (§4.3) and nothing about it says so. The
-        // list has no room for a line that does, so the row says it itself.
-        toolTip =
-            "Drag to a timeline track, or onto the canvas. Hold ⌥ to insert, ⇧⌥ to overwrite."
+        syncToolTip()
+    }
+
+    /// The row is a drag source (§4.3) and nothing about it says so. The
+    /// list has no room for a line that does, so the row says it itself.
+    static let dragHint =
+        "Drag to a timeline track, or onto the canvas. Hold ⌥ to insert, ⇧⌥ to overwrite."
+
+    /// The row's tooltip: the drag hint, and above it, for a copy, where the
+    /// copy lives (spec §11 #228-O, Q1 and Q2) — the Media tab has no path
+    /// line to say it in.
+    static func toolTip(for entry: MediaSnapshot) -> String {
+        guard let original = entry.original else { return dragHint }
+        let folder = (entry.path as NSString).deletingLastPathComponent
+        let home =
+            folder.hasSuffix("/Reelcut/Rewrapped")
+            ? "Reelcut's Rewrapped folder" : "this project's package"
+        return "\(original.path) — copied into \(home).\n" + dragHint
+    }
+
+    /// Keeps the tooltip current after a relink or a consolidate; written
+    /// only when it changed, so the tooltip manager is not reset each pass.
+    func syncToolTip() {
+        let wanted = entry.map(Self.toolTip(for:)) ?? Self.dragHint
+        if toolTip != wanted { toolTip = wanted }
     }
 
     @available(*, unavailable)

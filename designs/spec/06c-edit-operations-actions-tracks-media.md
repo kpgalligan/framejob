@@ -74,7 +74,9 @@ The rules every op shares are §6a; the clip ops are §6b.
   the host probes the file. `relink_media`'s `probe` is the new file's descriptor minus `path` and
   `bookmark`, filled by the host: the media takes its duration, size, rate and flags, a file of
   another kind is refused, and a media clip that runs past a shorter file's end is held to it; an
-  absent `probe` keeps the record (§11, #63).
+  absent `probe` keeps the record (§11, #63). The descriptor and the probe both carry `original`,
+  the WebM or Matroska file a `.mov` copy was made from (§11 #228-O): `add_media` stores it, a
+  probe with one replaces the stored one, a probe without one clears it, and no probe keeps it.
 
 **This table is the SEMANTICS half of the op table, and it has a second
 half.** What an op MEANS is written here and in `core/src/edit.rs`'s module

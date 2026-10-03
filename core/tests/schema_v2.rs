@@ -48,6 +48,7 @@
 
 mod common;
 
+use reelcut_core::format::RC_FORMAT_VERSION;
 use serde_json::{json, Value};
 
 use common::{array, assert_contains, at, num, text, Handle};
@@ -170,7 +171,7 @@ fn a_version_one_file_reads_with_the_new_fields_at_their_defaults() {
     }))
     .value();
 
-    assert_eq!(at(&project, "/version"), &json!(10));
+    assert_eq!(at(&project, "/version"), &json!(RC_FORMAT_VERSION));
     assert_eq!(at(&project, "/nests"), &json!([]));
     assert_eq!(at(&project, "/clips/0/video/filters"), &json!([]));
     assert_eq!(at(&project, "/clips/0/video/reflection"), &Value::Null);
