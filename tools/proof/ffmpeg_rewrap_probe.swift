@@ -1,6 +1,19 @@
 // Issue batch B80 — the opt-in ffmpeg conversion records its original (spec
 // §11 #233) and copies a constant-rate VP9 stream, checked on the copy (#227):
 // the probe behind `ffmpeg_rewrap_proof.py`'s rows F0, O1–O5, T1–T3, V1–V8.
+// Issue batch B81 (spec §11 #227 as amended): V7's plan count, and rows V9
+// (one re-encode per file), V10 (`discard(_:ifStill:)`), G1 (`onFrameGrid`),
+// C1 (the ceilings) and P1 (no second attempt for a plan that copies no VP9);
+// and M1 (spec §11 #234's risk): whether a tool's hop to the main thread is
+// served while the conversion question is up.
+//
+// M1 is the one row that puts a window up: `FFmpegRewrap.consent(for:)`'s
+// alert, twice, for about 2 s each, in this `.prohibited` process, which is
+// never activated and takes no key window from anyone. Each showing is ended
+// by `NSApp.abortModal()` from a `.common` timer, which answers the question
+// "no"; nothing ticks its box, so `ask` remembers nothing. A showing that will
+// not end is a scored FAILURE of M1 after 30 s, answered from a watchdog
+// thread with every earlier row intact — never a hang.
 //
 // Compiled AS `main.swift` over every file in `app/Sources` but the app's own
 // `main.swift`, module `Reelcut`, against `libreelcut_core.a` —
@@ -21,9 +34,12 @@
 //
 // `<work-dir>/tools/ffmpeg` is the script's wrapper: it appends its argv as a
 // JSON line to `<work-dir>/ffmpeg.log` and obeys `<work-dir>/mode` (`pass`,
-// `fail-copy`, `swap-copy`), which this probe writes before a row. A row's
-// run count is the log's lines that hold `-i <its source>`, less the lines
-// whose last argument is under `<work-dir>/t/` (the T rows' own runs).
+// `fail-copy`, `swap-copy`, `bad-encode`), which this probe writes before a
+// row. A row's run count is the log's lines that hold `-i <its source>`,
+// less the lines whose last argument is under `<work-dir>/t/` (the T rows'
+// own runs). Its sibling `<work-dir>/tools/ffprobe`, which the product
+// finds beside it, appends its argv to `<work-dir>/ffprobe.log`; a PLAN of a
+// source is a line there that holds `-show_streams` and ends in its path.
 //
 // Prints exactly one stdout line:
 //   ANSWER {"rows":[{"id","ok","detail"}],"measure":{…}}
@@ -195,12 +211,21 @@ func setMode(_ mode: String) {
     try? Data(mode.utf8).write(to: work.appendingPathComponent("mode"), options: .atomic)
 }
 
-/// Every wrapper run so far, as its argv.
-func log() -> [[String]] {
-    let data = (try? Data(contentsOf: work.appendingPathComponent("ffmpeg.log"))) ?? Data()
+/// Every run of a wrapper so far, as its argv.
+func log(_ name: String = "ffmpeg.log") -> [[String]] {
+    let data = (try? Data(contentsOf: work.appendingPathComponent(name))) ?? Data()
     return String(decoding: data, as: UTF8.self).split(separator: "\n").compactMap {
         (try? JSONSerialization.jsonObject(with: Data($0.utf8))) as? [String]
     }
+}
+
+/// How many times the product planned `source`: the ffprobe wrapper's lines
+/// that hold `-show_streams` and end in its path.
+func plans(of source: URL) -> Int {
+    log("ffprobe.log").filter { line in
+        line.contains("-show_streams")
+            && line.last.map { canonical($0) == canonical(source.path) } == true
+    }.count
 }
 
 /// The product's ffmpeg runs over `source`: the lines that hold `-i <source>`,
@@ -449,7 +474,10 @@ func copiedRow(
 /// A source whose copy was not kept: it imports with its original as H.264
 /// after two runs, the second a re-encode into a QuickTime file, and leaves
 /// exactly one file and no partial.
-func fallbackRow(_ id: String, _ name: String, mode: String) {
+///
+/// `onePlan` (B81) also holds exactly one plan of it in `ffprobe.log`: the
+/// second attempt takes the first's.
+func fallbackRow(_ id: String, _ name: String, mode: String, onePlan: Bool = false) {
     let source = fixture(name)
     setMode(mode)
     let imported = importing(source)
@@ -458,16 +486,19 @@ func fallbackRow(_ id: String, _ name: String, mode: String) {
     let video = file.flatMap { format($0, .video) }
     let ran = runs(for: source)
     let made = files(for: source)
+    let planned = plans(of: source)
     let firstCopies = ran.first.map { holds($0, "-c:v", "copy") } ?? false
     let secondEncodes = ran.count == 2 && holds(ran[1], "-f", "mov")
         && !holds(ran[1], "-c:v", "copy")
     row(id, hasOriginal(imported.descriptor, source) && video == "avc1" && firstCopies
-        && secondEncodes && made.finished.count == 1 && made.partial.isEmpty,
+        && secondEncodes && made.finished.count == 1 && made.partial.isEmpty
+        && (!onePlan || planned == 1),
         "\(name) (mode \(mode)): imports \(file?.lastPathComponent ?? "nothing") "
             + "(\(imported.error ?? "no error")), original "
             + "\(imported.descriptor?.original?.path ?? "nil"); video \(video ?? "nil"); "
             + "\(runsLine(ran)); \(made.finished.count) file(s) and \(made.partial.count) "
-            + "partial(s) for it in Rewrapped/")
+            + "partial(s) for it in Rewrapped/"
+            + (onePlan ? "; \(planned) plan(s) of it in ffprobe.log (exactly 1 wanted)" : ""))
 }
 
 copiedRow("V1", v0, converted, 30, 1, wholeFrame: true)
@@ -535,8 +566,302 @@ fallbackRow("V5", "v0c.mkv", mode: "swap-copy")
 let vn = fixture("vn.mkv")
 copiedRow("V6", vn, importing(vn), 30000, 1001, wholeFrame: false)
 
-fallbackRow("V7", "vj.mkv", mode: "pass")
+fallbackRow("V7", "vj.mkv", mode: "pass", onePlan: true)
 fallbackRow("V8", "vg.mkv", mode: "pass")
+
+// MARK: - V9: one re-encode per file (#227 as amended by B81)
+
+do {
+    let source = fixture("vj2.mkv")
+    // Two imports of one failing VP9 file, started together.
+    let first = Pending<Result<MediaDescriptor, any Error>>()
+    let second = Pending<Result<MediaDescriptor, any Error>>()
+    for pending in [first, second] {
+        Thread.detachNewThread {
+            pending.set(Result { try MediaImporter.probeBlocking(url: source) })
+        }
+    }
+    let deadline = Date().addingTimeInterval(300)
+    while (first.value == nil || second.value == nil) && Date() < deadline { spin(0.02) }
+    let both = [first.value, second.value].map { $0.flatMap { try? $0.get() } }
+    let paths = both.compactMap { $0?.path }
+    let videos = paths.map { format(URL(fileURLWithPath: $0), .video) ?? "nil" }
+    let ran = runs(for: source)
+    let copies = ran.filter { holds($0, "-c:v", "copy") }.count
+    let encodes = ran.count - copies
+    let made = files(for: source)
+    let imports = paths.count == 2 && Set(paths).count == 1 && videos == ["avc1", "avc1"]
+        && encodes == 1 && copies <= 2 && made.finished.count == 1 && made.partial.isEmpty
+
+    // THEN the second attempt, called directly: the kept re-encode is
+    // answered, not discarded and made again.
+    let digest = paths.first.map { URL(fileURLWithPath: $0) }
+    let numberBefore = digest.flatMap { FFmpegRewrap.fileNumber(of: $0) }
+    let linesBefore = log().count
+    let again: Result<URL?, any Error>? = offMain {
+        var planned: FFmpegRewrap.Plan?
+        return Result {
+            try FFmpegRewrap.assist(source, mayAsk: false, planned: &planned, reencodingVP9: true)
+        }
+    }
+    let answered = again.flatMap { try? $0.get() }
+    let numberAfter = digest.flatMap { FFmpegRewrap.fileNumber(of: $0) }
+    let linesAfter = log().count
+    let kept = digest != nil && answered.map { canonical($0.path) } == digest.map {
+        canonical($0.path)
+    } && linesAfter == linesBefore && numberBefore != nil && numberAfter == numberBefore
+    row("V9", imports && kept,
+        "two probeBlocking(vj2.mkv) started together: import "
+            + "\(paths.map { ($0 as NSString).lastPathComponent }) as \(videos); "
+            + "\(encodes) encoder run(s) and \(copies) copy run(s); \(made.finished.count) "
+            + "file(s) and \(made.partial.count) partial(s) for it in Rewrapped/. Then "
+            + "assist(…, reencodingVP9: true) called directly: answers "
+            + "\(answered?.lastPathComponent ?? "nil"); ffmpeg.log \(linesBefore) → "
+            + "\(linesAfter) lines; the file's number "
+            + "\(numberBefore.map { String($0) } ?? "nil") → "
+            + "\(numberAfter.map { String($0) } ?? "nil")")
+}
+
+// MARK: - V10: discard(_:ifStill:)
+
+do {
+    let folder = rewrappedFolder
+    let replaced = folder.appendingPathComponent("b81-v10-replaced.mov")
+    let numbered = folder.appendingPathComponent("b81-v10-numbered.mov")
+    let spare = folder.appendingPathComponent("b81-v10-unnumbered.mov")
+    for url in [replaced, numbered, spare] { try? Data("first".utf8).write(to: url) }
+    // A file that replaced the one numbered: removed, and written again.
+    let old = FFmpegRewrap.fileNumber(of: replaced)
+    try? manager.removeItem(at: replaced)
+    try? Data("second".utf8).write(to: replaced)
+    let new = FFmpegRewrap.fileNumber(of: replaced)
+    FFmpegRewrap.discard(replaced, ifStill: old)
+    let left = manager.fileExists(atPath: replaced.path)
+    // The one numbered.
+    let own = FFmpegRewrap.fileNumber(of: numbered)
+    FFmpegRewrap.discard(numbered, ifStill: own)
+    let removed = !manager.fileExists(atPath: numbered.path)
+    // No number at all.
+    FFmpegRewrap.discard(spare, ifStill: nil)
+    let spared = manager.fileExists(atPath: spare.path)
+    for url in [replaced, numbered, spare] { try? manager.removeItem(at: url) }
+    row("V10", old != nil && new != nil && old != new && left && own != nil && removed && spared,
+        "discard(_:ifStill:) in Rewrapped/: a file that replaced the one numbered (number "
+            + "\(old.map { String($0) } ?? "nil") → \(new.map { String($0) } ?? "nil")) is "
+            + "left \(left); the one numbered is removed \(removed); a nil number leaves the "
+            + "file \(spared)")
+}
+
+// MARK: - G1: onFrameGrid
+
+do {
+    let thirty = FFmpegRewrap.FrameRate(num: 30, den: 1)
+    // A 3-frame grid at 30 fps in 1/90000 s: 3000 units a frame.
+    let grid = FFmpegRewrap.onFrameGrid(times: [0, 3000, 6000], timescale: 90000, rate: thirty)
+    // The largest multiple of the step that is not above Int64.max.
+    let top = (Int64.max / 3000) * 3000
+    let one = FFmpegRewrap.onFrameGrid(times: [top], timescale: 90000, rate: thirty)
+    // A second packet there: its expected time is past Int64.max.
+    let two = FFmpegRewrap.onFrameGrid(times: [top, top], timescale: 90000, rate: thirty)
+    let off = FFmpegRewrap.onFrameGrid(times: [0, 3000, 6001], timescale: 90000, rate: thirty)
+    row("G1", grid && one && !two && !off,
+        "onFrameGrid at 30/1 in 1/90000 s: [0, 3000, 6000] \(grid) (true wanted); one packet "
+            + "at \(top), the largest multiple of 3000 not above Int64.max, \(one) (true); two "
+            + "packets from there, the second's expected time past Int64.max, \(two) (false); "
+            + "[0, 3000, 6001] \(off) (false)")
+}
+
+// MARK: - C1: the ceilings
+
+do {
+    let ceiling = AgentServer.probeCeiling
+    let assist = FFmpegRewrap.longestAssist
+    let conversion = FFmpegRewrap.longestConversion
+    measure["C1"] = ["probe_ceiling": ceiling, "longest_assist": assist,
+                     "longest_conversion": conversion]
+    row("C1", ceiling == 29330 && assist == 2 * conversion + 440,
+        "AgentServer.probeCeiling \(Int(ceiling)) s (29330 wanted); FFmpegRewrap.longestAssist "
+            + "\(Int(assist)) s, 2 × longestConversion (\(Int(conversion)) s) + 440 = "
+            + "\(Int(2 * conversion + 440)) s")
+}
+
+// MARK: - P1: no second attempt for a plan that copies no VP9
+
+do {
+    let source = fixture("p1b.ivf")
+    setMode("bad-encode")
+    let imported = importing(source)
+    setMode("pass")
+    // The source's own refusal: what AVFoundation's probe of it throws.
+    let wanted: String? = offMain { () -> String? in
+        do {
+            _ = try MediaImporter.waitForProbe(source)
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
+    } ?? nil
+    let ran = runs(for: source)
+    let made = files(for: source)
+    let planned = plans(of: source)
+    row("P1", imported.descriptor == nil && wanted != nil && imported.error == wanted
+        && planned == 1 && ran.count == 1 && made.finished.isEmpty && made.partial.isEmpty,
+        "p1b.ivf (mode bad-encode): imports "
+            + "\(imported.descriptor.map { ($0.path as NSString).lastPathComponent } ?? "nothing") "
+            + "(\(imported.error ?? "no error"); the source's own refusal is "
+            + "“\(wanted ?? "none: it probes")”); "
+            + "\(planned) plan(s) of it in ffprobe.log (exactly 1 wanted); \(runsLine(ran)); "
+            + "\(made.finished.count) file(s) and \(made.partial.count) partial(s) for it in "
+            + "Rewrapped/")
+}
+
+// MARK: - M1: a tool's main hop while the conversion question is up (#234)
+
+/// Times, each noted once, from any thread.
+final class Marks {
+    private let lock = NSLock()
+    private var times: [String: Double] = [:]
+
+    func mark(_ name: String) {
+        lock.lock()
+        if times[name] == nil { times[name] = ProcessInfo.processInfo.systemUptime }
+        lock.unlock()
+    }
+
+    subscript(_ name: String) -> Double? {
+        lock.lock()
+        defer { lock.unlock() }
+        return times[name]
+    }
+
+    /// Seconds from `up` (the question on screen) to `name`.
+    func since(_ name: String) -> Double? {
+        guard let up = self["up"], let at = self[name] else { return nil }
+        return at - up
+    }
+}
+
+/// One showing of the conversion question. `consent(for:)` is called on a
+/// background thread (`askedOnMain` false: how `MediaImporter.probe`'s import
+/// queue and a read on AppKit's read queue reach it, by the source) or on main
+/// itself. A `.common` timer, which the modal loop serves, sees the question
+/// up (`NSApp.modalWindow`), starts a thread that makes a tool's hop to main
+/// (`AgentServer.onMain`, which is `AgentLane.onMainWhenIdle`'s
+/// `DispatchQueue.main.sync`), and 2 s later ends the modal.
+struct Showing {
+    let marks = Marks()
+    let answered = Pending<Bool>()
+    /// Whether the question was still up when the hop's body ran.
+    let servedInModal = Pending<Bool>()
+
+    /// Whether everything the showing started has ended.
+    var ended: Bool { answered.value != nil && marks["returned"] != nil }
+
+    var line: String {
+        func s(_ value: Double?) -> String { value.map { String(format: "%.3f s", $0) } ?? "never" }
+        let order: String
+        if let served = marks.since("served"), let aborted = marks.since("aborted") {
+            order = served < aborted ? "BEFORE the abort" : "AFTER the abort"
+        } else {
+            order = "order unknown"
+        }
+        return "the question up; the hop called \(s(marks.since("called"))) later, its body "
+            + "run at \(s(marks.since("served"))) with the question "
+            + "\(servedInModal.value.map { $0 ? "still up" : "gone" } ?? "unknown") and returned "
+            + "at \(s(marks.since("returned"))); NSApp.abortModal() at "
+            + "\(s(marks.since("aborted"))) — the hop was served \(order); consent answered "
+            + "\(answered.value.map { String($0) } ?? "nothing")"
+    }
+
+    var measure: [String: Any] {
+        var out: [String: Any] = [:]
+        for name in ["called", "served", "returned", "aborted"] {
+            out[name] = marks.since(name).map { ($0 * 1000).rounded() / 1000 } ?? NSNull()
+        }
+        return out
+    }
+}
+
+func showing(_ plan: FFmpegRewrap.Plan, askedOnMain: Bool) -> Showing {
+    let shown = Showing()
+    let marks = shown.marks
+    let timer = Timer(timeInterval: 0.02, repeats: true) { _ in
+        guard NSApp.modalWindow != nil else { return }
+        if marks["up"] == nil {
+            marks.mark("up")
+            Thread.detachNewThread {
+                marks.mark("called")
+                AgentServer.shared.onMain {
+                    marks.mark("served")
+                    shown.servedInModal.set(NSApp.modalWindow != nil)
+                }
+                marks.mark("returned")
+            }
+        }
+        if let up = marks["up"], ProcessInfo.processInfo.systemUptime - up >= 2 {
+            marks.mark("aborted")
+            NSApp.abortModal()
+        }
+    }
+    RunLoop.main.add(timer, forMode: .common)
+    defer { timer.invalidate() }
+    if askedOnMain {
+        shown.answered.set(FFmpegRewrap.consent(for: plan))
+    } else {
+        Thread.detachNewThread { shown.answered.set(FFmpegRewrap.consent(for: plan)) }
+    }
+    let deadline = Date().addingTimeInterval(20)
+    while !shown.ended && Date() < deadline { spin(0.02) }
+    return shown
+}
+
+do {
+    // The hop with no question up: the control for "served".
+    let plain = Marks()
+    plain.mark("up")
+    _ = offMain(20) { () -> Bool in
+        AgentServer.shared.onMain { plain.mark("served") }
+        return true
+    }
+    let control = plain.since("served")
+
+    // A showing that will not end must not take the other rows with it: main
+    // is then inside the modal loop, so the answer is given from here.
+    let finished = Pending<Bool>()
+    DispatchQueue.global().asyncAfter(deadline: .now() + 30) {
+        guard finished.value == nil else { return }
+        row("M1", false, "a showing of the conversion question did not end within 30 s of the "
+            + "row's start (NSApp.abortModal() from a .common timer did not end it, or the "
+            + "question never came up)")
+        answer()
+    }
+    if let plan = FFmpegRewrap.plan(for: v0, with: tools) {
+        let off = showing(plan, askedOnMain: false)
+        let on = off.ended ? showing(plan, askedOnMain: true) : Showing()
+        finished.set(true)
+        measure["M1"] = ["control": control.map { ($0 * 1000).rounded() / 1000 } ?? NSNull(),
+                         "asked_off_main": off.measure, "asked_on_main": on.measure]
+        func servedAfter(_ shown: Showing) -> Bool? {
+            guard let served = shown.marks.since("served"),
+                let aborted = shown.marks.since("aborted")
+            else { return nil }
+            return served >= aborted
+        }
+        row("M1", control.map { $0 < 1 } == true && off.ended && on.ended
+            && off.answered.value == false && on.answered.value == false
+            && servedAfter(off) == true && off.servedInModal.value == false
+            && servedAfter(on) == false && on.servedInModal.value == true,
+            "AgentServer.onMain {} from a background thread with no question up is served in "
+                + "\(control.map { String(format: "%.3f s", $0) } ?? "never"). "
+                + "consent(for: v0.mkv's plan) called OFF main (as the import queue calls "
+                + "it): \(off.line). Called ON main: \(on.line). Wanted: off main the hop is "
+                + "served only AFTER the abort, the question gone; on main BEFORE it, the "
+                + "question still up; both answered false")
+    } else {
+        finished.set(true)
+        row("M1", false, "not run: FFmpegRewrap.plan(for: v0.mkv) answered nil")
+    }
+}
 
 for document in AgentServer.shared.openProjects() { document.close() }
 spin(0.2)

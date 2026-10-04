@@ -65,16 +65,21 @@ extension AgentServer {
         }
     }
 
-    /// The longest conversion plus 300 s for the funnel's other bounds: two
-    /// 30 s header probes (`MediaImporter.waitForProbe`), ffprobe's and the
-    /// encoder query's 20 s each with `run`'s 20 s grace, and ffmpeg's own.
-    private static let probeCeiling: TimeInterval = FFmpegRewrap.longestConversion + 300
+    /// The longest one import's own runs can take (spec §11 #227; the time it
+    /// queues behind another import's conversion is not counted): the opt-in
+    /// ffmpeg step's own bound, both attempts (`FFmpegRewrap.longestAssist`:
+    /// the plan, the frame check, the encoder query, a VP9 copy and then its
+    /// re-encode, and `run`'s grace on each of those five runs), plus three
+    /// header probes (`MediaImporter.probeTimeout`: the source, the copy and
+    /// the re-encode). `import_media` and `relink_media` both wait this long.
+    static let probeCeiling: TimeInterval =
+        FFmpegRewrap.longestAssist + 3 * MediaImporter.probeTimeout
 
     /// Probes one file and waits for the answer. MUST run off the main thread
     /// — see `importMedia` — and gives up only after `probeCeiling`: a file
     /// AVFoundation cannot read may be converted by ffmpeg first
     /// (`FFmpegRewrap.assist`), which legitimately takes as long as
-    /// `FFmpegRewrap.longestConversion`, so a shorter wait would answer a
+    /// `FFmpegRewrap.longestAssist`, so a shorter wait would answer a
     /// timeout while the conversion is still running. A tool call never
     /// asks the conversion question (spec §11 MC-5), so it passes
     /// `mayAsk: false`, and a refusal ffmpeg could have helped names the

@@ -68,7 +68,7 @@ enum MediaImporter {
         }
         // Generous, and only a backstop: a probe reads headers and decodes one frame.
         // A file on a stalled network mount is the case this exists for.
-        guard semaphore.wait(timeout: .now() + 30) == .success,
+        guard semaphore.wait(timeout: .now() + probeTimeout) == .success,
             let outcome = box.outcome
         else {
             throw ImportError.timedOut(url)

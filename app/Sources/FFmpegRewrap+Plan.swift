@@ -155,7 +155,8 @@ extension FFmpegRewrap {
             "-v", "error", "-print_format", "json", "-show_streams", "-show_format",
             source.path,
         ]
-        guard let result = try? run(tools.ffprobe, arguments, timeout: 20), result.status == 0,
+        guard let result = try? run(tools.ffprobe, arguments, timeout: planTimeout),
+            result.status == 0,
             let root = (try? JSONSerialization.jsonObject(with: result.output)) as? [String: Any]
         else { return nil }
 
@@ -261,14 +262,15 @@ extension FFmpegRewrap {
     /// the first a whole number of frames from zero, at `plan.videoRate`.
     /// Read from the file with ffprobe, because ffmpeg's exit code does not
     /// say. Anything unreadable is false. Takes no lock: it runs inside
-    /// `convert`.
+    /// `convert`. The arithmetic is `onFrameGrid`'s.
     static func keepsFrameGrid(_ file: URL, of plan: Plan, with tools: Tools) -> Bool {
         guard let rate = plan.videoRate else { return false }
         let arguments = [
             "-v", "error", "-select_streams", "v:0", "-show_entries",
             "stream=time_base:packet=pts", "-of", "csv=p=0", file.path,
         ]
-        guard let result = try? run(tools.ffprobe, arguments, timeout: 300), result.status == 0
+        guard let result = try? run(tools.ffprobe, arguments, timeout: frameCheckTimeout),
+            result.status == 0
         else { return false }
         var timescale: Int64?
         var times: [Int64] = []
@@ -286,17 +288,88 @@ extension FFmpegRewrap {
                 return false
             }
         }
-        guard let timescale, let first = times.first, first >= 0 else { return false }
+        guard let timescale else { return false }
+        return onFrameGrid(times: times, timescale: timescale, rate: rate)
+    }
+
+    /// Whether `times`, packet times in units of 1/`timescale` s, are
+    /// consecutive frames at `rate`: the first a whole number of frames from
+    /// zero and each next one exactly one frame later. Pure. No packet, a
+    /// frame that is not a whole number of units, or a next time past
+    /// `Int64.max` is false; the next time is computed only before a further
+    /// packet, so a last packet near the top of the range is not an overflow.
+    static func onFrameGrid(times: [Int64], timescale: Int64, rate: FrameRate) -> Bool {
+        guard let first = times.first, first >= 0 else { return false }
         let (ticks, overflow) = timescale.multipliedReportingOverflow(by: Int64(rate.den))
         guard !overflow, ticks % Int64(rate.num) == 0 else { return false }
         let step = ticks / Int64(rate.num)
         guard step > 0, first % step == 0 else { return false }
         var expected = first
-        for pts in times {
-            guard pts == expected else { return false }
-            expected += step
+        for pts in times.dropFirst() {
+            let (next, past) = expected.addingReportingOverflow(step)
+            guard !past else { return false }
+            guard pts == next else { return false }
+            expected = next
         }
         return true
+    }
+
+    // MARK: - The bounds
+
+    /// ffprobe's read of a source's streams (`plan`).
+    static let planTimeout: TimeInterval = 20
+    /// ffprobe's read of a VP9 copy's packet times (`keepsFrameGrid`).
+    static let frameCheckTimeout: TimeInterval = 300
+    /// ffmpeg's `-encoders` listing (`hasLibX264`).
+    static let encoderQueryTimeout: TimeInterval = 20
+    /// What `run` adds to any tool's own timeout: half for the tool to exit
+    /// after `terminate`, half for its two pipes to drain.
+    static let runGrace: TimeInterval = 20
+
+    /// The longest one import's ffmpeg step can take, both attempts (spec
+    /// §11 #227): one plan (the second attempt takes the first's), the frame
+    /// check, the encoder query, two conversions — the VP9 copy, then its
+    /// re-encode — and `run`'s grace on each of those five runs.
+    /// `import_media`'s wait is this plus its header probes
+    /// (`AgentServer.probeCeiling`).
+    static var longestAssist: TimeInterval {
+        planTimeout + frameCheckTimeout + encoderQueryTimeout + 2 * longestConversion
+            + 5 * runGrace
+    }
+
+    // MARK: - One re-encode per file
+
+    /// The file-system number of the file at `url`
+    /// (`FileAttributeKey.systemFileNumber`), nil when there is none: what
+    /// tells a file from another that has since taken its name.
+    static func fileNumber(of url: URL) -> UInt64? {
+        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+        return (attributes?[.systemFileNumber] as? NSNumber)?.uint64Value
+    }
+
+    /// `discard(url)`, only while the file there is still the one numbered
+    /// `number`: a conversion that would not probe is thrown away, and a
+    /// file another import has since put at that name is not.
+    static func discard(_ url: URL, ifStill number: UInt64?) {
+        guard let number, fileNumber(of: url) == number else { return }
+        discard(url)
+    }
+
+    /// The re-encodes this process made, by path, each with the file number
+    /// it had when it was finished. Touched only under `conversionLock`.
+    private static var keptReencodes: [String: UInt64] = [:]
+
+    /// Whether the file at `destination` is a re-encode this process made
+    /// and nothing has replaced. The caller holds `conversionLock`.
+    static func isKeptReencode(_ destination: URL) -> Bool {
+        guard let noted = keptReencodes[destination.path] else { return false }
+        return fileNumber(of: destination) == noted
+    }
+
+    /// Notes the re-encode just finished at `destination`. The caller holds
+    /// `conversionLock`.
+    static func noteReencode(_ destination: URL) {
+        keptReencodes[destination.path] = fileNumber(of: destination)
     }
 
     /// x264 at CRF 18 when the user's build has it — visually lossless, and

@@ -2,6 +2,9 @@ import AppKit
 
 // The supplemental VP9 and AV1 decoders, before anything decodes (spec §11 #216).
 DecoderSupport.enable()
+// The document controller that knows which paths AppKit's own open is
+// reading, before anything else can make one (spec §11 #234).
+ProjectDocumentController.install()
 
 // No storyboard and no @NSApplicationMain: the delegate is created and set
 // before NSApplicationMain so applicationWillFinishLaunching can build the

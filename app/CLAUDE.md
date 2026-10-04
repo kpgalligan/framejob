@@ -268,8 +268,17 @@ detail there.
   kept only when every frame is on that grid (`keepsFrameGrid`, ffprobe's
   packet times read from the `.partial.mov` before `convert` moves it into
   place); a copy that ffmpeg fails, that fails the check or that will not
-  open is re-encoded once (`assist(…, reencodingVP9: true)`, from
-  `probeConverted`), under the same policy.
+  open is re-encoded once (`assist(_:mayAsk:planned:reencodingVP9:)` with
+  `reencodingVP9: true`, from `probeConverted`, which hands it the first
+  attempt's plan and makes no second call for a plan that copied no VP9),
+  under the same policy; a re-encode this process made and kept is answered
+  rather than discarded (`isKeptReencode`, `noteReencode`, under the
+  conversion lock), and a conversion that will not probe is discarded only
+  while it is still the file that was probed (`discard(_:ifStill:)`).
+  `FFmpegRewrap+Plan.swift` also holds the step's named bounds and their
+  sum `longestAssist`, from which `AgentServer.probeCeiling`
+  (`import_media`'s and `relink_media`'s wait) is built, and the pure
+  `onFrameGrid` the frame check calls.
   `FFmpegRewrap` is opt-in (`-RCFFmpegImport always`), and `assist`'s
   `mayAsk` is the CALLER's (spec §11 MC-5): `MediaImporter.probe` requires
   it, every click path passes `true`, a tool call's import passes `false`
@@ -455,11 +464,26 @@ the key map behind it.
   the delegate), `main.swift` — the window,
   the no-document window, the launch/terminate flow and the whole menu bar
   (spec §9). Menu items are nil-target selectors down the responder chain.
-  `AppDelegate.swift` binds the agent socket at launch and releases it at
-  quit. Copy MCP Command is Settings' MCP pane's (`MCPSettingsPane.swift`,
+  `AppDelegate.swift` binds the agent socket at launch, then calls
+  `ProjectDocumentController.complainUnlessShared()`, and releases the
+  socket at quit. Copy MCP Command is Settings' MCP pane's (`MCPSettingsPane.swift`,
   spec §11 MC-7); there is no Tools menu.
-  `main.swift` also calls `AgentCatalogSnapshot.writeIfAsked()` straight
-  after `AgentLane.prepareAtLaunch()`, at `#if` depth 0.
+  `main.swift` calls `ProjectDocumentController.install()` straight after
+  `DecoderSupport.enable()`, and `AgentCatalogSnapshot.writeIfAsked()`
+  straight after `AgentLane.prepareAtLaunch()`, at `#if` depth 0.
+- `ProjectDocumentController.swift` — the app's `NSDocumentController`
+  (spec §11 #234), made once by `main.swift` before any other can be (the
+  first one instantiated is `.shared`); no other product file instantiates
+  it. Its overrides of the two public asynchronous opens count, per
+  `AgentServer.canonical` path and on main, the opens AppKit has in flight:
+  one added before `super`, one taken off in the completion before the
+  caller's runs; a reopen with no URL is not counted. `isOpening(url)`
+  (main only) is what `open_project`'s two main-thread steps and
+  `refuseHeldPath` ask; it answers false when `.shared` is not this class,
+  which is every proof probe but `agent_open_probe.swift`, which subclasses
+  it (so it is not `final`). A launch whose shared controller is not this
+  class logs `Reelcut: `; `agent_socket_proof.py`'s `no-controller` mutant
+  removes the `install()` line and must fail Z1.
 - `EditorWindow.swift` — the editor's `NSWindow` subclass: its `sendEvent`
   routes a bare Space to play/pause unless the first responder types or
   presses on it (spec §11 K-1), so Space never beeps when focus has fallen
@@ -1583,11 +1607,15 @@ free.
   (`import_media`, `transcribe`, `record_screen`, `export`,
   `render_graphic`, `open_project`, …); the criterion
   is "waits on main" or, for `open_project`, "must not hold main for a
-  read" (spec §11 #231), not "touches the disk".
+  read" (spec §11 #231), not "touches the disk". `open_project`'s two
+  main-thread steps also wait, up to `AgentServer.personOpenWait` (30 s)
+  each, for a person's open of the same path that is still in flight, and
+  then answer `already_open` or refuse by name; `refuseHeldPath` refuses a
+  path being opened (spec §11 #234).
 - `AgentServer+Socket.swift` — the agent server's Unix socket, its only
   listener since road map 14's MC4 deleted TCP (MC2, spec §11 MC-1, MC-2,
   MC-6). `socketPlan` is pure: a non-empty `RC_AGENT_SOCKET`, else
-  `AppSupport`'s `Agent/agent.sock`. `bindSocket` (all of
+  `AppSupport`'s `Agent/agent.sock`. `bindSocket` (the first statement of
   `applicationDidFinishLaunching`) runs `socketRefusal` — the folder made
   through `AppSupport.ensureDirectory`, then a real folder this user owns
   with no group or world bits; a socket at the path that ACCEPTS is left

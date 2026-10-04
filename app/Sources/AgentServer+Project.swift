@@ -22,6 +22,12 @@ extension AgentServer {
     /// answer and the file's type on main; the read here, as AppKit's own
     /// concurrent read does it; then, on main, the document added and shown.
     /// It answers when the read ends, with no window and no question (MC-5).
+    ///
+    /// **One document per path** (spec §11 #234): each main-thread step is
+    /// one block that sees a holder, or a person's open of the path still in
+    /// flight (`ProjectDocumentController.isOpening`), or neither — and the
+    /// last step adds in that same block. An open in flight is waited for
+    /// (`afterPersonOpen`), and past `personOpenWait` the call is refused.
     func openProject(_ a: [String: Any]) throws -> String {
         let path = try requiredString(a, "path")
         let url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
@@ -34,10 +40,12 @@ extension AgentServer {
         // path a project is known by is `AgentServer.path(of:)`. Compared
         // canonically, as in `target(_:)`: two spellings of one file that
         // failed to match here would open the SAME file twice.
-        let known: (answer: String?, type: String) = try onMain {
+        let found: (answer: String?, type: String)? = try afterPersonOpen {
             if let answer = try self.alreadyOpen(url) { return (answer, "") }
+            if ProjectDocumentController.isOpening(url) { return nil }
             return (nil, try controller.typeForContents(of: url))
         }
+        guard let known = found else { throw Self.beingOpened(url) }
         if let answer = known.answer { return answer }
         // A tool call never asks the conversion question (spec §11 MC-5):
         // the read runs on this thread, inside the import's no-asking scope.
@@ -48,19 +56,59 @@ extension AgentServer {
             throw ToolError(
                 message: "\(url.lastPathComponent) did not open as a Reelcut project.")
         }
-        return try onMain {
+        let landed: String? = try afterPersonOpen {
             // A document that came to hold the path during the read wins:
             // the one made here was never added and has no window.
             if let answer = try self.alreadyOpen(url) {
                 document.close()
                 return answer
             }
+            if ProjectDocumentController.isOpening(url) { return nil }
             controller.addDocument(document)
             document.makeWindowControllers()
             document.showWindows()
             controller.noteNewRecentDocumentURL(url)
             return try self.jsonResult(["project": self.summary(document)])
         }
+        guard let answer = landed else {
+            // The person's open outlasted the wait: theirs is the document,
+            // and the one made here was never added or shown.
+            onMain { document.close() }
+            throw Self.beingOpened(url)
+        }
+        return answer
+    }
+
+    /// The longest `open_project` waits, at each of its two steps, for a
+    /// person's open of the same path to end (spec §11 #234). The app never
+    /// reassigns it; a probe shortens it (`ProjectDocument.copyWatch`'s
+    /// precedent).
+    static var personOpenWait: TimeInterval = 30
+
+    /// One of `openProject`'s main-thread steps: `step` on main, where nil
+    /// means a person's open of the path is in flight (spec §11 #234), again
+    /// every 50 ms while it answers nil, until `personOpenWait` after its
+    /// first nil; then nil. The sleep is this thread's and never main's: on
+    /// main the deadline is at once. A hop to main is `onMain`'s and is not
+    /// counted.
+    private func afterPersonOpen<T>(_ step: () throws -> T?) throws -> T? {
+        var deadline: Date?
+        while true {
+            if let found = try onMain(step) { return found }
+            let now = Date()
+            let limit = deadline
+                ?? (Thread.isMainThread ? now : now.addingTimeInterval(Self.personOpenWait))
+            deadline = limit
+            if now >= limit { return nil }
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+    }
+
+    /// `open_project`'s refusal of a file a person's open is still reading.
+    private static func beingOpened(_ url: URL) -> ToolError {
+        ToolError(
+            message: "\(url.lastPathComponent) is being opened in a window; call open_project "
+                + "again once it has opened.")
     }
 
     /// `open_project`'s answer when an open document already holds `url`,
@@ -154,14 +202,21 @@ extension AgentServer {
     }
 
     /// Refuses a write to a path another open document holds (spec §11 #40),
-    /// naming that document and the way out. Main only, so `save_project` and
-    /// `new_project` call it inside `onMain`.
+    /// naming that document and the way out, and then to a path a person's
+    /// open is still reading (spec §11 #234). Main only, so `save_project`
+    /// and `new_project` call it inside `onMain`. The save is a later hop:
+    /// an open that begins after this check is not seen (#234's risks).
     func refuseHeldPath(_ url: URL, except: ProjectDocument?, tool: String) throws {
-        guard let holder = documentHolding(url, except: except) else { return }
+        if let holder = documentHolding(url, except: except) {
+            throw ToolError(
+                message: "Another open project (\(holder.displayName ?? "Untitled")) is at "
+                    + "\(url.path), so \(tool) did not write there: close_project closes it, "
+                    + "or pass another path.")
+        }
+        guard ProjectDocumentController.isOpening(url) else { return }
         throw ToolError(
-            message: "Another open project (\(holder.displayName ?? "Untitled")) is at "
-                + "\(url.path), so \(tool) did not write there: close_project closes it, "
-                + "or pass another path.")
+            message: "\(url.path) is being opened in a window, so \(tool) did not write "
+                + "there: call \(tool) again once it has opened, or pass another path.")
     }
 
     /// Writes `document` and WAITS for NSDocument's asynchronous save to

@@ -32,9 +32,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     /// The agent socket, at every launch (road map 14, spec §11 MC-1;
-    /// `AgentServer+Socket.swift` logs why when it binds none).
+    /// `AgentServer+Socket.swift` logs why when it binds none), then the
+    /// complaint when the document controller is not the app's (#234).
     func applicationDidFinishLaunching(_ notification: Notification) {
         AgentServer.shared.bindSocket()
+        ProjectDocumentController.complainUnlessShared()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

@@ -129,6 +129,9 @@ extension MediaImporter {
 
     // MARK: - The synchronous faces
 
+    /// The longest `waitForProbe` waits for one AVFoundation probe.
+    static let probeTimeout: TimeInterval = 30
+
     /// The queue the completion-handler face probes on. A serial queue, not
     /// the cooperative pool: a conversion (`FFmpegRewrap`) blocks its thread
     /// for as long as ffmpeg runs, which is exactly what a cooperative
@@ -159,9 +162,10 @@ extension MediaImporter {
     /// body of both synchronous faces.
     ///
     /// The two halves are deliberately not nested inside `probe(url:)`.
-    /// `waitForProbe` puts a 30-second ceiling on AVFoundation, which is
-    /// right for reading headers and catastrophically wrong for a transcode;
-    /// `FFmpegRewrap.assist` therefore runs OUTSIDE it, unbounded, and its
+    /// `waitForProbe` puts a 30-second ceiling (`probeTimeout`) on
+    /// AVFoundation, which is right for reading headers and catastrophically
+    /// wrong for a transcode; `FFmpegRewrap.assist` therefore runs OUTSIDE
+    /// it, under its own bounds (`FFmpegRewrap.longestAssist`), and its
     /// result is probed with a fresh ceiling of its own. `assist` also needs
     /// the main thread for its consent alert, which it can only have because
     /// this function's callers are never the thread being waited on.
@@ -226,17 +230,19 @@ extension MediaImporter {
     ///
     /// There is ONE second attempt (spec §11 #227): when ffmpeg failed, a
     /// VP9 copy failed its frame check, or the file will not open, the step
-    /// is asked again to re-encode a VP9 stream it had copied. It answers
-    /// `nil` for every other source, and then the first attempt's error is
-    /// the one thrown. A timeout is not tried again.
+    /// is asked again to re-encode a VP9 stream it had copied, with the
+    /// first attempt's plan. A source whose plan copied no VP9 gets no
+    /// second call, and then the first attempt's error is the one thrown. A
+    /// timeout is not tried again.
     private static func probeConverted(
         _ url: URL, failure: any Error, mayAsk: Bool
     ) throws -> MediaDescriptor {
         var remembered = failure
         var converted: URL?
         var failed = false
+        var planned: FFmpegRewrap.Plan?
         do {
-            converted = try FFmpegRewrap.assist(url, mayAsk: mayAsk)
+            converted = try FFmpegRewrap.assist(url, mayAsk: mayAsk, planned: &planned)
         } catch let refusal as FFmpegRewrap.RewrapError {
             guard case .failed = refusal else { throw refusal }
             (remembered, failed) = (refusal, true)
@@ -246,8 +252,10 @@ extension MediaImporter {
         } else if !failed {
             throw failure
         }
+        if let planned, !planned.copiesVP9 { throw remembered }
         guard
-            let again = try FFmpegRewrap.assist(url, mayAsk: mayAsk, reencodingVP9: true)
+            let again = try FFmpegRewrap.assist(
+                url, mayAsk: mayAsk, planned: &planned, reencodingVP9: true)
         else { throw remembered }
         guard let descriptor = probeConversion(again, of: url) else { throw failure }
         return descriptor
@@ -257,11 +265,14 @@ extension MediaImporter {
     /// the file thrown away, when AVFoundation still will not open it. The
     /// conversion is cached by name, so leaving it there would hand the same
     /// broken result back for ever; throwing it away makes the next attempt
-    /// a real attempt. The error its caller reports is the ORIGINAL one,
-    /// because the file the user chose is the one they are being told about.
+    /// a real attempt. Only the file that was probed is thrown away: one
+    /// another import has since put at the name is left (spec §11 #227). The
+    /// error its caller reports is the ORIGINAL one, because the file the
+    /// user chose is the one they are being told about.
     private static func probeConversion(_ rewrapped: URL, of url: URL) -> MediaDescriptor? {
+        let probed = FFmpegRewrap.fileNumber(of: rewrapped)
         guard var descriptor = try? waitForProbe(rewrapped) else {
-            FFmpegRewrap.discard(rewrapped)
+            FFmpegRewrap.discard(rewrapped, ifStill: probed)
             return nil
         }
         descriptor.original = MediaOriginal(of: url)

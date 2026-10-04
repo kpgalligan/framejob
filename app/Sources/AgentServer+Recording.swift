@@ -74,12 +74,13 @@ extension AgentServer {
     /// `seconds` and a function of the SEGMENTS the recorder holds: its own
     /// `finishCeiling` (past which it probes whatever is on disk), plus two
     /// sequential `MediaImporter.probe` ceilings of 30 s PER SEGMENT
-    /// (`waitForProbe`'s literal; `settle` probes each segment's movie, then
+    /// (`MediaImporter.probeTimeout`; `settle` probes each segment's movie, then
     /// its microphone file — n segments, 2n probes), plus a margin: 75 s
     /// unpaused, 60 s more per further segment. The old bound was
     /// `seconds + 30`; R2's fixed 75 s was shorter than two segments' probes.
     static func stopCeiling(segments: Int) -> TimeInterval {
-        ScreenRecorder.finishCeiling + 2 * 30 * TimeInterval(max(segments, 1)) + 5
+        ScreenRecorder.finishCeiling
+            + 2 * MediaImporter.probeTimeout * TimeInterval(max(segments, 1)) + 5
     }
 
     // MARK: - The tool

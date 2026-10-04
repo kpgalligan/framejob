@@ -328,6 +328,17 @@ lenient-decoding rule.
 - **The archived AVFoundation guide says a second `AVPlayerLayer` blanks the first. Measured false
   on macOS 26.5.1.** `isReadyForDisplay` and `videoRect` are useless as instruments for it.
 - **`NSPopUpButton` has no `item(withTag:)`.** Use `menu?.item(withTag:)`.
+- **`ProjectDocumentController.swift` is its own file, and `main.swift` is the only product file
+  that makes one** (issue batch B81, spec §11 #234). The first `NSDocumentController`
+  instantiated is `.shared`, so the instance is made at the top of `main.swift`, before
+  `NSApplicationMain`. The CLASS cannot live in `main.swift`: every proof probe compiles
+  `app/Sources` without `main.swift` and installs a controller of its own first, so
+  `AgentServer+Project.swift` would not build there. It does not live in
+  `AgentServer+Project.swift` either: it is a launch object the app needs whether or not an agent
+  ever calls, and that file holds handlers. `isOpening` is static and answers false when
+  `.shared` is not this class, so a probe with its own controller behaves as it did. The class is
+  not `final` because `agent_open_probe.swift` subclasses it to hold a read and count what was
+  asked.
 
 ### Recording
 
@@ -459,8 +470,11 @@ to pay a toll starts from it. A file not listed has no named seam yet.
 - `FFmpegRewrap.swift`: the plan and the command moved to `FFmpegRewrap+Plan.swift` in issue
   batch B80 (#227), a pure move gated alone before the VP9 copy landed (`Plan`, the copyable
   codecs, `plan(for:with:)`, `rate`, `arguments`, `encoderArguments`; `run`, `ToolResult`,
-  `hasLibX264` and `arguments` lost `private`). The next seam: the process plumbing (`run`,
-  `ToolResult`, `OutputBox`) with the tool search.
+  `hasLibX264` and `arguments` lost `private`). Issue batch B81 put what it added there too
+  (the named bounds and `longestAssist`, `onFrameGrid`, `fileNumber`, `discard(_:ifStill:)` and
+  the kept-re-encode map), and the base file took only `assist`'s `planned` and its kept
+  re-encode check. The next seam: the process plumbing (`run`, `ToolResult`, `OutputBox`) with
+  the tool search.
 - `ProjectDocument.swift`: stored properties cannot move; the natural cut is the media/reverse
   machinery, in the shape of `+DisplayStem`, `+Import`, `+Graphics`.
 - `InspectorPane.swift`: the precedents are `InspectorSection.swift`, `InspectorSlider.swift` and

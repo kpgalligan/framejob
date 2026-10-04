@@ -71,11 +71,34 @@ K14 (#224) a quit with an agent call in flight, by the same pid-targeted
     event: M exits within 20 s, its socket file is gone, and the raw
     connection reads 0 bytes and closes by EOF or a reset (not a 10 s
     timeout) — a clean failure, never a half answer.
+K15 (spec §11 #231, issue batch B81) a quit with an `open_project` READ in
+    flight, by K14's quit event. N is launched with
+    `CFFIXED_USER_HOME=<work>/k15-home`, a fresh folder with no `Library`,
+    so its copy lands in a scratch `Rewrapped/` and never in the owner's.
+    CONTROL C0: once N has bound, `<k15-home>/Library/Application Support`
+    exists (else the row FAILs, N is stopped by SIGTERM and no call is
+    made). The fixture is `agent_open_proof.make_fixture`'s `big.webm`
+    (`--k15-megabytes`, default 512) under `<work>/k15/`. A quit sender is
+    armed BEFORE the call: one bounded `osascript -l JavaScript` that polls
+    for a trigger file every 10 ms and then sends K14's `terminate`, so the
+    quit costs no osascript start-up once the copy is seen. Then a raw `POST`
+    of `open_project {big.webm}`; the scratch `Rewrapped/` is polled every
+    10 ms, and on its `.partial.mov`: CONTROL C2, the connection has nothing
+    to read, then the trigger. Pass: N exits within 20 s, its socket file is
+    gone, the connection reads 0 bytes and closes by EOF or a reset, and
+    `Rewrapped/` holds exactly `big-<16 hex>.partial.mov` (#228-P O8). Then
+    N2, on the same scratch home: `open_project {big.webm}` answers a media
+    path `…/big-<16 hex>.mov` that is on disk, with no partial left; the
+    project is closed (`close_project {discard: true}`: a WebM opens as an
+    untitled project with unsaved changes, and a quit's document review
+    would put a save sheet up) and N2 quits by the same event. A call that
+    answered before the quit is a FAIL that names `--k15-megabytes`. Both
+    folders are removed when the row ends.
 Z1  no `Reelcut: ` in any log.  Z2  no proof pid alive.
 
-    python3 tools/proof/agent_socket_proof.py [--app PATH]
+    python3 tools/proof/agent_socket_proof.py [--app PATH] [--k15-megabytes N]
         [--mutant no-connect-first|no-mode-check|tcp-listener|agent-asks|
-                  open-asks|fixed-path|waits-for-call]
+                  open-asks|fixed-path|waits-for-call|no-controller]
 
 Any FAIL exits 1; an instrument that cannot run is a FAIL, never a skip, and
 no row may SKIP. Every mutant replaces one anchor in a
@@ -85,16 +108,18 @@ against that build: `no-connect-first` (K4 must FAIL), `no-mode-check` (K8),
 `listening at` line), `agent-asks` (K12's import half: `AgentServer+Media`'s
 probe passes `mayAsk: true`), `open-asks` (K12's open half: `openProject`
 calls `makeDocument` outside `withoutAsking`) and `fixed-path` (K13:
-`mcpHelperURL` is `/Applications/Reelcut.app/…`) and `waits-for-call` (K14:
-`applicationWillTerminate` joins a `get_project` served on a background
-thread before it unbinds, so main waits on the lane lock the in-flight
-export holds, while the export's completion waits for main; K6 and K7 fail
-too, as expected. It is `async` plus a semaphore, never
+`mcpHelperURL` is `/Applications/Reelcut.app/…`) and `waits-for-call` (K14
+AND K15: `applicationWillTerminate` joins a `get_project` served on a
+background thread before it unbinds, so main waits on the lane lock the
+in-flight export or open holds, while that call's completion waits for main;
+K6 and K7 fail too, as expected. It is `async` plus a semaphore, never
 `DispatchQueue.global().sync`: GCD runs a `sync` block inline on the calling
-thread, so `serve` would see the main thread and skip the lock). `lsregister -u` is run on
-a copy's built app before its tree is replaced and at the end of its run. A
-mutant run exits 0 when its row FAILED (caught), 1 when it passed
-(survived), 2 when the control could not be performed.
+thread, so `serve` would see the main thread and skip the lock) and
+`no-controller` (Z1: `main.swift` installs no `ProjectDocumentController`,
+so the launch logs the `Reelcut: ` complaint, spec §11 #234). `lsregister -u`
+is run on a copy's built app before its tree is replaced and at the end of
+its run. A mutant run exits 0 when every row it names FAILED (caught), 1
+when one passed (survived), 2 when the control could not be performed.
 """
 
 import argparse
@@ -147,8 +172,8 @@ TCP_LISTENER = (
     "            }\n"
     "        }\n"
     "        _ = listen(leaked, 1)\n")
-# name → (the row it must fail, the half of it (or None), file in app/Sources,
-# before — exactly once, after)
+# name → (the row it must fail, or a tuple of rows that must ALL fail; the
+# half of it (or None); file in app/Sources; before — exactly once; after)
 MUTANTS = {
     "no-connect-first": ("K4", None, "AgentServer+Socket.swift",
                          "        let answer = connectErrno(toSocketAt: path)\n",
@@ -163,11 +188,14 @@ MUTANTS = {
     "agent-asks": ("K12", "import", "AgentServer+Media.swift",
                    "        MediaImporter.probe(url: url, mayAsk: false) { result in\n",
                    "        MediaImporter.probe(url: url, mayAsk: true) { result in\n"),
+    # Step B of `openProject`, unchanged since B79 moved the type into
+    # `known` (the anchor had not matched since; re-anchored by B81).
     "open-asks": ("K12", "open", "AgentServer+Project.swift",
                   "        let made = try MediaImporter.withoutAsking {\n"
-                  "            try controller.makeDocument(withContentsOf: url, ofType: type)\n"
+                  "            try controller.makeDocument(withContentsOf: url, ofType: known.type)\n"
                   "        }\n",
-                  "        let made = try controller.makeDocument(withContentsOf: url, ofType: type)\n"),
+                  "        let made = try controller.makeDocument("
+                  "withContentsOf: url, ofType: known.type)\n"),
     "fixed-path": ("K13", None, "AgentServer+Socket.swift",
                    "        Bundle.main.bundleURL.appendingPathComponent(\"Contents/Helpers/reelcut-mcp\")\n",
                    "        URL(fileURLWithPath: \"/Applications/Reelcut.app/Contents/Helpers/reelcut-mcp\")\n"),
@@ -176,16 +204,22 @@ MUTANTS = {
     # delivered on main (Exporter.swift), so the quit cannot complete. Not
     # `DispatchQueue.global().sync`: GCD runs that block inline on main, and
     # `serve` skips the lock on main (AgentLane.swift).
-    "waits-for-call": ("K14", None, "AppDelegate.swift",
+    "waits-for-call": (("K14", "K15"), None, "AppDelegate.swift",
                        "        AgentServer.shared.unbindSocket()\n",
                        "        let held = DispatchSemaphore(value: 0)\n"
                        "        DispatchQueue.global().async { _ = AgentLane.shared.serve("
                        "tool: \"get_project\", argumentsJSON: \"{}\"); held.signal() }\n"
                        "        held.wait()\n"
                        "        AgentServer.shared.unbindSocket()\n"),
+    # No `ProjectDocumentController` is made, so the shared controller is
+    # AppKit's own and the launch complains (spec §11 #234).
+    "no-controller": ("Z1", None, "main.swift",
+                      "ProjectDocumentController.install()\n", ""),
 }
 ORDER = ["P1", "K0", "K1", "K3", "K4", "K5", "K6", "K7", "K8", "K9", "K11", "K12", "K13",
-         "K14", "Z1", "Z2"]
+         "K14", "K15", "Z1", "Z2"]
+# The rows that need the app and K0: every K row after K0.
+APP_ROWS = [name for name in ORDER if name.startswith("K") and name != "K0"]
 rows = {}
 skips = {}
 halves = {}
@@ -225,8 +259,8 @@ def rpc(path, method, params=None, request_id=1, timeout=60):
     return answer["result"]
 
 
-def call(path, tool, arguments):
-    result = rpc(path, "tools/call", {"name": tool, "arguments": arguments})
+def call(path, tool, arguments, timeout=60):
+    result = rpc(path, "tools/call", {"name": tool, "arguments": arguments}, timeout=timeout)
     text = "".join(part.get("text", "") for part in result.get("content", [])
                    if part.get("type") == "text")
     if result.get("isError"):
@@ -269,17 +303,19 @@ def ident(path):
 # ---- instances ------------------------------------------------------------------
 
 class Instance:
-    """One owned app, by PID, on its own scratch socket."""
+    """One owned app, by PID, on its own scratch socket. `env` is added to
+    the child's environment (K15's scratch home)."""
 
-    def __init__(self, name, app, sock, extra=()):
+    def __init__(self, name, app, sock, extra=(), env=None):
         self.name, self.app, self.sock, self.extra = name, app, sock, list(extra)
+        self.env = dict(env or {})
         self.log = WORK / f"{name}.log"
         self.child = None
         self.socket_line = None
 
     def start(self):
         self.log.write_text("")
-        env = bounded.child_env({"RC_AGENT_SOCKET": self.sock})
+        env = bounded.child_env({**self.env, "RC_AGENT_SOCKET": self.sock})
         with open(self.log, "a") as out:
             self.child = subprocess.Popen(
                 [str(self.app), "-ApplePersistenceIgnoreState", "YES"] + self.extra,
@@ -309,15 +345,20 @@ class Instance:
             os.kill(self.child.pid, sig)
             self.child.wait(timeout=30)
 
+    def quit_script(self):
+        """JavaScript for `osascript`: a quit event to THIS pid through
+        NSRunningApplication, answering what `terminate` said."""
+        return ("ObjC.import('AppKit');"
+                f"var app = $.NSRunningApplication.runningApplicationWithProcessIdentifier("
+                f"{self.child.pid});"
+                "app.isNil() ? 'no such app' : String(app.terminate);")
+
     def quit_event(self):
         """A quit event to THIS pid through NSRunningApplication; answers
         (exited within QUIT_BOUND, seconds, the osascript result)."""
         if not self.alive():
             return False, 0.0, "not running"
-        script = ("ObjC.import('AppKit');"
-                  f"var app = $.NSRunningApplication.runningApplicationWithProcessIdentifier("
-                  f"{self.child.pid});"
-                  "app.isNil() ? 'no such app' : String(app.terminate);")
+        script = self.quit_script()
         started = time.monotonic()
         sent = bounded.run(["osascript", "-l", "JavaScript", "-e", script], 30)
         try:
@@ -602,9 +643,192 @@ def row_k14(app):
         m.stop()
 
 
+K15_MEGABYTES = 512
+K15_ARM_BOUND = 30
+K15_PARTIAL_BOUND = 120
+K15_SENDER_BOUND = 300
+K15_OPEN_BOUND = 300
+K15_PARTIAL = re.compile(r"^big-[0-9a-f]{16}\.partial\.mov$")
+K15_MOVIE = re.compile(r"^big-[0-9a-f]{16}\.mov$")
+
+
+def k15_sender(instance, armed, trigger):
+    """The quit sender, armed before the call: one bounded `osascript` that
+    writes `armed`, polls for `trigger` every 10 ms and then sends
+    `instance` K14's quit event. A `bounded.Background`."""
+    script = ("ObjC.import('AppKit');"
+              f"var app = $.NSRunningApplication.runningApplicationWithProcessIdentifier("
+              f"{instance.child.pid});"
+              "var files = $.NSFileManager.defaultManager;"
+              f"files.createFileAtPathContentsAttributes({json.dumps(str(armed))}, $(), $());"
+              "var said = 'no trigger';"
+              f"for (var i = 0; i < {K15_SENDER_BOUND * 100}; i++) {{"
+              f"  if (files.fileExistsAtPath({json.dumps(str(trigger))})) {{"
+              "    said = app.isNil() ? 'no such app' : String(app.terminate);"
+              "    break;"
+              "  }"
+              "  $.NSThread.sleepForTimeInterval(0.01);"
+              "}"
+              "said;")
+    return bounded.Background(["osascript", "-l", "JavaScript", "-e", script],
+                              K15_SENDER_BOUND + 30)
+
+
+def row_k15(app, megabytes):
+    """A quit event with an `open_project` read in flight (spec §11 #231)."""
+    import agent_open_proof  # the fixture's one maker
+    home, fixtures = WORK / "k15-home", WORK / "k15"
+    for folder in (home, fixtures):
+        shutil.rmtree(folder, ignore_errors=True)
+        folder.mkdir(parents=True)
+    support = home / "Library/Application Support"
+    rewrapped = support / "Reelcut/Rewrapped"
+    scratch = {"CFFIXED_USER_HOME": str(home)}
+    sock = os.path.join(scratch_folder(), "agent.sock")
+    n = Instance("n", app, sock, env=scratch)
+    raw = sender = n2 = None
+    try:
+        up = n.start()
+        if not up or n.socket_line != f"listening at {sock}":
+            check("K15", False, f"N did not bind: {n.socket_line!r}")
+            return
+        if not support.is_dir():
+            check("K15", False, f"CONTROL C0: {support} does not exist after N bound, so the "
+                                f"scratch home did not take (N is stopped by SIGTERM; no call "
+                                f"was made)")
+            return
+        fixture, why = agent_open_proof.make_fixture(megabytes, str(fixtures))
+        if fixture is None:
+            check("K15", False, f"the fixture was not made: {why}")
+            return
+        size = os.path.getsize(fixture) / (1024 * 1024)
+        armed, trigger = fixtures / "armed", fixtures / "quit-now"
+        sender = k15_sender(n, armed, trigger)
+        deadline = time.monotonic() + K15_ARM_BOUND
+        while not armed.exists() and time.monotonic() < deadline:
+            time.sleep(0.05)
+        if not armed.exists():
+            check("K15", False, f"the quit sender was not armed within {K15_ARM_BOUND} s")
+            return
+        body = json.dumps({"jsonrpc": "2.0", "id": 15, "method": "tools/call", "params": {
+            "name": "open_project", "arguments": {"path": fixture}}}).encode()
+        raw = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        raw.settimeout(10)
+        raw.connect(sock)
+        raw.sendall(b"POST /mcp HTTP/1.1\r\nHost: localhost\r\n"
+                    b"Content-Type: application/json\r\n"
+                    b"Accept: application/json, text/event-stream\r\n"
+                    b"Connection: close\r\n"
+                    + f"Content-Length: {len(body)}\r\n\r\n".encode() + body)
+        sent = time.monotonic()
+        seen, early = None, False
+        while time.monotonic() - sent < K15_PARTIAL_BOUND:
+            names = os.listdir(rewrapped) if rewrapped.is_dir() else []
+            if any(name.endswith(".partial.mov") for name in names):
+                seen = round(time.monotonic() - sent, 3)
+                break
+            if select.select([raw], [], [], 0)[0]:
+                early = True
+                break
+            time.sleep(0.01)
+        if seen is None:
+            check("K15", False,
+                  (f"the call answered before a .partial.mov was seen in {rewrapped}" if early
+                   else f"no .partial.mov in {rewrapped} within {K15_PARTIAL_BOUND} s")
+                  + f" (a {size:.1f} MiB fixture; --k15-megabytes {megabytes})")
+            return
+        if select.select([raw], [], [], 0)[0]:
+            check("K15", False, f"CONTROL C2: the call's connection had bytes to read when its "
+                                f".partial.mov was seen — it answered before the quit: raise "
+                                f"--k15-megabytes (now {megabytes})")
+            return
+        trigger.write_text("quit\n")
+        started = time.monotonic()
+        try:
+            n.child.wait(timeout=QUIT_BOUND)
+            exited = True
+        except subprocess.TimeoutExpired:
+            exited = False
+        seconds = round(time.monotonic() - started, 2)
+        received, close = 0, "timeout"
+        raw.settimeout(K14_READ_BOUND)
+        try:
+            while True:
+                chunk = raw.recv(65536)
+                if not chunk:
+                    close = "EOF"
+                    break
+                received += len(chunk)
+        except ConnectionResetError:
+            close = "reset"
+        except socket.timeout:
+            close = "timeout"
+        gone = ident(sock) is None
+        left = sorted(os.listdir(rewrapped)) if rewrapped.is_dir() else []
+        partial_only = len(left) == 1 and bool(K15_PARTIAL.match(left[0]))
+        # The trigger is written, so the sender ends on its own within its
+        # next poll: its answer is read whether or not N exited.
+        said, sender = sender.finish(), None
+        quit_half = exited and gone and received == 0 and close in ("EOF", "reset") and partial_only
+        answered = (f"; the call ANSWERED before the quit ({received} bytes): raise "
+                    f"--k15-megabytes (now {megabytes})") if received else ""
+        detail = (f"C0 the scratch home took; a {size:.1f} MiB fixture; the .partial.mov seen "
+                  f"{seen} s into the call; C2 in flight; N exited {exited} in {seconds} s "
+                  f"(osascript rc {said['rc']}: "
+                  f"{' '.join(line for _, line in said['lines'])}); socket file gone {gone}; "
+                  f"{received} bytes received; closed by {close}; Rewrapped/ holds {left}"
+                  f"{answered}")
+        if not quit_half:
+            check("K15", False, detail)
+            return
+
+        # N2, on the same scratch home: the next open copies again and
+        # removes the partial the quit left (#228-P O8).
+        sock2 = os.path.join(scratch_folder(), "agent.sock")
+        n2 = Instance("n2", app, sock2, env=scratch)
+        up2 = n2.start()
+        if not up2 or n2.socket_line != f"listening at {sock2}":
+            check("K15", False, detail + f"; N2 did not bind: {n2.socket_line!r}")
+            return
+        opened = call(sock2, "open_project", {"path": fixture}, timeout=K15_OPEN_BOUND)
+        media = call(sock2, "get_project", {"project": fixture})["project"]["media"]
+        path = media[0]["path"] if media else ""
+        after = sorted(os.listdir(rewrapped))
+        named = (os.path.realpath(os.path.dirname(path)) == os.path.realpath(rewrapped)
+                 and bool(K15_MOVIE.match(os.path.basename(path))))
+        # A WebM opens as an untitled project with unsaved changes, and a
+        # quit's document review would put a save sheet up and never exit:
+        # the project is closed first, so no sheet can appear (K14's C1).
+        closed = call(sock2, "close_project", {"project": fixture, "discard": True})
+        n2_exited, n2_seconds, n2_said = n2.quit_event()
+        check("K15", "project" in opened and len(media) == 1 and named and os.path.exists(path)
+              and after == [os.path.basename(path)] and closed.get("ok") is True and n2_exited,
+              detail + f". Then N2 on the same home: open_project answers keys {sorted(opened)}; "
+              f"media {len(media)}, path {path!r} (in the scratch Rewrapped/, named: {named}), "
+              f"on disk {os.path.exists(path)}; Rewrapped/ holds {after}; close_project "
+              f"{{discard: true}} ok {closed.get('ok')}; N2 exited {n2_exited} in {n2_seconds} s "
+              f"({n2_said})")
+    finally:
+        if raw is not None:
+            raw.close()
+        n.stop()
+        if n2 is not None:
+            n2.stop()
+        if sender is not None:
+            # The trigger never came: end the sender now (its own group; a
+            # group that has already gone answers either error).
+            try:
+                os.killpg(sender.child.pid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                pass
+            sender.finish()
+        for folder in (home, fixtures):
+            shutil.rmtree(folder, ignore_errors=True)
+
+
 # ---- the K rows -------------------------------------------------------------------
 
-def run_rows(app):
+def run_rows(app, megabytes=K15_MEGABYTES):
     tmp = os.path.realpath(os.environ.get("TMPDIR") or tempfile.gettempdir())
     shared = scratch_folder()
     path = os.path.join(shared, "agent.sock")
@@ -614,7 +838,7 @@ def run_rows(app):
           and not real.startswith(str(SUPPORT.resolve()) + os.sep) and folder_mode == 0o700,
           f"{path} ({len(path.encode())} bytes), folder {oct(folder_mode)}")
     if not rows["K0"]:
-        for name in ORDER[2:14]:
+        for name in APP_ROWS:
             check(name, False, "not run: K0 failed")
         return
 
@@ -744,6 +968,12 @@ def run_rows(app):
     except Exception as error:  # noqa: BLE001
         check("K14", False, f"the row broke: {type(error).__name__}: {error}")
 
+    # K15 — a quit with an open_project read in flight (#231).
+    try:
+        row_k15(app, megabytes)
+    except Exception as error:  # noqa: BLE001
+        check("K15", False, f"the row broke: {type(error).__name__}: {error}")
+
 
 def finish_z():
     for instance in INSTANCES:
@@ -808,6 +1038,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--app", type=Path, default=APP)
     parser.add_argument("--mutant", choices=sorted(MUTANTS))
+    parser.add_argument("--k15-megabytes", type=int, default=K15_MEGABYTES,
+                        help="K15's fixture's least size, in MiB")
     args = parser.parse_args()
     started = time.monotonic()
     WORK.mkdir(parents=True, exist_ok=True)
@@ -815,7 +1047,9 @@ def main():
     app = args.app
     if args.mutant:
         row, half = MUTANTS[args.mutant][:2]
-        print(f"agent socket — the {args.mutant} MUTANT ({row}{f' {half} half' if half else ''} "
+        targets = row if isinstance(row, tuple) else (row,)
+        named = " and ".join(targets)
+        print(f"agent socket — the {args.mutant} MUTANT ({named}{f' {half} half' if half else ''} "
               f"must FAIL)", flush=True)
         app, why = build_mutant_app(args.mutant)
         if app is None:
@@ -828,10 +1062,10 @@ def main():
     try:
         row_p1(SOURCES, WORK / "probe")
         if not Path(app).exists():
-            for name in ORDER[1:14]:
+            for name in ["K0"] + APP_ROWS:
                 check(name, False, f"not run: no app at {app}")
         else:
-            run_rows(app)
+            run_rows(app, args.k15_megabytes)
     except Exception as error:  # an instrument that breaks is a FAIL, not an exit
         check("K?", False, f"the proof broke: {type(error).__name__}: {error}")
     finally:
@@ -844,13 +1078,21 @@ def main():
     seconds = time.monotonic() - started
     if args.mutant:
         row, half = MUTANTS[args.mutant][:2]
-        if row not in rows or not rows.get("K0", False) or (half and half not in halves):
+        targets = row if isinstance(row, tuple) else (row,)
+        named = " and ".join(targets)
+        if (any(name not in rows for name in targets) or not rows.get("K0", False)
+                or (half and half not in halves)):
             print(f"mutant {args.mutant}: the control could not be performed — "
-                  f"{row}{f' ({half} half)' if half else ''} was not scored or K0 failed")
+                  f"{named}{f' ({half} half)' if half else ''} was not scored or K0 failed")
             return 2
-        caught = (halves.get(half) is False) if half else (rows[row] is False)
-        print(f"mutant {args.mutant}: {row}{f' {half} half' if half else ''} "
-              f"{'FAIL — caught' if caught else 'ok — survived'} in {seconds:.0f} s")
+        caught = (halves.get(half) is False) if half else all(
+            rows[name] is False for name in targets)
+        passed = ", ".join(name for name in targets if rows[name])
+        verdict = "FAIL — caught" if caught else "ok — survived"
+        if not caught and not half:
+            verdict += f" ({passed} passed)"
+        print(f"mutant {args.mutant}: {named}{f' {half} half' if half else ''} "
+              f"{verdict} in {seconds:.0f} s")
         return 0 if caught else 1
     passed = sum(1 for good in rows.values() if good)
     tail = f"; skipped {', '.join(f'{k}: {v}' for k, v in skips.items())}" if skips else ""

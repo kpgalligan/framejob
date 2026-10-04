@@ -37,7 +37,7 @@ import Foundation
 /// converted file lands in Application Support and not in the `.reelcut`
 /// bundle.
 ///
-/// The orchestration is `assist(_:mayAsk:reencodingVP9:)`;
+/// The orchestration is `assist(_:mayAsk:planned:reencodingVP9:)`;
 /// `MediaImporter.probeConverted` is its only caller.
 enum FFmpegRewrap {
 
@@ -330,19 +330,24 @@ enum FFmpegRewrap {
     /// * a throw — the conversion was authorised and failed, which is worth
     ///   its own message rather than "could not read".
     ///
-    /// Synchronous and unbounded in time by design: it is called from
-    /// `MediaImporter`'s two synchronous faces, OUTSIDE the 30-second ceiling
-    /// those put on the AVFoundation probe, because a transcode legitimately
-    /// takes minutes and being killed at 30 seconds would be a bug rather
-    /// than a safeguard. `mayAsk` is the CALLER's (spec §11 MC-5): false for
-    /// a tool call's import, where nobody is at the keyboard, so there the
-    /// stored policy decides alone and `ask` means no.
+    /// Synchronous and long by design (`longestAssist` is its bound): it is
+    /// called from `MediaImporter`'s two synchronous faces, OUTSIDE the
+    /// 30-second ceiling those put on the AVFoundation probe, because a
+    /// transcode legitimately takes minutes and being killed at 30 seconds
+    /// would be a bug rather than a safeguard. `mayAsk` is the CALLER's (spec
+    /// §11 MC-5): false for a tool call's import, where nobody is at the
+    /// keyboard, so there the stored policy decides alone and `ask` means no.
     ///
     /// `reencodingVP9` is the second attempt after a VP9 copy failed, failed
-    /// its frame check or would not open (spec §11 #227): it reuses no file,
-    /// answers `nil` for a source whose plan is not a VP9 copy before any
-    /// question, and re-encodes the video.
-    static func assist(_ source: URL, mayAsk: Bool, reencodingVP9: Bool = false) throws -> URL? {
+    /// its frame check or would not open (spec §11 #227): it answers `nil`
+    /// for a source whose plan is not a VP9 copy before any question, and
+    /// re-encodes the video, once per file: a re-encode this process made
+    /// and kept is answered instead of discarded. `planned` is the first
+    /// attempt's plan, set before its question, which the second attempt
+    /// takes instead of running ffprobe again.
+    static func assist(
+        _ source: URL, mayAsk: Bool, planned: inout Plan?, reencodingVP9: Bool = false
+    ) throws -> URL? {
         // Before ffmpeg is even looked for, and before the policy is even
         // read: a conversion already on disk is already paid for. The policy
         // governs whether ffmpeg RUNS, and reusing a finished file runs
@@ -355,10 +360,14 @@ enum FFmpegRewrap {
         // nothing beyond the `stat` above.
         let decided = policy
         if decided == .never || (decided == .ask && !mayAsk) { return nil }
-        guard let tools = tools(), var plan = plan(for: source, with: tools) else { return nil }
+        guard let tools = tools(),
+            var plan = (reencodingVP9 ? planned : nil) ?? plan(for: source, with: tools)
+        else { return nil }
         if reencodingVP9 {
             guard plan.copiesVP9 else { return nil }
             plan = plan.reencodingVideo()
+        } else {
+            planned = plan
         }
         if decided == .ask, !consent(for: plan) { return nil }
 
@@ -372,11 +381,16 @@ enum FFmpegRewrap {
         conversionLock.lock()
         defer { conversionLock.unlock() }
         if reencodingVP9 {
+            // Another import of this file may have re-encoded it while this
+            // one waited: that file is kept, not discarded (spec §11 #227).
+            if isKeptReencode(plan.destination) { return plan.destination }
             discard(plan.destination)
         } else if FileManager.default.fileExists(atPath: plan.destination.path) {
             return plan.destination
         }
-        return try convert(plan, with: tools)
+        let made = try convert(plan, with: tools)
+        if reencodingVP9 { noteReencode(made) }
+        return made
     }
 
     // MARK: - Running ffmpeg
@@ -438,7 +452,8 @@ enum FFmpegRewrap {
         defer { stateLock.unlock() }
         if let known = libX264 { return known }
         let result = try? run(
-            tools.ffmpeg, ["-hide_banner", "-loglevel", "error", "-encoders"], timeout: 20)
+            tools.ffmpeg, ["-hide_banner", "-loglevel", "error", "-encoders"],
+            timeout: encoderQueryTimeout)
         let text = String(decoding: result?.output ?? Data(), as: UTF8.self)
         let found = text.split(separator: "\n").contains { line in
             line.split(separator: " ").contains("libx264")
@@ -458,7 +473,8 @@ enum FFmpegRewrap {
         return min(ceiling, longestConversion)
     }
 
-    /// The longest ffmpeg is ever given; `import_media`'s wait covers it.
+    /// The longest ffmpeg is ever given; `import_media`'s wait covers two
+    /// (`longestAssist`).
     static let longestConversion: TimeInterval = 4 * 3600
 
     private static func lastLine(of data: Data) -> String {
@@ -518,15 +534,15 @@ enum FFmpegRewrap {
 
         if exited.wait(timeout: .now() + timeout) != .success {
             process.terminate()
-            if exited.wait(timeout: .now() + 10) != .success, process.isRunning {
+            if exited.wait(timeout: .now() + runGrace / 2) != .success, process.isRunning {
                 kill(process.processIdentifier, SIGKILL)
             }
-            _ = drained.wait(timeout: .now() + 10)
+            _ = drained.wait(timeout: .now() + runGrace / 2)
             throw ToolFailure(
                 detail: "\(tool.lastPathComponent) did not finish in time", timedOut: true)
         }
         process.waitUntilExit()
-        _ = drained.wait(timeout: .now() + 10)
+        _ = drained.wait(timeout: .now() + runGrace / 2)
         return ToolResult(
             status: process.terminationStatus, output: collected.output,
             errorOutput: collected.errorOutput)

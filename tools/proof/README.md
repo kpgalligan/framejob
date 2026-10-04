@@ -13274,7 +13274,8 @@ on the lane's thread inside `MediaImporter.withoutAsking`.
   and 373 for A5, each at least 30. 512 and 1024 were not tried.
 - **Measured: the calls' lengths vary run to run.** A1 printed 3.018 s,
   1.501 s and 1.403 s, and A4 1.187 s, 0.796 s and 9.504 s, over one
-  fixture size. The cause was not measured.
+  fixture size. The cause was not measured. (Measured in issue batch B81,
+  #235: the disk write; the B81 section below.)
 - **Measured: `open-on-main` also fails A7.** With the read on main no tick
   sees the partial ("0 main ticks saw the .partial.mov", 1 tick in the whole
   call), so A7's stub is never added and the call opens the package.
@@ -13347,7 +13348,8 @@ instance of the built app on its own scratch socket, each log with no
 4 known warnings) and `make app` exited 0.
 
 A quit during an `open_project` read is not a row: #231 records it as
-argued from `agent_socket_proof.py`'s K14.
+argued from `agent_socket_proof.py`'s K14. (It is a row since issue batch
+B81: `agent_socket_proof.py`'s K15, the B81 section below.)
 
 ```sh
 python3 tools/proof/container_rewrap_probe.py                             # passed 60/60, exit 0
@@ -13437,8 +13439,9 @@ mov]; 1 file(s) and 0 partial(s) for it in Rewrapped/"; V6 "video vp09 …; 1
 -i run(s) [-c:v copy -f mp4]; the count at 30000/1001: 30/30 right, 30/30
 distinct". The probe built in 122 s and 123 s.
 
-The mutants, each run twice — once to read its set, once against it — and
-each MUTANT PASS, exit 0, on the second:
+The mutants. EXPECTED was read from one earlier run of each mutant, which is
+not a score; run each mutant once: it must print MUTANT PASS, exit 0. What
+that scored run printed:
 
 | Run | Failed (all as expected) | Printed |
 |---|---|---|
@@ -13455,4 +13458,338 @@ for m in no-original recopy-ffmpeg vp9-encode no-fallback no-snap no-check; do
   python3 tools/proof/ffmpeg_rewrap_proof.py --mutant $m                  # MUTANT PASS, exit 0, each
 done
 python3 tools/proof/spec_index_proof.py                                   # 138/138 checks passed
+```
+
+## Issue batch B81 — one document per path while a person's open is in flight, the two rewrap measurements explained, and B79's and B80's leftovers (`agent_open_proof.py` A8–A14 and `--mutant no-inflight`; `agent_socket_proof.py` K15 and `--mutant no-controller`; `ffmpeg_rewrap_proof.py` V9, V10, G1, C1, P1, M1 and four mutants; `container_rewrap_probe.py` T22; `recording_proof.py` section 3's stop-ceiling row; #234, #235; spec §11 #234, #231, #227, #228-V, #232)
+
+`ProjectDocumentController` (new, made at the top of `main.swift`) counts the
+opens AppKit has in flight, per canonical path; `open_project`'s two
+main-thread steps wait for one, up to `AgentServer.personOpenWait` each, and
+`refuseHeldPath` refuses a path being opened. `FFmpegRewrap.assist` takes
+the first attempt's plan (`planned`) and answers a re-encode this process
+already made and kept; `probeConversion` discards only the file it probed;
+`import_media`'s wait (`AgentServer.probeCeiling`) is the sum of every bound
+the step has; the frame check's arithmetic is the pure `onFrameGrid`.
+
+- **The EXPECTED sets were written before the first build**, as
+  predictions: `no-inflight`'s, `no-recheck`'s and `open-on-main`'s new rows
+  in `agent_open_proof.py`, and `discard-kept`'s, `plan-twice`'s,
+  `pure-rows`'s and the three V9 additions in `ffmpeg_rewrap_proof.py`.
+  **Every prediction held:** each of the fourteen probe-mutant runs below is
+  that mutant's FIRST run, and each printed MUTANT PASS. No set was
+  corrected.
+- **`agent_open_proof.py` A8–A14** race a person's open of `a4.reelcut`
+  against an agent's call. The probe's controller is the app's own
+  `ProjectDocumentController`, subclassed: `opens(of:)` notes an ask that
+  answered above 0; the public open's override counts its entries and
+  records its completion's document and error; `beginOpenPanel` answers the
+  package with no panel; `presentError` counts; and the two `makeDocument`
+  overrides call `super` and then HOLD the finished read, off main, until
+  the other side has got as far as the row needs — a person's read until
+  `opens(of:)` has answered above 0 or the agent's call has answered (mode
+  `seen`), or until that call has answered (mode `answered`); an agent's
+  read, where the row says so, until the person-style open has been
+  called. Each hold is bounded at 120 s and an expired hold fails its row
+  by name; no row sleeps for a guessed time, removes a copy or waits on a
+  partial tick. No hold expired in any run below.
+- **The establishing run is `--mutant no-inflight`** (`isOpening` answers
+  false: the app as it was before #234). It printed, for A8, "open_project
+  mid-read: already_open absent …; 2 open documents at the package's path,
+  the person's open's own false", for A9 "1 reads by the agent during A8 (1
+  by the person)", for A10 "its document among the open ones true; 2 open
+  documents at the package's path", for A11 "1 read(s) by the person, 1 by
+  the agent; 2 open documents", for A12 "open_project: ok: {"project": …
+  after 0.172 s (no sooner than 1 wanted); 1 read(s) by the agent; then 2
+  open documents", for A13 the same shape, 0.192 s after the person's open
+  was called, and for A14 "new_project {path: a4.reelcut}: error: Timed out
+  saving a4.reelcut.; project.json's bytes unchanged true (2781 → 2781);
+  then 1 open documents at the package's path …; 2 open project(s) in all":
+  with the person's read held until the call answered, the Save As waited
+  for the open until `save`'s own bound, and left a second, untitled
+  project open.
+- **The doors AppKit has were read, not run** (spec §11 #234 lists them).
+  The reading is a disassembly of the 3,513 AppKit methods and blocks whose
+  names match `NSDocument`, `NSApplication(NSAppleEventHandling)`,
+  `RecentItemsMenuController`, `Seamless`, `DocumentOpen`,
+  `NSPersistentUI`, `NSWindowRestor` or `NSWorkspace`, one `disassemble`
+  per symbol in a batch file, on macOS 26.5.1 (the designer's second pass;
+  its output was a scratch file and is not kept):
+
+  ```sh
+  lldb -b -o "target create <a binary that links AppKit>" \
+       -o "disassemble -n '-[NSDocumentController openDocument:]'"   # … one -o per symbol
+  ```
+
+  A8 drives File ▸ Open's own action, A10 the direct call the app's own
+  doors make, A11 reopen.
+- **#235 (1): T22's 0.000667 s was the reference's rounding, and the copy is
+  not wrong.** `ffprobe` on the fixtures (this batch's run): `p22.webm`'s
+  audio packets are stamped "0, 22, 43, 64, 86, 107, 128" ms and its first
+  video packet 0.022 s; `p22.ogg`'s packets read "-1040,1024 -16,1024
+  1008,1024 2032,1024 3056,1024" (pts, duration, in 1/48000 s).
+  `container_rewrap_probe.py`'s T22 now holds the copy to a sample-exact
+  reference (`click_reference`: the first audio Block's `pts_time`, plus the
+  first Ogg packet's duration in samples and the sample of ffmpeg's plain
+  decode that first passes 0.3, over 48000), bound 0.0001 s, and prints
+  ffmpeg's timeline reading beside it, held to nothing. It printed "P22:
+  the impulse decodes at 1.0213333333333334 s from the copy,
+  1.0213333333333334 s by the sample-exact reference (first Block 0.000 s +
+  (lead 1024 + plain-decode click 48000) / 48000), |difference| 0.000000 s,
+  bound 0.0001 s; ffmpeg's timeline reading 1.022 s, |difference| 0.000667
+  s, not bounded".
+- **#235 (2): the slow re-copy waited in the disk write** (the designer's
+  measurement, recorded in spec §11 #231; host state). What this batch
+  changes is the instrument: each `open_project` row prints where its
+  seconds went, and A2 and A5 want at least 3 partial ticks, "a count; the
+  copy's seconds are the disk's". The baseline below printed, for A1,
+  "1.146 s (0.252 s before the .partial.mov was first seen, 0.210 s while it
+  was written, 0.684 s after it was last seen); 41 main ticks, 22 saw the
+  .partial.mov", and for A4 "0.452 s (0.065 s before …, 0.208 s while it was
+  written, 0.179 s after it was last seen); 30 main ticks, 19 saw the
+  .partial.mov". `df -h /System/Volumes/Data` read 112 GiB free of 926
+  directly before that run, against 23 GiB during the designer's.
+- **`ffmpeg_rewrap_proof.py`** has a second wrapper, `<work>/tools/ffprobe`,
+  beside the ffmpeg one, so the product finds it as the sibling: it appends
+  its argv to `<work>/ffprobe.log` and execs the real ffprobe. A PLAN of a
+  source is a line there that holds `-show_streams` and ends in its path.
+  Mode `bad-encode` writes 64 bytes of junk to the output of a `-f mov` run
+  and exits 0. A mutant is a LIST of replacements, each exactly once.
+- **The build folders are kept, and a mutant's is not.**
+  `tools/proof/work/agent-open-build/` and `…/ffmpeg-rewrap-build/` each
+  keep `probe/`, the baseline's, so a repeat run does not rebuild (`du -sh`:
+  30 M each after the runs below); a mutant's `mutants/<name>/` is rebuilt
+  on every run, because its sources are copied afresh, so each run removes
+  its own at exit. `--clean` on either script removes the whole build
+  folder and exits 0, running nothing: run after the last run below, each
+  printed "removed …/tools/proof/work/<name>-build" and the folder was gone.
+- **`agent_socket_proof.py` K15** is a quit with an `open_project` read in
+  flight, on the built app in a scratch home (`CFFIXED_USER_HOME=
+  <work>/k15-home`; control C0 holds that the home took before any call).
+  The quit sender is one bounded `osascript` armed BEFORE the call, polling
+  for a trigger file every 10 ms, so the event costs no osascript start-up
+  once the copy's partial is seen. **The first run failed, on the row's own
+  last step, and the row was corrected once:** "N2 exited False in 20.0 s
+  (osascript rc 0: true)". A WebM opens as an untitled project with unsaved
+  changes, so the quit's document review held N2. The row now closes the
+  project first (`close_project {discard: true}`, K14's C1 rule: no save
+  sheet can appear). Nothing in the product changed between that run and
+  the next. The second and third runs printed `17/17`.
+- **`open-asks` is re-anchored** on step B's
+  `try controller.makeDocument(withContentsOf: url, ofType: known.type)`;
+  its old anchor had not matched since B79, so K12's open half had no
+  runnable control.
+
+Run on 2026-10-03 over `7da4b1c` plus this batch's diff, macOS 26.5.1,
+Apple M2 Max, ffmpeg 9.0.2, `hw_av1 False`.
+
+`container_rewrap_probe.py` printed `passed 60/60`, exit 0, with T17, T18
+and T20 "|difference| 0.000000 s, bound 0.0001 s" and T22 as above.
+`--mutant movie-600` printed MUTANT PASS (`passed 58/60`): G24 every `mvhd`
+600, and T22 "decodes at 1.02 s from the copy, 1.0213333333333334 s by the
+sample-exact reference …, |difference| 0.001333 s, bound 0.0001 s; ffmpeg's
+timeline reading 1.022 s, |difference| 0.002000 s, not bounded".
+`--mutant audio-early` printed MUTANT PASS (`passed 56/60`): T17 and T18
+0.021333 s, T22 "decodes at 1 s from the copy, 1.0213333333333334 s by the
+sample-exact reference …, |difference| 0.021333 s", B3a — not T20.
+`audio-dropped`, `offset-shift` and `vorbis-as-aac` were not run: T22 fails
+under each because no impulse decodes, and this batch edits no source they
+mutate.
+
+`agent_open_proof.py` printed `passed 15/15`, exit 0 (the probe built in
+122 s; a 278.8 MiB fixture). A0–A7 as in B79, with the seconds divided as
+above. A8 "openDocument(nil) with the panel answering a4.reelcut: the
+open's override entered 1 time(s); open_project mid-read: already_open true
+…; 1 open documents at the package's path, the person's open's own true
+(its completion called true, error nil); 0 errors presented; no hold
+expired"; A9 "0 reads by the agent during A8 (1 by the person)"; A10
+"open_project first, its read held; openDocument(withContentsOf:display:)
+mid-read: already_open true …; 1 read(s) by the agent, its document among
+the open ones false; 1 open documents at the package's path, the person's
+open's own true"; A11 "reopenDocument(for:withContentsOf:display:), then
+open_project mid-read: already_open true …; 1 read(s) by the person, 0 by
+the agent; 1 open documents"; A12 "open_project: error: a4.reelcut is being
+opened in a window; call open_project again once it has opened. after
+1.136 s (no sooner than 1 wanted); 0 read(s) by the agent; then 1 open
+documents at the package's path, the person's open's own true"; A13 "…
+1.201 s after the person's open was called (no sooner than 1 wanted); 1
+read(s) by the agent, its document among the open ones false; then 1 open
+documents"; A14 "new_project {path: a4.reelcut}: error: …/a4.reelcut is
+being opened in a window, so new_project did not write there: call new_p…;
+project.json's bytes unchanged true (2782 → 2782); then 1 open documents at
+the package's path …; 1 open project(s) in all". Its mutants, each run
+once:
+
+| Run | Failed (all as predicted) | Printed |
+|---|---|---|
+| `--mutant no-inflight` (new: `isOpening` answers false) | A8, A9, A10, A11, A12, A13, A14 (quoted above) | `passed 8/15`, MUTANT PASS |
+| `--mutant no-recheck` (step C's holder check off) | A7 ("already_open absent …; 2 open documents at the package's path"), A10 ("its document among the open ones true; 2 open documents") | `passed 13/15`, MUTANT PASS |
+| `--mutant open-on-main` | A2 and A5 ("0 main ticks saw the .partial.mov"), A7, A8 and A11 (refused at once: "already_open absent (error: a4.reelcut is being opened in a window …"), A10 ("already_open absent (ok: …); … its document among the open ones true"), A12 ("after 0.021 s (no sooner than 1 wanted)"), A13 ("open_project: ok: … 0.007 s after the person's open was called") | `passed 7/15`, MUTANT PASS |
+| `--mutant quiet-watch` | A3 ("93 of 108 main ticks saw a progress controller") | `passed 14/15`, MUTANT PASS |
+| `--mutant recopy-agent-watch` | A6 ("32 of 33 main ticks saw a progress controller") | `passed 14/15`, MUTANT PASS |
+
+`ffmpeg_rewrap_proof.py` printed `passed 22/22`, exit 0 (the probe built in
+122 s). F0 now prints "ffprobe …/ffmpeg-rewrap/tools/ffprobe". V7 "vj.mkv
+(mode pass): imports vj-<16 hex>.mov (no error), original …/vj.mkv; video
+avc1; 2 -i run(s) [-c:v copy -f mp4; an encoder -f mov]; 1 file(s) and 0
+partial(s) for it in Rewrapped/; 1 plan(s) of it in ffprobe.log (exactly 1
+wanted)"; V9 "two probeBlocking(vj2.mkv) started together: import
+["vj2-<16 hex>.mov", "vj2-<16 hex>.mov"] as ["avc1", "avc1"]; 1 encoder
+run(s) and 2 copy run(s); 1 file(s) and 0 partial(s) for it in Rewrapped/.
+Then assist(…, reencodingVP9: true) called directly: answers vj2-<16
+hex>.mov; ffmpeg.log 20 → 20 lines; the file's number 504871318 →
+504871318"; V10 "discard(_:ifStill:) in Rewrapped/: a file that replaced
+the one numbered (number 504871321 → 504871324) is left true; the one
+numbered is removed true; a nil number leaves the file true"; G1
+"onFrameGrid at 30/1 in 1/90000 s: [0, 3000, 6000] true (true wanted); one
+packet at 9223372036854774000, the largest multiple of 3000 not above
+Int64.max, true (true); two packets from there, the second's expected time
+past Int64.max, false (false); [0, 3000, 6001] false (false)"; C1
+"AgentServer.probeCeiling 29330 s (29330 wanted); FFmpegRewrap.longestAssist
+29240 s, 2 × longestConversion (14400 s) + 440 = 29240 s"; P1 "p1b.ivf
+(mode bad-encode): imports nothing (Could not read p1b.ivf.; the source's
+own refusal is “Could not read p1b.ivf.”); 1 plan(s) of it in ffprobe.log
+(exactly 1 wanted); 1 -i run(s) [an encoder -f mov]; 0 file(s) and 0
+partial(s) for it in Rewrapped/". Its mutants, each run once:
+
+| Run | Failed (all as predicted) | Printed |
+|---|---|---|
+| `--mutant discard-kept` (new) | V9 ("import ["vj2-<16 hex>.mov"] as ["avc1"]; 2 encoder run(s) and 2 copy run(s) … Then assist(…) called directly: answers vj2-<16 hex>.mov; ffmpeg.log 21 → 22 lines; the file's number 504872857 → 504872858": one of the two imports landed nothing) | `passed 21/22`, MUTANT PASS |
+| `--mutant plan-twice` (new) | V7 and P1 ("2 plan(s) of it in ffprobe.log (exactly 1 wanted)") | `passed 20/22`, MUTANT PASS |
+| `--mutant pure-rows` (new, three replacements in one build) | V10 ("is left false … a nil number leaves the file false"), G1 ("two packets from there … true (false)"), C1 ("AgentServer.probeCeiling 14930 s (29330 wanted); FFmpegRewrap.longestAssist 14840 s") | `passed 19/22`, MUTANT PASS |
+| `--mutant no-original` | its eight, as in B80 | `passed 14/22`, MUTANT PASS |
+| `--mutant recopy-ffmpeg` | O4 | `passed 21/22`, MUTANT PASS |
+| `--mutant vp9-encode` | its ten, and V9 ("1 encoder run(s) and 0 copy run(s) … called directly: answers nil") | `passed 11/22`, MUTANT PASS |
+| `--mutant no-fallback` (re-anchored) | V4, V5, V7, V8, and V9 ("import [] as []; 0 encoder run(s) and 2 copy run(s); 0 file(s)") | `passed 17/22`, MUTANT PASS |
+| `--mutant no-snap` | its six | `passed 16/22`, MUTANT PASS |
+| `--mutant no-check` | V7 ("video vp09; 1 -i run(s) [-c:v copy -f mp4]"), V8, and V9 ("as ["vp09", "vp09"]; 0 encoder run(s) and 1 copy run(s)") | `passed 19/22`, MUTANT PASS |
+
+`agent_socket_proof.py`, after `make app`, printed `17/17 in 135 s`, exit 0
+(its fourth run, on the final build, the socket probe rebuilt; the first is
+the corrected one above, `16/17`, and the second and third printed `17/17
+in 13 s`): K14 "C1 saved; C2 in flight; M exited True in 0.13 s", K15 "C0
+the scratch home took; a 532.2 MiB fixture; the .partial.mov seen 0.099 s
+into the call; C2 in flight; N exited True in 0.07 s (osascript rc 0:
+true); socket file gone True; 0 bytes received; closed by EOF; Rewrapped/
+holds ['big-<16 hex>.partial.mov']. Then N2 on the same home: open_project
+answers keys ['project']; media 1, path '…/k15-home/Library/Application
+Support/Reelcut/Rewrapped/big-<16 hex>.mov' (in the scratch Rewrapped/,
+named: True), on disk True; Rewrapped/ holds ['big-<16 hex>.mov'];
+close_project {discard: true} ok True; N2 exited True in 0.12 s", Z1 "11
+logs; no `Reelcut: ` line", Z2 "11 pids all gone". Its mutants, each a tree
+copy built by its own `make app`:
+
+| Run | Failed | Printed |
+|---|---|---|
+| `--mutant waits-for-call` (now K14 AND K15) | K14 ("M exited False in 20.0 s … closed by timeout"), K15 ("N exited False in 20.0 s (osascript rc 0: true); socket file gone False; 0 bytes received; closed by timeout; Rewrapped/ holds ['big-<16 hex>.mov']"), and K6 and K7 as before | `mutant waits-for-call: K14 and K15 FAIL — caught in 209 s`, exit 0 |
+| `--mutant no-controller` (new: `main.swift` installs none) | Z1 ("11 logs; ["… Reelcut: the shared document controller is not ProjectDocumentController, so open_project cannot see a window's open in flight (spec §11 #234)", …]", the first three such lines printed) | `mutant no-controller: Z1 FAIL — caught in 109 s`, exit 0 |
+| `--mutant open-asks` (re-anchored) | K12's open half ("open half False (isError None, 20.0 s: 'TimeoutError: timed out')"), the import half true | `mutant open-asks: K12 open half FAIL — caught in 129 s`, exit 0 |
+
+`waits-for-call` was run twice. Its first run was caught too, but K15's
+cleanup raised on the failure path (`killpg` of the quit sender's group,
+which had already gone, answered `PermissionError`), so the row printed a
+second line, "the row broke", and left its two work folders. The cleanup
+now takes either error and the sender's answer is read whether or not N
+exited; the table's line is the second run.
+
+**The fix pass (2026-10-04): row M1, and the stop ceiling's row.** The
+review asked for #234's one argued risk to be measured: whether a tool's
+hop to the main thread is served while the ffmpeg conversion question is
+up. `ffmpeg_rewrap_proof.py` gained row **M1** and `--mutant
+ask-in-run-loop`, its EXPECTED set (`{M1}`) written before its build. A
+`.common` timer on main sees `NSApp.modalWindow`, starts a thread that calls
+`AgentServer.shared.onMain {}`, and calls `NSApp.abortModal()` 2 s after the
+question came up; the question is shown twice, once with
+`FFmpegRewrap.consent(for:)` called on a background thread and once on main.
+The probe is still `.prohibited`: the two showings activate nothing and
+take no key window. A showing that has not ended 30 s after the row began
+is answered as a FAILED M1 from a watchdog thread, the earlier rows kept.
+
+| Run | M1 | Printed |
+|---|---|---|
+| baseline (the probe built in 121 s) | "served in 0.000 s [no question up]. … called OFF main …: the hop called 0.000 s later, its body run at 2.018 s with the question gone …; NSApp.abortModal() at 2.013 s — the hop was served AFTER the abort; consent answered false. Called ON main: … its body run at 0.003 s with the question still up …; NSApp.abortModal() at 2.016 s — the hop was served BEFORE the abort; consent answered false" | `passed 23/23`, exit 0 |
+| baseline again (the probe up to date) | off main: body at 2.019 s, the question gone, abort at 2.009 s; on main: body at 0.008 s, the question still up, abort at 2.002 s | `passed 23/23`, exit 0 |
+| `--mutant ask-in-run-loop` (new: `consent` asks from a `CFRunLoopPerformBlock` block; built in 136 s) | FAIL: off main "its body run at 0.008 s with the question still up …; NSApp.abortModal() at 2.000 s — the hop was served BEFORE the abort" | `passed 22/23`, MUTANT PASS |
+
+The nine earlier mutants were not run again: M1 is in none of their sets
+and none of their texts is in `consent`, so each is expected to print one
+more passing row than the table above shows (`N+1/23`); that is a
+prediction, not a run.
+
+`AgentServer.stopCeiling(segments:)` now reads `MediaImporter.probeTimeout`
+where it held the literal 30, so `recording_proof.py` section 3's first row
+looks for `ScreenRecorder.finishCeiling + 2 * MediaImporter.probeTimeout *
+TimeInterval(max(segments, 1)) + 5` with the source's line breaks folded.
+It also reads `static let probeTimeout: TimeInterval = 30` in
+`MediaImporter+Probe.swift`, so the 30 its sentence states is still read.
+Section 3 reads source text and needs no app, so it was scored alone, by
+importing the script with a socket path nothing listens at and calling
+`source_part()`: 23/23 before any edit; 22/23 with the row changed and the
+code not (the literal still there), failing that row; 22/23 again with the
+code changed but broken over two lines, which is why the row folds line
+breaks; 23/23 with both; 22/23 with the literal put back in the code; 23/23
+with it restored. With the row also reading `probeTimeout`'s own line (the
+second fix pass): 23/23; 22/23 with `= 30` made `= 31` in
+`MediaImporter+Probe.swift`, failing that row; 23/23 with it restored. The
+script's other sections (an instance, the Screen Recording and Microphone
+grants) were not run in either pass.
+
+**The second fix pass (2026-10-04): where a person's read ran, and M1's
+wording.** The second review found M1's detail ("as every import door calls
+it") and #234 saying every door asks the question off main, which M1 does
+not measure (it calls `consent(for:)` itself). The row's detail now reads
+"as the import queue calls it"; the probe was rebuilt (125 s) and
+`python3 tools/proof/ffmpeg_rewrap_proof.py` printed `passed 23/23`, exit 0,
+M1 with the off-main hop's body at 2.013 s, the question gone, abort at
+2.008 s, and the on-main hop's at 0.004 s, the question still up, abort at
+2.015 s. No mutant was run: no anchor and no row's condition changed.
+
+The review also asked whether there is a door at which a person's read runs
+on main at all. `agent_open_probe.swift`'s two `makeDocument` overrides now
+note `Thread.isMainThread` as each person's read is entered, and A8 (File ▸
+Open's own action), A10 (the direct call) and A11 (reopen) print the count
+and want at least one such read and none on main.
+
+| Run | A8, A10, A11 | Printed |
+|---|---|---|
+| the probe's note inverted (`onMain: !Thread.isMainThread`, a temporary edit of the probe, its expected rows written before the build; built in 140 s) | FAIL, each: "the person's read entered makeDocument 1 time(s), 1 of them on the main thread (at least 1, and 0 on main, wanted)" | `passed 12/15`, exit 1; no other row failed |
+| baseline (the probe restored, byte-equal to the text kept before the edit; built in 122 s) | ok, each: "the person's read entered makeDocument 1 time(s), 0 of them on the main thread (at least 1, and 0 on main, wanted)" | `passed 15/15`, exit 0 |
+
+That is the probe's `.prohibited` process at those three doors. No row put
+the conversion question up from a person's read, and the doors that reach
+the two public opens by a static read (an open-documents Apple event, the Open Recent menu, `_openFile:`,
+restoration, autoreopen) were not driven. The five mutants were not
+run again: A8, A10 and A11 each gained one condition, and a row that fails
+cannot come to pass by gaining one, which covers the three sets that hold
+any of them (`no-inflight`, `no-recheck`, `open-on-main`); `quiet-watch` and
+`recopy-agent-watch` hold none of the three and replace a watch argument,
+not where AppKit reads, so each is expected to print what it printed. That
+is a prediction, not a run.
+
+**The owner's real `Rewrapped/`.** `ls -laT` of
+`~/Library/Application Support/Reelcut/Rewrapped/` before the first run and
+after the last: the six files' lines are byte-equal. The folder's own line
+differs in its modification time, because `container_rewrap_probe.py`
+makes and discards copies there, as it has since B73; `agent_open_proof.py`,
+`ffmpeg_rewrap_proof.py` and K15 run in scratch homes and touch nothing
+there.
+
+```sh
+python3 tools/proof/container_rewrap_probe.py                             # passed 60/60, exit 0
+python3 tools/proof/container_rewrap_probe.py --mutant movie-600          # MUTANT PASS, exit 0 (and audio-early)
+python3 tools/proof/agent_open_proof.py                                   # passed 15/15, exit 0
+for m in no-inflight no-recheck open-on-main quiet-watch recopy-agent-watch; do
+  python3 tools/proof/agent_open_proof.py --mutant $m                     # MUTANT PASS, exit 0, each
+done
+python3 tools/proof/ffmpeg_rewrap_proof.py                                # passed 23/23, exit 0 (M1 shows the conversion question twice, 2 s each, with no activation)
+for m in discard-kept plan-twice pure-rows no-original recopy-ffmpeg vp9-encode no-fallback no-snap no-check ask-in-run-loop; do
+  python3 tools/proof/ffmpeg_rewrap_proof.py --mutant $m                  # MUTANT PASS, exit 0, each
+done
+make app && python3 tools/proof/agent_socket_proof.py                     # 17/17, exit 0
+for m in waits-for-call no-controller open-asks; do
+  python3 tools/proof/agent_socket_proof.py --mutant $m                   # caught, exit 0, each
+done
+python3 tools/proof/agent_open_proof.py --clean                           # removes work/agent-open-build/
+python3 tools/proof/ffmpeg_rewrap_proof.py --clean                        # removes work/ffmpeg-rewrap-build/
+python3 -B -c "import sys; sys.path.insert(0, 'tools/proof'); sys.argv = ['recording_proof.py', '/nonexistent/agent.sock']; import recording_proof as r; r.source_part(); print(f'{r.checks - len(r.failures)}/{r.checks}')"   # 23/23: section 3 alone, no app
+python3 tools/proof/spec_index_proof.py
 ```

@@ -90,8 +90,10 @@ count rather than passing vacuously.
   missing dylib), or no answer within 30 s. On PATH alone was not enough:
   a broken install is on PATH and cannot run.
 * Section 3, the tool's SOURCE, read where no call can reach: the stop
-  ceiling's derivation (`stopCeiling(segments:)` — `finishCeiling + 2 × 30 ×
-  max(n, 1) + 5` over the segments the recorder holds, 75 s unpaused and
+  ceiling's derivation (`stopCeiling(segments:)` — `finishCeiling + 2 ×
+  MediaImporter.probeTimeout × max(n, 1) + 5`, the expression read with its
+  line breaks folded and `probeTimeout`'s own line read as 30, over the
+  segments the recorder holds, 75 s unpaused and
   60 s more per further segment, independent of `seconds`; the R2 review
   found a fixed 75 s shorter than two segments' probes), the old "`.busy`
   mid-finish" claim gone from
@@ -1128,9 +1130,13 @@ def source_part():
     result = source("AgentServer+RecordingResult.swift")
 
     check("static func stopCeiling(segments: Int) -> TimeInterval" in tool
-          and "ScreenRecorder.finishCeiling + 2 * 30 * TimeInterval(max(segments, 1)) + 5"
-          in tool,
-          "the stop wait is `stopCeiling(segments:)` = finishCeiling + 2 × 30 × max(n, 1) + 5 "
+          and "ScreenRecorder.finishCeiling + 2 * MediaImporter.probeTimeout "
+              "* TimeInterval(max(segments, 1)) + 5"
+          in " ".join(tool.split())
+          and "static let probeTimeout: TimeInterval = 30\n"
+          in source("MediaImporter+Probe.swift"),
+          "the stop wait is `stopCeiling(segments:)` = finishCeiling + 2 × probeTimeout × "
+          "max(n, 1) + 5, and `MediaImporter.probeTimeout` reads 30 "
           "(75 s unpaused, 60 s more per further segment), derived from the recorder's finish "
           "ceiling and two sequential probe ceilings PER SEGMENT, independent of seconds — "
           "R2's review found a fixed 75 s shorter than two segments' probes")

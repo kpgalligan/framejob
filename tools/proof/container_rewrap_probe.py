@@ -44,10 +44,9 @@ source's packets byte for byte (by PTS alone an AAC packet cannot be paired:
 the writer puts AAC's 2112 priming samples before its edit where ffmpeg's
 MKV has 1024, so T17 is what holds AAC's timing). B77: W10 also reads the
 written audio's subtype `vorb`; B10v/B10a are P10's payload rows; T22
-P22's impulse decodes from the copy within its bound (`CLICK_BOUND`; until
-B79 1/600 s + 1 ms, the movie's old edit grid and the Block's) of where
-ffmpeg places it on the source's timeline, which only the lead (spec §11
-#228-V) makes true.
+P22's impulse decodes from the copy within its bound (`CLICK_BOUND`) of a
+sample-exact reference (B81, below), which only the lead (spec §11 #228-V)
+makes true.
 
 Issue batch B76 (spec §11 #228-P), the copy's progress and Cancel, on P1
 (and P2 for C29's .mov): C20 a whole copy's `copiedBytes` never decreases
@@ -106,10 +105,19 @@ index reports, and the literal for P1 48000, P2 240000, P23 30000 and P14
 48000; G25 `ContainerRewrapWriter.movieTimeScale` over a fixed table of ten
 cases (one job of `kind: "timescale"`), the two fallbacks and both nils
 among them. T17/T18/T20/T22 each hold the impulse to a bound of its own
-(`CLICK_BOUND`), the largest difference three runs printed rounded up to
-0.0001 s, and T22's has no 1/600 s term. Mutant `movie-600` leaves the
-writer's default movie timescale; `main-watch` now drops only the
-main-thread half of the re-copy's guard.
+(`CLICK_BOUND`), 0.0001 s each. Mutant `movie-600` leaves the writer's
+default movie timescale; `main-watch` now drops only the main-thread half
+of the re-copy's guard.
+
+Issue batch B81 (#235, spec §11 #228-V as amended): T22's reference is
+sample-exact, `click_reference`: the first audio Block's `pts_time` in
+p22.webm (ffprobe) plus (the first packet's duration in p22.ogg, in samples
+— the lead — plus the sample at which ffmpeg's plain decode of p22.webm
+first passes 0.3) / 48000. Until B81 it was ffmpeg's timeline reading
+(`aresample=async=1:first_pts=0`), which starts at the SECOND Block's
+millisecond stamp and so sits a stamp-rounding away (0.000667 s on this
+fixture); the row still prints that reading and its difference, held to
+nothing.
 
     python3 tools/proof/container_rewrap_probe.py [--mutant NAME]
 """
@@ -188,10 +196,10 @@ TIMESCALE_CASES = [
     ((1000, 44100, 2), 441000), ((30000, 44100, 600), 88200), ((None, 48000, 72000), None),
     ((1000000, None, 3600), None),
 ]
-# The most the impulse may decode away from the source's, in seconds: the
-# largest difference three runs printed on 2026-10-03 (0 for T17, T18 and
-# T20, 0.000667 for T22), rounded up to the next 0.0001 s, 0.0001 at least.
-CLICK_BOUND = {"T17": 0.0001, "T18": 0.0001, "T20": 0.0001, "T22": 0.0007}
+# The most the impulse may decode away from its reference, in seconds: T17,
+# T18 and T20 against ffmpeg's plain decode of the source, T22 against
+# `click_reference` (B81). 0.0001 s is 4.8 samples at 48 kHz.
+CLICK_BOUND = {"T17": 0.0001, "T18": 0.0001, "T20": 0.0001, "T22": 0.0001}
 
 DEAF = [("ContainerRewrapWriter.swift",
          "guard shared.failure == nil, shared.progress?.isCancelled != true,",
@@ -318,6 +326,8 @@ SOURCE_MUTANTS = {
 # starts at 16 samples, without it before 0, and the decode is the same.
 # P22's first Block is at 0 ms: with the lead its copy's click reads 1.020 s
 # against ffmpeg's timeline 1.022, without it 1.000, so T22 holds the lead.
+# (B81, measured on 2026-10-03 against the sample-exact reference, 1.021333
+# s: the copy reads 1.021333 s with the lead and 1.000 s without it.)
 # `vorbis-as-aac` fails W10 (no audio track is written), T20, T22 and B10a.
 #
 # B79 (measured on 2026-10-03): `no-retime` also fails F23, P23's frame 47,
@@ -360,7 +370,8 @@ EXPECTED = {
     "recopy-any-file": {"O41"},
     "trash-plays": {"O43"},
     # B79 (measured on 2026-10-03): every copy's `mvhd` reads 600, and P22's
-    # impulse decodes at 1.020 s against ffmpeg's 1.022, past T22's bound.
+    # impulse decodes at 1.020 s against ffmpeg's 1.022, past T22's bound
+    # (B81: 0.001333 s from the sample-exact reference, past 0.0001 s).
     "movie-600": {"G24", "T22"},
 }
 
@@ -552,6 +563,42 @@ def decoded_click(path, timeline=False):
     return None
 
 
+def first_audio_packet(path, entries):
+    """ffprobe's JSON for the first audio packet of `path` and its stream,
+    limited to `entries`; {} when it cannot be read."""
+    result = bounded.run(["ffprobe", "-v", "error", "-select_streams", "a:0", "-read_intervals",
+                          "%+#1", "-show_entries", entries, "-of", "json", str(path)], 60)
+    try:
+        return json.loads(result["stdout"] or "{}")
+    except json.JSONDecodeError:
+        return {}
+
+
+def click_reference(webm, ogg):
+    """(seconds, facts) — where P22's impulse belongs in a copy that carries
+    the lead, sample-exact (spec §11 #228-V as amended by #235): the first
+    audio Block's time in `webm`, plus the lead (the first packet's duration
+    in `ogg`, in samples) and the sample of ffmpeg's plain decode of `webm`
+    that first passes 0.3, over 48000. (None, why) when a term is unread."""
+    if webm is None or not Path(ogg).exists():
+        return None, "p22.webm or p22.ogg was not made"
+    block = (first_audio_packet(webm, "packet=pts_time").get("packets") or [{}])[0]
+    read = first_audio_packet(ogg, "stream=time_base:packet=duration")
+    packet = (read.get("packets") or [{}])[0]
+    base = ((read.get("streams") or [{}])[0].get("time_base") or "").split("/")
+    plain = decoded_click(webm)
+    try:
+        start = float(block["pts_time"])
+        lead = int(packet["duration"]) * int(base[0]) * 48000 / int(base[1])
+    except (KeyError, ValueError, IndexError, ZeroDivisionError):
+        return None, f"unread: first Block {block!r}, first Ogg packet {packet!r} at {base!r}"
+    if plain is None or lead != int(lead):
+        return None, f"unread: plain decode {plain!r}, lead {lead!r} samples"
+    click = round(plain * 48000)
+    return start + (int(lead) + click) / 48000, (
+        f"first Block {start:.3f} s + (lead {int(lead)} + plain-decode click {click}) / 48000")
+
+
 def mvhd_timescale(path):
     """The movie timescale in `path`'s `moov`/`mvhd`, read from the file's own
     atoms: the big-endian u32 12 bytes after the `mvhd` fourcc for version 0,
@@ -725,16 +772,21 @@ def score(answers, made, problems, host):
             f"{job_id}: the impulse decodes at {heard} s from the copy, {source} s from the "
             f"source (ffmpeg){apart(heard, source)}, bound {CLICK_BOUND[row_id]:.4f} s; "
             f"{a.get('error', '')}")
-    # B77: P22's picture and sound both start 22 ms in, so the source's click
-    # is read on its timeline: without the lead it decodes 22 ms early. B79:
-    # the bound no longer carries the movie's 1/600 s edit grid (#232).
+    # B77: P22's first audio Block is at 0 ms and its picture 22 ms in, so
+    # without the lead the copy's click decodes one packet early. B79: the
+    # bound no longer carries the movie's 1/600 s edit grid (#232). B81
+    # (#235): the reference is sample-exact (`click_reference`); ffmpeg's
+    # timeline reading is printed beside it and held to nothing.
     a = get("P22")
-    heard, source = a.get("click"), decoded_click(made.get("P22"), timeline=True)
-    row("T22", heard is not None and source is not None
-        and abs(heard - source) <= CLICK_BOUND["T22"],
-        f"P22: the impulse decodes at {heard} s from the copy, {source} s on the source's "
-        f"timeline (ffmpeg){apart(heard, source)}, bound {CLICK_BOUND['T22']:.4f} s; "
-        f"{a.get('error', '')}")
+    heard = a.get("click")
+    reference, facts = click_reference(made.get("P22"), FIX / "p22.ogg")
+    timeline = decoded_click(made.get("P22"), timeline=True)
+    row("T22", heard is not None and reference is not None
+        and abs(heard - reference) <= CLICK_BOUND["T22"],
+        f"P22: the impulse decodes at {heard} s from the copy, {reference} s by the "
+        f"sample-exact reference ({facts}){apart(heard, reference)}, bound "
+        f"{CLICK_BOUND['T22']:.4f} s; ffmpeg's timeline reading {timeline} s"
+        f"{apart(heard, timeline)}, not bounded; {a.get('error', '')}")
     for n, job_id in ((1, "P1"), (3, "P3"), (10, "P10")):
         p = get(job_id).get("payload") or {}
         row(f"B{n}v", p.get("video_found") and p.get("video_equal"),
