@@ -100,7 +100,7 @@ detail there.
 - `ProjectSnapshot.swift` · `TextProps.swift` · `MotionProps.swift` ·
   `WordProps.swift` · `MediaSnapshot.swift` — the `Codable`, READ-ONLY mirror
   of spec §5.2 every view draws from. `MediaSnapshot` (a pure move out of
-  `ProjectSnapshot.swift`) carries a WebM/MKV's `original`, and its `name` is
+  `ProjectSnapshot.swift`) carries a copy's or an ffmpeg conversion's `original`, and its `name` is
   the one display-name spelling: the original's name when one is recorded. **Its enums decode LENIENTLY**
   — a misspelt kind becomes the first case, a `T??` field a clear — which is
   why a caller-authored object is never decoded through them (below). The
@@ -213,7 +213,7 @@ detail there.
   any pass in flight still hold its path (G-19 (d)).
 - `MediaImporter.swift` (+`Probe`, +`Speech`, +`Peaks`) ·
   `MediaPeakBuckets.swift` · `MediaCacheFiles.swift` · `MediaCacheLedger.swift` ·
-  `FFmpegRewrap.swift` · `AppSupport.swift` · `DecoderSupport.swift` ·
+  `FFmpegRewrap.swift` (+`Plan`) · `AppSupport.swift` · `DecoderSupport.swift` ·
   `ContainerRewrap.swift` (+`Writer`) · `RewrapProgress.swift` ·
   `RewrapProgressWindowController.swift` — the import funnel and the three per-media caches (`thumbs/`, `peaks/`,
   `speech/`) inside the package. `DecoderSupport.swift` (await-free) is the
@@ -257,6 +257,19 @@ detail there.
   session after 2 s and 10 s. The cache order is thumbnails → peaks → speech.
   `thumbnails` holds a
   video track's last frame past its end, from the track's last SAMPLE's time.
+  `FFmpegRewrap+Plan.swift` (a pure move, issue batch B80) holds the plan,
+  the command and the frame check; neither file imports AVFoundation. A
+  conversion records the file it was made from as the descriptor's
+  `original` (`MediaImporter.probeConverted`, spec §11 #233), as the
+  built-in copy does; the re-copy on open stays the built-in copy's alone.
+  A VP9 Profile 0 or 2 stream with a frame rate is COPIED, not re-encoded
+  (spec §11 #227): into an MP4-format file under the `.mov` digest name,
+  snapped to its frame rate (`-bsf:v setts=time_base=D/N:prescale=1`) and
+  kept only when every frame is on that grid (`keepsFrameGrid`, ffprobe's
+  packet times read from the `.partial.mov` before `convert` moves it into
+  place); a copy that ffmpeg fails, that fails the check or that will not
+  open is re-encoded once (`assist(…, reencodingVP9: true)`, from
+  `probeConverted`), under the same policy.
   `FFmpegRewrap` is opt-in (`-RCFFmpegImport always`), and `assist`'s
   `mayAsk` is the CALLER's (spec §11 MC-5): `MediaImporter.probe` requires
   it, every click path passes `true`, a tool call's import passes `false`

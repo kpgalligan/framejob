@@ -456,6 +456,11 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   `OpDictionaries.swift`, whose code is identical (only its
   `import` and the doc comment's file name differ). It stays the only file that calls
   `rc_*`.
+- `FFmpegRewrap.swift`: the plan and the command moved to `FFmpegRewrap+Plan.swift` in issue
+  batch B80 (#227), a pure move gated alone before the VP9 copy landed (`Plan`, the copyable
+  codecs, `plan(for:with:)`, `rate`, `arguments`, `encoderArguments`; `run`, `ToolResult`,
+  `hasLibX264` and `arguments` lost `private`). The next seam: the process plumbing (`run`,
+  `ToolResult`, `OutputBox`) with the tool search.
 - `ProjectDocument.swift`: stored properties cannot move; the natural cut is the media/reverse
   machinery, in the shape of `+DisplayStem`, `+Import`, `+Graphics`.
 - `InspectorPane.swift`: the precedents are `InspectorSection.swift`, `InspectorSlider.swift` and

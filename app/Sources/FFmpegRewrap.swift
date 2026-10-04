@@ -13,8 +13,12 @@ import Foundation
 /// unopenable for a *container* reason. When the user already has an ffmpeg,
 /// repackaging that MKV into a QuickTime file costs a stream copy — seconds,
 /// no re-encode, no generation loss — and the clip imports. That is the whole
-/// idea; the transcode path below exists only because VP9 and AV1 leave no
-/// alternative.
+/// idea; the transcode path exists only for a stream that cannot be copied,
+/// or whose copy failed. A VP9 Profile 0 or 2 stream with a frame rate IS
+/// copied, into an MP4-format file under the same `.mov` name, and kept only
+/// when every frame of the copy is on its rate's grid; a copy that fails is
+/// re-encoded once (spec §11 #227). The plan, the command and that frame
+/// check are `FFmpegRewrap+Plan.swift`'s.
 ///
 /// Three rules shape everything here.
 ///
@@ -33,8 +37,8 @@ import Foundation
 /// converted file lands in Application Support and not in the `.reelcut`
 /// bundle.
 ///
-/// The orchestration is `assist(_:mayAsk:)`; `MediaImporter.probeAllowingRewrap` is
-/// its only caller.
+/// The orchestration is `assist(_:mayAsk:reencodingVP9:)`;
+/// `MediaImporter.probeConverted` is its only caller.
 enum FFmpegRewrap {
 
     // MARK: - The preference
@@ -283,160 +287,6 @@ enum FFmpegRewrap {
         return text.isEmpty ? "media" : text
     }
 
-    // MARK: - The plan
-
-    /// What ffmpeg would be asked to do, and what it would cost. Built from
-    /// ffprobe before anything is asked of the user, because "make the cost
-    /// obvious before it starts" is the difference between a helpful step and
-    /// an app that disappears for twenty minutes.
-    struct Plan {
-        let source: URL
-        let destination: URL
-        /// ffprobe's `codec_name` for the first stream of each type, or nil
-        /// when the container has none.
-        let videoCodec: String?
-        let audioCodec: String?
-        /// Whether that stream can be copied rather than re-encoded.
-        let copiesVideo: Bool
-        let copiesAudio: Bool
-        let width: Int
-        let height: Int
-        let fps: Double
-        let duration: Double
-        let sourceBytes: Int64
-
-        /// No re-encoding at all: the fast, lossless case, and the one this
-        /// feature exists for.
-        var isStreamCopy: Bool { copiesVideo && copiesAudio }
-
-        /// Roughly what the result will weigh. A copy is the source's own
-        /// size; an encode is estimated at 0.12 bits per pixel per frame plus
-        /// the AAC bitrate, which is the right order of magnitude for the
-        /// x264 CRF used below and is presented as "about", never as fact.
-        var estimatedBytes: Int64 {
-            if copiesVideo { return sourceBytes }
-            let pixels = Double(max(1, width * height))
-            let rate = fps > 0 ? fps : 30
-            let bitsPerSecond = pixels * rate * 0.12 + (copiesAudio ? 0 : 256_000)
-            let seconds = duration > 0 ? duration : 0
-            return Int64((bitsPerSecond * seconds / 8).rounded())
-        }
-
-        /// The sentence the user reads before deciding. Names the codec that
-        /// forced the choice, so "why is this one slow and that one instant"
-        /// has an answer on screen.
-        var consentText: String {
-            let size = ByteCountFormatter.string(fromByteCount: estimatedBytes, countStyle: .file)
-            let tail =
-                "\n\nThe original file is left exactly where it is; Reelcut imports the "
-                + "converted copy from its Application Support folder."
-            if isStreamCopy {
-                return "\(source.lastPathComponent) is in a container AVFoundation will not open, "
-                    + "but the \(codecList) inside it can be decoded as they are. ffmpeg can "
-                    + "repackage it into a QuickTime movie by copying the streams — no "
-                    + "re-encoding, no loss of quality, about \(size) and a few seconds."
-                    + tail
-            }
-            if copiesVideo {
-                // `copiesVideo` is also true when there is no picture at all
-                // — an audio-only Matroska — and promising to copy a video
-                // stream that does not exist would be a small lie.
-                let sound = "\(audioCodec ?? "audio") soundtrack has to be re-encoded to AAC"
-                let middle = videoCodec == nil
-                    ? "The \(sound)"
-                    : "The video can be copied as it is, but the \(sound)"
-                return "\(source.lastPathComponent) is in a container AVFoundation will not open. "
-                    + "\(middle). About \(size), and a few seconds."
-                    + tail
-            }
-            return "\(source.lastPathComponent) is \(videoCodec ?? "in a format") this Mac cannot "
-                + "decode, so repackaging is not enough — the whole file has to be re-encoded to "
-                + "H.264. That is \(sizeLine) of video and takes at least as long as the clip "
-                + "runs, usually longer. The result will be about \(size)."
-                + tail
-        }
-
-        private var codecList: String {
-            switch (videoCodec, audioCodec) {
-            case (let video?, let audio?): return "\(video) video and \(audio) audio"
-            case (let video?, nil): return "\(video) video"
-            case (nil, let audio?): return "\(audio) audio"
-            case (nil, nil): return "streams"
-            }
-        }
-
-        private var sizeLine: String {
-            let seconds = Int(duration.rounded())
-            let clock = String(format: "%d:%02d", seconds / 60, seconds % 60)
-            guard width > 0, height > 0 else { return clock }
-            return "\(width)×\(height), \(clock)"
-        }
-    }
-
-    /// Video codecs a QuickTime file can carry and this Mac can decode, so
-    /// the stream is copied rather than re-encoded. Conservative on purpose:
-    /// a codec wrongly listed here produces a `.mov` that AVFoundation opens
-    /// and then cannot play, which is a far worse failure than a needless
-    /// re-encode. VP8, VP9 and AV1 are deliberately absent — AVFoundation
-    /// has no QuickTime mapping for any of them.
-    private static let copyableVideo: Set<String> = [
-        "h264", "hevc", "prores", "mjpeg", "mpeg4", "qtrle", "dvvideo",
-    ]
-
-    /// Audio codecs likewise. Opus, Vorbis, FLAC, AC-3 and MP3 are absent:
-    /// re-encoding a soundtrack is seconds even for a long file, so the
-    /// benefit of the doubt is not worth a silent track.
-    private static let copyableAudio: Set<String> = [
-        "aac", "alac", "pcm_s16le", "pcm_s24le", "pcm_s32le", "pcm_f32le", "pcm_s16be",
-        "pcm_s24be",
-    ]
-
-    /// Inspects `source` and decides copy versus encode per stream. `nil`
-    /// when ffprobe cannot read the file or finds nothing to import — a
-    /// container with no video and no audio is not something ffmpeg can
-    /// rescue, and the caller's own "no video or audio the app can open"
-    /// message is the better one.
-    static func plan(for source: URL, with tools: Tools) -> Plan? {
-        guard let destination = destination(for: source) else { return nil }
-        let arguments = [
-            "-v", "error", "-print_format", "json", "-show_streams", "-show_format",
-            source.path,
-        ]
-        guard let result = try? run(tools.ffprobe, arguments, timeout: 20), result.status == 0,
-            let root = (try? JSONSerialization.jsonObject(with: result.output)) as? [String: Any]
-        else { return nil }
-
-        let streams = (root["streams"] as? [[String: Any]]) ?? []
-        let format = (root["format"] as? [String: Any]) ?? [:]
-        let video = streams.first { $0["codec_type"] as? String == "video" }
-        let audio = streams.first { $0["codec_type"] as? String == "audio" }
-        // An attached cover image is a video stream with a still disposition;
-        // importing it as the picture would be wrong, so it does not count.
-        let isCover = ((video?["disposition"] as? [String: Any])?["attached_pic"] as? Int) == 1
-        let videoCodec = isCover ? nil : video?["codec_name"] as? String
-        let audioCodec = audio?["codec_name"] as? String
-        guard videoCodec != nil || audioCodec != nil else { return nil }
-
-        return Plan(
-            source: source, destination: destination, videoCodec: videoCodec,
-            audioCodec: audioCodec,
-            copiesVideo: videoCodec.map { copyableVideo.contains($0) } ?? true,
-            copiesAudio: audioCodec.map { copyableAudio.contains($0) } ?? true,
-            width: isCover ? 0 : (video?["width"] as? Int) ?? 0,
-            height: isCover ? 0 : (video?["height"] as? Int) ?? 0,
-            fps: rate(video?["avg_frame_rate"] as? String),
-            duration: Double(format["duration"] as? String ?? "") ?? 0,
-            sourceBytes: Int64(format["size"] as? String ?? "") ?? 0)
-    }
-
-    /// ffprobe writes rates as `"30000/1001"`, and `"0/0"` when it has none.
-    private static func rate(_ text: String?) -> Double {
-        guard let parts = text?.split(separator: "/"), parts.count == 2,
-            let num = Double(parts[0]), let den = Double(parts[1]), den > 0
-        else { return 0 }
-        return num / den
-    }
-
     // MARK: - Consent
 
     /// Puts the cost in front of the user and returns their answer. Safe from
@@ -475,7 +325,8 @@ enum FFmpegRewrap {
     ///   policy says no, the user cancelled, ffprobe found nothing to
     ///   import). The caller reports AVFoundation's own failure, which is
     ///   exactly the behaviour of a machine with no ffmpeg on it.
-    /// * a URL — a QuickTime file on disk, ready to probe.
+    /// * a URL — a movie on disk under the `.mov` digest name (MP4-format
+    ///   for a VP9 copy), ready to probe.
     /// * a throw — the conversion was authorised and failed, which is worth
     ///   its own message rather than "could not read".
     ///
@@ -486,20 +337,29 @@ enum FFmpegRewrap {
     /// than a safeguard. `mayAsk` is the CALLER's (spec §11 MC-5): false for
     /// a tool call's import, where nobody is at the keyboard, so there the
     /// stored policy decides alone and `ask` means no.
-    static func assist(_ source: URL, mayAsk: Bool) throws -> URL? {
+    ///
+    /// `reencodingVP9` is the second attempt after a VP9 copy failed, failed
+    /// its frame check or would not open (spec §11 #227): it reuses no file,
+    /// answers `nil` for a source whose plan is not a VP9 copy before any
+    /// question, and re-encodes the video.
+    static func assist(_ source: URL, mayAsk: Bool, reencodingVP9: Bool = false) throws -> URL? {
         // Before ffmpeg is even looked for, and before the policy is even
         // read: a conversion already on disk is already paid for. The policy
         // governs whether ffmpeg RUNS, and reusing a finished file runs
         // nothing — a user who turned the feature off to stop being asked
         // should still get the copy they made last week.
-        if let existing = existingRewrap(of: source) { return existing }
+        if !reencodingVP9, let existing = existingRewrap(of: source) { return existing }
 
         // Read once, and read BEFORE ffprobe is spawned: a user who said
         // never, and a tool call's import with nobody to ask, should cost
         // nothing beyond the `stat` above.
         let decided = policy
         if decided == .never || (decided == .ask && !mayAsk) { return nil }
-        guard let tools = tools(), let plan = plan(for: source, with: tools) else { return nil }
+        guard let tools = tools(), var plan = plan(for: source, with: tools) else { return nil }
+        if reencodingVP9 {
+            guard plan.copiesVP9 else { return nil }
+            plan = plan.reencodingVideo()
+        }
         if decided == .ask, !consent(for: plan) { return nil }
 
         // The lock starts HERE and not above. Consent can block on the main
@@ -511,7 +371,9 @@ enum FFmpegRewrap {
         // the re-check below and never runs ffmpeg twice.
         conversionLock.lock()
         defer { conversionLock.unlock() }
-        if FileManager.default.fileExists(atPath: plan.destination.path) {
+        if reencodingVP9 {
+            discard(plan.destination)
+        } else if FileManager.default.fileExists(atPath: plan.destination.path) {
             return plan.destination
         }
         return try convert(plan, with: tools)
@@ -549,6 +411,14 @@ enum FFmpegRewrap {
             try? manager.removeItem(at: partial)
             throw RewrapError.failed(plan.source, lastLine(of: result.errorOutput))
         }
+        // A VP9 copy is kept only when every frame is on its rate's grid
+        // (spec §11 #227), checked here so no unchecked copy ever holds the
+        // name `existingRewrap` hands out.
+        let exact = !plan.copiesVP9 || keepsFrameGrid(partial, of: plan, with: tools)
+        guard exact else {
+            try? manager.removeItem(at: partial)
+            throw RewrapError.failed(plan.source, "")
+        }
         do {
             try manager.moveItem(at: partial, to: plan.destination)
         } catch {
@@ -558,63 +428,12 @@ enum FFmpegRewrap {
         return plan.destination
     }
 
-    /// The command. Only the first video and the first audio stream are
-    /// carried over — that is all `MediaImporter.probeAsset` and
-    /// `CompositionBuilder` ever read — and `-dn -sn` drops the data,
-    /// subtitle and attachment streams a QuickTime file cannot hold anyway.
-    /// The `?` on each `-map` makes it optional, so an audio-only Matroska
-    /// and a silent WebM both work without a second command shape.
-    private static func arguments(for plan: Plan, with tools: Tools, writing output: URL)
-        -> [String] {
-        var args = [
-            // `-nostdin` matters: ffmpeg reads the terminal by default and a
-            // GUI app gives it none, which is a hang rather than an error.
-            "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-            "-i", plan.source.path,
-            "-map", "0:v:0?", "-map", "0:a:0?", "-dn", "-sn",
-        ]
-        if let codec = plan.videoCodec {
-            if plan.copiesVideo {
-                args += ["-c:v", "copy"]
-                // HEVC in a QuickTime file must be tagged `hvc1`; ffmpeg's
-                // default `hev1` tag produces a movie AVFoundation opens and
-                // then shows as black.
-                if codec == "hevc" { args += ["-tag:v", "hvc1"] }
-            } else {
-                args += encoderArguments(for: plan, with: tools)
-            }
-        }
-        if plan.audioCodec != nil {
-            args += plan.copiesAudio ? ["-c:a", "copy"] : ["-c:a", "aac", "-b:a", "256k"]
-        }
-        args += ["-movflags", "+faststart", "-f", "mov", output.path]
-        return args
-    }
-
-    /// x264 at CRF 18 when the user's build has it — visually lossless, and
-    /// the quality a source clip deserves before it is edited. VideoToolbox
-    /// is the fallback for a build without libx264: hardware, always present
-    /// on macOS, but rate-controlled by bitrate, so one is computed from the
-    /// picture instead of hard-coded. `yuv420p` in both cases, because a
-    /// 10-bit H.264 profile is not reliably decodable by AVFoundation.
-    private static func encoderArguments(for plan: Plan, with tools: Tools) -> [String] {
-        if hasLibX264(tools) {
-            return ["-c:v", "libx264", "-crf", "18", "-preset", "veryfast", "-pix_fmt", "yuv420p"]
-        }
-        let pixels = Double(max(1, plan.width * plan.height))
-        let rate = plan.fps > 0 ? plan.fps : 30
-        let bits = min(60_000_000.0, max(2_000_000.0, pixels * rate * 0.12))
-        return [
-            "-c:v", "h264_videotoolbox", "-b:v", "\(Int(bits))", "-pix_fmt", "yuv420p",
-        ]
-    }
-
     /// Asked once per process, and only on the transcode path — a stream copy
     /// never needs an encoder, and spawning a process to find that out would
     /// tax the common case for nothing. Takes `tools` rather than calling
     /// `tools()`: this runs inside `convert`, and the two functions must not
     /// contend for the same lock (`stateLock` here, `conversionLock` there).
-    private static func hasLibX264(_ tools: Tools) -> Bool {
+    static func hasLibX264(_ tools: Tools) -> Bool {
         stateLock.lock()
         defer { stateLock.unlock() }
         if let known = libX264 { return known }
@@ -652,7 +471,7 @@ enum FFmpegRewrap {
 
     // MARK: - Process plumbing
 
-    private struct ToolResult {
+    struct ToolResult {
         let status: Int32
         let output: Data
         let errorOutput: Data
@@ -666,7 +485,7 @@ enum FFmpegRewrap {
     /// reading them after `waitUntilExit` deadlocks the moment ffmpeg writes
     /// more than a pipe buffer's worth of diagnostics, which a long encode
     /// certainly does.
-    private static func run(_ tool: URL, _ arguments: [String], timeout: TimeInterval) throws
+    static func run(_ tool: URL, _ arguments: [String], timeout: TimeInterval) throws
         -> ToolResult {
         let process = Process()
         process.executableURL = tool

@@ -224,7 +224,8 @@ extension AgentServer {
                     + "it has video, audio or an alpha channel), which is what you need to place "
                     + "and size it. A WebM or Matroska file is copied into a .mov first: the "
                     + "result's path is the copy and its original is the file you named, which "
-                    + "the media is named after.",
+                    + "the media is named after. A file the opt-in ffmpeg step converts is "
+                    + "recorded the same way.",
                 ["path": ["type": "string", "description": "Absolute or ~ path to the file."]],
                 required: ["path"]),
         ]
@@ -250,8 +251,8 @@ extension AgentServer {
                 "The raw op behind import_media: adds a media entry from a descriptor you "
                     + "supply — the media[] element of the project JSON minus its id (path, "
                     + "bookmark, kind, duration, width, height, fps [num, den], has_video, "
-                    + "has_audio, has_alpha, original {path, bookmark?} — the WebM or Matroska "
-                    + "file a .mov copy was made from). Probing files is the host's job, so "
+                    + "has_audio, has_alpha, original {path, bookmark?} — the file a .mov copy "
+                    + "or conversion was made from). Probing files is the host's job, so "
                     + "unless you are replaying a project's own JSON, call import_media and let "
                     + "it probe.",
                 ["descriptor": "The media entry to add; only path is required."]),
@@ -264,7 +265,8 @@ extension AgentServer {
                     + "end of a shorter file is shortened to end with it. A bookmark for the new "
                     + "location is stored so the next move is followed automatically. A WebM or "
                     + "Matroska file is copied into a .mov first and recorded as the entry's new "
-                    + "original (the result's original); any other file clears it. "
+                    + "original (the result's original), and a file the opt-in ffmpeg step "
+                    + "converts is recorded the same way; any other file clears it. "
                     + "get_project's missing_media names the entries that need this.",
                 [
                     "media": "Media id.",

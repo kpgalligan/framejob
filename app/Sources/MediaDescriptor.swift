@@ -2,11 +2,13 @@ import Foundation
 
 // MARK: - Media descriptors
 
-/// The file a playable copy was made from (spec §11 #228-O): a WebM or
-/// Matroska file the built-in copy turned into a `.mov`. The media's own
-/// `path` and `bookmark` stay the copy's; these are the original's, which
-/// the Media tab names, Reveal in Finder opens and the open-time re-copy
-/// copies again.
+/// The file a playable copy was made from (spec §11 #228-O, #233): a WebM or
+/// Matroska file the built-in copy turned into a `.mov`, or a file the
+/// opt-in ffmpeg step converted. The media's own `path` and `bookmark` stay
+/// the copy's; these are the original's, which the Media tab names and
+/// Reveal in Finder opens. The open-time re-copy copies a built-in copy's
+/// original again; it never runs ffmpeg, so a conversion that is gone stays
+/// missing.
 struct MediaOriginal: Codable, Equatable {
     var path: String
     var bookmark: String?

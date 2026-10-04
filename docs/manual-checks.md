@@ -108,6 +108,11 @@ the same way.
 - **Expect:** the row and the clip are named `big.webm`, not `big-<16 hex>.mov`. The tooltip's first line is "`<the WebM's path>` — copied into Reelcut's Rewrapped folder.", above the drag hint. Reveal in Finder selects the WebM, not the `.mov`. On reopening, the "Copying Movie" window appears about a second in, and when it closes the project shows no missing badge and no Missing media sheet; the clip plays from a new `.mov` in `Rewrapped/` (Reveal in Finder still shows the WebM), and the `.mov` in the Trash is left there.
 - **Source:** #228 (issue batch B78, spec §11 #228-O; `container_rewrap_probe.py` O31–O43 and `container_import_proof.py` M8–M11 script the name, the tooltip text, the reveal URL and the re-copy, never the window, the tooltip or Finder on screen).
 
+**PB-13 — An MKV the ffmpeg step converts copies its VP9 video, keeps its own name and steps frame by frame**
+- **Do:** 1. Make an MKV: `ffmpeg -f lavfi -i testsrc2=size=640x360:rate=30:duration=10 -f lavfi -i sine=frequency=440:duration=10 -c:v libvpx-vp9 -pix_fmt yuv420p -c:a flac v.mkv`. 2. Quit Reelcut and launch it with `open build/Build/Products/Release/Reelcut.app --args -RCFFmpegImport ask`. 3. Drop the MKV into a project and read the question; press the first button. 4. Place the clip, play it, scrub across it and step with ← and →.
+- **Expect:** the question says the video can be copied as it is and the flac soundtrack has to be re-encoded to AAC. The Media tab row and the clip are named `v.mkv`. It plays with its sound in sync, every scrub shows a picture and every single-frame step shows a new one.
+- **Source:** #227, #233 (issue batch B80, spec §11 #227 and #233; `ffmpeg_rewrap_proof.py` scripts the plan, the copy's frame times, the original and the fallbacks on generated files, never the question, the names or playback on screen).
+
 ## Timeline, canvas and keys
 
 **TL-1 — Timeline basics**

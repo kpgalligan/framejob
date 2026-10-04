@@ -754,7 +754,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   descriptor (`MediaImporter.probeCopy`, the original's path and a
   bookmark of it); `path` and `bookmark` stay the copy's, so everything that
   plays, caches or consolidates reads the `.mov` as before. ffmpeg's opt-in
-  conversions record none and keep the `.mov`'s name (Q4). **Display:**
+  conversions record none and keep the `.mov`'s name (Q4; amended by #233:
+  a conversion records its original too). **Display:**
   `MediaSnapshot.name` is the one spelling of a media's display name — the
   original's last path component, else the path's — so the Media tab, clip
   labels, the relink sheets, Consolidate's messages and the search all read
@@ -875,3 +876,115 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   With `"open_project"` out of the off-main set (`--mutant open-on-main`) 0
   ticks saw the partial in either call. On the built app,
   `container_import_proof.py`'s M12 opens a WebM by `open_project`.
+- **#233 — A file the opt-in ffmpeg step converts records the file it was
+  made from as the media's `original`, exactly as the built-in copy does;
+  the re-copy on open stays the built-in copy's alone** (issue batch B80;
+  amends #228-O's "ffmpeg's opt-in conversions record none" sentence).
+  `MediaImporter.probeConverted` sets `original {path, bookmark}` on the
+  descriptor of every conversion that probes, on every door through
+  `probeAllowingRewrap`, so the name (`MediaSnapshot.name`), the Media tab
+  row's tooltip, Reveal in Finder, and `import_media`'s and
+  `relink_media`'s `original` are #228-O's, unchanged, and a relink to a
+  file ffmpeg converts records it. The tooltip of a re-encoded conversion
+  keeps B78's sentence, "`<original path>` — copied into Reelcut's Rewrapped
+  folder." (the owner's choice 1, the default kept). **The re-copy on open
+  is unchanged: the built-in copy only, never ffmpeg, never a question.** A
+  missing ffmpeg-made copy stays missing (the slate, the badge, Relink…): a
+  non-Matroska original fails `isMatroska`, and a Matroska one is refused
+  `.unsupported` by `ContainerRewrap.rewrap`. The one free case, already in
+  the code: a Matroska original whose conversion is still on disk under its
+  digest name is relinked to it by `ContainerRewrap.assist`'s
+  `existingRewrap`, with no ffmpeg run. **The risk it accepts:** a
+  non-Matroska original with its conversion still on disk is not relinked
+  (O41's rule). **Measured** (2026-10-03, macOS 26.5.1, Apple M2 Max,
+  ffmpeg 9.0.2; `python3 tools/proof/ffmpeg_rewrap_proof.py`, a VP9 + FLAC
+  MKV under a scratch home with `-RCFFmpegImport always`): the import's
+  descriptor carries `original.path` and a bookmark that resolves to the
+  MKV (O1); `import_media` answers `original` and `get_project` carries it
+  (O2); the media is named `v0.mkv`, the tooltip's first line is
+  "`<the MKV's path>` — copied into Reelcut's Rewrapped folder." and Reveal
+  is the MKV (O3); with the conversion discarded the re-copy on open
+  answers the same project, ffmpeg's log gains no line and `Rewrapped/` no
+  file (O4), and with it still on disk the media's path becomes the digest
+  file with no ffmpeg run (O5). With the re-copy sent through the whole
+  import funnel (`--mutant recopy-ffmpeg`) O4 fails: the log gains a line
+  and `Rewrapped/` a file.
+- **#227 — The opt-in ffmpeg step copies a VP9 Profile 0 or 2 video stream
+  instead of re-encoding it, only when the copy's frame times are exact,
+  which the product checks on the copy itself before keeping it; every
+  other source re-encodes as before** (issue batch B80; amends
+  Foundations' "AVFoundation, not ffmpeg"). **Copies:** the first video
+  stream is `vp9`, ffprobe's `profile` is 0 or 2
+  (`FFmpegRewrap.vp9CopyProfiles`), its `r_frame_rate` is `N/D` with both
+  positive integers, ffmpeg's snapped copy exits 0, the copy's video
+  packets sit at `p0 + k·D/N` s for every k with `p0` a whole number of
+  frames (the frame check, `FFmpegRewrap.keepsFrameGrid`), and the file
+  then probes and decodes its first frame. **Re-encodes, as before:** VP9
+  Profile 1, 3 or unknown; no usable `r_frame_rate`; every variable-rate
+  source — dropped frames, jittered times, a header rate that is not the
+  true rate — because its copy fails the frame check; a user's ffmpeg whose
+  `setts` has no `prescale` (the copy fails); a copy that will not decode;
+  every non-VP9 codec, untouched. **The file** is MP4-format (`-f mp4`:
+  §7.7 measured that ffmpeg writes VP9 into no `.mov`, and B72's V10/V17
+  that VP9 Profile 0 and 2 MP4s decode) under the unchanged
+  `<stem>-<16 hex>.mov` digest name and `.partial.mov`, so `existingRewrap`,
+  `discard` and the built-in copy's reuse are untouched; sound: `aac` and
+  `alac` are copied, everything else is AAC at 256k. **The snap:** the
+  copy's command is the stream copy's with `-bsf:v
+  setts=time_base=D/N:prescale=1` directly after `-c:v copy` (one argv
+  element, never a shell). **Frame accuracy does not regress against the
+  re-encode:** `setts … prescale=1` rounds each packet's time to the
+  nearest 1/rate, which is what the re-encode's encoder time base does, and
+  the frame check (`ffprobe -v error -select_streams v:0 -show_entries
+  stream=time_base:packet=pts -of csv=p=0`, read before the partial is
+  moved into place) refuses any copy where that did not yield consecutive
+  frames, so no unchecked copy ever holds the digest name. **The
+  fallback** is the frame check, the product's own probe (`waitForProbe`,
+  which runs `DecoderSupport.decodesFirstFrame`) or ffmpeg's failure — then
+  the re-encode, once (`FFmpegRewrap.assist(…, reencodingVP9: true)`, which
+  reuses no file, obeys the policy as the first call does and, under `ask`,
+  asks again with the Convert text; a timeout is not retried). The question
+  for a copy keeps the stream-copy texts (the owner's choices 2 and 3, the
+  defaults kept). **Measured at spec time** (ffmpeg 9.0.2, 128×72
+  `testsrc2`, `AVAssetImageGenerator` at zero tolerance asked for frame k
+  at exactly k·D/N; "exact" = the answer's time equals the request's): an
+  unsnapped copy is exact for 20 of 60 requests at 30 fps (packets 0, 528,
+  1072 /16000) and 2 of 60 at 30000/1001, where the re-encode is 60 of 60
+  on both; the snapped copy is 60 of 60 at 30 (Profile 0 and 2) and at
+  30000/1001 (packets 0, 1001, 2002 /30000), and n of n at 24, 25, 60, 120,
+  24000/1001 and 19001/317 (what Matroska reports for 59.94), with packet
+  times identical to the re-encode's on each, and a video starting 100 ms
+  late keeps p0 = 3 frames in both. Rejected snaps: `-video_track_timescale
+  30000` alone on 30000/1001 is 2 of 60 (packets 0, 990, 2010);
+  `setts=time_base=…:ts=round(TS*TB/TB_OUT)` exits 0 and 56 of 60 requests
+  fail, which is why the product checks the file and not the exit code.
+  Variable rate: a source with every fifth frame dropped, and one with
+  times jittered by 0/9/18 ms, both report `r_frame_rate` =
+  `avg_frame_rate` = 30/1, so no header field tells them apart; their
+  snapped copies (0, 512, 1536 … and 0, 512, 1536, 1537 …) fail the frame
+  check at k = 2 and re-encode. The frame check on a 10-minute,
+  18,000-frame, 101 MB copy took 0.11 s. **Measured by the proof**
+  (2026-10-03, macOS 26.5.1, Apple M2 Max, ffmpeg 9.0.2; `python3
+  tools/proof/ffmpeg_rewrap_proof.py`, 30-frame 128×72 fixtures, the same
+  count over frames 0–29): the command's own output is 30 of 30 right and
+  30 distinct times at 30/1 (T1), at 30000/1001 (T2) and for Profile 2 at
+  30/1 (T3); the product's kept copies of the same three sources are `vp09`
+  after one `-c:v copy … -f mp4` run and count 30 of 30 (V1, V2, V6), the
+  first two with an `mp4a` sound entry and a first frame that decodes to
+  128×72 BGRA; a Profile 1 source is re-encoded in one run (V3); a copy
+  that ffmpeg fails (V4), a copy that will not decode (V5), a jittered
+  source (V7) and a gapped one (V8) each import as `avc1` after two runs,
+  the copy and then the re-encode, leaving one file and no partial. Without
+  the snap (`--mutant no-snap`) the command's output is 10 of 30 right at
+  30/1 (T1, T3) and 1 of 30 at 30000/1001 (T2), and the frame check sends
+  all three product copies to the re-encode; without the frame check
+  (`--mutant no-check`) the jittered and the gapped copies are kept as
+  `vp09`. **The risks it accepts:** a
+  variable-rate VP9 costs one discarded copy before its re-encode, and
+  under `ask` it is asked about a copy and then about the conversion; VP9
+  alpha is dropped (#216); a cached VP9 copy re-imported through the
+  Matroska door that no longer decodes is refused once and converted on the
+  next import; a VP9 source that takes the copy and then the re-encode can
+  outlast `import_media`'s wait, whose ceiling still counts one conversion;
+  and two imports of one failing VP9 file at the same moment can each
+  discard the other's re-encode (both read from the code, not measured).

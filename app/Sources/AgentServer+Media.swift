@@ -54,8 +54,8 @@ extension AgentServer {
                 "has_audio": descriptor.hasAudio,
                 "has_alpha": descriptor.hasAlpha,
             ]
-            // A WebM or Matroska copy's original (spec §11 #228-O): the
-            // file the caller named, which the media is named after.
+            // A copy's or an ffmpeg conversion's original (spec §11 #228-O,
+            // #233): the file the caller named, which the media is named after.
             if let original = descriptor.original { result["original"] = original.path }
             result["note"] =
                 "The file is in the project's media list but not on the timeline yet — place it "
@@ -359,7 +359,7 @@ extension AgentServer {
             "has_video": descriptor.hasVideo, "has_audio": descriptor.hasAudio,
             "has_alpha": descriptor.hasAlpha,
         ]
-        // The new original, when the file was a WebM or Matroska (#228-O).
+        // The new original, when the file was copied or converted (#228-O, #233).
         if let original = descriptor.original { fields["original"] = original.path }
         return try onMain {
             let result = try self.editResult(

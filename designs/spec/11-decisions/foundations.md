@@ -20,6 +20,9 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   the import fails exactly as it did before the feature existed.
   Amended by #216-R: WebM and Matroska open by a built-in rewrap; ffmpeg
   remains the opt-in step for what that does not copy.
+  Amended by #227: that step copies a constant-rate VP9 Profile 0 or 2
+  video stream rather than re-encoding it, kept only when every frame of
+  the copy is on its rate's grid.
 - **Custom compositor from day one** (M1 step 5). `AVVideoCompositing`
   has sharp edges — pixel-buffer pools, timing, `renderContextChanged`.
   Building the single-layer version first de-risks every later effect.

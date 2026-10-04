@@ -173,7 +173,8 @@ extension MediaImporter {
     /// them, and `assist` answering `nil` leaves all four with exactly the
     /// failure they report on a machine that has no ffmpeg. The built-in
     /// copy records the file it was made from as the descriptor's
-    /// `original` (spec §11 #228-O), on every door alike.
+    /// `original` (spec §11 #228-O), on every door alike, and so does an
+    /// ffmpeg conversion (#233).
     ///
     /// **Who may be asked is decided by the caller** (spec §11 MC-5), never
     /// read from process-wide state: each place a tool call hands work to the
@@ -217,26 +218,54 @@ extension MediaImporter {
         }
     }
 
-    /// The opt-in ffmpeg step, and its result probed; `failure` is what is
-    /// thrown when there is no conversion or it will not open. `mayAsk` is
-    /// the caller's (spec §11 MC-5): a tool call's is false, so it never
-    /// raises the consent question.
+    /// The opt-in ffmpeg step, and its result probed, with `url` recorded as
+    /// its `original` (spec §11 #233); `failure` is what is thrown when there
+    /// is no conversion or it will not open. `mayAsk` is the caller's (spec
+    /// §11 MC-5): a tool call's is false, so it never raises the consent
+    /// question.
+    ///
+    /// There is ONE second attempt (spec §11 #227): when ffmpeg failed, a
+    /// VP9 copy failed its frame check, or the file will not open, the step
+    /// is asked again to re-encode a VP9 stream it had copied. It answers
+    /// `nil` for every other source, and then the first attempt's error is
+    /// the one thrown. A timeout is not tried again.
     private static func probeConverted(
         _ url: URL, failure: any Error, mayAsk: Bool
     ) throws -> MediaDescriptor {
-        guard let rewrapped = try FFmpegRewrap.assist(url, mayAsk: mayAsk) else { throw failure }
+        var remembered = failure
+        var converted: URL?
+        var failed = false
         do {
-            return try waitForProbe(rewrapped)
-        } catch {
-            // ffmpeg wrote a file AVFoundation still will not open. The
-            // conversion is cached by name, so leaving it there would
-            // hand the same broken result back for ever; throwing it away
-            // makes the next attempt a real attempt. The error reported
-            // is the ORIGINAL one, because the file the user chose is the
-            // one they are being told about.
-            FFmpegRewrap.discard(rewrapped)
+            converted = try FFmpegRewrap.assist(url, mayAsk: mayAsk)
+        } catch let refusal as FFmpegRewrap.RewrapError {
+            guard case .failed = refusal else { throw refusal }
+            (remembered, failed) = (refusal, true)
+        }
+        if let converted {
+            if let descriptor = probeConversion(converted, of: url) { return descriptor }
+        } else if !failed {
             throw failure
         }
+        guard
+            let again = try FFmpegRewrap.assist(url, mayAsk: mayAsk, reencodingVP9: true)
+        else { throw remembered }
+        guard let descriptor = probeConversion(again, of: url) else { throw failure }
+        return descriptor
+    }
+
+    /// A conversion of `url` probed, with `url` as its `original`; nil, and
+    /// the file thrown away, when AVFoundation still will not open it. The
+    /// conversion is cached by name, so leaving it there would hand the same
+    /// broken result back for ever; throwing it away makes the next attempt
+    /// a real attempt. The error its caller reports is the ORIGINAL one,
+    /// because the file the user chose is the one they are being told about.
+    private static func probeConversion(_ rewrapped: URL, of url: URL) -> MediaDescriptor? {
+        guard var descriptor = try? waitForProbe(rewrapped) else {
+            FFmpegRewrap.discard(rewrapped)
+            return nil
+        }
+        descriptor.original = MediaOriginal(of: url)
+        return descriptor
     }
 
     /// The built-in copy of `source` probed, with `source` recorded as its

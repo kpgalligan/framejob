@@ -272,7 +272,9 @@ schema, §6 the op table, §7 the architecture.
   check that the copy fits on the disk. A copy that takes more than a second
   shows its progress in a small window whose Cancel stops it and adds nothing.
   The media keeps the WebM's own name, and a project whose copy is gone copies
-  it again from the WebM when it opens.
+  it again from the WebM when it opens. A file the opt-in ffmpeg step converts
+  keeps its own name too, and that step copies a constant-rate VP9 stream
+  instead of re-encoding it.
 - **Export** through an `AVAssetWriter` over the same composition, the
   format (H.264, HEVC, ProRes 422, ProRes 4444, M4A, WAV, AIFF, GIF, APNG)
   and the size chosen separately and both resolved by the core — the default

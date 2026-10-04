@@ -13359,3 +13359,100 @@ python3 tools/proof/close_project_proof.py <dir>/agent.sock               # 12 p
 python3 tools/proof/save_project_proof.py <dir>/agent.sock                # 9 pass, 0 fail
 python3 tools/proof/spec_index_proof.py                                   # 138/138 checks passed
 ```
+
+## Issue batch B80 — the opt-in ffmpeg conversion records its original, and copies a constant-rate VP9 stream checked on the copy (`ffmpeg_rewrap_proof.py` F0, O1–O5, T1–T3, V1–V8 and six mutants; #233, #227; spec §11 #233, #227)
+
+`MediaImporter.probeConverted` records the file an ffmpeg conversion was
+made from as the descriptor's `original`. `FFmpegRewrap.plan(for:with:)`
+(now in `FFmpegRewrap+Plan.swift`, a pure move gated alone) copies a VP9
+Profile 0 or 2 stream that has a frame rate: the copy is snapped
+(`-bsf:v setts=time_base=D/N:prescale=1`), written MP4-format under the
+`.mov` digest name, and kept by `convert` only when
+`FFmpegRewrap.keepsFrameGrid` finds every packet of the partial on the
+rate's grid; a copy that fails, fails that check or will not open is
+re-encoded once (`assist(…, reencodingVP9: true)`).
+
+- **`ffmpeg_rewrap_proof.py [--mutant NAME]`** (new, not a line of
+  `make test`; needs `ffmpeg` and `ffprobe` with libvpx-vp9) builds
+  `ffmpeg_rewrap_probe.swift` over `app/Sources` under
+  `tools/proof/work/ffmpeg-rewrap-build/` and runs it once, a `.prohibited`
+  process on `agent_open_probe.swift`'s pattern: every import runs on a
+  background thread while main spins. The rows, the fixtures, the wrapper
+  and the count are in its docstring.
+- **Scratch home.** The script removes `tools/proof/work/ffmpeg-rewrap/` at
+  start and at exit and runs the probe with `CFFIXED_USER_HOME=<work>/home`
+  and `-RCFFmpegImport always -RCFFmpegPath <work>/tools/ffmpeg`; F0 printed
+  "Rewrapped/ is …/tools/proof/work/ffmpeg-rewrap/home/Library/Application
+  Support/Reelcut/Rewrapped, inside the scratch home …: true;
+  FFmpegRewrap.tools()?.ffmpeg is …/ffmpeg-rewrap/tools/ffmpeg, the wrapper:
+  true; ffprobe /opt/homebrew/bin/ffprobe; policy always". `ls -la` of the
+  owner's real `~/Library/Application Support/Reelcut/Rewrapped/` taken
+  before the first run and after the last (three baseline runs and twelve
+  mutant runs between them) compared equal (`cmp`).
+- **The wrapper** is a Python script the proof writes with the real
+  ffmpeg's resolved path baked in (here
+  `/opt/homebrew/Cellar/ffmpeg/9.0.2/bin/ffmpeg`); the probe writes
+  `<work>/mode` before a row and reads `<work>/ffmpeg.log` after it. The
+  encoder query (`-encoders`) is a log line with no `-i` and is counted by
+  no row.
+- **Measured: CoreMedia names the copy's sound `aac `, not `mp4a`.** The
+  first run of V1 and V2 compared the audio track's CoreMedia media subtype
+  with `mp4a` and failed both: "video vp09, audio aac ; first frame 128×72
+  BGRA true, decodesFirstFrame true; 1 -i run(s) [-c:v copy -f mp4]; the
+  count at 30/1: 30/30 right, 30/30 distinct", `passed 15/17`. `mp4a` is the
+  sample entry's own tag in the file, so V1 and V2 now read it with the
+  real ffprobe (`codec_tag_string`) and print CoreMedia's subtype beside
+  it. Nothing in the product changed between that run and the next.
+- **Measured: `no-original` and `vp9-encode` fail more rows than their
+  subject's.** `no-original` also fails O5 ("the media's path is the digest
+  file false … original nil": with no original there is nothing to re-copy
+  from) and V4, V5, V7 and V8, which each import with "original nil".
+  `vp9-encode` also fails V4, V5, V7 and V8: with no copy tried each prints
+  "1 -i run(s) [an encoder -f mov]", not two. Their EXPECTED sets are those
+  runs' sets.
+
+Run on 2026-10-03 over `03a1397` plus this batch's diff, macOS 26.5.1,
+Apple M2 Max, ffmpeg 9.0.2. `ffmpeg_rewrap_proof.py` printed `passed
+17/17`, exit 0, twice: O1 "path …/Rewrapped/v0-<16 hex>.mov (no error);
+original.path …/ffmpeg-rewrap/v0.mkv; its bookmark resolves to
+…/ffmpeg-rewrap/v0.mkv"; O2 "import_media {v0a.mkv} … answers original
+…/v0a.mkv; get_project's media has original.path …/v0a.mkv"; O3
+"MediaSnapshot.name v0.mkv; the tooltip's first line “…/v0.mkv — copied
+into Reelcut's Rewrapped folder.”; revealURL …/v0.mkv"; O4 "the conversion
+discarded: the same JSON true; conversion on disk before false; media path
+/nonexistent-b80/v0-<16 hex>.mov, original …/v0.mkv; ffmpeg.log 5 → 5
+lines; Rewrapped/ 1 → 1 files"; O5 "the conversion still on disk: the
+media's path is the digest file true; … ffmpeg.log 5 → 5 lines"; T1
+"v0.mkv: plan copiesVP9 true, rate 30/1; the command exits 0; the count at
+30/1: 30/30 right, 30/30 distinct"; T2 "vn.mkv: … rate 30000/1001; … the
+count at 30000/1001: 30/30 right, 30/30 distinct"; T3 "v2.mkv: … rate 30/1;
+… 30/30 right, 30/30 distinct"; V1 and V2 "video vp09, audio entry mp4a
+(CoreMedia subtype “aac ”); first frame 128×72 BGRA true, decodesFirstFrame
+true; 1 -i run(s) [-c:v copy -f mp4]; the count at 30/1: 30/30 right, 30/30
+distinct"; V3 "p1.ivf: imports p1-<16 hex>.mov (no error); video avc1; 1 -i
+run(s) [an encoder -f mov]"; V4 (mode fail-copy), V5 (mode swap-copy), V7
+(vj.mkv) and V8 (vg.mkv) each "imports …-<16 hex>.mov (no error), original
+…/<its source>; video avc1; 2 -i run(s) [-c:v copy -f mp4; an encoder -f
+mov]; 1 file(s) and 0 partial(s) for it in Rewrapped/"; V6 "video vp09 …; 1
+-i run(s) [-c:v copy -f mp4]; the count at 30000/1001: 30/30 right, 30/30
+distinct". The probe built in 122 s and 123 s.
+
+The mutants, each run twice — once to read its set, once against it — and
+each MUTANT PASS, exit 0, on the second:
+
+| Run | Failed (all as expected) | Printed |
+|---|---|---|
+| `--mutant no-original` | O1 ("original.path nil"), O2 ("answers original absent"), O3 (name `v0-<16 hex>.mov`, the tooltip only the drag hint, Reveal the copy), O5, V4, V5, V7, V8 ("original nil") | `passed 9/17`, MUTANT PASS |
+| `--mutant recopy-ffmpeg` | O4 ("the same JSON false … ffmpeg.log 5 → 6 lines; Rewrapped/ 1 → 2 files") | `passed 16/17`, MUTANT PASS |
+| `--mutant vp9-encode` | T1–T3 ("plan copiesVP9 false"), V1, V2, V6 ("video avc1 … 1 -i run(s) [an encoder -f mov]"), V4, V5, V7, V8 (one run) | `passed 7/17`, MUTANT PASS |
+| `--mutant no-fallback` | V4 and V7, V8 ("imports nothing (Could not convert … with ffmpeg.) … 1 -i run(s) [-c:v copy -f mp4]; 0 file(s)"), V5 ("imports nothing (v0c.mkv has FLAC audio, which Reelcut cannot copy out of a WebM or Matroska file.)") | `passed 13/17`, MUTANT PASS |
+| `--mutant no-snap` | T1 and T3 ("the count at 30/1: 10/30 right, 20/30 distinct"), T2 ("the count at 30000/1001: 1/30 right, 19/30 distinct"), V1, V2, V6 ("video avc1 … 2 -i run(s) [-c:v copy -f mp4; an encoder -f mov]; … 30/30 right, 30/30 distinct") | `passed 11/17`, MUTANT PASS |
+| `--mutant no-check` | V7, V8 ("video vp09; 1 -i run(s) [-c:v copy -f mp4]") | `passed 15/17`, MUTANT PASS |
+
+```
+python3 tools/proof/ffmpeg_rewrap_proof.py                                # passed 17/17, exit 0
+for m in no-original recopy-ffmpeg vp9-encode no-fallback no-snap no-check; do
+  python3 tools/proof/ffmpeg_rewrap_proof.py --mutant $m                  # MUTANT PASS, exit 0, each
+done
+python3 tools/proof/spec_index_proof.py                                   # 138/138 checks passed
+```
