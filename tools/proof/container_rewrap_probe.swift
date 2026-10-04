@@ -1,18 +1,20 @@
 // tools/proof/container_rewrap_probe.swift — the WebM/Matroska rewrap
 // probe's entry (issue batch B73, spec §11 #216-R).
 //
-// Copied to tools/proof/work/container-rewrap-probe/main.swift and compiled
-// LAST with every app/Sources/*.swift except the app's main.swift (the
-// harness's swiftc line), so each row runs the product's own
-// `ContainerRewrap.rewrap` and reads the result back through the product's
-// `MediaImporter.waitForProbe` and AVFoundation.
+// Copied to tools/proof/work/container-rewrap-probe-build/probe/main.swift
+// (a mutant's to …-build/mutants/<name>/probe/) and compiled LAST with every
+// app/Sources/*.swift except the app's main.swift (the harness's swiftc
+// line), so each row runs the product's own `ContainerRewrap.rewrap` and
+// reads the result back through the product's `MediaImporter.waitForProbe`
+// and AVFoundation.
 //
-//   container-rewrap-probe <jobs.json>
+//   container-rewrap-probe <jobs.json> <scratch-home>
 //
 // jobs.json is a list of {id, source, dest, free_delta?, stop_after?,
 // refuse_audio_at?, inspect?, frame47?, payload?}. Prints one HOST line,
-// then one ROW line per job, each a JSON object (container_rewrap_probe.py
-// scores them); a rewrap that has not returned in 60 s is `"hung"`.
+// then row H0 (B82, below), then one ROW line per job, each a JSON object
+// (container_rewrap_probe.py scores them); a rewrap that has not returned in
+// 60 s is `"hung"`.
 // `free_delta` stands in `required_bytes + free_delta` for the volume's free
 // space. stdout is line-buffered so every finished row survives a kill.
 //
@@ -36,6 +38,19 @@
 // `index_audio_timescale`), which G24 holds each copy's `mvhd` timescale to;
 // one job of `kind: "timescale"` ({cases: [{video?, audio?, seconds}]})
 // answers `ContainerRewrapWriter.movieTimeScale` for each case, as row G25.
+//
+// Issue batch B82 (#236): the probe runs in a scratch home
+// (`CFFIXED_USER_HOME`, set by container_rewrap_probe.py), so the product's
+// `Rewrapped/` is `<scratch-home>/Library/Application Support/Reelcut/
+// Rewrapped/`, which the product makes itself. Row H0 answers where
+// `AppSupport.subdirectory("Rewrapped")` is and whether that is inside
+// `<scratch-home>`; when it is not the probe exits before it reads the jobs
+// file, so no job runs in any other home. O31–O43's `in_rewrapped` compares
+// a path's folder to that same folder. O42 asks FileManager for the Trash of
+// the copy's own volume and looks at paths only: a home's Trash is NOT moved
+// by a scratch home (measured at design time: asked for an existing scratch
+// file, FileManager answers the real `~/.Trash`), and it is never listed,
+// written or created here.
 
 import AppKit
 import AVFoundation
@@ -72,6 +87,10 @@ func waitFor<T>(_ seconds: Double, _ body: @escaping @Sendable () async -> T) ->
     }
     guard done.wait(timeout: .now() + seconds) == .success else { return nil }
     return box.value
+}
+
+func canonical(_ path: String) -> String {
+    URL(fileURLWithPath: path).resolvingSymlinksInPath().path
 }
 
 func emit(_ tag: String, _ object: [String: Any]) {
@@ -309,6 +328,22 @@ emit("HOST", [
     "macos": "\(version.majorVersion).\(version.minorVersion).\(version.patchVersion)",
     "hw_av1": VTIsHardwareDecodeSupported(kCMVideoCodecType_AV1),
 ])
+
+// MARK: - B82: the scratch home (H0)
+
+/// Where the product's `Rewrapped/` is, and whether that is inside the
+/// scratch home the script named. Outside it, no job runs.
+let scratchHome = CommandLine.arguments.count > 2 ? CommandLine.arguments[2] : ""
+let rewrappedFolder = AppSupport.subdirectory("Rewrapped")
+let insideHome: Bool = {
+    guard !scratchHome.isEmpty, let folder = rewrappedFolder else { return false }
+    return canonical(folder.path).hasPrefix(canonical(scratchHome) + "/")
+}()
+emit("ROW", [
+    "id": "H0", "home": scratchHome, "rewrapped": rewrappedFolder?.path ?? NSNull(),
+    "inside": insideHome,
+])
+if !insideHome { exit(0) }
 
 let jobsData = try! Data(contentsOf: URL(fileURLWithPath: CommandLine.arguments[1]))
 let jobs = try! JSONSerialization.jsonObject(with: jobsData) as! [[String: Any]]
@@ -803,7 +838,8 @@ func runOriginalRows(_ job: [String: Any]) {
     }
     func real(_ url: URL?) -> String? { url?.resolvingSymlinksInPath().path }
     func inRewrapped(_ path: String) -> Bool {
-        (path as NSString).deletingLastPathComponent.hasSuffix("/Reelcut/Rewrapped")
+        guard let folder = AppSupport.subdirectory("Rewrapped") else { return false }
+        return canonical((path as NSString).deletingLastPathComponent) == canonical(folder.path)
     }
     func exists(_ path: String?) -> Bool { path.map { manager.fileExists(atPath: $0) } ?? false }
     /// A one-media project: `descriptor` with `path` and `bookmark` swapped
@@ -893,10 +929,17 @@ func runOriginalRows(_ job: [String: Any]) {
         ])
     }
 
-    // O42: `isInside` and `isTrashed`, never listing or writing the Trash.
+    // O42: `isInside` and `isTrashed`, never listing, writing or creating
+    // the Trash. B82: the Trash asked for is the one of the copy's own
+    // volume (`appropriateFor: copyURL`, the product's first lookup), which
+    // a scratch home does not move; when FileManager answers none,
+    // `trashed` is null. `fake_trashed` is a path in the scratch `fakeTrash`
+    // that does not exist: the product's own test must not call it trashed.
     do {
         let trash = try? manager.url(
-            for: .trashDirectory, in: .userDomainMask, appropriateFor: nil, create: false)
+            for: .trashDirectory, in: .userDomainMask, appropriateFor: copyURL, create: false)
+        let fake = scratch.appendingPathComponent("fakeTrash")
+            .appendingPathComponent(copyURL.lastPathComponent)
         emit("ROW", [
             "id": "O42",
             "inside": isInside(
@@ -904,10 +947,11 @@ func runOriginalRows(_ job: [String: Any]) {
             "sibling": isInside(
                 URL(fileURLWithPath: "/a/bc/x.mov"), folder: URL(fileURLWithPath: "/a/b")),
             "itself": isInside(URL(fileURLWithPath: "/a/b"), folder: URL(fileURLWithPath: "/a/b")),
-            "trash_found": trash != nil,
-            "trashed": trash.map { isTrashed($0.appendingPathComponent("b78-probe.mov")) }
+            "volume_trash": trash != nil,
+            "trashed": trash.map { isTrashed($0.appendingPathComponent("b82-probe.mov")) }
                 ?? NSNull(),
             "copy_trashed": isTrashed(copyURL),
+            "fake_trashed": isTrashed(fake),
         ])
     }
 
@@ -1007,7 +1051,8 @@ func runOriginalRows(_ job: [String: Any]) {
         madeElsewhere = []
     }
 
-    // O43: a copy in the Trash (a scratch stand-in, through the seam).
+    // O43: a copy in the Trash (a scratch stand-in, through the seam). Both
+    // legs pass a `trashed` closure, so neither asks for the real Trash.
     do {
         discardCopies()
         let fakeTrash = scratch.appendingPathComponent("fakeTrash")

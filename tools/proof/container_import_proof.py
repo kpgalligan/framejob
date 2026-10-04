@@ -2,14 +2,23 @@
 """Issue batch B73 — a WebM or Matroska file imports by the built-in rewrap
 (spec §11 #216-R), proved over MCP on an instance this script launches.
 
-    python3 tools/proof/container_import_proof.py [--mutant ffmpeg-copy]
+    python3 tools/proof/container_import_proof.py [--app PATH]
+        [--mutant ffmpeg-copy | --control decoy-home]
 
 Launches the Release build on a scratch socket of its own (spec §11 MC-6)
 with `-RCFFmpegImport never` (so a
 codec the copy refuses is never handed to a stored "always" policy) and
-kills only that process. It runs over the instance's REAL
-`~/Library/Application Support/Reelcut/Rewrapped/`: cleanup removes only the
-`<stem>-<16 hex>.mov` files this run created there, each parent-checked.
+kills only that process.
+
+**The instance runs in a scratch home** (issue batch B82, #236):
+`CFFIXED_USER_HOME=tools/proof/work/container-import/home`, a bare folder
+with no `Library`, so its `Rewrapped/` is
+`<home>/Library/Application Support/Reelcut/Rewrapped/` and every copy the
+rows make lands there. There is no launch without one. The work folder is
+removed at the start and at exit; the fixtures, the packages and the log are
+in a temporary directory, and the scratch socket in one of its own. Nothing
+outside those three is written, except the app's own `UserDefaults` domain,
+which this batch does not move.
 
 **Fixtures**, made with ffmpeg in a temporary directory, 640×360
 `testsrc2` with a 440 Hz sine, 2 s: P1 VP9+Opus WebM, P2 the same at
@@ -17,6 +26,11 @@ kills only that process. It runs over the instance's REAL
 WebM.
 
 Rows:
+- **H0**, first (B82): with the instance listening,
+  `<home>/Library/Application Support` is a directory — the app made it in
+  the scratch home (`agent_socket_proof.py` K15's C0). When it fails the
+  instance is stopped, no tool is called, and the run prints `passed 0/1`
+  and exits 1.
 - **M0**: no `Reelcut: ` line in the instance's log (the parity check).
 - **M1**: `import_media` of P1 answers a `.mov` directly inside
   `Rewrapped/` named `p1-<16 hex>.mov`, 640×360, `[30, 1]`, `has_audio`.
@@ -53,20 +67,27 @@ Rows:
 - **M12** (issue batch B79, spec §11 #231): `open_project` of a fresh
   `p12.webm` (P1's arguments), which the built app reads off the main
   thread, answers a project whose one media is `p12-<16 hex>.mov` directly
-  inside `Rewrapped/` with `original.path` = p12.webm; M6 closes it and the
-  cleanup removes its copy.
+  inside `Rewrapped/` with `original.path` = p12.webm; M6 closes it.
 
 `--mutant ffmpeg-copy` imports ffmpeg's `-c copy` MP4 of P1 in M2's place:
 M2 must fail (that copy lands frame 47 a frame early) and nothing else, and
 then it prints MUTANT PASS and exits 0. Rows print `<ID> ok|FAIL|skip —
 <detail>`, then `passed n/m`; without a mutant, exit 0 iff none failed.
+
+`--control decoy-home` (B82) launches the instance under a SECOND scratch
+home, `…/container-import/decoy-home`: H0, which looks in the first, must
+FAIL, no tool may be called, and the decoy must hold
+`Library/Application Support` and no `Reelcut/Rewrapped` under it. Then it
+prints CONTROL PASS and exits 0; else CONTROL FAIL, exit 1.
 """
 
 import argparse
+import atexit
 import json
 import math
 import os
 import re
+import shutil
 import struct
 import subprocess
 import sys
@@ -78,7 +99,12 @@ from mcp import MCP, ToolError, remove_scratch, scratch_socket, wait_listening  
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SEC = 600_000
-REWRAPPED = os.path.expanduser("~/Library/Application Support/Reelcut/Rewrapped")
+# Removed at the start and at exit. The instance's home is HOME, or DECOY
+# under `--control decoy-home`: each is made bare, with no `Library`.
+WORK = os.path.join(ROOT, "tools", "proof", "work", "container-import")
+HOME, DECOY = os.path.join(WORK, "home"), os.path.join(WORK, "decoy-home")
+SUPPORT = os.path.join("Library", "Application Support")
+REWRAPPED = os.path.join(HOME, SUPPORT, "Reelcut", "Rewrapped")
 DIGEST_NAME = re.compile(r"^[A-Za-z0-9_-]+-[0-9a-f]{16}\.mov$")
 
 rows = []
@@ -117,6 +143,10 @@ def make_fixtures(where):
     paths["p1-copy.mp4"] = os.path.join(where, "p1-copy.mp4")
     ffmpeg("-i", paths["p1.webm"], "-c", "copy", paths["p1-copy.mp4"])
     return paths
+
+
+def remove_work():
+    shutil.rmtree(WORK, ignore_errors=True)
 
 
 def check_parity(log_path):
@@ -398,7 +428,11 @@ def run(mcp, where, fixtures, mutant):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mutant", choices=["ffmpeg-copy"])
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--mutant", choices=["ffmpeg-copy"])
+    mode.add_argument("--control", choices=["decoy-home"],
+                      help="the instance under a second scratch home: H0 must fail and no "
+                           "tool may be called")
     parser.add_argument("--app", default=os.path.join(ROOT, "build", "Build", "Products",
                                                      "Release", "Reelcut.app"))
     args = parser.parse_args()
@@ -406,25 +440,40 @@ def main():
     if not os.path.isfile(binary):
         print("instrument failure: no app binary at " + binary)
         return 2
-    before = set(listing())
+    remove_work()
+    atexit.register(remove_work)
+    for folder in (HOME, DECOY):
+        os.makedirs(folder)
+    home = DECOY if args.control else HOME
+    support = os.path.join(HOME, SUPPORT)
+    took = called = False
     with tempfile.TemporaryDirectory(prefix="reelcut-container-import-") as work:
         fixtures = make_fixtures(work)
         log_path = os.path.join(work, "app.log")
         socket_path = scratch_socket()
         with open(log_path, "w", encoding="utf-8") as log:
+            # The one launch, and always in a scratch home under WORK.
             env = os.environ.copy()
             env["RC_AGENT_SOCKET"] = socket_path
+            env["CFFIXED_USER_HOME"] = home
             app = subprocess.Popen([binary, "-ApplePersistenceIgnoreState", "YES", "-RCFFmpegImport", "never"],
                                    stdout=log, stderr=subprocess.STDOUT, env=env)
             try:
                 if not wait_listening(log_path, socket_path, child=app, seconds=20):
                     print(f"instrument failure: the app did not listen at {socket_path}")
                     return 2
-                run(MCP(socket_path, timeout=300), work, fixtures, args.mutant)
-                complaints = check_parity(log_path)[1]
-                row("M0", not complaints,
-                    "no `Reelcut: ` line in the log" if not complaints
-                    else " | ".join(complaints))
+                took = os.path.isdir(support)
+                row("H0", took, f"with the instance listening, {support} is "
+                    f"{'a directory' if took else 'NOT a directory'}: the scratch home "
+                    + ("took" if took else "did not take, so the instance is stopped and no "
+                                           "tool is called"))
+                if took:
+                    called = True
+                    run(MCP(socket_path, timeout=300), work, fixtures, args.mutant)
+                    complaints = check_parity(log_path)[1]
+                    row("M0", not complaints,
+                        "no `Reelcut: ` line in the log" if not complaints
+                        else " | ".join(complaints))
             finally:
                 if app.poll() is None:
                     app.terminate()
@@ -434,13 +483,15 @@ def main():
                         app.kill()
                         app.wait(timeout=5)
                 remove_scratch(socket_path)
-                # Only the digest names this run created, directly inside
-                # Rewrapped/ (parent-checked), go.
-                for name in sorted(set(listing()) - before):
-                    path = os.path.join(REWRAPPED, name)
-                    if DIGEST_NAME.match(name) and os.path.dirname(path) == REWRAPPED:
-                        os.remove(path)
-                        print(f"cleanup: removed Rewrapped/{name}")
+    if args.control:
+        decoy_support = os.path.isdir(os.path.join(DECOY, SUPPORT))
+        decoy_rewrapped = os.path.exists(os.path.join(DECOY, SUPPORT, "Reelcut", "Rewrapped"))
+        good = not took and not called and decoy_support and not decoy_rewrapped
+        print(f"{'CONTROL PASS' if good else 'CONTROL FAIL'}: {args.control} — H0 "
+              f"{'passed' if took else 'failed'}; a tool was called: {called}; "
+              f"{os.path.join(DECOY, SUPPORT)} is a directory: {decoy_support}; "
+              f"Reelcut/Rewrapped under it: {decoy_rewrapped}")
+        return 0 if good else 1
     passed = sum(1 for _, ok in rows if ok)
     scored = sum(1 for _, ok in rows if ok is not None)
     failed = {row_id for row_id, ok in rows if ok is False}

@@ -156,16 +156,24 @@ The last line is `<n>/<n> checks passed` and the exit status is non-zero if any
 failed. The renders, the written stills, the exported files and every probe
 answer stay under `tools/proof/work/chrome7/`.
 
-**It touches two things outside the tree and puts both back.** The probe's
-`UserDefaults` domain is its own (`~/Library/Preferences/phase7probe.plist`,
-keyed on the executable name — measured: two runs of one binary share a domain
-and two different binaries do not), and its one key is removed at the end.
-`ExportPresetsStore` writes the REAL
-`~/Library/Application Support/Reelcut/ExportPresets.json`, because its path is
-`AppSupport.directory`'s and `NSHomeDirectory()` ignores `$HOME` on macOS
-(measured), so there is no sandbox to put it in — this script therefore copies
-that file aside before section 3 and restores it afterwards in a `finally`,
-scoring the restoration as a check of its own.
+**Section 3's three probe runs are in a scratch home** (issue batch B82,
+#236): `CFFIXED_USER_HOME=tools/proof/work/chrome7/presets-home`, removed and
+made bare when the section starts, so `ExportPresetsStore` writes
+`<presets-home>/Library/Application Support/Reelcut/ExportPresets.json` and the
+owner's real `ExportPresets.json` is only ever `stat`ed: its existence, size
+and modification time are compared before and after the section. The three
+modes (`defaults-write`, `defaults-read`, `defaults-clean`) are reached only
+through `run_presets_probe`, which names the home in the request as well as in
+the environment, and each REFUSES — writing, corrupting and removing nothing,
+the defaults key included — unless `ExportPresetsStore.url` is inside the home
+the request names. One run under a second home, `presets-decoy`, exercises
+that refusal before the first write. The harness renders and the probe's other
+modes keep the caller's environment.
+
+Nothing outside `tools/proof/work/` is written, except the probe's own
+`UserDefaults` domain (keyed on the executable name — measured: two runs of
+one binary share a domain and two different binaries do not), whose one key is
+removed at the end and which that batch does not move.
 """
 
 import json
@@ -183,6 +191,10 @@ ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 WORK = os.path.join(HERE, "work")
 CHROME = os.path.join(WORK, "chrome7")
 EXPORTS = os.path.join(CHROME, "exports")
+# Section 3's scratch home and its decoy (B82): each is removed and made bare
+# when the section starts.
+PRESETS_HOME = os.path.join(CHROME, "presets-home")
+PRESETS_DECOY = os.path.join(CHROME, "presets-decoy")
 BUILD = os.path.join(HERE, "harness", "build.sh")
 PROBE = os.path.join(WORK, "phase7probe")
 SHADER = os.path.join(ROOT, "app", "Resources", "Shaders", "Compositor.metal")
@@ -723,7 +735,24 @@ func describe(_ c: ExportChoice) -> [String: Any] {
     ]
 }
 
+/// `ExportPresetsStore.url` when it is inside `home`, the scratch home the
+/// request names; else nil, and then the three modes below write, corrupt and
+/// remove nothing (B82): a run that did not get its scratch home must not
+/// reach the presets file of whichever home it did get.
+func presetsURL(inside home: String?) -> URL? {
+    guard let home = home, !home.isEmpty, let url = ExportPresetsStore.url else { return nil }
+    func canonical(_ path: String) -> String {
+        URL(fileURLWithPath: path).resolvingSymlinksInPath().path
+    }
+    return canonical(url.path).hasPrefix(canonical(home) + "/") ? url : nil
+}
+
 func runDefaultsWrite() {
+    guard presetsURL(inside: request["home"] as? String) != nil else {
+        answer["presetsURL"] = ExportPresetsStore.url?.path ?? ""
+        answer["refused"] = true
+        return
+    }
     answer["presetsURL"] = ExportPresetsStore.url?.path ?? ""
     answer["defaultsKey"] = ExportChoice.rememberedKey
     UserDefaults.standard.removeObject(forKey: ExportChoice.rememberedKey)
@@ -752,6 +781,11 @@ func runDefaultsWrite() {
 }
 
 func runDefaultsRead() {
+    guard presetsURL(inside: request["home"] as? String) != nil else {
+        answer["presetsURL"] = ExportPresetsStore.url?.path ?? ""
+        answer["refused"] = true
+        return
+    }
     answer["defaultsKey"] = ExportChoice.rememberedKey
     answer["presetsURL"] = ExportPresetsStore.url?.path ?? ""
     answer["remembered"] = ExportChoice.remembered.map(describe) as Any
@@ -773,10 +807,14 @@ func runDefaultsRead() {
     }
 }
 
-/// Puts back what the two modes above touched: the one defaults key, and the
-/// presets file (which the SCRIPT restores from its own copy — this only
-/// removes what the probe wrote when there was nothing there before).
+/// Removes what the two modes above made: the one defaults key, and the
+/// presets file in the scratch home.
 func runDefaultsClean() {
+    guard presetsURL(inside: request["home"] as? String) != nil else {
+        answer["presetsURL"] = ExportPresetsStore.url?.path ?? ""
+        answer["refused"] = true
+        return
+    }
     UserDefaults.standard.removeObject(forKey: ExportChoice.rememberedKey)
     UserDefaults.standard.synchronize()
     answer["remembered"] = ExportChoice.remembered.map(describe) as Any
@@ -1114,10 +1152,11 @@ def build_probe():
 PROBE_RUNS = []
 
 
-def run_probe(binary, tag, request, timeout=600):
+def run_probe(binary, tag, request, timeout=600, home=None):
     """One probe invocation. Answers (answer, error); a probe that crashed or
     wrote nothing answers (None, its output), which every caller turns into
-    failures BY NAME rather than into a shorter list."""
+    failures BY NAME rather than into a shorter list. With `home`, the child's
+    environment is the caller's plus `CFFIXED_USER_HOME=home`."""
     if binary is None:
         return None, "the probe did not build"
     request_path = os.path.join(CHROME, f"request-{tag}.json")
@@ -1129,7 +1168,8 @@ def run_probe(binary, tag, request, timeout=600):
     start = time.time()
     try:
         result = subprocess.run(
-            [binary, request_path, out], capture_output=True, text=True, timeout=timeout)
+            [binary, request_path, out], capture_output=True, text=True, timeout=timeout,
+            env=None if home is None else dict(os.environ, CFFIXED_USER_HOME=home))
     except subprocess.TimeoutExpired:
         PROBE_RUNS.append((tag, False, timeout))
         return None, f"the probe did not return within {timeout} s"
@@ -1142,6 +1182,13 @@ def run_probe(binary, tag, request, timeout=600):
     PROBE_RUNS.append((tag, True, elapsed))
     print(f"  probe {tag}: {elapsed:.1f} s")
     return answer, None
+
+
+def run_presets_probe(binary, tag, request, home=PRESETS_HOME):
+    """The ONLY way `defaults-write`, `defaults-read` and `defaults-clean` are
+    run (B82): in a scratch home, which the request names too, so the probe
+    refuses when the home it runs in is not the one it was sent."""
+    return run_probe(binary, tag, dict(request, home=PRESETS_HOME), home=home)
 
 
 # ---------------------------------------------------------------------------
@@ -1697,20 +1744,51 @@ def main():
     print("\n3. the remembered choice and the named presets, across a process boundary")
     print("      (the probe binary's OWN defaults domain, never Reelcut.app's — see the "
           "header)")
-    presets_path = os.path.expanduser(
-        "~/Library/Application Support/Reelcut/ExportPresets.json")
-    backup = os.path.join(CHROME, "ExportPresets.backup.json")
-    had_presets = os.path.exists(presets_path)
-    if had_presets:
-        shutil.copy2(presets_path, backup)
-    restored = False
+    print("      (in a scratch home, `presets-home`; the real ExportPresets.json is only "
+          "`stat`ed)")
+    for folder in (PRESETS_HOME, PRESETS_DECOY):
+        shutil.rmtree(folder, ignore_errors=True)
+        os.makedirs(folder)
+
+    def real_presets():
+        """(exists, size, mtime_ns) of the owner's real file, by `stat` alone."""
+        try:
+            info = os.stat(os.path.expanduser(
+                "~/Library/Application Support/Reelcut/ExportPresets.json"))
+        except OSError:
+            return (False, None, None)
+        return (True, info.st_size, info.st_mtime_ns)
+
+    def presets_files():
+        return [os.path.relpath(os.path.join(folder, name), CHROME)
+                for home in (PRESETS_HOME, PRESETS_DECOY)
+                for folder, _, names in os.walk(home) for name in names
+                if name == "ExportPresets.json"]
+
+    real_before = real_presets()
+    decoy, decoy_error = run_presets_probe(probe, "defaults-decoy", {
+        "mode": "defaults-write",
+        "presets": [{"name": "Decoy", "preset_id": "h264"}],
+    }, home=PRESETS_DECOY)
+    decoy = decoy or {}
+    check("the presets modes REFUSE in a home that is not the one the request names — run "
+          "under `presets-decoy` while naming `presets-home`, the writing mode answers "
+          "`refused`, with its presets file's path under the decoy, and no "
+          "`ExportPresets.json` exists under either home",
+          decoy.get("refused") is True
+          and decoy.get("presetsURL", "").startswith(PRESETS_DECOY + os.sep)
+          and not presets_files(),
+          f"refused {decoy.get('refused')}; presetsURL {decoy.get('presetsURL')}; presets "
+          f"files under the two homes: {presets_files() or 'none'}"
+          + (f"; the probe: {decoy_error}" if decoy_error else ""))
+    write_answer, read_answer, clean = {}, {}, None
     try:
         remembered_ask = {
             "name": "dropped on the way in", "preset_id": "prores_4444",
             "size_row": "1080p", "fps": [24, 1], "quality_tier": "High",
             "loudness": -16.0, "in_out_range": True, "burn_in_timecode": True,
         }
-        write_answer, write_error = run_probe(probe, "defaults-write", {
+        write_answer, write_error = run_presets_probe(probe, "defaults-write", {
             "mode": "defaults-write",
             "remember": remembered_ask,
             "presets": [
@@ -1726,7 +1804,7 @@ def main():
             ],
             "remove": ["  MASTER "],
         })
-        read_answer, read_error = run_probe(probe, "defaults-read", {
+        read_answer, read_error = run_presets_probe(probe, "defaults-read", {
             "mode": "defaults-read",
             "lookup": ["Review copy", "review copy", "  review copy  ", "Master", "nope"],
             "corrupt": "{ this is not JSON at all ]]",
@@ -1837,20 +1915,24 @@ def main():
               and read_answer.get("corruptCount") == 0,
               f"{read_answer.get('corruptCount')} presets read back from nonsense")
     finally:
-        clean, clean_error = run_probe(probe, "defaults-clean", {
-            "mode": "defaults-clean", "deletePresets": not had_presets,
+        clean, clean_error = run_presets_probe(probe, "defaults-clean", {
+            "mode": "defaults-clean", "deletePresets": True,
         })
-        if had_presets:
-            shutil.copy2(backup, presets_path)
-        restored = (
-            (had_presets and same_file(backup, presets_path))
-            or (not had_presets and not os.path.exists(presets_path)))
-    check("this script put back what it touched outside the tree — the probe's one defaults "
-          "key is gone and the user's own `ExportPresets.json` is byte for byte what it was "
-          "(or is absent again, if there was none)",
-          restored and (clean or {}).get("remembered", "unset") is None,
-          f"presets file {'restored' if restored else 'NOT restored'}; "
-          f"remembered now {(clean or {}).get('remembered')}"
+    real_after = real_presets()
+    refused = [tag for tag, got in (("defaults-write", write_answer),
+                                    ("defaults-read", read_answer),
+                                    ("defaults-clean", clean)) if "refused" in (got or {})]
+    in_home = (write_answer or {}).get("presetsURL", "").startswith(PRESETS_HOME + os.sep)
+    check("this section touched nothing of the user's — the probe's one defaults key is "
+          "gone, the presets file the three modes used was the scratch home's and none of "
+          "them refused, and the user's own `ExportPresets.json` (only ever `stat`ed) is "
+          "what it was: the same existence, size and modification time",
+          (clean or {}).get("remembered", "unset") is None and in_home and not refused
+          and real_before == real_after,
+          f"remembered now {(clean or {}).get('remembered', 'unset')}; the writing process's "
+          f"presets file {(write_answer or {}).get('presetsURL')} (under presets-home: "
+          f"{in_home}); refused: {refused or 'none'}; the real file (exists, size, mtime_ns) "
+          f"{real_before} → {real_after}"
           + (f"; clean probe: {clean_error}" if clean is None else ""))
 
     # ------------------------------------------------------------------

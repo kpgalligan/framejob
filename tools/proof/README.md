@@ -13793,3 +13793,252 @@ python3 tools/proof/ffmpeg_rewrap_proof.py --clean                        # remo
 python3 -B -c "import sys; sys.path.insert(0, 'tools/proof'); sys.argv = ['recording_proof.py', '/nonexistent/agent.sock']; import recording_proof as r; r.source_part(); print(f'{r.checks - len(r.failures)}/{r.checks}')"   # 23/23: section 3 alone, no app
 python3 tools/proof/spec_index_proof.py
 ```
+
+## Issue batch B82 — no proof writes the owner's real `Application Support/Reelcut/` (`container_rewrap_probe.py` H0, O42, `--control decoy-home`, `--mutant NAME …` and all 26 mutants; `container_import_proof.py` H0 and `--control decoy-home`; `export_cancel_proof.py` I1; `phase7_chrome.py` section 3; #236)
+
+Four proofs made, discarded or restored files under the owner's
+`~/Library/Application Support/Reelcut/`. Each now runs what did so in a
+scratch home, `CFFIXED_USER_HOME` naming a folder under `tools/proof/work/`,
+the pattern `agent_open_proof.py`, `ffmpeg_rewrap_proof.py` and K15 already
+had. No file under `app/`, `core/`, `graphic/` or `mcp-proxy/` changed.
+
+**The audit: proofs that wrote the real `Application Support/Reelcut/`.**
+
+| Proof | What it wrote there | Now |
+|---|---|---|
+| `container_rewrap_probe.py` | `Rewrapped/`: digest copies and partials of `p1.webm`, `o1.webm`, `o41.mov`, made and discarded (C23–C27, C29, O31–O43) | the probe binary runs in `work/container-rewrap-probe/home` |
+| `container_import_proof.py` | `Rewrapped/`: `p1-`, `p2-` (two digests), `p3-`, `p10-`, `p12-<16 hex>.mov`, removed by its own cleanup | the instance runs in `work/container-import/home`; the cleanup of the real folder is gone |
+| `export_cancel_proof.py` I1 | `Rewrapped/`: `slow-<hex>-<16 hex>.mov` and its partial, through the stand-in ffmpeg, removed by its own cleanup | the instance runs in `work/export-cancel/home` |
+| `phase7_chrome.py` section 3 | `ExportPresets.json`, written, corrupted and deleted by its probe, copied aside and restored | the three presets modes run in `work/chrome7/presets-home`; the real file is only `stat`ed |
+
+Read and found NOT to write there (the designer's reading): `agent_open_proof.py`,
+`ffmpeg_rewrap_proof.py`, `agent_socket_proof.py` K15 (scratch homes
+already); `agent_socket_proof.py` K12 (`ContainerRewrap.rewrap` runs
+`precheck` before `AppSupport.ensureDirectory`, and policy `ask` never
+converts over MCP); `formats_probe.py` (`MediaImporter.waitForProbe` only);
+`codec_import_proof.py` (`ImportError.undecodable.invitesFFmpeg` is false);
+`spend_proof.py`, `mcp_proxy_proof.py`, `mc1_spike/` (they assert nothing is
+written); `cloud_captions_probe.py`, `harness/main.swift`,
+`assistant_lane_probe.swift` (`MemoryStore`, `-RCSecretFolder`, scratch
+folders). No launch site binds the default socket: every proof that launches
+the app sets `RC_AGENT_SOCKET`. No MCP tool writes `ExportPresets.json`.
+
+- **What a scratch home moves** (the designer's measurements, 2026-10-04,
+  `4c41af9`, macOS 26.5.1). In a process under `CFFIXED_USER_HOME=<dir>`,
+  `NSHomeDirectory()` and FileManager's `.applicationSupportDirectory` are
+  under `<dir>`. `.trashDirectory` is NOT moved: `appropriateFor:` an
+  existing scratch file or folder answers the real `~/.Trash`, a missing
+  file throws, and `nil` answers the real Trash. One `UserDefaults` write
+  was seen to land in the real `~/Library/Preferences/`; nothing more about
+  defaults was measured, and this batch moves no defaults domain (probe
+  binaries write one named for the executable, the app its own).
+  `AppSupport.directory` asks FileManager with `create: true`, so it makes
+  `Library/Application Support` in whichever home it runs, and nothing under
+  it: that folder appearing is the import proof's H0 and I1's guard.
+- **The unchanged scripts under a scratch home** (the designer's runs, its
+  drivers not kept): the rewrap probe `passed 60/60` (fixtures 14.1 s, build
+  120.4 s, probe 2.2 s), O42 answering `trash_found true, trashed true`,
+  which is the real Trash's URL; `trash-plays` MUTANT PASS; `no-mkdir`
+  failing D16 and nineteen more rows; `container_import_proof.py` `passed
+  15/15` in 8.6 s; `export_cancel_proof.py --only import` `2/2 rows ok in 47
+  s`; `phase7_chrome.py` `78/78 checks passed`.
+- **`container_rewrap_probe.py`.** `run_probe` is the only call that
+  executes a probe binary, under `CFFIXED_USER_HOME=<work>/home` with that
+  folder as the binary's second argument; before each run the home is
+  removed and made again as `Library/Application Support` and nothing more,
+  so `Reelcut/Rewrapped` is the product's to make. `child_env` raises
+  before anything is executed for a home that is not under the work folder.
+  Row **H0** is the probe's first: where `AppSupport.subdirectory
+  ("Rewrapped")` is and whether that is inside the home it was named; when
+  it is not the probe exits before it reads its jobs. The script makes the
+  comparison again itself and both must agree, or a baseline scores no other
+  row (`passed 0/1`, exit 1) and a mutant's control could not be performed
+  (exit 2). The baseline is 61 rows.
+- **`--control decoy-home`** (both scripts) runs the binary, or the
+  instance, under a SECOND scratch home, `<work>/decoy-home`, while the
+  first is the one looked in. It passes when H0 FAILS and nothing ran: for
+  the probe, the `Rewrapped/` it answered is under the decoy, the binary
+  printed no other row and nothing is under the decoy's
+  `Library/Application Support/Reelcut`; for the import proof, no tool was
+  called, and the decoy holds `Library/Application Support` and no
+  `Reelcut/Rewrapped`. Each was run before its script's baseline, as the
+  changed binary's or script's first execution. No script of this batch was
+  run in its HEAD form, and no rewrap probe binary, app instance or presets
+  mode was executed without a scratch home.
+- **O42 no longer needs the home Trash.** It answers `isInside`'s three
+  cases; `isTrashed` of the copy and of a path in the scratch `fakeTrash`
+  that does not exist (both false); whether FileManager answered a Trash
+  for the copy's own volume (`appropriateFor:` the copy, the product's
+  first lookup), and `isTrashed` of `b82-probe.mov` in it, a path that is
+  never listed, written or created. It passes with a Trash found and that
+  path trashed, or with none found. O43 was already through the `trashed`
+  seam on both legs. The product's own `isTrashed` still asks FileManager
+  for the Trash in `recopyingMissingCopies`' default (O36–O41); that lookup
+  reads and never writes, and no probe change can stop it.
+- **`no-mkdir` fails twenty rows where it failed one.** A fresh home has no
+  `Rewrapped/`, which the real home always had, so with `ensureDirectory`
+  gone no copy lands there. The run below printed, for D16, "P16: error
+  {'invites_ffmpeg': False, 'message': 'Could not copy p1.webm into a movie:
+  Cannot create file.', 'type': 'failed'}; destination exists False"; for
+  C23, "assist with a cancelling watch: failed, watch called 1, copy left
+  False, partial False; again with none: error {… 'Cannot create file.' …},
+  probes None"; for C29, "importMedia([p1.webm, p2.mov]): completed True,
+  ids [2], media ['p2.mov'], presented 1"; for O31, "probeBlocking(o1.webm):
+  path None (Rewrapped None) … 'Could not copy o1.webm into a movie: Cannot
+  create file.'", after which the probe answers no later O row. Its set is
+  the one the designer measured; no other set changed, and none was
+  corrected by this batch's run.
+- **`--mutant` takes names.** One name, several, or `all`; the fixtures are
+  made once; each mutant is built in `…-build/mutants/<name>/`, which is
+  removed when its run ends, and prints `seconds: build B, probe P`. A
+  corrected set therefore costs `--mutant NAME`, one build (121.7 to 122.7 s
+  in the run below), not the whole set.
+- **The folders.** `work/container-rewrap-probe/` (fixtures, scratch
+  destinations, both homes) and `work/container-import/` are removed at the
+  start and at exit: each was absent after every run below.
+  `work/container-rewrap-probe-build/` keeps `probe/`, rebuilt only when
+  stale (`agent_open_proof.build_probe`'s rule), and `answers.json`:
+  `du -sh` read 26M after the mutant run, and `--clean` printed "removed
+  …/tools/proof/work/container-rewrap-probe-build". The first run's start
+  removed the old script's `work/container-rewrap-probe/`, 172M by `du -sh`,
+  the `Sources-<mutant>` copies it kept there included.
+- **`phase7_chrome.py` section 3.** `defaults-write`, `defaults-read` and
+  `defaults-clean` are reached only through `run_presets_probe`, which
+  names the home in the request as well as in the environment, and each
+  refuses — writing, corrupting and removing nothing, the defaults key
+  included — unless `ExportPresetsStore.url` is inside the home the request
+  names. The backup and restore of the real file are gone; the closing
+  check `stat`s it before and after. The harness renders and the probe's
+  other modes keep the caller's environment.
+- **`export_cancel_proof.py`.** Its one instance (the gate, import and
+  cancel groups) runs under `<work>/home`; I1 fails before any import when
+  `<work>/home/Library/Application Support` is not a directory. That guard
+  was exercised with no instance at all (`HOME` pointed at a folder that
+  does not exist, `run_import` called): with no client it printed "FAIL I1
+  the instance's scratch home took … is not a directory: the instance did
+  not start; no import was made", with a client "… the scratch home did
+  not take; no import was made", and nothing was written. The M rows' probe
+  (`export_cancel_probe`) keeps the caller's environment, as before.
+
+Run on 2026-10-04 over `4c41af9` plus this batch's diff, macOS 26.5.1,
+Apple M2 Max, ffmpeg 9.0.2, `hw_av1 False`, in this order.
+
+`container_rewrap_probe.py --control decoy-home` printed "FAIL H0
+Rewrapped/ is …/container-rewrap-probe/decoy-home/Library/Application
+Support/Reelcut/Rewrapped, inside the scratch home
+…/container-rewrap-probe/home: False (by this script's own comparison:
+False)", then "CONTROL PASS: decoy-home — H0 answered and failed; the
+Rewrapped/ it answered is under …/decoy-home: True; other rows from the
+binary: none (exit 0, expired False); under the decoy's Library/Application
+Support/Reelcut: nothing" and "seconds: build 123.6, probe 0.6", exit 0
+(fixtures: 20 made in 16.0 s).
+
+`container_rewrap_probe.py` printed `passed 61/61`, exit 0 ("fixtures: 20
+made in 14.2 s", the probe up to date, "seconds: build 0.0, probe 1.9"):
+H0 "Rewrapped/ is …/container-rewrap-probe/home/Library/Application
+Support/Reelcut/Rewrapped, inside the scratch home
+…/container-rewrap-probe/home: True (by this script's own comparison:
+True)"; O31's path "…/container-rewrap-probe/home/Library/Application
+Support/Reelcut/Rewrapped/o1-<16 hex>.mov' (Rewrapped True)"; O42 "isInside
+c/sibling/itself, isTrashed copy/a path in the scratch fakeTrash = (True,
+False, False, False, False); FileManager answered the copy's volume's
+Trash, and a path in it is trashed"; T17, T18 and T20 "|difference| 0.000000
+s, bound 0.0001 s" and T22 as in B81.
+
+`container_rewrap_probe.py --mutant all` printed `mutants: 26/26 MUTANT
+PASS in 3325 s`, exit 0: ONE run, made after the last edit to
+`container_rewrap_probe.swift` and to `container_rewrap_probe.py` (both
+files' checksums were taken when it started and matched when it ended),
+each mutant's first run in a scratch home, fixtures made once (14.1 s). H0
+passed in all 26. `trash-plays` failed O43 with "a copy in fakeTrash: path
+'…/scratch/original/fakeTrash/o1-<16 hex>.mov' exists True": the copy in
+the stand-in Trash was left where it was. `deaf-pump-unbounded-wait`'s 62.2
+s is P19's 60 s hang.
+
+| Mutant | Failed (its EXPECTED set, exactly) | Printed | Build, s | Probe, s |
+|---|---|---|---|---|
+| `no-retime` | B10v, B1v, B3v, F1, F2, F23, F3, F4, G24, W3 | `passed 51/61`, MUTANT PASS | 122.7 | 2.3 |
+| `no-precheck` | R7, R8, R9 | `passed 58/61`, MUTANT PASS | 122.0 | 2.5 |
+| `no-space-check` | N11 | `passed 60/61`, MUTANT PASS | 122.5 | 1.9 |
+| `keep-partial` | K12, X19 | `passed 59/61`, MUTANT PASS | 122.2 | 2.4 |
+| `fixed-opus-frames` | A13 | `passed 60/61`, MUTANT PASS | 122.4 | 2.4 |
+| `audio-dropped` | A13, B10a, B1a, B3a, C20, G24, S14, S5, T17, T18, T20, T22, W1, W10, W2, W3, W4, X19 | `passed 43/61`, MUTANT PASS | 122.2 | 2.0 |
+| `fps-timescale-always` | V15 | `passed 60/61`, MUTANT PASS | 122.4 | 2.3 |
+| `no-mkdir` | C23, C24, C25, C26, C27, C29, D16, O31, O32, O33, O34, O35, O36, O37, O38, O39, O40, O41, O42, O43 | `passed 41/61`, MUTANT PASS | 122.0 | 1.8 |
+| `offset-shift` | B10a, B10v, B1a, B1v, B3a, B3v, F1, F2, F23, F3, F4, T17, T18, T20, T22 | `passed 46/61`, MUTANT PASS | 122.3 | 2.0 |
+| `deaf-pump` | nothing | `passed 61/61`, MUTANT PASS | 122.7 | 2.9 |
+| `deaf-pump-unbounded-wait` | X19 | `passed 60/61`, MUTANT PASS | 122.3 | 62.2 |
+| `ignore-cancel` | C21 | `passed 60/61`, MUTANT PASS | 122.0 | 2.4 |
+| `no-user-cancelled` | C26 | `passed 60/61`, MUTANT PASS | 122.0 | 2.3 |
+| `quiet-watch` | C25 | `passed 60/61`, MUTANT PASS | 122.5 | 2.3 |
+| `present-cancel` | C28, C29 | `passed 59/61`, MUTANT PASS | 122.1 | 2.6 |
+| `door-no-watch` | C29 | `passed 60/61`, MUTANT PASS | 122.3 | 2.5 |
+| `audio-early` | B3a, T17, T18, T22 | `passed 57/61`, MUTANT PASS | 122.5 | 2.3 |
+| `vorbis-as-aac` | B10a, T20, T22, W10 | `passed 57/61`, MUTANT PASS | 122.1 | 2.3 |
+| `no-original` | O31, O33, O36, O40, O43 | `passed 56/61`, MUTANT PASS | 122.4 | 2.3 |
+| `copy-name` | O33 | `passed 60/61`, MUTANT PASS | 121.9 | 2.8 |
+| `reveal-copy` | O34 | `passed 60/61`, MUTANT PASS | 122.3 | 2.3 |
+| `no-recopy` | O40 | `passed 60/61`, MUTANT PASS | 122.1 | 2.3 |
+| `main-watch` | O37 | `passed 60/61`, MUTANT PASS | 121.8 | 2.3 |
+| `recopy-any-file` | O41 | `passed 60/61`, MUTANT PASS | 122.3 | 2.8 |
+| `trash-plays` | O43 | `passed 60/61`, MUTANT PASS | 121.7 | 2.3 |
+| `movie-600` | G24, T22 | `passed 59/61`, MUTANT PASS | 122.5 | 2.3 |
+
+`container_import_proof.py --control decoy-home` printed "H0 FAIL — with
+the instance listening, …/container-import/home/Library/Application Support
+is NOT a directory: the scratch home did not take, so the instance is
+stopped and no tool is called", then "CONTROL PASS: decoy-home — H0 failed;
+a tool was called: False; …/container-import/decoy-home/Library/Application
+Support is a directory: True; Reelcut/Rewrapped under it: False", exit 0.
+`container_import_proof.py` printed `passed 16/16`, exit 0: H0 "… is a
+directory: the scratch home took", M1 "path
+…/container-import/home/Library/Application Support/Reelcut/Rewrapped/p1-<16
+hex>.mov; in Rewrapped, named, size, fps, has_audio = (True, True, 640, 360,
+[30, 1], True)", M9 "copy deleted True; open_project missing_media None;
+path '…/container-import/home/…/Rewrapped/p2-<16 hex>.mov' exists True".
+`--mutant ffmpeg-copy` printed `passed 15/16 (mutant ffmpeg-copy)` and
+"MUTANT PASS: ffmpeg-copy failed ['M2'], expected ['M2']", exit 0.
+
+`export_cancel_proof.py --runs 3` printed `7/7 rows ok in 256 s`, exit 0
+(the probe built in 121 s): I1 "elapsed 45.5 s, answer {… 'path':
+'…/export-cancel/home/Library/Application Support/Reelcut/Rewrapped/slow-<hex>-<16
+hex>.mov' …}, inside Rewrapped True, cleanup clean"; M1 "crashes 0 of 3";
+M2 "max 0.627 s".
+
+`phase7_chrome.py` printed `79/79 checks passed`, exit 0 (the harness up to
+date, the probe "built in 118.8 s"). The new check: "the presets modes
+REFUSE in a home that is not the one the request names …" with "refused
+True; presetsURL …/work/chrome7/presets-decoy/Library/Application
+Support/Reelcut/ExportPresets.json; presets files under the two homes:
+none". The closing check of section 3: "remembered now None; the writing
+process's presets file …/work/chrome7/presets-home/Library/Application
+Support/Reelcut/ExportPresets.json (under presets-home: True); refused:
+none; the real file (exists, size, mtime_ns) (False, None, None) → (False,
+None, None)".
+
+**The owner's real folders.** `ls -laT` of
+`~/Library/Application Support/Reelcut/Rewrapped/` and of
+`~/Library/Application Support/Reelcut/` were saved before the first run
+and compared (`cmp`) after each of the eight runs above: every comparison
+was silent, `Rewrapped/`'s own line included, which still reads
+`drwxr-xr-x@ 8 kevingalligan  staff  256 Oct  3 22:51:21 2026 .` over its
+six files dated Sep 5. Another session's Reelcut (an Xcode build) was
+running throughout and was not this batch's.
+
+**Left for the owner.** `tools/proof/work/b82-design-c0/` (gitignored), from
+the design pass: `home/Library/Application Support` and no file. Its removal
+was denied to the designer by the permission system, and this batch did not
+try again.
+
+```sh
+python3 tools/proof/container_rewrap_probe.py --control decoy-home        # CONTROL PASS, exit 0
+python3 tools/proof/container_rewrap_probe.py                             # passed 61/61, exit 0
+python3 tools/proof/container_rewrap_probe.py --mutant all                # mutants: 26/26 MUTANT PASS, exit 0 (about 55 min)
+python3 tools/proof/container_rewrap_probe.py --mutant no-mkdir trash-plays   # any names: one build each
+python3 tools/proof/container_import_proof.py --control decoy-home        # CONTROL PASS, exit 0
+python3 tools/proof/container_import_proof.py                             # passed 16/16, exit 0
+python3 tools/proof/container_import_proof.py --mutant ffmpeg-copy        # MUTANT PASS, exit 0
+python3 tools/proof/export_cancel_proof.py --runs 3                       # 7/7 rows ok, exit 0
+python3 tools/proof/phase7_chrome.py                                      # 79/79 checks passed
+python3 tools/proof/container_rewrap_probe.py --clean                     # removes work/container-rewrap-probe-build/
+```

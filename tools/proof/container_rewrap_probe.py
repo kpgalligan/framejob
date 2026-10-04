@@ -6,7 +6,8 @@ built-in rewrap (spec §11 #216-R), probed through the product's own
 Makes ffmpeg fixtures (640x360 `testsrc2`, 2 s, with a 440 Hz sine), builds
 container_rewrap_probe.swift with every app/Sources/*.swift except main.swift
 over harness/build.sh's swiftc line, and rewraps each into its own scratch
-destination under tools/proof/work/container-rewrap-probe/scratch/.
+destination under tools/proof/work/container-rewrap-probe/scratch/. The
+probe runs in a scratch home (issue batch B82, below).
 
 Fixtures: P1 VP9+Opus WebM (no CodecPrivate) · P2 the same at 30000/1001 ·
 P3 H.264+AAC MKV (B-frames) · P4 HEVC+AAC MKV · P5 a `-live 1` WebM through
@@ -80,11 +81,11 @@ at 30 % leaves the same JSON and no copy or partial; O39 with o1 gone,
 unchanged; O40 `ProjectDocument().read(from:ofType:)` of a package holding
 O36's project, on main, ends with no missing media and the original kept;
 O41 a `.mov` original with a movie already at its digest name is not
-copied again; O42 `isInside`'s exact cases and `isTrashed` of the home
-Trash's `b78-probe.mov` (never listed or written) and of the copy; O43 a
-copy in a scratch `fakeTrash` through the `trashed` seam is copied again,
-and with `trashed` false left alone. Every row discards the digest names it
-made.
+copied again; O42 `isInside`'s exact cases and `isTrashed` (B82, below: of
+the copy, of a path in the scratch `fakeTrash`, and of a path in the Trash
+of the copy's own volume, never listed or written); O43 a copy in a scratch
+`fakeTrash` through the `trashed` seam is copied again, and with `trashed`
+false left alone. Every row discards the digest names it made.
 
 Mutants edit a copy of app/Sources; each must fail exactly its rows (then
 MUTANT PASS, exit 0): no-retime, no-precheck, no-space-check, keep-partial,
@@ -119,23 +120,94 @@ millisecond stamp and so sits a stamp-rounding away (0.000667 s on this
 fixture); the row still prints that reading and its difference, held to
 nothing.
 
-    python3 tools/proof/container_rewrap_probe.py [--mutant NAME]
+Issue batch B82 (#236): the probe runs in a scratch home. Every run of a
+probe binary is `run_probe`, under `CFFIXED_USER_HOME=<work>/home`, remade
+before each run as `Library/Application Support` and nothing more, so the
+product's `Rewrapped/` is `<work>/home/Library/Application Support/Reelcut/
+Rewrapped/` and the product makes it itself. `child_env` refuses a home
+that is not under the work folder before anything is executed; swiftc,
+xcrun, ffmpeg and ffprobe keep the caller's environment. Row H0, scored
+first: the probe answers where its `Rewrapped/` is and whether that is
+inside the scratch home, and exits before any job when it is not; the
+script makes the same comparison itself and both must agree. When H0 fails
+a baseline scores no other row (`passed 0/1`, exit 1) and a mutant's
+control could not be performed (exit 2). `--control decoy-home` runs the
+baseline binary under a SECOND scratch home, `<work>/decoy-home`, while
+naming `<work>/home` to it: CONTROL PASS when H0 fails, the `Rewrapped/` it
+answered is under the decoy, the binary printed no other row, and nothing
+is under the decoy's `Library/Application Support/Reelcut`. O42 no longer
+needs the home Trash: it passes when `isInside`'s cases hold, the copy and
+a path in the scratch `fakeTrash` that does not exist are not trashed, and
+either FileManager answered a Trash for the copy's volume and
+`isTrashed(<it>/b82-probe.mov)` is true, or it answered none. A scratch home
+does not move that Trash (FileManager answers the real `~/.Trash` for a
+scratch file; measured at design time), so the row reads its PATH and
+nothing else. `no-mkdir` now fails twenty rows: a fresh home has no
+`Rewrapped/`, which the real home always had.
+
+The work folder (`tools/proof/work/container-rewrap-probe/`: the fixtures,
+the scratch destinations, both homes, jobs.json) is removed at the start
+and at exit. The build folder (`…/container-rewrap-probe-build/`) keeps
+`probe/`, the baseline's, rebuilt only when stale, and `answers.json`, the
+last run's; a mutant's `mutants/<name>/` is removed when its run ends, and
+`--clean` removes the whole folder and exits 0, running nothing. Nothing
+outside `tools/proof/work/` is written, except the process's own
+`UserDefaults` domain, which this batch does not move.
+
+`--mutant` takes one name, several, or `all` (every mutant, in the table's
+order); the fixtures are made once. Each prints its rows, `passed n/m`, its
+MUTANT PASS or MUTANT FAIL line and `seconds: build B, probe P`; a run of
+more than one ends with each mutant's line again and `mutants: k/n MUTANT
+PASS in T s`. Exit 0 when every one passed, 2 when any control could not be
+performed, else 1.
+
+    python3 tools/proof/container_rewrap_probe.py
+        [--mutant NAME [NAME ...] | --control decoy-home | --clean]
 """
 import argparse
+import atexit
 import json
 import math
 from pathlib import Path
 import shutil
 import subprocess
 import sys
+import time
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
 import bounded  # noqa: E402
 
+# Removed at the start and at exit.
 WORK = ROOT / "tools/proof/work/container-rewrap-probe"
-FIX = WORK / "fixtures"
-SCRATCH = WORK / "scratch"
+# `probe/` (the baseline's) is kept; `mutants/<name>/` is removed when its
+# run ends; `answers.json` is the last run's.
+BUILD = ROOT / "tools/proof/work/container-rewrap-probe-build"
+HOME, DECOY = WORK / "home", WORK / "decoy-home"
+FIX, SCRATCH = WORK / "fixtures", WORK / "scratch"
+PROBE_SWIFT = ROOT / "tools/proof/container_rewrap_probe.swift"
+
+
+def child_env(home):
+    """A child's environment. `None`: the caller's (swiftc, xcrun, ffmpeg,
+    ffprobe). A path: the caller's plus `CFFIXED_USER_HOME`, the scratch
+    home; ValueError, before anything is executed, unless the resolved path
+    is under WORK."""
+    env = bounded.child_env()
+    if home is not None:
+        if WORK.resolve() not in Path(home).resolve().parents:
+            raise ValueError(f"{home} is not under {WORK}: no probe runs in that home")
+        env["CFFIXED_USER_HOME"] = str(home)
+    return env
+
+
+def run(argv, seconds, cwd=None, home=None):
+    """A bounded child (rule H), in `home` when one is given."""
+    return bounded.run(argv, seconds, cwd=cwd, env=child_env(home))
+
+
+def remove_work():
+    shutil.rmtree(WORK, ignore_errors=True)
 
 
 def src(rate="30", seconds=2):
@@ -336,6 +408,12 @@ SOURCE_MUTANTS = {
 # `offset-shift` fails F23 with the other frame rows. `audio-dropped` fails
 # G24: with no audio input the timescale is the video's alone (P1's `mvhd`
 # reads 600, P2's 30000) and P14, sound alone, has no copy to read.
+#
+# B82 (measured on 2026-10-04, at design time and again by this batch's run):
+# `no-mkdir` fails D16 and, in a scratch home, every row that needs a copy
+# in `Rewrapped/` too. A fresh home has no `Rewrapped/`, which the real home
+# always had, so with `ensureDirectory` gone no copy lands there: C23–C27
+# and C29, and O31, after which the probe answers no later O row.
 EXPECTED = {
     "no-retime": {"W3", "F1", "F2", "F3", "F4", "F23", "B1v", "B3v", "B10v", "G24"},
     "no-precheck": {"R7", "R8", "R9"},
@@ -345,7 +423,8 @@ EXPECTED = {
     "audio-dropped": {"W1", "W2", "W3", "W4", "W10", "S5", "S14", "A13", "T17", "T18", "T20",
                       "T22", "B1a", "B3a", "B10a", "X19", "C20", "G24"},
     "fps-timescale-always": {"V15"},
-    "no-mkdir": {"D16"},
+    "no-mkdir": {"D16", "C23", "C24", "C25", "C26", "C27", "C29", "O31", "O32", "O33", "O34",
+                 "O35", "O36", "O37", "O38", "O39", "O40", "O41", "O42", "O43"},
     # A frame read one byte late no longer decodes, so the frame and impulse
     # rows fail with the payload rows.
     "offset-shift": {"B1v", "B1a", "B3v", "B3a", "B10v", "B10a", "F1", "F2", "F3", "F4", "F23",
@@ -394,7 +473,7 @@ def make_fixtures():
     made, problems = {}, {}
     for row_id, (name, args, inputs) in FIXTURES.items():
         path = FIX / name
-        result = bounded.run(["ffmpeg", "-y", "-v", "error", *inputs, *args, str(path)], 120)
+        result = run(["ffmpeg", "-y", "-v", "error", *inputs, *args, str(path)], 120)
         if result["rc"] or result["expired"] or not path.exists():
             problems[row_id] = "expired" if result["expired"] else tail(result["stderr"])
         else:
@@ -422,15 +501,15 @@ def make_fixtures():
         # B77: P20's Vorbis through an Ogg and back beside its own video, so
         # the muxer moves both 22 ms later and the first audio Block is at 0.
         ogg, remux = FIX / "p22.ogg", FIX / "p22.webm"
-        result = bounded.run(["ffmpeg", "-y", "-v", "error", "-i", str(made["P20"]), "-vn",
-                              "-c", "copy", str(ogg)], 120)
+        result = run(["ffmpeg", "-y", "-v", "error", "-i", str(made["P20"]), "-vn",
+                      "-c", "copy", str(ogg)], 120)
         if not result["rc"] and not result["expired"]:
-            result = bounded.run(["ffmpeg", "-y", "-v", "error", "-i", str(made["P20"]), "-i",
-                                  str(ogg), "-map", "0:v", "-map", "1:a", "-c", "copy",
-                                  str(remux)], 120)
-        first = bounded.run(["ffprobe", "-v", "error", "-select_streams", "a", "-read_intervals",
-                             "%+#1", "-show_entries", "packet=pts", "-of", "csv=p=0",
-                             str(remux)], 60)["stdout"].strip() if remux.exists() else ""
+            result = run(["ffmpeg", "-y", "-v", "error", "-i", str(made["P20"]), "-i",
+                          str(ogg), "-map", "0:v", "-map", "1:a", "-c", "copy",
+                          str(remux)], 120)
+        first = run(["ffprobe", "-v", "error", "-select_streams", "a", "-read_intervals",
+                     "%+#1", "-show_entries", "packet=pts", "-of", "csv=p=0",
+                     str(remux)], 60)["stdout"].strip() if remux.exists() else ""
         if result["rc"] or result["expired"] or not remux.exists():
             problems["P22"] = "expired" if result["expired"] else tail(result["stderr"])
         elif first != "0":
@@ -445,27 +524,83 @@ def make_fixtures():
     return made, problems
 
 
-def build(sources):
-    WORK.mkdir(parents=True, exist_ok=True)
-    entry = WORK / "main.swift"
-    shutil.copyfile(ROOT / "tools/proof/container_rewrap_probe.swift", entry)
-    binary = WORK / "container-rewrap-probe"
+def build(sources, probe_dir):
+    """(binary, "") or (None, why): the probe over `sources`, in `probe_dir`.
+    Rebuilt only when stale (`agent_open_proof.build_probe`'s rule): the
+    binary must be newer than every source, the entry, the staticlib, both
+    headers and this script, over the same list of sources. A mutant's
+    folder is new on every run, so its probe is always built."""
+    probe_dir.mkdir(parents=True, exist_ok=True)
+    entry = probe_dir / "main.swift"
+    source = PROBE_SWIFT.read_text()
+    if not entry.exists() or entry.read_text() != source:
+        entry.write_text(source)
+    binary = probe_dir / "container-rewrap-probe"
     swift = sorted(str(p) for p in sources.glob("*.swift") if p.name != "main.swift")
     if len(swift) < 100:
         return None, "app source set incomplete"
-    sdk = bounded.run(["xcrun", "--show-sdk-path", "--sdk", "macosx"], 60)["stdout"].strip()
-    result = bounded.run(["swiftc", "-D", "REELCUT_DEV_TOOLS", "-sdk", sdk,
-                          "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
-                          "-import-objc-header",
-                          str(ROOT / "app/Bridging/Reelcut-Bridging-Header.h"),
-                          "-L", str(ROOT / "core/target/release"), "-lreelcut_core",
-                          *swift, str(entry), "-o", str(binary)], 900)
+    stamp = probe_dir / "sources.txt"
+    listing = "\n".join(swift)
+    inputs = [Path(p) for p in swift] + [
+        entry, ROOT / "core/target/release/libreelcut_core.a", Path(__file__).resolve(),
+        ROOT / "app/Bridging/Reelcut-Bridging-Header.h", ROOT / "core/include/reelcut_core.h"]
+    if (binary.exists() and stamp.exists() and stamp.read_text() == listing
+            and all(p.exists() and p.stat().st_mtime < binary.stat().st_mtime for p in inputs)):
+        print(f"probe: {binary} (up to date)", flush=True)
+        return binary, ""
+    if binary.exists():
+        binary.unlink()
+    sdk = run(["xcrun", "--show-sdk-path", "--sdk", "macosx"], 60)["stdout"].strip()
+    result = run(["swiftc", "-D", "REELCUT_DEV_TOOLS", "-sdk", sdk,
+                  "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
+                  "-import-objc-header",
+                  str(ROOT / "app/Bridging/Reelcut-Bridging-Header.h"),
+                  "-L", str(ROOT / "core/target/release"), "-lreelcut_core",
+                  *swift, str(entry), "-o", str(binary)], 900)
     if result["expired"]:
         return None, "swiftc expired after 900 s"
-    if result["rc"]:
+    if result["rc"] or not binary.exists():
         lines = [line for line in result["stderr"].splitlines() if ": error:" in line]
         return None, "swiftc: " + "; ".join(lines[:8] or [tail(result["stderr"], 600)])
+    stamp.write_text(listing)
     return binary, ""
+
+
+def run_probe(binary, jobs, home=HOME):
+    """(host, answers by id, the bounded result). The ONLY call that
+    executes a probe binary: under `CFFIXED_USER_HOME=home`, which is HOME
+    or, for `--control decoy-home`, DECOY, and with HOME as its second
+    argument either way. The run's home is removed first and made again as
+    `Library/Application Support` and nothing more, so `Reelcut/Rewrapped`
+    is the product's to make."""
+    if home not in (HOME, DECOY):
+        raise ValueError(f"{home} is neither the scratch home nor the decoy")
+    child_env(home)  # refuses a home outside WORK before anything is removed or run
+    shutil.rmtree(home, ignore_errors=True)
+    (home / "Library/Application Support").mkdir(parents=True)
+    job_file = WORK / "jobs.json"
+    job_file.write_text(json.dumps(jobs, indent=2))
+    result = run([str(binary), str(job_file), str(HOME)], 900, home=home)
+    host, answers = {}, {}
+    for line in result["stdout"].splitlines():
+        tag, _, body = line.partition(" ")
+        try:
+            parsed = json.loads(body) if tag in ("HOST", "ROW") else None
+        except json.JSONDecodeError:
+            continue
+        if tag == "HOST":
+            host = parsed
+        elif tag == "ROW":
+            answers[parsed["id"]] = parsed
+    print(f"host: macOS {host.get('macos', '?')}, hw_av1 {host.get('hw_av1')}")
+    if result["expired"]:
+        print(f"probe binary expired after 900 s; {len(answers)} rows received")
+    elif result["rc"]:
+        print(f"probe binary exited {result['rc']}: {tail(result['stderr'], 600)}")
+    BUILD.mkdir(parents=True, exist_ok=True)
+    (BUILD / "answers.json").write_text(json.dumps({"host": host, "answers": answers},
+                                                   indent=2) + "\n")
+    return host, answers, result
 
 
 def mutate(name, dest):
@@ -533,8 +668,8 @@ def jobs_for(made):
 def ffprobe_video_duration(path):
     """The source's video stream from ffprobe's packets: last pts plus its
     duration, less the first pts."""
-    result = bounded.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
-                          "packet=pts_time,duration_time", "-of", "json", str(path)], 60)
+    result = run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                  "packet=pts_time,duration_time", "-of", "json", str(path)], 60)
     packets = json.loads(result["stdout"] or "{}").get("packets", [])
     times = sorted((float(p["pts_time"]), p.get("duration_time")) for p in packets
                    if p.get("pts_time") not in (None, "N/A"))
@@ -566,8 +701,8 @@ def decoded_click(path, timeline=False):
 def first_audio_packet(path, entries):
     """ffprobe's JSON for the first audio packet of `path` and its stream,
     limited to `entries`; {} when it cannot be read."""
-    result = bounded.run(["ffprobe", "-v", "error", "-select_streams", "a:0", "-read_intervals",
-                          "%+#1", "-show_entries", entries, "-of", "json", str(path)], 60)
+    result = run(["ffprobe", "-v", "error", "-select_streams", "a:0", "-read_intervals",
+                  "%+#1", "-show_entries", entries, "-of", "json", str(path)], 60)
     try:
         return json.loads(result["stdout"] or "{}")
     except json.JSONDecodeError:
@@ -634,7 +769,25 @@ def mvhd_timescale(path):
     return None
 
 
+def under(path, folder):
+    """Whether `path`, resolved, is inside `folder`, resolved."""
+    return isinstance(path, str) and folder.resolve() in Path(path).resolve().parents
+
+
+def home_took(answers):
+    """(ok, detail) for row H0: the probe's own answer that its `Rewrapped/`
+    is inside the scratch home, and this script's comparison of the path it
+    answered; both must say so."""
+    a = answers.get("H0") or {}
+    agrees = under(a.get("rewrapped"), HOME)
+    return a.get("inside") is True and agrees, (
+        f"Rewrapped/ is {a.get('rewrapped')}, inside the scratch home {HOME}: "
+        f"{a.get('inside')} (by this script's own comparison: {agrees})")
+
+
 def score(answers, made, problems, host):
+    """Every row, H0 first; None when H0 failed, and then no other row is
+    scored."""
     results = []
 
     def row(row_id, ok, detail):
@@ -643,6 +796,11 @@ def score(answers, made, problems, host):
 
     def get(job_id):
         return answers.get(job_id, {})
+
+    took, detail = home_took(answers)
+    row("H0", took, detail)
+    if not took:
+        return None
 
     def absent(row_id, job_id):
         why = problems.get(job_id.rstrip("b"), "no answer")
@@ -979,10 +1137,16 @@ def score_original(get, row):
         f"a .mov original with a movie at its digest name: unchanged {a.get('unchanged')} "
         f"(original {a.get('original_exists')}, decoy {a.get('decoy_made')})")
     a = get("O42")
-    facts = tuple(a.get(k) for k in ("inside", "sibling", "itself", "trash_found", "trashed",
-                                     "copy_trashed"))
-    row("O42", facts == (True, False, False, True, True, False),
-        f"isInside c/sibling/itself, Trash found, isTrashed Trash/copy = {facts}")
+    facts = tuple(a.get(k) for k in ("inside", "sibling", "itself", "copy_trashed",
+                                     "fake_trashed"))
+    trash = (a.get("volume_trash"), a.get("trashed"))
+    which = {(True, True): "FileManager answered the copy's volume's Trash, and a path in it "
+                           "is trashed",
+             (False, None): "FileManager answered no Trash for the copy's volume, so no path "
+                            "in one was asked"}.get(trash)
+    row("O42", facts == (True, False, False, False, False) and which is not None,
+        f"isInside c/sibling/itself, isTrashed copy/a path in the scratch fakeTrash = {facts}; "
+        f"{which or f'volume Trash found, isTrashed of a path in it = {trash}'}")
     a = get("O43")
     row("O43", a.get("held") is True and a.get("set_up") is True and landed(a)
         and a.get("original_path") == o1 and a.get("kept_unchanged") is True,
@@ -990,58 +1154,142 @@ def score_original(get, row):
         f"{a.get('original_path')!r}; with trashed false unchanged {a.get('kept_unchanged')}")
 
 
+def seconds_line(build_seconds, result):
+    probe = "not run" if result is None else f"{result['seconds']:.1f}"
+    return f"seconds: build {build_seconds:.1f}, probe {probe}"
+
+
+def run_mutant(name, made, problems):
+    """One mutant, built in `BUILD/mutants/<name>/` and run in the scratch
+    home: (status, its last line). Status 0 is MUTANT PASS, 1 MUTANT FAIL
+    and 2 a control that could not be performed. Its folder is removed when
+    the run ends."""
+    folder = BUILD / "mutants" / name
+    shutil.rmtree(folder, ignore_errors=True)
+    try:
+        why = mutate(name, folder / "Sources")
+        if why:
+            line = f"mutant {name}: the control could not be performed — {why}"
+            print(line, flush=True)
+            return 2, line
+        started = time.monotonic()
+        binary, problem = build(folder / "Sources", folder / "probe")
+        build_seconds = time.monotonic() - started
+        result = None
+        if binary is None:
+            # A probe that will not build is a scored failure, never an exit.
+            print(f"  FAIL B0 the probe builds from {folder / 'Sources'}: {problem}")
+            print("passed 0/1")
+            failed, host = {"B0"}, {}
+        else:
+            host, answers, result = run_probe(binary, jobs_for(made))
+            results = score(answers, made, problems, host)
+            if results is None:
+                line = (f"mutant {name}: the control could not be performed — H0 failed, so "
+                        f"no row was scored")
+                print(line + "\n" + seconds_line(build_seconds, result), flush=True)
+                return 2, line
+            failed = {row_id for row_id, ok in results if not ok}
+            print(f"passed {len(results) - len(failed)}/{len(results)}")
+        expected = set(EXPECTED[name])
+        if name == "no-precheck" and host.get("hw_av1"):
+            expected.discard("R7")
+        verdict = "MUTANT PASS" if failed == expected else "MUTANT FAIL"
+        line = f"{verdict}: {name} failed {sorted(failed)}, expected {sorted(expected)}"
+        print(line + "\n" + seconds_line(build_seconds, result), flush=True)
+        return (0 if failed == expected else 1), line
+    finally:
+        shutil.rmtree(folder, ignore_errors=True)
+
+
+def control_decoy(binary, made):
+    """`--control decoy-home`: the baseline binary in the decoy home, with
+    the scratch home named to it. H0 must fail and nothing else may run."""
+    host, answers, result = run_probe(binary, jobs_for(made), home=DECOY)
+    took, detail = home_took(answers)
+    print(("  ok   " if took else "  FAIL ") + f"H0 {detail}", flush=True)
+    answered = (answers.get("H0") or {}).get("rewrapped")
+    others = sorted(set(answers) - {"H0"})
+    reelcut = DECOY / "Library/Application Support/Reelcut"
+    left = sorted(str(p.relative_to(DECOY)) for p in reelcut.rglob("*"))
+    good = ("H0" in answers and not took and under(answered, DECOY) and not others and not left)
+    print(f"{'CONTROL PASS' if good else 'CONTROL FAIL'}: decoy-home — H0 "
+          f"{'answered' if 'H0' in answers else 'NOT answered'} and "
+          f"{'passed' if took else 'failed'}; the Rewrapped/ it answered is under {DECOY}: "
+          f"{under(answered, DECOY)}; other rows from the binary: {others or 'none'} (exit "
+          f"{result['rc']}, expired {result['expired']}); under the decoy's "
+          f"Library/Application Support/Reelcut: {left or 'nothing'}", flush=True)
+    return good, result
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mutant", choices=list(SOURCE_MUTANTS))
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--mutant", nargs="+", metavar="NAME",
+                      choices=list(SOURCE_MUTANTS) + ["all"],
+                      help="one or more of the mutants, or `all` (every one, in table order)")
+    mode.add_argument("--control", choices=["decoy-home"],
+                      help="the baseline binary under a second scratch home: H0 must fail and "
+                           "no job may run")
+    mode.add_argument("--clean", action="store_true",
+                      help="remove the build folder and exit, running nothing")
     args = parser.parse_args()
-    sources = ROOT / "app/Sources"
-    if args.mutant:
-        sources = WORK / f"Sources-{args.mutant}"
-        why = mutate(args.mutant, sources)
-        if why:
-            print(f"mutant {args.mutant}: the control could not be performed — {why}")
-            return 2
+    if args.clean:
+        shutil.rmtree(BUILD, ignore_errors=True)
+        print(f"removed {BUILD}")
+        return 0
+    began = time.monotonic()
+    remove_work()
+    atexit.register(remove_work)
     made, problems = make_fixtures()
     for row_id, why in problems.items():
         print(f"fixture {row_id} not made: {why}")
-    binary, problem = build(sources)
+    print(f"fixtures: {len(made)} made in {time.monotonic() - began:.1f} s; scratch home {HOME}",
+          flush=True)
+
+    if args.mutant:
+        names = []
+        for name in args.mutant:
+            for each in (list(SOURCE_MUTANTS) if name == "all" else [name]):
+                if each not in names:
+                    names.append(each)
+        outcomes = []
+        for name in names:
+            print(f"mutant {name}:", flush=True)
+            outcomes.append(run_mutant(name, made, problems))
+        if len(names) > 1:
+            for _, line in outcomes:
+                print(line)
+            passed = sum(1 for status, _ in outcomes if status == 0)
+            print(f"mutants: {passed}/{len(names)} MUTANT PASS in "
+                  f"{time.monotonic() - began:.0f} s", flush=True)
+        statuses = {status for status, _ in outcomes}
+        return 2 if 2 in statuses else (1 if 1 in statuses else 0)
+
+    sources = ROOT / "app/Sources"
+    started = time.monotonic()
+    binary, problem = build(sources, BUILD / "probe")
+    build_seconds = time.monotonic() - started
     if binary is None:
         print(f"  FAIL B0 the probe builds from {sources}: {problem}")
+        if args.control:
+            print(f"CONTROL FAIL: {args.control} — the probe did not build")
+        else:
+            print("passed 0/1")
+        return 1
+    if args.control:
+        good, result = control_decoy(binary, made)
+        print(seconds_line(build_seconds, result), flush=True)
+        return 0 if good else 1
+    host, answers, result = run_probe(binary, jobs_for(made))
+    results = score(answers, made, problems, host)
+    print(seconds_line(build_seconds, result), flush=True)
+    if results is None:
         print("passed 0/1")
         return 1
-    jobs = jobs_for(made)
-    job_file = WORK / "jobs.json"
-    job_file.write_text(json.dumps(jobs, indent=2))
-    result = bounded.run([str(binary), str(job_file)], 900)
-    host, answers = {}, {}
-    for line in result["stdout"].splitlines():
-        tag, _, body = line.partition(" ")
-        try:
-            parsed = json.loads(body) if tag in ("HOST", "ROW") else None
-        except json.JSONDecodeError:
-            continue
-        if tag == "HOST":
-            host = parsed
-        elif tag == "ROW":
-            answers[parsed["id"]] = parsed
-    print(f"host: macOS {host.get('macos', '?')}, hw_av1 {host.get('hw_av1')}")
-    if result["expired"]:
-        print(f"probe binary expired after 900 s; {len(answers)} rows received")
-    elif result["rc"]:
-        print(f"probe binary exited {result['rc']}: {tail(result['stderr'], 600)}")
-    (WORK / "answers.json").write_text(json.dumps({"host": host, "answers": answers},
-                                                  indent=2) + "\n")
-    results = score(answers, made, problems, host)
     failed = {row_id for row_id, ok in results if not ok}
     print(f"passed {len(results) - len(failed)}/{len(results)}")
-    if not args.mutant:
-        return 1 if failed else 0
-    expected = set(EXPECTED[args.mutant])
-    if args.mutant == "no-precheck" and host.get("hw_av1"):
-        expected.discard("R7")
-    verdict = "MUTANT PASS" if failed == expected else "MUTANT FAIL"
-    print(f"{verdict}: {args.mutant} failed {sorted(failed)}, expected {sorted(expected)}")
-    return 0 if failed == expected else 1
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

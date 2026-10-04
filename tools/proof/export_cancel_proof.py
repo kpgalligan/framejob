@@ -9,7 +9,16 @@ One owned instance on a scratch socket (`mcp.scratch_socket`), launched with
 `-ApplePersistenceIgnoreState YES
 -RCFFmpegImport always -RCFFmpegPath <work>/standin/ffmpeg`, stopped by PID,
 its log at `tools/proof/work/export-cancel/reelcut.log`; nothing else
-is ever killed. Every child runs under `graphics_spike/bounded.py`. The M rows
+is ever killed. **The instance runs in a scratch home** (issue batch B82,
+#236): `CFFIXED_USER_HOME=<work>/home`, made bare, so the `Rewrapped/` I1's
+conversion lands in is `<work>/home/Library/Application Support/Reelcut/
+Rewrapped/`; the gate, import and cancel groups all use that one instance.
+The M rows' probe (`export_cancel_probe`) keeps the caller's environment.
+Nothing outside `tools/proof/work/` and the scratch socket's own temporary
+folder (`mcp.scratch_socket`, removed when the instance stops) is written,
+except the app's and the probe's own `UserDefaults` domains, which that
+batch does not move.
+Every child runs under `graphics_spike/bounded.py`. The M rows
 run `export_cancel_probe.swift`, an in-process instrument built like
 `graphics_proof.py`'s pin probe into `tools/proof/work/export-cancel-probe/`
 (rebuilt when any of `app/Sources`, the probe, `libreelcut_core.a`, the
@@ -29,7 +38,10 @@ I1  stand-in `ffprobe` (fixed JSON: one h264 640×360 30/1 stream, 10 s) and
     `ffmpeg` (sleeps 45 s, copies `media/A.mov` to its last argument, then
     touches `standin/ffmpeg.exited`); `import_media` of a 4096-byte
     `slow-<hex>.mkv` answers ok after ≥ 45 s, kind video, 640×360, a `.mov`
-    directly inside Rewrapped. Cleanup, whatever it answered and before the
+    directly inside the scratch home's Rewrapped. When
+    `<work>/home/Library/Application Support` is not a directory the scratch
+    home did not take: I1 FAILS and no import is made. Cleanup, whatever it
+    answered and before the
     instance stops: wait for `ffmpeg.exited` (120 s from the call's start),
     then for no `slow-<hex>-*.partial.mov` (10 s), then delete every
     Rewrapped entry starting `slow-<hex>-` (parent-checked) and the fixture.
@@ -94,7 +106,9 @@ PROBE_SOURCE = ROOT / "tools/proof/export_cancel_probe.swift"
 PROBE_DIR = ROOT / "tools/proof/work/export-cancel-probe"
 SOURCES = ROOT / "app/Sources"
 A_MOV = ROOT / "tools/proof/media/A.mov"
-REWRAPPED = Path.home() / "Library/Application Support/Reelcut/Rewrapped"
+# The instance's scratch home (B82), made bare after WORK is remade.
+HOME = WORK / "home"
+REWRAPPED = HOME / "Library/Application Support/Reelcut/Rewrapped"
 CALL_BOUND = 600
 FFMPEG_SLEEP = 45
 NOISE_SECONDS = 60
@@ -166,7 +180,8 @@ class Instance:
                  "-RCFFmpegImport", "always",
                  "-RCFFmpegPath", str(STANDIN / "ffmpeg")],
                 stdin=subprocess.DEVNULL, stdout=out, stderr=out, start_new_session=True,
-                env=bounded.child_env({"RC_AGENT_SOCKET": self.socket}))
+                env=bounded.child_env({"RC_AGENT_SOCKET": self.socket,
+                                       "CFFIXED_USER_HOME": str(HOME)}))
         if mcp.wait_listening(self.log, self.socket, child=self.child, seconds=60):
             print(f"  instance PID {self.child.pid} at {self.socket}", flush=True)
             return mcp.MCP(self.socket, timeout=CALL_BOUND)
@@ -419,6 +434,13 @@ def rewrapped_entries(prefix):
 
 
 def run_import(client):
+    support = HOME / "Library/Application Support"
+    if not support.is_dir():
+        why = ("the instance did not start" if client is None
+               else "the scratch home did not take")
+        check("I1 the instance's scratch home took", False,
+              f"{support} is not a directory: {why}; no import was made")
+        return
     marker = STANDIN / "ffmpeg.exited"
     if marker.exists():
         marker.unlink()
@@ -582,6 +604,7 @@ def main():
 
     shutil.rmtree(WORK, ignore_errors=True)
     WORK.mkdir(parents=True)
+    HOME.mkdir()
     write_standins()
 
     binary, why = (None, "")
