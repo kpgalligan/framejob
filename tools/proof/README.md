@@ -23,7 +23,11 @@ socket's line (`wait_listening`), `socket_pid` finds the pid listening at a
 socket (`lsof -U`, read only), `target(argv)` is a proof's socket argument
 (else `$RC_AGENT_SOCKET`), `remove_scratch` deletes a scratch folder under the
 temp dir, and `LSREGISTER` is the one spelling of `lsregister`'s path. No proof
-binds the person's own socket (spec §11 MC-6).
+binds the person's own socket (spec §11 MC-6). It also guards the defaults
+domain each instance shares with the owner (issue batch B83, #238): a script
+whose session moved a key outside AppKit's `NS*`/`Apple*` families ends with
+status 3 and `mcp: DEFAULTS MOVED …` last on stderr when no other Reelcut
+shares the domain, and only prints the line when one does.
 `harness/` is the offscreen renderer, described at the end.
 
 **Ports in records.** Road map 14's MC4 deleted the app's TCP listener.
@@ -14041,4 +14045,635 @@ python3 tools/proof/container_import_proof.py --mutant ffmpeg-copy        # MUTA
 python3 tools/proof/export_cancel_proof.py --runs 3                       # 7/7 rows ok, exit 0
 python3 tools/proof/phase7_chrome.py                                      # 79/79 checks passed
 python3 tools/proof/container_rewrap_probe.py --clean                     # removes work/container-rewrap-probe-build/
+```
+
+## Issue batch B83 — proofs and the owner's `UserDefaults` (`proof_defaults.py` P1–P9, P5s and three mutants; `defaults_proof.py` C0, G1–G5, R1, R2 and two mutants; `mcp.py`'s guard; #238)
+
+B82 put four proofs' Application Support under a scratch home and measured
+that this does not move `UserDefaults`. This batch closes #238 as measured:
+no environment moves `UserDefaults`, a proof session moves no setting the
+owner sees, and a probe's domain can only be removed after it exits. So
+there are two things: a guard in `mcp.py` that FAILS a script whose session
+moved a key, and a removal recipe with a gated sweep for the proofs' own
+domains. No file under `app/`, `core/`, `graphic/`, `mcp-proxy/` or `agent/`
+changed, and no spec §11 decision was made.
+
+**Measured** (the designer, 2026-10-04, `a31b9da`, macOS 26.5.1; drivers not
+kept; key names only):
+
+- **(a) refuted.** A throwaway executable writing `UserDefaults.standard`, a fresh name per run,
+  under `CFFIXED_USER_HOME`; that + `__CFPREFERENCES_AVOID_DAEMON=1` (scratch `Library/Preferences`
+  absent, then pre-made); the variable alone; `HOME` + it; all three: every run left
+  `~/Library/Preferences/<name>.plist` and nothing in the scratch home. `__CFBundleIdentifier` did
+  not rename the domain; a `sandbox-exec` profile denying `com.apple.cfprefsd.*` did not stop it.
+- **(b) in-process refuted; after exit it works.** `removePersistentDomain` in the process, or
+  `defaults delete <name>` alone, leaves a 42-byte plist. `defaults delete <name>` (rc 0 or 1) THEN
+  unlinking the plist, after the process exited, left no file and no domain at once and 10 s
+  later, in five cases (with and without `synchronize`, with and without an in-process removal).
+  Unlinking without the `defaults delete` after an in-process removal: the file came back.
+- **(c) holds for the app's domain.** The real `com.kgalligan.Reelcut` (47 keys, by name and
+  salted digest; another session's pid 85319 running; an 8 s no-launch control unmoved) was
+  unmoved across a bare `mcp.launch`, `new_project` + `close_project`, and every clone session.
+  The clone is the built app with `CFBundleIdentifier` replaced (`cp -c -R`, `plutil -replace`; it
+  launched without re-signing and wrote the new identifier's domain), so a same-value rewrite
+  shows. It ran `new_project`/`close_project`; `screens.PINS` + `View ▸ Assistant`,
+  `select_inspector_tab`, `Reelcut ▸ Settings…`; `screens.py --app <clone>` (23 pass); `v2_menu.py
+  --only T,N,D,U,R,S,L` (23 pass). Keys written, in all — AppKit's, re-saved from the same domain:
+  `NSWindow Frame NSColorPanel`, `NSToolbar Configuration com.apple.NSColorPanel`, `NSSplitView
+  Subview Frames NSColorPanelSplitView`, `NSNavPanelExpandedSizeForOpenMode`,
+  `NSOSPLastRootDirectory`. No `Reelcut*` or `RC*` key.
+- **The one route to an owner-visible write is `perform_menu_item`:** on the clone, `["View",
+  "Snapping"]` wrote `ReelcutSnappingEnabled`, seen by `defaults export` while running and at
+  once after `stop()`. No MCP handler writes defaults, no script runs `defaults write`/`delete`,
+  no `-Key value` was persisted, and no path a proof performs today persists an app key.
+- **Probes.** 90 executable names under `tools/proof/work`, 22 with a same-named plist; no shared
+  runner (93 scripts carry their own `swiftc`). `harness.plist` holds two Rasterize keys as well.
+- **(d) not taken and not measured:** (c) holds, and the request allows (d) only when (a)–(c) fail.
+- **The app's persisted keys** are `Reelcut*` and `RC*` (`RCFFmpegImport`).
+- **Ownership under the rules below, read with `plistlib`: 36 names.**
+  `executable` 22, `source` 2 (`agent_open_probe`, `ffmpeg_rewrap_probe`),
+  `prefix` 8 (`com.kgalligan.reelcut.…`), `keys` 4 (`probe-mutant`,
+  `probe-pristine`, `homecheck`, `sweep`). All hold only the families a
+  probe compiled from `app/Sources` writes, except `harness`
+  (`ReelcutInspectorWidth`, `ReelcutTimelineHeight` beside Rasterize's
+  `toolOptions.*`): `shared`.
+- **Unattributed: 29.** 28 by name and `dbg` by its two `Reelcut*` keys; 11
+  `com.kgalligan.rasterize.*` names are refused, never listed. The Mach-O
+  walk of `tools/proof/work` finds 90 names, among them `reelcut-agent` (a
+  product helper's name).
+- **Exit status.** Python 3.14.7: `SystemExit` raised in an `atexit` handler
+  leaves status 0; `os._exit(3)` there gives 3. `ps -axo pid=,comm=` prints
+  each executable's full path.
+
+This batch's own reading at the same commit agreed: `owned_domains()` was
+compared in code with those 36 (identical name and rule, 36 of 36, none with
+a `refusal`), and `executables()` answered 90 names with `reelcut-agent`
+among them.
+
+**The guard** (`mcp.py`). A record per socket path: the domain, its key
+names against salted digests (`proof_defaults.snapshot`, which runs
+`defaults export <domain> -` and nothing else), the Reelcut pids sharing the
+domain then, and the pids the record owns. `scratch_socket()` records
+`com.kgalligan.Reelcut`; `launch()` re-records the binary's own bundle
+identifier before `Popen` and owns its child (a record that already owns a
+pid, a relaunch on the same socket, is compared first, so nothing is lost);
+`MCP()` records a socket that has no record, a handed one, under the domain
+of the executable holding it, that pid owned. `remove_scratch()` compares
+before it deletes, and one `atexit` handler, registered at import so it
+runs after any a script registers later, compares every record still held:
+a script that never calls `remove_scratch`, leaves early by `sys.exit` or an
+exception, or was handed its socket. A moved key outside AppKit's `NS*` and
+`Apple*` families prints
+
+    mcp: DEFAULTS MOVED in <domain>: <names> (other Reelcut pids: <list|none>)
+
+on stderr. When no other Reelcut shares the domain the handler reprints
+those lines last and ends the process with `os._exit(3)`; when one does, the
+line is all there is, because the write may be that instance's. Others are
+the sharing pids then and now, less every pid a record of this process has
+owned and the pid holding the socket. Each guard body catches `Exception`
+and says so (`mcp: the defaults guard is off for <socket>: <type>`, the
+exception's type and never its text); an `lsof` or `ps` answer the guard
+cannot read counts as no pid, except a handed pid whose executable `ps` will
+not name: it is owned, its record guards the app's domain, and that is said;
+and a moved key already found is appended and printed whatever `ps` and
+`lsof` then answer. A domain `defaults export` will not
+answer for is said on stderr, at the record or at the compare (`mcp: the
+defaults guard could not read <domain> at the record|at the compare …`):
+that record can see no moved key. The status does not change.
+`defaults_moved(socket)` answers every moved key name of a guarded socket. Existing signatures and
+returns are unchanged; the exit status changes in that one case.
+
+**What the guard does not reach.** A script killed by a signal, interrupted
+while a compare is running, or leaving by `os._exit` (none in `tools/proof`
+does); a script that never imports
+`mcp.py` (`dist_check.py`); a write by a Reelcut that started after the
+record and quit before the compare would be blamed on the script; a write
+by a script with two instances of its own alive, launched by its own
+`Popen`, counts the other as another Reelcut and only prints. When the guard
+ends a script, `os._exit` skips whatever would have run after its handler:
+an `atexit` handler registered before `mcp` was first imported, and the
+flush of any file the script still holds open. The script's own status (1 or
+2) becomes 3; its rows are already flushed above the line. A probe's or the
+harness's writes at their source are not stopped: their domains are swept
+afterwards.
+
+**`defaults_proof.py`** proves the guard on a clone of the built app whose
+`CFBundleIdentifier` is `com.kgalligan.reelcut.defaults-proof`
+(`tools/proof/work/defaults-proof/Reelcut.app`, `cp -c -R`, removed through
+`tree_copy.remove_tree`), so the write it makes on purpose, View ▸ Snapping
+through `perform_menu_item`, lands in that domain and none of the owner's.
+Each G row runs the script again as a `--child` that scores nothing and
+ends `sys.exit(0)`; the parent scores its status and stderr.
+
+| Row | Child | Holds |
+|---|---|---|
+| C0 | — | the clone is made, its domain removed, it comes up with `perform_menu_item` and no parity complaint, and a bare launch moves no owner-visible key |
+| G1 | `write`: `mcp.launch(clone)`, `new_project`, View ▸ Snapping, `defaults_moved` as JSON, stop, `remove_scratch` | the JSON holds `ReelcutSnappingEnabled`; status 3; stderr's last line is `DEFAULTS MOVED` naming it and `none` |
+| G2 | CONTROL `quiet`: `new_project`, `close_project` | status 0, no such line |
+| G3 | `write-no-remove`: never calls `remove_scratch` | status 3 |
+| G5 | `write`, while S2 (a second instance of the clone the parent started by `Popen` on its own folder, no `mcp` record) is alive | status 0; the line names S2's pid |
+| G4 | `write-handed`: `MCP(S2's socket)` only | status 3, and the key is among `defaults_moved` at the first reading after the call |
+| R1 | the REAL build in this process: `mcp.launch`, `new_project`, `close_project`, stop, `remove_scratch` | no owner-visible key of `com.kgalligan.Reelcut` moved (one retry when another Reelcut shares the domain, then FAIL naming keys and pids) |
+| R2 | — | the real domain across C0 and the G rows: no owner-visible key moved |
+
+`--mutant` reaches the children by argv: `no-compare`
+(`proof_defaults.moved` answers `[]`) must fail exactly G1, G3, G4, G5;
+`no-exit` (`mcp._exit_failed` is a no-op) exactly G1, G3, G4.
+
+**`proof_defaults.py`** is the other half and imports nothing from
+`tools/proof`. `remove_domain(name)` is `defaults delete <name>` (0 and 1
+both accepted) THEN unlinking the plist. `refusal(name)` is asked first and
+names what is never acted on: the empty name, a name holding `/` or
+starting `.` or `-`, `NSGlobalDomain` and `Apple Global Domain`, `reelcut`,
+`reelcut-agent` and `reelcut-mcp`, `com.apple.*`, any name containing
+`rasterize`, and `com.kgalligan.Reelcut` in any case with its capital-R
+namespace and any name that extends it without a dot
+(`com.kgalligan.Reelcut-Dev`, `com.kgalligan.ReelcutHelper`). A call on the real Preferences folder asks that rule a second
+time under no mutant, and a scratch folder with no stand-in runner raises
+`ValueError`. A plist with no `refusal` is a proof's own by the first rule
+that holds: `executable` (a Mach-O of that name with an exec bit under
+`tools/proof/work`, the walk skipping `*.app`, `*.dSYM`, `node_modules`,
+`.git`, `Intermediates.noindex`, `target` and symlinks), `source` (the stem
+of a `*_probe.swift` under `tools/proof`), `prefix` (the name starts
+`com.kgalligan.reelcut.` or `reelcut.`, case-sensitive), `keys` (at least
+one key, every one starting `Reelcut`). The sweep, per owned name: `busy`
+(the plist is under 60 minutes old, a process of that basename is running,
+or one's bundle identifier is the name), read immediately before acting, is
+left and reported (for a probe the caller names with `--ran`, whose plist
+holds only `NS*`/`Apple*` keys, the age is not asked); else, with every key in `Reelcut*`, `RC*`, `NS*`,
+`Apple*` (or none), `remove_domain`; else `shared`, `defaults delete <name>
+<key>` for its `Reelcut*` keys only and the file never unlinked; a returned
+reason is `denied` and is not worked around. The busy gate cannot see a
+write `cfprefsd` has not flushed from a process that already exited into a
+plist older than 60 minutes; `phase7_chrome.py`'s `defaults-write` then
+`defaults-read` is the only read-back in `tools/proof` (the designer's
+reading).
+
+The selftest's P1 and P2 are real, on `reelcut.proof-defaults-selftest.<pid>`
+made with `defaults write`; P3–P9 run over scratch folders under `$TMPDIR`
+with a recording runner that executes nothing. Each refused name a file can
+bear has a plist and a Mach-O (a copy of `/usr/bin/true`) in a folder of its
+own beside the row's control: P3 the app's names, P4 the global and
+option-like names, P5 Rasterize's, P6 the product helpers', each with a
+control that IS removed; P5s the `shared` branch and its removed-whole
+control; P7 one name per rule and an `NS`-only `x-probe` owned by none; P8
+the busy gate; P9 the raise. P8's running process is `/bin/sleep` started
+through a symlink of the name, whose path is what `ps` prints: a COPY of
+`/bin/sleep` exits 137 at exec on this host (run twice), while a copy of
+`/usr/bin/true` runs. Its plist is owned by `keys`. `--mutant no-unlink`
+skips the unlink in the real Preferences folder only, since over a scratch
+folder there is no daemon and the unlink is the whole removal.
+
+Run on 2026-10-04 over `a31b9da` plus this batch's diff, macOS 26.5.1,
+Python 3.14.7, another session's Reelcut (pid 85319, an Xcode build)
+running throughout and never this batch's.
+
+`proof_defaults.py --selftest` printed `passed 10/10`, exit 0: P1 "CONTROL:
+`defaults write reelcut.proof-defaults-selftest.<pid>` exited 0; its plist
+exists True"; P2 "remove_domain answered None; file there, keys in the
+domain: at once (False, 0), 6 s later (False, 0)"; P8 "busy-probe: its plist
+changed 0 min ago (under 60); the running /bin/sleep of its name: a process
+named rc-pd-sleep-<pid> is running (pid …); nothing recorded; CONTROL:
+busy-probe two hours old is removed". `--mutant no-unlink` printed "FAIL P2
+remove_domain answered '…/reelcut.proof-defaults-selftest.<pid>.plist is
+still there'; … at once (True, 0), 6 s later (True, 0)" and `MUTANT PASS:
+no-unlink failed ['P2'], expected ['P2']`; `--mutant no-refusal` `MUTANT
+PASS: no-refusal failed ['P3', 'P4', 'P5', 'P6'], expected ['P3', 'P4',
+'P5', 'P6']`; `--mutant no-busy` `MUTANT PASS: no-busy failed ['P8'],
+expected ['P8']`, each exit 0. After the three, no
+`reelcut.proof-defaults-selftest.*` plist was in Preferences.
+
+**`--list` before the first sweep** (13:58:16; name, rule, key-name
+families, what the sweep would do). Compared in code with the designer's
+36 before anything was removed: the same names under the same rules.
+
+```
+owned: 36
+  agent_open_probe  [source]  NS:2  -> remove
+  assistant_lane_probe  [executable]  NS:2  -> remove
+  assistant_prompt_probe  [executable]  NS:2  -> remove
+  assistant_tab_probe  [executable]  NS:2  -> remove
+  clip-inspector-probe  [executable]  Reelcut:1,NS:2  -> remove
+  clip-inspector2-probe  [executable]  NS:2  -> remove
+  com.kgalligan.reelcut.assistant-settings-probe  [prefix]  (no key)  -> remove
+  com.kgalligan.reelcut.assistant-tab-probe  [prefix]  (no key)  -> remove
+  com.kgalligan.reelcut.captureprobe  [prefix]  NS:1  -> remove
+  com.kgalligan.reelcut.p8refute  [prefix]  NS:3  -> remove
+  com.kgalligan.reelcut.phase8probe  [prefix]  Reelcut:3,NS:4  -> remove
+  com.kgalligan.reelcut.refute8  [prefix]  NS:1  -> remove
+  com.kgalligan.reelcut.review8spike  [prefix]  (no key)  -> remove
+  com.kgalligan.reelcut.undoprobe  [prefix]  Reelcut:2,NS:4  -> remove
+  drag_probe  [executable]  NS:2  -> remove
+  e1probe  [executable]  NS:2  -> remove
+  e2probe  [executable]  Reelcut:1,NS:2  -> remove
+  editor-keys-undo-probe  [executable]  NS:2  -> remove
+  ffmpeg_rewrap_probe  [source]  NS:3  -> remove
+  graphics-inspector-probe  [executable]  NS:1  -> remove
+  harness  [executable]  Reelcut:2,other:2  -> shared: ReelcutInspectorWidth, ReelcutTimelineHeight
+  homecheck  [keys]  Reelcut:1  -> remove
+  menuprobe  [executable]  NS:1  -> remove
+  obscure-handles-probe  [executable]  Reelcut:2,NS:2  -> remove
+  phase7probe  [executable]  NS:1  -> remove
+  playerprobe  [executable]  Reelcut:1  -> remove
+  probe-mutant  [keys]  Reelcut:1  -> remove
+  probe-pristine  [keys]  Reelcut:1  -> remove
+  probe  [executable]  NS:2  -> remove
+  recordingprobe  [executable]  Reelcut:6,NS:2  -> remove
+  refreshprobe  [executable]  Reelcut:1  -> remove
+  space-key-probe  [executable]  NS:2  -> remove
+  sweep  [keys]  Reelcut:2  -> remove
+  text-apply-probe  [executable]  NS:2  -> remove
+  text-break-probe  [executable]  Reelcut:2,NS:2  -> remove
+  text-edit-probe  [executable]  NS:2  -> remove
+unattributed (no script removes these): 29
+  chromeprobe
+  colorpanel_probe
+  com.example.panelprobe
+  com.kgalligan.p9probe
+  com.kgalligan.spikedoc
+  com.kgalligan.spikeframe
+  dbg
+  keyprobe
+  local.panelprobe
+  menuprobe3
+  nharness
+  p9probe
+  p9probe2
+  p9probe3
+  pinprobe
+  playerprobe2
+  playerprobe_rev
+  probe2
+  probe8refute
+  probe_mutant
+  probe_shipped
+  rcrefute66
+  realprobe-mutant
+  realprobe-pristine
+  refute66harness
+  refuteprobe
+  renameprobe
+  spike
+  spike8
+```
+
+**The first sweep** (13:59:08) printed:
+
+```
+sweep: removed 35, shared 1, busy 0, denied 0
+  removed agent_open_probe
+  removed assistant_lane_probe
+  removed assistant_prompt_probe
+  removed assistant_tab_probe
+  removed clip-inspector-probe
+  removed clip-inspector2-probe
+  removed com.kgalligan.reelcut.assistant-settings-probe
+  removed com.kgalligan.reelcut.assistant-tab-probe
+  removed com.kgalligan.reelcut.captureprobe
+  removed com.kgalligan.reelcut.p8refute
+  removed com.kgalligan.reelcut.phase8probe
+  removed com.kgalligan.reelcut.refute8
+  removed com.kgalligan.reelcut.review8spike
+  removed com.kgalligan.reelcut.undoprobe
+  removed drag_probe
+  removed e1probe
+  removed e2probe
+  removed editor-keys-undo-probe
+  removed ffmpeg_rewrap_probe
+  removed graphics-inspector-probe
+  removed homecheck
+  removed menuprobe
+  removed obscure-handles-probe
+  removed phase7probe
+  removed playerprobe
+  removed probe-mutant
+  removed probe-pristine
+  removed probe
+  removed recordingprobe
+  removed refreshprobe
+  removed space-key-probe
+  removed sweep
+  removed text-apply-probe
+  removed text-break-probe
+  removed text-edit-probe
+  shared harness: ReelcutInspectorWidth, ReelcutTimelineHeight deleted
+```
+
+Read back at once: none of the 35 plists existed, none of the 35 names was
+in `defaults domains`, `harness` held two keys outside the four families
+(Rasterize's) and no `Reelcut*` key, and `com.kgalligan.Reelcut` still held
+47 keys with its plist in place. `--list` straight after:
+
+```
+owned: 1
+  harness  [executable]  other:2  -> busy: its plist changed 0 min ago (under 60)
+```
+
+and the same 29 unattributed names. `harness` reads `busy` for an hour
+because deleting its two keys rewrote its plist; after that it reads
+`shared: no Reelcut* key left`, and nothing more is done to it.
+
+**Not attributable to a `tools/proof` executable; the owner may delete these
+by hand; no script does** (as `--list` printed them, before and after):
+
+```
+  chromeprobe
+  colorpanel_probe
+  com.example.panelprobe
+  com.kgalligan.p9probe
+  com.kgalligan.spikedoc
+  com.kgalligan.spikeframe
+  dbg
+  keyprobe
+  local.panelprobe
+  menuprobe3
+  nharness
+  p9probe
+  p9probe2
+  p9probe3
+  pinprobe
+  playerprobe2
+  playerprobe_rev
+  probe2
+  probe8refute
+  probe_mutant
+  probe_shipped
+  rcrefute66
+  realprobe-mutant
+  realprobe-pristine
+  refute66harness
+  refuteprobe
+  renameprobe
+  spike
+  spike8
+```
+
+`defaults_proof.py` printed `passed 8/8`, exit 0, with "cleanup: the work
+folder is gone; the clone's domain: removed": C0 "a bare launch moved
+['NSSplitView Subview Frames NSColorPanelSplitView', 'NSToolbar
+Configuration com.apple.NSColorPanel']"; G1 "status 3; guarded
+com.kgalligan.reelcut.defaults-proof (2 keys before); toggles 1;
+defaults_moved ['NSSplitView Subview Frames NSColorPanelSplitView',
+'NSWindow Frame NSColorPanel', 'ReelcutSnappingEnabled']; stderr's last line
+'mcp: DEFAULTS MOVED in com.kgalligan.reelcut.defaults-proof:
+ReelcutSnappingEnabled (other Reelcut pids: none)'"; G2 "status 0; …
+defaults_moved ['NSWindow Frame NSColorPanel']; stderr's last line '(no
+stderr)'"; G3 and G4 "status 3; … toggles 1; defaults_moved
+['ReelcutSnappingEnabled']" with the same last line; G5 "status 0; …
+(other Reelcut pids: 67299)", S2's pid; R1 "the real build, new_project and
+close_project: moved []; owner-visible []; other Reelcut pids sharing
+com.kgalligan.Reelcut now: [85319]"; R2 "com.kgalligan.Reelcut (47 keys)
+across C0 and the G rows: moved []; owner-visible []". `--mutant no-compare`
+printed `passed 4/8` and `MUTANT PASS: no-compare failed ['G1', 'G3', 'G4',
+'G5'], expected ['G1', 'G3', 'G4', 'G5']` (each writing child "toggles 3;
+defaults_moved []"); `--mutant no-exit` `passed 5/8` and `MUTANT PASS:
+no-exit failed ['G1', 'G3', 'G4'], expected ['G1', 'G3', 'G4']` (each
+"status 0" under its `DEFAULTS MOVED … none` line, G5 passing), each exit 0.
+
+`screens.py --out tools/proof/work/defaults-proof-screens/out`, under the
+guard, printed `scores: 23 pass, 0 fail, 0 skip of 23`, exit 0, and no
+`DEFAULTS MOVED` line on either stream; the folder was removed afterwards.
+
+`make test` exited 0 (14:04:02 to 14:05:10). Its last step printed `passed
+10/10`, then `sweep: removed 0, shared 0, busy 3, denied 0`:
+`assistant_lane_probe` and `assistant_prompt_probe` ("its plist changed 0
+min ago (under 60)"), which that same `make test`'s two assistant probes had
+just written, and `harness` (5 min). `make test` therefore names the two
+probes it runs (`--ran assistant_lane_probe --ran assistant_prompt_probe`):
+for a named probe whose plist holds only `NS*`/`Apple*` keys the sweep does
+not ask the plist's age, there being no key of a probe's own to read back; a
+running process of that name is still `busy`, and so is every name while
+`ps` does not answer. A probe added to `make test`
+and not named stays `busy` and is printed. P8 holds it: a fresh `NS`-only
+`ran-probe` is `busy` unnamed and removed when named, while `busy-probe`
+(fresh, `ReelcutA`) and the running sleeper stay `busy` though named.
+After that change `make test` (14:41:56 to 14:43:03, exit 0, 93 `test
+result: ok` lines) ended `passed 10/10`, then `sweep: removed 2, shared 0,
+busy 1, denied 0`: `removed assistant_lane_probe`, `removed
+assistant_prompt_probe`, `busy harness: its plist changed 43 min ago (under
+60)`. `--list --ran assistant_lane_probe --ran assistant_prompt_probe` had
+printed both as `remove` before it, and `--list` after it printed `owned: 1`
+(`harness`, `busy`) and the same 29 unattributed names; neither probe's
+plist was in Preferences or in `defaults domains`, and
+`com.kgalligan.Reelcut` still held 47 keys.
+
+**Three handed sessions showed no moved key, and it was not explained.**
+Before a writing child toggled until the key showed, the handed child (G4)
+printed "status 0; defaults_moved []; stderr's last line '(no stderr)'" in
+two of the first four proof runs, and one of four handed sessions in a
+driver that was not kept showed no `ReelcutSnappingEnabled` among
+`defaults_moved` within 15 s, on a domain removed just before. The first
+proof run was timed at 100 s; the final one took 9 s by its output file's
+timestamps. It did not happen again: in 51 further handed sessions (drivers not kept, and the runs
+above) the key showed at the first toggle; in 12 of them the menu item's
+state agreed with the stored value before and after; 2088 `defaults export`
+calls made during 12 sessions all answered a dictionary; `socket_pid` found
+the instance 75 times of 75; and `MCP()`'s record named the clone's domain
+and pid 18 times of 18. Three causes fit the print and none was caught: the
+toggle writing the value already stored, the record guarding the wrong
+domain (`socket_pid` answering None, so `com.kgalligan.Reelcut`), or a
+snapshot that could not be taken (silence). So each child toggles up to
+three times, waiting up to 3 s each, and prints its record's domain, its
+owned pids, how many keys its first snapshot held, whether
+`ReelcutSnappingEnabled` was among them, how long the session took to open,
+and for each toggle whether and when the key showed. A key that shows only
+at a later toggle FAILS its row (one that shows at none is said to have
+shown at none), and G4 also fails when the first reading
+after the call lacks the key, which is what a handed script exiting at once
+would be compared on. The later toggles are an instrument and never a retry.
+For a real build the second cause leaves the domain right
+and the record owning no pid: the handed instance, alive when the record was
+made, then counts as another Reelcut, and a moved key is only printed unless
+`lsof` answers at the compare with the instance still up. So `MCP()` asks
+`lsof` twice and says on stderr when a socket's file is there and no pid
+holds it.
+
+**The miss was looked for again and not caught** (the same day, 14:28 to
+14:46, after the review; another session's Reelcut, pid 85319, running and
+never signalled). With the scoring above, 52 runs of the proof printed no
+FAIL: two whole (`passed 8/8`), 40 of `--only C0,G1,G2,G3,G5,G4` (`passed
+6/6` each, 7 to 8 s), and 10 more of those under sixteen busy loops (9 to 10
+s each). All 208 writing children (G1, G3, G5, G4, 52 each) printed the
+clone's domain with one pid owned, "toggle 1 shown after 0.0 s; first
+reading at once" and no second toggle; `ReelcutSnappingEnabled` was absent
+before in every G1 and present in every G3, G5 and G4; a launched child
+opened in 0.6 to 0.9 s and a handed one in 0.2 or 0.3 s; no "found no pid"
+line was printed. A driver that was not kept ran the handed child against
+one S2 sixteen more times: six after S2 had idled 30 s with a fresh
+instance's write in between, ten on the clone's domain removed just before
+with S2 alive (the earlier driver's condition, the key absent before). All
+sixteen: status 3, toggle 1 at 0.0 s, first reading at once. So a toggle
+onto the stored value and a compare that ran before the write was visible
+did not happen in 68 handed sessions, and neither can now pass a row.
+
+What does reproduce the earlier print exactly is the record: the handed
+child run with `socket_pid` answering None (a driver that was not kept)
+printed "DOMAIN com.kgalligan.Reelcut (47 keys before; … owns pids [])",
+"TOGGLE 1 not shown in 3 s" three times, `MOVED []`, status 0, and on stderr
+only the new "mcp: the defaults guard found no pid holding
+<folder>/agent.sock; …" line. That is the earlier "status 0; defaults_moved
+[]" with the line the old code did not print, and it shows the old
+toggle-until-shown could not have hidden this cause: no number of toggles
+shows a key of the clone's in the app's domain. It is consistent with the
+100 s first run (three 30 s expiries) and it was not observed: `lsof`
+answered in 0.1 s here every time. A snapshot that could not be taken prints
+the same thing (status 0, `defaults_moved []`), and so did a `ps` that
+expired under the first code, which left no record. The second now keeps a
+record, which is the right one for the real build; for a clone it guards the
+app's domain, and `mcp.py` says so (`could not read the bundle identifier of
+pid …`), as it now says the first. The
+scoring was made to fail on purpose
+with two drivers that were not kept: the child's first reading blinded gave
+`passed 4/5` with G4 alone failing ("first reading late … a handed script
+that exits at once would not be failed"), and every reading of its first 3.2
+s blinded gave `passed 1/5`, G1, G3, G5 and G4 failing ("showed only at
+toggle 2", "toggle 3"), each with the status and last line the old scoring
+passed. The final run of the proof printed `passed 8/8`, exit 0 (G4 "status
+3; guarded com.kgalligan.reelcut.defaults-proof (4 keys before;
+ReelcutSnappingEnabled present; owns pids [<S2>]; opened in 0.2 s); toggle 1
+shown after 0.0 s; first reading at once; …"); `--mutant no-compare` `passed
+4/8` and `MUTANT PASS: no-compare failed ['G1', 'G3', 'G4', 'G5'], expected
+['G1', 'G3', 'G4', 'G5']` (each writing child "toggle 1 not shown in 3 s,
+toggle 2 not shown in 3 s, toggle 3 not shown in 3 s; first reading late");
+`--mutant no-exit` `passed 5/8` and `MUTANT PASS: no-exit failed ['G1',
+'G3', 'G4'], expected ['G1', 'G3', 'G4']`, each exit 0. `proof_defaults.py
+--selftest` printed `passed 10/10` with P3 "6 names untouched" (the two
+dot-less names added) and P8 "…; ran-probe (NS only, named in `ran`) is
+removed while fresh; busy-probe named in `ran` stays busy for its ReelcutA;
+CONTROL: busy-probe two hours old is removed", and its three mutants `MUTANT
+PASS` on the same rows as before, each exit 0.
+
+**After the second review** (the same day, 15:04 to 15:14; pid 85319 running
+and never signalled; no load was added). The guard's quiet ways out were
+made loud and each was shown printing its line once. By stubs alone, no app
+and no real domain (a driver that was not kept): a raise in the record, in
+`MCP()`'s record, in the compare and in the exit handler each printed one
+`mcp: the defaults guard is off for <socket|its exit handler>: <type>` and
+never the exception's text; `defaults export` not answering printed one
+`mcp: the defaults guard could not read <domain> at the record …`, or `… at
+the compare …` when it had answered at the record; a move already found,
+with `socket_pid` and `sharing_pids` both raising at the compare, still
+ended with status 3 and `DEFAULTS MOVED … (other Reelcut pids: none)`, where
+the same stubs under the earlier `_finish` gave status 0 and no line; `ps`
+unreadable made `busy`, `plan` and `sweep` over a scratch
+folder answer "`ps` did not answer, so a running process of that name cannot
+be ruled out" for a two-hour-old plist, named in `ran` or not, with nothing
+recorded, and `ps` exiting 1 made `_processes()` answer None the same way.
+On the clone, `defaults_proof.py`'s own rows with each writing
+child stubbed (a second driver, not kept): G1, G3 and G5 with `socket_pid` and
+`ps` raising from the compare on passed (status 3, 3 and 0, the line there),
+and G4 with `socket_pid` raising throughout FAILED as it should: "status 0;
+guarded com.kgalligan.Reelcut (47 keys before; … owns pids []; …); toggle 1
+not shown in 3 s, toggle 2 …, toggle 3 …; first reading late;
+defaults_moved []", its one stderr line "mcp: the defaults guard found no
+pid holding <folder>/agent.sock; it guards com.kgalligan.Reelcut and cannot
+tell this instance from another Reelcut, so a moved key is only printed
+unless `lsof` names it at the compare", and "ReelcutSnappingEnabled showed
+at none of the 3 toggles" among its problems. Then, unstubbed:
+`proof_defaults.py --selftest` `passed 10/10` and its three mutants `MUTANT
+PASS` on P2, P3–P6 and P8; `defaults_proof.py` `passed 8/8` twice, `--mutant
+no-compare` `passed 4/8` and `MUTANT PASS` (each writing child now "showed
+at none of the 3 toggles"), `--mutant no-exit` `passed 5/8` and `MUTANT
+PASS`, each exit 0; `screens.py --out
+tools/proof/work/defaults-proof-screens/out` `scores: 23 pass, 0 fail, 0
+skip of 23`, exit 0, nothing at all on stderr, the folder removed
+afterwards; `make test` exit 0 (15:12:50 to 15:13:58, 93 `test result: ok`
+lines), its last step `passed 10/10` and `sweep: removed 2, shared 1, busy
+0, denied 0` (`removed assistant_lane_probe`, `removed
+assistant_prompt_probe`, `shared harness: no Reelcut* key to delete`, its
+plist by then over 60 minutes old and holding two keys of Rasterize's);
+`--list` after it `owned: 1` (`harness`) and the same 29 unattributed names.
+Three runs of `defaults_proof.py` in a row ran long and the fourth did not:
+the first whole run 108 s (15:06:34 to 15:08:22), `--mutant no-compare` 97 s
+(its twelve unshown toggles are 36 s of that) and `--mutant no-exit` 40 s,
+then the second whole run, each row stamped as it arrived, 19 s. Every row
+was right in all four, every child of the slow three printed "opened in" 0.3
+to 0.7 s, and the first run's G2 printed no stderr, so the time went to the
+parent or to a child after its session had opened, and where was not
+measured: the proof printed no times of its own. It is not shown to be load.
+The one reading, at 15:11 straight after the 19 s run, was a load average of
+18.14 over one minute and 14.48 over five (the five spanning the slow runs),
+with `lsof -nP -U -Fpn` at 0.12 to 0.17 s; and the earlier ten runs under
+sixteen busy loops took 9 to 10 s. The instances' pids put most of it
+between G1's launch and G2's (217 apart in the 108 s run, 128 and 59 in the
+two mutant runs, 19 in the last): G1's session after it opened, its stop,
+its compare and exit, the parent's `lsof`, and G2's start. That is an
+inference from pid numbers, not a measurement.
+
+**After the third review** (the same day, 15:26 to 15:35; pid 85319 running
+and never signalled; no load was added). One more quiet path was made loud:
+a handed socket whose pid `lsof` names and whose executable `ps -p` does not
+name. By stubs alone (a driver that was not kept; no app, and no `defaults`
+child at all, counted): `ps -p` expiring, raising, answering nothing and
+naming `/bin/sleep` each printed one `mcp: the defaults guard could not read
+the bundle identifier of pid <pid> holding <socket>; it guards
+com.kgalligan.Reelcut, which is that instance's domain only if it is the
+real build`, the record owning that pid, and an empty answer was not read as
+a path; CONTROL, `ps -p` naming an executable inside a scratch bundle,
+printed nothing and guarded that bundle's identifier. On the clone, rows C0
+and G4 with the handed child's `ps -p` raising (a second driver, not kept):
+`passed 1/2`, "FAIL G4 [10 s] status 0; guarded com.kgalligan.Reelcut (47 keys
+before; ReelcutSnappingEnabled present; owns pids [<S2>]; …); toggle 1 not
+shown in 3 s, toggle 2 …, toggle 3 …; first reading late; defaults_moved
+[]", that line the last on its stderr. The exit handler now finishes every record
+though one raises: by stubs, an entry appended earlier and `_finish` raising
+for one of two records still held gave `is off for <socket>: KeyError`, the
+other record finished, the `DEFAULTS MOVED` line last and status 3, where
+the earlier handler gave `is off for its exit handler` and status 0.
+
+**The proof now prints its own times, and the slow runs were not seen
+again.** Each row starts `[N s]`, the time since the row before it (G5's holds
+S2's start), and each G row ends
+"session S s, stop T s, compare U s; child V s, the parent's lsof and stop W
+s": the child's time from its start to its last read of `defaults_moved`,
+its `stop()`, its `remove_scratch` (the compare, where the child calls it),
+then the child's wall and the parent's work after it. G3's and G4's compare
+runs in the exit handler, inside the child's wall less its three. Three whole
+runs straight after the change (15:29:29 to 15:29:54) printed `passed 8/8`
+in 9, 8 and 8 s: every row 0 to 2 s; session 0.4 to 0.9 s, stop 0.0 s,
+compare 0.0 to 0.2 s, child 0.7 to 1.4 s, the parent's 0.0 to 0.1 s. None
+was slow, so no stage is named for the 108, 97 and 40 s runs above, and they
+stay unexplained; a run that is slow again says which stage it was in its
+own rows. The pid distance the paragraph above leans on is no measure of
+time here: in these three runs G1's and G2's instances were 27, 18 and 138
+pids apart with both rows at 1 s each time. `uptime` before run 1 and after each run read a one-minute load
+average of 12.86, 21.11, 22.27 and 21.37: 8 s runs at 21 and 22, which is
+all that was read about load across those three. `--mutant no-compare` took 45 s (`passed 4/8`,
+`MUTANT PASS` on G1, G3, G4, G5; each writing child's session 9.9 to 10.4 s,
+9 of them its three unshown toggles) and `--mutant no-exit` 9 s (`passed
+5/8`, `MUTANT PASS` on G1, G3, G4), each exit 0. `screens.py --out
+tools/proof/work/defaults-proof-screens/out`: `scores: 23 pass, 0 fail, 0
+skip of 23`, exit 0, nothing on stderr, the folder removed afterwards. `make
+test` exit 0 (15:32:00 to 15:33:20, 93 `test result: ok` lines), its last
+step `passed 10/10` and `sweep: removed 2, shared 1, busy 0, denied 0` (the
+two assistant probes it had just written; `harness` shared); `--list` after
+it `owned: 1` (`harness`) and the same 29 unattributed names.
+
+**The app's plist was rewritten while real-build sessions ran, and no key
+moved.**
+`com.kgalligan.Reelcut.plist`'s modification time went from 14:45:55 to
+15:31:02 during those runs, the second at which `--mutant no-exit` ended (its
+R1 the last session in it), while every R1 and R2 printed "moved []" and the domain held 47 keys
+before and after. Looked at alone (a read-only driver, not kept: `defaults_proof.py
+--only R1` three times, a snapshot and the file's time either side): the
+time was unchanged across two sessions and moved across the third, and no
+key name was added, removed or changed across any. So the file's time moving is
+not evidence that a proof moved a key, and the guard, which compares digests of
+values, is not misled by it. Whether it is the instance's own same-value
+write or pid 85319's was not told apart. On the clone, whose domain pid
+85319 does not share, every quiet session (G2) moved `NSWindow Frame
+NSColorPanel` and a bare launch (C0) one or two `NS*` keys, so an instance
+does write AppKit's keys in such a session; that the real plist's rewrite is
+that write with the value already stored was not shown.
+
+```sh
+python3 tools/proof/proof_defaults.py --selftest                      # passed 10/10, exit 0
+python3 tools/proof/proof_defaults.py --mutant no-unlink              # MUTANT PASS (also no-refusal, no-busy)
+python3 tools/proof/proof_defaults.py --list                          # removes nothing
+python3 tools/proof/proof_defaults.py --sweep                         # removed / shared / busy / denied
+python3 tools/proof/proof_defaults.py                                 # the selftest, then the sweep
+python3 tools/proof/proof_defaults.py --ran assistant_lane_probe --ran assistant_prompt_probe   # make test's last step
+python3 tools/proof/defaults_proof.py                                 # passed 8/8, exit 0 (launches the app; not in make test)
+python3 tools/proof/defaults_proof.py --mutant no-compare             # MUTANT PASS (also no-exit)
 ```

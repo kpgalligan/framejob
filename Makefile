@@ -32,6 +32,10 @@ rust:
 # enclosing function rather than its line, and its other citations by
 # anchor; no app, no build. `spec_index_proof.py` (issue batch B70) checks the
 # spec indexes' Lines cells against `wc -l` and a row for every spec file.
+# `proof_defaults.py` (issue batch B83, #238) is the defaults removal recipe
+# on a throwaway domain, its refusals over scratch folders, then the sweep of
+# the proofs' own idle domains, and of the two probes this target ran, out of
+# `~/Library/Preferences`; no app.
 # `mcp-proxy` is road map 14's `reelcut-mcp`, its tests black-box over the
 # built binary's stdin and stdout.
 test: rust
@@ -44,6 +48,7 @@ test: rust
 	python3 tools/proof/budget_proof.py
 	python3 tools/proof/capture_spike/inventory.py --check
 	python3 tools/proof/spec_index_proof.py
+	python3 tools/proof/proof_defaults.py --ran assistant_lane_probe --ran assistant_prompt_probe
 
 lint:
 	cd core && cargo clippy --all-targets -- -D warnings
