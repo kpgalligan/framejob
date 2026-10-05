@@ -47,6 +47,7 @@ extension UIMenu {
         "copy:": .plain,
         "paste:": .plain,
         "pasteAttributes:": .plain,
+        "pasteGraphicProperties:": .plain,
         "duplicateClips:": .plain,
         "deleteClips:": .plain,
         "rippleDeleteClips:": .plain,

@@ -199,6 +199,10 @@ extension AppDelegate {
                 "Paste Attributes", #selector(EditorViewController.pasteAttributes(_:)), "v",
                 [.command, .option]))
         menu.addItem(
+            item(
+                "Paste Graphic Properties",
+                #selector(EditorViewController.pasteGraphicProperties(_:))))
+        menu.addItem(
             item("Duplicate", #selector(EditorViewController.duplicateClips(_:)), "d"))
         // Bare ⌫: U+0008 (NSBackspaceCharacter) is what AppKit matches the
         // Delete key against and what it draws as ⌫ (U+007F is forward

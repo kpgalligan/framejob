@@ -472,7 +472,14 @@ the key map behind it.
   Delete always on the first; nothing there writes a file or applies an
   op),
   `+Clipboard` (⌘X/⌘C/⌘V over the `com.kgalligan.reelcut.clips` pasteboard,
-  the `paste` op's payload; ⌥⌘V Paste Attributes with no `groups`),
+  the `paste` op's payload; ⌥⌘V Paste Attributes with no `groups`; and
+  Edit ▸ Paste Graphic Properties, whose `@objc` action
+  `pasteGraphicProperties(_:)` lives here and sends ONE `paste_attributes`
+  with `groups: ["graphic"]` and `skip_missing` (spec §11 G-32). Every reader
+  and writer takes its `NSPasteboard` as a parameter, the general one by
+  default, and that action reads a pasteboard SENDER in place of the general
+  one (a menu sends its `NSMenuItem`), so a probe drives all of them over a
+  private pasteboard),
   `+Edge` (slip, roll, close gap, insert, overwrite, the `,` / `.` nudge —
   with an `extension TimelineView` because the two ⌥⇧ drags begin there),
   `+Identity` (Rename ⇧⌘R, the Label submenu over `ClipLabel.allCases`),

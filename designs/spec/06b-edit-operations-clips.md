@@ -202,26 +202,46 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   duration, action spans, present base motion/text timings and a graphic's `in` and `length`
   normalized to this document's grid, since the payload may come from another
   frame rate (§11, D7-3, G-18·b).
-- **`paste_attributes {clips, payload, groups?}`** — Copies the payload's EARLIEST clip's property
-  groups onto each clip (at one start the front-most, then the lower id — never the array's first,
-  which is Copy's creation order) — `payload` is the same Copy payload `paste` takes, and only that
-  clip's `video`, `audio`, `text` and `shape` are read; its ids, times, media rows and nests do not
-  matter and nothing is minted. A group is REPLACED whole, never merged: video and audio whole,
-  transform included (`audio.muted` and `keep_pitch` travel — they are properties like opacity);
-  text but its `content` and the `words` that time it (§11 W-6); a shape but its `kind`, `width`,
-  `height`, `from` and `to`. `groups` ∈ `video`, `audio`, `text`, `shape`: absent, it means every
-  group BOTH sides have, silently skipping the rest; a NAMED group the payload clip lacks, or a
-  target lacks, is an **error**, all-or-nothing, and so is a copied value the inspector would refuse
-  — each copied group passes the patches' range checks. Copied video motion and text animation pass
-  the same original-value range checks as a patch, then snap to the target grid; audio envelopes
-  retain sample precision. Speed, enabled, actions, the transition, the source and the clip's own
-  name and label stay; `graphic` is not a group, so a graphic target keeps its module, size,
-  timeline and props (§11 G-10). One value is NORMALISED on the way in, not merely checked: a copied
-  `video.motion` whose three slots are all null lands as `null`, the same one spelling of "no
-  motion" `set_video` and `split` keep — this op's payload is a third door for a `Motion`, and
-  `{"motion": {}}` means the same thing; the file reader does NOT normalise
-  (`core/tests/schema_v8.rs`). Refuses when nothing changes, and on an empty
-  `groups` list.
+- **`paste_attributes {clips, payload, groups?, skip_missing?}`** — Copies the payload's EARLIEST
+  clip's property groups onto each clip (at one start the front-most, then the lower id — never the
+  array's first, which is Copy's creation order) — `payload` is the same Copy payload `paste` takes,
+  and only that clip's `video`, `audio`, `text` and `shape` are read, and its `graphic.props` when
+  `graphic` is named; its ids, times, media rows and nests do not matter and nothing is minted. A
+  group is REPLACED whole, never merged: video and audio whole, transform included (`audio.muted`
+  and `keep_pitch` travel — they are properties like opacity); text but its `content` and the
+  `words` that time it (§11 W-6); a shape but its `kind`, `width`, `height`, `from` and `to`.
+  `groups` ∈ `video`, `audio`, `text`, `shape`, `graphic`: absent, it means each of the FIRST FOUR
+  both sides have, silently skipping the rest — never `graphic`, and `skip_missing` changes nothing
+  there; a NAMED group the payload clip lacks, or a target lacks, is an **error**, all-or-nothing,
+  and so is a copied value the inspector would refuse — each copied layer group passes the patches'
+  range checks. Copied video motion and text animation pass the same original-value range checks as
+  a patch, then snap to the target grid; audio envelopes retain sample precision. Speed, enabled,
+  actions, the transition, the source and the clip's own name and label stay. **`graphic` is the
+  fifth group, and only when NAMED** (§11 G-32, amending G-10): a side has it when its source is a
+  graphic and it has a `graphic` description, and a target TAKES it when it has it and its
+  `graphic.name` is the payload clip's. It copies `props` WHOLE — a target key the payload lacks is
+  removed, a key both have keeps its slot, new keys are appended in the payload's order — and the
+  target keeps its `name`, `width`, `height`, `in` and `length` and everything outside `graphic`.
+  Named without `skip_missing`, the errors are `payload clip has no graphic properties`, `clip N has
+  no graphic properties` and `clip N is drawn by "<its module>" and the payload clip by "<the
+  payload's>"; graphic props are pasted only between clips of one module`; the payload clip is
+  checked first, then every id in `clips` is resolved (an unknown one is an error before any target
+  is looked at), then the targets are visited in the order `clips` lists them, a repeated id once
+  (`selected_clips`, `core/src/edit_clip.rs`), each for the named groups in `groups`' order, and the
+  first error met is the answer. **`skip_missing: true`** (with `groups` named) drops a named group
+  the payload clip lacks and skips, for that group, a target that lacks it or cannot take it — for
+  all five groups, no error for a missing group, and an identity when nothing changed; it is what
+  Edit ▸ Paste Graphic Properties sends, with `groups: ["graphic"]`. The copied props are checked
+  for SHAPE only (each a string of at most 4096 characters, a number or a boolean, under a key that
+  is a name, at most 64 keys, `null`s dropped; no schema, no colour normalisation), once, the first
+  time a target takes them, in `model_graphic.rs`'s own sentences: a paste in which no target takes
+  `graphic` never reads them — an identity with `skip_missing`, the error above without it — and a
+  malformed map onto a target that takes it is the map's error in both modes, nothing changed. One
+  value is NORMALISED on the way in, not merely checked: a copied `video.motion` whose three slots
+  are all null lands as `null`, the same one spelling of "no motion" `set_video` and `split` keep —
+  this op's payload is a third door for a `Motion`, and `{"motion": {}}` means the same thing; the
+  file reader does NOT normalise (`core/tests/schema_v8.rs`). Refuses when nothing changes, and on
+  an empty `groups` list.
 - **`nest {clips, name?}`** — Collapses the selection into ONE clip showing a nest (§5.2), on the
   front-most track the selection occupied, running from the earliest start to the latest end. The
   clips move whole — ids, props, actions, transitions — keeping their relative times (the earliest

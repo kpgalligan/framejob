@@ -1,4 +1,4 @@
-//! Four optional plain booleans default to false; nullable controls do not.
+//! Five optional plain booleans default to false; nullable controls do not.
 mod common;
 
 use common::{Handle, Outcome};
@@ -108,6 +108,21 @@ fn rescale_clips_controls_existing_transform() {
         .value();
     assert_eq!(resized.pointer("/clips/0/video/x"), Some(&json!(50.0)));
     assert_eq!(resized.pointer("/clips/0/video/scale"), Some(&json!(0.25)));
+}
+
+#[test]
+fn skip_missing_turns_a_missing_named_group_from_an_error_into_a_skip() {
+    let mut source = project().value()["clips"][0].clone();
+    source["track"] = json!(0);
+    let base = json!({"op":"paste_attributes","clips":[11],
+        "payload":{"clips":[source]},"groups":["video","text"]});
+    let (before, default) = absent_false_null(base.clone(), "skip_missing");
+    assert_eq!(default, "error:payload clip has no text properties");
+    let mut skipping = base;
+    skipping["skip_missing"] = json!(true);
+    let pasted = before.apply(&skipping).value();
+    assert_eq!(pasted.pointer("/clips/1/video/x"), Some(&json!(100.0)));
+    assert_eq!(pasted.pointer("/clips/1/video/scale"), Some(&json!(0.5)));
 }
 
 #[test]

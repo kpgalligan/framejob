@@ -15191,3 +15191,133 @@ cd graphic && cargo test --release --test stdlib path_test_js       # 1 passed
 cd graphic && cargo test --release --test path -- --nocapture       # 6 passed; prints R2, R4, R5
 python3 tools/proof/graphics_path_proof.py                          # 6/6, exit 0 (launches the app in a scratch home; not in make test)
 ```
+
+## Issue batch B85 phase 2 — a graphic's properties pasted between clips of one module (`core/tests/paste_graphic.rs` T1–T8, T10, T11 and eight core mutants; `paste_graphic_probe.py` K0–K8 and six mutants; `paste_graphic_proof.py` H0, T0, P1–P5, Z1 and two mutants; #103; spec §11 G-32)
+
+`paste_attributes` takes a fifth group, `graphic` (a clip's props, whole,
+onto clips drawn by the same module; never a default), and a flag,
+`skip_missing`; Edit ▸ Paste Graphic Properties is the person's door. Phase 3
+(HEVC with alpha) is its own pipeline.
+
+**What is proved, and by which instrument.**
+
+- **`core/tests/paste_graphic.rs`** (in `make test`), through the FFI, over a
+  fixture written by hand: `lower-third` clips A and B (different props, key
+  order, size, `in`, `length` and video), a `title-card` clip, a text clip, a
+  media clip and a nest holding two more `lower-third` clips. T1 what travels
+  and what the target keeps; T2 the props' key order off `to_json()`'s text;
+  T3 no `groups`, and `["video"]`, copy the video and no props; T4 the three
+  sentences of a named group, a matching target listed first unchanged; T5
+  `skip_missing` (mixed targets, nothing to take, `["video","graphic"]` onto
+  a text clip, `["audio"]` an identity where it is an error without the
+  flag); T6 a malformed copied map onto a matching clip, with and without
+  the flag — an array value, a bad key, 4,097 characters, 65 keys — and a
+  `null` not stored; T7 equal props an identity, the payload clip the
+  earliest; T8 the same paste through `scope`; T10 the flag with no
+  `groups` changes nothing (`to_json()` byte-identical); T11 a map no target
+  takes is never read. T9 is `op_default_booleans.rs`'s:
+  `skip_missing` absent equals `false`, `null` is a decode error;
+  `op_nullability.rs` holds it as the fifth plain boolean.
+- **`paste_graphic_probe.py`** (not in `make test`: it compiles
+  `app/Sources`). `paste_graphic_probe.swift` over
+  `harness/build.sh`'s swiftc line with `-D REELCUT_DEV_TOOLS`: a real
+  `EditorViewController` over an untitled document whose clips are placed
+  by ops, its window the document's sheet window
+  (`sheet_queue_probe.swift`'s set-up), `setActivationPolicy(.prohibited)`.
+  **Every Copy and paste is over a private named pasteboard, released at
+  exit; `NSPasteboard.general` is never written** (K6). K0 builds; K1 the
+  item, its place, action and empty key, and its `UIMenu.verdicts` row; K2
+  the validator arm, and `pasteAttributes:`'s answers; K3 the door onto
+  {same module, other module, text}; K4 nothing to do, twice; K5 ⌥⌘V copies
+  the video and no props; K7, a CONTROL, a malformed copied map: no taker,
+  no sheet; a taker, the core's sentence in the alert sheet, which the probe
+  ends; K8 the menu's ACTION, its selector `pasteGraphicProperties:` sent to
+  the controller with the private pasteboard as its sender, K3's claims
+  again. K3, K4 and K7 call the door's body, `pasteGraphicProps(from:)`;
+  the action reads a pasteboard sender in place of the general pasteboard
+  (a menu sends its `NSMenuItem`, so the app reads the general one), which
+  is the seam K8 uses.
+- **`paste_graphic_proof.py`** (not in `make test`: it launches the app, in
+  a scratch home `tools/proof/work/paste-graphic/mcp/home`, on its own
+  socket, performs no menu item, reads and writes no pasteboard, closes its
+  project and removes its work folder). H0, T0 and Z1 are CONTROLS. T0's
+  enum is printed from the core's table, so no mutant here can move it: it
+  is held to the decoder by `core/tests/op_table.rs` and to the handler's
+  list by `clip_catalog_proof.py`. P1 the named group (props, what B keeps,
+  the PNG at B, `undo`); P2 no `groups`; P3 the three sentences; P4
+  `skip_missing`; P5 when the map is read.
+
+**What the runs printed** (2026-10-05, one host).
+
+| Run | Answer |
+|---|---|
+| the move gate, `core/` holding only the move: `cargo fmt --check`, `cargo test --release`, `make lint` | exit 0; 73 `test result: ok`, 1,014 passed, 0 failed; clean. `wc -l`: `edit_paste.rs` 467 (593 before), `edit_paste_attributes.rs` 143. What moved and what stayed is `designs/adr/core-file-history.md`'s entry for `edit_paste_attributes.rs` |
+| `cd core && cargo test --release` | 74 `test result: ok`, 1,025 passed, 0 failed |
+| `cd core && cargo test --release --test paste_graphic` | 10 passed |
+| `python3 tools/proof/paste_graphic_probe.py` | 9/9, exit 0. K6: `changeCount` 2480 at start and at end. K8: `pass`, B's props equal A's, undo "Paste Graphic Properties" ("Opacity" before), one undo restores the project text and that name |
+| `python3 tools/proof/paste_graphic_proof.py` | 8/8, exit 0. P1's frames at 8 s: 40162 bytes before the paste, 40161 after, different |
+| `clip_catalog_proof.py` / `op_catalog_proof.py` / `phase2_proof.py`, one instance in a scratch home | 24/24 / 23/23 / 86/86; the log held no `Reelcut: ` line |
+| `v2_menu.py --only H` / `op_schema_probe.py` / `capture_spike/inventory.py --check` / `spec_index_proof.py` | 5 pass / 28/28 / 5/5 / 138/138 |
+| `make test` / `make lint` / `make typecheck` / `make app` | exit 0 (95 `test result: ok`) on the second run, the first having failed in `op_nullability.rs`'s plain-boolean list / clean / 0 errors, 4 warnings / `** BUILD SUCCEEDED **` |
+| after the review's fix (the action's pasteboard sender, K8 and its two mutants, documents; no core or graphic file): `make typecheck` / `make app` / `paste_graphic_proof.py` / `capture_spike/inventory.py --check` / `spec_index_proof.py` / `v2_menu.py --only H` | 0 errors, 4 warnings / `** BUILD SUCCEEDED **` / 8/8, exit 0 / 5/5 / 138/138 / 5 pass. `make test` and `make lint` were not run again. The probe's row above and its mutants' table below are that pass's runs |
+
+**The eight core mutants**, each one replacement (anchor asserted once) in a
+scratch copy of `core/` and `graphic/` under
+`tools/proof/work/paste-graphic/core-copy/`, never in the tree, each run
+alone after both controls passed in the copy. 8 of 8 caught.
+
+| Mutant | What failed, as cargo printed it |
+|---|---|
+| the default set gains `graphic` | `a_paste_that_names_no_graphic_group_copies_no_props` (T3), and T10's test |
+| the copy also writes `width` | `naming_graphic_copies_the_props_whole_and_the_target_keeps_the_rest` (T1), and T8's test |
+| the name comparison removed | `a_named_graphic_group_a_side_cannot_serve_is_an_error_and_nothing_changes` (T4) and `skip_missing_skips_what_cannot_take_a_named_group` (T5), and T11's test |
+| the `check_props` call removed | `a_malformed_copied_map_onto_a_matching_clip_is_the_maps_own_sentence` (T6), and T11's test |
+| `skip_missing` read as false | `skip_missing_skips_what_cannot_take_a_named_group` (T5), and T11's test |
+| the default set gains `graphic` only under `skip_missing` | `with_no_groups_skip_missing_changes_nothing_and_copies_no_props` (T10) alone; T3's test still passed |
+| the shape check hoisted above the target loop | `a_copied_map_no_target_takes_is_never_read` (T11) alone |
+| `Kind::Groups`' values lose `"graphic"` (`--test op_table`) | `every_closed_vocabulary_answers_with_its_own_members` |
+
+The runner was a throwaway script in the work folder. Its second run, on a
+copy left by the first, scored the `op_table` control BROKEN: the copy had
+been refreshed with the tree's mtimes, older than the copy's last build (the
+last mutant's), so cargo did not rebuild. The copy is now made without
+mtimes; the table above is the run after that.
+
+**The probe's six mutants**, each an edit to a copy of `app/Sources`
+(rule R: exit 1 caught, 0 survived, 2 not performed). All six exit 1,
+each `scores: 1/2`.
+
+| Mutant | Edit | What failed |
+|---|---|---|
+| `door-no-groups` | the door omits `groups` | K3: B's props stayed `{"legacy":3,"subtitle":"Guest","title":"Bob"}`, no undo step |
+| `door-strict` | the door sends `skipMissing: false` | K3: the props stayed, and an alert sheet came up: `clip 6 is drawn by "title-card" …` |
+| `validator-any-selection` | the arm asks for any selection | K2: a payload with only the text clip selected validated true |
+| `attributes-names-graphic` | ⌥⌘V sends `groups: ["video", "graphic"]` | K5: B's graphic took A's props |
+| `action-empty` | the menu's action has no body | K8: the project did not change; B's props stayed `{"legacy":3,"subtitle":"Guest","title":"Bob"}`, undo still "Opacity" |
+| `action-pastes-attributes` | the action's body is ⌥⌘V's, `pasteAttributes(from:)` over the same sender | K8: the project changed under the step "Paste Attributes"; B's props stayed `{"legacy":3,"subtitle":"Guest","title":"Bob"}`, B did not keep what is outside `graphic`, and A, C and the text clip were not all as they were |
+
+**The MCP proof's two mutants**, each one anchor replaced in a tree copy's
+`AgentServer+Clips.swift` and built by the copy's own `make app`
+(`graphics_files_proof.py`'s rule: exit 0 caught, 1 survived, 2 not
+performed — the OTHER way round from the probe's, each as its pattern has
+it). Both exit 0, `MUTANT PASS`.
+
+| Mutant | Edit | What failed |
+|---|---|---|
+| `handler-drops-skip` | the handler does not pass `skip_missing` | P4, and P5 (6/8) |
+| `groups-without-graphic` | `AgentServer.attributeGroups` loses `"graphic"` | P1, and P3, P4, P5 (4/8); T0 passed, as a control must |
+
+The menu item's one-line action is K8's: `K8 pass` in the 9/9, and `caught —
+K8 failed` from both of its mutants. `action-pastes-attributes` keeps the
+sender so that it reads the private pasteboard and pastes A's look; with the
+default it would read the owner's clipboard. What stays a person's is the
+item chosen by hand over the real clipboard, `docs/manual-checks.md` TL-8
+step 4.
+
+```sh
+cd core && cargo test --release --test paste_graphic                    # 10 passed
+python3 tools/proof/paste_graphic_probe.py                              # 9/9, exit 0 (compiles app/Sources; not in make test)
+python3 tools/proof/paste_graphic_probe.py --mutant door-no-groups      # caught, exit 1 (also door-strict, validator-any-selection, attributes-names-graphic, action-empty, action-pastes-attributes)
+python3 tools/proof/paste_graphic_proof.py                              # 8/8, exit 0 (launches the app in a scratch home; not in make test)
+python3 tools/proof/paste_graphic_proof.py --mutant handler-drops-skip  # MUTANT PASS, exit 0 (builds an app in a tree copy; also groups-without-graphic)
+```

@@ -62,8 +62,8 @@
 //!   `ZoomFit`: closed vocabularies, each carrying its members in
 //!   [`Kind::values`] rather than flattened to a string, because an agent
 //!   picking a legal value out of a schema is a reason this table exists.
-//!   [`Kind::Groups`] is `Vec<Group>`, the one vocabulary arriving as a
-//!   list.
+//!   [`Kind::Groups`] is `Vec<PasteGroup>`, the one vocabulary arriving
+//!   as a list.
 //! - [`Kind::Region`] — `ZoomRegion`, `add_zoom_action`'s four numbers. NOT
 //!   an opaque object: it is a caller-authored object whose members the
 //!   core declares and refuses by name (`edit_zoom.rs`), so a later schema
@@ -93,9 +93,10 @@ pub struct OpRow {
 
 /// One named value an op takes. `required` is the absence of a serde
 /// default on the enum's field. Optional means omission is accepted; it does
-/// not imply that `null` is accepted. The four defaulted plain booleans
-/// (`add_transition.ripple`, both `with_clips` fields, and
-/// `set_canvas.rescale_clips`) default to false when absent and reject null.
+/// not imply that `null` is accepted. The five defaulted plain booleans
+/// (`add_transition.ripple`, `paste_attributes.skip_missing`, both
+/// `with_clips` fields, and `set_canvas.rescale_clips`) default to false
+/// when absent and reject null.
 /// Other optional fields are `Option<T>` and decode absence and null alike.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Argument {
@@ -177,7 +178,7 @@ impl Kind {
             Alignment => &["center", "before", "after"],
             Curve => &["linear", "ease_in", "ease_out", "ease_in_out"],
             Fit => &["fit", "fill"],
-            Groups => &["video", "audio", "text", "shape"],
+            Groups => &["video", "audio", "text", "shape", "graphic"],
             Ticks | Id | Index | Ids | Ranges | Number | Boolean | Text | Texts | Object
             | Color | FrameRate | Region => &[],
         }
@@ -262,7 +263,9 @@ pub const OP_TABLE: [OpRow; OP_COUNT] = [
     op("detach_audio", &[req("clip", Id)]),
     op("duplicate", &[req("clips", Ids)]),
     op("paste", &[req("at", Ticks), opt("track", Id), req("payload", Object)]),
-    op("paste_attributes", &[req("clips", Ids), req("payload", Object), opt("groups", Groups)]),
+    op("paste_attributes",
+       &[req("clips", Ids), req("payload", Object), opt("groups", Groups),
+         opt("skip_missing", Boolean)]),
     op("nest", &[req("clips", Ids), opt("name", Text)]),
     op("unnest", &[req("clip", Id)]),
     op("set_video", &[req("clips", Ids), req("patch", Object)]),

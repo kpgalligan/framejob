@@ -126,9 +126,12 @@ schema, §6 the op table, §7 the architecture.
   in the same container go quiet, and mute still wins), and Paste
   Attributes (⌥⌘V: the copied clip's look onto the selection, each group
   replaced whole, a text clip keeping its words and a shape its kind and
-  size). Every edit is a pure op in the Rust core returning a new
-  immutable project handle, so undo is a stack of handles and a refused
-  edit costs nothing.
+  size), with Edit ▸ Paste Graphic Properties beside it for what ⌥⌘V
+  leaves alone: a copied graphic's properties, its text and colours
+  included, onto every selected clip drawn by the same graphic, each
+  keeping its own size, in point and length. Every edit is a pure op in the
+  Rust core returning a new immutable project handle, so undo is a stack of
+  handles and a refused edit costs nothing.
 - **The screencast trio.** **Remove Silences** (Clip ▸ Remove Silences…)
   finds the dead air — Judge by Voice or Level, threshold, minimum length
   and padding, over the selected clips or everything audible — shades the

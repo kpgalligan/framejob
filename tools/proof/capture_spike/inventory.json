@@ -246,6 +246,13 @@
    ],
    "note": "an edit"
   },
+  "pasteGraphicProperties:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+Clipboard.swift `func pasteGraphicProperties(`"
+   ],
+   "note": "an edit"
+  },
   "duplicateClips:": {
    "verdict": "none",
    "code": [

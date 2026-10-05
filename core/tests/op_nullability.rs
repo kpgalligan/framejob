@@ -5,8 +5,9 @@ use common::{Handle, Outcome};
 use reelcut_core::op_table::{Kind, OpRow, OP_TABLE};
 use serde_json::{json, Value};
 
-const PLAIN: [(&str, &str); 4] = [
+const PLAIN: [(&str, &str); 5] = [
     ("add_transition", "ripple"),
+    ("paste_attributes", "skip_missing"),
     ("remove_track", "with_clips"),
     ("remove_media", "with_clips"),
     ("set_canvas", "rescale_clips"),
@@ -78,7 +79,7 @@ fn every_optional_field_has_its_real_null_contract() {
             }
         }
     }
-    assert_eq!(seen.len(), 64, "optional inventory changed");
+    assert_eq!(seen.len(), 65, "optional inventory changed");
     for field in PLAIN {
         assert!(seen.contains(&field), "missing plain bool {field:?}");
     }

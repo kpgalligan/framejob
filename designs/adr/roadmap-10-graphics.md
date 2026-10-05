@@ -303,7 +303,6 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   engine's own sentence says so.
 - **Deliberately not built** (orig §7):
   - keyframed props (G-10) — wanted, #239;
-  - `paste_attributes` for graphics;
   - HEVC with alpha (ProRes 4444 and APNG already carry alpha);
   - mattes or video input to a graphic — wanted, #240;
   - system fonts as an opt-in — CLOSED by the owner 2026-10-04: Add Font to
@@ -317,7 +316,9 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   Built since, and so off this list: a revision history and
   `delete_graphic` / `rename_graphic` (issue batch B84, spec §11
   G-27..G-29), path helpers (issue batch B85 phase 1, spec §11 G-31:
-  `graphic/src/path.js`), and named CSS colours and `hsl()` in a `color` prop and in
+  `graphic/src/path.js`), `paste_attributes` for graphics (issue batch B85
+  phase 2, spec §11 G-32: the `graphic` group and Edit ▸ Paste Graphic
+  Properties), and named CSS colours and `hsl()` in a `color` prop and in
   `interpolateColors` (#219: `core/src/model_color.rs`,
   `docs/graphics-api.md`'s schema table and `interpolateColors` section).
 - **The watcher:** each module, font and asset file has its own source, but
@@ -799,6 +800,97 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   `graphics_path_proof.py` 6/6 again. `make typecheck` was not run again:
   no Swift or helper file is in the pass.
 
+  Issue batch B85, phase 2 (2026-10-05, #103; spec §11 G-32, amending
+  G-10's paste sentence) built the not-built list's `paste_attributes`
+  for graphics. `paste_attributes` takes a fifth group, `graphic`, that
+  copies the payload clip's `graphic.props` whole onto clips drawn by the
+  SAME module — the target keeps its name, size, `in` and `length` — and
+  a flag, `skip_missing`, that drops a named group the payload clip lacks
+  and skips a target that cannot take one instead of refusing the call.
+  `graphic` is never in the default set, so ⌥⌘V and a tool call with no
+  `groups` do what they did (the owner, 2026-10-04: props hold a
+  graphic's words as well as its look). The person's door is a new item,
+  Edit ▸ Paste Graphic Properties, directly under Paste Attributes with no
+  key: one op, `groups: ["graphic"]` with `skip_missing`, the undo step
+  "Paste Graphic Properties"; it is enabled when Reelcut clips are on the
+  clipboard and a graphic is selected, and beeps when nothing takes the
+  props. The copied map is checked for shape only, the first time a
+  target takes it, so a paste nothing takes never reads it.
+  The phase opened with a pure move, gated alone: `paste_attributes`, its
+  two helpers and its doc section left `core/src/edit_paste.rs` (593
+  lines) for a new `edit_paste_attributes.rs` (467 and 143 at the gate:
+  `cargo fmt --check`, `cargo test --release` 73 `test result: ok` with
+  1,014 passed, `make lint` clean); the group is a paste-only enum,
+  `PasteGroup`, and `patch::Group` gained no variant. The clipboard
+  extension's readers and writers now take their pasteboard as a
+  parameter, the general one by default, so the probe below never
+  touches the owner's clipboard. No FFI export, no format bump, no new op
+  and no new tool: no count moved.
+  What the runs printed. `cargo test --release` in `core/`: 74 `test
+  result: ok`, 1,025 passed, 0 failed; the new `core/tests/paste_graphic.rs`
+  10 passed (T1–T8, T10, T11), `op_default_booleans.rs` 5 passed (T9).
+  Eight core mutants, each one replacement in a scratch copy of `core/`
+  and `graphic/` under `tools/proof/work/paste-graphic/core-copy/`, each
+  run alone after a control that passed: the default set gaining
+  `graphic` failed
+  `a_paste_that_names_no_graphic_group_copies_no_props` (and the
+  no-groups-under-the-flag test); the copy also writing `width` failed
+  `naming_graphic_copies_the_props_whole_and_the_target_keeps_the_rest`
+  (and the nest test); the name comparison removed failed
+  `a_named_graphic_group_a_side_cannot_serve_is_an_error_and_nothing_changes`
+  and `skip_missing_skips_what_cannot_take_a_named_group` (and the
+  unread-map test); `check_props` removed failed
+  `a_malformed_copied_map_onto_a_matching_clip_is_the_maps_own_sentence`
+  (and the unread-map test); `skip_missing` read as false failed
+  `skip_missing_skips_what_cannot_take_a_named_group` (and the unread-map
+  test); the default set gaining `graphic` only under the flag failed
+  `with_no_groups_skip_missing_changes_nothing_and_copies_no_props` alone,
+  the no-groups test still passing; the shape check hoisted above the
+  target loop failed `a_copied_map_no_target_takes_is_never_read` alone;
+  and `Kind::Groups`' values losing `"graphic"` failed `op_table`'s
+  `every_closed_vocabulary_answers_with_its_own_members`. 8 of 8 caught.
+  `paste_graphic_probe.py` (the menu door, compiled from `app/Sources`,
+  every Copy and paste over a private pasteboard) 9/9: K0–K8, the general
+  pasteboard's `changeCount` 2480 at start and at end; its six mutants
+  each caught (1/2, exit 1) — `door-no-groups` and `door-strict` failed
+  K3, `validator-any-selection` K2, `attributes-names-graphic` K5,
+  `action-empty` and `action-pastes-attributes` K8.
+  `paste_graphic_proof.py` (the tool over MCP, its own instance in a
+  scratch home) 8/8: H0, T0, P1–P5, Z1; its two mutants, each an app built
+  in a tree copy, `MUTANT PASS` — `handler-drops-skip` failed P4 (and
+  P5), `groups-without-graphic` failed P1 (and P3–P5) while T0, a
+  control, passed, as designed. On one instance in a scratch home, its log
+  holding no `Reelcut: ` line: `clip_catalog_proof.py` 24/24,
+  `op_catalog_proof.py` 23/23, `phase2_proof.py` 86/86. `v2_menu.py --only
+  H` 5 pass, `op_schema_probe.py` 28/28, `inventory.py --check` 5/5,
+  `spec_index_proof.py` 138/138. `make test` exit 0 (95 `test result:
+  ok`) on its second run — the first failed in
+  `core/tests/op_nullability.rs`, which holds the list of plain booleans
+  and now names `paste_attributes.skip_missing` as the fifth — `make
+  lint` clean, `make typecheck` 0 errors and the 4 warnings, `make app`
+  built. `AgentServer+Clips.swift` and `AgentCatalog+Clips.swift`, both
+  over the cap, ended at the 856 and 801 lines they began at.
+  The phase's review found the menu's one-line action,
+  `pasteGraphicProperties(_:)`, held by the typecheck alone: emptied, or
+  given ⌥⌘V's body, it passed every row. The action now reads a
+  pasteboard SENDER in place of the general pasteboard (a menu sends its
+  `NSMenuItem`, so the app still reads the general one), and K8 sends
+  `pasteGraphicProperties:` to the controller with the private pasteboard
+  as its sender and holds K3's claims: `K8 pass`, B's props equal to A's,
+  the undo step "Paste Graphic Properties", in the 9/9 above. Its two
+  mutants each printed `caught — K8 failed`: with the body emptied the
+  project did not change, and with ⌥⌘V's body over the same sender it
+  changed under the step "Paste Attributes", B keeping its own props and
+  not what is outside `graphic`.
+  After that fix — Swift, the probe and documents, no core or graphic
+  file — `make typecheck` (0 errors, the 4 warnings), the probe and its
+  six mutants, `make app` (built), `paste_graphic_proof.py` (8/8),
+  `inventory.py --check` (5/5), `spec_index_proof.py` (138/138) and
+  `v2_menu.py --only H` (5 pass) ran again; `make test` and `make lint`
+  did not. Owed: the person's check, TL-8 step 4 in
+  `docs/manual-checks.md`; and by the batch's last phase, HEVC with alpha
+  as an export row (phase 3).
+
 ## Open items
 
 - G6's rest — playback prefetch, in-place raster (`graphic/src/raster.rs`)
@@ -813,8 +905,8 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   - `validate` accepts a graphic clip with no description.
 
   Tracked in #72.
-- The not-built list: `paste_attributes` and HEVC with alpha — tracked in
-  #103; keyframed props — #239; mattes or video input — #240.
+- The not-built list: HEVC with alpha — tracked in #103; keyframed props —
+  #239; mattes or video input — #240.
 - Replacing QuickJS with JavaScriptCore — GitHub issue #39.
 
 ## Where to look in the original

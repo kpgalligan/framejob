@@ -88,7 +88,9 @@ transparent canvas reachable and JPEG cannot carry one — it flattens onto
 black. One writer serves the menu item and `render_frame` alike
 (`FrameWriter.swift`), which is what makes the two produce the same bytes for
 one frame rather than merely being meant to)),
-Edit (Undo, Redo, Cut, Copy, Paste, Paste Attributes, Duplicate, Delete,
+Edit (Undo, Redo, Cut, Copy, Paste, Paste Attributes, Paste Graphic
+Properties (no key equivalent; the copied graphic's props onto the selected
+clips drawn by the same graphic, §11 G-32), Duplicate, Delete,
 Ripple Delete, Insert at Playhead, Overwrite at Playhead, Select All,
 Select After Playhead, Select All on Track), Clip (Split, Trim Start, Trim
 End, Freeze Frame, Detach Audio, Normalize (road map 2's phase 5, beside

@@ -637,19 +637,27 @@ extension ReelOp {
     /// `clips` — ⌥⌘V. Earliest by start, at one start the front-most
     /// track and then the lower id; never the array's first, which is
     /// Copy's creation order. `payload` is the same Copy payload `paste` takes.
-    /// `groups` names which of `video`, `audio`, `text` and `shape` travel;
-    /// omitted, every group BOTH sides have does, silently skipping the rest,
-    /// where a named group either side lacks is an error. Video and audio
-    /// paste whole, text keeps its content, a shape keeps its kind and
-    /// geometry; speed, enabled, actions, the transition and the clip's own
-    /// name and label stay. Refuses when nothing changes.
+    /// `groups` names which of the five groups travel — `video`, `audio`,
+    /// `text`, `shape` and `graphic`; omitted, each of the FIRST FOUR both
+    /// sides have does, silently skipping the rest and never `graphic`, where
+    /// a named group either side lacks is an error. Video and audio paste
+    /// whole, text keeps its content, a shape keeps its kind and geometry,
+    /// and `graphic` copies the props whole between clips drawn by one
+    /// module, the target keeping its module, size, in point and length
+    /// (spec §11 G-32); speed, enabled, actions, the transition and the
+    /// clip's own name and label stay. `skipMissing` (with `groups` named)
+    /// drops a named group the payload clip lacks and skips a target that
+    /// cannot take one, instead of the error — Edit ▸ Paste Graphic
+    /// Properties sends it. An identity when nothing changes.
     static func pasteAttributes(
-        clips: [UInt32], payload: [String: Any], groups: [String]? = nil
+        clips: [UInt32], payload: [String: Any], groups: [String]? = nil,
+        skipMissing: Bool? = nil
     ) -> ReelOp {
         var a = OpArgs()
         a.put("clips", clips)
         a.put("payload", payload)
         a.put("groups", groups)
+        a.put("skip_missing", skipMissing)
         return ReelOp(name: "paste_attributes", args: a.values)
     }
 

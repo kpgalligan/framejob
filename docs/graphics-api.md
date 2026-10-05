@@ -373,7 +373,9 @@ Read `graphic_reference` once. `write_graphic {name, source}` answers `ok` and
 draws up to 16 frames on a contact sheet with no clip, at most 134217728
 pixels of frames in all (two at 8192×8192, or sixteen at 3840×2160);
 `add_graphic_clip {name}` places it, `render_frame` shows a frame,
-`set_graphic {patch: {props}}` changes it. `import_graphic_font {path}` answers `families`, the exact names
+`set_graphic {patch: {props}}` changes it.
+`paste_attributes {clips, payload, groups: ["graphic"]}` copies one clip's props onto other clips
+drawn by the same module. `import_graphic_font {path}` answers `families`, the exact names
 `font-family` must say; `import_graphic_asset {path}` adds a picture for
 `asset(name)`; its `name` is the one to use, and `renamed_from` says it was
 renamed. `get_graphic` reads a module or names the folder, which your file

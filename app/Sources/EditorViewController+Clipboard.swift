@@ -1,16 +1,21 @@
 import AppKit
 
 /// Edit ▸ Cut / Copy / Paste / Paste Attributes (⌘X, ⌘C, ⌘V, ⌥⌘V) — the
-/// four menu items `EditorViewController.swift` forwards here.
+/// four menu items `EditorViewController.swift` forwards here — and the
+/// fifth, Edit ▸ Paste Graphic Properties, whose action is this file's own.
 ///
 /// The clipboard is one pasteboard type and two ops that read it. Copy writes
 /// the selection as the `paste` op's payload (the module doc of
 /// `core/src/edit_paste.rs` is its schema) under `com.kgalligan.reelcut.clips`;
 /// Paste hands that payload straight back to the core, which does all the
 /// deciding — fresh ids, media matched by path, the overlap rule, the frame
-/// grid — and Paste Attributes hands the SAME payload to `paste_attributes`,
-/// which reads only its earliest clip's property groups. Nothing about a clip is
-/// interpreted on this side.
+/// grid — and Paste Attributes and Paste Graphic Properties hand the SAME
+/// payload to `paste_attributes`, which reads only its earliest clip's
+/// property groups. Nothing about a clip is interpreted on this side.
+///
+/// **Every reader and writer takes its pasteboard as a parameter**, the
+/// general one by default, so a probe can drive Copy and both pastes over a
+/// private pasteboard and never touch the owner's clipboard.
 ///
 /// Two decisions worth stating, because neither is forced:
 ///
@@ -35,14 +40,15 @@ extension EditorViewController {
 
     // MARK: - Copy
 
-    /// ⌘C. Writes the selection to the general pasteboard, with a short human
-    /// summary as the plain-text fallback — pasting into a text editor should
-    /// say what was copied, not spill a project.
+    /// ⌘C. Writes the selection to the pasteboard (the general one, unless a
+    /// probe names its own), with a short human summary as the plain-text
+    /// fallback — pasting into a text editor should say what was copied, not
+    /// spill a project.
     ///
     /// Returns whether anything was written, so Cut can stop before it deletes
     /// something it failed to copy.
     @discardableResult
-    func copySelection() -> Bool {
+    func copySelection(to pasteboard: NSPasteboard = .general) -> Bool {
         guard let document = document, !document.selection.isEmpty,
               let payload = clipboardPayload(for: document),
               JSONSerialization.isValidJSONObject(payload),
@@ -52,7 +58,6 @@ extension EditorViewController {
             NSSound.beep()
             return false
         }
-        let pasteboard = NSPasteboard.general
         // `declareTypes` clears the pasteboard and takes ownership in one
         // call, which is the documented pairing for `setData(_:forType:)`.
         pasteboard.declareTypes([Self.clipsPasteboardType, .string], owner: nil)
@@ -178,9 +183,9 @@ extension EditorViewController {
     /// presented. There is no group picker here: the default rule is what
     /// ⌥⌘V has always meant in a cutting room, and the agent's tool
     /// (`paste_attributes`) takes `groups` for anyone who needs the choice.
-    func pasteAttributes() {
+    func pasteAttributes(from pasteboard: NSPasteboard = .general) {
         guard let document = document, !document.selection.isEmpty,
-              let payload = pasteboardPayload()
+              let payload = pasteboardPayload(on: pasteboard)
         else {
             NSSound.beep()
             return
@@ -190,11 +195,44 @@ extension EditorViewController {
             .pasteAttributes(clips: Array(document.selection), payload: payload))
     }
 
+    // MARK: - Paste Graphic Properties
+
+    /// Edit ▸ Paste Graphic Properties (spec §11 G-32), which has no key. A
+    /// menu sends its `NSMenuItem`, so the app reads the general pasteboard;
+    /// a probe sends this action a private pasteboard as its sender, which
+    /// is how the line below is measured and not only typechecked.
+    @objc func pasteGraphicProperties(_ sender: Any?) {
+        pasteGraphicProps(from: sender as? NSPasteboard ?? .general)
+    }
+
+    /// The copied graphic's props — all of them, its words included — onto
+    /// every selected clip drawn by the SAME graphic; each keeps its own
+    /// size, in point and length. ONE op, and nothing about the payload is
+    /// read here: `groups: ["graphic"]` names the group ⌥⌘V never carries,
+    /// and `skipMissing` makes the core skip a selected clip that cannot take
+    /// it rather than refuse the paste. So when the copied clip is not a
+    /// graphic, or no selected clip is drawn by the same one, the answer is
+    /// an identity — `applyEdit`'s beep — and copied props the core will not
+    /// store, onto a clip that takes them, are its sentence in an alert.
+    func pasteGraphicProps(from pasteboard: NSPasteboard = .general) {
+        guard let document = document, !document.selection.isEmpty,
+              let payload = pasteboardPayload(on: pasteboard)
+        else {
+            NSSound.beep()
+            return
+        }
+        document.applyEdit(
+            "Paste Graphic Properties",
+            .pasteAttributes(
+                clips: Array(document.selection), payload: payload,
+                groups: ["graphic"], skipMissing: true))
+    }
+
     /// The payload on the pasteboard, or nil when there is nothing of ours
     /// there to paste — an empty pasteboard, another app's content, or a
     /// payload with no clips in it.
-    private func pasteboardPayload() -> [String: Any]? {
-        guard let data = NSPasteboard.general.data(forType: Self.clipsPasteboardType),
+    private func pasteboardPayload(on pasteboard: NSPasteboard = .general) -> [String: Any]? {
+        guard let data = pasteboard.data(forType: Self.clipsPasteboardType),
               let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let clips = payload["clips"] as? [Any], !clips.isEmpty
         else { return nil }
@@ -204,25 +242,33 @@ extension EditorViewController {
     /// Whether ⌘V has anything to do. Only the TYPE is inspected, not the
     /// bytes: this runs on every menu validation, and reading a pasteboard's
     /// available types is cheap where decoding its data is not.
-    var canPasteClips: Bool {
-        NSPasteboard.general.availableType(from: [Self.clipsPasteboardType]) != nil
+    func canPasteClips(on pasteboard: NSPasteboard = .general) -> Bool {
+        pasteboard.availableType(from: [Self.clipsPasteboardType]) != nil
     }
 
     // MARK: - Validation
 
     /// The half of `validateUserInterfaceItem` this file owns. nil means "not
     /// mine" and leaves the base file's answer alone.
-    func validateClipboardAction(_ action: Selector) -> Bool? {
+    func validateClipboardAction(
+        _ action: Selector, pasteboard: NSPasteboard = .general
+    ) -> Bool? {
         guard let document = document else { return false }
         switch action {
         case #selector(cut(_:)), #selector(copy(_:)):
             return !document.selection.isEmpty
         case #selector(paste(_:)):
-            return canPasteClips
+            return canPasteClips(on: pasteboard)
         case #selector(pasteAttributes(_:)):
             // Paste needs no selection (the clips land at the playhead);
             // Paste Attributes needs something to paste ONTO.
-            return canPasteClips && !document.selection.isEmpty
+            return canPasteClips(on: pasteboard) && !document.selection.isEmpty
+        case #selector(pasteGraphicProperties(_:)):
+            // Something of ours to read and a graphic to paste onto. WHAT was
+            // copied is not read here (the bytes, on every menu validation):
+            // a copied clip that is not a graphic is the item's beep (G-32).
+            return canPasteClips(on: pasteboard)
+                && selectedClips.contains { $0.source == .graphic && $0.graphic != nil }
         default:
             return nil
         }

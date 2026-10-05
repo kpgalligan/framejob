@@ -151,9 +151,9 @@ the same way.
 - **Source:** #48, #69.
 
 **TL-8 — Labels, solo and Paste Attributes**
-- **Do:** 1. Clip ▸ Label ▸ Blue, then None. 2. Click a track's headphones toggle at S, M and L height; watch Track ▸ Solo. 3. Copy a clip, select another, Edit ▸ Paste Attributes (⌥⌘V); try it between a video and an audio-only clip.
-- **Expect:** a blue dot on the strip and header, cleared by None; the headphones match eye, speaker and lock at every height and Solo's checkmark follows; paste restyles, and beeps when the clips share no group.
-- **Source:** #48.
+- **Do:** 1. Clip ▸ Label ▸ Blue, then None. 2. Click a track's headphones toggle at S, M and L height; watch Track ▸ Solo. 3. Copy a clip, select another, Edit ▸ Paste Attributes (⌥⌘V); try it between a video and an audio-only clip. 4. Copy a graphic clip; select another clip drawn by the same graphic and a video clip; Edit ▸ Paste Graphic Properties; then ⌥⌘V.
+- **Expect:** a blue dot on the strip and header, cleared by None; the headphones match eye, speaker and lock at every height and Solo's checkmark follows; paste restyles, and beeps when the clips share no group; the second graphic shows the first's text and colours at its own size and length, the video clip is unchanged; ⌥⌘V then copies position and opacity and not the text.
+- **Source:** #48, #103.
 
 **TL-9 — Region mode**
 - **Do:** 1. Select a video clip, press Z, drag a band on the canvas; hold ⇧ during a second drag. 2. End the mode with Z, Esc, a selection change, and the chroma eyedropper in turn. 3. Press ⇧Z. 4. Use Place on Canvas until four regions exist. 5. Obscure a face with a region; view at 100 %.

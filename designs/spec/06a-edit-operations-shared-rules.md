@@ -15,12 +15,13 @@ preset's two edge durations and its `during` period, and a text animation's
 names the number the caller sent.
 
 An optional op argument may be omitted; this alone does not make JSON `null`
-valid. `add_transition.ripple`, both `with_clips` arguments and
-`set_canvas.rescale_clips` are plain booleans: omission means `false`, while
-`null` is a decode error. Every other optional core enum field is `Option<T>`
-and decodes absence and null alike. The separate `scope` envelope key accepts
-absence or null; a present value must be a nest id. The app's MCP schemas may
-apply stricter present-value rules for transition arguments (§7.9).
+valid. `add_transition.ripple`, `paste_attributes.skip_missing`, both
+`with_clips` arguments and `set_canvas.rescale_clips` are plain booleans:
+omission means `false`, while `null` is a decode error. Every other optional
+core enum field is `Option<T>` and decodes absence and null alike. The
+separate `scope` envelope key accepts absence or null; a present value must
+be a nest id. The app's MCP schemas may apply stricter present-value rules
+for transition arguments (§7.9).
 
 **How to read a "refuses" in §6b and §6c.** An op the core understood answers one of
 three ways (§5.5): it applies, it is an **identity**, or a rule **refuses**
