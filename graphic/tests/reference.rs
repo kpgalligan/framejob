@@ -1,6 +1,7 @@
 //! The reference an agent reads, `docs/graphics-api.md` (road map 10 §5i),
 //! evaluated so it cannot rot away from the engine: every ```` ```js ````
-//! block runs, every standard-library name is in it, every bundled family
+//! block runs, every standard-library name is in it (the globals its three
+//! sources declare: `stdlib.js`, `noise.js` and `path.js`), every bundled family
 //! is named, the sandbox's three sentences are quoted word for word, and the
 //! schema limits it and its typings state are the engine's `MAX_PROPS`,
 //! `MAX_STRING` and `MAX_OPTIONS`.
@@ -21,9 +22,10 @@ use common::{shared, BUDGET_MS};
 
 const DOC: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../docs/graphics-api.md");
 const TYPINGS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../docs/graphics-api.d.ts");
-const SOURCES: [&str; 2] = [
+const SOURCES: [&str; 3] = [
     concat!(env!("CARGO_MANIFEST_DIR"), "/src/stdlib.js"),
     concat!(env!("CARGO_MANIFEST_DIR"), "/src/noise.js"),
+    concat!(env!("CARGO_MANIFEST_DIR"), "/src/path.js"),
 ];
 const SANDBOX: [&str; 3] = [
     "Math.random is not available; use random(seed)",

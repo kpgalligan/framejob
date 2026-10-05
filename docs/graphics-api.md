@@ -171,6 +171,43 @@ const drift = noise2D("wave", frame / 60, 0) * 40;
 const wobble = noise3D(7, 0.5, 0.5, ctx.time) * 20;
 ```
 
+### Paths: `getLength(d)`, `getPointAtLength(d, length)` and `evolvePath(progress, d)`
+
+`d` is SVG path data: every command (`M L H V C S Q T A Z`) and its
+relative form. `getLength` answers the path's length, curves and arcs
+measured to within about 0.01 %. `getPointAtLength` answers `{x, y, angle}`:
+the point that far along the path (`length` is clamped to the path) and the
+way the path is heading there, in degrees, ready for `rotate()`.
+`evolvePath` answers `{strokeDasharray, strokeDashoffset}` for a `progress`
+of 0–1: put both on the `<path>` and it is drawn from its start up to that
+fraction. Its dash is 0.1 % longer than the measured length, so a closed
+outline closes at 1.
+
+A path of several pieces (more than one `M`) draws them all at once, each
+from its own start and at the same speed, the longest finishing at 1; pieces
+drawn one after another are one `<path>` each. A path that cannot be read
+throws, naming where reading stopped —
+`getLength: cannot parse the path at character 6: "X 5 5"` — and is never a
+silent zero. A number too large to do arithmetic with (`1e999`, or a line
+1e200 long, whose square overflows) is refused in the same sentence, so no
+answer is ever `Infinity` or `NaN`.
+
+The paths a graphic measures are remembered, so the same `d` costs a lookup
+on later calls and frames — up to 32 paths, and about 50,000 characters and
+measured pieces between them (a curve is 64 pieces). Past either limit all
+are forgotten and measured again when next asked for, so with paths that
+large take every length and point from one before turning to the next.
+
+```js
+const d = `M 200 ${ctx.height / 2} C 600 100 1000 900 1400 ${ctx.height / 2}`;
+const total = getLength(d);
+const tip = getPointAtLength(d, total * ctx.progress);
+const dash = evolvePath(ctx.progress, d);
+const line = `<path d="${d}" fill="none" stroke="#ffffff" stroke-width="8"
+  stroke-dasharray="${dash.strokeDasharray}" stroke-dashoffset="${dash.strokeDashoffset}"/>
+  <circle cx="${tip.x}" cy="${tip.y}" r="12" fill="#ffcc00"/>`;
+```
+
 ### `measureText(text, font)`
 
 `font` is `{family, size, weight, style, letterSpacing, xmlSpace}`
@@ -439,19 +476,44 @@ export function render(frame, props, ctx) {
 
 ### A draw-on stroke
 
-Give the path a known length (or overestimate it), dash it that long, and
-move the dash offset from the length to 0.
+`evolvePath` measures the path and answers the dash that draws it up to a
+progress of 0–1.
 
 ```js
 export const meta = { name: "Underline", durationInFrames: 60 };
 export const schema = { color: { type: "color", default: "#ff5a36" } };
 
 export function render(frame, props, ctx) {
-  const length = ctx.width * 0.6;
-  const drawn = interpolate(frame, [0, 24], [length, 0], { easing: Easing.inOutCubic, clamp: true });
   const y = ctx.height * 0.62;
-  return svg(ctx, `<path d="M ${ctx.width * 0.2} ${y} h ${length}" stroke="${props.color}"
+  const d = `M ${ctx.width * 0.2} ${y} q ${ctx.width * 0.3} ${ctx.height * 0.05} ${ctx.width * 0.6} 0`;
+  const drawn = interpolate(frame, [0, 24], [0, 1], { easing: Easing.inOutCubic, clamp: true });
+  const dash = evolvePath(drawn, d);
+  return svg(ctx, `<path d="${d}" stroke="${props.color}"
     stroke-width="${ctx.height / 90}" stroke-linecap="round" fill="none"
-    stroke-dasharray="${length} ${length}" stroke-dashoffset="${drawn}"/>`);
+    stroke-dasharray="${dash.strokeDasharray}" stroke-dashoffset="${dash.strokeDashoffset}"/>`);
+}
+```
+
+### Follow a path
+
+`getPointAtLength` answers where the path is and which way it is heading;
+`rotate(angle)` turns an arrowhead drawn pointing right to match.
+
+```js
+export const meta = { name: "Arrow", durationInFrames: 60 };
+export const schema = { color: { type: "color", default: "#ffffff" } };
+
+export function render(frame, props, ctx) {
+  const w = ctx.width;
+  const h = ctx.height;
+  const d = `M ${w * 0.2} ${h * 0.7} C ${w * 0.4} ${h * 0.2} ${w * 0.6} ${h * 0.2} ${w * 0.8} ${h * 0.5}`;
+  const drawn = interpolate(frame, [0, 30], [0, 1], { easing: Easing.inOutCubic, clamp: true });
+  const dash = evolvePath(drawn, d);
+  const tip = getPointAtLength(d, getLength(d) * drawn);
+  const s = h / 36;
+  return svg(ctx, `<path d="${d}" stroke="${props.color}" stroke-width="${h / 120}" fill="none"
+    stroke-dasharray="${dash.strokeDasharray}" stroke-dashoffset="${dash.strokeDashoffset}"/>
+    <path d="M ${-s} ${-s * 0.6} L ${s * 0.5} 0 L ${-s} ${s * 0.6} Z" fill="${props.color}"
+    transform="translate(${tip.x} ${tip.y}) rotate(${tip.angle})"/>`);
 }
 ```

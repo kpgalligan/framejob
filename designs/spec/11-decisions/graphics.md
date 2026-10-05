@@ -870,3 +870,118 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   **Risk accepted:** a person reads a tool's hint in a refusal. A second
   wording for people would be a second spelling of every sentence to keep
   in step with the first.
+- **G-31 — The standard library measures a path: `getLength`,
+  `getPointAtLength` and `evolvePath`, in JavaScript, a curve as 64
+  chords, a draw-on dashed by the longest subpath** (issue #103,
+  2026-10-05, issue batch B85, phase 1).
+  (a) **The names.** `getLength(d)` answers a number, `getPointAtLength(d,
+  length)` answers `{x, y, angle}` and `evolvePath(progress, d)` answers
+  `{strokeDasharray, strokeDashoffset}`. The three names and their
+  argument orders are Remotion's, which an agent already knows, as the
+  rest of the library's are (G-2); none of its code, nor any other
+  library's, is carried over. The heading comes with the point, in
+  degrees as SVG's `rotate()` takes them, rather than from a fourth
+  function.
+  (b) **What is measured.** `d` is read as `String(d)`: `M L H V C S Q T A
+  Z` in both cases, implicit repeats (the pairs after an `M` are `L`),
+  SVG's number grammar (`.5.5`, `1e2`, `-1-1`, commas optional) and arc
+  flags written without separators (`a50 50 0 01100 0`). `S` and `T`
+  reflect the previous control point only after a curve of their own
+  family, else the current point. An arc with a zero radius is a line;
+  radii too small for the chord are scaled up, and the centre
+  conversion's radicand is clamped at 0, so a length is never NaN. A
+  SUBPATH begins at each `M`/`m` and at the first drawing command after a
+  `Z`/`z`, from that subpath's start point. `getLength` is the sum over
+  every subpath, a `Z` adding its closing line and a move adding nothing;
+  an empty string is 0.
+  (c) **The point and the heading.** `length` is `Number(length)`, NaN
+  read as 0, clamped to 0…total. The point is on the true curve, not on a
+  chord. `angle` is `Math.atan2(dy, dx) * 180 / Math.PI` of the curve's
+  own derivative there (y down); at a joint it is the segment ending
+  there, at 0 the first drawn segment's start, and a zero-length segment
+  gives no heading. Where the derivative is (0, 0) on a segment of
+  non-zero length the heading is the tangent's LIMIT: at the segment's
+  start, the direction from the start to the first later control point
+  (or end) that differs from it; at its end, the direction to the end
+  from the last earlier control point (or start) that differs from it; at
+  an interior parameter (a cubic's cusp), the direction of the chord the
+  point lies on. A path with no drawn length answers its last `M` point
+  (or 0, 0) with `angle: 0`.
+  (d) **The draw-on.** `progress` is `Number(progress)`, NaN read as 0,
+  clamped to 0…1. With `D = L × 1.001`, `L` being the length of the
+  LONGEST subpath, the answer is `{strokeDasharray: "D D",
+  strokeDashoffset: D × (1 − progress)}`, and `{strokeDasharray: "none",
+  strokeDashoffset: 0}` when `L` is 0. The pad is there so a closed
+  outline always closes at progress 1 although the measure is a
+  flattening; mid-way the tip is at most 0.1 % ahead. The longest subpath
+  and not the total, because the rasterizer restarts the dash on each
+  subpath (`tiny-skia-path` 0.12.0's `dash.rs` walks the contours, each
+  from the pattern's first interval): a dash as long as the total would
+  draw a short subpath too slowly, and no single dash can draw the
+  subpaths one after another. So every subpath draws from its own start
+  at once and at the same speed, the longest ending at progress 1; pieces
+  drawn in turn are one `<path>` each, which the reference says.
+  (e) **The two errors**, thrown as `Error`s, `<fn>` being the function
+  the module called: `<fn>: cannot parse the path at character <i>:
+  "<d.slice(i, i + 12)>"` — an unknown command, a path that does not
+  begin with `M`/`m`, a number where none can be read, an arc flag that
+  is not `0` or `1`, a number that is not finite, `<i>` the 0-based index
+  — and `<fn>: the path ends inside a command`, when the data ran out
+  while a command still wanted numbers. A path that cannot be read is
+  never a silent zero.
+  **Not finite is a refusal, not an answer**: no helper ever answers
+  `Infinity` or NaN, and a path that would make one do so is refused in
+  the first sentence. Five checks in `path.js` hold it, each with a case
+  in `path.test.js`'s row `T8 a number that is not finite`. At the
+  number's own character: a number that reads as `Infinity` (`1e999`). At
+  the character where its command, or its repeat of one, begins: a move
+  to a point that is not finite (`M 1e308 0 m 1e308 0`); an arc whose
+  centre form is not, which is radii whose squares overflow (`A 1e300
+  1e300 …`) or end points so close that theirs underflow (`M 0 0 A 1 1 0
+  0 1 1e-200 0`) — unchecked, each was answered as a path with nothing
+  drawn, the silent zero; a segment that takes the running length out of
+  a double's range, which is a point past the largest number or a chord
+  whose square is (`H 1e200`, or the diagonal that closes `M 0 0 H 1.2e154
+  V 1.2e154 Z`, while the same path at 1e153 measures); and, asked of
+  `getPointAtLength` alone, a point that is not finite between two
+  measured points that are — a curve one step under the largest double,
+  whose length `getLength` answers. The length is checked padded, so
+  `evolvePath`'s dash is finite whenever the length is. The sentence says
+  "cannot parse" of a number that was read: one sentence for every path
+  the helpers will not answer was preferred to a third.
+  (f) **The tolerance.** A path is measured as its flattening: a line
+  exactly, each `C S Q T` as 64 chords at uniform parameter, each arc as
+  chords of at most π/128 rad of sweep. That is within 0.01 % (1e-4
+  relative) on the reference shapes, whose lengths are closed forms: a
+  circle of radius 500 (2π·500), the ellipse of radii 200 and 100
+  (4a·E(e), 968.8448220547675) plain and rotated 30°, the parabola
+  y = x² from −1 to 1 (√5 + asinh(2)/2) as a `Q` and as a `C`, and the
+  cusp x = t², y = t³ ((13√13 − 8)/27). Exact formulas exist only for
+  some curves and would cost much more code.
+  (g) **The memo.** The last paths measured are kept per engine, keyed by
+  the `d` string. A path's cost is its chord count plus `d.length`;
+  before an insert that would take the memo past 32 paths or past a total
+  cost of 50,000 the memo is cleared whole, and the new path is then kept
+  — so a path over the cost bound on its own is kept alone until the next
+  insert, and its own calls in a render do not re-measure it. An engine's
+  heap is 64 MB and outlives a render (G-5's limit); the cost bound keeps
+  what the memo holds to a few MB of it, except a single path over the
+  bound, which is held whole until the next insert and is limited only by
+  what one render's budget can measure. It breaks no G-5 purity: an
+  answer never depends on what the memo holds, and the memo's state is
+  reachable by no module — the Map sits in a closure, as `noise.js`'s
+  permutation tables do, because the library's `__` functions and
+  top-level `const`s are visible to a module.
+  (h) **Pure JavaScript, not a host function.** `graphic/src/path.js`,
+  evaluated as a script after `stdlib.js` and `noise.js` and before the
+  sandbox, uses only `Math`, `Map`, `Float64Array`, `String`, `Number`
+  and `Error`: nothing crosses into Rust, and nothing the sandbox removes
+  is used. A path the memo still holds costs a lookup per call; paths
+  that together pass a bound are measured again in turn; a path rebuilt
+  every frame is re-measured, and a fresh path of 200 cubic segments with
+  1,000 points taken along it stays inside the preview's 250 ms
+  (`graphic/tests/path.rs` prints the figure).
+  **Risks accepted:** a curve tighter than the references can exceed the
+  tolerance, and the pad covers 0.1 %. No row measures the memo's held
+  bytes, because reading them would make the memo's state visible to a
+  module, which is the G-5 hole the closure prevents.

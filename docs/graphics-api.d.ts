@@ -184,6 +184,29 @@ declare function noise2D(seed: number | string, x: number, y: number): number;
 /** Simplex noise in about −1..1; time as the third axis drifts smoothly. */
 declare function noise3D(seed: number | string, x: number, y: number, z: number): number;
 
+/** A point on a path and the way the path is heading there. */
+interface PathPoint {
+  x: number;
+  y: number;
+  /** Degrees, as SVG's `rotate()` takes them. */
+  angle: number;
+}
+
+/** The length of the SVG path data `d`; a path that cannot be read throws. */
+declare function getLength(d: string): number;
+
+/** The point `length` along `d`, clamped to the path, and the heading there. */
+declare function getPointAtLength(d: string, length: number): PathPoint;
+
+/**
+ * The dash that draws `d` from its start up to `progress` 0–1; the subpaths of
+ * a path with several draw at once, the longest finishing at 1.
+ */
+declare function evolvePath(
+  progress: number,
+  d: string,
+): { strokeDasharray: string; strokeDashoffset: number };
+
 /** Measures `text` in a bundled or project font; an unknown family throws. */
 declare function measureText(text: string, font?: Font): TextMetrics;
 

@@ -13,13 +13,14 @@ use graphic::{Level, Module};
 use common::{shared, BUDGET_MS};
 
 const JS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/js");
-const FILES: [&str; 6] = [
+const FILES: [&str; 7] = [
     "interpolate",
     "easing",
     "spring",
     "text",
     "random",
     "format",
+    "path",
 ];
 
 fn run_js(name: &str) {
@@ -63,6 +64,11 @@ fn random_test_js() {
 #[test]
 fn format_test_js() {
     run_js("format");
+}
+
+#[test]
+fn path_test_js() {
+    run_js("path");
 }
 
 #[test]

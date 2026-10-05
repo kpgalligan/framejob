@@ -251,7 +251,8 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
 
 - `graphic/` — the crate. `src/`: `lib.rs`, `library.rs`, `raster.rs`,
   `measure.rs`, `module.rs`, `runtime.rs`, `sandbox.rs`, `exception.rs`,
-  `host.rs`, `props.rs`, `diagnostic.rs`, `stdlib.js`, `noise.js`; rules in
+  `host.rs`, `props.rs`, `diagnostic.rs`, `stdlib.js`, `noise.js`, `path.js`;
+  rules in
   `graphic/CLAUDE.md`. `tests/graphics/` holds the six fixtures, which are
   also the Insert ▸ Graphic templates (copied into the bundle as
   `GraphicTemplates/` by `project.yml`).
@@ -308,14 +309,15 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   - system fonts as an opt-in — CLOSED by the owner 2026-10-04: Add Font to
     Graphics… / `import_graphic_font` already puts a face in the package and
     keeps a project portable; G-6 stands;
-  - path helpers;
   - audio from a graphic;
-  - generic CSS families such as `sans-serif`, which are warned like any
-    missing name.
+  - `cursive` and `fantasy`, which have no bundled face and are warned like
+    any missing name (`serif`, `sans-serif` and `monospace` draw in bundled
+    faces, G-6).
 
   Built since, and so off this list: a revision history and
   `delete_graphic` / `rename_graphic` (issue batch B84, spec §11
-  G-27..G-29), and named CSS colours and `hsl()` in a `color` prop and in
+  G-27..G-29), path helpers (issue batch B85 phase 1, spec §11 G-31:
+  `graphic/src/path.js`), and named CSS colours and `hsl()` in a `color` prop and in
   `interpolateColors` (#219: `core/src/model_color.rs`,
   `docs/graphics-api.md`'s schema table and `interpolateColors` section).
 - **The watcher:** each module, font and asset file has its own source, but
@@ -713,6 +715,90 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   appearances, a refused Delete's sentence on screen, a real keyboard
   typing into New name — is `docs/manual-checks.md`'s GR-7.
 
+  Issue batch B85, phase 1 (2026-10-05, #103 part 2; spec §11 G-31) built
+  the not-built list's path helpers: `getLength(d)`,
+  `getPointAtLength(d, length)` and `evolvePath(progress, d)` in
+  `graphic/src/path.js`, a third standard-library script evaluated after
+  `noise.js` and before the sandbox. Pure JavaScript, no host function:
+  the path is parsed once (every command, both cases, SVG's number
+  grammar, unseparated arc flags), flattened — a line exactly, a curve as
+  64 chords, an arc as chords of at most π/128 rad — and memoised by its
+  text, at most 32 paths and 50,000 chords-plus-characters, in a closure
+  no module can reach. The global the spec named, `__path(d, who)`, is not
+  one: a global answering the memoised record would hand a module the
+  memo's state, so the closure answers the three functions and the record
+  never leaves it (`noise.js`'s shape). A draw-on is dashed by the LONGEST
+  subpath times 1.001, because tiny-skia restarts the dash on each
+  contour; a heading where the derivative is zero is the tangent's limit;
+  a path that cannot be read throws, naming the character. The reference
+  gained the section, the draw-on idiom was rewritten over `evolvePath`
+  and "Follow a path" was added; both idioms were drawn once through
+  `render_graphic` on a scratch instance and looked at (a throwaway run,
+  not a row).
+  What a run printed (`cargo test --release --test path -- --nocapture`,
+  6 passed): the relative errors against the closed forms — the circle
+  of radius 500 and the ellipse, plain and turned 30°, 2.51e-5 each; the
+  parabola as a `Q` and as a `C` 4.92e-5; the cusp 6.29e-6 — all inside
+  G-31's 1e-4, the parabola by a factor of two; a fresh path of 200
+  cubics with 1,000 points taken, 16.6 ms of the preview's 250; a
+  17,000-segment path over the memo's cost bound measured twice with a
+  point taken, 56.3 ms. `path_test_js` (rows T1–T9, each in its own `try`,
+  T5's two limit rows scored apart) passed. The five mutants, each applied
+  to `path.js` by hand, run and restored: `chords-4` — the one message
+  named T2 (the circle 3121.445 for 3141.593), T3 and T4, and R1's circle
+  and R5 failed too; `unpadded` — T7 failed, and R1 PASSED (recorded, not
+  required: no pixel row catches a missing pad);
+  `relative-as-absolute` — T1 failed (54.14 for 40), and R4; `total-dash` — T7 failed (160.16 for 100.1) and R1's
+  two-subpath pixels (the long line red past its tip); `raw-derivative` —
+  both of T5's limit rows failed (0 for 90). `graphics_path_proof.py`, on
+  its own instance in a scratch home, 6/6: its control M0 (the oracle
+  answers False for a ring of half the radius), the ring's dash
+  1886.7932 for 2π·300·1.001 = 1886.8405, the offset half of it, the dot at
+  (960, 840), and `graphic_reference` naming `evolvePath(progress, d)`.
+  `make test` exit 0 (94 `test result: ok`), `make lint` clean, `make
+  typecheck` 0 errors and the 4 warnings, `make app` built. No core, FFI,
+  Swift, op, tool or catalog file is in the diff, so no count moved (B84
+  left 89 product tools and 59 ops), and `tests/pins.json` was not
+  re-pinned. Owed by the batch's later phases, each its own pipeline:
+  `paste_attributes` between graphic clips of one module with Edit ▸
+  Paste Graphic Properties (phase 2), and HEVC with alpha as an export
+  row (phase 3).
+
+  The review's fix pass (2026-10-05) made one thing the first build
+  answered a refusal, and G-31 (e) now says so: no helper answers a
+  number that is not finite. As built, a number too large for a double's
+  arithmetic was answered — `getLength` `Infinity` or NaN, and for an arc
+  whose centre form came out NaN the answers of a path with nothing
+  drawn, the silent zero (e) rules out — and G-31 had recorded it as a
+  risk accepted. `path.js` (385 lines) now refuses such a path in the
+  parse sentence, at the number or at its command, by five checks: the
+  number read, a move's point, an arc's centre form, the running length,
+  and the point answered. `path.test.js` gained the row `T8 a number that
+  is not finite` — twelve cases, ten refusals over the five checks and
+  two controls that expect an answer, every case run though another
+  failed — and T5 an arc drawn with sweep 0, the sign of whose heading no
+  row held. A sixth mutant, `non-finite` (the one predicate answering
+  true): the one message named all ten refusals — `M 0 0 L 1e999 0`
+  answered `Infinity`, the same path going on NaN, `M 0 0 A 1e300 1e300 0
+  0 1 1 0` answered 0, a point of a curve one step under the largest
+  double x `Infinity` — and neither control; `path.rs` passed, holding no
+  such row. Each of the five checks was then removed alone (extras,
+  `path_test_js` only): number 2 cases, move 1, arc 2, running length 4,
+  point 1 — each case under exactly one. The five earlier mutants, run
+  again on the fixed file, failed the rows named above,
+  `relative-as-absolute` now two of the new row's cases as well; an
+  extra, `arc-turn` (the sign dropped), failed T5 (angle 1.6e-14 for
+  180); and `path.js` was written back byte-equal to the copy taken
+  before. On the fixed file `cargo test --release --test path --
+  --nocapture` printed 16.6 ms for the 200 cubics and 67.6 ms for the
+  17,000-segment path (56.3 in the first build's run), the six relative
+  errors unchanged. The reference gained the refusal and the memo's two
+  limits, which an agent otherwise meets as a budget error. After it:
+  `cargo test --release` in `graphic/` 125 passed, `make test` exit 0 (94
+  `test result: ok`), `make lint` clean, `make app` built,
+  `graphics_path_proof.py` 6/6 again. `make typecheck` was not run again:
+  no Swift or helper file is in the pass.
+
 ## Open items
 
 - G6's rest — playback prefetch, in-place raster (`graphic/src/raster.rs`)
@@ -727,8 +813,8 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   - `validate` accepts a graphic clip with no description.
 
   Tracked in #72.
-- The not-built list: `paste_attributes`, HEVC with alpha and path helpers —
-  tracked in #103; keyframed props — #239; mattes or video input — #240.
+- The not-built list: `paste_attributes` and HEVC with alpha — tracked in
+  #103; keyframed props — #239; mattes or video input — #240.
 - Replacing QuickJS with JavaScriptCore — GitHub issue #39.
 
 ## Where to look in the original

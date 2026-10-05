@@ -15085,3 +15085,109 @@ CFFIXED_USER_HOME="$PWD/tools/proof/work/b84b-screens/home" python3 tools/proof/
 python3 tools/proof/defaults_proof.py                                     # passed 10/10, exit 0 (H1, H2 new)
 python3 tools/proof/defaults_proof.py --mutant home-followed              # MUTANT PASS: failed H1, H2
 ```
+
+## Issue batch B85 phase 1 — path helpers in the graphics standard library (`graphic/tests/js/path.test.js` T1–T9, `graphic/tests/path.rs` R1–R5, six hand mutants; `graphics_path_proof.py` H0, M0–M3, Z1; #103 part 2; spec §11 G-31)
+
+`getLength(d)`, `getPointAtLength(d, length)` and `evolvePath(progress, d)`
+are `graphic/src/path.js`, pure JavaScript. Phases 2 (`paste_attributes`
+between graphic clips) and 3 (HEVC with alpha) are their own pipelines.
+
+**What is proved, and by which instrument.**
+
+- **`path.test.js`** (`cargo test --release --test stdlib path_test_js`; in
+  `make test`). Each row is a function run in its own `try`; the render
+  throws ONE `Error` joining `"<row>: <message>"` for every row that threw,
+  so a single run names every failed row. T1 lines, exact to 1e-9 (the
+  relative spelling, implicit pairs, two subpaths, `M0,0L.5.5-1-1`); T2
+  arcs against closed forms at 1e-4 relative (a circle of radius 500, a
+  quarter arc, the ellipse 200 by 100 plain and turned 30°, radii scaled
+  up, a zero-radius arc, unseparated flags); T3 the parabola as a `Q` and
+  as a `C`, a `T` and an `S` equal to their explicit spellings; T4 the
+  cusp; T5 points and headings on the circle (0.01 px, 0.05°), the two
+  ends, the clamps, a second subpath, a corner, an arc drawn the other
+  way (sweep 0); `T5 the limit at a start`
+  and `T5 the limit at an end`, the two zero-derivative rows, scored apart
+  so one run can show both failing; T6 nothing drawn; T7 `evolvePath`
+  (`D === getLength(d) * 1.001`, the offsets, the clamps, `"none"`, and
+  the LONGEST subpath for two paths of several); T8 the two error
+  sentences whole, each named for the function called; `T8 a number
+  that is not finite`, twelve cases each run though another failed (the
+  fix pass, below); T9 forty paths, then the first again.
+- **`path.rs`** (`cargo test --release --test path -- --nocapture`; in
+  `make test` without the prints). R1 pixels through `common::render`: a
+  closed two-arc circle stroked red, 12 wide, butt caps, at progress 0,
+  0.5 and 1, and two subpaths (160 and 80 long) at 0.25 and 0.5; R2 one
+  render of a fresh 200-cubic path with 1,000 points taken, under the
+  250 ms budget, its milliseconds printed; R3 a parse error reported at
+  the module's line 3; R4 a path over the memo's cost bound (17,000
+  chords and 34,005 characters) measured, dropped for a small path and
+  measured again, its milliseconds printed; R5 (added by the implementer)
+  the six reference lengths against their closed forms, each relative
+  error printed.
+- **`graphics_path_proof.py`** (not in `make test`: it launches the app,
+  in a scratch home `tools/proof/work/graphics-path/home`, on its own
+  socket, performs no menu item, closes its project and removes its work
+  folder). H0 the scratch home took; M0, the CONTROL, scored first: M2's
+  oracle for radius 300 answers False for a ring written and drawn at
+  radius 150; M1 `write_graphic {ring}` — the three helpers in one module
+  — `ok: true`, no diagnostics; M2 `render_graphic {ring, frame 15, svg}`:
+  the dash within 1e-4 of 2π·300·1.001, the offset half of it, the dot
+  within 0.05 of the quarter point; M3 `graphic_reference` holds
+  `` `evolvePath(progress, d)` ``; Z1 the project closes and the log holds
+  no `Reelcut: ` line.
+
+**What the runs printed** (2026-10-05, one host; the fix pass's runs, on
+the file with the finite checks).
+
+| Run | Answer |
+|---|---|
+| `cargo test --release --test stdlib path_test_js` | 1 passed |
+| `cargo test --release --test path -- --nocapture` | 6 passed. R5: circle 2.51e-5, ellipse 2.51e-5, ellipse turned 30° 2.51e-5, parabola as `Q` 4.92e-5, as `C` 4.92e-5, cusp 6.29e-6. R2: 16.6 ms. R4: 67.6 ms (budget 250 ms each; the first build's run printed 56.3 for R4) |
+| `cargo test --release --test reference` | 5 passed |
+| `cargo test --release --test determinism` | 3 passed |
+| `python3 tools/proof/graphics_path_proof.py` | 6/6, exit 0, nothing on stderr. M0's oracle read dash 943.3966 for the wanted 1886.8405 and the dot at (960, 690) for (960, 840); M2 read dash 1886.7932, offset 943.3966, dot (960, 840) |
+| `cargo test --release` in `graphic/` | 125 passed in 17 `test result: ok`, 0 failed |
+| `make test` / `make lint` / `make typecheck` / `make app` | exit 0 (94 `test result: ok`; `spec_index_proof.py` 138/138) / clean / 0 errors, 4 warnings (the first run's; not run again by the fix pass, which holds no Swift or helper file) / `** BUILD SUCCEEDED **` |
+
+**The six mutants**, each one edit of `graphic/src/path.js` made by hand
+(here by a throwaway script that asserts each anchor occurs once, runs the
+two test commands and writes the file back, compared byte-equal to the
+copy taken before), none left in the tree:
+
+| Mutant | Edit | What failed |
+|---|---|---|
+| `chords-4` | `__PATH_CHORDS` 64 → 4, `__PATH_ARC_STEP` π/128 → π/8 | the ONE `path_test_js` message named T2 (3121.445 for 3141.593), T3 (292.081 for 295.789) and T4 (143.753 for 143.971); `path.rs` R1's circle (the last 1 % read `[0, 0, 64, 64]`) and R5 (6.41e-3) |
+| `unpadded` | `__PATH_PAD` 1.001 → 1 | T7 (the dash string). `path.rs` 6 passed: R1 does NOT catch a missing pad — recorded, not required |
+| `relative-as-absolute` | `const rel = false` | T1 (54.142 for 40) and two of `T8 a number that is not finite`'s cases (the relative move and line, answered); `path.rs` R4 (`"34005 1 5 1 1"`) |
+| `total-dash` | `evolvePath` reads `.total` for `.longest` | T7 (160.16 for 100.1); `path.rs` R1's two subpaths (the long line red at (70, 50) at progress 0.25) |
+| `raw-derivative` | the limit rule removed | `T5 the limit at a start` (0 for 90) and `T5 the limit at an end` (angle 0 for 90), both in the one message |
+| `non-finite` | `const finite = () => true` — the five checks at once | `T8 a number that is not finite`: the one message named all ten refusals and neither control — `M 0 0 L 1e999 0` answered `Infinity`, the same path going on NaN, the move `{"x":"Infinity","y":0,"angle":0}`, `M 0 0 A 1e300 1e300 0 0 1 1 0` answered 0, `H 1e200` `Infinity`, a dash `Infinity Infinity`, the point of the curve under the largest double x `Infinity`. `path.rs` 6 passed: it holds no such row |
+
+One thing no row holds: the memo's cost bound itself (an answer never
+depends on what the memo holds, so T9 and R4 are oracles of the ANSWERS
+across a clear, not of the bytes held — spec §11 G-31's accepted risk).
+
+**No helper answers a number that is not finite** (the review's fix pass).
+`path.js` refuses such a path in the parse sentence by five checks — the
+number read (at the number), and at the command: a move's point, an arc's
+centre form, the running length, the point answered — and `T8 a number that
+is not finite` holds ten refusals over them and two controls. What the
+unchecked file answered is the `non-finite` row above and, one check at a
+time, these extras (`path_test_js` only, not of the six): the number check
+removed, 2 cases failed (the refusal named character 6, the `L`, for 8); the
+move check, 1 (`{"x":"Infinity","y":0,"angle":0}`); the arc check, 2
+(`getLength` answered 0, the point `{"x":0,"y":0,"angle":0}` — the silent
+zero); the running-length check, 4 (`Infinity`, a dash of `Infinity
+Infinity`, and one finite wrong point); the answer check, 1 (x `Infinity` at
+length 0.005 of a curve that measures 10). Each case failed under exactly
+one. And `arc-turn` (the heading's sign on a sweep-0 arc dropped): T5
+failed, angle 1.6e-14 for 180. A coordinate is not refused for being large:
+two sides and the diagonal of a square 1e153 on a side measure; a chord whose SQUARE overflows (`H
+1e200`, the diagonal of a square 1.2e154 on a side) does not, since the
+measure is `Math.sqrt` of a sum of squares.
+
+```sh
+cd graphic && cargo test --release --test stdlib path_test_js       # 1 passed
+cd graphic && cargo test --release --test path -- --nocapture       # 6 passed; prints R2, R4, R5
+python3 tools/proof/graphics_path_proof.py                          # 6/6, exit 0 (launches the app in a scratch home; not in make test)
+```

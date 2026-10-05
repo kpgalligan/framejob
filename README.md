@@ -291,6 +291,8 @@ schema, §6 the op table, §7 the architecture.
   Graphics Reference. An agent can do the whole job over MCP: read the
   reference, write a module, look at its frames without placing it, bring in
   a font or a picture, put it on the timeline and change its properties. The
+  module's standard library measures a path, finds a point along it and
+  draws it on. The
   project keeps the last 10 versions of each graphic's code in
   `graphics/history/`, kept whenever the app sees the code replaced, so an
   agent can restore an earlier version, delete a graphic no clip uses (its
