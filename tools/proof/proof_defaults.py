@@ -22,6 +22,14 @@ keys added, removed or changed between two snapshots, `owner_visible` drops
 AppKit's own (`NS*`, `Apple*`), and `sharing_pids` lists the running
 `…/Contents/MacOS/Reelcut` that share a domain. `mcp.py`'s guard is built
 from these; `defaults_proof.py` is its proof. `APP_DOMAIN` is only ever read.
+Every `defaults` this file runs — these reads, the removal recipe's delete
+and the selftest's write — runs WITHOUT `CFFIXED_USER_HOME` (`read_env`):
+under that variable `defaults export` answers the same domain while the
+folder it names exists and NO key while it does not (measured, the proof
+README's B84 section), so a read that followed it would compare a scratch
+home not made yet, or already removed, against the owner's whole domain, and
+a delete that followed an absent one would do nothing while its read-back
+looked elsewhere.
 
 **The removal recipe.** `remove_domain(name)`: `defaults delete <name>` (0
 and 1 are both answers), THEN unlinking `<Preferences>/<name>.plist`. It
@@ -151,14 +159,28 @@ _SALT = os.urandom(16)
 
 # ---- what a session moved --------------------------------------------------------
 
+def read_env():
+    """The environment every `defaults` of this file runs in (a read, the
+    recipe's delete, the selftest's write): this process's without
+    `CFFIXED_USER_HOME`, so two reads of one domain answer the same thing
+    whether or not the folder that variable names exists at either, and a
+    delete acts on the domain its read-back reads. What the guard answers
+    for is the owner's domain, the one read without the variable: an
+    instance under a scratch home that exists writes it (#238), and a write
+    that lands anywhere else moves nothing of the owner's."""
+    env = dict(os.environ)
+    env.pop("CFFIXED_USER_HOME", None)
+    return env
+
+
 def _export(domain, run=None):
     """`defaults export <domain> -` as a dict ({} for no such domain), or
-    None when it could not be run or read."""
+    None when it could not be run or read. Runs in `read_env()`."""
     if not domain or domain.startswith("-"):
         return None
     try:
         done = (run or subprocess.run)(["defaults", "export", domain, "-"],
-                                       capture_output=True, timeout=30)
+                                       capture_output=True, timeout=30, env=read_env())
         if done.returncode != 0:
             return None
         loaded = plistlib.loads(done.stdout)
@@ -298,7 +320,8 @@ def remove_domain(name, preferences=None, run=None):
         return reason
     runner = run or subprocess.run
     try:
-        done = runner(["defaults", "delete", name], capture_output=True, timeout=30)
+        done = runner(["defaults", "delete", name], capture_output=True, timeout=30,
+                      env=read_env())
     except subprocess.TimeoutExpired:
         return f"`defaults delete {name}` ran past 30 s"
     except OSError as error:
@@ -329,7 +352,7 @@ def _delete_key(name, key, preferences, run):
         return reason
     try:
         done = (run or subprocess.run)(["defaults", "delete", name, key], capture_output=True,
-                                       timeout=30)
+                                       timeout=30, env=read_env())
     except subprocess.TimeoutExpired:
         return f"`defaults delete {name} {key}` ran past 30 s"
     except OSError as error:
@@ -656,7 +679,8 @@ def _real_cleanup(name):
     if not name.startswith(SELFTEST_PREFIX) or _refusal(name):
         return
     try:
-        subprocess.run(["defaults", "delete", name], capture_output=True, timeout=30)
+        subprocess.run(["defaults", "delete", name], capture_output=True, timeout=30,
+                       env=read_env())
         path = _plist_path(REAL_PREFERENCES, name)
         if os.path.lexists(path):
             os.unlink(path)
@@ -685,7 +709,7 @@ def selftest():
     try:
         def p1():
             wrote = subprocess.run(["defaults", "write", name, "ReelcutSelftest", "-bool", "true"],
-                                   capture_output=True, timeout=30)
+                                   capture_output=True, timeout=30, env=read_env())
             deadline = time.monotonic() + 10
             while not os.path.exists(path) and time.monotonic() < deadline:
                 time.sleep(0.1)

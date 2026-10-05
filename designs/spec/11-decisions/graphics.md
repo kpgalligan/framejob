@@ -601,3 +601,272 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   frame's worker did. Why: the compositor's queue is serial, and the
   rasterization is most of a heavy graphic's time; moving only the raster
   keeps G-8's reports and G-5's purity where they were.
+- **G-27 — Deleting a graphic is refused while a clip draws it; the deleted
+  text is kept, and that kept text is what marks the name as deleted**
+  (issue #103, 2026-10-04, issue batch B84).
+  (a) **The tool and the menu item.** `delete_graphic {name}`; File ▸
+  Delete Graphic… is its menu item (G-30), one small sheet with a pop-up
+  of the project's graphics, over the same body
+  (`ProjectDocument.deleteGraphic(named:)`).
+  (b) **Used is refused, saying which clips**: `The graphic "<name>" is
+  still drawn by <where>; delete those clips or point them at another
+  module (set_graphic {name}) first`. `<where>` is one group per
+  container, the timeline first then nests by id, joined by " and "; a
+  group is `clip 4`, `clips 4 and 9` or `clips 4, 9 and 12`, ids
+  ascending, then ` on the timeline` or ` in nest <id>`. The sentence is
+  the app's, not a core rule's: it names a file act's precondition.
+  (c) **Not the Trash.** `graphics/<name>.js` leaves the folder and its
+  bytes are kept with the module's other kept revisions (G-29), so
+  `restore_graphic` brings it back. The Trash is somewhere an agent cannot
+  reach and a proof would litter. Removing a module for good is deleting
+  its folder under `graphics/history/` in Finder.
+  (d) **Fonts and assets are left alone**: other modules share them.
+  (e) **Not an undo step, never dirty** (G-3). The answer's `note` says so.
+  (f) **A file-less name that has kept revisions is a DELETED module.** A
+  rename carries its history away with it (G-28 (d)) and a delete always
+  leaves the deleted text, so "no file, and something kept" is what a
+  deleted name looks like — and, of everything the app FINISHES, only a
+  deleted name. A rename killed part-way can leave the same state (G-28
+  (f)). G-28 (e)'s repair reads that test and stands aside.
+  **Risk accepted:** Undo can bring back a clip whose module was deleted
+  after the clip was (delete the clip, delete the module, Undo). That clip
+  shows the error card (G-8) until the module is restored by hand; no
+  other module is ever moved onto the deleted one's name to fill the gap,
+  even one it was once renamed from. The alternative, restoring the file
+  on Undo, would make a file write an undo step, which G-3 refuses.
+- **G-28 — Renaming a graphic moves the file, its kept revisions and every
+  clip that names it; Undo renames the file back** (issue #103,
+  2026-10-04, issue batch B84).
+  (a) **The tool and the menu item.** `rename_graphic {name, to}`; File ▸
+  Rename Graphic… is its menu item (G-30), over the same body
+  (`ProjectDocument.renameGraphic(named:to:apply:)`).
+  (b) **What moves.** `graphics/<name>.js` becomes `graphics/<to>.js`,
+  `graphics/history/<name>/` is folded into `graphics/history/<to>/`, and
+  every clip that names the module — on the timeline and inside every
+  nest — is repointed by `set_graphic {name}` with no schema, as ONE undo
+  step called "Rename Graphic". The project is marked edited only when
+  clips changed. No core op was added: the op count stays 59.
+  (c) **Refusals, in this order.** The module is absent: `No module named
+  "<name>" in graphics/ — the folder holds: <list>`. `to` is not a module
+  name: the core's own sentence (`GraphicStore.nameSentence`). **`to` is
+  in use by a file** (the scan or the disk, `to == name` included):
+  `graphics/<to>.js already exists`. **`to` has no file but a clip already
+  names it** (a clip left behind by a deleted module): `The name "<to>" is
+  already drawn by <where>; delete those clips or point them at another
+  module (set_graphic {name}) first`, `<where>` as in G-27 (b) —
+  otherwise that clip would silently start drawing the renamed module and
+  Undo could not put things back. A nest is open: `rename_graphic has no
+  meaning inside nest <id>: it renames the module for every clip in the
+  project, the timeline's included. set_scope with no arguments comes back
+  out; then rename.`
+  (d) **The kept revisions follow the name**, and `graphics/history/<name>/`
+  is gone afterwards. A rename that RETURNS is all-or-nothing: a failure
+  part-way leaves the file, the history and the journal where they were —
+  a rename refused after its pair was written puts `renames.json` back as
+  it was read (its bytes, or no file), so a refused rename journals no
+  pair, and an earlier pair of the same two names is still there for Undo.
+  That holds for both refusals that come after the pair: the history that
+  cannot be folded, and the CLIPS that refuse the new name (the edit
+  throws, or leaves a clip behind) — there the file and its history are
+  moved back under `<name>` and the journal is put back as it was read
+  before the rename; a failed move back leaves the file at `<to>` and the
+  pair, so (e)'s repair can make it. One thing the clips' arm cannot put
+  back: a rename onto a DELETED module's name (the risk accepted below)
+  has folded the two histories before the clips are asked, so the move
+  back carries the deleted module's kept texts under `<name>` and leaves
+  nothing kept under `<to>` (store probe H18 measures each of these).
+  A crash between its steps is not a failure the app can put back: (f).
+  The journal pair of (e) is written, and read back, after the file moves
+  and BEFORE the history is folded (a fold cannot be undone): **a rename
+  that could not be journalled is refused** — `graphics/<name>.js could
+  not be renamed: its rename could not be journalled in
+  graphics/history/renames.json` — so no rename succeeds that Undo could
+  not repair.
+  (e) **What Undo does.** The file rename itself is not an undo step
+  (G-3), but the clips' names are model state. So the store journals each
+  rename as a pair `[a, b]` in `graphics/history/renames.json` (at most
+  32, oldest first, a repeated unordered pair moved to the end): the app
+  moved the file FROM `a` TO `b`. After every committed project change,
+  and once when the store starts, the document REPAIRS, **in one
+  direction only**: for each pair, newest first, when the pair's FIRST
+  name is drawn by a clip, has no file and has no kept revision, while its
+  SECOND name has a file and no clip, the file (and its history) is moved
+  back under the first. That move journals the pair the other way round,
+  so Redo is the same repair. Undo therefore renames the file back with
+  the clips, Redo forward again, a chain of renames undoes and redoes step
+  by step, and a project opened after a crash between a FINISHED rename
+  and a save is healed (a crash inside the rename is (f)'s). A clip never
+  names a module a finished rename took away.
+  (Amended by B84's review, 2026-10-04: the repair first tried BOTH
+  directions of a pair, which moved a live module under a name whose file
+  had been removed outside the app and — once `history/<name>/` was
+  removed in Finder, as G-27 (c) tells a person to — under a deleted
+  module's name.)
+  (f) **What the repair skips, and its limits.** A file-less name WITH
+  kept revisions is a deleted module (G-27 (f)): its clips keep the error
+  card and no live module is moved under its name. A drawn name with no
+  file at a pair's SECOND name is a removal the app did not make — the
+  app's own moves leave the file there — and nothing is moved under it. A
+  rename made outside the app (Finder, a shell `mv`) writes no journal
+  pair and is not repaired, a `mv` back to a pair's first name included.
+  **Three limits.** The first: the store cannot see a removal made
+  outside the app (nothing is kept for one, G-29 (c)), so with the pair
+  `[a, b]`, clips that name `a` with no file and nothing kept for a reason
+  OTHER than Undo — repointed onto a new `a.js` that was then removed
+  outside the app — cannot be told from an Undo, and `b.js`, when no clip
+  draws it, is moved under `a`. The other two are a crash INSIDE a rename
+  `<from>` → `<to>`, whose three steps — the file moves, the pair is
+  journalled, the history is folded — are not one act on disk. Killed
+  after the file moved and before the pair was written, there is no pair:
+  `<to>.js` is on disk, the clips name `<from>`, and nothing is repaired
+  (a rename made outside the app leaves the same). Killed after the pair
+  was written and before the fold finished, the repair heals it when
+  `<from>` had nothing kept, and does NOT when it had:
+  `history/<from>/` is still there, so `<from>` reads as a deleted module
+  (G-27 (f)), its clips keep the error card, and a default
+  `restore_graphic {name: <from>}` writes an OLDER text while the current
+  one sits undrawn at `<to>.js` (store probe H15 builds that state and
+  runs the restore in it). That state cannot be told from a rename
+  followed by a new `<from>` written and deleted — the same pair, kept
+  texts under `<from>`, an undrawn `<to>.js` — and no order of the three
+  steps closes both windows; telling them apart needs a marker on disk
+  this decision does not have. The way out of either, by hand:
+  `set_graphic {name: <to>}` on the clips.
+  (g) **The nest limit.** Rename is refused while a nest is open (the
+  menu item is greyed there, G-30 (f)). An unscoped op is re-addressed to the
+  open nest (`ProjectDocument.addressed`), so the timeline's clips cannot
+  be reached from inside one; making it work there needs a document-level
+  core op, which is a larger change and is not built.
+  **Risk accepted:** the alternative to (e), a rename that empties the
+  undo history, is not safe in this app (`removeAllActions` on a document
+  is the "do not flush" pitfall). The repair's cost is one journal read
+  per committed change in which some drawn name has no file, and none
+  otherwise. **A rename onto the name of a DELETED module** (no file, no
+  clip, kept revisions) is none of (c)'s refusals: the two histories fold
+  under `to` ((b)), the deleted module's texts as the oldest, and the
+  prune past 10 (G-29 (b)) removes those first — a renamed module that
+  brings 10 kept texts removes, in one call, the deleted text that G-27
+  (c) says only a Finder delete removes. `rename_graphic`'s description
+  says so; a sixth refusal was not chosen.
+- **G-29 — The last 10 texts of each module are kept in the package;
+  amends G-3's price** (issue #103, 2026-10-04, issue batch B84).
+  (a) **Where.** `graphics/history/<name>/<%06d sequence>-<revision>.js`,
+  inside the package and not in `cache/`: the cache is documented as safe
+  to delete and is rebuilt freely, so history there could vanish silently,
+  while `graphics/` is user content carried by every save, Save As and
+  copy (§5.6). `history/` is created only inside an existing `graphics/`
+  (G-14 stands: `ensureFolder()` is still the one creator of the folder).
+  The next sequence is the highest plus one; any other file there is
+  ignored.
+  (b) **How much.** The last 10 per module (`GraphicStore.historyLimit`),
+  a few kilobytes each; the lowest sequences are pruned. History never
+  holds the current text, and a text kept twice is listed once: a pass
+  drops a module's new revision from its history, and `start()` drops
+  each module's current one — a text put back while the project was
+  closed, or a crash between a delete's keep and its removal — so a
+  default restore always reaches an OLDER text. A drop is not a keep.
+  (c) **When.** Whenever the app SEES a module's text replaced while the
+  project is open — `write_graphic`, a save from an outside editor, a
+  restore — and when `delete_graphic` removes it. Nothing is kept at
+  `start()`, for a removal the app did not make, or for a text that came
+  and went inside one 100 ms pass.
+  (d) **Restore.** `restore_graphic {name, revision?}` writes a kept text
+  back as `graphics/<name>.js` and keeps the text it replaced, so
+  restoring twice returns to where you were; `revision` defaults to the
+  newest kept, and the tool works when `<name>.js` is absent (a deleted
+  module). Refusals: `No kept revision of "<name>" — one is kept when a
+  write replaces a module's text or delete_graphic removes it`, and
+  `"<name>" has no kept revision <revision> — kept: <revisions>`. A kept
+  file whose bytes no longer hash to the revision in its name (changed by
+  hand) is not a kept text (§5.6): restoring it is refused and nothing is
+  written — `graphics/history/<name>/<file> was changed outside Reelcut
+  and no longer holds the revision in its name; it is not restored — other
+  kept revisions: <revisions, or "none">` — and the file is left for the
+  person. Listing reads names, not bytes (hashing every kept file on
+  every read is not done), so that file is still listed in `kept` and
+  `history`, still counts toward the 10 and still marks a file-less name
+  as deleted, and while it is the newest a default restore is refused
+  until it is removed or another revision is named. File ▸
+  Restore Graphic Version… is its menu item (G-30); it restores the newest
+  and has no history browser. Not an undo step, never dirty (G-3).
+  (e) **What an agent sees.** `kept` — `[revision]`, newest first — in
+  the answers of `write_graphic`, `get_graphic {name}` and the three new
+  tools, and `history: [{name, kept}]`, deleted modules included, in
+  `get_graphic {}`.
+  (f) **G-3's price is amended.** `write_graphic`'s note is now "not
+  undoable; the text it replaced is kept (the last 10 per module) —
+  restore_graphic brings it back", in place of "keep your own copy if you
+  want the old one back". The built-in Assistant may call all three tools
+  without asking first, because a delete keeps the text.
+  (g) **An untitled document** keeps its history in its temporary
+  graphics root; the first save carries it into the package, and closing
+  without saving loses it with the graphics themselves.
+  **Risk accepted:** an edit made while the project was closed, or two
+  saves within a tenth of a second, keeps nothing extra; an eleventh text
+  drops the oldest for good.
+- **G-30 — File ▸ Rename Graphic…, Delete Graphic… and Restore Graphic
+  Version… are one small sheet over G-27..G-29's three bodies; a refusal
+  is the body's own sentence, shown in the sheet** (issue #103,
+  2026-10-04, issue batch B84, phase 2).
+  (a) **The items.** In the File menu, in a separator group of their own
+  straight under Add Image to Graphics…, in the order Rename Graphic…,
+  Delete Graphic…, Restore Graphic Version…, with no key equivalents (the
+  caption items' reason, §9). Each is a nil-target selector the editor
+  implements: `renameGraphic(_:)`, `deleteGraphic(_:)`,
+  `restoreGraphicVersion(_:)`.
+  (b) **The one sheet** (`GraphicFileSheetController`). Its title is the
+  item's without the "…"; under it a hint ((c)), a `Graphic:` pop-up of
+  the project's graphics, Cancel, and a button reading Rename, Delete or
+  Restore. Rename adds a `New name:` field, filled with the chosen
+  graphic's name, and the footnote `lowercase letters, digits and -`; its
+  button is dimmed until the name is filled in and differs from the
+  chosen one. Restore adds one line under the pop-up, `1 version kept` or
+  `<n> versions kept`, and lists no version: it restores the newest
+  (G-29 (d)), and there is no history browser. Rename and Delete list the
+  folder's modules by name. Restore lists every name that has a kept
+  text, a deleted module (G-27 (f)) reading `<name> (deleted)` — which is
+  how a delete is taken back.
+  (c) **The hints, word for word.** Rename: `Every clip that uses the
+  graphic follows its new name, on the timeline and inside nests. Undo
+  renames it back when a clip uses it; a graphic no clip uses is renamed
+  back by renaming it again.` Delete: `A graphic that clips still use
+  cannot be deleted. Its code is kept with its earlier versions, so
+  Restore Graphic Version… brings it back. Deleting is not an Undo step.`
+  Restore: `Puts back the newest kept version of the graphic's code. If
+  the graphic has code now, that code is kept in its place, so restoring
+  again returns to where you were. Restoring is not an Undo step.` They
+  promise only what holds: a rename of a graphic no clip uses makes no
+  edit (G-28 (b)) and so no undo step, and a restored DELETED graphic
+  replaced nothing, so nothing is kept in its place.
+  (d) **Where a sheet opens.** Rename and Restore open on the graphic of
+  the selected clip when exactly one clip is selected and its graphic is
+  a row — a deleted one included, which is how a clip showing the error
+  card gets its code back; otherwise on the first row by name. Delete
+  always opens on the first: a selected clip's graphic is in use and
+  could not be deleted.
+  (e) **A refusal shows in the sheet, which stays up.** The body's
+  sentence is shown word for word, with a beep, in a label at the foot of
+  the sheet's content, so the person can fix the name or pick another
+  graphic; no alert sheet is put up. It is the sentence an agent reads,
+  the hint `(set_graphic {name})` included (the owner's choice,
+  2026-10-04). The sheet owns two guards, both about the CALL (D2-1): a
+  new name that is empty or unchanged (the dimmed button), and an item
+  with nothing to list ((f)). The name goes to the body as typed, neither
+  trimmed nor lowercased. **There is no second confirmation**: the
+  sheet's Delete button is the confirmation, because the code is kept and
+  Restore brings it back (G-27 (c)). After a success the sheet closes and
+  says nothing; a restored text that does not compile shows the error
+  card as any broken graphic does (G-8).
+  (f) **When an item is greyed.** Rename and Delete in a project whose
+  folder holds no module; Restore when no name has a kept text; Rename
+  also while a nest is open (G-28 (g)); all three before the document's
+  graphics store exists, and while a sheet is attached.
+  (g) **One implementation.** Each act is one call of the body the tool
+  calls — `ProjectDocument.renameGraphic(named:to:apply:)`, its `apply`
+  the document's `performGroupedEdit("Rename Graphic", …)`,
+  `deleteGraphic(named:)`, `restoreGraphic(named:revision:)` with no
+  revision — and the sheet reaches no store writer, no op and no undo
+  registration of its own.
+  **Risk accepted:** a person reads a tool's hint in a refusal. A second
+  wording for people would be a second spelling of every sentence to keep
+  in step with the first.

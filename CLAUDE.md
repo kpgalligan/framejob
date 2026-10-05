@@ -207,7 +207,7 @@ else is what bloats files:
   (`AgentServer+Parity.swift`). What it cannot see is a CALL, which two
   things guard at dispatch: the argument GATE in `AgentServer+Gate.swift`
   compares the caller's keys to the schema the tool published and refuses a
-  stranger by name, for all eighty-six product tools (and the dev tools, road
+  stranger by name, for all eighty-nine product tools (and the dev tools, road
   map 11), before any handler runs;
   and the throwing helpers in `AgentServer+Arguments.swift` refuse a value a
   handler cannot read by name rather than dropping it.
@@ -269,8 +269,9 @@ envelope key, plus the app-state tools — `open_project`, `new_project`,
 `import_captions`, `export_captions`, `transcribe`, `consolidate_media`, `detect_silence`,
 `normalize_clip`, `set_playhead`, `set_range`, `set_selection`, `set_scope`,
 `undo`, `redo`, `render_frame`, `export`, `record_screen`, `write_graphic`,
-`get_graphic`, `graphic_reference`, `render_graphic`, `import_graphic_font`
-and `import_graphic_asset`. A Release build also has the dev tools
+`get_graphic`, `graphic_reference`, `render_graphic`, `import_graphic_font`,
+`import_graphic_asset`, `delete_graphic`, `rename_graphic` and
+`restore_graphic`. A Release build also has the dev tools
 (`snapshot_ui`, `perform_menu_item`, `cancel_sheet`, `select_inspector_tab`;
 "Seeing the chrome" below; and `assistant_send` / `assistant_answer`, which
 drive a window's assistant turn against a stand-in server, with the dev-only
@@ -289,7 +290,12 @@ environment moves `UserDefaults` (#238). Never perform a persisting menu item
 Quality) on the real build: `mcp.py` ends the script with status 3 and
 `DEFAULTS MOVED` last on stderr when its session moved a key and no other
 Reelcut shares the domain, and only prints the line when one does;
-`defaults_proof.py` is its proof.
+`defaults_proof.py` is its proof. The guard reads the domain with
+`CFFIXED_USER_HOME` taken out of `defaults`' environment
+(`proof_defaults.read_env`), so a proof run under a scratch home that does
+not exist yet, or is removed before the script ends, is compared with
+itself: `defaults export` answers no key under a variable naming an absent
+folder.
 
 **`tools/proof/` holds the scripts that do this** — an MCP script per phase
 over a dependency-free client (`mcp.py`), and beside most of them an

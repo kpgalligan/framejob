@@ -20,7 +20,7 @@ The Lines cell is `wc -l`, and `make test` checks it (`tools/proof/spec_index_pr
 | [`cloud-captions.md`](cloud-captions.md) | 404 | **Cloud captions (road map 6).** R6-1..R6-24: AssemblyAI, keys, deletion, recovery, refusal precedence, a dripping server, a Stop's bound on a DELETE, a refused transcript's failed DELETE reported for the dashboard, cached transcripts not re-checked for the key, speaker colours on Subtitles, server strings checked whole and bounded, a transcript id the key cannot delete holding its media. |
 | [`word-captions.md`](word-captions.md) | 123 | **Word captions (road map 8).** W-1..W-11. |
 | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) | 408 | **Chrome, the clip inspector and keys (the sharp pass, road map 9, #35).** SH-1..SH-5, CI-1..CI-16, K-1..K-3. |
-| [`graphics.md`](graphics.md) | 603 | **Graphics (road map 10).** G-1..G-26. |
+| [`graphics.md`](graphics.md) | 872 | **Graphics (road map 10).** G-1..G-30. |
 | [`dev-tools.md`](dev-tools.md) | 27 | **Dev tools (road map 11).** V-1..V-3: the `REELCUT_DEV_TOOLS` flag and `make dist`, dev tools as ordinary tools, capture by `cacheDisplay`. |
 | [`assistant.md`](assistant.md) | 202 | **The Assistant (road map 12).** AI-1..AI-20: the bundled helper, one lane, the catalog at launch, the fourth tab, the window's own project, W-9's reach, withheld and ask-first tools, the key, history, undo, the model, a call mid-gesture, the base-URL override, the tab kept on a selection change, the live context on each message, Stop reaching a running export or transcribe, the selectable transcript and the multi-line composer, the dev-only compaction threshold a proof lowers, the dot on the Assistant tab's title while a question waits, and the person's chat settings. |
 | [`pricing.md`](pricing.md) | 96 | **Pricing and spend (road map 13).** P-1..P-8: LiteLLM's table as the feed, a call priced from its own `usage` and `model` (per iteration), monthly dollar budgets per service, the app's spend as its own, the spend folder (ledger and price cache) that a proof never touches, the proofs' own ledger and how a paid proof request is held to the month's budget in it, and the two figures the app shows (the conversation's on the Assistant tab, the UTC month's in Settings), and a response cut short priced once and marked partial. |
@@ -169,7 +169,7 @@ The Lines cell is `wc -l`, and `make test` checks it (`tools/proof/spec_index_pr
 | SH-5 | Settings' explanations are an info button's AppKit `NSPopover`, which keeps its own rounded bubble | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
 | G-1 | A graphic is a SOURCE, not an effect; R5-1 stands for effects | [`graphics.md`](graphics.md) |
 | G-2 | The engine is a separate Rust crate; the core crate keeps its two rules | [`graphics.md`](graphics.md) |
-| G-3 | A graphic's source is a FILE in the package, and is not an undo step | [`graphics.md`](graphics.md) |
+| G-3 | A graphic's source is a FILE in the package, and is not an undo step — its price amended by G-29 | [`graphics.md`](graphics.md) |
 | G-4 | The core checks props against the schema the OP carries; render time is lenient | [`graphics.md`](graphics.md) |
 | G-5 | A graphic is a pure function of its inputs (R5-5 for code) | [`graphics.md`](graphics.md) |
 | G-6 | Fonts: the app's bundled faces and the package's, never the system's | [`graphics.md`](graphics.md) |
@@ -193,6 +193,10 @@ The Lines cell is `wc -l`, and `make test` checks it (`tools/proof/spec_index_pr
 | G-24 | A graphic's warnings show where its other messages do: compile warnings in the module's diagnostics, scan warnings in `get_graphic {}` and the Source section, an export's in its answer, sheet and queue row | [`graphics.md`](graphics.md) |
 | G-25 | A colour default is G-12's: refused at compile by the engine and the core, read by the Inspector through `rc_normalise_color` | [`graphics.md`](graphics.md) |
 | G-26 | An export rasterizes its graphics ahead on worker threads; the compositor stays the one writer and the texture key decides | [`graphics.md`](graphics.md) |
+| G-27 | Deleting a graphic is refused while a clip draws it, naming the clips; the deleted text is kept, not trashed, and a file-less name with kept revisions is a deleted module | [`graphics.md`](graphics.md) |
+| G-28 | Renaming a graphic moves the file, its kept revisions and every clip that names it as one undo step; a name in use by a file or by a clip is refused; Undo renames the file back, except onto a deleted name; refused with a nest open | [`graphics.md`](graphics.md) |
+| G-29 | The last 10 texts of each module are kept in `graphics/history/` inside the package; `restore_graphic` brings one back and keeps what it replaced; amends G-3's price | [`graphics.md`](graphics.md) |
+| G-30 | File ▸ Rename Graphic…, Delete Graphic… and Restore Graphic Version… are one small sheet over the three bodies; a refusal is the body's sentence shown in the sheet, which stays up; no second confirmation; where each opens and when each is greyed | [`graphics.md`](graphics.md) |
 | V-1 | Dev tools are compiled only under `REELCUT_DEV_TOOLS`; Distribution ships without them | [`dev-tools.md`](dev-tools.md) |
 | V-2 | A dev tool is not an op, but goes through the catalog, gate and parity check like any tool | [`dev-tools.md`](dev-tools.md) |
 | V-3 | Screens are captured with `cacheDisplay`, never ScreenCaptureKit | [`dev-tools.md`](dev-tools.md) |

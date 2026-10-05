@@ -418,6 +418,11 @@ Uses the three `tools/proof/work/playback-check/` projects (Setup 3).
 - **Expect:** the sheet's line reads `Exported “…”. 2 graphic warnings (hover for details).` and its tooltip lists `"nofont" at frame …` and `"late" at frame …`, each naming its font. Each queue row shows `Exported “…”. 2 graphic warnings.` visibly, straight after the Exported sentence and ahead of the loudness figures on the audio row, and its tooltip lists the two warnings under the path. The Source section shows "In the graphics folder" and a row reading `graphics/Bad.js is not a module name…`; Reveal shows the `graphics` folder selected in Finder. All of it in both appearances.
 - **Source:** #105.
 
+**GR-7 — The Rename, Delete and Restore Graphic sheets**
+- **Do:** 1. In a project with one graphic a clip uses, one no clip uses and one deleted (delete a third with File ▸ Delete Graphic…), open File ▸ Rename Graphic…, File ▸ Delete Graphic… and File ▸ Restore Graphic Version… in turn. 2. In Delete Graphic…, choose the graphic the clip uses and press Delete. 3. In Rename Graphic…, type a name on the keyboard. Repeat 1–3 in the other appearance.
+- **Expect:** in each sheet the wording reads whole and nothing looks cramped, loose or misaligned, in both appearances (Delete Graphic… has one row and the most empty space between its pop-up and its buttons); the refused Delete's sentence shows inside the sheet, which stays open and grows to hold it; the name typed lands in New name.
+- **Source:** #103.
+
 ## Screen recording
 
 Launch Reelcut from the Finder or Dock unless the check says otherwise.

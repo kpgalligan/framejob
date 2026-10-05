@@ -4,7 +4,9 @@
 // `graphics/`: `write_graphic`, `get_graphic` and `graphic_reference`, with
 // `graphicsSummary`, which `get_project` reports as `graphics`. G4b's three
 // are next door: `render_graphic` in `AgentServer+GraphicRender.swift`, the
-// two imports in `AgentServer+GraphicImports.swift`.
+// two imports in `AgentServer+GraphicImports.swift`; and issue batch B84's
+// three — `delete_graphic`, `rename_graphic`, `restore_graphic` — in
+// `AgentServer+GraphicFiles.swift`.
 //
 // **The app fills `schema`, and only the app can** (G-4): the core has no
 // filesystem, so the schema a `props` patch is checked against is read here
@@ -101,7 +103,9 @@ extension AgentServer {
     /// Writes `graphics/<name>.js` through the store's one writer, then
     /// rescans at once, so the registry has compiled THAT text before the
     /// reply is built: a failed compile is an answer (`ok` false with its
-    /// diagnostics), not an error. Not undoable and never dirty (G-3).
+    /// diagnostics), not an error. Not undoable and never dirty (G-3); the
+    /// text it replaced is kept by that rescan's pass, and `kept` lists the
+    /// module's kept revisions, newest first (G-29).
     func writeGraphic(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let name = try requiredString(a, "name")
@@ -124,7 +128,8 @@ extension AgentServer {
         }
         var result = moduleReport(named: name, document)
         result["name"] = name
-        result["note"] = Self.notUndoableNote
+        result["kept"] = store.kept(named: name).map(\.revision)
+        result["note"] = Self.keptNote
         return try jsonResult(result)
     }
 
@@ -132,9 +137,10 @@ extension AgentServer {
     /// (GraphicPane+Source.swift).
     ///
     /// With `name`, one module as the folder holds it now: its source, its
-    /// revision and its compile. Without, where the folder is, what it
-    /// holds, and `warnings`: what its scan skipped or could not watch
-    /// (G-24 (b)).
+    /// revision, its compile and `kept`, its kept revisions newest first.
+    /// Without, where the folder is, what it holds, `warnings`: what its
+    /// scan skipped or could not watch (G-24 (b)), and `history`: every
+    /// name with a kept revision, deleted modules included (G-29 (e)).
     func getGraphic(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let store = try graphicStore(document)
@@ -146,6 +152,9 @@ extension AgentServer {
                 "families": libraryFamilies(document),
                 "assets": store.scan.assets.map(\.name),
                 "warnings": store.scan.warnings,
+                "history": store.keptNames().map { kept -> [String: Any] in
+                    ["name": kept, "kept": store.kept(named: kept).map(\.revision)]
+                },
             ])
         }
         guard let file = store.module(named: name) else {
@@ -154,6 +163,7 @@ extension AgentServer {
         var result = moduleReport(named: name, document)
         result["name"] = name
         result["source"] = String(decoding: file.bytes, as: UTF8.self)
+        result["kept"] = store.kept(named: name).map(\.revision)
         return try jsonResult(result)
     }
 
@@ -213,7 +223,7 @@ extension AgentServer {
     /// `{path, revision, ok, meta, schema, diagnostics, clips}` for a module
     /// the scan holds; a compiled module's diagnostics are what its top level
     /// warned (G-24 (a)).
-    private func moduleReport(named name: String, _ document: ProjectDocument) -> [String: Any] {
+    func moduleReport(named name: String, _ document: ProjectDocument) -> [String: Any] {
         let file = document.graphicStore?.module(named: name)
         var result: [String: Any] = [
             "path": file?.url.path ?? NSNull(),
@@ -285,10 +295,11 @@ extension AgentServer {
     }
 
     /// The sentence for a module the folder does not hold, naming what it does.
+    /// The store's own sentence (`GraphicStore+Files.swift`), which the
+    /// delete and rename bodies answer too.
     func noModuleSentence(_ name: String, _ document: ProjectDocument) -> String {
-        let held = (document.graphicStore?.scan.modules.keys).map { Array($0).sorted() } ?? []
-        let listed = held.isEmpty ? "nothing" : held.joined(separator: ", ")
-        return "No module named \"\(name)\" in graphics/ — the folder holds: \(listed)"
+        document.graphicStore?.noModuleSentence(name)
+            ?? "No module named \"\(name)\" in graphics/ — the folder holds: nothing"
     }
 
     /// `width` or `height` as a side, refused by name outside 1…8192.

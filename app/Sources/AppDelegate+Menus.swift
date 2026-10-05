@@ -166,6 +166,7 @@ extension AppDelegate {
             item("Add Font to Graphics…", #selector(EditorViewController.addGraphicFont(_:))))
         menu.addItem(
             item("Add Image to Graphics…", #selector(EditorViewController.addGraphicImage(_:))))
+        addGraphicFileItems(to: menu)
         menu.addItem(.separator())
         menu.addItem(item("Export…", #selector(EditorViewController.exportProject(_:)), "e"))
         // Save Frame… is the still-image sibling of Export… and sits beside

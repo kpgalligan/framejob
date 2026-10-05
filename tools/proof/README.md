@@ -385,8 +385,9 @@ log is where the startup parity check would complain — `grep "Reelcut: "
 
 **The EXACT tool count belongs to the newest phase's script**, because it is
 what tells a stale binary on the port from the build under test: road map 7's
-`op_argument_proof.py` asserts **86** since issue batch B44's `close_project`
-(85 from road map 10's G4b, 82 from G4a, 79 from G3b, 77 from D3·5), and
+`op_argument_proof.py` asserts **89** since issue batch B84's three
+graphics-file tools (86 from B44's `close_project`, 85 from road map 10's
+G4b, 82 from G4a, 79 from G3b, 77 from D3·5), and
 every script before it keeps
 a floor — phases 1 to 9's 63, 65, 68, 70, 71, 73, 73, 73 and 74, and road map
 3's 75 — so a later phase's tools never fail an older proof.
@@ -14118,7 +14119,12 @@ domain then, and the pids the record owns. `scratch_socket()` records
 identifier before `Popen` and owns its child (a record that already owns a
 pid, a relaunch on the same socket, is compared first, so nothing is lost);
 `MCP()` records a socket that has no record, a handed one, under the domain
-of the executable holding it, that pid owned. `remove_scratch()` compares
+of the executable holding it, that pid owned. Since issue batch B84 the
+record and the compare both run `defaults export` with no
+`CFFIXED_USER_HOME` (`proof_defaults.read_env`), so a script run under a
+scratch home that is not there at one of the two is compared with itself
+(rows H1 and H2 below; the measurement is in B84's phase-2 section).
+`remove_scratch()` compares
 before it deletes, and one `atexit` handler, registered at import so it
 runs after any a script registers later, compares every record still held:
 a script that never calls `remove_scratch`, leaves early by `sys.exit` or an
@@ -14174,12 +14180,16 @@ ends `sys.exit(0)`; the parent scores its status and stderr.
 | G3 | `write-no-remove`: never calls `remove_scratch` | status 3 |
 | G5 | `write`, while S2 (a second instance of the clone the parent started by `Popen` on its own folder, no `mcp` record) is alive | status 0; the line names S2's pid |
 | G4 | `write-handed`: `MCP(S2's socket)` only | status 3, and the key is among `defaults_moved` at the first reading after the call |
+| H1 (B84) | `absent-home`, with `CFFIXED_USER_HOME` naming an absent folder under the work folder: `mcp.launch(clone)`, the folder made (by the instance, else the child), `new_project`, `close_project`, stop, `remove_scratch`. The parent first seeds the CLONE's domain with `ReelcutDefaultsProofSeed` (`defaults write`, that domain only) and counts its keys | the record held as many keys as the parent counted; the home absent at the record and present at the compare; status 0, no such line |
+| H2 (B84) | `home-removed`: the folder is there at the record and the child removes it after `stop()`, before `remove_scratch` | the same, the home present then absent |
 | R1 | the REAL build in this process: `mcp.launch`, `new_project`, `close_project`, stop, `remove_scratch` | no owner-visible key of `com.kgalligan.Reelcut` moved (one retry when another Reelcut shares the domain, then FAIL naming keys and pids) |
-| R2 | — | the real domain across C0 and the G rows: no owner-visible key moved |
+| R2 | — | the real domain across C0 and the G and H rows: no owner-visible key moved |
 
 `--mutant` reaches the children by argv: `no-compare`
 (`proof_defaults.moved` answers `[]`) must fail exactly G1, G3, G4, G5;
-`no-exit` (`mcp._exit_failed` is a no-op) exactly G1, G3, G4.
+`no-exit` (`mcp._exit_failed` is a no-op) exactly G1, G3, G4;
+`home-followed` (B84: `proof_defaults.read_env` answers None, so `defaults
+export` inherits `CFFIXED_USER_HOME` as it did before) exactly H1, H2.
 
 **`proof_defaults.py`** is the other half and imports nothing from
 `tools/proof`. `remove_domain(name)` is `defaults delete <name>` (0 and 1
@@ -14674,6 +14684,404 @@ python3 tools/proof/proof_defaults.py --list                          # removes 
 python3 tools/proof/proof_defaults.py --sweep                         # removed / shared / busy / denied
 python3 tools/proof/proof_defaults.py                                 # the selftest, then the sweep
 python3 tools/proof/proof_defaults.py --ran assistant_lane_probe --ran assistant_prompt_probe   # make test's last step
-python3 tools/proof/defaults_proof.py                                 # passed 8/8, exit 0 (launches the app; not in make test)
-python3 tools/proof/defaults_proof.py --mutant no-compare             # MUTANT PASS (also no-exit)
+python3 tools/proof/defaults_proof.py                                 # passed 10/10, exit 0 since B84's H1 and H2 (8/8 in this batch; launches the app; not in make test)
+python3 tools/proof/defaults_proof.py --mutant no-compare             # MUTANT PASS (also no-exit, and B84's home-followed)
+```
+
+## Issue batch B84 — delete, rename and restore a graphic, over the last 10 kept texts of each module (`graphics_store_probe.py` H1–H18, C7 and fifteen mutants; `graphics_files_proof.py` and `--mutant rename-unreconciled`; #103 part 1, phase 1; spec §11 G-27, G-28, G-29)
+
+Phase 1 of the batch: the records, the store, the three document bodies,
+the three tools and their proofs. Phase 2 — File ▸ Rename Graphic…, Delete
+Graphic…, Restore Graphic Version… and their sheet — is the subsection at
+this section's end (`graphics_menu_proof.py`, spec §11 G-30).
+
+**What is proved, and by which instrument.**
+
+- **The probe** (`graphics_store_probe.py`, nineteen new rows beside its
+  twenty-six; no app, no MCP) drives `GraphicStore` and
+  `ProjectDocument+GraphicFiles.swift`'s bodies directly, every text
+  compared as text and every revision against hashlib:
+  H1 a replacing `write` + `rescan()` and an in-place outside rewrite each
+  keep the replaced text, newest first, the outside one in ONE post; H2
+  `restoreGraphic` twice, then a kept file rewritten by hand refused in a
+  sentence naming it and the other kept revision, nothing written; H3
+  thirteen writes keep the 10 newest of the 12
+  replaced, and `keep` of a text already kept lists it once; H4 delete
+  refused while used, then done, `fonts/` and `assets/` left, the change
+  count unmoved; H5 a timeline clip and a nest clip through rename, a taken
+  name, a bad name and an open nest refused, `undo()` and `redo()`; H6 a
+  package naming the old name beside the renamed file and its journal pair
+  healed at `startGraphicStore()`, with a CONTROL (no journal: not healed);
+  H7 Undo never moves a live module under a deleted one's name; H8 a rename
+  onto a name a clip draws with no file behind it is refused; H9 (added by
+  the implementer, not in the spec's list) the rename journal holds the 32
+  newest pairs, newest first, a repeated pair once; C7 an untitled
+  document's save carries `graphics/history/`. Five rows came from the
+  batch's review: H10 after `rename a → b`, with `b.js` removed outside
+  the app and a new undrawn `a` written, a committed change leaves `a.js`
+  alone (the repair goes from a pair's second name back to its first,
+  never the other way); H11 after `rename a → b`, a new `a` written and
+  deleted, `undo()` leaves `b.js` and the clip naming `a` — the row where
+  the kept-revision test is the only guard, which H7 no longer is; H12 a
+  package built by hand whose `m.js` is also the newest of two kept texts
+  has it dropped by `startGraphicStore()`, and a default restore writes
+  the older text; H13 with `history/renames.json` a directory, a rename is
+  refused in its sentence and the file, its kept text, the clip and the
+  undo stack are where they were; H14 with a FILE at `history/new`, so
+  the history cannot be folded, a rename is refused, everything is where
+  it was and the journal is as it was — no pair, no `renames.json`. Three
+  rows came from the second review: H15 the state a crash INSIDE a rename
+  leaves when the old name had kept texts, built by hand (`new.js`, the
+  pair `[old, new]`, a kept text under `history/old/`, the project naming
+  `old`): `startGraphicStore()` moves nothing — a LIMIT measured, not a
+  behaviour wanted (G-28 (f)) — and a default `restoreGraphic(old)` run in
+  that package then writes the OLDER kept text to `old.js` while `new.js`
+  keeps the current text, undrawn, the clip still naming `old` and the
+  document not edited (the restore came from the third review); H16 after `rename a → b`, a `rename b → a`
+  refused at the fold (a FILE at `history/a`) leaves `renames.json`
+  byte-for-byte what it was, `[a, b]`, and with the file removed `undo()`
+  puts `a.js` back with its kept text; H17 a chain `a → b → c` with a kept
+  text, `undo()` twice and `redo()` twice, the clip's name, the one file
+  and the kept text scored under one name after each of the six steps. One
+  row came from the third review: H18 a rename refused at the CLIPS,
+  through the probe's own `apply` — one that throws, and one that returns
+  having applied nothing ("its clips did not take the new name") — in both
+  journal states, with no `renames.json` (`a → b`) and after a real
+  `a → b` (`b → c`): after each of the four the file, its kept text, the
+  clip's name, the undo stack and `renames.json` (no file; byte-for-byte
+  `[a, b]`) are where they were, `apply` was handed one op, and `undo()`
+  of the real rename still puts `a.js` back. One part is a LIMIT
+  measured (G-28 (d)): onto a DELETED module's name the histories have
+  folded before the clips refuse, so after the move back the deleted text
+  is kept under the renamed module and nothing is kept under the deleted
+  name. The last part makes the move back itself FAIL (the probe's `apply`
+  puts a FILE at `history/a` before it throws, so the history cannot be
+  folded back): `b.js` and its kept text stay, the clip names `a`, the
+  pair `[a, b]` is still journalled, and with that file removed a
+  committed change repairs — `a.js` back with its kept text.
+- **The MCP proof** (`graphics_files_proof.py`, new; its own instance on a
+  scratch socket under `CFFIXED_USER_HOME=work/graphics-files/home`, the
+  work folder removed at the start and at exit, no menu item performed):
+  H0 the scratch home took; T0 the three tools are listed with no `scope`;
+  D1/D2 delete refused in the exact sentence, then done, listed under
+  `history`, `unsaved_changes` unmoved, restored byte-equal; V1/V2 `kept`
+  across writes and restores, restore by revision, the two refusals, 12
+  writes keeping 10, and a `save_project` that succeeds afterwards with
+  `graphics/history/` in the package; N1 rename over a timeline clip and a
+  nest clip with two frames byte-identical before and after, and five
+  refusals in their exact sentences; N2 `undo` and `redo` of Rename Graphic
+  each leaving no clip naming an absent module and the same frame bytes; N3
+  H7's steps over the tools; Z1 the projects close and the log holds no
+  `Reelcut: ` line.
+- **The count** moved to 89 product tools: `op_argument_proof.py`'s
+  `PRODUCT_TOOLS`, and the three names in `phase9_proof.py`'s,
+  `recording_proof.py`'s and `recording_probe.py`'s `APP_STATE_TOOLS`.
+
+**Mutants** (each built from a copy with one anchor, asserted once,
+replaced; exit 0 means its row FAILED in the copy):
+
+| Mutant | What it removes | Must fail | Also failed |
+|---|---|---|---|
+| `history-unkept` (probe) | the pass's `keepReplaced` call | H1 | H2, H3, H5, H12, H13, H14, H15, H16, H17, H18, C7 |
+| `history-uncapped` (probe) | `tidy`'s prune past 10 | H3 | — |
+| `delete-used` (probe) | `deleteGraphic`'s clip groups | H4 | — |
+| `rename-unreconciled` (probe) | the `.projectDocumentDidChange` observer's body | H5 and H17 (both required) | H16, H18 |
+| `history-left-behind` (probe) | `moveModule`'s `moveHistory` | H5 | H14, H16, H17, H18 |
+| `reconcile-over-delete` (probe) | the repair's kept-revision test | H11 | H15 |
+| `rename-onto-drawn` (probe) | `renameGraphic`'s drawn check | H8 | — |
+| `journal-uncapped` (probe) | `recordRename`'s cut to 32 pairs | H9 (40 pairs) | — |
+| `reconcile-both-directions` (probe) | the repair's one direction (each pair tried both ways) | H10 | — |
+| `rename-unjournalled` (probe) | `moveModule`'s read-back of the pair it wrote | H13 | — |
+| `start-undropped` (probe) | `start()`'s drop of each current revision | H12 | — |
+| `restore-unhashed` (probe) | `restoreGraphic`'s hash of the kept bytes | H2 | — |
+| `rollback-unjournalled` (probe) | `moveModule`'s put-back of the journal, as it was read, when the history cannot be folded | H14 and H16 (both required) | H18 |
+| `moveback-unjournalled` (probe) | `renameGraphic`'s put-back of the journal, as it was read before the rename, after a rename refused at the clips is moved back | H18 | — |
+| `moveback-unconditional` (probe) | that put-back's condition (it runs whether or not the move back succeeded, taking the pair from a file left at the new name) | H18 | — |
+| `rename-unreconciled` (MCP, an app built in a tree copy) | the same observer body | N2 | — |
+
+**What the runs printed** (2026-10-04, this tree over `0b6f437`):
+`graphics_store_probe.py` 45/45; each of its fifteen new mutants `MUTANT
+PASS` with the rows in the table; `graphics_files_proof.py` 10/10;
+`--mutant rename-unreconciled` 9/10 and `MUTANT PASS: rename-unreconciled —
+N2 FAILED in the copy (failed: N2)`, its undo leaving clips 2 and 3 naming
+`title` beside a folder holding `headline` and the frames differing.
+
+**Not claimed.** How the three acts look to a person: the sheets are
+phase 2's below, and what only a person can judge of them is
+`docs/manual-checks.md`'s GR-7. A crash between `removeModule`'s `keep` and
+the file's removal was not made to happen: H12 builds the state it leaves
+(the current text also the newest kept) by hand. **The repair's three
+limits** (spec §11 G-28 (f)). The first no row can measure: with the pair
+`[a, b]`, clips that name `a` with no file and nothing kept for a reason
+other than Undo — repointed onto a new `a.js` that was then removed
+outside the app — cannot be told from an Undo, because the store cannot
+see a removal made outside the app, and an undrawn `b.js` is moved under
+`a`. The mirror of it, a file removed at a pair's SECOND name, is H10 and
+is not repaired. The other two are a crash INSIDE `moveModule`, which no
+row makes happen; each row builds by hand the state the crash leaves.
+**That a rename killed part-way is healed is NOT claimed**: killed after
+the file moved and before the pair was written, nothing is repaired (H6's
+CONTROL is that state); killed after the pair was written and before the
+history was folded, it is healed only when the old name had nothing kept
+(H6), and with kept texts under the old name the repair reads it as a
+deleted module and moves nothing (H15, which also runs the default
+restore G-28 (f) speaks of in that state). The way out is by hand:
+`set_graphic {name: <to>}` on the clips. **That a rename refused at the
+clips puts everything back is claimed for the file, its history, the
+clips and the journal, not for a deleted module's kept texts**: onto a
+deleted module's name they end under the renamed module (H18's LIMIT
+part, G-28 (d)). H18 refuses through the probe's own `apply`; no row
+makes the CORE refuse a rename's `set_graphic`, and no MCP row reaches
+that arm. A kept file changed by hand is
+still LISTED (`kept`, `history`): H2 measures the listing and the refused
+restore, and nothing claims the list ignores it (G-29 (d)).
+
+```sh
+python3 tools/proof/graphics_store_probe.py                               # 45/45, exit 0
+for m in history-unkept history-uncapped delete-used rename-unreconciled \
+         history-left-behind reconcile-over-delete rename-onto-drawn journal-uncapped \
+         reconcile-both-directions rename-unjournalled start-undropped restore-unhashed \
+         rollback-unjournalled moveback-unjournalled moveback-unconditional; do
+  python3 tools/proof/graphics_store_probe.py --mutant $m                 # MUTANT PASS each
+done
+python3 tools/proof/graphics_files_proof.py                               # 10/10, exit 0 (launches the app; not in make test)
+python3 tools/proof/graphics_files_proof.py --mutant rename-unreconciled  # MUTANT PASS (builds an app in a tree copy)
+```
+
+### Phase 2 — File ▸ Rename Graphic…, Delete Graphic… and Restore Graphic Version…, and their one sheet (`graphics_menu_proof.py` M14–M20 and S0–S2, eleven probe-tier and two app-tier mutants; `screens.py` 15b–15d; spec §11 G-30)
+
+The three File items put up one sheet, `GraphicFileSheetController`, which
+calls phase 1's three bodies and shows a refusal as the body's own sentence.
+`graphics_menu_proof.py` (road map 10's G5b proof; its docstring has every
+row word for word) now runs ONE Release instance for the whole run, in a
+scratch home (`CFFIXED_USER_HOME=tools/proof/work/graphics-menu/home`,
+through `mcp.launch`, as `graphics_files_proof.py` launches). It builds GM
+as before and **GF**: `title` written twice (so one text is kept), `other`
+and `spare` written once, `gone` written and then `delete_graphic`, two
+`title` clips with the second nested, saved. The probe gets a COPY of GF.
+At the start and at exit the home, the packages, the captures and a
+mutant's tree copy are removed; the probe's build (`work/graphics-menu/probe/`)
+and the last log stay.
+
+**What is proved, and by which instrument.**
+
+- **The probe** (`graphics_menu_probe.swift`, rows M14–M20 after M2–M13; the
+  app's own `AppDelegate`, `EditorViewController` and
+  `GraphicFileSheetController`, the editor in an unshown window): M14 File
+  from Add Image to Graphics… on reads Add Image to Graphics…, a separator,
+  the three items, a separator, Export…, Save Frame…, each with its action,
+  no key equivalent, and no target with no window; M15 the validator —
+  false,false,false with no store and on a package with no module,
+  true,true,false with modules and nothing kept, true,true,true on GF,
+  false,true,true with its nest open, true,true,true back out; M16 Delete
+  opens on the FIRST graphic though the selected clip draws another, and a
+  refused Delete (the graphic two clips draw) leaves the sheet up with
+  exactly the body's sentence, in a label that is inside the sheet's
+  content view and tall enough for its text at its width, the sheet taller
+  than before; M17 a Delete that succeeds closes the sheet, keeps the text
+  and moves neither the undo stack nor the edited flag; M18 Rename opens on
+  the selected clip's graphic with the button dimmed; renaming a graphic
+  no clip uses is no undo step; renaming a used one is ONE closed step,
+  "Rename Graphic", and `undo()` / `redo()` carry the file with the clips;
+  M19 a taken name and a name that breaks the rule are each refused in the
+  body's sentence, the name passed as typed; M20 Restore lists deleted
+  graphics as `<name> (deleted)`, opens on the deleted graphic a selected
+  clip draws, says `1 version kept`, restores the deleted bytes, and a
+  second Restore puts a live graphic's earlier text back and keeps the one
+  it replaced.
+  **How a confirm is reached.** No dev tool presses a sheet's default
+  button, so each row drives the sheet's own controls in the probe's
+  process: `selection` set, the editor's own action called
+  (`deleteGraphic(nil)`), `attachedSheet` waited for, the pop-up's row
+  selected by `representedObject` and the pop-up's action sent, the field
+  written and its delegate handed the text-change, and the
+  `graphicfile.confirm` button's own action sent to its own target. `press`
+  never sends a disabled button's action, and never a button of a sheet
+  that is no longer the attached one (the first `opening-first` run found
+  why: an earlier row's failure let a later step dismiss a closed sheet a
+  second time, which raises).
+- **MCP** (the dev tools, on GF in the instance; nothing is confirmed
+  there): S0 the scratch home took; S1 `perform_menu_item` with no path
+  lists the three straight after Add Image to Graphics…, each `sheet`, not
+  refused, enabled — and with the nest open Rename is disabled and
+  performing it is refused "is disabled here"; S2 with nothing selected
+  each item's sheet goes up, its `snapshot_ui` layout dump has no
+  `problems` and shows the title, the hint, Cancel, the act's button and
+  the pop-up's first graphic (`other`, `other`, `gone (deleted)`; Restore
+  also `1 version kept`), `cancel_sheet` answers `cancel_button` with no
+  sheet left, and the modules, the history, every clip's graphic and
+  `unsaved_changes` (false) are as before.
+- **The screen catalog**: `15b-rename-graphic-sheet`,
+  `15c-delete-graphic-sheet` and `15d-restore-graphic-version-sheet`, each
+  one `perform_menu_item` over `demo` and an `expect` on its title (15d
+  also `1 version kept`). `screens.py`'s `demo` now writes `lower-third`
+  twice, an earlier text first, so one version is kept; no other screen's
+  picture reads the module's history.
+- `capture_spike/inventory.json` has the three selectors (`sheet`) and
+  their one site, `presentGraphicFileSheet`'s `presentAsSheet`;
+  `inventory.py --check` (in `make test`) and `v2_menu.py --only H` hold it
+  to the tree and to `UIMenuTable.swift`.
+
+**Mutants.** Probe tier: the probe built over a COPY of `app/Sources` with
+one anchor, asserted once, replaced; the fixtures and the probe run.
+**Rule R1** holds the ten new ones: exit 0 only when the mutant's row was
+answered, FAILED, and every row the probe answered before it passed — the
+row is the FIRST failure, so a mutant that breaks an earlier row's
+precondition is not counted as caught by its own; exit 1 when the row
+passed or an earlier row failed first (printed by name); exit 2 when the
+control was not performed. `notice-dropped` keeps Rule R (its row failed).
+App tier: a tree copy (`tree_copy.make_copy`) built by its own `make app`,
+the fixtures and the S rows only, Rule R.
+
+| Mutant | What it changes | Must fail | Also failed |
+|---|---|---|---|
+| `item-dropped` (probe) | Restore's `addItem` in `addGraphicFileItems` | M14 | — |
+| `rename-in-nest` (probe) | `isOffered`'s line that refuses Rename with a nest open | M15 | — |
+| `refusal-unshown` (probe) | the message label's assignment | M16 | M19 |
+| `refusal-unwrapped` (probe) | the message label built by `labelWithString` | M16 | — |
+| `delete-opens-selected` (probe) | `opening`'s line that sets Delete's selected graphic aside | M16 | — |
+| `success-undismissed` (probe) | the `dismiss` after a success | M17 | M18, M20 |
+| `rename-ungrouped` (probe) | `performGroupedEdit` → `applyEdit` in `perform` | M18 | — |
+| `opening-first` (probe) | `opening`'s selected-graphic line | M18 | M19, M20 |
+| `rename-field-lowercased` (probe) | `.lowercased()` on the field's text where `perform` is called | M19 | — |
+| `restore-deleted-unlisted` (probe) | Restore's `choices` filtered to names `holdsModule` holds | M20 | — |
+| `notice-dropped` (probe, Rule R; issue batch B67's) | `addGraphicImage(from:)`'s `showGraphicNotice(` call | M13 | — |
+| `app-rename-in-nest` (MCP, an app built in a tree copy) | the same `isOffered` line | S1 | — |
+| `app-sheet-unpresented` (MCP, an app built in a tree copy) | `presentGraphicFileSheet`'s `presentAsSheet(` line, a no-op | S2 | — |
+
+**What the runs printed** (2026-10-04 into 2026-10-05, this tree over `0b6f437`):
+`graphics_menu_proof.py` 27/27, exit 0 (S0, M14–M20, S1 and S2 new beside
+its seventeen), the probe's 19 rows all passed; M16 read the refusal's
+label at 380 × 45 pt needing 45, and the sheet 240 → 265 pt tall (the
+probe's own window and fonts). Each of the ten new probe-tier mutants
+printed `MUTANT PASS: <name> — <row> FAILED in the copy and is the first
+failure`, with the rows in the table, and `notice-dropped` `MUTANT PASS:
+notice-dropped — M13 FAILED in the copy (failed: M13)`. What the failing
+row read: `item-dropped` the File tail without Restore Graphic Version…;
+`rename-in-nest` true,true,true with the nest open; `refusal-unshown` an
+empty message; `refusal-unwrapped` the label 380 × 15 pt needing 45, the
+sheet 240 → 240; `delete-opens-selected` opened on `title`;
+`success-undismissed` not detached after 3 s; `rename-ungrouped`
+`groupingLevel` 1; `opening-first` opened on `other`;
+`rename-field-lowercased` `graphic name "bad name" is not a module name …`;
+`restore-deleted-unlisted` the one row `headline`. `--mutant
+app-rename-in-nest`: `MUTANT PASS: app-rename-in-nest — S1 FAILED in the
+copy (failed: S1)` — with the nest open the three read enabled and
+Rename was performed, not refused (the row cancelled its sheet). `--mutant
+app-sheet-unpresented`: `MUTANT PASS: app-sheet-unpresented — S2 FAILED in
+the copy (failed: S2)` — `perform_menu_item` answered no sheet and
+`snapshot_ui` "has no sheet attached". `screens.py --only` the three new
+screens: 8 pass, 0 fail, 0 skip of 8, 0 new problems; the captures are
+420 × 254 (Rename), 420 × 240 (Delete) and 420 × 242 pt (Restore) in both
+looks. `inventory.py --check` 5/5 (48 grep sites, 48 pins) and `v2_menu.py
+--only H` 5 pass of 5 (149 leaves, 97 selectors, 97 rows in both tables).
+`graphics_files_proof.py` 10/10 and `graphics_proof.py` 51/51 (the second
+with `CFFIXED_USER_HOME` set to a scratch home) as before.
+**Superseded, said so it is not mistaken for a count:** the first
+`--mutant opening-first` run exited 2 — the probe raised before answering
+(above) — and after `press` was hardened the eleven probe-tier mutants and
+the proof were run again; only those runs are quoted.
+
+**Not claimed.** How the three sheets look, and that a name typed on a real
+keyboard lands in New name: `docs/manual-checks.md`'s GR-7 (no script types
+real keys without taking focus). A confirm over MCP: no dev tool presses a
+sheet's default button, so M16–M20 press it in the probe's process, in an
+unshown window, and the built app's sheets are only opened, read and
+cancelled (S2). M16's geometry is therefore the probe's: the label inside
+the content view, its height against its text, the sheet taller — not a
+picture of the refusal on screen, which is GR-7's. That the validator is
+cheap is a code read (Rename and Delete ask the last scan; Restore lists
+file names under `graphics/history/`, no kept file's bytes), not a timing. The Delete sheet's card is 420 × 240 in the
+15c layout dumps — the height `makeSheetView` creates every card at — with
+its one-row grid 46 pt tall, where 15d's grid of a pop-up and the kept line
+is 48: the card did not shrink to its one row, and the slack shows between
+the pop-up and the buttons. Why is not measured, and `Sheets.swift` is
+every sheet's, so nothing is changed for it here; whether it reads as
+loose is GR-7's.
+
+**Fix pass 1** (2026-10-05, the review's two should-fixes; macOS 26.5.1,
+Python 3.14.7, another session's Reelcut, pid 85319, running throughout).
+*The guard under a scratch home that is not there.* The screens line
+below, run while `tools/proof/work/b84b-screens/home` did not exist,
+printed `mcp: DEFAULTS MOVED in com.kgalligan.Reelcut:` with forty of the
+owner's key names though no default had moved (the review's run; it ended
+0 only because pid 85319 shared the domain). Measured, counts only:
+`defaults export com.kgalligan.Reelcut -` answered 47 keys with no
+`CFFIXED_USER_HOME`; 0 keys, status 0 and nothing on stderr, under one
+naming an absent folder; 47 under one naming a present, empty folder,
+every key name and value equal to the read with no variable; then 0 and
+47 again. The read did not make the absent folder and put nothing in the
+present one. `screens.py` records at `scratch_socket()`, before the
+instance it launches has made the home, so the record held no key and the
+compare the whole domain. **What the guard does now:**
+`proof_defaults._export`, the one `defaults export` behind every snapshot,
+runs `defaults` in `read_env()` — the process's environment without
+`CFFIXED_USER_HOME` — so the record and the compare read the same domain
+whether or not the folder exists at either, and the screens line needs no
+`mkdir` in front of it. Nothing creates a home for a proof, and the
+owner's domain is still only read. `defaults_proof.py` gained H1 (the home
+absent at the record, present at the compare), H2 (present, then removed
+before the compare) and `--mutant home-followed`; the B83 section's table
+has them. What the runs printed: `passed 10/10`, exit 0 — H1 "the clone's
+domain holds 5 keys, ReelcutDefaultsProofSeed among them; status 0; … the
+home at the record absent, made by the instance True, at the compare
+present; the record held 5 keys; defaults_moved []", H2 "… the home at the
+record present, … at the compare absent; the record held 5 keys;
+defaults_moved []", R1 and R2 no key of `com.kgalligan.Reelcut` (47 keys)
+moved. `--mutant home-followed`: `MUTANT PASS: home-followed failed ['H1',
+'H2'], expected ['H1', 'H2']`, H1 there "status 3; … (0 keys before …);
+the record held 0 keys of the 5 the clone's domain holds" and H2 "status
+3" with five keys recorded, each under `mcp: DEFAULTS MOVED in
+com.kgalligan.reelcut.defaults-proof: ReelcutDefaultsProofSeed,
+ReelcutSnappingEnabled (other Reelcut pids: none)`. `--mutant no-compare`
+and `no-exit` `MUTANT PASS` on their own rows (G1, G3, G4, G5; G1, G3, G4)
+with H1 and H2 passing, and `proof_defaults.py`'s three as before
+(`no-unlink` P2, `no-refusal` P3–P6, `no-busy` P8). The screens line from
+a work folder with no home in it: 8 pass, 0 fail, 0 skip of 8, 0 new
+problems, nothing on stderr, and the home there afterwards (the instance
+made it). Not measured: which domain an instance writes when its home is
+absent at launch; the guard reads the owner's either way.
+*The second review's one finding (fixed by the orchestrator).* After the
+read moved to `read_env()`, the removal recipe's `defaults delete`, the
+per-key delete and the selftest's `defaults write` still followed
+`CFFIXED_USER_HOME`: under one naming an absent folder the review's
+`proof_defaults.py --selftest` printed `passed 9/10`, exit 1 (P1's write
+landed in no domain the read finds). All of this file's `defaults` now run
+in `read_env()`. With `CFFIXED_USER_HOME` naming an absent folder,
+`proof_defaults.py --selftest` printed `passed 10/10`, exit 0, and the
+folder was still absent afterwards; with no variable `passed 10/10`; its
+three mutants `MUTANT PASS` on P2, P3–P6 and P8; `defaults_proof.py`
+`passed 10/10`, exit 0, R2 "moved []" over the 47 keys; `--mutant
+home-followed` `MUTANT PASS` on H1 and H2. No selftest ROW sets the
+variable: the absent-home run is a command, not a row, and no mutant holds
+it.
+*The validator.* `isOffered` built `choices`, so every File-menu open
+listed `graphics/history/<name>/` once per module for Rename and again for
+Delete, for a `kept` count neither sheet shows. It now answers without
+building them — Rename and Delete from the last scan, Restore from
+`keptNames()` — with the same truth table: `graphics_menu_proof.py` 27/27,
+exit 0, M15 as before; `--mutant rename-in-nest` `MUTANT PASS … M15 FAILED
+in the copy and is the first failure`, `restore-deleted-unlisted` the same
+for M20, `app-rename-in-nest` `MUTANT PASS … S1 FAILED in the copy`. The
+other ten mutants were not re-run; all thirteen anchors were counted in
+the tree, once each. `make typecheck` 0 errors and the 4 warnings, `make
+app` `** BUILD SUCCEEDED **`, `make test` exit 0 (93 `test result: ok`;
+18/18, 14/14, 27/27, 23/23, `inventory.py --check` 5/5 over 48 sites and
+48 pins, `spec_index_proof.py` 138/138, `proof_defaults.py` 10/10 and
+`sweep: removed 2, shared 1, busy 0, denied 0`).
+
+```sh
+python3 tools/proof/graphics_menu_proof.py                                # 27/27, exit 0 (launches the app in a scratch home; not in make test)
+for m in notice-dropped item-dropped rename-in-nest refusal-unshown refusal-unwrapped \
+         delete-opens-selected success-undismissed rename-ungrouped opening-first \
+         rename-field-lowercased restore-deleted-unlisted; do
+  python3 tools/proof/graphics_menu_proof.py --mutant $m                  # MUTANT PASS each (a probe build each)
+done
+python3 tools/proof/graphics_menu_proof.py --mutant app-rename-in-nest    # MUTANT PASS (builds an app in a tree copy)
+python3 tools/proof/graphics_menu_proof.py --mutant app-sheet-unpresented # MUTANT PASS (builds an app in a tree copy)
+# The home need not exist: the defaults guard reads with no CFFIXED_USER_HOME (fix pass 1 above).
+CFFIXED_USER_HOME="$PWD/tools/proof/work/b84b-screens/home" python3 tools/proof/screens.py \
+  --only 15b-rename-graphic-sheet,15c-delete-graphic-sheet,15d-restore-graphic-version-sheet
+python3 tools/proof/defaults_proof.py                                     # passed 10/10, exit 0 (H1, H2 new)
+python3 tools/proof/defaults_proof.py --mutant home-followed              # MUTANT PASS: failed H1, H2
 ```

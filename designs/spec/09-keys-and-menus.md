@@ -74,6 +74,11 @@ Add Media…, Import Captions… (M3), Generate Captions… and Export
 Captions… (road map 2's phase 4 — the three caption items sit
 together, in the order a caption track comes into being and leaves again,
 and none of them takes a key equivalent), Consolidate Media… (M3),
+Rename Graphic…, Delete Graphic… and Restore Graphic Version… (issue batch
+B84, §11 G-30 — a separator group of their own under the two Add … to
+Graphics… items named below; each puts up one small sheet with a pop-up of
+the project's graphics, none takes a key equivalent, and Rename Graphic… is
+greyed while a nest is open),
 Export…, Save Frame… (road map 2's phase 7a — the frame under the playhead
 written as a PNG, JPEG or HEIC still, at ⌥⌘E because it is Export…'s
 still-image sibling and belongs under the same letter; the format is chosen
@@ -134,5 +139,13 @@ into the app's `GraphicTemplates/`, titled from the file stem —
 From File…; and File gains **Add Font to Graphics…** and **Add Image to
 Graphics…** right after Consolidate Media…. None of the ten items takes a
 key equivalent, for the caption items' reason; §11 G-16 has the rules.
+Issue batch B84 (#103) adds, after a separator straight under Add Image to
+Graphics… and before the separator above Export…, **Rename Graphic…**,
+**Delete Graphic…** and **Restore Graphic Version…**, in that order and
+with no key equivalents: each is one small sheet over the body its tool
+runs (`rename_graphic`, `delete_graphic`, `restore_graphic`). Rename and
+Delete are greyed in a project with no graphics, Restore when no version
+of any graphic is kept, and Rename also while a nest is open; §11 G-30 has
+the rules.
 All menu items are nil-target selectors validated in
 `validateUserInterfaceItem`.

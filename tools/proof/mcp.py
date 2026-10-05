@@ -15,7 +15,13 @@ A record per socket path holds that domain's key names against salted
 digests (`proof_defaults.snapshot`, `defaults export` only) and the other
 Reelcut pids sharing it: `scratch_socket()` records the real domain,
 `launch()` re-records the binary's own and owns its child, and `MCP()`
-records a socket it was handed. `remove_scratch()` compares, and one
+records a socket it was handed. The record and the compare both read the
+domain with no `CFFIXED_USER_HOME` in `defaults`' environment
+(`proof_defaults.read_env`): under one naming a folder that does not exist
+`defaults export` answers no key, so a script run under a scratch home not
+made yet at the record, or removed before the compare, would otherwise be
+told every key of the domain moved (issue batch B84; `defaults_proof.py`
+H1, H2). `remove_scratch()` compares, and one
 `atexit` handler compares every record still held. A moved key outside
 AppKit's `NS*`/`Apple*` families prints `mcp: DEFAULTS MOVED in <domain>:
 <names> (other Reelcut pids: <list|none>)` on stderr; when no other Reelcut

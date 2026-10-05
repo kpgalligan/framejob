@@ -52,6 +52,10 @@ _Avoid_: script, component, file (the file holds the module), plugin
 Which text of a **Module** drew a frame: the SHA-256 of its source's bytes, 64 hex digits. Two identical texts are one revision wherever they came from; an edit to the file is a new revision, and an export pins the revision it started with.
 _Avoid_: version (the font and asset set has a version), hash, edit number
 
+**Kept revision**:
+An earlier text of a **Module** the app kept, named by its **Revision**: the text a write replaced while the project was open, or the text a delete removed. The last 10 per module live in the package's `graphics/history/<name>/`, never the current text among them, and move with the module when it is renamed. A name with no file but with kept revisions is a deleted module (spec §11 G-27, G-29).
+_Avoid_: backup, snapshot, undo step (restoring one is a file write, not undo), version
+
 **Props**:
 The values a **Graphic** is drawn with, stored on its clip in the caller's key order — a title, an accent colour, a size. When the op that sets them carries the module's schema, each is checked by its dotted path (`props.accent`) for its type, its range and its options, and a colour is stored as lowercase hex; without one, only its shape. Distinct from a **Patch**, which is what a caller SENDS to change them: a patch's `props` merges into the stored props key by key, and a null in it removes that key (spec §11 G-4, G-12).
 _Avoid_: parameters, inputs, settings, variables

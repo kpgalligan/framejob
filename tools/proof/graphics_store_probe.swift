@@ -702,6 +702,727 @@ do {
 }
 answer["c6"] = r6
 
+// MARK: - H1..H18, C7 — kept revisions, delete, rename, restore (issue batch B84, #103)
+
+func moduleText(_ tag: String) -> String {
+    "export function render() { return '<svg/>' } // \(tag)\n"
+}
+func textAt(_ url: URL) -> Any { (try? String(contentsOf: url, encoding: .utf8)) ?? NSNull() }
+func keptTexts(_ store: GraphicStore?, _ name: String) -> [Any] {
+    (store?.kept(named: name) ?? []).map { textAt($0.url) }
+}
+func keptRevisions(_ store: GraphicStore?, _ name: String) -> [String] {
+    (store?.kept(named: name) ?? []).map(\.revision)
+}
+func sentence(_ body: () throws -> Void) -> Any {
+    do { try body(); return NSNull() } catch { return error.localizedDescription }
+}
+func historyDirectory(_ store: GraphicStore?, _ name: String) -> Bool {
+    store.map { present($0.folderURL.appendingPathComponent("history/\(name)")) } ?? false
+}
+/// A new untitled document with its store started and one track; the track.
+func graphicDocument() -> (ProjectDocument, UInt32) {
+    let document = ProjectDocument()
+    document.startGraphicStore()
+    document.performGroupedEdit("Add Track", [.addTrack(index: 0)])
+    return (document, document.project.snapshot.tracks.first?.id ?? 0)
+}
+/// Writes `name` and rescans, as `write_graphic` does.
+func writeModule(_ document: ProjectDocument, _ name: String, _ text: String) {
+    try? document.graphicStore?.write(name: name, source: text)
+    document.graphicStore?.rescan()
+}
+/// Places a graphic clip drawn by `name` at `at` seconds; its id.
+func placeGraphic(_ document: ProjectDocument, _ track: UInt32, _ name: String, at: Int) -> UInt32 {
+    let before = Set(document.project.snapshot.clips.map(\.id))
+    document.performGroupedEdit("Add Graphic", [.addGraphicClipRaw(
+        track: track, at: Ticks(at) * 600_000, duration: 600_000, name: name)])
+    return document.project.snapshot.clips.first { !before.contains($0.id) }?.id ?? 0
+}
+/// Every graphic clip's module name, the timeline's and every nest's, by id.
+func graphicNames(_ document: ProjectDocument) -> [String: String] {
+    let snapshot = document.project.snapshot
+    var names: [String: String] = [:]
+    for clip in snapshot.clips + snapshot.nests.flatMap({ $0.clips }) {
+        if let name = clip.graphic?.name { names[String(clip.id)] = name }
+    }
+    return names
+}
+func walk(_ document: ProjectDocument, redo: Bool) {
+    guard let manager = document.undoManager else { return }
+    let groupsByEvent = manager.groupsByEvent
+    if groupsByEvent { manager.groupsByEvent = false }
+    if redo { manager.redo() } else { manager.undo() }
+    if groupsByEvent { manager.groupsByEvent = true }
+}
+var historyRoots: [URL] = []
+
+// H1 — a replacing write and an in-place outside rewrite each keep the text
+let hs = GraphicStore(package: nil, seed: nil, bundledFonts: fontsDir)
+hs.start()
+historyRoots.append(hs.folderURL)
+let (h1a, h1b, h1c) = (moduleText("h1 a"), moduleText("h1 b"), moduleText("h1 c"))
+try? hs.write(name: "h", source: h1a)
+hs.rescan()
+let h1Fresh = keptTexts(hs, "h")
+try? hs.write(name: "h", source: h1b)
+hs.rescan()
+row = ["texts": [h1a, h1b, h1c], "kept_fresh": h1Fresh, "kept_after_write": keptTexts(hs, "h")]
+pump(0.3)
+mark = posts.count
+writeInPlace(h1c, hs.folderURL.appendingPathComponent("h.js"))
+row["outside"] = settle(mark, hs)
+row["kept_after_outside"] = keptTexts(hs, "h")
+row["revisions"] = keptRevisions(hs, "h")
+answer["h1"] = row
+hs.stop()
+
+// H2 — restore writes the newest kept text and keeps what it replaced
+let h2 = ProjectDocument()
+h2.startGraphicStore()
+if let root = h2.graphicStore?.folderURL { historyRoots.append(root) }
+let (h2a, h2b) = (moduleText("h2 a"), moduleText("h2 b"))
+writeModule(h2, "r", h2a)
+writeModule(h2, "r", h2b)
+let h2File = h2.graphicStore?.folderURL.appendingPathComponent("r.js") ?? work
+row = ["texts": [h2a, h2b]]
+row["first"] = (try? h2.restoreGraphic(named: "r", revision: nil)) ?? NSNull()
+row["file_after_first"] = textAt(h2File)
+row["bytes_equal"] = (try? Data(contentsOf: h2File)) == Data(h2a.utf8)
+row["kept_after_first"] = keptTexts(h2.graphicStore, "r")
+row["second"] = (try? h2.restoreGraphic(named: "r", revision: nil)) ?? NSNull()
+row["file_after_second"] = textAt(h2File)
+row["kept_after_second"] = keptTexts(h2.graphicStore, "r")
+row["none"] = sentence { _ = try h2.restoreGraphic(named: "never", revision: nil) }
+row["unknown"] = sentence { _ = try h2.restoreGraphic(named: "r", revision: "feed") }
+row["kept_revisions"] = keptRevisions(h2.graphicStore, "r")
+row["edited"] = h2.isDocumentEdited
+// A kept file changed by hand is not a kept text: restore refuses it and writes nothing.
+let h2c = moduleText("h2 c")
+writeModule(h2, "r", h2c)
+let h2Newest = h2.graphicStore?.kept(named: "r").first
+if let url = h2Newest?.url { write(moduleText("h2 changed by hand"), url) }
+row["third"] = h2c
+row["tampered_file"] = h2Newest?.url.lastPathComponent ?? ""
+row["tampered"] = sentence { _ = try h2.restoreGraphic(named: "r", revision: nil) }
+row["file_after_tampered"] = textAt(h2File)
+row["kept_revisions_after_tampered"] = keptRevisions(h2.graphicStore, "r")
+answer["h2"] = row
+
+// H3 — thirteen texts keep exactly ten; a text kept twice is listed once
+let h3Texts = (0..<13).map { moduleText("h3 \($0)") }
+for text in h3Texts { writeModule(h2, "t", text) }
+row = ["texts": h3Texts, "kept": keptTexts(h2.graphicStore, "t")]
+if let folder = h2.graphicStore?.folderURL {
+    GraphicStore.keep(Data(h3Texts[7].utf8), named: "t", in: folder)
+}
+row["kept_again"] = keptTexts(h2.graphicStore, "t")
+answer["h3"] = row
+h2.close()
+
+// H4 — delete is refused while a clip draws the module, then done
+let (h4, h4Track) = graphicDocument()
+let h4Store = h4.graphicStore
+let h4Folder = h4Store?.folderURL ?? work
+historyRoots.append(h4Folder)
+let h4Text = moduleText("h4")
+writeModule(h4, "used", h4Text)
+try? files.createDirectory(
+    at: h4Folder.appendingPathComponent("fonts"), withIntermediateDirectories: false)
+try? files.copyItem(
+    at: fontsDir.appendingPathComponent(face), to: h4Folder.appendingPathComponent("fonts/\(face)"))
+try? files.createDirectory(
+    at: h4Folder.appendingPathComponent("assets"), withIntermediateDirectories: false)
+try? files.copyItem(at: assetPNG, to: h4Folder.appendingPathComponent("assets/logo.png"))
+h4Store?.rescan()
+let h4Clip = placeGraphic(h4, h4Track, "used", at: 0)
+row = ["clip": Int(h4Clip), "text": h4Text]
+row["refused"] = sentence { _ = try h4.deleteGraphic(named: "used") }
+row["file_after_refusal"] = present(h4Folder.appendingPathComponent("used.js"))
+row["absent"] = sentence { _ = try h4.deleteGraphic(named: "nope") }
+h4.performGroupedEdit("Delete", [.delete(clips: [h4Clip])])
+let h4Edited = h4.isDocumentEdited
+h4.updateChangeCount(.changeCleared)
+row["deleted"] = (try? h4.deleteGraphic(named: "used")) ?? NSNull()
+row["file_after_delete"] = present(h4Folder.appendingPathComponent("used.js"))
+row["listed_after_delete"] = h4Store?.module(named: "used") != nil
+row["kept"] = keptTexts(h4Store, "used")
+row["kept_names"] = h4Store?.keptNames() ?? []
+row["font_kept"] = present(h4Folder.appendingPathComponent("fonts/\(face)"))
+row["asset_kept"] = present(h4Folder.appendingPathComponent("assets/logo.png"))
+row["edited_by_clip_delete"] = h4Edited
+row["edited_by_delete"] = h4.isDocumentEdited
+answer["h4"] = row
+h4.close()
+
+// H5 — rename moves a timeline clip, a nest clip and the kept texts; undo and redo
+let (h5, h5Track) = graphicDocument()
+let h5Store = h5.graphicStore
+let h5Folder = h5Store?.folderURL ?? work
+historyRoots.append(h5Folder)
+let (h5a, h5b) = (moduleText("h5 a"), moduleText("h5 b"))
+writeModule(h5, "old", h5a)
+writeModule(h5, "old", h5b)
+writeModule(h5, "other", moduleText("h5 other"))
+let h5Timeline = placeGraphic(h5, h5Track, "old", at: 0)
+let h5Nested = placeGraphic(h5, h5Track, "old", at: 2)
+h5.performGroupedEdit("Nest", [.nest(clips: [h5Nested])])
+let h5Nest = h5.project.snapshot.nests.first?.id ?? 0
+let h5NestClip = h5.project.snapshot.clips.first { $0.source.nestID == h5Nest }?.id ?? 0
+func h5State() -> [String: Any] {
+    [
+        "names": graphicNames(h5),
+        "old_file": textAt(h5Folder.appendingPathComponent("old.js")),
+        "new_file": textAt(h5Folder.appendingPathComponent("new.js")),
+        "kept_old": keptTexts(h5Store, "old"), "kept_new": keptTexts(h5Store, "new"),
+        "history_old": historyDirectory(h5Store, "old"),
+        "history_new": historyDirectory(h5Store, "new"),
+        "modules": h5Store?.scan.modules.keys.sorted() ?? [],
+    ]
+}
+row = [
+    "timeline": Int(h5Timeline), "nested": Int(h5Nested), "nest": Int(h5Nest),
+    "texts": [h5a, h5b], "before": h5State(),
+    "groups": h5.graphicClips(named: "old").map { group -> [String: Any] in
+        ["nest": group.nest.map { Int($0) as Any } ?? NSNull(), "clips": group.clips.map { Int($0) }]
+    },
+]
+row["taken"] = sentence {
+    _ = try h5.renameGraphic(named: "old", to: "other") { h5.performGroupedEdit("Rename Graphic", $0) }
+}
+row["bad"] = sentence {
+    _ = try h5.renameGraphic(named: "old", to: "Bad Name") { h5.performGroupedEdit("Rename Graphic", $0) }
+}
+h5.setNestPath([NestScopeStep(nest: h5Nest, clip: h5NestClip)], playhead: 0, selection: [])
+row["scope_inside"] = h5.scope.map { Int($0) as Any } ?? NSNull()
+row["nest_open"] = sentence {
+    _ = try h5.renameGraphic(named: "old", to: "new") { h5.performGroupedEdit("Rename Graphic", $0) }
+}
+row["after_refusals"] = h5State()
+h5.setNestPath([], playhead: 0, selection: [])
+row["renamed"] = (try? h5.renameGraphic(named: "old", to: "new") {
+    h5.performGroupedEdit("Rename Graphic", $0)
+})?.map { Int($0) } ?? NSNull()
+row["undo_name"] = h5.undoManager?.undoActionName ?? ""
+row["after_rename"] = h5State()
+row["pairs"] = (h5Store?.renamePairs() ?? []).map { [$0.0, $0.1] }
+walk(h5, redo: false)
+row["after_undo"] = h5State()
+walk(h5, redo: true)
+row["after_redo"] = h5State()
+answer["h5"] = row
+h5.close()
+
+// H6 — a document read naming the old name beside a renamed file is healed at start
+let (h6, h6Track) = graphicDocument()
+if let root = h6.graphicStore?.folderURL { historyRoots.append(root) }
+let h6Text = moduleText("h6")
+writeModule(h6, "old", h6Text)
+_ = placeGraphic(h6, h6Track, "old", at: 0)
+let h6Package = work.appendingPathComponent("H6.reelcut", isDirectory: true)
+let h6Control = work.appendingPathComponent("H6-control.reelcut", isDirectory: true)
+try? files.removeItem(at: h6Package)
+try? files.removeItem(at: h6Control)
+row = [:]
+do {
+    let wrapper = try h6.fileWrapper(ofType: projectType)
+    try wrapper.write(to: h6Package, options: .atomic, originalContentsURL: nil)
+} catch {
+    row["save_error"] = error.localizedDescription
+}
+h6.close()
+let h6Graphics = h6Package.appendingPathComponent("graphics")
+try? files.moveItem(
+    at: h6Graphics.appendingPathComponent("old.js"), to: h6Graphics.appendingPathComponent("new.js"))
+try? files.copyItem(at: h6Package, to: h6Control)
+try? files.createDirectory(
+    at: h6Graphics.appendingPathComponent("history"), withIntermediateDirectories: true)
+write("[[\"old\", \"new\"]]", h6Graphics.appendingPathComponent("history/renames.json"))
+func opened(_ package: URL) -> [String: Any] {
+    let document = ProjectDocument()
+    do {
+        try document.read(from: package, ofType: projectType)
+        document.fileURL = package
+        document.startGraphicStore()
+    } catch {
+        return ["error": error.localizedDescription]
+    }
+    let graphics = package.appendingPathComponent("graphics")
+    let state: [String: Any] = [
+        "names": Array(graphicNames(document).values),
+        "old_file": textAt(graphics.appendingPathComponent("old.js")),
+        "new_file": present(graphics.appendingPathComponent("new.js")),
+        "new_text": textAt(graphics.appendingPathComponent("new.js")),
+        "kept_old": keptTexts(document.graphicStore, "old"),
+        "pairs": (document.graphicStore?.renamePairs() ?? []).map { [$0.0, $0.1] },
+        "listed": document.graphicStore?.scan.modules.keys.sorted() ?? [],
+        "edited": document.isDocumentEdited,
+    ]
+    document.close()
+    return state
+}
+row["text"] = h6Text
+row["healed"] = opened(h6Package)
+row["control"] = opened(h6Control)
+answer["h6"] = row
+
+// H7 — Undo never moves a live module under a deleted one's name
+let (h7, h7Track) = graphicDocument()
+let h7Store = h7.graphicStore
+let h7Folder = h7Store?.folderURL ?? work
+historyRoots.append(h7Folder)
+let (h7Old, h7New) = (moduleText("h7 the first title"), moduleText("h7 the new title"))
+writeModule(h7, "title", h7Old)
+let h7Clip = placeGraphic(h7, h7Track, "title", at: 0)
+row = ["clip": Int(h7Clip), "texts": [h7Old, h7New]]
+row["renamed"] = (try? h7.renameGraphic(named: "title", to: "title-v1") {
+    h7.performGroupedEdit("Rename Graphic", $0)
+})?.map { Int($0) } ?? NSNull()
+writeModule(h7, "title", h7New)
+h7.performGroupedEdit(
+    "Graphic Properties", [.setGraphicRaw(clips: [h7Clip], patch: ["name": "title"])])
+row["repointed"] = graphicNames(h7)
+row["deleted"] = sentence { _ = try h7.deleteGraphic(named: "title-v1") }
+walk(h7, redo: false)
+row["names_after_undo"] = graphicNames(h7)
+row["title_file"] = textAt(h7Folder.appendingPathComponent("title.js"))
+row["v1_file"] = present(h7Folder.appendingPathComponent("title-v1.js"))
+row["kept_v1"] = keptTexts(h7Store, "title-v1")
+row["modules"] = h7Store?.scan.modules.keys.sorted() ?? []
+answer["h7"] = row
+h7.close()
+
+// H8 — a name a clip already draws with no file behind it is not a rename's target
+let (h8, h8Track) = graphicDocument()
+let h8Store = h8.graphicStore
+let h8Folder = h8Store?.folderURL ?? work
+historyRoots.append(h8Folder)
+let h8Other = moduleText("h8 other")
+writeModule(h8, "ghost", moduleText("h8 ghost"))
+writeModule(h8, "other", h8Other)
+let h8Clip = placeGraphic(h8, h8Track, "ghost", at: 0)
+h8.performGroupedEdit("Delete", [.delete(clips: [h8Clip])])
+row = ["clip": Int(h8Clip)]
+row["deleted"] = sentence { _ = try h8.deleteGraphic(named: "ghost") }
+walk(h8, redo: false)
+row["names_after_undo"] = graphicNames(h8)
+row["ghost_file_after_undo"] = present(h8Folder.appendingPathComponent("ghost.js"))
+row["drawn"] = sentence {
+    _ = try h8.renameGraphic(named: "other", to: "ghost") { h8.performGroupedEdit("Rename Graphic", $0) }
+}
+row["other_file"] = textAt(h8Folder.appendingPathComponent("other.js"))
+row["other_text"] = h8Other
+row["ghost_file"] = present(h8Folder.appendingPathComponent("ghost.js"))
+row["kept_ghost"] = keptTexts(h8Store, "ghost").count
+row["kept_other"] = keptTexts(h8Store, "other").count
+answer["h8"] = row
+h8.close()
+
+// H9 — the rename journal holds at most 32 pairs, a repeated pair once, at the end
+let js = GraphicStore(package: nil, seed: nil, bundledFonts: fontsDir)
+js.start()
+for i in 0..<40 { GraphicStore.recordRename("n\(i)", "m\(i)", in: js.folderURL) }
+GraphicStore.recordRename("m20", "n20", in: js.folderURL)
+answer["h9"] = ["pairs": js.renamePairs().map { [$0.0, $0.1] }, "limit": GraphicStore.renameJournalLimit]
+js.stop()
+try? files.removeItem(at: js.folderURL)
+
+// H10 — a removal the app did not make is not a rename to repair
+let (h10, h10Track) = graphicDocument()
+let h10Store = h10.graphicStore
+let h10Folder = h10Store?.folderURL ?? work
+historyRoots.append(h10Folder)
+let h10New = moduleText("h10 the new a")
+writeModule(h10, "a", moduleText("h10 a"))
+let h10Clip = placeGraphic(h10, h10Track, "a", at: 0)
+row = ["clip": Int(h10Clip), "text": h10New]
+row["renamed"] = (try? h10.renameGraphic(named: "a", to: "b") {
+    h10.performGroupedEdit("Rename Graphic", $0)
+})?.map { Int($0) } ?? NSNull()
+try? files.removeItem(at: h10Folder.appendingPathComponent("b.js"))
+h10Store?.rescan()
+row["kept_b"] = keptTexts(h10Store, "b").count
+writeModule(h10, "a", h10New)
+row["pairs"] = (h10Store?.renamePairs() ?? []).map { [$0.0, $0.1] }
+let h10Tracks = h10.project.snapshot.tracks.count
+h10.performGroupedEdit("Add Track", [.addTrack(index: 0)])
+row["tracks_added"] = h10.project.snapshot.tracks.count - h10Tracks
+row["names"] = graphicNames(h10)
+row["a_file"] = textAt(h10Folder.appendingPathComponent("a.js"))
+row["b_file"] = present(h10Folder.appendingPathComponent("b.js"))
+row["modules"] = h10Store?.scan.modules.keys.sorted() ?? []
+answer["h10"] = row
+h10.close()
+
+// H11 — Undo of a rename whose old name was since written anew and deleted
+let (h11, h11Track) = graphicDocument()
+let h11Store = h11.graphicStore
+let h11Folder = h11Store?.folderURL ?? work
+historyRoots.append(h11Folder)
+let (h11Text, h11New) = (moduleText("h11 the module"), moduleText("h11 a new a"))
+writeModule(h11, "a", h11Text)
+let h11Clip = placeGraphic(h11, h11Track, "a", at: 0)
+row = ["clip": Int(h11Clip), "texts": [h11Text, h11New]]
+row["renamed"] = (try? h11.renameGraphic(named: "a", to: "b") {
+    h11.performGroupedEdit("Rename Graphic", $0)
+})?.map { Int($0) } ?? NSNull()
+writeModule(h11, "a", h11New)
+row["deleted"] = sentence { _ = try h11.deleteGraphic(named: "a") }
+row["undo_name"] = h11.undoManager?.undoActionName ?? ""
+walk(h11, redo: false)
+row["names_after_undo"] = graphicNames(h11)
+row["a_file"] = present(h11Folder.appendingPathComponent("a.js"))
+row["b_file"] = textAt(h11Folder.appendingPathComponent("b.js"))
+row["kept_a"] = keptTexts(h11Store, "a")
+row["modules"] = h11Store?.scan.modules.keys.sorted() ?? []
+answer["h11"] = row
+h11.close()
+
+// H12 — start() drops a module's current text from its history
+let h12Package = scratchPackage("H12.reelcut")
+let h12Graphics = h12Package.appendingPathComponent("graphics", isDirectory: true)
+try? files.createDirectory(at: h12Graphics, withIntermediateDirectories: true)
+let (h12Old, h12Current) = (moduleText("h12 old"), moduleText("h12 current"))
+GraphicStore.keep(Data(h12Old.utf8), named: "m", in: h12Graphics)
+GraphicStore.keep(Data(h12Current.utf8), named: "m", in: h12Graphics)
+write(h12Current, h12Graphics.appendingPathComponent("m.js"))
+let h12History = h12Graphics.appendingPathComponent("history/m")
+func h12Entries() -> [String] {
+    ((try? files.contentsOfDirectory(atPath: h12History.path)) ?? []).sorted()
+}
+row = ["texts": [h12Old, h12Current], "built": h12Entries()]
+let h12 = ProjectDocument()
+do {
+    try h12.read(from: h12Package, ofType: projectType)
+    h12.fileURL = h12Package
+    h12.startGraphicStore()
+    row["kept_at_start"] = keptTexts(h12.graphicStore, "m")
+    row["entries_at_start"] = h12Entries()
+    row["restored"] = (try? h12.restoreGraphic(named: "m", revision: nil)) ?? NSNull()
+    row["file"] = textAt(h12Graphics.appendingPathComponent("m.js"))
+    row["kept_after"] = keptTexts(h12.graphicStore, "m")
+    row["edited"] = h12.isDocumentEdited
+} catch {
+    row["error"] = error.localizedDescription
+}
+h12.close()
+answer["h12"] = row
+
+// H13 — a rename that cannot be journalled is refused, and nothing has moved
+let (h13, h13Track) = graphicDocument()
+let h13Store = h13.graphicStore
+let h13Folder = h13Store?.folderURL ?? work
+historyRoots.append(h13Folder)
+let (h13a, h13b) = (moduleText("h13 a"), moduleText("h13 b"))
+writeModule(h13, "old", h13a)
+writeModule(h13, "old", h13b)
+let h13Clip = placeGraphic(h13, h13Track, "old", at: 0)
+let h13Journal = h13Folder.appendingPathComponent("history/renames.json", isDirectory: true)
+try? files.createDirectory(at: h13Journal, withIntermediateDirectories: true)
+write("in the way", h13Journal.appendingPathComponent("in-the-way"))
+row = ["clip": Int(h13Clip), "texts": [h13a, h13b]]
+row["journal_is_directory"] = present(h13Journal.appendingPathComponent("in-the-way"))
+row["refused"] = sentence {
+    _ = try h13.renameGraphic(named: "old", to: "new") { h13.performGroupedEdit("Rename Graphic", $0) }
+}
+row["names"] = graphicNames(h13)
+row["old_file"] = textAt(h13Folder.appendingPathComponent("old.js"))
+row["new_file"] = present(h13Folder.appendingPathComponent("new.js"))
+row["kept_old"] = keptTexts(h13Store, "old")
+row["history_new"] = historyDirectory(h13Store, "new")
+row["modules"] = h13Store?.scan.modules.keys.sorted() ?? []
+row["undo_name"] = h13.undoManager?.undoActionName ?? ""
+answer["h13"] = row
+h13.close()
+
+// H14 — a rename whose history cannot be folded is put back, and journals nothing
+let (h14, h14Track) = graphicDocument()
+let h14Store = h14.graphicStore
+let h14Folder = h14Store?.folderURL ?? work
+historyRoots.append(h14Folder)
+let (h14a, h14b) = (moduleText("h14 a"), moduleText("h14 b"))
+writeModule(h14, "old", h14a)
+writeModule(h14, "old", h14b)
+let h14Clip = placeGraphic(h14, h14Track, "old", at: 0)
+write("in the way", h14Folder.appendingPathComponent("history/new"))
+row = ["clip": Int(h14Clip), "texts": [h14a, h14b]]
+row["in_the_way"] = present(h14Folder.appendingPathComponent("history/new"))
+row["refused"] = sentence {
+    _ = try h14.renameGraphic(named: "old", to: "new") { h14.performGroupedEdit("Rename Graphic", $0) }
+}
+row["names"] = graphicNames(h14)
+row["old_file"] = textAt(h14Folder.appendingPathComponent("old.js"))
+row["new_file"] = present(h14Folder.appendingPathComponent("new.js"))
+row["kept_old"] = keptTexts(h14Store, "old")
+row["pairs"] = (h14Store?.renamePairs() ?? []).map { [$0.0, $0.1] }
+row["journal_file"] = present(h14Folder.appendingPathComponent("history/renames.json"))
+row["modules"] = h14Store?.scan.modules.keys.sorted() ?? []
+row["undo_name"] = h14.undoManager?.undoActionName ?? ""
+answer["h14"] = row
+h14.close()
+
+// H15 — the state a crash inside moveModule leaves when the old name had kept texts: the file
+// at the new name, the pair journalled, history/old/ still there. Built by hand (G-28 (f)).
+// Then, in the same package, the default restore G-28 (f) speaks of: it writes the OLDER text.
+let h15Package = work.appendingPathComponent("H15.reelcut", isDirectory: true)
+try? files.removeItem(at: h15Package)
+try? files.copyItem(at: h6Control, to: h15Package)
+let h15Graphics = h15Package.appendingPathComponent("graphics")
+let h15Kept = moduleText("h15 an older text of old")
+GraphicStore.keep(Data(h15Kept.utf8), named: "old", in: h15Graphics)
+write("[[\"old\", \"new\"]]", h15Graphics.appendingPathComponent("history/renames.json"))
+row = ["text": h6Text, "kept": h15Kept, "opened": opened(h15Package)]
+let h15 = ProjectDocument()
+do {
+    try h15.read(from: h15Package, ofType: projectType)
+    h15.fileURL = h15Package
+    h15.startGraphicStore()
+    var restored: [String: Any] = [:]
+    do {
+        restored["revision"] = try h15.restoreGraphic(named: "old", revision: nil)
+    } catch {
+        restored["error"] = error.localizedDescription
+    }
+    restored["names"] = Array(graphicNames(h15).values)
+    restored["drawn_new"] = h15.graphicClips(named: "new").count
+    restored["old_file"] = textAt(h15Graphics.appendingPathComponent("old.js"))
+    restored["new_text"] = textAt(h15Graphics.appendingPathComponent("new.js"))
+    restored["kept_old"] = keptTexts(h15.graphicStore, "old")
+    restored["pairs"] = (h15.graphicStore?.renamePairs() ?? []).map { [$0.0, $0.1] }
+    restored["listed"] = h15.graphicStore?.scan.modules.keys.sorted() ?? []
+    restored["edited"] = h15.isDocumentEdited
+    row["restored"] = restored
+} catch {
+    row["restore_error"] = error.localizedDescription
+}
+h15.close()
+answer["h15"] = row
+
+// H16 — a rename back that is refused at the fold leaves the EARLIER pair, so Undo still repairs
+let (h16, h16Track) = graphicDocument()
+let h16Store = h16.graphicStore
+let h16Folder = h16Store?.folderURL ?? work
+historyRoots.append(h16Folder)
+let (h16a, h16b) = (moduleText("h16 a"), moduleText("h16 b"))
+writeModule(h16, "a", h16a)
+writeModule(h16, "a", h16b)
+let h16Clip = placeGraphic(h16, h16Track, "a", at: 0)
+let h16Journal = h16Folder.appendingPathComponent("history/renames.json")
+row = ["clip": Int(h16Clip), "texts": [h16a, h16b]]
+row["renamed"] = (try? h16.renameGraphic(named: "a", to: "b") {
+    h16.performGroupedEdit("Rename Graphic", $0)
+})?.map { Int($0) } ?? NSNull()
+row["journal_before"] = textAt(h16Journal)
+row["pairs_before"] = (h16Store?.renamePairs() ?? []).map { [$0.0, $0.1] }
+write("in the way", h16Folder.appendingPathComponent("history/a"))
+row["in_the_way"] = present(h16Folder.appendingPathComponent("history/a"))
+row["refused"] = sentence {
+    _ = try h16.renameGraphic(named: "b", to: "a") { h16.performGroupedEdit("Rename Graphic", $0) }
+}
+row["journal_after"] = textAt(h16Journal)
+row["pairs_after"] = (h16Store?.renamePairs() ?? []).map { [$0.0, $0.1] }
+row["names_after_refusal"] = graphicNames(h16)
+row["a_file_after_refusal"] = present(h16Folder.appendingPathComponent("a.js"))
+row["b_file_after_refusal"] = textAt(h16Folder.appendingPathComponent("b.js"))
+row["kept_b_after_refusal"] = keptTexts(h16Store, "b")
+try? files.removeItem(at: h16Folder.appendingPathComponent("history/a"))
+row["undo_name"] = h16.undoManager?.undoActionName ?? ""
+walk(h16, redo: false)
+row["names_after_undo"] = graphicNames(h16)
+row["a_file"] = textAt(h16Folder.appendingPathComponent("a.js"))
+row["b_file"] = present(h16Folder.appendingPathComponent("b.js"))
+row["kept_a"] = keptTexts(h16Store, "a")
+row["kept_b"] = keptTexts(h16Store, "b")
+row["modules"] = h16Store?.scan.modules.keys.sorted() ?? []
+answer["h16"] = row
+h16.close()
+
+// H17 — a chain of renames undoes and redoes step by step
+let (h17, h17Track) = graphicDocument()
+let h17Store = h17.graphicStore
+let h17Folder = h17Store?.folderURL ?? work
+historyRoots.append(h17Folder)
+let (h17a, h17b) = (moduleText("h17 a"), moduleText("h17 b"))
+writeModule(h17, "a", h17a)
+writeModule(h17, "a", h17b)
+let h17Clip = placeGraphic(h17, h17Track, "a", at: 0)
+func h17State() -> [String: Any] {
+    var state: [String: Any] = [
+        "names": graphicNames(h17), "modules": h17Store?.scan.modules.keys.sorted() ?? [],
+    ]
+    for name in ["a", "b", "c"] {
+        state["file_\(name)"] = textAt(h17Folder.appendingPathComponent("\(name).js"))
+        state["kept_\(name)"] = keptTexts(h17Store, name)
+        state["history_\(name)"] = historyDirectory(h17Store, name)
+    }
+    return state
+}
+row = ["clip": Int(h17Clip), "texts": [h17a, h17b], "before": h17State()]
+row["renamed_b"] = (try? h17.renameGraphic(named: "a", to: "b") {
+    h17.performGroupedEdit("Rename Graphic", $0)
+})?.map { Int($0) } ?? NSNull()
+row["after_b"] = h17State()
+row["renamed_c"] = (try? h17.renameGraphic(named: "b", to: "c") {
+    h17.performGroupedEdit("Rename Graphic", $0)
+})?.map { Int($0) } ?? NSNull()
+row["after_c"] = h17State()
+row["pairs"] = (h17Store?.renamePairs() ?? []).map { [$0.0, $0.1] }
+walk(h17, redo: false)
+row["undo_1"] = h17State()
+walk(h17, redo: false)
+row["undo_2"] = h17State()
+walk(h17, redo: true)
+row["redo_1"] = h17State()
+walk(h17, redo: true)
+row["redo_2"] = h17State()
+answer["h17"] = row
+h17.close()
+
+// H18 — a rename refused at the CLIPS is moved back and journals nothing (G-28 (d)): `apply`
+// throws, or returns having applied nothing, with no journal and with an earlier pair.
+let (h18, h18Track) = graphicDocument()
+let h18Store = h18.graphicStore
+let h18Folder = h18Store?.folderURL ?? work
+historyRoots.append(h18Folder)
+let (h18a, h18b) = (moduleText("h18 a"), moduleText("h18 b"))
+writeModule(h18, "a", h18a)
+writeModule(h18, "a", h18b)
+let h18Clip = placeGraphic(h18, h18Track, "a", at: 0)
+func h18State() -> [String: Any] {
+    var state: [String: Any] = [
+        "names": graphicNames(h18), "modules": h18Store?.scan.modules.keys.sorted() ?? [],
+        "journal": textAt(h18Folder.appendingPathComponent("history/renames.json")),
+        "pairs": (h18Store?.renamePairs() ?? []).map { [$0.0, $0.1] },
+        "undo_name": h18.undoManager?.undoActionName ?? "",
+    ]
+    for name in ["a", "b", "c"] {
+        state["file_\(name)"] = textAt(h18Folder.appendingPathComponent("\(name).js"))
+        state["kept_\(name)"] = keptTexts(h18Store, name)
+        state["history_\(name)"] = historyDirectory(h18Store, name)
+    }
+    return state
+}
+/// A rename whose `apply` throws (`throwing`) or returns having applied nothing; the state after
+/// it, the sentence it threw and the ops `apply` was handed.
+func h18Refused(_ from: String, _ to: String, throwing: Bool) -> [String: Any] {
+    var asked = 0
+    let said = sentence {
+        _ = try h18.renameGraphic(named: from, to: to) { ops in
+            asked += ops.count
+            if throwing { throw ReelCoreError(message: "h18: the clips refused") }
+        }
+    }
+    var state = h18State()
+    state["refused"] = said
+    state["asked"] = asked
+    return state
+}
+row = ["clip": Int(h18Clip), "texts": [h18a, h18b], "before": h18State()]
+row["thrown_no_journal"] = h18Refused("a", "b", throwing: true)
+row["left_no_journal"] = h18Refused("a", "b", throwing: false)
+row["renamed"] = (try? h18.renameGraphic(named: "a", to: "b") {
+    h18.performGroupedEdit("Rename Graphic", $0)
+})?.map { Int($0) } ?? NSNull()
+row["after_rename"] = h18State()
+row["thrown_with_pair"] = h18Refused("b", "c", throwing: true)
+row["left_with_pair"] = h18Refused("b", "c", throwing: false)
+walk(h18, redo: false)
+row["after_undo"] = h18State()
+h18.close()
+// LIMIT (G-28 (d)): onto a DELETED module's name the two histories have folded before the clips
+// refuse, so the move back carries the deleted module's kept text under the renamed module.
+let (h18d, h18dTrack) = graphicDocument()
+let h18dStore = h18d.graphicStore
+let h18dFolder = h18dStore?.folderURL ?? work
+historyRoots.append(h18dFolder)
+let (h18Gone, h18Live1, h18Live2) = (
+    moduleText("h18 gone"), moduleText("h18 live 1"), moduleText("h18 live 2"))
+writeModule(h18d, "gone", h18Gone)
+var h18Deleted: [String: Any] = ["texts": [h18Gone, h18Live1, h18Live2]]
+h18Deleted["deleted"] = sentence { _ = try h18d.deleteGraphic(named: "gone") }
+writeModule(h18d, "live", h18Live1)
+writeModule(h18d, "live", h18Live2)
+let h18dClip = placeGraphic(h18d, h18dTrack, "live", at: 0)
+h18Deleted["clip"] = Int(h18dClip)
+h18Deleted["kept_before"] = ["gone": keptTexts(h18dStore, "gone"), "live": keptTexts(h18dStore, "live")]
+h18Deleted["refused"] = sentence {
+    _ = try h18d.renameGraphic(named: "live", to: "gone") { _ in
+        throw ReelCoreError(message: "h18: the clips refused")
+    }
+}
+h18Deleted["names"] = graphicNames(h18d)
+h18Deleted["live_file"] = textAt(h18dFolder.appendingPathComponent("live.js"))
+h18Deleted["gone_file"] = present(h18dFolder.appendingPathComponent("gone.js"))
+h18Deleted["kept_after"] = ["gone": keptTexts(h18dStore, "gone"), "live": keptTexts(h18dStore, "live")]
+h18Deleted["history_gone"] = historyDirectory(h18dStore, "gone")
+h18Deleted["kept_names"] = h18dStore?.keptNames() ?? []
+h18Deleted["journal"] = textAt(h18dFolder.appendingPathComponent("history/renames.json"))
+h18Deleted["modules"] = h18dStore?.scan.modules.keys.sorted() ?? []
+row["deleted_name"] = h18Deleted
+h18d.close()
+// A move back that FAILS (a FILE put at history/a by `apply` itself, so the history cannot be
+// folded back) leaves the pair journalled; with the file removed, a committed change repairs.
+let (h18f, h18fTrack) = graphicDocument()
+let h18fStore = h18f.graphicStore
+let h18fFolder = h18fStore?.folderURL ?? work
+historyRoots.append(h18fFolder)
+let (h18f1, h18f2) = (moduleText("h18 f 1"), moduleText("h18 f 2"))
+writeModule(h18f, "a", h18f1)
+writeModule(h18f, "a", h18f2)
+let h18fClip = placeGraphic(h18f, h18fTrack, "a", at: 0)
+let h18fInTheWay = h18fFolder.appendingPathComponent("history/a")
+func h18fState() -> [String: Any] {
+    [
+        "names": graphicNames(h18f), "modules": h18fStore?.scan.modules.keys.sorted() ?? [],
+        "a_file": textAt(h18fFolder.appendingPathComponent("a.js")),
+        "b_file": textAt(h18fFolder.appendingPathComponent("b.js")),
+        "kept_a": keptTexts(h18fStore, "a"), "kept_b": keptTexts(h18fStore, "b"),
+        "pairs": (h18fStore?.renamePairs() ?? []).map { [$0.0, $0.1] },
+    ]
+}
+var h18Failed: [String: Any] = ["clip": Int(h18fClip), "texts": [h18f1, h18f2]]
+h18Failed["refused"] = sentence {
+    _ = try h18f.renameGraphic(named: "a", to: "b") { _ in
+        write("in the way", h18fInTheWay)
+        throw ReelCoreError(message: "h18: the clips refused")
+    }
+}
+h18Failed["in_the_way"] = present(h18fInTheWay)
+h18Failed["stranded"] = h18fState()
+try? files.removeItem(at: h18fInTheWay)
+let h18fTracks = h18f.project.snapshot.tracks.count
+h18f.performGroupedEdit("Add Track", [.addTrack(index: 0)])
+h18Failed["tracks_added"] = h18f.project.snapshot.tracks.count - h18fTracks
+h18Failed["repaired"] = h18fState()
+row["failed_move_back"] = h18Failed
+answer["h18"] = row
+h18f.close()
+
+// C7 — an untitled document's save carries graphics/history/
+let (c7, _) = graphicDocument()
+if let root = c7.graphicStore?.folderURL { historyRoots.append(root) }
+let (c7a, c7b) = (moduleText("c7 a"), moduleText("c7 b"))
+writeModule(c7, "m", c7a)
+writeModule(c7, "m", c7b)
+let c7Package = work.appendingPathComponent("C7-saved.reelcut", isDirectory: true)
+try? files.removeItem(at: c7Package)
+row = ["texts": [c7a, c7b]]
+do {
+    let wrapper = try c7.fileWrapper(ofType: projectType)
+    try wrapper.write(to: c7Package, options: .atomic, originalContentsURL: nil)
+} catch {
+    row["save_error"] = error.localizedDescription
+}
+let c7History = c7Package.appendingPathComponent("graphics/history/m")
+let c7Entries = ((try? files.contentsOfDirectory(atPath: c7History.path)) ?? []).sorted()
+row["entries"] = c7Entries
+row["kept_text"] = c7Entries.first.map { textAt(c7History.appendingPathComponent($0)) } ?? NSNull()
+row["module"] = textAt(c7Package.appendingPathComponent("graphics/m.js"))
+answer["c7"] = row
+c7.close()
+answer["history_roots_removed"] = historyRoots.allSatisfy { !present($0) || $0 == hs.folderURL }
+try? files.removeItem(at: hs.folderURL)
+
 // The untitled roots this run made, removed so the temporary directory is
 // left as found (a mutant leaves the C5 and C6 ones behind).
 for leftover in [c5aRoot, c5bRoot, c6aRoot, c6bRoot].compactMap({ $0 }) {

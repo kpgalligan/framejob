@@ -177,13 +177,16 @@ schema, the core refuses a bad prop by its dotted path. Without one (a
 replayed op), it checks shape only. At render time, stale keys and wrong
 types become warnings, never errors.
 
-**Six app-state tools** (orig §5h, §10.7):
+**Nine app-state tools** (orig §5h, §10.7; the last three issue batch
+B84's, spec §11 G-27..G-29):
 - `write_graphic` answers the compile in the same call; its
   `store.rescan()` is synchronous so the reply is current;
 - `get_graphic`;
 - `render_graphic`, a contact sheet of up to 16 frames with no clip;
 - `graphic_reference`;
-- `import_graphic_font` and `import_graphic_asset`.
+- `import_graphic_font` and `import_graphic_asset`;
+- `delete_graphic`, `rename_graphic` and `restore_graphic`, over the last 10
+  texts of each module kept in `graphics/history/`.
 
 The agent's loop is `graphic_reference` → `write_graphic` →
 `render_graphic` → `add_graphic_clip` → `set_graphic`.
@@ -298,19 +301,23 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   A 50 MB string is built but cannot be read out of a 64 MB heap at all; the
   engine's own sentence says so.
 - **Deliberately not built** (orig §7):
-  - keyframed props (G-10);
+  - keyframed props (G-10) — wanted, #239;
   - `paste_attributes` for graphics;
-  - a revision history;
   - HEVC with alpha (ProRes 4444 and APNG already carry alpha);
-  - mattes or video input to a graphic;
-  - system fonts as an opt-in;
+  - mattes or video input to a graphic — wanted, #240;
+  - system fonts as an opt-in — CLOSED by the owner 2026-10-04: Add Font to
+    Graphics… / `import_graphic_font` already puts a face in the package and
+    keeps a project portable; G-6 stands;
   - path helpers;
   - audio from a graphic;
-  - `delete_graphic`/`rename_graphic`;
-  - named CSS colours and `hsl()` in a `color` prop, and in
-    `interpolateColors`;
   - generic CSS families such as `sans-serif`, which are warned like any
     missing name.
+
+  Built since, and so off this list: a revision history and
+  `delete_graphic` / `rename_graphic` (issue batch B84, spec §11
+  G-27..G-29), and named CSS colours and `hsl()` in a `color` prop and in
+  `interpolateColors` (#219: `core/src/model_color.rs`,
+  `docs/graphics-api.md`'s schema table and `interpolateColors` section).
 - **The watcher:** each module, font and asset file has its own source, but
   a store arms at most 16 of them per pass (`GraphicStore.fileSourceLimit`),
   modules first, then fonts, then assets, each in name order; an in-place
@@ -558,6 +565,154 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   (`sans-serif`) where the spec stripped it: a `<text>` with none warns that
   the default family is not in the set.
 
+  Issue batch B84 (2026-10-04, #103 part 1, phase 1; spec §11 G-27, G-28,
+  G-29) built three of the not-built list's items for an agent:
+  `delete_graphic`, `rename_graphic` and `restore_graphic`, over a store
+  that keeps the last 10 texts of each module in `graphics/history/`
+  (`GraphicStore+History.swift`: a pass keeps the text a module's new text
+  replaced; `removeModule` keeps the deleted one; `moveModule` carries the
+  history with the file and journals the pair in `history/renames.json`).
+  The three bodies are `ProjectDocument+GraphicFiles.swift`'s, which both
+  doors call. A delete is refused while a clip draws the module, naming the
+  clips per container. A rename repoints every clip, the timeline's and
+  every nest's, by `set_graphic {name}` with no schema as one step, "Rename
+  Graphic" — no core op, no FFI; the op count stays 59 — and Undo is made
+  safe by a repair the document runs after every committed change and once
+  at the store's start, in one direction only: a journalled pair `[a, b]`
+  says the app moved the file from `a` to `b`, and when a clip draws `a`,
+  with no file and nothing kept, the file is moved back from `b` (which
+  journals `[b, a]`, so Redo is the same repair). A file-less name WITH
+  kept texts is a deleted module, and the repair leaves it alone, so Undo
+  never puts a live module under a deleted one's name.
+  The batch's review changed four things before the commit, each with a
+  probe row and a mutant: the repair tried BOTH directions of a pair and so
+  moved a live module under a name whose file was removed outside the app
+  (now one direction, H10; G-28 (f) records the one case that cannot be
+  told from an Undo); a rename whose journal pair was not written
+  succeeded with nothing to heal its Undo (now refused, the pair written
+  and read back before the history is folded, H13, and the journal put
+  back as it was read when the fold then fails, H14); `start()` left a
+  module's current text in its history, so a default restore rewrote the
+  same bytes (now dropped at `start()`, H12); and a kept file changed by
+  hand was restored under the revision in its name (now refused, H2). A
+  rename onto a deleted module's name still folds the two histories and
+  can prune the deleted text: G-28's accepted risk, said in the tool's
+  description.
+  The second review changed one thing and recorded three. Changed: a
+  rename refused at the fold first journalled its pair the other way
+  round, which invented a pair for two names that had none and could push
+  the oldest real pair out of the 32; it now puts `renames.json` back as
+  it was read, so a refused rename journals nothing and an earlier pair of
+  the same two names is still there for Undo (H14, H16). Recorded as
+  limits, G-28 (f) and G-29 (d): a crash inside a rename is not healed
+  when it lands before the pair is written, or after it with kept texts
+  still under the old name, where the repair reads the old name as a
+  deleted module (H15 builds that state and measures that nothing moves;
+  no order of the three steps closes both windows without a marker on
+  disk); and a kept file changed by hand stays listed, and refuses a
+  default restore while it is the newest. A chain of renames undone and
+  redone step by step, claimed by G-28 (e), has its row (H17).
+  The third review changed one thing and measured one. Changed: a rename
+  refused at the CLIPS (the edit throws, or leaves a clip behind) moved
+  the file back through `moveModule`, which journalled that move as a pair
+  of its own — the invented pair the second review had removed from the
+  fold's arm. `renameGraphic` now reads `renames.json` before the rename
+  and puts it back after the move back, so "a refused rename journals
+  nothing" holds for both arms (H18, with the probe's own `apply` throwing
+  and applying nothing, with no journal and with an earlier pair). The
+  put-back runs only when the move back succeeded: a move back that fails
+  leaves the file at the new name, and the pair with it, so the repair can
+  still make it (H18's last part, which fails the move back and then
+  repairs). What that arm cannot put back is recorded in G-28 (d) and
+  measured by H18: onto a deleted module's name the histories fold before
+  the clips are asked, so the move back leaves the deleted text kept under
+  the renamed module. Measured: G-28 (f)'s sentence that a default restore in
+  the crashed state writes an older text was an inference; H15 now runs
+  that restore in its own package.
+  Rename is refused with a nest open, onto a name whose file exists, and
+  onto a name a clip already draws with no file behind it. History is in
+  the package, not `cache/`, because the cache is safe to delete; an
+  untitled document's first save carries it. `write_graphic`'s note
+  changed from "keep your own copy" to naming the kept text, and
+  `write_graphic` / `get_graphic` answer `kept` (and `history` for the
+  folder). The catalog is 89 product tools, thirty of them app-state.
+  What a run printed: `graphics_store_probe.py` 45/45 (rows H1–H18 and C7
+  new), its fifteen new mutants each `MUTANT PASS` (`history-unkept` failed
+  H1, H2, H3, H5, H12, H13, H14, H15, H16, H17, H18 and C7;
+  `history-uncapped` H3; `delete-used` H4; `rename-unreconciled` H5, H16,
+  H17 and H18, of which H5 and H17 are required; `history-left-behind` H5,
+  H14, H16, H17 and H18; `reconcile-over-delete` H11 and H15;
+  `rename-onto-drawn` H8; `journal-uncapped` H9;
+  `reconcile-both-directions` H10; `rename-unjournalled` H13;
+  `start-undropped` H12; `restore-unhashed` H2; `rollback-unjournalled`
+  H14, H16 and H18, of which H14 and H16 are required;
+  `moveback-unjournalled` H18; `moveback-unconditional` H18);
+  `graphics_files_proof.py` 10/10 over MCP on its own instance in a scratch
+  home, and its `--mutant rename-unreconciled`, an app built in a tree copy,
+  9/10 with N2 failed (after the undo clips 2 and 3 named `title` beside a
+  folder holding `headline`, and the frames differed).
+  **Phase 2** (2026-10-04 into 2026-10-05, #103; spec §11 G-30) is the
+  person's door. File ▸ Rename Graphic…, Delete Graphic… and Restore
+  Graphic Version… sit in a group of their own under Add Image to
+  Graphics…, with no key equivalents, and put up ONE sheet
+  (`GraphicFileSheetController`): a pop-up of the project's graphics, a
+  New name field for Rename, a "<n> versions kept" line for Restore and no
+  history browser. Every act is one call of a phase-1 body, so the two
+  doors refuse in the same sentences: a refusal is shown word for word in
+  a label inside the sheet, which stays up, the tool's hint
+  `(set_graphic {name})` included — the owner chose one wording over a
+  second for people. A delete has no second confirmation, because the text
+  is kept. Rename and Restore open on the one selected clip's graphic when
+  it is a row, a deleted one too (how a clip showing the error card gets
+  its code back); Delete always opens on the first, since a selected
+  clip's graphic could not be deleted. The items are greyed with nothing
+  to list, and Rename while a nest is open. The hints were corrected in
+  design: the first wording promised an Undo for renaming a graphic no
+  clip uses, which makes no edit, and a way back after restoring a deleted
+  graphic, which keeps nothing in its place. No op, tool or count changed
+  (89 product tools, thirty app-state). `EditorViewController+GraphicFiles.swift`
+  holds the three actions, the one `presentAsSheet` and the validator arm
+  that `validateGraphicMenuAction`'s default forwards to; no line of the
+  frozen `EditorViewController.swift` changed.
+  What a run printed: `graphics_menu_proof.py` 27/27 on one instance in a
+  scratch home (rows S0, M14–M20, S1 and S2 new; a confirm is reached in
+  the probe's process through the sheet's own controls, because no dev
+  tool presses a sheet's default button); its ten new probe-tier mutants
+  each `MUTANT PASS` under Rule R1, the mutant's row the FIRST failure
+  (`item-dropped` M14; `rename-in-nest` M15; `refusal-unshown` M16, then
+  M19; `refusal-unwrapped` M16; `delete-opens-selected` M16;
+  `success-undismissed` M17, then M18 and M20; `rename-ungrouped` M18;
+  `opening-first` M18, then M19 and M20; `rename-field-lowercased` M19;
+  `restore-deleted-unlisted` M20), `notice-dropped` still M13; its two
+  app-tier mutants, an app built in a tree copy each, `app-rename-in-nest`
+  failing S1 and `app-sheet-unpresented` S2; `screens.py` over the three
+  new screens (15b, 15c, 15d) 8 pass of 8 with 0 new problems;
+  `graphics_files_proof.py` 10/10 and `graphics_proof.py` 51/51 as before.
+  One instrument fault was found on the way: the first `opening-first` run
+  ended the probe with an exception, because after its row failed a later
+  step pressed Cancel on a sheet that a mis-opened rename had already
+  closed; the probe's `press` now refuses a button whose sheet is no
+  longer attached, and the runs quoted are the ones made after that.
+  The review changed two things. A proof run under a scratch home that did
+  not exist yet was told every key of the owner's defaults had moved,
+  though none had: `defaults export` answers no key under a
+  `CFFIXED_USER_HOME` naming an absent folder and the whole domain once
+  the folder is there, so `mcp.py`'s guard recorded one thing and compared
+  another. The guard now reads with that variable taken out of `defaults`'
+  environment (`proof_defaults.read_env`; `defaults_proof.py` rows H1 and
+  H2, 10/10, with `--mutant home-followed` failing exactly those two), and
+  the three screens run from a work folder with no home in it scored 8
+  pass of 8 with no `DEFAULTS MOVED` line. And the three items' validator
+  built every pop-up row on each menu open, listing each module's history
+  folder for a count the Rename and Delete sheets do not show; `isOffered`
+  now asks the last scan for Rename and Delete and `keptNames()` for
+  Restore, with the same answers (`graphics_menu_proof.py` 27/27 again;
+  `rename-in-nest`, `restore-deleted-unlisted` and `app-rename-in-nest`
+  still caught).
+  What only a person can judge — how the three sheets look in both
+  appearances, a refused Delete's sentence on screen, a real keyboard
+  typing into New name — is `docs/manual-checks.md`'s GR-7.
+
 ## Open items
 
 - G6's rest — playback prefetch, in-place raster (`graphic/src/raster.rs`)
@@ -572,9 +727,8 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   - `validate` accepts a graphic clip with no description.
 
   Tracked in #72.
-- The not-built list (keyframed props, `paste_attributes`, revision history,
-  HEVC with alpha, mattes, system fonts, path helpers, `delete_graphic` /
-  `rename_graphic`) — tracked in #103.
+- The not-built list: `paste_attributes`, HEVC with alpha and path helpers —
+  tracked in #103; keyframed props — #239; mattes or video input — #240.
 - Replacing QuickJS with JavaScriptCore — GitHub issue #39.
 
 ## Where to look in the original

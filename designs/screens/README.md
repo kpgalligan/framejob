@@ -95,7 +95,10 @@ Built by `screens.py` on the first screen that names one, into
   - `video` — `media/speech.mov` (5.2 s, a navy card with speech);
   - `text` — a text clip reading "Reelcut", 5 s;
   - `graphic` — `graphic/tests/graphics/lower-third.js` as the module
-    `lower-third`, 5 s;
+    `lower-third`, 5 s. The module is written twice, an earlier text first
+    (the file plus one trailing comment line), so `demo` holds one kept
+    version of it — the "1 version kept" the Restore Graphic Version sheet
+    shows;
   - `shape` — an ellipse, 5 s;
   - `tone` — `media/toneA.m4a` (a 440 Hz tone, about 5 s).
 

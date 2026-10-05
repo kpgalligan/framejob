@@ -165,11 +165,11 @@ final class AgentServer {
         // one this tool published, or the call is refused here by name before
         // the scope or any handler reads a thing. It is here for the reason
         // the scope read below is — the one place that holds the name and
-        // the arguments of all eighty-six.
+        // the arguments of all eighty-nine.
         try Self.checkArgumentNames(tool, a)
         // The envelope's `scope` is read ONCE, here, because this is the only
         // place that holds both the tool's name and its arguments for all
-        // eighty-six of them — a read inside each handler would be
+        // eighty-nine of them — a read inside each handler would be
         // fifty-nine edit sites across the handler files, every one able to
         // forget. It is read for exactly the tools whose schema declares it
         // (`AgentCatalog.opNames`, the core's own op list), and a `scope` on
@@ -191,15 +191,16 @@ final class AgentServer {
     /// and `prepareCatalog()` checks the two sets match on every launch.
     ///
     /// One entry per row of the op table (spec §6, and the module doc of
-    /// `core/src/edit.rs`) plus the twenty-seven tools that are not ops: the
+    /// `core/src/edit.rs`) plus the thirty tools that are not ops: the
     /// project-level ones spec §7.9 names, the five view-state and history
     /// mirrors beside them (`set_range`, `set_selection`, `set_scope`,
     /// `undo`, `redo`), the composites later phases added —
     /// `detect_silence`, `transcribe`, `import_captions`, `export_captions`,
     /// `normalize_clip` — road map 3's `record_screen`, and road map 10's
-    /// six graphics tools (`write_graphic`, `get_graphic`,
+    /// nine graphics tools (`write_graphic`, `get_graphic`,
     /// `graphic_reference`, `render_graphic`, `import_graphic_font`,
-    /// `import_graphic_asset`). The count is
+    /// `import_graphic_asset`, `delete_graphic`, `rename_graphic`,
+    /// `restore_graphic`). The count is
     /// not decoration: `prepareCatalog()`'s parity check reads the core's own
     /// `rc_op_names` and holds an explicit allow-list for the ops that
     /// deliberately have no tool, so a new tool that is not an op belongs in
@@ -263,6 +264,9 @@ final class AgentServer {
         "render_graphic": { $0.renderGraphic },
         "import_graphic_font": { $0.importGraphicFont },
         "import_graphic_asset": { $0.importGraphicAsset },
+        "delete_graphic": { $0.deleteGraphic },
+        "rename_graphic": { $0.renameGraphic },
+        "restore_graphic": { $0.restoreGraphic },
         "set_clip": { $0.setClip },
         "set_enabled": { $0.setEnabled },
         "set_transition": { $0.setTransition },

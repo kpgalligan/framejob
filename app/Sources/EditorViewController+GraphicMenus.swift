@@ -137,14 +137,18 @@ extension EditorViewController {
 
     /// The menu arms for the four, answered from `validateUserInterfaceItem`'s
     /// default case: each needs the document's graphics store, which
-    /// `startGraphicStore()` makes with the window.
+    /// `startGraphicStore()` makes with the window. Any other action is
+    /// forwarded to `validateGraphicFileAction`, the arm for File ▸ Rename
+    /// Graphic…, Delete Graphic… and Restore Graphic Version…
+    /// (`EditorViewController+GraphicFiles.swift`), which answers nil for
+    /// an action that is none of the three.
     func validateGraphicMenuAction(_ action: Selector) -> Bool? {
         switch action {
         case #selector(insertGraphicTemplate(_:)), #selector(insertGraphicFromFile(_:)),
             #selector(addGraphicFont(_:)), #selector(addGraphicImage(_:)):
             return document?.graphicStore != nil
         default:
-            return nil
+            return validateGraphicFileAction(action)
         }
     }
 

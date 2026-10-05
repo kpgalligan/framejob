@@ -342,7 +342,17 @@ pixels of frames in all (two at 8192×8192, or sixteen at 3840×2160);
 renamed. `get_graphic` reads a module or names the folder, which your file
 tools may edit too; its `API.md` is this page, `API.d.ts` its types.
 `get_graphic {}`'s `warnings` says what the folder's scan skipped or could
-not watch, such as a file whose name is not a module name. A successful
+not watch, such as a file whose name is not a module name. The app keeps the
+last 10 texts of each module whenever it sees one replaced: `kept`, in
+`write_graphic`'s and `get_graphic {name}`'s answers, lists their revisions,
+newest first, and `get_graphic {}`'s `history` lists every name with a kept
+text, deleted modules included. `restore_graphic {name, revision?}` writes a
+kept text back (the newest by default) and keeps the one it replaced.
+`delete_graphic {name}` removes a module no clip draws and keeps its text, so
+`restore_graphic` brings it back. `rename_graphic {name, to}` renames a
+module and repoints every clip that draws it as one undo step; undo renames
+the file back. The folder's `history/` is the app's: leave it to those three
+tools. A successful
 `export` answers `graphic_warnings`, each distinct warning a graphic gave
 while the file was drawn, with its name and frame.
 
