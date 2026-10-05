@@ -62,22 +62,9 @@
 //! somewhere visible rather than beep. That fallback is why the only
 //! "changes nothing" answer here is an empty clip list.
 //!
-//! ### Paste Attributes
-//!
-//! `paste_attributes` reads the same payload and places nothing: it copies
-//! the EARLIEST payload clip's property groups onto clips already on the
-//! timeline. It lives here rather than in `edit_props.rs` because the
-//! material again comes from the clipboard, whose shape is this module's to
-//! know. A group is REPLACED whole, never merged — "make this look like
-//! that" is the gesture, and a merge would leave the target's shadow under
-//! a source that had none. What a target keeps is what makes it the clip it
-//! is rather than how it looks: a text clip's `content` and the `words`
-//! that time it (spec §11 W-6 — a timing belongs to its words); a shape's
-//! `kind`, `width`, `height`, `from` and `to`. Video and audio travel whole,
-//! transform included — `audio.muted` and `keep_pitch` are properties like
-//! opacity, and `keep_pitch` only acts when the speed is not 1, which does
-//! not travel: `speed`, `enabled`, the actions, the transition, the name,
-//! the label and the source are not properties at all.
+//! `paste_attributes` reads the same payload and places nothing; it is
+//! `edit_paste_attributes.rs`'s, which parses the payload through
+//! [`parse_payload`].
 
 use std::collections::HashMap;
 
@@ -86,21 +73,20 @@ use serde_json::Value;
 
 use crate::export::describe;
 use crate::format::MAX_TRACKS;
-use crate::model::{Clip, Media, Nest, Project, ShapeProps, Source, TextProps, Track};
+use crate::model::{Clip, Media, Nest, Project, Source, Track};
 use crate::outcome::Outcome;
-use crate::patch::{Group, GROUPS};
 use crate::time::Ticks;
 
 /// One clipboard payload. `media` and `nests` default because most
 /// selections name neither; `clips` deliberately does not, so a payload that
 /// forgot the key is an error naming it rather than a silent no-op.
 #[derive(Debug, Deserialize)]
-struct Payload {
-    clips: Vec<Clip>,
+pub(crate) struct Payload {
+    pub(crate) clips: Vec<Clip>,
     #[serde(default)]
-    media: Vec<Media>,
+    pub(crate) media: Vec<Media>,
     #[serde(default)]
-    nests: Vec<Nest>,
+    pub(crate) nests: Vec<Nest>,
 }
 
 /// The media a source shows, or `None` for the kinds with no file behind
@@ -331,61 +317,8 @@ fn new_track(project: &mut Project) -> Track {
     }
 }
 
-/// Whether a clip HAS the group — the model's only notion of what a clip
-/// can take, the same one `edit_props.rs`'s patches go by.
-fn has_group(clip: &Clip, group: Group) -> bool {
-    match group {
-        Group::Video => clip.video.is_some(),
-        Group::Audio => clip.audio.is_some(),
-        Group::Text => clip.text.is_some(),
-        Group::Shape => clip.shape.is_some(),
-    }
-}
-
-/// Replaces `target`'s group with a copy of `source`'s, keeping the fields
-/// that make the target the clip it is (module doc). A side that lacks the
-/// group leaves the target as it was — the caller has already refused that
-/// case by name, so this is only the shape that cannot invent a group.
-fn copy_group(target: &mut Clip, source: &Clip, group: Group) {
-    match group {
-        Group::Video => {
-            if let (Some(into), Some(from)) = (target.video.as_mut(), &source.video) {
-                *into = from.clone();
-            }
-        }
-        Group::Audio => {
-            if let (Some(into), Some(from)) = (target.audio.as_mut(), &source.audio) {
-                *into = *from;
-            }
-        }
-        Group::Text => {
-            if let (Some(into), Some(from)) = (target.text.as_mut(), &source.text) {
-                let content = std::mem::take(&mut into.content);
-                let words = std::mem::take(&mut into.words);
-                *into = TextProps {
-                    content,
-                    words,
-                    ..from.clone()
-                };
-            }
-        }
-        Group::Shape => {
-            if let (Some(into), Some(from)) = (target.shape.as_mut(), &source.shape) {
-                *into = ShapeProps {
-                    kind: into.kind,
-                    width: into.width,
-                    height: into.height,
-                    from: into.from,
-                    to: into.to,
-                    ..from.clone()
-                };
-            }
-        }
-    }
-}
-
 /// Parses the payload, naming what was wrong.
-fn parse_payload(payload: &Value) -> Result<Payload, String> {
+pub(crate) fn parse_payload(payload: &Value) -> Result<Payload, String> {
     if !payload.is_object() {
         return Err(format!(
             "a paste payload must be a json object, not {}",
@@ -530,64 +463,5 @@ impl Project {
         }
 
         self.finish_placement(next, &touched)
-    }
-
-    /// Copies one payload clip's property groups onto every named clip (spec
-    /// §6) — Edit ▸ Paste Attributes. The clip is the EARLIEST, then the
-    /// front-most (`track` is a depth, 0 = front), then the lower id: Copy
-    /// writes a selection in storage — creation — order, not the timeline's,
-    /// so the array's first is a clip the user cannot see. Which fields
-    /// travel, which a target keeps and why a group is replaced rather than
-    /// merged are the module doc's.
-    ///
-    /// `groups` absent means every group BOTH sides have, silently skipping
-    /// the rest: video onto a text clip from a media clip copies the video,
-    /// leaves the text alone and drops the audio, which has nowhere to go. A
-    /// NAMED group is different — one the source lacks is an `Err` naming
-    /// the group, one a target lacks is `Err("clip N has no audio
-    /// properties")`, the patches' answer — because a caller who asked for
-    /// it would otherwise never learn it did not happen. An empty explicit
-    /// list, an identity paste and an empty selection are all identities. The
-    /// copied groups then pass the range checks a patch does, so a payload
-    /// written by hand cannot smuggle in a value the inspector would refuse.
-    pub fn paste_attributes(
-        &self,
-        clips: &[u32],
-        payload: &Value,
-        groups: Option<&[Group]>,
-    ) -> Result<Outcome, String> {
-        let payload = parse_payload(payload)?;
-        let earliest = |c: &&Clip| (c.start, c.track, c.id);
-        let Some(source) = payload.clips.iter().min_by_key(earliest) else {
-            return Err("paste payload has no clips".to_string());
-        };
-        for group in groups.unwrap_or_default() {
-            if !has_group(source, *group) {
-                return Err(format!("payload clip has no {} properties", group.name()));
-            }
-        }
-        let ids: Vec<u32> = self.selected_clips(clips)?.iter().map(|c| c.id).collect();
-
-        let mut next = self.clone();
-        for id in ids {
-            let Some(target) = next.clip_mut(id) else {
-                continue;
-            };
-            let chosen: Vec<Group> = match groups {
-                Some(named) => named.to_vec(),
-                None => GROUPS
-                    .into_iter()
-                    .filter(|g| has_group(source, *g) && has_group(target, *g))
-                    .collect(),
-            };
-            for group in chosen {
-                if !has_group(target, group) {
-                    return Err(format!("clip {id} has no {} properties", group.name()));
-                }
-                copy_group(target, source, group);
-                self.normalise_and_check_group(target, group)?;
-            }
-        }
-        self.finish(next)
     }
 }

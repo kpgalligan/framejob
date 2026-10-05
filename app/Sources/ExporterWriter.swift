@@ -200,8 +200,8 @@ final class ExportWriter {
         // the bundled resource is missing and there is nothing to compose
         // against.
         guard !tracks.isEmpty else { throw Exporter.ExportError.emptyTimeline }
-        try Self.checkAlphaSurvivesTheSize(settings, canvas: built.videoComposition.renderSize)
-
+        let canvas = built.videoComposition.renderSize
+        try Self.checkAlphaSurvivesTheSize(settings, canvas: canvas)
         let output = AVAssetReaderVideoCompositionOutput(
             videoTracks: tracks,
             videoSettings: [
@@ -220,7 +220,7 @@ final class ExportWriter {
         reader.add(output)
 
         let input = AVAssetWriterInput(
-            mediaType: .video, outputSettings: try Self.videoSettings(settings))
+            mediaType: .video, outputSettings: try Self.videoSettings(settings, canvas: canvas))
         input.expectsMediaDataInRealTime = false
         guard writer.canAdd(input) else {
             throw Exporter.ExportError.presetUnavailable(Self.presetName(settings))

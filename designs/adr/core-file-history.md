@@ -104,6 +104,17 @@ named for the next cut are under "Named next cuts".
   full.** A copied `{"motion": {}}` or three nulls must become §5a's one spelling of "no
   motion". This is the shape the size rule asks for when a fix lands beside a file at
   the cap.
+- **`edit_paste_attributes.rs` is a pure move out of `edit_paste.rs` (issue batch B85
+  phase 2, 2026-10-05), made ahead of spec §11 G-32 under the size rule.** What moved:
+  `paste_attributes`, its two helpers `has_group` and `copy_group`, and the module doc's
+  "Paste Attributes" section; `Payload`, its three fields and `parse_payload` stayed and
+  became `pub(crate)`, because the payload's shape is still `edit_paste.rs`'s to know.
+  `wc -l` printed 593 for `edit_paste.rs` before the cut, and 467 and 143 for the two
+  files at the move's own gate (`cargo fmt --check`, `cargo test --release`, `make lint`
+  with nothing else in `core/` changed). The seam is the clipboard's two uses: `paste`
+  makes another document's clips fit and places them, and `paste_attributes` copies
+  properties onto clips already there and places nothing. G-32's `graphic` group, its
+  `PasteGroup` and `skip_missing` then landed in the new file alone.
 - **Background and blurred background are OPS, not app composites.** The clipboard
   payload has no `nests` key. Repairing with `add_clip` would lose the source window,
   so the backdrop would drift out of sync. The op also needs `fill_scale`, `SCALE_MAX`

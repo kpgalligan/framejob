@@ -140,7 +140,7 @@ detail there.
   W-6). It lives there, not in `InspectorPane.swift`, for the size rule.
 
 **The document.**
-- `ProjectDocument.swift` (+`DisplayStem`, +`Recording`, +`SelectedAction`, +`Import`, +`Graphics`, +`UndoGroup`, +`CacheSaves`, +`Alerts`)
+- `ProjectDocument.swift` (+`DisplayStem`, +`Recording`, +`SelectedAction`, +`Import`, +`Graphics`, +`GraphicFiles`, +`UndoGroup`, +`CacheSaves`, +`Alerts`)
   — NSDocument, `.reelcut` package read/write, and the single mutation
   point (see Undo); `applyEdit`'s `.refused` arm beeps and then posts
   `projectDocumentDidRefuse` with the `ReelRefusal` (spec §11 CI-10), which
@@ -210,7 +210,29 @@ detail there.
   BOTH untitled roots — the graphics root (`removeScratchRoot()`) and
   `temporaryCacheDirectory` (`removeTemporaryCacheDirectory()`); the cache
   root goes at close ONLY, never at the first save, because the timeline and
-  any pass in flight still hold its path (G-19 (d)).
+  any pass in flight still hold its path (G-19 (d)). `startGraphicStore()` also observes the document's own
+  `.projectDocumentDidChange` and ends with one `reconcileGraphicNames()`;
+  `stopGraphicStore()` removes that observer. `+GraphicFiles` holds the three
+  bodies BOTH doors call — `deleteGraphic(named:)` (refused while a clip
+  draws the module, naming the clips per container),
+  `renameGraphic(named:to:apply:)` (the file, its history, then one
+  `set_graphic {name}` per container handed to `apply` as ONE step, moved
+  back when `apply` throws or leaves a clip behind, the journal put back as
+  it was read before the rename — only when the move back succeeded, so a
+  failed one keeps its pair for the repair (G-28 (d)); refused with a nest
+  open) and `restoreGraphic(named:revision:)` (which refuses a kept file
+  whose bytes are not the revision in its name, G-29 (d)) — each ending its
+  file act in one `rescan()`, every throw of its own a `ReelCoreError`; and
+  the repair `reconcileGraphicNames()` (spec §11 G-28 (e)): after every
+  committed change and once at the store's start, a journalled pair `[a, b]`
+  says the app moved the file from `a` to `b`, and when a clip draws `a`,
+  with no file and NO kept revision, while `b` has a file and no clip, the
+  file is moved back from `b` — one direction only, never from a pair's
+  first name to its second (G-28 (e), (f)) — and a file-less name WITH kept
+  revisions is left alone even when a crash inside a rename, not a delete,
+  left it so (G-28 (f)): it is otherwise a deleted module (G-27 (f)). Never
+  call it, or any of the three bodies, from a `.graphicsDidChange` or
+  `.projectGraphicsDidChange` observer.
 - `MediaImporter.swift` (+`Probe`, +`Speech`, +`Peaks`) ·
   `MediaPeakBuckets.swift` · `MediaCacheFiles.swift` · `MediaCacheLedger.swift` ·
   `FFmpegRewrap.swift` (+`Plan`) · `AppSupport.swift` · `DecoderSupport.swift` ·
@@ -333,7 +355,30 @@ detail there.
   and `importFile` land through `land(at:writing:)`, whose `.partial` is
   removed on any failure; and `removeScratchRoot()`, which removes an untitled
   root after `stop()` — from `packageDidMove(to:)` and `stopGraphicStore()`
-  (G-19 (d)). `GraphicStore+Import.swift`'s `importAsset` files a name
+  (G-19 (d)). It also holds the app's delete and rename, each inside
+  `onQueue` (main only, never on the store's queue) so no pass runs between
+  their steps: `removeModule(named:)` keeps the file's bytes and then removes
+  it, refusing when the text could not be kept, and `moveModule(from:to:)`
+  moves the file, journals the pair and reads it back — a rename that cannot
+  be journalled is refused — and then moves its history, a throw leaving the
+  file and the history where they were and the journal put back as it was
+  read (its bytes, or no file: `renameJournalBytes` / `putBackRenameJournal`
+  in `GraphicStore+History.swift`), so a refused rename journals no pair; a
+  crash between the three steps is G-28 (f)'s limit; neither rescans.
+  `write(name:bytes:)` is `write(name:source:)` for bytes as they are, and
+  `noModuleSentence(_:)` the one sentence for an absent module.
+  `GraphicStore+History.swift` is the kept revisions and the rename journal
+  (spec §11 G-27..G-29): `graphics/history/<name>/<%06d sequence>-<revision>.js`,
+  the last `historyLimit` (10) per module, and `history/renames.json`, at
+  most `renameJournalLimit` (32) pairs. `keepReplaced`, called by `pass` on
+  the queue before it stores its scan, keeps the bytes a module's new text
+  replaced and drops the new text's own revision, so history never holds the
+  current text; nothing is kept at `start()` or for a removal the app did not
+  make, and `start()` drops each module's current revision from its history.
+  `history/` is created only inside an existing `graphics/` (G-14) with no
+  `packageContentsDidChangeOnDisk()` call, and `moveHistory` leaves no
+  `history/<from>/` behind — which is what makes 'no file, something kept'
+  mean a DELETED module. `GraphicStore+Import.swift`'s `importAsset` files a name
   `asset(name)` cannot use under `GraphicAssetName.legalized`, a renamed
   copy taking `-2`, `-3`, … while `holdsAsset(named:)` (scan or disk) says
   the name is held, and answers `name`/`renamedFrom` (G-23 (c), (d)). **`drain()` is not
@@ -415,9 +460,26 @@ the key map behind it.
   UTF-8 is refused by name before anything is written (#75); Add Image to
   Graphics…'s body is `addGraphicImage(from:) throws` (no panel), which
   shows `showGraphicNotice`'s informational sheet when the picture was
-  renamed, G-23 (d)),
+  renamed, G-23 (d); its `validateGraphicMenuAction` answers the four and
+  forwards every other action to `validateGraphicFileAction`),
+  `+GraphicFiles` (File ▸ Rename Graphic…, Delete Graphic… and Restore
+  Graphic Version…, spec §11 G-30: three `@objc` actions, the ONE
+  `presentAsSheet` of `GraphicFileSheetController`, in
+  `presentGraphicFileSheet`, which beeps when the item has nothing to
+  offer, and the validator arm `validateGraphicFileAction` — something to
+  list, and for Rename no nest open; Rename and Restore open on the ONE
+  selected clip's graphic when it is a row, a deleted one included, and
+  Delete always on the first; nothing there writes a file or applies an
+  op),
   `+Clipboard` (⌘X/⌘C/⌘V over the `com.kgalligan.reelcut.clips` pasteboard,
-  the `paste` op's payload; ⌥⌘V Paste Attributes with no `groups`),
+  the `paste` op's payload; ⌥⌘V Paste Attributes with no `groups`; and
+  Edit ▸ Paste Graphic Properties, whose `@objc` action
+  `pasteGraphicProperties(_:)` lives here and sends ONE `paste_attributes`
+  with `groups: ["graphic"]` and `skip_missing` (spec §11 G-32). Every reader
+  and writer takes its `NSPasteboard` as a parameter, the general one by
+  default, and that action reads a pasteboard SENDER in place of the general
+  one (a menu sends its `NSMenuItem`), so a probe drives all of them over a
+  private pasteboard),
   `+Edge` (slip, roll, close gap, insert, overwrite, the `,` / `.` nudge —
   with an `extension TimelineView` because the two ⌥⇧ drags begin there),
   `+Identity` (Rename ⇧⌘R, the Label submenu over `ClipLabel.allCases`),
@@ -460,8 +522,11 @@ the key map behind it.
   the outlines stay drawn under them.
 - `EditorWindowController.swift`, `WelcomeWindowController.swift`,
   `AppDelegate.swift` (+`Menus`, +`Recording`, +`GraphicMenu` — the Insert
-  menu's builder and Help ▸ Graphics Reference, `showGraphicsReference`, on
-  the delegate), `main.swift` — the window,
+  menu's builder, File's three graphic-file items (`addGraphicFileItems(to:)`,
+  called once from `fileMenu()` right after Add Image to Graphics…: a
+  separator, then Rename Graphic…, Delete Graphic… and Restore Graphic
+  Version…, no key equivalents, spec §11 G-30) and Help ▸ Graphics
+  Reference, `showGraphicsReference`, on the delegate), `main.swift` — the window,
   the no-document window, the launch/terminate flow and the whole menu bar
   (spec §9). Menu items are nil-target selectors down the responder chain.
   `AppDelegate.swift` binds the agent socket at launch, then calls
@@ -719,7 +784,8 @@ the key map behind it.
   name field. `GraphicSchema.swift` holds `GraphicSchemaEntry` and
   `GraphicSchema` (with `orderedKeys`), a pure move out of it ·
   `DocumentPane.swift` (reads `documentSnapshot`, never the scoped one: its
-  ops are document-level) · `OptionControls.swift` (the descriptor-driven
+  ops are document-level; its transparency note names one or two alpha
+  export formats and counts three or more, spec §11 G-33) · `OptionControls.swift` (the descriptor-driven
   row controls) · `OptionControls+Choices.swift` (the typed, value-carrying
   `OptionPopupControl` init over the index one). `VideoPane+Motion.swift` owns the local wrapping
   `MotionInactiveNote` for selected zero-duration edges; it refreshes with
@@ -1005,9 +1071,19 @@ the key map behind it.
   32-bit float, then the write: un-normalised from a 16-bit decode (a mix
   past full scale clips there, and `mixClipped` says so); normalised from the
   same float decode the measurement read, gained and quantised once by
-  `ExportAudioGain` (#86). `ExportWriter` refuses an alpha-carrying row at a PADDED size
-  (padding inverts the alpha; a pure scale is fine), testing the box the
-  ENCODER is handed through `encodedSize`; `apng` FITS instead and must not
+  `ExportAudioGain` (#86). `ExportWriter` FILLS the frame when a fit would leave at most
+  a pixel uncovered, or — the frame a canvas-SHAPED size less at most one
+  pixel on each axis, `(bw + a)·ch == (bh + b)·cw` for some `a`, `b` in
+  {0, 1}, at any scale — when a fill would overshoot by at most one
+  (`shapeGap`: `gap <= limit`, in integers), and letterboxes past that, where
+  an alpha-carrying movie row (`prores_4444`, `hevc_alpha`) is refused instead
+  (padding inverts the alpha; a pure scale is fine); so no size of the
+  canvas's own shape is refused for being odd, and a typed size of another
+  shape is judged as the even frame it becomes; the frame is the size the
+  CORE resolved, already even where the row needs it (spec §11 G-33), and
+  `encodedSize` is only the floor under it; a missing encoder is
+  `.presetUnavailable` and no file (`Exporter.encoderOutcome`, in
+  `ExporterErrors.swift`, applied where `startWriting` hears the pipeline); `apng` FITS instead and must not
   grow the guard. GIF and APNG refuse past 600 frames rather than truncate.
   `renderFrame` is documented off-main. Audio export is NOT bit-deterministic
   within an 8 ms window at a duck ramp edge (AVFoundation's mix); a duck-free
@@ -1357,13 +1433,35 @@ free.
 - `Sheets.swift` (the `makeSheetView` builders every sheet uses) ·
   `ExportSheetController.swift` (+`Options`, +`Resolve`, +`Presets`,
   `ExportPresetsStore.swift`) · `ExportProgressSheetController.swift` ·
-  `SpeedSheetController.swift` · `RelinkSheetController.swift`. A sheet
+  `SpeedSheetController.swift` · `RelinkSheetController.swift` ·
+  `GraphicFileSheetController.swift`. A sheet
   captures a project handle and trusts it; every editor action and
   `handleEditorKey` refuse while one is attached. The export card's controls
   are a VALUE (`ExportChoice`); presets store control choices, not resolved
   overrides; `apply(_:)`'s order is load-bearing and documented there; the
-  burn-in checkbox rides as a `RecipeOptions`, not an override. The sheet has
-  TWO commits, Export… and Add to Queue, one method.
+  burn-in checkbox rides as a `RecipeOptions`, not an override. The
+  footnote's tooltip follows its text: `syncReadout` (`+Resolve`) writes both
+  and clears both, because `sheetFootnote` sets a tooltip only for the text
+  it is built with and this sheet's text changes after (spec §11 G-33 (a)). The sheet has
+  TWO commits, Export… and Add to Queue, one method. `GraphicFileSheetController.swift` is the ONE sheet of File ▸ Rename
+  Graphic…, Delete Graphic… and Restore Graphic Version… (spec §11 G-30):
+  `GraphicFileAct`, `GraphicFileChoice`, and the model statics a probe
+  calls — `choices` (the folder's modules for Rename and Delete; every name
+  with a kept text for Restore, a deleted module titled `<name>
+  (deleted)`), `isOffered` (what the validator asks on every menu open: the
+  last scan for Rename and Delete, `keptNames()` for Restore — it never
+  builds `choices`), `opening`, `keptLine`, `canConfirm` and `perform`.
+  Every act is ONE call of a body in `ProjectDocument+GraphicFiles.swift`,
+  from the button's action only (the bodies end in `rescan()`: never from a
+  `.graphicsDidChange` observer); Rename's `apply` is `performGroupedEdit`,
+  never `applyEdit`, and the name goes to the body as typed. A refusal is
+  the body's sentence verbatim in `messageLabel`, with a beep, and the sheet
+  stays up — it writes no sentence, calls no `GraphicStore` writer, builds
+  no op and registers no undo; its two guards name the CALL (an empty or
+  unchanged name, nothing to list). The pop-up's rows are `NSMenuItem`s
+  carrying the name in `representedObject`. `graphics_menu_proof.py`'s ten
+  phase-2 mutants each replace one of its lines (or of `+GraphicFiles`' and
+  `AppDelegate+GraphicMenu`'s), asserted to occur once.
 - `ExportQueueController.swift` · `ExportQueueWindowController.swift` — the
   controller has NO AppKit in it so a probe can drive it; one job at a time on
   the MAIN thread with a fresh `Exporter` each (two concurrent ones deadlock);
@@ -1525,7 +1623,7 @@ free.
   otherwise the code it was. `+Graphics` holds the two graphic op tools and
   the three app-state ones — `write_graphic` (the store's one writer, then a
   synchronous `rescan()` so the reply is the compile of THAT text; a failed
-  compile is `ok: false`, not an error; not undoable, never dirty, G-3),
+  compile is `ok: false`, not an error; not undoable, never dirty, G-3; its replaced text kept, G-29),
   `get_graphic` (one module — a compiled one's `diagnostics` are its
   top-level warnings — or the folder with `folder_exists`, the engine's
   `families`, the `assets` and the scan's `warnings`, G-24) and
@@ -1549,7 +1647,16 @@ free.
   also runs (the copy via `ensureFolder()`, G-14, `.partial` moved into
   place, then `rescan()`), and the store's own post reaches the registry; a
   font's `families` come from a throwaway
-  library holding that file alone. `GraphicContactSheet.swift` is pure: the
+  library holding that file alone. `+GraphicFiles` is `delete_graphic`, `rename_graphic` and
+  `restore_graphic` (spec §11 G-27..G-29), on main, thin: each calls its body
+  in `ProjectDocument+GraphicFiles.swift` — the body File ▸ Delete Graphic…,
+  Rename Graphic… and Restore Graphic Version… call through
+  `GraphicFileSheetController` (G-30) — and rethrows a `ReelCoreError` as
+  the tool's error; rename's `apply` is `performGroupedEdit(document, "Rename
+  Graphic", …)`. `kept` — the module's kept revisions, newest first — is in
+  their answers and in `write_graphic`'s and `get_graphic {name}`'s;
+  `get_graphic {}` answers `history`. `write_graphic`'s note is `keptNote`;
+  `notUndoableNote` stays for the two imports. `GraphicContactSheet.swift` is pure: the
   layout (the scale is over the cells alone, so the sheet is exactly
   `width × height ≤ max_width × maxSide`, `maxSide` being
   `GraphicLibrary.maxSide`), `maxCellPixels`, the painter and
@@ -1562,12 +1669,12 @@ free.
   from the core's published table (`Self.opSchemas` over `rc_op_schemas`).
   **Every one of the fifty-nine op tools is `opTool`'s** and carries no
   `"type"`, no `"enum"` and no hand-written required list; `tool`'s remaining
-  callers are the twenty-seven APP-STATE tools, which have no op behind them
+  callers are the thirty APP-STATE tools, which have no op behind them
   and so nothing to read from the table — the eleven of the Projects group,
   `AgentCatalog+Audio.swift`'s two composites and
   `AgentCatalog+Captions.swift`'s three, spliced back at the two points they
   left, the five other file tools, `record_screen` among them, and
-  `AgentCatalog+Graphics.swift`'s six, after its two `opTool` rows. `opTool`
+  `AgentCatalog+Graphics.swift`'s nine, after its two `opTool` rows. `opTool`
   goes THROUGH `tool`, so `project` and `scope` are injected by one piece of
   code either way. `AgentCatalog+Declarations.swift` is the one list of places
   a tool deliberately takes more or less than its op does — a bare-string
@@ -1593,7 +1700,7 @@ free.
   `AgentServer+Scope.swift` with the feature it is about; all five assert in
   debug, log `Reelcut: ` in release and start the server either way.
   `AgentServer+Gate.swift` is the CALL-time half of the same contract
-  (kpgalligan/reelcut#21): one comparison in `dispatch`, for all eighty-six
+  (kpgalligan/reelcut#21): one comparison in `dispatch`, for all eighty-nine
   product tools, of a caller's keys against the schema the tool published, every
   stranger refused by name — the tool, the strangers and the whole of what it
   takes — before the scope or any handler reads a thing. Its map is read once
@@ -1910,7 +2017,8 @@ free.
   an `NSClipView` or at zero area (the frame's); truncated,
   except when wrapping. Problems on `_NS…` views go to `private_problems`. A
   secure field's text is never written, nor a field editor's; an ordinary text
-  view's text is. A view that `is UISnapshotParts` adds one `UISnapshotPart`
+  view's text is. Each view's record carries its `tooltip` too (first 200
+  characters, `null` for none and always for a secure field). A view that `is UISnapshotParts` adds one `UISnapshotPart`
   record per part it names (id, text, rect), after its own record and before
   its subviews, never a problem (the Assistant tab's transcript, spec §11
   AI-17). It is pure over an `NSView` tree, so

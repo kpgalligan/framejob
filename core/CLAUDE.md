@@ -251,7 +251,9 @@ governs a module now.
   check, so a refusal names what the caller sent. What a patch may CARRY is
   `patch.rs`'s and nothing here restates it.
 - `patch.rs` — reading a caller-authored patch, cut out of `edit_props.rs`
-  under the size rule: `Group` and its per-group template, `check_keys` (the
+  under the size rule: `Group` — the four PATCH groups; `paste_attributes` takes these four and
+  `graphic` as `edit_paste_attributes.rs`'s `PasteGroup`, and a patch has no
+  fifth group — and its per-group template, `check_keys` (the
   walk of keys and JSON kinds, array indices in the path) and `merge_group`
   (the one read of a group patch — the walk, the deep merge and the
   path-tracking deserialise — the new text and shape clips' patches
@@ -358,12 +360,23 @@ governs a module now.
   and `merge_group`'s read of a `null` for an unknown or a required key),
   and a non-object group slot is replaced by `{}`, never indexed. `nest` and `unnest`
   (fresh ids, content byte-equal);
-  `paste`, whose payload schema is its module doc, and `paste_attributes`,
-  which copies the EARLIEST clip's property groups (then the front-most, then
-  the lower id — never the array's first) onto each target, replaced whole
-  and never merged.
+  `paste`, whose payload schema is its module doc; `Payload` and
+  `parse_payload` are `pub(crate)`, because `edit_paste_attributes.rs` reads
+  the same payload.
   `graphic` in a `patch` or an `off` path is an `Err` in G-10's sentence,
   asked before the group lookup.
+- `edit_paste_attributes.rs` — `paste_attributes`, cut out of `edit_paste.rs`
+  under the size rule as a pure move ahead of spec §11 G-32: the payload's
+  EARLIEST clip's property groups (then the front-most, then the lower id —
+  never the array's first) copied onto each target, replaced whole and never
+  merged. `PasteGroup` is the five names it takes — the four patch groups and
+  `graphic`, which is never in the default set: a graphic's `props` copied
+  whole onto clips drawn by the SAME module, the target keeping its name,
+  size, `in` and `length`, written with `insert` and `shift_remove`
+  (`model_graphic.rs`'s rule). `skip_missing` drops a named group the payload
+  clip lacks and skips a target that cannot take one. **The copied props are
+  shape-checked once, the first time a target takes them**: a paste nothing
+  takes never reads the map. `patch::Group` gains no variant for it.
 - `edit_zoom.rs` — `add_zoom_action`, the screencast zoom, and `ZoomRegion`,
   the one op ARGUMENT that is a caller-authored object: its `Deserialize` is
   written out rather than derived so it answers as a patch does — an object
@@ -484,10 +497,13 @@ governs a module now.
   override is READ and REFUSED, naming the key and the value (`peak_dbtp`
   without `loudness_lufs` is an `Err`, because a ceiling with nothing to cap
   would be a key accepted and silently inert); the sizes the sheet offers and
-  `fit_within`; and the rows themselves. In a row, `avf_preset: null` routes
+  `fit_within`, and `even_size` — on every row AVFoundation writes but
+  `prores_4444` an odd edge resolves one pixel smaller, in the list's
+  Document row (named "Document (even)") and in the resolved settings alike,
+  so the size reported is the size written (G-33); and the rows themselves. In a row, `avf_preset: null` routes
   an export to the ImageIO writer (so the two LPCM rows repeat `audio_m4a`'s
   name), and `alpha` means "this ENCODING carries an alpha channel" — true for
-  `prores_4444` and `apng`, false for `gif`, which has one palette index and
+  `prores_4444`, `hevc_alpha` and `apng`, false for `gif`, which has one palette index and
   no partial value — never "the canvas is translucent".
 - `agent.rs` — embedded MCP server (streamable HTTP, tools only).
   **Generic** — knows nothing about video; the host registers the catalog

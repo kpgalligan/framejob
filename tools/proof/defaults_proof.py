@@ -3,7 +3,7 @@
 built app, and the real build's own session measured.
 
     python3 tools/proof/defaults_proof.py [--app <Reelcut.app>] [--only ROWS]
-    python3 tools/proof/defaults_proof.py --mutant no-compare|no-exit
+    python3 tools/proof/defaults_proof.py --mutant no-compare|no-exit|home-followed
 
 No environment moves `UserDefaults`, so an instance a proof launches shares
 `com.kgalligan.Reelcut` with the owner. `mcp.py` snapshots that domain by key
@@ -43,12 +43,26 @@ ends `sys.exit(0)`; the parent scores its status, stdout and stderr.
   3, and the key is among `defaults_moved` at the first reading after the
   call. A script handed its socket is guarded by the record `MCP()` makes,
   and its exit is the one compare with no `stop()` in front of it.
+- **H1** (issue batch B84) a scratch home that does not exist yet. The
+  parent seeds the CLONE's domain with `ReelcutDefaultsProofSeed` (`defaults
+  write` on the clone's domain only; refused for any other), counts its
+  keys, and runs child `absent-home` with `CFFIXED_USER_HOME` naming an
+  absent folder under the work folder: `mcp.launch(clone)` (the record),
+  the folder made (by the instance, else by the child), `new_project`,
+  `close_project`, stop, `remove_scratch` (the compare). The record held as
+  many keys as the parent counted; the home was absent at the record and
+  present at the compare; status 0 and no `DEFAULTS MOVED` line. This is
+  `screens.py` run under a scratch home nothing has made, which the guard
+  once answered with every key of the owner's domain.
+- **H2** the other way round, child `home-removed`: the folder is there at
+  the record and the child removes it after `stop()`, before the compare.
+  Same four claims, the home present then absent.
 - **R1** the REAL build, in this process: `mcp.launch`, `new_project`,
   `close_project`, stop, `remove_scratch`. No owner-visible key of
   `com.kgalligan.Reelcut` moved. If one did and another Reelcut shares the
   domain, one retry; then FAIL naming the keys and the pids.
-- **R2** the real domain across C0 and the G rows: no owner-visible key
-  moved (no retry).
+- **R2** the real domain across C0 and the G and H rows: no owner-visible
+  key moved (no retry).
 
 **A write is a toggle, and only the first one may count.** View ▸ Snapping
 writes the opposite of what the instance read when the project's window was
@@ -82,7 +96,9 @@ moved key and the runs since in which none did.
 
 `--mutant` reaches the children by argv and must fail exactly its rows (then
 MUTANT PASS, exit 0): `no-compare` (`proof_defaults.moved` answers `[]`) G1,
-G3, G4, G5; `no-exit` (`mcp._exit_failed` is a no-op) G1, G3, G4.
+G3, G4, G5; `no-exit` (`mcp._exit_failed` is a no-op) G1, G3, G4;
+`home-followed` (`proof_defaults.read_env` answers None, so `defaults
+export` inherits `CFFIXED_USER_HOME` as it did before B84) H1, H2.
 
 At the end S2 is stopped, the work folder removed through
 `tree_copy.remove_tree` (which unregisters the clone, #223) and the clone's
@@ -117,8 +133,11 @@ CLONE = os.path.join(WORK, "Reelcut.app")
 CLONE_DOMAIN = "com.kgalligan.reelcut.defaults-proof"
 KEY = "ReelcutSnappingEnabled"
 MARK = "mcp: DEFAULTS MOVED in "
-ROWS = ["C0", "G1", "G2", "G3", "G5", "G4", "R1", "R2"]
-EXPECTED = {"no-compare": {"G1", "G3", "G4", "G5"}, "no-exit": {"G1", "G3", "G4"}}
+SEED = "ReelcutDefaultsProofSeed"
+HOME_KINDS = ("absent-home", "home-removed")
+ROWS = ["C0", "G1", "G2", "G3", "G5", "G4", "H1", "H2", "R1", "R2"]
+EXPECTED = {"no-compare": {"G1", "G3", "G4", "G5"}, "no-exit": {"G1", "G3", "G4"},
+            "home-followed": {"H1", "H2"}}
 WALL_CHILD, WALL_COPY = 240, 300
 TOGGLES, WAIT = 3, 3.0
 
@@ -141,6 +160,14 @@ def child(kind, target, mutant):
         proof_defaults.moved = lambda before, after: []
     if mutant == "no-exit":
         mcp._exit_failed = lambda lines: None
+    if mutant == "home-followed":
+        proof_defaults.read_env = lambda: None
+    home = os.environ.get("CFFIXED_USER_HOME") if kind in HOME_KINDS else None
+    if home and not os.path.realpath(home).startswith(os.path.realpath(WORK) + os.sep):
+        home = None     # a folder is made or removed under the work folder only
+    if kind in HOME_KINDS:
+        print(f"HOME record {'present' if home and os.path.isdir(home) else 'absent'}",
+              flush=True)
     started = None
     began = time.monotonic()
     if kind == "write-handed":
@@ -156,12 +183,16 @@ def child(kind, target, mutant):
           f"keys before; {KEY} {'present' if KEY in (held or {}) else 'absent'}; owns pids "
           f"{sorted(record.get('own') or [])}; opened in {time.monotonic() - began:.1f} s)",
           flush=True)
+    print(f"HELD {'none' if held is None else len(held)}", flush=True)
+    if kind == "absent-home" and home:
+        print(f"HOME instance-made {os.path.isdir(home)}", flush=True)
+        os.makedirs(home, exist_ok=True)
     if client is None:
         print("NOT UP", flush=True)
     else:
         project = os.path.join(WORK, f"{kind}-{os.getpid()}.reelcut")
         client.call("new_project", path=project)
-        if kind == "quiet":
+        if kind == "quiet" or kind in HOME_KINDS:
             client.call("close_project", project=project, discard=True)
         else:
             first = False
@@ -186,8 +217,13 @@ def child(kind, target, mutant):
     asked = time.monotonic()
     if started is not None:
         started.stop()
+    if kind == "home-removed" and home:
+        shutil.rmtree(home, ignore_errors=True)
+    if kind in HOME_KINDS:
+        print(f"HOME compare {'present' if home and os.path.isdir(home) else 'absent'}",
+              flush=True)
     stopped = time.monotonic()
-    if kind in ("write", "quiet"):
+    if kind in ("write", "quiet") or kind in HOME_KINDS:
         mcp.remove_scratch(socket_path)
     print(f"TIMES session {asked - began:.1f} s, stop {stopped - asked:.1f} s, compare "
           f"{time.monotonic() - stopped:.1f} s", flush=True)
@@ -216,18 +252,28 @@ def stop_pid(pid):
         pass
 
 
-def run_child(kind, target, mutant):
-    """{rc, expired, moved (list or None), done, stderr lines, marks}."""
+def run_child(kind, target, mutant, home=None):
+    """{rc, expired, moved (list or None), done, stderr lines, marks}. `home`
+    is the child's `CFFIXED_USER_HOME` (H1, H2)."""
     argv = [sys.executable, os.path.abspath(__file__), "--child", kind, target]
     if mutant:
         argv += ["--mutant", mutant]
     began = time.monotonic()
-    ran = bounded.run(argv, WALL_CHILD, env=child_env())
+    env = child_env()
+    if home:
+        env["CFFIXED_USER_HOME"] = home
+    ran = bounded.run(argv, WALL_CHILD, env=env)
     ended = time.monotonic()
     moved, done, socket_path, toggles, domain = None, False, None, None, None
-    first, trail, times = None, [], None
+    first, trail, times, held, homes = None, [], None, None, {}
     for line in ran["stdout"].splitlines():
-        if line.startswith("MOVED "):
+        if line.startswith("HELD "):
+            held = line[len("HELD "):]
+        elif line.startswith("HOME "):
+            parts = line.split(" ", 2)
+            if len(parts) == 3:
+                homes[parts[1]] = parts[2]
+        elif line.startswith("MOVED "):
             try:
                 moved = json.loads(line[len("MOVED "):])
             except json.JSONDecodeError:
@@ -256,6 +302,7 @@ def run_child(kind, target, mutant):
     lines = [line for line in ran["stderr"].splitlines() if line.strip()]
     return {"rc": ran["rc"], "expired": ran["expired"], "moved": moved, "done": done,
             "toggles": toggles, "domain": domain, "first": first, "trail": trail,
+            "held": held, "homes": homes,
             "times": f"{times or 'no TIMES line'}; child {ended - began:.1f} s, the parent's "
                      f"lsof and stop {time.monotonic() - ended:.1f} s",
             "lines": lines, "marks": [line for line in lines if line.startswith(MARK)]}
@@ -268,6 +315,10 @@ def shape(answer):
             + f"; guarded {answer['domain']}"
             + (f"; {', '.join(answer['trail'])}; first reading {answer['first']}"
                if answer["trail"] else "")
+            + (f"; the home at the record {answer['homes'].get('record')}, made by the "
+               f"instance {answer['homes'].get('instance-made', 'not asked')}, at the compare "
+               f"{answer['homes'].get('compare')}; the record held {answer['held']} keys"
+               if answer["homes"] else "")
             + f"; defaults_moved {answer['moved']}; stderr's last line {last!r}"
             + f"; {answer['times']}")
 
@@ -331,6 +382,25 @@ def stop_s2(s2, socket_path):
         folder = os.path.dirname(socket_path)
         if os.path.realpath(folder).startswith(os.path.realpath(tempfile.gettempdir()) + os.sep):
             shutil.rmtree(folder, ignore_errors=True)
+
+
+def seed_clone():
+    """(the clone's domain's key count with `SEED` among them, None) or
+    (None, reason). `defaults write` on the CLONE's domain only, a proof's
+    own by `proof_defaults`' `prefix` rule and removed at the end; any other
+    name is refused here, and the owner's is never written."""
+    if (CLONE_DOMAIN == proof_defaults.APP_DOMAIN
+            or not CLONE_DOMAIN.startswith(proof_defaults.PREFIXES[0])
+            or proof_defaults._refusal(CLONE_DOMAIN)):
+        return None, f"{CLONE_DOMAIN} is not a proof's own domain: not written"
+    wrote = bounded.run(["defaults", "write", CLONE_DOMAIN, SEED, "-bool", "true"], 30,
+                        env=proof_defaults.read_env())
+    if wrote["rc"] != 0 or wrote["expired"]:
+        return None, f"`defaults write {CLONE_DOMAIN} {SEED}` exited {wrote['rc']}"
+    held = proof_defaults.snapshot(CLONE_DOMAIN)
+    if held is None or SEED not in held:
+        return None, f"{SEED} is not among the clone's domain's keys after the write"
+    return len(held), None
 
 
 def parity(log_path):
@@ -519,6 +589,44 @@ def main():
                   lambda a: wrote(a) + at_once(a) + failed_last(a))
         stop_s2(s2, s2_socket)
         s2, s2_socket = None, None
+
+        def home_row(row_id, kind, home, at_record, at_compare):
+            """H1, H2: one session of the clone under a scratch home that is
+            `at_record` when the guard records and `at_compare` when it
+            compares."""
+            if row_id not in wanted:
+                return
+            if not clone_up:
+                row(row_id, False, "not run: C0 failed")
+                return
+            held, reason = seed_clone()
+            if reason:
+                row(row_id, False, f"not run: {reason}")
+                return
+            shutil.rmtree(os.path.dirname(home), ignore_errors=True)
+            if at_record == "present":
+                os.makedirs(home)
+            answer = run_child(kind, binary_of(CLONE), args.mutant, home=home)
+            problems = []
+            if answer["rc"] != 0:
+                problems.append("status is not 0")
+            if answer["marks"]:
+                problems.append("a DEFAULTS MOVED line was printed")
+            if not answer["done"] or answer["moved"] is None:
+                problems.append("the child did not finish its session")
+            if answer["held"] != str(held):
+                problems.append(f"the record held {answer['held']} keys of the {held} the "
+                                "clone's domain holds")
+            homes = answer["homes"]
+            if (homes.get("record"), homes.get("compare")) != (at_record, at_compare):
+                problems.append(f"the home was not {at_record} at the record and {at_compare} "
+                                "at the compare: the control was not performed")
+            row(row_id, not problems,
+                f"the clone's domain holds {held} keys, {SEED} among them; " + shape(answer)
+                + ("" if not problems else " — " + "; ".join(problems)))
+
+        home_row("H1", "absent-home", os.path.join(WORK, "h1", "home"), "absent", "present")
+        home_row("H2", "home-removed", os.path.join(WORK, "h2", "home"), "present", "absent")
         after = proof_defaults.snapshot()
 
         if "R1" in wanted:
@@ -547,7 +655,8 @@ def main():
                 names = proof_defaults.moved(before, after)
                 visible = proof_defaults.owner_visible(names)
                 row("R2", not visible,
-                    f"{proof_defaults.APP_DOMAIN} ({len(after)} keys) across C0 and the G rows: moved "
+                    f"{proof_defaults.APP_DOMAIN} ({len(after)} keys) across C0 and the G and H "
+                    "rows: moved "
                     f"{names}; owner-visible {visible}; other Reelcut pids sharing it now: "
                     f"{proof_defaults.sharing_pids(proof_defaults.APP_DOMAIN) or 'none'}")
     finally:

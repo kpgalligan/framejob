@@ -490,9 +490,10 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
     the edit and at or below it before. **Not asked about:** a clip already
     above, a clip without sound or with its audio off, and a clip new in
     the answer — a paste, split, duplicate or detach mints it, and
-    `paste_attributes` carries no speed (`edit_paste.rs:79`). **Cancel adds
-    no undo step**, and one question covers every clip a multi-clip edit
-    takes over. **A rate stretch that crosses is put back before the
+    `paste_attributes` carries no speed (`edit_paste_attributes.rs`'s
+    module doc). **Cancel adds no undo step**, and one question covers
+    every clip a multi-clip edit takes over. **A rate stretch that
+    crosses is put back before the
     question** (`endLiveEdit(_:cancelled: true)`, no step, no change
     count), so nothing is live while the question is up: a save writes the
     base and an agent call is not held (AI-12). Set Speed re-applies the

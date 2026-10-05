@@ -60,8 +60,16 @@ The crate's record is road map 10 §10.4.
   `GRAPHIC_<X>` (`core/tests/graphic_ffi.rs` pins each pair;
   `tests/reference.rs` pins the numbers the reference states, and its
   typings' key cap).
-- `stdlib.js`, `noise.js` — §5c's standard library, evaluated as SCRIPTS
-  (globals) before the sandbox; each under 400 lines.
+- `stdlib.js`, `noise.js`, `path.js` — §5c's standard library, evaluated
+  as SCRIPTS (globals) in that order before the sandbox; each under 400
+  lines. `path.js` is G-31's path helpers (`getLength`,
+  `getPointAtLength`, `evolvePath`): pure JavaScript, a curve measured as
+  64 chords, a draw-on dashed by the longest subpath, the last paths
+  memoised per engine (at most 32, at most 50,000 chords and characters) —
+  a cache that changes no answer, held in a closure no module can reach.
+  No helper answers `Infinity` or NaN: a path that would make one do so
+  is refused in the parse sentence (five checks through one predicate,
+  `finite`; `path.test.js`'s row `T8 a number that is not finite`).
 
 ## Rules
 

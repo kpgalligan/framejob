@@ -32,10 +32,10 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`05.3-placement.md`](05.3-placement.md) | 81 | Where a layer lands on the canvas: position, scale, crop, regions, reflection, motion, nests flattened. |
 | [`05.4-actions.md`](05.4-actions.md) | 81 | Actions (keyframed segments): what they target, how lists interpolate, a stored `null` as off. |
 | [`05.5-purity-and-undo.md`](05.5-purity-and-undo.md) | 40 | An edit's three answers, purity, undo. |
-| [`05.6-persistence.md`](05.6-persistence.md) | 150 | The package on disk: Consolidate, bookmarks, reversed assets, caches and their markers, transcripts. |
+| [`05.6-persistence.md`](05.6-persistence.md) | 163 | The package on disk: Consolidate, bookmarks, reversed assets, caches and their markers, transcripts. |
 | **§6 — Edit operations: exact semantics** | | |
-| [`06a-edit-operations-shared-rules.md`](06a-edit-operations-shared-rules.md) | 82 | The rules every op shares: caller ticks snapped to the frame grid, an omitted argument against `null`, how to read a "refuses", the one way a patch is read, and the `scope` envelope key (the view project, the seven ops that are an error with a scope, the checks on the merged parent). |
-| [`06b-edit-operations-clips.md`](06b-edit-operations-clips.md) | 354 | Every clip op: add, insert and overwrite, the two backgrounds; move and the overlap rule; the trims, roll, slip, rate stretch, speed and reverse; split, the ripple deletes and range cuts; freeze, detach, duplicate, paste and paste attributes; nest and unnest; the patch ops; the transition ops. |
+| [`06a-edit-operations-shared-rules.md`](06a-edit-operations-shared-rules.md) | 83 | The rules every op shares: caller ticks snapped to the frame grid, an omitted argument against `null`, how to read a "refuses", the one way a patch is read, and the `scope` envelope key (the view project, the seven ops that are an error with a scope, the checks on the merged parent). |
+| [`06b-edit-operations-clips.md`](06b-edit-operations-clips.md) | 374 | Every clip op: add, insert and overwrite, the two backgrounds; move and the overlap rule; the trims, roll, slip, rate stretch, speed and reverse; split, the ripple deletes and range cuts; freeze, detach, duplicate, paste and paste attributes; nest and unnest; the patch ops; the transition ops. |
 | [`06c-edit-operations-actions-tracks-media.md`](06c-edit-operations-actions-tracks-media.md) | 94 | The action ops (the zoom action, end patches and `off`); the track, marker, canvas and media ops; and the op table's two halves (the arguments half is `core/src/op_table.rs`). |
 | **§7 — Architecture: Rust decides, AVFoundation and Metal do** | | |
 | [`07-architecture.md`](07-architecture.md) | 25 | The Rust/platform split in one page. |
@@ -46,14 +46,14 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.5-compositor.md`](07.5-compositor.md) | 106 | The Metal compositor's passes, and transitions. |
 | [`07.6-playback-update-rules.md`](07.6-playback-update-rules.md) | 46 | What playback does after every edit: rebuild or refresh. |
 | [`07.7-import.md`](07.7-import.md) | 183 | `MediaImporter.probe`, the formats import accepts, the WebM/Matroska rewrap, its copy's progress window, the copy's original, and the opt-in ffmpeg step's original and checked VP9 copy. |
-| [`07.8-export.md`](07.8-export.md) | 242 | Export: writers, formats, loudness, the queue. |
-| [`07.9a-agent-tools.md`](07.9a-agent-tools.md) | 425 | The MCP agent's tools: one tool per op plus `scope`, the parity check and the argument gate, the app-state tools, lenient decoding, the graphics loop, the dev tools, the transport. |
+| [`07.8-export.md`](07.8-export.md) | 310 | Export: writers, formats, loudness, the queue. |
+| [`07.9a-agent-tools.md`](07.9a-agent-tools.md) | 455 | The MCP agent's tools: one tool per op plus `scope`, the parity check and the argument gate, the app-state tools, lenient decoding, the graphics loop, the dev tools, the transport. |
 | [`07.9b-agent-lane-assistant.md`](07.9b-agent-lane-assistant.md) | 156 | The agent lane every tool call goes through, the bundled helper, the assistant session (its key, prices and spend), its prompt, and the Assistant tab as the session's door. |
-| [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 77 | The spec's Rust module map (core/CLAUDE.md is the live one). |
+| [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 78 | The spec's Rust module map (core/CLAUDE.md is the live one). |
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
-| [`09-keys-and-menus.md`](09-keys-and-menus.md) | 138 | The keyboard map and every menu, and keys proposed but not yet bound. |
+| [`09-keys-and-menus.md`](09-keys-and-menus.md) | 153 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
-| [`11-decisions/`](11-decisions/README.md) | 3978 in 15 files | Every decision already made, indexed by ID. |
+| [`11-decisions/`](11-decisions/README.md) | 4892 in 15 files | Every decision already made, indexed by ID. |
 
 ## The original preface
 

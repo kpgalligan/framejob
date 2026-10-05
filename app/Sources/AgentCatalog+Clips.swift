@@ -583,29 +583,29 @@ extension AgentServer {
             opTool(
                 "paste_attributes",
                 "Copies the payload's EARLIEST clip's property groups onto each of the clips — "
-                    + "Edit ▸ Paste Attributes (⌥⌘V). The payload is the same Copy payload "
-                    + "paste takes, but only its earliest clip's video, audio, text and shape are "
-                    + "read (at one start the front-most, then the lower id — never the array's "
-                    + "first, which is creation order): its ids and media rows do not matter. Each group "
-                    + "REPLACES the target's whole group rather than merging — video and audio "
-                    + "whole (position and scale included), text but its content, a shape but "
-                    + "its kind, width, height, from and to. Left out, `groups` means every "
-                    + "group BOTH clips have, silently skipping the rest; a named group the "
-                    + "payload clip lacks, or a target lacks, is an error, and so is a value "
-                    + "the inspector would refuse. Speed, enabled, actions, the transition and "
-                    + "the clip's own name and label stay. Refused (no change) when nothing "
-                    + "would change.",
+                    + "Edit ▸ Paste Attributes (⌥⌘V). The payload is the same Copy payload paste "
+                    + "takes; only its earliest clip is read (at one start the front-most, then "
+                    + "the lower id — never the array's first, which is creation order), and its "
+                    + "ids and media rows do not matter. Each group REPLACES the target's whole "
+                    + "group — video and audio whole (position and scale included), text but its "
+                    + "content, a shape but its kind, width, height, from and to. Left out, "
+                    + "`groups` means each of video, audio, text and shape BOTH clips have, "
+                    + "silently skipping the rest; a named group the payload clip lacks, or a "
+                    + "target lacks, is an error, and so is a value the inspector would refuse. "
+                    + "`graphic` travels only when NAMED (Edit ▸ Paste Graphic Properties): the "
+                    + "props, whole, onto clips drawn by the SAME graphic, each keeping its name, "
+                    + "size, in and length; a clip of another graphic is an error naming both. "
+                    + "The props are checked for shape only, when a target takes them. Speed, "
+                    + "enabled, actions, the transition and the clip's own name and label stay. "
+                    + "Refused (no change) when nothing changes.",
                 [
                     "clips": clipsDescription,
-                    "payload": "{\"clips\": [...], \"media\": [...]} — what Copy puts "
-                        + "on the pasteboard; see paste.",
-                    // The four member names are the CORE's list now, printed
-                    // from `Group` (`core/src/patch.rs`) rather than from the
-                    // handler's copy of it; `AgentServer.attributeGroups` is
-                    // still what a refusal here names, and the clip-catalog
-                    // proof compares the two.
-                    "groups": "Which property groups travel. Default: every group both clips "
-                        + "have; an empty list is refused.",
+                    "payload": "What Copy wrote, {\"clips\": [...], \"media\": [...]}; see paste.",
+                    // The names are the CORE's (`Kind::Groups`); a refusal names the handler's.
+                    "groups": "Which groups travel. Default: each of video, audio, text and "
+                        + "shape both clips have, never graphic; an empty list is refused.",
+                    "skip_missing": "true: with groups named, a group the payload clip lacks is "
+                        + "dropped and a clip that cannot take one is skipped. Default false.",
                 ]),
             opTool(
                 "nest",

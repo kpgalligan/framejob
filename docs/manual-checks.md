@@ -151,9 +151,9 @@ the same way.
 - **Source:** #48, #69.
 
 **TL-8 — Labels, solo and Paste Attributes**
-- **Do:** 1. Clip ▸ Label ▸ Blue, then None. 2. Click a track's headphones toggle at S, M and L height; watch Track ▸ Solo. 3. Copy a clip, select another, Edit ▸ Paste Attributes (⌥⌘V); try it between a video and an audio-only clip.
-- **Expect:** a blue dot on the strip and header, cleared by None; the headphones match eye, speaker and lock at every height and Solo's checkmark follows; paste restyles, and beeps when the clips share no group.
-- **Source:** #48.
+- **Do:** 1. Clip ▸ Label ▸ Blue, then None. 2. Click a track's headphones toggle at S, M and L height; watch Track ▸ Solo. 3. Copy a clip, select another, Edit ▸ Paste Attributes (⌥⌘V); try it between a video and an audio-only clip. 4. Copy a graphic clip; select another clip drawn by the same graphic and a video clip; Edit ▸ Paste Graphic Properties; then ⌥⌘V.
+- **Expect:** a blue dot on the strip and header, cleared by None; the headphones match eye, speaker and lock at every height and Solo's checkmark follows; paste restyles, and beeps when the clips share no group; the second graphic shows the first's text and colours at its own size and length, the video clip is unchanged; ⌥⌘V then copies position and opacity and not the text.
+- **Source:** #48, #103.
 
 **TL-9 — Region mode**
 - **Do:** 1. Select a video clip, press Z, drag a band on the canvas; hold ⇧ during a second drag. 2. End the mode with Z, Esc, a selection change, and the chroma eyedropper in turn. 3. Press ⇧Z. 4. Use Place on Canvas until four regions exist. 5. Obscure a face with a region; view at 100 %.
@@ -304,6 +304,11 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Answer:** does the speech at the ceiling sound right?
 - **Source:** #190, #212.
 
+**SE-9 — HEVC with alpha plays transparent**
+- **Do:** 1. Set the Document tab's Background opacity to 0 on a project with a title; read the note under it at the inspector's narrowest width. 2. Export… ▸ HEVC with Alpha (MOV); read the footnote at the sheet's bottom left, then rest the pointer on it. 3. Export it; play the file in a Safari page with a coloured background, open it in QuickTime Player, and lay it over a clip in Final Cut.
+- **Expect:** the note reads "Transparent — kept by 3 export formats." uncut; the footnote begins "HEVC_ALPHA" and is cut short with an ellipsis beside the sheet's three buttons, as ProRes 4444's is; resting the pointer on it shows the whole line, "HEVC_ALPHA · MOV · alpha"; the title's edges are clean, with no dark fringe and no line at the frame's edge, in all three.
+- **Source:** #103, spec §11 G-33.
+
 ## Captions
 
 **CAP-1 — Text reveals and legibility**
@@ -417,6 +422,11 @@ Uses the three `tools/proof/work/playback-check/` projects (Setup 3).
 - **Do:** 1. In a project, write `graphics/nofont.js` drawing text in `font-family="'Nope Sans'"` and `graphics/late.js` the same in `'Late Sans'`; place a 3 s `nofont` clip, then a 1 s `late` clip after it. 2. File ▸ Export…, export it; hover the sheet's finish line. 3. Export it again with Add to Queue, open Window ▸ Export Queue at its default width and hover the finished row. 4. Add an audio clip under the graphics and Add to Queue once more; look at that row. 5. Put a file named `Bad.js` into the package's `graphics/` folder, select a graphic clip, open Clip ▸ Graphic ▸ Source (reselect the clip if the row is not there yet), and click Reveal. Repeat 2–5 in the other appearance.
 - **Expect:** the sheet's line reads `Exported “…”. 2 graphic warnings (hover for details).` and its tooltip lists `"nofont" at frame …` and `"late" at frame …`, each naming its font. Each queue row shows `Exported “…”. 2 graphic warnings.` visibly, straight after the Exported sentence and ahead of the loudness figures on the audio row, and its tooltip lists the two warnings under the path. The Source section shows "In the graphics folder" and a row reading `graphics/Bad.js is not a module name…`; Reveal shows the `graphics` folder selected in Finder. All of it in both appearances.
 - **Source:** #105.
+
+**GR-7 — The Rename, Delete and Restore Graphic sheets**
+- **Do:** 1. In a project with one graphic a clip uses, one no clip uses and one deleted (delete a third with File ▸ Delete Graphic…), open File ▸ Rename Graphic…, File ▸ Delete Graphic… and File ▸ Restore Graphic Version… in turn. 2. In Delete Graphic…, choose the graphic the clip uses and press Delete. 3. In Rename Graphic…, type a name on the keyboard. Repeat 1–3 in the other appearance.
+- **Expect:** in each sheet the wording reads whole and nothing looks cramped, loose or misaligned, in both appearances (Delete Graphic… has one row and the most empty space between its pop-up and its buttons); the refused Delete's sentence shows inside the sheet, which stays open and grows to hold it; the name typed lands in New name.
+- **Source:** #103.
 
 ## Screen recording
 

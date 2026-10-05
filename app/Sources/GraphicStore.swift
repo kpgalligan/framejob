@@ -150,6 +150,9 @@ final class GraphicStore {
             watchedPackage = package
             watchedFolder = folder
             let (found, exists) = armAndScan(generation)
+            for (name, module) in found.modules {
+                Self.dropKept(revision: module.revision, named: name, in: folder)
+            }
             lastScan = found
             folderPresent = exists
             outbox = []
@@ -184,6 +187,13 @@ final class GraphicStore {
     func rescan() {
         queue.sync { pass(generation) }
         drain()
+    }
+
+    /// Main only, never from the queue: `body` on the store's queue, so a
+    /// file act of the app's (`removeModule`, `moveModule`) never interleaves
+    /// with a pass.
+    func onQueue<T>(_ body: () throws -> T) rethrows -> T {
+        try queue.sync(execute: body)
     }
 
     /// The ONE creator of `graphics/` inside a package (G-14).
@@ -258,6 +268,7 @@ final class GraphicStore {
         let library = found.libraryVersion != lastScan.libraryVersion
         if library { names.formUnion(found.modules.keys) }
         let appeared = watchedPackage != nil && !folderPresent && exists
+        Self.keepReplaced(from: lastScan, to: found, in: watchedFolder)
         lastScan = found
         folderPresent = exists
         outbox.append((found, names.sorted(), library, appeared))

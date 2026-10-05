@@ -164,6 +164,30 @@
    ],
    "note": "NSOpenPanel.beginSheetModal (chooseGraphicFile)"
   },
+  "renameGraphic:": {
+   "verdict": "sheet",
+   "code": [
+    "app/Sources/EditorViewController+GraphicFiles.swift `@objc func renameGraphic(`",
+    "app/Sources/EditorViewController+GraphicFiles.swift:50"
+   ],
+   "note": "presentAsSheet(GraphicFileSheetController) (presentGraphicFileSheet); greyed with no graphic, and while a nest is open; a refusal is a label in the sheet, never an alert"
+  },
+  "deleteGraphic:": {
+   "verdict": "sheet",
+   "code": [
+    "app/Sources/EditorViewController+GraphicFiles.swift `@objc func deleteGraphic(`",
+    "app/Sources/EditorViewController+GraphicFiles.swift:50"
+   ],
+   "note": "presentAsSheet(GraphicFileSheetController) (presentGraphicFileSheet); greyed with no graphic; a refusal is a label in the sheet, never an alert"
+  },
+  "restoreGraphicVersion:": {
+   "verdict": "sheet",
+   "code": [
+    "app/Sources/EditorViewController+GraphicFiles.swift `@objc func restoreGraphicVersion(`",
+    "app/Sources/EditorViewController+GraphicFiles.swift:50"
+   ],
+   "note": "presentAsSheet(GraphicFileSheetController) (presentGraphicFileSheet); greyed when no graphic has a kept version; a refusal is a label in the sheet, never an alert"
+  },
   "exportProject:": {
    "verdict": "sheet",
    "code": [
@@ -219,6 +243,13 @@
    "verdict": "none",
    "code": [
     "app/Sources/EditorViewController.swift `func pasteAttributes(`"
+   ],
+   "note": "an edit"
+  },
+  "pasteGraphicProperties:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+Clipboard.swift `func pasteGraphicProperties(`"
    ],
    "note": "an edit"
   },
@@ -883,6 +914,17 @@
      "gate": "app/Sources/EditorViewController+Export.swift `guard let document = document, !document.missingMedia.isEmpty else { return }` — the project has missing media"
     }
    ],
+   "other_caller": ""
+  },
+  "app/Sources/EditorViewController+GraphicFiles.swift:50": {
+   "token": "presentAsSheet",
+   "func": "presentGraphicFileSheet",
+   "reached_from": [
+    "renameGraphic:",
+    "deleteGraphic:",
+    "restoreGraphicVersion:"
+   ],
+   "reached_after": [],
    "other_caller": ""
   },
   "app/Sources/EditorViewController+GraphicMenus.swift:45": {

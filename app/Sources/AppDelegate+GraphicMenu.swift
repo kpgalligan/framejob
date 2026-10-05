@@ -1,7 +1,8 @@
 import AppKit
 
 /// The menu bar's graphics rows (road map 10's G5b): the Insert menu and its
-/// Graphic submenu, and Help ▸ Graphics Reference's action.
+/// Graphic submenu, and Help ▸ Graphics Reference's action; and File's three
+/// graphic-file items (spec §11 G-30, issue batch B84).
 ///
 /// **Insert ▸ Graphic lists the BUNDLED templates by file stem** —
 /// `GraphicTemplates.list(in:)`, never a compile, because chrome probes build
@@ -37,6 +38,25 @@ extension AppDelegate {
         menu.addItem(
             item("From File…", #selector(EditorViewController.insertGraphicFromFile(_:))))
         return menu
+    }
+
+    /// File's graphic-file group (spec §11 G-30 (a)): a separator, then
+    /// Rename Graphic…, Delete Graphic… and Restore Graphic Version…, each a
+    /// nil-target selector the editor implements and validates
+    /// (`EditorViewController+GraphicFiles.swift`). No key equivalents, the
+    /// caption items' reason.
+    func addGraphicFileItems(to menu: NSMenu) {
+        menu.addItem(.separator())
+        menu.addItem(
+            item(
+                GraphicFileAct.rename.menuTitle, #selector(EditorViewController.renameGraphic(_:))))
+        menu.addItem(
+            item(
+                GraphicFileAct.delete.menuTitle, #selector(EditorViewController.deleteGraphic(_:))))
+        menu.addItem(
+            item(
+                GraphicFileAct.restore.menuTitle,
+                #selector(EditorViewController.restoreGraphicVersion(_:))))
     }
 
     /// Help ▸ Graphics Reference: the bundled `GraphicsAPI.md` in the

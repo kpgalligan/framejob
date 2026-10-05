@@ -111,8 +111,11 @@ impl Container {
     /// the delivery containers people upload, and a leading `moov` atom
     /// lets a player start before the file is fully fetched. A ProRes MOV
     /// is an editing master handed to another application, where the
-    /// rewrite pass buys nothing. GIF and APNG have no `moov` atom and
-    /// nothing to move: a viewer already starts on the first frame, and
+    /// rewrite pass buys nothing. An HEVC-with-alpha MOV is a delivery file
+    /// too, and its default stays off all the same: that was the owner's
+    /// choice for the row (spec §11 G-33), and the override turns it on. GIF
+    /// and APNG have no `moov` atom and nothing to move: a viewer already
+    /// starts on the first frame, and
     /// neither do WAV and AIFF — a RIFF or an IFF file is a header
     /// followed by samples, with no index to relocate, so the flag would
     /// be a request the writer has nothing to do about.
@@ -143,9 +146,10 @@ pub(crate) struct Preset {
     /// False for the three audio-only presets; every other row carries
     /// video.
     pub(crate) video: bool,
-    /// Whether this ENCODING carries an alpha channel — `prores_4444` and
-    /// `apng`, and nothing else. It says what the FILE can hold, and
-    /// never that a particular canvas is translucent: `export_settings`
+    /// Whether this ENCODING carries an alpha channel — `hevc_alpha`,
+    /// `prores_4444` and `apng`, and nothing else. It says what the FILE can
+    /// hold, and never that a particular canvas is translucent:
+    /// `export_settings`
     /// emits one flat object for every row, so a flag derived from the
     /// project's background would report `alpha: true` on an H.264, a GIF
     /// and a WAV, which reads as a defect from either side of the FFI. A
@@ -234,7 +238,7 @@ pub(crate) struct Preset {
 /// and HEVC — half the size, not yet everywhere — follows.
 ///
 /// Each movie row carries an `AVAssetExportSession` preset name for the
-/// record: the two "highest quality" names are the ones a session would
+/// record: the three "highest quality" names are the ones a session would
 /// take the composition's own size under rather than fit it to a fixed
 /// frame, which is exactly a row with no size of its own. Nothing runs a
 /// session any more (§7.8), so on the Swift side the name is only the
@@ -254,7 +258,7 @@ pub(crate) struct Preset {
 /// bitrate to set. A bitrate is therefore something the user asks for — the
 /// `video_bitrate` / `audio_bitrate` overrides — never something a preset
 /// assumes on their behalf.
-const PRESETS: [Preset; 9] = [
+const PRESETS: [Preset; 10] = [
     // The default (see above). The ids are the `export` tool's vocabulary
     // and every script that calls it spells them, so a row is named for
     // the encoding alone — `h264`, not `h264_document` — because the size
@@ -281,6 +285,26 @@ const PRESETS: [Preset; 9] = [
         fps: None,
         avf_preset: Some("AVAssetExportPresetHEVCHighestQuality"),
     },
+    // HEVC with an alpha channel (spec §11 G-33), directly after the row it
+    // is a variant of. It is the DELIVERY row that keeps transparency — a
+    // title or a lower third a web page or another editor plays over its
+    // own background, at HEVC's size where `prores_4444` is a master — and
+    // it is a MOV because that is the container AVFoundation writes the
+    // codec into (it refuses it an `.mp4`). The codec is spelled as the id
+    // is, `hevc_alpha`: `ExporterWriter.codecType(for:)` maps it to
+    // `AVVideoCodecType.hevcWithAlpha`, and the sheet's Quality tiers and
+    // bit-rate controls read the `hevc` prefix, so it takes HEVC's.
+    Preset {
+        id: "hevc_alpha",
+        name: "HEVC with Alpha (MOV)",
+        container: Container::Mov,
+        codec: "hevc_alpha",
+        video: true,
+        alpha: true,
+        size: None,
+        fps: None,
+        avf_preset: Some("AVAssetExportPresetHEVCHighestQualityWithAlpha"),
+    },
     Preset {
         id: "prores_422",
         name: "ProRes 422 (MOV)",
@@ -293,14 +317,15 @@ const PRESETS: [Preset; 9] = [
         avf_preset: Some("AVAssetExportPresetAppleProRes422LPCM"),
     },
     // The MASTERING row that keeps transparency (road map 2, phase 7) —
-    // one of the two rows with a fourth channel and not the only one:
-    // `apng` carries one too and says so at its own row below. The pair is
-    // not redundant, which is why neither row's comment may be written as
-    // if it were alone: this is a MOVIE, in a container AVFoundation
-    // writes, whose next reader is another application, where `apng` is a
+    // one of the three rows with a fourth channel and not the only one:
+    // `hevc_alpha` above and `apng` below carry one too and say so at
+    // their own rows. The three are not redundant, which is why no row's
+    // comment may be written as if it were alone: this is a MASTER, in a
+    // container AVFoundation writes, whose next reader is another
+    // application; `hevc_alpha` is the delivery movie; and `apng` is a
     // frame sequence with a null `avf_preset` and no audio track at all.
-    // `alpha`'s field doc above holds the rule both rows answer to, and
-    // `core/tests/export.rs` pins the two by name.
+    // `alpha`'s field doc above holds the rule all three answer to, and
+    // `core/tests/export.rs` pins the three by name.
     //
     // ProRes 4444 is a master or an intermediate: a file whose next
     // reader is another application rather than a viewer — a lower third
@@ -309,10 +334,12 @@ const PRESETS: [Preset; 9] = [
     // fourth channel is the whole of why it earns a row beside
     // `prores_422`, which shares its container, its colour and its
     // editing-master posture and differs in exactly this: 422 cannot carry
-    // alpha at any bitrate. Nor can a delivery codec stand in — H.264 and
-    // HEVC have no alpha in the profiles `ExporterWriter` writes, so an
-    // export of a transparent canvas through one of them is a picture
-    // flattened onto black with no way back.
+    // alpha at any bitrate. Nor can the `h264` or `hevc` row stand in —
+    // neither has an alpha channel in the profile `ExporterWriter` writes
+    // for it, so an export of a transparent canvas through one of them is
+    // a picture flattened onto black with no way back. `hevc_alpha` does
+    // keep the channel, as a lossy 8-bit 4:2:0 delivery file, which is not
+    // what a master is.
     //
     // It sits AFTER 422 rather than before it because a row's position is
     // an invitation: most exports of a finished timeline have nothing
@@ -430,9 +457,9 @@ const PRESETS: [Preset; 9] = [
         container: Container::Apng,
         codec: "apng",
         video: true,
-        // The other row that keeps a transparent canvas transparent, and
-        // the only one that is not a mastering codec — which is what makes
-        // it the practical answer for an overlay going into a web page.
+        // One of the three rows that keep a transparent canvas
+        // transparent, and the only one that is not a movie — a lossless
+        // frame sequence any browser shows, with no sound.
         alpha: true,
         // 960 × 540 at 25 fps. APNG is true colour and lossless, so it
         // costs more per pixel than GIF but has no palette to quantise to:
@@ -465,6 +492,25 @@ impl Preset {
     /// resolved numbers are the fit (`export_size::fit_within`).
     pub(crate) fn fits_inside_size(&self) -> bool {
         self.video && self.avf_preset.is_none()
+    }
+
+    /// True for the rows whose frame has to have EVEN pixel dimensions:
+    /// every row AVFoundation writes but ProRes 4444 (spec §11 G-33). On
+    /// these an odd edge is resolved one pixel smaller, in the size list's
+    /// Document row and in the resolved settings alike
+    /// (`export_size::even_size`), so the size reported is the size the
+    /// writer writes.
+    ///
+    /// It is asked of `avf_preset` and the codec rather than listed row by
+    /// row, so a new AVFoundation row is even-sized until someone exempts
+    /// it — the safe side, since 4:2:0 chroma needs it and a row that can
+    /// keep an odd edge has to be measured doing so, as ProRes 4444 was
+    /// (`ExporterWriter+Settings.swift`'s `encodedSize`). The audio-only
+    /// rows answer true: they have no picture and go on reporting what
+    /// `h264` reports. The two image rows answer false; their numbers are
+    /// the fit (`fits_inside_size`), odd or not.
+    pub(crate) fn even_sized(&self) -> bool {
+        self.avf_preset.is_some() && self.codec != "prores4444"
     }
 
     fn to_json(&self) -> Value {

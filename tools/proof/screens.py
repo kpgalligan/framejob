@@ -375,6 +375,11 @@ def _demo_ops(mcp, path):
     ids["text"] = clip_on("Titles")
     with open(GRAPHIC_SOURCE) as handle:
         source = handle.read()
+    # An earlier text first (the source plus one trailing comment line), so
+    # `demo` holds one kept version of lower-third — what File ▸ Restore
+    # Graphic Version…'s sheet lists (15d). The second write is the module.
+    earlier = source + ("" if source.endswith("\n") else "\n") + "// an earlier version\n"
+    _call(mcp, "write_graphic", path, name="lower-third", source=earlier)
     wrote = _call(mcp, "write_graphic", path, name="lower-third", source=source)
     if isinstance(wrote, dict) and wrote.get("ok") is False:
         raise FixtureError(f"building demo: lower-third.js did not compile: {wrote}")

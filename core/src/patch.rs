@@ -33,10 +33,11 @@ use crate::model::{
 
 // ---- property groups -----------------------------------------------------
 
-/// The four property groups a patch can address — and, as `video | audio |
-/// text | shape` on the wire, the names `paste_attributes` takes. Carries
-/// the group's name for error messages and its template for the
-/// unknown-key check.
+/// The four property groups a PATCH can address, `video | audio | text |
+/// shape` on the wire. `paste_attributes` takes these four and `graphic`,
+/// as `edit_paste_attributes.rs`'s `PasteGroup` (spec §11 G-32): a patch
+/// has no fifth group. Carries the group's name for error messages and its
+/// template for the unknown-key check.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Group {

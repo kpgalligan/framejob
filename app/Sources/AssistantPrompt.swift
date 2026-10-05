@@ -63,10 +63,10 @@ enum AssistantPrompt {
         ("audio clean-up: find silences, even out loudness",
          ["detect_silence", "normalize_clip"]),
         ("graphics: write a module, place and change a graphic clip, its reference, fonts and "
-            + "assets",
+            + "assets; rename, delete or restore a module",
          ["add_graphic_clip", "set_graphic", "write_graphic", "get_graphic",
           "graphic_reference", "render_graphic", "import_graphic_font",
-          "import_graphic_asset"]),
+          "import_graphic_asset", "delete_graphic", "rename_graphic", "restore_graphic"]),
         ("export a movie", ["export"]),
     ]
 

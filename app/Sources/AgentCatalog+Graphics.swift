@@ -17,7 +17,9 @@ import Foundation
 /// Road map 10's G4a appends three APP-STATE rows after them, `tool`'s, with
 /// their own schemas and no `scope` (they have no op): `write_graphic`,
 /// `get_graphic` and `graphic_reference`; G4b three more the same way:
-/// `render_graphic`, `import_graphic_font` and `import_graphic_asset`.
+/// `render_graphic`, `import_graphic_font` and `import_graphic_asset`; and
+/// issue batch B84 (#103) three more after those: `delete_graphic`,
+/// `rename_graphic` and `restore_graphic` (spec §11 G-27, G-28, G-29).
 extension AgentServer {
     /// The graphic rows, given the sentences the clip group already hoisted.
     func graphicTools(
@@ -72,8 +74,9 @@ extension AgentServer {
                     + "are the module's top-level warnings (e.g. asset() outside render). "
                     + "clips lists the clips "
                     + "drawn by it, which redraw with the new text at once. A file write is "
-                    + "not undoable and does not mark the project edited (the previous text "
-                    + "is gone), so keep your own copy if you want the old one back. Read "
+                    + "not undoable and does not mark the project edited, but the text it "
+                    + "replaced is kept — the last 10 per module; kept lists their "
+                    + "revisions, newest first — and restore_graphic brings one back. Read "
                     + "graphic_reference first for the API.",
                 [
                     "name": [
@@ -91,15 +94,19 @@ extension AgentServer {
                 "get_graphic",
                 "Reads the project's graphics/ folder. With name: that module's source, "
                     + "revision (the SHA-256 of its bytes), path, whether it compiles (ok, meta, "
-                    + "schema, diagnostics) and the clips drawn by it. Without: folder, the "
+                    + "schema, diagnostics), the clips drawn by it and kept, the revisions of "
+                    + "its kept earlier texts, newest first (restore_graphic takes one). "
+                    + "Without: folder, the "
                     + "folder's absolute path — where it WILL be when folder_exists is false; "
                     + "the first write_graphic creates it — and every module with its revision, "
-                    + "ok and clips, and warnings: what the folder's scan skipped or could not "
-                    + "watch, in its own sentences. The folder may also be edited with your own "
-                    + "file tools: "
+                    + "ok and clips, warnings: what the folder's scan skipped or could not "
+                    + "watch, in its own sentences, and history: [{name, kept}] for every name "
+                    + "with a kept text, deleted modules included. The folder may also be "
+                    + "edited with your own file tools: "
                     + "modules (<name>.js), fonts in fonts/ (.ttf, .otf) and pictures in "
                     + "assets/; the app sees a change within a moment. API.md and API.d.ts "
-                    + "there are the reference, written by the app.",
+                    + "there are the reference, written by the app, and history/ is the "
+                    + "app's too: the kept texts, which restore_graphic reads.",
                 [
                     "name": [
                         "type": "string",
@@ -224,6 +231,72 @@ extension AgentServer {
                             + "extension must be one of the six. Default: the file's own name.",
                     ],
                 ], required: ["path"]),
+            tool(
+                "delete_graphic",
+                "Deletes the module graphics/<name>.js from the project's package. Refused "
+                    + "while any clip is drawn by it, on the timeline or inside a nest, in a "
+                    + "sentence naming those clips: delete them or point them at another "
+                    + "module (set_graphic {name}) first. The deleted text is kept with the "
+                    + "module's other kept texts (kept, newest first), so restore_graphic "
+                    + "{name} brings the module back; get_graphic {} lists it under history. "
+                    + "Fonts and assets are left alone. Not undoable, and it does not mark "
+                    + "the project edited. Mirrors File ▸ Delete Graphic…",
+                [
+                    "name": [
+                        "type": "string",
+                        "description": "The module to delete: graphics/<name>.js.",
+                    ],
+                ], required: ["name"]),
+            tool(
+                "rename_graphic",
+                "Renames the module graphics/<name>.js to graphics/<to>.js. Every clip drawn "
+                    + "by it, on the timeline and inside every nest, follows the new name as "
+                    + "ONE undo step (Rename Graphic; clips lists them), and its kept texts "
+                    + "move with it — when to is a deleted module's name (no file, kept "
+                    + "texts), the two sets join under to and, past 10, the oldest, the "
+                    + "deleted module's, are dropped for good. Undo renames the file back "
+                    + "together with the clips, and redo forward again. Refused when to is "
+                    + "not a module name, when "
+                    + "graphics/<to>.js already exists, when a clip already names to with no "
+                    + "file behind it (a clip left by a deleted module), and while a nest is "
+                    + "open (set_scope with no arguments comes back out). The file rename "
+                    + "itself does not mark the project edited; the clips' change does. "
+                    + "Mirrors File ▸ Rename Graphic…",
+                [
+                    "name": [
+                        "type": "string",
+                        "description": "The module to rename: graphics/<name>.js.",
+                    ],
+                    "to": [
+                        "type": "string",
+                        "description": "The new name: lowercase letters, digits and -, starting "
+                            + "with a letter or a digit, at most 63 characters.",
+                    ],
+                ], required: ["name", "to"]),
+            tool(
+                "restore_graphic",
+                "Writes a kept earlier text of a module back as graphics/<name>.js — the "
+                    + "newest kept one, or the one revision names — compiles it and answers "
+                    + "as write_graphic does (ok, meta, schema, diagnostics, clips), with "
+                    + "restored, the revision put back, and kept, what is kept now. The text "
+                    + "it replaced is kept in turn, so restoring twice returns to where you "
+                    + "were. Works for a module delete_graphic removed. A text is kept "
+                    + "whenever the app sees a module's text replaced while the project is "
+                    + "open (write_graphic, a save from an outside editor, a restore) and "
+                    + "when delete_graphic removes it; the last 10 per module. Not undoable, "
+                    + "and it does not mark the project edited. Mirrors File ▸ Restore "
+                    + "Graphic Version… (which restores the newest).",
+                [
+                    "name": [
+                        "type": "string",
+                        "description": "The module: graphics/<name>.js, present or deleted.",
+                    ],
+                    "revision": [
+                        "type": "string",
+                        "description": "The kept revision to put back, one of kept (get_graphic "
+                            + "lists them). Default: the newest kept.",
+                    ],
+                ], required: ["name"]),
         ]
     }
 }

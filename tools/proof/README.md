@@ -385,8 +385,9 @@ log is where the startup parity check would complain — `grep "Reelcut: "
 
 **The EXACT tool count belongs to the newest phase's script**, because it is
 what tells a stale binary on the port from the build under test: road map 7's
-`op_argument_proof.py` asserts **86** since issue batch B44's `close_project`
-(85 from road map 10's G4b, 82 from G4a, 79 from G3b, 77 from D3·5), and
+`op_argument_proof.py` asserts **89** since issue batch B84's three
+graphics-file tools (86 from B44's `close_project`, 85 from road map 10's
+G4b, 82 from G4a, 79 from G3b, 77 from D3·5), and
 every script before it keeps
 a floor — phases 1 to 9's 63, 65, 68, 70, 71, 73, 73, 73 and 74, and road map
 3's 75 — so a later phase's tools never fail an older proof.
@@ -14118,7 +14119,12 @@ domain then, and the pids the record owns. `scratch_socket()` records
 identifier before `Popen` and owns its child (a record that already owns a
 pid, a relaunch on the same socket, is compared first, so nothing is lost);
 `MCP()` records a socket that has no record, a handed one, under the domain
-of the executable holding it, that pid owned. `remove_scratch()` compares
+of the executable holding it, that pid owned. Since issue batch B84 the
+record and the compare both run `defaults export` with no
+`CFFIXED_USER_HOME` (`proof_defaults.read_env`), so a script run under a
+scratch home that is not there at one of the two is compared with itself
+(rows H1 and H2 below; the measurement is in B84's phase-2 section).
+`remove_scratch()` compares
 before it deletes, and one `atexit` handler, registered at import so it
 runs after any a script registers later, compares every record still held:
 a script that never calls `remove_scratch`, leaves early by `sys.exit` or an
@@ -14174,12 +14180,16 @@ ends `sys.exit(0)`; the parent scores its status and stderr.
 | G3 | `write-no-remove`: never calls `remove_scratch` | status 3 |
 | G5 | `write`, while S2 (a second instance of the clone the parent started by `Popen` on its own folder, no `mcp` record) is alive | status 0; the line names S2's pid |
 | G4 | `write-handed`: `MCP(S2's socket)` only | status 3, and the key is among `defaults_moved` at the first reading after the call |
+| H1 (B84) | `absent-home`, with `CFFIXED_USER_HOME` naming an absent folder under the work folder: `mcp.launch(clone)`, the folder made (by the instance, else the child), `new_project`, `close_project`, stop, `remove_scratch`. The parent first seeds the CLONE's domain with `ReelcutDefaultsProofSeed` (`defaults write`, that domain only) and counts its keys | the record held as many keys as the parent counted; the home absent at the record and present at the compare; status 0, no such line |
+| H2 (B84) | `home-removed`: the folder is there at the record and the child removes it after `stop()`, before `remove_scratch` | the same, the home present then absent |
 | R1 | the REAL build in this process: `mcp.launch`, `new_project`, `close_project`, stop, `remove_scratch` | no owner-visible key of `com.kgalligan.Reelcut` moved (one retry when another Reelcut shares the domain, then FAIL naming keys and pids) |
-| R2 | — | the real domain across C0 and the G rows: no owner-visible key moved |
+| R2 | — | the real domain across C0 and the G and H rows: no owner-visible key moved |
 
 `--mutant` reaches the children by argv: `no-compare`
 (`proof_defaults.moved` answers `[]`) must fail exactly G1, G3, G4, G5;
-`no-exit` (`mcp._exit_failed` is a no-op) exactly G1, G3, G4.
+`no-exit` (`mcp._exit_failed` is a no-op) exactly G1, G3, G4;
+`home-followed` (B84: `proof_defaults.read_env` answers None, so `defaults
+export` inherits `CFFIXED_USER_HOME` as it did before) exactly H1, H2.
 
 **`proof_defaults.py`** is the other half and imports nothing from
 `tools/proof`. `remove_domain(name)` is `defaults delete <name>` (0 and 1
@@ -14674,8 +14684,1178 @@ python3 tools/proof/proof_defaults.py --list                          # removes 
 python3 tools/proof/proof_defaults.py --sweep                         # removed / shared / busy / denied
 python3 tools/proof/proof_defaults.py                                 # the selftest, then the sweep
 python3 tools/proof/proof_defaults.py --ran assistant_lane_probe --ran assistant_prompt_probe   # make test's last step
-python3 tools/proof/defaults_proof.py                                 # passed 8/8, exit 0 (launches the app; not in make test)
-python3 tools/proof/defaults_proof.py --mutant no-compare             # MUTANT PASS (also no-exit)
+python3 tools/proof/defaults_proof.py                                 # passed 10/10, exit 0 since B84's H1 and H2 (8/8 in this batch; launches the app; not in make test)
+python3 tools/proof/defaults_proof.py --mutant no-compare             # MUTANT PASS (also no-exit, and B84's home-followed)
+```
+
+## Issue batch B84 — delete, rename and restore a graphic, over the last 10 kept texts of each module (`graphics_store_probe.py` H1–H18, C7 and fifteen mutants; `graphics_files_proof.py` and `--mutant rename-unreconciled`; #103 part 1, phase 1; spec §11 G-27, G-28, G-29)
+
+Phase 1 of the batch: the records, the store, the three document bodies,
+the three tools and their proofs. Phase 2 — File ▸ Rename Graphic…, Delete
+Graphic…, Restore Graphic Version… and their sheet — is the subsection at
+this section's end (`graphics_menu_proof.py`, spec §11 G-30).
+
+**What is proved, and by which instrument.**
+
+- **The probe** (`graphics_store_probe.py`, nineteen new rows beside its
+  twenty-six; no app, no MCP) drives `GraphicStore` and
+  `ProjectDocument+GraphicFiles.swift`'s bodies directly, every text
+  compared as text and every revision against hashlib:
+  H1 a replacing `write` + `rescan()` and an in-place outside rewrite each
+  keep the replaced text, newest first, the outside one in ONE post; H2
+  `restoreGraphic` twice, then a kept file rewritten by hand refused in a
+  sentence naming it and the other kept revision, nothing written; H3
+  thirteen writes keep the 10 newest of the 12
+  replaced, and `keep` of a text already kept lists it once; H4 delete
+  refused while used, then done, `fonts/` and `assets/` left, the change
+  count unmoved; H5 a timeline clip and a nest clip through rename, a taken
+  name, a bad name and an open nest refused, `undo()` and `redo()`; H6 a
+  package naming the old name beside the renamed file and its journal pair
+  healed at `startGraphicStore()`, with a CONTROL (no journal: not healed);
+  H7 Undo never moves a live module under a deleted one's name; H8 a rename
+  onto a name a clip draws with no file behind it is refused; H9 (added by
+  the implementer, not in the spec's list) the rename journal holds the 32
+  newest pairs, newest first, a repeated pair once; C7 an untitled
+  document's save carries `graphics/history/`. Five rows came from the
+  batch's review: H10 after `rename a → b`, with `b.js` removed outside
+  the app and a new undrawn `a` written, a committed change leaves `a.js`
+  alone (the repair goes from a pair's second name back to its first,
+  never the other way); H11 after `rename a → b`, a new `a` written and
+  deleted, `undo()` leaves `b.js` and the clip naming `a` — the row where
+  the kept-revision test is the only guard, which H7 no longer is; H12 a
+  package built by hand whose `m.js` is also the newest of two kept texts
+  has it dropped by `startGraphicStore()`, and a default restore writes
+  the older text; H13 with `history/renames.json` a directory, a rename is
+  refused in its sentence and the file, its kept text, the clip and the
+  undo stack are where they were; H14 with a FILE at `history/new`, so
+  the history cannot be folded, a rename is refused, everything is where
+  it was and the journal is as it was — no pair, no `renames.json`. Three
+  rows came from the second review: H15 the state a crash INSIDE a rename
+  leaves when the old name had kept texts, built by hand (`new.js`, the
+  pair `[old, new]`, a kept text under `history/old/`, the project naming
+  `old`): `startGraphicStore()` moves nothing — a LIMIT measured, not a
+  behaviour wanted (G-28 (f)) — and a default `restoreGraphic(old)` run in
+  that package then writes the OLDER kept text to `old.js` while `new.js`
+  keeps the current text, undrawn, the clip still naming `old` and the
+  document not edited (the restore came from the third review); H16 after `rename a → b`, a `rename b → a`
+  refused at the fold (a FILE at `history/a`) leaves `renames.json`
+  byte-for-byte what it was, `[a, b]`, and with the file removed `undo()`
+  puts `a.js` back with its kept text; H17 a chain `a → b → c` with a kept
+  text, `undo()` twice and `redo()` twice, the clip's name, the one file
+  and the kept text scored under one name after each of the six steps. One
+  row came from the third review: H18 a rename refused at the CLIPS,
+  through the probe's own `apply` — one that throws, and one that returns
+  having applied nothing ("its clips did not take the new name") — in both
+  journal states, with no `renames.json` (`a → b`) and after a real
+  `a → b` (`b → c`): after each of the four the file, its kept text, the
+  clip's name, the undo stack and `renames.json` (no file; byte-for-byte
+  `[a, b]`) are where they were, `apply` was handed one op, and `undo()`
+  of the real rename still puts `a.js` back. One part is a LIMIT
+  measured (G-28 (d)): onto a DELETED module's name the histories have
+  folded before the clips refuse, so after the move back the deleted text
+  is kept under the renamed module and nothing is kept under the deleted
+  name. The last part makes the move back itself FAIL (the probe's `apply`
+  puts a FILE at `history/a` before it throws, so the history cannot be
+  folded back): `b.js` and its kept text stay, the clip names `a`, the
+  pair `[a, b]` is still journalled, and with that file removed a
+  committed change repairs — `a.js` back with its kept text.
+- **The MCP proof** (`graphics_files_proof.py`, new; its own instance on a
+  scratch socket under `CFFIXED_USER_HOME=work/graphics-files/home`, the
+  work folder removed at the start and at exit, no menu item performed):
+  H0 the scratch home took; T0 the three tools are listed with no `scope`;
+  D1/D2 delete refused in the exact sentence, then done, listed under
+  `history`, `unsaved_changes` unmoved, restored byte-equal; V1/V2 `kept`
+  across writes and restores, restore by revision, the two refusals, 12
+  writes keeping 10, and a `save_project` that succeeds afterwards with
+  `graphics/history/` in the package; N1 rename over a timeline clip and a
+  nest clip with two frames byte-identical before and after, and five
+  refusals in their exact sentences; N2 `undo` and `redo` of Rename Graphic
+  each leaving no clip naming an absent module and the same frame bytes; N3
+  H7's steps over the tools; Z1 the projects close and the log holds no
+  `Reelcut: ` line.
+- **The count** moved to 89 product tools: `op_argument_proof.py`'s
+  `PRODUCT_TOOLS`, and the three names in `phase9_proof.py`'s,
+  `recording_proof.py`'s and `recording_probe.py`'s `APP_STATE_TOOLS`.
+
+**Mutants** (each built from a copy with one anchor, asserted once,
+replaced; exit 0 means its row FAILED in the copy):
+
+| Mutant | What it removes | Must fail | Also failed |
+|---|---|---|---|
+| `history-unkept` (probe) | the pass's `keepReplaced` call | H1 | H2, H3, H5, H12, H13, H14, H15, H16, H17, H18, C7 |
+| `history-uncapped` (probe) | `tidy`'s prune past 10 | H3 | — |
+| `delete-used` (probe) | `deleteGraphic`'s clip groups | H4 | — |
+| `rename-unreconciled` (probe) | the `.projectDocumentDidChange` observer's body | H5 and H17 (both required) | H16, H18 |
+| `history-left-behind` (probe) | `moveModule`'s `moveHistory` | H5 | H14, H16, H17, H18 |
+| `reconcile-over-delete` (probe) | the repair's kept-revision test | H11 | H15 |
+| `rename-onto-drawn` (probe) | `renameGraphic`'s drawn check | H8 | — |
+| `journal-uncapped` (probe) | `recordRename`'s cut to 32 pairs | H9 (40 pairs) | — |
+| `reconcile-both-directions` (probe) | the repair's one direction (each pair tried both ways) | H10 | — |
+| `rename-unjournalled` (probe) | `moveModule`'s read-back of the pair it wrote | H13 | — |
+| `start-undropped` (probe) | `start()`'s drop of each current revision | H12 | — |
+| `restore-unhashed` (probe) | `restoreGraphic`'s hash of the kept bytes | H2 | — |
+| `rollback-unjournalled` (probe) | `moveModule`'s put-back of the journal, as it was read, when the history cannot be folded | H14 and H16 (both required) | H18 |
+| `moveback-unjournalled` (probe) | `renameGraphic`'s put-back of the journal, as it was read before the rename, after a rename refused at the clips is moved back | H18 | — |
+| `moveback-unconditional` (probe) | that put-back's condition (it runs whether or not the move back succeeded, taking the pair from a file left at the new name) | H18 | — |
+| `rename-unreconciled` (MCP, an app built in a tree copy) | the same observer body | N2 | — |
+
+**What the runs printed** (2026-10-04, this tree over `0b6f437`):
+`graphics_store_probe.py` 45/45; each of its fifteen new mutants `MUTANT
+PASS` with the rows in the table; `graphics_files_proof.py` 10/10;
+`--mutant rename-unreconciled` 9/10 and `MUTANT PASS: rename-unreconciled —
+N2 FAILED in the copy (failed: N2)`, its undo leaving clips 2 and 3 naming
+`title` beside a folder holding `headline` and the frames differing.
+
+**Not claimed.** How the three acts look to a person: the sheets are
+phase 2's below, and what only a person can judge of them is
+`docs/manual-checks.md`'s GR-7. A crash between `removeModule`'s `keep` and
+the file's removal was not made to happen: H12 builds the state it leaves
+(the current text also the newest kept) by hand. **The repair's three
+limits** (spec §11 G-28 (f)). The first no row can measure: with the pair
+`[a, b]`, clips that name `a` with no file and nothing kept for a reason
+other than Undo — repointed onto a new `a.js` that was then removed
+outside the app — cannot be told from an Undo, because the store cannot
+see a removal made outside the app, and an undrawn `b.js` is moved under
+`a`. The mirror of it, a file removed at a pair's SECOND name, is H10 and
+is not repaired. The other two are a crash INSIDE `moveModule`, which no
+row makes happen; each row builds by hand the state the crash leaves.
+**That a rename killed part-way is healed is NOT claimed**: killed after
+the file moved and before the pair was written, nothing is repaired (H6's
+CONTROL is that state); killed after the pair was written and before the
+history was folded, it is healed only when the old name had nothing kept
+(H6), and with kept texts under the old name the repair reads it as a
+deleted module and moves nothing (H15, which also runs the default
+restore G-28 (f) speaks of in that state). The way out is by hand:
+`set_graphic {name: <to>}` on the clips. **That a rename refused at the
+clips puts everything back is claimed for the file, its history, the
+clips and the journal, not for a deleted module's kept texts**: onto a
+deleted module's name they end under the renamed module (H18's LIMIT
+part, G-28 (d)). H18 refuses through the probe's own `apply`; no row
+makes the CORE refuse a rename's `set_graphic`, and no MCP row reaches
+that arm. A kept file changed by hand is
+still LISTED (`kept`, `history`): H2 measures the listing and the refused
+restore, and nothing claims the list ignores it (G-29 (d)).
+
+```sh
+python3 tools/proof/graphics_store_probe.py                               # 45/45, exit 0
+for m in history-unkept history-uncapped delete-used rename-unreconciled \
+         history-left-behind reconcile-over-delete rename-onto-drawn journal-uncapped \
+         reconcile-both-directions rename-unjournalled start-undropped restore-unhashed \
+         rollback-unjournalled moveback-unjournalled moveback-unconditional; do
+  python3 tools/proof/graphics_store_probe.py --mutant $m                 # MUTANT PASS each
+done
+python3 tools/proof/graphics_files_proof.py                               # 10/10, exit 0 (launches the app; not in make test)
+python3 tools/proof/graphics_files_proof.py --mutant rename-unreconciled  # MUTANT PASS (builds an app in a tree copy)
+```
+
+### Phase 2 — File ▸ Rename Graphic…, Delete Graphic… and Restore Graphic Version…, and their one sheet (`graphics_menu_proof.py` M14–M20 and S0–S2, eleven probe-tier and two app-tier mutants; `screens.py` 15b–15d; spec §11 G-30)
+
+The three File items put up one sheet, `GraphicFileSheetController`, which
+calls phase 1's three bodies and shows a refusal as the body's own sentence.
+`graphics_menu_proof.py` (road map 10's G5b proof; its docstring has every
+row word for word) now runs ONE Release instance for the whole run, in a
+scratch home (`CFFIXED_USER_HOME=tools/proof/work/graphics-menu/home`,
+through `mcp.launch`, as `graphics_files_proof.py` launches). It builds GM
+as before and **GF**: `title` written twice (so one text is kept), `other`
+and `spare` written once, `gone` written and then `delete_graphic`, two
+`title` clips with the second nested, saved. The probe gets a COPY of GF.
+At the start and at exit the home, the packages, the captures and a
+mutant's tree copy are removed; the probe's build (`work/graphics-menu/probe/`)
+and the last log stay.
+
+**What is proved, and by which instrument.**
+
+- **The probe** (`graphics_menu_probe.swift`, rows M14–M20 after M2–M13; the
+  app's own `AppDelegate`, `EditorViewController` and
+  `GraphicFileSheetController`, the editor in an unshown window): M14 File
+  from Add Image to Graphics… on reads Add Image to Graphics…, a separator,
+  the three items, a separator, Export…, Save Frame…, each with its action,
+  no key equivalent, and no target with no window; M15 the validator —
+  false,false,false with no store and on a package with no module,
+  true,true,false with modules and nothing kept, true,true,true on GF,
+  false,true,true with its nest open, true,true,true back out; M16 Delete
+  opens on the FIRST graphic though the selected clip draws another, and a
+  refused Delete (the graphic two clips draw) leaves the sheet up with
+  exactly the body's sentence, in a label that is inside the sheet's
+  content view and tall enough for its text at its width, the sheet taller
+  than before; M17 a Delete that succeeds closes the sheet, keeps the text
+  and moves neither the undo stack nor the edited flag; M18 Rename opens on
+  the selected clip's graphic with the button dimmed; renaming a graphic
+  no clip uses is no undo step; renaming a used one is ONE closed step,
+  "Rename Graphic", and `undo()` / `redo()` carry the file with the clips;
+  M19 a taken name and a name that breaks the rule are each refused in the
+  body's sentence, the name passed as typed; M20 Restore lists deleted
+  graphics as `<name> (deleted)`, opens on the deleted graphic a selected
+  clip draws, says `1 version kept`, restores the deleted bytes, and a
+  second Restore puts a live graphic's earlier text back and keeps the one
+  it replaced.
+  **How a confirm is reached.** No dev tool presses a sheet's default
+  button, so each row drives the sheet's own controls in the probe's
+  process: `selection` set, the editor's own action called
+  (`deleteGraphic(nil)`), `attachedSheet` waited for, the pop-up's row
+  selected by `representedObject` and the pop-up's action sent, the field
+  written and its delegate handed the text-change, and the
+  `graphicfile.confirm` button's own action sent to its own target. `press`
+  never sends a disabled button's action, and never a button of a sheet
+  that is no longer the attached one (the first `opening-first` run found
+  why: an earlier row's failure let a later step dismiss a closed sheet a
+  second time, which raises).
+- **MCP** (the dev tools, on GF in the instance; nothing is confirmed
+  there): S0 the scratch home took; S1 `perform_menu_item` with no path
+  lists the three straight after Add Image to Graphics…, each `sheet`, not
+  refused, enabled — and with the nest open Rename is disabled and
+  performing it is refused "is disabled here"; S2 with nothing selected
+  each item's sheet goes up, its `snapshot_ui` layout dump has no
+  `problems` and shows the title, the hint, Cancel, the act's button and
+  the pop-up's first graphic (`other`, `other`, `gone (deleted)`; Restore
+  also `1 version kept`), `cancel_sheet` answers `cancel_button` with no
+  sheet left, and the modules, the history, every clip's graphic and
+  `unsaved_changes` (false) are as before.
+- **The screen catalog**: `15b-rename-graphic-sheet`,
+  `15c-delete-graphic-sheet` and `15d-restore-graphic-version-sheet`, each
+  one `perform_menu_item` over `demo` and an `expect` on its title (15d
+  also `1 version kept`). `screens.py`'s `demo` now writes `lower-third`
+  twice, an earlier text first, so one version is kept; no other screen's
+  picture reads the module's history.
+- `capture_spike/inventory.json` has the three selectors (`sheet`) and
+  their one site, `presentGraphicFileSheet`'s `presentAsSheet`;
+  `inventory.py --check` (in `make test`) and `v2_menu.py --only H` hold it
+  to the tree and to `UIMenuTable.swift`.
+
+**Mutants.** Probe tier: the probe built over a COPY of `app/Sources` with
+one anchor, asserted once, replaced; the fixtures and the probe run.
+**Rule R1** holds the ten new ones: exit 0 only when the mutant's row was
+answered, FAILED, and every row the probe answered before it passed — the
+row is the FIRST failure, so a mutant that breaks an earlier row's
+precondition is not counted as caught by its own; exit 1 when the row
+passed or an earlier row failed first (printed by name); exit 2 when the
+control was not performed. `notice-dropped` keeps Rule R (its row failed).
+App tier: a tree copy (`tree_copy.make_copy`) built by its own `make app`,
+the fixtures and the S rows only, Rule R.
+
+| Mutant | What it changes | Must fail | Also failed |
+|---|---|---|---|
+| `item-dropped` (probe) | Restore's `addItem` in `addGraphicFileItems` | M14 | — |
+| `rename-in-nest` (probe) | `isOffered`'s line that refuses Rename with a nest open | M15 | — |
+| `refusal-unshown` (probe) | the message label's assignment | M16 | M19 |
+| `refusal-unwrapped` (probe) | the message label built by `labelWithString` | M16 | — |
+| `delete-opens-selected` (probe) | `opening`'s line that sets Delete's selected graphic aside | M16 | — |
+| `success-undismissed` (probe) | the `dismiss` after a success | M17 | M18, M20 |
+| `rename-ungrouped` (probe) | `performGroupedEdit` → `applyEdit` in `perform` | M18 | — |
+| `opening-first` (probe) | `opening`'s selected-graphic line | M18 | M19, M20 |
+| `rename-field-lowercased` (probe) | `.lowercased()` on the field's text where `perform` is called | M19 | — |
+| `restore-deleted-unlisted` (probe) | Restore's `choices` filtered to names `holdsModule` holds | M20 | — |
+| `notice-dropped` (probe, Rule R; issue batch B67's) | `addGraphicImage(from:)`'s `showGraphicNotice(` call | M13 | — |
+| `app-rename-in-nest` (MCP, an app built in a tree copy) | the same `isOffered` line | S1 | — |
+| `app-sheet-unpresented` (MCP, an app built in a tree copy) | `presentGraphicFileSheet`'s `presentAsSheet(` line, a no-op | S2 | — |
+
+**What the runs printed** (2026-10-04 into 2026-10-05, this tree over `0b6f437`):
+`graphics_menu_proof.py` 27/27, exit 0 (S0, M14–M20, S1 and S2 new beside
+its seventeen), the probe's 19 rows all passed; M16 read the refusal's
+label at 380 × 45 pt needing 45, and the sheet 240 → 265 pt tall (the
+probe's own window and fonts). Each of the ten new probe-tier mutants
+printed `MUTANT PASS: <name> — <row> FAILED in the copy and is the first
+failure`, with the rows in the table, and `notice-dropped` `MUTANT PASS:
+notice-dropped — M13 FAILED in the copy (failed: M13)`. What the failing
+row read: `item-dropped` the File tail without Restore Graphic Version…;
+`rename-in-nest` true,true,true with the nest open; `refusal-unshown` an
+empty message; `refusal-unwrapped` the label 380 × 15 pt needing 45, the
+sheet 240 → 240; `delete-opens-selected` opened on `title`;
+`success-undismissed` not detached after 3 s; `rename-ungrouped`
+`groupingLevel` 1; `opening-first` opened on `other`;
+`rename-field-lowercased` `graphic name "bad name" is not a module name …`;
+`restore-deleted-unlisted` the one row `headline`. `--mutant
+app-rename-in-nest`: `MUTANT PASS: app-rename-in-nest — S1 FAILED in the
+copy (failed: S1)` — with the nest open the three read enabled and
+Rename was performed, not refused (the row cancelled its sheet). `--mutant
+app-sheet-unpresented`: `MUTANT PASS: app-sheet-unpresented — S2 FAILED in
+the copy (failed: S2)` — `perform_menu_item` answered no sheet and
+`snapshot_ui` "has no sheet attached". `screens.py --only` the three new
+screens: 8 pass, 0 fail, 0 skip of 8, 0 new problems; the captures are
+420 × 254 (Rename), 420 × 240 (Delete) and 420 × 242 pt (Restore) in both
+looks. `inventory.py --check` 5/5 (48 grep sites, 48 pins) and `v2_menu.py
+--only H` 5 pass of 5 (149 leaves, 97 selectors, 97 rows in both tables).
+`graphics_files_proof.py` 10/10 and `graphics_proof.py` 51/51 (the second
+with `CFFIXED_USER_HOME` set to a scratch home) as before.
+**Superseded, said so it is not mistaken for a count:** the first
+`--mutant opening-first` run exited 2 — the probe raised before answering
+(above) — and after `press` was hardened the eleven probe-tier mutants and
+the proof were run again; only those runs are quoted.
+
+**Not claimed.** How the three sheets look, and that a name typed on a real
+keyboard lands in New name: `docs/manual-checks.md`'s GR-7 (no script types
+real keys without taking focus). A confirm over MCP: no dev tool presses a
+sheet's default button, so M16–M20 press it in the probe's process, in an
+unshown window, and the built app's sheets are only opened, read and
+cancelled (S2). M16's geometry is therefore the probe's: the label inside
+the content view, its height against its text, the sheet taller — not a
+picture of the refusal on screen, which is GR-7's. That the validator is
+cheap is a code read (Rename and Delete ask the last scan; Restore lists
+file names under `graphics/history/`, no kept file's bytes), not a timing. The Delete sheet's card is 420 × 240 in the
+15c layout dumps — the height `makeSheetView` creates every card at — with
+its one-row grid 46 pt tall, where 15d's grid of a pop-up and the kept line
+is 48: the card did not shrink to its one row, and the slack shows between
+the pop-up and the buttons. Why is not measured, and `Sheets.swift` is
+every sheet's, so nothing is changed for it here; whether it reads as
+loose is GR-7's.
+
+**Fix pass 1** (2026-10-05, the review's two should-fixes; macOS 26.5.1,
+Python 3.14.7, another session's Reelcut, pid 85319, running throughout).
+*The guard under a scratch home that is not there.* The screens line
+below, run while `tools/proof/work/b84b-screens/home` did not exist,
+printed `mcp: DEFAULTS MOVED in com.kgalligan.Reelcut:` with forty of the
+owner's key names though no default had moved (the review's run; it ended
+0 only because pid 85319 shared the domain). Measured, counts only:
+`defaults export com.kgalligan.Reelcut -` answered 47 keys with no
+`CFFIXED_USER_HOME`; 0 keys, status 0 and nothing on stderr, under one
+naming an absent folder; 47 under one naming a present, empty folder,
+every key name and value equal to the read with no variable; then 0 and
+47 again. The read did not make the absent folder and put nothing in the
+present one. `screens.py` records at `scratch_socket()`, before the
+instance it launches has made the home, so the record held no key and the
+compare the whole domain. **What the guard does now:**
+`proof_defaults._export`, the one `defaults export` behind every snapshot,
+runs `defaults` in `read_env()` — the process's environment without
+`CFFIXED_USER_HOME` — so the record and the compare read the same domain
+whether or not the folder exists at either, and the screens line needs no
+`mkdir` in front of it. Nothing creates a home for a proof, and the
+owner's domain is still only read. `defaults_proof.py` gained H1 (the home
+absent at the record, present at the compare), H2 (present, then removed
+before the compare) and `--mutant home-followed`; the B83 section's table
+has them. What the runs printed: `passed 10/10`, exit 0 — H1 "the clone's
+domain holds 5 keys, ReelcutDefaultsProofSeed among them; status 0; … the
+home at the record absent, made by the instance True, at the compare
+present; the record held 5 keys; defaults_moved []", H2 "… the home at the
+record present, … at the compare absent; the record held 5 keys;
+defaults_moved []", R1 and R2 no key of `com.kgalligan.Reelcut` (47 keys)
+moved. `--mutant home-followed`: `MUTANT PASS: home-followed failed ['H1',
+'H2'], expected ['H1', 'H2']`, H1 there "status 3; … (0 keys before …);
+the record held 0 keys of the 5 the clone's domain holds" and H2 "status
+3" with five keys recorded, each under `mcp: DEFAULTS MOVED in
+com.kgalligan.reelcut.defaults-proof: ReelcutDefaultsProofSeed,
+ReelcutSnappingEnabled (other Reelcut pids: none)`. `--mutant no-compare`
+and `no-exit` `MUTANT PASS` on their own rows (G1, G3, G4, G5; G1, G3, G4)
+with H1 and H2 passing, and `proof_defaults.py`'s three as before
+(`no-unlink` P2, `no-refusal` P3–P6, `no-busy` P8). The screens line from
+a work folder with no home in it: 8 pass, 0 fail, 0 skip of 8, 0 new
+problems, nothing on stderr, and the home there afterwards (the instance
+made it). Not measured: which domain an instance writes when its home is
+absent at launch; the guard reads the owner's either way.
+*The second review's one finding (fixed by the orchestrator).* After the
+read moved to `read_env()`, the removal recipe's `defaults delete`, the
+per-key delete and the selftest's `defaults write` still followed
+`CFFIXED_USER_HOME`: under one naming an absent folder the review's
+`proof_defaults.py --selftest` printed `passed 9/10`, exit 1 (P1's write
+landed in no domain the read finds). All of this file's `defaults` now run
+in `read_env()`. With `CFFIXED_USER_HOME` naming an absent folder,
+`proof_defaults.py --selftest` printed `passed 10/10`, exit 0, and the
+folder was still absent afterwards; with no variable `passed 10/10`; its
+three mutants `MUTANT PASS` on P2, P3–P6 and P8; `defaults_proof.py`
+`passed 10/10`, exit 0, R2 "moved []" over the 47 keys; `--mutant
+home-followed` `MUTANT PASS` on H1 and H2. No selftest ROW sets the
+variable: the absent-home run is a command, not a row, and no mutant holds
+it.
+*The validator.* `isOffered` built `choices`, so every File-menu open
+listed `graphics/history/<name>/` once per module for Rename and again for
+Delete, for a `kept` count neither sheet shows. It now answers without
+building them — Rename and Delete from the last scan, Restore from
+`keptNames()` — with the same truth table: `graphics_menu_proof.py` 27/27,
+exit 0, M15 as before; `--mutant rename-in-nest` `MUTANT PASS … M15 FAILED
+in the copy and is the first failure`, `restore-deleted-unlisted` the same
+for M20, `app-rename-in-nest` `MUTANT PASS … S1 FAILED in the copy`. The
+other ten mutants were not re-run; all thirteen anchors were counted in
+the tree, once each. `make typecheck` 0 errors and the 4 warnings, `make
+app` `** BUILD SUCCEEDED **`, `make test` exit 0 (93 `test result: ok`;
+18/18, 14/14, 27/27, 23/23, `inventory.py --check` 5/5 over 48 sites and
+48 pins, `spec_index_proof.py` 138/138, `proof_defaults.py` 10/10 and
+`sweep: removed 2, shared 1, busy 0, denied 0`).
+
+```sh
+python3 tools/proof/graphics_menu_proof.py                                # 27/27, exit 0 (launches the app in a scratch home; not in make test)
+for m in notice-dropped item-dropped rename-in-nest refusal-unshown refusal-unwrapped \
+         delete-opens-selected success-undismissed rename-ungrouped opening-first \
+         rename-field-lowercased restore-deleted-unlisted; do
+  python3 tools/proof/graphics_menu_proof.py --mutant $m                  # MUTANT PASS each (a probe build each)
+done
+python3 tools/proof/graphics_menu_proof.py --mutant app-rename-in-nest    # MUTANT PASS (builds an app in a tree copy)
+python3 tools/proof/graphics_menu_proof.py --mutant app-sheet-unpresented # MUTANT PASS (builds an app in a tree copy)
+# The home need not exist: the defaults guard reads with no CFFIXED_USER_HOME (fix pass 1 above).
+CFFIXED_USER_HOME="$PWD/tools/proof/work/b84b-screens/home" python3 tools/proof/screens.py \
+  --only 15b-rename-graphic-sheet,15c-delete-graphic-sheet,15d-restore-graphic-version-sheet
+python3 tools/proof/defaults_proof.py                                     # passed 10/10, exit 0 (H1, H2 new)
+python3 tools/proof/defaults_proof.py --mutant home-followed              # MUTANT PASS: failed H1, H2
+```
+
+## Issue batch B85 phase 1 — path helpers in the graphics standard library (`graphic/tests/js/path.test.js` T1–T9, `graphic/tests/path.rs` R1–R5, six hand mutants; `graphics_path_proof.py` H0, M0–M3, Z1; #103 part 2; spec §11 G-31)
+
+`getLength(d)`, `getPointAtLength(d, length)` and `evolvePath(progress, d)`
+are `graphic/src/path.js`, pure JavaScript. Phases 2 (`paste_attributes`
+between graphic clips) and 3 (HEVC with alpha) are their own pipelines.
+
+**What is proved, and by which instrument.**
+
+- **`path.test.js`** (`cargo test --release --test stdlib path_test_js`; in
+  `make test`). Each row is a function run in its own `try`; the render
+  throws ONE `Error` joining `"<row>: <message>"` for every row that threw,
+  so a single run names every failed row. T1 lines, exact to 1e-9 (the
+  relative spelling, implicit pairs, two subpaths, `M0,0L.5.5-1-1`); T2
+  arcs against closed forms at 1e-4 relative (a circle of radius 500, a
+  quarter arc, the ellipse 200 by 100 plain and turned 30°, radii scaled
+  up, a zero-radius arc, unseparated flags); T3 the parabola as a `Q` and
+  as a `C`, a `T` and an `S` equal to their explicit spellings; T4 the
+  cusp; T5 points and headings on the circle (0.01 px, 0.05°), the two
+  ends, the clamps, a second subpath, a corner, an arc drawn the other
+  way (sweep 0); `T5 the limit at a start`
+  and `T5 the limit at an end`, the two zero-derivative rows, scored apart
+  so one run can show both failing; T6 nothing drawn; T7 `evolvePath`
+  (`D === getLength(d) * 1.001`, the offsets, the clamps, `"none"`, and
+  the LONGEST subpath for two paths of several); T8 the two error
+  sentences whole, each named for the function called; `T8 a number
+  that is not finite`, twelve cases each run though another failed (the
+  fix pass, below); T9 forty paths, then the first again.
+- **`path.rs`** (`cargo test --release --test path -- --nocapture`; in
+  `make test` without the prints). R1 pixels through `common::render`: a
+  closed two-arc circle stroked red, 12 wide, butt caps, at progress 0,
+  0.5 and 1, and two subpaths (160 and 80 long) at 0.25 and 0.5; R2 one
+  render of a fresh 200-cubic path with 1,000 points taken, under the
+  250 ms budget, its milliseconds printed; R3 a parse error reported at
+  the module's line 3; R4 a path over the memo's cost bound (17,000
+  chords and 34,005 characters) measured, dropped for a small path and
+  measured again, its milliseconds printed; R5 (added by the implementer)
+  the six reference lengths against their closed forms, each relative
+  error printed.
+- **`graphics_path_proof.py`** (not in `make test`: it launches the app,
+  in a scratch home `tools/proof/work/graphics-path/home`, on its own
+  socket, performs no menu item, closes its project and removes its work
+  folder). H0 the scratch home took; M0, the CONTROL, scored first: M2's
+  oracle for radius 300 answers False for a ring written and drawn at
+  radius 150; M1 `write_graphic {ring}` — the three helpers in one module
+  — `ok: true`, no diagnostics; M2 `render_graphic {ring, frame 15, svg}`:
+  the dash within 1e-4 of 2π·300·1.001, the offset half of it, the dot
+  within 0.05 of the quarter point; M3 `graphic_reference` holds
+  `` `evolvePath(progress, d)` ``; Z1 the project closes and the log holds
+  no `Reelcut: ` line.
+
+**What the runs printed** (2026-10-05, one host; the fix pass's runs, on
+the file with the finite checks).
+
+| Run | Answer |
+|---|---|
+| `cargo test --release --test stdlib path_test_js` | 1 passed |
+| `cargo test --release --test path -- --nocapture` | 6 passed. R5: circle 2.51e-5, ellipse 2.51e-5, ellipse turned 30° 2.51e-5, parabola as `Q` 4.92e-5, as `C` 4.92e-5, cusp 6.29e-6. R2: 16.6 ms. R4: 67.6 ms (budget 250 ms each; the first build's run printed 56.3 for R4) |
+| `cargo test --release --test reference` | 5 passed |
+| `cargo test --release --test determinism` | 3 passed |
+| `python3 tools/proof/graphics_path_proof.py` | 6/6, exit 0, nothing on stderr. M0's oracle read dash 943.3966 for the wanted 1886.8405 and the dot at (960, 690) for (960, 840); M2 read dash 1886.7932, offset 943.3966, dot (960, 840) |
+| `cargo test --release` in `graphic/` | 125 passed in 17 `test result: ok`, 0 failed |
+| `make test` / `make lint` / `make typecheck` / `make app` | exit 0 (94 `test result: ok`; `spec_index_proof.py` 138/138) / clean / 0 errors, 4 warnings (the first run's; not run again by the fix pass, which holds no Swift or helper file) / `** BUILD SUCCEEDED **` |
+
+**The six mutants**, each one edit of `graphic/src/path.js` made by hand
+(here by a throwaway script that asserts each anchor occurs once, runs the
+two test commands and writes the file back, compared byte-equal to the
+copy taken before), none left in the tree:
+
+| Mutant | Edit | What failed |
+|---|---|---|
+| `chords-4` | `__PATH_CHORDS` 64 → 4, `__PATH_ARC_STEP` π/128 → π/8 | the ONE `path_test_js` message named T2 (3121.445 for 3141.593), T3 (292.081 for 295.789) and T4 (143.753 for 143.971); `path.rs` R1's circle (the last 1 % read `[0, 0, 64, 64]`) and R5 (6.41e-3) |
+| `unpadded` | `__PATH_PAD` 1.001 → 1 | T7 (the dash string). `path.rs` 6 passed: R1 does NOT catch a missing pad — recorded, not required |
+| `relative-as-absolute` | `const rel = false` | T1 (54.142 for 40) and two of `T8 a number that is not finite`'s cases (the relative move and line, answered); `path.rs` R4 (`"34005 1 5 1 1"`) |
+| `total-dash` | `evolvePath` reads `.total` for `.longest` | T7 (160.16 for 100.1); `path.rs` R1's two subpaths (the long line red at (70, 50) at progress 0.25) |
+| `raw-derivative` | the limit rule removed | `T5 the limit at a start` (0 for 90) and `T5 the limit at an end` (angle 0 for 90), both in the one message |
+| `non-finite` | `const finite = () => true` — the five checks at once | `T8 a number that is not finite`: the one message named all ten refusals and neither control — `M 0 0 L 1e999 0` answered `Infinity`, the same path going on NaN, the move `{"x":"Infinity","y":0,"angle":0}`, `M 0 0 A 1e300 1e300 0 0 1 1 0` answered 0, `H 1e200` `Infinity`, a dash `Infinity Infinity`, the point of the curve under the largest double x `Infinity`. `path.rs` 6 passed: it holds no such row |
+
+One thing no row holds: the memo's cost bound itself (an answer never
+depends on what the memo holds, so T9 and R4 are oracles of the ANSWERS
+across a clear, not of the bytes held — spec §11 G-31's accepted risk).
+
+**No helper answers a number that is not finite** (the review's fix pass).
+`path.js` refuses such a path in the parse sentence by five checks — the
+number read (at the number), and at the command: a move's point, an arc's
+centre form, the running length, the point answered — and `T8 a number that
+is not finite` holds ten refusals over them and two controls. What the
+unchecked file answered is the `non-finite` row above and, one check at a
+time, these extras (`path_test_js` only, not of the six): the number check
+removed, 2 cases failed (the refusal named character 6, the `L`, for 8); the
+move check, 1 (`{"x":"Infinity","y":0,"angle":0}`); the arc check, 2
+(`getLength` answered 0, the point `{"x":0,"y":0,"angle":0}` — the silent
+zero); the running-length check, 4 (`Infinity`, a dash of `Infinity
+Infinity`, and one finite wrong point); the answer check, 1 (x `Infinity` at
+length 0.005 of a curve that measures 10). Each case failed under exactly
+one. And `arc-turn` (the heading's sign on a sweep-0 arc dropped): T5
+failed, angle 1.6e-14 for 180. A coordinate is not refused for being large:
+two sides and the diagonal of a square 1e153 on a side measure; a chord whose SQUARE overflows (`H
+1e200`, the diagonal of a square 1.2e154 on a side) does not, since the
+measure is `Math.sqrt` of a sum of squares.
+
+```sh
+cd graphic && cargo test --release --test stdlib path_test_js       # 1 passed
+cd graphic && cargo test --release --test path -- --nocapture       # 6 passed; prints R2, R4, R5
+python3 tools/proof/graphics_path_proof.py                          # 6/6, exit 0 (launches the app in a scratch home; not in make test)
+```
+
+## Issue batch B85 phase 2 — a graphic's properties pasted between clips of one module (`core/tests/paste_graphic.rs` T1–T8, T10, T11 and eight core mutants; `paste_graphic_probe.py` K0–K8 and six mutants; `paste_graphic_proof.py` H0, T0, P1–P5, Z1 and two mutants; #103; spec §11 G-32)
+
+`paste_attributes` takes a fifth group, `graphic` (a clip's props, whole,
+onto clips drawn by the same module; never a default), and a flag,
+`skip_missing`; Edit ▸ Paste Graphic Properties is the person's door. Phase 3
+(HEVC with alpha) is its own pipeline.
+
+**What is proved, and by which instrument.**
+
+- **`core/tests/paste_graphic.rs`** (in `make test`), through the FFI, over a
+  fixture written by hand: `lower-third` clips A and B (different props, key
+  order, size, `in`, `length` and video), a `title-card` clip, a text clip, a
+  media clip and a nest holding two more `lower-third` clips. T1 what travels
+  and what the target keeps; T2 the props' key order off `to_json()`'s text;
+  T3 no `groups`, and `["video"]`, copy the video and no props; T4 the three
+  sentences of a named group, a matching target listed first unchanged; T5
+  `skip_missing` (mixed targets, nothing to take, `["video","graphic"]` onto
+  a text clip, `["audio"]` an identity where it is an error without the
+  flag); T6 a malformed copied map onto a matching clip, with and without
+  the flag — an array value, a bad key, 4,097 characters, 65 keys — and a
+  `null` not stored; T7 equal props an identity, the payload clip the
+  earliest; T8 the same paste through `scope`; T10 the flag with no
+  `groups` changes nothing (`to_json()` byte-identical); T11 a map no target
+  takes is never read. T9 is `op_default_booleans.rs`'s:
+  `skip_missing` absent equals `false`, `null` is a decode error;
+  `op_nullability.rs` holds it as the fifth plain boolean.
+- **`paste_graphic_probe.py`** (not in `make test`: it compiles
+  `app/Sources`). `paste_graphic_probe.swift` over
+  `harness/build.sh`'s swiftc line with `-D REELCUT_DEV_TOOLS`: a real
+  `EditorViewController` over an untitled document whose clips are placed
+  by ops, its window the document's sheet window
+  (`sheet_queue_probe.swift`'s set-up), `setActivationPolicy(.prohibited)`.
+  **Every Copy and paste is over a private named pasteboard, released at
+  exit; `NSPasteboard.general` is never written** (K6). K0 builds; K1 the
+  item, its place, action and empty key, and its `UIMenu.verdicts` row; K2
+  the validator arm, and `pasteAttributes:`'s answers; K3 the door onto
+  {same module, other module, text}; K4 nothing to do, twice; K5 ⌥⌘V copies
+  the video and no props; K7, a CONTROL, a malformed copied map: no taker,
+  no sheet; a taker, the core's sentence in the alert sheet, which the probe
+  ends; K8 the menu's ACTION, its selector `pasteGraphicProperties:` sent to
+  the controller with the private pasteboard as its sender, K3's claims
+  again. K3, K4 and K7 call the door's body, `pasteGraphicProps(from:)`;
+  the action reads a pasteboard sender in place of the general pasteboard
+  (a menu sends its `NSMenuItem`, so the app reads the general one), which
+  is the seam K8 uses.
+- **`paste_graphic_proof.py`** (not in `make test`: it launches the app, in
+  a scratch home `tools/proof/work/paste-graphic/mcp/home`, on its own
+  socket, performs no menu item, reads and writes no pasteboard, closes its
+  project and removes its work folder). H0, T0 and Z1 are CONTROLS. T0's
+  enum is printed from the core's table, so no mutant here can move it: it
+  is held to the decoder by `core/tests/op_table.rs` and to the handler's
+  list by `clip_catalog_proof.py`. P1 the named group (props, what B keeps,
+  the PNG at B, `undo`); P2 no `groups`; P3 the three sentences; P4
+  `skip_missing`; P5 when the map is read.
+
+**What the runs printed** (2026-10-05, one host).
+
+| Run | Answer |
+|---|---|
+| the move gate, `core/` holding only the move: `cargo fmt --check`, `cargo test --release`, `make lint` | exit 0; 73 `test result: ok`, 1,014 passed, 0 failed; clean. `wc -l`: `edit_paste.rs` 467 (593 before), `edit_paste_attributes.rs` 143. What moved and what stayed is `designs/adr/core-file-history.md`'s entry for `edit_paste_attributes.rs` |
+| `cd core && cargo test --release` | 74 `test result: ok`, 1,025 passed, 0 failed |
+| `cd core && cargo test --release --test paste_graphic` | 10 passed |
+| `python3 tools/proof/paste_graphic_probe.py` | 9/9, exit 0. K6: `changeCount` 2480 at start and at end. K8: `pass`, B's props equal A's, undo "Paste Graphic Properties" ("Opacity" before), one undo restores the project text and that name |
+| `python3 tools/proof/paste_graphic_proof.py` | 8/8, exit 0. P1's frames at 8 s: 40162 bytes before the paste, 40161 after, different |
+| `clip_catalog_proof.py` / `op_catalog_proof.py` / `phase2_proof.py`, one instance in a scratch home | 24/24 / 23/23 / 86/86; the log held no `Reelcut: ` line |
+| `v2_menu.py --only H` / `op_schema_probe.py` / `capture_spike/inventory.py --check` / `spec_index_proof.py` | 5 pass / 28/28 / 5/5 / 138/138 |
+| `make test` / `make lint` / `make typecheck` / `make app` | exit 0 (95 `test result: ok`) on the second run, the first having failed in `op_nullability.rs`'s plain-boolean list / clean / 0 errors, 4 warnings / `** BUILD SUCCEEDED **` |
+| after the review's fix (the action's pasteboard sender, K8 and its two mutants, documents; no core or graphic file): `make typecheck` / `make app` / `paste_graphic_proof.py` / `capture_spike/inventory.py --check` / `spec_index_proof.py` / `v2_menu.py --only H` | 0 errors, 4 warnings / `** BUILD SUCCEEDED **` / 8/8, exit 0 / 5/5 / 138/138 / 5 pass. `make test` and `make lint` were not run again. The probe's row above and its mutants' table below are that pass's runs |
+
+**The eight core mutants**, each one replacement (anchor asserted once) in a
+scratch copy of `core/` and `graphic/` under
+`tools/proof/work/paste-graphic/core-copy/`, never in the tree, each run
+alone after both controls passed in the copy. 8 of 8 caught.
+
+| Mutant | What failed, as cargo printed it |
+|---|---|
+| the default set gains `graphic` | `a_paste_that_names_no_graphic_group_copies_no_props` (T3), and T10's test |
+| the copy also writes `width` | `naming_graphic_copies_the_props_whole_and_the_target_keeps_the_rest` (T1), and T8's test |
+| the name comparison removed | `a_named_graphic_group_a_side_cannot_serve_is_an_error_and_nothing_changes` (T4) and `skip_missing_skips_what_cannot_take_a_named_group` (T5), and T11's test |
+| the `check_props` call removed | `a_malformed_copied_map_onto_a_matching_clip_is_the_maps_own_sentence` (T6), and T11's test |
+| `skip_missing` read as false | `skip_missing_skips_what_cannot_take_a_named_group` (T5), and T11's test |
+| the default set gains `graphic` only under `skip_missing` | `with_no_groups_skip_missing_changes_nothing_and_copies_no_props` (T10) alone; T3's test still passed |
+| the shape check hoisted above the target loop | `a_copied_map_no_target_takes_is_never_read` (T11) alone |
+| `Kind::Groups`' values lose `"graphic"` (`--test op_table`) | `every_closed_vocabulary_answers_with_its_own_members` |
+
+The runner was a throwaway script in the work folder. Its second run, on a
+copy left by the first, scored the `op_table` control BROKEN: the copy had
+been refreshed with the tree's mtimes, older than the copy's last build (the
+last mutant's), so cargo did not rebuild. The copy is now made without
+mtimes; the table above is the run after that.
+
+**The probe's six mutants**, each an edit to a copy of `app/Sources`
+(rule R: exit 1 caught, 0 survived, 2 not performed). All six exit 1,
+each `scores: 1/2`.
+
+| Mutant | Edit | What failed |
+|---|---|---|
+| `door-no-groups` | the door omits `groups` | K3: B's props stayed `{"legacy":3,"subtitle":"Guest","title":"Bob"}`, no undo step |
+| `door-strict` | the door sends `skipMissing: false` | K3: the props stayed, and an alert sheet came up: `clip 6 is drawn by "title-card" …` |
+| `validator-any-selection` | the arm asks for any selection | K2: a payload with only the text clip selected validated true |
+| `attributes-names-graphic` | ⌥⌘V sends `groups: ["video", "graphic"]` | K5: B's graphic took A's props |
+| `action-empty` | the menu's action has no body | K8: the project did not change; B's props stayed `{"legacy":3,"subtitle":"Guest","title":"Bob"}`, undo still "Opacity" |
+| `action-pastes-attributes` | the action's body is ⌥⌘V's, `pasteAttributes(from:)` over the same sender | K8: the project changed under the step "Paste Attributes"; B's props stayed `{"legacy":3,"subtitle":"Guest","title":"Bob"}`, B did not keep what is outside `graphic`, and A, C and the text clip were not all as they were |
+
+**The MCP proof's two mutants**, each one anchor replaced in a tree copy's
+`AgentServer+Clips.swift` and built by the copy's own `make app`
+(`graphics_files_proof.py`'s rule: exit 0 caught, 1 survived, 2 not
+performed — the OTHER way round from the probe's, each as its pattern has
+it). Both exit 0, `MUTANT PASS`.
+
+| Mutant | Edit | What failed |
+|---|---|---|
+| `handler-drops-skip` | the handler does not pass `skip_missing` | P4, and P5 (6/8) |
+| `groups-without-graphic` | `AgentServer.attributeGroups` loses `"graphic"` | P1, and P3, P4, P5 (4/8); T0 passed, as a control must |
+
+The menu item's one-line action is K8's: `K8 pass` in the 9/9, and `caught —
+K8 failed` from both of its mutants. `action-pastes-attributes` keeps the
+sender so that it reads the private pasteboard and pastes A's look; with the
+default it would read the owner's clipboard. What stays a person's is the
+item chosen by hand over the real clipboard, `docs/manual-checks.md` TL-8
+step 4.
+
+```sh
+cd core && cargo test --release --test paste_graphic                    # 10 passed
+python3 tools/proof/paste_graphic_probe.py                              # 9/9, exit 0 (compiles app/Sources; not in make test)
+python3 tools/proof/paste_graphic_probe.py --mutant door-no-groups      # caught, exit 1 (also door-strict, validator-any-selection, attributes-names-graphic, action-empty, action-pastes-attributes)
+python3 tools/proof/paste_graphic_proof.py                              # 8/8, exit 0 (launches the app in a scratch home; not in make test)
+python3 tools/proof/paste_graphic_proof.py --mutant handler-drops-skip  # MUTANT PASS, exit 0 (builds an app in a tree copy; also groups-without-graphic)
+```
+
+## Issue batch B85 phase 3, phase A — the size an export reports is the size written (`core/tests/export_size.rs`, five new and three rewritten tests, five hand mutants; `hevc_alpha_proof.py --rows size` H0, T0, R1–R4, E2, B1, B4, G1, Z1; `hevc_alpha_baseline.json`; #103; spec §11 G-33)
+
+On every export row that needs even pixel dimensions the core resolves and
+lists the even size the file will have (`Preset::even_sized`,
+`export_size::even_size`), so the Size popup, the sheet's readout and
+fields and the `export` tool's `width` and `height` say the file's size.
+This is phase A of G-33, gated alone and committed as fcfeebf. Phase B —
+the `hevc_alpha` row, the fill rule, the encoder outcome — is the next
+section, and added its rows, mutants and controls to the same script. This
+section is the record of phase A's gate ON PHASE A'S BUILD: **on a build
+that holds phase B, `--rows size` prints 10/11 and exits 1, by design** —
+its row G1 requires the pad and an unknown `hevc_alpha` — and says so on
+G1's line and on its last line (next section, "Gate A after phase B").
+
+**What is proved, and by which instrument.**
+
+- **`core/tests/export_size.rs`** (in `make test`), through the FFI, every
+  oracle a literal written by hand.
+  `an_odd_document_row_is_evened_on_the_rows_that_need_it`: 1000 × 667,
+  321 × 181, 181 × 320, 1619 × 1080 and 1 × 1 list `("document", "Document
+  (even)", …)` at 1000 × 666, 320 × 180, 180 × 320, 1618 × 1080 and 2 × 2 on
+  the six even-sized rows, and the canvas as `"Document size"` on
+  `prores_4444`, `gif` and `apng`; 1600 × 900 is `"Document size"`
+  everywhere. `every_preset_is_even_sized_or_keeps_an_odd_edge`: every id
+  `rc_export_presets` lists is in exactly one of the test's two literal
+  lists, and `rc_export_settings` on 321 × 181 answers 320 × 180 for the
+  first and 321 × 181 for the second — a new row fails here until it is
+  classified. `an_asked_size_resolves_even_on_the_rows_that_need_it`: an
+  override pair, one edge alone, 1 × 1 and an even pair, on `h264`, `hevc`,
+  `prores_422` and, as asked, on `prores_4444`.
+  `a_listed_movie_size_sent_back_resolves_to_itself`: every row of every
+  movie format on six canvases. Rewritten to the new Document row:
+  `the_long_edge_rounds_to_the_nearest_even_integer`,
+  `a_long_edge_that_lands_on_an_odd_integer_goes_up` and
+  `the_audio_only_formats_list_what_h264_lists`;
+  `the_first_row_is_the_document_for_every_movie_format` keeps its two even
+  documents.
+- **`hevc_alpha_proof.py --rows size`** (not in `make test`: it launches
+  the app). Its own Release instance in a scratch home
+  (`tools/proof/work/hevc-alpha/home`, removed at start and exit) on its own
+  socket, launched with every key of `screens.py`'s `PINS`, the inspector
+  width at 280 and the export choice pinned to `{"preset_id":"hevc_alpha"}`.
+  One menu item, File ▸ Export…; its sheet is cancelled. Neither that nor
+  the `export` tool writes the remembered export choice (below: "The
+  owner's defaults"). Every export is one second; the largest frame is
+  1280 × 720.
+  H0 the scratch home took. T0 `export`'s `size` description holds "written
+  one pixel smaller on that edge". R1, R2 a 321 × 181 and a 181 × 320
+  document with no `size` as `h264`, `hevc`, `prores_422` (and `hevc` at
+  `document`): the answer's size is ffprobe's, 320 × 180 and 180 × 320, the
+  baseline's pair printed beside each. R3 the same document as
+  `prores_4444`, `apng` and `gif`: 321 × 181 both. R4 an asked `[321, 181]`
+  on a 640 × 360 canvas: 320 × 180 as `h264`, 321 × 181 as `prores_4444`;
+  no `size`: 640 × 360 on four rows. E2 the sheet: the Size popup "Document
+  (even) · 320 × 180", the readout beginning "320 × 180 · ", the two fields
+  320 and 180, no "321 × 181" anywhere; on a 1001 × 667 document "Document
+  (even) · 1000 × 666", not truncated (intrinsic width 207 in a 240 pt
+  frame in fix pass 1's run, 206.5 in Gate A's first green run of the same
+  build; the row requires only that it is no wider than the frame); on the
+  even canvas "Document size · 640 × 360"; and the Format
+  popup reading "H.264 (MP4)" or "HEVC with Alpha (MOV)" (what that shows
+  of the pinned choice, and what it cannot in phase A, is under "A launch
+  argument", below). B1 `hevc` on the even canvas equals the baseline in ffprobe's
+  fixed parameters (its byte counts are printed, not compared: "The baseline
+  is one host's bytes", below), alphas, corner and frame-0 digest. B4 `prores_4444` at three
+  sizes equals the baseline's size and digest. G1 the six odd-canvas files
+  equal the baseline's frame-0 digest and eight edge pixels, a black one
+  among them, and `hevc_alpha` is an unknown preset that writes no file —
+  so phase A moved no pixel where it acts, and the row is red on a tree that
+  already fills or already lists the row (it is scored only under `--rows
+  size`). Z1 every project closes and the log holds no `Reelcut: ` line.
+
+**The baseline**, `tools/proof/hevc_alpha_baseline.json`, was recorded
+twice on the build of main at 055a5ed, before any core or Swift edit
+(`--record-baseline`; 17 cases; the two recordings, each its own launch,
+agreed on every value, the frame digests included, so nothing is stored
+`null`). The recorder refuses to write unless `git status` shows `core/`
+and `app/` unchanged, the answer for both odd documents says the canvas's
+size over an evened file on each of `h264`, `hevc` and `prores_422`, and
+each of those files' eight pixels holds a black one. On a tree with G-33's
+resolver the recorder exits 1, so it is not re-recorded on this one. It
+also holds what
+phase B's rows are read against: the right-hand edge of a 334 × 222 white
+canvas at `720p` (columns w−1 and w−2 black, w−3 white on all three opaque
+rows), a 400 × 100 white canvas at `[402, 100]` (the middle row's black
+pixels are columns 400 and 401 on all three), and that `prores_4444`
+refuses that size.
+
+**The baseline is one host's bytes and one build's, and says which**
+(fix pass 1 of phase A's review). Its cases are hardware H.264 and HEVC
+bitstreams, ffprobe's values for one of them, and ffmpeg's RGBA
+digests, so another Mac, another macOS or another ffmpeg can differ in
+every one of them with nothing wrong in Reelcut. (ffprobe's byte counts
+for that file — the stream's `bit_rate`, the file's `size` and `bit_rate`
+— are held in the baseline and printed, and since fix pass 2 of phase B's
+review compared on no host, this one included: "B1 compares no byte
+count", in the next section.) The file carries `host` —
+the chip (`sysctl -n machdep.cpu.brand_string`), the macOS version and
+build (`sw_vers`) and the first three words of `ffmpeg -version` — and the
+rows print it on the line under their heading. **On a host that is not
+the baseline's, phase A's script scored nothing, named both hosts and
+exited 2**: the instrument, not the product. Phase B changed that to what
+this paragraph left open — the rows that read no digest are scored there
+and only B1, B4 and G1 withheld, still with exit 2 (next section, "Another
+host"). Such a host
+records its own baseline: a git work tree of a commit before G-33's code
+(055a5ed), `make app` in it, then THIS script twice with `--record-baseline
+--app <that tree>/build/Build/Products/Release/Reelcut.app`. A recording at
+another commit or on another host than the file's starts the file over, so
+that baseline replaces the committed one in the working tree.
+`head` is the commit of the BUILD's tree, not of the checkout the script
+sits in: the recorder takes `--app`'s own work tree (`build_tree`: the app
+has to be `build/Build/Products/Release/Reelcut.app` at the top of a git
+work tree), stamps that tree's `git rev-parse HEAD`, holds THAT tree's
+`core/` and `app/` to `git status`, and records nothing for a build
+anywhere else (a proof's tree copy has no `.git`). What it cannot see is a
+stale build inside its tree — `make app` there first. **The committed
+file's `host` was stamped, not recorded**: the recorder cannot run on phase
+A's tree, so the host `host()` reads today (Apple M2 Max, macOS 26.5.1
+(25F80), ffmpeg version 9.0.2 — the machine and the day of both
+recordings, and what this section and G-33 already named) was added to the
+existing document by a few lines of Python (load, `d["host"] =
+hevc_alpha_proof.host()`, write with the recorder's own `json.dumps(…,
+indent=1, sort_keys=True)`). The SHA-256 of the `cases` object was the
+same before and after (a29eac32…), a `diff` of the two files is the five
+`host` lines alone, and `head` was already the build's (the recordings
+used the default `--app`, this tree's build at 055a5ed). The 17 cases are
+the two 055a5ed recordings, untouched. By import, with no launch: the
+unstamped file and a copy stamped with another chip each answer `instrument
+failure: …` naming both hosts and return 2; `record` on this tree answers
+`NOT RECORDED: core/ or app/ of <tree> differs from its HEAD`, and with
+`--app /Applications/Reelcut.app`, `NOT RECORDED: the build's commit cannot
+be read`. The recorder as it now stands has not written a baseline: both
+recordings were made before `build_tree` and the host stamp existed, and its
+writing path — the merge on `head` and `host`, and `--app` aimed at another
+tree — needs a built work tree of 055a5ed to run, which this pass did not
+make.
+
+**The owner's defaults.** The instance shares the owner's
+`com.kgalligan.Reelcut` domain (#238), and before the pin was sent as a
+`<string>` its launches READ the owner's remembered export choice (next
+paragraph). Nothing the proof does can WRITE it, by reading: the key's one
+writer is `ExportChoice.remember()` (`ExportPresetsStore.swift:174`, the
+`UserDefaults.standard.set` at `:180`), whose one caller is
+`ExportSheetController.commit(queue:)` (`ExportSheetController.swift:568`),
+reached only from `exportClicked` and `queueClicked` (`:521`, `:527`);
+`cancel_sheet` (`AgentServer+MenuItem.swift:112`) presses the sheet's
+Escape button through `UISheet.cancel` (`UISheet.swift:66`) — Cancel, which
+`makeButtonRow` gives that key (`Sheets.swift:90`) — and its action,
+`cancelClicked` (`ExportSheetController.swift:516`), is `dismiss(self)` and
+nothing else; the `export` tool's handler,
+`exportProject` (`AgentServer+Render.swift:260`), is in a file that names
+`UserDefaults` nowhere, and neither do `Exporter*.swift`,
+`ExportSheet*.swift` or `ExportQueue*.swift`. (Line numbers at 055a5ed;
+phase A's diff touches none of these files.) By a run, `mcp.py`'s guard is
+the instrument: a moved owner-visible key is a `mcp: DEFAULTS MOVED` line
+on stderr, and status 3 when no other Reelcut shares the domain. **The
+stderr of the two recordings and of the gate's red and green runs was not
+kept**, and another session's Reelcut was alive then, so a moved key would
+only have printed — nothing is claimed of those four runs from their
+output. Fix pass 1's run
+kept both streams apart: 11/11, exit 0, **stderr empty** (0 bytes) — no
+`DEFAULTS MOVED` line and no line saying the guard could not read the
+domain. Another Reelcut (`/Applications/Reelcut.app`, the same bundle
+identifier) was alive during it, so a line, not status 3, is what a moved
+key would have been.
+
+**A launch argument the argument domain drops.** `-ReelcutExportChoice
+{"preset_id":"hevc_alpha"}` is NOT taken: a value that begins with a brace
+and is not a property list is discarded, `UserDefaults` answers the owner's
+own remembered choice, and the sheet opened on it (measured on this host:
+a format and a Quality tier that are not the build's defaults). Sent as `<string>{"preset_id":"hevc_alpha"}</string>` the
+key reads as that text. E2 also requires the Format popup to read "H.264
+(MP4)" or "HEVC with Alpha (MOV)", which fails the row when the pin did
+not take and the owner's remembered format is another one (as it was on
+this host); in phase A, where a taken pin names a row the build lacks and
+the sheet falls back to H.264, an owner who last exported H.264 cannot be
+told apart — phase B's row requires "HEVC with Alpha (MOV)" exactly.
+`screens.py`'s own pin is the empty string, which is taken as it is.
+
+**What the runs printed** (2026-10-05, one host: Apple M2 Max, macOS
+26.5.1).
+
+| Run | Answer |
+|---|---|
+| `hevc_alpha_proof.py --record-baseline`, twice, on the unchanged build | `RECORDED: recording 1 …` then `recording 2 at 055a5ed…; 17 cases; the recordings disagree on nothing`, exit 0 both. Both odd documents: the answer `[321, 181]` (`[181, 320]`) over a file of `[320, 180]` (`[180, 320]`) on all three rows; two of the eight pixels black in each file |
+| `hevc_alpha_proof.py --rows size` on the unchanged build (the gate's red) | 6/11, exit 1: T0, R1, R2, R4 and E2 failed (the answer and the sheet said 321 × 181 beside a 320 × 180 file); H0, R3, B1, B4, G1 and Z1 passed |
+| `cd core && cargo test --release --test export_size` | 20 passed |
+| `hevc_alpha_proof.py --rows size` on phase A's build | 11/11, exit 0 |
+| the same, fix pass 1 (the stamped baseline; stdout and stderr kept apart) | `host Apple M2 Max · macOS 26.5.1 (25F80) · ffmpeg version 9.0.2 — the baseline's, recorded on the build of 055a5ed`, 11/11, exit 0; stderr empty |
+| the integer sweep of G-33 (c), re-run with the tighter arm as its own column (`r12.swift`'s `tight`, no encoder, 6 s; the source and `run12-rule-tight.txt` are in the batch's handoff folder under `measurement/`, not in the repository) | evened Document rows over every canvas with both edges in 2…4096: exact 4,196,351, filled 12,572,674, neither 0; standard rows: exact 1,961,452, filled 65,114,648, neither 0; one-pixel-edge canvases neither exact nor filled: 4,094 of 8,192 — each equal to the wider arm's column. Typed frames within 8 px of eight canvases that the tighter arm newly fills: on the even-sized rows the evened size alone (180 × 320 on 181 × 320, 1080 × 1920 on 1081 × 1920); on `prores_4444` a frame one pixel short on one axis or both (eleven in all, among them 399 × 99 and 400 × 99 on 400 × 100, 180 × 320 on 181 × 320, 321 × 180 on 321 × 181, 1920 × 1079 on 1920 × 1080); 396 × 98 on 400 × 100 stays fitted |
+
+**Five hand mutants of the core**, each one replacement in `core/src/`
+with `--test export_size` run and the file put back from a byte-compared
+copy; none is a script. 5 of 5 caught.
+
+| Mutant | Tests that failed |
+|---|---|
+| `even_sized` answers false | 5: the odd-document, every-preset, asked-size, nearest-even and odd-integer tests |
+| `even_size` rounds an odd edge UP | the same 5 |
+| the Document row is never renamed | 3: the odd-document, nearest-even and odd-integer tests |
+| the list keeps the canvas while the resolver evens | 4, `a_listed_movie_size_sent_back_resolves_to_itself` among them |
+| the audio-only rows are not even-sized | 3, `the_audio_only_formats_list_what_h264_lists` among them |
+
+What the gate does not show: that no file moved on an odd canvas LARGE
+enough for the default bit rate to clear its 1 Mbps floor (0.25 % lower at
+1001 × 667, by arithmetic; G1's canvases sit under the floor), nor the
+rate a Quality tier of the sheet sends, which is computed from the Document
+row's numbers, now even, and rounded to 100 kbps (G-33 (b); no row picks a
+tier). The queue's
+tooltip prints the same resolved value by construction and no row reads it
+(G-33 (b)).
+
+```sh
+cd core && cargo test --release --test export_size        # 20 passed
+python3 tools/proof/hevc_alpha_proof.py --rows size       # 11/11, exit 0 on phase A's build (fcfeebf); 10/11, exit 1, G1 red by design, on a build with phase B
+```
+
+## Issue batch B85 phase 3, phase B — HEVC with alpha, the fill within a pixel, and a missing encoder (`core/tests/export.rs`, three new tests; `hevc_alpha_proof.py`: 30 rows, 2 controls, 3 mutants; #103; spec §11 G-33)
+
+`hevc_alpha`, "HEVC with Alpha (MOV)", is the tenth export row: a QuickTime
+movie whose frames carry the canvas's alpha. Every movie row FILLS the
+frame when it is within a pixel of the canvas's shape (`ExportWriter.shapeGap`,
+one integer test the alpha guard shares) and letterboxes past that, where
+the two alpha movie rows refuse instead; a Mac with no encoder for a row
+answers the preset's own sentence and leaves no file
+(`Exporter.encoderOutcome`); the Document tab's note counts the alpha
+formats once there are three. The first arm of the fill rule is the one
+G-33 (c) records as amended in fix pass 1: a canvas-SHAPED size less at
+most one pixel on each axis — `(bw + a)·ch == (bh + b)·cw`, `a` and `b`
+each 0 or 1 — is filled on the strength of the fill's overshoot, at any
+scale, so no size of the canvas's own shape is refused for being odd.
+
+**What is proved, and by which instrument.**
+
+- **`core/tests/export.rs`** (in `make test`; 38 tests). `EXPECTED` holds
+  ten rows with `hevc_alpha` after `hevc`.
+  `hevc_alpha_is_a_mov_avfoundation_writes`: every key of the resolved
+  settings — `mov`, `com.apple.quicktime-movie`, the codec `hevc_alpha`,
+  `…HEVCHighestQualityWithAlpha`, picture, sound, alpha, the document's
+  size and rate, no bit rate unasked, `optimize_for_network` false by
+  default and true when asked, an asked bit rate echoed.
+  `hevc_alpha_sits_directly_after_hevc`: the menu's order and the row's
+  name. `the_hevc_row_is_what_it_was`: the `hevc` preset row and its
+  resolved settings, with nothing asked and with all four optional
+  overrides, against literals the tree printed BEFORE the row was added
+  (the test was written and passed first, then the row).
+  `only_prores_4444_hevc_alpha_and_apng_carry_alpha`: the three ids, in
+  menu order. `core/tests/export_size.rs` (20 tests): `hevc_alpha` is in
+  `MOVIE_FORMATS`, in the even-sized list (so
+  `every_preset_is_even_sized_or_keeps_an_odd_edge` classifies it), in the
+  asked-size loop and in both "lists what `h264` lists" loops.
+- **`hevc_alpha_proof.py`** (not in `make test`: it launches the app). One
+  Release instance per run in a scratch home under
+  `tools/proof/work/hevc-alpha/` (removed at start and exit), on its own
+  socket, with every key of `screens.py`'s `PINS` as a launch argument, the
+  inspector at 280 pt and the export choice pinned to `hevc_alpha`. Two
+  menu-driven acts, neither persisting: File ▸ Export… (opened, read,
+  cancelled — nothing in a sheet is pressed) and the inspector's Document
+  tab. Twelve fixtures, every export one second, the largest frame
+  1296 × 728. The full rows and the two controls, three launches, took
+  25 s together here.
+  The phase A rows are scored again with `hevc_alpha` added to R1 and R2
+  and with E2 requiring the Format popup to read "HEVC with Alpha (MOV)"
+  alone, so a pin that did not take fails E2 (the phase A build could not
+  tell). T0 reads B6's four phrases off `tools/list`.
+  **A1** a hard-edged opaque red card on a clear 640 × 360 canvas as
+  `hevc_alpha`: the answer says `hevc_alpha` / `mov` / `hevc_alpha`, the
+  path ends `.mov`, ffprobe says `hevc` / `hvc1` (and `yuv420p` — it cannot
+  see the alpha), and decoded the frame holds two alphas, 0 and 255, with
+  no pixel wrong more than 4 px from the card's edge. **A2** the card at
+  half opacity decodes (129,0,0,128) at its centre. **A3** on an opaque
+  canvas every alpha is 255. **A4** at `720p`: 1280 × 720, corner 0,
+  centre 255. **A5** with a tone on a second track: an `aac` stream, 48000
+  Hz, 2 channels, and `loudness` in the answer ("Peak −14.0 dBTP · −14.7
+  LUFS").
+  **S1** 640 × 480 on 640 × 360 as `hevc_alpha`, and **S2** 402 × 100 on
+  400 × 100 as `prores_4444` and as `hevc_alpha`, are refused in the shape
+  sentence, naming both sizes, with no file.
+  **O1** a clear 321 × 181 and a clear 181 × 320 document as `hevc_alpha`
+  with no size, and `[321, 181]` asked on 640 × 360: written at the even
+  size the answer names, every pixel of all four edges alpha 0, the centre
+  255. **O2** `prores_4444` keeps 321 × 181, and writes a typed 180 × 320
+  on 181 × 320 (which the earlier guard refused) with all four edges 0.
+  **O3** `apng` keeps 321 × 181. **O4** the 321 × 181 document at `720p`
+  as `hevc_alpha`: 1276 × 720, all four edges 0. **O5** (fix pass 1) on
+  the clear 640 × 360 document, `hevc_alpha` asked `[400, 225]` and
+  `[1296, 729]` — odd sizes in the canvas's own proportions, one smaller
+  than it and one larger — is not refused: the answer and the file are
+  400 × 224 and 1296 × 728, all four edges 0, the centre 255; and
+  `prores_4444` at a typed `[400, 224]` is written the same. The build
+  before the first arm was amended REFUSED all three in the shape sentence
+  ("…and 400 × 224 is a different shape…"), which is this row's red.
+  **P1**, **P2** a clear
+  334 × 222 document at `720p` (1084 × 720, 0.76 px off shape) as
+  `hevc_alpha` and `prores_4444`: all four edges 0.
+  **B2** a white 334 × 222 document at `720p` as `hevc`, `h264` and
+  `prores_422`: the last three columns of the middle row read 253–254
+  where the baseline's last two are black. **B3** the two odd red
+  documents on those three rows: all eight edge pixels red (253–254 on
+  321 × 181, 250 on 181 × 320) where the baseline has two black among
+  them. **L1** 334 × 222 at `[640, 640]` is letterboxed, black at the top
+  and bottom. **L2** 400 × 100 at `[402, 100]`: exactly two black pixels in
+  the middle row, columns 400 and 401, the baseline's.
+  **N1** the Document tab reads "Transparent — kept by 3 export formats."
+  once, 183 pt wide, not truncated. **E1** the sheet opens on "HEVC with
+  Alpha (MOV)", its footnote's text is "HEVC_ALPHA · MOV · alpha", and the
+  footnote's `tooltip` in the layout dump is that same whole line.
+  B1, B4, H0 and Z1 are phase A's. **X1** is scored only under
+  `--mutant encoder-refused`.
+
+**What E1 does NOT score, and why it is printed.** The spec's row also
+required that no `truncated` problem name the footnote. That is false on
+the built app and was before this phase: beside the sheet's three buttons
+the footnote's slot is 88 pt, and "HEVC_ALPHA · MOV · alpha" — like the
+shipped "PRORES4444 · MOV · alpha" — needs 144, so both are drawn cut with
+a tail ellipsis, before the word "alpha" (measured, all three rows
+compared: "H264 · MP4" is 60 pt in 64). What E1 DOES score since fix
+pass 1 is where the whole line can still be read: `syncReadout`
+(`ExportSheetResolve.swift`) writes the footnote's tooltip after its text
+and clears it with the text, the layout dump carries each view's `tooltip`
+(`UISnapshotLayout.swift`; first 200 characters, `null` for none and for a
+secure field), and E1 requires the footnote's to equal its text. Its red:
+on a build with the dump's key and without those two lines the tooltip
+read the empty string `sheetFootnote("")` set once, and E1 failed.
+Only the `hevc_alpha` sheet is opened; ProRes 4444's footnote takes the
+same two lines and has no row. E1 still prints the cut on its line in
+every run: giving the summary room on the sheet's FACE (a line of its
+own, a wider sheet) is a visible change to every format's sheet and the
+owner's choice, not a row's. G-33 (a) and (h) and the manual check SE-9
+say the same.
+
+**Controls** (no build), each exit 0. `--control plain-hevc-reader`: A1's
+and A2's pixel readers over plain `hevc` exports of the same two projects
+both FAIL (every alpha 255: 203,100 pixels outside the card are not 0;
+the half card's centre is (129,0,0,255)). `--control sheet-default`: with
+`screens.py`'s empty export choice the sheet opens on "H.264 (MP4)" and E1
+FAILS.
+
+**Mutants**, each one `tree_copy.make_copy`, every anchor asserted to
+occur once, built by the copy's own `make app` (99–133 s here), each exit
+0. `encoder-refused` — an encoder specification nothing satisfies for
+`.hevcWithAlpha`: A1 FAILS and X1 PASSES ("This Mac cannot export with the
+“hevc_alpha” preset.", nothing at the path); relaunched with
+`RC_MUTANT_UNMAPPED`, which turns `encoderOutcome` off, X1 FAILS: the tool
+answers "Cannot Encode" and a 0-byte file is left. `report-and-fill` —
+`Preset::even_sized` false and `fillsTheBox` false: R1, R2, R4, E2 FAIL
+(the answer and the sheet say 321 × 181 over a 320 × 180 file) and O1,
+O5, P1, P2, B2, B3 FAIL (edges at alpha 15–16 on `hevc_alpha` and 255 on
+`prores_4444`; two black columns or rows), while R3, S1, S2, L1, L2 PASS.
+`shape-and-note` — the guard skipped for `.hevcWithAlpha`, the note
+always joined, `limit` `max(cw, ch)` for every frame: S1, N1, L2 and S2
+FAIL (S2's `prores_4444` half by the limit alone: 402 × 100 is written;
+L2 has no black column; the joined three-name note is truncated) while L1
+and O1 PASS; relaunched with `RC_MUTANT_FILL_ALL`, L1 FAILS (white at the
+top and bottom). **The copy's `core/` is its own for `report-and-fill`**
+(`own_core`): `make_copy` links `core` to the tree's, so an anchor
+replaced through the link would be replaced in the TREE; the script
+refuses any anchor whose file resolves outside the copy, copies `src/` and
+the two Cargo files, links `include/`, and clones the tree's release
+artifacts (`cp -c`) so the copy compiles the local crates only. The first
+run of this mutant found a fault in the SCRIPT, not the product: a mutant's
+launch was not handed the baseline, so L2's "columns equal the baseline's"
+clause failed; mutants and controls are handed it now, and that mutant was
+built again (four mutant builds in all).
+
+**Gate A after phase B.** `--rows size` on this build prints 10/11 and
+exits 1: G1 requires the pad the baseline recorded and an unknown
+`hevc_alpha`, and this build fills and lists the row. G1's line ends "RED
+BY DESIGN: this build holds phase B…" and the last line reads "10/11 — G1
+is RED BY DESIGN on a build that holds phase B; it is Gate A's row and
+the only one that failed". The gate was passed where it belongs, on the
+phase A build (fcfeebf). The exit status stays 1 on purpose: a gate that
+answered 0 here would no longer be red on a tree that already fills.
+
+**Another host.** The baseline is this host's bytes (previous section).
+Phase B's decision on what that section left open: on a host that is not
+the baseline's, **the rows that read no digest are scored**, B1 and B4
+(and G1 under `--rows size`) print a `skip` line naming both hosts, L2
+drops its "columns equal the baseline's" clause and says so, the last line
+is `n/n — not scored: …`, and the script exits **2** when everything it
+scored passed — the claim is incomplete there, which is the instrument's
+answer and not the product's — and 1 when a scored row failed. Run once
+here by import, the baseline aimed at a copy stamped "Apple M1 · macOS
+15.6 · ffmpeg 7.1": 27/27, B1 and B4 skipped, exit 2. So a macOS or ffmpeg
+update on this Mac no longer silences the alpha, fill and size rows; it
+withholds the two "the old file is byte for byte the old file" rows until
+a baseline is recorded for the new host.
+
+**I1, printed and never scored** (for the issue G-33 (h) names): a
+half-opaque red card over an opaque white canvas, re-imported from the
+`hevc_alpha` file, renders (191,127,127) at the card's centre, and from
+the `prores_4444` file (193,129,127); a correct composite is about
+(255,128,128). The files' own centre pixels decode (129,0,0,128) and
+(129,0,0,129).
+
+**Fix pass 1 (2026-10-05, the review of phase B).** Two findings, each
+shown red before its fix. *The first arm.* As first built — the canvas
+ITSELF less at most a pixel on each axis — `shapeGap` refused an odd size
+typed in the canvas's own proportions on `hevc_alpha` (the core evens
+`[720, 405]` on 1920 × 1080 to 720 × 404: gap 1920, limit 1080). The arm
+is now a canvas-SHAPED size less at most a pixel on each axis, and O5 is
+its row. *The tooltip.* E1's new clause, above. **The red build** was the
+tree with the dump's `tooltip` key and neither fix: 28/30, O5 FAILED (all
+three exports refused in the shape sentence, naming 400 × 224, 1296 × 728
+and 400 × 224) and E1 FAILED (`tooltip ['']`). On the fixed build 30/30.
+`report-and-fill` names O5 and was built again (O5 FAILS there: the answer
+says `[400, 225]` and `[1296, 729]` over files of 400 × 224 and
+1296 × 728 with edge alphas 0, 15 and 16, and `prores_4444`'s edges hold
+255), and `shape-and-note` was built again unchanged (its third anchor is
+the line under the one that changed); `encoder-refused` was not — its two
+anchors still occur once and its rows did not change. **The integer
+sweep**, run again with the amended arm as its own column (`shaped`,
+beside `pad` and `tight`; 9 s, no encoder; `r12b.swift` and
+`run12-rule-shaped.txt` are in the batch's handoff folder under
+`measurement/fix-1/`, not in the repository): the evened Document rows
+(4,196,351 exact, 12,572,674 filled, 0 neither) and the standard rows
+(1,961,452 / 65,114,648 / 0) are the tight arm's counts, no standard row's
+verdict differs, and 4,094 of the 8,192 one-pixel-edge canvases are still
+neither. Of every size in the canvas's own proportions with each edge in
+2…8192, evened, the tight arm refused or letterboxed 256 of 512 on
+1920 × 1080, on 640 × 360 and on 1080 × 1920, 1,023 of 2,047 on
+400 × 100, 1,364 of 2,729 on 300 × 100 and 12 of 25 on 181 × 320 (none
+on the other four); the amended arm none, on each of the ten canvases.
+Typed frames within 8 px of nine canvases that the amended
+arm newly fills: 396 × 98 and 404 × 100 on 400 × 100 on the even-sized
+rows, seven there on `prores_4444`, none on the other eight; none that
+the tight arm wrote is letterboxed or refused. The frames of L1, L2, S1
+and S2 — and 736 × 90 on 728 × 90, 2560 × 1080 on 2558 × 1080, 394 × 98
+on 400 × 100 — are past the limit under both. A typed size of ANOTHER
+shape is judged as the even frame it becomes: 1279 × 720 on 1920 × 1080
+is filled on `prores_4444` and, as 1278 × 720, past the limit on
+`hevc_alpha` (arithmetic; no row).
+
+**B1 compares no byte count (fix pass 2, 2026-10-05, the second review
+of phase B).** What led to it: the first full run on fix pass 1's build
+printed 29/30: B1, `hevc` on an even canvas, "differs in ['format',
+'stream']" with frame 0's digest, the alphas and the corner equal — and
+the values were not on the line, and the file was gone with the work
+folder. Read again on the same build: equal alone, equal after T0, R1, R3
+and R4 (the rows that precede its export in a full run), equal in the
+next full run (30/30) and equal in five more launches — eight of eight.
+The build before that fix read it equal too, and nothing in that pass
+touches an exact-shape frame's encoder dictionary (`gap == 0`). The row
+then compared ffprobe's exact `size` and `bit_rate` of a 3,782-byte
+hardware HEVC bitstream: byte counts, which the encoder does not promise
+to repeat and which are not what the row is for. **What the row does
+now:** it drops the stream's `bit_rate` and the file's `size` and
+`bit_rate` from BOTH sides before `held` — `B1_UNSCORED`, a constant of
+its own, so `STREAM_KEYS` and `FORMAT_KEYS` still read them and the
+baseline file is as it was recorded — and prints them under its line as
+"printed, not scored", beside the baseline's. Still compared: the
+stream's `codec_name`, `codec_tag_string`, `profile`, `level`, `pix_fmt`,
+`width`, `height`, `r_frame_rate`, `avg_frame_rate`, `nb_frames` and four
+colour values; the file's `format_name`, `nb_streams` and `duration`; the
+extension, the answer's and the file's size, the alphas, the corner,
+frame 0's digest and the samples. B4, G1 and L2's baseline clause read
+decoded pixels only and did not change. **Shown by import** (`demo_b1.py`
+and its kept output, in the batch's handoff folder under
+`measurement/fix-2/`, not in the repository): one launch, one export,
+and `row_b1` itself scored over today's case and six altered copies of
+it. As the app wrote it, and with only the three values altered (to
+21082, 3839 and 30712): ok, "equal". With `stream.profile`,
+`stream.nb_frames`, `format.duration` or `frame0` altered, and with the
+three values AND the profile altered: FAIL, each line naming the one
+value that moved and none of the three — 7 of 7 as expected. In every
+read of this pass the three values were the baseline's own (19848, 3782,
+30256). **Which values moved in the one failed run is not known** — no
+run printed them — so nothing here says it was these three; had it been
+the frame count or the duration, the row still fails, by name, and that
+would be the product's. **What the row gives up:** a change of the
+encoder's rate no longer fails it. On this 640 × 360 fixture it could
+not see the line of `defaultVideoBitrate` phase B changed in any case:
+483,840 at 0.07 bits a pixel and 967,680 at 0.14 are both raised to the
+1,000,000 floor (arithmetic, not run). `held` prints every value that
+moved (fix pass 1's change), which stays.
+
+**The dump's `tooltip` key and its other readers (fix pass 2).** Fix
+pass 1 added `tooltip` to every view's record in the layout dump
+(`UISnapshotLayout.swift`) and ran E1, `phase7_chrome.py` and
+`phase7_proof.py` after it; two readers of the dump were not run. No
+reader compares whole dumps — `screens.py --compare` and
+`v2_snapshot.py`'s `same_bytes` compare PNGs, and every reader takes a
+record's keys by name — and both were run on the same build to hold it:
+`v2_snapshot.py` (which builds `v2_layout_probe.swift` over
+`UISnapshotLayout.swift`; 120 s) on an instance of its own in a scratch
+home with V2a's pinned launch arguments, an empty `-RCSecretFolder` and
+a `-RCSpendFolder` that does not exist: 29 pass, 0 fail, 1 skip — O2,
+the named host skip "editor occluded without the cover" — P1–P7 and
+L1–L3 among the passes, O5 "38 of 38 captures had active false", no
+`Reelcut: ` line; and `screens.py --only 12-export-sheet` under a scratch
+home, light then dark: 6 pass of 6, 0 new problems, each dump 60 records
+with the key on every one and the footnote's `"H264 · MP4"` as both its
+text and its tooltip. Spec §7.9a's sentence on what a record holds now
+names the tooltip.
+
+**What is not proved here.** Any other Mac's encoders; playback in Safari,
+QuickTime Player and Final Cut (SE-9), and that the footnote's tooltip
+appears under a resting pointer (SE-9; E1 reads the property); a canvas,
+or a typed size, with an edge of exactly 1 px; a both-odd canvas far from
+square; what the amended arm's accepted costs look like in a file (396 ×
+98 and 404 × 100 on 400 × 100, an odd canvas-shaped size on an opaque
+row: arithmetic only); the Quality tiers and bit-rate controls on the new
+row (the sheet reads the codec's `hevc` prefix, by reading — no row picks
+a tier); the queue's tooltip (G-33 (b)).
+
+| Run (2026-10-05, Apple M2 Max, macOS 26.5.1, ffmpeg 9.0.2) | Result |
+|---|---|
+| **after fix pass 2** (no app source changed: the build is fix pass 1's) — `demo_b1.py`, B1 by import over seven variants of today's case | DEMONSTRATION PASS: 7/7, exit 0, stderr empty |
+| `hevc_alpha_proof.py`, once | 30/30, exit 0, stderr empty; B1 "equal", its three unscored values the baseline's |
+| `--control plain-hevc-reader` · `--control sheet-default` | CONTROL PASS, exit 0, stderr empty, each |
+| `v2_snapshot.py` (own instance, scratch home) · `screens.py --only 12-export-sheet` (scratch home) | 29 pass, 0 fail, 1 skip (O2, a named host skip), exit 0 · 6 pass of 6, exit 0; stderr empty, each |
+| `spec_index_proof.py` | 138/138, exit 0 |
+| **after fix pass 1** — `hevc_alpha_proof.py` on the red build (the dump's `tooltip` key, neither fix) | 28/30, exit 1: O5 and E1 FAILED; stderr empty |
+| `hevc_alpha_proof.py` on the fixed build, first run | 29/30, exit 1: B1 "differs in ['format', 'stream']" (above); stderr empty |
+| `hevc_alpha_proof.py` on the fixed build, the run that counts | 30/30, exit 0, stderr empty |
+| `--control plain-hevc-reader` · `--control sheet-default` | CONTROL PASS, exit 0, stderr empty, each |
+| `--mutant report-and-fill` (124 s) · `--mutant shape-and-note` (101 s) | MUTANT PASS, exit 0, stderr empty, each |
+| `phase7_chrome.py` · `phase7_proof.py` (own instance, scratch home) | 79/79 · 92/92, no `Reelcut: ` line, stderr empty |
+| **before fix pass 1** (29 rows, the tighter first arm) — `hevc_alpha_proof.py` | 29/29, exit 0, stderr empty |
+| before: `--control plain-hevc-reader` · `--control sheet-default` | CONTROL PASS, exit 0, stderr empty, each |
+| before: `--mutant encoder-refused` (built in 99 s) | MUTANT PASS, exit 0, both launches |
+| before: `--mutant report-and-fill` (112 s; the first build, 133 s, exit 1 on the script's L2 fault above) | MUTANT PASS, exit 0 |
+| before: `--mutant shape-and-note` (108 s) | MUTANT PASS, exit 0, both launches |
+| before: `--rows size` | 10/11, exit 1 — G1 red by design |
+| before: the full rows by import against a foreign-stamped copy of the baseline | 27/27, B1 and B4 not scored, exit 2 |
+| before: `phase7_chrome.py` · `phase7_proof.py` (own instance, scratch home) | 79/79 · 92/92, no `Reelcut: ` line |
+
+```sh
+cd core && cargo test --release --test export --test export_size    # 38 passed, 20 passed
+python3 tools/proof/hevc_alpha_proof.py                              # 30/30, exit 0
+python3 tools/proof/hevc_alpha_proof.py --control plain-hevc-reader  # CONTROL PASS (also: sheet-default)
+python3 tools/proof/hevc_alpha_proof.py --mutant shape-and-note      # MUTANT PASS (also: encoder-refused, report-and-fill)
+python3 tools/proof/hevc_alpha_proof.py --rows size                  # 10/11, exit 1: G1 red by design on a build with phase B
 ```
 
 ## Publishing — the app the workflow is about to pack (`published_check.py` P1–P16; spec §11 PUB-1..PUB-5)

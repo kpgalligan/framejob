@@ -234,9 +234,10 @@ extension AgentServer {
                 + "the app's to make (app/CLAUDE.md, spec §11's D2-1)."),
         AgentDeclaration(
             .argument("groups", of: "paste_attributes"), alsoKeys: ["minItems": 1],
-            why: "The handler refuses an empty list by name and says which four to choose "
-                + "from. Leaving `groups` out already means every group both clips have, so "
-                + "an empty list cannot be a way of saying \"none\" and is a mistake."),
+            why: "The handler refuses an empty list by name and says which names to choose "
+                + "from. Leaving `groups` out already means each of video, audio, text and "
+                + "shape both clips have, so an empty list cannot be a way of saying \"none\" "
+                + "and is a mistake."),
         AgentDeclaration(
             .argument("ranges", of: "ripple_delete_ranges"), alsoKeys: ["minItems": 1],
             why: "rippleDeleteRanges refuses an empty list by name — \"ranges is empty — name "

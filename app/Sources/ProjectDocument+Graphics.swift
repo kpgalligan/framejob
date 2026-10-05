@@ -56,7 +56,10 @@ extension ProjectDocument {
     /// from autosave `autosavedContentsFileURL`, whose `graphics/` seeds the
     /// fresh root. `folderDidAppear` is the ONE caller of
     /// `packageContentsDidChangeOnDisk()` for this folder, weakly, so the
-    /// store does not keep a closed document alive.
+    /// store does not keep a closed document alive. It also observes the
+    /// document's own `.projectDocumentDidChange` for the rename repair and
+    /// ends with one repair (`ProjectDocument+GraphicFiles.swift`, spec §11
+    /// G-28 (e)).
     func startGraphicStore() {
         let seed = fileURL == nil
             ? autosavedContentsFileURL?.appendingPathComponent(
@@ -71,6 +74,10 @@ extension ProjectDocument {
         NotificationCenter.default.addObserver(
             self, selector: #selector(graphicsDidChange(_:)), name: .graphicsDidChange,
             object: store)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(graphicNamesMayHaveChanged(_:)),
+            name: .projectDocumentDidChange, object: self)
+        reconcileGraphicNames()
     }
 
     /// The store saw modules or the font and asset set change: the registry
@@ -97,6 +104,8 @@ extension ProjectDocument {
             NotificationCenter.default.removeObserver(
                 self, name: .graphicsDidChange, object: store)
         }
+        NotificationCenter.default.removeObserver(
+            self, name: .projectDocumentDidChange, object: self)
         GraphicRegistry.shared.remove(recipeKey)
         graphicStore?.stop()
         graphicStore?.removeScratchRoot()

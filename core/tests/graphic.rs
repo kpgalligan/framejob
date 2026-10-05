@@ -665,13 +665,6 @@ fn an_action_end_naming_graphic_is_an_error_in_g10s_sentence() {
         with.errors(&end(json!({}), json!(["graphic.props"]))),
         sentence
     );
-
-    let payload = json!({"clips": [clip(&project(), 11)], "media": [], "nests": []});
-    assert_contains(
-        &project().errors(&json!({"op": "paste_attributes", "clips": [11],
-                                  "payload": payload, "groups": ["graphic"]})),
-        "graphic",
-    );
 }
 
 #[test]

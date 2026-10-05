@@ -208,9 +208,9 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   props`, as it answers `video.motion` and `text.words`; a file or paste
   payload whose `end` names `graphic` keeps it and animates nothing. Nor is
   `graphic` a `paste_attributes` group: a target keeps its module, size,
-  timeline and props. `video.*` actions, motion presets, transitions and
-  blend all apply, because they belong to the layer. Keyframed props are
-  road map 10 §7's.
+  timeline and props (amended by G-32). `video.*` actions, motion presets,
+  transitions and blend all apply, because they belong to the layer.
+  Keyframed props are road map 10 §7's.
 - **G-11 — Plain JavaScript, one ES module, no TypeScript** (road map 10
   §4, 2026-09-25). A module is ES2020+ JavaScript as QuickJS evaluates it,
   with no build step: agents write plain JavaScript as reliably as
@@ -601,3 +601,909 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   frame's worker did. Why: the compositor's queue is serial, and the
   rasterization is most of a heavy graphic's time; moving only the raster
   keeps G-8's reports and G-5's purity where they were.
+- **G-27 — Deleting a graphic is refused while a clip draws it; the deleted
+  text is kept, and that kept text is what marks the name as deleted**
+  (issue #103, 2026-10-04, issue batch B84).
+  (a) **The tool and the menu item.** `delete_graphic {name}`; File ▸
+  Delete Graphic… is its menu item (G-30), one small sheet with a pop-up
+  of the project's graphics, over the same body
+  (`ProjectDocument.deleteGraphic(named:)`).
+  (b) **Used is refused, saying which clips**: `The graphic "<name>" is
+  still drawn by <where>; delete those clips or point them at another
+  module (set_graphic {name}) first`. `<where>` is one group per
+  container, the timeline first then nests by id, joined by " and "; a
+  group is `clip 4`, `clips 4 and 9` or `clips 4, 9 and 12`, ids
+  ascending, then ` on the timeline` or ` in nest <id>`. The sentence is
+  the app's, not a core rule's: it names a file act's precondition.
+  (c) **Not the Trash.** `graphics/<name>.js` leaves the folder and its
+  bytes are kept with the module's other kept revisions (G-29), so
+  `restore_graphic` brings it back. The Trash is somewhere an agent cannot
+  reach and a proof would litter. Removing a module for good is deleting
+  its folder under `graphics/history/` in Finder.
+  (d) **Fonts and assets are left alone**: other modules share them.
+  (e) **Not an undo step, never dirty** (G-3). The answer's `note` says so.
+  (f) **A file-less name that has kept revisions is a DELETED module.** A
+  rename carries its history away with it (G-28 (d)) and a delete always
+  leaves the deleted text, so "no file, and something kept" is what a
+  deleted name looks like — and, of everything the app FINISHES, only a
+  deleted name. A rename killed part-way can leave the same state (G-28
+  (f)). G-28 (e)'s repair reads that test and stands aside.
+  **Risk accepted:** Undo can bring back a clip whose module was deleted
+  after the clip was (delete the clip, delete the module, Undo). That clip
+  shows the error card (G-8) until the module is restored by hand; no
+  other module is ever moved onto the deleted one's name to fill the gap,
+  even one it was once renamed from. The alternative, restoring the file
+  on Undo, would make a file write an undo step, which G-3 refuses.
+- **G-28 — Renaming a graphic moves the file, its kept revisions and every
+  clip that names it; Undo renames the file back** (issue #103,
+  2026-10-04, issue batch B84).
+  (a) **The tool and the menu item.** `rename_graphic {name, to}`; File ▸
+  Rename Graphic… is its menu item (G-30), over the same body
+  (`ProjectDocument.renameGraphic(named:to:apply:)`).
+  (b) **What moves.** `graphics/<name>.js` becomes `graphics/<to>.js`,
+  `graphics/history/<name>/` is folded into `graphics/history/<to>/`, and
+  every clip that names the module — on the timeline and inside every
+  nest — is repointed by `set_graphic {name}` with no schema, as ONE undo
+  step called "Rename Graphic". The project is marked edited only when
+  clips changed. No core op was added: the op count stays 59.
+  (c) **Refusals, in this order.** The module is absent: `No module named
+  "<name>" in graphics/ — the folder holds: <list>`. `to` is not a module
+  name: the core's own sentence (`GraphicStore.nameSentence`). **`to` is
+  in use by a file** (the scan or the disk, `to == name` included):
+  `graphics/<to>.js already exists`. **`to` has no file but a clip already
+  names it** (a clip left behind by a deleted module): `The name "<to>" is
+  already drawn by <where>; delete those clips or point them at another
+  module (set_graphic {name}) first`, `<where>` as in G-27 (b) —
+  otherwise that clip would silently start drawing the renamed module and
+  Undo could not put things back. A nest is open: `rename_graphic has no
+  meaning inside nest <id>: it renames the module for every clip in the
+  project, the timeline's included. set_scope with no arguments comes back
+  out; then rename.`
+  (d) **The kept revisions follow the name**, and `graphics/history/<name>/`
+  is gone afterwards. A rename that RETURNS is all-or-nothing: a failure
+  part-way leaves the file, the history and the journal where they were —
+  a rename refused after its pair was written puts `renames.json` back as
+  it was read (its bytes, or no file), so a refused rename journals no
+  pair, and an earlier pair of the same two names is still there for Undo.
+  That holds for both refusals that come after the pair: the history that
+  cannot be folded, and the CLIPS that refuse the new name (the edit
+  throws, or leaves a clip behind) — there the file and its history are
+  moved back under `<name>` and the journal is put back as it was read
+  before the rename; a failed move back leaves the file at `<to>` and the
+  pair, so (e)'s repair can make it. One thing the clips' arm cannot put
+  back: a rename onto a DELETED module's name (the risk accepted below)
+  has folded the two histories before the clips are asked, so the move
+  back carries the deleted module's kept texts under `<name>` and leaves
+  nothing kept under `<to>` (store probe H18 measures each of these).
+  A crash between its steps is not a failure the app can put back: (f).
+  The journal pair of (e) is written, and read back, after the file moves
+  and BEFORE the history is folded (a fold cannot be undone): **a rename
+  that could not be journalled is refused** — `graphics/<name>.js could
+  not be renamed: its rename could not be journalled in
+  graphics/history/renames.json` — so no rename succeeds that Undo could
+  not repair.
+  (e) **What Undo does.** The file rename itself is not an undo step
+  (G-3), but the clips' names are model state. So the store journals each
+  rename as a pair `[a, b]` in `graphics/history/renames.json` (at most
+  32, oldest first, a repeated unordered pair moved to the end): the app
+  moved the file FROM `a` TO `b`. After every committed project change,
+  and once when the store starts, the document REPAIRS, **in one
+  direction only**: for each pair, newest first, when the pair's FIRST
+  name is drawn by a clip, has no file and has no kept revision, while its
+  SECOND name has a file and no clip, the file (and its history) is moved
+  back under the first. That move journals the pair the other way round,
+  so Redo is the same repair. Undo therefore renames the file back with
+  the clips, Redo forward again, a chain of renames undoes and redoes step
+  by step, and a project opened after a crash between a FINISHED rename
+  and a save is healed (a crash inside the rename is (f)'s). A clip never
+  names a module a finished rename took away.
+  (Amended by B84's review, 2026-10-04: the repair first tried BOTH
+  directions of a pair, which moved a live module under a name whose file
+  had been removed outside the app and — once `history/<name>/` was
+  removed in Finder, as G-27 (c) tells a person to — under a deleted
+  module's name.)
+  (f) **What the repair skips, and its limits.** A file-less name WITH
+  kept revisions is a deleted module (G-27 (f)): its clips keep the error
+  card and no live module is moved under its name. A drawn name with no
+  file at a pair's SECOND name is a removal the app did not make — the
+  app's own moves leave the file there — and nothing is moved under it. A
+  rename made outside the app (Finder, a shell `mv`) writes no journal
+  pair and is not repaired, a `mv` back to a pair's first name included.
+  **Three limits.** The first: the store cannot see a removal made
+  outside the app (nothing is kept for one, G-29 (c)), so with the pair
+  `[a, b]`, clips that name `a` with no file and nothing kept for a reason
+  OTHER than Undo — repointed onto a new `a.js` that was then removed
+  outside the app — cannot be told from an Undo, and `b.js`, when no clip
+  draws it, is moved under `a`. The other two are a crash INSIDE a rename
+  `<from>` → `<to>`, whose three steps — the file moves, the pair is
+  journalled, the history is folded — are not one act on disk. Killed
+  after the file moved and before the pair was written, there is no pair:
+  `<to>.js` is on disk, the clips name `<from>`, and nothing is repaired
+  (a rename made outside the app leaves the same). Killed after the pair
+  was written and before the fold finished, the repair heals it when
+  `<from>` had nothing kept, and does NOT when it had:
+  `history/<from>/` is still there, so `<from>` reads as a deleted module
+  (G-27 (f)), its clips keep the error card, and a default
+  `restore_graphic {name: <from>}` writes an OLDER text while the current
+  one sits undrawn at `<to>.js` (store probe H15 builds that state and
+  runs the restore in it). That state cannot be told from a rename
+  followed by a new `<from>` written and deleted — the same pair, kept
+  texts under `<from>`, an undrawn `<to>.js` — and no order of the three
+  steps closes both windows; telling them apart needs a marker on disk
+  this decision does not have. The way out of either, by hand:
+  `set_graphic {name: <to>}` on the clips.
+  (g) **The nest limit.** Rename is refused while a nest is open (the
+  menu item is greyed there, G-30 (f)). An unscoped op is re-addressed to the
+  open nest (`ProjectDocument.addressed`), so the timeline's clips cannot
+  be reached from inside one; making it work there needs a document-level
+  core op, which is a larger change and is not built.
+  **Risk accepted:** the alternative to (e), a rename that empties the
+  undo history, is not safe in this app (`removeAllActions` on a document
+  is the "do not flush" pitfall). The repair's cost is one journal read
+  per committed change in which some drawn name has no file, and none
+  otherwise. **A rename onto the name of a DELETED module** (no file, no
+  clip, kept revisions) is none of (c)'s refusals: the two histories fold
+  under `to` ((b)), the deleted module's texts as the oldest, and the
+  prune past 10 (G-29 (b)) removes those first — a renamed module that
+  brings 10 kept texts removes, in one call, the deleted text that G-27
+  (c) says only a Finder delete removes. `rename_graphic`'s description
+  says so; a sixth refusal was not chosen.
+- **G-29 — The last 10 texts of each module are kept in the package;
+  amends G-3's price** (issue #103, 2026-10-04, issue batch B84).
+  (a) **Where.** `graphics/history/<name>/<%06d sequence>-<revision>.js`,
+  inside the package and not in `cache/`: the cache is documented as safe
+  to delete and is rebuilt freely, so history there could vanish silently,
+  while `graphics/` is user content carried by every save, Save As and
+  copy (§5.6). `history/` is created only inside an existing `graphics/`
+  (G-14 stands: `ensureFolder()` is still the one creator of the folder).
+  The next sequence is the highest plus one; any other file there is
+  ignored.
+  (b) **How much.** The last 10 per module (`GraphicStore.historyLimit`),
+  a few kilobytes each; the lowest sequences are pruned. History never
+  holds the current text, and a text kept twice is listed once: a pass
+  drops a module's new revision from its history, and `start()` drops
+  each module's current one — a text put back while the project was
+  closed, or a crash between a delete's keep and its removal — so a
+  default restore always reaches an OLDER text. A drop is not a keep.
+  (c) **When.** Whenever the app SEES a module's text replaced while the
+  project is open — `write_graphic`, a save from an outside editor, a
+  restore — and when `delete_graphic` removes it. Nothing is kept at
+  `start()`, for a removal the app did not make, or for a text that came
+  and went inside one 100 ms pass.
+  (d) **Restore.** `restore_graphic {name, revision?}` writes a kept text
+  back as `graphics/<name>.js` and keeps the text it replaced, so
+  restoring twice returns to where you were; `revision` defaults to the
+  newest kept, and the tool works when `<name>.js` is absent (a deleted
+  module). Refusals: `No kept revision of "<name>" — one is kept when a
+  write replaces a module's text or delete_graphic removes it`, and
+  `"<name>" has no kept revision <revision> — kept: <revisions>`. A kept
+  file whose bytes no longer hash to the revision in its name (changed by
+  hand) is not a kept text (§5.6): restoring it is refused and nothing is
+  written — `graphics/history/<name>/<file> was changed outside Reelcut
+  and no longer holds the revision in its name; it is not restored — other
+  kept revisions: <revisions, or "none">` — and the file is left for the
+  person. Listing reads names, not bytes (hashing every kept file on
+  every read is not done), so that file is still listed in `kept` and
+  `history`, still counts toward the 10 and still marks a file-less name
+  as deleted, and while it is the newest a default restore is refused
+  until it is removed or another revision is named. File ▸
+  Restore Graphic Version… is its menu item (G-30); it restores the newest
+  and has no history browser. Not an undo step, never dirty (G-3).
+  (e) **What an agent sees.** `kept` — `[revision]`, newest first — in
+  the answers of `write_graphic`, `get_graphic {name}` and the three new
+  tools, and `history: [{name, kept}]`, deleted modules included, in
+  `get_graphic {}`.
+  (f) **G-3's price is amended.** `write_graphic`'s note is now "not
+  undoable; the text it replaced is kept (the last 10 per module) —
+  restore_graphic brings it back", in place of "keep your own copy if you
+  want the old one back". The built-in Assistant may call all three tools
+  without asking first, because a delete keeps the text.
+  (g) **An untitled document** keeps its history in its temporary
+  graphics root; the first save carries it into the package, and closing
+  without saving loses it with the graphics themselves.
+  **Risk accepted:** an edit made while the project was closed, or two
+  saves within a tenth of a second, keeps nothing extra; an eleventh text
+  drops the oldest for good.
+- **G-30 — File ▸ Rename Graphic…, Delete Graphic… and Restore Graphic
+  Version… are one small sheet over G-27..G-29's three bodies; a refusal
+  is the body's own sentence, shown in the sheet** (issue #103,
+  2026-10-04, issue batch B84, phase 2).
+  (a) **The items.** In the File menu, in a separator group of their own
+  straight under Add Image to Graphics…, in the order Rename Graphic…,
+  Delete Graphic…, Restore Graphic Version…, with no key equivalents (the
+  caption items' reason, §9). Each is a nil-target selector the editor
+  implements: `renameGraphic(_:)`, `deleteGraphic(_:)`,
+  `restoreGraphicVersion(_:)`.
+  (b) **The one sheet** (`GraphicFileSheetController`). Its title is the
+  item's without the "…"; under it a hint ((c)), a `Graphic:` pop-up of
+  the project's graphics, Cancel, and a button reading Rename, Delete or
+  Restore. Rename adds a `New name:` field, filled with the chosen
+  graphic's name, and the footnote `lowercase letters, digits and -`; its
+  button is dimmed until the name is filled in and differs from the
+  chosen one. Restore adds one line under the pop-up, `1 version kept` or
+  `<n> versions kept`, and lists no version: it restores the newest
+  (G-29 (d)), and there is no history browser. Rename and Delete list the
+  folder's modules by name. Restore lists every name that has a kept
+  text, a deleted module (G-27 (f)) reading `<name> (deleted)` — which is
+  how a delete is taken back.
+  (c) **The hints, word for word.** Rename: `Every clip that uses the
+  graphic follows its new name, on the timeline and inside nests. Undo
+  renames it back when a clip uses it; a graphic no clip uses is renamed
+  back by renaming it again.` Delete: `A graphic that clips still use
+  cannot be deleted. Its code is kept with its earlier versions, so
+  Restore Graphic Version… brings it back. Deleting is not an Undo step.`
+  Restore: `Puts back the newest kept version of the graphic's code. If
+  the graphic has code now, that code is kept in its place, so restoring
+  again returns to where you were. Restoring is not an Undo step.` They
+  promise only what holds: a rename of a graphic no clip uses makes no
+  edit (G-28 (b)) and so no undo step, and a restored DELETED graphic
+  replaced nothing, so nothing is kept in its place.
+  (d) **Where a sheet opens.** Rename and Restore open on the graphic of
+  the selected clip when exactly one clip is selected and its graphic is
+  a row — a deleted one included, which is how a clip showing the error
+  card gets its code back; otherwise on the first row by name. Delete
+  always opens on the first: a selected clip's graphic is in use and
+  could not be deleted.
+  (e) **A refusal shows in the sheet, which stays up.** The body's
+  sentence is shown word for word, with a beep, in a label at the foot of
+  the sheet's content, so the person can fix the name or pick another
+  graphic; no alert sheet is put up. It is the sentence an agent reads,
+  the hint `(set_graphic {name})` included (the owner's choice,
+  2026-10-04). The sheet owns two guards, both about the CALL (D2-1): a
+  new name that is empty or unchanged (the dimmed button), and an item
+  with nothing to list ((f)). The name goes to the body as typed, neither
+  trimmed nor lowercased. **There is no second confirmation**: the
+  sheet's Delete button is the confirmation, because the code is kept and
+  Restore brings it back (G-27 (c)). After a success the sheet closes and
+  says nothing; a restored text that does not compile shows the error
+  card as any broken graphic does (G-8).
+  (f) **When an item is greyed.** Rename and Delete in a project whose
+  folder holds no module; Restore when no name has a kept text; Rename
+  also while a nest is open (G-28 (g)); all three before the document's
+  graphics store exists, and while a sheet is attached.
+  (g) **One implementation.** Each act is one call of the body the tool
+  calls — `ProjectDocument.renameGraphic(named:to:apply:)`, its `apply`
+  the document's `performGroupedEdit("Rename Graphic", …)`,
+  `deleteGraphic(named:)`, `restoreGraphic(named:revision:)` with no
+  revision — and the sheet reaches no store writer, no op and no undo
+  registration of its own.
+  **Risk accepted:** a person reads a tool's hint in a refusal. A second
+  wording for people would be a second spelling of every sentence to keep
+  in step with the first.
+- **G-31 — The standard library measures a path: `getLength`,
+  `getPointAtLength` and `evolvePath`, in JavaScript, a curve as 64
+  chords, a draw-on dashed by the longest subpath** (issue #103,
+  2026-10-05, issue batch B85, phase 1).
+  (a) **The names.** `getLength(d)` answers a number, `getPointAtLength(d,
+  length)` answers `{x, y, angle}` and `evolvePath(progress, d)` answers
+  `{strokeDasharray, strokeDashoffset}`. The three names and their
+  argument orders are Remotion's, which an agent already knows, as the
+  rest of the library's are (G-2); none of its code, nor any other
+  library's, is carried over. The heading comes with the point, in
+  degrees as SVG's `rotate()` takes them, rather than from a fourth
+  function.
+  (b) **What is measured.** `d` is read as `String(d)`: `M L H V C S Q T A
+  Z` in both cases, implicit repeats (the pairs after an `M` are `L`),
+  SVG's number grammar (`.5.5`, `1e2`, `-1-1`, commas optional) and arc
+  flags written without separators (`a50 50 0 01100 0`). `S` and `T`
+  reflect the previous control point only after a curve of their own
+  family, else the current point. An arc with a zero radius is a line;
+  radii too small for the chord are scaled up, and the centre
+  conversion's radicand is clamped at 0, so a length is never NaN. A
+  SUBPATH begins at each `M`/`m` and at the first drawing command after a
+  `Z`/`z`, from that subpath's start point. `getLength` is the sum over
+  every subpath, a `Z` adding its closing line and a move adding nothing;
+  an empty string is 0.
+  (c) **The point and the heading.** `length` is `Number(length)`, NaN
+  read as 0, clamped to 0…total. The point is on the true curve, not on a
+  chord. `angle` is `Math.atan2(dy, dx) * 180 / Math.PI` of the curve's
+  own derivative there (y down); at a joint it is the segment ending
+  there, at 0 the first drawn segment's start, and a zero-length segment
+  gives no heading. Where the derivative is (0, 0) on a segment of
+  non-zero length the heading is the tangent's LIMIT: at the segment's
+  start, the direction from the start to the first later control point
+  (or end) that differs from it; at its end, the direction to the end
+  from the last earlier control point (or start) that differs from it; at
+  an interior parameter (a cubic's cusp), the direction of the chord the
+  point lies on. A path with no drawn length answers its last `M` point
+  (or 0, 0) with `angle: 0`.
+  (d) **The draw-on.** `progress` is `Number(progress)`, NaN read as 0,
+  clamped to 0…1. With `D = L × 1.001`, `L` being the length of the
+  LONGEST subpath, the answer is `{strokeDasharray: "D D",
+  strokeDashoffset: D × (1 − progress)}`, and `{strokeDasharray: "none",
+  strokeDashoffset: 0}` when `L` is 0. The pad is there so a closed
+  outline always closes at progress 1 although the measure is a
+  flattening; mid-way the tip is at most 0.1 % ahead. The longest subpath
+  and not the total, because the rasterizer restarts the dash on each
+  subpath (`tiny-skia-path` 0.12.0's `dash.rs` walks the contours, each
+  from the pattern's first interval): a dash as long as the total would
+  draw a short subpath too slowly, and no single dash can draw the
+  subpaths one after another. So every subpath draws from its own start
+  at once and at the same speed, the longest ending at progress 1; pieces
+  drawn in turn are one `<path>` each, which the reference says.
+  (e) **The two errors**, thrown as `Error`s, `<fn>` being the function
+  the module called: `<fn>: cannot parse the path at character <i>:
+  "<d.slice(i, i + 12)>"` — an unknown command, a path that does not
+  begin with `M`/`m`, a number where none can be read, an arc flag that
+  is not `0` or `1`, a number that is not finite, `<i>` the 0-based index
+  — and `<fn>: the path ends inside a command`, when the data ran out
+  while a command still wanted numbers. A path that cannot be read is
+  never a silent zero.
+  **Not finite is a refusal, not an answer**: no helper ever answers
+  `Infinity` or NaN, and a path that would make one do so is refused in
+  the first sentence. Five checks in `path.js` hold it, each with a case
+  in `path.test.js`'s row `T8 a number that is not finite`. At the
+  number's own character: a number that reads as `Infinity` (`1e999`). At
+  the character where its command, or its repeat of one, begins: a move
+  to a point that is not finite (`M 1e308 0 m 1e308 0`); an arc whose
+  centre form is not, which is radii whose squares overflow (`A 1e300
+  1e300 …`) or end points so close that theirs underflow (`M 0 0 A 1 1 0
+  0 1 1e-200 0`) — unchecked, each was answered as a path with nothing
+  drawn, the silent zero; a segment that takes the running length out of
+  a double's range, which is a point past the largest number or a chord
+  whose square is (`H 1e200`, or the diagonal that closes `M 0 0 H 1.2e154
+  V 1.2e154 Z`, while the same path at 1e153 measures); and, asked of
+  `getPointAtLength` alone, a point that is not finite between two
+  measured points that are — a curve one step under the largest double,
+  whose length `getLength` answers. The length is checked padded, so
+  `evolvePath`'s dash is finite whenever the length is. The sentence says
+  "cannot parse" of a number that was read: one sentence for every path
+  the helpers will not answer was preferred to a third.
+  (f) **The tolerance.** A path is measured as its flattening: a line
+  exactly, each `C S Q T` as 64 chords at uniform parameter, each arc as
+  chords of at most π/128 rad of sweep. That is within 0.01 % (1e-4
+  relative) on the reference shapes, whose lengths are closed forms: a
+  circle of radius 500 (2π·500), the ellipse of radii 200 and 100
+  (4a·E(e), 968.8448220547675) plain and rotated 30°, the parabola
+  y = x² from −1 to 1 (√5 + asinh(2)/2) as a `Q` and as a `C`, and the
+  cusp x = t², y = t³ ((13√13 − 8)/27). Exact formulas exist only for
+  some curves and would cost much more code.
+  (g) **The memo.** The last paths measured are kept per engine, keyed by
+  the `d` string. A path's cost is its chord count plus `d.length`;
+  before an insert that would take the memo past 32 paths or past a total
+  cost of 50,000 the memo is cleared whole, and the new path is then kept
+  — so a path over the cost bound on its own is kept alone until the next
+  insert, and its own calls in a render do not re-measure it. An engine's
+  heap is 64 MB and outlives a render (G-5's limit); the cost bound keeps
+  what the memo holds to a few MB of it, except a single path over the
+  bound, which is held whole until the next insert and is limited only by
+  what one render's budget can measure. It breaks no G-5 purity: an
+  answer never depends on what the memo holds, and the memo's state is
+  reachable by no module — the Map sits in a closure, as `noise.js`'s
+  permutation tables do, because the library's `__` functions and
+  top-level `const`s are visible to a module.
+  (h) **Pure JavaScript, not a host function.** `graphic/src/path.js`,
+  evaluated as a script after `stdlib.js` and `noise.js` and before the
+  sandbox, uses only `Math`, `Map`, `Float64Array`, `String`, `Number`
+  and `Error`: nothing crosses into Rust, and nothing the sandbox removes
+  is used. A path the memo still holds costs a lookup per call; paths
+  that together pass a bound are measured again in turn; a path rebuilt
+  every frame is re-measured, and a fresh path of 200 cubic segments with
+  1,000 points taken along it stays inside the preview's 250 ms
+  (`graphic/tests/path.rs` prints the figure).
+  **Risks accepted:** a curve tighter than the references can exceed the
+  tolerance, and the pad covers 0.1 %. No row measures the memo's held
+  bytes, because reading them would make the memo's state visible to a
+  module, which is the G-5 hole the closure prevents.
+- **G-32 — `paste_attributes` takes a fifth group, `graphic`, that copies
+  a clip's props whole onto clips drawn by the same module; it is never in
+  the default set; `skip_missing` skips what cannot take a named group;
+  Edit ▸ Paste Graphic Properties is the person's door** (issue #103,
+  2026-10-05, issue batch B85, phase 2). It amends G-10's sentence "Nor is
+  `graphic` a `paste_attributes` group": `graphic` is now a group a caller
+  may NAME, and G-10's sentence still describes a paste that names none.
+  "The owner's choice N" below is one of this phase's seven, each accepted
+  as recommended (2026-10-05); batch B85's own choice 7 is named as such.
+  (a) **No `groups`: unchanged.** With `groups` absent the op copies the
+  four groups in `patch::GROUPS` (`video`, `audio`, `text`, `shape`), each
+  where both sides have it, exactly as before this entry. `graphic` is
+  never in that set, and `skip_missing` changes nothing there: with no
+  `groups`, the answer with the flag is the answer without it. **Why
+  `graphic` is not in the default set** (batch B85's choice 7, answered
+  (c) by the owner on 2026-10-04): a graphic's props hold its WORDS as
+  well as its look, and ⌥⌘V has no picker, so a default that carried them
+  would overwrite one lower third's name with another's on a paste that
+  was asked for the position and the opacity.
+  (b) **Who has it, who can take it.** A side HAS `graphic` when its
+  source is `Source::Graphic` and `clip.graphic` is set, which is
+  `set_graphic`'s test. A target can TAKE it when it has it and its
+  `graphic.name` equals the payload clip's. The payload clip is the
+  EARLIEST (then the front-most, then the lower id), as for every group.
+  (c) **Named, `skip_missing` false (the default): all or nothing**, as
+  the four groups are. The exact errors: `payload clip has no graphic
+  properties`; `clip {id} has no graphic properties`; and `clip {id} is
+  drawn by "{its name}" and the payload clip by "{payload's name}";
+  graphic props are pasted only between clips of one module` (the owner's
+  choice 6). The four existing groups keep their sentences. Targets are
+  visited in `selected_clips`' order and the first error met is the
+  answer.
+  (d) **Named, `skip_missing` true.** A named group the payload clip
+  lacks is dropped, and a target that lacks a named group (for `graphic`:
+  one that cannot take it) is skipped for that group. A missing group is
+  never an error, and the answer is an identity when nothing changed. The
+  flag applies to all five groups, so an agent can ask for exactly what
+  the menu item does (the owner's choice 5).
+  (e) **What travels: `props`, whole.** The target keeps `name`, `width`,
+  `height`, `in`, `length` and everything outside `graphic`. A target key
+  the payload lacks is removed with `shift_remove`; a key both have keeps
+  its slot (`insert`); new keys are appended in the payload's order —
+  `model_graphic.rs`'s insert-and-`shift_remove` rule, so the written
+  text moves no key it did not have to.
+  (f) **When the copied map is read.** The map is checked for shape only,
+  once, the first time a target TAKES it, before anything is written to
+  that target: `model_graphic::check_props(_, None)`, its `null`s
+  dropped, then `check_count`, each in its own sentence, unprefixed. No
+  schema is read and no colour is normalised (the core has no module to
+  ask, G-4). **A paste in which no target takes `graphic` never reads
+  the map**: with `skip_missing` it is an identity however the map is
+  shaped, and without it it is (c)'s error, not the map's. A malformed
+  map and at least one target that takes it is the map's error in both
+  modes, and nothing changes. So the menu item BEEPS and shows no alert
+  whenever no selected clip takes the props, however the copied map is
+  shaped, and a malformed map onto a matching clip is the core's sentence
+  in an alert (the owner's choice 7). **Why**: the owner's choice 3
+  ("choosing it beeps and changes nothing … when nothing matches") then
+  holds without exception, and the four groups already check a copied
+  group only after it has landed on a target (`normalise_and_check_group`
+  follows `copy_group`).
+  A malformed map can reach the MENU only from a project file written by
+  hand or from an agent's `paste` of a hand-written payload, neither of
+  which checks a graphic's props for shape (`validate` in
+  `model_query.rs` reads only its name, `normalise_and_check_pasted` only
+  the four groups); an agent can also hand one to the tool directly.
+  (g) **The door.** Edit ▸ Paste Graphic Properties, directly under Paste
+  Attributes, with no key equivalent (the owner's choices 1 and 2). It
+  sends ONE op — `paste_attributes` over the selection with `groups:
+  ["graphic"]` and `skip_missing: true` — as the undo step "Paste Graphic
+  Properties", and interprets nothing about the payload: an identity is
+  the edit path's beep, and an error is its alert sheet with the core's
+  sentence and no undo step. It is enabled when Reelcut clips are on the
+  clipboard and at least one selected clip is a graphic (the owner's
+  choice 3); greying it exactly would mean reading the clipboard's bytes
+  every time a menu opens. When several clips were copied the props come
+  from the earliest, and if that clip is not a graphic nothing is pasted
+  (the owner's choice 4). An agent's step is still named "Paste
+  Attributes": it calls the same tool with the group named.
+  (h) **A paste-only enum, not a fifth `patch::Group`.** `patch::Group`
+  is the four groups a PATCH can address, and it is matched exhaustively
+  where a patch is read: `patch.rs` (`name`, `subject`, `template`),
+  `edit_props.rs` (`normalise_and_check_group`, `check_group`,
+  `patch_clips`) and `edit_action.rs` (`check_end_patch`'s probe). A
+  `Graphic` variant there would need a template that means nothing — a
+  graphic's keys are its module's, not the vocabulary's — and would make
+  `graphic` look like a group an action's `end` could carry, which G-10
+  refuses. So `paste_attributes` takes its own `PasteGroup` (the four and
+  `Graphic`), whose first four map onto `patch::Group` and still go
+  through `normalise_and_check_group` after each copy.
+  **Not done, and why:** the props are not checked against the module's
+  schema and their colours are not normalised, because the op carries no
+  schema and the payload's props were stored through one already; a
+  subset of props, or the look without the words, would need the module's
+  schema sent with the edit. **Risks accepted:** a target written before
+  its module dropped a key receives the payload's keys as they are,
+  stale ones included, as `set_graphic` without a schema would store
+  them; the item can be enabled when choosing it only beeps ((g)).
+- **G-33 — On every export row that needs even pixel dimensions the CORE
+  resolves and lists the even size the file will have, so the size
+  reported is the size written and no size of the canvas's own shape is
+  refused for being odd; `hevc_alpha`,
+  "HEVC with Alpha (MOV)", is a tenth row whose frames carry the canvas's
+  alpha; every movie row FILLS the frame instead of padding it when the
+  miss is within a pixel; a missing encoder ends in the preset's own
+  sentence and no file** (issue #103, 2026-10-05, issue batch B85, phase
+  3). Built in two phases, gated in order and committed apart: A is the
+  even rule alone, which moved the REPORT and no picture (commit fcfeebf);
+  B is the row, the fill rule, the guard's test, the encoder outcome and
+  the Document tab's note. Every figure below was measured by the designer
+  on 2026-10-05 (Apple M2 Max, macOS 26.5.1, ffmpeg 9.0.2) in a scratch
+  `AVAssetWriter` program at 320 × 180 and 30 frames, unless it says "on
+  the built app": those are `tools/proof/hevc_alpha_proof.py`'s, on the
+  same host and day, one-second exports no larger than 1296 × 728. That
+  proof's `--rows size` was phase A's gate, and its row G1 is red by
+  design on a build that holds phase B (it requires the pad the baseline
+  recorded and an unknown `hevc_alpha`).
+  (a) **Whose choices.** Batch B85's choices 12–17, accepted as
+  recommended on 2026-10-04: a NEW format row "HEVC with Alpha (MOV)"
+  directly after "HEVC (MP4)", `hevc_alpha` to the `export` tool; `.mov`,
+  AAC sound, HEVC's Quality tiers and bit-rate controls, "optimize for
+  network use" off by default; the sheet's summary says "alpha" (its
+  footnote's text is "HEVC_ALPHA · MOV · alpha". On the built app the
+  footnote's slot beside the sheet's three buttons is 88 pt and that line
+  needs 144, so it is DRAWN cut with a tail ellipsis, before the word — a
+  footnote gives way before a button (#141), and ProRes 4444's
+  "PRORES4444 · MOV · alpha" has been cut the same way, 144 pt in 88,
+  on this build (measured beside it). Its TOOLTIP is the whole line:
+  `syncReadout` writes the tooltip after the text and clears it where it
+  clears the text, so resting the pointer on the footnote shows "HEVC_ALPHA
+  · MOV · alpha" (the proof's row E1 requires the layout dump's `tooltip`
+  to equal the text; on the build before those two lines it read the empty
+  string `sheetFootnote("")` set once). ProRes 4444's footnote takes the
+  same two lines and no row opens the sheet on it. So the choice holds of
+  the footnote's text and its tooltip and NOT of the sheet's drawn face;
+  the sheet's layout is not changed by this entry, and (h) names what is
+  left); the `export` tool's
+  `preset` description names
+  the three rows that keep transparency and its answer reports `preset:
+  "hevc_alpha"`, `container: "mov"`, `codec: "hevc_alpha"`; the Document
+  tab's note becomes "Transparent — kept by 3 export formats." (one or two
+  rows are still named; three or more are counted, because three names
+  run to about 295 pt in a row 244 pt wide at the inspector's narrowest;
+  on the built app the counted note is 183 pt); a custom size of a different
+  shape from the canvas is refused with ProRes 4444's sentence; the row is
+  always listed, and a Mac whose encoder refuses it ends with "This Mac
+  cannot export with the “hevc_alpha” preset." and no file. The owner's
+  four answers of 2026-10-05: a miss of under a pixel is FILLED rather
+  than fitted on `h264`, `hevc` and `prores_422`; an odd size is NEVER
+  refused — the owner's answer (c): the core resolves and reports the even
+  size that will be written (as built this holds of every size of the
+  canvas's own shape; section (c) below says what becomes of a typed size
+  of another shape) — which SUPERSEDES choice 18 (a) of 2026-10-04 (a
+  refusal in a sentence of its own: there is no such error case and no
+  such sentence); ProRes 4444 is filled too; and the sheet's footnote
+  keeps the core's codec as it prints every row's, `HEVC_ALPHA`. One
+  choice was left to the orchestrator, who took the NARROWER of two fill
+  rules the same day and then amended its first arm, because as built it
+  refused an odd size typed in the canvas's own proportions ((c) below
+  says which, why, and what the amendment costs).
+  (b) **The even rule (phase A).** A row is EVEN-SIZED when AVFoundation
+  writes it (`avf_preset` is not null) and its codec is not `prores4444`
+  (`Preset::even_sized` in `export_table.rs`): `h264`, `hevc`,
+  `prores_422` and the three audio-only rows, which have no picture and go
+  on listing what `h264` lists — and `hevc_alpha`. `prores_4444`, `gif`
+  and `apng` KEEP an odd edge.
+  A new AVFoundation row is therefore even-sized until someone exempts it,
+  and `core/tests/export_size.rs` fails on a row nobody classified. On an
+  even-sized row each edge is resolved on its own
+  (`export_size::even_size`): below 2 it is 2, an odd edge is one SMALLER,
+  an even edge is itself. The core applies it in the two places a size is
+  answered: `Project::export_settings`, after the width and height are
+  read (the override, else the preset's cap, else the canvas) — an image
+  format is fitted as before, else an even-sized row answers the even
+  pair, else the pair as asked — and `Project::export_sizes`, whose
+  `document` row on an even-sized row holds the canvas evened and is named
+  exactly "Document (even)" when those are not the canvas's numbers and
+  "Document size" when they are. The id stays `document`; the standard
+  rows are unchanged (the short edge named, the long edge to the nearest
+  even integer, a tie going up); no key is added to either answer. **Down,
+  because** it is the size `ExportWriter.evenDimension` already wrote on
+  `h264`, `hevc` and `prores_422`, so the change moves the report to the
+  file and no shipped file changes size; rounding up would hand the
+  encoder a frame larger than the picture on that axis; and every listed
+  row is then its own fixed point (a row's numbers sent back as `width`
+  and `height` resolve to themselves). **What reports it.** The Size
+  popup's title (`"\(name) · \(width) × \(height)"`), the sheet's readout
+  and the size fields under a popup row, and the `export` tool's `width`
+  and `height` each print the resolved pair, and each is proved
+  (`hevc_alpha_proof.py`: rows R1–R4 hold the tool's answer to ffprobe's
+  reading of the file, and E2 reads the popup, the readout and the two
+  fields off the sheet — on a 321 × 181 document all of them say 320 ×
+  180, where the build before this entry answered 321 × 181 beside a 320 ×
+  180 file; the baseline recorder requires that failure before it writes,
+  and its two recordings agreed on every value they kept). The queue's
+  tooltip prints the same `ExportSettings` value BY CONSTRUCTION and no
+  row reads it: the sheet hands its own resolved settings to
+  `enqueueExport`, `ExportQueueController.Job.settings` is a `let`, and
+  `ExportQueueRowView.toolTip(for:)` prints its `width` × `height`; no MCP
+  tool adds a job and Add to Queue ends in a save panel.
+  `ExportWriter.encodedSize` stays as the floor under any other caller and
+  is the identity on what the core answers. In Custom the fields keep what
+  was typed and the readout shows the resolved pair. **What does not
+  move.** No stored value: `ExportChoice` keeps a row id (`document` is
+  unchanged) or the typed pair, which stays as typed and resolves even on
+  use; `get_project` reports the canvas and nothing about export. On an
+  even canvas with no odd size asked, and on `prores_4444`, `gif` and
+  `apng` on any canvas, the settings object is byte-for-byte what it was.
+  Where an odd edge is evened — the Document row on an odd canvas, or an
+  odd size asked for on any canvas (R4's `h264` at `[321, 181]` on 640 ×
+  360) — the settings object's `width` and `height` are the even pair; the
+  frame the encoder is given, the scaling mode and the picture are what
+  they were; and what changes in a FILE is a bit rate computed from that
+  pair. There are two. The DEFAULT, when no rate is asked, which
+  `ExportWriter.defaultVideoBitrate` computes from the resolved pair: 0.25
+  % lower at 1001 × 667 (2,797,200 against 2,804,201 bits per second for
+  `h264` at 30 fps, by arithmetic) and identical under its 1 Mbps floor at
+  321 × 181. And the rate a chosen Quality tier of the sheet sends, which
+  is computed from the frame the controls ask for
+  (`ExportSheetResolve.requestedFormat()`, by reading): with the Size
+  popup on its first row that is the Document row's numbers, now even, so
+  the tier is computed over the smaller area too — but
+  `QualityTier.videoBitsPerSecond` rounds to the nearest 100 kbps, so the
+  rate sent moves only where the smaller area crosses a rounding step
+  (High for `h264` at 1001 × 667 is 2,600,000 either way, by arithmetic:
+  2,583,871 and 2,577,420 before rounding). On another row of the popup it
+  is that row's numbers, which did not move, and in Custom the TYPED pair,
+  as before, even where the file is a pixel smaller. This amends
+  `export_size.rs`'s earlier "a Document size that was not the document's
+  size would be a lie" — the lie was a row that said 321 × 181 over a file
+  of 320 × 180 — and spec §7.8's Document row.
+  (c) **The fill rule.** One shape test, in integers, shared by the alpha
+  guard and the scaling mode (`ExportWriter.shapeGap`; nothing else
+  compares shapes). With `cw`, `ch` the canvas's rounded width and
+  height (each at least 1) and `bw` × `bh` the frame the encoder is given:
+  `d = bw*ch − bh*cw` and `gap = |d|`. `gap == 0` is the canvas's exact
+  shape. When `d > 0` the frame is wider than the canvas's shape: a fit
+  leaves `gap/ch` px of width uncovered and a fill overshoots the height
+  by `gap/cw` px; when `d < 0` it is the other way round. `limit` has two
+  arms. **A canvas-shaped size less at most one pixel on each axis** —
+  `(bw + a)·ch == (bh + b)·cw` for some `a`, `b` in {0, 1}, which is `d`
+  one of 0, `cw`, `−ch` and `cw − ch`: `max(cw, ch)` — the fit leaves at
+  most a pixel OR the fill overshoots by at most a pixel. **Any other
+  frame**: `ch` when `d > 0`, else `cw` — the fit leaves at most a pixel,
+  which is the phase-7b guard in integers. `gap <= limit` is "within a
+  pixel", `<=` and in integers on purpose: an evened canvas whose odd edge
+  is the SHORT one sits exactly on the limit (181 × 320 into 180 × 320:
+  gap 320, limit 320). A frame with `0 < gap <= limit` is FILLED
+  (`AVVideoScalingModeResizeAspectFill`), whatever the codec; `gap == 0`
+  and `gap > limit` are fitted as before (`…ResizeAspect`), and on a row
+  whose `alpha` is true `gap > limit` is REFUSED with
+  `alphaAspectMismatch`'s sentence instead, so an alpha row is exact or
+  filled and never padded. **No size of the canvas's own shape is refused
+  for being odd.** The evened Document row, and any `[width, height]`
+  typed in the canvas's proportions (`w·ch == h·cw`, each edge at least
+  2), is after the core's evening a canvas-shaped size less at most a
+  pixel on each axis, where `gap = |b·cw − a·ch|` is never above
+  `max(cw, ch)`: exact or filled at any scale, smaller than the canvas or
+  larger, on every row. So the shape sentence's last clause, "or at any
+  size with the same proportions", is true of both alpha rows. A typed
+  size of ANOTHER shape is judged as the even frame it becomes, which is
+  the size the sentence names, and the evening can carry a frame from
+  within a pixel to past it: 1279 × 720 on 1920 × 1080 is filled on
+  `prores_4444` (a fit leaves 0.562 px) and is 1278 × 720 on `hevc_alpha`
+  (1.125 px), refused. **Why the
+  fit's half is not enough alone:** an evened row can miss by more than a
+  pixel fitted — 181 × 320 into 180 × 320 leaves 320/181 = 1.77 px and 481
+  × 181 into 480 × 180 leaves 1.66 px — so the old test would letterbox
+  those rows and refuse `hevc_alpha` at its own default size, on 6,285,314
+  of the 16,769,025 canvases with both edges in 2…4096 (the first is 3 ×
+  4). With the first arm the evened row (W−a) × (H−b), a and b each 0 or
+  1, has `gap = |bW − aH|`, one of 0, W, H and |W − H| and never above
+  `max(W, H)`: exact on 4,196,351 of those canvases, filled on 12,572,674,
+  neither on none. A standard row's short edge is exact and its long edge
+  within a pixel of exact, so a fit leaves at most a pixel and the second
+  arm is enough: of 67,076,100 rows over the same canvases 1,961,452 are
+  exact, 65,114,648 filled and none is neither, under the old test and the
+  new alike. These counts are an integer sweep with no encoder, not the
+  scratch writer's, swept with the two arms as written above (2026-10-05,
+  the sweep's column `shaped`): the Document row's three counts and the
+  standard rows' three are also what the arm phase B first built — the
+  canvas ITSELF less at most a pixel on each axis, the column `tight` —
+  printed beside them in the same run (no standard row's verdict differs
+  between the two), and what the designer's wider first arm, every frame
+  no larger than the canvas, printed in the run before. **Why the first
+  arm is not every frame a fill would overshoot by at most a pixel:** a
+  frame typed LARGER than the canvas to pad it (736 × 90 on 728 × 90, 2560
+  × 1080 on 2558 × 1080, 402 × 100 on 400 × 100) is a picture written
+  pixel for pixel between bars — measured at 402 × 100: `hevc`, `h264` and
+  `prores_422` write 2 wholly black columns, both at the right, and the
+  picture between is pixel for pixel (ProRes 4444's ramp: 0 of 402
+  blended) — and stays one; a rule that looked only at the overshoot would
+  fill it (gap 200 against 400), stretching 400 columns over 402 (312 of
+  402 blended). None of those three is a canvas-shaped size less a pixel,
+  so each is still past the limit, as 394 × 98 on 400 × 100 and 640 × 480
+  on 640 × 360 are. **Why it is a canvas-shaped size at ANY scale** (the
+  orchestrator, twice on 2026-10-05). The first decision was narrower
+  than the designer's "every frame no larger than the canvas": only the
+  canvas itself less at most a pixel on each axis, because the owner
+  agreed to fill "at an under-a-pixel miss" and a hand-typed frame a few
+  pixels inside the canvas is outside that. Built so, it REFUSED an odd
+  size typed in the canvas's own proportions on `hevc_alpha` — `[720,
+  405]` on 1920 × 1080 is evened to 720 × 404, gap 1920 against a limit of
+  1080 — in a sentence naming a size the caller never sent and ending "or
+  at any size with the same proportions", against the owner's answer that
+  an odd size is never refused: 256 of the 512 sizes in 1920 × 1080's
+  proportions with each edge in 2…8192 (every one with an odd edge), and
+  on the built app `[400, 225]` and `[1296, 729]` on 640 × 360, with a
+  typed 400 × 224 as `prores_4444` (the proof's row O5, which that build
+  failed). The amended arm refuses none: 0 of those 512, and 0 on each of
+  the ten canvases swept, as typed and evened alike. **What the amendment
+  costs, accepted with it**, each because Swift is handed only the even
+  frame and cannot tell a typed even size from an odd one the core
+  evened: (1) 396 × 98 on a 400 × 100 document — the frame the first
+  decision named, and also an evened 396 × 99 — is FILLED on every row
+  (gap 400; a fit leaves 4 px, a fill overshoots 1) where it was scaled
+  down between bars; (2) on a canvas whose ratio is a whole number, a
+  frame typed that many pixels wider than a canvas-shaped size — 404 ×
+  100 on 400 × 100, 2002 × 1000 on 2000 × 1000, each also an evened 404 ×
+  101 or 2002 × 1001 — is filled where it was padded, or on an alpha row
+  refused; (3) on the opaque
+  rows an odd size typed in the canvas's proportions (`[720, 405]` on
+  1920 × 1080 as `h264`, written 720 × 404) is filled where a fit left
+  1.778 px to the pad; (4) on `prores_4444`, which keeps an odd edge, the
+  same even frames typed as they are, and a frame one pixel short of a
+  canvas-shaped size on both axes (395 × 98, 403 × 100 on 400 × 100), are
+  written, filled, where the guard refused them; (5) the pixel is a large
+  share of a tiny frame — `[16, 9]` on 1920 × 1080 is written 16 × 8 on
+  the even-sized rows, the fill carrying one of the picture's nine rows
+  past the frame, where it was refused or letterboxed. Among typed frames
+  within 8 px of nine canvases (400 × 100, 728 × 90, 2558 × 1080, 1920 ×
+  1080, 640 × 360, 181 × 320, 321 × 180, 321 × 181, 1081 × 1920) the
+  amended arm fills, beyond the first decision's, 396 × 98 and 404 × 100
+  on 400 × 100 on the even-sized rows and seven frames there on
+  `prores_4444` (392 × 97, 395 × 98, 396 × 98, 403 × 100, 404 × 100, 407 ×
+  101, 408 × 101), none on the other eight canvases, and letterboxes or
+  refuses nothing the first decision wrote. (1) to (5) are by arithmetic
+  over `shapeGap` — the same integer sweep, no encoder; what the built
+  app wrote of them is O5's three files, below. The amended arm loses no
+  row the sheet offers: an evened Document row is the canvas less at most
+  a pixel on each axis by construction, and a standard row is filled by
+  the second arm alone. **What is newly
+  written:** on the opaque rows a frame within a pixel is filled where it
+  was padded with black — the evened size on an odd canvas (2 wholly black
+  rows or columns before on `hevc`, `h264` and `prores_422` in every one
+  of four canvas classes measured, `prores_422` 1 row at 321 × 180; none
+  after) and a standard row that misses by under a pixel (334 × 222 at
+  `720p`, 1084 × 720: 2 black columns at the right before, none after).
+  That is where `hevc` is no longer "the same file as before" (choice 12),
+  and nowhere else: at an exact shape the encoder's dictionary is the one
+  it was, and a frame further off is letterboxed as it was. On
+  `prores_4444`, which keeps an odd edge, a typed frame one pixel short on
+  one axis or both (400 × 99 and 399 × 99 on 400 × 100, 180 × 320 on
+  181 × 320) is written, filled, where the phase-7b guard refused it, and
+  so is a canvas-shaped size less a pixel at another scale (400 × 224 on
+  640 × 360). On `hevc_alpha` an odd size typed in the canvas's
+  proportions is written one pixel smaller on its odd edges. On
+  the two alpha rows a fitted miss of under a pixel left an edge at the
+  wrong alpha (`hevc_alpha` up to 16, ProRes 4444 255); filled, all four
+  edges are 0. **On the built app** (the proof's rows, each beside the
+  baseline the build before this entry recorded): a 321 × 181 and a 181 ×
+  320 opaque red document at their evened sizes, as `hevc`, `h264` and
+  `prores_422`, are red at both ends of the middle row and of the middle
+  column where the baseline had two black pixels among those eight (B3);
+  334 × 222 on white at `720p` has its last three columns white where the
+  baseline's last two were black (B2); 400 × 100 at `[402, 100]` keeps
+  exactly two black columns, 400 and 401, as the baseline has them (L2),
+  and 334 × 222 at `[640, 640]` is letterboxed (L1); `prores_4444` at
+  three sizes equals the baseline by frame digest, a kept odd edge among
+  them (B4), and `hevc` on an even canvas equals it in the stream's and
+  the file's fixed parameters and by frame digest (B1; its byte count and
+  bit rates are printed, not compared — (h)). On the alpha rows every
+  pixel of all
+  four edges is alpha 0 — `hevc_alpha` at an evened 320 × 180 and 180 ×
+  320 and at 1276 × 720 and 1084 × 720, `prores_4444` at 1084 × 720 and at
+  a typed 180 × 320 on 181 × 320 (O1, O2, O4, P1, P2), and on 640 × 360
+  `hevc_alpha` asked `[400, 225]` and `[1296, 729]`, written 400 × 224 and
+  1296 × 728 as its answer says, and `prores_4444` at a typed 400 × 224
+  (O5) — and both refuse
+  402 × 100 on 400 × 100, and `hevc_alpha` 640 × 480 on 640 × 360, in the
+  shape sentence, no file (S2, S1). Three mutants hold the rows to the rule: with the
+  core's even rule and the fill switched off the size and fill rows fail;
+  with the limit `max(cw, ch)` for every frame L2 and S2 fail — the two
+  rows that tell the limits apart — and with every frame filled L1 fails.
+  **What the fill costs, by ramp** (ProRes 4444; a pattern whose red and
+  green carry the source coordinate and whose blue alternates 255 and 0,
+  so a blend reads as a blue that is neither). ONE odd edge, 181 × 320
+  into 180 × 320: output column 0 is source column 1 and output 179 is
+  source 179, each unblended, so source columns 0 and 180 are read by
+  nothing — one source pixel dropped on each side of the odd axis, two in
+  all — and the 179 left are stretched over 180 (180/179, 0.56 %), 141 of
+  the 180 output pixels a blend; the other axis is pixel for pixel (0 of
+  320 blended). 321 × 180 into 320 × 180 is the same on its odd axis:
+  columns 0 and 320 dropped, 319 stretched over 320 (320/319, 0.31 %), 249
+  of 320 blended, 0 of 180 on the other axis. BOTH odd, 321 × 181 into 320
+  × 180: nothing is dropped and every output pixel on both axes is a
+  blend, 321 columns over 320 and 181 rows over 180. The same three
+  FITTED, as before this entry: every output pixel of the picture is a
+  blend on both axes, beside the black lines. So the scaler drops whole
+  source pixels per side — one at an arithmetic overshoot of 1.000 px,
+  none at 0.436, 0.50 or 0.624, two at 3.56 — and stretches what is left:
+  the quotient `gap/cw` or `gap/ch` is the arithmetic overshoot and NOT
+  the measured cut.
+  (d) **The encoder.** The row is written by `AVAssetWriter(.mov)` with
+  `AVVideoCodecType.hevcWithAlpha` (`"hevc_alpha"` in
+  `ExportWriter.codecType(for:)`), fed the compositor's premultiplied
+  32BGRA as every row is. Its compression dictionary is the HEVC row's —
+  the average bit rate, the 2 s key-frame interval,
+  the expected frame rate, and HEVC's 0.07 bits per pixel per frame when
+  no rate is asked — plus `kVTCompressionPropertyKey_AlphaChannelMode:
+  kVTAlphaChannelMode_PremultipliedAlpha`, which says what the pixels are
+  (0 of 57,600 pixels differ from leaving it unset; the decoded buffer
+  then reads `PremultipliedAlpha`). No
+  `kVTCompressionPropertyKey_TargetQualityForAlpha` and no profile key:
+  unset, the file's size and error figures are those of 0.75 — alpha off
+  by at most 2 at 960 of 57,600 pixels on a hard-edged card and by at most
+  5 on a soft disc — and 1.0 is exact on the card at 4,951 bytes against
+  4,654 (7,029 against 5,753 on the disc); an alpha-quality control is out
+  of scope. Decoded, in the scratch writer: `hvc1`, `ContainsAlphaChannel`
+  1, pixels (0,0,0,0), (128,0,0,128) and (255,0,0,255) for clear, half and
+  opaque red, through `ExportWriter`'s own shape (a custom compositor,
+  `AVAssetReaderVideoCompositionOutput`, `append(sampleBuffer)`). On the
+  built app a hard-edged opaque red card on a clear 640 × 360 canvas
+  decodes with two alphas in the whole frame, 0 and 255, the corner
+  (0,0,0,0) and the card's centre (255,0,0,255); the same card at half
+  opacity decodes (129,0,0,128) at its centre; an opaque canvas decodes
+  every alpha 255; and ffprobe says `hevc`, `hvc1`, `yuv420p` (rows A1–A4).
+  AAC in a `.mov` is a combination no row wrote before: the file holds an
+  `aac` stream at 48 kHz with 2 channels, and the export's loudness is
+  measured as on every row (A5).
+  (e) **Hardware, and a Mac without the encoder.** This host lists "Apple
+  Muxed Alpha-Apple HEVC (HW)" and "(SW)"; with hardware disabled the file
+  still carries alpha (largest error 6). The row is always listed. A
+  refusing encoder was measured with an encoder
+  specification nothing satisfies, on `.hevcWithAlpha` and `.hevc` alike:
+  `canApply` is TRUE, the input constructs, `canAdd` is TRUE, and
+  `startWriting()` returns false with `AVFoundationErrorDomain` −11834
+  ("Cannot Encode", underlying `NSOSStatusErrorDomain` −12908), leaving a
+  0-byte file — so `addVideo`'s `canAdd` test does not catch it.
+  `Exporter.encoderOutcome`, applied where `startWriting` hears the
+  pipeline, maps exactly that domain and code to
+  `ExportError.presetUnavailable` with the preset's name and removes the
+  file, and returns every other result as it came. No new error case.
+  `.hevcWithAlpha` in an `.mp4` is refused by `canApply` and `canAdd`, the
+  existing `.presetUnavailable` branch. On the built app this is proved by
+  a mutant, since no Mac without the encoder was to hand: a copy of the
+  tree whose `videoSettings` adds that same unsatisfiable specification
+  for `.hevcWithAlpha` answers `export` with exactly "This Mac cannot
+  export with the “hevc_alpha” preset." and leaves nothing at the path
+  (row X1), and the same copy with the mapping switched off answers
+  AVFoundation's own "Cannot Encode" over a 0-byte file.
+  (f) **How alpha is proved.** ffprobe reports `hevc`, `hvc1`,
+  `Main`, `yuv420p` for an HEVC-with-alpha file and for a plain HEVC file
+  in the same `.mov`, so `phase7_proof.py`'s `startswith("yuva")` test
+  cannot see this row; only the DECODED frame tells them apart (plain
+  `.hevc`: every alpha 255; the alpha file through `phase7_proof.py`'s
+  `Raster` command: (0,0,0,0), (129,0,0,128), (255,0,0,255)). The proof's
+  alpha rows read a transparent, a half and an opaque pixel back from the
+  decoded RGBA, and its control `plain-hevc-reader` scores the same
+  readers over plain `hevc` exports of the same two projects, where both
+  fail.
+  (g) **`RC_FORMAT_VERSION` stays 11.** No project stores a preset id or
+  an export size; the remembered export choice is a `UserDefaults` record
+  holding a row id or the typed pair, and a build without the `hevc_alpha`
+  row leaves its Format popup where it was (`apply(_:)`'s `firstIndex`).
+  Nothing persisted changes shape.
+  (h) **Risks accepted.** Only this host's encoders were measured.
+  Playback in Safari, QuickTime Player and Final Cut is a person's check:
+  the row SE-9 of `docs/manual-checks.md`. The proof's baseline is this
+  host's bytes: on another chip, macOS or ffmpeg the rows that read a
+  digest (B1, B4, and G1 under `--rows size`) are not scored, every other
+  row is, and the script exits 2 to say the claim is incomplete there.
+  And B1 compares no byte count: the stream's `bit_rate` and the file's
+  `size` and `bit_rate` are printed beside the baseline's and not scored
+  — they are byte counts of a hardware HEVC bitstream, which the encoder
+  does not promise to repeat — while the stream's and the file's fixed
+  parameters (codec, tag, profile, level, pixel format, size, frame
+  rates, frame count, colour values; container, stream count, duration),
+  the alphas, the corner and frame 0's digest are compared. The row
+  compared all of it until one full run on the built app printed `hevc`
+  on an even canvas differing from the baseline in its stream and format
+  values with frame 0's digest equal, where eight later reads of the same
+  build were equal: not reproduced, and that line did not print WHICH
+  values moved, so nothing here says it was those three — a frame count
+  or a duration that moves still fails the row, by name. What the row no
+  longer sees is a change of the encoder's rate — and on its 640 × 360
+  fixture it could not see the line of `defaultVideoBitrate` this entry
+  changed either: 483,840 at 0.07 bits a pixel and 967,680 at 0.14 are
+  both raised to the 1,000,000 floor (arithmetic, not run).
+  `tools/proof/README.md` has the runs. A
+  canvas
+  with an edge of exactly 1 px is raised to 2 on an even-sized row and can
+  then be a different shape, where the shape sentence answers on the alpha
+  rows: of the 8,192 canvases 1 × n and n × 1 with n in 1…4096 the evened
+  Document row is neither exact nor filled on 4,094 ((c)'s integer sweep,
+  the same under the old test, the designer's wider first arm, the arm
+  phase B first built and the first arm as written), and a size TYPED
+  with an edge of 1 is raised the same way (3 × 1 on 300 × 100 becomes 2
+  × 2, refused on `hevc_alpha`) — not proved on the built
+  app. The 481 × 181 class (both edges odd, wider than 2:1) is measured in
+  the scratch writer only, and a both-odd canvas far from square (an
+  arithmetic overshoot between 0.62 and 1 px) was not measured at all.
+  Phase A's gate compares pixels only on canvases under the default bit
+  rate's 1 Mbps floor; the 0.25 % lower default rate on a larger odd
+  canvas, and a Quality tier's rate where it crosses a rounding step
+  ((b)), are by arithmetic. A reader that ignores the declared
+  premultiplied mode draws translucent pixels dark, **and Reelcut is such
+  a reader**: `Compositor.swift` builds every video source as straight
+  alpha and nothing in `app/Sources` reads a file's declared mode, so an
+  exported `hevc_alpha` or `prores_4444` movie re-imported is multiplied
+  by its alpha a second time (the proof's line I1 prints the composite
+  and never scores it: on the built app a half-opaque red card over an
+  opaque white canvas comes back (191,127,127) from the `hevc_alpha` file
+  and (193,129,127) from the `prores_4444` one, where a correct composite
+  is about (255,128,128); the ProRes 4444 file also holds premultiplied
+  colour under a `StraightAlpha` label — a half-red source pixel decodes
+  (129,0,0,128)). The export sheet's footnote is DRAWN cut before the
+  word "alpha" on both alpha movie rows; its tooltip carries the whole
+  line ((a)), and whether the summary gets room on the sheet's face — a
+  line of its own, or a wider sheet, either a visible change to every
+  format's sheet — is the owner's choice. What to do about any of the
+  three is an issue's, not this entry's.

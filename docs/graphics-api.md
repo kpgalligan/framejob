@@ -171,6 +171,43 @@ const drift = noise2D("wave", frame / 60, 0) * 40;
 const wobble = noise3D(7, 0.5, 0.5, ctx.time) * 20;
 ```
 
+### Paths: `getLength(d)`, `getPointAtLength(d, length)` and `evolvePath(progress, d)`
+
+`d` is SVG path data: every command (`M L H V C S Q T A Z`) and its
+relative form. `getLength` answers the path's length, curves and arcs
+measured to within about 0.01 %. `getPointAtLength` answers `{x, y, angle}`:
+the point that far along the path (`length` is clamped to the path) and the
+way the path is heading there, in degrees, ready for `rotate()`.
+`evolvePath` answers `{strokeDasharray, strokeDashoffset}` for a `progress`
+of 0–1: put both on the `<path>` and it is drawn from its start up to that
+fraction. Its dash is 0.1 % longer than the measured length, so a closed
+outline closes at 1.
+
+A path of several pieces (more than one `M`) draws them all at once, each
+from its own start and at the same speed, the longest finishing at 1; pieces
+drawn one after another are one `<path>` each. A path that cannot be read
+throws, naming where reading stopped —
+`getLength: cannot parse the path at character 6: "X 5 5"` — and is never a
+silent zero. A number too large to do arithmetic with (`1e999`, or a line
+1e200 long, whose square overflows) is refused in the same sentence, so no
+answer is ever `Infinity` or `NaN`.
+
+The paths a graphic measures are remembered, so the same `d` costs a lookup
+on later calls and frames — up to 32 paths, and about 50,000 characters and
+measured pieces between them (a curve is 64 pieces). Past either limit all
+are forgotten and measured again when next asked for, so with paths that
+large take every length and point from one before turning to the next.
+
+```js
+const d = `M 200 ${ctx.height / 2} C 600 100 1000 900 1400 ${ctx.height / 2}`;
+const total = getLength(d);
+const tip = getPointAtLength(d, total * ctx.progress);
+const dash = evolvePath(ctx.progress, d);
+const line = `<path d="${d}" fill="none" stroke="#ffffff" stroke-width="8"
+  stroke-dasharray="${dash.strokeDasharray}" stroke-dashoffset="${dash.strokeDashoffset}"/>
+  <circle cx="${tip.x}" cy="${tip.y}" r="12" fill="#ffcc00"/>`;
+```
+
 ### `measureText(text, font)`
 
 `font` is `{family, size, weight, style, letterSpacing, xmlSpace}`
@@ -336,13 +373,25 @@ Read `graphic_reference` once. `write_graphic {name, source}` answers `ok` and
 draws up to 16 frames on a contact sheet with no clip, at most 134217728
 pixels of frames in all (two at 8192×8192, or sixteen at 3840×2160);
 `add_graphic_clip {name}` places it, `render_frame` shows a frame,
-`set_graphic {patch: {props}}` changes it. `import_graphic_font {path}` answers `families`, the exact names
+`set_graphic {patch: {props}}` changes it.
+`paste_attributes {clips, payload, groups: ["graphic"]}` copies one clip's props onto other clips
+drawn by the same module. `import_graphic_font {path}` answers `families`, the exact names
 `font-family` must say; `import_graphic_asset {path}` adds a picture for
 `asset(name)`; its `name` is the one to use, and `renamed_from` says it was
 renamed. `get_graphic` reads a module or names the folder, which your file
 tools may edit too; its `API.md` is this page, `API.d.ts` its types.
 `get_graphic {}`'s `warnings` says what the folder's scan skipped or could
-not watch, such as a file whose name is not a module name. A successful
+not watch, such as a file whose name is not a module name. The app keeps the
+last 10 texts of each module whenever it sees one replaced: `kept`, in
+`write_graphic`'s and `get_graphic {name}`'s answers, lists their revisions,
+newest first, and `get_graphic {}`'s `history` lists every name with a kept
+text, deleted modules included. `restore_graphic {name, revision?}` writes a
+kept text back (the newest by default) and keeps the one it replaced.
+`delete_graphic {name}` removes a module no clip draws and keeps its text, so
+`restore_graphic` brings it back. `rename_graphic {name, to}` renames a
+module and repoints every clip that draws it as one undo step; undo renames
+the file back. The folder's `history/` is the app's: leave it to those three
+tools. A successful
 `export` answers `graphic_warnings`, each distinct warning a graphic gave
 while the file was drawn, with its name and frame.
 
@@ -429,19 +478,44 @@ export function render(frame, props, ctx) {
 
 ### A draw-on stroke
 
-Give the path a known length (or overestimate it), dash it that long, and
-move the dash offset from the length to 0.
+`evolvePath` measures the path and answers the dash that draws it up to a
+progress of 0–1.
 
 ```js
 export const meta = { name: "Underline", durationInFrames: 60 };
 export const schema = { color: { type: "color", default: "#ff5a36" } };
 
 export function render(frame, props, ctx) {
-  const length = ctx.width * 0.6;
-  const drawn = interpolate(frame, [0, 24], [length, 0], { easing: Easing.inOutCubic, clamp: true });
   const y = ctx.height * 0.62;
-  return svg(ctx, `<path d="M ${ctx.width * 0.2} ${y} h ${length}" stroke="${props.color}"
+  const d = `M ${ctx.width * 0.2} ${y} q ${ctx.width * 0.3} ${ctx.height * 0.05} ${ctx.width * 0.6} 0`;
+  const drawn = interpolate(frame, [0, 24], [0, 1], { easing: Easing.inOutCubic, clamp: true });
+  const dash = evolvePath(drawn, d);
+  return svg(ctx, `<path d="${d}" stroke="${props.color}"
     stroke-width="${ctx.height / 90}" stroke-linecap="round" fill="none"
-    stroke-dasharray="${length} ${length}" stroke-dashoffset="${drawn}"/>`);
+    stroke-dasharray="${dash.strokeDasharray}" stroke-dashoffset="${dash.strokeDashoffset}"/>`);
+}
+```
+
+### Follow a path
+
+`getPointAtLength` answers where the path is and which way it is heading;
+`rotate(angle)` turns an arrowhead drawn pointing right to match.
+
+```js
+export const meta = { name: "Arrow", durationInFrames: 60 };
+export const schema = { color: { type: "color", default: "#ffffff" } };
+
+export function render(frame, props, ctx) {
+  const w = ctx.width;
+  const h = ctx.height;
+  const d = `M ${w * 0.2} ${h * 0.7} C ${w * 0.4} ${h * 0.2} ${w * 0.6} ${h * 0.2} ${w * 0.8} ${h * 0.5}`;
+  const drawn = interpolate(frame, [0, 30], [0, 1], { easing: Easing.inOutCubic, clamp: true });
+  const dash = evolvePath(drawn, d);
+  const tip = getPointAtLength(d, getLength(d) * drawn);
+  const s = h / 36;
+  return svg(ctx, `<path d="${d}" stroke="${props.color}" stroke-width="${h / 120}" fill="none"
+    stroke-dasharray="${dash.strokeDasharray}" stroke-dashoffset="${dash.strokeDashoffset}"/>
+    <path d="M ${-s} ${-s * 0.6} L ${s * 0.5} 0 L ${-s} ${s * 0.6} Z" fill="${props.color}"
+    transform="translate(${tip.x} ${tip.y}) rotate(${tip.angle})"/>`);
 }
 ```

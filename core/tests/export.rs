@@ -47,12 +47,12 @@
 //!    when they are, accepted by presets that cannot use them, refused by
 //!    a message naming the value — with the single documented exception
 //!    that a ceiling with no target is an error rather than an inert key.
-//! 10. **The two rows with a fourth channel, and `alpha`.** The capability
-//!     that says so is a fact about the ENCODING — true for `prores_4444`
-//!     and for `apng` and for nothing else, the same on a transparent
-//!     canvas as on an opaque one, and not something an override can ask
-//!     for — so the sweep is the whole table twice over rather than a
-//!     check on the new row. `gif` is the row that makes the sweep worth
+//! 10. **The three rows with a fourth channel, and `alpha`.** The
+//!     capability that says so is a fact about the ENCODING — true for
+//!     `hevc_alpha`, `prores_4444` and `apng` and for nothing else, the same
+//!     on a transparent canvas as on an opaque one, and not something an
+//!     override can ask for — so the sweep is the whole table twice over
+//!     rather than a check on the new row. `gif` is the row that makes the sweep worth
 //!     writing: it shows a transparent pixel and still answers FALSE,
 //!     because a palette index is not a channel. Beside it, the shape of a
 //!     settings object is pinned key by key: the phase added ONE key, and
@@ -118,7 +118,7 @@ struct Expected {
 /// a timeline in it. The old size-carrying ids (`h264_1080p`, `hevc_4k`…)
 /// are gone without aliases — `an_unknown_preset_errors_and_names_it`
 /// pins that.
-const EXPECTED: [Expected; 9] = [
+const EXPECTED: [Expected; 10] = [
     Expected {
         id: "h264",
         container: "mp4",
@@ -143,6 +143,23 @@ const EXPECTED: [Expected; 9] = [
         file_type: "public.mpeg-4",
         avf_preset: Some("AVAssetExportPresetHEVCHighestQuality"),
     },
+    // HEVC with an alpha channel (spec §11 G-33): directly after `hevc`,
+    // and everything `hevc` is except the three things that make it a
+    // different file — a QuickTime movie rather than an MP4 (AVFoundation
+    // writes HEVC with alpha into a `.mov` and refuses it an `.mp4`), a
+    // codec name of its own, and the fourth channel.
+    Expected {
+        id: "hevc_alpha",
+        container: "mov",
+        codec: "hevc_alpha",
+        size: None,
+        fps: None,
+        video: true,
+        audio: true,
+        alpha: true,
+        file_type: "com.apple.quicktime-movie",
+        avf_preset: Some("AVAssetExportPresetHEVCHighestQualityWithAlpha"),
+    },
     Expected {
         id: "prores_422",
         container: "mov",
@@ -155,7 +172,7 @@ const EXPECTED: [Expected; 9] = [
         file_type: "com.apple.quicktime-movie",
         avf_preset: Some("AVAssetExportPresetAppleProRes422LPCM"),
     },
-    // The master row, and one of the two `alpha: true` rows. Everything
+    // The master row, and one of the three `alpha: true` rows. Everything
     // else about it is 422's — the same container, the same UTI, the same
     // "an editing master does not stream" answer to network optimization —
     // which is exactly why it is written out here beside 422 rather than
@@ -465,7 +482,7 @@ fn every_preset_in_the_menu_resolves_to_what_it_advertised() {
         assert_eq!(flag(&out, "/video"), want.video, "{} video", want.id);
         assert_eq!(flag(&out, "/audio"), want.audio, "{} audio", want.id);
         // The whole table, not three spot checks: a capability that is
-        // true for one row is a claim about the other eight as much as
+        // true for one row is a claim about the other nine as much as
         // about that one, and `alpha` on a row with nowhere to put a
         // fourth channel would be reported to the sheet and the `export`
         // tool as a channel the file will carry.
@@ -695,7 +712,7 @@ fn alpha_is_the_only_key_the_settings_grew() {
     }
 }
 
-/// Two rows carry a fourth channel and seven do not. The sweep is the
+/// Three rows carry a fourth channel and seven do not. The sweep is the
 /// whole table rather than a spot check on three rows, because `alpha` is
 /// a claim about every row at once: reported true on a row with nowhere to
 /// put it, the export sheet and the `export` tool would both promise a
@@ -716,8 +733,13 @@ fn alpha_is_the_only_key_the_settings_grew() {
 /// transparent canvas decodes `pix_fmt=rgba` with its corner at alpha 0,
 /// a `gif` of the same timeline has a hard-edged transparent index — and
 /// the flag is what stops the sheet promising a translucent GIF.
+///
+/// The three are in the MENU's order, `hevc_alpha` first because it sits
+/// directly after `hevc` (spec §11 G-33): the order is the table's, and a
+/// row that moved would fail here as well as in
+/// `hevc_alpha_sits_directly_after_hevc`.
 #[test]
-fn only_prores_4444_and_apng_carry_alpha() {
+fn only_prores_4444_hevc_alpha_and_apng_carry_alpha() {
     let handle = project();
     let carrying: Vec<&str> = EXPECTED
         .iter()
@@ -726,8 +748,8 @@ fn only_prores_4444_and_apng_carry_alpha() {
         .collect();
     assert_eq!(
         carrying,
-        [PRORES_4444, "apng"],
-        "the rows claiming an alpha channel are not the two that have one"
+        ["hevc_alpha", PRORES_4444, "apng"],
+        "the rows claiming an alpha channel are not the three that have one"
     );
 
     // And the menu offers it, so the id above is reachable from the Format
@@ -800,7 +822,7 @@ fn prores_4444_is_a_mov_avfoundation_writes() {
 /// export of an opaque timeline, which carry the channel and simply have
 /// nothing transparent in them this time.
 ///
-/// So the same nine rows are resolved against two documents differing
+/// So the same ten rows are resolved against two documents differing
 /// ONLY in the background's alpha, and every flag has to be the same in
 /// both. A build wired to the canvas fails on both halves of this at once.
 #[test]
@@ -817,7 +839,7 @@ fn alpha_is_the_encodings_fact_and_never_the_canvas() {
         );
         assert_eq!(
             on_opaque,
-            want.id == PRORES_4444 || want.id == "apng",
+            want.id == "hevc_alpha" || want.id == PRORES_4444 || want.id == "apng",
             "{} on an opaque canvas",
             want.id
         );
@@ -847,6 +869,154 @@ fn alpha_is_not_an_override() {
             "/alpha"
         ),
         "{PRORES_4444} gave up the channel it writes because an override said so"
+    );
+}
+
+// ---- HEVC with alpha (spec §11 G-33) -------------------------------------
+
+/// The row as G-33 decided it, key by key: a QuickTime movie AVFoundation
+/// writes, with sound, with the fourth channel, at the document's size and
+/// rate, and NOT rewritten for network use unless somebody asks.
+///
+/// That last one is the assertion the container would not give you for
+/// free. An HEVC-with-alpha movie is a delivery file — it is what a web
+/// page plays over its own background — and the other delivery rows
+/// default the flag on; this one is a `.mov`, whose default is off, and the
+/// owner's choice was to leave it there. So the default is pinned as false
+/// and the override as honoured, which is what makes "off by default" a
+/// decision a test holds rather than a side effect of the container.
+#[test]
+fn hevc_alpha_is_a_mov_avfoundation_writes() {
+    let handle = project();
+    let out = settings(&handle, "hevc_alpha", None);
+
+    assert_eq!(text(&out, "/preset"), "hevc_alpha");
+    assert_eq!(text(&out, "/container"), "mov");
+    assert_eq!(text(&out, "/file_type"), "com.apple.quicktime-movie");
+    assert_eq!(text(&out, "/codec"), "hevc_alpha");
+    assert_eq!(
+        text(&out, "/avf_preset"),
+        "AVAssetExportPresetHEVCHighestQualityWithAlpha",
+        "the row does not name AVFoundation's own preset for HEVC with alpha"
+    );
+    assert!(flag(&out, "/video"), "hevc_alpha has no picture");
+    assert!(flag(&out, "/audio"), "hevc_alpha carries no sound");
+    assert!(flag(&out, "/alpha"), "hevc_alpha carries no alpha channel");
+    assert!(
+        !flag(&out, "/optimize_for_network"),
+        "hevc_alpha is rewritten for network use by default"
+    );
+    assert_eq!(
+        (int(&out, "/width"), int(&out, "/height")),
+        (CANVAS_WIDTH, CANVAS_HEIGHT)
+    );
+    assert_eq!(fps_of(&out), (30, 1));
+    assert!(
+        out.get("video_bitrate").is_none(),
+        "hevc_alpha invented a bit rate nobody asked for: {out}"
+    );
+
+    let asked = settings(
+        &handle,
+        "hevc_alpha",
+        Some(&json!({"optimize_for_network": true, "video_bitrate": 6_000_000})),
+    );
+    assert!(
+        flag(&asked, "/optimize_for_network"),
+        "hevc_alpha ignored an asked-for network rewrite"
+    );
+    assert_eq!(
+        int(&asked, "/video_bitrate"),
+        6_000_000,
+        "hevc_alpha did not echo the bit rate it was asked for"
+    );
+}
+
+/// The Format popup lists the rows in the table's order, and G-33 put this
+/// one directly after "HEVC (MP4)": the two HEVC rows read as a pair, the
+/// one with the channel second.
+#[test]
+fn hevc_alpha_sits_directly_after_hevc() {
+    let rows = preset_rows();
+    let ids: Vec<&str> = rows.iter().map(|row| text(row, "/id")).collect();
+    let hevc = ids
+        .iter()
+        .position(|id| *id == "hevc")
+        .expect("the menu has no hevc row");
+    assert_eq!(
+        ids.get(hevc + 1).copied(),
+        Some("hevc_alpha"),
+        "the row after hevc is not hevc_alpha: {ids:?}"
+    );
+    assert_eq!(text(&rows[hevc + 1], "/name"), "HEVC with Alpha (MOV)");
+}
+
+/// Adding a row beside `hevc` must not move `hevc` (owner choice 12: the
+/// existing row byte for byte as before). The literals below are what the
+/// tree printed for the preset row and for its resolved settings — with
+/// nothing asked for, and with every optional override — BEFORE the
+/// `hevc_alpha` row was added, written out whole so that a key gained, lost
+/// or changed on the old row fails here by name.
+#[test]
+fn the_hevc_row_is_what_it_was() {
+    let row = preset_rows()
+        .into_iter()
+        .find(|row| text(row, "/id") == "hevc")
+        .expect("the menu has no hevc row");
+    assert_eq!(
+        row,
+        json!({
+            "id": "hevc",
+            "name": "HEVC (MP4)",
+            "container": "mp4",
+            "codec": "hevc",
+            "video": true,
+            "size": null,
+            "fps": null,
+            "avf_preset": "AVAssetExportPresetHEVCHighestQuality"
+        })
+    );
+
+    let handle = project();
+    assert_eq!(
+        settings(&handle, "hevc", None),
+        json!({
+            "preset": "hevc",
+            "avf_preset": "AVAssetExportPresetHEVCHighestQuality",
+            "container": "mp4",
+            "file_type": "public.mpeg-4",
+            "codec": "hevc",
+            "width": 1600,
+            "height": 900,
+            "fps": [30, 1],
+            "range": {"start": 0, "duration": 6_000_000},
+            "audio": true,
+            "video": true,
+            "alpha": false,
+            "optimize_for_network": true
+        })
+    );
+    assert_eq!(
+        settings(&handle, "hevc", Some(&every_optional_override())),
+        json!({
+            "preset": "hevc",
+            "avf_preset": "AVAssetExportPresetHEVCHighestQuality",
+            "container": "mp4",
+            "file_type": "public.mpeg-4",
+            "codec": "hevc",
+            "width": 1600,
+            "height": 900,
+            "fps": [30, 1],
+            "video_bitrate": 8_000_000,
+            "audio_bitrate": 192_000,
+            "loudness_lufs": -14.0,
+            "peak_dbtp": -1.0,
+            "range": {"start": 0, "duration": 6_000_000},
+            "audio": true,
+            "video": true,
+            "alpha": false,
+            "optimize_for_network": true
+        })
     );
 }
 

@@ -58,8 +58,9 @@ section 3 pass against a build with no alpha at all; one that always
 answered 0 would make them all pass against a build that wrote nothing.
 
 **What the alpha claims are made ON, and why.** `alpha` in the resolved
-export settings is a per-row CAPABILITY — true for `prores_4444` and `apng`
-and false for the other seven — and it has **no MCP surface**: the core
+export settings is a per-row CAPABILITY — true for `prores_4444`,
+`hevc_alpha` and `apng` and false for the other seven — and it has **no MCP
+surface**: the core
 emits it (`export.rs`), `ExportSettings` decodes it, the sheet's summary
 prints it, and the `export` tool's result does not echo it. So what this
 script measures is not the flag but the capability where it bites, in the
@@ -76,7 +77,10 @@ Four traps in section 3, each measured on this machine:
   A file WRITTEN `yuva444p10le` is REPORTED `yuva444p12le`: the decoder's
   output format is not the encoder's input format. An equality against
   either spelling is a check that fails on a correct build the day
-  ffmpeg's ProRes decoder picks a different depth.
+  ffmpeg's ProRes decoder picks a different depth. The test cannot see the
+  third alpha row at all: an HEVC-with-alpha file reports `yuv420p`, as a
+  plain HEVC file does, so that row's alpha is read off the decoded frame
+  by `hevc_alpha_proof.py` (spec §11 G-33 (f)).
 * **A `gif` reports `pix_fmt=bgra`**, which reads as "carries alpha" and is
   not what the row's capability means. GIF is palettised: ONE index is
   nominated transparent, a pixel is either that index or fully opaque, and

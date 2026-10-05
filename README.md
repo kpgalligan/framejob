@@ -126,9 +126,12 @@ schema, §6 the op table, §7 the architecture.
   in the same container go quiet, and mute still wins), and Paste
   Attributes (⌥⌘V: the copied clip's look onto the selection, each group
   replaced whole, a text clip keeping its words and a shape its kind and
-  size). Every edit is a pure op in the Rust core returning a new
-  immutable project handle, so undo is a stack of handles and a refused
-  edit costs nothing.
+  size), with Edit ▸ Paste Graphic Properties beside it for what ⌥⌘V
+  leaves alone: a copied graphic's properties, its text and colours
+  included, onto every selected clip drawn by the same graphic, each
+  keeping its own size, in point and length. Every edit is a pure op in the
+  Rust core returning a new immutable project handle, so undo is a stack of
+  handles and a refused edit costs nothing.
 - **The screencast trio.** **Remove Silences** (Clip ▸ Remove Silences…)
   finds the dead air — Judge by Voice or Level, threshold, minimum length
   and padding, over the selected clips or everything audible — shades the
@@ -225,10 +228,14 @@ schema, §6 the op table, §7 the architecture.
   uses, so a still saved from the menu and one an agent asked for are the
   same file. PNG and HEIC keep the canvas's alpha; JPEG cannot, so it
   flattens onto black and the panel says so as you pick the format.
-  **ProRes 4444** exports a real alpha channel, which is what a transparent
-  canvas is for: set the background's opacity in the Document tab and the
-  note there names the rows that can keep it (ProRes 4444 and APNG; a GIF
-  can only be transparent or not, with nothing in between). **Burn in
+  **ProRes 4444** and **HEVC with alpha** export a real alpha channel, which
+  is what a transparent canvas is for — ProRes 4444 as a master for another
+  editor, HEVC with alpha (a QuickTime movie) as the small file a web page
+  or a player lays over its own background. Set the background's opacity in
+  the Document tab and the note there counts the formats that keep it —
+  "Transparent — kept by 3 export formats.": ProRes 4444, HEVC with alpha
+  and APNG (a GIF can only be transparent or not, with nothing in between).
+  **Burn in
   timecode** draws the document's own timecode over the picture, in the
   document's own spelling, on an export or a rendered frame — and it reads
   PROJECT time even in a file written from the in/out range, which is the
@@ -276,11 +283,22 @@ schema, §6 the op table, §7 the architecture.
   keeps its own name too, and that step copies a constant-rate VP9 stream
   instead of re-encoding it.
 - **Export** through an `AVAssetWriter` over the same composition, the
-  format (H.264, HEVC, ProRes 422, ProRes 4444, M4A, WAV, AIFF, GIF, APNG)
-  and the size chosen separately and both resolved by the core — the default
+  format (H.264, HEVC, HEVC with alpha, ProRes 422, ProRes 4444, M4A, WAV,
+  AIFF, GIF, APNG) and the size chosen separately and both resolved by the core — the default
   size is the document's own, or for a GIF or APNG the format's cap fitted to
   it — and an optional loudness target and timecode burn-in over it, plus an
   offline single-frame render used for verification and by File ▸ Save Frame….
+  The size the sheet and the `export` tool report is the size the file has: a
+  document with an odd width or height exports one pixel smaller on that edge
+  on the formats that need even dimensions (H.264, HEVC, HEVC with alpha,
+  ProRes 422), where the Size popup names the row "Document (even)"; ProRes
+  4444, GIF and APNG keep the odd edge. A movie whose size is within a pixel
+  of the document's shape — that evened size, a custom size in the
+  document's proportions with an odd edge (written a pixel smaller, at any
+  scale), or a standard size whose long edge rounded — is filled edge to
+  edge rather than padded with a black line; any other shape is letterboxed,
+  or on ProRes 4444 and HEVC with alpha refused, since padding would destroy
+  the alpha channel.
 - **Motion graphics.** A graphic clip is drawn every frame by a small
   JavaScript module in the package's `graphics/` folder. A person puts one on
   the timeline from Insert ▸ Graphic — six bundled templates (Bar Chart,
@@ -290,7 +308,17 @@ schema, §6 the op table, §7 the architecture.
   Graphics… and Add Image to Graphics…, and reads the API from Help ▸
   Graphics Reference. An agent can do the whole job over MCP: read the
   reference, write a module, look at its frames without placing it, bring in
-  a font or a picture, put it on the timeline and change its properties.
+  a font or a picture, put it on the timeline and change its properties. The
+  module's standard library measures a path, finds a point along it and
+  draws it on. The
+  project keeps the last 10 versions of each graphic's code in
+  `graphics/history/`, kept whenever the app sees the code replaced, so an
+  agent can restore an earlier version, delete a graphic no clip uses (its
+  code is kept and can be restored) and rename one — every clip that uses it
+  follows, and Undo renames it back. A person renames, deletes and restores
+  from File ▸ Rename Graphic…, Delete Graphic… and Restore Graphic Version…
+  (which puts back the newest kept version); each is a small sheet that
+  shows Reelcut's reason when it refuses.
 - **MCP agent** (below): one tool per edit op, plus open/new/save/read,
   import, playhead, frame render and export.
 
@@ -308,8 +336,9 @@ in both directions with the built-in text animations, sound (the mono fold,
 a level meter, Normalize Clip, loudness on export and the two uncompressed
 audio formats), looks (blend modes, gradient fills, the two background
 commands and filters as animation targets), output (Save Frame…, ProRes 4444
-with a real alpha channel, the timecode burn-in, remembered and named export
-settings, and the export queue), viewing and finding (preview quality, a
+with a real alpha channel — HEVC with alpha has joined it since — the
+timecode burn-in, remembered and named export settings, and the export
+queue), viewing and finding (preview quality, a
 second preview window, and a Media tab you can search, sort and filter), and
 now the last of them: editing INSIDE a nest, which the spec designed and left
 and which every op reaches through one envelope key.
@@ -527,8 +556,8 @@ hue rather than paints with it, is the one `[r, g, b]` in the model.
 | `set_scope {nest?, clip?}` | opens a nest to look and edit inside it — the mirror of double-clicking a nest clip and of Clip ▸ Open Nest (⌘↓). At most one argument, and NEITHER means the timeline: send it with no arguments to come back out. `clip` is the precise spelling, since one nest can be shown by two clips at two different starts. With a nest open `get_project` lists ITS clips, `render_frame` draws it at its own frozen size, and every op lands inside it — the same view a person gets. Every op tool also takes `scope` directly, which names a nest for one call and outranks whatever is open |
 | `undo` · `redo` | one step each (⌘Z / ⇧⌘Z), reporting the step's name |
 | `render_frame {t, max_width?, path?, format?, burn_in_timecode?}` | **the verification hook**. With neither `path` nor `format` it writes a PNG to a temporary file, exactly the call it always was. `format` is `png`, `jpeg` or `heic` and WINS over the path's extension, which is replaced rather than appended to (`{path: "shot.jpg", format: "png"}` writes `shot.png`); `png` and `heic` keep the canvas's alpha and `jpeg` flattens onto black. It is the same writer File ▸ Save Frame… uses, so a still from the menu and one from here are byte-identical. `burn_in_timecode` draws the document's timecode over the picture — the only way a burn-in can be photographed |
-| `export {preset, path, size?, range?, video_bitrate?, audio_bitrate?, loudness_lufs?, peak_dbtp?, burn_in_timecode?}` | writes a file and waits for it; `preset` is the encoding, `size` a Size-popup row (`document`, `1080p`, …) or `[width, height]`, default the document's size (a GIF or APNG's cap); `range: "in_out"` scopes it to the in/out range; the bitrates are the sheet's Quality popup in bits per second; `loudness_lufs` normalises the whole mix by one gain to that integrated target and `peak_dbtp` is the ceiling that gain is capped against (a ceiling with no target is refused — there would be nothing to cap). `burn_in_timecode` draws the document's own timecode over every frame (the export sheet's checkbox), showing PROJECT time even in a file written from the in/out range. The result reports what the file's sound MEASURED, asked for or not, and echoes the burn-in either way |
-| `graphic_reference` · `write_graphic {name, source}` · `get_graphic {name?}` · `render_graphic {name, frames?, frame?, props?, width?, height?, max_width?, background?, format?, path?}` · `import_graphic_font {path}` · `import_graphic_asset {path, name?}` | the six graphics tools, the agent's whole loop for a motion graphic: read the API once, write `graphics/<name>.js` and read its compile back (`ok` and `diagnostics`, not an error), look at up to 16 of its frames as a contact sheet with no clip (or one frame's SVG), copy a `.ttf`/`.otf` into `graphics/fonts/` — its reply names the exact family names the engine reads — or a picture into `graphics/assets/`; then `add_graphic_clip` and `set_graphic` place and change it. File writes are not undoable. They mirror the Graphic sub-tab, Insert ▸ Graphic (`write_graphic` then `add_graphic_clip`), File ▸ Add Font to Graphics… and Add Image to Graphics…, and Help ▸ Graphics Reference |
+| `export {preset, path, size?, range?, video_bitrate?, audio_bitrate?, loudness_lufs?, peak_dbtp?, burn_in_timecode?}` | writes a file and waits for it; `preset` is the encoding, `size` a Size-popup row (`document`, `1080p`, …) or `[width, height]`, default the document's size (a GIF or APNG's cap); `range: "in_out"` scopes it to the in/out range; the bitrates are the sheet's Quality popup in bits per second; `loudness_lufs` normalises the whole mix by one gain to that integrated target and `peak_dbtp` is the ceiling that gain is capped against (a ceiling with no target is refused — there would be nothing to cap). `burn_in_timecode` draws the document's own timecode over every frame (the export sheet's checkbox), showing PROJECT time even in a file written from the in/out range. The result reports what the file's sound MEASURED, asked for or not, and echoes the burn-in either way; the result's width and height are the file's |
+| `graphic_reference` · `write_graphic {name, source}` · `get_graphic {name?}` · `render_graphic {name, frames?, frame?, props?, width?, height?, max_width?, background?, format?, path?}` · `import_graphic_font {path}` · `import_graphic_asset {path, name?}` · `delete_graphic {name}` · `rename_graphic {name, to}` · `restore_graphic {name, revision?}` | the nine graphics tools, the agent's whole loop for a motion graphic: read the API once, write `graphics/<name>.js` and read its compile back (`ok` and `diagnostics`, not an error), look at up to 16 of its frames as a contact sheet with no clip (or one frame's SVG), copy a `.ttf`/`.otf` into `graphics/fonts/` — its reply names the exact family names the engine reads — or a picture into `graphics/assets/`; then `add_graphic_clip` and `set_graphic` place and change it. File writes are not undoable, but the text a write replaces is kept (the last 10 per module; `kept` lists them, and `get_graphic {}`'s `history` lists deleted modules too) and `restore_graphic` brings one back; `delete_graphic` is refused while a clip draws the module and keeps the deleted text; `rename_graphic` moves the file, its kept texts and every clip that names it as one undo step, and undo renames the file back. The first six mirror the Graphic sub-tab, Insert ▸ Graphic (`write_graphic` then `add_graphic_clip`), File ▸ Add Font to Graphics… and Add Image to Graphics…, and Help ▸ Graphics Reference; the last three mirror File ▸ Delete Graphic…, Rename Graphic… and Restore Graphic Version… (which restores the newest kept text) |
 
 `set_range`, `set_selection`, `set_scope`, `undo` and `redo` exist so that
 spec §10's own verifications —

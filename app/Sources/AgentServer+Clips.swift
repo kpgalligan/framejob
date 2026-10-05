@@ -12,12 +12,12 @@ import AppKit
 /// factories every patch handler below reaches for included.
 extension AgentServer {
 
-    /// The four property groups `paste_attributes` can be told to carry —
-    /// `Group` in `core/src/edit_props.rs`, spelled as the wire spells it, in
-    /// the order the core checks them (and so the order its range errors
-    /// come back in). The catalog's `groups` enum reads this list, so the
-    /// two cannot disagree.
-    static let attributeGroups: [String] = ["video", "audio", "text", "shape"]
+    /// The five property groups `paste_attributes` can be told to carry —
+    /// `Kind::Groups`' values in `core/src/op_table.rs`, spelled as the wire
+    /// spells them and in its order: the four patch groups, then `graphic`
+    /// (spec §11 G-32). A refusal here names this list; the catalog's enum is
+    /// printed from the core's, and the clip-catalog proof compares the two.
+    static let attributeGroups: [String] = ["video", "audio", "text", "shape", "graphic"]
 
     // MARK: - Placing clips
 
@@ -398,30 +398,30 @@ extension AgentServer {
     }
 
     /// `paste_attributes` — ⌥⌘V, Edit ▸ Paste Attributes
-    /// (`EditorViewController+Clipboard.pasteAttributes`): the payload's
-    /// EARLIEST clip's property groups onto the selection (at one start the
-    /// front-most, then the lower id), each group replacing the target's
-    /// whole group. The menu command sends no `groups`, so it gets
-    /// the default rule — every group both clips have.
+    /// (`EditorViewController+Clipboard.pasteAttributes`), which sends no
+    /// `groups` and gets the default (each of video, audio, text and shape
+    /// both clips have), and Edit ▸ Paste Graphic Properties
+    /// (`pasteGraphicProps`): `groups: ["graphic"]` with `skip_missing`. The
+    /// payload's EARLIEST clip is read; each group replaces the target's.
     ///
-    /// `groups` is checked here against the four names, because the core
+    /// `groups` is checked here against the five names, because the core
     /// refuses a misspelt one as serde's envelope error, which names the
     /// variant but not the argument; an EMPTY list is refused too, since the
-    /// core answers it with "no change" and a caller who wrote `[]` meant
-    /// something. Which groups travel by default, what a target keeps, and
-    /// the "clip N has no audio properties" refusals are the core's
-    /// (`edit_paste.rs`) and come back in band, as `paste`'s do.
+    /// core answers it "no change". What travels, what a target keeps and
+    /// its "clip N has no … properties" errors are the core's
+    /// (`edit_paste_attributes.rs`), in band, as `paste`'s are.
     func pasteAttributes(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clips = try clipsArg(a, "clips", document)
         let payload = try pastePayloadArg(a)
         let groups = try stringsArg(a, "groups")
+        let skip = try boolArg(a, "skip_missing")
         let known = Self.attributeGroups.joined(separator: ", ")
         if let groups = groups {
             guard !groups.isEmpty else {
                 throw ToolError(
                     message: "groups is empty — name at least one of \(known), or leave it "
-                        + "out to paste every group both clips have.")
+                        + "out to paste each of video, audio, text and shape both clips have.")
             }
             if let unknown = groups.first(where: { !Self.attributeGroups.contains($0) }) {
                 throw ToolError(
@@ -430,7 +430,7 @@ extension AgentServer {
         }
         return try editResult(
             document, "Paste Attributes",
-            [.pasteAttributes(clips: clips, payload: payload, groups: groups)])
+            [.pasteAttributes(clips: clips, payload: payload, groups: groups, skipMissing: skip)])
     }
 
     // MARK: - Grouping

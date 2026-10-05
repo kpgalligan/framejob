@@ -40,6 +40,7 @@ pub const ENGINES_PER_THREAD: usize = 16;
 
 const STDLIB: &str = include_str!("stdlib.js");
 const NOISE: &str = include_str!("noise.js");
+const PATH: &str = include_str!("path.js");
 
 /// A loaded module's `meta` and `schema`, as JSON, and what `__warn`
 /// collected while its top level evaluated, in order.
@@ -100,6 +101,7 @@ impl Engine {
             for (name, script) in [
                 ("stdlib.js", STDLIB),
                 ("noise.js", NOISE),
+                ("path.js", PATH),
                 ("sandbox", SANDBOX),
             ] {
                 ctx.eval::<(), _>(script)

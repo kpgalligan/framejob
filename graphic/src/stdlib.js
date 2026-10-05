@@ -1,7 +1,7 @@
 // The graphics standard library — road map 10 §5c. Written from scratch
 // (G-2): the names and argument shapes follow Remotion's, none of its code
-// is here. Evaluated as a SCRIPT before `noise.js` and the sandbox, so every
-// declaration is a global. The host functions `__measureText`,
+// is here. Evaluated as a SCRIPT before `noise.js`, `path.js` and the sandbox,
+// so every declaration is a global. The host functions `__measureText`,
 // `__assetNames`, `__warn` and `__namedColour` are installed before it runs.
 
 function svg(ctx, body, options) {

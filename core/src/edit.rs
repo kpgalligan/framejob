@@ -34,7 +34,7 @@
 //! - **What an absent optional argument MEANS is said here**, in the
 //!   Semantics column, and which arguments are optional at all is
 //!   [`crate::op_table`]. An optional argument may be omitted. Most are
-//!   `Option<T>` and decode an explicit `null` like absence; the four
+//!   `Option<T>` and decode an explicit `null` like absence; the five
 //!   defaulted plain booleans reject null and default to false when omitted.
 //! - **A new id is the project's `next_id` from BEFORE the call.** An op
 //!   returns a project, not a value, so a caller that needs the id of the
@@ -127,7 +127,7 @@
 //! | `detach_audio` | Clears the clip's `enabled.audio` and puts an audio-only twin on the track below, inserting a track when there is none. Refuses, naming why, on a clip with no audio to detach: not a media clip, media with no audio track, or audio already switched off. |
 //! | `duplicate` | Copies each clip one selection-span later on its own track, with fresh ids. |
 //! | `paste` | Inserts the clips of a clipboard payload — `{"clips": […], "media": […]}`, what Copy wrote — with fresh ids, the earliest landing at `at` and the rest keeping their offsets. A payload clip's `track` is a DEPTH from the front (0 = front-most), so `track` says where depth 0 lands (default: the front) and the rest follow by the same index delta; tracks missing behind it are added. Media is matched to `media[]` by path and appended when absent. A clip the overlap rule refuses goes on a new track in front; an empty clip list changes nothing. Every landed clip — the payload's own and those inside the nests it brings — first has every group pass `paste_attributes`' normalise-and-check on what the payload sent (an empty motion lands null; a value out of range is an Err, `pasted clip N: …`, N the payload's id; a speed outside ×0.1–×1000 gets the same `pasted clip N: …` Err), then has its start, source-bounded duration, action spans, present base motion/text timings and a graphic's `in` and `length` re-snapped to this document's grid (spec §11, D7-3, G-18). |
-//! | `paste_attributes` | Copies the payload's EARLIEST clip's property groups (at one start the front-most, then the lower id — never the array's first, which is creation order) onto each clip: video and audio whole, text but content and the `words` that time it (W-6), shape but kind, width, height, from and to. Default: every group both sides have; a named group either side lacks is an Err. Copied video motion and text animation pass their original-value range checks, then snap to the target grid; audio envelopes keep sample precision. Speed, enabled, actions, transition and identity stay. `graphic` is not a group: a target keeps its module, size, timeline and props (G-10). An identity when nothing changes. |
+//! | `paste_attributes` | Copies the payload's EARLIEST clip's property groups (at one start the front-most, then the lower id — never the array's first, which is creation order) onto each clip: video and audio whole, text but content and the `words` that time it (W-6), shape but kind, width, height, from and to. Default (no `groups`): each of those four both sides have, and `skip_missing` changes nothing; a named group either side lacks is an Err. Copied video motion and text animation pass their original-value range checks, then snap to the target grid; audio envelopes keep sample precision. Speed, enabled, actions, transition and identity stay. `graphic` is a fifth group a caller NAMES, never a default (G-32, amending G-10): a side has it when it is a graphic clip, and a target takes it when its module is the payload clip's. It copies `props` whole — a key the payload lacks is removed, a key both have keeps its slot, new keys are appended — and the target keeps its module, size, `in` and `length`; a target that is not a graphic is `clip N has no graphic properties`, and one drawn by another module an Err naming both modules. `skip_missing: true` (with `groups` named) drops a named group the payload clip lacks and skips, for that group, a target that cannot take it, for all five groups — no Err for a missing group. The copied props are checked for shape only (strings, numbers and booleans, at most 64 keys, `null`s dropped), once, the first time a target takes them: a paste in which no target takes `graphic` never reads them, and a malformed map onto a target that takes it is `model_graphic.rs`'s own Err in both modes. An identity when nothing changes. |
 //! | `nest` | Collapses the selection into ONE clip showing a nest named `Nest <n>` unless `name` says otherwise, on the front-most track the selection occupied, running from the earliest start to the latest end. The clips move whole — ids, props, actions, transitions — keeping their relative times (earliest → 0) and their track order; the nest's canvas is frozen at the project's current size. Refuses on an empty selection, on a lone nest clip, and when the nest clip would break the overlap rule. |
 //! | `unnest` | The inverse: the nest's clips return at `clip.start + their own start`, with fresh ids, on tracks counted back from the nest clip's own (front-most nest track first), and the nest clip goes. `nest` then `unnest` is the identity on clip content, ids aside. A clip the overlap rule refuses lands on a new track in front, as `paste` does; a nest clip trimmed shorter than its contents gives ALL of them back (a nest has no in point); the nest is dropped when nothing else shows it. Returning clips have translated start, source-bounded duration, action spans and present base motion/text timings normalized on the document grid (spec §11, D7-3). `Err` when `clip` is not a nest clip. |
 //! | `set_video` | Merges the patch into each clip's video props (spec §5.2). |
@@ -218,12 +218,12 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::edit_paste_attributes::PasteGroup;
 use crate::edit_transition::TransitionAlign;
 use crate::edit_zoom::{ZoomFit, ZoomRegion};
 use crate::export::describe;
 use crate::model::{Color, Curve, Project, TransitionKind};
 use crate::outcome::Outcome;
-use crate::patch::Group;
 use crate::scope;
 use crate::time::{Fps, Ticks};
 
@@ -399,14 +399,18 @@ pub enum Op {
         track: Option<u32>,
         payload: Value,
     },
-    /// The same opaque `payload` as `paste`. `groups` absent means "every
-    /// group both sides have"; an unknown group name is a serde error from
-    /// the envelope, like any other bad enum value.
+    /// The same opaque `payload` as `paste`. `groups` absent means "each of
+    /// video, audio, text and shape both sides have" — never `graphic`,
+    /// which a caller names (G-32); an unknown group name is a serde error
+    /// from the envelope, like any other bad enum value. `skip_missing` is
+    /// a plain boolean: absent is false, and `null` is a decode error.
     PasteAttributes {
         clips: Vec<u32>,
         payload: Value,
         #[serde(default)]
-        groups: Option<Vec<Group>>,
+        groups: Option<Vec<PasteGroup>>,
+        #[serde(default)]
+        skip_missing: bool,
     },
     Nest {
         clips: Vec<u32>,
@@ -793,7 +797,8 @@ impl Project {
                 clips,
                 payload,
                 groups,
-            } => self.paste_attributes(clips, payload, groups.as_deref()),
+                skip_missing,
+            } => self.paste_attributes(clips, payload, groups.as_deref(), *skip_missing),
             Op::Nest { clips, name } => self.nest_clips(clips, name.as_deref()),
             Op::Unnest { clip } => self.unnest_clip(*clip),
             Op::SetVideo { clips, patch } => self.set_video(clips, patch),

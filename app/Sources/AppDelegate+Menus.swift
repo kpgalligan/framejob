@@ -166,6 +166,7 @@ extension AppDelegate {
             item("Add Font to Graphics…", #selector(EditorViewController.addGraphicFont(_:))))
         menu.addItem(
             item("Add Image to Graphics…", #selector(EditorViewController.addGraphicImage(_:))))
+        addGraphicFileItems(to: menu)
         menu.addItem(.separator())
         menu.addItem(item("Export…", #selector(EditorViewController.exportProject(_:)), "e"))
         // Save Frame… is the still-image sibling of Export… and sits beside
@@ -197,6 +198,10 @@ extension AppDelegate {
             item(
                 "Paste Attributes", #selector(EditorViewController.pasteAttributes(_:)), "v",
                 [.command, .option]))
+        menu.addItem(
+            item(
+                "Paste Graphic Properties",
+                #selector(EditorViewController.pasteGraphicProperties(_:))))
         menu.addItem(
             item("Duplicate", #selector(EditorViewController.duplicateClips(_:)), "d"))
         // Bare ⌫: U+0008 (NSBackspaceCharacter) is what AppKit matches the
