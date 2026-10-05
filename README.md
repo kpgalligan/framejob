@@ -228,10 +228,14 @@ schema, §6 the op table, §7 the architecture.
   uses, so a still saved from the menu and one an agent asked for are the
   same file. PNG and HEIC keep the canvas's alpha; JPEG cannot, so it
   flattens onto black and the panel says so as you pick the format.
-  **ProRes 4444** exports a real alpha channel, which is what a transparent
-  canvas is for: set the background's opacity in the Document tab and the
-  note there names the rows that can keep it (ProRes 4444 and APNG; a GIF
-  can only be transparent or not, with nothing in between). **Burn in
+  **ProRes 4444** and **HEVC with alpha** export a real alpha channel, which
+  is what a transparent canvas is for — ProRes 4444 as a master for another
+  editor, HEVC with alpha (a QuickTime movie) as the small file a web page
+  or a player lays over its own background. Set the background's opacity in
+  the Document tab and the note there counts the formats that keep it —
+  "Transparent — kept by 3 export formats.": ProRes 4444, HEVC with alpha
+  and APNG (a GIF can only be transparent or not, with nothing in between).
+  **Burn in
   timecode** draws the document's own timecode over the picture, in the
   document's own spelling, on an export or a rendered frame — and it reads
   PROJECT time even in a file written from the in/out range, which is the
@@ -279,16 +283,22 @@ schema, §6 the op table, §7 the architecture.
   keeps its own name too, and that step copies a constant-rate VP9 stream
   instead of re-encoding it.
 - **Export** through an `AVAssetWriter` over the same composition, the
-  format (H.264, HEVC, ProRes 422, ProRes 4444, M4A, WAV, AIFF, GIF, APNG)
-  and the size chosen separately and both resolved by the core — the default
+  format (H.264, HEVC, HEVC with alpha, ProRes 422, ProRes 4444, M4A, WAV,
+  AIFF, GIF, APNG) and the size chosen separately and both resolved by the core — the default
   size is the document's own, or for a GIF or APNG the format's cap fitted to
   it — and an optional loudness target and timecode burn-in over it, plus an
   offline single-frame render used for verification and by File ▸ Save Frame….
   The size the sheet and the `export` tool report is the size the file has: a
   document with an odd width or height exports one pixel smaller on that edge
-  on the formats that need even dimensions (H.264, HEVC, ProRes 422), where
-  the Size popup names the row "Document (even)"; ProRes 4444, GIF and APNG
-  keep the odd edge.
+  on the formats that need even dimensions (H.264, HEVC, HEVC with alpha,
+  ProRes 422), where the Size popup names the row "Document (even)"; ProRes
+  4444, GIF and APNG keep the odd edge. A movie whose size is within a pixel
+  of the document's shape — that evened size, a custom size in the
+  document's proportions with an odd edge (written a pixel smaller, at any
+  scale), or a standard size whose long edge rounded — is filled edge to
+  edge rather than padded with a black line; any other shape is letterboxed,
+  or on ProRes 4444 and HEVC with alpha refused, since padding would destroy
+  the alpha channel.
 - **Motion graphics.** A graphic clip is drawn every frame by a small
   JavaScript module in the package's `graphics/` folder. A person puts one on
   the timeline from Insert ▸ Graphic — six bundled templates (Bar Chart,
@@ -326,8 +336,9 @@ in both directions with the built-in text animations, sound (the mono fold,
 a level meter, Normalize Clip, loudness on export and the two uncompressed
 audio formats), looks (blend modes, gradient fills, the two background
 commands and filters as animation targets), output (Save Frame…, ProRes 4444
-with a real alpha channel, the timecode burn-in, remembered and named export
-settings, and the export queue), viewing and finding (preview quality, a
+with a real alpha channel — HEVC with alpha has joined it since — the
+timecode burn-in, remembered and named export settings, and the export
+queue), viewing and finding (preview quality, a
 second preview window, and a Media tab you can search, sort and filter), and
 now the last of them: editing INSIDE a nest, which the spec designed and left
 and which every op reaches through one envelope key.

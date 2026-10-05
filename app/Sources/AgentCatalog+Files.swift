@@ -82,16 +82,18 @@ extension AgentServer {
         // canvas and gave `ExportWriter` a refusal for one of them, and
         // neither reached the schema — so the tool promised a letterbox where
         // the build throws, and the row to ask for was named nowhere a caller
-        // could see it. The refusal is `prores_4444`'s alone: `apng` takes
-        // the ImageIO path, which FITS instead of padding.
+        // could see it. There are three such rows since G-33, and the refusal
+        // is the two MOVIE rows', `prores_4444` and `hevc_alpha`: `apng`
+        // takes the ImageIO path, which FITS instead of padding.
         let exportPresetProperty: [String: Any] = [
             "type": "string",
             "description": "Export preset id — one per encoding, a container and a codec with "
                 + "no size of its own (that is size's). h264 is what the export sheet opens "
-                + "on. Two rows keep a transparent canvas transparent: prores_4444 (the movie "
-                + "row — see size, which it constrains) and apng. gif is not one of them: it "
-                + "can show a transparent pixel but has no alpha channel, so nothing partial "
-                + "survives it. Pass a wrong one once and the error lists them all.",
+                + "on. Three rows keep a transparent canvas transparent: prores_4444 and "
+                + "hevc_alpha (the movie rows — see size, which constrains them) and apng. "
+                + "gif is not one of them: it can show a transparent pixel but has no alpha "
+                + "channel, so nothing partial survives it. Pass a wrong one once and the "
+                + "error lists them all.",
         ]
         let exportSizeProperty: [String: Any] = [
             "type": ["string", "array"],
@@ -107,14 +109,20 @@ extension AgentServer {
                 + "anyway — so an id means the same thing wherever it is sent; only preset is "
                 + "confined to gif and apng. Omit for the document size or the image format's "
                 + "cap; a wrong id's error lists the ids. A movie is written at exactly the "
-                + "size asked for, letterboxed if the aspect differs — except on prores_4444, "
-                + "where a size of a DIFFERENT ASPECT from the canvas is refused rather than "
-                + "written, because the padding destroys the alpha channel that row is chosen "
-                + "for; every row id is already the document's own aspect, so this only bites "
-                + "on a [width, height] of another shape. h264, hevc and prores_422 need "
+                + "size asked for, letterboxed if the shape differs by more than a pixel "
+                + "(within a pixel the picture fills the frame instead) — except on "
+                + "prores_4444 and hevc_alpha, where a size of a DIFFERENT SHAPE from the "
+                + "canvas is refused rather than written, because the padding destroys the "
+                + "alpha channel those rows are chosen for; every row id is already the "
+                + "document's own shape, so this only bites on a [width, height] of another "
+                + "shape. h264, hevc, hevc_alpha and prores_422 need "
                 + "even dimensions: an odd width or height — the document size on a canvas "
                 + "with an odd edge, or an odd [width, height] — is written one pixel smaller "
                 + "on that edge, and the width and height reported back are the file's. "
+                + "The shape is judged on that even frame: a [width, height] in the canvas's "
+                + "own proportions is never refused for being odd, at any scale; one of "
+                + "another shape is judged as the even size it becomes, which is the size "
+                + "hevc_alpha's refusal names. "
                 + "prores_4444, gif and apng keep an odd edge. On gif and apng a size — the "
                 + "cap, a row, or [width, height] — is a box the picture is fitted inside, aspect "
                 + "kept and never upscaled, and the width and height reported back are the "

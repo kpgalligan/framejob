@@ -58,9 +58,12 @@ fn row(id: &str, name: &str, width: i64, height: i64) -> Row {
 /// audio-only rows included, on the terms `rc_export_settings` reports a
 /// width for them. Only the two image formats list anything else, and only
 /// because they are the only rows carrying a cap.
-const MOVIE_FORMATS: [&str; 7] = [
+const MOVIE_FORMATS: [&str; 8] = [
     "h264",
     "hevc",
+    // HEVC with alpha (spec §11 G-33): a movie row with no cap, and
+    // even-sized like the row it sits after.
+    "hevc_alpha",
     "prores_422",
     // The alpha master (road map 2, phase 7). It carries no cap and is
     // not an image format, so on a canvas with even edges it lists what
@@ -81,9 +84,10 @@ const MOVIE_FORMATS: [&str; 7] = [
 /// every row AVFoundation writes but ProRes 4444, the three audio-only rows
 /// among them, which have no picture and report what `h264` reports. On
 /// these an odd edge is listed and resolved one pixel smaller.
-const EVEN_SIZED: [&str; 6] = [
+const EVEN_SIZED: [&str; 7] = [
     "h264",
     "hevc",
+    "hevc_alpha",
     "prores_422",
     "audio_m4a",
     "audio_wav",
@@ -349,7 +353,7 @@ fn an_asked_size_resolves_even_on_the_rows_that_need_it() {
                 .unwrap_or_else(|msg| panic!("{preset} with {overrides}: {msg}"));
             (int(&settings, "/width"), int(&settings, "/height"))
         };
-        for preset in ["h264", "hevc", "prores_422"] {
+        for preset in ["h264", "hevc", "hevc_alpha", "prores_422"] {
             assert_eq!(
                 resolved(preset),
                 even,
@@ -456,6 +460,7 @@ fn the_audio_only_formats_list_what_h264_lists() {
             "audio_wav",
             "audio_aiff",
             "hevc",
+            "hevc_alpha",
             "prores_422",
             "prores_4444",
         ] {
@@ -468,12 +473,19 @@ fn the_audio_only_formats_list_what_h264_lists() {
     }
 
     // A canvas with an odd edge, where the document row is evened (G-33):
-    // the audio rows still list what `h264` lists, and so do the other two
-    // rows that need even dimensions. ProRes 4444 is not in this loop — it
-    // keeps the odd edge, so its first row is a different one.
+    // the audio rows still list what `h264` lists, and so do the other
+    // three rows that need even dimensions. ProRes 4444 is not in this loop
+    // — it keeps the odd edge, so its first row is a different one.
     let handle = document(1000, 667);
     let h264 = listed(&handle, "h264");
-    for preset in ["audio_m4a", "audio_wav", "audio_aiff", "hevc", "prores_422"] {
+    for preset in [
+        "audio_m4a",
+        "audio_wav",
+        "audio_aiff",
+        "hevc",
+        "hevc_alpha",
+        "prores_422",
+    ] {
         assert_eq!(listed(&handle, preset), h264, "{preset} on 1000 × 667");
     }
 }

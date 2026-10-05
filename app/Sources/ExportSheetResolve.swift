@@ -441,6 +441,7 @@ extension ExportSheetController {
             summaryLabel.stringValue = resolveError ?? "These settings are not available."
             summaryLabel.textColor = DS.textStrong
             footnote.stringValue = ""
+            footnote.toolTip = nil
             exportButton?.isEnabled = false
             return
         }
@@ -451,6 +452,7 @@ extension ExportSheetController {
         summaryLabel.textColor = DS.textMuted
         summaryLabel.stringValue = summary(for: settings)
         footnote.stringValue = footnoteText(for: settings)
+        footnote.toolTip = footnote.stringValue
         exportButton?.isEnabled = settings.duration > 0
     }
 

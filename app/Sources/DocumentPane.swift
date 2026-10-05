@@ -303,13 +303,14 @@ final class DocumentPane: InspectorPaneView {
     /// would go on naming no row however much footage arrived afterwards — a
     /// whole session's worth of a discoverability line saying nothing, bought
     /// by one glance at the Document tab of an empty project. Re-asking costs
-    /// nine FFI calls per section build, and only in the state where the
+    /// ten FFI calls per section build, and only in the state where the
     /// answer is useless.
     ///
-    /// Internal, not private, and the split is the reason: a render cannot
-    /// read TEXT, so the note is the one thing in this phase's chrome that no
-    /// photograph can check, and `phase7_chrome.py`'s probe calls this and
-    /// `transparencyNote` instead.
+    /// Internal, not private, as `transparencyNote` is, so a probe can call
+    /// them; no script does today. A render cannot read TEXT, so the note's
+    /// words are checked where they can be read: `hevc_alpha_proof.py`'s row
+    /// N1 takes them off the live Document tab's layout dump, and
+    /// `phase7_chrome.py` section 5 photographs the note's row.
     static func alphaFormats(_ project: ReelProject?) -> [String] {
         if let cached = alphaFormatCache, !cached.isEmpty { return cached }
         guard let project = project else { return [] }
@@ -341,28 +342,21 @@ final class DocumentPane: InspectorPaneView {
     /// row joins the list or is silent, where an enumeration of the rows that
     /// flatten would be wrong the moment the core added one.
     ///
-    /// **It names ALL of them and does not count.** The guard here used to be
-    /// `formats.count == 1`, written when `prores_4444` was the only row with
-    /// the flag; `apng` has it too, so that test could never hold again and
-    /// the branch that named a row became unreachable — the note degraded to
-    /// its class sentence on every project, which is the discoverability it
-    /// exists to provide, gone. Counting was the wrong test even at one row:
-    /// what the note wants is a NAME, and the honest question is whether
-    /// there is one.
+    /// **It names them while the names fit, and counts them when they do
+    /// not** (spec §11 G-33 (a)). One or two rows are named, joined by a
+    /// comma; three or more are counted — "kept by 3 export formats." — and
+    /// the count is the list's own, so a fourth row changes the number and
+    /// nothing here. With no row to name (a document with no duration answers
+    /// none) it says the class of format instead.
     ///
     /// Short on purpose, and the arithmetic is what decided the wording.
     /// `InspectorNoteLabel` truncates rather than wraps; its row is 268 pt in
     /// the default 304 pt pane (`DS.panelWidth` less the scroller and two
     /// insets) and **244 pt at the 280 pt narrowest a person can drag the
-    /// inspector to**, which is the width that has to be met. Measured in
-    /// `DS.sans(11)` — Source Sans 3, the BUNDLED face, not the system one,
-    /// which is a third wider and would give every number here a different
-    /// answer: the two-row sentence is 229 pt and fits both. A verb does not
-    /// ("Transparent — kept by ProRes 4444 (MOV), Animated PNG." is 265 and
-    /// clips at the narrow end), so the em-dash carries it, exactly as it does
-    /// in the sentence below. **A THIRD alpha row would not fit** — three
-    /// names run to about 295 pt — and the answer then is this method, not the
-    /// caller.
+    /// inspector to**, which is the width that has to be met. In
+    /// `DS.sans(11)` — Source Sans 3, the BUNDLED face — two names are 229 pt
+    /// and fit, and three run to about 295 pt and do not, which is why the
+    /// third row turned the list into a count.
     static func transparencyNote(_ background: RGBA, formats: [String]) -> String? {
         guard background.nsColor.alphaComponent < 0.995 else { return nil }
         // Nothing to name is a real state rather than a bug — `alphaFormats`
@@ -370,6 +364,9 @@ final class DocumentPane: InspectorPaneView {
         // with no duration answers nothing — so the class of format is still
         // worth saying, and it is still said positively.
         guard !formats.isEmpty else { return "Transparent — needs an alpha format." }
+        guard formats.count < 3 else {
+            return "Transparent — kept by \(formats.count) export formats."
+        }
         return "Transparent — " + formats.joined(separator: ", ") + "."
     }
 

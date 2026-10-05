@@ -303,7 +303,6 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   engine's own sentence says so.
 - **Deliberately not built** (orig §7):
   - keyframed props (G-10) — wanted, #239;
-  - HEVC with alpha (ProRes 4444 and APNG already carry alpha);
   - mattes or video input to a graphic — wanted, #240;
   - system fonts as an opt-in — CLOSED by the owner 2026-10-04: Add Font to
     Graphics… / `import_graphic_font` already puts a face in the package and
@@ -903,8 +902,10 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   neither of 16,769,025 evened Document rows, 1,961,452 / 65,114,648 / 0
   of 67,076,100 standard rows, 4,094 of the 8,192 one-pixel-edge
   canvases neither, each the designer's wider arm's count), and it
-  supersedes the owner's choice 18 (a): no size is refused for being
-  odd. Of G-33 this phase BUILDS only (b): the row, the fill rule, the
+  supersedes the owner's choice 18 (a): there is no refusal for an odd
+  size as such (what holds exactly, as phase B's fix pass 1 left it: no
+  size of the canvas's own shape is refused for being odd). Of G-33 this
+  phase BUILDS only (b): the row, the fill rule, the
   guard's test and the encoder outcome are decisions phase B builds, and
   until it does G-33 says so in a note under its heading and words them
   as what is to be — after fix pass 1 of this phase's review, which
@@ -993,6 +994,155 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   controls, SE-9 in `docs/manual-checks.md`, and this list's "HEVC with
   alpha" entries; and the `CLAUDE.md` edits for both phases.
 
+  Issue batch B85, phase 3, PHASE B (2026-10-05, #103; spec §11 G-33) is
+  the row and what it needed, and the last of #103 this batch builds.
+  `hevc_alpha`, "HEVC with Alpha (MOV)", is the tenth export row, directly
+  after `hevc`: `ExportWriter` writes `AVVideoCodecType.hevcWithAlpha`
+  into a QuickTime movie with AAC sound, HEVC's dictionary and default
+  rate plus the one key that declares the pixels premultiplied, network
+  optimisation off unless asked. **The fill rule** is one integer test,
+  `ExportWriter.shapeGap`, shared by the alpha guard and the scaling mode,
+  with the first arm G-33 (c) records — a canvas-shaped size less at most
+  one pixel on each axis, at any scale; fix pass 1, below, is how it came
+  to be that and not the tighter arm first built: a frame within a pixel
+  of the canvas's shape, or such a size, is written
+  `AVVideoScalingModeResizeAspectFill` on every movie row, an exact one
+  and one further off as before, and on the two alpha movie rows one
+  further off is refused in the shape sentence. No size of the canvas's
+  own shape is refused for being odd, and there is no new error case.
+  `Exporter.encoderOutcome`,
+  one replaced line in `Exporter.swift`'s `startWriting`, turns a failed
+  write whose error is `AVFoundationErrorDomain` −11834 into the preset's
+  own sentence and removes the 0-byte file. `DocumentPane.transparencyNote`
+  names one or two alpha formats and counts three or more. The `export`
+  tool's `preset` and `size` descriptions say all of it; no handler, no
+  `rc_*` export, no schema and no format version moved (10 presets; the
+  op and tool counts are B84's). `ExporterWriter.swift`, `Exporter.swift`
+  and `ReelCore.swift` stay at 782, 588 and 999 lines;
+  `ExporterWriter+Settings.swift` is 391 and `export_table.rs` 564. G-33
+  was read back against the build: its note is gone, (c)–(f) are in the
+  present tense with the built app's figures beside the designer's, and
+  two things it had not foreseen are written into (a) and (h) — below.
+  **Verified:** `cargo test --release --test export` 38 passed (three new
+  tests; `the_hevc_row_is_what_it_was` holds the `hevc` row and its
+  settings to literals printed before the row was added) and `--test
+  export_size` 20; `make test`, `make lint`, `cargo fmt --check`, `make
+  typecheck` (0 errors, the 4 warnings) and `make app`;
+  `hevc_alpha_proof.py` 29/29 with an empty stderr — the decoded alpha of
+  a clear, a half and an opaque pixel (A1–A4), AAC in the `.mov` (A5),
+  the two refusals (S1, S2), every edge at alpha 0 on the evened and the
+  within-a-pixel sizes of both alpha movie rows (O1, O2, O4, P1, P2), no
+  black line on `hevc`, `h264` and `prores_422` where the baseline has
+  two (B2, B3), the letterbox kept for another shape and for a frame
+  typed wider than the canvas (L1, L2), `hevc` on an even canvas and
+  `prores_4444` at three sizes equal to the baseline by frame digest (B1,
+  B4), the note (N1) and the sheet's Format popup and footnote text (E1);
+  its two controls (the alpha readers fail on plain `hevc`; the sheet
+  with no pinned choice fails E1); its three mutants, each built in a
+  tree copy and each exit 0 (`encoder-refused`: the sentence and no file,
+  and "Cannot Encode" over a 0-byte file with the mapping off;
+  `report-and-fill`: the size and fill rows fail; `shape-and-note`: S1,
+  N1, L2 and S2 fail, S2's `prores_4444` half by the wider limit alone,
+  and L1 with every frame filled); `phase7_chrome.py` 79/79 and
+  `phase7_proof.py` 92/92 on an instance of its own. The first
+  `report-and-fill` run failed on a fault in the script (a mutant's launch
+  was not handed the baseline, so L2's columns clause could not hold); it
+  was fixed and that mutant built again. **Gate A is red on this build by
+  design:** `--rows size` prints 10/11 and exits 1, G1 saying so — it
+  requires the pad and an unknown `hevc_alpha`. **Another host:** the
+  rows that read no digest are scored there, B1, B4 and G1 are not, and
+  the script exits 2 (run once against a foreign-stamped copy of the
+  baseline: 27/27, exit 2). **Found on the way, and not fixed:** (1) the
+  export sheet's footnote is drawn CUT on both alpha movie rows, before
+  the word "alpha" — its slot beside the three buttons is 88 pt and
+  "HEVC_ALPHA · MOV · alpha", like the shipped "PRORES4444 · MOV · alpha",
+  needs 144. Its tooltip was set once, empty, and never followed the
+  text; fix pass 1, below, made it follow, so resting the pointer on the
+  footnote shows the whole line. Owner choice 14 therefore holds of the
+  footnote's text and its tooltip and not of the sheet's drawn face: the
+  spec's row E1 required it untruncated, E1 scores the text and the
+  tooltip and prints the cut, and room for the summary on the face — a
+  line of its own, or a wider sheet, either a visible change to every
+  format's sheet — is the owner's choice. (2) Reelcut composites a
+  re-imported `hevc_alpha` or `prores_4444` movie as straight alpha: a
+  half-opaque red card over white comes back (191,127,127) and
+  (193,129,127), where about (255,128,128) is right (the proof's line I1,
+  printed and never scored). (2) goes to an issue. Owed: the person's
+  check SE-9 in `docs/manual-checks.md` (the note, the footnote and its
+  tooltip, and the file played in Safari, QuickTime Player and Final
+  Cut), and the `CLAUDE.md` edits for the phase.
+
+  Phase B, fix pass 1 (2026-10-05, the phase's review: two findings,
+  both fixed). **(1) The first arm of the fill rule.** As first built —
+  the canvas ITSELF less at most a pixel on each axis, the orchestrator's
+  tighter choice — it REFUSED an odd size typed in the canvas's own
+  proportions on `hevc_alpha`: the core evens `[720, 405]` on 1920 ×
+  1080 to 720 × 404, gap 1920 against a limit of 1080, and the sentence
+  named a size nobody sent and ended "or at any size with the same
+  proportions". The orchestrator amended its decision: the arm is a
+  canvas-SHAPED size less at most one pixel on each axis, at any scale
+  (one line of `shapeGap`: `d` is one of 0, `cw`, `−ch`, `cw − ch`),
+  with the costs G-33 (c) lists accepted — 396 × 98 and 404 × 100 on
+  400 × 100 are filled on every row, an odd canvas-shaped typed size is
+  filled on the opaque rows, `prores_4444` writes such frames where it
+  refused them, and a tiny frame gives up a large share. The new row O5
+  — `hevc_alpha` asked `[400, 225]` and `[1296, 729]` on 640 × 360 and
+  `prores_4444` a typed 400 × 224, each written with all four edges at
+  alpha 0 — printed all three REFUSED on the build before the line
+  changed, and `report-and-fill` names it. The integer sweep was run
+  again with the amended arm as its own column: the Document and
+  standard rows' six counts are unchanged, none of the sizes in the
+  canvas's proportions is refused on ten canvases (the first arm refused
+  256 of 512 on 1920 × 1080), and the frames of L1, L2, S1 and S2 are
+  past the limit under both. Every sentence that said no size is refused
+  for being odd says what holds: no size of the canvas's own SHAPE is,
+  and a typed size of another shape is judged as the even frame it
+  becomes (1279 × 720 on 1920 × 1080 is filled on `prores_4444` and, as
+  1278 × 720, refused on `hevc_alpha`; by arithmetic). **(2) The export
+  sheet's footnote** — its tooltip follows its text (two lines in
+  `ExportSheetResolve.syncReadout`, now 578 lines;
+  `ExportSheetController.swift` stays at 639), the layout dump carries
+  each view's `tooltip` (`UISnapshotLayout.swift`, 222), and E1 requires
+  the footnote's to equal its text: on a build with the key and without
+  the two lines it read the empty string. No layout changed; SE-9 says
+  what a person sees. **Verified after the last source edit:** `make
+  typecheck` (0 errors, the 4 warnings), `make app`,
+  `hevc_alpha_proof.py` 30/30 with an empty stderr (its red, on the build
+  with the dump's key and neither fix: 28/30, O5 and E1), both controls,
+  `report-and-fill` and `shape-and-note` built again and passing
+  (`encoder-refused` was not: its two anchors still occur once and its
+  rows did not change), `phase7_chrome.py` 79/79, `phase7_proof.py`
+  92/92 on an instance of its own, `make test` (1171 tests in 95 result lines, 0 failed, and its six proofs and the defaults sweep) and `spec_index_proof.py` 138/138; the core did not
+  change, so `make lint` and `cargo fmt --check` were not run again.
+  **Seen once:** the first full run on the fixed build printed 29/30 —
+  B1, `hevc` on an even canvas, differing from the baseline in its
+  ffprobe stream and format values with frame 0's digest equal — and
+  eight later reads of the same build were equal; that line did not print
+  which values moved (`held` prints them since). **Fix pass 2
+  (2026-10-05, the second review of phase B)** took the byte counts out
+  of the row, changing no app source. B1 had compared the stream's
+  `bit_rate` and the file's `size` and `bit_rate` — byte counts of a
+  hardware HEVC bitstream, which the encoder does not promise to repeat —
+  and now prints those three beside the baseline's and compares the rest:
+  the stream's and the file's fixed parameters, the alphas, the corner
+  and frame 0's digest (`B1_UNSCORED`; the baseline file is as it was
+  recorded). Shown by import on the built app, through the row itself:
+  today's case and a copy with only the three values altered read equal,
+  and copies with the profile, the frame count, the duration or frame 0's
+  digest altered fail, each line naming what moved (7 of 7 variants as
+  expected); then `hevc_alpha_proof.py` 30/30 with an empty stderr and
+  both controls. Whether the one failed run was those three values is not
+  known — a frame count or a duration that moves still fails the row —
+  and what the row gives up is a change of the encoder's rate, which this
+  640 × 360 fixture could not see for the line phase B changed (G-33
+  (h)). The same pass wrote the dump's `tooltip` into spec §7.9a and ran
+  the two readers of the dump not run since the key was added, each on an
+  instance of its own in a scratch home: `v2_snapshot.py` 29 pass, 0
+  fail, one named host skip (O2), and `screens.py --only 12-export-sheet`
+  6 of 6 over its two looks; `spec_index_proof.py` 138/138. Nothing was built
+  and no mutant run: no anchor is in the proof. Owed as before, with the
+  `CLAUDE.md` text now following the amended arm.
+
 ## Open items
 
 - G6's rest — playback prefetch, in-place raster (`graphic/src/raster.rs`)
@@ -1007,8 +1157,8 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   - `validate` accepts a graphic clip with no description.
 
   Tracked in #72.
-- The not-built list: HEVC with alpha — tracked in #103; keyframed props —
-  #239; mattes or video input — #240.
+- The not-built list: keyframed props — #239; mattes or video input —
+  #240. (HEVC with alpha was on it and is built: spec §11 G-33.)
 - Replacing QuickJS with JavaScriptCore — GitHub issue #39.
 
 ## Where to look in the original

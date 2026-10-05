@@ -784,7 +784,8 @@ the key map behind it.
   name field. `GraphicSchema.swift` holds `GraphicSchemaEntry` and
   `GraphicSchema` (with `orderedKeys`), a pure move out of it ·
   `DocumentPane.swift` (reads `documentSnapshot`, never the scoped one: its
-  ops are document-level) · `OptionControls.swift` (the descriptor-driven
+  ops are document-level; its transparency note names one or two alpha
+  export formats and counts three or more, spec §11 G-33) · `OptionControls.swift` (the descriptor-driven
   row controls) · `OptionControls+Choices.swift` (the typed, value-carrying
   `OptionPopupControl` init over the index one). `VideoPane+Motion.swift` owns the local wrapping
   `MotionInactiveNote` for selected zero-duration edges; it refreshes with
@@ -1070,11 +1071,19 @@ the key map behind it.
   32-bit float, then the write: un-normalised from a 16-bit decode (a mix
   past full scale clips there, and `mixClipped` says so); normalised from the
   same float decode the measurement read, gained and quantised once by
-  `ExportAudioGain` (#86). `ExportWriter` refuses an alpha-carrying row at a PADDED size
-  (padding inverts the alpha; a pure scale is fine), testing the box the
-  ENCODER is handed through `encodedSize`, which is the identity on the size
-  the CORE resolved — already even where the row needs it (spec §11 G-33) —
-  and only the floor under any other caller; `apng` FITS instead and must not
+  `ExportAudioGain` (#86). `ExportWriter` FILLS the frame when a fit would leave at most
+  a pixel uncovered, or — the frame a canvas-SHAPED size less at most one
+  pixel on each axis, `(bw + a)·ch == (bh + b)·cw` for some `a`, `b` in
+  {0, 1}, at any scale — when a fill would overshoot by at most one
+  (`shapeGap`: `gap <= limit`, in integers), and letterboxes past that, where
+  an alpha-carrying movie row (`prores_4444`, `hevc_alpha`) is refused instead
+  (padding inverts the alpha; a pure scale is fine); so no size of the
+  canvas's own shape is refused for being odd, and a typed size of another
+  shape is judged as the even frame it becomes; the frame is the size the
+  CORE resolved, already even where the row needs it (spec §11 G-33), and
+  `encodedSize` is only the floor under it; a missing encoder is
+  `.presetUnavailable` and no file (`Exporter.encoderOutcome`, in
+  `ExporterErrors.swift`, applied where `startWriting` hears the pipeline); `apng` FITS instead and must not
   grow the guard. GIF and APNG refuse past 600 frames rather than truncate.
   `renderFrame` is documented off-main. Audio export is NOT bit-deterministic
   within an 8 ms window at a duck ramp edge (AVFoundation's mix); a duck-free
@@ -1430,7 +1439,10 @@ free.
   `handleEditorKey` refuse while one is attached. The export card's controls
   are a VALUE (`ExportChoice`); presets store control choices, not resolved
   overrides; `apply(_:)`'s order is load-bearing and documented there; the
-  burn-in checkbox rides as a `RecipeOptions`, not an override. The sheet has
+  burn-in checkbox rides as a `RecipeOptions`, not an override. The
+  footnote's tooltip follows its text: `syncReadout` (`+Resolve`) writes both
+  and clears both, because `sheetFootnote` sets a tooltip only for the text
+  it is built with and this sheet's text changes after (spec §11 G-33 (a)). The sheet has
   TWO commits, Export… and Add to Queue, one method. `GraphicFileSheetController.swift` is the ONE sheet of File ▸ Rename
   Graphic…, Delete Graphic… and Restore Graphic Version… (spec §11 G-30):
   `GraphicFileAct`, `GraphicFileChoice`, and the model statics a probe
@@ -2005,7 +2017,8 @@ free.
   an `NSClipView` or at zero area (the frame's); truncated,
   except when wrapping. Problems on `_NS…` views go to `private_problems`. A
   secure field's text is never written, nor a field editor's; an ordinary text
-  view's text is. A view that `is UISnapshotParts` adds one `UISnapshotPart`
+  view's text is. Each view's record carries its `tooltip` too (first 200
+  characters, `null` for none and always for a secure field). A view that `is UISnapshotParts` adds one `UISnapshotPart`
   record per part it names (id, text, rect), after its own record and before
   its subviews, never a problem (the Assistant tab's transcript, spec §11
   AI-17). It is pure over an `NSView` tree, so

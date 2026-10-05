@@ -377,7 +377,7 @@ final class Exporter {
         writer.start { [weak self] result in
             guard let self = self else { return }
             if case .success = result { self.progressHandler?(1) }
-            self.finish(result)
+            self.finish(Exporter.encoderOutcome(result, settings: settings, destination: url))
         }
     }
 

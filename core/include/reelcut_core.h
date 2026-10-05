@@ -368,8 +368,8 @@ char *rc_export_sizes(const RcProject *p, const char *preset_id, char **err_out)
  * One key of the RESOLVED settings needs its meaning stated, because the
  * obvious reading of the name is the wrong one: `alpha` is a capability of
  * the ENCODING — "this row carries an alpha channel" — and is true for
- * `prores_4444` and `apng`, and for nothing else. It is not "this
- * project's canvas is translucent". `gif` is false and `apng` is true
+ * `prores_4444`, `hevc_alpha` and `apng`, and for nothing else. It is not
+ * "this project's canvas is translucent". `gif` is false and `apng` is true
  * although both can show a transparent pixel: APNG has a real fourth
  * channel and a pixel may be any fraction of opaque, while a GIF
  * nominates ONE palette index as transparent and has no partial value to

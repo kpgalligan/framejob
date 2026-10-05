@@ -503,7 +503,7 @@ governs a module now.
   so the size reported is the size written (G-33); and the rows themselves. In a row, `avf_preset: null` routes
   an export to the ImageIO writer (so the two LPCM rows repeat `audio_m4a`'s
   name), and `alpha` means "this ENCODING carries an alpha channel" — true for
-  `prores_4444` and `apng`, false for `gif`, which has one palette index and
+  `prores_4444`, `hevc_alpha` and `apng`, false for `gif`, which has one palette index and
   no partial value — never "the canvas is translucent".
 - `agent.rs` — embedded MCP server (streamable HTTP, tools only).
   **Generic** — knows nothing about video; the host registers the catalog

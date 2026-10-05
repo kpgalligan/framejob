@@ -522,10 +522,10 @@ struct ExportSettings: Decodable, Equatable {
     /// script's "no ceiling but full scale", and `ExportLoudness.resolve`
     /// supplies 0 dBTP for it.
     let peakDbtp: Double?
-    /// Whether this ENCODING carries an alpha channel — true for
-    /// `prores_4444` and `apng`, and for nothing else the table offers.
+    /// Whether this ENCODING carries an alpha channel — true for `prores_4444`,
+    /// `hevc_alpha` and `apng`, and for nothing else the table offers.
     ///
-    /// The two rows are not alike and the second one is the one to remember:
+    /// The rows are not alike and `apng`'s is the one to remember beside it:
     /// `gif` is FALSE though a GIF can show a transparent pixel, because one
     /// palette index is not a channel and nothing partial survives it, where
     /// APNG carries a real fourth channel (`export_table.rs`'s field doc is
@@ -599,10 +599,10 @@ struct ExportSettings: Decodable, Equatable {
         audioBitrate = c.lenient(.audioBitrate)
         loudnessLufs = c.lenient(.loudnessLufs)
         peakDbtp = c.lenient(.peakDbtp)
-        // False is the safe default: only `prores_4444` and `apng` answer
-        // true, and a core that predates phase 7 does not emit the key at
-        // all. Its silence UNDER-reports — that core has no `prores_4444`
-        // row to describe, but its `apng` row wrote alpha then as it does
+        // False is the safe default: only `prores_4444`, `hevc_alpha` and
+        // `apng` answer true, and a core that predates phase 7 does not emit
+        // the key at all. Its silence UNDER-reports — that core has no
+        // `prores_4444` row to describe, but its `apng` row wrote alpha then as it does
         // now — and under-reporting is the direction that cannot hurt: this
         // key only ADDS the footnote's "alpha" and ARMS
         // `ExportWriter.checkAlphaSurvivesTheSize`, so false promises less

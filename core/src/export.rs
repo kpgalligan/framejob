@@ -223,11 +223,12 @@ impl Project {
         );
         out.insert("video".to_string(), Value::from(preset.video));
         // Whether the ENCODING carries a fourth channel — true for
-        // `prores_4444` and `apng`, and for nothing else the table offers.
-        // `export_table.rs`'s `alpha` field doc is where that PAIR is
-        // argued — a GIF shows a transparent pixel and still answers false,
-        // because it has one palette index and no fourth channel — and
-        // `core/tests/export.rs` pins both rows by name.
+        // `prores_4444`, `hevc_alpha` and `apng`, and for nothing else the
+        // table offers. `export_table.rs`'s `alpha` field doc is where
+        // `apng` against `gif` is argued — a GIF shows a transparent pixel
+        // and still answers false, because it has one palette index and no
+        // fourth channel — and `core/tests/export.rs` pins the three rows
+        // by name.
         //
         // It reads `preset.alpha` and not `self.canvas.background`, which
         // is the whole decision and is worth one sentence here as well as

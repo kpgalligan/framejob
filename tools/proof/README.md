@@ -15328,10 +15328,13 @@ On every export row that needs even pixel dimensions the core resolves and
 lists the even size the file will have (`Preset::even_sized`,
 `export_size::even_size`), so the Size popup, the sheet's readout and
 fields and the `export` tool's `width` and `height` say the file's size.
-This is phase A of G-33, gated alone. Phase B — the `hevc_alpha` row, the
-fill rule, the encoder outcome — is the next pipeline, and adds its rows,
-mutants and controls to the same script; **`hevc_alpha_proof.py` holds
-phase A's rows only today and exits 2 without `--rows size`**.
+This is phase A of G-33, gated alone and committed as fcfeebf. Phase B —
+the `hevc_alpha` row, the fill rule, the encoder outcome — is the next
+section, and added its rows, mutants and controls to the same script. This
+section is the record of phase A's gate ON PHASE A'S BUILD: **on a build
+that holds phase B, `--rows size` prints 10/11 and exits 1, by design** —
+its row G1 requires the pad and an unknown `hevc_alpha` — and says so on
+G1's line and on its last line (next section, "Gate A after phase B").
 
 **What is proved, and by which instrument.**
 
@@ -15382,7 +15385,8 @@ phase A's rows only today and exits 2 without `--rows size`**.
   popup reading "H.264 (MP4)" or "HEVC with Alpha (MOV)" (what that shows
   of the pinned choice, and what it cannot in phase A, is under "A launch
   argument", below). B1 `hevc` on the even canvas equals the baseline in ffprobe's
-  values, alphas, corner and frame-0 digest. B4 `prores_4444` at three
+  fixed parameters (its byte counts are printed, not compared: "The baseline
+  is one host's bytes", below), alphas, corner and frame-0 digest. B4 `prores_4444` at three
   sizes equals the baseline's size and digest. G1 the six odd-canvas files
   equal the baseline's frame-0 digest and eight edge pixels, a black one
   among them, and `hevc_alpha` is an unknown preset that writes no file —
@@ -15408,16 +15412,21 @@ refuses that size.
 
 **The baseline is one host's bytes and one build's, and says which**
 (fix pass 1 of phase A's review). Its cases are hardware H.264 and HEVC
-bitstreams, ffprobe's exact `size` and `bit_rate`, and ffmpeg's RGBA
+bitstreams, ffprobe's values for one of them, and ffmpeg's RGBA
 digests, so another Mac, another macOS or another ffmpeg can differ in
-every one of them with nothing wrong in Reelcut. The file carries `host` —
+every one of them with nothing wrong in Reelcut. (ffprobe's byte counts
+for that file — the stream's `bit_rate`, the file's `size` and `bit_rate`
+— are held in the baseline and printed, and since fix pass 2 of phase B's
+review compared on no host, this one included: "B1 compares no byte
+count", in the next section.) The file carries `host` —
 the chip (`sysctl -n machdep.cpu.brand_string`), the macOS version and
 build (`sw_vers`) and the first three words of `ffmpeg -version` — and the
 rows print it on the line under their heading. **On a host that is not
-the baseline's, `--rows size` scores nothing, names both hosts and exits
-2**: the instrument, not the product. That includes the rows that read no
-digest (R1–R4, E2); phase B, which writes the full rows, may want those
-scored on a foreign host and only B1, B4 and G1 withheld. Such a host
+the baseline's, phase A's script scored nothing, named both hosts and
+exited 2**: the instrument, not the product. Phase B changed that to what
+this paragraph left open — the rows that read no digest are scored there
+and only B1, B4 and G1 withheld, still with exit 2 (next section, "Another
+host"). Such a host
 records its own baseline: a git work tree of a commit before G-33's code
 (055a5ed), `make app` in it, then THIS script twice with `--record-baseline
 --app <that tree>/build/Build/Products/Release/Reelcut.app`. A recording at
@@ -15528,5 +15537,323 @@ tooltip prints the same resolved value by construction and no row reads it
 
 ```sh
 cd core && cargo test --release --test export_size        # 20 passed
-python3 tools/proof/hevc_alpha_proof.py --rows size       # 11/11, exit 0 (launches the app in a scratch home; not in make test)
+python3 tools/proof/hevc_alpha_proof.py --rows size       # 11/11, exit 0 on phase A's build (fcfeebf); 10/11, exit 1, G1 red by design, on a build with phase B
+```
+
+## Issue batch B85 phase 3, phase B — HEVC with alpha, the fill within a pixel, and a missing encoder (`core/tests/export.rs`, three new tests; `hevc_alpha_proof.py`: 30 rows, 2 controls, 3 mutants; #103; spec §11 G-33)
+
+`hevc_alpha`, "HEVC with Alpha (MOV)", is the tenth export row: a QuickTime
+movie whose frames carry the canvas's alpha. Every movie row FILLS the
+frame when it is within a pixel of the canvas's shape (`ExportWriter.shapeGap`,
+one integer test the alpha guard shares) and letterboxes past that, where
+the two alpha movie rows refuse instead; a Mac with no encoder for a row
+answers the preset's own sentence and leaves no file
+(`Exporter.encoderOutcome`); the Document tab's note counts the alpha
+formats once there are three. The first arm of the fill rule is the one
+G-33 (c) records as amended in fix pass 1: a canvas-SHAPED size less at
+most one pixel on each axis — `(bw + a)·ch == (bh + b)·cw`, `a` and `b`
+each 0 or 1 — is filled on the strength of the fill's overshoot, at any
+scale, so no size of the canvas's own shape is refused for being odd.
+
+**What is proved, and by which instrument.**
+
+- **`core/tests/export.rs`** (in `make test`; 38 tests). `EXPECTED` holds
+  ten rows with `hevc_alpha` after `hevc`.
+  `hevc_alpha_is_a_mov_avfoundation_writes`: every key of the resolved
+  settings — `mov`, `com.apple.quicktime-movie`, the codec `hevc_alpha`,
+  `…HEVCHighestQualityWithAlpha`, picture, sound, alpha, the document's
+  size and rate, no bit rate unasked, `optimize_for_network` false by
+  default and true when asked, an asked bit rate echoed.
+  `hevc_alpha_sits_directly_after_hevc`: the menu's order and the row's
+  name. `the_hevc_row_is_what_it_was`: the `hevc` preset row and its
+  resolved settings, with nothing asked and with all four optional
+  overrides, against literals the tree printed BEFORE the row was added
+  (the test was written and passed first, then the row).
+  `only_prores_4444_hevc_alpha_and_apng_carry_alpha`: the three ids, in
+  menu order. `core/tests/export_size.rs` (20 tests): `hevc_alpha` is in
+  `MOVIE_FORMATS`, in the even-sized list (so
+  `every_preset_is_even_sized_or_keeps_an_odd_edge` classifies it), in the
+  asked-size loop and in both "lists what `h264` lists" loops.
+- **`hevc_alpha_proof.py`** (not in `make test`: it launches the app). One
+  Release instance per run in a scratch home under
+  `tools/proof/work/hevc-alpha/` (removed at start and exit), on its own
+  socket, with every key of `screens.py`'s `PINS` as a launch argument, the
+  inspector at 280 pt and the export choice pinned to `hevc_alpha`. Two
+  menu-driven acts, neither persisting: File ▸ Export… (opened, read,
+  cancelled — nothing in a sheet is pressed) and the inspector's Document
+  tab. Twelve fixtures, every export one second, the largest frame
+  1296 × 728. The full rows and the two controls, three launches, took
+  25 s together here.
+  The phase A rows are scored again with `hevc_alpha` added to R1 and R2
+  and with E2 requiring the Format popup to read "HEVC with Alpha (MOV)"
+  alone, so a pin that did not take fails E2 (the phase A build could not
+  tell). T0 reads B6's four phrases off `tools/list`.
+  **A1** a hard-edged opaque red card on a clear 640 × 360 canvas as
+  `hevc_alpha`: the answer says `hevc_alpha` / `mov` / `hevc_alpha`, the
+  path ends `.mov`, ffprobe says `hevc` / `hvc1` (and `yuv420p` — it cannot
+  see the alpha), and decoded the frame holds two alphas, 0 and 255, with
+  no pixel wrong more than 4 px from the card's edge. **A2** the card at
+  half opacity decodes (129,0,0,128) at its centre. **A3** on an opaque
+  canvas every alpha is 255. **A4** at `720p`: 1280 × 720, corner 0,
+  centre 255. **A5** with a tone on a second track: an `aac` stream, 48000
+  Hz, 2 channels, and `loudness` in the answer ("Peak −14.0 dBTP · −14.7
+  LUFS").
+  **S1** 640 × 480 on 640 × 360 as `hevc_alpha`, and **S2** 402 × 100 on
+  400 × 100 as `prores_4444` and as `hevc_alpha`, are refused in the shape
+  sentence, naming both sizes, with no file.
+  **O1** a clear 321 × 181 and a clear 181 × 320 document as `hevc_alpha`
+  with no size, and `[321, 181]` asked on 640 × 360: written at the even
+  size the answer names, every pixel of all four edges alpha 0, the centre
+  255. **O2** `prores_4444` keeps 321 × 181, and writes a typed 180 × 320
+  on 181 × 320 (which the earlier guard refused) with all four edges 0.
+  **O3** `apng` keeps 321 × 181. **O4** the 321 × 181 document at `720p`
+  as `hevc_alpha`: 1276 × 720, all four edges 0. **O5** (fix pass 1) on
+  the clear 640 × 360 document, `hevc_alpha` asked `[400, 225]` and
+  `[1296, 729]` — odd sizes in the canvas's own proportions, one smaller
+  than it and one larger — is not refused: the answer and the file are
+  400 × 224 and 1296 × 728, all four edges 0, the centre 255; and
+  `prores_4444` at a typed `[400, 224]` is written the same. The build
+  before the first arm was amended REFUSED all three in the shape sentence
+  ("…and 400 × 224 is a different shape…"), which is this row's red.
+  **P1**, **P2** a clear
+  334 × 222 document at `720p` (1084 × 720, 0.76 px off shape) as
+  `hevc_alpha` and `prores_4444`: all four edges 0.
+  **B2** a white 334 × 222 document at `720p` as `hevc`, `h264` and
+  `prores_422`: the last three columns of the middle row read 253–254
+  where the baseline's last two are black. **B3** the two odd red
+  documents on those three rows: all eight edge pixels red (253–254 on
+  321 × 181, 250 on 181 × 320) where the baseline has two black among
+  them. **L1** 334 × 222 at `[640, 640]` is letterboxed, black at the top
+  and bottom. **L2** 400 × 100 at `[402, 100]`: exactly two black pixels in
+  the middle row, columns 400 and 401, the baseline's.
+  **N1** the Document tab reads "Transparent — kept by 3 export formats."
+  once, 183 pt wide, not truncated. **E1** the sheet opens on "HEVC with
+  Alpha (MOV)", its footnote's text is "HEVC_ALPHA · MOV · alpha", and the
+  footnote's `tooltip` in the layout dump is that same whole line.
+  B1, B4, H0 and Z1 are phase A's. **X1** is scored only under
+  `--mutant encoder-refused`.
+
+**What E1 does NOT score, and why it is printed.** The spec's row also
+required that no `truncated` problem name the footnote. That is false on
+the built app and was before this phase: beside the sheet's three buttons
+the footnote's slot is 88 pt, and "HEVC_ALPHA · MOV · alpha" — like the
+shipped "PRORES4444 · MOV · alpha" — needs 144, so both are drawn cut with
+a tail ellipsis, before the word "alpha" (measured, all three rows
+compared: "H264 · MP4" is 60 pt in 64). What E1 DOES score since fix
+pass 1 is where the whole line can still be read: `syncReadout`
+(`ExportSheetResolve.swift`) writes the footnote's tooltip after its text
+and clears it with the text, the layout dump carries each view's `tooltip`
+(`UISnapshotLayout.swift`; first 200 characters, `null` for none and for a
+secure field), and E1 requires the footnote's to equal its text. Its red:
+on a build with the dump's key and without those two lines the tooltip
+read the empty string `sheetFootnote("")` set once, and E1 failed.
+Only the `hevc_alpha` sheet is opened; ProRes 4444's footnote takes the
+same two lines and has no row. E1 still prints the cut on its line in
+every run: giving the summary room on the sheet's FACE (a line of its
+own, a wider sheet) is a visible change to every format's sheet and the
+owner's choice, not a row's. G-33 (a) and (h) and the manual check SE-9
+say the same.
+
+**Controls** (no build), each exit 0. `--control plain-hevc-reader`: A1's
+and A2's pixel readers over plain `hevc` exports of the same two projects
+both FAIL (every alpha 255: 203,100 pixels outside the card are not 0;
+the half card's centre is (129,0,0,255)). `--control sheet-default`: with
+`screens.py`'s empty export choice the sheet opens on "H.264 (MP4)" and E1
+FAILS.
+
+**Mutants**, each one `tree_copy.make_copy`, every anchor asserted to
+occur once, built by the copy's own `make app` (99–133 s here), each exit
+0. `encoder-refused` — an encoder specification nothing satisfies for
+`.hevcWithAlpha`: A1 FAILS and X1 PASSES ("This Mac cannot export with the
+“hevc_alpha” preset.", nothing at the path); relaunched with
+`RC_MUTANT_UNMAPPED`, which turns `encoderOutcome` off, X1 FAILS: the tool
+answers "Cannot Encode" and a 0-byte file is left. `report-and-fill` —
+`Preset::even_sized` false and `fillsTheBox` false: R1, R2, R4, E2 FAIL
+(the answer and the sheet say 321 × 181 over a 320 × 180 file) and O1,
+O5, P1, P2, B2, B3 FAIL (edges at alpha 15–16 on `hevc_alpha` and 255 on
+`prores_4444`; two black columns or rows), while R3, S1, S2, L1, L2 PASS.
+`shape-and-note` — the guard skipped for `.hevcWithAlpha`, the note
+always joined, `limit` `max(cw, ch)` for every frame: S1, N1, L2 and S2
+FAIL (S2's `prores_4444` half by the limit alone: 402 × 100 is written;
+L2 has no black column; the joined three-name note is truncated) while L1
+and O1 PASS; relaunched with `RC_MUTANT_FILL_ALL`, L1 FAILS (white at the
+top and bottom). **The copy's `core/` is its own for `report-and-fill`**
+(`own_core`): `make_copy` links `core` to the tree's, so an anchor
+replaced through the link would be replaced in the TREE; the script
+refuses any anchor whose file resolves outside the copy, copies `src/` and
+the two Cargo files, links `include/`, and clones the tree's release
+artifacts (`cp -c`) so the copy compiles the local crates only. The first
+run of this mutant found a fault in the SCRIPT, not the product: a mutant's
+launch was not handed the baseline, so L2's "columns equal the baseline's"
+clause failed; mutants and controls are handed it now, and that mutant was
+built again (four mutant builds in all).
+
+**Gate A after phase B.** `--rows size` on this build prints 10/11 and
+exits 1: G1 requires the pad the baseline recorded and an unknown
+`hevc_alpha`, and this build fills and lists the row. G1's line ends "RED
+BY DESIGN: this build holds phase B…" and the last line reads "10/11 — G1
+is RED BY DESIGN on a build that holds phase B; it is Gate A's row and
+the only one that failed". The gate was passed where it belongs, on the
+phase A build (fcfeebf). The exit status stays 1 on purpose: a gate that
+answered 0 here would no longer be red on a tree that already fills.
+
+**Another host.** The baseline is this host's bytes (previous section).
+Phase B's decision on what that section left open: on a host that is not
+the baseline's, **the rows that read no digest are scored**, B1 and B4
+(and G1 under `--rows size`) print a `skip` line naming both hosts, L2
+drops its "columns equal the baseline's" clause and says so, the last line
+is `n/n — not scored: …`, and the script exits **2** when everything it
+scored passed — the claim is incomplete there, which is the instrument's
+answer and not the product's — and 1 when a scored row failed. Run once
+here by import, the baseline aimed at a copy stamped "Apple M1 · macOS
+15.6 · ffmpeg 7.1": 27/27, B1 and B4 skipped, exit 2. So a macOS or ffmpeg
+update on this Mac no longer silences the alpha, fill and size rows; it
+withholds the two "the old file is byte for byte the old file" rows until
+a baseline is recorded for the new host.
+
+**I1, printed and never scored** (for the issue G-33 (h) names): a
+half-opaque red card over an opaque white canvas, re-imported from the
+`hevc_alpha` file, renders (191,127,127) at the card's centre, and from
+the `prores_4444` file (193,129,127); a correct composite is about
+(255,128,128). The files' own centre pixels decode (129,0,0,128) and
+(129,0,0,129).
+
+**Fix pass 1 (2026-10-05, the review of phase B).** Two findings, each
+shown red before its fix. *The first arm.* As first built — the canvas
+ITSELF less at most a pixel on each axis — `shapeGap` refused an odd size
+typed in the canvas's own proportions on `hevc_alpha` (the core evens
+`[720, 405]` on 1920 × 1080 to 720 × 404: gap 1920, limit 1080). The arm
+is now a canvas-SHAPED size less at most a pixel on each axis, and O5 is
+its row. *The tooltip.* E1's new clause, above. **The red build** was the
+tree with the dump's `tooltip` key and neither fix: 28/30, O5 FAILED (all
+three exports refused in the shape sentence, naming 400 × 224, 1296 × 728
+and 400 × 224) and E1 FAILED (`tooltip ['']`). On the fixed build 30/30.
+`report-and-fill` names O5 and was built again (O5 FAILS there: the answer
+says `[400, 225]` and `[1296, 729]` over files of 400 × 224 and
+1296 × 728 with edge alphas 0, 15 and 16, and `prores_4444`'s edges hold
+255), and `shape-and-note` was built again unchanged (its third anchor is
+the line under the one that changed); `encoder-refused` was not — its two
+anchors still occur once and its rows did not change. **The integer
+sweep**, run again with the amended arm as its own column (`shaped`,
+beside `pad` and `tight`; 9 s, no encoder; `r12b.swift` and
+`run12-rule-shaped.txt` are in the batch's handoff folder under
+`measurement/fix-1/`, not in the repository): the evened Document rows
+(4,196,351 exact, 12,572,674 filled, 0 neither) and the standard rows
+(1,961,452 / 65,114,648 / 0) are the tight arm's counts, no standard row's
+verdict differs, and 4,094 of the 8,192 one-pixel-edge canvases are still
+neither. Of every size in the canvas's own proportions with each edge in
+2…8192, evened, the tight arm refused or letterboxed 256 of 512 on
+1920 × 1080, on 640 × 360 and on 1080 × 1920, 1,023 of 2,047 on
+400 × 100, 1,364 of 2,729 on 300 × 100 and 12 of 25 on 181 × 320 (none
+on the other four); the amended arm none, on each of the ten canvases.
+Typed frames within 8 px of nine canvases that the amended
+arm newly fills: 396 × 98 and 404 × 100 on 400 × 100 on the even-sized
+rows, seven there on `prores_4444`, none on the other eight; none that
+the tight arm wrote is letterboxed or refused. The frames of L1, L2, S1
+and S2 — and 736 × 90 on 728 × 90, 2560 × 1080 on 2558 × 1080, 394 × 98
+on 400 × 100 — are past the limit under both. A typed size of ANOTHER
+shape is judged as the even frame it becomes: 1279 × 720 on 1920 × 1080
+is filled on `prores_4444` and, as 1278 × 720, past the limit on
+`hevc_alpha` (arithmetic; no row).
+
+**B1 compares no byte count (fix pass 2, 2026-10-05, the second review
+of phase B).** What led to it: the first full run on fix pass 1's build
+printed 29/30: B1, `hevc` on an even canvas, "differs in ['format',
+'stream']" with frame 0's digest, the alphas and the corner equal — and
+the values were not on the line, and the file was gone with the work
+folder. Read again on the same build: equal alone, equal after T0, R1, R3
+and R4 (the rows that precede its export in a full run), equal in the
+next full run (30/30) and equal in five more launches — eight of eight.
+The build before that fix read it equal too, and nothing in that pass
+touches an exact-shape frame's encoder dictionary (`gap == 0`). The row
+then compared ffprobe's exact `size` and `bit_rate` of a 3,782-byte
+hardware HEVC bitstream: byte counts, which the encoder does not promise
+to repeat and which are not what the row is for. **What the row does
+now:** it drops the stream's `bit_rate` and the file's `size` and
+`bit_rate` from BOTH sides before `held` — `B1_UNSCORED`, a constant of
+its own, so `STREAM_KEYS` and `FORMAT_KEYS` still read them and the
+baseline file is as it was recorded — and prints them under its line as
+"printed, not scored", beside the baseline's. Still compared: the
+stream's `codec_name`, `codec_tag_string`, `profile`, `level`, `pix_fmt`,
+`width`, `height`, `r_frame_rate`, `avg_frame_rate`, `nb_frames` and four
+colour values; the file's `format_name`, `nb_streams` and `duration`; the
+extension, the answer's and the file's size, the alphas, the corner,
+frame 0's digest and the samples. B4, G1 and L2's baseline clause read
+decoded pixels only and did not change. **Shown by import** (`demo_b1.py`
+and its kept output, in the batch's handoff folder under
+`measurement/fix-2/`, not in the repository): one launch, one export,
+and `row_b1` itself scored over today's case and six altered copies of
+it. As the app wrote it, and with only the three values altered (to
+21082, 3839 and 30712): ok, "equal". With `stream.profile`,
+`stream.nb_frames`, `format.duration` or `frame0` altered, and with the
+three values AND the profile altered: FAIL, each line naming the one
+value that moved and none of the three — 7 of 7 as expected. In every
+read of this pass the three values were the baseline's own (19848, 3782,
+30256). **Which values moved in the one failed run is not known** — no
+run printed them — so nothing here says it was these three; had it been
+the frame count or the duration, the row still fails, by name, and that
+would be the product's. **What the row gives up:** a change of the
+encoder's rate no longer fails it. On this 640 × 360 fixture it could
+not see the line of `defaultVideoBitrate` phase B changed in any case:
+483,840 at 0.07 bits a pixel and 967,680 at 0.14 are both raised to the
+1,000,000 floor (arithmetic, not run). `held` prints every value that
+moved (fix pass 1's change), which stays.
+
+**The dump's `tooltip` key and its other readers (fix pass 2).** Fix
+pass 1 added `tooltip` to every view's record in the layout dump
+(`UISnapshotLayout.swift`) and ran E1, `phase7_chrome.py` and
+`phase7_proof.py` after it; two readers of the dump were not run. No
+reader compares whole dumps — `screens.py --compare` and
+`v2_snapshot.py`'s `same_bytes` compare PNGs, and every reader takes a
+record's keys by name — and both were run on the same build to hold it:
+`v2_snapshot.py` (which builds `v2_layout_probe.swift` over
+`UISnapshotLayout.swift`; 120 s) on an instance of its own in a scratch
+home with V2a's pinned launch arguments, an empty `-RCSecretFolder` and
+a `-RCSpendFolder` that does not exist: 29 pass, 0 fail, 1 skip — O2,
+the named host skip "editor occluded without the cover" — P1–P7 and
+L1–L3 among the passes, O5 "38 of 38 captures had active false", no
+`Reelcut: ` line; and `screens.py --only 12-export-sheet` under a scratch
+home, light then dark: 6 pass of 6, 0 new problems, each dump 60 records
+with the key on every one and the footnote's `"H264 · MP4"` as both its
+text and its tooltip. Spec §7.9a's sentence on what a record holds now
+names the tooltip.
+
+**What is not proved here.** Any other Mac's encoders; playback in Safari,
+QuickTime Player and Final Cut (SE-9), and that the footnote's tooltip
+appears under a resting pointer (SE-9; E1 reads the property); a canvas,
+or a typed size, with an edge of exactly 1 px; a both-odd canvas far from
+square; what the amended arm's accepted costs look like in a file (396 ×
+98 and 404 × 100 on 400 × 100, an odd canvas-shaped size on an opaque
+row: arithmetic only); the Quality tiers and bit-rate controls on the new
+row (the sheet reads the codec's `hevc` prefix, by reading — no row picks
+a tier); the queue's tooltip (G-33 (b)).
+
+| Run (2026-10-05, Apple M2 Max, macOS 26.5.1, ffmpeg 9.0.2) | Result |
+|---|---|
+| **after fix pass 2** (no app source changed: the build is fix pass 1's) — `demo_b1.py`, B1 by import over seven variants of today's case | DEMONSTRATION PASS: 7/7, exit 0, stderr empty |
+| `hevc_alpha_proof.py`, once | 30/30, exit 0, stderr empty; B1 "equal", its three unscored values the baseline's |
+| `--control plain-hevc-reader` · `--control sheet-default` | CONTROL PASS, exit 0, stderr empty, each |
+| `v2_snapshot.py` (own instance, scratch home) · `screens.py --only 12-export-sheet` (scratch home) | 29 pass, 0 fail, 1 skip (O2, a named host skip), exit 0 · 6 pass of 6, exit 0; stderr empty, each |
+| `spec_index_proof.py` | 138/138, exit 0 |
+| **after fix pass 1** — `hevc_alpha_proof.py` on the red build (the dump's `tooltip` key, neither fix) | 28/30, exit 1: O5 and E1 FAILED; stderr empty |
+| `hevc_alpha_proof.py` on the fixed build, first run | 29/30, exit 1: B1 "differs in ['format', 'stream']" (above); stderr empty |
+| `hevc_alpha_proof.py` on the fixed build, the run that counts | 30/30, exit 0, stderr empty |
+| `--control plain-hevc-reader` · `--control sheet-default` | CONTROL PASS, exit 0, stderr empty, each |
+| `--mutant report-and-fill` (124 s) · `--mutant shape-and-note` (101 s) | MUTANT PASS, exit 0, stderr empty, each |
+| `phase7_chrome.py` · `phase7_proof.py` (own instance, scratch home) | 79/79 · 92/92, no `Reelcut: ` line, stderr empty |
+| **before fix pass 1** (29 rows, the tighter first arm) — `hevc_alpha_proof.py` | 29/29, exit 0, stderr empty |
+| before: `--control plain-hevc-reader` · `--control sheet-default` | CONTROL PASS, exit 0, stderr empty, each |
+| before: `--mutant encoder-refused` (built in 99 s) | MUTANT PASS, exit 0, both launches |
+| before: `--mutant report-and-fill` (112 s; the first build, 133 s, exit 1 on the script's L2 fault above) | MUTANT PASS, exit 0 |
+| before: `--mutant shape-and-note` (108 s) | MUTANT PASS, exit 0, both launches |
+| before: `--rows size` | 10/11, exit 1 — G1 red by design |
+| before: the full rows by import against a foreign-stamped copy of the baseline | 27/27, B1 and B4 not scored, exit 2 |
+| before: `phase7_chrome.py` · `phase7_proof.py` (own instance, scratch home) | 79/79 · 92/92, no `Reelcut: ` line |
+
+```sh
+cd core && cargo test --release --test export --test export_size    # 38 passed, 20 passed
+python3 tools/proof/hevc_alpha_proof.py                              # 30/30, exit 0
+python3 tools/proof/hevc_alpha_proof.py --control plain-hevc-reader  # CONTROL PASS (also: sheet-default)
+python3 tools/proof/hevc_alpha_proof.py --mutant shape-and-note      # MUTANT PASS (also: encoder-refused, report-and-fill)
+python3 tools/proof/hevc_alpha_proof.py --rows size                  # 10/11, exit 1: G1 red by design on a build with phase B
 ```

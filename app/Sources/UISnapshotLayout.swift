@@ -30,6 +30,9 @@ import AppKit
 /// detail are `null` for any `NSSecureTextField` (Settings' key field), and a
 /// field editor's (the text view that edits a field, a secure one included)
 /// is `null` too; an ordinary text view's `text` is its string.
+/// `tooltip` is the view's own `toolTip`, `null` when it has none and always
+/// for a secure field — what a label cut short can still be read by
+/// (`hevc_alpha_proof.py` E1 holds the export sheet's footnote to it).
 ///
 /// **A view that draws several things in one view names them as parts**
 /// (`UISnapshotParts`; the Assistant tab's transcript, whose entries are
@@ -65,6 +68,7 @@ enum UISnapshotLayout {
                 "ambiguous": ambiguous,
                 "intrinsic": [metric(intrinsic.width), metric(intrinsic.height)],
                 "text": UISnapshot.orNull(text(of: view)),
+                "tooltip": UISnapshot.orNull(tooltip(of: view)),
             ])
             if let named = view as? UISnapshotParts {
                 for part in named.snapshotParts() {
@@ -193,6 +197,12 @@ enum UISnapshotLayout {
             return String(textView.string.prefix(200))
         }
         return nil
+    }
+
+    /// A view's tooltip, first 200 characters; never a secure field's.
+    private static func tooltip(of view: NSView) -> String? {
+        if view is NSSecureTextField { return nil }
+        return view.toolTip.map { String($0.prefix(200)) }
     }
 }
 

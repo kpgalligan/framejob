@@ -304,6 +304,11 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Answer:** does the speech at the ceiling sound right?
 - **Source:** #190, #212.
 
+**SE-9 — HEVC with alpha plays transparent**
+- **Do:** 1. Set the Document tab's Background opacity to 0 on a project with a title; read the note under it at the inspector's narrowest width. 2. Export… ▸ HEVC with Alpha (MOV); read the footnote at the sheet's bottom left, then rest the pointer on it. 3. Export it; play the file in a Safari page with a coloured background, open it in QuickTime Player, and lay it over a clip in Final Cut.
+- **Expect:** the note reads "Transparent — kept by 3 export formats." uncut; the footnote begins "HEVC_ALPHA" and is cut short with an ellipsis beside the sheet's three buttons, as ProRes 4444's is; resting the pointer on it shows the whole line, "HEVC_ALPHA · MOV · alpha"; the title's edges are clean, with no dark fringe and no line at the frame's edge, in all three.
+- **Source:** #103, spec §11 G-33.
+
 ## Captions
 
 **CAP-1 — Text reveals and legibility**
