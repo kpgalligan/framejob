@@ -97,9 +97,10 @@ extension AgentServer {
             "type": ["string", "array"],
             "items": ["type": "integer"], "minItems": 2, "maxItems": 2,
             "description": "Output size — the sheet's Size popup. A row id: document (the "
-                + "default, the document's own size), 1080p, 720p, 1440p or 2160p (the number "
-                + "is the SHORT edge and the long edge follows the document's aspect, rounded "
-                + "to even, so a vertical project's 1080p is 1080 × 1920), or preset for an "
+                + "default, the document's own size, evened on the formats that need it), "
+                + "1080p, 720p, 1440p or 2160p (the number is the SHORT edge and the long "
+                + "edge follows the document's aspect, rounded to even, so a vertical "
+                + "project's 1080p is 1080 × 1920), or preset for an "
                 + "image format's cap (gif and apng, where it is the default) — or an explicit "
                 + "[width, height] in px, the sheet's Custom…. Every row exists on every "
                 + "document — a 1920 × 1080 project's 1080p is its own size and is listed "
@@ -110,8 +111,12 @@ extension AgentServer {
                 + "where a size of a DIFFERENT ASPECT from the canvas is refused rather than "
                 + "written, because the padding destroys the alpha channel that row is chosen "
                 + "for; every row id is already the document's own aspect, so this only bites "
-                + "on a [width, height] of another shape. On gif and apng a size — the cap, a "
-                + "row, or [width, height] — is a box the picture is fitted inside, aspect "
+                + "on a [width, height] of another shape. h264, hevc and prores_422 need "
+                + "even dimensions: an odd width or height — the document size on a canvas "
+                + "with an odd edge, or an odd [width, height] — is written one pixel smaller "
+                + "on that edge, and the width and height reported back are the file's. "
+                + "prores_4444, gif and apng keep an odd edge. On gif and apng a size — the "
+                + "cap, a row, or [width, height] — is a box the picture is fitted inside, aspect "
                 + "kept and never upscaled, and the width and height reported back are the "
                 + "file's: a vertical 1080 × 1920 project's GIF default is 152 × 270.",
         ]

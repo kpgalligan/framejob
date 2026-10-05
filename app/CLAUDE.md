@@ -1072,7 +1072,9 @@ the key map behind it.
   same float decode the measurement read, gained and quantised once by
   `ExportAudioGain` (#86). `ExportWriter` refuses an alpha-carrying row at a PADDED size
   (padding inverts the alpha; a pure scale is fine), testing the box the
-  ENCODER is handed through `encodedSize`; `apng` FITS instead and must not
+  ENCODER is handed through `encodedSize`, which is the identity on the size
+  the CORE resolved — already even where the row needs it (spec §11 G-33) —
+  and only the floor under any other caller; `apng` FITS instead and must not
   grow the guard. GIF and APNG refuse past 600 frames rather than truncate.
   `renderFrame` is documented off-main. Audio export is NOT bit-deterministic
   within an 8 ms window at a duck ramp edge (AVFoundation's mix); a duck-free

@@ -26,9 +26,24 @@
 //! before writing. Rounding here — to the nearest even integer, a tie
 //! going up — means the size the popup shows is the size the file has;
 //! leaving it to the writer would change the size behind the sheet's
-//! back. The document row is the exception and is the canvas as it is,
-//! odd or not: a "Document size" that was not the document's size would be
-//! a lie, and the writer's own rounding is the right place for that one.
+//! back.
+//!
+//! **The even rule (spec §11 G-33).** The same is true of the document row
+//! and of any size asked for, so on every row that needs even dimensions
+//! (`Preset::even_sized`: every row AVFoundation writes but ProRes 4444)
+//! the size is resolved HERE, by [`even_size`]: the document row's numbers
+//! in this list, and in `export_settings` whatever was asked. An odd edge
+//! is one pixel SMALLER. Down, because that is the size the writer already
+//! wrote, so the report moves to the file and no file changes size;
+//! because rounding up would hand the encoder a frame larger than the
+//! picture on that axis; and because every listed row is then its own
+//! fixed point, as an image format's is. The row is named "Document
+//! (even)" when its numbers are not the canvas's, which is the whole of
+//! how the popup says why. The argument this replaces was that a "Document
+//! size" that was not the document's size would be a lie; the lie was the
+//! row that said 321 × 181 over a file of 320 × 180. ProRes 4444 and the
+//! two image formats keep an odd edge, and their row is "Document size",
+//! the canvas as it is.
 //!
 //! **An image format's numbers are the file's.** A GIF or an APNG is
 //! written frame by frame with the picture FITTED inside the size — aspect
@@ -105,7 +120,9 @@ impl Project {
     ///
     /// 1. `preset` — the format's cap, "GIF default" / "APNG default", for
     ///    the two rows of the table that carry one; nothing for the rest.
-    /// 2. `document` — "Document size", the canvas as it is.
+    /// 2. `document` — "Document size", the canvas as it is; on a row that
+    ///    needs even dimensions the canvas evened ([`even_size`]), named
+    ///    "Document (even)" when that is not the canvas's own size.
     /// 3. `2160p` ("4K"), `1440p`, `1080p`, `720p` — the short edge named,
     ///    the long edge fitted to the canvas and rounded to even.
     ///
@@ -143,11 +160,23 @@ impl Project {
                 height,
             });
         }
+        // The id is `document` either way: the name is the popup's, and it
+        // changes only when the numbers are not the canvas's.
+        let listed = if preset.even_sized() {
+            even_size(document)
+        } else {
+            document
+        };
+        let name = if listed == document {
+            "Document size"
+        } else {
+            "Document (even)"
+        };
         rows.push(Row {
             id: "document",
-            name: "Document size".to_string(),
-            width: document.0,
-            height: document.1,
+            name: name.to_string(),
+            width: listed.0,
+            height: listed.1,
         });
         for (id, name, short) in STANDARD {
             let (width, height) = sized(fitted(document, short));
@@ -190,6 +219,18 @@ fn fitted((width, height): (u32, u32), short: u32) -> (u32, u32) {
     } else {
         (short, long)
     }
+}
+
+/// A size as a row that needs even dimensions writes it (spec §11 G-33),
+/// each edge on its own: below 2 it is 2, an odd edge is one SMALLER, and an
+/// even edge is itself. The rule `export_settings` and
+/// [`Project::export_sizes`] share, so the list and the resolver cannot
+/// disagree about what an H.264 will measure; the module doc says why down.
+/// It is `ExporterWriter.evenDimension`'s arithmetic, which stays as the
+/// floor under any caller that did not come through here.
+pub(crate) fn even_size((width, height): (u32, u32)) -> (u32, u32) {
+    let even = |edge: u32| if edge < 2 { 2 } else { edge - edge % 2 };
+    (even(width), even(height))
 }
 
 /// A `width` × `height` canvas fitted inside a box: the canvas itself when

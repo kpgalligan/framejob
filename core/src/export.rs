@@ -116,14 +116,19 @@ impl Project {
             .unwrap_or((self.canvas.width, self.canvas.height));
         let width = positive_u32(overrides, "width")?.unwrap_or(preset_width);
         let height = positive_u32(overrides, "height")?.unwrap_or(preset_height);
-        // An image format is written with the picture FITTED inside the
-        // size, never letterboxed and never upscaled (`export_size.rs` has
-        // the rule and the reason), so what is reported is the size the
-        // file will have, not the box it was fitted into: the sheet's
-        // readout, its Size popup and the `export` tool's result all say
-        // the numbers the writer draws.
+        // What is reported is the size the FILE will have, so that the
+        // sheet's readout, its Size popup and the `export` tool's result
+        // all say the numbers the writer draws (`export_size.rs` has both
+        // rules and their reasons). An image format is written with the
+        // picture FITTED inside the size, never letterboxed and never
+        // upscaled, so its numbers are the fit and not the box. A row that
+        // needs even dimensions writes an odd edge one pixel smaller
+        // (spec §11 G-33), whether the edge came from the canvas or was
+        // asked for. Every other row writes the pair as it stands.
         let (width, height) = if preset.fits_inside_size() {
             crate::export_size::fit_within((self.canvas.width, self.canvas.height), (width, height))
+        } else if preset.even_sized() {
+            crate::export_size::even_size((width, height))
         } else {
             (width, height)
         };

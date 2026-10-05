@@ -1083,3 +1083,285 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   its module dropped a key receives the payload's keys as they are,
   stale ones included, as `set_graphic` without a schema would store
   them; the item can be enabled when choosing it only beeps ((g)).
+- **G-33 — On every export row that needs even pixel dimensions the CORE
+  resolves and lists the even size the file will have, so the size
+  reported is the size written and no odd size is refused; `hevc_alpha`,
+  "HEVC with Alpha (MOV)", is a tenth row whose frames carry the canvas's
+  alpha; every movie row FILLS the frame instead of padding it when the
+  miss is within a pixel; a missing encoder ends in the preset's own
+  sentence and no file** (issue #103, 2026-10-05, issue batch B85, phase
+  3). Two phases, gated in order: A is the even rule alone, which moves
+  the REPORT and no picture; B is the row, the fill rule, the guard's
+  test, the encoder outcome and the Document tab's note. At the commit
+  that adds this entry ONLY phase A is built — (b), of (a) only the answer
+  on an odd size, and of the proof `--rows size`. (c)–(f), the rest of (a)
+  and `hevc_alpha` in (b)'s list are decided here and built by phase B,
+  the next commit: until it lands `hevc_alpha` is an unknown preset, a
+  miss within a pixel is padded as before, the Document tab's note is what
+  it was, a refusing encoder would still answer its own error over an
+  empty file, and `ExportWriter.shapeGap`, `Exporter.encoderOutcome`, the
+  proof's alpha rows, its control and its line I1, and
+  `docs/manual-checks.md` SE-9 do not exist. Phase B reads this entry back
+  against what it built, amends what turned out otherwise, puts what it
+  built in the present tense and removes this note. Every figure below was
+  measured by the designer on 2026-10-05 (Apple M2 Max, macOS 26.5.1,
+  ffmpeg 9.0.2) in a scratch `AVAssetWriter` program at 320 × 180 and 30
+  frames unless said; the proof is `tools/proof/hevc_alpha_proof.py`,
+  whose `--rows size` is phase A's gate.
+  (a) **Whose choices.** Batch B85's choices 12–17, accepted as
+  recommended on 2026-10-04: a NEW format row "HEVC with Alpha (MOV)"
+  directly after "HEVC (MP4)", `hevc_alpha` to the `export` tool; `.mov`,
+  AAC sound, HEVC's Quality tiers and bit-rate controls, "optimize for
+  network use" off by default; the sheet's summary says "alpha"; the
+  `export` tool's `preset` description names the three rows that keep
+  transparency and its answer reports `preset: "hevc_alpha"`, `container:
+  "mov"`, `codec: "hevc_alpha"`; the Document tab's note becomes
+  "Transparent — kept by 3 export formats."; a custom size of a different
+  shape from the canvas is refused with ProRes 4444's sentence; the row is
+  always listed, and a Mac whose encoder refuses it ends with "This Mac
+  cannot export with the “hevc_alpha” preset." and no file. The owner's
+  four answers of 2026-10-05: a miss of under a pixel is FILLED rather
+  than fitted on `h264`, `hevc` and `prores_422`; an odd size is NEVER
+  refused — answer (c), the core resolves and reports the even size that
+  will be written — which SUPERSEDES choice 18 (a) of 2026-10-04 (a
+  refusal in a sentence of its own: there is no such error case and no
+  such sentence); ProRes 4444 is filled too; and the sheet's footnote
+  keeps the core's codec as it prints every row's, `HEVC_ALPHA`. One
+  choice was left to the orchestrator, who took the NARROWER of two fill
+  rules the same day ((c) below says which and why).
+  (b) **The even rule (phase A).** A row is EVEN-SIZED when AVFoundation
+  writes it (`avf_preset` is not null) and its codec is not `prores4444`
+  (`Preset::even_sized` in `export_table.rs`): `h264`, `hevc`,
+  `prores_422` and the three audio-only rows, which have no picture and go
+  on listing what `h264` lists — and `hevc_alpha` from the commit in which
+  phase B adds the row. `prores_4444`, `gif` and `apng` KEEP an odd edge.
+  A new AVFoundation row is therefore even-sized until someone exempts it,
+  and `core/tests/export_size.rs` fails on a row nobody classified. On an
+  even-sized row each edge is resolved on its own
+  (`export_size::even_size`): below 2 it is 2, an odd edge is one SMALLER,
+  an even edge is itself. The core applies it in the two places a size is
+  answered: `Project::export_settings`, after the width and height are
+  read (the override, else the preset's cap, else the canvas) — an image
+  format is fitted as before, else an even-sized row answers the even
+  pair, else the pair as asked — and `Project::export_sizes`, whose
+  `document` row on an even-sized row holds the canvas evened and is named
+  exactly "Document (even)" when those are not the canvas's numbers and
+  "Document size" when they are. The id stays `document`; the standard
+  rows are unchanged (the short edge named, the long edge to the nearest
+  even integer, a tie going up); no key is added to either answer. **Down,
+  because** it is the size `ExportWriter.evenDimension` already wrote on
+  `h264`, `hevc` and `prores_422`, so the change moves the report to the
+  file and no shipped file changes size; rounding up would hand the
+  encoder a frame larger than the picture on that axis; and every listed
+  row is then its own fixed point (a row's numbers sent back as `width`
+  and `height` resolve to themselves). **What reports it.** The Size
+  popup's title (`"\(name) · \(width) × \(height)"`), the sheet's readout
+  and the size fields under a popup row, and the `export` tool's `width`
+  and `height` each print the resolved pair, and each is proved
+  (`hevc_alpha_proof.py`: rows R1–R4 hold the tool's answer to ffprobe's
+  reading of the file, and E2 reads the popup, the readout and the two
+  fields off the sheet — on a 321 × 181 document all of them say 320 ×
+  180, where the build before this entry answered 321 × 181 beside a 320 ×
+  180 file; the baseline recorder requires that failure before it writes,
+  and its two recordings agreed on every value they kept). The queue's
+  tooltip prints the same `ExportSettings` value BY CONSTRUCTION and no
+  row reads it: the sheet hands its own resolved settings to
+  `enqueueExport`, `ExportQueueController.Job.settings` is a `let`, and
+  `ExportQueueRowView.toolTip(for:)` prints its `width` × `height`; no MCP
+  tool adds a job and Add to Queue ends in a save panel.
+  `ExportWriter.encodedSize` stays as the floor under any other caller and
+  is the identity on what the core answers. In Custom the fields keep what
+  was typed and the readout shows the resolved pair. **What does not
+  move.** No stored value: `ExportChoice` keeps a row id (`document` is
+  unchanged) or the typed pair, which stays as typed and resolves even on
+  use; `get_project` reports the canvas and nothing about export. On an
+  even canvas with no odd size asked, and on `prores_4444`, `gif` and
+  `apng` on any canvas, the settings object is byte-for-byte what it was.
+  Where an odd edge is evened — the Document row on an odd canvas, or an
+  odd size asked for on any canvas (R4's `h264` at `[321, 181]` on 640 ×
+  360) — the settings object's `width` and `height` are the even pair; the
+  frame the encoder is given, the scaling mode and the picture are what
+  they were; and what changes in a FILE is a bit rate computed from that
+  pair. There are two. The DEFAULT, when no rate is asked, which
+  `ExportWriter.defaultVideoBitrate` computes from the resolved pair: 0.25
+  % lower at 1001 × 667 (2,797,200 against 2,804,201 bits per second for
+  `h264` at 30 fps, by arithmetic) and identical under its 1 Mbps floor at
+  321 × 181. And the rate a chosen Quality tier of the sheet sends, which
+  is computed from the frame the controls ask for
+  (`ExportSheetResolve.requestedFormat()`, by reading): with the Size
+  popup on its first row that is the Document row's numbers, now even, so
+  the tier is computed over the smaller area too — but
+  `QualityTier.videoBitsPerSecond` rounds to the nearest 100 kbps, so the
+  rate sent moves only where the smaller area crosses a rounding step
+  (High for `h264` at 1001 × 667 is 2,600,000 either way, by arithmetic:
+  2,583,871 and 2,577,420 before rounding). On another row of the popup it
+  is that row's numbers, which did not move, and in Custom the TYPED pair,
+  as before, even where the file is a pixel smaller. This amends
+  `export_size.rs`'s earlier "a Document size that was not the document's
+  size would be a lie" — the lie was a row that said 321 × 181 over a file
+  of 320 × 180 — and spec §7.8's Document row.
+  (c) **The fill rule (phase B: decided here, built by the next commit).**
+  One shape test, in integers, to be shared by the alpha guard and the
+  scaling mode (`ExportWriter.shapeGap`, which phase B adds; nothing else
+  is to compare shapes). With `cw`, `ch` the canvas's rounded width and
+  height (each at least 1) and `bw` × `bh` the frame the encoder is given:
+  `d = bw*ch − bh*cw` and `gap = |d|`. `gap == 0` is the canvas's exact
+  shape. When `d > 0` the frame is wider than the canvas's shape: a fit
+  leaves `gap/ch` px of width uncovered and a fill overshoots the height
+  by `gap/cw` px; when `d < 0` it is the other way round. `limit` has two
+  arms. **A frame that is the canvas less at most one pixel on each axis**
+  (`cw − bw` and `ch − bh` each 0 or 1): `max(cw, ch)` — the fit leaves at
+  most a pixel OR the fill overshoots by at most a pixel. **Any other
+  frame**: `ch` when `d > 0`, else `cw` — the fit leaves at most a pixel,
+  which is the phase-7b guard in integers. `gap <= limit` is "within a
+  pixel", `<=` and in integers on purpose: an evened canvas whose odd edge
+  is the SHORT one sits exactly on the limit (181 × 320 into 180 × 320:
+  gap 320, limit 320). A frame with `0 < gap <= limit` is FILLED
+  (`AVVideoScalingModeResizeAspectFill`), whatever the codec; `gap == 0`
+  and `gap > limit` are fitted as before (`…ResizeAspect`), and on a row
+  whose `alpha` is true `gap > limit` is REFUSED with
+  `alphaAspectMismatch`'s sentence instead, so an alpha row is exact or
+  filled and never padded. No size is refused for being odd. **Why the
+  fit's half is not enough alone:** an evened row can miss by more than a
+  pixel fitted — 181 × 320 into 180 × 320 leaves 320/181 = 1.77 px and 481
+  × 181 into 480 × 180 leaves 1.66 px — so the old test would letterbox
+  those rows and refuse `hevc_alpha` at its own default size, on 6,285,314
+  of the 16,769,025 canvases with both edges in 2…4096 (the first is 3 ×
+  4). With the first arm the evened row (W−a) × (H−b), a and b each 0 or
+  1, has `gap = |bW − aH|`, one of 0, W, H and |W − H| and never above
+  `max(W, H)`: exact on 4,196,351 of those canvases, filled on 12,572,674,
+  neither on none. A standard row's short edge is exact and its long edge
+  within a pixel of exact, so a fit leaves at most a pixel and the second
+  arm is enough: of 67,076,100 rows over the same canvases 1,961,452 are
+  exact, 65,114,648 filled and none is neither, under the old test and the
+  new alike. These counts are an integer sweep with no encoder, not the
+  scratch writer's, swept with the two arms as written above (2026-10-05,
+  the sweep's column `tight`): the Document row's three counts and the
+  standard rows' three are also what the designer's wider first arm —
+  every frame no larger than the canvas — printed beside them in the same
+  run. **Why the first arm stops at the canvas's own size:** a frame typed
+  LARGER than the canvas (736 × 90 on 728 × 90, 2560 × 1080 on 2558 ×
+  1080, 402 × 100 on 400 × 100) is a picture written pixel for pixel
+  between bars — measured at 402 × 100: `hevc`, `h264` and `prores_422`
+  write 2 wholly black columns, both at the right, and the picture between
+  is pixel for pixel (ProRes 4444's ramp: 0 of 402 blended) — and stays
+  one; a rule that looked only at the overshoot would fill it (gap 200
+  against 400), stretching 400 columns over 402 (312 of 402 blended).
+  **Why it also stops one pixel inside** (the orchestrator, 2026-10-05,
+  where the designer had recommended every frame no larger than the
+  canvas): the owner agreed to fill "at an under-a-pixel miss", and a
+  hand-typed frame a few pixels inside the canvas is outside that — 396 ×
+  98 on a 400 × 100 document (gap 400; a fit leaves 4 px, a fill
+  overshoots 1) is scaled down between bars today and still is, where the
+  wider arm would have filled it. The narrower arm loses no row the sheet
+  offers: an evened row is within one pixel on each axis by construction,
+  and a standard row is filled by the second arm alone. **What is newly
+  written:** on the opaque rows a frame within a pixel is filled where it
+  was padded with black — the evened size on an odd canvas (2 wholly black
+  rows or columns before on `hevc`, `h264` and `prores_422` in every one
+  of four canvas classes measured, `prores_422` 1 row at 321 × 180; none
+  after) and a standard row that misses by under a pixel (334 × 222 at
+  `720p`, 1084 × 720: 2 black columns at the right before, none after).
+  That is where `hevc` is no longer "the same file as before" (choice 12),
+  and nowhere else: at an exact shape the encoder's dictionary is the one
+  it was, and a frame further off is letterboxed as it was. On
+  `prores_4444`, which keeps an odd edge, a typed frame one pixel short on
+  one axis or both (400 × 99 and 399 × 99 on 400 × 100, 180 × 320 on
+  181 × 320) is written,
+  filled, where the phase-7b guard refused it. On the two alpha rows a
+  fitted miss of under a pixel left an edge at the wrong alpha
+  (`hevc_alpha` up to 16, ProRes 4444 255); filled, all four edges are 0.
+  **What the fill costs, by ramp** (ProRes 4444; a pattern whose red and
+  green carry the source coordinate and whose blue alternates 255 and 0,
+  so a blend reads as a blue that is neither). ONE odd edge, 181 × 320
+  into 180 × 320: output column 0 is source column 1 and output 179 is
+  source 179, each unblended, so source columns 0 and 180 are read by
+  nothing — one source pixel dropped on each side of the odd axis, two in
+  all — and the 179 left are stretched over 180 (180/179, 0.56 %), 141 of
+  the 180 output pixels a blend; the other axis is pixel for pixel (0 of
+  320 blended). 321 × 180 into 320 × 180 is the same on its odd axis:
+  columns 0 and 320 dropped, 319 stretched over 320 (320/319, 0.31 %), 249
+  of 320 blended, 0 of 180 on the other axis. BOTH odd, 321 × 181 into 320
+  × 180: nothing is dropped and every output pixel on both axes is a
+  blend, 321 columns over 320 and 181 rows over 180. The same three
+  FITTED, as before this entry: every output pixel of the picture is a
+  blend on both axes, beside the black lines. So the scaler drops whole
+  source pixels per side — one at an arithmetic overshoot of 1.000 px,
+  none at 0.436, 0.50 or 0.624, two at 3.56 — and stretches what is left:
+  the quotient `gap/cw` or `gap/ch` is the arithmetic overshoot and NOT
+  the measured cut.
+  (d) **The encoder (phase B).** The row is to be written by
+  `AVAssetWriter(.mov)` with `AVVideoCodecType.hevcWithAlpha`
+  (`"hevc_alpha"` in `ExportWriter.codecType(for:)`), fed the compositor's
+  premultiplied 32BGRA as every row is. Its compression dictionary is to
+  be the HEVC row's — the average bit rate, the 2 s key-frame interval,
+  the expected frame rate, and HEVC's 0.07 bits per pixel per frame when
+  no rate is asked — plus `kVTCompressionPropertyKey_AlphaChannelMode:
+  kVTAlphaChannelMode_PremultipliedAlpha`, which says what the pixels are
+  (0 of 57,600 pixels differ from leaving it unset; the decoded buffer
+  then reads `PremultipliedAlpha`). No
+  `kVTCompressionPropertyKey_TargetQualityForAlpha` and no profile key:
+  unset, the file's size and error figures are those of 0.75 — alpha off
+  by at most 2 at 960 of 57,600 pixels on a hard-edged card and by at most
+  5 on a soft disc — and 1.0 is exact on the card at 4,951 bytes against
+  4,654 (7,029 against 5,753 on the disc); an alpha-quality control is out
+  of scope. Decoded, in the scratch writer: `hvc1`, `ContainsAlphaChannel`
+  1, pixels (0,0,0,0), (128,0,0,128) and (255,0,0,255) for clear, half and
+  opaque red, through `ExportWriter`'s own shape (a custom compositor,
+  `AVAssetReaderVideoCompositionOutput`, `append(sampleBuffer)`). AAC in a
+  `.mov` is a combination no row wrote before.
+  (e) **Hardware, and a Mac without the encoder (phase B).** This host
+  lists "Apple Muxed Alpha-Apple HEVC (HW)" and "(SW)"; with hardware
+  disabled the file still carries alpha (largest error 6). The row is to
+  be listed always. A refusing encoder was measured with an encoder
+  specification nothing satisfies, on `.hevcWithAlpha` and `.hevc` alike:
+  `canApply` is TRUE, the input constructs, `canAdd` is TRUE, and
+  `startWriting()` returns false with `AVFoundationErrorDomain` −11834
+  ("Cannot Encode", underlying `NSOSStatusErrorDomain` −12908), leaving a
+  0-byte file — so `addVideo`'s `canAdd` test does not catch it, and until
+  phase B the app would answer that error as it came and leave the empty
+  file. Phase B adds `Exporter.encoderOutcome`, applied where
+  `startWriting` hears the pipeline, which is to map exactly that domain
+  and code to `ExportError.presetUnavailable` with the preset's name and
+  remove the file, and to return every other result as it came. No new
+  error case. `.hevcWithAlpha` in an `.mp4` is refused by `canApply` and
+  `canAdd`, the existing `.presetUnavailable` branch.
+  (f) **How alpha is proved (phase B).** ffprobe reports `hevc`, `hvc1`,
+  `Main`, `yuv420p` for an HEVC-with-alpha file and for a plain HEVC file
+  in the same `.mov`, so `phase7_proof.py`'s `startswith("yuva")` test
+  cannot see this row; only the DECODED frame tells them apart (plain
+  `.hevc`: every alpha 255; the alpha file through `phase7_proof.py`'s
+  `Raster` command: (0,0,0,0), (129,0,0,128), (255,0,0,255)). Phase B adds
+  the proof's alpha rows, which are to read a transparent, a half and an
+  opaque pixel back from the decoded RGBA, and a control that scores the
+  same readers over plain `hevc` exports, where they must fail.
+  (g) **`RC_FORMAT_VERSION` stays 11.** No project stores a preset id or
+  an export size; the remembered export choice is a `UserDefaults` record
+  holding a row id or the typed pair, and a build without the `hevc_alpha`
+  row leaves its Format popup where it was (`apply(_:)`'s `firstIndex`).
+  Nothing persisted changes shape.
+  (h) **Risks accepted.** Only this host's encoders were measured.
+  Playback in Safari, QuickTime Player and Final Cut is a person's check:
+  the row SE-9, which phase B adds to `docs/manual-checks.md`. A canvas
+  with an edge of exactly 1 px is raised to 2 on an even-sized row and can
+  then be a different shape, where the shape sentence answers on the alpha
+  rows: of the 8,192 canvases 1 × n and n × 1 with n in 1…4096 the evened
+  Document row is neither exact nor filled on 4,094 ((c)'s integer sweep,
+  the same under the old test, the designer's wider first arm and the first
+  arm as written) — not proved on the built
+  app. The 481 × 181 class (both edges odd, wider than 2:1) is measured in
+  the scratch writer only, and a both-odd canvas far from square (an
+  arithmetic overshoot between 0.62 and 1 px) was not measured at all.
+  Phase A's gate compares pixels only on canvases under the default bit
+  rate's 1 Mbps floor; the 0.25 % lower default rate on a larger odd
+  canvas, and a Quality tier's rate where it crosses a rounding step
+  ((b)), are by arithmetic. A reader that ignores the declared
+  premultiplied mode draws translucent pixels dark, **and Reelcut is such
+  a reader**: `Compositor.swift` builds every video source as straight
+  alpha and nothing in `app/Sources` reads a file's declared mode, so an
+  exported `hevc_alpha` or `prores_4444` movie re-imported is multiplied
+  by its alpha a second time (the proof's line I1, which phase B adds, is
+  to print the composite and never score it; the ProRes 4444 file also
+  holds premultiplied colour under a `StraightAlpha` label — a half-red
+  source pixel decodes (129,0,0,128)). What to do about either is an
+  issue's, not this entry's.

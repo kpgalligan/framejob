@@ -85,22 +85,30 @@ extension ExportWriter {
         guard abs(fitted.width - want.width) > 1 || abs(fitted.height - want.height) > 1 else {
             return
         }
-        // The MESSAGE names the size that was ASKED for, not the box: it
-        // tells the person what to type instead, and a number they never
-        // typed in that sentence would read as the app's own arithmetic.
+        // The MESSAGE names `settings`' size and not the box. That is the
+        // size the core RESOLVED (spec §11 G-33): on ProRes 4444, which
+        // keeps an odd edge, the pair that was asked for — so the sentence
+        // still tells the person what to type instead, with no number in it
+        // they never typed — and on a row the core evens, the even pair the
+        // sheet and the `export` tool reported.
         throw Exporter.ExportError.alphaAspectMismatch(
             width: Int(canvas.width.rounded()), height: Int(canvas.height.rounded()),
             wantWidth: settings.width, wantHeight: settings.height)
     }
 
-    /// The frame the ENCODER is given, which is not always the size the core
-    /// resolved — and the ONE place that difference is decided, because a
-    /// second opinion about it is exactly what `checkAlphaSurvivesTheSize`
-    /// was missing.
+    /// The frame the ENCODER is given, and the ONE place that is decided,
+    /// because a second opinion about it is exactly what
+    /// `checkAlphaSurvivesTheSize` was missing.
     ///
-    /// Dimensions are forced even because H.264 and HEVC require it; the
-    /// standard rows arrive even already (`export_size.rs`), so the rounding
-    /// bites only on a custom size or an odd-edged document.
+    /// **The core has already evened the size** (spec §11 G-33). On every row
+    /// that needs even dimensions `rc_export_settings` resolves an odd edge
+    /// one pixel smaller — a standard row, the Document row and a custom size
+    /// alike (`export_size.rs`'s `even_size`, which is `evenDimension`'s
+    /// arithmetic) — so on what the core answers this function is the
+    /// IDENTITY, and the size the sheet, the queue and the `export` tool
+    /// report is the frame the file has. The rounding stays as the floor
+    /// under any caller that hands in settings the core did not resolve:
+    /// H.264 and HEVC require even dimensions whoever asks.
     ///
     /// **ProRes 4444 keeps its odd edges, and that is the fix rather than a
     /// preference.** Rounding an odd edge down moves the box, so

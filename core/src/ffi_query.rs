@@ -309,7 +309,11 @@ pub unsafe extern "C" fn rc_export_presets() -> *mut c_char {
 /// project, as a JSON array of `{id, name, width, height}` in menu order,
 /// the FIRST row the default: the document's own size, or an image
 /// format's cap ahead of it (`Project::export_sizes` in `export_size.rs`
-/// says why the standard rows are named by their short edge). NULL with a
+/// says why the standard rows are named by their short edge). On a row
+/// that needs even pixel dimensions the `document` row is the canvas
+/// evened — an odd edge one pixel smaller, the size the file will have —
+/// and is named "Document (even)" when that is not the canvas's own size
+/// (spec §11 G-33). NULL with a
 /// message through `err_out` for a NULL project, a NULL `preset_id` or an
 /// unknown preset.
 ///
@@ -345,7 +349,11 @@ pub unsafe extern "C" fn rc_export_sizes(
 }
 
 /// A preset plus optional `overrides_json` resolved against the project
-/// into the concrete settings an `AVAssetExportSession` needs. NULL with a
+/// into the concrete settings an `AVAssetExportSession` needs. The
+/// resolved `width` and `height` are the size the file will have: evened
+/// on a row that needs even pixel dimensions (an odd edge one pixel
+/// smaller, whether the canvas's or an override's), fitted on the two
+/// image formats, and as asked on `prores_4444` (spec §11 G-33). NULL with a
 /// message through `err_out` for a NULL project, an unknown preset, bad
 /// overrides, or an empty export range.
 ///

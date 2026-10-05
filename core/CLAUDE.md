@@ -497,7 +497,10 @@ governs a module now.
   override is READ and REFUSED, naming the key and the value (`peak_dbtp`
   without `loudness_lufs` is an `Err`, because a ceiling with nothing to cap
   would be a key accepted and silently inert); the sizes the sheet offers and
-  `fit_within`; and the rows themselves. In a row, `avf_preset: null` routes
+  `fit_within`, and `even_size` — on every row AVFoundation writes but
+  `prores_4444` an odd edge resolves one pixel smaller, in the list's
+  Document row (named "Document (even)") and in the resolved settings alike,
+  so the size reported is the size written (G-33); and the rows themselves. In a row, `avf_preset: null` routes
   an export to the ImageIO writer (so the two LPCM rows repeat `audio_m4a`'s
   name), and `alpha` means "this ENCODING carries an alpha channel" — true for
   `prores_4444` and `apng`, false for `gif`, which has one palette index and

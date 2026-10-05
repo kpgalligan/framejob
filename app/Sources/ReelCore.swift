@@ -620,8 +620,8 @@ struct ExportSize: Decodable, Equatable, Identifiable {
     /// "document", "preset" (an image format's cap), "2160p", "1440p",
     /// "1080p" or "720p" — the vocabulary the `export` tool's `size` takes.
     let id: String
-    /// "Document size", "GIF default", "4K", "1080p"… — the sheet appends
-    /// the numbers.
+    /// "Document size" (or "Document (even)"), "GIF default", "4K"… — the
+    /// sheet appends the numbers.
     let name: String
     let width: Int
     let height: Int

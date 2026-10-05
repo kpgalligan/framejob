@@ -15321,3 +15321,212 @@ python3 tools/proof/paste_graphic_probe.py --mutant door-no-groups      # caught
 python3 tools/proof/paste_graphic_proof.py                              # 8/8, exit 0 (launches the app in a scratch home; not in make test)
 python3 tools/proof/paste_graphic_proof.py --mutant handler-drops-skip  # MUTANT PASS, exit 0 (builds an app in a tree copy; also groups-without-graphic)
 ```
+
+## Issue batch B85 phase 3, phase A — the size an export reports is the size written (`core/tests/export_size.rs`, five new and three rewritten tests, five hand mutants; `hevc_alpha_proof.py --rows size` H0, T0, R1–R4, E2, B1, B4, G1, Z1; `hevc_alpha_baseline.json`; #103; spec §11 G-33)
+
+On every export row that needs even pixel dimensions the core resolves and
+lists the even size the file will have (`Preset::even_sized`,
+`export_size::even_size`), so the Size popup, the sheet's readout and
+fields and the `export` tool's `width` and `height` say the file's size.
+This is phase A of G-33, gated alone. Phase B — the `hevc_alpha` row, the
+fill rule, the encoder outcome — is the next pipeline, and adds its rows,
+mutants and controls to the same script; **`hevc_alpha_proof.py` holds
+phase A's rows only today and exits 2 without `--rows size`**.
+
+**What is proved, and by which instrument.**
+
+- **`core/tests/export_size.rs`** (in `make test`), through the FFI, every
+  oracle a literal written by hand.
+  `an_odd_document_row_is_evened_on_the_rows_that_need_it`: 1000 × 667,
+  321 × 181, 181 × 320, 1619 × 1080 and 1 × 1 list `("document", "Document
+  (even)", …)` at 1000 × 666, 320 × 180, 180 × 320, 1618 × 1080 and 2 × 2 on
+  the six even-sized rows, and the canvas as `"Document size"` on
+  `prores_4444`, `gif` and `apng`; 1600 × 900 is `"Document size"`
+  everywhere. `every_preset_is_even_sized_or_keeps_an_odd_edge`: every id
+  `rc_export_presets` lists is in exactly one of the test's two literal
+  lists, and `rc_export_settings` on 321 × 181 answers 320 × 180 for the
+  first and 321 × 181 for the second — a new row fails here until it is
+  classified. `an_asked_size_resolves_even_on_the_rows_that_need_it`: an
+  override pair, one edge alone, 1 × 1 and an even pair, on `h264`, `hevc`,
+  `prores_422` and, as asked, on `prores_4444`.
+  `a_listed_movie_size_sent_back_resolves_to_itself`: every row of every
+  movie format on six canvases. Rewritten to the new Document row:
+  `the_long_edge_rounds_to_the_nearest_even_integer`,
+  `a_long_edge_that_lands_on_an_odd_integer_goes_up` and
+  `the_audio_only_formats_list_what_h264_lists`;
+  `the_first_row_is_the_document_for_every_movie_format` keeps its two even
+  documents.
+- **`hevc_alpha_proof.py --rows size`** (not in `make test`: it launches
+  the app). Its own Release instance in a scratch home
+  (`tools/proof/work/hevc-alpha/home`, removed at start and exit) on its own
+  socket, launched with every key of `screens.py`'s `PINS`, the inspector
+  width at 280 and the export choice pinned to `{"preset_id":"hevc_alpha"}`.
+  One menu item, File ▸ Export…; its sheet is cancelled. Neither that nor
+  the `export` tool writes the remembered export choice (below: "The
+  owner's defaults"). Every export is one second; the largest frame is
+  1280 × 720.
+  H0 the scratch home took. T0 `export`'s `size` description holds "written
+  one pixel smaller on that edge". R1, R2 a 321 × 181 and a 181 × 320
+  document with no `size` as `h264`, `hevc`, `prores_422` (and `hevc` at
+  `document`): the answer's size is ffprobe's, 320 × 180 and 180 × 320, the
+  baseline's pair printed beside each. R3 the same document as
+  `prores_4444`, `apng` and `gif`: 321 × 181 both. R4 an asked `[321, 181]`
+  on a 640 × 360 canvas: 320 × 180 as `h264`, 321 × 181 as `prores_4444`;
+  no `size`: 640 × 360 on four rows. E2 the sheet: the Size popup "Document
+  (even) · 320 × 180", the readout beginning "320 × 180 · ", the two fields
+  320 and 180, no "321 × 181" anywhere; on a 1001 × 667 document "Document
+  (even) · 1000 × 666", not truncated (intrinsic width 207 in a 240 pt
+  frame in fix pass 1's run, 206.5 in Gate A's first green run of the same
+  build; the row requires only that it is no wider than the frame); on the
+  even canvas "Document size · 640 × 360"; and the Format
+  popup reading "H.264 (MP4)" or "HEVC with Alpha (MOV)" (what that shows
+  of the pinned choice, and what it cannot in phase A, is under "A launch
+  argument", below). B1 `hevc` on the even canvas equals the baseline in ffprobe's
+  values, alphas, corner and frame-0 digest. B4 `prores_4444` at three
+  sizes equals the baseline's size and digest. G1 the six odd-canvas files
+  equal the baseline's frame-0 digest and eight edge pixels, a black one
+  among them, and `hevc_alpha` is an unknown preset that writes no file —
+  so phase A moved no pixel where it acts, and the row is red on a tree that
+  already fills or already lists the row (it is scored only under `--rows
+  size`). Z1 every project closes and the log holds no `Reelcut: ` line.
+
+**The baseline**, `tools/proof/hevc_alpha_baseline.json`, was recorded
+twice on the build of main at 055a5ed, before any core or Swift edit
+(`--record-baseline`; 17 cases; the two recordings, each its own launch,
+agreed on every value, the frame digests included, so nothing is stored
+`null`). The recorder refuses to write unless `git status` shows `core/`
+and `app/` unchanged, the answer for both odd documents says the canvas's
+size over an evened file on each of `h264`, `hevc` and `prores_422`, and
+each of those files' eight pixels holds a black one. On a tree with G-33's
+resolver the recorder exits 1, so it is not re-recorded on this one. It
+also holds what
+phase B's rows are read against: the right-hand edge of a 334 × 222 white
+canvas at `720p` (columns w−1 and w−2 black, w−3 white on all three opaque
+rows), a 400 × 100 white canvas at `[402, 100]` (the middle row's black
+pixels are columns 400 and 401 on all three), and that `prores_4444`
+refuses that size.
+
+**The baseline is one host's bytes and one build's, and says which**
+(fix pass 1 of phase A's review). Its cases are hardware H.264 and HEVC
+bitstreams, ffprobe's exact `size` and `bit_rate`, and ffmpeg's RGBA
+digests, so another Mac, another macOS or another ffmpeg can differ in
+every one of them with nothing wrong in Reelcut. The file carries `host` —
+the chip (`sysctl -n machdep.cpu.brand_string`), the macOS version and
+build (`sw_vers`) and the first three words of `ffmpeg -version` — and the
+rows print it on the line under their heading. **On a host that is not
+the baseline's, `--rows size` scores nothing, names both hosts and exits
+2**: the instrument, not the product. That includes the rows that read no
+digest (R1–R4, E2); phase B, which writes the full rows, may want those
+scored on a foreign host and only B1, B4 and G1 withheld. Such a host
+records its own baseline: a git work tree of a commit before G-33's code
+(055a5ed), `make app` in it, then THIS script twice with `--record-baseline
+--app <that tree>/build/Build/Products/Release/Reelcut.app`. A recording at
+another commit or on another host than the file's starts the file over, so
+that baseline replaces the committed one in the working tree.
+`head` is the commit of the BUILD's tree, not of the checkout the script
+sits in: the recorder takes `--app`'s own work tree (`build_tree`: the app
+has to be `build/Build/Products/Release/Reelcut.app` at the top of a git
+work tree), stamps that tree's `git rev-parse HEAD`, holds THAT tree's
+`core/` and `app/` to `git status`, and records nothing for a build
+anywhere else (a proof's tree copy has no `.git`). What it cannot see is a
+stale build inside its tree — `make app` there first. **The committed
+file's `host` was stamped, not recorded**: the recorder cannot run on phase
+A's tree, so the host `host()` reads today (Apple M2 Max, macOS 26.5.1
+(25F80), ffmpeg version 9.0.2 — the machine and the day of both
+recordings, and what this section and G-33 already named) was added to the
+existing document by a few lines of Python (load, `d["host"] =
+hevc_alpha_proof.host()`, write with the recorder's own `json.dumps(…,
+indent=1, sort_keys=True)`). The SHA-256 of the `cases` object was the
+same before and after (a29eac32…), a `diff` of the two files is the five
+`host` lines alone, and `head` was already the build's (the recordings
+used the default `--app`, this tree's build at 055a5ed). The 17 cases are
+the two 055a5ed recordings, untouched. By import, with no launch: the
+unstamped file and a copy stamped with another chip each answer `instrument
+failure: …` naming both hosts and return 2; `record` on this tree answers
+`NOT RECORDED: core/ or app/ of <tree> differs from its HEAD`, and with
+`--app /Applications/Reelcut.app`, `NOT RECORDED: the build's commit cannot
+be read`. The recorder as it now stands has not written a baseline: both
+recordings were made before `build_tree` and the host stamp existed, and its
+writing path — the merge on `head` and `host`, and `--app` aimed at another
+tree — needs a built work tree of 055a5ed to run, which this pass did not
+make.
+
+**The owner's defaults.** The instance shares the owner's
+`com.kgalligan.Reelcut` domain (#238), and before the pin was sent as a
+`<string>` its launches READ the owner's remembered export choice (next
+paragraph). Nothing the proof does can WRITE it, by reading: the key's one
+writer is `ExportChoice.remember()` (`ExportPresetsStore.swift:174`, the
+`UserDefaults.standard.set` at `:180`), whose one caller is
+`ExportSheetController.commit(queue:)` (`ExportSheetController.swift:568`),
+reached only from `exportClicked` and `queueClicked` (`:521`, `:527`);
+`cancel_sheet` (`AgentServer+MenuItem.swift:112`) presses the sheet's
+Escape button through `UISheet.cancel` (`UISheet.swift:66`) — Cancel, which
+`makeButtonRow` gives that key (`Sheets.swift:90`) — and its action,
+`cancelClicked` (`ExportSheetController.swift:516`), is `dismiss(self)` and
+nothing else; the `export` tool's handler,
+`exportProject` (`AgentServer+Render.swift:260`), is in a file that names
+`UserDefaults` nowhere, and neither do `Exporter*.swift`,
+`ExportSheet*.swift` or `ExportQueue*.swift`. (Line numbers at 055a5ed;
+phase A's diff touches none of these files.) By a run, `mcp.py`'s guard is
+the instrument: a moved owner-visible key is a `mcp: DEFAULTS MOVED` line
+on stderr, and status 3 when no other Reelcut shares the domain. **The
+stderr of the two recordings and of the gate's red and green runs was not
+kept**, and another session's Reelcut was alive then, so a moved key would
+only have printed — nothing is claimed of those four runs from their
+output. Fix pass 1's run
+kept both streams apart: 11/11, exit 0, **stderr empty** (0 bytes) — no
+`DEFAULTS MOVED` line and no line saying the guard could not read the
+domain. Another Reelcut (`/Applications/Reelcut.app`, the same bundle
+identifier) was alive during it, so a line, not status 3, is what a moved
+key would have been.
+
+**A launch argument the argument domain drops.** `-ReelcutExportChoice
+{"preset_id":"hevc_alpha"}` is NOT taken: a value that begins with a brace
+and is not a property list is discarded, `UserDefaults` answers the owner's
+own remembered choice, and the sheet opened on it (measured on this host:
+a format and a Quality tier that are not the build's defaults). Sent as `<string>{"preset_id":"hevc_alpha"}</string>` the
+key reads as that text. E2 also requires the Format popup to read "H.264
+(MP4)" or "HEVC with Alpha (MOV)", which fails the row when the pin did
+not take and the owner's remembered format is another one (as it was on
+this host); in phase A, where a taken pin names a row the build lacks and
+the sheet falls back to H.264, an owner who last exported H.264 cannot be
+told apart — phase B's row requires "HEVC with Alpha (MOV)" exactly.
+`screens.py`'s own pin is the empty string, which is taken as it is.
+
+**What the runs printed** (2026-10-05, one host: Apple M2 Max, macOS
+26.5.1).
+
+| Run | Answer |
+|---|---|
+| `hevc_alpha_proof.py --record-baseline`, twice, on the unchanged build | `RECORDED: recording 1 …` then `recording 2 at 055a5ed…; 17 cases; the recordings disagree on nothing`, exit 0 both. Both odd documents: the answer `[321, 181]` (`[181, 320]`) over a file of `[320, 180]` (`[180, 320]`) on all three rows; two of the eight pixels black in each file |
+| `hevc_alpha_proof.py --rows size` on the unchanged build (the gate's red) | 6/11, exit 1: T0, R1, R2, R4 and E2 failed (the answer and the sheet said 321 × 181 beside a 320 × 180 file); H0, R3, B1, B4, G1 and Z1 passed |
+| `cd core && cargo test --release --test export_size` | 20 passed |
+| `hevc_alpha_proof.py --rows size` on phase A's build | 11/11, exit 0 |
+| the same, fix pass 1 (the stamped baseline; stdout and stderr kept apart) | `host Apple M2 Max · macOS 26.5.1 (25F80) · ffmpeg version 9.0.2 — the baseline's, recorded on the build of 055a5ed`, 11/11, exit 0; stderr empty |
+| the integer sweep of G-33 (c), re-run with the tighter arm as its own column (`r12.swift`'s `tight`, no encoder, 6 s; the source and `run12-rule-tight.txt` are in the batch's handoff folder under `measurement/`, not in the repository) | evened Document rows over every canvas with both edges in 2…4096: exact 4,196,351, filled 12,572,674, neither 0; standard rows: exact 1,961,452, filled 65,114,648, neither 0; one-pixel-edge canvases neither exact nor filled: 4,094 of 8,192 — each equal to the wider arm's column. Typed frames within 8 px of eight canvases that the tighter arm newly fills: on the even-sized rows the evened size alone (180 × 320 on 181 × 320, 1080 × 1920 on 1081 × 1920); on `prores_4444` a frame one pixel short on one axis or both (eleven in all, among them 399 × 99 and 400 × 99 on 400 × 100, 180 × 320 on 181 × 320, 321 × 180 on 321 × 181, 1920 × 1079 on 1920 × 1080); 396 × 98 on 400 × 100 stays fitted |
+
+**Five hand mutants of the core**, each one replacement in `core/src/`
+with `--test export_size` run and the file put back from a byte-compared
+copy; none is a script. 5 of 5 caught.
+
+| Mutant | Tests that failed |
+|---|---|
+| `even_sized` answers false | 5: the odd-document, every-preset, asked-size, nearest-even and odd-integer tests |
+| `even_size` rounds an odd edge UP | the same 5 |
+| the Document row is never renamed | 3: the odd-document, nearest-even and odd-integer tests |
+| the list keeps the canvas while the resolver evens | 4, `a_listed_movie_size_sent_back_resolves_to_itself` among them |
+| the audio-only rows are not even-sized | 3, `the_audio_only_formats_list_what_h264_lists` among them |
+
+What the gate does not show: that no file moved on an odd canvas LARGE
+enough for the default bit rate to clear its 1 Mbps floor (0.25 % lower at
+1001 × 667, by arithmetic; G1's canvases sit under the floor), nor the
+rate a Quality tier of the sheet sends, which is computed from the Document
+row's numbers, now even, and rounded to 100 kbps (G-33 (b); no row picks a
+tier). The queue's
+tooltip prints the same resolved value by construction and no row reads it
+(G-33 (b)).
+
+```sh
+cd core && cargo test --release --test export_size        # 20 passed
+python3 tools/proof/hevc_alpha_proof.py --rows size       # 11/11, exit 0 (launches the app in a scratch home; not in make test)
+```

@@ -891,6 +891,108 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   `docs/manual-checks.md`; and by the batch's last phase, HEVC with alpha
   as an export row (phase 3).
 
+  Issue batch B85, phase 3, PHASE A (2026-10-05, #103; spec §11 G-33) is
+  the first of the two phases the HEVC-with-alpha work is gated in, and
+  builds no row: it makes the size an export REPORTS the size the file
+  has. G-33 was written first, for the whole feature — the even rule,
+  the fill rule, the `hevc_alpha` row, the encoder outcome — with the
+  NARROWER fill rule the orchestrator chose on 2026-10-05 (the overshoot
+  half only for a frame within one pixel of the canvas on each axis; the
+  integer sweep G-33 (c) quotes was re-run in fix pass 1 with that arm
+  as its own column, `tight` — 4,196,351 exact, 12,572,674 filled and 0
+  neither of 16,769,025 evened Document rows, 1,961,452 / 65,114,648 / 0
+  of 67,076,100 standard rows, 4,094 of the 8,192 one-pixel-edge
+  canvases neither, each the designer's wider arm's count), and it
+  supersedes the owner's choice 18 (a): no size is refused for being
+  odd. Of G-33 this phase BUILDS only (b): the row, the fill rule, the
+  guard's test and the encoder outcome are decisions phase B builds, and
+  until it does G-33 says so in a note under its heading and words them
+  as what is to be — after fix pass 1 of this phase's review, which
+  found (d), (e), (f) and (h) reading as built. Phase A is G-33 (b).
+  `Preset::even_sized` (`export_table.rs`) is true for every row
+  AVFoundation writes but `prores_4444`; `export_size::even_size` makes
+  an odd edge one pixel smaller and an edge below 2 two;
+  `Project::export_settings` applies it after the width and height are
+  read, and `Project::export_sizes` lists the canvas evened as the
+  `document` row, named "Document (even)" when that is not the canvas's
+  size. No `rc_*` export, no schema, no format version, and no Swift
+  logic: the three Swift files touched are comments and the `export`
+  tool's `size` description (`ExporterWriter+Settings.swift`,
+  `AgentCatalog+Files.swift`, and `ReelCore.swift`, which stays at 999
+  lines). So `h264`, `hevc` and `prores_422` write the files they wrote
+  (frame and picture; the bit rate, below), and the Size popup, the
+  readout, the size fields and the tool's answer now say 320 × 180 on a
+  321 × 181 document where they said 321 × 181. **The baseline came
+  first**: `tools/proof/hevc_alpha_baseline.json` was recorded twice on
+  the build of main at 055a5ed before any core or Swift edit, 17 cases,
+  the two recordings agreeing on every value; the recorder requires that
+  build's answer to say the odd size over an evened file and each
+  odd-canvas file to hold a black edge pixel, and Gate A's rows on that
+  build printed 6/11 (T0, R1, R2, R4 and E2 failed). The baseline is one
+  host's bytes — hardware bitstreams, ffprobe's values, ffmpeg's digests
+  — and since fix pass 1 says whose: it carries `host` (Apple M2 Max,
+  macOS 26.5.1 (25F80), ffmpeg 9.0.2) and `head`, now the commit of the
+  BUILD's own work tree and not of the checkout the script sits in; the
+  rows print the host and, on another host, score nothing and exit 2
+  (the instrument, not the product). The host was stamped into the
+  existing file without re-recording — the recorder cannot run on a tree
+  with the resolver — so the 17 cases are the two 055a5ed recordings,
+  unchanged (`tools/proof/README.md` says how). **Gate A, on phase A's
+  build:** `cargo test --release --test export_size` 20 passed (five new
+  tests, three rewritten; five hand mutants of `core/src/`, each
+  caught), `--test export` 35 passed, `cargo fmt --check` clean, `make
+  lint` clean, `make typecheck` 0 errors and the 4 warnings,
+  `spec_index_proof.py` 138/138, `make app` built, and
+  `hevc_alpha_proof.py --rows size` 11/11: the answer and ffprobe agree
+  at 320 × 180 and 180 × 320 on the three rows (R1, R2), `prores_4444`,
+  `apng` and `gif` keep 321 × 181 (R3), the sheet reads "Document (even)
+  · 320 × 180" (E2), `hevc` on an even canvas and `prores_4444` at three
+  sizes equal the baseline by frame digest (B1, B4), and the six
+  odd-canvas files equal the baseline by frame digest and by eight edge
+  pixels, the black pad still there, with `hevc_alpha` still an unknown
+  preset (G1) — phase A moved no pixel of them. `make test` was not run
+  in this phase (Gate A does not name it). One thing the proof found on
+  the way: the launch argument `-ReelcutExportChoice {"preset_id":…}` is
+  dropped by the argument domain, so the instance read the owner's
+  remembered export choice; the value is sent as a `<string>` plist
+  fragment. E2 also requires the Format popup to read "H.264 (MP4)" or
+  "HEVC with Alpha (MOV)", which fails the row when the pin did not take
+  and the owner's remembered format is another one (as it was on this
+  host); in phase A, where a taken pin names a row the build lacks and
+  the sheet falls back to H.264, an owner who last exported H.264 cannot
+  be told apart — phase B's row requires "HEVC with Alpha (MOV)"
+  exactly. **The owner's defaults, which those launches read:** by
+  reading, nothing the proof does can write the remembered choice —
+  `ExportChoice.remember()` (`ExportPresetsStore.swift`) is the key's
+  one writer and `ExportSheetController.commit(queue:)`, the Export and
+  Add to Queue buttons, its one caller; `cancel_sheet` presses the
+  sheet's Escape button, whose action only dismisses; and the `export`
+  tool's handler (`AgentServer+Render.swift`) reads and writes no
+  default. By a run: the stderr of the two recordings and of the gate's
+  red and green runs was NOT kept, and another Reelcut was alive then,
+  so `mcp.py`'s guard would only have printed a moved key there, not
+  failed the run — nothing is claimed of those four from their output.
+  Fix pass 1's `--rows size` run kept it: 11/11, exit 0, stderr empty —
+  no `mcp: DEFAULTS MOVED` line and no line saying the guard could not
+  read the domain (another Reelcut, `/Applications/Reelcut.app`, was
+  alive, so the line and not status 3 is what a moved key would have
+  been). Not shown by the gate: a bit rate computed from the evened
+  pair, the one thing of a FILE phase A moves. The default
+  (`ExportWriter.defaultVideoBitrate`) on an odd canvas above its 1 Mbps
+  floor is 0.25 % lower at 1001 × 667, by arithmetic; and the rate a
+  chosen Quality tier of the sheet sends is computed from the Document
+  row's numbers, now even (`ExportSheetResolve.requestedFormat()`, by
+  reading) and rounded to the nearest 100 kbps, so it moves only across
+  a rounding step (High for `h264` at 1001 × 667: 2,600,000 either way)
+  — in Custom it is computed from the typed pair, as before. An odd size
+  ASKED on an even canvas resolves even too (R4), so "an even canvas is
+  byte-for-byte what it was" holds only with no odd size asked; G-33 (b)
+  says both. Owed by phase B, its own pipeline: the `hevc_alpha` row,
+  the fill rule and the guard's integer test, `Exporter.encoderOutcome`,
+  the Document tab's note, the rest of the proof with its mutants and
+  controls, SE-9 in `docs/manual-checks.md`, and this list's "HEVC with
+  alpha" entries; and the `CLAUDE.md` edits for both phases.
+
 ## Open items
 
 - G6's rest — playback prefetch, in-place raster (`graphic/src/raster.rs`)

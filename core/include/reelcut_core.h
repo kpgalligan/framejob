@@ -309,7 +309,12 @@ char *rc_export_presets(void);
 /* The output sizes the export sheet offers for `preset_id` against this
    project, as a JSON array of {id, name, width, height} in menu order. The
    FIRST row is the default: the document's own size ("document"), or for an
-   image format its cap ("preset"). After it come the standard sizes fitted to
+   image format its cap ("preset"). On a row that needs even pixel dimensions
+   — every row AVFoundation writes but `prores_4444` — the "document" row
+   holds the canvas with an odd edge made one pixel smaller, the size the
+   file will have, and is named "Document (even)" when that is not the
+   canvas's own size; everywhere else it is named "Document size" and is the
+   canvas as it is (spec §11 G-33). After it come the standard sizes fitted to
    the document's aspect — "2160p" (named 4K), "1440p", "1080p", "720p": the
    number is the SHORT edge, the long edge follows the document, rounded to
    even. On an image format every row's numbers are the canvas fitted inside
@@ -350,6 +355,15 @@ char *rc_export_sizes(const RcProject *p, const char *preset_id, char **err_out)
  * the suite. It has to be checked, because the ignore-unknown rule is
  * exactly what makes a wrong name silent — settings that resolve, at the
  * document's size, reported ok.
+ *
+ * The resolved `width` and `height` are the size the FILE will have, which
+ * is not always the pair that was asked for. On a row that needs even pixel
+ * dimensions (every row AVFoundation writes but `prores_4444`) an odd edge
+ * comes back one pixel smaller and an edge below 2 comes back 2, whether it
+ * was the canvas's or an override's; on the two image formats the pair is
+ * the canvas fitted inside the size, never upscaled; `prores_4444` answers
+ * the pair as it stands, odd or not (spec §11 G-33). So a caller prints
+ * these two numbers and never the ones it sent.
  *
  * One key of the RESOLVED settings needs its meaning stated, because the
  * obvious reading of the name is the wrong one: `alpha` is a capability of

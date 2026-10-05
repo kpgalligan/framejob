@@ -467,6 +467,25 @@ impl Preset {
         self.video && self.avf_preset.is_none()
     }
 
+    /// True for the rows whose frame has to have EVEN pixel dimensions:
+    /// every row AVFoundation writes but ProRes 4444 (spec §11 G-33). On
+    /// these an odd edge is resolved one pixel smaller, in the size list's
+    /// Document row and in the resolved settings alike
+    /// (`export_size::even_size`), so the size reported is the size the
+    /// writer writes.
+    ///
+    /// It is asked of `avf_preset` and the codec rather than listed row by
+    /// row, so a new AVFoundation row is even-sized until someone exempts
+    /// it — the safe side, since 4:2:0 chroma needs it and a row that can
+    /// keep an odd edge has to be measured doing so, as ProRes 4444 was
+    /// (`ExporterWriter+Settings.swift`'s `encodedSize`). The audio-only
+    /// rows answer true: they have no picture and go on reporting what
+    /// `h264` reports. The two image rows answer false; their numbers are
+    /// the fit (`fits_inside_size`), odd or not.
+    pub(crate) fn even_sized(&self) -> bool {
+        self.avf_preset.is_some() && self.codec != "prores4444"
+    }
+
     fn to_json(&self) -> Value {
         let mut out = Map::new();
         out.insert("id".to_string(), Value::from(self.id));
