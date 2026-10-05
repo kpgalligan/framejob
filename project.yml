@@ -54,6 +54,13 @@ targets:
         CODE_SIGN_STYLE: Manual
         DEVELOPMENT_TEAM: ""
         MACOSX_DEPLOYMENT_TARGET: "26.0"
+        # The base version lives in VERSION (spec §11 PUB-2), as Rasterize's
+        # does; `make project` exports it as RC_BASE_VERSION (a bare `xcodegen
+        # generate` leaves it blank). Local builds read "0.2 (0)"; the publish
+        # workflow overrides both settings with "<base>.<run number>" and the
+        # run number.
+        MARKETING_VERSION: ${RC_BASE_VERSION}
+        CURRENT_PROJECT_VERSION: "0"
       # The dev-tools seam (AgentServer+DevTools.swift) compiles only under this
       # condition; `$(inherited)` keeps the project-level DEBUG in Debug.
       configs:
@@ -71,8 +78,8 @@ targets:
       properties:
         CFBundleName: Reelcut
         CFBundleDisplayName: Reelcut
-        CFBundleShortVersionString: "0.1.0"
-        CFBundleVersion: "1"
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSMinimumSystemVersion: "26.0"
         LSApplicationCategoryType: public.app-category.video
         NSPrincipalClass: NSApplication
@@ -146,7 +153,12 @@ targets:
       - name: Build Rust Core
         script: |
           set -e
-          export PATH="$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+          # /usr/bin is ahead of Xcode's own PATH, so `cc` is the xcrun shim a
+          # shell finds and not the toolchain's clang: with SDKROOT unset (below) that
+          # clang has no SDK, and a COLD build of rquickjs-sys's C stops at
+          # "'stdlib.h' file not found". `make app` never met it, because
+          # `make rust` builds first; an archive on a fresh checkout does.
+          export PATH="$HOME/.cargo/bin:/usr/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
           cd "$PROJECT_DIR/core"
           # Xcode exports MACOSX_DEPLOYMENT_TARGET and SDKROOT, a shell's
           # `make rust` neither, and rquickjs-sys's build script reruns when

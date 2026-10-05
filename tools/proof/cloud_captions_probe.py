@@ -7467,11 +7467,17 @@ def section_chrome(binary, sources):
         # Since this baseline: W1a's macOS 26 minimum (LSMinimumSystemVersion),
         # and road map 8's W2, which DELETED the Speech usage string with its
         # comment (no code path asks for the grant any more, spec §11 W-8) and
-        # reworded the microphone comment's aside about how speech reads a file.
-        check("18: `project.yml`'s `info:` and `entitlements:` blocks changed in the macOS 26 "
-              "minimum, the deleted Speech usage string and the microphone comment's aside, "
-              "and NOWHERE else",
-              diff == ['-        LSMinimumSystemVersion: "15.0"',
+        # reworded the microphone comment's aside about how speech reads a file;
+        # and spec §11 PUB-2, the two version strings read from build settings
+        # (one hunk with the minimum: the three lines are adjacent).
+        check("18: `project.yml`'s `info:` and `entitlements:` blocks changed in the two "
+              "version strings, the macOS 26 minimum, the deleted Speech usage string and "
+              "the microphone comment's aside, and NOWHERE else",
+              diff == ['-        CFBundleShortVersionString: "0.1.0"',
+                       '-        CFBundleVersion: "1"',
+                       '-        LSMinimumSystemVersion: "15.0"',
+                       '+        CFBundleShortVersionString: $(MARKETING_VERSION)',
+                       '+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)',
                        '+        LSMinimumSystemVersion: "26.0"',
                        "-        # File ▸ Generate Captions… (Transcriber.swift). NOT optional and not",
                        "-        # a nicety: SFSpeechRecognizer.h says an app whose Info.plist lacks",

@@ -55,9 +55,9 @@ make app        # cargo build --release + xcodegen + xcodebuild → build/Build/
 make test       # make rust, cd core && cargo test --release, cd graphic && cargo test --release, cd mcp-proxy && cargo test --release (black-box tests), then tools/proof/assistant_lane_proof.py (the agent lane's probe, with the assistant's credential rows and the support folder's `0700` rows), tools/proof/assistant_prompt_proof.py --probe (the prompt texts' drift checks), tools/proof/prices_proof.py (the price function: prices.py and agent/'s `bun test` against agent/prices/cases.json, and update.py's reducer against reduce_cases.json, no network) and tools/proof/budget_proof.py (the proofs' ledger and the monthly budgets, over scratch ledgers, no network) and tools/proof/capture_spike/inventory.py --check (the menu inventory's sites, found by token and enclosing function, and its other citations, found by anchor, against app/Sources; no app) and tools/proof/spec_index_proof.py (the spec indexes' Lines cells against `wc -l`, and a row for every spec file; no app) and tools/proof/proof_defaults.py --ran assistant_lane_probe --ran assistant_prompt_probe (the defaults removal recipe on a throwaway domain, its refusals over scratch folders, then the sweep of the proofs' own idle domains, and of the two probes this target ran, out of `~/Library/Preferences`; no app)
 make lint       # cargo clippy --all-targets -- -D warnings, in core/, graphic/ then mcp-proxy/
 make typecheck  # swiftc -typecheck -D REELCUT_DEV_TOOLS of app/Sources/*.swift — the ONLY authoritative Swift check, then agent/'s `tsc --noEmit` (through bun)
-make project    # xcodegen generate (Reelcut.xcodeproj is generated; project.yml is the source of truth)
+make project    # xcodegen generate with VERSION injected — never run a bare xcodegen, it leaves the version blank (Reelcut.xcodeproj is generated; project.yml is the source of truth)
 make run        # make app, then launch
-make dist       # make app, then the Distribution build (no dev tools, spec §11 V-1) and tools/proof/dist_check.py
+make dist       # make app, then the Distribution build (no dev tools, spec §11 V-1), tools/proof/dist_check.py and tools/proof/published_check.py (the check the publish workflow runs over the app it packs, spec §11 PUB-4)
 make prices     # NETWORK: regenerate agent/prices/anthropic.json from LiteLLM (spec §11 P-1); its only writer, never run by another target
 ```
 
@@ -82,6 +82,13 @@ make prices     # NETWORK: regenerate agent/prices/anthropic.json from LiteLLM (
 - `Reelcut.xcodeproj` is generated; never commit it. xcodegen and
   `make typecheck` both glob `app/Sources/`, so a new Swift file needs no
   registration anywhere.
+- **A build for another Mac comes only from a push to the `publish` branch**
+  (`.github/workflows/publish.yml`, spec §11 PUB-1..PUB-5): Distribution,
+  Developer ID-signed, checked by `published_check.py`, notarized, a DMG on a
+  GitHub Release. Pushing there publishes, so it is the owner's to ask for.
+  The base version is the `VERSION` file (MAJOR.MINOR), as in Rasterize;
+  the workflow file's NAME owns the run counter and is never changed. Every
+  local build stays ad-hoc signed.
 
 ## File map
 
@@ -123,7 +130,11 @@ archive/             closed road maps and histories, verbatim; INDEX.md — read
 docs/agents/         what the engineering skills read: tracker, labels, domain docs
 docs/graphics-api.md the graphics reference an agent reads; graphic/tests/reference.rs runs every js block
 tools/proof/         mcp.py, the per-phase proof scripts, harness/ (offscreen chrome)
+.github/             workflows/publish.yml (the publish branch's signed, notarized DMG, spec §11
+                     PUB-1..PUB-5) and ExportOptions.plist (its developer-id export)
 project.yml          xcodegen definition; Makefile; README.md (user-facing)
+VERSION              the base version, MAJOR.MINOR; `make project` feeds it to xcodegen and
+                     the publish workflow appends its run number (spec §11 PUB-2)
 ```
 
 ## Architecture

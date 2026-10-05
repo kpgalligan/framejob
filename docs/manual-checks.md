@@ -569,6 +569,27 @@ on your own account, never the spike's.
 - **Answer:** did the question appear during the agent's export?
 - **Source:** road map 14 MC4 (spec §11 MC-5: a click still asks; `agent_socket_proof.py` K12 holds the tool call's half).
 
+## Published build
+
+After a push to `publish` has made a release (README, "Publishing a
+release"). These use the DOWNLOADED app, not the tree's build, and one
+appearance is enough.
+
+**REL-1 — The DMG installs and opens on another Mac**
+- **Do:** On a Mac that has never run Reelcut (or in a fresh user account), on macOS 26 and Apple silicon: 1. Download `Reelcut.dmg` from the release with a browser, so the file is quarantined. 2. Open it and drag Reelcut to Applications. 3. Double-click Reelcut in Applications. 4. Choose Reelcut ▸ About Reelcut.
+- **Expect:** the one "downloaded from the Internet" question, naming the developer, and no "cannot be opened", "damaged" or "unidentified developer" alert; the Welcome window; About shows the release's version with the run number in parentheses (e.g. 0.2.7 (7)).
+- **Source:** spec §11 PUB-1, PUB-5.
+
+**REL-2 — The downloaded build's microphone, recorder, assistant and MCP helper work**
+- **Do:** In the downloaded app: 1. File ▸ New Recording… with a microphone chosen; answer the Microphone and Screen Recording prompts; record a few seconds while speaking; stop. 2. Open the Assistant tab with your own Anthropic key set and send one short message. 3. Reelcut ▸ Settings… ▸ MCP ▸ Copy MCP Command; paste the line into Terminal, run it, then `claude mcp list`.
+- **Expect:** both prompts name Reelcut; your voice is in the recording's microphone file; the assistant answers (the helper did not die at launch); `claude mcp list` shows `reelcut` connected, with its path inside `/Applications/Reelcut.app`.
+- **Source:** spec §11 PUB-4 (`published_check.py` holds that the entitlements are there; this is whether they do their job under a Developer ID signature).
+
+**REL-3 — Permissions survive an update**
+- **Do:** With REL-2's grants given, download the NEXT release's DMG, replace the app in Applications, open it, and start a recording with the same microphone.
+- **Expect:** no Microphone or Screen Recording prompt, and the recording starts.
+- **Source:** spec §11 PUB-1 (a Developer ID signature is stable across builds; an ad-hoc one is not).
+
 ## Host-state proof runs
 
 Scripts that need a state no agent session has. Run from a terminal on an

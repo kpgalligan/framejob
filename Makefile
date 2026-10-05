@@ -60,8 +60,12 @@ fmt:
 	cd graphic && cargo fmt
 	cd mcp-proxy && cargo fmt
 
+# The base version is the VERSION file (spec §11 PUB-2, Rasterize's scheme),
+# passed to xcodegen as RC_BASE_VERSION for project.yml's MARKETING_VERSION. A
+# missing VERSION stops here rather than generating a project with a blank
+# version; a bare `xcodegen generate` has no such guard, so never run it.
 project:
-	xcodegen generate
+	base="$$(cat VERSION)" && RC_BASE_VERSION="$$base" xcodegen generate
 
 app: rust project
 	xcodebuild -project $(APP).xcodeproj -scheme $(APP) -configuration Release \
@@ -80,11 +84,14 @@ app: rust project
 # snapshot (Contents/Resources/agent-catalog.json) must be at the bundle's
 # version, Release's naming every dev tool and Distribution's none (road map
 # 14 MC3, D15–D24). The file-wide `unexport RC_ASSEMBLYAI_KEY` above covers
-# this recipe too.
+# this recipe too. `published_check.py` is the check the publish workflow runs
+# over the app it is about to pack (spec §11 PUB-4), run here over the
+# Distribution build so it cannot rot between two publishes.
 dist: app
 	xcodebuild -project $(APP).xcodeproj -scheme $(APP) -configuration Distribution \
 		-derivedDataPath $(BUILD_DIR) build
 	python3 tools/proof/dist_check.py --release "$(APP_PATH)" --dist "$(DIST_PATH)"
+	python3 tools/proof/published_check.py --app "$(DIST_PATH)"
 
 # Fast compile check of the Swift sources without a full Xcode build.
 # `-D REELCUT_DEV_TOOLS` as Debug and Release set it (project.yml); the

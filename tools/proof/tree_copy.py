@@ -23,8 +23,9 @@ can miss it (#146: `graphics_proof.py`'s copy missed `agent/` and `docs/`).
 its own.
 
 `make_copy(dest, agent=True)`, in order: remove `dest` (`remove_tree`), make it; copy `app/`
-without `Info.plist` or `*.entitlements`; copy `project.yml` and
-`Makefile`; when `agent`, copy `agent/` without `node_modules`; link every
+without `Info.plist` or `*.entitlements`; copy `project.yml`, `Makefile`
+and `VERSION` (`COPIED_FILES`: the copy's own `make project` reads all
+three, spec §11 PUB-2); when `agent`, copy `agent/` without `node_modules`; link every
 other build input. It answers `(dest, None)`, or `(None, reason)` on an
 `OSError`. `agent=False` is the assistant spike's, which splices
 Rasterize's `agent/` in its place.
@@ -46,7 +47,7 @@ The selftest, in a fresh `work/tree_copy/`:
 * T2 — a copy's `app/` is a real directory holding `Sources/main.swift` and
   no `Info.plist` or `*.entitlements` at its top; its `agent/` is real, holds
   `build.sh` and no `node_modules`; every other input is a symlink resolving
-  to the tree's; `project.yml` and `Makefile` are byte-equal to the tree's;
+  to the tree's; `project.yml`, `Makefile` and `VERSION` are byte-equal to the tree's;
 * T3 — `agent=False` leaves no `agent`;
 * T4 (CONTROL) — the tree's `project.yml` text plus a line
   `cp "$PROJECT_DIR/designs/x" "$dest/"` also names `designs`: a new input
@@ -72,6 +73,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 WORK = os.path.join(ROOT, "tools", "proof", "work", "tree_copy")
 
 COPIED = ("app", "agent")                      # the build writes into these, so copied
+COPIED_FILES = ("project.yml", "Makefile", "VERSION")   # what `make project` reads
 GENERATED = ("build", "Reelcut.xcodeproj")     # never linked
 
 
@@ -141,7 +143,7 @@ def remove_tree(path):
 
 def make_copy(dest, agent=True):
     """A copy of the tree at `dest` that the app builds in: `app/` (and,
-    when `agent`, `agent/`) copied, `project.yml` and `Makefile` copied,
+    when `agent`, `agent/`) copied, `project.yml`, `Makefile` and `VERSION` copied,
     every other build input a symlink. Answers `(dest, None)` or
     `(None, reason)`."""
     try:
@@ -149,7 +151,7 @@ def make_copy(dest, agent=True):
         os.makedirs(dest)
         shutil.copytree(os.path.join(ROOT, "app"), os.path.join(dest, "app"),
                         ignore=shutil.ignore_patterns("Info.plist", "*.entitlements"))
-        for one in ("project.yml", "Makefile"):
+        for one in COPIED_FILES:
             shutil.copy2(os.path.join(ROOT, one), os.path.join(dest, one))
         if agent:
             shutil.copytree(os.path.join(ROOT, "agent"), os.path.join(dest, "agent"),
@@ -225,13 +227,13 @@ def selftest():
                     problems.append(f"{name} resolves to {os.path.realpath(path)}")
                 else:
                     linked.append(name)
-            for one in ("project.yml", "Makefile"):
+            for one in COPIED_FILES:
                 if not filecmp.cmp(os.path.join(ROOT, one), os.path.join(dest, one),
                                    shallow=False):
                     problems.append(f"{one} differs from the tree's")
             row("T2", not problems,
                 "; ".join(problems) if problems
-                else f"app/ and agent/ copied, {linked} linked, project.yml and Makefile equal")
+                else f"app/ and agent/ copied, {linked} linked, {', '.join(COPIED_FILES)} equal")
     except Exception as error:
         row("T2", False, f"the copy raised {error!r}")
 

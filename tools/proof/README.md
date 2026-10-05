@@ -14677,3 +14677,89 @@ python3 tools/proof/proof_defaults.py --ran assistant_lane_probe --ran assistant
 python3 tools/proof/defaults_proof.py                                 # passed 8/8, exit 0 (launches the app; not in make test)
 python3 tools/proof/defaults_proof.py --mutant no-compare             # MUTANT PASS (also no-exit)
 ```
+
+## Publishing — the app the workflow is about to pack (`published_check.py` P1–P16; spec §11 PUB-1..PUB-5)
+
+`.github/workflows/publish.yml` archives the Distribution configuration with a
+Developer ID identity, exports the archive (which signs the app a second
+time) and runs this over the exported `Reelcut.app` before it builds the DMG;
+a failed row fails the step and nothing is packed, notarized or released.
+`make dist` runs it too, after `dist_check.py`, over the local Distribution
+build and with no `--version` or `--build`, so the instrument is exercised on
+every local Distribution build. It holds what Apple's notary does not look
+at, read with `dist_check.py`'s own readers (imported, not copied):
+
+- **P1** the needle reads from the seam; **P2** the binary exists; **P3** it
+  does not hold the needle (no positive control here: that is `dist_check.py`
+  D4, which needs a Release bundle the workflow never builds);
+- **P4** the app is signed with the hardened runtime and `codesign --verify
+  --strict` accepts it, which also fails when anything nested was changed
+  after the app was sealed; **P5** its entitlements are exactly `audio-input`;
+- **P6–P9** the assistant helper: present, hardened runtime, entitlements
+  exactly `allow-jit`, no needle;
+- **P10–P12** the MCP proxy: present, hardened runtime, no entitlements;
+- **P13** the catalog snapshot is at the bundle's version; **P14** it names no
+  dev tool;
+- **P15** `CFBundleShortVersionString` is `--version` (without one: two or
+  three dot-separated integers); **P16** `CFBundleVersion` is `--build`
+  (without one: an integer).
+
+No row is skipped; the last line is `published_check: <passed>/16` and the
+exit is 0 only at 16/16.
+
+```sh
+make dist                                                   # → dist_check: 24/24, published_check: 16/16
+python3 tools/proof/published_check.py --app APP [--version V --build N]
+```
+
+**Measured, 2026-10-04.** The workflow's own archive line, run locally with
+the ad-hoc identity and `MARKETING_VERSION=0.2.999 CURRENT_PROJECT_VERSION=999`
+after `make project`, exits 0, and the archived app scores 16/16 with
+`--version 0.2.999 --build 999` (the snapshot reads `0.2.999`, 86 tools); the
+same line had passed from a COLD `core/target` and `mcp-proxy/target` before
+the base moved to the `VERSION` file. `make dist` scores 24/24 and 16/16, the
+Distribution bundle reading `0.2` and `0`. What no local run reaches — the
+Developer ID identity, the `developer-id` export's re-sign, the notary, the
+release — is first tested by the first push to `publish`.
+
+**The `VERSION` file (spec §11 PUB-2), made to fail.** `make project` in a
+folder holding the tree's `Makefile` and `project.yml` and no `VERSION` stops
+at `cat: VERSION: No such file or directory`, exit 1, and writes no project.
+A copy of the Distribution bundle with `CFBundleShortVersionString` set to
+the empty string — what a bare `xcodegen generate` builds — scores 13/16: P15
+FAIL, and P13 and P4 with it. `tree_copy.py` copies `VERSION` beside
+`project.yml` and `Makefile` (`COPIED_FILES`), because a proof's `make app`
+in a copy runs `make project` there; its selftest is 5/5, T2 naming all
+three files.
+
+**The cold archive found a defect in "Build Rust Core"**, fixed in the same
+change: with `SDKROOT` unset (#225) and Xcode's toolchain `clang` first on
+the script's `PATH`, a cold build of rquickjs-sys's C stopped at
+`'stdlib.h' file not found` (measured: that `clang` with no `SDKROOT` fails
+on a one-line `#include <stdlib.h>`, `/usr/bin/cc` does not). `make app` never
+met it because `make rust` builds first. The step now puts `/usr/bin` ahead,
+and #225's property still holds: after the cold archive, `make rust` finishes
+in 0.19 s and compiles nothing.
+
+**Made to fail by hand (2026-10-04)**, every mutated bundle a copy outside the
+tree, re-signed ad hoc, each exit 1:
+
+| Case | FAIL | Score |
+|---|---|---|
+| control: the Distribution build | none | 16/16, exit 0 |
+| `--app` the Release app (the wrong configuration archived) | P3 P5 P14 | 13/16 |
+| `--version 0.1.7 --build 7` on the Distribution build | P15 P16 | 14/16 |
+| `--app` a missing path | all but P1 | 1/16 |
+| the helper signed again with no entitlements (what an export could do) | P4 P8 | 14/16 |
+| the helper signed without the hardened runtime | P4 P7 | 14/16 |
+| the MCP proxy signed with the helper's entitlement | P4 P12 | 14/16 |
+| the app signed again with no entitlements | P5 | 15/16 |
+| no catalog snapshot | P4 P13 P14 | 13/16 |
+| no MCP proxy | P4 P10 P11 P12 | 12/16 |
+
+The workflow file passes `actionlint` 1.7.12 (with its shellcheck pass over
+every step), which is what catches a context used where GitHub does not
+provide it — the error that failed Rasterize's first run in 0 s.
+`cloud_captions_probe.py`'s row 18 expects the two version strings among
+`project.yml`'s `info:` changes; its diff was computed alone against the
+row's own baseline tree and equals the expected list (18 lines).

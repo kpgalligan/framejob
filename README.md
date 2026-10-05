@@ -386,17 +386,42 @@ Requires Xcode 26 or later (the macOS 26 SDK), Rust (cargo), [xcodegen](https://
 
 ```sh
 make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
-make dist       # make app, then the Distribution build (no dev tools; the assistant helper signed with the hardened runtime) → build/Build/Products/Distribution/Reelcut.app, checked
+make dist       # make app, then the Distribution build (no dev tools; the assistant helper signed with the hardened runtime) → build/Build/Products/Distribution/Reelcut.app, checked (dist_check.py, then published_check.py, the check a published build gets)
 make run        # build and launch
 make test       # Rust core, graphics and MCP proxy tests, then the agent lane's proof (tools/proof/assistant_lane_proof.py), the prompt texts' checks (tools/proof/assistant_prompt_proof.py --probe), the price function in both readers (tools/proof/prices_proof.py, no network) and the proofs' ledger and monthly budgets (tools/proof/budget_proof.py, no network)
 make lint       # cargo clippy --all-targets -D warnings
 make typecheck  # swiftc -typecheck of app/Sources — the ONLY authoritative Swift check, then agent/'s tsc --noEmit (through bun)
-make project    # xcodegen generate
+make project    # xcodegen generate, with the base version from VERSION
 make prices     # regenerate agent/prices/anthropic.json from LiteLLM's price table (network); the file's only writer
 ```
 
-`Reelcut.xcodeproj` is generated — run `xcodegen generate` (or `make project`)
-after editing `project.yml`, and don't commit the project file.
+`Reelcut.xcodeproj` is generated — run `make project` after editing
+`project.yml`, and don't commit the project file. Use `make project` rather
+than a bare `xcodegen generate`: it feeds the base version from `VERSION` into
+the project, which a bare run leaves blank.
+
+### Publishing a release
+
+Pushing to the `publish` branch runs `.github/workflows/publish.yml`: it
+archives the Distribution configuration signed with Developer ID, exports it,
+checks the exported app (`tools/proof/published_check.py`), packs it into
+`Reelcut.dmg`, notarizes and staples the DMG, and attaches it to a GitHub
+Release tagged `v<version>`. The version is `VERSION` (MAJOR.MINOR) plus the
+workflow's run number, and the build number is the run number, so bump
+`VERSION` for a new minor line. A local build reads "0.2 (0)". The newest build is always at
+`https://github.com/kpgalligan/reelcut/releases/latest/download/Reelcut.dmg`
+(while the repository is private, only for people with access to it).
+
+The workflow runs no tests: run `make test` and `make dist` on what you push.
+
+The signing and notarization credentials are secrets in the repository's
+`publish` environment (Settings ▸ Environments), whose deployment branches are
+restricted to `publish`: `DEVELOPER_ID_P12_BASE64` and
+`DEVELOPER_ID_P12_PASSWORD` (the Developer ID Application certificate exported
+with its private key as a `.p12`, base64-encoded, and the export password),
+`KEYCHAIN_PASSWORD` (any random string), `APPLE_TEAM_ID`, and `ASC_KEY_ID`,
+`ASC_ISSUER_ID` and `ASC_KEY_P8_BASE64` (an App Store Connect API key and its
+`.p8`, base64-encoded). Local builds stay ad-hoc signed and need none of them.
 
 ## AI agent access (MCP)
 
