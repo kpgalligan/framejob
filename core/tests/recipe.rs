@@ -53,11 +53,12 @@ const LAYER_KEYS: [&str; 20] = [
     "y",
 ];
 
-/// The eight keys a TEXT layer's `source` object carries (spec §7.3): the
+/// The eleven keys a TEXT layer's `source` object carries (spec §7.3): the
 /// tagged kind, the cache hash, the description, the three computed
-/// reveal keys and the two computed word keys (format version 9), all
-/// emitted whether the layer animates or is word-timed or not.
-const TEXT_SOURCE_KEYS: [&str; 8] = [
+/// reveal keys and the five computed word keys (two of format version 9,
+/// three of format version 12), all emitted whether the layer animates or
+/// is word-timed or not.
+const TEXT_SOURCE_KEYS: [&str; 11] = [
     "hash",
     "kind",
     "reveal",
@@ -65,6 +66,9 @@ const TEXT_SOURCE_KEYS: [&str; 8] = [
     "reveal_phase",
     "text",
     "word",
+    "word_dim",
+    "word_fill",
+    "word_glide",
     "word_pop",
 ];
 
@@ -380,7 +384,7 @@ fn the_burn_in_carries_every_key_a_drawn_layer_carries() {
          RecipeSourceRef.init(from:)"
     );
     // Layer 1 of the fixture at this tick is the authored, ANIMATED text
-    // clip: the same six keys, which is the point of emitting all three
+    // clip: the same eleven keys, which is the point of emitting all three
     // reveal keys on every text layer whether it animates or not.
     assert_eq!(text(&burnt, "/layers/1/source/kind"), "text");
     assert_eq!(keys(&layer, "/source"), keys(&burnt, "/layers/1/source"));

@@ -18,7 +18,7 @@ The Lines cell is `wc -l`, and `make test` checks it (`tools/proof/spec_index_pr
 | [`effects-motion.md`](effects-motion.md) | 60 | **Transitions and motion (road map 5).** R5-1..R5-5, E2-27. |
 | [`deepening.md`](deepening.md) | 1271 | **Deepening (road map 7).** D2-1, D3-1, #21, #22, D4-1..D4-6, D7-1..D7-3, #42, #88, #63, #174, #40, #43, #190, #87, #86, #178, #216, #216-R, #228-P, #228-V, #228-O, #232, #231, #233, #227, #234: how ops refuse, the op table, the gate, the source window, time envelopes, one-delta shifts on the canvas's grid, the non-edits that speak, a relink that re-probes, one frame on the grid, a tool that closes a document, a path one open document holds, a caption name's own extension, a speed of ×0.1–×1000 and the audio ceiling above ×12, a gain change on one audio track slews over 25 ms, a normalised export gained in float and quantised once, the cache passes' save gate's five accepted limits, the supplemental VP9/AV1 decoders and the one-frame import decode, the WebM/Matroska rewrap, its copy's progress window with Cancel, its Vorbis copy, the copy's original, the copy's movie timescale, an agent's `open_project` read off the main thread, the original an ffmpeg conversion records, the ffmpeg step's checked VP9 copy, and one document per path while a person's open is in flight. |
 | [`cloud-captions.md`](cloud-captions.md) | 404 | **Cloud captions (road map 6).** R6-1..R6-24: AssemblyAI, keys, deletion, recovery, refusal precedence, a dripping server, a Stop's bound on a DELETE, a refused transcript's failed DELETE reported for the dashboard, cached transcripts not re-checked for the key, speaker colours on Subtitles, server strings checked whole and bounded, a transcript id the key cannot delete holding its media. |
-| [`word-captions.md`](word-captions.md) | 123 | **Word captions (road map 8).** W-1..W-11. |
+| [`word-captions.md`](word-captions.md) | 211 | **Word captions (road map 8).** W-1..W-14. |
 | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) | 408 | **Chrome, the clip inspector and keys (the sharp pass, road map 9, #35).** SH-1..SH-5, CI-1..CI-16, K-1..K-3. |
 | [`graphics.md`](graphics.md) | 1509 | **Graphics (road map 10).** G-1..G-33. |
 | [`dev-tools.md`](dev-tools.md) | 27 | **Dev tools (road map 11).** V-1..V-3: the `REELCUT_DEV_TOOLS` flag and `make dist`, dev tools as ordinary tools, capture by `cacheDisplay`. |
@@ -144,6 +144,9 @@ The Lines cell is `wc -l`, and `make test` checks it (`tools/proof/spec_index_pr
 | W-9 | No language model chooses words — amended by AI-6 | [`word-captions.md`](word-captions.md) |
 | W-10 | `set_text` can patch `case`, `words` and `word_style` | [`word-captions.md`](word-captions.md) |
 | W-11 | Karaoke's two lines, the bundled caption faces and the 80 % shrink floor are confirmed | [`word-captions.md`](word-captions.md) |
+| W-12 | A sliding pill, an in-word fill and a dim in a pause are three keys of `word_style`, not modes; format version 12 | [`word-captions.md`](word-captions.md) |
+| W-13 | The recipe's `word_glide`, `word_fill` and `word_dim`: no second index, a word fills in at most 0.6 s, a pause under 0.25 s does not dim | [`word-captions.md`](word-captions.md) |
+| W-14 | How the three are drawn: a gliding pill under every word's ink, a hard fill edge, one opacity that leaves the backdrop alone | [`word-captions.md`](word-captions.md) |
 | SH-1 | `StickerButton` keeps its pill — superseded by SH-4 | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
 | SH-2 | `BlockSliderCell.drawBar` is forked from Rasterize's copy | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |
 | CI-1 | The selected action is the SIXTH piece of view state | [`chrome-inspector-keys.md`](chrome-inspector-keys.md) |

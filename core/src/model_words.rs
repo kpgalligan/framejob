@@ -2,15 +2,18 @@
 //! [`TextCase`], the [`Word`] timings a caption page carries, and the
 //! [`WordStyle`] (with its [`WordMode`] and [`ActivePill`]) that says how
 //! the word being spoken is drawn — plus the two small facts every writer
-//! of `text.words` shares, [`token_count`] and [`rebase_words`].
+//! of `text.words` shares, [`token_count`] and [`rebase_words`]. Format
+//! version 12 (spec §11, W-12) added three looks as KEYS, each off by
+//! default: [`ActivePill::glide`], [`WordStyle::active_fill`] and
+//! [`WordStyle::pause_dim`].
 //!
 //! **A word caption is an ordinary text clip holding one PAGE** (spec §11,
 //! W-1): `content` is the page, `words` is one `{start, end}` per
 //! whitespace token of it, in CLIP time, and `word_style` is how the
 //! renderer shows which of them has been said. Nothing here is a measured
-//! size or a per-frame answer — `recipe_words.rs` computes the `word` and
-//! `word_pop` keys from these at render time and stores nothing — which is
-//! the seam `model_text.rs` states for the text group as a whole, read once
+//! size or a per-frame answer — `recipe_words.rs` computes the five word
+//! keys (`word`, `word_pop`, `word_glide`, `word_fill`, `word_dim`) from
+//! these at render time and stores nothing — which is the seam `model_text.rs` states for the text group as a whole, read once
 //! more: the model says what the words ARE and when they are said, and only
 //! the platform knows where each one lands on the page.
 //!
@@ -60,8 +63,10 @@ pub enum TextCase {
 /// A negative `start` is legal and means "already said": `split` rebases
 /// the second half's words by the cut, so a split page is invisible. Two
 /// words may share a `start` — the engines' 0.06 s grid snapped to a frame
-/// can land two on one — and the later one wins that frame. `end` is not
-/// read by the recipe; it is stored because the pager needs the gaps.
+/// can land two on one — and the later one wins that frame. `end` is what
+/// the pager reads the gaps from, and since format version 12 the recipe
+/// reads it too: a word fills until its `end` (capped), and a pause is the
+/// gap from one word's `end` to the next one's `start` (spec §11, W-13).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Word {
@@ -89,6 +94,10 @@ pub struct ActivePill {
     pub color: Color,
     pub padding: f64,
     pub radius: f64,
+    /// Whether the plate SLIDES from the word before to the active one
+    /// rather than jumping (format version 12; spec §11, W-12). It lives on
+    /// the pill because without a pill nothing slides.
+    pub glide: bool,
 }
 
 impl Default for ActivePill {
@@ -98,6 +107,7 @@ impl Default for ActivePill {
             color: [0.55, 0.27, 0.93, 1.0],
             padding: 0.2,
             radius: 0.25,
+            glide: false,
         }
     }
 }
@@ -118,6 +128,12 @@ pub struct WordStyle {
     pub spoken_color: Option<Color>,
     /// Words not yet said (highlight mode).
     pub upcoming_color: Option<Color>,
+    /// Whether the active word fills left to right as it is said, from its
+    /// `start` to its `end` (format version 12; spec §11, W-12).
+    pub active_fill: bool,
+    /// How far the page dims in a pause between words, 0 (off) to 1
+    /// (invisible): its opacity there is `1 − pause_dim` (format version 12).
+    pub pause_dim: f64,
 }
 
 impl Default for WordStyle {
@@ -129,6 +145,8 @@ impl Default for WordStyle {
             active_pill: None,
             spoken_color: None,
             upcoming_color: None,
+            active_fill: false,
+            pause_dim: 0.0,
         }
     }
 }
@@ -147,6 +165,8 @@ impl WordStyle {
             active_pill: Some(ActivePill::default()),
             spoken_color: Some([1.0, 1.0, 1.0, 1.0]),
             upcoming_color: Some([1.0, 1.0, 1.0, 1.0]),
+            active_fill: false,
+            pause_dim: 0.0,
         }
     }
 }

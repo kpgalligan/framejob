@@ -411,6 +411,7 @@ pub(crate) fn check_text(props: &TextProps) -> Result<(), String> {
             at_least("text.word_style.active_pill.padding", pill.padding, 0.0)?;
             at_least("text.word_style.active_pill.radius", pill.radius, 0.0)?;
         }
+        in_range("text.word_style.pause_dim", style.pause_dim, 0.0, 1.0)?;
     }
     Ok(())
 }

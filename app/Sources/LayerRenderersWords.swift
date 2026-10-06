@@ -4,10 +4,13 @@ import CoreText
 /// The FOURTH text routine of `LayerRenderers` (road map 8 §5d, W3): a word
 /// caption's timed page — the base pass, the active word's pill, and the
 /// active word popped — and the headroom that keeps the pop inside the box.
+/// Since issue batch B86 (spec §11 W-14) also the three looks: a pill that
+/// glides, a word that fills, a page that dims in a pause.
 ///
-/// The recipe's `word` and `word_pop` are the whole of what the core says
-/// (`RecipeReveal`, spec §11 W-4): the active token is `word − 1`, the
-/// spoken ones are before it, the upcoming ones from `word` on. Everything
+/// The recipe's five word keys are the whole of what the core says
+/// (`RecipeReveal`, spec §11 W-4, W-13): the active token is `word − 1`, the
+/// spoken ones are before it, the upcoming ones from `word` on, and a
+/// gliding pill comes from token `word − 2`. Everything
 /// here indexes `tokens(of: props.laidContent)` and nothing else, because
 /// the `TextLayout` was laid from `laidContent` — so every
 /// `CTLineGetOffsetForStringIndex`, `CTLineGetStringRange` and `midpoint`
@@ -149,12 +152,99 @@ extension LayerRenderers {
         context.restoreGState()
     }
 
+    /// `1 − (1 − u)³`, the curve a gliding pill rides: fast off the word it
+    /// leaves, settling onto the active one (spec §11 W-14).
+    static func easeOut(_ u: Double) -> Double {
+        let p = 1 - u
+        return 1 - p * p * p
+    }
+
+    /// The part of one token that lies on one line: where its glyph range
+    /// starts and ends, the pill around it, and its midpoint clip.
+    private struct TokenPiece {
+        let line: Int
+        let left: CGFloat
+        let right: CGFloat
+        let pill: CGRect
+        let bounds: (left: CGFloat, right: CGFloat)
+    }
+
+    /// `token`'s pieces in line order — one, unless the token wraps; none
+    /// for an index that is no token.
+    private static func pieces(
+        of token: Int, _ layout: TextLayout, _ tokens: [Range<Int>], pad: CGFloat
+    ) -> [TokenPiece] {
+        guard tokens.indices.contains(token) else { return [] }
+        var found: [TokenPiece] = []
+        for (index, laid) in layout.lines.enumerated() {
+            let line = laid.range.location..<(laid.range.location + laid.range.length)
+            let here = tokens.indices.filter {
+                tokens[$0].lowerBound < line.upperBound && tokens[$0].upperBound > line.lowerBound
+            }
+            guard let position = here.firstIndex(of: token) else { continue }
+            let range = tokens[token].clamped(to: line)
+            let left = laid.origin.x
+                + CTLineGetOffsetForStringIndex(laid.line, range.lowerBound, nil)
+            let right = laid.origin.x
+                + CTLineGetOffsetForStringIndex(laid.line, range.upperBound, nil)
+            let pill = CGRect(
+                x: left - pad, y: laid.origin.y - laid.descent - pad,
+                width: (right - left) + pad * 2, height: laid.ascent + laid.descent + pad * 2)
+            found.append(
+                TokenPiece(
+                    line: index, left: left, right: right, pill: pill,
+                    bounds: clipBounds(layout, laid, tokens, here, position, line)))
+        }
+        return found
+    }
+
+    /// Fills `plate` in `rect`, scaled about the rect's own centre.
+    private static func fillPlate(
+        _ plate: ActivePill, in rect: CGRect, size: CGFloat, scale: CGFloat, in context: CGContext
+    ) {
+        context.saveGState()
+        context.translateBy(x: rect.midX, y: rect.midY)
+        context.scaleBy(x: scale, y: scale)
+        context.translateBy(x: -rect.midX, y: -rect.midY)
+        fillPlate(plate, in: rect, size: size, in: context)
+        context.restoreGState()
+    }
+
+    private static func fillPlate(
+        _ plate: ActivePill, in rect: CGRect, size: CGFloat, in context: CGContext
+    ) {
+        guard rect.width > 0, rect.height > 0 else { return }
+        let radius = min(CGFloat(plate.radius) * size, min(rect.width, rect.height) / 2)
+        context.addPath(
+            CGPath(
+                roundedRect: rect, cornerWidth: max(radius, 0), cornerHeight: max(radius, 0),
+                transform: nil))
+        context.setFillColor(plate.color.nsColor.cgColor)
+        context.fillPath()
+    }
+
+    /// `x` moved onto the nearest whole DEVICE pixel column under the
+    /// context's current transform, so a fill's edge never antialiases.
+    private static func snappedToDevice(
+        _ x: CGFloat, y: CGFloat, in context: CGContext
+    ) -> CGFloat {
+        var device = context.convertToDeviceSpace(CGPoint(x: x, y: y))
+        device.x = device.x.rounded()
+        return context.convertToUserSpace(device).x
+    }
+
     /// A timed page at `word` (how many words have started) and `pop` (0…1
-    /// through the active word's pop, nil for none).
+    /// through the active word's pop, nil for none), with the three looks of
+    /// spec §11 W-14: `glide` (0…1 through the pill's slide from token
+    /// `word − 2`), `fill` (0…1 of the active word filled) and `dim` (0…1
+    /// into a pause's dim). All three are clamped here, and `pauseDim` with
+    /// them: an action's end patch is not range-checked.
     ///
-    /// The base pass first, token by token: build mode skips the upcoming
-    /// tokens (`≥ word`), highlight draws them in `upcoming_color` when set;
-    /// the spoken ones (`< word − 1`) take `spoken_color` when set; the base
+    /// **With `activePill.glide` not set and `fill` and `dim` nil, the calls
+    /// are the ones this routine has always made, in their order.** The base
+    /// pass first, token by token: build mode skips the upcoming tokens
+    /// (`≥ word`), highlight draws them in `upcoming_color` when set; the
+    /// spoken ones (`< word − 1`) take `spoken_color` when set; the base
     /// colour otherwise. Then the ACTIVE token, `word − 1`, in this order
     /// inside one saved state: the CTM scaled about its pill's centre by
     /// `1 + (active_scale − 1) × backOut(pop)`; the pill filled UNCLIPPED —
@@ -162,12 +252,43 @@ extension LayerRenderers {
     /// in text space so the CTM scales it with the token, and the token in
     /// `active_color`. Clipping before scaling would shave the popped
     /// word's end glyphs at the unscaled midpoints.
+    ///
+    /// **A gliding pill is filled BEFORE the base pass, in every frame of
+    /// the page**, sliding or settled, so every word's ink lies over it —
+    /// the word it is leaving included — and the order never flips when a
+    /// slide ends. Its rect is the interpolation of token `word − 2`'s pill
+    /// and the active token's at `easeOut(glide)` when each lies on one
+    /// line, else the active token's settled pill; it pops about its OWN
+    /// centre, and the active token still pops about its settled pill's.
+    ///
+    /// **A fill's edge is hard**: `left + fill × (right − left)` over the
+    /// token's glyph range, on a whole device pixel; the active ink left of
+    /// it, and right of it the upcoming ink (highlight) or nothing (build).
+    /// At 1 the edge is the token's own clip bound, so a full word is drawn
+    /// whole — an outline's stroke reaches past the glyph range.
+    ///
+    /// **A dim is one opacity over the words and the pill together**,
+    /// `1 − dim × pauseDim`, in one transparency layer. The caller's
+    /// backdrop is outside it and never dims.
     static func drawWords(
         _ layout: TextLayout, of props: TextProps, style: WordStyle, word: Int, pop: Double?,
-        in context: CGContext
+        glide: Double? = nil, fill: Double? = nil, dim: Double? = nil, in context: CGContext
     ) {
         let tokens = tokens(of: props.laidContent)
         guard !tokens.isEmpty, !layout.lines.isEmpty else { return }
+        let dimmed = min(max(dim ?? 0, 0), 1) * min(max(style.pauseDim, 0), 1)
+        guard dimmed < 1 else { return }
+        if dimmed > 0 {
+            context.saveGState()
+            context.setAlpha(CGFloat(1 - dimmed))
+            context.beginTransparencyLayer(auxiliaryInfo: nil)
+        }
+        defer {
+            if dimmed > 0 {
+                context.endTransparencyLayer()
+                context.restoreGState()
+            }
+        }
         context.textMatrix = .identity
         // The base colour draws from the layout AS LAID, as the static page
         // does: fill at its own alpha, the stroke at the outline's.
@@ -176,7 +297,95 @@ extension LayerRenderers {
         let upcoming = style.upcomingColor.map { ink(props, $0) } ?? base
         let active = word - 1
         let height = layout.size.height
+        let size = max(1, CGFloat(props.size))
+        let scale = pop.map { 1 + CGFloat(style.activeScale - 1) * CGFloat(backOut($0)) } ?? 1
+        let pad = CGFloat(style.activePill?.padding ?? 0) * size
+        let activePieces = pieces(of: active, layout, tokens, pad: pad)
+        let glidingPlate = style.activePill.flatMap { $0.glide ? $0 : nil }
 
+        if let plate = glidingPlate {
+            drawGlidingPlate(
+                plate, to: activePieces, from: pieces(of: active - 1, layout, tokens, pad: pad),
+                glide: glide, size: size, scale: scale, in: context)
+        }
+        drawBase(
+            layout, tokens, word: word, mode: style.mode, spoken: spoken, upcoming: upcoming,
+            in: context)
+
+        guard active >= 0, active < tokens.count else { return }
+        let activeInk = style.activeColor.map { ink(props, $0) } ?? base
+        let filled: Double? = fill.map { min(max($0, 0), 1) }
+        for piece in activePieces {
+            let pill = piece.pill
+            let bounds = piece.bounds
+            context.saveGState()
+            // (a) the pop, about the pill's centre.
+            context.translateBy(x: pill.midX, y: pill.midY)
+            context.scaleBy(x: scale, y: scale)
+            context.translateBy(x: -pill.midX, y: -pill.midY)
+            // (b) the pill, unclipped — unless it glides, and is already
+            // down under the base pass.
+            if glidingPlate == nil, let plate = style.activePill {
+                fillPlate(plate, in: pill, size: size, in: context)
+            }
+            // (c) the token, clipped at its midpoints in text space, and at
+            // the fill's edge when it is filling.
+            if let filled {
+                let edge = filled >= 1
+                    ? bounds.right
+                    : snappedToDevice(
+                        piece.left + CGFloat(filled) * (piece.right - piece.left), y: pill.midY,
+                        in: context)
+                drawToken(
+                    activeInk, line: piece.line, left: bounds.left, right: edge, height: height,
+                    in: context)
+                if style.mode == .highlight, edge < bounds.right {
+                    drawToken(
+                        upcoming, line: piece.line, left: edge, right: bounds.right,
+                        height: height, in: context)
+                }
+            } else {
+                drawToken(
+                    activeInk, line: piece.line, left: bounds.left, right: bounds.right,
+                    height: height, in: context)
+            }
+            context.restoreGState()
+        }
+    }
+
+    /// A gliding pill's plate: between `from`'s pill and `to`'s at
+    /// `easeOut(glide)` while it slides and each is one piece, else on
+    /// `to`'s pieces, settled. A nil `glide` is a page's first word, or a
+    /// caller with no recipe (the sheet's preview): settled.
+    private static func drawGlidingPlate(
+        _ plate: ActivePill, to: [TokenPiece], from: [TokenPiece], glide: Double?, size: CGFloat,
+        scale: CGFloat, in context: CGContext
+    ) {
+        var rects = to.map { $0.pill }
+        let travel = CGFloat(easeOut(min(max(glide ?? 1, 0), 1)))
+        if travel < 1, to.count == 1, from.count == 1 {
+            let a = from[0].pill
+            let b = to[0].pill
+            rects = [
+                CGRect(
+                    x: a.minX + (b.minX - a.minX) * travel,
+                    y: a.minY + (b.minY - a.minY) * travel,
+                    width: a.width + (b.width - a.width) * travel,
+                    height: a.height + (b.height - a.height) * travel)
+            ]
+        }
+        for rect in rects {
+            fillPlate(plate, in: rect, size: size, scale: scale, in: context)
+        }
+    }
+
+    /// The base pass: every token but the active one, `word − 1`.
+    private static func drawBase(
+        _ layout: TextLayout, _ tokens: [Range<Int>], word: Int, mode: WordMode, spoken: WordInk,
+        upcoming: WordInk, in context: CGContext
+    ) {
+        let active = word - 1
+        let height = layout.size.height
         for (index, laid) in layout.lines.enumerated() {
             let line = laid.range.location..<(laid.range.location + laid.range.length)
             // `wordFade`'s filter: the tokens with ink on THIS line.
@@ -184,56 +393,12 @@ extension LayerRenderers {
                 tokens[$0].lowerBound < line.upperBound && tokens[$0].upperBound > line.lowerBound
             }
             for (position, token) in here.enumerated() where token != active {
-                if token >= word, style.mode == .build { continue }
+                if token >= word, mode == .build { continue }
                 let bounds = clipBounds(layout, laid, tokens, here, position, line)
                 drawToken(
                     token >= word ? upcoming : spoken, line: index, left: bounds.left,
                     right: bounds.right, height: height, in: context)
             }
-        }
-
-        guard active >= 0, active < tokens.count else { return }
-        let activeInk = style.activeColor.map { ink(props, $0) } ?? base
-        let size = max(1, CGFloat(props.size))
-        let scale = pop.map { 1 + CGFloat(style.activeScale - 1) * CGFloat(backOut($0)) } ?? 1
-        for (index, laid) in layout.lines.enumerated() {
-            let line = laid.range.location..<(laid.range.location + laid.range.length)
-            let here = tokens.indices.filter {
-                tokens[$0].lowerBound < line.upperBound && tokens[$0].upperBound > line.lowerBound
-            }
-            guard let position = here.firstIndex(of: active) else { continue }
-            let range = tokens[active].clamped(to: line)
-            let left = laid.origin.x
-                + CTLineGetOffsetForStringIndex(laid.line, range.lowerBound, nil)
-            let right = laid.origin.x
-                + CTLineGetOffsetForStringIndex(laid.line, range.upperBound, nil)
-            let pad = CGFloat(style.activePill?.padding ?? 0) * size
-            let pill = CGRect(
-                x: left - pad, y: laid.origin.y - laid.descent - pad,
-                width: (right - left) + pad * 2, height: laid.ascent + laid.descent + pad * 2)
-            let bounds = clipBounds(layout, laid, tokens, here, position, line)
-
-            context.saveGState()
-            // (a) the pop, about the pill's centre.
-            context.translateBy(x: pill.midX, y: pill.midY)
-            context.scaleBy(x: scale, y: scale)
-            context.translateBy(x: -pill.midX, y: -pill.midY)
-            // (b) the pill, unclipped.
-            if let plate = style.activePill, pill.width > 0, pill.height > 0 {
-                let radius = min(
-                    CGFloat(plate.radius) * size, min(pill.width, pill.height) / 2)
-                context.addPath(
-                    CGPath(
-                        roundedRect: pill, cornerWidth: max(radius, 0),
-                        cornerHeight: max(radius, 0), transform: nil))
-                context.setFillColor(plate.color.nsColor.cgColor)
-                context.fillPath()
-            }
-            // (c) the token, clipped at its midpoints in text space.
-            drawToken(
-                activeInk, line: index, left: bounds.left, right: bounds.right, height: height,
-                in: context)
-            context.restoreGState()
         }
     }
 

@@ -86,8 +86,17 @@ extern "C" {
  * `{path, bookmark}`, the WebM or Matroska file the app copied into a
  * playable .mov, which the app names, reveals and copies again when the copy
  * is gone. It defaults to null, so there is no migration step; an older
- * build would drop it and leave nothing to copy the media again from. */
-#define RC_FORMAT_VERSION 11
+ * build would drop it and leave nothing to copy the media again from.
+ *
+ * Version 12 is three word-caption looks: `glide` last on
+ * `word_style.active_pill` (the plate slides from word to word), and
+ * `active_fill` and `pause_dim` last on `word_style`, in that order (the
+ * active word fills as it is said; the page's opacity in a pause is
+ * `1 - pause_dim`). All three default to off, so there is no migration step
+ * and an older page draws as it did; an older build would drop them. The
+ * recipe's `word_glide`, `word_fill` and `word_dim` are computed, never
+ * stored. */
+#define RC_FORMAT_VERSION 12
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips

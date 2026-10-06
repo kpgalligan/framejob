@@ -40,7 +40,11 @@ governs a module now.
   map 8's W1b): `TextCase`, `Word`, `WordMode`, `ActivePill` and
   `WordStyle` (whose `template()` is what `patch.rs`'s text template walks
   against), re-exported through `model_props.rs`; the FIELDS (`case`,
-  `words`, `word_style`) close `TextProps`. It also holds the two facts
+  `words`, `word_style`) close `TextProps`. Format version 12 (spec §11
+  W-12) added three looks as KEYS, each off by default: `ActivePill.glide`,
+  `WordStyle.active_fill` and `WordStyle.pause_dim` (0–1, range-checked in
+  `props_check.rs`); `Word.end` is read by the recipe since then, not only
+  by the pager. It also holds the two facts
   every writer of `text.words` shares, both `pub(crate)` and so named
   directly by their callers (a glob re-export cannot widen them):
   `token_count`, THE token rule (`split_whitespace` — the core is the one
@@ -438,16 +442,27 @@ governs a module now.
   A graphic layer's source is one arm calling `recipe_graphic.rs`'s
   `graphic_source`; `missing_source` is `pub(crate)` for it.
 - `recipe_words.rs` — what a timed text PAGE shows at one instant:
-  `Words::of` answers `word` (how many of `text.words` have started, 0 to n)
-  and `word_pop` (0..1 through the active word's pop over `WORD_POP`, 0.12
-  s), both null unless the text has a `word_style`, non-empty `words` and a
-  matching token count, and `word_pop` null at `active_scale` 1.0. Total and
-  order-blind — a count, a saturating subtraction and a clamp — because the
-  file reader stores `words` unchecked. `recipe_text.rs` emits both keys on
-  every text layer, gives a styled page a WHOLE reveal (W-5), strips `words`
-  from the description (and `word_style` when unset, `case` when
-  `as_written`, so an unstyled title hashes as before version 9), and folds
-  the two keys into the hash only for a styled page.
+  `Words::of(text, clip_t, duration)` answers five keys — `word` (how many
+  of `text.words` have started, 0 to n), `word_pop` (0..1 through the active
+  word's pop over `WORD_POP`, 0.12 s; null at `active_scale` 1.0), and,
+  since format version 12 (spec §11 W-13), `word_glide` (0..1 from the
+  active word's start over `WORD_GLIDE`, 0.2 s, or the time to the next
+  word when sooner; null unless `active_pill.glide` and a second word has
+  started — the pill comes from token `word − 2`, no second index is
+  carried), `word_fill` (0..1 to the active word's `end`, at most
+  `WORD_FILL_MAX`, 0.6 s, holding 1.0 after; null unless `active_fill` and a
+  word has started) and `word_dim` (0 inside a word and in a pause under
+  `WORD_DIM_GAP`, 0.25 s; else `WORD_DIM`, 0.1 s, ramps either side of the
+  pause, none on a side with no word — the tail runs to `duration`; null
+  unless `pause_dim > 0`) — all null unless the text has a `word_style`,
+  non-empty `words` and a matching token count. Total and order-blind — a
+  count, `get`, saturating subtractions and `recipe_text.rs`'s `ramp`
+  (`pub(crate)` for this) for every division — because the file reader
+  stores `words` unchecked. `insert_into` writes the five keys in order;
+  `recipe_text.rs` calls it for every text layer's `source` and, only for a
+  styled page, for the hash, gives a styled page a WHOLE reveal (W-5), and
+  strips `words` from the description (and `word_style` when unset, `case`
+  when `as_written`, so an unstyled title hashes as before version 9).
 - `recipe_graphic.rs` — a graphic clip's own timeline (road map 10's G-9)
   and its layer: `effective_length` (`graphic.length`, or `in + duration`
   when null — G-9·c), `graphic_advanced` (`in` moved through
@@ -655,7 +670,7 @@ Export names mirror the Rust method exactly.
 `RC_FORMAT_VERSION` in `format.rs` **and** the `#define` in
 `core/include/reelcut_core.h`; the reader must keep accepting every prior
 version; the writer enforces the reader's caps. A bump whose new fields all
-carry a serde default needs no migrate step (versions 3 through 11 have none)
+carry a serde default needs no migrate step (versions 3 through 12 have none)
 but still bumps, because unknown keys are ignored at every level by design
 and an older build would otherwise open the file, drop the new fields on read
 and write the loss back on the next save; a bump that changes a field's

@@ -371,7 +371,9 @@ extension LayerRenderers {
         // gets a WHOLE reveal). A page whose `word` is null — untimed, or a
         // count mismatch — falls through and draws static.
         if let word = reveal.word, let style = props.wordStyle {
-            drawWords(layout, of: props, style: style, word: word, pop: reveal.wordPop, in: context)
+            drawWords(
+                layout, of: props, style: style, word: word, pop: reveal.wordPop,
+                glide: reveal.wordGlide, fill: reveal.wordFill, dim: reveal.wordDim, in: context)
             return
         }
         guard let frame = layout.frame else { return }

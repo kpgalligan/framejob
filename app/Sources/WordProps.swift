@@ -9,8 +9,10 @@ import Foundation
 /// W-1): `content` is the page, `words` is one `{start, end}` per
 /// whitespace token of it in CLIP ticks, and `word_style` is how the
 /// renderer shows which of them has been said. Nothing on this side times
-/// anything: the core computes `word` and `word_pop` per frame
-/// (`RecipeReveal`) and `LayerRenderersWords.swift` draws them.
+/// anything: the core computes the five word keys per frame
+/// (`RecipeReveal`) and `LayerRenderersWords.swift` draws them. Format
+/// version 12 (spec §11 W-12) added `ActivePill.glide`,
+/// `WordStyle.activeFill` and `WordStyle.pauseDim`, each off by default.
 ///
 /// Decoding is LENIENT for `ProjectSnapshot.swift`'s reason — these are
 /// values the CORE wrote — and every default mirrors the core's `Default`.
@@ -62,16 +64,22 @@ struct TextWord: Codable, Equatable {
 }
 
 /// The rounded plate behind the active word. `padding` and `radius` are
-/// FRACTIONS of the text's `size`.
+/// FRACTIONS of the text's `size`; `glide` slides the plate from the word
+/// before to the active one instead of jumping (format version 12).
 struct ActivePill: Codable, Equatable {
     let color: RGBA
     let padding: Double
     let radius: Double
+    let glide: Bool
 
-    init(color: RGBA = [0.55, 0.27, 0.93, 1], padding: Double = 0.2, radius: Double = 0.25) {
+    init(
+        color: RGBA = [0.55, 0.27, 0.93, 1], padding: Double = 0.2, radius: Double = 0.25,
+        glide: Bool = false
+    ) {
         self.color = color
         self.padding = padding
         self.radius = radius
+        self.glide = glide
     }
 
     init(from decoder: Decoder) throws {
@@ -79,13 +87,19 @@ struct ActivePill: Codable, Equatable {
         color = c.lenient(.color, [0.55, 0.27, 0.93, 1])
         padding = c.lenient(.padding, 0.2)
         radius = c.lenient(.radius, 0.25)
+        glide = c.lenient(.glide, false)
     }
 
-    var dictionary: [String: Any] { ["color": color, "padding": padding, "radius": radius] }
+    var dictionary: [String: Any] {
+        ["color": color, "padding": padding, "radius": radius, "glide": glide]
+    }
 }
 
 /// How a timed page shows which word is being said (W-4). A nil colour means
 /// "the text's own colour"; `activeScale` is where the pop settles, 1…1.5.
+/// `activeFill` fills the active word left to right as it is said, and
+/// `pauseDim` (0 off … 1 invisible) is how far the page dims in a pause
+/// (format version 12, W-12).
 struct WordStyle: Codable, Equatable {
     let mode: WordMode
     let activeColor: RGBA?
@@ -93,10 +107,13 @@ struct WordStyle: Codable, Equatable {
     let activePill: ActivePill?
     let spokenColor: RGBA?
     let upcomingColor: RGBA?
+    let activeFill: Bool
+    let pauseDim: Double
 
     init(
         mode: WordMode = .highlight, activeColor: RGBA? = nil, activeScale: Double = 1,
-        activePill: ActivePill? = nil, spokenColor: RGBA? = nil, upcomingColor: RGBA? = nil
+        activePill: ActivePill? = nil, spokenColor: RGBA? = nil, upcomingColor: RGBA? = nil,
+        activeFill: Bool = false, pauseDim: Double = 0
     ) {
         self.mode = mode
         self.activeColor = activeColor
@@ -104,6 +121,8 @@ struct WordStyle: Codable, Equatable {
         self.activePill = activePill
         self.spokenColor = spokenColor
         self.upcomingColor = upcomingColor
+        self.activeFill = activeFill
+        self.pauseDim = pauseDim
     }
 
     init(from decoder: Decoder) throws {
@@ -114,9 +133,11 @@ struct WordStyle: Codable, Equatable {
         activePill = c.lenient(.activePill)
         spokenColor = c.lenient(.spokenColor)
         upcomingColor = c.lenient(.upcomingColor)
+        activeFill = c.lenient(.activeFill, false)
+        pauseDim = c.lenient(.pauseDim, 0)
     }
 
-    /// ALL six keys, `NSNull` for a nil slot — `MotionProps.dictionary`'s
+    /// ALL eight keys, `NSNull` for a nil slot — `MotionProps.dictionary`'s
     /// rule (app/CLAUDE.md): the core deep-merges `word_style`, so a key
     /// left out would keep whatever the clip already had.
     var dictionary: [String: Any] {
@@ -127,6 +148,8 @@ struct WordStyle: Codable, Equatable {
             "active_pill": activePill.map { $0.dictionary as Any } ?? NSNull(),
             "spoken_color": spokenColor.map { $0 as Any } ?? NSNull(),
             "upcoming_color": upcomingColor.map { $0 as Any } ?? NSNull(),
+            "active_fill": activeFill,
+            "pause_dim": pauseDim,
         ]
     }
 }

@@ -119,16 +119,22 @@ detail there.
   edge that writes a whole motion. `MotionEdge` also supplies nonpersisted
   zero-duration activity and inactive display/menu titles (E2-27).
   `TextProps.swift` is the text group and `RecipeReveal` (with format version
-  9's `textCase` / `words` / `wordStyle` and the recipe's `word` / `wordPop`),
-  a pure move out of `ProjectSnapshot.swift` because a stored property cannot
-  be added from an extension. `ProjectSnapshot+Graphic.swift` mirrors
+  9's `textCase` / `words` / `wordStyle`, the recipe's `word` / `wordPop` and,
+  since format version 12, `wordGlide` / `wordFill` / `wordDim`), a pure move
+  out of `ProjectSnapshot.swift` because a stored property cannot be added
+  from an extension. `RecipeReveal` reads and writes its OWN keys — siblings of
+  `hash` and `text` in the `text` source — through `init(siblingsOf:)` and
+  `encodeSiblings(to:)`, so a new recipe key costs `ProjectSnapshot.swift`
+  nothing; a key spelled other than the snake-case converter spells it
+  decodes silently to that key's default (the amount to 1, the rest to nil).
+  `ProjectSnapshot+Graphic.swift` mirrors
   `model_graphic.rs`'s `GraphicProps` as `GraphicSnapshot` (`in` is
   `sourceIn`) and `GraphicPropValue` (string, number, bool; anything else
   `.null`), decoded into `ClipSnapshot.graphic`; `props` keys keep the
   module's own spelling (snake-case conversion does not reach a dictionary's
   keys). `WordProps.swift` mirrors `model_words.rs`
   (`TextCase`, `TextWord`, `WordMode`, `ActivePill`, `WordStyle`)
-  — `WordStyle.dictionary` writes ALL six keys, `NSNull` for a nil slot,
+  — `WordStyle.dictionary` writes ALL eight keys (`active_fill` and `pause_dim` since format version 12; `ActivePill.dictionary` writes `glide`), `NSNull` for a nil slot,
   `MotionProps.dictionary`'s rule, because the core deep-merges
   `word_style` — and holds
   what the renderer and the inspector share: `laidContent` (`case` applied —
@@ -1041,14 +1047,29 @@ the key map behind it.
   timed page (road map 8's W3): tokens of `laidContent` only, clipped at the
   whitespace midpoints; the active token `word − 1` scaled about its pill's
   centre, the pill filled UNCLIPPED, then the midpoint clip set in TEXT space
-  so it scales with the token. `wordHeadroom` sits inside `measuredSize`
+  so it scales with the token. `drawWords` takes the recipe's `glide`,
+  `fill` and `dim` (spec §11 W-14; each defaulted to nil, each clamped to
+  0…1 there, `pauseDim` with them): with `activePill.glide` not set and the
+  other two nil it makes the calls it always made, in their order
+  (`word_looks_proof.py` B1 holds an older project's frames to the bytes).
+  A GLIDING pill is filled BEFORE the base pass in every frame of the page,
+  between token `word − 2`'s pill and the active one's at `easeOut(glide)`
+  when each lies on one line, else settled, scaled about its own centre; the
+  active token then draws with no plate. A FILL clips the active ink at a
+  hard edge on a whole device pixel (`left + fill × (right − left)`; the
+  token's own clip bound at 1), with the upcoming ink right of it in
+  `highlight` and nothing in `build`. A DIM is one transparency layer over
+  the words and the pill at `1 − dim × pauseDim`; the backdrop
+  (`textBitmap`) is outside it. None of the three moves a glyph or the box:
+  `layoutKey`, `frameKey` and `wordHeadroom` do not read them.
+  `wordHeadroom` sits inside `measuredSize`
   (zero with no style or a colour-only one; 0.45 em and 0.30 em are FLOORS
   under the formula, plus `wordHeadroomEdgePx` horizontally and `wordHeadroomVerticalEdgePx`
   vertically; with NO pill the horizontal term ADDS the popped stroke,
   `peak × outline / 2`, where a pill's keeps `− outline` — road map 8
   §10.7, W4a), so the box never depends on
   `word`, and `layoutKey` gains `case` and the headroom's inputs only when set
-  — never `words`, `word` or `word_pop`. `renderTextBitmap` is the drawn
+  — never `words`, `word`, `word_pop` or the three looks' values. `renderTextBitmap` is the drawn
   bitmap `renderText` uploads; its body is `static textBitmap`, which the
   Generate Captions sheet's preview draws with, off-Metal (road map 8's W4b). A shape's gradient SORTS its stops (the core
   does not police order), projects a linear ramp onto the box, and is ignored
@@ -1674,7 +1695,10 @@ free.
   `AgentCatalog+Audio.swift`'s two composites and
   `AgentCatalog+Captions.swift`'s three, spliced back at the two points they
   left, the five other file tools, `record_screen` among them, and
-  `AgentCatalog+Graphics.swift`'s nine, after its two `opTool` rows. `opTool`
+  `AgentCatalog+Graphics.swift`'s nine, after its two `opTool` rows.
+  `set_text`'s clause for `case`, `words` and `word_style` is
+  `AgentServer.textWordsClause` in `AgentCatalog+Captions.swift` (a pure move
+  out of `+Clips`), where the three looks' keys are taught. `opTool`
   goes THROUGH `tool`, so `project` and `scope` are injected by one piece of
   code either way. `AgentCatalog+Declarations.swift` is the one list of places
   a tool deliberately takes more or less than its op does — a bare-string

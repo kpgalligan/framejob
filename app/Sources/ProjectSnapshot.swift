@@ -1847,14 +1847,10 @@ enum RecipeSourceRef: Codable, Equatable {
     case missing
 
     private enum CodingKeys: String, CodingKey {
-        case kind, media, hash, text, shape, reveal
+        case kind, media, hash, text, shape
         // `track_id` converts to `trackId`, not `trackID`; spell it the way
-        // the converter does or this key silently never matches. The same
-        // goes for the two reveal keys: the core writes `reveal_phase` and
-        // `reveal_kind`, which the converter hands over camel-cased.
+        // the converter does or this key silently never matches.
         case trackID = "trackId"
-        case revealPhase, revealKind
-        case word, wordPop
     }
 
     init(from decoder: Decoder) throws {
@@ -1871,10 +1867,7 @@ enum RecipeSourceRef: Codable, Equatable {
             // of it.
             self = .text(
                 hash: c.lenient(.hash, ""), props: c.lenient(.text, TextProps()),
-                reveal: RecipeReveal(
-                    amount: c.lenient(.reveal, 1), phase: c.lenient(.revealPhase),
-                    kind: c.lenient(.revealKind), word: c.lenient(.word),
-                    wordPop: c.lenient(.wordPop)))
+                reveal: RecipeReveal(siblingsOf: decoder))
         case "shape":
             self = .shape(hash: c.lenient(.hash, ""), props: c.lenient(.shape, ShapeProps()))
         case "graphic": self = RecipeSourceRef.graphic(from: decoder)
@@ -1896,11 +1889,7 @@ enum RecipeSourceRef: Codable, Equatable {
             try c.encode("text", forKey: .kind)
             try c.encode(hash, forKey: .hash)
             try c.encode(props, forKey: .text)
-            try c.encode(reveal.amount, forKey: .reveal)
-            try c.encode(reveal.phase, forKey: .revealPhase)
-            try c.encode(reveal.kind, forKey: .revealKind)
-            try c.encode(reveal.word, forKey: .word)
-            try c.encode(reveal.wordPop, forKey: .wordPop)
+            try reveal.encodeSiblings(to: encoder)
         case .shape(let hash, let props):
             try c.encode("shape", forKey: .kind)
             try c.encode(hash, forKey: .hash)

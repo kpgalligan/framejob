@@ -178,7 +178,18 @@ use crate::model::{Canvas, Project};
 /// defaults to `None`, so there is no migration step; an older build would
 /// drop it and leave a media named after its copy, with nothing left to
 /// copy it again from.
-pub const RC_FORMAT_VERSION: u32 = 11;
+///
+/// Version 12 is three word-caption looks (spec §11, W-12): on
+/// [`crate::model::ActivePill`], `glide`, placed last — the plate slides
+/// from word to word — and on [`crate::model::WordStyle`], `active_fill`
+/// and `pause_dim`, placed last in that order — the active word fills as it
+/// is said, and the page dims in a pause. All three default to off, so
+/// there is no migration step and a version-11 page draws as it did; an
+/// older build would drop them and write back a page that no longer slides,
+/// fills or dims, with nothing left in the file to say it ever did. The
+/// recipe's `word_glide`, `word_fill` and `word_dim` are computed, never
+/// stored.
+pub const RC_FORMAT_VERSION: u32 = 12;
 
 /// Reader caps, mirrored by the `RC_MAX_*` defines in the C header. They
 /// exist so a corrupt or generated file cannot make the app allocate

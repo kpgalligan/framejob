@@ -294,7 +294,8 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   not the content's token count is an **error** in the rule's own words — `this text is timed word
   by word: 4 timings for 5 words` — as are a word time outside D7-1's envelope, an `end` before its
   `start`, a `start` before the previous word's, and a `word_style` value out of range
-  (`active_scale` 1.0–1.5, colours 0–1, a negative pill padding or radius). The check runs on what
+  (`active_scale` 1.0–1.5, colours 0–1, a negative pill padding or radius, `pause_dim` 0–1 — format
+  version 12, §11 W-12: `text.word_style.pause_dim must be between 0 and 1, not 2`). The check runs on what
   the caller sent; the word times are then snapped to the grid, nearest, a negative one staying
   negative. A content edit that changes the count sends `words: []` in the same patch.
 - **`set_graphic {clips, patch, schema?}`** — Patches each graphic clip's `name`, `width`, `height`,

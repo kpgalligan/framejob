@@ -21,6 +21,29 @@ import Foundation
 /// internal extension of `AgentServer`.
 extension AgentServer {
 
+    /// `set_text`'s clause for format version 9's three word-caption keys,
+    /// spliced into its patch description by `AgentCatalog+Clips.swift`,
+    /// which is over the cap and gave it up as a pure move (issue batch B86).
+    /// The three looks of format version 12 (spec §11 W-12, W-13) are
+    /// taught here: `glide`, `active_fill` and `pause_dim`.
+    static let textWordsClause: String =
+        ", case (as_written|upper — applied before layout; it never changes the word count), "
+        + "words (one {start, end} per whitespace token of content, in clip ticks, or [] for "
+        + "an untimed page — a content change that alters the count must send words: [] in "
+        + "the same patch), word_style (null or {mode: highlight|build, active_color, "
+        + "active_scale 1–1.5, active_pill {color, padding, radius, glide}, spoken_color, "
+        + "upcoming_color, active_fill, pause_dim 0–1} — how the word being said is drawn; it "
+        + "replaces animation. Three looks, each off by default: active_pill.glide (true|false) "
+        + "slides the pill from the word before to the active one over 0.2 s, or sooner when "
+        + "the next word starts sooner, instead of jumping; active_fill (true|false) fills the "
+        + "active word left to right from its start to its end, taking 0.6 s at most — the "
+        + "part said in active_color and the rest in upcoming_color, or not yet drawn in build "
+        + "mode; in highlight mode it shows only where those two colours differ; pause_dim "
+        + "fades the words and the pill to 1 − pause_dim of their opacity in a pause of 0.25 s "
+        + "or more — after one word's end until the next one's start, before a late first "
+        + "word, and after the last word until the clip ends — over 0.1 s each way, and outside "
+        + "0–1 it is refused)"
+
     /// `import_captions`' row, spliced into `fileTools`'s Media group
     /// where it has always been, after `import_media`.
     func captionImportTools() -> [[String: Any]] {

@@ -43,9 +43,11 @@ fn full_style() -> Value {
         "mode": "build",
         "active_color": [1.0, 0.85, 0.0, 1.0],
         "active_scale": 1.2,
-        "active_pill": {"color": [0.1, 0.2, 0.3, 1.0], "padding": 0.18, "radius": 0.3},
+        "active_pill": {"color": [0.1, 0.2, 0.3, 1.0], "padding": 0.18, "radius": 0.3, "glide": true},
         "spoken_color": [0.9, 0.9, 0.9, 1.0],
-        "upcoming_color": [0.5, 0.5, 0.5, 1.0]
+        "upcoming_color": [0.5, 0.5, 0.5, 1.0],
+        "active_fill": true,
+        "pause_dim": 0.4
     })
 }
 
@@ -117,9 +119,11 @@ fn an_empty_style_and_an_empty_pill_take_the_documented_defaults() {
             "mode": "highlight",
             "active_color": null,
             "active_scale": 1.0,
-            "active_pill": {"color": [0.55, 0.27, 0.93, 1.0], "padding": 0.2, "radius": 0.25},
+            "active_pill": {"color": [0.55, 0.27, 0.93, 1.0], "padding": 0.2, "radius": 0.25, "glide": false},
             "spoken_color": null,
-            "upcoming_color": null
+            "upcoming_color": null,
+            "active_fill": false,
+            "pause_dim": 0.0
         })
     );
 }

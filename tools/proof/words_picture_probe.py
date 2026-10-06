@@ -10,7 +10,9 @@ P1  the bitmap is `measuredSize` at every word 0…n and pop {0, .3, .58, 1}, fo
     top and bottom, at (active_scale 1.15, default pill), (1.5, default pill)
     and (1.5, no pill) — plus, since W4a, each of §5h's five word styles in its
     own face, case, outline, scale and pill (`CaptionStyle`);
-P2  no ink outside that box at any of them, the pill's rows and columns in;
+P2  no ink outside that box at any of them, the pill's rows and columns in —
+    and, since issue batch B86, with every config also drawn half FILLED and
+    every pill config also GLIDING at `glide` 0 and 0.5 (word ≥ 2);
 P3  word 1 ≠ word 2; a build page at word 0 has no ink (and at word 1 has);
 P4  `laidContent` applies `case`, and on the upper page "straße ist" with a red
     active word: at word 1 the red ink ends left of the LAID midpoint and is
@@ -23,14 +25,80 @@ P7  `wordHeadroom` is zero for a colour-only style, ≥ the floors for a pop,
     and at 1.5 / default pill equals the formula and exceeds both floors;
 P8  `measuredSize` is equal with and without `words`;
 P9  no pill, active_scale 1.5, a ≥ 3-em word: the red ink at pop 1 is at least
-    0.95 × 1.5 × its width at pop 0 (the clip scaled with the token).
+    0.95 × 1.5 × its width at pop 0 (the clip scaled with the token);
+P10 (issue batch B86, spec §11 W-14) what the three looks COST: the median of
+    20 `text(_:hash:reveal:)` calls on a cache miss — a raster and an upload,
+    after one untimed warm-up — of the P1 text as the HIGHLIGHT preset's own
+    page (Montserrat-Black at 0.075 × min(w, h), upper case, outlined), at
+    1080×1920 and 3840×2160, for four reveals at word 3: `pop` 0.5 (the
+    shipped comparator, never scored), `fill` 0.5, `fill` 0.5 with `dim` 0.5
+    at `pause_dim` 0.5, and `glide` 0.5 (with the default pill) — and, since
+    the dim's layer costs by the box and One Word's type is the largest a
+    preset ships (0.12 × min(w, h)), the fill with the dim on the page ONE
+    WORD generates, one word (`oneword-page fill+dim`, scored). **P10 scores
+    two pages in the presets' own styles**: Highlight's line and One Word's
+    one-word page. Beside them it prints, never scored (as `pop` is), a
+    HAND-MADE page of large type: the same six words on one line at One
+    Word's size (`oneword-line fill+dim (hand-made)`), which no preset makes
+    and `set_text` can write. On a dim's ramp frames that page read 9.529 ms
+    at 3840×2160 against the 8 ms budget (2026-10-05, High Power, on
+    battery, thermal state nominal) — a known limit, in
+    `designs/adr/roadmap-08-word-captions.md`, not a scored row; the dim
+    costs this because it is one transparency layer over the whole box (spec
+    §11 W-14). Every page is one line (`width` nil). The probe measures it
+    FIRST, before the P1/P2 sweep. It FAILS when a scored median is over
+    4 ms at 1080×1920 — half of spec §7.5's 8 ms frame, because a fill pays
+    it on every frame of a word — or over 8 ms at 3840×2160. The twelve
+    medians are printed either way. A median over budget is reported; the
+    budget is not raised.
+    **P10 is JUDGED only on an unthrottled host.** The probe reads
+    `ProcessInfo`'s Low Power Mode flag and thermal state before the first
+    raster and after the last; when Low Power Mode is on, or the thermal
+    state is above nominal, at either reading — or the probe did not say —
+    the row is `P10 not judged: <why>`, a CONTROL FAILURE with the medians
+    and the power state printed: never a pass, never a skip. Re-run it with
+    Low Power Mode off and the Mac cool.
+P11–P16 (issue batch B86, spec §11 W-14) the looks' geometry, each value the
+    recipe would carry set exactly and the picture read off `textBitmap`:
+P11 between two LINES the gliding plate's four edges are at
+    `from + easeOut(½) × (to − from)` ± 2 px at `word_glide` ½ — x, y and
+    width all travel — and on `from`'s at 0;
+P12 the plate pops about its OWN centre: at `word_pop` 1 and `active_scale`
+    1.5 its centre is where it is unpopped and its width and height 1.5×;
+P13 a token that WRAPS over two lines takes the settled pill: the plate does
+    not slide onto it or off it (`word_glide` ½ is `word_glide` 1, byte for
+    byte), where between two one-piece tokens the same two instants differ;
+P14 a wrapped token fills each of its two pieces by the same fraction;
+P15 a FULL word is drawn whole: on an outlined build page `word_fill` 1 is
+    the unfilled page byte for byte, though the stroke reaches past the edge
+    `word_fill` 0.999 is cut at;
+P16 a look's value outside 0…1 draws as the nearest value inside it
+    (`word_fill`, `word_glide`, `word_dim` and `pause_dim`, each side), the
+    two ends of each range being two pictures; and a full dim at `pause_dim`
+    1 draws nothing.
 
-    python3 tools/proof/words_picture_probe.py
+    python3 tools/proof/words_picture_probe.py [--raster-budget-ms N] [--only ROWS]
     python3 tools/proof/words_picture_probe.py --mutant NAME
+    python3 tools/proof/words_picture_probe.py --power-selftest
 
-A mutant is built from a COPY of `app/Sources` with one anchor, asserted to
-occur exactly once, replaced; exit 0 means at least one row FAILED in the
-copy, which is the pass, and 1 that every row held (it survived). Exit 2
+`--power-selftest` builds and times nothing: it feeds P10's scorer made-up
+answers — Low Power Mode on, a thermal state above nominal before or after
+the rasters, no power state at all, and an unthrottled host under and over
+budget — and scores that each is the row it should be (T1–T8).
+
+`--only ROWS` (comma-separated, of P10–P16: the rows measured before the
+sweep) runs the probe with `--quick`, which stops before the sweep, and
+scores those rows alone — `--only P10` is P10 by itself, a build and about
+half a minute. `--raster-budget-ms N` replaces both of P10's budgets with
+N; a run at 0 is its made-to-fail control (P10 alone must fail, on an
+unthrottled host for the budget's own reason — a throttled one answers
+`P10 not judged` whatever the budget). A `--mutant` run does not score P10.
+
+A mutant is built from a COPY of `app/Sources` with one anchor (three, for
+`looks-unclamped`), each asserted to occur exactly once, replaced; exit 0
+means at least one row FAILED in the copy, which is the pass, and 1 that
+every row held (it survived). A mutant of the looks' geometry names its row
+and runs `--only` that row. Exit 2
 (rule R, issue batch B13) means the control could not be performed — the
 copy could not be made, the anchor was not found exactly once, the copy did
 not build, the probe did not answer one JSON object, or the run passed its
@@ -54,6 +122,16 @@ FONTS = ROOT / "app/Resources/Fonts"
 PINNED = {"Montserrat-ExtraBold": "d3ac6a843d3ba6d5", "Montserrat-Black": "ea67b37f8776eebe",
           "Anton-Regular": "a4ba3a92350ebb03", "BebasNeue-Regular": "08e4623805102d81"}
 DEADLINE = 1500
+# P10's budgets in milliseconds, by canvas; `--raster-budget-ms` replaces both.
+RASTER_BUDGET = {"1080x1920": 4.0, "3840x2160": 8.0}
+# A mutant run does not score P10: a timing is no picture, and a median over
+# budget must not be what "catches" a mutant of the drawing.
+SCORE_RASTER = True
+# The rows the probe measures before the sweep, which `--only` can run alone.
+QUICK = ("P10", "P11", "P12", "P13", "P14", "P15", "P16")
+# None for every row, else the rows `--only` named.
+ONLY = None
+THERMAL_NOMINAL = 0
 
 rows = []
 
@@ -88,7 +166,217 @@ def sha(path):
         return hashlib.sha256(stream.read()).hexdigest()[:16]
 
 
+def wanted(name):
+    return ONLY is None or name in ONLY
+
+
+def throttled(answer):
+    """Why P10's medians cannot be judged on this host, and the power state
+    as the probe read it; the reason is "" on an unthrottled host."""
+    power = answer.get("power")
+    readings = [power.get(key) for key in ("before", "after")] if isinstance(power, dict) else []
+    if len(readings) != 2 or not all(
+            isinstance(r, dict) and isinstance(r.get("low_power"), bool)
+            and isinstance(r.get("thermal_state"), int) for r in readings):
+        return "the probe did not report the host's power state", f"power: {power!r}"
+    state = "; ".join(
+        f"{key}: Low Power Mode {'on' if r['low_power'] else 'off'}, thermal state "
+        f"{r.get('thermal', r['thermal_state'])}"
+        for key, r in zip(("before the rasters", "after"), readings))
+    why = []
+    if any(r["low_power"] for r in readings):
+        why.append("Low Power Mode")
+    hot = max(readings, key=lambda r: r["thermal_state"])
+    if hot["thermal_state"] > THERMAL_NOMINAL:
+        why.append(f"thermal state {hot.get('thermal', hot['thermal_state'])}")
+    return " and ".join(why), state
+
+
+def judge_raster(answer):
+    """P10 as `(row, good, detail)`: the medians against the budgets — judged
+    only when the host was not throttled while they were taken."""
+    p10 = answer.get("p10") or []
+    medians = "; ".join(
+        f"{m['canvas']} {m['case']} {m['median_ms']:.3f} ms"
+        + ("" if m.get("scored") else " (not scored)") for m in p10)
+    budgets = ", ".join(f"{canvas} {limit:g} ms" for canvas, limit in RASTER_BUDGET.items())
+    why, power = throttled(answer)
+    if why:
+        return (f"P10 not judged: {why} — a CONTROL FAILURE, never a pass or a skip: the "
+                f"medians below were taken on a throttled host and are held to no budget "
+                f"({budgets}); re-run with Low Power Mode off and the Mac cool",
+                False, f"medians: {medians}; power: {power}")
+    over = [(m["canvas"], m["case"], round(m["median_ms"], 3)) for m in p10
+            if m.get("scored") and not m["median_ms"] <= RASTER_BUDGET[m["canvas"]]]
+    scored = [m for m in p10 if m.get("scored")]
+    return (f"P10 a fill, a fill with a dim, a glide and One Word's one-word page with a fill "
+            f"and a dim each rasterize and upload within budget ({budgets}; median of 20 on a "
+            f"cache miss)",
+            len(p10) == 12 and len(scored) == 8 and all(m["drew"] for m in p10) and not over,
+            f"medians: {medians}; over budget: {over}; power: {power}")
+
+
+def score_raster(answer):
+    check(*judge_raster(answer))
+
+
+def power_selftest():
+    """`--power-selftest`: P10's scorer fed made-up answers — no probe is
+    built and nothing is timed. The twelve medians are 1 ms each."""
+    def answer(low=False, thermal=0, after=None, power=True):
+        names = ["nominal", "fair", "serious", "critical"]
+        def reading(state):
+            return {"low_power": low, "thermal_state": state, "thermal": names[state]}
+        cases = [("pop", False), ("fill", True), ("fill+dim", True), ("glide", True),
+                 ("oneword-page fill+dim", True),
+                 ("oneword-line fill+dim (hand-made)", False)]
+        made = {"p10": [{"canvas": canvas, "case": case, "scored": scored, "drew": True,
+                         "median_ms": 1.0}
+                        for canvas in RASTER_BUDGET for case, scored in cases]}
+        if power:
+            made["power"] = {"before": reading(thermal),
+                             "after": reading(thermal if after is None else after)}
+        return made
+
+    print("P10's scorer on made-up answers (nothing is built or timed)")
+    saved = dict(RASTER_BUDGET)
+    name, good, _ = judge_raster(answer(low=True))
+    check("T1 Low Power Mode on: the row is `P10 not judged: Low Power Mode …` and it fails",
+          name.startswith("P10 not judged: Low Power Mode —") and good is False, name)
+    name, good, _ = judge_raster(answer(thermal=1))
+    check("T2 thermal state fair: `P10 not judged: thermal state fair …`, failed",
+          name.startswith("P10 not judged: thermal state fair —") and good is False, name)
+    name, good, _ = judge_raster(answer(after=2))
+    check("T3 nominal before the rasters and serious after: not judged, failed",
+          name.startswith("P10 not judged: thermal state serious —") and good is False, name)
+    name, good, _ = judge_raster(answer(low=True, thermal=3))
+    check("T4 both: the row names both, failed",
+          name.startswith("P10 not judged: Low Power Mode and thermal state critical —")
+          and good is False, name)
+    name, good, _ = judge_raster(answer(power=False))
+    check("T5 a probe that reports no power state: not judged, failed",
+          name.startswith("P10 not judged: the probe did not report") and good is False, name)
+    name, good, _ = judge_raster(answer())
+    check("T6 unthrottled, every median under budget: judged, and it passes",
+          name.startswith("P10 a fill") and good is True, name)
+    for canvas in RASTER_BUDGET:
+        RASTER_BUDGET[canvas] = 0.0
+    name, good, detail = judge_raster(answer())
+    check("T7 unthrottled at budget 0: judged, and it fails on the eight scored medians",
+          name.startswith("P10 a fill") and good is False and detail.count("1.0)") == 8,
+          detail[detail.find("over budget"):detail.find("; power")])
+    name, good, _ = judge_raster(answer(low=True))
+    check("T8 throttled at budget 0: still `not judged` — the budget is not what fails it",
+          name.startswith("P10 not judged: Low Power Mode —") and good is False, name)
+    RASTER_BUDGET.update(saved)
+    print(f"{rows.count(True)}/{len(rows)}")
+    return 0 if all(rows) else 1
+
+
+def rect(value):
+    return value if isinstance(value, list) and len(value) == 4 else None
+
+
+def score_looks(answer):
+    """P11–P16: the looks' geometry."""
+    ease = 1 - (1 - 0.5) ** 3
+    if wanted("P11"):
+        p11 = answer.get("p11") or {}
+        a, b, start, half = (rect(p11.get(key)) for key in ("from", "to", "start", "half"))
+        good = None not in (a, b, start, half) and p11.get("lines") == 2
+        expect = [a[i] + ease * (b[i] - a[i]) for i in range(4)] if good else None
+        # Not vacuous: the two pills differ in x, in y and in width.
+        apart = good and abs(b[0] - a[0]) > 10 and abs(b[1] - a[1]) > 10 \
+            and abs((b[2] - b[0]) - (a[2] - a[0])) > 10
+        check("P11 between two lines the gliding plate's four edges are at from + easeOut(½) × "
+              "(to − from) ± 2 px at word_glide ½, and on from's at 0",
+              good and apart and all(abs(half[i] - expect[i]) <= 2 for i in range(4))
+              and all(abs(start[i] - a[i]) <= 1 for i in range(4)),
+              f"[minX, minY, maxX, maxY] from {a}, to {b}, at 0 {start}, at ½ {half}, "
+              f"expected {expect}; lines {p11.get('lines')}")
+    if wanted("P12"):
+        p12 = answer.get("p12") or {}
+        flat, popped = rect(p12.get("flat")), rect(p12.get("popped"))
+        scale = p12.get("scale")
+        good = None not in (flat, popped) and scale == 1.5
+        if good:
+            centre = [abs((popped[i] + popped[i + 2]) - (flat[i] + flat[i + 2])) / 2
+                      for i in (0, 1)]
+            grown = [(popped[i + 2] - popped[i]) / (flat[i + 2] - flat[i]) for i in (0, 1)]
+            sizes = [abs((popped[i + 2] - popped[i]) - scale * (flat[i + 2] - flat[i]))
+                     for i in (0, 1)]
+        check("P12 the gliding plate pops about its own centre: at word_pop 1 its centre is "
+              "the unpopped plate's ± 1.5 px and its width and height are active_scale (1.5) "
+              "times it ± 3 px",
+              good and max(centre) <= 1.5 and max(sizes) <= 3,
+              f"unpopped {flat}, popped {popped}"
+              + (f"; centre moved {centre}, grew ×{grown[0]:.3f} by ×{grown[1]:.3f}"
+                 if good else ""))
+    if wanted("P13"):
+        p13 = answer.get("p13") or {}
+        plate = rect(p13.get("plate_on_wrapped"))
+        tall = plate is not None and (plate[3] - plate[1]) > 1.5 * (p13.get("line_height") or 1e9)
+        check("P13 a token that wraps over two lines takes the settled pill: word_glide ½ is "
+              "word_glide 1 byte for byte, sliding onto it and off it, with the plate on both "
+              "its lines; between two one-piece tokens the same two instants differ",
+              p13.get("token_lines") == 2 and p13.get("onto_wrapped_same") is True
+              and p13.get("off_wrapped_same") is True and tall
+              and p13.get("one_piece_same") is False, f"{p13}")
+    if wanted("P14"):
+        p14 = answer.get("p14") or {}
+        pieces = p14.get("pieces") or []
+        lines, good = [], p14.get("token_lines") == 2 and len(pieces) == 2
+        for piece in pieces:
+            full, red, blue = (rect(piece.get(key)) for key in
+                               ("full_red", "half_red", "half_blue"))
+            if None in (full, red, blue):
+                good = False
+                lines.append(f"line {piece.get('line')}: {piece}")
+                continue
+            expect = full[0] + 0.5 * (full[2] - full[0])
+            # The red run ends within 6 px of half the piece, and blue takes over there.
+            fine = abs(red[2] - expect) <= 6 and -1 <= blue[0] - red[2] <= 12
+            good = good and fine
+            lines.append(f"line {piece['line']}: the piece {full[0]:g}…{full[2]:g}, red to "
+                         f"{red[2]:g} (half is {expect:g}), blue from {blue[0]:g}")
+        check("P14 a token on two lines fills each piece by the same fraction: at word_fill ½ "
+              "each line's active ink ends within 6 px of half that piece, and the upcoming "
+              "ink starts there", good, "; ".join(lines) or f"{p14}")
+    if wanted("P15"):
+        p15 = answer.get("p15") or {}
+        full, nearly = rect(p15.get("ink_full")), rect(p15.get("ink_nearly"))
+        past = full[2] - nearly[2] if None not in (full, nearly) else None
+        check("P15 a full word is drawn whole: on an outlined build page word_fill 1 is the "
+              "unfilled page byte for byte (½ is not), and its stroke reaches at least 2 px "
+              "past where word_fill 0.999 is cut",
+              p15.get("full_same_as_unfilled") is True
+              and p15.get("half_same_as_unfilled") is False and past is not None and past >= 2,
+              f"{p15}; the stroke's reach past the edge {past}")
+    if wanted("P16"):
+        p16 = answer.get("p16") or {}
+        same, control = p16.get("same") or {}, p16.get("control_same") or {}
+        moved = sorted(key for key, value in same.items() if value is not True)
+        flat = sorted(key for key, value in control.items() if value is not False)
+        check("P16 a look's value outside 0…1 draws as the nearest one inside (word_fill, "
+              "word_glide, word_dim and pause_dim, each side), the ends of each range are two "
+              "pictures, and a full dim at pause_dim 1 draws nothing",
+              len(same) == 8 and not moved and len(control) == 4 and not flat
+              and rect(p16.get("lit_ink")) is not None and p16.get("invisible_ink") is None,
+              f"not drawn as the clamped value: {moved}; ends that drew alike: {flat}; ink at "
+              f"pause_dim 1 × word_dim 1: {p16.get('invisible_ink')!r}; compared: "
+              f"{sorted(same)}")
+
+
 def score(answer):
+    if ONLY is None:
+        score_sweep(answer)
+    if SCORE_RASTER and wanted("P10"):
+        score_raster(answer)
+    score_looks(answer)
+
+
+def score_sweep(answer):
+    """P1–P9: road map 8's rows, the sweep among them."""
     boxes = answer["boxes"]
     uneven = [b for b in boxes if b["bitmap_sizes"] != [b["measured"]]]
     check(f"P1 the bitmap is measuredSize at every word and pop ({len(boxes)} pages)",
@@ -169,7 +457,8 @@ def run(sources, out):
     check("the probe builds over app/Sources", binary is not None, problem)
     if binary is None:
         return
-    result = subprocess.run([str(binary), str(FONTS)], capture_output=True, text=True,
+    quick = ["--quick"] if ONLY is not None else []
+    result = subprocess.run([str(binary), str(FONTS), *quick], capture_output=True, text=True,
                             timeout=max(DEADLINE - (time.time() - began), 60),
                             start_new_session=True)
     try:
@@ -219,21 +508,58 @@ MUTANTS = {
                       "            peak * pad + (peak - 1) * (metrics.ascent + metrics.descent) "
                       "/ 2 - outline\n                + wordHeadroomVerticalEdgePx)\n",
                       "        let height = CGFloat(wordHeadroomVerticalFloorEm) * size\n"),
+    # The looks' geometry (issue batch B86): each names the row it must fail,
+    # and runs `--only` that row.
+    "plate-y-jumps": ("LayerRenderersWords.swift",
+                      "                    y: a.minY + (b.minY - a.minY) * travel,\n",
+                      "                    y: b.minY,\n", "P11"),
+    "plate-width-jumps": ("LayerRenderersWords.swift",
+                          "                    width: a.width + (b.width - a.width) * travel,\n",
+                          "                    width: b.width,\n", "P11"),
+    "plate-pop-ignored": ("LayerRenderersWords.swift",
+                          "            fillPlate(plate, in: rect, size: size, scale: scale, "
+                          "in: context)\n",
+                          "            fillPlate(plate, in: rect, size: size, scale: 1, "
+                          "in: context)\n", "P12"),
+    "one-piece-ignored": ("LayerRenderersWords.swift",
+                          "        if travel < 1, to.count == 1, from.count == 1 {\n",
+                          "        if travel < 1, !to.isEmpty, !from.isEmpty {\n", "P13"),
+    "fill-first-piece-only": ("LayerRenderersWords.swift",
+                              "        for piece in activePieces {\n",
+                              "        for piece in activePieces.prefix(1) {\n", "P14"),
+    "full-word-at-glyph-edge": ("LayerRenderersWords.swift",
+                                "                let edge = filled >= 1\n",
+                                "                let edge = filled >= 2\n", "P15"),
+    "looks-unclamped": ("LayerRenderersWords.swift", [
+        ("        let filled: Double? = fill.map { min(max($0, 0), 1) }\n",
+         "        let filled: Double? = fill\n"),
+        ("        let travel = CGFloat(easeOut(min(max(glide ?? 1, 0), 1)))\n",
+         "        let travel = CGFloat(easeOut(glide ?? 1))\n"),
+        ("        let dimmed = min(max(dim ?? 0, 0), 1) * min(max(style.pauseDim, 0), 1)\n",
+         "        let dimmed = (dim ?? 0) * style.pauseDim\n"),
+    ], None, "P16"),
 }
 
 
 def mutant(name):
-    file, before, after = MUTANTS[name]
+    global SCORE_RASTER, ONLY
+    SCORE_RASTER = False
+    file, before, after, *row = MUTANTS[name]
+    edits = before if isinstance(before, list) else [(before, after)]
+    if row:
+        ONLY = [row[0]]
     began = time.time()
     with tempfile.TemporaryDirectory(prefix=f"reelcut-words-picture-{name}-") as temp:
         sources = Path(temp) / "Sources"
         try:
             shutil.copytree(ROOT / "app/Sources", sources)
-            replace_once(sources / file, before, after)
+            for one, other in edits:
+                replace_once(sources / file, one, other)
         except (OSError, RuntimeError) as error:
             print(f"mutant {name}: the control could not be performed — {error}")
             return 2
-        print(f"MUTANT {name}: {file}, anchor replaced once, in {sources}")
+        print(f"MUTANT {name}: {file}, {len(edits)} anchor(s) each replaced once, in {sources}"
+              + (f"; --only {row[0]}" if row else ""))
         try:
             run(sources, Path(temp) / "out")
         except subprocess.TimeoutExpired:
@@ -261,11 +587,31 @@ def mutant(name):
 
 
 def main():
+    global ONLY
     if len(sys.argv) == 3 and sys.argv[1] == "--mutant" and sys.argv[2] in MUTANTS:
         return mutant(sys.argv[2])
-    if len(sys.argv) != 1:
+    if sys.argv[1:] == ["--power-selftest"]:
+        return power_selftest()
+    arguments = sys.argv[1:]
+    if len(arguments) % 2:
         sys.exit(__doc__)
-    print("W3 — word captions, the picture's arithmetic (probe)")
+    for flag, value in zip(arguments[::2], arguments[1::2]):
+        if flag == "--raster-budget-ms":
+            try:
+                budget = float(value)
+            except ValueError:
+                sys.exit(__doc__)
+            for canvas in RASTER_BUDGET:
+                RASTER_BUDGET[canvas] = budget
+        elif flag == "--only":
+            ONLY = [name.strip() for name in value.split(",") if name.strip()]
+            if not ONLY or any(name not in QUICK for name in ONLY):
+                sys.exit(f"--only takes rows of {', '.join(QUICK)} (the rows measured before "
+                         f"the sweep), not {value!r}")
+        else:
+            sys.exit(__doc__)
+    print("W3 — word captions, the picture's arithmetic (probe)"
+          + (f" — only {', '.join(ONLY)}" if ONLY else ""))
     try:
         run(ROOT / "app/Sources", WORK)
     except subprocess.TimeoutExpired:

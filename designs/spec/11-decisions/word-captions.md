@@ -121,3 +121,91 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   Montserrat ExtraBold and Black, Anton and Bebas Neue (OFL, in
   `app/Resources/Fonts/`); and a page that does not fit shrinks no further
   than 80 % of its size (`CaptionPages.Rules.shrinkFloor`).
+- **W-12 — A sliding pill, an in-word fill and a dim in a pause are three
+  KEYS of `word_style`, not modes** (issue batch B86, #96; the owner,
+  2026-10-05). `active_pill.glide` (a boolean, on the pill because without
+  a pill nothing slides), `active_fill` (a boolean) and `pause_dim` (0 to 1:
+  the page's opacity in a pause is `1 − pause_dim`). Each defaults to off,
+  so a page written before them draws exactly as it did. W-4 is kept and
+  not stretched: `mode` stays `highlight | build`, and the three compose
+  with each other and with both modes, which three more modes could not
+  say. They are appended in declaration order — `glide` after `radius`,
+  `active_fill` and `pause_dim` after `upcoming_color` — and never renamed.
+  **Format version 12**, with no migrate step, since each carries a serde
+  default; the bump is what makes an older build refuse the file ("project
+  format version 12 is newer than this build understands (version 11);
+  update Reelcut to open it") rather than open it, drop the three keys on
+  read and write the loss back on the next save. `pause_dim` outside 0–1
+  is refused at the patch door in the rule's own words
+  (`text.word_style.pause_dim must be between 0 and 1, not 2`); the two
+  booleans are refused only by kind. `set_text` is the door (W-10 stands:
+  nothing in the inspector writes `word_style`).
+- **W-13 — The recipe carries three more computed answers, `word_glide`,
+  `word_fill` and `word_dim`, and still no timing** (W-4). They ride on
+  every text layer's `source` after `word_pop`, each 0..1 or null, all null
+  when `word` is null, and the text hash folds all five word keys for a
+  styled page and none for an unstyled one. With `w` = `word`, `n` the
+  number of words, `s[i]` / `e[i]` word i's start and end (0-based) and `t`
+  the clip time:
+  - `word_glide` — null unless `active_pill.glide` and `w ≥ 2`. Else
+    `ramp(t − s[w−1], over)`, where `over` is `min(WORD_GLIDE, s[w] −
+    s[w−1])` while a next word exists (`w < n`) and `WORD_GLIDE` on the
+    last. The pill comes FROM token `w − 2`, the one before the active
+    token; **no second index is carried**, because the renderer can derive
+    it from `word`. So the pill APPEARS on a page's first word and never
+    flies in from the page before.
+  - `word_fill` — null unless `active_fill` and `w ≥ 1`. Else `ramp(t −
+    s[w−1], min(e[w−1] − s[w−1], WORD_FILL_MAX))`, holding 1.0 after.
+    **A word takes at most `WORD_FILL_MAX`, 0.6 s, to fill** (the owner's
+    choice, a chosen number, not a measured one): an on-device word's `end`
+    is stretched over the silence after it — the engine's word ranges tile
+    the audio; road map 8 measured a 1.57 s silence stored as a 0.30 s gap
+    and a 1.13 s one as 0.06 s — so uncapped, the last word before a pause
+    would crawl for over a second. The cost is accepted: a word really
+    spoken for longer than 0.6 s, with either engine, finishes its fill
+    early.
+  - `word_dim` — null unless `pause_dim > 0`. 0.0 inside a word, and in
+    any pause shorter than `WORD_DIM_GAP`, 0.25 s, so ordinary gaps between
+    words do not flicker. Else, for the pause `[a, b)`: `min(ramp(t − a,
+    WORD_DIM), ramp(b − t, WORD_DIM))`, where `a = e[w−1]` — with no
+    down-ramp when `w = 0`, where the pause runs from clip time 0 — and
+    `b = s[w]` — with no up-ramp when `w = n`, where the pause runs to the
+    clip's `duration`. The value is how far INTO the dim the page is; the
+    renderer multiplies it by `pause_dim`.
+  `WORD_GLIDE` is 0.2 s, `WORD_DIM` 0.1 s each way; all four constants are
+  `recipe_words.rs`'s, and nothing persists them. Every division is
+  `recipe_text.rs`'s `ramp`, every subtraction saturates and every word is
+  read by `get`, because the file reader stores `words` unchecked: an
+  unsorted list or a start of `i64::MIN` answers a number in 0..1 and never
+  panics. **What W-7 makes of the dim on generated captions is accepted and
+  said in the sheet** (the owner's choice): the pager already ends a page at
+  a 0.25 s pause and takes it down at most 0.5 s later, so there the dim is
+  a page fading for its last 0.25–0.5 s, on AssemblyAI words; on-device
+  words rarely carry a pause that long. It dims and comes back in mid-page
+  on a page timed by hand or by an agent. W-7 is not changed.
+- **W-14 — How the three are drawn** (`LayerRenderersWords.swift`). With
+  `glide` not set and `word_fill` and `word_dim` null, a page draws by the
+  calls it drew by before, in their order: an existing project's frames
+  are byte-identical (`word_looks_proof.py` B1). **A gliding pill lies
+  UNDER every word's ink**: when `active_pill.glide` is true the plate is
+  filled before the base pass in every frame of the page, gliding or
+  settled, so the word it is leaving is never covered and the drawing order
+  does not flip when a glide ends. Its rect is the linear interpolation of
+  token `w − 2`'s pill rect and the active token's at `easeOut(word_glide)`
+  (`1 − (1 − u)³`) when each of the two lies on one line, and the active
+  token's settled pill otherwise (a token that wraps over two lines). It is
+  scaled about its own centre by the pop's scale; the active token still
+  pops about its settled pill's centre. **The fill's edge is hard**, at
+  `left + word_fill × (right − left)` over the active token's glyph range,
+  snapped to a whole device pixel: the active colour left of it, the
+  upcoming colour right of it in `highlight`, nothing right of it in
+  `build`; a token on two lines fills each piece by the same fraction. At
+  1 the edge is the token's own clip bound, so a full word is drawn whole
+  (an outline's stroke reaches past the glyph range). It runs left to right
+  in every script. **The dim is one opacity over the
+  words and the pill together** (`1 − word_dim × pause_dim`, in one
+  transparency layer); **the backdrop never dims**, for the reason it never
+  fades with a reveal. None of the three moves a glyph or the box, so
+  `layoutKey`, `frameKey` and the headroom are unchanged. All three recipe
+  values and `pause_dim` are clamped to 0…1 where they are drawn, because
+  `set_action_end` is lenient and text is not clamped.

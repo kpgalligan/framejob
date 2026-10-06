@@ -5,10 +5,15 @@
 // `tools/proof/harness/build.sh`'s swiftc line — so it measures the
 // renderer's own code: `measuredSize`, `layout(for:)`, `drawWords`,
 // `renderTextBitmap`, `wordHeadroom`, `laidContent`, `contentEdit` and
-// `InspectorBinding.contentOps`. It MEASURES and prints one JSON object;
+// `InspectorBinding.contentOps`, and (issue batch B86, P10) `text(_:hash:reveal:)`
+// timed on a cache miss. It MEASURES and prints one JSON object;
 // `words_picture_probe.py` scores it.
 //
-//   words_picture_probe <app_fonts_dir>
+//   words_picture_probe <app_fonts_dir> [--quick]
+//
+// `--quick` stops after P10 and the looks' geometry (P11–P16), which are
+// measured first: before the P1/P2 sweep, ten minutes of pixel scans. It is
+// how P10 is run alone.
 //
 // Fonts are registered at `.process` scope first (`text_probe.swift`'s loop):
 // a bare Mach-O has no `ATSApplicationFontsPath`.
@@ -31,11 +36,13 @@ func wpRegister(_ directory: String) -> Int {
 /// Ink bounds of a premultiplied BGRA context — `text_probe.swift`'s — over
 /// the pixels `keep` accepts (b, g, r, a). x is CoreGraphics x; rows are the
 /// context's memory rows.
-func wpInk(_ context: CGContext, _ keep: (UInt8, UInt8, UInt8, UInt8) -> Bool) -> CGRect? {
+func wpInk(
+    _ context: CGContext, rows: Range<Int>? = nil, _ keep: (UInt8, UInt8, UInt8, UInt8) -> Bool
+) -> CGRect? {
     guard let data = context.data else { return nil }
     let bytes = data.assumingMemoryBound(to: UInt8.self)
     var minX = Int.max, maxX = -1, minY = Int.max, maxY = -1
-    for y in 0..<context.height {
+    for y in (rows ?? 0..<context.height).clamped(to: 0..<context.height) {
         let row = bytes + y * context.bytesPerRow
         for x in 0..<context.width {
             let p = row + x * 4
@@ -51,6 +58,10 @@ func wpInk(_ context: CGContext, _ keep: (UInt8, UInt8, UInt8, UInt8) -> Bool) -
 }
 
 func wpAny(_ b: UInt8, _ g: UInt8, _ r: UInt8, _ a: UInt8) -> Bool { a > 0 }
+/// Blue ink, as `wpRed` is red.
+func wpBlue(_ b: UInt8, _ g: UInt8, _ r: UInt8, _ a: UInt8) -> Bool {
+    a > 200 && b > 160 && r < 70 && g < 70
+}
 /// Red ink: a strongly red, nearly opaque pixel. The base colour is white and
 /// the outline black, so neither passes.
 func wpRed(_ b: UInt8, _ g: UInt8, _ r: UInt8, _ a: UInt8) -> Bool {
@@ -87,16 +98,314 @@ guard CommandLine.arguments.count >= 2, let device = MTLCreateSystemDefaultDevic
 }
 let registered = wpRegister(CommandLine.arguments[1])
 let renderers = LayerRenderers(device: device)
-var out: [String: Any] = ["registered": registered]
+let wpQuick = CommandLine.arguments.dropFirst(2).contains("--quick")
+var out: [String: Any] = ["registered": registered, "quick": wpQuick]
+
+/// Prints the one JSON object and ends the probe.
+func wpFinish(_ out: [String: Any]) -> Never {
+    var answer = out
+    answer["ok"] = true
+    let data = (try? JSONSerialization.data(withJSONObject: answer, options: [.sortedKeys]))
+        ?? Data()
+    FileHandle.standardOutput.write(data)
+    FileHandle.standardOutput.write(Data("\n".utf8))
+    exit(0)
+}
+
+/// The host's power state, which a millisecond budget depends on: macOS
+/// slows the processor in Low Power Mode and under thermal pressure, so
+/// `words_picture_probe.py` does not JUDGE P10's medians when either holds.
+func wpPower() -> [String: Any] {
+    let info = ProcessInfo.processInfo
+    let names = ["nominal", "fair", "serious", "critical"]
+    let state = info.thermalState.rawValue
+    return [
+        "low_power": info.isLowPowerModeEnabled, "thermal_state": state,
+        "thermal": names.indices.contains(state) ? names[state] : "unknown (\(state))",
+    ]
+}
 let faces = ["Montserrat-ExtraBold", "Montserrat-Black", "Anton-Regular", "BebasNeue-Regular"]
 let pops: [Double] = [0, 0.3, 0.58, 1]
 let pageText = "this is how it looks, extraordinary"
+
+// MARK: P10 — what a fill, a dim and a glide cost on a cache miss
+
+/// The spike's q5 method (`words_spike/text_probe.swift`): `text(_:hash:reveal:)`
+/// under a hash no call has used — a cache miss, so a raster and an upload —
+/// one untimed warm-up (it pays the face's first raster and the layout,
+/// which IS cached), then the median of 20. Measured FIRST, before the P1/P2
+/// sweep has run the machine hot for ten minutes: a budget is about a frame
+/// of playback, not about the end of this probe.
+///
+/// The page is the HIGHLIGHT preset's own (`CaptionStyle.highlight`:
+/// Montserrat-Black at 0.075 × min(w, h), upper case, its outline, its pop),
+/// so `pop` is a shipped picture; the glide adds the default pill, which
+/// Highlight does not have. A look's reveal carries `wordPop` 1, as the
+/// recipe does once the pop has settled. Every page is ONE line (`width`
+/// nil), where a generated page is cut to its style's width. The host's
+/// power state is read before the first raster and after the last.
+func wpMedian(_ values: [Double]) -> Double {
+    let sorted = values.sorted()
+    guard !sorted.isEmpty else { return .nan }
+    let middle = sorted.count / 2
+    return sorted.count % 2 == 0 ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle]
+}
+
+/// One of P10's rasters: a preset's page of `content` on one line, the look
+/// laid over the preset's own word style, and whether the scorer holds its
+/// median to the budget.
+struct WpRaster {
+    let label: String
+    let caption: CaptionStyle
+    let content: String
+    let word: Int
+    let pop: Double
+    let pill: ActivePill?
+    let fill: Bool
+    let dim: Bool
+    let glide: Bool
+    let scored: Bool
+}
+
+/// Highlight's four are the page P10 has always timed. One Word's (size
+/// 0.12 × min(w, h), where Highlight's is 0.075) is the largest type a
+/// preset ships, and a dim's layer costs by the box. `oneword-page fill+dim`
+/// is the page One Word generates — ONE word (`CaptionStyle.maxWords`), the
+/// text's longest — and it is scored. `oneword-line fill+dim (hand-made)`
+/// is the same six words on one line in that style: a page no preset makes
+/// and `set_text` can write, printed and never scored, as `pop` is.
+let wpRasters: [WpRaster] = [
+    WpRaster(
+        label: "pop", caption: .highlight, content: pageText, word: 3, pop: 0.5, pill: nil,
+        fill: false, dim: false, glide: false, scored: false),
+    WpRaster(
+        label: "fill", caption: .highlight, content: pageText, word: 3, pop: 1, pill: nil,
+        fill: true, dim: false, glide: false, scored: true),
+    WpRaster(
+        label: "fill+dim", caption: .highlight, content: pageText, word: 3, pop: 1, pill: nil,
+        fill: true, dim: true, glide: false, scored: true),
+    WpRaster(
+        label: "glide", caption: .highlight, content: pageText, word: 3, pop: 1,
+        pill: ActivePill(glide: true), fill: false, dim: false, glide: true, scored: true),
+    WpRaster(
+        label: "oneword-page fill+dim", caption: .oneWord, content: "extraordinary", word: 1,
+        pop: 1, pill: nil, fill: true, dim: true, glide: false, scored: true),
+    WpRaster(
+        label: "oneword-line fill+dim (hand-made)", caption: .oneWord, content: pageText,
+        word: 3, pop: 1, pill: nil, fill: true, dim: true, glide: false, scored: false),
+]
+
+var p10: [[String: Any]] = []
+let wpPowerBefore = wpPower()
+for (canvasW, canvasH) in [(1080, 1920), (3840, 2160)] {
+    let canvas = CGSize(width: canvasW, height: canvasH)
+    for raster in wpRasters {
+        let caption = raster.caption
+        let shipped = caption.wordStyle ?? WordStyle()
+        let wordStyle = WordStyle(
+            mode: shipped.mode, activeColor: shipped.activeColor,
+            activeScale: shipped.activeScale, activePill: raster.pill,
+            spokenColor: shipped.spokenColor, upcomingColor: shipped.upcomingColor,
+            activeFill: raster.fill, pauseDim: raster.dim ? 0.5 : 0)
+        let reveal = RecipeReveal(
+            word: raster.word, wordPop: raster.pop, wordGlide: raster.glide ? 0.5 : nil,
+            wordFill: raster.fill ? 0.5 : nil, wordDim: raster.dim ? 0.5 : nil)
+        let page = caption.textProps(
+            content: raster.content, size: caption.size(for: canvas), width: nil)
+        let props = TextProps(
+            content: page.content, font: page.font, size: page.size, color: page.color,
+            align: page.align, valign: page.valign, outline: page.outline, width: page.width,
+            textCase: page.textCase, wordStyle: wordStyle)
+        let key = "p10-\(canvasW)-\(raster.label)"
+        let warm = renderers.text(props, hash: key + "-warm", reveal: reveal)
+        var milliseconds: [Double] = []
+        for step in 0..<20 {
+            let began = Date()
+            _ = renderers.text(props, hash: key + "-\(step)", reveal: reveal)
+            milliseconds.append(Date().timeIntervalSince(began) * 1000)
+        }
+        let box = LayerRenderers.measuredSize(for: props)
+        p10.append([
+            "canvas": "\(canvasW)x\(canvasH)", "case": raster.label, "drew": warm != nil,
+            "scored": raster.scored, "box": "\(Int(box.width))x\(Int(box.height))",
+            "median_ms": wpMedian(milliseconds), "min_ms": milliseconds.min() ?? .nan,
+            "max_ms": milliseconds.max() ?? .nan,
+        ])
+    }
+}
+out["p10"] = p10
+out["power"] = ["before": wpPowerBefore, "after": wpPower()]
+
+// MARK: P11–P16 — the looks' geometry (issue batch B86, spec §11 W-14)
+
+// Every value the recipe would carry is set HERE, exactly, and the picture
+// is `textBitmap`'s — the bitmap `renderText` uploads. Saturated inks and no
+// outline (P15 aside), so a pixel names what drew it: the plate red, and in
+// the fill rows the active ink red and the upcoming ink blue.
+let wpGreenColor: RGBA = [0, 1, 0, 1]
+let wpBlueColor: RGBA = [0, 0, 1, 1]
+let wpGlidingPill = ActivePill(color: wpRedColor, glide: true)
+
+func wpLookPage(
+    _ content: String, style: WordStyle, width: Double? = nil, outline: OutlineProps? = nil
+) -> TextProps {
+    TextProps(
+        content: content, font: "Montserrat-Black", size: 80, color: [1, 1, 1, 1],
+        outline: outline, width: width, textCase: .upper, wordStyle: style)
+}
+func wpDraw(_ props: TextProps, _ reveal: RecipeReveal) -> CGContext? {
+    LayerRenderers.textBitmap(props, reveal: reveal)
+}
+func wpRedRect(_ props: TextProps, _ reveal: RecipeReveal) -> Any {
+    wpDraw(props, reveal).map { wpRect(wpInk($0, wpRed)) } ?? "no bitmap"
+}
+/// Whether two drawings are the same bytes.
+func wpSame(_ a: CGContext?, _ b: CGContext?) -> Any {
+    guard let first = wpBytes(a), let second = wpBytes(b) else { return "no bitmap" }
+    return first == second
+}
+/// The lines token `index` of `props` has glyphs on.
+func wpLines(_ props: TextProps, token index: Int) -> [Int] {
+    let tokens = LayerRenderers.tokens(of: props.laidContent)
+    guard tokens.indices.contains(index) else { return [] }
+    let token = tokens[index]
+    return LayerRenderers.layout(for: props).lines.enumerated().compactMap { place, laid in
+        let line = laid.range.location..<(laid.range.location + laid.range.length)
+        return token.lowerBound < line.upperBound && token.upperBound > line.lowerBound
+            ? place : nil
+    }
+}
+
+// P11 — the plate between two LINES: x, y and width all travel.
+let wpTwoLines = wpLookPage("sun\nmoon", style: WordStyle(activePill: wpGlidingPill))
+out["p11"] = [
+    "lines": LayerRenderers.layout(for: wpTwoLines).lines.count,
+    "from": wpRedRect(wpTwoLines, RecipeReveal(word: 1)),
+    "to": wpRedRect(wpTwoLines, RecipeReveal(word: 2, wordGlide: 1)),
+    "start": wpRedRect(wpTwoLines, RecipeReveal(word: 2, wordGlide: 0)),
+    "half": wpRedRect(wpTwoLines, RecipeReveal(word: 2, wordGlide: 0.5)),
+]
+
+// P12 — the plate pops about its OWN centre.
+let wpPopping = wpLookPage(
+    "sun moon", style: WordStyle(activeScale: 1.5, activePill: wpGlidingPill))
+out["p12"] = [
+    "scale": 1.5,
+    "flat": wpRedRect(wpPopping, RecipeReveal(word: 2, wordGlide: 0.5)),
+    "popped": wpRedRect(wpPopping, RecipeReveal(word: 2, wordPop: 1, wordGlide: 0.5)),
+]
+
+// P13 — the one-piece condition: a token that wraps over two lines.
+let wpWrapContent = "go mmmmmmmmmmmm on"
+let wpWrapWidth = 500.0
+let wpWrapped = wpLookPage(
+    wpWrapContent, style: WordStyle(activePill: wpGlidingPill), width: wpWrapWidth)
+out["p13"] = [
+    "token_lines": wpLines(wpWrapped, token: 1).count,
+    "onto_wrapped_same": wpSame(
+        wpDraw(wpWrapped, RecipeReveal(word: 2, wordGlide: 0.5)),
+        wpDraw(wpWrapped, RecipeReveal(word: 2, wordGlide: 1))),
+    "off_wrapped_same": wpSame(
+        wpDraw(wpWrapped, RecipeReveal(word: 3, wordGlide: 0.5)),
+        wpDraw(wpWrapped, RecipeReveal(word: 3, wordGlide: 1))),
+    "plate_on_wrapped": wpRedRect(wpWrapped, RecipeReveal(word: 2, wordGlide: 0.5)),
+    "line_height": Double(LayerRenderers.layout(for: wpWrapped).lines.first?.height ?? 0),
+    // The control: between two one-piece tokens the same two instants differ.
+    "one_piece_same": wpSame(
+        wpDraw(wpTwoLines, RecipeReveal(word: 2, wordGlide: 0.5)),
+        wpDraw(wpTwoLines, RecipeReveal(word: 2, wordGlide: 1))),
+]
+
+// P14 — a wrapped token fills each piece by the same fraction.
+let wpFilling = wpLookPage(
+    wpWrapContent,
+    style: WordStyle(activeColor: wpRedColor, upcomingColor: wpBlueColor, activeFill: true),
+    width: wpWrapWidth)
+var wpPieces: [[String: Any]] = []
+if let full = wpDraw(wpFilling, RecipeReveal(word: 2, wordFill: 1)),
+    let half = wpDraw(wpFilling, RecipeReveal(word: 2, wordFill: 0.5)) {
+    let lines = LayerRenderers.layout(for: wpFilling).lines
+    for index in wpLines(wpFilling, token: 1) {
+        // The line's rows from its baseline up: memory row 0 is the TOP.
+        let line = lines[index]
+        let top = Int((CGFloat(full.height) - (line.origin.y + line.ascent)).rounded(.down))
+        let bottom = Int((CGFloat(full.height) - line.origin.y).rounded(.up))
+        let rows = max(top, 0)..<max(bottom, max(top, 0) + 1)
+        wpPieces.append([
+            "line": index, "full_red": wpRect(wpInk(full, rows: rows, wpRed)),
+            "half_red": wpRect(wpInk(half, rows: rows, wpRed)),
+            "half_blue": wpRect(wpInk(half, rows: rows, wpBlue)),
+        ])
+    }
+}
+out["p14"] = ["token_lines": wpLines(wpFilling, token: 1).count, "pieces": wpPieces]
+
+// P15 — a FULL word is drawn whole: its outline's stroke reaches past the
+// glyph range, and a build page draws nothing right of the fill's edge.
+let wpOutlined = wpLookPage(
+    "go mmmm", style: WordStyle(mode: .build, activeColor: wpRedColor, activeFill: true),
+    outline: OutlineProps(width: 20, color: wpBlueColor))
+let wpWhole = wpDraw(wpOutlined, RecipeReveal(word: 2))
+let wpFullWord = wpDraw(wpOutlined, RecipeReveal(word: 2, wordFill: 1))
+out["p15"] = [
+    "full_same_as_unfilled": wpSame(wpFullWord, wpWhole),
+    "half_same_as_unfilled": wpSame(
+        wpDraw(wpOutlined, RecipeReveal(word: 2, wordFill: 0.5)), wpWhole),
+    "ink_full": wpFullWord.map { wpRect(wpInk($0, wpAny)) } ?? "no bitmap",
+    "ink_nearly": wpDraw(wpOutlined, RecipeReveal(word: 2, wordFill: 0.999))
+        .map { wpRect(wpInk($0, wpAny)) } ?? "no bitmap",
+]
+
+// P16 — a value outside 0…1 draws as the nearest one inside (an action's end
+// patch is not range-checked), and a full dim at `pause_dim` 1 draws nothing.
+func wpClamped(
+    pauseDim: Double = 0.5, fill: Double? = nil, glide: Double? = nil, dim: Double? = nil
+) -> CGContext? {
+    let style = WordStyle(
+        activeColor: wpRedColor, activePill: ActivePill(color: [1, 0, 1, 1], glide: true),
+        spokenColor: wpGreenColor, upcomingColor: wpBlueColor, activeFill: true,
+        pauseDim: pauseDim)
+    return wpDraw(
+        wpLookPage("sun moon star", style: style),
+        RecipeReveal(word: 2, wordGlide: glide, wordFill: fill, wordDim: dim))
+}
+let wpEqual: [(String, CGContext?, CGContext?)] = [
+    ("fill -0.5 as 0", wpClamped(fill: -0.5), wpClamped(fill: 0)),
+    ("fill 1.5 as 1", wpClamped(fill: 1.5), wpClamped(fill: 1)),
+    ("glide -0.5 as 0", wpClamped(glide: -0.5), wpClamped(glide: 0)),
+    ("glide 1.5 as 1", wpClamped(glide: 1.5), wpClamped(glide: 1)),
+    ("dim 2 as 1", wpClamped(dim: 2), wpClamped(dim: 1)),
+    ("dim -1 as 0", wpClamped(dim: -1), wpClamped(dim: 0)),
+    ("pause_dim 2 as 1", wpClamped(pauseDim: 2, dim: 0.5), wpClamped(pauseDim: 1, dim: 0.5)),
+    ("pause_dim -1 as 0", wpClamped(pauseDim: -1, dim: 0.5), wpClamped(pauseDim: 0, dim: 0.5)),
+]
+// The controls: inside the range the two ends of each are two pictures.
+let wpDiffer: [(String, CGContext?, CGContext?)] = [
+    ("fill 0 as 1", wpClamped(fill: 0), wpClamped(fill: 1)),
+    ("glide 0 as 1", wpClamped(glide: 0), wpClamped(glide: 1)),
+    ("dim 0 as 1", wpClamped(dim: 0), wpClamped(dim: 1)),
+    ("pause_dim 0 as 1", wpClamped(pauseDim: 0, dim: 0.5), wpClamped(pauseDim: 1, dim: 0.5)),
+]
+out["p16"] = [
+    "same": Dictionary(uniqueKeysWithValues: wpEqual.map { ($0.0, wpSame($0.1, $0.2)) }),
+    "control_same": Dictionary(
+        uniqueKeysWithValues: wpDiffer.map { ($0.0, wpSame($0.1, $0.2)) }),
+    "lit_ink": wpClamped(dim: 0).map { wpRect(wpInk($0, wpAny)) } ?? "no bitmap",
+    "invisible_ink": wpClamped(pauseDim: 1, dim: 1).map { wpRect(wpInk($0, wpAny)) }
+        ?? "no bitmap",
+]
+
+if wpQuick { wpFinish(out) }
 
 // MARK: P1, P2 — the box at every word and pop, and no ink outside it
 
 var boxes: [[String: Any]] = []
 /// One page of the P1/P2 loop, drawn at every word and pop in six layouts
-/// (one line and wrapped, valign middle, top and bottom).
+/// (one line and wrapped, valign middle, top and bottom). Since issue batch
+/// B86 each is also drawn half FILLED, and a config with a pill also with
+/// the pill GLIDING at `glide` 0 and 0.5 (word ≥ 2), over the same bitmap
+/// and so into the same `overflow_px`: neither look may put ink outside
+/// the box.
 func wpMeasure(
     _ base: TextProps, style: WordStyle, canvas: (Int, Int), label: String, scale: Double
 ) {
@@ -114,24 +423,50 @@ func wpMeasure(
         var sizes: Set<String> = []
         var worst: [String: Double] = ["l": 0, "r": 0, "b": 0, "t": 0]
         let margin = CGFloat(size) * 2
+        let gliding = style.activePill.map {
+            WordStyle(
+                mode: style.mode, activeColor: style.activeColor, activeScale: style.activeScale,
+                activePill: ActivePill(
+                    color: $0.color, padding: $0.padding, radius: $0.radius, glide: true),
+                spokenColor: style.spokenColor, upcomingColor: style.upcomingColor)
+        }
+        /// One more drawing of the page into a margin-wide bitmap, folded
+        /// into `worst`.
+        func fold(_ draw: (CGContext) -> Void) {
+            guard let big = LayerRenderers.bitmap(CGSize(
+                width: box.width + margin * 2, height: box.height + margin * 2))
+            else { return }
+            big.translateBy(x: margin, y: margin)
+            draw(big)
+            guard let ink = wpInk(big, wpAny) else { return }
+            // Memory row 0 is the TOP; CG y is up, so rows map to t/b.
+            worst["l"] = max(worst["l"] ?? 0, Double(margin - ink.minX))
+            worst["r"] = max(worst["r"] ?? 0, Double(ink.maxX - (margin + box.width)))
+            worst["t"] = max(worst["t"] ?? 0, Double(margin - ink.minY))
+            worst["b"] = max(worst["b"] ?? 0, Double(ink.maxY - (margin + box.height)))
+        }
         for word in 0...count {
             for pop in pops {
                 let reveal = RecipeReveal(word: word, wordPop: word == 0 ? nil : pop)
                 if let bitmap = renderers.renderTextBitmap(props, reveal: reveal) {
                     sizes.insert("\(bitmap.width)x\(bitmap.height)")
                 }
-                guard word > 0, let big = LayerRenderers.bitmap(CGSize(
-                    width: box.width + margin * 2, height: box.height + margin * 2))
-                else { continue }
-                big.translateBy(x: margin, y: margin)
-                LayerRenderers.drawWords(
-                    layout, of: props, style: style, word: word, pop: pop, in: big)
-                guard let ink = wpInk(big, wpAny) else { continue }
-                // Memory row 0 is the TOP; CG y is up, so rows map to t/b.
-                worst["l"] = max(worst["l"] ?? 0, Double(margin - ink.minX))
-                worst["r"] = max(worst["r"] ?? 0, Double(ink.maxX - (margin + box.width)))
-                worst["t"] = max(worst["t"] ?? 0, Double(margin - ink.minY))
-                worst["b"] = max(worst["b"] ?? 0, Double(ink.maxY - (margin + box.height)))
+                guard word > 0 else { continue }
+                // One bitmap takes every drawing of this word and pop — the
+                // ink of their UNION is the worst of each, and the pixel
+                // scan, which is what this loop costs, runs once.
+                fold {
+                    LayerRenderers.drawWords(
+                        layout, of: props, style: style, word: word, pop: pop, in: $0)
+                    LayerRenderers.drawWords(
+                        layout, of: props, style: style, word: word, pop: pop, fill: 0.5, in: $0)
+                    guard let gliding, word >= 2 else { return }
+                    for glide in [0, 0.5] {
+                        LayerRenderers.drawWords(
+                            layout, of: props, style: gliding, word: word, pop: pop,
+                            glide: glide, in: $0)
+                    }
+                }
             }
         }
         boxes.append([
@@ -302,8 +637,4 @@ for pop in [0.0, 1.0] {
 p9["word_em"] = Double(LayerRenderers.wordMetrics(long).widest) / em
 out["p9"] = p9
 
-out["ok"] = true
-let data = (try? JSONSerialization.data(withJSONObject: out, options: [.sortedKeys])) ?? Data()
-FileHandle.standardOutput.write(data)
-FileHandle.standardOutput.write(Data("\n".utf8))
-exit(0)
+wpFinish(out)

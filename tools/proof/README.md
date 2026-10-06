@@ -15943,3 +15943,215 @@ provide it — the error that failed Rasterize's first run in 0 s.
 `cloud_captions_probe.py`'s row 18 expects the two version strings among
 `project.yml`'s `info:` changes; its diff was computed alone against the
 row's own baseline tree and equals the expected list (18 lines).
+
+## Issue batch B86 phase 1 — three word-caption looks in the model, the recipe and the picture (`core/tests/word_looks.rs`, `core/tests/schema_v12.rs`, four core mutants; `word_looks_proof.py` H0, B1, W3, G1–G3, F1–F3, D1–D3, S1, R1, Z1 and six mutants; `word_looks_baseline.json`; `words_picture_probe.py` P2, P10, P11–P16, seven mutants and `--power-selftest`; #96; spec §11 W-12, W-13, W-14)
+
+`word_style` gains three keys, each off by default — `active_pill.glide` (the
+pill slides), `active_fill` (the active word fills as it is said) and
+`pause_dim` (the page dims in a pause) — at format version 12; the recipe
+carries `word_glide`, `word_fill` and `word_dim`; `LayerRenderersWords.swift`
+draws them. They are reachable through `set_text` only: the Generate
+Captions sheet and `transcribe` are phase 2.
+
+**What is proved, and by which instrument.**
+
+- **`core/tests/word_looks.rs`** (in `make test`), through the FFI, every
+  expected number computed in the test from the four durations written out
+  there. Per key: a word boundary, inside a word, a pause on each side of
+  0.25 s (one tick apart), the first and the last word, the tail against the
+  clip's duration (one tick apart again), a late first word (the page opens
+  dim, no ramp down), two abutting pages (the first ends dim; the second
+  opens with `word_glide` null, `word_fill` 0, `word_dim` 0), a word shorter
+  than the 0.6 s cap (full at its `end`) and one longer (full at the cap,
+  1.0 after), a next word sooner than the 0.2 s glide, equal starts, an
+  unsorted list and `i64::MIN` / `i64::MAX` ticks (in 0..1, no panic), all
+  three null on an unstyled page, an untimed styled page, a count mismatch
+  and the burn-in, the keys' order in the source text, the hash (two fill
+  fractions, two glide fractions and two dim levels differ; a dim plateau
+  and two instants past the cap are equal), and `pause_dim`'s refusals by
+  name at `set_text` and `add_text_clip`. The recipe's numbers are compared
+  at nine decimals: the FFI's JSON reads back an ulp from the f64 written.
+- **`core/tests/schema_v12.rs`** (in `make test`): versions 9–11 read with
+  the three keys off and 1–8 with no style; a version-11 style keeps its six
+  keys and its pill's three; absent equals spelled-out defaults (the written
+  text); the key order off the written text (`glide` closes the pill,
+  `active_fill` then `pause_dim` close the style, `word_style` still closes
+  the text); a page with all three round-trips twice to the same bytes; each
+  key patched alone keeps the others; a wrong kind and an unknown key are
+  refused by path. No test writes the current version as a literal.
+- **`word_looks_proof.py`** (not in `make test`: it launches the app, twice,
+  each in the scratch home `tools/proof/work/word-looks/home`, on its own
+  socket, performs no menu item, closes what it opens). H0 and Z1 are
+  CONTROLS. **B1** holds a hand-written version-11 package's 41 frames —
+  the five shipped word styles, an untimed styled page, a plain title and a
+  typewriter, a `word_fade` and a `line_rise` title, at the instants its
+  docstring lists — to the SHA-256 digests in `word_looks_baseline.json`.
+  **The baseline is one host's bytes and one build's, and says which**:
+  recorded by `--record-baseline` (two launches, written only when every
+  digest agrees) from the build of `d8fa4fa`, BEFORE any B86 code, on host
+  `25F80 arm64`. So on that host B1 says an existing project draws exactly
+  as it did before the three keys. On another host, or with no file, B1 is a
+  control FAILURE that says to re-record — never a pass or a skip — and a
+  re-recording pins the build it is made on instead (`recorded_from` says
+  which); the pre-B86 anchor holds for the recording host only. **W3** runs
+  `words_picture_proof.py` (road map 8's R1–R7, R6 reading `set_text`'s
+  description) on the second launch. G1–G3 the glide, F1–F3 the fill, D1–D3
+  the dim, each read off `render_frame` PNGs of a 640×360 fixture with no
+  pop and saturated colours on black (the plate red, spoken ink green,
+  upcoming ink blue), through the script's own PNG decoder; S1 the door.
+  Three things the fix pass added: **F1 also holds the fill's edge to a
+  whole pixel** (at ¼ and ¾, where the edge falls inside a letter, the last
+  active-colour column and the first upcoming-colour one are adjacent, and
+  at no fraction does a pixel of the word carry both colours); **D3** is the
+  dim as ONE opacity over the words and the pill together (white active ink
+  over a red pill: on the plateau the ink is grey, `1 − pause_dim` of
+  itself with no plate through it, where an opacity applied to each drawing
+  in turn would leave it a quarter red); and **R1** is the recording's own
+  gate: **`--record-baseline` refuses, exit 2, before it launches anything,
+  while `git status --porcelain -- app core graphic` prints a line** (or
+  cannot be read), because `recorded_from` names a commit and a build of
+  uncommitted sources is no commit's picture. R1 shows it on a sample
+  status, on an unreadable one, and — when the tree it runs in has such
+  changes — by calling the recording itself, and holds the baseline file to
+  the bytes it had.
+- **`words_picture_probe.py`** (not in `make test`: it compiles
+  `app/Sources`). P2's sweep now draws every page, at every word and pop,
+  also half FILLED and — a config with a pill — GLIDING at `glide` 0 and 0.5
+  (word ≥ 2), over the same bitmap, so `overflow_px` is the worst of all of
+  them: no look puts ink outside the box. **P10** times
+  `text(_:hash:reveal:)` on a cache miss — a raster and an upload, the
+  words spike's q5 method — on the Highlight preset's own page
+  (Montserrat-Black at 0.075 × min(w, h)) at 1080×1920 and 3840×2160: one
+  untimed warm-up, then the median of 20, for `pop` 0.5 (the shipped
+  comparator, never scored), `fill` 0.5, `fill` 0.5 with `dim` 0.5 at
+  `pause_dim` 0.5, and `glide` 0.5 with the default pill; measured before
+  the sweep. Since the fix pass it also times the fill with the dim in ONE
+  WORD's style — the largest type a preset ships, 0.12 × min(w, h), and a
+  dim's layer costs by the box. **P10 scores two pages in the presets' own
+  styles**: Highlight's line and, as `oneword-page fill+dim`, One Word's
+  page, which is one word (`maxWords` 1). Beside them it prints, never
+  scored, as `pop` is, a HAND-MADE page of large type:
+  `oneword-line fill+dim (hand-made)`, the same six words on one line at One
+  Word's size, which no preset makes and `set_text` can write. (Pass 1 of
+  the fix scored that line, as `oneword fill+dim`, and printed the one-word
+  page; pass 1b swapped them.) **Every P10 page is one line (`width`
+  nil)**, where a generated page is cut to its style's width, so Highlight's
+  scored line is wider than any its pager makes. Budgets: 4 ms at 1080×1920 (half of spec §7.5's 8 ms
+  frame: a fill pays it on every frame of a word), 8 ms at 3840×2160.
+  `--raster-budget-ms N` replaces both; a `--mutant` run does not score P10.
+  **P10 is judged only on an unthrottled host**: the probe reads
+  `ProcessInfo`'s Low Power Mode flag and thermal state before the first
+  raster and after the last, the scorer prints them beside the medians, and
+  with Low Power Mode on or a thermal state above nominal the row is
+  `P10 not judged: <why>` — a control FAILURE with the medians printed,
+  never a pass or a skip. `--power-selftest` feeds the scorer made-up
+  answers (T1–T8: Low Power Mode, each thermal reading, no power state, an
+  unthrottled host under budget and at budget 0, a throttled one at budget
+  0) and builds nothing. **`--only P10` runs P10 alone** — under two
+  minutes, nearly all of it the probe's build — through the probe's
+  `--quick`, which stops before the sweep; `--only` takes any of P10–P16.
+  **P11–P16** are the looks' geometry, each value the recipe would carry
+  set exactly and the picture read off `textBitmap`: P11 the gliding
+  plate's four edges between two LINES (x, y and width all travel, at
+  `easeOut`); P12 the plate popping about its own centre; P13 the one-piece
+  condition (a token that wraps over two lines takes the settled pill,
+  sliding onto it and off it); P14 a wrapped token filling each piece by
+  the same fraction; P15 a full word drawn whole (on an outlined build
+  page `word_fill` 1 is the unfilled page byte for byte, though the stroke
+  reaches past where 0.999 is cut); P16 a value outside 0…1 drawing as the
+  nearest one inside, for `word_fill`, `word_glide`, `word_dim` and
+  `pause_dim` on each side, and a full dim at `pause_dim` 1 drawing nothing.
+
+**What the runs printed** (2026-10-05, one host: `25F80 arm64`, on battery.
+The first pass ran in Low Power Mode. The fix pass's runs from 19:34 to
+19:52 — the picture probe's among them — ran in High Power, `pmset -g`
+`powermode 2`; Low Power Mode was on again after the lid was closed at
+19:53. The Mac slept twice in the afternoon and once in the evening, and no
+run that spanned a sleep is counted).
+
+| Run | Answer |
+|---|---|
+| `word_looks_proof.py --record-baseline`, on the build of the UNCHANGED tree at `d8fa4fa` | exit 0; 41 frames on each of two launches, every digest agreeing (25 distinct); `word_looks_baseline.json` written |
+| `word_looks_proof.py --only B1,W3` after the FIRST pure move alone (`RecipeReveal`'s sibling keys out of `ProjectSnapshot.swift`), `make typecheck` and `make app` first | 4/4, exit 0: B1's 41 frames unmoved, W3 7/7 |
+| the same after the SECOND pure move alone (`textWordsClause` out of `AgentCatalog+Clips.swift`) | 4/4, exit 0; the bundle's catalog snapshot holds the same `tools` value before and after |
+| `cd core && cargo test --release --test word_looks` / `schema_v12` / `schema_v9` / `words` (unedited) / `schema_v3` | 22 / 10 / 14 / 16 / 9 passed |
+| `python3 tools/proof/word_looks_proof.py` | 15/15, exit 0; B1 `moved: []`. G1: plate centres 95.5 and 254.0 settled, 234.5 three frames in, 234.1875 expected. G3: the left token's ink value (0, 255, 0) on 2004 pixels at `word_glide` 0, at 0.5 and settled. F1: the word's filled extent is columns 162…476; at ¼ red to 239 and blue from 240 (240.5 expected), at ½ red to 315 and blue from 323 (319.0), at ¾ red to 399 and blue from 400 (397.5); 0 pixels of both colours at each. F2: the last inked column 316 (319.0). D1: mean distance 13.2657 lit, 11.0819 on the ramp, 6.6614 on the plateau, ratio 0.5022. D3: 3205 ink pixels over the plate, each (128, 128, 128) on the plateau, channel spread 0; 12432 bare plate pixels, each (128, 0, 0). S1: `set_text: text.word_style.pause_dim must be between 0 and 1, not 2`. R1: the tree had 18 uncommitted changes under `app/`, `core/` and `graphic/`, the recording answered 2 and printed `NOT WRITTEN: 18 uncommitted change(s) …`, the baseline file unchanged |
+| `python3 tools/proof/words_picture_probe.py --only P10` (pass 1b, the scoring as it now stands; JUDGED: High Power on battery, Low Power Mode off, thermal state nominal before the rasters and after; 20:50–20:52, beside the orchestrator's `make test`) | **3/3, exit 0: P10 passes.** 1080×1920 pop 1.220 ms, fill 1.215 ms, fill+dim 2.443 ms, glide 1.206 ms, oneword-page fill+dim 1.541 ms, oneword-line fill+dim (hand-made) 3.136 ms; 3840×2160 pop 2.404 ms, fill 2.458 ms, fill+dim 7.382 ms, glide 2.525 ms, oneword-page fill+dim 4.915 ms, oneword-line fill+dim (hand-made) 9.759 ms. Over budget: none (`pop` and the hand-made line are printed, not scored). `--power-selftest` 8/8 under the same scoring |
+| the same `--only P10`, the orchestrator's run alone on the final probe after its `make test` had ended (`pmset -g` read `powermode 2` before and after) | **3/3, exit 0, over budget: [].** 1080×1920 pop 1.193 ms, fill 1.187, fill+dim 2.440, glide 1.224, oneword-page fill+dim 1.548, oneword-line fill+dim (hand-made, not scored) 3.147; 3840×2160 pop 2.455, fill 2.477, fill+dim 7.353, glide 2.550, oneword-page fill+dim 4.989, oneword-line (not scored) 9.707; power: Low Power Mode off, thermal state nominal, before the rasters and after |
+| the same with `--raster-budget-ms 0`, pass 1b's scoring (20:56–20:58) | exit 1, 2/3: `P10 not judged: Low Power Mode` — the Mac went back into Low Power Mode during the run (off before the rasters, on after them), so this run shows the throttled arm on the real host and NOT the budget's; the selftest's T7 remains the budget's control under 1b's scoring |
+| `python3 tools/proof/words_picture_probe.py` (pass 1, when the six-word line was the scored One Word case, `oneword fill+dim`, and the one-word page the printed one; JUDGED: High Power on battery, Low Power Mode off, thermal state nominal before the rasters and after; 19:36–19:47, nothing else running) | **17/18, exit 1: P10 FAILED on one median, the hand-made line's.** P1 204 pages; P2 worst 0 px with the fill and the glide drawn in; P11–P16 hold. P10's medians: 1080×1920 pop 1.215 ms, fill 1.187 ms, fill+dim 2.435 ms, glide 1.200 ms, oneword fill+dim 3.100 ms, oneword-page fill+dim 1.553 ms; 3840×2160 pop 2.439 ms, fill 2.449 ms, fill+dim 7.174 ms, glide 2.514 ms, oneword fill+dim 9.529 ms, oneword-page fill+dim 4.982 ms. Over budget: 3840×2160 oneword fill+dim (9.529 ms against 8 ms). The budget was not raised |
+| `python3 tools/proof/words_picture_probe.py --only P10` (pass 1's scoring, the same power state; 1 min 46 s) | 2/3, exit 1, the same one median over: 1080×1920 pop 1.250, fill 1.204, fill+dim 2.403, glide 1.207, oneword fill+dim 3.060, oneword-page fill+dim 1.526 ms; 3840×2160 pop 2.436, fill 2.441, fill+dim 7.147, glide 2.542, oneword fill+dim 9.714, oneword-page fill+dim 4.864 ms |
+| `python3 tools/proof/words_picture_probe.py --only P10 --raster-budget-ms 0` (the control, pass 1's scoring, the same power state; not re-run under pass 1b's, where the selftest's T7 holds the eight scored cases) | 2/3, exit 1, P10 for the budget's own reason: all eight scored medians over 0 (1.190, 2.440, 1.187, 3.106, 2.408, 7.174, 2.471, 9.498 ms) |
+| `python3 tools/proof/words_picture_probe.py --power-selftest` | 8/8, exit 0: a made-up answer in Low Power Mode is `P10 not judged: Low Power Mode — a CONTROL FAILURE, never a pass or a skip: …` and fails, at the real budgets and at budget 0; so do thermal state fair, serious after the rasters, and no power state; an unthrottled one passes under budget and fails at budget 0 on its eight scored medians |
+| The first pass's run of the probe, in Low Power Mode (before P10 read the power state) | 11/12, exit 1: 1080×1920 pop 1.504 ms, fill 1.495 ms, fill+dim 3.067 ms, glide 1.491 ms; 3840×2160 pop 2.925 ms, fill 2.984 ms, fill+dim 9.268 ms, glide 3.145 ms. A fix-pass reading in Low Power Mode, taken beside a running build and not scored: oneword fill+dim 3.951 ms and 12.043 ms, oneword-page fill+dim 1.967 ms and 6.265 ms |
+| `python3 tools/proof/words_core_proof.py <socket>` (road map 8's W1b, on an instance under a scratch home) | 27/27, exit 0 |
+| `python3 tools/proof/spec_index_proof.py` | 141/141 |
+| `make test` | **exit 2, three times.** The first stopped at `core/tests/recipe.rs`, whose list of a text source's keys named eight and now names eleven (fixed). The other two passed all of `core` (76 `test result: ok`, 1,064 passed, 0 failed) and `graphic` (17, 125 passed) and stopped in `mcp-proxy/tests/stdio.rs`, a crate this batch does not touch, on `no answer within 8s` and `within 5s` — one test the second time, two the third, not the same ones. `cd mcp-proxy && cargo test --release --test stdio -- --test-threads=1` then passed 14 of 14. The host was on battery in Low Power Mode with another session's app and `XprotectService` busy. The seven proof steps `make test` never reached were run one by one, each exit 0: `assistant_lane_proof.py` 18/18, `assistant_prompt_proof.py --probe` 14/14, `prices_proof.py` 27/27, `budget_proof.py` 23/23, `capture_spike/inventory.py --check` 5/5, `spec_index_proof.py` 141/141, `proof_defaults.py --ran …` 10/10. **The fix pass ran it once more**, at 20:35 with Low Power Mode on again: exit 2 — all of `core` (76 `test result: ok`, 1,064 passed) and `graphic` (17, 125 passed) passing, and `mcp-proxy/tests/stdio.rs` 13 passed, 1 failed, `tools_list_answers_the_snapshot_while_another_client_holds_the_app` on `no answer within 8s`. The steps after it that the pass's files can reach were run one by one, each exit 0: `assistant_lane_proof.py` 18/18, `assistant_prompt_proof.py --probe` 14/14, `capture_spike/inventory.py --check` 5/5, `spec_index_proof.py` 141/141, `proof_defaults.py --ran …` 10/10 |
+| `make test`, the orchestrator's run on pass 1's final sources in High Power (`powermode 2` before and after; ended 20:51) | **exit 0**: core, graphic and `mcp-proxy` (its `stdio` test 14/14), the lane 18/18, the prompt probe 14/14, prices 27/27, the spec index 141/141 and the defaults sweep. The timeouts above were Low Power Mode (#244) |
+| `make lint` / `make typecheck` / `make app` | clean / 0 errors, 4 warnings, tsc silent / `BUILD SUCCEEDED` |
+
+**What P10 says, and the limit it does not score.** A fill and a glide
+cost what the shipped pop costs on the same page (about 1.2 ms at 1080×1920
+and 2.5 ms at 3840×2160). The dim is the cost: it draws the words and the
+pill inside one transparency layer over the whole text box (spec §11
+W-14), so it costs by the box. P10 scores two pages in the presets' own styles,
+and judged in High Power each is inside its budget: a fill with a dim took
+7.174 ms on Highlight's line at 3840×2160 and 4.982 ms on One Word's
+one-word page (7.382 ms and 4.915 ms in pass 1b's run). **A hand-made page
+of large type is over, and is a known limit, not a scored row**: six words
+on one line at One Word's size, which no preset makes and `set_text` can
+write, read 9.529 ms at 3840×2160 on a dim's ramp frames against the 8 ms
+budget (2026-10-05, High Power, on battery, thermal state nominal; 9.759 ms
+in pass 1b's run). The dim is paid on the frames of a ramp only (0.1 s
+down, 0.1 s up per pause); the plateau is one cached texture. The probe is
+an unoptimised build, so the numbers are an upper reading of the app's.
+`designs/adr/roadmap-08-word-captions.md`'s Known limits carries it.
+**The verdict depended on the power state**, which is why P10 reads it: in
+Low Power Mode the first pass read 9.268 ms on Highlight's page at
+3840×2160, over the budget the judged run is inside. An earlier run of that
+day scored a page nobody ships (pill, pop, outline and a 0.55-alpha upcoming
+colour at once), measured after the ten-minute sweep, on which the shipped
+pop itself read 9.111 ms at 3840×2160; P10 was then re-based on the
+Highlight preset's own page and moved ahead of the sweep, budgets unchanged.
+
+**Made to fail on purpose.**
+
+| Mutant | Where | Answer |
+|---|---|---|
+| `glide-ignores-next-start` (`WORD_GLIDE.min(…)` → `WORD_GLIDE`) | `recipe_words.rs`, by hand, `cargo test --release --test word_looks` | exit 101, 1 failed: `glide_is_done_by_the_next_words_start_when_that_is_sooner` |
+| `fill-from-clip-start` (the fill's elapsed measured from clip time 0) | the same | exit 101, 4 failed |
+| `dim-gap-exclusive` (`<` → `<=` at `WORD_DIM_GAP`) | the same | exit 101, 2 failed: the quarter-second pause and the tail |
+| `fill-uncapped` (no `min(WORD_FILL_MAX)`) | the same | exit 101, 2 failed: `a_word_longer_than_the_cap_is_full_at_the_cap`, `the_hash_follows_the_picture_and_only_the_picture` |
+| `word_looks_proof.py --mutant glide-ignored` | a tree copy's `LayerRenderersWords.swift`, built by its own `make app` | `MUTANT PASS`, 13/14, G1 failed |
+| `--mutant plate-over-ink` (the plate pass after the base pass) | the same | `MUTANT PASS`, 13/14, G3 failed |
+| `--mutant fill-ignored` | the same | `MUTANT PASS`, 11/14, F1, F2 and F3 failed |
+| `--mutant fill-unsnapped` (the fill's edge left where the fraction puts it) | the same | `MUTANT PASS`, 13/14, F1 failed: at ¾ red to 399 and blue from 401, 17 pixels of both colours (¼ still landed on a pixel) |
+| `--mutant dim-ignored` | the same | `MUTANT PASS`, 12/14, D1 and D3 failed |
+| `--mutant dim-per-draw` (no transparency layer, and an opaque ink inherits the context's alpha: the dim's opacity on each drawing in turn) | the same, and `LayerRenderersText.swift`'s `drawFaded` | `MUTANT PASS`, 12/14, D3 failed — the ink over the plate (192, 128, 128), channel spread 64 — while D1 HELD (ratio 0.5022), so D3 is the row that tells one opacity from one per drawing; B1 failed too (nine frames of the karaoke, `word_fade` and `line_rise` pages, whose partial-alpha inks the second edit changes) |
+| `words_picture_probe.py --mutant plate-y-jumps` (`y: b.minY`) | a copy of `app/Sources`, the probe built over it, `--only P11` | `MUTANT PASS`: P11 failed, the plate at ½ on rows 104…233 where 91.875…220.875 was expected |
+| `--mutant plate-width-jumps` (`width: b.width`) | the same | `MUTANT PASS`: P11 failed, the plate's right edge at 334 where 322 was expected |
+| `--mutant plate-pop-ignored` (the gliding plate filled at scale 1) | the same, `--only P12` | `MUTANT PASS`: P12 failed, grew ×1.000 by ×1.000 |
+| `--mutant one-piece-ignored` (`!to.isEmpty, !from.isEmpty`) | the same, `--only P13` | `MUTANT PASS`: P13 failed, `word_glide` ½ differs from 1 onto the wrapped token and off it |
+| `--mutant fill-first-piece-only` (`activePieces.prefix(1)`) | the same, `--only P14` | `MUTANT PASS`: P14 failed, no ink on the token's second line |
+| `--mutant full-word-at-glyph-edge` (`filled >= 2`) | the same, `--only P15` | `MUTANT PASS`: P15 failed, `word_fill` 1 no longer the unfilled page, its ink ending at 479 where the whole word's ends at 485 |
+| `--mutant looks-unclamped` (the three clamping lines of `drawWords` and `drawGlidingPlate` without their `min(max(…))`) | the same, `--only P16` | `MUTANT PASS`: P16 failed on four of its eight comparisons — `fill -0.5 as 0`, `glide -0.5 as 0`, `dim 2 as 1`, `pause_dim 2 as 1`. The other four hold with no clamp: a fill of 1 or more takes the whole-word branch, an eased glide of 1 or more the settled branch, and a negative dim opens no layer — one negative factor at a time, which is all P16 draws: with no clamp, word_dim and pause_dim both below 0 would multiply to a dim above 0, a pair the core cannot send (its word_dim is ramp's 0..1) |
+| `words_core_proof.py --mutant hash-arm` (re-anchored on `words.insert_into(&mut keyed)`) | a copy of `core/`, `graphic/` linked beside it | `MUTANT PASS`: `words::a_styled_page_hashes_a_word_apart_differently` failed. Its first attempt found the anchor and could not build: the copy had no `../graphic`, which the core has depended on since road map 10, so none of the script's three mutants could run; `--mutant trim-rebase` and `count-check` then also `MUTANT PASS` |
+
+After each core mutant `recipe_words.rs` was restored byte for byte (`cmp`)
+and the test re-run, 22 passed. A `--mutant` run of `word_looks_proof.py`
+does not run W3 (its fourteen rows are the other fourteen). The probe's
+`plate-y-jumps`, `plate-width-jumps`, `plate-pop-ignored` and
+`one-piece-ignored` were each run twice: the first runs spanned a sleep of
+the Mac and are not counted.
+
+**Limits.** P11–P16 read `textBitmap`, the bitmap `renderText` uploads,
+not a `render_frame` PNG. No row can see two things, because removing each
+changes no pixel: the early return at a full dim (a layer at opacity 0
+composites nothing either), and the clamps named above that P16's mutant
+left standing, each taken alone. No row sees the plate's HEIGHT travel: every line of a page
+in one face has the same ascent and descent. B1's anchor to the picture
+before B86 holds on the recording host only. No row plays a page: whether a glide looks right, whether a fill
+keeps time with a voice and whether a dim reads well are a person's, and
+phase 2 lists them in `docs/manual-checks.md`. `render_frame` is the one
+door measured; preview and export draw text through the same `Compositor`
+(`Compositor.swift` → `LayerRenderers.text`), so there is no export row.

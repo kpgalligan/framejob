@@ -374,11 +374,7 @@ MUTANTS = {
     "hash-arm": (
         "recipe_text.rs",
         '    if let Some(words) = words {\n'
-        '        keyed.insert("word".to_string(), Value::from(words.word));\n'
-        '        keyed.insert(\n'
-        '            "word_pop".to_string(),\n'
-        '            words.pop.map_or(Value::Null, number),\n'
-        '        );\n'
+        '        words.insert_into(&mut keyed);\n'
         '    }\n',
         '    let _ = words;\n',
         "words", "a_styled_page_hashes_a_word_apart_differently",
@@ -406,6 +402,10 @@ def mutant(name):
         core = os.path.join(temp, "core")
         shutil.copytree(os.path.join(ROOT, "core"), core,
                         ignore=shutil.ignore_patterns("target", ".git", ".DS_Store"))
+        # The core's one path dependency (`graphic = { path = "../graphic" }`,
+        # road map 10), linked beside the copy: read, never written — the
+        # build goes to the copy's own CARGO_TARGET_DIR.
+        os.symlink(os.path.join(ROOT, "graphic"), os.path.join(temp, "graphic"))
         replace_once(os.path.join(core, "src", file), before, after)
         environment = dict(os.environ, CARGO_TARGET_DIR=os.path.join(temp, "target"))
         command = ["cargo", "test", "--release", "--test", suite, test]

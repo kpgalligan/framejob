@@ -1,6 +1,6 @@
 //! What a text layer SHOWS at one instant: [`Reveal`] — the amount, the
 //! phase and the kind that `text.animation` resolves to (spec §5.2, §7.3)
-//! — the [`text_hash`] that folds all three, and a word-timed page's two
+//! — the [`text_hash`] that folds all three, and a word-timed page's five
 //! word keys, into the layer's cache key, the [`text_source`] that
 //! assembles the `source` object a text layer carries, and the one text
 //! layer the core writes itself, the timecode
@@ -55,10 +55,10 @@
 //! `pub(crate) use crate::recipe_text::text_source`, so
 //! `crate::recipe::text_source` resolves as though the cut had not
 //! happened. [`burn_in_layer`] is `pub(crate)` and `recipe.rs` calls it by
-//! its own path. Nothing else here is reachable from outside the file:
-//! [`Reveal`], [`ramp`], [`text_hash`] and [`reveal_kind`] were private to
-//! `recipe.rs` before the move and are private to this file after it, which
-//! is the whole measure of how narrow the seam is.
+//! its own path. [`ramp`] is `pub(crate)` for `recipe_words.rs`, whose
+//! every division it is. Nothing else here is reachable from outside the
+//! file: [`Reveal`], [`text_hash`] and [`reveal_kind`] were private to
+//! `recipe.rs` before the move and are private to this file after it.
 
 use serde_json::{Map, Value};
 
@@ -196,7 +196,7 @@ impl Reveal {
 /// hand-written file can produce, since `set_action_end` is deliberately
 /// lenient and `clamp_video` does not touch text. This is where an absurd
 /// value is caught, because this is where it is consumed.
-fn ramp(elapsed: Ticks, over: Ticks) -> f64 {
+pub(crate) fn ramp(elapsed: Ticks, over: Ticks) -> f64 {
     if over <= 0 {
         return 1.0;
     }
@@ -235,9 +235,9 @@ fn ramp(elapsed: Ticks, over: Ticks) -> f64 {
 /// on one.
 ///
 /// `words` is `Some` only when the text has a `word_style` (spec §11, W-4),
-/// and then `word` and `word_pop` go in too: a page is a different picture
-/// at every word. Otherwise the hash is exactly what it was before format
-/// version 9, `words` or not.
+/// and then all five word keys go in too: a page is a different picture at
+/// every word, and through a glide, a fill and a dim (W-13). Otherwise the
+/// hash is exactly what it was before format version 9, `words` or not.
 fn text_hash(description: &Value, reveal: &Reveal, words: Option<&Words>) -> String {
     if reveal.phase.is_none() && words.is_none() {
         return content_hash(description);
@@ -250,11 +250,7 @@ fn text_hash(description: &Value, reveal: &Reveal, words: Option<&Words>) -> Str
         keyed.insert("reveal_kind".to_string(), reveal_kind(reveal));
     }
     if let Some(words) = words {
-        keyed.insert("word".to_string(), Value::from(words.word));
-        keyed.insert(
-            "word_pop".to_string(),
-            words.pop.map_or(Value::Null, number),
-        );
+        words.insert_into(&mut keyed);
     }
     content_hash(&Value::Object(keyed))
 }
@@ -269,9 +265,9 @@ fn reveal_kind(reveal: &Reveal) -> Value {
 }
 
 /// A text layer's `source` object (spec §7.3): the description Swift lays
-/// out, the hash it caches the laid-out result under, and the five
+/// out, the hash it caches the laid-out result under, and the eight
 /// computed keys that say how much of the description is showing — three
-/// for the reveal, two for a word-timed page's words.
+/// for the reveal, five for a word-timed page's words.
 ///
 /// It takes a description, a clip time and a duration and nothing else —
 /// no clip, no instance, no `Evaluated` — for [`Reveal`]'s reason read one
@@ -287,7 +283,7 @@ pub(crate) fn text_source(text: &TextProps, clip_t: Ticks, duration: Ticks) -> V
         Some(_) => Reveal::WHOLE,
         None => Reveal::of(text.animation.as_ref(), clip_t, duration),
     };
-    let words = Words::of(text, clip_t);
+    let words = Words::of(text, clip_t, duration);
     let mut description = json(text);
     // The animation is STRIPPED from the description carried here: the
     // computed reveal below is the only account of it a renderer gets.
@@ -342,15 +338,11 @@ pub(crate) fn text_source(text: &TextProps, clip_t: Ticks, duration: Ticks) -> V
         },
     );
     source.insert("reveal_kind".to_string(), reveal_kind(&reveal));
-    // The two computed word keys (format version 9, `recipe_words.rs`),
-    // emitted on every text layer for the reveal keys' reason: `word` is
-    // how many words have started, `word_pop` how far the newest one's pop
-    // has got, and both are null on a page that is not word-timed.
-    source.insert("word".to_string(), Value::from(words.word));
-    source.insert(
-        "word_pop".to_string(),
-        words.pop.map_or(Value::Null, number),
-    );
+    // The five computed word keys (`recipe_words.rs`), emitted on every
+    // text layer for the reveal keys' reason: `word` is how many words have
+    // started, the other four how far its pop, glide, fill and the page's
+    // dim have got, and all are null on a page that is not word-timed.
+    words.insert_into(&mut source);
     Value::Object(source)
 }
 

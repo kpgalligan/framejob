@@ -228,10 +228,10 @@ struct TextProps: Codable, Equatable {
 /// `animation` out of the description it carries: this is the renderer's only
 /// account of the animation, and there is deliberately no second one.
 ///
-/// Not `Codable`: the three keys are SIBLINGS of `hash` and `text` inside the
-/// tagged source object rather than a nested object, so `RecipeSourceRef`
-/// reads them off its own container. Grouping them here is for the renderer's
-/// sake, not the wire's.
+/// Not `Codable`: the keys are SIBLINGS of `hash` and `text` inside the
+/// tagged source object rather than a nested object, so `RecipeSourceRef`'s
+/// `text` arm reads them through `init(siblingsOf:)` below. Grouping them here
+/// is for the renderer's sake, not the wire's.
 struct RecipeReveal: Equatable {
     /// 0 (nothing showing) through 1 (all of it), the un-reveal folded in.
     let amount: Double
@@ -252,16 +252,27 @@ struct RecipeReveal: Equatable {
     /// 0…1 through the active word's pop, holding 1 once it settles; nil
     /// before the first word or when `active_scale` is 1.
     let wordPop: Double?
+    /// The three looks' answers (format version 12, spec §11 W-13), each
+    /// 0…1 or nil: how far the pill has slid from token `word − 2` to the
+    /// active one; how much of the active word is filled; how far into a
+    /// pause's dim the page is. Nil when the style does not ask for it.
+    let wordGlide: Double?
+    let wordFill: Double?
+    let wordDim: Double?
 
     init(
         amount: Double = 1, phase: String? = nil, kind: TextAnimationKind? = nil,
-        word: Int? = nil, wordPop: Double? = nil
+        word: Int? = nil, wordPop: Double? = nil, wordGlide: Double? = nil,
+        wordFill: Double? = nil, wordDim: Double? = nil
     ) {
         self.amount = amount
         self.phase = phase
         self.kind = kind
         self.word = word
         self.wordPop = wordPop
+        self.wordGlide = wordGlide
+        self.wordFill = wordFill
+        self.wordDim = wordDim
     }
 
     /// A layer with no animation: all of it, all of the time. The core's
@@ -271,4 +282,44 @@ struct RecipeReveal: Equatable {
 
     /// Whether the departure is what is holding the amount back.
     var isLeaving: Bool { phase == "out" }
+}
+
+/// The reveal's keys as `RecipeSourceRef`'s `text` arm carries them: SIBLINGS
+/// of `hash` and `text` in the tagged source object, read and written here so
+/// the over-cap `ProjectSnapshot.swift` holds none of them
+/// (`RecipeSourceRef.graphic(from:)` is the pattern).
+extension RecipeReveal {
+    /// The core writes `reveal_phase`, `reveal_kind`, `word_pop` and the
+    /// rest in snake case, which the converter hands over camel-cased: spell
+    /// a key the way the converter does or it silently never matches.
+    private enum SiblingKeys: String, CodingKey {
+        case reveal, revealPhase, revealKind
+        case word, wordPop, wordGlide, wordFill, wordDim
+    }
+
+    /// The amount falls back to 1 and the kind to nil, so a recipe this
+    /// build cannot read draws the whole text rather than none of it.
+    init(siblingsOf decoder: Decoder) {
+        guard let c = try? decoder.container(keyedBy: SiblingKeys.self) else {
+            self = .whole
+            return
+        }
+        self.init(
+            amount: c.lenient(.reveal, 1), phase: c.lenient(.revealPhase),
+            kind: c.lenient(.revealKind), word: c.lenient(.word),
+            wordPop: c.lenient(.wordPop), wordGlide: c.lenient(.wordGlide),
+            wordFill: c.lenient(.wordFill), wordDim: c.lenient(.wordDim))
+    }
+
+    func encodeSiblings(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: SiblingKeys.self)
+        try c.encode(amount, forKey: .reveal)
+        try c.encode(phase, forKey: .revealPhase)
+        try c.encode(kind, forKey: .revealKind)
+        try c.encode(word, forKey: .word)
+        try c.encode(wordPop, forKey: .wordPop)
+        try c.encode(wordGlide, forKey: .wordGlide)
+        try c.encode(wordFill, forKey: .wordFill)
+        try c.encode(wordDim, forKey: .wordDim)
+    }
 }

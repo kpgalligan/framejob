@@ -41,7 +41,7 @@ struct TextPatch: Codable, Equatable {
     /// the same patch, or the core errors (spec §11 W-2). `word_style` has
     /// ONE writer on this side, `CaptionLayout.place` for a word caption
     /// style (road map 8's W4a); the inspector never sets it (W-10). It is
-    /// sent whole — `WordStyle.dictionary` writes all six keys — because the
+    /// sent whole — `WordStyle.dictionary` writes all eight keys — because the
     /// core deep-merges it over its template.
     var textCase: TextCase?
     var words: [TextWord]?

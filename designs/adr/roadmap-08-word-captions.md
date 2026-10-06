@@ -2,10 +2,14 @@
 
 - **Status:** Built (2026-09-23), phases W0 (spike) to W4b. Landed in one
   commit, `532e115`. Nothing in the phase list is left. The not-built list
-  (orig §7) is where the next work starts.
+  (orig §7) is where the next work starts. Issue batch B86 (2026-10-05, #96)
+  builds three of its looks: phase 1, recorded below, put them in the model,
+  the recipe and the picture (spec §11 W-12..W-14); phase 2 owes the sheet,
+  `transcribe` and the list's close-out.
 - **Original:** `archive/reelcut-roadmap-8.md` (2971 lines) holds the full
   record. "orig §x" below points into it.
-- **Spec decisions:** spec §11 **W-1..W-10** (W-10 as the core's sentence;
+- **Spec decisions:** spec §11 **W-1..W-10**, and W-12..W-14 for issue batch
+  B86's three looks (W-10 as the core's sentence;
   W-9 was copied into §11 on 2026-09-26). This work extends R6-1 and reads R6-2, R6-3, R6-7, R6-12,
   R6-15, R6-16, D7-1, D7-3 and D1 across. W-8 amends two older §11 decisions:
   "`async` only in `MediaImporter`" and "the one-minute ceiling is reported,
@@ -228,6 +232,35 @@ is the one style that pages to two lines by design.
 - The chosen style is remembered under `CaptionStyle.defaultsKey`. It is
   not part of the transcript marker (R6-15).
 
+**Issue batch B86 phase 1 (2026-10-05, #96): three looks from the not-built
+list are keys of `word_style` (W-12, W-13, W-14).** The owner asked for a
+sliding pill, an in-word fill and a dim in a pause, and chose every point
+below.
+- They are three KEYS, not modes: `active_pill.glide`, `active_fill` and
+  `pause_dim` (0–1), each off by default. `mode` stays `highlight | build`,
+  and the three combine with each other and with both. Format version 12, no
+  migrate step; an older build refuses the file.
+- The recipe carries three more computed answers, `word_glide`, `word_fill`
+  and `word_dim`, and still no timing and no second index (W-4): the pill
+  comes from token `word − 2`, which the renderer can count for itself.
+- The glide takes 0.2 s, easing out, or the time to the next word when that
+  is sooner. The pill appears on a page's first word; it never flies in from
+  the page before.
+- **A word takes at most 0.6 s to fill** (the owner's choice 4 (a)), because
+  an on-device word's `end` is stretched over the silence after it. Known
+  limits has both engines' behaviour.
+- A pause dims only from 0.25 s, over 0.1 s each way; the depth is the key's
+  value. **The dim is built as specified** (the owner's choice 7 (a)) though
+  the pager ends a page at the same 0.25 s: Known limits says what that
+  makes of it on generated captions.
+- A gliding pill is drawn UNDER every word's ink, in every frame of its
+  page; the fill's edge is hard, on a device pixel; the dim is one opacity
+  over words and pill, and the backdrop never dims. With all three off the
+  drawing calls are the ones road map 8 shipped, in their order.
+- Phase 1 made them reachable through `set_text` only. The Generate Captions
+  sheet's three checkboxes, `transcribe`'s booleans and the close-out of the
+  not-built list are phase 2.
+
 ## What it built — where it lives now
 
 - **Core:**
@@ -275,6 +308,58 @@ is the one style that pages to two lines by design.
     `word_captions_chrome.py`
   - `target_bump_proof.py`, `reveal_toll_proof.py`
   - The spike: `words_spike/`
+- **Issue batch B86 phase 1 (2026-10-05, #96; spec §11 W-12..W-14):**
+  - Core: `ActivePill.glide`, `WordStyle.active_fill` and
+    `WordStyle.pause_dim` in `model_words.rs`; `pause_dim`'s range in
+    `props_check.rs`; format version 12 in `format.rs` and the header;
+    `recipe_words.rs`'s `Words::of(text, clip_t, duration)` with `word_glide`,
+    `word_fill`, `word_dim`, the constants `WORD_GLIDE`, `WORD_FILL_MAX`,
+    `WORD_DIM`, `WORD_DIM_GAP`, and `insert_into`, which `recipe_text.rs`
+    calls for the source and the hash. Tests: `core/tests/word_looks.rs`
+    (22), `core/tests/schema_v12.rs` (10).
+  - Picture: `LayerRenderersWords.swift`'s `drawWords` takes `glide`, `fill`
+    and `dim`; `WordProps.swift` and `TextProps.swift` mirror the keys.
+    Two pure moves went first, each gated alone: `RecipeReveal` reads and
+    writes its own sibling keys (out of `ProjectSnapshot.swift`), and
+    `set_text`'s word clause is `AgentServer.textWordsClause` (out of
+    `AgentCatalog+Clips.swift`).
+  - MCP: `set_text`'s patch description teaches the three keys. No op, no
+    `rc_*` export, no tool.
+  - Proofs: `word_looks_proof.py` (an existing project's frames held to the
+    bytes of the build before B86, `word_looks_baseline.json`, which
+    `--record-baseline` refuses to write from a tree with uncommitted
+    sources; the glide, the fill and the dim read off `render_frame` PNGs;
+    six mutants) and `words_picture_probe.py`'s P2 sweep, P10, and P11–P16,
+    the looks' geometry read off `textBitmap` (seven mutants).
+  - **What a look costs, as P10 printed it** (2026-10-05, one host, judged
+    in High Power on battery — `pmset -g` `powermode 2`, Low Power Mode off,
+    thermal state nominal before the rasters and after; an unoptimised probe
+    build, word 3, the median of 20 rasters-and-uploads on a cache miss,
+    every page one line). The Highlight preset's page: at 1080×1920 pop
+    1.215 ms, fill 1.187 ms, fill with dim 2.435 ms, glide 1.200 ms; at
+    3840×2160 pop 2.439 ms, fill 2.449 ms, fill with dim 7.174 ms, glide
+    2.514 ms. The page One Word generates, one word in the largest type a
+    preset ships, fill with dim: 1.553 ms and 4.982 ms. The budgets are 4 ms
+    and 8 ms, not raised, and **the two pages P10 scores are inside them**:
+    Highlight's six words on one line and One Word's one-word page. No run
+    timed a dim on Pill's, Karaoke's or Build's page in a judged power
+    state; Karaoke's is the one preset page of two lines. It
+    also prints, unscored, a hand-made page — the same six words on one line
+    at One Word's size — which read 3.100 ms and 9.529 ms, over the budget
+    at 3840×2160; Known limits has it. (The run that printed these scored
+    that line and failed on it; the scoring was put right the same day, and
+    a run under it passed, 7.382 ms and 4.915 ms on the two scored dims at
+    3840×2160, beside another session's `make test`.) An
+    earlier run that day in Low Power Mode read higher — Highlight's fill
+    with dim 3.067 ms and 9.268 ms, the hand-made line 3.951 ms and 12.043 ms
+    (that pair beside a running build) — and P10 now reads the power state
+    and does not judge a run taken in Low Power Mode or above a nominal
+    thermal state: it fails it by name.
+  - Owed to phase 2: the sheet's three checkboxes and their remembered
+    defaults, `transcribe`'s `slide` / `fill` / `dim`, the preview, the
+    README, `docs/manual-checks.md` and the not-built list's close-out; and,
+    once the sheet's Dim reaches every word style, a P10 case for a Karaoke
+    page laid on two lines as its pager lays it, which nothing here timed.
 
 ## Known limits
 
@@ -313,6 +398,47 @@ is the one style that pages to two lines by design.
 - **The no-blink extension is invisible at the default numbers.** `hold`
   (0.5 s) outlasts `breakGap` (0.25 s). It is kept as a rule, and a probe row
   exercises it at hold 0.1 s.
+- **On a hand-made page of large type a dim's ramp costs more than a
+  frame's budget at 3840×2160** (B86 phase 1; `words_picture_probe.py` P10
+  prints it and does not score it). P10 scores two pages in the presets'
+  own styles — Highlight's line and One Word's one-word page — and judged in
+  High Power each is inside its budget: a fill with a dim took a median of
+  7.174 ms and 4.982 ms at 3840×2160 against 8 ms (2.435 ms and 1.553 ms at
+  1080×1920 against 4 ms). A hand-made page of large type — six words on
+  one line at One Word's size, 0.12 × min(w, h) where Highlight's is 0.075,
+  which no preset makes and `set_text` can write — read 9.529 ms at
+  3840×2160 on a dim's ramp frames against the 8 ms budget (2026-10-05, High
+  Power, on battery, thermal state nominal; 3.100 ms at 1080×1920). The
+  reason the dim costs this is the one transparency layer over the whole
+  text box (W-14): it costs by the box. **P10's pages are one line with
+  `width: nil`**, where a generated page is cut to its style's width, so
+  Highlight's scored line is wider than any its pager makes. The cost is
+  paid on the frames of a ramp only — 0.1 s down and 0.1 s up per pause;
+  the plateau between is one cached texture — and a fill or a glide alone
+  costs what the shipped pop costs (about 1.2 ms and 2.5 ms). An earlier
+  run that day in Low Power Mode read 9.268 ms on Highlight's line and
+  12.043 ms on the hand-made one at 3840×2160; P10 does not judge such a
+  run. Not fixed.
+- **A fill follows a word's stored `end`, and the two engines store
+  different ends** (issue batch B86 phase 1, spec §11 W-13). AssemblyAI's
+  `end` is where the word was heard to end, so the fill keeps time with the
+  voice and then stays full. The on-device engine's word ranges tile the
+  audio (the 1.57 s silence stored as a 0.30 s gap, the 1.13 s one as
+  0.06 s, above), so the last word before a pause is stored as lasting
+  through most of it. A word therefore takes at most 0.6 s to fill
+  (`WORD_FILL_MAX`, the owner's choice, a chosen number and not a measured
+  one), which stops that crawl; its cost is that a word really spoken for
+  longer than 0.6 s, with either engine, finishes its fill early.
+- **On generated captions the dim is a page's tail, not a pause in
+  mid-page** (B86 phase 1, W-13). Only a pause of 0.25 s or more dims, and
+  the pager already ENDS a page at a 0.25 s pause (W-7) and takes it down at
+  most 0.5 s later. So with AssemblyAI words a page that is followed by a
+  pause fades for its last 0.25–0.5 s; with on-device words mostly nothing
+  happens, because the stretched `end` leaves gaps under 0.25 s (0.06 s for
+  the 1.13 s silence; the 1.57 s one left 0.30 s, so that page's last 0.3 s
+  dims). The dim behaves as #96 describes — down, then back before the next
+  word — on a page timed by hand or by an agent. Trimming on-device word
+  ends against the silence detector is not built.
 - **A lone word stays alone when the balance step cannot improve it.**
 - **`JSONSerialization` drops a leading U+FEFF.** Any corpus shipped through
   JSON has that hole (orig §5b).
