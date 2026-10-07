@@ -5,7 +5,7 @@ built-in rewrap (spec §11 #216-R), probed through the product's own
 
 Makes ffmpeg fixtures (640x360 `testsrc2`, 2 s, with a 440 Hz sine), builds
 container_rewrap_probe.swift with every app/Sources/*.swift except main.swift
-over harness/build.sh's swiftc line, and rewraps each into its own scratch
+over swift_build.py's line, and rewraps each into its own scratch
 destination under tools/proof/work/container-rewrap-probe/scratch/. The
 probe runs in a scratch home (issue batch B82, below).
 
@@ -148,7 +148,7 @@ nothing else. `no-mkdir` now fails twenty rows: a fresh home has no
 The work folder (`tools/proof/work/container-rewrap-probe/`: the fixtures,
 the scratch destinations, both homes, jobs.json) is removed at the start
 and at exit. The build folder (`…/container-rewrap-probe-build/`) keeps
-`probe/`, the baseline's, rebuilt only when stale, and `answers.json`, the
+`probe/`, the baseline's, cached by content, and `answers.json`, the
 last run's; a mutant's `mutants/<name>/` is removed when its run ends, and
 `--clean` removes the whole folder and exits 0, running nothing. Nothing
 outside `tools/proof/work/` is written, except the process's own
@@ -177,6 +177,7 @@ import time
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
 import bounded  # noqa: E402
+import swift_build  # noqa: E402
 
 # Removed at the start and at exit.
 WORK = ROOT / "tools/proof/work/container-rewrap-probe"
@@ -526,10 +527,9 @@ def make_fixtures():
 
 def build(sources, probe_dir):
     """(binary, "") or (None, why): the probe over `sources`, in `probe_dir`.
-    Rebuilt only when stale (`agent_open_proof.build_probe`'s rule): the
-    binary must be newer than every source, the entry, the staticlib, both
-    headers and this script, over the same list of sources. A mutant's
-    folder is new on every run, so its probe is always built."""
+    Through `swift_build.build`: reused when every input is byte-identical to
+    a cached build's, so a mutant's copy, whose sources differ, is always
+    built."""
     probe_dir.mkdir(parents=True, exist_ok=True)
     entry = probe_dir / "main.swift"
     source = PROBE_SWIFT.read_text()
@@ -539,30 +539,15 @@ def build(sources, probe_dir):
     swift = sorted(str(p) for p in sources.glob("*.swift") if p.name != "main.swift")
     if len(swift) < 100:
         return None, "app source set incomplete"
-    stamp = probe_dir / "sources.txt"
-    listing = "\n".join(swift)
-    inputs = [Path(p) for p in swift] + [
-        entry, ROOT / "core/target/release/libreelcut_core.a", Path(__file__).resolve(),
-        ROOT / "app/Bridging/Reelcut-Bridging-Header.h", ROOT / "core/include/reelcut_core.h"]
-    if (binary.exists() and stamp.exists() and stamp.read_text() == listing
-            and all(p.exists() and p.stat().st_mtime < binary.stat().st_mtime for p in inputs)):
+    try:
+        built = swift_build.build(sources=swift + [entry], output=binary,
+                                  defines=["REELCUT_DEV_TOOLS"], timeout=900)
+    except swift_build.SwiftBuildFailed as error:
+        if error.expired:
+            return None, "swiftc expired after 900 s"
+        return None, "swiftc: " + "; ".join(error.diagnostics[:8])
+    if built.reused:
         print(f"probe: {binary} (up to date)", flush=True)
-        return binary, ""
-    if binary.exists():
-        binary.unlink()
-    sdk = run(["xcrun", "--show-sdk-path", "--sdk", "macosx"], 60)["stdout"].strip()
-    result = run(["swiftc", "-D", "REELCUT_DEV_TOOLS", "-sdk", sdk,
-                  "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
-                  "-import-objc-header",
-                  str(ROOT / "app/Bridging/Reelcut-Bridging-Header.h"),
-                  "-L", str(ROOT / "core/target/release"), "-lreelcut_core",
-                  *swift, str(entry), "-o", str(binary)], 900)
-    if result["expired"]:
-        return None, "swiftc expired after 900 s"
-    if result["rc"] or not binary.exists():
-        lines = [line for line in result["stderr"].splitlines() if ": error:" in line]
-        return None, "swiftc: " + "; ".join(lines[:8] or [tail(result["stderr"], 600)])
-    stamp.write_text(listing)
     return binary, ""
 
 

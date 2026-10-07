@@ -143,6 +143,7 @@ sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
 sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
 import mcp  # noqa: E402
+import swift_build  # noqa: E402
 import tree_copy  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/agent-socket"
@@ -390,36 +391,25 @@ def scratch_folder():
 
 def build_probe(sources, probe_dir):
     """`agent_socket_probe.swift` as `main.swift` over every other file in
-    `sources` on harness/build.sh's swiftc line, into `probe_dir`; rebuilt
-    only when stale. The binary, or None and why."""
+    `sources` through `swift_build.build`, into `probe_dir`; reused when
+    every input is byte-identical to a cached build's. The binary, or None
+    and why."""
     probe_dir.mkdir(parents=True, exist_ok=True)
     binary = probe_dir / "agent_socket_probe"
     entry = probe_dir / "main.swift"
     if not entry.exists() or entry.read_text() != PROBE_SOURCE.read_text():
         entry.write_text(PROBE_SOURCE.read_text())
-    swift = sorted(path for path in Path(sources).glob("*.swift") if path.name != "main.swift")
     lib = ROOT / "core/target/release/libreelcut_core.a"
     if not lib.exists():
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
-    headers = [ROOT / "app/Bridging/Reelcut-Bridging-Header.h",
-               ROOT / "core/include/reelcut_core.h"]
-    if binary.exists() and all(path.stat().st_mtime < binary.stat().st_mtime
-                               for path in swift + [entry, lib] + headers):
-        print(f"  probe: up to date — {binary}", flush=True)
-        return binary, ""
-    started = time.monotonic()
-    sdk = bounded.run(["xcrun", "--show-sdk-path", "--sdk", "macosx"], 60)["stdout"].strip()
-    built = bounded.run(
-        ["swiftc", "-D", "REELCUT_DEV_TOOLS", "-sdk", sdk, "-target", "arm64-apple-macos26.0",
-         "-module-name", "Reelcut",
-         "-import-objc-header", str(ROOT / "app/Bridging/Reelcut-Bridging-Header.h"),
-         "-L", str(lib.parent), "-lreelcut_core"]
-        + [str(path) for path in swift] + [str(entry), "-o", str(binary)], 900)
-    if built["rc"] != 0 or not binary.exists():
-        errors = [line for line in built["stderr"].splitlines() if ": error:" in line]
-        tail = built["stderr"].strip().splitlines()[-4:]
-        return None, f"swiftc rc {built['rc']}: {(errors or tail or ['(no output)'])[:6]}"
-    print(f"  probe: built in {time.monotonic() - started:.0f} s — {binary}", flush=True)
+    try:
+        built = swift_build.build(sources=swift_build.app_sources(sources) + [entry],
+                                  output=binary, defines=["REELCUT_DEV_TOOLS"], timeout=900)
+    except swift_build.SwiftBuildFailed as error:
+        return None, (f"swiftc rc {error.rc if error.rc is not None else 'before running'}: "
+                      f"{(error.diagnostics or ['(no output)'])[:6]}")
+    print(f"  probe: up to date — {binary}" if built.reused
+          else f"  probe: built in {built.seconds:.0f} s — {binary}", flush=True)
     return binary, ""
 
 

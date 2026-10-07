@@ -9,8 +9,8 @@ the press's state back with no step.
     python3 tools/proof/obscure_handles_probe.py --mutant NAME
 
 `obscure_handles_probe.swift` is compiled AS `main.swift` over `--sources`
-(default `app/Sources`) minus the app's `main.swift`, on `harness/build.sh`'s
-swiftc line (`-D REELCUT_DEV_TOOLS`, the bridging header, `-lreelcut_core`),
+(default `app/Sources`) minus the app's `main.swift`, on `swift_build.py`'s
+line (`-D REELCUT_DEV_TOOLS`, the bridging header, `-lreelcut_core`),
 with `Compositor.metal` built into a `default.metallib` beside it
 (`editor_keys_undo_proof.build_shader`), and run once over four packages this
 script writes under `work/obscure-handles/fixtures/` at the header's
@@ -88,6 +88,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2_chrome as e2  # noqa: E402  (video_props, project, write_package)
 import editor_keys_undo_proof as eku  # noqa: E402  (build_shader)
+import swift_build  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/obscure-handles"
@@ -196,18 +197,12 @@ def build(sources, here):
     if not lib.exists():
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     try:
-        sdk = run(["xcrun", "--show-sdk-path", "--sdk", "macosx"], 60).stdout.strip()
-        result = run(["swiftc", "-D", "REELCUT_DEV_TOOLS", "-sdk", sdk,
-                      "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
-                      "-import-objc-header",
-                      str(ROOT / "app/Bridging/Reelcut-Bridging-Header.h"),
-                      "-L", str(lib.parent), "-lreelcut_core", *swift, str(entry),
-                      "-o", str(binary)], BUILD_WALL)
-    except subprocess.TimeoutExpired:
-        return None, f"swiftc did not finish within {BUILD_WALL} s"
-    if result.returncode or not binary.exists():
-        lines = [line for line in result.stderr.splitlines() if ": error:" in line]
-        return None, "swiftc: " + "; ".join(lines[:8] or [result.stderr[-600:]])
+        swift_build.build(sources=swift + [entry], output=binary,
+                          defines=["REELCUT_DEV_TOOLS"], timeout=BUILD_WALL)
+    except swift_build.SwiftBuildFailed as error:
+        if error.expired:
+            return None, f"swiftc did not finish within {BUILD_WALL} s"
+        return None, "swiftc: " + "; ".join(error.diagnostics[:8])
     return binary, None
 
 

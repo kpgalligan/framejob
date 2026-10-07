@@ -18,7 +18,7 @@ and F0 by name.
 
 Before the first MCP call the script writes its two fixtures
 (`work/v2_snapshot/fixtures/{v2well,note}.reelcut`, version 10) and builds the
-layout probe (`v2_layout_probe.swift` over `harness/build.sh`'s swiftc line)
+layout probe (`v2_layout_probe.swift` over `swift_build.py`'s line)
 and the cover; a build that fails is a scored FAIL of the rows that need it.
 Every child is bounded (`graphics_spike/bounded.py`) and only this script's
 own children are ever killed.
@@ -56,6 +56,7 @@ import bounded  # noqa: E402
 from dev_tools import DEV_TOOLS, dev_marker_count  # noqa: E402
 from mcp import MCP, ToolError, log_beside, target  # noqa: E402
 from media_less_playback_probe import console_locked  # noqa: E402
+import swift_build  # noqa: E402
 
 WORK = os.path.join(HERE, "work", "v2_snapshot")
 FIXTURES = os.path.join(WORK, "fixtures")
@@ -177,11 +178,16 @@ def build_probe():
     swift = sorted(os.path.join(SOURCES, n) for n in os.listdir(SOURCES)
                    if n.endswith(".swift") and n != "main.swift")
     binary = os.path.join(PROBE_DIR, "v2_layout_probe")
-    argv = (["swiftc", "-D", "REELCUT_DEV_TOOLS", "-sdk", sdk(), "-target", "arm64-apple-macos26.0",
-             "-module-name", "Reelcut", "-import-objc-header",
-             os.path.join(ROOT, "app", "Bridging", "Reelcut-Bridging-Header.h"),
-             "-L", os.path.dirname(LIB), "-lreelcut_core"] + swift + [entry, "-o", binary])
-    return compile_once(argv, binary, swift + [entry, LIB], 1200, "probe")
+    try:
+        built = swift_build.build(sources=swift + [entry], output=binary,
+                                  defines=["REELCUT_DEV_TOOLS"], timeout=1200)
+    except swift_build.SwiftBuildFailed as error:
+        return None, ("probe did not build: swiftc exited "
+                      f"{error.rc if error.rc is not None else 'before running'} (expired "
+                      f"{error.expired}): " + " | ".join(error.diagnostics[:4] or ["no output"]))
+    print(f"probe: {binary} (up to date)" if built.reused
+          else f"probe: built in {built.seconds:.0f} s", flush=True)
+    return binary, None
 
 
 def build_cover():

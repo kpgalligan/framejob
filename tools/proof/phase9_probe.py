@@ -29,7 +29,7 @@ rather than a trap.
 
 So this is `phase5_chrome.py`'s and `phase6_chrome.py`'s instrument: a
 `main.swift` compiled against the WHOLE of `app/Sources` with
-`harness/build.sh`'s own swiftc line, cached on modification times the way
+`swift_build.py`'s line, cached by content the way
 the harness is, and a build failure scored as a FAILURE rather than an exit,
 so a rotted instrument cannot take the rest of the score down with it.
 
@@ -42,7 +42,8 @@ import json
 import os
 import subprocess
 import sys
-import time
+
+import swift_build
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 WORK = os.path.join(ROOT, "tools", "proof", "work")
@@ -237,9 +238,9 @@ if out == "-" {
 
 
 def build_probe():
-    """`phase6_chrome.py`'s builder, one probe along: the same swiftc line as
-    `harness/build.sh`, the same staleness rule, and a reason instead of an
-    exit when it will not build."""
+    """`phase6_chrome.py`'s builder, one probe along: `swift_build.build`
+    (reused when every input is byte-identical to a cached build's), and a
+    reason instead of an exit when it will not build."""
     os.makedirs(PROBE, exist_ok=True)
     binary = os.path.join(PROBE, "scopeprobe")
     entry = os.path.join(PROBE, "main.swift")
@@ -254,24 +255,15 @@ def build_probe():
     lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
-    if os.path.exists(binary) and all(
-        os.path.getmtime(f) < os.path.getmtime(binary) for f in sources + [entry, lib]
-    ):
-        print(f"scope probe: {binary} (up to date)")
-        return binary, None
-    sdk = subprocess.run(
-        ["xcrun", "--show-sdk-path", "--sdk", "macosx"], capture_output=True, text=True
-    ).stdout.strip()
-    start = time.time()
-    result = subprocess.run(
-        ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
-         "-import-objc-header", os.path.join(ROOT, "app", "Bridging", "Reelcut-Bridging-Header.h"),
-         "-L", os.path.dirname(lib), "-lreelcut_core"] + sources + [entry, "-o", binary],
-        capture_output=True, text=True)
-    if result.returncode != 0 or not os.path.exists(binary):
-        errors = [line for line in result.stderr.splitlines() if ": error:" in line]
+    try:
+        built = swift_build.build(sources=sources + [entry], output=binary)
+    except swift_build.SwiftBuildFailed as error:
+        errors = [line for line in error.diagnostics if ": error:" in line]
         return None, "swiftc failed:\n      " + "\n      ".join(errors[:6] or ["(no error lines)"])
-    print(f"scope probe: {binary} (built in {time.time() - start:.1f} s)")
+    if built.reused:
+        print(f"scope probe: {binary} (up to date)")
+    else:
+        print(f"scope probe: {binary} (built in {built.seconds:.1f} s)")
     return binary, None
 
 

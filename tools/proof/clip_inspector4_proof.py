@@ -9,7 +9,7 @@ Two instruments, `clip_inspector3_proof.py`'s shape:
 
 * **the probe**, `clip_inspector4_probe.swift`, compiled AS `main.swift` over
   every file in `app/Sources` but the app's own `main.swift` on
-  `harness/build.sh`'s swiftc line (a probe that will not build is a scored
+  `swift_build.py`'s line (a probe that will not build is a scored
   FAILURE, never an exit). Rows R1–R8: Reset shown only when a section
   differs (R1), the summary's three inks (R2), Clear and what it removes
   (R3), the row's × on hover (R4), the row menus, never read after a hover
@@ -47,6 +47,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2_chrome as e2  # noqa: E402  (Image, clip, project, write_package, build_harness)
 import clip_inspector_proof as ci  # noqa: E402  (action, media_clip, build_probe)
 import clip_inspector2_proof as ci2  # noqa: E402  (movie, text_clip, pinned metrics)
+import swift_build  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -122,7 +123,7 @@ def packages():
 
 
 def build_probe(sources, out):
-    """`clip_inspector_proof.build_probe`'s swiftc line, over THIS phase's
+    """`clip_inspector_proof.build_probe`'s build, over THIS phase's
     probe source (its module global names the file it compiles)."""
     ci.PROBE_SWIFT = PROBE_SWIFT
     return ci.build_probe(sources, out)
@@ -160,7 +161,7 @@ def probe_checks(sources, out, paths):
 
 
 def build_harness(sources, out):
-    """`harness/build.sh`'s swiftc line over `sources` — the tree's own for a
+    """`swift_build.build` over `sources` — the tree's own for a
     normal run, the mutant copy for `--mutant`. A harness that will not build
     is a scored failure."""
     lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
@@ -170,27 +171,20 @@ def build_harness(sources, out):
     binary = os.path.join(out, "harness")
     swift = sorted(os.path.join(sources, n) for n in os.listdir(sources)
                    if n.endswith(".swift") and n != "main.swift")
-    if os.path.exists(binary) and all(os.path.getmtime(f) < os.path.getmtime(binary)
-                                      for f in swift + [HARNESS_MAIN, lib]):
-        return binary, None
-    sdk = subprocess.run(["xcrun", "--show-sdk-path", "--sdk", "macosx"],
-                         capture_output=True, text=True).stdout.strip()
-    start = time.time()
-    result = subprocess.run(
-        ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
-         "-import-objc-header", os.path.join(ROOT, "app", "Bridging",
-                                             "Reelcut-Bridging-Header.h"),
-         "-L", os.path.dirname(lib), "-lreelcut_core"] + swift + [HARNESS_MAIN, "-o", binary],
-        capture_output=True, text=True)
-    if result.returncode != 0 or not os.path.exists(binary):
-        errors = [line for line in result.stderr.splitlines() if ": error:" in line]
+    try:
+        built = swift_build.build(sources=swift + [HARNESS_MAIN], output=binary)
+    except swift_build.SwiftBuildFailed as error:
+        errors = [line for line in error.diagnostics if ": error:" in line]
         return None, "swiftc failed:\n       " + "\n       ".join(
             errors[:6] or ["(no error lines)"])
     for folder in ("Fonts", "Models"):
+        if built.reused and os.path.isdir(os.path.join(out, folder)):
+            continue
         shutil.rmtree(os.path.join(out, folder), ignore_errors=True)
         shutil.copytree(os.path.join(ROOT, "app", "Resources", folder),
                         os.path.join(out, folder))
-    print(f"  harness built in {time.time() - start:.0f} s")
+    if not built.reused:
+        print(f"  harness built in {built.seconds:.0f} s")
     return binary, None
 
 

@@ -14,8 +14,8 @@ No MCP call can reach any of this — a gesture is not an op, and a selection
 is view state `set_selection` writes without a mouse — and a photograph
 cannot show what a press DID. So this is `CLAUDE.md`'s instrument for app
 STRUCTURE with no caller a script can reach: a probe compiled out of
-`app/Sources` over `harness/build.sh`'s own swiftc line, cached on
-modification times, a build failure scored as a FAILURE rather than an
+`app/Sources` over `swift_build.py`'s line, cached by
+content, a build failure scored as a FAILURE rather than an
 exit. It builds a bare `TimelineView` at 1000 × 320 over a two-track
 fixture of four text clips — no media, every rectangle hand-computable —
 and drives the three entry points a mouse event reaches
@@ -58,7 +58,8 @@ import json
 import os
 import subprocess
 import sys
-import time
+
+import swift_build
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 PROBE = os.path.join(ROOT, "tools", "proof", "work", "marquee-probe")
@@ -170,6 +171,8 @@ func kind(_ hit: TimelineHit) -> String {
     case .clip(let id): return "clip:" + (names[id] ?? "?")
     case .clipEdge: return "clipEdge"
     case .fade: return "fade"
+    case .action: return "action"
+    case .actionEdge: return "actionEdge"
     case .lane(let row, _): return "lane:\(row)"
     case .outside: return "outside"
     case .none: return "none"
@@ -260,9 +263,9 @@ write(answer)
 
 
 def build_probe():
-    """`refusal_probe.py`'s builder, one probe along: the same swiftc line as
-    `harness/build.sh`, the same staleness rule, and a reason instead of an
-    exit when it will not build."""
+    """`refusal_probe.py`'s builder, one probe along: `swift_build.build`
+    (reused when every input is byte-identical to a cached build's), and a
+    reason instead of an exit when it will not build."""
     os.makedirs(PROBE, exist_ok=True)
     binary = os.path.join(PROBE, "marqueeprobe")
     entry = os.path.join(PROBE, "main.swift")
@@ -276,24 +279,15 @@ def build_probe():
     lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
-    if os.path.exists(binary) and all(
-        os.path.getmtime(f) < os.path.getmtime(binary) for f in sources + [entry, lib]
-    ):
-        print(f"marquee probe: {binary} (up to date)")
-        return binary, None
-    sdk = subprocess.run(
-        ["xcrun", "--show-sdk-path", "--sdk", "macosx"], capture_output=True, text=True
-    ).stdout.strip()
-    start = time.time()
-    result = subprocess.run(
-        ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
-         "-import-objc-header", os.path.join(ROOT, "app", "Bridging", "Reelcut-Bridging-Header.h"),
-         "-L", os.path.dirname(lib), "-lreelcut_core"] + sources + [entry, "-o", binary],
-        capture_output=True, text=True)
-    if result.returncode != 0 or not os.path.exists(binary):
-        errors = [line for line in result.stderr.splitlines() if ": error:" in line]
+    try:
+        built = swift_build.build(sources=sources + [entry], output=binary)
+    except swift_build.SwiftBuildFailed as error:
+        errors = [line for line in error.diagnostics if ": error:" in line]
         return None, "swiftc failed:\n      " + "\n      ".join(errors[:6] or ["(no error lines)"])
-    print(f"marquee probe: {binary} (built in {time.time() - start:.1f} s)")
+    if built.reused:
+        print(f"marquee probe: {binary} (up to date)")
+    else:
+        print(f"marquee probe: {binary} (built in {built.seconds:.1f} s)")
     return binary, None
 
 

@@ -182,6 +182,8 @@ import threading
 import time
 import urllib.request
 
+import swift_build
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 HERE = os.path.join(ROOT, "tools", "proof")
 WORK = os.path.join(HERE, "work", "cloudprobe")
@@ -2785,9 +2787,8 @@ def swift_files(sources):
 
 
 def build(sources, entry_source, stem, binary_name, defines=()):
-    """`recording_probe.py`'s builder: the same swiftc line as
-    `harness/build.sh` — never `build.sh` itself, which hard-codes the tree —
-    the same staleness rule, and a REASON instead of an exit when it will not
+    """`swift_build.build` over `sources` — never `build.sh` itself, which
+    hard-codes the tree — and a REASON instead of an exit when it will not
     build."""
     here = probe_dir(sources, stem)
     os.makedirs(here, exist_ok=True)
@@ -2801,24 +2802,13 @@ def build(sources, entry_source, stem, binary_name, defines=()):
     if not os.path.exists(STATICLIB):
         return None, f"{STATICLIB} is missing — run `cd core && cargo build --release` first"
     files = swift_files(sources)
-    if os.path.exists(binary) and all(
-        os.path.getmtime(f) < os.path.getmtime(binary) for f in files + [entry, STATICLIB]
-    ):
-        return binary, None
-    sdk = subprocess.run(["xcrun", "--show-sdk-path", "--sdk", "macosx"],
-                         capture_output=True, text=True, env=child_env()).stdout.strip()
-    started = time.time()
-    line = ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
-            "-import-objc-header", BRIDGING,
-            "-L", os.path.dirname(STATICLIB), "-lreelcut_core"]
-    for name in defines:
-        line += ["-D", name]
-    line += files + [entry, "-o", binary]
-    result = subprocess.run(line, capture_output=True, text=True, env=child_env())
-    if result.returncode != 0 or not os.path.exists(binary):
-        errors = [l for l in result.stderr.splitlines() if ": error:" in l]
+    try:
+        built = swift_build.build(sources=files + [entry], output=binary, defines=list(defines))
+    except swift_build.SwiftBuildFailed as error:
+        errors = [l for l in error.diagnostics if ": error:" in l]
         return None, "swiftc failed:\n      " + "\n      ".join(errors[:6] or ["(no error lines)"])
-    print(f"  built {binary} in {time.time() - started:.1f} s from {sources}")
+    if not built.reused:
+        print(f"  built {binary} in {built.seconds:.1f} s from {sources}")
     return binary, None
 
 

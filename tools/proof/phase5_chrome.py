@@ -213,6 +213,7 @@ import time
 import zlib
 
 from reference_build import build_reference as build_matching_reference
+import swift_build
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -1216,25 +1217,19 @@ STEP = 0.01              # ExportLoudness.gainStepDB
 
 
 def build_probe():
-    """`app/Sources/Loudness.swift` and the probe above, compiled together.
-
-    The same swiftc line the two harnesses use, less the staticlib and the
-    bridging header: this file links nothing of the core's. Rebuilt every run
-    — it costs under a second, and a stale probe is a probe that can lie."""
+    """`app/Sources/Loudness.swift` and the probe above, compiled together
+    through `swift_build.build` (which adds the bridging header and the
+    staticlib, though this file links nothing of the core's). Reused only
+    when every input is byte-identical, so a stale probe cannot lie."""
     os.makedirs(LOUDNESS, exist_ok=True)
     main = os.path.join(LOUDNESS, "main.swift")
     with open(main, "w") as f:
         f.write(PROBE)
     binary = os.path.join(LOUDNESS, "probe")
-    sdk = subprocess.run(
-        ["xcrun", "--show-sdk-path", "--sdk", "macosx"],
-        capture_output=True, text=True, check=True).stdout.strip()
-    result = subprocess.run(
-        ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0",
-         LOUDNESS_SOURCE, main, "-o", binary],
-        capture_output=True, text=True)
-    if result.returncode != 0 or not os.path.exists(binary):
-        sys.stderr.write(result.stdout + result.stderr)
+    try:
+        swift_build.build(sources=[LOUDNESS_SOURCE, main], output=binary)
+    except swift_build.SwiftBuildFailed as error:
+        sys.stderr.write("\n".join(error.diagnostics) + "\n")
         sys.exit("the loudness probe did not build")
     return binary
 

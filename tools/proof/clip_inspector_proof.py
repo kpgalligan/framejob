@@ -8,7 +8,7 @@ Two instruments, `sharp_chrome.py`'s shape:
 
 * **the probe**, `clip_inspector_probe.swift`, compiled AS `main.swift` over
   every file in `app/Sources` but the app's own `main.swift` on
-  `harness/build.sh`'s swiftc line (a probe that will not build is a scored
+  `swift_build.py`'s line (a probe that will not build is a scored
   FAILURE, never an exit). Rows S1–S6: the entry rule, a selection change,
   removal and a two-clip selection, the binding's END-state reads and its
   routing, the band hit against the fade handles, the Clip tab's lane.
@@ -36,6 +36,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2_chrome as e2  # noqa: E402  (the helpers: Image, clip, project, write_package)
+import swift_build  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -152,23 +153,14 @@ def build_probe(sources, out):
     lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
-    if os.path.exists(binary) and all(
-            os.path.getmtime(f) < os.path.getmtime(binary) for f in swift + [entry, lib]):
-        return binary, None
-    sdk = subprocess.run(["xcrun", "--show-sdk-path", "--sdk", "macosx"],
-                         capture_output=True, text=True).stdout.strip()
-    start = time.time()
-    result = subprocess.run(
-        ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
-         "-import-objc-header", os.path.join(ROOT, "app", "Bridging",
-                                             "Reelcut-Bridging-Header.h"),
-         "-L", os.path.dirname(lib), "-lreelcut_core"] + swift + [entry, "-o", binary],
-        capture_output=True, text=True)
-    if result.returncode != 0 or not os.path.exists(binary):
-        errors = [line for line in result.stderr.splitlines() if ": error:" in line]
+    try:
+        built = swift_build.build(sources=swift + [entry], output=binary)
+    except swift_build.SwiftBuildFailed as error:
+        errors = [line for line in error.diagnostics if ": error:" in line]
         return None, "swiftc failed:\n       " + "\n       ".join(
             errors[:6] or ["(no error lines)"])
-    print(f"  probe built in {time.time() - start:.0f} s")
+    if not built.reused:
+        print(f"  probe built in {built.seconds:.0f} s")
     return binary, None
 
 

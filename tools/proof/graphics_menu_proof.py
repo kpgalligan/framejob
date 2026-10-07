@@ -28,8 +28,8 @@ R1  the built app's `Contents/Resources/GraphicTemplates/` holds exactly the
     six modules of `graphic/tests/graphics/`, byte-equal.
 
 **The probe**, `graphics_menu_probe.swift`, compiled AS `main.swift` over
-every file in `app/Sources` but the app's own on `harness/build.sh`'s swiftc
-line, with `Fonts/`, `GraphicTemplates/` (from `graphic/tests/graphics/`) and
+every file in `app/Sources` but the app's own on `swift_build.py`'s line,
+with `Fonts/`, `GraphicTemplates/` (from `graphic/tests/graphics/`) and
 `GraphicsAPI.md` (from `docs/graphics-api.md`) copied beside it, over two
 COPIES of GM and a COPY of GF (`files`):
 M1  the probe builds (a failure is scored, never an exit);
@@ -190,11 +190,9 @@ or launch, or the row was not reached).
 import argparse
 import atexit
 import json
-import os
 import shutil
 import sys
 import tempfile
-import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -204,6 +202,7 @@ import bounded  # noqa: E402
 import graphics_proof as gp  # noqa: E402  (attempt, complaints)
 import mcp  # noqa: E402
 import tree_copy  # noqa: E402
+import swift_build  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/graphics-menu"
 HOME = WORK / "home"
@@ -417,7 +416,7 @@ def bundle_check(app):
 
 
 def build_probe(out, sources=ROOT / "app/Sources"):
-    """`harness/build.sh`'s swiftc line with the probe as `main.swift` over
+    """`swift_build.build` with the probe as `main.swift` over
     `sources`; the three resources beside the binary. The binary, or None and
     the error."""
     lib = ROOT / "core/target/release/libreelcut_core.a"
@@ -429,24 +428,15 @@ def build_probe(out, sources=ROOT / "app/Sources"):
     if not entry.exists() or entry.read_text() != source:
         entry.write_text(source)
     binary = out / "graphics-menu-probe"
-    swift = sorted(str(sources / n) for n in os.listdir(sources)
-                   if n.endswith(".swift") and n != "main.swift")
-    fresh = binary.exists() and all(
-        os.path.getmtime(f) < binary.stat().st_mtime for f in swift + [str(entry), str(lib)])
-    if not fresh:
-        sdk = bounded.run(["xcrun", "--show-sdk-path", "--sdk", "macosx"], 60)["stdout"].strip()
-        start = time.time()
-        built = bounded.run(
-            ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0", "-module-name",
-             "Reelcut", "-import-objc-header",
-             str(ROOT / "app/Bridging/Reelcut-Bridging-Header.h"),
-             "-L", str(lib.parent), "-lreelcut_core"] + swift + [str(entry), "-o", str(binary)],
-            900)
-        if built["rc"] != 0 or not binary.exists():
-            errors = [line for line in built["stderr"].splitlines() if ": error:" in line]
-            return None, "swiftc failed:\n       " + "\n       ".join(
-                errors[:6] or [f"(no error lines; expired {built['expired']})"])
-        print(f"  probe built in {time.time() - start:.0f} s", flush=True)
+    try:
+        built = swift_build.build(sources=swift_build.app_sources(sources) + [entry],
+                                  output=binary, timeout=900)
+    except swift_build.SwiftBuildFailed as error:
+        errors = [line for line in error.diagnostics if ": error:" in line]
+        return None, "swiftc failed:\n       " + "\n       ".join(
+            errors[:6] or [f"(no error lines; expired {error.expired})"])
+    if not built.reused:
+        print(f"  probe built in {built.seconds:.0f} s", flush=True)
     shutil.rmtree(out / "Fonts", ignore_errors=True)
     shutil.copytree(ROOT / "app/Resources/Fonts", out / "Fonts")
     shutil.rmtree(out / "GraphicTemplates", ignore_errors=True)

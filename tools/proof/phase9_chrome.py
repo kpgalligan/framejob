@@ -17,7 +17,7 @@ all: how many levels one double-click walks out (`beginGesture`'s
 field is being typed into — a click count and a validator's answer, which
 no photograph of any size can read. So this is `phase9_probe.py`'s
 instrument, a `main.swift` compiled against the WHOLE of `app/Sources`
-with `harness/build.sh`'s own swiftc line, cached on modification times,
+with `swift_build.py`'s line, cached by content,
 and a build failure scored as a FAILURE rather than an exit — except that
 this one RENDERS: it builds a bare `TimelineView`, feeds it a snapshot,
 scrolls it, and captures through the same `cacheDisplay` path the harness
@@ -141,6 +141,8 @@ import subprocess
 import sys
 import time
 import zlib
+
+import swift_build
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -607,15 +609,15 @@ exit(0)
 
 
 def build_probe(sources_dir, probe_dir):
-    """`phase9_probe.py`'s builder, one probe along: the same swiftc line as
-    `harness/build.sh`, the same staleness rule, and a reason instead of an
-    exit when it will not build. `sources_dir` is the tree's `app/Sources`
-    or a mutant copy of it; each gets its own `probe_dir` cache."""
+    """`phase9_probe.py`'s builder, one probe along: `swift_build.build`
+    (reused when every input is byte-identical to a cached build's), and a
+    reason instead of an exit when it will not build. `sources_dir` is the
+    tree's `app/Sources` or a mutant copy of it; each gets its own `probe_dir`
+    cache."""
     os.makedirs(probe_dir, exist_ok=True)
     binary = os.path.join(probe_dir, "cornerprobe")
     entry = os.path.join(probe_dir, "main.swift")
-    # Written only when it CHANGED, or the staleness check below would
-    # rebuild on every run.
+    # Written only when it CHANGED.
     if not os.path.exists(entry) or open(entry).read() != PROBE_SOURCE:
         with open(entry, "w") as f:
             f.write(PROBE_SOURCE)
@@ -628,24 +630,15 @@ def build_probe(sources_dir, probe_dir):
     lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
-    if os.path.exists(binary) and all(
-        os.path.getmtime(f) < os.path.getmtime(binary) for f in sources + [entry, lib]
-    ):
-        print(f"corner probe: {binary} (up to date)")
-        return binary, None
-    sdk = subprocess.run(
-        ["xcrun", "--show-sdk-path", "--sdk", "macosx"], capture_output=True, text=True
-    ).stdout.strip()
-    start = time.time()
-    result = subprocess.run(
-        ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
-         "-import-objc-header", os.path.join(ROOT, "app", "Bridging", "Reelcut-Bridging-Header.h"),
-         "-L", os.path.dirname(lib), "-lreelcut_core"] + sources + [entry, "-o", binary],
-        capture_output=True, text=True)
-    if result.returncode != 0 or not os.path.exists(binary):
-        errors = [line for line in result.stderr.splitlines() if ": error:" in line]
+    try:
+        built = swift_build.build(sources=sources + [entry], output=binary)
+    except swift_build.SwiftBuildFailed as error:
+        errors = [line for line in error.diagnostics if ": error:" in line]
         return None, "swiftc failed:\n      " + "\n      ".join(errors[:6] or ["(no error lines)"])
-    print(f"corner probe: {binary} (built in {time.time() - start:.1f} s)")
+    if built.reused:
+        print(f"corner probe: {binary} (up to date)")
+    else:
+        print(f"corner probe: {binary} (built in {built.seconds:.1f} s)")
     return binary, None
 
 

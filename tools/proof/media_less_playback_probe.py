@@ -16,7 +16,7 @@ Why a probe and not an MCP script. `render_frame` composes offline, so every
 MCP frame comparison passes against the broken build; the defect is in the
 editor's OWN player, which no tool reads. This is `preview_refresh_probe.py`'s
 instrument: `media_less_playback_probe.swift` compiled as `main.swift` against
-the whole of `app/Sources` with `harness/build.sh`'s swiftc line, the app's
+the whole of `app/Sources` with `swift_build.py`'s line, the app's
 `Compositor.metal`, `Fonts` and `Blank.mp4` beside it, `--sources PATH` to
 build the same probe over another tree (`mixed_audio_probe.py`'s tag scheme),
 a build failure scored as a FAILURE on every row. Every subprocess runs under
@@ -62,13 +62,13 @@ import os
 import shutil
 import struct
 import sys
-import time
 import zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 sys.path.insert(0, os.path.join(HERE, "graphics_spike"))
 import bounded  # noqa: E402
+import swift_build  # noqa: E402
 
 WORK = os.path.join(HERE, "work", "media-less-playback")
 SOURCES = os.path.join(ROOT, "app", "Sources")
@@ -234,30 +234,16 @@ def build_probe(sources):
     lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
-    stamp = os.path.join(probe, "sources.txt")
-    listing = "\n".join(swift)
-    same_set = os.path.exists(stamp) and open(stamp).read() == listing
-    if same_set and os.path.exists(binary) and all(
-        os.path.getmtime(f) < os.path.getmtime(binary) for f in swift + [entry, lib]
-    ):
+    try:
+        built = swift_build.build(sources=swift + [entry], output=binary, timeout=900)
+    except swift_build.SwiftBuildFailed as error:
+        return None, (f"swiftc exited {error.rc if error.rc is not None else 'before running'} "
+                      f"(expired {error.expired}): "
+                      + " | ".join(error.diagnostics[:6] or ["(no output)"]))
+    if built.reused:
         print(f"probe: {binary} (up to date)")
-        return binary, None
-    sdk = bounded.run(["xcrun", "--show-sdk-path", "--sdk", "macosx"], 60)["stdout"].strip()
-    start = time.time()
-    if os.path.exists(binary):
-        os.remove(binary)
-    built = bounded.run(
-        ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
-         "-import-objc-header", os.path.join(ROOT, "app", "Bridging", "Reelcut-Bridging-Header.h"),
-         "-L", os.path.dirname(lib), "-lreelcut_core"] + swift + [entry, "-o", binary], 900)
-    if built["rc"] != 0 or not os.path.exists(binary):
-        errors = [line for line in built["stderr"].splitlines() if ": error:" in line]
-        tail = [line for line in built["stderr"].strip().splitlines()[-4:] if line.strip()]
-        return None, (f"swiftc exited {built['rc']} (expired {built['expired']}): "
-                      + " | ".join(errors[:6] or tail or ["(no output)"]))
-    with open(stamp, "w") as f:
-        f.write(listing)
-    print(f"probe: {binary} (built in {time.time() - start:.1f} s)")
+    else:
+        print(f"probe: {binary} (built in {built.seconds:.1f} s)")
     return binary, None
 
 

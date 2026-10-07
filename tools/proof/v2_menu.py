@@ -25,7 +25,7 @@ Before the first MCP call the script writes three fixtures
 (`work/v2_menu/fixtures/menu_{a,b}.reelcut`, version 10, 640×360 at 30 fps,
 one track, a shape at 0 s and one at 3 s; `menu_late.reelcut`, the same with
 the first shape only), deletes `fixtures/late.mov` and, for the H rows, builds
-`v2_menu_probe.swift` over `harness/build.sh`'s swiftc line into
+`v2_menu_probe.swift` over `swift_build.py`'s line into
 `work/v2_menu/probe/` with the graphic templates beside it. A build that
 fails is a scored FAIL of the rows that need it. B is opened, then A (A is
 the front project). Every readback is a relative count from `get_project`.
@@ -71,6 +71,7 @@ sys.path.insert(0, os.path.join(HERE, "graphics_spike"))
 sys.path.insert(0, os.path.join(HERE, "capture_spike"))
 import bounded  # noqa: E402
 import inventory  # noqa: E402
+import swift_build  # noqa: E402
 import v2_snapshot as snapshot  # noqa: E402
 from dev_tools import DEV_TOOLS, dev_marker_count  # noqa: E402
 from mcp import MCP, ToolError, log_beside, target  # noqa: E402
@@ -144,11 +145,16 @@ def build_probe():
     swift = sorted(os.path.join(SOURCES, n) for n in os.listdir(SOURCES)
                    if n.endswith(".swift") and n != "main.swift")
     binary = os.path.join(PROBE_DIR, "v2_menu_probe")
-    argv = (["swiftc", "-D", "REELCUT_DEV_TOOLS", "-sdk", snapshot.sdk(), "-target",
-             "arm64-apple-macos26.0", "-module-name", "Reelcut", "-import-objc-header",
-             os.path.join(ROOT, "app", "Bridging", "Reelcut-Bridging-Header.h"),
-             "-L", os.path.dirname(LIB), "-lreelcut_core"] + swift + [entry, "-o", binary])
-    return snapshot.compile_once(argv, binary, swift + [entry, LIB], 1200, "probe")
+    try:
+        built = swift_build.build(sources=swift + [entry], output=binary,
+                                  defines=["REELCUT_DEV_TOOLS"], timeout=1200)
+    except swift_build.SwiftBuildFailed as error:
+        return None, ("probe did not build: swiftc exited "
+                      f"{error.rc if error.rc is not None else 'before running'} (expired "
+                      f"{error.expired}): " + " | ".join(error.diagnostics[:4] or ["no output"]))
+    print(f"probe: {binary} (up to date)" if built.reused
+          else f"probe: built in {built.seconds:.0f} s", flush=True)
+    return binary, None
 
 
 def run_probe(probe):

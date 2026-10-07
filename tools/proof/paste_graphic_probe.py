@@ -5,7 +5,7 @@ measured through the app's own sources, with ⌥⌘V held to what it was.
 
     python3 tools/proof/paste_graphic_probe.py [--sources DIR] [--mutant NAME] [--only IDS]
 
-`paste_graphic_probe.swift` is built with `harness/build.sh`'s swiftc line
+`paste_graphic_probe.swift` is built with `swift_build.py`'s line
 (`-D REELCUT_DEV_TOOLS`: `UIMenu` exists only there) over `--sources` and run
 once, in a process of its own, under `tools/proof/work/paste-graphic/probe/`,
 killed at a 120 s wall. No media, no module file, no instance, no MCP. Every
@@ -87,6 +87,8 @@ import shutil
 import subprocess
 import sys
 
+import swift_build
+
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/paste-graphic/probe"
 ROWS = ["K0", "K1", "K2", "K3", "K4", "K5", "K6", "K7", "K8"]
@@ -126,7 +128,7 @@ def run(command, **kw):
 
 
 def build(sources, here):
-    """(binary, None) or (None, why): `harness/build.sh`'s swiftc line."""
+    """(binary, None) or (None, why): `swift_build.build`."""
     entry = here / "main.swift"
     shutil.copyfile(ROOT / "tools/proof/paste_graphic_probe.swift", entry)
     binary = here / "paste-graphic-probe"
@@ -136,19 +138,13 @@ def build(sources, here):
     lib = ROOT / "core/target/release/libreelcut_core.a"
     if not lib.exists():
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
-    sdk = run(["xcrun", "--show-sdk-path", "--sdk", "macosx"]).stdout.strip()
     try:
-        result = run(["swiftc", "-D", "REELCUT_DEV_TOOLS", "-sdk", sdk,
-                      "-target", "arm64-apple-macos26.0",
-                      "-module-name", "Reelcut", "-import-objc-header",
-                      str(ROOT / "app/Bridging/Reelcut-Bridging-Header.h"),
-                      "-L", str(lib.parent), "-lreelcut_core", *swift, str(entry),
-                      "-o", str(binary)], timeout=900)
-    except subprocess.TimeoutExpired:
-        return None, "swiftc: no answer within 900 s"
-    if result.returncode:
-        lines = [line for line in result.stderr.splitlines() if ": error:" in line]
-        return None, "swiftc: " + "; ".join(lines[:8] or [result.stderr[-600:]])
+        swift_build.build(sources=swift + [entry], output=binary,
+                          defines=["REELCUT_DEV_TOOLS"], timeout=900)
+    except swift_build.SwiftBuildFailed as error:
+        if error.expired:
+            return None, "swiftc: no answer within 900 s"
+        return None, "swiftc: " + "; ".join(error.diagnostics[:8])
     return binary, None
 
 

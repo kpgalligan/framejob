@@ -117,6 +117,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from mcp import MCP, ToolError, log_beside, target  # noqa: E402
 from dev_tools import DEV_TOOLS, dev_marker_count  # noqa: E402
+import swift_build  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 WORK = os.path.join(ROOT, "tools", "proof", "work", "op-argument-probe")
@@ -259,7 +260,7 @@ write(answer)
 
 
 def build_probe():
-    """`harness/build.sh`'s own swiftc line over `app/Sources` plus this
+    """`swift_build.build` over `app/Sources` plus this
     probe's `main.swift`, which makes it the entry point."""
     os.makedirs(WORK, exist_ok=True)
     binary = os.path.join(WORK, "opargumentprobe")
@@ -274,24 +275,15 @@ def build_probe():
     lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
-    if os.path.exists(binary) and all(
-        os.path.getmtime(f) < os.path.getmtime(binary) for f in sources + [entry, lib]
-    ):
-        print(f"op-argument probe: {binary} (up to date)")
-        return binary, None
-    sdk = subprocess.run(
-        ["xcrun", "--show-sdk-path", "--sdk", "macosx"], capture_output=True, text=True
-    ).stdout.strip()
-    start = time.time()
-    result = subprocess.run(
-        ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
-         "-import-objc-header", os.path.join(ROOT, "app", "Bridging", "Reelcut-Bridging-Header.h"),
-         "-L", os.path.dirname(lib), "-lreelcut_core"] + sources + [entry, "-o", binary],
-        capture_output=True, text=True)
-    if result.returncode != 0 or not os.path.exists(binary):
-        errors = [line for line in result.stderr.splitlines() if ": error:" in line]
+    try:
+        built = swift_build.build(sources=sources + [entry], output=binary)
+    except swift_build.SwiftBuildFailed as error:
+        errors = [line for line in error.diagnostics if ": error:" in line]
         return None, "swiftc failed:\n      " + "\n      ".join(errors[:6] or ["(no error lines)"])
-    print(f"op-argument probe: {binary} (built in {time.time() - start:.1f} s)")
+    if built.reused:
+        print(f"op-argument probe: {binary} (up to date)")
+    else:
+        print(f"op-argument probe: {binary} (built in {built.seconds:.1f} s)")
     return binary, None
 
 

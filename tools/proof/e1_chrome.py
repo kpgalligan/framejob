@@ -65,6 +65,8 @@ import sys
 import time
 import zlib
 
+import swift_build
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 WORK = os.path.join(HERE, "work")
@@ -705,8 +707,8 @@ exit(0)
 
 
 def build_probe():
-    """Compile the probe if it is stale, exactly as `harness/build.sh` does —
-    the same swiftc line, the same staleness rule. Returns `(binary, None)` or
+    """Compile the probe through `swift_build.build` (reused when every input
+    is byte-identical to a cached build's). Returns `(binary, None)` or
     `(None, reason)`; the reason is SCORED and never exits."""
     os.makedirs(PROBE, exist_ok=True)
     binary = os.path.join(PROBE, "e1probe")
@@ -721,24 +723,15 @@ def build_probe():
     lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
-    if os.path.exists(binary) and all(
-        os.path.getmtime(f) < os.path.getmtime(binary) for f in sources + [entry, lib]
-    ):
-        print(f"probe: {binary} (up to date)")
-        return binary, None
-    sdk = subprocess.run(
-        ["xcrun", "--show-sdk-path", "--sdk", "macosx"], capture_output=True, text=True
-    ).stdout.strip()
-    start = time.time()
-    result = subprocess.run(
-        ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
-         "-import-objc-header", os.path.join(ROOT, "app", "Bridging", "Reelcut-Bridging-Header.h"),
-         "-L", os.path.dirname(lib), "-lreelcut_core"] + sources + [entry, "-o", binary],
-        capture_output=True, text=True)
-    if result.returncode != 0 or not os.path.exists(binary):
-        errors = [line for line in result.stderr.splitlines() if ": error:" in line]
+    try:
+        built = swift_build.build(sources=sources + [entry], output=binary)
+    except swift_build.SwiftBuildFailed as error:
+        errors = [line for line in error.diagnostics if ": error:" in line]
         return None, "swiftc failed:\n      " + "\n      ".join(errors[:6] or ["(no error lines)"])
-    print(f"probe: {binary} (built in {time.time() - start:.1f} s)")
+    if built.reused:
+        print(f"probe: {binary} (up to date)")
+    else:
+        print(f"probe: {binary} (built in {built.seconds:.1f} s)")
     return binary, None
 
 

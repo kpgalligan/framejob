@@ -21,10 +21,9 @@ batch does not move.
 Every child runs under `graphics_spike/bounded.py`. The M rows
 run `export_cancel_probe.swift`, an in-process instrument built like
 `graphics_proof.py`'s pin probe into `tools/proof/work/export-cancel-probe/`
-(rebuilt when any of `app/Sources`, the probe, `libreelcut_core.a`, the
-bridging header or `core/include/reelcut_core.h` is newer than it; the line
-reads `probe: built …` or `probe: up to date …`); a probe that will not build
-scores M0–M2 as FAILURES.
+(through `swift_build.py`, reused when every input is byte-identical to a
+cached build's; the line reads `probe: built …` or `probe: up to date …`); a
+probe that will not build scores M0–M2 as FAILURES.
 
 G1  (CONTROL) `new_project`; `write_graphic gate` (compiles, 30 frames, one
     rect); `add_graphic_clip gate` at 0; `nest` it; `add_text_clip` right
@@ -97,6 +96,7 @@ sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
 sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
 import mcp  # noqa: E402
+import swift_build  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/export-cancel"
 STANDIN = WORK / "standin"
@@ -226,10 +226,10 @@ def tool_message(error, tool):
 
 def build_probe(sources=None, probe_dir=None):
     """`export_cancel_probe.swift` as `main.swift` over every other file in
-    `sources`, on `harness/build.sh`'s swiftc line, with the app's `Fonts`,
+    `sources`, through `swift_build.build`, with the app's `Fonts`,
     `Blank.mp4` and a `default.metallib` of `Compositor.metal` beside it, in
-    `probe_dir`. Rebuilt only when stale — the sources, the entry, the
-    staticlib and both headers are its inputs. The binary, or None and why.
+    `probe_dir`. Reused when every input is byte-identical to a cached
+    build's. The binary, or None and why.
     `None` for either argument means the module's `SOURCES` / `PROBE_DIR`,
     read at call time, so an importer that sets them is heard."""
     sources = SOURCES if sources is None else sources
@@ -256,30 +256,17 @@ def build_probe(sources=None, probe_dir=None):
                                 str(metallib)], 300)
         if step["rc"] != 0 or not metallib.exists():
             return None, f"the shader did not build: {step['stderr'][-400:]}"
-    swift = sorted(path for path in Path(sources).glob("*.swift")
-                   if path.name != "main.swift")
     lib = ROOT / "core/target/release/libreelcut_core.a"
     if not lib.exists():
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
-    headers = [ROOT / "app/Bridging/Reelcut-Bridging-Header.h",
-               ROOT / "core/include/reelcut_core.h"]
-    if binary.exists() and all(path.stat().st_mtime < binary.stat().st_mtime
-                               for path in swift + [entry, lib] + headers):
-        print(f"  probe: up to date — {binary}", flush=True)
-        return binary, ""
-    started = time.monotonic()
-    sdk = bounded.run(["xcrun", "--show-sdk-path", "--sdk", "macosx"], 60)["stdout"].strip()
-    built = bounded.run(
-        ["swiftc", "-D", "REELCUT_DEV_TOOLS", "-sdk", sdk, "-target", "arm64-apple-macos26.0",
-         "-module-name", "Reelcut",
-         "-import-objc-header", str(ROOT / "app/Bridging/Reelcut-Bridging-Header.h"),
-         "-L", str(lib.parent), "-lreelcut_core"]
-        + [str(path) for path in swift] + [str(entry), "-o", str(binary)], 900)
-    if built["rc"] != 0 or not binary.exists():
-        errors = [line for line in built["stderr"].splitlines() if ": error:" in line]
-        tail = built["stderr"].strip().splitlines()[-4:]
-        return None, f"swiftc rc {built['rc']}: {(errors or tail or ['(no output)'])[:6]}"
-    print(f"  probe: built in {time.monotonic() - started:.0f} s — {binary}", flush=True)
+    try:
+        built = swift_build.build(sources=swift_build.app_sources(sources) + [entry],
+                                  output=binary, defines=["REELCUT_DEV_TOOLS"], timeout=900)
+    except swift_build.SwiftBuildFailed as error:
+        return None, (f"swiftc rc {error.rc if error.rc is not None else 'before running'}: "
+                      f"{(error.diagnostics or ['(no output)'])[:6]}")
+    print(f"  probe: up to date — {binary}" if built.reused
+          else f"  probe: built in {built.seconds:.0f} s — {binary}", flush=True)
     return binary, ""
 
 

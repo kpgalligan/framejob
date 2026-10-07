@@ -35,6 +35,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
 import bounded  # noqa: E402
+import swift_build  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/formats-probe"
 FIXTURES = WORK / "fixtures"
@@ -199,17 +200,12 @@ def build(sources):
     swift = sorted(str(p) for p in sources.glob("*.swift") if p.name != "main.swift")
     if len(swift) < 100:
         return None, "app source set incomplete"
-    sdk = bounded.run(["xcrun", "--show-sdk-path", "--sdk", "macosx"], 60)["stdout"].strip()
-    result = bounded.run(["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0",
-                          "-module-name", "Reelcut", "-import-objc-header",
-                          str(ROOT / "app/Bridging/Reelcut-Bridging-Header.h"),
-                          "-L", str(ROOT / "core/target/release"), "-lreelcut_core",
-                          *swift, str(entry), "-o", str(binary)], 600)
-    if result["expired"]:
-        return None, "swiftc expired after 600 s"
-    if result["rc"]:
-        lines = [line for line in result["stderr"].splitlines() if ": error:" in line]
-        return None, "swiftc: " + "; ".join(lines[:8] or [tail(result["stderr"], 600)])
+    try:
+        swift_build.build(sources=swift + [entry], output=binary, timeout=600)
+    except swift_build.SwiftBuildFailed as error:
+        if error.expired:
+            return None, "swiftc expired after 600 s"
+        return None, "swiftc: " + "; ".join(error.diagnostics[:8])
     return binary, ""
 
 

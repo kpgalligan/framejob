@@ -1589,7 +1589,7 @@ under a wall-clock bound).
 ```
 python3 tools/proof/swift_build.py build --output PATH [--define D]… [--force] SOURCE…   # entry last; last stdout line is PATH
 python3 tools/proof/swift_build.py typecheck [--define D]… [--sources DIR] PROBE.swift…  # seconds; no link
-python3 tools/proof/swift_build.py --selftest                                           # K0, K1, B1–B5 (make test)
+python3 tools/proof/swift_build.py --selftest                                           # K0, K1, B1–B6, G0, G1 (make test)
 ```
 
 From Python, `swift_build.build(sources=…, output=…, defines=…, optimize=…,
@@ -1602,13 +1602,14 @@ is a folder's `*.swift` but `main.swift`, sorted.
   <cores>] -sdk <sdk> -target arm64-apple-macos26.0 -module-name Reelcut
   -import-objc-header app/Bridging/Reelcut-Bridging-Header.h -L
   core/target/release -lreelcut_core <sources, entry last> [link args] -o
-  <tmp>`. A missing staticlib is refused, naming `cd core && cargo build
-  --release`.
+  <tmp>/link/<the caller's file name>`. A missing staticlib is refused,
+  naming `cd core && cargo build --release`.
 - **The key** is a sha256 over the helper's own bytes, `swiftc --version`, the
   SDK's path and its `SDKSettings.json`, the argv (ROOT-relative, less the
-  values of `-o`, `-j` and `-output-file-map`), the bytes of every source, of
-  the bridging header and every header it reaches by a quoted `#include`
-  (`core/include/reelcut_core.h`), of the staticlib and each link input, the
+  values of `-o`, `-j` and `-output-file-map`), the output's file name, the
+  bytes of every source, of the bridging header and every header it reaches
+  by a quoted `#include` (`core/include/reelcut_core.h`), of the staticlib and
+  each link input, the
   `DEVELOPER_DIR`, `SDKROOT`, `TOOLCHAINS` and `MACOSX_DEPLOYMENT_TARGET`
   variables, and the tree's own path (`#file` embeds it). Nothing about it is
   an mtime: a `touch` rebuilds nothing, and any byte change rebuilds.
@@ -1624,7 +1625,11 @@ is a folder's `*.swift` but `main.swift`, sorted.
   `work/swift-build/failed/<key>.log`.
 - **Delivery** copies the entry to `<output>.tmp-<pid>` and renames it onto
   the caller's own path and file name, so a bare binary's defaults domain and
-  `proof_defaults.py --ran` see the name they always did. It prints
+  `proof_defaults.py --ran` see the name they always did. It was LINKED under
+  that name too: the linker writes it into the ad-hoc signature as the
+  identifier, and LaunchServices keys a bare binary's recent documents by it
+  (linked as `binary`, every proof binary shared one recents list, and the
+  welcome window's Recent rows moved `recording_probe.py`'s section 6d). It prints
   `swift_build: reused <key>` or `swift_build: built <key> in <s> s` on
   stderr.
 - **`typecheck`** checks a probe's types against `app/Sources` (or
@@ -1632,23 +1637,45 @@ is a folder's `*.swift` but `main.swift`, sorted.
   compiled AS `main.swift` (top-level code is allowed only there), from a
   temporary copy whose path is written back to the probe's own in the output.
 
-**Who goes through it.** Phase 1a: `harness/build.sh`, and the `build_probe`
-of `assistant_lane_proof.py`, `assistant_prompt_proof.py` and
-`graphics_inspector_proof.py`; each keeps its defines, its entry file, its
-output name and its failure strings. The other proofs' own swiftc lines move
-onto it in phase 1b (`designs/build-velocity.md`).
+**Who goes through it.** Every proof, probe and the harness that compiles app
+sources. Phase 1a moved `harness/build.sh`, and the `build_probe` of
+`assistant_lane_proof.py`, `assistant_prompt_proof.py` and
+`graphics_inspector_proof.py`; phase 1b the other 68 scripts' own lines
+(`designs/build-velocity.md` lists them). Each keeps its defines, its entry and
+extra files, its optimisation (`speed_limits_probe.py`: `-O`, whole-module),
+its link arguments (`recording_probe.py`'s voice-over probe: `-sectcreate
+__TEXT __info_plist <plist>`, the plist also a `link_inputs` entry so its bytes
+are in the key), its output path and name and its failure strings; an
+mtime or `sources.txt` staleness check it had is gone, because the key is the
+staleness rule. `phase5_chrome.py`'s `Loudness.swift` probe, which had no
+bridging header or staticlib, now gets both (one line for every build).
+**Not converted**, and allowed by the guard: `reference_build.py` and
+`reference_build_selftest.py` (historical trees, with their own key and module
+caches) and the closed spikes (`*_spike/`, `recording_spike.py`). A swiftc
+line that compiles no app source also stays: `phase8_proof.py`'s extracted
+`PreviewQuality.swift` and `v2_snapshot.py`'s `v2_cover`.
 
 **The selftest** (`--selftest`, a line of `make test`), over a scratch cache
 in `work/swift-build-selftest/`: K0 (CONTROL) the same inputs give the same
 key twice; K1 the key changes for a source byte, the source order, a define,
 `optimize`, a link input's bytes, a header reached by `#include` and the
-library's bytes, and NOT for a different `-o` or `-j`; B1 a one-file program
-builds and runs; B2 the same call reuses; B3 an entry whose binary was
+library's bytes and the output's file name, and NOT for another `-o` folder
+or `-j`; B1 a one-file program builds and runs; B2 the same call reuses; B6
+the delivered binary's signature identifier is its own file name; B3 an entry whose binary was
 tampered with fails its digest and is rebuilt (the instrument's own first run
 caught the rebuild landing beside the tampered entry and the tampered binary
 still being delivered); B4 a type error raises, naming the file; B5 an entry
 folder with a broken manifest and no binary is replaced by a fresh build,
-never delivered and never a crash. Two tiny builds, no app, a few seconds.
+never delivered and never a crash. G0 (CONTROL) the guard flags a synthetic
+Python text holding a `"swiftc"` argv and the bridging header (its name,
+`-import-objc-header` or `BRIDGING`), one naming it through
+`swift_build.BRIDGING`, and shell `xcrun swiftc …` and `xcrun -sdk macosx
+swiftc …` lines naming it, and not a text without the header or a shell
+comment; G1 no `tools/proof/**/*.py` or `*.sh` (less `work/`) outside
+the allow-list (`swift_build.py`, `reference_build*.py`, `*_spike/*`,
+`recording_spike.py`) holds both — a proof that carries its own app swiftc
+line fails `make test`, naming the file. Two tiny builds, no app, a few
+seconds.
 
 **Measured, phase 1a** (2026-10-07, load in brackets): `make typecheck` 81 s →
 3.4 s (batch mode, `-j 12`), same four warnings; a cold harness 124 s
@@ -1674,8 +1701,7 @@ PNG — `harness/build.sh` builds it into `work/harness/` through
 build's, else compiled on every core; `--force` rebuilds; Fonts and Models
 recopied only when their digest changed) with `-D REELCUT_DEV_TOOLS`, as the
 app's Debug and Release set it (road map 11 V0), so the harness links what the
-app links; each probe passes its own defines to its build line (`swift_build.build` once phase 1b
-lands), and most
+app links; each probe passes its own defines to `swift_build.build`, and most
 stay flag-off, as Distribution is — and pins every `UserDefaults` key the chrome reads — the
 persisted view state, the Document tab's `ReelcutInspectorRescaleClips`
 checkbox and `AppleShowScrollBars` — in the argument domain, and captures on

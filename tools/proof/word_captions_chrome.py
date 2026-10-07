@@ -22,7 +22,7 @@ batch B86 phase 2 (spec §11 W-15): `tall`, light, with one look box ticked
 with Dim — each differs from the same style with none.
 
 STRUCTURE, through `word_captions_sheet_probe.swift` compiled over
-`app/Sources` with `harness/build.sh`'s swiftc line (a probe that will not
+`app/Sources` with `swift_build.py`'s line (a probe that will not
 build is a scored FAILURE), with `word_captions_sheet_support.swift` beside
 it: rows S1–S16 (S10–S16 are the three look boxes: their titles and live
 table, the row's layout and the note, the remembered keys, the greyed box
@@ -45,6 +45,8 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+
+import swift_build
 
 ROOT = Path(__file__).resolve().parents[2]
 HERE = ROOT / "tools/proof"
@@ -182,18 +184,10 @@ def build_probe(sources, out):
     shutil.copyfile(HERE / "word_captions_sheet_support.swift", support)
     binary = out / "word-captions-sheet-probe"
     swift = sorted(str(p) for p in Path(sources).glob("*.swift") if p.name != "main.swift")
-    sdk = subprocess.run(["xcrun", "--show-sdk-path", "--sdk", "macosx"],
-                         capture_output=True, text=True).stdout.strip()
-    lib = ROOT / "core/target/release/libreelcut_core.a"
-    result = subprocess.run(
-        ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
-         "-import-objc-header", str(ROOT / "app/Bridging/Reelcut-Bridging-Header.h"),
-         "-L", str(lib.parent), "-lreelcut_core", *swift, str(support), str(entry),
-         "-o", str(binary)],
-        capture_output=True, text=True, timeout=DEADLINE, start_new_session=True)
-    if result.returncode:
-        errors = [line for line in result.stderr.splitlines() if ": error:" in line]
-        return None, "; ".join(errors[:8]) or result.stderr[-600:]
+    try:
+        swift_build.build(sources=[*swift, support, entry], output=binary, timeout=DEADLINE)
+    except swift_build.SwiftBuildFailed as error:
+        return None, "; ".join(error.diagnostics[:8])
     return binary, ""
 
 

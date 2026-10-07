@@ -24,8 +24,8 @@ An MCP check for that name therefore PASSES against the unfixed build and
 cannot be its evidence. What can is the shape `FrameWriter.renamed` chose in
 phase 7 for the same defect: a pure function of a string, compiled out of
 `app/Sources` and run over a table of names — `phase9_probe.py`'s
-instrument, `harness/build.sh`'s own swiftc line, cached on modification
-times, and a build failure scored as a FAILURE rather than an exit.
+instrument, `swift_build.py`'s line, cached by content, and a build
+failure scored as a FAILURE rather than an exit.
 
 Section 1 (naming) runs three helpers over that kind of table:
 
@@ -261,8 +261,9 @@ import shutil
 import struct
 import subprocess
 import sys
-import time
 import zlib
+
+import swift_build
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 WORK = os.path.join(ROOT, "tools", "proof", "work")
@@ -973,9 +974,9 @@ def probe_dir(sources):
 
 
 def build_probe(sources):
-    """`phase9_probe.py`'s builder: the same swiftc line as `harness/build.sh`,
-    the same staleness rule, and a reason instead of an exit when it will
-    not build."""
+    """`phase9_probe.py`'s builder: `swift_build.build` (reused when every
+    input is byte-identical to a cached build's), and a reason instead of an
+    exit when it will not build."""
     here = probe_dir(sources)
     os.makedirs(here, exist_ok=True)
     binary = os.path.join(here, "remainingprobe")
@@ -992,24 +993,15 @@ def build_probe(sources):
     lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
-    if os.path.exists(binary) and all(
-        os.path.getmtime(f) < os.path.getmtime(binary) for f in files + [entry, lib]
-    ):
-        print(f"remaining probe: {binary} (up to date)")
-        return binary, None
-    sdk = subprocess.run(
-        ["xcrun", "--show-sdk-path", "--sdk", "macosx"], capture_output=True, text=True
-    ).stdout.strip()
-    start = time.time()
-    result = subprocess.run(
-        ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
-         "-import-objc-header", os.path.join(ROOT, "app", "Bridging", "Reelcut-Bridging-Header.h"),
-         "-L", os.path.dirname(lib), "-lreelcut_core"] + files + [entry, "-o", binary],
-        capture_output=True, text=True)
-    if result.returncode != 0 or not os.path.exists(binary):
-        errors = [line for line in result.stderr.splitlines() if ": error:" in line]
+    try:
+        built = swift_build.build(sources=files + [entry], output=binary)
+    except swift_build.SwiftBuildFailed as error:
+        errors = [line for line in error.diagnostics if ": error:" in line]
         return None, "swiftc failed:\n      " + "\n      ".join(errors[:6] or ["(no error lines)"])
-    print(f"remaining probe: {binary} (built in {time.time() - start:.1f} s from {sources})")
+    if built.reused:
+        print(f"remaining probe: {binary} (up to date)")
+    else:
+        print(f"remaining probe: {binary} (built in {built.seconds:.1f} s from {sources})")
     return binary, None
 
 

@@ -19,7 +19,7 @@ comparison passes against the broken build (`mixed_audio_proof.py` is that
 comparison, kept as the export's regression guard). What DOES see the defect
 is the editor's own `Playback` playing, and the meter its taps light — no tool
 reaches either. So this is a `main.swift` compiled against the whole of
-`app/Sources` with `harness/build.sh`'s swiftc line (`preview_validity_probe.py`'s
+`app/Sources` with `swift_build.py`'s line (`preview_validity_probe.py`'s
 `build_probe`, `Compositor.metal` and `Blank.mp4` beside it), a build failure
 SCORED rather than an exit, and `--sources PATH` (`peaks_probe.py`'s) to build
 the same probe over another tree — the baseline, to show the defect.
@@ -75,8 +75,9 @@ import re
 import shutil
 import subprocess
 import sys
-import time
 from array import array
+
+import swift_build
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -426,32 +427,16 @@ def build_probe(sources):
     lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
-    stamp = os.path.join(probe, "sources.txt")
-    listing = "\n".join(swift)
-    same_set = os.path.exists(stamp) and open(stamp).read() == listing
-    if same_set and os.path.exists(binary) and all(
-        os.path.getmtime(f) < os.path.getmtime(binary) for f in swift + [entry, lib]
-    ):
+    try:
+        built = swift_build.build(sources=swift + [entry], output=binary)
+    except swift_build.SwiftBuildFailed as error:
+        errors = [line for line in error.diagnostics if ": error:" in line]
+        return None, (f"swiftc exited {error.rc if error.rc is not None else 'before running'}: "
+                      + " | ".join(errors[:6] or error.diagnostics[-4:] or ["(no output)"]))
+    if built.reused:
         print(f"probe: {binary} (up to date)")
-        return binary, None
-    sdk = subprocess.run(["xcrun", "--show-sdk-path", "--sdk", "macosx"],
-                         capture_output=True, text=True).stdout.strip()
-    start = time.time()
-    if os.path.exists(binary):
-        os.remove(binary)
-    result = subprocess.run(
-        ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
-         "-import-objc-header", os.path.join(ROOT, "app", "Bridging", "Reelcut-Bridging-Header.h"),
-         "-L", os.path.dirname(lib), "-lreelcut_core"] + swift + [entry, "-o", binary],
-        capture_output=True, text=True)
-    if result.returncode != 0 or not os.path.exists(binary):
-        errors = [line for line in result.stderr.splitlines() if ": error:" in line]
-        tail = [line for line in result.stderr.strip().splitlines()[-4:] if line.strip()]
-        return None, (f"swiftc exited {result.returncode}: "
-                      + " | ".join(errors[:6] or tail or ["(no output)"]))
-    with open(stamp, "w") as f:
-        f.write(listing)
-    print(f"probe: {binary} (built in {time.time() - start:.1f} s)")
+    else:
+        print(f"probe: {binary} (built in {built.seconds:.1f} s)")
     return binary, None
 
 

@@ -6,7 +6,7 @@ shrinks.
 
     python3 tools/proof/speed_sheet_probe.py [--sources DIR] [--mutant NAME]
 
-`speed_sheet_probe.swift` is built with `harness/build.sh`'s swiftc line
+`speed_sheet_probe.swift` is built with `swift_build.py`'s line
 (`-D REELCUT_DEV_TOOLS`, the bridging header, `-lreelcut_core`) over
 `--sources` into `tools/proof/work/speed-sheet/`, and run once. It drives the
 real sheet — `SpeedSheetController(document:clips:)`, its view loaded, the
@@ -47,6 +47,8 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+
+import swift_build
 
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/speed-sheet"
@@ -91,18 +93,12 @@ def build(sources, here):
     if not lib.exists():
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
     try:
-        sdk = run(["xcrun", "--show-sdk-path", "--sdk", "macosx"], 60).stdout.strip()
-        result = run(["swiftc", "-D", "REELCUT_DEV_TOOLS", "-sdk", sdk,
-                      "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
-                      "-import-objc-header",
-                      str(ROOT / "app/Bridging/Reelcut-Bridging-Header.h"),
-                      "-L", str(lib.parent), "-lreelcut_core", *swift, str(entry),
-                      "-o", str(binary)], BUILD_WALL)
-    except subprocess.TimeoutExpired:
-        return None, f"swiftc did not finish within {BUILD_WALL} s"
-    if result.returncode:
-        lines = [line for line in result.stderr.splitlines() if ": error:" in line]
-        return None, "swiftc: " + "; ".join(lines[:8] or [result.stderr[-600:]])
+        swift_build.build(sources=swift + [entry], output=binary,
+                          defines=["REELCUT_DEV_TOOLS"], timeout=BUILD_WALL)
+    except swift_build.SwiftBuildFailed as error:
+        if error.expired:
+            return None, f"swiftc did not finish within {BUILD_WALL} s"
+        return None, "swiftc: " + "; ".join(error.diagnostics[:8])
     return binary, None
 
 

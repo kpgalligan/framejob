@@ -56,6 +56,7 @@ sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
 sys.path.insert(0, str(ROOT / "tools/proof/speed_spike"))
 import bounded  # noqa: E402
 from speed_spike import astats, ffprobe_json, has_audio, probe, run, sync_tree  # noqa: E402
+import swift_build  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/speed-limits"
 TREE = WORK / "tree"
@@ -164,7 +165,9 @@ def build_probe(lib_dir, probe_dir):
     """`speed_spike.py`'s `build_probe` with this probe's source and folder:
     the app's `Fonts`, `Blank.mp4` and a `default.metallib` beside the binary,
     every `app/Sources` file but `main.swift`, the probe as `main.swift`,
-    `-O -whole-module-optimization`, `-L <lib_dir>`. Rebuilt only when stale."""
+    `-O -whole-module-optimization`, `-L <lib_dir>`, through
+    `swift_build.build` (reused when every input is byte-identical to a
+    cached build's)."""
     probe_dir.mkdir(parents=True, exist_ok=True)
     binary = probe_dir / "speed_limits_probe"
     entry = probe_dir / "main.swift"
@@ -187,23 +190,18 @@ def build_probe(lib_dir, probe_dir):
         if step["rc"] != 0 or not metallib.exists():
             emit("B1", False, f"the shader did not build: {step['stderr'][-400:]}", True)
             return None
-    swift = sorted(p for p in (ROOT / "app/Sources").glob("*.swift") if p.name != "main.swift")
-    lib = lib_dir / "libreelcut_core.a"
-    headers = [ROOT / "app/Bridging/Reelcut-Bridging-Header.h", ROOT / "core/include/reelcut_core.h"]
-    if binary.exists() and all(p.stat().st_mtime < binary.stat().st_mtime
-                               for p in swift + [entry, lib] + headers):
+    try:
+        built = swift_build.build(sources=swift_build.app_sources() + [entry], output=binary,
+                                  defines=["REELCUT_DEV_TOOLS"], optimize=True, wmo=True,
+                                  library=lib_dir / "libreelcut_core.a", timeout=1800)
+    except swift_build.SwiftBuildFailed as error:
+        emit("B1", False, f"swiftc rc {error.rc if error.rc is not None else 'before running'} "
+             f"expired {error.expired}: "
+             f"{(error.diagnostics or ['(no output)'])[:6]}", True)
+        return None
+    if built.reused:
         emit("B1", True, f"probe up to date — {binary} (linked to {lib_dir})")
         return binary
-    sdk = run(["xcrun", "--show-sdk-path", "--sdk", "macosx"], 60)["stdout"].strip()
-    built = run(["swiftc", "-D", "REELCUT_DEV_TOOLS", "-O", "-whole-module-optimization",
-                 "-sdk", sdk, "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
-                 "-import-objc-header", ROOT / "app/Bridging/Reelcut-Bridging-Header.h",
-                 "-L", lib_dir, "-lreelcut_core"] + swift + [entry, "-o", binary], 1800)
-    if built["rc"] != 0 or not binary.exists():
-        errors = [line for line in built["stderr"].splitlines() if ": error:" in line]
-        emit("B1", False, f"swiftc rc {built['rc']} expired {built['expired']}: "
-             f"{(errors or built['stderr'].splitlines()[-4:] or ['(no output)'])[:6]}", True)
-        return None
     emit("B1", True, f"metallib + probe built in {time.monotonic() - started:.0f} s "
          f"(-O -wmo, linked to {lib_dir}) — {binary}")
     return binary

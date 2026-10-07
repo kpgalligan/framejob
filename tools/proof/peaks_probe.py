@@ -14,6 +14,8 @@ import subprocess
 import sys
 import wave
 
+import swift_build
+
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/peaks-probe"
 FIXTURES = WORK / "fixtures"
@@ -106,16 +108,10 @@ def build(sources):
     swift = sorted(str(p) for p in sources.glob("*.swift") if p.name != "main.swift")
     if len(swift) < 100:
         return None, "app source set incomplete"
-    sdk = run(["xcrun", "--show-sdk-path", "--sdk", "macosx"]).stdout.strip()
-    lib = ROOT / "core/target/release/libreelcut_core.a"
-    result = run(["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0",
-                  "-module-name", "Reelcut", "-import-objc-header",
-                  str(ROOT / "app/Bridging/Reelcut-Bridging-Header.h"),
-                  "-L", str(lib.parent), "-lreelcut_core", *swift, str(entry),
-                  "-o", str(binary)])
-    if result.returncode:
-        lines = [line for line in result.stderr.splitlines() if ": error:" in line]
-        return None, "swiftc: " + "; ".join(lines[:8] or [result.stderr[-600:]])
+    try:
+        swift_build.build(sources=swift + [entry], output=binary)
+    except swift_build.SwiftBuildFailed as error:
+        return None, "swiftc: " + "; ".join(error.diagnostics[:8])
     return binary, ""
 
 

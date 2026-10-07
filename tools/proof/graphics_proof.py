@@ -266,6 +266,7 @@ sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
 import mcp  # noqa: E402
 import tree_copy  # noqa: E402
+import swift_build  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/graphics"
 APP = ROOT / "build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut"
@@ -1520,11 +1521,11 @@ def make_pq(client, package):
 
 def build_pin_probe(sources_dir=ROOT / "app/Sources", out=PIN_PROBE_DIR):
     """`graphics_pin_probe.swift` as `main.swift` over every other file in
-    `sources_dir` (`app/Sources`, or a probe mutant's scratch copy), on
-    `harness/build.sh`'s swiftc line, into `out` with the app's `Fonts`,
-    `Blank.mp4` and a `default.metallib` of `Compositor.metal` beside it —
-    `phase7_chrome.py`'s `build_probe` and `build_shader`. Rebuilt only when
-    stale. The binary, or None and why."""
+    `sources_dir` (`app/Sources`, or a probe mutant's scratch copy), through
+    `swift_build.build`, into `out` with the app's `Fonts`, `Blank.mp4` and a
+    `default.metallib` of `Compositor.metal` beside it — `phase7_chrome.py`'s
+    `build_probe` and `build_shader`. Reused when every input is byte-identical
+    to a cached build's. The binary, or None and why."""
     out.mkdir(parents=True, exist_ok=True)
     binary = out / "graphics_pin_probe"
     entry = out / "main.swift"
@@ -1547,24 +1548,15 @@ def build_pin_probe(sources_dir=ROOT / "app/Sources", out=PIN_PROBE_DIR):
                                 str(metallib)], 300)
         if step["rc"] != 0 or not metallib.exists():
             return None, f"the shader did not build: {step['stderr'][-400:]}"
-    sources = sorted(path for path in Path(sources_dir).glob("*.swift")
-                     if path.name != "main.swift")
     lib = ROOT / "core/target/release/libreelcut_core.a"
     if not lib.exists():
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
-    if binary.exists() and all(path.stat().st_mtime < binary.stat().st_mtime
-                               for path in sources + [entry, lib]):
-        return binary, ""
-    sdk = bounded.run(["xcrun", "--show-sdk-path", "--sdk", "macosx"], 60)["stdout"].strip()
-    built = bounded.run(
-        ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
-         "-import-objc-header", str(ROOT / "app/Bridging/Reelcut-Bridging-Header.h"),
-         "-L", str(lib.parent), "-lreelcut_core"]
-        + [str(path) for path in sources] + [str(entry), "-o", str(binary)], 900)
-    if built["rc"] != 0 or not binary.exists():
-        errors = [line for line in built["stderr"].splitlines() if ": error:" in line]
-        tail = built["stderr"].strip().splitlines()[-4:]
-        return None, f"swiftc rc {built['rc']}: {(errors or tail or ['(no output)'])[:6]}"
+    try:
+        swift_build.build(sources=swift_build.app_sources(sources_dir) + [entry],
+                          output=binary, timeout=900)
+    except swift_build.SwiftBuildFailed as error:
+        return None, (f"swiftc rc {error.rc if error.rc is not None else 'before running'}: "
+                      f"{(error.diagnostics or ['(no output)'])[:6]}")
     return binary, ""
 
 

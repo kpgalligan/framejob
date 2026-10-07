@@ -21,7 +21,7 @@ fragment stages took it for canvas pixels, which was true only while
 
 So the instrument is `phase6_chrome.py`'s and `phase7_chrome.py`'s: a
 `main.swift` of this script's own, compiled against the WHOLE of `app/Sources`
-with `harness/build.sh`'s own swiftc line, cached on modification times, run
+with `swift_build.py`'s line, cached by content, run
 with a JSON request and answering with a JSON object. **A probe that will not
 build is a scored FAILURE and never a `sys.exit`** — a rotted instrument must
 not take the rest of the score down with it.
@@ -208,6 +208,8 @@ import subprocess
 import sys
 import time
 import zlib
+
+import swift_build
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -1728,8 +1730,8 @@ INFO_PLIST = """<?xml version="1.0" encoding="UTF-8"?>
 
 
 def build_probe():
-    """Compiles the probe if it is stale, exactly as `harness/build.sh` does —
-    the same swiftc line, the same staleness rule — into an `.app` bundle,
+    """Compiles the probe through `swift_build.build` (reused when every input
+    is byte-identical to a cached build's) into an `.app` bundle,
     which one mode needs and the rest merely tolerate (the script's header
     says why).
 
@@ -1743,8 +1745,7 @@ def build_probe():
         f.write(INFO_PLIST)
     binary = os.path.join(macos, "phase8probe")
     entry = os.path.join(PROBE, "main.swift")
-    # Written only when it CHANGED, or the staleness check below rebuilds on
-    # every run.
+    # Written only when it CHANGED.
     if not os.path.exists(entry) or open(entry).read() != PROBE_SOURCE:
         with open(entry, "w") as f:
             f.write(PROBE_SOURCE)
@@ -1761,26 +1762,18 @@ def build_probe():
     lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
-    if os.path.exists(binary) and all(
-        os.path.getmtime(f) < os.path.getmtime(binary) for f in sources + [entry, lib]
-    ):
-        print(f"probe: {binary} (up to date)")
-        return binary, None
-    sdk = subprocess.run(
-        ["xcrun", "--show-sdk-path", "--sdk", "macosx"], capture_output=True, text=True
-    ).stdout.strip()
-    start = time.time()
-    result = subprocess.run(
-        ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
-         "-import-objc-header", os.path.join(ROOT, "app", "Bridging", "Reelcut-Bridging-Header.h"),
-         "-L", os.path.dirname(lib), "-lreelcut_core"] + sources + [entry, "-o", binary],
-        capture_output=True, text=True)
-    if result.returncode != 0 or not os.path.exists(binary):
-        errors = [line for line in result.stderr.splitlines() if ": error:" in line]
-        tail = [line for line in result.stderr.strip().splitlines()[-4:] if line.strip()]
-        return None, (f"swiftc exited {result.returncode}:\n      "
+    try:
+        built = swift_build.build(sources=sources + [entry], output=binary)
+    except swift_build.SwiftBuildFailed as error:
+        errors = [line for line in error.diagnostics if ": error:" in line]
+        tail = error.diagnostics[-4:]
+        rc = error.rc if error.rc is not None else "before running"
+        return None, (f"swiftc exited {rc}:\n      "
                       + "\n      ".join(errors[:6] or tail or ["(no output)"]))
-    print(f"probe: {binary} (built in {time.time() - start:.1f} s)")
+    if built.reused:
+        print(f"probe: {binary} (up to date)")
+    else:
+        print(f"probe: {binary} (built in {built.seconds:.1f} s)")
     return binary, None
 
 

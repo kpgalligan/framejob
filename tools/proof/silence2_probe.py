@@ -20,8 +20,8 @@ have no caller a running binary can be asked to reach:
     up, and its readout is not a picture — it is a string and two booleans.
 
 The instrument is `phase9_probe.py`'s: a `main.swift` compiled against the
-WHOLE of `app/Sources` with `harness/build.sh`'s own swiftc line, cached on
-modification times, with `app/Resources/Models` copied beside the binary the
+WHOLE of `app/Sources` with `swift_build.py`'s line, cached by
+content, with `app/Resources/Models` copied beside the binary the
 way `build.sh` does it — and a build failure scored as a FAILURE rather than
 an exit, so a rotted instrument cannot take the rest of the score down.
 
@@ -49,6 +49,8 @@ import sys
 import time
 
 from silence2_proof import FIXTURES, fixture, make_fixtures, pcm
+
+import swift_build
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 HERE = os.path.join(ROOT, "tools", "proof")
@@ -743,24 +745,14 @@ def build_probe():
     lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
     if not os.path.exists(lib):
         return None, None, f"{lib} is missing — run `cd core && cargo build --release` first"
-    stale = not os.path.exists(binary) or any(
-        os.path.getmtime(f) >= os.path.getmtime(binary) for f in sources + [entry, lib])
-    if stale:
-        sdk = subprocess.run(
-            ["xcrun", "--show-sdk-path", "--sdk", "macosx"],
-            capture_output=True, text=True).stdout.strip()
-        start = time.time()
-        result = subprocess.run(
-            ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0",
-             "-module-name", "Reelcut", "-import-objc-header",
-             os.path.join(ROOT, "app", "Bridging", "Reelcut-Bridging-Header.h"),
-             "-L", os.path.dirname(lib), "-lreelcut_core"] + sources + [entry, "-o", binary],
-            capture_output=True, text=True)
-        if result.returncode != 0 or not os.path.exists(binary):
-            errors = [line for line in result.stderr.splitlines() if ": error:" in line]
-            return None, None, ("swiftc failed:\n      "
-                                + "\n      ".join(errors[:8] or ["(no error lines)"]))
-        print(f"silence2 probe: {binary} (built in {time.time() - start:.1f} s)")
+    try:
+        built = swift_build.build(sources=sources + [entry], output=binary)
+    except swift_build.SwiftBuildFailed as error:
+        errors = [line for line in error.diagnostics if ": error:" in line]
+        return None, None, ("swiftc failed:\n      "
+                            + "\n      ".join(errors[:8] or ["(no error lines)"]))
+    if not built.reused:
+        print(f"silence2 probe: {binary} (built in {built.seconds:.1f} s)")
     else:
         print(f"silence2 probe: {binary} (up to date)")
 

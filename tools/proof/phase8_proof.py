@@ -57,8 +57,8 @@ the thing to check is app arithmetic or app structure with no caller a script
 can reach, the answer is a probe and not a photograph — and adding a tool so
 that a proof could exist would be the proof deciding the product's API. So
 section 5 compiles every file in `app/Sources` except its `main.swift`
-against a `main.swift` of this script's own (`tools/proof/harness/build.sh`'s
-swiftc line, cached on modification times), opens the package section 5 just
+against a `main.swift` of this script's own (`tools/proof/swift_build.py`'s
+line, cached by content), opens the package section 5 just
 saved, puts an `EditorViewController` in a window, spins the runloop until
 the player has an item, and reads the render size of the composition that
 item is carrying. At Full it is the canvas, at Half 320 × 180, at Quarter
@@ -176,6 +176,7 @@ import zlib
 
 import mcp as mcp_launch
 from mcp import MCP, ToolError, log_beside, remove_scratch, target
+import swift_build
 
 SOCKET = target(sys.argv)
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -1075,13 +1076,11 @@ exit(0)
 
 
 def build_player_probe():
-    """The whole-app probe, compiled and cached on modification times.
-
-    `tools/proof/harness/build.sh`'s swiftc line, with a `main.swift` of this
-    script's own — the shape `phase6_chrome.py` established for the checks a
-    render cannot answer. Cached the way that script caches: rebuilt when any
-    source, this file or the staticlib is newer than the binary, so a re-run
-    costs nothing and a stale instrument is impossible."""
+    """The whole-app probe, compiled through `swift_build.build` with a
+    `main.swift` of this script's own — the shape `phase6_chrome.py`
+    established for the checks a render cannot answer. Reused when every
+    input is byte-identical to a cached build's, so a re-run costs nothing
+    and a stale instrument is impossible."""
     out = os.path.join(WORK, "phase8-player")
     os.makedirs(out, exist_ok=True)
     binary = os.path.join(out, "playerprobe")
@@ -1095,20 +1094,11 @@ def build_player_probe():
         if name.endswith(".swift") and name != "main.swift")
     with open(main, "w") as handle:
         handle.write(PLAYER_PROBE_MAIN)
-    newest = max(os.path.getmtime(path) for path in [*sources, main, library, __file__])
-    if os.path.exists(binary) and os.path.getmtime(binary) > newest:
-        return binary
-    sdk = subprocess.run(["xcrun", "--show-sdk-path", "--sdk", "macosx"],
-                         capture_output=True, text=True, check=True).stdout.strip()
-    build = subprocess.run(
-        ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
-         "-import-objc-header",
-         os.path.join(ROOT, "app", "Bridging", "Reelcut-Bridging-Header.h"),
-         "-L", os.path.join(ROOT, "core", "target", "release"), "-lreelcut_core",
-         *sources, main, "-o", binary],
-        capture_output=True, text=True)
-    if build.returncode != 0:
-        raise RuntimeError(f"the player probe would not build: {build.stderr.strip()[-600:]}")
+    try:
+        swift_build.build(sources=[*sources, main], output=binary)
+    except swift_build.SwiftBuildFailed as error:
+        raise RuntimeError("the player probe would not build: "
+                           + "\n".join(error.diagnostics).strip()[-600:]) from None
     return binary
 
 

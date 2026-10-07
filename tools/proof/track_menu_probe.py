@@ -11,8 +11,8 @@ beside Remove Track.
 No MCP call can reach a right-click — `remove_track` and `set_track` already
 have their tools, and what is new is which track a CLICK names — so this is
 `CLAUDE.md`'s instrument for app STRUCTURE with no caller a script can
-reach: a probe compiled out of `app/Sources` over `harness/build.sh`'s own
-swiftc line (`marquee_probe.py`'s builder, one probe along), a build failure
+reach: a probe compiled out of `app/Sources` over `swift_build.py`'s line
+(`marquee_probe.py`'s builder, one probe along), a build failure
 scored as a FAILURE rather than an exit. It puts a real
 `EditorViewController` in an offscreen `NSWindow` over a three-track
 fixture — front and middle EMPTY, the back one holding a text clip — and
@@ -56,7 +56,8 @@ import json
 import os
 import subprocess
 import sys
-import time
+
+import swift_build
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 PROBE = os.path.join(ROOT, "tools", "proof", "work", "track-menu-probe")
@@ -302,9 +303,9 @@ write(answer)
 
 
 def build_probe():
-    """`refusal_probe.py`'s builder, one probe along: the same swiftc line as
-    `harness/build.sh`, the same staleness rule, and a reason instead of an
-    exit when it will not build."""
+    """`refusal_probe.py`'s builder, one probe along: `swift_build.build`
+    (reused when every input is byte-identical to a cached build's), and a
+    reason instead of an exit when it will not build."""
     os.makedirs(PROBE, exist_ok=True)
     binary = os.path.join(PROBE, "trackmenuprobe")
     entry = os.path.join(PROBE, "main.swift")
@@ -318,24 +319,15 @@ def build_probe():
     lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
-    if os.path.exists(binary) and all(
-        os.path.getmtime(f) < os.path.getmtime(binary) for f in sources + [entry, lib]
-    ):
-        print(f"track menu probe: {binary} (up to date)")
-        return binary, None
-    sdk = subprocess.run(
-        ["xcrun", "--show-sdk-path", "--sdk", "macosx"], capture_output=True, text=True
-    ).stdout.strip()
-    start = time.time()
-    result = subprocess.run(
-        ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
-         "-import-objc-header", os.path.join(ROOT, "app", "Bridging", "Reelcut-Bridging-Header.h"),
-         "-L", os.path.dirname(lib), "-lreelcut_core"] + sources + [entry, "-o", binary],
-        capture_output=True, text=True)
-    if result.returncode != 0 or not os.path.exists(binary):
-        errors = [line for line in result.stderr.splitlines() if ": error:" in line]
+    try:
+        built = swift_build.build(sources=sources + [entry], output=binary)
+    except swift_build.SwiftBuildFailed as error:
+        errors = [line for line in error.diagnostics if ": error:" in line]
         return None, "swiftc failed:\n      " + "\n      ".join(errors[:6] or ["(no error lines)"])
-    print(f"track menu probe: {binary} (built in {time.time() - start:.1f} s)")
+    if built.reused:
+        print(f"track menu probe: {binary} (up to date)")
+    else:
+        print(f"track menu probe: {binary} (built in {built.seconds:.1f} s)")
     return binary, None
 
 

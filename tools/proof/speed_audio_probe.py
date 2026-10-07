@@ -6,7 +6,7 @@ names the clips instead — measured through the app's own sources.
 
     python3 tools/proof/speed_audio_probe.py [--sources DIR] [--mutant NAME] [--only IDS]
 
-`speed_audio_probe.swift` is built with `sheet_queue_probe.py`'s swiftc line
+`speed_audio_probe.swift` is built with `swift_build.py`'s line
 over `--sources` and run once, in a process of its own, under
 `tools/proof/work/speed-audio/<tree|mutant-NAME>/`, killed at a 240 s wall.
 Prints `<ID> pass|fail — <detail>` per row, then `scores: N/M`.
@@ -68,6 +68,8 @@ import shutil
 import subprocess
 import sys
 
+import swift_build
+
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/speed-audio"
 ROWS = ["B0", "C0", "S1", "S2", "S3", "S5", "S4", "I1", "I2", "I3", "I5", "I4", "R1", "R2",
@@ -88,23 +90,17 @@ def run(command, **kw):
 
 
 def build(sources, here):
-    """(binary, None) or (None, why): `sheet_queue_probe.py`'s swiftc line."""
+    """(binary, None) or (None, why): `swift_build.build`."""
     entry = here / "main.swift"
     shutil.copyfile(ROOT / "tools/proof/speed_audio_probe.swift", entry)
     binary = here / "speed-audio-probe"
     swift = sorted(str(p) for p in sources.glob("*.swift") if p.name != "main.swift")
     if len(swift) < 100:
         return None, "app source set incomplete"
-    sdk = run(["xcrun", "--show-sdk-path", "--sdk", "macosx"]).stdout.strip()
-    lib = ROOT / "core/target/release/libreelcut_core.a"
-    result = run(["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0",
-                  "-module-name", "Reelcut", "-import-objc-header",
-                  str(ROOT / "app/Bridging/Reelcut-Bridging-Header.h"),
-                  "-L", str(lib.parent), "-lreelcut_core", *swift, str(entry),
-                  "-o", str(binary)])
-    if result.returncode:
-        lines = [line for line in result.stderr.splitlines() if ": error:" in line]
-        return None, "swiftc: " + "; ".join(lines[:8] or [result.stderr[-600:]])
+    try:
+        swift_build.build(sources=swift + [entry], output=binary)
+    except swift_build.SwiftBuildFailed as error:
+        return None, "swiftc: " + "; ".join(error.diagnostics[:8])
     return binary, None
 
 

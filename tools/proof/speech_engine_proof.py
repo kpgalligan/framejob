@@ -38,6 +38,7 @@ import wave
 
 from mcp import MCP, ToolError, target
 from silence2_proof import SPEECH_TEXT
+import swift_build
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
@@ -252,16 +253,11 @@ def build_probe(sources, out):
                    if n.endswith(".swift") and n != "main.swift")
     if len(swift) < 100:
         return None, f"app source set incomplete ({len(swift)} files)"
-    sdk = run(["xcrun", "--show-sdk-path", "--sdk", "macosx"], 60).stdout.strip()
     binary = os.path.join(out, "speech-engine-probe")
-    answer = run(["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0",
-                  "-module-name", "Reelcut", "-import-objc-header",
-                  os.path.join(ROOT, "app", "Bridging", "Reelcut-Bridging-Header.h"),
-                  "-L", os.path.join(ROOT, "core", "target", "release"), "-lreelcut_core",
-                  *swift, entry, "-o", binary], 900)
-    if answer.returncode:
-        errors = [line for line in answer.stderr.splitlines() if ": error:" in line]
-        return None, "swiftc: " + "; ".join(errors[:6] or [answer.stderr[-400:]])
+    try:
+        swift_build.build(sources=swift + [entry], output=binary, timeout=900)
+    except swift_build.SwiftBuildFailed as error:
+        return None, "swiftc: " + "; ".join(error.diagnostics[:6])
     return binary, ""
 
 

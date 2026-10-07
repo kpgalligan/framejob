@@ -2,7 +2,7 @@
 """The graphics engine through the app's wrappers: road map 10's G1d (§10.4).
 
 Builds `graphics_ffi_probe.swift` over `app/Sources` with
-`tools/proof/harness/build.sh`'s swiftc line (a probe that will not build is a
+`tools/proof/swift_build.py`'s line (a probe that will not build is a
 scored FAILURE, never an exit), runs it under `graphics_spike/bounded.py`'s
 `run`, and scores what it measured against oracles of its own:
 
@@ -43,6 +43,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
 from bounded import run as bounded_run  # noqa: E402
+import swift_build  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/graphics-ffi-probe"
 FONTS = ROOT / "app/Resources/Fonts"
@@ -66,18 +67,12 @@ def build(sources, out, seconds):
     shutil.copyfile(ROOT / "tools/proof/graphics_ffi_probe.swift", entry)
     binary = out / "graphics-ffi-probe"
     swift = sorted(str(p) for p in Path(sources).glob("*.swift") if p.name != "main.swift")
-    sdk = bounded_run(["xcrun", "--show-sdk-path", "--sdk", "macosx"], 60)["stdout"].strip()
-    lib = ROOT / "core/target/release/libreelcut_core.a"
-    result = bounded_run(
-        ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
-         "-import-objc-header", str(ROOT / "app/Bridging/Reelcut-Bridging-Header.h"),
-         "-L", str(lib.parent), "-lreelcut_core", *swift, str(entry), "-o", str(binary)],
-        seconds)
-    if result["expired"]:
-        return None, f"the build did not finish within {seconds} s"
-    if result["rc"]:
-        errors = [line for line in result["stderr"].splitlines() if ": error:" in line]
-        return None, "; ".join(errors[:8]) or result["stderr"][-600:]
+    try:
+        swift_build.build(sources=swift + [entry], output=binary, timeout=seconds)
+    except swift_build.SwiftBuildFailed as error:
+        if error.expired:
+            return None, f"the build did not finish within {seconds} s"
+        return None, "; ".join(error.diagnostics[:8])
     return binary, ""
 
 

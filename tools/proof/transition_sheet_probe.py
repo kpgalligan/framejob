@@ -19,8 +19,8 @@ is asserted here is the COMMAND: when the sheet appears and when it must not,
 what it says, what each button does to the document, and that a shift is ONE
 undo step that restores the document byte for byte. So it is
 `phase9_probe.py`'s instrument: a `main.swift` compiled against the whole of
-`app/Sources` with `harness/build.sh`'s swiftc line, an editor in a real
-window, cached on modification times, a build failure scored as a FAILURE.
+`app/Sources` with `swift_build.py`'s line, an editor in a real
+window, cached by content, a build failure scored as a FAILURE.
 `window.endSheet(_:returnCode:)` presses a button, which runs the sheet's own
 completion exactly as a click does.
 
@@ -59,7 +59,8 @@ import os
 import shutil
 import subprocess
 import sys
-import time
+
+import swift_build
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -333,25 +334,17 @@ def build_probe():
     lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
-    if os.path.exists(binary) and all(
-        os.path.getmtime(f) < os.path.getmtime(binary) for f in sources + [entry, lib]
-    ):
-        print(f"probe: {binary} (up to date)")
-        return binary, None
-    sdk = subprocess.run(["xcrun", "--show-sdk-path", "--sdk", "macosx"],
-                         capture_output=True, text=True).stdout.strip()
-    start = time.time()
-    result = subprocess.run(
-        ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
-         "-import-objc-header", os.path.join(ROOT, "app", "Bridging", "Reelcut-Bridging-Header.h"),
-         "-L", os.path.dirname(lib), "-lreelcut_core"] + sources + [entry, "-o", binary],
-        capture_output=True, text=True)
-    if result.returncode != 0 or not os.path.exists(binary):
-        errors = [line for line in result.stderr.splitlines() if ": error:" in line]
-        tail = [line for line in result.stderr.strip().splitlines()[-4:] if line.strip()]
-        return None, (f"swiftc exited {result.returncode}: "
+    try:
+        built = swift_build.build(sources=sources + [entry], output=binary)
+    except swift_build.SwiftBuildFailed as error:
+        errors = [line for line in error.diagnostics if ": error:" in line]
+        tail = error.diagnostics[-4:]
+        return None, (f"swiftc exited {error.rc if error.rc is not None else 'before running'}: "
                       + " | ".join(errors[:6] or tail or ["(no output)"]))
-    print(f"probe: {binary} (built in {time.time() - start:.1f} s)")
+    if built.reused:
+        print(f"probe: {binary} (up to date)")
+    else:
+        print(f"probe: {binary} (built in {built.seconds:.1f} s)")
     return binary, None
 
 

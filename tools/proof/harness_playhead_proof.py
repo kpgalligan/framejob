@@ -28,7 +28,7 @@ action A (id 3) over 0.5–1.5 s ending `{video: {opacity: 0.5}}` and action B
 
 `--mutant` writes `harness/main.swift` minus its anchor line to
 `work/harness-playhead/mutant-<name>/main.swift`, compiles it last after
-`app/Sources/*.swift` minus the app's `main.swift` on `build.sh`'s swiftc line,
+`app/Sources/*.swift` minus the app's `main.swift` through `swift_build.py`,
 and follows rule R (README B13): 1 caught, 0 survived, 2 not performed.
 """
 
@@ -36,11 +36,11 @@ import os
 import shutil
 import subprocess
 import sys
-import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2_chrome as e2  # noqa: E402
 import clip_inspector_proof as ci  # noqa: E402
+import swift_build  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -91,18 +91,6 @@ def fixture():
             ci.action(4, 2.0, 3.5, {"video": {"x": 100.0}})])]))
 
 
-def swiftc_line(sources, out):
-    """`build.sh`'s swiftc flags, verbatim."""
-    sdk = subprocess.run(["xcrun", "--show-sdk-path", "--sdk", "macosx"],
-                         capture_output=True, text=True).stdout.strip()
-    return ["swiftc", "-D", "REELCUT_DEV_TOOLS", "-sdk", sdk,
-            "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
-            "-import-objc-header",
-            os.path.join(ROOT, "app", "Bridging", "Reelcut-Bridging-Header.h"),
-            "-L", os.path.join(ROOT, "core", "target", "release"), "-lreelcut_core",
-            *sources, "-o", out]
-
-
 def build(mutant: str | None) -> tuple[str | None, str]:
     """The harness: `build.sh`'s for a plain run, a mutant copy's otherwise.
     Answers (binary, note) or (None, why)."""
@@ -131,11 +119,11 @@ def build(mutant: str | None) -> tuple[str | None, str]:
     sources = [os.path.join(sources_dir, name) for name in sorted(os.listdir(sources_dir))
                if name.endswith(".swift") and name != "main.swift"]
     binary = os.path.join(here, "harness")
-    began = time.time()
-    result = subprocess.run(swiftc_line(sources + [copy], binary),
-                            capture_output=True, text=True)
-    if result.returncode != 0 or not os.path.exists(binary):
-        return None, "swiftc failed: " + (result.stdout + result.stderr).strip()[-600:]
+    try:
+        built = swift_build.build(sources=sources + [copy], output=binary,
+                                  defines=["REELCUT_DEV_TOOLS"])
+    except swift_build.SwiftBuildFailed as error:
+        return None, "swiftc failed: " + "\n".join(error.diagnostics).strip()[-600:]
     resources = os.path.join(ROOT, "app", "Resources")
     shutil.copytree(os.path.join(resources, "Fonts"), os.path.join(here, "Fonts"))
     shutil.copytree(os.path.join(resources, "Models"), os.path.join(here, "Models"))
@@ -143,7 +131,8 @@ def build(mutant: str | None) -> tuple[str | None, str]:
                 os.path.join(here, "GraphicsAPI.md"))
     shutil.copy(os.path.join(ROOT, "docs", "graphics-api.d.ts"),
                 os.path.join(here, "GraphicsAPI.d.ts"))
-    return binary, f"built {os.path.relpath(binary, ROOT)} in {time.time() - began:.0f} s"
+    verb = "reused" if built.reused else "built"
+    return binary, f"{verb} {os.path.relpath(binary, ROOT)} in {built.seconds:.0f} s"
 
 
 def render(binary, package, out, select, playhead, action="-") -> tuple[str | None, str | None]:

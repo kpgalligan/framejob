@@ -8,7 +8,7 @@ render does (spec §11 K-3).
 
 One instrument, the probe `text_break_probe.swift`, compiled AS `main.swift`
 over every file in `app/Sources` but the app's own `main.swift` on
-`harness/build.sh`'s swiftc line, `-D REELCUT_DEV_TOOLS` included, with the
+`swift_build.py`'s line, `-D REELCUT_DEV_TOOLS` included, with the
 app's `Compositor.metal` built into a `default.metallib` beside it (a probe
 that will not build is a scored FAILURE, never an exit). In the app's own
 window it opens the in-canvas editor over one text clip per fixture and
@@ -71,6 +71,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import e2_chrome as e2  # noqa: E402  (video_props, project, write_package)
 import text_edit_proof as te  # noqa: E402  (build_shader)
+import swift_build  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -218,27 +219,17 @@ def build_probe(sources, out):
     lib = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
     if not os.path.exists(lib):
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
-    if os.path.exists(binary) and all(
-            os.path.getmtime(f) < os.path.getmtime(binary) for f in swift + [entry, lib]):
-        return binary, None
-    sdk = subprocess.run(["xcrun", "--show-sdk-path", "--sdk", "macosx"],
-                         capture_output=True, text=True).stdout.strip()
-    start = time.time()
     try:
-        result = subprocess.run(
-            ["swiftc", "-D", "REELCUT_DEV_TOOLS", "-sdk", sdk, "-target",
-             "arm64-apple-macos26.0", "-module-name", "Reelcut",
-             "-import-objc-header", os.path.join(ROOT, "app", "Bridging",
-                                                 "Reelcut-Bridging-Header.h"),
-             "-L", os.path.dirname(lib), "-lreelcut_core"] + swift + [entry, "-o", binary],
-            capture_output=True, text=True, timeout=900)
-    except subprocess.TimeoutExpired:
-        return None, "swiftc expired after 900 s"
-    if result.returncode != 0 or not os.path.exists(binary):
-        errors = [line for line in result.stderr.splitlines() if ": error:" in line]
+        built = swift_build.build(sources=swift + [entry], output=binary,
+                                  defines=["REELCUT_DEV_TOOLS"], timeout=900)
+    except swift_build.SwiftBuildFailed as error:
+        if error.expired:
+            return None, "swiftc expired after 900 s"
+        errors = [line for line in error.diagnostics if ": error:" in line]
         return None, "swiftc failed:\n       " + "\n       ".join(
             errors[:6] or ["(no error lines)"])
-    print(f"  probe built in {time.time() - start:.0f} s")
+    if not built.reused:
+        print(f"  probe built in {built.seconds:.0f} s")
     return binary, None
 
 

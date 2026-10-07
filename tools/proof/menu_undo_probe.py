@@ -7,7 +7,7 @@ such a target's action is still one step (F1).
 
     python3 tools/proof/menu_undo_probe.py [--sources DIR] [--mutant NAME] [--only IDS]
 
-`menu_undo_probe.swift` is built with `relink_sheet_probe.py`'s swiftc line
+`menu_undo_probe.swift` is built with `swift_build.py`'s line
 plus `-D REELCUT_DEV_TOOLS` (`UIMenu` exists only there, as `v2_menu.py`
 builds its probe) over `--sources` and run once, in a process of its own,
 under `tools/proof/work/menu-undo/`, killed at a 120 s wall. No media. Prints
@@ -61,6 +61,8 @@ import shutil
 import subprocess
 import sys
 
+import swift_build
+
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/menu-undo"
 ROWS = ["B0", "M1", "M2", "V1", "F1"]
@@ -84,25 +86,18 @@ def run(command, **kw):
 
 
 def build(sources, here):
-    """(binary, None) or (None, why): `relink_sheet_probe.py`'s swiftc line
-    with `-D REELCUT_DEV_TOOLS`."""
+    """(binary, None) or (None, why): `swift_build.build` with
+    `-D REELCUT_DEV_TOOLS`."""
     entry = here / "main.swift"
     shutil.copyfile(ROOT / "tools/proof/menu_undo_probe.swift", entry)
     binary = here / "menu-undo-probe"
     swift = sorted(str(p) for p in sources.glob("*.swift") if p.name != "main.swift")
     if len(swift) < 100:
         return None, "app source set incomplete"
-    sdk = run(["xcrun", "--show-sdk-path", "--sdk", "macosx"]).stdout.strip()
-    lib = ROOT / "core/target/release/libreelcut_core.a"
-    result = run(["swiftc", "-D", "REELCUT_DEV_TOOLS", "-sdk", sdk,
-                  "-target", "arm64-apple-macos26.0",
-                  "-module-name", "Reelcut", "-import-objc-header",
-                  str(ROOT / "app/Bridging/Reelcut-Bridging-Header.h"),
-                  "-L", str(lib.parent), "-lreelcut_core", *swift, str(entry),
-                  "-o", str(binary)])
-    if result.returncode:
-        lines = [line for line in result.stderr.splitlines() if ": error:" in line]
-        return None, "swiftc: " + "; ".join(lines[:8] or [result.stderr[-600:]])
+    try:
+        swift_build.build(sources=swift + [entry], output=binary, defines=["REELCUT_DEV_TOOLS"])
+    except swift_build.SwiftBuildFailed as error:
+        return None, "swiftc: " + "; ".join(error.diagnostics[:8])
     return binary, None
 
 

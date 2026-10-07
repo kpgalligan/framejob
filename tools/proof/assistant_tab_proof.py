@@ -3,7 +3,7 @@
 AI-14, AI-17, AI-19).
 
 P — the probe `assistant_tab_probe.swift`, compiled over `app/Sources` minus
-`main.swift` on `harness/build.sh`'s swiftc line (`-D REELCUT_DEV_TOOLS`; a
+`main.swift` on `swift_build.py`'s line (`-D REELCUT_DEV_TOOLS`; a
 probe that does not build is a scored FAIL on every P row), with the Release
 build's helper copied to `<probe dir>/Contents/Helpers/reelcut-agent`, run
 with `--fonts app/Resources/Fonts` (the shipped faces registered, #207), a
@@ -203,6 +203,7 @@ sys.path.insert(0, os.path.join(HERE, "graphics_spike"))
 import assistant_session_proof as asp  # noqa: E402
 import bounded  # noqa: E402
 import prices  # noqa: E402
+import swift_build  # noqa: E402
 import tree_copy  # noqa: E402
 
 WORK = os.path.join(HERE, "work", "assistant_tab")
@@ -301,37 +302,17 @@ def build_probe(sources=None, probe_dir=None):
     helpers = os.path.join(probe_dir, "Contents", "Helpers")
     os.makedirs(helpers, exist_ok=True)
     shutil.copy2(HELPER, os.path.join(helpers, "reelcut-agent"))
-    swift = sorted(os.path.join(sources, n) for n in os.listdir(sources)
-                   if n.endswith(".swift") and n != "main.swift")
-    inputs = swift + [entry, LIB, os.path.join(ROOT, "app", "Bridging",
-                                                "Reelcut-Bridging-Header.h"),
-                      os.path.join(ROOT, "core", "include", "reelcut_core.h")]
-    stamp = os.path.join(probe_dir, "sources.txt")
-    listing = "\n".join(swift)
-    if (os.path.exists(stamp) and open(stamp).read() == listing and os.path.exists(binary)
-            and all(os.path.getmtime(f) < os.path.getmtime(binary) for f in inputs)):
-        print(f"probe: {binary} (up to date)", flush=True)
-        return binary, None
-    sdk = bounded.run(["xcrun", "--show-sdk-path", "--sdk", "macosx"], 60,
-                      env=child_env())["stdout"].strip()
-    if os.path.exists(binary):
-        os.remove(binary)
-    print(f"probe: building over {len(swift)} sources (up to {WALL_BUILD} s)…", flush=True)
-    started = time.time()
-    built = bounded.run(
-        ["swiftc", "-D", "REELCUT_DEV_TOOLS", "-sdk", sdk, "-target", "arm64-apple-macos26.0",
-         "-module-name", "Reelcut", "-import-objc-header",
-         os.path.join(ROOT, "app", "Bridging", "Reelcut-Bridging-Header.h"),
-         "-L", os.path.dirname(LIB), "-lreelcut_core"] + swift + [entry, "-o", binary],
-        WALL_BUILD, env=child_env())
-    if built["rc"] != 0 or not os.path.exists(binary):
-        errors = [l for l in built["stderr"].splitlines() if ": error:" in l]
-        tail = [l for l in built["stderr"].strip().splitlines()[-4:] if l.strip()]
-        return None, (f"swiftc exited {built['rc']} (expired {built['expired']}): "
-                      + " | ".join(errors[:6] or tail or ["(no output)"]))
-    with open(stamp, "w") as f:
-        f.write(listing)
-    print(f"probe: built in {time.time() - started:.0f} s", flush=True)
+    swift = swift_build.app_sources(sources)
+    print(f"probe: {len(swift)} sources through swift_build (up to {WALL_BUILD} s)…", flush=True)
+    try:
+        built = swift_build.build(sources=swift + [entry], output=binary,
+                                  defines=["REELCUT_DEV_TOOLS"], timeout=WALL_BUILD)
+    except swift_build.SwiftBuildFailed as error:
+        return None, (f"swiftc exited {error.rc if error.rc is not None else 'before running'} "
+                      f"(expired {error.expired}): "
+                      + " | ".join(error.diagnostics[:6] or ["(no output)"]))
+    print(f"probe: {binary} (up to date)" if built.reused
+          else f"probe: built in {built.seconds:.0f} s", flush=True)
     return binary, None
 
 
