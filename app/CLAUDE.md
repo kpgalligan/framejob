@@ -1029,7 +1029,10 @@ the key map behind it.
   pixels — an invariant that held only because the two had always been
   equal, until Preview Quality. A layer mid-transition blends `normal`
   because the CORE emits it; grow no second opinion here. Where two obscure
-  regions cover one fragment the GREATER hiding wins.
+  regions cover one fragment the GREATER hiding wins. A layer's opacity is read as
+  `RecipeLayer.drawnOpacity` (`CompositorEffects.swift`): the recipe's
+  `opacity`, times `1 − word_dim × pause_dim` for a timed text page with no
+  backdrop (spec §11 W-16).
 - `LayerRenderers.swift` · `LayerRenderersText.swift` · `LayerRenderersReveal.swift`
   · `LayerRenderersWords.swift` — text and shape descriptions to textures,
   keyed by the recipe's `hash` (`RecipeSourceRef.cacheHash` is the WHOLE key;
@@ -1048,8 +1051,8 @@ the key map behind it.
   whitespace midpoints; the active token `word − 1` scaled about its pill's
   centre, the pill filled UNCLIPPED, then the midpoint clip set in TEXT space
   so it scales with the token. `drawWords` takes the recipe's `glide`,
-  `fill` and `dim` (spec §11 W-14; each defaulted to nil, each clamped to
-  0…1 there, `pauseDim` with them): with `activePill.glide` not set and the
+  `fill` and `dim` (spec §11 W-14; each defaulted to nil, each clamped to 0…1 —
+  `glide` and `fill` there, `dim` and `pauseDim` in `dimAmount`): with `activePill.glide` not set and the
   other two nil it makes the calls it always made, in their order
   (`word_looks_proof.py` B1 holds an older project's frames to the bytes).
   A GLIDING pill is filled BEFORE the base pass in every frame of the page,
@@ -1058,9 +1061,14 @@ the key map behind it.
   active token then draws with no plate. A FILL clips the active ink at a
   hard edge on a whole device pixel (`left + fill × (right − left)`; the
   token's own clip bound at 1), with the upcoming ink right of it in
-  `highlight` and nothing in `build`. A DIM is one transparency layer over
-  the words and the pill at `1 − dim × pauseDim`; the backdrop
-  (`textBitmap`) is outside it. None of the three moves a glyph or the box:
+  `highlight` and nothing in `build`. A DIM is drawn in one of two places, by one rule
+  (`wordDim(of:reveal:)`, spec §11 W-16): on a page with no backdrop the
+  bitmap holds none of it and the compositor multiplies the layer's opacity
+  (`RecipeLayer.drawnOpacity`); on a page with a backdrop `drawText` hands
+  `drawWords` the dim, and it is one transparency layer over the words and
+  the pill at `1 − dim × pauseDim`, above the backdrop `textBitmap` drew.
+  `dimAmount` is the one clamp, and the texture key is still the recipe's
+  hash, `word_dim` included. None of the three moves a glyph or the box:
   `layoutKey`, `frameKey` and `wordHeadroom` do not read them.
   `wordHeadroom` sits inside `measuredSize`
   (zero with no style or a colour-only one; 0.45 em and 0.30 em are FLOORS

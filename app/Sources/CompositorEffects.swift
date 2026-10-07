@@ -256,6 +256,20 @@ extension RecipeLayer {
     var needsBlend: Bool {
         blend != .normal
     }
+
+    /// The opacity this layer is DRAWN at, which the compositor reads
+    /// wherever it read `opacity` (spec §11 W-16): `opacity`, times
+    /// `1 − amount` when the source is a text page whose pause dim is the
+    /// layer's (`LayerRenderers.wordDim(of:reveal:)` — a timed page with no
+    /// backdrop) and the amount is above 0. In every other case it is
+    /// `opacity` ITSELF, returned and never multiplied by 1, so a layer with
+    /// no dim reaches the shader with the bits it always had.
+    var drawnOpacity: Double {
+        guard case .text(_, let props, let reveal) = source else { return opacity }
+        let dim = LayerRenderers.wordDim(of: props, reveal: reveal)
+        guard dim.onLayer, dim.amount > 0 else { return opacity }
+        return opacity * (1 - dim.amount)
+    }
 }
 
 extension Collection where Element == FilterProps {

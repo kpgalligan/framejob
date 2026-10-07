@@ -1270,7 +1270,7 @@ final class MetalRenderer {
         for layer: RecipeLayer, canvas: RecipeCanvas, destination: CGSize,
         partner: RecipeLayer? = nil
     ) -> LayerUniforms? {
-        guard layer.opacity > 0 else { return nil }
+        guard layer.drawnOpacity > 0 else { return nil }
         var u = LayerUniforms()
         u.canvasWidth = Float(max(1, canvas.width))
         u.canvasHeight = Float(max(1, canvas.height))
@@ -1285,7 +1285,7 @@ final class MetalRenderer {
         u.cropR = Float(max(0, layer.crop.r))
         u.cropB = Float(max(0, layer.crop.b))
         u.cornerRadius = Float(max(0, layer.cornerRadius))
-        u.opacity = Float(min(max(layer.opacity, 0), 1))
+        u.opacity = Float(min(max(layer.drawnOpacity, 0), 1))
         u.brightness = Float(layer.color.brightness)
         u.contrast = Float(layer.color.contrast)
         u.saturation = Float(layer.color.saturation)
@@ -1333,7 +1333,7 @@ final class MetalRenderer {
                 u.partnerMinY = Float(box.minY)
                 u.partnerMaxX = Float(box.maxX)
                 u.partnerMaxY = Float(box.maxY)
-                u.partnerAlpha = Float(min(max(partner.opacity, 0), 1))
+                u.partnerAlpha = Float(min(max(partner.drawnOpacity, 0), 1))
             }
         }
         return u

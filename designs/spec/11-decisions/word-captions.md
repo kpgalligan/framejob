@@ -209,6 +209,11 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   `layoutKey`, `frameKey` and the headroom are unchanged. All three recipe
   values and `pause_dim` are clamped to 0…1 where they are drawn, because
   `set_action_end` is lenient and text is not clamped.
+  **Amended 2026-10-07, by W-16 (#245): "in one transparency layer" now
+  holds only for a page with a backdrop.** On a page with none the dim is
+  the text layer's opacity in the compositor and the bitmap holds none of
+  it. What is seen is unchanged: one opacity over the words and the pill
+  together, and a backdrop that never dims.
 - **W-15 — The three looks are three checkboxes in the Generate Captions
   sheet and three booleans on `transcribe`, off unless asked for** (issue
   batch B86 phase 2, #96; the owner, 2026-10-05). Under the Style pop-up
@@ -278,3 +283,61 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
     app-side writer of `word_style`, and nothing in the inspector turns a
     look on or off for a page already placed (`set_text` is the agent's
     door, W-12).
+- **W-16 — The dim is the text layer's opacity in the compositor when the
+  page has no backdrop, and one transparency layer in the bitmap when it
+  has one** (issue batch B86 phase 3, #245; the owner, 2026-10-07: build
+  the cheaper draw rather than record Karaoke's page as a limit). It
+  supersedes W-14's "in one transparency layer" for a page with no
+  backdrop and changes nothing else of W-14. The layer cost by the text
+  box's area on every frame of a ramp: judged on 2026-10-06 at 3840×2160,
+  a fill with a dim read 7.57–7.76 ms on Highlight's line where the fill
+  alone read 2.77–2.78 ms, and 8.21–8.44 ms on Karaoke's two-line page,
+  over the 8 ms budget.
+  - **One rule, in one place** (`LayerRenderers.wordDim(of:reveal:)`). The
+    amount is `word_dim × pause_dim`, each clamped to 0…1
+    (`LayerRenderers.dimAmount`), and 0 on a page that is not timed and
+    styled. It is the LAYER's when `text.backdrop` is null and the
+    BITMAP's otherwise. `drawText` hands `drawWords` a dim only in the
+    second case; `RecipeLayer.drawnOpacity` is `opacity × (1 − amount)` in
+    the first and `opacity` itself, the same bits, in every other, and the
+    compositor reads it wherever it read `opacity`.
+  - **No backdrop: the bitmap is the undimmed page's, byte for byte**, so
+    a dim adds nothing to a raster. The compositor multiplies the finished
+    bitmap's alpha by the layer's opacity once, after every colour stage,
+    and the layer's shadow and reflection are drawn from the same number —
+    exactly what a clip's own opacity or fade is. The words and the pill
+    are both in that bitmap and nothing else is, so they still fade
+    together (W-14).
+  - **A backdrop: W-14's draw, unchanged** — the words and the pill in one
+    transparency layer above the backdrop, which never dims. The
+    compositor cannot do this one: the backdrop is in the same bitmap and
+    would dim with them. Such a page still pays the layer by its box on a
+    ramp's frames. No caption style writes a backdrop, so the Generate
+    Captions sheet and `transcribe` never make such a page; the
+    inspector's Backdrop switch, its Lower Third and Caption presets, and
+    `set_text` do. A cheaper draw for it — the words and the pill first,
+    one `destinationIn` multiply, the backdrop under them — was designed
+    in this phase and not built: it was to be kept only at or under 5.0 ms
+    at 3840×2160 and 2.5 ms at 1080×1920, and Karaoke's two-line page
+    under the default backdrop read 6.359 ms and 6.341 ms at 3840×2160
+    with NO dim (1.033 ms and 0.993 ms at 1080×1920; judged twice on
+    2026-10-07), so no draw of the dim could meet it. With the dim that
+    page read 11.289 ms and 11.227 ms, and 1.734 ms and 1.718 ms.
+    `designs/adr/roadmap-08-word-captions.md`'s Known limits has it.
+  - **The recipe and its hash are unchanged** (W-13): `word_dim` still
+    rides on the source and still folds into the hash, so each frame of a
+    ramp has its own cache key and none can be handed another's texture. A
+    ramp's frames therefore still rasterize, at the undimmed page's cost.
+    Leaving `word_dim` out of the hash would let them share one texture
+    and would put this entry's backdrop rule in the core as well as in the
+    renderer: not done.
+  - **What may move, and what may not.** With `word_dim` 0 or null a frame
+    is byte-identical to what it was (`word_looks_proof.py` B1, D2). A
+    DIMMED frame of a page with no backdrop is not the layer's to the
+    byte: the layer rounded the dimmed colour into the 8-bit bitmap, and
+    the compositor multiplies in floating point. D1 and D3 hold it to the
+    same picture. Preview, `render_frame` and both export passes draw a
+    layer from the same uniforms, so an exported frame is the previewed
+    one. A dimmed frame is as repeatable as any layer drawn below full
+    opacity: it is the one multiply a clip's own opacity takes
+    (`Compositor.metal`, step 9).

@@ -332,6 +332,11 @@ extension LayerRenderers {
     /// `renderTextBitmap`'s body, static so the Generate Captions sheet's
     /// preview (road map 8's W4b) draws with the renderer's own routine and
     /// no Metal device.
+    ///
+    /// A timed page's pause dim is in this bitmap only when the page has a
+    /// backdrop. With none the bitmap is the undimmed page's, byte for byte,
+    /// and the compositor's layer opacity carries the dim
+    /// (`wordDim(of:reveal:)`, `RecipeLayer.drawnOpacity`, spec §11 W-16).
     static func textBitmap(_ props: TextProps, reveal: RecipeReveal) -> CGContext? {
         let layout = LayerRenderers.layout(for: props)
         guard let context = LayerRenderers.bitmap(layout.size) else { return nil }
@@ -369,11 +374,14 @@ extension LayerRenderers {
     ) {
         // A timed page draws its words and nothing else (W-5: a styled page
         // gets a WHOLE reveal). A page whose `word` is null — untimed, or a
-        // count mismatch — falls through and draws static.
+        // count mismatch — falls through and draws static. The dim is
+        // handed on only when the rule says the bitmap draws it (W-16).
         if let word = reveal.word, let style = props.wordStyle {
             drawWords(
                 layout, of: props, style: style, word: word, pop: reveal.wordPop,
-                glide: reveal.wordGlide, fill: reveal.wordFill, dim: reveal.wordDim, in: context)
+                glide: reveal.wordGlide, fill: reveal.wordFill,
+                dim: wordDim(of: props, reveal: reveal).onLayer ? nil : reveal.wordDim,
+                in: context)
             return
         }
         guard let frame = layout.frame else { return }

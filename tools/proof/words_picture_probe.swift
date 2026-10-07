@@ -11,9 +11,9 @@
 //
 //   words_picture_probe <app_fonts_dir> [--quick]
 //
-// `--quick` stops after P10 and the looks' geometry (P11–P16), which are
-// measured first: before the P1/P2 sweep, ten minutes of pixel scans. It is
-// how P10 is run alone.
+// `--quick` stops after P10, the looks' geometry (P11–P17) and where the dim
+// is drawn (P18, P19), which are measured first: before the P1/P2 sweep, ten
+// minutes of pixel scans. It is how P10 is run alone.
 //
 // Fonts are registered at `.process` scope first (`text_probe.swift`'s loop):
 // a bare Mach-O has no `ATSApplicationFontsPath`.
@@ -169,6 +169,9 @@ struct WpRaster {
     /// (`CaptionPages.samplePage`): its text, its size and its wrap `width`,
     /// the active word its last. False lays `content` on one line.
     var paged = false
+    /// The page's backdrop, which no caption style writes: nil for a preset's
+    /// own page. With one, the dim is the bitmap's (spec §11 W-16).
+    var backdrop: BackdropProps? = nil
 }
 
 /// The paged case's words: `karaokeText`'s tokens, one every 0.12 s and 0.1 s
@@ -187,16 +190,27 @@ func wpPagerPage(_ caption: CaptionStyle, _ content: String, _ canvas: CGSize) -
 
 /// Highlight's four are the page P10 has always timed. One Word's (size
 /// 0.12 × min(w, h), where Highlight's is 0.075) is the largest type a
-/// preset ships, and a dim's layer costs by the box. `oneword-page fill+dim`
-/// is the page One Word generates — ONE word (`CaptionStyle.maxWords`), the
-/// text's longest — and it is scored. `oneword-line fill+dim (hand-made)`
-/// is the same six words on one line in that style: a page no preset makes
-/// and `set_text` can write, printed and never scored, as `pop` is.
+/// preset ships. `oneword-page fill+dim` is the page One Word generates —
+/// ONE word (`CaptionStyle.maxWords`), the text's longest — and it is scored.
+/// `oneword-line fill+dim (hand-made)` is the same six words on one line in
+/// that style: a page no preset makes and `set_text` can write, P10's largest
+/// box, and SCORED since issue batch B86 phase 3 — with no backdrop its dim
+/// is the compositor's (spec §11 W-16), so it is a page like the others.
 /// `karaoke-2line fill+dim` (issue batch B86 phase 2, where the sheet's Dim
 /// first reaches every word style) is the page Karaoke's PAGER makes — the
 /// one preset page of two lines, with partial-alpha upcoming ink — its last
 /// word half filled and the page half-way into its dim, which is a generated
 /// page's tail. Scored, under the same budgets.
+///
+/// Phase 3's five, after those seven so the seven keep their order. Three
+/// TWINS, printed and never scored: `oneword-page fill`, `oneword-line fill
+/// (hand-made)` and `karaoke-2line fill` are their pages with `dim` false,
+/// what a `… fill+dim` median is read against on the same run (Highlight's
+/// `fill` is `fill+dim`'s). And the page with a BACKDROP, where the dim is
+/// still the bitmap's: `karaoke-2line-backdrop fill (hand-made)` and
+/// `karaoke-2line-backdrop fill+dim (hand-made)` are the pager's Karaoke page
+/// with `BackdropProps()` — what the inspector's Backdrop switch writes; no
+/// caption style writes one — printed and not scored.
 let wpRasters: [WpRaster] = [
     WpRaster(
         label: "pop", caption: .highlight, content: pageText, word: 3, pop: 0.5, pill: nil,
@@ -215,10 +229,27 @@ let wpRasters: [WpRaster] = [
         pop: 1, pill: nil, fill: true, dim: true, glide: false, scored: true),
     WpRaster(
         label: "oneword-line fill+dim (hand-made)", caption: .oneWord, content: pageText,
-        word: 3, pop: 1, pill: nil, fill: true, dim: true, glide: false, scored: false),
+        word: 3, pop: 1, pill: nil, fill: true, dim: true, glide: false, scored: true),
     WpRaster(
         label: "karaoke-2line fill+dim", caption: .karaoke, content: karaokeText, word: 0,
         pop: 1, pill: nil, fill: true, dim: true, glide: false, scored: true, paged: true),
+    WpRaster(
+        label: "oneword-page fill", caption: .oneWord, content: "extraordinary", word: 1,
+        pop: 1, pill: nil, fill: true, dim: false, glide: false, scored: false),
+    WpRaster(
+        label: "oneword-line fill (hand-made)", caption: .oneWord, content: pageText,
+        word: 3, pop: 1, pill: nil, fill: true, dim: false, glide: false, scored: false),
+    WpRaster(
+        label: "karaoke-2line fill", caption: .karaoke, content: karaokeText, word: 0,
+        pop: 1, pill: nil, fill: true, dim: false, glide: false, scored: false, paged: true),
+    WpRaster(
+        label: "karaoke-2line-backdrop fill (hand-made)", caption: .karaoke,
+        content: karaokeText, word: 0, pop: 1, pill: nil, fill: true, dim: false, glide: false,
+        scored: false, paged: true, backdrop: BackdropProps()),
+    WpRaster(
+        label: "karaoke-2line-backdrop fill+dim (hand-made)", caption: .karaoke,
+        content: karaokeText, word: 0, pop: 1, pill: nil, fill: true, dim: true, glide: false,
+        scored: false, paged: true, backdrop: BackdropProps()),
 ]
 
 var p10: [[String: Any]] = []
@@ -246,8 +277,9 @@ for (canvasW, canvasH) in [(1080, 1920), (3840, 2160)] {
             wordFill: raster.fill ? 0.5 : nil, wordDim: raster.dim ? 0.5 : nil)
         let props = TextProps(
             content: page.content, font: page.font, size: page.size, color: page.color,
-            align: page.align, valign: page.valign, outline: page.outline, width: page.width,
-            textCase: page.textCase, wordStyle: wordStyle)
+            align: page.align, valign: page.valign, outline: page.outline,
+            backdrop: raster.backdrop, width: page.width, textCase: page.textCase,
+            wordStyle: wordStyle)
         let key = "p10-\(canvasW)-\(raster.label)"
         let warm = renderers.text(props, hash: key + "-warm", reveal: reveal)
         var milliseconds: [Double] = []
@@ -258,9 +290,14 @@ for (canvasW, canvasH) in [(1080, 1920), (3840, 2160)] {
         }
         let box = LayerRenderers.measuredSize(for: props)
         // How many lines the page was laid on: its box against one line's in
-        // the same style and size.
+        // the same style and size, under the same backdrop.
+        let single = caption.textProps(content: "x", size: page.size, width: nil)
         let oneLine = LayerRenderers.measuredSize(
-            for: caption.textProps(content: "x", size: page.size, width: nil))
+            for: TextProps(
+                content: single.content, font: single.font, size: single.size,
+                color: single.color, align: single.align, valign: single.valign,
+                outline: single.outline, backdrop: raster.backdrop, width: single.width,
+                textCase: single.textCase))
         let lines = oneLine.height > 0 ? Int((box.height / oneLine.height).rounded()) : 0
         p10.append([
             "canvas": "\(canvasW)x\(canvasH)", "case": raster.label, "drew": warm != nil,
@@ -396,16 +433,26 @@ out["p15"] = [
 
 // P16 — a value outside 0…1 draws as the nearest one inside (an action's end
 // patch is not range-checked), and a full dim at `pause_dim` 1 draws nothing.
-func wpClamped(
-    pauseDim: Double = 0.5, fill: Double? = nil, glide: Double? = nil, dim: Double? = nil
-) -> CGContext? {
-    let style = WordStyle(
+// Drawn through `drawWords` itself, the routine that clamps, into a bitmap of
+// the page's own size: since spec §11 W-16 `textBitmap` hands a page with no
+// backdrop no dim at all (P18), so it could not show the dim's clamp.
+func wpClampStyle(_ pauseDim: Double) -> WordStyle {
+    WordStyle(
         activeColor: wpRedColor, activePill: ActivePill(color: [1, 0, 1, 1], glide: true),
         spokenColor: wpGreenColor, upcomingColor: wpBlueColor, activeFill: true,
         pauseDim: pauseDim)
-    return wpDraw(
-        wpLookPage("sun moon star", style: style),
-        RecipeReveal(word: 2, wordGlide: glide, wordFill: fill, wordDim: dim))
+}
+func wpClamped(
+    pauseDim: Double = 0.5, fill: Double? = nil, glide: Double? = nil, dim: Double? = nil
+) -> CGContext? {
+    let style = wpClampStyle(pauseDim)
+    let props = wpLookPage("sun moon star", style: style)
+    let layout = LayerRenderers.layout(for: props)
+    guard let context = LayerRenderers.bitmap(layout.size) else { return nil }
+    LayerRenderers.drawWords(
+        layout, of: props, style: style, word: 2, pop: nil, glide: glide, fill: fill, dim: dim,
+        in: context)
+    return context
 }
 let wpEqual: [(String, CGContext?, CGContext?)] = [
     ("fill -0.5 as 0", wpClamped(fill: -0.5), wpClamped(fill: 0)),
@@ -450,6 +497,203 @@ out["p17"] = [
     "to": wpRedRect(wpMixed, RecipeReveal(word: 2, wordGlide: 1)),
     "half": wpRedRect(wpMixed, RecipeReveal(word: 2, wordGlide: 0.2063)),
 ]
+
+// MARK: P18, P19 — where the dim is drawn (issue batch B86 phase 3, spec §11 W-16)
+
+let wpYellow: RGBA = [1, 1, 0, 1]
+/// P16's page under `backdrop`, as `TextProps`.
+func wpDimPage(_ pauseDim: Double, backdrop: BackdropProps? = nil) -> TextProps {
+    let page = wpLookPage("sun moon star", style: wpClampStyle(pauseDim))
+    return TextProps(
+        content: page.content, font: page.font, size: page.size, color: page.color,
+        outline: page.outline, backdrop: backdrop, width: page.width, textCase: page.textCase,
+        wordStyle: page.wordStyle)
+}
+func wpDimAnswer(_ props: TextProps, _ reveal: RecipeReveal) -> [String: Any] {
+    let answer = LayerRenderers.wordDim(of: props, reveal: reveal)
+    return ["amount": answer.amount, "on_layer": answer.onLayer]
+}
+
+// P18 — the rule. No backdrop: `textBitmap` holds none of the dim. A backdrop
+// (opaque yellow, which is no ink of this page: white, red, magenta, green,
+// blue): the bitmap holds it, and the bare backdrop is untouched.
+let wpBare = wpDimPage(0.5)
+let wpPlated = wpDimPage(0.5, backdrop: BackdropProps(color: wpYellow, radius: 0))
+let wpPlatedLit = wpDraw(wpPlated, RecipeReveal(word: 2))
+let wpPlatedDim = wpDraw(wpPlated, RecipeReveal(word: 2, wordDim: 0.5))
+/// Of the pixels that are exactly the opaque yellow backdrop in `lit`: how
+/// many there are, and how many are other bytes in `dimmed`.
+func wpBareBackdrop(_ lit: CGContext?, _ dimmed: CGContext?) -> [String: Any] {
+    guard let lit, let dimmed, let a = lit.data, let b = dimmed.data,
+        lit.width == dimmed.width, lit.height == dimmed.height,
+        lit.bytesPerRow == dimmed.bytesPerRow
+    else { return ["pixels": 0, "moved": -1] }
+    let one = a.assumingMemoryBound(to: UInt8.self)
+    let two = b.assumingMemoryBound(to: UInt8.self)
+    var pixels = 0
+    var moved = 0
+    for y in 0..<lit.height {
+        for x in 0..<lit.width {
+            let at = y * lit.bytesPerRow + x * 4
+            // BGRA, premultiplied: opaque yellow is (0, 255, 255, 255).
+            guard one[at] == 0, one[at + 1] == 255, one[at + 2] == 255, one[at + 3] == 255
+            else { continue }
+            pixels += 1
+            if (0..<4).contains(where: { two[at + $0] != one[at + $0] }) { moved += 1 }
+        }
+    }
+    return ["pixels": pixels, "moved": moved]
+}
+let wpUnstyled = TextProps(content: "sun moon star", font: "Montserrat-Black", size: 80)
+out["p18"] = [
+    "bare_half_same_as_nil": wpSame(
+        wpDraw(wpBare, RecipeReveal(word: 2, wordDim: 0.5)), wpDraw(wpBare, RecipeReveal(word: 2))),
+    "bare_full_same_as_nil": wpSame(
+        wpDraw(wpDimPage(1), RecipeReveal(word: 2, wordDim: 1)),
+        wpDraw(wpBare, RecipeReveal(word: 2))),
+    "bare_ink": wpDraw(wpBare, RecipeReveal(word: 2, wordDim: 0.5))
+        .map { wpRect(wpInk($0, wpAny)) } ?? "no bitmap",
+    "bare_answer": wpDimAnswer(wpBare, RecipeReveal(word: 2, wordDim: 0.5)),
+    "plated_same_as_nil": wpSame(wpPlatedDim, wpPlatedLit),
+    "plated_backdrop": wpBareBackdrop(wpPlatedLit, wpPlatedDim),
+    "plated_answer": wpDimAnswer(wpPlated, RecipeReveal(word: 2, wordDim: 0.5)),
+    "amounts": [
+        "word nil": wpDimAnswer(wpBare, RecipeReveal(wordDim: 0.5)),
+        "no style": wpDimAnswer(wpUnstyled, RecipeReveal(word: 2, wordDim: 0.5)),
+        "word_dim nil": wpDimAnswer(wpBare, RecipeReveal(word: 2)),
+        "word_dim 2": wpDimAnswer(wpBare, RecipeReveal(word: 2, wordDim: 2)),
+        "pause_dim 2": wpDimAnswer(wpDimPage(2), RecipeReveal(word: 2, wordDim: 0.5)),
+        "word_dim -1": wpDimAnswer(wpBare, RecipeReveal(word: 2, wordDim: -1)),
+        "pause_dim -1": wpDimAnswer(wpDimPage(-1), RecipeReveal(word: 2, wordDim: 0.5)),
+    ],
+]
+
+// P19 — a dimmed page WITH a backdrop is the lit page at one opacity over an
+// untouched backdrop. Three `textBitmap`s a page: D, the dimmed page; U, the
+// same page with its backdrop's alpha 0 and no dim (the words and the pill
+// alone, in the same box); B, the same page in `build` at word 0 (the
+// backdrop alone). The reference is this probe's own arithmetic per
+// premultiplied byte, `U·(1 − a) + B·(1 − U_alpha·(1 − a))`, unrounded.
+struct WpDimCase {
+    let label: String
+    let style: WordStyle
+    let backdrop: BackdropProps
+    let outline: OutlineProps?
+    let reveal: RecipeReveal
+    let amount: Double
+}
+func wpDimStyle(_ style: WordStyle, mode: WordMode) -> WordStyle {
+    WordStyle(
+        mode: mode, activeColor: style.activeColor, activeScale: style.activeScale,
+        activePill: style.activePill, spokenColor: style.spokenColor,
+        upcomingColor: style.upcomingColor, activeFill: style.activeFill,
+        pauseDim: style.pauseDim)
+}
+func wpDimProps(_ one: WpDimCase, style: WordStyle, backdrop: BackdropProps) -> TextProps {
+    TextProps(
+        content: "sun moon star", font: "Montserrat-Black", size: 80, color: [1, 1, 1, 1],
+        outline: one.outline, backdrop: backdrop, textCase: .upper, wordStyle: style)
+}
+let wpPlate = BackdropProps(color: wpYellow, radius: 0)
+let wpDimCases: [WpDimCase] = [
+    WpDimCase(
+        label: "opaque", style: wpClampStyle(0.5), backdrop: wpPlate, outline: nil,
+        reveal: RecipeReveal(word: 2, wordGlide: 0.5, wordFill: 0.5, wordDim: 0.5), amount: 0.25),
+    WpDimCase(
+        label: "default",
+        style: WordStyle(
+            activeColor: wpRedColor, activeScale: 1.5, spokenColor: [0, 1, 0, 0.5],
+            upcomingColor: wpBlueColor, pauseDim: 0.5),
+        backdrop: BackdropProps(), outline: OutlineProps(width: 8, color: [0, 0, 0, 1]),
+        reveal: RecipeReveal(word: 2, wordPop: 0.5, wordDim: 1), amount: 0.5),
+    WpDimCase(
+        label: "full", style: wpClampStyle(1), backdrop: wpPlate, outline: nil,
+        reveal: RecipeReveal(word: 2, wordGlide: 0.5, wordFill: 0.5, wordDim: 1), amount: 1),
+]
+var p19: [[String: Any]] = []
+for one in wpDimCases {
+    let page = wpDimProps(one, style: one.style, backdrop: one.backdrop)
+    var clear = one.backdrop.color
+    if clear.count > 3 { clear[3] = 0 }
+    let alone = wpDimProps(
+        one, style: one.style,
+        backdrop: BackdropProps(
+            color: clear, padding: one.backdrop.padding, radius: one.backdrop.radius))
+    let lit = RecipeReveal(
+        word: one.reveal.word, wordPop: one.reveal.wordPop, wordGlide: one.reveal.wordGlide,
+        wordFill: one.reveal.wordFill)
+    let plate = wpDimProps(one, style: wpDimStyle(one.style, mode: .build), backdrop: one.backdrop)
+    var row: [String: Any] = [
+        "page": one.label, "amount": one.amount,
+        "answer": wpDimAnswer(page, one.reveal), "drew": false,
+    ]
+    if let d = wpDraw(page, one.reveal), let u = wpDraw(alone, lit),
+        let b = wpDraw(plate, RecipeReveal(word: 0)),
+        let dData = d.data, let uData = u.data, let bData = b.data,
+        d.width == u.width, d.height == u.height, d.width == b.width, d.height == b.height,
+        d.bytesPerRow == u.bytesPerRow, d.bytesPerRow == b.bytesPerRow {
+        let dp = dData.assumingMemoryBound(to: UInt8.self)
+        let up = uData.assumingMemoryBound(to: UInt8.self)
+        let bp = bData.assumingMemoryBound(to: UInt8.self)
+        let keep = 1 - one.amount
+        var worst = 0.0
+        var worstAt: [String: Any] = [:]
+        var over1 = 0
+        var over3 = 0
+        var inked = 0
+        var empty = 0
+        var emptyMoved = 0
+        // The largest distance per pixel class: U's alpha 255 (full ink), 1…254
+        // (an antialiased edge or a partial-alpha ink) — where a difference
+        // sits says what made it.
+        var worstFull = 0.0
+        var worstEdge = 0.0
+        for y in 0..<d.height {
+            for x in 0..<d.width {
+                let at = y * d.bytesPerRow + x * 4
+                let alpha = Double(up[at + 3])
+                if alpha == 0 {
+                    empty += 1
+                    if (0..<4).contains(where: { dp[at + $0] != bp[at + $0] }) { emptyMoved += 1 }
+                } else {
+                    inked += 1
+                }
+                for channel in 0..<4 {
+                    let reference = Double(up[at + channel]) * keep
+                        + Double(bp[at + channel]) * (1 - alpha / 255 * keep)
+                    let distance = abs(Double(dp[at + channel]) - reference)
+                    if distance > 1 { over1 += 1 }
+                    if distance > 3 { over3 += 1 }
+                    if alpha == 255 { worstFull = max(worstFull, distance) }
+                    if alpha > 0, alpha < 255 { worstEdge = max(worstEdge, distance) }
+                    if distance > worst {
+                        worst = distance
+                        worstAt = [
+                            "x": x, "y": y, "channel": ["b", "g", "r", "a"][channel],
+                            "d": (0..<4).map { Int(dp[at + $0]) },
+                            "u": (0..<4).map { Int(up[at + $0]) },
+                            "b": (0..<4).map { Int(bp[at + $0]) }, "reference": reference,
+                        ]
+                    }
+                }
+            }
+        }
+        row["drew"] = true
+        row["size"] = "\(d.width)x\(d.height)"
+        row["distance"] = worst
+        row["worst_at"] = worstAt
+        row["distance_full_ink"] = worstFull
+        row["distance_partial_ink"] = worstEdge
+        row["bytes_over_1"] = over1
+        row["bytes_over_3"] = over3
+        row["ink_pixels"] = inked
+        row["empty_pixels"] = empty
+        row["empty_moved"] = emptyMoved
+        row["same_as_backdrop"] = wpSame(d, b)
+    }
+    p19.append(row)
+}
+out["p19"] = p19
 
 if wpQuick { wpFinish(out) }
 

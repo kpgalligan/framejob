@@ -5,7 +5,10 @@ import CoreText
 /// caption's timed page — the base pass, the active word's pill, and the
 /// active word popped — and the headroom that keeps the pop inside the box.
 /// Since issue batch B86 (spec §11 W-14) also the three looks: a pill that
-/// glides, a word that fills, a page that dims in a pause.
+/// glides, a word that fills, a page that dims in a pause — and, since its
+/// phase 3 (spec §11 W-16), the one rule for WHERE that dim is drawn,
+/// `wordDim(of:reveal:)`: the compositor's layer opacity on a page with no
+/// backdrop, `drawWords`' own transparency layer on a page with one.
 ///
 /// The recipe's five word keys are the whole of what the core says
 /// (`RecipeReveal`, spec §11 W-4, W-13): the active token is `word − 1`, the
@@ -118,6 +121,40 @@ extension LayerRenderers {
     static func backOut(_ u: Double) -> Double {
         let p = u - 1
         return 1 + 2.70158 * p * p * p + 1.70158 * p * p
+    }
+
+    // MARK: - Where a dim is drawn
+
+    /// Where a timed page's dim is drawn (spec §11 W-16).
+    struct WordDim: Equatable {
+        /// `word_dim × pause_dim`, each clamped to 0…1; 0 on a page that is
+        /// not timed and styled.
+        let amount: Double
+        /// True: the compositor's layer opacity carries the dim and the
+        /// bitmap holds none of it. False: the bitmap does.
+        let onLayer: Bool
+    }
+
+    /// The ONE clamp of a dim, which `drawWords` and `wordDim` both call:
+    /// the recipe's `word_dim` (nil is 0) times the style's `pause_dim`.
+    static func dimAmount(_ dim: Double?, pauseDim: Double) -> Double {
+        min(max(dim ?? 0, 0), 1) * min(max(pauseDim, 0), 1)
+    }
+
+    /// The one rule (spec §11 W-16). The amount is 0 unless the page is
+    /// timed and styled — `drawText`'s own condition for drawing words at
+    /// all. The dim is the LAYER's when the page has no backdrop: the bitmap
+    /// then holds the words and the pill and nothing else, so one multiply
+    /// of it in the compositor is one opacity over both. With a backdrop in
+    /// the same bitmap that multiply would dim the backdrop too, so the dim
+    /// is the BITMAP's.
+    static func wordDim(of props: TextProps, reveal: RecipeReveal) -> WordDim {
+        let onLayer = props.backdrop == nil
+        guard reveal.word != nil, let style = props.wordStyle else {
+            return WordDim(amount: 0, onLayer: onLayer)
+        }
+        return WordDim(
+            amount: dimAmount(reveal.wordDim, pauseDim: style.pauseDim), onLayer: onLayer)
     }
 
     // MARK: - Drawing a timed page
@@ -237,8 +274,9 @@ extension LayerRenderers {
     /// through the active word's pop, nil for none), with the three looks of
     /// spec §11 W-14: `glide` (0…1 through the pill's slide from token
     /// `word − 2`), `fill` (0…1 of the active word filled) and `dim` (0…1
-    /// into a pause's dim). All three are clamped here, and `pauseDim` with
-    /// them: an action's end patch is not range-checked.
+    /// into a pause's dim, nil for a page whose dim is not this bitmap's).
+    /// All three are clamped — `glide` and `fill` here, `dim` and `pauseDim`
+    /// in `dimAmount`: an action's end patch is not range-checked.
     ///
     /// **With `activePill.glide` not set and `fill` and `dim` nil, the calls
     /// are the ones this routine has always made, in their order.** The base
@@ -268,15 +306,19 @@ extension LayerRenderers {
     /// whole — an outline's stroke reaches past the glyph range.
     ///
     /// **A dim is one opacity over the words and the pill together**,
-    /// `1 − dim × pauseDim`, in one transparency layer. The caller's
-    /// backdrop is outside it and never dims.
+    /// `1 − dimAmount(dim, pauseDim:)`, drawn HERE in one transparency
+    /// layer — which only a page with a backdrop asks for: the caller drew
+    /// that backdrop, it is outside the layer and it never dims. For a page
+    /// with none the caller hands a nil `dim`, this routine draws the
+    /// undimmed page, and the compositor multiplies the layer's opacity
+    /// (`wordDim(of:reveal:)`, spec §11 W-16).
     static func drawWords(
         _ layout: TextLayout, of props: TextProps, style: WordStyle, word: Int, pop: Double?,
         glide: Double? = nil, fill: Double? = nil, dim: Double? = nil, in context: CGContext
     ) {
         let tokens = tokens(of: props.laidContent)
         guard !tokens.isEmpty, !layout.lines.isEmpty else { return }
-        let dimmed = min(max(dim ?? 0, 0), 1) * min(max(style.pauseDim, 0), 1)
+        let dimmed = dimAmount(dim, pauseDim: style.pauseDim)
         guard dimmed < 1 else { return }
         if dimmed > 0 {
             context.saveGState()

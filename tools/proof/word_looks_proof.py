@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Issue batch B86 phase 1 (#96; spec §11 W-12, W-13, W-14) — the three
-word-caption looks over MCP: a gliding pill, an in-word fill and a dim in a
-pause, on instances this script launches.
+"""Issue batch B86 phase 1 (#96; spec §11 W-12, W-13, W-14) and phase 3
+(#245; W-16) — the three word-caption looks over MCP: a gliding pill, an
+in-word fill and a dim in a pause, on instances this script launches.
 
     python3 tools/proof/word_looks_proof.py [--app PATH] [--only B1,W3]
     python3 tools/proof/word_looks_proof.py --record-baseline [--app PATH]
     python3 tools/proof/word_looks_proof.py --mutant glide-ignored
         (also plate-over-ink, fill-ignored, fill-unsnapped, dim-ignored,
-        dim-per-draw)
+        dim-per-draw, dim-twice, dim-not-composited, backdrop-dims)
 
 Launches the Release build on a scratch socket of its own (`mcp.launch`) and
 stops only that process. **Every instance runs in a scratch home**,
@@ -64,7 +64,19 @@ Rows:
   the plateau, that ink at `1 − pause_dim` with NO plate showing through
   it — grey, where an opacity applied to each drawing in turn would leave
   it a quarter red — and every pixel that is bare plate is the plate at
-  `1 − pause_dim`.
+  `1 − pause_dim`. Its page has no backdrop, so since phase 3 (spec §11
+  W-16) what it reads is the compositor's one multiply of the finished
+  bitmap, which cannot be applied per drawing: D3 has no per-draw mutant,
+  and `dim-per-draw` is D4's.
+- **D4** (phase 3, spec §11 W-16): a BACKDROP never dims, and the words and
+  the pill fade together above it. Page `dimplate` is D3's page over an
+  opaque yellow backdrop (no ink of the page is yellow). Lit at 0.7 s and
+  on the plateau at 1.1 s: every pixel that is the backdrop's (255, 255, 0)
+  in the lit frame is (255, 255, 0) ± 1 on the plateau; every lit
+  (255, 255, 255) pixel — the active ink, over the plate — is
+  (255, 255, 127.5) ± 3; every lit (255, 0, 0) pixel — bare plate — is
+  (255, 127.5, 0) ± 3; and none of the three sets is empty. It is one
+  backdrop colour on one page.
 - **S1**: `set_text` sets and `get_project` reads back `active_pill.glide`,
   `active_fill` and `pause_dim`; `pause_dim` 2 is refused in the core's
   sentence and changes nothing.
@@ -101,11 +113,21 @@ the rows on it, W3 aside:
   fill-ignored    the fill fraction is not read: F1 must FAIL.
   fill-unsnapped  the fill's edge is left where the fraction puts it, off
                   the pixel grid: F1 must FAIL.
-  dim-ignored     the dim is not read: D1 must FAIL.
-  dim-per-draw    no transparency layer: the dim's opacity is applied to
-                  each drawing in turn (the second edit, in
-                  `LayerRenderersText.swift`, lets an opaque ink inherit
-                  it): D3 must FAIL.
+  dim-ignored     the dim's amount is always 0 (`dimAmount`): D1 must FAIL.
+  dim-per-draw    no transparency layer on a page with a backdrop: the
+                  dim's opacity is applied to each drawing in turn (the
+                  second edit, in `LayerRenderersText.swift`, lets an opaque
+                  ink inherit it): D4 must FAIL — white over the plate
+                  reads (255, 191, 127.5).
+  dim-twice       `drawText` hands `drawWords` the dim on every page, so a
+                  page with no backdrop is dimmed in the bitmap AND by the
+                  compositor: D1 must FAIL (the ratio reads about 0.25).
+  dim-not-composited
+                  the compositor reads the recipe's `opacity`, not
+                  `drawnOpacity` (in `Compositor.swift`): D1 must FAIL.
+  backdrop-dims   every page's dim is the layer's (`wordDim`'s `onLayer`
+                  always true): D4 must FAIL — the backdrop reads
+                  (127.5, 127.5, 0).
 Exit 0 means the named row FAILED in the copy — caught; 1 that it passed —
 survived; 2 that the control could not be performed. A plain run exits 0 iff
 every scored row passed; 3 is `mcp.py`'s, a moved default.
@@ -140,14 +162,17 @@ CALL_BOUND = 120
 SEC = 600_000
 FRAME = 20_000
 PAGE = 3 * SEC
-ROWS = ["H0", "B1", "W3", "G1", "G2", "G3", "F1", "F2", "F3", "D1", "D2", "D3", "S1", "R1",
-        "Z1"]
-LOOK_ROWS = ("G1", "G2", "G3", "F1", "F2", "F3", "D1", "D2", "D3")
+ROWS = ["H0", "B1", "W3", "G1", "G2", "G3", "F1", "F2", "F3", "D1", "D2", "D3", "D4", "S1",
+        "R1", "Z1"]
+LOOK_ROWS = ("G1", "G2", "G3", "F1", "F2", "F3", "D1", "D2", "D3", "D4")
 # What a recording is recorded FROM: `--record-baseline` refuses while any
 # of these holds an uncommitted change.
 SOURCES = ("app", "core", "graphic")
 CONTROLS = ("H0", "Z1")
 RENDERER = "LayerRenderersWords.swift"
+# `dimAmount`'s expression, the one clamp of a dim, and `drawText`'s hand-off.
+DIM_AMOUNT = "min(max(dim ?? 0, 0), 1) * min(max(pauseDim, 0), 1)"
+DIM_HANDED = "wordDim(of: props, reveal: reveal).onLayer ? nil : reveal.wordDim"
 BASE_PASS = (
     "        drawBase(\n"
     "            layout, tokens, word: word, mode: style.mode, spoken: spoken, upcoming: upcoming,\n"
@@ -176,11 +201,11 @@ MUTANTS = {
           "                        in: context)\n",
           "                    : piece.left + CGFloat(filled) * (piece.right - piece.left)\n")],
         "F1"),
-    "dim-ignored": (
-        [("let dimmed = min(max(dim ?? 0, 0), 1) * min(max(style.pauseDim, 0), 1)",
-          "let dimmed = min(max(dim ?? 0, 0), 1) * 0")], "D1"),
+    "dim-ignored": ([(DIM_AMOUNT, "min(max(dim ?? 0, 0), 1) * 0")], "D1"),
     # No layer, and an opaque ink no longer resets the context's alpha: the
     # pill and each token are composited at the dim's opacity one by one.
+    # Only a page with a backdrop draws its dim here (spec §11 W-16), so the
+    # row is D4.
     "dim-per-draw": (
         [("            context.beginTransparencyLayer(auxiliaryInfo: nil)\n"
           "        }\n"
@@ -193,7 +218,15 @@ MUTANTS = {
          ("        context.setAlpha(CGFloat(alpha))\n"
           "        guard alpha < 1 else {\n",
           "        guard alpha < 1 else {\n", "LayerRenderersText.swift")],
-        "D3"),
+        "D4"),
+    # Where the dim is drawn (issue batch B86 phase 3, spec §11 W-16).
+    "dim-twice": ([(DIM_HANDED, "reveal.wordDim", "LayerRenderersText.swift")], "D1"),
+    "dim-not-composited": (
+        [("u.opacity = Float(min(max(layer.drawnOpacity, 0), 1))",
+          "u.opacity = Float(min(max(layer.opacity, 0), 1))", "Compositor.swift")], "D1"),
+    "backdrop-dims": ([("props.backdrop == nil", "true")], "D4"),
+    "dim-on-both": ([("guard dim.onLayer, dim.amount > 0", "guard dim.amount > 0",
+                      "CompositorEffects.swift")], "D4"),
 }
 rows = {}
 scored = list(ROWS)
@@ -511,12 +544,16 @@ GREEN = [0.0, 1.0, 0.0, 1.0]
 BLUE = [0.0, 0.0, 1.0, 1.0]
 
 
-def look(content, timings, mode="highlight", active=None, pill=None, fill=False, dim=0.0):
-    return {"content": content, "font": "Montserrat-Black", "size": 56, "color": WHITE,
+def look(content, timings, mode="highlight", active=None, pill=None, fill=False, dim=0.0,
+         backdrop=None):
+    text = {"content": content, "font": "Montserrat-Black", "size": 56, "color": WHITE,
             "words": timings,
             "word_style": {"mode": mode, "active_color": active, "active_scale": 1.0,
                            "active_pill": pill, "spoken_color": GREEN, "upcoming_color": BLUE,
                            "active_fill": fill, "pause_dim": dim}}
+    if backdrop is not None:
+        text["backdrop"] = backdrop
+    return text
 
 
 def plate(glide):
@@ -538,6 +575,11 @@ LOOKS = [
     ("dimpill", look("sun moon star sky",
                      words((0.2, 0.5), (0.6, 0.9), (1.4, 1.7), (1.8, 2.1)),
                      active=WHITE, pill=plate(False), dim=0.5)),
+    # `dimpill` over an opaque yellow backdrop, which no ink of the page is.
+    ("dimplate", look("sun moon star sky",
+                      words((0.2, 0.5), (0.6, 0.9), (1.4, 1.7), (1.8, 2.1)),
+                      active=WHITE, pill=plate(False), dim=0.5,
+                      backdrop={"color": [1.0, 1.0, 0.0, 1.0], "padding": 12, "radius": 0})),
 ]
 INDEX = {name: index for index, (name, _) in enumerate(LOOKS)}
 
@@ -743,6 +785,31 @@ def dim_rows(looks):
                   f"and furthest channel from {half} {off} (an opacity per drawing would "
                   f"spread them by about 64); {len(bare)} bare plate pixels, furthest from "
                   f"({half}, 0, 0) {plate_off}; samples {dimmed[:1]} {plates[:1]}")
+    if wanted("D4"):
+        seen = pictures(looks.png("dimplate", 0.7), looks.png("dimplate", 1.1))
+        if seen is None:
+            check("D4 the backdrop page's frames could not be rendered", False)
+        else:
+            lit, low = seen
+            half = 255 * (1 - 0.5)
+            # What each lit colour must be on the plateau, and how near.
+            expect = (("backdrop", (255, 255, 0), (255, 255, 0), 1),
+                      ("ink over the plate", (255, 255, 255), (255, 255, half), 3),
+                      ("bare plate", (255, 0, 0), (255, half, 0), 3))
+            good, lines = True, []
+            for label, was, now, near in expect:
+                where = [at for at, pixel in lit.rgb.items() if pixel == was]
+                found = [low.rgb.get(at, low.background) for at in where]
+                off = max((max(abs(c - e) for c, e in zip(p, now)) for p in found),
+                          default=None)
+                good = good and bool(where) and off <= near
+                lines.append(f"{len(where)} lit {was} pixels ({label}): furthest channel from "
+                             f"{now} {off} (within {near}), sample {found[:1]}")
+            check("D4 a backdrop never dims, and the words and the pill fade together above "
+                  "it: on the plateau every lit backdrop pixel is the backdrop ± 1, the active "
+                  "ink over the plate is (255, 255, 127.5) ± 3 and the bare plate "
+                  "(255, 127.5, 0) ± 3, none of the three sets empty",
+                  good, "; ".join(lines))
 
 
 def row_s1(client):

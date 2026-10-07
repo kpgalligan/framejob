@@ -16104,7 +16104,8 @@ run that spanned a sleep is counted).
 | `make test`, the orchestrator's run on pass 1's final sources in High Power (`powermode 2` before and after; ended 20:51) | **exit 0**: core, graphic and `mcp-proxy` (its `stdio` test 14/14), the lane 18/18, the prompt probe 14/14, prices 27/27, the spec index 141/141 and the defaults sweep. The timeouts above were Low Power Mode (#244) |
 | `make lint` / `make typecheck` / `make app` | clean / 0 errors, 4 warnings, tsc silent / `BUILD SUCCEEDED` |
 
-**What P10 says, and the limit it does not score.** A fill and a glide
+**What P10 says, and the limit it does not score.** As measured in phase 1;
+phase 3 took the dim out of the raster — see that section. A fill and a glide
 cost what the shipped pop costs on the same page (about 1.2 ms at 1080×1920
 and 2.5 ms at 3840×2160). The dim is the cost: it draws the words and the
 pill inside one transparency layer over the whole text box (spec §11
@@ -16240,10 +16241,9 @@ occur once in a copy).
   in the two `--only P10` runs, 8.358 ms in the control and 8.441 ms in the
   whole probe — four judged readings on 2026-10-06, each over the 8 ms
   budget. Nothing was changed: not the draw, not the budget, not the scoring.
-  The choices are a cheaper draw for the dim (#245) or this page recorded as
-  a known limit, as the hand-made `oneword-line fill+dim` is. Until one is
-  made, `python3 tools/proof/words_picture_probe.py --only P10` and the whole
-  probe fail by name on an unthrottled host. What these readings do not
+  The owner decided on 2026-10-07: the cheaper draw for the dim (#245), built
+  in phase 3 — the next section, where the same page reads 3.2–3.3 ms and
+  P10 passes. What these readings do not
   settle: on Highlight's line the same four runs read a fill with a dim at
   7.567–7.760 ms, where phase 1's four judged runs read 7.147–7.382 ms. This
   host was on AC at `powermode 0` and in use by other sessions; phase 1's was
@@ -16262,3 +16262,89 @@ occur once in a copy).
   core and header, as the meter and welcome comparisons build theirs, and
   the probe's `chromeSettings` must compile against B46's tree. Until then
   the probe's whole run exits 1 on those two rows.
+
+## Issue batch B86 phase 3 — the pause dim leaves the transparency layer (#245, spec §11 W-16)
+
+One host, **2026-10-07, 09:22–10:15 CEST**: on AC power, `pmset -g | grep
+powermode` reading 0 every time it was read — at the start, and before and
+after every timing run and `make test`. Every proof launch ran under a
+scratch home and its stderr was empty; no run printed `DEFAULTS MOVED`.
+
+**What is proved, and by which row.** On a timed page with NO backdrop the
+pause dim is the text layer's opacity in the compositor
+(`RecipeLayer.drawnOpacity`), and the bitmap is the undimmed page's byte for
+byte: `words_picture_probe` **P18** (and the rule's amounts and clamps); a
+dim therefore adds nothing to a raster: **P10**'s "the dim adds", each
+`… fill+dim` against its `… fill` twin of the same run; the dimmed frame is
+still one opacity over the words and the pill: `word_looks_proof` **D1**,
+**D3** (now the compositor's multiply), with **B1** and **D2** holding the
+undimmed bytes. On a page WITH a backdrop the dim is still W-14's
+transparency layer in the bitmap, and the backdrop never dims: **D4** (new),
+P18's backdrop half, and **P19** (new), which prints the layer's distance from
+the probe's own arithmetic. P16 now reads the clamps off `drawWords` itself.
+P10 has twelve cases a canvas: `oneword-line fill+dim (hand-made)` is scored
+(six scored a canvas), and five more are printed — the three no-dim twins
+and Karaoke's two-line page under `BackdropProps()` with and without a dim.
+
+| Instrument | Run | Result |
+|---|---|---|
+| `spec_index_proof.py` | after §11 text A (before any code), and after W-16's closing sentence | 141/141, exit 0, each time |
+| `make typecheck` | after step 1's four app edits | 0 errors, 4 warnings (the baseline four), tsc silent |
+| `words_picture_probe.py --only P10,P18,P19`, step 1 run 1 | 09:28:50–09:30:40. JUDGED: `powermode 0` before and after; Low Power Mode off and thermal state nominal before the rasters and after | **5/5, exit 0.** Scored medians, 1080×1920: fill 1.262 ms, fill+dim 1.268, glide 1.317, oneword-page fill+dim 0.672, oneword-line fill+dim (hand-made) 1.443, karaoke-2line fill+dim 0.591; 3840×2160: fill 2.650, fill+dim 2.633, glide 2.735, oneword-page fill+dim 1.526, oneword-line fill+dim (hand-made) 3.184, karaoke-2line fill+dim 3.271. Printed: pop 1.262 / 2.607; the twins oneword-page fill 0.659 / 1.497, oneword-line fill 1.414 / 3.154, karaoke-2line fill 0.558 / 3.348; karaoke-2line-backdrop fill (hand-made) 1.033 / **6.359**, with the dim 1.734 / **11.289**. The dim adds −0.077…+0.032 ms on the four no-backdrop pages; +0.701 and +4.930 ms on the backdrop page |
+| the same, run 2 | 09:30:49–09:32:40, the same power readings (load averages 6.0 before, 3.6 after) | **5/5, exit 0.** 1080×1920: fill 1.224, fill+dim 1.206, glide 1.246, oneword-page fill+dim 0.650, oneword-line 1.399, karaoke-2line fill+dim 0.550; 3840×2160: fill 2.562, fill+dim 2.545, glide 2.633, oneword-page fill+dim 1.510, oneword-line 3.048, karaoke-2line fill+dim 3.212. Printed: pop 1.232 / 2.546; twins 0.641 / 1.444, 1.392 / 3.061, 0.540 / 3.227; backdrop page 0.993 / **6.341**, with the dim 1.718 / **11.227**. The dim adds −0.018…+0.067 ms with no backdrop; +0.725 and +4.886 ms with one |
+| `make app` | the step 1 tree (the final app sources) | `BUILD SUCCEEDED` |
+| `word_looks_proof.py --only B1,D1,D2,D3,D4` | the step 1 build | 7/7, exit 0. B1 `moved: []` (41 frames, recorded from `d8fa4fa`, not re-recorded). D1: lit 13.2657, ramp 11.0341, plateau 6.6550, ratio 0.5017. D3: 3205 ink pixels over the plate, channel spread 1, furthest from 127.5 by 0.5 (sample (128, 128, 128)); 12432 bare plate pixels, furthest 0.5 (sample (128, 0, 0)). D4: 52378 backdrop pixels, each (255, 255, 0) on the plateau (0 off); 3205 ink-over-plate pixels at (255, 255, 128) (0.5 off); 12433 bare plate pixels at (255, 127, 0) (0.5 off) |
+| `words_picture_probe.py --power-selftest` | the final scorer | 8/8, exit 0 (T7 fails on the 12 scored medians) |
+| `words_picture_probe.py --only P10 --raster-budget-ms 0` (the control) | 09:47:37–09:49:38, the same power readings (load averages 11.0 before, 5.0 after) | 2/3, exit 1, as the control must: P10 alone, all twelve scored medians over 0 (3840×2160 karaoke-2line fill+dim 3.436 ms, oneword-line 3.250, fill+dim 2.608; the backdrop page 6.649 and, with the dim, 11.520, printed) |
+| `words_picture_probe.py`, whole | 09:49:46–10:00:17, once, the same power readings | **21/21, exit 0.** P1 204 pages; P2 worst 0 px; P3–P9, P11–P19 hold. P10: 3840×2160 fill 2.582, fill+dim 2.602, glide 2.714, oneword-page fill+dim 1.616, oneword-line fill+dim 3.195, karaoke-2line fill+dim 3.284 (1080×1920: 1.252, 1.258, 1.292, 0.648, 1.414, 0.581); the backdrop page 6.477 and, with the dim, 11.497 (1.027 and 1.819) |
+| `word_looks_proof.py`, whole | the final build | 16/16, exit 0; B1 `moved: []`; W3 (`words_picture_proof.py` on a second scratch launch) 7/7 |
+| `word_looks_sheet_proof.py`, whole | the final build | 9/9, exit 0. T3 (Karaoke with `dim`, now the compositor's): on 3.0565, off 6.0956, ratio 0.5014 |
+| `word_captions_chrome.py`, whole | the final sources | 49/49, exit 0 (245 s): the sheet's preview and the looks untouched |
+| `make typecheck` / `make app` | the final tree | 0 errors, 4 warnings (the baseline four), tsc silent / `BUILD SUCCEEDED` |
+| `make test`, whole | 10:09:20–10:14:46, once and last, nothing else of this phase's running; `powermode 0` before and after | **exit 0**: `core` 76 `test result: ok` (1,064 passed, 0 failed), `graphic` 17 (125 passed), `mcp-proxy` 4 (14 passed), the lane 18/18, the prompt probe 14/14, prices 27/27, budget 23/23, the inventory 5/5, the spec index 141/141, the defaults selftest 10/10 and its sweep |
+
+**P19, the layer's distance** (printed in every run above, the same each
+time): on the `opaque` page (amount 0.25) 0.500 of 255, on `default` (an
+outline, a 0.5-alpha spoken ink, a pop; amount 0.5) 0.600, on `full` 0.000, by construction (a full dim draws the backdrop alone);
+no byte over 1 on any page, and every pixel with no ink is the backdrop's
+own bytes. CoreGraphics draws a glyph into W-14's layer as it draws it into
+the bitmap, to within the rounding of the probe's unrounded reference.
+
+**D1 and D3 read what they read before.** D3's plateau values are
+(128, 128, 128) and (128, 0, 0), as phase 1 recorded; D1's ratio is 0.5017
+(phase 1: 0.5022), its ramp frame 11.0341 (11.0819) and its plateau 6.6550
+(6.6614) — the compositor's float multiply where the layer rounded into the
+8-bit bitmap.
+
+**Made to fail on purpose** (2026-10-07; each mutant one anchor or more,
+each asserted to occur once, in a copy).
+
+| Mutant | Where | Answer |
+|---|---|---|
+| `words_picture_probe.py --mutant dim-rasterized` (`props.backdrop == nil` → `false`: every page's dim is the bitmap's) | a copy of `app/Sources`, the probe built over it, `--only P18` | `MUTANT PASS` (119 s): P18 failed — with no backdrop `word_dim` 0.5 no longer the undimmed page, `onLayer` false |
+| `--mutant looks-unclamped` (third anchor now `dimAmount`'s expression → `(dim ?? 0) * pauseDim`) | the same, `--only P16` | `MUTANT PASS` (130 s): P16 failed on `dim 2 as 1`, `fill -0.5 as 0`, `glide -0.5 as 0`, `pause_dim 2 as 1` |
+| `word_looks_proof.py --mutant backdrop-dims` (`props.backdrop == nil` → `true`) | a tree copy built by its own `make app` | `MUTANT PASS`, 14/15, D4 failed alone: the backdrop (128, 128, 0), the ink over the plate (128, 128, 128), the bare plate (128, 0, 0) |
+| `word_looks_proof.py --mutant dim-on-both` (`drawnOpacity`'s `guard dim.onLayer, dim.amount > 0` → `guard dim.amount > 0` in `CompositorEffects.swift`: a backdrop page dimmed in the bitmap AND by the compositor; added after review 1, 2026-10-07, `powermode 0`) | a tree copy built by its own `make app` | `MUTANT PASS`, 14 rows ok, D4 failed alone |
+| `--mutant dim-twice` (`drawText` hands `drawWords` the dim on every page) | the same, in `LayerRenderersText.swift` | `MUTANT PASS`, 13/15: D1 failed, ratio 0.2511; D3 too, (64, 64, 64) |
+| `--mutant dim-not-composited` (`u.opacity` from `layer.opacity`) | the same, in `Compositor.swift` | `MUTANT PASS`, 13/15: D1 failed, ratio 1.0; D3 too |
+| `--mutant dim-ignored` (re-anchored on `dimAmount`'s expression, `… * 0`) | the same | `MUTANT PASS`, 12/15: D1 (ratio 1.0), D3 and D4 failed |
+| `--mutant dim-per-draw` (its two edits, no third; its row is now D4) | the same, and `drawFaded` in `LayerRenderersText.swift` | `MUTANT PASS`, 13/15: D4 failed, the ink over the plate (255, 191, 128); B1 failed too (the nine frames of the karaoke, `word_fade` and `line_rise` pages whose partial-alpha inks the second edit changes, as in phase 1) |
+
+**Step 2's gate and outcome: not begun.** The spec designed a second step for
+the backdrop page — the words and the pill drawn first, one `destinationIn`
+multiply, the backdrop filled under them with `destinationOver`, no layer —
+to be kept only at or under 5.0 ms at 3840×2160 and 2.5 ms at 1080×1920 on
+`karaoke-2line-backdrop fill+dim (hand-made)`, and gated first on the same
+page with NO dim. Both judged step 1 runs read that page at 6.359 ms and
+6.341 ms at 3840×2160 — over the keep limit before any dim is drawn — so no
+draw of the dim could meet it, and the step was not built. The backdrop pair
+stays printed and unscored; P19's distance stays printed.
+
+**Limits.** D4 is one backdrop colour on one page. No row plays a ramp: D1's
+ramp frame is one frame. There is no export row: `MetalRenderer.uniforms(for:)`
+is the one reader of a layer's opacity for preview, `render_frame` and both
+export passes, and `textBitmap` the one bitmap, so no line an export-only
+mutant could change exists. There is no nest row: the core flattens a nest
+into ordinary layers drawn by the same loop, a nested text layer keeps its
+`.text` source and reveal, and a nest has no code of its own here. The probe
+is an unoptimised build, so its medians are an upper reading of the app's.

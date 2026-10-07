@@ -5,10 +5,11 @@
   (orig §7) is where the next work starts. Issue batch B86 (2026-10-05, #96)
   builds three of its looks: phase 1, recorded below, put them in the model,
   the recipe and the picture (spec §11 W-12..W-14); phase 2 put them in the
-  sheet and `transcribe` (W-15) and closed the list.
+  sheet and `transcribe` (W-15) and closed the list; phase 3 (2026-10-07,
+  #245) took the dim out of the raster of a page with no backdrop (W-16).
 - **Original:** `archive/reelcut-roadmap-8.md` (2971 lines) holds the full
   record. "orig §x" below points into it.
-- **Spec decisions:** spec §11 **W-1..W-10**, and W-12..W-15 for issue batch
+- **Spec decisions:** spec §11 **W-1..W-10**, and W-12..W-16 for issue batch
   B86's three looks (W-10 as the core's sentence;
   W-9 was copied into §11 on 2026-09-26). This work extends R6-1 and reads R6-2, R6-3, R6-7, R6-12,
   R6-15, R6-16, D7-1, D7-3 and D1 across. W-8 amends two older §11 decisions:
@@ -285,6 +286,39 @@ below.
 - The preview draws a ticked fill half done and a ticked pill half-way
   through its slide; the dim is not previewed.
 
+**Issue batch B86 phase 3 (2026-10-07, #245): the dim left the transparency
+layer (W-16).** Phase 2 ended with Karaoke's two-line page over the 8 ms
+budget on a dim's ramp frames, and the owner chose the cheaper draw over
+recording that page as a limit.
+- **One rule, in one place** (`LayerRenderers.wordDim(of:reveal:)`): the
+  amount is `word_dim × pause_dim`, each clamped (`dimAmount`), and it is
+  the LAYER's when the page has no backdrop and the BITMAP's when it has
+  one.
+- **No backdrop: the compositor multiplies the text layer's opacity**
+  (`RecipeLayer.drawnOpacity`, read wherever `Compositor.swift` read
+  `opacity`) and the bitmap is the undimmed page's, byte for byte. That is
+  sound only because such a bitmap holds the words and the pill and nothing
+  else, so one multiply of it is one opacity over both. A dim now adds
+  nothing to a raster: every page a caption style makes is such a page.
+- **A backdrop: W-14's transparency layer, unchanged.** The backdrop is in
+  the same bitmap and would dim with the words, so the compositor cannot do
+  that page.
+- **The recipe and its hash are unchanged.** `word_dim` still folds into the
+  hash, so each frame of a ramp has its own texture key and none can be
+  handed another's. A ramp's frames still rasterize, at the undimmed page's
+  cost. Leaving `word_dim` out of the hash would let them share one texture
+  and would put the backdrop rule in the core as well as in the renderer:
+  not done.
+- **A second step was designed for the backdrop page and not begun**: the
+  words and the pill drawn first on the empty bitmap, one `destinationIn`
+  multiply, then the backdrop filled under them — no layer. It was to be
+  kept only at or under 5.0 ms at 3840×2160 and 2.5 ms at 1080×1920 on
+  Karaoke's two-line page under the default backdrop, and gated first on
+  that page with NO dim. In both judged runs of 2026-10-07 the page with no
+  dim read 6.359 ms and 6.341 ms at 3840×2160 — over the limit before any
+  dim is drawn, so no draw of the dim could meet it (1.033 ms and 0.993 ms
+  at 1080×1920). The step was not built, and Known limits has the page.
+
 ## What it built — where it lives now
 
 - **Core:**
@@ -456,11 +490,10 @@ below.
     7.147–7.382 ms; whether Karaoke's page is inside 8 ms under phase 1's
     conditions was not measured.
   - **Owed after this phase:**
-    - **The owner's decision on that median**: a cheaper draw for the dim
-      (#245) or Karaoke's two-line page at 3840×2160 recorded as a known
-      limit beside the hand-made line. Until then `python3
-      tools/proof/words_picture_probe.py --only P10` fails by name on an
-      unthrottled host.
+    - The owner's decision on that median: made 2026-10-07 — the cheaper
+      draw (#245), built in phase 3 (below); `--only P10` reads Karaoke's
+      two-line page with a fill and a dim at 3.271 ms and 3.212 ms at
+      3840×2160 and passes.
     - The person checks CAP-6 (the sheet) and CAP-7 (the three looks on real
       speech, with each engine) in `docs/manual-checks.md`.
     - `word_captions_proof.py` and `cloud_captions_proof.py` were not run:
@@ -475,6 +508,56 @@ below.
       exports road map 14 deleted. Each baseline needs its own tree's core
       and header, as the meter and welcome comparisons build theirs; not
       done in this phase, and tracked in #246.
+- **Issue batch B86 phase 3 (2026-10-07, #245; spec §11 W-16):**
+  - App: `LayerRenderersWords.swift`'s `WordDim`, `dimAmount` (the one clamp
+    of a dim) and `wordDim(of:reveal:)` (the rule); `drawWords`' `dimmed` is
+    `dimAmount`'s; `LayerRenderersText.swift`'s `drawText` hands `drawWords`
+    the dim only when the rule says the bitmap draws it;
+    `CompositorEffects.swift`'s `RecipeLayer.drawnOpacity`; and three token
+    swaps in `Compositor.swift`'s `uniforms(for:)` (`layer.opacity` →
+    `layer.drawnOpacity` twice, `partner.opacity` → `partner.drawnOpacity`;
+    no line added). No core, FFI, recipe, hash, format or texture-key change.
+  - Proofs, as their runs printed them on 2026-10-07 (one host, on AC power,
+    `pmset -g` `powermode 0` every time it was read; `tools/proof/README.md`'s
+    "Issue batch B86 phase 3" has every row):
+    - `words_picture_probe.py`: P10 has twelve cases a canvas, six scored —
+      the hand-made `oneword-line fill+dim` is scored now — plus three
+      no-dim twins and Karaoke's two-line page under `BackdropProps()`,
+      printed; P16 reads the clamps off `drawWords`; P18 (where the dim is
+      drawn) and P19 (a backdrop page's dim against the probe's own
+      arithmetic) are new. Two judged `--only P10,P18,P19` runs, 5/5 each,
+      and the whole probe once, 21/21. **The scored medians at 3840×2160,
+      run 1 / run 2 / the whole probe**: fill 2.650 / 2.562 / 2.582 ms,
+      fill with dim 2.633 / 2.545 / 2.602, glide 2.735 / 2.633 / 2.714, One
+      Word's page 1.526 / 1.510 / 1.616, the hand-made line 3.184 / 3.048 /
+      3.195, Karaoke's two lines 3.271 / 3.212 / 3.284 — every one at or
+      under 3.3 ms against 8 ms, and at 1080×1920 at or under 1.45 ms
+      against 4 ms. On the four pages with no backdrop the dim added
+      between −0.080 and +0.116 ms to its twin's median in the same run. The
+      backdrop page, printed: 6.359 / 6.341 / 6.477 ms with no dim and
+      11.289 / 11.227 / 11.497 ms with one at 3840×2160. P19's printed
+      distance (the layer's): 0.500 and 0.600 of 255 on `opaque` and `default` (0.000 on `full`,
+  where a full dim draws the backdrop alone), no byte over 1, every pixel with no ink the backdrop's own
+      bytes. The zero-budget control: exit 1, P10 alone. The selftest: 8/8.
+    - `word_looks_proof.py`: page `dimplate` and row D4 (a backdrop never
+      dims; the words and the pill fade together above it) are new; 16/16
+      whole, B1 `moved: []` on the baseline not re-recorded. D1 and D3 read
+      the compositor's dim: D1's ratio 0.5017 (phase 1: 0.5022), D3's
+      plateau values (128, 128, 128) and (128, 0, 0), as phase 1's.
+    - Mutants, each `MUTANT PASS`: `dim-rasterized` (P18) and the
+      re-anchored `looks-unclamped` (P16) on the probe; `backdrop-dims` (D4
+      alone), `dim-twice` (D1, ratio 0.2511), `dim-not-composited` (D1, ratio
+      1.0), the re-anchored `dim-ignored` (D1, D3, D4) and `dim-per-draw`,
+      whose row is now D4 (the ink over the plate (255, 191, 128); B1 too, as
+      in phase 1).
+    - Phase 2's instruments, the sheet's preview and the looks untouched:
+      `word_looks_sheet_proof.py` 9/9 (T3, Karaoke's dim through the
+      compositor now, ratio 0.5014) and `word_captions_chrome.py` 49/49.
+  - **Step 2 was not begun** (Decisions, phase 3): its pre-gate read the
+    backdrop page with no dim over the keep limit in both judged runs.
+  - Owed: the person check CAP-7 (whether the dim reads well on real
+    speech) stands in `docs/manual-checks.md`; this phase changed no
+    picture a person could tell apart.
 
 ## Known limits
 
@@ -513,30 +596,46 @@ below.
 - **The no-blink extension is invisible at the default numbers.** `hold`
   (0.5 s) outlasts `breakGap` (0.25 s). It is kept as a rule, and a probe row
   exercises it at hold 0.1 s.
-- **On a hand-made page of large type a dim's ramp costs more than a
-  frame's budget at 3840×2160** (B86 phase 1; `words_picture_probe.py` P10
-  prints it and does not score it). In phase 1 P10 scored two pages in the presets'
-  own styles — Highlight's line and One Word's one-word page — and judged in
-  High Power each was inside its budget: a fill with a dim took a median of
-  7.174 ms and 4.982 ms at 3840×2160 against 8 ms (2.435 ms and 1.553 ms at
-  1080×1920 against 4 ms). A hand-made page of large type — six words on
-  one line at One Word's size, 0.12 × min(w, h) where Highlight's is 0.075,
-  which no preset makes and `set_text` can write — read 9.529 ms at
-  3840×2160 on a dim's ramp frames against the 8 ms budget (2026-10-05, High
-  Power, on battery, thermal state nominal; 3.100 ms at 1080×1920). The
-  reason the dim costs this is the one transparency layer over the whole
-  text box (W-14): it costs by the box. **Those two pages are one line with
-  `width: nil`**, where a generated page is cut to its style's width, so
-  Highlight's scored line is wider than any its pager makes. Phase 2 added
-  a third scored page, Karaoke's two lines as its pager cuts them, which
-  read over the 8 ms budget at 3840×2160: an open decision, not a limit
-  recorded here ("Owed after this phase", above). The cost is
-  paid on the frames of a ramp only — 0.1 s down and 0.1 s up per pause;
-  the plateau between is one cached texture — and a fill or a glide alone
-  costs what the shipped pop costs (about 1.2 ms and 2.5 ms). An earlier
-  run that day in Low Power Mode read 9.268 ms on Highlight's line and
-  12.043 ms on the hand-made one at 3840×2160; P10 does not judge such a
-  run. Not fixed.
+- **A page with a backdrop AND a pause dim still pays a transparency layer
+  on a ramp's frames** (B86 phase 3, spec §11 W-16;
+  `words_picture_probe.py` P10 prints it and does not score it). The
+  compositor can carry the dim only for a page whose bitmap holds the words
+  and the pill and nothing else; a backdrop is in the same bitmap and would
+  dim with them, so such a page keeps W-14's draw — the words and the pill
+  in one transparency layer over the whole box, above the backdrop — and
+  the layer costs by the box. No caption STYLE writes a backdrop, so the
+  Generate Captions sheet and `transcribe` never make such a page; the
+  inspector's Backdrop switch, its Lower Third and Caption presets, and
+  `set_text` do. The page P10 prints is the one Karaoke's pager makes, two
+  lines, under `BackdropProps()` (what the Backdrop switch writes), its
+  last word half filled. Judged twice on 2026-10-07 (AC power, `pmset -g`
+  `powermode 0` before and after, Low Power Mode off, thermal state
+  nominal; an unoptimised probe build, the median of 20
+  rasters-and-uploads on a cache miss): **with the dim, half-way into it,
+  11.289 ms and 11.227 ms at 3840×2160 (box 3061×420) against the 8 ms
+  budget**, and 1.734 ms and 1.718 ms at 1080×1920 (box 830×221) against
+  4 ms; with NO dim 6.359 ms and 6.341 ms, and 1.033 ms and 0.993 ms. The
+  same page with no backdrop read 3.348 ms and 3.227 ms at 3840×2160, so
+  the backdrop's own fill is about 3 ms of that box before any dim, and
+  the layer about 4.9 ms more. The cost is paid on the frames of a ramp
+  only — 0.1 s down and 0.1 s up per pause; the plateau between is one
+  cached texture. A cheaper draw for this page (the words and the pill
+  first, one `destinationIn` multiply, the backdrop filled under them) was
+  designed in phase 3 and not built: its keep limit was 5.0 ms at
+  3840×2160, and the page with no dim already reads over it (Decisions,
+  phase 3). Untried: a SIMD blend (vImage) of a separate words buffer, which could
+  at best bring the dim inside the 8 ms budget (about 1.6 ms of room over
+  the undimmed page at 3840×2160), not under the 5.0 ms keep limit. Not
+  fixed; tracked in #247. **The limit this bullet replaces ended with phase 3**: on a page
+  with no backdrop a dim now adds nothing to a raster. The hand-made line
+  of large type (six words on one line at One Word's size), which read
+  9.529–10.120 ms at 3840×2160 on a dim's ramp frames, read 3.184 ms and
+  3.048 ms and is a scored row; Karaoke's two-line page, 8.210–8.441 ms on
+  2026-10-06 and over the budget, read 3.271 ms and 3.212 ms; Highlight's
+  line, 7.567–7.760 ms, read 2.633 ms and 2.545 ms. A fill or a glide
+  alone costs what the shipped pop costs (1.2–1.3 ms and 2.5–2.7 ms in
+  those two runs). P10 does not judge a run taken in Low Power Mode or
+  above a nominal thermal state.
 - **A fill follows a word's stored `end`, and the two engines store
   different ends** (issue batch B86 phase 1, spec §11 W-13). AssemblyAI's
   `end` is where the word was heard to end, so the fill keeps time with the
@@ -579,7 +678,7 @@ below.
   - the Style row seen as a sheet.
 - The not-built list (orig §7), closed by issue batch B86 (2026-10-05):
   - a sliding pill, a karaoke in-word fill and "dim during silence": BUILT
-    (B86, spec §11 W-12..W-15);
+    (B86, spec §11 W-12..W-16);
   - restyling in place: STRUCK by the owner, 2026-10-05 — regenerating is
     not slow for them, and W-10 stands;
   - WebVTT inline timestamps: STRUCK by the owner, 2026-10-05 — no player
