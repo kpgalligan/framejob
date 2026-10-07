@@ -44,6 +44,23 @@ extension AgentServer {
         + "word, and after the last word until the clip ends — over 0.1 s each way, and outside "
         + "0–1 it is refused)"
 
+    /// One of `transcribe`'s three look booleans (spec §11 W-15): what it
+    /// does, then the rule all three share, with the styles it applies with
+    /// read off `CaptionLooks.Look.styleList` — the list its refusal prints —
+    /// never typed.
+    static func captionLookProperty(
+        _ look: CaptionLooks.Look, _ does: String
+    ) -> [String: Any] {
+        [
+            "type": "boolean",
+            "description": does + " Default false, and never what the sheet last chose. It "
+                + "applies with style " + look.styleList + ": true is refused by name with any "
+                + "other style or with place false, where it would show nothing; false is "
+                + "always accepted (unlike replace, which is refused whenever it is given "
+                + "where it cannot apply).",
+        ]
+    }
+
     /// `import_captions`' row, spliced into `fileTools`'s Media group
     /// where it has always been, after `import_media`.
     func captionImportTools() -> [[String: Any]] {
@@ -97,8 +114,11 @@ extension AgentServer {
             // write captions rather than reading a file into the project.
 
             // It mirrors File ▸ Generate Captions… — the sheet's clip scope,
-            // its language popup, its ENGINE popup, its three cloud rows and
-            // its progress bar are these arguments, this result and nothing
+            // its language popup, its ENGINE popup, its three cloud rows, its
+            // Style popup, its three look checkboxes (Slide the pill, Fill
+            // words as spoken, Dim in pauses: `slide`, `fill`, `dim`, spec §11
+            // W-15), its Replace checkbox and its progress bar are these
+            // arguments, this result and nothing
             // else. The two the sheet has and this tool deliberately has not:
             // the REGION, which is a person's setting and no tool's (R6-12),
             // and the sheet's memory of the engine, which an agent call never
@@ -128,7 +148,9 @@ extension AgentServer {
                     + "size where a lone word shrank — names the engine that ran, reports "
                     + "under skipped every clip you named that cannot be transcribed, and, "
                     + "whenever replace was given, lists under replaced the tracks it "
-                    + "removed. "
+                    + "removed. slide, fill and dim each add a look to a word style's pages; "
+                    + "whenever one of the three was given, a placed run lists under looks "
+                    + "the ones that were on. "
                     + "ENGINE \"apple\" (the default) is ON-DEVICE speech recognition and "
                     + "nothing leaves this Mac. It needs no grant and has no length ceiling. "
                     + "Its models are installed per Mac: a language whose model is not "
@@ -215,6 +237,22 @@ extension AgentServer {
                             + "only text clips, each of which overlaps a clip being "
                             + "transcribed. The result lists them under replaced.",
                     ],
+                    "slide": Self.captionLookProperty(
+                        .slide,
+                        "The pill slides from the word before to the word being said, over "
+                            + "0.2 s or sooner, instead of jumping: writes "
+                            + "word_style.active_pill.glide true on every page placed."),
+                    "fill": Self.captionLookProperty(
+                        .fill,
+                        "The word being said fills left to right as it is spoken, taking 0.6 s "
+                            + "at most: writes word_style.active_fill true on every page "
+                            + "placed."),
+                    "dim": Self.captionLookProperty(
+                        .dim,
+                        "The page fades to half its opacity in a pause of 0.25 s or more: writes "
+                            + "word_style.pause_dim 0.5 on every page placed. On-device "
+                            + "(engine apple) words rarely carry a pause that long, so it shows "
+                            + "mostly with assemblyai."),
                     "refresh": [
                         "type": "boolean",
                         "description": "engine \"assemblyai\" only. Ignore the cached "

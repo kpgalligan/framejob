@@ -8444,12 +8444,12 @@ MUTANTS = {
         "CaptionLayout.swift",
         "                        text: style.pagePatch(\n"
         "                            content: cue.text, size: cue.size ?? base, width: cue.width,\n"
-        "                            words: words)))\n",
+        "                            words: words, looks: looks)))\n",
         "                        text: { () -> TextPatch in\n"
         "                            var patch = style.pagePatch(\n"
         "                                content: cue.text, size: cue.size ?? base, "
         "width: cue.width,\n"
-        "                                words: words)\n"
+        "                                words: words, looks: looks)\n"
         "                            if let at = kept.firstIndex(where: { $0.order == cue.order }),\n"
         "                                let color = CaptionStyle.speakerColors(kept.map(\\.speaker))[at]\n"
         "                            {\n"

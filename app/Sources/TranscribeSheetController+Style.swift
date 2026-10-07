@@ -3,25 +3,30 @@ import AppKit
 // MARK: - Sheet: the Style row
 
 /// The caption STYLE on the Generate Captions card — road map 8 §5e, W4b:
-/// the Style popup, the preview under it, and the "Replace existing
+/// the Style popup, the preview under the looks row
+/// (`TranscribeSheetController+Looks.swift`), and the "Replace existing
 /// captions" checkbox with the list of what it will replace.
 ///
-/// **The sheet commits what `transcribe {style, replace}` commits.** `style`,
-/// `replaceExisting` and `pagesRequest` are the three things `begin`,
-/// `beginCloud` and `finish` read, and they are computed off the controls
-/// here: the style off the popup's ITEM (app/CLAUDE.md's popup rule), and
-/// Replace only while the checkbox is live — which is the tool's two rules
-/// read across (`AgentServer+Captions.swift`): a word style, and at least one
-/// track `CaptionLayout.replaceableTracks` names.
+/// **The sheet commits what `transcribe {style, replace, slide, fill, dim}`
+/// commits.** `style`, `replaceExisting`, `pagesRequest` and `looks` are the
+/// four things `begin`, `beginCloud` and `finish` read, and they are computed
+/// off the controls: the style off the popup's ITEM (app/CLAUDE.md's popup
+/// rule), Replace only while the checkbox is live — which is the tool's two
+/// rules read across (`AgentServer+Captions.swift`): a word style, and at
+/// least one track `CaptionLayout.replaceableTracks` names — and each look
+/// only while its box is enabled and on (spec §11 W-15).
 ///
 /// **The preview is the renderer's own picture.** A sample page — the first
 /// page `CaptionPages` makes of the scope's first clip's cached transcript,
 /// else of `sampleText` — is laid out exactly as `place` would write it and
 /// drawn by `LayerRenderers.textBitmap`, the routine the compositor uploads;
 /// nothing is hand-drawn here but the plate and the scaling. A word style
-/// shows two frames, the first and then the second word active. It is
-/// redrawn only when its `PreviewKey` — the style, the first job's clip and
-/// the canvas — changes, so a keystroke in Vocabulary draws nothing.
+/// shows two frames, the first and then the second word active — with a
+/// ticked fill half done in both and a ticked pill half-way through its slide
+/// in the second (`previewReveals`); the dim is not previewed. It is
+/// redrawn only when its `PreviewKey` — the style, the first job's clip, the
+/// canvas and the previewed looks — changes, so a keystroke in Vocabulary or
+/// a click on Dim draws nothing.
 ///
 /// **The style is remembered** under `CaptionStyle.defaultsKey`, read when
 /// the popup is built and written when it changes, and never by the tool
@@ -30,7 +35,19 @@ import AppKit
 extension TranscribeSheetController {
 
     /// What the preview was last drawn for; `refreshStyleRow` redraws on a change only.
-    struct PreviewKey: Equatable { let style: CaptionStyle; let clip: UInt32?; let canvas: CGSize }
+    /// `looks` are the PREVIEWED ones: `dim` is always false there.
+    struct PreviewKey: Equatable {
+        let style: CaptionStyle
+        let clip: UInt32?
+        let canvas: CGSize
+        var looks = CaptionLooks.none
+    }
+
+    /// How far through its fill the preview draws the active word.
+    static let previewFill = 0.5
+    /// The slide's progress in the preview: `easeOut(0.2)` is 0.488, the pill
+    /// drawn half-way between the first word and the second.
+    static let previewGlide = 0.2
 
     /// The preview's size in points: column 1 of the grid, 420 − 44 − 106 − 12.
     static let previewSize = CGSize(width: 258, height: 80)
@@ -87,7 +104,7 @@ extension TranscribeSheetController {
         return [fieldLabel("Style:"), stylePopup]
     }
 
-    /// Grid row 8: the preview, the full width of the controls column.
+    /// Grid row 9: the preview, the full width of the controls column.
     func makePreviewRow() -> [NSView] {
         previewView.imageScaling = .scaleNone
         previewView.imageFrameStyle = .none
@@ -98,7 +115,7 @@ extension TranscribeSheetController {
         return [fieldLabel(""), previewView]
     }
 
-    /// Grid row 9: the checkbox, and under it the tracks it will replace.
+    /// Grid row 10: the checkbox, and under it the tracks it will replace.
     func makeReplaceRow() -> [NSView] {
         replaceCheckbox.font = DS.sans(12)
         replaceCheckbox.target = self
@@ -120,9 +137,11 @@ extension TranscribeSheetController {
         refresh()
     }
 
-    /// The three rows' state, recomputed — `refresh()` calls it on the way
-    /// out, whichever engine it dispatched to.
+    /// The four rows' state, recomputed — `refresh()` calls it on the way
+    /// out, whichever engine it dispatched to. The looks row first: the
+    /// preview's key reads `looks`, which reads each box's `isEnabled`.
     func refreshStyleRow() {
+        refreshLooksRow()
         let jobs = jobs(in: scope)
         let replaceable = CaptionLayout.replaceableTracks(in: snapshot, jobs: jobs)
         let live = style.isWordStyle && !replaceable.isEmpty
@@ -130,9 +149,12 @@ extension TranscribeSheetController {
         if !live { replaceCheckbox.state = .off }
         replaceLabel.isHidden = !live
         replaceLabel.stringValue = live ? replaceText(replaceable) : ""
+        var previewed = looks
+        previewed.dim = false
         let key = PreviewKey(
             style: style, clip: jobs.first?.clip,
-            canvas: CGSize(width: snapshot.canvas.width, height: snapshot.canvas.height))
+            canvas: CGSize(width: snapshot.canvas.width, height: snapshot.canvas.height),
+            looks: previewed)
         if key != previewKey {
             previewKey = key
             previewView.image = preview()
@@ -180,8 +202,9 @@ extension TranscribeSheetController {
 
     /// The page's text props as `CaptionLayout.place` writes them: a word
     /// style's are `CaptionStyle.textProps` at the page's own size and width —
-    /// the one construction the pager measured and `pagePatch` commits — and
-    /// Subtitles' are the Caption preset with its wrap box, mirrored.
+    /// the one construction the pager measured and `pagePatch` commits, with
+    /// the sheet's `looks` as `place` is handed them — and Subtitles' are the
+    /// Caption preset with its wrap box, mirrored.
     func previewProps(for cue: CaptionLayout.Cue, canvas: CGSize) -> TextProps {
         guard style.isWordStyle else {
             let preset = CaptionLayout.captionPreset
@@ -192,11 +215,25 @@ extension TranscribeSheetController {
                 width: Double(canvas.width) * CaptionLayout.wrapFraction)
         }
         return style.textProps(
-            content: cue.text, size: cue.size ?? style.size(for: canvas), width: cue.width)
+            content: cue.text, size: cue.size ?? style.size(for: canvas), width: cue.width,
+            looks: looks)
+    }
+
+    /// A word style's two preview frames: the first word active, then the
+    /// second (the first again on a one-word page), each with the fill at
+    /// `previewFill` when Fill is on, and the second with the pill at
+    /// `previewGlide` when Slide is on and there is a word to slide from.
+    static func previewReveals(tokens: Int, looks: CaptionLooks) -> [RecipeReveal] {
+        let fill = looks.fill ? previewFill : nil
+        let glide = looks.slide && tokens >= 2 ? previewGlide : nil
+        return [
+            RecipeReveal(word: 1, wordPop: 1, wordFill: fill),
+            RecipeReveal(word: min(2, tokens), wordPop: 1, wordGlide: glide, wordFill: fill),
+        ]
     }
 
     /// The sample page drawn by the renderer: two frames for a word style
-    /// (the first word active, then the second), one for Subtitles, each
+    /// (`previewReveals`), one for Subtitles, each
     /// scaled to fit a 258×36 slot, stacked 8 pt apart over the plate, at 2×.
     func preview() -> NSImage? {
         let canvas = CGSize(width: snapshot.canvas.width, height: snapshot.canvas.height)
@@ -208,10 +245,7 @@ extension TranscribeSheetController {
         let props = previewProps(for: cue, canvas: canvas)
         let reveals =
             style.isWordStyle
-            ? [
-                RecipeReveal(word: 1, wordPop: 1),
-                RecipeReveal(word: min(2, props.tokenCount), wordPop: 1),
-            ]
+            ? Self.previewReveals(tokens: props.tokenCount, looks: looks)
             : [RecipeReveal.whole]
         let size = Self.previewSize
         let scale: CGFloat = 2

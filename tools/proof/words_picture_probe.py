@@ -35,9 +35,14 @@ P10 (issue batch B86, spec §11 W-14) what the three looks COST: the median of
     at `pause_dim` 0.5, and `glide` 0.5 (with the default pill) — and, since
     the dim's layer costs by the box and One Word's type is the largest a
     preset ships (0.12 × min(w, h)), the fill with the dim on the page ONE
-    WORD generates, one word (`oneword-page fill+dim`, scored). **P10 scores
-    two pages in the presets' own styles**: Highlight's line and One Word's
-    one-word page. Beside them it prints, never scored (as `pop` is), a
+    WORD generates, one word (`oneword-page fill+dim`, scored), and (issue
+    batch B86 phase 2, where the sheet's Dim first reaches every word style)
+    on the page KARAOKE's pager makes of a run of words with no pause — the
+    one preset page of TWO lines, at its own wrap width, its last word half
+    filled (`karaoke-2line fill+dim`, scored; the row also requires that the
+    page really was laid on two lines). **P10 scores three pages in the
+    presets' own styles**: Highlight's line, One Word's one-word page and
+    Karaoke's two-line page. Beside them it prints, never scored (as `pop` is), a
     HAND-MADE page of large type: the same six words on one line at One
     Word's size (`oneword-line fill+dim (hand-made)`), which no preset makes
     and `set_text` can write. On a dim's ramp frames that page read 9.529 ms
@@ -45,10 +50,10 @@ P10 (issue batch B86, spec §11 W-14) what the three looks COST: the median of
     battery, thermal state nominal) — a known limit, in
     `designs/adr/roadmap-08-word-captions.md`, not a scored row; the dim
     costs this because it is one transparency layer over the whole box (spec
-    §11 W-14). Every page is one line (`width` nil). The probe measures it
+    §11 W-14). Every page but Karaoke's is one line (`width` nil). The probe measures it
     FIRST, before the P1/P2 sweep. It FAILS when a scored median is over
     4 ms at 1080×1920 — half of spec §7.5's 8 ms frame, because a fill pays
-    it on every frame of a word — or over 8 ms at 3840×2160. The twelve
+    it on every frame of a word — or over 8 ms at 3840×2160. The fourteen
     medians are printed either way. A median over budget is reported; the
     budget is not raised.
     **P10 is JUDGED only on an unthrottled host.** The probe reads
@@ -75,7 +80,14 @@ P15 a FULL word is drawn whole: on an outlined build page `word_fill` 1 is
 P16 a look's value outside 0…1 draws as the nearest value inside it
     (`word_fill`, `word_glide`, `word_dim` and `pause_dim`, each side), the
     two ends of each range being two pictures; and a full dim at `pause_dim`
-    1 draws nothing.
+    1 draws nothing;
+P17 (issue batch B86 phase 2) the plate's HEIGHT travels too: between two
+    lines of DIFFERENT metrics — the second holds glyphs Montserrat does not
+    have, so a fallback face's ascent and descent make that line — the two
+    settled pills differ in height by more than 8 px (else the row is a
+    CONTROL FAILURE: this host's fallback face gave the line the same
+    metrics) and half-way through the travel (`word_glide` 0.2063, which
+    eases to ½) all four edges are at `from + ½ × (to − from)` ± 2 px.
 
     python3 tools/proof/words_picture_probe.py [--raster-budget-ms N] [--only ROWS]
     python3 tools/proof/words_picture_probe.py --mutant NAME
@@ -86,7 +98,7 @@ answers — Low Power Mode on, a thermal state above nominal before or after
 the rasters, no power state at all, and an unthrottled host under and over
 budget — and scores that each is the row it should be (T1–T8).
 
-`--only ROWS` (comma-separated, of P10–P16: the rows measured before the
+`--only ROWS` (comma-separated, of P10–P17: the rows measured before the
 sweep) runs the probe with `--quick`, which stops before the sweep, and
 scores those rows alone — `--only P10` is P10 by itself, a build and about
 half a minute. `--raster-budget-ms N` replaces both of P10's budgets with
@@ -128,12 +140,13 @@ RASTER_BUDGET = {"1080x1920": 4.0, "3840x2160": 8.0}
 # budget must not be what "catches" a mutant of the drawing.
 SCORE_RASTER = True
 # The rows the probe measures before the sweep, which `--only` can run alone.
-QUICK = ("P10", "P11", "P12", "P13", "P14", "P15", "P16")
+QUICK = ("P10", "P11", "P12", "P13", "P14", "P15", "P16", "P17")
 # None for every row, else the rows `--only` named.
 ONLY = None
 THERMAL_NOMINAL = 0
 
 rows = []
+control_failures = []
 
 
 def check(name, good, detail=""):
@@ -198,6 +211,8 @@ def judge_raster(answer):
     p10 = answer.get("p10") or []
     medians = "; ".join(
         f"{m['canvas']} {m['case']} {m['median_ms']:.3f} ms"
+        + (f" [{m.get('lines')} lines, {m.get('tokens')} words, box {m.get('box')}]"
+           if m["case"].startswith("karaoke-2line") else "")
         + ("" if m.get("scored") else " (not scored)") for m in p10)
     budgets = ", ".join(f"{canvas} {limit:g} ms" for canvas, limit in RASTER_BUDGET.items())
     why, power = throttled(answer)
@@ -209,11 +224,15 @@ def judge_raster(answer):
     over = [(m["canvas"], m["case"], round(m["median_ms"], 3)) for m in p10
             if m.get("scored") and not m["median_ms"] <= RASTER_BUDGET[m["canvas"]]]
     scored = [m for m in p10 if m.get("scored")]
-    return (f"P10 a fill, a fill with a dim, a glide and One Word's one-word page with a fill "
-            f"and a dim each rasterize and upload within budget ({budgets}; median of 20 on a "
-            f"cache miss)",
-            len(p10) == 12 and len(scored) == 8 and all(m["drew"] for m in p10) and not over,
-            f"medians: {medians}; over budget: {over}; power: {power}")
+    # The Karaoke case is only what it says when the pager's page took two lines.
+    two_lines = [m.get("lines") for m in p10 if m["case"].startswith("karaoke-2line")]
+    return (f"P10 a fill, a fill with a dim, a glide, One Word's one-word page and Karaoke's "
+            f"two-line page with a fill and a dim each rasterize and upload within budget "
+            f"({budgets}; median of 20 on a cache miss)",
+            len(p10) == 14 and len(scored) == 10 and all(m["drew"] for m in p10)
+            and two_lines == [2, 2] and not over,
+            f"medians: {medians}; Karaoke's page lines per canvas: {two_lines}; over budget: "
+            f"{over}; power: {power}")
 
 
 def score_raster(answer):
@@ -222,16 +241,17 @@ def score_raster(answer):
 
 def power_selftest():
     """`--power-selftest`: P10's scorer fed made-up answers — no probe is
-    built and nothing is timed. The twelve medians are 1 ms each."""
+    built and nothing is timed. The fourteen medians are 1 ms each."""
     def answer(low=False, thermal=0, after=None, power=True):
         names = ["nominal", "fair", "serious", "critical"]
         def reading(state):
             return {"low_power": low, "thermal_state": state, "thermal": names[state]}
         cases = [("pop", False), ("fill", True), ("fill+dim", True), ("glide", True),
                  ("oneword-page fill+dim", True),
-                 ("oneword-line fill+dim (hand-made)", False)]
+                 ("oneword-line fill+dim (hand-made)", False),
+                 ("karaoke-2line fill+dim", True)]
         made = {"p10": [{"canvas": canvas, "case": case, "scored": scored, "drew": True,
-                         "median_ms": 1.0}
+                         "median_ms": 1.0, "lines": 2 if case.startswith("karaoke") else 1}
                         for canvas in RASTER_BUDGET for case, scored in cases]}
         if power:
             made["power"] = {"before": reading(thermal),
@@ -262,8 +282,8 @@ def power_selftest():
     for canvas in RASTER_BUDGET:
         RASTER_BUDGET[canvas] = 0.0
     name, good, detail = judge_raster(answer())
-    check("T7 unthrottled at budget 0: judged, and it fails on the eight scored medians",
-          name.startswith("P10 a fill") and good is False and detail.count("1.0)") == 8,
+    check("T7 unthrottled at budget 0: judged, and it fails on the ten scored medians",
+          name.startswith("P10 a fill") and good is False and detail.count("1.0)") == 10,
           detail[detail.find("over budget"):detail.find("; power")])
     name, good, _ = judge_raster(answer(low=True))
     check("T8 throttled at budget 0: still `not judged` — the budget is not what fails it",
@@ -365,6 +385,29 @@ def score_looks(answer):
               f"not drawn as the clamped value: {moved}; ends that drew alike: {flat}; ink at "
               f"pause_dim 1 × word_dim 1: {p16.get('invisible_ink')!r}; compared: "
               f"{sorted(same)}")
+    if wanted("P17"):
+        p17 = answer.get("p17") or {}
+        a, b, half = (rect(p17.get(key)) for key in ("from", "to", "half"))
+        glide = p17.get("glide")
+        good = None not in (a, b, half) and isinstance(glide, float)
+        travel = 1 - (1 - glide) ** 3 if good else None
+        tall = [(r[3] - r[1]) for r in (a, b, half)] if good else []
+        if good and abs(tall[1] - tall[0]) <= 8:
+            control_failures.append("P17")
+            check("P17 CONTROL FAILURE: the two lines' pills are the same height on this host "
+                  "(the fallback face gave the second line the first one's metrics), so the "
+                  "row cannot see the height travel", False,
+                  f"heights {tall}; lines' ascent + descent {p17.get('lines')}")
+        else:
+            expect = [a[i] + travel * (b[i] - a[i]) for i in range(4)] if good else None
+            check("P17 between two lines of different metrics the gliding plate's four edges "
+                  "are half-way between the two pills' ± 2 px half-way through the travel: its "
+                  "HEIGHT travels with it",
+                  good and abs(travel - 0.5) < 0.01
+                  and all(abs(half[i] - expect[i]) <= 2 for i in range(4)),
+                  f"[minX, minY, maxX, maxY] from {a}, to {b}, half-way {half}, expected "
+                  f"{expect}; heights {tall}; lines' ascent + descent {p17.get('lines')}; "
+                  f"travel {travel}")
 
 
 def score(answer):
@@ -516,6 +559,9 @@ MUTANTS = {
     "plate-width-jumps": ("LayerRenderersWords.swift",
                           "                    width: a.width + (b.width - a.width) * travel,\n",
                           "                    width: b.width,\n", "P11"),
+    "plate-height-jumps": ("LayerRenderersWords.swift",
+                           "                    height: a.height + (b.height - a.height) * travel)\n",
+                           "                    height: b.height)\n", "P17"),
     "plate-pop-ignored": ("LayerRenderersWords.swift",
                           "            fillPlate(plate, in: rect, size: size, scale: scale, "
                           "in: context)\n",
@@ -576,6 +622,10 @@ def mutant(name):
     if elapsed > DEADLINE:
         print(f"mutant {name}: the control could not be performed — the run passed "
               f"{DEADLINE} s ({elapsed:.0f} s)")
+        return 2
+    if control_failures:
+        print(f"mutant {name}: the control could not be performed — "
+              f"{', '.join(control_failures)} failed as a control on this host")
         return 2
     caught = not all(rows[2:])
     if caught:

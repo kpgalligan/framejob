@@ -237,13 +237,13 @@ enum CaptionLayout {
     /// style writes `style.pagePatch` per page — the props the pager measured,
     /// at the page's own size (a shrunk one or the style's), with its wrap
     /// width and its `words` in CLIP time — and puts the batch at the style's
-    /// `y`. `replacing` names caption tracks to remove
+    /// `y`, with the run's `looks` (W-15). `replacing` names caption tracks to remove
     /// WITH their clips in the same ops, first — `replaceableTracks` says
     /// which qualify — and the new track takes their place at the front.
     static func place(
         _ cues: [Cue], problems existing: [Problem] = [], in project: ReelProject,
         track: UInt32? = nil, trackBase: String = "Captions", style: CaptionStyle = .subtitles,
-        replacing: [UInt32] = []
+        looks: CaptionLooks = .none, replacing: [UInt32] = []
     ) throws -> Plan {
         let snapshot = project.snapshot
         let canvas = snapshot.canvas
@@ -320,7 +320,7 @@ enum CaptionLayout {
                         track: destination, at: cue.start, duration: cue.end - cue.start,
                         text: style.pagePatch(
                             content: cue.text, size: cue.size ?? base, width: cue.width,
-                            words: words)))
+                            words: words, looks: looks)))
             }
         } else {
             var base = TextPatch(

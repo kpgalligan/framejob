@@ -231,3 +231,162 @@ func page(_ word: String, _ s: TranscribeSheetController) -> CaptionLayout.Cue? 
 }
 /// A page's measured width, the pager's own measurement.
 func measured(_ p: TextProps) -> Double { Double(LayerRenderers.measuredSize(for: p).width) }
+
+// MARK: - S10–S16's helpers (issue batch B86 phase 2, spec §11 W-15)
+
+typealias Look = CaptionLooks.Look
+/// The three remembered keys, as LITERALS: the probe's own spelling of them.
+let lookKeys: [(Look, String)] = [
+    (.slide, "ReelcutCaptionSlide"), (.fill, "ReelcutCaptionFill"), (.dim, "ReelcutCaptionDim"),
+]
+/// A box clicked the way AppKit clicks it: its state, then its action with
+/// the box as the sender.
+func tick(_ look: Look, on sheet: TranscribeSheetController, _ on: Bool = true) {
+    let box = sheet.checkbox(for: look)
+    box.state = on ? .on : .off
+    sheet.perform(#selector(TranscribeSheetController.lookChanged(_:)), with: box)
+}
+/// A sheet over defaults that remember AssemblyAI: the cloud state.
+func cloudSheet(_ document: ProjectDocument) -> TranscribeSheetController {
+    let defaults = freshDefaults()
+    defaults.set("assemblyai", forKey: "ReelcutCaptionEngine")
+    return sheet(document, defaults: defaults)
+}
+/// The style's preset REBUILT here, field by field, with only `look`'s field
+/// changed — the oracle S15 holds `CaptionStyle.wordStyle(_:)` and the commit
+/// to. It reads the no-argument `wordStyle`, which phase 2 does not edit.
+func rebuilt(_ style: CaptionStyle, _ look: Look) -> WordStyle? {
+    guard let p = style.wordStyle else { return nil }
+    let pill = p.activePill.map {
+        ActivePill(
+            color: $0.color, padding: $0.padding, radius: $0.radius,
+            glide: look == .slide ? true : $0.glide)
+    }
+    return WordStyle(
+        mode: p.mode, activeColor: p.activeColor, activeScale: p.activeScale, activePill: pill,
+        spokenColor: p.spokenColor, upcomingColor: p.upcomingColor,
+        activeFill: look == .fill ? true : p.activeFill,
+        pauseDim: look == .dim ? 0.5 : p.pauseDim)
+}
+var keptAlive: [AnyObject] = []
+/// S15's commit, S5's method: a fresh document and sheet, `style` chosen,
+/// `look` ticked (or none), the fixed sample paged and handed to
+/// `finish(.success(…))`. Answers every placed clip's `text`.
+func commitLooks(_ style: CaptionStyle, _ look: Look?) -> [TextProps]? {
+    guard let doc = document(vertical) else { return nil }
+    let s = sheet(doc)
+    let host = NSViewController()
+    host.view = NSView()
+    let animator = StillAnimator()
+    keptAlive.append(contentsOf: [host, animator])
+    host.present(s, animator: animator)
+    choose(style, on: s)
+    if let look { tick(look, on: s) }
+    guard let job = s.jobs(in: s.scope).first else { return nil }
+    let before = doc.editedProject.snapshot
+    let cues = CaptionPages.cues(
+        from: TranscribeSheetController.fixedSampleWords, span: job.span,
+        frame: max(before.canvas.fps.frameDuration, 1), request: s.pagesRequest, engine: .apple,
+        clip: job.clip)
+    s.finish(.success(Transcriber.Outcome(cues: cues, problems: [], clips: [job.clip])))
+    let old = Set(before.clips.map(\.id))
+    return doc.editedProject.snapshot.clips.filter { !old.contains($0.id) }.compactMap(\.text)
+}
+/// Whether every committed page measures what its looks-free page measures.
+func measuresAlike(_ pages: [TextProps], _ style: CaptionStyle) -> Bool {
+    pages.allSatisfy {
+        LayerRenderers.measuredSize(for: $0)
+            == LayerRenderers.measuredSize(
+                for: style.textProps(content: $0.content, size: $0.size, width: $0.width))
+    }
+}
+/// S11's reading BEFORE any layout, on a sheet just built and not yet hosted:
+/// what the note's `preferredMaxLayoutWidth` is for. A wrapping label with
+/// none answers its ONE-LINE size until a layout pass has handed it a width,
+/// (335.5 × 15.0 pt, where the line gives 257.5 × 30.0; 2026-10-06); the hosted rows
+/// cannot see it, since by then the 258 pt column has bounded the label. So:
+/// the note's `intrinsicContentSize` is above 0 and at most 258 pt wide, and
+/// at least as tall as its cell needs at 258 pt — which must itself be taller
+/// than the cell on one line (the control: the sentence does wrap there).
+func noteBeforeLayout(_ s: TranscribeSheetController) -> (problems: [String], reading: String) {
+    let note = s.dimNoteLabel
+    let size = note.intrinsicContentSize
+    func cellHeight(_ width: CGFloat) -> CGFloat {
+        note.cell?.cellSize(
+            forBounds: NSRect(x: 0, y: 0, width: width, height: .greatestFiniteMagnitude)
+        ).height ?? .infinity
+    }
+    let wrapped = cellHeight(258)
+    let oneLine = cellHeight(100_000)
+    var problems: [String] = []
+    if !(wrapped > oneLine + 0.5) {
+        problems.append("CONTROL: the note's cell is \(wrapped) tall at 258 and \(oneLine) on one line")
+    }
+    if !(size.width > 0 && size.width <= 258.5) {
+        problems.append("the note's intrinsic width before layout is \(size.width)")
+    }
+    if !(size.height + 0.5 >= wrapped) {
+        problems.append("the note's intrinsic height before layout is \(size.height), needs \(wrapped)")
+    }
+    return (
+        problems,
+        "intrinsic \(size.width) × \(size.height); its cell at 258 pt is \(wrapped) tall, on one "
+            + "line \(oneLine)"
+    )
+}
+/// The card as the harness hosts it: a window's content, at its fitting size.
+func host(_ s: TranscribeSheetController) -> NSWindow {
+    let window = NSWindow(
+        contentRect: NSRect(x: 0, y: 0, width: 420, height: 400), styleMask: [.titled],
+        backing: .buffered, defer: true)
+    window.isReleasedWhenClosed = false
+    window.contentViewController = s
+    keptAlive.append(window)
+    relayout(s, in: window)
+    return window
+}
+func relayout(_ s: TranscribeSheetController, in window: NSWindow) {
+    s.view.layoutSubtreeIfNeeded()
+    window.setContentSize(s.view.fittingSize)
+    s.view.layoutSubtreeIfNeeded()
+}
+/// A view's ALIGNMENT rect in `root`'s coordinates — what Auto Layout places
+/// and what `snapshot_ui`'s layout rules measure (#140): a label's frame is a
+/// few points wider than it (measured here: 261.5 pt of frame for 258).
+func aligned(_ view: NSView, in root: NSView) -> CGRect {
+    let rect = view.alignmentRect(forFrame: view.frame)
+    return view.superview.map { $0.convert(rect, to: root) } ?? rect
+}
+/// S11's reading of the laid-out looks row, in alignment rects: every box at
+/// least its intrinsic width and inside the 258 pt controls column (the
+/// preview's own rect), and a VISIBLE note at most 258 pt wide and at least
+/// as tall as its text needs at its frame's width. Empty when all of it holds.
+func looksLayoutProblems(_ s: TranscribeSheetController) -> [String] {
+    let column = aligned(s.previewView, in: s.view)
+    var problems: [String] = []
+    for look in Look.allCases {
+        let box = s.checkbox(for: look)
+        let frame = aligned(box, in: s.view)
+        let need = box.intrinsicContentSize.width
+        if frame.width + 0.5 < need {
+            problems.append("\(look.rawValue) is \(frame.width) wide, needs \(need)")
+        }
+        if frame.minX < column.minX - 0.5 || frame.maxX > column.maxX + 0.5 {
+            problems.append(
+                "\(look.rawValue) \(frame.minX)…\(frame.maxX) leaves the column "
+                    + "\(column.minX)…\(column.maxX)")
+        }
+    }
+    let note = s.dimNoteLabel
+    guard !note.isHidden else { return problems }
+    let frame = note.frame
+    let need = note.cell?.cellSize(
+        forBounds: NSRect(x: 0, y: 0, width: frame.width, height: .greatestFiniteMagnitude)
+    ).height ?? .infinity
+    let width = aligned(note, in: s.view).width
+    if width > 258.5 { problems.append("the note's alignment rect is \(width) wide") }
+    if frame.height + 0.5 < need {
+        problems.append("the note is \(frame.height) tall, needs \(need) at \(frame.width)")
+    }
+    return problems
+}

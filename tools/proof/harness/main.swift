@@ -114,7 +114,7 @@
 // does not exist, so the Assistant pane's month line is an empty month,
 // answered synchronously — the two processes' renders stay byte-identical.
 //
-//   harness transcribe <project.reelcut> <out.png> <light|dark> <style> [replace 0|1]
+//   harness transcribe <project.reelcut> <out.png> <light|dark> <style> [replace 0|1] [looks]
 //
 // renders the Generate Captions card (road map 8 §5e, W4b) over a package,
 // hosted as a WINDOW's content view controller for `settings`' reason. It is
@@ -124,9 +124,13 @@
 // behind (the class says why a removed suite still does). `<style>` is a
 // `CaptionStyle` raw value, chosen the way AppKit chooses it — the row
 // selected, then `styleChanged:` — and `replace` is the checkbox, set and
-// then `controlChanged:`. The preview is drawn off-Metal, so unlike the
+// then `controlChanged:`. `looks` (issue batch B86, spec §11 W-15) is letters
+// of `sfd` — Slide, Fill, Dim — each box set on and `lookChanged:` sent with
+// it, as a click does, after the style is chosen; absent or "" ticks none.
+// The preview is drawn off-Metal, so unlike the
 // editor's preview well it is not black here. `MemoryDefaults` is what the
-// popup reads and writes; `ReelcutCaptionStyle`'s pin below is defensive.
+// popup and the boxes read and write; `ReelcutCaptionStyle`'s pin below, and
+// the three look keys' beside it, are defensive.
 //
 //   harness cues <words.json> <out.json>
 //
@@ -382,6 +386,16 @@ enum Harness {
             // `transcribe` hands the card `MemoryDefaults` and no other mode
             // builds the card.
             "ReelcutCaptionStyle": "subtitles",
+            // The card's three remembered looks (`CaptionLooks.slideKey`,
+            // `.fillKey`, `.dimKey`, spec §11 W-15), on the same terms and as
+            // defensive — and spelled as LITERALS, never through
+            // `CaptionLooks`: this function is outside the
+            // `HARNESS_REFERENCE_BUILD` guard and compiles against old
+            // `app/Sources` in the reference builds. `false` is
+            // `bool(forKey:)` of an absent key.
+            "ReelcutCaptionSlide": false,
+            "ReelcutCaptionFill": false,
+            "ReelcutCaptionDim": false,
             // Settings' Assistant pane's model field (`AssistantConfiguration.modelKey`,
             // road map 12 A2), a literal for the recorder keys' reason: written
             // by ordinary use whenever a person chooses a model, and drawn by
@@ -955,6 +969,13 @@ extension Harness {
         sheet.perform(#selector(TranscribeSheetController.styleChanged(_:)), with: nil)
         sheet.replaceCheckbox.state = arguments.count > 6 && arguments[6] == "1" ? .on : .off
         sheet.controlChanged(nil)
+        // The looks: each named box set on and its action sent, as a click does.
+        let wanted = arguments.count > 7 ? arguments[7] : ""
+        for (letter, look) in zip("sfd", CaptionLooks.Look.allCases) where wanted.contains(letter) {
+            let box = sheet.checkbox(for: look)
+            box.state = .on
+            sheet.lookChanged(box)
+        }
         for _ in 0..<10 {
             RunLoop.current.run(until: Date().addingTimeInterval(0.05))
             sheet.view.layoutSubtreeIfNeeded()
@@ -993,7 +1014,7 @@ guard arguments.count >= 4 else {
             + "[w] [h] [selectIndex] [playheadSec] [sizeIndex 0-2] [clip|media|document] "
             + "[candidateSpans] [expandSections] [mediaFilter] [selectAction] [subTab]\n"
             + "       harness transcribe <project.reelcut> <out.png> <light|dark> <style> "
-            + "[replace 0|1]\n"
+            + "[replace 0|1] [looks: letters of sfd]\n"
             + "       harness cues <words.json> <out.json>\n"
             + "       harness meter <request.json> <out.json>\n")
             .data(using: .utf8)!)

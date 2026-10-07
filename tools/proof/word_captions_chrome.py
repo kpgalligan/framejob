@@ -16,12 +16,17 @@ missing file) and one clip on it —
 CONTROL  tall, Subtitles, light, rendered twice, is byte-identical;
 then the six styles are six distinct PNGs per appearance, each style differs
 light vs dark, Highlight differs 9:16 vs 16:9, and `track` with Replace
-checked differs from `tall` with Replace asked for (which stays off).
+checked differs from `tall` with Replace asked for (which stays off). Issue
+batch B86 phase 2 (spec §11 W-15): `tall`, light, with one look box ticked
+(the mode's `looks` argument) — Pill with Slide, Karaoke with Fill, Highlight
+with Dim — each differs from the same style with none.
 
 STRUCTURE, through `word_captions_sheet_probe.swift` compiled over
 `app/Sources` with `harness/build.sh`'s swiftc line (a probe that will not
 build is a scored FAILURE), with `word_captions_sheet_support.swift` beside
-it: rows S1–S9.
+it: rows S1–S16 (S10–S16 are the three look boxes: their titles and live
+table, the row's layout and the note, the remembered keys, the greyed box
+that keeps its tick, what a commit writes, the preview's two frames).
 
     python3 tools/proof/word_captions_chrome.py
     python3 tools/proof/word_captions_chrome.py --mutant NAME
@@ -98,10 +103,11 @@ def build_harness():
     return binary, None
 
 
-def render(binary, package_path, name, appearance, style, replace=0):
+def render(binary, package_path, name, appearance, style, replace=0, looks=""):
     out = WORK / f"{name}.png"
     result = subprocess.run(
-        [binary, "transcribe", str(package_path), str(out), appearance, style, str(replace)],
+        [binary, "transcribe", str(package_path), str(out), appearance, style, str(replace),
+         looks],
         capture_output=True, text=True, timeout=300)
     if result.returncode != 0 or not out.exists():
         return None, (result.stdout + result.stderr).strip()[-400:]
@@ -136,6 +142,9 @@ def photographs():
     shoot("wide-highlight", wide, "wide-light-highlight", "light", "highlight")
     shoot("track-replace", track, "track-light-highlight-replace", "light", "highlight", 1)
     shoot("tall-replace", tall, "tall-light-highlight-replace", "light", "highlight", 1)
+    looked = [("pill", "s", "slide"), ("karaoke", "f", "fill"), ("highlight", "d", "dim")]
+    for style, letter, look in looked:
+        shoot(("look", style), tall, f"tall-light-{style}-{look}", "light", style, 0, letter)
     check("every render wrote a PNG", not problems, "; ".join(problems[:3]))
 
     a, b = shots.get("control-1"), shots.get("control-2")
@@ -155,6 +164,11 @@ def photographs():
     with_track, without = shots.get("track-replace"), shots.get("tall-replace")
     check("a Captions track with Replace checked differs from no track with Replace asked for",
           with_track is not None and without is not None and with_track != without)
+    for style, _, look in looked:
+        ticked, plain = shots.get(("look", style)), shots.get(("light", style))
+        check(f"{style} with {look} ticked differs from {style} with no look (light)",
+              ticked is not None and plain is not None and ticked != plain,
+              f"{len(ticked or b'')} / {len(plain or b'')} bytes")
 
 
 # ---- the probe ------------------------------------------------------------
@@ -216,6 +230,7 @@ def replace_once(path, before, after):
 
 
 STYLE = "TranscribeSheetController+Style.swift"
+LOOKS = "TranscribeSheetController+Looks.swift"
 # name: ([(file, before, after)], the row-name prefix that must FAIL)
 MUTANTS = {
     "preview-ignores-style": ([(STYLE,
@@ -243,12 +258,51 @@ MUTANTS = {
     # …and the preview measured at the style's size, not the page's.
     "preview-base-size": ([(STYLE,
                             "content: cue.text, size: cue.size ?? style.size(for: canvas), "
-                            "width: cue.width)",
+                            "width: cue.width,\n",
                             "content: cue.text, size: style.size(for: canvas), "
-                            "width: cue.width)")],
+                            "width: cue.width,\n")],
                           "S8 a shrunk"),
     "preview-redraws": ([(STYLE, "        if key != previewKey {\n",
                           "        if true || key != previewKey {\n")], "S9 "),
+    # Issue batch B86 phase 2 (spec §11 W-15): the three look boxes.
+    "fill-live-everywhere": ([("CaptionLooks.swift",
+                               "                return word.mode == .build || active != upcoming\n",
+                               "                return true || word.mode == .build "
+                               "|| active != upcoming\n")],
+                             "S10 "),
+    "note-unbounded": ([(LOOKS,
+                         "        dimNoteLabel.preferredMaxLayoutWidth = Self.previewSize.width\n",
+                         "")],
+                       "S11 before any layout"),
+    "note-any-engine": ([(LOOKS,
+                          "        dimNoteLabel.isHidden = !(engine == .apple && "
+                          "dimCheckbox.isEnabled)\n",
+                          "        dimNoteLabel.isHidden = !dimCheckbox.isEnabled\n")],
+                        "S12 "),
+    "looks-not-remembered": ([(LOOKS,
+                               "            defaults.set(checkbox(for: look).state == .on, "
+                               "forKey: look.defaultsKey)\n",
+                               "            _ = look\n")],
+                             "S13 "),
+    "greyed-box-counts": ([(LOOKS,
+                            "            out[look] = box.isEnabled && box.state == .on\n",
+                            "            out[look] = box.state == .on\n")],
+                          "S14 "),
+    "commit-drops-looks": ([("TranscribeSheetController+Commit.swift",
+                             "                style: style, looks: looks, replacing: replacing)\n",
+                             "                style: style, replacing: replacing)\n")],
+                           "S15 (ii) "),
+    # `wordStyle(_:)`'s rebuild forgets one field of the preset: Karaoke's
+    # upcoming colour is the one preset value that is not the default there.
+    "rebuild-drops-preset": ([("CaptionLooks.swift",
+                               "            upcomingColor: preset.upcomingColor,\n", "")],
+                             "S15 (ii) karaoke"),
+    "preview-ignores-looks": ([(STYLE,
+                                "            ? Self.previewReveals(tokens: props.tokenCount, "
+                                "looks: looks)\n",
+                                "            ? Self.previewReveals(tokens: props.tokenCount, "
+                                "looks: .none)\n")],
+                              "S16 "),
 }
 
 

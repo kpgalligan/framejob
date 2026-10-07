@@ -6,7 +6,8 @@ against a Reelcut of its own: `select_inspector_tab` (a dev tool) and
     python3 tools/proof/v3_tools.py [--app APP] [--only L,T,R]
 
 It launches the Release app exactly as `screens.py` does (`screens.launch`:
-the same pins, an empty secret folder, a scratch socket), builds the
+the same pins, an empty secret folder, a scratch socket, a scratch home),
+builds the
 `demo` fixture (`screens.build_fixture`) and writes its captures under
 `tools/proof/work/v3_tools/<stamp>/`. It kills only the process it started.
 

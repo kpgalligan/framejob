@@ -78,6 +78,13 @@ extension AgentServer {
     /// `replace` is refused by name with `subtitles` or with `place: false`,
     /// where it could do nothing. The tracks it replaces are found at
     /// COMMIT time, against the handle the plan is built on.
+    ///
+    /// **`slide`, `fill` and `dim` (spec §11 W-15)** are read next, after
+    /// `replace`'s refusals and before the scope (`captionLooks`): a `true`
+    /// with a style the look shows nothing on, then with `place: false`, is
+    /// refused by name; a `false` is always accepted — a second rule in this
+    /// one tool, since `replace` and the three cloud-only arguments refuse on
+    /// PRESENCE. The remembered checkboxes are never read (R6-2 read across).
     func transcribe(_ a: [String: Any]) throws -> String {
         let stop = AgentLane.shared.callCancel  // the assistant's Stop (spec §11 AI-16)
         // `importMedia`'s guard, restated: everything below assumes the main
@@ -106,6 +113,7 @@ extension AgentServer {
                         + "nothing is placed, so nothing is replaced.")
             }
         }
+        let asked = try captionLooks(a, style: style, place: place)
 
         let document = try onMain { try self.target(a) }
         // The scope, the jobs and the frame in ONE main-thread hop, so every
@@ -199,7 +207,7 @@ extension AgentServer {
                     : []
                 plan = try CaptionLayout.place(
                     outcome.cues, problems: problems, in: document.editedProject,
-                    style: style, replacing: replacing)
+                    style: style, looks: asked.looks, replacing: replacing)
             } catch {
                 throw ToolError(message: error.localizedDescription)
             }
@@ -209,6 +217,7 @@ extension AgentServer {
             if let name = plan.trackName { fields["track_name"] = name }
             if plan.trimmed > 0 { fields["trimmed"] = plan.trimmed }
             if replace != nil { fields["replaced"] = plan.replaced.map { Int($0) } }
+            if asked.given { fields["looks"] = asked.looks.names }
             if !problems.isEmpty { fields["skipped"] = problems.map { $0.description } }
             return try self.editResult(document, "Generate Captions", plan.ops, fields)
         }
@@ -256,6 +265,39 @@ extension AgentServer {
                     + " (got \"\(name)\").")
         }
         return style
+    }
+
+    /// `slide`, `fill` and `dim` (spec §11 W-15): the looks the call asked
+    /// for, and whether it gave any of the three keys at all — which is what
+    /// puts `looks` in a placed answer. A `true` that would show nothing is
+    /// refused BY NAME, the style first and then `place`, each list of
+    /// styles from `CaptionLooks.Look.styleList`; a `false` is always
+    /// accepted. Only the call is read: never the sheet's remembered boxes.
+    private func captionLooks(
+        _ a: [String: Any], style: CaptionStyle, place: Bool
+    ) throws -> (looks: CaptionLooks, given: Bool) {
+        var looks = CaptionLooks.none
+        var given = false
+        for look in CaptionLooks.Look.allCases {
+            guard let value = try boolArg(a, look.rawValue) else { continue }
+            given = true
+            looks[look] = value
+        }
+        for look in CaptionLooks.Look.allCases where looks[look] {
+            guard look.isLive(for: style) else {
+                throw ToolError(
+                    message: "\(look.rawValue) only applies with style \(look.styleList) — not "
+                        + "\(style.rawValue).")
+            }
+        }
+        for look in CaptionLooks.Look.allCases where looks[look] {
+            guard place else {
+                throw ToolError(
+                    message: "\(look.rawValue) only applies when place is true: with place "
+                        + "false nothing is placed, so nothing is styled.")
+            }
+        }
+        return (looks, given)
     }
 
     /// The jobs a run will do, and how to refuse when there are none.

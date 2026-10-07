@@ -41,6 +41,12 @@ import AppKit
 /// card out of them. W2 widened `language`, `grid` and `refresh()` for the
 /// Download row's file; the cloud half still reads none of them.
 ///
+/// **The Style row and what hangs under it** are two more files:
+/// `TranscribeSheetController+Style.swift` (the Style popup, the preview and
+/// Replace) and `TranscribeSheetController+Looks.swift` (the three look
+/// checkboxes and the on-device note, spec §11 W-15). What is HERE for them
+/// is their stored views and their grid rows.
+///
 /// **Four injection points, for the probe and for nothing else.** `store`,
 /// `defaults`, `environment` and `languages` are initialiser arguments with
 /// the app's own values as defaults, so an instrument can build this sheet
@@ -103,6 +109,11 @@ final class TranscribeSheetController: NSViewController {
     let statusLabel = NSTextField(wrappingLabelWithString: "")
     let detailLabel = NSTextField(labelWithString: "")
     let stylePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    /// The three looks (`+Looks.swift`), titled and set by `makeLooksRow()`.
+    let slideCheckbox = NSButton(checkboxWithTitle: "", target: nil, action: nil)
+    let fillCheckbox = NSButton(checkboxWithTitle: "", target: nil, action: nil)
+    let dimCheckbox = NSButton(checkboxWithTitle: "", target: nil, action: nil)
+    let dimNoteLabel = NSTextField(wrappingLabelWithString: "")
     let previewView = NSImageView()
     let replaceCheckbox = NSButton(checkboxWithTitle: "existing captions", target: nil, action: nil)
     let replaceLabel = NSTextField(wrappingLabelWithString: "")
@@ -301,6 +312,7 @@ final class TranscribeSheetController: NSViewController {
             [fieldLabel("Transcribe again:"), refreshCheckbox],
             [fieldLabel("From:"), scopePopup],
             makeStyleRow(),
+            makeLooksRow(),
             makePreviewRow(),
             makeReplaceRow(),
         ])

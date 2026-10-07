@@ -4,11 +4,11 @@
   commit, `532e115`. Nothing in the phase list is left. The not-built list
   (orig §7) is where the next work starts. Issue batch B86 (2026-10-05, #96)
   builds three of its looks: phase 1, recorded below, put them in the model,
-  the recipe and the picture (spec §11 W-12..W-14); phase 2 owes the sheet,
-  `transcribe` and the list's close-out.
+  the recipe and the picture (spec §11 W-12..W-14); phase 2 put them in the
+  sheet and `transcribe` (W-15) and closed the list.
 - **Original:** `archive/reelcut-roadmap-8.md` (2971 lines) holds the full
   record. "orig §x" below points into it.
-- **Spec decisions:** spec §11 **W-1..W-10**, and W-12..W-14 for issue batch
+- **Spec decisions:** spec §11 **W-1..W-10**, and W-12..W-15 for issue batch
   B86's three looks (W-10 as the core's sentence;
   W-9 was copied into §11 on 2026-09-26). This work extends R6-1 and reads R6-2, R6-3, R6-7, R6-12,
   R6-15, R6-16, D7-1, D7-3 and D1 across. W-8 amends two older §11 decisions:
@@ -261,6 +261,30 @@ below.
   sheet's three checkboxes, `transcribe`'s booleans and the close-out of the
   not-built list are phase 2.
 
+**Issue batch B86 phase 2 (2026-10-05, #96): the sheet and `transcribe`
+(W-15).** The owner chose all four points as the spec built them.
+- Three checkboxes under Style, one per line, no heading: "Slide the pill",
+  "Fill words as spoken", "Dim in pauses". Each is off until ticked and is
+  remembered under its own key, written by a CLICK and never by Generate,
+  and never read by the tool. An older build's defaults hold none of the
+  keys, so its remembered style opens with all three off.
+- What is live when is derived from the style's own `word_style`, never a
+  table: Slide with a pill (Pill); Fill where `build` or the active and
+  upcoming colours differ (Highlight, Karaoke, Build); Dim with every word
+  style. A box that is not live is greyed and KEEPS its tick (the owner's
+  choice 2); it commits nothing while greyed.
+- Dim writes `pause_dim` 0.5. While On this Mac and a word style are
+  chosen, a two-line note under the boxes says on-device words rarely carry
+  a pause (the owner's choice 3); the card is about two lines taller while
+  it shows (34 pt in the offscreen probe).
+- `transcribe` takes `slide`, `fill`, `dim`: a `true` that would show
+  nothing (a style it is not live with, or `place: false`) is refused by
+  name; an explicit `false` is always accepted (the owner's choice 4 (b)) —
+  where `replace` and the cloud-only arguments refuse on presence. A placed
+  run given any of them answers `looks`.
+- The preview draws a ticked fill half done and a ticked pill half-way
+  through its slide; the dim is not previewed.
+
 ## What it built — where it lives now
 
 - **Core:**
@@ -360,6 +384,97 @@ below.
     README, `docs/manual-checks.md` and the not-built list's close-out; and,
     once the sheet's Dim reaches every word style, a P10 case for a Karaoke
     page laid on two lines as its pager lays it, which nothing here timed.
+    (Phase 2 did all of it. The Karaoke case was built on 2026-10-05 in Low
+    Power Mode and first timed in a judged power state on 2026-10-06: "What
+    Karaoke's two-line page costs", in the phase 2 record below.)
+- **Issue batch B86 phase 2 (2026-10-05, #96; spec §11 W-15):**
+  - App: `CaptionLooks.swift` (the value, the live rule, `styleList`, the
+    keys, `CaptionStyle.wordStyle(_:)`); `CaptionStyle.textProps` /
+    `pagePatch` and `CaptionLayout.place` take `looks:`;
+    `TranscribeSheetController+Looks.swift` (the row, `looks`,
+    `lookChanged`, `refreshLooksRow`, the note); `+Style` (`PreviewKey`'s
+    looks, `previewReveals`), `+Commit`; `AgentServer+Captions.swift`'s
+    `captionLooks` and `AgentCatalog+Captions.swift`'s three properties. No
+    core, FFI, op or format change.
+  - Proofs, as their runs printed them on 2026-10-06 (one host, on AC power,
+    `pmset -g` `powermode 0` every time it was read; `tools/proof/README.md`'s
+    "Issue batch B86 phase 2" has every row):
+    - `word_captions_sheet_probe.swift` S10–S16 through
+      `word_captions_chrome.py`: 49/49 with three new photographs. Nine
+      mutants, each `MUTANT PASS`: `fill-live-everywhere`, `note-unbounded`,
+      `note-any-engine`, `looks-not-remembered`, `greyed-box-counts`,
+      `commit-drops-looks`, `rebuild-drops-preset`, `preview-ignores-looks`
+      and the re-anchored `preview-base-size`. `note-unbounded` survived the
+      day before, when S11 read the note only in a hosted window; S11 now
+      also reads it on a sheet just built, before any layout, where the
+      note's `preferredMaxLayoutWidth` is what makes its intrinsic size
+      257.5 × 30.0 pt and not 335.5 × 15.0 pt. The line stays.
+    - `word_looks_sheet_proof.py`: 9/9 on a scratch home, the stand-in's
+      words. Four mutants, each `MUTANT PASS`: `looks-not-placed` (T1, T2 and
+      T3 all failed), `refusals-dropped`, `tool-reads-remembered`,
+      `note-never-shown`.
+    - `word_looks_proof.py`, phase 1's rows on this build: 15/15, B1
+      `moved: []`.
+    - `words_picture_probe.py`: P17, the pill's height between two lines of
+      different metrics, passes (the two pills 259 and 287 px tall, the
+      plate 273 px half-way) and its mutant `plate-height-jumps` is
+      `MUTANT PASS`. The whole probe, its first full run under the final
+      scoring: 18/19 — P1–P9 and P11–P17 hold and P10 fails, on the median
+      below.
+    - `screens.py` launches under a scratch home of its own: 26 pass of 26,
+      both looks, and screen 16's footnote reads "saved in ~/Movies/Reelcut
+      Recordings" under it. `v3_tools.py`, the launch's other caller: 8 of 8.
+    - `cloud_captions_probe.py --mutant speaker-colour-word-styles` (its
+      anchor quotes `place`'s `pagePatch` call): exit 1, SP2 failed on all
+      five word styles. The unmutated probe: 863/865 with SP2 passing; its
+      two failures (SP3, SP4·off) are the baseline build under "Owed" (#246).
+    - `make typecheck` 0 errors and 4 warnings, tsc silent; `make lint`
+      clean; `make app` `BUILD SUCCEEDED`; `make test` whole, exit 0 (`core`
+      1,064 passed, `graphic` 125, `mcp-proxy`'s `stdio` suite 14/14 with no
+      timeout, and its seven proof steps).
+  - **What Karaoke's two-line page costs, as P10 printed it** (2026-10-06,
+    one host, two runs of `--only P10`, each judged: on AC power, `pmset -g`
+    `powermode 0` before and after, Low Power Mode off and thermal state
+    nominal before the rasters and after; an unoptimised probe build, the
+    median of 20 rasters-and-uploads on a cache miss; none of the pass's own
+    jobs beside them, the Mac in use by other sessions). The page is the one
+    Karaoke's pager makes of a run of words with no pause: two lines at its
+    own wrap width, its last word half filled, half-way into its dim. At
+    1080×1920 (8 words, box 806×197) it read 1.241 ms and 1.237 ms. **At
+    3840×2160 (15 words, box 3037×396) it read 8.384 ms and 8.210 ms, over
+    the 8 ms budget, and P10 FAILED both runs on that one median**; the
+    control run at budget 0 read 8.358 ms and the whole probe's run 8.441 ms.
+    Every other scored median was
+    inside: at 3840×2160 Highlight's fill with dim 7.684 ms and 7.567 ms,
+    One Word's page 5.147 ms and 5.214 ms, a fill 2.772 ms and 2.781 ms, a
+    glide 2.787 ms and 2.936 ms. The budget was not raised, and the draw and
+    the scoring were not changed. As on the hand-made line (Known limits), it
+    is the dim that costs — one transparency layer over the whole text box
+    (W-14) — and it is paid on a ramp's frames only. What these readings do
+    not settle: in the same four runs Highlight's line read 7.567–7.760 ms,
+    where phase 1's four judged runs, on battery at `powermode 2`, read
+    7.147–7.382 ms; whether Karaoke's page is inside 8 ms under phase 1's
+    conditions was not measured.
+  - **Owed after this phase:**
+    - **The owner's decision on that median**: a cheaper draw for the dim
+      (#245) or Karaoke's two-line page at 3840×2160 recorded as a known
+      limit beside the hand-made line. Until then `python3
+      tools/proof/words_picture_probe.py --only P10` fails by name on an
+      unthrottled host.
+    - The person checks CAP-6 (the sheet) and CAP-7 (the three looks on real
+      speech, with each engine) in `docs/manual-checks.md`.
+    - `word_captions_proof.py` and `cloud_captions_proof.py` were not run:
+      each launches outside a scratch home, which this batch's limits did
+      not allow. `word_looks_sheet_proof.py`'s T1–T5 cover `place` and the
+      handler on a scratch home.
+    - `cloud_captions_probe.py`'s two baseline builds no longer build
+      against today's core, a rot older than this phase (its SP3 and SP4·off
+      fail and row W's three rows are skipped by name on any run):
+      the probe's source names a Settings member B46's tree does not have,
+      and B46's and the WAV baseline's `AgentServer.swift` call the TCP
+      exports road map 14 deleted. Each baseline needs its own tree's core
+      and header, as the meter and welcome comparisons build theirs; not
+      done in this phase, and tracked in #246.
 
 ## Known limits
 
@@ -400,9 +515,9 @@ below.
   exercises it at hold 0.1 s.
 - **On a hand-made page of large type a dim's ramp costs more than a
   frame's budget at 3840×2160** (B86 phase 1; `words_picture_probe.py` P10
-  prints it and does not score it). P10 scores two pages in the presets'
+  prints it and does not score it). In phase 1 P10 scored two pages in the presets'
   own styles — Highlight's line and One Word's one-word page — and judged in
-  High Power each is inside its budget: a fill with a dim took a median of
+  High Power each was inside its budget: a fill with a dim took a median of
   7.174 ms and 4.982 ms at 3840×2160 against 8 ms (2.435 ms and 1.553 ms at
   1080×1920 against 4 ms). A hand-made page of large type — six words on
   one line at One Word's size, 0.12 × min(w, h) where Highlight's is 0.075,
@@ -410,9 +525,12 @@ below.
   3840×2160 on a dim's ramp frames against the 8 ms budget (2026-10-05, High
   Power, on battery, thermal state nominal; 3.100 ms at 1080×1920). The
   reason the dim costs this is the one transparency layer over the whole
-  text box (W-14): it costs by the box. **P10's pages are one line with
+  text box (W-14): it costs by the box. **Those two pages are one line with
   `width: nil`**, where a generated page is cut to its style's width, so
-  Highlight's scored line is wider than any its pager makes. The cost is
+  Highlight's scored line is wider than any its pager makes. Phase 2 added
+  a third scored page, Karaoke's two lines as its pager cuts them, which
+  read over the 8 ms budget at 3840×2160: an open decision, not a limit
+  recorded here ("Owed after this phase", above). The cost is
   paid on the frames of a ramp only — 0.1 s down and 0.1 s up per pause;
   the plateau between is one cached texture — and a fill or a glide alone
   costs what the shipped pop costs (about 1.2 ms and 2.5 ms). An earlier
@@ -436,7 +554,7 @@ below.
   pause fades for its last 0.25–0.5 s; with on-device words mostly nothing
   happens, because the stretched `end` leaves gaps under 0.25 s (0.06 s for
   the 1.13 s silence; the 1.57 s one left 0.30 s, so that page's last 0.3 s
-  dims). The dim behaves as #96 describes — down, then back before the next
+  dims). The dim behaves as W-13 describes — down, then back before the next
   word — on a page timed by hand or by an agent. Trimming on-device word
   ends against the silence detector is not built.
 - **A lone word stays alone when the balance step cannot improve it.**
@@ -459,9 +577,16 @@ below.
   - 60 fps with pops;
   - the preview looked at;
   - the Style row seen as a sheet.
-- The not-built list (AI emphasis/emoji, a sliding pill, a karaoke in-word
-  fill and "dim during silence", restyling in place, WebVTT inline
-  timestamps, filler words, per-word confidence styling) is tracked in #96.
+- The not-built list (orig §7), closed by issue batch B86 (2026-10-05):
+  - a sliding pill, a karaoke in-word fill and "dim during silence": BUILT
+    (B86, spec §11 W-12..W-15);
+  - restyling in place: STRUCK by the owner, 2026-10-05 — regenerating is
+    not slow for them, and W-10 stands;
+  - WebVTT inline timestamps: STRUCK by the owner, 2026-10-05 — no player
+    they use shows them;
+  - filler words: tracked in #92;
+  - per-word confidence styling: tracked in #241;
+  - AI emphasis and emoji: ruled out by W-9 (as amended by AI-6).
 - Three choices shipped unconfirmed: Karaoke's two-line exception, the
   initial font set and the 80 % shrink floor. The user confirmed all three
   on 2026-09-28 (spec §11 W-11; #45 closed).

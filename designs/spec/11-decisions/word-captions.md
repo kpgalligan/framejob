@@ -209,3 +209,72 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   `layoutKey`, `frameKey` and the headroom are unchanged. All three recipe
   values and `pause_dim` are clamped to 0…1 where they are drawn, because
   `set_action_end` is lenient and text is not clamped.
+- **W-15 — The three looks are three checkboxes in the Generate Captions
+  sheet and three booleans on `transcribe`, off unless asked for** (issue
+  batch B86 phase 2, #96; the owner, 2026-10-05). Under the Style pop-up
+  and above the preview, one per line with no heading: "Slide the pill",
+  "Fill words as spoken", "Dim in pauses". Each is off by default and
+  REMEMBERED under its own key in the sheet's defaults
+  (`ReelcutCaptionSlide`, `ReelcutCaptionFill`, `ReelcutCaptionDim`; an
+  absent key is off, so a build that remembered only a style opens with
+  all three off), read when the row is built and written by a CLICK —
+  never by Generate — and never read or written by a tool (R6-2 read
+  across, as for the engine and the style). The six presets are not
+  changed: a look is added to the preset's `word_style` when the page is
+  placed, and with none asked for the placed page is the one it was.
+  - **What is live when** is derived from the style's own `word_style`,
+    never a table: Slide ⇔ the style has an `active_pill`; Fill ⇔ its
+    `mode` is `build`, or its active and upcoming colours differ; Dim ⇔ it
+    is a word style. Today:
+
+    | look | key written | live with |
+    |---|---|---|
+    | Slide the pill (`slide`) | `active_pill.glide: true` | pill |
+    | Fill words as spoken (`fill`) | `active_fill: true` | highlight, karaoke, build |
+    | Dim in pauses (`dim`) | `pause_dim: 0.5` | highlight, pill, karaoke, build, one_word |
+
+    On Pill and One Word a fill would show nothing (one colour on both
+    sides of its edge), and with Subtitles nothing is live.
+  - **A box that is not live is greyed, not hidden, and keeps its tick**:
+    tick Slide on Pill, choose Karaoke, and the box is disabled and still
+    ticked; back on Pill it is on again. While greyed it writes no default
+    and commits nothing — the sheet's looks are each box ENABLED and on.
+  - **Dim writes `pause_dim` 0.5, and the sheet has no depth or speed
+    control.** While On this Mac is the engine and a word style is chosen —
+    ticked or not — one note under the box reads "On-device words rarely
+    carry a pause; this shows mostly with AssemblyAI." (W-13's last
+    paragraph is why.) It is hidden with AssemblyAI and with Subtitles. At
+    the sheet's small-note size it wraps to two lines, so the card is about
+    two lines taller while it shows, as it is while the AssemblyAI rows
+    show.
+  - **`transcribe` takes `slide`, `fill` and `dim`**, booleans, each false
+    by default and never what the sheet last chose. A `true` that would
+    show nothing is the caller's own mistake and is refused by name, after
+    the refusals of `replace` and before the scope, the style first and
+    then `place`: `<name> only applies with style <the styles it is live
+    with> — not <style>.` and `<name> only applies when place is true: with
+    place false nothing is placed, so nothing is styled.` **An explicit
+    `false` is always accepted.** That is a second rule inside one tool,
+    on purpose: `replace`, `speakers`, `vocabulary` and `refresh` are
+    refused whenever they are PRESENT where they cannot apply, `false`
+    included, while these three are refused only when `true`. The first
+    rule exists so a dropped request is never mistaken for one that was
+    carried out; a `false` asks for nothing, and with three switches whose
+    styles differ, refusing on presence would mostly refuse calls that
+    asked for exactly what they would have got. Each description says
+    which rule it follows. A placed run in which any of the three was
+    given answers `looks`, the names that were on, in the order slide,
+    fill, dim. The style list in each description and each refusal comes
+    from one accessor over the live rule, never typed.
+  - **The looks are no part of the measurement.** `CaptionPages.Request`
+    does not carry them and the pager's measured page is the looks-free
+    one: none of the three moves a glyph or the box (W-14), so the
+    committed page is still the measured page.
+  - **The preview's two frames show the fill half done and the pill
+    half-way through its slide**; the dim is not previewed, and ticking it
+    redraws nothing.
+  - **Restyling is still regenerating** (W-10): the boxes and the booleans
+    act when captions are generated, `CaptionLayout.place` stays the one
+    app-side writer of `word_style`, and nothing in the inspector turns a
+    look on or off for a page already placed (`set_text` is the agent's
+    door, W-12).

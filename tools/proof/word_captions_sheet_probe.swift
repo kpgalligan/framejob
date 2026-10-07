@@ -381,6 +381,247 @@ if let doc = document(vertical) {
     check("S9 the document builds", false, "")
 }
 
+// MARK: - S10 the three look boxes (issue batch B86 phase 2, spec §11 W-15)
+
+// The table and the lists are WRITTEN here, not derived: the app derives them.
+let liveTable: [Look: Set<CaptionStyle>] = [
+    .slide: [.pill],
+    .fill: [.highlight, .karaoke, .build],
+    .dim: [.highlight, .pill, .karaoke, .build, .oneWord],
+]
+let styleLists: [Look: String] = [
+    .slide: "pill",
+    .fill: "highlight, karaoke or build",
+    .dim: "highlight, pill, karaoke, build or one_word",
+]
+let lookTitles = ["Slide the pill", "Fill words as spoken", "Dim in pauses"]
+if let doc = document(vertical) {
+    let s = sheet(doc)
+    let titles = Look.allCases.map { s.checkbox(for: $0).title }
+    let ids = Look.allCases.map { s.checkbox(for: $0).accessibilityIdentifier() }
+    let allOff = Look.allCases.allSatisfy { s.checkbox(for: $0).state == .off } && s.looks == .none
+    var wrong: [String] = []
+    for style in CaptionStyle.allCases {
+        choose(style, on: s)
+        for look in Look.allCases
+        where s.checkbox(for: look).isEnabled != (liveTable[look]?.contains(style) ?? false) {
+            wrong.append("\(look.rawValue) on \(style.rawValue): \(s.checkbox(for: look).isEnabled)")
+        }
+    }
+    let lists = Look.allCases.map(\.styleList)
+    check("S10 the three boxes carry the three titles in order, all off over empty defaults; "
+          + "each is enabled exactly on its table's styles; each styleList is its literal",
+          titles == lookTitles && allOff && wrong.isEmpty
+            && ids == ["captions.look.slide", "captions.look.fill", "captions.look.dim"]
+            && lists == Look.allCases.map { styleLists[$0] ?? "?" },
+          "titles \(titles), ids \(ids), all off \(allOff), wrong \(wrong), lists \(lists)")
+} else {
+    check("S10 the document builds", false, "")
+}
+
+// MARK: - S11 the looks row laid out, S12 the note
+
+let noteLiteral = "On-device words rarely carry a pause; this shows mostly with AssemblyAI."
+if let doc = document(vertical) {
+    var problems: [String] = []
+    var noteWrong: [String] = []
+    var heights: [String: CGFloat] = [:]
+    var early: [String] = []
+    var earlyReadings: [String] = []
+    for (engine, s) in [("apple", sheet(doc)), ("assemblyai", cloudSheet(doc))] {
+        // Before `host(_:)` and before any layout pass: the sheet is only built.
+        let before = noteBeforeLayout(s)
+        early += before.problems.map { "\(engine): \($0)" }
+        earlyReadings.append("\(engine): \(before.reading)")
+        let window = host(s)
+        for style in CaptionStyle.allCases {
+            choose(style, on: s)
+            relayout(s, in: window)
+            problems += looksLayoutProblems(s).map { "\(engine) \(style.rawValue): \($0)" }
+            let visible = !s.dimNoteLabel.isHidden
+            if visible != (engine == "apple" && style != .subtitles) {
+                noteWrong.append("\(engine) \(style.rawValue): visible \(visible)")
+            }
+            heights["\(engine) \(style.rawValue)"] = s.view.fittingSize.height
+        }
+        if s.dimNoteLabel.stringValue != noteLiteral
+            || s.dimNoteLabel.accessibilityIdentifier() != "captions.look.dimnote"
+        {
+            noteWrong.append("\(engine): \"\(s.dimNoteLabel.stringValue)\"")
+        }
+    }
+    let shown = heights["apple highlight"] ?? -1
+    let hidden = heights["apple subtitles"] ?? -1
+    check("S11 laid out in a window, 6 styles × 2 engines: each box at least its intrinsic "
+          + "width and inside the 258 pt column; a visible note at most 258 pt wide and at "
+          + "least its fitting height",
+          problems.isEmpty && shown > 0 && hidden > 0,
+          "problems \(problems.prefix(6)); RECORDED, not scored — the card's fitting height on "
+            + "this Mac: \(shown) pt with the note (Highlight) and \(hidden) pt without "
+            + "(Subtitles), a difference of \(shown - hidden) pt")
+    check("S11 before any layout, on a sheet just built (each engine): the note's intrinsic "
+          + "size is above 0 and at most 258 pt wide and at least its cell's height at 258 pt, "
+          + "which is taller than one line",
+          early.isEmpty, "problems \(early); \(earlyReadings.joined(separator: "; "))")
+    check("S12 the note is visible exactly when the engine is On this Mac and the style is a "
+          + "word style, and it is the owner's sentence", noteWrong.isEmpty,
+          "wrong \(noteWrong)")
+} else {
+    check("S11 the document builds", false, "")
+    check("S11 before any layout: the document builds", false, "")
+    check("S12 the document builds", false, "")
+}
+
+// MARK: - S13 the remembered boxes, S14 a greyed box keeps its tick
+
+if let doc = document(vertical) {
+    let memory = freshDefaults()
+    let first = sheet(doc, defaults: memory)
+    let untouched = lookKeys.allSatisfy { memory.object(forKey: $0.1) == nil }
+    choose(.pill, on: first)
+    tick(.slide, on: first)
+    tick(.dim, on: first)
+    choose(.karaoke, on: first)
+    tick(.fill, on: first)
+    let wrote = lookKeys.map { memory.object(forKey: $0.1) as? Bool }
+    let second = sheet(doc, defaults: memory)
+    let reopened = Look.allCases.map { second.checkbox(for: $0).state == .on }
+    let older = freshDefaults()
+    older.set("pill", forKey: "ReelcutCaptionStyle")
+    let third = sheet(doc, defaults: older)
+    let thirdOff = Look.allCases.allSatisfy { third.checkbox(for: $0).state == .off }
+    check("S13 ticking each box where it is live writes true under its key; a second sheet over "
+          + "those defaults opens ticked; defaults holding only the style pill open on Pill "
+          + "with all three off",
+          untouched && wrote == [true, true, true] && reopened == [true, true, true]
+            && third.style == .pill && thirdOff && third.looks == .none,
+          "untouched before a click \(untouched), wrote \(wrote), reopened \(reopened), older "
+            + "opens on \(third.style.rawValue) with all off \(thirdOff)")
+
+    let kept = freshDefaults()
+    let s = sheet(doc, defaults: kept)
+    choose(.pill, on: s)
+    tick(.slide, on: s)
+    let onPill = s.looks.slide
+    choose(.karaoke, on: s)
+    let box = s.slideCheckbox
+    let greyed = !box.isEnabled && box.state == .on
+    let counted = s.looks.slide
+    let stillHeld = kept.bool(forKey: "ReelcutCaptionSlide")
+    choose(.pill, on: s)
+    let back = box.isEnabled && box.state == .on && s.looks.slide
+    check("S14 Slide ticked on Pill, then Karaoke: the box is disabled and still ticked, "
+          + "looks.slide is false and the defaults still hold true; back on Pill it is on",
+          onPill && greyed && !counted && stillHeld && back,
+          "on Pill \(onPill); on Karaoke greyed-and-ticked \(greyed), counted \(counted), "
+            + "defaults \(stillHeld); back on Pill \(back)")
+} else {
+    check("S13 the document builds", false, "")
+    check("S14 the document builds", false, "")
+}
+
+// MARK: - S15 what a commit writes, whole
+
+let wordStyles = CaptionStyle.allCases.filter(\.isWordStyle)
+var bare: [String] = []
+var unmeasured: [String] = []
+for style in wordStyles {
+    let pages = commitLooks(style, nil) ?? []
+    if pages.isEmpty || !pages.allSatisfy({ $0.wordStyle == style.wordStyle }) {
+        bare.append("\(style.rawValue): \(pages.count) pages, \(String(describing: pages.first?.wordStyle))")
+    }
+    if !measuresAlike(pages, style) { unmeasured.append(style.rawValue) }
+}
+check("S15 (i) each of the five word styles with no box ticked commits the unedited preset's "
+      + "word_style, whole", wordStyles.count == 5 && bare.isEmpty, "wrong \(bare)")
+var pairs = 0
+for style in wordStyles {
+    var wrong: [String] = []
+    let live = Look.allCases.filter { liveTable[$0]?.contains(style) ?? false }
+    for look in live {
+        pairs += 1
+        let pages = commitLooks(style, look) ?? []
+        let want = rebuilt(style, look)
+        if pages.isEmpty || want == nil || !pages.allSatisfy({ $0.wordStyle == want }) {
+            wrong.append("\(look.rawValue): \(pages.count) pages, committed "
+                + "\(String(describing: pages.first?.wordStyle)), wanted \(String(describing: want))")
+        }
+        if !measuresAlike(pages, style) { unmeasured.append("\(style.rawValue)+\(look.rawValue)") }
+    }
+    check("S15 (ii) \(style.rawValue): each live look, ticked alone, commits the preset rebuilt "
+          + "in the probe with only that look's field changed (\(live.map(\.rawValue)))",
+          !live.isEmpty && wrong.isEmpty, "wrong \(wrong)")
+}
+var unequal: [String] = []
+for style in CaptionStyle.allCases {
+    if style.wordStyle(.none) != style.wordStyle { unequal.append("\(style.rawValue) .none") }
+    for look in Look.allCases where !(liveTable[look]?.contains(style) ?? false) {
+        var alone = CaptionLooks.none
+        alone[look] = true
+        if style.wordStyle(alone) != style.wordStyle {
+            unequal.append("\(style.rawValue) \(look.rawValue)")
+        }
+    }
+}
+check("S15 (iii) for all six styles wordStyle(.none) == wordStyle, and a look that is not "
+      + "live, alone, leaves wordStyle(_:) equal to wordStyle", unequal.isEmpty,
+      "unequal \(unequal)")
+check("S15 (iv) in each of the 14 commits every committed page measures what its looks-free "
+      + "page measures", pairs == 9 && unmeasured.isEmpty,
+      "\(5 + pairs) commits, differing \(unmeasured)")
+
+// MARK: - S16 the preview's two frames
+
+if let doc = document(vertical) {
+    let k = sheet(doc)
+    choose(.karaoke, on: k)
+    let plain = png(k.previewView.image)
+    tick(.fill, on: k)
+    let filled = png(k.previewView.image)
+    let beforeDim = k.previewView.image
+    tick(.dim, on: k)
+    let dimDrewNothing = beforeDim != nil && k.previewView.image === beforeDim
+    let p = sheet(doc)
+    choose(.pill, on: p)
+    let settled = png(p.previewView.image)
+    tick(.slide, on: p)
+    let slid = png(p.previewView.image)
+    // The second frame is mid-slide, not at rest: the sheet's own props drawn
+    // at the preview's glide differ from the same props with none.
+    let frame = max(doc.project.snapshot.canvas.fps.frameDuration, 1)
+    let props = CaptionPages.samplePage(
+        TranscribeSheetController.fixedSampleWords, request: p.pagesRequest, frame: frame
+    ).map { p.previewProps(for: $0, canvas: vertical) }
+    let midway = props.flatMap {
+        bytes(LayerRenderers.textBitmap($0, reveal: RecipeReveal(word: 2, wordPop: 1, wordGlide: 0.2)))
+    }
+    let atRest = props.flatMap {
+        bytes(LayerRenderers.textBitmap($0, reveal: RecipeReveal(word: 2, wordPop: 1)))
+    }
+    let all = CaptionLooks(slide: true, fill: true, dim: true)
+    let one = TranscribeSheetController.previewReveals(tokens: 1, looks: all)
+    let three = TranscribeSheetController.previewReveals(tokens: 3, looks: all)
+    let none = TranscribeSheetController.previewReveals(tokens: 3, looks: .none)
+    let revealsOK =
+        one == [RecipeReveal(word: 1, wordPop: 1, wordFill: 0.5),
+                RecipeReveal(word: 1, wordPop: 1, wordFill: 0.5)]
+        && three == [RecipeReveal(word: 1, wordPop: 1, wordFill: 0.5),
+                     RecipeReveal(word: 2, wordPop: 1, wordGlide: 0.2, wordFill: 0.5)]
+        && none == [RecipeReveal(word: 1, wordPop: 1), RecipeReveal(word: 2, wordPop: 1)]
+    check("S16 Karaoke's preview with Fill differs from without, Pill's with Slide differs from "
+          + "without and its second frame is mid-slide; ticking Dim draws nothing; "
+          + "previewReveals answers the literal values for 1 and 3 tokens",
+          plain != nil && filled != nil && plain != filled && dimDrewNothing
+            && settled != nil && slid != nil && settled != slid
+            && midway != nil && atRest != nil && midway != atRest
+            && (props?.tokenCount ?? 0) >= 2 && revealsOK,
+          "Karaoke differs \(plain != filled), Dim kept the image \(dimDrewNothing), Pill "
+            + "differs \(settled != slid), mid-slide differs from rest \(midway != atRest) on "
+            + "\(props?.tokenCount ?? 0) tokens, reveals \(revealsOK): \(three)")
+} else {
+    check("S16 the document builds", false, "")
+}
+
 let out: [String: Any] = ["ok": true, "registered": registered, "rows": rows]
 let data = (try? JSONSerialization.data(withJSONObject: out, options: [.sortedKeys])) ?? Data()
 FileHandle.standardOutput.write(data)

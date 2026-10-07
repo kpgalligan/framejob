@@ -338,9 +338,15 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Source:** #52.
 
 **CAP-6 — The Generate Captions sheet**
-- **Do:** 1. Open it; pick a style; relaunch; reopen. 2. With two caption tracks, generate with Replace; ⌘Z once. 3. Look at the style preview at 9:16 and 16:9.
-- **Expect:** the Style row and card fit; the popup opens on the last style; Replace swaps both tracks and one ⌘Z brings them back; the preview reads as "this style, second word lit".
-- **Source:** #52.
+- **Do:** 1. Open it; pick a style; relaunch; reopen. 2. With two caption tracks, generate with Replace; ⌘Z once. 3. Look at the style preview at 9:16 and 16:9. 4. Choose Pill and tick "Slide the pill"; relaunch; reopen. 5. Still with Slide ticked, choose Karaoke, then Subtitles, then Pill again. 6. With Engine on "On this Mac", choose Subtitles, then Highlight; then switch Engine to AssemblyAI. 7. On Karaoke tick "Fill words as spoken"; on Pill tick "Slide the pill"; tick "Dim in pauses". 8. On a 13-inch display, select AssemblyAI and a word style.
+- **Expect:** the Style row and card fit; the popup opens on the last style; Replace swaps both tracks and one ⌘Z brings them back; the preview reads as "this style, second word lit". The three boxes sit one per line under Style, and a ticked box is still ticked after the relaunch. A box that does not apply to the style is greyed and keeps its tick: Slide is greyed on Karaoke and Subtitles and is on again, still ticked, back on Pill. Under "Dim in pauses" the note "On-device words rarely carry a pause; this shows mostly with AssemblyAI." shows on two lines with On this Mac and a word style, and goes with Subtitles or AssemblyAI; the card grows by about two lines when it appears and nothing is cut off. With Fill the preview's lit word is half filled; with Slide the pill in the second frame sits half-way between the first word and the second; ticking Dim changes nothing in the preview. With AssemblyAI selected the whole card, buttons included, fits on the 13-inch display.
+- **Source:** #52, spec §11 W-15.
+
+**CAP-7 — Word caption looks**
+- **Do:** 1. On real speech, generate Pill with "Slide the pill" ticked, with On this Mac and then with AssemblyAI; play. 2. Generate Karaoke, then Highlight and Build, with "Fill words as spoken" ticked, with each engine; play. 3. Generate Karaoke — which pages to two lines — with "Dim in pauses" ticked, with each engine, over speech that has real pauses; play. 4. Select one of the Pill pages from step 1 and, in the Clip tab's Text ▸ Box section, narrow its width until the page wraps onto two lines; play across the line break. 5. Play a page with a fill running and read the compositor's timing log (Setup 4).
+- **Expect:** the pill slides from word to word instead of jumping, and never covers a word's letters; between two lines it travels diagonally, under the ink, and arrives the right size for the new line. A word fills left to right in time with the voice and is full when the word ends, with both engines. In a pause the page fades to half and comes back as the next word starts; with On this Mac it rarely dims at all (the sheet says so). Playback holds 60 fps with a fill running.
+- **Answer:** is 0.6 s the right longest time for one word to fill, and is 50 % the right depth for the dim? Does the glide look right, and does the dim read as a pause rather than a glitch?
+- **Source:** spec §11 W-12..W-15 (issue batch B86).
 
 ## Cloud captions
 

@@ -165,6 +165,24 @@ struct WpRaster {
     let dim: Bool
     let glide: Bool
     let scored: Bool
+    /// The page is the PAGER's own first page of `content`
+    /// (`CaptionPages.samplePage`): its text, its size and its wrap `width`,
+    /// the active word its last. False lays `content` on one line.
+    var paged = false
+}
+
+/// The paged case's words: `karaokeText`'s tokens, one every 0.12 s and 0.1 s
+/// long — no pause, no sentence mark and 3 s away from the page's time limit,
+/// so the WIDTH is what closes the page, on Karaoke's second line.
+let karaokeText = "this is how it looks when a karaoke page runs onto its second line and keeps "
+    + "going until the pager closes it for good measure"
+func wpPagerPage(_ caption: CaptionStyle, _ content: String, _ canvas: CGSize) -> CaptionLayout.Cue? {
+    let words = content.split(separator: " ").enumerated().map { index, token in
+        CaptionCues.Word(
+            text: String(token), start: Ticks(index) * 72_000, end: Ticks(index) * 72_000 + 60_000)
+    }
+    return CaptionPages.samplePage(
+        words, request: CaptionPages.Request(style: caption, canvas: canvas), frame: 20_000)
 }
 
 /// Highlight's four are the page P10 has always timed. One Word's (size
@@ -174,6 +192,11 @@ struct WpRaster {
 /// text's longest — and it is scored. `oneword-line fill+dim (hand-made)`
 /// is the same six words on one line in that style: a page no preset makes
 /// and `set_text` can write, printed and never scored, as `pop` is.
+/// `karaoke-2line fill+dim` (issue batch B86 phase 2, where the sheet's Dim
+/// first reaches every word style) is the page Karaoke's PAGER makes — the
+/// one preset page of two lines, with partial-alpha upcoming ink — its last
+/// word half filled and the page half-way into its dim, which is a generated
+/// page's tail. Scored, under the same budgets.
 let wpRasters: [WpRaster] = [
     WpRaster(
         label: "pop", caption: .highlight, content: pageText, word: 3, pop: 0.5, pill: nil,
@@ -193,6 +216,9 @@ let wpRasters: [WpRaster] = [
     WpRaster(
         label: "oneword-line fill+dim (hand-made)", caption: .oneWord, content: pageText,
         word: 3, pop: 1, pill: nil, fill: true, dim: true, glide: false, scored: false),
+    WpRaster(
+        label: "karaoke-2line fill+dim", caption: .karaoke, content: karaokeText, word: 0,
+        pop: 1, pill: nil, fill: true, dim: true, glide: false, scored: true, paged: true),
 ]
 
 var p10: [[String: Any]] = []
@@ -207,11 +233,17 @@ for (canvasW, canvasH) in [(1080, 1920), (3840, 2160)] {
             activeScale: shipped.activeScale, activePill: raster.pill,
             spokenColor: shipped.spokenColor, upcomingColor: shipped.upcomingColor,
             activeFill: raster.fill, pauseDim: raster.dim ? 0.5 : 0)
-        let reveal = RecipeReveal(
-            word: raster.word, wordPop: raster.pop, wordGlide: raster.glide ? 0.5 : nil,
-            wordFill: raster.fill ? 0.5 : nil, wordDim: raster.dim ? 0.5 : nil)
-        let page = caption.textProps(
+        var page = caption.textProps(
             content: raster.content, size: caption.size(for: canvas), width: nil)
+        var active = raster.word
+        if raster.paged, let cue = wpPagerPage(caption, raster.content, canvas) {
+            page = caption.textProps(
+                content: cue.text, size: cue.size ?? caption.size(for: canvas), width: cue.width)
+            active = page.tokenCount
+        }
+        let reveal = RecipeReveal(
+            word: active, wordPop: raster.pop, wordGlide: raster.glide ? 0.5 : nil,
+            wordFill: raster.fill ? 0.5 : nil, wordDim: raster.dim ? 0.5 : nil)
         let props = TextProps(
             content: page.content, font: page.font, size: page.size, color: page.color,
             align: page.align, valign: page.valign, outline: page.outline, width: page.width,
@@ -225,9 +257,15 @@ for (canvasW, canvasH) in [(1080, 1920), (3840, 2160)] {
             milliseconds.append(Date().timeIntervalSince(began) * 1000)
         }
         let box = LayerRenderers.measuredSize(for: props)
+        // How many lines the page was laid on: its box against one line's in
+        // the same style and size.
+        let oneLine = LayerRenderers.measuredSize(
+            for: caption.textProps(content: "x", size: page.size, width: nil))
+        let lines = oneLine.height > 0 ? Int((box.height / oneLine.height).rounded()) : 0
         p10.append([
             "canvas": "\(canvasW)x\(canvasH)", "case": raster.label, "drew": warm != nil,
             "scored": raster.scored, "box": "\(Int(box.width))x\(Int(box.height))",
+            "lines": lines, "tokens": props.tokenCount, "word": active,
             "median_ms": wpMedian(milliseconds), "min_ms": milliseconds.min() ?? .nan,
             "max_ms": milliseconds.max() ?? .nan,
         ])
@@ -393,6 +431,24 @@ out["p16"] = [
     "lit_ink": wpClamped(dim: 0).map { wpRect(wpInk($0, wpAny)) } ?? "no bitmap",
     "invisible_ink": wpClamped(pauseDim: 1, dim: 1).map { wpRect(wpInk($0, wpAny)) }
         ?? "no bitmap",
+]
+
+// P17 — the plate's HEIGHT travels too (issue batch B86 phase 2). On a page
+// in one face every line has the same ascent and descent, so P11's two pills
+// are equally tall; here the second line holds glyphs the face does not have,
+// so a fallback face's metrics make that line and its pill. `word_glide`
+// 0.2063 eases to one half, where a height that jumped is furthest off.
+let wpMixed = TextProps(
+    content: "sun\n月見", font: "Montserrat-Black", size: 160, color: [1, 1, 1, 1],
+    textCase: .upper, wordStyle: WordStyle(activePill: wpGlidingPill))
+out["p17"] = [
+    "lines": LayerRenderers.layout(for: wpMixed).lines.map {
+        Double($0.ascent + $0.descent)
+    },
+    "glide": 0.2063,
+    "from": wpRedRect(wpMixed, RecipeReveal(word: 1)),
+    "to": wpRedRect(wpMixed, RecipeReveal(word: 2, wordGlide: 1)),
+    "half": wpRedRect(wpMixed, RecipeReveal(word: 2, wordGlide: 0.2063)),
 ]
 
 if wpQuick { wpFinish(out) }

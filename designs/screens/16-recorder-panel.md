@@ -3,7 +3,8 @@
   "title": "New Recording",
   "project": "demo",
   "steps": [{"call": "perform_menu_item", "args": {"path": ["File", "New Recording…"]}}],
-  "captures": [{"name": "panel", "window": "recorder"}]
+  "captures": [{"name": "panel", "window": "recorder"}],
+  "expect": [{"capture": "panel", "visible_text": "saved in ~/Movies/Reelcut Recordings"}]
 }
 ```
 

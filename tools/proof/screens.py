@@ -5,7 +5,10 @@
         [--out DIR] [--only ID,…] [--compare EARLIER_OUT]
 
 It launches its OWN Release instance on a scratch socket (`mcp.scratch_socket`;
-the log names the path it bound), with every `UserDefaults` key a captured screen draws pinned
+the log names the path it bound), under a scratch home of its own
+(`CFFIXED_USER_HOME` = `<out>/home.<look>`, rebuilt bare before each launch
+and replacing one the caller exported; issue batch B86 phase 2), with every
+`UserDefaults` key a captured screen draws pinned
 as a launch argument (`PINS`), an empty `-RCSecretFolder`, a `-RCSpendFolder`
 that does not exist (removed before each launch and never created, so
 Settings' month line is an empty month and the person's ledger is never read,
@@ -35,7 +38,9 @@ and prose; `designs/screens/README.md` is the format. Every step is checked
 before the first one runs, so a broken screen file fails by name and runs
 nothing.
 
-Rows print as `<ID> <pass|fail|skip> — <reason>`: `P1.<look>` each launch,
+Rows print as `<ID> <pass|fail|skip> — <reason>`: `P1.<look>` each launch
+(which also requires that the scratch home took: `<home>/Library/Application
+Support` is a directory once the instance listens, the other proofs' H0),
 `P2` the pins cover every key, `P3.<look>` each instance's end, and one row
 per screen, scored after both looks (a screen passes only if both did; each
 look's result prints first as an indented progress line). Then the new layout
@@ -134,9 +139,10 @@ def _plist(value):
     return value
 
 
-# tools/proof/harness/main.swift:289-395's `pinDefaults` — every key and value
+# tools/proof/harness/main.swift:295-418's `pinDefaults` — every key and value
 # — plus each section's collapsed state. Booleans and numbers go as plist fragments, which
-# the argument domain parses into typed values.
+# the argument domain parses into typed values. A scratch home does not move
+# `UserDefaults` (#238), so these pins are still what pins it.
 PINS = [(key, _plist(value)) for key, value in [
     ("ReelcutInspectorWidth", 304.0),
     ("ReelcutTimelineHeight", 300.0),
@@ -158,6 +164,9 @@ PINS = [(key, _plist(value)) for key, value in [
     ("ReelcutCaptionEngine", "apple"),
     ("ReelcutAssemblyAIRegion", "us"),
     ("ReelcutCaptionStyle", "subtitles"),
+    ("ReelcutCaptionSlide", False),
+    ("ReelcutCaptionFill", False),
+    ("ReelcutCaptionDim", False),
     ("ReelcutAssistantModel", ""),
     ("ReelcutAssistantAutoCompact", True),
     ("ReelcutAssistantAutoCompactTokens", 300000),
@@ -234,11 +243,26 @@ def log_path(out, look=None):
     return os.path.join(out, "app.log" if look is None else f"app.{look}.log")
 
 
+def home_path(out, look=None):
+    """The instance's scratch home, inside the run's own folder: `log_path`'s
+    naming, `<out>/home` or `<out>/home.<look>`."""
+    return os.path.join(os.path.abspath(out), "home" if look is None else f"home.{look}")
+
+
 def launch(app, out, look=None):
     """Start `app` with the pins, and with `look` as `-RCDevAppearance`, on a
-    scratch socket; answer the child and the socket it bound. Raises
-    LaunchError when the socket's line is not in the log within 60 s."""
+    scratch socket and under a scratch home (`home_path`, removed and made
+    bare first); answer the child and the socket it bound. Raises LaunchError
+    when the socket's line is not in the log within 60 s."""
     os.makedirs(out, exist_ok=True)
+    home = home_path(out, look)
+    shutil.rmtree(home, ignore_errors=True)
+    try:
+        os.makedirs(home)
+    except OSError as error:
+        raise LaunchError(f"{home} could not be made bare: {error}")
+    if os.listdir(home):
+        raise LaunchError(f"{home} is not empty after it was rebuilt")
     secrets = os.path.join(os.path.dirname(os.path.abspath(out)), "secrets")
     shutil.rmtree(secrets, ignore_errors=True)
     os.makedirs(secrets)
@@ -260,6 +284,9 @@ def launch(app, out, look=None):
     socket_path = scratch_socket()
     env = bounded.child_env({"RC_AGENT_SOCKET": socket_path})
     env.pop("ANTHROPIC_API_KEY", None)
+    # After `child_env`, so it REPLACES a scratch home the caller exported:
+    # every launch here answers for its own.
+    env["CFFIXED_USER_HOME"] = home
     log = log_path(out, look)
     handle = open(log, "w")
     try:
@@ -644,8 +671,13 @@ class Run:
         parity = parity_lines(self.out, look)
         marker = dev_marker_count(log_path(self.out, look))
         missing = [n for n in DEV_TOOLS if n not in tools]
-        ok = alive and welcome and not parity and not missing and marker == len(DEV_TOOLS)
+        home = home_path(self.out, look)
+        homed = os.path.isdir(os.path.join(home, "Library", "Application Support"))
+        ok = (alive and welcome and homed and not parity and not missing
+              and marker == len(DEV_TOOLS))
         notes = [f"pid {self.child.pid} alive {alive}", f"socket {bound}",
+                 f"scratch home {home} took (its Library/Application Support is a directory) "
+                 f"{homed}",
                  f"welcome {welcome}", f"`Reelcut: ` lines {len(parity)}",
                  f"dev tools missing {missing}", f"marker count {marker} (want {len(DEV_TOOLS)})"]
         self.score(rid, "pass" if ok else "fail", "; ".join(notes))

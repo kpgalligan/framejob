@@ -1146,7 +1146,9 @@ free.
   one cue), used only by a producer that must INVENT line breaks. An
   SRT brings its own. `Word.speaker` defaults to nil, so every caller
   that knows nothing about speakers is byte-identical to what it was.
-  `place` takes a `CaptionStyle`: `.subtitles` is the Caption-preset
+  `place` takes a `CaptionStyle` and the run's `CaptionLooks` (`looks:`,
+  `.none` by default, handed to `pagePatch`; spec §11 W-15): `.subtitles` is the
+  Caption-preset
   path, byte for byte for a cue with no speaker (a speaker's cue adds its
   palette `color`, spec §11 R6-22); a word style writes
   `CaptionStyle.pagePatch` per page — the pager's own props at the page's size (a shrunk one or the
@@ -1162,12 +1164,27 @@ free.
   min(W, H)), `y` (of H), outline, `word_style`, `maxWords`, `maxLines`,
   `textProps`, the ONE construction the pager
   measures and the sheet previews, and `pagePatch`, the patch `place` writes,
-  built from it, and `speakerPalette` / `speakerColors`, R6-22's four colours
+  built from it (both take `looks:`, a `CaptionLooks`, `.none` by default: the
+  pager asks with none, the sheet's preview and `place` pass the run's, and they
+  change `word_style` alone, never the measurement, W-14), and `speakerPalette` / `speakerColors`, R6-22's four colours
   by first appearance — so a committed page is the measured one and a shrunk
   page's outline is em × its own size. A GENERATION choice, not an inspector preset;
   `defaultsKey` is the sheet's remembered style, read when the Style popup
   is built and written by `styleChanged`; the tool never reads it (R6-2
   read across).
+- `CaptionLooks.swift` — the three LOOKS a run may add to a word style's
+  pages (spec §11 W-15): `CaptionLooks` (`slide`, `fill`, `dim`; `.none`;
+  `dimDepth` 0.5, the `pause_dim` a ticked Dim writes; the three remembered
+  keys `ReelcutCaptionSlide` / `Fill` / `Dim`, read and written by the
+  sheet alone), `Look` (the tool's argument names; `title`, `defaultsKey`,
+  and `isLive(for:)` DERIVED from the style's own `wordStyle` — a slide
+  needs a pill, a fill `build` or an upcoming colour that is not the active
+  one, a dim a word style — with `styles` and `styleList`, the one list
+  `transcribe`'s descriptions and refusals print), `live(for:)`, `names`,
+  and `CaptionStyle.wordStyle(_:)`, the preset with the live looks turned
+  on and EVERY other field carried by name (`word_captions_chrome.py`'s
+  `rebuild-drops-preset` removes one). The no-argument `wordStyle` is the
+  presets and is not edited by a look.
 - `CaptionPages.swift` — word-caption PAGES (spec §11 W-7), pure and
   synchronous so it runs on whichever engine thread calls it:
   `normalize` (trim, split, sort, the per-engine `lead` — its ONE home —
@@ -1353,7 +1370,11 @@ free.
   exit, `cloudReportLines` and the menu command with its validator arm;
   +`Download`: the Download row; +`Style`: the Style popup, the preview and
   the Replace checkbox with its list — `style`, `replaceExisting` and
-  `pagesRequest` COMPUTED off those controls) — on-device recognition through
+  `pagesRequest` COMPUTED off those controls; +`Looks`: the three look
+  checkboxes and the on-device note, spec §11 W-15 — `looks` is each box
+  ENABLED and on, `lookChanged` the card's third `defaults.set`, written by
+  a click and never by Generate, `refreshLooksRow()` greys a box that is not
+  live and leaves its tick) — on-device recognition through
   `SpeechEngine` (spec §11 W-8: no grant, no ceiling, nothing `async` here)
   over each clip's source window EXTRACTED to a temporary mono 16 kHz WAV,
   on `Transcriber`'s serial `work` queue with the one completion posted to
@@ -1367,8 +1388,8 @@ free.
   every row marked `installed` from the installed SET (no transcriber per
   locale: a reservation cap of 5), `forgetLanguages()` drops both caches,
   and `defaultLanguage(in:)` prefers an installed row at each step. The
-  tool's refusal ORDER is the caller's own mistakes first (scope, `engine`,
-  cloud-only arguments, the tag's spelling), then the installed model, then
+  tool's refusal ORDER is the caller's own mistakes first (the style, `replace` and a `slide` / `fill` / `dim` that would show
+  nothing, then scope, `engine`, cloud-only arguments, the tag's spelling), then the installed model, then
   the run; the tool NEVER downloads — a person does, from the sheet. `Job`
   carries `media` for the cloud engine, which uploads a MEDIA once;
   `CancelToken` holds a `SpeechEngine.Handle` and a `URLSessionTask`, under
@@ -1377,17 +1398,21 @@ free.
   (`+Jobs`) is the one spelling of a job's timeline span. The sheet's `style` is read off the Style popup's item and
   `replaceExisting` is true only while the checkbox is ENABLED and on —
   enabled only for a word style over tracks `replaceableTracks` names, the
-  tool's two rules — and `finish` passes both to `place`, so the sheet
-  commits what `transcribe {style, replace}` commits. The preview is
+  tool's two rules — and `finish` passes both, and `looks`, to `place`, so the sheet
+  commits what `transcribe {style, replace, slide, fill, dim}` commits. The preview is
   `CaptionPages.samplePage` of the first job's cached transcript (up to
   twelve words) else "This is how it looks", laid out by the style's
   `textProps` and drawn by `LayerRenderers.textBitmap`: two stacked frames
-  for a word style (the first word active, then the second), one for
+  for a word style (`previewReveals`: the first word active, then the
+  second, a ticked fill half done in both and a ticked pill at
+  `previewGlide` in the second; the dim is not previewed), one for
   Subtitles, over `DS.captionPreviewPlate`. `sampleWordsCache` stores the
   ANSWER per clip, a miss included, and the drawn preview is cached under
-  `PreviewKey` (style, first job's clip, canvas) in `previewKey`, so a
-  Vocabulary keystroke reads and draws nothing. `refresh()`'s `defer` runs
-  `refreshStyleRow()` then `refreshDownloadRow()`. `+Jobs` is no longer a pure move: it
+  `PreviewKey` (style, first job's clip, canvas, and the PREVIEWED looks —
+  `dim` always false there) in `previewKey`, so a Vocabulary keystroke or a
+  click on Dim reads and draws nothing. `refresh()`'s `defer` runs
+  `refreshStyleRow()` — whose first statement is `refreshLooksRow()`, since
+  the key reads `looks` — then `refreshDownloadRow()`. `+Jobs` is no longer a pure move: it
   owns `maxSourceTicks` (1e15) and `placed(offset:in:)`, the ONE door both
   caption mappings convert through, because spec §11's R6-10 says a
   hand-written `speed` the ops cannot write reaches the app and every
@@ -1405,8 +1430,8 @@ free.
   with no on-device model can still transcribe in the cloud. The Language
   popup lists every SUPPORTED locale, a missing model titled "— not
   installed", and Generate is live only for an installed one. **The
-  Download row** (grid row 1; `cloudRows` is `[3, 4, 5]`; Style,
-  preview and Replace are rows 7, 8 and 9) shows for an
+  Download row** (grid row 1; `cloudRows` is `[3, 4, 5]`; Style, the looks,
+  the preview and Replace are rows 7, 8, 9 and 10) shows for an
   uninstalled apple language or while a download runs; `downloading` names
   the running download's locale, and while it is set BOTH popups are
   locked — applied in `refreshDownloadRow()`, AFTER `populateLanguages()`

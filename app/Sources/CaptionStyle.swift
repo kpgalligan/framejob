@@ -23,6 +23,10 @@ import Foundation
 /// A word style's page is ONE page in three places: `textProps` is what the
 /// pager measures and what the sheet previews, and `pagePatch`, built from
 /// it, is what `place` writes — so a committed page is the measured one.
+/// The three LOOKS (`CaptionLooks.swift`, spec §11 W-15) ride outside the
+/// measurement: the pager asks with none, the sheet's preview and `place`
+/// pass the run's, and they change `word_style` alone — never a glyph or
+/// the box (W-14).
 enum CaptionStyle: String, CaseIterable {
     case subtitles
     case highlight
@@ -146,13 +150,15 @@ enum CaptionStyle: String, CaseIterable {
     /// the pager hands it `LayerRenderers.measuredSize(for:)`, the sheet
     /// previews it, and `pagePatch` writes its values. `width` nil lays it on
     /// one line (or on its own hard breaks); `words` stays empty, which the
-    /// measurement does not read.
-    func textProps(content: String, size: Double, width: Double?) -> TextProps {
+    /// measurement does not read. `looks` are the run's, `.none` for the pager.
+    func textProps(
+        content: String, size: Double, width: Double?, looks: CaptionLooks = .none
+    ) -> TextProps {
         TextProps(
             content: content, font: font, size: size, color: color, align: "center",
             valign: "middle",
             outline: outlineEm.map { OutlineProps(width: $0 * size, color: [0, 0, 0, 1]) },
-            width: width, textCase: textCase, wordStyle: wordStyle)
+            width: width, textCase: textCase, wordStyle: wordStyle(looks))
     }
 
     /// One page's `text` patch, what `place` writes: `textProps(content:size:width:)`'s
@@ -160,9 +166,12 @@ enum CaptionStyle: String, CaseIterable {
     /// the sheet shows; the outline is em × THIS size, shrunk or not (the
     /// pill's padding and radius are fractions of `size` at render time, and
     /// `width` is the budget in pixels by design) — plus the page's `words` in
-    /// CLIP time.
-    func pagePatch(content: String, size: Double, width: Double?, words: [TextWord]?) -> TextPatch {
-        let props = textProps(content: content, size: size, width: width)
+    /// CLIP time, and the run's `looks` in its `word_style`.
+    func pagePatch(
+        content: String, size: Double, width: Double?, words: [TextWord]?,
+        looks: CaptionLooks = .none
+    ) -> TextPatch {
+        let props = textProps(content: content, size: size, width: width, looks: looks)
         return TextPatch(
             content: props.content, font: props.font, size: props.size, color: props.color,
             align: props.align, valign: props.valign,

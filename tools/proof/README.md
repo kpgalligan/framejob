@@ -6887,7 +6887,19 @@ python3 tools/proof/screens.py [--app build/Build/Products/Release/Reelcut.app] 
     [--only ID,…] [--compare EARLIER_OUT]
 ```
 
-**The launch** (`screens.launch`, which `v3_tools.py` shares): the app's
+**The launch** (`screens.launch`, which `v3_tools.py` shares): since issue
+batch B86 phase 2 every launch runs under a scratch home of its own,
+`CFFIXED_USER_HOME=<out>/home.<look>` (`screens.home_path`), removed and made
+bare before the launch and set after `bounded.child_env`, so it replaces one
+the caller exported, and P1 requires its `Library/Application Support` once
+the instance listens. What a captured screen reads does not depend on the
+real home: the fixtures are written under `tools/proof/work/screens/fixtures/`
+from `tools/proof/media/` and `graphic/tests/graphics/` by absolute path, the
+secret and spend folders are launch arguments, recents are off by argument,
+nothing records (so `Movies/` is never made), and `UserDefaults` is not moved
+by a scratch home (#238), so `PINS` is still what pins it; the one string a
+screen derives from the home, the recorder panel's "saved in ~/Movies/Reelcut
+Recordings", is screen 16's `expect`. The app's
 binary with `-ApplePersistenceIgnoreState YES
 -RCSecretFolder <out>/../secrets -RCSpendFolder <out>/../spend
 -RCAssemblyAIEndpoint http://127.0.0.1:9 -NSRecentDocumentsLimit 0` and every
@@ -16082,6 +16094,8 @@ run that spanned a sleep is counted).
 | `python3 tools/proof/words_picture_probe.py` (pass 1, when the six-word line was the scored One Word case, `oneword fill+dim`, and the one-word page the printed one; JUDGED: High Power on battery, Low Power Mode off, thermal state nominal before the rasters and after; 19:36–19:47, nothing else running) | **17/18, exit 1: P10 FAILED on one median, the hand-made line's.** P1 204 pages; P2 worst 0 px with the fill and the glide drawn in; P11–P16 hold. P10's medians: 1080×1920 pop 1.215 ms, fill 1.187 ms, fill+dim 2.435 ms, glide 1.200 ms, oneword fill+dim 3.100 ms, oneword-page fill+dim 1.553 ms; 3840×2160 pop 2.439 ms, fill 2.449 ms, fill+dim 7.174 ms, glide 2.514 ms, oneword fill+dim 9.529 ms, oneword-page fill+dim 4.982 ms. Over budget: 3840×2160 oneword fill+dim (9.529 ms against 8 ms). The budget was not raised |
 | `python3 tools/proof/words_picture_probe.py --only P10` (pass 1's scoring, the same power state; 1 min 46 s) | 2/3, exit 1, the same one median over: 1080×1920 pop 1.250, fill 1.204, fill+dim 2.403, glide 1.207, oneword fill+dim 3.060, oneword-page fill+dim 1.526 ms; 3840×2160 pop 2.436, fill 2.441, fill+dim 7.147, glide 2.542, oneword fill+dim 9.714, oneword-page fill+dim 4.864 ms |
 | `python3 tools/proof/words_picture_probe.py --only P10 --raster-budget-ms 0` (the control, pass 1's scoring, the same power state; not re-run under pass 1b's, where the selftest's T7 holds the eight scored cases) | 2/3, exit 1, P10 for the budget's own reason: all eight scored medians over 0 (1.190, 2.440, 1.187, 3.106, 2.408, 7.174, 2.471, 9.498 ms) |
+| `python3 tools/proof/words_picture_probe.py --only P10 --raster-budget-ms 0`, 2026-10-06 (the control under the FINAL scoring, which 2026-10-05's run at 20:56 could not show: phase 2 has since added Karaoke's two-line page, so ten medians are scored. JUDGED: on AC power, `powermode 0` before and after, Low Power Mode off, thermal state nominal before the rasters and after; 21:33–21:35) | 2/3, exit 1, P10 for the budget's own reason: all ten scored medians over 0 (1.308, 2.621, 1.366, 1.581, 1.329, 2.677, 7.760, 2.776, 5.223, 8.358 ms) |
+| `python3 tools/proof/words_picture_probe.py`, whole, 2026-10-06 (the first full run under the FINAL scoring, P1–P17 with ten scored medians; JUDGED: on AC power, `powermode 0` before and after, Low Power Mode off, thermal state nominal before the rasters and after; 21:36–21:46, none of the fix pass's jobs beside it) | **18/19, exit 1: P10 FAILED on one median, Karaoke's two-line page at 3840×2160, 8.441 ms against 8 ms; every other row holds.** P1 204 pages; P2 worst 0 px; P11–P16 hold; P17 passes (pills 259 and 287 px, the plate 273 px half-way). P10's medians: 1080×1920 pop 1.315 ms (not scored), fill 1.235, fill+dim 2.600, glide 1.390, oneword-page fill+dim 1.617, oneword-line fill+dim (hand-made, not scored) 3.370, karaoke-2line fill+dim 1.263; 3840×2160 pop 2.860 (not scored), fill 2.687, fill+dim 7.695, glide 3.057, oneword-page fill+dim 5.401, oneword-line (not scored) 10.120, karaoke-2line fill+dim 8.441. The budget was not raised. Phase 2's section has the two `--only P10` runs that read the same median over, and what is owed |
 | `python3 tools/proof/words_picture_probe.py --power-selftest` | 8/8, exit 0: a made-up answer in Low Power Mode is `P10 not judged: Low Power Mode — a CONTROL FAILURE, never a pass or a skip: …` and fails, at the real budgets and at budget 0; so do thermal state fair, serious after the rasters, and no power state; an unthrottled one passes under budget and fails at budget 0 on its eight scored medians |
 | The first pass's run of the probe, in Low Power Mode (before P10 read the power state) | 11/12, exit 1: 1080×1920 pop 1.504 ms, fill 1.495 ms, fill+dim 3.067 ms, glide 1.491 ms; 3840×2160 pop 2.925 ms, fill 2.984 ms, fill+dim 9.268 ms, glide 3.145 ms. A fix-pass reading in Low Power Mode, taken beside a running build and not scored: oneword fill+dim 3.951 ms and 12.043 ms, oneword-page fill+dim 1.967 ms and 6.265 ms |
 | `python3 tools/proof/words_core_proof.py <socket>` (road map 8's W1b, on an instance under a scratch home) | 27/27, exit 0 |
@@ -16148,10 +16162,103 @@ the Mac and are not counted.
 not a `render_frame` PNG. No row can see two things, because removing each
 changes no pixel: the early return at a full dim (a layer at opacity 0
 composites nothing either), and the clamps named above that P16's mutant
-left standing, each taken alone. No row sees the plate's HEIGHT travel: every line of a page
-in one face has the same ascent and descent. B1's anchor to the picture
+left standing, each taken alone. No row of phase 1 sees the plate's HEIGHT travel: every line of a page
+in one face has the same ascent and descent (phase 2's P17 does, on a page
+whose second line is set in a fallback face — the next section). B1's anchor to the picture
 before B86 holds on the recording host only. No row plays a page: whether a glide looks right, whether a fill
 keeps time with a voice and whether a dim reads well are a person's, and
 phase 2 lists them in `docs/manual-checks.md`. `render_frame` is the one
 door measured; preview and export draw text through the same `Compositor`
 (`Compositor.swift` → `LayerRenderers.text`), so there is no export row.
+
+## Issue batch B86 phase 2 — the three looks in the sheet and `transcribe` (#96, spec §11 W-15)
+
+One host, two days. **2026-10-05** (the implementation): on battery in Low
+Power Mode; no run of that day judges a time, and its mutant runs stopped at
+the first when the battery ran down. **2026-10-06, 20:45–21:52 CEST** (the fix
+pass): on AC power, the battery at 100 %, `pmset -g | grep powermode` reading
+0 every time it was read — at the start, and before and after each timing
+run and `make test`. Every proof launch's stderr was empty; no run printed
+`DEFAULTS MOVED`.
+
+| Instrument | Run | Result |
+|---|---|---|
+| `word_captions_chrome.py` | 2026-10-06: S1–S16 and the photographs, the final sources and probe | 49/49, exit 0 (130 s). S11 records the card's fitting height: 572 pt with the on-device note, 538 pt without — 34 pt, "about two lines". S11's second row, read on a sheet just built, before it is hosted or laid out: the note's `intrinsicContentSize` is 257.5 × 30.0 pt with either engine (its cell at 258 pt is 30.0 pt tall, on one line 15.0) |
+| the same | 2026-10-05, the final app sources, before that row existed | 48/48, exit 0 (306 s) |
+| the same, earlier | 2026-10-05, runs 1–2 | 47/48: S11 read the note's FRAME, 261.5 pt — a label's frame is 2 pt wider than its text each side; S11 now reads alignment rects, as `snapshot_ui`'s rules do (#140). No app change came of it |
+| `word_looks_sheet_proof.py` | 2026-10-06: one scratch-home launch of the `make app` build, the stand-in's five words (2026-10-05's run printed the same T1–T3 figures) | 9/9, exit 0 (H0, C1, T1–T5, U1, Z1). T1: the plate's centre 279.5 → 388.0 → 433.5 px; off 433.5 at once. T2: the last yellow column 363 → 434 → 491 (middle 60 %: 388.6…465.4); off 491. T3: the dimmed frame's distance ratio 0.502. U1: the note's frame 262 × 30 pt in the live sheet, no layout problem naming the four views |
+| `word_looks_proof.py` | 2026-10-06: phase 1's rows on this build, the baseline not re-recorded | 15/15, exit 0; B1 `moved: []` — the 41 frames of the version-11 package still have the digests recorded from `d8fa4fa` |
+| `screens.py` | 2026-10-06: the whole walk, both looks, default `--out` | 26 pass, 0 fail, 0 skip of 26, exit 0, digest `e58ac6b2…`. P1.light and P1.dark each name a scratch home under `tools/proof/work/screens/2026-10-06-205840/` (`home.light`, `home.dark`) whose `Library/Application Support` is a directory; P2: 43 section ids pinned, 38 key literals, 27 pinned, 11 not shown. **Screen 16's footnote reads "saved in ~/Movies/Reelcut Recordings" under the scratch home, in both looks** (its `expect`; read back from the two layout dumps). `recorder panel up` 68 ms and 83 ms, Reelcut not active before New Recording… in either |
+| `v3_tools.py` | 2026-10-06: the other caller of `screens.launch`, under its scratch home | 8 pass, 0 fail, 0 skip of 8, exit 0 (L1, T1–T4, R1–R3; R3 passed, with no host skip) |
+| `words_picture_probe.py --only P17` | 2026-10-06 | 3/3, exit 0: the two settled pills are 259 and 287 px tall (the lines' ascent + descent 195.04 and 224.00), and half-way through the travel the plate is [50, 113, 454, 386] where [50.5, 113.0, 453.5, 386.0] is expected — 273 px tall |
+| `words_picture_probe.py --only P10`, run 1 | 2026-10-06 21:29–21:31. JUDGED: Low Power Mode off and thermal state nominal before the rasters and after; `powermode 0` on AC before and after; none of this pass's jobs beside it, the Mac in use by other sessions (load averages 5.3 before, 9.4 after) | **2/3, exit 1: P10 FAILED on one scored median, Karaoke's two-line page at 3840×2160, 8.384 ms against 8 ms.** 1080×1920 pop 1.244 ms (not scored), fill 1.308, fill+dim 2.571, glide 1.418, oneword-page fill+dim 1.660, oneword-line fill+dim (hand-made, not scored) 3.296, karaoke-2line fill+dim 1.241 (2 lines, 8 words, box 806×197); 3840×2160 pop 2.602 (not scored), fill 2.772, fill+dim 7.684, glide 2.787, oneword-page fill+dim 5.147, oneword-line (not scored) 9.981, **karaoke-2line fill+dim 8.384** (2 lines, 15 words, box 3037×396) |
+| the same, run 2 | 2026-10-06 21:31–21:33, the same power readings (load averages 8.9 before, 7.1 after) | **2/3, exit 1, the same one median over: 8.210 ms.** 1080×1920 pop 1.201 ms, fill 1.297, fill+dim 2.542, glide 1.309, oneword-page fill+dim 1.696, oneword-line (not scored) 3.420, karaoke-2line fill+dim 1.237; 3840×2160 pop 2.578, fill 2.781, fill+dim 7.567, glide 2.936, oneword-page fill+dim 5.214, oneword-line (not scored) 9.983, **karaoke-2line fill+dim 8.210**. The budget was not raised and the draw and the scoring were not changed |
+| the same with `--raster-budget-ms 0` | 2026-10-06 21:33–21:35, the same power readings: the budget's own arm under the final scoring | 2/3, exit 1, as the control must: all ten scored medians over 0 — 1080×1920 fill 1.308 ms, fill+dim 2.621, glide 1.366, oneword-page fill+dim 1.581, karaoke-2line fill+dim 1.329; 3840×2160 fill 2.677, fill+dim 7.760, glide 2.776, oneword-page fill+dim 5.223, karaoke-2line fill+dim 8.358 |
+| `words_picture_probe.py`, whole | 2026-10-06 21:36–21:46, once: the first full run under the final scoring (P1–P17). JUDGED: the same power readings; none of this pass's jobs beside it | **18/19, exit 1: P10 FAILED on one median, Karaoke's two-line page at 3840×2160, 8.441 ms against 8 ms; every other row holds.** P1 204 pages; P2 worst 0 px; P11–P16 hold; P17 passes (pills 259 and 287 px, the plate 273 px half-way). P10's medians: 1080×1920 pop 1.315 ms (not scored), fill 1.235, fill+dim 2.600, glide 1.390, oneword-page fill+dim 1.617, oneword-line fill+dim (hand-made, not scored) 3.370, karaoke-2line fill+dim 1.263; 3840×2160 pop 2.860 (not scored), fill 2.687, fill+dim 7.695, glide 3.057, oneword-page fill+dim 5.401, oneword-line (not scored) 10.120, karaoke-2line fill+dim 8.441. The budget was not raised |
+| `words_picture_probe.py --power-selftest` | P10's scorer with the Karaoke case (both days) | 8/8, exit 0 |
+| `env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py` | 2026-10-06: the whole probe against the stand-in; nothing reaches AssemblyAI | 863/865, 3 skipped by name, exit 1 (480 s). SP2 passes on all five word styles. **The two failures and the three skips are the instrument's own and older than this phase**: SP3 ("the B46-baseline probe builds against ef54f48e") and SP4·off, which needs that build, fail because the probe's own source has named `SettingsWindowController.transcriptionPane` since `6682104` (issue batch B71), which B46's tree does not have — and behind that, B46's `AgentServer.swift` calls `rc_agent_server_start` / `_stop`, which road map 14's MC4 took out of the core and its header; row W's baseline `515e6a80` does not build for that second reason and is the three rows skipped by name. This phase's change to the file is the `speaker-colour-word-styles` anchor alone |
+| `spec_index_proof.py` / `make typecheck` / `make lint` / `make app` | 2026-10-06 | 141/141 / 0 errors, 4 warnings, tsc silent / clean / `BUILD SUCCEEDED` |
+| `make test`, whole | 2026-10-06 21:47–21:52, once and last, none of this pass's jobs beside it; `powermode 0` before and after | **exit 0**: `core` 76 `test result: ok` (1,064 passed, 0 failed), `graphic` 17 (125 passed), `mcp-proxy` 14 passed (its `stdio` suite 14/14 in 7.34 s: no `no answer within` timeout, #244's being Low Power Mode's), the lane 18/18, the prompt probe 14/14, prices 27/27, budget 23/23, the inventory 5/5, the spec index 141/141, the defaults selftest 10/10 and its sweep |
+
+**The instruments.** `word_captions_sheet_probe.swift` S10 (titles, live table
+and `styleList` as literals), S11 (the row's layout hosted in a window, 6
+styles × 2 engines; and, as a row of its own, the note's intrinsic size
+before any layout), S12 (the note), S13 (the remembered keys), S14 (a greyed
+box keeps its tick), S15 (each commit's whole `word_style` against the preset
+and a rebuild written in the support file), S16 (the preview's frames and
+`previewReveals`). `word_looks_sheet_proof.py` is the MCP half.
+`words_picture_probe` P10 gains `karaoke-2line fill+dim` (the page Karaoke's
+pager makes, scored, and required to be two lines) and P17, the pill's height
+between two lines of different metrics — the row phase 1's Limits said no
+instrument had. `--only` takes P17 too.
+
+**Made to fail on purpose** (2026-10-06; each mutant is one anchor asserted to
+occur once in a copy).
+
+| Mutant | Where | Answer |
+|---|---|---|
+| `word_captions_chrome.py --mutant fill-live-everywhere` (`isLive` answers true for a fill) | a copy of `app/Sources`, the probe built over it | `MUTANT PASS`: S10 failed, and S15 (iii) |
+| `--mutant note-unbounded` (the note's `preferredMaxLayoutWidth` line removed) | the same | `MUTANT PASS`: "S11 before any layout" failed — the note's intrinsic size 335.5 × 15.0 pt, one line and 77.5 pt wider than the column. The hosted S11 row held, as it had on 2026-10-05, when this mutant SURVIVED (S11 was then that row alone: in a hosted window the 258 pt column already bounds the label). The line is what gives the note its two-line size before a layout pass has handed it a width, so it stays |
+| `--mutant note-any-engine` (the note shown for any engine) | the same | `MUTANT PASS`: S12 failed — the note visible on the five word styles with AssemblyAI |
+| `--mutant looks-not-remembered` (`lookChanged` writes no key) | the same | `MUTANT PASS`: S13 failed, and S14 |
+| `--mutant greyed-box-counts` (`looks` counts a disabled box) | the same | `MUTANT PASS`: S14 failed |
+| `--mutant commit-drops-looks` (`finish` hands `place` no looks) | the same | `MUTANT PASS`: S15 (ii) failed on all five word styles |
+| `--mutant rebuild-drops-preset` (`wordStyle(_:)` forgets `upcomingColor`) | the same | `MUTANT PASS`: S15 (ii) karaoke failed, alone |
+| `--mutant preview-ignores-looks` (the preview's reveals built with no looks) | the same | `MUTANT PASS`: S16 failed |
+| `--mutant preview-base-size` (the preview laid out at the style's size, not the page's; its anchor moved with this phase's `looks:` argument) | the same | `MUTANT PASS`: S8's shrunk page and its wrapped page at the floor failed |
+| `word_looks_sheet_proof.py --mutant looks-not-placed` (the handler hands `place` no looks) | a tree copy built by its own `make app` | `MUTANT PASS`, 6/9: T1, T2 and T3 all failed |
+| `--mutant refusals-dropped` | the same | `MUTANT PASS`, 8/9: T4 failed — `slide` with karaoke, `fill` with pill and with one_word, `dim` with subtitles each accepted |
+| `--mutant tool-reads-remembered` (the tool reads the sheet's remembered boxes) | the same | `MUTANT PASS`, 4/9: T5 failed — `style: pill` with no boolean answered "fill only applies with style highlight, karaoke or build — not pill." — and T1–T4 with it (T1's own placing call was refused in that sentence) |
+| `--mutant note-never-shown` | the same | `MUTANT PASS`, 8/9: U1 failed, `captions.look.dimnote` not in the sheet's layout dump |
+| `words_picture_probe.py --mutant plate-height-jumps` (`height: b.height`) | a copy of `app/Sources`, the probe built over it, `--only P17` | `MUTANT PASS`: P17 failed, the plate half-way [50, 99, 454, 386] — 287 px tall, the second line's pill already, where 273 is expected |
+| `cloud_captions_probe.py --mutant speaker-colour-word-styles` (re-anchored on `place`'s `pagePatch(… looks: looks)` call) | a copy of `app/Sources`, the whole probe run against the stand-in | exit 1, not 2: SP2 failed on all five word styles, "the ops differ". 858/865: SP3 and SP4·off failed in this run too, as they do unmutated (the table above) |
+
+**What is owed after this phase.**
+
+- **The owner's decision on P10's one median over budget.** Karaoke's
+  two-line page with a fill and a dim at 3840×2160 read 8.384 ms and 8.210 ms
+  in the two `--only P10` runs, 8.358 ms in the control and 8.441 ms in the
+  whole probe — four judged readings on 2026-10-06, each over the 8 ms
+  budget. Nothing was changed: not the draw, not the budget, not the scoring.
+  The choices are a cheaper draw for the dim (#245) or this page recorded as
+  a known limit, as the hand-made `oneword-line fill+dim` is. Until one is
+  made, `python3 tools/proof/words_picture_probe.py --only P10` and the whole
+  probe fail by name on an unthrottled host. What these readings do not
+  settle: on Highlight's line the same four runs read a fill with a dim at
+  7.567–7.760 ms, where phase 1's four judged runs read 7.147–7.382 ms. This
+  host was on AC at `powermode 0` and in use by other sessions; phase 1's was
+  on battery at `powermode 2` (High Power). Whether Karaoke's page is inside
+  the budget under phase 1's conditions was not measured.
+- **The person checks** CAP-6 (the sheet: the three boxes, the greyed ones,
+  the note and the card's height, a remembered tick across a relaunch) and
+  CAP-7 (the three looks on real speech with each engine, 60 fps with a fill
+  running) in `docs/manual-checks.md`.
+- **Not run in this batch:** `word_captions_proof.py` and
+  `cloud_captions_proof.py`, which launch outside a scratch home.
+  `word_looks_sheet_proof.py`'s T1–T5 cover `place` and the handler under
+  one.
+- **`cloud_captions_probe.py`'s two baseline builds** (SP3 and SP4·off; row
+  W's three skipped rows), older than this phase and tracked in #246: each needs its own tree's
+  core and header, as the meter and welcome comparisons build theirs, and
+  the probe's `chromeSettings` must compile against B46's tree. Until then
+  the probe's whole run exits 1 on those two rows.

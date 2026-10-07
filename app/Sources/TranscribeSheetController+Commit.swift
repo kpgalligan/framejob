@@ -73,7 +73,7 @@ extension TranscribeSheetController {
                 : []
             plan = try CaptionLayout.place(
                 result.cues, problems: result.problems, in: document.editedProject,
-                style: style, replacing: replacing)
+                style: style, looks: looks, replacing: replacing)
         } catch {
             statusLabel.stringValue = error.localizedDescription
             statusLabel.textColor = DS.textStrong
