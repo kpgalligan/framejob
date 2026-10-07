@@ -48,6 +48,7 @@ test: rust
 	python3 tools/proof/budget_proof.py
 	python3 tools/proof/capture_spike/inventory.py --check
 	python3 tools/proof/spec_index_proof.py
+	python3 tools/proof/swift_build.py --selftest
 	python3 tools/proof/proof_defaults.py --ran assistant_lane_probe --ran assistant_prompt_probe
 
 lint:
@@ -99,7 +100,7 @@ dist: app
 # The last line is agent/'s `tsc --noEmit`, through bun (agent/build.sh),
 # which fails rather than skips when bun is missing.
 typecheck:
-	swiftc -typecheck \
+	swiftc -typecheck -enable-batch-mode -j "$$(sysctl -n hw.logicalcpu)" \
 		-D REELCUT_DEV_TOOLS \
 		-sdk "$$(xcrun --show-sdk-path --sdk macosx)" \
 		-target arm64-apple-macos26.0 \

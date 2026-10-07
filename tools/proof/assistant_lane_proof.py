@@ -7,8 +7,9 @@ probe".
           `AgentLane.prepareAtLaunch()` at top level (between no `#if` and
           its `#endif`), before the `NSApplicationMain` line
   L1–L9   the probe's rows (`assistant_lane_probe.swift`, compiled over
-          `app/Sources` minus `main.swift` on `harness/build.sh`'s swiftc line
-          with `-D REELCUT_DEV_TOOLS`, rebuilt only when stale); L6 also
+          `app/Sources` minus `main.swift` through `swift_build.py` with
+          `-D REELCUT_DEV_TOOLS`, reused when every input is byte-identical
+          to a cached build's); L6 also
           requires every `AssistantPrompt.coreTools` name in the assistant's
           catalog (A1 part 3)
   L10     (#148) a question pending in window A holds A's next call but not
@@ -59,12 +60,13 @@ import os
 import re
 import shutil
 import sys
-import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
+sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "graphics_spike"))
 import bounded  # noqa: E402
+import swift_build  # noqa: E402
 
 WORK = os.path.join(HERE, "work", "assistant_lane")
 PROBE_DIR = os.path.join(WORK, "probe")
@@ -210,7 +212,8 @@ def mutant_sources(name):
 
 
 def build_probe(sources=None, probe_dir=None):
-    """(binary, None) or (None, reason). Rebuilt only when stale. `None`
+    """(binary, None) or (None, reason), through `swift_build.build` (reused
+    when every input is byte-identical to a cached build's). `None`
     for either argument means the module's `SOURCES` / `PROBE_DIR`, read at
     call time, so an importer that sets them is heard."""
     sources = SOURCES if sources is None else sources
@@ -230,39 +233,17 @@ def build_probe(sources=None, probe_dir=None):
             shutil.copytree(src, dst)
     if not os.path.exists(LIB):
         return None, f"{LIB} is missing — run `cd core && cargo build --release` first"
-    swift = sorted(os.path.join(sources, n) for n in os.listdir(sources)
-                   if n.endswith(".swift") and n != "main.swift")
-    stamp = os.path.join(probe_dir, "sources.txt")
-    listing = "\n".join(swift)
-    same_set = os.path.exists(stamp) and open(stamp).read() == listing
-    if same_set and os.path.exists(binary) and all(
-            os.path.getmtime(f) < os.path.getmtime(binary)
-            # The two headers too: a change to only the C contract or the
-            # bridging header must rebuild, not reuse a probe built against the old one.
-            for f in swift + [entry, LIB, os.path.abspath(__file__),
-                              os.path.join(ROOT, "app", "Bridging", "Reelcut-Bridging-Header.h"),
-                              os.path.join(ROOT, "core", "include", "reelcut_core.h")]):
-        print(f"probe: {binary} (up to date)", flush=True)
-        return binary, None
-    sdk = run(["xcrun", "--show-sdk-path", "--sdk", "macosx"], 60)["stdout"].strip()
-    if os.path.exists(binary):
-        os.remove(binary)
-    print(f"probe: building over {len(swift)} sources (up to {WALL_BUILD} s)…", flush=True)
-    started = time.time()
-    built = run(["swiftc", "-D", "REELCUT_DEV_TOOLS", "-sdk", sdk,
-                 "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
-                 "-import-objc-header",
-                 os.path.join(ROOT, "app", "Bridging", "Reelcut-Bridging-Header.h"),
-                 "-L", os.path.dirname(LIB), "-lreelcut_core"] + swift + [entry, "-o", binary],
-                WALL_BUILD)
-    if built["rc"] != 0 or not os.path.exists(binary):
-        errors = [l for l in built["stderr"].splitlines() if ": error:" in l]
-        tail = [l for l in built["stderr"].strip().splitlines()[-4:] if l.strip()]
-        return None, (f"swiftc exited {built['rc']} (expired {built['expired']}): "
-                      + " | ".join(errors[:6] or tail or ["(no output)"]))
-    with open(stamp, "w") as f:
-        f.write(listing)
-    print(f"probe: built in {time.time() - started:.0f} s", flush=True)
+    swift = swift_build.app_sources(sources)
+    print(f"probe: {len(swift)} sources through swift_build (up to {WALL_BUILD} s)…", flush=True)
+    try:
+        built = swift_build.build(sources=swift + [entry], output=binary,
+                                  defines=["REELCUT_DEV_TOOLS"], timeout=WALL_BUILD)
+    except swift_build.SwiftBuildFailed as error:
+        return None, (f"swiftc exited {error.rc if error.rc is not None else 'before running'} "
+                      f"(expired {error.expired}): "
+                      + " | ".join(error.diagnostics[:6] or ["(no output)"]))
+    print(f"probe: {binary} (up to date)" if built.reused
+          else f"probe: built in {built.seconds:.0f} s", flush=True)
     return binary, None
 
 

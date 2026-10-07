@@ -52,9 +52,9 @@ comment citing "road map N §x" refers to the archived original.
 
 ```sh
 make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
-make test       # make rust, cd core && cargo test --release, cd graphic && cargo test --release, cd mcp-proxy && cargo test --release (black-box tests), then tools/proof/assistant_lane_proof.py (the agent lane's probe, with the assistant's credential rows and the support folder's `0700` rows), tools/proof/assistant_prompt_proof.py --probe (the prompt texts' drift checks), tools/proof/prices_proof.py (the price function: prices.py and agent/'s `bun test` against agent/prices/cases.json, and update.py's reducer against reduce_cases.json, no network) and tools/proof/budget_proof.py (the proofs' ledger and the monthly budgets, over scratch ledgers, no network) and tools/proof/capture_spike/inventory.py --check (the menu inventory's sites, found by token and enclosing function, and its other citations, found by anchor, against app/Sources; no app) and tools/proof/spec_index_proof.py (the spec indexes' Lines cells against `wc -l`, and a row for every spec file; no app) and tools/proof/proof_defaults.py --ran assistant_lane_probe --ran assistant_prompt_probe (the defaults removal recipe on a throwaway domain, its refusals over scratch folders, then the sweep of the proofs' own idle domains, and of the two probes this target ran, out of `~/Library/Preferences`; no app)
+make test       # make rust, cd core && cargo test --release, cd graphic && cargo test --release, cd mcp-proxy && cargo test --release (black-box tests), then tools/proof/assistant_lane_proof.py (the agent lane's probe, with the assistant's credential rows and the support folder's `0700` rows), tools/proof/assistant_prompt_proof.py --probe (the prompt texts' drift checks), tools/proof/prices_proof.py (the price function: prices.py and agent/'s `bun test` against agent/prices/cases.json, and update.py's reducer against reduce_cases.json, no network) and tools/proof/budget_proof.py (the proofs' ledger and the monthly budgets, over scratch ledgers, no network) and tools/proof/capture_spike/inventory.py --check (the menu inventory's sites, found by token and enclosing function, and its other citations, found by anchor, against app/Sources; no app) and tools/proof/spec_index_proof.py (the spec indexes' Lines cells against `wc -l`, and a row for every spec file; no app) and tools/proof/swift_build.py --selftest (the probe builder's key, reuse and digest check; one tiny build, no app) and tools/proof/proof_defaults.py --ran assistant_lane_probe --ran assistant_prompt_probe (the defaults removal recipe on a throwaway domain, its refusals over scratch folders, then the sweep of the proofs' own idle domains, and of the two probes this target ran, out of `~/Library/Preferences`; no app)
 make lint       # cargo clippy --all-targets -- -D warnings, in core/, graphic/ then mcp-proxy/
-make typecheck  # swiftc -typecheck -D REELCUT_DEV_TOOLS of app/Sources/*.swift — the ONLY authoritative Swift check, then agent/'s `tsc --noEmit` (through bun)
+make typecheck  # swiftc -typecheck -D REELCUT_DEV_TOOLS of app/Sources/*.swift in batch mode on every core (seconds) — the ONLY authoritative Swift check, then agent/'s `tsc --noEmit` (through bun)
 make project    # xcodegen generate with VERSION injected — never run a bare xcodegen, it leaves the version blank (Reelcut.xcodeproj is generated; project.yml is the source of truth)
 make run        # make app, then launch
 make dist       # make app, then the Distribution build (no dev tools, spec §11 V-1), tools/proof/dist_check.py and tools/proof/published_check.py (the check the publish workflow runs over the app it packs, spec §11 PUB-4)
@@ -66,7 +66,7 @@ make prices     # NETWORK: regenerate agent/prices/anthropic.json from LiteLLM (
   `core/` (and `graphic/`, and `mcp-proxy/`) and a clean `make lint`.
 - There are no Swift unit tests. App-side verification is `make typecheck`
   plus driving the built app over MCP and the probes in `tools/proof/`.
-- `make typecheck` is fast; run it before `make app` (~90 s). Its baseline is
+- `make typecheck` takes seconds; run it before `make app` (~90 s). Its baseline is
   **0 errors and 4 warnings**, and tsc prints no error; the warnings are all
   AVFoundation deprecations (3 in `CompositionBuilder.swift`, 1 in
   `Exporter.swift`), deliberate because their replacements are `async`-only
@@ -129,7 +129,8 @@ designs/             the spec, adr/ (condensed records), the handoffs — the ta
 archive/             closed road maps and histories, verbatim; INDEX.md — read only when asked
 docs/agents/         what the engineering skills read: tracker, labels, domain docs
 docs/graphics-api.md the graphics reference an agent reads; graphic/tests/reference.rs runs every js block
-tools/proof/         mcp.py, the per-phase proof scripts, harness/ (offscreen chrome)
+tools/proof/         mcp.py, the per-phase proof scripts, harness/ (offscreen chrome),
+                     swift_build.py (the one probe build line and its cache)
 .github/             workflows/publish.yml (the publish branch's signed, notarized DMG, spec §11
                      PUB-1..PUB-5) and ExportOptions.plist (its developer-id export)
 project.yml          xcodegen definition; Makefile; README.md (user-facing)
@@ -365,8 +366,8 @@ turns (on an `NSStackView` that is `setHuggingPriority(_:for:)`;
 `setContentHuggingPriority` is inert on a stack); and **when the thing to
 check is app ARITHMETIC or app STRUCTURE with
 no caller a script can reach** (a menu, a validator, a cue builder, a queue),
-the answer is a probe compiled from `app/Sources` over `harness/build.sh`'s
-own `swiftc` line, not a photograph. A probe that will not build is a scored
+the answer is a probe compiled from `app/Sources` through
+`tools/proof/swift_build.py`, not a photograph. A probe that will not build is a scored
 FAILURE, never an exit, so a rotted instrument cannot take a score down with
 it. **That rule applies to historical instruments too.** The meter and welcome
 comparisons build old `app/Sources` with the matching old core and header in

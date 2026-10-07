@@ -25,8 +25,8 @@ PROJECT 1–3 s), `set_action_end {size: 150, color: "#2d7ff9", showBox: false, 
 "center", title: "Hello"}` and `save_project`.
 
 **The probe**, `graphics_inspector_probe.swift`, compiled AS `main.swift` over
-every file in `app/Sources` but the app's own on `harness/build.sh`'s swiftc
-line (a probe that will not build is a scored FAILURE), with the app's Fonts
+every file in `app/Sources` but the app's own through `swift_build.py`
+(a probe that will not build is a scored FAILURE), with the app's Fonts
 beside it, over a COPY of the fixture:
 I1  `orderedKeys` over six's `describeJSON()` is the module's order;
 I2  one row per type, with its control classes; the asset popup lists None
@@ -203,7 +203,6 @@ Issue batch B87 phase 4 adds two more:
 
 import argparse
 import json
-import os
 import shutil
 import subprocess
 import sys
@@ -217,6 +216,7 @@ sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
 import graphics_proof as gp  # noqa: E402  (attempt, complaints)
 import mcp  # noqa: E402
+import swift_build  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/graphics-inspector"
 HOME = WORK / "home"
@@ -513,9 +513,8 @@ def fixture(app, work, gia=False):
 
 
 def build_probe(sources, out):
-    """`harness/build.sh`'s swiftc line over `sources` with the probe as
-    `main.swift`; the app's Fonts beside the binary. The binary, or None and
-    the error lines."""
+    """`swift_build.build` over `sources` with the probe as `main.swift`; the
+    app's Fonts beside the binary. The binary, or None and the error lines."""
     lib = ROOT / "core/target/release/libreelcut_core.a"
     if not lib.exists():
         return None, f"{lib} is missing — run `cd core && cargo build --release` first"
@@ -525,24 +524,15 @@ def build_probe(sources, out):
     if not entry.exists() or entry.read_text() != source:
         entry.write_text(source)
     binary = out / "graphics-inspector-probe"
-    swift = sorted(str(Path(sources) / n) for n in os.listdir(sources)
-                   if n.endswith(".swift") and n != "main.swift")
-    fresh = binary.exists() and all(
-        os.path.getmtime(f) < binary.stat().st_mtime for f in swift + [str(entry), str(lib)])
-    if not fresh:
-        sdk = bounded.run(["xcrun", "--show-sdk-path", "--sdk", "macosx"], 60)["stdout"].strip()
-        start = time.time()
-        built = bounded.run(
-            ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0", "-module-name",
-             "Reelcut", "-import-objc-header",
-             str(ROOT / "app/Bridging/Reelcut-Bridging-Header.h"),
-             "-L", str(lib.parent), "-lreelcut_core"] + swift + [str(entry), "-o", str(binary)],
-            900)
-        if built["rc"] != 0 or not binary.exists():
-            errors = [line for line in built["stderr"].splitlines() if ": error:" in line]
-            return None, "swiftc failed:\n       " + "\n       ".join(
-                errors[:6] or [f"(no error lines; expired {built['expired']})"])
-        print(f"  probe built in {time.time() - start:.0f} s", flush=True)
+    try:
+        built = swift_build.build(sources=swift_build.app_sources(sources) + [entry],
+                                  output=binary, timeout=900)
+    except swift_build.SwiftBuildFailed as error:
+        errors = [line for line in error.diagnostics if ": error:" in line]
+        return None, "swiftc failed:\n       " + "\n       ".join(
+            errors[:6] or [f"(no error lines; expired {error.expired})"])
+    if not built.reused:
+        print(f"  probe built in {built.seconds:.0f} s", flush=True)
     shutil.rmtree(out / "Fonts", ignore_errors=True)
     shutil.copytree(ROOT / "app/Resources/Fonts", out / "Fonts")
     return binary, None

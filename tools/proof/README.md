@@ -1578,18 +1578,105 @@ phase 2's measured reason, and its exports and stills are pid-named for phase
 5's. Two runs of either at once would collide, and there is no reason to start
 two.
 
+## The probe builder (swift_build.py)
+
+`swift_build.py` (issue batch B88) is the one swiftc line a probe, a proof or
+the offscreen harness compiles app sources with, and the cache that lets a
+second build of the same inputs cost nothing. It uses the standard library
+and `graphics_spike/bounded.py` only (every child in its own process group,
+under a wall-clock bound).
+
+```
+python3 tools/proof/swift_build.py build --output PATH [--define D]… [--force] SOURCE…   # entry last; last stdout line is PATH
+python3 tools/proof/swift_build.py typecheck [--define D]… [--sources DIR] PROBE.swift…  # seconds; no link
+python3 tools/proof/swift_build.py --selftest                                           # K0, K1, B1–B5 (make test)
+```
+
+From Python, `swift_build.build(sources=…, output=…, defines=…, optimize=…,
+wmo=…, link_args=…, link_inputs=…)` answers a `Built` (`binary`, `key`,
+`reused`, `seconds`) or raises `SwiftBuildFailed` (`.diagnostics`, at most 12
+`error:` lines; `.log`; `.expired`; `.rc`); `swift_build.app_sources(folder)`
+is a folder's `*.swift` but `main.swift`, sorted.
+
+- **The line**: `xcrun swiftc [-D d]… [-O] [-whole-module-optimization | -j
+  <cores>] -sdk <sdk> -target arm64-apple-macos26.0 -module-name Reelcut
+  -import-objc-header app/Bridging/Reelcut-Bridging-Header.h -L
+  core/target/release -lreelcut_core <sources, entry last> [link args] -o
+  <tmp>`. A missing staticlib is refused, naming `cd core && cargo build
+  --release`.
+- **The key** is a sha256 over the helper's own bytes, `swiftc --version`, the
+  SDK's path and its `SDKSettings.json`, the argv (ROOT-relative, less the
+  values of `-o`, `-j` and `-output-file-map`), the bytes of every source, of
+  the bridging header and every header it reaches by a quoted `#include`
+  (`core/include/reelcut_core.h`), of the staticlib and each link input, the
+  `DEVELOPER_DIR`, `SDKROOT`, `TOOLCHAINS` and `MACOSX_DEPLOYMENT_TARGET`
+  variables, and the tree's own path (`#file` embeds it). Nothing about it is
+  an mtime: a `touch` rebuilds nothing, and any byte change rebuilds.
+- **The cache** is `work/swift-build/<key>/` (`binary`, `manifest.json`,
+  `build.log`), built in a `tmp-<pid>-<hex>` folder, delivered from there and
+  renamed into place (a racing loser discards its own). A reuse re-hashes its
+  delivered copy against the manifest — a mismatch, a missing binary or a
+  malformed manifest prints `swift_build: entry <key> failed its digest;
+  rebuilding` — and touches the manifest; the 32 most recently used entries
+  are kept. An entry being replaced or evicted is first renamed to a `tmp-`
+  folder, so a removal cut short never leaves a half-entry under a key, and a
+  dead process's `tmp-` folder is removed. A failed build's output is
+  `work/swift-build/failed/<key>.log`.
+- **Delivery** copies the entry to `<output>.tmp-<pid>` and renames it onto
+  the caller's own path and file name, so a bare binary's defaults domain and
+  `proof_defaults.py --ran` see the name they always did. It prints
+  `swift_build: reused <key>` or `swift_build: built <key> in <s> s` on
+  stderr.
+- **`typecheck`** checks a probe's types against `app/Sources` (or
+  `--sources DIR`) in batch mode on every core, in seconds. The last probe is
+  compiled AS `main.swift` (top-level code is allowed only there), from a
+  temporary copy whose path is written back to the probe's own in the output.
+
+**Who goes through it.** Phase 1a: `harness/build.sh`, and the `build_probe`
+of `assistant_lane_proof.py`, `assistant_prompt_proof.py` and
+`graphics_inspector_proof.py`; each keeps its defines, its entry file, its
+output name and its failure strings. The other proofs' own swiftc lines move
+onto it in phase 1b (`designs/build-velocity.md`).
+
+**The selftest** (`--selftest`, a line of `make test`), over a scratch cache
+in `work/swift-build-selftest/`: K0 (CONTROL) the same inputs give the same
+key twice; K1 the key changes for a source byte, the source order, a define,
+`optimize`, a link input's bytes, a header reached by `#include` and the
+library's bytes, and NOT for a different `-o` or `-j`; B1 a one-file program
+builds and runs; B2 the same call reuses; B3 an entry whose binary was
+tampered with fails its digest and is rebuilt (the instrument's own first run
+caught the rebuild landing beside the tampered entry and the tampered binary
+still being delivered); B4 a type error raises, naming the file; B5 an entry
+folder with a broken manifest and no binary is replaced by a fresh build,
+never delivered and never a crash. Two tiny builds, no app, a few seconds.
+
+**Measured, phase 1a** (2026-10-07, load in brackets): `make typecheck` 81 s →
+3.4 s (batch mode, `-j 12`), same four warnings; a cold harness 124 s
+(serial) → 15.1 s (`-j`); the lane probe cold 110 s → 17.2 s; `make test`
+after a one-line Swift comment 307 s → 109 s; `graphics_inspector_proof.py
+--mutant popup-fixed-width` 112.5 s → 19.7 s. The full table is
+`designs/build-velocity.md`. **Machine code**: the `__TEXT,__text` section
+(`segedit <bin> -extract __TEXT __text`) of the serial line's binary and the
+helper's is byte-equal for the harness and for the lane probe; CONTROL two
+serial harness builds are equal; sensitivity one source changed (`0o700` →
+`0o755` in a copy) makes them differ. **E1** — the same line with
+`-enable-batch-mode -output-file-map` — linked the harness in 0.66× the `-j`
+build's wall time, but its `__text` differs from the `-j` build's (8 bytes
+shorter), so it was not adopted and the line stays `-j`.
+
 ## The offscreen harness (no running app)
 
 `harness/` is CLAUDE.md's "Seeing the chrome": `harness/main.swift` compiles
 with every `app/Sources/*.swift` but the app's own `main.swift`, links the
 staticlib, opens a package from disk and `cacheDisplay`s the editor into a
-PNG — `harness/build.sh` builds it into `work/harness/` (about 30 s, skipped
-when the binary is newer than the sources, `harness/main.swift`, `build.sh`
-itself and the staticlib, so a change to the build line makes the binary
-stale; `--force` rebuilds) with `-D REELCUT_DEV_TOOLS`, as the app's
-Debug and Release set it (road map 11 V0), so the harness links what the
-app links; the other probes' own `swiftc` lines stay flag-off, as
-Distribution is — and pins every `UserDefaults` key the chrome reads — the
+PNG — `harness/build.sh` builds it into `work/harness/` through
+`swift_build.py` (reused when every input is byte-identical to a cached
+build's, else compiled on every core; `--force` rebuilds; Fonts and Models
+recopied only when their digest changed) with `-D REELCUT_DEV_TOOLS`, as the
+app's Debug and Release set it (road map 11 V0), so the harness links what the
+app links; each probe passes its own defines to its build line (`swift_build.build` once phase 1b
+lands), and most
+stay flag-off, as Distribution is — and pins every `UserDefaults` key the chrome reads — the
 persisted view state, the Document tab's `ReelcutInspectorRescaleClips`
 checkbox and `AppleShowScrollBars` — in the argument domain, and captures on
 SETTLE rather than after a fixed number of runloop turns, so two renders of
