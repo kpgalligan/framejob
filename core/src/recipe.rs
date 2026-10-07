@@ -584,7 +584,7 @@ impl Project {
             // `drawing_instances` has already dropped, so this arm exists
             // to keep the match exhaustive.
             Source::Nest { .. } => (missing_source(), Value::Null),
-            Source::Graphic => graphic_source(clip, clip_t, &self.canvas),
+            Source::Graphic => graphic_source(clip, evaluated, clip_t, &self.canvas),
         }
     }
 }

@@ -322,7 +322,7 @@ pub(crate) fn unknown_key(path: &str, subject: &str) -> String {
 /// read at all; the merged value is thrown away, because only the refusal
 /// is wanted. It is a walk and a read and NOT a range check: the state a
 /// clip interpolates toward may legitimately name a value no stored group
-/// could hold, and `actions.rs`'s `clamp_video` bounds the evaluated value
+/// could hold, and `actions_clamp.rs`'s `clamp_video` bounds the evaluated value
 /// instead.
 ///
 /// **A `null` here can only be a REMOVAL**, there being no stored value to

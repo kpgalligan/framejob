@@ -1745,9 +1745,9 @@ free.
   one is a promise the app breaks. A `.filledByTheApp` row takes an argument
   OUT of the tool entirely — `declaredInput` omits it from `properties` and
   `required` and the parity check's `expectedArguments` subtracts it — for an
-  argument only the app can fill: the two graphic ops' `schema`, read from
-  the module's current revision (G-4), which the gate therefore refuses as a
-  stranger. `AgentServer+Parity.swift` is the FIFTH
+  argument only the app can fill: the two graphic ops' `schema` and
+  `set_action_end`'s (G-34), read from the module's current revision (G-4),
+  which the gate therefore refuses as a stranger. `AgentServer+Parity.swift` is the FIFTH
   part of the startup parity check — the one part that looks INSIDE an op
   tool's schema: its arguments must be the core's own (both directions, the
   envelope's two keys and the declarations list apart), each one must carry a

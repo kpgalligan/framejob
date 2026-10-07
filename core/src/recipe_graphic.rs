@@ -27,6 +27,7 @@
 
 use serde_json::{Map, Value};
 
+use crate::actions::Evaluated;
 use crate::evaluate::number;
 use crate::model::{Canvas, Clip, GraphicProps, Project};
 use crate::recipe::{content_hash, missing_source};
@@ -102,9 +103,18 @@ pub(crate) fn graphic_resnapped(
 /// frame, the whole `ctx` and the props (decision G-9·b): a `trim_end`
 /// changes `durationInFrames` and so the outro at the same frame, and a
 /// rate change changes `time`, so a key over less would serve a stale
-/// texture. The props are the STORED map, cloned whole; `content_hash`
-/// sorts keys, so their order does not move the hash.
-pub(crate) fn graphic_source(clip: &Clip, clip_t: Ticks, canvas: &Canvas) -> (Value, Value) {
+/// texture. The props are the map EVALUATED at `clip_t`
+/// ([`Evaluated::graphic`], spec §11 G-34): the stored map with each
+/// finished action's `graphic.props` laid over it and the spanning one's
+/// interpolated, which is the stored map itself when no action names a
+/// prop, so such a layer's hash is what it always was. `content_hash` sorts
+/// keys, so their order does not move the hash.
+pub(crate) fn graphic_source(
+    clip: &Clip,
+    evaluated: &Evaluated,
+    clip_t: Ticks,
+    canvas: &Canvas,
+) -> (Value, Value) {
     let (Some(graphic), Some(effective)) = (clip.graphic.as_ref(), effective_length(clip)) else {
         return (missing_source(), Value::Null);
     };
@@ -127,7 +137,10 @@ pub(crate) fn graphic_source(clip: &Clip, clip_t: Ticks, canvas: &Canvas) -> (Va
     ctx.insert("height".to_string(), Value::from(graphic.height));
     ctx.insert("canvas".to_string(), Value::Object(size));
     let ctx = Value::Object(ctx);
-    let props = Value::Object(graphic.props.clone());
+    let props = Value::Object(evaluated.graphic.as_ref().map_or_else(
+        || graphic.props.clone(),
+        |evaluated| evaluated.props.clone(),
+    ));
     let ctx_json = serde_json::to_string(&ctx).unwrap_or_default();
     let props_json = serde_json::to_string(&props).unwrap_or_default();
 

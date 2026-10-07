@@ -213,7 +213,6 @@ tests are in `core/tests/`: `media_window.rs`, `source_window.rs`, `motion_edges
 The size rule is in the root `CLAUDE.md` and `core/CLAUDE.md`; which modules are over it is
 `wc -l`, never a table here. What follows is only the seam a record named.
 
-- `actions.rs`: `clamp_video` and its helpers to a new `actions_clamp.rs` (roadmap 5 §5e).
 - `edit.rs`: exempt, its module doc being the op table's semantics half. If a cut is ever forced,
   the `Op` enum goes to `edit_ops.rs`, never in a feature phase.
 - `edit_clip.rs`: known debt, no seam named.
@@ -224,8 +223,7 @@ The size rule is in the root `CLAUDE.md` and `core/CLAUDE.md`; which modules are
 
 ## Open items
 
-- `actions.rs` is at 592 of ~600 (and `recipe.rs` 596, `evaluate.rs` 590 since B52b moved `lifted` to `nest.rs`). The original's plan is that the next addition first cuts
-  `clamp_video` and its helpers to an `actions_clamp.rs` (see "Named next cuts").
+- `recipe.rs` is at 596 of ~600 and `evaluate.rs` 590 (since B52b moved `lifted` to `nest.rs`).
 
 ## Where to look in the original
 

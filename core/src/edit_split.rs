@@ -32,13 +32,21 @@ use crate::source_window::source_advanced;
 use crate::time::Ticks;
 
 /// The evaluated state as an action-style patch object, so `split` can hand
-/// the first half of a straddled action the state it must reach.
+/// the first half of a straddled action the state it must reach. A
+/// graphic's evaluated props go in as `graphic.props` (G-34), which
+/// [`narrow_to`] narrows to the props the action named, carrying its
+/// `kinds` through untouched.
 fn state_patch(evaluated: &Evaluated) -> Value {
     let mut out = serde_json::Map::new();
     out.insert("video".to_string(), actions::to_json(&evaluated.video));
     out.insert("audio".to_string(), actions::to_json(&evaluated.audio));
     if let Some(text) = &evaluated.text {
         out.insert("text".to_string(), actions::to_json(text));
+    }
+    if let Some(graphic) = &evaluated.graphic {
+        let mut props = serde_json::Map::new();
+        props.insert("props".to_string(), Value::Object(graphic.props.clone()));
+        out.insert("graphic".to_string(), Value::Object(props));
     }
     Value::Object(out)
 }
@@ -79,7 +87,8 @@ fn narrow_to(state: &Value, shape: &Value, depth: u32) -> Value {
 ///
 /// The second clip's BASE props are the evaluated state at the cut, so the
 /// join is invisible; its actions are the ones that had not finished,
-/// rebased to its own clip time.
+/// rebased to its own clip time. A graphic's `props` are the evaluated
+/// ones, and a straddled action's first half ends at them (G-34).
 pub(crate) fn split_clip(project: &mut Project, clip_id: u32, at: Ticks) -> bool {
     let Some(original) = project.clip(clip_id).cloned() else {
         return false;
@@ -106,7 +115,7 @@ pub(crate) fn split_clip(project: &mut Project, clip_id: u32, at: Ticks) -> bool
     // `clip_t` further into it, and BOTH halves keep the original's length,
     // so the join is invisible and neither half's outro moves — the first
     // half's `in + duration` would otherwise be only the head.
-    second.graphic = graphic_advanced(original.graphic.as_ref(), clip_t);
+    second.graphic = graphic_advanced(state.graphic.as_ref(), clip_t);
     if let Some(graphic) = second.graphic.as_mut() {
         graphic.length = pinned;
     }

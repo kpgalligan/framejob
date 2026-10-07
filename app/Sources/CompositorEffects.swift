@@ -43,7 +43,7 @@ import Metal
 ///
 /// **Ranges.** The core already refuses anything out of range —
 /// `check_video` in `props_check.rs` names the dotted key, `clamp_video` in
-/// `actions.rs` bounds the action path — so the clamps here are not
+/// `actions_clamp.rs` bounds the action path — so the clamps here are not
 /// validation. They are the last line between a recipe from some future
 /// version and a garbage uniform, and they cost nothing.
 extension LayerUniforms {

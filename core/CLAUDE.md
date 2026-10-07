@@ -68,7 +68,9 @@ governs a module now.
   `validate`), `check_side`, `check_schema` (the engine's sentences, COPIED —
   no module of the model may name the crate, G-2), `check_props` (by dotted
   path against the schema the op carries, shape only without one; a `null`
-  is a removal and is never checked), `check_count` (on the map about to be
+  is a removal and is never checked), `check_typed` (one value against its
+  entry, answered normalised; `edit_action_graphic.rs` calls it under
+  `graphic.props.<key>`), `check_count` (on the map about to be
   STORED). **A props map is changed only by `insert` and
   `shift_remove`**: under `preserve_order`, `Map::remove` is `swap_remove`,
   and `Project ==` cannot see the reorder.
@@ -79,7 +81,8 @@ governs a module now.
   and both suites read `graphic/tests/colours.json`. `rc_normalise_color`
   (`ffi.rs`) exports it for the Inspector's colour defaults (spec §11 G-25
   (c)), and `model_graphic.rs`'s `check_schema` refuses a `color` default
-  it refuses (G-25 (a)).
+  it refuses (G-25 (a)). `color_channels` and `color_hex` (which
+  `normalise_color` writes through) are `actions_graphic.rs`'s blend's.
 - `model_query.rs` — reading a project: `Project::new`, id allocation, the
   `clip`/`track`/`media`/`marker`/`nest` lookups, `clips_on`, `duration`,
   `validate` with its nesting walk, and `source_size`. The three
@@ -203,7 +206,8 @@ governs a module now.
   `add_described_clip` (`pub(crate)`, with `Described`) places the clip, so
   the op table's bound probe reaches the side check on any project;
   `set_graphic`'s patch reader takes `name`, `width`, `height`, `length`,
-  `props` and refuses `in` by name.
+  `props` and refuses `in` by name. With a `schema`, a `null` for a prop
+  an action on the clip names stores the schema's default (G-34 (d)).
 - `edit_clip.rs` — clip construction and placement callers: `add_clip`, move,
   duplicate, delete, join, detach, `fit_scale` and `fill_scale` (Fit is a RESCUE for oversized
   footage and honours `canvas.fit_new_clips`; Fill is a REQUIREMENT, ignores
@@ -235,7 +239,8 @@ governs a module now.
   called mid-edit on a clone the caller is still assembling.
   A graphic's second half gets `in + cut` through `recipe_graphic.rs`'s
   `graphic_advanced`, and BOTH halves' `length` are pinned to the ORIGINAL's
-  `effective_length` (G-9), so every splitter obeys it.
+  `effective_length` (G-9), so every splitter obeys it, and its `props` the
+  evaluated ones, a straddled action's first half ending at them (G-34).
 - `edit_props.rs` — the five patches (`set_video`, `set_audio`, `set_text`,
   `set_shape`, `set_clip`), `Project::check_group` (the range check
   `paste_attributes` runs on each group it has just replaced and `paste` on
@@ -276,8 +281,7 @@ governs a module now.
   home.
 - `props_check.rs` — the range checks every value written into a property
   group passes first (`check_video` / `check_audio` / `check_text` /
-  `check_shape`, the `finite` / `in_range` family, the bounds `actions.rs`'s
-  `clamp_video` reads too). A range check is a fact about the vocabulary,
+  `check_shape`, the `finite` / `in_range` family, the bounds `actions_clamp.rs`'s `clamp_video` reads too). A range check is a fact about the vocabulary,
   not about an edit — and it runs BEFORE `edit_props.rs` snaps a patch's
   ticks, which is what lets a refusal name the number the caller sent rather
   than the one a snap rounded it to. Gradient stops are deliberately NOT
@@ -356,7 +360,8 @@ governs a module now.
   REMOVES at every depth rather than clearing, and `patch.rs`'s walk and
   read per group. The door is composed here because which groups an end
   patch names, and what a `null` in one means, are facts about an ACTION;
-  values are deliberately not range-checked, and `actions.rs`'s
+  values are deliberately not range-checked, except a graphic prop's end
+  (G-34 (c), `edit_action_graphic.rs`), and `actions_clamp.rs`'s
   `clamp_video` is the last line of defence for them. `set_action_end`'s
   `off` (spec §11 CI-14) is the one way to STORE a `null` — the optional
   property keyed OFF at the end — written after the merge and the prune;
@@ -367,8 +372,17 @@ governs a module now.
   `paste`, whose payload schema is its module doc; `Payload` and
   `parse_payload` are `pub(crate)`, because `edit_paste_attributes.rs` reads
   the same payload.
-  `graphic` in a `patch` or an `off` path is an `Err` in G-10's sentence,
-  asked before the group lookup.
+  `graphic` in a `patch` is `edit_action_graphic.rs`'s arm, read against
+  the op's `schema` after the three groups' walk (G-34); in an `off` path it
+  is an `Err`.
+- `edit_action_graphic.rs` — `set_action_end`'s graphic arm (G-34):
+  `read_graphic_end` checks the patch's `graphic.props` (never the stored
+  end's) against the op's `schema` through `check_typed` under
+  `graphic.props.<key>`, discards a `kinds`, refuses an asset, an
+  undeclared prop, a layer key and a missing schema by name, and answers
+  each prop's kind and the default for each the clip lacks
+  (`schema_default`); `write_graphic_end` stores `props` and `kinds` by
+  `insert` / `shift_remove`.
 - `edit_paste_attributes.rs` — `paste_attributes`, cut out of `edit_paste.rs`
   under the size rule as a pure move ahead of spec §11 G-32: the payload's
   EARLIEST clip's property groups (then the front-most, then the lower id —
@@ -377,7 +391,9 @@ governs a module now.
   `graphic`, which is never in the default set: a graphic's `props` copied
   whole onto clips drawn by the SAME module, the target keeping its name,
   size, `in` and `length`, written with `insert` and `shift_remove`
-  (`model_graphic.rs`'s rule). `skip_missing` drops a named group the payload
+  (`model_graphic.rs`'s rule). A target key the payload lacks that an
+  action on the target names (`names_prop`) is kept (G-34 (d), amending
+  G-32 (e)). `skip_missing` drops a named group the payload
   clip lacks and skips a target that cannot take one. **The copied props are
   shape-checked once, the first time a target takes them**: a paste nothing
   takes never reads the map. `patch::Group` gains no variant for it.
@@ -395,15 +411,27 @@ governs a module now.
   `enabled.audio`, `audio.duck`, the transition, the actions and the label
   (each a wrong picture or a wrong sound if carried) and refuses a nest.
   Default plate colour is white: the canvas is already black.
-- `actions.rs` — action evaluation and interpolation, `clip_state`, and
-  `clamp_video`, the evaluator's last line of defence (`set_action_end`
-  checks an end patch's keys and kinds but deliberately not its VALUES, and
-  never sees the clip; this bounds every value an end patch can carry and
-  forces `normal` on a nest clip). **The LIST rule is stated here once as the
+- `actions.rs` — action evaluation and interpolation, and `clip_state`;
+  its last line of defence is `actions_clamp.rs`'s, and a graphic's props
+  are `actions_graphic.rs`'s (spec §11 G-34), carried in `Evaluated.graphic`
+  and `clip_state`'s `graphic`. **The LIST rule is stated here once as the
   crate's**: an end patch interpolates a list per index when the lengths
   match and each pair of entries agrees on its discrete fields (`kind`,
-  `shape`), and switches at the end otherwise; `video.filters` and
-  `video.obscure` are both governed by it and carry no code of their own.
+  `shape`), and switches at the end otherwise; `video.filters` and `video.obscure` are both governed by it and carry no code of their own.
+- `actions_clamp.rs` — `clamp_video` and `clamp_audio`, the evaluator's
+  last line of defence (`set_action_end` checks a `video`, `audio` or
+  `text` end patch's keys and kinds but deliberately not its VALUES, and
+  never looks at the clip for them; this bounds every value such a patch
+  can carry and forces `normal` on a nest clip), with `bounded` /
+  `finite_or`; a pure move out of `actions.rs` (issue batch B87, toll A).
+- `actions_graphic.rs` — a graphic clip's props at a clip time (format
+  version 13, spec §11 G-34): finished actions' `end.graphic.props` laid
+  over the clip's map by `insert`, the spanning one interpolated — a number
+  in floating point, never rounded; a `color` (by `end.graphic.kinds`,
+  never by shape) four channels straight through `model_color.rs`'s
+  `color_channels` / `color_hex`; anything else, a malformed end, or a prop
+  with no start, held and switched at the end. Total. `names_prop` is
+  `set_graphic`'s and `paste_attributes`' question.
 - `transition.rs` — overlap detection, THE overlap rule (spec §11), eased
   progress at *t*. An overlap with no kind still dissolves
   (`unwrap_or_default`), and `add_clip` onto an overlap mints a
@@ -473,8 +501,7 @@ governs a module now.
   layer's `{kind, name, hash, frame, ctx, props}` and `[width, height]` —
   `frame` floored onto the canvas grid, `durationInFrames` ceiled, `ctx`
   exactly the engine's keys (the app passes it through verbatim),
-  `ctx.canvas` the PROJECT's size inside a nest too, `props` the stored map
-  cloned whole, the hash over everything `render` is called with (G-9·b). It
+  `ctx.canvas` the PROJECT's size inside a nest too, `props` the map evaluated at the clip time (`Evaluated.graphic`, G-34), the hash over everything `render` is called with (G-9·b). It
   holds ONE equation for the writers and the reader together: `trim_start`,
   `roll`, `split`'s second half and `add_transition`'s handle form call
   `graphic_advanced`, every `frame_grid.rs` re-snap calls
@@ -670,7 +697,7 @@ Export names mirror the Rust method exactly.
 `RC_FORMAT_VERSION` in `format.rs` **and** the `#define` in
 `core/include/reelcut_core.h`; the reader must keep accepting every prior
 version; the writer enforces the reader's caps. A bump whose new fields all
-carry a serde default needs no migrate step (versions 3 through 12 have none)
+carry a serde default needs no migrate step (versions 3 through 13 have none)
 but still bumps, because unknown keys are ignored at every level by design
 and an older build would otherwise open the file, drop the new fields on read
 and write the loss back on the next save; a bump that changes a field's

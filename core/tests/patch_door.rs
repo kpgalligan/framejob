@@ -586,7 +586,7 @@ fn an_action_end_patch_still_merges_and_a_null_still_removes_a_key() {
         crop_gone.value()["clips"][0]["actions"][0]["end"],
         json!({ "video": { "opacity": 0.25, "shadow": { "blur": 40.0 } } })
     );
-    // An out-of-range value is still stored: `actions.rs`'s `clamp_video`
+    // An out-of-range value is still stored: `actions_clamp.rs`'s `clamp_video`
     // is the last line of defence for an evaluated value, and this door
     // deliberately does not become a second one (spec §5.4).
     let steep = project.apply(&end_op(json!({ "video": { "opacity": 5.0 } })));

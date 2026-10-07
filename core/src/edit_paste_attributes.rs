@@ -38,11 +38,15 @@
 //! takes `graphic` never reads the map, as the four groups are checked
 //! only after they have landed on a target. The write is `insert` and
 //! `shift_remove`, `model_graphic.rs`'s rule, so a key both sides have
-//! keeps its slot.
+//! keeps its slot. A target key the payload lacks that an action on the
+//! target names (`actions_graphic.rs`'s `names_prop`) is KEPT in its slot,
+//! so the action's ramp keeps its start (spec §11 G-34 (d), amending
+//! G-32 (e)).
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
+use crate::actions_graphic::names_prop;
 use crate::edit_paste::parse_payload;
 use crate::model::{Clip, GraphicProps, Project, ShapeProps, Source, TextProps};
 use crate::model_graphic::{check_count, check_props};
@@ -132,13 +136,14 @@ fn checked_props(from: &GraphicProps) -> Result<Map<String, Value>, String> {
     Ok(stored)
 }
 
-/// Makes `into` hold exactly `props`: a key `props` lacks is removed with
-/// `shift_remove`, a key both have keeps its slot, a new key is appended in
-/// `props`' order.
-fn replace_props(into: &mut Map<String, Value>, props: &Map<String, Value>) {
+/// Makes `into` hold exactly `props` plus the keys in `keep`: a key that
+/// neither `props` nor `keep` holds is removed with `shift_remove`, a key
+/// both maps have keeps its slot, a kept key keeps its slot and value, and
+/// a new key is appended in `props`' order.
+fn replace_props(into: &mut Map<String, Value>, props: &Map<String, Value>, keep: &[String]) {
     let gone: Vec<String> = into
         .keys()
-        .filter(|key| !props.contains_key(*key))
+        .filter(|key| !props.contains_key(*key) && !keep.contains(*key))
         .cloned()
         .collect();
     for key in gone {
@@ -266,6 +271,10 @@ impl Project {
                     return Err(format!("clip {id} has no {} properties", group.name()));
                 }
                 let Some(layer) = group.layer() else {
+                    let keep: Vec<String> = target.graphic.as_ref().map_or_else(Vec::new, |g| {
+                        let named = g.props.keys().filter(|key| names_prop(target, key));
+                        named.cloned().collect()
+                    });
                     let (Some(from), Some(into)) = (graphic_of(source), target.graphic.as_mut())
                     else {
                         continue;
@@ -284,7 +293,7 @@ impl Project {
                         copied = Some(checked_props(from)?);
                     }
                     if let Some(props) = &copied {
-                        replace_props(&mut into.props, props);
+                        replace_props(&mut into.props, props, &keep);
                     }
                     continue;
                 };

@@ -23,10 +23,14 @@
 //! with `shift_remove`, which keeps the other keys' order (`Map::remove`
 //! would swap the last key into the hole). `Project ==` cannot see an
 //! order change, so the Identity arm is unaffected either way, and only
-//! the written text shows it.
+//! the written text shows it. With a `schema`, a `null` for a prop an
+//! action on the clip names stores the schema's default instead (spec §11
+//! G-34 (d)): the action's ramp keeps a start.
 
 use serde_json::{Map, Value};
 
+use crate::actions_graphic::names_prop;
+use crate::edit_action_graphic::schema_default;
 use crate::edit_clip::Described;
 use crate::export::describe;
 use crate::model::{GraphicProps, Project, Source};
@@ -116,8 +120,9 @@ impl Project {
 
     /// Patches each named graphic clip's `name`, `width`, `height`,
     /// `length` and `props` (road map 10 §5h). `props` merges key by key and
-    /// a `null` removes its key; `in` is not patchable, because the trims
-    /// and `split` own it (G-9).
+    /// a `null` removes its key — except, with a `schema`, a prop an action
+    /// on the clip names, which takes the schema's default (G-34 (d)); `in`
+    /// is not patchable, because the trims and `split` own it (G-9).
     ///
     /// `Err` for a malformed schema, a patch that is not an object, an
     /// unknown clip, a clip that is not a graphic, an unknown key and any
@@ -153,6 +158,9 @@ impl Project {
 
         let mut next = self.clone();
         for id in ids {
+            let Some(original) = self.clip(id) else {
+                continue;
+            };
             let Some(graphic) = next.clip_mut(id).and_then(|clip| clip.graphic.as_mut()) else {
                 continue;
             };
@@ -170,7 +178,12 @@ impl Project {
             }
             if let Some(props) = &read.props {
                 for (key, value) in props {
-                    if value.is_null() {
+                    let kept = schema
+                        .and_then(|schema| schema_default(schema, key))
+                        .filter(|_| value.is_null() && names_prop(original, key));
+                    if let Some(default) = kept {
+                        graphic.props.insert(key.clone(), default);
+                    } else if value.is_null() {
                         graphic.props.shift_remove(key);
                     } else {
                         graphic.props.insert(key.clone(), value.clone());

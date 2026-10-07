@@ -28,12 +28,27 @@ pub(crate) fn normalise_color(text: &str) -> Option<String> {
         Some(hex) => hex_channels(hex)?,
         None => function_channels(&text).or_else(|| named_channels(&text))?,
     };
+    Some(color_hex(channels))
+}
+
+/// The four bytes of a colour G-12's grammar reads, red, green, blue and
+/// alpha: [`normalise_color`] first, then its hex digits, six of them
+/// giving an alpha of 255. `actions_graphic.rs`'s blend reads a colour
+/// through this, so it reads every spelling a stored colour can have.
+pub(crate) fn color_channels(text: &str) -> Option<[u8; 4]> {
+    let normal = normalise_color(text)?;
+    hex_channels(normal.strip_prefix('#')?)
+}
+
+/// Four bytes written as G-12 writes a colour: `#rrggbb` when the alpha is
+/// 255, else `#rrggbbaa`, lowercase.
+pub(crate) fn color_hex(channels: [u8; 4]) -> String {
     let [r, g, b, a] = channels;
-    Some(if a == 255 {
+    if a == 255 {
         format!("#{r:02x}{g:02x}{b:02x}")
     } else {
         format!("#{r:02x}{g:02x}{b:02x}{a:02x}")
-    })
+    }
 }
 
 fn hex_channels(hex: &str) -> Option<[u8; 4]> {

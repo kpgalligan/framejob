@@ -12,6 +12,8 @@
 //! Declarations and re-exports only — no implementation lives here.
 
 pub mod actions;
+mod actions_clamp;
+mod actions_graphic;
 pub mod agent;
 pub mod audio;
 pub mod audio_crossfade;
@@ -25,6 +27,7 @@ mod container_vorbis;
 mod container_vorbis_setup;
 pub mod edit;
 pub mod edit_action;
+mod edit_action_graphic;
 pub mod edit_background;
 pub mod edit_canvas;
 pub mod edit_clip;

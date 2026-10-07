@@ -428,7 +428,7 @@ impl Project {
             Outcome::Identity => {}
             Outcome::Refused(why) => return Ok(Outcome::Refused(why)),
         }
-        match next.set_action_end(clip, id, &patch, &[])? {
+        match next.set_action_end(clip, id, &patch, &[], None)? {
             Outcome::Applied(patched) => next = patched,
             Outcome::Identity => {}
             Outcome::Refused(why) => return Ok(Outcome::Refused(why)),

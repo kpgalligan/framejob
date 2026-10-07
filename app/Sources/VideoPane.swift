@@ -190,7 +190,7 @@ final class VideoPane: InspectorPaneView {
     /// FLATTENED rather than composited offscreen (`nest.rs`), so the nest
     /// clip contributes no layer of its own for a mode to apply to — its
     /// clips each become a layer and each blend on their own. `check_blend`
-    /// (`edit_props.rs`) is the refusal and `clamp_video` (`actions.rs`) is
+    /// (`edit_props.rs`) is the refusal and `clamp_video` (`actions_clamp.rs`) is
     /// the same rule closing the `set_action_end` back door, so both of the
     /// row's outcomes were dead ends: an error sheet from the popup, or a
     /// mode stored into an action's end state that the recipe then forces

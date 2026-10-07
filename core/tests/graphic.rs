@@ -5,8 +5,9 @@
 //! props ORDER — read off the written text, since `Project ==` cannot see
 //! it. What a graphic clip is on disk is `schema_v10.rs`'s. Road map 10's
 //! G2b adds the graphic's own timeline under the trims, `roll` and `split`
-//! (G-9), the refusal of `graphic` as an action target (G-10), and the
-//! layer source the recipe publishes — its frame, its `ctx` and its hash.
+//! (G-9) and the layer source the recipe publishes — its frame, its `ctx`
+//! and its hash. A graphic's props as action targets (G-34) are
+//! `graphic_actions.rs`'s and `graphic_action_door.rs`'s.
 
 mod common;
 
@@ -638,33 +639,6 @@ fn a_canvas_rate_change_puts_in_and_length_on_the_new_grid() {
 
     let tiny = project_with(0, json!(1)).apply(&fps);
     assert_eq!(at(&clip(&tiny, 11), "/graphic/length"), &json!(25_000));
-}
-
-#[test]
-fn an_action_end_naming_graphic_is_an_error_in_g10s_sentence() {
-    let sentence =
-        "props are not animated by actions; a graphic animates itself — change the module or its props";
-    let with = project().apply(&json!({"op": "add_action", "clip": 11, "at": 0}));
-    let action = int(&clip(&with, 11), "/actions/0/id");
-    let end = |patch: Value, off: Value| {
-        json!({"op": "set_action_end", "clip": 11, "action": action,
-               "patch": patch, "off": off})
-    };
-    assert_eq!(
-        with.errors(&end(
-            json!({"graphic": {"props": {"title": "Ada"}}}),
-            Value::Null
-        )),
-        sentence
-    );
-    assert_eq!(
-        with.errors(&end(json!({"graphic": null}), Value::Null)),
-        sentence
-    );
-    assert_eq!(
-        with.errors(&end(json!({}), json!(["graphic.props"]))),
-        sentence
-    );
 }
 
 #[test]

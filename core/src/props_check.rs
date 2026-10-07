@@ -13,7 +13,7 @@
 //! (`edit_clip.rs`) or a canvas colour (`edit_track.rs`) produced them.
 //! Every op that writes a group runs that group's check after writing and
 //! before storing, so these four functions are the ONE statement of what a
-//! legal group is — and `actions.rs`'s `clamp_video` bounds an
+//! legal group is — and `actions_clamp.rs`'s `clamp_video` bounds an
 //! interpolated value against the same constants, which is why the bounds
 //! live with the checks and not in any one op.
 //!

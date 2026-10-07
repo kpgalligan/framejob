@@ -20,7 +20,10 @@
 //! LENIENT is the VALUE, because the state a clip interpolates toward may
 //! name something no stored group could hold, and because a half-written
 //! animation must stay editable. The evaluator is the line of defence for
-//! that — it clamps every value it produces (spec §5.4). The forward
+//! that — it clamps every value it produces (spec §5.4). The one exception
+//! is a graphic prop's end (spec §11 G-34 (c)), checked against the op's
+//! `schema`: nothing clamps a prop, and a curve between two in-range ends
+//! stays in range. The forward
 //! compatibility the old leniency was for lives in the FILE reader, which
 //! keeps an `end` object exactly as it found it.
 //!
@@ -32,14 +35,16 @@
 //! the enforcement — `evaluate_clip` restores the base motion over whatever
 //! any end patch carries, which is what closes a hand-written file, a
 //! pasted action and a project from another tool at once. A `graphic`
-//! group, in `patch` or in `off`, is refused the same way (road map 10's
-//! G-10): a graphic animates itself, and `actions.rs` merges no such group.
+//! group in `patch` is `edit_action_graphic.rs`'s arm (spec §11 G-34); in
+//! `off` it is an `Err`.
 
 use serde_json::{json, Map, Value};
 
 use crate::actions::{self, MAX_PATCH_DEPTH};
+use crate::edit_action_graphic::{read_graphic_end, write_graphic_end, GRAPHIC_NOT_KEYED_OFF};
 use crate::export::describe;
 use crate::model::{Action, AudioProps, Curve, Project, ShapeProps, TextProps, VideoProps};
+use crate::model_graphic::{check_count, check_schema};
 use crate::outcome::Outcome;
 use crate::patch::{check_group_patch, merge_group, unknown_key, Group};
 use crate::time::{Ticks, TIMESCALE};
@@ -92,7 +97,8 @@ fn action_past_end(clip: u32, start: Ticks, duration: Ticks, length: Ticks) -> S
 /// Removes from `value` every key the incoming `patch` set to `null` —
 /// `set_action_end`'s delete rule (spec §6). Only keys the patch mentions
 /// are touched, so a `null` that was already in the end patch (animating a
-/// shadow away, say) survives untouched.
+/// shadow away, say) survives untouched. `shift_remove`, because under
+/// `preserve_order` `Map::remove` swaps the last key into the hole.
 fn prune_removed(value: &mut Value, patch: &Value, depth: u32) {
     let Value::Object(patched) = patch else {
         return;
@@ -105,7 +111,7 @@ fn prune_removed(value: &mut Value, patch: &Value, depth: u32) {
     }
     for (key, sub) in patched {
         if sub.is_null() {
-            target.remove(key);
+            target.shift_remove(key);
         } else if let Some(slot) = target.get_mut(key) {
             prune_removed(slot, sub, depth + 1);
         }
@@ -115,7 +121,7 @@ fn prune_removed(value: &mut Value, patch: &Value, depth: u32) {
 /// What a refusal calls this op's patch. It is not one group's — the paths
 /// inside it carry the group's name (`video.filters[1].kind`) — so it
 /// cannot be a `Group`'s own subject.
-const END_PATCH: &str = "an action end patch";
+pub(crate) const END_PATCH: &str = "an action end patch";
 
 /// The groups §5.4's end patch may name. `shape` is not among them, and its
 /// absence is a refusal rather than an omission: `evaluate_clip` passes a
@@ -145,10 +151,13 @@ fn check_end_patch(patch: &Value) -> Result<(), String> {
         return Ok(());
     };
     for (key, body) in groups {
+        // `graphic` is `edit_action_graphic.rs`'s arm, read after this walk.
+        if key == "graphic" {
+            continue;
+        }
         // The three groups, by their own names rather than by three string
         // literals: a group renamed in `patch.rs` cannot drift from the
         // door that lists it.
-        graphic_not_a_target(key)?;
         let group = END_GROUPS
             .into_iter()
             .find(|group| group.name() == key)
@@ -161,20 +170,6 @@ fn check_end_patch(patch: &Value) -> Result<(), String> {
         check_group_patch(body, group, END_PATCH, key)?;
     }
     Ok(())
-}
-
-/// G-10's sentence: a graphic's props are not an action's to animate.
-const GRAPHIC_NOT_A_TARGET: &str =
-    "props are not animated by actions; a graphic animates itself — change the module or its props";
-
-/// `Err` in [`GRAPHIC_NOT_A_TARGET`] for the group `graphic`, asked before
-/// the group lookup so it is not answered as an unknown key.
-fn graphic_not_a_target(group: &str) -> Result<(), String> {
-    if group == "graphic" {
-        Err(GRAPHIC_NOT_A_TARGET.to_string())
-    } else {
-        Ok(())
-    }
 }
 
 /// The two refusals that are about this op rather than the vocabulary,
@@ -206,7 +201,9 @@ fn check_off<'a>(patch: &Value, off: &'a [String]) -> Result<Vec<(&'a str, &'a s
                 ))
             }
         };
-        graphic_not_a_target(group_name)?;
+        if group_name == "graphic" {
+            return Err(GRAPHIC_NOT_KEYED_OFF.to_string());
+        }
         let group = END_GROUPS
             .into_iter()
             .find(|group| group.name() == group_name)
@@ -389,8 +386,10 @@ impl Project {
     /// and a misspelt variant are each refused, naming the dotted path with
     /// the group's name in it and the value sent. What it does NOT do is
     /// range-check — the state a clip interpolates toward may legitimately
-    /// name a value no stored group could hold, and `actions.rs`'s
-    /// `clamp_video` bounds the evaluated value instead (spec §5.4).
+    /// name a value no stored group could hold, and `actions_clamp.rs`'s
+    /// `clamp_video` bounds the evaluated value instead (spec §5.4); a
+    /// graphic prop's end is the exception, checked against the op's
+    /// `schema` (G-34 (c)).
     ///
     /// A `null` is the one value the walk lets past at any depth, because
     /// here it is a REMOVAL rather than a clear.
@@ -410,12 +409,16 @@ impl Project {
     /// `"group.key"` path is written as `null` after the merge and the
     /// prune, which keys that optional property off at the action's end.
     /// It refuses what `patch` refuses ([`check_off`]).
+    ///
+    /// `graphic` is `edit_action_graphic.rs`'s (G-34), read against
+    /// `schema`; a prop the clip's map lacks gets its start in this edit.
     pub fn set_action_end(
         &self,
         clip: u32,
         action: u32,
         patch: &Value,
         off: &[String],
+        schema: Option<&Value>,
     ) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?;
         let existing = target
@@ -429,6 +432,9 @@ impl Project {
                 describe(patch)
             ));
         }
+        if let Some(schema) = schema {
+            check_schema(schema)?;
+        }
         // Present at all — a `null` included, since writing `motion: null`
         // into an end patch is still asking an action to decide a preset.
         for (group, key) in [("video", "motion"), ("text", "words")] {
@@ -437,19 +443,36 @@ impl Project {
             }
         }
         check_end_patch(patch)?;
+        let graphic = match patch.get("graphic") {
+            Some(body) => Some(read_graphic_end(target, body, schema)?),
+            None => None,
+        };
         let off = check_off(patch, off)?;
-        let mut merged = actions::merge(&existing.end, patch);
-        prune_removed(&mut merged, patch, 0);
+        let mut rest = patch.clone();
+        if let Value::Object(groups) = &mut rest {
+            groups.shift_remove("graphic");
+        }
+        let mut merged = actions::merge(&existing.end, &rest);
+        prune_removed(&mut merged, &rest, 0);
+        if let Some(read) = &graphic {
+            write_graphic_end(&mut merged, read);
+        }
         for (group, key) in off {
             key_off(&mut merged, group, key);
         }
 
         let mut next = self.clone();
-        if let Some(slot) = next
-            .clip_mut(clip)
-            .and_then(|c| c.actions.iter_mut().find(|a| a.id == action))
-        {
-            slot.end = merged;
+        let Some(slot) = next.clip_mut(clip) else {
+            return self.finish(next);
+        };
+        if let Some(found) = slot.actions.iter_mut().find(|a| a.id == action) {
+            found.end = merged;
+        }
+        if let (Some(read), Some(stored)) = (&graphic, slot.graphic.as_mut()) {
+            for (key, start) in &read.starts {
+                stored.props.insert(key.clone(), start.clone());
+            }
+            check_count(&stored.props)?;
         }
         self.finish(next)
     }

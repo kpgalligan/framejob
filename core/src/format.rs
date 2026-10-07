@@ -189,7 +189,17 @@ use crate::model::{Canvas, Project};
 /// fills or dims, with nothing left in the file to say it ever did. The
 /// recipe's `word_glide`, `word_fill` and `word_dim` are computed, never
 /// stored.
-pub const RC_FORMAT_VERSION: u32 = 12;
+///
+/// Version 13 is a graphic's props as action targets (spec §11 G-34): an
+/// action's `end` may carry `graphic: {props, kinds}`, `props` before
+/// `kinds`, `kinds` holding each named prop's schema type as
+/// `set_action_end` wrote it. Nothing new is a typed field — an `end` is
+/// stored as found — so there is no migration step, and a version-12 file
+/// whose end already names `graphic` (G-10 kept it inert) now animates, its
+/// colours switching at the end for want of `kinds`. The bump is so an older
+/// build refuses the file instead of drawing every animated prop held at
+/// its start.
+pub const RC_FORMAT_VERSION: u32 = 13;
 
 /// Reader caps, mirrored by the `RC_MAX_*` defines in the C header. They
 /// exist so a corrupt or generated file cannot make the app allocate

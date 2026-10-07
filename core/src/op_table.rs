@@ -291,7 +291,8 @@ pub const OP_TABLE: [OpRow; OP_COUNT] = [
        &[req("clip", Id), req("action", Id), opt("start", Ticks), opt("duration", Ticks),
          opt("curve", Curve)]),
     op("set_action_end",
-       &[req("clip", Id), req("action", Id), req("patch", Object), opt("off", Texts)]),
+       &[req("clip", Id), req("action", Id), req("patch", Object), opt("off", Texts),
+         opt("schema", Object)]),
     op("remove_action", &[req("clip", Id), req("action", Id)]),
 
     // ---- tracks, markers, canvas, media ---------------------------------

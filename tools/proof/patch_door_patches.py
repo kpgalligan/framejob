@@ -684,7 +684,7 @@ def action_end_door(mcp):
           "…and a whole group set to null goes the same way")
     # An out-of-range value is NOT refused here, unlike at every other patch
     # door: the state a clip interpolates toward may name a value no stored
-    # group could hold, and `actions.rs`'s `clamp_video` bounds the evaluated
+    # group could hold, and `actions_clamp.rs`'s `clamp_video` bounds the evaluated
     # value instead (spec §5.4). Pinned so the difference is deliberate.
     s.op("set_action_end", clip=clip, action=action, patch={"video": {"opacity": 5.0}})
     landed("an out-of-range value is STORED rather than refused, which is this "

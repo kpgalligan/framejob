@@ -199,7 +199,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
     which looks the same, would give 150. Under this rule a front trim or
     a roll leaves `durationInFrames` where it was, and the split pin writes
     the number the unsplit clip already had.
-- **G-10 — Props are not action targets; everything about the LAYER is**
+- **G-10 — Props are not action targets (superseded by G-34);
+  everything about the LAYER is**
   (road map 10 §4, 2026-09-25; built by G2b). The graphic animates itself,
   so `graphic` is not among the groups an action's `end` may carry, which
   is W-6's precedent: `set_action_end` answers a `graphic` object (a `null`
@@ -210,7 +211,10 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   `graphic` a `paste_attributes` group: a target keeps its module, size,
   timeline and props (amended by G-32). `video.*` actions, motion presets,
   transitions and blend all apply, because they belong to the layer.
-  Keyframed props are road map 10 §7's.
+  Keyframed props are road map 10 §7's. **G-34 supersedes** this entry's
+  first sentence, its error and "a file or paste payload whose `end` names
+  `graphic` keeps it and animates nothing"; what it says of the layer
+  stands.
 - **G-11 — Plain JavaScript, one ES module, no TypeScript** (road map 10
   §4, 2026-09-25). A module is ES2020+ JavaScript as QuickJS evaluates it,
   with no build step: agents write plain JavaScript as reliably as
@@ -1028,7 +1032,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   the payload lacks is removed with `shift_remove`; a key both have keeps
   its slot (`insert`); new keys are appended in the payload's order —
   `model_graphic.rs`'s insert-and-`shift_remove` rule, so the written
-  text moves no key it did not have to.
+  text moves no key it did not have to. (Amended by G-34 (d): a target
+  key that an action on the target names is kept.)
   (f) **When the copied map is read.** The map is checked for shape only,
   once, the first time a target TAKES it, before anything is written to
   that target: `model_graphic::check_props(_, None)`, its `null`s
@@ -1507,3 +1512,114 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   line of its own, or a wider sheet, either a visible change to every
   format's sheet — is the owner's choice. What to do about any of the
   three is an issue's, not this entry's.
+- **G-34 — A graphic's props are action targets: a number and a colour
+  ramp, a string, a boolean and an enum switch at the action's end, an
+  asset is refused; supersedes G-10's first sentence and its error, and
+  amends G-32 (e)** (issue #239, 2026-10-07, issue batch B87; the owner's
+  seven answers, each "as recommended", are (b), (d), (e), (f), (g), (i)
+  and the limits, and the owner's answer on the paste is (d)). G-10's
+  layer half stands, and so does G-32 (h): `graphic` is not a
+  `patch::Group`; the action door has its own graphic arm.
+  (a) **The shape.** An action's `end` may carry `graphic: {props: {<key>:
+  <value>}, kinds: {<key>: <type>}}`. `set_action_end` writes each named
+  prop's schema `type` into `kinds` and removes it with the prop. A
+  `kinds` in a patch is read and DISCARDED, whatever it holds, because
+  every named prop's kind is rewritten from the schema; so an end read
+  back from `get_project` can be sent again, and a caller never decides a
+  kind (G-4). `name`, `width`, `height`, `in` and `length` are errors
+  (`graphic.<key> is not an animation target; an action animates
+  graphic.props`); any other key is an unknown key.
+  (b) **Which kinds move (answers 1 and 2).** A `number` and a `color` ramp
+  along the action's curve. A `string`, `boolean` and `enum` hold their
+  start and take the end's value at the action's END, as every
+  non-numeric property does (§5.4). An `asset` is an error naming the prop
+  (`graphic.props.<key> is an asset; an action does not animate an image —
+  set it with set_graphic`).
+  (c) **How the kind is known, and the check.** From the `schema` the op
+  carries. The app fills it from the module's CURRENT revision and never
+  takes it from a caller (G-4; a `.filledByTheApp` row). A non-null prop
+  with no schema is an error naming it (`graphic.props.<key> needs its
+  module's schema to animate, and none came with the op`). A prop the
+  schema lacks is `unknown key "graphic.props.<key>" in an action end
+  patch`. Every value is checked as `set_graphic` checks it (type,
+  `min`/`max`, options, length, a colour normalised) and refused under
+  `graphic.props.<key>`. This is the one end that IS range-checked (§5.4's
+  ends are not), because nothing clamps a prop: the engine reads no
+  `min`/`max`, and `clamp_video` never sees `graphic`. Every curve is
+  monotone (§5.4), so a ramp between two in-range ends stays in range.
+  Only the props a patch names are checked; a stored end is never
+  re-checked. So when a module later narrows a range, a project holding an
+  old end still opens and renders as stored (the module is handed the old
+  value, as it is a stored base prop), an edit naming another prop of that
+  end is not refused, and only a new value for that prop is checked. The
+  evaluator knows a colour by `kinds`, never by a value's shape; two numbers
+  ramp whatever `kinds` holds, which is how a version-12 end ramps its
+  numbers ((k)).
+  (d) **The start (answer 4).** The first time an action names a prop that
+  the clip's own `graphic.props` does not hold, the schema's CURRENT
+  default (a colour normalised) is appended to it in the same edit, so in
+  the same undo step. A later change to the module's default does not move
+  it. The start is kept in two places it would otherwise be lost.
+  G-15 (b)'s "A value equal to the schema's default is written as `null`"
+  gains one exception in the core: `set_graphic` with a schema answers a
+  `null` for a prop that
+  an action on that clip names by storing the schema's default; without a
+  schema, or for a key the schema lacks, a `null` still removes. And
+  G-32 (e) is amended (the owner's answer, 2026-10-07): Paste Graphic
+  Properties, and `paste_attributes`' `graphic` group, KEEP a target key
+  the payload lacks when an action on the target names it, in its slot,
+  so the ramp survives the paste. Every other key pastes as G-32 (e) says.
+  (e) **Numbers arrive fractional (answer 5)**: `a + (b − a) × eased` in
+  floating point, never rounded and never snapped to `step`, so two whole
+  ends 64 and 129 give 96.5 halfway. A module that needs a whole number
+  rounds it. A module written before this entry that does
+  `new Array(props.count)` throws on a fraction and draws its error card
+  for those frames (G-8), which stops an export.
+  (f) **Colours blend channel by channel (answer 6)**, as every colour
+  action already does (the model's `[r, g, b, a]`, element by element).
+  The red, green, blue and alpha of the two `#rrggbb[aa]` strings (no alpha
+  is 255) each interpolate STRAIGHT, not premultiplied: `#00000000` to
+  `#ffffff` is `#80808080` halfway. Each channel is rounded to the nearest
+  byte and the result written as G-12 writes a colour (`#rrggbb` when the
+  alpha is 255). Not OKLab.
+  (g) **Playback (answer 7).** Nothing is built. Every frame of an
+  animated prop is drawn at the recorded per-frame cost, so a graphic that
+  had settled misses its texture for the action's span. A
+  `docs/manual-checks.md` row watches a 4K clip with an animated prop for
+  stutter. #127 stays deferred.
+  (h) **Evaluation.** Each finished action's `graphic.props` is laid over
+  the clip's map in start order, then the spanning action's are
+  interpolated. `clip_state` answers the result as `graphic` beside
+  `shape`, and the recipe's `props` and `props_json` (and so its hash,
+  G-9·b) are those values. The texture key, the export pin (G-13) and the
+  prefetch (G-26) do not change. The evaluator is total. Two values of
+  different JSON kinds, a colour it cannot read, a malformed `graphic`,
+  `props` or `kinds`, and a prop with no start (removed by a `set_graphic`
+  without a schema, or a hand-written end) all hold, then switch at the
+  end; no frame fails.
+  (i) **Edits.** `split` gives the second half the props evaluated at the
+  cut, and gives a straddled action's first half an end of those values,
+  so a split is invisible: a number exactly on a linear curve (to
+  floating-point rounding), a colour to within one byte per channel, and
+  on an eased curve at its ends, as for every property. `trim_start` and
+  `roll` touch an action's span, never its end; an op under `scope` acts
+  on the nested clip as on any other; `rate_stretch` and `set_speed` are
+  media-only. `get_project` shows an end as stored, `kinds` included. The
+  inspector edits an end as it edits every animated property (CI-1, CI-2,
+  CI-6, CI-7, CI-9): the Graphic tab stops being the exception (answer 3).
+  (j) **Removing.** `graphic: null` and `graphic.props: null` remove the
+  group from the end. A `null` prop removes the prop and its kind,
+  unchecked, so a stale key can go. `off` cannot name `graphic` (`graphic
+  props cannot be keyed off; name the value a prop ends at in patch`).
+  `video.motion` and `text.words` stay errors in their own sentences (W-6).
+  (k) **Format version 13**, so an older build refuses the file instead of
+  drawing it un-animated. There is no migration step: an end is stored as
+  found. A file of version 12 or older whose end already names `graphic`
+  (hand-written or pasted; G-10 kept it inert) now animates by these
+  rules, its colours switching at the end for want of `kinds`.
+  **Limits accepted (answer 3).** A clip's actions do not overlap, and one
+  action has one span and one curve for everything it animates. There is
+  no per-prop opt-out: a module's own animation composes by being handed
+  that frame's value. A prop that a later revision renames or drops stays
+  in the end, and the engine passes it through with a warning. `kinds`
+  goes stale only if a module changes a prop's type.

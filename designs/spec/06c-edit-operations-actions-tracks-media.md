@@ -30,7 +30,7 @@ The rules every op shares are §6a; the clip ops are §6b.
   **error** too — `region.width must be greater than 0` — because a zero-width region asks for an
   infinite scale.
 - **`set_action {clip, action, start?, duration?, curve?}`** — Same overlap checks.
-- **`set_action_end {clip, action, patch, off?}`** — Merges into the end patch; a key set to `null`
+- **`set_action_end {clip, action, patch, off?, schema?}`** — Merges into the end patch; a key set to `null`
   removes it, at any depth. `off` — a list of `"group.key"` paths, `group` one of `video`, `audio`,
   `text` and `key` a top-level key of it — writes a `null` at each AFTER the merge, which keys that
   optional property OFF at the end (§5.4, §11 CI-14); a malformed path, `video.motion`,
@@ -40,15 +40,27 @@ The rules every op shares are §6a; the clip ops are §6b.
   value of the wrong JSON kind or a misspelt variant anywhere in it is an **error** naming the
   dotted path with the group in it — `unknown key "video.filters[1].kindd" in an action end patch` —
   and a `shape` object is an unknown key, because a shape is not animatable and the key would be
-  stored, reported as success and animate nothing. VALUES are not range-checked, so an end state may
+  stored, reported as success and animate nothing. VALUES are not range-checked (except a graphic prop's end, §11 G-34 (c)), so an end state may
   name what no stored group could hold and the evaluator clamps it (§5.4's `clamp_video`). One
   refusal is about the op rather than the vocabulary: a `video` object naming `motion` is an
   **error** (format version 8, §5.4), because a preset is anchored to the clip's two ends rather
   than being a value to ramp between two states, and the evaluator would restore the base value
   anyway. A `text` object naming `words` — a `null` included — is an **error** too (format version
   9, §11 W-6): a word's times are anchored to speech, not a state to ramp toward. A `graphic` object
-  — a `null` included — or `graphic` in `off` is an **error** in G-10's sentence, `props are not
-  animated by actions; a graphic animates itself — change the module or its props` (§11 G-10).
+  is a graphic clip's props as a fourth target (format version 13, §11 G-34): `{props: {<key>:
+  <value>}}`, each non-null prop checked as `set_graphic` checks it against `schema` — the module's
+  CURRENT revision, which the app fills and never takes from a caller (G-4) — and refused under
+  `graphic.props.<key>`; no schema (`graphic.props.<key> needs its module's schema to animate, and
+  none came with the op`), a prop the schema lacks (an unknown key) and an `asset`
+  (`graphic.props.<key> is an asset; an action does not animate an image — set it with
+  set_graphic`) are each an **error**, and so are `name`, `width`, `height`, `in` and `length`
+  (`graphic.<key> is not an animation target; an action animates graphic.props`). Each named prop's
+  schema `type` is written into the end's `kinds`, and a `kinds` in the patch is read and discarded,
+  so an end read back from `get_project` can be sent again. A number and a colour ramp; a string,
+  a boolean and an enum switch at the end. A prop the clip's own `props` lacks gets the schema's
+  CURRENT default appended to them in the same edit. `graphic: null` or `graphic.props: null`
+  removes the group; a `null` prop removes the prop and its kind, unchecked. `graphic` in `off` is
+  an **error**: `graphic props cannot be keyed off; name the value a prop ends at in patch`.
 - **`remove_action {clip, action}`** —
 
 ## Tracks, markers, canvas, media

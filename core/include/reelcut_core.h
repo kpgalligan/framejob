@@ -95,8 +95,15 @@ extern "C" {
  * `1 - pause_dim`). All three default to off, so there is no migration step
  * and an older page draws as it did; an older build would drop them. The
  * recipe's `word_glide`, `word_fill` and `word_dim` are computed, never
- * stored. */
-#define RC_FORMAT_VERSION 12
+ * stored.
+ *
+ * Version 13 is a graphic's props as action targets: an action's `end` may
+ * carry `graphic: {props, kinds}`, `props` before `kinds`, `kinds` holding
+ * each named prop's schema type as set_action_end wrote it. An end is
+ * stored as found, so there is no migration step; a version-12 end that
+ * already names `graphic` now animates, its colours switching at the end.
+ * An older build would draw every animated prop held at its start. */
+#define RC_FORMAT_VERSION 13
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips

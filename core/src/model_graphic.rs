@@ -226,7 +226,7 @@ pub(crate) fn check_props(
 }
 
 /// One value against its schema entry, answered normalised.
-fn check_typed(key: &str, entry: &Value, value: &Value) -> Result<Value, String> {
+pub(crate) fn check_typed(key: &str, entry: &Value, value: &Value) -> Result<Value, String> {
     let kind = entry.get("type").and_then(Value::as_str).unwrap_or("");
     let wrong = |what: &str| format!("props.{key} must be {what}, not {}", describe(value));
     match kind {

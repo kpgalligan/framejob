@@ -108,7 +108,9 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   evaluated state at `at`. `transition_in` stays with the first. A graphic's second half gets
   `graphic.in + (at − start)`, and BOTH halves' `graphic.length` are pinned to the original's
   effective length — `length`, or `in + duration` when `null` — so the animation continues across
-  the cut and plays its outro once, at the true end (§11 G-9). The second keeps every `text.words`
+  the cut and plays its outro once, at the true end (§11 G-9); the second half's `graphic.props` are
+  the evaluated ones, and a straddled action's first half ends at them (§11 G-34). The second keeps
+  every `text.words`
   entry rebased by the cut — a negative start is legal and means "already said", so the split is
   invisible — and the first half's words are untouched; a second half whose EVALUATED content (a
   finished action may have switched it) has a different token count stores `words: []` instead,
@@ -220,7 +222,8 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   fifth group, and only when NAMED** (§11 G-32, amending G-10): a side has it when its source is a
   graphic and it has a `graphic` description, and a target TAKES it when it has it and its
   `graphic.name` is the payload clip's. It copies `props` WHOLE — a target key the payload lacks is
-  removed, a key both have keeps its slot, new keys are appended in the payload's order — and the
+  removed unless an action on the target names it (§11 G-34 (d)), when it keeps its value and slot,
+  a key both have keeps its slot, new keys are appended in the payload's order — and the
   target keeps its `name`, `width`, `height`, `in` and `length` and everything outside `graphic`.
   Named without `skip_missing`, the errors are `payload clip has no graphic properties`, `clip N has
   no graphic properties` and `clip N is drawn by "<its module>" and the payload clip by "<the
@@ -305,8 +308,10 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   schema no longer has can still be removed — each other value checked as `add_graphic_clip` checks
   them, and the merged map holds at most 64 (an **error** naming the count). `in` is an **error** —
   the trims and `split` own it (road map 10's G-9, recorded here by G2b) — and so is a clip that is
-  not a graphic, an unknown key and a malformed `schema`. The identity when nothing changes, a
-  colour re-sent in another spelling included.
+  not a graphic, an unknown key and a malformed `schema`. With a `schema`, a `null` for a prop an
+  action on the clip names stores the schema's default instead, so the action's ramp keeps a start
+  (§11 G-34 (d)); without one, or for a key the schema lacks, it removes. The identity when nothing
+  changes, a colour re-sent in another spelling included.
 - **`set_clip {clips, patch: {name?: string | null, label?: string | null}}`** — The fifth patch op:
   sets or clears the clip's own name and label (§5.2). Inside the patch an absent key keeps, `null`
   clears, and so does an empty string — after the trim a name gets on its way in — because an

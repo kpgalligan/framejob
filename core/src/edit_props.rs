@@ -73,7 +73,7 @@ use crate::props_check::{check_audio, check_shape, check_text, check_video};
 ///
 /// It is not the whole story either: `set_action_end` checks the VOCABULARY
 /// and never the clip, and a blend mode is a legal value, so an end patch
-/// can still carry one onto a nest clip. `actions.rs`'s `clamp_video` is
+/// can still carry one onto a nest clip. `actions_clamp.rs`'s `clamp_video` is
 /// what closes that door, for the recipe, `clip_state` and both export
 /// writers at once.
 fn check_blend(clip: &Clip, props: &VideoProps) -> Result<(), String> {
