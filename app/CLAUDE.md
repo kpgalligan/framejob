@@ -71,8 +71,9 @@ detail there.
   The typed `setActionEnd` LIFTS every top-level null out of its patch into
   `off` (spec §11 CI-14: a typed `.some(nil)` is a switch turned OFF, kept
   at the end); `setActionEndRaw`'s nulls stay removals, which is what
-  `clearOps` and every agent call send, and it writes `off` only when
-  non-empty.
+  `clearOps` and every agent call send, and it writes `off` only when non-empty and `schema` only when non-nil
+  (the agent door fills it for a graphic end from the module's current
+  revision, spec §11 G-34).
   `addZoomActionRaw`'s region is `Any` and not `Any?`: an absent key and an
   explicit null are opposite intentions there, and only the tool can tell
   them apart.
@@ -1663,7 +1664,7 @@ free.
   `remainderPlacement` take it unchanged.
 
 **The agent.**
-- `AgentServer.swift` (frozen) and `AgentServer+Project` / `Clips` / `Tracks`
+- `AgentServer.swift` (frozen) and `AgentServer+Project` / `Clips` / `Actions` / `Tracks`
   / `Media` / `Render` / `ExportResult` / `History` / `Silence` / `Captions` / `Audio` /
   `Background` / `Scope` / `Transitions` / `CloudCaptions` / `Recording` /
   `Graphics`
@@ -1673,8 +1674,13 @@ free.
   `finishingDidBeginNotification`) — the handlers, one file per group. `+CloudCaptions` is `transcribe`'s CLOUD arm alone — the `engine`
   reader, the three cloud-only arguments refused by name under `apple`, the
   vocabulary's trim/de-dup/cap, the credential and the endpoint read ABOVE
-  the network, and the result keys; `+Captions` dispatches on `engine` and is
-  otherwise the code it was. `+Graphics` holds the two graphic op tools and
+  the network, and the result keys; `+Captions` dispatches on `engine` and is otherwise the code it was.
+  `+Actions` is the five action tools (a pure move out of `+Clips`, issue
+  batch B87 phase 2); `set_action_end` fills `schema` from the CURRENT
+  revision of the module its clip — found in the call's scope — is drawn
+  by, only when the patch names `graphic`, and sends none for any other
+  clip or a module missing or not compiling, so the core answers (spec §11
+  G-34). `+Graphics` holds the two graphic op tools and
   the three app-state ones — `write_graphic` (the store's one writer, then a
   synchronous `rescan()` so the reply is the compile of THAT text; a failed
   compile is `ok: false`, not an error; not undoable, never dirty, G-3; its replaced text kept, G-29),
@@ -1714,10 +1720,10 @@ free.
   layout (the scale is over the cells alone, so the sheet is exactly
   `width × height ≤ max_width × maxSide`, `maxSide` being
   `GraphicLibrary.maxSide`), `maxCellPixels`, the painter and
-  `GraphicRaster.cgImage()`. `AgentCatalog.swift`
-  (+`Clips`, +`Audio`, +`Transitions`, +`Files`, +`Captions`, +`Graphics`,
+  `GraphicRaster.cgImage()`. `AgentCatalog.swift` (+`Clips`, +`Actions`, +`Audio`, +`Transitions`, +`Files`, +`Captions`, +`Graphics`,
   +`Declarations`)
-  — the catalog, spliced in ORDER (`recording_probe.py` reads the last eleven
+  — the catalog, spliced in ORDER (`+Actions`' rows are appended to
+  `+Clips`' array last) (`recording_probe.py` reads the last eleven
   names). **A tool is built one of two ways**: `tool`, which declares its own
   schema, or `opTool`, which declares PROSE and prints the argument STRUCTURE
   from the core's published table (`Self.opSchemas` over `rc_op_schemas`).

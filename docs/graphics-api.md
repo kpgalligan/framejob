@@ -395,6 +395,48 @@ tools. A successful
 `export` answers `graphic_warnings`, each distinct warning a graphic gave
 while the file was drawn, with its name and frame.
 
+## Animating a prop from the timeline
+
+A graphic clip's props can be the target of an action, as a clip's position or opacity can:
+`add_action {clip, at, duration}` makes the span, and `set_action_end {clip, action, patch:
+{graphic: {props: {…}}}}` names the values the props end at. Each value is checked against your
+schema as `set_graphic` checks it, `min` and `max` included, using the module as it is now. Across
+the action a `number` and a `color` ramp along its curve; a `string`, `boolean` and `enum` change to
+the end's value when the action ends; an `asset` cannot be animated. A prop the clip holds no value
+for starts from the schema's `default` as it is when an action first names it, and that value is
+written into the clip, so a later change to the default does not move the animation. `render` gets
+that frame's values every frame, and your own animation from `frame` still runs on top. A `null`
+for a prop in `set_action_end`'s patch stops animating it.
+
+**An animated number arrives with decimals**: 64 to 129 is 96.5 halfway, never rounded and never
+snapped to `step`. A module that needs a whole number rounds it itself. One that does not —
+`new Array(props.count)` is the usual case — throws on a fraction, so those frames draw the error
+card, and an export stops there.
+
+```js
+export const meta = { name: "Bars", durationInFrames: 90 };
+export const schema = {
+  count: { type: "number", default: 5, min: 1, max: 20, step: 1 },
+  accent: { type: "color", default: "#ff5a36" },
+};
+
+export function render(frame, props, ctx) {
+  const n = Math.round(props.count);
+  const w = ctx.width / (2 * n);
+  let bars = "";
+  for (let i = 0; i < n; i++) {
+    bars += `<rect x="${(2 * i + 0.5) * w}" y="${ctx.height / 3}" width="${w}"
+      height="${ctx.height / 3}" fill="${props.accent}"/>`;
+  }
+  return svg(ctx, bars);
+}
+```
+
+A colour blends channel by channel with straight alpha: `#ff0000` to `#0000ff` is `#800080`
+halfway, and `#ffffff` to `#00000000` is `#80808080`, grey and half transparent. While a prop
+moves, every frame is drawn anew, so a graphic that had settled costs a full draw per frame for the
+length of the action.
+
 ## Idioms
 
 ### A slide-in

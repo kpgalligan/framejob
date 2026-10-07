@@ -52,13 +52,16 @@ extension AgentServer {
                 ]),
             opTool(
                 "set_graphic",
-                "Patches what graphic clips are drawn from: name (another module), width, "
-                    + "height, length (the graphic's own timeline in ticks; null ends it "
-                    + "with the clip) and props, merged key by key — a null prop removes "
-                    + "its key. A patch naming props or name is checked against the schema "
-                    + "of the module it names, else of the one module every clip is drawn "
-                    + "by; clips drawn by two different modules are refused for props. A "
-                    + "clip that is not a graphic is an error.",
+                "Patches what graphic clips are drawn from: name (another module), width, height, "
+                    + "length (the graphic's own timeline in ticks; null ends it with the clip) "
+                    + "and props, merged key by key — a null prop removes its key, except a key "
+                    + "the module's schema has that an action on the clip animates "
+                    + "(set_action_end's graphic): that one is set to the schema's default, so the "
+                    + "animation keeps its start. A patch naming props or name is checked against "
+                    + "the schema of the module it names, else of the one module every clip is "
+                    + "drawn by; clips drawn by two different modules are refused for props. A "
+                    + "clip that is not a graphic is an error. These are the BASE props; to "
+                    + "animate one, add_action and then set_action_end.",
                 [
                     "clips": "Clip ids (get_project lists them).",
                     "patch": "The keys to change: name, width, height, length, props.",

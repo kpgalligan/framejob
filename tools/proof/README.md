@@ -16348,3 +16348,80 @@ mutant could change exists. There is no nest row: the core flattens a nest
 into ordinary layers drawn by the same loop, a nested text layer keeps its
 `.text` source and reveal, and a nest has no code of its own here. The probe
 is an unoptimised build, so its medians are an upper reading of the app's.
+
+## Issue batch B87 phase 2 — an action animates a graphic's props over MCP (`graphic_prop_action_proof.py` H0, T0, F0, A1, B1, S1, U1, C1, E0, E1, R1–R3, N1, F1, F2, Z1 and two mutants; #239, spec §11 G-34)
+
+**What it proves.** `set_action_end`'s handler (`AgentServer+Actions.swift`)
+fills `schema` from the CURRENT revision of the module the action's clip is
+drawn by — found in the call's scope — when the patch names `graphic`, and
+the evaluated props reach the picture: `render_frame` halfway through the
+action, a `prores_422` export with the graphic prefetch on and off, and
+undo. The module is the proof's own `ramp` (one rectangle whose `x`, `fill`
+and `mode` are props) on a 640×360, 30 fps canvas; the action runs 0.5–1.5 s,
+linear.
+
+    python3 tools/proof/graphic_prop_action_proof.py
+    python3 tools/proof/graphic_prop_action_proof.py --mutant recipe-stored-props
+    python3 tools/proof/graphic_prop_action_proof.py --mutant handler-no-schema
+
+Two instances, one after the other, each launched by the script under the
+scratch home `tools/proof/work/graphic-prop-action/home` and stopped by its
+own pid; everything it writes is under `tools/proof/work/graphic-prop-action/`,
+removed at the start and at exit. Instance 2 runs with the launch argument
+`-ReelcutGraphicPrefetchOff YES`, which lives in the volatile argument domain.
+
+Under `--mutant` (rule R: 0 caught, 1 survived, 2 not performed) a row
+marked failed only because its fixture was never built is not a catch: the
+run answers 2 unless F0 held, and for `recipe-stored-props` (C1) unless the
+still control Q was built too (added after review, 2026-10-07).
+
+**Rows.** H0 (CONTROL) the scratch home took. T0 (CONTROL) the tool publishes
+no `schema` and the gate refuses one ("set_action_end does not take schema.",
+after `mcp.ToolError`'s `set_action_end: ` prefix). F0 the fixture (the
+default curve is already linear, so `set_action`'s "made no change" is
+accepted and the curve read back). A1 the end lands with `props` and the
+op's `kinds`, and the clip's props hold the three defaults. B1 at the mid
+tick the edge is at x = 96.5 — (80,60) background where the still frame is
+red, (150,60) #800080, (96,60) the half-covered column — and the frame 20000
+ticks later differs (CONTROL). S1 the string switches at the END tick. U1
+undo answers "Action End" and restores the project and the mid frame's
+bytes; redo restores the animated bytes. C1 the mid and end frames are
+byte-equal to a STILL control clip holding the evaluated values (project Q).
+E0 (CONTROL) Q.mov's decoded frames 10 and 30 — one still picture — are
+byte-equal: the encoder is stable for identical input frames. E1 P-on.mov's
+frame 30 is byte-equal to Q.mov's frame 30 and differs from its own frame 10;
+this byte comparison rests on ProRes 422 being INTRA-frame (a frame's bytes
+depend only on its own picture, which E0 shows for this encoder), and no PNG
+is ever compared with a ProRes frame (lossy 4:2:2 YUV). R1 a shape clip's
+action: "clip N is not a graphic clip". R2 after v2 (`x` max 100, a new `h`):
+`{x: 129}` refused by v2's range, `{h: 40}` lands and the clip gains `h: 10`,
+so the CURRENT revision went. R3 after a v3 that does not compile: a value is
+refused ("needs its module's schema to animate, and none came with the op")
+and `{mode: null}` still removes. N1 with `scope` = the nest's id, the nested
+clip's end takes `x: 30`. F1 P-on.mov equals P-off.mov (`same_movie`). F2 the
+one `graphic prefetch:` line instance 1 logged between the start of the
+P-on export and the start of the Q export says hits > 0 and mismatched 0
+(read from log offsets, since the Q export logs its own line); instance 2
+logs none. Z1 (CONTROL) no `Reelcut: ` line; each log's tail printed.
+
+**Mutants** (rule R: 0 caught, 1 survived, 2 not performed; a tree copy built
+by its own `make app`, the one anchor asserted to occur once; instance 2, F1
+and F2 skipped):
+
+| Mutant | Anchor | Must fail | Answer (2026-10-07, powermode 0) |
+|---|---|---|---|
+| `recipe-stored-props` | `core/src/recipe_graphic.rs` `\|evaluated\| evaluated.props.clone(),` → `\|_\| graphic.props.clone(),` (the copy's `core/` its own, `hevc_alpha_proof.own_core`) | C1 | `MUTANT PASS`, built in 94 s, 11/15: B1, S1, C1, E1 failed (mid and end frames not the control's) |
+| `handler-no-schema` | `app/Sources/AgentServer+Actions.swift` `off: off, schema: schema)` → `off: off, schema: nil)` | A1 | `MUTANT PASS`, built in 88 s, 6/15: A1 failed on "graphic.props.fill needs its module's schema to animate, and none came with the op", and every row after it that needs the end |
+
+**Its record** (2026-10-07, the B87 phase 2 tree, `powermode 0`): plain run
+17/17, exit 0, no `DEFAULTS MOVED`. B1 read background (0, 0, 0), (80,60)
+(0, 0, 0) against the still frame's (255, 0, 0), (150,60) (128, 0, 128),
+(96,60) (64, 0, 64); E1's decoded (150,60) (129, 0, 129); F2's line `key 9,
+11 workers, 60 frames with graphics, 31 hits, 0 mismatched, 0 missed, 29
+unused`; P-on.mov and P-off.mov 306963 bytes each, equal after masking.
+The two instances' rows take a few seconds; each mutant adds one tree-copy
+build (about 90 s here).
+
+**Limits.** No row is timed. The 4K playback of an animated prop is spec §11
+G-34's watched row for phase 3 (GR-8). One module, one action, one curve; the
+props' interpolation arithmetic itself is `core/tests/graphic_actions.rs`'s.

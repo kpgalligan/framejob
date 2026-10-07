@@ -1029,14 +1029,17 @@ extension ReelOp {
     /// merge — the property keyed OFF at the end (spec §11 CI-14) — and is
     /// written only when non-empty, so every call without it is the JSON it
     /// always was. A null in `patch` stays a REMOVAL (`clearOps`, agents).
+    /// `schema` is the module's current revision, which the agent door fills
+    /// when the patch names `graphic` (spec §11 G-34); nil writes no key.
     static func setActionEndRaw(
-        clip: UInt32, action: UInt32, patch: Any, off: [String] = []
+        clip: UInt32, action: UInt32, patch: Any, off: [String] = [], schema: Any? = nil
     ) -> ReelOp {
         var a = OpArgs()
         a.put("clip", clip)
         a.put("action", action)
         a.put("patch", patch)
         if !off.isEmpty { a.put("off", off) }
+        a.put("schema", schema)
         return ReelOp(name: "set_action_end", args: a.values)
     }
 

@@ -483,7 +483,11 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   `chapterSample`) to `ExporterWriter+Chapters.swift`.
 - `OptionControls.swift`: the precedent is `OptionControls+Choices.swift`.
 - `VideoPane.swift`: a section out as an extension, the precedent `VideoPane+Obscure.swift`.
-- `AgentServer+Clips.swift`: the clip-placement handlers against the property doors.
+- `AgentServer+Clips.swift`: the property doors (`// MARK: - Properties`, `set_video` …
+  `set_transition_duration`) to `AgentServer+Properties.swift`. The action handlers went to
+  `AgentServer+Actions.swift` in issue batch B87 phase 2.
+- `AgentCatalog+Clips.swift`: the action rows went to `AgentCatalog+Actions.swift` in issue batch
+  B87 phase 2; the property rows and the hoisted vocabularies they read are the next cut, together.
 - `AgentServer+Scope.swift`: the envelope rule (`checkCallScope`, `effectiveScope`, `idScope`,
   `addressed`, `checkDocumentLevelTicks`, `scopeLanding`, `scopeFailure`) against `set_scope` the
   tool (`setScope`, `nestScopePath`, `pathToClip`, `applyNestScope`, `commonPrefix`,

@@ -33,11 +33,13 @@ import Foundation
 /// `groupsProperty`. Of those three only their SENTENCES are left: the
 /// structure each of them hand-wrote is the core's now.
 ///
-/// **The actions travel with the clips**, which is the one decision in the
-/// cut: `set_action_end` takes the very `video` / `audio` / `text` patches
-/// `set_video`, `set_audio` and `set_text` take, so a boundary between them
-/// would have left one vocabulary spelt on both sides of it — and an action is
-/// a clip's own span in CLIP time, not an object of its own.
+/// **The five action rows are `AgentCatalog+Actions.swift`'s** (issue batch
+/// B87 phase 2, a pure move so their graphic prose could land under the cap),
+/// appended to this array last by `actionTools`, so the catalog's order is
+/// unchanged. The cut spells no vocabulary twice: the action rows NAME
+/// set_video's, set_audio's and set_text's keys rather than printing them,
+/// and the one hoisted local they read, `zoomRegionDescription`, went with
+/// them.
 ///
 /// What stayed behind is what a SECOND group also asks: `ticks` is every
 /// group's, the track sentence is Tracks' as well and the colour sentence is
@@ -227,19 +229,6 @@ extension AgentServer {
         let clipPatchDescription: String =
             "name and/or label; a key set to null clears it. Labels are the marker colours: "
             + "\(labelNames.joined(separator: ", "))."
-        // `add_zoom_action`'s region, the one argument whose own MEMBERS the
-        // core declares and refuses by name (`core/src/edit_zoom.rs`), so the
-        // four of them arrive printed, required and closed, and what is left
-        // to say here is the frame they are measured in. The sentence says
-        // what each member means, which is why the per-member descriptions
-        // this hand-written property used to carry are not missed: a
-        // region's members are part of a VALUE, not arguments of the op.
-        let zoomRegionDescription =
-            "The rectangle to zoom to, in SOURCE pixels: x and y are its "
-            + "CENTRE measured from the centre of the clip's cropped rect — the frame "
-            + "video.spotlight and video.obscure use — and width and height its size. "
-            + "null is a zoom BACK to the clip's own scale and position; the key is "
-            + "required so a forgotten rectangle cannot become that by accident."
         var rows: [[String: Any]] = [
 
             // MARK: Clips
@@ -587,10 +576,11 @@ extension AgentServer {
                     + "target lacks, is an error, and so is a value the inspector would refuse. "
                     + "`graphic` travels only when NAMED (Edit ▸ Paste Graphic Properties): the "
                     + "props, whole, onto clips drawn by the SAME graphic, each keeping its name, "
-                    + "size, in and length; a clip of another graphic is an error naming both. "
-                    + "The props are checked for shape only, when a target takes them. Speed, "
-                    + "enabled, actions, the transition and the clip's own name and label stay. "
-                    + "Refused (no change) when nothing changes.",
+                    + "size, in and length, and any prop the payload lacks that an action on that "
+                    + "clip animates, which stays so the ramp keeps its start; a clip of another "
+                    + "graphic is an error naming both. The props are checked for shape only, when "
+                    + "a target takes them. Speed, enabled, actions, the transition and the clip's "
+                    + "own name and label stay. Refused (no change) when nothing changes.",
                 [
                     "clips": clipsDescription,
                     "payload": "What Copy wrote, {\"clips\": [...], \"media\": [...]}; see paste.",
@@ -709,86 +699,8 @@ extension AgentServer {
                     + "with the clip before it equals that. Refused on a track's first clip and past "
                     + "half the shorter clip (snapped down), naming that limit.",
                 ["clip": clipDescription, "duration": "Overlap length, \(ticks)"]),
-
-            // MARK: Actions
-
-            opTool(
-                "add_action",
-                "Adds an animation span to a clip: over `duration` starting at `at`, the clip's "
-                    + "properties ease from whatever they are to the span's END state. The end "
-                    + "state starts EMPTY — nothing changes until set_action_end fills it in. "
-                    + "`at` is CLIP time, measured from the clip's own start, not the "
-                    + "timeline's. Refused when it would overlap another action or run past the "
-                    + "clip's end. The new action's id comes back as new_actions.",
-                [
-                    "clip": clipDescription,
-                    "at": "Where the animation starts, in CLIP time, \(ticks)",
-                    "duration": "How long it runs \(ticks) Default 1 s (600000).",
-                ]),
-            opTool(
-                "add_zoom_action",
-                "Adds an animation that zooms the picture to a rectangle — the screencast "
-                    + "zoom, and what the canvas's Z mode and the Video tab's Zoom to Region… "
-                    + "both send. Over `duration` starting at `at`, the clip's scale, x and y "
-                    + "ease to the values that bring `region` to the canvas: `fit` shows the "
-                    + "whole region, `fill` covers the whole canvas, both measured THROUGH the "
-                    + "clip's rotation. `region: null` is a zoom BACK — the end state is the "
-                    + "clip's own base scale, x and y. `at` is CLIP time, measured from the "
-                    + "clip's own start. Rotation and crop are read from the clip as it is at "
-                    + "`at`, and the scale is clamped to the layer maximum with the position "
-                    + "computed from the clamped value, so a region too small to fill the "
-                    + "canvas still lands centred. Refused when it would overlap another "
-                    + "action or run past the clip's end; an error on a clip with no picture. "
-                    + "The new action's id comes back as new_actions, and set_action_end adds "
-                    + "to what the same action animates.",
-                [
-                    "clip": clipDescription,
-                    "at": "Where the zoom starts, in CLIP time, \(ticks)",
-                    "duration": "How long it runs \(ticks) Default 1 s (600000).",
-                    "region": zoomRegionDescription,
-                    "fit": "fit shows the whole region (the default); fill covers "
-                        + "the whole canvas, cropping whatever the region's shape does not "
-                        + "match.",
-                    "curve": "How the zoom eases. Default ease_in_out, not linear: "
-                        + "a zoom that starts and stops abruptly is the thing this exists "
-                        + "to avoid.",
-                ]),
-            opTool(
-                "set_action",
-                "Moves or re-times an action, or changes its easing curve. Same overlap checks "
-                    + "as add_action.",
-                [
-                    "clip": clipDescription,
-                    "action": "Action id (get_project lists each clip's actions).",
-                    "start": "New start in CLIP time, \(ticks)",
-                    "duration": "New length, \(ticks)",
-                    "curve": "How the values ease from start to end.",
-                ]),
-            opTool(
-                "set_action_end",
-                "Sets what an action animates TO. The patch is the action's end state and MERGES "
-                    + "into it key by key at every depth (a one-key shadow keeps the rest of it); a "
-                    + "key set to null is REMOVED from the end state, so that property stops being "
-                    + "animated. Groups are video, audio and text, with the same keys as set_video "
-                    + "/ set_audio / set_text — a colour is FOUR numbers here too, and a bad key or "
-                    + "value is refused by its path with the group in it (video.filters[1].kind), "
-                    + "though values are NOT range-checked: an animation may aim past what a stored "
-                    + "property could hold. ONE exception: video.motion is refused, a preset being "
-                    + "anchored to the clip's two ends rather than a value to ramp between. Set it "
-                    + "with set_video.",
-                [
-                    "clip": clipDescription,
-                    "action": "Action id.",
-                    "patch": "{video?: {...}, audio?: {...}, text?: {...}} — the "
-                        + "properties the animation ends at.",
-                    "off": "\"group.key\" paths (video.shadow, text.width) to switch OFF at the "
-                        + "end — stored as null, where a null in patch removes. Optional keys only.",
-                ]),
-            opTool(
-                "remove_action",
-                "Removes an animation span. The clip keeps its base properties.",
-                ["clip": clipDescription, "action": "Action id."]),
         ]
+        rows += actionTools(ticks: ticks, clipDescription: clipDescription)
         return rows
     }
 }
