@@ -705,9 +705,11 @@ the key map behind it.
   four typed ones derive a row's DEFAULT from its own `read` and `ops` unless `resets: false`;
   `inspectorRow(discrete:)` makes a row discrete — "at end" — when its control is none of the
   popup, checkbox or segmented control: the graphic string row and the Text tab's Content area;
-  a row's widest `OptionPopupControl` holds its intrinsic width only at compression resistance
-  749, below the one-line tag's 750, so a keyed row short of room narrows that popup and never
-  the tag (O8, G-34 (l): Font ▸ Family, a filter's and an obscure region's kind)) ·
+  a row's widest `OptionPopupControl` — or, in a row with none, its widest
+  `OptionCheckboxControl`, clipped to its bounds so its title stops at its edge — holds its
+  intrinsic width only at compression resistance 749, below the one-line tag's 750, so a keyed
+  row short of room narrows that control and never the tag (O8, G-34 (l): Font ▸ Family, a
+  filter's and an obscure region's kind, a module's boolean with a long label)) ·
   `InspectorSlider.swift` (`InspectorSliderControl`, a pure move: the 7 × 11
   block knob snapped to device pixels (CI-6) and, keyed, the mint segment
   from the action's start value and the coral playhead tick) ·
@@ -747,7 +749,7 @@ the key map behind it.
   `set_graphic` (`graphic.props.<key>`, and `graphic.<key>` for width/height/length, so those rows
   are ⊘) and an end's `graphic.props.<key>`; `InspectorRowTag` is one line
   (`maximumNumberOfLines = 1`) so a row short of room narrows a CONTROL — the string field (O1) or
-  the row's widest popup (`inspectorRow`, O8) — never the tag; a row's paths come from the ops it WRITES,
+  the row's widest popup, else its widest checkbox (`inspectorRow`, O8) — never the tag; a row's paths come from the ops it WRITES,
   `writes:` / `follows:`, and an un-annotated row is `.none`, never ⊘) ·
   `InspectorRowMenu.swift` (`InspectorRowView`, the row's stack: its own
   tracking area sets the gutter's hover, and its context menu — Remove from

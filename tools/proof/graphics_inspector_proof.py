@@ -120,7 +120,15 @@ K1–K18 (issue batch B87 phase 3, #239, spec §11 G-34 (l); after I21, before I
     out at `DS.panelWidth` Font ▸ Family's popup narrows below 150 so its "at end" is
     whole and inside the panel's inset — the CONTROL gives way, never the tag (O8;
     CONTROL: the font not keyed, no tag and exactly 150); K18b the same action keys a
-    filter and an obscure region, and in each row only the widest popup gives way.
+    filter and an obscure region, and in each row only the widest popup gives way;
+    K18c (issue batch B87 phase 4) six's `showBox` relabelled "Show the long
+    descriptive label for this toggle" and keyed: in a row with no popup the
+    checkbox narrows below its own width so its "at end" is whole and inside the
+    inset, its compression resistance below the tag's (a tie at 750 is what the
+    solver happens to break the right way here), and the row's cached drawing
+    has no ink between the checkbox and the tag and none over the tag beyond
+    the tag's own (its title cut at its edge) while the checkbox's frame has
+    some (CONTROL: not keyed, no tag and the checkbox exactly its own width).
 I15 (B8, last) a second `six` clip; the two hold logo "a.png" and "b.png" and
     both are selected: the Logo popup is `["None", "red.png", "a.png",
     "b.png"]`, and the signature holds "red.png,a.png,b.png".
@@ -184,7 +192,13 @@ Issue batch B87 phase 3 adds K12 to `stale` and sixteen more (a bare K id in
   content-continuous the Text tab's Content row is not discrete — K16;
   reset-to-base      Properties' Reset ignores the selected action — K17;
   popup-fixed-width  a row's widest popup holds its width against the tag (its
-                     compression resistance required, not 749) — K18a K18b (O8).
+                     compression resistance required, not 749) — K18a K18b (O8);
+                     since phase 4 the same 749 is a popup-less row's widest
+                     checkbox's, so K18c too.
+Issue batch B87 phase 4 adds two more:
+  checkbox-fixed-width  a row with no popup gives no checkbox the 749 — K18c (O8);
+  checkbox-title-unclipped  the narrowing checkbox is not clipped to its
+                     bounds, so its title draws on under the tag — K18c.
 """
 
 import argparse
@@ -359,7 +373,13 @@ MUTANTS = {
         "GraphicPane.swift", "if binding.selectedAction != nil {", "if false {", ["K17"]),
     "popup-fixed-width": (
         "InspectorRows.swift", "NSLayoutConstraint.Priority(749), for: .horizontal)",
-        ".required, for: .horizontal)", ["K18a", "K18b"]),
+        ".required, for: .horizontal)", ["K18a", "K18b", "K18c"]),
+    "checkbox-fixed-width": (
+        "InspectorRows.swift", "(popups.isEmpty ? checks : popups)", "popups", ["K18c"]),
+    "checkbox-title-unclipped": (
+        "InspectorRows.swift",
+        "        if narrowing is OptionCheckboxControl { narrowing.clipsToBounds = true }\n",
+        "", ["K18c"]),
 }
 
 
@@ -375,7 +395,7 @@ def expected_names(expected, names):
     return out
 
 K_IDS = ["K1", "K2", "K3a", "K3b", "K4", "K5", "K6a", "K6b", "K7", "K8", "K9", "K10", "K11",
-         "K12", "K13", "K14", "K15a", "K15b", "K16", "K17", "K18a", "K18b"]
+         "K12", "K13", "K14", "K15a", "K15b", "K16", "K17", "K18a", "K18b", "K18c"]
 
 RESULTS = []
 

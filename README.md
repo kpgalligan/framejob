@@ -317,7 +317,11 @@ schema, §6 the op table, §7 the architecture.
   Graphics… and Add Image to Graphics…, and reads the API from Help ▸
   Graphics Reference. An agent can do the whole job over MCP: read the
   reference, write a module, look at its frames without placing it, bring in
-  a font or a picture, put it on the timeline and change its properties. The
+  a font or a picture, put it on the timeline and change its properties. A
+  graphic's properties can be animated by an action like any other
+  property: numbers and colours ramp across it, and text, a checkbox or a
+  menu switches at its end. A person selects the action and edits its end in
+  the Graphic sub-tab; an agent does the same with `set_action_end`. The
   module's standard library measures a path, finds a point along it and
   draws it on. The
   project keeps the last 10 versions of each graphic's code in

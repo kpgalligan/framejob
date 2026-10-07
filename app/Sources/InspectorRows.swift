@@ -34,11 +34,20 @@ func inspectorRow(
     // popup keeps its width only below the one-line tag's compression
     // resistance (750), so a keyed row short of room — Font ▸ Family's 150,
     // a filter's kind — narrows that popup to show "at end" whole. With no
-    // tag showing the row has room and the popup is its full width.
-    controls.compactMap { $0 as? OptionPopupControl }
-        .max { $0.intrinsicContentSize.width < $1.intrinsicContentSize.width }?
-        .setContentCompressionResistancePriority(
+    // tag showing the row has room and the popup is its full width. A row
+    // with no popup gives its widest checkbox the same 749, so a module's
+    // boolean with a long label narrows and the tag stays whole; the checkbox
+    // draws its title from a point, so it is clipped to its own bounds rather
+    // than drawing on under the tag.
+    let popups: [NSView] = controls.compactMap { $0 as? OptionPopupControl }
+    let checks: [NSView] = controls.compactMap { $0 as? OptionCheckboxControl }
+    if let narrowing = (popups.isEmpty ? checks : popups)
+        .max(by: { $0.intrinsicContentSize.width < $1.intrinsicContentSize.width })
+    {
+        narrowing.setContentCompressionResistancePriority(
             NSLayoutConstraint.Priority(749), for: .horizontal)
+        if narrowing is OptionCheckboxControl { narrowing.clipsToBounds = true }
+    }
     var views: [NSView] = [gutter]
     if let field {
         field.translatesAutoresizingMaskIntoConstraints = false

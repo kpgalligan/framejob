@@ -16540,3 +16540,42 @@ fail, 0 new layout problems.
 **Limits.** No row is timed. The inspector predicts no refusal (an end the core
 refuses beeps and shows its sentence, as on every tab). G-34's accepted limits
 stand (no per-prop opt-out, no asset ends, no OKLab).
+
+## Issue batch B87 phase 4 — a long checkbox label gives way to "at end" (`graphics_inspector_proof.py` K18c and two more mutants; #239, spec §11 G-34 (l))
+
+**What it proves.** O8's last gap: a row with no popup gives its widest
+checkbox the 749 (`inspectorRow`), so a module's boolean whose label is longer
+than about 200 pt narrows while keyed and its "at end" stays whole. K18c
+relabels six's `showBox` "Show the long descriptive label for this toggle" —
+wider than the keyed row's 222 pt and narrower than the unkeyed row's 264 pt in
+both the app's Source Sans 3 (228) and the system face the probe draws in
+(260) — keys it, and lays Properties out at `DS.panelWidth`, held: the
+checkbox 222/260, its compression resistance 749 against the tag's 750, the
+tag 40/40 inside the inset; not keyed, no tag and the checkbox 260/260. The
+checkbox draws its title from a point and a view does not clip to its bounds
+by default (macOS 14 on), so a narrowed one drew its title on under the tag;
+the rule clips that checkbox, and K18c reads the row's cached drawing: no ink
+between the checkbox and the tag, and over the tag exactly the tag's own ink
+alone (409 against 409). The priority is asserted, not only the widths: with
+the checkbox and the tag tied at 750 this solver happens to narrow the
+checkbox anyway (measured under `checkbox-fixed-width` before the assertion,
+checkbox 222 and tag 40/40), and a tie is an ambiguity, not a rule. The gap is
+read with the tag-region comparison because the first form, the 3 pt gap
+alone, landed on the space between "this" and "toggle" and missed the spill.
+
+| Mutant | Anchor | Must fail | Answer |
+|---|---|---|---|
+| `checkbox-fixed-width` | `InspectorRows.swift` `(popups.isEmpty ? checks : popups)` → `popups` | K18c | `MUTANT PASS`, exactly that, 111 s (compression resistance 750 against 750; over the tag 840 against 409) |
+| `checkbox-title-unclipped` | `InspectorRows.swift` the `if narrowing is OptionCheckboxControl { narrowing.clipsToBounds = true }` line deleted | K18c | `MUTANT PASS`, exactly that, 116 s (over the tag 840 against 409) |
+| `popup-fixed-width` | (phase 3) now fails K18c too: the same 749 is the checkbox's | K18a K18b K18c | `MUTANT PASS`, exactly those, 116 s (the checkbox 1000, 258/260, the tag cut to 4/40) |
+
+**Its record** (2026-10-07, `powermode 0`): `graphics_inspector_proof.py`
+91/91, exit 0, Z1 empty, no `DEFAULTS MOVED`; the three mutants above
+`MUTANT PASS`. The other 27 mutants were not run again: none has an anchor in
+`InspectorRows.swift`, and K18c writes its end through the probe's own
+`set_action_end` (as K3 and K11 do) and reads only layout and drawing.
+`clip_inspector3_proof.py` 31/31 and `clip_inspector4_proof.py` 46/46,
+`spec_index_proof.py` 141/141.
+The first run of K18c (91 rows, 90 passed) failed it on its own fixture: the
+label was "… for this toggle box", 282 pt in the probe's face, wider than the
+unkeyed row.

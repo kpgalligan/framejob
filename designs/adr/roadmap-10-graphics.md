@@ -20,7 +20,8 @@
   G-7 a graphic draws at its own frozen size, premultiplied BGRA across the FFI;
   G-8 a failure draws an error card, answers the agent, and stops an export;
   G-9 a graphic's own timeline is `in` + `length`, and `split` pins it;
-  G-10 props are not action targets;
+  G-10 props are not action targets (its props half superseded by G-34,
+  #239, below);
   G-11 plain JavaScript, one ES module, no TypeScript;
   G-12 colour props are CSS strings normalised to hex;
   G-13 the revision is a SHA-256 content hash, and an export pins it;
@@ -302,7 +303,6 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   A 50 MB string is built but cannot be read out of a 64 MB heap at all; the
   engine's own sentence says so.
 - **Deliberately not built** (orig §7):
-  - keyframed props (G-10) — wanted, #239;
   - mattes or video input to a graphic — wanted, #240;
   - system fonts as an opt-in — CLOSED by the owner 2026-10-04: Add Font to
     Graphics… / `import_graphic_font` already puts a face in the package and
@@ -317,9 +317,10 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   G-27..G-29), path helpers (issue batch B85 phase 1, spec §11 G-31:
   `graphic/src/path.js`), `paste_attributes` for graphics (issue batch B85
   phase 2, spec §11 G-32: the `graphic` group and Edit ▸ Paste Graphic
-  Properties), and named CSS colours and `hsl()` in a `color` prop and in
+  Properties), named CSS colours and `hsl()` in a `color` prop and in
   `interpolateColors` (#219: `core/src/model_color.rs`,
-  `docs/graphics-api.md`'s schema table and `interpolateColors` section).
+  `docs/graphics-api.md`'s schema table and `interpolateColors` section),
+  and keyframed props (#239, spec §11 G-34: the section below).
 - **The watcher:** each module, font and asset file has its own source, but
   a store arms at most 16 of them per pass (`GraphicStore.fileSourceLimit`),
   modules first, then fonts, then assets, each in name order; an in-place
@@ -1143,6 +1144,68 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   and no mutant run: no anchor is in the proof. Owed as before, with the
   `CLAUDE.md` text now following the amended arm.
 
+## Keyframed props (#239, spec §11 G-34)
+
+Issue batch B87, 2026-10-07, four phases after the owner answered I-239's
+seven choices "as recommended" (G-34's preamble names which sub-entry holds
+each; the paste answer is G-34 (d)). G-10's props half is superseded; its
+layer half and G-32 (h) stand.
+
+- **Phase 1, the core rule (826439d).** Toll A first, gated alone:
+  `actions.rs`'s clamps to `actions_clamp.rs`. Then `set_action_end` takes
+  `graphic.props` with an app-filled `schema` (`edit_action_graphic.rs`);
+  the end stores each prop's schema type in `kinds` (a caller's is
+  discarded); a prop the clip lacks starts from the schema's default,
+  written into the clip in the same step (G-34 (d)); `actions_graphic.rs`
+  evaluates — a number in floating point, never rounded, a colour four
+  channels straight, everything else switching at the end; the recipe draws
+  the evaluated props, `split` carries them, and `set_graphic`'s and
+  `paste_attributes`' nulls keep an animated prop's start. Format version 13.
+  Measured: `cd core && cargo test --release` 1082 passed (three new
+  binaries, `graphic_actions.rs`, `graphic_action_door.rs`,
+  `schema_v13.rs`); seventeen mutants (M1–M16, M2 in two forms), each
+  failing its named test.
+- **Phase 2, the agent's door (34c11e4).** Toll B first, gated alone (the
+  action handlers and catalog rows to `AgentServer+Actions.swift` and
+  `AgentCatalog+Actions.swift`, the bundle's catalog equal to the
+  baseline's). The `set_action_end` handler fills `schema` from the
+  CURRENT revision of the clip's module, in the call's scope; the tool's
+  prose and `docs/graphics-api.md`'s "Animating a prop from the timeline".
+  Measured: `graphic_prop_action_proof.py` 17/17 — `render_frame` mid-action
+  equals a still clip holding the evaluated values byte for byte, a string
+  switches on the end tick, undo and redo restore the bytes, the export with
+  the prefetch on equals it off — and its two mutants
+  (`handler-no-schema`, `recipe-stored-props`) caught.
+- **Phase 3, the Graphic tab (242c33d).** Tolls C and D first, each gated
+  alone (`ActionSnapshot.swift`, `InspectorRows.swift`). With an action
+  selected the Properties rows read and write the action's END (G-34 (l)):
+  ◆ and "at end", the mint segment and playhead tick, ×, Clear, `◆N` with a
+  stale end key counted, the end's own stale rows, ⊘ on Width, Height and
+  Follow Clip, Reset writing the end, the band's label naming graphic keys.
+  The row tag became one line, and a keyed row short of room narrows a
+  CONTROL, never the tag (O8). Measured: `graphics_inspector_proof.py`
+  90/90 with 27 mutants caught; `clip_inspector3_proof.py` 31/31,
+  `clip_inspector4_proof.py` 46/46; `screens.py` 07b.
+- **Phase 4, the close-out (this record).** O8's one gap: a module's
+  boolean whose label is longer than about 200 pt tied with the tag at
+  compression resistance 750. `inspectorRow` now gives a row with no popup
+  its widest checkbox the 749 and clips that checkbox to its bounds — its
+  title had drawn past them into the tag (`clipsToBounds` is off by
+  default since macOS 14). Measured: `graphics_inspector_proof.py` 91/91
+  with K18c (keyed, the checkbox 222 of its 260 at 749 against the tag's
+  750, the tag 40/40, no ink of the title beside or over the tag), its
+  mutants `checkbox-fixed-width` and `checkbox-title-unclipped` caught, and
+  `popup-fixed-width` now failing K18c too. Left alone: the checkbox is
+  `OptionControls.swift`'s, carried from Rasterize unforked, so its title is
+  cut at its edge rather than ended in an ellipsis.
+
+Owed: the person's checks CT-8 (a keyed graphic row's look, both
+appearances) and GR-8 (a 4K animated prop plays without stutter, G-34 (g))
+in `docs/manual-checks.md`. Left out by G-34's accepted limits and filed
+as issues: a per-prop `animate: false` opt-out for module authors
+(#248), an asset prop in an action (#249) and an OKLab
+blend beside the channel blend (#250).
+
 ## Open items
 
 - G6's rest — playback prefetch, in-place raster (`graphic/src/raster.rs`)
@@ -1157,8 +1220,11 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   - `validate` accepts a graphic clip with no description.
 
   Tracked in #72.
-- The not-built list: keyframed props — #239; mattes or video input —
-  #240. (HEVC with alpha was on it and is built: spec §11 G-33.)
+- The not-built list: mattes or video input — #240. (HEVC with alpha and
+  keyframed props were on it and are built: spec §11 G-33, G-34.)
+- G-34's accepted limits, as candidates: the per-prop opt-out
+  (#248), asset props in an action (#249), an OKLab blend
+  (#250).
 - Replacing QuickJS with JavaScriptCore — GitHub issue #39.
 
 ## Where to look in the original

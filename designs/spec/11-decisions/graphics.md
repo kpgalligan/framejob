@@ -1654,11 +1654,13 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   sliver instead of narrowing a control. What gives way is fixed by
   priority, below the tag's compression resistance (750): the one-line
   string field (≤ 170 required, == 170 at 249, O1) and, in `inspectorRow`,
-  the row's widest pop-up (its intrinsic width held at 749). A row with
-  room is untouched; the rows the tag leaves short at `DS.panelWidth` are
-  Font ▸ Family (150 → 140), a filter's kind (92 → 74) and an obscure
-  region's kind (96 → 74), each narrowing only while keyed and full width
-  otherwise (`graphics_inspector_proof.py` K18a, K18b).
+  the row's widest pop-up, or in a row with no pop-up its widest checkbox
+  (its intrinsic width held at 749). A row with room is untouched; the rows
+  the tag leaves short at `DS.panelWidth` are Font ▸ Family (150 → 140), a
+  filter's kind (92 → 74), an obscure region's kind (96 → 74) and a
+  module's boolean whose label is longer than about 200 pt (its title
+  cut at the checkbox's edge), each narrowing only while keyed and full width
+  otherwise (`graphics_inspector_proof.py` K18a, K18b, K18c).
   **Limits accepted (answer 3).** A clip's actions do not overlap, and one
   action has one span and one curve for everything it animates. There is
   no per-prop opt-out: a module's own animation composes by being handed

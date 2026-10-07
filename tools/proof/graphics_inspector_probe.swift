@@ -1237,6 +1237,93 @@ check("K18b the same action keys a filter and an obscure region; laid out at DS.
         + "row's widest popup (a filter's kind, a region's kind) is narrower than its own width (O8)",
       k18b.count == 2 && k18b.allSatisfy(\.ok), k18b.map(\.detail).joined(separator: " ¶ "))
 
+// K18c a module's boolean with a long label (O8, issue batch B87 phase 4): a row
+// with no popup gives its widest checkbox the 749, so keyed its title narrows and
+// "at end" is whole inside the inset; not keyed, the checkbox is its full width.
+// The label is wider than the keyed row's room and narrower than the unkeyed
+// row's in both the app's Source Sans 3 (228 pt with the box) and the system face
+// this probe draws in (260 pt); the rooms are 222 and 264. Keyed, the title is cut
+// at the checkbox's edge: the row draws nothing between the checkbox and its tag,
+// and over the tag no more than the tag draws alone. The checkbox and the tag tie
+// at 750 without the rule and this solver happens to narrow the checkbox anyway
+// (measured under `checkbox-fixed-width`), so the row also asserts the order of
+// the two priorities rather than lean on that pick.
+let showBoxLabel = "label: \"Show box\""
+let longBoxLabel = "Show the long descriptive label for this toggle"
+let showBoxLabels = sixSource.components(separatedBy: showBoxLabel).count - 1
+rewrite("six", sixSource.replacingOccurrences(
+    of: showBoxLabel, with: "label: \"\(longBoxLabel)\""))
+/// Ink (alpha above 0.1) in the columns of `rect` of `view`'s cached drawing.
+func ink(_ view: NSView, _ rect: NSRect) -> Int {
+    guard rect.width >= 1, let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds)
+    else { return -1 }
+    view.cacheDisplay(in: view.bounds, to: rep)
+    let scale = CGFloat(rep.pixelsWide) / view.bounds.width
+    var count = 0
+    for x in Int(ceil(rect.minX * scale))..<max(Int(ceil(rect.minX * scale)), Int(floor(rect.maxX * scale))) {
+        for y in 0..<rep.pixelsHigh where rep.colorAt(x: x, y: y).map({ $0.alphaComponent > 0.1 }) == true {
+            count += 1
+        }
+    }
+    return count
+}
+func checkboxLayout() -> (check: CGFloat, intrinsic: CGFloat, tag: CGFloat?, fitting: CGFloat,
+                          inside: Bool, spill: Int, own: Int, below: Bool, detail: String) {
+    guard let props = laidOut("graphic.properties", .graphic)
+    else { return (-1, 0, nil, 0, false, -1, -1, false, "no graphic.properties section") }
+    guard let found = checkboxRow(props, longBoxLabel),
+          let box = found.arrangedSubviews.first(where: { $0 is OptionCheckboxControl })
+    else { return (-1, 0, nil, 0, false, -1, -1, false, "no long-label checkbox row") }
+    let tag = walk(found).compactMap { $0 as? InspectorRowTag }.first { !$0.isHidden }
+    let limit = props.bounds.width - InspectorMetrics.inset
+    let tagMaxX = tag.map { $0.convert($0.bounds, to: props).maxX }
+    let rowMaxX = found.convert(found.bounds, to: props).maxX
+    let inside = (tagMaxX ?? rowMaxX) <= limit + 0.5 && rowMaxX <= limit + 0.5
+    // The row's ink between the checkbox's right edge and the tag's left (the
+    // stack's spacing), and inside the checkbox (a CONTROL that the cache drew).
+    let boxFrame = box.frame
+    let gapRect = tag.map {
+        NSRect(x: boxFrame.maxX + 0.5, y: 0, width: $0.frame.minX - boxFrame.maxX - 1,
+               height: found.bounds.height)
+    } ?? .zero
+    let gap = tag == nil ? 0 : ink(found, gapRect)
+    let overTag = tag.map { ink(found, $0.frame) } ?? 0
+    let tagAlone = tag.map { ink($0, $0.bounds) } ?? 0
+    let spill = gap + max(0, overTag - tagAlone)
+    let own = ink(found, boxFrame.insetBy(dx: 1, dy: 0))
+    let boxPriority = box.contentCompressionResistancePriority(for: .horizontal).rawValue
+    let tagPriority = tag?.contentCompressionResistancePriority(for: .horizontal).rawValue
+    let below = tagPriority.map { boxPriority < $0 } ?? false
+    return (box.frame.width, box.intrinsicContentSize.width, tag?.frame.width,
+            tag?.fittingSize.width ?? 0, inside, spill, own, below,
+            "compression resistance checkbox \(boxPriority) tag "
+              + "\(tagPriority.map { "\($0)" } ?? "-"); ink: gap \(gap) in \(gapRect.width) pt, "
+              + "over the tag \(overTag) against \(tagAlone) alone, checkbox \(own); "
+              + "checkbox \(box.frame.width)/\(box.intrinsicContentSize.width), tag "
+              + "\(tag.map { "\($0.stringValue) \($0.frame.width)" } ?? "hidden")"
+              + "/\(tag?.fittingSize.width ?? 0), tag maxX \(tagMaxX.map { "\($0)" } ?? "-"), "
+              + "row maxX \(rowMaxX), limit \(limit)")
+}
+fresh(["showBox": false])
+let k18cKeyed = checkboxLayout()
+resetEnd()
+let k18cPlain = checkboxLayout()
+rewrite("six", sixSource)
+let k18cOK: Bool = {
+    guard showBoxLabels == 1, let tag = k18cKeyed.tag else { return false }
+    return tag + 0.5 >= k18cKeyed.fitting && k18cKeyed.fitting > 0 && k18cKeyed.inside
+        && k18cKeyed.check > 0 && k18cKeyed.check < k18cKeyed.intrinsic
+        && k18cKeyed.spill <= 20 && k18cKeyed.own > 0 && k18cKeyed.below
+        && k18cPlain.tag == nil && k18cPlain.inside && k18cPlain.intrinsic > 0
+        && abs(k18cPlain.check - k18cPlain.intrinsic) < 0.5
+}()
+check("K18c six's showBox labelled \"\(longBoxLabel)\" and keyed: laid out at DS.panelWidth, "
+        + "its \"at end\" is at its fitting width and inside the panel's inset, the checkbox "
+        + "narrower than its own width at a compression resistance below the tag's, and its "
+        + "title drawn neither between it and the tag nor over the tag (the checkbox itself "
+        + "inked); CONTROL, not keyed: no tag, the checkbox exactly its own width (O8)",
+      k18cOK, "anchor \(showBoxLabels)× ¶ " + k18cKeyed.detail + " ¶ " + k18cPlain.detail)
+
 // K17 Properties' Reset writes the end (O7).
 resetEnd()
 properties = section("graphic.properties")
