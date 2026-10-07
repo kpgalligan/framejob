@@ -87,7 +87,7 @@ button is Record, and the script cannot hold its child inactive, so
 
 Built by `screens.py` on the first screen that names one, into
 `tools/proof/work/screens/fixtures/`, from `tools/proof/media/` (made by
-`tools/proof/README.md`'s recipe). Both are 960 × 540 at 30 fps on black.
+`tools/proof/README.md`'s recipe). All are 960 × 540 at 30 fps on black.
 
 - `empty` — `Empty.reelcut`: one track, "Track 1", no clips.
 - `demo` — `Demo.reelcut`: five tracks, back to front Video, Titles, Graphics,
@@ -108,6 +108,12 @@ Built by `screens.py` on the first screen that names one, into
   `demo` is ready once both sound clips' (`video`'s and `tone`'s) peaks are
   cached: `screens.py` polls `detect_silence` in level mode until it answers
   no `pending_peaks`, so every capture draws the Music clip's waveform band.
+- `animated` — `Animated.reelcut` (issue batch B87 phase 3): one track,
+  "Graphics", holding one clip, `graphic` — `lower-third` at 0, 5 s — with one
+  action at clip 1–3 s whose end keys `size` 96, `accent` "#2d7ff9" and
+  `boxed` false (`set_action_end`'s graphic group, spec §11 G-34). A playhead
+  inside the span selects the action (CI-1), so the Graphic tab shows the
+  action's end.
 
 ## Adding a screen
 

@@ -419,7 +419,7 @@ Files that were split since the notes wrote them:
 | `MediaCacheFiles` | `MediaPeakBuckets.swift`, `MediaImporter+Peaks.swift` (#23) |
 | `Playback` | `Playback+Meter.swift`, `Playback+PreviewQuality.swift`, `Playback+Step.swift` (B21; `onMain`, B53), `Playback+Scope.swift` (B30) |
 | `ReelCore` | `RecipeSource.swift`, `TextPatch.swift`, `MediaDescriptor.swift`, `OpDictionaries.swift` (#190) |
-| `InspectorPane` | `InspectorSection.swift`, `InspectorSectionHeader.swift`, `InspectorSlider.swift`, `InspectorBinding+Writes.swift`, `InspectorNameField.swift` (#171) |
+| `InspectorPane` | `InspectorSection.swift`, `InspectorSectionHeader.swift`, `InspectorSlider.swift`, `InspectorBinding+Writes.swift`, `InspectorNameField.swift` (#171), `InspectorRows.swift` (B87) |
 | `ClipPane` | `ClipSelectionHeader.swift`, `ClipPane+Timing.swift` |
 | `VideoPane` | `VideoPane+Obscure.swift`, `VideoPane+Speed.swift` (#190) |
 | `Transcriber` | `+Languages`, `+Jobs`, `+Extract`; `SpeechEngine.swift` |
@@ -457,8 +457,12 @@ What follows is only the SEAM each over-cap or at-edge file's record named, so t
 to pay a toll starts from it. A file not listed has no named seam yet.
 
 - `ProjectSnapshot.swift`: a property group's snapshot types out, whole. The precedents are
-  `TextProps.swift`, `ProjectSnapshot+Graphic.swift` and `MediaSnapshot.swift` (issue batch
-  B78, a pure move gated alone before `original` landed).
+  `TextProps.swift`, `ProjectSnapshot+Graphic.swift`, `MediaSnapshot.swift` (issue batch
+  B78, a pure move gated alone before `original` landed) and `ActionSnapshot.swift` (issue batch
+  B87 phase 3: `// MARK: - Actions`, `ActionPatch` and `ActionSnapshot`, a pure move gated alone
+  before `ActionGraphicPatch` landed). The next seam: the frame recipe (`// MARK: - Frame recipe
+  (spec §7.3)`) or the composition plan (`// MARK: - Composition plan (spec §7.2)`), each out
+  whole.
 - `ReelCore.swift`: the typed patches moved to `TypedPatches.swift` in issue batch B73 (#216), a
   pure move gated alone before `ReelContainer` landed; no further seam is named. The `dictionary`
   extensions went to `OpDictionaries.swift` in issue batch B52b (#190), the media helpers earlier
@@ -477,8 +481,12 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   the tool search.
 - `ProjectDocument.swift`: stored properties cannot move; the natural cut is the media/reverse
   machinery, in the shape of `+DisplayStem`, `+Import`, `+Graphics`.
-- `InspectorPane.swift`: the precedents are `InspectorSection.swift`, `InspectorSlider.swift` and
-  `InspectorBinding+Writes.swift`.
+- `InspectorPane.swift`: the precedents are `InspectorSection.swift`, `InspectorSlider.swift`,
+  `InspectorBinding+Writes.swift` and `InspectorRows.swift` (issue batch B87 phase 3: `// MARK: -
+  Row builders` through `changedRGBA`, a pure move gated alone before `inspectorRow(discrete:)`
+  and `graphicProps` landed). The next seam: the small labels and the multi-line text (`// MARK: -
+  Small labels`, `// MARK: - Multi-line text`: `InspectorRowLabel`, `InspectorMixedBadge`,
+  `InspectorTimecodeField`, `InspectorNoteLabel`, `InspectorTextArea`).
 - `ExporterWriter.swift`: the chapter half (`ExportChapter`, `textFormat`, `chapterSamples`,
   `chapterSample`) to `ExporterWriter+Chapters.swift`.
 - `OptionControls.swift`: the precedent is `OptionControls+Choices.swift`.

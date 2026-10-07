@@ -18,12 +18,14 @@ enum ClipSubTab: String, CaseIterable {
 
     /// The `◆N` badge (spec §11 CI-6): how many KEYS of an action's end patch
     /// this tab's sections write. Motion lives on Clip, so Picture counts the
-    /// video keys without it; a shape's props are not animatable.
+    /// video keys without it; a shape's props are not animatable; Graphic
+    /// counts the end's `graphic.props`, a key its module no longer declares
+    /// included (CI-6 amended, G-34 (l)).
     func keyedCount(in end: ActionPatch) -> Int {
         switch self {
         case .text: return end.text?.dictionary.count ?? 0
         case .shape: return 0
-        case .graphic: return 0
+        case .graphic: return end.graphic?.props.count ?? 0
         case .picture: return end.video?.dictionary.keys.filter { $0 != "motion" }.count ?? 0
         case .sound: return end.audio?.dictionary.count ?? 0
         case .clip: return end.video?.dictionary["motion"] == nil ? 0 : 1

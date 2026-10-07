@@ -312,7 +312,9 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   stored" agree. A colour is equal by its parsed channels (the core accepts
   any string as a colour default and normalises only stored values). A
   default the four hex forms cannot parse (a named colour, `rgb()`) shows
-  as transparent black, and its Reset writes `null`.
+  as transparent black, and its Reset writes `null`. (Amended by G-34 (l):
+  with an action selected a row writes the value itself into the action's
+  end, never `null`.)
   (c) **Stale keys are listed sorted by key** — the stored props reach the
   app as a dictionary, which has no order. ⌫ writes `{key: null}` with no
   schema; a `null` always removes (G-4).
@@ -1617,6 +1619,46 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   found. A file of version 12 or older whose end already names `graphic`
   (hand-written or pasted; G-10 kept it inert) now animates by these
   rules, its colours switching at the end for want of `kinds`.
+  (l) **The Graphic tab** (issue batch B87 phase 3, 2026-10-07). With an
+  action of a graphic clip selected, the Properties rows show the selected
+  action's END state (`clip_state`'s `graphic`, CI-2), and a row's write is
+  ONE `set_action_end` naming `graphic.props.<key>`, carrying the module's
+  current schema, filled by the app ((c)). The end takes the value itself,
+  never `null`, because a `null` in an end removes ((j)); G-15 (b)'s null
+  rule stays the base's. An asset is the base's: its row writes
+  `set_graphic` as before, marked ⊘ and still changing the clip, the way
+  CI-3 sends a structural write to the base. With no action selected every
+  row writes `set_graphic`, as before. The owner's answers, all as
+  recommended: a keyed string row's one-line field narrows by about 35 pt
+  and reads "at end" only while the selected action keys it, and is full
+  width otherwise (O1); a key the end names that its module no longer
+  declares gets a stale row of its own — ◆, the end's value and ⌫ ("The
+  module no longer declares <key> — remove it from action N") — beside the
+  clip's own stale row for that key (O2); a graphic action's band is
+  labelled with the prop keys its end changes ("accent, size"), and an
+  end's empty `graphic.props` does not stop a zoom being one (O3); the
+  Graphic sub-tab's and the Properties section's `◆N` count the keys of the
+  end's `graphic.props`, a stale key included (O4, CI-6 amended); the Text
+  tab's keyed Content row reads "at end" (O5). Two follow from answer 3
+  with CI-7 and CI-9: with an action selected, Width, Height and Follow
+  Clip show ⊘, since their writes never reach `set_action_end` and (a)
+  refuses those keys in an end (O6); and Properties' Reset writes the end
+  through the same split, each declared prop's default into the end and an
+  asset's `null` to the base (O7). ◇, Clear, the gutter's ×, the row menu's
+  "Set end value to default", the slider's mint segment and coral playhead
+  tick are the shared pattern (CI-6, CI-7, CI-9), not new rules.
+  **A row short of room: the CONTROL gives way, never the tag** (O8, on
+  every tab). Every row's "at end" / "now …" tag is one line
+  (`InspectorRowTag.maximumNumberOfLines = 1`): a wrapping tag gave its
+  width away by growing tall, so a row short of room squeezed it into a
+  sliver instead of narrowing a control. What gives way is fixed by
+  priority, below the tag's compression resistance (750): the one-line
+  string field (≤ 170 required, == 170 at 249, O1) and, in `inspectorRow`,
+  the row's widest pop-up (its intrinsic width held at 749). A row with
+  room is untouched; the rows the tag leaves short at `DS.panelWidth` are
+  Font ▸ Family (150 → 140), a filter's kind (92 → 74) and an obscure
+  region's kind (96 → 74), each narrowing only while keyed and full width
+  otherwise (`graphics_inspector_proof.py` K18a, K18b).
   **Limits accepted (answer 3).** A clip's actions do not overlap, and one
   action has one span and one curve for everything it animates. There is
   no per-prop opt-out: a module's own animation composes by being handed

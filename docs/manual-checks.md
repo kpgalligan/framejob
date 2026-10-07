@@ -24,8 +24,8 @@ in both appearances (System Settings ▸ Appearance, Light then Dark).
      `ffmpeg` lines under "Make the test media once" in
      `tools/proof/README.md` (into `tools/proof/media/`).
    - **Graphics projects** (GR): `python3 tools/proof/graphics_playback_samples.py`
-     builds `Playback-1080p`, `Playback-4K` and `Error-card` into
-     `tools/proof/work/playback-check/`. Rebuild them on a fresh checkout.
+     builds `Playback-1080p`, `Playback-4K`, `Error-card` and
+     `Playback-4K-animated` into `tools/proof/work/playback-check/`. Rebuild them on a fresh checkout.
    - **Keys**: your own AssemblyAI key for Cloud captions (Reelcut ▸
      Settings… ▸ Transcription) and your own Anthropic API key for the
      Assistant (Reelcut ▸ Settings… ▸ Assistant). No script ever uses a real
@@ -225,6 +225,11 @@ Run each in both appearances. An action is a keyframed segment (Clip ▸ Add Act
 - **Expect:** a header darkens one step with a quick fade, instantly with Reduce motion; its title, marks, summary and Reset/Clear stay legible; rows never darken.
 - **Source:** #102 (spec §11 CI-15, amended); the "clip" tag is clip_inspector7_proof.py T1, T2, T4 since #209.
 
+**CT-8 — A graphic's props under a selected action**
+- **Do:** 1. Insert ▸ Graphic ▸ Lower Third, select it, open Clip ▸ Graphic, add an action (⌥⌘K) and keep it selected. 2. Change Size, Align, the "boxed" checkbox, Title and the accent colour; set the timeline to L. 3. Scrub across the action; hover a keyed gutter; look at the Graphic sub-tab. 4. Rewrite the module without one of the props the action keys, then put it back. Use Properties' Clear. 5. With a module that has an image (`asset`) prop, pick an image in its row; look at Size's Width and Height and Timeline's Follow Clip. 6. On a text clip, select an action and change the Content and Font ▸ Family. Repeat in the other appearance.
+- **Expect:** ◆ on each keyed row; the mint border on the Size field and the Align pop-up only; "at end" after "boxed", Align and Title; a mint segment and a coral playhead tick on Size's slider; × on a hovered keyed gutter, Clear empties the action's props, and the Graphic sub-tab's `◆N` counts them; a prop the module no longer declares gets its own faint row with ◆ and ⌫ ("… remove it from action N"); an image row shows ⊘ and still changes the clip; Width, Height and Follow Clip show ⊘ with their sections' "Actions don't animate this" note; the action's band reads its keys sorted, "accent, align, boxed, size, title", cut short with "…" where the band is narrow, at L on both the timeline and the lane; the text clip's Content and Family rows read "at end", and the Title field and the Family pop-up, narrower only while keyed, still read cleanly (their widths are measured by K6b and K18; judge only the look). All of it in both appearances.
+- **Source:** #239 (issue batch B87 phase 3, spec §11 G-34 (l)); `graphics_inspector_proof.py` K1–K18 and screen 07b cover the arithmetic and the capture.
+
 ## Chrome and looks
 
 **CH-1 — The zoom slider and square controls**
@@ -397,10 +402,10 @@ Needs your own AssemblyAI key (Setup 3).
 
 ## Graphics
 
-Uses the three `tools/proof/work/playback-check/` projects (Setup 3).
+Uses the four `tools/proof/work/playback-check/` projects (Setup 3).
 
 **GR-1 — Graphics play, watched**
-- **Do:** 1. Open `Playback-1080p` at Preview Quality Full; play. 2. In each of the three projects: play, scrub, and loop an in/out range.
+- **Do:** 1. Open `Playback-1080p` at Preview Quality Full; play. 2. In each of `Playback-1080p`, `Playback-4K` and `Error-card`: play, scrub, and loop an in/out range.
 - **Expect:** `lower-third` and `kinetic-type` play smoothly; with no video beneath, the preview shows, Play runs, and scrub and loop look right.
 - **Source:** #56.
 
@@ -433,6 +438,13 @@ Uses the three `tools/proof/work/playback-check/` projects (Setup 3).
 - **Do:** 1. In a project with one graphic a clip uses, one no clip uses and one deleted (delete a third with File ▸ Delete Graphic…), open File ▸ Rename Graphic…, File ▸ Delete Graphic… and File ▸ Restore Graphic Version… in turn. 2. In Delete Graphic…, choose the graphic the clip uses and press Delete. 3. In Rename Graphic…, type a name on the keyboard. Repeat 1–3 in the other appearance.
 - **Expect:** in each sheet the wording reads whole and nothing looks cramped, loose or misaligned, in both appearances (Delete Graphic… has one row and the most empty space between its pop-up and its buttons); the refused Delete's sentence shows inside the sheet, which stays open and grows to hold it; the name typed lands in New name.
 - **Source:** #103.
+
+**GR-8 — An animated prop at 4K**
+- **Setup:** Low Power Mode off — `pmset -g | grep powermode` reads 0 before and after the run (if it does not, skip this check and note it). View ▸ Preview Quality ▸ Full.
+- **Do:** Play `Playback-4K-animated` through both actions (title-card's colours, then kinetic-type's stagger and accent).
+- **Expect:** no stutter through the two action spans.
+- **Answer:** stutter, yes or no. #127 (graphics performance) stays deferred either way.
+- **Source:** #239 (issue batch B87 phase 3, spec §11 G-34 (g)); the project is built by `graphics_playback_samples.py`.
 
 ## Screen recording
 

@@ -16425,3 +16425,118 @@ build (about 90 s here).
 **Limits.** No row is timed. The 4K playback of an animated prop is spec §11
 G-34's watched row for phase 3 (GR-8). One module, one action, one curve; the
 props' interpolation arithmetic itself is `core/tests/graphic_actions.rs`'s.
+
+## Issue batch B87 phase 3 — the Graphic tab edits a selected action's end (`graphics_inspector_proof.py` H0, K1–K18b, H3, H4 and sixteen more mutants; `screens.py` 07b; `graphics_playback_samples.py`'s `Playback-4K-animated`; #239, spec §11 G-34 (l))
+
+**What it proves.** With an action of a graphic clip selected, the Graphic
+sub-tab's Properties rows read the action's END (`InspectorBinding.graphicProps`)
+and a row's write is ONE `set_action_end` naming `graphic.props.<key>` with the
+module's current schema (`InspectorBinding.ops(graphic:…)`), an asset staying
+the clip's `set_graphic`; the rows carry the other tabs' marks — ◆, "at end"
+on the checkbox, the pop-up and the string row (whose 170 pt field narrows only
+while keyed), the mint segment and coral tick, ×, Clear and `◆N` (a stale end
+key counted, O4) — the end's own stale rows (O2), ⊘ on Width, Height and Follow
+Clip (O6), Reset writing the end (O7), the band's label naming graphic keys
+and the zoom test (O3), and the Text tab's keyed Content row reading "at end"
+(O5). A keyed row short of room narrows a CONTROL, never the tag (O8): K18a
+lays out the Text tab's Font section at `DS.panelWidth`, held there as
+`showPane` holds a pane, with the font keyed — Family's popup 140, "at end"
+40/40 inside the inset — and not keyed (150, no tag); K18b keys a filter and an
+obscure region on the same action, and only each row's widest popup gives way
+(a filter's kind 92 → 74 beside its order popup 76/76 and Remove 60/60; a
+region's kind 96 → 74). With no action selected every write is `set_graphic`,
+byte for byte as before.
+
+    python3 tools/proof/graphics_inspector_proof.py
+    python3 tools/proof/graphics_inspector_proof.py --mutant NAME     # every name in MUTANTS (27)
+    python3 tools/proof/screens.py --only 07-clip-graphic,07b-clip-graphic-action
+    python3 tools/proof/graphics_playback_samples.py                  # GR-8's project, built once
+
+The proof's one instance now runs under the scratch home
+`tools/proof/work/graphics-inspector/home` (`mcp.launch`, stopped by pid), H0
+its CONTROL. The same instance builds GIA (six on a clip, one action at 1–3 s
+keying a number, a colour, a boolean, an enum and a string), which H3/H4 render
+with the action selected at track size L. The K rows, the GIA fixture and the
+probe's guarded apply are in the script's docstring; the probe calls each
+control's OWN stored closure (`write`, the slider's `start`/`now`, the strip's
+`badge`) through a one-field struct, because `Mirror` hands a closure back at
+the wrong abstraction (measured: a cast `write(false)` wrote `true`, a
+`() -> Double?` answered 3e-314), and it applies an edit only when the core
+APPLIES it, because a mutant's invalid write (an asset in an end, an end with no
+schema) otherwise reaches `present(_:)`'s app-modal alert and hangs the probe
+(measured in the first mutant run).
+
+**The toll gate** (each pure move landed and gated alone before any behaviour
+change; the moved bytes equal `git show HEAD:<file> | sed -n '<range>p'`):
+toll C `ProjectSnapshot.swift` 1199–1259 → `ActionSnapshot.swift` and toll D
+`InspectorPane.swift` 304–597 → `InspectorRows.swift`, each `make typecheck` 0
+errors / 4 warnings, `make app` built, `graphics_inspector_proof.py` 66/66 and
+`clip_inspector3_proof.py` 31/31 — the baseline HEAD's own build gave.
+
+**The single-line row tag.** `InspectorRowTag` is `maximumNumberOfLines = 1`
+since this phase: its cell wrapped, so a row short of room squeezed "at end" to
+10 pt (growing tall) and the Title field kept 170 (K6b, and a standalone
+`NSStackView` reproduction: field 170 / tag 10 wrapping, field 139 / tag 41 with
+any single-line setting). At `DS.panelWidth` the keyed Title field is 140 pt
+and the tag whole (40/40); with nothing selected it is 170. A row with a popup
+gives way the same way since the fix pass (O8): `inspectorRow` holds the row's
+widest popup at compression resistance 749, below the tag's 750. A free host,
+as K6b's, grows past `DS.panelWidth` at that priority instead (measured: the
+section 314 wide, Family 150) — so K18 holds the section at the panel's width,
+as the app's pane is held by its clip view.
+
+**GR-8 is a person's row**, not a script (spec §11 G-34 (g); stutter is a
+judgment; this host has run in Low Power Mode): `graphics_playback_samples.py`
+builds `Playback-4K-animated` (3840×2160; `title-card` with an action over its
+whole length ending `{from: "#00c853", to: "#ffd60a"}`, then `kinetic-type`
+ending `{stagger: 20, accent: "#2d7ff9"}`) under the scratch home
+`tools/proof/work/playback-check/home`, with no persisting act, and prints each
+end as `get_project` reads it back. Run 2026-10-07: `{"graphic": {"kinds":
+{"from": "color", "to": "color"}, "props": {"from": "#00c853", "to":
+"#ffd60a"}}}` and `{"graphic": {"kinds": {"accent": "color", "stagger":
+"number"}, "props": {"accent": "#2d7ff9", "stagger": 20}}}`; parity complaints
+none. The owner runs `docs/manual-checks.md` GR-8 and CT-8.
+
+**Mutants** (each anchor asserted to occur once; exit 0 = exactly its rows
+failed; a bare K id names that one row). Measured 2026-10-07 on the final
+instrument, `powermode 0`:
+
+| Mutant | Anchor | Must fail | Answer |
+|---|---|---|---|
+| `row-writes-base` | `InspectorBinding+Writes.swift` `return (base.isEmpty ? nil : base, animated.isEmpty ? nil : animated)` → `return (values, nil)` | K2 K3a K4 K5 K6a K6b K7 K9 K11 K17 | `MUTANT PASS`, exactly those, 117 s |
+| `count-zero` | `ClipPinnedBlock.swift` `case .graphic: return end.graphic?.props.count ?? 0` → `case .graphic: return 0` | K3b K12 | `MUTANT PASS`, exactly those, 120 s |
+| `null-default-in-end` | `InspectorBinding+Writes.swift` `ActionGraphicPatch(props: $0)` → the end through `patchProps`' nulls | K9 K17 | `MUTANT PASS`, exactly those, 135 s |
+| `stored-read` | `InspectorPane.swift` `evaluated(clip).graphic ?? ` → `` | K3a K4 | `MUTANT PASS`, exactly those, 130 s |
+| `paths-flat` | `InspectorMarks.swift` the `if group == "graphic" { return graphicPaths(value) }` line deleted | K3a K10 K11 K13 | `MUTANT PASS`, exactly those, 118 s |
+| `string-continuous` | `GraphicSchemaRows.swift` `discrete: true` → `discrete: false` | K6a K6b | `MUTANT PASS`, exactly those, 115 s |
+| `title-fixed-width` | `GraphicSchemaRows.swift` the `width.priority = NSLayoutConstraint.Priority(249)` line deleted | K6b | `MUTANT PASS`, exactly those, 113 s |
+| `asset-to-end` | `InspectorBinding+Writes.swift` `let assets = Set(…)` → `let assets = Set<String>()` | K8 K17 | `MUTANT PASS`, exactly those, 113 s |
+| `schema-dropped` | `ReelOps.swift` `off: off.sorted(), schema: schema)` → `off: off.sorted())` | K2 K5 K9 K17 | `MUTANT PASS`, exactly those, 113 s |
+| `end-stale-dropped` | `GraphicPane.swift` `binding.selectedAction?.end.graphic?.props ?? [:]` → `[:]` | K12 | `MUTANT PASS`, exactly those, 113 s |
+| `layer-keys-unnamed` | `InspectorMarks.swift` `paths.append("graphic." + key)` → `_ = key` | K14 | `MUTANT PASS`, exactly those, 113 s |
+| `band-label-graphic-dropped` | `ActionBands.swift` the `if let graphic = patch.graphic { … }` line deleted | K15a | `MUTANT PASS`, exactly those, 113 s |
+| `zoom-graphic-nil` | `ActionBands.swift` `end.graphic?.props.isEmpty ?? true` → `end.graphic == nil` | K15b | `MUTANT PASS`, exactly those, 113 s |
+| `content-continuous` | `TextPane.swift` `discrete: true` → `discrete: false` | K16 | `MUTANT PASS`, exactly those, 113 s |
+| `reset-to-base` | `GraphicPane.swift` `if binding.selectedAction != nil {` → `if false {` | K17 | `MUTANT PASS`, exactly those, 124 s |
+| `popup-fixed-width` (fix pass 1, O8) | `InspectorRows.swift` `NSLayoutConstraint.Priority(749), for: .horizontal)` → `.required, for: .horizontal)` | K18a K18b | `MUTANT PASS`, exactly those, 125 s (Family 150 with its tag cut to 30/40; the filter row's order popup 58/76 and the region's Remove 38/60 gave way instead) |
+| `stale` | (existing) `staleKeys` answers `[]` | its five I5 rows and K12 | `MUTANT PASS`, exactly those, 140 s |
+
+The ten earlier mutants (`entry-signature`, `step-decimals`, `name-height`, `merged-asset-names`, `no-schema-memo`, `compile-warnings-dropped`, `folder-warnings-dropped`, `default-color-hex-only`, `compile-heading-dropped`, `first-frame-note-unconditional`) each `MUTANT PASS` on the same tree: 26 of 26, 0 survived, 0 not performed. A first run, before the probe's guarded apply, lost `asset-to-end` and `schema-dropped` to the hang above ("the probe runs" failed at the 300 s bound); every mutant was then run again on the final instrument.
+
+**Its record** (2026-10-07, `powermode 0`): `graphics_inspector_proof.py` 88/88,
+exit 0, no `DEFAULTS MOVED`, Z1 empty; probe built in 127 s; the GIA renders
+show ◆5 on the tab and Properties, Clear, the Title narrower with "at end",
+Size 150 with its mint segment and tick, Logo ⊘ and Size/Timeline ⊘ with their
+note, the band "align, color, sh…" at L. `screens.py --only
+07-clip-graphic,07b-clip-graphic-action` 7 pass / 0 fail, 0 new layout
+problems. `clip_inspector3_proof.py` 31/31 and `clip_inspector4_proof.py`
+46/46. Fix pass 1 (O8, 2026-10-07, `powermode 0`): `graphics_inspector_proof.py`
+90/90, exit 0, Z1 empty, no `DEFAULTS MOVED`; `popup-fixed-width` and
+`content-continuous` `MUTANT PASS`; `clip_inspector3_proof.py` 31/31,
+`clip_inspector4_proof.py` 46/46; `screens.py --only
+05-clip-picture,06-clip-text,07-clip-graphic,07b-clip-graphic-action` 9 pass / 0
+fail, 0 new layout problems.
+
+**Limits.** No row is timed. The inspector predicts no refusal (an end the core
+refuses beeps and shows its sentence, as on every tab). G-34's accepted limits
+stand (no per-prop opt-out, no asset ends, no OKLab).

@@ -59,7 +59,8 @@ final class TextPane: InspectorPaneView {
                 binding.textProps.isUntimedPage ? Self.untimedNote : nil
             },
             rows: [inspectorRow(nil, [area], binding: binding,
-                                writes: binding.ops(textContent: binding.textProps.content))])
+                                writes: binding.ops(textContent: binding.textProps.content),
+                                discrete: true)])
     }
 
     // MARK: Face

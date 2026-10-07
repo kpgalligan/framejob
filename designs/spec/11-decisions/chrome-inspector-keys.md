@@ -96,6 +96,9 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   pixels (`backingAlignedRect`, nearest) with the accent fill running to the
   snapped knob's centre; the accent fill is kept until phase 3's keyed
   segment replaces it.
+  **Amended 2026-10-07, by issue batch B87 (#239, G-34 (l))**: Graphic
+  counts the keys of the end's `graphic.props`, a key its module no longer
+  declares included, so the tab's and the Properties section's `◆N` agree.
 - **CI-7 — Every inspector row carries the 14 pt mark gutter, and the label
   stays 76** (road map 9 §5, the clip inspector redesign's phase 3a). The
   gutter is the FIRST view of every `inspectorRow`, blank when its mark is

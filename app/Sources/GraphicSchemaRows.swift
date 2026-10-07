@@ -8,9 +8,16 @@
 // **No state of its own.** Every function here is a function of its
 // arguments, so a probe can drive each one without a window.
 //
-// **A value equal to the schema's default is written as `null`** (spec §11
-// G-15): the key leaves the stored props and the module draws its own
-// default, which is exactly what Reset writes too. A colour is "equal" by
+// **Where a write goes** (spec §11 G-34 (l)): with no action selected every
+// row writes `set_graphic` to the clip; with one selected, a row reads the
+// action's END state (`InspectorBinding.graphicProps`) and writes it — one
+// `set_action_end` naming `graphic.props.<key>` with the module's schema —
+// through `InspectorBinding.ops(graphic:…)`, an asset still the clip's.
+//
+// **A value equal to the schema's default is written as `null`** to the
+// clip (spec §11 G-15): the key leaves the stored props and the module
+// draws its own default, which is exactly what Reset writes too. An end
+// takes the value itself, since a `null` there removes (G-34 (j)). A colour is "equal" by
 // its parsed channels, and a colour DEFAULT is read through the core's own
 // G-12 (`ReelColor.normalise`, spec §11 G-25), so a name or `hsl()` default
 // draws and matches as the colour it is; a default G-12 refuses does not
@@ -91,6 +98,22 @@ enum GraphicSchemaRows {
         return json(value)
     }
 
+    /// A base write's props: each value through `patchValue` against its
+    /// entry, and a key no entry declares as it is.
+    static func patchProps(
+        _ values: [String: GraphicPropValue], entries: [GraphicSchemaEntry]
+    ) -> [String: Any] {
+        var props: [String: Any] = [:]
+        for (key, value) in values {
+            if let entry = entries.first(where: { $0.key == key }) {
+                props[key] = patchValue(value, for: entry)
+            } else {
+                props[key] = json(value)
+            }
+        }
+        return props
+    }
+
     /// The stored keys `schema` does not declare, sorted — all of them when
     /// there is no compiled schema.
     static func staleKeys(stored: [String: GraphicPropValue], schema: GraphicSchema?) -> [String] {
@@ -129,8 +152,10 @@ enum GraphicSchemaRows {
     // MARK: - Rows
 
     /// One schema entry's row. Every `read` answers the default in the
-    /// binding's `.defaults` mode, so the builders' derived Reset works; every
-    /// write is one `set_graphic` over `clips()`.
+    /// binding's `.defaults` mode, so the builders' derived Reset works, and
+    /// otherwise the binding's mode's value (the selected action's end, its
+    /// start, the playhead); every write is `InspectorBinding.ops(graphic:…)`
+    /// over `clips()`.
     static func row(
         _ entry: GraphicSchemaEntry, _ binding: InspectorBinding,
         clips: @escaping () -> [ClipSnapshot], schema: [String: Any],
@@ -138,15 +163,13 @@ enum GraphicSchemaRows {
     ) -> NSView {
         let key = entry.key, name = "Graphic " + entry.label
         func stored() -> GraphicPropValue? {
-            binding.mode == .defaults ? nil : clips().first?.graphic?.props[key]
+            clips().first.map { binding.graphicProps($0)[key] } ?? nil
         }
         func current() -> GraphicPropValue { stored() ?? entry.default }
         func ops(_ value: GraphicPropValue) -> [ReelOp] {
-            let targets = clips()
-            guard !targets.isEmpty else { return [] }
-            return [op(clips: targets, props: [key: patchValue(value, for: entry)], schema: schema)]
+            binding.ops(graphic: value, for: entry, clips: clips(), schema: schema)
         }
-        let mixed = { binding.mixed(clips()) { $0.graphic?.props[key] } }
+        let mixed = { binding.mixed(clips()) { binding.graphicProps($0)[key] } }
         let view: NSView
         switch entry.type {
         case "number":
@@ -263,12 +286,19 @@ enum GraphicSchemaRows {
                 read: read, write: { [weak binding] in binding?.apply(name, write($0)) },
                 enabled: { true }, onEdit: { [weak binding] in binding?.edited() })
         if !entry.multiline {
+            // 170 wide, giving way only to the "at end" tag while the
+            // selected action keys the row (G-34 (l), O1).
             control.translatesAutoresizingMaskIntoConstraints = false
-            control.widthAnchor.constraint(equalToConstant: 170).isActive = true
+            control.widthAnchor.constraint(lessThanOrEqualToConstant: 170).isActive = true
+            let width = control.widthAnchor.constraint(equalToConstant: 170)
+            width.priority = NSLayoutConstraint.Priority(249)
+            width.isActive = true
+            control.setContentCompressionResistancePriority(
+                NSLayoutConstraint.Priority(248), for: .horizontal)
         }
         return inspectorRow(
             entry.label, [control], mixed: mixed, binding: binding, writes: write(read()),
-            default: .derived(binding, name: name, read: read, ops: write))
+            discrete: true, default: .derived(binding, name: name, read: read, ops: write))
     }
 
     /// A stored key the schema no longer declares: the key dimmed, its value,
@@ -277,6 +307,41 @@ enum GraphicSchemaRows {
         key: String, value: GraphicPropValue, _ binding: InspectorBinding,
         clips: @escaping () -> [ClipSnapshot]
     ) -> NSView {
+        let (label, readout) = staleLabels(key: key, value: value)
+        let remove = OptionButtonControl(
+            title: "⌫",
+            action: { [weak binding] in
+                let targets = clips()
+                binding?.apply(
+                    "Remove Graphic Property",
+                    targets.isEmpty ? [] : [op(clips: targets, props: [key: NSNull()], schema: nil)])
+            },
+            enabled: { true }, onEdit: {})
+        remove.toolTip = "The module no longer declares \(key) — remove the stored value"
+        return inspectorRow(nil, [label, readout, remove])
+    }
+
+    /// A key the selected action's END names that the schema no longer
+    /// declares (G-34 (l), O2): its row beside the clip's own, marked as the
+    /// end's, with ⌫ taking it out of the end — `clearOps`, no schema.
+    static func actionStaleRow(
+        key: String, value: GraphicPropValue, _ binding: InspectorBinding
+    ) -> NSView {
+        let (label, readout) = staleLabels(key: key, value: value)
+        let ops = binding.clearOps(["graphic.props." + key])
+        let remove = OptionButtonControl(
+            title: "⌫",
+            action: { [weak binding] in binding?.apply("Remove from Action", ops) },
+            enabled: { true }, onEdit: {})
+        let number = binding.selectedActionNumber.map { String($0) } ?? ""
+        remove.toolTip = "The module no longer declares \(key) — remove it from action \(number)"
+        return inspectorRow(nil, [label, readout, remove], binding: binding, writes: ops)
+    }
+
+    /// A stale row's key, dimmed, and its value.
+    private static func staleLabels(
+        key: String, value: GraphicPropValue
+    ) -> (InspectorRowLabel, NSView) {
         let label = InspectorRowLabel(key)
         label.textColor = DS.textFaint
         label.translatesAutoresizingMaskIntoConstraints = false
@@ -290,16 +355,6 @@ enum GraphicSchemaRows {
         }
         let readout = inspectorReadout(width: 110) { shown }
         readout.alphaValue = 0.55
-        let remove = OptionButtonControl(
-            title: "⌫",
-            action: { [weak binding] in
-                let targets = clips()
-                binding?.apply(
-                    "Remove Graphic Property",
-                    targets.isEmpty ? [] : [op(clips: targets, props: [key: NSNull()], schema: nil)])
-            },
-            enabled: { true }, onEdit: {})
-        remove.toolTip = "The module no longer declares \(key) — remove the stored value"
-        return inspectorRow(nil, [label, readout, remove])
+        return (label, readout)
     }
 }

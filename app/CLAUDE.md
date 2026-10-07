@@ -99,8 +99,10 @@ detail there.
   stop the list** — a later op still runs after one, exactly as after an
   identity — and the FIRST refusal is answered only when nothing applied.
 - `ProjectSnapshot.swift` · `TextProps.swift` · `MotionProps.swift` ·
-  `WordProps.swift` · `MediaSnapshot.swift` — the `Codable`, READ-ONLY mirror
-  of spec §5.2 every view draws from. `MediaSnapshot` (a pure move out of
+  `WordProps.swift` · `MediaSnapshot.swift` · `ActionSnapshot.swift` — the `Codable`, READ-ONLY mirror
+  of spec §5.2 every view draws from. `ActionSnapshot.swift` (a pure move out of
+  `ProjectSnapshot.swift`, B87) holds `ActionPatch`, `ActionSnapshot` and `ActionGraphicPatch` — an
+  end's `graphic.props` and `kinds`, whose `dictionary` sends `props` only. `MediaSnapshot` (a pure move out of
   `ProjectSnapshot.swift`) carries a copy's or an ffmpeg conversion's `original`, and its `name` is
   the one display-name spelling: the original's name when one is recorded. **Its enums decode LENIENTLY**
   — a misspelt kind becomes the first case, a `T??` field a clear — which is
@@ -598,7 +600,8 @@ the key map behind it.
   cursor call and three one-line overrides on `TimelineContentView`).
   `ActionBands.swift` is what the timeline and the Clip tab's lane share:
   time order (an action's NUMBER is its index there plus one), the label's
-  keys, the zoom test, the 5 pt `grip` and `gripEdge` (none on a band 15 pt
+  keys (`graphic.props` keys included), the zoom test (an empty `graphic.props` does not stop
+  `isZoom`), the 5 pt `grip` and `gripEdge` (none on a band 15 pt
   wide or less), `curvePath`, and the ONE band painter — hover and grips
   are its `hovered:` argument, never a second painter.
   `ActionDragSession.swift` is the ONE session both lanes drag a band with,
@@ -687,8 +690,7 @@ the key map behind it.
   is not forked; `showAssistantBadge(_:)` is its inspector-side setter) ·
   `InspectorPane.swift`
   (the pane base — `pinnedBlock` is the header `makeHeader()` built, never
-  stacked — the row builders, whose four typed ones derive a row's DEFAULT
-  from its own `read` and `ops` unless `resets: false`, and
+  stacked — and
   `InspectorBinding` — the one place that knows the fields read the
   SELECTED action's END state
   (`action(_:)` answers the selected action and never consults the playhead;
@@ -696,7 +698,16 @@ the key map behind it.
   §11 CI-2, or in `at(.start)` / `at(.playhead)` at the action's start or
   the playhead, over a cache keyed by clip and `ReadMode`; `.defaults` is
   what a row resets to — `VideoProps.identity`, `AudioProps()`,
-  `TextProps()`, `ShapeProps()` — with no FFI and no cache entry, CI-9)) ·
+  `TextProps()`, `ShapeProps()` — with no FFI and no cache entry, CI-9;
+  `graphicProps(_:)` — a graphic clip's props in the binding's mode (the END with an action
+  selected, the stored props with none), `[:]` in `.defaults`)) ·
+  `InspectorRows.swift` (a pure move out of `InspectorPane.swift`, B87: the row builders, whose
+  four typed ones derive a row's DEFAULT from its own `read` and `ops` unless `resets: false`;
+  `inspectorRow(discrete:)` makes a row discrete — "at end" — when its control is none of the
+  popup, checkbox or segmented control: the graphic string row and the Text tab's Content area;
+  a row's widest `OptionPopupControl` holds its intrinsic width only at compression resistance
+  749, below the one-line tag's 750, so a keyed row short of room narrows that popup and never
+  the tag (O8, G-34 (l): Font ▸ Family, a filter's and an obscure region's kind)) ·
   `InspectorSlider.swift` (`InspectorSliderControl`, a pure move: the 7 × 11
   block knob snapped to device pixels (CI-6) and, keyed, the mint segment
   from the action's start value and the coral playhead tick) ·
@@ -704,7 +715,10 @@ the key map behind it.
   selected goes to `set_action_end`, with `structural(video:for:)` the
   exception that sends a list of a different LENGTH, or `motion`, to the
   BASE props, and `structural(audio:for:)` the one that sends pan, mono,
-  compressor, noise reduction, duck and keep-pitch there (CI-3)) ·
+  compressor, noise reduction, duck and keep-pitch there (CI-3);
+  `ops(graphic:entries:clips:schema:)` / `ops(graphic:for:clips:schema:)` are G-34 (l)'s split: the base
+  write keeps G-15 (b)'s nulls (`patchProps`), the end write carries the values and the module's schema,
+  and an asset is the base's, by CI-3's mechanism; `split` forwards `schema`) ·
   `InspectorSection.swift` (`InspectorSection` with its `id`, `title`,
   `header` and folded `marks` readable — `differs` from an explicit closure
   else the rows' defaults, `editing` the selected action's number when a
@@ -729,7 +743,11 @@ the key map behind it.
   `InspectorRowTag` ("at end", "now …"), `InspectorClipTag` (Normalize's boxed
   "clip" while an action is selected, #102), and the binding's mark
   queries, `selectedActionNumber`, `actionID(number:)` and `clearOps`, the
-  ONE `set_action_end` of nulls; a row's paths come from the ops it WRITES,
+  ONE `set_action_end` of nulls (a `graphic.props.<key>` path nested one level deeper); `paths` read
+  `set_graphic` (`graphic.props.<key>`, and `graphic.<key>` for width/height/length, so those rows
+  are ⊘) and an end's `graphic.props.<key>`; `InspectorRowTag` is one line
+  (`maximumNumberOfLines = 1`) so a row short of room narrows a CONTROL — the string field (O1) or
+  the row's widest popup (`inspectorRow`, O8) — never the tag; a row's paths come from the ops it WRITES,
   `writes:` / `follows:`, and an un-annotated row is `.none`, never ⊘) ·
   `InspectorRowMenu.swift` (`InspectorRowView`, the row's stack: its own
   tracking area sets the gutter's hover, and its context menu — Remove from
@@ -744,7 +762,7 @@ the key map behind it.
   `ClipSelectionHeader.swift`
   (`ClipSelectionHeaderView`, a pure move out of `ClipPane.swift`) ·
   `ClipPinnedBlock.swift` (`ClipSubTab` — six cases in display order, text,
-  shape, graphic, picture, sound, clip; `graphic` keys nothing, G-10 — with
+  shape, graphic, picture, sound, clip; `graphic` counts `graphic.props`, a stale key included (G-34 (l), CI-6 amended) — with
   its `◆N` key count,
   `ClipSubTabsView`, and `ClipHeaderBlock` — header, lane, sub-tabs — which
   `makeHeader()` builds once per pane build) · `ActionLaneView.swift` (the
@@ -769,7 +787,11 @@ the key map behind it.
   stored values, the revision or the playhead; `schema(_:)` is memoised by
   name and revision (`schemaMemo`) and `report(for:)` reads a clip's layer
   through `layerMemo`, emptied on a new project handle; Properties, Size and
-  Timeline; every write is `set_graphic`) ·
+  Timeline; with no action selected every write is `set_graphic`; with one selected a Properties
+  write — Reset's included (O7) — is one `set_action_end` naming `graphic.props.<key>` with the
+  module's current schema, except an asset's, which stays `set_graphic`; Size, Timeline and Source
+  still write `set_graphic` (Width, Height and Follow Clip ⊘); the structure signature also carries
+  the selected action's end's stale keys (`endProps()`)) ·
   `GraphicPane+Source.swift` (Source: name, file, revision, Open / Reveal /
   Duplicate as New Graphic… — `store.write`, `rescan()` inside the button's
   event, one `set_graphic {name}` step — and `report(for:)`, the compile's
@@ -785,9 +807,12 @@ the key map behind it.
   registry's dictionary lost it — one row per schema type, stale rows
   sorted with ⌫ writing `null`, CSS ↔ `RGBA`, and the null rule: a value
   equal to the default is written as `null`, a colour compared by parsed
-  channels); `decimals(for:)` (a step decides, else a fractional default, min
+  channels); rows read `binding.graphicProps`; `patchProps` (the base null rule over a
+  map) and `actionStaleRow` (an end key the module no longer declares, ⌫ through `clearOps`);
+  `decimals(for:)` (a step decides, else a fractional default, min
   or max) and `assetNames(for:files:clips:)`; a one-line string field's own
-  height is re-pinned to `DS.controlHeight`, as is `DocumentPane`'s marker
+  height is re-pinned to `DS.controlHeight`, and its width is ≤ 170 required, == 170 at 249,
+  compression 248, so it gives way only to "at end" (O1), as is `DocumentPane`'s marker
   name field. `GraphicSchema.swift` holds `GraphicSchemaEntry` and
   `GraphicSchema` (with `orderedKeys`), a pure move out of it ·
   `DocumentPane.swift` (reads `documentSnapshot`, never the scoped one: its

@@ -136,6 +136,40 @@ extension InspectorBinding {
             action: { ActionPatch(text: $0) })
     }
 
+    /// Spec §11 G-34 (l): a graphic clip's props. Clips outside an action
+    /// share ONE `set_graphic`, each value through G-15 (b)'s null rule
+    /// (`patchProps`), so a base write is what it always was; a clip with an
+    /// action selected gets one `set_action_end` naming `graphic.props.<key>`
+    /// with the module's `schema`, each value as it is — a `null` in an end
+    /// REMOVES (G-34 (j)). An asset is the base's (an end refuses one, G-34
+    /// (b)), sent there by CI-3's mechanism.
+    func ops(
+        graphic values: [String: GraphicPropValue], entries: [GraphicSchemaEntry],
+        clips: [ClipSnapshot], schema: [String: Any]?
+    ) -> [ReelOp] {
+        let assets = Set(entries.filter { $0.type == "asset" }.map(\.key))
+        return split(
+            clips, values, values.isEmpty,
+            base: {
+                .setGraphicRaw(clips: $0, patch: ["props": GraphicSchemaRows.patchProps($1, entries: entries)], schema: schema)
+            },
+            action: { ActionPatch(graphic: ActionGraphicPatch(props: $0)) },
+            schema: schema,
+            structural: { values, _ in
+                let base = values.filter { assets.contains($0.key) }
+                let animated = values.filter { !assets.contains($0.key) }
+                return (base.isEmpty ? nil : base, animated.isEmpty ? nil : animated)
+            })
+    }
+
+    /// One row's write: `ops(graphic:entries:…)` for one entry.
+    func ops(
+        graphic value: GraphicPropValue, for entry: GraphicSchemaEntry,
+        clips: [ClipSnapshot], schema: [String: Any]?
+    ) -> [ReelOp] {
+        ops(graphic: [entry.key: value], entries: [entry], clips: clips, schema: schema)
+    }
+
     /// Shapes have no action form (§5.4's patch covers video, audio and text),
     /// so this is always one `set_shape` over every selected shape clip.
     func ops(shape patch: ShapePatch) -> [ReelOp] {
@@ -152,11 +186,12 @@ extension InspectorBinding {
     ///
     /// Audio and text pass no `structural`, and the default says why they
     /// need none: `VideoPatch` is the only patch with an array-valued key, so
-    /// video is the only one whose write can change a LENGTH.
+    /// video is the only one whose write can change a LENGTH. `schema` goes with
+    /// every `set_action_end`; only a graphic end needs one (G-34 (c)).
     private func split<Patch>(
         _ clips: [ClipSnapshot], _ patch: Patch, _ isEmpty: Bool,
         base: ([UInt32], Patch) -> ReelOp,
-        action end: (Patch) -> ActionPatch,
+        action end: (Patch) -> ActionPatch, schema: [String: Any]? = nil,
         structural: (Patch, ClipSnapshot) -> (base: Patch?, animatable: Patch?) = {
             whole, _ in (base: nil, animatable: whole)
         }
@@ -172,7 +207,8 @@ extension InspectorBinding {
             let parts = structural(patch, clip)
             if let onClip = parts.base { ops.append(base([clip.id], onClip)) }
             if let animated = parts.animatable {
-                ops.append(.setActionEnd(clip: clip.id, action: inside.id, patch: end(animated)))
+                ops.append(
+                    .setActionEnd(clip: clip.id, action: inside.id, patch: end(animated), schema: schema))
             }
         }
         if !ids.isEmpty { ops.insert(base(ids, patch), at: 0) }

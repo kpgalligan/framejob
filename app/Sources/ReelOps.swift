@@ -1048,7 +1048,12 @@ extension ReelOp {
     /// LIFTED out of the patch into `off`, so the end state holds the
     /// property off rather than losing the key (spec §11 CI-14). Removal
     /// keeps its one spelling: `InspectorBinding.clearOps`' raw nulls.
-    static func setActionEnd(clip: UInt32, action: UInt32, patch: ActionPatch) -> ReelOp {
+    /// `graphic`'s one value is its `props` map, so the lift never touches
+    /// it; `schema` is the module's current revision, which a graphic end
+    /// needs (spec §11 G-34 (c), (l)).
+    static func setActionEnd(
+        clip: UInt32, action: UInt32, patch: ActionPatch, schema: [String: Any]? = nil
+    ) -> ReelOp {
         var groups = patch.dictionary
         var off: [String] = []
         for (group, body) in groups {
@@ -1059,7 +1064,7 @@ extension ReelOp {
             }
             groups[group] = fields
         }
-        return setActionEndRaw(clip: clip, action: action, patch: groups, off: off.sorted())
+        return setActionEndRaw(clip: clip, action: action, patch: groups, off: off.sorted(), schema: schema)
     }
 
     static func removeAction(clip: UInt32, action: UInt32) -> ReelOp {

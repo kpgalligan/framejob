@@ -24,6 +24,7 @@ enum ActionBands {
         if let video = patch.video { keys.append(contentsOf: video.dictionary.keys) }
         if let audio = patch.audio { keys.append(contentsOf: audio.dictionary.keys) }
         if let text = patch.text { keys.append(contentsOf: text.dictionary.keys) }
+        if let graphic = patch.graphic { keys.append(contentsOf: graphic.props.keys) }
         return keys.sorted()
     }
 
@@ -32,7 +33,8 @@ enum ActionBands {
     /// drawn with the zoom glyph whichever door wrote it.
     static func isZoom(_ action: ActionSnapshot) -> Bool {
         let end = action.end
-        guard let video = end.video, end.audio?.isEmpty ?? true, end.text?.isEmpty ?? true
+        guard let video = end.video, end.audio?.isEmpty ?? true, end.text?.isEmpty ?? true,
+              end.graphic?.props.isEmpty ?? true
         else { return false }
         return Set(video.dictionary.keys) == ["scale", "x", "y"]
     }

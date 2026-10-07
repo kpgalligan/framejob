@@ -294,6 +294,7 @@ extension ActionPatch {
         if let video = video { d["video"] = video.dictionary }
         if let audio = audio { d["audio"] = audio.dictionary }
         if let text = text { d["text"] = text.dictionary }
+        if let graphic = graphic { d["graphic"] = graphic.dictionary }
         return d
     }
 }

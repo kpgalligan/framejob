@@ -1,7 +1,12 @@
 // app/Sources/GraphicPane.swift — the Clip tab's GRAPHIC sections (road map
 // 10 §5j, G5a): Source (in `GraphicPane+Source.swift`), Properties from the
 // module's schema (rows from `GraphicSchemaRows.swift`), Size and Timeline.
-// Every write is `set_graphic`, which the core validates.
+// With no action selected every write is `set_graphic`. With one selected, a
+// Properties write — Reset's included — goes to the action's END with the
+// module's current schema, one `set_action_end` naming `graphic.props.<key>`,
+// except an asset's, which stays the clip's (spec §11 G-34 (l)); Size and
+// Timeline still write `set_graphic`, so their rows are ⊘. The core
+// validates both.
 //
 // **Never shown itself**: like `ShapePane`, a factory `ClipPane` holds and
 // calls when EVERY selected clip is a graphic clip.
@@ -89,6 +94,12 @@ final class GraphicPane: InspectorPaneView {
         return merged
     }
 
+    /// The selected action's end props (G-34 (a)); none with no action
+    /// selected. Its keys the schema lacks are the action's stale rows.
+    func endProps() -> [String: GraphicPropValue] {
+        binding.selectedAction?.end.graphic?.props ?? [:]
+    }
+
     /// The asset folder's file names, sorted.
     func assetNames() -> [String] {
         (binding.document?.graphicStore?.scan.assets.map(\.name) ?? []).sorted()
@@ -101,7 +112,8 @@ final class GraphicPane: InspectorPaneView {
     }
 
     /// The schema's entries whole (a default, bounds or options a row is
-    /// built from), the stale keys, each asset popup's names, the
+    /// built from), the stale keys (the clip's, then the selected action's
+    /// end's), each asset popup's names, the
     /// diagnostics' messages and the folder's warnings. Stored values, the
     /// revision and the playhead are NOT here: they are read fresh by
     /// `refresh()`.
@@ -125,6 +137,8 @@ final class GraphicPane: InspectorPaneView {
         return [
             super.structureSignature, shared?.name ?? "mixed", keys.joined(separator: ","),
             stale.joined(separator: ","), assetSignature(parsed?.schema),
+            GraphicSchemaRows.staleKeys(stored: endProps(), schema: parsed?.schema)
+                .joined(separator: ","),
         ].joined(separator: "|") + "|" + messages.joined(separator: "|")
     }
 
@@ -141,8 +155,11 @@ final class GraphicPane: InspectorPaneView {
     // MARK: - Properties
 
     /// One row per schema key in the module's order, then the stale keys,
-    /// sorted. With no compiled schema every stored key is stale. Reset
-    /// nulls every stored key; its `differs` folds from the rows.
+    /// sorted, then — with an action selected — the end's own stale keys
+    /// (G-34 (l), O2). With no compiled schema every stored key is stale.
+    /// Reset nulls every stored key; with an action selected it writes each
+    /// declared default through the rows' own split, into the END, an
+    /// asset's onto the clip (O7). Its `differs` folds from the rows.
     func propertiesSection() -> InspectorSection {
         let binding = self.binding
         let shared = self.shared()
@@ -159,6 +176,10 @@ final class GraphicPane: InspectorPaneView {
                 GraphicSchemaRows.staleRow(
                     key: key, value: stored[key] ?? .null, binding, clips: clips))
         }
+        let ends = endProps()
+        for key in GraphicSchemaRows.staleKeys(stored: ends, schema: parsed?.schema) {
+            rows.append(GraphicSchemaRows.actionStaleRow(key: key, value: ends[key] ?? .null, binding))
+        }
         let note: String?
         if parsed == nil {
             note = "The module did not compile — see Source. Stored values are listed below."
@@ -173,6 +194,16 @@ final class GraphicPane: InspectorPaneView {
             summary: { count == 1 ? "1 property" : "\(count) properties" },
             note: note.map { text -> () -> String? in { text } },
             reset: {
+                if binding.selectedAction != nil {
+                    let entries = parsed?.schema.entries ?? []
+                    let defaults = Dictionary(
+                        entries.map { ($0.key, $0.default) }, uniquingKeysWith: { first, _ in first })
+                    binding.apply(
+                        "Reset Graphic Properties",
+                        binding.ops(
+                            graphic: defaults, entries: entries, clips: clips(), schema: parsed?.raw))
+                    return
+                }
                 let targets = clips()
                 var keys = Set<String>()
                 for clip in targets { keys.formUnion(clip.graphic?.props.keys.map { $0 } ?? []) }

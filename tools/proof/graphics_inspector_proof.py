@@ -6,7 +6,9 @@
     python3 tools/proof/graphics_inspector_proof.py --mutant NAME
 
 **The fixture, over MCP** (one owned instance on a scratch socket, launched and
-stopped by PID, its log at `work/graphics-inspector/reelcut.log`):
+stopped by PID, under the scratch home `CFFIXED_USER_HOME=work/graphics-inspector/home`
+since issue batch B87 phase 3 — H0, a CONTROL, says the home took: `<home>/Library/
+Application Support` is a directory — its log at `work/graphics-inspector/reelcut.log`):
 `new_project {path: GI}`, `write_graphic six` — a module with one entry of
 every schema type: `title` a string whose default holds `{"}:`, `size` a
 number 12–200 step 1, `offset` an unbounded number, `showBox` a boolean,
@@ -16,7 +18,11 @@ ctx (`svg(ctx, …)`) and draws text in `'Nope Sans'` — `import_graphic_asset
 graphic/tests/assets/red.png`, `add_graphic_clip`, `set_graphic {props:
 {size: 90}}`, `save_project`; the instance is stopped, and `"old": 1` and
 `"zzz": 2` are injected into the clip's props in `project.json` (the tool
-path refuses a stranger key; this is the external edit G-4 tolerates).
+path refuses a stranger key; this is the external edit G-4 tolerates). The same
+instance, before it stops, makes GIA (B87 phase 3): `new_project`, `write_graphic
+six`, `add_graphic_clip` at 0, `add_action {at: 600000, duration: 1200000}` (CLIP and
+PROJECT 1–3 s), `set_action_end {size: 150, color: "#2d7ff9", showBox: false, align:
+"center", title: "Hello"}` and `save_project`.
 
 **The probe**, `graphics_inspector_probe.swift`, compiled AS `main.swift` over
 every file in `app/Sources` but the app's own on `harness/build.sh`'s swiftc
@@ -41,7 +47,7 @@ I6  one more schema key changes `structureSignature`; so does each of a
     entries are spelled whole (issue batch B8, #106); a stored value alone
     does not;
 I7  the tabs [graphic, picture, clip]; the four section ids; two modules →
-    [graphic.source, graphic.size]; `keyedCount` 0;
+    [graphic.source, graphic.size]; `keyedCount` of a video-only end patch 0;
 I8  the report names Nope Sans and the set's families, with no size warning;
     a fixed 100×100 `<svg>` gets exactly one naming 1920×1080; a throw at
     frame 0 is an error with `frame == 0`;
@@ -90,6 +96,31 @@ I21 (B69, #219, spec §11 G-25) a colour default through the core's G-12
     "#40bf40"; b) `patchValue` of each hex against its default is NSNull, and
     "#000000" against "steelblue" is the string itself (CONTROL); c)
     `defaultColor("bluish")` is `unparsedColor`;
+K1–K18 (issue batch B87 phase 3, #239, spec §11 G-34 (l); after I21, before I15)
+    the Graphic tab under a selected action: six's clip (PROJECT 2–5 s after I12)
+    gets an action at CLIP 1–3 s, linear, selected; every write goes through the
+    control's own `write` (read from its stored closure through a one-field struct,
+    because `Mirror` hands a closure back at the wrong abstraction), and `recorded`
+    is every op the inspector sent. K1 (CONTROL) no action selected: Size's write is
+    one `set_graphic`; K2 selected: one `set_action_end` naming `graphic.props.size`
+    with the module's schema, the end's `kinds.size` "number", the base 90; K3a/K3b
+    the mark ◆, the field reads the END, and the section's, tab's and strip's counts
+    are 1; K4 the slider's start 90, now 120 at mid-span, keyed; K5 a checkbox and a
+    pop-up are ◆ "at end"; K6a/K6b the string row too, and laid out at
+    `DS.panelWidth` its field narrows below 170 for a whole tag only while keyed
+    (CONTROL: exactly 170 with nothing selected); K7 the colour well ◆, no tag; K8
+    the asset is ⊘ and its write stays `set_graphic`; K9 "Set end value to default"
+    writes 64 into the end; K10 × removes one key; K11 Clear removes all, counts 0;
+    K12 a key the module no longer declares gets the action's own stale row, ◆, ⌫
+    "… remove it from action 1", counted (O2, O4); K13 with no action selected ◇1 and
+    `set_graphic`; K14 Width, Height and Follow Clip are ⊘ (O6; CONTROL blank); K15a/
+    K15b the band's label keys and the zoom test (O3); K16 the Text tab's keyed
+    Content row reads "at end" (O5); K17 Properties' Reset writes the end, the
+    asset's null to the base (O7); K18a the text clip's action keys the font, and laid
+    out at `DS.panelWidth` Font ▸ Family's popup narrows below 150 so its "at end" is
+    whole and inside the panel's inset — the CONTROL gives way, never the tag (O8;
+    CONTROL: the font not keyed, no tag and exactly 150); K18b the same action keys a
+    filter and an obscure region, and in each row only the widest popup gives way.
 I15 (B8, last) a second `six` clip; the two hold logo "a.png" and "b.png" and
     both are selected: the Logo popup is `["None", "red.png", "a.png",
     "b.png"]`, and the signature holds "red.png,a.png,b.png".
@@ -99,6 +130,10 @@ graphic, the four sections expanded):
 H1  light, rendered twice: byte-identical;
 H2  dark, rendered twice: byte-identical, and light ≠ dark. Both kept under
     `work/graphics-inspector/` to be LOOKED AT.
+H3  (B87 phase 3) GIA light, its action (index 0) selected, the playhead at 2 s,
+    track size L so the band's label shows (`0 2 2 clip - SECTIONS - 0 graphic`),
+    rendered twice: byte-identical; H4 dark the same, and light ≠ dark. Kept as
+    `work/graphics-inspector/gia-*.png`.
 Z1  `grep "Reelcut: "` over the log prints nothing.
 
 `--mutant NAME` builds the probe over a COPY of `app/Sources` with one
@@ -130,6 +165,26 @@ nothing else did:
                      I20 a and I20 b (B69);
   first-frame-note-unconditional  the first-frame note is shown whatever
                      `report.frame` is — I20 b (B69).
+Issue batch B87 phase 3 adds K12 to `stale` and sixteen more (a bare K id in
+`MUTANTS` names that one row):
+  row-writes-base    the graphic split sends every value to the base — K2 K3a K4 K5
+                     K6a K6b K7 K9 K11 K17;
+  count-zero         `keyedCount` of graphic is 0 again — K3b K12;
+  null-default-in-end  the end takes G-15 (b)'s nulls — K9 K17;
+  stored-read        `graphicProps` reads the stored props — K3a K4;
+  paths-flat         an end's `graphic` group is one path — K3a K10 K11 K13;
+  string-continuous  the string row is not discrete — K6a K6b;
+  title-fixed-width  the Title field's 170 is required — K6b;
+  asset-to-end       an asset goes to the end — K8 K17;
+  schema-dropped     the typed `setActionEnd` drops `schema` — K2 K5 K9 K17;
+  end-stale-dropped  `endProps()` answers nothing — K12;
+  layer-keys-unnamed `set_graphic`'s width/height/length name no path — K14;
+  band-label-graphic-dropped  the band's label omits graphic keys — K15a;
+  zoom-graphic-nil   the zoom test asks for no `graphic` at all — K15b;
+  content-continuous the Text tab's Content row is not discrete — K16;
+  reset-to-base      Properties' Reset ignores the selected action — K17;
+  popup-fixed-width  a row's widest popup holds its width against the tag (its
+                     compression resistance required, not 749) — K18a K18b (O8).
 """
 
 import argparse
@@ -146,9 +201,12 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
 sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
-import graphics_proof as gp  # noqa: E402  (Instance, attempt, complaints)
+import graphics_proof as gp  # noqa: E402  (attempt, complaints)
+import mcp  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/graphics-inspector"
+HOME = WORK / "home"
+CALL_BOUND = 300
 APP = ROOT / "build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut"
 PROBE_SWIFT = ROOT / "tools/proof/graphics_inspector_probe.swift"
 HARNESS_BUILD = ROOT / "tools/proof/harness/build.sh"
@@ -181,7 +239,8 @@ MUTANTS = {
          "I5 the Properties section lists the stale rows old then zzz, under the schema's",
          "I5 six rewritten to a syntax error: every stored key is a stale row, sorted",
          "I5 old's ⌫ nulls it: the key leaves the stored props",
-         "I5 zzz's ⌫ nulls it: the key leaves the stored props"]),
+         "I5 zzz's ⌫ nulls it: the key leaves the stored props",
+         "K12"]),
     "entry-signature": (
         "GraphicPane.swift",
         "parsed?.schema.entries.map { String(describing: $0) }",
@@ -251,7 +310,72 @@ MUTANTS = {
         "        if report.frame != nil || true {\n",
         ["I20 b six rewritten to a syntax error: the Source section's notes are [Compiling the "
          "module]"]),
+    # Issue batch B87 phase 3 (#239, G-34 (l)). A bare K id names that one row.
+    "row-writes-base": (
+        "InspectorBinding+Writes.swift",
+        "return (base.isEmpty ? nil : base, animated.isEmpty ? nil : animated)",
+        "return (values, nil)",
+        ["K2", "K3a", "K4", "K5", "K6a", "K6b", "K7", "K9", "K11", "K17"]),
+    "count-zero": (
+        "ClipPinnedBlock.swift", "case .graphic: return end.graphic?.props.count ?? 0",
+        "case .graphic: return 0", ["K3b", "K12"]),
+    "null-default-in-end": (
+        "InspectorBinding+Writes.swift", "ActionGraphicPatch(props: $0)",
+        "ActionGraphicPatch(props: GraphicSchemaRows.patchProps($0, entries: entries)"
+        ".mapValues { GraphicSchemaRows.value($0) })",
+        ["K9", "K17"]),
+    "stored-read": (
+        "InspectorPane.swift", "evaluated(clip).graphic ?? ", "", ["K3a", "K4"]),
+    "paths-flat": (
+        "InspectorMarks.swift", "            if group == \"graphic\" { return graphicPaths(value) }\n",
+        "", ["K3a", "K10", "K11", "K13"]),
+    "string-continuous": (
+        "GraphicSchemaRows.swift", "discrete: true", "discrete: false", ["K6a", "K6b"]),
+    "title-fixed-width": (
+        "GraphicSchemaRows.swift",
+        "            width.priority = NSLayoutConstraint.Priority(249)\n", "", ["K6b"]),
+    "asset-to-end": (
+        "InspectorBinding+Writes.swift",
+        "let assets = Set(entries.filter { $0.type == \"asset\" }.map(\\.key))",
+        "let assets = Set<String>()", ["K8", "K17"]),
+    "schema-dropped": (
+        "ReelOps.swift", "off: off.sorted(), schema: schema)", "off: off.sorted())",
+        ["K2", "K5", "K9", "K17"]),
+    "end-stale-dropped": (
+        "GraphicPane.swift", "binding.selectedAction?.end.graphic?.props ?? [:]", "[:]",
+        ["K12"]),
+    "layer-keys-unnamed": (
+        "InspectorMarks.swift", "paths.append(\"graphic.\" + key)", "_ = key", ["K14"]),
+    "band-label-graphic-dropped": (
+        "ActionBands.swift",
+        "        if let graphic = patch.graphic { keys.append(contentsOf: graphic.props.keys) }\n",
+        "", ["K15a"]),
+    "zoom-graphic-nil": (
+        "ActionBands.swift", "end.graphic?.props.isEmpty ?? true", "end.graphic == nil",
+        ["K15b"]),
+    "content-continuous": (
+        "TextPane.swift", "discrete: true", "discrete: false", ["K16"]),
+    "reset-to-base": (
+        "GraphicPane.swift", "if binding.selectedAction != nil {", "if false {", ["K17"]),
+    "popup-fixed-width": (
+        "InspectorRows.swift", "NSLayoutConstraint.Priority(749), for: .horizontal)",
+        ".required, for: .horizontal)", ["K18a", "K18b"]),
 }
+
+
+def expected_names(expected, names):
+    """`expected` with each bare K id (no space) replaced by the one row whose name starts
+    with it; an id no row starts with stays as it is, so it is reported missing."""
+    out = []
+    for item in expected:
+        if " " in item:
+            out.append(item)
+        else:
+            out += [n for n in names if n.startswith(item + " ")] or [item]
+    return out
+
+K_IDS = ["K1", "K2", "K3a", "K3b", "K4", "K5", "K6a", "K6b", "K7", "K8", "K9", "K10", "K11",
+         "K12", "K13", "K14", "K15a", "K15b", "K16", "K17", "K18a", "K18b"]
 
 RESULTS = []
 
@@ -269,20 +393,60 @@ def check(name, ok, detail=""):
 # The fixture.
 
 
-def fixture(app, work):
+HOME_TOOK = []  # H0's fact, from the last fixture's instance
+GIA_MADE = []   # the GIA package, when the last fixture made it
+
+
+def gia_fixture(step, package):
+    """GIA (issue batch B87 phase 3): six on a clip at 0 with one action at CLIP and PROJECT
+    1–3 s whose end keys a number, a colour, a boolean, an enum and a string. The package,
+    or None."""
+    p = {"project": str(package)}
+    step("new_project", {"path": str(package)})
+    step("write_graphic", dict(p, name="six", source=SIX_JS))
+    project = (step("get_project", p).get("reply") or {}).get("project") or {}
+    track = (project.get("tracks") or [{}])[0].get("id")
+    step("add_graphic_clip", dict(p, name="six", track=track, at=0))
+    project = (step("get_project", p).get("reply") or {}).get("project") or {}
+    clips = [c for c in project.get("clips", [])
+             if (c.get("graphic") or {}).get("name") == "six"]
+    if not clips:
+        return None
+    added = step("add_action", dict(p, clip=clips[0]["id"], at=600000, duration=1200000))
+    actions = (added.get("reply") or {}).get("new_actions") or []
+    if not actions:
+        return None
+    step("set_action_end", dict(p, clip=clips[0]["id"], action=actions[0], patch={"graphic": {
+        "props": {"size": 150, "color": "#2d7ff9", "showBox": False, "align": "center",
+                  "title": "Hello"}}}))
+    step("save_project", p)
+    return package
+
+
+def fixture(app, work, gia=False):
     """The package over MCP, then the two stale keys injected on disk. The
-    package's path, or None and why; the log."""
+    package's path, or None and why; the log. The instance runs under the
+    scratch home (`CFFIXED_USER_HOME`), launched and stopped by PID."""
     work.mkdir(parents=True, exist_ok=True)
+    HOME.mkdir(parents=True, exist_ok=True)
     package = work / "GI.reelcut"
     shutil.rmtree(package, ignore_errors=True)
+    shutil.rmtree(work / "GIA.reelcut", ignore_errors=True)
+    GIA_MADE.clear()
     log = work / "reelcut.log"
     if log.exists():
         log.unlink()
-    instance = gp.Instance(app, log)
-    client = instance.start()
+    launched = mcp.launch(str(app), env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
+                          log_path=str(log), timeout=CALL_BOUND)
+    client = launched.client
+    HOME_TOOK.clear()
     try:
         if client is None:
             return None, "the instance did not start", log
+        print(f"  instance PID {launched.child.pid} at {launched.socket_path}", flush=True)
+        HOME_TOOK.append((HOME / "Library/Application Support").is_dir())
+        if not HOME_TOOK[0]:
+            return None, f"the scratch home did not take: no {HOME}/Library/Application Support", log
         steps = []
 
         def step(tool, arguments):
@@ -304,11 +468,16 @@ def fixture(app, work):
             return None, "no clip drawn by six: " + "; ".join(steps), log
         step("set_graphic", dict(p, clips=[clips[0]["id"]], patch={"props": {"size": 90}}))
         step("save_project", p)
+        if gia:
+            made = gia_fixture(step, work / "GIA.reelcut")
+            if made is not None:
+                GIA_MADE.append(made)
         ok = (wrote.get("reply") or {}).get("ok") is True
         if not ok or any(not s.endswith(" ok") for s in steps):
             return None, "; ".join(steps) + f"; write_graphic reply {wrote}", log
     finally:
-        instance.stop()
+        launched.stop()
+        mcp.remove_scratch(launched.socket_path)
     path = package / "project.json"
     data = json.loads(path.read_text())
     for clip in data.get("clips", []):
@@ -360,7 +529,7 @@ def build_probe(sources, out):
 
 
 def probe_checks(sources, out, package):
-    print("\n1 — the probe: I1–I21", flush=True)
+    print("\n1 — the probe: I1–I21, K1–K18", flush=True)
     binary, error = build_probe(Path(sources), out)
     check("the probe builds over app/Sources", binary is not None, error or "")
     if binary is None:
@@ -377,8 +546,10 @@ def probe_checks(sources, out, package):
         check("the probe runs", False, (ran["stdout"] + ran["stderr"]).strip()[-600:])
         return
     probe_rows = json.loads(answer.read_text())["rows"]
-    present = all(any(r["name"].startswith(f"I{n} ") for r in probe_rows) for n in range(1, 22))
-    check("the probe answers every I-row (I1–I21 present)", present, f"{len(probe_rows)} rows")
+    ids = [f"I{n}" for n in range(1, 22)] + K_IDS
+    missing = [i for i in ids if not any(r["name"].startswith(i + " ") for r in probe_rows)]
+    check("the probe answers every row (I1–I21 and K1–K18 present)", not missing,
+          f"{len(probe_rows)} rows, missing {missing}")
     for row in probe_rows:
         check(row["name"], row["ok"], row["detail"])
 
@@ -387,7 +558,7 @@ def probe_checks(sources, out, package):
 # The harness.
 
 
-def harness_checks(package):
+def harness_checks(package, gia):
     print("\n2 — the harness: the Graphic sub-tab, light and dark, 1440 × 1500", flush=True)
     built = bounded.run([str(HARNESS_BUILD)], 900)
     binary = built["stdout"].strip().splitlines()[-1] if built["rc"] == 0 else None
@@ -417,6 +588,39 @@ def harness_checks(package):
     check("H2 dark, rendered twice: byte-identical PNGs, and light ≠ dark",
           data("dark-a") == data("dark-b") and data("dark-a") != data("light-a"),
           str(renders["dark-a"].relative_to(ROOT)))
+    gia_checks(binary, gia)
+
+
+def gia_checks(binary, gia):
+    """H3/H4 (issue batch B87 phase 3): GIA with its action selected, the playhead at 2 s
+    inside the span, track size L (the band's label), the Graphic sub-tab."""
+    renders, error = {}, None if gia is not None else "the GIA fixture was not made"
+    for tag, look in (("light-a", "light"), ("light-b", "light"), ("dark-a", "dark"),
+                      ("dark-b", "dark")):
+        if error:
+            break
+        out = WORK / f"gia-{tag}.png"
+        if out.exists():
+            out.unlink()
+        ran = bounded.run(
+            [binary, str(gia), str(out), look, str(WIDTH), str(HEIGHT), "0", "2", "2",
+             "clip", "-", SECTIONS, "-", "0", "graphic"], 120)
+        if ran["rc"] != 0 or not out.exists():
+            error = (ran["stdout"] + ran["stderr"]).strip()[-400:] or f"rc {ran['rc']}"
+        renders[tag] = out
+    if error:
+        check("H3 GIA light, its action selected, rendered twice: byte-identical PNGs", False,
+              error)
+        check("H4 GIA dark, rendered twice: byte-identical PNGs, and light ≠ dark", False, error)
+        return
+
+    def data(tag):
+        return renders[tag].read_bytes()
+    check("H3 GIA light, its action selected, rendered twice: byte-identical PNGs",
+          data("light-a") == data("light-b"), str(renders["light-a"].relative_to(ROOT)))
+    check("H4 GIA dark, rendered twice: byte-identical PNGs, and light ≠ dark",
+          data("dark-a") == data("dark-b") and data("dark-a") != data("light-a"),
+          str(renders["dark-a"].relative_to(ROOT)))
 
 
 # ---------------------------------------------------------------------------
@@ -442,6 +646,7 @@ def mutant(app, name):
             return 1
         probe_checks(sources, temp / "probe", package)
     failed = [n for n, ok in RESULTS if not ok]
+    expected = expected_names(expected, [n for n, _ in RESULTS])
     built = bool(RESULTS) and RESULTS[0][1]
     elapsed = time.time() - began
     if built and sorted(failed) == sorted(expected):
@@ -464,12 +669,15 @@ def main():
         return mutant(app, args.mutant)
     print("Road map 10, G5a — the Graphic sub-tab", flush=True)
     print("\n0 — the fixture over MCP", flush=True)
-    package, why, log = fixture(app, WORK)
+    package, why, log = fixture(app, WORK, gia=True)
+    check("H0 the scratch home took: <home>/Library/Application Support is a directory "
+          "(CONTROL)", HOME_TOOK == [True], str(HOME / "Library/Application Support"))
     check("the fixture is made over MCP (new_project, write_graphic, import_graphic_asset, "
-          "add_graphic_clip, set_graphic, save_project)", package is not None, why or "")
+          "add_graphic_clip, set_graphic, save_project; GIA: add_action, set_action_end)",
+          package is not None and bool(GIA_MADE), why or ("" if GIA_MADE else "no GIA"))
     if package is not None:
         probe_checks(ROOT / "app/Sources", WORK / "probe", package)
-        harness_checks(package)
+        harness_checks(package, GIA_MADE[0] if GIA_MADE else None)
     lines = gp.complaints(log)
     check("Z1 grep \"Reelcut: \" over the log prints nothing", not lines,
           "; ".join(lines[:4]))

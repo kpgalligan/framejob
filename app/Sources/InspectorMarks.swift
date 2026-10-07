@@ -231,6 +231,10 @@ final class InspectorRowTag: NSTextField, OptionControl {
         drawsBackground = false
         font = DS.mono(10)
         textColor = color
+        // One line: a wrapping tag gives its width away to its neighbours by
+        // growing tall, so a row short of room squeezed "at end" into a
+        // column instead of narrowing the field beside it (B87, G-34 (l)).
+        maximumNumberOfLines = 1
         refresh()
     }
 
@@ -296,8 +300,9 @@ final class InspectorClipTag: NSView, OptionControl {
 
 extension InspectorBinding {
     /// The `"group.key"` paths a list of ops writes: `set_video`, `set_audio`
-    /// and `set_text` by their patch's keys, `set_action_end` by each group
-    /// of its patch; every other op (a trim, a speed, a reverse) writes none.
+    /// and `set_text` by their patch's keys, `set_graphic` and an end's
+    /// `graphic` by `graphicPaths`, `set_action_end` by each group of its
+    /// patch; every other op (a trim, a speed, a reverse) writes none.
     static func paths(of ops: [ReelOp]) -> [String] {
         let groups = ["set_video": "video", "set_audio": "audio", "set_text": "text"]
         var found = Set<String>()
@@ -308,16 +313,36 @@ extension InspectorBinding {
             } else if op.name == "set_action_end" {
                 found.formUnion(paths(inPatch: patch))
                 found.formUnion(op.args["off"] as? [String] ?? [])  // keyed OFF (CI-14)
-            }
+            } else if op.name == "set_graphic" { found.formUnion(graphicPaths(patch)) }
         }
         return found.sorted()
     }
 
     /// An end patch's paths, spelled as `paths(of:)` spells them.
     private static func paths(inPatch patch: [String: Any]) -> [String] {
-        patch.flatMap { group, value in
-            ((value as? [String: Any])?.keys).map { $0.map { group + "." + $0 } } ?? []
+        patch.flatMap { group, value -> [String] in
+            if group == "graphic" { return graphicPaths(value) }
+            return ((value as? [String: Any])?.keys).map { $0.map { group + "." + $0 } } ?? []
         }
+    }
+
+    /// A `graphic` group's paths, `set_graphic`'s patch or an end's (spec §11
+    /// G-34 (l)): `graphic.props.<key>` per prop, none for the core's
+    /// `kinds`, and `graphic.<key>` for any other key — `set_graphic`'s
+    /// `width`, `height` and `length`, which no end takes, so their rows are
+    /// ⊘ while an action is selected.
+    private static func graphicPaths(_ group: Any) -> [String] {
+        guard let body = group as? [String: Any] else { return [] }
+        var paths: [String] = []
+        for (key, value) in body where key != "kinds" {
+            if key == "props" {
+                let props = (value as? [String: Any])?.keys.map { "graphic.props." + $0 }
+                paths += props ?? []
+            } else {
+                paths.append("graphic." + key)
+            }
+        }
+        return paths
     }
 
     /// Whether any of the ops reaches an action's end patch.
@@ -371,6 +396,13 @@ extension InspectorBinding {
         for path in paths.sorted() {
             let parts = path.split(separator: ".", maxSplits: 1).map(String.init)
             guard parts.count == 2 else { continue }
+            if parts[0] == "graphic", parts[1].hasPrefix("props.") {
+                // An end's prop nests one level deeper (G-34 (a)).
+                var props = patch["graphic"]?["props"] as? [String: Any] ?? [:]
+                props[String(parts[1].dropFirst("props.".count))] = NSNull()
+                patch["graphic", default: [:]]["props"] = props
+                continue
+            }
             patch[parts[0], default: [:]][parts[1]] = NSNull()
         }
         guard !patch.isEmpty else { return [] }

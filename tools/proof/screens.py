@@ -217,6 +217,7 @@ FIXTURES = {
     "demo": {"path": os.path.join(FIXTURE_DIR, "Demo.reelcut"),
              "clips": ["video", "text", "graphic", "shape", "tone"],
              "media": ["speech.mov", "toneA.m4a", "toneB.m4a"], "sound": ["video", "tone"]},
+    "animated": {"path": os.path.join(FIXTURE_DIR, "Animated.reelcut"), "clips": ["graphic"]},
 }
 CANVAS = {"width": 960, "height": 540, "fps": [30, 1], "background": [0.0, 0.0, 0.0, 1.0],
           "fit_new_clips": True}
@@ -357,6 +358,8 @@ def build_fixture(mcp, name):
         mcp.call("open_project", path=path)
         if name == "demo":
             ids = _demo_ops(mcp, path)
+        elif name == "animated":
+            ids = _animated_ops(mcp, path)
         mcp.call("save_project", project=path)
     except ToolError as error:
         raise FixtureError(f"building {name}: {error}") from error
@@ -430,6 +433,38 @@ def _demo_ops(mcp, path):
     # Imported last, so every earlier media and clip id is unchanged.
     _media_id(_call(mcp, "import_media", path, path=os.path.join(MEDIA, "toneB.m4a")))
     return ids
+
+
+def _animated_ops(mcp, path):
+    """Issue batch B87 phase 3 (#239, G-34 (l)): `lower-third` on one track,
+    "Graphics", with one action at CLIP 1–3 s whose end keys a number, a
+    colour and a boolean — the Graphic tab under a selected action (07b)."""
+    _call(mcp, "set_track", path, track=1, name="Graphics")
+    with open(GRAPHIC_SOURCE) as handle:
+        source = handle.read()
+    wrote = _call(mcp, "write_graphic", path, name="lower-third", source=source)
+    if isinstance(wrote, dict) and wrote.get("ok") is False:
+        raise FixtureError(f"building animated: lower-third.js did not compile: {wrote}")
+    deadline = time.monotonic() + 5
+    while True:
+        try:
+            _call(mcp, "add_graphic_clip", path, name="lower-third", track=1, at=0)
+            break
+        except ToolError:
+            if time.monotonic() > deadline:
+                raise
+            time.sleep(0.2)
+    clips = _project(mcp, path)["clips"]
+    if len(clips) != 1:
+        raise FixtureError(f"building animated: {len(clips)} clips, not 1")
+    clip = clips[0]["id"]
+    added = _call(mcp, "add_action", path, clip=clip, at=600000, duration=1200000)
+    actions = added.get("new_actions") if isinstance(added, dict) else None
+    if not actions:
+        raise FixtureError(f"building animated: add_action answered no new_actions: {added}")
+    _call(mcp, "set_action_end", path, clip=clip, action=actions[0], patch={
+        "graphic": {"props": {"size": 96, "accent": "#2d7ff9", "boxed": False}}})
+    return {"graphic": clip}
 
 
 def _media_id(answer):
