@@ -1107,7 +1107,7 @@ extension ReelOp {
     /// untouched either way.
     static func setTrack(
         track: UInt32, name: String? = nil, hidden: Bool? = nil, muted: Bool? = nil,
-        locked: Bool? = nil, solo: Bool? = nil
+        locked: Bool? = nil, solo: Bool? = nil, matte: TrackMatte? = nil
     ) -> ReelOp {
         var a = OpArgs()
         a.put("track", track)
@@ -1116,6 +1116,7 @@ extension ReelOp {
         a.put("muted", muted)
         a.put("locked", locked)
         a.put("solo", solo)
+        a.put("matte", matte?.rawValue)
         return ReelOp(name: "set_track", args: a.values)
     }
 

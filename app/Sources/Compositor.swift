@@ -607,13 +607,18 @@ final class MetalRenderer {
     /// combination itself. Built with `blending: false`, which is the whole
     /// correctness argument — see `pipelineDescriptor`.
     ///
-    /// Five pipelines, then, from three fragment functions: plain, plain +
-    /// gather, blend, blend + gather, and the shadow. `pipelineState(gather:
-    /// blend:)` picks one of the first four per layer.
+    /// Six pipelines, then, from four fragment functions: plain, plain +
+    /// gather, blend, blend + gather, the shadow, and the matte resolve
+    /// (`Compositor+Matte.swift`). `pipelineState(gather: blend:)` picks one
+    /// of the first four per layer.
     private let blendPipeline: MTLRenderPipelineState
     private let blendGatherPipeline: MTLRenderPipelineState
     /// The full-canvas quad that draws one blurred mask as a shadow (§7.5).
     let shadowPipeline: MTLRenderPipelineState
+    /// The matte resolve pass and the matte pass's targets (spec §11 MT-6,
+    /// `Compositor+Matte.swift`).
+    let matteResolvePipeline: MTLRenderPipelineState
+    let mattePool: MattePool
     let sampler: MTLSamplerState
     private let textureCache: CVMetalTextureCache
     /// Bound wherever the shader ignores the texture (the missing-media
@@ -664,7 +669,8 @@ final class MetalRenderer {
             let blendGatherFunction = MetalRenderer.layerFragment(
                 library, name: "reelcut_layer_blend_fragment", gather: true),
             let shadowVertex = library.makeFunction(name: "reelcut_shadow_vertex"),
-            let shadowFragment = library.makeFunction(name: "reelcut_shadow_fragment")
+            let shadowFragment = library.makeFunction(name: "reelcut_shadow_fragment"),
+            let resolveFragment = library.makeFunction(name: "reelcut_matte_resolve_fragment")
         else { return nil }
 
         guard
@@ -690,7 +696,10 @@ final class MetalRenderer {
                     fragment: blendGatherFunction, blending: false)),
             let shadowPipeline = try? device.makeRenderPipelineState(
                 descriptor: MetalRenderer.pipelineDescriptor(
-                    label: "Reelcut shadow", vertex: shadowVertex, fragment: shadowFragment))
+                    label: "Reelcut shadow", vertex: shadowVertex, fragment: shadowFragment)),
+            let matteResolvePipeline = try? device.makeRenderPipelineState(
+                descriptor: MetalRenderer.matteResolveDescriptor(
+                    vertex: shadowVertex, fragment: resolveFragment))
         else { return nil }
 
         let samplerDescriptor = MTLSamplerDescriptor()
@@ -730,6 +739,8 @@ final class MetalRenderer {
         self.blendPipeline = blendPipeline
         self.blendGatherPipeline = blendGatherPipeline
         self.shadowPipeline = shadowPipeline
+        self.matteResolvePipeline = matteResolvePipeline
+        self.mattePool = MattePool(device: device)
         self.sampler = sampler
         self.textureCache = cache
         self.placeholder = placeholder
@@ -743,7 +754,8 @@ final class MetalRenderer {
 
     /// The compositor's FIXED-FUNCTION blend, in descriptor form: source-over
     /// on PREMULTIPLIED colour, so the source factor is one and not source
-    /// alpha. All five pipelines come through here and three of them take it
+    /// alpha. The five layer and shadow pipelines come through here (the
+    /// matte resolve has its own, `matteResolveDescriptor`) and three take it
     /// as written — a shadow is just another layer, drawn under its own.
     ///
     /// **`blending: false` is for a programmable-blend pipeline, and it is a
@@ -781,7 +793,7 @@ final class MetalRenderer {
     /// four states rather than a hierarchy: `gather` is a function constant
     /// (`kGatherFilters`, whose measurement is in the shader) and `blend`
     /// picks the entry point that reads the destination.
-    private func pipelineState(gather: Bool, blend: Bool) -> MTLRenderPipelineState {
+    func pipelineState(gather: Bool, blend: Bool) -> MTLRenderPipelineState {
         switch (gather, blend) {
         case (false, false): return pipeline
         case (true, false): return gatherPipeline
@@ -816,6 +828,13 @@ final class MetalRenderer {
         guard let buffer = commandQueue.makeCommandBuffer() else {
             throw CompositorError.noDestinationTexture
         }
+        // Every matte, before the destination pass opens (spec §11 MT-6).
+        var coverage = MatteCoverage(placeholder: placeholder)
+        if let recipe = recipe {
+            coverage = try encodeMattes(
+                recipe: recipe, canvas: canvas, target: target, buffer: buffer, request: request,
+                instruction: instruction, live: &live)
+        }
         // One encoder for the whole frame, as before — but a shadowed layer
         // has to interrupt it (`encodeShadow`), so the pass is a value that
         // can be suspended and resumed rather than one long-lived encoder.
@@ -829,6 +848,8 @@ final class MetalRenderer {
 
         let layers = recipe?.layers ?? []
         for layer in layers {
+            // A layer drawn into a matte is never drawn on the canvas (MT-1).
+            if layer.matte?.into != nil { continue }
             guard
                 let prepared = prepare(
                     layer, among: layers, canvas: canvas,
@@ -859,9 +880,14 @@ final class MetalRenderer {
             // reduces to the source exactly — and `encodeShadow` says how
             // that was measured.
             let maskState = layer.needsGather ? gatherPipeline : pipeline
+            // The mattes cutting this layer, or the placeholder (MT-3).
+            guard let matte = coverage.texture(for: layer) else {
+                pass.suspend()
+                throw MatteError.unordered
+            }
             if let shadow = layer.shadow {
                 encodeShadow(
-                    shadow, uniforms: uniforms, texture: texture, canvas: canvas,
+                    shadow, uniforms: uniforms, texture: texture, matte: matte, canvas: canvas,
                     maskState: maskState, pass: &pass)
             }
             // Cheap when the pass is already open, which for an unshadowed
@@ -871,6 +897,7 @@ final class MetalRenderer {
                 throw CompositorError.noDestinationTexture
             }
             if state !== pipeline { encoder.setRenderPipelineState(state) }
+            encoder.setFragmentTexture(matte, index: 1)
             if layer.reflection != nil {
                 encodeReflection(uniforms: uniforms, texture: texture, encoder: encoder)
             }

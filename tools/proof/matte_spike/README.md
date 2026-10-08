@@ -27,7 +27,9 @@ app for `proof_app.py` to choose.
   sample's median, min and max, and the K readbacks) and `result.json` (the
   rows, the figures, the route).
 
-**The variants.** V0 is the tree's `Compositor.metal`. V1 (placeholder) and V2
+**The variants.** V0 is `Compositor.metal` as it stood before MT2
+(`git show 464a3aa:app/Resources/Shaders/Compositor.metal`; a failed show is
+a B0 failure). V1 (placeholder) and V2
 (function constant) both add `kMatte*` codes, `MatteUniforms`,
 `reelcut_matte_resolve_fragment` (it reads the matte target at the fragment's
 pixel and returns the mode's value; its pipeline is `r8Unorm` with source
@@ -37,7 +39,7 @@ both layer entry points, and, after step 7's corner radius, `alpha *=` the
 coverage sampled at the fragment's canvas-normalised position — always in V1
 (an unmatted layer binds a 1×1 white texture), behind
 `kMatte [[function_constant(1)]]` in V2. Every patch has an anchor that must
-occur exactly once in the tree's shader; otherwise B0 fails naming it.
+occur exactly once in that shader; otherwise B0 fails naming it.
 
 **The scenes**, full bleed at 1920×1080 and 3840×2160: S1 one picture layer;
 S2 the picture, then a white-text layer drawn normally; S3 S2 with the text as

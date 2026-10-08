@@ -210,11 +210,20 @@ impl Project {
     pub fn frame_recipe_opts(&self, t: Ticks, opts: RecipeOptions) -> Value {
         let assignment = self.assign();
 
-        let mut layers: Vec<Value> = self
+        // The covering instances, collected once: the mattes are a relation
+        // between them (`recipe_matte.rs`), answered per instance in order.
+        let instances: Vec<Instance> = self
             .drawing_instances()
             .into_iter()
             .filter(|i| i.covers(t))
-            .map(|instance| self.layer(&instance, t, &assignment))
+            .collect();
+        let mattes = self.frame_mattes(&instances);
+        let mut layers: Vec<Value> = instances
+            .iter()
+            .zip(mattes.drawn_into.iter().zip(mattes.layer))
+            .map(|(instance, (drawn_into, matte))| {
+                self.layer(instance, t, &assignment, *drawn_into, matte)
+            })
             .collect();
         if opts.burn_in_timecode {
             layers.push(burn_in_layer(&self.canvas, t));
@@ -232,6 +241,7 @@ impl Project {
         out.insert("t".to_string(), Value::from(t));
         out.insert("canvas".to_string(), Value::Object(canvas));
         out.insert("layers".to_string(), Value::Array(layers));
+        out.insert("mattes".to_string(), mattes.listed);
         Value::Object(out)
     }
 
@@ -245,8 +255,17 @@ impl Project {
         }
     }
 
-    /// One layer of the recipe.
-    fn layer(&self, instance: &Instance, t: Ticks, assignment: &Assignment) -> Value {
+    /// One layer of the recipe. `drawn_into` says the layer is drawn into a
+    /// matte rather than onto the canvas, and `matte` is its `matte` key
+    /// (`recipe_matte.rs`).
+    fn layer(
+        &self,
+        instance: &Instance,
+        t: Ticks,
+        assignment: &Assignment,
+        drawn_into: bool,
+        matte: Value,
+    ) -> Value {
         // Clip time: 0 is the clip's first frame, which is what actions are
         // measured in (spec §5.4). The clip's own first frame, not the
         // instance's — a nest clip's edge cuts a nested clip short without
@@ -263,13 +282,22 @@ impl Project {
         // properties off it and the recipe publishes no `motion` key.
         let size = self.source_size(instance.clip);
         let container = self.container(&instance.inside);
-        let moved = motion::apply(
+        let mut moved = motion::apply(
             &evaluated.video,
             clip_t,
             instance.clip.duration,
             size,
             container,
         );
+        // A matte layer's drop shadow and reflection do nothing (spec §11
+        // MT-4): the matte is the clip's own picture, so they are cleared
+        // here, with its blend below — the recipe's second deliberate
+        // override of model values, decided by the core for the reason the
+        // transition's `normal` is. The inspector still shows the model's.
+        if drawn_into {
+            moved.shadow = None;
+            moved.reflection = None;
+        }
         let video = &moved;
         let (source, source_size) = self.layer_source(instance, &evaluated, clip_t, assignment);
         let frame = self.frame_of(instance, t);
@@ -315,7 +343,10 @@ impl Project {
         // MODEL's value through `clip_state`**, so during an overlap the
         // popup says `multiply` while the frame composites `normal`. Both
         // are honest — the clip multiplies, and this frame does not.
-        let blend = if transition.is_null() {
+        //
+        // A matte layer forces `normal` too (MT-4): what it draws into is a
+        // cleared target of its own, and its blend mode does nothing there.
+        let blend = if transition.is_null() && !drawn_into {
             video.blend
         } else {
             BlendMode::Normal
@@ -329,6 +360,7 @@ impl Project {
             placed,
             blend,
             transition,
+            matte,
         }
         .object()
     }

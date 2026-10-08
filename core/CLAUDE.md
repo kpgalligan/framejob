@@ -19,9 +19,10 @@ governs a module now.
   (`VideoProps`, `AudioProps`, `Crop`, `Shadow`, `ColorAdjust`, `Chroma`,
   `Filter`, `Reflection`, `BlendMode`, `Compressor`, `Duck`) and their
   defaults, re-exported whole by `model.rs` so every `crate::model::X` path
-  holds. **`BlendMode`'s and `ObscureKind`'s declaration ORDER are shader
-  discriminants** (`ProjectSnapshot.swift` derives the code from the case
-  index, `Compositor.metal` compares against the same integers): append,
+  holds. **`BlendMode`'s, `ObscureKind`'s and `TrackMatte`'s declaration
+  ORDER are shader discriminants** (`ProjectSnapshot.swift` and
+  `TrackMatte.swift` derive the code from the case index, `Compositor.metal`
+  compares against the same integers): append,
   never reorder. `Normal` is 0 with no `+1`, so a zeroed uniform block, an
   older recipe and a file with no `blend` key all render source-over.
 - `model_text.rs` · `model_shape.rs` · `model_regions.rs` · `model_motion.rs`
@@ -74,6 +75,11 @@ governs a module now.
   STORED). **A props map is changed only by `insert` and
   `shift_remove`**: under `preserve_order`, `Map::remove` is `swap_remove`,
   and `Project ==` cannot see the reorder.
+- `model_matte.rs` — the matte vocabulary (format version 14, spec §11 MT-1):
+  `TrackMatte` (`none`, `alpha`, `alpha_inverted`, `luma`, `luma_inverted`)
+  and `is_none`, re-exported through `model_props.rs`; the FIELD
+  `Track.matte` stays in `model.rs`, the model's one `skip_serializing_if`
+  (an ordinary track writes no key).
 - `model_color.rs` — `normalise_color`, G-12's colour grammar (hex,
   `rgb()`/`rgba()`, `hsl()`/`hsla()` and the CSS named colours, from
   svgtypes' table) to lowercase `#rrggbb[aa]`; out of range is refused,
@@ -168,7 +174,7 @@ governs a module now.
   `add_graphic_clip`'s `width` and `height`, from `model_graphic.rs`'s, never
   retyped — and never where it CLAMPS, which is the app's to say in its
   prose. A row holds no prose, no semantics and no default spelled twice;
-  `Kind` is closed (eighteen kinds; `Texts`, a list of strings, is
+  `Kind` is closed (nineteen kinds; `Texts`, a list of strings, is
   `set_action_end`'s `off`), carries each vocabulary's members, and has exactly ONE
   kind per answer serde gives, because a distinction the
   decoder cannot see is one no test could prove. Nothing here is the
@@ -449,15 +455,16 @@ governs a module now.
   `pitch` (#190, #211).
 - `recipe.rs` · `recipe_layer.rs` · `recipe_text.rs` — `frame_recipe(t)`: the
   layer list at one instant. `RecipeLayer` (`recipe_layer.rs`, re-exported by
-  `recipe.rs`) is the twenty keys of a layer written in ONE place
+  `recipe.rs`) is the twenty-one keys of a layer written in ONE place
   (`RecipeLayer.init(from:)` on the Swift side defaults a missing key
   silently, so a copied skeleton drifts with no diagnostic). `RecipeOptions`
   is what a caller wanted besides `t` — the burn-in timecode — and is a
   recipe option, never an export override, because the override table drops
   an unknown key in silence. A layer whose `transition` is non-null is
-  emitted `blend: "normal"` whatever the clip says: the core's ONE deliberate
-  override of a model value, because the dissolve's weight correction is the
-  inverse of a fixed-function destination factor. The inspector therefore
+  emitted `blend: "normal"` whatever the clip says: one of the core's TWO
+  deliberate overrides of model values (the other: a matte layer's `blend`,
+  `shadow` and `reflection`, MT-4), because the dissolve's weight correction
+  is the inverse of a fixed-function destination factor. The inspector therefore
   shows the model's value while the frame draws `normal` during an overlap.
   `recipe_text.rs` computes what a text layer SHOWS — `Reveal::of` turns
   `text.animation` into `reveal`, `reveal_phase` (the ORDER the renderer draws
@@ -470,6 +477,14 @@ governs a module now.
   of a map.
   A graphic layer's source is one arm calling `recipe_graphic.rs`'s
   `graphic_source`; `missing_source` is `pub(crate)` for it.
+- `recipe_matte.rs` — what the mattes do at one instant (spec §7.3, §11 MT-2,
+  MT-5): `matte_target` (the track directly behind a matte track in its
+  container, when that is not a matte track — the one place that says a matte
+  track is nobody's target), `MatteKey` (the enclosing nest-clip path and the
+  matte track's id) and `frame_mattes`, over the recipe's covering instances:
+  each layer's `matte` (`into`, `cut`), whether it is drawn into a matte, and
+  the listed groups, deepest container first. A layer's levels are walked
+  inner to outer, each level's cut asked BEFORE its own matte test.
 - `recipe_words.rs` — what a timed text PAGE shows at one instant:
   `Words::of(text, clip_t, duration)` answers five keys — `word` (how many
   of `text.words` have started, 0 to n), `word_pop` (0..1 through the active
@@ -698,7 +713,7 @@ Export names mirror the Rust method exactly.
 `RC_FORMAT_VERSION` in `format.rs` **and** the `#define` in
 `core/include/reelcut_core.h`; the reader must keep accepting every prior
 version; the writer enforces the reader's caps. A bump whose new fields all
-carry a serde default needs no migrate step (versions 3 through 13 have none)
+carry a serde default needs no migrate step (versions 3 through 14 have none)
 but still bumps, because unknown keys are ignored at every level by design
 and an older build would otherwise open the file, drop the new fields on read
 and write the loss back on the next save; a bump that changes a field's

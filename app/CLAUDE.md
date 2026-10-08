@@ -1044,14 +1044,18 @@ the key map behind it.
   last worker has exited.
 - `FrameRecipe.swift` — the frame recipe's Swift side (spec §7.3), decoded
   leniently: `RecipeCanvas`, `RecipeSourceRef`, `RecipeTransition`,
-  `RecipeClipRect`, `RecipeLayer` and `FrameRecipe` with the canvas hit test
+  `RecipeClipRect`, `RecipeLayerMatte`, `RecipeMatteGroup`, `RecipeLayer`
+  (with `matte`) and `FrameRecipe` (with `mattes`) with the canvas hit test
   `layer(at:measuring:)`, out of `ProjectSnapshot.swift`.
-- `Compositor.swift` · `Compositor+Shadow.swift` · `CompositorEffects.swift` ·
-  `Resources/Shaders/Compositor.metal`
+- `TrackMatte.swift` — a track's matte mode, mirroring `model_matte.rs`: raw
+  values, `displayName` and `shaderCode` (the case index — a shader
+  discriminant, append only); `TrackSnapshot.matte` decodes it leniently.
+- `Compositor.swift` · `Compositor+Shadow.swift` · `Compositor+Matte.swift` ·
+  `CompositorEffects.swift` · `Resources/Shaders/Compositor.metal`
   — the per-layer pass. The uniform block's field ORDER is a contract with the
   shader checked only by reading both, so change them in one edit; it is 104
   floats and **the padding tail is EMPTY** (the next field needs three
-  companions). **Five pipelines from three fragment functions**: the two
+  companions). **Six pipelines from four fragment functions**: the two
   programmable-blend pipelines MUST be built with fixed-function blending
   OFF, or the finished pixel is blended twice — invisible over an opaque
   destination, so a proof of it reads the ALPHA channel over a translucent
@@ -1060,8 +1064,17 @@ the key map behind it.
   three passes and its canvas-sized pair are `Compositor+Shadow.swift`'s
   (`encodeShadow`); a layer's uniforms and source texture are made by
   `prepare` in `CompositorEffects.swift`, which `render` calls once per layer.
-  Blending
-  is in the ENCODED sRGB space, deliberately. `[[position]]` arrives in
+  The matte pass is `Compositor+Matte.swift`'s `encodeMattes`, run BEFORE the
+  destination pass opens: each group the recipe's `mattes` lists is drawn by
+  the layer pipelines into a pooled destination-sized target (`MattePool`),
+  each cut set resolved by the sixth pipeline, the matte resolve (r8, source
+  factor zero, destination factor `sourceColor`), into a pooled coverage the
+  layer stage samples at `texture(1)` — every layer draw binds one, the 1×1
+  placeholder when nothing cuts it, and so do the shadow's silhouette pass
+  and the reflection. A layer whose `matte.into` is non-null is never drawn
+  on the canvas, and a cut naming a matte not drawn before it fails the frame
+  (`MatteError.unordered`). Blending is in the ENCODED sRGB space,
+  deliberately. `[[position]]` arrives in
   DESTINATION pixels, and `canvasPerDestX/Y` is what turns it into canvas
   pixels — an invariant that held only because the two had always been
   equal, until Preview Quality. A layer mid-transition blends `normal`

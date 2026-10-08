@@ -179,6 +179,39 @@ struct RecipeClipRect: Codable, Equatable {
     var rect: CGRect { CGRect(x: x - w / 2, y: y - h / 2, width: w, height: h) }
 }
 
+/// A layer's part in the frame's mattes (spec §7.3 `matte`, §11 MT-5): the
+/// group it is drawn INTO — never onto the canvas — when its track is a
+/// matte track, and the listed groups that CUT it, ascending. Ids name a
+/// `RecipeMatteGroup`.
+struct RecipeLayerMatte: Codable, Equatable {
+    let into: Int?
+    let cut: [Int]
+
+    init(into: Int?, cut: [Int]) {
+        self.into = into
+        self.cut = cut
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        into = c.lenient(.into)
+        cut = c.lenient(.cut, [])
+    }
+}
+
+/// One matte the compositor draws before the destination pass (spec §7.3
+/// `mattes`, §11 MT-6): its group id and how it cuts.
+struct RecipeMatteGroup: Codable, Equatable {
+    let group: Int
+    let mode: TrackMatte
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        group = c.lenient(.group, 0)
+        mode = c.lenient(.mode, TrackMatte.alpha)
+    }
+}
+
 /// One layer of a composed frame, every property already evaluated through
 /// the clip's actions.
 struct RecipeLayer: Codable, Equatable {
@@ -224,6 +257,11 @@ struct RecipeLayer: Codable, Equatable {
     /// nest — see `RecipeClipRect`.
     let clipRect: RecipeClipRect?
     let transition: RecipeTransition?
+    /// Nil for a layer no matte touches (format version 14). A layer with a
+    /// non-nil `into` is never drawn on the canvas — the core also cleared
+    /// its blend, shadow and reflection (MT-4) — and is drawn into its
+    /// group's target only when the recipe lists that group.
+    let matte: RecipeLayerMatte?
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -249,6 +287,7 @@ struct RecipeLayer: Codable, Equatable {
         obscure = c.lenient(.obscure, [])
         clipRect = c.lenient(.clipRect)
         transition = c.lenient(.transition)
+        matte = c.lenient(.matte)
     }
 
     /// `sourceSize` as a size; nil for text, whose size only the renderer
@@ -281,12 +320,16 @@ struct FrameRecipe: Codable, Equatable {
     let canvas: RecipeCanvas
     /// Back to front.
     let layers: [RecipeLayer]
+    /// The mattes to draw before the destination pass, deepest container
+    /// first (format version 14); empty when no matte cuts anything.
+    let mattes: [RecipeMatteGroup]
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         t = c.lenient(.t, 0)
         canvas = c.lenient(.canvas, RecipeCanvas())
         layers = c.lenient(.layers, [])
+        mattes = c.lenient(.mattes, [])
     }
 
     /// The topmost layer whose canvas rect contains `point` (canvas space,

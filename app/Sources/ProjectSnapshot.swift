@@ -460,10 +460,13 @@ struct TrackSnapshot: Codable, Equatable, Identifiable {
     /// is silent — audio only, and mute still wins on the same track. The
     /// core's envelopes apply it (`audio.rs`); the header only shows it.
     let solo: Bool
+    /// The track's matte (format version 14, `TrackMatte.swift`); `.none`
+    /// for an ordinary track and for a file that names no mode.
+    let matte: TrackMatte
 
     init(
         id: UInt32, name: String = "Track", hidden: Bool = false, muted: Bool = false,
-        locked: Bool = false, solo: Bool = false
+        locked: Bool = false, solo: Bool = false, matte: TrackMatte = .none
     ) {
         self.id = id
         self.name = name
@@ -471,6 +474,7 @@ struct TrackSnapshot: Codable, Equatable, Identifiable {
         self.muted = muted
         self.locked = locked
         self.solo = solo
+        self.matte = matte
     }
 
     init(from decoder: Decoder) throws {
@@ -481,6 +485,7 @@ struct TrackSnapshot: Codable, Equatable, Identifiable {
         muted = c.lenient(.muted, false)
         locked = c.lenient(.locked, false)
         solo = c.lenient(.solo, false)
+        matte = c.lenient(.matte, TrackMatte.none)
     }
 }
 

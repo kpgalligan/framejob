@@ -699,6 +699,7 @@ impl Project {
                         muted: false,
                         locked: false,
                         solo: false,
+                        matte: crate::model::TrackMatte::None,
                     },
                 );
                 id

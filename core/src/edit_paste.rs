@@ -314,6 +314,7 @@ fn new_track(project: &mut Project) -> Track {
         muted: false,
         locked: false,
         solo: false,
+        matte: crate::model::TrackMatte::None,
     }
 }
 

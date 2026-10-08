@@ -199,7 +199,16 @@ use crate::model::{Canvas, Project};
 /// colours switching at the end for want of `kinds`. The bump is so an older
 /// build refuses the file instead of drawing every animated prop held at
 /// its start.
-pub const RC_FORMAT_VERSION: u32 = 13;
+///
+/// Version 14 is the matte track (spec §11 MT-1): the track key
+/// [`crate::model::Track::matte`], placed after `solo` — `none`, `alpha`,
+/// `alpha_inverted`, `luma` or `luma_inverted` — and written only when it is
+/// not `none`, so an ordinary track, and every older file, writes exactly
+/// the text it did. The reader's default is `none`, so there is no
+/// migration step; an older build would drop the key and write back a
+/// matte track as an ordinary one, its clips suddenly drawn over the
+/// picture they were cutting.
+pub const RC_FORMAT_VERSION: u32 = 14;
 
 /// Reader caps, mirrored by the `RC_MAX_*` defines in the C header. They
 /// exist so a corrupt or generated file cannot make the app allocate

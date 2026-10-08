@@ -109,6 +109,13 @@ pub use crate::model_graphic::*;
 /// video group whose meaning is computed at render time rather than read.
 pub use crate::model_motion::*;
 
+/// The matte vocabulary — [`TrackMatte`], what a track's clips do to the
+/// track directly behind it (format version 14, spec §11 MT-1) — lives in
+/// `model_matte.rs` and is re-exported whole, so every
+/// `crate::model::TrackMatte` path resolves. See that module's doc for why
+/// its declaration order is a shader discriminant.
+pub use crate::model_matte::*;
+
 // ---- video properties ----------------------------------------------------
 
 /// Placement on the canvas plus the per-clip image controls. `x`/`y` are an

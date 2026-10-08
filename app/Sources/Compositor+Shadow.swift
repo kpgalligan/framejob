@@ -91,7 +91,7 @@ extension MetalRenderer {
     /// (The third member of that family, the REFLECTION, goes the other way
     /// and inherits the blend — `encodeReflection` says why.)
     func encodeShadow(
-        _ shadow: ShadowProps, uniforms: LayerUniforms, texture: MTLTexture,
+        _ shadow: ShadowProps, uniforms: LayerUniforms, texture: MTLTexture, matte: MTLTexture,
         canvas: RecipeCanvas, maskState: MTLRenderPipelineState, pass: inout DestinationPass
     ) {
         func component(_ index: Int) -> Float {
@@ -116,8 +116,8 @@ extension MetalRenderer {
             Float(max(shadow.blur, 0)) * uniforms.scale * 0.5, MetalRenderer.maxShadowSigma)
         guard
             let silhouette = shadowSilhouette(
-                uniforms: uniforms, texture: texture, sigma: sigma, canvas: canvas,
-                maskState: maskState, pass: &pass),
+                uniforms: uniforms, texture: texture, matte: matte, sigma: sigma,
+                canvas: canvas, maskState: maskState, pass: &pass),
             let encoder = pass.open()
         else { return }
 
@@ -168,8 +168,8 @@ extension MetalRenderer {
     /// an MPS kernel can be encoded while a render encoder is open, which is
     /// the reason `DestinationPass` exists.
     private func shadowSilhouette(
-        uniforms: LayerUniforms, texture: MTLTexture, sigma: Float, canvas: RecipeCanvas,
-        maskState: MTLRenderPipelineState, pass: inout DestinationPass
+        uniforms: LayerUniforms, texture: MTLTexture, matte: MTLTexture, sigma: Float,
+        canvas: RecipeCanvas, maskState: MTLRenderPipelineState, pass: inout DestinationPass
     ) -> MTLTexture? {
         let width = max(1, canvas.width)
         let height = max(1, canvas.height)
@@ -205,6 +205,10 @@ extension MetalRenderer {
         encoder.setVertexBytes(&u, length: MemoryLayout<LayerUniforms>.stride, index: 0)
         encoder.setFragmentBytes(&u, length: MemoryLayout<LayerUniforms>.stride, index: 0)
         encoder.setFragmentTexture(texture, index: 0)
+        // The layer's matte coverage, so the silhouette — and the shadow — is
+        // the cut-out shape (spec §11 MT-3). It is sampled at the canvas-
+        // normalised position, so this canvas-sized pass reads it right.
+        encoder.setFragmentTexture(matte, index: 1)
         encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
         encoder.endEncoding()
 

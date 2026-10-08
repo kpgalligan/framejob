@@ -26,7 +26,9 @@ fn sample(kind: Kind) -> Value {
         Kind::Color => json!([0.0, 0.0, 0.0, 1.0]),
         Kind::FrameRate => json!([30, 1]),
         Kind::Region => json!({"x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0}),
-        Kind::Transition | Kind::Alignment | Kind::Curve | Kind::Fit => json!(kind.values()[0]),
+        Kind::Transition | Kind::Alignment | Kind::Curve | Kind::Fit | Kind::Matte => {
+            json!(kind.values()[0])
+        }
     }
 }
 
@@ -79,11 +81,11 @@ fn every_optional_field_has_its_real_null_contract() {
             }
         }
     }
-    assert_eq!(seen.len(), 66, "optional inventory changed");
+    assert_eq!(seen.len(), 67, "optional inventory changed");
     for field in PLAIN {
         assert!(seen.contains(&field), "missing plain bool {field:?}");
     }
-    assert_eq!(seen.iter().filter(|x| !PLAIN.contains(x)).count(), 61);
+    assert_eq!(seen.iter().filter(|x| !PLAIN.contains(x)).count(), 62);
 }
 
 #[test]

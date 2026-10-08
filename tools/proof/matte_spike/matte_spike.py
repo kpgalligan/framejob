@@ -7,7 +7,8 @@ and which of two routes an UNMATTED layer takes (spec §11 MT-6).
     python3 tools/proof/matte_spike/matte_spike.py --check --mutant resolve-writes-one|anchor-missing
 
 Nothing is merged into `app/`. Three shaders are made in `work/matte_spike/<tag>/`
-from the tree's `app/Resources/Shaders/Compositor.metal`: V0 the file as it is;
+from `app/Resources/Shaders/Compositor.metal` as it stood at 464a3aa, before
+MT2 (`git show`; a failed show is the scored FAILURE row B0): V0 that file;
 V1 + the placeholder route (both layer entry points take `texture(1)` and step
 7 multiplies the layer's coverage by its sample at the fragment's
 canvas-normalised position, always); V2 + the function-constant route (the same
@@ -41,6 +42,7 @@ import json
 import re
 import shutil
 import statistics
+import subprocess
 import sys
 from pathlib import Path
 
@@ -52,7 +54,10 @@ sys.path.insert(0, str(PROOF / "graphics_spike"))
 import bounded  # noqa: E402
 import swift_build  # noqa: E402
 
-SHADER = ROOT / "app/Resources/Shaders/Compositor.metal"
+SHADER = "app/Resources/Shaders/Compositor.metal"
+# The commit whose shader the anchors were written against: the shader as it
+# stood before MT2 put route V1 into it (unchanged from b3dc3c2 through 464a3aa).
+SHADER_COMMIT = "464a3aa"
 WORK = PROOF / "work/matte_spike"
 SIZES = [(1920, 1080), (3840, 2160)]
 # The route's bound on V1's S1 overhead over V0 (ms): at 1080p the tree's
@@ -192,7 +197,12 @@ def run(argv, seconds):
 # ---- building -----------------------------------------------------------------
 
 def build_shaders(folder, mutant):
-    source = SHADER.read_text()
+    shown = subprocess.run(["git", "-C", str(ROOT), "show", f"{SHADER_COMMIT}:{SHADER}"],
+                           capture_output=True, text=True)
+    if shown.returncode != 0:
+        emit("B0", "FAIL", f"git show {SHADER_COMMIT}:{SHADER} failed: {shown.stderr.strip()[-300:]}")
+        return None
+    source = shown.stdout
     texts = {"V0": source}
     for name, route in (("V1", "placeholder"), ("V2", "constant")):
         text, why = patched(source, route, mutant)

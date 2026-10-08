@@ -470,7 +470,13 @@ extension AgentServer {
                     + "picture from the composition, muted its sound; locked keeps every ripple, "
                     + "insert and range edit off it; solo silences every OTHER track in its "
                     + "container (the timeline, or a nest's own tracks) that is not also soloed "
-                    + "— mute wins on a track that is both, and pictures are untouched.",
+                    + "— mute wins on a track that is both, and pictures are untouched. matte "
+                    + "makes the track a matte for the track directly behind it in its "
+                    + "container: its clips are not drawn, and what they show cuts that track "
+                    + "by alpha, inverted alpha, luma or inverted luma — where the matte track "
+                    + "shows nothing, the track behind shows uncut; a back-most matte track, or "
+                    + "one in front of another matte track, cuts nothing. Its clips still "
+                    + "sound. \"none\" makes it an ordinary track again.",
                 [
                     // The four switches name the MENU ITEM each one mirrors
                     // and nothing else: what each DOES is the sentence above,
@@ -483,6 +489,7 @@ extension AgentServer {
                     "muted": "Track ▸ Mute Audio.",
                     "locked": "Track ▸ Lock Track.",
                     "solo": "Track ▸ Solo.",
+                    "matte": "The matte mode; \"none\" switches it off.",
                 ]),
             opTool(
                 "remove_empty_tracks",

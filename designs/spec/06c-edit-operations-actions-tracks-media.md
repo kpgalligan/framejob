@@ -67,11 +67,16 @@ The rules every op shares are §6a; the clip ops are §6b.
 
 - **`add_track {index?, name?}`** — Inserts (index 0 = back).
 - **`remove_track {track, with_clips=false}`** — Refuses on a non-empty track unless `with_clips`.
-- **`move_track {track, index}` · `set_track {track, name?, hidden?, muted?, locked?, solo?}`** —
-  Omitted fields keep their value. `solo` (format version 3) is §5.2's container rule — while any
-  track in the set is soloed every other is treated as muted, mute wins, audio only, a nest's tracks
-  judged among themselves — applied as a 0 envelope in `audio.rs` (§7.2) and never in the plan, so a
-  solo toggle changes ramps and nothing else.
+- **`move_track {track, index}` · `set_track {track, name?, hidden?, muted?, locked?, solo?,
+  matte?}`** — Omitted fields keep their value. `solo` (format version 3) is §5.2's container
+  rule — while any track in the set is soloed every other is treated as muted, mute wins, audio
+  only, a nest's tracks judged among themselves — applied as a 0 envelope in `audio.rs` (§7.2) and
+  never in the plan, so a solo toggle changes ramps and nothing else. `matte` (format version 14,
+  §11 MT-1) is one of `none`, `alpha`, `alpha_inverted`, `luma`, `luma_inverted`; `"none"`
+  switches a matte off, an unknown name is invalid input naming the five, and re-choosing the
+  current mode is an identity. It changes the recipe alone (§7.3's `matte` and `mattes`), never
+  the plan: a matte track's clips decode and sound as on any track. `move_track` and
+  `remove_track` change which track is behind a matte, visibly (MT-2).
 - **`remove_empty_tracks`** —
 - **`add_marker {at, name?, chapter?, color?}` · `set_marker {marker, time?, name?, chapter?,
   color?}` · `remove_marker {marker}`** — Markers snap to frames; two markers may not share a time.

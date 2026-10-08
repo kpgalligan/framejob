@@ -47,7 +47,7 @@
 //! [`Kind::Text`], [`Kind::Texts`], [`Kind::Ids`] and [`Kind::Ranges`] are
 //! `Ticks`, `f64`, `bool`, `String`, `Vec<String>` (`set_action_end`'s
 //! `off` paths), `Vec<u32>` and the silence cut's `Vec<[Ticks; 2]>`, and
-//! the nine named types map like this:
+//! the twelve named types map like this:
 //!
 //! - [`Kind::Id`] — `u32`: an id naming a clip, track, action, marker or
 //!   media, and the canvas's two pixel dimensions, which are the same whole
@@ -57,10 +57,11 @@
 //! - [`Kind::Color`] — `Color`, four numbers; [`Kind::FrameRate`] — `Fps`,
 //!   two. Named rather than "a list of numbers" because their LENGTH is
 //!   part of what serde refuses.
-//! - [`Kind::Transition`], [`Kind::Alignment`], [`Kind::Curve`] and
-//!   [`Kind::Fit`] — `TransitionKind`, `TransitionAlign`, `Curve`,
-//!   `ZoomFit`: closed vocabularies, each carrying its members in
-//!   [`Kind::values`] rather than flattened to a string, because an agent
+//! - [`Kind::Transition`], [`Kind::Alignment`], [`Kind::Curve`],
+//!   [`Kind::Fit`] and [`Kind::Matte`] — `TransitionKind`,
+//!   `TransitionAlign`, `Curve`, `ZoomFit`, `TrackMatte`: closed
+//!   vocabularies, each carrying its members in [`Kind::values`] rather
+//!   than flattened to a string, because an agent
 //!   picking a legal value out of a schema is a reason this table exists.
 //!   [`Kind::Groups`] is `Vec<PasteGroup>`, the one vocabulary arriving
 //!   as a list.
@@ -146,6 +147,7 @@ pub enum Kind {
     Fit,
     Region,
     Groups,
+    Matte,
 }
 
 impl Kind {
@@ -179,6 +181,7 @@ impl Kind {
             Curve => &["linear", "ease_in", "ease_out", "ease_in_out"],
             Fit => &["fit", "fill"],
             Groups => &["video", "audio", "text", "shape", "graphic"],
+            Matte => &["none", "alpha", "alpha_inverted", "luma", "luma_inverted"],
             Ticks | Id | Index | Ids | Ranges | Number | Boolean | Text | Texts | Object
             | Color | FrameRate | Region => &[],
         }
@@ -301,7 +304,7 @@ pub const OP_TABLE: [OpRow; OP_COUNT] = [
     op("move_track", &[req("track", Id), req("index", Index)]),
     op("set_track",
        &[req("track", Id), opt("name", Text), opt("hidden", Boolean), opt("muted", Boolean),
-         opt("locked", Boolean), opt("solo", Boolean)]),
+         opt("locked", Boolean), opt("solo", Boolean), opt("matte", Matte)]),
     op("remove_empty_tracks", &[]),
     op("add_marker",
        &[req("at", Ticks), opt("name", Text), opt("chapter", Boolean), opt("color", Text)]),

@@ -183,6 +183,13 @@ pub struct Track {
     /// is applied as a gain envelope in `audio.rs`, never in the plan.
     #[serde(default)]
     pub solo: bool,
+    /// Matte (format version 14, spec §11 MT-1): `none` is an ordinary
+    /// track; any other mode makes the track's clips draw nothing on the
+    /// canvas and cut the track directly behind (MT-2, MT-3). Written only
+    /// when not `none` — the model's one `skip_serializing_if` — so an
+    /// ordinary track and every older file round-trip byte for byte.
+    #[serde(default, skip_serializing_if = "TrackMatte::is_none")]
+    pub matte: TrackMatte,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

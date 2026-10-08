@@ -102,8 +102,14 @@ extern "C" {
  * each named prop's schema type as set_action_end wrote it. An end is
  * stored as found, so there is no migration step; a version-12 end that
  * already names `graphic` now animates, its colours switching at the end.
- * An older build would draw every animated prop held at its start. */
-#define RC_FORMAT_VERSION 13
+ * An older build would draw every animated prop held at its start.
+ *
+ * Version 14 is the matte track: `matte` after `solo` on a track — `none`,
+ * `alpha`, `alpha_inverted`, `luma` or `luma_inverted` — written only when
+ * it is not `none`, so an ordinary track writes the text it did. The
+ * default is `none`, so there is no migration step; an older build would
+ * drop the key and draw a matte track's clips over the picture they cut. */
+#define RC_FORMAT_VERSION 14
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips

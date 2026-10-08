@@ -541,6 +541,7 @@ pub(crate) fn burn_in_layer(canvas: &Canvas, t: Ticks) -> Value {
         placed: Frame::TOP.place(&video),
         blend: BlendMode::Normal,
         transition: Value::Null,
+        matte: Value::Null,
     }
     .object()
 }

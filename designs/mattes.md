@@ -61,7 +61,7 @@ Each phase is committed alone, after its review.
 |---|---|---|
 | MT0 | MT-1..MT-6 recorded in spec §11 before any code; the matte spike (`tools/proof/matte_spike/`): the route for an unmatted layer and the matte's cost at 1080p and 4K | done (below) |
 | MT1 | Tolls, pure moves: `recipe_layer.rs` out of `recipe.rs`, `Compositor+Shadow.swift` and `prepare` out of `Compositor.swift`, `FrameRecipe.swift` out of `ProjectSnapshot.swift` | done (below) |
-| MT2 | The matte end to end over MCP, top level and nested levels: `tracks[].matte` (format 14), `set_track {matte}`, the recipe's `matte` and `mattes`, the mask and resolve passes, `matte_proof.py` | — |
+| MT2 | The matte end to end over MCP, top level and nested levels: `tracks[].matte` (format 14), `set_track {matte}`, the recipe's `matte` and `mattes`, the mask and resolve passes, `matte_proof.py` | done (below) |
 | MT3 | Nests (`nest` / `unnest`), dissolves, shadow, reflection, Preview Quality, every export | — |
 | MT4 | The chrome (MT-7 recorded first): Track ▸ Matte, the context submenu, the header tag, the lane, the Clip tab's note | — |
 | MT5 | Documents and figures; the spike re-run against the tree; the ADR; close | — |
@@ -183,3 +183,97 @@ second after the two comment fixes (typecheck, fmt, lint, test 129 s, app;
 `phase8_chrome.py` 150/150 (it builds its probes from `app/Sources` through
 `swift_build.py` and drives no built app, so `RC_PROOF_APP` does not reach
 it). Every score equals its last recorded run.
+
+## MT2 — the matte end to end over MCP (2026-10-08)
+
+**The core.** `TrackMatte` (`model_matte.rs`, re-exported through
+`model_props.rs`; its order a shader discriminant) is `Track.matte`, after
+`solo`, the model's first `skip_serializing_if`: an ordinary track writes no
+key, so every older file round-trips byte for byte. `RC_FORMAT_VERSION` 14 in
+`format.rs` and the header, no migrate step. `set_track` takes `matte` last
+(`op_table.rs`'s new `Kind::Matte`, the nineteenth kind; an unchanged mode is
+an identity through `finish`). `recipe_matte.rs` is MT-2 and MT-5's walk:
+over the covering instances, a layer's levels inner to outer, each level's
+cut asked before its own matte test so that `matte_target` alone says a
+matte track is nobody's target; the first matte level is `into`. A group is
+`MatteKey` (the enclosing nest-clip path, the matte track's id). `recipe.rs`
+collects the covering instances once, writes `mattes` after `layers`, and a
+layer drawn into a matte is the recipe's second override: `blend: "normal"`,
+`shadow: null`, `reflection: null` (MT-4). `matte` is every layer's 21st key
+(`recipe_layer.rs`), `null` on the burn-in. `nest` gives a nested track
+`matte: none` and carries nothing until MT3: nesting a matte pair today draws
+its matte clips inside the nest, ordinary.
+
+**The app.** `TrackMatte.swift`; `TrackSnapshot.matte`; `RecipeLayerMatte`,
+`RecipeMatteGroup`, `RecipeLayer.matte` and `FrameRecipe.mattes` in
+`FrameRecipe.swift`; `ReelOps.setTrack(…, matte:)`; `set_track`'s handler
+reads `matte` through `trackMatteArg` (an unknown name refused naming the
+five) and its catalog entry teaches it. No menu: the chrome is MT4. The
+shader takes route V1 (MT0): step 7c multiplies the coverage by the
+`texture(1)` sample at the fragment's canvas-normalised position, and
+`reelcut_matte_resolve_fragment` is the sixth pipeline (r8, source factor
+zero, destination factor `sourceColor`). `Compositor+Matte.swift`'s
+`encodeMattes` runs before the destination pass opens: each listed group's
+members drawn into a pooled destination-sized target exactly as `render`
+draws a layer (shadow, reflection, layer), each cut set resolved once into a
+pooled r8 coverage. `render` skips a layer with a non-null `into`, binds the
+coverage (or the placeholder) at `texture(1)` before the reflection and the
+draw, and hands it to `encodeShadow`, whose silhouette pass binds it too. A
+cut that names a matte not drawn before it is needed fails the frame
+(`MatteError.unordered`) rather than drawing it uncut: a recipe from the core
+never asks for one, and every matte throw happens before its encoder opens.
+
+| File | Before | After |
+|---|---|---|
+| `core/src/recipe.rs` | 511 | 543 |
+| `core/src/recipe_matte.rs` | — | 219 |
+| `core/src/model_matte.rs` | — | 45 |
+| `app/Sources/Compositor.swift` | 1120 | 1147 |
+| `app/Sources/Compositor+Matte.swift` | — | 272 |
+| `app/Sources/Compositor+Shadow.swift` | 263 | 267 |
+| `app/Sources/FrameRecipe.swift` | 317 | 360 |
+| `app/Sources/ProjectSnapshot.swift` | 1866 | 1871 |
+| `app/Sources/TrackMatte.swift` | — | 34 |
+
+**Scores.** `cargo test --release`: `matte` 8/8 (roles at a tick, top level
+and through nests; the unlisted `into` of a back-most matte and of a matte
+behind a matte; a hidden track, no clip at `t` and video off cut nothing; the
+overrides with the model kept; the identity and the unknown name; the plan's
+JSON unchanged by every mode; groups deepest first; the burn-in), `schema_v14`
+4/4, `recipe` 15/15, `op_table` 8/8, `op_schemas` 10/10, `op_nullability` 2/2
+(its optional inventory 66 → 67). `make lint`, `make typecheck` (the four
+baseline warnings), `make app-debug`. On Debug: `matte_proof.py` 16/16,
+`phase6_proof.py` 168/168, `phase8_chrome.py` 150/150. `make gate` passed
+three times in the foreground, each after a Swift change the mutants forced
+(below): 233 s, 198 s, 203 s (the last two with fmt and lint skipped, their
+inputs unchanged). The recorded run, on the third gate's Release build:
+`matte_proof.py` 16/16, `phase6_proof.py` 168/168 (no `Reelcut: ` line before
+or after), `phase8_chrome.py` 150/150.
+
+**Mutants** (eight, the spec's budget; `matte_proof.py --mutant NAME`, each on
+a tree copy built by its own `make app-debug`, rule R; a core mutant naming
+CT also runs `cargo test --release --test matte` in the copy's core). The
+first pass caught six and found two holes:
+- `source-drawn` survived MM: MM compared its frame only with A1's, which the
+  mutant corrupts the same way (a white matte rectangle drawn under a white
+  one). MM now draws C in red and makes A1's two region claims itself.
+- `core-matte-behind-matte` survived MM: the mutated recipe lists the front
+  matte's group after the group it cuts (both at depth 0, so by id), and the
+  resolve skipped a matte not drawn yet, so nothing showed. The walk now asks
+  a level's cut before its own matte test (so `matte_target` alone says a
+  matte track is nobody's target), and a cut naming a matte not drawn before
+  it fails the frame (`MatteError.unordered`). Run again, that failure was a
+  Metal assertion that killed the instance — "Command encoder released
+  without endEncoding": the throw left the resolve's encoder open — so every
+  matte throw now precedes its encoder, and `render`'s suspends the
+  destination pass first.
+The second pass, on the final instrument, caught `shader-no-multiply` (A1 A2
+L1), `source-drawn` (A1 B0 MM), `resolve-mode-ignored` (A2 L1 L2 L3),
+`core-no-prune` (V5 H0), `core-untargeted-into-null` (B0 MM CT),
+`core-no-override` (P6) and `handler-drops-matte` (A1 G0); after the encoder
+fix, `core-matte-behind-matte` was run again alone and caught (MM: no frame;
+the other fifteen rows passed, so the instance lived). The fix touched no
+other mutant's anchor.
+
+**Owed.** Nesting a matte pair draws its matte clips inside the nest,
+ordinary, until MT3's carry rule.

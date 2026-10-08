@@ -25,7 +25,8 @@ use serde_json::Value;
 
 use crate::export::describe;
 use crate::model::{
-    Clip, Marker, Media, MediaKind, MediaOriginal, Project, Source, Track, DEFAULT_MARKER_COLOR,
+    Clip, Marker, Media, MediaKind, MediaOriginal, Project, Source, Track, TrackMatte,
+    DEFAULT_MARKER_COLOR,
 };
 use crate::outcome::Outcome;
 use crate::time::Ticks;
@@ -201,6 +202,7 @@ impl Project {
                 muted: false,
                 locked: false,
                 solo: false,
+                matte: TrackMatte::None,
             },
         );
         self.finish(next)
@@ -273,7 +275,11 @@ impl Project {
     /// Sets any subset of a track's fields; an omitted argument keeps its
     /// value (spec §6). The name is stored trimmed, and an empty name is
     /// allowed — it means "unnamed", and the timeline draws the track's
-    /// position instead.
+    /// position instead. `matte` makes the track a matte for the track
+    /// directly behind it, `none` an ordinary track again (spec §11 MT-1);
+    /// re-choosing the current mode is an identity through `finish`, like
+    /// every other unchanged field.
+    #[allow(clippy::too_many_arguments)]
     pub fn set_track(
         &self,
         track: u32,
@@ -282,6 +288,7 @@ impl Project {
         muted: Option<bool>,
         locked: Option<bool>,
         solo: Option<bool>,
+        matte: Option<TrackMatte>,
     ) -> Result<Outcome, String> {
         self.require_track(track)?;
         let mut next = self.clone();
@@ -300,6 +307,9 @@ impl Project {
             }
             if let Some(solo) = solo {
                 found.solo = solo;
+            }
+            if let Some(matte) = matte {
+                found.matte = matte;
             }
         }
         self.finish(next)

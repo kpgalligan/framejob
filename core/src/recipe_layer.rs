@@ -9,13 +9,13 @@ use crate::evaluate::{json, number};
 use crate::model::{BlendMode, VideoProps};
 use crate::nest::Frame;
 
-/// The TWENTY keys of a recipe layer (spec §7.3), and the one place they are
-/// written.
+/// The TWENTY-ONE keys of a recipe layer (spec §7.3), and the one place they
+/// are written.
 ///
 /// It is a struct rather than twenty lines inside [`crate::model::Project::layer`] because
 /// phase 7 gave the recipe a SECOND producer of layers — the burn-in
 /// [`crate::recipe_text::burn_in_layer`] synthesizes, which belongs to no
-/// clip — and a second literal copy of a twenty-key object is a copy that
+/// clip — and a second literal copy of a twenty-one-key object is a copy that
 /// drifts. It would drift SILENTLY, which is the part worth stating:
 /// `FrameRecipe.swift`'s `RecipeLayer.init(from:)` reads every key
 /// leniently and DEFAULTS a missing one with no diagnostic anywhere, so a
@@ -42,11 +42,14 @@ pub(crate) struct RecipeLayer<'a> {
     /// `x`, `y`, `scale`, `rotation`, `opacity`, and the `clip_rect` the
     /// innermost nest imposed.
     pub placed: Frame,
-    /// Passed rather than read off `video`, because this is the one property
-    /// the recipe OVERRIDES: see [`crate::model::Project::layer`], which forces `normal`
-    /// under a transition.
+    /// Passed rather than read off `video`, because the recipe OVERRIDES
+    /// it: see [`crate::model::Project::layer`], which forces `normal` under
+    /// a transition and on a layer drawn into a matte (spec §11 MT-4).
     pub blend: BlendMode,
     pub transition: Value,
+    /// `null`, or `{into, cut}` — the matte group this layer is drawn into
+    /// and the groups that cut it (`recipe_matte.rs`, spec §7.3).
+    pub matte: Value,
 }
 
 impl RecipeLayer<'_> {
@@ -89,6 +92,7 @@ impl RecipeLayer<'_> {
             },
         );
         out.insert("transition".to_string(), self.transition);
+        out.insert("matte".to_string(), self.matte);
         Value::Object(out)
     }
 }

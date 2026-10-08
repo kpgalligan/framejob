@@ -16918,3 +16918,56 @@ route V1; with V1, S3 − S2 −0.082 / 0.066 ms and S4 − S2 0.040 / 0.542 ms
 (1080p / 4K), within 0.50 / 2.00 ms. Mutants: `resolve-writes-one` killed by K3
 and K4, `anchor-missing` by B0. The full table is `designs/mattes.md`'s MT0
 record.
+
+The spike patches the shader as it stood before MT2 (`git show
+464a3aa:app/Resources/Shaders/Compositor.metal`), the one its anchors were
+written against, so `--check` and `--measure` keep answering for MT0's routes;
+measuring the tree's own shader is road map mattes MT5's `--tree` mode.
+
+## Road map mattes — MT2, the matte track end to end over MCP (`matte_proof.py` C0, A1, G0, U0, P6, MM, V5, H0, B0, A2, N0, R0, L1–L3, Z1 and eight mutants; `core/tests/matte.rs`, `core/tests/schema_v14.rs`; #240, spec §11 MT-1..MT-6)
+
+**What it answers.** That `set_track {matte}` makes a track a matte for the
+track directly behind it, through the core's recipe (`matte`, `mattes`) and
+the compositor's matte pass, in `render_frame`'s bytes: alpha and inverted
+alpha against two references, luma and inverted luma against a formula over
+measured bytes, the movie itself as a luma matte, and every case MT-2 says
+cuts nothing (no clip at `t`, a hidden matte track, a back-most matte, a
+matte in front of a matte), plus undo, the model's own values for blend,
+shadow and reflection (MT-4) and the unknown-mode refusal. The module
+docstring lists every row and its fixture.
+
+```
+python3 tools/proof/matte_proof.py                          # Debug unless RC_PROOF_APP=release
+python3 tools/proof/matte_proof.py --only C0,A1,L1           # run and score only these rows
+python3 tools/proof/matte_proof.py --mutant NAME             # one of the eight below
+cd core && cargo test --release --test matte && cargo test --release --test schema_v14
+```
+
+It launches its own instance on a scratch socket in a scratch home
+(`tools/proof/work/matte/home`), makes a 2 s 640×360 `testsrc2` movie with
+ffmpeg in its work folder, performs no menu item, closes both projects it
+opens, and removes its work folder at the start and at exit. `--mutant`
+builds a tree copy (`tree_copy.make_copy`, `own_core` for a `core/` anchor,
+with the tree's `core/tests` linked in) with one anchor replaced, asserted to
+occur once, and scores rule R: exit 0 when every named row failed, 1 when one
+survived, 2 when the control could not be performed. A core mutant that
+names CT also runs `cargo test --release --test matte` in the copy's core.
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `shader-no-multiply` | step 7c's multiply by the coverage made `1.0 + 0.0 ×` it | A1 A2 L1 |
+| `source-drawn` | `render`'s skip of a layer with a non-null `into` emptied | A1 B0 MM |
+| `resolve-mode-ignored` | the resolve reads every mode as `kMatteAlpha` | A2 L1 L2 L3 |
+| `core-no-prune` | a group is listed whether or not a layer is drawn into it | V5 H0 |
+| `core-matte-behind-matte` | `matte_target` ignores that the track behind is a matte | MM |
+| `core-untargeted-into-null` | an unlisted group's `into` is written `null` | B0 MM CT |
+| `core-no-override` | `layer` is told no layer is drawn into a matte | P6 |
+| `handler-drops-matte` | `set_track`'s handler sends `matte: nil` | A1 G0 |
+
+**Its record** (2026-10-08): on Debug 16/16; recorded on the third gate's
+Release build (`RC_PROOF_APP=release`) 16/16, beside `phase6_proof.py` 168/168
+and `phase8_chrome.py` 150/150 for the layer stage every layer now goes
+through. Every mutant caught, `core-matte-behind-matte` after the instrument
+and the matte pass were fixed (MM made A1's region claims itself; a cut naming
+a matte not drawn before it fails the frame before any encoder opens) — the
+two passes are `designs/mattes.md`'s MT2 record.

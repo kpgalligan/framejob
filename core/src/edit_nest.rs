@@ -60,6 +60,7 @@ fn nested_track(project: &mut Project, from: &Track) -> Track {
         muted: from.muted,
         locked: from.locked,
         solo: from.solo,
+        matte: crate::model::TrackMatte::None,
     }
 }
 
@@ -75,6 +76,7 @@ fn new_track(project: &mut Project) -> Track {
         muted: false,
         locked: false,
         solo: false,
+        matte: crate::model::TrackMatte::None,
     }
 }
 

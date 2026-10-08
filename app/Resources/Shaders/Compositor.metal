@@ -72,6 +72,16 @@ constant int kBlendDarken     = 5;
 constant int kBlendLighten    = 6;
 constant int kBlendDifference = 7;
 
+// `TrackMatte` (format version 14, spec §11 MT-3) as the matte resolve
+// pass's code: the case index of `core/src/model_matte.rs`'s enum and of
+// `TrackMatte.swift`'s, `none` 0 to `luma_inverted` 4. **APPEND ONLY**, the
+// same contract as the blend modes above, checked by reading the three.
+constant int kMatteNone          = 0;
+constant int kMatteAlpha         = 1;
+constant int kMatteAlphaInverted = 2;
+constant int kMatteLuma          = 3;
+constant int kMatteLumaInverted  = 4;
+
 // What `amount = 1` means for each of the three filters whose strength is a
 // LENGTH. All three are SOURCE pixels, the frame every other length on a
 // layer is measured in (the crop, the corner radius, the shadow's blur and
@@ -868,7 +878,7 @@ static inline ObscurePlan obscurePlan(constant LayerUniforms &u, float2 localPx,
 //   5. the point filters       sepia, noir, vignette, invert, IN SLOT ORDER
 //   6. spotlight dim           after every colour stage: the dim is a light
 //                              on the layer, not something the filters act on
-//   7. coverage                corner radius × nest clip rectangle
+//   7. coverage                corner radius × nest clip rectangle × matte
 //   8. transition weight
 //   9. opacity, then the reflection's fade
 //  10. premultiply out
@@ -978,7 +988,8 @@ static inline ObscurePlan obscurePlan(constant LayerUniforms &u, float2 localPx,
 static inline float4 layerColorPremultiplied(Varyings in,
                                              constant LayerUniforms &u,
                                              texture2d<float> source,
-                                             sampler samp) {
+                                             sampler samp,
+                                             texture2d<float> matte) {
     float2 srcSize = max(float2(u.sourceWidth, u.sourceHeight), float2(1.0));
     float2 cropped = max(srcSize - float2(u.cropL + u.cropR, u.cropT + u.cropB), float2(1.0));
 
@@ -1248,6 +1259,18 @@ static inline float4 layerColorPremultiplied(Varyings in,
         alpha *= clamp(0.5 - d / feather, 0.0, 1.0);
     }
 
+    // (7c) The matte coverage (spec §11 MT-3, MT-6): the product of every
+    // matte cutting this layer, resolved into one r8 texture the size of the
+    // destination, sampled at the fragment's canvas-normalised position — so
+    // Preview Quality, the shadow's canvas-sized silhouette pass and the
+    // reflection, which lands where it lands, all read one coverage. An
+    // unmatted layer binds the 1×1 white placeholder, which reads 1
+    // everywhere (MT0's spike chose that route over a specialization: its
+    // cost per layer was within the measured bound).
+    alpha *= matte.sample(samp, canvasPixels(
+        in.position.xy, float2(u.canvasPerDestX, u.canvasPerDestY))
+        / max(float2(u.canvasWidth, u.canvasHeight), float2(1.0))).r;
+
     // Transitions. The recipe hands the pair as two adjacent layers with the
     // same kind and progress, so each pass only needs its own half: every
     // kind decomposes into a per-layer weight (here) plus a per-layer offset
@@ -1336,8 +1359,9 @@ static inline float4 layerColorPremultiplied(Varyings in,
 fragment float4 reelcut_layer_fragment(Varyings in [[stage_in]],
                                        constant LayerUniforms &u [[buffer(0)]],
                                        texture2d<float> source [[texture(0)]],
-                                       sampler samp [[sampler(0)]]) {
-    return layerColorPremultiplied(in, u, source, samp);
+                                       sampler samp [[sampler(0)]],
+                                       texture2d<float> matte [[texture(1)]]) {
+    return layerColorPremultiplied(in, u, source, samp, matte);
 }
 
 /// Step 11: one layer's colour combined with the destination under a
@@ -1457,8 +1481,9 @@ fragment float4 reelcut_layer_blend_fragment(Varyings in [[stage_in]],
                                              constant LayerUniforms &u [[buffer(0)]],
                                              texture2d<float> source [[texture(0)]],
                                              sampler samp [[sampler(0)]],
-                                             float4 dst [[color(0)]]) {
-    float4 src = layerColorPremultiplied(in, u, source, samp);
+                                             float4 dst [[color(0)]],
+                                             texture2d<float> matte [[texture(1)]]) {
+    float4 src = layerColorPremultiplied(in, u, source, samp, matte);
     return blendPremultiplied(int(u.blendMode + 0.5), src, dst);
 }
 
@@ -1545,4 +1570,42 @@ fragment float4 reelcut_shadow_fragment(ShadowVaryings in [[stage_in]],
     float alpha = clamp(mask.sample(samp, uv).a * u.opacity, 0.0, 1.0);
     // Premultiplied, like every other pass: the blend factor is one.
     return float4(float3(u.colorR, u.colorG, u.colorB) * alpha, alpha);
+}
+
+// MARK: - The matte resolve pass (spec §11 MT-3, MT-6)
+
+// The matte resolve pass's uniform block: the mode's code and a padding
+// tail to 16 bytes, mirrored by `MatteUniforms` in `Compositor+Matte.swift`
+// under `LayerUniforms`' layout contract.
+struct MatteUniforms {
+    float mode;
+    float reserved0;
+    float reserved1;
+    float reserved2;
+};
+
+// One matte's value at this pixel, from its composite — PREMULTIPLIED, in
+// encoded sRGB like every stage above — multiplied into the r8 coverage by
+// the pipeline (source factor zero, destination factor sourceColor), so a
+// layer cut by two mattes reads their product. The composite and the
+// coverage are both the destination's size, so the pixel is read, not
+// sampled. Luma is Rec. 709 over the premultiplied colour, the saturation
+// stage's weights, so a transparent pixel counts as black.
+fragment float4 reelcut_matte_resolve_fragment(ShadowVaryings in [[stage_in]],
+                                               constant MatteUniforms &u [[buffer(0)]],
+                                               texture2d<float> mask [[texture(0)]]) {
+    float4 m = mask.read(uint2(in.position.xy));
+    int mode = int(u.mode + 0.5);
+    float luma = dot(m.rgb, float3(0.2126, 0.7152, 0.0722));
+    float v = 1.0;
+    if (mode == kMatteAlpha) {
+        v = m.a;
+    } else if (mode == kMatteAlphaInverted) {
+        v = 1.0 - m.a;
+    } else if (mode == kMatteLuma) {
+        v = luma;
+    } else if (mode == kMatteLumaInverted) {
+        v = 1.0 - luma;
+    }
+    return float4(clamp(v, 0.0, 1.0));
 }

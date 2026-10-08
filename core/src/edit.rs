@@ -168,7 +168,7 @@
 //! | `add_track` | Inserts a track at `index`, or at the front when it is absent; index 0 is the back-most. The default name is `Track <count + 1>`. |
 //! | `remove_track` | Refuses on a track that still holds clips unless `with_clips`, and on the last remaining track. |
 //! | `move_track` | Reorders the stack; index 0 is the back-most. |
-//! | `set_track` | Omitted fields keep their value. |
+//! | `set_track` | Omitted fields keep their value. `matte: "none"` switches a matte off (MT-1). |
 //! | `remove_empty_tracks` | Drops every track with no clips, keeping the back-most if that would empty the stack. |
 //! | `add_marker` | A marker at `at`, clamped to ≥ 0, named `Marker <n>` and red unless `name` and `color` say otherwise. Two markers may not share a tick. |
 //! | `set_marker` | Omitted fields keep their value; the same one-marker-per-tick rule. |
@@ -224,7 +224,7 @@ use crate::edit_paste_attributes::PasteGroup;
 use crate::edit_transition::TransitionAlign;
 use crate::edit_zoom::{ZoomFit, ZoomRegion};
 use crate::export::describe;
-use crate::model::{Color, Curve, Project, TransitionKind};
+use crate::model::{Color, Curve, Project, TrackMatte, TransitionKind};
 use crate::outcome::Outcome;
 use crate::scope;
 use crate::time::{Fps, Ticks};
@@ -569,6 +569,8 @@ pub enum Op {
         locked: Option<bool>,
         #[serde(default)]
         solo: Option<bool>,
+        #[serde(default)]
+        matte: Option<TrackMatte>,
     },
     /// A struct variant with no fields, not a unit one, so that
     /// `deny_unknown_fields` applies to it like every other op.
@@ -874,7 +876,16 @@ impl Project {
                 muted,
                 locked,
                 solo,
-            } => self.set_track(*track, name.as_deref(), *hidden, *muted, *locked, *solo),
+                matte,
+            } => self.set_track(
+                *track,
+                name.as_deref(),
+                *hidden,
+                *muted,
+                *locked,
+                *solo,
+                *matte,
+            ),
             Op::RemoveEmptyTracks {} => self.remove_empty_tracks(),
             Op::AddMarker {
                 at,
