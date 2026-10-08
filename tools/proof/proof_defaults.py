@@ -12,7 +12,8 @@ session moved, by key NAME, and the removal of the proofs' own domains.
 No environment moves `UserDefaults` (the proof README's B83 section has the
 measurements): a probe compiled from app/Sources writes a domain named for
 its executable into the owner's real `~/Library/Preferences/`, and the app
-writes `com.kgalligan.Reelcut`. This file is the two halves of what is done
+writes its bundle's domain, `com.kgalligan.Reelcut` (Release) or
+`com.kgalligan.Reelcut.debug` (`make app-debug`), both refused by `refusal`. This file is the two halves of what is done
 about it, and it imports nothing from `tools/proof`.
 
 **What a session moved.** `snapshot(domain)` runs `defaults export <domain>
@@ -85,7 +86,8 @@ it, while the control IS removed.
 
 - **P3** the app's: `com.kgalligan.Reelcut`, `com.kgalligan.reelcut`,
   `COM.KGALLIGAN.REELCUT`, `com.kgalligan.Reelcut.helper`,
-  `com.kgalligan.Reelcut-Dev`, `com.kgalligan.ReelcutHelper`; control
+  `com.kgalligan.Reelcut-Dev`, `com.kgalligan.ReelcutHelper`,
+  `com.kgalligan.Reelcut.debug` (the Debug build's, spec §11 V-5); control
   `com.kgalligan.reelcut.x` (`prefix`).
 - **P4** global: `-g`, `-globalDomain`, `-app`, `NSGlobalDomain`, `Apple
   Global Domain`, `.GlobalPreferences`, the empty name, `a/b`; control `g`
@@ -737,7 +739,8 @@ def selftest():
         guarded("P3", lambda: _refused_row(
             root, "P3", ["com.kgalligan.Reelcut", "com.kgalligan.reelcut", "COM.KGALLIGAN.REELCUT",
                          "com.kgalligan.Reelcut.helper", "com.kgalligan.Reelcut-Dev",
-                         "com.kgalligan.ReelcutHelper"], "com.kgalligan.reelcut.x", "prefix"))
+                         "com.kgalligan.ReelcutHelper", "com.kgalligan.Reelcut.debug"],
+            "com.kgalligan.reelcut.x", "prefix"))
         guarded("P4", lambda: _refused_row(
             root, "P4", ["-g", "-globalDomain", "-app", "NSGlobalDomain", "Apple Global Domain",
                          ".GlobalPreferences", "", "a/b"], "g", "executable"))

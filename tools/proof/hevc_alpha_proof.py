@@ -239,12 +239,12 @@ because the claim is then incomplete: the instrument, not the product. A
 control or a mutant names none of those three rows and runs in full there
 (L2, where a mutant names it, likewise without the columns clause).
 `head` is the commit of the BUILD's tree, not of this checkout: `--app` has
-to be `build/Build/Products/Release/Reelcut.app` at the top of a git work
-tree (`build_tree`), `head` is that tree's `git rev-parse HEAD`, the `git
+to be `build/Build/Products/{Release,Debug}/Reelcut.app` at the top of a git
+work tree (`build_tree`), `head` is that tree's `git rev-parse HEAD`, the `git
 status` above is that tree's, and a build anywhere else — a proof's tree
 copy has no `.git` — is not recorded.
-What it cannot see is a STALE build inside its tree: `make app` there
-first. A recording at another commit or on another host than the file's
+A STALE build inside its tree is refused at launch (`proof_app`), naming
+the `make` target. A recording at another commit or on another host than the file's
 starts the file over. So another host records its own, from a work tree of
 a commit before G-33's code built there, with this script and `--app`
 aimed at that build. Where a digest is `null` its row compares the case's five
@@ -276,12 +276,13 @@ sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
 sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
 import mcp  # noqa: E402
+import proof_app  # noqa: E402
 import tree_copy  # noqa: E402
 import v2_snapshot  # noqa: E402
 from screens import PINS  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/hevc-alpha"
-APP = ROOT / "build/Build/Products/Release/Reelcut.app"
+APP = proof_app.bundle()
 BASELINE = ROOT / "tools/proof/hevc_alpha_baseline.json"
 CALL_BOUND = 120
 TOOL_BOUND = 60
@@ -759,12 +760,13 @@ def host_text(stamp):
 
 def build_tree(app):
     """The git work tree a build sits in — `<tree>/build/Build/Products/
-    Release/Reelcut.app`, where `make app` puts it — or None when `app` is
-    anywhere else or `<tree>` is not the top of a work tree. A proof's tree
+    {Release,Debug}/Reelcut.app`, where `make app` or `make app-debug` puts it —
+    or None when `app` is anywhere else or `<tree>` is not the top of a work tree. A proof's tree
     COPY is not one: it has no `.git`, and `git` would answer for the tree
     around it."""
     app = Path(app).resolve()
-    if app.parts[-5:-1] != ("build", "Build", "Products", "Release"):
+    if app.parts[-5:-2] != ("build", "Build", "Products") or app.parts[-2] not in (
+            "Release", "Debug"):
         return None
     tree = app.parents[4]
     done = bounded.run(["git", "-C", str(tree), "rev-parse", "--show-toplevel"], TOOL_BOUND)
@@ -789,7 +791,7 @@ def record(s, today):
     tree = build_tree(s.app)
     if tree is None:
         print(f"NOT RECORDED: the build's commit cannot be read — {s.app} is not "
-              "build/Build/Products/Release/Reelcut.app at the top of a git work tree")
+              "build/Build/Products/{Release,Debug}/Reelcut.app at the top of a git work tree")
         return None
     head, dirty = unchanged_build(tree)
     if dirty:
@@ -1605,14 +1607,9 @@ def build_mutant(name):
         target.write_text(text.replace(anchor, replacement))
     print(f"  building the copy ({len(anchors)} anchors replaced, each found once)…",
           flush=True)
-    built = bounded.run(["make", "app"], BUILD_BOUND, cwd=str(copy))
-    app = copy / "build/Build/Products/Release/Reelcut.app"
-    if built["rc"] != 0 or not (app / "Contents/MacOS/Reelcut").exists():
-        errors = [line for line in (built["stdout"] + built["stderr"]).splitlines()
-                  if "error" in line]
-        return None, (f"make app rc {built['rc']} (expired {built['expired']}): "
-                      + ("\n      ".join(errors[:6]) or built["stdout"][-600:]))
-    print(f"  built in {built['seconds']:.0f} s", flush=True)
+    app, reason = tree_copy.build_app(copy, BUILD_BOUND)
+    if app is None:
+        return None, reason
     return app, ""
 
 

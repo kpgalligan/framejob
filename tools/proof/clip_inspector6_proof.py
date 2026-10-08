@@ -65,14 +65,14 @@ import e2_chrome as e2  # noqa: E402  (clip, project, write_package, GREY)
 import clip_inspector_proof as ci  # noqa: E402  (action, media_clip, build_probe)
 import clip_inspector2_proof as ci2  # noqa: E402  (movie, text_clip)
 import mcp as mcp_launch  # noqa: E402
+import proof_app  # noqa: E402
 from mcp import MCP, ToolError  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 WORK = os.path.join(HERE, "work", "clip-inspector6")
 PROBE_SWIFT = os.path.join(HERE, "clip_inspector6_probe.swift")
-APP = os.path.join(ROOT, "build", "Build", "Products", "Release", "Reelcut.app", "Contents",
-                   "MacOS", "Reelcut")
+APP = str(proof_app.binary())
 TICKS = e2.TICKS
 SIX = 6 * TICKS
 

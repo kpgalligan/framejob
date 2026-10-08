@@ -364,6 +364,7 @@ from datetime import datetime
 
 import mcp as mcp_launch
 from mcp import MCP, ToolError, log_beside, remove_scratch, socket_pid, target
+import proof_app
 from dev_tools import DEV_TOOLS
 
 # Positional arguments first, flags anywhere: `--no-screen` (issue batch B66)
@@ -380,7 +381,7 @@ LOG = POSITIONAL[1] if len(POSITIONAL) > 1 else log_beside(SOCKET)
 HERE = os.path.dirname(os.path.abspath(__file__))
 WORK = os.path.join(HERE, "work")
 ROOT = os.path.dirname(os.path.dirname(HERE))
-APP = os.path.join(ROOT, "build", "Build", "Products", "Release", "Reelcut.app")
+APP = str(proof_app.bundle())
 BINARY = os.path.join(APP, "Contents", "MacOS", "Reelcut")
 SOURCES = os.path.join(ROOT, "app", "Sources")
 FIXTURES = os.path.join(WORK, "recordingproof")

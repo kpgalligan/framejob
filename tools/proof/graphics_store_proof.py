@@ -48,9 +48,10 @@ sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
 sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
 import mcp  # noqa: E402
+import proof_app  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/graphics-store"
-APP = ROOT / "build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut"
+APP = proof_app.binary()
 CALL_BOUND = 150
 ROWS = [f"S{n}" for n in range(1, 10)]
 rows = {}

@@ -66,6 +66,17 @@ targets:
       configs:
         Debug:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) REELCUT_DEV_TOOLS"
+          # Xcode 26 splits a Debug executable into a stub and __preview.dylib,
+          # and Write Agent Catalog's `codesign -s - -f "$exe"` fails on the split.
+          ENABLE_DEBUG_DYLIB: "NO"
+          # The Debug build is its own app (spec §11 V-5): "Reelcut Debug", its
+          # own bundle id and defaults domain, and an Alternate `.reelcut`
+          # handler, so a double-click opens the real Reelcut. Info.plist reads
+          # the two RC_ settings through `:default=`, so Release and
+          # Distribution, which set neither, keep their settings and bytes.
+          PRODUCT_BUNDLE_IDENTIFIER: com.kgalligan.Reelcut.debug
+          RC_APP_NAME: "Reelcut Debug"
+          RC_PROJECT_HANDLER_RANK: Alternate
         Release:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) REELCUT_DEV_TOOLS"
         # Distribution is the build that ships (spec §11 V-1), and notarization
@@ -76,8 +87,8 @@ targets:
     info:
       path: app/Info.plist
       properties:
-        CFBundleName: Reelcut
-        CFBundleDisplayName: Reelcut
+        CFBundleName: "$(RC_APP_NAME:default=Reelcut)"
+        CFBundleDisplayName: "$(RC_APP_NAME:default=Reelcut)"
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         LSMinimumSystemVersion: "26.0"
@@ -111,7 +122,7 @@ targets:
             CFBundleTypeRole: Editor
             NSDocumentClass: Reelcut.ProjectDocument
             LSTypeIsPackage: true
-            LSHandlerRank: Owner
+            LSHandlerRank: "$(RC_PROJECT_HANDLER_RANK:default=Owner)"
           # Opening a media file makes an UNTITLED project sized to it with
           # the file as the first clip (spec 1) — the app is an Alternate
           # handler for each so Open With… works from the Finder.
@@ -151,6 +162,9 @@ targets:
         com.apple.security.device.audio-input: true
     preBuildScripts:
       - name: Build Rust Core
+        # cargo decides staleness, so the step runs every build (a no-op
+        # costs 0.1 s).
+        basedOnDependencyAnalysis: false
         script: |
           set -e
           # /usr/bin is ahead of Xcode's own PATH, so `cc` is the xcrun shim a
@@ -238,8 +252,8 @@ targets:
       # The catalog snapshot reelcut-mcp lists from while no Reelcut runs
       # (MC-4; MC1 q1): the just-linked executable, ad-hoc signed alone in place
       # because the linker leaves it unsigned and arm64 kills an unsigned exec,
-      # run with -RCWriteCatalog (AgentCatalogSnapshot.swift). Xcode's CodeSign
-      # step re-signs the bundle after this phase. It fails on a non-zero exit
+      # run with -RCWriteCatalog (AgentCatalogSnapshot.swift), then the bundle
+      # signed again as Xcode's CodeSign signs it. It fails on a non-zero exit
       # and on any `Reelcut: ` line, the parity check complaining.
       - name: Write Agent Catalog
         basedOnDependencyAnalysis: false
@@ -247,6 +261,11 @@ targets:
           set -e
           out="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/agent-catalog.json"
           exe="$TARGET_BUILD_DIR/$EXECUTABLE_PATH"
+          # The codesign below re-seals the bundle, writing the marker
+          # tools/proof/proof_app.py reads as a complete build; any failure
+          # from here on removes it, so a failed build is refused (B88).
+          marker="$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/_CodeSignature/CodeResources"
+          trap 'rm -f "$marker"' EXIT
           mkdir -p "$(dirname "$out")"
           codesign -s - -f "$exe"
           rc=0
@@ -260,6 +279,25 @@ targets:
             echo "error: the catalog writer's output holds the parity check's complaint"
             exit 1
           fi
+          # Xcode's CodeSign task does not see this step change the bundle, so
+          # a build where nothing else changed skips it and would ship the
+          # ad-hoc signature above (no entitlements) over a catalog written
+          # after it. Seal the bundle as that task does: its identity and its
+          # processed entitlements (B88; a second no-op `make dist` failed D14).
+          IDENTITY="${EXPANDED_CODE_SIGN_IDENTITY:--}"
+          TIMESTAMP="--timestamp=none"
+          if [ "$IDENTITY" != "-" ]; then TIMESTAMP="--timestamp"; fi
+          RUNTIME=""
+          if [ "$ENABLE_HARDENED_RUNTIME" = YES ]; then RUNTIME="-o runtime"; fi
+          codesign --force --sign "$IDENTITY" $RUNTIME $TIMESTAMP \
+            --entitlements "$TARGET_TEMP_DIR/$FULL_PRODUCT_NAME.xcent" \
+            --generate-entitlement-der "$CODESIGNING_FOLDER_PATH"
+          trap - EXIT
+        inputFiles:
+          # Ordering only (the step runs every build): the entitlements it
+          # signs with, and the Info.plist its seal covers.
+          - $(TARGET_TEMP_DIR)/$(FULL_PRODUCT_NAME).xcent
+          - $(TARGET_BUILD_DIR)/$(INFOPLIST_PATH)
 
 schemes:
   Reelcut:

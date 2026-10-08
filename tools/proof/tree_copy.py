@@ -30,6 +30,14 @@ other build input. It answers `(dest, None)`, or `(None, reason)` on an
 `OSError`. `agent=False` is the assistant spike's, which splices
 Rasterize's `agent/` in its place.
 
+**A copy builds through `build_app(dest, seconds, env=None,
+release_only=None)`** (issue batch B88): `make app-debug` or `make app` in
+`dest`, as `proof_app.config(release_only)` chooses (`RC_PROOF_APP`), under
+`bounded.run`'s wall-clock bound, answering `(the copy's Reelcut.app, None)`
+or `(None, reason)`: the target, its status, whether it expired, and its
+first six `error:` lines (else its output's tail). A build that succeeded
+prints one line with its target and its seconds.
+
 **A built app is unregistered before its folder goes** (#223). Xcode and
 `/usr/bin/open` register a `.app` with LaunchServices, and deleting the
 folder leaves the registration behind. `unregister_apps(path)` runs
@@ -68,6 +76,10 @@ import subprocess
 import sys
 
 import mcp
+import proof_app
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "graphics_spike"))
+import bounded  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 WORK = os.path.join(ROOT, "tools", "proof", "work", "tree_copy")
@@ -163,6 +175,25 @@ def make_copy(dest, agent=True):
     except OSError as error:
         return None, f"the tree copy at {dest} could not be made: {error}"
     return dest, None
+
+
+def build_app(dest, seconds, env=None, release_only=None):
+    """The copy's own app, built by the chosen configuration's `make` target
+    in `dest`: `(bundle, None)`, or `(None, reason)`."""
+    try:
+        target = proof_app.MAKE_TARGET[proof_app.config(release_only)]
+        app = proof_app.bundle(dest, release_only)
+    except ValueError as error:
+        return None, str(error)
+    built = bounded.run(["make", target], seconds, cwd=str(dest), env=env)
+    if built["rc"] != 0 or built["expired"] or not (app / "Contents/MacOS/Reelcut").exists():
+        output = built["stdout"] + built["stderr"]
+        errors = [line for line in output.splitlines() if "error:" in line]
+        return None, (f"make {target} rc {built['rc']} (expired {built['expired']}, "
+                      f"{built['seconds']:.0f} s): "
+                      + ("\n      ".join(errors[:6]) or output[-600:]))
+    print(f"tree_copy: make {target} built {app} in {built['seconds']:.0f} s", flush=True)
+    return app, None
 
 
 def selftest():

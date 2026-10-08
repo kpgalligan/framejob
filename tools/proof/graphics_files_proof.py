@@ -74,11 +74,12 @@ sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
 sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
 import mcp  # noqa: E402
+import proof_app  # noqa: E402
 import tree_copy  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/graphics-files"
 HOME = WORK / "home"
-APP = ROOT / "build/Build/Products/Release/Reelcut.app"
+APP = proof_app.bundle()
 CALL_BOUND = 120
 FRAME = 20000
 SECOND = 30 * FRAME
@@ -427,8 +428,8 @@ def remove_work():
 
 
 def build_mutant():
-    """A copy of the tree with the mutant's anchor replaced, built by its own
-    `make app`. The app bundle, or None and why."""
+    """A copy of the tree with the mutant's anchor replaced, built by
+    `tree_copy.build_app`. The app bundle, or None and why."""
     file, anchor, replacement, _ = MUTANT
     made, reason = tree_copy.make_copy(str(WORK / "mutant"))
     if made is None:
@@ -439,13 +440,9 @@ def build_mutant():
     if text.count(anchor) != 1:
         return None, f"the anchor occurs {text.count(anchor)} times in {file}"
     target.write_text(text.replace(anchor, replacement))
-    built = bounded.run(["make", "app"], 1500, cwd=str(copy))
-    app = copy / "build/Build/Products/Release/Reelcut.app"
-    if built["rc"] != 0 or not (app / "Contents/MacOS/Reelcut").exists():
-        errors = [line for line in (built["stdout"] + built["stderr"]).splitlines()
-                  if "error:" in line]
-        return None, (f"make app rc {built['rc']} (expired {built['expired']}): "
-                      + ("\n      ".join(errors[:6]) or built["stdout"][-600:]))
+    app, reason = tree_copy.build_app(copy, 1500)
+    if app is None:
+        return None, reason
     return app, ""
 
 

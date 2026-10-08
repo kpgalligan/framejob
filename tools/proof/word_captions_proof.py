@@ -48,6 +48,7 @@ import sys
 import time
 
 from mcp import MCP, ToolError, log_beside, remove_scratch, scratch_socket, wait_listening
+import proof_app
 from cloud_captions_probe import Fake, child_env, hold_cloud_lock
 from e1_proof import decode_png
 from speech_engine_proof import make_fixtures
@@ -56,8 +57,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 WORK = os.path.join(HERE, "work", "word_captions")
 MEDIA = os.path.join(HERE, "media")
-BINARY = os.path.join(ROOT, "build", "Build", "Products", "Release", "Reelcut.app",
-                      "Contents", "MacOS", "Reelcut")
+BINARY = str(proof_app.binary())
 DUMMY = "proof-key"
 SEC = 600_000
 STYLES = ["subtitles", "highlight", "pill", "karaoke", "build", "one_word"]

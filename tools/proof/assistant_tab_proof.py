@@ -818,14 +818,11 @@ def build_mutant(name="no-forward"):
         with open(path, "w") as handle:
             handle.write(text.replace(before, after))
         done = f"{name} applied to the copy's {file}"
-    print(f"mutant: {done}; make app (up to {asp.WALL_BUILD} s)…", flush=True)
-    built = bounded.run(["make", "app"], asp.WALL_BUILD, cwd=root, env=child_env())
-    app = os.path.join(root, asp.APP_PATH)
-    if built["expired"] or built["rc"] != 0 or not os.path.exists(os.path.join(app, asp.BINARY)):
-        tail = [l for l in (built["stdout"] + built["stderr"]).splitlines() if l.strip()][-3:]
-        return None, f"make app exit {built['rc']} (expired {built['expired']}): {tail}"
-    print(f"mutant: built in {built['seconds']:.0f} s", flush=True)
-    return app, None
+    print(f"mutant: {done}; building the copy (up to {asp.WALL_BUILD} s)…", flush=True)
+    app, reason = tree_copy.build_app(root, asp.WALL_BUILD, env=child_env())
+    if app is None:
+        return None, reason
+    return str(app), None
 
 
 # ---------------------------------------------------------------------------

@@ -3,23 +3,26 @@
 built app, and the real build's own session measured.
 
     python3 tools/proof/defaults_proof.py [--app <Reelcut.app>] [--only ROWS]
-    python3 tools/proof/defaults_proof.py --mutant no-compare|no-exit|home-followed
+    python3 tools/proof/defaults_proof.py --mutant no-compare|no-exit|home-followed|no-rehome
 
 No environment moves `UserDefaults`, so an instance a proof launches shares
-`com.kgalligan.Reelcut` with the owner. `mcp.py` snapshots that domain by key
+its bundle's domain with the owner: `com.kgalligan.Reelcut` for Release,
+`com.kgalligan.Reelcut.debug` for Debug (spec §11 V-5). `mcp.py` snapshots that domain by key
 name when a socket is made, launched on or handed over, compares when the
 session ends, and ENDS the script with status 3 and `mcp: DEFAULTS MOVED …`
 last on stderr when a key outside AppKit's `NS*`/`Apple*` families moved and
 no other Reelcut shares the domain (with one, it only prints). This proof
 makes that happen on purpose, and never on the owner's domain.
 
-**The clone.** `--app` (the Release build by default) is cloned to
+**The clone.** `--app` (`proof_app.bundle()`, the app `RC_PROOF_APP` chooses,
+by default) is cloned to
 `tools/proof/work/defaults-proof/Reelcut.app` (`cp -c -R`, else a copy) and
 its `CFBundleIdentifier` replaced with `com.kgalligan.reelcut.defaults-proof`,
 so its instances write that domain and none of the owner's. The one route to
 an owner-visible write is `perform_menu_item`: `["View", "Snapping"]` writes
 `ReelcutSnappingEnabled`. The real `com.kgalligan.Reelcut` domain is only
-ever read (`defaults export`), and no value or digest is printed.
+ever read (`defaults export`), and no value or digest is printed; so is the
+Debug build's `com.kgalligan.Reelcut.debug`.
 
 Each G row runs this script again as a `--child` that scores nothing and
 ends `sys.exit(0)`; the parent scores its status, stdout and stderr.
@@ -35,6 +38,13 @@ ends `sys.exit(0)`; the parent scores its status, stdout and stderr.
   and no such line.
 - **G3** child `write-no-remove`, which never calls `remove_scratch`:
   status 3, by the `atexit` handler finishing the record still held.
+- **G6** (issue batch B88) child `write-rehomed`, run with
+  `RC_PROOF_APP=release`: it calls `mcp.scratch_socket()` (a record of
+  `com.kgalligan.Reelcut`, read only), starts the clone itself by `Popen` on
+  that socket, builds `MCP(socket)` and toggles as G1 does, then stops the
+  clone by pid and calls `remove_scratch`: the record was re-homed to the
+  clone's domain (`mcp._rehome`, said on stderr), so status 3 and stderr's
+  last line is `DEFAULTS MOVED in com.kgalligan.reelcut.defaults-proof`.
 - **G5** child `write` while S2 is alive, a second instance of the clone the
   parent started itself by `Popen` on its own folder (no `mcp` record):
   status 0, and the line names S2's pid. Another Reelcut shares the domain,
@@ -57,12 +67,14 @@ ends `sys.exit(0)`; the parent scores its status, stdout and stderr.
 - **H2** the other way round, child `home-removed`: the folder is there at
   the record and the child removes it after `stop()`, before the compare.
   Same four claims, the home present then absent.
-- **R1** the REAL build, in this process: `mcp.launch`, `new_project`,
-  `close_project`, stop, `remove_scratch`. No owner-visible key of
-  `com.kgalligan.Reelcut` moved. If one did and another Reelcut shares the
+- **R1** the REAL build (`--app`), in this process: `mcp.launch`,
+  `new_project`, `close_project`, stop, `remove_scratch`. No owner-visible
+  key of its bundle's domain (`com.kgalligan.Reelcut`, or
+  `com.kgalligan.Reelcut.debug` for a Debug build; the detail names it)
+  moved. If one did and another Reelcut shares the
   domain, one retry; then FAIL naming the keys and the pids.
-- **R2** the real domain across C0 and the G and H rows: no owner-visible
-  key moved (no retry).
+- **R2** that domain across C0 and the G and H rows: no owner-visible key
+  moved (no retry).
 
 **A write is a toggle, and only the first one may count.** View ▸ Snapping
 writes the opposite of what the instance read when the project's window was
@@ -96,9 +108,10 @@ moved key and the runs since in which none did.
 
 `--mutant` reaches the children by argv and must fail exactly its rows (then
 MUTANT PASS, exit 0): `no-compare` (`proof_defaults.moved` answers `[]`) G1,
-G3, G4, G5; `no-exit` (`mcp._exit_failed` is a no-op) G1, G3, G4;
+G3, G6, G4, G5; `no-exit` (`mcp._exit_failed` is a no-op) G1, G3, G6, G4;
 `home-followed` (`proof_defaults.read_env` answers None, so `defaults
-export` inherits `CFFIXED_USER_HOME` as it did before B84) H1, H2.
+export` inherits `CFFIXED_USER_HOME` as it did before B84) H1, H2;
+`no-rehome` (`mcp._rehome` does nothing) G6 alone.
 
 At the end S2 is stopped, the work folder removed through
 `tree_copy.remove_tree` (which unregisters the clone, #223) and the clone's
@@ -124,10 +137,10 @@ import bounded  # noqa: E402
 
 sys.path.insert(0, HERE)
 import mcp  # noqa: E402
+import proof_app  # noqa: E402
 import proof_defaults  # noqa: E402
 import tree_copy  # noqa: E402
 
-APP = os.path.join(ROOT, "build", "Build", "Products", "Release", "Reelcut.app")
 WORK = os.path.join(HERE, "work", "defaults-proof")
 CLONE = os.path.join(WORK, "Reelcut.app")
 CLONE_DOMAIN = "com.kgalligan.reelcut.defaults-proof"
@@ -135,9 +148,10 @@ KEY = "ReelcutSnappingEnabled"
 MARK = "mcp: DEFAULTS MOVED in "
 SEED = "ReelcutDefaultsProofSeed"
 HOME_KINDS = ("absent-home", "home-removed")
-ROWS = ["C0", "G1", "G2", "G3", "G5", "G4", "H1", "H2", "R1", "R2"]
-EXPECTED = {"no-compare": {"G1", "G3", "G4", "G5"}, "no-exit": {"G1", "G3", "G4"},
-            "home-followed": {"H1", "H2"}}
+ROWS = ["C0", "G1", "G2", "G3", "G6", "G5", "G4", "H1", "H2", "R1", "R2"]
+EXPECTED = {"no-compare": {"G1", "G3", "G6", "G4", "G5"}, "no-exit": {"G1", "G3", "G6", "G4"},
+            "home-followed": {"H1", "H2"}, "no-rehome": {"G6"}}
+REHOMED = "mcp: the defaults guard moved "
 WALL_CHILD, WALL_COPY = 240, 300
 TOGGLES, WAIT = 3, 3.0
 
@@ -162,17 +176,30 @@ def child(kind, target, mutant):
         mcp._exit_failed = lambda lines: None
     if mutant == "home-followed":
         proof_defaults.read_env = lambda: None
+    if mutant == "no-rehome":
+        mcp._rehome = lambda socket_path, pid, domain: None
     home = os.environ.get("CFFIXED_USER_HOME") if kind in HOME_KINDS else None
     if home and not os.path.realpath(home).startswith(os.path.realpath(WORK) + os.sep):
         home = None     # a folder is made or removed under the work folder only
     if kind in HOME_KINDS:
         print(f"HOME record {'present' if home and os.path.isdir(home) else 'absent'}",
               flush=True)
-    started = None
+    started, own = None, None
     began = time.monotonic()
     if kind == "write-handed":
         socket_path = target
         client = mcp.MCP(socket_path, timeout=60)
+    elif kind == "write-rehomed":
+        socket_path = mcp.scratch_socket()
+        log_path = mcp.log_beside(socket_path)
+        print("SOCKET " + socket_path, flush=True)
+        with open(log_path, "ab") as out:
+            own = subprocess.Popen([target, "-ApplePersistenceIgnoreState", "YES"],
+                                   stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.STDOUT,
+                                   start_new_session=True,
+                                   env={**child_env(), "RC_AGENT_SOCKET": socket_path})
+        client = (mcp.MCP(socket_path, timeout=60)
+                  if mcp.wait_listening(log_path, socket_path, child=own, seconds=60) else None)
     else:
         started = mcp.launch(target, env=child_env(), timeout=60)
         socket_path, client = started.socket_path, started.client
@@ -217,13 +244,15 @@ def child(kind, target, mutant):
     asked = time.monotonic()
     if started is not None:
         started.stop()
+    if own is not None:   # this child's own Popen: stopped by its pid, and reaped
+        mcp.Launched(own, socket_path, None, None).stop()
     if kind == "home-removed" and home:
         shutil.rmtree(home, ignore_errors=True)
     if kind in HOME_KINDS:
         print(f"HOME compare {'present' if home and os.path.isdir(home) else 'absent'}",
               flush=True)
     stopped = time.monotonic()
-    if kind in ("write", "quiet") or kind in HOME_KINDS:
+    if kind in ("write", "quiet", "write-rehomed") or kind in HOME_KINDS:
         mcp.remove_scratch(socket_path)
     print(f"TIMES session {asked - began:.1f} s, stop {stopped - asked:.1f} s, compare "
           f"{time.monotonic() - stopped:.1f} s", flush=True)
@@ -252,9 +281,9 @@ def stop_pid(pid):
         pass
 
 
-def run_child(kind, target, mutant, home=None):
+def run_child(kind, target, mutant, home=None, extra=None):
     """{rc, expired, moved (list or None), done, stderr lines, marks}. `home`
-    is the child's `CFFIXED_USER_HOME` (H1, H2)."""
+    is the child's `CFFIXED_USER_HOME` (H1, H2); `extra` more environment."""
     argv = [sys.executable, os.path.abspath(__file__), "--child", kind, target]
     if mutant:
         argv += ["--mutant", mutant]
@@ -262,6 +291,7 @@ def run_child(kind, target, mutant, home=None):
     env = child_env()
     if home:
         env["CFFIXED_USER_HOME"] = home
+    env.update(extra or {})
     ran = bounded.run(argv, WALL_CHILD, env=env)
     ended = time.monotonic()
     moved, done, socket_path, toggles, domain = None, False, None, None, None
@@ -327,6 +357,10 @@ def make_clone(app):
     """None, or why the clone could not be made."""
     tree_copy.remove_tree(WORK)
     os.makedirs(WORK)
+    try:
+        proof_app.require_fresh(binary_of(app))
+    except proof_app.StaleApp as error:
+        return str(error)
     copied = bounded.run(["cp", "-c", "-R", app, CLONE], WALL_COPY)
     if copied["rc"] != 0 or copied["expired"] or not os.path.isdir(CLONE):
         tree_copy.remove_tree(CLONE)
@@ -434,7 +468,8 @@ def real_session(app, index):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--app", default=APP, help="the built Reelcut.app (Release)")
+    parser.add_argument("--app", default=None,
+                        help="the built Reelcut.app (default: proof_app.bundle())")
     parser.add_argument("--only", help="rows to run, comma-separated (C0 runs for any G row)")
     parser.add_argument("--mutant", choices=sorted(EXPECTED))
     parser.add_argument("--child", nargs=2, metavar=("KIND", "TARGET"), help=argparse.SUPPRESS)
@@ -460,14 +495,16 @@ def main():
               + f"{row_id} [{now - clock[0]:.0f} s] {detail}", flush=True)
         clock[0] = now
 
-    app = os.path.abspath(args.app)
+    app = os.path.abspath(args.app or proof_app.bundle())
     if not os.path.isfile(binary_of(app)):
-        print(f"instrument failure: {binary_of(app)} is missing — run `make app`")
+        print(f"instrument failure: {binary_of(app)} is missing — run `make "
+              f"{proof_app.MAKE_TARGET[proof_app.config()]}`")
         return 2
+    real = proof_defaults.bundle_domain(binary_of(app)) or proof_defaults.APP_DOMAIN
 
     s2, s2_socket = None, None
     try:
-        before = proof_defaults.snapshot()
+        before = proof_defaults.snapshot(real)
         needs_clone = bool(wanted - {"R1"})
         clone_up = False
         if needs_clone:
@@ -511,13 +548,13 @@ def main():
             clone_up = not problems
             row("C0", clone_up, "; ".join(problems) if problems else detail)
 
-        def guard_row(row_id, kind, target, check):
+        def guard_row(row_id, kind, target, check, extra=None):
             if row_id not in wanted:
                 return
             if not clone_up:
                 row(row_id, False, "not run: C0 failed")
                 return
-            answer = run_child(kind, target, args.mutant)
+            answer = run_child(kind, target, args.mutant, extra=extra)
             problems = check(answer)
             row(row_id, not problems, shape(answer) + ("" if not problems
                                                       else " — " + "; ".join(problems)))
@@ -563,6 +600,15 @@ def main():
         guard_row("G2", "quiet", binary_of(CLONE), quiet)
         guard_row("G3", "write-no-remove", binary_of(CLONE),
                   lambda a: wrote(a) + failed_last(a))
+
+        def rehomed(answer):
+            said = [line for line in answer["lines"] if line.startswith(REHOMED)
+                    and f" to {CLONE_DOMAIN}, the bundle of pid " in line]
+            return [] if said else [f"no `{REHOMED}… to {CLONE_DOMAIN}` line on stderr"]
+
+        guard_row("G6", "write-rehomed", binary_of(CLONE),
+                  lambda a: wrote(a) + rehomed(a) + failed_last(a),
+                  extra={proof_app.ENV: "release"})
 
         if clone_up and wanted & {"G5", "G4"}:
             s2, s2_socket, _log, reason = start_s2()
@@ -627,38 +673,36 @@ def main():
 
         home_row("H1", "absent-home", os.path.join(WORK, "h1", "home"), "absent", "present")
         home_row("H2", "home-removed", os.path.join(WORK, "h2", "home"), "present", "absent")
-        after = proof_defaults.snapshot()
+        after = proof_defaults.snapshot(real)
 
         if "R1" in wanted:
             os.makedirs(WORK, exist_ok=True)
             names, reason = real_session(app, 1)
             visible = proof_defaults.owner_visible(names or [])
             retried = False
-            if reason is None and visible and proof_defaults.sharing_pids(proof_defaults.APP_DOMAIN):
+            if reason is None and visible and proof_defaults.sharing_pids(real):
                 retried = True
                 names, reason = real_session(app, 2)
                 visible = proof_defaults.owner_visible(names or [])
             if reason:
                 row("R1", False, f"the real build's session: {reason}")
             else:
-                pids = proof_defaults.sharing_pids(proof_defaults.APP_DOMAIN)
+                pids = proof_defaults.sharing_pids(real)
                 row("R1", not visible,
-                    f"the real build, new_project and close_project: moved {names}; "
-                    f"owner-visible {visible}" + ("; after one retry" if retried else "")
-                    + f"; other Reelcut pids sharing {proof_defaults.APP_DOMAIN} now: "
-                    f"{pids or 'none'}")
+                    f"the real build, new_project and close_project, guarding {real}: moved "
+                    f"{names}; owner-visible {visible}" + ("; after one retry" if retried else "")
+                    + f"; other Reelcut pids sharing {real} now: {pids or 'none'}")
 
         if "R2" in wanted:
             if before is None or after is None:
-                row("R2", False, f"`defaults export {proof_defaults.APP_DOMAIN} -` did not answer")
+                row("R2", False, f"`defaults export {real} -` did not answer")
             else:
                 names = proof_defaults.moved(before, after)
                 visible = proof_defaults.owner_visible(names)
                 row("R2", not visible,
-                    f"{proof_defaults.APP_DOMAIN} ({len(after)} keys) across C0 and the G and H "
-                    "rows: moved "
+                    f"{real} ({len(after)} keys) across C0 and the G and H rows: moved "
                     f"{names}; owner-visible {visible}; other Reelcut pids sharing it now: "
-                    f"{proof_defaults.sharing_pids(proof_defaults.APP_DOMAIN) or 'none'}")
+                    f"{proof_defaults.sharing_pids(real) or 'none'}")
     finally:
         stop_s2(s2, s2_socket)
         tree_copy.remove_tree(WORK)

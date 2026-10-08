@@ -216,12 +216,13 @@ sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
 import graphics_proof as gp  # noqa: E402  (attempt, complaints)
 import mcp  # noqa: E402
+import proof_app  # noqa: E402
 import swift_build  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/graphics-inspector"
 HOME = WORK / "home"
 CALL_BOUND = 300
-APP = ROOT / "build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut"
+APP = proof_app.binary()
 PROBE_SWIFT = ROOT / "tools/proof/graphics_inspector_probe.swift"
 HARNESS_BUILD = ROOT / "tools/proof/harness/build.sh"
 RED_PNG = ROOT / "graphic/tests/assets/red.png"

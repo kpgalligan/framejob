@@ -104,13 +104,14 @@ ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "graphics_spike"))
 import bounded  # noqa: E402
+import proof_app  # noqa: E402
 import tree_copy  # noqa: E402
 from dev_tools import DEV_TOOLS, dev_marker_count  # noqa: E402
 from mcp import MCP, remove_scratch, scratch_socket, wait_listening  # noqa: E402
 
 WORK = os.path.join(HERE, "work", "assistant_session")
 FAKE = os.path.join(HERE, "anthropic_fake.py")
-APP_PATH = os.path.join("build", "Build", "Products", "Release", "Reelcut.app")
+APP_PATH = os.path.relpath(proof_app.bundle(), ROOT)   # the app RC_PROOF_APP chooses
 BINARY = os.path.join("Contents", "MacOS", "Reelcut")
 HELPER_SUFFIX = "Contents/Helpers/reelcut-agent"
 PREPARE = "AgentLane.prepareAtLaunch()"
@@ -813,15 +814,12 @@ def build_mutant(name):
         return None, f"{file} has {len(hits)} `{line}` lines, not 1"
     with open(main, "w") as handle:
         handle.write("".join(l for l in lines if l.strip() != line))
-    print(f"mutant: {line} deleted from the copy's {file}; make app (up to {WALL_BUILD} s)…",
+    print(f"mutant: {line} deleted from the copy's {file}; building it (up to {WALL_BUILD} s)…",
           flush=True)
-    built = bounded.run(["make", "app"], WALL_BUILD, cwd=root, env=child_env())
-    app = os.path.join(root, APP_PATH)
-    if built["expired"] or built["rc"] != 0 or not os.path.exists(os.path.join(app, BINARY)):
-        tail = [l for l in (built["stdout"] + built["stderr"]).splitlines() if l.strip()][-3:]
-        return None, f"make app exit {built['rc']} (expired {built['expired']}): {tail}"
-    print(f"mutant: built in {built['seconds']:.0f} s", flush=True)
-    return app, None
+    app, reason = tree_copy.build_app(root, WALL_BUILD, env=child_env())
+    if app is None:
+        return None, reason
+    return str(app), None
 
 
 def mutant_verdict(mutant, results, skipped, details):

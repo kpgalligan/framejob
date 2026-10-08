@@ -81,12 +81,13 @@ import bounded  # noqa: E402
 import v2_snapshot  # noqa: E402
 from dev_tools import DEV_TOOLS, dev_marker_count  # noqa: E402
 from mcp import MCP, ToolError, remove_scratch, scratch_socket, wait_listening  # noqa: E402
+import proof_app  # noqa: E402
 
 SOURCES = os.path.join(ROOT, "app", "Sources")
 MEDIA = os.path.join(HERE, "media")
 WORK = os.path.join(HERE, "work", "screens")
 FIXTURE_DIR = os.path.join(WORK, "fixtures")
-DEFAULT_APP = os.path.join(ROOT, "build", "Build", "Products", "Release", "Reelcut.app")
+DEFAULT_APP = str(proof_app.bundle())
 DEFAULT_SCREENS = os.path.join(ROOT, "designs", "screens")
 SECOND = 600_000
 

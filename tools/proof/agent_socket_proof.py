@@ -102,7 +102,7 @@ Z1  no `Reelcut: ` in any log.  Z2  no proof pid alive.
 
 Any FAIL exits 1; an instrument that cannot run is a FAIL, never a skip, and
 no row may SKIP. Every mutant replaces one anchor in a
-`tree_copy.make_copy` copy built by its own `make app` and runs every row
+`tree_copy.make_copy` copy built by `tree_copy.build_app` and runs every row
 against that build: `no-connect-first` (K4 must FAIL), `no-mode-check` (K8),
 `tcp-listener` (K11: a POSIX listener on 127.0.0.1:0 after the socket's
 `listening at` line), `agent-asks` (K12's import half: `AgentServer+Media`'s
@@ -143,11 +143,12 @@ sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
 sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
 import mcp  # noqa: E402
+import proof_app  # noqa: E402
 import swift_build  # noqa: E402
 import tree_copy  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/agent-socket"
-APP = ROOT / "build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut"
+APP = proof_app.binary()
 PROBE_SOURCE = ROOT / "tools/proof/agent_socket_probe.swift"
 SOURCES = ROOT / "app/Sources"
 SUPPORT = Path.home() / "Library/Application Support/Reelcut"
@@ -988,7 +989,7 @@ def finish_z():
 # ---- the mutants ------------------------------------------------------------------
 
 def built_app(tree):
-    return Path(tree) / "build/Build/Products/Release/Reelcut.app"
+    return proof_app.bundle(tree)
 
 
 def unregister(tree):
@@ -1001,7 +1002,7 @@ def unregister(tree):
 
 def build_mutant_app(name):
     """A tree copy with the mutant's anchor replaced once, built by its own
-    `make app`: the binary, or None and why."""
+    `tree_copy.build_app`: the binary, or None and why."""
     _, _, file, before, after = MUTANTS[name]
     tree = WORK / f"mutant-{name}" / "tree"
     unregister(tree)
@@ -1013,15 +1014,11 @@ def build_mutant_app(name):
     if text.count(before) != 1:
         return None, f"{file} holds {before!r} {text.count(before)} times, not once"
     target.write_text(text.replace(before, after))
-    print(f"  mutant {name}: make app in {made}", flush=True)
-    built = bounded.run(["make", "app"], 1500, cwd=made)
-    binary = built_app(made) / "Contents/MacOS/Reelcut"
-    if built["rc"] != 0 or not binary.exists():
-        errors = [line for line in (built["stdout"] + built["stderr"]).splitlines()
-                  if "error:" in line]
-        return None, (f"make app rc {built['rc']} (expired {built['expired']}): "
-                      + ("\n      ".join(errors[:6]) or built["stdout"][-600:]))
-    return binary, ""
+    print(f"  mutant {name}: building {made}", flush=True)
+    app, reason = tree_copy.build_app(made, 1500)
+    if app is None:
+        return None, reason
+    return app / "Contents/MacOS/Reelcut", ""
 
 
 def main():

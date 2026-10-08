@@ -96,11 +96,12 @@ sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
 sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
 import mcp  # noqa: E402
+import proof_app  # noqa: E402
 import swift_build  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/export-cancel"
 STANDIN = WORK / "standin"
-APP = ROOT / "build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut"
+APP = proof_app.binary()
 PROBE_SOURCE = ROOT / "tools/proof/export_cancel_probe.swift"
 # Outside WORK, which every run empties, so an up-to-date probe is not rebuilt.
 PROBE_DIR = ROOT / "tools/proof/work/export-cancel-probe"

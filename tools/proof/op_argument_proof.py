@@ -99,9 +99,7 @@ built BEFORE the first MCP call, so no swiftc runs while the proof is driving
 the app.
 
     make app
-    d="$(mktemp -d)"; echo "$d"
-    (RC_AGENT_SOCKET="$d/agent.sock" ./build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut \\
-       -ApplePersistenceIgnoreState YES > "$d/reelcut.log" 2>&1 &)
+    python3 tools/proof/proof_app.py launch   # prints folder, socket, log, pid
     grep "Reelcut: " <dir>/reelcut.log     # must print nothing
     python3 tools/proof/op_argument_proof.py <dir>/agent.sock
 """

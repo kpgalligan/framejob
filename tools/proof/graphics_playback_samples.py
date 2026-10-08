@@ -19,8 +19,9 @@ sys.path.insert(0, str(REPO / "tools/proof"))
 sys.path.insert(0, str(REPO / "tools/proof/graphics_spike"))
 import bounded  # noqa: E402
 import mcp  # noqa: E402
+import proof_app  # noqa: E402
 
-APP = REPO / "build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut"
+APP = proof_app.binary()
 OUT = REPO / "tools/proof/work/playback-check"
 HOME = OUT / "home"
 LOG = OUT / "reelcut.log"

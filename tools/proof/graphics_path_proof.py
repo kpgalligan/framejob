@@ -48,10 +48,11 @@ sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
 sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
 import mcp  # noqa: E402
+import proof_app  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/graphics-path"
 HOME = WORK / "home"
-APP = ROOT / "build/Build/Products/Release/Reelcut.app"
+APP = proof_app.bundle()
 CALL_BOUND = 120
 PAD = 1.001
 ROWS = ["H0", "M0", "M1", "M2", "M3", "Z1"]

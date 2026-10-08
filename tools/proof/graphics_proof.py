@@ -265,11 +265,12 @@ sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
 sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
 import mcp  # noqa: E402
+import proof_app  # noqa: E402
 import tree_copy  # noqa: E402
 import swift_build  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/graphics"
-APP = ROOT / "build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut"
+APP = proof_app.binary()
 FIXTURES = ROOT / "graphic/tests/graphics"
 FFI_BGRA = ROOT / "tools/proof/work/graphics-ffi-probe/lower-third-30.bgra"
 PIN_PROBE_SOURCE = ROOT / "tools/proof/graphics_pin_probe.swift"
@@ -1772,8 +1773,8 @@ def run_g11(client, ws):
 def build_mutant(file, anchor, replacement):
     """A COPY of the tree from `tree_copy.make_copy` (`app/` and `agent/`
     copied, every other build input `project.yml` names linked), `anchor`
-    in `app/Sources/<file>` replaced, built by the copy's own `make app`.
-    The binary, or None and why."""
+    in `app/Sources/<file>` replaced, built by `tree_copy.build_app` (the
+    copy's own `make app` or `make app-debug`). The binary, or None and why."""
     made, reason = tree_copy.make_copy(str(WORK / "mutant"))
     if made is None:
         return None, reason
@@ -1783,14 +1784,10 @@ def build_mutant(file, anchor, replacement):
     if text.count(anchor) != 1:
         return None, f"the anchor occurs {text.count(anchor)} times in {file}"
     target.write_text(text.replace(anchor, replacement))
-    built = bounded.run(["make", "app"], 1500, cwd=str(copy))
-    binary = copy / "build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut"
-    if built["rc"] != 0 or not binary.exists():
-        errors = [line for line in (built["stdout"] + built["stderr"]).splitlines()
-                  if "error:" in line]
-        return None, (f"make app rc {built['rc']} (expired {built['expired']}): "
-                      + ("\n      ".join(errors[:6]) or built["stdout"][-600:]))
-    return binary, ""
+    app, reason = tree_copy.build_app(copy, 1500)
+    if app is None:
+        return None, reason
+    return app / "Contents/MacOS/Reelcut", ""
 
 
 def probe_mutant(app, name):

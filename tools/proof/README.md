@@ -1691,6 +1691,75 @@ serial harness builds are equal; sensitivity one source changed (`0o700` →
 build's wall time, but its `__text` differs from the `-j` build's (8 bytes
 shorter), so it was not adopted and the line stays `-j`.
 
+## Which app a proof drives (proof_app.py)
+
+`proof_app.py` (issue batch B88 phase 2) is where a proof gets the app it
+drives, and the refusal to drive one older than its sources. It uses the
+standard library and imports nothing from `tools/proof` (`mcp.py` imports
+it); only its `launch` command imports `mcp`.
+
+```
+python3 tools/proof/proof_app.py launch [--app debug|release|PATH] [-- ARG…]   # prints folder, socket, log, pid
+python3 tools/proof/proof_app.py check [--app debug|release|PATH]
+python3 tools/proof/proof_app.py --selftest                                     # F1–F6, R1–R3, T1, E1, E2, D1, D2, C1 (make test)
+python3 tools/proof/proof_app.py --mutant exe-marker|md-counted|exe-mtime-running
+```
+
+**The choice.** `RC_PROOF_APP` is `release` (the default), `debug` or a
+`.app` or executable path. Debug is `make app-debug`'s
+`build/Build/Products/Debug/Reelcut.app`: "Reelcut Debug",
+`com.kgalligan.Reelcut.debug`, its own defaults domain and an Alternate
+`.reelcut` handler (spec §11 V-5); `PRODUCT_NAME` stays `Reelcut`, so the
+bundle, `MacOS/Reelcut` and `pgrep -f "MacOS/Reelcut"` read the same, and
+the products folder tells the two apart. `proof_app.bundle(tree)` and
+`binary(tree)` answer the chosen product (a tree copy's own, for a copy);
+`domain()` the chosen bundle's `CFBundleIdentifier`. A proof that must run
+on Release passes `release_only="<why>"`: Release unless a path is given, and
+a path in a `Debug` products folder is refused with the reason. A tree copy
+builds through `tree_copy.build_app(dest, seconds)`: `make app-debug` or
+`make app` there, as the choice says. 32 proofs take their default app from
+`proof_app` (the list is `designs/build-velocity.md`'s phase 2 record), and
+17 build their tree-copy mutants through `build_app`.
+
+**The refusal.** `mcp.launch` and the launcher refuse a built product
+(`build/Build/Products/{Debug,Release,Distribution}/Reelcut.app`) when its
+`Contents/_CodeSignature/CodeResources` is missing or older than the newest
+input of its tree, naming the file, its time and the `make` target:
+
+    refusing …/Debug/Reelcut.app/Contents/MacOS/Reelcut: app/Sources/ActionBands.swift (modified 2026-10-08 01:25:13) is newer than its last complete build (2026-10-08 01:24:45); rebuild with `make app-debug`
+
+`MCP(socket)` refuses an instance of a product that started before the
+newest input (once per socket and pid; `lsof` names its executable, `ps -o
+lstart=` its start, to the second), or whose product is refused, never by
+the executable's mtime ("relaunch pid N after `make app-debug`: <file>
+(modified …) is newer than the instance (started …)"). With no pid holding the socket it says so on
+stderr and does not refuse. The inputs are `app/`, `agent/`, `core/src`,
+`graphic/src`, `mcp-proxy/src`, each crate's `Cargo.*`, the C header, the
+built staticlib, `docs/graphics-api.md` and `.d.ts`, the graphic templates,
+`project.yml` and `VERSION`, never `node_modules`, `target`, `build`, `.git`,
+`__pycache__`, a dot-file, the generated `app/Info.plist` and
+`app/Reelcut.entitlements`, or a `*.md` but `docs/graphics-api.md` (a
+`CLAUDE.md` edit does not stale the app). There is no override variable.
+Accepted limit: an input another session edits during a build that then
+succeeds is older than the marker, so the app passes until the next edit.
+Write Agent Catalog's `codesign -s - -f "$exe"` re-seals the bundle before
+the catalog writer runs (which is what lets a no-op rebuild clear a
+`touch`), so that step removes the marker on any failure after it starts
+(an `EXIT` trap): a build failing in the writer has no marker and is
+refused as `no complete build`. A build failing in Swift, the link, Build
+Agent Helper or Build MCP Proxy leaves the marker old.
+
+**The defaults guard follows the app.** `mcp.scratch_socket()` records
+`proof_app.domain()`, and a socket it made that `MCP()` then finds held by
+an instance of another bundle (a script that started the app itself with
+`Popen`) is re-homed to that bundle's domain, said on stderr (`mcp:
+the defaults guard moved <socket> from <old> to <new>, the bundle of pid
+<pid>; a write before this connect is not seen`). `defaults_proof.py` G6 is
+its proof (child `write-rehomed` under `RC_PROOF_APP=release`, status 3 with
+`DEFAULTS MOVED in com.kgalligan.reelcut.defaults-proof` last), and its
+`no-rehome` mutant fails G6 alone; R1 and R2 guard the `--app`'s own domain
+and name it. `proof_defaults.py`'s P3 refuses `com.kgalligan.Reelcut.debug`.
+
 ## The offscreen harness (no running app)
 
 `harness/` is CLAUDE.md's "Seeing the chrome": `harness/main.swift` compiles

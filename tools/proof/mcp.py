@@ -8,16 +8,29 @@ the socket `RC_AGENT_SOCKET` names, and a proof never binds the person's own
 `launch()` starts a binary on it and waits for the socket's log line, and
 `remove_scratch()` deletes the folder afterwards.
 
+**Which app, and how fresh** (issue batch B88). `launch()` refuses a built
+product older than its tree's inputs (`proof_app.require_fresh`), and
+`MCP()` refuses an instance of one started before an input changed
+(`proof_app.require_running_fresh`, once per socket and pid, on
+`socket_pid`'s answer; with no pid it says so on stderr and does not
+refuse). Both raise `proof_app.StaleApp`, naming the file, its time and the
+`make` target.
+
 **The defaults guard** (issue batch B83, #238). No environment moves
 `UserDefaults`, so every instance a proof drives shares its bundle's
-defaults domain with the owner: `com.kgalligan.Reelcut` for the real build.
-A record per socket path holds that domain's key names against salted
-digests (`proof_defaults.snapshot`, `defaults export` only) and the other
-Reelcut pids sharing it: `scratch_socket()` records the real domain,
-`launch()` re-records the binary's own and owns its child, and `MCP()`
-records a socket it was handed. The record and the compare both read the
-domain with no `CFFIXED_USER_HOME` in `defaults`' environment
-(`proof_defaults.read_env`): under one naming a folder that does not exist
+defaults domain with the owner. The guarded domain is the bundle under
+test's: `com.kgalligan.Reelcut` for Release, `com.kgalligan.Reelcut.debug`
+for Debug (`make app-debug`, spec §11 V-5). A record per socket path holds
+that domain's key names against salted digests (`proof_defaults.snapshot`,
+`defaults export` only) and the other Reelcut pids sharing it:
+`scratch_socket()` records `proof_app.domain()`, the app `RC_PROOF_APP`
+chooses, `launch()` re-records the binary's own and owns its child, and
+`MCP()` records a socket it was handed. A socket `scratch_socket()` made and
+`MCP()` then finds held by an instance of ANOTHER bundle (a script that
+started the app itself on it) is re-homed to that bundle's domain, said on
+stderr (`_rehome`); a write before that connect is not seen. The record and
+the compare both read the domain with no `CFFIXED_USER_HOME` in `defaults`'
+environment (`proof_defaults.read_env`): under one naming a folder that does not exist
 `defaults export` answers no key, so a script run under a scratch home not
 made yet at the record, or removed before the compare, would otherwise be
 told every key of the domain moved (issue batch B84; `defaults_proof.py`
@@ -49,6 +62,7 @@ import time
 _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:
     sys.path.append(_HERE)
+import proof_app  # noqa: E402
 import proof_defaults  # noqa: E402
 
 MAX_SOCKET_PATH = 103
@@ -84,6 +98,7 @@ class MCP:
                 "14's MC4 deleted the TCP listener (launch with RC_AGENT_SOCKET and pass it)")
         self.socket_path = str(socket_path)
         _guard_handed(self.socket_path)
+        _require_running_fresh(self.socket_path)
         self.path = path
         self.session = None
         self.next_id = 0
@@ -195,7 +210,7 @@ def scratch_socket(prefix="rc-"):
         shutil.rmtree(folder, ignore_errors=True)
         raise ValueError(f"{path} is {len(path.encode())} bytes; a socket path may be "
                          f"{MAX_SOCKET_PATH}")
-    _record(path, proof_defaults.APP_DOMAIN)
+    _record(path, proof_app.domain())
     return path
 
 
@@ -319,6 +334,41 @@ def _own(socket_path, pid):
         _OWN_PIDS.add(pid)
 
 
+_FRESH_CHECKED = set()  # (socket path, pid) whose instance proof_app has checked
+
+
+def _require_running_fresh(socket_path):
+    """`proof_app.require_running_fresh` on the pid holding the socket, once
+    per (socket, pid); raises `proof_app.StaleApp`. With no pid, one stderr
+    line and no refusal."""
+    pid = socket_pid(socket_path)
+    if pid is None:
+        _say(f"mcp: no pid holds {socket_path}; the instance's freshness is not checked")
+    elif (socket_path, pid) not in _FRESH_CHECKED:
+        proof_app.require_running_fresh(pid)
+        _FRESH_CHECKED.add((socket_path, pid))
+
+
+def _pid_domain(pid):
+    """The bundle identifier of the executable `ps` names for `pid`, else None."""
+    try:
+        named = subprocess.run(["ps", "-p", str(pid), "-o", "comm="],
+                               capture_output=True, text=True, timeout=30)
+        executable = named.stdout.strip()
+        return proof_defaults.bundle_domain(executable) if executable else None
+    except Exception:
+        return None
+
+
+def _rehome(socket_path, pid, domain):
+    """Moves a `scratch_socket()` record to the bundle domain of the pid that
+    holds the socket, owning it: the instance a script started itself."""
+    old = _GUARDED[socket_path]["domain"]
+    _say(f"mcp: the defaults guard moved {socket_path} from {old} to {domain}, the bundle of pid "
+         f"{pid}; a write before this connect is not seen")
+    _record(socket_path, domain, own=[pid])
+
+
 def _guard_handed(socket_path):
     """Records a socket with no record: the domain of the executable holding
     it, else the app's, that pid owned. When the socket's file is there and
@@ -326,9 +376,17 @@ def _guard_handed(socket_path):
     record then guards the app's domain and cannot tell the handed instance
     from another Reelcut, so a moved key is only printed unless `lsof` names
     the pid at the compare. A pid whose bundle identifier cannot be read is
-    said too: the record then guards the app's domain."""
+    said too: the record then guards the app's domain. A record that owns no
+    pid (one `scratch_socket()` made) is re-homed (`_rehome`) when the
+    holder's bundle domain can be read and differs from it."""
     try:
-        if socket_path in _GUARDED:
+        record = _GUARDED.get(socket_path)
+        if record is not None:
+            if not record["own"]:
+                pid = _holder(socket_path)
+                domain = _pid_domain(pid) if pid is not None else None
+                if domain is not None and domain != record["domain"]:
+                    _rehome(socket_path, pid, domain)
             return
         pid = _holder(socket_path)
         if pid is None and os.path.exists(socket_path):
@@ -336,13 +394,7 @@ def _guard_handed(socket_path):
             pid = _holder(socket_path)
         domain = None
         if pid is not None:
-            try:
-                named = subprocess.run(["ps", "-p", str(pid), "-o", "comm="],
-                                       capture_output=True, text=True, timeout=30)
-                executable = named.stdout.strip()
-                domain = proof_defaults.bundle_domain(executable) if executable else None
-            except Exception:
-                domain = None
+            domain = _pid_domain(pid)
             if domain is None:
                 _say(f"mcp: the defaults guard could not read the bundle identifier of pid {pid} "
                      f"holding {socket_path}; it guards {proof_defaults.APP_DOMAIN}, which is "
@@ -488,7 +540,9 @@ def launch(binary, arguments=(), env=None, socket_path=None, log_path=None, seco
     scratch socket (or `socket_path`), in its own session, logging to
     `log_path` (else beside the socket), and waits up to `seconds` for its
     listening line. `client` is an `MCP` with `timeout`, or None when the
-    instance did not come up."""
+    instance did not come up. A built product older than its inputs is
+    refused first (`proof_app.StaleApp`), and nothing is started."""
+    proof_app.require_fresh(binary)
     socket_path = str(socket_path or scratch_socket())
     log_path = str(log_path or log_beside(socket_path))
     environment = dict(env) if env is not None else _child_env()
@@ -506,5 +560,9 @@ def launch(binary, arguments=(), env=None, socket_path=None, log_path=None, seco
     _own(socket_path, child.pid)
     client = None
     if wait_listening(log_path, socket_path, child=child, seconds=seconds, offset=offset):
-        client = MCP(socket_path, timeout=timeout)
+        try:
+            client = MCP(socket_path, timeout=timeout)
+        except proof_app.StaleApp:
+            Launched(child, socket_path, log_path, None).stop()
+            raise
     return Launched(child, socket_path, log_path, client)

@@ -3,9 +3,9 @@
 MCP server (spec §11 MC-3, MC-4, MC-6), driven as a client drives it, over its
 stdin and stdout.
 
-The Release app (`--app`) is `ditto`ed to `work/mcp-proxy/<run>/Reelcut.app`
-and every proxy is that copy's `Contents/Helpers/reelcut-mcp`, so the bundle a
-proxy launches is the copy; the copy is removed at the end unless Z1 finds an
+The app `proof_app.bundle()` chooses (`--app`; Release by default) is
+`ditto`ed to `work/mcp-proxy/<run>/Reelcut.app` and every proxy is that copy's
+`Contents/Helpers/reelcut-mcp`, so the bundle a proxy launches is the copy; the copy is removed at the end unless Z1 finds an
 instance of it alive. Every socket is in its own
 `tempfile.mkdtemp(prefix="rcm-")` under `$TMPDIR`, passed as `RC_AGENT_SOCKET`
 (MC1: a path under `tools/proof/work/` can pass 103 bytes). An instance is any
@@ -95,9 +95,10 @@ sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
 import tree_copy  # noqa: E402
 from mcp import LSREGISTER  # noqa: E402
+import proof_app  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/mcp-proxy"
-APP = ROOT / "build/Build/Products/Release/Reelcut.app"
+APP = proof_app.bundle()
 SUPPORT = Path.home() / "Library/Application Support/Reelcut"
 PERSON_PATHS = [SUPPORT / "Agent", SUPPORT / "Agent/agent.sock",
                 SUPPORT / "Agent/agent.launch.lock"]
@@ -694,6 +695,10 @@ def write_ac_fixture():
 
 def make_copy(app, run):
     """`ditto` the app to work/mcp-proxy/<run>/Reelcut.app; the path or None and why."""
+    try:
+        proof_app.require_fresh(Path(app) / "Contents/MacOS/Reelcut")
+    except proof_app.StaleApp as error:
+        return None, str(error)
     target = WORK / run / "Reelcut.app"
     tree_copy.remove_tree(target.parent)
     target.parent.mkdir(parents=True)

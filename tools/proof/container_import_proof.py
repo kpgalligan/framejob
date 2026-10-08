@@ -96,6 +96,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(__file__))
 from mcp import MCP, ToolError, remove_scratch, scratch_socket, wait_listening  # noqa: E402
+import proof_app  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SEC = 600_000
@@ -433,8 +434,7 @@ def main():
     mode.add_argument("--control", choices=["decoy-home"],
                       help="the instance under a second scratch home: H0 must fail and no "
                            "tool may be called")
-    parser.add_argument("--app", default=os.path.join(ROOT, "build", "Build", "Products",
-                                                     "Release", "Reelcut.app"))
+    parser.add_argument("--app", default=str(proof_app.bundle()))
     args = parser.parse_args()
     binary = os.path.join(args.app, "Contents", "MacOS", "Reelcut")
     if not os.path.isfile(binary):

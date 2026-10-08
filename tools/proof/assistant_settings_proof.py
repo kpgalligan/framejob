@@ -282,15 +282,12 @@ def build_tree_mutant(name):
         return None, f"{file} holds {before!r} {text.count(before)} times, not once"
     with open(path, "w") as f:
         f.write(text.replace(before, after))
-    print(f"mutant: {name} applied to the copy's {file}; make app (up to {asp.WALL_BUILD} s)…",
+    print(f"mutant: {name} applied to the copy's {file}; building it (up to {asp.WALL_BUILD} s)…",
           flush=True)
-    built = bounded.run(["make", "app"], asp.WALL_BUILD, cwd=root, env=asp.child_env())
-    app = os.path.join(root, asp.APP_PATH)
-    if built["expired"] or built["rc"] != 0 or not os.path.exists(os.path.join(app, asp.BINARY)):
-        tail = [l for l in (built["stdout"] + built["stderr"]).splitlines() if l.strip()][-3:]
-        return None, f"make app exit {built['rc']} (expired {built['expired']}): {tail}"
-    print(f"mutant: built in {built['seconds']:.0f} s", flush=True)
-    return app, None
+    app, reason = tree_copy.build_app(root, asp.WALL_BUILD, env=asp.child_env())
+    if app is None:
+        return None, reason
+    return str(app), None
 
 
 # ---------------------------------------------------------------------------

@@ -428,6 +428,7 @@ Requires Xcode 26 or later (the macOS 26 SDK), Rust (cargo), [xcodegen](https://
 
 ```sh
 make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
+make app-debug  # the Debug app the proofs can drive: "Reelcut Debug" (its own bundle id, com.kgalligan.Reelcut.debug, and settings) → build/Build/Products/Debug/Reelcut.app, seconds after a one-file edit
 make dist       # make app, then the Distribution build (no dev tools; the assistant helper signed with the hardened runtime) → build/Build/Products/Distribution/Reelcut.app, checked (dist_check.py, then published_check.py, the check a published build gets)
 make run        # build and launch
 make test       # Rust core, graphics and MCP proxy tests, then the agent lane's proof (tools/proof/assistant_lane_proof.py), the prompt texts' checks (tools/proof/assistant_prompt_proof.py --probe), the price function in both readers (tools/proof/prices_proof.py, no network) and the proofs' ledger and monthly budgets (tools/proof/budget_proof.py, no network)

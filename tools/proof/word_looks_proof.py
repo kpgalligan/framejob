@@ -150,12 +150,13 @@ sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
 sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
 import mcp  # noqa: E402
+import proof_app  # noqa: E402
 import tree_copy  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/word-looks"
 HOME = WORK / "home"
 FRAMES = WORK / "frames"
-APP = ROOT / "build/Build/Products/Release/Reelcut.app"
+APP = proof_app.bundle()
 BASELINE = ROOT / "tools/proof/word_looks_baseline.json"
 HEADER = ROOT / "core/include/reelcut_core.h"
 CALL_BOUND = 120
@@ -1045,13 +1046,9 @@ def build_mutant(name):
             return None, (f"the anchor {anchor.splitlines()[0].strip()!r} occurs "
                           f"{text.count(anchor)} times in {name}")
         target.write_text(text.replace(anchor, replacement))
-    built = bounded.run(["make", "app"], 1500, cwd=str(copy))
-    app = copy / "build/Build/Products/Release/Reelcut.app"
-    if built["rc"] != 0 or not (app / "Contents/MacOS/Reelcut").exists():
-        errors = [line for line in (built["stdout"] + built["stderr"]).splitlines()
-                  if "error:" in line]
-        return None, (f"make app rc {built['rc']} (expired {built['expired']}): "
-                      + ("\n      ".join(errors[:6]) or built["stdout"][-600:]))
+    app, reason = tree_copy.build_app(copy, 1500)
+    if app is None:
+        return None, reason
     return app, ""
 
 

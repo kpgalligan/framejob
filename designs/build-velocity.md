@@ -49,6 +49,18 @@ Each phase is committed alone, in this order.
 - **The harness's Fonts and Models** are recopied only when their digest
   differs, through a sibling folder renamed into place, so a reuse never
   pulls a folder out from under a launching harness.
+- **The Debug build is its own app** (spec §11 V-5, phase 2): "Reelcut
+  Debug", `com.kgalligan.Reelcut.debug`, its own defaults domain and an
+  Alternate `.reelcut` handler, through three Debug-only settings that
+  Info.plist reads with `:default=`, so Release and Distribution keep their
+  settings and bytes. `PRODUCT_NAME` stays `Reelcut`.
+- **A built app is judged by its `_CodeSignature/CodeResources`**, never its
+  executable's mtime, against the newest input of its own tree (`*.md` but
+  `docs/graphics-api.md` excluded); a running instance by its start. No
+  override variable: the refusal names the file, its time and the target.
+- **The defaults guard follows the app under test**: `scratch_socket()`
+  records `proof_app.domain()`, and a socket it made that an instance of
+  another bundle then holds is re-homed to that bundle's domain.
 - Owner rulings that bind every phase: one mutant per new decision (usually
   3–8; more than 10 only with a written reason); Debug while working, Release
   built and checked once at each phase's end; no override variable for the
@@ -252,3 +264,161 @@ exit 0 in 98 s (powermode 0 before and after): cargo 100 `ok`, 0 failed;
 lane 18/18; prompt 14/14; prices 27/27; budget 23/23; inventory 5/5; spec
 index 141/141; selftest 10/10; proof_defaults 10/10. `make lint` and `make
 typecheck` were not re-run, because no Rust, Swift or TypeScript file changed.
+
+### Phase 2 — the Debug app, its identity and the stale refusal (2026-10-08)
+
+**Landed.** Spec §11 V-5 first (`designs/spec/11-decisions/dev-tools.md`,
+its index row and Lines cell, and `designs/spec/README.md`'s 11-decisions
+total, which `spec_index_proof.py` checks). `project.yml`: the Debug config
+gains `ENABLE_DEBUG_DYLIB: NO` (Write Agent Catalog's `codesign -s - -f
+"$exe"` fails on Xcode 26's split `__preview.dylib`),
+`PRODUCT_BUNDLE_IDENTIFIER: com.kgalligan.Reelcut.debug`, `RC_APP_NAME:
+"Reelcut Debug"` and `RC_PROJECT_HANDLER_RANK: Alternate`; `CFBundleName`
+and `CFBundleDisplayName` read `$(RC_APP_NAME:default=Reelcut)` and the
+Reelcut Project type's `LSHandlerRank` `$(RC_PROJECT_HANDLER_RANK:default=Owner)`;
+"Build Rust Core" runs every build (`basedOnDependencyAnalysis: false`).
+Release and Distribution are untouched. `Makefile`: `DEBUG_APP_PATH`, `make
+app-debug` (`rust project`, then `xcodebuild -configuration Debug …
+COMPILER_INDEX_STORE_ENABLE=NO build`), and `proof_app.py --selftest` in
+`make test` before `proof_defaults.py`. `tools/proof/proof_app.py` (400
+lines): `RC_PROOF_APP`, `config`, `bundle`, `binary`, `domain`,
+`require_fresh`, `require_running_fresh`, `running_verdict`, `inputs`, the
+`launch` and `check` commands, the selftest and three mutants. `mcp.py`:
+`launch` checks the binary first (and stops its child if the new client is
+refused), `MCP()` checks the instance once per socket and pid,
+`scratch_socket()` records `proof_app.domain()`, and `_rehome`.
+`defaults_proof.py`: `--app` defaults to `proof_app.bundle()`, R1 and R2
+guard and name the app's own domain, row G6 (child `write-rehomed` under
+`RC_PROOF_APP=release`) and mutant `no-rehome`; `no-compare` and `no-exit`
+now also fail G6, which their mechanism reaches. `proof_defaults.py`: the
+docstring and P3's `com.kgalligan.Reelcut.debug`. `phase8_proof.py`'s
+`BUNDLE_ID` reads its binary's bundle. `tree_copy.build_app`. The 32
+scripts' default app comes from `proof_app` (agent_socket_proof,
+assistant_session_proof's `APP_PATH` and so the seven that read it,
+clip_catalog_proof, clip_inspector6_proof, cloud_captions_proof,
+codec_import_proof, container_import_proof, defaults_proof,
+export_cancel_proof, extreme_time_proof, frame_grid_proof,
+graphic_prop_action_proof, graphics_files_proof, graphics_inspector_proof,
+graphics_menu_proof, graphics_path_proof, graphics_playback_samples,
+graphics_prefetch_proof, graphics_proof, graphics_store_proof,
+hevc_alpha_proof (its build-tree check accepts Debug), mcp_proxy_proof,
+op_argument_proof, op_catalog_proof, paste_graphic_proof, phase8_proof,
+recording_proof, screens, word_captions_proof, word_looks_proof,
+word_looks_sheet_proof; clip_catalog, op_argument and op_catalog take a
+socket, so theirs is the docstring recipe, now `proof_app.py launch`;
+mixed_audio_proof takes a socket too), and the 17 tree-copy builders go
+through `tree_copy.build_app`, which prints the target and its seconds.
+The default stays Release.
+
+**The three unproven Xcode facts.**
+- `:default=` in Info.plist EXPANDS. The Debug bundle reads
+  `com.kgalligan.Reelcut.debug`, "Reelcut Debug" twice and the Reelcut
+  Project type's `LSHandlerRank` `Alternate` (the five media types stay
+  Alternate). Release's and Distribution's built `Info.plist` are
+  byte-identical to the copies taken from HEAD's builds before the edit
+  (`cmp`, after `make app` and again after the final `make dist`), and
+  `-showBuildSettings` for Release and Distribution is identical to HEAD's
+  but for xcodebuild's own timestamped log lines; Debug's differs by exactly
+  `ENABLE_DEBUG_DYLIB`, `PRODUCT_BUNDLE_IDENTIFIER` and the two `RC_` settings.
+- The JXA LaunchServices query answers without launching anything:
+  `NSWorkspace.URLForApplicationToOpenURL` for `work/b88/x.reelcut` is
+  `/Applications/Reelcut.app` while the Debug bundle is among the registered
+  candidates (`URLsForApplicationsToOpenURL`). No manual-checks row is owed.
+- A no-op `make app-debug` DOES rewrite CodeResources: after `touch
+  core/Cargo.toml` the app was refused naming that file, and the next `make
+  app-debug` (2.3 s) advanced the marker and `check --app debug` passed. The
+  writer is Write Agent Catalog's `codesign -s - -f "$exe"`, which re-seals
+  the bundle (measured on a scratch copy: signing the executable alone
+  rewrote CodeResources); a no-op build runs no Xcode CodeSign step.
+
+**Finding: the marker is written before the catalog writer runs.** The spec
+took CodeResources to be written only by Xcode's CodeSign after every
+script phase. In fact Write Agent Catalog signs the executable, which
+re-seals the bundle, and only then runs the writer. So a build that fails in
+the catalog writer (its exit, or a `Reelcut: ` parity line) leaves a fresh
+marker, and `proof_app` would pass it. Failures in Swift, the link, Build
+Agent Helper and Build MCP Proxy all happen before that step, so they leave
+the marker old (selftest F4). A proof's own instance still logs the parity
+lines, which every proof checks. The same re-seal is what makes the no-op
+rebuild advance the marker, so signing a copy of the executable instead
+would turn `touch` into a refusal that never clears. Closed in this phase:
+the step removes the marker on any failure after it starts (an `EXIT` trap
+in `project.yml`); a tree copy whose writer was forced to fail was refused
+as `no complete build`, and the no-op `make app-debug` after `touch
+core/Cargo.toml` still cleared the refusal.
+
+**Finding: a no-op build shipped an app without its entitlements
+(pre-existing, fixed in this phase).** After the review's fixes a second
+`make dist` with nothing changed failed dist_check D14 ("the entitlements
+do not parse"). Xcode's CodeSign task does not see Write Agent Catalog
+re-sign the executable and rewrite `agent-catalog.json`, so a build where
+nothing else changed skips it, and the bundle kept the step's ad-hoc
+signature: no entitlements (no `audio-input`, so no microphone) and a seal
+that `codesign --verify --deep --strict` rejects (`file modified:
+…/agent-catalog.json`). It is HEAD's: a `tree_copy` copy of 724250e with
+HEAD's `project.yml`, `Makefile` and `VERSION` passed its first `make dist`
+(161 s, 24/24 and 16/16), and the second (5 s) failed D14 with both apps
+unverifiable. The implementer's two `make dist` runs passed only because
+each relinked Distribution; in both, the Release build had run no CodeSign
+task. Fixed in `project.yml`: after the writer succeeds the step signs the
+bundle as Xcode's task does (`$EXPANDED_CODE_SIGN_IDENTITY`, `-o runtime`
+when `ENABLE_HARDENED_RUNTIME`, the processed `$TARGET_TEMP_DIR/
+$FULL_PRODUCT_NAME.xcent`, `--generate-entitlement-der`, `--timestamp=none`
+ad hoc and `--timestamp` otherwise, as Build MCP Proxy does), and it
+declares that `.xcent` and the built `Info.plist` as inputs, only to
+order it after them. Measured: `make dist` twice (6 s, 5 s, no CodeSign
+task) 24/24 and 16/16 each; `make app` twice, Release entitlements
+`audio-input` plus `get-task-allow` as Xcode signs them; all three apps
+pass `codesign --verify --deep --strict`; a cold `make dist` in a copy of
+the fixed tree (160 s) and an `xcodebuild archive` of it as the publish
+workflow runs it, ad hoc (77 s, published_check 16/16), where Xcode's own
+CodeSign still signs last. The Developer ID branch of the step is not run
+here (no certificate); Build MCP Proxy signs the same way in that workflow.
+
+**Measured** (load in brackets): `make app-debug` cold 18 s (12.8 → 13.3);
+no-op 2.6 s (4.9); a one-line Swift comment 6.5 s (4.3; one SwiftCompile
+batch); a top-level `func` added to `ReelOps.swift` 7.2 s (4.3; 14 batches);
+a comment in `reelcut_core.h` 10.5 s (4.2 → 4.7); a bare `xcodebuild
+-configuration Debug` after a `core/src` comment 11.2 s, cargo compiled
+`reelcut-core` (1.1 s) and the `.a` and the executable were newer than the
+edit. `make app` after the same one-line Swift comment 73.0 s (4.7 → 4.1);
+`make app` 75 s and 73 s; `make dist` 79 s and 74 s. A tree-copy mutant,
+`graphics_files_proof.py --mutant rename-unreconciled`: 87 s whole with
+`make app` (85 s build, load 4.5 → 11.4) against 20 s with `RC_PROOF_APP=debug`
+(`make app-debug` 17 s, load 11.4 → 13.4). `proof_app.py check` 0.05 s over
+504 inputs; `MCP()` 0.27 s with its two `lsof` reads and the `ps`
+(`socket_pid` plus `require_running_fresh` 0.15 s).
+
+**Verified.**
+- `proof_app.py --selftest` 15/15 `PASS`; `--mutant exe-marker` (F3 F4),
+  `md-counted` (F5) and `exe-mtime-running` (R1 R2) each `MUTANT PASS`.
+- The launcher: `launch --app debug` came up in 1.2 s with no `Reelcut: `
+  line, guarded `com.kgalligan.Reelcut.debug`, and its `tools/list` (95
+  tools) is byte-equal to the Release instance's that `RC_PROOF_APP=release
+  … launch` started. After `touch app/Sources/ActionBands.swift`,
+  `mcp.launch` and the launcher refused naming that file, its mtime and `make
+  app-debug`; `MCP()` on the running instance refused with "relaunch pid …
+  after `make app-debug`", and still did after the rebuild.
+- `defaults_proof.py` 11/11 on Release (G6 status 3, the re-home line, and
+  `DEFAULTS MOVED in com.kgalligan.reelcut.defaults-proof` last); `--app
+  build/Build/Products/Debug/Reelcut.app --only C0,G1,G6,R1` 4/4, R1
+  guarding `com.kgalligan.Reelcut.debug`; `--mutant no-rehome` `MUTANT PASS`
+  (G6 alone); `no-compare` and `no-exit` re-run on the new expected sets,
+  each `MUTANT PASS`. `proof_defaults.py --selftest` 10/10 (P3 with seven
+  names). `tree_copy.py --selftest` 5/5.
+- `graphics_files_proof.py --mutant rename-unreconciled` through
+  `build_app`: `MUTANT PASS` on `make app` and on `make app-debug`.
+- **Full:** `make test` exit 0 in 122 s (load 8.1 → 19.3, powermode 0):
+  cargo 100 `ok`, 0 failed; lane 18/18; prompt 14/14; prices 27/27; budget
+  23/23; inventory 5/5; spec index 141/141; `swift_build.py --selftest`
+  10/10; `proof_app.py --selftest` 15/15; proof_defaults 10/10. `make app`
+  exit 0 (Release fresh by `check`); `make dist` exit 0, dist_check 24/24,
+  published_check 16/16. `make lint` and `make typecheck` were not re-run:
+  no Rust, Swift or TypeScript file is changed (the timing rows' edits were
+  restored byte for byte).
+
+**Owed to phase 3.** The flip of `DEFAULT`, `release_only` pins, and the
+descriptive "`make app`" sentences in the converted proofs' docstrings and
+instrument messages (a copy's build is `build_app`'s choice); the README's
+launch recipe under "Building".
+

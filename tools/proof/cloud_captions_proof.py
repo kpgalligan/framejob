@@ -121,6 +121,7 @@ from mcp import MCP, ToolError, log_beside, remove_scratch, scratch_socket, wait
 # `FAKE` global, and `Fake.__enter__` reads it off the module, so the
 # rebinding has to happen there and not on a copy of the name here.
 import cloud_captions_probe
+import proof_app
 import tree_copy
 
 from cloud_captions_probe import (
@@ -2422,8 +2423,9 @@ def build_mutant(name, wall=900):
     other build input `project.yml` names a SYMLINK to the tree's (`core`
     already built, so `project.yml`'s pre-build `cargo build --release` is a
     no-op and the copy links the tree's `libreelcut_core.a`). The copy is
-    built by its own `make app`, whose `unexport` keeps both keys out of its
-    build database. The working tree is never touched."""
+    built by `tree_copy.build_app` (its own `make app` or `make app-debug`),
+    whose Makefile `unexport` keeps both keys out of its build database. The
+    working tree is never touched."""
     path, before, after, what = CLOUD_MUTANTS[name]
     root, reason = tree_copy.make_copy(os.path.join(WORK, "mutants", name))
     if root is None:
@@ -2438,19 +2440,10 @@ def build_mutant(name, wall=900):
     with open(target, "w") as handle:
         handle.write(text.replace(before, after))
     print(f"  mutant {name}: {what}")
-    started = time.time()
-    try:
-        run = subprocess.run(["make", "app"], cwd=root, capture_output=True, text=True,
-                             env=child_env(), timeout=wall, stdin=subprocess.DEVNULL)
-    except subprocess.TimeoutExpired:
-        return None, f"the mutant's build passed its {wall:.0f} s wall"
-    if run.returncode != 0:
-        errors = [line for line in (run.stdout + run.stderr).splitlines() if "error:" in line]
-        return None, "`make app` failed:\n      " + "\n      ".join(errors[:6] or ["(none)"])
-    binary = os.path.join(root, "build", "Build", "Products", "Release", "Reelcut.app",
-                          "Contents", "MacOS", "Reelcut")
-    print(f"  built {binary} in {time.time() - started:.0f} s")
-    return binary, None
+    app, reason = tree_copy.build_app(root, wall, env=child_env())
+    if app is None:
+        return None, f"the mutant's build: {reason}"
+    return str(app / "Contents/MacOS/Reelcut"), None
 
 
 # --------------------------------------------------------------------------
@@ -2461,9 +2454,7 @@ instance_binary = ""
 def main():
     global instance_binary
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--binary", default=os.path.join(
-        ROOT, "build", "Build", "Products", "Release", "Reelcut.app", "Contents", "MacOS",
-        "Reelcut"))
+    parser.add_argument("--binary", default=str(proof_app.binary()))
     parser.add_argument("--mutant", choices=sorted(CLOUD_MUTANTS),
                         help="build a COPY of the tree with one text replaced and run every "
                              "row against it")

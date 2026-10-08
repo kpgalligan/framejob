@@ -176,6 +176,8 @@ import zlib
 
 import mcp as mcp_launch
 from mcp import MCP, ToolError, log_beside, remove_scratch, target
+import proof_app
+import proof_defaults
 import swift_build
 
 SOCKET = target(sys.argv)
@@ -183,8 +185,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 WORK = os.path.join(HERE, "work")
 MEDIA = os.path.join(HERE, "media")
 ROOT = os.path.dirname(os.path.dirname(HERE))
-BINARY = os.path.join(
-    ROOT, "build", "Build", "Products", "Release", "Reelcut.app", "Contents", "MacOS", "Reelcut")
+BINARY = str(proof_app.binary())
 SOURCE = os.path.join(ROOT, "app", "Sources", "EditorViewController+PreviewQuality.swift")
 
 SEC = 600_000
@@ -216,11 +217,12 @@ def format_version():
 
 VERSION = format_version()
 
-# The app's own defaults key and bundle id. The first is read off the source
-# in section 0 as well as spelled here, so a rename shows up as a failure
-# rather than as two files quietly disagreeing.
+# The app's own defaults key and the build under test's bundle id (Release's
+# com.kgalligan.Reelcut, Debug's com.kgalligan.Reelcut.debug). The first is
+# read off the source in section 0 as well as spelled here, so a rename shows
+# up as a failure rather than as two files quietly disagreeing.
 DEFAULTS_KEY = "ReelcutPreviewQuality"
-BUNDLE_ID = "com.kgalligan.Reelcut"
+BUNDLE_ID = proof_defaults.bundle_domain(BINARY) or proof_defaults.APP_DOMAIN
 
 # `AgentServer+Render.swift`'s sentence, read the way six earlier scripts
 # read it.

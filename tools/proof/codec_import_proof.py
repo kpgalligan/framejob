@@ -45,6 +45,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(__file__))
 from mcp import MCP, ToolError, remove_scratch, scratch_socket, wait_listening  # noqa: E402
+import proof_app  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SEC = 600_000
@@ -260,8 +261,7 @@ def run(mcp, where, fixtures, mutant):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--mutant", choices=["p1-as-p0", "p0-as-p1"])
-    parser.add_argument("--app", default=os.path.join(ROOT, "build", "Build", "Products",
-                                                     "Release", "Reelcut.app"))
+    parser.add_argument("--app", default=str(proof_app.bundle()))
     args = parser.parse_args()
     binary = os.path.join(args.app, "Contents", "MacOS", "Reelcut")
     if not os.path.isfile(binary):

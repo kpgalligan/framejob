@@ -4,6 +4,9 @@ APP_PATH := $(BUILD_DIR)/Build/Products/Release/$(APP).app
 # The Distribution configuration's product (`make dist`): Release without
 # REELCUT_DEV_TOOLS, in its own products folder beside Release's.
 DIST_PATH := $(BUILD_DIR)/Build/Products/Distribution/$(APP).app
+# The Debug configuration's product (`make app-debug`): "Reelcut Debug",
+# com.kgalligan.Reelcut.debug (spec §11 V-5), in its own products folder.
+DEBUG_APP_PATH := $(BUILD_DIR)/Build/Products/Debug/$(APP).app
 
 # `xcodebuild` records every task's ENVIRONMENT in its build database under
 # build/Build/Intermediates.noindex/XCBuildData/, so a `make app` from a shell
@@ -15,7 +18,7 @@ DIST_PATH := $(BUILD_DIR)/Build/Products/Distribution/$(APP).app
 unexport RC_ASSEMBLYAI_KEY
 unexport ANTHROPIC_API_KEY
 
-.PHONY: all app dist rust test lint fmt typecheck project run clean prices
+.PHONY: all app app-debug dist rust test lint fmt typecheck project run clean prices
 
 all: app
 
@@ -49,6 +52,7 @@ test: rust
 	python3 tools/proof/capture_spike/inventory.py --check
 	python3 tools/proof/spec_index_proof.py
 	python3 tools/proof/swift_build.py --selftest
+	python3 tools/proof/proof_app.py --selftest
 	python3 tools/proof/proof_defaults.py --ran assistant_lane_probe --ran assistant_prompt_probe
 
 lint:
@@ -71,6 +75,12 @@ project:
 app: rust project
 	xcodebuild -project $(APP).xcodeproj -scheme $(APP) -configuration Release \
 		-derivedDataPath $(BUILD_DIR) build
+
+# The Debug app the proofs can drive (tools/proof/proof_app.py): unoptimised,
+# so it rebuilds in seconds after a one-file edit; never the index store.
+app-debug: rust project
+	xcodebuild -project $(APP).xcodeproj -scheme $(APP) -configuration Debug \
+		-derivedDataPath $(BUILD_DIR) COMPILER_INDEX_STORE_ENABLE=NO build
 
 # Builds the Distribution configuration (Release without REELCUT_DEV_TOOLS,
 # spec §11 V-1) beside Release's product, then runs the binary check: the

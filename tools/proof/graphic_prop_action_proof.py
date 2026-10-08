@@ -101,6 +101,7 @@ sys.path.insert(0, str(ROOT / "tools/proof/graphics_spike"))
 sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
 import mcp  # noqa: E402
+import proof_app  # noqa: E402
 import tree_copy  # noqa: E402
 from graphics_prefetch_proof import LINE, FIELDS, await_line, log_size  # noqa: E402
 from graphics_proof import near, pixel  # noqa: E402
@@ -109,7 +110,7 @@ from video_configuration_proof import same_movie  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/graphic-prop-action"
 HOME = WORK / "home"
-APP = ROOT / "build/Build/Products/Release/Reelcut.app"
+APP = proof_app.bundle()
 CALL_BOUND = 300
 BUILD_BOUND = 1500
 WIDTH, HEIGHT = 640, 360
@@ -558,14 +559,9 @@ def build_mutant(name):
         return None, f"the anchor occurs {text.count(anchor)} times in {path}: {anchor!r}"
     target.write_text(text.replace(anchor, replacement))
     print("  building the copy (one anchor replaced, found once)…", flush=True)
-    built = bounded.run(["make", "app"], BUILD_BOUND, cwd=str(copy))
-    app = copy / "build/Build/Products/Release/Reelcut.app"
-    if built["rc"] != 0 or not (app / "Contents/MacOS/Reelcut").exists():
-        errors = [line for line in (built["stdout"] + built["stderr"]).splitlines()
-                  if "error" in line]
-        return None, (f"make app rc {built['rc']} (expired {built['expired']}): "
-                      + ("\n      ".join(errors[:6]) or built["stdout"][-600:]))
-    print(f"  built in {built['seconds']:.0f} s", flush=True)
+    app, reason = tree_copy.build_app(copy, BUILD_BOUND)
+    if app is None:
+        return None, reason
     return app, ""
 
 

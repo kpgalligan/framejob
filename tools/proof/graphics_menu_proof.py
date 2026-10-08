@@ -201,13 +201,14 @@ sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
 import graphics_proof as gp  # noqa: E402  (attempt, complaints)
 import mcp  # noqa: E402
+import proof_app  # noqa: E402
 import tree_copy  # noqa: E402
 import swift_build  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/graphics-menu"
 HOME = WORK / "home"
 LOG = WORK / "reelcut.log"
-APP = ROOT / "build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut"
+APP = proof_app.binary()
 PROBE_SWIFT = ROOT / "tools/proof/graphics_menu_probe.swift"
 TEMPLATES = ROOT / "graphic/tests/graphics"
 REFERENCE = ROOT / "docs/graphics-api.md"
@@ -685,8 +686,8 @@ def probe_mutant(app, name):
 
 
 def build_app_mutant(name):
-    """A copy of the tree with the mutant's anchor replaced, built by its own
-    `make app`. The binary, or None and why."""
+    """A copy of the tree with the mutant's anchor replaced, built by
+    `tree_copy.build_app`. The binary, or None and why."""
     made, reason = tree_copy.make_copy(str(WORK / "mutant"))
     if made is None:
         return None, reason
@@ -695,14 +696,10 @@ def build_app_mutant(name):
         mutate(copy / "app/Sources", name, APP_MUTANTS)
     except (OSError, RuntimeError) as error:
         return None, str(error)
-    built = bounded.run(["make", "app"], 1500, cwd=str(copy))
-    binary = copy / "build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut"
-    if built["rc"] != 0 or not binary.exists():
-        errors = [line for line in (built["stdout"] + built["stderr"]).splitlines()
-                  if "error:" in line]
-        return None, (f"make app rc {built['rc']} (expired {built['expired']}): "
-                      + ("\n      ".join(errors[:6]) or built["stdout"][-600:]))
-    return binary, ""
+    app, reason = tree_copy.build_app(copy, 1500)
+    if app is None:
+        return None, reason
+    return app / "Contents/MacOS/Reelcut", ""
 
 
 def app_mutant(name):

@@ -52,7 +52,8 @@ comment citing "road map N §x" refers to the archived original.
 
 ```sh
 make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
-make test       # make rust, cd core && cargo test --release, cd graphic && cargo test --release, cd mcp-proxy && cargo test --release (black-box tests), then tools/proof/assistant_lane_proof.py (the agent lane's probe, with the assistant's credential rows and the support folder's `0700` rows), tools/proof/assistant_prompt_proof.py --probe (the prompt texts' drift checks), tools/proof/prices_proof.py (the price function: prices.py and agent/'s `bun test` against agent/prices/cases.json, and update.py's reducer against reduce_cases.json, no network) and tools/proof/budget_proof.py (the proofs' ledger and the monthly budgets, over scratch ledgers, no network) and tools/proof/capture_spike/inventory.py --check (the menu inventory's sites, found by token and enclosing function, and its other citations, found by anchor, against app/Sources; no app) and tools/proof/spec_index_proof.py (the spec indexes' Lines cells against `wc -l`, and a row for every spec file; no app) and tools/proof/swift_build.py --selftest (the probe builder's key, reuse and digest check, and that no proof carries its own app swiftc line; one tiny build, no app) and tools/proof/proof_defaults.py --ran assistant_lane_probe --ran assistant_prompt_probe (the defaults removal recipe on a throwaway domain, its refusals over scratch folders, then the sweep of the proofs' own idle domains, and of the two probes this target ran, out of `~/Library/Preferences`; no app)
+make app-debug  # make rust + make project + xcodebuild Debug → build/Build/Products/Debug/Reelcut.app, "Reelcut Debug" (com.kgalligan.Reelcut.debug; seconds after a one-file edit)
+make test       # make rust, cd core && cargo test --release, cd graphic && cargo test --release, cd mcp-proxy && cargo test --release (black-box tests), then tools/proof/assistant_lane_proof.py (the agent lane's probe, with the assistant's credential rows and the support folder's `0700` rows), tools/proof/assistant_prompt_proof.py --probe (the prompt texts' drift checks), tools/proof/prices_proof.py (the price function: prices.py and agent/'s `bun test` against agent/prices/cases.json, and update.py's reducer against reduce_cases.json, no network) and tools/proof/budget_proof.py (the proofs' ledger and the monthly budgets, over scratch ledgers, no network) and tools/proof/capture_spike/inventory.py --check (the menu inventory's sites, found by token and enclosing function, and its other citations, found by anchor, against app/Sources; no app) and tools/proof/spec_index_proof.py (the spec indexes' Lines cells against `wc -l`, and a row for every spec file; no app) and tools/proof/swift_build.py --selftest (the probe builder's key, reuse and digest check, and that no proof carries its own app swiftc line; one tiny build, no app) and tools/proof/proof_app.py --selftest (the stale-app refusal, the app choice and the Debug bundle id against project.yml, over scratch trees; no app) and tools/proof/proof_defaults.py --ran assistant_lane_probe --ran assistant_prompt_probe (the defaults removal recipe on a throwaway domain, its refusals over scratch folders, then the sweep of the proofs' own idle domains, and of the two probes this target ran, out of `~/Library/Preferences`; no app)
 make lint       # cargo clippy --all-targets -- -D warnings, in core/, graphic/ then mcp-proxy/
 make typecheck  # swiftc -typecheck -D REELCUT_DEV_TOOLS of app/Sources/*.swift in batch mode on every core (seconds) — the ONLY authoritative Swift check, then agent/'s `tsc --noEmit` (through bun)
 make project    # xcodegen generate with VERSION injected — never run a bare xcodegen, it leaves the version blank (Reelcut.xcodeproj is generated; project.yml is the source of truth)
@@ -134,7 +135,8 @@ archive/             closed road maps and histories, verbatim; INDEX.md — read
 docs/agents/         what the engineering skills read: tracker, labels, domain docs
 docs/graphics-api.md the graphics reference an agent reads; graphic/tests/reference.rs runs every js block
 tools/proof/         mcp.py, the per-phase proof scripts, harness/ (offscreen chrome),
-                     swift_build.py (the one probe build line and its cache)
+                     swift_build.py (the one probe build line and its cache),
+                     proof_app.py (which app a proof drives, and the stale refusal)
 .github/             workflows/publish.yml (the publish branch's signed, notarized DMG, spec §11
                      PUB-1..PUB-5) and ExportOptions.plist (its developer-id export)
 project.yml          xcodegen definition; Makefile; README.md (user-facing)
@@ -259,7 +261,8 @@ else is what bloats files:
 
 The app is verified by driving the built binary over MCP and comparing what
 it renders — not by reading code. Launch your own instance on your own socket
-and only ever kill that one (`pgrep -f "MacOS/Reelcut"` lists them; another
+and only ever kill that one (`pgrep -f "MacOS/Reelcut"` lists them, Debug and Release alike; the products
+folder tells them apart; another
 session may have one running):
 
 ```sh
@@ -287,7 +290,7 @@ envelope key, plus the app-state tools — `open_project`, `new_project`,
 `undo`, `redo`, `render_frame`, `export`, `record_screen`, `write_graphic`,
 `get_graphic`, `graphic_reference`, `render_graphic`, `import_graphic_font`,
 `import_graphic_asset`, `delete_graphic`, `rename_graphic` and
-`restore_graphic`. A Release build also has the dev tools
+`restore_graphic`. A Debug or Release build also has the dev tools
 (`snapshot_ui`, `perform_menu_item`, `cancel_sheet`, `select_inspector_tab`;
 "Seeing the chrome" below; and `assistant_send` / `assistant_answer`, which
 drive a window's assistant turn against a stand-in server, with the dev-only
@@ -297,13 +300,22 @@ and the catalog are the authority for the counts; the parity check compares
 them at startup. `render_frame` writes a PNG and returns its path; `export`
 waits for the file.
 
+A proof picks its app through `tools/proof/proof_app.py`: `RC_PROOF_APP` is
+`release` (the default), `debug` or a `.app` path. `mcp.launch`, `mcp.MCP` and
+`python3 tools/proof/proof_app.py launch` refuse a tree's built app when any
+input is newer than its last complete build (its
+`_CodeSignature/CodeResources`), or an instance started before an input
+changed, naming the file, its time and the `make` target.
+
 **Before trusting any MCP proof, `grep "Reelcut: " <dir>/reelcut.log`
 must print nothing** — that prefix is the startup parity check complaining.
 
-A proof's instance shares the owner's `com.kgalligan.Reelcut` defaults: no
+A proof's instance shares its bundle's defaults domain (the owner's
+`com.kgalligan.Reelcut` for a Release build, `com.kgalligan.Reelcut.debug`
+for a Debug build, spec §11 V-5): no
 environment moves `UserDefaults` (#238). Never perform a persisting menu item
 (View ▸ Snapping, Safe Areas, Hide Inspector, Timeline Track Height, Preview
-Quality) on the real build: `mcp.py` ends the script with status 3 and
+Quality) on either build: `mcp.py` ends the script with status 3 and
 `DEFAULTS MOVED` last on stderr when its session moved a key and no other
 Reelcut shares the domain, and only prints the line when one does;
 `defaults_proof.py` is its proof. The guard reads the domain with
@@ -347,8 +359,8 @@ is ever claimed offscreen; pixel claims go over MCP. `tools/proof/README.md`'s
 "offscreen harness" section has the build line, the argument list and the
 pinned `UserDefaults`.
 
-To look at the LIVE app, a Release build (the one `make app` builds, never
-Distribution) has dev tools over MCP (road map 11, spec §11 V-1).
+To look at the LIVE app, a Debug or Release build (`make app-debug`,
+`make app`; never Distribution) has dev tools over MCP (road map 11, spec §11 V-1).
 `snapshot_ui` captures the editor, a sheet, Settings, Welcome or the recorder panel, with a
 layout dump. `perform_menu_item` runs a menu item by path to put a sheet or
 Settings up, `cancel_sheet` closes the sheet, and `select_inspector_tab`

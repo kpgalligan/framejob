@@ -41,8 +41,8 @@ Fixtures are `mixed_audio_probe.py`'s, written fresh by importing it (the
 `--mutant old-onset` builds a tree copy (`tree_copy.make_copy`, under
 `work/mixed-audio-mutant`) with the pre-B61 onset (`git show 16d4934`: the
 track's first segment of positive duration, sounding or not) in
-`CompositionBuilder+AudioTracks.swift`, the anchor asserted once, by the
-copy's own `make app`; launches it on a scratch socket of its own
+`CompositionBuilder+AudioTracks.swift`, the anchor asserted once, built by
+`tree_copy.build_app`; launches it on a scratch socket of its own
 (`mcp.launch`), logging beside that socket; and runs every row against it.
 Exit 0 means caught: both `missing-first` and
 `pending-first`'s first-25 ms rows FAIL while both sections' CONTROL rows
@@ -316,7 +316,7 @@ def fixtures():
 
 def build_mutant(name):
     """`graphics_proof.build_mutant`'s shape: a tree copy, the anchor asserted
-    once in `app/Sources/<file>` and replaced, the copy's own `make app`.
+    once in `app/Sources/<file>` and replaced, `tree_copy.build_app`.
     The binary, or None and why."""
     file, anchor, replacement = MUTANTS[name]
     made, reason = tree_copy.make_copy(os.path.join(WORK, "mixed-audio-mutant"))
@@ -329,14 +329,10 @@ def build_mutant(name):
         return None, f"the anchor occurs {text.count(anchor)} times in {file}"
     with open(target, "w") as handle:
         handle.write(text.replace(anchor, replacement))
-    built = bounded.run(["make", "app"], 1500, cwd=made)
-    binary = os.path.join(made, "build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut")
-    if built["rc"] != 0 or not os.path.exists(binary):
-        errors = [line for line in (built["stdout"] + built["stderr"]).splitlines()
-                  if "error:" in line]
-        return None, (f"make app rc {built['rc']} (expired {built['expired']}): "
-                      + ("\n      ".join(errors[:6]) or built["stdout"][-600:]))
-    return binary, ""
+    app, reason = tree_copy.build_app(made, 1500)
+    if app is None:
+        return None, reason
+    return str(app / "Contents/MacOS/Reelcut"), ""
 
 
 def parity_lines(log_path):
