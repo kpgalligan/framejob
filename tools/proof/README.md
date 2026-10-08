@@ -1732,7 +1732,10 @@ on Debug its render_frame took 2.04 s of the 3 s bound, so it was pinned); the
 18 app-driving proofs changed since issue batch B80 each scored their full
 score on Debug, the two with a recorded Release time (agent_socket_proof
 135 s, export_cancel_proof 256 s) faster on Debug (`archive/build-velocity.md`'s
-phase 3 record has the table).
+phase 3 record has the table). `matte_spike/matte_spike.py --measure` (road map
+"mattes" MT0) is the same kind without an app: it times the GPU, so its bench
+is always built `-O` through `swift_build.build(…, optimize=True)`, and it takes
+no `release_only=` because there is no app for `proof_app` to choose.
 
 **Debug against Release (`debug_release_proof.py`).** The evidence for spec
 §11 V-4: Debug answers, renders and exports as Release does.
@@ -16892,3 +16895,26 @@ alone, landed on the space between "this" and "toggle" and missed the spill.
 The first run of K18c (91 rows, 90 passed) failed it on its own fixture: the
 label was "… for this toggle box", 282 pt in the probe's face, wider than the
 unkeyed row.
+
+## Road map mattes — MT0, the matte spike (`matte_spike/`; spec §11 MT-6)
+
+**What it answers.** Which route an unmatted layer takes once the layer stage
+samples a matte coverage at `texture(1)` — V1, a 1×1 white placeholder bound
+there, or V2, a `kMatte` function-constant specialization — and what a matte
+costs, at 1920×1080 and 3840×2160. Nothing is merged into `app/`.
+`matte_spike/README.md` has the variants, scenes, rows and statistic.
+
+```
+python3 tools/proof/matte_spike/matte_spike.py --check                       # B0–B2, K3/K4 (10 frames a scene)
+python3 tools/proof/matte_spike/matte_spike.py --check --mutant resolve-writes-one|anchor-missing
+perl -e 'alarm 600; exec @ARGV' python3 tools/proof/matte_spike/matte_spike.py --measure   # H0, C0, T0–T2, M0; recorded
+```
+
+**Its record** (2026-10-08, Apple M2 Max, `powermode 0`, AC power):
+`--check` exit 0 (B0–B2, K3/K4 for both routes at both sizes); `--measure`
+exit 0: C0 noise floor 0.038 ms at 1080p and 0.002 ms at 4K; S1 overhead over
+V0 0.014 ms (V1) and 0.019 ms (V2) at 1080p, 0.052 ms and −0.003 ms at 4K;
+route V1; with V1, S3 − S2 −0.082 / 0.066 ms and S4 − S2 0.040 / 0.542 ms
+(1080p / 4K), within 0.50 / 2.00 ms. Mutants: `resolve-writes-one` killed by K3
+and K4, `anchor-missing` by B0. The full table is `designs/mattes.md`'s MT0
+record.
