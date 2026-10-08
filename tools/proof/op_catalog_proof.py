@@ -47,7 +47,7 @@ A probe that will not build is a scored FAILURE, never an exit. The probe is
 built BEFORE the first MCP call, so no swiftc runs while the proof is driving
 the app.
 
-    make app
+    make app-debug
     python3 tools/proof/proof_app.py launch   # prints folder, socket, log, pid
     grep "Reelcut: " <dir>/reelcut.log     # must print nothing
     python3 tools/proof/op_catalog_proof.py <dir>/agent.sock

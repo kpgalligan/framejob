@@ -2312,4 +2312,12 @@ sees; only invalid input throws, and errors never crash.
 **`make typecheck` is authoritative for TYPE errors, and only those.** It
 stops before SILGen, so `closure captures 'x' before it is declared` and its
 kin never appear; declare captured copies at the TOP of their scope, and
-prove a build with `make app`.
+prove a build with `make app-debug`, and Release with `make app` at the gate.
+
+**Debug and Release.** The loop and mutant tiers build and drive a Debug app
+(spec §11 V-4, V-5); the gate builds Release and the run a phase records is on
+Release. (a) The 18 `assert`/`assertionFailure` sites are live in Debug: a trap
+is a defect to fix, never an assert to delete or a reason to switch
+configuration. (b) Debug is unoptimised: a proof that measures time or
+throughput is `release_only`, as is one that needs a TCC grant. (c) A failure
+only Release shows is found by the recorded run and fixed in that phase.

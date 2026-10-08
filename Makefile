@@ -94,7 +94,9 @@ app-debug: rust project
 # signed with the hardened runtime and hold no entitlements, and its catalog
 # snapshot (Contents/Resources/agent-catalog.json) must be at the bundle's
 # version, Release's naming every dev tool and Distribution's none (road map
-# 14 MC3, D15–D24). The file-wide `unexport RC_ASSEMBLYAI_KEY` above covers
+# 14 MC3, D15–D24); and the Release app must be signed with exactly Xcode's
+# audio-input and get-task-allow, and both apps must pass `codesign --verify
+# --deep --strict` (issue batch B88, D25–D27). The file-wide `unexport RC_ASSEMBLYAI_KEY` above covers
 # this recipe too. `published_check.py` is the check the publish workflow runs
 # over the app it is about to pack (spec §11 PUB-4), run here over the
 # Distribution build so it cannot rot between two publishes.

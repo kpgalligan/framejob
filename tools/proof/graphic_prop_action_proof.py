@@ -8,7 +8,8 @@ the clip's module, and the evaluated props reach `render_frame`, a
     python3 tools/proof/graphic_prop_action_proof.py --mutant recipe-stored-props
     python3 tools/proof/graphic_prop_action_proof.py --mutant handler-no-schema
 
-Launches the Release build on scratch sockets of its own, one instance at a
+Launches the built app `proof_app` picks (Debug unless `RC_PROOF_APP=release`)
+on scratch sockets of its own, one instance at a
 time, and stops only those processes. **Every instance runs in a scratch
 home**, `CFFIXED_USER_HOME=tools/proof/work/graphic-prop-action/home`, and
 every package and movie is under `tools/proof/work/graphic-prop-action/`,
@@ -76,8 +77,9 @@ opened and exported as P-off.mov.
 
 `--mutant NAME` builds a COPY of the tree (`tree_copy.make_copy`; a `core/`
 anchor makes the copy's `core/` its own through `hevc_alpha_proof.own_core`),
-replaces one anchor (asserted to occur exactly once), builds it by the
-copy's own `make app`, and runs instance 1's rows on it (instance 2, F1 and
+replaces one anchor (asserted to occur exactly once), builds it by
+the copy's own `make app-debug` (`make app` under
+`RC_PROOF_APP=release`; `tree_copy.build_app`), and runs instance 1's rows on it (instance 2, F1 and
 F2 are skipped):
   recipe-stored-props  the recipe publishes the STORED props, not the
                        evaluated ones: C1 must FAIL.
@@ -541,7 +543,7 @@ def remove_work():
 
 def build_mutant(name):
     """A copy of the tree with the mutant's anchor replaced, built by its own
-    `make app`. The app bundle, or None and why."""
+    `tree_copy.build_app`. The app bundle, or None and why."""
     path, anchor, replacement, _ = MUTANTS[name]
     made, reason = tree_copy.make_copy(str(WORK / "mutant"))
     if made is None:

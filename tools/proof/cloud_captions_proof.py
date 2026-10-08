@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Road map 6, C1 pipeline 3 — the cloud engine through the BUILT binary.
 
-Drives `make app`'s Reelcut over MCP against `assemblyai_fake.py` on a
+Drives the built Reelcut (`proof_app`'s choice: `make app-debug`'s, or `make
+app`'s under `RC_PROOF_APP=release`) over MCP against `assemblyai_fake.py` on a
 loopback socket. Nothing here calls AssemblyAI: every instance is launched
 with `-RCAssemblyAIEndpoint http://127.0.0.1:<the fake's port>` and
 `-RCSecretFolder <a folder under work/>` (spec §11's R6-9), and the only
@@ -87,7 +88,8 @@ answered and `AVAudioFile` always runs), and a free loopback port for each fake.
 `--mutant <name>` builds a COPY of the tree with `tree_copy.make_copy` —
 `app/` and `agent/` copied, every other build input `project.yml` names a
 SYMLINK to the tree's, `core` already built — patches one text asserted to
-occur exactly once, runs the copy's `make app` under a 900 s wall, and runs every row
+occur exactly once, runs the copy's own `make app-debug` (`make app` under
+`RC_PROOF_APP=release`; `tree_copy.build_app`) under a 900 s wall, and runs every row
 against that binary. A mutant that survives is a
 finding about the ROW, not about the mutant. A mutant (or `--fake-mutant`)
 whose control could not be performed — the text to replace not found
@@ -2512,7 +2514,8 @@ def main():
             print(f"mutant {args.mutant}: the control could not be performed — {why}")
             return 2
     if not os.path.exists(binary):
-        check("the built binary is there — run `make app` first", False, binary)
+        check(f"the built binary is there — run `make {proof_app.MAKE_TARGET[proof_app.config()]}` "
+              "first", False, binary)
         print(f"\n{passed}/{passed + failed} checks passed in {time.time() - started:.0f} s")
         return 1
     instance_binary = binary

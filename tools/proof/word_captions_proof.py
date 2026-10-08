@@ -389,7 +389,8 @@ def main():
     os.makedirs(WORK, exist_ok=True)
     print("road map 8 W4a — word-caption generation, over MCP\n")
     if not os.path.exists(BINARY):
-        check("the built binary is there — run `make app` first", False, BINARY)
+        check(f"the built binary is there — run `make {proof_app.MAKE_TARGET[proof_app.config()]}` "
+              "first", False, BINARY)
         return 1
     with Fake("word-captions") as fake:
         instance = Instance(fake)

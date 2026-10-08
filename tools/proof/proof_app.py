@@ -7,8 +7,8 @@ proof drives (proof_app.py)" is the long form.
     python3 tools/proof/proof_app.py check [--app debug|release|PATH]
     python3 tools/proof/proof_app.py --selftest | --mutant exe-marker|md-counted|exe-mtime-running
 
-`RC_PROOF_APP`: `debug` (`make app-debug`, spec §11 V-5), `release` (`make
-app`; the default while unset) or a `.app` or executable path. The marker of
+`RC_PROOF_APP`: `debug` (`make app-debug`, spec §11 V-4, V-5; the default
+while unset), `release` (`make app`) or a `.app` or executable path. The marker of
 a complete build is the bundle's `_CodeSignature/CodeResources`; there is no
 override variable. Imports nothing from `tools/proof` (`mcp.py` imports it)
 but in the `launch` command. A `--mutant` must fail exactly its rows:
@@ -30,7 +30,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 WORK = ROOT / "tools/proof/work/proof_app"
 ENV = "RC_PROOF_APP"
-DEFAULT = "release"     # phase 3 of build velocity makes it "debug"
+DEFAULT = "debug"       # spec §11 V-4: the loop drives Debug; release_only pins Release
 MAKE_TARGET = {"debug": "app-debug", "release": "app"}
 DOMAINS = {"debug": "com.kgalligan.Reelcut.debug", "release": "com.kgalligan.Reelcut"}
 FOLDER = {"debug": "Debug", "release": "Release"}

@@ -10,7 +10,7 @@ Every instance is a `Popen` this script owns, launched with
 holds the socket's line alone. Logs go to
 `tools/proof/work/agent-socket/<name>.log`; every other child (the probe's
 build, the probe, `osascript`, `lsof`, `ffmpeg`,
-`make app`) runs under `graphics_spike/bounded.py`. HTTP over AF_UNIX is
+`tree_copy.build_app`) runs under `graphics_spike/bounded.py`. HTTP over AF_UNIX is
 `mcp.UnixHTTPConnection`. Nothing is signalled but this script's own pids,
 and nothing under `~/Library/Application Support/Reelcut/` is created,
 written or unlinked.

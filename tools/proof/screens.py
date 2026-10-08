@@ -4,7 +4,8 @@
     python3 tools/proof/screens.py [--app APP] [--screens DIR]
         [--out DIR] [--only ID,…] [--compare EARLIER_OUT]
 
-It launches its OWN Release instance on a scratch socket (`mcp.scratch_socket`;
+It launches its OWN instance of the built app (`proof_app`'s choice, Debug unless
+`RC_PROOF_APP=release`) on a scratch socket (`mcp.scratch_socket`;
 the log names the path it bound), under a scratch home of its own
 (`CFFIXED_USER_HOME` = `<out>/home.<look>`, rebuilt bare before each launch
 and replacing one the caller exported; issue batch B86 phase 2), with every

@@ -4,8 +4,8 @@ AI-14, AI-17, AI-19).
 
 P — the probe `assistant_tab_probe.swift`, compiled over `app/Sources` minus
 `main.swift` on `swift_build.py`'s line (`-D REELCUT_DEV_TOOLS`; a
-probe that does not build is a scored FAIL on every P row), with the Release
-build's helper copied to `<probe dir>/Contents/Helpers/reelcut-agent`, run
+probe that does not build is a scored FAIL on every P row), with the built
+app's helper (`proof_app`'s choice) copied to `<probe dir>/Contents/Helpers/reelcut-agent`, run
 with `--fonts app/Resources/Fonts` (the shipped faces registered, #207), a
 DUMMY key in a `-RCSecretFolder` of its own,
 `-ReelcutInspectorCollapsed NO` and `RC_ASSISTANT_BASE_URL=http://127.0.0.1:9`:
@@ -152,7 +152,7 @@ Launch B (the override set, no `-RCSecretFolder`: no key, AI-13):
 
 `no-forward` copies the tree with `tree_copy.make_copy` into
 `work/assistant_tab/mutant/tree`, deletes the `session.onEvent =` line from
-`EditorViewController+Assistant.swift`, runs `make app` there, and runs L1's
+`EditorViewController+Assistant.swift`, builds it there (`tree_copy.build_app`), and runs L1's
 steps and L2 against that app: L2 must FAIL (exit 1; 0 when it survives). A
 copy that did not build could not perform the control (exit 2). `flatten-send`
 is the same tree copy with `send()` joining the composer's lines with spaces
@@ -203,6 +203,7 @@ sys.path.insert(0, os.path.join(HERE, "graphics_spike"))
 import assistant_session_proof as asp  # noqa: E402
 import bounded  # noqa: E402
 import prices  # noqa: E402
+import proof_app  # noqa: E402
 import swift_build  # noqa: E402
 import tree_copy  # noqa: E402
 
@@ -260,7 +261,7 @@ MUTANTS = {
                 "P15"),
 }
 # name: (file in app/Sources, before — exactly once, after, row): a tree copy built with
-# `make app`, its row run live against it
+# `tree_copy.build_app`, its row run live against it
 TREE_MUTANTS = {
     "flatten-send": ("AssistantView.swift",
                      "        let text = composer.string.trimmingCharacters(in: "
@@ -298,7 +299,8 @@ def build_probe(sources=None, probe_dir=None):
     if not os.path.exists(LIB):
         return None, f"{LIB} is missing — run `cd core && cargo build --release` first"
     if not os.path.exists(HELPER):
-        return None, f"{HELPER} is missing — run `make app` first"
+        return None, (f"{HELPER} is missing — run "
+                      f"`make {proof_app.MAKE_TARGET[proof_app.config()]}` first")
     helpers = os.path.join(probe_dir, "Contents", "Helpers")
     os.makedirs(helpers, exist_ok=True)
     shutil.copy2(HELPER, os.path.join(helpers, "reelcut-agent"))
@@ -790,7 +792,7 @@ def row_n1(fake):
 
 
 def build_mutant(name="no-forward"):
-    """(app, None): `make app` over a tree copy with the mutant applied —
+    """(app, None): `tree_copy.build_app` over a tree copy with the mutant applied —
     no-forward's `session.onEvent =` line deleted, any other name's
     `TREE_MUTANTS` replacement made exactly once; or (None, reason)."""
     base = os.path.join(WORK, "mutant")

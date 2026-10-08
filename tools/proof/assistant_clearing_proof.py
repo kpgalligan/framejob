@@ -2,7 +2,7 @@
 """The assistant's tool-result clearing, against the stand-in or the real API
 — issue batch B54 (#208; spec §11 AI-20).
 
-One Release app (on a scratch socket, spec §11 MC-6; a dummy
+One built app (`proof_app`'s choice, Debug unless `RC_PROOF_APP=release`; on a scratch socket, spec §11 MC-6; a dummy
 `-RCSecretFolder`, `-ReelcutAssistantModel claude-opus-5-5`,
 `-ReelcutAssistantAutoCompact NO`, `-ReelcutAssistantClearToolResults YES`)
 is pointed at `ClearingRelay`, a subclass of `assistant_prompt_eval.py`'s

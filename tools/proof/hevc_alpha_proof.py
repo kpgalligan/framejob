@@ -17,7 +17,8 @@ a build that holds phase B** — it requires the pad the baseline recorded
 and an unknown `hevc_alpha` — and the script says so on G1's line and on
 its last line; Gate A was passed on the phase A build (commit fcfeebf).
 
-Each launch is the Release build on a scratch socket of its own, and only
+Each launch is the built app `proof_app` picks (Debug unless `RC_PROOF_APP=release`)
+on a scratch socket of its own, and only
 that process is stopped, by its launcher. **Every instance runs in a
 scratch home**, `CFFIXED_USER_HOME=tools/proof/work/hevc-alpha/<launch>/home`,
 and every package, PNG and export is under `tools/proof/work/hevc-alpha/`,
@@ -194,8 +195,8 @@ apart). `--control sheet-default` launches with `screens.py`'s own empty
 `ReelcutExportChoice`: E1 must FAIL (the sheet opens on H.264).
 
 **Mutants**, each ONE `tree_copy.make_copy` with every named anchor
-asserted to occur exactly once and replaced, built by the copy's own
-`make app` under a 1500 s bound, running only its named rows:
+asserted to occur exactly once and replaced, built by the copy's own `make app-debug` (`make app` under
+`RC_PROOF_APP=release`; `tree_copy.build_app`) under a 1500 s bound, running only its named rows:
 - `encoder-refused` — `videoSettings` adds an encoder specification nothing
   satisfies for `.hevcWithAlpha`, and `encoderOutcome` returns its argument
   untouched when the environment holds `RC_MUTANT_UNMAPPED`. Two launches:
@@ -1587,7 +1588,7 @@ def own_core(copy):
 
 def build_mutant(name):
     """A copy of the tree with every anchor of the mutant replaced, built by
-    its own `make app`. The app bundle, or None and why."""
+    `tree_copy.build_app`. The app bundle, or None and why."""
     anchors = MUTANTS[name]["anchors"]
     made, reason = tree_copy.make_copy(str(WORK / "mutant"))
     if made is None:

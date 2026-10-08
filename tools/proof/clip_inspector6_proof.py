@@ -254,7 +254,8 @@ def mcp_checks(chrome):
     print(f"\n2 — the built app over MCP ({os.path.relpath(APP, ROOT)})")
     if not os.path.exists(APP):
         for name in K3_ROWS:
-            check(name, False, "no built app — run `make app` first")
+            check(name, False, "no built app — run "
+                  f"`make {proof_app.MAKE_TARGET[proof_app.config()]}` first")
         return
     frames = os.path.join(WORK, "frames")
     os.makedirs(frames, exist_ok=True)

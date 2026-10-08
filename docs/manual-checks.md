@@ -23,7 +23,7 @@ in both appearances (System Settings ▸ Appearance, Light then Dark).
    - **Synthetic test media**, where a check names it: make it once with the
      `ffmpeg` lines under "Make the test media once" in
      `tools/proof/README.md` (into `tools/proof/media/`).
-   - **Graphics projects** (GR): `python3 tools/proof/graphics_playback_samples.py`
+   - **Graphics projects** (GR): `RC_PROOF_APP=release python3 tools/proof/graphics_playback_samples.py`
      builds `Playback-1080p`, `Playback-4K`, `Error-card` and
      `Playback-4K-animated` into `tools/proof/work/playback-check/`. Rebuild them on a fresh checkout.
    - **Keys**: your own AssemblyAI key for Cloud captions (Reelcut ▸
@@ -580,7 +580,7 @@ on your own account, never the spike's.
 - **Source:** road map 14 MC1 (q3, rows T1–T3 and D1).
 
 **AC-3 — Claude Code reaches Reelcut through `reelcut-mcp`**
-- **Do:** 1. `make app`, then `python3 tools/proof/mcp_proxy_proof.py` once: it writes `tools/proof/work/mcp-proxy/ac-mcp.json`, a scratch configuration whose `reelcut` server is the tree's Release `Contents/Helpers/reelcut-mcp`, with no env. 2. Quit Reelcut (every copy). 3. In a terminal, `claude --mcp-config tools/proof/work/mcp-proxy/ac-mcp.json --strict-mcp-config`. 4. Ask it to list the `reelcut` server's tools (`/mcp`). 5. Ask it to call `get_project`. 6. Quit Claude Code, and quit the Reelcut it opened.
+- **Do:** 1. `make app`, then `RC_PROOF_APP=release python3 tools/proof/mcp_proxy_proof.py` once: it writes `tools/proof/work/mcp-proxy/ac-mcp.json`, a scratch configuration whose `reelcut` server is the tree's Release `Contents/Helpers/reelcut-mcp`, with no env. 2. Quit Reelcut (every copy). 3. In a terminal, `claude --mcp-config tools/proof/work/mcp-proxy/ac-mcp.json --strict-mcp-config`. 4. Ask it to list the `reelcut` server's tools (`/mcp`). 5. Ask it to call `get_project`. 6. Quit Claude Code, and quit the Reelcut it opened.
 - **Expect:** step 4 lists Reelcut's tools with no Reelcut launched (the Dock shows none). Step 5 opens Reelcut in the background — the terminal keeps focus — and the call answers in Reelcut's own words (with no project open, "No project is open…"). Per MC1's q3, a running Reelcut newer than the bundle the proxy came from shows its own tools after the first call; whether Claude Code refetches on `list_changed` is AC-1's question.
 - **Answer:** were the tools listed before Reelcut ran, and did the first call open Reelcut without taking focus from the terminal and answer?
 - **Source:** road map 14 MC3 (`mcp_proxy_proof.py` X1, X2; spec §11 MC-3, MC-4).
@@ -629,7 +629,7 @@ unlocked Mac; paste each score into the issue in the Source.
 - **Source:** #57.
 
 **HS-2 — The recorder's microphone rows with a wired or built-in microphone**
-- **Do:** 1. Set the default input to the built-in or a wired microphone (not Bluetooth), in System Settings ▸ Sound. 2. Give Terminal Screen Recording and Microphone permission. 3. Launch an instance on a scratch socket as in CLAUDE.md's "Verifying a build" (it prints its folder, `<dir>`); run `python3 tools/proof/recording_proof.py <dir>/agent.sock`.
+- **Do:** 1. Set the default input to the built-in or a wired microphone (not Bluetooth), in System Settings ▸ Sound. 2. Give Terminal Screen Recording and Microphone permission. 3. `make app`, then `python3 tools/proof/proof_app.py launch --app release` (it prints its folder, `<dir>`); run `python3 tools/proof/recording_proof.py <dir>/agent.sock`.
 - **Expect:** every microphone row passes (only the named Bluetooth-output skips).
 - **Answer:** should the proof skip its microphone rows by name on a Bluetooth input?
 - **Source:** #57.

@@ -7,7 +7,8 @@ script launches.
     python3 tools/proof/paste_graphic_proof.py --mutant handler-drops-skip
     python3 tools/proof/paste_graphic_proof.py --mutant groups-without-graphic
 
-Launches the Release build on a scratch socket of its own and stops only
+Launches the built app `proof_app` picks (Debug unless `RC_PROOF_APP=release`)
+on a scratch socket of its own and stops only
 that process. **The instance runs in a scratch home**,
 `CFFIXED_USER_HOME=tools/proof/work/paste-graphic/mcp/home`, and its one
 package is under `tools/proof/work/paste-graphic/mcp/`, which is removed at
@@ -53,7 +54,8 @@ Rows:
 
 `--mutant NAME` builds a COPY of the tree (`tree_copy.make_copy`), replaces
 one anchor in the copy's `AgentServer+Clips.swift` (asserted to occur once),
-builds it by the copy's own `make app`, and runs the same rows on it:
+builds it by the copy's own `make app-debug` (`make app` under
+`RC_PROOF_APP=release`; `tree_copy.build_app`), and runs the same rows on it:
   handler-drops-skip      the handler does not pass `skip_missing`: P4 must
                           FAIL.
   groups-without-graphic  `AgentServer.attributeGroups` loses "graphic": P1

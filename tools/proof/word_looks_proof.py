@@ -9,7 +9,8 @@ in-word fill and a dim in a pause, on instances this script launches.
         (also plate-over-ink, fill-ignored, fill-unsnapped, dim-ignored,
         dim-per-draw, dim-twice, dim-not-composited, backdrop-dims)
 
-Launches the Release build on a scratch socket of its own (`mcp.launch`) and
+Launches the built app `proof_app` picks (Debug unless `RC_PROOF_APP=release`)
+on a scratch socket of its own (`mcp.launch`) and
 stops only that process. **Every instance runs in a scratch home**,
 `CFFIXED_USER_HOME=tools/proof/work/word-looks/home`. No menu item is
 performed. Every call is bounded (120 s; W3's child 300 s). Every picture
@@ -105,7 +106,8 @@ is no commit's picture. It says so before launching and writes nothing.
 `--mutant NAME` builds a COPY of the tree (`tree_copy.make_copy`), replaces
 each of the mutant's anchors in the copy's `app/Sources` (in
 `LayerRenderersWords.swift` unless the edit names another file; each
-asserted to occur once), builds it by the copy's own `make app`, and runs
+asserted to occur once), builds it by the copy's own `make app-debug` (`make app` under
+`RC_PROOF_APP=release`; `tree_copy.build_app`), and runs
 the rows on it, W3 aside:
   glide-ignored   the plate is never interpolated: G1 must FAIL.
   plate-over-ink  the gliding plate is filled after the base pass: G3 must
@@ -873,7 +875,7 @@ def recording_refusal(changes):
         return (f"{len(changes)} uncommitted change(s) under {where} ({named}"
                 f"{'; …' if len(changes) > 3 else ''}): the baseline's `recorded_from` names a "
                 "commit, and this build is not that commit's picture. Commit or stash them, "
-                "`make app`, and record again")
+                f"`make {proof_app.MAKE_TARGET[proof_app.config()]}`, and record again")
     return None
 
 
@@ -1031,7 +1033,7 @@ def remove_scratch():
 
 def build_mutant(name):
     """A copy of the tree with the mutant's anchor replaced, built by its own
-    `make app`. The app bundle, or None and why."""
+    `tree_copy.build_app`. The app bundle, or None and why."""
     edits, _ = MUTANTS[name]
     made, reason = tree_copy.make_copy(str(WORK / "mutant"))
     if made is None:

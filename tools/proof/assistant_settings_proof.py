@@ -24,7 +24,8 @@ The probe `assistant_settings_probe.swift` (over `app/Sources`,
        `context_management.edits[0]` the clear edit (trigger 150,000 input
        tokens, keep 5 tool uses, at least 50,000) and the beta; POST 3 with
        `compaction`, POST 4 without
-The Release app (`assistant_session_proof`'s `App`, a scratch socket), launched with
+The built app (`assistant_session_proof`'s `App`, `proof_app`'s choice, a scratch socket),
+launched with
 `-ReelcutAssistantAutoCompact NO -ReelcutAssistantClearToolResults YES
 -RCDevAssistantAutoCompact 1`:
   CS3  `new_project`, then `assistant_send` against a reply and a compaction
@@ -44,7 +45,7 @@ copy of `app/Sources` with one literal replaced in the file `MUTANTS` names
 (`settingsJSON` reads `AssistantChatSettings()`; the editor's settings arm
 writes nothing to the session; the arm never taken, so a settings change ends
 the conversation) and run CS1 and CS2; `fixed-settings-app` makes
-`fixed-settings`' edit in a `tree_copy.make_copy` tree, runs `make app` there
+`fixed-settings`' edit in a `tree_copy.make_copy` tree, builds it there (`tree_copy.build_app`)
 and runs CS3 against it. The named row must FAIL: exit 1 (caught), 0 when it
 passes (survived). A literal not found exactly once, a build that failed, or
 (rule R, issue batch B13) a named row never scored or scored by a path where
@@ -206,7 +207,7 @@ def rows_probe(score, fake, secrets, sources=None, label=""):
 
 
 # ---------------------------------------------------------------------------
-# CS3: the Release app.
+# CS3: the built app (`proof_app`'s choice).
 
 
 def row_cs3(app_path, fake, secrets, tag="CS3"):
@@ -268,7 +269,7 @@ def mutant_sources(name):
 
 
 def build_tree_mutant(name):
-    """(app, None): `make app` over a tree copy with the mutant applied; or
+    """(app, None): `tree_copy.build_app` over a tree copy with the mutant applied; or
     (None, reason)."""
     file, before, after, _ = TREE_MUTANTS[name]
     base = os.path.join(WORK, "mutant")

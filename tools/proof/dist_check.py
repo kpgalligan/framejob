@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Road map 11 V0, road map 12 A4, #145 and road map 14 MC3 — the binary check `make dist` runs.
+"""Road map 11 V0, road map 12 A4, #145, road map 14 MC3 and build velocity — the binary check `make dist` runs.
 
 The Distribution configuration is Release without the Swift condition
 `REELCUT_DEV_TOOLS` (spec §11 V-1), so its binary must hold none of the dev
@@ -34,6 +34,21 @@ turns it off for Distribution alone). D14 reads the Distribution app's
 signature through its executable, `realpath`ed so a skeleton's symlink reads
 the real app, and wants exactly `com.apple.security.device.audio-input`.
 
+**Release's signature and both seals (issue batch B88).** A no-op build once
+left the Release app signed ad hoc by Write Agent Catalog alone: no
+entitlements (no microphone) and a seal broken by the catalog written after
+it, which nothing here read, because D14 reads Distribution's alone. D25
+reads the Release app's entitlements the same way and wants exactly what
+Xcode's own CodeSign gives it, the Distribution pair plus the
+`com.apple.security.get-task-allow` Xcode injects outside Distribution (the
+processed `Reelcut.app.xcent` of a Release build holds those two): an exact
+set, so a build signed with anything but Xcode's processed entitlements — a
+missing `get-task-allow` as much as a missing microphone — fails, and a
+no-op build cannot ship a different signature from a linking one. D26 / D27
+run `codesign --verify --deep --strict` over each app, the bundle being the
+one its executable `realpath`s into (so a skeleton reads the real app, as
+D14 does).
+
 **The MCP proxy and its snapshot (road map 14 MC3).** Both bundles carry
 `Contents/Helpers/reelcut-mcp`, which `project.yml`'s "Build MCP Proxy"
 phase copies in and signs `--options runtime` with NO entitlements (a plain
@@ -45,7 +60,7 @@ Distribution's: it must name every key of the seam's flag-on `devHandlers`
 table, read out of `AgentServer+DevTools.swift` at every run, and
 Distribution's must name none.
 
-The twenty-four rows, none ever skipped:
+The twenty-seven rows, none ever skipped:
 
 * D1 — the needle is read from the seam file: exactly one bare declaration
   line, ASCII, at least 16 UTF-8 bytes;
@@ -71,16 +86,22 @@ The twenty-four rows, none ever skipped:
   `tools` is a non-empty array of objects each with a string `name`;
 * D23 — Release's snapshot names every `devHandlers` key (at least one: the
   positive control);
-* D24 — Distribution's snapshot names none of them.
+* D24 — Distribution's snapshot names none of them;
+* D25 — the Release app's entitlements are exactly
+  `com.apple.security.device.audio-input` and
+  `com.apple.security.get-task-allow`;
+* D26 / D27 — the Release / Distribution app passes `codesign --verify
+  --deep --strict`.
 
 If D1 fails, D4, D5, D12 and D13 FAIL too, and so does each when its binary
-or helper is missing; D14 FAILs when the Distribution binary is. D17–D20
+or helper is missing; D14 FAILs when the Distribution binary is, D25 and
+D26 when the Release binary is, and D27 when the Distribution binary is. D17–D20
 FAIL when their proxy is missing; D23 and D24 when their snapshot has no
 readable `tools` or the dev names cannot be read. A missing `codesign`, a
 timeout or output that does not parse FAILs the row with the reason.
 `tools/proof/dist_check_mutants.py` makes each helper row, D14 and each of
-D15–D24 fail on purpose. The last line is `dist_check: <passed>/24`; the exit
-is 0 only at 24/24.
+D15–D27 fail on purpose. The last line is `dist_check: <passed>/27`; the exit
+is 0 only at 27/27.
 """
 
 import argparse
@@ -105,6 +126,8 @@ HELPER = os.path.join("Contents", "Helpers", "reelcut-agent")
 ENTITLEMENTS = {"com.apple.security.cs.allow-jit": True}
 # The Distribution app's one entitlement (#145): the microphone, never get-task-allow.
 APP_ENTITLEMENTS = {"com.apple.security.device.audio-input": True}
+# The Release app's (B88): Distribution's plus the get-task-allow Xcode injects outside it.
+RELEASE_ENTITLEMENTS = {**APP_ENTITLEMENTS, "com.apple.security.get-task-allow": True}
 # The MCP proxy and its catalog snapshot, inside each bundle (road map 14 MC3).
 PROXY = os.path.join("Contents", "Helpers", "reelcut-mcp")
 SNAPSHOT = os.path.join("Contents", "Resources", "agent-catalog.json")
@@ -114,7 +137,7 @@ DEV_BLOCK = re.compile(r"^\s*#if REELCUT_DEV_TOOLS\s*$(.*?)^\s*#else\s*$", re.M 
 DEV_TABLE = re.compile(r"private static let devHandlers: \[String: ToolHandler\] = \[(.*?)\n\s*\]",
                        re.S)
 DEV_KEY = re.compile(r'^\s*"([a-z_]+)":', re.M)
-TOTAL = 24
+TOTAL = 27
 # The CodeDirectory line's flags; `Executable Segment flags=0x1` has no parentheses.
 FLAGS = re.compile(r"flags=0x[0-9a-fA-F]+\(([^)]*)\)")
 TIMEOUT = 120
@@ -257,6 +280,19 @@ def proxy_entitlements(path):
     return True, ""
 
 
+def sealed(binary_where):
+    """Whether the bundle the executable `realpath`s into passes `codesign
+    --verify --deep --strict`."""
+    app = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(binary_where))))
+    verified, reason = run_codesign(["--verify", "--deep", "--strict", app])
+    if verified is None:
+        return False, reason
+    if verified.returncode != 0:
+        return False, (f"codesign --verify --deep --strict exit {verified.returncode}: "
+                       f"{verified.stderr.decode('utf-8', 'replace').strip()[:300]}")
+    return True, app
+
+
 def dev_names():
     """The flag-on devHandlers keys read from the seam, or None with the reason."""
     try:
@@ -321,9 +357,9 @@ def main():
     arguments = parser.parse_args()
 
     needle, needle_reason = read_needle()
-    print("road map 11 V0, road map 12 A4, #145 and road map 14 MC3 — no dev tools in "
-          "Distribution; the helper signed in both; Distribution's entitlements; the MCP "
-          "proxy and its snapshot in both\n")
+    print("road map 11 V0, road map 12 A4, #145, road map 14 MC3 and B88 — no dev tools in "
+          "Distribution; the helper signed in both; both apps' entitlements and seals; the "
+          "MCP proxy and its snapshot in both\n")
     print(f"  needle:       {needle.decode('ascii') if needle else '(none)'}")
     print(f"  release:      {os.path.abspath(arguments.release)}")
     print(f"  distribution: {os.path.abspath(arguments.dist)}\n")
@@ -455,6 +491,23 @@ def main():
     else:
         held = [tool for tool in dev if tool in names]
         check(name, not held, f"holds {held} in {where}")
+
+    name = ("D25 the Release app's entitlements are exactly "
+            "com.apple.security.device.audio-input and com.apple.security.get-task-allow")
+    if release is None:
+        check(name, False, "no Release binary (D2)")
+    else:
+        ok, detail = entitlements(os.path.realpath(release_where), RELEASE_ENTITLEMENTS)
+        check(name, ok, detail)
+    for side, row_id, binary, where, exists_id in (
+            ("Release", "D26", release, release_where, "D2"),
+            ("Distribution", "D27", dist, dist_where, "D3")):
+        name = f"{row_id} the {side} app passes codesign --verify --deep --strict"
+        if binary is None:
+            check(name, False, f"no {side} binary ({exists_id})")
+        else:
+            ok, detail = sealed(where)
+            check(name, ok, "" if ok else detail)
 
     print(f"\ndist_check: {passed}/{TOTAL}")
     return 0 if passed == TOTAL else 1

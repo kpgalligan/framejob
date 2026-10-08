@@ -35,7 +35,7 @@ The sections, in order:
    handover rule gives it — and the shipped binary's own parity log, which
    must be empty. The dev tools (road map 11, `dev_tools.py`) are counted
    apart: all present with the log's marker count equal to their number
-   (Release), or all absent with no marker line (Distribution), and when
+   (Debug or Release), or all absent with no marker line (Distribution), and when
    present they sit together immediately before `import_media`, where
    `devTools()` splices them (V0's owed count and order probes).
 2. **Every difference between a tool's schema and the core's table is one the
@@ -98,7 +98,7 @@ A probe that will not build is a scored FAILURE, never an exit. The probe is
 built BEFORE the first MCP call, so no swiftc runs while the proof is driving
 the app.
 
-    make app
+    make app-debug
     python3 tools/proof/proof_app.py launch   # prints folder, socket, log, pid
     grep "Reelcut: " <dir>/reelcut.log     # must print nothing
     python3 tools/proof/op_argument_proof.py <dir>/agent.sock

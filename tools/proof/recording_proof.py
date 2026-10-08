@@ -345,6 +345,12 @@ microphone that lands carries no such key, and the source read of the key.
     python3 tools/proof/recording_proof.py <dir>/agent.sock [log path]
     python3 tools/proof/recording_proof.py <dir>/agent.sock [log path] --no-screen   # B66: no screen recorded
     python3 tools/proof/recording_proof.py <dir>/agent.sock [log path] --no-screen --no-microphone   # nothing recorded
+
+It is Release-only (`RELEASE_ONLY`, spec §11 V-4, V-5): the instance it
+launches is the Release app whatever `RC_PROOF_APP` says (a Debug path is
+refused), because Screen Recording and Microphone grants are per bundle
+identifier and "Reelcut Debug" has none of Reelcut's. Start the instance at
+the socket the same way: `python3 tools/proof/proof_app.py launch --app release`.
 """
 
 import hashlib
@@ -381,7 +387,10 @@ LOG = POSITIONAL[1] if len(POSITIONAL) > 1 else log_beside(SOCKET)
 HERE = os.path.dirname(os.path.abspath(__file__))
 WORK = os.path.join(HERE, "work")
 ROOT = os.path.dirname(os.path.dirname(HERE))
-APP = str(proof_app.bundle())
+# Release-only (spec §11 V-4, V-5): the granted tier runs under the
+# Release bundle's grants, which a Debug build (its own identifier) lacks.
+RELEASE_ONLY = "Screen Recording and Microphone grants are per bundle identifier"
+APP = str(proof_app.bundle(release_only=RELEASE_ONLY))
 BINARY = os.path.join(APP, "Contents", "MacOS", "Reelcut")
 SOURCES = os.path.join(ROOT, "app", "Sources")
 FIXTURES = os.path.join(WORK, "recordingproof")
@@ -2182,8 +2191,24 @@ def cleanup():
         remove_scratch(instance.socket)
 
 
+def debug_at_socket():
+    """The refusal of a Debug instance at SOCKET (`RELEASE_ONLY`: sections 0-2
+    and 6 run on it), read by `proof_app`'s instance reader; else None."""
+    pid = socket_pid(SOCKET)
+    seen = proof_app._instance(pid) if pid is not None else None
+    parts = seen[0].parts if seen else ()
+    if not any(parts[i:i + 2] == ("Products", "Debug") for i in range(len(parts))):
+        return None
+    return (f"recording_proof: pid {pid} at {SOCKET} runs {seen[0]}, a Debug build, and this "
+            f"proof is Release-only (RELEASE_ONLY: {RELEASE_ONLY}); start the socket's "
+            "instance with `python3 tools/proof/proof_app.py launch --app release`")
+
+
 def main():
     os.makedirs(WORK, exist_ok=True)
+    if refusal := debug_at_socket():
+        print(refusal, file=sys.stderr)
+        return 2
     mcp = MCP(SOCKET, timeout=180)
     print(f"road map 3, R1 and R2 — record_screen, against {SOCKET}")
     try:

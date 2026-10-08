@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The helper prices every response — road map 13 P2 (spec §11 P-2, P-4, P-5).
 
-The Release helper, driven over stdio against `anthropic_fake.py` and a local
+The built app's helper (`proof_app`'s choice), driven over stdio against `anthropic_fake.py` and a local
 price feed (`assistant_helper_proof`'s `Helper` and `configure`):
   H1  no cache: `prices` bundled, `as_of` anthropic.json's commit date, the
       problem "no price cache is configured"; one `cost` per POST, equal to
@@ -29,7 +29,7 @@ price feed (`assistant_helper_proof`'s `Helper` and `configure`):
   H12 a `get_project` request cancelled while the app runs it, then answered
       with the session's cancelled result: exactly one `cost`, no `partial`,
       one POST, no `error` (a response already priced is never priced again)
-The Release app (`assistant_session_proof`'s `App`, `Fake`, `secret_folder`;
+The built app (`assistant_session_proof`'s `App`, `Fake`, `secret_folder`;
 `assistant_tab_proof`'s `Dump` and `open_tab`):
   L0  no `Reelcut: ` line
   L1  `-RCSpendFolder` scratch and `-RCPriceFeed` local: a priming turn, the

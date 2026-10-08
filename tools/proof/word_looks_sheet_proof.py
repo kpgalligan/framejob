@@ -7,7 +7,8 @@ instance this script launches.
     python3 tools/proof/word_looks_sheet_proof.py --mutant looks-not-placed
         (also refusals-dropped, tool-reads-remembered, note-never-shown)
 
-ONE launch of the Release build on a scratch socket (`mcp.launch`), stopped by
+ONE launch of the built app `proof_app` picks (Debug unless `RC_PROOF_APP=release`)
+on a scratch socket (`mcp.launch`), stopped by
 this script alone, **in a scratch home**
 (`CFFIXED_USER_HOME=tools/proof/work/word-looks-sheet/home`), pointed at
 `cloud_captions_probe`'s stand-in for AssemblyAI (`Fake`, under
@@ -67,7 +68,8 @@ Rows:
 
 `--mutant NAME` builds a COPY of the tree (`tree_copy.make_copy`), replaces
 the mutant's one anchor in the copy's `app/Sources` (asserted to occur
-exactly once), builds it by the copy's own `make app`, and runs the rows on it:
+exactly once), builds it by the copy's own `make app-debug` (`make app` under
+`RC_PROOF_APP=release`; `tree_copy.build_app`), and runs the rows on it:
   looks-not-placed       the handler hands `place` no looks: T1, T2 and T3
                          must ALL fail.
   refusals-dropped       a `true` that would show nothing is not refused: T4
@@ -572,7 +574,7 @@ def remove_scratch():
 
 def build_mutant(name):
     """A copy of the tree with the mutant's one anchor replaced, built by its
-    own `make app`. The app bundle, or None and why."""
+    own `tree_copy.build_app`. The app bundle, or None and why."""
     file, anchor, replacement, _ = MUTANTS[name]
     made, reason = tree_copy.make_copy(str(WORK / "mutant"))
     if made is None:

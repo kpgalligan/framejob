@@ -3,7 +3,7 @@
 MCP server (spec §11 MC-3, MC-4, MC-6), driven as a client drives it, over its
 stdin and stdout.
 
-The app `proof_app.bundle()` chooses (`--app`; Release by default) is
+The app `proof_app.bundle()` chooses (`--app`; Debug unless `RC_PROOF_APP=release`) is
 `ditto`ed to `work/mcp-proxy/<run>/Reelcut.app` and every proxy is that copy's
 `Contents/Helpers/reelcut-mcp`, so the bundle a proxy launches is the copy; the copy is removed at the end unless Z1 finds an
 instance of it alive. Every socket is in its own
@@ -53,8 +53,9 @@ Z1  no instance alive.  Z2  `lstat` of `~/Library/Application
     identical before and after.
 
 It also writes `work/mcp-proxy/ac-mcp.json`, `docs/manual-checks.md` AC-3's
-fixture: an `mcpServers.reelcut` entry whose command is the TREE's Release
-`Contents/Helpers/reelcut-mcp`, with no env.
+fixture: an `mcpServers.reelcut` entry whose command is the chosen app's
+`Contents/Helpers/reelcut-mcp` (the TREE's Release under `RC_PROOF_APP=release`,
+as AC-3 runs it), with no env.
 
     python3 tools/proof/mcp_proxy_proof.py [--app PATH]
         [--mutant launch-on-list|no-lock]

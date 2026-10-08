@@ -492,16 +492,16 @@ The socket is yours alone: its folder is `0700` and the socket `0600`, so
 only processes running as you can connect — and any of them can, while the
 app runs.
 
-To drive a build for verification, give it a socket of its own with
-`RC_AGENT_SOCKET`, so it never touches your own, and
-point `tools/proof/mcp.py`'s `MCP` or `reelcut-mcp` (with the same variable
-set) at that path:
+To drive a build for verification, launch it with `tools/proof/proof_app.py`,
+which gives it a socket of its own (`RC_AGENT_SOCKET`) and a scratch home, so
+it never touches your own, and point `tools/proof/mcp.py`'s `MCP` or
+`reelcut-mcp` (with `RC_AGENT_SOCKET` set to the same path) at the socket it
+prints. It launches "Reelcut Debug" (`make app-debug`) unless told
+`--app release` (`make app`), and refuses a build older than its sources:
 
 ```sh
-make app
-d="$(mktemp -d)"; echo "$d"
-(RC_AGENT_SOCKET="$d/agent.sock" build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut \
-   -ApplePersistenceIgnoreState YES > "$d/reelcut.log" 2>&1 &)
+make app-debug
+python3 tools/proof/proof_app.py launch   # prints folder, socket, log, pid
 ```
 
 Calls run one at a time. A call made while you are dragging something in

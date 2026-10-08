@@ -296,16 +296,18 @@ open -a ./build/Build/Products/Release/Reelcut.app --env RC_AGENT_SOCKET="$d/age
 ```
 
 (One trap: `open -a` of a bundle that already has an instance running
-ACTIVATES that instance rather than launching another.) The direct line
-below is still the one every script here is run against. It prints its
-folder; each later command names it literally, because a shell variable does
-not survive from one agent command to the next:
+ACTIVATES that instance rather than launching another.) The launcher below
+is the one every script here is run against: a direct launch of the app
+`proof_app` picks (Debug unless `RC_PROOF_APP=release` or `--app release`;
+"Which app a proof drives" below) on a scratch socket, under a scratch home,
+with `-ApplePersistenceIgnoreState YES`, refused when the build is older than
+its sources. It prints its folder, socket, log and pid; each later command
+names them literally, because a shell variable does not survive from one
+agent command to the next, and the instance is stopped by that pid:
 
 ```sh
-make app
-d="$(mktemp -d)"; echo "$d"
-(RC_AGENT_SOCKET="$d/agent.sock" ./build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut \
-   -ApplePersistenceIgnoreState YES > "$d/reelcut.log" 2>&1 &)
+make app-debug
+python3 tools/proof/proof_app.py launch   # prints folder, socket, log, pid
 python3 tools/proof/phase1_proof.py <dir>/agent.sock
 python3 tools/proof/phase2_proof.py <dir>/agent.sock
 python3 tools/proof/phase3_proof.py <dir>/agent.sock
@@ -1705,8 +1707,8 @@ python3 tools/proof/proof_app.py --selftest                                     
 python3 tools/proof/proof_app.py --mutant exe-marker|md-counted|exe-mtime-running
 ```
 
-**The choice.** `RC_PROOF_APP` is `release` (the default), `debug` or a
-`.app` or executable path. Debug is `make app-debug`'s
+**The choice.** `RC_PROOF_APP` is `debug` (the default since build
+velocity's phase 3, spec §11 V-4), `release` or a `.app` or executable path. Debug is `make app-debug`'s
 `build/Build/Products/Debug/Reelcut.app`: "Reelcut Debug",
 `com.kgalligan.Reelcut.debug`, its own defaults domain and an Alternate
 `.reelcut` handler (spec §11 V-5); `PRODUCT_NAME` stays `Reelcut`, so the
@@ -1719,7 +1721,44 @@ a path in a `Debug` products folder is refused with the reason. A tree copy
 builds through `tree_copy.build_app(dest, seconds)`: `make app-debug` or
 `make app` there, as the choice says. 32 proofs take their default app from
 `proof_app` (the list is `designs/build-velocity.md`'s phase 2 record), and
-17 build their tree-copy mutants through `build_app`.
+17 build their tree-copy mutants through `build_app`. Release-only proofs
+pass `release_only=` (`git grep release_only= tools/proof`): a proof that
+needs a TCC grant, or that measures time or throughput, runs on Release
+(spec §11 V-4). Today that is `recording_proof.py` ("Screen Recording and
+Microphone grants are per bundle identifier"; it also refuses a Debug instance
+at its socket, so start that one with `proof_app.py launch --app release`) and
+`graphics_proof.py` ("E2 bounds render_frame and get_project in wall seconds":
+on Debug its render_frame took 2.04 s of the 3 s bound, so it was pinned); the
+18 app-driving proofs changed since issue batch B80 each scored their full
+score on Debug, the two with a recorded Release time (agent_socket_proof
+135 s, export_cancel_proof 256 s) faster on Debug (`designs/build-velocity.md`'s
+phase 3 record has the table).
+
+**Debug against Release (`debug_release_proof.py`).** The evidence for spec
+§11 V-4: Debug answers, renders and exports as Release does.
+
+```
+make app-debug && make app
+python3 tools/proof/debug_release_proof.py      # T1–T6, C0, C1, Z1, Z2; exit 0 iff all pass
+```
+
+It launches Debug and Release twice (`proof_app.binary()`, each on a scratch
+socket and a scratch home, each with `-ReelcutPreviewQuality 0`, stopped by
+pid) and builds one fixture over MCP on each under
+`work/debug-release/<side>/`: a 640×360 canvas, `media/A.mov`, a title, a
+timed word caption (highlight) and a graphic clip that moves with the frame.
+T1 `tools/list` and T2 `get_project` parse equal (each side's folder spelled
+`<WORK>`); T3 `render_frame` PNGs are byte-equal at five times; T4 a ProRes
+422 export of the in/out range is masked-equal
+(`video_configuration_proof.same_movie`); T5 the bundles'
+`agent-catalog.json` parse equal — their bytes are reported, not scored,
+because two catalog writes by one Release executable differ in key order
+(Swift's per-process hash seed); T6 `perform_menu_item ["Reelcut"]` answers
+the same text (the name "Reelcut Debug" does not reach the menus). C0
+(CONTROL) the two Release instances' T3 renders are byte-equal; C1 one
+graphic prop changed on the Debug side alone is seen by T2's and T3's
+comparisons, then undone; Z1 no `Reelcut: ` line; Z2 each instance's defaults
+guard (`mcp._GUARDED`) names its own bundle's identifier.
 
 **The refusal.** `mcp.launch` and the launcher refuse a built product
 (`build/Build/Products/{Debug,Release,Distribution}/Reelcut.app`) when its
@@ -6812,11 +6851,21 @@ and prints the needle and both paths before its rows:
   snapshot: the proxy present, hardened runtime, no entitlements; the
   snapshot at the bundle's version, Release's naming every dev tool and
   Distribution's none (the MC3 section of this file).
+- **D25–D27** (issue batch B88) — the Release app's entitlements, read as
+  D14 reads Distribution's, are EXACTLY `audio-input` and the
+  `get-task-allow` Xcode injects outside Distribution (what a Release
+  build's processed `Reelcut.app.xcent` holds, so a signature that is not
+  Xcode's — a missing `get-task-allow` as much as a missing microphone —
+  fails); and each app passes `codesign --verify --deep --strict`, the
+  bundle being the one its executable `realpath`s into. A no-op build once
+  left Release signed ad hoc by Write Agent Catalog alone, with no
+  entitlements and a broken seal, and no row saw it (`designs/build-velocity.md`'s
+  phase 2 record).
 
 No row is ever skipped: if D1 fails, D4, D5, D12 and D13 FAIL too, and so
 does each when its binary, helper, proxy or snapshot is missing. The last
-line is `dist_check: <passed>/24`; the exit is 0 only at 24/24.
-`dist_check_mutants.py` makes each helper row, D14 and D15–D24 fail on
+line is `dist_check: <passed>/27`; the exit is 0 only at 27/27.
+`dist_check_mutants.py` makes each helper row, D14 and D15–D27 fail on
 purpose; the A4 and MC3 sections of this file have its cases.
 
 **Why a marker and not the tool names.** Swift string literals of 15 UTF-8
@@ -6830,7 +6879,7 @@ optimised binary by the log line the flag-on `devTools()` writes, so a dev
 tool added to the seam needs no edit here.
 
 ```sh
-make dist                                                  # → dist_check: 24/24
+make dist                                                  # → dist_check: 27/27
 python3 tools/proof/dist_check.py [--release APP] [--dist APP]
 ```
 
@@ -7998,11 +8047,14 @@ otherwise; a failed setup step is a scored FAIL naming it.
 | `no-entitlements-dist` | re-signed `--options runtime`, no entitlements | D11 |
 | `marker-release` / `-dist` | the needle written over the copy at the first `compaction_instructions`, re-signed as `build.sh` signs | D12 / D13 |
 | `app-entitlements-dist` (#145) | the whole Distribution app `ditto`ed to `<case>/dist/Reelcut.app` and re-signed ad hoc `--options runtime` with the pair it carried before B20, `audio-input` and `get-task-allow` | D14 |
+| `app-entitlements-mic-only-release` (B88) | the whole Release app `ditto`ed and re-signed ad hoc `--options runtime` with `audio-input` alone | D25 |
+| `noop-sign-release` (B88) | the whole Release app `ditto`ed, its executable re-signed alone (`codesign -s - -f`, as Write Agent Catalog does), then a byte appended to `agent-catalog.json` — what a no-op build shipped before B88's fix | D25 D26 |
+| `seal-broken-dist` (B88) | the whole Distribution app `ditto`ed and a byte appended to `agent-catalog.json` | D27 |
 
 ```sh
-make dist                                                  # → dist_check: 24/24
-python3 tools/proof/dist_check_mutants.py [--release APP] [--dist APP]   # → dist_check_mutants: 20/20
-python3 tools/proof/dist_check.py --dist /nonexistent/Reelcut.app        # D3 D5 D7 D9 D11 D13 D14 D16 D18 D20 D22 D24 FAIL, 12/24, exit 1
+make dist                                                  # → dist_check: 27/27
+python3 tools/proof/dist_check_mutants.py [--release APP] [--dist APP]   # → dist_check_mutants: 23/23
+python3 tools/proof/dist_check.py --dist /nonexistent/Reelcut.app        # D3 D5 D7 D9 D11 D13 D14 D16 D18 D20 D22 D24 D27 FAIL, 14/27, exit 1
 ```
 
 **Measured 2026-09-28**, every command as `(unset ANTHROPIC_API_KEY

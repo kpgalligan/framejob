@@ -6,7 +6,8 @@ work over, on an instance this script launches.
     python3 tools/proof/graphics_files_proof.py [--app PATH]
     python3 tools/proof/graphics_files_proof.py --mutant rename-unreconciled
 
-Launches the Release build on a scratch socket of its own and stops only
+Launches the built app `proof_app` picks (Debug unless `RC_PROOF_APP=release`)
+on a scratch socket of its own and stops only
 that process. **The instance runs in a scratch home**,
 `CFFIXED_USER_HOME=tools/proof/work/graphics-files/home` (the way
 `container_import_proof.py` launches), and every package is under
@@ -57,7 +58,8 @@ Rows:
 `--mutant rename-unreconciled` builds a COPY of the tree
 (`tree_copy.make_copy`) whose `.projectDocumentDidChange` observer in
 `ProjectDocument+GraphicFiles.swift` is emptied (the anchor asserted once),
-by the copy's own `make app`, and runs the same rows on it. Rule R: exit 0
+by the copy's own `make app-debug` (`make app` under
+`RC_PROOF_APP=release`; `tree_copy.build_app`), and runs the same rows on it. Rule R: exit 0
 means N2 FAILED in the copy — caught; 1 that it passed — survived; 2 that
 the control could not be performed (the copy did not build or launch).
 """

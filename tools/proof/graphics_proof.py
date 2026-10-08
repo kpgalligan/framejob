@@ -224,8 +224,11 @@ Z1  `grep "Reelcut: "` over every launch's log prints nothing.
 A mutant is built in a COPY of the tree from `tree_copy.make_copy` (`app/` and
 `agent/` copied, every other build input `project.yml` names linked) by
 `build_mutant(file, anchor, replacement)`, the anchor asserted to occur
-exactly once in `app/Sources/<file>`; the copy is built by its own `make app`
-into its own directory and driven through its own rows only.
+exactly once in `app/Sources/<file>`; the copy is built by `tree_copy.build_app`
+(`make app-debug`, or `make app` under `RC_PROOF_APP=release`)
+into its own directory and driven through its own rows only. The proof's own
+instance is Release-only (`RELEASE_ONLY`, spec §11 V-4): E2 bounds
+`render_frame` and `get_project` in wall seconds; a mutant's rows do not.
 `frame-plus-one` asks the module for `frame + 1` in `LayerRenderersGraphic.swift`
 and is driven through P1 and P2; P2 must FAIL. The rows past P2 are relative
 and a uniform +1 moves both sides of them, so they are not expected to fail.
@@ -270,7 +273,10 @@ import tree_copy  # noqa: E402
 import swift_build  # noqa: E402
 
 WORK = ROOT / "tools/proof/work/graphics"
-APP = proof_app.binary()
+# Release-only (spec §11 V-4): on Debug E2's render_frame took 2.04 s of its
+# 3 s bound (B88 phase 3), not well under it. A mutant runs P1/P2 only.
+RELEASE_ONLY = "E2 bounds render_frame and get_project in wall seconds"
+APP = proof_app.binary(release_only=RELEASE_ONLY)
 FIXTURES = ROOT / "graphic/tests/graphics"
 FFI_BGRA = ROOT / "tools/proof/work/graphics-ffi-probe/lower-third-30.bgra"
 PIN_PROBE_SOURCE = ROOT / "tools/proof/graphics_pin_probe.swift"

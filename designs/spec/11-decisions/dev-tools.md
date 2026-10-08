@@ -5,7 +5,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
 
 The road map that made these is closed; its condensed record is
 `designs/adr/roadmap-11-dev-tools.md` (the original is `archive/reelcut-roadmap-11.md`).
-V-5 comes from the build-velocity road map (`designs/build-velocity.md`).
+V-4 and V-5 come from the build-velocity road map (`designs/build-velocity.md`).
 
 - **V-1 — Dev tools are compiled only under `REELCUT_DEV_TOOLS`, and the shipping build is
   the Distribution configuration, which does not set it.** Debug and Release set the flag;
@@ -26,6 +26,12 @@ V-5 comes from the build-velocity road map (`designs/build-velocity.md`).
   path cannot draw (the player layer, Metal) is filled from `render_frame`'s picture and the
   result says so; the capture is a picture of the chrome, and pixel claims about the VIDEO stay
   with `render_frame`.
+- **V-4 — The edit loop and mutant tiers drive a Debug app; the run a phase records, the gate's
+  build and every `release_only` proof are Release.** Amends V-1's 'the binary that is verified
+  is the optimised one': `debug_release_proof.py` shows the two answer alike (`tools/list`,
+  `get_project` and the catalog snapshot, compared parsed), render byte-for-byte alike, and
+  export alike but for the movie header's creation and modification times; Debug is used for its
+  rebuild time. Risk accepted: an optimiser-only defect is seen only by the recorded run.
 - **V-5 — The Debug build is its own app: "Reelcut Debug", `com.kgalligan.Reelcut.debug`, its
   own defaults domain, and an Alternate handler for `.reelcut`, so a double-click opens the real
   Reelcut.** Debug-config settings only (`PRODUCT_BUNDLE_IDENTIFIER`, `RC_APP_NAME`,

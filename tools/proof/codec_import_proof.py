@@ -5,7 +5,8 @@ will not decode is refused at import with a sentence naming the codec
 
     python3 tools/proof/codec_import_proof.py [--mutant NAME]
 
-Launches the Release build on a scratch socket of its own (spec §11 MC-6;
+Launches the built app `proof_app` picks (Debug unless `RC_PROOF_APP=release`)
+on a scratch socket of its own (spec §11 MC-6;
 frame_grid_proof.py's launch and parity log) and kills only that process.
 
 **Fixtures**, made with ffmpeg in a temporary directory: one 2 s AAC sine

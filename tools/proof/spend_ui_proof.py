@@ -16,7 +16,7 @@ The probe `spend_ui_probe.swift` (over `app/Sources`, `assistant_tab_proof`'s
       after), a fixture ledger (`Reading…`, then its sentence within 5 s), then
       `AssistantSpend.record` → the sentence unchanged when `record` returns,
       then the new one within 5 s; the note exact
-The Release app (`assistant_session_proof`'s `App`, `Fake`, `secret_folder`;
+The built app (`assistant_session_proof`'s `App`, `Fake`, `secret_folder`;
 `assistant_tab_proof`'s `Dump` and `open_tab`), a dummy key, the stand-in:
   U0  no `Reelcut: ` line
   U1  a seeded `-RCSpendFolder` ledger (the current UTC month's start + 1 s,

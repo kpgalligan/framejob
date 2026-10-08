@@ -2,7 +2,7 @@
 """The assistant's end-of-turn compaction, against the stand-in or the real
 API — issue batch B26 (#161; spec §11 AI-9, AI-18).
 
-One Release app (a scratch socket, a dummy
+One built app (`proof_app`'s choice, Debug unless `RC_PROOF_APP=release`; a scratch socket, a dummy
 `-RCSecretFolder`, `-RCDevAssistantAutoCompact 1`, the Assistant tab open)
 is pointed at the relay of `assistant_prompt_eval.py` (imported), which
 forwards to the stand-in (`--rehearse`) or the real API (`--live`). Two turns

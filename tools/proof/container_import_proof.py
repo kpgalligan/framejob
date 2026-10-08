@@ -5,7 +5,8 @@
     python3 tools/proof/container_import_proof.py [--app PATH]
         [--mutant ffmpeg-copy | --control decoy-home]
 
-Launches the Release build on a scratch socket of its own (spec §11 MC-6)
+Launches the built app `proof_app` picks (Debug unless `RC_PROOF_APP=release`)
+on a scratch socket of its own (spec §11 MC-6)
 with `-RCFFmpegImport never` (so a
 codec the copy refuses is never handed to a stored "always" policy) and
 kills only that process.

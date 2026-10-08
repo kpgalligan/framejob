@@ -261,22 +261,20 @@ else is what bloats files:
 
 The app is verified by driving the built binary over MCP and comparing what
 it renders — not by reading code. Launch your own instance on your own socket
-and only ever kill that one (`pgrep -f "MacOS/Reelcut"` lists them, Debug and Release alike; the products
-folder tells them apart; another
-session may have one running):
+and only ever kill that one (`pgrep -f "MacOS/Reelcut"` lists them, Debug
+and Release alike; the products folder tells them apart; another session may
+have one running):
 
 ```sh
-make app
-d="$(mktemp -d)"; echo "$d"
-(RC_AGENT_SOCKET="$d/agent.sock" ./build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut \
-   -ApplePersistenceIgnoreState YES > "$d/reelcut.log" 2>&1 &)
+make app-debug
+python3 tools/proof/proof_app.py launch   # prints folder, socket, log, pid
 ```
 
 Each later command names the printed folder literally
 (`mcp.MCP("<dir>/agent.sock")`, `python3 tools/proof/phaseN_proof.py
 <dir>/agent.sock`, `grep "Reelcut: " <dir>/reelcut.log`), because a shell
 variable does not survive from one agent command to the next; stop it by the
-pid `mcp.socket_pid` answers.
+pid the launcher prints.
 
 The log line `Reelcut agent socket listening at <dir>/agent.sock` says it is
 up (`not bound: <reason>` says why not). Drive it with `tools/proof/mcp.py`'s
@@ -301,14 +299,21 @@ them at startup. `render_frame` writes a PNG and returns its path; `export`
 waits for the file.
 
 A proof picks its app through `tools/proof/proof_app.py`: `RC_PROOF_APP` is
-`release` (the default), `debug` or a `.app` path. `mcp.launch`, `mcp.MCP` and
+`debug` (the default), `release` or a `.app` path. `mcp.launch`, `mcp.MCP` and
 `python3 tools/proof/proof_app.py launch` refuse a tree's built app when any
 input is newer than its last complete build (its
 `_CodeSignature/CodeResources`), or an instance started before an input
 changed, naming the file, its time and the `make` target.
 
+Release-only proofs pass `release_only=` (`git grep release_only= tools/proof`);
+recording_proof's socket instance is started with
+`python3 tools/proof/proof_app.py launch --app release`.
+
 **Before trusting any MCP proof, `grep "Reelcut: " <dir>/reelcut.log`
 must print nothing** — that prefix is the startup parity check complaining.
+On a Debug build the same complaint is an `assertionFailure` that traps first
+(`AgentServer.prepareCatalog`), so `make app-debug` fails at Write Agent
+Catalog with `Fatal error: …` instead of logging the line.
 
 A proof's instance shares its bundle's defaults domain (the owner's
 `com.kgalligan.Reelcut` for a Release build, `com.kgalligan.Reelcut.debug`

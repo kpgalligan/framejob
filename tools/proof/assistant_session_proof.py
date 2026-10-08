@@ -2,7 +2,7 @@
 """The assistant session, end to end — road map 12 A1, part 3 (spec §11 AI-3,
 AI-5, AI-7, AI-8, AI-10, AI-11, AI-13).
 
-Real turns in the built Release app, against `anthropic_fake.py`: the
+Real turns in the built app (`proof_app`'s choice), against `anthropic_fake.py`: the
 session in `AssistantSession.swift`, driven over MCP by the dev tools
 `assistant_send` / `assistant_answer`, and WITHOUT the MCP server by the
 dev-only launch default `-RCDevAssistantSend` / `-RCDevAssistantReport`.
@@ -61,12 +61,12 @@ Launch C, K2: AI-13 — the override set and no `-RCSecretFolder`: the session
 A mutant copies the tree with `tree_copy.make_copy` into
 `work/assistant_session/mutant/tree`, deletes its one line (`MUTANTS`: the
 `AgentLane.prepareAtLaunch()` line in main.swift; the export's `onCancel`
-line; the transcribe's `onCancel` line), runs `make app` there, and runs its
+line; the transcribe's `onCancel` line), builds it there (`tree_copy.build_app`), and runs its
 row against that app — W's report must be `ok: false`, naming AI-3; SX and
 ST run in a launch A of the mutant app. `no-transcribe-stop` must fail ST
 with `waited_ms − stopped_ms … > 5000` (LATE) among its problems, or the run
 exits 2: the fixture ran out within the bound on this host. `key-echo` is a
-stand-in control with no build: launch A of the Release app, where SX's and
+stand-in control with no build: launch A of the built app, where SX's and
 ST's first replies carry a text block holding `proof-key`, which reaches the
 dev tools' `text`; W and K2 do not run, and K1 must FAIL. Exit 1 depends only
 on the named row FAILing (caught); 0 when it passes (survived). A mutant that
@@ -799,7 +799,7 @@ def row_k2(app_path, fake):
 
 def build_mutant(name):
     """(app path, None) or (None, reason): the tree copied, the mutant's one
-    line deleted from the copy's file, `make app` run there."""
+    line deleted from the copy's file, `tree_copy.build_app` run there."""
     file, line, _, _ = MUTANTS[name]
     base = os.path.join(WORK, "mutant")
     tree_copy.remove_tree(base)
@@ -854,7 +854,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--mutant", choices=sorted(MUTANTS),
                         help="its one row, against a build without its line; must FAIL "
-                             "(key-echo builds nothing: launch A of the Release app, K1 last)")
+                             "(key-echo builds nothing: launch A of the built app, K1 last)")
     args = parser.parse_args()
     os.makedirs(WORK, exist_ok=True)
     results = []

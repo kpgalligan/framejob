@@ -61,6 +61,12 @@ Each phase is committed alone, in this order.
 - **The defaults guard follows the app under test**: `scratch_socket()`
   records `proof_app.domain()`, and a socket it made that an instance of
   another bundle then holds is re-homed to that bundle's domain.
+- **Debug in the loop, Release for the record** (spec §11 V-4, phase 3,
+  amending V-1): an unset `RC_PROOF_APP` means Debug; the run a phase
+  records, the gate's build and every `release_only` proof are Release.
+  `debug_release_proof.py` is the evidence that the two answer, render and
+  export alike; a proof that needs a TCC grant or measures time or
+  throughput passes `release_only=`.
 - Owner rulings that bind every phase: one mutant per new decision (usually
   3–8; more than 10 only with a written reason); Debug while working, Release
   built and checked once at each phase's end; no override variable for the
@@ -422,3 +428,100 @@ descriptive "`make app`" sentences in the converted proofs' docstrings and
 instrument messages (a copy's build is `build_app`'s choice); the README's
 launch recipe under "Building".
 
+### Phase 3 — Debug against Release, the qualification, the default flips (2026-10-08)
+
+**Landed.** Spec §11 V-4 first (`designs/spec/11-decisions/dev-tools.md`;
+its index row, V-1's row "— amended by V-4", the Lines cell, and
+`designs/spec/README.md`'s 11-decisions total). `tools/proof/debug_release_proof.py`
+(new). `recording_proof.py` takes its app through `proof_app.bundle(release_only=
+"Screen Recording and Microphone grants are per bundle identifier")`, and its
+docstring says to start the socket's instance with `proof_app.py launch --app
+release`. Then `proof_app.DEFAULT` became `"debug"`. The converted proofs'
+docstrings and messages that still said "the copy's own `make app`", "run
+`make app` first" or "the Release build/app/instance" now name the build
+`proof_app` picks (`make app-debug`, or `make app` under `RC_PROOF_APP=release`;
+`tree_copy.build_app` for a copy), and the four "run `make app` first" messages
+name the chosen target. The hand-typed launch recipes in `README.md` and
+`tools/proof/README.md` are `make app-debug` and `python3
+tools/proof/proof_app.py launch`. `docs/manual-checks.md` AC-3 runs
+`mcp_proxy_proof.py` under `RC_PROOF_APP=release`, so its fixture names the
+Release helper. No proof was pinned by the qualification; two are
+`release_only`: `recording_proof.py`, which also refuses a Debug instance at
+its socket (sections 0–2 and 6 run there) naming `proof_app.py launch --app
+release`, as `docs/manual-checks.md` HS-2's step 3 now starts it; and
+`graphics_proof.py` ("E2 bounds render_frame and get_project in wall
+seconds"), outside Q but asserting on wall time: run once on Debug it scored
+51/51, E2's `render_frame` 2.04 s against its 3 s bound and `get_project`
+0.00 s against 5 s — the first is not well under its bound, so it is pinned
+(pinned, it scored 51/51 on Release with E2's `render_frame` at 2.03 s: the
+spin's own budget, not the build, sets that time).
+
+**Debug against Release** (`debug_release_proof.py`, 10/10 in 4 s, three
+times; load 1.4–2.3): T1 `tools/list` 95 tools equal; T2 `get_project` (4
+clips) equal; T3 five `render_frame` PNGs byte-equal, five distinct pictures;
+T4 a 2 s ProRes 422 export masked-equal (6,111,055 bytes on the final
+fixture, 3 boxes masked, the same sha); T5 `agent-catalog.json` parse-equal (95 tools); T6
+`perform_menu_item ["Reelcut"]` answers the same refusal, "About Reelcut, …
+Quit Reelcut"; C0 the two Release instances' renders byte-equal; C1 the
+Debug graphic's `x` 40 → 300 is seen by T2's comparison and at all five
+times by T3's, and its undo restores equality; Z1 no `Reelcut: ` line; Z2
+each instance guarded its own bundle's id (`com.kgalligan.Reelcut.debug`,
+`com.kgalligan.Reelcut` ×2). Deviation: T5 is a parse comparison, not bytes —
+two `-RCWriteCatalog` runs of one Release executable differ at byte 60 and
+parse equal (Swift's per-process hash seed orders the keys), so a byte
+comparison would fail Release against itself; the bytes are reported.
+
+**Qualification** (the set Q, the app-driving proofs changed since B80,
+each run whole on Debug, 02:12–02:22, load 1.5–7.2, powermode 0; every
+stderr empty but a `swift_build:` line, no `DEFAULTS MOVED`):
+
+| Proof | Last recorded (Release) | Debug | Debug wall |
+|---|---|---|---|
+| graphics_path_proof | 6/6 | 6/6 | 0 s |
+| graphics_inspector_proof | 91/91 | 91/91 | 48 s (15 s probe build) |
+| graphic_prop_action_proof | 17/17 | 17/17 | 3 s |
+| graphics_files_proof | 10/10 | 10/10 | 2 s |
+| graphics_menu_proof | 27/27 | 27/27 | 34 s (17 s probe build) |
+| paste_graphic_proof | 8/8 | 8/8 | 1 s |
+| container_import_proof | 16/16 | 16/16 | 8 s |
+| word_looks_sheet_proof | 9/9 | 9/9 | 3 s |
+| word_looks_proof | 16/16 | 16/16; B1's 41 frames equal the digests recorded on Release from `d8fa4fa` | 4 s |
+| hevc_alpha_proof | 30/30 | 30/30 | 16 s |
+| agent_socket_proof | 17/17 (135 s) | 17/17 | 27 s (15 s probe build) |
+| export_cancel_proof `--runs 3` | 7/7 (256 s) | 7/7 | 137 s (15 s probe build; M rows time the probe, not the app) |
+| screens.py | every screen | 27 of 27 pass | 27 s |
+| v3_tools.py | 8/8 | 8/8 | 3 s |
+| op_argument_proof (launcher instance) | 153/153 | 156/156; Release, same session, 156/156 | 18 s |
+| phase7_proof (launcher instance) | 92/92 | 92/92 | 8 s |
+| phase9_proof (launcher instance) | 218/218 | 221/221; Release, same session, 221/221 | 7 s |
+| words_core_proof (launcher instance) | 27/27 | 27/27 | 1 s |
+
+Two counts differ from the last record because rows were added since (both
+re-run on Release in the same session, equal). None failed, the two with a
+recorded Release time ran faster on Debug (27 s against 135 s, 137 s against
+256 s), and none asserts on the app's wall time or throughput, so the
+qualification pinned nothing. After the flip,
+`defaults_proof.py` 11/11 (R1 and R2 guarding `com.kgalligan.Reelcut.debug`)
+and `mcp_proxy_proof.py` 14/14 on the default; `proof_app.py --selftest`
+15/15.
+
+**Finding closed: Release's entitlements and both seals are checked**
+(the residue of phase 2's no-op-build finding, which dist_check could not
+see because D14 reads Distribution alone). `dist_check.py` gains D25 — the
+Release app's entitlements are EXACTLY `audio-input` and `get-task-allow`
+— and D26 / D27, each app passes `codesign --verify --deep --strict` (the
+bundle its executable `realpath`s into, as D14 reads, so the mutants'
+skeletons read the real app). Exact set, not "contains", on the evidence:
+the processed `Reelcut.app.xcent` of the Release build and the signed app
+both hold exactly those two (Debug the same; Distribution `audio-input`
+alone), so anything else is a signature that is not Xcode's — and a step
+that signed with `app/Reelcut.entitlements` instead of the `.xcent` would
+drop `get-task-allow` on a no-op build alone, which "contains" would pass.
+`dist_check_mutants.py` gains three whole-bundle cases:
+`app-entitlements-mic-only-release` {D25}, `noop-sign-release` (the executable
+re-signed alone as Write Agent Catalog does, then a byte appended to the
+catalog: phase 2's defect) {D25, D26}, and `seal-broken-dist` {D27}, with D14
+still passing. `make dist` twice (6 s, 4 s; the second ran no CodeSign task)
+`dist_check: 27/27` and `published_check: 16/16` each; `dist_check_mutants.py`
+23/23; `dist_check.py --dist /nonexistent/Reelcut.app` 14/27, exit 1, the
+D27 row joining D14's.

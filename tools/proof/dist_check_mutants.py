@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Road map 12 A4, #145 and road map 14 MC3 — `dist_check.py`'s helper rows (D6–D13),
-D14 and the MCP proxy's and snapshot's rows (D15–D24), each made to fail on purpose.
+"""Road map 12 A4, #145, road map 14 MC3 and B88 — `dist_check.py`'s helper rows (D6–D13),
+D14, the MCP proxy's and snapshot's rows (D15–D24) and the Release entitlements and
+seal rows (D25–D27), each made to fail on purpose.
 
     python3 tools/proof/dist_check_mutants.py [--release APP] [--dist APP]
 
@@ -11,19 +12,26 @@ real `Contents/Info.plist`, `Contents/Helpers/reelcut-agent`,
 `Contents/Helpers/reelcut-mcp` and `Contents/Resources/agent-catalog.json`,
 for every mutation: the helper or the proxy mutated and re-signed ad hoc, or
 the snapshot removed, re-versioned or swapped for the OTHER side's. The
-other side is the real app. Nothing is written into `build/`. The
-`app-entitlements` case is the one whole bundle: the real Distribution app
-`ditto`ed to `<case>/dist/Reelcut.app` and re-signed ad hoc with HEAD's pair
-(`audio-input` and `get-task-allow`, #145), which D14 must refuse.
+other side is the real app. Nothing is written into `build/`. Four cases
+mutate a whole bundle, the real app `ditto`ed to `<case>/<side>/Reelcut.app`:
+`app-entitlements` re-signs Distribution ad hoc with HEAD's pair
+(`audio-input` and `get-task-allow`, #145), which D14 must refuse;
+`app-entitlements-mic-only` re-signs Release with `audio-input` alone, which
+D25's exact set must refuse (a "contains" check would pass it); `noop-sign`
+does to Release what a no-op build did before issue batch B88's fix — `codesign
+-s - -f` of the executable alone, then a byte appended to
+`agent-catalog.json` — which D25 (no entitlements) and D26 (the seal) must
+refuse; `seal-broken` appends a byte to Distribution's `agent-catalog.json`
+after signing, which D27 must refuse while D14 still passes.
 
 A case passes iff dist_check's FAIL ids equal the expected set exactly, its
-last line is `dist_check: <24 - |set|>/24`, and it exits 0 for an empty set
+last line is `dist_check: <27 - |set|>/27`, and it exits 0 for an empty set
 and 1 otherwise. `control` (both real) and `skeleton` (both skeletons,
 helpers, proxies and snapshots copied untouched) expect nothing to fail: they
 prove the skeleton is not itself a failure. A setup command that fails (a
 copy, a `codesign`, the offset not found) is a scored FAIL naming it. Each
 case's directory is removed after scoring. The last line is
-`dist_check_mutants: <passed>/20`; the exit is 0 only at 20/20.
+`dist_check_mutants: <passed>/23`; the exit is 0 only at 23/23.
 """
 
 import argparse
@@ -69,7 +77,12 @@ CASES = [
     ("snapshot-version-release", ("release",), "snapshot-version", {"D21"}),
     ("dist-snapshot-in-release", ("release",), "other-snapshot", {"D23"}),
     ("release-snapshot-in-dist", ("dist",), "other-snapshot", {"D24"}),
+    ("app-entitlements-mic-only-release", ("release",), "app-entitlements-mic-only", {"D25"}),
+    ("noop-sign-release", ("release",), "noop-sign", {"D25", "D26"}),
+    ("seal-broken-dist", ("dist",), "seal-broken", {"D27"}),
 ]
+# The cases that mutate a whole `ditto`ed bundle rather than a skeleton.
+WHOLE = {"app-entitlements", "app-entitlements-mic-only", "noop-sign", "seal-broken"}
 OTHER = {"release": "dist", "dist": "release"}
 
 
@@ -137,7 +150,7 @@ def skeleton(case_dir, side, real, mutation, needle):
     returns its path."""
     real_app = real[side]
     app = os.path.join(case_dir, side, "Reelcut.app")
-    if mutation == "app-entitlements":
+    if mutation in WHOLE:
         try:
             done = subprocess.run(["ditto", real_app, app], capture_output=True, timeout=300,
                                   env=dist_check.child_env())
@@ -146,10 +159,21 @@ def skeleton(case_dir, side, real, mutation, needle):
         if done.returncode != 0:
             raise SetupError(f"ditto {real_app} exit {done.returncode}: "
                              f"{done.stderr.decode('utf-8', 'replace').strip()[:300]}")
+        if mutation == "noop-sign":
+            sign(os.path.join(app, "Contents", "MacOS", "Reelcut"))
+        if mutation in ("noop-sign", "seal-broken"):
+            try:
+                with open(os.path.join(app, dist_check.SNAPSHOT), "ab") as handle:
+                    handle.write(b"\n")
+            except OSError as error:
+                raise SetupError(f"append to the snapshot: {error}")
+            return app
+        held = {"com.apple.security.device.audio-input": True}
+        if mutation == "app-entitlements":
+            held["com.apple.security.get-task-allow"] = True
         plist = os.path.join(case_dir, "app.plist")
         with open(plist, "wb") as handle:
-            plistlib.dump({"com.apple.security.device.audio-input": True,
-                           "com.apple.security.get-task-allow": True}, handle)
+            plistlib.dump(held, handle)
         sign(app, "--options", "runtime", "--entitlements", plist)
         return app
     macos = os.path.join(app, "Contents", "MacOS")
@@ -233,8 +257,8 @@ def main():
     real = {"release": os.path.abspath(arguments.release),
             "dist": os.path.abspath(arguments.dist)}
 
-    print("road map 12 A4, #145 and road map 14 MC3 — dist_check's helper rows (D6–D13), "
-          "D14 and D15–D24, each made to fail on purpose\n")
+    print("road map 12 A4, #145, road map 14 MC3 and B88 — dist_check's helper rows "
+          "(D6–D13), D14 and D15–D27, each made to fail on purpose\n")
     print(f"  release:      {real['release']}")
     print(f"  distribution: {real['dist']}\n")
     needle, reason = dist_check.read_needle()

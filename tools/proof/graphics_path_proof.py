@@ -6,7 +6,8 @@ reference the app answers names them.
 
     python3 tools/proof/graphics_path_proof.py [--app PATH]
 
-Launches the Release build on a scratch socket of its own and stops only
+Launches the built app `proof_app` picks (Debug unless `RC_PROOF_APP=release`)
+on a scratch socket of its own and stops only
 that process. **The instance runs in a scratch home**,
 `CFFIXED_USER_HOME=tools/proof/work/graphics-path/home`, and its one package
 is under `tools/proof/work/graphics-path/`, which is removed at the start

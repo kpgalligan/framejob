@@ -12,7 +12,7 @@ A3 (spec §11 AI-7, AI-9, AI-15).
           live context block's; F8 holds each ask-first row's reason to a
           write (#158). `--probe` runs these alone:
           no app, no bun — the line `make test` runs.
-Launch S (Release app, a scratch socket, a dummy
+Launch S (the built app `proof_app` picks, a scratch socket, a dummy
 `-RCSecretFolder`, `RC_ASSISTANT_BASE_URL` at the stand-in):
   S0  no `Reelcut: ` line
   S1  POST 1's system is `system`, a blank line, `search_guide`

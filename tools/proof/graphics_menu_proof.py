@@ -8,7 +8,7 @@ their one sheet — against the built app and a probe.
     python3 tools/proof/graphics_menu_proof.py [--app PATH]
     python3 tools/proof/graphics_menu_proof.py --mutant <name>
 
-**The instance.** ONE Release instance for the run, on a scratch socket of
+**The instance.** ONE instance of the built app (`proof_app`'s choice) for the run, on a scratch socket of
 its own, launched and stopped by PID, **in a scratch home**
 (`CFFIXED_USER_HOME=tools/proof/work/graphics-menu/home`, the way
 `graphics_files_proof.py` launches), its log at
@@ -178,8 +178,8 @@ performed.
                               holdsModule holds                          → M20
 
 **App-tier mutants** (`APP_MUTANTS`): a COPY of the tree
-(`tree_copy.make_copy`) with one anchor replaced, built by the copy's own
-`make app`, launched in the scratch home, the fixtures and the S rows only.
+(`tree_copy.make_copy`) with one anchor replaced, built by the copy's own `make app-debug` (`make app` under
+`RC_PROOF_APP=release`; `tree_copy.build_app`), launched in the scratch home, the fixtures and the S rows only.
 Rule R: exit 0 means the row FAILED in the copy — caught; 1 that it passed —
 survived; 2 that the control could not be performed (the copy did not build
 or launch, or the row was not reached).
