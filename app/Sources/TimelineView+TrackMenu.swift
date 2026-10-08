@@ -4,7 +4,7 @@ import AppKit
 /// on the empty part of its lane. It carries the header's four toggles —
 /// each with a checkmark, because a menu opened on ONE track can say that
 /// track's state where the Track menu, acting on `currentTrack`, cannot —
-/// and Remove Track, which is the only way to delete an EMPTY track that is
+/// the Matte submenu (spec §11 MT-7), and Remove Track, which is the only way to delete an EMPTY track that is
 /// not the front-most one without selecting a clip on it first (and an empty
 /// track has none to select).
 ///
@@ -43,11 +43,35 @@ extension TimelineView {
         add("Mute Audio", #selector(trackMenuToggleMuted(_:)), on: track.muted)
         add("Lock Track", #selector(trackMenuToggleLocked(_:)), on: track.locked)
         add("Solo", #selector(trackMenuToggleSolo(_:)), on: track.solo)
+        menu.addItem(matteMenuItem(for: track))
         menu.addItem(.separator())
         add("Remove Track", #selector(trackMenuRemove(_:)), on: false)
         // The core refuses to remove the last track; say so before the click.
         menu.items.last?.isEnabled = snapshot.tracks.count > 1
         return menu
+    }
+
+    /// Matte ▸ Off / Alpha / Inverted Alpha / Luma / Inverted Luma (spec §11
+    /// MT-7) — Track ▸ Matte's rows, for the CLICKED track: each names it in
+    /// `representedObject`, carries its mode as the tag
+    /// (`TrackMatte.allCases`' index) and is checked for the track's own mode.
+    private func matteMenuItem(for track: TrackSnapshot) -> NSMenuItem {
+        let submenu = NSMenu(title: "Matte")
+        submenu.autoenablesItems = false
+        for (index, mode) in TrackMatte.allCases.enumerated() {
+            let item = NSMenuItem(
+                title: mode.displayName, action: #selector(trackMenuSetMatte(_:)),
+                keyEquivalent: "")
+            item.target = self
+            item.tag = index
+            item.representedObject = NSNumber(value: track.id)
+            item.state = track.matte == mode ? .on : .off
+            submenu.addItem(item)
+        }
+        let item = NSMenuItem(title: "Matte", action: nil, keyEquivalent: "")
+        item.representedObject = NSNumber(value: track.id)
+        item.submenu = submenu
+        return item
     }
 
     /// The four header toggles as edits — one `set_track` flipping one flag.
@@ -82,6 +106,18 @@ extension TimelineView {
     @objc func trackMenuToggleMuted(_ sender: Any?) { toggleFromMenu(.muted, sender) }
     @objc func trackMenuToggleLocked(_ sender: Any?) { toggleFromMenu(.locked, sender) }
     @objc func trackMenuToggleSolo(_ sender: Any?) { toggleFromMenu(.solo, sender) }
+
+    /// One `set_track {matte}` on the clicked track, undo "Track Matte";
+    /// re-choosing its mode is the core's identity, which beeps.
+    @objc func trackMenuSetMatte(_ sender: Any?) {
+        guard let track = menuTrack(sender), let tag = (sender as? NSMenuItem)?.tag,
+              TrackMatte.allCases.indices.contains(tag)
+        else {
+            NSSound.beep()
+            return
+        }
+        onEdit?("Track Matte", [.setTrack(track: track.id, matte: TrackMatte.allCases[tag])])
+    }
 
     @objc func trackMenuRemove(_ sender: Any?) {
         guard let track = menuTrack(sender) else {

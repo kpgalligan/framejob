@@ -465,8 +465,9 @@ extension AgentServer {
                 ["track": trackDescription, "index": "New position."]),
             opTool(
                 "set_track",
-                "Renames a track or flips its four switches — the track header's toggles, "
-                    + "Track ▸ Hide Video / Mute Audio / Lock Track / Solo. hidden drops its "
+                "Renames a track, flips its four switches — the track header's toggles, "
+                    + "Track ▸ Hide Video / Mute Audio / Lock Track / Solo — or sets its matte, "
+                    + "Track ▸ Matte. hidden drops its "
                     + "picture from the composition, muted its sound; locked keeps every ripple, "
                     + "insert and range edit off it; solo silences every OTHER track in its "
                     + "container (the timeline, or a nest's own tracks) that is not also soloed "
@@ -489,7 +490,7 @@ extension AgentServer {
                     "muted": "Track ▸ Mute Audio.",
                     "locked": "Track ▸ Lock Track.",
                     "solo": "Track ▸ Solo.",
-                    "matte": "The matte mode; \"none\" switches it off.",
+                    "matte": "Track ▸ Matte; \"none\" is its Off.",
                 ]),
             opTool(
                 "remove_empty_tracks",

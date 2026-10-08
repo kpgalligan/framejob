@@ -72,8 +72,10 @@ extension AgentServer {
     /// nest's own tracks: while any track there is soloed, every track that
     /// is not is silent, mute wins on a track that is both, and pictures are
     /// untouched (`core/src/audio.rs`).
-    /// `matte` (spec §11 MT-1) has no UI path yet: the mattes road map's MT4
-    /// adds Track ▸ Matte and the same submenu in the track context menu.
+    /// `matte` (spec §11 MT-1, MT-7) mirrors Track ▸ Matte
+    /// (`EditorViewController.setTrackMatte`, on the current track) and the
+    /// same submenu in the track context menu (`trackMenuSetMatte`, on the
+    /// clicked track), undo "Track Matte".
     func setTrack(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let track = try trackArg(a, "track", document)

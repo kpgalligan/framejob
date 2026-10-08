@@ -446,6 +446,18 @@ Uses the four `tools/proof/work/playback-check/` projects (Setup 3).
 - **Answer:** stutter, yes or no. #127 (graphics performance) stays deferred either way.
 - **Source:** #239 (issue batch B87 phase 3, spec §11 G-34 (g)); the project is built by `graphics_playback_samples.py`.
 
+## Mattes
+
+**MAT-1 — A matte plays**
+- **Do:** 1. Put a 1080p movie on a track and a large bold text clip on the track above it; give the text a motion preset or an action that moves it across the frame. 2. Track ▸ Matte ▸ Alpha with the text selected. 3. Play it at View ▸ Preview Quality ▸ Full, then at Quarter. 4. Switch the mode to Luma, then Inverted Alpha, and play again.
+- **Expect:** only the movie shows, and only through the letters (outside them, the canvas background; with Inverted Alpha, the reverse); the window follows the text's movement frame for frame with no lag behind it; the letters' edges are clean at Full and at Quarter, with no fringe, flicker or banding; Luma shows the movie through the text's brightness.
+- **Source:** #240 (mattes MT4, spec §11 MT-1..MT-7).
+
+**MAT-2 — The matte chrome reads right**
+- **Do:** 1. In a project with three tracks (a movie, then a shape above it, then a text clip above that), make the shape's track Track ▸ Matte ▸ Alpha and the text's track Matte ▸ Inverted Luma (it has a matte behind it, so it cuts nothing). 2. Look at the timeline at View ▸ Timeline Track Height Small, Medium and Large, and scroll the timeline sideways and back. 3. Select the shape, then the text, and look at each Clip sub-tab. Repeat in the other appearance.
+- **Expect:** the shape's header reads "Matte · Alpha" in the ordinary label colour on a faint accent tint and the text's a dimmed "Matte · nothing behind" — under the name on Medium and Large, beside it on Small, where the name is clipped (on a Small text or audio row the text's tag reads "Matte" alone and its name stays readable); the two matte lanes' clips are half-transparent with a dashed outline; an accent bracket just right of the header column joins the shape's lane to the movie's and stays there while scrolling, with no stale copy left behind; the note under the sub-tab strip reads whole on every sub-tab ("Matte for the track below (Alpha). …" for the shape, "Nothing is behind this matte track, so it cuts nothing." for the text). Nothing is cramped, clipped or low-contrast, the dimmed tag included, in both appearances.
+- **Source:** #240 (mattes MT4, spec §11 MT-7); `tools/proof/screens.py --only 10c-matte-track` captures the Medium case.
+
 ## Screen recording
 
 Launch Reelcut from the Finder or Dock unless the check says otherwise.

@@ -89,6 +89,7 @@ extension UIMenu {
         "toggleTrackMuted:": .plain,
         "toggleTrackLocked:": .plain,
         "toggleTrackSolo:": .plain,
+        "setTrackMatte:": .plain,
         "addMarker:": .plain,
         "nextMarker:": .plain,
         "previousMarker:": .plain,

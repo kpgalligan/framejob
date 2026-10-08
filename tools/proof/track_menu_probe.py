@@ -25,9 +25,11 @@ What it measures:
   * **Where a menu opens.** A header, a header's toggle button and an empty
     lane each open the menu for THEIR row's track; a clip, the ruler and the
     room below the lanes open none.
-  * **What it says.** Hide Video, Mute Audio, Lock Track, Solo, a separator,
-    Remove Track — the toggles checked from the clicked track's own flags,
-    every item naming that track's id.
+  * **What it says.** Hide Video, Mute Audio, Lock Track, Solo, Matte, a
+    separator, Remove Track — the toggles checked from the clicked track's
+    own flags, every item naming that track's id, and the Matte submenu
+    (spec §11 MT-7) listing the five modes for that track with Off checked
+    (`matte_chrome_probe.py` measures what its rows do).
   * **What the toggles do.** Hide Video on the middle track hides the middle
     track and nothing else, as one undo step.
   * **Remove Track on an empty track that is neither front-most nor
@@ -37,7 +39,8 @@ What it measures:
     removes nothing until Remove is pressed, then the track and its clip go.
   * **The last track** gets a disabled Remove Track.
 
-Made to fail on purpose, twice: `removeTrackCommand` ignoring its `id`
+Made to fail on purpose, twice, when the probe had 22 rows (before the
+three Matte rows, mattes MT4): `removeTrackCommand` ignoring its `id`
 (falling back to `currentTrack`, the front track) takes the three rows that
 say WHICH track went — the middle one, no clip lost, the back one after the
 sheet — and nothing else (19/22); the content view's `menu(for:)` answering
@@ -200,6 +203,7 @@ func describe(_ menu: NSMenu?) -> Any {
             "on": item.state == .on,
             "enabled": item.isEnabled,
             "track": (item.representedObject as? NSNumber)?.intValue ?? -1,
+            "submenu": item.submenu.map { describe($0) } ?? NSNull(),
         ]
     }
 }
@@ -345,21 +349,16 @@ def run_probe(binary):
         return json.load(f), None
 
 
-def run_probe(binary):
-    out = os.path.join(PROBE, "answer.json")
-    if os.path.exists(out):
-        os.remove(out)
-    try:
-        result = subprocess.run([binary, out], capture_output=True, text=True, timeout=120)
-    except subprocess.TimeoutExpired:
-        return None, "the probe never returned"
-    if result.returncode != 0 or not os.path.exists(out):
-        return None, (result.stderr.strip().splitlines() or ["(no output)"])[-1]
-    with open(out) as f:
-        return json.load(f), None
+TITLES = ["Hide Video", "Mute Audio", "Lock Track", "Solo", "Matte", "-", "Remove Track"]
+MATTE = ["Off", "Alpha", "Inverted Alpha", "Luma", "Inverted Luma"]
 
 
-TITLES = ["Hide Video", "Mute Audio", "Lock Track", "Solo", "-", "Remove Track"]
+def matte_rows(menu):
+    """The Matte submenu's rows of a described menu, or None."""
+    for item in menu if isinstance(menu, list) else []:
+        if item["title"] == "Matte":
+            return item["submenu"]
+    return None
 
 
 def main():
@@ -399,6 +398,13 @@ def main():
               and all(i["track"] == track for i in menu if i["title"] != "-")
               and all(i["enabled"] for i in menu if i["title"] != "-"),
               json.dumps(menu))
+    for label, track in [("headerFront", front), ("laneMiddle", middle), ("buttonBack", back)]:
+        rows = matte_rows(menus.get(label))
+        check(f"{label}: its Matte submenu lists Off, Alpha, Inverted Alpha, Luma, Inverted "
+              "Luma, each naming that track, Off checked on an ordinary track (spec §11 MT-7)",
+              isinstance(rows, list) and [i["title"] for i in rows] == MATTE
+              and all(i["track"] == track and i["enabled"] for i in rows)
+              and [i["title"] for i in rows if i["on"]] == ["Off"], json.dumps(rows))
     check("a clip, the ruler and the room below the lanes open no menu",
           menus["clipA"] is None and menus["ruler"] is None and menus["below"] is None,
           json.dumps({k: menus[k] for k in ("clipA", "ruler", "below")}))

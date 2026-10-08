@@ -47,20 +47,27 @@ extension TimelineContentView {
     /// lies inside the PREVIOUS clip's body, over its right edge: drawn with
     /// that clip, the NEXT clip's hatch painted white 0.26 and a solid white
     /// edge straight over the previous clip's ring (#66). Clips outside
-    /// `dirtyRect` are skipped in every pass.
+    /// `dirtyRect` are skipped in every pass. On a matte track the first two
+    /// passes run at half opacity inside `drawMatteLane` (spec §11 MT-7,
+    /// `TimelineView+Matte.swift`); the rings stay whole.
     func drawClips(
         _ clips: [ClipSnapshot], row: Int, track: TrackSnapshot, owner: TimelineView,
         dirtyRect: CGRect
     ) {
         let rects = clips.map { owner.layout.clipRect($0, row: row) }
         let shown = clips.indices.filter { rects[$0].intersects(dirtyRect) }
-        for i in shown {
-            draw(clip: clips[i], in: rects[i], track: track, owner: owner, visible: dirtyRect)
-        }
-        for i in shown where i > 0 {
-            drawTransition(
-                clips[i], previous: clips[i - 1], in: Self.bodyRect(rects[i]),
-                layout: owner.layout)
+        drawMatteLane(
+            track: track, rects: shown.map { rects[$0] },
+            lane: owner.layout.rowRect(row, width: owner.layout.contentWidth), owner: owner
+        ) {
+            for i in shown {
+                draw(clip: clips[i], in: rects[i], track: track, owner: owner, visible: dirtyRect)
+            }
+            for i in shown where i > 0 {
+                drawTransition(
+                    clips[i], previous: clips[i - 1], in: Self.bodyRect(rects[i]),
+                    layout: owner.layout)
+            }
         }
         for i in shown where owner.selection.contains(clips[i].id) {
             drawSelectionRing(Self.bodyRect(rects[i]))

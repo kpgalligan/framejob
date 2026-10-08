@@ -110,7 +110,9 @@ key equivalent, Rename…, Label ▸ (the six colours and None),
 Nest, Un-nest, Open Nest ⌘↓, Close Nest ⌘↑ — road map 2's phase 9, in the
 grouping group because going inside a nest is the third thing you do with
 one), Track (New Track,
-Remove Track, Remove Empty Tracks, Hide/Mute/Lock/Solo), Mark (Add Marker,
+Remove Track, Remove Empty Tracks, Hide/Mute/Lock/Solo, Matte ▸ (Off · Alpha
+· Inverted Alpha · Luma · Inverted Luma, on the current track, checked for
+its mode, undo "Track Matte", no key — §11 MT-7)), Mark (Add Marker,
 Set In, Set Out, Clear Range, Next/Previous Marker), View (Zoom, Fit,
 Snapping, Safe Areas, Inspector, Assistant ⌃⌘A (road map 12 A2: the
 Assistant tab, shown and focused), Timeline Track Height, and — road map 2's

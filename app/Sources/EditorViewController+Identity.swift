@@ -1,7 +1,8 @@
 import AppKit
 
 /// Clip identity (spec §5.2, format version 3): Clip ▸ Rename… (⇧⌘R), the
-/// Clip ▸ Label ▸ submenu, and the Track ▸ Solo item's validation — the menu
+/// Clip ▸ Label ▸ submenu, and the Track ▸ Solo and Track ▸ Matte items'
+/// validation — the menu
 /// halves of what the timeline does in place (`TimelineView+Rename.swift`,
 /// the header column's S) and what the Clip tab's header field does
 /// (`ClipSelectionHeaderView` in `ClipPane.swift`).
@@ -91,6 +92,17 @@ extension EditorViewController {
             // it still silences the rest — so the menu says which it is.
             let track = currentTrack
             (item as? NSMenuItem)?.state = track?.solo == true ? .on : .off
+            return track != nil
+        case #selector(setTrackMatte(_:)):
+            // Track ▸ Matte's rows (spec §11 MT-7): the current track's mode
+            // checked, by the row's tag.
+            let track = currentTrack
+            if let menuItem = item as? NSMenuItem {
+                let modes = TrackMatte.allCases
+                menuItem.state =
+                    modes.indices.contains(menuItem.tag) && track?.matte == modes[menuItem.tag]
+                    ? .on : .off
+            }
             return track != nil
         default:
             return nil

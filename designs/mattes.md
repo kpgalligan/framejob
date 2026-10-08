@@ -63,7 +63,7 @@ Each phase is committed alone, after its review.
 | MT1 | Tolls, pure moves: `recipe_layer.rs` out of `recipe.rs`, `Compositor+Shadow.swift` and `prepare` out of `Compositor.swift`, `FrameRecipe.swift` out of `ProjectSnapshot.swift` | done (below) |
 | MT2 | The matte end to end over MCP, top level and nested levels: `tracks[].matte` (format 14), `set_track {matte}`, the recipe's `matte` and `mattes`, the mask and resolve passes, `matte_proof.py` | done (below) |
 | MT3 | Nests (`nest` / `unnest`), dissolves, shadow, reflection, Preview Quality, every export | done (below) |
-| MT4 | The chrome (MT-7 recorded first): Track ▸ Matte, the context submenu, the header tag, the lane, the Clip tab's note | — |
+| MT4 | The chrome (MT-7 recorded first): Track ▸ Matte, the context submenu, the header tag, the lane, the Clip tab's note | done (below) |
 | MT5 | Documents and figures; the spike re-run against the tree; the ADR; close | — |
 
 ## MT0 — the decisions and the spike (2026-10-08)
@@ -365,3 +365,127 @@ name CT were run again on it — `core-group-by-track` (`matte` and
 `matte_nest`), `unnest-old-depth` (`matte_nest`), MT2's
 `core-untargeted-into-null` (B0 MM, `matte`) — with MT2's
 `shader-no-multiply` (A1 A2 L1), whose anchor this phase rewrote: all caught.
+
+## MT4 — the chrome (2026-10-08)
+
+**MT-7 first.** `designs/spec/11-decisions/mattes.md` gained MT-7 in the
+spec's exact words, its index a row (the file 99 → 114 lines, the folder
+5403 → 5419), before any code; `spec_index_proof.py` 144/144.
+
+**What landed.** `TrackMatte.target(of:in:)` — the core's `matte_target`
+for the chrome only. Track ▸ Matte ▸ Off / Alpha / Inverted Alpha / Luma /
+Inverted Luma (`AppDelegate+Menus.swift`, `tagged` rows as Timeline Track
+Height's) runs `EditorViewController+Matte.swift`'s `setTrackMatte` on
+`currentTrack`, undo "Track Matte"; its validator arm sits beside Solo's in
+`EditorViewController+Identity.swift` (checked by tag, enabled iff there is
+a current track). The track context menu's Matte submenu follows Solo
+(`TimelineView+TrackMenu.swift`: rows targeted at the view, the track by
+`representedObject`, the mode by tag, checked; `trackMenuSetMatte` →
+`onEdit("Track Matte", …)`). `TimelineView+Matte.swift` holds the header's
+tag (`TimelineMatteTag`, `matteTagWidth`, `drawMatteTag`), the lane
+(`drawMatteLane`: the body passes in one transparency layer at 0.5, then
+dashed accent outlines, then the bracket) and `invalidateMatteBrackets`.
+`TimelineView.swift` (frozen) took three lines of wiring: the name label's
+width less `matteTagWidth`, the `drawMatteTag` call, and
+`invalidateMatteBrackets` in `pinFloatingBands` (see Deviations).
+`TimelineClipDrawing.swift`'s `drawClips` runs its bodies and transition
+zones inside `drawMatteLane`; the selection rings stay whole on top.
+`ClipPane+Matte.swift`'s `matteNote` is MT-7's rule; `ClipHeaderBlock`
+shows it as a wrapping `InspectorNoteLabel` under the sub-tab strip, and
+`ClipPane.structureSignature` carries whether it shows. `UIMenuTable.swift`
+and `inventory.json` have the `setTrackMatte:` row; the `set_track` tool's
+prose and its `matte` description name Track ▸ Matte.
+
+**Where the tag goes.** The rule is the row's geometry, "room above the
+toggles": the tag takes its own line when the first toggle's top is ≥ 10 pt
+below the name's box. That is every Medium and Large row and the Small video
+row (54 pt); the Small text (30 pt) and audio (40 pt) rows put it on the
+name's line. Beside "Matte · Inverted Alpha" there a name had 6.0 pt left
+and was not drawn (`TimelineDraw.label` draws nothing narrower than 6 pt);
+the review's fix pass amended MT-7 (every Medium and Large row and the Small
+video row; on the name's line the tag reads "Matte" alone when its full words
+would leave the name less than 40 pt, `TimelineMatteTag.fitted`), so the
+three long tags read "Matte" there and the name keeps 81 pt ("Matte · Alpha"
+47 pt, "Matte · Luma" 48 pt).
+
+**Scores** (each printed by a run on this tree). `make typecheck` 0 errors,
+the four baseline warnings; `inventory.py --check` 5/5; `spec_index_proof.py`
+144/144. `matte_chrome_probe.py` 8/8 (B0, M1, M2, M3, T1, LN, NT, HT; LN's
+pixel (158, 185, 193) against the 0.5 mix (158.0, 185.5, 193.5) of the fill
+(61, 116, 132) and the lane (255, 255, 255), in the capture's
+`NSCalibratedRGBColorSpace`); `track_menu_probe.py` 25/25 (22 before, and
+three Matte rows); `v2_menu.py --only H` 5/5 on the Debug loop;
+`screens.py --only 10c-matte-track` 6 pass of 6, 0 new problems, light and
+dark. `make gate` passed in the foreground once (typecheck 5 s, fmt and lint
+skipped, test 109 s, app 85 s; 199 s). The recorded run, on the gate's
+Release build: `v2_menu.py` whole 28/28 (H1/H2 99 rows each, no `Reelcut: `
+line, no DEFAULTS MOVED); `matte_chrome_probe.py` and `track_menu_probe.py`
+drive no app (they build from `app/Sources`), so their runs above, on the same
+tree, are their record.
+
+**Mutants** (the spec's seven, once on the final instrument, each
+`matte_chrome_probe.py --mutant NAME` over a mutated copy of `app/Sources`):
+`menu-current-track` (M3), `validator-always-off` (M2, all three current
+tracks), `tag-never-dim` (T1), `lane-full-opacity` (LN), `note-every-clip`
+(NT, the function and the shown note), `hit-skips-matte` (HT) and
+`undo-name` (M3) — all caught, 7/8 each.
+
+**The review's fix pass** (two should-fix findings and a nit). (1) The
+Small-row tag: MT-7, §4.4 and MAT-2 amended (above); `TimelineMatteTag.fitted`
+and `minimumNameWidth` (40 pt), applied by `matteTagWidth` and by
+`drawMatteTag`'s name-line branch, which now answers the words and box it
+drew. (2) The dimmed tag drew the accent at 0.45 alpha, about 1.8:1 in both
+looks; it now draws `DS.textMuted` at its own alpha over the same faint box
+(`TimelineMatteTag.textColor(dimmed:)`, `fillColor(dimmed:)`): 3.85:1 light,
+5.57:1 dark; the undimmed accent tag then measured 3.01:1 light and 3.24:1
+dark on the host's blue accent (the second fix pass, below, scores it). MAT-2 no longer excepts the dimmed tag.
+New rows T2 (the five tags on the Small text and audio name lines) and T3 (the
+contrast, both looks) and mutants `tag-never-short` (T2) and
+`tag-dim-accent` (T3, both looks), both caught; no earlier mutant's anchor was
+touched. `matte_chrome_probe.py` 10/10; `make typecheck` 0 errors, the four
+baseline warnings; `spec_index_proof.py` 144/144; `screens.py --only
+10c-matte-track` 6 pass of 6, 0 new problems (`tools/proof/work/screens/2026-10-08-073729/`);
+`make gate` PASS (typecheck 4 s, fmt and lint skipped, test 118 s, app 83 s;
+205 s).
+
+**The second fix pass** (one should-fix and an orchestrator ruling). The
+first pass's T3 control asked the undimmed accent tag for 3:1, which depends
+on the owner's System Settings accent: about 1.3:1 under yellow, and under
+3:1 for green, orange, red, pink and graphite. The probe would fail with no
+code change, and the tag's words would be just as hard to read. The ruling:
+the box keeps its accent tint, and the undimmed tag's words are drawn in
+the primary label colour (`TimelineMatteTag.textColor(dimmed: false)` is
+`DS.textStrong`), so their legibility no longer depends on the accent. MT-7,
+§4.4, MT-7's index row and MAT-2 say so; Lines 117, 209 and 5422. T3 now
+scores the undimmed tag at 4.5:1 or better in both looks, over the host's
+accent (11.9:1 light, 9.79:1 dark) and over every corner of the sRGB cube
+standing in for the accent at the box's 0.22 alpha (worst 9.8:1 light under
+black, 6.4:1 dark under white). The control is replaced by two
+host-independent controls: the header row's own colour as text over the
+dimmed box measures 1.14:1 light and 1.1:1 dark (it must be under 1.5:1),
+and the light row's luminance is above 0.5 and the dark row's below 0.1. The
+dimmed tag is unchanged (3.85:1, 5.57:1). The new mutant is
+`tag-accent-text` (T3: the undimmed words back in the accent, 3.01:1 and
+3.24:1 on the host's accent, worst 2.37:1 and 2.02:1 over the corners).
+It was caught, and so was `tag-dim-accent` with its anchor moved (1.76:1,
+1.78:1). Results: `matte_chrome_probe.py` 10/10; `make typecheck` 0 errors
+and the four baseline warnings; `spec_index_proof.py` 144/144; `screens.py
+--only 10c-matte-track` 6 pass of 6, 0 new problems
+(`tools/proof/work/screens/2026-10-08-074800/`); `make gate` PASS
+(typecheck 4 s, fmt and lint skipped, test 103 s, app 78 s; 186 s).
+
+**Deviations.** (1) The screen is `designs/screens/10c-matte-track.md`, not
+`17-matte-track.md`: screens run in name order and `16-recorder-panel` must
+be the last (`screens.py`'s `validate`: "New Recording… must be the last
+screen run"), so a 17 would fail the whole catalog; it needed a fixture,
+`matte`, in `screens.py` (no step tool sets a track's matte). (2) HT's
+mutant is anchored in `CanvasLayerBox.boxes(recipe:snapshot:)`, the canvas's
+live hit path (`PreviewCanvasView.hit(at:)`), not in
+`FrameRecipe.layer(at:measuring:)`, which no app code calls; HT checks both.
+(3) `TimelineView.swift` took a third wiring line, `invalidateMatteBrackets`
+in `pinFloatingBands`: the bracket is pinned to the header column, and a
+layer-backed scroll moves the content without redrawing it, which would
+leave the bracket at its old place. (4) The note shows only when the matte
+tracks share one mode, for both sentences (MT-7's grammar puts "share one
+mode" before the choice of sentence).
+

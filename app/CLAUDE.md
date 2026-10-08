@@ -497,6 +497,9 @@ the key map behind it.
   nest-local tick sent unscoped would land at the wrong project time;
   `finishScopeChange` lands the player through `Playback.seekAfterRebuild`,
   never `setPlayhead`),
+  `+Matte` (Track ▸ Matte, `setTrackMatte`, spec §11 MT-7: the current
+  track's mode, undo "Track Matte"; its checkmark is the validator arm beside
+  Solo's in `+Identity`),
   `+Motion` (Clip ▸ Motion ▸, one `set_video` PER CLIP; inactive stored edge
   titles refreshed at validation), `+Assistant` (`assistantSession()`: the
   window's live session or a new one, stored in the frozen file's
@@ -583,11 +586,22 @@ the key map behind it.
   (`performGroupedEdit`), so a rename is its own undo step even when the
   mouse-down that ended it edits too (#69)) · `+TrackMenu` (the right-click
   menu on a header or an
-  empty lane: the four toggles, checked, and Remove Track through
+  empty lane: the four toggles, checked, the Matte submenu (spec §11 MT-7),
+  and Remove Track through
   `onRemoveTrack` to `removeTrackCommand`, which asks when clips would go;
   a clip hit answers no menu) · `+Candidates` (Remove Silences' wash, drawn not
   overlaid) · `+NestScope` (the breadcrumb, painted LAST in the ruler's
-  corner so it stays above the header column when scrolled) ·
+  corner so it stays above the header column when scrolled) · `+Matte` (spec
+  §11 MT-7: `TimelineMatteTag` — the header tag's words, dimmed with no
+  target, on its own line when the row has room above the toggles, else
+  right-aligned on the name's line, and there `fitted` to "Matte" alone when
+  the name would keep under 40 pt; `textColor` / `fillColor`, an undimmed
+  tag's words `DS.textStrong` over the accent tint, never the accent itself,
+  a dimmed tag's `DS.textMuted` over a fainter tint; `drawMatteTag` answers
+  the words and box it drew; `drawMatteLane` — a matte lane's body passes in
+  one transparency layer at 0.5, dashed accent outlines, and the accent
+  bracket to its target at `pinnedX + headerWidth + 2`, repainted on scroll
+  by `invalidateMatteBrackets`, which `pinFloatingBands` calls) ·
   `TimelineActionBands.swift` (each clip's action lane under its name strip,
   the band hit — `actionHit`, which `hit(at:)` asks AFTER the fade handles,
   since on an audio-only clip they sit inside the lane, and BEFORE the edge
@@ -761,12 +775,17 @@ the key map behind it.
   sections, with the open rule per tab) · `ClipPane+Timing.swift` (the
   Timing section — `timingSection`, `reverseTimingSection`, `reverseRows` —
   a pure move out of `ClipPane.swift`; `makeSections()` is its only caller) ·
+  `ClipPane+Matte.swift` (`matteNote`, spec §11 MT-7: the note
+  `ClipHeaderBlock` shows under the sub-tab strip when every selected clip
+  sits on a matte track of one mode; `structureSignature` carries whether it
+  shows) ·
   `ClipSelectionHeader.swift`
   (`ClipSelectionHeaderView`, a pure move out of `ClipPane.swift`) ·
   `ClipPinnedBlock.swift` (`ClipSubTab` — six cases in display order, text,
   shape, graphic, picture, sound, clip; `graphic` counts `graphic.props`, a stale key included (G-34 (l), CI-6 amended) — with
   its `◆N` key count,
-  `ClipSubTabsView`, and `ClipHeaderBlock` — header, lane, sub-tabs — which
+  `ClipSubTabsView`, and `ClipHeaderBlock` — header, lane, sub-tabs and, when given one, the matte
+  note — which
   `makeHeader()` builds once per pane build) · `ActionLaneView.swift` (the
   action lane, the Actions section's replacement, with the clip and action
   ids it shows captured, and the stored `drag` / `pressed` / `hover` its
@@ -1048,8 +1067,10 @@ the key map behind it.
   (with `matte`) and `FrameRecipe` (with `mattes`) with the canvas hit test
   `layer(at:measuring:)`, out of `ProjectSnapshot.swift`.
 - `TrackMatte.swift` — a track's matte mode, mirroring `model_matte.rs`: raw
-  values, `displayName` and `shaderCode` (the case index — a shader
-  discriminant, append only); `TrackSnapshot.matte` decodes it leniently.
+  values, `displayName`, `shaderCode` (the case index — a shader
+  discriminant, append only) and `target(of:in:)` (the core's
+  `matte_target`, for the chrome only); `TrackSnapshot.matte` decodes it
+  leniently.
 - `Compositor.swift` · `Compositor+Shadow.swift` · `Compositor+Matte.swift` ·
   `CompositorEffects.swift` · `Resources/Shaders/Compositor.metal`
   — the per-layer pass. The uniform block's field ORDER is a contract with the

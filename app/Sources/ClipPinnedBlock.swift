@@ -144,18 +144,28 @@ final class ClipSubTabsView: NSView, OptionControl {
 
 /// The Clip tab's pinned block (the clip inspector handoff's "Pinned action
 /// lane block", road map 9 §1 and §3): the selection header, the action lane
-/// and the sub-tab strip, stacked. One `OptionControl`, because the pane has
-/// one header slot (`InspectorPaneView.makeHeader()`), refreshed with it and
-/// hosted ABOVE the scroll view by the controller (`pinnedBlock`).
+/// and the sub-tab strip, stacked, and under them the matte note when the
+/// pane gives one (spec §11 MT-7, `ClipPane+Matte.swift`). One
+/// `OptionControl`, because the pane has one header slot
+/// (`InspectorPaneView.makeHeader()`), refreshed with it and hosted ABOVE the
+/// scroll view by the controller (`pinnedBlock`).
 final class ClipHeaderBlock: NSView, OptionControl {
     private let header: ClipSelectionHeaderView
     private let lane: ActionLaneView
     private let strip: ClipSubTabsView?
+    private let noteLabel: InspectorNoteLabel?
 
-    init(binding: InspectorBinding, inspector: InspectorViewController?, subTabs: ClipSubTabsView?) {
+    /// `note` is given only while it has words: the pane's structure
+    /// signature carries whether it shows, so its coming or going rebuilds
+    /// the block, and a refresh only re-reads its words.
+    init(
+        binding: InspectorBinding, inspector: InspectorViewController?,
+        subTabs: ClipSubTabsView?, note: (() -> String?)? = nil
+    ) {
         header = ClipSelectionHeaderView(binding: binding)
         lane = ActionLaneView(binding: binding, inspector: inspector)
         strip = subTabs
+        noteLabel = note.map { InspectorNoteLabel(note: $0) }
         super.init(frame: .zero)
         var views: [NSView] = [header, lane]
         if let subTabs { views.append(subTabs) }
@@ -170,7 +180,24 @@ final class ClipHeaderBlock: NSView, OptionControl {
             ])
             above = view.bottomAnchor
         }
-        above.constraint(equalTo: bottomAnchor).isActive = true
+        if let label = noteLabel {
+            // A sentence of two lines at the panel's width: it wraps.
+            label.lineBreakMode = .byWordWrapping
+            label.maximumNumberOfLines = 0
+            label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+            label.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(label)
+            NSLayoutConstraint.activate([
+                label.topAnchor.constraint(equalTo: above, constant: 6),
+                label.leadingAnchor.constraint(
+                    equalTo: leadingAnchor, constant: InspectorMetrics.inset),
+                label.trailingAnchor.constraint(
+                    equalTo: trailingAnchor, constant: -InspectorMetrics.inset),
+            ])
+            label.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8).isActive = true
+        } else {
+            above.constraint(equalTo: bottomAnchor).isActive = true
+        }
     }
 
     @available(*, unavailable)
@@ -186,9 +213,23 @@ final class ClipHeaderBlock: NSView, OptionControl {
     /// The sub-tab strip, for a probe.
     var subTabsView: ClipSubTabsView? { strip }
 
+    /// The matte note's words as shown, for a probe; nil when it has none.
+    var noteText: String? { noteLabel.flatMap { $0.isHidden ? nil : $0.stringValue } }
+
+    /// A wrapping label needs its width to know its height.
+    override func layout() {
+        super.layout()
+        guard let label = noteLabel else { return }
+        let width = max(bounds.width - 2 * InspectorMetrics.inset, 0)
+        guard label.preferredMaxLayoutWidth != width else { return }
+        label.preferredMaxLayoutWidth = width
+        super.layout()
+    }
+
     func refresh() {
         header.refresh()
         lane.refresh()
         strip?.refresh()
+        noteLabel?.refresh()
     }
 }

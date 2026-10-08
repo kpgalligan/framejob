@@ -97,3 +97,21 @@ it.
   specialization instead of two. `LayerUniforms` stays 104 floats. Targets are pooled per destination
   size and allocated on the first matted frame (at 3840×2160, 33.2 MB per matte and 8.3 MB per
   coverage). The deferred E5 and E9 take the next free texture slots.
+- **MT-7 — The chrome (owner, 2026-10-08, O2–O8).** No fifth header toggle and no shortcut. Set
+  by Track ▸ Matte ▸ Off / Alpha / Inverted Alpha / Luma / Inverted Luma on the current track,
+  and by the same submenu in the track's context menu after Solo, each checked for the track's
+  mode; undo "Track Matte"; re-choosing the current mode is an identity. The header shows a
+  tag by the name — "Matte · Alpha", "Matte · Inverted Alpha", "Matte · Luma", "Matte ·
+  Inverted Luma" — in the primary label colour over a faint accent tint, so its legibility never
+  depends on the accent the person picked; dimmed (muted words, a fainter tint) and reading
+  "Matte · nothing behind" when the track has no target (MT-2); on its own line under the name when the row leaves room above the toggles (every Medium
+  and Large row, and the Small video row), else on the name's line, right-aligned, the name
+  clipped before it — and there, when its full words would leave the name less than 40 pt, the
+  tag reads "Matte" alone. A matte track's clips are drawn at half opacity with a dashed outline,
+  and an accent bracket joins its lane to
+  the track below when it has a target. Every Clip sub-tab opens with a note when every selected
+  clip sits on a matte track and those tracks share one mode: "Matte for the track below
+  (<mode>). Not drawn: its blend mode, drop shadow and reflection have no effect.", or, when none
+  of those tracks has a target, "Nothing is behind this matte track, so it cuts nothing."; every
+  control stays live, its values kept for when the track stops being a matte. On the canvas a
+  matte clip is the topmost hit inside its box, selected and dragged like any clip.

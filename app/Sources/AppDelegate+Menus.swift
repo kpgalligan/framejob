@@ -456,6 +456,18 @@ extension AppDelegate {
         menu.addItem(item("Lock Track", #selector(EditorViewController.toggleTrackLocked(_:))))
         // The checkmark is the validator's (EditorViewController+Identity.swift).
         menu.addItem(item("Solo", #selector(EditorViewController.toggleTrackSolo(_:))))
+        menu.addItem(submenuItem(trackMatteMenu()))
+        return menu
+    }
+
+    /// Track ▸ Matte (spec §11 MT-7): `TrackMatte`'s rows, tagged with their
+    /// case index, checked by the validator for the current track's mode.
+    private func trackMatteMenu() -> NSMenu {
+        let menu = NSMenu(title: "Matte")
+        for (index, mode) in TrackMatte.allCases.enumerated() {
+            menu.addItem(
+                tagged(mode.displayName, #selector(EditorViewController.setTrackMatte(_:)), index))
+        }
         return menu
     }
 

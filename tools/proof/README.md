@@ -3623,9 +3623,11 @@ without a whole Copy payload, and what is true of them is asserted instead.
 ## The track context menu (`track_menu_probe.py`)
 
 `python3 tools/proof/track_menu_probe.py`, no port and no running app,
-**22/22**. A right-click on a track's header or empty lane opens that
+**25/25**. A right-click on a track's header or empty lane opens that
 track's menu — Hide Video, Mute Audio, Lock Track, Solo (checked from the
-track's own flags) and Remove Track (`TimelineView+TrackMenu.swift`,
+track's own flags), the Matte submenu (mattes MT4: its five modes for that
+track, checked for its mode, three rows; `matte_chrome_probe.py` measures
+what they do) and Remove Track (`TimelineView+TrackMenu.swift`,
 2026-09-23). A click is not an op, so no MCP call can reach WHICH track it
 names; the instrument is `marquee_probe.py`'s builder, one probe along. It
 puts a real `EditorViewController` in an offscreen `NSWindow` over three
@@ -17031,3 +17033,63 @@ whole 36/36 (E3 ran: this Mac has the encoder); the probe drives no app, so
 its run on the same tree is its record. All eight mutants caught, and MT2's
 `shader-no-multiply` (its anchor moved) and `core-untargeted-into-null` (CT
 became `--no-fail-fast`) again — `designs/mattes.md`'s MT3 record.
+
+## Road map mattes — MT4, the chrome (`matte_chrome_probe.py` B0, M1–M3, T1–T3, LN, NT, HT and ten mutants; `track_menu_probe.py`'s Matte rows; `screens.py` 10c; #240, spec §11 MT-7)
+
+**What it answers.** That Track ▸ Matte and the track context menu's Matte
+submenu come right after Solo with the five modes in order; that the
+validator checks the CURRENT track's mode and the context menu the CLICKED
+track's; that choosing a mode edits exactly that track as one undo step
+named "Track Matte" and choosing it again is an identity (no change, no
+step); that the header's tag reads "Matte · <mode>", or "Matte · nothing
+behind" dimmed for a matte with no target; that on a Small text or audio
+row's name line the three long tags read "Matte" alone, so the name keeps
+at least 40 pt, and the header clips the name by exactly the drawn tag;
+that the dimmed tag (muted words) keeps a WCAG contrast of at least 3:1
+over the header in light and dark, and the undimmed tag (label-coloured
+words on the accent tint) at least 4.5:1 in both — over the host's accent
+and over every corner of the sRGB cube in its place, so no accent the owner
+picks can fail it — with two host-independent controls (the header row's
+own colour as text over the dimmed box is under 1.5:1, and the light and
+dark rows resolved apart); that a matte
+lane's clip is painted at half opacity over the lane (a `cacheDisplay`
+of the timeline's content view, the window's own paint path); that the Clip tab's note is
+MT-7's sentence exactly for single and shared-mode selections, the "Nothing
+is behind…" sentence with no target, nil otherwise — as a function and as
+the pinned block shows it on two sub-tabs; and that the canvas hits a matte
+clip inside its box and the clip it cuts outside it. Its docstring lists
+every row and the fixture.
+
+```
+python3 tools/proof/matte_chrome_probe.py                    # no app; builds through swift_build.py
+python3 tools/proof/matte_chrome_probe.py --mutant NAME      # the ten below
+python3 tools/proof/track_menu_probe.py
+python3 tools/proof/screens.py --only 10c-matte-track        # the matte fixture, light and dark
+```
+
+`matte_chrome_probe.swift` is built as `main.swift` over every other
+`app/Sources` file through `swift_build.build` into
+`tools/proof/work/matte_chrome_probe/`; it launches no app, puts a real
+`EditorViewController` in an offscreen aqua window and writes one JSON
+answer. A build that fails is its B0 FAILURE. A mutant copies `app/Sources`'
+Swift files into `work/matte_chrome_probe/mutant/NAME/Sources`, applies one
+anchored replacement (asserted to occur once) and builds the probe over the
+copy — no app build. LN reads the capture's pixels in its own encoding
+(`NSCalibratedRGBColorSpace`), where the transparency layer is composited: a
+0.5 mix converted to sRGB is not the mix of the two sRGB colours. The
+probe's undo groups come from `groupsByEvent`, as an AppKit event's do — an
+explicit begin/end pair around an identity would leave an empty step.
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `menu-current-track` | the context menu's Matte edits the front-most track, not the clicked one | M3 |
+| `validator-always-off` | Track ▸ Matte's rows never checked | M2 |
+| `tag-never-dim` | "Matte · nothing behind" not dimmed | T1 |
+| `tag-never-short` | `TimelineMatteTag.fitted` always keeps the full words | T2 |
+| `tag-dim-accent` | the dimmed tag's text back to the accent at 0.45 alpha | T3 |
+| `tag-accent-text` | the undimmed tag's text in the accent, not the label colour | T3 |
+| `lane-full-opacity` | a matte lane's clips at full opacity | LN |
+| `note-every-clip` | the note for a selection on any track | NT |
+| `hit-skips-matte` | the canvas's boxes (`CanvasLayerBox.boxes(recipe:)`) skip a matte layer | HT |
+| `undo-name` | Track ▸ Matte's undo named "Matte Track" | M3 |
+

@@ -83,6 +83,7 @@ final class ClipPane: InspectorPaneView {
             audioPane.structureSignature,
             (binding.videoClips.isEmpty ? "-" : "px") + (binding.audioClips.isEmpty ? "-" : "au"),
             activeSubTab.rawValue, subTabs.map(\.rawValue).joined(separator: ","),
+            matteNote == nil ? "-" : "matte",
         ].joined(separator: "|")
     }
 
@@ -92,7 +93,9 @@ final class ClipPane: InspectorPaneView {
             tabs: subTabs, active: activeSubTab,
             badge: { tab in binding.selectedAction.map { tab.keyedCount(in: $0.end) } ?? 0 },
             onSelect: { [weak inspector] in inspector?.selectClipSubTab($0) })
-        return ClipHeaderBlock(binding: binding, inspector: inspector, subTabs: strip)
+        return ClipHeaderBlock(
+            binding: binding, inspector: inspector, subTabs: strip,
+            note: matteNote == nil ? nil : { [weak self] in self?.matteNote })
     }
 
     // MARK: - Sub-tabs

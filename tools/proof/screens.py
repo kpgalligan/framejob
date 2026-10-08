@@ -220,6 +220,9 @@ FIXTURES = {
              "clips": ["video", "text", "graphic", "shape", "tone"],
              "media": ["speech.mov", "toneA.m4a", "toneB.m4a"], "sound": ["video", "tone"]},
     "animated": {"path": os.path.join(FIXTURE_DIR, "Animated.reelcut"), "clips": ["graphic"]},
+    "matte": {"path": os.path.join(FIXTURE_DIR, "Matte.reelcut"),
+              "clips": ["video", "window", "stray"], "media": ["speech.mov"],
+              "sound": ["video"]},
 }
 CANVAS = {"width": 960, "height": 540, "fps": [30, 1], "background": [0.0, 0.0, 0.0, 1.0],
           "fit_new_clips": True}
@@ -362,6 +365,8 @@ def build_fixture(mcp, name):
             ids = _demo_ops(mcp, path)
         elif name == "animated":
             ids = _animated_ops(mcp, path)
+        elif name == "matte":
+            ids = _matte_ops(mcp, path)
         mcp.call("save_project", project=path)
     except ToolError as error:
         raise FixtureError(f"building {name}: {error}") from error
@@ -467,6 +472,39 @@ def _animated_ops(mcp, path):
     _call(mcp, "set_action_end", path, clip=clip, action=actions[0], patch={
         "graphic": {"props": {"size": 96, "accent": "#2d7ff9", "boxed": False}}})
     return {"graphic": clip}
+
+
+def _matte_ops(mcp, path):
+    """Mattes MT4 (#240, spec §11 MT-7): back to front "Video" (`speech.mov`),
+    "Window" (a white-filled rectangle, an `alpha` matte that cuts Video) and "Stray" (a
+    text clip, a `luma_inverted` matte with a matte behind it, so it cuts
+    nothing) — both header tags, both lanes and the Clip tab's note (10c)."""
+    _call(mcp, "set_track", path, track=1, name="Video")
+    for track in ("Window", "Stray"):
+        _call(mcp, "add_track", path, name=track)
+    tracks = {t["name"]: t["id"] for t in _project(mcp, path)["tracks"]}
+
+    def clip_on(track):
+        clips = [c for c in _project(mcp, path)["clips"] if c["track"] == tracks[track]]
+        if len(clips) != 1:
+            raise FixtureError(f"building matte: track {track} holds {len(clips)} clips, not 1")
+        return clips[0]["id"]
+
+    ids = {}
+    video = _call(mcp, "import_media", path, path=os.path.join(MEDIA, "speech.mov"))
+    _call(mcp, "add_clip", path, media=_media_id(video), track=tracks["Video"], at=0)
+    ids["video"] = clip_on("Video")
+    _call(mcp, "add_shape_clip", path, track=tracks["Window"], at=0, duration=5 * SECOND,
+          shape="rectangle")
+    ids["window"] = clip_on("Window")
+    # Filled, so the preview shows the video through a solid window.
+    _call(mcp, "set_shape", path, clips=[ids["window"]], patch={"fill": [1.0, 1.0, 1.0, 1.0]})
+    _call(mcp, "add_text_clip", path, track=tracks["Stray"], at=0, duration=5 * SECOND,
+          text="Reelcut")
+    ids["stray"] = clip_on("Stray")
+    _call(mcp, "set_track", path, track=tracks["Window"], matte="alpha")
+    _call(mcp, "set_track", path, track=tracks["Stray"], matte="luma_inverted")
+    return ids
 
 
 def _media_id(answer):

@@ -546,6 +546,13 @@
    ],
    "note": "an edit or a playhead move"
   },
+  "setTrackMatte:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+Matte.swift `func setTrackMatte(`"
+   ],
+   "note": "an edit or a playhead move"
+  },
   "addMarker:": {
    "verdict": "none",
    "code": [

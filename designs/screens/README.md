@@ -114,6 +114,12 @@ Built by `screens.py` on the first screen that names one, into
   `boxed` false (`set_action_end`'s graphic group, spec §11 G-34). A playhead
   inside the span selects the action (CI-1), so the Graphic tab shows the
   action's end.
+- `matte` — `Matte.reelcut` (mattes MT4, spec §11 MT-7): three tracks, back to
+  front Video, Window and Stray, one clip each, all starting at 0: `video` —
+  `media/speech.mov`; `window` — a white-filled rectangle, 5 s, on an `alpha`
+  matte track (it cuts Video); `stray` — a text clip reading "Reelcut", 5 s, on
+  a `luma_inverted` matte track with a matte behind it (it cuts nothing). Ready
+  once `video`'s peaks are cached.
 
 ## Adding a screen
 

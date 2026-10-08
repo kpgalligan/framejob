@@ -31,4 +31,18 @@ enum TrackMatte: String, Codable, CaseIterable {
     /// The code the matte resolve pass's uniform carries: the case index,
     /// `none` 0 to `lumaInverted` 4.
     var shaderCode: Float { Float(TrackMatte.allCases.firstIndex(of: self) ?? 0) }
+
+    /// The track `track` cuts (MT-2), the core's `matte_target` for the
+    /// CHROME only — the header's tag, the lane's bracket and the Clip tab's
+    /// note; what is drawn is the recipe's. The track directly behind it in
+    /// `tracks` (one container, back first), when that track is not itself a
+    /// matte track; nil for an ordinary track, a back-most matte track, a
+    /// matte in front of a matte and an id `tracks` does not hold.
+    static func target(of track: UInt32, in tracks: [TrackSnapshot]) -> UInt32? {
+        guard let index = tracks.firstIndex(where: { $0.id == track }),
+              tracks[index].matte != .none, index > 0
+        else { return nil }
+        let behind = tracks[index - 1]
+        return behind.matte == .none ? behind.id : nil
+    }
 }

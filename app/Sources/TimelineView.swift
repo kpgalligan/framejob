@@ -338,6 +338,7 @@ final class TimelineView: NSView, NSTextFieldDelegate {
     /// bounds change on the clip view, and this is the handler.
     private func pinFloatingBands() {
         let visible = scrollView.contentView.bounds
+        invalidateMatteBrackets(movingTo: max(visible.minX, 0))
         pinnedX = max(visible.minX, 0)
         pinnedY = max(visible.minY, 0)
         ruler.frame = NSRect(
@@ -1643,8 +1644,11 @@ final class TimelineHeaderView: NSView {
 
             TimelineDraw.label(
                 track.name.isEmpty ? "Track \(index + 1)" : track.name,
-                in: CGRect(x: 8, y: rect.minY + 2, width: bounds.width - 14, height: 13),
+                in: CGRect(
+                    x: 8, y: rect.minY + 2,
+                    width: bounds.width - 14 - matteTagWidth(track, rowHeight: height), height: 13),
                 font: DS.sans(11, weight: .semibold), color: DS.textStrong)
+            drawMatteTag(track, row: rect, tracks: owner.snapshot.tracks)
 
             let toggles: [(TimelineHeaderButton, String, String, Bool)] = [
                 (.hidden, track.hidden ? "eye.slash" : "eye", "H", track.hidden),
