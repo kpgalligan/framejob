@@ -127,7 +127,7 @@ detail there.
   out of `ProjectSnapshot.swift` because a stored property cannot be added
   from an extension. `RecipeReveal` reads and writes its OWN keys — siblings of
   `hash` and `text` in the `text` source — through `init(siblingsOf:)` and
-  `encodeSiblings(to:)`, so a new recipe key costs `ProjectSnapshot.swift`
+  `encodeSiblings(to:)`, so a new recipe key costs `FrameRecipe.swift`
   nothing; a key spelled other than the snake-case converter spells it
   decodes silently to that key's default (the amount to 1, the rest to nil).
   `ProjectSnapshot+Graphic.swift` mirrors
@@ -1042,7 +1042,12 @@ the key map behind it.
   `ReelcutGraphicPrefetchOff` (YES) is the measurement switch; each session
   logs one `[reelcut] graphic prefetch: …` line once it is stopped and its
   last worker has exited.
-- `Compositor.swift` · `CompositorEffects.swift` · `Resources/Shaders/Compositor.metal`
+- `FrameRecipe.swift` — the frame recipe's Swift side (spec §7.3), decoded
+  leniently: `RecipeCanvas`, `RecipeSourceRef`, `RecipeTransition`,
+  `RecipeClipRect`, `RecipeLayer` and `FrameRecipe` with the canvas hit test
+  `layer(at:measuring:)`, out of `ProjectSnapshot.swift`.
+- `Compositor.swift` · `Compositor+Shadow.swift` · `CompositorEffects.swift` ·
+  `Resources/Shaders/Compositor.metal`
   — the per-layer pass. The uniform block's field ORDER is a contract with the
   shader checked only by reading both, so change them in one edit; it is 104
   floats and **the padding tail is EMPTY** (the next field needs three
@@ -1051,7 +1056,11 @@ the key map behind it.
   OFF, or the finished pixel is blended twice — invisible over an opaque
   destination, so a proof of it reads the ALPHA channel over a translucent
   one. A shadow's silhouette pass takes `maskState`, the gather
-  specialization without the blend (defensive, not load-bearing). Blending
+  specialization without the blend (defensive, not load-bearing). A shadow's
+  three passes and its canvas-sized pair are `Compositor+Shadow.swift`'s
+  (`encodeShadow`); a layer's uniforms and source texture are made by
+  `prepare` in `CompositorEffects.swift`, which `render` calls once per layer.
+  Blending
   is in the ENCODED sRGB space, deliberately. `[[position]]` arrives in
   DESTINATION pixels, and `canvasPerDestX/Y` is what turns it into canvas
   pixels — an invariant that held only because the two had always been

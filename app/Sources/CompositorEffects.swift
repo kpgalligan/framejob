@@ -1,3 +1,5 @@
+import AVFoundation
+import CoreVideo
 import Metal
 
 /// The M3 effect block of `LayerUniforms`: filters, reflection, spotlight and
@@ -356,6 +358,51 @@ extension MetalRenderer {
         encoder.setFragmentTexture(texture, index: 0)
         encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
     }
+
+    /// One recipe layer made ready to draw: its uniform block, with the
+    /// source's size, premultiplication and orientation filled in, and the
+    /// texture its fragment stage samples. nil is "draw nothing" — a layer
+    /// with no drawn opacity, or a track with no frame at this time.
+    func prepare(
+        _ layer: RecipeLayer, among layers: [RecipeLayer], canvas: RecipeCanvas,
+        destination: CGSize, request: AVAsynchronousVideoCompositionRequest,
+        instruction: RecipeInstruction?, live: inout [CVMetalTexture]
+    ) -> PreparedLayer? {
+        let partner = layer.transition.flatMap { transition in
+            layers.first { $0.clip == transition.partner }
+        }
+        guard
+            var uniforms = self.uniforms(
+                for: layer, canvas: canvas, destination: destination, partner: partner)
+        else { return nil }
+        let texture: MTLTexture
+        switch source(for: layer, request: request, instruction: instruction, live: &live) {
+        case .textured(let resolved, let size, let premultiplied, let orientation):
+            texture = resolved
+            uniforms.sourceWidth = Float(size.width)
+            uniforms.sourceHeight = Float(size.height)
+            uniforms.premultiplied = premultiplied ? 1 : 0
+            uniforms.sourceQuarterTurns = Float(orientation & 3)
+            uniforms.sourceMirrored = orientation & 4 != 0 ? 1 : 0
+        case .slate(let size):
+            texture = placeholder
+            uniforms.sourceWidth = Float(size.width)
+            uniforms.sourceHeight = Float(size.height)
+            uniforms.slate = 1
+        case .absent:
+            // A composition track with no frame at this time: a gap, not
+            // an error. Nothing to draw.
+            return nil
+        }
+        return PreparedLayer(uniforms: uniforms, texture: texture)
+    }
+}
+
+/// What `MetalRenderer.prepare` hands `render`: a layer's uniform block and
+/// the texture it samples.
+struct PreparedLayer {
+    var uniforms: LayerUniforms
+    let texture: MTLTexture
 }
 
 /// `value` into 0…1 as a `Float`. Spelled out once because the effect block

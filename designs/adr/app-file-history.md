@@ -460,9 +460,18 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   `TextProps.swift`, `ProjectSnapshot+Graphic.swift`, `MediaSnapshot.swift` (issue batch
   B78, a pure move gated alone before `original` landed) and `ActionSnapshot.swift` (issue batch
   B87 phase 3: `// MARK: - Actions`, `ActionPatch` and `ActionSnapshot`, a pure move gated alone
-  before `ActionGraphicPatch` landed). The next seam: the frame recipe (`// MARK: - Frame recipe
-  (spec §7.3)`) or the composition plan (`// MARK: - Composition plan (spec §7.2)`), each out
-  whole.
+  before `ActionGraphicPatch` landed) and `FrameRecipe.swift` (the mattes road map's MT1, issue
+  batch B89: `// MARK: - Frame recipe (spec §7.3)` out whole, a pure move gated alone before the
+  matte keys landed). The next seam: the composition plan (`// MARK: - Composition plan (spec
+  §7.2)`), out whole.
+- `Compositor.swift`: the mattes road map's MT1 (issue batch B89) moved `// MARK: - Shadows`
+  through `blurKernel`, with `ShadowSurfaces`, to `Compositor+Shadow.swift`, and `render`'s
+  per-layer uniforms-and-source block to `prepare` in `CompositorEffects.swift`, a pure move gated
+  alone before the matte pass landed (`DestinationPass`, `device`, `pipeline`, `shadowPipeline`,
+  `sampler`, `placeholder`, `blurSupported`, `shadowSurfaces`, `blurKernels`, the two sigma
+  constants, `uniforms(for:…)`, `source(for:…)`, `LayerSource` and `encodeShadow` lost
+  `private`). The next seam: `MetalRenderer`'s uniforms section (its `// MARK: - Uniforms`, not the file-level one above `LayerUniforms`: `uniforms(for:…)`,
+  `partnerBox`, `clearColor`), moved with `word_looks_proof.py`'s D1 anchor re-pinned.
 - `ReelCore.swift`: the typed patches moved to `TypedPatches.swift` in issue batch B73 (#216), a
   pure move gated alone before `ReelContainer` landed; no further seam is named. The `dictionary`
   extensions went to `OpDictionaries.swift` in issue batch B52b (#190), the media helpers earlier

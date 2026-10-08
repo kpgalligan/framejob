@@ -255,7 +255,7 @@ final class VideoPane: InspectorPaneView {
     /// is the half the first version left out. `blendPremultiplied`'s
     /// `(1 - ab)·src` term carries the source through an empty destination:
     /// at `ab` = 0 the whole formula reduces to `src` exactly, for all eight
-    /// modes — the same property `Compositor.swift`'s shadow mask relies on.
+    /// modes — the same property `Compositor+Shadow.swift`'s shadow mask relies on.
     /// So over a TRANSPARENT canvas `multiply` renders the layer untouched,
     /// and a note reading "multiply reads black here" would name the opposite
     /// of what is on screen. Between the two the composite is a partial

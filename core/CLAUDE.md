@@ -447,8 +447,9 @@ governs a module now.
   and the `assign()` the recipe shares with it. `assign` leaves a clip's audio
   out above `AUDIO_SPEED_MAX`, and `place` gives every plan audio track ONE
   `pitch` (#190, #211).
-- `recipe.rs` · `recipe_text.rs` — `frame_recipe(t)`: the layer list at one
-  instant. `RecipeLayer` is the twenty keys of a layer written in ONE place
+- `recipe.rs` · `recipe_layer.rs` · `recipe_text.rs` — `frame_recipe(t)`: the
+  layer list at one instant. `RecipeLayer` (`recipe_layer.rs`, re-exported by
+  `recipe.rs`) is the twenty keys of a layer written in ONE place
   (`RecipeLayer.init(from:)` on the Swift side defaults a missing key
   silently, so a copied skeleton drifts with no diagnostic). `RecipeOptions`
   is what a caller wanted besides `t` — the burn-in timecode — and is a

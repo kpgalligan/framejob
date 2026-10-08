@@ -60,7 +60,7 @@ Each phase is committed alone, after its review.
 | Phase | What | State |
 |---|---|---|
 | MT0 | MT-1..MT-6 recorded in spec §11 before any code; the matte spike (`tools/proof/matte_spike/`): the route for an unmatted layer and the matte's cost at 1080p and 4K | done (below) |
-| MT1 | Tolls, pure moves: `recipe_layer.rs` out of `recipe.rs`, `Compositor+Shadow.swift` and `prepare` out of `Compositor.swift`, `FrameRecipe.swift` out of `ProjectSnapshot.swift` | — |
+| MT1 | Tolls, pure moves: `recipe_layer.rs` out of `recipe.rs`, `Compositor+Shadow.swift` and `prepare` out of `Compositor.swift`, `FrameRecipe.swift` out of `ProjectSnapshot.swift` | done (below) |
 | MT2 | The matte end to end over MCP, top level and nested levels: `tracks[].matte` (format 14), `set_track {matte}`, the recipe's `matte` and `mattes`, the mask and resolve passes, `matte_proof.py` | — |
 | MT3 | Nests (`nest` / `unnest`), dissolves, shadow, reflection, Preview Quality, every export | — |
 | MT4 | The chrome (MT-7 recorded first): Track ▸ Matte, the context submenu, the header tag, the lane, the Clip tab's note | — |
@@ -131,3 +131,55 @@ resolve returns 1 everywhere) failed K3 and K4 at both sizes for both routes
 (outside pixels read the picture, e.g. `[0, 140, 40, 255]` for
 `[153, 102, 51, 255]`); `anchor-missing` (V1's step-7 anchor misspelt) failed
 B0 ("the step 7 anchor occurs 0 times, not once").
+
+## MT1 — tolls, pure moves, no behaviour (2026-10-08)
+
+**What moved.** Three files over or at the size rule paid before MT2 adds to
+them, each a pure move:
+
+- `core/src/recipe.rs`: `RecipeLayer` and its `object()` went whole to the new
+  `recipe_layer.rs` (with a `//!` doc and its own imports); `recipe.rs`
+  re-exports it (`pub(crate) use crate::recipe_layer::RecipeLayer;`), so
+  `recipe_text.rs`'s burn-in is unchanged, and lost the `VideoProps` import
+  only the struct read.
+- `app/Sources/Compositor.swift`: `// MARK: - Shadows` through `blurKernel`,
+  with `ShadowSurfaces`, went whole into an `extension MetalRenderer` in the
+  new `Compositor+Shadow.swift`; `render`'s per-layer block (the partner, the
+  uniforms, the source switch) became `prepare` in `CompositorEffects.swift`,
+  returning a `PreparedLayer` (nil where the loop used to `continue`), and
+  `render` calls it. `private` came off what the moved code and `prepare`
+  read: `DestinationPass`, `device`, `pipeline`, `shadowPipeline`, `sampler`,
+  `placeholder`, `blurSupported`, `shadowSurfaces`, `blurKernels`, the two
+  sigma constants, `uniforms(for:…)`, `source(for:…)`, `LayerSource`, and
+  `encodeShadow` itself, which `render` calls across the file boundary.
+- `app/Sources/ProjectSnapshot.swift`: `// MARK: - Frame recipe (spec §7.3)`
+  went whole to the new `FrameRecipe.swift`.
+
+Each moved block was diffed against the original lines: byte-identical but
+for `encodeShadow`'s `private`. Two comments the move made false name the new
+file: `recipe_layer.rs`'s pointer to `RecipeLayer.init(from:)` (now
+`FrameRecipe.swift`) and `VideoPane.swift`'s to the shadow mask (now
+`Compositor+Shadow.swift`).
+
+| File | Before | After |
+|---|---|---|
+| `core/src/recipe.rs` | 596 | 511 |
+| `core/src/recipe_layer.rs` | — | 94 |
+| `core/src/lib.rs` | 111 | 112 |
+| `app/Sources/Compositor.swift` | 1396 | 1120 |
+| `app/Sources/Compositor+Shadow.swift` | — | 263 |
+| `app/Sources/CompositorEffects.swift` | 371 | 418 |
+| `app/Sources/ProjectSnapshot.swift` | 2182 | 1866 |
+| `app/Sources/FrameRecipe.swift` | — | 317 |
+
+**Scores** (a pure move adds no decision, so no mutants; passing is every
+score equal to its last recorded run, 168/168 and 150/150 in road map 9):
+`cargo test --release --test recipe` 15/15; `make lint` and `make typecheck`
+clean (the four baseline warnings); on Debug, `phase6_proof.py` 168/168 and
+`phase8_chrome.py` 150/150. `make gate` passed twice in the foreground, the
+second after the two comment fixes (typecheck, fmt, lint, test 129 s, app;
+221 s). The recorded run, on the gate's final Release build:
+`phase6_proof.py` 168/168, no `Reelcut: ` line before or after;
+`phase8_chrome.py` 150/150 (it builds its probes from `app/Sources` through
+`swift_build.py` and drives no built app, so `RC_PROOF_APP` does not reach
+it). Every score equals its last recorded run.

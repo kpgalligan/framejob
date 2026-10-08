@@ -223,7 +223,10 @@ The size rule is in the root `CLAUDE.md` and `core/CLAUDE.md`; which modules are
 
 ## Open items
 
-- `recipe.rs` is at 596 of ~600 and `evaluate.rs` 590 (since B52b moved `lifted` to `nest.rs`).
+- `evaluate.rs` is at 590 of ~600 (since B52b moved `lifted` to `nest.rs`).
+- `recipe.rs` paid its toll in the mattes road map's MT1 (issue batch B89), a pure move gated
+  alone before the matte keys landed: `RecipeLayer` and its `object()` went whole to
+  `recipe_layer.rs`, which `recipe.rs` re-exports, taking it from 596 to 511 lines.
 
 ## Where to look in the original
 
