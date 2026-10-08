@@ -18,7 +18,7 @@ DEBUG_APP_PATH := $(BUILD_DIR)/Build/Products/Debug/$(APP).app
 unexport RC_ASSEMBLYAI_KEY
 unexport ANTHROPIC_API_KEY
 
-.PHONY: all app app-debug dist rust test lint fmt typecheck project run clean prices
+.PHONY: all app app-debug dist rust test lint fmt typecheck project run clean prices gate
 
 all: app
 
@@ -53,6 +53,7 @@ test: rust
 	python3 tools/proof/spec_index_proof.py
 	python3 tools/proof/swift_build.py --selftest
 	python3 tools/proof/proof_app.py --selftest
+	python3 tools/proof/gate.py --selftest
 	python3 tools/proof/proof_defaults.py --ran assistant_lane_probe --ran assistant_prompt_probe
 
 lint:
@@ -105,6 +106,14 @@ dist: app
 		-derivedDataPath $(BUILD_DIR) build
 	python3 tools/proof/dist_check.py --release "$(APP_PATH)" --dist "$(DIST_PATH)"
 	python3 tools/proof/published_check.py --app "$(DIST_PATH)"
+
+# The one Full verification command (issue batch B88, tools/proof/gate.py):
+# typecheck (exactly its four baseline warnings), fmt --check, lint, test, then
+# app with dist_check's D25/D26 over the Release app; serial, stopping at the
+# first failure, skipping a step whose inputs and tools are byte-identical to
+# its last pass. Its state is build/gate/. `GATE_ARGS=--force` runs every step.
+gate:
+	python3 tools/proof/gate.py $(GATE_ARGS)
 
 # Fast compile check of the Swift sources without a full Xcode build.
 # `-D REELCUT_DEV_TOOLS` as Debug and Release set it (project.yml); the

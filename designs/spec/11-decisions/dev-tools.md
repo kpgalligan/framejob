@@ -5,7 +5,7 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
 
 The road map that made these is closed; its condensed record is
 `designs/adr/roadmap-11-dev-tools.md` (the original is `archive/reelcut-roadmap-11.md`).
-V-4 and V-5 come from the build-velocity road map (`designs/build-velocity.md`).
+V-4 and V-5 come from the build-velocity road map, now closed: `designs/adr/build-velocity.md` (the original is `archive/build-velocity.md`).
 
 - **V-1 — Dev tools are compiled only under `REELCUT_DEV_TOOLS`, and the shipping build is
   the Distribution configuration, which does not set it.** Debug and Release set the flag;

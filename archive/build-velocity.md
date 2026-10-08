@@ -67,6 +67,11 @@ Each phase is committed alone, in this order.
   `debug_release_proof.py` is the evidence that the two answer, render and
   export alike; a proof that needs a TCC grant or measures time or
   throughput passes `release_only=`.
+- **One gate over the Full tier** (phase 4): `make gate` runs typecheck,
+  fmt, lint, test and app serially, skips a step whose files' content and
+  tools are byte-identical to its last pass, and stamps a pass only when the
+  inputs did not change while it ran. Its `app` step also reads the Release
+  app's entitlements and seal (dist_check D25, D26).
 - Owner rulings that bind every phase: one mutant per new decision (usually
   3–8; more than 10 only with a written reason); Debug while working, Release
   built and checked once at each phase's end; no override variable for the
@@ -525,3 +530,94 @@ still passing. `make dist` twice (6 s, 4 s; the second ran no CodeSign task)
 `dist_check: 27/27` and `published_check: 16/16` each; `dist_check_mutants.py`
 23/23; `dist_check.py --dist /nonexistent/Reelcut.app` 14/27, exit 1, the
 D27 row joining D14's.
+
+### Phase 4 — the gate, the Verification rule, the close (2026-10-08)
+
+**Landed.** `tools/proof/gate.py` (new, 400 lines): `make gate` runs
+`typecheck` (`make typecheck`; no `error:` and exactly the four baseline
+warnings, `TYPECHECK_BASELINE`, by file basename and message), `fmt` (`cargo
+fmt --check` in the three crates), `lint`, `test` and `app` serially under
+300/120/600/900/1500 s bounds, stopping at the first failure. A step is
+skipped when its hash — sha256 over the content of its own files among `git
+ls-files -co --exclude-standard`, `gate.py` and the `Makefile` in every step,
+and the eight tools' version output — equals its last pass; the hash is taken
+before and after the step and the pass is stamped only when they are equal.
+Writes go only under `build/gate/` (`lock`, `state.json`, `<step>.log`,
+`times.tsv`). `Makefile`: `gate` (with `GATE_ARGS`) in `.PHONY`, and `make
+test` runs `gate.py --selftest` before `proof_defaults.py`. `README.md`'s
+Building block has `make gate`; `tools/proof/README.md` has "The gate
+(gate.py)". The citations of this file in `tools/proof/README.md` and
+`designs/spec/11-decisions/dev-tools.md` now name `archive/build-velocity.md`
+and the ADR (dev-tools.md keeps its line count).
+
+**Phase 3's gap, closed.** The `app` step runs dist_check's D25 (the
+Release app's entitlements are exactly `audio-input` and `get-task-allow`)
+and D26 (`codesign --verify --deep --strict`) after `make app`, through
+`dist_check`'s own functions, so the gate's Release build is checked for the
+no-op-signing defect without the Distribution build; D27 and the other
+dist_check rows still run only in `make dist`. `tools/proof/dist_check.py` is
+therefore one of the `app` step's files. Measured on scratch copies of the
+Release app: an untouched copy passes both; a byte appended to its
+`agent-catalog.json` fails D26 alone ("a sealed resource is missing or
+invalid"); the executable then re-signed alone with `codesign -s - -f`, as
+Write Agent Catalog does, fails D25 alone (the entitlements do not parse;
+the re-sign re-sealed the bundle).
+
+**V-4 against the code.** `release_only` is enforced (`proof_app.config`
+answers Release and refuses a Debug path); "the gate's build is Release" is
+carried by the `app` step's `make app`; "the run a phase records is on
+Release" is a RULE, the root `CLAUDE.md`'s Verification section
+(`RC_PROOF_APP=release` after the gate's `make app`) — nothing can see which
+build a recorded run drove.
+
+**Deviations.** (1) A `*.md` counts in no step but under `designs/spec/` and
+`docs/` (for `test`) and as `docs/graphics-api.md` (for `app`); the spec
+listed `agent` for `typecheck` without saying so, and `agent/` has no
+`*.md` today. (2) `tools/proof/dist_check.py` joins the `app` step's files
+(above). (3) Four selftest mutants, one per decision the gate adds that a
+pure row can reach: `no-tools` (H2), `stamp-always` (H3), `md-counted`
+(M4–M6), `warning-count` (W2), each `MUTANT PASS`. (4) The first cold `make
+gate` FAILED at `test`: `swift_build.py`'s G1 flagged `gate.py` itself,
+which held a swiftc argv (the fingerprint's `xcrun swiftc --version`) and
+the bridging header's name (a selftest path). The selftest path became
+`app/Bridging/x.h`. The same run showed PASS rows that quote `error:` among
+the five FAIL lines, so a line beginning `PASS` or `ok` is no longer one.
+
+**Scenarios** (`make gate`, 2026-10-08 02:51–03:06, powermode 0; each edit
+restored byte-for-byte with `cp` and `cmp`):
+
+| Scenario | Ran | Result |
+|---|---|---|
+| cold (no `build/gate/`) | all five | PASS 74 s (test 63 s; app 4 s, a no-op build), D25 and D26 ok |
+| unchanged | none | PASS 0.37 s wall |
+| a `README.md` edit (this phase's line) | none | PASS 0 s |
+| a held lock, `--wait 2` | none | `gate: BLOCKED (build/gate/lock)`, exit 3, 2.1 s |
+| a type error in `ActionBands.swift` | typecheck | FAIL, the error line named |
+| a fifth warning (`var` never mutated) | typecheck | FAIL, `new warning: ActionBands.swift: variable 'unchanged' was never mutated…` |
+| a `core/src` comment (Rust only) | fmt, lint, test, app; typecheck skip | PASS 203 s |
+| a `clone_on_copy` added on top | fmt, lint | lint FAIL, clippy's error lines named |
+| a line added to a spec file | fmt (still at the clippy state), test | test FAIL, spec_index_proof's two Lines rows named |
+| the Rust comment restored, a root file added 25 s into `test` | fmt, lint, test, app | PASS, `test pass, not stamped`, last line `(not stamped: test)`; `app` stamped |
+| a one-line Swift comment | typecheck, test, app; fmt, lint skip | PASS 173 s (probes built 14.6 s, 15.4 s) |
+| restored | typecheck, test, app | PASS 142 s (probes reused); every stamp equal to the cold run's |
+| unchanged | none | PASS 0.38 s wall |
+| this phase's citation in `dev-tools.md` (a spec file), on the final tree | test | PASS 64 s: cargo 100 `ok`, 0 FAILED; lane 18/18, prompt 14/14, prices 27/27, budget 23/23, inventory 5/5, spec index 141/141, swift_build 10/10, proof_app 15/15, gate 33/33, proof_defaults exit 0 (one probe domain left busy, swept later) |
+| unchanged, the final tree | none | PASS 0.37 s wall |
+
+**Headline timings on the final tree** (load in brackets; before = phase
+1a's at fe22fac, or no Debug app):
+
+| Command | Before | After |
+|---|---|---|
+| `make typecheck` | 81 s | 3.7 s (3.8 → 5.0) |
+| `make test`, nothing changed (the gate's step, probes reused) | — | 63 s (6.2 → 3.3) |
+| `make test` after a one-line Swift comment | 307 s | 94 s (7.5 → 6.2) |
+| `make app-debug` after a one-line Swift comment | — (the loop was `make app`, 73 s) | 5.3 s (2.2) |
+| `make app` after a one-line Swift comment (the gate's step) | 73 s | 75 s (unchanged by design) |
+| `graphics_inspector_proof.py --mutant popup-fixed-width` | 112.5 s | 21 s, probe 18.0 s (3.5 → 7.2) |
+| `make gate`, nothing changed | — | 0.4 s |
+| `make gate` after a one-line Swift comment | ≈ 461 s as three commands | 173 s |
+
+**Verified.** `gate.py --selftest` 33/33 `PASS`; the four mutants each
+`MUTANT PASS`. `make gate` is the phase's Full command; its runs are the
+table above, the last on the final tree.

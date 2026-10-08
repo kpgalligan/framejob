@@ -434,6 +434,7 @@ make run        # build and launch
 make test       # Rust core, graphics and MCP proxy tests, then the agent lane's proof (tools/proof/assistant_lane_proof.py), the prompt texts' checks (tools/proof/assistant_prompt_proof.py --probe), the price function in both readers (tools/proof/prices_proof.py, no network) and the proofs' ledger and monthly budgets (tools/proof/budget_proof.py, no network)
 make lint       # cargo clippy --all-targets -D warnings
 make typecheck  # swiftc -typecheck of app/Sources — the ONLY authoritative Swift check, then agent/'s tsc --noEmit (through bun)
+make gate       # the whole check, in order: typecheck (its four known warnings and no other), cargo fmt --check, lint, test, then app with the Release app's signature checked; stops at the first failure and skips a step whose inputs and tools are unchanged since it last passed (build/gate/)
 make project    # xcodegen generate, with the base version from VERSION
 make prices     # regenerate agent/prices/anthropic.json from LiteLLM's price table (network); the file's only writer
 ```

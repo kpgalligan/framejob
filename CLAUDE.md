@@ -39,7 +39,7 @@ comment citing "road map N §x" refers to the archived original.
 | `designs/spec/` | **The normative spec, one file per section — never read it whole.** Start at its `README.md` (the index: each file, its size, what it answers), then read only the file you need; "spec §7.3" is `07.3-frame-recipe.md`. §5 schemas, §6 op table, §7 architecture, §9 keys and menus, §10 acceptance steps, §11 decisions already made — not to be re-litigated, indexed by ID in `11-decisions/README.md`. An ADR cites §11's IDs; it never replaces them. |
 | GitHub issues | **What is left**, and the one place it is kept: open defects, proof residue, candidates, accepted limits, work the user deferred (`gh issue list`), and one-off asks of the owner — a spend, a choice, a permission an agent was refused (`--label ready-for-human`). Nothing open is tracked in a document. |
 | `docs/manual-checks.md` | **What only a person at the machine can confirm**, as a standing list the owner runs periodically and before every release — not open work, so not an issue. A change that creates such a check adds or edits its row in the same change. |
-| `designs/adr/` | One condensed decision record per closed road map, survey or file history: why the code is the shape it is. Start with the one for the area: `roadmap-03` the recorder · `roadmap-04` `detect_silence` · `roadmap-05` transitions and `video.motion` · `roadmap-06` transcription (C2, the relay, designed and deferred) · `roadmap-07` how a patch is checked, what an op answers, where its arguments are written down, the source window, the argument gate · `roadmap-08` word captions · `roadmap-09` the Clip tab, the action lane, band drags · `roadmap-10` graphics · `roadmap-11` the dev tools (snapshot_ui, perform_menu_item, the screen catalog) and `make dist` · `roadmap-12` the assistant (the bundled helper, the agent lane, withheld and ask-first tools, the Assistant tab and its prompt) · `roadmap-13` pricing and spend (LiteLLM's table, the price function in the helper and the proofs, the spend ledger, the proofs' budgets, the tab's and Settings' spend figures) · `roadmap-14` the agent socket (the Unix socket, `reelcut-mcp` and its catalog snapshot, a tool call never asking, Copy MCP Command) · `app-file-history` / `core-file-history` why a file or module is cut where it is, and its named next cut · `rust-build-settings` why release builds are incremental with no LTO · `effects-survey` E3–E9 (deferred by the user) and **the Concat rule: it is AGPL-3.0; none of its code, shaders, chains or colour tables may be carried over** · `remaining-closed` the debts already paid. |
+| `designs/adr/` | One condensed decision record per closed road map, survey or file history: why the code is the shape it is. Start with the one for the area: `roadmap-03` the recorder · `roadmap-04` `detect_silence` · `roadmap-05` transitions and `video.motion` · `roadmap-06` transcription (C2, the relay, designed and deferred) · `roadmap-07` how a patch is checked, what an op answers, where its arguments are written down, the source window, the argument gate · `roadmap-08` word captions · `roadmap-09` the Clip tab, the action lane, band drags · `roadmap-10` graphics · `roadmap-11` the dev tools (snapshot_ui, perform_menu_item, the screen catalog) and `make dist` · `roadmap-12` the assistant (the bundled helper, the agent lane, withheld and ask-first tools, the Assistant tab and its prompt) · `roadmap-13` pricing and spend (LiteLLM's table, the price function in the helper and the proofs, the spend ledger, the proofs' budgets, the tab's and Settings' spend figures) · `roadmap-14` the agent socket (the Unix socket, `reelcut-mcp` and its catalog snapshot, a tool call never asking, Copy MCP Command) · `build-velocity` the probe builder (`swift_build.py`), the Debug app and its identity, the stale refusals (`proof_app.py`), Debug against Release, the gate · `app-file-history` / `core-file-history` why a file or module is cut where it is, and its named next cut · `rust-build-settings` why release builds are incremental with no LTO · `effects-survey` E3–E9 (deferred by the user) and **the Concat rule: it is AGPL-3.0; none of its code, shaders, chains or colour tables may be carried over** · `remaining-closed` the debts already paid. |
 | `designs/design_handoff_reelcut/` | The shipped chrome cleanup and identity; its README is normative for the redesign's metrics. |
 | `designs/design_handoff_reelcut_sharp/` | The sharp pass (2026-09-23): square chrome, 2 pt clips, the zoom slider's block knob. Its README is normative for radii and the knob, with spec §11 SH-2 as the deviation (SH-4 squared `StickerButton`, superseding SH-1). |
 | `designs/design_handoff_clip_inspector/` | The clip inspector handoff road map 9 built from; `designs/adr/roadmap-09-clip-inspector.md` records the deviations. |
@@ -53,9 +53,10 @@ comment citing "road map N §x" refers to the archived original.
 ```sh
 make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
 make app-debug  # make rust + make project + xcodebuild Debug → build/Build/Products/Debug/Reelcut.app, "Reelcut Debug" (com.kgalligan.Reelcut.debug; seconds after a one-file edit)
-make test       # make rust, cd core && cargo test --release, cd graphic && cargo test --release, cd mcp-proxy && cargo test --release (black-box tests), then tools/proof/assistant_lane_proof.py (the agent lane's probe, with the assistant's credential rows and the support folder's `0700` rows), tools/proof/assistant_prompt_proof.py --probe (the prompt texts' drift checks), tools/proof/prices_proof.py (the price function: prices.py and agent/'s `bun test` against agent/prices/cases.json, and update.py's reducer against reduce_cases.json, no network) and tools/proof/budget_proof.py (the proofs' ledger and the monthly budgets, over scratch ledgers, no network) and tools/proof/capture_spike/inventory.py --check (the menu inventory's sites, found by token and enclosing function, and its other citations, found by anchor, against app/Sources; no app) and tools/proof/spec_index_proof.py (the spec indexes' Lines cells against `wc -l`, and a row for every spec file; no app) and tools/proof/swift_build.py --selftest (the probe builder's key, reuse and digest check, and that no proof carries its own app swiftc line; one tiny build, no app) and tools/proof/proof_app.py --selftest (the stale-app refusal, the app choice and the Debug bundle id against project.yml, over scratch trees; no app) and tools/proof/proof_defaults.py --ran assistant_lane_probe --ran assistant_prompt_probe (the defaults removal recipe on a throwaway domain, its refusals over scratch folders, then the sweep of the proofs' own idle domains, and of the two probes this target ran, out of `~/Library/Preferences`; no app)
+make test       # make rust, cd core && cargo test --release, cd graphic && cargo test --release, cd mcp-proxy && cargo test --release (black-box tests), then tools/proof/assistant_lane_proof.py (the agent lane's probe, with the assistant's credential rows and the support folder's `0700` rows), tools/proof/assistant_prompt_proof.py --probe (the prompt texts' drift checks), tools/proof/prices_proof.py (the price function: prices.py and agent/'s `bun test` against agent/prices/cases.json, and update.py's reducer against reduce_cases.json, no network) and tools/proof/budget_proof.py (the proofs' ledger and the monthly budgets, over scratch ledgers, no network) and tools/proof/capture_spike/inventory.py --check (the menu inventory's sites, found by token and enclosing function, and its other citations, found by anchor, against app/Sources; no app) and tools/proof/spec_index_proof.py (the spec indexes' Lines cells against `wc -l`, and a row for every spec file; no app) and tools/proof/swift_build.py --selftest (the probe builder's key, reuse and digest check, and that no proof carries its own app swiftc line; one tiny build, no app) and tools/proof/proof_app.py --selftest (the stale-app refusal, the app choice and the Debug bundle id against project.yml, over scratch trees; no app) and tools/proof/gate.py --selftest (the gate's input classes, its stamp rule and its warning baseline, over synthetic digests; no tree, no app) and tools/proof/proof_defaults.py --ran assistant_lane_probe --ran assistant_prompt_probe (the defaults removal recipe on a throwaway domain, its refusals over scratch folders, then the sweep of the proofs' own idle domains, and of the two probes this target ran, out of `~/Library/Preferences`; no app)
 make lint       # cargo clippy --all-targets -- -D warnings, in core/, graphic/ then mcp-proxy/
 make typecheck  # swiftc -typecheck -D REELCUT_DEV_TOOLS of app/Sources/*.swift in batch mode on every core (seconds) — the ONLY authoritative Swift check, then agent/'s `tsc --noEmit` (through bun)
+make gate       # the one Full verification command: typecheck (exactly its four baseline warnings), cargo fmt --check, lint, test, app (and the Release app's entitlements and seal, dist_check D25/D26); serial, stops at the first failure, skips a step whose inputs and tools are byte-identical to its last pass (build/gate/)
 make project    # xcodegen generate with VERSION injected — never run a bare xcodegen, it leaves the version blank (Reelcut.xcodeproj is generated; project.yml is the source of truth)
 make run        # make app, then launch
 make dist       # make app, then the Distribution build (no dev tools, spec §11 V-1), tools/proof/dist_check.py and tools/proof/published_check.py (the check the publish workflow runs over the app it packs, spec §11 PUB-4)
@@ -72,7 +73,9 @@ make prices     # NETWORK: regenerate agent/prices/anthropic.json from LiteLLM (
   AVFoundation deprecations (3 in `CompositionBuilder.swift`, 1 in
   `Exporter.swift`), deliberate because their replacements are `async`-only
   and `async` is confined to `MediaImporter.swift` and `SpeechEngine.swift`
-  (spec §11 W-8). Any fifth warning is new and yours. It stops before
+  (spec §11 W-8). Any fifth warning is new and yours; `make gate` holds the
+  check to exactly those four (`TYPECHECK_BASELINE` in `tools/proof/gate.py`),
+  and a change that fixes one deletes its row there. It stops before
   SILGen, so a clean typecheck does not prove the app builds; only `make app`
   does.
 - A probe or the harness compiles ONLY through `tools/proof/swift_build.py`
@@ -136,7 +139,8 @@ docs/agents/         what the engineering skills read: tracker, labels, domain d
 docs/graphics-api.md the graphics reference an agent reads; graphic/tests/reference.rs runs every js block
 tools/proof/         mcp.py, the per-phase proof scripts, harness/ (offscreen chrome),
                      swift_build.py (the one probe build line and its cache),
-                     proof_app.py (which app a proof drives, and the stale refusal)
+                     proof_app.py (which app a proof drives, and the stale refusal),
+                     gate.py (make gate: the Full tier, skipping what already passed)
 .github/             workflows/publish.yml (the publish branch's signed, notarized DMG, spec §11
                      PUB-1..PUB-5) and ExportOptions.plist (its developer-id export)
 project.yml          xcodegen definition; Makefile; README.md (user-facing)
@@ -206,9 +210,8 @@ else is what bloats files:
 5. **Documents:** spec §5.2 / §6 / §7.10 for anything they mirror; the map
    entry in the per-side `CLAUDE.md` if a file's role changed; the README's
    feature bullets; the phase's record in its road map.
-6. **Verify:** `make test`, `make lint`, `make typecheck`, `make app`; then a
-   proof script in `tools/proof/` that has been made to fail on purpose; then
-   read the change back adversarially before committing.
+6. **Verify:** as "Verification" below says; then read the change back
+   adversarially before committing.
 
 ## Rules
 
@@ -345,6 +348,35 @@ one that does not relaunches between proof sessions.
 Spec §10's per-step verifications are the acceptance tests. What no script
 can answer — step 4's "the clip plays with audio", step 5's 60 fps, and the
 rest — is a row in `docs/manual-checks.md`, which the owner runs.
+
+## Verification
+
+- **In the loop:** a targeted test (`cd core && cargo test --release --test
+  <file> <filter>`), `make lint` after Rust edits, `make typecheck` after Swift
+  edits, `make app-debug` before driving the app, and the phase's own rows
+  (`--only` where the proof has it) against Debug.
+- **Once, when the code is complete:** `make gate`, in the foreground, under
+  the 600 s tool cap (`make gate GATE_ARGS=--force` only when a stamp itself is
+  in doubt). It stops at the first failure and skips a step whose inputs and
+  tools are byte-identical to its last pass, so after a fix it re-runs only
+  what the fix can change. Never run one of its steps by hand to stand in for
+  it, never re-run an unchanged step, and never run anything twice with no
+  edit between.
+- **The proof a phase records** runs whole once, on the final instrument,
+  against Release (`RC_PROOF_APP=release` after the gate's `make app`), with
+  any `release_only` proof the change touches. This is a rule: nothing checks
+  which build a recorded run drove.
+- **A proof that fails only on Debug** is pinned `release_only="<reason>"` in
+  the change that finds it (spec §11 V-4); an assert trap on Debug is a defect
+  to fix, never a pin.
+- **Mutants** target the decisions the phase adds: about one per new branch,
+  threshold, refusal or ordering, usually 3–8; more than 10 only with a reason
+  written in the spec. The full set runs once, at the end, on the final
+  instrument.
+- **A fix pass** re-runs only the rows whose instrument code it changed and
+  the mutants whose anchor lines it touched, then `make gate`.
+- **Background** only for a command that cannot fit 600 s, waited on once with
+  a bound; never a poll loop.
 
 ## Seeing the chrome
 

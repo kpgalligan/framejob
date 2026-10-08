@@ -1643,7 +1643,7 @@ is a folder's `*.swift` but `main.swift`, sorted.
 sources. Phase 1a moved `harness/build.sh`, and the `build_probe` of
 `assistant_lane_proof.py`, `assistant_prompt_proof.py` and
 `graphics_inspector_proof.py`; phase 1b the other 68 scripts' own lines
-(`designs/build-velocity.md` lists them). Each keeps its defines, its entry and
+(`archive/build-velocity.md` lists them). Each keeps its defines, its entry and
 extra files, its optimisation (`speed_limits_probe.py`: `-O`, whole-module),
 its link arguments (`recording_probe.py`'s voice-over probe: `-sectcreate
 __TEXT __info_plist <plist>`, the plist also a `link_inputs` entry so its bytes
@@ -1684,7 +1684,7 @@ seconds.
 (serial) → 15.1 s (`-j`); the lane probe cold 110 s → 17.2 s; `make test`
 after a one-line Swift comment 307 s → 109 s; `graphics_inspector_proof.py
 --mutant popup-fixed-width` 112.5 s → 19.7 s. The full table is
-`designs/build-velocity.md`. **Machine code**: the `__TEXT,__text` section
+`archive/build-velocity.md`. **Machine code**: the `__TEXT,__text` section
 (`segedit <bin> -extract __TEXT __text`) of the serial line's binary and the
 helper's is byte-equal for the harness and for the lane probe; CONTROL two
 serial harness builds are equal; sensitivity one source changed (`0o700` →
@@ -1720,7 +1720,7 @@ on Release passes `release_only="<why>"`: Release unless a path is given, and
 a path in a `Debug` products folder is refused with the reason. A tree copy
 builds through `tree_copy.build_app(dest, seconds)`: `make app-debug` or
 `make app` there, as the choice says. 32 proofs take their default app from
-`proof_app` (the list is `designs/build-velocity.md`'s phase 2 record), and
+`proof_app` (the list is `archive/build-velocity.md`'s phase 2 record), and
 17 build their tree-copy mutants through `build_app`. Release-only proofs
 pass `release_only=` (`git grep release_only= tools/proof`): a proof that
 needs a TCC grant, or that measures time or throughput, runs on Release
@@ -1731,7 +1731,7 @@ at its socket, so start that one with `proof_app.py launch --app release`) and
 on Debug its render_frame took 2.04 s of the 3 s bound, so it was pinned); the
 18 app-driving proofs changed since issue batch B80 each scored their full
 score on Debug, the two with a recorded Release time (agent_socket_proof
-135 s, export_cancel_proof 256 s) faster on Debug (`designs/build-velocity.md`'s
+135 s, export_cancel_proof 256 s) faster on Debug (`archive/build-velocity.md`'s
 phase 3 record has the table).
 
 **Debug against Release (`debug_release_proof.py`).** The evidence for spec
@@ -1798,6 +1798,85 @@ its proof (child `write-rehomed` under `RC_PROOF_APP=release`, status 3 with
 `DEFAULTS MOVED in com.kgalligan.reelcut.defaults-proof` last), and its
 `no-rehome` mutant fails G6 alone; R1 and R2 guard the `--app`'s own domain
 and name it. `proof_defaults.py`'s P3 refuses `com.kgalligan.Reelcut.debug`.
+
+## The gate (gate.py)
+
+`gate.py` (issue batch B88 phase 4) is `make gate`, the one Full
+verification command. It uses the standard library; only its `app` step
+imports `dist_check`.
+
+```
+make gate                                   # or: python3 tools/proof/gate.py [--force] [--wait SECONDS]
+make gate GATE_ARGS=--force                 # run every step, stamps or not
+python3 tools/proof/gate.py --selftest      # H0, M1–M7, H2–H4, W0–W4 (make test)
+python3 tools/proof/gate.py --mutant no-tools|stamp-always|md-counted|warning-count
+```
+
+**The steps**, serially, stopping at the first failure, each under its
+bound (running past it is a FAIL): `typecheck` (`make typecheck`, 300 s) —
+passes only with no `error:` and exactly the four baseline warnings by file
+basename and message (`TYPECHECK_BASELINE`, spec §11 W-8; a line number may
+move, a fifth warning or a missing one fails); `fmt` (`cargo fmt --check` in
+`core`, `graphic`, `mcp-proxy`, 120 s); `lint` (`make lint`, 600 s); `test`
+(`make test`, 900 s); `app` (`make app`, 1500 s, whose Write Agent Catalog
+step is the parity check), then dist_check's D25 and D26 over the Release
+app: its entitlements are exactly `audio-input` and `get-task-allow`, and it
+passes `codesign --verify --deep --strict`. Those two rows are the defect
+class a no-op build once shipped (Release signed by Write Agent Catalog
+alone), which before this read only at `make dist`; D27 (Distribution's
+seal) and the rest of dist_check still run only there.
+
+**Skip and stamp.** A step's hash is sha256 over the content of its own
+files among `git ls-files -co --exclude-standard` and a tool fingerprint
+(the output of `xcrun swiftc --version`, `xcodebuild -version`, `xcrun
+--show-sdk-path`, `rustc -Vv`, `cargo clippy -V`, `bun --version`,
+`xcodegen --version` and `cargo fmt --version`).
+`gate.py` and the `Makefile` are in every step's files. `typecheck`:
+`app/Sources`, `app/Bridging`, `core/include`, `agent`. `fmt`, `lint`:
+`core`, `graphic`, `mcp-proxy`. `test`: everything but `archive/`. `app`:
+`app`, `agent`, `core`, `graphic`, `mcp-proxy`, `project.yml`, `VERSION`,
+`docs/graphics-api.md`, `docs/graphics-api.d.ts` and
+`tools/proof/dist_check.py`. A `*.md` counts only under `designs/spec/` and
+`docs/` (for `test`) and as `docs/graphics-api.md` (for `app`); `.secrets/`
+is never read. A step is skipped when its hash equals its last pass. The
+hash is taken before the step and again after it (the tree re-read and the
+fingerprint re-run), and the pass is stamped only when the two are equal;
+otherwise `gate: <step> pass, not stamped: its inputs changed while it ran`,
+and the last line adds `(not stamped: <steps>)`.
+
+**Output and files.** One line per step, `gate: <step> pass|skip|FAIL
+<s>s`, a FAIL followed by at most five of its first error lines (a PASS or
+`ok` row that merely quotes `error:` is not one); the last line is `gate:
+PASS <s>s` (exit 0), `gate: FAIL <step> <s>s` (1) or `gate: BLOCKED
+(build/gate/lock)` (3, another gate held the `fcntl` lock past `--wait`,
+default 120 s). `make` itself exits 2 when the gate exits non-zero. Writes go
+only under `build/gate/`: `lock`, `state.json` (each step's last stamped
+hash), `<step>.log` (the step's whole output, and the app step's two rows)
+and `times.tsv` (UTC, commit with `-dirty`, step, seconds, result:
+`pass`, `skip`, `FAIL` or `pass-unstamped`).
+
+**The selftest**, pure (no tree, no lock): H0 (CONTROL) identical digests
+give identical hashes and every step is stamped; M1–M7 one file of each
+input class moves exactly its steps' hashes (an app source, the bridging
+header folder, the C header, the helper; a crate's source and `Cargo.toml`;
+`project.yml`, `VERSION`, a shader, the graphics reference, dist_check, a
+proof, a spec file, `docs/manual-checks.md`; `archive/`, `README.md`, a
+`CLAUDE.md` and an ADR move none; `gate.py` and the `Makefile` move all); H2
+a substituted tool string moves every step; H3 unequal before and after
+hashes record no pass; H4 (CONTROL) a `.secrets/` path is in no step; W0
+(CONTROL) the four baseline warnings at other line numbers, each with its
+caret line, pass; W1 a fifth fails, named; W2 a baseline warning in another
+file fails; W3 one gone fails; W4 an `error:` fails. Each mutant fails
+exactly its rows: `no-tools` H2, `stamp-always` H3, `md-counted` M4–M6,
+`warning-count` W2.
+
+**Measured** (2026-10-08, the phase 4 record in `archive/build-velocity.md`
+has the scenarios): an unchanged tree, all five skip, 0.4 s; a `README.md`
+edit, all five skip; a Swift-only edit runs typecheck, test and app (173 s);
+a `core/src` edit runs fmt, lint, test and app (203 s); an injected type
+error, a fifth warning, a clippy warning and a failing spec-index row each
+FAIL their step, named; a held lock BLOCKED in 2 s under `--wait 2`; a file
+added while `test` ran left `test` unstamped and stamped `app`.
 
 ## The offscreen harness (no running app)
 
@@ -6859,7 +6938,7 @@ and prints the needle and both paths before its rows:
   fails); and each app passes `codesign --verify --deep --strict`, the
   bundle being the one its executable `realpath`s into. A no-op build once
   left Release signed ad hoc by Write Agent Catalog alone, with no
-  entitlements and a broken seal, and no row saw it (`designs/build-velocity.md`'s
+  entitlements and a broken seal, and no row saw it (`archive/build-velocity.md`'s
   phase 2 record).
 
 No row is ever skipped: if D1 fails, D4, D5, D12 and D13 FAIL too, and so
