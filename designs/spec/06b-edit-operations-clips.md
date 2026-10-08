@@ -246,18 +246,23 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   file reader does NOT normalise (`core/tests/schema_v8.rs`). Refuses when nothing changes, and on
   an empty `groups` list.
 - **`nest {clips, name?}`** — Collapses the selection into ONE clip showing a nest (§5.2), on the
-  front-most track the selection occupied, running from the earliest start to the latest end. The
+  front-most track the selection occupied that is not a matte track (the front-most when all are,
+  §11 MT-5), running from the earliest start to the latest end. The
   clips move whole — ids, props, actions, transitions — keeping their relative times (the earliest
   starts at 0 inside) and their track order, onto fresh tracks of the nest's own that copy the
   source tracks' names and their hidden/muted/locked/solo state (a copied solo is then judged among
-  the nest's own tracks, §5.2). The nest's canvas is frozen at the project's current size, so a
+  the nest's own tracks, §5.2), and a source track's `matte` only when the nested track directly
+  behind it is the copy of that matte's target — a matte pair nested together keeps cutting inside,
+  and a matte taken without its target draws there as an ordinary track (O9). The nest's canvas is frozen at the project's current size, so a
   later `set_canvas` cannot re-lay-out what is inside it. Media is untouched: a nest references the
   project's `media[]` in the same one id space. Refuses on an empty selection, on a selection of one
   nest clip, and when the nest clip would break the overlap rule against what was left behind.
 - **`unnest {clip}`** — The inverse: the nest's clips return at `clip.start + their own start` with
   fresh ids (as `split` then a re-join mints fresh ones), on tracks counted back from the nest
-  clip's own — the nest's front-most track lands where the nest clip was — with tracks missing
-  behind added, and the nest clip goes. A clip the overlap rule refuses lands on a new track in
+  clip's own — the nest's front-most NON-matte track (the front-most when all are, §11 MT-5) lands
+  where the nest clip was, so carried matte tracks land on the tracks in front of it — with tracks
+  missing behind added, and the nest clip goes. It makes no track a matte. A clip the overlap rule
+  refuses, or a matte clip with no track in front, lands on a new track in
   front, as `paste` does, so a group can always be opened. A nest clip trimmed shorter than its
   contents gives **all** of them back: there is no in point on a nest, so this is the inverse of
   `nest`, not of the trim. The nest is dropped from `nests[]` when no clip anywhere still shows it.

@@ -35,15 +35,15 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`05.6-persistence.md`](05.6-persistence.md) | 163 | The package on disk: Consolidate, bookmarks, reversed assets, caches and their markers, transcripts. |
 | **§6 — Edit operations: exact semantics** | | |
 | [`06a-edit-operations-shared-rules.md`](06a-edit-operations-shared-rules.md) | 83 | The rules every op shares: caller ticks snapped to the frame grid, an omitted argument against `null`, how to read a "refuses", the one way a patch is read, and the `scope` envelope key (the view project, the seven ops that are an error with a scope, the checks on the merged parent). |
-| [`06b-edit-operations-clips.md`](06b-edit-operations-clips.md) | 380 | Every clip op: add, insert and overwrite, the two backgrounds; move and the overlap rule; the trims, roll, slip, rate stretch, speed and reverse; split, the ripple deletes and range cuts; freeze, detach, duplicate, paste and paste attributes; nest and unnest; the patch ops; the transition ops. |
+| [`06b-edit-operations-clips.md`](06b-edit-operations-clips.md) | 385 | Every clip op: add, insert and overwrite, the two backgrounds; move and the overlap rule; the trims, roll, slip, rate stretch, speed and reverse; split, the ripple deletes and range cuts; freeze, detach, duplicate, paste and paste attributes; nest and unnest; the patch ops; the transition ops. |
 | [`06c-edit-operations-actions-tracks-media.md`](06c-edit-operations-actions-tracks-media.md) | 111 | The action ops (the zoom action, end patches and `off`); the track, marker, canvas and media ops; and the op table's two halves (the arguments half is `core/src/op_table.rs`). |
 | **§7 — Architecture: Rust decides, AVFoundation and Metal do** | | |
 | [`07-architecture.md`](07-architecture.md) | 25 | The Rust/platform split in one page. |
 | [`07.1-ffi-surface.md`](07.1-ffi-surface.md) | 122 | The `rc_*` exports and their contracts. |
 | [`07.2-composition-plan.md`](07.2-composition-plan.md) | 133 | The composition plan: A/B assignment, speed and freeze, audio envelopes, instructions. |
-| [`07.3-frame-recipe.md`](07.3-frame-recipe.md) | 324 | The per-frame recipe the compositor draws: layers, mattes, nests, recipe options, burn-in. |
+| [`07.3-frame-recipe.md`](07.3-frame-recipe.md) | 332 | The per-frame recipe the compositor draws: layers, mattes, nests, recipe options, burn-in. |
 | [`07.4-swift-file-map.md`](07.4-swift-file-map.md) | 52 | The spec's Swift file map (app/CLAUDE.md is the live one). |
-| [`07.5-compositor.md`](07.5-compositor.md) | 131 | The Metal compositor's passes, mattes, and transitions. |
+| [`07.5-compositor.md`](07.5-compositor.md) | 133 | The Metal compositor's passes, mattes, and transitions. |
 | [`07.6-playback-update-rules.md`](07.6-playback-update-rules.md) | 46 | What playback does after every edit: rebuild or refresh. |
 | [`07.7-import.md`](07.7-import.md) | 183 | `MediaImporter.probe`, the formats import accepts, the WebM/Matroska rewrap, its copy's progress window, the copy's original, and the opt-in ffmpeg step's original and checked VP9 copy. |
 | [`07.8-export.md`](07.8-export.md) | 310 | Export: writers, formats, loudness, the queue. |

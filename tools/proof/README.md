@@ -16951,11 +16951,13 @@ builds a tree copy (`tree_copy.make_copy`, `own_core` for a `core/` anchor,
 with the tree's `core/tests` linked in) with one anchor replaced, asserted to
 occur once, and scores rule R: exit 0 when every named row failed, 1 when one
 survived, 2 when the control could not be performed. A core mutant that
-names CT also runs `cargo test --release --test matte` in the copy's core.
+names CT also runs `cargo test --release --no-fail-fast --test matte --test
+matte_nest` in the copy's core (`matte_nest` since MT3) and names the files
+that failed.
 
 | Mutant | Edit | Must fail |
 |---|---|---|
-| `shader-no-multiply` | step 7c's multiply by the coverage made `1.0 + 0.0 ×` it | A1 A2 L1 |
+| `shader-no-multiply` | step 7c's multiply by the coverage made `1.0 + 0.0 ×` it (`alpha *= matteCover;` since MT3) | A1 A2 L1 |
 | `source-drawn` | `render`'s skip of a layer with a non-null `into` emptied | A1 B0 MM |
 | `resolve-mode-ignored` | the resolve reads every mode as `kMatteAlpha` | A2 L1 L2 L3 |
 | `core-no-prune` | a group is listed whether or not a layer is drawn into it | V5 H0 |
@@ -16971,3 +16973,61 @@ through. Every mutant caught, `core-matte-behind-matte` after the instrument
 and the matte pass were fixed (MM made A1's region claims itself; a cut naming
 a matte not drawn before it fails the frame before any encoder opens) — the
 two passes are `designs/mattes.md`'s MT2 record.
+
+## Road map mattes — MT3, nests, dissolves, shadow, reflection, Preview Quality, every export (`matte_proof.py` N1–N7, T1–T3, S1, RF1, E1–E7, F1; `matte_probe.py` B0, Q0–Q2; `core/tests/matte_nest.rs`; #240, spec §11 MT-3, MT-5, MT-6)
+
+**What it answers.** That a matte holds through `nest` and `unnest` (the
+nest clip lands on the front-most selected track that is not a matte, a
+nested track keeps its matte only above the copy of its target, `unnest`
+lines the front-most non-matte track up with the nest clip's), inside and
+around nest clips (a nest clip as the matted clip, as the matte, a matted
+nest holding its own pair — the product — and a split nest clip in a
+dissolve, each half cut by its own matte); that a dissolve under a matte is
+exact (between two matte clips, between two matted clips under a hard and a
+soft matte — the outgoing half's correction weighs its partner's cover by
+the matte, spec §11 MT-3); that a matted clip's drop shadow is the cut shape
+offset and its reflection is cut where it lands; that all seven export
+presets write what `render_frame` shows, alpha included, and a graphic matte
+is prefetched for an export; and, in the probe, that the matte's edge and a
+matted layer's shadow sit at the same fraction of the frame at Full, Half and
+Quarter. `matte_proof.py`'s and `matte_probe.py`'s docstrings list every row
+and fixture.
+
+```
+python3 tools/proof/matte_proof.py --only N1,N2,N3,N4,N5,N6,N7,T1,T2,T3,S1,RF1,E1,E2,E3,E4,E5,E6,E7,F1,Z1
+python3 tools/proof/matte_proof.py --mutant NAME             # MT3's seven below
+python3 tools/proof/matte_probe.py                           # no app; builds through swift_build.py
+python3 tools/proof/matte_probe.py --mutant coverage-destination-coords
+cd core && cargo test --release --test matte_nest
+```
+
+`matte_proof.py` runs as MT2's section says (its own instance, scratch home,
+no menu item, every project closed). The export rows need ffmpeg to decode
+(frame 0.5 s, frame 0 when an encoder kept fewer — the fixture does not
+move); a Mac with no HEVC-with-alpha encoder is a named host skip of E3,
+never a failure. `matte_probe.py` launches no app: `matte_probe.swift` is
+built as `main.swift` over every other `app/Sources` file through
+`swift_build.build`, beside `Blank.mp4` and a `default.metallib` compiled
+from the tree's shader, in `tools/proof/work/matte_probe/`, and renders
+through `CompositionBuilder.build`, `Playback.previewComposition` and
+`AVAssetImageGenerator` as `phase8_chrome.py`'s section 9 does. A build that
+fails is its B0 FAILURE. Its mutant compiles a copy of the shader into its
+own folder beside a copy of the same binary — no app build.
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `dissolve-no-cover` | the outgoing half's partner cover not weighed by the matte | T3 |
+| `nest-always-carries` | `nest` keeps every nested track's matte | N4 |
+| `nest-old-front-track` | the nest clip on the front-most selected track, matte or not | N1 |
+| `unnest-old-depth` | `unnest` counts depth from the nest's front-most track | N6 CT |
+| `core-group-by-track` | a group keyed by its matte track alone (no nest-clip path) | N7 CT |
+| `resolve-overwrites` | the resolve pass unblended: the last matte in a cut set wins | N5 |
+| `reflection-placeholder` | the reflection draw binds the placeholder at `texture(1)` | RF1 |
+| `coverage-destination-coords` (`matte_probe.py`) | step 7c samples at `position / coverage size` | Q2 |
+
+**Its record** (2026-10-08): on Debug, the MT3 rows 21/21 and the probe 4/4;
+recorded on the gate's Release build (`RC_PROOF_APP=release`) `matte_proof.py`
+whole 36/36 (E3 ran: this Mac has the encoder); the probe drives no app, so
+its run on the same tree is its record. All eight mutants caught, and MT2's
+`shader-no-multiply` (its anchor moved) and `core-untargeted-into-null` (CT
+became `--no-fail-fast`) again — `designs/mattes.md`'s MT3 record.

@@ -1266,10 +1266,12 @@ static inline float4 layerColorPremultiplied(Varyings in,
     // reflection, which lands where it lands, all read one coverage. An
     // unmatted layer binds the 1×1 white placeholder, which reads 1
     // everywhere (MT0's spike chose that route over a specialization: its
-    // cost per layer was within the measured bound).
-    alpha *= matte.sample(samp, canvasPixels(
+    // cost per layer was within the measured bound). Kept as a value: the
+    // outgoing half of a dissolve weighs its partner's cover by it below.
+    float matteCover = matte.sample(samp, canvasPixels(
         in.position.xy, float2(u.canvasPerDestX, u.canvasPerDestY))
         / max(float2(u.canvasWidth, u.canvasHeight), float2(1.0))).r;
+    alpha *= matteCover;
 
     // Transitions. The recipe hands the pair as two adjacent layers with the
     // same kind and progress, so each pass only needs its own half: every
@@ -1309,7 +1311,14 @@ static inline float4 layerColorPremultiplied(Varyings in,
             bool insidePartner =
                 canvasPoint.x >= u.partnerMinX && canvasPoint.x <= u.partnerMaxX &&
                 canvasPoint.y >= u.partnerMinY && canvasPoint.y <= u.partnerMaxY;
-            float cover = insidePartner ? clamp(u.partnerAlpha, 0.0, 1.0) : 0.0;
+            //
+            // Under a matte the incoming pass's attenuation is
+            // (1 - p·alphaIncoming·m), m the coverage at this pixel: both
+            // halves on one matted track are cut by the same mattes (spec
+            // §11 MT-3), so this layer's own `matteCover` is the partner's
+            // m, and the composite stays m·mix(out, in, p) + (1 - m)·bg
+            // under a soft matte as well as a hard one.
+            float cover = insidePartner ? clamp(u.partnerAlpha, 0.0, 1.0) * matteCover : 0.0;
             alpha *= (1.0 - p) / max(1.0 - p * cover, 1e-4);
         }
     } else if (kind == kTransitionFadeBlack || kind == kTransitionFadeWhite) {

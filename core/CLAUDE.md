@@ -374,7 +374,9 @@ governs a module now.
   `check_off` refuses what `patch` refuses (`not_a_target`'s two sentences,
   and `merge_group`'s read of a `null` for an unknown or a required key),
   and a non-object group slot is replaced by `{}`, never indexed. `nest` and `unnest`
-  (fresh ids, content byte-equal);
+  (fresh ids, content byte-equal; the nest clip on the front-most non-matte
+  track, a matte carried only above the copy of its target, unnest aligned on
+  the front-most non-matte track — spec §11 MT-5);
   `paste`, whose payload schema is its module doc; `Payload` and
   `parse_payload` are `pub(crate)`, because `edit_paste_attributes.rs` reads
   the same payload.

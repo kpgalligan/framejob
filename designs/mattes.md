@@ -62,7 +62,7 @@ Each phase is committed alone, after its review.
 | MT0 | MT-1..MT-6 recorded in spec §11 before any code; the matte spike (`tools/proof/matte_spike/`): the route for an unmatted layer and the matte's cost at 1080p and 4K | done (below) |
 | MT1 | Tolls, pure moves: `recipe_layer.rs` out of `recipe.rs`, `Compositor+Shadow.swift` and `prepare` out of `Compositor.swift`, `FrameRecipe.swift` out of `ProjectSnapshot.swift` | done (below) |
 | MT2 | The matte end to end over MCP, top level and nested levels: `tracks[].matte` (format 14), `set_track {matte}`, the recipe's `matte` and `mattes`, the mask and resolve passes, `matte_proof.py` | done (below) |
-| MT3 | Nests (`nest` / `unnest`), dissolves, shadow, reflection, Preview Quality, every export | — |
+| MT3 | Nests (`nest` / `unnest`), dissolves, shadow, reflection, Preview Quality, every export | done (below) |
 | MT4 | The chrome (MT-7 recorded first): Track ▸ Matte, the context submenu, the header tag, the lane, the Clip tab's note | — |
 | MT5 | Documents and figures; the spike re-run against the tree; the ADR; close | — |
 
@@ -276,4 +276,92 @@ the other fifteen rows passed, so the instance lived). The fix touched no
 other mutant's anchor.
 
 **Owed.** Nesting a matte pair draws its matte clips inside the nest,
-ordinary, until MT3's carry rule.
+ordinary, until MT3's carry rule (done in MT3, below).
+
+## MT3 — nests, dissolves, shadow, reflection, Preview Quality, every export (2026-10-08)
+
+**The core.** `edit_nest.rs` is MT-5's nesting half. `nest` puts the nest
+clip on the front-most selected track that is not a matte track (the
+front-most when all are); `nested_track` copies the source's `matte`, and
+one pass over the mapping (the carry rule) keeps it only when the nested
+track directly behind is the copy of `recipe_matte.rs`'s `matte_target` of
+the source — so a matte pair nested together keeps cutting inside, and a
+matte taken without its target (or a matte above a matte) is ordinary
+there. `unnest` counts depth from the nest's front-most NON-matte track
+(`front`; `len − 1` when all are), so a carried matte track's depth is
+negative and it lands on the track in front of the nest clip's; with none
+there it lands on a new ordinary track, as any clip the overlap rule
+refuses. Nothing in the recipe changed: MT2's walk already keyed a group by
+the enclosing nest-clip path, which is what gives each half of a split nest
+clip in a dissolve its own matte. `core/tests/matte_nest.rs` (six tests):
+the front track and carry for a pair, for the matte clips alone, for a matte
+without its target and for a matte above a matte; unnest of a carried pair
+(roles and `mattes` as before nesting); a carried matte with no track in
+front; two groups for a split nest clip in a dissolve.
+
+**The app.** One shader change: step 7c keeps the coverage sample as
+`matteCover`, and the outgoing half of a dissolve multiplies its partner's
+cover by it (MT-3) — on one matted track both halves read the same
+coverage, so the pair composites to m·mix(out, in, p) + (1 − m)·bg under a
+soft matte as under a hard one. An unmatted layer's `matteCover` is the
+placeholder's exact 1.0, so no unmatted picture moves. The shadow's
+silhouette pass and the reflection already bound the coverage (MT2); MT3
+proves them.
+
+| File | Before | After |
+|---|---|---|
+| `core/src/edit_nest.rs` | 321 | 366 |
+| `core/tests/matte_nest.rs` | — | 273 |
+| `app/Resources/Shaders/Compositor.metal` | 1611 | 1620 |
+| `tools/proof/matte_proof.py` | 698 | 1395 |
+| `tools/proof/matte_probe.py` | — | 294 |
+| `tools/proof/matte_probe.swift` | — | 181 |
+
+**The instruments.** `matte_proof.py` gains N1–N7, T1–T3, S1, RF1, E1–E7
+and F1 (its docstring has every fixture); `matte_probe.py` builds
+`matte_probe.swift` over `app/Sources` through `swift_build.py` and renders
+two fixtures at Full, Half and Quarter through `Playback.previewComposition`
+and `AVAssetImageGenerator` (Q1 the window's box and coverage, Q2 a matted
+card's cut shape and its shadow, the cut shape offset, as fractions of the
+frame; B0 the build, Q0 the three destinations as a control). Two claims
+the spec put in the proof are read elsewhere, because no tool returns a
+recipe: that N7's overlap lists two groups is `matte_nest.rs`'s
+(`a_split_nest_clip_in_a_dissolve_has_one_group_per_half`), and the halves'
+origins are read from `get_project` (a nest clip's origin is its start). T2
+and T3 measure the dissolve at its overlap's midpoint (1 s, curve linear),
+where the unmatted dissolve read (119, 0, 136) from red and blue — p a
+little past 0.5 on the frame grid; T3's formula uses that measured
+dissolve, so it holds whatever p is.
+
+**Scores.** `cargo test --release --test matte_nest` 6/6 (with `matte` 8/8
+and `nest` 35/35 beside it); `make lint` clean; `make app-debug`. On Debug:
+`matte_proof.py --only N1,…,F1,Z1` 21/21; `matte_probe.py` 4/4 (B0, Q0, Q1
+and Q2 at all three qualities: Q1's window at x 0.1667…0.5833, y
+0.1852…0.5556, coverage 0.1543 at each; Q2's shadow at x 0.2562…0.3604, y
+0.3074…0.5852 at each, against 0.2563…0.3605 and 0.3075…0.5853). `make gate`
+passed in the foreground (typecheck skipped, its inputs unchanged; fmt, lint,
+test 136 s, app; 146 s), and again after the mutants' CT change and these
+records (test 71 s, the rest skipped; 72 s). The recorded run, on the gate's Release
+build: `matte_proof.py` whole 36/36 (no `Reelcut: ` line; F1's line "1 hits,
+0 mismatched"; E3 ran — this Mac has the HEVC-with-alpha encoder);
+`matte_probe.py` drives no app (it builds from `app/Sources`, as
+`phase8_chrome.py` does), so its run above, on the same tree, is its record.
+
+**Mutants** (the spec's eight, once on the final instrument; each
+`matte_proof.py --mutant NAME --only <its rows>,Z1` on a tree copy built by
+its own `make app-debug`, and the probe's on a mutated copy of the shader
+beside the same binary): `dissolve-no-cover` (T3: (131, 18, 78) against
+(110.53, 25.4, 81.22) at (4, 4)), `nest-always-carries` (N4),
+`nest-old-front-track` (N1: the nest clip on the matte track),
+`unnest-old-depth` (N6: the tracks' mattes `none, none, alpha` after
+unnest; CT), `core-group-by-track` (N7: 44 green in the left window, 63 red
+in the right; CT), `resolve-overwrites` (N5: the outer window's own part
+showed the movie), `reflection-placeholder` (RF1: the reflection white below
+the card) and `coverage-destination-coords` (Q2 at Half and Quarter) — all
+caught. The first pass showed CT stopping at the first failing test file
+(`core-group-by-track` failed `matte.rs` before `matte_nest.rs` ran), so CT
+became `--no-fail-fast` and names the failing files; the three mutants that
+name CT were run again on it — `core-group-by-track` (`matte` and
+`matte_nest`), `unnest-old-depth` (`matte_nest`), MT2's
+`core-untargeted-into-null` (B0 MM, `matte`) — with MT2's
+`shader-no-multiply` (A1 A2 L1), whose anchor this phase rewrote: all caught.

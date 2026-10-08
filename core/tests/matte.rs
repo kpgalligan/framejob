@@ -264,7 +264,7 @@ fn through_nests_the_first_matte_level_wins_and_groups_list_deepest_first() {
         .collect();
     assert_eq!(inner.len(), 2);
 
-    // Nesting carries no matte in MT2: both nested tracks are ordinary.
+    // Neither source track was a matte, so both nested tracks are ordinary.
     assert!(array(nest, "/tracks")
         .iter()
         .all(|t| t.get("matte").is_none()));

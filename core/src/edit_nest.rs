@@ -30,21 +30,31 @@
 //!
 //! ### What `nest` decides
 //!
-//! The nest clip lands on the FRONT-most track the selection occupied, which
-//! is where the selection's front-most layer already was, and runs from the
-//! earliest start to the latest end. The nest's own canvas is frozen at the
-//! project's current size, so a later `set_canvas` cannot silently re-lay
+//! The nest clip lands on the FRONT-most track the selection occupied that
+//! is not a matte track (the front-most when all are, spec §11 MT-5), which
+//! is where the selection's front-most DRAWN layer already was, and runs from
+//! the earliest start to the latest end. The nest's own canvas is frozen at
+//! the project's current size, so a later `set_canvas` cannot silently re-lay
 //! out what is inside it ([`Nest`]). Its tracks are fresh — new ids, the
 //! source tracks' names and their `hidden`/`muted`/`locked`/`solo` flags —
 //! because the timeline's tracks stay on the timeline, holding whatever was
-//! not selected.
+//! not selected. A nested track keeps its source's `matte` only when the
+//! nested track directly behind it is the copy of that matte's target (the
+//! CARRY rule): a matte pair nested together goes on cutting inside the nest,
+//! and a matte taken without its target becomes an ordinary track there.
+//!
+//! `unnest` lines the nest's front-most NON-matte track up with the nest
+//! clip's track, so carried matte tracks land on the tracks in front of it
+//! and nest-then-unnest gives the picture back; it makes no track a matte.
 
 use crate::edit_clip::clip_end;
 use crate::model::{AudioProps, Clip, Enabled, Nest, Project, Source, Track, VideoProps};
 use crate::outcome::Outcome;
+use crate::recipe_matte::matte_target;
 
 /// A track with a fresh id, copying `from`'s name and its hidden / muted /
-/// locked / solo state.
+/// locked / solo / matte state (the matte only provisionally: `nest_clips`
+/// keeps it by the carry rule alone).
 ///
 /// The state is copied and not cleared: a selection taken off a muted track
 /// must go on sounding the way it did, and the mute now lives on the nest's
@@ -60,7 +70,7 @@ fn nested_track(project: &mut Project, from: &Track) -> Track {
         muted: from.muted,
         locked: from.locked,
         solo: from.solo,
-        matte: crate::model::TrackMatte::None,
+        matte: from.matte,
     }
 }
 
@@ -125,11 +135,18 @@ impl Project {
             }
         }
         sources.sort_unstable();
-        // The front-most source track is where the nest clip goes. The
+        // The front-most source track that is not a matte track is where
+        // the nest clip goes (MT-5): a matte pair nested together must land
+        // where its picture was drawn, not on the matte track, where the
+        // whole nest would become a matte. The front-most when all are. The
         // nest's own tracks count toward `MAX_TRACKS` like any other
         // (`format::check_caps`), so a selection that would overrun the cap
         // is caught by `finish` rather than counted twice here.
-        let Some((_, front_track)) = sources.last().copied() else {
+        let drawn = sources
+            .iter()
+            .rev()
+            .find(|(_, id)| self.track(*id).is_some_and(|t| t.matte.is_none()));
+        let Some((_, front_track)) = drawn.or(sources.last()).copied() else {
             return Ok(Outcome::Identity);
         };
 
@@ -144,6 +161,23 @@ impl Project {
             let track = nested_track(&mut next, source);
             mapping.push((*id, track.id));
             tracks.push(track);
+        }
+        // The carry rule (MT-5), one pass over the mapping: a nested track
+        // stays a matte only when the nested track directly behind it is the
+        // copy of its source's target. A matte nested without its target
+        // draws inside the nest as an ordinary track (owner, O9).
+        for index in 0..tracks.len() {
+            let from = mapping.get(index).map(|(from, _)| *from);
+            let behind = index
+                .checked_sub(1)
+                .and_then(|i| mapping.get(i))
+                .map(|(from, _)| *from);
+            let carried = from.and_then(|from| matte_target(&self.tracks, from));
+            if carried.is_none() || carried != behind {
+                if let Some(track) = tracks.get_mut(index) {
+                    track.matte = crate::model::TrackMatte::None;
+                }
+            }
         }
 
         // The clips move WHOLE — ids, actions, transitions and all — so
@@ -214,9 +248,12 @@ impl Project {
     ///
     /// Each clip returns at `clip.start + its own start`, with fresh ids, on
     /// the track counted back from the nest clip's own: the nest's
-    /// front-most track lands where the nest clip was, the one behind it a
-    /// track further back, and tracks missing behind are added. A clip the
-    /// overlap rule refuses goes on a new track in front.
+    /// front-most NON-matte track (the front-most when all are, MT-5) lands
+    /// where the nest clip was, the one behind it a track further back, a
+    /// carried matte track in front of it a track further forward, and
+    /// tracks missing behind are added. A clip the overlap rule refuses —
+    /// or a matte clip with no track in front — goes on a new track in
+    /// front, ordinary: `unnest` makes no track a matte.
     ///
     /// The nest itself is dropped when nothing else shows it; a second clip
     /// showing it keeps it, which is why the returned clips are copies.
@@ -235,17 +272,25 @@ impl Project {
             .clone();
 
         let base = self.require_track_index(target.track)? as i64;
+        // The nest's front-most non-matte track, the one the nest clip's own
+        // track stands for (MT-5); the front-most when all are mattes.
+        let front = nest
+            .tracks
+            .iter()
+            .rposition(|t| t.matte.is_none())
+            .unwrap_or(nest.tracks.len().saturating_sub(1)) as i64;
         let depth = |track: u32| -> i64 {
-            // 0 for the nest's FRONT-most track, counting backwards.
+            // 0 for `front`, counting backwards; negative for a carried
+            // matte track in front of it.
             match nest.tracks.iter().position(|t| t.id == track) {
-                Some(index) => (nest.tracks.len() as i64 - 1) - index as i64,
+                Some(index) => front - index as i64,
                 None => 0,
             }
         };
         // Bounded by the track cap the project was read under, so the
         // deficit loop below can ask for at most `MAX_TRACKS` tracks and
         // `finish` refuses the result if that is too many.
-        let deepest = nest.tracks.len().saturating_sub(1) as i64;
+        let deepest = front;
 
         let mut next = self.clone();
         next.clips.retain(|c| c.id != clip);
