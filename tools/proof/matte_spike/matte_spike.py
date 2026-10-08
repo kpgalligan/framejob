@@ -5,6 +5,8 @@ and which of two routes an UNMATTED layer takes (spec §11 MT-6).
     python3 tools/proof/matte_spike/matte_spike.py --check                 # builds, 10 frames a scene, K3/K4
     python3 tools/proof/matte_spike/matte_spike.py --measure               # release-only kind: host gate, timings
     python3 tools/proof/matte_spike/matte_spike.py --check --mutant resolve-writes-one|anchor-missing
+    python3 tools/proof/matte_spike/matte_spike.py --check --tree          # MT5: the tree's own shader
+    python3 tools/proof/matte_spike/matte_spike.py --measure --tree        # MT5's record
 
 Nothing is merged into `app/`. Three shaders are made in `work/matte_spike/<tag>/`
 from `app/Resources/Shaders/Compositor.metal` as it stood at 464a3aa, before
@@ -34,6 +36,14 @@ memory, computed). A figure is the median of the runs' medians (200 frames
 each, three runs, every series interleaved), with the runs' range beside it.
 Exit 0 when every scored row passes, 1 when one fails, 2 when the host gate
 stops the run. README: `tools/proof/README.md`, "Road map mattes — MT0".
+
+`--tree` (MT5) measures what MT2 built instead of the two candidate routes: V0
+is still the pinned pre-MT2 shader, and VT is the tree's own
+`app/Resources/Shaders/Compositor.metal`, unpatched (B0 records that no patch
+is made). K3/K4 score VT; T0 is VT's S1 overhead over V0 (what the placeholder
+costs an unmatted layer in the shipped shader); T1 (the route) is not asked;
+T2 scores VT's unmatted-against-matted frames (S3 − S2, S4 − S2) against the
+same budget. No mutant runs with `--tree`.
 """
 
 import argparse
@@ -196,7 +206,7 @@ def run(argv, seconds):
 
 # ---- building -----------------------------------------------------------------
 
-def build_shaders(folder, mutant):
+def build_shaders(folder, mutant, tree=False):
     shown = subprocess.run(["git", "-C", str(ROOT), "show", f"{SHADER_COMMIT}:{SHADER}"],
                            capture_output=True, text=True)
     if shown.returncode != 0:
@@ -204,13 +214,18 @@ def build_shaders(folder, mutant):
         return None
     source = shown.stdout
     texts = {"V0": source}
-    for name, route in (("V1", "placeholder"), ("V2", "constant")):
+    if tree:
+        texts["VT"] = (ROOT / SHADER).read_text()
+        emit("B0", "PASS", f"--tree: V0 the shader at {SHADER_COMMIT}, VT the tree's own {SHADER}, "
+             "unpatched (no anchor asked)")
+    for name, route in () if tree else (("V1", "placeholder"), ("V2", "constant")):
         text, why = patched(source, route, mutant)
         if text is None:
             emit("B0", "FAIL", f"{name} ({route} route): {why}")
             return None
         texts[name] = text
-    emit("B0", "PASS", "V1 and V2 patched, every anchor exactly once")
+    if not tree:
+        emit("B0", "PASS", "V1 and V2 patched, every anchor exactly once")
     libs = {}
     for name, text in texts.items():
         metal, air, lib = folder / f"{name}.metal", folder / f"{name}.air", folder / f"{name}.metallib"
@@ -223,7 +238,7 @@ def build_shaders(folder, mutant):
                  f"{'expired' if step['expired'] else step['stderr'][-600:]}")
             return None
         libs[name] = lib
-    emit("B1", "PASS", f"V0, V1, V2 metallibs in {folder.relative_to(ROOT)}")
+    emit("B1", "PASS", f"{', '.join(texts)} metallibs in {folder.relative_to(ROOT)}")
     return libs
 
 
@@ -278,10 +293,10 @@ def bench(binary, libs, size, folder, frames, runs, warmup):
     return json.loads(out.read_text())
 
 
-def k_rows(answer, h):
+def k_rows(answer, h, variants):
     ok_all = True
     for row in ("K3", "K4"):
-        for variant in ("V1", "V2"):
+        for variant in variants:
             entries = [k for k in answer["k"] if k["row"] == row and k["variant"] == variant]
             ok = len(entries) == 2 and all(k["ok"] for k in entries)
             ok_all &= ok
@@ -310,11 +325,18 @@ def main():
     mode.add_argument("--check", action="store_true")
     mode.add_argument("--measure", action="store_true")
     parser.add_argument("--mutant", choices=MUTANTS)
+    parser.add_argument("--tree", action="store_true",
+                        help="measure the tree's own shader (VT) against the pre-MT2 one (MT5)")
     args = parser.parse_args()
     if args.mutant and args.measure:
         parser.error("a mutant runs with --check")
+    if args.mutant and args.tree:
+        parser.error("no mutant runs with --tree")
+    matte_variants = ("VT",) if args.tree else ("V1", "V2")
 
     tag = f"mutant-{args.mutant}" if args.mutant else ("measure" if args.measure else "check")
+    if args.tree:
+        tag = f"tree-{tag}"
     folder = WORK / tag
     shutil.rmtree(folder, ignore_errors=True)
     folder.mkdir(parents=True)
@@ -326,11 +348,11 @@ def main():
     if args.measure:
         ok, host_text = host_gate()
         emit("H0", "PASS" if ok else "SKIP", host_text if ok else
-             f"{host_text}: the host gate is shut, so every timing row is skipped and MT0 "
-             "stops for the owner")
+             f"{host_text}: the host gate is shut, so every timing row is skipped"
+             + (" (MT5's record is a named skip)" if args.tree else " and MT0 stops for the owner"))
         timing = ok
 
-    libs = build_shaders(folder, args.mutant)
+    libs = build_shaders(folder, args.mutant, args.tree)
     binary = build_bench() if libs else None
     answers = {}
     scored_ok = libs is not None and binary is not None
@@ -342,12 +364,12 @@ def main():
                 scored_ok = False
                 continue
             answers[size[1]] = answer
-            scored_ok &= k_rows(answer, size[1])
+            scored_ok &= k_rows(answer, size[1], matte_variants)
 
     result = {"tag": tag, "started": started.isoformat(), "host": host_text, "rows": ROWS,
               "answers": {str(h): a for h, a in answers.items()}}
     if args.measure and not timing:
-        for row in ("C0", "T1", "T2"):
+        for row in ("C0", "T2") if args.tree else ("C0", "T1", "T2"):
             emit(row, "SKIP", "the host gate is shut (H0)")
     elif timing and scored_ok and len(answers) == len(SIZES):
         result["figures"] = figures = {}
@@ -356,7 +378,7 @@ def main():
             answer = answers[h]
             f = {s: figure(answer, s) for s in answer["samples"]}
             noise = abs(f["V0:S1"][0] - f["V0b:S1"][0])
-            over = {v: f[f"{v}:S1"][0] - f["V0:S1"][0] for v in ("V1", "V2")}
+            over = {v: f[f"{v}:S1"][0] - f["V0:S1"][0] for v in matte_variants}
             overheads[h] = (over, noise)
             figures[h] = {"series": {s: {"median": m, "low": lo, "high": hi}
                                      for s, (m, lo, hi) in f.items()},
@@ -366,10 +388,14 @@ def main():
                  f"({ms(f['V0b:S1'][1])}–{ms(f['V0b:S1'][2])}): noise floor {ms(noise)}")
             for s in sorted(f):
                 emit("F", "RECORD", f"{h}p {s}: {ms(f[s][0])} (runs {ms(f[s][1])}–{ms(f[s][2])})")
-            emit("T0", "RECORD", f"{h}p S1 overhead over V0: V1 {ms(over['V1'])}, "
-                 f"V2 {ms(over['V2'])} (bound {BOUND[h]:.2f} ms + noise {ms(noise)})")
-        v1_fits = all(overheads[h][0]["V1"] <= BOUND[h] + overheads[h][1] for _, h in SIZES)
-        if v1_fits:
+            emit("T0", "RECORD", f"{h}p S1 overhead over V0: "
+                 + ", ".join(f"{v} {ms(over[v])}" for v in matte_variants)
+                 + f" (bound {BOUND[h]:.2f} ms + noise {ms(noise)})")
+        v1_fits = not args.tree and all(
+            overheads[h][0]["V1"] <= BOUND[h] + overheads[h][1] for _, h in SIZES)
+        if args.tree:
+            route = "VT"
+        elif v1_fits:
             route = "V1"
             why = "V1's S1 overhead is within bound + noise at both sizes"
         else:
@@ -378,8 +404,9 @@ def main():
                    f"{[h for _, h in SIZES if overheads[h][0]['V1'] <= BOUND[h] + overheads[h][1]]}"
                    f" only; {route} has the smaller S1 overhead at 4K")
         result["route"] = route
-        emit("T1", "RECORD", f"route {route} ({'placeholder' if route == 'V1' else 'function constant'})"
-             f": {why}")
+        if not args.tree:
+            emit("T1", "RECORD", f"route {route} "
+                 f"({'placeholder' if route == 'V1' else 'function constant'}): {why}")
         for w, h in SIZES:
             f = figures[h]["series"]
             s2 = f[f"{route}:S2"]["median"]

@@ -3,11 +3,12 @@
 Part of spec §11, *Decisions made — do not re-litigate*. The index of every decision is
 [`README.md`](README.md).
 
-The road map that makes these is in progress: its record is `designs/mattes.md` (phases
-MT0–MT5). MT-1..MT-6 were recorded in MT0, before any code, and MT-6's choice of route was filled
-from MT0's spike (`tools/proof/matte_spike/`); MT-7 (the chrome) is recorded at MT4's start, before
-its code. They are not G- decisions: a matte is a track relation the compositor draws for any
-clip, not a graphics decision (road map 10's own plan: "Mattes are compositor features",
+The road map that made these is closed: its condensed record is `designs/adr/mattes.md`, and the
+original, `archive/mattes.md`, holds each phase's record (MT0–MT5). MT-1..MT-6 were recorded in
+MT0, before any code, and MT-6's choice of route was filled from MT0's spike
+(`tools/proof/matte_spike/`); MT-7 (the chrome) was recorded at MT4's start, before its code.
+They are not G- decisions: a matte is a track relation the compositor draws for any clip, not a
+graphics decision (road map 10's own plan: "Mattes are compositor features",
 `designs/adr/svg-motion-plan.md`). The video-input half of #240 is #251, and nothing here decides
 it.
 

@@ -178,9 +178,9 @@ final class LayerRenderers {
     // MARK: - Measured layers
 
     /// The source size of ANY recipe layer: measured for text, the stored
-    /// box for a shape, the media size otherwise. This is the closure
-    /// `FrameRecipe.layer(at:measuring:)` wants, so the canvas overlay
-    /// hit-tests exactly what the compositor drew.
+    /// box for a shape, the media size otherwise.
+    /// `CanvasLayerBox.boxes(recipe:snapshot:)` measures with it, so the
+    /// canvas overlay hit-tests exactly what the compositor drew.
     static func measuredSize(for layer: RecipeLayer) -> CGSize? {
         switch layer.source {
         // The REVEAL is deliberately ignored: the overlay's handles sit on

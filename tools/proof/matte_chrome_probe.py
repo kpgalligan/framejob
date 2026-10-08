@@ -42,7 +42,9 @@ Rows:
   T3  the tag's contrast: `TimelineMatteTag.textColor` over its box
       (`fillColor`) over the header row's fill (`DS.chromeBackground`), each
       resolved under aqua and darkAqua, composited in sRGB: the dimmed tag's
-      WCAG contrast ratio is >= 3.0 in both looks; the undimmed tag's (its
+      WCAG contrast ratio is >= 3.0 in both looks, over the host's accent
+      AND over every sRGB cube corner standing in for the accent at the
+      dimmed box's own alpha (MT5); the undimmed tag's (its
       words in the primary label colour over the accent-tinted box) is
       >= 4.5 in both looks, over the host's accent AND over every accent the
       box could take (its RGB swapped for each corner of the sRGB cube at the
@@ -66,8 +68,7 @@ Rows:
   HT  a 1600×900 card under a 200×200 alpha window, both centred: the
       canvas's hit (`CanvasLayerBox.boxes(recipe:snapshot:)` and
       `PreviewCanvasView.hit(at:)`'s rule) answers the window at the centre
-      and the card 500 px right of it; `FrameRecipe.layer(at:measuring:)`
-      answers the same; CONTROL: the window's recipe layer has non-null
+      and the card 500 px right of it; CONTROL: the window's recipe layer has non-null
       `matte.into` (it is a matte layer, not drawn).
 Not scored: where the tag goes per lane height (printed).
 
@@ -391,6 +392,14 @@ def score(answer):
               f"could take (each sRGB cube corner at the box's alpha {fill[3:]})",
               worst[0] is not None and worst[0] >= 4.5,
               f"worst {worst[0] and round(worst[0], 2)}:1 at accent {worst[1]}")
+        dim_fill = colors["dimmedFill"]
+        dim_worst = (min(((contrast(colors["dimmedText"], c + dim_fill[3:], row), c)
+                          for c in corners), key=lambda pair: pair[0])
+                     if len(dim_fill) == 4 and dimmed is not None else (None, None))
+        check(f"T3 {look}: the dimmed tag's ratio is >= 3.0 over every accent its box could "
+              f"take (each sRGB cube corner at the dimmed box's alpha {dim_fill[3:]})",
+              dim_worst[0] is not None and dim_worst[0] >= 3.0,
+              f"worst {dim_worst[0] and round(dim_worst[0], 2)}:1 at accent {dim_worst[1]}")
         control = contrast(row, colors["dimmedFill"], row)
         check(f"T3 CONTROL {look}: the measure can fail — the header row's own colour as "
               f"text over the dimmed box is < 1.5:1",
@@ -441,9 +450,6 @@ def score(answer):
           hit["windowInto"] is not None, json.dumps(hit))
     check("HT the canvas hits the matte clip inside its box and the matted card outside it",
           hit["canvasInside"] == hit["window"] and hit["canvasOutside"] == hit["card"],
-          json.dumps(hit))
-    check("HT FrameRecipe.layer(at:) answers the same",
-          hit["recipeInside"] == hit["window"] and hit["recipeOutside"] == hit["card"],
           json.dumps(hit))
 
 

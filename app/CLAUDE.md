@@ -1064,8 +1064,8 @@ the key map behind it.
 - `FrameRecipe.swift` — the frame recipe's Swift side (spec §7.3), decoded
   leniently: `RecipeCanvas`, `RecipeSourceRef`, `RecipeTransition`,
   `RecipeClipRect`, `RecipeLayerMatte`, `RecipeMatteGroup`, `RecipeLayer`
-  (with `matte`) and `FrameRecipe` (with `mattes`) with the canvas hit test
-  `layer(at:measuring:)`, out of `ProjectSnapshot.swift`.
+  (with `matte`) and `FrameRecipe` (with `mattes`), out of
+  `ProjectSnapshot.swift`; the canvas hit-tests through `CanvasLayerBox`.
 - `TrackMatte.swift` — a track's matte mode, mirroring `model_matte.rs`: raw
   values, `displayName`, `shaderCode` (the case index — a shader
   discriminant, append only) and `target(of:in:)` (the core's

@@ -449,9 +449,9 @@ Uses the four `tools/proof/work/playback-check/` projects (Setup 3).
 ## Mattes
 
 **MAT-1 — A matte plays**
-- **Do:** 1. Put a 1080p movie on a track and a large bold text clip on the track above it; give the text a motion preset or an action that moves it across the frame. 2. Track ▸ Matte ▸ Alpha with the text selected. 3. Play it at View ▸ Preview Quality ▸ Full, then at Quarter. 4. Switch the mode to Luma, then Inverted Alpha, and play again.
-- **Expect:** only the movie shows, and only through the letters (outside them, the canvas background; with Inverted Alpha, the reverse); the window follows the text's movement frame for frame with no lag behind it; the letters' edges are clean at Full and at Quarter, with no fringe, flicker or banding; Luma shows the movie through the text's brightness.
-- **Source:** #240 (mattes MT4, spec §11 MT-1..MT-7).
+- **Do:** 1. Put a 1080p movie on a track and a large bold text clip on the track above it; give the text a motion preset or an action that moves it across the frame. 2. Track ▸ Matte ▸ Alpha with the text selected. 3. Play it at View ▸ Preview Quality ▸ Full, then at Quarter. 4. Switch the mode to Luma, then Inverted Alpha, and play again. 5. In a 3840×2160 project, put a full-frame shape filled with a slow black-to-white linear gradient (one edge to the other) over the movie, set its track to Matte ▸ Luma, and look at a still frame at Full; then set it to Matte ▸ Off and look at the gradient itself.
+- **Expect:** only the movie shows, and only through the letters (outside them, the canvas background; with Inverted Alpha, the reverse); the window follows the text's movement frame for frame with no lag behind it; the letters' edges are clean at Full and at Quarter, with no fringe, flicker or banding; Luma shows the movie through the text's brightness; in step 5 the movie fades in smoothly across the frame, with no step or band you cannot also see in the gradient drawn on its own.
+- **Source:** #240 (mattes MT4 and MT5, spec §11 MT-1..MT-7).
 
 **MAT-2 — The matte chrome reads right**
 - **Do:** 1. In a project with three tracks (a movie, then a shape above it, then a text clip above that), make the shape's track Track ▸ Matte ▸ Alpha and the text's track Matte ▸ Inverted Luma (it has a matte behind it, so it cuts nothing). 2. Look at the timeline at View ▸ Timeline Track Height Small, Medium and Large, and scroll the timeline sideways and back. 3. Select the shape, then the text, and look at each Clip sub-tab. Repeat in the other appearance.

@@ -331,30 +331,4 @@ struct FrameRecipe: Codable, Equatable {
         layers = c.lenient(.layers, [])
         mattes = c.lenient(.mattes, [])
     }
-
-    /// The topmost layer whose canvas rect contains `point` (canvas space,
-    /// y down), or nil. Rotation is applied about the layer's anchor, so a
-    /// rotated clip hit-tests correctly.
-    func layer(at point: CGPoint, measuring textSize: (RecipeLayer) -> CGSize?) -> RecipeLayer? {
-        for layer in layers.reversed() {
-            guard let size = layer.sourceSizeCG ?? textSize(layer) else { continue }
-            let anchor = CGPoint(
-                x: Double(canvas.width) / 2 + layer.x, y: Double(canvas.height) / 2 + layer.y)
-            let scale = layer.scale
-            let full = CGSize(width: size.width * scale, height: size.height * scale)
-            let rect = CGRect(
-                x: anchor.x - full.width / 2 + layer.crop.l * scale,
-                y: anchor.y - full.height / 2 + layer.crop.t * scale,
-                width: max(0, full.width - (layer.crop.l + layer.crop.r) * scale),
-                height: max(0, full.height - (layer.crop.t + layer.crop.b) * scale))
-            let radians = -layer.rotation * .pi / 180
-            let dx = point.x - anchor.x
-            let dy = point.y - anchor.y
-            let local = CGPoint(
-                x: anchor.x + dx * cos(radians) - dy * sin(radians),
-                y: anchor.y + dx * sin(radians) + dy * cos(radians))
-            if rect.contains(local) { return layer }
-        }
-        return nil
-    }
 }

@@ -231,7 +231,15 @@ schema, §6 the op table, §7 the architecture.
   can be filled with a **gradient** instead of a flat colour, linear or
   radial, up to eight stops, at any angle. And a filter can be
   **animated**: an action's end state carries the filter stack, so a blur
-  can ramp up across a clip like any other property.
+  can ramp up across a clip like any other property. And a track can be a
+  **matte** for the track below (**Track ▸ Matte**, or the track's context
+  menu): its clips are not drawn, and what they show cuts the track
+  directly behind by alpha, inverted alpha, luma or inverted luma — text,
+  a shape, a graphic, an image, a movie or a nest becomes a window onto the
+  footage beneath, animated like any clip, in the preview, stills and
+  every export. The header tags the track ("Matte · Alpha"), its clips
+  draw at half opacity with a dashed outline, and the Clip tab says which
+  of a matte clip's settings have no effect.
 - **Output.** **File ▸ Save Frame…** (⌥⌘E) writes the frame under the
   playhead as a PNG, JPEG or HEIC still — the same writer `render_frame`
   uses, so a still saved from the menu and one an agent asked for are the

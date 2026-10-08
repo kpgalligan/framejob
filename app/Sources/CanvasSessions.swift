@@ -19,9 +19,9 @@ import AppKit
 // MARK: - Rotation
 
 /// Rotates `vector` by `degrees`. Canvas y grows downward, so a positive
-/// angle reads CLOCKWISE on screen — the same sense `FrameRecipe.layer(at:)`
-/// un-rotates by, which is what keeps overlay hit-testing and the
-/// compositor's hit-testing the same answer.
+/// angle reads CLOCKWISE on screen — the same sense the canvas's hit boxes
+/// (`CanvasLayerBox`) un-rotate by, which is what keeps overlay hit-testing
+/// and the compositor's picture the same answer.
 func canvasRotate(_ vector: CGVector, degrees: Double) -> CGVector {
     guard degrees != 0 else { return vector }
     let radians = degrees * .pi / 180

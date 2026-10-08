@@ -437,6 +437,34 @@ halfway, and `#ffffff` to `#00000000` is `#80808080`, grey and half transparent.
 moves, every frame is drawn anew, so a graphic that had settled costs a full draw per frame for the
 length of the action.
 
+## Video inside a graphic: the matte
+
+A graphic cannot read a video's pixels. To show video inside a shape the graphic draws, put the
+graphic on the track directly above the video and switch that track to a **matte**: Track ▸ Matte
+in the app, or `set_track {track, matte}` over MCP. A matte track's clips are never drawn. What
+they show cuts the track directly behind: with `alpha`, the video shows where the graphic is
+opaque; with `alpha_inverted`, where it is transparent; with `luma` and `luma_inverted`, by the
+brightness of what it draws. `matte: "none"` turns it off. Where the matte track has no clip, the
+video shows uncut. The module is written and called exactly as anywhere else. Fill the window in
+white so it works in every mode, and animate it as usual: the cut follows each frame.
+
+```js
+export const meta = { name: "Window", durationInFrames: 90 };
+export const schema = { radius: { type: "number", default: 24, min: 0, max: 200 } };
+
+export function render(frame, props, ctx) {
+  const t = spring({ frame, fps: ctx.fps, damping: 18 });
+  const w = ctx.width * 0.6 * t;
+  const h = ctx.height * 0.6 * t;
+  return svg(ctx, `<rect x="${(ctx.width - w) / 2}" y="${(ctx.height - h) / 2}"
+    width="${w}" height="${h}" rx="${props.radius}" fill="#ffffff"/>`);
+}
+```
+
+On a matte track a clip's position, scale, opacity, crop and actions still shape the window. Its
+blend mode, drop shadow and reflection do nothing. The matted video's own drop shadow follows the
+cut-out shape.
+
 ## Idioms
 
 ### A slide-in

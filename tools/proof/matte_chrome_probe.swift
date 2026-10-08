@@ -306,15 +306,11 @@ let boxes = CanvasLayerBox.boxes(recipe: recipe, snapshot: hitSnapshot)
 func canvasHit(_ point: CGPoint) -> Any {
     boxes.reversed().first(where: { !$0.locked && $0.contains(point) })?.id ?? NSNull()
 }
-func recipeHit(_ point: CGPoint) -> Any {
-    recipe.layer(at: point, measuring: LayerRenderers.measuredSize(for:))?.clip ?? NSNull()
-}
 answer["hit"] = [
     "card": card, "window": windowClip,
     "windowInto": recipe.layers.first { $0.clip == windowClip }?.matte?.into ?? NSNull(),
     "layers": recipe.layers.map { $0.clip },
     "canvasInside": canvasHit(centre), "canvasOutside": canvasHit(outside),
-    "recipeInside": recipeHit(centre), "recipeOutside": recipeHit(outside),
 ]
 
 // ---- M3: the edits ------------------------------------------------------------

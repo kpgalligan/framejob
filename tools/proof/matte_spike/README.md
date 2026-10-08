@@ -8,6 +8,8 @@ is merged into `app/`; MT2 builds the chosen route into `Compositor.metal`.
 python3 tools/proof/matte_spike/matte_spike.py --check                       # the loop: builds, 10 frames a scene, K3/K4
 python3 tools/proof/matte_spike/matte_spike.py --check --mutant NAME         # resolve-writes-one | anchor-missing
 perl -e 'alarm 600; exec @ARGV' python3 tools/proof/matte_spike/matte_spike.py --measure   # recorded
+python3 tools/proof/matte_spike/matte_spike.py --check --tree                # MT5: the tree's own shader
+perl -e 'alarm 600; exec @ARGV' python3 tools/proof/matte_spike/matte_spike.py --measure --tree   # MT5's record
 ```
 
 **Release-only kind.** It times the GPU, so its bench is always an optimised
@@ -71,9 +73,17 @@ turn, V0 / V1 / V2 / V0 again at S1, so a drift in the GPU's clocks lands on
 every series alike. A figure is the median of the three runs' medians, quoted
 with the runs' range. `--check` takes 10 frames, one run, and scores K only.
 
+**`--tree` (MT5).** In place of V1 and V2, VT is the tree's own
+`Compositor.metal`, unpatched — route V1 as MT2 built it — timed against the
+same pinned V0 by the same bench and scenes (the bench draws whichever matte
+variants it is given). K3/K4 score VT; T0 is VT's S1 overhead over V0; T1 is
+not asked; T2 holds VT's S3 − S2 and S4 − S2 to the same budget. Output under
+`work/matte_spike/tree-<check|measure>/`. No mutant runs with `--tree`.
+
 **Mutants.** `resolve-writes-one` (the resolve returns 1 everywhere) must fail
 K3 and K4; `anchor-missing` (V1's step-7 anchor misspelt) must fail B0. The
 script prints `mutant NAME: killed by …` or `SURVIVED`.
 
-**Its record** is `designs/mattes.md`'s MT0 section, and spec §11 MT-6 carries
+**Its record** is `designs/adr/mattes.md` (MT5's `--tree` figures) and
+`archive/mattes.md` (MT0's full table and MT5's), and spec §11 MT-6 carries
 the route and its figures.

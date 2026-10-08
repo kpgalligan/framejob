@@ -1,9 +1,9 @@
 # Road map "mattes" — the matte track (#240)
 
-**In progress.** Issue batch B89. The decisions are spec §11 MT-1..MT-7
-(`designs/spec/11-decisions/mattes.md`); this file is the phases' record. When
-the road map closes (MT5) it is condensed into `designs/adr/mattes.md` and
-moved to `archive/`.
+**Closed** 2026-10-08 (MT5). Issue batch B89. The decisions are spec §11
+MT-1..MT-7 (`designs/spec/11-decisions/mattes.md`); this file is the phases'
+record. It is condensed into `designs/adr/mattes.md` and was moved to
+`archive/mattes.md` when the road map closed.
 
 ## Goal
 
@@ -64,7 +64,7 @@ Each phase is committed alone, after its review.
 | MT2 | The matte end to end over MCP, top level and nested levels: `tracks[].matte` (format 14), `set_track {matte}`, the recipe's `matte` and `mattes`, the mask and resolve passes, `matte_proof.py` | done (below) |
 | MT3 | Nests (`nest` / `unnest`), dissolves, shadow, reflection, Preview Quality, every export | done (below) |
 | MT4 | The chrome (MT-7 recorded first): Track ▸ Matte, the context submenu, the header tag, the lane, the Clip tab's note | done (below) |
-| MT5 | Documents and figures; the spike re-run against the tree; the ADR; close | — |
+| MT5 | Documents and figures; the spike re-run against the tree; the ADR; close | done (below) |
 
 ## MT0 — the decisions and the spike (2026-10-08)
 
@@ -489,3 +489,60 @@ leave the bracket at its old place. (4) The note shows only when the matte
 tracks share one mode, for both sentences (MT-7's grammar puts "share one
 mode" before the choice of sentence).
 
+## MT5 — documents, figures, close (2026-10-08)
+
+**Documents.** `docs/graphics-api.md` gained "Video inside a graphic: the
+matte": a graphic cannot read a video's pixels, so the way to show video
+inside a shape it draws is a matte track above the video, with one `js`
+window module that `graphic/tests/reference.rs` runs. `README.md`'s Looks
+bullet names the matte track and its chrome. `designs/adr/roadmap-10-graphics.md`'s
+"Deliberately not built" now lists only video input to a graphic (#251), the
+matte half built here. The decision file's header points at the ADR and this
+archived record. MAT-1 gained a step: a slow full-frame black-to-white
+gradient as a luma matte on a 4K canvas, compared by eye with the gradient
+drawn alone (the "Not established" r8 question; see below).
+
+**The spike against the tree.** `matte_spike.py --tree` times VT, the tree's
+own `Compositor.metal` unpatched (route V1 as MT2 built it, with MT3's
+dissolve change), against the same pinned V0 by the same bench and scenes;
+`bench.swift` now draws whichever matte variants it is given, so MT0's
+`--check` and `--measure` are unchanged (`--check` exit 0 after the change).
+Host (H0, read only): `pmset -g` `powermode 0`, `pmset -g batt` "AC Power";
+Apple M2 Max, macOS 26.5.1. `--check --tree` exit 0 (K3/K4 for VT at both
+sizes). `--measure --tree`, 2026-10-08 07:57 CEST, exit 0 (ms; the runs'
+range in brackets):
+
+| | 1920×1080 | 3840×2160 |
+|---|---|---|
+| V0 S1 | 0.108 (0.106–0.146) | 0.388 (0.387–0.388) |
+| V0 S1, second series (C0) | 0.105 (0.105–0.107) | 0.387 (0.387–0.388) |
+| noise floor (C0) | 0.002 | 0.001 |
+| VT S1 / S2 / S3 / S4 | 0.120 / 0.222 / 0.254 / 0.376 | 0.442 / 0.891 / 0.960 / 1.440 |
+| VT's S1 overhead over V0 | 0.013 (bound 0.02 + noise) | 0.054 (bound 0.08 + noise) |
+| matte cost: S3 − S2, S4 − S2 | 0.033, 0.154 (budget 0.50) | 0.070, 0.549 (budget 2.00) |
+| memory per matte (bgra8), per coverage (r8) | 8.3 MB, 2.1 MB | 33.2 MB, 8.3 MB |
+
+These series are tight at both sizes (C0 0.002 and 0.001 ms), unlike MT0's
+1080p ones, so they resolve what MT0's could not: the shipped placeholder
+costs an unmatted full-bleed layer 0.013 ms at 1080p and 0.054 ms at 4K
+(MT0's V1: 0.014 and 0.052), one alpha matte costs 0.033 ms at 1080p and
+0.070 ms at 4K, and two mattes in one coverage plus the gradient layer's own
+draw 0.154 and 0.549 ms, all within MT0's budget.
+
+**The "Not established" list, reviewed against the tree.** (1) The route's
+cost: measured, MT0 and above. (2) Whether r8 coverage bands on a slow luma
+gradient at 4K: the matte is drawn into a bgra8 target, so the luma it
+yields is already 8-bit; r8 adds at most one rounding, and L1 (MT2) holds
+every sample of a gradient luma matte to ±1 of card × g + background ×
+(1 − g). Whether that reads as banding to an eye is MAT-1's new step.
+(3) A dissolve between two nest clips cut by different mattes: still an
+approximation, drafted as an issue. (4) "Matte · Inverted Alpha" on a Small
+row: settled in MT4's fix pass (the tag reads "Matte" there). (5) Other
+editors' behaviour: general knowledge only; nothing owed. (6) The GIF
+palette at a soft matte edge: not a matte question (the GIF writer quantises
+any soft edge — a shadow, a feathered corner — the same way); nothing owed.
+(7) Memory with many mattes: the pool has no cap, drafted as an issue. Also
+from the reviews: MT4's T3 now sweeps the dimmed tag over every sRGB cube
+corner too (07-review-MT4-3's nit; worst 3.77:1 light, 4.95:1 dark,
+`matte_chrome_probe.py` 10/10), and `FrameRecipe.layer(at:measuring:)`,
+which no app code called, was deleted (HT keeps the canvas's own path).

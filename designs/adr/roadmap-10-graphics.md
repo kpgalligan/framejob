@@ -303,7 +303,9 @@ plan proposed, were rejected under `core/CLAUDE.md`'s rules.
   A 50 MB string is built but cannot be read out of a 64 MB heap at all; the
   engine's own sentence says so.
 - **Deliberately not built** (orig §7):
-  - mattes or video input to a graphic — wanted, #240;
+  - video input to a graphic — wanted, #251 (iceboxed; split out of #240,
+    whose matte half is built: road map "mattes", spec §11 MT-1..MT-7,
+    `designs/adr/mattes.md`);
   - system fonts as an opt-in — CLOSED by the owner 2026-10-04: Add Font to
     Graphics… / `import_graphic_font` already puts a face in the package and
     keeps a project portable; G-6 stands;

@@ -4,13 +4,15 @@
 // it fills the app's own `LayerUniforms` (416 bytes, asserted below), so the
 // block it hands the shader is the block the compositor hands it. It draws
 // with pipelines of its own, built the way `MetalRenderer.init` builds them,
-// from three metallibs `matte_spike.py` compiles:
+// from the metallibs `matte_spike.py` compiles:
 //
-//   V0  the tree's `Compositor.metal`
+//   V0  `Compositor.metal` as it stood before MT2 (464a3aa)
 //   V1  + the placeholder route: every layer samples `texture(1)` (a 1×1
 //         white texture for an unmatted layer)
 //   V2  + the function-constant route: `kMatte [[function_constant(1)]]`,
 //         false for an unmatted layer, true for a matted one
+//   VT  (`--tree` mode, MT5, instead of V1 and V2) the tree's own
+//         `Compositor.metal`, unpatched: route V1 as MT2 built it
 //
 // Scenes (canvas = destination, full bleed, no effects):
 //   S1  one picture layer
@@ -21,12 +23,12 @@
 //   S4  S3 plus a static full-frame gradient as a luma matte, resolved into
 //       the same coverage (two mattes, one coverage)
 //
-//     bench --lib V0=PATH --lib V1=PATH --lib V2=PATH --width W --height H
-//           --frames N --runs R --warmup K --out JSON
+//     bench --lib V0=PATH (--lib V1=PATH --lib V2=PATH | --lib VT=PATH)
+//           --width W --height H --frames N --runs R --warmup K --out JSON
 //
 // One command buffer per frame, committed and waited on; a frame's time is
 // `gpuEndTime − gpuStartTime`. Within a run every (scene, variant) sample is
-// taken in turn — V0, V1, V2, then V0 again for the C0 control at S1 — so the
+// taken in turn — V0, each matte variant, then V0 again for the C0 control at S1 — so the
 // GPU's clock drift lands on every series alike. The JSON holds each sample's
 // median, minimum and maximum (ms), and the K3/K4 readbacks.
 import CoreGraphics
@@ -63,9 +65,11 @@ do {
         }
     }
 }
+// The variants that draw a matte: V1 and V2 (MT0's routes) or VT (the tree).
+let matteVariants = ["V1", "V2", "VT"].filter { libs[$0] != nil }
 guard width > 0, height > 0, frames > 0, runs > 0, !outPath.isEmpty,
-    libs["V0"] != nil, libs["V1"] != nil, libs["V2"] != nil
-else { fail("usage: --lib V0=… --lib V1=… --lib V2=… --width --height --frames --runs --out") }
+    libs["V0"] != nil, !matteVariants.isEmpty
+else { fail("usage: --lib V0=… (--lib V1=… --lib V2=… | --lib VT=…) --width --height --frames --runs --out") }
 guard MemoryLayout<LayerUniforms>.stride == 416 else {
     fail("LayerUniforms is \(MemoryLayout<LayerUniforms>.stride) bytes, not 416")
 }
@@ -141,7 +145,7 @@ func pipes(_ name: String) -> Pipes {
     return Pipes(unmatted: unmatted, matted: matted, resolve: state(d))
 }
 
-let variants = ["V0", "V1", "V2"]
+let variants = ["V0"] + matteVariants
 var pipesByName: [String: Pipes] = [:]
 for name in variants { pipesByName[name] = pipes(name) }
 
@@ -396,7 +400,7 @@ let picks: [(row: String, side: String, at: (Int, Int)?)] = [
 ]
 
 var kRows: [[String: Any]] = []
-for variant in ["V1", "V2"] {
+for variant in matteVariants {
     let alone = render(variant, "S1")  // the picture's own bytes over the background
     let renders = ["K3": render(variant, "S3"), "K4": render(variant, "S4")]
     for (row, side, at) in picks {
@@ -419,12 +423,9 @@ for variant in ["V1", "V2"] {
 
 // The order inside a run: per scene, every variant that draws it, interleaved;
 // S1 ends with a second V0 series (the C0 control).
-let plan: [(series: String, variant: String, scene: String)] = [
-    ("V0:S1", "V0", "S1"), ("V1:S1", "V1", "S1"), ("V2:S1", "V2", "S1"), ("V0b:S1", "V0", "S1"),
-    ("V1:S2", "V1", "S2"), ("V2:S2", "V2", "S2"),
-    ("V1:S3", "V1", "S3"), ("V2:S3", "V2", "S3"),
-    ("V1:S4", "V1", "S4"), ("V2:S4", "V2", "S4"),
-]
+let plan: [(series: String, variant: String, scene: String)] =
+    [("V0:S1", "V0", "S1")] + matteVariants.map { ("\($0):S1", $0, "S1") } + [("V0b:S1", "V0", "S1")]
+    + ["S2", "S3", "S4"].flatMap { scene in matteVariants.map { ("\($0):\(scene)", $0, scene) } }
 func median(_ values: [Double]) -> Double {
     let s = values.sorted()
     return s.count % 2 == 1 ? s[s.count / 2] : (s[s.count / 2 - 1] + s[s.count / 2]) / 2

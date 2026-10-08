@@ -16910,6 +16910,8 @@ costs, at 1920×1080 and 3840×2160. Nothing is merged into `app/`.
 python3 tools/proof/matte_spike/matte_spike.py --check                       # B0–B2, K3/K4 (10 frames a scene)
 python3 tools/proof/matte_spike/matte_spike.py --check --mutant resolve-writes-one|anchor-missing
 perl -e 'alarm 600; exec @ARGV' python3 tools/proof/matte_spike/matte_spike.py --measure   # H0, C0, T0–T2, M0; recorded
+python3 tools/proof/matte_spike/matte_spike.py --check --tree                # MT5: the tree's own shader, B0–B2, K3/K4
+perl -e 'alarm 600; exec @ARGV' python3 tools/proof/matte_spike/matte_spike.py --measure --tree   # MT5's record
 ```
 
 **Its record** (2026-10-08, Apple M2 Max, `powermode 0`, AC power):
@@ -16918,13 +16920,13 @@ exit 0: C0 noise floor 0.038 ms at 1080p and 0.002 ms at 4K; S1 overhead over
 V0 0.014 ms (V1) and 0.019 ms (V2) at 1080p, 0.052 ms and −0.003 ms at 4K;
 route V1; with V1, S3 − S2 −0.082 / 0.066 ms and S4 − S2 0.040 / 0.542 ms
 (1080p / 4K), within 0.50 / 2.00 ms. Mutants: `resolve-writes-one` killed by K3
-and K4, `anchor-missing` by B0. The full table is `designs/mattes.md`'s MT0
+and K4, `anchor-missing` by B0. The full table is `archive/mattes.md`'s MT0
 record.
 
 The spike patches the shader as it stood before MT2 (`git show
 464a3aa:app/Resources/Shaders/Compositor.metal`), the one its anchors were
-written against, so `--check` and `--measure` keep answering for MT0's routes;
-measuring the tree's own shader is road map mattes MT5's `--tree` mode.
+written against, so `--check` and `--measure` keep answering for MT0's routes.
+`--tree` (MT5, below) measures the tree's own shader instead.
 
 ## Road map mattes — MT2, the matte track end to end over MCP (`matte_proof.py` C0, A1, G0, U0, P6, MM, V5, H0, B0, A2, N0, R0, L1–L3, Z1 and eight mutants; `core/tests/matte.rs`, `core/tests/schema_v14.rs`; #240, spec §11 MT-1..MT-6)
 
@@ -16974,7 +16976,7 @@ and `phase8_chrome.py` 150/150 for the layer stage every layer now goes
 through. Every mutant caught, `core-matte-behind-matte` after the instrument
 and the matte pass were fixed (MM made A1's region claims itself; a cut naming
 a matte not drawn before it fails the frame before any encoder opens) — the
-two passes are `designs/mattes.md`'s MT2 record.
+two passes are `archive/mattes.md`'s MT2 record.
 
 ## Road map mattes — MT3, nests, dissolves, shadow, reflection, Preview Quality, every export (`matte_proof.py` N1–N7, T1–T3, S1, RF1, E1–E7, F1; `matte_probe.py` B0, Q0–Q2; `core/tests/matte_nest.rs`; #240, spec §11 MT-3, MT-5, MT-6)
 
@@ -17032,7 +17034,7 @@ recorded on the gate's Release build (`RC_PROOF_APP=release`) `matte_proof.py`
 whole 36/36 (E3 ran: this Mac has the encoder); the probe drives no app, so
 its run on the same tree is its record. All eight mutants caught, and MT2's
 `shader-no-multiply` (its anchor moved) and `core-untargeted-into-null` (CT
-became `--no-fail-fast`) again — `designs/mattes.md`'s MT3 record.
+became `--no-fail-fast`) again — `archive/mattes.md`'s MT3 record.
 
 ## Road map mattes — MT4, the chrome (`matte_chrome_probe.py` B0, M1–M3, T1–T3, LN, NT, HT and ten mutants; `track_menu_probe.py`'s Matte rows; `screens.py` 10c; #240, spec §11 MT-7)
 
@@ -17046,7 +17048,8 @@ behind" dimmed for a matte with no target; that on a Small text or audio
 row's name line the three long tags read "Matte" alone, so the name keeps
 at least 40 pt, and the header clips the name by exactly the drawn tag;
 that the dimmed tag (muted words) keeps a WCAG contrast of at least 3:1
-over the header in light and dark, and the undimmed tag (label-coloured
+over the header in light and dark, over the host's accent and (since MT5)
+over every corner of the sRGB cube in its place, and the undimmed tag (label-coloured
 words on the accent tint) at least 4.5:1 in both — over the host's accent
 and over every corner of the sRGB cube in its place, so no accent the owner
 picks can fail it — with two host-independent controls (the header row's
@@ -17093,3 +17096,20 @@ explicit begin/end pair around an identity would leave an empty step.
 | `hit-skips-matte` | the canvas's boxes (`CanvasLayerBox.boxes(recipe:)`) skip a matte layer | HT |
 | `undo-name` | Track ▸ Matte's undo named "Matte Track" | M3 |
 
+## Road map mattes — MT5, the spike against the tree (`matte_spike.py --tree`; spec §11 MT-6)
+
+**What it answers.** What MT2 built costs, measured on the shader the app
+ships rather than on MT0's patched candidates: VT is the tree's own
+`Compositor.metal`, unpatched (B0 records that no anchor is asked), timed
+against V0, the pinned pre-MT2 shader, by the same bench, scenes and statistic.
+K3/K4 score VT; T0 is VT's S1 overhead over V0 (what the placeholder costs an
+unmatted layer); T1 (the route) is not asked; T2 holds VT's S3 − S2 and
+S4 − S2 to MT0's budget. No mutant runs with `--tree`; MT0's two still run
+without it.
+
+**Its record** (2026-10-08 07:57 CEST, Apple M2 Max, macOS 26.5.1,
+`powermode 0`, AC power; `--check --tree` exit 0, `--measure --tree` exit 0):
+C0 noise floor 0.002 ms at 1080p and 0.001 ms at 4K; VT's S1 overhead over V0
+0.013 ms at 1080p (0.120 against 0.108 ms) and 0.054 ms at 4K (0.442 against
+0.388 ms); S3 − S2 0.033 ms and 0.070 ms, S4 − S2 0.154 ms and 0.549 ms
+(1080p, 4K), within 0.50 / 2.00 ms. The table is `designs/adr/mattes.md`'s.
