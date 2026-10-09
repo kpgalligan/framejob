@@ -116,6 +116,42 @@ it.
   of those tracks has a target, "Nothing is behind this matte track, so it cuts nothing."; every
   control stays live, its values kept for when the track stops being a matte. On the canvas a
   matte clip is the topmost hit inside its box, selected and dragged like any clip.
+- **MT-8 — A dissolve or zoom with a nested half mixes its two halves exactly, matte or not
+  (#252; owner, 2026-10-08; zoom by the owner's residue rule, 2026-10-08).** A `cross_dissolve`
+  or `zoom` whose container is a nest, or one of whose two clips is a nest clip, is ROUTED. Each
+  half is drawn, with no dissolve weight, into its own destination-sized `bgra8Unorm` target
+  cleared transparent. A half is everything its clip draws: inner layers, their mattes, shadows
+  and reflections, and any dissolve inside it, each such level in a pair of targets of its own.
+  One full-frame pass then lays the pair on what is below as (1 − p)·out + p·in, source-over. So
+  the frame is (1 − p)·H_out + p·H_in + (1 − (1 − p)·a_out − p·a_in)·D, with H each half's
+  premultiplied picture drawn alone, a its alpha and D what is behind. A zoom's halves are
+  scaled in that pass, out by 1 + 0.25p and in by 0.75 + 0.25p (the vertex stage's own ramps),
+  each about its half's anchor — the canvas point its clip is placed at: a plain clip's anchor,
+  or the centre of a nest clip's placed canvas rectangle — and sampled bilinearly from its
+  target, transparent outside it; H is then the scaled half. So a nested zoom's half zooms as
+  one picture about the nest clip's centre, where each inner layer used to scale about its own
+  anchor, and it is resampled once from its target, where an unnested zoom scales each layer
+  from its source. That holds for nest → plain, plain → nest, nest ↔ nest and a dissolve inside
+  a nest, under any mattes, in the canvas pass and in a matte's own. The core decides it (§7.3).
+  A routed level is an entry in the layer's `dissolve`, never its `transition`, and its layers
+  draw `normal` as a transition's do. A layer drawn into a matte keeps only the dissolves at or
+  inside its first matte level, so a matte inside a dissolving nest clip is drawn whole and the
+  half fades once. The overlapping inner layers of a half no longer show through each other
+  mid-dissolve. Every nested dissolve's and zoom's picture changed, which the owner accepted. A
+  timeline dissolve or zoom between two clips that are not nest clips keeps MT-3's per-layer
+  correction and is unchanged. Push, slide, wipe and the fades are not routed: they apply no
+  partner correction to dip. Cost, from MT-9's pool, shared with the mattes:
+  - Memory: two targets per routed dissolve, live from its first half's draw to its mix (66.4 MB
+    at 3840×2160, 16.6 MB at 1920×1080), and two more for each routed dissolve inside a half.
+  - Passes, per routed dissolve: the pass it lands in is suspended and resumed once, two passes
+    are cleared and stored, and one full-frame draw is added. The halves' own layers draw once,
+    as before.
+
+  A frame with no routed dissolve pays nothing. `LayerUniforms` and the layer stage's texture
+  slots are unchanged. A half that is one layer could be drawn straight onto the pass with its
+  correction read from the other half's target, saving one target. That route was not taken: it
+  would cost every layer draw a third texture sample, MT-6's measured placeholder cost. Measured
+  before and after by `matte_proof.py` D0–D8 (issue batch B90).
 - **MT-9 — The matte pool keeps what recent frames used, and no cap drops a picture (#253;
   owner, 2026-10-08).** Amends MT-6's pooling sentence.
   - **Planning.** A frame's mattes are planned before any is drawn (`MattePlan`). Each cut set

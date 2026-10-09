@@ -199,6 +199,32 @@ struct RecipeLayerMatte: Codable, Equatable {
     }
 }
 
+/// One routed dissolve or zoom a layer is a half of (spec §7.3 `dissolve`,
+/// §11 MT-8): the compositor draws each half into a target of its own and
+/// mixes the two (`Compositor+Dissolve.swift`). `id` names the dissolve in
+/// this frame; `anchor` is the canvas point (top-left frame) the half is
+/// placed at, read for a `zoom` only.
+struct RecipeLayerDissolve: Codable, Equatable {
+    let id: Int
+    let kind: TransitionKind
+    /// "in" or "out".
+    let role: String
+    /// Eased, 0…1.
+    let progress: Double
+    let anchor: [Double]
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.lenient(.id, 0)
+        kind = c.lenient(.kind, TransitionKind.crossDissolve)
+        role = c.lenient(.role, "in")
+        progress = c.lenient(.progress, 0)
+        anchor = c.lenient(.anchor, [0, 0])
+    }
+
+    var isIncoming: Bool { role == "in" }
+}
+
 /// One matte the compositor draws before the destination pass (spec §7.3
 /// `mattes`, §11 MT-6): its group id and how it cuts.
 struct RecipeMatteGroup: Codable, Equatable {
@@ -262,6 +288,10 @@ struct RecipeLayer: Codable, Equatable {
     /// its blend, shadow and reflection (MT-4) — and is drawn into its
     /// group's target only when the recipe lists that group.
     let matte: RecipeLayerMatte?
+    /// The routed dissolves and zooms this layer is a half of, outermost
+    /// first; empty for most layers (`null` in the recipe). A layer in one
+    /// carries no `transition` for it and draws `normal` (§11 MT-8).
+    let dissolve: [RecipeLayerDissolve]
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -288,6 +318,7 @@ struct RecipeLayer: Codable, Equatable {
         clipRect = c.lenient(.clipRect)
         transition = c.lenient(.transition)
         matte = c.lenient(.matte)
+        dissolve = c.lenient(.dissolve, [])
     }
 
     /// `sourceSize` as a size; nil for text, whose size only the renderer

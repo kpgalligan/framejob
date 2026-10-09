@@ -9,13 +9,13 @@ use crate::evaluate::{json, number};
 use crate::model::{BlendMode, VideoProps};
 use crate::nest::Frame;
 
-/// The TWENTY-ONE keys of a recipe layer (spec §7.3), and the one place they
+/// The TWENTY-TWO keys of a recipe layer (spec §7.3), and the one place they
 /// are written.
 ///
 /// It is a struct rather than twenty lines inside [`crate::model::Project::layer`] because
 /// phase 7 gave the recipe a SECOND producer of layers — the burn-in
 /// [`crate::recipe_text::burn_in_layer`] synthesizes, which belongs to no
-/// clip — and a second literal copy of a twenty-one-key object is a copy that
+/// clip — and a second literal copy of a twenty-two-key object is a copy that
 /// drifts. It would drift SILENTLY, which is the part worth stating:
 /// `FrameRecipe.swift`'s `RecipeLayer.init(from:)` reads every key
 /// leniently and DEFAULTS a missing one with no diagnostic anywhere, so a
@@ -50,6 +50,9 @@ pub(crate) struct RecipeLayer<'a> {
     /// `null`, or `{into, cut}` — the matte group this layer is drawn into
     /// and the groups that cut it (`recipe_matte.rs`, spec §7.3).
     pub matte: Value,
+    /// `null`, or the routed dissolves and zooms this layer is a half of,
+    /// outermost first (`recipe_dissolve.rs`, spec §7.3, §11 MT-8).
+    pub dissolve: Value,
 }
 
 impl RecipeLayer<'_> {
@@ -93,6 +96,7 @@ impl RecipeLayer<'_> {
         );
         out.insert("transition".to_string(), self.transition);
         out.insert("matte".to_string(), self.matte);
+        out.insert("dissolve".to_string(), self.dissolve);
         Value::Object(out)
     }
 }

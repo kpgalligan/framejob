@@ -479,6 +479,15 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   `Compositor+Uniforms.swift` is 152. The next seam: `LayerUniforms`, `ShadowUniforms` and
   `TransitionCode` (the file-level `// MARK: - Uniforms` above `LayerUniforms`) out whole to
   `LayerUniforms.swift`.
+  Issue batch B90 phase 4 (#252, spec §11 MT-8) moved `render`'s per-layer loop out as well:
+  `encodeLayers` in the new `Compositor+Dissolve.swift` walks the canvas's layers (and a matte
+  group's members), drawing a routed dissolve as two halves and their mix, and every other
+  layer through `drawLayer` — `Compositor+Matte.swift`'s private `draw`, moved there verbatim
+  and renamed, so the canvas and the matte pass share one per-layer draw. `render` keeps the
+  `canvasLayers` filter, the coverage check before the pass opens and one `encodeLayers` call;
+  `dissolvePipeline` is built in `init`. `wc -l app/Sources/Compositor.swift`: 1005 before
+  (phase 3's two lines included), 959 after; `Compositor+Dissolve.swift` is 190 and
+  `Compositor+Matte.swift` 335 → 304. The named next seam is unchanged.
 - `ReelCore.swift`: the typed patches moved to `TypedPatches.swift` in issue batch B73 (#216), a
   pure move gated alone before `ReelContainer` landed; no further seam is named. The `dictionary`
   extensions went to `OpDictionaries.swift` in issue batch B52b (#190), the media helpers earlier

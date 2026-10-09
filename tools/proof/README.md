@@ -17133,7 +17133,7 @@ mix.
 
 ```
 python3 tools/proof/matte_proof.py --only DR,D0,D1,D2,D3,D4,D5,D6,D7,D8,Z1
-python3 tools/proof/matte_proof.py --mutant dissolve-cover-everywhere --only DR,D0,D1,D2,D4,D5,D6,D7,D8,Z1
+python3 tools/proof/matte_proof.py --mutant dissolve-cover-everywhere --only DR,D0,D1,D2,D4,D5,D6,D7,D8,Z1   # retired in phase 4
 ```
 
 It runs as MT2's section says (its own instance, scratch home, no menu item,
@@ -17217,3 +17217,85 @@ Release build (`RC_PROOF_APP=release`), `matte_proof.py` whole scored 46/46
 run, once the instance, pid, socket and log-tail lines are set aside. All six
 mutants exit 0. Under `free-ignores-liveness` and `early-resolve`, N5's frames
 are missing: the released or unresolved matte fails the frame (`unordered`).
+
+## Mattes follow-up B90 — nested dissolves and zooms mixed exactly (`matte_proof.py` D0–D8 exact and nine mutants; `matte_probe.py` Q3, Q4; `core/tests/dissolve_nest.rs`; #252, spec §11 MT-8)
+
+**What it answers.** Whether a `cross_dissolve` or `zoom` with a nested half
+now draws the exact mix (issue batch B90 phase 4). The core routes it
+(`recipe_dissolve.rs`: the layer's `dissolve`, never its `transition`), and
+the app draws each half alone into a pool target and mixes the pair
+(`Compositor+Dissolve.swift`, `reelcut_dissolve_fragment`), a zoom's halves
+scaled there about their anchors. The D rows of phase 1 now assert the exact
+mix and print the pre-fix prediction beside it, from the same fixtures.
+`matte_probe.py` Q3 and Q4 hold D0's and D8's fixtures, written by hand at
+1920×1080, to the mix at Full, Half and Quarter through the app's own
+preview path: Q3's "mix" class (R 85 ± 8, G 170 ± 8) covers at least 99.5 %
+of each frame, and Q4's sits in the in-box (1/12 … 11/12 of each axis, within
+1.5 destination pixels) with the out half alone around it ("border",
+1 − (5/6)² of the frame within 0.4 %). `core/tests/dissolve_nest.rs` holds the
+recipe: each routed case's entries, ids and contiguity, the matte-level stop,
+the `transition` and `blend` rules, a routed zoom's `kind`, a moved and
+cropped nest clip's anchor, and a timeline pair of plain clips left unrouted.
+
+```
+cd core && cargo test --release --test dissolve_nest
+python3 tools/proof/matte_proof.py --only DR,D0,D1,D2,D3,D4,D5,D6,D7,D8,Z1
+python3 tools/proof/matte_probe.py                                # Q0–Q4, no app
+python3 tools/proof/matte_proof.py --mutant NAME --only <its rows>,Z1
+```
+
+A core mutant's CT row runs `cargo test --release --no-fail-fast --test
+matte --test matte_nest --test dissolve_nest` in the copy's own `core/`.
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `core-dissolve-not-routed` (`recipe_dissolve.rs`) | `routed` answers false | D0–D8 CT |
+| `core-zoom-not-routed` | `routed` admits `cross_dissolve` alone | D8 CT |
+| `core-routed-keeps-transition` | a routed level also fills `transition` | D0 CT |
+| `core-member-keeps-outer` | no matte-level stop | D1 CT |
+| `core-chain-inner-first` | the chain left inner first | D7 CT |
+| `mix-weights-swapped` (`Compositor.metal`) | the mix at 1 − p | D0 |
+| `half-shared-target` (`Compositor+Dissolve.swift`) | the in half drawn into the out half's target | D0 |
+| `members-plain` (`Compositor+Matte.swift`) | `encodeMattes` walks its members at a depth past every chain | D6 |
+| `zoom-scale-dropped` (`Compositor.metal`) | the mix fragment's z_out and z_in both 1 | D8 |
+
+Three earlier mutants were re-pinned to their new homes and re-run:
+`source-drawn` (the `canvasLayers` filter; A1 B0 MM), `reflection-placeholder`
+(`drawLayer`'s `encodeReflection` line; RF1) and `core-no-override`
+(`LayerRoles`' `drawn_into`; P6). `dissolve-cover-everywhere` is retired: no D
+row reaches the outgoing half's partner-cover term any more, which only a
+timeline pair of clips that are not nest clips reads.
+
+**Its record** (2026-10-08, Apple M2 Max): `cargo test --release --test
+dissolve_nest` 8/8. On Debug, `matte_proof.py --only
+DR,D0–D8,A1,B0,MM,N5,N7,T1,T2,T3,S1,RF1,Z1` 21/21; `matte_probe.py` 6/6 (Q4
+at Quarter: the mix box y 0.0815 … 0.9185 for 0.0833 … 0.9167, within the
+1.5-pixel slop, border 0.3025 for 0.3056); `matte_pool_probe.py` 4/4. All
+twelve mutants exit 0. `make gate` PASS (229 s). Recorded on the gate's
+Release build (`RC_PROOF_APP=release`), `matte_proof.py` whole 46/46 (E3
+ran). Rows C0–F1 read as phase 3's recorded run did, but for N7's printed
+minima (left red ≥ 140, right green ≥ 115, where they were ≥ 77 and ≥ 52):
+N7 is itself a split nest clip in a dissolve, and its halves no longer dip.
+DR: p_A 0.3333 (G 85.0), p_B 0.2000, R + G 255 at all 1840 samples. Measured
+at the middle sample, against the exact mix and the pre-fix prediction:
+
+| Row | Case | Measured (R, G, B) | Exact | Pre |
+|---|---|---|---|---|
+| D0 | nest ↔ nest, T_A | (85, 170, 0) | (85.0, 170.0) | G 113.3 |
+| D1 | overlap, T_A (m_i 0.4, m_o 0.8) | (34, 136, 0) | (34.0, 136.0) | (11.3, 86.6) |
+| D1 | right-only | (0, 136, 0) | G 136.0 | G 90.7 |
+| D1 | left-only | (34, 0, 0) | R 34.0 | R 11.3 |
+| D2 | inside a nest, T_C (p 0.3333) | (170, 85, 0) | U's (170, 85, 0) | R 113.3 |
+| D3 | nest → plain, m_o 0.4, T_A | (85, 68, 0) | (85.0, 68.0) | G 52.3 |
+| D4 | plain → nest, T_A | (170, 85, 0) | (170.0, 85.0) | R 113.3 |
+| D5 | white box, T_A | (170, 170, 170) | 170.0 each | Blue 226.7 |
+| D5 | inside B | (85, 0, 170) | (85.0, 0, 170.0) | the same |
+| D6 | matte dissolve in a nest, T_C (p 0.3333) | (136, 136, 136) | U's 136 | 113.3 |
+| D7 | p_i 0.7333, p_o 0.2000, T_B | (54, 150, 51) | (54.4, 149.6, 51.0) | R 14.5 |
+| D8 | zoom, in-box (z_in 0.8333) | (85, 170, 0) | (85.0, 170.0) | G 113.3 |
+| D8 | zoom, outside the in-box | (0, 170, 0) | G 170.0 | G 170.0 |
+
+Under the mutants, D0 read (170, 85, 0) with the weights swapped and
+(255, 0, 85) with one shared target; D6 read 204 with the members drawn plain;
+D8's outside read (85, 170, 0) with the scale dropped; D7 read (43, 120, 51)
+with the chain left inner first.

@@ -227,6 +227,14 @@ The size rule is in the root `CLAUDE.md` and `core/CLAUDE.md`; which modules are
 - `recipe.rs` paid its toll in the mattes road map's MT1 (issue batch B89), a pure move gated
   alone before the matte keys landed: `RecipeLayer` and its `object()` went whole to
   `recipe_layer.rs`, which `recipe.rs` re-exports, taking it from 596 to 511 lines.
+  Issue batch B90 phase 4 (#252, spec §11 MT-8) moved `recipe.rs`'s `transition_of` out:
+  its level walk lives on in the new `recipe_dissolve.rs` (`frame_transitions`, asked once
+  per frame over the covering instances, as `recipe_matte.rs`'s `frame_mattes` is), which
+  answers each layer's `transition` and the new `dissolve`; `layer` takes them with its matte
+  roles as one `LayerRoles`, and `placement` and `frame_of` are `pub(crate)` for the routed
+  half's anchor (the clip's own `motion::apply` call moved into `moved`, which `layer` and
+  `placement` both read, so it stays one of two call sites). `recipe.rs` went from 543 to 521
+  lines.
 
 ## Where to look in the original
 

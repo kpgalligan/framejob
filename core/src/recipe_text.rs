@@ -542,6 +542,7 @@ pub(crate) fn burn_in_layer(canvas: &Canvas, t: Ticks) -> Value {
         blend: BlendMode::Normal,
         transition: Value::Null,
         matte: Value::Null,
+        dissolve: Value::Null,
     }
     .object()
 }

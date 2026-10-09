@@ -2124,14 +2124,13 @@ fn a_nest_clip_evaluates_to_normal_however_the_blend_got_there() {
 
 #[test]
 fn a_transition_inherited_into_a_nest_forces_normal_on_the_layers_inside() {
-    // The override is written against the layer's `transition`, whatever
-    // put it there — and a nested layer's can be INHERITED, from the
-    // nearest nest clip above it that has one, because a dissolve into a
-    // nest has to dissolve everything the nest draws. The weight correction
-    // is the same correction and it is invalidated the same way, so a
-    // blended caption inside a dissolving group has to composite normally
-    // too. Nothing in [`Project::layer`] special-cases the two, which is
-    // the point of asking the question here.
+    // The override is written against the layer's `transition` and its
+    // `dissolve`, whatever put them there. A dissolve INTO a nest clip is
+    // routed (spec §11 MT-8): the nest's layers carry it in `dissolve`, not
+    // `transition`, and are drawn as one half and mixed — and a blended
+    // caption inside that half has to composite normally too, as it does
+    // under a transition. Nothing in [`Project::layer`] special-cases a
+    // nested layer, which is the point of asking the question here.
     let mut project = nest_with_blends("normal", "normal", "screen");
     project["clips"][0]["transition_in"] = json!({ "kind": "cross_dissolve" });
     // A neighbour for it to dissolve from: 0–3 s against the nest clip's
@@ -2146,14 +2145,19 @@ fn a_transition_inherited_into_a_nest_forces_normal_on_the_layers_inside() {
     let inside = handle.recipe(2 * SEC + SEC / 2);
     let nested = layer_of(&inside, 11);
     assert_eq!(
-        nested["transition"]["kind"],
-        json!("cross_dissolve"),
-        "the nested layer inherited the nest clip's transition"
+        nested["transition"],
+        Value::Null,
+        "a routed dissolve is never the nested layer's transition"
+    );
+    assert_eq!(
+        nested["dissolve"][0]["role"],
+        json!("in"),
+        "the nested layer is the incoming half of the nest clip's dissolve"
     );
     assert_eq!(
         nested["blend"],
         json!("normal"),
-        "and an inherited transition forces normal exactly as its own would"
+        "and a routed dissolve forces normal exactly as a transition would"
     );
 
     // Past the overlap the same layer has its blend back, which is what

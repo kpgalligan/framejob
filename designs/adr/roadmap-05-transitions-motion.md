@@ -66,7 +66,8 @@ outgoing end.** `Stage` learns its container; `Side` is threaded through
 `transition_among` would read gain 1 there). Every stage's term multiplies, so
 a clip in an overlap inside a nest that is itself in a transition gets both
 fades — deliberately different from the picture, which takes the clip's own
-transition first. Mute, solo, duck and volume keep precedence by multiplying.
+transition first. (Since issue batch B90 a dissolve with a nested half takes
+both, spec §11 MT-8.) Mute, solo, duck and volume keep precedence by multiplying.
 Breakpoints are sampled across the overlap at the action step (the law is not
 linear). Nothing in Swift changed (orig §3e).
 

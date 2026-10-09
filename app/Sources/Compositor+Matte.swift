@@ -51,7 +51,9 @@ enum MatteError: LocalizedError {
 /// the `index`th cut set's and outlives the destination pass. Between frames
 /// the pool keeps, of each kind, the most any of the last `keepFrames` frames
 /// held at once, and releases the rest when a frame ends. A frame that needs
-/// more targets gets them. Emptied when the destination size changes. One
+/// more targets gets them. A routed dissolve's two halves take composites
+/// from the same pool (MT-8, `Compositor+Dissolve.swift`). Emptied when the
+/// destination size changes. One
 /// renderer serves one serial render queue and waits for each frame's GPU
 /// work, so every target is free again by the next frame.
 final class MattePool {
@@ -214,7 +216,6 @@ extension MetalRenderer {
     ) throws -> MatteCoverage {
         var coverage = MatteCoverage(placeholder: placeholder)
         guard !recipe.mattes.isEmpty else { return coverage }
-        let destination = CGSize(width: target.width, height: target.height)
         let plan = MattePlan(
             groups: recipe.mattes.map(\.group),
             cuts: recipe.layers.compactMap { layer in
@@ -226,30 +227,26 @@ extension MetalRenderer {
         for (group, step) in zip(recipe.mattes, plan.steps) {
             let members = recipe.layers.filter { $0.matte?.into == step.group }
             // Each member's coverage, resolved at an earlier step — the list
-            // is deepest container first — and read before the pass opens: a
-            // throw never leaves an encoder open.
-            let cuts: [MTLTexture] = try members.map {
-                guard let matte = coverage.texture(for: $0) else { throw MatteError.unordered }
-                return matte
+            // is deepest container first — and checked before the pass opens:
+            // a throw never leaves an encoder open.
+            guard members.allSatisfy({ coverage.texture(for: $0) != nil }) else {
+                throw MatteError.unordered
             }
             guard let composite = mattePool.takeComposite() else { throw MatteError.noTarget }
             // A pass of its own, cleared transparent, drawn exactly as the
-            // destination pass draws a layer — a shadow suspends it the same
-            // way — so nothing on this side has an opinion about a matte
-            // layer's blend, shadow or reflection: the core cleared them.
+            // destination pass draws its layers (`encodeLayers`) — a shadow
+            // suspends it the same way, and a routed dissolve among the
+            // members is two halves mixed here (MT-8) — so nothing on this
+            // side has an opinion about a matte layer's blend, shadow or
+            // reflection: the core cleared them.
             var pass = DestinationPass(
                 buffer: buffer, target: composite,
                 clear: MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0),
                 pipeline: pipeline, sampler: sampler)
             guard pass.open() != nil else { throw MatteError.noTarget }
-            for (member, matte) in zip(members, cuts) {
-                guard
-                    let prepared = prepare(
-                        member, among: recipe.layers, canvas: canvas, destination: destination,
-                        request: request, instruction: instruction, live: &live)
-                else { continue }
-                try draw(member, prepared, matte: matte, canvas: canvas, pass: &pass)
-            }
+            try encodeLayers(
+                members, depth: 0, among: recipe.layers, coverage: coverage, canvas: canvas,
+                pass: &pass, request: request, instruction: instruction, live: &live)
             pass.suspend()
             composites[step.group] = (composite, group.mode)
             for cut in step.resolve {
@@ -265,34 +262,6 @@ extension MetalRenderer {
             }
         }
         return coverage
-    }
-
-    /// One layer drawn into a matte's composite, in the steps `render` draws
-    /// a layer on the canvas with: its shadow, then its reflection and
-    /// itself, `texture(1)` bound to the mattes cutting it.
-    private func draw(
-        _ layer: RecipeLayer, _ prepared: PreparedLayer, matte: MTLTexture,
-        canvas: RecipeCanvas, pass: inout DestinationPass
-    ) throws {
-        var uniforms = prepared.uniforms
-        let state = pipelineState(gather: layer.needsGather, blend: layer.needsBlend)
-        if let shadow = layer.shadow {
-            encodeShadow(
-                shadow, uniforms: uniforms, texture: prepared.texture, matte: matte,
-                canvas: canvas, maskState: pipelineState(gather: layer.needsGather, blend: false),
-                pass: &pass)
-        }
-        guard let encoder = pass.open() else { throw MatteError.noTarget }
-        if state !== pipeline { encoder.setRenderPipelineState(state) }
-        encoder.setFragmentTexture(matte, index: 1)
-        if layer.reflection != nil {
-            encodeReflection(uniforms: uniforms, texture: prepared.texture, encoder: encoder)
-        }
-        encoder.setVertexBytes(&uniforms, length: MemoryLayout<LayerUniforms>.stride, index: 0)
-        encoder.setFragmentBytes(&uniforms, length: MemoryLayout<LayerUniforms>.stride, index: 0)
-        encoder.setFragmentTexture(prepared.texture, index: 0)
-        encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
-        if state !== pipeline { encoder.setRenderPipelineState(pipeline) }
     }
 
     /// One cut set's coverage, resolved once per frame: a pass cleared to 1

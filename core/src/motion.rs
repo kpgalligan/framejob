@@ -11,7 +11,8 @@
 //! anything about motion.
 //!
 //! **It is called where placement is PRODUCED and nowhere else** (spec §11,
-//! R5-4): the two call sites are `recipe.rs`'s `layer` and `frame_of`.
+//! R5-4): the two call sites are `recipe.rs`'s `moved` (a clip's own, which
+//! `layer` and the routed dissolve's `placement` read) and `frame_of`.
 //! `evaluate_clip`, `clip_state`, `get_project`, `split_clip`'s state,
 //! `add_zoom_action`, `freeze_frame` and the audio plan all read the clip
 //! UN-MOVED, so an edit works on the numbers a person typed and only the

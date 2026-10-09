@@ -1063,8 +1063,8 @@ the key map behind it.
   last worker has exited.
 - `FrameRecipe.swift` — the frame recipe's Swift side (spec §7.3), decoded
   leniently: `RecipeCanvas`, `RecipeSourceRef`, `RecipeTransition`,
-  `RecipeClipRect`, `RecipeLayerMatte`, `RecipeMatteGroup`, `RecipeLayer`
-  (with `matte`) and `FrameRecipe` (with `mattes`), out of
+  `RecipeClipRect`, `RecipeLayerMatte`, `RecipeLayerDissolve`,
+  `RecipeMatteGroup`, `RecipeLayer` (with `matte` and `dissolve`) and `FrameRecipe` (with `mattes`), out of
   `ProjectSnapshot.swift`; the canvas hit-tests through `CanvasLayerBox`.
 - `TrackMatte.swift` — a track's matte mode, mirroring `model_matte.rs`: raw
   values, `displayName`, `shaderCode` (the case index — a shader
@@ -1072,12 +1072,12 @@ the key map behind it.
   `matte_target`, for the chrome only); `TrackSnapshot.matte` decodes it
   leniently.
 - `Compositor.swift` · `Compositor+Uniforms.swift` · `Compositor+Shadow.swift` ·
-  `Compositor+Matte.swift` · `MattePlan.swift` · `CompositorEffects.swift` ·
-  `Resources/Shaders/Compositor.metal`
+  `Compositor+Matte.swift` · `MattePlan.swift` · `Compositor+Dissolve.swift` ·
+  `CompositorEffects.swift` · `Resources/Shaders/Compositor.metal`
   — the per-layer pass. The uniform block's field ORDER is a contract with the
   shader checked only by reading both, so change them in one edit; it is 104
   floats and **the padding tail is EMPTY** (the next field needs three
-  companions). **Six pipelines from four fragment functions**: the two
+  companions). **Seven pipelines from five fragment functions**: the two
   programmable-blend pipelines MUST be built with fixed-function blending
   OFF, or the finished pixel is blended twice — invisible over an opaque
   destination, so a proof of it reads the ALPHA channel over a translucent
@@ -1085,7 +1085,7 @@ the key map behind it.
   specialization without the blend (defensive, not load-bearing). A shadow's
   three passes and its canvas-sized pair are `Compositor+Shadow.swift`'s
   (`encodeShadow`); a layer's uniforms and source texture are made by
-  `prepare` in `CompositorEffects.swift`, which `render` calls once per layer.
+  `prepare` in `CompositorEffects.swift`, which `encodeLayers` calls once per layer.
   A layer's uniform block is filled by `uniforms(for:…)` in
   `Compositor+Uniforms.swift`, with `partnerBox` and `clearColor`.
   The matte pass is `Compositor+Matte.swift`'s `encodeMattes`, run BEFORE the
@@ -1110,7 +1110,13 @@ the key map behind it.
   regions cover one fragment the GREATER hiding wins. A layer's opacity is read as
   `RecipeLayer.drawnOpacity` (`CompositorEffects.swift`): the recipe's
   `opacity`, times `1 − word_dim × pause_dim` for a timed text page with no
-  backdrop (spec §11 W-16).
+  backdrop (spec §11 W-16). A routed `cross_dissolve` or `zoom` (a layer's
+  `dissolve`, spec §11 MT-8) is `Compositor+Dissolve.swift`'s. `encodeLayers`
+  walks a layer list — the canvas's in `render`, a group's members in
+  `encodeMattes` — and draws each routed dissolve's two halves into two pool
+  targets, then mixes them onto the pass with the seventh pipeline
+  (`reelcut_dissolve_fragment`), which scales a zoom's halves about their
+  anchors there. `drawLayer` is the one per-layer draw both use.
 - `LayerRenderers.swift` · `LayerRenderersText.swift` · `LayerRenderersReveal.swift`
   · `LayerRenderersWords.swift` — text and shape descriptions to textures,
   keyed by the recipe's `hash` (`RecipeSourceRef.cacheHash` is the WHOLE key;

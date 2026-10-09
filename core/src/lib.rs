@@ -80,6 +80,7 @@ pub mod outcome;
 pub mod patch;
 pub mod props_check;
 pub mod recipe;
+mod recipe_dissolve;
 mod recipe_graphic;
 mod recipe_layer;
 mod recipe_matte;

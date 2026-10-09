@@ -825,10 +825,11 @@ fn a_transition_inside_a_nest_still_renders() {
 
 #[test]
 fn a_transition_on_the_nest_clip_is_inherited_by_everything_inside() {
-    // Otherwise a dissolve INTO a nest would cut its layers in at full
-    // opacity while the neighbour faded.
+    // Otherwise a push INTO a nest would move only the neighbour while its
+    // layers stood still. A dissolve or zoom into a nest is routed instead
+    // (spec §11 MT-8, `dissolve_nest.rs`); every other kind is inherited.
     let mut nested = nest_clip(6, 2, 2 * SEC, 2 * SEC, 4);
-    nested["transition_in"] = json!({"kind": "cross_dissolve"});
+    nested["transition_in"] = json!({"kind": "push_left"});
     let project = Handle::from_value(&project(
         vec![video_media(1)],
         vec![track(2)],
@@ -838,7 +839,7 @@ fn a_transition_on_the_nest_clip_is_inherited_by_everything_inside() {
     ));
     // The overlap runs 2 s – 3 s; half way through it is 2.5 s.
     let layer = layer_of(&project.recipe(2 * SEC + SEC / 2), 7);
-    assert_eq!(text(&layer, "/transition/kind"), "cross_dissolve");
+    assert_eq!(text(&layer, "/transition/kind"), "push_left");
     assert_eq!(text(&layer, "/transition/role"), "in");
     close(num(&layer, "/transition/progress"), 0.5, "progress");
 }

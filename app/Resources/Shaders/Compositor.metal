@@ -1276,7 +1276,10 @@ static inline float4 layerColorPremultiplied(Varyings in,
     // Transitions. The recipe hands the pair as two adjacent layers with the
     // same kind and progress, so each pass only needs its own half: every
     // kind decomposes into a per-layer weight (here) plus a per-layer offset
-    // (in the vertex stage), which is why no offscreen intermediate exists.
+    // (in the vertex stage), which is why no offscreen intermediate exists
+    // for a timeline pair. A dissolve or zoom with a nested half never reaches
+    // here as a transition: it is routed through two offscreen halves and
+    // `reelcut_dissolve_fragment` (spec §11 MT-8).
     int kind = int(u.transitionKind + 0.5);
     float p = clamp(u.transitionProgress, 0.0, 1.0);
     bool incoming = u.transitionIncoming > 0.5;
@@ -1617,4 +1620,64 @@ fragment float4 reelcut_matte_resolve_fragment(ShadowVaryings in [[stage_in]],
         v = 1.0 - luma;
     }
     return float4(clamp(v, 0.0, 1.0));
+}
+
+// MARK: - The dissolve mix (spec §11 MT-8)
+
+// The dissolve mix's uniform block, mirrored by `DissolveUniforms` in
+// `Compositor+Dissolve.swift` FIELD FOR FIELD under `LayerUniforms`' layout
+// contract: 12 floats, 48 bytes. Anchors are canvas pixels, top-left frame.
+struct DissolveUniforms {
+    float progress;
+    float zoom;
+    float canvasPerDestX;
+    float canvasPerDestY;
+    float canvasWidth;
+    float canvasHeight;
+    float outAnchorX;
+    float outAnchorY;
+    float inAnchorX;
+    float inAnchorY;
+    float reserved0;
+    float reserved1;
+};
+
+// One half of a routed zoom at canvas point `c`: its destination-sized target
+// scaled by `z` about `anchor`, sampled bilinearly, transparent outside it.
+static inline float4 zoomedHalf(texture2d<float> picture, sampler samp, float2 c,
+                                float2 anchor, float z, float2 canvas) {
+    float2 uv = (anchor + (c - anchor) / z) / canvas;
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {
+        return float4(0.0);
+    }
+    return picture.sample(samp, uv);
+}
+
+// A routed dissolve's two halves, each drawn alone into a destination-sized
+// target, laid on the pass as (1 − p)·out + p·in, PREMULTIPLIED, so the
+// pipeline's source-over leaves (1 − alpha) of what is behind. A dissolve
+// reads each half's own pixel — the targets are the destination's size, so
+// nothing is resampled; a zoom scales each half about its anchor by the
+// vertex stage's own ramps (out 1 → 1.25, in 0.75 → 1), the fragment taken
+// into CANVAS pixels first, as every canvas measurement here is.
+fragment float4 reelcut_dissolve_fragment(ShadowVaryings in [[stage_in]],
+                                          constant DissolveUniforms &u [[buffer(0)]],
+                                          texture2d<float> outgoing [[texture(0)]],
+                                          texture2d<float> incoming [[texture(1)]],
+                                          sampler samp [[sampler(0)]]) {
+    float p = clamp(u.progress, 0.0, 1.0);
+    float4 o;
+    float4 i;
+    if (u.zoom < 0.5) {
+        uint2 px = uint2(in.position.xy);
+        o = outgoing.read(px);
+        i = incoming.read(px);
+    } else {
+        float2 canvas = max(float2(u.canvasWidth, u.canvasHeight), float2(1.0));
+        float2 c = canvasPixels(in.position.xy, float2(u.canvasPerDestX, u.canvasPerDestY));
+        float zOut = mix(1.0, 1.25, p), zIn = mix(0.75, 1.0, p);
+        o = zoomedHalf(outgoing, samp, c, float2(u.outAnchorX, u.outAnchorY), zOut, canvas);
+        i = zoomedHalf(incoming, samp, c, float2(u.inAnchorX, u.inAnchorY), zIn, canvas);
+    }
+    return mix(o, i, p);
 }

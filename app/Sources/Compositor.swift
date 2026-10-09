@@ -607,10 +607,11 @@ final class MetalRenderer {
     /// combination itself. Built with `blending: false`, which is the whole
     /// correctness argument — see `pipelineDescriptor`.
     ///
-    /// Six pipelines, then, from four fragment functions: plain, plain +
-    /// gather, blend, blend + gather, the shadow, and the matte resolve
-    /// (`Compositor+Matte.swift`). `pipelineState(gather: blend:)` picks one
-    /// of the first four per layer.
+    /// Seven pipelines, then, from five fragment functions: plain, plain +
+    /// gather, blend, blend + gather, the shadow, the matte resolve
+    /// (`Compositor+Matte.swift`) and the dissolve mix
+    /// (`Compositor+Dissolve.swift`). `pipelineState(gather: blend:)` picks
+    /// one of the first four per layer.
     private let blendPipeline: MTLRenderPipelineState
     private let blendGatherPipeline: MTLRenderPipelineState
     /// The full-canvas quad that draws one blurred mask as a shadow (§7.5).
@@ -619,6 +620,8 @@ final class MetalRenderer {
     /// `Compositor+Matte.swift`).
     let matteResolvePipeline: MTLRenderPipelineState
     let mattePool: MattePool
+    /// The routed dissolve's mix (spec §11 MT-8, `Compositor+Dissolve.swift`).
+    let dissolvePipeline: MTLRenderPipelineState
     let sampler: MTLSamplerState
     private let textureCache: CVMetalTextureCache
     /// Bound wherever the shader ignores the texture (the missing-media
@@ -670,7 +673,8 @@ final class MetalRenderer {
                 library, name: "reelcut_layer_blend_fragment", gather: true),
             let shadowVertex = library.makeFunction(name: "reelcut_shadow_vertex"),
             let shadowFragment = library.makeFunction(name: "reelcut_shadow_fragment"),
-            let resolveFragment = library.makeFunction(name: "reelcut_matte_resolve_fragment")
+            let resolveFragment = library.makeFunction(name: "reelcut_matte_resolve_fragment"),
+            let dissolveFragment = library.makeFunction(name: "reelcut_dissolve_fragment")
         else { return nil }
 
         guard
@@ -699,7 +703,10 @@ final class MetalRenderer {
                     label: "Reelcut shadow", vertex: shadowVertex, fragment: shadowFragment)),
             let matteResolvePipeline = try? device.makeRenderPipelineState(
                 descriptor: MetalRenderer.matteResolveDescriptor(
-                    vertex: shadowVertex, fragment: resolveFragment))
+                    vertex: shadowVertex, fragment: resolveFragment)),
+            let dissolvePipeline = try? device.makeRenderPipelineState(
+                descriptor: MetalRenderer.pipelineDescriptor(
+                    label: "Reelcut dissolve", vertex: shadowVertex, fragment: dissolveFragment))
         else { return nil }
 
         let samplerDescriptor = MTLSamplerDescriptor()
@@ -741,6 +748,7 @@ final class MetalRenderer {
         self.shadowPipeline = shadowPipeline
         self.matteResolvePipeline = matteResolvePipeline
         self.mattePool = MattePool(device: device)
+        self.dissolvePipeline = dissolvePipeline
         self.sampler = sampler
         self.textureCache = cache
         self.placeholder = placeholder
@@ -754,9 +762,10 @@ final class MetalRenderer {
 
     /// The compositor's FIXED-FUNCTION blend, in descriptor form: source-over
     /// on PREMULTIPLIED colour, so the source factor is one and not source
-    /// alpha. The five layer and shadow pipelines come through here (the
-    /// matte resolve has its own, `matteResolveDescriptor`) and three take it
-    /// as written — a shadow is just another layer, drawn under its own.
+    /// alpha. The five layer and shadow pipelines and the dissolve mix come
+    /// through here (the matte resolve has its own, `matteResolveDescriptor`)
+    /// and four take it as written — a shadow is just another layer, drawn
+    /// under its own, and the mix lays its premultiplied pair source-over.
     ///
     /// **`blending: false` is for a programmable-blend pipeline, and it is a
     /// correctness requirement rather than an optimisation.**
@@ -809,8 +818,9 @@ final class MetalRenderer {
     }
 
     /// Composes one frame: clear to the canvas background, then one pass per
-    /// recipe layer back to front — plus, for a layer that has a shadow, the
-    /// three passes `encodeShadow` puts in front of it.
+    /// recipe layer back to front (`encodeLayers`) — plus, for a layer that
+    /// has a shadow, the three passes `encodeShadow` puts in front of it, and
+    /// for a routed dissolve its two halves and their mix (MT-8).
     func render(
         recipe: FrameRecipe?, into destination: CVPixelBuffer,
         request: AVAsynchronousVideoCompositionRequest, instruction: RecipeInstruction?
@@ -837,9 +847,17 @@ final class MetalRenderer {
                 recipe: recipe, canvas: canvas, target: target, buffer: buffer, request: request,
                 instruction: instruction, live: &live)
         }
+        let layers = recipe?.layers ?? []
+        // A layer drawn into a matte is never drawn on the canvas (MT-1).
+        let canvasLayers = layers.filter { $0.matte?.into == nil }
+        // Each canvas layer's coverage, checked before the pass opens, so a
+        // throw leaves no encoder open.
+        guard canvasLayers.allSatisfy({ coverage.texture(for: $0) != nil }) else {
+            throw MatteError.unordered
+        }
         // One encoder for the whole frame, as before — but a shadowed layer
-        // has to interrupt it (`encodeShadow`), so the pass is a value that
-        // can be suspended and resumed rather than one long-lived encoder.
+        // or a routed dissolve has to interrupt it, so the pass is a value
+        // that can be suspended and resumed rather than one long-lived one.
         var pass = DestinationPass(
             buffer: buffer, target: target, clear: clearColor(canvas.background),
             pipeline: pipeline, sampler: sampler)
@@ -847,73 +865,9 @@ final class MetalRenderer {
         // the destination, which is a recycled pixel buffer holding an old
         // frame, not a blank one.
         guard pass.open() != nil else { throw CompositorError.noDestinationTexture }
-
-        let layers = recipe?.layers ?? []
-        for layer in layers {
-            // A layer drawn into a matte is never drawn on the canvas (MT-1).
-            if layer.matte?.into != nil { continue }
-            guard
-                let prepared = prepare(
-                    layer, among: layers, canvas: canvas,
-                    destination: CGSize(width: target.width, height: target.height),
-                    request: request, instruction: instruction, live: &live)
-            else { continue }
-            var uniforms = prepared.uniforms
-            let texture = prepared.texture
-            // A blur or a sharpen — a filter's, or an obscured region's —
-            // needs the fragment stage compiled WITH the tap loop, which is a
-            // whole second pipeline rather than a branch: the shader's
-            // `kGatherFilters` has the measurement. Every other layer, which
-            // is nearly all of them, keeps the pipeline the pass is already
-            // carrying and changes no state at all. The predicate belongs to
-            // the LAYER and not to its filter list, because a region that
-            // blurs gathers exactly as a blur filter does — and both gather
-            // sites in the shader are compiled out of the other pipeline, so
-            // getting this wrong renders the region plain and silently.
-            //
-            // A non-normal blend mode picks the other entry point on the same
-            // two specializations (format version 6), so the two questions are
-            // independent and there are four states.
-            let state = pipelineState(gather: layer.needsGather, blend: layer.needsBlend)
-            // The SHADOW's mask pass takes the same specialization WITHOUT
-            // the blend — see `encodeShadow`, which argues it at length. The
-            // one-line version: the mask is coverage, not ink. It is
-            // defensive and not load-bearing — a blend over the cleared mask
-            // reduces to the source exactly — and `encodeShadow` says how
-            // that was measured.
-            let maskState = layer.needsGather ? gatherPipeline : pipeline
-            // The mattes cutting this layer, or the placeholder (MT-3).
-            guard let matte = coverage.texture(for: layer) else {
-                pass.suspend()
-                throw MatteError.unordered
-            }
-            if let shadow = layer.shadow {
-                encodeShadow(
-                    shadow, uniforms: uniforms, texture: texture, matte: matte, canvas: canvas,
-                    maskState: maskState, pass: &pass)
-            }
-            // Cheap when the pass is already open, which for an unshadowed
-            // layer it always is: the encoder, the pipeline state and the
-            // sampler are exactly the ones the previous layer left behind.
-            guard let encoder = pass.open() else {
-                throw CompositorError.noDestinationTexture
-            }
-            if state !== pipeline { encoder.setRenderPipelineState(state) }
-            encoder.setFragmentTexture(matte, index: 1)
-            if layer.reflection != nil {
-                encodeReflection(uniforms: uniforms, texture: texture, encoder: encoder)
-            }
-            encoder.setVertexBytes(
-                &uniforms, length: MemoryLayout<LayerUniforms>.stride, index: 0)
-            encoder.setFragmentBytes(
-                &uniforms, length: MemoryLayout<LayerUniforms>.stride, index: 0)
-            encoder.setFragmentTexture(texture, index: 0)
-            encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
-            // Back to the pass's own pipeline, so the next layer inherits the
-            // state `DestinationPass.open()` promises.
-            if state !== pipeline { encoder.setRenderPipelineState(pipeline) }
-        }
-
+        try encodeLayers(
+            canvasLayers, depth: 0, among: layers, coverage: coverage, canvas: canvas,
+            pass: &pass, request: request, instruction: instruction, live: &live)
         pass.suspend()
         buffer.commit()
         // The pixel buffer is handed to AVFoundation the moment this returns,

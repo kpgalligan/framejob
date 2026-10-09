@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Road map "mattes", phase MT3 (#240; spec §11 MT-3, MT-6) — a matte under
-View ▸ Preview Quality, through the app's own preview path.
+View ▸ Preview Quality, through the app's own preview path; and (issue batch
+B90 phase 4, #252, spec §11 MT-8) a routed dissolve and zoom the same way.
 
     python3 tools/proof/matte_probe.py
     python3 tools/proof/matte_probe.py --mutant coverage-destination-coords
@@ -32,6 +33,16 @@ written by hand at the header's current format version:
   shape offset by 212.13 px down and right — where Full's is. The shadow's
   silhouette pass is canvas-sized whatever the quality, so a coverage
   sampled in destination pixels there misplaces it at Half and Quarter.
+- **Q3** (B90 phase 4): `matte_proof.py` D0's fixture written by hand — red
+  then green full cards (0–1 s, 1–2 s) in a nest, shown by a nest clip at
+  0–1.5 s and another at 1–2 s whose linear `cross_dissolve` makes the
+  overlap — at tick 700000 (p = 1/3): the class "mix" (R within 255/3 ± 8,
+  G within 170 ± 8) covers at least 99.5 % of the frame at each quality.
+- **Q4** (B90 phase 4): D8's fixture, the same with a `zoom`: at each quality
+  the "mix" class's box is the in-box, 1/12 … 11/12 of each axis (z_in =
+  5/6), and the class "border" (G within 170 ± 8, R ≤ 8) covers 1 − (5/6)²
+  of the frame within 0.4 %. A zoom anchor read in destination pixels
+  misplaces the box at Half and Quarter.
 - **Q0** (CONTROL): the destinations are 1920×1080, 960×540 and 480×270.
 
 `--mutant coverage-destination-coords` compiles a copy of the shader whose
@@ -77,6 +88,16 @@ CLASSES = [
     {"name": "white", "low": [200, 200, 200], "high": [255, 255, 255]},
     {"name": "shadow", "low": [100, 0, 0], "high": [255, 90, 90]},
 ]
+# Q3 and Q4 (B90 phase 4): the mix of a green out half and a red in half at
+# p = 1/3, and the out half alone at 1 − p.
+MIX_CLASSES = [
+    {"name": "mix", "low": [77, 162, 0], "high": [93, 178, 8]},
+    {"name": "border", "low": [0, 162, 0], "high": [8, 178, 8]},
+]
+GREEN = [0.0, 1.0, 0.0, 1.0]
+MIX_TICK = 700_000
+IN_BOX = (W / 12, H / 12, 11 * W / 12, 11 * H / 12)
+MIX_COVERAGE = 0.995
 # Q1's window, Q2's card, window and shadow, in canvas pixels.
 Q1_WINDOW = (320, 200, 1120, 600)
 CARD = (280, 120, 680, 420)
@@ -113,12 +134,12 @@ def video(x=0.0, y=0.0, shadow=None):
     }
 
 
-def shape_clip(cid, track, box, fill, shadow=None):
+def shape_clip(cid, track, box, fill, shadow=None, start=0, duration=2 * SEC):
     """An unstroked rectangle filling `box` (canvas pixels): `x`/`y` are its
     centre's offset from the canvas centre (spec §5.3)."""
     x0, y0, x1, y1 = box
     return {
-        "id": cid, "track": track, "start": 0, "duration": 2 * SEC,
+        "id": cid, "track": track, "start": start, "duration": duration,
         "source": {"kind": "shape"}, "enabled": {"video": True, "audio": True},
         "speed": 1.0,
         "video": video((x0 + x1) / 2 - W / 2, (y0 + y1) / 2 - H / 2, shadow),
@@ -130,7 +151,32 @@ def shape_clip(cid, track, box, fill, shadow=None):
     }
 
 
-def package(name, clips):
+def nest_clip(cid, track, start, duration, kind=None):
+    """A clip showing nest 40 (a `kind` transition in, linear, when given)."""
+    return {
+        "id": cid, "track": track, "start": start, "duration": duration,
+        "source": {"kind": "nest", "project": 40}, "enabled": {"video": True, "audio": True},
+        "speed": 1.0, "video": video(), "audio": None, "text": None, "shape": None,
+        "actions": [], "name": None, "label": None,
+        "transition_in": ({"kind": kind, "curve": "linear", "audio": False}
+                          if kind else None),
+    }
+
+
+def split_nest(kind):
+    """`matte_proof.py` D0's construction by hand: red then green full cards
+    in nest 40, one nest clip at 0–1.5 s and one at 1–2 s dissolving (`kind`)
+    over the overlap."""
+    nest = {"id": 40, "name": "Nest 40", "width": W, "height": H,
+            "tracks": [{"id": 41, "name": "Track 1", "hidden": False, "muted": False,
+                        "locked": False, "solo": False}],
+            "clips": [shape_clip(42, 41, (0, 0, W, H), RED, duration=SEC),
+                      shape_clip(43, 41, (0, 0, W, H), GREEN, start=SEC, duration=SEC)]}
+    clips = [nest_clip(50, 10, 0, SEC + SEC // 2), nest_clip(51, 10, SEC, SEC, kind)]
+    return clips, [nest]
+
+
+def package(name, clips, nests=None):
     path = WORK / f"{name}.reelcut"
     path.mkdir(parents=True, exist_ok=True)
     project = {
@@ -145,7 +191,7 @@ def package(name, clips):
             {"id": 11, "name": "Matte", "hidden": False, "muted": False,
              "locked": False, "solo": False, "matte": "alpha"},
         ],
-        "clips": clips, "markers": [], "next_id": 100, "nests": [],
+        "clips": clips, "markers": [], "next_id": 100, "nests": nests or [],
     }
     (path / "project.json").write_text(json.dumps(project, indent=2) + "\n")
     return path
@@ -231,6 +277,18 @@ def area(box):
     return (box[2] - box[0]) * (box[3] - box[1]) / (W * H)
 
 
+def covered(answer, tag, quality, klass, want, slop):
+    """(ok, detail): a class's coverage within `slop` of `want`, or at least
+    `want` when `slop` is None."""
+    got, why = measurement(answer, tag, quality, klass)
+    if got is None:
+        return False, why
+    ok = got["coverage"] >= want if slop is None else abs(got["coverage"] - want) <= slop
+    return ok, (f"{tag} q{quality} {got['width']}x{got['height']}: {klass} coverage "
+                f"{got['coverage']:.4f}; wanted " + (f"≥ {want:.4f}" if slop is None
+                                                    else f"{want:.4f} ± {slop}"))
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--mutant", choices=sorted(MUTANTS))
@@ -247,11 +305,15 @@ def main():
     shadow = {"color": RED, "opacity": 1.0, "blur": 0.0, "angle": 315.0, "distance": 300.0}
     q2 = package("q2", [shape_clip(20, 10, CARD, WHITE, shadow),
                         shape_clip(21, 11, Q2_WINDOW, WHITE)])
+    q3 = package("q3", *split_nest("cross_dissolve"))
+    q4 = package("q4", *split_nest("zoom"))
     answer = None
     if binary is not None:
         request = {"renders": [
             {"tag": "q1", "package": str(q1), "tick": SEC // 2, "classes": CLASSES},
             {"tag": "q2", "package": str(q2), "tick": SEC // 2, "classes": CLASSES},
+            {"tag": "q3", "package": str(q3), "tick": MIX_TICK, "classes": MIX_CLASSES},
+            {"tag": "q4", "package": str(q4), "tick": MIX_TICK, "classes": MIX_CLASSES},
         ]}
         request_path, out = WORK / "request.json", WORK / "answer.json"
         request_path.write_text(json.dumps(request, indent=2))
@@ -276,7 +338,18 @@ def main():
         shadow_ok, cast = placed(answer, "q2", quality, "shadow", SHADOW, area(CUT))
         check(f"Q2 {name}: the matted card is the cut shape and its shadow the cut shape "
               "offset, where Full's is", card_ok and shadow_ok, f"{card}\n       {cast}")
-    scored = ["B0", "Q0", "Q1", "Q2"]
+    for quality, name in ((0, "Full"), (1, "Half"), (2, "Quarter")):
+        ok, detail = covered(answer, "q3", quality, "mix", MIX_COVERAGE, None)
+        check(f"Q3 {name}: a dissolve between nest clips is the exact mix (R 85 ± 8, G 170 ± 8) "
+              "over the whole frame", ok, detail)
+    for quality, name in ((0, "Full"), (1, "Half"), (2, "Quarter")):
+        box_ok, box = placed(answer, "q4", quality, "mix", IN_BOX)
+        rim_ok, rim = covered(answer, "q4", quality, "border", 1 - (5 / 6) ** 2,
+                              COVERAGE_SLOP)
+        check(f"Q4 {name}: a zoom between nest clips mixes inside the in-box (1/12 … 11/12) "
+              "and shows the out half alone around it", box_ok and rim_ok,
+              f"{box}\n       {rim}")
+    scored = ["B0", "Q0", "Q1", "Q2", "Q3", "Q4"]
     passed = sum(1 for name in scored if rows.get(name))
     print(f"{passed}/{len(scored)}")
     if args.mutant:

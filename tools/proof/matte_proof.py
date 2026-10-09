@@ -3,7 +3,8 @@
 matte track end to end over MCP: `set_track {matte}`, the recipe's `matte` and
 `mattes`, and the compositor's matte pass, read back as `render_frame` bytes;
 then (MT3) nests, dissolves, a matted clip's shadow and reflection, and every
-export preset; then (issue batch B90) nested dissolves and zooms measured.
+export preset; then (issue batch B90) nested dissolves and zooms, measured
+and then mixed exactly (spec §11 MT-8).
 
     python3 tools/proof/matte_proof.py [--app PATH] [--only C0,A1,...]
     python3 tools/proof/matte_proof.py --mutant NAME
@@ -118,43 +119,49 @@ window less 8 px and every 16th more than 16 px clear of it within ±8 of
   the matte track over the card: `render_frame` shows the cut, and the
   `prores_422` export's `graphic prefetch:` line has hits > 0 and
   mismatched 0.
-Issue batch B90 phase 1 (#252): nested dissolves and zooms MEASURED, each
-row asserting today's picture ("pre") and printing the exact mix beside it.
-Each its own project, background black, every transition `linear`, closed
-at the end. Samples every 16th pixel of a region less MARGIN, ±2 per channel
-(D1 and D6 ±3: an r8 coverage and an 8-bit half). T_A = 700000 (frame 35),
-T_B = 660000 (33), T_C = 540000 (27). p is never read off the row's own
-frame: it comes from DR, or from the row's own un-nested frame U.
+Issue batch B90 (#252): nested dissolves and zooms. Phase 1 MEASURED them,
+each row asserting the picture of the day ("pre"); since phase 4 (spec §11
+MT-8, the routed dissolve) each row asserts the EXACT mix and prints the
+pre-fix prediction beside it. Each its own project, background black, every
+transition `linear`, closed at the end. Samples every 16th pixel of a region
+less MARGIN, ±2 per channel (D1 and D6 ±3: an r8 coverage and an 8-bit
+half). T_A = 700000 (frame 35), T_B = 660000 (33), T_C = 540000 (27). p is
+never read off the row's own frame: it comes from DR, or from the row's own
+un-nested frame U.
 - **DR** (CONTROL): red then green full cards (0–1 s, 1–2 s), a 0.5 s
   dissolve `after` on green: at T_A and T_B, R + G = 255 ± 2 (a timeline
   pair is exact) and p = G/255; at T_A 70 ≤ G ≤ 100. Runs whenever any D row
   does.
-- **D0**: N7's construction, no matte: G = 255(1−p)², R = 255p at T_A.
+- **D0**: N7's construction, no matte: G = 255(1−p), R = 255p at T_A
+  (pre: G = 255(1−p)²).
 - **D1**: N7's construction under a `luma` track, a left window
   (40–400 × 80–280, grey 0.4, 0–1 s) and a right one (240–600, grey 0.8,
   1–2 s), m_i and m_o their lumas drawn alone before nesting: overlap
-  G = 255·m_o(1−p)²(1 − m_i·p²), R = 255·m_i·p²; right-only
-  G = 255·m_o(1−p)²; left-only R = 255·m_i·p²; clear of both ≤ 2.
+  G = 255(1−p)m_o, R = 255·p·m_i; right-only G = 255(1−p)m_o; left-only
+  R = 255·p·m_i; clear of both ≤ 2 (pre: overlap G = 255·m_o(1−p)²(1 −
+  m_i·p²), R = 255·m_i·p²).
 - **D2**: red then green with a centred dissolve, p from U at T_C, then
-  nested: R = 255(1−p)², G = 255p.
+  nested: U's bytes (pre: R = 255(1−p)², G = 255p).
 - **D3**: a green card under a grey 0.4 `luma` card (m_o drawn alone),
   nested, trimmed to 1 s, a red card after it with a dissolve `after`:
-  G = 255·m_o(1−p)²/(1 − p·m_o), R = 255p at T_A.
+  G = 255(1−p)m_o, R = 255p at T_A (pre: G = 255·m_o(1−p)²/(1 − p·m_o)).
 - **D4**: a red card, then a green card nested alone with a dissolve
-  `after`: R = 255(1−p)², G = 255p at T_A.
+  `after`: R = 255(1−p), G = 255p at T_A (pre: R = 255(1−p)²).
 - **D5**: a blue card under a white 400–600 × 120–240 rectangle, nested,
   trimmed to 1 s; a red 0–320 × 0–360 rectangle B after it with a dissolve
-  `after`: in the white box R = G = 255(1−p), Blue = 255(1−p) + 255p(1−p);
-  inside B R = 255p, Blue = 255(1−p).
+  `after`: in the white box R = G = Blue = 255(1−p) (pre: Blue = 255(1−p) +
+  255p(1−p)); inside B R = 255p, Blue = 255(1−p).
 - **D6**: a white card under two grey `luma` cards (0.4, 0.8; m_a, m_b drawn
   alone) with a centred dissolve; U at T_C gives m and p = (m − m_a)/(m_b −
-  m_a); then all nested: every channel 255·(m_b·p + m_a(1−p)²).
+  m_a); then all nested: U's bytes (pre: every channel 255·(m_b·p +
+  m_a(1−p)²)).
 - **D7**: red then green with a centred dissolve (p_i from U at T_B), nested,
   trimmed to 1 s, a blue card after it with a dissolve `after` (p_o from DR
-  at T_B): R = 255(1−p_i)²(1−p_o), G = 255·p_i(1−p_o), Blue = 255p_o.
+  at T_B): R = 255(1−p_o)(1−p_i), G = 255(1−p_o)p_i, Blue = 255p_o (pre:
+  R = 255(1−p_i)²(1−p_o)).
 - **D8**: D0 with a `zoom`: inside the centred in-box (z_in = 0.75 + 0.25p of
-  the canvas, 4 px kept from its edges) G = 255(1−p)², R = 255p; outside it
-  G = 255(1−p), R ≤ 2.
+  the canvas, 4 px kept from its edges) G = 255(1−p), R = 255p (pre: G =
+  255(1−p)²); outside it G = 255(1−p), R ≤ 2.
 - **Z1** (CONTROL): the log holds no `Reelcut: ` line; its tail is printed.
 
 `--mutant NAME` builds a COPY of the tree (`tree_copy.make_copy`; a `core/`
@@ -162,18 +169,20 @@ anchor makes the copy's `core/` its own through `hevc_alpha_proof.own_core`),
 replaces one anchor (asserted to occur exactly once), builds it by the copy's
 own `make app-debug` (`make app` under `RC_PROOF_APP=release`;
 `tree_copy.build_app`), and runs every row on it. A core mutant also runs
-`cargo test --release --no-fail-fast --test matte --test matte_nest` in the
-copy's own `core/` (row CT, scored only for a mutant that names it; the
-failing files are named). The rows each must
+`cargo test --release --no-fail-fast --test matte --test matte_nest --test
+dissolve_nest` in the copy's own `core/` (row CT, scored only for a mutant
+that names it; the failing files are named). The rows each must
 FAIL:
   shader-no-multiply          step 7's multiply removed: A1 A2 L1
-  source-drawn                render's `into` skip removed: A1 B0 MM
+  source-drawn                render's `into` filter removed (the
+                              `canvasLayers` line since B90 phase 4): A1 B0 MM
   resolve-mode-ignored        the resolve reads every mode as alpha: A2 L1 L2 L3
   core-no-prune               a group listed with no `into` layer: V5 H0
   core-matte-behind-matte     the target ignores a matte behind: MM
   core-untargeted-into-null   a matte layer with no target gets `into: null`:
                               B0 MM CT
-  core-no-override            the source keeps shadow, reflection, blend: P6
+  core-no-override            the source keeps shadow, reflection, blend
+                              (`LayerRoles`' `drawn_into` since B90 phase 4): P6
   handler-drops-matte         the handler drops `matte`: A1 G0
   (MT3)
   dissolve-no-cover           the dissolve's cover ignores the matte: T3
@@ -182,16 +191,28 @@ FAIL:
   unnest-old-depth            depth from the nest's front-most track: N6 CT
   core-group-by-track         a group keyed by its track alone: N7 CT
   resolve-overwrites          the last matte in a cut set wins: N5
-  reflection-placeholder      the reflection draw binds the placeholder: RF1
-  (B90 phase 1)
-  dissolve-cover-everywhere   an outgoing half with no partner box takes its
-                              own cover: D0 D1 D2 D4 D5 D6 D7 D8
+  reflection-placeholder      the reflection draw binds the placeholder
+                              (`drawLayer`'s since B90 phase 4): RF1
+  (B90 phase 1's dissolve-cover-everywhere is retired: since phase 4 no D row
+  reaches the outgoing half's partner-cover term, which only a timeline pair
+  of clips that are not nest clips reads.)
   (B90 phase 3, `MattePlan.swift`)
   free-ignores-liveness       each step gives back only its own composite, so
                               the set naming an inner and an outer matte finds
                               the inner one given back: N5 (the frame fails)
   early-resolve               a cut set resolves at its first matte's step,
                               before its last is drawn: N5 (the frame fails)
+  (B90 phase 4, MT-8: `recipe_dissolve.rs`, then the app)
+  core-dissolve-not-routed    `routed` answers false: D0–D8 CT
+  core-zoom-not-routed        `routed` admits `cross_dissolve` alone: D8 CT
+  core-routed-keeps-transition  a routed level also fills `transition`: D0 CT
+  core-member-keeps-outer     no matte-level stop: D1 CT
+  core-chain-inner-first      the chain left inner first: D7 CT
+  mix-weights-swapped         the mix fragment at 1 − p: D0
+  half-shared-target          the in half drawn into the out half's target: D0
+  members-plain               `encodeMattes` walks its members at a depth past
+                              every chain: D6
+  zoom-scale-dropped          the mix fragment's z_out and z_in both 1: D8
 (MT3's eighth, coverage-destination-coords, is `matte_probe.py`'s.)
 (B90 phase 3's other four, on the pool and the plan alone, are
 `matte_pool_probe.py`'s.)
@@ -249,8 +270,9 @@ MUTANTS = {
         "    alpha *= 1.0 + 0.0 * matteCover;", ["A1", "A2", "L1"]),
     "source-drawn": (
         "app/Sources/Compositor.swift",
-        "            if layer.matte?.into != nil { continue }",
-        "            if layer.matte?.into != nil {}", ["A1", "B0", "MM"]),
+        "        let canvasLayers = layers.filter { $0.matte?.into == nil }",
+        "        let canvasLayers = layers.filter { $0.matte?.into == nil || true }",
+        ["A1", "B0", "MM"]),
     "resolve-mode-ignored": (
         "app/Resources/Shaders/Compositor.metal",
         "    int mode = int(u.mode + 0.5);",
@@ -271,8 +293,8 @@ MUTANTS = {
         ".map(|(k, mode)| id_of(k, *mode));", ["B0", "MM", "CT"]),
     "core-no-override": (
         "core/src/recipe.rs",
-        "self.layer(instance, t, &assignment, *drawn_into, matte)",
-        "self.layer(instance, t, &assignment, false && *drawn_into, matte)", ["P6"]),
+        "                    drawn_into: *drawn_into,",
+        "                    drawn_into: false && *drawn_into,", ["P6"]),
     "handler-drops-matte": (
         "app/Sources/AgentServer+Tracks.swift",
         "solo: solo, matte: matte)",
@@ -303,17 +325,13 @@ MUTANTS = {
         "        descriptor.colorAttachments[0].isBlendingEnabled = true",
         "        descriptor.colorAttachments[0].isBlendingEnabled = false", ["N5"]),
     "reflection-placeholder": (
-        "app/Sources/Compositor.swift",
-        "                encodeReflection(uniforms: uniforms, texture: texture, encoder: encoder)\n",
-        "                encoder.setFragmentTexture(placeholder, index: 1)\n"
-        "                encodeReflection(uniforms: uniforms, texture: texture, encoder: encoder)\n"
-        "                encoder.setFragmentTexture(matte, index: 1)\n", ["RF1"]),
-    # Issue batch B90 phase 1: zoom shares the dissolve's weight branch.
-    "dissolve-cover-everywhere": (
-        "app/Resources/Shaders/Compositor.metal",
-        "clamp(u.partnerAlpha, 0.0, 1.0) * matteCover : 0.0;",
-        "clamp(u.partnerAlpha, 0.0, 1.0) * matteCover : matteCover;",
-        ["D0", "D1", "D2", "D4", "D5", "D6", "D7", "D8"]),
+        "app/Sources/Compositor+Dissolve.swift",
+        "            encodeReflection(uniforms: uniforms, texture: prepared.texture, "
+        "encoder: encoder)\n",
+        "            encoder.setFragmentTexture(placeholder, index: 1)\n"
+        "            encodeReflection(uniforms: uniforms, texture: prepared.texture, "
+        "encoder: encoder)\n"
+        "            encoder.setFragmentTexture(matte, index: 1)\n", ["RF1"]),
     # Issue batch B90 phase 3 (#253, MT-9): the matte plan's two orderings.
     "free-ignores-liveness": (
         "app/Sources/MattePlan.swift",
@@ -323,6 +341,46 @@ MUTANTS = {
         "app/Sources/MattePlan.swift",
         "            guard at.count == cut.count, let last = at.max() else { continue }\n",
         "            guard at.count == cut.count, let last = at.min() else { continue }\n", ["N5"]),
+    # Issue batch B90 phase 4 (#252, MT-8): the routed dissolve. Core first,
+    # in `recipe_dissolve.rs` (CT runs `dissolve_nest` too).
+    "core-dissolve-not-routed": (
+        "core/src/recipe_dissolve.rs",
+        "    mixed && nested\n",
+        "    false && mixed && nested\n",
+        ["D0", "D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "CT"]),
+    "core-zoom-not-routed": (
+        "core/src/recipe_dissolve.rs",
+        "matches!(kind, TransitionKind::CrossDissolve | TransitionKind::Zoom)",
+        "matches!(kind, TransitionKind::CrossDissolve)", ["D8", "CT"]),
+    "core-routed-keeps-transition": (
+        "core/src/recipe_dissolve.rs",
+        "                } else if transition.is_null() {\n",
+        "                }\n                if transition.is_null() {\n", ["D0", "CT"]),
+    "core-member-keeps-outer": (
+        "core/src/recipe_dissolve.rs",
+        "                stopped = true;\n",
+        "                stopped = false;\n", ["D1", "CT"]),
+    "core-chain-inner-first": (
+        "core/src/recipe_dissolve.rs",
+        "        chain.reverse();\n",
+        "\n", ["D7", "CT"]),
+    # Then the app: the mix, the halves' targets, the matte members' walk.
+    "mix-weights-swapped": (
+        "app/Resources/Shaders/Compositor.metal",
+        "    return mix(o, i, p);\n",
+        "    return mix(o, i, 1.0 - p);\n", ["D0"]),
+    "half-shared-target": (
+        "app/Sources/Compositor+Dissolve.swift",
+        "for (half, target) in zip(halves, [outgoing, incoming]) {",
+        "for (half, target) in zip(halves, [outgoing, outgoing]) {", ["D0"]),
+    "members-plain": (
+        "app/Sources/Compositor+Matte.swift",
+        "                members, depth: 0, among: recipe.layers,",
+        "                members, depth: 1 << 20, among: recipe.layers,", ["D6"]),
+    "zoom-scale-dropped": (
+        "app/Resources/Shaders/Compositor.metal",
+        "        float zOut = mix(1.0, 1.25, p), zIn = mix(0.75, 1.0, p);\n",
+        "        float zOut = 1.0, zIn = 1.0;\n", ["D8"]),
 }
 rows = {}
 selected = set(ROWS)
@@ -1298,10 +1356,11 @@ def shown(value):
 
 
 def claim(got, points, pre, exact, channels=(0, 1, 2), tolerance=2):
-    """Each point's `channels` within `tolerance` of `pre` (a tuple, or a
-    function of (x, y)); (ok, a line with the measured value at the middle
-    sample, the pre-fix prediction and the exact mix there, and the first
-    miss)."""
+    """Each point's `channels` within `tolerance` of `exact` (a tuple, or a
+    function of (x, y)) — the mix B90 phase 4 draws (spec §11 MT-8); `pre`,
+    the picture phase 1 measured before it, is printed beside it. (ok, a
+    line with the measured value at the middle sample, the exact mix and the
+    pre-fix prediction there, and the first miss)."""
     def at(value, x, y):
         return value(x, y) if callable(value) else value
 
@@ -1309,15 +1368,16 @@ def claim(got, points, pre, exact, channels=(0, 1, 2), tolerance=2):
         return False, "the frame is missing" if got is None else "no samples"
     miss = None
     for x, y in points:
-        a, want = px(got, x, y), at(pre, x, y)
+        a, want = px(got, x, y), at(exact, x, y)
         if any(abs(a[c] - round(want[c])) > tolerance for c in channels):
-            miss = f"({x},{y}) {a} vs pre {shown(want)}"
+            miss = f"({x},{y}) {a} vs exact {shown(want)}"
             break
     x, y = points[len(points) // 2]
-    return miss is None, (f"measured {px(got, x, y)} at ({x},{y}), pre {shown(at(pre, x, y))}, "
-                          f"exact {shown(at(exact, x, y))}; {len(points)} samples, ±{tolerance} "
+    return miss is None, (f"measured {px(got, x, y)} at ({x},{y}), exact "
+                          f"{shown(at(exact, x, y))}, pre {shown(at(pre, x, y))}; "
+                          f"{len(points)} samples, ±{tolerance} "
                           f"on {'RGB'[channels[0]] if len(channels) == 1 else channels}; "
-                          f"{miss or 'all within pre'}")
+                          f"{miss or 'all within exact'}")
 
 
 def mean_of(raw, points, channel):
@@ -1434,8 +1494,8 @@ def run_d_split(client, state, row, kind):
         good, line = claim(got, within(FULL, MARGIN, D_STEP),
                            (255 * p, 255 * (1 - p) ** 2, None), (255 * p, 255 * (1 - p), 0),
                            channels=(0, 1))
-        check("D0 a nest ↔ nest dissolve at T_A, today's picture: G = 255(1−p)², R = 255p "
-              "(exact: G = 255(1−p)); p from DR (±2)",
+        check("D0 a nest ↔ nest dissolve at T_A, the exact mix: G = 255(1−p), R = 255p "
+              "(pre-fix: G = 255(1−p)²); p from DR (±2)",
               state["d0_fixture"] and good, f"p_A {p:.4f}; built {built}; {line}")
     else:
         z = 0.75 + 0.25 * p
@@ -1446,8 +1506,8 @@ def run_d_split(client, state, row, kind):
         out_ok, out_line = claim(got, clear_of([box], 4, D_STEP),
                                  (0, 255 * (1 - p), None), (0, 255 * (1 - p), 0),
                                  channels=(0, 1))
-        check("D8 a zoom between nest clips at T_A, today's picture: inside the in-box "
-              "G = 255(1−p)², R = 255p (exact: G = 255(1−p)); outside it G = 255(1−p), "
+        check("D8 a zoom between nest clips at T_A, the exact mix: inside the in-box "
+              "G = 255(1−p), R = 255p (pre-fix: G = 255(1−p)²); outside it G = 255(1−p), "
               "R ≤ 2; p from DR (±2)",
               state["d8_fixture"] and in_ok and out_ok,
               f"p_A {p:.4f}, z_in {z:.4f}, in-box {tuple(round(v, 1) for v in box)}; built "
@@ -1491,9 +1551,9 @@ def run_d1(client, state):
                             (255 * m_i * p ** 2, None, None), (255 * p * m_i, 0, 0), (0,), 3)),
         ("clear", claim(got, clear_of([left, right], MARGIN, D_STEP), (0, 0, 0), (0, 0, 0))),
     ]
-    check("D1 a split nest clip dissolving under two soft windows at T_A, today's picture: "
-          "overlap G = 255·m_o(1−p)²(1 − m_i·p²), R = 255·m_i·p²; right-only G = "
-          "255·m_o(1−p)²; left-only R = 255·m_i·p² (±3); clear ≤ 2",
+    check("D1 a split nest clip dissolving under two soft windows at T_A, the exact mix: "
+          "overlap G = 255(1−p)m_o, R = 255·p·m_i; right-only G = 255(1−p)m_o; left-only "
+          "R = 255·p·m_i (±3); clear ≤ 2 (pre-fix: (1−p)² and p², the matte faded too)",
           fixture and all(good for _, (good, _) in claims),
           f"p_A {p:.4f}, m_i {m_i:.4f}, m_o {m_o:.4f}; matte {set_.get('error', 'ok')}; built "
           f"{built}" + "".join(f"\n       {name}: {line}" for name, (_, line) in claims))
@@ -1518,8 +1578,8 @@ def run_d2(client, state):
     state["d2_fixture"] = fixture
     good, line = claim(got, points, (255 * (1 - p) ** 2, 255 * p, None),
                        lambda x, y: px(u, x, y), channels=(0, 1))
-    check("D2 a dissolve inside a nest at T_C, today's picture: R = 255(1−p)², G = 255p "
-          "(exact: U's bytes); p from the un-nested frame U (±2)",
+    check("D2 a dissolve inside a nest at T_C, the exact mix: the un-nested frame U's bytes "
+          "(pre-fix: R = 255(1−p)², G = 255p); p from U (±2)",
           fixture and good, f"p {p:.4f}; nest {nested.get('error', 'ok')}; {line}")
     return close(doc)
 
@@ -1550,8 +1610,8 @@ def run_d3(client, state):
     good, line = claim(got, points, (255 * p, 255 * m_o * (1 - p) ** 2 / (1 - p * m_o), None),
                        (255 * p, 255 * (1 - p) * m_o, 0), channels=(0, 1))
     check("D3 a nest clip under a soft inner matte dissolving into a plain card at T_A, "
-          "today's picture: G = 255·m_o(1−p)²/(1 − p·m_o), R = 255p (exact: G = "
-          "255(1−p)m_o); p from DR (±2)",
+          "the exact mix: G = 255(1−p)m_o, R = 255p (pre-fix: G = "
+          "255·m_o(1−p)²/(1 − p·m_o)); p from DR (±2)",
           fixture and good, f"p_A {p:.4f}, m_o {m_o:.4f}; halves {halves}; {line}")
     return close(doc)
 
@@ -1575,8 +1635,8 @@ def run_d4(client, state):
     good, line = claim(got, within(FULL, MARGIN, D_STEP),
                        (255 * (1 - p) ** 2, 255 * p, None), (255 * (1 - p), 255 * p, 0),
                        channels=(0, 1))
-    check("D4 a plain card dissolving into a nest clip at T_A, today's picture: R = "
-          "255(1−p)², G = 255p (exact: R = 255(1−p)); p from DR (±2)",
+    check("D4 a plain card dissolving into a nest clip at T_A, the exact mix: R = "
+          "255(1−p), G = 255p (pre-fix: R = 255(1−p)²); p from DR (±2)",
           fixture and good, f"p_A {p:.4f}; nest {nested.get('error', 'ok')}; {line}")
     return close(doc)
 
@@ -1604,8 +1664,8 @@ def run_d5(client, state):
                      (255 * (1 - p),) * 3)
     in_b = claim(got, within(b_box, MARGIN, D_STEP), (255 * p, None, 255 * (1 - p)),
                  (255 * p, 0, 255 * (1 - p)), channels=(0, 2))
-    check("D5 overlapping layers in a nested half at T_A, today's picture: in the white box "
-          "R = G = 255(1−p), Blue = 255(1−p) + 255p(1−p) (exact: all 255(1−p)); inside B "
+    check("D5 overlapping layers in a nested half at T_A, the exact mix: in the white box "
+          "R = G = Blue = 255(1−p) (pre-fix: Blue = 255(1−p) + 255p(1−p)); inside B "
           "R = 255p, Blue = 255(1−p); p from DR (±2)",
           fixture and in_white[0] and in_b[0],
           f"p_A {p:.4f}; halves {halves}\n       white box: {in_white[1]}\n       inside B: "
@@ -1642,8 +1702,8 @@ def run_d6(client, state):
     state["d6_fixture"] = fixture
     level = 255 * ((m_b or 0) * p + (m_a or 0) * (1 - p) ** 2)
     good, line = claim(got, points, (level,) * 3, lambda x, y: px(u, x, y), tolerance=3)
-    check("D6 a matte dissolve inside a nest at T_C, today's picture: every channel = "
-          "255·(m_b·p + m_a(1−p)²) (exact: U's bytes); p from the un-nested frame U (±3)",
+    check("D6 a matte dissolve inside a nest at T_C, the exact mix: the un-nested frame U's "
+          "bytes (pre-fix: every channel 255·(m_b·p + m_a(1−p)²)); p from U (±3)",
           fixture and good,
           f"m_a {m_a or 0:.4f}, m_b {m_b or 0:.4f}, m {m or 0:.4f}, p {p:.4f}; nest "
           f"{nested.get('error', 'ok')}; {line}")
@@ -1675,9 +1735,9 @@ def run_d7(client, state):
     good, line = claim(got, points,
                        (255 * (1 - p_i) ** 2 * (1 - p_o), 255 * p_i * (1 - p_o), 255 * p_o),
                        (255 * (1 - p_o) * (1 - p_i), 255 * (1 - p_o) * p_i, 255 * p_o))
-    check("D7 a dissolve inside a dissolving nested half at T_B, today's picture: R = "
-          "255(1−p_i)²(1−p_o), G = 255·p_i(1−p_o), Blue = 255p_o (exact: R = "
-          "255(1−p_o)(1−p_i)); p_i from the un-nested frame, p_o from DR (±2)",
+    check("D7 a dissolve inside a dissolving nested half at T_B, the exact mix: R = "
+          "255(1−p_o)(1−p_i), G = 255(1−p_o)p_i, Blue = 255p_o (pre-fix: R = "
+          "255(1−p_i)²(1−p_o)); p_i from the un-nested frame, p_o from DR (±2)",
           fixture and good, f"p_i {p_i:.4f}, p_o {p_o:.4f}; halves {halves}; {line}")
     return close(doc)
 
@@ -1756,11 +1816,13 @@ def build_mutant(name):
 
 
 def core_test(copy):
-    """`cargo test --release --no-fail-fast --test matte --test matte_nest` in
-    the copy's own core: whether it passed, and the failing targets cargo
-    names (both files run whatever the first answers)."""
+    """`cargo test --release --no-fail-fast --test matte --test matte_nest
+    --test dissolve_nest` in the copy's own core: whether it passed, and the
+    failing targets cargo names (every file runs whatever the first
+    answers)."""
     ran = bounded.run(["cargo", "test", "--release", "--no-fail-fast", "--test", "matte",
-                       "--test", "matte_nest"], 900, cwd=str(copy / "core"))
+                       "--test", "matte_nest", "--test", "dissolve_nest"], 900,
+                      cwd=str(copy / "core"))
     lines = (ran["stdout"] + ran["stderr"]).strip().splitlines()
     failed = [line.strip() for line in lines if line.strip().startswith("`--test ")]
     return ran["rc"] == 0 and not ran["expired"], failed or lines[-3:]
@@ -1799,7 +1861,8 @@ def main():
             passed_ct, last = core_test(copy)
             rows["CT"] = passed_ct
             print(("  ok   " if passed_ct else "  FAIL ") + "CT cargo test --test matte "
-                  "--test matte_nest in the copy's core\n       " + " | ".join(last),
+                  "--test matte_nest --test dissolve_nest in the copy's core\n       "
+                  + " | ".join(last),
                   flush=True)
             scored.append("CT")
     else:

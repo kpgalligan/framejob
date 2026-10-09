@@ -56,20 +56,14 @@ The budget was 0.50 ms at 1080p and 2.00 ms at 4K (MT0's figures, with V1 0.014 
 
 - **At 4K every unmatted full-bleed layer pays about 0.05 ms for the placeholder sample** (MT-6's accepted risk; 0.054 ms in the tree).
 - **A nest clip's soft-edged matted layers show through each other**, the recorded limit of nest opacity (§7.3, MT-5).
-- **A dissolve or zoom with a nested half is not an exact mix** (#252), measured by `matte_proof.py` DR and D0–D8 (issue batch B90 phase 1; p = 1/3 unless named; measured against the exact mix):
-  - A nested layer's partner is refused by `partnerBox` (every nested layer has a `clip_rect`) or names a nest clip, which is never a layer. So the outgoing half dips to (1−p)²: nest ↔ nest G 113 for 170 (D0), a dissolve inside a nest R 113 for 170 (D2), plain → nest R 113 for 170 (D4), a zoom between nest clips G 113 for 170 inside the incoming box (D8).
-  - Nest → plain weighs the plain partner's cover by the nest's own coverage: under a 0.4 inner luma matte G 52 for 68 (D3).
-  - A matte inside a dissolving nest clip fades with it: under two soft windows G 87 for 136 and R 11 for 34 (D1); a matte dissolve inside a nest 113 for 136 (D6).
-  - A half's overlapping inner layers show through each other: Blue 227 for 170 (D5).
-  - A dissolve inside a dissolving half dips as D2's does, the inner transition hiding the enclosing one: R 14 for 54 (D7, p_i 0.733, p_o 0.2).
-  - A timeline pair is exact (DR: R + G = 255 at all 1840 samples).
+- **A dissolve or zoom with a nested half: fixed, MT-8** (#252, issue batch B90 phase 4). It is routed: each half drawn alone into a pool target and mixed, a zoom's halves scaled at the mix about their anchors, so a nested zoom's half is resampled once from its target. Phase 1 measured the dip (nest ↔ nest G 113 for 170, D0, and the rest in `tools/proof/README.md`); phase 4 holds every D row to the exact mix. Cost: two destination-sized targets per routed dissolve while it draws (66.4 MB at 3840×2160), one suspended pass and one full-frame draw. A timeline pair of clips that are not nest clips keeps MT-3's per-layer correction (DR exact).
 - **The matte pool has no cap** (spec §11 MT-9; #253, issue batch B90 phase 3). A frame holds a composite only while a cut set still needs it, and one coverage per distinct cut set; between frames the pool keeps the most the last 30 frames held. Ten mattes in one frame, each cutting its own set, hold 116,121,600 B at 3840×2160, where MT-6's pool held 414,720,000 B (`matte_pool_probe.py` P1). Mattes that cut one set together are all live at once, and a frame that needs more targets gets them.
 - **The coverage is r8.** The matte's own target is bgra8, so the luma it yields is already 8-bit and r8 adds at most one rounding (L1 holds a gradient matte to ±1). Whether that reads as banding to an eye is MAT-1.
 - **Video as an input to a graphic is #251**, iceboxed; nothing here decides it.
 
 ## Open items
 
-- #252, filed at the close, and the owner's MAT-1 and MAT-2. #253, filed with it, is fixed (MT-9, issue batch B90 phase 3).
+- The owner's MAT-1, MAT-2 and MAT-3. #252 and #253, filed at the close, are fixed (MT-8 and MT-9, issue batch B90 phases 4 and 3).
 
 ## Follow-ups (issue batch B90)
 
@@ -83,6 +77,12 @@ The budget was 0.50 ms at 1080p and 2.00 ms at 4K (MT0's figures, with V1 0.014 
   - `encodeMattes` runs the plan. A released composite also leaves the frame's map of drawn mattes, so a wrong plan fails the frame (`unordered`) rather than read a target another matte has drawn over. The old final loop over the canvas layers' cuts is gone, because the plan resolves every layer's set.
   - Scores: `matte_pool_probe.py` (new; no app) 4/4. P1 shows ten one-set mattes at one composite live and ten coverages: 116,121,600 B at 3840×2160 against 414,720,000 B. Debug `matte_proof.py --only A1,MM,L3,N3,N5,N7,T1,T3,S1,RF1,D1,D3,D6,E1,F1,Z1` 16/16; `matte_probe.py` 4/4; `make gate` PASS; recorded on the gate's Release build, `matte_proof.py` whole 46/46 (E3 ran). Every row and printed value matches phase 2's recorded run, so no picture changed.
   - Six mutants were caught. In `matte_pool_probe.py`: `no-release` (P1), `give-ignored`, `trim-never` and `trim-early` (P2). In `matte_proof.py`: `free-ignores-liveness` and `early-resolve` (N5; under both the frame fails, `unordered`).
+- **Phase 4, the routed dissolve (#252, spec §11 MT-8; 2026-10-08).** MT-8 was recorded in spec §11, before MT-9, ahead of the code.
+  - Core: `recipe_dissolve.rs` (new, 247 lines) walks each layer's levels inner to outer through `transition_among` — `recipe.rs`'s `transition_of` moved there. A `cross_dissolve` or `zoom` whose container is a nest, or one of whose clips is a nest clip, is routed (`routed`): an entry in the layer's new `dissolve` key (the twenty-second, `recipe_layer.rs`) with its kind, role, eased progress and its half's anchor, ids dense per frame, outermost first; `transition` is the innermost unrouted level; a layer drawn into a matte keeps only the levels at or inside its first matte level. `blend` is `normal` under either key. Tests: `core/tests/dissolve_nest.rs` (new, 8); `recipe.rs`'s key list (22), `nest.rs`'s inheritance test on `push_left`, `evaluate_tests.rs`'s inherited-dissolve test.
+  - App: `Compositor+Dissolve.swift` (new, 190 lines) holds `encodeLayers` (the one walk over a layer list: the canvas in `render`, a group's members in `encodeMattes`), the routed draw (two halves from `MattePool`, then the seventh pipeline, `reelcut_dissolve_fragment`, over the shadow's full-frame quad) and `drawLayer`, `Compositor+Matte.swift`'s `draw` moved verbatim. `RecipeLayerDissolve` in `FrameRecipe.swift`. `Compositor.swift` 1005 → 959.
+  - Scores: Debug `matte_proof.py` 21/21 on the D rows and the matte rows they share code with; `matte_probe.py` 6/6 (Q3, Q4 new: the mix at Full, Half and Quarter, and the zoom's in-box where Full's is); `matte_pool_probe.py` 4/4; `make gate` PASS; recorded on the gate's Release build, `matte_proof.py` whole 46/46 (E3 ran), every D row at the exact mix (figures in `tools/proof/README.md`). The other rows read as phase 3's run did but N7, a split nest clip in a dissolve, whose halves no longer dip.
+  - Twelve mutants were caught: five in the core (`routed` false, zoom unrouted, a routed level kept as `transition`, no matte-level stop, the chain inner first) and four in the app (the mix's weights swapped, one shared half target, the matte members walked plain, the zoom's scale dropped), plus three re-pinned and re-run (`source-drawn`, `reflection-placeholder`, `core-no-override`). Phase 1's `dissolve-cover-everywhere` is retired: no D row reaches that term now.
+  - Person check: MAT-3 (`docs/manual-checks.md`), a nested dissolve and zoom at 4K, Full and Quarter.
 
 ## Where to look in the original
 

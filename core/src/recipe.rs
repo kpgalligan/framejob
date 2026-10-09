@@ -47,14 +47,13 @@ use serde_json::{Map, Value};
 
 use crate::actions::Evaluated;
 use crate::evaluate::{json, number, Assignment};
-use crate::model::{BlendMode, Clip, Nest, Project, Source, TransitionKind};
+use crate::model::{BlendMode, Nest, Project, Source, VideoProps};
 use crate::motion;
 use crate::nest::{Enclosing, Frame, Instance};
 use crate::recipe_graphic::graphic_source;
 pub(crate) use crate::recipe_layer::RecipeLayer;
 use crate::recipe_text::burn_in_layer;
 use crate::time::Ticks;
-use crate::transition;
 
 /// A nest's frozen canvas as the pair `motion::apply` wants.
 fn nest_size(nest: &Nest) -> (f64, f64) {
@@ -218,12 +217,24 @@ impl Project {
             .filter(|i| i.covers(t))
             .collect();
         let mattes = self.frame_mattes(&instances);
+        // So are the routed dissolves (`recipe_dissolve.rs`, spec §11 MT-8):
+        // their ids are dense over the frame.
+        let transitions = self.frame_transitions(&instances, t);
         let mut layers: Vec<Value> = instances
             .iter()
             .zip(mattes.drawn_into.iter().zip(mattes.layer))
-            .map(|(instance, (drawn_into, matte))| {
-                self.layer(instance, t, &assignment, *drawn_into, matte)
-            })
+            .zip(transitions.transition.into_iter().zip(transitions.dissolve))
+            .map(
+                |((instance, (drawn_into, matte)), (transition, dissolve))| {
+                    let roles = LayerRoles {
+                        drawn_into: *drawn_into,
+                        matte,
+                        transition,
+                        dissolve,
+                    };
+                    self.layer(instance, t, &assignment, roles)
+                },
+            )
             .collect();
         if opts.burn_in_timecode {
             layers.push(burn_in_layer(&self.canvas, t));
@@ -255,17 +266,20 @@ impl Project {
         }
     }
 
-    /// One layer of the recipe. `drawn_into` says the layer is drawn into a
-    /// matte rather than onto the canvas, and `matte` is its `matte` key
-    /// (`recipe_matte.rs`).
+    /// One layer of the recipe, its roles in the frame given (`LayerRoles`).
     fn layer(
         &self,
         instance: &Instance,
         t: Ticks,
         assignment: &Assignment,
-        drawn_into: bool,
-        matte: Value,
+        roles: LayerRoles,
     ) -> Value {
+        let LayerRoles {
+            drawn_into,
+            matte,
+            transition,
+            dissolve,
+        } = roles;
         // Clip time: 0 is the clip's first frame, which is what actions are
         // measured in (spec §5.4). The clip's own first frame, not the
         // instance's — a nest clip's edge cuts a nested clip short without
@@ -274,21 +288,11 @@ impl Project {
         // the props it reveals run off one clock.
         let clip_t = instance.clip_time(t);
         let evaluated = self.evaluate_clip(instance.clip, clip_t);
-        // `video.motion` (format version 8) turned into placement — one of
-        // `motion::apply`'s two call sites, whose module doc is the whole
-        // argument. Here and not in `evaluate_clip` on purpose (spec §11,
-        // R5-4). `moved` equals `evaluated.video` in every field but the
-        // five placed ones, so `RecipeLayer.video` reads its per-pixel
-        // properties off it and the recipe publishes no `motion` key.
-        let size = self.source_size(instance.clip);
-        let container = self.container(&instance.inside);
-        let mut moved = motion::apply(
-            &evaluated.video,
-            clip_t,
-            instance.clip.duration,
-            size,
-            container,
-        );
+        // `video.motion` (format version 8) turned into placement (`moved`).
+        // `moved` equals `evaluated.video` in every field but the five placed
+        // ones, so `RecipeLayer.video` reads its per-pixel properties off it
+        // and the recipe publishes no `motion` key.
+        let mut moved = self.moved(instance, clip_t, &evaluated);
         // A matte layer's drop shadow and reflection do nothing (spec §11
         // MT-4): the matte is the clip's own picture, so they are cleared
         // here, with its blend below — the recipe's second deliberate
@@ -302,21 +306,6 @@ impl Project {
         let (source, source_size) = self.layer_source(instance, &evaluated, clip_t, assignment);
         let frame = self.frame_of(instance, t);
         let placed = frame.place(video);
-
-        let transition = match self.transition_of(instance, t) {
-            Some((kind, progress, incoming, partner)) => {
-                let mut entry = Map::new();
-                entry.insert("kind".to_string(), json(&kind));
-                entry.insert("progress".to_string(), number(progress));
-                entry.insert(
-                    "role".to_string(),
-                    Value::from(if incoming { "in" } else { "out" }),
-                );
-                entry.insert("partner".to_string(), Value::from(partner));
-                Value::Object(entry)
-            }
-            None => Value::Null,
-        };
 
         // How this layer combines with what is already on the canvas
         // (format version 6) — and the ONE place that answer is overridden,
@@ -346,7 +335,9 @@ impl Project {
         //
         // A matte layer forces `normal` too (MT-4): what it draws into is a
         // cleared target of its own, and its blend mode does nothing there.
-        let blend = if transition.is_null() && !drawn_into {
+        // So does a routed dissolve (MT-8): its half is drawn alone and mixed,
+        // as a transition's pair is, and the core says so in one place.
+        let blend = if transition.is_null() && dissolve.is_null() && !drawn_into {
             video.blend
         } else {
             BlendMode::Normal
@@ -361,8 +352,33 @@ impl Project {
             blend,
             transition,
             matte,
+            dissolve,
         }
         .object()
+    }
+
+    /// Where `instance` is placed at `t`: its props moved by `video.motion`
+    /// and folded through every nest clip above it — `layer`'s placement,
+    /// asked again by `recipe_dissolve.rs` for a routed half's anchor.
+    pub(crate) fn placement(&self, instance: &Instance, t: Ticks) -> Frame {
+        let clip_t = instance.clip_time(t);
+        let evaluated = self.evaluate_clip(instance.clip, clip_t);
+        self.frame_of(instance, t)
+            .place(&self.moved(instance, clip_t, &evaluated))
+    }
+
+    /// A clip's evaluated props with `video.motion` turned into placement —
+    /// one of `motion::apply`'s two call sites, whose module doc is the whole
+    /// argument; `layer` and `placement` both read it. Here and not in
+    /// `evaluate_clip` on purpose (spec §11, R5-4).
+    fn moved(&self, instance: &Instance, clip_t: Ticks, evaluated: &Evaluated) -> VideoProps {
+        motion::apply(
+            &evaluated.video,
+            clip_t,
+            instance.clip.duration,
+            self.source_size(instance.clip),
+            self.container(&instance.inside),
+        )
     }
 
     /// The transform every nest clip above this instance composes to, at
@@ -377,7 +393,7 @@ impl Project {
     /// the depths anyone actually uses. A memo keyed by the path would save
     /// them and lives entirely inside one `frame_recipe` call, so it is
     /// worth adding the day a deep nest shows up in a profile.
-    fn frame_of(&self, instance: &Instance, t: Ticks) -> Frame {
+    pub(crate) fn frame_of(&self, instance: &Instance, t: Ticks) -> Frame {
         let mut frame = Frame::TOP;
         for (i, enclosing) in instance.inside.iter().enumerate() {
             let clip_t = t.saturating_sub(enclosing.origin);
@@ -398,55 +414,6 @@ impl Project {
             frame = frame.enter(&moved, enclosing.nest, &self.canvas);
         }
         frame
-    }
-
-    /// The transition this layer is playing at `t`.
-    ///
-    /// A nested clip's own transition — with a neighbour inside the nest —
-    /// wins, evaluated in the nest's own time base. Failing that, the layer
-    /// inherits the transition of the nearest nest clip above it that has
-    /// one, because a dissolve INTO a nest has to dissolve everything the
-    /// nest draws; without it a nested layer would cut in at full opacity
-    /// while its neighbour faded. The inherited `partner` names a clip that
-    /// is not itself a layer (it was flattened too), which the compositor
-    /// treats as no partner — the same answer it already gives for a
-    /// transition whose partner is on a hidden track.
-    fn transition_of(
-        &self,
-        instance: &Instance,
-        t: Ticks,
-    ) -> Option<(TransitionKind, f64, bool, u32)> {
-        // A container's own time base: its zero sits at `origin - start`, so
-        // this maps project time onto it for any clip in it.
-        let local =
-            |clip: &Clip, origin: Ticks| t.saturating_sub(origin).saturating_add(clip.start);
-
-        let container = match instance.inside.last() {
-            Some(innermost) => &innermost.nest.clips,
-            None => &self.clips,
-        };
-        if let Some(found) = transition::transition_among(
-            container,
-            instance.clip.id,
-            local(instance.clip, instance.origin),
-        ) {
-            return Some(found);
-        }
-
-        for (index, enclosing) in instance.inside.iter().enumerate().rev() {
-            let outer = match index.checked_sub(1).and_then(|up| instance.inside.get(up)) {
-                Some(above) => &above.nest.clips,
-                None => &self.clips,
-            };
-            if let Some(found) = transition::transition_among(
-                outer,
-                enclosing.clip.id,
-                local(enclosing.clip, enclosing.origin),
-            ) {
-                return Some(found);
-            }
-        }
-        None
     }
 
     /// A layer's `source` and `source_size`.
@@ -534,6 +501,17 @@ impl Project {
             Source::Graphic => graphic_source(clip, evaluated, clip_t, &self.canvas),
         }
     }
+}
+
+/// A layer's roles in the frame, each answered once per frame over the
+/// covering instances: whether it is drawn into a matte rather than onto the
+/// canvas and its `matte` key (`recipe_matte.rs`), and its `transition` and
+/// `dissolve` (`recipe_dissolve.rs`, spec §11 MT-8).
+struct LayerRoles {
+    drawn_into: bool,
+    matte: Value,
+    transition: Value,
+    dissolve: Value,
 }
 
 pub(crate) fn missing_source() -> Value {

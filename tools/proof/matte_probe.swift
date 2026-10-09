@@ -2,7 +2,8 @@
 // `app/Sources` (`swift_build.py`). See that script's header.
 //
 // Road map "mattes", phase MT3 (spec §11 MT-3, MT-6): a matte under View ▸
-// Preview Quality. Each fixture is rendered at Full, Half and Quarter through
+// Preview Quality — and since issue batch B90 phase 4 (spec §11 MT-8) a routed
+// dissolve and zoom between nest clips, the same way. Each fixture is rendered at Full, Half and Quarter through
 // the app's own path — the document, `CompositionBuilder.build`,
 // `Playback.previewComposition` (called), `Compositor`, `MetalRenderer`, the
 // project's own shader beside the binary — and read back by

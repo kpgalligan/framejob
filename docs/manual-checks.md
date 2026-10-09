@@ -458,6 +458,11 @@ Uses the four `tools/proof/work/playback-check/` projects (Setup 3).
 - **Expect:** the shape's header reads "Matte · Alpha" in the ordinary label colour on a faint accent tint and the text's a dimmed "Matte · nothing behind" — under the name on Medium and Large, beside it on Small, where the name is clipped (on a Small text or audio row the text's tag reads "Matte" alone and its name stays readable); the two matte lanes' clips are half-transparent with a dashed outline; an accent bracket just right of the header column joins the shape's lane to the movie's and stays there while scrolling, with no stale copy left behind; the note under the sub-tab strip reads whole on every sub-tab ("Matte for the track below (Alpha). …" for the shape, "Nothing is behind this matte track, so it cuts nothing." for the text). Nothing is cramped, clipped or low-contrast, the dimmed tag included, in both appearances.
 - **Source:** #240 (mattes MT4, spec §11 MT-7); `tools/proof/screens.py --only 10c-matte-track` captures the Medium case.
 
+**MAT-3 — A dissolve or zoom between nested clips plays smoothly**
+- **Do:** 1. In a 3840×2160 project, put two movies on one track, select both and Nest them. 2. Split the nest clip in the middle and add a cross dissolve at the split. 3. Play the dissolve at View ▸ Preview Quality ▸ Full, then at Quarter. 4. Put the same two movies, un-nested, on a second project's track with the same dissolve, and play that too. 5. Change both transitions to Zoom and play both again.
+- **Expect:** the nested dissolve plays without a stutter or a dark dip at its middle, and looks like the un-nested one; the nested zoom also plays without a dip, its picture as sharp as the un-nested zoom's to the eye.
+- **Source:** #252 (issue batch B90 phase 4, spec §11 MT-8).
+
 ## Screen recording
 
 Launch Reelcut from the Finder or Dock unless the check says otherwise.

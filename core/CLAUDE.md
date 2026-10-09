@@ -457,16 +457,18 @@ governs a module now.
   `pitch` (#190, #211).
 - `recipe.rs` · `recipe_layer.rs` · `recipe_text.rs` — `frame_recipe(t)`: the
   layer list at one instant. `RecipeLayer` (`recipe_layer.rs`, re-exported by
-  `recipe.rs`) is the twenty-one keys of a layer written in ONE place
+  `recipe.rs`) is the twenty-two keys of a layer written in ONE place
   (`RecipeLayer.init(from:)` on the Swift side defaults a missing key
   silently, so a copied skeleton drifts with no diagnostic). `RecipeOptions`
   is what a caller wanted besides `t` — the burn-in timecode — and is a
   recipe option, never an export override, because the override table drops
-  an unknown key in silence. A layer whose `transition` is non-null is
+  an unknown key in silence. A layer whose `transition` or `dissolve` is non-null is
   emitted `blend: "normal"` whatever the clip says: one of the core's TWO
   deliberate overrides of model values (the other: a matte layer's `blend`,
   `shadow` and `reflection`, MT-4), because the dissolve's weight correction
-  is the inverse of a fixed-function destination factor. The inspector therefore
+  is the inverse of a fixed-function destination factor, and a routed half
+  (`dissolve`) is drawn alone and mixed source-over (spec §11 MT-8). The
+  inspector therefore
   shows the model's value while the frame draws `normal` during an overlap.
   `recipe_text.rs` computes what a text layer SHOWS — `Reveal::of` turns
   `text.animation` into `reveal`, `reveal_phase` (the ORDER the renderer draws
@@ -487,6 +489,15 @@ governs a module now.
   each layer's `matte` (`into`, `cut`), whether it is drawn into a matte, and
   the listed groups, deepest container first. A layer's levels are walked
   inner to outer, each level's cut asked BEFORE its own matte test.
+- `recipe_dissolve.rs` — the transitions a layer plays at one instant (spec
+  §7.3, §11 MT-8), walking its levels inner to outer. A `cross_dissolve` or
+  `zoom` whose container is a nest, or one of whose clips is a nest clip, is
+  ROUTED (`routed`, the one predicate): an entry in the layer's `dissolve`
+  with its kind and its half's anchor, ids dense in first-seen order,
+  outermost first. The innermost unrouted level is its `transition`. A layer
+  drawn into a matte keeps only the dissolves at or inside its first matte
+  level. It is the crate's one walk of a layer's transition levels;
+  `recipe.rs` has none.
 - `recipe_words.rs` — what a timed text PAGE shows at one instant:
   `Words::of(text, clip_t, duration)` answers five keys — `word` (how many
   of `text.words` have started, 0 to n), `word_pop` (0..1 through the active
@@ -531,7 +542,8 @@ governs a module now.
 - `motion.rs` — `video.motion` turned into PLACEMENT: presets to `scale`,
   `rotation`, `opacity`, `x`, `y` from the clip time, its duration, the
   source size and the container's canvas. **Its only callers are
-  `recipe.rs`'s `layer` and `frame_of`**: every edit path — `evaluate_clip`,
+  `recipe.rs`'s `moved` (which `layer` and the routed dissolve's `placement`
+  read) and `frame_of`**: every edit path — `evaluate_clip`,
   `clip_state`, `get_project`, splitting, zooming, freezing, the audio plan
   — reads the clip un-moved. It never trusts the file (a non-positive
   duration or period is inactive, amounts clamp) and short-circuits to
