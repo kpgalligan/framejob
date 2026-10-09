@@ -1073,7 +1073,8 @@ the key map behind it.
   leniently.
 - `Compositor.swift` · `Compositor+Uniforms.swift` · `Compositor+Shadow.swift` ·
   `Compositor+Matte.swift` · `MattePlan.swift` · `Compositor+Dissolve.swift` ·
-  `CompositorEffects.swift` · `Resources/Shaders/Compositor.metal`
+  `CompositorEffects.swift` · `LayerUniforms.swift` (`LayerUniforms`,
+  `ShadowUniforms`, `TransitionCode`) · `Resources/Shaders/Compositor.metal`
   — the per-layer pass. The uniform block's field ORDER is a contract with the
   shader checked only by reading both, so change them in one edit; it is 104
   floats and **the padding tail is EMPTY** (the next field needs three

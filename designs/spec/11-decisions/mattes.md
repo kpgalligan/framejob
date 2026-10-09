@@ -97,7 +97,8 @@ it.
   constant), for one pipeline per layer
   specialization instead of two. `LayerUniforms` stays 104 floats. Targets are pooled per destination
   size and allocated on the first matted frame (at 3840×2160, 33.2 MB per matte and 8.3 MB per
-  coverage). The deferred E5 and E9 take the next free texture slots.
+  coverage). (Amended by PR-1: each matte's composite is `rgba16Float`, 66.4 MB at 3840×2160;
+  the `r8Unorm` coverage and its 8.3 MB stand.) The deferred E5 and E9 take the next free texture slots.
 - **MT-7 — The chrome (owner, 2026-10-08, O2–O8).** No fifth header toggle and no shortcut. Set
   by Track ▸ Matte ▸ Off / Alpha / Inverted Alpha / Luma / Inverted Luma on the current track,
   and by the same submenu in the track's context menu after Solo, each checked for the track's
@@ -120,7 +121,8 @@ it.
   (#252; owner, 2026-10-08; zoom by the owner's residue rule, 2026-10-08).** A `cross_dissolve`
   or `zoom` whose container is a nest, or one of whose two clips is a nest clip, is ROUTED. Each
   half is drawn, with no dissolve weight, into its own destination-sized `bgra8Unorm` target
-  cleared transparent. A half is everything its clip draws: inner layers, their mattes, shadows
+  cleared transparent. (Amended by PR-1: the halves are `rgba16Float`, so the memory figures
+  below double.) A half is everything its clip draws: inner layers, their mattes, shadows
   and reflections, and any dissolve inside it, each such level in a pair of targets of its own.
   One full-frame pass then lays the pair on what is below as (1 − p)·out + p·in, source-over. So
   the frame is (1 − p)·H_out + p·H_in + (1 − (1 − p)·a_out − p·a_in)·D, with H each half's
@@ -165,7 +167,9 @@ it.
     (`MattePool.keepFrames`), and releases the rest when a frame ends. A frame with no matte
     counts as holding none, and a destination size change still empties the pool. At 3840×2160,
     ten matte pairs in one frame hold 33.2 MB + 10 × 8.3 MB = 116.1 MB, where MT-6's pool held
-    414.7 MB.
+    414.7 MB. (Amended by PR-1: the composite is `rgba16Float`, 66.4 MB at 3840×2160, so ten
+    matte pairs hold 66.4 MB + 10 × 8.3 MB = 149.4 MB, where MT-6's pool would hold 746.5 MB; the
+    coverage's 8.3 MB stands.)
   - **No cap.** A frame that needs more targets gets them, and a target Metal cannot make fails
     the frame as before (`MatteError.noTarget`). A renderer that stops drawing keeps what its
     last 30 frames held until it draws again or is released with its player item or export.

@@ -1728,6 +1728,12 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   inside the video pump. A frame that cannot be straightened (not
   32BGRA, not lockable, no sample made) stops the export with "A frame's
   transparency could not be written straight."
+  (Amended by PR-3: the reader's frames are `64RGBAHalf`. `prores_4444`'s
+  frame is un-premultiplied in place in float, s = min(1, c/a) for a > 0,
+  then filled by (d)'s rule over its half-float pixels; `hevc_alpha`'s is
+  first rounded to 8-bit premultiplied BGRA, round(v·255), into a pooled
+  32BGRA buffer and then straightened by this paragraph and (d) unchanged.
+  A frame in neither format stops the export with the sentence above.)
   (d) **The fill.** Un-premultiplied, a transparent pixel is black at
   alpha 0, and a codec that subsamples colour (HEVC's 4:2:0) or a scaler
   that resamples the frame (the writer's own, at a size off the canvas)

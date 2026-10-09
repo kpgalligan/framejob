@@ -488,6 +488,12 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   `dissolvePipeline` is built in `init`. `wc -l app/Sources/Compositor.swift`: 1005 before
   (phase 3's two lines included), 959 after; `Compositor+Dissolve.swift` is 190 and
   `Compositor+Matte.swift` 335 → 304. The named next seam is unchanged.
+  The precision road map's PR0 (issue batch B94) paid that seam: the file-level
+  `// MARK: - Uniforms` through `TransitionCode` (`LayerUniforms`, `ShadowUniforms`,
+  `TransitionCode`) went whole to `LayerUniforms.swift` with `import Foundation` and nothing else,
+  a pure move gated alone before the 16-bit-float working depth landed. `wc -l
+  app/Sources/Compositor.swift`: 961 before, 695 after; `LayerUniforms.swift` is 267. The next
+  seam: `DestinationPass` out whole.
 - `ReelCore.swift`: the typed patches moved to `TypedPatches.swift` in issue batch B73 (#216), a
   pure move gated alone before `ReelContainer` landed; no further seam is named. The `dictionary`
   extensions went to `OpDictionaries.swift` in issue batch B52b (#190), the media helpers earlier
