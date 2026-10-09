@@ -116,11 +116,12 @@ the rows on it, W3 aside:
   fill-unsnapped  the fill's edge is left where the fraction puts it, off
                   the pixel grid: F1 must FAIL.
   dim-ignored     the dim's amount is always 0 (`dimAmount`): D1 must FAIL.
-  dim-per-draw    no transparency layer on a page with a backdrop: the
-                  dim's opacity is applied to each drawing in turn (the
-                  second edit, in `LayerRenderersText.swift`, lets an opaque
-                  ink inherit it): D4 must FAIL — white over the plate
-                  reads (255, 191, 127.5).
+  dim-per-draw    no multiply of the drawn page (`scaleBitmap`, spec §11
+                  W-17) on a page with a backdrop: the dim's opacity is
+                  applied to each drawing in turn (the second edit, in
+                  `LayerRenderersText.swift`, lets an opaque ink inherit
+                  it): D4 must FAIL — white over the plate reads
+                  (255, 191, 127.5).
   dim-twice       `drawText` hands `drawWords` the dim on every page, so a
                   page with no backdrop is dimmed in the bitmap AND by the
                   compositor: D1 must FAIL (the ratio reads about 0.25).
@@ -205,19 +206,35 @@ MUTANTS = {
           "                    : piece.left + CGFloat(filled) * (piece.right - piece.left)\n")],
         "F1"),
     "dim-ignored": ([(DIM_AMOUNT, "min(max(dim ?? 0, 0), 1) * 0")], "D1"),
-    # No layer, and an opaque ink no longer resets the context's alpha: the
-    # pill and each token are composited at the dim's opacity one by one.
-    # Only a page with a backdrop draws its dim here (spec §11 W-16), so the
-    # row is D4.
+    # No multiply of the drawn page (`scaleBitmap`, spec §11 W-17) and no
+    # layer: the dim is the context's alpha, set once before the page is
+    # drawn, and an opaque ink no longer resets it, so the pill and each
+    # token are composited at the dim's opacity one by one. Only a page with
+    # a backdrop draws its dim here (spec §11 W-16), so the row is D4.
     "dim-per-draw": (
-        [("            context.beginTransparencyLayer(auxiliaryInfo: nil)\n"
+        [("        let multiplies = dimmed > 0 && context.data != nil\n"
+          "        if dimmed > 0, !multiplies {\n"
+          "            context.saveGState()\n"
+          "            context.setAlpha(CGFloat(1 - dimmed))\n"
+          "            context.beginTransparencyLayer(auxiliaryInfo: nil)\n"
+          "        }\n"
+          "        defer {\n"
+          "            if multiplies {\n"
+          "                scaleBitmap(context, by: 1 - dimmed)\n"
+          "            } else if dimmed > 0 {\n"
+          "                context.endTransparencyLayer()\n"
+          "                context.restoreGState()\n"
+          "            }\n"
+          "        }\n",
+          "        if dimmed > 0 {\n"
+          "            context.saveGState()\n"
+          "            context.setAlpha(CGFloat(1 - dimmed))\n"
           "        }\n"
           "        defer {\n"
           "            if dimmed > 0 {\n"
-          "                context.endTransparencyLayer()\n",
-          "        }\n"
-          "        defer {\n"
-          "            if dimmed > 0 {\n"),
+          "                context.restoreGState()\n"
+          "            }\n"
+          "        }\n"),
          ("        context.setAlpha(CGFloat(alpha))\n"
           "        guard alpha < 1 else {\n",
           "        guard alpha < 1 else {\n", "LayerRenderersText.swift")],

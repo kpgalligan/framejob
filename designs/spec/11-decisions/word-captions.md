@@ -214,6 +214,10 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   the text layer's opacity in the compositor and the bitmap holds none of
   it. What is seen is unchanged: one opacity over the words and the pill
   together, and a backdrop that never dims.
+  **Amended 2026-10-09, by W-17 (#247): on a timed page with a backdrop
+  the words and the pill are drawn first, the dim is one multiply of that
+  bitmap, and the backdrop is composited under them;** "in one transparency
+  layer" now holds only for a context with no memory.
 - **W-15 — The three looks are three checkboxes in the Generate Captions
   sheet and three booleans on `transcribe`, off unless asked for** (issue
   batch B86 phase 2, #96; the owner, 2026-10-05). Under the Style pop-up
@@ -324,6 +328,11 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
     2026-10-07), so no draw of the dim could meet it. With the dim that
     page read 11.289 ms and 11.227 ms, and 1.734 ms and 1.718 ms.
     `designs/adr/roadmap-08-word-captions.md`'s Known limits has it.
+    **Amended 2026-10-09, by W-17 (#247):** such a page draws its words
+    first, its dim is one multiply of that bitmap, and its backdrop is
+    composited under them, so it no longer pays the layer. That is the
+    cheaper draw designed above, built with the multiply and the backdrop's
+    fully covered pixels written by vImage.
   - **The recipe and its hash are unchanged** (W-13): `word_dim` still
     rides on the source and still folds into the hash, so each frame of a
     ramp has its own cache key and none can be handed another's texture. A
@@ -341,3 +350,57 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
     one. A dimmed frame is as repeatable as any layer drawn below full
     opacity: it is the one multiply a clip's own opacity takes
     (`Compositor.metal`, step 9).
+- **W-17 — On a timed page with a backdrop the words are drawn first, a dim
+  is one multiply of the bitmap, and the backdrop is composited under them;
+  a backdrop's fully covered pixels are written by vImage** (issue batch
+  B93 phase 3, #247). It amends W-14 and W-16 for a page with a backdrop
+  and changes nothing else of either: W-16's rule of WHERE a dim is drawn
+  (`wordDim(of:reveal:)`) stands, and so do the recipe and its hash.
+  - **The order.** On a TIMED page (`reveal.word` and `word_style` both
+    set) with a backdrop, `textBitmap` draws the words and the pill first,
+    into the empty bitmap. A dim is then ONE multiply of that bitmap by
+    `1 − word_dim × pause_dim` (`LayerRenderers.scaleBitmap`:
+    `vImageMatrixMultiply_ARGB8888` in place, every premultiplied byte
+    times the factor in 1/4096ths, rounded), run on every exit of
+    `drawWords` once drawing has started. The backdrop is then composited
+    UNDER them (`destinationOver`). Every other page with a backdrop — a
+    static page, a reveal, an untimed styled page — draws the backdrop
+    FIRST, as it always has, and its bytes do not change.
+  - **The backdrop's two parts** (`LayerRenderers.drawBackdrop`, in either
+    order). The radius is clamped as before, to half the box's shorter
+    side. The pixels the rounded rect covers COMPLETELY — the cross of rows
+    [⌈r⌉, ⌊H − r⌋) by every whole column, and every whole row by columns
+    [⌈r⌉, ⌊W − r⌋), each clamped to the bitmap — are flattened in place by
+    `vImageFlatten_RGBA8888` against the bytes CoreGraphics itself writes
+    when it fills one pixel of a text bitmap with the colour
+    (`fullCoverageBytes`). Over an empty pixel that is exactly those bytes;
+    under the words it is source-over with the backdrop below. CoreGraphics
+    fills the same rounded path everywhere else, clipped to the bitmap less
+    the cross: the corners and any partly covered row or column. A context
+    with no memory, or a colour whose bytes cannot be read, takes the
+    whole-path fill with the same blend.
+  - **What may move, and what may not.** A page with no word style is the
+    whole-path fill and its text, byte for byte, and so is a timed page that
+    draws no ink (`build` at word 0; `words_picture_probe.py` P20). A timed
+    page's undimmed bitmap is no longer the backdrop-first one to the byte
+    where ink is partly transparent: the backdrop is composited under ink
+    rather than ink over the backdrop. A dimmed page with a backdrop is the
+    lit page at one opacity over an untouched backdrop, within 3 of 255 per
+    premultiplied byte of `U·(1 − a) + B·(1 − U_alpha·(1 − a))` (P19), and
+    every bare backdrop pixel keeps its bytes (P18). What is seen is W-14's:
+    one opacity over the words and the pill together, and a backdrop that
+    never dims.
+  - **The transparency layer stays only as the fallback** for a context
+    with no memory (`context.data` nil), decided before anything is drawn;
+    no caller of `textBitmap` makes one.
+  - **Why.** Karaoke's two-line page under `BackdropProps()` read 11.289 ms
+    and 11.227 ms at 3840×2160 with the dim (W-16), over P10's 8 ms budget,
+    and 6.359 ms and 6.341 ms without it, of which the backdrop's own
+    whole-path fill was about 3 ms of a 3061×420 box. Both the layer and the
+    fill had to go. P10 now scores both of that page's rasters, the fill
+    alone and with the dim, under the budgets every other scored page has
+    (4 ms at 1080×1920, 8 ms at 3840×2160). Judged twice on 2026-10-09
+    (`powermode 0` before and after, Low Power Mode off, thermal state
+    nominal), the page read 5.144 ms and 5.129 ms at 3840×2160 with the dim
+    and 4.702 ms and 4.584 ms without it, and 0.976 ms and 0.950 ms, 0.893 ms
+    and 0.881 ms at 1080×1920.

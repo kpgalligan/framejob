@@ -11,9 +11,10 @@
 //
 //   words_picture_probe <app_fonts_dir> [--quick]
 //
-// `--quick` stops after P10, the looks' geometry (P11–P17) and where the dim
-// is drawn (P18, P19), which are measured first: before the P1/P2 sweep, ten
-// minutes of pixel scans. It is how P10 is run alone.
+// `--quick` stops after P10, the looks' geometry (P11–P17), where the dim is
+// drawn (P18, P19) and the backdrop's bytes (P20), which are measured first:
+// before the P1/P2 sweep, ten minutes of pixel scans. It is how P10 is run
+// alone.
 //
 // Fonts are registered at `.process` scope first (`text_probe.swift`'s loop):
 // a bare Mach-O has no `ATSApplicationFontsPath`.
@@ -210,7 +211,9 @@ func wpPagerPage(_ caption: CaptionStyle, _ content: String, _ canvas: CGSize) -
 /// still the bitmap's: `karaoke-2line-backdrop fill (hand-made)` and
 /// `karaoke-2line-backdrop fill+dim (hand-made)` are the pager's Karaoke page
 /// with `BackdropProps()` — what the inspector's Backdrop switch writes; no
-/// caption style writes one — printed and not scored.
+/// caption style writes one — SCORED since issue batch B93 phase 3, which
+/// drew its words first, its dim as one multiply and its backdrop under them
+/// (spec §11 W-17).
 let wpRasters: [WpRaster] = [
     WpRaster(
         label: "pop", caption: .highlight, content: pageText, word: 3, pop: 0.5, pill: nil,
@@ -245,11 +248,11 @@ let wpRasters: [WpRaster] = [
     WpRaster(
         label: "karaoke-2line-backdrop fill (hand-made)", caption: .karaoke,
         content: karaokeText, word: 0, pop: 1, pill: nil, fill: true, dim: false, glide: false,
-        scored: false, paged: true, backdrop: BackdropProps()),
+        scored: true, paged: true, backdrop: BackdropProps()),
     WpRaster(
         label: "karaoke-2line-backdrop fill+dim (hand-made)", caption: .karaoke,
         content: karaokeText, word: 0, pop: 1, pill: nil, fill: true, dim: true, glide: false,
-        scored: false, paged: true, backdrop: BackdropProps()),
+        scored: true, paged: true, backdrop: BackdropProps()),
 ]
 
 var p10: [[String: Any]] = []
@@ -569,7 +572,10 @@ out["p18"] = [
 ]
 
 // P19 — a dimmed page WITH a backdrop is the lit page at one opacity over an
-// untouched backdrop. Three `textBitmap`s a page: D, the dimmed page; U, the
+// untouched backdrop. `highlight-word0` (issue batch B93 phase 3) is a page
+// with no active token — `highlight` at word 0, every token upcoming — which
+// `drawWords` leaves by its early return after the base pass: its dim must
+// still be applied. Three `textBitmap`s a page: D, the dimmed page; U, the
 // same page with its backdrop's alpha 0 and no dim (the words and the pill
 // alone, in the same box); B, the same page in `build` at word 0 (the
 // backdrop alone). The reference is this probe's own arithmetic per
@@ -609,6 +615,10 @@ let wpDimCases: [WpDimCase] = [
     WpDimCase(
         label: "full", style: wpClampStyle(1), backdrop: wpPlate, outline: nil,
         reveal: RecipeReveal(word: 2, wordGlide: 0.5, wordFill: 0.5, wordDim: 1), amount: 1),
+    WpDimCase(
+        label: "highlight-word0", style: wpDimStyle(wpClampStyle(0.5), mode: .highlight),
+        backdrop: BackdropProps(color: [0.2, 0.5, 0.9, 0.37], radius: 30), outline: nil,
+        reveal: RecipeReveal(word: 0, wordDim: 0.5), amount: 0.25),
 ]
 var p19: [[String: Any]] = []
 for one in wpDimCases {
@@ -694,6 +704,102 @@ for one in wpDimCases {
     p19.append(row)
 }
 out["p19"] = p19
+
+// MARK: P20 — a backdrop's bytes (issue batch B93 phase 3, spec §11 W-17)
+
+// The reference is HEAD's `textBitmap` before W-17: the whole rounded path
+// filled by CoreGraphics, then — on a static page — `CTFrameDraw`.
+func wpReferenceBackdrop(_ backdrop: BackdropProps, size: CGSize, in context: CGContext) {
+    let rect = CGRect(origin: .zero, size: size)
+    let radius = min(CGFloat(backdrop.radius), min(size.width, size.height) / 2)
+    context.addPath(
+        CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil))
+    context.setFillColor(backdrop.color.nsColor.cgColor)
+    context.fillPath()
+}
+func wpReferencePage(_ props: TextProps, text: Bool) -> CGContext? {
+    let layout = LayerRenderers.layout(for: props)
+    guard let context = LayerRenderers.bitmap(layout.size) else { return nil }
+    if let backdrop = props.backdrop {
+        wpReferenceBackdrop(backdrop, size: layout.size, in: context)
+    }
+    if text, let frame = layout.frame { CTFrameDraw(frame, context) }
+    return context
+}
+let wpRadii: [Double] = [0, 8, 30, 10_000]
+let wpBackdropColors: [RGBA] = [[0, 0, 0, 0.6], [1, 1, 0, 1], [0.2, 0.5, 0.9, 0.37]]
+/// Two pages, each laid at a fractional width, font size and padding; the
+/// box `measuredSize` rounds is printed beside each.
+struct WpBackdropPage {
+    let label: String
+    let content: String
+    let size: Double
+    let width: Double?
+    let padding: Double
+}
+let wpBackdropPages = [
+    WpBackdropPage(
+        label: "three words", content: "sun moon star", size: 80.5, width: 401.37,
+        padding: 12.25),
+    WpBackdropPage(label: "two words", content: "a b", size: 33.3, width: nil, padding: 7.5),
+]
+var p20Static: [[String: Any]] = []
+var p20Timed: [[String: Any]] = []
+var p20Direct: [[String: Any]] = []
+for page in wpBackdropPages {
+    for radius in wpRadii {
+        for color in wpBackdropColors {
+            let backdrop = BackdropProps(color: color, padding: page.padding, radius: radius)
+            let still = TextProps(
+                content: page.content, font: "Montserrat-Black", size: page.size,
+                color: [1, 1, 1, 1], outline: OutlineProps(width: 4, color: [0, 0, 0, 1]),
+                backdrop: backdrop, width: page.width, textCase: .upper)
+            let timed = TextProps(
+                content: page.content, font: "Montserrat-Black", size: page.size,
+                color: [1, 1, 1, 1], outline: OutlineProps(width: 4, color: [0, 0, 0, 1]),
+                backdrop: backdrop, width: page.width, textCase: .upper,
+                wordStyle: WordStyle(mode: .build, activeColor: wpRedColor))
+            let box = LayerRenderers.measuredSize(for: still)
+            let timedBox = LayerRenderers.measuredSize(for: timed)
+            p20Static.append([
+                "page": page.label, "radius": radius, "color": color,
+                "box": [Double(box.width), Double(box.height)],
+                "same": wpSame(
+                    LayerRenderers.textBitmap(still, reveal: RecipeReveal()),
+                    wpReferencePage(still, text: true)),
+            ])
+            p20Timed.append([
+                "page": page.label, "radius": radius, "color": color,
+                "box": [Double(timedBox.width), Double(timedBox.height)],
+                "same": wpSame(
+                    LayerRenderers.textBitmap(timed, reveal: RecipeReveal(word: 0)),
+                    wpReferencePage(timed, text: false)),
+            ])
+        }
+    }
+}
+// `drawBackdrop` itself at sizes `measuredSize` never makes — fractional on
+// both axes, so the clamped radius and the box's last row and column are
+// fractional too — over and under, into an empty bitmap of the rounded size.
+for size in [CGSize(width: 301.4, height: 97.6), CGSize(width: 120.5, height: 63)] {
+    for radius in wpRadii {
+        for color in wpBackdropColors {
+            let backdrop = BackdropProps(color: color, radius: radius)
+            for under in [false, true] {
+                guard let drawn = LayerRenderers.bitmap(size),
+                    let reference = LayerRenderers.bitmap(size)
+                else { continue }
+                LayerRenderers.drawBackdrop(backdrop, size: size, under: under, in: drawn)
+                wpReferenceBackdrop(backdrop, size: size, in: reference)
+                p20Direct.append([
+                    "size": [Double(size.width), Double(size.height)], "radius": radius,
+                    "color": color, "under": under, "same": wpSame(drawn, reference),
+                ])
+            }
+        }
+    }
+}
+out["p20"] = ["static": p20Static, "timed": p20Timed, "direct": p20Direct]
 
 if wpQuick { wpFinish(out) }
 

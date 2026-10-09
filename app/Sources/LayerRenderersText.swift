@@ -337,6 +337,9 @@ extension LayerRenderers {
     /// backdrop. With none the bitmap is the undimmed page's, byte for byte,
     /// and the compositor's layer opacity carries the dim
     /// (`wordDim(of:reveal:)`, `RecipeLayer.drawnOpacity`, spec §11 W-16).
+    /// With one, a TIMED page draws its words first — a dim is then one
+    /// multiply of them (`drawWords`) — and its backdrop UNDER them; every
+    /// other page draws its backdrop first (spec §11 W-17).
     static func textBitmap(_ props: TextProps, reveal: RecipeReveal) -> CGContext? {
         let layout = LayerRenderers.layout(for: props)
         guard let context = LayerRenderers.bitmap(layout.size) else { return nil }
@@ -345,19 +348,16 @@ extension LayerRenderers {
         // the readability plate, not the words, and a plate that faded or
         // wiped with them would flicker under every caption. The outline
         // needs no decision at all — it is a glyph attribute, so it arrives
-        // and leaves with its own glyph.
-        if let backdrop = props.backdrop {
-            let rect = CGRect(origin: .zero, size: layout.size)
-            let radius = min(
-                CGFloat(backdrop.radius), min(layout.size.width, layout.size.height) / 2)
-            let path = CGPath(
-                roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
-            context.addPath(path)
-            context.setFillColor(backdrop.color.nsColor.cgColor)
-            context.fillPath()
+        // and leaves with its own glyph. `drawText`'s own condition for
+        // drawing words decides which goes down first.
+        let wordsFirst = reveal.word != nil && props.wordStyle != nil
+        if let backdrop = props.backdrop, !wordsFirst {
+            drawBackdrop(backdrop, size: layout.size, under: false, in: context)
         }
-
         LayerRenderers.drawText(layout, of: props, reveal: reveal, in: context)
+        if let backdrop = props.backdrop, wordsFirst {
+            drawBackdrop(backdrop, size: layout.size, under: true, in: context)
+        }
         return context
     }
 

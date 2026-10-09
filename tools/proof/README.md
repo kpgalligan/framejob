@@ -17583,3 +17583,88 @@ On the gate's Release build (`RC_PROOF_APP=release`), `--rows alpha-mode`
 scored 12/12, exit 0, with stderr empty and no `Reelcut: ` line. F1 read 1
 on `prores_4444` and 18 on `hevc_alpha` (2 pixels over 10), and F2 read 0 and
 2, B92's figures.
+
+## Issue batch B93 phase 3 — a timed page's backdrop goes under its words, a dim is one multiply, a backdrop's interior is written by vImage (`words_picture_probe.py` P10's backdrop pair scored, P19's `highlight-word0`, P20 and four mutants; `word_looks_proof.py`'s `dim-per-draw` re-anchored; #247, spec §11 W-17)
+
+#247: a page with a backdrop AND a pause dim kept W-14's transparency layer,
+and Karaoke's two-line page under `BackdropProps()` read 11.289 ms and
+11.227 ms at 3840 × 2160 with the dim (6.359 ms and 6.341 ms without), over
+P10's 8 ms budget; the backdrop's own whole-path fill was about 3 ms of that
+3061 × 420 box. W-17 was recorded first. Now:
+- `textBitmap` draws a TIMED page's (`reveal.word` and `word_style` set) words
+  and pill first, and its backdrop UNDER them (`destinationOver`); every other
+  page draws its backdrop first, as before.
+- `drawWords`' dim is one `scaleBitmap` of the drawn page (every byte × the
+  factor through `vImageMatrixMultiply_ARGB8888` in place, in 1/4096ths,
+  rounded), in the existing `defer`, so the early return after `drawBase` is
+  dimmed too. The transparency layer stays only for a context with no
+  `data`, decided before drawing.
+- `drawBackdrop` (`LayerRenderersBackdrop.swift`, new) flattens the rounded
+  rect's fully covered cross — rows [⌈r⌉, ⌊H − r⌋) by every whole column, and
+  every whole row by columns [⌈r⌉, ⌊W − r⌋) — with `vImageFlatten_RGBA8888`
+  against `fullCoverageBytes(color)`, the bytes CoreGraphics writes for one
+  pixel of a text bitmap, and has CoreGraphics fill the same path clipped to
+  the bitmap less the cross (an even-odd clip of the bitmap, both halves and
+  their overlap).
+
+**Rows.** P10 scores the backdrop pair (`RASTER_SCORED` 8, budgets unchanged
+at 4 ms / 8 ms; `--power-selftest` holds 16 scored medians). P19 scores its
+distance (`SCORE_DIM_DISTANCE`, within 3 of 255) and gains `highlight-word0`:
+`highlight` at word 0, every token upcoming and none active, `word_dim` 0.5,
+under a translucent blue backdrop with radius 30, the page `drawWords` leaves
+by its early return. **P20** (new) compares against the probe's copy of the
+draw before W-17 (the whole rounded path, then `CTFrameDraw`) over radii
+{0, 8, 30, 10 000} × colours {[0, 0, 0, 0.6], [1, 1, 0, 1],
+[0.2, 0.5, 0.9, 0.37]}: a STATIC page's `textBitmap` on two pages laid at a
+fractional width, font size and padding (their boxes print 426 × 320 and
+78 × 56: `measuredSize` rounds a box up to whole pixels), byte for byte; a
+TIMED `build` page at word 0 against the fill alone, byte for byte; and
+`drawBackdrop` itself, over and under, at 301.4 × 97.6 and 120.5 × 63, where
+the clamped radius and the last row and column are fractional, byte for byte.
+
+**Mutants**, from a copy of `app/Sources` (`--mutant NAME`, each runs `--only`
+its row):
+- `backdrop-corners-unfilled`: the edge fill clipped to nothing — P20.
+- `backdrop-cross-wide`: the cross's left bound ⌊r⌋, not ⌈r⌉ — P20 (its
+  direct part only: both pages' clamped radii are whole).
+- `dim-unscaled`: the `scaleBitmap` call removed — P19.
+- `backdrop-over-words`: the timed order's condition false, so the backdrop
+  goes down first and dims — P18.
+`word_looks_proof.py`'s `dim-per-draw` now replaces the `multiplies` block
+with the context's alpha set once and no layer, plus its `drawFaded` edit; D4
+must fail. Every other anchor of both scripts still occurs once (checked).
+
+```sh
+python3 tools/proof/words_picture_probe.py --only P10,P16,P18,P19,P20
+python3 tools/proof/words_picture_probe.py --mutant backdrop-cross-wide   # MUTANT PASS
+RC_PROOF_APP=release python3 tools/proof/word_looks_proof.py
+python3 tools/proof/word_looks_proof.py --mutant dim-per-draw
+```
+
+**Its record** (2026-10-09, Apple M2 Max, macOS 26.5.1, on AC, `powermode 0`
+before and after every judged run, Low Power Mode off and thermal state
+nominal as the probe read them). Two judged `--only` runs passed (5/5 rows
+and 1/1). Karaoke's two-line page under `BackdropProps()` (box 3061 × 420):
+
+| Run | 3840 × 2160 fill | fill+dim | 1080 × 1920 fill | fill+dim |
+|---|---|---|---|---|
+| before B93 (2026-10-07, B86's two judged runs) | 6.359, 6.341 ms | 11.289, 11.227 ms | 1.033, 0.993 ms | 1.734, 1.718 ms |
+| `--only P10,P16,P18,P19,P20` | 4.702 ms | 5.144 ms | 0.893 ms | 0.976 ms |
+| `--only P10` | 4.584 ms | 5.129 ms | 0.881 ms | 0.950 ms |
+| the whole probe | 4.387 ms | 4.900 ms | 0.795 ms | 0.858 ms |
+
+The same page with no backdrop read 3.213, 3.139 and 3.191 ms at 3840 × 2160
+with the dim in the three runs. P19's distances in the whole run: `opaque`
+0.750, `default` 0.600, `full` 0.000, `highlight-word0` 0.806 of 255, 0 bytes
+over 1, every pixel with no ink the backdrop's own bytes. P20 compared 24
+static, 24 timed and 48 direct cases, none different. All four mutants printed
+MUTANT PASS, exit 0 (`dim-unscaled`'s P19 distances 63.75, 127.5, 0 and
+42.5). `--power-selftest` 8/8. The whole probe scored 22/22, exit 0.
+`make typecheck` held its four baseline warnings. `make gate` PASS (183 s).
+On the gate's Release build, `word_looks_proof.py` scored 16/16, exit 0,
+stderr empty: B1 `moved: []`; D4's backdrop 0 from (255, 255, 0), ink over
+the plate (255, 255, 128), bare plate (255, 127, 0); Z1 no `Reelcut: ` line.
+`word_looks_proof.py --mutant dim-per-draw` printed `MUTANT PASS`, 13/15,
+exit 0: D4 failed, the ink over the plate (255, 191, 128); B1 failed too (the
+nine frames of the karaoke, `word_fade` and `line_rise` pages whose
+partial-alpha inks the `drawFaded` edit changes, as in B86).

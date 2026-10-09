@@ -29,7 +29,7 @@ P9  no pill, active_scale 1.5, a ≥ 3-em word: the red ink at pop 1 is at least
 P10 (issue batch B86, spec §11 W-14, W-16) what the three looks COST: the
     median of 20 `text(_:hash:reveal:)` calls on a cache miss — a raster and
     an upload, after one untimed warm-up — at 1080×1920 and 3840×2160, of
-    TWELVE cases a canvas. Six are SCORED: on the P1 text as the HIGHLIGHT
+    TWELVE cases a canvas. Eight are SCORED: on the P1 text as the HIGHLIGHT
     preset's own page (Montserrat-Black at 0.075 × min(w, h), upper case,
     outlined) at word 3, `fill` 0.5, `fill` 0.5 with `dim` 0.5 at
     `pause_dim` 0.5 (`fill+dim`) and `glide` 0.5 (with the default pill);
@@ -42,22 +42,23 @@ P10 (issue batch B86, spec §11 W-14, W-16) what the three looks COST: the
     the page KARAOKE's pager makes of a run of words with no pause — the
     one preset page of TWO lines, at its own wrap width, its last word half
     filled (`karaoke-2line fill+dim`; the row also requires that every
-    Karaoke page really was laid on two lines). Six are PRINTED and never
-    scored: `pop` 0.5, the shipped comparator; the three TWINS
-    `oneword-page fill`, `oneword-line fill (hand-made)` and `karaoke-2line
-    fill`, each its page with no dim; and Karaoke's two-line page under
+    Karaoke page really was laid on two lines); and, since issue batch B93
+    phase 3 (spec §11 W-17), Karaoke's two-line page under
     `BackdropProps()` — what the inspector's Backdrop switch writes, and no
     caption style does — with the fill alone and with the dim
     (`karaoke-2line-backdrop fill (hand-made)`, `karaoke-2line-backdrop
-    fill+dim (hand-made)`). **Since phase 3 a dim adds nothing to the
-    raster of a page with no backdrop** (spec §11 W-16: the compositor
-    multiplies the layer's opacity and the bitmap is the undimmed page's),
-    so each of the four `… fill+dim` cases with no backdrop is its twin's
-    raster, and the row's detail prints, per canvas, what the dim added
-    over the twin of the same run ("the dim adds"). A page WITH a backdrop
-    still draws its dim in the bitmap, in W-14's transparency layer, which
-    costs by the box: the backdrop pair prints that, unscored
-    (`designs/adr/roadmap-08-word-captions.md`, Known limits). The probe
+    fill+dim (hand-made)`). Four are PRINTED and never scored: `pop` 0.5,
+    the shipped comparator; and the three TWINS `oneword-page fill`,
+    `oneword-line fill (hand-made)` and `karaoke-2line fill`, each its page
+    with no dim. **Since B86 phase 3 a dim adds nothing to the raster of a
+    page with no backdrop** (spec §11 W-16: the compositor multiplies the
+    layer's opacity and the bitmap is the undimmed page's), so each of the
+    four `… fill+dim` cases with no backdrop is its twin's raster, and the
+    row's detail prints, per canvas, what the dim added over the twin of
+    the same run ("the dim adds"). A page WITH a backdrop still draws its
+    dim in the bitmap, since W-17 as one multiply of the words before the
+    backdrop goes under them, and its backdrop's fully covered pixels are
+    written by vImage. The probe
     measures P10 FIRST, before the P1/P2 sweep. It FAILS when a scored
     median is over 4 ms at 1080×1920 — half of spec §7.5's 8 ms frame,
     because a fill pays it on every frame of a word — or over 8 ms at
@@ -122,7 +123,25 @@ P19 a dimmed page WITH a backdrop is the lit page at one opacity over an
     many bytes are over 1 and over 3, and how many pixels with no ink in U
     are not B's bytes in D. While the backdrop page is drawn by W-14's
     transparency layer that distance is printed as "the layer's distance"
-    and not scored (`SCORE_DIM_DISTANCE`).
+    and not scored (`SCORE_DIM_DISTANCE`). Since issue batch B93 phase 3
+    (spec §11 W-17) the layer is gone and the distance is SCORED: within 3
+    of 255 per byte, every pixel with no ink the backdrop's own bytes. A
+    fourth page, `highlight-word0` (`highlight` at word 0, every token
+    upcoming and no active one, `word_dim` 0.5 at `pause_dim` 0.5, under a
+    translucent blue backdrop with radius 30), is the page `drawWords`
+    leaves by its early return after the base pass: its dim must still be
+    there.
+P20 (issue batch B93 phase 3, spec §11 W-17) a backdrop's bytes. Against
+    the probe's own copy of the draw before W-17 — the whole rounded path
+    filled by CoreGraphics, then `CTFrameDraw` — over radii {0, 8, 30,
+    10 000}, colours {[0, 0, 0, 0.6], [1, 1, 0, 1], [0.2, 0.5, 0.9, 0.37]}
+    and two pages laid at a fractional width, font size and padding (their
+    boxes printed; `measuredSize` rounds a box up to whole pixels): a STATIC
+    page's `textBitmap` is the reference byte for byte; a TIMED `build` page
+    at word 0, which draws no ink, is the reference fill alone byte for
+    byte; and `drawBackdrop` itself, over and under, at two sizes no box has
+    (301.4 × 97.6 and 120.5 × 63, so the clamped radius and the last row
+    and column are fractional), is the reference fill byte for byte.
 
     python3 tools/proof/words_picture_probe.py [--raster-budget-ms N] [--only ROWS]
     python3 tools/proof/words_picture_probe.py --mutant NAME
@@ -133,7 +152,7 @@ answers — Low Power Mode on, a thermal state above nominal before or after
 the rasters, no power state at all, and an unthrottled host under and over
 budget — and scores that each is the row it should be (T1–T8).
 
-`--only ROWS` (comma-separated, of P10–P19: the rows measured before the
+`--only ROWS` (comma-separated, of P10–P20: the rows measured before the
 sweep) runs the probe with `--quick`, which stops before the sweep, and
 scores those rows alone — `--only P10` is P10 by itself, a build and about
 half a minute. `--raster-budget-ms N` replaces both of P10's budgets with
@@ -177,12 +196,15 @@ RASTER_BUDGET = {"1080x1920": 4.0, "3840x2160": 8.0}
 # budget must not be what "catches" a mutant of the drawing.
 SCORE_RASTER = True
 # The rows the probe measures before the sweep, which `--only` can run alone.
-QUICK = ("P10", "P11", "P12", "P13", "P14", "P15", "P16", "P17", "P18", "P19")
+QUICK = ("P10", "P11", "P12", "P13", "P14", "P15", "P16", "P17", "P18", "P19", "P20")
 # P19's tolerance per premultiplied byte (spec §11 W-16). SCORED only when a
-# page with a backdrop is drawn without W-14's transparency layer; while the
-# layer draws it, the distance is printed as "the layer's distance".
+# page with a backdrop is drawn without W-14's transparency layer, which it is
+# since issue batch B93 phase 3 (spec §11 W-17); while the layer drew it, the
+# distance was printed as "the layer's distance".
 DIM_TOLERANCE = 3
-SCORE_DIM_DISTANCE = False
+SCORE_DIM_DISTANCE = True
+# P19's pages.
+DIM_PAGES = ("opaque", "default", "full", "highlight-word0")
 # Each `… fill+dim` case and the `… fill` twin it is read against: the same
 # page with `dim` false, on the same run.
 TWINS = (("fill+dim", "fill"),
@@ -193,7 +215,7 @@ TWINS = (("fill+dim", "fill"),
           "karaoke-2line-backdrop fill (hand-made)"))
 # P10's cases per canvas, and how many of them are scored.
 RASTER_CASES = 12
-RASTER_SCORED = 6
+RASTER_SCORED = 8
 # None for every row, else the rows `--only` named.
 ONLY = None
 THERMAL_NOMINAL = 0
@@ -274,7 +296,8 @@ def judge_raster(answer):
     two_lines = [m.get("lines") for m in p10 if m["case"].startswith("karaoke-2line")]
     canvases = len(RASTER_BUDGET)
     return (f"P10 a fill, a fill with a dim, a glide, One Word's one-word page, its six words "
-            f"on one line and Karaoke's two-line page, each with a fill and a dim, rasterize "
+            f"on one line and Karaoke's two-line page, each with a fill and a dim, and that "
+            f"page under a backdrop with a fill and with a fill and a dim, rasterize "
             f"and upload within budget ({budgets}; median of 20 on a cache miss; "
             f"{RASTER_SCORED * canvases} scored of {RASTER_CASES * canvases})",
             len(p10) == RASTER_CASES * canvases and len(scored) == RASTER_SCORED * canvases
@@ -316,8 +339,8 @@ def power_selftest():
                  ("oneword-page fill", False),
                  ("oneword-line fill (hand-made)", False),
                  ("karaoke-2line fill", False),
-                 ("karaoke-2line-backdrop fill (hand-made)", False),
-                 ("karaoke-2line-backdrop fill+dim (hand-made)", False)]
+                 ("karaoke-2line-backdrop fill (hand-made)", True),
+                 ("karaoke-2line-backdrop fill+dim (hand-made)", True)]
         made = {"p10": [{"canvas": canvas, "case": case, "scored": scored, "drew": True,
                          "median_ms": 1.0, "lines": 2 if case.startswith("karaoke") else 1}
                         for canvas in RASTER_BUDGET for case, scored in cases]}
@@ -511,8 +534,8 @@ def score_dim(answer):
     if wanted("P19"):
         p19 = answer.get("p19") or []
         pages = {page.get("page"): page for page in p19}
-        lines, good = [], len(p19) == 3 and set(pages) == {"opaque", "default", "full"}
-        for name in ("opaque", "default", "full"):
+        lines, good = [], len(p19) == len(DIM_PAGES) and set(pages) == set(DIM_PAGES)
+        for name in DIM_PAGES:
             page = pages.get(name) or {}
             if not page.get("drew"):
                 good = False
@@ -538,14 +561,30 @@ def score_dim(answer):
                 f"no ink, {page.get('empty_moved')} of them not the backdrop's own bytes; same "
                 f"as the backdrop alone {page.get('same_as_backdrop')}")
         check("P19 a dimmed page with a backdrop is the lit page at one opacity over an "
-              "untouched backdrop: three pages (opaque, default, full) each draw, have ink, "
-              "and short of a full dim differ from the backdrop alone"
+              "untouched backdrop: four pages (opaque, default, full, highlight-word0) each "
+              "draw, have ink, and short of a full dim differ from the backdrop alone"
               + (f"; every premultiplied byte is within {DIM_TOLERANCE} of 255 of U·(1 − a) + "
                  f"B·(1 − U_alpha·(1 − a)), and every pixel with no ink is the backdrop's own "
                  f"bytes" if SCORE_DIM_DISTANCE else
                  "; the distance from U·(1 − a) + B·(1 − U_alpha·(1 − a)) is PRINTED, not "
                  "scored: the backdrop page is drawn by W-14's transparency layer"),
               good, "; ".join(lines) or f"{p19}")
+    if wanted("P20"):
+        p20 = answer.get("p20") or {}
+        parts, good = [], True
+        for key, count in (("static", 24), ("timed", 24), ("direct", 48)):
+            cases = p20.get(key) or []
+            differ = [{k: v for k, v in case.items() if k != "same"}
+                      for case in cases if case.get("same") is not True]
+            good = good and len(cases) == count and not differ
+            boxes = sorted({f"{c.get('page')} {c.get('box')}" for c in cases if "box" in c})
+            parts.append(f"{key}: {len(cases)} of {count} compared, not the reference "
+                         f"{differ[:4]}" + (f"; boxes {boxes}" if boxes else ""))
+        check("P20 a backdrop's bytes: a static page's textBitmap is the whole-path fill and "
+              "its text byte for byte, a timed build page at word 0 is the whole-path fill "
+              "alone, and drawBackdrop at fractional sizes, over and under, is the whole-path "
+              "fill — radii 0, 8, 30, 10 000 by three colours",
+              good, "; ".join(parts))
 
 
 def score(answer):
@@ -727,6 +766,23 @@ MUTANTS = {
     # with no backdrop has its dim rasterized after all.
     "dim-rasterized": ("LayerRenderersWords.swift",
                        "props.backdrop == nil", "false", "P18"),
+    # A backdrop's bytes and the timed order (issue batch B93 phase 3, spec §11
+    # W-17).
+    "backdrop-corners-unfilled": ("LayerRenderersBackdrop.swift",
+                                  "        context.clip(using: .evenOdd)\n",
+                                  "        context.clip(using: .evenOdd)\n"
+                                  "        context.clip(to: CGRect.zero)\n", "P20"),
+    "backdrop-cross-wide": ("LayerRenderersBackdrop.swift",
+                            "        let left = clamp(Int(radius.rounded(.up)), width)\n",
+                            "        let left = clamp(Int(radius.rounded(.down)), width)\n",
+                            "P20"),
+    "dim-unscaled": ("LayerRenderersWords.swift",
+                     "                scaleBitmap(context, by: 1 - dimmed)\n",
+                     "                _ = dimmed\n", "P19"),
+    "backdrop-over-words": ("LayerRenderersText.swift",
+                            "        let wordsFirst = reveal.word != nil && props.wordStyle "
+                            "!= nil\n",
+                            "        let wordsFirst = false\n", "P18"),
 }
 
 

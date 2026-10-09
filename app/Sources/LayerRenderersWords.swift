@@ -8,7 +8,8 @@ import CoreText
 /// glides, a word that fills, a page that dims in a pause — and, since its
 /// phase 3 (spec §11 W-16), the one rule for WHERE that dim is drawn,
 /// `wordDim(of:reveal:)`: the compositor's layer opacity on a page with no
-/// backdrop, `drawWords`' own transparency layer on a page with one.
+/// backdrop, and on a page with one `drawWords`' own multiply of the
+/// bitmap, drawn before the backdrop is put under it (spec §11 W-17).
 ///
 /// The recipe's five word keys are the whole of what the core says
 /// (`RecipeReveal`, spec §11 W-4, W-13): the active token is `word − 1`, the
@@ -306,12 +307,16 @@ extension LayerRenderers {
     /// whole — an outline's stroke reaches past the glyph range.
     ///
     /// **A dim is one opacity over the words and the pill together**,
-    /// `1 − dimAmount(dim, pauseDim:)`, drawn HERE in one transparency
-    /// layer — which only a page with a backdrop asks for: the caller drew
-    /// that backdrop, it is outside the layer and it never dims. For a page
-    /// with none the caller hands a nil `dim`, this routine draws the
-    /// undimmed page, and the compositor multiplies the layer's opacity
-    /// (`wordDim(of:reveal:)`, spec §11 W-16).
+    /// `1 − dimAmount(dim, pauseDim:)`, drawn HERE — which only a page with a
+    /// backdrop asks for, and its caller puts the backdrop under the words
+    /// AFTER this returns, so it never dims (spec §11 W-17). The page is
+    /// drawn undimmed and the whole bitmap multiplied once
+    /// (`scaleBitmap`), on every exit after drawing starts, so the context
+    /// must hold nothing but this page when a dim is passed; a context with
+    /// no memory, decided before anything is drawn, takes one transparency
+    /// layer instead. For a page with no backdrop the caller hands a nil
+    /// `dim`, this routine draws the undimmed page, and the compositor
+    /// multiplies the layer's opacity (`wordDim(of:reveal:)`, spec §11 W-16).
     static func drawWords(
         _ layout: TextLayout, of props: TextProps, style: WordStyle, word: Int, pop: Double?,
         glide: Double? = nil, fill: Double? = nil, dim: Double? = nil, in context: CGContext
@@ -320,13 +325,16 @@ extension LayerRenderers {
         guard !tokens.isEmpty, !layout.lines.isEmpty else { return }
         let dimmed = dimAmount(dim, pauseDim: style.pauseDim)
         guard dimmed < 1 else { return }
-        if dimmed > 0 {
+        let multiplies = dimmed > 0 && context.data != nil
+        if dimmed > 0, !multiplies {
             context.saveGState()
             context.setAlpha(CGFloat(1 - dimmed))
             context.beginTransparencyLayer(auxiliaryInfo: nil)
         }
         defer {
-            if dimmed > 0 {
+            if multiplies {
+                scaleBitmap(context, by: 1 - dimmed)
+            } else if dimmed > 0 {
                 context.endTransparencyLayer()
                 context.restoreGState()
             }

@@ -596,46 +596,14 @@ recording that page as a limit.
 - **The no-blink extension is invisible at the default numbers.** `hold`
   (0.5 s) outlasts `breakGap` (0.25 s). It is kept as a rule, and a probe row
   exercises it at hold 0.1 s.
-- **A page with a backdrop AND a pause dim still pays a transparency layer
-  on a ramp's frames** (B86 phase 3, spec §11 W-16;
-  `words_picture_probe.py` P10 prints it and does not score it). The
-  compositor can carry the dim only for a page whose bitmap holds the words
-  and the pill and nothing else; a backdrop is in the same bitmap and would
-  dim with them, so such a page keeps W-14's draw — the words and the pill
-  in one transparency layer over the whole box, above the backdrop — and
-  the layer costs by the box. No caption STYLE writes a backdrop, so the
-  Generate Captions sheet and `transcribe` never make such a page; the
-  inspector's Backdrop switch, its Lower Third and Caption presets, and
-  `set_text` do. The page P10 prints is the one Karaoke's pager makes, two
-  lines, under `BackdropProps()` (what the Backdrop switch writes), its
-  last word half filled. Judged twice on 2026-10-07 (AC power, `pmset -g`
-  `powermode 0` before and after, Low Power Mode off, thermal state
-  nominal; an unoptimised probe build, the median of 20
-  rasters-and-uploads on a cache miss): **with the dim, half-way into it,
-  11.289 ms and 11.227 ms at 3840×2160 (box 3061×420) against the 8 ms
-  budget**, and 1.734 ms and 1.718 ms at 1080×1920 (box 830×221) against
-  4 ms; with NO dim 6.359 ms and 6.341 ms, and 1.033 ms and 0.993 ms. The
-  same page with no backdrop read 3.348 ms and 3.227 ms at 3840×2160, so
-  the backdrop's own fill is about 3 ms of that box before any dim, and
-  the layer about 4.9 ms more. The cost is paid on the frames of a ramp
-  only — 0.1 s down and 0.1 s up per pause; the plateau between is one
-  cached texture. A cheaper draw for this page (the words and the pill
-  first, one `destinationIn` multiply, the backdrop filled under them) was
-  designed in phase 3 and not built: its keep limit was 5.0 ms at
-  3840×2160, and the page with no dim already reads over it (Decisions,
-  phase 3). Untried: a SIMD blend (vImage) of a separate words buffer, which could
-  at best bring the dim inside the 8 ms budget (about 1.6 ms of room over
-  the undimmed page at 3840×2160), not under the 5.0 ms keep limit. Not
-  fixed; tracked in #247. **The limit this bullet replaces ended with phase 3**: on a page
-  with no backdrop a dim now adds nothing to a raster. The hand-made line
-  of large type (six words on one line at One Word's size), which read
-  9.529–10.120 ms at 3840×2160 on a dim's ramp frames, read 3.184 ms and
-  3.048 ms and is a scored row; Karaoke's two-line page, 8.210–8.441 ms on
-  2026-10-06 and over the budget, read 3.271 ms and 3.212 ms; Highlight's
-  line, 7.567–7.760 ms, read 2.633 ms and 2.545 ms. A fill or a glide
-  alone costs what the shipped pop costs (1.2–1.3 ms and 2.5–2.7 ms in
-  those two runs). P10 does not judge a run taken in Low Power Mode or
-  above a nominal thermal state.
+- **A page with a backdrop AND a pause dim no longer pays a transparency layer**: issue
+  batch B93 phase 3 lifted the limit (#247, spec §11 W-17: the words first, the dim one multiply
+  of them, the backdrop under them with its fully covered pixels written by vImage), and P10 now
+  scores the page. Karaoke's two-line page under `BackdropProps()` (box 3061×420), 11.289 ms and
+  11.227 ms at 3840×2160 with the dim before, read 5.144 ms and 5.129 ms, and 4.702 ms and
+  4.584 ms with no dim (6.359 ms and 6.341 ms before); at 1080×1920 0.976 ms and 0.950 ms, and
+  0.893 ms and 0.881 ms (judged twice on 2026-10-09, `powermode 0` before and after, Low Power
+  Mode off, thermal state nominal).
 - **A fill follows a word's stored `end`, and the two engines store
   different ends** (issue batch B86 phase 1, spec §11 W-13). AssemblyAI's
   `end` is where the word was heard to end, so the fill keeps time with the

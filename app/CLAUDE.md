@@ -1122,7 +1122,8 @@ the key map behind it.
   (`reelcut_dissolve_fragment`), which scales a zoom's halves about their
   anchors there. `drawLayer` is the one per-layer draw both use.
 - `LayerRenderers.swift` · `LayerRenderersText.swift` · `LayerRenderersReveal.swift`
-  · `LayerRenderersWords.swift` — text and shape descriptions to textures,
+  · `LayerRenderersWords.swift` · `LayerRenderersBackdrop.swift` — text and
+  shape descriptions to textures,
   keyed by the recipe's `hash` (`RecipeSourceRef.cacheHash` is the WHOLE key;
   nothing here may append to it — a graphic's key is its SVG text instead,
   `LayerRenderersGraphic.swift`, in its own six-entry pool). Text draws what the recipe computed; the
@@ -1153,8 +1154,12 @@ the key map behind it.
   (`wordDim(of:reveal:)`, spec §11 W-16): on a page with no backdrop the
   bitmap holds none of it and the compositor multiplies the layer's opacity
   (`RecipeLayer.drawnOpacity`); on a page with a backdrop `drawText` hands
-  `drawWords` the dim, and it is one transparency layer over the words and
-  the pill at `1 − dim × pauseDim`, above the backdrop `textBitmap` drew.
+  `drawWords` the dim, and it is one multiply of the page's bitmap
+  (`scaleBitmap`) at `1 − dim × pauseDim`, after which `textBitmap`
+  composites the backdrop under the words (spec §11 W-17).
+  `LayerRenderersBackdrop` is the backdrop of a text page: its fully covered
+  pixels written by vImage with CoreGraphics' own bytes, its edge by
+  CoreGraphics; under the words on a timed page (spec §11 W-17).
   `dimAmount` is the one clamp, and the texture key is still the recipe's
   hash, `word_dim` included. None of the three moves a glyph or the box:
   `layoutKey`, `frameKey` and `wordHeadroom` do not read them.
