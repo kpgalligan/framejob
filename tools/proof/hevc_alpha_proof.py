@@ -7,6 +7,7 @@ launches.
 
     python3 tools/proof/hevc_alpha_proof.py [--app PATH]
     python3 tools/proof/hevc_alpha_proof.py --rows size [--app PATH]
+    python3 tools/proof/hevc_alpha_proof.py --rows sheet [--app PATH]
     python3 tools/proof/hevc_alpha_proof.py --control plain-hevc-reader|sheet-default
     python3 tools/proof/hevc_alpha_proof.py --mutant encoder-refused|report-and-fill|shape-and-note
     python3 tools/proof/hevc_alpha_proof.py --record-baseline [--app PATH]
@@ -16,6 +17,9 @@ Gate A, phase A's gate: the rows marked ◆, and G1. **G1 is RED BY DESIGN on
 a build that holds phase B** — it requires the pad the baseline recorded
 and an unknown `hevc_alpha` — and the script says so on G1's line and on
 its last line; Gate A was passed on the phase A build (commit fcfeebf).
+`--rows sheet` is the export sheet's rows alone, each launch with CLEAR as
+its one fixture and no baseline read: H0, E1 and Z1 in one launch, then E3's
+launches.
 
 Each launch is the built app `proof_app` picks (Debug unless `RC_PROOF_APP=release`)
 on a scratch socket of its own, and only
@@ -157,21 +161,34 @@ Rows (◆ = also Gate A's):
   names it.
 - **E1**: File ▸ Export… on CLEAR: the Format popup reads "HEVC with Alpha
   (MOV)" with no `truncated` problem naming it, exactly one text — the
-  sheet's footnote — contains "MOV" and ends "alpha", and that view's
-  `tooltip` in the layout dump equals its whole text. The footnote's WIDTH
-  is printed and NOT scored: beside the sheet's three buttons its slot is
-  88 pt and "HEVC_ALPHA · MOV · alpha" needs 144, so it is drawn cut with a
-  tail ellipsis (`sheetFootnote`, `Sheets.swift`; a footnote gives way
-  before a button, #141) — exactly as ProRes 4444's "PRORES4444 · MOV ·
-  alpha" has been (measured: 144 pt in 88 on both). So the word "alpha" is
-  in the footnote's text and its tooltip and not on the sheet's drawn
-  face, which this proof prints and does not hide; whether the summary
-  gets a line of its own is a layout choice no row decides. The tooltip
-  clause is red on a build whose `syncReadout` writes only `stringValue`:
-  the tooltip there is the empty string the label was built with. Only
-  this row's sheet is opened (the choice is pinned to `hevc_alpha`):
-  ProRes 4444's footnote goes through the same two assignments and has no
-  row of its own.
+  sheet's footnote — contains "MOV" and ends "alpha", that view's
+  `tooltip` in the layout dump equals its whole text, and no `truncated`
+  problem names it. The footnote's intrinsic width and its frame's are
+  printed. The truncation clause is #243's (the owner chose a wider sheet,
+  issue batch B91): on a 420 pt sheet the footnote's slot beside the three
+  buttons was 88 pt and "HEVC_ALPHA · MOV · alpha" needs 144, so it was
+  drawn cut with a tail ellipsis before "alpha" (`sheetFootnote`,
+  `Sheets.swift`; a footnote gives way before a button, #141), and that
+  build is the clause's red. The tooltip clause is red on a build whose
+  `syncReadout` writes only `stringValue`: the tooltip there is the empty
+  string the label was built with.
+- **E3**, not in a session of the full rows' own: once per row of the core's
+  preset table (`core/src/export_table.rs`, each `id` and `name` read from
+  the source, so a row added there is covered), a launch with
+  `ReelcutExportChoice` pinned to that row alone and one fixture, CLEAR;
+  File ▸ Export…, `snapshot_ui` of the sheet, `cancel_sheet`: the Format
+  popup reads the row's name (the pin took), exactly one text's tooltip is
+  its whole text (the footnote), it is on a line of its own above the
+  buttons (not in "Add to Queue"'s row, its frame's bottom at or above that
+  button's top), no `truncated` problem names it, the project closes and the
+  log holds no `Reelcut: ` line. Two more launches are scored the same way,
+  the footnotes a Quality tier and a loudness target lengthen: `h264` at
+  "High" (its footnote must hold "kbps audio") and `hevc_alpha` at "Maximum"
+  with −14 LUFS (it must hold "kbps audio", "LUFS" and "alpha"). Each
+  footnote, its intrinsic width and its frame's are printed. The owner's
+  second choice on #243 (2026-10-09) moved the footnote onto that line; on
+  the build beside the buttons, 148 pt wide, the two long launches are cut
+  (228 and 378 pt) and every launch fails the own-line clause.
 - **X1**, scored only under `--mutant encoder-refused`: CLEAR as
   `hevc_alpha` answers exactly "This Mac cannot export with the
   “hevc_alpha” preset." and nothing is at the path, not even an empty file.
@@ -267,6 +284,7 @@ import atexit
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -292,7 +310,8 @@ SECOND = 600_000
 SIZE_ROWS = ["H0", "T0", "R1", "R2", "R3", "R4", "E2", "B1", "B4", "G1", "Z1"]
 FULL_ROWS = ["H0", "T0", "R1", "R2", "R3", "R4", "E2", "A1", "A2", "A3", "A4", "A5", "S1",
              "S2", "O1", "O2", "O3", "O4", "O5", "P1", "P2", "B1", "B2", "B3", "B4", "L1",
-             "L2", "N1", "E1", "Z1"]
+             "L2", "N1", "E1", "E3", "Z1"]
+SHEET_ROWS = ["H0", "E1", "E3", "Z1"]
 DIGEST_ROWS = ("B1", "B4", "G1")     # the rows that read the baseline's host's bytes
 EVEN_ROWS = ["h264", "hevc", "prores_422"]
 EXTENSION = {"h264": "mp4", "hevc": "mp4", "hevc_alpha": "mov", "prores_422": "mov",
@@ -305,6 +324,15 @@ B6_SIZE = ["h264, hevc, hevc_alpha and prores_422 need even dimensions",
 B6_PRESET = ("Three rows keep a transparent canvas transparent: prores_4444 and hevc_alpha "
              "(the movie rows — see size, which constrains them) and apng.")
 CHOICE = '<string>{"preset_id":"hevc_alpha"}</string>'
+PRESET_TABLE = ROOT / "core/src/export_table.rs"
+# E3's long launches: the footnotes a Quality tier and a loudness target
+# lengthen (#243's second half). Each: its title, the pinned choice, the row's
+# id and what its footnote must hold, so the tier and the target took.
+LONG_CHOICES = (('h264 at "High"', '{"preset_id":"h264","quality_tier":"High"}', "h264",
+                 ("kbps audio",)),
+                ('hevc_alpha at "Maximum" with -14 LUFS',
+                 '{"preset_id":"hevc_alpha","quality_tier":"Maximum","loudness":-14}',
+                 "hevc_alpha", ("kbps audio", "LUFS", "alpha")))
 ALPHA_FORMAT = "HEVC with Alpha (MOV)"
 # What E2's Format popup may read under `--rows size`. Phase A's build had no
 # `hevc_alpha` row, so a pin that took showed H.264 — as did an owner who last
@@ -590,11 +618,16 @@ def tone(s):
     return path
 
 
+def clear_fixture(s):
+    """CLEAR alone: the one fixture the sheet's rows open the sheet on."""
+    s.fx["CLEAR"] = shapes(s, "CLEAR", 640, 360, [0, 0, 0, 0], (200, 120), [1, 0, 0, 1])
+
+
 def fixtures(s, full):
     """The seven fixtures the baseline's cases use, and with `full` the
     five the alpha and fill rows add."""
     clear, white_, red = [0, 0, 0, 0], [1, 1, 1, 1], [1, 0, 0, 1]
-    s.fx["CLEAR"] = shapes(s, "CLEAR", 640, 360, clear, (200, 120), red)
+    clear_fixture(s)
     s.fx["SUBWHITE"] = shapes(s, "SUBWHITE", 334, 222, white_, (100, 100), white_)
     s.fx["WIDE"] = shapes(s, "WIDE", 400, 100, white_, (40, 40), white_)
     s.fx["ODDFULL"] = picture(s, "ODDFULL", 321, 181)
@@ -1296,18 +1329,105 @@ def row_e1(s):
     cut = [f"{t!r} needs {seen['widths'][t][0]} pt and has {seen['widths'][t][1]}"
            for t in summary if t in seen["truncated"]]
     check(f"E1 the Export sheet on CLEAR opens on \"{ALPHA_FORMAT}\", not truncated, its "
-          "footnote's text holds \"MOV\" and ends \"alpha\", and the footnote's tooltip is "
-          "that whole text",
+          "footnote's text holds \"MOV\" and ends \"alpha\", the footnote's tooltip is "
+          "that whole text, and no truncated problem names the footnote (#243)",
           seen["format"] == ALPHA_FORMAT and len(summary) == 1 and tips == summary
-          and ALPHA_FORMAT not in seen["truncated"],
-          f"format {seen['format']!r}; texts holding MOV and ending alpha: {summary}; "
-          f"tooltip {tips}"
-          + (f"\n       printed, not scored: the footnote is drawn cut — {'; '.join(cut)} "
-             "beside the three buttons, so it ends in a tail ellipsis before the word "
-             "(Sheets.swift's sheetFootnote; ProRes 4444's footnote is cut the same way); "
-             + ("its tooltip carries the whole line" if tips == summary else
-                "its tooltip does NOT carry the line")
-             if cut else ("; the footnote is drawn whole" if summary else "")))
+          and ALPHA_FORMAT not in seen["truncated"] and not cut,
+          "; ".join([f"format {seen['format']!r}",
+                     f"texts holding MOV and ending alpha: {summary}", f"tooltip {tips}"]
+                    + ([f"the footnote is drawn CUT — {'; '.join(cut)}, so it ends in a tail "
+                        "ellipsis before the word"] if cut else
+                       [f"the footnote is drawn whole: {t!r} needs {seen['widths'][t][0]} pt "
+                        f"and has {seen['widths'][t][1]}" for t in summary])))
+
+
+def table_rows():
+    """Each `(id, name)` of the core's preset table, read from its source."""
+    return re.findall(r'\bid: "([^"]+)",\s*name: "([^"]+)",', PRESET_TABLE.read_text())
+
+
+def footnote_of(views, problems):
+    """The texts whose tooltip is their whole text — the footnote, when there
+    is exactly one (`syncReadout` writes both) — each with whether it is on a
+    line of its own above the buttons: not in "Add to Queue"'s row, and its
+    frame's bottom at or above that button's top (the dump's frames run
+    down from the root's top). And the texts a `truncated` problem names."""
+    visible = [v for v in views if not v.get("hidden")]
+    queue = [v for v in visible if v.get("text") == "Add to Queue"]
+    notes = [v for v in visible if v.get("text") and v.get("tooltip") == v["text"]]
+
+    def own_line(note):
+        return (len(queue) == 1 and note.get("parent") != queue[0].get("parent")
+                and note["frame"][1] + note["frame"][3] <= queue[0]["frame"][1])
+
+    return [(v, own_line(v)) for v in notes], truncated_texts(views, problems)
+
+
+def sheet_launch(label, app, choice):
+    """One launch of E3's: CLEAR, the sheet's Format popup and footnote, every
+    project closed and the log read. `(reading, None)` or `(None, why)`."""
+    s = Session(label, app, f"<string>{choice}</string>")
+    try:
+        if not s.launch():
+            return None, f"the app did not listen at {s.launched.socket_path}"
+        clear_fixture(s)
+        views, problems = sheet(s, "CLEAR")
+        notes, cut = footnote_of(views, problems)
+        closed, how = close_all(s)
+        complaints = [line.strip() for line in open(s.log, errors="replace")
+                      if "Reelcut: " in line]
+        return {"format": read_sheet(views, problems)["format"],
+                "notes": [(v["text"], v["intrinsic"][0], v["frame"][2], own)
+                          for v, own in notes],
+                "cut": [v["text"] for v, _ in notes if v["text"] in cut],
+                "clean": closed and not complaints,
+                "closing": f"closed {how}; complaints {complaints}"}, None
+    except Exception as error:  # a launch that could not be read is the row's failure
+        return None, f"{type(error).__name__}: {error}"
+    finally:
+        s.stop()
+
+
+def described(got):
+    return "; ".join(f"footnote {text!r} needs {need} pt and has {room}, "
+                     + ("on its own line above the buttons" if own else
+                        "NOT on a line of its own above the buttons")
+                     for text, need, room, own in got["notes"]) or "no footnote"
+
+
+def row_e3(app):
+    """Every Format row's footnote at its default quality, one launch each,
+    then the two long footnotes. Runs its own launches, never inside a
+    session."""
+    table = table_rows()
+    names = dict(table)
+    ids = list(names)
+    good = "h264" in ids and "hevc_alpha" in ids
+    lines = [] if good else [f"the preset table read from {PRESET_TABLE} is {ids}"]
+    cases = [(preset_id, json.dumps({"preset_id": preset_id}, separators=(",", ":")),
+              preset_id, ()) for preset_id in ids]
+    cases += [(title, choice, preset_id, holds)
+              for title, choice, preset_id, holds in LONG_CHOICES]
+    for index, (title, choice, preset_id, holds) in enumerate(cases, 1):
+        print(f"  E3 launch: {title}", flush=True)
+        got, why = sheet_launch(f"e3-{index}", app, choice)
+        if got is None:
+            good = False
+            lines.append(f"FAIL {title}: could not be read — {why}")
+            continue
+        text = got["notes"][0][0] if len(got["notes"]) == 1 else ""
+        whole = (got["format"] == names.get(preset_id) and len(got["notes"]) == 1
+                 and got["notes"][0][3] and not got["cut"] and got["clean"]
+                 and all(part in text for part in holds))
+        good = good and whole
+        lines.append(f"{'ok  ' if whole else 'FAIL'} {title}: format {got['format']!r}; "
+                     f"{described(got)}" + (f"; CUT {got['cut']}" if got["cut"] else "")
+                     + (f"; must hold {list(holds)}" if holds else "")
+                     + ("" if got["clean"] else f"; {got['closing']}"))
+    check("E3 every row of the core's preset table at its default quality, and h264 at High "
+          "and hevc_alpha at Maximum with -14 LUFS, open the sheet on the row's name with one "
+          "footnote, on a line of its own above the buttons and drawn whole (#243)", good,
+          "\n       ".join(lines))
 
 
 def row_x1(s):
@@ -1441,7 +1561,7 @@ def score(s, names, full):
     """Each named row in turn; one that cannot run is a failure, not an
     exit. R2 rides on R1."""
     for name in names:
-        if name in ("H0", "Z1") or (name == "R2" and "R1" in names):
+        if name in ("H0", "Z1", "E3") or (name == "R2" and "R1" in names):
             continue
         try:
             ROWS["R1" if name == "R2" else name](s, full)
@@ -1457,9 +1577,11 @@ def close_all(s):
     return all(c["ok"] for c in closes), [c.get("error", "ok") for c in closes]
 
 
-def session(label, app, body, full, choice=CHOICE, env=None, baseline=None, foreign=None):
-    """One launch: H0, the fixtures, `body(s)`, then every project closed
-    and Z1. True when the instance listened and the body ran to its end."""
+def session(label, app, body, full, choice=CHOICE, env=None, baseline=None, foreign=None,
+            light=False):
+    """One launch: H0, the fixtures (CLEAR alone when `light`), `body(s)`,
+    then every project closed and Z1. True when the instance listened and
+    the body ran to its end."""
     s = Session(label, app, choice, env)
     s.cases, s.foreign = (baseline or {}).get("cases") or {}, foreign
     ran = False
@@ -1474,7 +1596,7 @@ def session(label, app, body, full, choice=CHOICE, env=None, baseline=None, fore
               support.is_dir(), str(support))
         if rows.get("H0"):
             try:
-                fixtures(s, full)
+                clear_fixture(s) if light else fixtures(s, full)
                 body(s)
                 ran = True
             except Exception as error:  # a body that could not run is a failure
@@ -1696,7 +1818,7 @@ def foreign_text(baseline, today):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--app", default=str(APP))
-    parser.add_argument("--rows", choices=["size"])
+    parser.add_argument("--rows", choices=["size", "sheet"])
     parser.add_argument("--record-baseline", action="store_true")
     parser.add_argument("--mutant", choices=sorted(MUTANTS))
     parser.add_argument("--control", choices=["plain-hevc-reader", "sheet-default"])
@@ -1741,6 +1863,13 @@ def main():
         write_baseline(document[0])
         return 0
 
+    if args.rows == "sheet":
+        print("B85 phase 3, B91 — the export sheet's footnote, drawn whole (#243)", flush=True)
+        session("sheet", args.app, lambda s: score(s, ["E1"], True), True, light=True)
+        row_e3(args.app)
+        passed = sum(1 for name in SHEET_ROWS if rows.get(name))
+        print(f"{passed}/{len(SHEET_ROWS)}")
+        return 0 if passed == len(SHEET_ROWS) else 1
     if baseline is None:
         print(f"instrument failure: no baseline at {BASELINE} (--record-baseline, twice, "
               "on the build before G-33's code)")
@@ -1767,6 +1896,8 @@ def main():
             line_i1(s)
 
     session("rows", args.app, body, full, baseline=baseline, foreign=foreign)
+    if full:
+        row_e3(args.app)
     skipped = [name for name in names if name in rows and rows[name] is None]
     scored = [name for name in names if name not in skipped]
     passed = sum(1 for name in scored if rows.get(name))

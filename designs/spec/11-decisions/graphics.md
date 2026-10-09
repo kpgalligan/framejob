@@ -1514,6 +1514,23 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   line of its own, or a wider sheet, either a visible change to every
   format's sheet — is the owner's choice. What to do about any of the
   three is an issue's, not this entry's.
+  **Amended 2026-10-09 (issue #243, issue batch B91; the owner chose a
+  wider sheet, the issue's (b), and then "own line + wider", both of
+  (a) and (b)):** the export sheet is 480 pt wide, 60 more than every
+  other sheet (`ExportSheetController.cardWidth`), and its footnote is
+  the content stack's last line, under the readout and above the buttons,
+  no longer in the button row's leading slot — 436 pt of room where the
+  slot beside the three buttons was 88 pt on the 420 pt sheet and 148 on
+  the 480. Every row of the preset table draws its footnote whole at its
+  default quality (the alpha movie rows' lines are 144 pt, ProRes 422's
+  "PRORES422 · MOV" 90, which the 88 pt slot also cut), and so do the
+  footnotes a Quality tier and a loudness target lengthen: "H264 · MP4 ·
+  900 kbps · 256 kbps audio" (228 pt) and `hevc_alpha` at Maximum with −14
+  LUFS (378 pt), which the 148 pt slot cut. `hevc_alpha_proof.py` E1 and
+  E3 hold it: E1 and E3's first form were red on the 420 pt sheet, and E3
+  as it stands (the long footnotes and the own line scored) on the 480 pt
+  sheet with the footnote beside the buttons. (a)'s and (h)'s sentences on
+  the cut footnote describe the 420 pt sheet.
 - **G-34 — A graphic's props are action targets: a number and a colour
   ramp, a string, a boolean and an enum switch at the action's end, an
   asset is refused; supersedes G-10's first sentence and its error, and

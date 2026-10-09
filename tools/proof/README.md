@@ -17299,3 +17299,41 @@ Under the mutants, D0 read (170, 85, 0) with the weights swapped and
 (255, 0, 85) with one shared target; D6 read 204 with the members drawn plain;
 D8's outside read (85, 170, 0) with the scale dropped; D7 read (43, 120, 51)
 with the chain left inner first.
+
+## Issue batch B91 — the export sheet 60 pt wider, its footnote on a line of its own, every footnote drawn whole (`hevc_alpha_proof.py` E1's truncation clause, E3, `--rows sheet`; #243, spec §11 G-33 amended)
+
+The owner chose #243's (b) on 2026-10-09, then "own line + wider" the same day:
+the export sheet is 480 pt wide (`ExportSheetController.cardWidth`,
+`sheetWidth` + 60) and its footnote is the content stack's last line, under the
+readout and above the buttons, out of the button row (436 pt of room). **E1**
+now scores what it used to print: no `truncated` problem names the footnote.
+**E3** (new) launches once per row of the core's preset table — each `id` and
+`name` read from `core/src/export_table.rs`, so a new row is covered — with the
+export choice pinned to that row and CLEAR as the one fixture, and twice more
+for the long footnotes (`h264` at High; `hevc_alpha` at Maximum with −14 LUFS,
+each footnote required to hold its rates). Each launch scores that the Format
+popup reads the row's name, exactly one text's tooltip is its whole text (the
+footnote), it is on a line of its own above the buttons (not in "Add to
+Queue"'s row, its bottom at or above that button's top), and no `truncated`
+problem names it. `--rows sheet` runs H0, E1 and Z1 in one launch and then E3's
+twelve, with no baseline; the full run adds E3 after its session (31 rows).
+
+```sh
+python3 tools/proof/hevc_alpha_proof.py --rows sheet   # 4/4, exit 0
+```
+
+**Its record** (2026-10-09, Apple M2 Max, macOS 26.5.1), every run's stderr
+empty. *Wider (first choice).* On the Debug build of HEAD 72ef9e4 (420 pt),
+`--rows sheet` with E3's first form (defaults only, footnote beside "Add to
+Queue") 2/4, exit 1: E1 FAILED ("HEVC_ALPHA · MOV · alpha" needs 144 pt and has
+88) and E3 FAILED on `hevc_alpha` and `prores_4444` (144 in 88) and
+`prores_422` ("PRORES422 · MOV", 90 in 88 — a cut #243 had not named). On the
+480 pt build 4/4, but E3's long launches, then printed, were cut: 228 pt and
+378 pt in 148. *Own line + wider.* E3 as it stands on that 480 pt build with the
+footnote beside the buttons: 3/4, exit 1, E3 FAILED on all twelve launches (no
+footnote on a line of its own; the two long ones also cut, 228 and 378 in
+148). On the final Debug build 4/4, exit 0: the long footnotes 228 in 232 and
+378 in 382. `make gate` PASS (179 s). Recorded on the gate's Release build
+(`RC_PROOF_APP=release`): the whole proof 31/31, exit 0; `--control
+sheet-default` CONTROL PASS (E1 FAILED as it must). `screens.py --only
+12-export-sheet` passed light and dark, 0 new problems.

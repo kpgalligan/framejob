@@ -498,8 +498,8 @@ extension ExportSheetController {
         return text
     }
 
-    /// The bottom-left footnote: the codec, the container, and the rates the
-    /// CORE resolved — never the ones the tier asked for, and not filtered by
+    /// The footnote over the buttons: the codec, the container, and the rates
+    /// the CORE resolved — never the ones the tier asked for, and not filtered by
     /// what the sheet thinks applies, since a preset is free to carry a rate
     /// of its own that no control here offered.
     ///

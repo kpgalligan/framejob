@@ -26,9 +26,16 @@ Format "H.264 (MP4)"; Size "Document size · 960 × 540", with two dimmed number
 fields, 960 × 540, under it; Frame rate "Project rate"; Quality "Format default";
 Loudness "Off", with a dimmed "-14" field beside it; Range "Whole project",
 dimmed; and an unchecked "Burn in timecode". A monospaced summary line reads
-"960 × 540 · 30 fps · 00:00:05:07". Along the bottom: "H264 · MP4" in small
-grey type on the left, then the buttons "Add to Queue", "Cancel" and "Export…"
-(blue).
+"960 × 540 · 30 fps · 00:00:05:07", and under it, on a line of its own, the
+format line "H264 · MP4" in smaller grey monospaced type. Along the bottom, to
+the right, the buttons "Add to Queue", "Cancel" and "Export…" (blue), with
+nothing to their left.
+
+The sheet is 480 pt wide, 60 more than the app's other sheets. The format line
+reads longer on other formats and grows with a Quality tier or a loudness
+target ("HEVC_ALPHA · MOV · 800 kbps · 320 kbps audio · −14 LUFS · alpha"), so
+it has the sheet's full width rather than the gap beside the buttons, and is
+drawn whole on every one (#243).
 
 In the light capture the sheet is white with black text; the pop-ups are
 light-grey pills, the dimmed number fields white boxes with pale grey numbers,

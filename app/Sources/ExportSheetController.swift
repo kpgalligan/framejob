@@ -134,7 +134,7 @@ final class ExportSheetController: NSViewController {
 
     /// The saved-preset row, and the gear beside it carrying Save… and
     /// Delete. A pull-down rather than two more buttons because the control
-    /// column is 258 points wide and a popup plus two titled buttons is not:
+    /// column is 318 points wide and a popup plus two titled buttons is not:
     /// the arithmetic is the size fields' and the Loudness row's, written down
     /// twice already below.
     ///
@@ -172,13 +172,15 @@ final class ExportSheetController: NSViewController {
     let footnote = sheetFootnote("")
     var exportButton: NSButton!
     /// Add to Queue (road map 2's phase 7e). It takes `makeButtonRow`'s
-    /// `secondary` slot — beside Cancel, not out at the far left by the
-    /// footnote, where an affirmative button reads as something else entirely.
+    /// `secondary` slot — beside Cancel, not out at the far left, where an
+    /// affirmative button reads as something else entirely.
     var queueButton: NSButton!
 
     /// Frame-rate overrides. Index 0 is "the project's rate", i.e. no
     /// override at all — the core then uses the canvas rate (§5.2).
     static let rates: [Fps] = Fps.common
+    /// 60 pt over `sheetWidth`, with the footnote on its own line: the owner's choice (#243).
+    static let cardWidth: CGFloat = sheetWidth + 60
 
     init(editor: EditorViewController) {
         self.editor = editor
@@ -325,7 +327,7 @@ final class ExportSheetController: NSViewController {
 
         summaryLabel.font = DS.mono(11)
         summaryLabel.textColor = DS.textMuted
-        summaryLabel.preferredMaxLayoutWidth = sheetWidth - sheetInset * 2
+        summaryLabel.preferredMaxLayoutWidth = Self.cardWidth - sheetInset * 2
 
         let grid = NSGridView(views: [
             // The Preset row is FIRST because it is the row that sets every
@@ -334,16 +336,14 @@ final class ExportSheetController: NSViewController {
             [fieldLabel("Preset:"), presetRow()],
             [fieldLabel("Format:"), formatPopup],
             [fieldLabel("Size:"), sizePopup],
-            // The custom fields get a row of their own under the popup: the
-            // card is 420 wide with 22 insets and a 106 label column, so a
-            // 240 popup fits beside its label and the popup plus two fields
-            // does not.
+            // The custom fields get a row of their own under the popup: on the
+            // 480-wide card a 240 popup fits beside its 106 label column and
+            // the popup plus two fields does not.
             [NSGridCell.emptyContentView, sizeRow()],
             [fieldLabel("Frame rate:"), ratePopup],
             [fieldLabel("Quality:"), qualityPopup],
-            // ONE row, popup and field together: 186 + 6 + 64 fits the 258
-            // points the 420-wide card leaves beside a 106 label column,
-            // where the Size popup's 240 does not.
+            // ONE row, popup and field together: 186 + 6 + 64 fits the 318
+            // points the 480-wide card leaves beside a 106 label column.
             [fieldLabel("Loudness:"), loudnessRow()],
             [fieldLabel("Range:"), rangePopup],
             // No label: the checkbox carries its own, the way
@@ -355,10 +355,10 @@ final class ExportSheetController: NSViewController {
         grid.column(at: 0).xPlacement = .trailing
         grid.column(at: 0).width = 106
 
-        // The readout sits UNDER the grid rather than in its second column:
-        // it is a full sentence and would run past the card's edge from an
-        // indented start.
-        let content = NSStackView(views: [grid, summaryLabel])
+        // The readout and the footnote sit UNDER the grid, each on a line of
+        // its own: from the grid's indented column the readout would run past
+        // the card's edge, and beside the buttons a footnote with a bit rate is cut (#243).
+        let content = NSStackView(views: [grid, summaryLabel, footnote])
         content.orientation = .vertical
         content.alignment = .leading
         content.spacing = 10
@@ -386,8 +386,8 @@ final class ExportSheetController: NSViewController {
                 + "a time, in Window ▸ Export Queue.",
             content: content,
             buttonRow: makeButtonRow(
-                cancel: cancelButton, apply: exportButton, secondary: queueButton,
-                leading: [footnote]))
+                cancel: cancelButton, apply: exportButton, secondary: queueButton),
+            width: Self.cardWidth)
 
         resolveCard()
     }

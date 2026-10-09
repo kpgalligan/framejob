@@ -30,10 +30,10 @@ import AppKit
 /// what the file actually does.
 extension ExportSheetController {
 
-    /// The Preset popup and its gear, together on one row: 216 + 6 + 36 is
-    /// the 258 points the 420-wide card leaves beside its 106 label column.
-    /// The card is NOT widened for it — `makeSheetView` takes a `width:`, but
-    /// widening this one moves every row already on it.
+    /// The Preset popup and its gear, together on one row: 216 + 6 + 36 fits
+    /// the 318 points the 480-wide card leaves beside its 106 label column.
+    /// The card's width is the owner's (`cardWidth`, #243), not this row's:
+    /// the row fitted the 420-wide card it was built on exactly.
     func presetRow() -> NSStackView {
         let stack = NSStackView(views: [presetPopup, presetMenuButton])
         stack.orientation = .horizontal

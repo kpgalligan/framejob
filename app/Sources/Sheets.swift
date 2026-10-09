@@ -10,8 +10,8 @@ let sheetWidth: CGFloat = 420
 let sheetInset: CGFloat = 22
 
 /// Assembles a design-system sheet: 420px card by default (`width:` for a
-/// wider one — the Layer Style sheet's two panes), 15px/700 title, optional
-/// 12px muted hint, content, then the button row.
+/// wider one — the Layer Style sheet's two panes, the export sheet's 480),
+/// 15px/700 title, optional 12px muted hint, content, then the button row.
 func makeSheetView(
     title: String? = nil, hint: String? = nil, content: NSView, buttonRow: NSStackView,
     width: CGFloat = sheetWidth
@@ -67,8 +67,8 @@ func makeSheetView(
 /// the trailing cluster — a "do something else with this card" beside the
 /// button that does the main thing. It is NOT `leading`, which is where the
 /// footnote lives: an affirmative button at the far left of a dialog reads as
-/// a destructive or a tertiary one, and it would sit under the export sheet's
-/// codec footnote besides. It takes no key equivalent, which is the other half
+/// a destructive or a tertiary one, and on most sheets it would sit under a
+/// footnote besides. It takes no key equivalent, which is the other half
 /// of the same point — Return belongs to `apply` and Escape to `cancel`, and a
 /// row with two Returns has none.
 ///
@@ -110,10 +110,11 @@ func fieldLabel(_ text: String) -> NSTextField {
     return label
 }
 
-/// Bottom-left 10px mono footnote carried in the button row's leading slot.
-/// A label built by `NSTextField(labelWithString:)` breaks by clipping, so a
-/// footnote too long for its slot ends with a tail ellipsis and carries the
-/// whole string as a tooltip (Rasterize's two lines, #141).
+/// 10px mono footnote: in the button row's `leading` slot, or on a line of
+/// its own under a sheet's content (the export sheet, #243). A label built by
+/// `NSTextField(labelWithString:)` breaks by clipping, so a footnote too long
+/// for its room ends with a tail ellipsis and carries the whole string as a
+/// tooltip (Rasterize's two lines, #141).
 func sheetFootnote(_ text: String) -> NSTextField {
     let label = NSTextField(labelWithString: text)
     label.font = DS.mono(10)
