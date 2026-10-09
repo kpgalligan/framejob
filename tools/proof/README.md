@@ -1739,7 +1739,8 @@ at its socket, so start that one with `proof_app.py launch --app release`) and
 `graphics_proof.py` ("E2 bounds render_frame and get_project in wall seconds":
 on Debug its render_frame took 2.04 s of the 3 s bound, so it was pinned), and
 `precision_proof.py --measure` ("M1 measures the compositor's frame times and
-the app's memory"; its rows, `capture` and `compare` run on either); the
+the app's memory", and `--measure ab`'s MA beside it; its rows, `capture` and
+`compare` run on either); the
 18 app-driving proofs changed since issue batch B80 each scored their full
 score on Debug, the two with a recorded Release time (agent_socket_proof
 135 s, export_cancel_proof 256 s) faster on Debug (`archive/build-velocity.md`'s
@@ -17760,9 +17761,10 @@ historical skip.
 `make gate` PASS (68 s): its test step passed, and the other steps were
 skipped as unchanged.
 
-## The precision road map — PR0, PR1 and PR2 (`precision_proof.py`, `precision_encoder_probe.swift`, `preview_display_probe.py`; the preview probes' format reads and PF; `hevc_alpha_proof.py` R8, RH, KH, HA and four mutants; PR2's D2, R1, R2, C1 and two mutants; spec §11 PR-1..PR-5)
+## The precision road map — PR0 to PR3 (`precision_proof.py`, `precision_encoder_probe.swift`, `preview_display_probe.py`; the preview probes' format reads and PF; `hevc_alpha_proof.py` R8, RH, KH, HA and four mutants; PR2's D2, R1, R2, C1 and two mutants; PR3's T1, T2, MA, the selftest and four mutants; spec §11 PR-1..PR-5)
 
-The road map's record is `designs/precision.md`; its decisions are
+The road map is closed: its condensed record is `designs/adr/precision.md`,
+the phase records `archive/precision.md`, and its decisions
 `designs/spec/11-decisions/precision.md`. PR1 makes the compositor 16-bit
 float (`64RGBAHalf` buffers, `rgba16Float` targets) while sources stay
 32BGRA, and decides per export row what its encoder is handed
@@ -17771,12 +17773,15 @@ to `64RGBAHalf` (`Compositor.sourcePixelFormat`, spec §11 PR-2).
 
 ```
 python3 tools/proof/preview_display_probe.py --rows spike          # V0–V2 (PR0's spike; exit 1 is its RECORDED outcome)
-python3 tools/proof/precision_proof.py [--only C0,D1,D2,P1,H1,R1,R2,C1] [--control DIR]
+python3 tools/proof/precision_proof.py [--only C0,D1,D2,P1,H1,R1,R2,C1,T1,T2] [--control DIR]
 python3 tools/proof/precision_proof.py capture DIR                 # on the CONTROL tree, before any product edit
 python3 tools/proof/precision_proof.py compare DIR [--only K1,…,E2]
 RC_PROOF_APP=release python3 tools/proof/precision_proof.py --measure capture|compare DIR   # M1, release-only
+RC_PROOF_APP=release python3 tools/proof/precision_proof.py --measure ab --mutant decode-8bit [--rounds N]   # MA, release-only
+python3 tools/proof/precision_proof.py --selftest                  # S1–S3, no app
 python3 tools/proof/precision_proof.py --mutant h264-deep|hevc-deep compare DIR
 python3 tools/proof/precision_proof.py --mutant output-8bit|hevc-no-profile|decode-8bit|no-source-clamp
+python3 tools/proof/precision_proof.py --mutant hevc10-main|hevc10-unmapped|hevc10-eightbit|row-before-hevc-alpha
 python3 tools/proof/hevc_alpha_proof.py --rows straighten          # R0, K1, R8, RH, KH
 python3 tools/proof/hevc_alpha_proof.py --measure hevc-alpha-deep   # HA, recorded
 python3 tools/proof/hevc_alpha_proof.py --mutant hevc-no-profile|bgra8-truncates|half-no-unpremultiply|half-no-fill
@@ -17863,6 +17868,42 @@ its recipe by hand:
 ffmpeg -f lavfi -i "color=c=black:size=1920x1080:rate=30:duration=1,format=yuv422p10le,geq=lum='64+X*876/1919':cb=512:cr=512" \
   -c:v prores_ks -profile:v 3 -pix_fmt yuv422p10le -colorspace bt709 -color_primaries bt709 -color_trc bt709 ramp10.mov
 ```
+
+**PR3's rows: the `hevc_10bit` row.** **T1** the 10-bit ramp exported
+`hevc_10bit`: ffprobe's `hevc`, `Main 10`, `yuv420p10le`, and an MP4 (major
+brand `mp42`; QuickTime's is `qt  `). **T2** the same ramp's middle-row luma
+against x/1919, through `hevc_10bit` at most 2.0 10-bit steps RMS and at
+most half of an `hevc` export of the same project in the same run, AND its
+encoder was handed deep frames: the 8-bit staircase's tone
+(`staircase_tone`: each column's mean 10-bit Y code over the frame's rows,
+less a 31-column moving average, as an amplitude at 255 steps across the
+width) at most 0.1 codes, where the `hevc` file's (8-bit, the control that
+the instrument sees a staircase at all) is at least 0.3. The tone is the
+claim that discriminates: Main 10 handed 8-bit frames (`hevc10-eightbit`)
+measured 1.794 steps RMS against the tree's 1.459, inside both RMS halves,
+but a tone of 0.536 against 0.014 (floor 0.010; `hevc` 0.758). **H1**
+runs again. **MA** (`--measure ab --mutant decode-8bit`, release-only,
+recorded; PR2's review asked for it): the heavy 2160p fixture alone,
+exported on this tree's Release app and on a Release build of the
+`decode-8bit` copy, alternated (ABBA…) `--rounds` times, so the deep
+decode's frame-time share is read on one host load; each export's average,
+the medians and their ratio are printed, and the row scores only that every
+export measured. **The app driven decides the formats read** (PR2's review):
+`app_tree` takes the sources from the tree whose `build/Build/Products` the
+app sits in — this tree, or a mutant's copy — and an app outside any tree is
+refused with exit 2 before any launch; `--selftest` (no app) holds S1 a
+scratch tree's formats read through an app under its build folder, S2 an
+app outside any tree (and one under a build folder with no `app/Sources`)
+refused by `main`, S3 the default app this tree's. The mutants:
+`hevc10-main` (Main 10 → Main: T1), `hevc10-unmapped` (`codecType(for:)`
+drops `"hevc_10bit"`, so the export is refused: T1), `hevc10-eightbit`
+(`frameForm`'s `isMain10` arm removed, so `.hevc` rounds the row to 8 bits:
+T2), and the core `row-before-hevc-alpha` (the row moved before
+`hevc_alpha` in `export_table.rs`; no app is built — row CT runs `cargo
+test --release --no-fail-fast --test export --test export_hevc_10bit` in the
+copy's own `core/`, made its own by `hevc_alpha_proof.own_core`, and must
+fail naming `hevc_alpha_sits_directly_after_hevc` and
+`it_sits_directly_after_hevc_alpha`).
 
 **The preview probes read a buffer by its format.**
 `preview_refresh_probe.py`, `preview_validity_probe.py` and

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """What an `AVPlayerLayer` DISPLAYS, seen without capturing the screen — the
 precision road map's display instrument (issue batch B94, spec §11 PR-1;
-`designs/precision.md`).
+`archive/precision.md`, condensed in `designs/adr/precision.md`).
 
 Why. The preview probes (`preview_refresh_probe.py`, `preview_validity_probe.py`,
 `media_less_playback_probe.swift`) read `AVPlayerLayer.displayedPixelBuffer()`:
@@ -33,8 +33,8 @@ process.
   V2  the same 64RGBAHalf frame untagged: every quadrant's mean within ±2 of
       V0's.
 
-If V0 or V1 fails the instrument cannot see the display: `designs/precision.md`
-says so with the figures, PV is not built, and spec §11 PR-1's check of the
+If V0 or V1 fails the instrument cannot see the display: the road map's record
+(`archive/precision.md`) says so with the figures, PV is not built, and spec §11 PR-1's check of the
 displayed picture is `docs/manual-checks.md`'s PRC-1 alone.
 
 The spike's outcome (2026-10-09, PR0's tree, M2 Max, macOS 26.5.1): V0 and
@@ -42,7 +42,7 @@ V2 hold and V1 FAILS — the Linear-tagged half-float frame draws within 0.03
 of the untagged one (grey 128: 127.98 against 128). The control does not
 move, so the instrument cannot be shown to see how the layer READS a buffer,
 and PV — the K3/K6 editor-preview row with `capture DIR` / `compare DIR` —
-was not built (`designs/precision.md`, PR0). The instrument does see the
+was not built (`archive/precision.md`, PR0). The instrument does see the
 layer's content: the quadrants come out exact, upside down in the texture.
 `displayedPixelBuffer()` answers nil for this windowless layer even with
 `isReadyForDisplay` true; it is printed, not scored.

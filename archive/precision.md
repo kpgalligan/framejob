@@ -1,9 +1,9 @@
 # Road map "precision" — 16-bit-float compositing, deep decode, 10-bit exports
 
-**In progress.** Issue batch B94. The decisions are spec §11 PR-1..PR-5
-(`designs/spec/11-decisions/precision.md`); this file is the phases' record.
-When the road map closes (PR3) it is condensed into `designs/adr/precision.md`
-and moved to `archive/precision.md`.
+**Closed 2026-10-09** (PR3). Issue batch B94. The decisions are spec §11
+PR-1..PR-5 (`designs/spec/11-decisions/precision.md`); this file is the
+phases' record, condensed into `designs/adr/precision.md` and moved here,
+`archive/precision.md`, at the close.
 
 ## Goal
 
@@ -45,7 +45,7 @@ Each phase is committed alone, after its review.
 | PR0 | PR-1..PR-5 recorded in spec §11 before any code (amending MT-6, MT-8, MT-9 and G-35); `LayerUniforms`, `ShadowUniforms` and `TransitionCode` out of `Compositor.swift` into `LayerUniforms.swift`, a pure move gated alone; PR1's controls captured on PR0's tree and the preview-display spike (V0–V2) | done (below) |
 | PR1 | 16-bit-float working depth and output (sources stay 32BGRA): the render context, targets and pipelines `rgba16Float`, the shader clamps, the export reader deep, `ExportFrames` (`prores_4444` straightened in float, `hevc_alpha` and `h264` rounded to 8 bits first), the `hevc` Main pin, the preview probes reading the new format, the pixel sweep's re-baselines | built; M1's memory stop returned to the owner, who accepted the measured figures (below) |
 | PR2 | Deep decode: every video source `64RGBAHalf`; the ramp rows; the video-sourced re-baselines | built (below) |
-| PR3 | The `hevc_10bit` row (core and app), the documents, the ADR, close | — |
+| PR3 | The `hevc_10bit` row (core and app), the documents, the ADR, close | built (below) |
 
 ## PR0 — the decisions, the toll, the controls (2026-10-09)
 
@@ -416,3 +416,123 @@ the two. Their cause, the 4:2:0 chroma reconstruction each path uses, is
 still not established. Frame times and footprints at 1080p and 4K are M1's
 above, on this host only.
 
+
+## PR3 — the `hevc_10bit` row, the documents, the close (2026-10-09)
+
+**Built.**
+- Core: `export_table.rs`'s eleventh row, `hevc_10bit` ("HEVC 10-bit (MP4)",
+  `Container::Mp4`, codec `hevc_10bit`, video, no alpha, no size or rate,
+  `AVAssetExportPresetHEVCHighestQuality`), at index 3, after `hevc_alpha`
+  (spec §11 PR-3). No FFI, header or format change. Tests:
+  `core/tests/export_hevc_10bit.rs` (new, 4: the preset row and its resolved
+  settings written out whole, with nothing asked and with every optional
+  override; the row directly after `hevc_alpha` and before `prores_422`; no
+  alpha on an opaque or a transparent canvas), `export.rs`'s `EXPECTED`
+  (11 rows) and module doc, `export_size.rs`'s `MOVIE_FORMATS` and
+  `EVEN_SIZED`. `the_hevc_row_is_what_it_was` passes untouched.
+- App: `ExporterWriter+Settings.swift` maps `"hevc_10bit"` to `.hevc`, pins
+  it to `kVTProfileLevel_HEVC_Main10_AutoLevel`, and `frameForm` answers nil
+  for it — PR1's carry-over: `codecType` answers `.hevc` for both HEVC rows,
+  so `isMain10(settings)` (the codec NAME) is asked first, or the row would
+  have been rounded to 8 bits. The `hevc` Main pin's line is kept verbatim
+  (an `else if`), so PR1's `hevc-no-profile` anchors still occur once.
+  `AgentCatalog+Files.swift`: the `export` tool's preset description says
+  which rows keep the compositor's 16-bit frames (prores_422, prores_4444 and
+  hevc_10bit; ProRes 4444 at 12 bits) and which are 8-bit (h264, hevc,
+  hevc_alpha); its size description's even-dimension list gains `hevc_10bit`
+  (and `hevc_alpha_proof.py`'s T0 phrase with it).
+- `wc -l`: `export_table.rs` 564 → 581, `ExporterWriter+Settings.swift`
+  413 → 427, `AgentCatalog+Files.swift` 562 → 564.
+
+**`precision_proof.py`** (1,239 → 1,538 lines):
+- **T1** a `hevc_10bit` export of the 10-bit ramp: ffprobe `hevc`, `Main 10`,
+  `yuv420p10le`, and an MP4 (major brand `mp42`). **T2** the same ramp's
+  middle-row luma against x/1919 through `hevc_10bit` ≤ 2.0 10-bit steps RMS
+  and ≤ ½ of an `hevc` export's of the same project in the same run.
+- **PR2's review nit 3, fixed:** `tree_formats()` read the working tree's
+  `app/Sources` whatever `--app` named. `app_tree(binary)` now takes the
+  sources from the tree whose `build/Build/Products` holds the app driven
+  (this tree, or a mutant's copy), and an app outside any tree is refused,
+  exit 2, before any launch. `--selftest` (no app): S1 a scratch tree's
+  formats read through an app under its build folder; S2 an app outside any
+  tree, and one under a build folder with no `app/Sources`, refused by
+  `main`; S3 the default app is this tree's. 3/3.
+- **MA** (`--measure ab --mutant decode-8bit`, release-only; PR2's review):
+  the heavy 2160p fixture alone on this tree's Release app and on a Release
+  build of the `decode-8bit` copy, alternated ABBA… (below).
+- Four mutants: `hevc10-main`, `hevc10-unmapped`, `hevc10-eightbit` (PR1's
+  carry-over: `frameForm` answering `.eightBit` for `hevc_10bit`) and the
+  core `row-before-hevc-alpha` (no app; row CT runs `cargo test --test export
+  --test export_hevc_10bit` in the copy's own core).
+
+**Verification.**
+- The loop (Debug): the three core test files (4, 38 and 20 tests), `make
+  typecheck` (0 errors, the 4 baseline warnings), `make lint`, `make
+  app-debug`, `--selftest` 3/3, `--only T1,T2,H1` 4/4 (T2: 1.459 against
+  `hevc`'s 6.18).
+- `make gate`: the first run failed its test step on the spec index's Lines
+  cell for §7.8 (336 against 350), fixed; the second PASSED (typecheck, fmt
+  and lint skipped as already passed; test 67 s, app 89 s).
+- **Recorded on Release** (the gate's `make app`), run twice, the second on
+  the final instrument (T2 with its tone; every figure the same in both):
+  `precision_proof.py --control ctl-pr1` 11/11 — C0; D1 and D2 8-bit PNGs; P1 0.914; H1 Main,
+  `yuv420p`; R1 1,418 distinct (control 256); R2 0.707 (control 2.007); C1
+  within 1; **T1** `hevc`, `Main 10`, `yuv420p10le`, `mp42`; **T2
+  `hevc_10bit` 1.459 steps RMS against `hevc`'s 6.18** (Main, `yuv420p`),
+  staircase tone 0.014 codes (floor 0.010) against `hevc`'s 0.758, distinct
+  middle-row codes 859 against 216; Z1. `hevc` measures 6.18 here against PR1's 6.462; the likely cause
+  (REASONED, not isolated) is that its 8-bit frame is now rounded from a
+  deep-decoded source rather than an 8-bit one. `hevc_alpha_proof.py` whole: 43/43 (T0
+  reads the new even-dimension list).
+- **The mutants** (Debug copies by `tree_copy.build_app`; the core one builds
+  no app). All but `hevc10-eightbit`'s final run drove the instrument before
+  T2 gained its tone; that change added measurements to `run_t` and a claim
+  to T2, and left T1's, H1's and CT's code as it was:
+  - `row-before-hevc-alpha`: CT FAILS — `hevc_alpha_sits_directly_after_hevc`,
+    `it_sits_directly_after_hevc_alpha` and `the_menu_is_the_table` fail.
+  - `hevc10-main`: T1 FAILS (`Main`, `yuv420p`).
+  - `hevc10-unmapped`: T1 FAILS (the export is refused: "This Mac cannot
+    export with the “hevc_10bit” preset").
+  - **`hevc10-eightbit` SURVIVED T2 as the spec wrote it**, then was caught.
+    Main 10 handed 8-bit frames encoded the ramp at 1.794 steps RMS — under
+    2.0 and under half of `hevc`'s 6.18 — so the RMS halves cannot tell a deep
+    input from an 8-bit one. Measured on the tree and the mutant in the same
+    way (distinct middle-row codes 859 against 798; the column means' fine
+    residual 0.541 against 0.846 codes; their amplitude at the 8-bit
+    staircase's frequency 0.014 against 0.536, floor 0.010 and 0.029, and
+    `hevc`'s 0.758), T2 gained the third: the staircase tone at most 0.1
+    codes, with `hevc`'s at least 0.3 as its control. On the final
+    instrument the tree passes (0.014) and the mutant FAILS T2 (0.536).
+  - Re-run because PR3 rewrote the lines around their anchors (the `hevc`
+    Main line is kept verbatim inside an `else if`): `precision_proof.py`'s
+    `hevc-no-profile` — H1 FAILS; `hevc_alpha_proof.py`'s `hevc-no-profile` —
+    B1 FAILS. Both caught.
+- **MA, the heavy-4K A/B (PR2's review, measured now)**:
+  `RC_PROOF_APP=release precision_proof.py --measure ab --mutant decode-8bit
+  --rounds 3` 2/2. The `decode-8bit` copy built Release in 91 s; heavy 2160p
+  alone, each export on an instance of its own, ABBA (`vm.loadavg` 17.25
+  before, 16.06 after; `powermode 0`, AC power; other sessions running):
+
+| Round | This tree (`64RGBAHalf` sources) | `decode-8bit` copy (32BGRA) |
+|---|---|---|
+| 1 | 8.005 ms (worst 39.02), export 2.23 s | 6.67 ms (40.49), 2.29 s |
+| 2 | 8.465 ms (37.94), 3.93 s | 6.405 ms (37.75), 2.38 s |
+| 3 | 8.155 ms (45.64), 2.19 s | 5.98 ms (36.25), 2.37 s |
+
+  Medians 8.155 against 6.405 ms: **deep decode costs ×1.273 of the heavy
+  4K compositor average on one load**, confirming PR2's +23–26 % as the
+  decode's own cost (PR2's runs could not rule out the host load). The export
+  medians are 2.23 against 2.37 s: the faster deep decode still outweighs it.
+  Which part of the frame pays (PR2's REASONED half-float source sampling)
+  is still not isolated: the timing log is one number a frame, and
+  `Compositor.swift` (724) is over the cap for per-pass GPU timestamps.
+  The averages above 8 ms are this load's; the road map's frame-time stop
+  is 1080p's, and is not approached.
+- `make gate` PASS on the final tree (attempt 3, 79 s; attempt 1 failed on a stale §7.8 Lines cell, fixed).
+
+**Unfinished, filed at the close** (`ai-drafted`, `low-priority`): PR-5's
+deferred list as #256 (HDR/EDR, wide gamut, linear-light blending) and #257
+(10-bit `hevc_alpha`, a 10-bit reversed-clip intermediate, deep still
+images, 10-bit screen recording), and #258, 4K headroom: a 10-bit biplanar
+source sampled in the layer stage instead of `64RGBAHalf` (amends PR-2),
+with PR2's frame and export times and MA's figures above.

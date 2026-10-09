@@ -1,18 +1,26 @@
 #!/usr/bin/env python3
 """The precision road map (issue batch B94; spec §11 PR-1..PR-5,
-`designs/precision.md`) — the 16-bit-float compositor and its exports, over
+`designs/adr/precision.md`, the phase records `archive/precision.md`) — the
+16-bit-float compositor and its exports, over
 MCP. Written in PR0, before any product edit, so PR1's controls are captured
 on PR0's product.
 
-    python3 tools/proof/precision_proof.py [--app PATH] [--only C0,D1,D2,P1,H1,R1,R2,C1] [--control DIR]
+    python3 tools/proof/precision_proof.py [--app PATH] [--only C0,D1,D2,P1,H1,R1,R2,C1,T1,T2] [--control DIR]
     python3 tools/proof/precision_proof.py capture DIR          # the CONTROL tree
     python3 tools/proof/precision_proof.py compare DIR [--only K1,...,E2]
     python3 tools/proof/precision_proof.py --measure capture|compare DIR   # release-only
+    python3 tools/proof/precision_proof.py --measure ab --mutant decode-8bit [--rounds N]  # release-only
     python3 tools/proof/precision_proof.py --mutant NAME [compare DIR]
+    python3 tools/proof/precision_proof.py --selftest           # no app
 
 `matte_proof.py`'s shape: it launches the app `proof_app` picks (Debug unless
 `RC_PROOF_APP=release`; `--measure` is release-only) on a scratch socket of its
-own and stops only that process. The instance runs in a scratch home,
+own and stops only that process. The app must be a product of a TREE — a
+`build/Build/Products/…` under a folder holding `app/Sources/Compositor.swift`
+(this tree, or a mutant's copy) — because `capture` records, and `compare`
+and D2 read, the pixel formats of the SOURCES the driven app was built from
+(`app_tree`); `--app PATH` or `RC_PROOF_APP` naming an app outside any tree is
+refused (exit 2), never read against this tree's formats. The instance runs in a scratch home,
 `CFFIXED_USER_HOME=tools/proof/work/precision/run/home`; every package, PNG
 and movie of a run is under `tools/proof/work/precision/run/`, removed at the
 start and at exit. DIR (a capture) is kept. No menu item is performed, no
@@ -54,6 +62,17 @@ Rows (`ID ok|FAIL — detail`, then `n/m`; exit 0 iff every scored row passes):
   C1  (PR2) the H.264 clip at `video.color.brightness` −0.4: every colour
       channel within ±2 of max(0, its brightness-0 render − 102) — a deep
       frame arrives unclamped, and `layerSample`'s `saturate` bounds it.
+  T1  (PR3) the 10-bit ramp exported `hevc_10bit`: ffprobe says `hevc`,
+      profile `Main 10`, `yuv420p10le`, and an MP4 (major brand `mp42`, not
+      QuickTime's `qt  `).
+  T2  (PR3) the same ramp's middle-row luma against x/1919: `hevc_10bit` is
+      ≤ 2.0 10-bit steps RMS and ≤ ½ of an `hevc` export's RMS of the same
+      project in the same run; and its encoder was handed DEEP frames: the
+      8-bit staircase's tone (`staircase_tone`: each column's mean code over
+      the frame's rows, less a 31-column moving average, at 255 steps across
+      the width) is ≤ 0.1 codes, where the `hevc` file's — 8-bit, the control
+      that the instrument sees a staircase — is ≥ 0.3. Main 10 handed 8-bit
+      frames passes the RMS halves (1.794 against 1.459) but not the tone.
   capture: the tree's `Compositor.swift` formats recorded (`formats`, read
       from `app/Sources`; a capture without them is PR0's, both 32BGRA);
       K1–K6 rendered into DIR; E0 (CONTROL) two `h264` exports of K6's
@@ -105,6 +124,16 @@ Rows (`ID ok|FAIL — detail`, then `n/m`; exit 0 iff every scored row passes):
       recorded, not a stop: the owner accepted PR1's measured rise (heavy 4K
       +851.7 MB, spec §11 PR-1) and retired the road map's +532 MB stop. A
       refused `footprint` is a named skip of the memory half.
+  --measure ab --mutant decode-8bit (MA, recorded, release-only; PR2's
+      review): the heavy 2160p fixture alone, exported on this tree's Release
+      app and on a Release build of the `decode-8bit` copy (every source
+      32BGRA, nothing else changed), alternated `--rounds` times (default 3)
+      so both see the same host load; each export's compositor average and
+      worst, the medians, and the deep decode's share (tree median ÷ copy
+      median). Scored only on every export measuring.
+  --selftest (no app): `app_tree` reads a scratch tree's formats from an app
+      under its `build/Build/Products`, refuses an app outside any tree, and
+      the default (no `--app`) is this tree's (rows S1–S3).
   Z1  the projects close and the log holds no `Reelcut: ` line.
 
 `--mutant NAME` (PR1; spec B94) builds ONE `tree_copy.make_copy` with each
@@ -125,9 +154,19 @@ built from the copy's `app/Sources`:
                    FAIL.
   no-source-clamp  (PR2) `layerSample`'s `saturate` removed (the clamp landed
                    in PR1; only a deep source reaches it): C1 FAILS.
+  hevc10-main      (PR3) `hevc_10bit`'s profile is Main, not Main 10: T1 FAILS.
+  hevc10-unmapped  (PR3) `codecType(for:)` drops `"hevc_10bit"`: T1 FAILS.
+  hevc10-eightbit  (PR3; carried from PR1's fix pass) `frameForm` answers
+                   `.eightBit` for `hevc_10bit` (the `isMain10` arm removed,
+                   so `.hevc` decides): T2 FAILS.
+  row-before-hevc-alpha  (PR3, core) the `hevc_10bit` row moved before
+                   `hevc_alpha` in `export_table.rs`: no app is built; row CT
+                   runs `cargo test --release --no-fail-fast --test export
+                   --test export_hevc_10bit` in the copy's own `core/`, and
+                   FAILS naming `hevc_alpha_sits_directly_after_hevc` and
+                   `it_sits_directly_after_hevc_alpha`.
 Exit 0 when every named row FAILED (caught), 1 when one passed (survived), 2
-when the control could not be performed. PR3 adds its rows
-(`designs/precision.md`).
+when the control could not be performed.
 """
 
 import argparse
@@ -135,7 +174,9 @@ import atexit
 import hashlib
 import json
 import math
+import os
 import re
+import tempfile
 import shutil
 import struct
 import subprocess
@@ -173,6 +214,13 @@ TIMING = re.compile(r"\[reelcut\] compositor: ([\d.]+) ms average, ([\d.]+) ms w
 # 64RGBAHalf buffer less one 32BGRA buffer.
 PER_BUFFER = {2160: 66_355_264 - 33_177_664, 1080: (66_355_264 - 33_177_664) // 4}
 STOP_MS = 8.0
+# An MP4's major brands as AVFoundation and ffmpeg write them; QuickTime's is "qt  ".
+MP4_BRANDS = ("mp42", "mp41", "isom")
+# T2's 8-bit staircase tone, in 10-bit codes (`staircase_tone`). Measured on
+# the ramp (M2 Max, macOS 26.5.1, precision PR3): hevc_10bit 0.014 (floor
+# 0.010); hevc_10bit handed 8-bit frames (mutant hevc10-eightbit) 0.536;
+# hevc (8-bit Main) 0.758.
+TONE_MAX, TONE_SEEN = 0.1, 0.3
 # The formats a tree's `Compositor.swift` names; a capture records its own
 # (PR2), and a capture without them is PR0's: both 32BGRA.
 FORMAT = re.compile(r"static let (output|source)PixelFormat: OSType = (kCVPixelFormatType_\w+)")
@@ -182,6 +230,12 @@ PROBE_SOURCE = ROOT / "tools/proof/precision_encoder_probe.swift"
 PROBE_DIR = BASE / "encoder-probe"
 BUILD_BOUND = 1500
 SETTINGS = "app/Sources/ExporterWriter+Settings.swift"
+TABLE = "core/src/export_table.rs"
+HEVC10_ROW = ('    Preset {\n        id: "hevc_10bit",\n        name: "HEVC 10-bit (MP4)",\n'
+              '        container: Container::Mp4,\n        codec: "hevc_10bit",\n'
+              '        video: true,\n        alpha: false,\n        size: None,\n'
+              '        fps: None,\n'
+              '        avf_preset: Some("AVAssetExportPresetHEVCHighestQuality"),\n    },\n')
 HEVC_DEEP = (SETTINGS, "        return codec == .h264 || codec == .hevc ? .eightBit : nil\n",
              "        return codec == .h264 ? .eightBit : nil\n")
 MUTANTS = {
@@ -208,8 +262,23 @@ MUTANTS = {
     "no-source-clamp": {"mode": "rows", "rows": ["C1"], "anchors": [
         ("app/Resources/Shaders/Compositor.metal", "    float4 texel = saturate(source.sample(\n",
          "    float4 texel = (source.sample(\n")]},
+    # PR3.
+    "hevc10-main": {"mode": "rows", "rows": ["T1"], "anchors": [
+        (SETTINGS, "            compression[AVVideoProfileLevelKey] = "
+         "kVTProfileLevel_HEVC_Main10_AutoLevel as String\n",
+         "            compression[AVVideoProfileLevelKey] = "
+         "kVTProfileLevel_HEVC_Main_AutoLevel as String\n")]},
+    "hevc10-unmapped": {"mode": "rows", "rows": ["T1"], "anchors": [
+        (SETTINGS, '        case "hevc_10bit": return .hevc\n', "")]},
+    "hevc10-eightbit": {"mode": "rows", "rows": ["T2"], "anchors": [
+        (SETTINGS, "        if isMain10(settings) { return nil }\n", "")]},
+    "row-before-hevc-alpha": {"mode": "core", "rows": ["CT"], "anchors": [
+        (TABLE, HEVC10_ROW, ""),
+        (TABLE, '    Preset {\n        id: "hevc_alpha",\n',
+         HEVC10_ROW + '    Preset {\n        id: "hevc_alpha",\n')]},
 }
-ROWS = ["C0", "D1", "D2", "P1", "H1", "R1", "R2", "C1", "Z1"]
+CORE_TESTS = ("hevc_alpha_sits_directly_after_hevc", "it_sits_directly_after_hevc_alpha")
+ROWS = ["C0", "D1", "D2", "P1", "H1", "R1", "R2", "C1", "T1", "T2", "Z1"]
 CAPTURE_ROWS = ["K", "E0", "P1c", "Rc", "Z1"]
 COMPARE_ROWS = ["K1", "K2", "K3", "K4", "K5", "K6", "E1", "E2", "Z1"]
 rows = {}
@@ -410,6 +479,41 @@ def luma_row(path, width, height):
     return [v / 65535 for v in struct.unpack(f"<{width}H", raw[:width * 2])]
 
 
+def y10_columns(path, width, height):
+    """`path`'s first frame decoded as `yuv420p10le`: (the middle row's luma
+    CODES, each column's mean code over rows 8…H−8), or (None, None). The
+    ramp is the same on every row, so the column mean averages the encoder's
+    block noise away and keeps what every row shares — an 8-bit staircase
+    under it, if the encoder was handed 8-bit frames."""
+    raw = decode(path, "yuv420p10le")
+    if not raw or len(raw) < width * height * 2:
+        return None, None
+    plane = struct.unpack(f"<{width * height}H", raw[:width * height * 2])
+    middle = list(plane[(height // 2) * width:(height // 2 + 1) * width])
+    rows = range(8, height - 8)
+    means = [sum(plane[y * width + x] for y in rows) / len(rows) for x in range(width)]
+    return middle, means
+
+
+def staircase_tone(means, width):
+    """The 8-bit staircase's tone: the column means less their own 31-column
+    moving average (detail finer than 31 px is left — an 8-bit staircase's
+    sawtooth, a step every 7.5 px on this ramp — and no offset or gentle
+    curve, which the average follows), and that residual's amplitude, in
+    codes, at the staircase's own frequency (255 steps across W−1 px); with
+    the median amplitude over 41 frequencies either side of it (0.09–0.12 and
+    0.15–0.18 cycles/px) as its floor. (tone, floor)."""
+    errors = [means[x] - sum(means[x - 15:x + 16]) / 31 for x in range(32, width - 32)]
+
+    def amplitude(f):
+        re = sum(e * math.cos(2 * math.pi * f * n) for n, e in enumerate(errors))
+        im = sum(e * math.sin(2 * math.pi * f * n) for n, e in enumerate(errors))
+        return 2 * math.hypot(re, im) / len(errors)
+    floor = sorted(amplitude(f) for f in [0.09 + 0.03 * k / 20 for k in range(21)]
+                   + [0.15 + 0.03 * k / 19 for k in range(20)])
+    return amplitude(255 / (width - 1)), floor[len(floor) // 2]
+
+
 def rms_steps(measured, ideal):
     """RMS of (measured − ideal) in 10-bit steps over columns 16…W−16."""
     errors = [(m - i) * 1023 for m, i in list(zip(measured, ideal))[16:len(ideal) - 16]]
@@ -438,13 +542,30 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()[:16] if data else None
 
 
-def tree_formats():
-    """{"output", "source"}: the pixel formats `sources_folder`'s
-    `Compositor.swift` names (the tree's, or a mutant copy's)."""
+def tree_formats(folder=None):
+    """{"output", "source"}: the pixel formats `folder`'s (by default
+    `sources_folder`'s) `Compositor.swift` names — the sources of the app
+    driven (`app_tree`), this tree's or a mutant copy's."""
     try:
-        return dict(FORMAT.findall((sources_folder / "Compositor.swift").read_text()))
+        return dict(FORMAT.findall((Path(folder or sources_folder) / "Compositor.swift")
+                                   .read_text()))
     except OSError:
         return {}
+
+
+def app_tree(binary):
+    """The tree whose `app/Sources` built `binary`: the folder above the
+    `build/Build/Products` it sits in, when that folder holds
+    `app/Sources/Compositor.swift`; else None (an app outside any tree, whose
+    formats cannot be read). PR2's review: `--app PATH` once read the WORKING
+    tree's formats whatever PATH was."""
+    path = Path(os.path.abspath(binary))
+    for parent in path.parents:
+        if (parent.name, parent.parent.name, parent.parent.parent.name) == (
+                "Products", "Build", "build"):
+            tree = parent.parent.parent.parent
+            return tree if (tree / "app/Sources/Compositor.swift").is_file() else None
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -596,6 +717,49 @@ def run_rows(client, state):
               f"{ramp.get('prores_422_rms', 'not given (--control DIR)')})")
     if "C1" in selected:
         closed = run_c1(client, clip) and closed
+    if selected & {"T1", "T2"}:
+        closed = run_t(client) and closed
+    return closed
+
+
+def run_t(client):
+    """T1 and T2 (PR3): the 10-bit ramp exported `hevc_10bit` and `hevc` from
+    one project in one run; each file's ffprobe, major brand, middle-row luma
+    RMS against x/1919, distinct middle-row codes and staircase tone."""
+    doc = Doc(client, "T", 1920, 1080)
+    doc.movie(doc.first_track(), ramp_clip())
+    got = {}
+    for preset in ("hevc_10bit", "hevc"):
+        movie = doc.export(preset, WORK / f"t-{preset}.mp4")
+        measured = luma_row(movie, 1920, 1080) if movie else None
+        codes, means = y10_columns(movie, 1920, 1080) if movie else (None, None)
+        got[preset] = {"probe": ffprobe(movie) if movie else {},
+                       "brand": major_brand(movie) if movie else None,
+                       "rms": rms_steps(measured, [x / 1919 for x in range(1920)])
+                       if measured else None,
+                       "distinct": len(set(codes[16:-16])) if codes else None,
+                       "tone": staircase_tone(means, 1920) if means else (None, None)}
+    closed = doc.close()
+    ten, eight = got["hevc_10bit"], got["hevc"]
+    probe = ten["probe"]
+    check("T1 a hevc_10bit export is hevc, Main 10, yuv420p10le, in an MP4",
+          doc.ok and probe.get("codec_name") == "hevc" and probe.get("profile") == "Main 10"
+          and probe.get("pix_fmt") == "yuv420p10le" and ten["brand"] in MP4_BRANDS,
+          f"fixture {doc.why or 'ok'}; {probe}; major brand {ten['brand']!r}")
+    a, b = ten["rms"], eight["rms"]
+    tone, control = ten["tone"][0], eight["tone"][0]
+    fmt = lambda v: None if v is None else round(v, 3)  # noqa: E731
+    check("T2 the ramp through hevc_10bit: the middle row's luma against x/1919 is ≤ 2.0 "
+          "10-bit steps RMS and ≤ ½ of hevc's in the same run, and the encoder was handed "
+          f"deep frames — no 8-bit staircase: its tone ≤ {TONE_MAX} codes, where hevc's "
+          f"(8-bit, the control) is ≥ {TONE_SEEN}",
+          doc.ok and None not in (a, b, tone, control) and a <= 2.0 and a <= b / 2
+          and tone <= TONE_MAX and control >= TONE_SEEN,
+          f"hevc_10bit RMS {fmt(a)}; hevc RMS {fmt(b)} (half {fmt(b / 2 if b else None)}); "
+          f"staircase tone (amplitude, floor) in codes: hevc_10bit "
+          f"{[fmt(v) for v in ten['tone']]}, hevc {[fmt(v) for v in eight['tone']]}; distinct "
+          f"10-bit Y codes on the middle row: hevc_10bit {ten['distinct']}, hevc "
+          f"{eight['distinct']}; hevc {eight['probe']}, brand {eight['brand']!r}")
     return closed
 
 
@@ -640,6 +804,17 @@ def ffprobe(path):
         return (json.loads(ran["stdout"]).get("streams") or [{}])[0]
     except (ValueError, IndexError):
         return {}
+
+
+def major_brand(path):
+    """The file's `ftyp` major brand as ffprobe reads it, or None."""
+    ran = bounded.run(["ffprobe", "-v", "error", "-show_entries", "format_tags=major_brand",
+                       "-of", "json", str(path)], 60)
+    try:
+        return ((json.loads(ran["stdout"]).get("format") or {}).get("tags") or {}).get(
+            "major_brand")
+    except ValueError:
+        return None
 
 
 def h264_pair(client, clip, out_dir, names):
@@ -951,10 +1126,10 @@ def m1_fixture(client, kind, height):
     return doc
 
 
-def m1_measure(binary, kind, height):
+def m1_measure(binary, kind, height, label=""):
     """One M1 export, on an instance of its own so its lifetime
     `phys_footprint_peak` is this fixture's; (its figures, its log)."""
-    log = WORK / f"m1-{kind}-{height}.log"
+    log = WORK / f"m1-{kind}-{height}{label}.log"
     launched = mcp.launch(str(binary), ["-ReelcutCompositorTiming", "YES"],
                           env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
                           log_path=str(log), timeout=CALL_BOUND)
@@ -1054,6 +1229,121 @@ def run_measure(binary, mode, where, logs):
     return all(f["closed"] for f in figures.values())
 
 
+def run_ab(tree_binary, copy_binary, rounds):
+    """MA (PR2's review, recorded in PR3): the heavy 2160p fixture exported on
+    this tree's Release app and on the `decode-8bit` copy's, alternated
+    (ABBA…) `rounds` times so both see the same load. The compositor averages,
+    their medians and the deep decode's share."""
+    runs, logs = {"tree": [], "decode-8bit": []}, []
+    for n in range(rounds):
+        order = [("tree", tree_binary), ("decode-8bit", copy_binary)]
+        for label, binary in (order if n % 2 == 0 else order[::-1]):
+            figures, log = m1_measure(binary, "heavy", 2160, f"-{label}-{n}")
+            logs.append(log)
+            runs[label].append(figures)
+            print(f"  round {n + 1} {label}: average {figures.get('average_ms')} ms, worst "
+                  f"{figures.get('worst_ms')} ms, export {figures.get('export_s')} s, "
+                  f"{figures.get('windows')} windows, fixture {figures['fixture']}", flush=True)
+    measured = all(f["fixture"] == "ok" and f["exported"] and f["windows"] > 0
+                   for one in runs.values() for f in one)
+    median = {k: sorted(f.get("average_ms") or 0 for f in v)[len(v) // 2] for k, v in runs.items()}
+    export = {k: sorted(f.get("export_s") or 0 for f in v)[len(v) // 2] for k, v in runs.items()}
+    share = (round(median["tree"] / median["decode-8bit"], 3)
+             if median["decode-8bit"] else None)
+    check("MA the heavy 2160p export's compositor average, this tree (64RGBAHalf sources) "
+          "against the decode-8bit copy (32BGRA), alternated on one host load", measured,
+          f"medians {median} ms (tree ÷ copy {share}); export medians {export} s; "
+          f"averages tree {[f.get('average_ms') for f in runs['tree']]}, copy "
+          f"{[f.get('average_ms') for f in runs['decode-8bit']]}")
+    return all(f["closed"] for one in runs.values() for f in one), logs
+
+
+def run_core_mutant(name):
+    """A core mutant: the copy's `core/` made its own, the anchors replaced,
+    and `cargo test` of the two export files in it (row CT). No app."""
+    from hevc_alpha_proof import own_core
+    dest = BASE / "mutant"
+    made, reason = tree_copy.make_copy(str(dest), agent=False)
+    atexit.register(tree_copy.remove_tree, str(dest))
+    if made is None:
+        print(f"mutant {name}: the control could not be performed — {reason}")
+        return 2
+    copy = Path(made)
+    reason = own_core(copy)
+    if reason is None:
+        try:
+            (copy / "core/tests").symlink_to(ROOT / "core/tests")
+        except OSError as error:
+            reason = f"the copy's core/tests could not be linked: {error}"
+    reason = reason or replace_anchors(copy, name)
+    if reason:
+        print(f"mutant {name}: the control could not be performed — {reason}")
+        return 2
+    ran = bounded.run(["cargo", "test", "--release", "--no-fail-fast", "--test", "export",
+                       "--test", "export_hevc_10bit"], 900, cwd=str(copy / "core"))
+    out = ran["stdout"] + ran["stderr"]
+    if ran["expired"] or "test result:" not in out:
+        print(f"mutant {name}: the control could not be performed — cargo rc {ran['rc']}, "
+              f"expired {ran['expired']}: {out[-600:]}")
+        return 2
+    failed = [t for t in CORE_TESTS if re.search(rf"^test {t} \.\.\. FAILED$", out, re.M)]
+    every = re.findall(r"^test (\w+) \.\.\. FAILED$", out, re.M)
+    print(("  ok   " if ran["rc"] == 0 else "  FAIL ") + "CT cargo test --test export --test "
+          f"export_hevc_10bit in the copy's core\n       failed: {every}", flush=True)
+    caught = ran["rc"] != 0 and failed == list(CORE_TESTS)
+    print(("MUTANT PASS" if caught else "MUTANT FAILURE") + f": {name} — CT "
+          + ("FAILED" if ran["rc"] != 0 else "passed")
+          + f"; named tests failed: {failed} (want {list(CORE_TESTS)})")
+    return 0 if caught else 1
+
+
+def selftest():
+    """S1–S3: `app_tree` over scratch trees, and main's refusal; no app."""
+    results = []
+
+    def row(name, good, detail):
+        results.append(bool(good))
+        print(("  ok   " if good else "  FAIL ") + name + f"\n       {detail}", flush=True)
+
+    print("precision (B94) — the selftest: which sources an app's formats are read from")
+    with tempfile.TemporaryDirectory() as scratch:
+        scratch = Path(scratch)
+        tree = scratch / "tree"
+        (tree / "app/Sources").mkdir(parents=True)
+        (tree / "app/Sources/Compositor.swift").write_text(
+            "    static let outputPixelFormat: OSType = kCVPixelFormatType_TEST_OUT\n"
+            "    static let sourcePixelFormat: OSType = kCVPixelFormatType_TEST_SRC\n")
+        inside = tree / "build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut"
+        inside.parent.mkdir(parents=True)
+        inside.write_text("")
+        found = app_tree(inside)
+        formats = tree_formats(found / "app/Sources") if found else {}
+        row("S1 an app under a tree's build/Build/Products reads THAT tree's formats",
+            found == tree and formats == {"output": "kCVPixelFormatType_TEST_OUT",
+                                          "source": "kCVPixelFormatType_TEST_SRC"},
+            f"tree {found}; formats {formats}")
+        outside = scratch / "elsewhere/Reelcut.app/Contents/MacOS/Reelcut"
+        outside.parent.mkdir(parents=True)
+        outside.write_text("")
+        bare = scratch / "bare/build/Build/Products/Debug/Reelcut.app/Contents/MacOS/Reelcut"
+        bare.parent.mkdir(parents=True)
+        bare.write_text("")
+        ran = bounded.run([sys.executable, str(Path(__file__).resolve()), "--app", str(outside),
+                           "--only", "D1"], 120)
+        refused = "is not a product of a tree" in ran["stdout"]
+        row("S2 an app outside any tree (or under a build folder with no app/Sources) is "
+            "refused, exit 2, before any launch",
+            app_tree(outside) is None and app_tree(bare) is None and ran["rc"] == 2
+            and refused and "instance PID" not in ran["stdout"],
+            f"outside {app_tree(outside)}; bare {app_tree(bare)}; main rc {ran['rc']}: "
+            f"{ran['stdout'].strip().splitlines()[-1:] if ran['stdout'].strip() else ran['stderr'][-200:]}")
+    default = proof_app.binary()
+    row("S3 the default app (no --app) is this tree's, so its formats are this tree's",
+        app_tree(default) == ROOT, f"{default} → {app_tree(default)}")
+    print(f"{sum(results)}/{len(results)}")
+    return 0 if all(results) else 1
+
+
 # ---------------------------------------------------------------------------
 
 
@@ -1077,7 +1367,21 @@ def remove_work():
         tree_copy.remove_tree(str(WORK))
 
 
-def build_mutant(name):
+def replace_anchors(copy, name):
+    """Every anchor of `name` replaced in `copy`, each found exactly once (in
+    order, so a later anchor sees an earlier one's text); None, or why not."""
+    for path, anchor, replacement in MUTANTS[name]["anchors"]:
+        target = copy / path
+        if not target.resolve().is_relative_to(BASE / "mutant"):
+            return f"{path} in the copy is the tree's own file"
+        text = target.read_text()
+        if text.count(anchor) != 1:
+            return f"the anchor occurs {text.count(anchor)} times in {path}: {anchor!r}"
+        target.write_text(text.replace(anchor, replacement))
+    return None
+
+
+def build_mutant(name, release_only=None):
     """A copy of the tree with every anchor of `name` replaced (each found
     once), built by `tree_copy.build_app`. (app bundle, copy) or (None, why)."""
     made, reason = tree_copy.make_copy(str(BASE / "mutant"))
@@ -1085,17 +1389,12 @@ def build_mutant(name):
     if made is None:
         return None, reason
     copy = Path(made)
-    for path, anchor, replacement in MUTANTS[name]["anchors"]:
-        target = copy / path
-        if not target.resolve().is_relative_to(BASE / "mutant"):
-            return None, f"{path} in the copy is the tree's own file"
-        text = target.read_text()
-        if text.count(anchor) != 1:
-            return None, f"the anchor occurs {text.count(anchor)} times in {path}: {anchor!r}"
-        target.write_text(text.replace(anchor, replacement))
+    reason = replace_anchors(copy, name)
+    if reason:
+        return None, reason
     print(f"  building the copy ({len(MUTANTS[name]['anchors'])} anchor(s) replaced, each found "
           "once)…", flush=True)
-    app, reason = tree_copy.build_app(copy, BUILD_BOUND)
+    app, reason = tree_copy.build_app(copy, BUILD_BOUND, release_only=release_only)
     return (app, copy) if app is not None else (None, reason)
 
 
@@ -1114,6 +1413,39 @@ def mutant_pf(copy):
     return None, (lines or [f"no PF line (rc {ran['rc']}): {ran['stdout'][-300:]}"])[0]
 
 
+def main_ab(rounds):
+    """`--measure ab --mutant decode-8bit`: MA and Z1 (release-only)."""
+    global selected
+    selected = {"MA", "Z1"}
+    tree_binary = Path(proof_app.binary(release_only=RELEASE_ONLY))
+    print(f"precision (B94) — --measure ab: the heavy 2160p export, {tree_binary} against a "
+          f"Release build of the decode-8bit copy, {rounds} rounds", flush=True)
+    if not tree_binary.is_file():
+        print(f"instrument failure: no app binary at {tree_binary}")
+        return 2
+    app, copy = build_mutant("decode-8bit", release_only=RELEASE_ONLY)
+    if app is None:
+        print(f"instrument failure: the decode-8bit copy did not build — {copy}")
+        return 2
+    remove_work()
+    atexit.register(remove_work)
+    HOME.mkdir(parents=True)
+    if prores_clip(2160) is None:
+        print("instrument failure: ffmpeg did not make M1's 2160p movie")
+        return 2
+    try:
+        closed, logs = run_ab(tree_binary, app / "Contents/MacOS/Reelcut", rounds)
+    except Exception as error:  # a row that could not run is a failure
+        print(f"  instrument error: {type(error).__name__}: {error}", flush=True)
+        closed, logs = False, []
+    found = [line for log in logs for line in complaints(log)]
+    check("Z1 CONTROL: the projects close and no log holds a `Reelcut: ` line",
+          closed and not found, f"closed {closed}; complaints {found}")
+    passed = sum(1 for name in ("MA", "Z1") if rows.get(name))
+    print(f"{passed}/2")
+    return 0 if passed == 2 else 1
+
+
 def main():
     global selected, sources_folder
     parser = argparse.ArgumentParser()
@@ -1122,16 +1454,31 @@ def main():
     parser.add_argument("--measure", action="store_true")
     parser.add_argument("--control", help="a capture DIR whose P1 figure the rows print")
     parser.add_argument("--mutant", choices=sorted(MUTANTS))
-    parser.add_argument("mode", nargs="?", choices=("capture", "compare"))
+    parser.add_argument("--selftest", action="store_true")
+    parser.add_argument("--rounds", type=int, default=3, help="--measure ab's rounds")
+    parser.add_argument("mode", nargs="?", choices=("capture", "compare", "ab"))
     parser.add_argument("dir", nargs="?")
     args = parser.parse_args()
-    if (args.mode is None) != (args.dir is None) or (args.measure and args.mode is None):
+    if args.selftest:
+        return selftest()
+    ab = args.mode == "ab"
+    if ab and not (args.measure and args.mutant == "decode-8bit" and args.dir is None
+                   and not args.only and args.rounds >= 1):
+        parser.error("ab is `--measure ab --mutant decode-8bit [--rounds N]`")
+    if not ab and ((args.mode is None) != (args.dir is None)
+                   or (args.measure and args.mode is None)):
         parser.error("capture and compare take DIR; --measure takes capture or compare DIR")
     mutant = MUTANTS.get(args.mutant)
-    if mutant and (args.measure or args.only or args.mode not in (
-            None if mutant["mode"] == "rows" else "compare",)):
+    if mutant and not ab and (args.measure or args.only or args.mode not in (
+            None if mutant["mode"] in ("rows", "core") else "compare",)):
         parser.error(f"--mutant {args.mutant} runs {mutant['mode']}"
                      + (" DIR" if mutant["mode"] == "compare" else "") + " alone")
+    if mutant and mutant["mode"] == "core":
+        print(f"precision (B94) — the {args.mutant} core MUTANT (CT must FAIL, naming "
+              f"{', '.join(CORE_TESTS)})", flush=True)
+        return run_core_mutant(args.mutant)
+    if ab:
+        return main_ab(args.rounds)
     universe = (["M1", "Z1"] if args.measure else CAPTURE_ROWS if args.mode == "capture"
                 else COMPARE_ROWS if args.mode == "compare" else ROWS)
     selected = set(universe)
@@ -1158,6 +1505,13 @@ def main():
     if not binary.is_file():
         print(f"instrument failure: no app binary at {binary}")
         return 2
+    tree = app_tree(binary)
+    if tree is None:
+        print(f"instrument failure: {binary} is not a product of a tree (a build/Build/Products "
+              "under a folder holding app/Sources/Compositor.swift), so the formats it was "
+              "built from cannot be read")
+        return 2
+    sources_folder = tree / "app/Sources"
     where = Path(args.dir).resolve() if args.dir else None
     remove_work()
     atexit.register(remove_work)

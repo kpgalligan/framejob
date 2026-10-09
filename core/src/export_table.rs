@@ -258,7 +258,7 @@ pub(crate) struct Preset {
 /// bitrate to set. A bitrate is therefore something the user asks for — the
 /// `video_bitrate` / `audio_bitrate` overrides — never something a preset
 /// assumes on their behalf.
-const PRESETS: [Preset; 10] = [
+const PRESETS: [Preset; 11] = [
     // The default (see above). The ids are the `export` tool's vocabulary
     // and every script that calls it spells them, so a row is named for
     // the encoding alone — `h264`, not `h264_document` — because the size
@@ -304,6 +304,23 @@ const PRESETS: [Preset; 10] = [
         size: None,
         fps: None,
         avf_preset: Some("AVAssetExportPresetHEVCHighestQualityWithAlpha"),
+    },
+    // HEVC Main 10 (spec §11 PR-3): `hevc`'s MP4 from the compositor's
+    // 16-bit frames, so a 10-bit source survives to a 10-bit delivery file.
+    // After `hevc_alpha`, which G-33 keeps directly after `hevc`. The codec
+    // spelling is the id's: `ExporterWriter.codecType(for:)` maps it to
+    // `.hevc` with the Main 10 profile, and the `hevc` prefix gives it
+    // HEVC's Quality tiers.
+    Preset {
+        id: "hevc_10bit",
+        name: "HEVC 10-bit (MP4)",
+        container: Container::Mp4,
+        codec: "hevc_10bit",
+        video: true,
+        alpha: false,
+        size: None,
+        fps: None,
+        avf_preset: Some("AVAssetExportPresetHEVCHighestQuality"),
     },
     Preset {
         id: "prores_422",

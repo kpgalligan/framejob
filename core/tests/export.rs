@@ -65,6 +65,12 @@
 //!     nothing reads is dropped in silence, and the caller gets an export
 //!     at settings they did not ask for, reported ok.
 //!
+//! 12. **The rows, in menu order:** `h264`, `hevc`, `hevc_alpha`,
+//!     `hevc_10bit`, `prores_422`, `prores_4444`, `audio_m4a`, `audio_wav`,
+//!     `audio_aiff`, `gif`, `apng` — [`EXPECTED`] holds them; the
+//!     `hevc_10bit` row (spec §11 PR-3) has its own file,
+//!     `core/tests/export_hevc_10bit.rs`.
+//!
 //! The sizes the sheet offers are `core/tests/export_size.rs`.
 
 mod common;
@@ -118,7 +124,7 @@ struct Expected {
 /// a timeline in it. The old size-carrying ids (`h264_1080p`, `hevc_4k`…)
 /// are gone without aliases — `an_unknown_preset_errors_and_names_it`
 /// pins that.
-const EXPECTED: [Expected; 10] = [
+const EXPECTED: [Expected; 11] = [
     Expected {
         id: "h264",
         container: "mp4",
@@ -159,6 +165,21 @@ const EXPECTED: [Expected; 10] = [
         alpha: true,
         file_type: "com.apple.quicktime-movie",
         avf_preset: Some("AVAssetExportPresetHEVCHighestQualityWithAlpha"),
+    },
+    // HEVC Main 10 (spec §11 PR-3): `hevc`'s MP4 in every field but the
+    // id and the codec, after `hevc_alpha` (G-33 keeps that one directly
+    // after `hevc`). The 10 bits are the writer's profile, not a field.
+    Expected {
+        id: "hevc_10bit",
+        container: "mp4",
+        codec: "hevc_10bit",
+        size: None,
+        fps: None,
+        video: true,
+        audio: true,
+        alpha: false,
+        file_type: "public.mpeg-4",
+        avf_preset: Some("AVAssetExportPresetHEVCHighestQuality"),
     },
     Expected {
         id: "prores_422",
@@ -712,7 +733,7 @@ fn alpha_is_the_only_key_the_settings_grew() {
     }
 }
 
-/// Three rows carry a fourth channel and seven do not. The sweep is the
+/// Three rows carry a fourth channel and eight do not. The sweep is the
 /// whole table rather than a spot check on three rows, because `alpha` is
 /// a claim about every row at once: reported true on a row with nowhere to
 /// put it, the export sheet and the `export` tool would both promise a
@@ -822,7 +843,7 @@ fn prores_4444_is_a_mov_avfoundation_writes() {
 /// export of an opaque timeline, which carry the channel and simply have
 /// nothing transparent in them this time.
 ///
-/// So the same ten rows are resolved against two documents differing
+/// So the same eleven rows are resolved against two documents differing
 /// ONLY in the background's alpha, and every flag has to be the same in
 /// both. A build wired to the canvas fails on both halves of this at once.
 #[test]

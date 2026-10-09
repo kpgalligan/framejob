@@ -471,9 +471,9 @@ Uses the four `tools/proof/work/playback-check/` projects (Setup 3).
 - **Source:** the precision road map's PR1 (spec §11 PR-1: the preview shows the compositor's 16-bit-float frames, with no EDR and no HDR flag; `preview_display_probe.py`'s spike found no script can see how the layer reads them, so this row is the check), and PR2 (spec §11 PR-2: every video source decodes to 16-bit float; `precision_proof.py` R1 measures the ramp's levels in a render, not on screen).
 
 **PRC-2 — Deep exports play and look right**
-- **Do:** 1. In a project with a full-frame shape filled with a slow black-to-white linear gradient (one edge to the other) and a title over it, export `prores_422` and then `prores_4444` (File ▸ Export…). 2. Open each file in QuickTime Player and look at it beside Reelcut's preview of the same frame.
-- **Expect:** both play; the gradient is smooth in each, with no band or step you cannot also see in the preview; the colours and the title are the ones the preview shows.
-- **Source:** the precision road map's PR1 (spec §11 PR-3: the ProRes rows take the compositor's 16-bit frames).
+- **Do:** 1. In a project with a full-frame shape filled with a slow black-to-white linear gradient (one edge to the other) and a title over it, export `prores_422` and then `prores_4444` (File ▸ Export…). 2. Open each file in QuickTime Player and look at it beside Reelcut's preview of the same frame. 3. In a 1920×1080 project holding the 10-bit ProRes ramp (PRC-1's step 4), export "HEVC 10-bit (MP4)" (`hevc_10bit`) and then "HEVC (MP4)" (`hevc`), and play both in QuickTime Player side by side.
+- **Expect:** both ProRes files play; the gradient is smooth in each, with no band or step you cannot also see in the preview; the colours and the title are the ones the preview shows. The HEVC 10-bit file plays, smooth across the ramp, the same colours as the preview; beside it the `hevc` file may show faint bands, and the 10-bit one shows fewer or none.
+- **Source:** the precision road map's PR1 (spec §11 PR-3: the ProRes rows take the compositor's 16-bit frames) and PR3 (spec §11 PR-3: the `hevc_10bit` row writes Main 10; `precision_proof.py` T2 measures the ramp, not what the player shows).
 
 ## Screen recording
 

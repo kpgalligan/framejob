@@ -1213,8 +1213,9 @@ the key map behind it.
   PR-3); the fill is one generic pass over `StraightAlphaLayout` (`BGRA8`,
   `RGBAHalf`), whose `allVisible` keeps the whole-row check vectorised.
   `h264`'s and `hevc`'s frames are rounded to 8 bits the same way and not
-  straightened, and `hevc` is pinned to Main; every other row's frame goes
-  to the encoder as drawn.
+  straightened, and `hevc` is pinned to Main; `hevc_10bit` maps to `.hevc`
+  too, is told apart by its codec name (`isMain10`), is pinned to Main 10
+  and, like every other row, gets the frame as drawn.
   `ExportWriter` FILLS the frame when a fit would leave at most
   a pixel uncovered, or — the frame a canvas-SHAPED size less at most one
   pixel on each axis, `(bw + a)·ch == (bh + b)·cw` for some `a`, `b` in

@@ -58,12 +58,14 @@ fn row(id: &str, name: &str, width: i64, height: i64) -> Row {
 /// audio-only rows included, on the terms `rc_export_settings` reports a
 /// width for them. Only the two image formats list anything else, and only
 /// because they are the only rows carrying a cap.
-const MOVIE_FORMATS: [&str; 8] = [
+const MOVIE_FORMATS: [&str; 9] = [
     "h264",
     "hevc",
     // HEVC with alpha (spec §11 G-33): a movie row with no cap, and
     // even-sized like the row it sits after.
     "hevc_alpha",
+    // HEVC Main 10 (spec §11 PR-3): a movie row with no cap.
+    "hevc_10bit",
     "prores_422",
     // The alpha master (road map 2, phase 7). It carries no cap and is
     // not an image format, so on a canvas with even edges it lists what
@@ -84,10 +86,11 @@ const MOVIE_FORMATS: [&str; 8] = [
 /// every row AVFoundation writes but ProRes 4444, the three audio-only rows
 /// among them, which have no picture and report what `h264` reports. On
 /// these an odd edge is listed and resolved one pixel smaller.
-const EVEN_SIZED: [&str; 7] = [
+const EVEN_SIZED: [&str; 8] = [
     "h264",
     "hevc",
     "hevc_alpha",
+    "hevc_10bit",
     "prores_422",
     "audio_m4a",
     "audio_wav",

@@ -91,8 +91,8 @@ Rows (◆ = also Gate A's):
   Support` is a directory (the scratch home took). When it fails no tool is
   called.
 - ◆ **T0**: `export`'s `size` description holds "written one pixel smaller
-  on that edge"; in the full rows also "h264, hevc, hevc_alpha and
-  prores_422 need even dimensions", "letterboxed if the shape differs by
+  on that edge"; in the full rows also "h264, hevc, hevc_alpha, hevc_10bit
+  and prores_422 need even dimensions", "letterboxed if the shape differs by
   more than a pixel (within a pixel the picture fills the frame instead)"
   and "except on prores_4444 and hevc_alpha", and its `preset` description
   holds "Three rows keep a transparent canvas transparent: prores_4444 and
@@ -447,7 +447,8 @@ EVEN_ROWS = ["h264", "hevc", "prores_422"]
 EXTENSION = {"h264": "mp4", "hevc": "mp4", "hevc_alpha": "mov", "prores_422": "mov",
              "prores_4444": "mov", "gif": "gif", "apng": "png"}
 A6_PHRASE = "written one pixel smaller on that edge"
-B6_SIZE = ["h264, hevc, hevc_alpha and prores_422 need even dimensions",
+# precision PR3 (spec §11 PR-3): the list gained `hevc_10bit`, the new even-sized row.
+B6_SIZE = ["h264, hevc, hevc_alpha, hevc_10bit and prores_422 need even dimensions",
            "letterboxed if the shape differs by more than a pixel (within a pixel the "
            "picture fills the frame instead)",
            "except on prores_4444 and hevc_alpha"]
@@ -1115,8 +1116,8 @@ def row_t0(s, full):
     missing = [p for p in [A6_PHRASE] + B6_SIZE if p not in size]
     if B6_PRESET not in preset:
         missing.append(B6_PRESET)
-    check("T0 export's size description says what an odd edge does, names the four "
-          "even-sized rows, the fill within a pixel and the two rows that refuse another "
+    check("T0 export's size description says what an odd edge does, names the five "
+          "even-sized movie rows, the fill within a pixel and the two rows that refuse another "
           "shape; its preset description names the three rows that keep transparency",
           not missing, f"missing: {missing}" if missing else "")
 

@@ -92,7 +92,9 @@ extension AgentServer {
                 + "on. Three rows keep a transparent canvas transparent: prores_4444 and "
                 + "hevc_alpha (the movie rows — see size, which constrains them) and apng. "
                 + "gif is not one of them: it can show a transparent pixel but has no alpha "
-                + "channel, so nothing partial survives it. Pass a wrong one once and the "
+                + "channel, so nothing partial survives it. prores_422, prores_4444 and "
+                + "hevc_10bit keep the compositor's 16-bit frames at 10 bits (ProRes 4444 at "
+                + "12); h264, hevc and hevc_alpha are 8-bit. Pass a wrong one once and the "
                 + "error lists them all.",
         ]
         let exportSizeProperty: [String: Any] = [
@@ -115,7 +117,7 @@ extension AgentServer {
                 + "canvas is refused rather than written, because the padding destroys the "
                 + "alpha channel those rows are chosen for; every row id is already the "
                 + "document's own shape, so this only bites on a [width, height] of another "
-                + "shape. h264, hevc, hevc_alpha and prores_422 need "
+                + "shape. h264, hevc, hevc_alpha, hevc_10bit and prores_422 need "
                 + "even dimensions: an odd width or height — the document size on a canvas "
                 + "with an odd edge, or an odd [width, height] — is written one pixel smaller "
                 + "on that edge, and the width and height reported back are the file's. "

@@ -3,8 +3,9 @@
 Part of spec §11, *Decisions made — do not re-litigate*. The index of every decision is
 [`README.md`](README.md).
 
-The road map that makes these is in progress: its record is `designs/precision.md`, which holds
-each phase's record (PR0–PR3). PR-1..PR-5 were recorded in PR0, before any code, from the owner's
+The road map that made these is closed: its condensed record is `designs/adr/precision.md`, and
+the original, `archive/precision.md`, holds each phase's record (PR0–PR3). PR-1..PR-5 were
+recorded in PR0, before any code, from the owner's
 seven answers of 2026-10-09 ("As recommended") to the scoping spike's choices
 (`~/.claude/litecode/reelcut/precision/S-precision.md` §0). They change how many bits hold a
 pixel, not what a pixel means: blending stays in encoded sRGB (§7.5, MT-3), and HDR, wide gamut

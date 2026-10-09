@@ -300,16 +300,19 @@ schema, §6 the op table, §7 the architecture.
   keeps its own name too, and that step copies a constant-rate VP9 stream
   instead of re-encoding it.
 - **Export** through an `AVAssetWriter` over the same composition, the
-  format (H.264, HEVC, HEVC with alpha, ProRes 422, ProRes 4444, M4A, WAV,
-  AIFF, GIF, APNG) and the size chosen separately and both resolved by the core — the default
+  format (H.264, HEVC, HEVC with alpha, HEVC 10-bit, ProRes 422, ProRes 4444,
+  M4A, WAV, AIFF, GIF, APNG) and the size chosen separately and both resolved by the core — the default
   size is the document's own, or for a GIF or APNG the format's cap fitted to
   it — and an optional loudness target and timecode burn-in over it, plus an
   offline single-frame render used for verification and by File ▸ Save Frame….
+  The picture is composited in 16-bit float and every video source decoded
+  deep, so ProRes 422, ProRes 4444 and HEVC 10-bit keep a 10-bit source's
+  gradients; H.264, HEVC and HEVC with alpha are 8-bit.
   The size the sheet and the `export` tool report is the size the file has: a
   document with an odd width or height exports one pixel smaller on that edge
   on the formats that need even dimensions (H.264, HEVC, HEVC with alpha,
-  ProRes 422), where the Size popup names the row "Document (even)"; ProRes
-  4444, GIF and APNG keep the odd edge. A movie whose size is within a pixel
+  HEVC 10-bit, ProRes 422), where the Size popup names the row "Document
+  (even)"; ProRes 4444, GIF and APNG keep the odd edge. A movie whose size is within a pixel
   of the document's shape — that evened size, a custom size in the
   document's proportions with an odd edge (written a pixel smaller, at any
   scale), or a standard size whose long edge rounded — is filled edge to
@@ -408,7 +411,7 @@ Makefile              Build orchestration
 | `ProjectSnapshot.swift` | the `Codable` mirror of the §5.2 project JSON, the plan and the recipe, plus the §5.3 placement maths |
 | `ProjectDocument.swift` | NSDocument, `.reelcut` package read/write, and the single mutation point (`applyEdit`, the live-edit trio, undo as a handle stack) |
 | `MediaImporter.swift` | `AVURLAsset` probing (the one file allowed `async`/`await`), thumbnails, waveform peaks |
-| `CompositionBuilder.swift` · `Compositor.swift` · `LayerRenderers.swift` · `LayerRenderersText.swift` · `Playback.swift` · `RecipeSource.swift` | plan → `AVComposition`; the `AVVideoCompositing` Metal pipeline — five states from three fragment functions, one of them reading the destination so a layer can blend; text/shape/image textures, a shape's gradient and the three text reveals the recipe asks for; the player and its rebuild-vs-refresh rule; the registry the compositor reads a recipe from, one slot per document and per export |
+| `CompositionBuilder.swift` · `Compositor.swift` · `LayerRenderers.swift` · `LayerRenderersText.swift` · `Playback.swift` · `RecipeSource.swift` | plan → `AVComposition`; the `AVVideoCompositing` Metal pipeline — seven pipelines from five fragment functions, one of them reading the destination so a layer can blend; text/shape/image textures, a shape's gradient and the three text reveals the recipe asks for; the player and its rebuild-vs-refresh rule; the registry the compositor reads a recipe from, one slot per document and per export |
 | `CaptionImporter.swift` · `CaptionLayout.swift` · `CaptionStyle.swift` · `CaptionLooks.swift` · `CaptionPages.swift` · `Transcriber.swift` (+`Extract` `Jobs` `Languages`) · `CaptionExporter.swift` | captions in and out: the SubRip grammar, the placement every producer shares, the five word caption styles, the three looks a run may add to them (a sliding pill, a word that fills, a dim in pauses) and the pager that fills their pages to a measured width, on-device speech recognition and the cue builder over it, the extractor and the job list both engines share, and the `.srt` / `.vtt` writer |
 | `CloudTranscriber.swift` (+`Media`) · `MediaTranscript.swift` · `AssemblyAIClient.swift` (+`Session`) · `AssemblyAITranscript.swift` · `AssemblyAIConfiguration.swift` · `AssemblyAILanguages.swift` · `SecretStore.swift` · `CloudProgress.swift` · `CloudEstimate.swift` | captions from the cloud (road map 6): the run that groups clips by media and deletes what it fetched, the transcript cache in the package, AssemblyAI's five REST calls and their wire values, where the client speaks and what it says it is, the `0600` key file, the progress number and the price the sheet shows before the button |
 | `Exporter.swift` · `ExporterSettings.swift` · `ExporterWriter.swift` · `ExporterWriter+Settings.swift` · `ExporterAudioGain.swift` · `ExportSheetController.swift` (with `ExportSheetOptions` `ExportSheetResolve` `ExportSheetPresets` `ExportProgressSheetController`) | writing a file — two passes wherever it holds sound, the first measuring loudness — and rendering one frame offline; the settings each row becomes in AVFoundation's terms, and the loudness gain applied to the float mix and quantised once; the sheet's controls, the resolution behind them and the progress sheet |
