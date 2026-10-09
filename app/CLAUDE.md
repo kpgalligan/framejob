@@ -1176,8 +1176,9 @@ the key map behind it.
   A track whose clips ask for none is bit-identical.
 - `Exporter.swift` · `ExporterLoudness.swift` · `ExporterSettings.swift` ·
   `ExporterWriter.swift` · `ExporterWriter+Settings.swift` ·
-  `ExporterAudioGain.swift` · `ExporterImageSequence.swift` ·
-  `ExporterErrors.swift` · `ExporterGraphics.swift` — the writer
+  `ExporterWriter+Chapters.swift` · `ExporterAudioGain.swift` ·
+  `ExporterImageSequence.swift` · `ExporterErrors.swift` ·
+  `ExporterGraphics.swift` — the writer
   (`ExportWriter` REPLACED `AVAssetExportSession` so chapters, bitrate and
   size have one path) and the one-frame offline render. An export is TWO
   passes wherever the file holds sound: a measurement build of its own in

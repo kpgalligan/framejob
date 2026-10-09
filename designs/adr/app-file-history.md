@@ -512,8 +512,14 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   and `graphicProps` landed). The next seam: the small labels and the multi-line text (`// MARK: -
   Small labels`, `// MARK: - Multi-line text`: `InspectorRowLabel`, `InspectorMixedBadge`,
   `InspectorTimecodeField`, `InspectorNoteLabel`, `InspectorTextArea`).
-- `ExporterWriter.swift`: the chapter half (`ExportChapter`, `textFormat`, `chapterSamples`,
-  `chapterSample`) to `ExporterWriter+Chapters.swift`.
+- `ExporterWriter.swift`: issue batch B92 paid the seam this entry named: the chapter half
+  (`ExportChapter`, still at file scope, and `addChapters`, `pumpChapters`, `textFormat`,
+  `chapterSamples(_:in:format:)` and `chapterSample`) went verbatim to
+  `ExporterWriter+Chapters.swift` as an `extension ExportWriter`, a pure move gated alone before
+  the alpha rows' straightening landed (`addChapters`, `pumpChapters`, `videoInput`,
+  `audioInput`, `writer`, `range`, `chapterInput`, `chapterSamples` and `isStopping` lost
+  `private`). `wc -l app/Sources/ExporterWriter.swift`: 782 before, 543 after;
+  `ExporterWriter+Chapters.swift` is 248. No next seam is named.
 - `OptionControls.swift`: the precedent is `OptionControls+Choices.swift`.
 - `VideoPane.swift`: a section out as an extension, the precedent `VideoPane+Obscure.swift`.
 - `AgentServer+Clips.swift`: the property doors (`// MARK: - Properties`, `set_video` …
