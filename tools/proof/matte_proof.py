@@ -3,7 +3,7 @@
 matte track end to end over MCP: `set_track {matte}`, the recipe's `matte` and
 `mattes`, and the compositor's matte pass, read back as `render_frame` bytes;
 then (MT3) nests, dissolves, a matted clip's shadow and reflection, and every
-export preset.
+export preset; then (issue batch B90) nested dissolves and zooms measured.
 
     python3 tools/proof/matte_proof.py [--app PATH] [--only C0,A1,...]
     python3 tools/proof/matte_proof.py --mutant NAME
@@ -118,6 +118,43 @@ window less 8 px and every 16th more than 16 px clear of it within ±8 of
   the matte track over the card: `render_frame` shows the cut, and the
   `prores_422` export's `graphic prefetch:` line has hits > 0 and
   mismatched 0.
+Issue batch B90 phase 1 (#252): nested dissolves and zooms MEASURED, each
+row asserting today's picture ("pre") and printing the exact mix beside it.
+Each its own project, background black, every transition `linear`, closed
+at the end. Samples every 16th pixel of a region less MARGIN, ±2 per channel
+(D1 and D6 ±3: an r8 coverage and an 8-bit half). T_A = 700000 (frame 35),
+T_B = 660000 (33), T_C = 540000 (27). p is never read off the row's own
+frame: it comes from DR, or from the row's own un-nested frame U.
+- **DR** (CONTROL): red then green full cards (0–1 s, 1–2 s), a 0.5 s
+  dissolve `after` on green: at T_A and T_B, R + G = 255 ± 2 (a timeline
+  pair is exact) and p = G/255; at T_A 70 ≤ G ≤ 100. Runs whenever any D row
+  does.
+- **D0**: N7's construction, no matte: G = 255(1−p)², R = 255p at T_A.
+- **D1**: N7's construction under a `luma` track, a left window
+  (40–400 × 80–280, grey 0.4, 0–1 s) and a right one (240–600, grey 0.8,
+  1–2 s), m_i and m_o their lumas drawn alone before nesting: overlap
+  G = 255·m_o(1−p)²(1 − m_i·p²), R = 255·m_i·p²; right-only
+  G = 255·m_o(1−p)²; left-only R = 255·m_i·p²; clear of both ≤ 2.
+- **D2**: red then green with a centred dissolve, p from U at T_C, then
+  nested: R = 255(1−p)², G = 255p.
+- **D3**: a green card under a grey 0.4 `luma` card (m_o drawn alone),
+  nested, trimmed to 1 s, a red card after it with a dissolve `after`:
+  G = 255·m_o(1−p)²/(1 − p·m_o), R = 255p at T_A.
+- **D4**: a red card, then a green card nested alone with a dissolve
+  `after`: R = 255(1−p)², G = 255p at T_A.
+- **D5**: a blue card under a white 400–600 × 120–240 rectangle, nested,
+  trimmed to 1 s; a red 0–320 × 0–360 rectangle B after it with a dissolve
+  `after`: in the white box R = G = 255(1−p), Blue = 255(1−p) + 255p(1−p);
+  inside B R = 255p, Blue = 255(1−p).
+- **D6**: a white card under two grey `luma` cards (0.4, 0.8; m_a, m_b drawn
+  alone) with a centred dissolve; U at T_C gives m and p = (m − m_a)/(m_b −
+  m_a); then all nested: every channel 255·(m_b·p + m_a(1−p)²).
+- **D7**: red then green with a centred dissolve (p_i from U at T_B), nested,
+  trimmed to 1 s, a blue card after it with a dissolve `after` (p_o from DR
+  at T_B): R = 255(1−p_i)²(1−p_o), G = 255·p_i(1−p_o), Blue = 255p_o.
+- **D8**: D0 with a `zoom`: inside the centred in-box (z_in = 0.75 + 0.25p of
+  the canvas, 4 px kept from its edges) G = 255(1−p)², R = 255p; outside it
+  G = 255(1−p), R ≤ 2.
 - **Z1** (CONTROL): the log holds no `Reelcut: ` line; its tail is printed.
 
 `--mutant NAME` builds a COPY of the tree (`tree_copy.make_copy`; a `core/`
@@ -146,6 +183,9 @@ FAIL:
   core-group-by-track         a group keyed by its track alone: N7 CT
   resolve-overwrites          the last matte in a cut set wins: N5
   reflection-placeholder      the reflection draw binds the placeholder: RF1
+  (B90 phase 1)
+  dissolve-cover-everywhere   an outgoing half with no partner box takes its
+                              own cover: D0 D1 D2 D4 D5 D6 D7 D8
 (MT3's eighth, coverage-destination-coords, is `matte_probe.py`'s.)
 Rule R: exit 0 means every named row FAILED in the copy — caught; 1 that one
 passed — survived; 2 that the control could not be performed (the copy did
@@ -183,13 +223,15 @@ MARGIN = 3
 ROWS = ["C0", "A1", "G0", "U0", "P6", "MM", "V5", "H0", "B0", "A2", "N0", "R0",
         "L1", "L2", "L3",
         "N1", "N4", "N2", "N6", "N3", "N5", "N7", "T2", "T3", "T1", "S1", "RF1",
-        "E1", "E2", "E4", "E6", "E3", "E5", "E7", "F1", "Z1"]
+        "E1", "E2", "E4", "E6", "E3", "E5", "E7", "F1",
+        "DR", "D0", "D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "Z1"]
 P_ROWS = {"C0", "A1", "G0", "U0", "P6", "MM", "V5", "H0", "B0", "A2", "N0", "R0"}
 L_ROWS = {"L1", "L2", "L3"}
 N_ROWS = {"N1", "N4", "N2", "N6", "N3"}
 T_ROWS = {"T2", "T3"}
 S_ROWS = {"S1", "RF1"}
 E_ROWS = {"E1", "E2", "E3", "E4", "E5", "E6", "E7"}
+D_ROWS = {"DR", "D0", "D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8"}
 MODES = ["none", "alpha", "alpha_inverted", "luma", "luma_inverted"]
 # name: (file, anchor, replacement, the rows that must fail)
 MUTANTS = {
@@ -258,6 +300,12 @@ MUTANTS = {
         "                encoder.setFragmentTexture(placeholder, index: 1)\n"
         "                encodeReflection(uniforms: uniforms, texture: texture, encoder: encoder)\n"
         "                encoder.setFragmentTexture(matte, index: 1)\n", ["RF1"]),
+    # Issue batch B90 phase 1: zoom shares the dissolve's weight branch.
+    "dissolve-cover-everywhere": (
+        "app/Resources/Shaders/Compositor.metal",
+        "clamp(u.partnerAlpha, 0.0, 1.0) * matteCover : 0.0;",
+        "clamp(u.partnerAlpha, 0.0, 1.0) * matteCover : matteCover;",
+        ["D0", "D1", "D2", "D4", "D5", "D6", "D7", "D8"]),
 }
 rows = {}
 selected = set(ROWS)
@@ -1215,6 +1263,426 @@ def run_f(client, log, state):
     return closed["ok"]
 
 
+# ---------------------------------------------------------------------------
+# Issue batch B90 phase 1 (#252): nested dissolves and zooms, measured.
+
+T_A, T_B, T_C = 700_000, 660_000, 540_000  # frames 35, 33 and 27
+FULL = (0, 0, WIDTH, HEIGHT)
+D_STEP = 16
+RED, GREEN, BLUE, WHITE = [1, 0, 0, 1], [0, 1, 0, 1], [0, 0, 1, 1], [1, 1, 1, 1]
+
+
+def grey(level):
+    return [level, level, level, 1]
+
+
+def shown(value):
+    return "(" + ", ".join("·" if c is None else f"{c:.1f}" for c in value) + ")"
+
+
+def claim(got, points, pre, exact, channels=(0, 1, 2), tolerance=2):
+    """Each point's `channels` within `tolerance` of `pre` (a tuple, or a
+    function of (x, y)); (ok, a line with the measured value at the middle
+    sample, the pre-fix prediction and the exact mix there, and the first
+    miss)."""
+    def at(value, x, y):
+        return value(x, y) if callable(value) else value
+
+    if got is None or not points:
+        return False, "the frame is missing" if got is None else "no samples"
+    miss = None
+    for x, y in points:
+        a, want = px(got, x, y), at(pre, x, y)
+        if any(abs(a[c] - round(want[c])) > tolerance for c in channels):
+            miss = f"({x},{y}) {a} vs pre {shown(want)}"
+            break
+    x, y = points[len(points) // 2]
+    return miss is None, (f"measured {px(got, x, y)} at ({x},{y}), pre {shown(at(pre, x, y))}, "
+                          f"exact {shown(at(exact, x, y))}; {len(points)} samples, ±{tolerance} "
+                          f"on {'RGB'[channels[0]] if len(channels) == 1 else channels}; "
+                          f"{miss or 'all within pre'}")
+
+
+def mean_of(raw, points, channel):
+    if raw is None or not points:
+        return None
+    return sum(px(raw, x, y)[channel] for x, y in points) / len(points)
+
+
+def mean_luma(raw, points):
+    if raw is None or not points:
+        return None
+    return sum(luma(px(raw, x, y)) for x, y in points) / len(points)
+
+
+def linear_transition(doc, clip, **arguments):
+    """`add_transition` on `clip`, its curve then set linear; whether both
+    answered."""
+    if clip is None:
+        return False
+    made = doc.call("add_transition", clip=clip, **arguments)
+    return made["ok"] and doc.call("set_transition_style", clip=clip, curve="linear")["ok"]
+
+
+def d_project(client, name):
+    """A new project at the proof's canvas, background black; (doc, whether
+    it was made and sized, its first track's id)."""
+    path = WORK / f"{name}.reelcut"
+    made = attempt(client, "new_project", {"path": str(path)})
+    doc = Doc(client, path)
+    sized = canvas(doc, background=[0, 0, 0, 1])
+    return doc, made["ok"] and sized, (doc.tracks() or [{}])[0].get("id")
+
+
+def close(doc):
+    return attempt(doc.client, "close_project", {"project": str(doc.path), "discard": True})["ok"]
+
+
+def nest_halves(doc):
+    """The timeline's nest clips as sorted (start, duration, id, track)."""
+    return sorted((c["start"], c["duration"], c["id"], c.get("track"))
+                  for c in doc.project().get("clips") or []
+                  if (c.get("source") or {}).get("kind") == "nest")
+
+
+def split_dissolve(doc, clips, kind="cross_dissolve"):
+    """N7's construction: `clips` nested, the nest clip split at 1 s and a
+    0.5 s `kind` made from the first half's tail, linear. Whether every step
+    answered and the halves are [0, 1.5 s) and [1 s, 2 s)."""
+    if None in clips:
+        return False
+    nested = doc.call("nest", clips=clips)
+    first = nest_clip_of(doc)
+    split = doc.call("split", clips=[first], at=SEC) if first is not None else {"ok": False}
+    halves = nest_halves(doc)
+    second = halves[1][2] if len(halves) == 2 else None
+    dissolved = linear_transition(doc, second, kind=kind, duration=SEC // 2, align="after")
+    return (nested["ok"] and split["ok"] and dissolved
+            and [h[:2] for h in nest_halves(doc)] == [(0, SEC + SEC // 2), (SEC, SEC)])
+
+
+def trimmed_nest(doc, clips):
+    """`clips` nested and the nest clip trimmed to end at 1 s; (its id, its
+    track), or (None, None)."""
+    if None in clips or not doc.call("nest", clips=clips)["ok"]:
+        return None, None
+    halves = nest_halves(doc)
+    if len(halves) != 1 or not doc.call("trim_end", clip=halves[0][2], to=SEC)["ok"]:
+        return None, None
+    return halves[0][2], halves[0][3]
+
+
+def run_dr(client, state):
+    """Row DR: a timeline dissolve between two full cards — exact, and the
+    reference p at T_A and T_B."""
+    doc, ok, t1 = d_project(client, "DR")
+    red = placed_shape(doc, t1, FULL, RED, at=0, duration=SEC)
+    green = placed_shape(doc, t1, FULL, GREEN, at=SEC, duration=SEC)
+    dissolved = linear_transition(doc, green, duration=SEC // 2, align="after")
+    _, at_a = doc.frame("dr-a", t=T_A)
+    _, at_b = doc.frame("dr-b", t=T_B)
+    points = within(FULL, MARGIN, D_STEP)
+    fixture = ok and None not in (red, green, at_a, at_b) and dissolved
+    state["dr_fixture"] = fixture
+    p, sums = {}, []
+    for name, raw in (("A", at_a), ("B", at_b)):
+        if raw is not None:
+            p[name] = mean_of(raw, points, 1) / 255
+            sums += [px(raw, x, y)[0] + px(raw, x, y)[1] for x, y in points]
+    state["p"] = p if fixture else {}
+    exact = bool(sums) and all(abs(s - 255) <= 2 for s in sums)
+    g_a = 255 * p.get("A", 0)
+    check("DR CONTROL: a timeline dissolve between two full cards is exact (R + G = 255 ± 2 "
+          "at T_A and T_B) and gives p = G/255 (70 ≤ G ≤ 100 at T_A)",
+          fixture and exact and 70 <= g_a <= 100,
+          f"transition {dissolved}; p_A {p.get('A', 0):.4f} (G {g_a:.1f}), p_B "
+          f"{p.get('B', 0):.4f}; R + G {min(sums or [0])}…{max(sums or [0])} over "
+          f"{len(sums)} samples")
+    return close(doc)
+
+
+def run_d_split(client, state, row, kind):
+    """Rows D0 (`cross_dissolve`) and D8 (`zoom`): two full cards nested, the
+    nest clip split and dissolving into itself (N7's construction, no
+    matte), at T_A."""
+    doc, ok, t1 = d_project(client, row)
+    red = placed_shape(doc, t1, FULL, RED, at=0, duration=SEC)
+    green = placed_shape(doc, t1, FULL, GREEN, at=SEC, duration=SEC)
+    built = split_dissolve(doc, [red, green], kind)
+    _, got = doc.frame(row.lower(), t=T_A)
+    p = state["p"].get("A")
+    state[f"{row.lower()}_fixture"] = ok and built and p is not None
+    p = p or 0
+    if kind == "cross_dissolve":
+        good, line = claim(got, within(FULL, MARGIN, D_STEP),
+                           (255 * p, 255 * (1 - p) ** 2, None), (255 * p, 255 * (1 - p), 0),
+                           channels=(0, 1))
+        check("D0 a nest ↔ nest dissolve at T_A, today's picture: G = 255(1−p)², R = 255p "
+              "(exact: G = 255(1−p)); p from DR (±2)",
+              state["d0_fixture"] and good, f"p_A {p:.4f}; built {built}; {line}")
+    else:
+        z = 0.75 + 0.25 * p
+        box = (320 - 320 * z, 180 - 180 * z, 320 + 320 * z, 180 + 180 * z)
+        in_ok, in_line = claim(got, within(box, 4, D_STEP),
+                               (255 * p, 255 * (1 - p) ** 2, None),
+                               (255 * p, 255 * (1 - p), 0), channels=(0, 1))
+        out_ok, out_line = claim(got, clear_of([box], 4, D_STEP),
+                                 (0, 255 * (1 - p), None), (0, 255 * (1 - p), 0),
+                                 channels=(0, 1))
+        check("D8 a zoom between nest clips at T_A, today's picture: inside the in-box "
+              "G = 255(1−p)², R = 255p (exact: G = 255(1−p)); outside it G = 255(1−p), "
+              "R ≤ 2; p from DR (±2)",
+              state["d8_fixture"] and in_ok and out_ok,
+              f"p_A {p:.4f}, z_in {z:.4f}, in-box {tuple(round(v, 1) for v in box)}; built "
+              f"{built}\n       inside: {in_line}\n       outside: {out_line}")
+    return close(doc)
+
+
+def run_d1(client, state):
+    """Row D1 (#252): N7's construction under a `luma` matte track of two
+    overlapping grey windows, at T_A."""
+    doc, ok, t1 = d_project(client, "D1")
+    left, right = (40, 80, 400, 280), (240, 80, 600, 280)
+    red = placed_shape(doc, t1, FULL, RED, at=0, duration=SEC)
+    green = placed_shape(doc, t1, FULL, GREEN, at=SEC, duration=SEC)
+    t2 = doc.new_track()
+    w_left = placed_shape(doc, t2, left, grey(0.4), at=0, duration=SEC)
+    w_right = placed_shape(doc, t2, right, grey(0.8), at=SEC, duration=SEC)
+    doc.call("set_track", track=t1, hidden=True)
+    _, alone_i = doc.frame("d1-left", t=T)
+    _, alone_o = doc.frame("d1-right", t=SEC + T)
+    doc.call("set_track", track=t1, hidden=False)
+    m_i = mean_luma(alone_i, within(left, MARGIN, D_STEP))
+    m_o = mean_luma(alone_o, within(right, MARGIN, D_STEP))
+    set_ = doc.matte(t2, "luma")
+    built = split_dissolve(doc, [red, green, w_left, w_right])
+    _, got = doc.frame("d1", t=T_A)
+    p = state["p"].get("A")
+    fixture = ok and set_["ok"] and built and None not in (p, m_i, m_o)
+    state["d1_fixture"] = fixture
+    p, m_i, m_o = p or 0, m_i or 0, m_o or 0
+    overlap, right_only, left_only = (240, 80, 400, 280), (400, 80, 600, 280), (40, 80, 240, 280)
+    claims = [
+        ("overlap", claim(got, within(overlap, MARGIN, D_STEP),
+                          (255 * m_i * p ** 2, 255 * m_o * (1 - p) ** 2 * (1 - m_i * p ** 2),
+                           None),
+                          (255 * p * m_i, 255 * (1 - p) * m_o, 0), (0, 1), 3)),
+        ("right-only", claim(got, within(right_only, MARGIN, D_STEP),
+                             (None, 255 * m_o * (1 - p) ** 2, None),
+                             (0, 255 * (1 - p) * m_o, 0), (1,), 3)),
+        ("left-only", claim(got, within(left_only, MARGIN, D_STEP),
+                            (255 * m_i * p ** 2, None, None), (255 * p * m_i, 0, 0), (0,), 3)),
+        ("clear", claim(got, clear_of([left, right], MARGIN, D_STEP), (0, 0, 0), (0, 0, 0))),
+    ]
+    check("D1 a split nest clip dissolving under two soft windows at T_A, today's picture: "
+          "overlap G = 255·m_o(1−p)²(1 − m_i·p²), R = 255·m_i·p²; right-only G = "
+          "255·m_o(1−p)²; left-only R = 255·m_i·p² (±3); clear ≤ 2",
+          fixture and all(good for _, (good, _) in claims),
+          f"p_A {p:.4f}, m_i {m_i:.4f}, m_o {m_o:.4f}; matte {set_.get('error', 'ok')}; built "
+          f"{built}" + "".join(f"\n       {name}: {line}" for name, (_, line) in claims))
+    return close(doc)
+
+
+def run_d2(client, state):
+    """Row D2: a dissolve inside a nest, at T_C."""
+    doc, ok, t1 = d_project(client, "D2")
+    red = placed_shape(doc, t1, FULL, RED, at=0, duration=SEC)
+    green = placed_shape(doc, t1, FULL, GREEN, at=SEC, duration=SEC)
+    dissolved = linear_transition(doc, green, duration=SEC // 2)
+    _, u = doc.frame("d2-u", t=T_C)
+    points = within(FULL, MARGIN, D_STEP)
+    g = mean_of(u, points, 1)
+    nested = doc.call("nest", clips=[red, green]) if None not in (red, green) else {"ok": False}
+    halves = nest_halves(doc)
+    _, got = doc.frame("d2", t=T_C)
+    p = (g or 0) / 255
+    fixture = (ok and dissolved and nested["ok"] and len(halves) == 1 and halves[0][0] == 0
+               and g is not None and 0.1 < p < 0.9)
+    state["d2_fixture"] = fixture
+    good, line = claim(got, points, (255 * (1 - p) ** 2, 255 * p, None),
+                       lambda x, y: px(u, x, y), channels=(0, 1))
+    check("D2 a dissolve inside a nest at T_C, today's picture: R = 255(1−p)², G = 255p "
+          "(exact: U's bytes); p from the un-nested frame U (±2)",
+          fixture and good, f"p {p:.4f}; nest {nested.get('error', 'ok')}; {line}")
+    return close(doc)
+
+
+def run_d3(client, state):
+    """Row D3: a nest clip under a soft inner matte dissolving into a plain
+    card, at T_A."""
+    doc, ok, t1 = d_project(client, "D3")
+    green = placed_shape(doc, t1, FULL, GREEN)
+    t2 = doc.new_track()
+    matte = placed_shape(doc, t2, FULL, grey(0.4))
+    doc.call("set_track", track=t1, hidden=True)
+    _, alone = doc.frame("d3-grey")
+    doc.call("set_track", track=t1, hidden=False)
+    points = within(FULL, MARGIN, D_STEP)
+    m_o = mean_luma(alone, points)
+    set_ = doc.matte(t2, "luma")
+    group, track = trimmed_nest(doc, [green, matte])
+    b = placed_shape(doc, track, FULL, RED, at=SEC, duration=SEC) if track is not None else None
+    dissolved = linear_transition(doc, b, duration=SEC // 2, align="after")
+    halves = nest_halves(doc)
+    _, got = doc.frame("d3", t=T_A)
+    p = state["p"].get("A")
+    fixture = (ok and set_["ok"] and group is not None and dissolved
+               and [h[:2] for h in halves] == [(0, SEC + SEC // 2)] and None not in (p, m_o))
+    state["d3_fixture"] = fixture
+    p, m_o = p or 0, m_o or 0
+    good, line = claim(got, points, (255 * p, 255 * m_o * (1 - p) ** 2 / (1 - p * m_o), None),
+                       (255 * p, 255 * (1 - p) * m_o, 0), channels=(0, 1))
+    check("D3 a nest clip under a soft inner matte dissolving into a plain card at T_A, "
+          "today's picture: G = 255·m_o(1−p)²/(1 − p·m_o), R = 255p (exact: G = "
+          "255(1−p)m_o); p from DR (±2)",
+          fixture and good, f"p_A {p:.4f}, m_o {m_o:.4f}; halves {halves}; {line}")
+    return close(doc)
+
+
+def run_d4(client, state):
+    """Row D4: a plain card dissolving into a nest clip, at T_A."""
+    doc, ok, t1 = d_project(client, "D4")
+    red = placed_shape(doc, t1, FULL, RED, at=0, duration=SEC)
+    green = placed_shape(doc, t1, FULL, GREEN, at=SEC, duration=SEC)
+    nested = doc.call("nest", clips=[green]) if green is not None else {"ok": False}
+    group = nest_clip_of(doc)
+    dissolved = linear_transition(doc, group, duration=SEC // 2, align="after")
+    red_now = next((c for c in doc.project().get("clips") or [] if c["id"] == red), {})
+    _, got = doc.frame("d4", t=T_A)
+    p = state["p"].get("A")
+    fixture = (ok and red is not None and nested["ok"] and dissolved
+               and (red_now.get("start"), red_now.get("duration")) == (0, SEC + SEC // 2)
+               and p is not None)
+    state["d4_fixture"] = fixture
+    p = p or 0
+    good, line = claim(got, within(FULL, MARGIN, D_STEP),
+                       (255 * (1 - p) ** 2, 255 * p, None), (255 * (1 - p), 255 * p, 0),
+                       channels=(0, 1))
+    check("D4 a plain card dissolving into a nest clip at T_A, today's picture: R = "
+          "255(1−p)², G = 255p (exact: R = 255(1−p)); p from DR (±2)",
+          fixture and good, f"p_A {p:.4f}; nest {nested.get('error', 'ok')}; {line}")
+    return close(doc)
+
+
+def run_d5(client, state):
+    """Row D5: a nest clip of two overlapping layers dissolving into a red
+    rectangle, at T_A."""
+    doc, ok, t1 = d_project(client, "D5")
+    white_box, b_box = (400, 120, 600, 240), (0, 0, 320, 360)
+    blue = placed_shape(doc, t1, FULL, BLUE)
+    t2 = doc.new_track()
+    white = placed_shape(doc, t2, white_box, WHITE)
+    group, track = trimmed_nest(doc, [blue, white])
+    b = placed_shape(doc, track, b_box, RED, at=SEC, duration=SEC) if track is not None else None
+    dissolved = linear_transition(doc, b, duration=SEC // 2, align="after")
+    halves = nest_halves(doc)
+    _, got = doc.frame("d5", t=T_A)
+    p = state["p"].get("A")
+    fixture = (ok and group is not None and dissolved
+               and [h[:2] for h in halves] == [(0, SEC + SEC // 2)] and p is not None)
+    state["d5_fixture"] = fixture
+    p = p or 0
+    in_white = claim(got, within(white_box, MARGIN, D_STEP),
+                     (255 * (1 - p), 255 * (1 - p), 255 * (1 - p) + 255 * p * (1 - p)),
+                     (255 * (1 - p),) * 3)
+    in_b = claim(got, within(b_box, MARGIN, D_STEP), (255 * p, None, 255 * (1 - p)),
+                 (255 * p, 0, 255 * (1 - p)), channels=(0, 2))
+    check("D5 overlapping layers in a nested half at T_A, today's picture: in the white box "
+          "R = G = 255(1−p), Blue = 255(1−p) + 255p(1−p) (exact: all 255(1−p)); inside B "
+          "R = 255p, Blue = 255(1−p); p from DR (±2)",
+          fixture and in_white[0] and in_b[0],
+          f"p_A {p:.4f}; halves {halves}\n       white box: {in_white[1]}\n       inside B: "
+          f"{in_b[1]}")
+    return close(doc)
+
+
+def run_d6(client, state):
+    """Row D6: a dissolve between two luma matte clips inside a nest, at
+    T_C."""
+    doc, ok, t1 = d_project(client, "D6")
+    white = placed_shape(doc, t1, FULL, WHITE)
+    t2 = doc.new_track()
+    g_a = placed_shape(doc, t2, FULL, grey(0.4), at=0, duration=SEC)
+    g_b = placed_shape(doc, t2, FULL, grey(0.8), at=SEC, duration=SEC)
+    dissolved = linear_transition(doc, g_b, duration=SEC // 2)
+    points = within(FULL, MARGIN, D_STEP)
+    doc.call("set_track", track=t1, hidden=True)
+    _, alone_a = doc.frame("d6-a", t=T)
+    _, alone_b = doc.frame("d6-b", t=SEC + T)
+    doc.call("set_track", track=t1, hidden=False)
+    m_a, m_b = mean_luma(alone_a, points), mean_luma(alone_b, points)
+    set_ = doc.matte(t2, "luma")
+    _, u = doc.frame("d6-u", t=T_C)
+    m = mean_luma(u, points)
+    nested = (doc.call("nest", clips=[white, g_a, g_b]) if None not in (white, g_a, g_b)
+              else {"ok": False})
+    halves = nest_halves(doc)
+    _, got = doc.frame("d6", t=T_C)
+    usable = None not in (m_a, m_b, m) and abs((m_b or 0) - (m_a or 0)) > 0.1
+    p = (m - m_a) / (m_b - m_a) if usable else 0
+    fixture = (ok and dissolved and set_["ok"] and nested["ok"] and len(halves) == 1
+               and halves[0][0] == 0 and usable and 0.1 < p < 0.9)
+    state["d6_fixture"] = fixture
+    level = 255 * ((m_b or 0) * p + (m_a or 0) * (1 - p) ** 2)
+    good, line = claim(got, points, (level,) * 3, lambda x, y: px(u, x, y), tolerance=3)
+    check("D6 a matte dissolve inside a nest at T_C, today's picture: every channel = "
+          "255·(m_b·p + m_a(1−p)²) (exact: U's bytes); p from the un-nested frame U (±3)",
+          fixture and good,
+          f"m_a {m_a or 0:.4f}, m_b {m_b or 0:.4f}, m {m or 0:.4f}, p {p:.4f}; nest "
+          f"{nested.get('error', 'ok')}; {line}")
+    return close(doc)
+
+
+def run_d7(client, state):
+    """Row D7: a dissolve inside a nest clip that is itself dissolving into a
+    blue card, at T_B."""
+    doc, ok, t1 = d_project(client, "D7")
+    red = placed_shape(doc, t1, FULL, RED, at=0, duration=SEC)
+    green = placed_shape(doc, t1, FULL, GREEN, at=SEC, duration=SEC)
+    inner = linear_transition(doc, green, duration=SEC // 2)
+    points = within(FULL, MARGIN, D_STEP)
+    _, u = doc.frame("d7-u", t=T_B)
+    g = mean_of(u, points, 1)
+    group, track = trimmed_nest(doc, [red, green])
+    blue = placed_shape(doc, track, FULL, BLUE, at=SEC, duration=SEC) \
+        if track is not None else None
+    outer = linear_transition(doc, blue, duration=SEC // 2, align="after")
+    halves = nest_halves(doc)
+    _, got = doc.frame("d7", t=T_B)
+    p_i, p_o = (g or 0) / 255, state["p"].get("B")
+    fixture = (ok and inner and group is not None and outer
+               and [h[:2] for h in halves] == [(0, SEC + SEC // 2)] and g is not None
+               and 0.1 < p_i < 0.9 and p_o is not None)
+    state["d7_fixture"] = fixture
+    p_o = p_o or 0
+    good, line = claim(got, points,
+                       (255 * (1 - p_i) ** 2 * (1 - p_o), 255 * p_i * (1 - p_o), 255 * p_o),
+                       (255 * (1 - p_o) * (1 - p_i), 255 * (1 - p_o) * p_i, 255 * p_o))
+    check("D7 a dissolve inside a dissolving nested half at T_B, today's picture: R = "
+          "255(1−p_i)²(1−p_o), G = 255·p_i(1−p_o), Blue = 255p_o (exact: R = "
+          "255(1−p_o)(1−p_i)); p_i from the un-nested frame, p_o from DR (±2)",
+          fixture and good, f"p_i {p_i:.4f}, p_o {p_o:.4f}; halves {halves}; {line}")
+    return close(doc)
+
+
+def run_d(client, state):
+    """Rows DR and D0–D8. DR's project always runs: it is every other row's
+    p. Answers whether every project closed."""
+    closed = run_dr(client, state)
+    for name, run in (("D0", lambda: run_d_split(client, state, "D0", "cross_dissolve")),
+                      ("D1", lambda: run_d1(client, state)),
+                      ("D2", lambda: run_d2(client, state)),
+                      ("D3", lambda: run_d3(client, state)),
+                      ("D4", lambda: run_d4(client, state)),
+                      ("D5", lambda: run_d5(client, state)),
+                      ("D6", lambda: run_d6(client, state)),
+                      ("D7", lambda: run_d7(client, state)),
+                      ("D8", lambda: run_d_split(client, state, "D8", "zoom"))):
+        if name in selected:
+            closed = run() and closed
+    return closed
+
+
 def tail(log, count=4):
     try:
         lines = [line.rstrip() for line in open(log, errors="replace")]
@@ -1360,6 +1828,8 @@ def main():
                 closed = run_e(launched.client, state) and closed
             if "F1" in selected:
                 closed = run_f(launched.client, log, state) and closed
+            if selected & D_ROWS:
+                closed = run_d(launched.client, state) and closed
         except Exception as error:  # a row that could not run is a failure
             print(f"  instrument error: {type(error).__name__}: {error}", flush=True)
             closed = False

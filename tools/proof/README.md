@@ -17113,3 +17113,57 @@ C0 noise floor 0.002 ms at 1080p and 0.001 ms at 4K; VT's S1 overhead over V0
 0.013 ms at 1080p (0.120 against 0.108 ms) and 0.054 ms at 4K (0.442 against
 0.388 ms); S3 − S2 0.033 ms and 0.070 ms, S4 − S2 0.154 ms and 0.549 ms
 (1080p, 4K), within 0.50 / 2.00 ms. The table is `designs/adr/mattes.md`'s.
+
+## Mattes follow-up B90 — nested dissolves and zooms measured (`matte_proof.py` DR, D0–D8)
+
+**What it answers.** What a `cross_dissolve` or `zoom` with a nested half
+draws TODAY, before #252's fix (issue batch B90 phase 1; no product code
+changed). Each D row asserts its pre-fix prediction ("pre", from the full
+formula in the module docstring of `matte_proof.py`)
+and prints the exact mix beside it: nest ↔ nest (D0), N7's split nest under
+two soft luma windows (D1), a dissolve inside a nest (D2), nest → plain under
+a soft inner matte (D3), plain → nest (D4), overlapping layers in a nested
+half (D5), a matte dissolve inside a nest (D6), a dissolve inside a
+dissolving half (D7) and a zoom between nest clips (D8). DR is the control: a
+timeline pair is exact (R + G = 255 ± 2) and gives p at T_A and T_B, so no
+row reads p off its own frame (D2, D6 and D7's inner p come from the row's own
+un-nested frame). Every transition is linear; each row is its own project,
+background black, closed at the end. Phase 4 switches the rows to the exact
+mix.
+
+```
+python3 tools/proof/matte_proof.py --only DR,D0,D1,D2,D3,D4,D5,D6,D7,D8,Z1
+python3 tools/proof/matte_proof.py --mutant dissolve-cover-everywhere --only DR,D0,D1,D2,D4,D5,D6,D7,D8,Z1
+```
+
+It runs as MT2's section says (its own instance, scratch home, no menu item,
+every project closed). DR's project runs whenever any D row is selected.
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `dissolve-cover-everywhere` | the outgoing half with no partner box takes its own cover (`… : matteCover;`) | D0 D1 D2 D4 D5 D6 D7 D8 (zoom shares the branch) |
+
+**Its record** (2026-10-08): on Debug, DR, D0–D8 and Z1 11/11, every
+prediction held at the first run; the mutant exit 0, D0 D1 D2 D4 D5 D6 D7
+D8 all FAILED (under it D0, D2, D4, D6 and D7 read the exact mix: (85, 170,
+0), (170, 85, 0), (170, 85, 0), 136 and (54, 150, 51)). `make gate` PASS.
+Recorded on the gate's Release build (`RC_PROOF_APP=release`)
+`matte_proof.py` whole 46/46 (E3 ran). DR: p_A 0.3333 (G 85.0), p_B 0.2000,
+R + G 255 at all 1840 samples. Measured at the middle sample, against pre and
+exact:
+
+| Row | Case | Measured (R, G, B) | Pre | Exact |
+|---|---|---|---|---|
+| D0 | nest ↔ nest, T_A | (85, 113, 0) | G 113.3 | G 170.0 |
+| D1 | overlap, T_A (m_i 0.4, m_o 0.8) | (11, 87, 0) | (11.3, 86.6) | (34.0, 136.0) |
+| D1 | right-only | (0, 91, 0) | G 90.7 | G 136.0 |
+| D1 | left-only | (11, 0, 0) | R 11.3 | R 34.0 |
+| D2 | inside a nest, T_C (p 0.3333) | (113, 85, 0) | R 113.3 | R 170.0 |
+| D3 | nest → plain, m_o 0.4, T_A | (85, 52, 0) | G 52.3 | G 68.0 |
+| D4 | plain → nest, T_A | (113, 85, 0) | R 113.3 | R 170.0 |
+| D5 | white box, T_A | (170, 170, 227) | Blue 226.7 | Blue 170.0 |
+| D5 | inside B | (85, 0, 170) | (85.0, ·, 170.0) | the same |
+| D6 | matte dissolve in a nest, T_C (p 0.3333) | (113, 113, 113) | 113.3 | 136.0 |
+| D7 | p_i 0.7333, p_o 0.2000, T_B | (14, 150, 51) | (14.5, 149.6, 51.0) | (54.4, 149.6, 51.0) |
+| D8 | zoom, in-box (z_in 0.8333) | (85, 113, 0) | G 113.3 | G 170.0 |
+| D8 | zoom, outside the in-box | (0, 170, 0) | G 170.0 | G 170.0 |

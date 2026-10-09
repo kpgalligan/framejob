@@ -56,7 +56,13 @@ The budget was 0.50 ms at 1080p and 2.00 ms at 4K (MT0's figures, with V1 0.014 
 
 - **At 4K every unmatted full-bleed layer pays about 0.05 ms for the placeholder sample** (MT-6's accepted risk; 0.054 ms in the tree).
 - **A nest clip's soft-edged matted layers show through each other**, the recorded limit of nest opacity (§7.3, MT-5).
-- **A dissolve between two nest clips cut by different mattes** weighs the outgoing half by its own coverage, which is exact only where the two coverages agree (N7 claims channel isolation, not the weights). #252.
+- **A dissolve or zoom with a nested half is not an exact mix** (#252), measured by `matte_proof.py` DR and D0–D8 (issue batch B90 phase 1; p = 1/3 unless named; measured against the exact mix):
+  - A nested layer's partner is refused by `partnerBox` (every nested layer has a `clip_rect`) or names a nest clip, which is never a layer. So the outgoing half dips to (1−p)²: nest ↔ nest G 113 for 170 (D0), a dissolve inside a nest R 113 for 170 (D2), plain → nest R 113 for 170 (D4), a zoom between nest clips G 113 for 170 inside the incoming box (D8).
+  - Nest → plain weighs the plain partner's cover by the nest's own coverage: under a 0.4 inner luma matte G 52 for 68 (D3).
+  - A matte inside a dissolving nest clip fades with it: under two soft windows G 87 for 136 and R 11 for 34 (D1); a matte dissolve inside a nest 113 for 136 (D6).
+  - A half's overlapping inner layers show through each other: Blue 227 for 170 (D5).
+  - A dissolve inside a dissolving half dips as D2's does, the inner transition hiding the enclosing one: R 14 for 54 (D7, p_i 0.733, p_o 0.2).
+  - A timeline pair is exact (DR: R + G = 255 at all 1840 samples).
 - **The matte pool has no cap**: each matte drawn in a frame holds a destination-sized target (33.2 MB at 4K). #253.
 - **The coverage is r8.** The matte's own target is bgra8, so the luma it yields is already 8-bit and r8 adds at most one rounding (L1 holds a gradient matte to ±1). Whether that reads as banding to an eye is MAT-1.
 - **Video as an input to a graphic is #251**, iceboxed; nothing here decides it.
@@ -64,6 +70,13 @@ The budget was 0.50 ms at 1080p and 2.00 ms at 4K (MT0's figures, with V1 0.014 
 ## Open items
 
 - #252 and #253, filed at the close, and the owner's MAT-1 and MAT-2.
+
+## Follow-ups (issue batch B90)
+
+- **Phase 1, the pre-fix measurement (#252; 2026-10-08).** No product code changed.
+  - `matte_proof.py` gained DR (a control) and D0–D8, one row per nested-dissolve case, D8 the zoom. Each asserts today's picture from its full formula and prints the exact mix beside it. p comes from DR or from the row's own un-nested frame, never from the row's own frame.
+  - Every prediction held at the first run, with DR exact. Scores: Debug 11/11 (DR, D0–D8, Z1); `make gate` PASS; recorded on the gate's Release build, `matte_proof.py` whole 46/46 (E3 ran). The figures are in the Known-limits bullet above and in `tools/proof/README.md`'s "Mattes follow-up B90" section.
+  - One mutant, `dissolve-cover-everywhere` (an outgoing half with no partner box takes its own cover), was caught: D0 D1 D2 D4 D5 D6 D7 D8 failed. Under it D0, D2, D4, D6 and D7 read the exact mix, so their dip is the missing partner correction alone.
 
 ## Where to look in the original
 
