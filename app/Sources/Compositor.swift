@@ -914,7 +914,9 @@ final class MetalRenderer {
             let size = layer.sourceSizeCG
                 ?? (orientation & 1 != 0
                     ? CGSize(width: coded.height, height: coded.width) : coded)
-            return .textured(texture, size, premultiplied: false, orientation: orientation)
+            return .textured(
+                texture, size, premultiplied: Self.declaresPremultipliedAlpha(buffer),
+                orientation: orientation)
         case .image(let media):
             guard let url = instruction?.mediaURLs[media],
                 let rendered = renderers.image(url: url, media: media)

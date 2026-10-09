@@ -10,20 +10,26 @@ import AVFoundation
 /// that `Playback` plays and `Exporter.renderFrame` samples — the custom
 /// `Compositor` runs here exactly as it does on screen, from the same frame
 /// recipes, through the same `RecipeSource` slot, and so do the audio mix's
-/// processing taps (`addAudioOutput`). Nothing in this file draws a pixel; it moves
-/// what AVFoundation composed into an encoder and adds the three things a
-/// preset name cannot express: a chapter track, explicit bitrates, and an
-/// output size the sheet actually promised.
+/// processing taps (`addAudioOutput`). Nothing in this file draws a pixel;
+/// beyond the alpha rows' straightening (below), it moves what AVFoundation
+/// composed into an encoder and adds the three things a preset name cannot
+/// express: a chapter track, explicit bitrates, and an output size the sheet
+/// actually promised.
 ///
-/// **The one sample it touches** is the loudness normalisation's gain,
-/// applied here because this is where the export's samples exist: it is
-/// export-only by definition, so the preview and the file still share one
-/// description of the sound (the mix, the ramps and the taps) and differ only
-/// by a number the export was asked for. `Exporter` measured that number a
-/// moment earlier from a float read of the mix; a gained export reads the
-/// same float mix and `ExportAudioGain` multiplies and quantises it once to
-/// the 16-bit format every encoder here takes (spec §11 #86). An export with
-/// no gain reads the 16-bit decode it always read.
+/// **The two samples it touches** are made here because this is where the
+/// export's samples exist, and both are export-only by definition. One is
+/// the loudness normalisation's gain: the preview and the file still share
+/// one description of the sound (the mix, the ramps and the taps) and differ
+/// only by a number the export was asked for. `Exporter` measured that
+/// number a moment earlier from a float read of the mix; a gained export
+/// reads the same float mix and `ExportAudioGain` multiplies and quantises it
+/// once to the 16-bit format every encoder here takes (spec §11 #86). An
+/// export with no gain reads the 16-bit decode it always read. The other is
+/// the alpha movie rows' picture (`prores_4444`, `hevc_alpha`): the
+/// compositor's premultiplied frame is un-premultiplied, its transparent
+/// pixels' colour filled from the nearest visible one, and labelled
+/// straight (`ExportStraightAlpha`, spec §11 G-35); every other row's frame
+/// goes to the encoder as the compositor drew it.
 ///
 /// **Why the read is a reader and not a second render.** The alternative —
 /// driving the compositor by hand over an `AVAssetImageGenerator`, one frame
@@ -95,6 +101,11 @@ final class ExportWriter {
     /// by `start` and then only on `audioQueue`. Not under the lock for that
     /// reason and no other.
     private var audioGain: ExportAudioGain?
+
+    /// Whether the video pump straightens each frame (spec §11 G-35): the
+    /// row's `alpha`, set once by `addVideo` in `init` and read only by
+    /// `start`.
+    private var straightensAlpha = false
 
     /// Builds the reader, the writer and every track, or throws the
     /// `Exporter.ExportError` the sheet should show. Nothing is read or
@@ -176,6 +187,9 @@ final class ExportWriter {
                 kCVPixelBufferMetalCompatibilityKey as String: true,
             ])
         output.videoComposition = Self.videoComposition(built, settings: settings)
+        // AVFoundation's default, kept explicit: `ExportStraightAlpha` rewrites an
+        // alpha row's frame in place, which is safe only on the reader's own copy.
+        output.alwaysCopiesSampleData = true
         guard reader.canAdd(output) else {
             throw Exporter.ExportError.failed(
                 "The composition could not be read for export.")
@@ -191,6 +205,7 @@ final class ExportWriter {
         writer.add(input)
         videoOutput = output
         videoInput = input
+        straightensAlpha = settings.alpha
     }
 
     /// The audio half: every composition audio track through the plan's mix.
@@ -295,7 +310,9 @@ final class ExportWriter {
 
         let group = DispatchGroup()
         if let input = videoInput, let output = videoOutput {
-            pump(input, from: output, on: videoQueue, group: group, tracksProgress: true)
+            pump(
+                input, from: output, on: videoQueue, group: group, tracksProgress: true,
+                straightAlpha: straightensAlpha)
         }
         if let input = audioInput, let output = audioOutput {
             // Audio drives the bar only when there is no picture to drive it,
@@ -353,9 +370,12 @@ final class ExportWriter {
     /// `gain` is nil for every pump but the audio one, and nil for the audio
     /// one too unless the export asked to be normalised — which is what
     /// keeps an ordinary export on exactly the samples it had before.
+    /// `straightAlpha` is true only for the video pump of an alpha row: each
+    /// frame is then straightened and labelled (`ExportStraightAlpha`).
     private func pump(
         _ input: AVAssetWriterInput, from output: AVAssetReaderOutput, on queue: DispatchQueue,
-        group: DispatchGroup, tracksProgress: Bool, gain: ExportAudioGain? = nil
+        group: DispatchGroup, tracksProgress: Bool, gain: ExportAudioGain? = nil,
+        straightAlpha: Bool = false
     ) {
         group.enter()
         var finished = false
@@ -403,7 +423,17 @@ final class ExportWriter {
                     stop()
                     return
                 }
-                guard let rebased = Self.retimed(sample, by: self.range.start) else {
+                // An alpha row's frame, un-premultiplied and labelled straight
+                // (spec §11 G-35), before `retimed`; any other goes on as read.
+                guard let ready = straightAlpha ? ExportStraightAlpha.straighten(sample) : sample
+                else {
+                    self.stopped(
+                        with: Exporter.ExportError.failed(
+                            "A frame's transparency could not be written straight."))
+                    stop()
+                    return
+                }
+                guard let rebased = Self.retimed(ready, by: self.range.start) else {
                     self.stopped(
                         with: Exporter.ExportError.failed(
                             "A sample could not be re-timed for the file."))

@@ -166,7 +166,8 @@ struct LayerUniforms {
     float transitionIncoming;   // 1 = role "in", 0 = role "out"
     float transitionDirX;       // push/slide/wipe direction, unit vector
     float transitionDirY;
-    float premultiplied;        // 1 for text/shape/image textures
+    float premultiplied;        // 1 for text/shape/image/graphic textures, and a
+                                // video frame labelled PremultipliedAlpha (G-35)
     float slate;                // 1 = missing media, ignore the texture
     // A video track's frames arrive in the source's CODED orientation, while
     // the model measures the DISPLAY size (§7.7). These turn the sampling
@@ -543,9 +544,10 @@ static inline LayerSample layerSample(texture2d<float> source, sampler samp,
     float4 texel = source.sample(
         samp, orientedUV(uv, u.sourceQuarterTurns, u.sourceMirrored));
     // Text, shape and image textures arrive PREMULTIPLIED (that is what
-    // LayerRenderers hands over, and what this stage outputs); video frames
-    // arrive straight. Every effect wants straight colour, so undo the
-    // premultiply here and redo it once at the end of the fragment.
+    // LayerRenderers hands over, and what this stage outputs); a video frame
+    // is premultiplied only when its buffer is labelled so, and straight
+    // otherwise (spec §11 G-35 (b)). Every effect wants straight colour, so
+    // undo the premultiply here and redo it once at the end of the fragment.
     float3 rgb = u.premultiplied > 0.5 ? texel.rgb / max(texel.a, 1e-4) : texel.rgb;
     return gradeSample(rgb, texel.a, u);
 }

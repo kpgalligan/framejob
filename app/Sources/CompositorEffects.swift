@@ -396,6 +396,18 @@ extension MetalRenderer {
         }
         return PreparedLayer(uniforms: uniforms, texture: texture)
     }
+
+    /// True only when the buffer's `kCVImageBufferAlphaChannelModeKey`
+    /// attachment equals `kCVImageBufferAlphaChannelMode_PremultipliedAlpha`;
+    /// absent or anything else is straight (spec §11 G-35 (b)). Asked of each
+    /// video frame, so a premultiplied movie — another app's, or an
+    /// `hevc_alpha` export from before G-35 — is divided by its alpha once,
+    /// in `layerSample`, and an unlabelled one draws as it always did.
+    static func declaresPremultipliedAlpha(_ buffer: CVPixelBuffer) -> Bool {
+        guard let mode = CVBufferCopyAttachment(buffer, kCVImageBufferAlphaChannelModeKey, nil)
+        else { return false }
+        return CFEqual(mode, kCVImageBufferAlphaChannelMode_PremultipliedAlpha)
+    }
 }
 
 /// What `MetalRenderer.prepare` hands `render`: a layer's uniform block and

@@ -1422,6 +1422,8 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   AAC in a `.mov` is a combination no row wrote before: the file holds an
   `aac` stream at 48 kHz with 2 channels, and the export's loudness is
   measured as on every row (A5).
+  (Amended by G-35 (e): the row's frames are un-premultiplied before the
+  encoder and the key says `StraightAlpha`.)
   (e) **Hardware, and a Mac without the encoder.** This host lists "Apple
   Muxed Alpha-Apple HEVC (HW)" and "(SW)"; with hardware disabled the file
   still carries alpha (largest error 6). The row is always listed. A
@@ -1684,3 +1686,140 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   that frame's value. A prop that a later revision renames or drops stays
   in the end, and the engine passes it through with a warning. `kinds`
   goes stale only if a module changes a prop's type.
+- **G-35 — A video frame is composited as premultiplied only when its
+  buffer says so, and every other frame, an unlabelled one included, as
+  straight; the two alpha movie rows are written STRAIGHT — each frame
+  un-premultiplied, its transparent pixels' colour filled from the
+  nearest visible pixel within 4 px, and labelled `StraightAlpha` —
+  so a re-imported export composites to the right colour; amends G-33
+  (d) and the reader sentence of G-33 (h)** (issue #242, 2026-10-09,
+  issue batch B92, phase 2).
+  (a) **Whose choice.** #242 offered two ways, reading the declared mode
+  on import or un-premultiplying before encoding. The owner, 2026-10-09:
+  "I think we should do both. Compensate for other apps, but export
+  straight." And: "We're not using Reelcut in any real work yet, so we
+  don't generally need to worry about old files."
+  (b) **Import.** `Compositor.swift`'s track source asks
+  `MetalRenderer.declaresPremultipliedAlpha` about each frame
+  `request.sourceFrame(byTrackID:)` hands it: true only when the
+  buffer's `kCVImageBufferAlphaChannelModeKey` attachment equals
+  `kCVImageBufferAlphaChannelMode_PremultipliedAlpha`; absent or anything
+  else is straight, so an unlabelled movie draws as it always did. The
+  answer is the layer's existing `premultiplied` uniform, which
+  `layerSample` already divides by, as it does for a text, shape, image or
+  graphic texture: no uniform and no shader code changes. It is asked per
+  BUFFER, not per file: the decoder attaches the mode to the frames it
+  hands over ((f)), and no format description is read for it (a
+  synchronous `formatDescriptions` would be a fifth deprecation, and
+  `async` stays where W-8 put it). This fixes a premultiplied movie from
+  another application (After Effects, Motion) as well as an `hevc_alpha`
+  file made before this entry.
+  (c) **Export.** On the two rows `ExportWriter` writes whose `alpha` is
+  true — `prores_4444` and `hevc_alpha`; `apng` is `ImageSequenceWriter`'s
+  and is unchanged — the video pump straightens each frame after the
+  reader hands it over and before it is re-timed
+  (`ExportStraightAlpha.straighten`): in place on the reader's own copy of
+  the 32BGRA buffer, every pixel with a > 0 becomes
+  c' = min(255, (c·255 + ⌊a/2⌋) / a) in integers, and the buffer is
+  wrapped in a new sample whose format description is made from it. The
+  division is exact for 8 bits: re-premultiplying with (s·a + 127) / 255
+  gives back c for every one of the 32,895 pairs 0 ≤ c ≤ a, a in 1…255
+  (R0, (f)). The rows are split over `DispatchQueue.concurrentPerform`
+  inside the video pump. A frame that cannot be straightened (not
+  32BGRA, not lockable, no sample made) stops the export with "A frame's
+  transparency could not be written straight."
+  (d) **The fill.** Un-premultiplied, a transparent pixel is black at
+  alpha 0, and a codec that subsamples colour (HEVC's 4:2:0) or a scaler
+  that resamples the frame (the writer's own, at a size off the canvas)
+  can carry that black into a half-transparent edge pixel beside it: a
+  dark fringe on a straight file. So a pixel with a = 0 within Chebyshev distance
+  `ExportStraightAlpha.bleedRadius` = 4 px of a pixel with a > 0 takes
+  that pixel's straightened colour — the nearest by dx² + dy², a tie
+  going to the first in row-major order — and keeps alpha 0; every other
+  a = 0 pixel is left as it was. The fill reads only pixels with a > 0,
+  which it never writes, so in place is race-free. A band of rows with no
+  visible pixel within 4 rows is skipped whole. The fill changes no alpha
+  and no visible pixel, so a reader that composites straight colour by
+  its alpha draws the same picture with or without it; what it changes is
+  the colour the codec averages into an edge ((f), F1).
+  (e) **The labels.** Each straightened buffer carries
+  `kCVImageBufferAlphaChannelModeKey` = `StraightAlpha`
+  (`.shouldPropagate`), which the ProRes 4444 encoder writes into its
+  file, and `hevc_alpha`'s `kVTCompressionPropertyKey_AlphaChannelMode`
+  is `kVTAlphaChannelMode_StraightAlpha` where G-33 (d) set
+  `PremultipliedAlpha`. Decoded, either row's frame reads `StraightAlpha`
+  (M1).
+  (f) **The figures** (2026-10-09, Apple M2 Max, macOS 26.5.1, ffmpeg
+  9.0.2; `tools/proof/hevc_alpha_proof.py` on the gate's Release build,
+  39/39 with the phase review's F2 and Q1, and its mutants on Debug copies; the probe is
+  `tools/proof/alpha_mode_probe.swift`). **I1:** FAINT's half-opaque red
+  card, re-imported over an opaque white canvas, composites (255,128,128)
+  from the `prores_4444` file and (255,127,127) from the `hevc_alpha` one,
+  where G-33 (h) recorded (193,129,127) and (191,127,127); the files' own
+  centres decode (255,0,0,129) and (255,0,0,128) (A2's is the second).
+  **M1:** the first decoded frame of either file reads `StraightAlpha`,
+  and so does its track's format description. **T1:** the probe's
+  premultiplied (128,0,0,128) card labelled `PremultipliedAlpha` — a
+  third-party writer's file, decoding (129,1,0,128) from ProRes 4444 and
+  (128,0,0,128) from HEVC with alpha, both labelled `PremultipliedAlpha`
+  — composites (255,129,127) and (255,127,127); with the helper answering
+  false (mutant `import-straight`) the same files composite (193,129,127)
+  and (191,127,127). So the decoder's attachment reaches
+  `request.sourceFrame(byTrackID:)`. **T2:** an unlabelled (255,0,0,128)
+  ProRes 4444 card decodes `StraightAlpha` and composites (255,128,128).
+  **F1:** a red 200 × 200 disc on a clear canvas, exported, re-imported over
+  white and compared with the same disc drawn on white over all 230,400
+  pixels: the largest channel difference is 1 on `prores_4444` and 18 on
+  `hevc_alpha` (2 pixels over 10). Without the fill (mutant `no-bleed`) it
+  is 2 and 100 (324 pixels over 10 on `hevc_alpha`, the worst (155,31,30)
+  against (255,3,3)): at the document size the fill is what keeps an
+  HEVC edge from darkening, and ProRes 4444's 4:4:4 colour does not need
+  it. **F2** (off the canvas's size, through the writer's scaling): the
+  same disc exported at `720p` (1280 × 720, ×2) and re-imported over white
+  at that size, where a red disc keeps red at 255 at every pixel: red falls
+  at most 0 on `prores_4444` and 2 on `hevc_alpha`; without the fill 26 and
+  45 — a scaled export needs the fill on BOTH rows. Against the same disc
+  on white exported at `720p` as `prores_4444` (an opaque frame through the
+  same scaler) the edge differs by up to 73 and 75 in a ring of about
+  3,100 pixels, which is not a fringe: the scaler resamples a frame's
+  alpha apart from its colour, and down column 640 the alpha file's top
+  edge reads alpha 51, 203, 255 where the opaque file's coverage reads
+  0.09, 0.51, 1 — the alpha edge sits about a third of a pixel outside the
+  opaque one. **Q1:** the first cached thumbnail — the JPEG
+  `AVAssetImageGenerator` and CoreGraphics make, which the filmstrip and
+  the Media tab's row draw — of I1's two straight files, T1's two
+  premultiplied-labelled ones and T2's unlabelled one reads (255,127,126)
+  at the card's centre for all five: half red over white, the label
+  honoured by the generator with no change here. **R0:** 0 mismatches of
+  the 32,895 pairs; the 16 × 16 fill exact; the tie to (4,8). **Speed**
+  (`--measure straighten-speed`: the probe built `-O` with whole-module
+  optimisation, as the Release app is; 12 cores; best of five): an opaque
+  card on a clear frame 0.65 ms at 1920 × 1080 and 0.72 ms at
+  3840 × 2160; soft alpha at every pixel (pass 1 divides them all) 0.99
+  and 2.86 ms; one visible pixel in every 9 × 9 block (pass 2's worst
+  case, nearly every pixel transparent and within reach) 15.1 and 61.4 ms.
+  The unoptimised probe takes 33–41 ms for the 1080p card frame. B4:
+  `prores_4444`'s sizes and sampled alphas equal the baseline's, and its
+  frame digests moved, as (c) and (d) intend.
+  (g) **`RC_FORMAT_VERSION` is unchanged and nothing is migrated.**
+  Nothing persisted changes shape. An `hevc_alpha` file written before
+  this entry is labelled premultiplied and now composites right on import
+  ((b)); a `prores_4444` file written before it holds premultiplied
+  colour under a straight label and still composites dark. It is not
+  relabelled or re-encoded: the owner's answer in (a).
+  (h) **Risks accepted.** The writer's own scaling
+  (`AVVideoScalingModeKey`) of a straight frame was measured at one size
+  off the canvas, ×2 (F2: no fringe with the fill), and its alpha edge
+  lands about a third of a pixel from where an opaque row's does; a
+  downscale was not measured. A reader that scales the file down by more
+  than about 4× or blurs it further than the fill reaches can still pull
+  black into an edge. A frame of scattered visible pixels costs pass 2
+  the most: 61 ms at 3840 × 2160 in the optimised build, nearly twice a
+  30 fps frame's time, so such a 4K export runs slower by up to that much
+  a frame; a title, a card or soft alpha costs under 3 ms. Thumbnails,
+  filmstrips and poster frames go through CoreGraphics, not (b), and
+  draw both labels right (Q1). Only this host's
+  encoders and decoders were measured; playback of either row in Safari,
+  QuickTime Player and Final Cut is a person's check (`docs/manual-checks.md`
+  SE-9). G-33 (h)'s sentence that Reelcut is a reader that ignores the
+  declared mode, and its I1 figures, describe the build before this entry.

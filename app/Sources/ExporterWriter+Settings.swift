@@ -217,9 +217,11 @@ extension ExportWriter {
     ///
     /// **HEVC with alpha** is the HEVC row's dictionary — the bit rate, the
     /// key-frame interval, the expected frame rate — plus the one key that
-    /// says what the compositor's pixels ARE, premultiplied. There is no
-    /// alpha-quality key and no profile key (G-33 (d) has what was measured
-    /// with and without).
+    /// says what the pixels handed to the encoder ARE: straight, because the
+    /// video pump un-premultiplies an alpha row's frames first
+    /// (`ExportStraightAlpha`, spec §11 G-35 (e), amending G-33 (d)). There
+    /// is no alpha-quality key and no profile key (G-33 (d) has what was
+    /// measured with and without).
     ///
     /// **Bitrate.** `settings.videoBitrate` when the core resolved one. When
     /// it did not, a rate computed from the frame — bits per pixel per frame,
@@ -269,7 +271,7 @@ extension ExportWriter {
         }
         if codec == .hevcWithAlpha {
             compression[kVTCompressionPropertyKey_AlphaChannelMode as String] =
-                kVTAlphaChannelMode_PremultipliedAlpha
+                kVTAlphaChannelMode_StraightAlpha
         }
         output[AVVideoCompressionPropertiesKey] = compression
         return output

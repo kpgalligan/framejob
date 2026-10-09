@@ -17337,3 +17337,122 @@ footnote on a line of its own; the two long ones also cut, 228 and 378 in
 (`RC_PROOF_APP=release`): the whole proof 31/31, exit 0; `--control
 sheet-default` CONTROL PASS (E1 FAILED as it must). `screens.py --only
 12-export-sheet` passed light and dark, 0 new problems.
+
+## Issue batch B92 — the alpha movie rows written straight, a video frame read as labelled (`hevc_alpha_proof.py` A2, I1, M1, T1, T2, F1, F2, R0, Q1, B4, `--rows alpha-mode`, `--measure straighten-speed` and four mutants; `alpha_mode_probe.swift`; #242, spec §11 G-35)
+
+The owner chose both of #242's halves on 2026-10-09 ("Compensate for other
+apps, but export straight"). On import, a video frame whose buffer is labelled
+`PremultipliedAlpha` is composited as premultiplied
+(`MetalRenderer.declaresPremultipliedAlpha`), and any other as straight. On
+export, `prores_4444` and `hevc_alpha` frames are un-premultiplied, each
+transparent pixel within 4 px of a visible one takes the nearest one's colour,
+and every buffer, plus `hevc_alpha`'s encoder key, says `StraightAlpha`
+(`ExportStraightAlpha.swift`).
+
+**The probe** is `tools/proof/alpha_mode_probe.swift`. It is compiled last
+with every `app/Sources/*.swift` but `main.swift` through `swift_build.build`
+(the tree's sources, also under a mutant), once per run, and run in a scratch
+home. `write` is a third-party writer: one second of a 640 × 360 clear frame
+with a 200 × 120 card of a given RGBA, labelled premultiplied, straight or
+not at all. `read` reports the track's and the first decoded frame's alpha
+mode and the centre pixel. `roundtrip` runs R0 over the product's
+`straighten(bgra:…)`. A probe that does not build is a scored failure of M1,
+T1, T2 and R0.
+
+**Rows.** **A2** (rewritten): FAINT as `hevc_alpha` decodes alpha 128 ± 3
+with red ≥ 250 and green and blue ≤ 5 (straight). **I1** (scored now): FAINT's
+two files re-imported over white read (255, 128, 128) ± 6 at alpha 255.
+**M1**: their first decoded frame reads `StraightAlpha`. **T1**: the probe's
+premultiplied (128, 0, 0, 128) card, labelled, as each codec, re-imported over
+white reads (255, 128, 128) ± 6. **T2**: its unlabelled (255, 0, 0, 128)
+ProRes 4444 card reads the same. **F1**: DISC (a red 200 × 200 ellipse on a
+clear canvas) as each codec, re-imported over white, against DISCWHITE (the
+same on white) over every pixel: the largest channel difference is at most 6
+on `prores_4444` and at most 20 on `hevc_alpha`. **R0**: all 32,895 pairs
+0 ≤ c ≤ a round-trip, the 16 × 16 fill is exact, and a tie goes to the first
+pixel in row-major order. **B4** (rewritten): `prores_4444`'s three files
+match the baseline's sizes and five sampled alphas, and the digests are
+printed, not scored. **F2** (the phase's review): DISC as each codec at
+`720p`, scaled ×2 by the writer, re-imported over white at 1280 × 720: red
+falls below 255 by at most 6 on `prores_4444` and 20 on `hevc_alpha` anywhere
+(a red disc over white is red 255 everywhere, so a fall is a dark fringe);
+DISCWHITE at `720p` as `prores_4444`, compared over every pixel, and both
+files' edge down column 640 are printed. **Q1** (the review): the first
+cached thumbnail of each movie I1, T1 and T2 re-imported — the JPEG the
+filmstrip and the Media tab draw — reads (255, 128, 128) ± 6 at the card's
+centre. `--rows alpha-mode` runs H0, A2, I1, M1, T1, T2, F1, F2, R0, Q1 and
+Z1 on FAINT, DISC and DISCWHITE alone, with no baseline. The full run is 39
+rows. `--measure straighten-speed` builds the probe `-O` with whole-module
+optimisation and prints `straighten(bgra:…)`'s time at 1920 × 1080 and
+3840 × 2160 on three frames (an opaque card, soft alpha everywhere, one
+visible pixel in each 9 × 9 block); it launches nothing and scores nothing.
+
+**Mutants**, each a `tree_copy` naming only the rows above, with only their
+fixtures:
+- `import-straight`: the helper answers false. T1 FAILS and I1 passes.
+- `export-premultiplied`: pass 1 divides nothing. A2 and I1 FAIL.
+- `label-premultiplied`: the attachment and the key say premultiplied. M1
+  FAILS.
+- `no-bleed`: `bleedRadius` is 0. F1 FAILS on its `hevc_alpha` half, and F2
+  FAILS.
+
+Each also names a half that has to fail by measurement (`half`: T1's
+`prores_4444`, I1's `hevc_alpha`, M1's `hevc_alpha`), so a row that could not
+run — a probe that would not build — is not a MUTANT PASS.
+
+```sh
+python3 tools/proof/hevc_alpha_proof.py --rows alpha-mode     # 11/11, exit 0
+python3 tools/proof/hevc_alpha_proof.py --mutant no-bleed     # MUTANT PASS
+```
+
+**Its record** (2026-10-09, Apple M2 Max, macOS 26.5.1, ffmpeg 9.0.2). Every
+run's stderr was empty except the first `--rows alpha-mode`, which printed
+swift_build's own progress line there; that line now goes to stdout. On Debug:
+`--rows alpha-mode` 9/9, exit 0. All seven mutants printed MUTANT PASS: the
+four above, plus `encoder-refused`, `report-and-fill` and `shape-and-note`,
+each re-run on this tree. Without the fill (`no-bleed`), F1 read 2 on
+`prores_4444` and 100 on `hevc_alpha`, with 324 pixels over 10 (the worst
+(155, 31, 30) against (255, 3, 3)). With `import-straight`, T1 composited
+(193, 129, 127) and (191, 127, 127). With `export-premultiplied`, A2 decoded
+(129, 0, 0, 128) and I1 read (193, 129, 127) and (191, 127, 127).
+
+`make gate` PASS. On the gate's Release build (`RC_PROOF_APP=release`) the
+whole proof scored 37/37, exit 0:
+
+| Row | prores_4444 | hevc_alpha |
+|---|---|---|
+| I1 re-imported over white | (255, 128, 128) | (255, 127, 127) |
+| I1 the file's own centre | (255, 0, 0, 129) | (255, 0, 0, 128) |
+| M1 decoded / format description | StraightAlpha / StraightAlpha | StraightAlpha / StraightAlpha |
+| T1 the probe's premultiplied card | (255, 129, 127) | (255, 127, 127) |
+| T2 the probe's unlabelled card | (255, 128, 128), decoded StraightAlpha | — |
+| F1 largest difference, pixels over 10 | 1, 0 | 18 at (222, 192), 2 |
+
+A2 decoded (255, 0, 0, 128). R0 had 0 mismatches and took 35.8 ms best of
+five in the unoptimised probe build. B4's digests moved, as G-35 intends.
+`--control plain-hevc-reader` printed CONTROL PASS, and `matte_proof.py
+--only E3,E5` scored 2/2 on Debug and on Release.
+
+**The review's nits and measurements** (the same day and host). The video
+reader output's `alwaysCopiesSampleData = true` is now explicit, since the
+straightening writes into the reader's copy. The type comment no longer says
+the file draws no pixel. The three mutants gained their `half`. The owner's
+rule is to measure rather than leave a risk, and three were measured:
+- *Speed* (`--measure straighten-speed`, 12 cores, best of five): card 0.65 ms
+  at 1080p and 0.72 ms at 4K; soft alpha everywhere 0.99 and 2.86 ms; scattered
+  pixels (pass 2's worst case) 15.1 and 61.4 ms. Scattered pixels at 4K cost
+  nearly two 30 fps frame-times per frame; a title, a card or a soft edge costs
+  under 3 ms.
+- *Off the canvas's size* (F2, `720p`): red fell at most 0 on `prores_4444`
+  and 2 on `hevc_alpha`; under `no-bleed` it fell 26 and 45. So a scaled
+  export needs the fill on both rows, where at the document size only HEVC
+  did. Against the opaque reference, the edge differs by up to 73 and 75 in
+  about 3,100 pixels. That is the scaler, not a fringe: down column 640 the
+  alpha file reads 51, 203, 255 where the opaque file's coverage reads 0.09,
+  0.51, 1.
+- *Thumbnails* (Q1): all five movies' first thumbnails read (255, 127, 126).
+  The generator honours the label with no change here.
+
+On Debug, `--rows alpha-mode` scored 11/11, exit 0, and the four B92 mutants
+each printed MUTANT PASS again. `make gate` PASS (230 s). On its Release build
+the whole proof scored 39/39, exit 0, with stderr empty.

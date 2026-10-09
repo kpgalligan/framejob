@@ -1086,6 +1086,10 @@ the key map behind it.
   three passes and its canvas-sized pair are `Compositor+Shadow.swift`'s
   (`encodeShadow`); a layer's uniforms and source texture are made by
   `prepare` in `CompositorEffects.swift`, which `encodeLayers` calls once per layer.
+  A video frame is premultiplied only when its buffer's
+  `kCVImageBufferAlphaChannelModeKey` attachment says `PremultipliedAlpha`
+  (`declaresPremultipliedAlpha`, asked by `source(for:…)`), and straight
+  otherwise, an unlabelled one included (spec §11 G-35 (b)).
   A layer's uniform block is filled by `uniforms(for:…)` in
   `Compositor+Uniforms.swift`, with `partnerBox` and `clearColor`.
   The matte pass is `Compositor+Matte.swift`'s `encodeMattes`, run BEFORE the
@@ -1177,15 +1181,21 @@ the key map behind it.
 - `Exporter.swift` · `ExporterLoudness.swift` · `ExporterSettings.swift` ·
   `ExporterWriter.swift` · `ExporterWriter+Settings.swift` ·
   `ExporterWriter+Chapters.swift` · `ExporterAudioGain.swift` ·
-  `ExporterImageSequence.swift` · `ExporterErrors.swift` ·
-  `ExporterGraphics.swift` — the writer
+  `ExportStraightAlpha.swift` · `ExporterImageSequence.swift` ·
+  `ExporterErrors.swift` · `ExporterGraphics.swift` — the writer
   (`ExportWriter` REPLACED `AVAssetExportSession` so chapters, bitrate and
   size have one path) and the one-frame offline render. An export is TWO
   passes wherever the file holds sound: a measurement build of its own in
   32-bit float, then the write: un-normalised from a 16-bit decode (a mix
   past full scale clips there, and `mixClipped` says so); normalised from the
   same float decode the measurement read, gained and quantised once by
-  `ExportAudioGain` (#86). `ExportWriter` FILLS the frame when a fit would leave at most
+  `ExportAudioGain` (#86). The alpha movie rows' frames (`prores_4444`,
+  `hevc_alpha`) are straightened in the video pump before `retimed`:
+  un-premultiplied, each transparent pixel within 4 px of a visible one
+  filled with the nearest one's colour, and labelled `StraightAlpha`, with
+  `hevc_alpha`'s encoder key straight too (`ExportStraightAlpha.swift`, spec
+  §11 G-35). Every other row's frame goes to the encoder as drawn.
+  `ExportWriter` FILLS the frame when a fit would leave at most
   a pixel uncovered, or — the frame a canvas-SHAPED size less at most one
   pixel on each axis, `(bw + a)·ch == (bh + b)·cw` for some `a`, `b` in
   {0, 1}, at any scale — when a fill would overshoot by at most one
@@ -2352,7 +2362,9 @@ global hop, `GraphicStore`'s serial queue (its file-system sources'
 handlers, the coalesced pass and the outbox; main publishes through
 `drain()` and never waits on it but by `queue.sync`), the cache's main
 hop, the alert queue's main hop (`ProjectDocument+Alerts.swift`), the agent lane's per-document serial queues (`AgentLane.swift`), the
-assistant session's write queue (`AssistantSession.swift`), and the spend-month
+assistant session's write queue (`AssistantSession.swift`), the alpha rows'
+straightening (`ExportStraightAlpha.swift`, `DispatchQueue.concurrentPerform`
+over rows, inside the video pump), and the spend-month
 queue (`AssistantSpendMonth.queue`, Settings' ledger fold, answered by a
 main hop), and — not a queue but a seam all the same — the graphic
 prefetch's worker `Thread`s (`GraphicPrefetch.swift`, G-26). The recorder adds

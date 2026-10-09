@@ -3,13 +3,19 @@
 is the size the file has, HEVC with alpha is a row whose frames carry the
 canvas's alpha, a miss within a pixel is filled and not padded, and a missing
 encoder ends in the preset's own sentence — on instances this script
-launches.
+launches. Issue batch B92 (#242; spec §11 G-35) adds the alpha mode: the two
+alpha movie rows are written straight and labelled so, and a video frame
+labelled premultiplied is composited as premultiplied (A2, I1, M1, T1, T2,
+F1, F2, R0, Q1, B4 and four mutants).
 
     python3 tools/proof/hevc_alpha_proof.py [--app PATH]
     python3 tools/proof/hevc_alpha_proof.py --rows size [--app PATH]
     python3 tools/proof/hevc_alpha_proof.py --rows sheet [--app PATH]
+    python3 tools/proof/hevc_alpha_proof.py --rows alpha-mode [--app PATH]
     python3 tools/proof/hevc_alpha_proof.py --control plain-hevc-reader|sheet-default
     python3 tools/proof/hevc_alpha_proof.py --mutant encoder-refused|report-and-fill|shape-and-note
+    python3 tools/proof/hevc_alpha_proof.py --mutant import-straight|export-premultiplied|label-premultiplied|no-bleed
+    python3 tools/proof/hevc_alpha_proof.py --measure straighten-speed
     python3 tools/proof/hevc_alpha_proof.py --record-baseline [--app PATH]
 
 With no option it scores every row below but G1 and X1. `--rows size` is
@@ -19,7 +25,11 @@ and an unknown `hevc_alpha` — and the script says so on G1's line and on
 its last line; Gate A was passed on the phase A build (commit fcfeebf).
 `--rows sheet` is the export sheet's rows alone, each launch with CLEAR as
 its one fixture and no baseline read: H0, E1 and Z1 in one launch, then E3's
-launches.
+launches. `--rows alpha-mode` is H0, A2, I1, M1, T1, T2, F1, F2, R0, Q1 and Z1
+in one launch, with FAINT, DISC and DISCWHITE its only fixtures and no baseline
+read. `--measure straighten-speed` launches nothing: it builds the probe `-O`
+with whole-module optimisation, as the Release app is built, and prints its
+`timing` (printed, never scored).
 
 Each launch is the built app `proof_app` picks (Debug unless `RC_PROOF_APP=release`)
 on a scratch socket of its own, and only
@@ -59,8 +69,10 @@ scale (its `720p` row is 1276 × 720, 0.51 px off shape); **TALLFULL** and
 **TALL** the same pair from a 181 × 320 PNG (the evened 180 × 320 misses by
 1.77 px fitted and 1 px filled); **ODDBIG** `open_project` of a 1001 × 667
 PNG, never exported; **TONE** CLEAR plus a one-second 48 kHz stereo WAV on a
-track of its own. `--rows size` and the recorder build only the seven the
-baseline's cases use.
+track of its own; **DISC** 640 × 360, background alpha 0, an opaque red
+200 × 200 `ellipse` (its anti-aliased rim is the translucent edge F1 reads);
+**DISCWHITE** the same on an opaque white background. `--rows size` and the
+recorder build only the seven the baseline's cases use.
 
 Rows (◆ = also Gate A's):
 - ◆ **H0**: with the instance listening, `<home>/Library/Application
@@ -98,8 +110,9 @@ Rows (◆ = also Gate A's):
   ffprobe says `hevc` / `hvc1` at 640 × 360; decoded, the corner is alpha 0,
   the card's centre alpha 255 with red above 200, and every pixel more than
   4 px from the card's edge is exactly 0 outside it and 255 inside.
-  **A2**: FAINT: the centre's alpha is 128 ± 3 and its red within 3 of its
-  alpha (premultiplied). **A3**: SOLID: the alphas are {255}. **A4**: CLEAR
+  **A2**: FAINT: the centre's alpha is 128 ± 3, its red at least 250 and its
+  green and blue at most 5 — straight colour (G-35; it read red within 3 of
+  its alpha, premultiplied, before). **A3**: SOLID: the alphas are {255}. **A4**: CLEAR
   at `720p`: 1280 × 720, corner alpha 0, centre 255. **A5**: TONE: an `aac`
   stream at 48000 Hz with 2 channels, and `loudness` in the answer.
 - **S1**: CLEAR as `hevc_alpha` at `[640, 480]`: refused, the error names
@@ -145,8 +158,10 @@ Rows (◆ = also Gate A's):
   column's rows 0, 1, h−2, h−1 are red (r > 200, g and b < 60), printed
   beside the baseline's classes.
 - ◆ **B4**: `prores_4444` for CLEAR at the document size, CLEAR at `720p`
-  and ODD at the document size: the size and frame 0's digest equal the
-  baseline's.
+  and ODD at the document size: the answer's and the file's size and the
+  five samples' ALPHAS equal the baseline's. Frame 0's digest is printed
+  beside the baseline's and not scored, because G-35 changes this row's
+  colour by design (the baseline was recorded before it).
 - **L1**: SUBWHITE as `hevc` at `[640, 640]`: 640 × 640, the middle
   column's top and bottom pixels are black (every channel under 40) and the
   centre is white — a different shape is still letterboxed. **L2**: WIDE as
@@ -192,9 +207,48 @@ Rows (◆ = also Gate A's):
 - **X1**, scored only under `--mutant encoder-refused`: CLEAR as
   `hevc_alpha` answers exactly "This Mac cannot export with the
   “hevc_alpha” preset." and nothing is at the path, not even an empty file.
-- **I1**, printed and never scored: FAINT's `hevc_alpha` and `prores_4444`
-  files each imported into a new 640 × 360 project on an opaque white
-  background, `render_frame` at 0.5 s, the card's centre pixel.
+- **I1** (scored since B92): FAINT's `prores_4444` and `hevc_alpha` files
+  each imported into a new 640 × 360 project on an opaque white background,
+  `render_frame` at 0.5 s: the card's centre is within ±6 per channel of
+  (255, 128, 128) at alpha 255. Before G-35 it was printed, not scored, and
+  read (193, 129, 127) and (191, 127, 127).
+- **M1**: FAINT's two files through the probe's `read`: the first decoded
+  frame's alpha mode is `StraightAlpha` (the track's format description's
+  mode is printed, not scored).
+- **T1**: the probe writes a premultiplied (128, 0, 0, 128) card labelled
+  `PremultipliedAlpha` — a third-party writer's file — as each codec;
+  re-imported over white (as I1), the centre is within ±6 of (255, 128, 128).
+- **T2**: the probe writes an unlabelled (255, 0, 0, 128) card as
+  `prores_4444`; re-imported over white it is within ±6 of (255, 128, 128).
+  The decoded mode is printed.
+- **F1**: DISC exported as each codec and re-imported over white, and
+  DISCWHITE's own `render_frame` at 0.5 s, compared over EVERY pixel: the
+  largest channel difference is at most 6 on `prores_4444` and 20 on
+  `hevc_alpha` — no dark fringe. The maximum, its pixel and the count over
+  10 are printed.
+- **F2**: DISC exported as each codec at `720p` (1280 × 720: the writer's
+  own scaling, ×2) and re-imported over white at 1280 × 720: red falls
+  below 255 by at most 6 on `prores_4444` and 20 on `hevc_alpha` anywhere
+  (a red disc over white is red 255 at every pixel, so a fall is a dark
+  fringe). DISCWHITE exported at `720p` as `prores_4444` and re-imported the
+  same way is compared over every pixel and printed, with both files' edge
+  down column 640, not scored: the scaler resamples alpha apart from colour.
+- **Q1**: the first cached thumbnail (`cache/thumbs/<media>/0.jpg` in the
+  package — what the filmstrip and the Media tab's row draw) of each movie
+  I1, T1 and T2 re-imported: the card's centre within ±6 of
+  (255, 128, 128), for straight, premultiplied-labelled and unlabelled files.
+- **R0**: the probe's `roundtrip`, over the product's
+  `ExportStraightAlpha.straighten(bgra:…)`: re-premultiplying with
+  (s·a + 127) / 255 gives back c for all 32,895 pairs 0 ≤ c ≤ a, a in
+  1…255; a 16 × 16 plane with one opaque pixel at (8,8) ends with exactly its
+  Chebyshev-≤ 4 square holding its colour at alpha 0 and everything else
+  (0,0,0,0); with visible pixels at (4,8) and (12,8), (8,8) takes (4,8)'s
+  colour. The milliseconds for one 1920 × 1080 frame are printed.
+
+**The probe** is `tools/proof/alpha_mode_probe.swift`, compiled LAST with
+every `app/Sources/*.swift` but `main.swift` through `swift_build.build` (the
+tree's sources, also under a mutant), once a run, and run in a scratch home.
+One that does not build is a scored failure of M1, T1, T2 and R0.
 - ◆ **G1**, scored ONLY under `--rows size`: ODDFULL and TALLFULL with no
   `size` as `h264`, `hevc` and `prores_422`: frame 0's digest equals the
   baseline's, and so do eight pixels — the middle row's columns 0, 1, w−2,
@@ -229,6 +283,15 @@ asserted to occur exactly once and replaced, built by the copy's own `make app-d
   answers true when the environment holds `RC_MUTANT_FILL_ALL`. Two
   launches: without the variable S1, N1, L2 and S2 FAIL (S2's `prores_4444`
   half by the limit alone) while L1 and O1 PASS; with it L1 FAILS.
+- `import-straight` (B92) — `declaresPremultipliedAlpha` answers false: T1
+  FAILS and I1 PASSES.
+- `export-premultiplied` (B92) — pass 1 of `ExportStraightAlpha` divides
+  nothing (the label stays straight): A2 and I1 FAIL.
+- `label-premultiplied` (B92) — the buffer's attachment and `hevc_alpha`'s
+  encoder key say `PremultipliedAlpha`: M1 FAILS.
+- `no-bleed` (B92) — `bleedRadius` is 0: F1 FAILS, its `hevc_alpha` half,
+  and F2 FAILS.
+A mutant that names only `--rows alpha-mode`'s rows makes only its fixtures.
 A control or a mutant exits 0 only when every named row did what is named,
 1 when one did not, 2 when it could not be performed.
 
@@ -281,6 +344,7 @@ moved default.
 
 import argparse
 import atexit
+import contextlib
 import hashlib
 import json
 import os
@@ -288,6 +352,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -296,6 +361,7 @@ sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
 import mcp  # noqa: E402
 import proof_app  # noqa: E402
+import swift_build  # noqa: E402
 import tree_copy  # noqa: E402
 import v2_snapshot  # noqa: E402
 from screens import PINS  # noqa: E402
@@ -308,10 +374,18 @@ TOOL_BOUND = 60
 BUILD_BOUND = 1500
 SECOND = 600_000
 SIZE_ROWS = ["H0", "T0", "R1", "R2", "R3", "R4", "E2", "B1", "B4", "G1", "Z1"]
-FULL_ROWS = ["H0", "T0", "R1", "R2", "R3", "R4", "E2", "A1", "A2", "A3", "A4", "A5", "S1",
-             "S2", "O1", "O2", "O3", "O4", "O5", "P1", "P2", "B1", "B2", "B3", "B4", "L1",
-             "L2", "N1", "E1", "E3", "Z1"]
+FULL_ROWS = ["H0", "T0", "R1", "R2", "R3", "R4", "E2", "A1", "A2", "A3", "A4", "A5", "I1",
+             "M1", "T1", "T2", "F1", "F2", "R0", "Q1", "S1", "S2", "O1", "O2", "O3", "O4", "O5", "P1",
+             "P2", "B1", "B2", "B3", "B4", "L1", "L2", "N1", "E1", "E3", "Z1"]
 SHEET_ROWS = ["H0", "E1", "E3", "Z1"]
+# `--rows alpha-mode` (issue batch B92, spec §11 G-35): what a straight export
+# and a labelled import answer, on FAINT, DISC and DISCWHITE alone.
+ALPHA_ROWS = ["H0", "A2", "I1", "M1", "T1", "T2", "F1", "F2", "R0", "Q1", "Z1"]
+ALPHA_CODECS = ("prores_4444", "hevc_alpha")
+PROBE_SWIFT = ROOT / "tools/proof/alpha_mode_probe.swift"
+PROBE_BOUND = 120
+OVER_WHITE = [255, 128, 128]     # half red over white, composited right
+F1_LIMIT = {"prores_4444": 6, "hevc_alpha": 20}
 DIGEST_ROWS = ("B1", "B4", "G1")     # the rows that read the baseline's host's bytes
 EVEN_ROWS = ["h264", "hevc", "prores_422"]
 EXTENSION = {"h264": "mp4", "hevc": "mp4", "hevc_alpha": "mov", "prores_422": "mov",
@@ -493,10 +567,12 @@ def card_reading(raster, card=CARD, margin=4):
 
 
 def faint_reading(raster):
-    """A2's pixel reader: the centre's alpha is 128 ± 3 and its red within
-    3 of its alpha. `(good, text)`."""
+    """A2's pixel reader: the centre's alpha is 128 ± 3, its red at least
+    250 and its green and blue at most 5 — straight colour (G-35).
+    `(good, text)`."""
     centre = raster.centre()
-    good = abs(centre[3] - 128) <= 3 and abs(centre[0] - centre[3]) <= 3
+    good = (abs(centre[3] - 128) <= 3 and centre[0] >= 250 and centre[1] <= 5
+            and centre[2] <= 5)
     return good, f"centre {centre}"
 
 
@@ -558,8 +634,9 @@ class Session:
 
 # ---- fixtures --------------------------------------------------------------------
 
-def shapes(s, name, width, height, background, card, fill, opacity=None):
-    """A new project with one card for a second; its package."""
+def shapes(s, name, width, height, background, card, fill, opacity=None, kind="rectangle"):
+    """A new project with one card (or another shape `kind`) for a second;
+    its package."""
     path = s.dir / f"{name}.reelcut"
     must(s.client, "new_project", {"path": str(path)})
     must(s.client, "set_canvas", {"project": str(path), "width": width, "height": height,
@@ -567,7 +644,7 @@ def shapes(s, name, width, height, background, card, fill, opacity=None):
     track = must(s.client, "get_project", {"project": str(path)})["project"]["tracks"][0]["id"]
     must(s.client, "add_shape_clip",
          {"project": str(path), "track": track, "at": 0, "duration": SECOND,
-          "shape": {"kind": "rectangle", "width": card[0], "height": card[1], "stroke": None,
+          "shape": {"kind": kind, "width": card[0], "height": card[1], "stroke": None,
                     "fill": fill}})
     if opacity is not None:
         clips = must(s.client, "get_project", {"project": str(path)})["project"]["clips"]
@@ -623,9 +700,19 @@ def clear_fixture(s):
     s.fx["CLEAR"] = shapes(s, "CLEAR", 640, 360, [0, 0, 0, 0], (200, 120), [1, 0, 0, 1])
 
 
+def alpha_fixtures(s):
+    """FAINT, DISC and DISCWHITE: the fixtures `--rows alpha-mode` reads
+    (spec §11 G-35)."""
+    clear, white_, red = [0, 0, 0, 0], [1, 1, 1, 1], [1, 0, 0, 1]
+    s.fx["FAINT"] = shapes(s, "FAINT", 640, 360, clear, (200, 120), red, opacity=0.5)
+    s.fx["DISC"] = shapes(s, "DISC", 640, 360, clear, (200, 200), red, kind="ellipse")
+    s.fx["DISCWHITE"] = shapes(s, "DISCWHITE", 640, 360, white_, (200, 200), red,
+                               kind="ellipse")
+
+
 def fixtures(s, full):
     """The seven fixtures the baseline's cases use, and with `full` the
-    five the alpha and fill rows add."""
+    seven the alpha and fill rows add."""
     clear, white_, red = [0, 0, 0, 0], [1, 1, 1, 1], [1, 0, 0, 1]
     clear_fixture(s)
     s.fx["SUBWHITE"] = shapes(s, "SUBWHITE", 334, 222, white_, (100, 100), white_)
@@ -640,6 +727,9 @@ def fixtures(s, full):
         s.fx["SUB"] = shapes(s, "SUB", 334, 222, clear, (160, 100), red)
         s.fx["TALL"] = picture(s, "TALL", 181, 320, clear=True)
         s.fx["TONE"] = tone(s)
+        s.fx["DISC"] = shapes(s, "DISC", 640, 360, clear, (200, 200), red, kind="ellipse")
+        s.fx["DISCWHITE"] = shapes(s, "DISCWHITE", 640, 360, white_, (200, 200), red,
+                                   kind="ellipse")
 
 
 # ---- one export, and what is read from it ----------------------------------------
@@ -1074,8 +1164,8 @@ def row_a1(s):
 def row_a2(s):
     _, raster = written(s, "FAINT", "hevc_alpha")
     good, text = faint_reading(raster)
-    check("A2 FAINT as hevc_alpha: the card's centre is alpha 128 ± 3 with its red within "
-          "3 of its alpha (premultiplied)", good, text)
+    check("A2 FAINT as hevc_alpha: the card's centre is alpha 128 ± 3, red at least 250, "
+          "green and blue at most 5 (straight)", good, text)
 
 
 def row_a3(s):
@@ -1268,12 +1358,19 @@ def row_b4(s):
     for fixture, size in (("CLEAR", None), ("CLEAR", "720p"), ("ODD", None)):
         base = s.cases[f"B4 {fixture} prores_4444 {size or 'document'}"]
         now = case_plain(s, fixture, "prores_4444", size)
-        same, text = held(base, now)
+        alphas = [p[3] for p in now["samples"]]
+        was = None if base.get("samples") is None else [p[3] for p in base["samples"]]
+        same = (base.get("answer") == now["answer"] and base.get("file") == now["file"]
+                and was is not None and was == alphas)
         good = good and same
-        lines.append(f"{fixture} at {size or 'the document size'}: {now['file']} {text}")
+        lines.append(f"{fixture} at {size or 'the document size'}: answer {now['answer']} file "
+                     f"{now['file']} (baseline {base.get('answer')} {base.get('file')}); the "
+                     f"five samples' alphas {alphas} (baseline {was}); frame 0's digest "
+                     f"{now['frame0'][:12]} (baseline {str(base.get('frame0'))[:12]}, printed, "
+                     "not scored: G-35 changes the colour)")
     check("B4 prores_4444 for CLEAR at the document size, CLEAR at 720p and ODD at the "
-          "document size: the size and frame 0's digest equal the baseline's",
-          good, "; ".join(lines))
+          "document size: the size and the five samples' alphas equal the baseline's",
+          good, "\n       ".join(lines))
 
 
 def row_l1(s):
@@ -1491,37 +1588,296 @@ def row_g1(s):
           + design)
 
 
-def line_i1(s):
-    """I1, printed and never scored: what Reelcut draws when it re-imports
-    its own translucent alpha exports over white."""
-    for preset in ("hevc_alpha", "prores_4444"):
+# ---- the alpha mode (issue batch B92, spec §11 G-35) -----------------------------
+
+PROBE = {}   # per build, the probe's binary or why it could not be built: built once a run
+
+
+def build_probe(optimized=False):
+    """`alpha_mode_probe.swift` compiled LAST with every `app/Sources/*.swift`
+    but `main.swift`, through `swift_build.build` (reused when every input is
+    byte-identical). The TREE's sources, also under a mutant. `optimized` is
+    `-O` with whole-module optimisation, as the Release app is built, for
+    `--measure straighten-speed`. Its path, or raises with why, once a run."""
+    kind = "optimized" if optimized else "plain"
+    if kind not in PROBE:
+        folder = WORK / f"alpha-mode-probe-{kind}"
+        folder.mkdir(parents=True, exist_ok=True)
+        entry = folder / "main.swift"
+        entry.write_text(PROBE_SWIFT.read_text())
+        print(f"  building the alpha-mode probe ({kind}) through swift_build…", flush=True)
         try:
-            done = export(s, "FAINT", preset)
-            if not done["ok"]:
-                raise RuntimeError(done["error"])
-            package = s.dir / f"I1-{preset}.reelcut"
-            project = str(package)
-            must(s.client, "new_project", {"path": project})
-            s.fx[f"I1-{preset}"] = package
-            must(s.client, "set_canvas", {"project": project, "width": 640, "height": 360,
-                                          "background": [1, 1, 1, 1]})
-            track = must(s.client, "get_project",
-                         {"project": project})["project"]["tracks"][0]["id"]
-            media = must(s.client, "import_media",
-                         {"project": project, "path": str(done["path"])})["media"]
-            must(s.client, "add_clip", {"project": project, "track": track, "media": media,
-                                        "at": 0})
-            png = s.out / f"I1-{preset}.png"
-            must(s.client, "render_frame", {"project": project, "t": SECOND // 2,
-                                            "path": str(png)})
-            raster = Raster(png)
-            print(f"  I1   (printed, not scored) FAINT's {preset} file re-imported over an "
-                  f"opaque white 640 × 360 canvas, render_frame at 0.5 s: the card's centre "
-                  f"is {raster.centre()} and the corner {raster.pixel(0, 0)}; the file's own "
-                  f"centre pixel decodes {Raster(done['path']).centre()}", flush=True)
-        except Exception as error:  # printed either way; the line is never a score
-            print(f"  I1   (printed, not scored) {preset}: could not be measured — "
-                  f"{type(error).__name__}: {error}", flush=True)
+            # swift_build's own progress line goes to stdout, so a run's stderr
+            # stays what mcp.py and the rows say.
+            with contextlib.redirect_stderr(sys.stdout):
+                built = swift_build.build(sources=swift_build.app_sources() + [entry],
+                                          output=folder / "alpha-mode-probe",
+                                          defines=["REELCUT_DEV_TOOLS"], optimize=optimized,
+                                          wmo=optimized, timeout=900)
+            PROBE[kind] = (built.binary, None)
+            print(f"  probe {'reused' if built.reused else f'built in {built.seconds} s'}",
+                  flush=True)
+        except swift_build.SwiftBuildFailed as error:
+            PROBE[kind] = (None, f"the probe did not build: {error} | "
+                           + " | ".join(error.diagnostics[:4]))
+    binary, why = PROBE[kind]
+    if binary is None:
+        raise RuntimeError(why)
+    return binary
+
+
+def probe(*argv, optimized=False):
+    """One probe job; its JSON answer, or raises."""
+    binary = build_probe(optimized)
+    home = WORK / "alpha-mode-probe" / "home"
+    home.mkdir(parents=True, exist_ok=True)
+    done = bounded.run([str(binary)] + [str(a) for a in argv], PROBE_BOUND,
+                       env=bounded.child_env({"CFFIXED_USER_HOME": str(home)}))
+    lines = [line for line in done["stdout"].splitlines() if line.startswith("{")]
+    answer = json.loads(lines[-1]) if lines else None
+    if done["expired"] or done["rc"] != 0 or answer is None or "error" in answer:
+        raise RuntimeError(f"probe {argv[0]} rc {done['rc']} (expired {done['expired']}): "
+                           f"{answer or done['stderr'].strip()[-300:]}")
+    return answer
+
+
+IMPORTED = {}      # a re-import's label → (its package, its media id), for Q1
+
+
+def reimport(s, movie, label, size=(640, 360)):
+    """`movie` imported into a new project of `size` (640 × 360 unless asked)
+    on an opaque white background, `render_frame` at 0.5 s: the frame's
+    Raster."""
+    package = s.dir / f"{label}.reelcut"
+    project = str(package)
+    must(s.client, "new_project", {"path": project})
+    s.fx[label] = package
+    must(s.client, "set_canvas", {"project": project, "width": size[0], "height": size[1],
+                                  "background": [1, 1, 1, 1]})
+    track = must(s.client, "get_project", {"project": project})["project"]["tracks"][0]["id"]
+    media = must(s.client, "import_media", {"project": project, "path": str(movie)})["media"]
+    IMPORTED[label] = (package, media)
+    must(s.client, "add_clip", {"project": project, "track": track, "media": media, "at": 0})
+    png = s.out / f"{label}.png"
+    must(s.client, "render_frame", {"project": project, "t": SECOND // 2, "path": str(png)})
+    return Raster(png)
+
+
+def near(pixel, want, slack):
+    return all(abs(a - b) <= slack for a, b in zip(pixel[:3], want))
+
+
+def row_i1(s):
+    """I1: FAINT's export of each alpha row, re-imported over white, draws
+    half red over white."""
+    halves, lines = {}, []
+    for preset in ALPHA_CODECS:
+        done, _ = written(s, "FAINT", preset)
+        centre = reimport(s, done["path"], f"I1-{preset}").centre()
+        halves[preset] = near(centre, OVER_WHITE, 6) and centre[3] == 255
+        lines.append(f"{preset}: centre {centre}; the file's own centre decodes "
+                     f"{Raster(done['path']).centre()}")
+    details["I1"] = halves
+    check("I1 FAINT as prores_4444 and as hevc_alpha, each re-imported over an opaque white "
+          "640 × 360 canvas: render_frame at 0.5 s reads the card's centre within ±6 of "
+          "(255, 128, 128) at alpha 255", all(halves.values()), "\n       ".join(lines))
+
+
+def row_m1(s):
+    """M1: FAINT's file of each alpha row, decoded, reads StraightAlpha."""
+    halves, lines = {}, []
+    for preset in ALPHA_CODECS:
+        done, _ = written(s, "FAINT", preset)
+        read = probe("read", done["path"])
+        halves[preset] = read.get("decoded_mode") == "StraightAlpha"
+        lines.append(f"{preset}: decoded {read.get('decoded_mode')!r}, the track's format "
+                     f"description {read.get('format_mode')!r} (printed, not scored), centre "
+                     f"{read.get('centre')}")
+    details["M1"] = halves
+    check("M1 FAINT's prores_4444 and hevc_alpha files: the first decoded frame's alpha mode "
+          "is StraightAlpha", all(halves.values()), "\n       ".join(lines))
+
+
+def row_t1(s):
+    """T1: a third-party-style premultiplied movie composites right."""
+    halves, lines = {}, []
+    for preset in ALPHA_CODECS:
+        movie = s.out / f"T1-{preset}.mov"
+        probe("write", movie, preset, "premultiplied", "128,0,0,128")
+        read = probe("read", movie)
+        centre = reimport(s, movie, f"T1-{preset}").centre()
+        halves[preset] = near(centre, OVER_WHITE, 6)
+        lines.append(f"{preset}: centre {centre}; the file decodes {read.get('centre')} "
+                     f"labelled {read.get('decoded_mode')!r}")
+    details["T1"] = halves
+    check("T1 the probe's premultiplied (128, 0, 0, 128) card, written as prores_4444 and as "
+          "hevc_alpha and labelled PremultipliedAlpha, re-imported over white reads within "
+          "±6 of (255, 128, 128)", all(halves.values()), "\n       ".join(lines))
+
+
+def row_t2(s):
+    """T2: an unlabelled ProRes 4444 movie is read as straight."""
+    movie = s.out / "T2-prores_4444.mov"
+    probe("write", movie, "prores_4444", "none", "255,0,0,128")
+    read = probe("read", movie)
+    centre = reimport(s, movie, "T2-prores_4444").centre()
+    check("T2 the probe's unlabelled (255, 0, 0, 128) card as prores_4444, re-imported over "
+          "white, reads within ±6 of (255, 128, 128)", near(centre, OVER_WHITE, 6),
+          f"centre {centre}; decoded {read.get('decoded_mode')!r} (printed), the file decodes "
+          f"{read.get('centre')}")
+
+
+def row_f1(s):
+    """F1: DISC's export of each alpha row, re-imported over white, against
+    DISCWHITE drawn directly, over every pixel."""
+    white_png = s.out / "F1-DISCWHITE.png"
+    must(s.client, "render_frame", {"project": str(s.fx["DISCWHITE"]), "t": SECOND // 2,
+                                    "path": str(white_png)})
+    reference = Raster(white_png)
+    halves, lines = {}, []
+    for preset in ALPHA_CODECS:
+        done, _ = written(s, "DISC", preset)
+        drawn = reimport(s, done["path"], f"F1-{preset}")
+        if (drawn.width, drawn.height) != (reference.width, reference.height):
+            halves[preset] = False
+            lines.append(f"{preset}: {drawn.width} × {drawn.height} against "
+                         f"{reference.width} × {reference.height}")
+            continue
+        worst, text = largest_difference(drawn, reference)
+        halves[preset] = worst <= F1_LIMIT[preset]
+        lines.append(f"{preset}: {text.replace('LIMIT', str(F1_LIMIT[preset]))}")
+    details["F1"] = halves
+    check("F1 DISC as prores_4444 and as hevc_alpha, each re-imported over white, against "
+          "DISCWHITE over every pixel: the largest channel difference is at most 6 on "
+          "prores_4444 and 20 on hevc_alpha — no dark fringe", all(halves.values()),
+          "\n       ".join(lines))
+
+
+def largest_difference(drawn, reference):
+    """The largest channel difference between two Rasters of one size, and
+    a line naming it, its pixel and the count of pixels over 10 (`LIMIT`
+    stands where the caller's limit goes)."""
+    worst, where, over = 0, None, 0
+    a, b = drawn.data, reference.data
+    for i in range(0, len(a), 4):
+        diff = max(abs(a[i] - b[i]), abs(a[i + 1] - b[i + 1]), abs(a[i + 2] - b[i + 2]))
+        if diff > 10:
+            over += 1
+        if diff > worst:
+            worst, where = diff, i // 4
+    at = None if where is None else (where % drawn.width, where // drawn.width)
+    return worst, (f"the largest channel difference {worst} (limit LIMIT) at {at}: "
+                   f"{drawn.pixel(*at) if at else None} against "
+                   f"{reference.pixel(*at) if at else None}; pixels over 10: {over}")
+
+
+def darkest_red(raster):
+    """How far the red channel falls below 255 anywhere in the frame, and
+    where: a red disc over white is red 255 at every pixel, so any fall is
+    black pulled into the edge — the dark fringe."""
+    reds = raster.data[0::4]
+    low = min(reds)
+    at = reds.index(low)
+    return 255 - low, (at % raster.width, at // raster.width)
+
+
+def row_f2(s):
+    """F2: F1 off the canvas's size — DISC written at `720p` (1280 × 720,
+    the writer's own scaling of a straight frame), re-imported over white at
+    1280 × 720. Scored on the dark fringe alone: a red disc over white keeps
+    red at 255 everywhere. DISCWHITE written at `720p` as prores_4444 (the
+    same scaler, an opaque frame) re-imported the same way is compared over
+    every pixel and printed, not scored: the scaler resamples a straight
+    frame's alpha and colour apart, so the edge's profile differs by design
+    of the scaler, not by a fringe."""
+    done, _ = written(s, "DISCWHITE", "prores_4444", "720p")
+    reference = reimport(s, done["path"], "F2-DISCWHITE", (1280, 720))
+    halves, lines = {}, []
+    for preset in ALPHA_CODECS:
+        done, _ = written(s, "DISC", preset, "720p")
+        drawn = reimport(s, done["path"], f"F2-{preset}", (1280, 720))
+        fall, at = darkest_red(drawn)
+        halves[preset] = (drawn.width, drawn.height) == (1280, 720) and fall <= F1_LIMIT[preset]
+        compared = ("" if (drawn.width, drawn.height) != (reference.width, reference.height)
+                    else largest_difference(drawn, reference)[1].replace("LIMIT", "none"))
+        # The disc's top edge, column 640, rows 154…166: the file's own alpha
+        # and the opaque reference's green, which falls as its coverage rises.
+        alphas = [Raster(done["path"]).pixel(640, y)[3] for y in range(154, 167)]
+        greens = [reference.pixel(640, y)[1] for y in range(154, 167)]
+        lines.append(f"{preset} at 720p ({sized(done)}): red falls at most {fall} (limit "
+                     f"{F1_LIMIT[preset]}) at {at}: {drawn.pixel(*at)}; against DISCWHITE "
+                     f"(printed, not scored): {compared}; column 640, rows 154…166: the "
+                     f"file's alpha {alphas}, DISCWHITE's green {greens}")
+    details["F2"] = halves
+    check("F2 DISC as prores_4444 and as hevc_alpha at 720p — scaled ×2 by the writer — each "
+          "re-imported over white at 1280 × 720: red falls below 255 by at most 6 on "
+          "prores_4444 and 20 on hevc_alpha anywhere — no dark fringe off the canvas's size",
+          all(halves.values()), "\n       ".join(lines))
+
+
+def thumbnail(package, media, bound=30):
+    """The first cached thumbnail of `media` in `package` — the JPEG the
+    filmstrip and the Media tab's row draw (`MediaImporter.thumbnails`) —
+    decoded, or None when none landed within `bound` seconds."""
+    deadline = time.monotonic() + bound
+    while time.monotonic() < deadline:
+        found = sorted(package.glob(f"**/thumbs/{media}/0.jpg"))
+        if found:
+            time.sleep(0.5)       # the writer finalises the file it named
+            return Raster(found[0])
+        time.sleep(0.25)
+    return None
+
+
+def row_q1(s):
+    """Q1: the first thumbnail of each movie I1, T1 and T2 re-imported —
+    straight-labelled, premultiplied-labelled and unlabelled — the JPEG the
+    filmstrip and the Media tab draw (`AVAssetImageGenerator`, CoreGraphics,
+    not the compositor): its card's centre is half red over white too."""
+    labels = [k for k in IMPORTED if k.split("-")[0] in ("I1", "T1", "T2")]
+    good, lines = len(labels) == 5, []
+    for label in labels:
+        package, media = IMPORTED[label]
+        raster = thumbnail(package, media)
+        if raster is None:
+            good = False
+            lines.append(f"{label}: no thumbnail within 30 s")
+            continue
+        centre = raster.centre()
+        good = good and near(centre, OVER_WHITE, 6)
+        lines.append(f"{label}: {raster.width} × {raster.height}, centre {centre}, corner "
+                     f"{raster.pixel(0, 0)}")
+    check("Q1 the first thumbnail of the five re-imported movies (I1's two straight files, "
+          "T1's two premultiplied-labelled ones, T2's unlabelled one): the card's centre is "
+          "within ±6 of (255, 128, 128)", good, "\n       ".join(lines))
+
+
+def measure_speed():
+    """`--measure straighten-speed`: the optimised probe's `timing`."""
+    got = probe("timing", optimized=True)
+    print(f"  {got.get('cores')} cores; ExportStraightAlpha.straighten(bgra:…), -O with "
+          "whole-module optimisation, best of five after one warm-up:")
+    for row in got.get("timing", []):
+        print(f"    {row['size']} {row['frame']:<6} best {row['ms_best']:.2f} ms of "
+              f"{[round(m, 2) for m in row['ms_runs']]}")
+    return 0
+
+
+def row_r0(s):
+    """R0: the product's pixel half, in the probe."""
+    got = probe("roundtrip")
+    good = (got.get("pairs") == 32895 and got.get("pair_mismatches") == 0
+            and got.get("square_mismatches") == 0 and got.get("tie_ok") is True)
+    check("R0 straighten(bgra:…): all 32,895 pairs 0 ≤ c ≤ a, a in 1…255, re-premultiplied "
+          "with (s·a + 127) / 255 give c back; one opaque pixel on 16 × 16 fills exactly its "
+          "Chebyshev-≤ 4 square at alpha 0 and nothing else; a tie goes to the first in "
+          "row-major order", good,
+          f"pairs {got.get('pairs')}, mismatches {got.get('pair_mismatches')} (first "
+          f"{got.get('first_mismatch')}); the square's mismatches {got.get('square_mismatches')}"
+          f"; (8,8) took {got.get('tie')}; bleedRadius {got.get('bleed_radius')}; one "
+          f"1920 × 1080 frame with a 600 × 360 card: best {got.get('ms_best'):.1f} ms of "
+          f"{[round(m, 1) for m in got.get('ms_runs', [])]} (an unoptimised probe build; "
+          "printed, not scored)")
 
 
 ROWS = {
@@ -1535,6 +1891,14 @@ ROWS = {
     "A3": lambda s, full: row_a3(s),
     "A4": lambda s, full: row_a4(s),
     "A5": lambda s, full: row_a5(s),
+    "I1": lambda s, full: row_i1(s),
+    "M1": lambda s, full: row_m1(s),
+    "T1": lambda s, full: row_t1(s),
+    "T2": lambda s, full: row_t2(s),
+    "F1": lambda s, full: row_f1(s),
+    "R0": lambda s, full: row_r0(s),
+    "F2": lambda s, full: row_f2(s),
+    "Q1": lambda s, full: row_q1(s),
     "S1": lambda s, full: row_s1(s),
     "S2": lambda s, full: row_s2(s),
     "O1": lambda s, full: row_o1(s),
@@ -1578,12 +1942,13 @@ def close_all(s):
 
 
 def session(label, app, body, full, choice=CHOICE, env=None, baseline=None, foreign=None,
-            light=False):
-    """One launch: H0, the fixtures (CLEAR alone when `light`), `body(s)`,
-    then every project closed and Z1. True when the instance listened and
-    the body ran to its end."""
+            light=False, make=None):
+    """One launch: H0, the fixtures (CLEAR alone when `light`, `make(s)`'s
+    when given), `body(s)`, then every project closed and Z1. True when the
+    instance listened and the body ran to its end."""
     s = Session(label, app, choice, env)
     s.cases, s.foreign = (baseline or {}).get("cases") or {}, foreign
+    IMPORTED.clear()
     ran = False
     try:
         if not s.launch():
@@ -1596,7 +1961,10 @@ def session(label, app, body, full, choice=CHOICE, env=None, baseline=None, fore
               support.is_dir(), str(support))
         if rows.get("H0"):
             try:
-                clear_fixture(s) if light else fixtures(s, full)
+                if make is not None:
+                    make(s)
+                else:
+                    clear_fixture(s) if light else fixtures(s, full)
                 body(s)
                 ran = True
             except Exception as error:  # a body that could not run is a failure
@@ -1614,6 +1982,8 @@ def session(label, app, body, full, choice=CHOICE, env=None, baseline=None, fore
 # ---- mutants and controls --------------------------------------------------------
 
 SETTINGS = "app/Sources/ExporterWriter+Settings.swift"
+STRAIGHT = "app/Sources/ExportStraightAlpha.swift"
+EFFECTS = "app/Sources/CompositorEffects.swift"
 MUTANTS = {
     "encoder-refused": {
         "anchors": [
@@ -1674,6 +2044,44 @@ MUTANTS = {
         "launches": [({}, {"fail": ["S1", "N1", "L2", "S2"], "pass": ["L1", "O1"],
                            "half": ("S2", "prores_4444")}),
                      ({"RC_MUTANT_FILL_ALL": "1"}, {"fail": ["L1"], "pass": []})],
+    },
+    # Issue batch B92 (spec §11 G-35): one per decision the change adds.
+    "import-straight": {      # (b): every video frame read as straight again
+        "anchors": [
+            (EFFECTS,
+             "        return CFEqual(mode, kCVImageBufferAlphaChannelMode_PremultipliedAlpha)\n",
+             "        _ = mode\n"
+             "        return false\n"),
+        ],
+        "launches": [({}, {"fail": ["T1"], "pass": ["I1"], "half": ("T1", "prores_4444")})],
+    },
+    "export-premultiplied": {     # (c): pass 1 skipped, the label still straight
+        "anchors": [
+            (STRAIGHT,
+             "            let unpremultiplies = alpha < 255\n",
+             "            let unpremultiplies = alpha < 0\n"),
+        ],
+        "launches": [({}, {"fail": ["A2", "I1"], "pass": [], "half": ("I1", "hevc_alpha")})],
+    },
+    "label-premultiplied": {      # (e): both labels premultiplied
+        "anchors": [
+            (STRAIGHT,
+             "            kCVImageBufferAlphaChannelMode_StraightAlpha, .shouldPropagate)\n",
+             "            kCVImageBufferAlphaChannelMode_PremultipliedAlpha, .shouldPropagate)\n"),
+            (SETTINGS,
+             "                kVTAlphaChannelMode_StraightAlpha\n",
+             "                kVTAlphaChannelMode_PremultipliedAlpha\n"),
+        ],
+        "launches": [({}, {"fail": ["M1"], "pass": [], "half": ("M1", "hevc_alpha")})],
+    },
+    "no-bleed": {     # (d): no fill
+        "anchors": [
+            (STRAIGHT,
+             "    static let bleedRadius = 4\n",
+             "    static let bleedRadius = 0\n"),
+        ],
+        "launches": [({}, {"fail": ["F1", "F2"], "pass": [],
+                           "half": ("F1", "hevc_alpha")})],
     },
 }
 
@@ -1737,7 +2145,7 @@ def build_mutant(name):
 
 
 def run_mutant(name, baseline, foreign):
-    print(f"B85 phase 3 — the {name} MUTANT", flush=True)
+    print(f"B85 phase 3 / B92 — the {name} MUTANT", flush=True)
     app, why = build_mutant(name)
     if app is None:
         print(f"mutant {name}: the control could not be performed — {why}")
@@ -1751,8 +2159,10 @@ def run_mutant(name, baseline, foreign):
         print(f" launch {index} of {len(MUTANTS[name]['launches'])}: "
               f"{', '.join(want['fail'])} must FAIL"
               + (f"; {', '.join(want['pass'])} must PASS" if want["pass"] else ""), flush=True)
+        # A mutant that names only the alpha mode's rows makes only its fixtures.
+        make = alpha_fixtures if set(named) <= set(ALPHA_ROWS) else None
         ran = session(f"mutant-{index}", app, lambda s: score(s, order, True), True, env=env,
-                      baseline=baseline, foreign=foreign)
+                      baseline=baseline, foreign=foreign, make=make)
         if not ran or any(r not in rows for r in named) or not rows.get("Z1"):
             print(f"mutant {name}: the control could not be performed — launch {index} "
                   f"reached {sorted(r for r in named if r in rows)} of {sorted(named)} "
@@ -1818,10 +2228,11 @@ def foreign_text(baseline, today):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--app", default=str(APP))
-    parser.add_argument("--rows", choices=["size", "sheet"])
+    parser.add_argument("--rows", choices=["size", "sheet", "alpha-mode"])
     parser.add_argument("--record-baseline", action="store_true")
     parser.add_argument("--mutant", choices=sorted(MUTANTS))
     parser.add_argument("--control", choices=["plain-hevc-reader", "sheet-default"])
+    parser.add_argument("--measure", choices=["straighten-speed"])
     args = parser.parse_args()
     if sum(map(bool, (args.rows, args.record_baseline, args.mutant, args.control))) > 1:
         print("instrument failure: --rows, --record-baseline, --mutant and --control are "
@@ -1839,6 +2250,13 @@ def main():
     remove_work()
     atexit.register(remove_work)
     WORK.mkdir(parents=True)
+    if args.measure:
+        print("B92 — ExportStraightAlpha's speed, optimised (printed, never scored)", flush=True)
+        try:
+            return measure_speed()
+        except Exception as error:  # an instrument that could not run
+            print(f"instrument failure: {type(error).__name__}: {error}")
+            return 2
     baseline = json.loads(BASELINE.read_text()) if BASELINE.exists() else None
     if args.mutant or args.control:
         # Neither names a digest row; the baseline is what L2's columns are
@@ -1870,6 +2288,14 @@ def main():
         passed = sum(1 for name in SHEET_ROWS if rows.get(name))
         print(f"{passed}/{len(SHEET_ROWS)}")
         return 0 if passed == len(SHEET_ROWS) else 1
+    if args.rows == "alpha-mode":
+        print("B92 — the alpha mode: exported straight, imported as labelled (#242, spec §11 "
+              "G-35)", flush=True)
+        session("alpha", args.app, lambda s: score(s, ALPHA_ROWS, True), True,
+                make=alpha_fixtures)
+        passed = sum(1 for name in ALPHA_ROWS if rows.get(name))
+        print(f"{passed}/{len(ALPHA_ROWS)}")
+        return 0 if passed == len(ALPHA_ROWS) else 1
     if baseline is None:
         print(f"instrument failure: no baseline at {BASELINE} (--record-baseline, twice, "
               "on the build before G-33's code)")
@@ -1890,12 +2316,8 @@ def main():
         f" — NOT the baseline's ({host_text(baseline.get('host'))}): "
         f"{', '.join(r for r in DIGEST_ROWS if r in names)} will not be scored"), flush=True)
 
-    def body(s):
-        score(s, names, full)
-        if full:
-            line_i1(s)
-
-    session("rows", args.app, body, full, baseline=baseline, foreign=foreign)
+    session("rows", args.app, lambda s: score(s, names, full), full, baseline=baseline,
+            foreign=foreign)
     if full:
         row_e3(args.app)
     skipped = [name for name in names if name in rows and rows[name] is None]
