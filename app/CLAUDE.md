@@ -1071,8 +1071,9 @@ the key map behind it.
   discriminant, append only) and `target(of:in:)` (the core's
   `matte_target`, for the chrome only); `TrackSnapshot.matte` decodes it
   leniently.
-- `Compositor.swift` · `Compositor+Shadow.swift` · `Compositor+Matte.swift` ·
-  `CompositorEffects.swift` · `Resources/Shaders/Compositor.metal`
+- `Compositor.swift` · `Compositor+Uniforms.swift` · `Compositor+Shadow.swift` ·
+  `Compositor+Matte.swift` · `CompositorEffects.swift` ·
+  `Resources/Shaders/Compositor.metal`
   — the per-layer pass. The uniform block's field ORDER is a contract with the
   shader checked only by reading both, so change them in one edit; it is 104
   floats and **the padding tail is EMPTY** (the next field needs three
@@ -1085,6 +1086,8 @@ the key map behind it.
   three passes and its canvas-sized pair are `Compositor+Shadow.swift`'s
   (`encodeShadow`); a layer's uniforms and source texture are made by
   `prepare` in `CompositorEffects.swift`, which `render` calls once per layer.
+  A layer's uniform block is filled by `uniforms(for:…)` in
+  `Compositor+Uniforms.swift`, with `partnerBox` and `clearColor`.
   The matte pass is `Compositor+Matte.swift`'s `encodeMattes`, run BEFORE the
   destination pass opens: each group the recipe's `mattes` lists is drawn by
   the layer pipelines into a pooled destination-sized target (`MattePool`),

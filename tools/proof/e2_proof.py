@@ -965,7 +965,7 @@ def during_part(mcp):
     # itself. What it moves is a GUARD: `MetalRenderer.partnerBox` answers nil
     # for a partner that is rotated at all, and the outgoing half of a cross
     # dissolve then loses the coverage correction and is drawn at `1 − p`
-    # instead of at full alpha (`Compositor.swift`, `Compositor.metal`). So
+    # instead of at full alpha (`Compositor+Uniforms.swift`, `Compositor.metal`). So
     # the reduction is measured on the INCOMING clip of a dissolve, which is
     # the case `motion.rs`'s module doc names.
     pair = Session(mcp, "e2-spin-partner", background=(0, 0, 0))

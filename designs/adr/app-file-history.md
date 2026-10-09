@@ -470,8 +470,15 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   alone before the matte pass landed (`DestinationPass`, `device`, `pipeline`, `shadowPipeline`,
   `sampler`, `placeholder`, `blurSupported`, `shadowSurfaces`, `blurKernels`, the two sigma
   constants, `uniforms(for:…)`, `source(for:…)`, `LayerSource` and `encodeShadow` lost
-  `private`). The next seam: `MetalRenderer`'s uniforms section (its `// MARK: - Uniforms`, not the file-level one above `LayerUniforms`: `uniforms(for:…)`,
-  `partnerBox`, `clearColor`), moved with `word_looks_proof.py`'s D1 anchor re-pinned.
+  `private`). Issue batch B90 phase 2 paid the seam that move named: `MetalRenderer`'s
+  `// MARK: - Uniforms` section (`uniforms(for:…)`, `partnerBox`, `clearColor`) went whole to
+  `Compositor+Uniforms.swift` as an `extension MetalRenderer`, a pure move gated alone before the
+  matte pool and the routed dissolve landed (`clearColor` lost `private`, since `render` calls it;
+  `partnerBox` stayed `private static`; `word_looks_proof.py`'s `dim-not-composited` anchor
+  re-pinned). `wc -l app/Sources/Compositor.swift`: 1147 before, 1003 after;
+  `Compositor+Uniforms.swift` is 152. The next seam: `LayerUniforms`, `ShadowUniforms` and
+  `TransitionCode` (the file-level `// MARK: - Uniforms` above `LayerUniforms`) out whole to
+  `LayerUniforms.swift`.
 - `ReelCore.swift`: the typed patches moved to `TypedPatches.swift` in issue batch B73 (#216), a
   pure move gated alone before `ReelContainer` landed; no further seam is named. The `dictionary`
   extensions went to `OpDictionaries.swift` in issue batch B52b (#190), the media helpers earlier

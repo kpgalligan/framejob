@@ -126,7 +126,7 @@ the rows on it, W3 aside:
                   compositor: D1 must FAIL (the ratio reads about 0.25).
   dim-not-composited
                   the compositor reads the recipe's `opacity`, not
-                  `drawnOpacity` (in `Compositor.swift`): D1 must FAIL.
+                  `drawnOpacity` (in `Compositor+Uniforms.swift`): D1 must FAIL.
   backdrop-dims   every page's dim is the layer's (`wordDim`'s `onLayer`
                   always true): D4 must FAIL — the backdrop reads
                   (127.5, 127.5, 0).
@@ -226,7 +226,7 @@ MUTANTS = {
     "dim-twice": ([(DIM_HANDED, "reveal.wordDim", "LayerRenderersText.swift")], "D1"),
     "dim-not-composited": (
         [("u.opacity = Float(min(max(layer.drawnOpacity, 0), 1))",
-          "u.opacity = Float(min(max(layer.opacity, 0), 1))", "Compositor.swift")], "D1"),
+          "u.opacity = Float(min(max(layer.opacity, 0), 1))", "Compositor+Uniforms.swift")], "D1"),
     "backdrop-dims": ([("props.backdrop == nil", "true")], "D4"),
     "dim-on-both": ([("guard dim.onLayer, dim.amount > 0", "guard dim.amount > 0",
                       "CompositorEffects.swift")], "D4"),
