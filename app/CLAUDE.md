@@ -1075,7 +1075,12 @@ the key map behind it.
   `Compositor+Matte.swift` · `MattePlan.swift` · `Compositor+Dissolve.swift` ·
   `CompositorEffects.swift` · `LayerUniforms.swift` (`LayerUniforms`,
   `ShadowUniforms`, `TransitionCode`) · `Resources/Shaders/Compositor.metal`
-  — the per-layer pass. The uniform block's field ORDER is a contract with the
+  — the per-layer pass. The working format is `rgba16Float`
+  (`MetalRenderer.workingFormat`, from `Compositor.outputPixelFormat`,
+  `64RGBAHalf`; spec §11 PR-1): every layer, blend, shadow and dissolve
+  pipeline's attachment, the destination, each matte composite and dissolve
+  half, and the shadow pair. The coverage stays `r8Unorm`. `texture(from:)`
+  wraps a buffer by its own format. The uniform block's field ORDER is a contract with the
   shader checked only by reading both, so change them in one edit; it is 104
   floats and **the padding tail is EMPTY** (the next field needs three
   companions). **Seven pipelines from five fragment functions**: the two
@@ -1187,7 +1192,8 @@ the key map behind it.
 - `Exporter.swift` · `ExporterLoudness.swift` · `ExporterSettings.swift` ·
   `ExporterWriter.swift` · `ExporterWriter+Settings.swift` ·
   `ExporterWriter+Chapters.swift` · `ExporterAudioGain.swift` ·
-  `ExportStraightAlpha.swift` · `ExporterImageSequence.swift` ·
+  `ExportStraightAlpha.swift` · `ExportStraightAlphaHalf.swift` ·
+  `ExporterImageSequence.swift` ·
   `ExporterErrors.swift` · `ExporterGraphics.swift` — the writer
   (`ExportWriter` REPLACED `AVAssetExportSession` so chapters, bitrate and
   size have one path) and the one-frame offline render. An export is TWO
@@ -1200,7 +1206,13 @@ the key map behind it.
   un-premultiplied, each transparent pixel within 4 px of a visible one
   filled with the nearest one's colour, and labelled `StraightAlpha`, with
   `hevc_alpha`'s encoder key straight too (`ExportStraightAlpha.swift`, spec
-  §11 G-35). Every other row's frame goes to the encoder as drawn.
+  §11 G-35): `prores_4444`'s in place in float, `hevc_alpha`'s rounded first
+  into a pooled 32BGRA buffer (`ExportFrames`, `ExportStraightAlphaHalf.swift`,
+  PR-3); the fill is one generic pass over `StraightAlphaLayout` (`BGRA8`,
+  `RGBAHalf`), whose `allVisible` keeps the whole-row check vectorised.
+  `h264`'s and `hevc`'s frames are rounded to 8 bits the same way and not
+  straightened, and `hevc` is pinned to Main; every other row's frame goes
+  to the encoder as drawn.
   `ExportWriter` FILLS the frame when a fit would leave at most
   a pixel uncovered, or — the frame a canvas-SHAPED size less at most one
   pixel on each axis, `(bw + a)·ch == (bh + b)·cw` for some `a`, `b` in
@@ -2369,8 +2381,9 @@ handlers, the coalesced pass and the outbox; main publishes through
 `drain()` and never waits on it but by `queue.sync`), the cache's main
 hop, the alert queue's main hop (`ProjectDocument+Alerts.swift`), the agent lane's per-document serial queues (`AgentLane.swift`), the
 assistant session's write queue (`AssistantSession.swift`), the alpha rows'
-straightening (`ExportStraightAlpha.swift`, `DispatchQueue.concurrentPerform`
-over rows, inside the video pump), and the spend-month
+straightening and the 8-bit rounding (`ExportStraightAlpha.swift`,
+`ExportStraightAlphaHalf.swift`, `DispatchQueue.concurrentPerform` over rows,
+inside the video pump), and the spend-month
 queue (`AssistantSpendMonth.queue`, Settings' ledger fold, answered by a
 main hop), and — not a queue but a seam all the same — the graphic
 prefetch's worker `Thread`s (`GraphicPrefetch.swift`, G-26). The recorder adds

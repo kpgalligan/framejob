@@ -73,10 +73,18 @@ composes AFTER the recipe is published; the end branch removed — a round
 trip back to the end tick — scores **54/58**, the four end rows (the
 transport lands on the end tick and the layer shows black).
 
+  7. (the precision road map's PR1, spec §11 PR-1) PF: at Full the displayed
+     buffer is the compositor's 64RGBAHalf, and its 40 × 40 grid mean is
+     within ±1 of `Exporter.renderFrame`'s at the same tick. Every buffer the
+     probe reads is read by its format — 32BGRA bytes, or 64RGBAHalf halves
+     × 255 — and any other format leaves no mean, which fails the rows that
+     read it.
+
 Needs `ffmpeg`, `swiftc`, `xcrun metal` and `core/target/release/libreelcut_core.a`.
 No port. Run from anywhere:
 
     python3 tools/proof/preview_refresh_probe.py
+    python3 tools/proof/preview_refresh_probe.py --sources DIR   # a copy's app/Sources
 """
 
 import json
@@ -189,6 +197,42 @@ func spin(_ seconds: Double) {
 let args = CommandLine.arguments
 var answer: [String: Any] = [:]
 
+/// The displayed buffer's 40 × 40 grid: the mean of (r + g + b) / 3 a pixel
+/// in integers, each channel 0…255 — a 32BGRA buffer's bytes, or a
+/// 64RGBAHalf buffer's halves × 255, rounded (the precision road map's PR1:
+/// the compositor's output is 64RGBAHalf) — and the same mean unrounded, with
+/// the buffer's fourcc. The means are nil for any other format, which every
+/// row reading them scores as a failure.
+func gridMean(_ buffer: CVPixelBuffer) -> (format: String, mean: Int?, exact: Double?) {
+    let type = CVPixelBufferGetPixelFormatType(buffer)
+    let format = String(bytes: [24, 16, 8, 0].map { UInt8((type >> UInt32($0)) & 0xFF) },
+                        encoding: .ascii) ?? "\(type)"
+    guard type == kCVPixelFormatType_32BGRA || type == kCVPixelFormatType_64RGBAHalf,
+        CVPixelBufferLockBaseAddress(buffer, .readOnly) == kCVReturnSuccess
+    else { return (format, nil, nil) }
+    defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
+    let w = CVPixelBufferGetWidth(buffer), h = CVPixelBufferGetHeight(buffer)
+    let row = CVPixelBufferGetBytesPerRow(buffer)
+    guard let base = CVPixelBufferGetBaseAddress(buffer) else { return (format, nil, nil) }
+    var sum = 0, exact = 0.0, n = 0
+    for y in stride(from: 0, to: h, by: max(h / 40, 1)) {
+        for x in stride(from: 0, to: w, by: max(w / 40, 1)) {
+            var channels = [0, 0, 0]
+            if type == kCVPixelFormatType_32BGRA {
+                let p = (base + y * row).assumingMemoryBound(to: UInt8.self) + x * 4
+                channels = [Int(p[0]), Int(p[1]), Int(p[2])]
+            } else {
+                let p = (base + y * row).assumingMemoryBound(to: Float16.self) + x * 4
+                channels = (0..<3).map { Int((Float(p[$0]) * 255).rounded()) }
+            }
+            sum += (channels[0] + channels[1] + channels[2]) / 3
+            exact += Double(channels[0] + channels[1] + channels[2]) / 3
+            n += 1
+        }
+    }
+    return (format, sum / max(n, 1), exact / Double(max(n, 1)))
+}
+
 let document = ProjectDocument()
 try! document.read(from: URL(fileURLWithPath: args[1]), ofType: ProjectDocument.projectTypeIdentifier)
 NSDocumentController.shared.addDocument(document)
@@ -224,21 +268,13 @@ func sample() -> [String: Any] {
         "waitMs": Int(Date().timeIntervalSince(started) * 1000),
     ]
     if let buffer = buffer {
-        CVPixelBufferLockBaseAddress(buffer, .readOnly)
-        let w = CVPixelBufferGetWidth(buffer), h = CVPixelBufferGetHeight(buffer)
-        let row = CVPixelBufferGetBytesPerRow(buffer)
-        let base = CVPixelBufferGetBaseAddress(buffer)!.assumingMemoryBound(to: UInt8.self)
-        var sum = 0, n = 0
-        for y in stride(from: 0, to: h, by: max(h / 40, 1)) {
-            for x in stride(from: 0, to: w, by: max(w / 40, 1)) {
-                let p = base + y * row + x * 4
-                sum += (Int(p[0]) + Int(p[1]) + Int(p[2])) / 3
-                n += 1
-            }
+        let grid = gridMean(buffer)
+        s["format"] = grid.format
+        if let mean = grid.mean {
+            s["size"] = [CVPixelBufferGetWidth(buffer), CVPixelBufferGetHeight(buffer)]
+            s["mean"] = mean
+            s["meanExact"] = grid.exact
         }
-        CVPixelBufferUnlockBaseAddress(buffer, .readOnly)
-        s["size"] = [w, h]
-        s["mean"] = sum / max(n, 1)
     }
     return s
 }
@@ -311,6 +347,33 @@ answer["opacity1afterPlay"] = edit([opacity(1)])
 // and asks for the same refresh.
 move(ReelTime.ticks(seconds: 1))
 answer["beforeQuality"] = sample()
+// PF (the precision road map's PR1): the frame `Exporter.renderFrame` draws at
+// the same tick, on the same grid — redrawn into 8-bit RGBA in its own space.
+if let image = Exporter.renderFrame(
+    project: document.project, urls: document.mediaURLs(), at: document.playhead, maxWidth: nil),
+    let space = image.colorSpace ?? CGColorSpace(name: CGColorSpace.sRGB)
+{
+    let w = image.width, h = image.height
+    var bytes = [UInt8](repeating: 0, count: w * h * 4)
+    let drawn: Bool = bytes.withUnsafeMutableBytes { raw in
+        guard let context = CGContext(
+            data: raw.baseAddress, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+            space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { return false }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+        return true
+    }
+    var exact = 0.0, n = 0
+    for y in stride(from: 0, to: h, by: max(h / 40, 1)) where drawn {
+        for x in stride(from: 0, to: w, by: max(w / 40, 1)) {
+            let p = (y * w + x) * 4
+            exact += Double(Int(bytes[p]) + Int(bytes[p + 1]) + Int(bytes[p + 2])) / 3
+            n += 1
+        }
+    }
+    answer["renderAtFull"] = ["size": [w, h], "bits": image.bitsPerComponent,
+                              "mean": drawn ? exact / Double(max(n, 1)) : -1]
+}
 editor.playback.setPreviewQuality(.half)
 spin(1.5)
 answer["half"] = sample()
@@ -500,14 +563,36 @@ def rows():
     ])
 
 
+def pf_row():
+    """PF (the precision road map's PR1, spec §11 PR-1): at Full the displayed
+    buffer is 64RGBAHalf, and its grid mean is within ±1 of
+    `Exporter.renderFrame`'s at the same tick."""
+    def good(a):
+        shown, drawn = a["beforeQuality"], a["renderAtFull"]
+        return (shown.get("format") == "RGhA" and drawn.get("mean", -1) >= 0
+                and abs(shown["meanExact"] - drawn["mean"]) <= 1)
+    return ("7 — the displayed buffer is the compositor's 16-bit float (PR1)", [
+        ("PF at Full the displayed buffer is 64RGBAHalf and its 40 × 40 grid mean is within ±1 "
+         "of Exporter.renderFrame's at the same tick", good, "PF"),
+    ])
+
+
 def main():
+    global SOURCES, SHADER, PROBE
+    if "--sources" in sys.argv:
+        # A mutant's copy (`precision_proof.py --mutant output-8bit`): its
+        # sources and its shader, built in a folder of their own.
+        SOURCES = os.path.abspath(sys.argv[sys.argv.index("--sources") + 1])
+        SHADER = os.path.join(os.path.dirname(SOURCES), "Resources", "Shaders", "Compositor.metal")
+        PROBE = os.path.join(WORK, "probe-sources")
+        print(f"sources: {SOURCES}")
     package, why = make_fixture()
     binary, build_error = build_probe()
     locked = console_locked()
     answer, error = (None, None)
     if not locked and package is not None and binary is not None:
         answer, error = run_probe(binary, package)
-    for title, checks in rows():
+    for title, checks in list(rows()) + [pf_row()]:
         section(title)
         for name, predicate, key in checks:
             if locked:
@@ -519,7 +604,11 @@ def main():
                     ok = predicate(answer)
                 except (KeyError, TypeError) as e:
                     ok = False
-                check(name, ok, json.dumps(answer.get(key)))
+                detail = ({"shown": answer.get("beforeQuality"), "drawn": answer.get("renderAtFull")}
+                          if key == "PF" else answer.get(key))
+                check(name, ok, json.dumps(detail))
+                if ok and key == "PF":
+                    print(f"       {json.dumps(detail)}")
     total = passed + failed
     print(f"\n{passed}/{total} checks passed" + (f", {skipped} skipped by name" if skipped else ""))
     sys.exit(0 if failed == 0 else 1)

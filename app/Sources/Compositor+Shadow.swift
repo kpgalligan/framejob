@@ -224,7 +224,8 @@ extension MetalRenderer {
     /// The shared offscreen pair at the canvas size, allocated on first use
     /// and whenever the canvas changes size. Both are allocated together: a
     /// shadow with no blur leaves the second one idle, which is the cheaper
-    /// mistake to make.
+    /// mistake to make. In the working format, because the silhouette pass
+    /// draws with a layer pipeline (spec §11 PR-1).
     private func shadowPair(width: Int, height: Int) -> ShadowSurfaces? {
         if let surfaces = shadowSurfaces, surfaces.mask.width == width,
             surfaces.mask.height == height
@@ -232,7 +233,8 @@ extension MetalRenderer {
             return surfaces
         }
         let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: .bgra8Unorm, width: width, height: height, mipmapped: false)
+            pixelFormat: MetalRenderer.workingFormat, width: width, height: height,
+            mipmapped: false)
         // Rendered into, sampled by the shadow pass, and written by MPS (which
         // takes a compute path for some sigmas and a render path for others,
         // so both usages have to be there).

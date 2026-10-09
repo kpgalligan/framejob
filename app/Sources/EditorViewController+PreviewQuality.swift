@@ -134,7 +134,7 @@ enum PreviewQuality: Int, CaseIterable {
     /// and an `AVPlayerLayer` fed a 304 × 171 composition of a 16∶9 source
     /// reports `displayedPixelBuffer` at 304 × 171 and `videoRect` at
     /// 1.777778. Nothing here rounds to even numbers, and nothing should:
-    /// the buffers are 32BGRA with no chroma subsampling to make an odd edge
+    /// the buffers are 64RGBAHalf with no chroma subsampling to make an odd edge
     /// meaningless. (`ExportWriter.encodedSize` rounds down to even for the
     /// opposite reason — an ENCODER's requirement, which this path has not
     /// got.)

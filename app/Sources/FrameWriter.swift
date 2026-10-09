@@ -347,10 +347,10 @@ enum FrameWriter {
     /// a path nothing measures. One path per format is worth a full-frame
     /// draw at the speed a person presses a menu item.
     ///
-    /// Eight bits a component, deliberately: JPEG has no more, so a 16-bit
-    /// source (which is what `render_frame` writes from a ProRes clip) is
-    /// truncated here rather than at some later point where it would look like
-    /// a rendering difference. The colour space is the image's own where it is
+    /// Eight bits a component, deliberately: JPEG has no more, so a frame from
+    /// a 10-bit source (which `render_frame` writes as 16-bit float from a
+    /// ProRes or HEVC Main 10 clip) is truncated here rather than at some
+    /// later point where it would look like a rendering difference. The colour space is the image's own where it is
     /// an RGB one, so the flatten changes coverage and nothing else; a source
     /// in any other model falls back to device RGB, which is the only thing
     /// `noneSkipLast` can be built over.

@@ -383,9 +383,10 @@ def catalog_part(mcp):
     check(
         set(transcribe["properties"])
         == {"clips", "language", "place", "engine", "speakers", "vocabulary", "refresh",
-            "style", "replace", "project"},
+            "style", "replace", "slide", "fill", "dim", "project"},
         "transcribe declares clips, language and place, plus road map 6 C1's engine, "
-        "speakers, vocabulary and refresh, road map 8 W4a's style and replace (and project): "
+        "speakers, vocabulary and refresh, road map 8 W4a's style and replace, spec §11 "
+        "W-15's slide, fill and dim (and project): "
         f"{sorted(transcribe['properties'])}",
     )
     check(

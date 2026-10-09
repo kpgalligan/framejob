@@ -34,6 +34,14 @@ and re-litigate nothing.
   - Risk accepted: frame memory doubles. At 4K that is about 265 → 531 MB for a typical project
     and 611 → 1,143 MB for a heavy one, with PR-2 (REASONED from measured buffer sizes; PR1 and
     PR2 measure the app's own figures). A project with a shadow holds another 67 MB at 4K.
+  - Measured in PR1 (2026-10-09; Release, `precision_proof.py --measure`, each `prores_422`
+    export's lifetime `phys_footprint_peak`, PR0 → PR1): typical 1080p 285.3 → 422.5 MB,
+    typical 4K 618.0 → 1,236.1 MB, heavy 1080p 453.9 → 655.1 MB, heavy 4K 1,238.7 → 2,090.4 MB
+    (+851.7 MB). The export pipeline holds about 19–26 frame buffers at its peak, where the
+    reasoned figures assumed a handful, so the heavy 4K rise passed the road map's stop of
+    +532 MB. **Accepted as measured by the owner (2026-10-09):** "We shouldn't worry about 8g
+    macs at all, and give only minimal concern to 16g macs." The +532 MB stop no longer applies
+    to this road map; each phase still measures and records the footprints.
 - **PR-2 — Every video source decodes to `64RGBAHalf` (choice 2).**
   - `sourcePixelBufferAttributes` asks every track for `kCVPixelFormatType_64RGBAHalf`, wrapped
     as `rgba16Float`.
@@ -60,6 +68,9 @@ and re-litigate nothing.
   - `h264`'s frame is first rounded to 8-bit BGRA (round(v·255)) into a pooled 32BGRA buffer,
     unstraightened and unlabelled, so its encoder input is what it was. Measured: H.264 fed
     half-float frames gave 8.80 steps RMS on the ramp, against 6.27 from 32BGRA.
+  - `hevc`'s frame is rounded the same way (amended in PR1's fix pass). Measured on the app:
+    `hevc` (Main) encoded the precision proof's 10-bit ramp at 9.04 steps RMS from half-float
+    frames, against 6.46 from PR0's 32BGRA, each figure the same over three exports.
   - Amends G-35 (c):
     - `prores_4444`'s frame is un-premultiplied in place in float (s = min(1, c/a) for a > 0),
       then filled by G-35 (d)'s rule over its half-float pixels.

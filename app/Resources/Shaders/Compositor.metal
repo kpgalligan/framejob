@@ -541,8 +541,10 @@ static inline LayerSample gradeSample(float3 rgb, float alpha,
 
 static inline LayerSample layerSample(texture2d<float> source, sampler samp,
                                       float2 uv, constant LayerUniforms &u) {
-    float4 texel = source.sample(
-        samp, orientedUV(uv, u.sourceQuarterTurns, u.sourceMirrored));
+    // Clamped to [0, 1]: a 16-bit-float source can arrive outside it, and
+    // every stage below assumes encoded values (spec §11 PR-1).
+    float4 texel = saturate(source.sample(
+        samp, orientedUV(uv, u.sourceQuarterTurns, u.sourceMirrored)));
     // Text, shape and image textures arrive PREMULTIPLIED (that is what
     // LayerRenderers hands over, and what this stage outputs); a video frame
     // is premultiplied only when its buffer is labelled so, and straight
@@ -914,10 +916,12 @@ static inline ObscurePlan obscurePlan(constant LayerUniforms &u, float2 localPx,
 //
 // **This compositor blends in the ENCODED sRGB space, deliberately.** Nothing
 // in the pipeline uses an `_srgb` pixel format — the attachment is
-// `.bgra8Unorm` — so every stage above works on stored 8-bit values, and step
-// 11 works on the same ones. "Multiply of 50 % grey over 50 % grey is 25 %"
-// is a statement about ENCODED values and is false in linear light, where the
-// answer is about 22 %. A reader who knows colour will want to put a
+// `.rgba16Float` holding encoded values clamped to [0, 1] (spec §11 PR-1) —
+// so every stage above works on encoded values, and step 11 works on the same
+// ones, kept at 16-bit float rather than rounded to 8 bits between layers.
+// "Multiply of 50 % grey over 50 % grey is 25 %" is a statement about ENCODED
+// values and is false in linear light, where the answer is about 24 %
+// (61/255). A reader who knows colour will want to put a
 // linearise/encode pair around the blend; that would change every blended
 // pixel, break the proof's measured 64 / 192 / 255, and make the compositor
 // disagree with itself, since the grade, the filters and the transitions have
@@ -938,7 +942,7 @@ static inline ObscurePlan obscurePlan(constant LayerUniforms &u, float2 localPx,
 // a spatial term is vignette, and even there the tap ring is symmetric, so the
 // first-order error cancels and what is left is the SECOND derivative of a
 // smoothstep across a blur radius: a fraction of a percent of brightness at
-// `kBlurMaxRadius`, well inside the rounding of an 8-bit frame.
+// `kBlurMaxRadius` (one 8-bit step is 0.39 %, one 10-bit step 0.1 %).
 //
 // **Why the obscured regions run at 4b and not at the end.** They must come
 // after the SHARPEN, because the unsharp term is built from the RAW texture
@@ -1498,7 +1502,9 @@ fragment float4 reelcut_layer_blend_fragment(Varyings in [[stage_in]],
                                              float4 dst [[color(0)]],
                                              texture2d<float> matte [[texture(1)]]) {
     float4 src = layerColorPremultiplied(in, u, source, samp, matte);
-    return blendPremultiplied(int(u.blendMode + 0.5), src, dst);
+    // Clamped, because the 16-bit-float canvas keeps whatever is returned
+    // and a blend can step past 1 or below 0 (spec §11 PR-1).
+    return saturate(blendPremultiplied(int(u.blendMode + 0.5), src, dst));
 }
 
 // MARK: - The shadow pass (spec §7.5)
@@ -1681,5 +1687,5 @@ fragment float4 reelcut_dissolve_fragment(ShadowVaryings in [[stage_in]],
         o = zoomedHalf(outgoing, samp, c, float2(u.outAnchorX, u.outAnchorY), zOut, canvas);
         i = zoomedHalf(incoming, samp, c, float2(u.inAnchorX, u.inAnchorY), zIn, canvas);
     }
-    return mix(o, i, p);
+    return saturate(mix(o, i, p));
 }

@@ -70,11 +70,12 @@ E4  a fresh project with `pin.js` and a 3 s `pin` clip, exported as
     It does NOT race a module swap: the server is one thread and `export`
     holds it, so no MCP call can observe the registry mid-export;
 Q1  (`graphics_pin_probe.swift`, built from `app/Sources` like
-    `phase7_chrome.py`'s probe, over the saved project PQ — `pin.js` and
-    `nofont.js`, a 3 s `pin` clip) `queue pin`: the job enqueued with the
-    document's set, then the canvas turned blue and the document's set
-    REMOVED before any frame: at 1 s (480,540) within ±6 of RED and
-    (1440,540) of BLACK; CONTROL `queue nopin`: (480,540) is NOT RED;
+    `phase7_chrome.py`'s probe, over a fresh copy per run of the saved
+    project PQ — `pin.js` and `nofont.js`, a 3 s `pin` clip) `queue pin`:
+    the job enqueued with the document's set, then the canvas turned blue
+    and the document's set REMOVED before any frame: at 1 s (480,540)
+    within ±6 of RED and (1440,540) of BLACK; CONTROL `queue nopin`:
+    (480,540) is NOT RED;
 Q2  the same through `Exporter.export` directly: `direct pin` RED,
     `direct nopin` not;
 Q3  `hit`: one `LayerRenderers` asked twice for `nofont`: both answers'
@@ -1568,12 +1569,19 @@ def build_pin_probe(sources_dir=ROOT / "app/Sources", out=PIN_PROBE_DIR):
 
 
 def run_probe(binary, mode, pin, tag, package=None):
-    """One probe run over `package` (PQ by default): its JSON answer (or an
-    error), and the decoded frame at 1 s for the two pin export modes."""
+    """One probe run over a copy of `package` (PQ by default) of its own: its
+    JSON answer (or an error), and the decoded frame at 1 s for the two pin
+    export modes. A copy because `swapOut`'s blue canvas is a document edit,
+    which AppKit autosaves in place once a run outlasts its autosave delay
+    (the probe's -Onone export took 18–32 s from precision PR1 on), and a
+    shared PQ then handed the next run a blue canvas — Q2 read blue (#255)."""
     if binary is None:
         return {"error": "the probe did not build"}, b""
     movie = WORK / f"{tag}.mov"
-    package = package or WORK / "PQ.reelcut"
+    source = package or WORK / "PQ.reelcut"
+    package = WORK / f"{tag}.reelcut"
+    shutil.rmtree(package, ignore_errors=True)
+    shutil.copytree(source, package)
     got = bounded.run([str(binary), str(package), mode, pin, str(movie)], 600)
     try:
         answer = json.loads(got["stdout"].strip().splitlines()[-1])

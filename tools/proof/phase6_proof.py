@@ -22,12 +22,13 @@ line goes red.
 
 **This compositor blends in the ENCODED sRGB space, deliberately.** Nothing
 in the pipeline uses an `_srgb` texture format, so the fragment stage
-computes on the stored 8-bit values — the same space every other stage
-already works in. "A multiply of 50 % grey over 50 % grey is 25 %" is a
-statement about ENCODED values and is FALSE in linear light: linearise both
-128s, multiply, re-encode, and the answer is about **61**/255, four steps
-darker than the 64 this script measures — a small difference, and four times
-the ±1 tolerance every check below carries, so the two readings cannot both
+computes on the stored encoded values (16-bit float since spec §11 PR-1) —
+the same space every other stage already works in. "A multiply of 50 % grey
+over 50 % grey is 25 %" is a statement about ENCODED values and is FALSE in
+linear light: linearise both 128s, multiply, re-encode, and the answer is
+about **61**/255, three steps darker than the 64 this script measures — a
+small difference, and three times the ±1 tolerance every check below
+carries, so the two readings cannot both
 pass. A reader who knows colour will see the 64, take it for the wrong
 answer and reach for a linearise/encode pair around `blendPremultiplied`,
 which would break every number here and look like the proof was wrong. It is

@@ -182,6 +182,42 @@ final class ProbeDocumentController: NSDocumentController {
 _ = ProbeDocumentController()
 NSApplication.shared.setActivationPolicy(.accessory)
 
+/// The displayed buffer's 40 × 40 grid: the mean of (r + g + b) / 3 a pixel
+/// in integers, each channel 0…255 — a 32BGRA buffer's bytes, or a
+/// 64RGBAHalf buffer's halves × 255, rounded (the precision road map's PR1:
+/// the compositor's output is 64RGBAHalf) — and the same mean unrounded, with
+/// the buffer's fourcc. The means are nil for any other format, which every
+/// row reading them scores as a failure.
+func gridMean(_ buffer: CVPixelBuffer) -> (format: String, mean: Int?, exact: Double?) {
+    let type = CVPixelBufferGetPixelFormatType(buffer)
+    let format = String(bytes: [24, 16, 8, 0].map { UInt8((type >> UInt32($0)) & 0xFF) },
+                        encoding: .ascii) ?? "\(type)"
+    guard type == kCVPixelFormatType_32BGRA || type == kCVPixelFormatType_64RGBAHalf,
+        CVPixelBufferLockBaseAddress(buffer, .readOnly) == kCVReturnSuccess
+    else { return (format, nil, nil) }
+    defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
+    let w = CVPixelBufferGetWidth(buffer), h = CVPixelBufferGetHeight(buffer)
+    let row = CVPixelBufferGetBytesPerRow(buffer)
+    guard let base = CVPixelBufferGetBaseAddress(buffer) else { return (format, nil, nil) }
+    var sum = 0, exact = 0.0, n = 0
+    for y in stride(from: 0, to: h, by: max(h / 40, 1)) {
+        for x in stride(from: 0, to: w, by: max(w / 40, 1)) {
+            var channels = [0, 0, 0]
+            if type == kCVPixelFormatType_32BGRA {
+                let p = (base + y * row).assumingMemoryBound(to: UInt8.self) + x * 4
+                channels = [Int(p[0]), Int(p[1]), Int(p[2])]
+            } else {
+                let p = (base + y * row).assumingMemoryBound(to: Float16.self) + x * 4
+                channels = (0..<3).map { Int((Float(p[$0]) * 255).rounded()) }
+            }
+            sum += (channels[0] + channels[1] + channels[2]) / 3
+            exact += Double(channels[0] + channels[1] + channels[2]) / 3
+            n += 1
+        }
+    }
+    return (format, sum / max(n, 1), exact / Double(max(n, 1)))
+}
+
 func spin(_ seconds: Double) {
     let deadline = Date().addingTimeInterval(seconds)
     while Date() < deadline { RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.02)) }
@@ -325,21 +361,12 @@ case "player":
         spin(1.5)
         var frame: [String: Any] = ["seconds": seconds, "ready": layer.isReadyForDisplay]
         if let buffer = layer.displayedPixelBuffer() {
-            CVPixelBufferLockBaseAddress(buffer, .readOnly)
-            let w = CVPixelBufferGetWidth(buffer), h = CVPixelBufferGetHeight(buffer)
-            let row = CVPixelBufferGetBytesPerRow(buffer)
-            let base = CVPixelBufferGetBaseAddress(buffer)!.assumingMemoryBound(to: UInt8.self)
-            var sum = 0, n = 0
-            for y in stride(from: 0, to: h, by: max(h / 40, 1)) {
-                for x in stride(from: 0, to: w, by: max(w / 40, 1)) {
-                    let p = base + y * row + x * 4
-                    sum += (Int(p[0]) + Int(p[1]) + Int(p[2])) / 3
-                    n += 1
-                }
+            let grid = gridMean(buffer)
+            frame["format"] = grid.format
+            if let mean = grid.mean {
+                frame["size"] = [CVPixelBufferGetWidth(buffer), CVPixelBufferGetHeight(buffer)]
+                frame["mean"] = mean
             }
-            CVPixelBufferUnlockBaseAddress(buffer, .readOnly)
-            frame["size"] = [w, h]
-            frame["mean"] = sum / max(n, 1)
         }
         frames.append(frame)
     }

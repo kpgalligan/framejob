@@ -269,12 +269,32 @@ extension ExportWriter {
         if codec == .h264 {
             compression[AVVideoProfileLevelKey] = AVVideoProfileLevelH264HighAutoLevel
         }
+        // Pinned to 8-bit Main (spec §11 PR-3): given no profile, VideoToolbox
+        // follows its input's format, and the compositor's 16-bit frames
+        // gave Main 10. `frameForm` rounds this row's frame to 8 bits as
+        // well; the pin is what holds Main if a deep frame ever reaches it.
+        if codec == .hevc {
+            compression[AVVideoProfileLevelKey] = kVTProfileLevel_HEVC_Main_AutoLevel as String
+        }
         if codec == .hevcWithAlpha {
             compression[kVTCompressionPropertyKey_AlphaChannelMode as String] =
                 kVTAlphaChannelMode_StraightAlpha
         }
         output[AVVideoCompressionPropertiesKey] = compression
         return output
+    }
+
+    /// What the video pump makes of each 64RGBAHalf frame before the encoder
+    /// (spec §11 PR-3, `ExportFrames`): `hevc_alpha`'s rounded to 8 bits and
+    /// straightened, any other alpha row's (`prores_4444`) straightened in
+    /// float, `h264`'s and `hevc`'s rounded to 8 bits; nil hands the frame on
+    /// as drawn. The two 8-bit codecs encode a ramp worse from half-float
+    /// frames: H.264 8.80 steps RMS against 6.27 from 32BGRA, and `hevc`
+    /// (Main) 9.04 against 6.46 (precision PR1).
+    static func frameForm(_ settings: ExportSettings) -> ExportFrameForm? {
+        let codec = codecType(for: settings.codec)
+        if settings.alpha { return codec == .hevcWithAlpha ? .straightEightBit : .straightHalf }
+        return codec == .h264 || codec == .hevc ? .eightBit : nil
     }
 
     /// The core's codec name as an `AVVideoCodecType`. nil is a refusal, not

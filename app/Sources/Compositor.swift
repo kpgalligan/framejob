@@ -131,19 +131,28 @@ final class Compositor: NSObject, AVVideoCompositing {
 
     // MARK: - AVVideoCompositing
 
-    /// 32BGRA, Metal-compatible: the format the shader samples and the only
-    /// one this pipeline understands. AVFoundation converts anything else —
-    /// which is also how HDR sources arrive tone-mapped to SDR (§7.5).
+    /// The render context's buffers: 16-bit float, so a blend or a deep
+    /// source keeps more than 256 levels a channel (spec §11 PR-1). The
+    /// working format of every target a layer pipeline draws into follows it
+    /// (`MetalRenderer.workingFormat`), and the export reader reads it.
+    static let outputPixelFormat: OSType = kCVPixelFormatType_64RGBAHalf
+    /// What every video source is decoded to. Still 32BGRA: deep decode is
+    /// precision PR2 (spec §11 PR-2).
+    static let sourcePixelFormat: OSType = kCVPixelFormatType_32BGRA
+
+    /// Metal-compatible `sourcePixelFormat`: a format the layer stage samples
+    /// through `texture(from:)`. AVFoundation converts anything else — which
+    /// is also how HDR sources arrive tone-mapped to SDR (§7.5).
     var sourcePixelBufferAttributes: [String: any Sendable]? {
         [
-            kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA),
+            kCVPixelBufferPixelFormatTypeKey as String: Int(Compositor.sourcePixelFormat),
             kCVPixelBufferMetalCompatibilityKey as String: true,
         ]
     }
 
     var requiredPixelBufferAttributesForRenderContext: [String: any Sendable] {
         [
-            kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA),
+            kCVPixelBufferPixelFormatTypeKey as String: Int(Compositor.outputPixelFormat),
             kCVPixelBufferMetalCompatibilityKey as String: true,
         ]
     }
@@ -388,6 +397,23 @@ final class MetalRenderer {
     /// `blur: 0` shadow means anyway.
     static let minShadowSigma: Float = 0.5
 
+    /// The Metal format a pixel buffer of `pixelFormat` is wrapped as: 32BGRA
+    /// as `bgra8Unorm`, 64RGBAHalf as `rgba16Float`, anything else nil.
+    static func metalFormat(for pixelFormat: OSType) -> MTLPixelFormat? {
+        switch pixelFormat {
+        case kCVPixelFormatType_32BGRA: return .bgra8Unorm
+        case kCVPixelFormatType_64RGBAHalf: return .rgba16Float
+        default: return nil
+        }
+    }
+
+    /// The working format (spec §11 PR-1): the attachment of every layer,
+    /// blend, shadow and dissolve pipeline, and so of every target they draw
+    /// into — the destination, each matte composite and dissolve half, and
+    /// the shadow pair. The coverage stays `r8Unorm`.
+    static let workingFormat: MTLPixelFormat =
+        metalFormat(for: Compositor.outputPixelFormat) ?? .bgra8Unorm
+
     init?() {
         guard let device = MTLCreateSystemDefaultDevice(),
             let commandQueue = device.makeCommandQueue()
@@ -520,7 +546,7 @@ final class MetalRenderer {
         descriptor.label = label
         descriptor.vertexFunction = vertex
         descriptor.fragmentFunction = fragment
-        descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+        descriptor.colorAttachments[0].pixelFormat = workingFormat
         descriptor.colorAttachments[0].isBlendingEnabled = blending
         guard blending else { return descriptor }
         descriptor.colorAttachments[0].rgbBlendOperation = .add
@@ -677,14 +703,17 @@ final class MetalRenderer {
     }
 
     /// Wraps a pixel buffer as a texture through the `CVMetalTextureCache` —
-    /// zero-copy, because both sides are the same IOSurface.
+    /// zero-copy, because both sides are the same IOSurface — in the Metal
+    /// format of the buffer's own pixel format; nil for one with none.
     private func texture(from buffer: CVPixelBuffer, live: inout [CVMetalTexture]) -> MTLTexture? {
         let width = CVPixelBufferGetWidth(buffer)
         let height = CVPixelBufferGetHeight(buffer)
-        guard width > 0, height > 0 else { return nil }
+        guard width > 0, height > 0,
+            let format = Self.metalFormat(for: CVPixelBufferGetPixelFormatType(buffer))
+        else { return nil }
         var wrapper: CVMetalTexture?
         let status = CVMetalTextureCacheCreateTextureFromImage(
-            kCFAllocatorDefault, textureCache, buffer, nil, .bgra8Unorm, width, height, 0,
+            kCFAllocatorDefault, textureCache, buffer, nil, format, width, height, 0,
             &wrapper)
         guard status == kCVReturnSuccess, let wrapper = wrapper,
             let texture = CVMetalTextureGetTexture(wrapper)

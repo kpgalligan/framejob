@@ -1737,7 +1737,9 @@ needs a TCC grant, or that measures time or throughput, runs on Release
 Microphone grants are per bundle identifier"; it also refuses a Debug instance
 at its socket, so start that one with `proof_app.py launch --app release`) and
 `graphics_proof.py` ("E2 bounds render_frame and get_project in wall seconds":
-on Debug its render_frame took 2.04 s of the 3 s bound, so it was pinned); the
+on Debug its render_frame took 2.04 s of the 3 s bound, so it was pinned), and
+`precision_proof.py --measure` ("M1 measures the compositor's frame times and
+the app's memory"; its rows, `capture` and `compare` run on either); the
 18 app-driving proofs changed since issue batch B80 each scored their full
 score on Debug, the two with a recorded Release time (agent_socket_proof
 135 s, export_cancel_proof 256 s) faster on Debug (`archive/build-velocity.md`'s
@@ -17757,3 +17759,117 @@ invalidates the cache. Its two historical consumers (`phase5_chrome.py`,
 historical skip.
 `make gate` PASS (68 s): its test step passed, and the other steps were
 skipped as unchanged.
+
+## The precision road map — PR0 and PR1 (`precision_proof.py`, `precision_encoder_probe.swift`, `preview_display_probe.py`; the preview probes' format reads and PF; `hevc_alpha_proof.py` R8, RH, KH, HA and four mutants; spec §11 PR-1..PR-5)
+
+The road map's record is `designs/precision.md`; its decisions are
+`designs/spec/11-decisions/precision.md`. PR1 makes the compositor 16-bit
+float (`64RGBAHalf` buffers, `rgba16Float` targets) while sources stay
+32BGRA, and decides per export row what its encoder is handed
+(`ExportWriter.frameForm`, `ExportFrames`).
+
+```
+python3 tools/proof/preview_display_probe.py --rows spike          # V0–V2 (PR0's spike; exit 1 is its RECORDED outcome)
+python3 tools/proof/precision_proof.py [--only C0,D1,P1,H1] [--control DIR]
+python3 tools/proof/precision_proof.py capture DIR                 # on the CONTROL tree, before any product edit
+python3 tools/proof/precision_proof.py compare DIR [--only K1,…,E2]
+RC_PROOF_APP=release python3 tools/proof/precision_proof.py --measure capture|compare DIR   # M1, release-only
+python3 tools/proof/precision_proof.py --mutant h264-deep|hevc-deep compare DIR
+python3 tools/proof/precision_proof.py --mutant output-8bit|hevc-no-profile
+python3 tools/proof/hevc_alpha_proof.py --rows straighten          # R0, K1, R8, RH, KH
+python3 tools/proof/hevc_alpha_proof.py --measure hevc-alpha-deep   # HA, recorded
+python3 tools/proof/hevc_alpha_proof.py --mutant hevc-no-profile|bgra8-truncates|half-no-unpremultiply|half-no-fill
+python3 tools/proof/preview_refresh_probe.py [--sources DIR]       # PF is section 7
+```
+
+**`preview_display_probe.py` exits 1 by design.** Its one mode is PR0's spike
+(V0–V2): `CARenderer` draws an `AVPlayerLayer` in no window, and V1 — a
+half-float frame tagged Linear, the control that must move — drew within 0.03
+of the untagged one, so the instrument cannot be shown to see how the layer
+READS a buffer. V1's failure is the recorded result, not a broken
+instrument: leave the probe out of any sweep. PV was never built, and the
+displayed picture's check is `docs/manual-checks.md`'s PRC-1.
+
+**`precision_proof.py`** has `matte_proof.py`'s shape: its own instance
+(`proof_app`; Debug unless `RC_PROOF_APP=release`), a scratch
+`CFFIXED_USER_HOME`, everything under `work/precision/run/`, removed at the
+start and at exit; DIR, a capture, is kept (PR0's is
+`work/precision/ctl-pr0/`). The rows: **C0** two renders of K3 byte-equal;
+**D1** an all-8-bit project renders an 8-bit PNG (PR-4); **P1** a 50 %
+black→white gradient over black through `prores_422`, 1920 × 1080: the
+middle row's luma against 0.5·g/255 at most 1.0 10-bit steps RMS (`--control
+DIR` prints the 8-bit canvas's figure beside it); **H1** `hevc` is Main,
+`yuv420p`. `compare DIR`: **K1–K6** (the spike's scenes) against PR0's
+renders, K1 and K6 byte-identical and K2–K5 within ±2, each histogram
+printed; **E1** — under the orchestrator's ruling after PR0, because E0's two
+H.264 exports of one project differed by up to 124 levels (VideoToolbox's
+H.264 encode does not repeat) — compares the h264 ENCODER'S INPUT, not a
+file: K6's and K3's scenes are saved and read by
+`precision_encoder_probe.swift`, built through `swift_build.build` over the
+tree's `app/Sources` (a mutant copy's under `--mutant`), which resolves the
+core's `h264` settings, builds the composition as an export does, reads one
+frame through an `AVAssetReaderVideoCompositionOutput` in
+`Compositor.outputPixelFormat`, and applies `ExportWriter.frameForm` and
+`ExportFrames.convert` (or hands the reader's frame on when the form is
+nil). The handed buffer must be 32BGRA, K6 byte-identical to DIR's render
+and K3 within ±1 (the compositor's own ±1 on a blended scene). The probe
+registers the app's bundled fonts, as `ATSApplicationFontsPath` does for the
+bundle: without them K3's title drew in a fallback face, up to 194 levels
+off. This tree's encoded h264 file is printed beside E0's digests, unscored.
+**E2** (PR1's fix pass) is the same for the `hevc` (Main) encoder: fed the
+half-float frame, `hevc` encoded the 10-bit ramp at 9.04 steps RMS against
+PR0's 6.46 from 32BGRA (three exports each, every one the same figure), so
+`frameForm` rounds `hevc`'s frame to 8 bits as it does `h264`'s.
+**M1** (`--measure`, release-only, recorded): `prores_422` exports of a
+typical and a heavy fixture at 1080p and 2160p, each on an instance of its
+own launched with `-ReelcutCompositorTiming YES`: the timing log's average
+and worst and the instance's lifetime `phys_footprint_peak`, beside the
+control's, with the implied extra buffers and the frame-time stop (1080p
+heavy average ≥ 8 ms). The memory is printed and recorded, not scored: the
+owner accepted PR1's measured rise (heavy 4K +851.7 MB) and retired the
+road map's +532 MB stop (spec §11 PR-1).
+
+**The preview probes read a buffer by its format.**
+`preview_refresh_probe.py`, `preview_validity_probe.py` and
+`media_less_playback_probe.swift` each take the grid mean from 32BGRA bytes
+or from 64RGBAHalf halves × 255 (rounded), and leave no mean — failing every
+row that reads one — for any other format. **PF**
+(`preview_refresh_probe.py` section 7): at Full the displayed buffer is
+`RGhA` and its 40 × 40 grid mean is within ±1 of `Exporter.renderFrame`'s at
+the same tick. `--sources DIR` builds the probe from a copy's
+`app/Sources` and shader in `work/preview-refresh/probe-sources/`, for
+`precision_proof.py --mutant output-8bit`.
+
+**`hevc_alpha_proof.py`'s precision rows** (the probe's `precision`):
+**R8** `ExportStraightAlpha.eightBit(half:…)` rounds half(k/255) to k,
+half((k+0.4)/255) to k and half((k+0.6)/255) to k+1, and writes RGBA as
+BGRA; **RH** `straighten(half:…)` leaves |s·a − c| ≤ 2⁻¹⁰ and s ≤ 1 over a
+grid of premultiplied pairs; **KH** over K1's seeded frames (the same draws)
+and both lattices, every visible pixel opaque and coloured with a distinct
+id, the half fill gives each transparent pixel the same source pixel as the
+8-bit fill. **HA** (`--measure hevc-alpha-deep`, recorded, not used):
+`hevc_alpha` fed 64RGBAHalf buffers directly. `label-premultiplied`'s first
+anchor is now `ExportStraightAlphaHalf.swift`'s attachment line
+(`STRAIGHT_HALF`); `hevc-no-profile` removes the `hevc` Main pin and hands
+`hevc` the deep frame (from 32BGRA VideoToolbox writes Main with or without
+the pin, so the pin alone is an equivalent mutant) and must fail B1.
+
+**Re-baselined in PR1 (spec §11 PR-5).** `e1_proof.py`'s rows against the
+frozen 1c3e92e build (the version-6 `wipe` and five cross-dissolve ticks)
+compare decoded pixels within ±1 a channel (`within_one`); PR1's wipe moved
+by 1 on 1,080 channels of its soft edge. `hevc_alpha_proof.py`'s B1 is
+exact again: its re-baseline (PR1's centre red read 254 against 255, from
+`hevc` fed 64RGBAHalf) was withdrawn when `hevc` went back to 8-bit frames,
+which reproduce the baseline's digest. `word_looks_baseline.json`
+is re-recorded by `word_looks_proof.py --record-baseline` once PR1 is
+committed (it refuses an uncommitted tree): measured against PR0's Release,
+40 of fixture B's 41 frames moved, every channel by at most 1.
+
+**Mutants** (PR1, run once at the end on the final instrument):
+`precision_proof.py`'s `h264-deep` (E1), `hevc-deep` (E2), `output-8bit`
+(P1, and PF through `preview_refresh_probe.py --sources`) and
+`hevc-no-profile` (H1);
+`hevc_alpha_proof.py`'s probe-only `bgra8-truncates` (R8),
+`half-no-unpremultiply` (RH) and `half-no-fill` (KH), its
+`hevc-no-profile` (B1) and `label-premultiplied` on its new anchor, and the
+four B93 probe mutants, since the fill they anchor in went generic.

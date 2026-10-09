@@ -1,12 +1,46 @@
 import AVFoundation
 import CoreVideo
 
-// The alpha movie rows' frames written straight (spec §11 G-35, issue #242):
-// `ExportWriter`'s video pump hands each frame of `prores_4444` and
-// `hevc_alpha` here between the reader and `retimed`. The compositor's
-// premultiplied 32BGRA is un-premultiplied in place, every transparent pixel
-// within `bleedRadius` of a visible one takes that pixel's colour, and the
-// buffer is labelled `StraightAlpha` and wrapped in a new sample.
+// The alpha movie rows' frames written straight (spec §11 G-35, issue #242;
+// amended by PR-3): `ExportWriter`'s video pump hands each frame of
+// `prores_4444` and `hevc_alpha` to `ExportFrames` (`ExportStraightAlphaHalf.
+// swift`) between the reader and `retimed`. The compositor's premultiplied
+// frame is un-premultiplied in place — `prores_4444`'s in float, over its
+// 64RGBAHalf pixels; `hevc_alpha`'s here, after it is rounded into 8-bit BGRA
+// — every transparent pixel within `bleedRadius` of a visible one takes that
+// pixel's colour, by the one fill below over either layout, and the buffer
+// is labelled `StraightAlpha` and wrapped in a new sample.
+
+/// One pixel layout the fill runs over: its size, which pixels are visible
+/// (a > 0), the colour a transparent pixel takes from a visible one, and
+/// whether a whole row is visible — a loop over the alpha alone, written per
+/// layout so the compiler vectorises it (asked through `visible` it did not,
+/// and the fill ran 15–25 % slower on opaque and soft frames).
+protocol StraightAlphaLayout {
+    static var bytesPerPixel: Int { get }
+    static func visible(_ pixel: UnsafePointer<UInt8>) -> Bool
+    static func copyColour(_ from: UnsafePointer<UInt8>, _ to: UnsafeMutablePointer<UInt8>)
+    static func allVisible(_ row: UnsafePointer<UInt8>, width: Int) -> Bool
+}
+
+/// Premultiplied 8-bit BGRA, alpha the fourth byte.
+enum BGRA8: StraightAlphaLayout {
+    static var bytesPerPixel: Int { 4 }
+
+    static func visible(_ pixel: UnsafePointer<UInt8>) -> Bool { pixel[3] > 0 }
+
+    static func allVisible(_ row: UnsafePointer<UInt8>, width: Int) -> Bool {
+        var lowest = UInt8.max
+        for x in 0..<width { lowest = min(lowest, row[x * 4 + 3]) }
+        return lowest > 0
+    }
+
+    static func copyColour(_ from: UnsafePointer<UInt8>, _ to: UnsafeMutablePointer<UInt8>) {
+        to[0] = from[0]
+        to[1] = from[1]
+        to[2] = from[2]
+    }
+}
 
 /// The un-premultiply and the fill, over one frame (G-35 (c), (d)).
 enum ExportStraightAlpha {
@@ -16,50 +50,6 @@ enum ExportStraightAlpha {
     /// otherwise average the black of a transparent pixel into the edge
     /// beside it.
     static let bleedRadius = 4
-
-    /// The sample's 32BGRA image buffer straightened in place (below),
-    /// attached `kCVImageBufferAlphaChannelModeKey` = `StraightAlpha`
-    /// (`.shouldPropagate`), and wrapped in a NEW sample: its format
-    /// description made from the buffer, the original's timing. nil when the
-    /// buffer is not 32BGRA, cannot be locked, or the sample cannot be made.
-    ///
-    /// The buffer is the reader's own copy (`alwaysCopiesSampleData`, the
-    /// output's default), so writing into it changes no other frame.
-    static func straighten(_ sample: CMSampleBuffer) -> CMSampleBuffer? {
-        guard let buffer = CMSampleBufferGetImageBuffer(sample),
-            CVPixelBufferGetPixelFormatType(buffer) == kCVPixelFormatType_32BGRA,
-            !CVPixelBufferIsPlanar(buffer),
-            CVPixelBufferLockBaseAddress(buffer, []) == kCVReturnSuccess
-        else { return nil }
-        let base = CVPixelBufferGetBaseAddress(buffer)
-        if let base = base {
-            straighten(
-                bgra: base, width: CVPixelBufferGetWidth(buffer),
-                height: CVPixelBufferGetHeight(buffer),
-                bytesPerRow: CVPixelBufferGetBytesPerRow(buffer))
-        }
-        CVPixelBufferUnlockBaseAddress(buffer, [])
-        guard base != nil else { return nil }
-        CVBufferSetAttachment(
-            buffer, kCVImageBufferAlphaChannelModeKey,
-            kCVImageBufferAlphaChannelMode_StraightAlpha, .shouldPropagate)
-        var format: CMVideoFormatDescription?
-        guard CMVideoFormatDescriptionCreateForImageBuffer(
-            allocator: kCFAllocatorDefault, imageBuffer: buffer,
-            formatDescriptionOut: &format) == noErr,
-            let format = format
-        else { return nil }
-        var timing = CMSampleTimingInfo(
-            duration: .invalid, presentationTimeStamp: .invalid, decodeTimeStamp: .invalid)
-        guard CMSampleBufferGetSampleTimingInfo(sample, at: 0, timingInfoOut: &timing) == noErr
-        else { return nil }
-        var straight: CMSampleBuffer?
-        guard CMSampleBufferCreateReadyWithImageBuffer(
-            allocator: kCFAllocatorDefault, imageBuffer: buffer, formatDescription: format,
-            sampleTiming: &timing, sampleBufferOut: &straight) == noErr
-        else { return nil }
-        return straight
-    }
 
     /// The pure pixel half, over one premultiplied BGRA plane, in place.
     ///
@@ -83,7 +73,19 @@ enum ExportStraightAlpha {
         bgra: UnsafeMutableRawPointer, width: Int, height: Int, bytesPerRow: Int
     ) {
         guard width > 0, height > 0, bytesPerRow >= width * 4 else { return }
-        let pixels = bgra.assumingMemoryBound(to: UInt8.self)
+        straighten(
+            BGRA8.self, pixels: bgra.assumingMemoryBound(to: UInt8.self), width: width,
+            height: height, bytesPerRow: bytesPerRow, unpremultiply: unpremultiply)
+    }
+
+    /// The two passes over any layout: `unpremultiply` is pass 1 over one
+    /// row (recording its first and last visible column in `span`), then the
+    /// one fill. The caller has checked the size and the row length.
+    static func straighten<L: StraightAlphaLayout>(
+        _ layout: L.Type, pixels: UnsafeMutablePointer<UInt8>, width: Int, height: Int,
+        bytesPerRow: Int,
+        unpremultiply: (UnsafeMutablePointer<UInt8>, Int, UnsafeMutablePointer<Int>) -> Void
+    ) {
         // Each row's first and last visible column; `first > last` is none.
         let spans = UnsafeMutablePointer<Int>.allocate(capacity: height * 2)
         defer { spans.deallocate() }
@@ -97,16 +99,17 @@ enum ExportStraightAlpha {
         DispatchQueue.concurrentPerform(iterations: chunks) { index in
             for y in index * chunk..<min(height, (index + 1) * chunk) {
                 let row = pixels + y * bytesPerRow
-                unpremultiply(row: row, width: width, span: spans + y * 2)
+                unpremultiply(row, width, spans + y * 2)
                 guard radius > 0, spans[y * 2] <= spans[y * 2 + 1] else { continue }
-                nearestInRow(row, width: width, radius: radius, into: nearest + y * width)
+                nearestInRow(
+                    L.self, row, width: width, radius: radius, into: nearest + y * width)
             }
         }
         guard radius > 0 else { return }
         DispatchQueue.concurrentPerform(iterations: chunks) { index in
             for y in index * chunk..<min(height, (index + 1) * chunk) {
                 fill(
-                    y: y, pixels: pixels, width: width, height: height,
+                    L.self, y: y, pixels: pixels, width: width, height: height,
                     bytesPerRow: bytesPerRow, spans: spans, nearest: nearest, radius: radius)
             }
         }
@@ -116,12 +119,12 @@ enum ExportStraightAlpha {
 
     /// Rows per `concurrentPerform` iteration: about four per core, so a
     /// slow band does not hold the frame.
-    private static func chunk(_ height: Int) -> Int {
+    static func chunk(_ height: Int) -> Int {
         let pieces = max(1, ProcessInfo.processInfo.activeProcessorCount * 4)
         return max(1, (height + pieces - 1) / pieces)
     }
 
-    /// Pass 1 over one row, recording its visible columns in `span`.
+    /// Pass 1 over one 8-bit row, recording its visible columns in `span`.
     private static func unpremultiply(
         row: UnsafeMutablePointer<UInt8>, width: Int, span: UnsafeMutablePointer<Int>
     ) {
@@ -157,22 +160,20 @@ enum ExportStraightAlpha {
     /// left, and a visible pixel is its own nearest (0) and takes over each
     /// transparent pixel within reach on its left that it is STRICTLY
     /// nearer to, so a tie stays with the left. A row with no transparent
-    /// pixel (its lowest alpha, a loop the compiler vectorises, above 0) is
-    /// its own nearest everywhere.
-    private static func nearestInRow(
-        _ row: UnsafePointer<UInt8>, width: Int, radius: Int,
+    /// pixel (`allVisible`) is its own nearest everywhere.
+    static func nearestInRow<L: StraightAlphaLayout>(
+        _ layout: L.Type, _ row: UnsafePointer<UInt8>, width: Int, radius: Int,
         into table: UnsafeMutablePointer<Int8>
     ) {
-        var lowest = UInt8.max
-        for x in 0..<width { lowest = min(lowest, row[x * 4 + 3]) }
-        guard lowest == 0 else {
+        let step = L.bytesPerPixel
+        guard !L.allVisible(row, width: width) else {
             table.initialize(repeating: 0, count: width)
             return
         }
         let reach = radius
         var last = Int.min / 2      // the last visible column so far; none yet
         for x in 0..<width {
-            guard row[x * 4 + 3] > 0 else {
+            guard L.visible(row + x * step) else {
                 let left = x - last
                 table[x] = left <= reach ? Int8(-left) : noVisible
                 continue
@@ -195,8 +196,8 @@ enum ExportStraightAlpha {
     /// dx² + dy² replaces the one held, so of equals the smallest dy wins,
     /// and within a row the smallest dx — the first in row-major order
     /// (G-35 (d)).
-    private static func fill(
-        y: Int, pixels: UnsafeMutablePointer<UInt8>, width: Int, height: Int,
+    static func fill<L: StraightAlphaLayout>(
+        _ layout: L.Type, y: Int, pixels: UnsafeMutablePointer<UInt8>, width: Int, height: Int,
         bytesPerRow: Int, spans: UnsafeMutablePointer<Int>, nearest: UnsafePointer<Int8>,
         radius: Int
     ) {
@@ -217,8 +218,8 @@ enum ExportStraightAlpha {
                 count += 1
             }
             for x in max(0, low - radius)...min(width - 1, high + radius) {
-                let pixel = row + x * 4
-                guard pixel[3] == 0 else { continue }
+                let pixel = row + x * L.bytesPerPixel
+                guard !L.visible(pixel) else { continue }
                 var best = Int.max
                 var bestX = 0
                 var bestY = 0
@@ -236,10 +237,7 @@ enum ExportStraightAlpha {
                     }
                 }
                 guard best != Int.max else { continue }
-                let near = pixels + bestY * bytesPerRow + bestX * 4
-                pixel[0] = near[0]
-                pixel[1] = near[1]
-                pixel[2] = near[2]
+                L.copyColour(pixels + bestY * bytesPerRow + bestX * L.bytesPerPixel, pixel)
             }
         }
     }

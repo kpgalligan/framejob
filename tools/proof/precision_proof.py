@@ -6,8 +6,9 @@ on PR0's product.
 
     python3 tools/proof/precision_proof.py [--app PATH] [--only C0,D1,P1,H1] [--control DIR]
     python3 tools/proof/precision_proof.py capture DIR          # the CONTROL tree
-    python3 tools/proof/precision_proof.py compare DIR [--only K1,...,E1]
+    python3 tools/proof/precision_proof.py compare DIR [--only K1,...,E2]
     python3 tools/proof/precision_proof.py --measure capture|compare DIR   # release-only
+    python3 tools/proof/precision_proof.py --mutant NAME [compare DIR]
 
 `matte_proof.py`'s shape: it launches the app `proof_app` picks (Debug unless
 `RC_PROOF_APP=release`; `--measure` is release-only) on a scratch socket of its
@@ -48,10 +49,27 @@ Rows (`ID ok|FAIL — detail`, then `n/m`; exit 0 iff every scored row passes):
       figure; the ramp's controls (the middle row's distinct green values in
       `render_frame`, and a `prores_422` export's RMS against x/1919).
   compare: K1 and K6 byte-identical to DIR's; K2–K5 every channel within ±2
-      (the histogram of differences printed); E1 this tree's `h264` export of
-      DIR's K6 clip, decoded the same way: byte-identical to E0's when E0's
-      pair was equal, else every channel within the pair's own largest
-      difference.
+      (the histogram of differences printed).
+  E1 (compare; the orchestrator's ruling after PR0, because E0 showed
+      VideoToolbox's H.264 encode is not repeatable — two exports of one
+      project differed by up to 124 levels): what `ExportWriter` hands the
+      `h264` ENCODER. K6's and K3's scenes are saved as packages and read by
+      `precision_encoder_probe.swift`, compiled through `swift_build.build`
+      over this tree's `app/Sources` (a mutant's copy under `--mutant`): the
+      core's `h264` settings, the composition as an export builds it, one
+      frame through an `AVAssetReaderVideoCompositionOutput` in
+      `Compositor.outputPixelFormat`, then `ExportWriter.frameForm` and
+      `ExportFrames.convert` — or the reader's frame as it is when the form is
+      nil. The handed buffer must be 32BGRA and, against DIR's `render_frame`
+      PNG of the same scene (PR0's 8-bit frame), K6 (opaque, one layer)
+      byte-identical and K3 (blended) every channel within ±1, the
+      compositor's own ±1 at 16-bit float (K3's row). A probe that does not
+      build is a scored FAILURE. This tree's `h264` export of K6, decoded to
+      `rgb24`, is printed beside E0's digests, unscored.
+  E2 (compare; PR1's fix pass): the same for the `hevc` (Main) encoder. Fed
+      the half-float frame it encoded the precision ramp at 9.04 10-bit steps
+      RMS against PR0's 6.46 from 32BGRA (both repeatable over three exports
+      each), so `hevc` is rounded to 8 bits as `h264` is.
   --measure (M1, recorded, release-only): `prores_422` exports of a TYPICAL
       fixture (2 video tracks and a title) and a HEAVY one (4 video tracks,
       2 mattes, a routed dissolve, a shadow), each 8 s of the 2 s movie
@@ -62,13 +80,30 @@ Rows (`ID ok|FAIL — detail`, then `n/m`; exit 0 iff every scored row passes):
       `phys_footprint_peak` read after it, which is the figure compared (an
       export of 8 s takes 0.6–2.7 s, so a few samples miss its peak).
       `compare` prints PR0's beside, the implied extra buffers (Δpeak ÷ the
-      per-buffer Δ, 64RGBAHalf against 32BGRA) and the PR1 stops (1080p's
-      heavy average reaching 8 ms; the heavy 4K peak more than +532 MB). A
+      per-buffer Δ, 64RGBAHalf against 32BGRA) and the frame-time stop
+      (1080p's heavy average reaching 8 ms). The memory is printed and
+      recorded, not a stop: the owner accepted PR1's measured rise (heavy 4K
+      +851.7 MB, spec §11 PR-1) and retired the road map's +532 MB stop. A
       refused `footprint` is a named skip of the memory half.
   Z1  the projects close and the log holds no `Reelcut: ` line.
 
-PR1 adds `--mutant NAME` on `tree_copy.build_app` with its six anchors, and
-PR2/PR3 their rows (spec B94, `designs/precision.md`).
+`--mutant NAME` (PR1; spec B94) builds ONE `tree_copy.make_copy` with each
+named anchor asserted to occur exactly once and replaced, by the copy's own
+`make app-debug` (`make app` under `RC_PROOF_APP=release`;
+`tree_copy.build_app`), and runs only its named rows on the copy — the probe
+built from the copy's `app/Sources`:
+  h264-deep        `frameForm` answers nil for `h264`: E1 FAILS (compare DIR).
+  output-8bit      `Compositor.outputPixelFormat` is 32BGRA: P1 FAILS, and
+                   `preview_refresh_probe.py --sources <copy>` scores PF FAILED.
+  hevc-deep        `frameForm` answers nil for `hevc`: E2 FAILS (compare DIR).
+  hevc-no-profile  the `hevc` Main pin removed AND `hevc` handed the deep
+                   frame (`hevc-deep`'s anchor; with the 8-bit frame
+                   VideoToolbox writes Main with or without the pin, so the pin
+                   alone is an equivalent mutant): H1 FAILS
+                   (`hevc_alpha_proof.py --mutant hevc-no-profile` holds B1 to it).
+Exit 0 when every named row FAILED (caught), 1 when one passed (survived), 2
+when the control could not be performed. PR2/PR3 add their rows
+(`designs/precision.md`).
 """
 
 import argparse
@@ -91,6 +126,7 @@ sys.path.insert(0, str(ROOT / "tools/proof"))
 import bounded  # noqa: E402
 import mcp  # noqa: E402
 import proof_app  # noqa: E402
+import swift_build  # noqa: E402
 import tree_copy  # noqa: E402
 
 BASE = ROOT / "tools/proof/work/precision"
@@ -113,12 +149,35 @@ TIMING = re.compile(r"\[reelcut\] compositor: ([\d.]+) ms average, ([\d.]+) ms w
 # 64RGBAHalf buffer less one 32BGRA buffer.
 PER_BUFFER = {2160: 66_355_264 - 33_177_664, 1080: (66_355_264 - 33_177_664) // 4}
 STOP_MS = 8.0
-STOP_BYTES = 532_000_000
+PROBE_SOURCE = ROOT / "tools/proof/precision_encoder_probe.swift"
+PROBE_DIR = BASE / "encoder-probe"
+BUILD_BOUND = 1500
+SETTINGS = "app/Sources/ExporterWriter+Settings.swift"
+HEVC_DEEP = (SETTINGS, "        return codec == .h264 || codec == .hevc ? .eightBit : nil\n",
+             "        return codec == .h264 ? .eightBit : nil\n")
+MUTANTS = {
+    "h264-deep": {"mode": "compare", "rows": ["E1"], "anchors": [
+        (SETTINGS, "        return codec == .h264 || codec == .hevc ? .eightBit : nil\n",
+         "        return codec == .hevc ? .eightBit : nil\n")]},
+    "output-8bit": {"mode": "rows", "rows": ["P1"], "pf": True, "anchors": [
+        ("app/Sources/Compositor.swift",
+         "    static let outputPixelFormat: OSType = kCVPixelFormatType_64RGBAHalf\n",
+         "    static let outputPixelFormat: OSType = kCVPixelFormatType_32BGRA\n")]},
+    "hevc-deep": {"mode": "compare", "rows": ["E2"], "anchors": [HEVC_DEEP]},
+    # With `hevc`'s frame rounded to 8 bits, VideoToolbox writes Main with or
+    # without the pin, so the pin alone removed is an equivalent mutant: this
+    # one removes it AND hands `hevc` the deep frame, the input the pin is for.
+    "hevc-no-profile": {"mode": "rows", "rows": ["H1"], "anchors": [
+        (SETTINGS,
+         "            compression[AVVideoProfileLevelKey] = kVTProfileLevel_HEVC_Main_AutoLevel as "
+         "String\n", ""), HEVC_DEEP]},
+}
 ROWS = ["C0", "D1", "P1", "H1", "Z1"]
 CAPTURE_ROWS = ["K", "E0", "P1c", "Rc", "Z1"]
-COMPARE_ROWS = ["K1", "K2", "K3", "K4", "K5", "K6", "E1", "Z1"]
+COMPARE_ROWS = ["K1", "K2", "K3", "K4", "K5", "K6", "E1", "E2", "Z1"]
 rows = {}
 selected = set()
+sources_folder = ROOT / "app/Sources"
 
 
 def check(name, good, detail=""):
@@ -556,22 +615,121 @@ def run_compare(client, where):
               + ("byte-identical" if exact else "every channel within ±2"), good,
               f"fixture {doc.why or 'ok'}; histogram |Δ|: channels {short(counts)}")
     if "E1" in selected:
-        pair, fixture, ok = h264_pair(client, clip, WORK, ("e1",))
-        closed = ok and closed
-        got = pair[0][1]
-        e0 = record.get("E0", {})
-        a = decode(where / "e0-a.mp4", "rgb24", frames=None)
-        if e0.get("equal"):
-            good = got is not None and got == a
-            rule = "byte-identical to E0's"
-        else:
-            bound = e0.get("largest")
-            good = got is not None and a is not None and len(got) == len(a) \
-                and bound is not None and max(histogram(got, a)) <= bound
-            rule = f"every channel within E0's own largest difference ({bound})"
-        counts = histogram(got, a) if got and a and len(got) == len(a) else {}
-        check(f"E1 this tree's h264 export of DIR's K6 clip, decoded to rgb24: {rule}",
-              fixture and good, f"E0 {e0}; E1 {digest(got)}; histogram against E0 a {short(counts)}")
+        closed = run_e1(client, where, clip, record) and closed
+    if "E2" in selected:
+        closed = run_e2(client, where, clip) and closed
+    return closed
+
+
+# ---------------------------------------------------------------------------
+# E1 — the h264 encoder's input (the orchestrator's ruling after PR0).
+
+
+def build_encoder_probe():
+    """`precision_encoder_probe.swift` over `sources_folder` (the tree's
+    `app/Sources`, or a mutant copy's), beside that tree's `Compositor.metal`
+    as `default.metallib` and `Blank.mp4`. (binary, None) or (None, why)."""
+    PROBE_DIR.mkdir(parents=True, exist_ok=True)
+    entry = PROBE_DIR / "main.swift"
+    if not entry.exists() or entry.read_text() != PROBE_SOURCE.read_text():
+        entry.write_text(PROBE_SOURCE.read_text())
+    binary = PROBE_DIR / "precision_encoder_probe"
+    try:
+        made = swift_build.build(sources=swift_build.app_sources(sources_folder) + [entry],
+                                 output=binary, timeout=900)
+    except swift_build.SwiftBuildFailed as error:
+        return None, (f"swiftc rc {error.rc if error.rc is not None else 'before running'}: "
+                      f"{(error.diagnostics or ['(no output)'])[:6]}")
+    print(f"  encoder probe: {'up to date' if made.reused else f'built in {made.seconds:.0f} s'}"
+          f" from {sources_folder}", flush=True)
+    resources = sources_folder.parent / "Resources"
+    shader, air, library = (resources / "Shaders/Compositor.metal", PROBE_DIR / "Compositor.air",
+                            PROBE_DIR / "default.metallib")
+    library.unlink(missing_ok=True)
+    step = bounded.run(["xcrun", "-sdk", "macosx", "metal", "-c", str(shader), "-o", str(air)],
+                       300)
+    if step["rc"] == 0:
+        step = bounded.run(["xcrun", "-sdk", "macosx", "metallib", str(air), "-o", str(library)],
+                           300)
+    if step["rc"] != 0 or not library.exists():
+        return None, f"the shader did not build: {step['stderr'][-400:]}"
+    shutil.copy2(resources / "Blank.mp4", PROBE_DIR / "Blank.mp4")
+    return binary, None
+
+
+def handed_frames(client, where, clip, preset, prefix):
+    """K6's and K3's scenes saved, the encoder probe's frames handed to
+    `preset`'s encoder against DIR's renders: (good, detail, closed)."""
+    closed, frames = True, []
+    for name in ("K6", "K3"):
+        doc, t = k_scene(client, name, clip)
+        doc.step("save_project")
+        frames.append({"tag": name, "package": str(doc.path), "tick": t, "preset": preset,
+                       "raw": str(WORK / f"{prefix}-{name}.bgra"), "why": doc.why})
+        closed = doc.close() and closed
+    binary, why = build_encoder_probe()
+    answer = {}
+    if binary is not None:
+        request, out = WORK / f"{prefix}-request.json", WORK / f"{prefix}-answer.json"
+        request.write_text(json.dumps({"frames": frames,
+                                       "fonts": str(sources_folder.parent / "Resources/Fonts")}))
+        ran = bounded.run([str(binary), str(request), str(out)], 300, cwd=str(PROBE_DIR),
+                          env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}))
+        try:
+            answer = {row["tag"]: row for row in json.loads(out.read_text())["frames"]}
+        except (OSError, ValueError, KeyError):
+            why = f"no answer (rc {ran['rc']}, expired {ran['expired']}): {ran['stderr'][-300:]}"
+    good, lines = binary is not None and bool(answer), []
+    for frame in frames:
+        name = frame["tag"]
+        got = answer.get(name, {})
+        want = rgba(where / f"{name}.png")
+        handed = None
+        if got.get("format") == "BGRA" and got.get("raw") and Path(got["raw"]).exists():
+            bgra = Path(got["raw"]).read_bytes()
+            handed = bytearray(bgra)
+            handed[0::4], handed[2::4] = bgra[2::4], bgra[0::4]
+            handed = bytes(handed)
+        counts = histogram(handed, want) if handed and want and len(handed) == len(want) else {}
+        largest = max(counts) if counts else None
+        bound = 0 if name == "K6" else 1
+        ok = (frame["why"] is None and handed is not None and largest is not None
+              and largest <= bound)
+        good = good and ok
+        lines.append(f"{name} ({'byte-identical' if bound == 0 else 'within ±1'}): "
+                     f"{'ok' if ok else 'FAIL'}; fixture {frame['why'] or 'ok'}; form "
+                     f"{got.get('form')}, handed {got.get('format')} {got.get('width')}×"
+                     f"{got.get('height')} at {got.get('time')} s"
+                     + (f", error {got['error']}" if got.get("error") else "")
+                     + f"; histogram |Δ| against DIR's render: {short(counts)}")
+    detail = ((f"probe {why or 'ok'}\n       " if why or binary is None else "")
+              + "\n       ".join(lines))
+    return good, detail, closed
+
+
+def run_e1(client, where, clip, record):
+    """E1: the frames handed to the h264 encoder against DIR's renders; the
+    encoded K6 file printed, unscored."""
+    good, detail, closed = handed_frames(client, where, clip, "h264", "e1")
+    pair, fixture, ok = h264_pair(client, clip, WORK, ("e1",))
+    closed = ok and closed
+    encoded = pair[0][1]
+    a = decode(where / "e0-a.mp4", "rgb24", frames=None)
+    unscored = (f"the encoded file (unscored): E1 {digest(encoded)} against E0 "
+                f"{record.get('E0', {}).get('a')} / {record.get('E0', {}).get('b')}, "
+                f"|Δ| against E0 a {short(histogram(encoded, a)) if encoded and a and len(encoded) == len(a) else 'n/a'}")
+    check("E1 the frame ExportWriter hands the h264 encoder is 32BGRA and equals PR0's 8-bit frame "
+          "(K6 byte-identical; K3, blended, within ±1 — the compositor's own ±1 at 16-bit float)",
+          good, detail + "\n       " + unscored)
+    return closed
+
+
+def run_e2(client, where, clip):
+    """E2: the frames handed to the hevc (Main) encoder against DIR's renders."""
+    good, detail, closed = handed_frames(client, where, clip, "hevc", "e2")
+    check("E2 the frame ExportWriter hands the hevc (Main) encoder is 32BGRA and equals PR0's "
+          "8-bit frame (K6 byte-identical; K3, blended, within ±1) — fed half-float frames it "
+          "encoded the ramp at 9.04 steps RMS against PR0's 6.46", good, detail)
     return closed
 
 
@@ -726,13 +884,12 @@ def run_measure(binary, mode, where, logs):
             delta = now["peak_bytes"] - then["peak_bytes"]
             line += (f"; peak {then['peak_bytes'] / 1e6:.1f} → {now['peak_bytes'] / 1e6:.1f} MB "
                      f"(Δ {delta / 1e6:+.1f} MB, {delta / PER_BUFFER[height]:+.1f} buffers)")
-            if key == "heavy-2160" and delta > STOP_BYTES:
-                stops.append(f"heavy 4K peak +{delta / 1e6:.1f} MB > +532 MB")
         if key == "heavy-1080" and (now.get("average_ms") or 0) >= STOP_MS:
             stops.append(f"heavy 1080p average {now.get('average_ms')} ms ≥ 8 ms")
         print(f"       {line}", flush=True)
-    check("M1 measured beside the control, and no PR1 stop (1080p heavy average < 8 ms; heavy "
-          "4K peak ≤ +532 MB over the control's)", measured and not stops,
+    check("M1 measured beside the control (memory printed and recorded; the owner retired the "
+          "+532 MB stop, spec §11 PR-1), and no frame-time stop (1080p heavy average < 8 ms)",
+          measured and not stops,
           f"stops: {stops or 'none'}")
     return all(f["closed"] for f in figures.values())
 
@@ -760,27 +917,80 @@ def remove_work():
         tree_copy.remove_tree(str(WORK))
 
 
+def build_mutant(name):
+    """A copy of the tree with every anchor of `name` replaced (each found
+    once), built by `tree_copy.build_app`. (app bundle, copy) or (None, why)."""
+    made, reason = tree_copy.make_copy(str(BASE / "mutant"))
+    atexit.register(tree_copy.remove_tree, str(BASE / "mutant"))
+    if made is None:
+        return None, reason
+    copy = Path(made)
+    for path, anchor, replacement in MUTANTS[name]["anchors"]:
+        target = copy / path
+        if not target.resolve().is_relative_to(BASE / "mutant"):
+            return None, f"{path} in the copy is the tree's own file"
+        text = target.read_text()
+        if text.count(anchor) != 1:
+            return None, f"the anchor occurs {text.count(anchor)} times in {path}: {anchor!r}"
+        target.write_text(text.replace(anchor, replacement))
+    print(f"  building the copy ({len(MUTANTS[name]['anchors'])} anchor(s) replaced, each found "
+          "once)…", flush=True)
+    app, reason = tree_copy.build_app(copy, BUILD_BOUND)
+    return (app, copy) if app is not None else (None, reason)
+
+
+def mutant_pf(copy):
+    """`preview_refresh_probe.py --sources <copy>/app/Sources`: whether its PF
+    row passed (None when the probe printed no PF line), and the line."""
+    ran = bounded.run([sys.executable, str(ROOT / "tools/proof/preview_refresh_probe.py"),
+                       "--sources", str(copy / "app/Sources")], 900)
+    lines = [line.strip() for line in ran["stdout"].splitlines()
+             if line.strip().startswith(("ok   PF", "FAIL PF", "skip PF"))]
+    for line in lines:
+        if line.startswith("ok   PF"):
+            return True, line
+        if line.startswith("FAIL PF"):
+            return False, line
+    return None, (lines or [f"no PF line (rc {ran['rc']}): {ran['stdout'][-300:]}"])[0]
+
+
 def main():
-    global selected
+    global selected, sources_folder
     parser = argparse.ArgumentParser()
     parser.add_argument("--app")
     parser.add_argument("--only", help="comma-separated rows to run and score")
     parser.add_argument("--measure", action="store_true")
     parser.add_argument("--control", help="a capture DIR whose P1 figure the rows print")
+    parser.add_argument("--mutant", choices=sorted(MUTANTS))
     parser.add_argument("mode", nargs="?", choices=("capture", "compare"))
     parser.add_argument("dir", nargs="?")
     args = parser.parse_args()
     if (args.mode is None) != (args.dir is None) or (args.measure and args.mode is None):
         parser.error("capture and compare take DIR; --measure takes capture or compare DIR")
+    mutant = MUTANTS.get(args.mutant)
+    if mutant and (args.measure or args.only or args.mode not in (
+            None if mutant["mode"] == "rows" else "compare",)):
+        parser.error(f"--mutant {args.mutant} runs {mutant['mode']}"
+                     + (" DIR" if mutant["mode"] == "compare" else "") + " alone")
     universe = (["M1", "Z1"] if args.measure else CAPTURE_ROWS if args.mode == "capture"
                 else COMPARE_ROWS if args.mode == "compare" else ROWS)
     selected = set(universe)
+    if mutant:
+        selected = set(mutant["rows"]) | {"Z1"}
     if args.only:
         selected = {name.strip() for name in args.only.split(",") if name.strip()} | {"Z1"}
         unknown = selected - set(universe)
         if unknown:
             print(f"unknown rows: {sorted(unknown)}")
             return 2
+    if mutant:
+        print(f"precision (B94) — the {args.mutant} MUTANT ({', '.join(mutant['rows'])}"
+              f"{', PF' if mutant.get('pf') else ''} must FAIL)", flush=True)
+        app, copy = build_mutant(args.mutant)
+        if app is None:
+            print(f"mutant {args.mutant}: the control could not be performed — {copy}")
+            return 2
+        args.app, sources_folder = str(app), copy / "app/Sources"
     binary = Path(args.app or proof_app.binary(
         release_only=RELEASE_ONLY if args.measure else None))
     if binary.suffix == ".app":
@@ -849,6 +1059,19 @@ def main():
     scored = [name for name in universe if name in selected]
     passed = sum(1 for name in scored if rows.get(name))
     print(f"{passed}/{len(scored)}")
+    if mutant:
+        named = {name: rows.get(name) for name in mutant["rows"]}
+        if mutant.get("pf"):
+            named["PF"], line = mutant_pf(Path(sources_folder).parents[1])
+            print(f"  preview_refresh_probe on the copy: {line}", flush=True)
+        if None in named.values() or not rows.get("Z1"):
+            print(f"mutant {args.mutant}: the control could not be performed — {named}, "
+                  f"Z1 {rows.get('Z1')}")
+            return 2
+        caught = not any(named.values())
+        print(("MUTANT PASS" if caught else "MUTANT FAILURE") + f": {args.mutant} — "
+              + ", ".join(f"{k} {'passed' if v else 'FAILED'}" for k, v in named.items()))
+        return 0 if caught else 1
     return 0 if passed == len(scored) else 1
 
 

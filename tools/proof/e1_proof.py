@@ -44,10 +44,12 @@ the reference's `== 75` / `== 55` stay exact, because that tree is frozen.
   that nothing draws.
 * **2** the three wipe directions, at p = 0.25 on a two-second overlap: which
   SIDE the incoming colour is on and where the boundary sits, to a pixel; the
-  curve moving it; and the old `wipe` rendering byte-identical to the
-  reference build.
+  curve moving it; and the old `wipe` rendering as the reference build
+  does — byte-identical until, within ±1 a channel since, spec §11 PR-5 (the 16-bit-float
+  compositor moves a blended pixel by one level; the reference is frozen).
 * **3** a push's offset under `ease_in_out` and under `linear`; five ticks of
-  a version-6 cross dissolve byte-identical to the reference build.
+  a version-6 cross dissolve as the reference build draws them, within ±1 a
+  channel (PR-5).
 * **4** `add_transition`'s arithmetic: centre, the two alignments, the
   step-down, the odd frame, a speed, a nest, an action's rebase, the
   refusals, and one `undo` restoring `get_project` exactly.
@@ -150,6 +152,23 @@ def skip(count, why):
 def digest(path):
     with open(path, "rb") as handle:
         return hashlib.sha256(handle.read()).hexdigest()[:16]
+
+
+def within_one(mine, theirs):
+    """Spec §11 PR-5's rule for a frozen reference whose pixels this script
+    holds: (every channel within ±1, the largest difference, how many
+    channels differ). The 16-bit-float compositor (PR-1) moves a blended
+    pixel by one level, so the reference build's bytes are no longer exact."""
+    a, b = decode_png(mine), decode_png(theirs)
+    if a[:4] != b[:4]:
+        return False, None, None
+    largest, moved = 0, 0
+    for row_a, row_b in zip(a[4], b[4]):
+        for x, y in zip(row_a, row_b):
+            if x != y:
+                moved += 1
+                largest = max(largest, abs(x - y))
+    return largest <= 1, largest, moved
 
 
 def grey(value):
@@ -803,9 +822,11 @@ def wipe_part(session, reference, v6_wipe):
     else:
         mine = session.png(3 * SEC + SEC // 2)
         theirs = Session.opened(reference, v6_wipe).png(3 * SEC + SEC // 2)
-        check(digest(mine) == digest(theirs),
-              "a version-6 `wipe` renders byte-identical to the build before E1 "
-              f"({digest(mine)} vs {digest(theirs)})")
+        near, largest, moved = within_one(mine, theirs)
+        check(near,
+              "a version-6 `wipe` renders as the build before E1, every channel within ±1 "
+              f"(spec §11 PR-5; {digest(mine)} vs {digest(theirs)}, largest |Δ| {largest} on "
+              f"{moved} channels)")
 
     b = sorted(session.project()["clips"], key=lambda c: c["start"])[1]["id"]
     # Overlap [3, 5): p = 0.25 at 3.5 s, and linear so p is the raw progress.
@@ -875,11 +896,12 @@ def push_part(session, reference, v6_dissolve):
     theirs = Session.opened(reference, v6_dissolve)
     for t in [3 * SEC, 3 * SEC + SEC // 2, 4 * SEC, 4 * SEC + SEC // 2,
               4 * SEC + 29 * FRAME]:
-        a = digest(mine.png(t))
-        b2 = digest(theirs.png(t))
-        check(a == b2,
-              f"a version-6 cross dissolve at {t / SEC:.4f} s is byte-identical to the "
-              f"build before E1 ({a} vs {b2})")
+        ours, refs = mine.png(t), theirs.png(t)
+        near, largest, moved = within_one(ours, refs)
+        check(near,
+              f"a version-6 cross dissolve at {t / SEC:.4f} s renders as the build before "
+              f"E1, every channel within ±1 (spec §11 PR-5; {digest(ours)} vs {digest(refs)}, "
+              f"largest |Δ| {largest} on {moved} channels)")
 
 
 # ---- section 4: add_transition's arithmetic -------------------------------

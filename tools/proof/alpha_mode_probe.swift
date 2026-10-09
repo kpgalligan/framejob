@@ -13,6 +13,8 @@
 //   alpha-mode-probe roundtrip
 //   alpha-mode-probe timing
 //   alpha-mode-probe equivalence
+//   alpha-mode-probe precision
+//   alpha-mode-probe write-deep <path> <r,g,b,a>
 //
 // Each prints one JSON line on stdout and exits 0, or an {"error": …} line
 // and exits 1.
@@ -52,6 +54,17 @@
 // distinct colours at 1920 × 1080, and every pair of distinct visible pixels
 // in a 9 × 9 plane around a transparent centre (3,160 pairs; `pair_ties`
 // counts those the same distance from the centre).
+// `precision` (the precision road map's PR1, spec §11 PR-3): R8, the product's
+// `ExportStraightAlpha.eightBit(half:…)` — every k in 0…255 as half(k/255),
+// half((k+0.4)/255) and half((k+0.6)/255) to bytes k, k and k+1 (k < 255) in
+// each channel, and the RGBA → BGRA order; RH, `straighten(half:…)` over a
+// grid of premultiplied pairs (c, a), c ≤ a: |s·a − c| ≤ 2⁻¹⁰ and s ≤ 1; KH,
+// the half fill against the 8-bit fill over K1's seeded frames and both
+// lattices — every visible pixel opaque and carrying a distinct id as its
+// colour (an exact k/2048 per half channel), so after each fill a
+// transparent pixel's colour names the source pixel it was given.
+// `write-deep` (`--measure hevc-alpha-deep`, HA): `write`'s hevc_alpha file,
+// labelled straight, from 64RGBAHalf buffers — whether the writer takes them.
 
 import AVFoundation
 import CoreMedia
@@ -87,7 +100,7 @@ func blocking<T>(_ body: @escaping () async throws -> T) throws -> T {
 
 // MARK: - write
 
-func write(path: String, codec: String, mode: String, rgba: [Int]) {
+func write(path: String, codec: String, mode: String, rgba: [Int], deep: Bool = false) {
     let width = 640, height = 360
     let url = URL(fileURLWithPath: path)
     try? FileManager.default.removeItem(at: url)
@@ -125,7 +138,8 @@ func write(path: String, codec: String, mode: String, rgba: [Int]) {
     let adaptor = AVAssetWriterInputPixelBufferAdaptor(
         assetWriterInput: input,
         sourcePixelBufferAttributes: [
-            kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA),
+            kCVPixelBufferPixelFormatTypeKey as String:
+                Int(deep ? kCVPixelFormatType_64RGBAHalf : kCVPixelFormatType_32BGRA),
             kCVPixelBufferWidthKey as String: width, kCVPixelBufferHeightKey as String: height,
         ])
     guard writer.canAdd(input) else { fail("the writer refuses the input") }
@@ -145,7 +159,14 @@ func write(path: String, codec: String, mode: String, rgba: [Int]) {
         guard let base = CVPixelBufferGetBaseAddress(buffer) else { fail("no base address") }
         let row = CVPixelBufferGetBytesPerRow(buffer)
         let bytes = base.assumingMemoryBound(to: UInt8.self)
-        for y in 0..<height {
+        for y in 0..<height where deep {
+            for x in 0..<width {
+                let pixel = (base + y * row).assumingMemoryBound(to: Float16.self) + x * 4
+                let card = x >= 220 && x < 420 && y >= 120 && y < 240
+                for c in 0..<4 { pixel[c] = card ? Float16(Float(rgba[c]) / 255) : 0 }
+            }
+        }
+        for y in 0..<height where !deep {
             for x in 0..<width {
                 let pixel = bytes + y * row + x * 4
                 let card = x >= 220 && x < 420 && y >= 120 && y < 240
@@ -169,7 +190,7 @@ func write(path: String, codec: String, mode: String, rgba: [Int]) {
     guard writer.status == .completed else {
         fail("finishWriting: \(writer.error?.localizedDescription ?? "?")")
     }
-    emit(["wrote": path, "codec": codec, "mode": mode, "rgba": rgba])
+    emit(["wrote": path, "codec": codec, "mode": mode, "rgba": rgba, "deep": deep])
 }
 
 // MARK: - read
@@ -608,11 +629,197 @@ func equivalence() {
     ])
 }
 
+// MARK: - precision (PR1)
+
+/// R8: `eightBit(half:…)` over one row of 256 × 3 pixels — k/255,
+/// (k+0.4)/255 and (k+0.6)/255 in all four channels — and one pixel whose
+/// channels differ, for the order.
+func r8() -> [String: Any] {
+    let width = 256 * 3 + 1
+    var half = [Float16](repeating: 0, count: width * 4)
+    for k in 0..<256 {
+        for (n, offset) in [0.0, 0.4, 0.6].enumerated() {
+            let v = Float16(min(1, (Double(k) + offset) / 255))
+            for c in 0..<4 { half[(k * 3 + n) * 4 + c] = v }
+        }
+    }
+    let order: [Float16] = [10, 20, 30, 40].map { Float16(Float($0) / 255) }
+    for c in 0..<4 { half[(width - 1) * 4 + c] = order[c] }
+    var bgra = [UInt8](repeating: 0, count: width * 4)
+    half.withUnsafeBytes { from in
+        bgra.withUnsafeMutableBytes { to in
+            ExportStraightAlpha.eightBit(
+                half: from.baseAddress!, halfBytesPerRow: width * 8, bgra: to.baseAddress!,
+                bgraBytesPerRow: width * 4, width: width, height: 1)
+        }
+    }
+    var mismatches = 0
+    var first: [String: Any]?
+    for k in 0..<256 {
+        for (n, want) in [k, k, min(255, k + 1)].enumerated() where !(n == 2 && k == 255) {
+            for c in 0..<4 where Int(bgra[(k * 3 + n) * 4 + c]) != want {
+                mismatches += 1
+                if first == nil {
+                    first = ["k": k, "offset": [0, 0.4, 0.6][n], "channel": c,
+                             "got": Int(bgra[(k * 3 + n) * 4 + c]), "want": want]
+                }
+            }
+        }
+    }
+    let orderGot = (0..<4).map { Int(bgra[(width - 1) * 4 + $0]) }
+    return ["mismatches": mismatches, "first": first.map { $0 as Any } ?? NSNull(),
+            "order": orderGot, "order_ok": orderGot == [30, 20, 10, 40]]
+}
+
+/// RH: `straighten(half:…)` over premultiplied pairs (c, a): a in k/255 and
+/// i/64, c = a·j/32; the pairs as their half values.
+func rh() -> [String: Any] {
+    var alphas = (1...255).map { Float($0) / 255 } + (1...64).map { Float($0) / 64 }
+    alphas.sort()
+    let fractions = (0...32).map { Float($0) / 32 }
+    let width = fractions.count, height = alphas.count
+    var half = [Float16](repeating: 0, count: width * height * 4)
+    for (y, a) in alphas.enumerated() {
+        for (x, f) in fractions.enumerated() {
+            let at = (y * width + x) * 4
+            for c in 0..<3 { half[at + c] = Float16(a * f) }
+            half[at + 3] = Float16(a)
+        }
+    }
+    let before = half
+    half.withUnsafeMutableBytes {
+        ExportStraightAlpha.straighten(
+            half: $0.baseAddress!, width: width, height: height, bytesPerRow: width * 8)
+    }
+    var worst: Float = 0, overOne = 0, pairs = 0
+    var first: [String: Any]?
+    for at in stride(from: 0, to: half.count, by: 4) {
+        let a = Float(before[at + 3])
+        for c in 0..<3 {
+            pairs += 1
+            let s = Float(half[at + c]), given = Float(before[at + c])
+            let error = abs(s * a - given)
+            if s > 1 { overOne += 1 }
+            if error > worst { worst = error }
+            if error > 1.0 / 1024, first == nil {
+                first = ["c": given, "a": a, "s": s, "error": error]
+            }
+        }
+    }
+    return ["pairs": pairs, "worst": worst, "over_one": overOne, "bound": 1.0 / 1024,
+            "first_over": first.map { $0 as Any } ?? NSNull()]
+}
+
+/// K1's alpha patterns (visible or not), each a width, height and a row-major
+/// list of visibilities: `equivalence`'s frames, drawn from the same seeded
+/// sequence in the same order, so each pattern is that frame's.
+func kPatterns() -> [(String, Int, Int, [Bool])] {
+    var patterns: [(String, Int, Int, [Bool])] = []
+    var random = Seeded(state: 0x5EED_B93)
+    for (width, height) in [(1, 1), (3, 17), (17, 3), (64, 64), (257, 129)] {
+        let bytesPerRow = width * 4 + 16
+        for (density, label) in [(2, "0.2%"), (10, "1%"), (50, "5%"), (300, "30%")] {
+            for seed in 0..<3 {
+                for _ in 0..<(bytesPerRow * height) { _ = random.byte() }
+                var seen = [Bool](repeating: false, count: width * height)
+                for i in 0..<(width * height) {
+                    seen[i] = Int(random.next() % 1000) < density
+                    if seen[i] { _ = random.next() }
+                }
+                patterns.append(("\(width)x\(height) \(label) #\(seed)", width, height, seen))
+            }
+        }
+    }
+    for seed in 0..<3 {
+        for _ in 0..<((64 * 4 + 16) * 64) { _ = random.byte() }
+        var seen = [Bool](repeating: false, count: 64 * 64)
+        for y in 0..<64 {
+            for x in 0..<64 {
+                seen[y * 64 + x] = y % 4 == 0 || Int(random.next() % 1000) < 20
+                if seen[y * 64 + x] { _ = random.next() }
+            }
+        }
+        patterns.append(("64x64 whole rows #\(seed)", 64, 64, seen))
+    }
+    let fw = 1920, fh = 1080
+    var lattice9 = [Bool](repeating: false, count: fw * fh)
+    for y in stride(from: 4, to: fh, by: 9) {
+        for x in stride(from: 4, to: fw, by: 9) { lattice9[y * fw + x] = true }
+    }
+    patterns.append(("1920x1080 9x9 lattice", fw, fh, lattice9))
+    var lattice8 = [Bool](repeating: false, count: fw * fh)
+    for y in stride(from: 0, to: fh, by: 8) {
+        for x in stride(from: 0, to: fw, by: 8) { lattice8[y * fw + x] = true }
+    }
+    patterns.append(("1920x1080 8x8 lattice", fw, fh, lattice8))
+    return patterns
+}
+
+/// KH: per pattern, an 8-bit plane and a half plane (both with row padding)
+/// whose visible pixels are opaque and carry id i + 1 as their colour, every
+/// transparent pixel id 0; after each format's own straighten, every pixel's
+/// id must agree.
+func kh() -> [String: Any] {
+    var cases = 0, mismatched = 0, filled = 0
+    var first: [String: Any]?
+    for (name, width, height, seen) in kPatterns() {
+        cases += 1
+        let row8 = width * 4 + 16, row16 = width * 8 + 32
+        var bgra = [UInt8](repeating: 0, count: row8 * height)
+        var half = [UInt8](repeating: 0, count: row16 * height)
+        for i in 0..<(width * height) where seen[i] {
+            let (x, y) = (i % width, i / width)
+            let id = i + 1
+            let at8 = y * row8 + x * 4
+            bgra[at8] = UInt8(id & 0xFF)
+            bgra[at8 + 1] = UInt8((id >> 8) & 0xFF)
+            bgra[at8 + 2] = UInt8((id >> 16) & 0xFF)
+            bgra[at8 + 3] = 255
+            half.withUnsafeMutableBytes { raw in
+                let pixel = (raw.baseAddress! + y * row16).assumingMemoryBound(to: Float16.self)
+                    + x * 4
+                for c in 0..<3 { pixel[c] = Float16(Float((id >> (11 * c)) & 0x7FF) / 2048) }
+                pixel[3] = 1
+            }
+        }
+        bgra.withUnsafeMutableBytes {
+            ExportStraightAlpha.straighten(
+                bgra: $0.baseAddress!, width: width, height: height, bytesPerRow: row8)
+        }
+        half.withUnsafeMutableBytes {
+            ExportStraightAlpha.straighten(
+                half: $0.baseAddress!, width: width, height: height, bytesPerRow: row16)
+        }
+        var wrong = 0
+        for y in 0..<height {
+            for x in 0..<width {
+                let at8 = y * row8 + x * 4
+                let id8 = Int(bgra[at8]) | Int(bgra[at8 + 1]) << 8 | Int(bgra[at8 + 2]) << 16
+                let id16: Int = half.withUnsafeBytes { raw in
+                    let pixel = (raw.baseAddress! + y * row16)
+                        .assumingMemoryBound(to: Float16.self) + x * 4
+                    return (0..<3).reduce(0) { $0 | Int(Float(pixel[$1]) * 2048) << (11 * $1) }
+                }
+                if !seen[y * width + x] && id8 != 0 { filled += 1 }
+                if id8 != id16 {
+                    wrong += 1
+                    if first == nil {
+                        first = ["case": name, "x": x, "y": y, "eight": id8, "half": id16]
+                    }
+                }
+            }
+        }
+        if wrong > 0 { mismatched += 1 }
+    }
+    return ["cases": cases, "mismatched_cases": mismatched, "filled": filled,
+            "first": first.map { $0 as Any } ?? NSNull()]
+}
+
 // MARK: - main
 
 let arguments = CommandLine.arguments
 guard arguments.count >= 2 else {
-    fail("usage: alpha-mode-probe write|read|roundtrip|timing|equivalence …")
+    fail("usage: alpha-mode-probe write|read|roundtrip|timing|equivalence|precision|write-deep …")
 }
 switch arguments[1] {
 case "write":
@@ -631,6 +838,13 @@ case "timing":
     timing()
 case "equivalence":
     equivalence()
+case "precision":
+    emit(["r8": r8(), "rh": rh(), "kh": kh()])
+case "write-deep":
+    guard arguments.count == 4 else { fail("write-deep <path> <r,g,b,a>") }
+    let rgba = arguments[3].split(separator: ",").compactMap { Int($0) }
+    guard rgba.count == 4, rgba.allSatisfy({ (0...255).contains($0) }) else { fail("bad colour") }
+    write(path: arguments[2], codec: "hevc_alpha", mode: "straight", rgba: rgba, deep: true)
 default:
     fail("unknown mode \(arguments[1])")
 }

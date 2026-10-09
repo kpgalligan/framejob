@@ -44,7 +44,7 @@ enum MatteError: LocalizedError {
 }
 
 /// The destination-sized targets the matte pass draws into (spec §11 MT-6,
-/// MT-9): at 3840×2160, 33.2 MB per matte composite and 8.3 MB per coverage.
+/// MT-9): at 3840×2160, 66.4 MB per matte composite and 8.3 MB per coverage.
 /// A frame is one `render` call, bracketed by `beginFrame` and `endFrame`.
 /// Within it a composite is taken and given back as `MattePlan` says, so a
 /// later matte draws into one an earlier matte no longer needs; a coverage is
@@ -93,14 +93,15 @@ final class MattePool {
         peak = (0, 0)
     }
 
-    /// A free composite target, premultiplied BGRA: the lowest free index,
-    /// made when none is free. Nil only when Metal cannot make one.
+    /// A free composite target, premultiplied, in the working format
+    /// (`rgba16Float`, spec §11 PR-1): the lowest free index, made when none
+    /// is free. Nil only when Metal cannot make one.
     func takeComposite() -> MTLTexture? {
         let index: Int
         if let free = taken.firstIndex(of: false) {
             index = free
         } else {
-            guard let made = makeTarget(format: .bgra8Unorm) else { return nil }
+            guard let made = makeTarget(format: MetalRenderer.workingFormat) else { return nil }
             composites.append(made)
             taken.append(false)
             index = composites.count - 1

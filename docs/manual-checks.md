@@ -463,6 +463,18 @@ Uses the four `tools/proof/work/playback-check/` projects (Setup 3).
 - **Expect:** the nested dissolve plays without a stutter or a dark dip at its middle, and looks like the un-nested one; the nested zoom also plays without a dip, its picture as sharp as the un-nested zoom's to the eye.
 - **Source:** #252 (issue batch B90 phase 4, spec §11 MT-8).
 
+## Precision
+
+**PRC-1 — The preview looks as before**
+- **Do:** 1. In a 1920×1080 project, put a screen recording (or a movie of one) on a track, a title over it, and a shape filled with a slow black-to-white linear gradient at 50 % opacity with its blend set to Multiply over both. 2. Look at the preview, paused and playing, at View ▸ Preview Quality ▸ Full, then at Quarter. 3. If a build from before the precision road map is at hand, open the same project in it beside this one and compare.
+- **Expect:** the colours, the sharpness of the recording's text and the title's edges are as they were (no tint, no lighter or darker cast, no softening); the gradient is smooth; nothing flickers or shimmers, paused or playing, at either quality.
+- **Source:** the precision road map's PR1 (spec §11 PR-1: the preview shows the compositor's 16-bit-float frames, with no EDR and no HDR flag; `preview_display_probe.py`'s spike found no script can see how the layer reads them, so this row is the check).
+
+**PRC-2 — Deep exports play and look right**
+- **Do:** 1. In a project with a full-frame shape filled with a slow black-to-white linear gradient (one edge to the other) and a title over it, export `prores_422` and then `prores_4444` (File ▸ Export…). 2. Open each file in QuickTime Player and look at it beside Reelcut's preview of the same frame.
+- **Expect:** both play; the gradient is smooth in each, with no band or step you cannot also see in the preview; the colours and the title are the ones the preview shows.
+- **Source:** the precision road map's PR1 (spec §11 PR-3: the ProRes rows take the compositor's 16-bit frames).
+
 ## Screen recording
 
 Launch Reelcut from the Finder or Dock unless the check says otherwise.

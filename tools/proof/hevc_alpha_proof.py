@@ -19,7 +19,9 @@ probe-only mutants.
     python3 tools/proof/hevc_alpha_proof.py --mutant encoder-refused|report-and-fill|shape-and-note
     python3 tools/proof/hevc_alpha_proof.py --mutant import-straight|export-premultiplied|label-premultiplied|no-bleed
     python3 tools/proof/hevc_alpha_proof.py --mutant row-tie-right|rows-tie-last|reach-past-radius|full-row-unseen
-    python3 tools/proof/hevc_alpha_proof.py --measure straighten-speed
+    python3 tools/proof/hevc_alpha_proof.py --mutant hevc-no-profile
+    python3 tools/proof/hevc_alpha_proof.py --mutant bgra8-truncates|half-no-unpremultiply|half-no-fill
+    python3 tools/proof/hevc_alpha_proof.py --measure straighten-speed|hevc-alpha-deep
     python3 tools/proof/hevc_alpha_proof.py --record-baseline [--app PATH]
 
 With no option it scores every row below but G1 and X1. `--rows size` is
@@ -31,10 +33,15 @@ its last line; Gate A was passed on the phase A build (commit fcfeebf).
 its one fixture and no baseline read: H0, E1 and Z1 in one launch, then E3's
 launches. `--rows alpha-mode` is H0, A2, I1, M1, T1, T2, F1, F2, R0, K1, Q1 and
 Z1 in one launch, with FAINT, DISC and DISCWHITE its only fixtures and no
-baseline read. `--rows straighten` is R0 and K1 alone: the probe, no launch
-(and no app needed). `--measure straighten-speed` launches nothing: it builds the probe `-O`
+baseline read. `--rows straighten` is R0, K1, R8, RH and KH alone: the probe,
+no launch (and no app needed). `--measure straighten-speed` launches nothing: it builds the probe `-O`
 with whole-module optimisation, as the Release app is built, and prints its
-`timing` (printed, never scored).
+`timing` (printed, never scored). `--measure hevc-alpha-deep` (the precision
+road map's HA, spec §11 PR-3; recorded, never scored) launches nothing either:
+the probe's `write-deep` writes `hevc_alpha` from 64RGBAHalf buffers, a
+straight (255, 0, 0, 128) card labelled straight, and the line says whether
+the writer took them, ffprobe's profile and pixel format, and the decoded
+alphas.
 
 Each launch is the built app `proof_app` picks (Debug unless `RC_PROOF_APP=release`)
 on a scratch socket of its own, and only
@@ -261,6 +268,15 @@ Rows (◆ = also Gate A's):
   the 3,160 pairs of distinct visible pixels in a 9 × 9 plane around a
   transparent centre. Scored when `mismatched_cases` and `pair_mismatches`
   are 0, `cases` > 0 and `pair_ties` > 0 (so the pairs held ties to break).
+- **R8**, **RH**, **KH** (the precision road map's PR1, spec §11 PR-3; the
+  probe's `precision`): R8, `ExportStraightAlpha.eightBit(half:…)` takes
+  half(k/255) to byte k, half((k+0.4)/255) to k and half((k+0.6)/255) to
+  k+1 (k < 255) in every channel, and writes RGBA as BGRA; RH,
+  `straighten(half:…)` over premultiplied pairs (c, a ≤ 1, c ≤ a; a in k/255
+  and i/64, c = a·j/32) leaves s with |s·a − c| ≤ 2⁻¹⁰ and s ≤ 1; KH, over
+  K1's seeded frames (the same draws) and both lattices with every visible
+  pixel opaque and its colour a distinct id, the half fill gives each
+  transparent pixel the colour of the same source pixel as the 8-bit fill.
 
 **The probe** is `tools/proof/alpha_mode_probe.swift`, compiled LAST with
 every `app/Sources/*.swift` but `main.swift` through `swift_build.build` (the
@@ -308,6 +324,10 @@ asserted to occur exactly once and replaced, built by the copy's own `make app-d
   encoder key say `PremultipliedAlpha`: M1 FAILS.
 - `no-bleed` (B92) — `bleedRadius` is 0: F1 FAILS, its `hevc_alpha` half,
   and F2 FAILS.
+- `hevc-no-profile` (precision PR1, spec §11 PR-3) — the `hevc` row's Main
+  pin removed and its frame handed on deep (with the 8-bit frame
+  `frameForm` gives it, VideoToolbox writes Main with or without the pin):
+  B1 FAILS (VideoToolbox follows the 16-bit frames to Main 10).
 A mutant that names only `--rows alpha-mode`'s rows makes only its fixtures.
 Four more (B93 phase 2) are **probe-only**: each copies `app/Sources` into
 `work/`, replaces one anchor of `ExportStraightAlpha.swift` asserted to occur
@@ -319,6 +339,10 @@ R0 and K1 with no launch; it is caught when either FAILS:
 - `reach-past-radius` — the row table admits |dx| = radius + 1.
 - `full-row-unseen` — a row with no transparent pixel (the table's fast
   path) is written as holding no visible pixel.
+Three more (precision PR1), the same way over `ExportStraightAlphaHalf.swift`,
+scoring R0, K1, R8, RH and KH: `bgra8-truncates` — the 8-bit rounding
+dropped (R8); `half-no-unpremultiply` — the float pass divides nothing (RH);
+`half-no-fill` — the half layout's `copyColour` copies nothing (KH).
 A control or a mutant exits 0 only when every named row did what is named,
 1 when one did not, 2 when it could not be performed (a probe-only mutant:
 0 when R0 or K1 failed, 1 when both held, 2 when it could not be performed).
@@ -403,14 +427,16 @@ BUILD_BOUND = 1500
 SECOND = 600_000
 SIZE_ROWS = ["H0", "T0", "R1", "R2", "R3", "R4", "E2", "B1", "B4", "G1", "Z1"]
 FULL_ROWS = ["H0", "T0", "R1", "R2", "R3", "R4", "E2", "A1", "A2", "A3", "A4", "A5", "I1",
-             "M1", "T1", "T2", "F1", "F2", "R0", "K1", "Q1", "S1", "S2", "O1", "O2", "O3", "O4", "O5", "P1",
+             "M1", "T1", "T2", "F1", "F2", "R0", "K1", "R8", "RH", "KH", "Q1", "S1", "S2", "O1", "O2", "O3", "O4", "O5", "P1",
              "P2", "B1", "B2", "B3", "B4", "L1", "L2", "N1", "E1", "E3", "Z1"]
 SHEET_ROWS = ["H0", "E1", "E3", "Z1"]
 # `--rows alpha-mode` (issue batch B92, spec §11 G-35): what a straight export
 # and a labelled import answer, on FAINT, DISC and DISCWHITE alone.
-ALPHA_ROWS = ["H0", "A2", "I1", "M1", "T1", "T2", "F1", "F2", "R0", "K1", "Q1", "Z1"]
-# `--rows straighten` (issue batch B93 phase 2, #254): the probe's rows alone.
-STRAIGHTEN_ROWS = ["R0", "K1"]
+ALPHA_ROWS = ["H0", "A2", "I1", "M1", "T1", "T2", "F1", "F2", "R0", "K1", "R8", "RH", "KH",
+              "Q1", "Z1"]
+# `--rows straighten` (issue batch B93 phase 2, #254; R8, RH and KH since the
+# precision road map's PR1): the probe's rows alone.
+STRAIGHTEN_ROWS = ["R0", "K1", "R8", "RH", "KH"]
 ALPHA_CODECS = ("prores_4444", "hevc_alpha")
 PROBE_SWIFT = ROOT / "tools/proof/alpha_mode_probe.swift"
 PROBE_BOUND = 120
@@ -1901,6 +1927,62 @@ def measure_speed():
     return 0
 
 
+def measure_deep():
+    """`--measure hevc-alpha-deep` (HA): `hevc_alpha` fed 64RGBAHalf directly."""
+    movie = WORK / "hevc-alpha-deep.mov"
+    try:
+        got = probe("write-deep", movie, "255,0,0,128")
+    except RuntimeError as error:
+        print(f"  HA the writer did not take 64RGBAHalf for hevc_alpha: {error}")
+        return 0
+    stream, whole = probe_whole(movie)
+    raster = Raster(movie)
+    print(f"  HA the writer took 64RGBAHalf for hevc_alpha: {got}")
+    print(f"     ffprobe: codec {stream.get('codec_name')}, tag {stream.get('codec_tag_string')}, "
+          f"profile {stream.get('profile')}, pix_fmt {stream.get('pix_fmt')}")
+    print(f"     decoded frame 0: alphas {raster.alphas()}; corner {raster.pixel(0, 0)}, "
+          f"centre {raster.centre()} (written straight (255, 0, 0, 128))")
+    return 0
+
+
+PRECISION = {}
+
+
+def precision_probe():
+    """The probe's `precision` answer, asked once a run."""
+    if not PRECISION:
+        PRECISION.update(probe("precision"))
+    return PRECISION
+
+
+def row_r8():
+    got = precision_probe()["r8"]
+    check("R8 eightBit(half:…): half(k/255) → k, half((k+0.4)/255) → k, half((k+0.6)/255) → "
+          "k+1 for every k in 0…255 (k < 255 for the last) in every channel, RGBA written as BGRA",
+          got.get("mismatches") == 0 and got.get("order_ok") is True,
+          f"mismatches {got.get('mismatches')} (first {got.get('first')}); (10, 20, 30, 40) "
+          f"became BGRA {got.get('order')}")
+
+
+def row_rh():
+    got = precision_probe()["rh"]
+    check("RH straighten(half:…): every premultiplied pair (c ≤ a) gives |s·a − c| ≤ 2⁻¹⁰ "
+          "and s ≤ 1", (got.get("pairs") or 0) > 0 and got.get("worst", 1) <= 1 / 1024
+          and got.get("over_one") == 0,
+          f"pairs {got.get('pairs')}, worst {got.get('worst')} (bound {1 / 1024}), s > 1 "
+          f"{got.get('over_one')}; first over {got.get('first_over')}")
+
+
+def row_kh():
+    got = precision_probe()["kh"]
+    check("KH the half fill gives every transparent pixel the colour of the same source pixel "
+          "as the 8-bit fill, over K1's seeded frames and both lattices",
+          (got.get("cases") or 0) > 0 and got.get("mismatched_cases") == 0
+          and (got.get("filled") or 0) > 0,
+          f"cases {got.get('cases')}, mismatched {got.get('mismatched_cases')}, pixels filled "
+          f"(8-bit) {got.get('filled')}; first {got.get('first')}")
+
+
 def row_r0(s):
     """R0: the product's pixel half, in the probe."""
     got = probe("roundtrip")
@@ -1949,6 +2031,9 @@ ROWS = {
     "F1": lambda s, full: row_f1(s),
     "R0": lambda s, full: row_r0(s),
     "K1": lambda s, full: row_k1(),
+    "R8": lambda s, full: row_r8(),
+    "RH": lambda s, full: row_rh(),
+    "KH": lambda s, full: row_kh(),
     "F2": lambda s, full: row_f2(s),
     "Q1": lambda s, full: row_q1(s),
     "S1": lambda s, full: row_s1(s),
@@ -2035,6 +2120,9 @@ def session(label, app, body, full, choice=CHOICE, env=None, baseline=None, fore
 
 SETTINGS = "app/Sources/ExporterWriter+Settings.swift"
 STRAIGHT = "app/Sources/ExportStraightAlpha.swift"
+# The attachment that labels a frame straight moved here with `ExportFrames`
+# (the precision road map's PR1, spec §11 PR-3).
+STRAIGHT_HALF = "app/Sources/ExportStraightAlphaHalf.swift"
 EFFECTS = "app/Sources/CompositorEffects.swift"
 MUTANTS = {
     "encoder-refused": {
@@ -2117,7 +2205,7 @@ MUTANTS = {
     },
     "label-premultiplied": {      # (e): both labels premultiplied
         "anchors": [
-            (STRAIGHT,
+            (STRAIGHT_HALF,
              "            kCVImageBufferAlphaChannelMode_StraightAlpha, .shouldPropagate)\n",
              "            kCVImageBufferAlphaChannelMode_PremultipliedAlpha, .shouldPropagate)\n"),
             (SETTINGS,
@@ -2134,6 +2222,22 @@ MUTANTS = {
         ],
         "launches": [({}, {"fail": ["F1", "F2"], "pass": [],
                            "half": ("F1", "hevc_alpha")})],
+    },
+    # The precision road map's PR1 (spec §11 PR-3): the hevc row's Main pin.
+    # `hevc`'s frame is rounded to 8 bits, and from 32BGRA VideoToolbox writes
+    # Main with or without the pin, so the pin alone removed is an equivalent
+    # mutant: this one also hands `hevc` the deep frame, the input the pin is for.
+    "hevc-no-profile": {
+        "anchors": [
+            (SETTINGS,
+             "            compression[AVVideoProfileLevelKey] = kVTProfileLevel_HEVC_Main_AutoLevel"
+             " as String\n",
+             ""),
+            (SETTINGS,
+             "        return codec == .h264 || codec == .hevc ? .eightBit : nil\n",
+             "        return codec == .h264 ? .eightBit : nil\n"),
+        ],
+        "launches": [({}, {"fail": ["B1"], "pass": []})],
     },
 }
 
@@ -2153,15 +2257,28 @@ PROBE_MUTANTS = {
     "full-row-unseen": (STRAIGHT,    # a wholly visible row's entries say none
                         "            table.initialize(repeating: 0, count: width)\n",
                         "            table.initialize(repeating: noVisible, count: width)\n"),
+    # The precision road map's PR1 (spec §11 PR-3), over the half-float file.
+    "bgra8-truncates": (STRAIGHT_HALF,   # round(v·255) becomes a truncation
+                        "        return UInt8(min(255, (v * 255).rounded()))\n",
+                        "        return UInt8(min(255, v * 255))\n"),
+    "half-no-unpremultiply": (STRAIGHT_HALF,     # the float pass divides nothing
+                              "                pixel[channel] = Float16(min(1, Float(pixel[channel])"
+                              " / alpha))\n",
+                              "                pixel[channel] = Float16(min(1, Float(pixel[channel])"
+                              "))\n"),
+    "half-no-fill": (STRAIGHT_HALF,      # the half layout's colour copy copies nothing
+                     "            UnsafeMutableRawPointer(to).copyMemory(from: from, byteCount: 6)\n",
+                     "            _ = (from, to)\n"),
 }
 
 
 def run_probe_mutant(name):
     """A probe-only mutant: `app/Sources` copied into WORK, one anchor
-    replaced, the plain probe built from the copy, R0 and K1 scored. 0 when
-    either FAILED, 1 when both held, 2 when it could not be performed."""
+    replaced, the plain probe built from the copy, `STRAIGHTEN_ROWS` scored.
+    0 when one FAILED, 1 when all held, 2 when it could not be performed."""
     global PROBE_SOURCES
-    print(f"B93 phase 2 — the {name} MUTANT (probe only: R0, K1)", flush=True)
+    print(f"B93 phase 2 / precision PR1 — the {name} MUTANT (probe only: "
+          f"{', '.join(STRAIGHTEN_ROWS)})", flush=True)
     path, anchor, replacement = PROBE_MUTANTS[name]
     copy = WORK / "mutant-sources"
     try:
@@ -2340,7 +2457,7 @@ def main():
     parser.add_argument("--record-baseline", action="store_true")
     parser.add_argument("--mutant", choices=sorted(MUTANTS) + sorted(PROBE_MUTANTS))
     parser.add_argument("--control", choices=["plain-hevc-reader", "sheet-default"])
-    parser.add_argument("--measure", choices=["straighten-speed"])
+    parser.add_argument("--measure", choices=["straighten-speed", "hevc-alpha-deep"])
     args = parser.parse_args()
     if sum(map(bool, (args.rows, args.record_baseline, args.mutant, args.control))) > 1:
         print("instrument failure: --rows, --record-baseline, --mutant and --control are "
@@ -2359,9 +2476,11 @@ def main():
     atexit.register(remove_work)
     WORK.mkdir(parents=True)
     if args.measure:
-        print("B92 — ExportStraightAlpha's speed, optimised (printed, never scored)", flush=True)
+        print("B92 — ExportStraightAlpha's speed, optimised (printed, never scored)"
+              if args.measure == "straighten-speed" else
+              "precision PR1 — HA, hevc_alpha fed 64RGBAHalf (recorded, never scored)", flush=True)
         try:
-            return measure_speed()
+            return measure_speed() if args.measure == "straighten-speed" else measure_deep()
         except Exception as error:  # an instrument that could not run
             print(f"instrument failure: {type(error).__name__}: {error}")
             return 2
@@ -2369,7 +2488,8 @@ def main():
         return run_probe_mutant(args.mutant)
     if args.rows == "straighten":
         print("B93 phase 2 — the fill's row table against the fill before it (#254, spec §11 "
-              "G-35 (d)); the probe alone, no launch", flush=True)
+              "G-35 (d)), and precision PR1's R8, RH and KH; the probe alone, no launch",
+              flush=True)
         score(None, STRAIGHTEN_ROWS, True)
         passed = sum(1 for name in STRAIGHTEN_ROWS if rows.get(name))
         print(f"{passed}/{len(STRAIGHTEN_ROWS)}")

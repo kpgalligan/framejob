@@ -28,8 +28,9 @@ import AVFoundation
 /// the alpha movie rows' picture (`prores_4444`, `hevc_alpha`): the
 /// compositor's premultiplied frame is un-premultiplied, its transparent
 /// pixels' colour filled from the nearest visible one, and labelled
-/// straight (`ExportStraightAlpha`, spec §11 G-35); every other row's frame
-/// goes to the encoder as the compositor drew it.
+/// straight (`ExportStraightAlpha`, spec §11 G-35); `h264`'s, `hevc`'s and
+/// `hevc_alpha`'s are first rounded to 8 bits (`ExportFrames`, PR-3), and
+/// every other row's frame goes to the encoder as the compositor drew it.
 ///
 /// **Why the read is a reader and not a second render.** The alternative —
 /// driving the compositor by hand over an `AVAssetImageGenerator`, one frame
@@ -102,10 +103,10 @@ final class ExportWriter {
     /// reason and no other.
     private var audioGain: ExportAudioGain?
 
-    /// Whether the video pump straightens each frame (spec §11 G-35): the
-    /// row's `alpha`, set once by `addVideo` in `init` and read only by
-    /// `start`.
-    private var straightensAlpha = false
+    /// What the video pump makes of each frame (spec §11 G-35, PR-3;
+    /// `frameForm`), set once by `addVideo` in `init` and read only by
+    /// `start`; nil hands each frame on as drawn.
+    private var frames: ExportFrames?
 
     /// Builds the reader, the writer and every track, or throws the
     /// `Exporter.ExportError` the sheet should show. Nothing is read or
@@ -179,11 +180,10 @@ final class ExportWriter {
         let output = AVAssetReaderVideoCompositionOutput(
             videoTracks: tracks,
             videoSettings: [
-                // The one format the compositor produces and the shader
-                // samples (`Compositor.requiredPixelBufferAttributes…`).
-                // Asking for it here means no conversion between the render
-                // context and the encoder.
-                kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA),
+                // The one format the compositor produces (`Compositor.
+                // outputPixelFormat`, 64RGBAHalf). Asking for it here means no
+                // conversion between the render context and the encoder.
+                kCVPixelBufferPixelFormatTypeKey as String: Int(Compositor.outputPixelFormat),
                 kCVPixelBufferMetalCompatibilityKey as String: true,
             ])
         output.videoComposition = Self.videoComposition(built, settings: settings)
@@ -205,7 +205,7 @@ final class ExportWriter {
         writer.add(input)
         videoOutput = output
         videoInput = input
-        straightensAlpha = settings.alpha
+        frames = Self.frameForm(settings).map { ExportFrames(form: $0) }
     }
 
     /// The audio half: every composition audio track through the plan's mix.
@@ -312,7 +312,7 @@ final class ExportWriter {
         if let input = videoInput, let output = videoOutput {
             pump(
                 input, from: output, on: videoQueue, group: group, tracksProgress: true,
-                straightAlpha: straightensAlpha)
+                frames: frames)
         }
         if let input = audioInput, let output = audioOutput {
             // Audio drives the bar only when there is no picture to drive it,
@@ -370,12 +370,12 @@ final class ExportWriter {
     /// `gain` is nil for every pump but the audio one, and nil for the audio
     /// one too unless the export asked to be normalised — which is what
     /// keeps an ordinary export on exactly the samples it had before.
-    /// `straightAlpha` is true only for the video pump of an alpha row: each
-    /// frame is then straightened and labelled (`ExportStraightAlpha`).
+    /// `frames` is non-nil only for the video pump of a row `frameForm`
+    /// names: each frame is then converted by it (`ExportFrames`).
     private func pump(
         _ input: AVAssetWriterInput, from output: AVAssetReaderOutput, on queue: DispatchQueue,
         group: DispatchGroup, tracksProgress: Bool, gain: ExportAudioGain? = nil,
-        straightAlpha: Bool = false
+        frames: ExportFrames? = nil
     ) {
         group.enter()
         var finished = false
@@ -423,13 +423,12 @@ final class ExportWriter {
                     stop()
                     return
                 }
-                // An alpha row's frame, un-premultiplied and labelled straight
-                // (spec §11 G-35), before `retimed`; any other goes on as read.
-                guard let ready = straightAlpha ? ExportStraightAlpha.straighten(sample) : sample
-                else {
+                // A `frameForm` row's frame, converted (spec §11 G-35, PR-3),
+                // before `retimed`; any other goes on as read.
+                guard let ready = frames == nil ? sample : frames?.convert(sample) else {
                     self.stopped(
                         with: Exporter.ExportError.failed(
-                            "A frame's transparency could not be written straight."))
+                            frames?.failure ?? "A frame could not be prepared for the encoder."))
                     stop()
                     return
                 }

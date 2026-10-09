@@ -43,7 +43,7 @@ Each phase is committed alone, after its review.
 | Phase | What | State |
 |---|---|---|
 | PR0 | PR-1..PR-5 recorded in spec §11 before any code (amending MT-6, MT-8, MT-9 and G-35); `LayerUniforms`, `ShadowUniforms` and `TransitionCode` out of `Compositor.swift` into `LayerUniforms.swift`, a pure move gated alone; PR1's controls captured on PR0's tree and the preview-display spike (V0–V2) | done (below) |
-| PR1 | 16-bit-float working depth and output (sources stay 32BGRA): the render context, targets and pipelines `rgba16Float`, the shader clamps, the export reader deep, `ExportFrames` (`prores_4444` straightened in float, `hevc_alpha` and `h264` rounded to 8 bits first), the `hevc` Main pin, the preview probes reading the new format, the pixel sweep's re-baselines | — |
+| PR1 | 16-bit-float working depth and output (sources stay 32BGRA): the render context, targets and pipelines `rgba16Float`, the shader clamps, the export reader deep, `ExportFrames` (`prores_4444` straightened in float, `hevc_alpha` and `h264` rounded to 8 bits first), the `hevc` Main pin, the preview probes reading the new format, the pixel sweep's re-baselines | built; M1's memory stop returned to the owner, who accepted the measured figures (below) |
 | PR2 | Deep decode: every video source `64RGBAHalf`; the ramp rows; the video-sourced re-baselines | — |
 | PR3 | The `hevc_10bit` row (core and app), the documents, the ADR, close | — |
 
@@ -143,3 +143,136 @@ capture is `tools/proof/work/precision/ctl-pr0/`, gitignored):
   catch the peak only sometimes; the instance's lifetime `phys_footprint_peak`,
   read after the export on an instance that did nothing else, is the figure
   `--measure compare` compares.
+
+## PR1 — 16-bit-float working depth and output (2026-10-09)
+
+**Built.** `Compositor.outputPixelFormat` is `kCVPixelFormatType_64RGBAHalf`
+(`sourcePixelFormat` stays 32BGRA until PR2); `MetalRenderer.metalFormat(for:)`
+and `workingFormat` (`rgba16Float`) give every layer, blend, shadow and
+dissolve pipeline's attachment, the matte composites and dissolve halves
+(`MattePool.takeComposite`) and the shadow pair; `texture(from:)` wraps a
+buffer by its own format. `Compositor.metal`: `layerSample` `saturate`s its
+sample, the blend and dissolve entry points `saturate` what they return, and
+the order-of-operations comment is true for a 16-bit-float canvas (linear
+light's 50 % × 50 % is about 24 %, 61/255). The export reader reads
+64RGBAHalf; `ExportWriter.frameForm` and `ExportFrames`
+(`ExportStraightAlphaHalf.swift`, new) straighten `prores_4444` in float,
+round `hevc_alpha`, `h264` and `hevc` to 8-bit BGRA in a pooled 32BGRA
+buffer (the first then straightened by G-35's 8-bit rule, unchanged; `hevc`
+since the review's fix pass, below), and `hevc` is pinned to Main. `ExportStraightAlpha.swift`'s fill is generic over
+`StraightAlphaLayout` (`BGRA8`, `RGBAHalf`): one fill. `wc -l`:
+`Compositor.swift` 695 → 724, `ExporterWriter.swift` 573 → 572,
+`ExporterWriter+Settings.swift` 393 → 413, `ExportStraightAlpha.swift`
+246 → 244, `ExportStraightAlphaHalf.swift` 252 (new; both after the
+`allVisible` fix below).
+
+**E1 under the ruling.** `precision_encoder_probe.swift` (new, built through
+`swift_build`) reads what `ExportWriter` hands the `h264` encoder. Its first
+run failed K3 by up to 194 levels on the title: a bare binary has no
+`ATSApplicationFontsPath`, so the title drew in a fallback face; the probe
+now registers the bundled fonts, and K3's handed frame then equals PR1's
+own render byte for byte.
+
+**Recorded on Release** (the gate's `make app`; against PR0's capture
+`tools/proof/work/precision/ctl-pr0/`):
+- `precision_proof.py` rows 5/5: C0 ok; D1 an 8-bit PNG; **P1 0.914 10-bit
+  steps RMS** (PR0's 8-bit canvas: 2.82); H1 `hevc`, Main, `yuv420p`.
+- `compare` 8/8: K1 and K6 byte-identical; K2 740 channels at |Δ| 1, K3
+  177,726, K4 none, K5 147,333 (of 921,600; none past 1); **E1**: `h264`'s
+  handed frame is 32BGRA, K6 byte-identical to PR0's render and K3 within
+  ±1 (the same 177,726 channels as K3's row). The encoded file decoded to
+  the same digest as E0's first export (27266c5820dc4dd7), unscored.
+- `--measure compare` 1/2 — **M1 hits the memory stop** (host: `powermode
+  0`, AC power, `vm.loadavg` 13.05 before and 15.05 after, other sessions
+  running):
+
+| Fixture | Average (PR0 → PR1) | Worst | Lifetime peak (PR0 → PR1) | Δ | Implied extra buffers (Δ ÷ one buffer's Δ at that size) |
+|---|---|---|---|---|---|
+| typical 1080p | 1.095 → 1.13 ms | 2.40 → 2.80 ms | 285.3 → 422.5 MB | +137.2 MB | +16.5 |
+| typical 2160p | 2.71 → 2.555 ms | 5.01 → 6.14 ms | 618.0 → 1,236.1 MB | +618.0 MB | +18.6 |
+| heavy 1080p | 2.61 → 2.77 ms | 18.05 → 19.82 ms | 453.9 → 655.1 MB | +201.2 MB | +24.3 |
+| heavy 2160p | 5.94 → 6.015 ms | 32.2 → 35.87 ms | 1,238.7 → 2,090.4 MB | **+851.7 MB** | +25.7 |
+
+  Frame time is not a stop (heavy 1080p averages 2.77 ms against the 8 ms
+  stop). Memory is: the heavy 4K export's peak rose +851.7 MB, past the
+  spec's stop of +532 MB (twice the spike's reasoned +266 MB). The typical
+  4K peak exactly doubled (PR-1's "frame memory doubles"); the heavy one
+  rose 69 %. The implied extra 4K buffers (Δpeak ÷ 33.2 MB, the
+  64RGBAHalf-less-32BGRA size) are 18.6 and 25.7: the export pipeline holds
+  about that many frame buffers at its peak, where the spike reasoned from
+  a handful. Which pools they are (the render context's, the reader's
+  copies — `alwaysCopiesSampleData` — or the encoder's queue) was not
+  measured. **Per the spec this returned to the owner** (PR-1's risk, "Owner
+  choices"), who answered the same day: "Accept as measured. We shouldn't
+  worry about 8g macs at all, and give only minimal concern to 16g macs."
+  The figures and the acceptance are in spec §11 PR-1; the +532 MB stop no
+  longer applies to this road map (PR2's included), and `precision_proof.py
+  --measure` prints and records the memory without scoring it. Footprints
+  are still measured and recorded each phase.
+
+**After the owner's answer (2026-10-09).**
+- **The straighten speed.** It was measured again on a quieter host.
+  - The generic fill had slowed card and soft frames by 15–25 %. A standalone `-O` WMO bench of the PR0 file against PR1's showed it: 4K card 0.84 → 1.05 ms, soft 2.92 → 3.58 ms.
+  - The cause: `nearestInRow`'s whole-row-visible check, asked through `visible` per pixel, no longer vectorised.
+  - The fix: `StraightAlphaLayout` gained `allVisible(_:width:)`, a `min` over the alpha alone per layout. K1 and KH are unchanged.
+  - `--measure straighten-speed`, with the pre-B93 oracle in the same run:
+    - 1080p: card 0.34 ms (oracle 0.34), soft 0.93 (0.91), sparse 1.04 (16.63);
+    - 4K: card 1.06 (0.85), soft 3.40 (3.37), sparse 3.63 (65.08).
+  - The product-to-oracle ratios are now B93's own.
+- **`hevc_alpha_proof.py` whole on Release:** 42/43, then B1 re-baselined under PR-5, and `--rows size` showed B1 ok. The re-baseline was withdrawn in the fix pass (below): with `hevc` fed 8-bit frames again B1 reproduces the baseline's digest exactly.
+- **HA** (`--measure hevc-alpha-deep`): the writer takes 64RGBAHalf for `hevc_alpha`. ffprobe reads hevc/hvc1, Main, yuv420p. Decoded alphas are {0, 1, 2, 127, 128, 129}, and the centre is (254, 0, 0, 128) for a straight (255, 0, 0, 128) card. This is recorded, not used.
+- **The pixel sweep on Release.**
+  - Each proof ran on an instance of its own, and every parity log was empty.
+  - Every score was full except the re-baselined rows below and `graphics_proof` Q2 (PR1's own, fixed in the fix pass below):
+    - phase1 66/66, phase2 86/86, phase3 123/123, phase4 83/83, phase5 90/90, phase6 168/168, phase7 92/92, phase8 79/79, phase9 222/222;
+    - `phase6_chrome` 70/70, `phase7_chrome` 79/79, `phase8_chrome` 150/150 (run with the owner's leave to take focus; `LayerUniforms` 416, `ShadowUniforms` 48);
+    - `e1_proof` 101/101, `e2_proof` 75/75;
+    - `matte_proof` 46/46, `matte_probe` 6/6;
+    - `graphics_proof` 50/51 (Q2; 51/51 after the fix pass), `graphics_files_proof` 10/10, `graphics_prefetch_proof` 7/7, `graphic_prop_action_proof` 17/17, `paste_graphic_proof` 8/8;
+    - `word_looks_proof` 15/16 (B1, to re-record), `word_looks_sheet_proof` 9/9, `words_picture_proof` 7/7, `word_captions_proof` 20/20;
+    - `codec_import_proof` 10/10, `container_import_proof` 16/16, `clip_inspector6_proof` 25/25, `debug_release_proof` 10/10, `export_cancel_proof` 7/7, `remaining_proof` 80/80, `silence2_proof` 100/100;
+    - `recording_proof` 140/140 with `--no-screen --no-microphone`, recording nothing (79 checks skipped by name);
+    - the three preview probes 59/59, 24/24 and 32/32.
+  - phase4's one failure (82/83 first) was its `transcribe` argument row, which predated spec §11 W-15's slide/fill/dim. It was not PR1's and is fixed.
+- **Re-baselined rows** (script, row, old → new, cause):
+
+| Script | Row | Old | New | Cause |
+|---|---|---|---|---|
+| `e1_proof.py` | the version-6 `wipe` against 1c3e92e | byte-identical (3f25059c…) | within ±1 a channel (5e6ff5dc…; \|Δ\| 1 on 1,080 channels) | PR-1: the wipe's soft edge is blended at 16-bit float; PR-5's rule for a frozen reference that holds pixels |
+| `e1_proof.py` | five version-6 cross-dissolve ticks | byte-identical | within ±1 (still \|Δ\| 0 on every tick) | PR-5's rule, the same row family |
+| `hevc_alpha_proof.py` | B1 | frame 0's digest d038e20d… scored; samples exact | WITHDRAWN in the fix pass: exact again, digest d038e20d… | was: `hevc` fed 64RGBAHalf moved the digest to 2da5cab7… and the centre red to 254; `hevc` is now rounded to 8 bits first (below) |
+| `word_looks_baseline.json` | B1 (fixture B, 41 frames) | PR0's digests (PR0's Release reproduced all 41) | to re-record after PR1's commit | PR-1: 40 frames moved, 76,550 channels, every one by exactly 1, measured against a scratch Release build of PR0. `--record-baseline` refuses an uncommitted tree, so the recording is owed to the commit |
+
+- **The mutants, once, on the final instrument.** All 12 were caught:
+  - `precision_proof.py`:
+    - `h264-deep`: E1 FAILS; the handed frame is RGhA.
+    - `output-8bit`: P1 FAILS at 2.82, and PF FAILS through `preview_refresh_probe.py --sources`.
+    - `hevc-no-profile`: H1 FAILS; the profile reads Main 10.
+  - `hevc_alpha_proof.py`:
+    - `hevc-no-profile`: B1 FAILS on Main 10.
+    - `label-premultiplied`, on its new anchor: M1 FAILS.
+    - The probe-only `bgra8-truncates` (R8), `half-no-unpremultiply` (RH) and `half-no-fill` (KH).
+    - The four B93 probe mutants: K1 (`row-tie-right` also R0).
+- **`make gate` PASS** on the final tree.
+- **`graphics_proof.py` Q2 (`direct`)** failed on both Release runs: (1440, 540) read blue (0, 0, 255) where the row wants black, the canvas colour `swapOut` sets after the export was handed its project. It was first called a pre-existing race and filed as #255.
+
+**The review's fix pass (2026-10-09).**
+- **Q2 was PR1's, and a proof defect, not a product race.** The pin probe (`graphics_pin_probe.swift`, built `-Onone` by `swift_build`) was run as the proof runs it, Q1's `queue pin`/`nopin` then Q2's `direct pin`/`nopin` over ONE package, from a black-canvas copy of PQ, 3 rounds per tree, each tree's probe built from its own `app/Sources` and shader:
+  - PR0 (7b80810): 12 of 12 runs drew (1440, 540) black (Q1 3/3, Q2 3/3); each run took 9.3–10.2 s; the package's canvas stayed black.
+  - PR1: Q1 3/3 black, Q2 `direct pin` **0/3** (blue every time); each run took 17.3–32.4 s, and after every round's first run the package's saved canvas was blue.
+  - The cause: `swapOut`'s blue canvas is a document edit, and `ProjectDocument` autosaves in place. A run that outlasts AppKit's autosave delay writes the blue canvas into the package, so the NEXT run opens blue. Each export itself drew black, from the project it was handed. PR1 doubled the probe's `-Onone` `prores_4444` export time (the half-float path), which crossed that delay; PR0's runs finished first. The earlier "PR0 races too" run was over a PQ an earlier run had already autosaved.
+  - The fix: `graphics_proof.py`'s `run_probe` hands each run its own copy of the package (`work/graphics/<tag>.reelcut`). Over the fixed `run_probe`, PR1's probe drew black in 10 of 10 pin runs (5 rounds, Q1 and Q2); every copy was autosaved blue and the source package stayed black. `graphics_proof.py` whole on Release: 51/51.
+- **`hevc` (Main) from deep frames, measured** (review nit 2; the precision proof's 10-bit ramp at 1920 × 1080 through the app, decoded luma against x/1919, 10-bit steps RMS; three `hevc` exports, one `prores_422` and two `h264` per build, each figure identical across its repeats):
+
+| Build | `hevc` | `prores_422` | `h264` |
+|---|---|---|---|
+| PR0 Release (scratch build of 7b80810) | 6.462 | 3.159 (PR0's capture: 3.159) | 7.863 |
+| PR1 Release, `hevc` fed 64RGBAHalf | **9.040** | 2.007 | 7.863 |
+| PR1 Release, `hevc` rounded to 8 bits | 6.462 | 2.007 | 7.863 |
+
+  - `hevc` was worse from deep frames, as `h264` was, so `frameForm` now gives `hevc` the `.eightBit` form (spec §11 PR-3 amended, §7.8 too). Profile and pixel format are unchanged: Main, `yuv420p`.
+  - New row **E2** (`precision_proof.py compare`): the frame handed to the `hevc` encoder is 32BGRA, K6 byte-identical to PR0's render and K3 within ±1 (the same 177,726 channels as E1's). New mutant **`hevc-deep`** (`frameForm` answers nil for `hevc`) targets E2.
+  - **`hevc-no-profile` was redefined in both scripts.** With the 8-bit frame, VideoToolbox writes Main with or without the pin, so the pin alone removed is an equivalent mutant. The mutant now also hands `hevc` the deep frame (`hevc-deep`'s anchor), the input the pin is for; H1 and B1 still catch it on Main 10.
+  - **B1's re-baseline is withdrawn.** `hevc_alpha_proof.py --rows size` on Release read frame 0's digest d038e20d…, the baseline's, with the five samples exact, so B1 compares exactly again as it did before PR1.
+  - **Mutants, once, on Release** (the ones whose anchors the fix pass touched): `h264-deep` (its anchor line now holds `hevc` too) — E1 FAILS, handed RGhA; `hevc-deep` — E2 FAILS, handed RGhA; `precision_proof.py`'s `hevc-no-profile` — H1 FAILS on Main 10; `hevc_alpha_proof.py`'s `hevc-no-profile` — B1 FAILS (frame 0, the samples and the stream differ). All four caught; the phase's mutants are now 13.
+  - **Owed to PR3:** `frameForm` keys on `codecType`, so PR3's `hevc_10bit` (mapped to `.hevc`) must answer nil there, or it would be rounded to 8 bits. PR3's T2 (RMS ≤ 2.0) would catch it.
