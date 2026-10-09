@@ -44,7 +44,7 @@ Each phase is committed alone, after its review.
 |---|---|---|
 | PR0 | PR-1..PR-5 recorded in spec §11 before any code (amending MT-6, MT-8, MT-9 and G-35); `LayerUniforms`, `ShadowUniforms` and `TransitionCode` out of `Compositor.swift` into `LayerUniforms.swift`, a pure move gated alone; PR1's controls captured on PR0's tree and the preview-display spike (V0–V2) | done (below) |
 | PR1 | 16-bit-float working depth and output (sources stay 32BGRA): the render context, targets and pipelines `rgba16Float`, the shader clamps, the export reader deep, `ExportFrames` (`prores_4444` straightened in float, `hevc_alpha` and `h264` rounded to 8 bits first), the `hevc` Main pin, the preview probes reading the new format, the pixel sweep's re-baselines | built; M1's memory stop returned to the owner, who accepted the measured figures (below) |
-| PR2 | Deep decode: every video source `64RGBAHalf`; the ramp rows; the video-sourced re-baselines | — |
+| PR2 | Deep decode: every video source `64RGBAHalf`; the ramp rows; the video-sourced re-baselines | built (below) |
 | PR3 | The `hevc_10bit` row (core and app), the documents, the ADR, close | — |
 
 ## PR0 — the decisions, the toll, the controls (2026-10-09)
@@ -276,3 +276,143 @@ own render byte for byte.
   - **B1's re-baseline is withdrawn.** `hevc_alpha_proof.py --rows size` on Release read frame 0's digest d038e20d…, the baseline's, with the five samples exact, so B1 compares exactly again as it did before PR1.
   - **Mutants, once, on Release** (the ones whose anchors the fix pass touched): `h264-deep` (its anchor line now holds `hevc` too) — E1 FAILS, handed RGhA; `hevc-deep` — E2 FAILS, handed RGhA; `precision_proof.py`'s `hevc-no-profile` — H1 FAILS on Main 10; `hevc_alpha_proof.py`'s `hevc-no-profile` — B1 FAILS (frame 0, the samples and the stream differ). All four caught; the phase's mutants are now 13.
   - **Owed to PR3:** `frameForm` keys on `codecType`, so PR3's `hevc_10bit` (mapped to `.hevc`) must answer nil there, or it would be rounded to 8 bits. PR3's T2 (RMS ≤ 2.0) would catch it.
+
+## PR2 — deep decode (2026-10-09)
+
+**Built.** `Compositor.sourcePixelFormat` is `kCVPixelFormatType_64RGBAHalf`,
+so `sourcePixelBufferAttributes` asks every video track for 16-bit float,
+wrapped as `rgba16Float` by `texture(from:)` (spec §11 PR-2). HDR still
+arrives tone-mapped to SDR: `supportsHDRSourceFrames` is not implemented, so
+it is false. Nothing else in the product changed: PR1's `layerSample`
+`saturate` is the clamp a deep source's unclamped values reach. `wc -l
+app/Sources/Compositor.swift`: 724 → 724. The comment was first written
+two lines longer (726, the build the recorded runs and the sweep drove), then
+reworded within its old lines, because the file is over the ~600-line cap
+and takes nothing on. The trim is comment-only; the gate and M1's second run
+ran on the trimmed build.
+
+**PR2's controls, on PR1's committed tree** (HEAD b95d752, Release, before
+the product edit; `tools/proof/work/precision/ctl-pr1/`, gitignored).
+`precision_proof.py` now records the tree's formats in a capture (`formats`,
+read from `Compositor.swift`; a capture without them is PR0's) and picks each
+K row's rule from the control's formats against the tree's:
+- `capture`: 5/5. K1–K6 rendered (K3 db8d6c07fd2c0b06, K6 76ab60469c24daa1 —
+  PR0's K6 digest); formats 64RGBAHalf out, 32BGRA in. **E0** this time:
+  the two `h264` exports were equal (8b2c1ab173c6f686). P1's figure 0.914.
+  The ramp: `render_frame` a 16-bit PNG holding 256 distinct green values;
+  `prores_422` 2.007 steps RMS.
+- `--measure capture`: 2/2 (`vm.loadavg` 5.83 before, 17.81 after):
+
+| Fixture | Average | Worst | Lifetime peak |
+|---|---|---|---|
+| typical 1080p | 1.23 ms | 3.58 ms | 439.1 MB |
+| typical 2160p | 2.465 ms | 5.7 ms | 1,432.7 MB |
+| heavy 1080p | 2.775 ms | 19.08 ms | 656.7 MB |
+| heavy 2160p | 6.005 ms | 36.27 ms | 2,020.1 MB |
+
+  The same build's PR1 record read 1,236.1 MB and 2,090.4 MB for the 4K
+  peaks: the lifetime peak moves by up to ±200 MB run to run on this host.
+
+**Recorded on Release** (the gate's `make app`):
+- `precision_proof.py --control ctl-pr1`: 9/9. C0 ok; D1 and **D2** an 8-bit
+  PNG — spec §11 PR-4's stop did not trip: an all-8-bit project still renders
+  8-bit with every source decoded deep; P1 0.914; H1 Main, `yuv420p`;
+  **R1** a 16-bit PNG whose middle row holds **1,418** distinct green values
+  (the control 256); **R2** the ramp through `prores_422` at **0.707** 10-bit
+  steps RMS (the control 2.007; PR0's 3.159); **C1** the H.264 clip at
+  brightness −0.4: every colour channel within 1 of max(0, its brightness-0
+  render − 102) (686,264 at 0, 4,936 at 1; 117,361 channels read 255 at
+  brightness 0).
+- `compare ctl-pr1`: 9/9. **K1–K5 byte-identical** (no video: the decode
+  reaches none of them). **K6** (the H.264 clip, recorded): {0: 567,322, 1:
+  184,945, 2: 130,427, 3: 7,718, 4: 5,673, 5: 2,221} and 23,294 more up to
+  103, of 921,600 channels (alpha included, never moved): 38.4 % moved, 2.8 %
+  by 5 or more — PR-2's spike figures (18–50 %, ≤ 3.5 %). **Measured beside
+  it, against ffmpeg's own decode of the same frame** (BT.709,
+  `accurate_rnd+full_chroma_int`; colour channels): the deep decode is
+  NEARER the reference decoder — mean |Δ| 1.677 against PR1's 1.966, ≥ 5 on
+  37,237 channels against 45,022 (largest 155 against 153). Both decoders
+  differ from ffmpeg's at the clip's sharp colour edges, where 4:2:0 chroma
+  is reconstructed; which reconstruction each uses is still not established.
+  **E1 and E2**: the frame handed to the `h264` and `hevc` encoders is
+  32BGRA; K3 byte-identical to PR1's render; K6 within the K6 row's own 103
+  (the re-baseline rule's "within K6's histogram") AND byte-identical to this
+  tree's own render — the 8-bit rounding is the render's own.
+- `--measure compare ctl-pr1`: 2/2, no stop (`vm.loadavg` 31.91 before and
+  28.00 after — other sessions were running):
+
+| Fixture | Average (PR1 → PR2) | Worst | Lifetime peak (PR1 → PR2) | Δ |
+|---|---|---|---|---|
+| typical 1080p | 1.23 → 1.125 ms | 3.58 → 3.61 ms | 439.1 → 463.9 MB | +24.8 MB |
+| typical 2160p | 2.465 → 2.795 ms | 5.7 → 8.71 ms | 1,432.7 → 1,671.5 MB | +238.8 MB |
+| heavy 1080p | 2.775 → 2.945 ms | 19.08 → 22.89 ms | 656.7 → 665.1 MB | +8.3 MB |
+| heavy 2160p | 6.005 → 7.585 ms | 36.27 → 49.36 ms | 2,020.1 → 1,882.1 MB | −138.1 MB |
+
+  A second run on the final build (after the comment trim below; `vm.loadavg`
+  11.43 before and 10.75 after):
+
+| Fixture | Average (PR1 → PR2) | Worst | Lifetime peak (PR1 → PR2) | Δ |
+|---|---|---|---|---|
+| typical 1080p | 1.23 → 1.115 ms | 3.58 → 2.96 ms | 439.1 → 449.2 MB | +10.1 MB |
+| typical 2160p | 2.465 → 2.735 ms | 5.7 → 7.2 ms | 1,432.7 → 1,270.6 MB | −162.0 MB |
+| heavy 1080p | 2.775 → 2.6 ms | 19.08 → 23.15 ms | 656.7 → 626.9 MB | −29.8 MB |
+| heavy 2160p | 6.005 → 7.38 ms | 36.27 → 44.78 ms | 2,020.1 → 1,694.3 MB | −325.8 MB |
+
+  - **Frame time.** Heavy 1080p averages 2.945 and 2.6 ms against the 8 ms
+    stop, so no stop trips. **At 4K, deep decode costs compositor time**, and
+    both runs agree: heavy 6.005 → 7.585 and 7.38 ms (+23–26 %), typical
+    2.465 → 2.795 and 2.735 ms (+11–13 %), while 1080p is unchanged within
+    noise. The likely cost (REASONED, not measured) is each video layer's
+    half-float source texture, twice the bytes per sample. A heavy 4K frame now
+    averages within 0.6 ms of the 8 ms budget, while the heavy 4K export as a
+    whole got faster (2.36 → 2.17 and 1.96 s), the faster deep decode
+    outweighing the compositor's extra time. The spec's only frame-time stop is at 1080p, so this
+    is recorded, not a stop.
+  - **Memory.** The 4K peaks fall or rise by up to ±330 MB between runs of
+    the same build, as the control's own spread showed (±200 MB). Deep decode
+    adds no memory this instrument can separate from noise, and the +532 MB
+    stop (which the owner retired) is not approached.
+
+- **The pixel sweep on Release**, each proof on an instance of its own,
+  every parity log empty, every score full, **no row re-baselined**:
+  - phase1 66/66, phase2 86/86, phase3 123/123, phase4 83/83, phase5 90/90,
+    phase6 168/168 (its §8, the expected video-sourced re-baseline, did not
+    move: its claims hold at PR2's decode), phase7 92/92, phase8 79/79,
+    phase9 222/222;
+  - `phase6_chrome` 70/70, `phase7_chrome` 79/79;
+  - `e1_proof` 101/101 (the 1c3e92e reference rows within ±1, as PR1 left
+    them; the wipe's |Δ| 1 on 1,080 channels again), `e2_proof` 75/75;
+  - `matte_proof` 46/46, `matte_probe` 6/6, `hevc_alpha_proof` 43/43;
+  - `graphics_proof` 51/51, `graphics_files_proof` 10/10,
+    `graphics_prefetch_proof` 7/7, `graphic_prop_action_proof` 17/17,
+    `paste_graphic_proof` 8/8;
+  - `word_looks_proof` 16/16 (b95d752's baseline holds), `word_looks_sheet_proof`
+    9/9, `words_picture_proof` 7/7, `word_captions_proof` 20/20;
+  - `codec_import_proof` 10/10, `container_import_proof` 16/16,
+    `clip_inspector6_proof` 25/25, `debug_release_proof` 10/10,
+    `export_cancel_proof` 7/7, `remaining_proof` 80/80, `silence2_proof`
+    100/100;
+  - `recording_proof` 140/140 with `--no-screen --no-microphone`, recording
+    nothing (79 checks skipped by name);
+  - the three preview probes 59/59 (PF included), 24/24 and 32/32.
+  - Not run: `phase8_chrome.py` (its `dispatch` mode takes the keyboard
+    focus, and the owner's leave covered PR1's run; PR2 changes only the
+    video decode, and its compositor section draws shapes alone) and
+    `preview_display_probe.py` (exits 1 by design, PR0's spike).
+- `make gate` PASS on the final tree.
+- **The mutants, once, on the final instrument** (Debug copies, built by
+  `tree_copy.build_app`). Both were caught:
+  - `decode-8bit` (`sourcePixelFormat` = 32BGRA): R1 FAILS (256 distinct)
+    and R2 FAILS (2.007 steps RMS);
+  - `no-source-clamp` (`layerSample`'s `saturate` removed): C1 FAILS, with
+    1,233 channels off by more than 5, up to 102.
+
+**What PR2 answers of the road map's "not established" list.** Banding: R1
+and R2 measure the 10-bit ramp keeping 1,418 green values in a render and
+0.707 steps RMS through `prores_422` (PR1 256 and 2.007). Real footage is
+PRC-1's (its PR2 steps). The ≥ 5-level edge differences on decoded video
+are measured against ffmpeg's own decode: the deep decode is the nearer of
+the two. Their cause, the 4:2:0 chroma reconstruction each path uses, is
+still not established. Frame times and footprints at 1080p and 4K are M1's
+above, on this host only.
+

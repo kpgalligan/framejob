@@ -1080,7 +1080,9 @@ the key map behind it.
   `64RGBAHalf`; spec §11 PR-1): every layer, blend, shadow and dissolve
   pipeline's attachment, the destination, each matte composite and dissolve
   half, and the shadow pair. The coverage stays `r8Unorm`. `texture(from:)`
-  wraps a buffer by its own format. The uniform block's field ORDER is a contract with the
+  wraps a buffer by its own format. Every video source decodes to
+  `64RGBAHalf` (`Compositor.sourcePixelFormat`, spec §11 PR-2), clamped to
+  0…1 where the shader samples it. The uniform block's field ORDER is a contract with the
   shader checked only by reading both, so change them in one edit; it is 104
   floats and **the padding tail is EMPTY** (the next field needs three
   companions). **Seven pipelines from five fragment functions**: the two

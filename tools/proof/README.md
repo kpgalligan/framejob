@@ -17760,22 +17760,23 @@ historical skip.
 `make gate` PASS (68 s): its test step passed, and the other steps were
 skipped as unchanged.
 
-## The precision road map — PR0 and PR1 (`precision_proof.py`, `precision_encoder_probe.swift`, `preview_display_probe.py`; the preview probes' format reads and PF; `hevc_alpha_proof.py` R8, RH, KH, HA and four mutants; spec §11 PR-1..PR-5)
+## The precision road map — PR0, PR1 and PR2 (`precision_proof.py`, `precision_encoder_probe.swift`, `preview_display_probe.py`; the preview probes' format reads and PF; `hevc_alpha_proof.py` R8, RH, KH, HA and four mutants; PR2's D2, R1, R2, C1 and two mutants; spec §11 PR-1..PR-5)
 
 The road map's record is `designs/precision.md`; its decisions are
 `designs/spec/11-decisions/precision.md`. PR1 makes the compositor 16-bit
 float (`64RGBAHalf` buffers, `rgba16Float` targets) while sources stay
 32BGRA, and decides per export row what its encoder is handed
-(`ExportWriter.frameForm`, `ExportFrames`).
+(`ExportWriter.frameForm`, `ExportFrames`). PR2 decodes every video source
+to `64RGBAHalf` (`Compositor.sourcePixelFormat`, spec §11 PR-2).
 
 ```
 python3 tools/proof/preview_display_probe.py --rows spike          # V0–V2 (PR0's spike; exit 1 is its RECORDED outcome)
-python3 tools/proof/precision_proof.py [--only C0,D1,P1,H1] [--control DIR]
+python3 tools/proof/precision_proof.py [--only C0,D1,D2,P1,H1,R1,R2,C1] [--control DIR]
 python3 tools/proof/precision_proof.py capture DIR                 # on the CONTROL tree, before any product edit
 python3 tools/proof/precision_proof.py compare DIR [--only K1,…,E2]
 RC_PROOF_APP=release python3 tools/proof/precision_proof.py --measure capture|compare DIR   # M1, release-only
 python3 tools/proof/precision_proof.py --mutant h264-deep|hevc-deep compare DIR
-python3 tools/proof/precision_proof.py --mutant output-8bit|hevc-no-profile
+python3 tools/proof/precision_proof.py --mutant output-8bit|hevc-no-profile|decode-8bit|no-source-clamp
 python3 tools/proof/hevc_alpha_proof.py --rows straighten          # R0, K1, R8, RH, KH
 python3 tools/proof/hevc_alpha_proof.py --measure hevc-alpha-deep   # HA, recorded
 python3 tools/proof/hevc_alpha_proof.py --mutant hevc-no-profile|bgra8-truncates|half-no-unpremultiply|half-no-fill
@@ -17829,6 +17830,40 @@ heavy average ≥ 8 ms). The memory is printed and recorded, not scored: the
 owner accepted PR1's measured rise (heavy 4K +851.7 MB) and retired the
 road map's +532 MB stop (spec §11 PR-1).
 
+**PR2's rows and the compare's rules.** `capture` records the tree's
+formats (`formats`: the `outputPixelFormat` and `sourcePixelFormat`
+`Compositor.swift` names, read from `app/Sources`; a capture without them is
+PR0's, both 32BGRA), and `compare` picks each K row's rule from the
+control's formats against this tree's: K1 byte-identical always; K2–K5 (no
+video) byte-identical when the output format is the control's (PR2 against
+PR1's capture, `work/precision/ctl-pr1/`) and within ±2 across it (PR1
+against PR0's); K6 (video) byte-identical when the source format is the
+control's, and across it its histogram recorded and not scored (PR-2's ±1
+on video), with an unscored line comparing both renders to ffmpeg's own
+decode of the clip's frame 15 (BT.709, `accurate_rnd+full_chroma_int`).
+Across a decode change E1's and E2's K6 bound is the largest |Δ| of this
+tree's own K6 render against DIR's (the re-baseline rule's "within K6's
+histogram"), and the handed frame must also be byte-identical to that render
+(measured so: the 8-bit rounding is the render's own). The rows:
+**D2** (a STOP, PR-4) D1's all-8-bit project still renders an 8-bit PNG with
+every source decoded deep; **R1** `render_frame` of the 10-bit ramp on a
+1920 × 1080 canvas is a 16-bit PNG whose middle row's green holds ≥ 850
+distinct values (`--control DIR` holds the control's to ≤ 256); **R2** the
+ramp through `prores_422`, the middle row's luma against x/1919 at most 1.0
+10-bit steps RMS; **C1** the H.264 clip at `video.color.brightness` −0.4,
+every colour channel within ±2 of max(0, its brightness-0 render − 102): a
+deep-decoded frame arrives unclamped, and only `layerSample`'s `saturate`
+keeps a value above 1.0 from reading above 0.6 at −0.4. The ramp is the
+scoping spike's (every 10-bit code 64…940 across 1,920 px, ProRes 422 HQ,
+1 s), made once by `precision_proof.py` into
+`work/precision/media/ramp10_prores422hq.mov`; PRC-1 plays it, and this is
+its recipe by hand:
+
+```sh
+ffmpeg -f lavfi -i "color=c=black:size=1920x1080:rate=30:duration=1,format=yuv422p10le,geq=lum='64+X*876/1919':cb=512:cr=512" \
+  -c:v prores_ks -profile:v 3 -pix_fmt yuv422p10le -colorspace bt709 -color_primaries bt709 -color_trc bt709 ramp10.mov
+```
+
 **The preview probes read a buffer by its format.**
 `preview_refresh_probe.py`, `preview_validity_probe.py` and
 `media_less_playback_probe.swift` each take the grid mean from 32BGRA bytes
@@ -17868,7 +17903,9 @@ committed (it refuses an uncommitted tree): measured against PR0's Release,
 **Mutants** (PR1, run once at the end on the final instrument):
 `precision_proof.py`'s `h264-deep` (E1), `hevc-deep` (E2), `output-8bit`
 (P1, and PF through `preview_refresh_probe.py --sources`) and
-`hevc-no-profile` (H1);
+`hevc-no-profile` (H1), and PR2's `decode-8bit` (`sourcePixelFormat`
+32BGRA: R1 and R2) and `no-source-clamp` (`layerSample`'s `saturate`
+removed: C1);
 `hevc_alpha_proof.py`'s probe-only `bgra8-truncates` (R8),
 `half-no-unpremultiply` (RH) and `half-no-fill` (KH), its
 `hevc-no-profile` (B1) and `label-premultiplied` on its new anchor, and the

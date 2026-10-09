@@ -136,13 +136,13 @@ final class Compositor: NSObject, AVVideoCompositing {
     /// working format of every target a layer pipeline draws into follows it
     /// (`MetalRenderer.workingFormat`), and the export reader reads it.
     static let outputPixelFormat: OSType = kCVPixelFormatType_64RGBAHalf
-    /// What every video source is decoded to. Still 32BGRA: deep decode is
-    /// precision PR2 (spec §11 PR-2).
-    static let sourcePixelFormat: OSType = kCVPixelFormatType_32BGRA
+    /// What every video source is decoded to: 16-bit float, so a 10-bit source
+    /// keeps its levels; the layer stage clamps its values (spec §11 PR-2).
+    static let sourcePixelFormat: OSType = kCVPixelFormatType_64RGBAHalf
 
-    /// Metal-compatible `sourcePixelFormat`: a format the layer stage samples
-    /// through `texture(from:)`. AVFoundation converts anything else — which
-    /// is also how HDR sources arrive tone-mapped to SDR (§7.5).
+    /// Metal-compatible `sourcePixelFormat`, sampled through `texture(from:)`.
+    /// AVFoundation converts anything else, and HDR still arrives tone-mapped
+    /// to SDR (`supportsHDRSourceFrames` is not implemented, so false; §7.5).
     var sourcePixelBufferAttributes: [String: any Sendable]? {
         [
             kCVPixelBufferPixelFormatTypeKey as String: Int(Compositor.sourcePixelFormat),

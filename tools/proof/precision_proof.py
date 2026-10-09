@@ -4,7 +4,7 @@
 MCP. Written in PR0, before any product edit, so PR1's controls are captured
 on PR0's product.
 
-    python3 tools/proof/precision_proof.py [--app PATH] [--only C0,D1,P1,H1] [--control DIR]
+    python3 tools/proof/precision_proof.py [--app PATH] [--only C0,D1,D2,P1,H1,R1,R2,C1] [--control DIR]
     python3 tools/proof/precision_proof.py capture DIR          # the CONTROL tree
     python3 tools/proof/precision_proof.py compare DIR [--only K1,...,E2]
     python3 tools/proof/precision_proof.py --measure capture|compare DIR   # release-only
@@ -44,12 +44,28 @@ Rows (`ID ok|FAIL — detail`, then `n/m`; exit 0 iff every scored row passes):
       value from `render_frame` at opacity 1, RMS ≤ 1.0 10-bit steps. An 8-bit
       canvas measures about 1.4 or more; `capture` records the control's.
   H1  an `hevc` export of K6's clip: ffprobe `profile` Main, `pix_fmt` yuv420p.
-  capture: K1–K6 rendered into DIR; E0 (CONTROL) two `h264` exports of K6's
+  D2  (PR2; a STOP, spec §11 PR-4) D1's project, every source now decoded
+      `64RGBAHalf`: its `render_frame` is still an 8-bit PNG.
+  R1  (PR2) `render_frame` of the 10-bit ramp on a 1920×1080 canvas is a
+      16-bit PNG whose middle row's green holds ≥ 850 distinct values; with
+      `--control DIR` the control's (decoded 32BGRA) must hold ≤ 256.
+  R2  (PR2) the ramp through `prores_422`: the middle row's luma against
+      x/1919 is ≤ 1.0 10-bit steps RMS (`--control DIR` prints the control's).
+  C1  (PR2) the H.264 clip at `video.color.brightness` −0.4: every colour
+      channel within ±2 of max(0, its brightness-0 render − 102) — a deep
+      frame arrives unclamped, and `layerSample`'s `saturate` bounds it.
+  capture: the tree's `Compositor.swift` formats recorded (`formats`, read
+      from `app/Sources`; a capture without them is PR0's, both 32BGRA);
+      K1–K6 rendered into DIR; E0 (CONTROL) two `h264` exports of K6's
       clip decoded to `rgb24`, their digests recorded, equal or not; the P1
       figure; the ramp's controls (the middle row's distinct green values in
       `render_frame`, and a `prores_422` export's RMS against x/1919).
-  compare: K1 and K6 byte-identical to DIR's; K2–K5 every channel within ±2
-      (the histogram of differences printed).
+  compare (each histogram of differences printed): K1 byte-identical to
+      DIR's; K2–K5 (no video) byte-identical when this tree's output format
+      is the control's (PR2 against PR1), within ±2 when it is not (PR1
+      against PR0); K6 (video) byte-identical when the source format is the
+      control's, and when it is not (PR2 against PR1) recorded, not scored
+      (spec §11 PR-2's ±1 on video).
   E1 (compare; the orchestrator's ruling after PR0, because E0 showed
       VideoToolbox's H.264 encode is not repeatable — two exports of one
       project differed by up to 124 levels): what `ExportWriter` hands the
@@ -61,9 +77,13 @@ Rows (`ID ok|FAIL — detail`, then `n/m`; exit 0 iff every scored row passes):
       `Compositor.outputPixelFormat`, then `ExportWriter.frameForm` and
       `ExportFrames.convert` — or the reader's frame as it is when the form is
       nil. The handed buffer must be 32BGRA and, against DIR's `render_frame`
-      PNG of the same scene (PR0's 8-bit frame), K6 (opaque, one layer)
+      PNG of the same scene (the captured tree's 8-bit frame), K6 (opaque, one layer)
       byte-identical and K3 (blended) every channel within ±1, the
-      compositor's own ±1 at 16-bit float (K3's row). A probe that does not
+      compositor's own ±1 at 16-bit float (K3's row). Across a decode change
+      (PR2 against PR1's capture) K6's bound is the largest |Δ| of this
+      tree's own K6 render against DIR's (the re-baseline rule's "within
+      K6's histogram"), and the handed frame must also be byte-identical to
+      that render. A probe that does not
       build is a scored FAILURE. This tree's `h264` export of K6, decoded to
       `rgb24`, is printed beside E0's digests, unscored.
   E2 (compare; PR1's fix pass): the same for the `hevc` (Main) encoder. Fed
@@ -101,8 +121,12 @@ built from the copy's `app/Sources`:
                    VideoToolbox writes Main with or without the pin, so the pin
                    alone is an equivalent mutant): H1 FAILS
                    (`hevc_alpha_proof.py --mutant hevc-no-profile` holds B1 to it).
+  decode-8bit      (PR2) `Compositor.sourcePixelFormat` is 32BGRA: R1 and R2
+                   FAIL.
+  no-source-clamp  (PR2) `layerSample`'s `saturate` removed (the clamp landed
+                   in PR1; only a deep source reaches it): C1 FAILS.
 Exit 0 when every named row FAILED (caught), 1 when one passed (survived), 2
-when the control could not be performed. PR2/PR3 add their rows
+when the control could not be performed. PR3 adds its rows
 (`designs/precision.md`).
 """
 
@@ -149,6 +173,11 @@ TIMING = re.compile(r"\[reelcut\] compositor: ([\d.]+) ms average, ([\d.]+) ms w
 # 64RGBAHalf buffer less one 32BGRA buffer.
 PER_BUFFER = {2160: 66_355_264 - 33_177_664, 1080: (66_355_264 - 33_177_664) // 4}
 STOP_MS = 8.0
+# The formats a tree's `Compositor.swift` names; a capture records its own
+# (PR2), and a capture without them is PR0's: both 32BGRA.
+FORMAT = re.compile(r"static let (output|source)PixelFormat: OSType = (kCVPixelFormatType_\w+)")
+PR0_FORMATS = {"output": "kCVPixelFormatType_32BGRA", "source": "kCVPixelFormatType_32BGRA"}
+BRIGHTNESS = -0.4
 PROBE_SOURCE = ROOT / "tools/proof/precision_encoder_probe.swift"
 PROBE_DIR = BASE / "encoder-probe"
 BUILD_BOUND = 1500
@@ -171,8 +200,16 @@ MUTANTS = {
         (SETTINGS,
          "            compression[AVVideoProfileLevelKey] = kVTProfileLevel_HEVC_Main_AutoLevel as "
          "String\n", ""), HEVC_DEEP]},
+    # PR2.
+    "decode-8bit": {"mode": "rows", "rows": ["R1", "R2"], "anchors": [
+        ("app/Sources/Compositor.swift",
+         "    static let sourcePixelFormat: OSType = kCVPixelFormatType_64RGBAHalf\n",
+         "    static let sourcePixelFormat: OSType = kCVPixelFormatType_32BGRA\n")]},
+    "no-source-clamp": {"mode": "rows", "rows": ["C1"], "anchors": [
+        ("app/Resources/Shaders/Compositor.metal", "    float4 texel = saturate(source.sample(\n",
+         "    float4 texel = (source.sample(\n")]},
 }
-ROWS = ["C0", "D1", "P1", "H1", "Z1"]
+ROWS = ["C0", "D1", "D2", "P1", "H1", "R1", "R2", "C1", "Z1"]
 CAPTURE_ROWS = ["K", "E0", "P1c", "Rc", "Z1"]
 COMPARE_ROWS = ["K1", "K2", "K3", "K4", "K5", "K6", "E1", "E2", "Z1"]
 rows = {}
@@ -401,6 +438,15 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()[:16] if data else None
 
 
+def tree_formats():
+    """{"output", "source"}: the pixel formats `sources_folder`'s
+    `Compositor.swift` names (the tree's, or a mutant copy's)."""
+    try:
+        return dict(FORMAT.findall((sources_folder / "Compositor.swift").read_text()))
+    except OSError:
+        return {}
+
+
 # ---------------------------------------------------------------------------
 # The scenes.
 
@@ -505,12 +551,17 @@ def run_rows(client, state):
         check("C0 CONTROL: two renders of K3 are byte-equal", doc.ok and a is not None
               and a == b, f"fixture {doc.why or 'ok'}; {digest(a)} vs {digest(b)}")
         closed = doc.close() and closed
-    if "D1" in selected:
+    if selected & {"D1", "D2"}:
         doc, t = k_scene(client, "D1", clip)
         png = doc.render(WORK / "d1.png", t)
         check("D1 render_frame of an all-8-bit project (a card and the H.264 clip) is an 8-bit "
               "PNG (spec §11 PR-4)", doc.ok and png_depth(png) == 8,
               f"fixture {doc.why or 'ok'}; bit depth {png_depth(png)}")
+        check("D2 (STOP, PR-4) with every source decoded 64RGBAHalf (PR2) the same project's "
+              "render_frame is still an 8-bit PNG — a failure stops PR2 and returns PR-4 to the "
+              "owner", doc.ok and png_depth(png) == 8,
+              f"fixture {doc.why or 'ok'}; bit depth {png_depth(png)}; this tree's formats "
+              f"{tree_formats()}")
         closed = doc.close() and closed
     if "P1" in selected:
         figure, detail, ok = p1_figure(client, WORK)
@@ -528,6 +579,57 @@ def run_rows(client, state):
         check("H1 an hevc export is Main, yuv420p", doc.ok and probe.get("profile") == "Main"
               and probe.get("pix_fmt") == "yuv420p", f"fixture {doc.why or 'ok'}; {probe}")
         closed = doc.close() and closed
+    if selected & {"R1", "R2"}:
+        distinct, rms, depth, ok = ramp_controls(client, WORK)
+        closed = ok and closed
+        ramp = state.get("ramp") or {}
+        control = ramp.get("distinct_green")
+        check("R1 render_frame of the 10-bit ramp on a 1920×1080 canvas is a 16-bit PNG whose "
+              "middle row's green holds ≥ 850 distinct values (the control, decoded 32BGRA, "
+              "≤ 256)", depth == 16 and distinct is not None and distinct >= 850
+              and (control is None or control <= 256),
+              f"bit depth {depth}; {distinct} distinct (control "
+              f"{control if control is not None else 'not given (--control DIR)'})")
+        check("R2 the ramp through prores_422: the middle row's luma against x/1919 is ≤ 1.0 "
+              "10-bit steps RMS", rms is not None and rms <= 1.0,
+              f"RMS {rms if rms is None else round(rms, 3)} (control "
+              f"{ramp.get('prores_422_rms', 'not given (--control DIR)')})")
+    if "C1" in selected:
+        closed = run_c1(client, clip) and closed
+    return closed
+
+
+def run_c1(client, clip):
+    """C1: the H.264 clip at brightness −0.4 against max(0, its brightness-0
+    render − 102), every colour channel within ±2. A deep-decoded frame
+    arrives unclamped (spec §11 PR-2, −0.46…1.47); without `layerSample`'s
+    `saturate` a channel above 1.0 reads 1.0 at brightness 0 (the output
+    clamps) and above 0.6 at −0.4."""
+    doc = Doc(client, "C1")
+    made = [c for c in doc.movie(doc.first_track(), clip) if c is not None]
+    base = doc.render(WORK / "c1-0.png")
+    doc.step("set_video", clips=made, patch={"color": {"brightness": BRIGHTNESS}})
+    took = [((c.get("video") or {}).get("color") or {}).get("brightness")
+            for c in doc.project().get("clips") or [] if c.get("id") in made]
+    dim = doc.render(WORK / "c1-dim.png")
+    a, b = rgba(WORK / "c1-0.png"), rgba(WORK / "c1-dim.png")
+    closed = doc.close()
+    counts, white = {}, 0
+    if a and b and len(a) == len(b):
+        for i in range(len(a)):
+            if i % 4 == 3:
+                continue
+            white += a[i] == 255
+            d = abs(b[i] - max(0, a[i] - 102))
+            counts[d] = counts.get(d, 0) + 1
+    largest = max(counts) if counts else None
+    check("C1 the H.264 clip at brightness −0.4: every colour channel within ±2 of "
+          "max(0, its brightness-0 render − 102) — the source clamp holds a deep frame's "
+          "values above 1.0", doc.ok and took == [BRIGHTNESS] and largest is not None
+          and largest <= 2,
+          f"fixture {doc.why or 'ok'}; brightness {took}; depths {png_depth(base)}/"
+          f"{png_depth(dim)}; {white} channels read 255 at brightness 0; histogram |Δ|: "
+          f"{short(dict(sorted(counts.items())))}")
     return closed
 
 
@@ -559,15 +661,17 @@ def run_capture(client, where):
         return False
     shutil.copy2(clip, where / "k6.mp4")
     clip = where / "k6.mp4"
-    record, closed = {}, True
+    record, closed = {"formats": tree_formats()}, True
     rendered = []
     for name in ("K1", "K2", "K3", "K4", "K5", "K6"):
         doc, t = k_scene(client, name, clip)
         png = doc.render(where / f"{name}.png", t)
         rendered.append((name, doc.why, digest(png)))
         closed = doc.close() and closed
-    check("K CONTROL: K1–K6 rendered into DIR", all(not why and d for _, why, d in rendered),
-          "; ".join(f"{n} {why or 'ok'} {d}" for n, why, d in rendered))
+    check("K CONTROL: K1–K6 rendered into DIR", all(not why and d for _, why, d in rendered)
+          and len(record["formats"]) == 2,
+          "; ".join(f"{n} {why or 'ok'} {d}" for n, why, d in rendered)
+          + f"; this tree's formats {record['formats']}")
     pair, fixture, ok = h264_pair(client, clip, where, ("e0-a", "e0-b"))
     closed = ok and closed
     (_, a), (_, b) = pair
@@ -593,12 +697,36 @@ def run_capture(client, where):
     return closed
 
 
+def against_ffmpeg(clip, renders):
+    """Unscored (PR2): each K6 render's colour channels against ffmpeg's own
+    decode of the clip's frame at 0.5 s (frame 15; BT.709, limited range,
+    `accurate_rnd+full_chroma_int`) — which decode a reference decoder
+    is nearer, for spec §11 PR-2's edge differences."""
+    ref = decode(clip, "rgba", ["-vf", "select=eq(n\\,15)", "-sws_flags",
+                                "bicubic+accurate_rnd+full_chroma_int"])
+    if not ref or len(ref) != W * H * 4:
+        return "against ffmpeg's decode (unscored): no reference frame"
+    parts = []
+    for label, data in renders.items():
+        if not data or len(data) != len(ref):
+            parts.append(f"{label} n/a")
+            continue
+        deltas = [abs(a - b) for i, (a, b) in enumerate(zip(data, ref)) if i % 4 != 3]
+        parts.append(f"{label} mean |Δ| {sum(deltas) / len(deltas):.3f}, "
+                     f"≥ 5 on {sum(d >= 5 for d in deltas)}, largest {max(deltas)}")
+    return "against ffmpeg's decode (unscored): " + "; ".join(parts)
+
+
 def run_compare(client, where):
     try:
         record = json.loads((where / "capture.json").read_text())
     except (OSError, ValueError):
         sys.exit(f"no capture at {where}; run `capture` on the control tree first")
     clip, closed = where / "k6.mp4", True
+    then, now = record.get("formats") or PR0_FORMATS, tree_formats()
+    same_output = then.get("output") == now.get("output")
+    same_source = then.get("source") == now.get("source")
+    print(f"  formats: control {then}, this tree {now}", flush=True)
     for name in ("K1", "K2", "K3", "K4", "K5", "K6"):
         if name not in selected:
             continue
@@ -608,16 +736,26 @@ def run_compare(client, where):
         closed = doc.close() and closed
         counts = histogram(got, want) if got and want else {}
         largest = max(counts) if counts else None
-        exact = name in ("K1", "K6")
-        good = doc.ok and got is not None and want is not None and (
-            got == want if exact else largest <= 2)
-        check(f"{name} against the control: "
-              + ("byte-identical" if exact else "every channel within ±2"), good,
-              f"fixture {doc.why or 'ok'}; histogram |Δ|: channels {short(counts)}")
+        # K1 is one opaque card: exact always. K2–K5 (no video) are exact
+        # when the working depth is the control's (PR2 against PR1), within
+        # ±2 across it (PR1 against PR0). K6 (video) is exact when the decode
+        # is the control's, and across it (PR2 against PR1) its histogram is
+        # recorded, not scored (spec §11 PR-2's ±1 on video).
+        rule = ("exact" if name == "K1" or (name != "K6" and same_output)
+                or (name == "K6" and same_source) else "recorded" if name == "K6" else "two")
+        good = doc.ok and got is not None and want is not None and len(got) == len(want) and (
+            got == want if rule == "exact" else rule == "recorded" or largest <= 2)
+        extra = ""
+        if name == "K6":
+            extra = "\n       " + against_ffmpeg(clip, {"this tree": got, "DIR": want})
+        check(f"{name} against the control: " + {
+            "exact": "byte-identical", "two": "every channel within ±2",
+            "recorded": "the histogram recorded (the decode moved, spec §11 PR-2)"}[rule], good,
+              f"fixture {doc.why or 'ok'}; histogram |Δ|: channels {short(counts)}{extra}")
     if "E1" in selected:
-        closed = run_e1(client, where, clip, record) and closed
+        closed = run_e1(client, where, clip, record, same_source) and closed
     if "E2" in selected:
-        closed = run_e2(client, where, clip) and closed
+        closed = run_e2(client, where, clip, same_source) and closed
     return closed
 
 
@@ -657,12 +795,22 @@ def build_encoder_probe():
     return binary, None
 
 
-def handed_frames(client, where, clip, preset, prefix):
+def handed_frames(client, where, clip, preset, prefix, same_source):
     """K6's and K3's scenes saved, the encoder probe's frames handed to
-    `preset`'s encoder against DIR's renders: (good, detail, closed)."""
-    closed, frames = True, []
+    `preset`'s encoder against DIR's renders: (good, detail, closed). K6's
+    bound is 0 when this tree decodes as the control did; across a decode
+    change (PR2 against PR1) it is the largest |Δ| of this tree's own K6
+    render against DIR's — the re-baseline rule's "within K6's histogram" —
+    and the handed frame must equal that render byte for byte."""
+    closed, frames, bounds, own = True, [], {"K6": 0, "K3": 1}, {}
     for name in ("K6", "K3"):
         doc, t = k_scene(client, name, clip)
+        if name == "K6" and not same_source:
+            doc.render(WORK / f"{prefix}-K6.png", t)
+            own = rgba(WORK / f"{prefix}-K6.png")
+            want = rgba(where / "K6.png")
+            counts = histogram(own, want) if own and want and len(own) == len(want) else {}
+            bounds["K6"] = max(counts) if counts else None
         doc.step("save_project")
         frames.append({"tag": name, "package": str(doc.path), "tick": t, "preset": preset,
                        "raw": str(WORK / f"{prefix}-{name}.bgra"), "why": doc.why})
@@ -692,11 +840,20 @@ def handed_frames(client, where, clip, preset, prefix):
             handed = bytes(handed)
         counts = histogram(handed, want) if handed and want and len(handed) == len(want) else {}
         largest = max(counts) if counts else None
-        bound = 0 if name == "K6" else 1
+        bound = bounds[name]
         ok = (frame["why"] is None and handed is not None and largest is not None
-              and largest <= bound)
+              and bound is not None and largest <= bound)
+        if name == "K6" and not same_source:
+            # Across a decode change the handed frame must also be this
+            # tree's own 8-bit render exactly: the rounding is the render's.
+            mine = histogram(handed, own) if handed and own and len(handed) == len(own) else {}
+            ok = ok and mine == {0: len(handed or b"")}
+            lines.append(f"K6 handed against this tree's own render (byte-identical): {short(mine)}")
         good = good and ok
-        lines.append(f"{name} ({'byte-identical' if bound == 0 else 'within ±1'}): "
+        claim = ("byte-identical" if bound == 0 and name == "K6" else
+                 f"within ±{bound}" + (" (this tree's K6 render against DIR's)"
+                                       if name == "K6" else ""))
+        lines.append(f"{name} ({claim}): "
                      f"{'ok' if ok else 'FAIL'}; fixture {frame['why'] or 'ok'}; form "
                      f"{got.get('form')}, handed {got.get('format')} {got.get('width')}×"
                      f"{got.get('height')} at {got.get('time')} s"
@@ -707,10 +864,10 @@ def handed_frames(client, where, clip, preset, prefix):
     return good, detail, closed
 
 
-def run_e1(client, where, clip, record):
+def run_e1(client, where, clip, record, same_source):
     """E1: the frames handed to the h264 encoder against DIR's renders; the
     encoded K6 file printed, unscored."""
-    good, detail, closed = handed_frames(client, where, clip, "h264", "e1")
+    good, detail, closed = handed_frames(client, where, clip, "h264", "e1", same_source)
     pair, fixture, ok = h264_pair(client, clip, WORK, ("e1",))
     closed = ok and closed
     encoded = pair[0][1]
@@ -718,17 +875,20 @@ def run_e1(client, where, clip, record):
     unscored = (f"the encoded file (unscored): E1 {digest(encoded)} against E0 "
                 f"{record.get('E0', {}).get('a')} / {record.get('E0', {}).get('b')}, "
                 f"|Δ| against E0 a {short(histogram(encoded, a)) if encoded and a and len(encoded) == len(a) else 'n/a'}")
-    check("E1 the frame ExportWriter hands the h264 encoder is 32BGRA and equals PR0's 8-bit frame "
-          "(K6 byte-identical; K3, blended, within ±1 — the compositor's own ±1 at 16-bit float)",
+    check("E1 the frame ExportWriter hands the h264 encoder is 32BGRA and equals DIR's 8-bit frame "
+          "(K6 byte-identical, or across a decode change within K6's own |Δ| and byte-identical "
+          "to this tree's render; K3, blended, within ±1 — the compositor's own ±1 at 16-bit "
+          "float)",
           good, detail + "\n       " + unscored)
     return closed
 
 
-def run_e2(client, where, clip):
+def run_e2(client, where, clip, same_source):
     """E2: the frames handed to the hevc (Main) encoder against DIR's renders."""
-    good, detail, closed = handed_frames(client, where, clip, "hevc", "e2")
-    check("E2 the frame ExportWriter hands the hevc (Main) encoder is 32BGRA and equals PR0's "
-          "8-bit frame (K6 byte-identical; K3, blended, within ±1) — fed half-float frames it "
+    good, detail, closed = handed_frames(client, where, clip, "hevc", "e2", same_source)
+    check("E2 the frame ExportWriter hands the hevc (Main) encoder is 32BGRA and equals DIR's "
+          "8-bit frame (K6 byte-identical, or across a decode change within K6's own |Δ| and "
+          "byte-identical to this tree's render; K3, blended, within ±1) — fed half-float frames it "
           "encoded the ramp at 9.04 steps RMS against PR0's 6.46", good, detail)
     return closed
 
