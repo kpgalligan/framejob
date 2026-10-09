@@ -670,3 +670,8 @@ unlocked Mac; paste each score into the issue in the Source.
 - **Do:** On an M3 or later Mac: 1. `python3 tools/proof/formats_probe.py`. 2. `python3 tools/proof/codec_import_proof.py` (it launches its own instance on a scratch socket). 3. Drop an AV1 MP4 into a project and play it.
 - **Expect:** the formats probe prints `hw_av1 True` and the AV1 rows `opens` (`mp4_av1.mp4`; `mkv_av1.mkv` stays refused); the codec proof's R5 takes its M3 branch and passes; the AV1 clip plays and scrubs like any other. On an M1/M2 the same file is refused with "… is AV1 video, which needs an M3 or later Mac."
 - **Source:** #216 (issue batch B72; measured only on an M2 so far).
+
+**HS-7 — `make test` in Low Power Mode**
+- **Do:** Next time the Mac is in Low Power Mode anyway (`pmset -g | grep powermode` reads 1), run `cd mcp-proxy && cargo test --release --test stdio`, then `make test`.
+- **Expect:** both pass. If a test fails with `no answer within …`, the line ends with the host's power state and load; paste it into a new issue. Issue batch B93 changed the proxy tests to wait up to 60 s for the proxy to start, then time each request alone. The failure did not reproduce on AC power, so the fix is untested on a throttled host.
+- **Source:** #244.

@@ -123,8 +123,39 @@ fn snapshot_tools() -> Value {
     ])
 }
 
+/// How long a proxy may take from its spawn to its answer to the readiness
+/// ping `Proxy::start` sends, so no later bound times the exec of the copied
+/// binary (0.65–1.30 s for one exec under `make test`, measured in B75).
+const START_BOUND: Duration = Duration::from_secs(60);
+
+/// The host's power mode and load, read only, for a timeout's message: the
+/// `lowpowermode` and `powermode` lines of `pmset -g` and `vm.loadavg`.
+fn host_state() -> String {
+    let read = |program: &str, args: &[&str]| {
+        Command::new(program)
+            .args(args)
+            .output()
+            .map(|out| String::from_utf8_lossy(&out.stdout).into_owned())
+            .unwrap_or_default()
+    };
+    let pmset = read("/usr/bin/pmset", &["-g"]);
+    let mut parts: Vec<String> = pmset
+        .lines()
+        // "powermode" also matches "lowpowermode".
+        .filter(|line| line.to_ascii_lowercase().contains("powermode"))
+        .map(|line| line.split_whitespace().collect::<Vec<_>>().join(" "))
+        .collect();
+    if parts.is_empty() {
+        parts.push("pmset -g: no power mode line".to_string());
+    }
+    let load = read("/usr/sbin/sysctl", &["-n", "vm.loadavg"]);
+    parts.push(format!("vm.loadavg {}", load.trim()));
+    format!("host: {}", parts.join("; "))
+}
+
 /// A proxy child; its stdout lines arrive on a channel, each already
-/// checked to be JSON-RPC 2.0.
+/// checked to be JSON-RPC 2.0. `start` returns once the proxy has answered
+/// a readiness ping.
 struct Proxy {
     child: Child,
     stdin: ChildStdin,
@@ -156,11 +187,18 @@ impl Proxy {
                 }
             }
         });
-        Proxy {
+        let mut proxy = Proxy {
             child,
             stdin,
             lines,
-        }
+        };
+        proxy.send(json!({"jsonrpc": "2.0", "id": "ready", "method": "ping"}));
+        assert_eq!(
+            proxy.next(START_BOUND),
+            json!({"jsonrpc": "2.0", "id": "ready", "result": {}}),
+            "the readiness ping"
+        );
+        proxy
     }
 
     fn send_raw(&mut self, text: &str) {
@@ -183,7 +221,9 @@ impl Proxy {
         match self.lines.recv_timeout(within) {
             Ok(Ok(value)) => value,
             Ok(Err(line)) => panic!("a stdout line is not JSON-RPC 2.0: {line:?}"),
-            Err(RecvTimeoutError::Timeout) => panic!("no answer within {within:?}"),
+            Err(RecvTimeoutError::Timeout) => {
+                panic!("no answer within {within:?} ({})", host_state())
+            }
             Err(RecvTimeoutError::Disconnected) => panic!("the proxy's stdout closed"),
         }
     }

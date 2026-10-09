@@ -17456,3 +17456,31 @@ rule is to measure rather than leave a risk, and three were measured:
 On Debug, `--rows alpha-mode` scored 11/11, exit 0, and the four B92 mutants
 each printed MUTANT PASS again. `make gate` PASS (230 s). On its Release build
 the whole proof scored 39/39, exit 0, with stderr empty.
+
+## Issue batch B93 phase 1 — the proxy tests time a request, not a proxy's start (`mcp-proxy/tests/stdio.rs`; #244)
+
+#244 saw `make test` stop in `mcp-proxy/tests/stdio.rs` with `no answer within
+5s` / `8s` on a host in Low Power Mode under another app's load, a different
+test each run. Each bound timed the proxy's exec as well as its request: the
+fourteen tests start fourteen copied binaries at once, and one exec measured
+0.65–1.30 s under `make test` in B75. Now `Proxy::start` sends
+`{"jsonrpc":"2.0","id":"ready","method":"ping"}` and requires its empty result
+within `START_BOUND` (60 s) before it returns, so every later bound times only
+its own request. Every timeout's panic names the host:
+`no answer within {within:?} (host: <pmset -g's powermode lines>; vm.loadavg
+{ … })`, read only (`pmset -g`, `sysctl -n vm.loadavg`) and only when a bound
+expires. No other bound changed, and no test or Makefile line says not to run
+it on any power setting.
+
+**Its record** (2026-10-09, Apple M2 Max, macOS 26.5.1, on AC, `powermode 0`
+before and after every set). Throttled runs are
+`perl -e 'alarm shift; exec @ARGV' 300 taskpolicy -b cargo test --release
+--test stdio` in `mcp-proxy/`. The control, HEAD edbfa89's test, passed 14/14
+in all three runs (6.49, 6.40, 6.72 s): this host did not reproduce #244, so
+the control is no evidence for the fix. After the change, three runs passed
+14/14 (6.99, 8.15, 7.56 s), with no `no answer within` line. With
+`START_BOUND` set to 1 ns for one run (the file restored byte for byte
+after), `ping_is_answered_with_an_empty_result` panicked with
+`no answer within 1ns (host: powermode 0; vm.loadavg { 7.72 6.41 9.50 })`.
+`cargo clippy --all-targets -- -D warnings` and `cargo fmt --check` were clean.
+`make gate` PASS (101 s), and the stdio tests in it passed 14/14 in 6.48 s.
