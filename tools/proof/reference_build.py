@@ -1,4 +1,9 @@
-"""Build a historical chrome harness with that commit's own core and header."""
+"""Build a historical chrome harness with that commit's own core and header.
+
+`commit` may name a commit or a tree object (a pipeline's final working tree);
+the tree's `graphic/` is archived beside its core when it has one, because the
+core names it as a path dependency. `defines` are `-D` flags on the swiftc line
+and part of the cache key."""
 
 import hashlib
 import io
@@ -9,6 +14,7 @@ import shutil
 import subprocess
 import tarfile
 import time
+from typing import Sequence
 
 
 TARGET = "aarch64-apple-darwin"
@@ -74,18 +80,29 @@ def _inputs(root, harness_main, fonts, proof_script):
     return _digest(paths)
 
 
+def _resolve(root, commit, env):
+    """The full id of `commit` as a commit, or failing that as a tree."""
+    try:
+        return _run(["git", "-C", str(root), "rev-parse", "--verify", f"{commit}^{{commit}}"],
+                    env=env)
+    except (OSError, RuntimeError):
+        return _run(["git", "-C", str(root), "rev-parse", "--verify", f"{commit}^{{tree}}"],
+                    env=env)
+
+
 def build_reference(*, root: str, before: str, commit: str,
-                    harness_main: str, fonts: str, proof_script: str) -> tuple[str | None, str, str]:
-    """Return (binary, full commit, note); failure is data for the caller to score."""
+                    harness_main: str, fonts: str, proof_script: str,
+                    defines: Sequence[str] = ()) -> tuple[str | None, str, str]:
+    """Return (binary, full commit or tree id, note); failure is data for the caller to score."""
     before = Path(before)
     root = Path(root)
     binary = before / "harness"
     stamp_path = before / "stamp.json"
     env = os.environ.copy()
     env.pop("RC_ASSEMBLYAI_KEY", None)
+    defines = list(defines)
     try:
-        sha = _run(["git", "-C", str(root), "rev-parse", "--verify", f"{commit}^{{commit}}"],
-                   env=env)
+        sha = _resolve(root, commit, env)
     except (OSError, RuntimeError) as error:
         return None, commit, f"reference revision could not be resolved: {error}"
 
@@ -99,7 +116,7 @@ def build_reference(*, root: str, before: str, commit: str,
                     "swiftc_path": shutil.which("swiftc"),
                     "cargo_path": shutil.which("cargo"),
                     "rustc_path": shutil.which("rustc"),
-                    "targets": [TARGET, SWIFT_TARGET], "flags": FLAGS,
+                    "targets": [TARGET, SWIFT_TARGET], "flags": FLAGS, "defines": defines,
                     "overrides": {name: env.get(name) for name in sorted(set(OVERRIDES) | {
                         name for name in env if name.startswith(OVERRIDE_PREFIXES)})}}
         key = hashlib.sha256(json.dumps([sha, _inputs(root, harness_main, fonts, proof_script),
@@ -127,8 +144,10 @@ def build_reference(*, root: str, before: str, commit: str,
             shutil.rmtree(before)
         tree = before / "tree"
         tree.mkdir(parents=True)
+        top = _run(["git", "-C", str(root), "ls-tree", "--name-only", sha], env=env).splitlines()
         archive = subprocess.run(["git", "-C", str(root), "archive", sha,
-                                  "app/Sources", "app/Bridging", "core"],
+                                  "app/Sources", "app/Bridging", "core",
+                                  *(["graphic"] if "graphic" in top else [])],
                                  capture_output=True, env=env)
         (before / "archive.log").write_bytes(archive.stderr)
         if archive.returncode:
@@ -151,7 +170,8 @@ def build_reference(*, root: str, before: str, commit: str,
             raise RuntimeError(f"cargo succeeded without {lib}")
         sources = sorted(str(p) for p in (tree / "app/Sources").glob("*.swift")
                          if p.name != "main.swift")
-        swift = ["swiftc", "-sdk", sdk, *FLAGS, "-import-objc-header",
+        swift = ["swiftc", "-sdk", sdk, *FLAGS, *[x for d in defines for x in ("-D", d)],
+                 "-import-objc-header",
                  str(tree / "app/Bridging/Reelcut-Bridging-Header.h"),
                  "-module-cache-path", str(module_dir / "swift"),
                  "-Xcc", f"-fmodules-cache-path={module_dir / 'clang'}",

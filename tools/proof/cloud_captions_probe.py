@@ -9,6 +9,7 @@ no socket at all. Nothing here calls AssemblyAI.
     env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py
     env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --mutant no-retry
     env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only mapping,stamp
+    env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --control missing-baseline --only extract,speakers
 
 A `--mutant` or `--fake-mutant` run is scored as a normal run is (its rows,
 exit 1 when any failed); when its control could not be performed — the text
@@ -64,15 +65,25 @@ Sections, by the name after `section_`:
   order take white, yellow, cyan, green by first appearance in TIME order,
   "A" in two media is two speakers, a fifth cycles to white, and a cue with
   no speaker writes no `color` (SP1); the five word styles place the same ops
-  with speakers as without (SP2); nil-speaker cues place byte-identical ops
-  to the same probe built against B46's starting tree with
+  with speakers as without (SP2); nil-speaker cues place the same ops as the
+  same probe built against B46's starting tree with
   `-D CLOUD_PROBE_BEFORE_SPEAKERS`, with a CONTROL that speaker cues do not
   (SP3); and the Generate Captions sheet's own path against the fake's
   `speaker_words`: Speakers on reads white then yellow, Speakers off is the
-  baseline's project JSON byte for byte (SP4).
+  baseline's project JSON (SP4). SP3 and SP4·off compare less the keys
+  later batches added at their defaults (`LATER_DEFAULTS`) and, for SP4, the
+  format version, each named in the row.
 * `extract` — the WAV's byte-identity against the BASELINE tree (W), the
   FLAC's STREAMINFO, decode and determinism (F), the fallback (FB), and
   `wholeAsset` against an explicit range (Q).
+
+Both baselines (W's and SP's) are built by `reference_build.build_reference`
+(issue batch B93, #246): the tree object's own `app/Sources`, core, header
+and `graphic/`, each into its own `work/cloudprobe/baseline-ref-*` with a
+stamped cache, as the meter and welcome comparisons are. A baseline that
+will not build is a scored FAILURE (W's build row, SP3), never a skip.
+`--control missing-baseline` names both by an id no object has, so W's
+build row, SP3 and SP4·off must FAIL.
 * `verbatim` (V) — a served `words` holding `0.98`, `\\"]` and non-ASCII
   coming back byte-equal from the client, the written file and a
   `remoteDeleted` rewrite; `undeleted`; and the two malformed cache files.
@@ -156,10 +167,12 @@ Sections, by the name after `section_`:
 
 Host-state inputs: `say` for the fixture, `ffmpeg` for the FLAC decode row's
 second decoder (the row names which decoder answered and `AVAudioFile` always
-runs), `git` for the baseline tree, and a free loopback port. A probe that
-will not build is a scored FAILURE, never an exit. Every child gets
-`child_env()` — `os.environ` minus `RC_ASSEMBLYAI_KEY` — and one row scans
-this file's own text for a `subprocess` call without `env=`.
+runs), `git` for the baseline trees, and a free loopback port. A probe that
+will not build is a scored FAILURE, never an exit. A baseline's cargo build
+uses its own `work/cloudprobe/baseline-ref-*/target`, never `core/target`.
+Every child gets `child_env()` — `os.environ` minus `RC_ASSEMBLYAI_KEY` —
+and one row scans this file's own text for a `subprocess` call without
+`env=`.
 """
 
 import argparse
@@ -183,6 +196,7 @@ import time
 import urllib.request
 
 import swift_build
+from reference_build import build_reference
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 HERE = os.path.join(ROOT, "tools", "proof")
@@ -192,6 +206,7 @@ FAKE = os.path.join(HERE, "assemblyai_fake.py")
 HARNESS_MAIN = os.path.join(HERE, "harness", "main.swift")
 STATICLIB = os.path.join(ROOT, "core", "target", "release", "libreelcut_core.a")
 BRIDGING = os.path.join(ROOT, "app", "Bridging", "Reelcut-Bridging-Header.h")
+FONTS = os.path.join(ROOT, "app", "Resources", "Fonts")
 
 # Pipeline 1's final working tree — this pipeline's baseline, and what the
 # WAV byte-identity row compares against.
@@ -204,6 +219,11 @@ BASELINE_TREE_C1CHROME = "c9b8043522c5a91b6045102d182758fd5859d153"
 # B46's starting working tree — the speakers section's baseline, and what
 # SP3 and SP4's off arm compare today's placement against.
 BASELINE_TREE_SPEAKERS = "ef54f48e08e72bf6e3e6a48a78bf4431cae83018"
+
+# `--control missing-baseline` (issue batch B93, #246): both baseline ids
+# above replaced by this well-formed id no object has, so W's build row, SP3
+# and SP4·off must FAIL by name and nothing about them is skipped.
+MISSING_BASELINE = "0123456789abcdef0123456789abcdef01234567"
 
 # road map 4's fixture text, so the speech is the one every other proof uses.
 SPEECH_TEXT = (
@@ -2197,14 +2217,21 @@ func chromeSettings(_ request: [String: Any]) -> [String: Any] {
     let defaults = chromeSuite(request)
     let controller = SettingsWindowController(defaults: defaults, environment: [:])
     let key = request["key"] as? String ?? "proof-key"
+    #if CLOUD_PROBE_BEFORE_SPEAKERS
+    // B46's starting tree has no `transcriptionPane` (B71 added it), and SP3
+    // and SP4 never ask for Settings, so that build answers a fixed failure.
+    let headingOpensPane = false
+    #else
+    let headingOpensPane = controller.content.arrangedSubviews.contains(
+        where: { $0 === controller.transcriptionPane })
+        && (controller.transcriptionPane.arrangedSubviews.first as? NSStackView)?
+            .arrangedSubviews.first === controller.headingLabel
+    #endif
     var answer: [String: Any] = [
         "title": controller.window?.title ?? "<nil>",
         "paneTitle": SettingsWindowController.paneTitle,
         "heading": controller.headingLabel.stringValue,
-        "headingOpensPane": controller.content.arrangedSubviews.contains(
-            where: { $0 === controller.transcriptionPane })
-            && (controller.transcriptionPane.arrangedSubviews.first as? NSStackView)?
-                .arrangedSubviews.first === controller.headingLabel,
+        "headingOpensPane": headingOpensPane,
         "regionRows": popupRows(controller.regionPopup),
         "emptyPlaceholder": controller.keyField.placeholderString ?? "<nil>",
         "emptyStatus": controller.statusLabel.stringValue,
@@ -4503,27 +4530,24 @@ def make_fixture():
     return speech if os.path.exists(speech) else None
 
 
-def baseline_sources(tree=BASELINE_TREE, folder="baseline"):
-    """`git archive <tree> app/Sources` into `work/<folder>`, so row W
-    compares the WAV two TREES wrote rather than two runs of one — and the
-    speakers section (issue batch B46) the ops two trees placed."""
-    target = os.path.join(WORK, folder)
-    marker = os.path.join(target, ".tree")
-    if os.path.exists(marker) and open(marker).read().strip() == tree:
-        return os.path.join(target, "app", "Sources"), None
-    shutil.rmtree(target, ignore_errors=True)
-    os.makedirs(target)
-    archive = subprocess.run(["git", "-C", ROOT, "archive", tree, "app/Sources"],
-                             capture_output=True, env=child_env(), timeout=120)
-    if archive.returncode != 0:
-        return None, f"git archive {tree[:8]} failed: {archive.stderr.decode()[:200]}"
-    unpack = subprocess.run(["tar", "-x", "-C", target], input=archive.stdout,
-                            capture_output=True, env=child_env(), timeout=120)
-    if unpack.returncode != 0:
-        return None, f"unpacking the baseline failed: {unpack.stderr.decode()[:200]}"
-    with open(marker, "w") as f:
-        f.write(tree)
-    return os.path.join(target, "app", "Sources"), None
+def build_baseline(tree, entry_source, define, folder):
+    """`entry_source` built against `tree`'s own `app/Sources`, core and header
+    through `reference_build.build_reference` (issue batch B93, #246), so row
+    W compares the WAV two TREES wrote rather than two runs of one — and the
+    speakers section (issue batch B46) the ops two trees placed. Each caller
+    owns its `work/<folder>`: the builder keeps one binary and stamp per
+    folder and clears it on a miss. Answers (binary, None) or (None, why)."""
+    entry_dir = os.path.join(WORK, folder + "-entry")
+    os.makedirs(entry_dir, exist_ok=True)
+    entry = os.path.join(entry_dir, "main.swift")
+    if not os.path.exists(entry) or open(entry).read() != entry_source:
+        with open(entry, "w") as f:
+            f.write(entry_source)
+    binary, _, note = build_reference(root=ROOT, before=os.path.join(WORK, folder),
+                                      commit=tree, harness_main=entry, fonts=FONTS,
+                                      proof_script=os.path.abspath(__file__),
+                                      defines=(define,))
+    return (binary, None) if binary is not None else (None, note)
 
 
 def wav_samples(path):
@@ -4614,16 +4638,13 @@ def section_extract(binary, sources):
     reference_today, err_today = build(sources, REFERENCE_SOURCE, "reference", "reference")
     check("W: the reference entry builds against today's tree",
           reference_today is not None, err_today or "")
-    base_dir, base_error = baseline_sources()
-    reference_base, err_base = (None, base_error)
-    if base_dir is not None:
-        reference_base, err_base = build(base_dir, REFERENCE_SOURCE, "reference", "reference",
-                                         defines=("CLOUD_PROBE_BASELINE",))
+    reference_base, err_base = build_baseline(BASELINE_TREE, REFERENCE_SOURCE,
+                                              "CLOUD_PROBE_BASELINE", "baseline-ref-w")
+    check(f"W: the reference entry builds against the baseline tree {BASELINE_TREE[:8]}, "
+          "with that tree's own core and header — a baseline that will not build is a "
+          "FAILURE", reference_base is not None, err_base or "")
 
-    if reference_base is None:
-        skip_rows(3, f"the baseline tree {BASELINE_TREE[:8]} would not build the reference "
-                     f"entry: {err_base}")
-    elif reference_today is not None:
+    if reference_base is not None and reference_today is not None:
         # The WHOLE fixture, and an interior window, each extracted twice by
         # the baseline (the CONTROL) and once by today's tree.
         windows = {"whole": (0, 20 * SECOND), "interior": (3 * SECOND, 4 * SECOND)}
@@ -4939,6 +4960,54 @@ def placed_captions(project_json):
     return [(c["text"].get("content"), c["text"].get("color")) for c in clips]
 
 
+# Keys a later batch added at a default B46's starting tree never wrote
+# (issue batch B93, #246, read off the first run that built that tree with
+# its own core). SP3 and SP4·off ask what SPEAKERS changed, so both sides
+# drop exactly these keys, and only at exactly these values: any other value,
+# and any other key, still differs. The rows compare parsed JSON with `==`, so
+# key order and 1 / 1.0 / true no longer count as a difference, as the old
+# byte comparison counted them.
+#   word_style.active_fill, word_style.pause_dim — B86 phase 1 (#96), off by default
+#   media.original — B78 (#228, format v11), null for a media that is no copy
+LATER_DEFAULTS = {"word_style": (("active_fill", False), ("pause_dim", 0)),
+                  "media": (("original", None),)}
+
+
+def as_b46(node, dropped, parent=None):
+    """`node` less LATER_DEFAULTS' keys at their defaults; each drop is
+    appended to `dropped` so the row can print how many it took away."""
+    if isinstance(node, dict):
+        drop = {name for name, value in LATER_DEFAULTS.get(parent, ())
+                if name in node and node[name] == value and type(node[name]) is type(value)}
+        dropped.extend(f"{parent}.{name}" for name in sorted(drop))
+        return {k: as_b46(v, dropped, k) for k, v in node.items() if k not in drop}
+    if isinstance(node, list):
+        return [as_b46(v, dropped, parent) for v in node]
+    return node
+
+
+def ops_as_b46(answer, dropped):
+    """A `speakers` answer's ops, parsed, as B46's tree would have spelled them."""
+    return [as_b46(json.loads(one), dropped) for one in (answer or {}).get("ops") or []]
+
+
+def project_as_b46(answer, dropped):
+    """A sheet run's project JSON, parsed, as B46's tree would have spelled it:
+    LATER_DEFAULTS dropped, and the format `version` (10 at B46, moved by B78
+    and later batches) taken out."""
+    text = (answer or {}).get("project")
+    if not text:
+        return None
+    project = json.loads(text)
+    project.pop("version", None)
+    return as_b46(project, dropped)
+
+
+def project_version(answer):
+    text = (answer or {}).get("project")
+    return json.loads(text).get("version") if text else None
+
+
 def section_speakers(binary, sources):
     print("\nSP. speaker colours on Subtitles (issue batch B46, #93, R6-22)")
 
@@ -4979,31 +5048,32 @@ def section_speakers(binary, sources):
               with_error or bare_error or "the ops differ")
 
     # --- SP3: nil speakers place exactly what B46's starting tree placed --
-    base_dir, base_error = baseline_sources(BASELINE_TREE_SPEAKERS, "baseline-speakers")
-    baseline = None
-    if base_dir is not None:
-        baseline, base_error = build(base_dir, PROBE_SOURCE, "probe", "cloudprobe",
-                                     defines=("CLOUD_PROBE_BEFORE_SPEAKERS",))
-    check(f"SP3: the B46-baseline probe builds against {BASELINE_TREE_SPEAKERS[:8]} with "
-          "-D CLOUD_PROBE_BEFORE_SPEAKERS — a baseline that will not build is a FAILURE",
+    baseline, base_error = build_baseline(BASELINE_TREE_SPEAKERS, PROBE_SOURCE,
+                                          "CLOUD_PROBE_BEFORE_SPEAKERS", "baseline-ref-speakers")
+    check(f"SP3: the B46-baseline probe builds against {BASELINE_TREE_SPEAKERS[:8]}, with "
+          "that tree's own core and header, and -D CLOUD_PROBE_BEFORE_SPEAKERS — a baseline "
+          "that will not build is a FAILURE",
           baseline is not None, base_error or "")
     if baseline is not None:
         for style in ("subtitles", "highlight"):
             today, today_error = place(f"sp3-{style}-today", stripped, style)
             before, before_error = place(f"sp3-{style}-baseline", stripped, style,
                                          probe=baseline)
-            check(f"SP3·{style}: cues with no speaker place byte-identical ops to B46's "
-                  "starting tree",
-                  today is not None and before is not None and today.get("ops")
-                  and today.get("ops") == before.get("ops"),
+            dropped = []
+            ours, theirs = ops_as_b46(today, dropped), ops_as_b46(before, dropped)
+            check(f"SP3·{style}: cues with no speaker place the same ops as B46's starting "
+                  f"tree, less {len(dropped)} later key(s) at their defaults "
+                  f"({', '.join(sorted(set(dropped))) or 'none'})",
+                  today is not None and before is not None and ours and ours == theirs,
                   today_error or before_error or "the ops differ")
         today, today_error = place("sp3-control-today", rows, "subtitles")
         before, before_error = place("sp3-control-baseline", rows, "subtitles",
                                      probe=baseline)
+        dropped = []
+        ours, theirs = ops_as_b46(today, dropped), ops_as_b46(before, dropped)
         check("SP3: CONTROL — SP1's speaker cues DO place differently today than in "
               "B46's starting tree, so the comparison above can see a colour",
-              today is not None and before is not None and today.get("ops")
-              and before.get("ops") and today.get("ops") != before.get("ops"),
+              today is not None and before is not None and ours and theirs and ours != theirs,
               today_error or before_error or "the ops are equal")
 
     # --- SP4: the sheet's own path ----------------------------------------
@@ -5041,11 +5111,16 @@ def section_speakers(binary, sources):
         before_error = "the B46-baseline probe did not build"
         if baseline is not None:
             before, before_error, _ = sheet_run("speakers-off-baseline", False, baseline)
-        check("SP4·off: Speakers off — the project JSON is byte-equal to B46's starting "
-              "tree's same run (and the submit did not ask for speaker labels)",
+        dropped = []
+        ours, theirs = project_as_b46(off, dropped), project_as_b46(before, dropped)
+        check("SP4·off: Speakers off — the project JSON equals B46's starting tree's same "
+              f"run, less {len(dropped)} later key(s) at their defaults "
+              f"({', '.join(sorted(set(dropped))) or 'none'}) and the format version "
+              f"({project_version(before)} at B46, {project_version(off)} today), and the "
+              "submit did not ask for speaker labels",
               off is not None and before is not None and off.get("didFinish") is True
               and off_submitted and off_submitted[0].get("speaker_labels") is not True
-              and off.get("project") and off.get("project") == before.get("project"),
+              and ours is not None and ours == theirs,
               off_error or before_error
               or f"today {placed_captions((off or {}).get('project') or '{}')!r}, "
                  f"baseline {placed_captions((before or {}).get('project') or '{}')!r}, "
@@ -7459,13 +7534,22 @@ def section_chrome(binary, sources):
         # comment (no code path asks for the grant any more, spec §11 W-8) and
         # reworded the microphone comment's aside about how speech reads a file;
         # and spec §11 PUB-2, the two version strings read from build settings
-        # (one hunk with the minimum: the three lines are adjacent).
+        # (one hunk with the minimum: the three lines are adjacent); and the
+        # Debug app's identity (build velocity, issue batch B88 phase 2,
+        # 6e74f26), the two name strings and the document type's handler rank
+        # read from build settings, defaulting to the Release values (one hunk
+        # with the version strings and the minimum: the five lines are adjacent).
         check("18: `project.yml`'s `info:` and `entitlements:` blocks changed in the two "
-              "version strings, the macOS 26 minimum, the deleted Speech usage string and "
-              "the microphone comment's aside, and NOWHERE else",
-              diff == ['-        CFBundleShortVersionString: "0.1.0"',
+              "name strings, the two version strings, the macOS 26 minimum, the deleted "
+              "Speech usage string, the microphone comment's aside and the handler rank, "
+              "and NOWHERE else",
+              diff == ['-        CFBundleName: Reelcut',
+                       '-        CFBundleDisplayName: Reelcut',
+                       '-        CFBundleShortVersionString: "0.1.0"',
                        '-        CFBundleVersion: "1"',
                        '-        LSMinimumSystemVersion: "15.0"',
+                       '+        CFBundleName: "$(RC_APP_NAME:default=Reelcut)"',
+                       '+        CFBundleDisplayName: "$(RC_APP_NAME:default=Reelcut)"',
                        '+        CFBundleShortVersionString: $(MARKETING_VERSION)',
                        '+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)',
                        '+        LSMinimumSystemVersion: "26.0"',
@@ -7484,7 +7568,9 @@ def section_chrome(binary, sources):
                        "is one:",
                        "+        # recording, which speech never needed (the speech engine reads an",
                        "+        # extracted file). The microphone takes TWO things, and this key "
-                       "is one:"],
+                       "is one:",
+                       "-            LSHandlerRank: Owner",
+                       '+            LSHandlerRank: "$(RC_PROJECT_HANDLER_RANK:default=Owner)"'],
               f"got {diff!r}")
     check("18: and it still carries no NSAppTransportSecurity key — C0's q3 measured that it "
           "needs none",
@@ -8556,6 +8642,10 @@ def main():
                              "`section_` ("
                              + ", ".join(s.__name__.removeprefix("section_") for s in SECTIONS)
                              + ")")
+    parser.add_argument("--control", choices=["missing-baseline"],
+                        help="missing-baseline: both historical baselines named by an id no "
+                             "object has, so W's build row, SP3 and SP4·off must FAIL by name "
+                             "(issue batch B93, #246)")
     parser.add_argument("--wall", type=float, default=1800,
                         help="the whole run's wall-clock bound in seconds (rule H), counted "
                              "from the moment the lock is held")
@@ -8565,6 +8655,10 @@ def main():
     args = parser.parse_args()
 
     sources = os.path.abspath(args.sources)
+    if args.control == "missing-baseline":
+        global BASELINE_TREE, BASELINE_TREE_SPEAKERS
+        BASELINE_TREE = BASELINE_TREE_SPEAKERS = MISSING_BASELINE
+        print(f"  control missing-baseline: both baselines are {MISSING_BASELINE}\n")
     sections = SECTIONS
     if args.only:
         wanted = {name.strip() for name in args.only.split(",")}

@@ -127,11 +127,11 @@ def unit():
         current_lib = root / "core/target/release/libreelcut_core.a"
         reference_build.__file__ = str(builder_copy)
         try:
-            def build(commit=first):
+            def build(commit=first, defines=()):
                 with contextlib.redirect_stdout(io.StringIO()) as output:
                     answer = reference_build.build_reference(root=str(root), before=str(before),
                         commit=commit, harness_main=str(harness), fonts=str(fonts),
-                        proof_script=str(caller))
+                        proof_script=str(caller), defines=defines)
                 return answer, output.getvalue()
 
             def events():
@@ -212,6 +212,45 @@ def unit():
             insist(hashlib.sha256(current_lib.read_bytes()).hexdigest() == lib_digest
                    and current_lib.stat().st_mtime_ns == lib_mtime,
                    "historical builds leave current staticlib unchanged")
+
+            first_tree = subprocess.check_output(["git", "-C", str(root), "rev-parse",
+                                                  f"{first}^{{tree}}"], text=True).strip()
+            old_count = len(events())
+            (from_tree, sha, _), message = build(first_tree)
+            insist(from_tree and sha == first_tree and "built" in message
+                   and len(events()) == old_count + 2
+                   and (before / "tree/app/Sources/A.swift").read_text() == "let history = 1\n"
+                   and not (before / "tree/graphic").exists(),
+                   "a tree id resolves and builds that tree, with no graphic/ when it has none")
+            (_, _, _), message = build(first_tree)
+            insist("cache hit" in message and len(events()) == old_count + 2,
+                   "a tree id's build is cached")
+
+            write(root / "graphic/src/lib.rs", "// old graphics engine\n")
+            write(root / "graphic/Cargo.toml", "[package]\nname = 'graphic'\n")
+            subprocess.run(["git", "-C", str(root), "add", "graphic"], check=True)
+            graphic_tree = subprocess.check_output(["git", "-C", str(root), "write-tree"],
+                                                   text=True).strip()
+            (with_graphic, sha, _), message = build(graphic_tree)
+            insist(with_graphic and sha == graphic_tree and "built" in message
+                   and (before / "tree/graphic/src/lib.rs").read_text()
+                   == "// old graphics engine\n",
+                   "a tree with graphic/ archives it beside its core")
+
+            def swift_line():
+                return [line for line in events() if line.startswith("swiftc ")][-1]
+
+            (defined, _, _), message = build(graphic_tree, ("PROBE_ONE",))
+            insist(defined and "built" in message and "-D PROBE_ONE" in swift_line(),
+                   "a define reaches the swiftc line and invalidates the cache")
+            old_count = len(events())
+            _, message = build(graphic_tree, ("PROBE_ONE",))
+            insist("cache hit" in message and len(events()) == old_count,
+                   "the same define is a cache hit")
+            (changed, _, _), message = build(graphic_tree, ("PROBE_TWO",))
+            insist(changed and "built" in message and len(events()) == old_count + 2
+                   and "-D PROBE_TWO" in swift_line() and "PROBE_ONE" not in swift_line(),
+                   "a changed define invalidates the cache")
         finally:
             reference_build.__file__ = original_file
             os.environ.clear()

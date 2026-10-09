@@ -911,12 +911,21 @@ historical compile is a scored failure, even if the error names
 `rc_project_apply` in `ReelCore.swift`. There is no fallback to a historical
 harness. Host-state skips in recording's granted tier remain separate.
 
-`reference_build.py` keeps each caller's archived `app/Sources`, `app/Bridging`
-and `core`, Rust target, Swift/Clang modules, binary, Fonts, compiler logs and
-atomic stamp under its own `before/` directory. Its content key includes the
-resolved historical commit; current sources, core files and staticlib;
-current harness, builder, caller and Fonts; compiler/Rust/Cargo/SDK identity,
-targets, flags and effective build overrides, including `CARGO_TARGET_*` and
+`cloud_captions_probe.py` is the third caller (issue batch B93, #246): row
+W's reference entry against tree `515e6a80` and SP3/SP4's probe against tree
+`ef54f48e`, each with its own `-D` define and its own `before/`
+(`work/cloudprobe/baseline-ref-w`, `…-speakers`). The id may name a commit or
+a tree object, and a tree that has `graphic/` gets it archived beside its
+core, which names it as a path dependency.
+
+`reference_build.py` keeps each caller's archived `app/Sources`, `app/Bridging`,
+`core` (and `graphic` when the tree has it), Rust target, Swift/Clang modules,
+binary, Fonts, compiler logs and atomic stamp under its own `before/`
+directory; no two callers share one, because a miss clears it. Its content
+key includes the resolved historical commit or tree; current sources, core
+files and staticlib; current harness, builder, caller and Fonts;
+compiler/Rust/Cargo/SDK identity, targets, flags, the caller's `defines` and
+effective build overrides, including `CARGO_TARGET_*` and
 `CARGO_PROFILE_*`. A hit also rechecks extracted source, binary and Fonts
 digests. Deleting or changing an output, or changing
 same-size/same-mtime input bytes, rebuilds it. The current `core/target`
@@ -17668,3 +17677,83 @@ the plate (255, 255, 128), bare plate (255, 127, 0); Z1 no `Reelcut: ` line.
 exit 0: D4 failed, the ink over the plate (255, 191, 128); B1 failed too (the
 nine frames of the karaoke, `word_fade` and `line_rise` pages whose
 partial-alpha inks the `drawFaded` edit changes, as in B86).
+
+## Issue batch B93 phase 4 — the cloud probe's historical baselines build with their own core (`cloud_captions_probe.py` W and SP3/SP4 through `reference_build.py`, `--control missing-baseline`; `reference_build_selftest.py`'s tree, `graphic/` and define rows; #246)
+
+#246: the whole cloud probe exited 1 on SP3 and SP4·off, and skipped row W's
+three rows by name. Both baselines compiled an old tree's `app/Sources`
+against TODAY's core and header. Road map 14's MC4 removed
+`rc_agent_server_start` / `_stop`, which both old trees' `AgentServer.swift`
+call. The probe's own `chromeSettings` also names
+`SettingsWindowController.transcriptionPane`, which B71 added after B46's
+tree. Now:
+- `reference_build.build_reference` takes a tree object as well as a commit
+  (`<id>^{commit}`, then `<id>^{tree}`). It archives `graphic/` beside the
+  core when the tree has one (B46's core names it as a path dependency). Its
+  `defines` are `-D` flags on the swiftc line and part of the key.
+- W builds `REFERENCE_SOURCE` against tree `515e6a80` with
+  `CLOUD_PROBE_BASELINE` into `work/cloudprobe/baseline-ref-w`. SP3/SP4 build
+  `PROBE_SOURCE` against tree `ef54f48e` with `CLOUD_PROBE_BEFORE_SPEAKERS`
+  into `…/baseline-ref-speakers`. Each entry is written to
+  `…/baseline-ref-*-entry/main.swift`, outside the `before/` a miss clears.
+  `baseline_sources` is gone.
+- W's skip is a scored row, "W: the reference entry builds against the
+  baseline tree …". `chromeSettings`' two `transcriptionPane` clauses are a
+  fixed `false` under `#if CLOUD_PROBE_BEFORE_SPEAKERS`. SP3 and SP4 never
+  ask for Settings, and once the tree linked its own core this was the
+  speakers baseline's only swiftc error.
+- SP3 and SP4·off had never compared since B71. Once they ran, they showed
+  drift from later batches, not from speakers:
+  - `word_style.active_fill: false` and `pause_dim: 0` (B86 phase 1);
+  - `media[].original: null` (B78, format v11);
+  - `version` 10 → 14.
+
+  Both rows now compare after dropping exactly those keys
+  (`LATER_DEFAULTS`), only at exactly those default values. SP4 also drops
+  the format version. Each row prints what it dropped. The SP3 CONTROL
+  compares the same normalized ops.
+- Row 18's `project.yml` expectation gains B88 phase 2's lines: the two name
+  strings and the document type's handler rank, now read from build settings
+  for the Debug app. That row failed on the first whole run.
+- `--control missing-baseline` replaces both ids with
+  `0123456789abcdef0123456789abcdef01234567`.
+
+```sh
+python3 tools/proof/reference_build_selftest.py [--integration]
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only extract,speakers
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --control missing-baseline --only extract,speakers   # exit 1 on exactly W's build row, SP3, SP4·off
+```
+
+**Its record** (2026-10-09, Apple M2 Max, on AC, `powermode 0` before and
+after every whole run).
+
+Baseline builds:
+- W's tree builds in 71–86 s.
+- The speakers tree builds in 124–130 s, its core with `graphic/`.
+
+Whole runs:
+- Run 1 (stand-in server only) scored 874/875, exit 1, in 112 s. The one
+  failure was row 18's `project.yml` row.
+- After that fix, run 2 scored 875/875, exit 0, in 295 s, building both
+  baselines.
+- Run 3 scored 875/875, exit 0, in 96 s. It printed `reference: cache hit`
+  for `ef54f48e` and `515e6a80`.
+- No run printed a `SKIPPED by name` line.
+
+SP4·off dropped `media.original` and versions 10 → 14. SP3·highlight dropped
+14 keys (`active_fill`, `pause_dim` on 7 clips), and SP3·subtitles dropped
+none. W's whole and interior windows each read 1 distinct byte string across
+both trees.
+
+The control scored 28/31, exit 1, in 3 s. It failed exactly W's build row,
+SP3 and SP4·off, with no SKIPPED line.
+`reference_build_selftest.py --integration` printed 51 top-level PASS lines
+and no top-level FAIL, exit 0. Its output also holds three indented `FAIL 6b`
+lines: they come from the recording consumer's own mutated-reference build,
+which is meant to fail. The five new unit rows were among them: a tree id builds and
+is cached, a tree's `graphic/` is archived, and a define reaches swiftc and
+invalidates the cache. Its two historical consumers (`phase5_chrome.py`,
+`recording_probe.py`) still score a real compiler failure without a
+historical skip.
+`make gate` PASS (68 s): its test step passed, and the other steps were
+skipped as unchanged.
