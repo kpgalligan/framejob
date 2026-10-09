@@ -71,11 +71,14 @@ enum ExportStraightAlpha {
     /// going to the first in row-major order; its alpha stays 0. Every other
     /// a == 0 pixel is left as it was.
     ///
-    /// Both passes are split by rows over `concurrentPerform`. Pass 2 reads
-    /// only pixels with a > 0, which it never writes, so in place is
-    /// race-free. A row whose band of rows within `bleedRadius` holds no
-    /// visible pixel is skipped, and so is a pixel outside the band's
-    /// visible columns widened by the radius.
+    /// Both passes are split by rows over `concurrentPerform`. Pass 1 also
+    /// records, for each row with a visible pixel, every column's nearest
+    /// visible pixel in that row (`nearestInRow`); pass 2 then reads one
+    /// entry per row of the band, so it finds the nearest without walking
+    /// the square. Pass 2 reads only pixels with a > 0, which it never
+    /// writes, so in place is race-free. A row whose band of rows within
+    /// `bleedRadius` holds no visible pixel is skipped, and so is a pixel
+    /// outside the band's visible columns widened by the radius.
     static func straighten(
         bgra: UnsafeMutableRawPointer, width: Int, height: Int, bytesPerRow: Int
     ) {
@@ -84,21 +87,27 @@ enum ExportStraightAlpha {
         // Each row's first and last visible column; `first > last` is none.
         let spans = UnsafeMutablePointer<Int>.allocate(capacity: height * 2)
         defer { spans.deallocate() }
+        // Per row with a visible pixel, each column's signed dx to the
+        // nearest visible pixel in that row (`nearestInRow`).
+        let nearest = UnsafeMutablePointer<Int8>.allocate(capacity: height * width)
+        defer { nearest.deallocate() }
+        let radius = bleedRadius
         let chunk = Self.chunk(height)
         let chunks = (height + chunk - 1) / chunk
         DispatchQueue.concurrentPerform(iterations: chunks) { index in
             for y in index * chunk..<min(height, (index + 1) * chunk) {
-                unpremultiply(row: pixels + y * bytesPerRow, width: width, span: spans + y * 2)
+                let row = pixels + y * bytesPerRow
+                unpremultiply(row: row, width: width, span: spans + y * 2)
+                guard radius > 0, spans[y * 2] <= spans[y * 2 + 1] else { continue }
+                nearestInRow(row, width: width, radius: radius, into: nearest + y * width)
             }
         }
-        let radius = bleedRadius
         guard radius > 0 else { return }
-        let offsets = Self.offsets(radius)
         DispatchQueue.concurrentPerform(iterations: chunks) { index in
             for y in index * chunk..<min(height, (index + 1) * chunk) {
                 fill(
                     y: y, pixels: pixels, width: width, height: height,
-                    bytesPerRow: bytesPerRow, spans: spans, radius: radius, offsets: offsets)
+                    bytesPerRow: bytesPerRow, spans: spans, nearest: nearest, radius: radius)
             }
         }
     }
@@ -136,53 +145,102 @@ enum ExportStraightAlpha {
         span[1] = last
     }
 
+    /// A `nearestInRow` entry: no visible pixel in the row within the radius.
+    /// An entry is an Int8, so `bleedRadius` must stay ≤ 126 (`Int8(d)`
+    /// traps past 127, and at 127 it equals this sentinel).
+    private static let noVisible: Int8 = .max
+
+    /// Per x of one row, the signed dx of the a > 0 pixel in this row with
+    /// the smallest |dx| ≤ `radius`, a tie going to the negative dx (the
+    /// first in row-major order); `noVisible` when there is none. One sweep
+    /// left to right: a transparent pixel takes the last visible one on its
+    /// left, and a visible pixel is its own nearest (0) and takes over each
+    /// transparent pixel within reach on its left that it is STRICTLY
+    /// nearer to, so a tie stays with the left. A row with no transparent
+    /// pixel (its lowest alpha, a loop the compiler vectorises, above 0) is
+    /// its own nearest everywhere.
+    private static func nearestInRow(
+        _ row: UnsafePointer<UInt8>, width: Int, radius: Int,
+        into table: UnsafeMutablePointer<Int8>
+    ) {
+        var lowest = UInt8.max
+        for x in 0..<width { lowest = min(lowest, row[x * 4 + 3]) }
+        guard lowest == 0 else {
+            table.initialize(repeating: 0, count: width)
+            return
+        }
+        let reach = radius
+        var last = Int.min / 2      // the last visible column so far; none yet
+        for x in 0..<width {
+            guard row[x * 4 + 3] > 0 else {
+                let left = x - last
+                table[x] = left <= reach ? Int8(-left) : noVisible
+                continue
+            }
+            table[x] = 0
+            var d = 1
+            while d <= reach && d <= x && x - d > last {
+                let left = x - d - last
+                if d < left { table[x - d] = Int8(d) }
+                d += 1
+            }
+            last = x
+        }
+    }
+
     /// Pass 2 over row `y`: each transparent pixel near a visible one takes
-    /// the nearest one's colour.
+    /// the nearest one's colour. Each row of the band that holds a visible
+    /// pixel (listed once per `y`) offers its own nearest (`nearest`, from
+    /// pass 1); the rows are read top to bottom and only a strictly smaller
+    /// dx² + dy² replaces the one held, so of equals the smallest dy wins,
+    /// and within a row the smallest dx — the first in row-major order
+    /// (G-35 (d)).
     private static func fill(
         y: Int, pixels: UnsafeMutablePointer<UInt8>, width: Int, height: Int,
-        bytesPerRow: Int, spans: UnsafeMutablePointer<Int>, radius: Int,
-        offsets: [(dx: Int, dy: Int)]
+        bytesPerRow: Int, spans: UnsafeMutablePointer<Int>, nearest: UnsafePointer<Int8>,
+        radius: Int
     ) {
         var low = width
         var high = -1
-        for band in max(0, y - radius)...min(height - 1, y + radius) {
+        let top = max(0, y - radius)
+        let bottom = min(height - 1, y + radius)
+        for band in top...bottom {
             low = min(low, spans[band * 2])
             high = max(high, spans[band * 2 + 1])
         }
         guard low <= high else { return }
         let row = pixels + y * bytesPerRow
-        for x in max(0, low - radius)...min(width - 1, high + radius) {
-            let pixel = row + x * 4
-            guard pixel[3] == 0 else { continue }
-            for offset in offsets {
-                let nx = x + offset.dx
-                let ny = y + offset.dy
-                guard nx >= 0, nx < width, ny >= 0, ny < height else { continue }
-                let near = pixels + ny * bytesPerRow + nx * 4
-                guard near[3] > 0 else { continue }
+        withUnsafeTemporaryAllocation(of: Int.self, capacity: bottom - top + 1) { visibleRows in
+            var count = 0
+            for ny in top...bottom where spans[ny * 2] <= spans[ny * 2 + 1] {
+                visibleRows[count] = ny
+                count += 1
+            }
+            for x in max(0, low - radius)...min(width - 1, high + radius) {
+                let pixel = row + x * 4
+                guard pixel[3] == 0 else { continue }
+                var best = Int.max
+                var bestX = 0
+                var bestY = 0
+                for index in 0..<count {
+                    let ny = visibleRows[index]
+                    let entry = nearest[ny * width + x]
+                    guard entry != noVisible else { continue }
+                    let dx = Int(entry)
+                    let dy = ny - y
+                    let distance = dx * dx + dy * dy
+                    if distance < best {
+                        best = distance
+                        bestX = x + dx
+                        bestY = ny
+                    }
+                }
+                guard best != Int.max else { continue }
+                let near = pixels + bestY * bytesPerRow + bestX * 4
                 pixel[0] = near[0]
                 pixel[1] = near[1]
                 pixel[2] = near[2]
-                break
             }
-        }
-    }
-
-    /// Every offset within Chebyshev `radius` but the pixel itself, nearest
-    /// first by dx² + dy², and among equals the first in row-major order
-    /// (dy, then dx) — so the first visible one met is the one G-35 (d) names.
-    private static func offsets(_ radius: Int) -> [(dx: Int, dy: Int)] {
-        var all: [(dx: Int, dy: Int)] = []
-        for dy in -radius...radius {
-            for dx in -radius...radius where dx != 0 || dy != 0 {
-                all.append((dx, dy))
-            }
-        }
-        return all.sorted { a, b in
-            let da = a.dx * a.dx + a.dy * a.dy
-            let db = b.dx * b.dx + b.dy * b.dy
-            if da != db { return da < db }
-            return a.dy != b.dy ? a.dy < b.dy : a.dx < b.dx
         }
     }
 }

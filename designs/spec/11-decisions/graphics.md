@@ -1736,7 +1736,13 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   `ExportStraightAlpha.bleedRadius` = 4 px of a pixel with a > 0 takes
   that pixel's straightened colour — the nearest by dx² + dy², a tie
   going to the first in row-major order — and keeps alpha 0; every other
-  a = 0 pixel is left as it was. The fill reads only pixels with a > 0,
+  a = 0 pixel is left as it was. The nearest is found without walking the
+  square: pass 1 records, per row with a visible pixel, each column's
+  nearest visible pixel in that row (its smallest |dx| ≤ 4, a tie to the
+  left), and a transparent pixel reads that entry in each of the 9 rows of
+  its band, top to bottom, keeping only a strictly smaller dx² + dy² — the
+  same pixel the sorted square named (issue batch B93 phase 2, #254; K1
+  holds the two byte-identical). The fill reads only pixels with a > 0,
   which it never writes, so in place is race-free. A band of rows with no
   visible pixel within 4 rows is skipped whole. The fill changes no alpha
   and no visible pixel, so a reader that composites straight colour by
@@ -1792,12 +1798,20 @@ Part of spec §11, *Decisions made — do not re-litigate*. The index of every d
   at the card's centre for all five: half red over white, the label
   honoured by the generator with no change here. **R0:** 0 mismatches of
   the 32,895 pairs; the 16 × 16 fill exact; the tie to (4,8). **Speed**
-  (`--measure straighten-speed`: the probe built `-O` with whole-module
-  optimisation, as the Release app is; 12 cores; best of five): an opaque
-  card on a clear frame 0.65 ms at 1920 × 1080 and 0.72 ms at
-  3840 × 2160; soft alpha at every pixel (pass 1 divides them all) 0.99
-  and 2.86 ms; one visible pixel in every 9 × 9 block (pass 2's worst
-  case, nearly every pixel transparent and within reach) 15.1 and 61.4 ms.
+  (B93 phase 2, 2026-10-09, Apple M2 Max, macOS 26.5.1, on a host other
+  sessions loaded, `vm.loadavg` 25 then 11 over the run;
+  `--measure straighten-speed`: the probe built `-O` with whole-module
+  optimisation, as the Release app is; 12 cores; best of five, the fill
+  before B93 timed on the same frames in the same run, alternating): an
+  opaque card on a clear frame 0.53 ms at 1920 × 1080 and 0.87 ms at
+  3840 × 2160 (before B93 0.56 and 0.71 ms); soft alpha at every pixel
+  (pass 1 divides them all) 0.81 and 2.98 ms (0.86 and 2.87 ms); one
+  visible pixel in every 9 × 9 block (pass 2's worst case, nearly every
+  pixel transparent and within reach) 0.88 and 3.33 ms (14.78 and
+  59.16 ms; B92 recorded 15.1 and 61.4 ms). **K1** (B93): the fill and the
+  one before it give the same bytes, padding included, over 65 seeded and
+  lattice frames and all 3,160 pairs of visible pixels around a
+  transparent centre, 216 of them ties.
   The unoptimised probe takes 33–41 ms for the 1080p card frame. B4:
   `prores_4444`'s sizes and sampled alphas equal the baseline's, and its
   frame digests moved, as (c) and (d) intend.

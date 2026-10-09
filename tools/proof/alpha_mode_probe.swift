@@ -12,6 +12,7 @@
 //   alpha-mode-probe read <path>
 //   alpha-mode-probe roundtrip
 //   alpha-mode-probe timing
+//   alpha-mode-probe equivalence
 //
 // Each prints one JSON line on stdout and exits 0, or an {"error": …} line
 // and exits 1.
@@ -37,7 +38,20 @@
 // pass 1 divides every pixel and pass 2 finds no transparent one) and
 // `sparse` (one visible pixel in each 9 × 9 block, so nearly every pixel is
 // transparent and within reach of one: pass 2's worst case). The proof
-// builds it optimised for this mode (`--measure straighten-speed`).
+// builds it optimised for this mode (`--measure straighten-speed`). Since
+// B93 phase 2 each row also times `referenceStraighten` (below) on the same
+// frames in the same run, so a loaded host slows both alike.
+// `equivalence` (K1, issue batch B93 phase 2, #254): the product's
+// `straighten(bgra:…)` against `referenceStraighten` — the fill as it was
+// before B93 (commit 7308ace's `ExportStraightAlpha`, its square of offsets
+// sorted by distance), copied verbatim as the oracle — byte for byte over
+// whole planes, padding included: seeded frames of 1 × 1, 3 × 17, 17 × 3,
+// 64 × 64 and 257 × 129 with 16 bytes of padding a row at four visible
+// densities, 64 × 64 frames whose every fourth row is wholly visible,
+// `timing`'s 9 × 9 lattice at 1920 × 1080, an 8 × 8 lattice of
+// distinct colours at 1920 × 1080, and every pair of distinct visible pixels
+// in a 9 × 9 plane around a transparent centre (3,160 pairs; `pair_ties`
+// counts those the same distance from the centre).
 
 import AVFoundation
 import CoreMedia
@@ -300,7 +314,8 @@ func timing() {
         let scale = fw / 1920
         for kind in ["card", "soft", "sparse"] {
             var times: [Double] = []
-            for run in 0..<6 {
+            var referenceTimes: [Double] = []
+            for run in 0..<12 {
                 let frame = plane(fw, fh)
                 switch kind {
                 case "card":
@@ -323,27 +338,281 @@ func timing() {
                         }
                     }
                 }
+                // Runs alternate: even the product, odd the reference; the
+                // first of each is the warm-up.
                 let start = DispatchTime.now().uptimeNanoseconds
-                ExportStraightAlpha.straighten(
-                    bgra: frame, width: fw, height: fh, bytesPerRow: fw * 4)
+                if run % 2 == 0 {
+                    ExportStraightAlpha.straighten(
+                        bgra: frame, width: fw, height: fh, bytesPerRow: fw * 4)
+                } else {
+                    referenceStraighten(bgra: frame, width: fw, height: fh, bytesPerRow: fw * 4)
+                }
                 let ms = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000
-                if run > 0 { times.append(ms) }
+                if run >= 2 {
+                    if run % 2 == 0 { times.append(ms) } else { referenceTimes.append(ms) }
+                }
                 frame.deallocate()
             }
             rows.append([
                 "size": "\(fw)x\(fh)", "frame": kind, "ms_best": times.min() ?? -1,
-                "ms_runs": times,
+                "ms_runs": times, "reference_ms_best": referenceTimes.min() ?? -1,
+                "reference_ms_runs": referenceTimes,
             ])
         }
     }
     emit(["timing": rows, "cores": ProcessInfo.processInfo.activeProcessorCount])
 }
 
+// MARK: - equivalence
+
+/// The fill before B93 phase 2 (commit 7308ace's `ExportStraightAlpha`),
+/// copied verbatim but for its names and `bleedRadius`, which is that
+/// commit's 4: K1's oracle.
+enum ReferenceStraightAlpha {
+
+    static let bleedRadius = 4
+
+    static func straighten(
+        bgra: UnsafeMutableRawPointer, width: Int, height: Int, bytesPerRow: Int
+    ) {
+        guard width > 0, height > 0, bytesPerRow >= width * 4 else { return }
+        let pixels = bgra.assumingMemoryBound(to: UInt8.self)
+        // Each row's first and last visible column; `first > last` is none.
+        let spans = UnsafeMutablePointer<Int>.allocate(capacity: height * 2)
+        defer { spans.deallocate() }
+        let chunk = Self.chunk(height)
+        let chunks = (height + chunk - 1) / chunk
+        DispatchQueue.concurrentPerform(iterations: chunks) { index in
+            for y in index * chunk..<min(height, (index + 1) * chunk) {
+                unpremultiply(row: pixels + y * bytesPerRow, width: width, span: spans + y * 2)
+            }
+        }
+        let radius = bleedRadius
+        guard radius > 0 else { return }
+        let offsets = Self.offsets(radius)
+        DispatchQueue.concurrentPerform(iterations: chunks) { index in
+            for y in index * chunk..<min(height, (index + 1) * chunk) {
+                fill(
+                    y: y, pixels: pixels, width: width, height: height,
+                    bytesPerRow: bytesPerRow, spans: spans, radius: radius, offsets: offsets)
+            }
+        }
+    }
+
+    private static func chunk(_ height: Int) -> Int {
+        let pieces = max(1, ProcessInfo.processInfo.activeProcessorCount * 4)
+        return max(1, (height + pieces - 1) / pieces)
+    }
+
+    private static func unpremultiply(
+        row: UnsafeMutablePointer<UInt8>, width: Int, span: UnsafeMutablePointer<Int>
+    ) {
+        var first = width
+        var last = -1
+        for x in 0..<width {
+            let pixel = row + x * 4
+            let alpha = Int(pixel[3])
+            guard alpha > 0 else { continue }
+            if first == width { first = x }
+            last = x
+            let unpremultiplies = alpha < 255
+            guard unpremultiplies else { continue }
+            let half = alpha / 2
+            for channel in 0..<3 {
+                let value = (Int(pixel[channel]) * 255 + half) / alpha
+                pixel[channel] = UInt8(min(255, value))
+            }
+        }
+        span[0] = first
+        span[1] = last
+    }
+
+    private static func fill(
+        y: Int, pixels: UnsafeMutablePointer<UInt8>, width: Int, height: Int,
+        bytesPerRow: Int, spans: UnsafeMutablePointer<Int>, radius: Int,
+        offsets: [(dx: Int, dy: Int)]
+    ) {
+        var low = width
+        var high = -1
+        for band in max(0, y - radius)...min(height - 1, y + radius) {
+            low = min(low, spans[band * 2])
+            high = max(high, spans[band * 2 + 1])
+        }
+        guard low <= high else { return }
+        let row = pixels + y * bytesPerRow
+        for x in max(0, low - radius)...min(width - 1, high + radius) {
+            let pixel = row + x * 4
+            guard pixel[3] == 0 else { continue }
+            for offset in offsets {
+                let nx = x + offset.dx
+                let ny = y + offset.dy
+                guard nx >= 0, nx < width, ny >= 0, ny < height else { continue }
+                let near = pixels + ny * bytesPerRow + nx * 4
+                guard near[3] > 0 else { continue }
+                pixel[0] = near[0]
+                pixel[1] = near[1]
+                pixel[2] = near[2]
+                break
+            }
+        }
+    }
+
+    private static func offsets(_ radius: Int) -> [(dx: Int, dy: Int)] {
+        var all: [(dx: Int, dy: Int)] = []
+        for dy in -radius...radius {
+            for dx in -radius...radius where dx != 0 || dy != 0 {
+                all.append((dx, dy))
+            }
+        }
+        return all.sorted { a, b in
+            let da = a.dx * a.dx + a.dy * a.dy
+            let db = b.dx * b.dx + b.dy * b.dy
+            if da != db { return da < db }
+            return a.dy != b.dy ? a.dy < b.dy : a.dx < b.dx
+        }
+    }
+}
+
+func referenceStraighten(bgra: UnsafeMutableRawPointer, width: Int, height: Int, bytesPerRow: Int) {
+    ReferenceStraightAlpha.straighten(
+        bgra: bgra, width: width, height: height, bytesPerRow: bytesPerRow)
+}
+
+/// A seeded linear congruential generator (Knuth's MMIX constants), so a
+/// case is the same bytes on every run.
+struct Seeded {
+    var state: UInt64
+    mutating func next() -> UInt64 {
+        state = state &* 6364136223846793005 &+ 1442695040888963407
+        return state >> 33
+    }
+    mutating func byte() -> UInt8 { UInt8(truncatingIfNeeded: next()) }
+}
+
+/// The product and the reference over two copies of `bytes`; nil when every
+/// byte agrees, else the first differing byte's place and both values.
+func compare(
+    _ bytes: [UInt8], width: Int, height: Int, bytesPerRow: Int
+) -> [String: Int]? {
+    var product = bytes
+    var reference = bytes
+    product.withUnsafeMutableBytes {
+        ExportStraightAlpha.straighten(
+            bgra: $0.baseAddress!, width: width, height: height, bytesPerRow: bytesPerRow)
+    }
+    reference.withUnsafeMutableBytes {
+        referenceStraighten(
+            bgra: $0.baseAddress!, width: width, height: height, bytesPerRow: bytesPerRow)
+    }
+    guard let at = (0..<bytes.count).first(where: { product[$0] != reference[$0] }) else {
+        return nil
+    }
+    return ["byte": at, "x": (at % bytesPerRow) / 4, "y": at / bytesPerRow,
+            "channel": at % 4, "product": Int(product[at]), "reference": Int(reference[at])]
+}
+
+func equivalence() {
+    var cases = 0, mismatched = 0
+    var first: [String: Any]?
+    func run(_ name: String, _ bytes: [UInt8], _ width: Int, _ height: Int, _ bytesPerRow: Int) {
+        cases += 1
+        guard let where_ = compare(bytes, width: width, height: height, bytesPerRow: bytesPerRow)
+        else { return }
+        mismatched += 1
+        if first == nil { first = ["case": name, "at": where_] }
+    }
+    // Seeded frames, every byte random (padding and transparent pixels'
+    // colour included); a pixel is visible with the density's chance, its
+    // alpha then 1…255.
+    var random = Seeded(state: 0x5EED_B93)
+    for (width, height) in [(1, 1), (3, 17), (17, 3), (64, 64), (257, 129)] {
+        let bytesPerRow = width * 4 + 16
+        for (density, label) in [(2, "0.2%"), (10, "1%"), (50, "5%"), (300, "30%")] {
+            for seed in 0..<3 {
+                var bytes = (0..<(bytesPerRow * height)).map { _ in random.byte() }
+                for y in 0..<height {
+                    for x in 0..<width {
+                        let visible = Int(random.next() % 1000) < density
+                        bytes[y * bytesPerRow + x * 4 + 3] =
+                            visible ? UInt8(1 + Int(random.next() % 255)) : 0
+                    }
+                }
+                run("\(width)x\(height) \(label) #\(seed)", bytes, width, height, bytesPerRow)
+            }
+        }
+    }
+    // Every fourth row wholly visible (the row table's fast path) between
+    // rows of 2 % density, so transparent pixels read a whole row's entries.
+    for seed in 0..<3 {
+        let width = 64, height = 64, bytesPerRow = width * 4 + 16
+        var bytes = (0..<(bytesPerRow * height)).map { _ in random.byte() }
+        for y in 0..<height {
+            for x in 0..<width {
+                let visible = y % 4 == 0 || Int(random.next() % 1000) < 20
+                bytes[y * bytesPerRow + x * 4 + 3] =
+                    visible ? UInt8(1 + Int(random.next() % 255)) : 0
+            }
+        }
+        run("64x64 whole rows #\(seed)", bytes, width, height, bytesPerRow)
+    }
+    // `timing`'s sparse frame: one visible pixel per 9 × 9 block.
+    let fw = 1920, fh = 1080
+    var lattice9 = [UInt8](repeating: 0, count: fw * fh * 4)
+    for y in stride(from: 4, to: fh, by: 9) {
+        for x in stride(from: 4, to: fw, by: 9) {
+            let at = (y * fw + x) * 4
+            lattice9[at] = 0; lattice9[at + 1] = 0; lattice9[at + 2] = 128; lattice9[at + 3] = 128
+        }
+    }
+    run("1920x1080 9x9 lattice", lattice9, fw, fh, fw * 4)
+    // An 8 × 8 lattice of distinct colours: a pixel 4 px from two or four of
+    // them is a tie the colour shows.
+    var lattice8 = [UInt8](repeating: 0, count: fw * fh * 4)
+    var colours = Seeded(state: 8)
+    for y in stride(from: 0, to: fh, by: 8) {
+        for x in stride(from: 0, to: fw, by: 8) {
+            let at = (y * fw + x) * 4
+            for c in 0..<3 { lattice8[at + c] = colours.byte() }
+            lattice8[at + 3] = 255
+        }
+    }
+    run("1920x1080 8x8 lattice", lattice8, fw, fh, fw * 4)
+
+    // Every pair of distinct visible pixels on a 9 × 9 plane around a
+    // transparent centre (4,4).
+    var pairs = 0, ties = 0, pairMismatches = 0
+    var firstPair: [String: Any]?
+    let places = (0..<81).filter { $0 != 40 }
+    for i in 0..<places.count {
+        for j in (i + 1)..<places.count {
+            let (a, b) = (places[i], places[j])
+            var bytes = [UInt8](repeating: 0, count: 81 * 4)
+            for c in 0..<4 { bytes[a * 4 + c] = [10, 20, 30, 255][c] }
+            for c in 0..<4 { bytes[b * 4 + c] = [90, 80, 70, 255][c] }
+            pairs += 1
+            let da = (a % 9 - 4) * (a % 9 - 4) + (a / 9 - 4) * (a / 9 - 4)
+            let db = (b % 9 - 4) * (b % 9 - 4) + (b / 9 - 4) * (b / 9 - 4)
+            if da == db { ties += 1 }
+            if let where_ = compare(bytes, width: 9, height: 9, bytesPerRow: 36) {
+                pairMismatches += 1
+                if firstPair == nil {
+                    firstPair = ["a": [a % 9, a / 9], "b": [b % 9, b / 9], "at": where_]
+                }
+            }
+        }
+    }
+    emit([
+        "cases": cases, "mismatched_cases": mismatched,
+        "first_mismatch": first.map { $0 as Any } ?? firstPair.map { $0 as Any } ?? NSNull(),
+        "pairs": pairs, "pair_ties": ties, "pair_mismatches": pairMismatches,
+    ])
+}
+
 // MARK: - main
 
 let arguments = CommandLine.arguments
 guard arguments.count >= 2 else {
-    fail("usage: alpha-mode-probe write|read|roundtrip|timing …")
+    fail("usage: alpha-mode-probe write|read|roundtrip|timing|equivalence …")
 }
 switch arguments[1] {
 case "write":
@@ -360,6 +629,8 @@ case "roundtrip":
     roundtrip()
 case "timing":
     timing()
+case "equivalence":
+    equivalence()
 default:
     fail("unknown mode \(arguments[1])")
 }

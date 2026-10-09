@@ -17484,3 +17484,102 @@ after), `ping_is_answered_with_an_empty_result` panicked with
 `no answer within 1ns (host: powermode 0; vm.loadavg { 7.72 6.41 9.50 })`.
 `cargo clippy --all-targets -- -D warnings` and `cargo fmt --check` were clean.
 `make gate` PASS (101 s), and the stdio tests in it passed 14/14 in 6.48 s.
+
+## Issue batch B93 phase 2 — the straight-alpha fill finds its nearest through a row table (`hevc_alpha_proof.py` K1, `--rows straighten` and four probe-only mutants; `alpha_mode_probe.swift`'s `equivalence`; #254, spec §11 G-35 (d), (f))
+
+#254 measured B92's fill at 61.4 ms per 3840 × 2160 frame when visible pixels
+are scattered (one per 9 × 9 block): each transparent pixel walked the 80
+offsets of its 9 × 9 square, sorted by distance, until it met a visible one.
+Now pass 1 also writes, for each row that holds a visible pixel, a table of
+every column's nearest visible pixel in that row (`nearestInRow`: the signed
+dx with the smallest |dx| ≤ 4, a tie to the left, `noVisible` when none). It
+does this in one left-to-right sweep, and a row with no transparent pixel is
+a plain fill of zeros. Pass 2 (`fill`) lists the band's rows that hold a
+visible pixel once per row, then for each transparent pixel reads that row's
+entry top to bottom, keeping only a strictly smaller dx² + dy². That is the
+pixel the sorted square named: the smallest distance, then the smallest dy,
+then the smallest dx. `offsets(_:)` is gone. `bleedRadius`, pass 1's
+division and both labels are unchanged.
+
+**K1** is the probe's `equivalence` mode. It runs the product's
+`straighten(bgra:…)` against `referenceStraighten`, which is commit 7308ace's
+fill copied verbatim into the probe as the oracle, and compares the two byte
+for byte over whole planes, padding included. The planes are 65 frames and
+3,160 pairs:
+- seeded frames of 1 × 1, 3 × 17, 17 × 3, 64 × 64 and 257 × 129, each with
+  16 bytes of padding a row and every byte random, at visible densities of
+  0.2 %, 1 %, 5 % and 30 % (three seeds each);
+- 64 × 64 frames whose every fourth row is wholly visible (the table's fast
+  path; three seeds);
+- `timing`'s 9 × 9 lattice, and an 8 × 8 lattice of distinct colours, both at
+  1920 × 1080;
+- every pair of distinct visible pixels in a 9 × 9 plane around a transparent
+  centre.
+
+K1 is scored when no case and no pair differs, there was at least one case,
+and at least one pair was a tie. `--rows straighten` runs R0 and K1 with no
+launch and needs no app. `--rows alpha-mode`, and the full rows, gain K1.
+`--measure straighten-speed` now times the oracle beside the product, on the
+same frames in the same run, the two alternating, and prints the host's
+`vm.loadavg`.
+
+**Mutants**, probe-only: each copies `app/Sources` into `work/`, replaces one
+anchor of `ExportStraightAlpha.swift` asserted once, builds the plain probe
+from the copy and scores R0 and K1. Exit 0 when either FAILS.
+- `row-tie-right`: a visible pixel takes over a transparent one on its left
+  at an equal distance, so a tie in a row goes to +dx.
+- `rows-tie-last`: `<` becomes `<=` across the band's rows, so a tie goes to
+  the last row.
+- `reach-past-radius`: the row table admits |dx| = 5.
+- `full-row-unseen`: a wholly visible row's entries say `noVisible`.
+
+```sh
+python3 tools/proof/hevc_alpha_proof.py --rows straighten            # 2/2, exit 0
+python3 tools/proof/hevc_alpha_proof.py --mutant rows-tie-last       # MUTANT PASS
+python3 tools/proof/hevc_alpha_proof.py --measure straighten-speed
+```
+
+**Its record** (2026-10-09, Apple M2 Max, macOS 26.5.1, ffmpeg 9.0.2, on AC,
+`powermode 0` before and after each measurement). On Debug, `--rows
+straighten` scored 2/2, exit 0: R0 had 0 mismatches and the tie went to (4,8);
+K1 had 65 cases and 0 mismatched, and 3,160 pairs with 216 ties and 0
+mismatched. All four mutants printed MUTANT PASS, exit 0:
+
+| Mutant | R0 | K1 cases mismatched | K1 pairs mismatched |
+|---|---|---|---|
+| `row-tie-right` | FAILED, (8,8) took (12,8)'s colour | 25 | 140 |
+| `rows-tie-last` | passed | 34 | 1,340 |
+| `reach-past-radius` | passed | 19 | 396 |
+| `full-row-unseen` | passed | 4 | 0 |
+
+R0 passes under `reach-past-radius` because its lone pixel's band never
+reaches a column five away. K1 is what catches that mutant.
+
+The speed, from `--measure straighten-speed`, is the probe built `-O` with
+whole-module optimisation, 12 cores, best of five. Other sessions loaded the
+host: `vm.loadavg` read 25.39 before the run and 10.99 after it. The "before
+B93" column is the oracle in the same run, so both columns ran under the same
+load:
+
+| Frame | 1920 × 1080 | before B93 | 3840 × 2160 | before B93 |
+|---|---|---|---|---|
+| Opaque card | 0.53 ms | 0.56 ms | 0.87 ms | 0.71 ms |
+| Soft alpha at every pixel | 0.81 ms | 0.86 ms | 2.98 ms | 2.87 ms |
+| One visible pixel per 9 × 9 block | 0.88 ms | 14.78 ms | 3.33 ms | 59.16 ms |
+
+B92 recorded 15.1 and 61.4 ms for the last row. Two earlier versions of the
+table were measured the same way and replaced:
+- Two sweeps per row, with the band's rows filtered per pixel: sparse 4K
+  7.46 ms, but soft 4K 5.22 ms against the oracle's 2.86 ms.
+- An outward search from each transparent pixel.
+
+The final version replaces the sweep over a wholly visible row with a fill
+of zeros. One
+intermediate version wrote to column −1 when a row's first pixel was visible.
+K1 caught it as the probe's crash (rc −11) before any other check ran.
+
+`make typecheck` held its four baseline warnings. `make gate` PASS (206 s).
+On the gate's Release build (`RC_PROOF_APP=release`), `--rows alpha-mode`
+scored 12/12, exit 0, with stderr empty and no `Reelcut: ` line. F1 read 1
+on `prores_4444` and 18 on `hevc_alpha` (2 pixels over 10), and F2 read 0 and
+2, B92's figures.

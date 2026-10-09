@@ -6,15 +6,19 @@ encoder ends in the preset's own sentence — on instances this script
 launches. Issue batch B92 (#242; spec §11 G-35) adds the alpha mode: the two
 alpha movie rows are written straight and labelled so, and a video frame
 labelled premultiplied is composited as premultiplied (A2, I1, M1, T1, T2,
-F1, F2, R0, Q1, B4 and four mutants).
+F1, F2, R0, Q1, B4 and four mutants). Issue batch B93 phase 2 (#254) makes
+the fill's search a per-row table and adds K1, `--rows straighten` and four
+probe-only mutants.
 
     python3 tools/proof/hevc_alpha_proof.py [--app PATH]
     python3 tools/proof/hevc_alpha_proof.py --rows size [--app PATH]
     python3 tools/proof/hevc_alpha_proof.py --rows sheet [--app PATH]
     python3 tools/proof/hevc_alpha_proof.py --rows alpha-mode [--app PATH]
+    python3 tools/proof/hevc_alpha_proof.py --rows straighten
     python3 tools/proof/hevc_alpha_proof.py --control plain-hevc-reader|sheet-default
     python3 tools/proof/hevc_alpha_proof.py --mutant encoder-refused|report-and-fill|shape-and-note
     python3 tools/proof/hevc_alpha_proof.py --mutant import-straight|export-premultiplied|label-premultiplied|no-bleed
+    python3 tools/proof/hevc_alpha_proof.py --mutant row-tie-right|rows-tie-last|reach-past-radius|full-row-unseen
     python3 tools/proof/hevc_alpha_proof.py --measure straighten-speed
     python3 tools/proof/hevc_alpha_proof.py --record-baseline [--app PATH]
 
@@ -25,9 +29,10 @@ and an unknown `hevc_alpha` — and the script says so on G1's line and on
 its last line; Gate A was passed on the phase A build (commit fcfeebf).
 `--rows sheet` is the export sheet's rows alone, each launch with CLEAR as
 its one fixture and no baseline read: H0, E1 and Z1 in one launch, then E3's
-launches. `--rows alpha-mode` is H0, A2, I1, M1, T1, T2, F1, F2, R0, Q1 and Z1
-in one launch, with FAINT, DISC and DISCWHITE its only fixtures and no baseline
-read. `--measure straighten-speed` launches nothing: it builds the probe `-O`
+launches. `--rows alpha-mode` is H0, A2, I1, M1, T1, T2, F1, F2, R0, K1, Q1 and
+Z1 in one launch, with FAINT, DISC and DISCWHITE its only fixtures and no
+baseline read. `--rows straighten` is R0 and K1 alone: the probe, no launch
+(and no app needed). `--measure straighten-speed` launches nothing: it builds the probe `-O`
 with whole-module optimisation, as the Release app is built, and prints its
 `timing` (printed, never scored).
 
@@ -244,11 +249,23 @@ Rows (◆ = also Gate A's):
   Chebyshev-≤ 4 square holding its colour at alpha 0 and everything else
   (0,0,0,0); with visible pixels at (4,8) and (12,8), (8,8) takes (4,8)'s
   colour. The milliseconds for one 1920 × 1080 frame are printed.
+- **K1** (B93 phase 2, #254): the probe's `equivalence`: the product's
+  `straighten(bgra:…)` and `referenceStraighten` — the fill as it was before
+  B93 (commit 7308ace's square of offsets sorted by distance), copied
+  verbatim into the probe as the oracle — give the same bytes over whole
+  planes, padding included, on the seeded frames (1 × 1, 3 × 17, 17 × 3,
+  64 × 64 and 257 × 129, 16 bytes of padding a row, visible densities 0.2 %,
+  1 %, 5 % and 30 % with random alpha and colour; 64 × 64 frames whose every
+  fourth row is wholly visible), `timing`'s 9 × 9 lattice
+  and an 8 × 8 lattice of distinct colours at 1920 × 1080, and every one of
+  the 3,160 pairs of distinct visible pixels in a 9 × 9 plane around a
+  transparent centre. Scored when `mismatched_cases` and `pair_mismatches`
+  are 0, `cases` > 0 and `pair_ties` > 0 (so the pairs held ties to break).
 
 **The probe** is `tools/proof/alpha_mode_probe.swift`, compiled LAST with
 every `app/Sources/*.swift` but `main.swift` through `swift_build.build` (the
 tree's sources, also under a mutant), once a run, and run in a scratch home.
-One that does not build is a scored failure of M1, T1, T2 and R0.
+One that does not build is a scored failure of M1, T1, T2, R0 and K1.
 - ◆ **G1**, scored ONLY under `--rows size`: ODDFULL and TALLFULL with no
   `size` as `h264`, `hevc` and `prores_422`: frame 0's digest equals the
   baseline's, and so do eight pixels — the middle row's columns 0, 1, w−2,
@@ -292,8 +309,19 @@ asserted to occur exactly once and replaced, built by the copy's own `make app-d
 - `no-bleed` (B92) — `bleedRadius` is 0: F1 FAILS, its `hevc_alpha` half,
   and F2 FAILS.
 A mutant that names only `--rows alpha-mode`'s rows makes only its fixtures.
+Four more (B93 phase 2) are **probe-only**: each copies `app/Sources` into
+`work/`, replaces one anchor of `ExportStraightAlpha.swift` asserted to occur
+once, builds the plain probe from the copy (`swift_build.build`) and scores
+R0 and K1 with no launch; it is caught when either FAILS:
+- `row-tie-right` — the row table's tie goes to +dx.
+- `rows-tie-last` — `<` becomes `<=` across the band's rows, so a tie goes
+  to the last row.
+- `reach-past-radius` — the row table admits |dx| = radius + 1.
+- `full-row-unseen` — a row with no transparent pixel (the table's fast
+  path) is written as holding no visible pixel.
 A control or a mutant exits 0 only when every named row did what is named,
-1 when one did not, 2 when it could not be performed.
+1 when one did not, 2 when it could not be performed (a probe-only mutant:
+0 when R0 or K1 failed, 1 when both held, 2 when it could not be performed).
 
 **The baseline** is `tools/proof/hevc_alpha_baseline.json`, written only by
 `--record-baseline`, on the build BEFORE G-33's code: it refuses to write
@@ -375,12 +403,14 @@ BUILD_BOUND = 1500
 SECOND = 600_000
 SIZE_ROWS = ["H0", "T0", "R1", "R2", "R3", "R4", "E2", "B1", "B4", "G1", "Z1"]
 FULL_ROWS = ["H0", "T0", "R1", "R2", "R3", "R4", "E2", "A1", "A2", "A3", "A4", "A5", "I1",
-             "M1", "T1", "T2", "F1", "F2", "R0", "Q1", "S1", "S2", "O1", "O2", "O3", "O4", "O5", "P1",
+             "M1", "T1", "T2", "F1", "F2", "R0", "K1", "Q1", "S1", "S2", "O1", "O2", "O3", "O4", "O5", "P1",
              "P2", "B1", "B2", "B3", "B4", "L1", "L2", "N1", "E1", "E3", "Z1"]
 SHEET_ROWS = ["H0", "E1", "E3", "Z1"]
 # `--rows alpha-mode` (issue batch B92, spec §11 G-35): what a straight export
 # and a labelled import answer, on FAINT, DISC and DISCWHITE alone.
-ALPHA_ROWS = ["H0", "A2", "I1", "M1", "T1", "T2", "F1", "F2", "R0", "Q1", "Z1"]
+ALPHA_ROWS = ["H0", "A2", "I1", "M1", "T1", "T2", "F1", "F2", "R0", "K1", "Q1", "Z1"]
+# `--rows straighten` (issue batch B93 phase 2, #254): the probe's rows alone.
+STRAIGHTEN_ROWS = ["R0", "K1"]
 ALPHA_CODECS = ("prores_4444", "hevc_alpha")
 PROBE_SWIFT = ROOT / "tools/proof/alpha_mode_probe.swift"
 PROBE_BOUND = 120
@@ -1591,12 +1621,14 @@ def row_g1(s):
 # ---- the alpha mode (issue batch B92, spec §11 G-35) -----------------------------
 
 PROBE = {}   # per build, the probe's binary or why it could not be built: built once a run
+PROBE_SOURCES = None   # a probe-only mutant's copy of app/Sources; None is the tree's
 
 
 def build_probe(optimized=False):
     """`alpha_mode_probe.swift` compiled LAST with every `app/Sources/*.swift`
     but `main.swift`, through `swift_build.build` (reused when every input is
-    byte-identical). The TREE's sources, also under a mutant. `optimized` is
+    byte-identical). The TREE's sources, unless `PROBE_SOURCES` names a
+    probe-only mutant's copy. `optimized` is
     `-O` with whole-module optimisation, as the Release app is built, for
     `--measure straighten-speed`. Its path, or raises with why, once a run."""
     kind = "optimized" if optimized else "plain"
@@ -1610,7 +1642,8 @@ def build_probe(optimized=False):
             # swift_build's own progress line goes to stdout, so a run's stderr
             # stays what mcp.py and the rows say.
             with contextlib.redirect_stderr(sys.stdout):
-                built = swift_build.build(sources=swift_build.app_sources() + [entry],
+                built = swift_build.build(sources=swift_build.app_sources(PROBE_SOURCES)
+                                          + [entry],
                                           output=folder / "alpha-mode-probe",
                                           defines=["REELCUT_DEV_TOOLS"], optimize=optimized,
                                           wmo=optimized, timeout=900)
@@ -1857,9 +1890,14 @@ def measure_speed():
     got = probe("timing", optimized=True)
     print(f"  {got.get('cores')} cores; ExportStraightAlpha.straighten(bgra:…), -O with "
           "whole-module optimisation, best of five after one warm-up:")
+    print("  beside each, the fill before B93 phase 2 (the probe's referenceStraighten) on the "
+          "same frame in the same run, the two alternating")
     for row in got.get("timing", []):
         print(f"    {row['size']} {row['frame']:<6} best {row['ms_best']:.2f} ms of "
-              f"{[round(m, 2) for m in row['ms_runs']]}")
+              f"{[round(m, 2) for m in row['ms_runs']]}; before B93 best "
+              f"{row.get('reference_ms_best', -1):.2f} ms of "
+              f"{[round(m, 2) for m in row.get('reference_ms_runs', [])]}")
+    print(f"  host load (vm.loadavg) {tool(['sysctl', '-n', 'vm.loadavg']).strip()}")
     return 0
 
 
@@ -1880,6 +1918,19 @@ def row_r0(s):
           "printed, not scored)")
 
 
+def row_k1():
+    """K1: the product's fill against HEAD-before-B93's, in the probe."""
+    got = probe("equivalence")
+    good = (got.get("mismatched_cases") == 0 and got.get("pair_mismatches") == 0
+            and (got.get("cases") or 0) > 0 and (got.get("pair_ties") or 0) > 0)
+    check("K1 straighten(bgra:…) gives the same bytes as the fill before B93 (the oracle "
+          "copied into the probe), padding included, on every seeded frame, both lattices "
+          "and every pair of visible pixels around a transparent centre", good,
+          f"cases {got.get('cases')}, mismatched {got.get('mismatched_cases')}; pairs "
+          f"{got.get('pairs')}, ties {got.get('pair_ties')}, mismatched "
+          f"{got.get('pair_mismatches')}; first mismatch {got.get('first_mismatch')}")
+
+
 ROWS = {
     "T0": lambda s, full: row_t0(s, full),
     "R1": lambda s, full: row_r12(s, full),     # R1 and R2 are scored together
@@ -1897,6 +1948,7 @@ ROWS = {
     "T2": lambda s, full: row_t2(s),
     "F1": lambda s, full: row_f1(s),
     "R0": lambda s, full: row_r0(s),
+    "K1": lambda s, full: row_k1(),
     "F2": lambda s, full: row_f2(s),
     "Q1": lambda s, full: row_q1(s),
     "S1": lambda s, full: row_s1(s),
@@ -2086,6 +2138,62 @@ MUTANTS = {
 }
 
 
+# Issue batch B93 phase 2 (#254): the row table's decisions, caught by the probe
+# alone (R0, K1) — no app is built or launched.
+PROBE_MUTANTS = {
+    "row-tie-right": (STRAIGHT,      # a tie in a row goes to +dx
+                      "                if d < left { table[x - d] = Int8(d) }\n",
+                      "                if d <= left { table[x - d] = Int8(d) }\n"),
+    "rows-tie-last": (STRAIGHT,      # a tie across rows goes to the last row
+                      "                if distance < best {\n",
+                      "                if distance <= best {\n"),
+    "reach-past-radius": (STRAIGHT,  # the row table reaches one pixel too far
+                          "        let reach = radius\n",
+                          "        let reach = radius + 1\n"),
+    "full-row-unseen": (STRAIGHT,    # a wholly visible row's entries say none
+                        "            table.initialize(repeating: 0, count: width)\n",
+                        "            table.initialize(repeating: noVisible, count: width)\n"),
+}
+
+
+def run_probe_mutant(name):
+    """A probe-only mutant: `app/Sources` copied into WORK, one anchor
+    replaced, the plain probe built from the copy, R0 and K1 scored. 0 when
+    either FAILED, 1 when both held, 2 when it could not be performed."""
+    global PROBE_SOURCES
+    print(f"B93 phase 2 — the {name} MUTANT (probe only: R0, K1)", flush=True)
+    path, anchor, replacement = PROBE_MUTANTS[name]
+    copy = WORK / "mutant-sources"
+    try:
+        shutil.copytree(ROOT / "app/Sources", copy)
+        target = copy / Path(path).name
+        text = target.read_text()
+        if text.count(anchor) != 1:
+            print(f"mutant {name}: the control could not be performed — the anchor occurs "
+                  f"{text.count(anchor)} times in {path}: {anchor!r}")
+            return 2
+        target.write_text(text.replace(anchor, replacement))
+    except OSError as error:
+        print(f"mutant {name}: the control could not be performed — {error}")
+        return 2
+    PROBE_SOURCES = copy
+    try:
+        build_probe()
+    except Exception as error:  # a mutant that does not build caught nothing
+        print(f"mutant {name}: the control could not be performed — {error}")
+        return 2
+    score(None, STRAIGHTEN_ROWS, True)
+    if any(r not in rows for r in STRAIGHTEN_ROWS):
+        print(f"mutant {name}: the control could not be performed — reached "
+              f"{sorted(rows)}")
+        return 2
+    caught = not all(rows[r] for r in STRAIGHTEN_ROWS)
+    print(("MUTANT PASS" if caught else "MUTANT FAILURE") + f": {name} — "
+          + ", ".join(f"{r} {'FAILED' if not rows[r] else 'passed'}" for r in STRAIGHTEN_ROWS)
+          + ("" if caught else "; one had to fail"))
+    return 0 if caught else 1
+
+
 def own_core(copy):
     """Makes the copy's `core/` its own, so a mutant may edit it:
     `tree_copy.make_copy` links `core` to the tree's, and an anchor replaced
@@ -2228,9 +2336,9 @@ def foreign_text(baseline, today):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--app", default=str(APP))
-    parser.add_argument("--rows", choices=["size", "sheet", "alpha-mode"])
+    parser.add_argument("--rows", choices=["size", "sheet", "alpha-mode", "straighten"])
     parser.add_argument("--record-baseline", action="store_true")
-    parser.add_argument("--mutant", choices=sorted(MUTANTS))
+    parser.add_argument("--mutant", choices=sorted(MUTANTS) + sorted(PROBE_MUTANTS))
     parser.add_argument("--control", choices=["plain-hevc-reader", "sheet-default"])
     parser.add_argument("--measure", choices=["straighten-speed"])
     args = parser.parse_args()
@@ -2244,7 +2352,7 @@ def main():
         print(f"instrument failure: the host could not be read: {error}")
         return 2
     binary = Path(args.app) / "Contents/MacOS/Reelcut"
-    if not args.mutant and not binary.is_file():
+    if not args.mutant and args.rows != "straighten" and not binary.is_file():
         print(f"instrument failure: no app binary at {binary}")
         return 2
     remove_work()
@@ -2257,6 +2365,15 @@ def main():
         except Exception as error:  # an instrument that could not run
             print(f"instrument failure: {type(error).__name__}: {error}")
             return 2
+    if args.mutant in PROBE_MUTANTS:
+        return run_probe_mutant(args.mutant)
+    if args.rows == "straighten":
+        print("B93 phase 2 — the fill's row table against the fill before it (#254, spec §11 "
+              "G-35 (d)); the probe alone, no launch", flush=True)
+        score(None, STRAIGHTEN_ROWS, True)
+        passed = sum(1 for name in STRAIGHTEN_ROWS if rows.get(name))
+        print(f"{passed}/{len(STRAIGHTEN_ROWS)}")
+        return 0 if passed == len(STRAIGHTEN_ROWS) else 1
     baseline = json.loads(BASELINE.read_text()) if BASELINE.exists() else None
     if args.mutant or args.control:
         # Neither names a digest row; the baseline is what L2's columns are
