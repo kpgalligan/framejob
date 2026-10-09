@@ -1072,7 +1072,7 @@ the key map behind it.
   `matte_target`, for the chrome only); `TrackSnapshot.matte` decodes it
   leniently.
 - `Compositor.swift` · `Compositor+Uniforms.swift` · `Compositor+Shadow.swift` ·
-  `Compositor+Matte.swift` · `CompositorEffects.swift` ·
+  `Compositor+Matte.swift` · `MattePlan.swift` · `CompositorEffects.swift` ·
   `Resources/Shaders/Compositor.metal`
   — the per-layer pass. The uniform block's field ORDER is a contract with the
   shader checked only by reading both, so change them in one edit; it is 104
@@ -1091,6 +1091,10 @@ the key map behind it.
   The matte pass is `Compositor+Matte.swift`'s `encodeMattes`, run BEFORE the
   destination pass opens: each group the recipe's `mattes` lists is drawn by
   the layer pipelines into a pooled destination-sized target (`MattePool`),
+  scheduled by `MattePlan.swift` (spec §11 MT-9: each cut set resolved once
+  its last matte is drawn, a composite given back after its last resolve; the
+  pool keeps what the renderer's last 30 frames held, a frame being one
+  `render` call),
   each cut set resolved by the sixth pipeline, the matte resolve (r8, source
   factor zero, destination factor `sourceColor`), into a pooled coverage the
   layer stage samples at `texture(1)` — every layer draw binds one, the 1×1

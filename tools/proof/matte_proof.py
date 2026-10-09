@@ -186,7 +186,15 @@ FAIL:
   (B90 phase 1)
   dissolve-cover-everywhere   an outgoing half with no partner box takes its
                               own cover: D0 D1 D2 D4 D5 D6 D7 D8
+  (B90 phase 3, `MattePlan.swift`)
+  free-ignores-liveness       each step gives back only its own composite, so
+                              the set naming an inner and an outer matte finds
+                              the inner one given back: N5 (the frame fails)
+  early-resolve               a cut set resolves at its first matte's step,
+                              before its last is drawn: N5 (the frame fails)
 (MT3's eighth, coverage-destination-coords, is `matte_probe.py`'s.)
+(B90 phase 3's other four, on the pool and the plan alone, are
+`matte_pool_probe.py`'s.)
 Rule R: exit 0 means every named row FAILED in the copy — caught; 1 that one
 passed — survived; 2 that the control could not be performed (the copy did
 not build or launch, the fixture did not hold, or a row was not reached). A
@@ -306,6 +314,15 @@ MUTANTS = {
         "clamp(u.partnerAlpha, 0.0, 1.0) * matteCover : 0.0;",
         "clamp(u.partnerAlpha, 0.0, 1.0) * matteCover : matteCover;",
         ["D0", "D1", "D2", "D4", "D5", "D6", "D7", "D8"]),
+    # Issue batch B90 phase 3 (#253, MT-9): the matte plan's two orderings.
+    "free-ignores-liveness": (
+        "app/Sources/MattePlan.swift",
+        "                for group in cut { lastRead[group] = max(lastRead[group] ?? step, step) }\n",
+        "                for group in cut { lastRead[group] = lastRead[group] ?? step }\n", ["N5"]),
+    "early-resolve": (
+        "app/Sources/MattePlan.swift",
+        "            guard at.count == cut.count, let last = at.max() else { continue }\n",
+        "            guard at.count == cut.count, let last = at.min() else { continue }\n", ["N5"]),
 }
 rows = {}
 selected = set(ROWS)

@@ -63,13 +63,13 @@ The budget was 0.50 ms at 1080p and 2.00 ms at 4K (MT0's figures, with V1 0.014 
   - A half's overlapping inner layers show through each other: Blue 227 for 170 (D5).
   - A dissolve inside a dissolving half dips as D2's does, the inner transition hiding the enclosing one: R 14 for 54 (D7, p_i 0.733, p_o 0.2).
   - A timeline pair is exact (DR: R + G = 255 at all 1840 samples).
-- **The matte pool has no cap**: each matte drawn in a frame holds a destination-sized target (33.2 MB at 4K). #253.
+- **The matte pool has no cap** (spec §11 MT-9; #253, issue batch B90 phase 3). A frame holds a composite only while a cut set still needs it, and one coverage per distinct cut set; between frames the pool keeps the most the last 30 frames held. Ten mattes in one frame, each cutting its own set, hold 116,121,600 B at 3840×2160, where MT-6's pool held 414,720,000 B (`matte_pool_probe.py` P1). Mattes that cut one set together are all live at once, and a frame that needs more targets gets them.
 - **The coverage is r8.** The matte's own target is bgra8, so the luma it yields is already 8-bit and r8 adds at most one rounding (L1 holds a gradient matte to ±1). Whether that reads as banding to an eye is MAT-1.
 - **Video as an input to a graphic is #251**, iceboxed; nothing here decides it.
 
 ## Open items
 
-- #252 and #253, filed at the close, and the owner's MAT-1 and MAT-2.
+- #252, filed at the close, and the owner's MAT-1 and MAT-2. #253, filed with it, is fixed (MT-9, issue batch B90 phase 3).
 
 ## Follow-ups (issue batch B90)
 
@@ -77,6 +77,12 @@ The budget was 0.50 ms at 1080p and 2.00 ms at 4K (MT0's figures, with V1 0.014 
   - `matte_proof.py` gained DR (a control) and D0–D8, one row per nested-dissolve case, D8 the zoom. Each asserts today's picture from its full formula and prints the exact mix beside it. p comes from DR or from the row's own un-nested frame, never from the row's own frame.
   - Every prediction held at the first run, with DR exact. Scores: Debug 11/11 (DR, D0–D8, Z1); `make gate` PASS; recorded on the gate's Release build, `matte_proof.py` whole 46/46 (E3 ran). The figures are in the Known-limits bullet above and in `tools/proof/README.md`'s "Mattes follow-up B90" section.
   - One mutant, `dissolve-cover-everywhere` (an outgoing half with no partner box takes its own cover), was caught: D0 D1 D2 D4 D5 D6 D7 D8 failed. Under it D0, D2, D4, D6 and D7 read the exact mix, so their dip is the missing partner correction alone.
+- **Phase 3, the matte pool (#253, spec §11 MT-9; 2026-10-08).** MT-9 was recorded in spec §11 before the code.
+  - `MattePlan.swift` (new, 73 lines, no Metal) plans a frame's mattes before any is drawn. Each cut set is resolved at the step that draws the last matte it names. A composite is given back once every set naming it is resolved, and a set naming a group no step draws is never resolved.
+  - `MattePool` (`Compositor+Matte.swift`) lost `fit` and `composite(_:)` and took `beginFrame`, `takeComposite` (the lowest free index), `giveComposite`, `endFrame` and `held`. `endFrame` keeps, of each kind, the most any of the last `keepFrames` (30) frames held, and releases the rest. `render` brackets each frame with `beginFrame` and a deferred `endFrame`, so a frame with no matte counts as holding none.
+  - `encodeMattes` runs the plan. A released composite also leaves the frame's map of drawn mattes, so a wrong plan fails the frame (`unordered`) rather than read a target another matte has drawn over. The old final loop over the canvas layers' cuts is gone, because the plan resolves every layer's set.
+  - Scores: `matte_pool_probe.py` (new; no app) 4/4. P1 shows ten one-set mattes at one composite live and ten coverages: 116,121,600 B at 3840×2160 against 414,720,000 B. Debug `matte_proof.py --only A1,MM,L3,N3,N5,N7,T1,T3,S1,RF1,D1,D3,D6,E1,F1,Z1` 16/16; `matte_probe.py` 4/4; `make gate` PASS; recorded on the gate's Release build, `matte_proof.py` whole 46/46 (E3 ran). Every row and printed value matches phase 2's recorded run, so no picture changed.
+  - Six mutants were caught. In `matte_pool_probe.py`: `no-release` (P1), `give-ignored`, `trim-never` and `trim-early` (P2). In `matte_proof.py`: `free-ignores-liveness` and `early-resolve` (N5; under both the frame fails, `unordered`).
 
 ## Where to look in the original
 

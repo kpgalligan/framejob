@@ -43,19 +43,32 @@ enum MatteError: LocalizedError {
     }
 }
 
-/// The destination-sized targets the matte pass draws into, kept from frame
-/// to frame (MT-6): a project with no matte allocates nothing, and the first
-/// matted frame allocates what it needs — at 3840×2160, 33.2 MB per matte
-/// composite and 8.3 MB per coverage. Emptied when the destination size
-/// changes; it grows with the most mattes one frame has needed, and no cap
-/// is set. One renderer serves one serial render queue and waits for each
-/// frame's GPU work, so a target is free again by the next frame.
+/// The destination-sized targets the matte pass draws into (spec §11 MT-6,
+/// MT-9): at 3840×2160, 33.2 MB per matte composite and 8.3 MB per coverage.
+/// A frame is one `render` call, bracketed by `beginFrame` and `endFrame`.
+/// Within it a composite is taken and given back as `MattePlan` says, so a
+/// later matte draws into one an earlier matte no longer needs; a coverage is
+/// the `index`th cut set's and outlives the destination pass. Between frames
+/// the pool keeps, of each kind, the most any of the last `keepFrames` frames
+/// held at once, and releases the rest when a frame ends. A frame that needs
+/// more targets gets them. Emptied when the destination size changes. One
+/// renderer serves one serial render queue and waits for each frame's GPU
+/// work, so every target is free again by the next frame.
 final class MattePool {
+    /// How many frames, the current one included, the pool's size answers to.
+    static let keepFrames = 30
+
     private let device: MTLDevice
     private var width = 0
     private var height = 0
     private var composites: [MTLTexture] = []
+    /// Per composite, whether this frame holds it.
+    private var taken: [Bool] = []
     private var coverages: [MTLTexture] = []
+    /// What this frame has held at once: composites, coverages.
+    private var peak = (composites: 0, coverages: 0)
+    /// `peak` of each of the last `keepFrames` frames, oldest first.
+    private var recent: [(composites: Int, coverages: Int)] = []
 
     init(device: MTLDevice) {
         self.device = device
@@ -65,39 +78,80 @@ final class MattePool {
         fatalError("MattePool does not support NSCoder")
     }
 
-    /// Makes the pool's targets `width` × `height`, dropping any of another
-    /// size.
-    func fit(width: Int, height: Int) {
-        guard width != self.width || height != self.height else { return }
-        self.width = width
-        self.height = height
-        composites = []
-        coverages = []
+    /// Starts a frame `width` × `height`: a size change drops every target,
+    /// and every composite is free.
+    func beginFrame(width: Int, height: Int) {
+        if width != self.width || height != self.height {
+            self.width = width
+            self.height = height
+            composites = []
+            coverages = []
+        }
+        taken = Array(repeating: false, count: composites.count)
+        peak = (0, 0)
     }
 
-    /// The `index`th matte composite target, premultiplied BGRA.
-    func composite(_ index: Int) -> MTLTexture? {
-        target(index, in: &composites, format: .bgra8Unorm)
+    /// A free composite target, premultiplied BGRA: the lowest free index,
+    /// made when none is free. Nil only when Metal cannot make one.
+    func takeComposite() -> MTLTexture? {
+        let index: Int
+        if let free = taken.firstIndex(of: false) {
+            index = free
+        } else {
+            guard let made = makeTarget(format: .bgra8Unorm) else { return nil }
+            composites.append(made)
+            taken.append(false)
+            index = composites.count - 1
+        }
+        taken[index] = true
+        peak.composites = max(peak.composites, taken.filter { $0 }.count)
+        return composites[index]
+    }
+
+    /// Gives `texture` back to this frame's free composites.
+    func giveComposite(_ texture: MTLTexture) {
+        guard let index = composites.firstIndex(where: { $0 === texture }) else { return }
+        taken[index] = false
     }
 
     /// The `index`th coverage target, one channel.
     func coverage(_ index: Int) -> MTLTexture? {
-        target(index, in: &coverages, format: .r8Unorm)
+        while coverages.count <= index {
+            guard let made = makeTarget(format: .r8Unorm) else { return nil }
+            coverages.append(made)
+        }
+        peak.coverages = max(peak.coverages, index + 1)
+        return coverages[index]
     }
 
-    private func target(
-        _ index: Int, in list: inout [MTLTexture], format: MTLPixelFormat
-    ) -> MTLTexture? {
-        while list.count <= index {
-            let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-                pixelFormat: format, width: max(1, width), height: max(1, height),
-                mipmapped: false)
-            descriptor.usage = [.renderTarget, .shaderRead]
-            descriptor.storageMode = .private
-            guard let made = device.makeTexture(descriptor: descriptor) else { return nil }
-            list.append(made)
-        }
-        return list[index]
+    /// Ends the frame: keeps, of each kind, the most any of the last
+    /// `keepFrames` frames held, and releases the targets past it.
+    func endFrame() {
+        recent.append(peak)
+        let window = MattePool.keepFrames
+        if recent.count > window { recent.removeFirst(recent.count - window) }
+        trim(&composites, to: recent.map(\.composites).max() ?? 0)
+        trim(&coverages, to: recent.map(\.coverages).max() ?? 0)
+        taken = Array(repeating: false, count: composites.count)
+        peak = (0, 0)
+    }
+
+    /// The targets the pool holds now: composites, coverages.
+    var held: (composites: Int, coverages: Int) {
+        (composites.count, coverages.count)
+    }
+
+    private func trim(_ list: inout [MTLTexture], to count: Int) {
+        if list.count > count { list.removeLast(list.count - count) }
+    }
+
+    private func makeTarget(format: MTLPixelFormat) -> MTLTexture? {
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: format, width: max(1, width), height: max(1, height),
+            mipmapped: false)
+        descriptor.usage = [.renderTarget, .shaderRead]
+        descriptor.storageMode = .private
+        return device.makeTexture(descriptor: descriptor)
     }
 }
 
@@ -147,10 +201,12 @@ extension MetalRenderer {
 
     /// Encodes every matte `recipe.mattes` lists into `buffer`, ahead of the
     /// destination pass, and resolves the coverage of every layer that a
-    /// matte cuts. A layer whose `into` names a group is drawn into that
-    /// group's composite with the ordinary layer pipelines, so every one of
-    /// its own properties shapes the matte (MT-4); it is never drawn on the
-    /// canvas, which `render` decides.
+    /// matte cuts, in the order `MattePlan` gives (spec §11 MT-9). A layer
+    /// whose `into` names a group is drawn into that group's composite with
+    /// the ordinary layer pipelines, so every one of its own properties
+    /// shapes the matte (MT-4); it is never drawn on the canvas, which
+    /// `render` decides. A cut set the plan never resolves stays nil, and
+    /// `render` fails the frame on it (`unordered`).
     func encodeMattes(
         recipe: FrameRecipe, canvas: RecipeCanvas, target: MTLTexture,
         buffer: MTLCommandBuffer, request: AVAsynchronousVideoCompositionRequest,
@@ -158,24 +214,25 @@ extension MetalRenderer {
     ) throws -> MatteCoverage {
         var coverage = MatteCoverage(placeholder: placeholder)
         guard !recipe.mattes.isEmpty else { return coverage }
-        mattePool.fit(width: target.width, height: target.height)
         let destination = CGSize(width: target.width, height: target.height)
+        let plan = MattePlan(
+            groups: recipe.mattes.map(\.group),
+            cuts: recipe.layers.compactMap { layer in
+                guard let cut = layer.matte?.cut, !cut.isEmpty else { return nil }
+                return cut
+            })
         var composites: [Int: (texture: MTLTexture, mode: TrackMatte)] = [:]
 
-        for (index, group) in recipe.mattes.enumerated() {
-            let members = recipe.layers.filter { $0.matte?.into == group.group }
-            // An inner matte cutting a member is drawn already: the list is
-            // deepest container first.
-            for member in members {
-                try resolve(member.matte?.cut ?? [], composites, into: &coverage, buffer)
-            }
-            // Each member's coverage, resolved above, read before the pass
-            // opens: a throw never leaves an encoder open.
+        for (group, step) in zip(recipe.mattes, plan.steps) {
+            let members = recipe.layers.filter { $0.matte?.into == step.group }
+            // Each member's coverage, resolved at an earlier step — the list
+            // is deepest container first — and read before the pass opens: a
+            // throw never leaves an encoder open.
             let cuts: [MTLTexture] = try members.map {
                 guard let matte = coverage.texture(for: $0) else { throw MatteError.unordered }
                 return matte
             }
-            guard let composite = mattePool.composite(index) else { throw MatteError.noTarget }
+            guard let composite = mattePool.takeComposite() else { throw MatteError.noTarget }
             // A pass of its own, cleared transparent, drawn exactly as the
             // destination pass draws a layer — a shadow suspends it the same
             // way — so nothing on this side has an opinion about a matte
@@ -194,12 +251,18 @@ extension MetalRenderer {
                 try draw(member, prepared, matte: matte, canvas: canvas, pass: &pass)
             }
             pass.suspend()
-            composites[group.group] = (composite, group.mode)
-        }
-
-        // The canvas layers' cut sets, now every matte is drawn.
-        for layer in recipe.layers where layer.matte?.into == nil {
-            try resolve(layer.matte?.cut ?? [], composites, into: &coverage, buffer)
+            composites[step.group] = (composite, group.mode)
+            for cut in step.resolve {
+                try resolve(cut, composites, into: &coverage, buffer)
+            }
+            // A composite no later resolve reads goes back to the pool, so the
+            // next step may draw into it; Metal orders that clear after the
+            // resolves above, which read it, in this one command buffer.
+            for released in step.release {
+                if let given = composites.removeValue(forKey: released) {
+                    mattePool.giveComposite(given.texture)
+                }
+            }
         }
         return coverage
     }

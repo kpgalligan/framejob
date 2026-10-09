@@ -116,3 +116,20 @@ it.
   of those tracks has a target, "Nothing is behind this matte track, so it cuts nothing."; every
   control stays live, its values kept for when the track stops being a matte. On the canvas a
   matte clip is the topmost hit inside its box, selected and dragged like any clip.
+- **MT-9 — The matte pool keeps what recent frames used, and no cap drops a picture (#253;
+  owner, 2026-10-08).** Amends MT-6's pooling sentence.
+  - **Planning.** A frame's mattes are planned before any is drawn (`MattePlan`). Each cut set
+    is resolved as soon as the last matte it names is drawn. A matte's `bgra8Unorm` composite
+    goes back to the pool once every cut set naming it is resolved, so a later matte in the same
+    frame draws into it. A frame therefore holds as many composites at once as mattes are live
+    (one, for any number of mattes that each cut their own set). It also holds one `r8Unorm`
+    coverage per distinct cut set, and those all outlive the destination pass.
+  - **Between frames.** A frame is one `render` call. The pool keeps, of each kind, as many
+    targets as the most any of the renderer's last 30 frames held at once
+    (`MattePool.keepFrames`), and releases the rest when a frame ends. A frame with no matte
+    counts as holding none, and a destination size change still empties the pool. At 3840×2160,
+    ten matte pairs in one frame hold 33.2 MB + 10 × 8.3 MB = 116.1 MB, where MT-6's pool held
+    414.7 MB.
+  - **No cap.** A frame that needs more targets gets them, and a target Metal cannot make fails
+    the frame as before (`MatteError.noTarget`). A renderer that stops drawing keeps what its
+    last 30 frames held until it draws again or is released with its player item or export.

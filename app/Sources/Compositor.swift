@@ -822,6 +822,8 @@ final class MetalRenderer {
         guard let target = texture(from: destination, live: &live) else {
             throw CompositorError.noDestinationTexture
         }
+        mattePool.beginFrame(width: target.width, height: target.height)
+        defer { mattePool.endFrame() }
 
         let canvas = recipe?.canvas ?? RecipeCanvas(
             width: target.width, height: target.height, background: [0, 0, 0, 1])

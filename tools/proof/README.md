@@ -17167,3 +17167,53 @@ exact:
 | D7 | p_i 0.7333, p_o 0.2000, T_B | (14, 150, 51) | (14.5, 149.6, 51.0) | (54.4, 149.6, 51.0) |
 | D8 | zoom, in-box (z_in 0.8333) | (85, 113, 0) | G 113.3 | G 170.0 |
 | D8 | zoom, outside the in-box | (0, 170, 0) | G 170.0 | G 170.0 |
+
+## Mattes follow-up B90 — the matte pool reuses and trims (`matte_pool_probe.py` B0, P1–P3 and four mutants; `matte_proof.py` `free-ignores-liveness`, `early-resolve`; #253, spec §11 MT-9)
+
+**What it answers.** Whether a frame's mattes share composites as
+`MattePlan` says, and whether `MattePool` keeps exactly what the renderer's
+last 30 frames held (issue batch B90 phase 3). `matte_pool_probe.py` builds
+`matte_pool_probe.swift` as `main.swift` over every other file in
+`app/Sources` through `swift_build.build`, and asks the app's own
+`MattePlan` and `MattePool` what they answer. It launches no app and builds
+no shader. P1 is four plans: ten mattes each cutting its own set, two in one
+set, two in two sets, and a set naming a group no step draws. P2 is a pool on
+the real device at 64×64: take, give and take; a frame holding (3, 2) then
+idle frames; and a fresh pool used (1, 1) at frame 20 alone. P3 is a size
+change. The module docstring has each row's claim. The app-side ordering is
+scored by `matte_proof.py`'s N5, under its two new mutants.
+
+```
+python3 tools/proof/matte_pool_probe.py                  # no app; builds through swift_build.py
+python3 tools/proof/matte_pool_probe.py --mutant NAME    # no-release, give-ignored, trim-never, trim-early
+python3 tools/proof/matte_proof.py --mutant free-ignores-liveness --only N5,Z1
+python3 tools/proof/matte_proof.py --mutant early-resolve --only N5,Z1
+```
+
+A probe mutant builds the probe over a copy of one Swift file, with one
+anchor replaced (asserted once), in place of the tree's. It builds into
+`tools/proof/work/matte_pool_probe/mutant/<name>/`. A `matte_proof.py`
+mutant builds a tree copy as MT2's section says.
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `no-release` (`MattePlan.swift`) | no step gives a composite back | P1 |
+| `give-ignored` (`Compositor+Matte.swift`) | `giveComposite` frees nothing | P2 |
+| `trim-never` (`Compositor+Matte.swift`) | `endFrame` releases nothing | P2 |
+| `trim-early` (`Compositor+Matte.swift`) | the window is `keepFrames − 1` frames | P2 |
+| `free-ignores-liveness` (`matte_proof.py`) | each step gives back only its own composite | N5 |
+| `early-resolve` (`matte_proof.py`) | a cut set resolves at its first matte's step | N5 |
+
+**Its record** (2026-10-08, Apple M2 Max): `matte_pool_probe.py` 4/4. At
+3840×2160, ten mattes each cutting its own set hold 116,121,600 B: one
+composite live and ten coverages. MT-6's pool held 414,720,000 B for the same
+frame. In P2, `held` was (3, 2) after frames 1, 29 and 30 and (0, 0) after
+frame 31. The pool used at frame 20 held (0, 0) after frame 19, (1, 1) after
+frames 20 and 49, and (0, 0) after frame 50. On Debug,
+`matte_proof.py --only A1,MM,L3,N3,N5,N7,T1,T3,S1,RF1,D1,D3,D6,E1,F1,Z1` scored
+16/16 and `matte_probe.py` 4/4. `make gate` PASS. Recorded on the gate's
+Release build (`RC_PROOF_APP=release`), `matte_proof.py` whole scored 46/46
+(E3 ran). Every row and printed value is identical to phase 2's recorded
+run, once the instance, pid, socket and log-tail lines are set aside. All six
+mutants exit 0. Under `free-ignores-liveness` and `early-resolve`, N5's frames
+are missing: the released or unresolved matte fails the frame (`unordered`).
