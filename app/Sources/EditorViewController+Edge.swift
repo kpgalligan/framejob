@@ -167,8 +167,11 @@ extension EditorViewController {
             // Live only when the Media tab has a row selected: without one
             // there is nothing to place, and a live item that always beeps
             // is worse than a dead one.
-            guard let media = document.selectedMedia else { return false }
-            return document.project.snapshot.media(media) != nil && targetTrack != nil
+            // A LUT is applied as a look, never placed (spec §11 GR-8).
+            guard let media = document.selectedMedia,
+                let entry = document.project.snapshot.media(media), entry.kind != .lut
+            else { return false }
+            return targetTrack != nil
         default:
             return nil
         }

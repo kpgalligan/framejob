@@ -222,7 +222,10 @@ use crate::model::{Canvas, Project};
 /// variant `adjustment`", so nothing is dropped silently. It is also
 /// `video.look` (GR-7), an optional key written only when a clip has a look,
 /// so a look-less project writes the text it did; a branch build from before
-/// it would drop a look on save. The branch reads 1 to
+/// it would drop a look on save. It is also the `lut` kinds (GR-8): the
+/// media kind `lut` and the look kind `lut` with its `media` key, written
+/// only on a LUT's row and a LUT look — new variants, refused by name by a
+/// build that does not know them, as `adjustment` is. The branch reads 1 to
 /// [`BRANCH_BASE_VERSION`] and 1015, and refuses the numbers between in its
 /// own sentence: a later main file would open here and lose its new keys on
 /// save. At the merge 1015 is renumbered to main's next with one migration
@@ -241,6 +244,13 @@ pub const MAX_CLIPS: usize = 4096;
 pub const MAX_TRACKS: usize = 64;
 pub const MAX_MARKERS: usize = 1024;
 pub const MAX_MEDIA: usize = 1024;
+
+/// The largest `.cube` file `cube.rs` reads (spec §11 GR-8): 32 MiB, which
+/// holds a 65³ table four times over at the precision tools write, and keeps
+/// a stray file named `.cube` from being read whole. Mirrored by
+/// `RC_CUBE_MAX_BYTES` in the C header; the app reads at most one byte more,
+/// so a larger file is refused by the core's own sentence.
+pub const RC_CUBE_MAX_BYTES: usize = 33_554_432;
 
 /// How many levels of nest may sit inside one another. A cap on the WALK,
 /// not on taste: every evaluation of a nested layer recurses once per

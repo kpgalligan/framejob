@@ -83,7 +83,7 @@ fn uses_media(clip: &Clip, media: u32) -> bool {
 /// index form underflows on an empty slice and the crate's rule is that no
 /// input may panic (`core/CLAUDE.md`, Errors). A third caller that forgets
 /// the guard gets a poor sentence rather than a caught panic.
-fn clip_list(ids: &[u32]) -> String {
+pub(crate) fn clip_list(ids: &[u32]) -> String {
     let named: Vec<String> = ids.iter().take(3).map(|id| id.to_string()).collect();
     let rest = ids.len().saturating_sub(named.len());
     match (named.split_last(), rest) {
@@ -108,12 +108,14 @@ pub(crate) fn normalize_original(original: Option<MediaOriginal>) -> Option<Medi
 /// The checks a media record's fields must pass once the descriptor has
 /// matched the schema — `add_media`'s, and a relink probe's
 /// (`edit_relink.rs`), in one order and one set of sentences: an empty
-/// path, a negative duration, a media with pixels whose size or rate is not
+/// path, a `lut` row with a picture, sound or duration (`lut.rs`), a
+/// negative duration, a media with pixels whose size or rate is not
 /// usable, an original with an empty path.
 pub(crate) fn check_media_fields(media: &Media) -> Result<(), String> {
     if media.path.trim().is_empty() {
         return Err("media path must not be empty".to_string());
     }
+    crate::lut::check_lut_fields(media)?;
     if media.duration < 0 {
         return Err(format!(
             "media duration must not be negative, not {}",
@@ -504,7 +506,10 @@ impl Project {
     /// id that is gone is what `validate` rejects. The refusal names the
     /// clips ([`clip_list`]) and the argument that would let it through.
     pub fn remove_media(&self, media: u32, with_clips: bool) -> Result<Outcome, String> {
-        self.require_media(media)?;
+        // A LUT is no clip's source but some clips' look (spec §11 GR-8).
+        if self.require_media(media)?.kind == MediaKind::Lut {
+            return self.remove_lut(media, with_clips);
+        }
         // A nest references the project's `media[]` like everything else
         // (spec §5.2, one id space), so a clip INSIDE one counts as usage
         // and is removed with `with_clips` — but the nest CLIP is not

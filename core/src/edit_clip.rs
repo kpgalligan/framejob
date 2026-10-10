@@ -147,6 +147,7 @@ impl Project {
     /// made `insert_clip` open a hole wider than the clip it placed.
     pub(crate) fn whole_media_length(&self, media: &Media) -> Result<Ticks, String> {
         match media.kind {
+            MediaKind::Lut => Err(crate::lut::lut_not_placeable(media.id)),
             MediaKind::Image if media.duration <= 0 => {
                 Ok(self.snapped(DEFAULT_CLIP_DURATION).max(self.frame()))
             }
@@ -247,6 +248,7 @@ impl Project {
                 r#in: 0,
                 reversed: false,
             },
+            MediaKind::Lut => return Err(crate::lut::lut_not_placeable(media)),
         };
 
         let has_pixels = found.has_video || matches!(found.kind, MediaKind::Image);

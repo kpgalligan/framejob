@@ -47,7 +47,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use crate::actions_graphic::names_prop;
-use crate::edit_paste::parse_payload;
+use crate::edit_paste::{absorb_media, parse_payload};
+use crate::lut::{look_media_ids, remap_look_media};
 use crate::model::{Clip, GraphicProps, Project, ShapeProps, Source, TextProps};
 use crate::model_graphic::{check_count, check_props};
 use crate::outcome::Outcome;
@@ -251,20 +252,33 @@ impl Project {
         let mut next = self.clone();
         // Read at most once, by the first target that takes it (G-32 (f)).
         let mut copied: Option<Map<String, Value>> = None;
+        // The source with its looks pointing at THIS project's LUTs, made by
+        // the first target that takes the video group (spec §11 GR-8): the
+        // LUTs it names are absorbed by path, as `paste` absorbs media, and
+        // an id the payload lacks becomes no look.
+        let mut looked: Option<Clip> = None;
         for id in ids {
-            let Some(target) = next.clip_mut(id) else {
+            let Some(mut target) = next.clip(id).cloned() else {
                 continue;
             };
             let chosen: Vec<PasteGroup> = match &named {
                 Some(named) => named.clone(),
                 None => GROUPS
                     .into_iter()
-                    .filter(|g| has_group(source, *g) && has_group(target, *g))
+                    .filter(|g| has_group(source, *g) && has_group(&target, *g))
                     .map(PasteGroup::of)
                     .collect(),
             };
+            let takes_video = chosen.contains(&PasteGroup::Video) && target.video.is_some();
+            if takes_video && looked.is_none() {
+                let map = absorb_media(&mut next, &payload, &[], &look_media_ids(source))?;
+                let mut copy = source.clone();
+                remap_look_media(&mut copy, &map);
+                looked = Some(copy);
+            }
+            let from = looked.as_ref().unwrap_or(source);
             for group in chosen {
-                if !has(target, group) {
+                if !has(&target, group) {
                     if skip_missing {
                         continue;
                     }
@@ -272,10 +286,10 @@ impl Project {
                 }
                 let Some(layer) = group.layer() else {
                     let keep: Vec<String> = target.graphic.as_ref().map_or_else(Vec::new, |g| {
-                        let named = g.props.keys().filter(|key| names_prop(target, key));
+                        let named = g.props.keys().filter(|key| names_prop(&target, key));
                         named.cloned().collect()
                     });
-                    let (Some(from), Some(into)) = (graphic_of(source), target.graphic.as_mut())
+                    let (Some(from), Some(into)) = (graphic_of(from), target.graphic.as_mut())
                     else {
                         continue;
                     };
@@ -297,8 +311,11 @@ impl Project {
                     }
                     continue;
                 };
-                copy_group(target, source, layer);
-                self.normalise_and_check_group(target, layer)?;
+                copy_group(&mut target, from, layer);
+                next.normalise_and_check_group(&mut target, layer)?;
+            }
+            if let Some(slot) = next.clip_mut(id) {
+                *slot = target;
             }
         }
         self.finish(next)

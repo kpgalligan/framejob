@@ -3,7 +3,9 @@ import Foundation
 // MARK: - Looks' value types (road map grading, spec §11 GR-7)
 
 /// The eight built-in looks, in `model_look.rs`'s declaration order — the
-/// gallery's and the menu's order (append, never reorder). Closed, and
+/// gallery's and the menu's order (append, never reorder) — and `lut`, an
+/// imported `.cube` file (spec §11 GR-8), which is not one of `builtIns`.
+/// Closed, and
 /// decoded by RAW VALUE, so `JSONDecoder`'s `.convertFromSnakeCase` never
 /// touches these spellings. The core is the one place a look is DEFINED; this
 /// side only names them and reads the definition the recipe publishes.
@@ -16,6 +18,10 @@ enum LookKind: String, Codable, CaseIterable {
     case vintage
     case dramatic
     case blackWhite = "black_white"
+    case lut
+
+    /// The eight built-in looks, the gallery's tiles and the menu's items.
+    static let builtIns: [LookKind] = allCases.filter { $0 != .lut }
 
     var displayName: String {
         switch self {
@@ -27,26 +33,31 @@ enum LookKind: String, Codable, CaseIterable {
         case .vintage: return "Vintage"
         case .dramatic: return "Dramatic"
         case .blackWhite: return "Black & White"
+        case .lut: return "LUT"
         }
     }
 }
 
-/// A clip's stored look, `video.look`: which, and how much (0…1). Absent —
-/// nil on `VideoProps` — is no look. A `look` with no readable kind decodes
-/// as nil, which is what the core makes of one too.
+/// A clip's stored look, `video.look`: which, and how much (0…1), and for a
+/// `lut` look its media id (GR-8). Absent — nil on `VideoProps` — is no
+/// look. A `look` with no readable kind decodes as nil, which is what the
+/// core makes of one too.
 struct LookProps: Codable, Equatable {
     let kind: LookKind
     let amount: Double
+    let media: UInt32?
 
-    init(kind: LookKind, amount: Double = 1) {
+    init(kind: LookKind, amount: Double = 1, media: UInt32? = nil) {
         self.kind = kind
         self.amount = amount
+        self.media = media
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         kind = try c.decode(LookKind.self, forKey: .kind)
         amount = c.lenient(.amount, 1)
+        media = c.lenient(.media)
     }
 }
 
@@ -118,22 +129,26 @@ extension LookDefinition {
 }
 
 /// A recipe layer's `look` (spec §7.3): how much, and the definition to
-/// bake. The core publishes `null` for no look, an amount of 0 and an
-/// ungraded frame, so a non-nil one always has an amount above 0; its kind
-/// is on the wire for a reader and is not needed to draw.
+/// bake — or, for a LUT look (GR-8), the media whose `.cube` file to draw,
+/// with no definition. The core publishes `null` for no look, an amount of 0
+/// and an ungraded frame, so a non-nil one always has an amount above 0; its
+/// kind is on the wire for a reader and is not needed to draw.
 struct RecipeLook: Codable, Equatable {
     let amount: Double
     let definition: LookDefinition
+    let media: UInt32?
 
-    init(amount: Double, definition: LookDefinition) {
+    init(amount: Double, definition: LookDefinition, media: UInt32? = nil) {
         self.amount = amount
         self.definition = definition
+        self.media = media
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         amount = c.lenient(.amount, 0)
         definition = c.lenient(.definition, LookDefinition.identity)
+        media = c.lenient(.media)
     }
 }
 

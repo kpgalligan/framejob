@@ -64,3 +64,19 @@ struct MediaSnapshot: Codable, Equatable, Identifiable {
     /// Pixel size; `.zero` for audio, which has none.
     var pixelSize: CGSize { CGSize(width: width, height: height) }
 }
+
+/// What a media file is. `image` is a still picture (ImageIO decodes it);
+/// `audio` has no video track; `lut` is a `.cube` 3D LUT (spec §11 GR-8),
+/// applied as a clip's look and never placed as a clip.
+enum MediaKind: String, Codable, CaseIterable {
+    case video, audio, image, lut
+
+    var displayName: String {
+        switch self {
+        case .video: return "Video"
+        case .audio: return "Audio"
+        case .image: return "Image"
+        case .lut: return "LUT"
+        }
+    }
+}

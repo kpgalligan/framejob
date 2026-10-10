@@ -34,7 +34,7 @@ use crate::actions_clamp::{clamp_audio, clamp_video};
 use crate::actions_graphic::evaluate_graphic;
 use crate::edit_adjustment::{clamp_adjustment, is_adjustment};
 use crate::model::{
-    Action, AudioProps, Clip, ColorAdjust, Curve, GraphicProps, Look, Project, ShapeProps, Source,
+    Action, AudioProps, Clip, ColorAdjust, Curve, GraphicProps, Project, ShapeProps, Source,
     TextProps, VideoProps,
 };
 use crate::time::Ticks;
@@ -177,6 +177,16 @@ fn lerp(from: &Value, to: &Value, u: f64) -> Value {
 /// with. `core/tests/schema_v2.rs` pins both halves.
 const ENTRY_DISCRIMINANTS: [&str; 2] = ["kind", "shape"];
 
+/// The keys that name WHAT a named object is: `kind` (a filter's, a
+/// shape's, a transition's, a look's) and `media`, a LUT look's file (spec
+/// §11 GR-8). An id is a name, not a quantity: a LUT A → B interpolated
+/// would pass through whichever media sits between the two ids, so the
+/// look switches at the end instead, as a change of kind does. The rule
+/// applies to any object at any depth of an action's state; `video.look` is
+/// the only object with a `media` key today, so a group that adds one
+/// switches it at the end too.
+const OBJECT_DISCRIMINANTS: [&str; 2] = ["kind", "media"];
+
 /// One entry of a list toward the entry at the same index —
 /// [`lerp_at`] under the wider [`ENTRY_DISCRIMINANTS`] set.
 ///
@@ -231,13 +241,14 @@ fn lerp_at(from: &Value, to: &Value, u: f64, depth: u32) -> Value {
         // that leaves `kind` out — `{"filters": [{"amount": 1}]}`, "same
         // filter, more of it" — still interpolates, key by key, below.
         //
-        // `kind` is the ONLY discriminant here. A list ENTRY is judged
-        // against [`ENTRY_DISCRIMINANTS`] before it ever reaches this arm,
-        // and that constant argues why the two sets differ.
+        // `kind` and a look's `media` are the discriminants here
+        // ([`OBJECT_DISCRIMINANTS`]). A list ENTRY is judged against
+        // [`ENTRY_DISCRIMINANTS`] before it ever reaches this arm, and that
+        // constant argues why the two sets differ.
         (Value::Object(a), Value::Object(b))
-            if a.get("kind").is_some()
-                && b.get("kind").is_some()
-                && a.get("kind") != b.get("kind") =>
+            if OBJECT_DISCRIMINANTS
+                .iter()
+                .any(|key| matches!((a.get(*key), b.get(*key)), (Some(x), Some(y)) if x != y)) =>
         {
             from.clone()
         }
@@ -413,12 +424,15 @@ impl Project {
         // look (or one whose look was removed after the end was written) the
         // merge leaves a kind-less look, which would fail the whole group's
         // decode below and snap every animated key back to base. Inert
-        // instead: no kind, no look; every other key keeps its value.
+        // instead: no kind, no look; every other key keeps its value. The
+        // same for a LUT look whose `media` is not a LUT of the project
+        // (GR-8: an end is never checked against the media list).
         if let Some(Value::Object(video)) = state.get_mut("video") {
             video.insert("motion".to_string(), to_json(&base_video.motion));
-            if video.get("look").is_some_and(|look| {
-                !look.is_null() && serde_json::from_value::<Look>(look.clone()).is_err()
-            }) {
+            if video
+                .get("look")
+                .is_some_and(|look| !look.is_null() && !self.evaluates_as_look(look))
+            {
                 video.insert("look".to_string(), Value::Null);
             }
         }

@@ -76,7 +76,9 @@ extension MetalRenderer {
                         pass.suspend()
                         throw MatteError.unordered
                     }
-                    try drawAdjustment(layer, matte: matte, canvas: canvas, pass: &pass)
+                    try drawAdjustment(
+                        layer, matte: matte, canvas: canvas,
+                        urls: RecipeSource.shared.lookURLs(for: instruction), pass: &pass)
                     continue
                 }
                 guard
@@ -179,10 +181,10 @@ extension MetalRenderer {
     ) throws {
         var uniforms = prepared.uniforms
         let state = pipelineState(gather: layer.needsGather, blend: layer.needsBlend)
-        // The look's lattice, or the placeholder (spec §11 GR-7): every draw
-        // through the layer fragments binds `texture(2)`, the shadow's mask
-        // pass and the reflection's included.
-        let look = looks.texture(for: layer.look)
+        // The look's lattice, or the placeholder (spec §11 GR-7, GR-8): every
+        // draw through the layer fragments binds `texture(2)`, the shadow's
+        // mask pass and the reflection's included.
+        let look = prepared.look
         if let shadow = layer.shadow {
             encodeShadow(
                 shadow, uniforms: uniforms, texture: prepared.texture, matte: matte, look: look,

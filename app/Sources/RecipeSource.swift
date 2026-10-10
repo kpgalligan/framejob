@@ -34,6 +34,15 @@ final class RecipeSource {
     /// export and for an offline frame, which is why the switch never reaches
     /// them — never copy a document key's options onto one.
     private var options: [Int: RecipeOptions] = [:]
+    /// Media id → file, as each document last published it (spec §11 GR-8):
+    /// where a LUT look's `.cube` is read. The preview's composition keeps
+    /// the URL map it was BUILT with (`RecipeInstruction.mediaURLs`), and
+    /// adding, applying or relinking a LUT changes neither the plan nor the
+    /// DSP, so no rebuild follows (`Playback.update`); a look therefore reads
+    /// its URLs here. A key that never publishes — an export's or an offline
+    /// frame's fresh one — falls back to its instruction's map, which was
+    /// built from the project that key renders.
+    private var mediaURLs: [Int: [UInt32: URL]] = [:]
     private var nextKey = 1
 
     private init() {}
@@ -59,6 +68,7 @@ final class RecipeSource {
         // deliberately leaves them, because a key with no project published
         // right now is still the same ask.
         options.removeValue(forKey: key)
+        mediaURLs.removeValue(forKey: key)
     }
 
     /// Publishes the project the compositor should read from now. Called on
@@ -92,6 +102,24 @@ final class RecipeSource {
         } else {
             options[key] = newOptions
         }
+    }
+
+    /// Publishes a document's media URLs under `key` (main thread, beside
+    /// `set`, from `Playback.update`).
+    func setMediaURLs(_ urls: [UInt32: URL], for key: Int) {
+        lock.lock()
+        defer { lock.unlock() }
+        mediaURLs[key] = urls
+    }
+
+    /// The media URLs a LUT look under `instruction` reads: the map published
+    /// under its `recipeKey`, else the instruction's own (a fresh export or
+    /// frame key publishes none); `[:]` with no instruction. One lock hold.
+    func lookURLs(for instruction: RecipeInstruction?) -> [UInt32: URL] {
+        guard let instruction = instruction else { return [:] }
+        lock.lock()
+        defer { lock.unlock() }
+        return mediaURLs[instruction.recipeKey] ?? instruction.mediaURLs
     }
 
     /// The options published under `key`, for a caller that has to carry

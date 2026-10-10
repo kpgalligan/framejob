@@ -26,13 +26,14 @@ extension RecipeLayer {
     }
 
     /// An adjustment layer that would change nothing: its colour neutral (all
-    /// thirteen keys, which Show Ungraded writes so), no look (which Show
-    /// Ungraded removes, GR-7) and no point filter with an amount above 0. It
-    /// draws nothing, so the frame is byte-identical to one without the clip
-    /// (GR-6, GR-4).
-    var isNeutralAdjustment: Bool {
+    /// thirteen keys, which Show Ungraded writes so), no look that draws
+    /// (Show Ungraded removes a look, GR-7; a LUT look whose file is missing
+    /// or refused draws nothing, GR-8) and no point filter with an amount
+    /// above 0. It draws nothing, so the frame is byte-identical to one
+    /// without the clip (GR-6, GR-4).
+    func isNeutralAdjustment(drawsLook: Bool) -> Bool {
         let point: Set<FilterKind> = [.sepia, .noir, .vignette, .invert]
-        return color.isIdentity && look == nil
+        return color.isIdentity && !drawsLook
             && !filters.contains { point.contains($0.kind) && $0.amount > 0 }
     }
 }
@@ -53,25 +54,28 @@ extension MetalRenderer {
     }
 
     /// One adjustment layer graded into `pass`, `matte` the coverage cutting
-    /// it (the 1×1 placeholder when nothing does). Draws nothing when the
+    /// it (the 1×1 placeholder when nothing does), `urls` where a LUT look's
+    /// file is found (`RecipeSource.lookURLs(for:)`). Draws nothing when the
     /// layer has no drawn opacity or would change nothing. The chroma key is
     /// off: it opens a hole in a layer's own picture, and there is none. The
     /// pass's own pipeline is bound again after the draw, so the next layer
     /// inherits the state `DestinationPass.open()` promises.
     func drawAdjustment(
-        _ layer: RecipeLayer, matte: MTLTexture, canvas: RecipeCanvas,
+        _ layer: RecipeLayer, matte: MTLTexture, canvas: RecipeCanvas, urls: [UInt32: URL],
         pass: inout DestinationPass
     ) throws {
         let destination = CGSize(width: pass.target.width, height: pass.target.height)
-        guard !layer.isNeutralAdjustment,
+        let look = looks.lattice(for: layer.look, urls: urls)
+        guard !layer.isNeutralAdjustment(drawsLook: look != nil),
             var u = uniforms(for: layer, canvas: canvas, destination: destination)
         else { return }
         u.chromaEnabled = 0
+        if look == nil { u.lookEnabled = 0 }
         guard let encoder = pass.open() else { throw MatteError.noTarget }
         encoder.setRenderPipelineState(adjustPipeline)
         encoder.setFragmentBytes(&u, length: MemoryLayout<LayerUniforms>.stride, index: 0)
         encoder.setFragmentTexture(matte, index: 1)
-        encoder.setFragmentTexture(looks.texture(for: layer.look), index: 2)
+        encoder.setFragmentTexture(look ?? looks.placeholder, index: 2)
         encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
         encoder.setRenderPipelineState(pass.pipeline)
     }

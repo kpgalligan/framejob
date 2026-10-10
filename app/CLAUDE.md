@@ -960,7 +960,8 @@ the key map behind it.
   with `MediaDropMode` read from `NSEvent.modifierFlags` at the drop) ·
   `MediaPaneCommands.swift` · `MediaListFilter.swift` (the find band as a
   VALUE; not persisted) · `MediaUsage.swift` (the ONE spelling of "is this
-  media used", over the timeline's clips AND every nest's) ·
+  media used", over the timeline's clips AND every nest's, a LUT counted by
+  the clips whose look it is) ·
   `MediaReveal.swift` — the Media tab. The find band never rebuilds the pane.
   A filter that hides the selected row clears `selectedMedia`
   (`dropHiddenSelection`, #68).
@@ -1036,8 +1037,12 @@ the key map behind it.
 - `RecipeSource.swift` — the process-wide registry the compositor reads a
   recipe from (§7.6): a slot per document (`ProjectDocument.recipeKey`) and
   per export (`Exporter` mints its own), the project published under `set`
-  after every edit and the `RecipeOptions` stored BESIDE it per key, both
-  read under one lock hold in `recipe(for:at:)`.
+  after every edit and the `RecipeOptions` (`RecipeOptions.swift`) stored
+  BESIDE it per key, both read under one lock hold in `recipe(for:at:)`; a
+  document's key also holds the media URLs `Playback.update` publishes, which
+  `lookURLs(for:)` answers so the preview finds a LUT added or relinked after
+  its composition was built (an export or `render_frame` key falls back to its
+  instruction's own map).
 - `GraphicRegistry.swift` · `LayerRenderersGraphic.swift` — a graphic layer
   drawn (road map 10). The registry maps a `RecipeSource` key to one
   immutable `GraphicSet` (library, `libraryVersion`, each module `.compiled`
@@ -1125,7 +1130,11 @@ the key map behind it.
   (`LookTextures.swift`: the bake on the GPU, an LRU keyed by the look's whole
   definition from the recipe, a 2³ identity placeholder for no look or a failed
   bake; `LookProps.swift`: `LookProps`, `LookPatch`, `SplitTone`, the recipe's
-  `RecipeLook`). **Eight pipelines from six fragment functions** (the eighth,
+  `RecipeLook`; `LookKind.builtIns` is the eight the gallery and menu offer).
+  An imported LUT's look (GR-8) binds the `.cube` file's own lattice instead
+  (`LutTextures.swift`: read through `MediaImporter+LUT.swift` and the core's
+  `rc_cube_*`, cached by path and modification date, nothing bound — the clip
+  drawn ungraded — when the file is missing). **Eight pipelines from six fragment functions** (the eighth,
   `Compositor+Adjustment.swift`'s, is an adjustment clip's full-frame pass reading
   the destination, blending off; spec §11 GR-6): the two
   programmable-blend pipelines MUST be built with fixed-function blending

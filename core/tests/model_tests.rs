@@ -38,6 +38,7 @@ use reelcut_core::ffi_container::{
     rc_container_describe, rc_container_free, rc_container_open, rc_container_retime,
     rc_container_sample, rc_container_sample_count,
 };
+use reelcut_core::ffi_cube::{rc_cube_copy_rgb, rc_cube_free, rc_cube_parse, rc_cube_size};
 use reelcut_core::ffi_edit::rc_project_apply;
 use reelcut_core::ffi_graphic::{
     rc_graphic_compile, rc_graphic_describe, rc_graphic_free, rc_graphic_library_add_asset,
@@ -2316,6 +2317,20 @@ fn sweep_every_export_with_nulls() -> Vec<String> {
     cover("rc_container_sample");
     unsafe { rc_container_free(ptr::null_mut()) };
     cover("rc_container_free");
+
+    let mut err: *mut c_char = ptr::null_mut();
+    assert!(unsafe { rc_cube_parse(ptr::null(), 0, &mut err) }.is_null());
+    assert_eq!(take_string(err).as_deref(), Some("bytes is NULL"));
+    assert!(unsafe { rc_cube_parse(ptr::null(), 0, ptr::null_mut()) }.is_null());
+    cover("rc_cube_parse");
+    assert_eq!(unsafe { rc_cube_size(ptr::null()) }, 0);
+    cover("rc_cube_size");
+    let mut floats = [0f32; 24];
+    assert!(!unsafe { rc_cube_copy_rgb(ptr::null(), floats.as_mut_ptr(), 24) });
+    assert!(!unsafe { rc_cube_copy_rgb(ptr::null(), ptr::null_mut(), 0) });
+    cover("rc_cube_copy_rgb");
+    unsafe { rc_cube_free(ptr::null_mut()) };
+    cover("rc_cube_free");
 
     swept.sort();
     swept.dedup();

@@ -387,6 +387,10 @@ impl Project {
                     ));
                 }
             }
+            if let Some(video) = &clip.video {
+                self.check_look_media(video)
+                    .map_err(|why| format!("clip {}{whose}: {why}", clip.id))?;
+            }
             if !whose.is_empty() && crate::edit_adjustment::is_adjustment(clip) {
                 return Err(crate::edit_adjustment::adjustment_nested(clip.id, whose));
             }

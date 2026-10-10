@@ -408,16 +408,18 @@ numstat (±50 %).
 | GR3 | branch | **Seeing**: the `ungraded` recipe option (View ▸ Show Ungraded, `render_frame {ungraded}`) and the luma waveform panel (View ▸ Waveform), its compute pass run only while shown. | The option's bytes = the ungraded bytes; an export ignores the view switch; a known ramp's waveform (a probe, no photograph); harness captures light and dark; a manual-check row. |
 | GR4 | branch | GR-6, then **adjustment clips**: `Source::Adjustment`, every `Source` match classified, `add_adjustment_clip`, the refusals, the recipe role, `core/tests/adjustment.rs`; the eighth pipeline (`reelcut_adjust_fragment`, blending OFF, reads `[[color(0)]]`, weights by the matte coverage), Insert ▸ Adjustment Clip, the clip body, the inspector (Color and Clip only), the MCP tool. | Grades both tracks behind and not the one in front; opacity 0.5 halfway; matted = inside only; on a matte track it grades the matte group; each refusal in its sentence; Preview Quality; every export row including the two alpha rows (the ALPHA channel over a transparent canvas); blending OFF (a mutant turning it on, caught only over a translucent destination). |
 | GR5 | branch | GR-7, then **looks**: `LookKind`, each definition as data, `video.look {kind, amount}`; `texture(2)` and its placeholder, step 4d, `LookTextures.swift` (the bake on the GPU, the LRU), the Look section with a gallery drawn by the compositor, Clip ▸ Look ▸. | Amount 0 bytes = no look; an identity definition exact on every 8-bit colour; each built-in differs; a gallery thumbnail = `render_frame` at its size; a look on an adjustment clip; a manual-check row (the owner tunes the eight). |
-| GR6 | branch | GR-8, then **LUT import**: a one-file check first (does AVFoundation hand the compositor a log or HLG file's code values unchanged?); `MediaKind::Lut` through every site, `cube.rs`, the FFI export, parser tests; `MediaImporter+LUT.swift`, the Media tab's glyph and count, Consolidate, relink, the Look gallery's Imported group. | An identity `.cube` exact; a channel swap exact on lattice values; sizes 2 and 65; refusals by name; a missing file draws ungraded; `remove_media` clears the looks; a paste across documents. |
+| GR6a | branch | GR-8 (split like GR4 and GR5), then **LUT import**: the HLG/PQ/BT.2020 check first (T0; no log clip); `MediaKind::Lut` and `LookKind::Lut` through every site, `cube.rs`, `ffi_cube.rs`, `lut.rs`, parser tests; `MediaImporter+LUT.swift`, `LutTextures.swift`, the URLs a look reads (`RecipeSource.lookURLs`), the Media tab's glyph and Remove alert, Consolidate, relink, paste, the MCP mirror. | An identity `.cube` exact; a channel swap exact; sizes 2 and 65; refusals by name; a missing file draws ungraded; `remove_media` clears the looks; a paste across documents. |
+| GR6b | branch | The Look gallery's Imported group and its "Import LUT…" button, Clip ▸ Look ▸'s LUT items, the Look summary naming the file, the screen, the README bullet, its GRD row. | Thumbnails by GR-7's rule; the menu's items and states; one undo step "Import LUT". |
 | GR7 | branch | The owner's trial against "Worth keeping"; the figures; the verdict. Kept: the merge. Dropped: an ADR on main, the branch kept unmerged, the issues re-iced or closed. | The tables above, filled in. |
 
 ## Not established
 
-- **Whether AVFoundation converts log or HDR-tagged files before the
-  compositor sees them.** Spec §7.5 says HDR is tone-mapped to SDR; what it
-  does to Apple Log, S-Log or V-Log files tagged other ways was not checked. It
-  decides whether a camera log LUT (T4) looks right. GR6's first step, with a
-  real clip.
+- **Whether AVFoundation converts LOG footage before the compositor sees
+  it.** GR6a's T0 measured HLG, PQ and BT.2020 tags (spec §11 GR-8: only the
+  container's `colr` atom is read; HLG and PQ arrive unconverted, BT.2020 with
+  the BT.709 transfer arrives linearised); Apple Log, S-Log and V-Log were not
+  checked — ffmpeg cannot make them and the owner has no log clip. It decides
+  whether a camera log LUT (T4) looks right.
 - **Banding on real footage** is now a question about the source's own levels,
   not the pipeline's (PR-1, PR-2); GR2's fixture and the owner's eye answer it.
 - **Whether 65³ is worth it for built-in looks.** The brief's C3 says 33³ is
@@ -1280,3 +1282,141 @@ submenus, `select_inspector_tab`'s `section` and `-RCDevLookGalleryDump`; and
 its Hygiene list's one-frame render queues gain the gallery's
 (`LookGallery.queue`, "a third one-frame render joins this entry"). GRD-4 is the
 owner's. GR5a's, GR4a's and GR4b's still-owed lines above.
+
+## GR6a — `.cube` LUTs: media of kind `lut`, the core's parser, a look at step 4d (2026-10-10, on the `grading` branch)
+
+**Where.** The worktree `~/devel/reelcut-grading`, branch `grading`, at `c2b2794`
+(GR5b). GR6 is split like GR4 and GR5: GR6a (this) is GR-8, the log/HDR check,
+the core, the FFI, import, the picture, the Media tab's row and the MCP mirror;
+GR6b is the Look gallery's Imported group and its "Import LUT…" button, Clip ▸
+Look ▸'s LUT items, the Look summary naming the file, the screen, the README
+bullet and its GRD row. The owner's answer to GR6's eleven choices was "All as
+recommended" (2026-10-10), with no log clip to check.
+
+**What landed.**
+- Control first: the untouched tree's `make app`, then `RC_PROOF_APP=release
+  look_proof.py capture tools/proof/work/gr6/control` (four neutral frames).
+- T0, on that untouched Release build, before GR-8 and any product code (below).
+- Spec §11 GR-8 in `designs/spec/11-decisions/grading.md` (the eleven choices,
+  [b] marked, T0's finding, log unchecked) and its README rows. Then §4.3b (the
+  Media tab's LUT row), §5.2 (`video.look`'s `lut` and `media`, `media[].kind`
+  `lut`), §6b (the placing ops), §6c (`add_media`'s row rule, `remove_media`),
+  §7.1 (the four `rc_cube_*`), §7.3 (the recipe's LUT look), §7.4 (the Swift
+  rows), §7.5 (LUT textures and where a look finds its file), §7.7 (import),
+  §7.9a (`import_media`'s note, `add_media`'s default), §7.10 (`cube.rs`,
+  `ffi_cube.rs`, `lut.rs`, `model_look.rs`), and the index's Lines cells.
+- Toll, first and alone (`make typecheck`): `RecipeOptions` out of
+  `ReelCore.swift` into `RecipeOptions.swift`, `MediaKind` out of
+  `ProjectSnapshot.swift` into `MediaSnapshot.swift`.
+- Core: new `cube.rs` (`Cube::parse`, `CUBE_SIZE_MIN`/`MAX`, every refusal
+  sentence; red fastest; `copy_rgb` length-checked), `ffi_cube.rs` (the four
+  exports through `ffi_util.rs`'s `read_bytes`, `fallible_op`, `boxed`,
+  `free_boxed`), `lut.rs` (`check_lut_fields`, `lut_not_placeable`,
+  `normalise_look`, `look_media_ids`, `remap_look_media`,
+  `Project::check_look_media`, `evaluates_as_look`, `remove_lut`).
+  `format.rs`'s `RC_CUBE_MAX_BYTES` (the header's `#define`, equal by test) and
+  the 1015 paragraph; `MediaKind::Lut`; `LookKind::Lut`, `Look.media` (stored
+  between `kind` and `amount`, only when set), `ALL` → `BUILT_IN`,
+  `definition()` → `Option`; `patch.rs`'s template look carries `media`;
+  `edit_props.rs` normalises and checks; `actions.rs`'s object discriminants
+  are `kind` and `media` and its look guard asks `evaluates_as_look`;
+  `recipe_layer.rs` writes `{kind: "lut", amount, media}`; `edit_track.rs`
+  checks a `lut` row and hands a LUT's removal to `remove_lut`; `edit_clip.rs`
+  and `edit_background.rs` a `Lut` arm each; `model_query.rs`'s `validate`
+  checks every clip's base look (`clip N: …`); `edit_paste.rs` absorbs the
+  looks' LUTs after the sources' (a look id the payload lacks is skipped) and
+  remaps base looks and ends; `edit_paste_attributes.rs` absorbs and remaps the
+  source's LUTs before the video group lands, at the first target that takes
+  it. `edit.rs`'s six rows. New `core/tests/cube.rs` (9) and `lut.rs` (12);
+  `model_tests.rs`'s null sweep; `look.rs` names the nine; `relink.rs`'s serde
+  list gains `lut`.
+- App: `ReelCube.parse` in `ReelCore.swift`; `MediaKind.lut` ("LUT"); new
+  `MediaImporter+LUT.swift` and `MediaImporter.probe`'s dispatch, a LUT getting
+  no caches; Add Media… lists `lutType` (one line of the frozen
+  `EditorViewController.swift`); new `LutTextures.swift`; `LookTextures.luts`
+  and `lattice(for:urls:)`; `LookKind.lut`, `builtIns` (the gallery's, the
+  menu's and the validator's one-line switches), `LookProps.media`,
+  `RecipeLook.media`; `RecipeSource`'s per-key media URLs and
+  `lookURLs(for:)`, published by `Playback.update`; `prepare` resolves
+  `PreparedLayer.look` (zeroing `lookEnabled` when a LUT cannot be drawn),
+  `drawLayer` binds it and `drawAdjustment` takes the URLs;
+  `lookClause`, `remove_media`'s prose, `import_media`'s LUT note and
+  `add_media`'s `has_video` default; `MediaUsage` counts base-look users;
+  Remove's LUT alert; the row's cube glyph, its tooltip and no drag;
+  Insert/Overwrite at Playhead off; `payloadMediaIDs`.
+- Instruments: `lut_proof.py` (21 scored rows, T0's record, eight mutants) and
+  `lut_probe.swift`; `look_proof.py`'s K1 expects the eight and `lut`, and its
+  `kindless-look-kept` anchor follows the guard; `look_probe.swift`'s B1/B2
+  and L4 walk `builtIns`; the proof README's sections; GRD-5.
+
+**Sizes.** Product code (`app/Sources`, `core/src`, the header) +1,260 −193,
+about +1,067 net, of which the two pure moves are ±0 and the new files are
+`cube.rs` 234, `lut.rs` 237, `ffi_cube.rs` 79, `LutTextures.swift` 132,
+`MediaImporter+LUT.swift` 58 (`RecipeOptions.swift` 42 moved). With GR2–GR5b
+(about 3,270 by their records: 2,600 through GR5a, GR5b's ~670) about 4,340 of
+"Worth keeping"'s ≤ 4,500 — GR6b and GR7 have about 160 left. Over-cap files: `ReelCore.swift` 995
+→ 989, `ProjectSnapshot.swift` 1,783 → 1,769, `MediaImporter.swift` 591 → 593,
+`Playback.swift` 587 → 588, `AgentCatalog+Files.swift` 579 → 579,
+`edit_clip.rs` 755 → 757 (two match arms), `EditorViewController.swift` one
+line changed.
+
+**Measured.** 2026-10-10, Apple M2 Max, macOS 26.5.1, AC power.
+- **T0** (the untouched Release build, then each run since, identical): one
+  10-bit ProRes 422 chart, re-tagged by stream copy. **AVFoundation reads only
+  the container's `colr` atom**: every tag in the ProRes frame headers alone
+  drew the untagged frame's bytes (max |Δ| 0). With `colr`: HLG and PQ keep
+  the grey ramp unchanged (grey 129 → 129; no transfer conversion; red 255 →
+  243 by the BT.2020 matrix), max |Δ| 13 against `colr`-tagged BT.709;
+  BT.2020 primaries with the BT.709 transfer draw grey 129 as 66 — linearised
+  (BT.709's inverse OETF of 0.506 is 0.265, ≈ 67) — max |Δ| 63; untagged
+  against `colr`-tagged BT.709, up to 22 on saturated patches (red 234 against
+  255). Log is unchecked. ffmpeg's `prores_metadata` writes "untagged" as 0
+  (ffprobe reads `gbr`/`reserved`), its one non-tag value.
+- Loop, Debug: `cargo test --release --test cube --test lut --test look --test
+  relink --test paste --test patch_door --test model_tests --test recipe
+  --test ungraded --test adjustment` all green; `make lint` clean; `make
+  typecheck` 0 errors and the 4 baseline warnings; `lut_proof.py` 21/21;
+  `look_proof.py --only R1,K1,M1,J1,G1,LM1,LM2,B2` 8/8 (after B2's walk moved
+  to `builtIns`); `spec_index_proof.py` 150/150.
+- `make gate`: PASS in 232 s (typecheck 4 s, fmt 2 s, lint 4 s, test 132 s,
+  app 88 s).
+- Recorded, on the gate's Release build: `RC_PROOF_APP=release lut_proof.py`
+  21/21 and T0's record, no `Reelcut: ` line, no `DEFAULTS MOVED`; F1's
+  smooth LUTs within 1 level of ffmpeg's trilinear `lut3d` at every sample
+  (17, 33 and 65). `RC_PROOF_APP=release look_proof.py compare
+  tools/proof/work/gr6/control` 30/30, N0's four neutral frames byte-identical
+  at 16 bits — the draw path's change leaves a look-less layer unchanged.
+- Mutants, each `lut_proof.py --mutant NAME` on Debug on the final instrument,
+  all eight MUTANT PASS on their first run (every named row failed, no other
+  scored row did), no `DEFAULTS MOVED`: `blue-fastest` N1 S1 A1 F1 T1;
+  `domain-ignored` R1 CT; `size-cap-dropped` R1 CT; `media-interpolates` X1
+  CT; `builtin-keeps-media` K1 CT; `remove-deletes-clips` D1 CT;
+  `paste-not-remapped` P1 CT; `urls-from-instruction` P3.
+
+**Deviations.** M1 deletes the LUT's file rather than renaming it: the media's
+bookmark follows a rename, so a renamed file is never missing; the relink is to
+the same bytes at a new path. T0 tags each movie twice — in the ProRes headers
+alone (the spec's `-bsf:v prores_metadata`) and again with the container's
+`colr` atom (stream options with `+write_colr` under the same `-c copy`) —
+because the first measurement found AVFoundation reads only the atom; both are
+recorded. `add_background` refuses a LUT as a media with no pixel size (its
+existing check runs before its source match), not in `lut_not_placeable`'s
+words; GR-8 says so. `check_look_media`'s kind sentence takes "an" before a
+vowel (`is an image media, not a lut`). `probeLUT` answers an unreadable file
+as `undecodable` ("Could not read NAME.") too, so a `.cube` is never offered to
+the ffmpeg step. The Media row's tooltip says "A LUT: apply it to clips as a
+look." instead of the drag hint, and its context menu's Insert and Overwrite
+are off as the Edit menu's are. `drawAdjustment` draws nothing when a LUT look
+is its only grade and cannot be drawn (`isNeutralAdjustment(drawsLook:)`).
+`look_probe.swift` (outside the spec's file list) walks `builtIns` in B1/B2 and
+L4, which B2 needs: a touched instrument, against the spec's "the probes compile
+unchanged", so look_proof's history runs through this phase. `paste_attributes` now checks each copied group against the
+project being built (`next`), which holds an absorbed LUT, rather than `self`.
+
+**Owed.** GR6b (above); GRD-5 is the owner's. The `CLAUDE.md` lines (the spec
+kept every `CLAUDE.md` untouched): app/CLAUDE.md's map gains
+`RecipeOptions.swift`, `MediaImporter+LUT.swift`, `LutTextures.swift`,
+`LookKind.builtIns`, `RecipeSource`'s media URLs and `MediaUsage`'s look users;
+core/CLAUDE.md's map gains `cube.rs`, `ffi_cube.rs`, `lut.rs` and
+`MediaKind::Lut`, `model_look.rs`'s `lut` and `media`, and `actions.rs`'s
+object discriminants. GR5b's, GR5a's, GR4a's and GR4b's still-owed lines above.

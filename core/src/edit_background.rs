@@ -314,6 +314,8 @@ impl Project {
                             reversed: false,
                         }
                     }
+                    // Unreached: a LUT's row has no pixels, refused above.
+                    MediaKind::Lut => return Err(crate::lut::lut_not_placeable(id)),
                 };
                 // FILL, not `add_clip`'s Fit: a plate that leaves the canvas
                 // showing down one side has failed at the one thing a

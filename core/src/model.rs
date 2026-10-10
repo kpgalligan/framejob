@@ -152,12 +152,17 @@ pub struct MediaOriginal {
     pub bookmark: Option<String>,
 }
 
+/// What a media file is. `Lut` is a `.cube` 3D LUT (spec §11 GR-8): media
+/// so it is referenced, relinked and consolidated like footage, but never
+/// placed as a clip — it is drawn only as a clip's `video.look`, and its row
+/// carries no video, audio, alpha or duration (`lut.rs`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MediaKind {
     Video,
     Audio,
     Image,
+    Lut,
 }
 
 // ---- tracks and markers --------------------------------------------------

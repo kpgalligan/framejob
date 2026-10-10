@@ -660,7 +660,7 @@ final class EditorViewController: NSViewController {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
-        panel.allowedContentTypes = ProjectDocument.readableTypes.compactMap(UTType.init)
+        panel.allowedContentTypes = ProjectDocument.readableTypes.compactMap(UTType.init) + [MediaImporter.lutType]
         panel.beginSheetModal(for: window) { response in
             guard response == .OK, !panel.urls.isEmpty else { return }
             document.importMedia(panel.urls)

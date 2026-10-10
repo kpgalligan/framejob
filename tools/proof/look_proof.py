@@ -45,7 +45,8 @@ black).
   sepia}}` by `bad value at "look.kind" in a video patch: unknown variant
   `sepia`, expected one of …`; the project is unchanged.
 - **K1** (H): the kinds R1's second sentence names, in its order, are the
-  eight the `set_video` catalog entry's look clause lists, in its order.
+  eight and `lut` (GR-8) the `set_video` catalog entry's look clause lists, in
+  its order.
 - **D1** (H): each of the eight at amount 1 differs from the neutral chart, and
   from each of the other seven, by more than 3 levels at some sample.
 - **P1** (H): a save before any look holds no `look` key; a save with
@@ -245,9 +246,10 @@ MUTANTS = {
         "")], ["L5"]),
     "kindless-look-kept": ([(
         "core/src/actions.rs",
-        "            if video.get(\"look\").is_some_and(|look| {\n"
-        "                !look.is_null() && serde_json::from_value::<Look>(look.clone()).is_err()\n"
-        "            }) {\n"
+        "            if video\n"
+        "                .get(\"look\")\n"
+        "                .is_some_and(|look| !look.is_null() && !self.evaluates_as_look(look))\n"
+        "            {\n"
         "                video.insert(\"look\".to_string(), Value::Null);\n"
         "            }\n",
         "")], ["CT"]),
@@ -527,7 +529,8 @@ def run_h(client, chart, neutral, state):
         if "expected one of" in error else None
     listed, start = catalog_kinds(client)
     check("K1 the core's kinds (R1's sentence) are the catalog's look clause's, in order, "
-          "and are the eight", core is not None and core == listed and core == KINDS,
+          "and are the eight and lut (GR-8)",
+          core is not None and core == listed and core == KINDS + ["lut"],
           f"core {core}; catalog {listed} ({start!r})")
 
     # P1 (the look-less half)

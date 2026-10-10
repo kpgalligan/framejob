@@ -77,47 +77,6 @@ extension Fps {
     }
 }
 
-// MARK: - Recipe options
-
-/// What a caller wants of a frame recipe BESIDES the time — the Swift side
-/// of `rc_project_frame_recipe_opts` and of the core's `RecipeOptions`
-/// (spec §7.3, road map 2's phase 7).
-///
-/// **Why an option lives here and not in the export overrides.** It changes
-/// the PICTURE, so it travels with the description of the picture. The
-/// override table (`export_overrides.rs`) ignores a key it does not know, on
-/// purpose, so a newer UI still gets an export — which means an option posted
-/// that way would vanish without a word and the export would report success
-/// on a file it had not changed.
-///
-/// Nothing here is persisted. These are a question asked of a project, not a
-/// property of one, so no format version moves when an option is added.
-///
-/// The default is every option OFF, and that is load-bearing: `none` takes
-/// the plain `rc_project_frame_recipe` path, so a caller that says nothing
-/// gets byte for byte the recipe it got before this type existed.
-struct RecipeOptions: Equatable {
-    /// Append a text layer showing the project timecode at `t` — last in the
-    /// layer list, so topmost. The core builds it (`recipe_text.rs`); this
-    /// side only asks.
-    var burnInTimecode: Bool = false
-    /// Every layer's `video.color` neutral (spec §11 GR-4): View ▸ Show
-    /// Ungraded on a document's key, or `render_frame {ungraded}`.
-    var ungraded: Bool = false
-
-    /// Every option off: the recipe as it has always been.
-    static let none = RecipeOptions()
-
-    /// The core's `opts_json`, or nil for "ask the un-optioned export" — the
-    /// argument `rc_project_frame_recipe` itself passes, the core documenting
-    /// the two exports as one. Spelled by hand: the only place in the app
-    /// that has to match the header's key names.
-    var json: String? {
-        guard self != .none else { return nil }
-        return "{\"burn_in_timecode\":\(burnInTimecode),\"ungraded\":\(ungraded)}"
-    }
-}
-
 // MARK: - The project handle
 
 /// Owning Swift wrapper around an `RcProject *`. Immutable: nothing here
@@ -820,6 +779,41 @@ final class ReelContainer {
         guard index >= 0 else { return nil }
         var out = RcContainerSample()
         return rc_container_sample(handle, track, UInt64(index), &out) ? out : nil
+    }
+}
+
+// MARK: - LUTs
+
+/// A `.cube` 3D LUT read by the core (`RcCube`, spec §11 GR-8), so the import
+/// probe and the compositor read one file the same way.
+enum ReelCube {
+    /// The largest file the core reads; `MediaImporter.readLUT` reads one
+    /// byte more, so a larger file is refused in the core's own sentence.
+    static let maxBytes = Int(RC_CUBE_MAX_BYTES)
+
+    /// The file's lattice; throws the core's lowercase sentence.
+    static func parse(_ data: Data) throws -> CubeLattice {
+        var err: UnsafeMutablePointer<CChar>? = nil
+        // An empty file still needs a non-NULL pointer (NULL is the core's
+        // "bytes is NULL"), so it lends one byte and passes a length of 0.
+        let count = data.count
+        let made: OpaquePointer? = (data.isEmpty ? Data([0]) : data).withUnsafeBytes { bytes in
+            guard let base = bytes.bindMemory(to: UInt8.self).baseAddress else { return nil }
+            return rc_cube_parse(base, count, &err)
+        }
+        guard let cube = made else {
+            throw ReelCoreError(message: takeErrorMessage(err, fallback: "it could not be read"))
+        }
+        defer { rc_cube_free(cube) }
+        let size = Int(rc_cube_size(cube))
+        var rgb = [Float](repeating: 0, count: size * size * size * 3)
+        let copied = rgb.withUnsafeMutableBufferPointer { out in
+            out.baseAddress.map { rc_cube_copy_rgb(cube, $0, out.count) } ?? false
+        }
+        guard size >= 2, copied else {
+            throw ReelCoreError(message: "its table could not be read")
+        }
+        return CubeLattice(size: size, rgb: rgb)
     }
 }
 

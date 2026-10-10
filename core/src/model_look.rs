@@ -1,6 +1,7 @@
 //! The look vocabulary (spec §11 GR-7, format 1015 on the grading branch):
 //! [`Look`], the `video.look` a clip carries — one of the eight built-in
-//! [`LookKind`]s and how much of it — and each kind's [`LookDefinition`], the
+//! [`LookKind`]s or an imported `.cube` LUT (`lut`, GR-8, naming its media),
+//! and how much of it — and each built-in kind's [`LookDefinition`], the
 //! DATA the compositor bakes.
 //!
 //! **Rust decides, Metal does** (spec §7): a look is defined here, as Color's
@@ -15,10 +16,12 @@
 //! in turn, so `crate::model::Look` resolves like every other property type.
 //!
 //! **The declaration ORDER of [`LookKind`] is the gallery's and the menu's**
-//! (GR-7): append, never reorder. The JSON spelling of each variant is
-//! persisted, so a rename needs a migration step. Closed: a misspelt kind is
-//! refused at the serde boundary naming the eight, because there is no
-//! neutral look to fall back to — "no look" is `video.look` absent.
+//! (GR-7): append, never reorder; `Lut` comes last and is not one of
+//! [`LookKind::BUILT_IN`]. The JSON spelling of each variant is persisted, so
+//! a rename needs a migration step. Closed: a misspelt kind is refused at the
+//! serde boundary naming the nine, because there is no neutral look to fall
+//! back to — "no look" is `video.look` absent. What `media` must name, and
+//! when, is `lut.rs`'s.
 
 use serde::{Deserialize, Serialize};
 
@@ -32,7 +35,8 @@ fn default_look_amount() -> f64 {
     LOOK_DEFAULT_AMOUNT
 }
 
-/// The eight built-in looks, in the gallery's order (GR-7 choice 1).
+/// The eight built-in looks, in the gallery's order (GR-7 choice 1), and
+/// `Lut`, an imported `.cube` file (GR-8), whose table is the media's.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LookKind {
@@ -44,15 +48,20 @@ pub enum LookKind {
     Vintage,
     Dramatic,
     BlackWhite,
+    Lut,
 }
 
 /// A clip's look: which, and how much (0…1, `props_check.rs` refuses
 /// outside it). `kind` has NO default, so a `look` without one does not read
 /// — a patch naming only an amount on a clip that has no look is refused,
 /// and an action's end that does so evaluates as no look (`actions.rs`).
+/// `media` is the LUT's media id, with `Lut` only (GR-8; `lut.rs` holds the
+/// rule), written between `kind` and `amount` and only when set.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Look {
     pub kind: LookKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub media: Option<u32>,
     #[serde(default = "default_look_amount")]
     pub amount: f64,
 }
@@ -77,8 +86,8 @@ pub struct LookDefinition {
 }
 
 impl LookKind {
-    /// Every kind, in declaration order.
-    pub const ALL: [LookKind; 8] = [
+    /// The eight built-in kinds, in declaration order (`Lut` is not one).
+    pub const BUILT_IN: [LookKind; 8] = [
         LookKind::Warm,
         LookKind::Cool,
         LookKind::TealOrange,
@@ -89,11 +98,13 @@ impl LookKind {
         LookKind::BlackWhite,
     ];
 
-    /// The kind's definition — GR-7's table, every unlisted value 0.
-    pub fn definition(self) -> LookDefinition {
+    /// The kind's definition — GR-7's table, every unlisted value 0; `None`
+    /// for `Lut`, whose table is a file's.
+    pub fn definition(self) -> Option<LookDefinition> {
         let neutral = ColorAdjust::default();
         let none = SplitTone::default();
         let (color, split) = match self {
+            LookKind::Lut => return None,
             LookKind::Warm => (
                 ColorAdjust {
                     temperature: 0.35,
@@ -194,6 +205,6 @@ impl LookKind {
                 none,
             ),
         };
-        LookDefinition { color, split }
+        Some(LookDefinition { color, split })
     }
 }

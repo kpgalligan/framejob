@@ -394,7 +394,14 @@ extension MetalRenderer {
             // an error. Nothing to draw.
             return nil
         }
-        return PreparedLayer(uniforms: uniforms, texture: texture)
+        // The look's lattice (GR-7, GR-8): a LUT's file is found through the
+        // URLs its document last published, never the instruction's alone. A
+        // look that cannot be drawn — a LUT missing or refused — draws the
+        // layer ungraded, with `lookEnabled` 0 and the placeholder bound.
+        let urls = layer.look?.media == nil ? [:] : RecipeSource.shared.lookURLs(for: instruction)
+        let look = looks.lattice(for: layer.look, urls: urls)
+        if look == nil { uniforms.lookEnabled = 0 }
+        return PreparedLayer(uniforms: uniforms, texture: texture, look: look ?? looks.placeholder)
     }
 
     /// True only when the buffer's `kCVImageBufferAlphaChannelModeKey`
@@ -410,11 +417,12 @@ extension MetalRenderer {
     }
 }
 
-/// What `MetalRenderer.prepare` hands `render`: a layer's uniform block and
-/// the texture it samples.
+/// What `MetalRenderer.prepare` hands `render`: a layer's uniform block,
+/// the texture it samples, and its look's lattice (the placeholder for none).
 struct PreparedLayer {
     var uniforms: LayerUniforms
     let texture: MTLTexture
+    let look: MTLTexture
 }
 
 /// `value` into 0…1 as a `Float`. Spelled out once because the effect block

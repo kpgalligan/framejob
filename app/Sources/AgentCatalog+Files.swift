@@ -291,10 +291,10 @@ extension AgentServer {
             opTool(
                 "remove_media",
                 "Removes a media entry from the project. Media still used by clips is refused "
-                    + "unless with_clips is true, which removes those clips with it.",
+                    + "unless with_clips, which removes those clips (a LUT's: clears their looks).",
                 [
                     "media": "Media id.",
-                    "with_clips": "Remove the clips using it too (default false).",
+                    "with_clips": "Remove the clips using it, or a LUT's looks (default false).",
                 ]),
         ]
         // transcribe and export_captions are `AgentCatalog+Captions.swift`'s

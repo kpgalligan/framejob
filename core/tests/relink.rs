@@ -264,7 +264,7 @@ fn a_value_that_does_not_match_the_schema_is_serdes_sentence() {
     assert_eq!(
         project().errors(&relink(probe)),
         "relink probe does not match the schema: unknown variant `film`, expected one of \
-         `video`, `audio`, `image`"
+         `video`, `audio`, `image`, `lut`"
     );
 }
 

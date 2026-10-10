@@ -83,6 +83,8 @@ final class MediaRowView: NSView, NSDraggingSource {
     /// copy lives (spec §11 #228-O, Q1 and Q2) — the Media tab has no path
     /// line to say it in.
     static func toolTip(for entry: MediaSnapshot) -> String {
+        // A LUT is never dragged (spec §11 GR-8): it is applied as a look.
+        if entry.kind == .lut { return "A LUT: apply it to clips as a look." }
         guard let original = entry.original else { return dragHint }
         let folder = (entry.path as NSString).deletingLastPathComponent
         let home =
@@ -212,7 +214,8 @@ final class MediaRowView: NSView, NSDraggingSource {
             NSGraphicsContext.current?.restoreGraphicsState()
         } else {
             TimelineDraw.symbol(
-                entry.kind == .audio ? "waveform" : "photo", fallback: "▦", in: thumb,
+                entry.kind == .audio ? "waveform" : entry.kind == .lut ? "cube" : "photo",
+                fallback: "▦", in: thumb,
                 tint: DS.textFaint)
         }
         DS.border.setStroke()
@@ -291,8 +294,9 @@ final class MediaRowView: NSView, NSDraggingSource {
 
     /// A drag past the slop starts the row's drag session (§4.3: to a track,
     /// or onto the canvas).
+    /// A LUT starts none: it is applied as a look, never placed (GR-8).
     override func mouseDragged(with event: NSEvent) {
-        guard let origin = mouseDownAt, let pane = pane else { return }
+        guard let origin = mouseDownAt, let pane = pane, entry?.kind != .lut else { return }
         let point = convert(event.locationInWindow, from: nil)
         guard abs(point.x - origin.x) > 3 || abs(point.y - origin.y) > 3 else { return }
         mouseDownAt = nil
@@ -382,6 +386,8 @@ final class MediaRowView: NSView, NSDraggingSource {
             item.target = self
             if selector == #selector(revealInTimeline(_:)) {
                 item.isEnabled = pane?.canRevealInTimeline(media) ?? false
+            } else if entry?.kind == .lut {
+                item.isEnabled = false  // a LUT is not placed (GR-8)
             }
             menu.addItem(item)
         }

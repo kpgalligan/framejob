@@ -7,8 +7,10 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
 - **`add_clip {track, media, at}`** — Whole media as one clip at `at`; source in 0; Fit scale if
   `fit_new_clips` and the source exceeds the canvas. The length is the media's, snapped DOWN to
   whole frames, so the window stays inside the file and the segment plays at rate 1 (§11); a timed
-  media shorter than one canvas frame is an `Err` naming the frame. Refuses if the overlap rule
-  fails.
+  media shorter than one canvas frame is an `Err` naming the frame. A `lut` media is an `Err` (`media
+  7 is a LUT: apply it as a look (set_video {look: {kind: "lut", media: 7}}), it is not placed as a
+  clip`, §11 GR-8 on the grading branch), and so is it for `insert_clip` and `overwrite_clip`.
+  Refuses if the overlap rule fails.
 - **`add_text_clip {track, at, duration=5 s, text?}` / `add_shape_clip {…, shape?}`** — Same
   placement rules; default text is the Title preset centered, default shape the rectangle — except
   that `shape.kind = "arrow"` is created with `arrow_end` on, since an arrow with no head is a
@@ -46,7 +48,7 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   A plate of a TIMED media — video or audio — is held to that file's own whole length, default
   duration or given, so it never outruns what it shows (§11, D4-4); an image plate has no source
   bound and runs as long as it was asked to. `Err` for `media` and `color` together, an unknown
-  media, a media with no pictures, a colour outside 0–1, a duration under a frame, or a timed media
+  media, a media with no pictures (a `lut` media among them, §11 GR-8), a colour outside 0–1, a duration under a frame, or a timed media
   shorter than one canvas frame (`add_clip`'s own sentence, through the same function). A
   full-canvas GRADIENT is this clip and a `set_shape {gradient}` after it — the canvas background
   stays one colour (§5.2).

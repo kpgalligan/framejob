@@ -66,7 +66,7 @@ extension AppDelegate {
     /// `transitionMenu()` idiom; `validateLookAction` checks and dashes them.
     func lookMenu() -> NSMenu {
         let menu = NSMenu(title: "Look")
-        for (index, kind) in LookKind.allCases.enumerated() {
+        for (index, kind) in LookKind.builtIns.enumerated() {
             menu.addItem(tagged(kind.displayName, #selector(EditorViewController.setLook(_:)), index))
         }
         menu.addItem(.separator())

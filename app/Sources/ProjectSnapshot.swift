@@ -173,20 +173,6 @@ enum ReelJSON {
 
 // MARK: - Enumerations
 
-/// What a media file is. `image` is a still picture (ImageIO decodes it);
-/// `audio` has no video track.
-enum MediaKind: String, Codable, CaseIterable {
-    case video, audio, image
-
-    var displayName: String {
-        switch self {
-        case .video: return "Video"
-        case .audio: return "Audio"
-        case .image: return "Image"
-        }
-    }
-}
-
 /// The shape kinds the Shape tab offers. A "rounded rectangle" is a
 /// `rectangle` with a non-zero `radius`, not a kind of its own.
 enum ShapeKind: String, Codable, CaseIterable {

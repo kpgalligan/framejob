@@ -102,8 +102,11 @@ impl Group {
                 spotlight: Some(Spotlight::default()),
                 obscure: vec![ObscureRegion::default()],
                 motion: Some(Motion::template()),
+                // `media` is in the template so a patch may name it; which
+                // kind it goes with is `lut.rs`'s rule (spec §11 GR-8).
                 look: Some(Look {
                     kind: LookKind::Warm,
+                    media: Some(0),
                     amount: LOOK_DEFAULT_AMOUNT,
                 }),
                 ..VideoProps::default()

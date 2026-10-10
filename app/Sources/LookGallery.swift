@@ -25,7 +25,7 @@ import AppKit
 /// never land.
 final class LookGallery {
     /// None, then the eight in the core's order: the gallery's reading order.
-    static let tiles: [LookKind?] = [nil] + LookKind.allCases.map { Optional($0) }
+    static let tiles: [LookKind?] = [nil] + LookKind.builtIns.map { Optional($0) }
     static let thumbnailWidth = 256
     static let settle: TimeInterval = 0.3
     #if REELCUT_DEV_TOOLS

@@ -42,6 +42,7 @@ use serde_json::Value;
 use crate::edit_adjustment::check_adjustment_video;
 use crate::edit_clip_timing::{SPEED_MAX, SPEED_MIN};
 use crate::export::describe;
+use crate::lut::normalise_look;
 use crate::model::{BlendMode, Clip, Project, Source, TextProps, VideoProps};
 use crate::outcome::Outcome;
 use crate::patch::{merge_group, Group, GROUPS};
@@ -317,7 +318,8 @@ impl Project {
                 Some(video) => {
                     check_video(video, self.source_size(clip))?;
                     check_blend(clip, video)?;
-                    check_adjustment_video(clip, video)
+                    check_adjustment_video(clip, video)?;
+                    self.check_look_media(video)
                 }
                 None => Ok(()),
             },
@@ -372,9 +374,11 @@ impl Project {
                     if props.motion.is_some_and(|motion| motion.is_empty()) {
                         props.motion = None;
                     }
+                    normalise_look(&mut props, patch)?;
                     check_video(&props, self.source_size(&clip))?;
                     check_blend(&clip, &props)?;
                     check_adjustment_video(&clip, &props)?;
+                    self.check_look_media(&props)?;
                     self.snap_motion(&mut props);
                     if let Some(slot) = next.clip_mut(id) {
                         slot.video = Some(props);

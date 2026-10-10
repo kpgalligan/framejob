@@ -81,6 +81,14 @@ governs a module now.
   tone each — which the recipe's `look` key carries whole, so retuning a look
   is a core change only. `actions.rs` turns a merged look with no valid `kind`
   into `null`, so an action's end can never drop the clip's video group.
+  `kind: "lut"` names an imported LUT's media (`media`); `BUILT_IN` is the
+  eight. `actions.rs`'s object discriminants (`kind`, `media`) switch at an
+  action's end instead of interpolating.
+- `cube.rs` — the `.cube` reader (spec §11 GR-8): 3D only, size 2–65, the
+  default domain; anything else refused by line and name. `ffi_cube.rs` — the
+  four `rc_cube_*` exports. `lut.rs` — a LUT media's rules: placing one is
+  refused, removing one clears the looks that name it (the clips stay), paste
+  carries it by path.
 - `model_matte.rs` — the matte vocabulary (format version 14, spec §11 MT-1):
   `TrackMatte` (`none`, `alpha`, `alpha_inverted`, `luma`, `luma_inverted`)
   and `is_none`, re-exported through `model_props.rs`; the FIELD

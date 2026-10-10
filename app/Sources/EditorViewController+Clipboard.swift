@@ -97,21 +97,40 @@ extension EditorViewController {
             var copied = clip
             copied["track"] = front - index
             payloadClips.append(copied)
-            if let source = clip["source"] as? [String: Any],
-               let media = (source["media"] as? NSNumber)?.uint32Value {
-                wanted.insert(media)
-            }
+            wanted.formUnion(Self.payloadMediaIDs(clip))
         }
         guard !payloadClips.isEmpty else { return nil }
 
-        // Only the rows the copied clips SHOW: a media entry nothing points
-        // at would arrive in the other document as a Media-tab row the user
-        // cannot account for.
+        // Only the rows the copied clips SHOW or look through: a media entry
+        // nothing points at would arrive in the other document as a
+        // Media-tab row the user cannot account for.
         let media = (root["media"] as? [[String: Any]] ?? []).filter { entry in
             guard let id = (entry["id"] as? NSNumber)?.uint32Value else { return false }
             return wanted.contains(id)
         }
         return ["clips": payloadClips, "media": media]
+    }
+
+    /// The media ids one copied clip (its `project.json` object) names: its
+    /// source's, its base look's and each action end's look's (spec §11 GR-8),
+    /// in that order without repeats — the rows a paste into another project
+    /// needs. An end may name a LUT that is gone; its row is simply not found.
+    static func payloadMediaIDs(_ clip: [String: Any]) -> [UInt32] {
+        func lookMedia(_ video: Any?) -> UInt32? {
+            guard let video = video as? [String: Any], let look = video["look"] as? [String: Any]
+            else { return nil }
+            return (look["media"] as? NSNumber)?.uint32Value
+        }
+        var found: [UInt32?] = [
+            ((clip["source"] as? [String: Any])?["media"] as? NSNumber)?.uint32Value,
+            lookMedia(clip["video"]),
+        ]
+        for action in clip["actions"] as? [[String: Any]] ?? [] {
+            found.append(lookMedia((action["end"] as? [String: Any])?["video"]))
+        }
+        var ids: [UInt32] = []
+        for id in found.compactMap({ $0 }) where !ids.contains(id) { ids.append(id) }
+        return ids
     }
 
     /// The plain-text fallback: what was copied and the span it covered, in

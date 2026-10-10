@@ -33,6 +33,8 @@ final class LookTextures {
     static let capacity = 8
 
     let placeholder: MTLTexture
+    /// Imported LUTs' lattices (spec §11 GR-8), cached by file.
+    let luts: LutTextures
     private let device: MTLDevice
     private let queue: MTLCommandQueue
     private let pipeline: MTLComputePipelineState
@@ -51,6 +53,7 @@ final class LookTextures {
         self.queue = queue
         self.pipeline = pipeline
         self.placeholder = placeholder
+        self.luts = LutTextures(device: device)
     }
 
     @available(*, unavailable) required init?(coder: NSCoder) {
@@ -78,6 +81,17 @@ final class LookTextures {
             cache[order.removeFirst()] = nil
         }
         return baked
+    }
+
+    /// The lattice to bind for a layer's look, built-in or LUT; nil when
+    /// there is no look (or its amount is 0) or when a LUT look cannot be
+    /// drawn — its media has no file in `urls` (missing), or the file is
+    /// refused or unreadable — which draws the layer ungraded (GR-8 choice
+    /// 5). `urls` is `RecipeSource.lookURLs(for:)`'s answer.
+    func lattice(for look: RecipeLook?, urls: [UInt32: URL]) -> MTLTexture? {
+        guard let look = look, look.amount > 0 else { return nil }
+        guard let media = look.media else { return texture(for: look) }
+        return urls[media].flatMap { luts.texture(at: $0) }
     }
 
     /// One definition baked into a `size`³ lattice, or nil when the GPU

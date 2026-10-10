@@ -39,6 +39,7 @@ enum MediaImporter {
     /// think of this file" question that the rewrap's own re-probe can ask
     /// without recursing.
     static func probe(url: URL) async throws -> MediaDescriptor {
+        if isLUT(url) { return try probeLUT(url) }
         if isImage(url) { return try probeImage(url) }
         return try await probeAsset(url)
     }
@@ -209,6 +210,7 @@ enum MediaImporter {
     /// after each of `peaksRetryDelays` while the pass is current
     /// (`retryPeaks`), so a lost waveform does not wait for the next open.
     static func generateCaches(for media: MediaSnapshot, url: URL, in cacheDir: URL) {
+        guard media.kind != .lut else { return }  // a LUT has no thumbnails, peaks or speech
         DecoderSupport.enable()
         CacheLedger.shared.enqueue(cacheDir: cacheDir, media: media.id, url: url) {
             previous, bounded, pass in

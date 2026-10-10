@@ -114,7 +114,9 @@ extern "C" {
  * plus a thousand: tone, nine keys on `video.color` after `hue`, each written
  * only when not 0, the `adjustment` source kind (GR-6), which a build
  * that does not know it refuses as an unknown variant, and `video.look`
- * (GR-7), written only when a clip has a look. The branch reads 1 to
+ * (GR-7), written only when a clip has a look, and the `lut` kinds (GR-8):
+ * the media kind `lut` and the look kind `lut` with its `media` key, new
+ * variants an older build refuses by name. The branch reads 1 to
  * 14 and 1015 and refuses the numbers between by name; the merge renumbers
  * it to main's next. */
 #define RC_FORMAT_VERSION 1015
@@ -575,6 +577,42 @@ bool rc_container_sample(const RcContainer *container, uint32_t track, uint64_t 
 
 /* Releases a container. NULL-tolerant. */
 void rc_container_free(RcContainer *container);
+
+/* ------------------------------------------------------------------ cube */
+
+/* A `.cube` 3D LUT (spec §11 GR-8), parsed by the core so the import probe
+ * and the compositor read one file the same way. Read: 3D only,
+ * LUT_3D_SIZE 2–65, TITLE, `#` comment lines, blank lines, CRLF, a UTF-8
+ * BOM, and DOMAIN_MIN 0 0 0 / DOMAIN_MAX 1 1 1 / LUT_3D_INPUT_RANGE 0 1 (the
+ * defaults); table values any finite number. Everything else is refused by
+ * a lowercase sentence naming the 1-based line ("line 2: LUT_3D_SIZE 200 is
+ * outside 2–65", "line 4: LUT_1D_SIZE is a 1D LUT; only 3D LUTs are read",
+ * "line 3: DOMAIN_MIN must be 0 0 0, not 0 0 -0.1", "line 5: unknown
+ * keyword FOO", "line 9: FOO comes after the table", "line 3: a second
+ * LUT_3D_SIZE", "line 3: DOMAIN_MAX needs 3 numbers", "line 7: \"0.5x\" is
+ * not a number", "line 7: nan is not a finite number", "line 7: a table row
+ * has 3 numbers, not 2", "no LUT_3D_SIZE line", "LUT_3D_SIZE 33 needs 35937
+ * table rows, not 35936", "the file is larger than 32 MB", "the file is not
+ * text"). An RcCube is immutable and may be read from any thread. */
+#define RC_CUBE_MAX_BYTES 33554432
+
+typedef struct RcCube RcCube;
+
+/* Parses `len` bytes at `bytes`. NULL with the sentence above through
+ * `err_out` (or "bytes is NULL"). Freed with `rc_cube_free`. */
+RcCube *rc_cube_parse(const uint8_t *bytes, size_t len, char **err_out);
+
+/* Points an axis, 2–65; 0 for NULL. */
+uint32_t rc_cube_size(const RcCube *cube);
+
+/* Copies the table into the `count` floats at `out`: size³ rows of red,
+ * green, blue, red changing fastest, then green, then blue (a 3D texture's
+ * texel order). False, `out` untouched, for NULL or unless count is
+ * size³ × 3. */
+bool rc_cube_copy_rgb(const RcCube *cube, float *out, size_t count);
+
+/* Releases a LUT. NULL-tolerant. */
+void rc_cube_free(RcCube *cube);
 
 /* ----------------------------------------------------------------- agent */
 

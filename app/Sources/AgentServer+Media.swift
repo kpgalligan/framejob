@@ -58,8 +58,12 @@ extension AgentServer {
             // #233): the file the caller named, which the media is named after.
             if let original = descriptor.original { result["original"] = original.path }
             result["note"] =
-                "The file is in the project's media list but not on the timeline yet — place it "
-                + "with add_clip {track, media, at}."
+                descriptor.kind == .lut
+                ? "The LUT is in the project's media list. It is never placed as a clip: apply it "
+                    + "as a look with set_video {clips, patch: {look: {kind: \"lut\", media: "
+                    + "\(Int(added.first ?? expected))}}}."
+                : "The file is in the project's media list but not on the timeline yet — place "
+                    + "it with add_clip {track, media, at}."
             result["project"] = self.summary(document)
             return try self.jsonResult(result)
         }
@@ -294,7 +298,7 @@ extension AgentServer {
             width: try intArg(object, "width") ?? 0,
             height: try intArg(object, "height") ?? 0,
             fps: fps,
-            hasVideo: try boolArg(object, "has_video") ?? (kind != .audio),
+            hasVideo: try boolArg(object, "has_video") ?? (kind == .video || kind == .image),
             hasAudio: try boolArg(object, "has_audio") ?? (kind == .audio),
             hasAlpha: try boolArg(object, "has_alpha") ?? false,
             original: try mediaOriginal(object["original"]))

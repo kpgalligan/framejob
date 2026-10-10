@@ -18267,4 +18267,71 @@ CT).
 
 GR5a's seven are not re-run for GR5b: none of their anchors moved.
 
+GR6a moved one anchor: `kindless-look-kept` now names `evaluate_clip`'s guard
+as it calls `lut.rs`'s `evaluates_as_look`. K1 expects the eight and `lut`
+(GR-8), and `look_probe.swift`'s B1/B2 and L4 walk `LookKind.builtIns`.
+
 **Its record**: `designs/grading.md`'s GR5a and GR5b sections.
+
+## Road map grading — GR6a, `.cube` LUTs end to end over MCP (`lut_proof.py` T0, I1, R1, R2, N1, S1, A1, F1, K1, O1, X1, U1, J1, M1, C1, D1, P1, P2, T1, T2, P3, Z1 and eight mutants; `lut_probe.swift`; `core/tests/cube.rs`, `core/tests/lut.rs`; spec §11 GR-8; the `grading` branch)
+
+**What it answers.** That a `.cube` file imported over MCP becomes media of
+kind `lut` read by the core's parser, and that `set_video {patch: {look:
+{kind: "lut", media, amount}}}` draws its table at step 4d, in `render_frame`'s
+bytes. T0 (a record, run first on the untouched build) is the log/HDR check of
+spec §11 GR-8: one 10-bit ProRes 422 chart re-tagged by stream copy as BT.709,
+BT.2020 with the BT.709 transfer, HLG, PQ and untagged — in the ProRes headers
+alone and again with the container's `colr` atom — each rendered against the
+BT.709 movie tagged the same way. On the CHART: I1 the import's answer and its
+note, and a bare `add_media {path, kind: lut}`; R1 every refusal file (size
+200, 1D, a domain, an input range, an unknown keyword, a keyword after the
+table, a short table, a word, `nan`, a two-number row, no size, a second size,
+a short DOMAIN_MAX, binary bytes, 32 MiB + 1) answered as `“NAME.cube” is not a
+LUT Reelcut reads: <the core's sentence>.`; R2 the accepted variants; N1 an
+identity of 2, 33 and 65 is the neutral bytes; S1 a channel swap of each size
+is every sample's (g, b, r) exactly; A1 half of it is the midpoint ±1; F1 three
+smooth LUTs (17, 33, 65) within ±2 of ffmpeg's trilinear `lut3d` on the same
+PNG (`--lut PATH` adds an owner's file, for GR7's T4); K1 a built-in kind
+replacing a LUT and the four look-rule sentences; O1 `add_clip` refused; X1 an
+end from LUT A to LUT B at adjacent ids switching at the end, A at 75 %; U1
+`ungraded`; J1 an adjustment clip with a LUT; M1 a deleted file draws
+ungraded and a relink brings the look back (deleted, not renamed: the
+bookmark follows a rename); C1 `consolidate_media`; D1 `remove_media`'s
+refusal, `with_clips` and undo; P1 a paste into another project remapping the
+base look and an end by path. P2, T1, T2 and P3 are `lut_probe.swift`, built
+by `swift_build.build` over `app/Sources` (a failed build is a scored
+FAILURE): the clipboard's media ids, a size-2 asymmetric file through
+`LutTextures` read back red fastest, nil for a missing or refused file, and
+`RecipeSource.lookURLs(for:)` answering the URLs published under an
+instruction's key after it was built. The module docstring lists every row and
+its fixture.
+
+```
+python3 tools/proof/lut_proof.py                        # Debug unless RC_PROOF_APP=release
+python3 tools/proof/lut_proof.py --only S1,X1           # run and score only these rows
+python3 tools/proof/lut_proof.py --lut ~/LUTs/Film.cube # F1 with an owner's file too (T4)
+python3 tools/proof/lut_proof.py --mutant NAME          # one of the eight below
+cd core && cargo test --release --test cube --test lut
+```
+
+It launches its own instance on a scratch socket in a scratch home
+(`tools/proof/work/lut/home`), writes every `.cube` file and its fixtures into
+its work folder (the Concat rule: nothing is copied from anywhere), performs no
+menu item, closes every project it opens, and removes its work folder at the
+start and at exit. `--mutant` builds a tree copy as `look_proof` does and
+reports MUTANT PASS only when every named row failed and no other scored row
+did; a core mutant also runs `cargo test --release --no-fail-fast --test cube
+--test lut` in the copy's core (row CT).
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `blue-fastest` | `LutTextures` uploads the table blue fastest | N1 S1 A1 F1 T1 |
+| `domain-ignored` | a non-default DOMAIN or input range is read | R1 CT |
+| `size-cap-dropped` | `LUT_3D_SIZE` outside 2–65 is read | R1 CT |
+| `media-interpolates` | `media` is no object discriminant | X1 CT |
+| `builtin-keeps-media` | a built-in kind keeps a stored `media` | K1 CT |
+| `remove-deletes-clips` | `with_clips` deletes a LUT's clips | D1 CT |
+| `paste-not-remapped` | `paste` leaves a look's id as the payload's | P1 CT |
+| `urls-from-instruction` | `lookURLs(for:)` answers only the instruction's map | P3 |
+
+**Its record**: `designs/grading.md`'s GR6a section.

@@ -11,8 +11,9 @@ recommended" again to GR2's nine choices). GR-4 and GR-5 were recorded in GR3, b
 from the owner's "All as recommended" to GR3's eleven choices (2026-10-09). GR-6 was recorded in GR4a, before its code,
 from the owner's "All as recommended" to GR4's twelve choices, both halves (2026-10-10). GR-7 was
 recorded in GR5a, before its code, from the owner's "All as recommended" to GR5's thirteen choices,
-with Black & White as the eighth look (2026-10-10). GR-8 is a later phase's and is recorded at its
-start. The brief's D2 and D3 (from the effects survey) are not recorded as written: GR-1
+with Black & White as the eighth look (2026-10-10). GR-8 was recorded in GR6a, before its code,
+from the owner's "All as recommended" to GR6's eleven choices, both halves, with no log clip to
+check (2026-10-10). The brief's D2 and D3 (from the effects survey) are not recorded as written: GR-1
 stands in their place.
 
 **Stands, and nothing here re-litigates it:** R5-1 (closed vocabularies, never a runtime); G-1;
@@ -294,6 +295,81 @@ Reelcut's own numbers, and nothing of Concat is opened, at design time or build 
   - Risk accepted: a looked layer costs one 3D sample more than a toned one, and the first frame
     of a new definition pays its bake (GR5a's record measures it); `.cube` import (GR-8) is how a
     person gets a look that is not one of the eight.
+- **GR-8 — `.cube` LUTs: a LUT is MEDIA of kind `lut`, parsed by the core, applied as
+  `video.look {kind: "lut", media, amount}` at step 4d to the layer's encoded values.** The
+  owner's eleven choices (GR6, 2026-10-10, "all as recommended"); [b] marks what GR6b builds.
+  - **Importing** (choice 1): File ▸ Add Media… lists `.cube`, and a Finder drop on the Media tab
+    imports one, both through `MediaImporter.probe` (`import_media` mirrors them). A drop on the
+    Dock or the window opens documents, as before. [b] An "Import LUT…" button under the Look
+    gallery imports and applies to the selected clips as one undo step, "Import LUT".
+  - **The media row** (choice 2): `media[].kind` gains `lut` — referenced where it lies (spec §11
+    "media by reference"), relinked and consolidated like footage — with no video, audio, alpha or
+    duration (`add_media` refuses a `lut` row carrying any). The Media tab draws it with a cube
+    glyph and the meta "LUT", the existing missing badge, no thumbnail; it is never placed as a
+    clip (no drag to the timeline, Insert and Overwrite at Playhead off; `add_clip`,
+    `insert_clip` and `overwrite_clip` refuse it in the core's sentence, `media 7 is a LUT: apply
+    it as a look (set_video {look: {kind: "lut", media: 7}}), it is not placed as a clip`, and
+    `add_background` as a media with no pixel size). Reveal in Timeline selects the clips whose look it is.
+  - **[b] Applying** (choice 3): the Look gallery gains an "Imported" group under its 3×3 grid,
+    a tile per LUT in Media-tab order named by its file name without `.cube`, thumbnails by
+    GR-7's rule; Clip ▸ Look ▸ lists them after the eight, under a separator, before None. No
+    separate picker.
+  - **The look** (choice 4): `video.look` gains the kind `lut` and the key `media` (the LUT's
+    media id, stored between `kind` and `amount` and written only with `lut`). `media` is
+    required with `lut` and refused with a built-in kind, and must name a `lut` media of the
+    project, each in its own sentence; a patch naming a built-in kind and no `media` drops a stored
+    one, so a built-in kind on a LUT clip replaces the LUT. Amount is the look's own (0–100 %, 100 %
+    by default), animatable; a change of LUT switches at an action's end, never interpolating the
+    id. An action's end is not checked against the media list (`set_action_end` never was): an
+    end naming a LUT that is not there evaluates as no look.
+  - **A missing LUT** (choice 5): the clip draws ungraded (no slate over footage); the Media tab
+    badges it and the open-time missing-media sheet lists it; a relink brings the look back. A LUT
+    changed on disk is re-read at the next frame drawn (the texture cache keys by path, size and
+    modification date).
+  - **Removing a used LUT** (choice 6): Remove asks "It is the look of N clips, which keep their
+    place and lose the look." with "Remove and Clear Looks"; the clips stay, undoable. `remove_media`
+    without `with_clips` refuses naming the clips (`media 7 is the look of clip 3; pass with_clips:
+    true to remove it and clear their looks`); with it, every base look naming the LUT, on the
+    timeline and in every nest, is removed, and action ends are left alone (inert).
+  - **What is read** (choice 7): 3D only; `LUT_3D_SIZE` 2–65; `TITLE`; `#` comments; blank lines;
+    CRLF; a UTF-8 BOM; `DOMAIN_MIN 0 0 0`, `DOMAIN_MAX 1 1 1` and `LUT_3D_INPUT_RANGE 0 1` (the
+    defaults); table values any finite number, red fastest, clamped to 0–1 when drawn. **Refused by
+    name**: a 1D LUT (`LUT_1D_SIZE`, `LUT_1D_INPUT_RANGE`), a size outside 2–65, a non-default
+    domain or input range, any other keyword, a keyword after the table, a short or long table, a
+    non-number, a file over 32 MB (`RC_CUBE_MAX_BYTES`) or not text. The import refusal reads
+    `“Film.cube” is not a LUT Reelcut reads: line 2: LUT_3D_SIZE 200 is outside 2–65.` — the file's
+    name, then the parser's own sentence. Refuse rather than guess.
+  - **Where it applies** (choice 8): to the layer's ENCODED values — what camera and creative LUTs
+    expect — at step 4d like a built-in look (after Color and Light, before the point filters),
+    sampled trilinearly from an `rgba16Float` `size³` 3D texture at `texture(2)`, mixed by
+    `amount`. The recipe's look for a LUT is `{"kind": "lut", "amount": a, "media": id}` with no
+    definition; the app reads the file through the media's URL, parses it with the core
+    (`rc_cube_parse`), and keeps a least-recently-used cache of eight textures.
+  - **Seeing it** (choice 9): Show Ungraded and `render_frame {ungraded}` remove a LUT look like
+    every look; an export never does.
+  - **Log and HDR footage** (choice 10): Reelcut converts nothing in GR6. **Measured (GR6a's T0,
+    Release, 2026-10-10)**: one 10-bit ProRes 422 chart re-tagged by stream copy. AVFoundation
+    ignores the tags in the ProRes frame headers (every header-only tag drew the untagged frame's
+    bytes) and reads the container's `colr` atom: tagged there, HLG and PQ draw the grey ramp
+    UNCHANGED (no transfer conversion; only the BT.2020 matrix moves a saturated patch, red 255 → 243),
+    BT.2020 primaries with the BT.709 transfer draw grey 129 as 66 (the BT.709 inverse OETF of 0.506
+    is 0.265, ≈ 67: those frames arrive linearised), and an untagged file differs from a
+    `colr`-tagged BT.709 one by up to 22 levels on saturated patches. So a camera LUT meets HLG and
+    PQ footage still in its transfer, as such LUTs expect, and a BT.2020/709 file in linear light,
+    which no LUT expects. **Log footage (Apple Log and the rest) is unchecked**: ffmpeg cannot make
+    it and the owner has no log clip.
+  - **Copy and paste** (choice 11): Copy/Paste and Paste Attributes into another project bring the
+    LUT's media row with the look, matched by path like any media; a look id the payload does not
+    carry becomes no look rather than another media's id.
+  - **No new op, tool or format number**: `set_video` and `add_media`/`import_media` carry it; the
+    format stays 1015 (GR-9's rule, GR-6's precedent: a pre-GR6 branch build refuses a `lut` media
+    kind by name). The core exports `rc_cube_parse`, `rc_cube_size`, `rc_cube_copy_rgb` and
+    `rc_cube_free`.
+  - **The Concat rule stands**: the parser is written from the `.cube` format's own description,
+    and every test LUT is written by a script.
+  - Risk accepted: a LUT that expects log or linear input draws wrong on Reelcut's encoded values
+    unless the footage is what the LUT was made for, and nothing warns; non-default domains, 1D and
+    shaper LUTs are refused, not read.
 - **GR-9 — The branch writes project format 1015, refuses 15–1014 by name, and the merge
   renumbers.** The branch's `RC_FORMAT_VERSION` is **1015** (main's 14 plus a thousand), in
   `core/src/format.rs` and the header, so every main build refuses a branch-made project as "made

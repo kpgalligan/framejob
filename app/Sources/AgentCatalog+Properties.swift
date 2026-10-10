@@ -89,12 +89,14 @@ extension AgentServer {
     // gallery and Amount row) and Clip ▸ Look ▸.
     private static let lookNames: [String] = LookKind.allCases.map { $0.rawValue }
     private static let lookClause: String =
-        ", look (null, or {kind: \(lookNames.joined(separator: "|")), amount: 0–1} — one of "
-        + "the eight built-in looks, applied after color and before the filters; amount is "
-        + "how much of it, 1 when left out, refused outside 0–1. It MERGES: a new kind keeps "
-        + "the clip's amount, an amount alone needs a clip that already has a look, and "
-        + "{look: null} removes it. In an action's end the amount animates and a change of "
-        + "kind switches at the end)"
+        ", look (null, or {kind: \(lookNames.joined(separator: "|")), media, amount: 0–1} — "
+        + "one of the eight built-in looks, or lut: an imported .cube file, media its media "
+        + "id (import_media imports one), required with lut and refused with any other kind; "
+        + "applied after color and before the filters; amount is how much of it, 1 when "
+        + "left out, refused outside 0–1. It MERGES: a new kind keeps the clip's amount, a "
+        + "built-in kind replaces a LUT, an amount alone needs a clip that already has a "
+        + "look, and {look: null} removes it. In an action's end the amount animates and a "
+        + "change of kind or of LUT switches at the end)"
     // The three patch vocabularies, written once: every property group of
     // spec §5.2, with the ranges the ops enforce. A patch MERGES, so a key
     // left out keeps its current value and a key set to null clears an

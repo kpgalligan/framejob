@@ -24,15 +24,26 @@ import Foundation
 ///
 /// `ClipSource.mediaID` is the exact mirror of the core's `uses_media`: media,
 /// still and image clips carry an id and text, shape and nest clips do not.
+/// A LUT (spec §11 GR-8) is no clip's source but some clips' LOOK: a clip
+/// uses a media by its source or by its base look, which is the set the
+/// core's `remove_lut` refuses with and clears (`uses(_:)`). An action end
+/// naming a LUT is not a use: removing the LUT leaves it inert.
 extension ProjectSnapshot {
+    /// Whether `clip` shows `media` or looks through it.
+    static func uses(_ clip: ClipSnapshot, _ media: UInt32) -> Bool {
+        if clip.source.mediaID == media { return true }
+        guard let look = clip.video?.look else { return false }
+        return look.kind == .lut && look.media == media
+    }
+
     /// Every clip that SHOWS this media — the timeline's and every nest's, in
     /// that order. What Remove counts and what the "and its clips" alert
     /// promises to delete, since `remove_media { with_clips: true }` retains
     /// against exactly this set at both levels.
     func clipsUsing(_ media: UInt32) -> [ClipSnapshot] {
-        var used = clips.filter { $0.source.mediaID == media }
+        var used = clips.filter { Self.uses($0, media) }
         for nest in nests {
-            used.append(contentsOf: nest.clips.filter { $0.source.mediaID == media })
+            used.append(contentsOf: nest.clips.filter { Self.uses($0, media) })
         }
         return used
     }
@@ -41,8 +52,8 @@ extension ProjectSnapshot {
     /// filter asks per row, and the one the core asks inside `remove_media`
     /// before it refuses.
     func usesMedia(_ media: UInt32) -> Bool {
-        clips.contains { $0.source.mediaID == media }
-            || nests.contains { nest in nest.clips.contains { $0.source.mediaID == media } }
+        clips.contains { Self.uses($0, media) }
+            || nests.contains { nest in nest.clips.contains { Self.uses($0, media) } }
     }
 
     /// The users a SELECTION can hold: the timeline's clips only.
@@ -59,6 +70,6 @@ extension ProjectSnapshot {
     /// rather than selecting nothing when this is empty and `clipsUsing` is
     /// not — the honest answer being "open the nest first".
     func timelineClipsUsing(_ media: UInt32) -> [ClipSnapshot] {
-        clips.filter { $0.source.mediaID == media }
+        clips.filter { Self.uses($0, media) }
     }
 }

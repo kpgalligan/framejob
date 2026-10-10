@@ -61,18 +61,33 @@ pub(crate) struct RecipeLayer<'a> {
 /// thirteen keys and the split tone — or `null` when there is none, when
 /// its amount is 0 (a look-less layer, so the frame is byte-identical), or
 /// when the frame is ungraded (`recipe.rs` removes it before this).
+///
+/// A LUT look (GR-8) has no definition: it is `{kind: "lut", amount,
+/// media}`, and the app draws the table of that media's file. The evaluator
+/// has already made a LUT look whose `media` is not a LUT of the project
+/// `null` (`lut.rs`'s `evaluates_as_look`), so one that reaches here names
+/// a LUT.
 fn look_json(look: Option<Look>) -> Value {
     let Some(look) = look.filter(|look| look.amount > 0.0) else {
         return Value::Null;
     };
-    let definition = look.kind.definition();
-    let mut body = Map::new();
-    body.insert("color".to_string(), color_json(&definition.color));
-    body.insert("split".to_string(), json(&definition.split));
     let mut out = Map::new();
     out.insert("kind".to_string(), json(&look.kind));
     out.insert("amount".to_string(), number(look.amount));
-    out.insert("definition".to_string(), Value::Object(body));
+    match look.kind.definition() {
+        Some(definition) => {
+            let mut body = Map::new();
+            body.insert("color".to_string(), color_json(&definition.color));
+            body.insert("split".to_string(), json(&definition.split));
+            out.insert("definition".to_string(), Value::Object(body));
+        }
+        None => {
+            let Some(media) = look.media else {
+                return Value::Null;
+            };
+            out.insert("media".to_string(), Value::from(media));
+        }
+    }
     Value::Object(out)
 }
 

@@ -73,6 +73,7 @@ use serde_json::Value;
 
 use crate::export::describe;
 use crate::format::MAX_TRACKS;
+use crate::lut::{look_media_ids, remap_look_media};
 use crate::model::{Clip, Media, Nest, Project, Source, Track};
 use crate::outcome::Outcome;
 use crate::time::Ticks;
@@ -221,6 +222,7 @@ fn absorb_nests(
             }
             clip.track = tracks.get(&clip.track).copied().unwrap_or(clip.track);
             clip.source = remap_source(&clip.source, media, &map);
+            remap_look_media(clip, media);
             // The speed BEFORE the duration: the bound is measured at it.
             if !(clip.speed.is_finite() && clip.speed > 0.0) {
                 clip.speed = 1.0;
@@ -248,41 +250,45 @@ fn absorb_nests(
 /// project's `media[]`, appending the ones that are not there, and returns
 /// the payload-id → project-id map.
 ///
-/// `clips` is every clip the paste will land — the payload's own AND those
-/// inside the nests they show, which reference the payload's `media[]` in
-/// the same one id space (spec §5.2) and would otherwise dangle.
+/// `sources` are the media the landing clips SHOW and `looks` the LUTs their
+/// looks name ([`wanted_media`]) — the payload's own clips AND those inside
+/// the nests they show, which reference the payload's `media[]` in the same
+/// one id space (spec §5.2) and would otherwise dangle.
 ///
-/// Only media a pasted clip actually SHOWS is brought across. The pasteboard
-/// writer only ever puts those there, and a payload row nothing references
-/// would arrive as a Media-tab entry the user did not ask for and cannot
-/// account for.
+/// Only media a pasted clip actually shows or looks through is brought
+/// across. The pasteboard writer only ever puts those there, and a payload
+/// row nothing references would arrive as a Media-tab entry the user did not
+/// ask for and cannot account for.
 ///
-/// `Err` when a clip names a media the payload does not carry (a truncated
+/// `Err` when a clip shows a media the payload does not carry (a truncated
 /// or hand-written payload — the clip would otherwise become a dangling
-/// reference `validate` refuses) or when a row's path is empty.
-fn absorb_media(
+/// reference `validate` refuses) or when a row's path is empty. A look's id
+/// the payload lacks is skipped (spec §11 GR-8).
+pub(crate) fn absorb_media(
     project: &mut Project,
     payload: &Payload,
-    clips: &[&Clip],
+    sources: &[u32],
+    looks: &[u32],
 ) -> Result<HashMap<u32, u32>, String> {
-    // A `Vec` rather than a set so the ids are resolved — and therefore the
-    // new rows are appended and numbered — in the order the clips name them,
-    // which makes a paste reproducible.
-    let mut wanted: Vec<u32> = Vec::new();
-    for clip in clips {
-        if let Some(id) = source_media(&clip.source) {
-            if !wanted.contains(&id) {
-                wanted.push(id);
-            }
-        }
-    }
-
     let mut map: HashMap<u32, u32> = HashMap::new();
-    for id in wanted {
+    for (id, shown) in sources
+        .iter()
+        .map(|id| (*id, true))
+        .chain(looks.iter().map(|id| (*id, false)))
+    {
+        if map.contains_key(&id) {
+            continue;
+        }
         let Some(entry) = payload.media.iter().find(|m| m.id == id) else {
-            return Err(format!(
-                "a pasted clip shows media {id}, which the payload does not carry"
-            ));
+            if shown {
+                return Err(format!(
+                    "a pasted clip shows media {id}, which the payload does not carry"
+                ));
+            }
+            // A look's LUT the payload lacks (an end may name one that is
+            // gone, spec §11 GR-8): left out of the map, so
+            // `remap_look_media` makes it no look.
+            continue;
         };
         let path = entry.path.trim().to_string();
         if path.is_empty() {
@@ -304,6 +310,28 @@ fn absorb_media(
         map.insert(id, local);
     }
     Ok(map)
+}
+
+/// The ids `absorb_media` resolves for `clips`, in the order they name
+/// them (a `Vec` rather than a set, so the new rows are appended and
+/// numbered reproducibly): the media each SHOWS, then the LUTs their looks
+/// name (spec §11 GR-8).
+fn wanted_media(clips: &[&Clip]) -> (Vec<u32>, Vec<u32>) {
+    let mut sources: Vec<u32> = Vec::new();
+    let mut looks: Vec<u32> = Vec::new();
+    for clip in clips {
+        if let Some(id) = source_media(&clip.source) {
+            if !sources.contains(&id) {
+                sources.push(id);
+            }
+        }
+        for id in look_media_ids(clip) {
+            if !looks.contains(&id) {
+                looks.push(id);
+            }
+        }
+    }
+    (sources, looks)
 }
 
 /// A track with a fresh id, named by the COUNT the way `add_track` names
@@ -385,7 +413,8 @@ impl Project {
             .iter()
             .chain(nests.iter().flat_map(|n| n.clips.iter()))
             .collect();
-        let media = absorb_media(&mut next, &payload, &landing)?;
+        let (sources, looks) = wanted_media(&landing);
+        let media = absorb_media(&mut next, &payload, &sources, &looks)?;
         let nests = absorb_nests(&mut next, &nests, &media)?;
 
         // Tracks missing behind the destination. Inserting at index 0 shifts
@@ -417,6 +446,7 @@ impl Project {
                 action.id = next.allocate_id();
             }
             clip.source = remap_source(&source.source, &media, &nests);
+            remap_look_media(&mut clip, &media);
             // The payload is trusted about WHAT a clip is and checked about
             // what it would do to the project, so a nonsense rate — which
             // only a hand-written payload can carry — falls back to 1:1

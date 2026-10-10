@@ -215,11 +215,21 @@ extension MediaPane {
         let binding = self.binding
         let alert = NSAlert()
         alert.messageText = "Remove “\(entry.name)”?"
-        alert.informativeText =
-            users.count == 1
-            ? "It is used by 1 clip, which will be removed with it."
-            : "It is used by \(users.count) clips, which will be removed with it."
-        alert.addButton(withTitle: "Remove and Delete Clips")
+        // A LUT's users keep their place and lose the look (spec §11 GR-8).
+        if entry.kind == .lut {
+            alert.informativeText =
+                users.count == 1
+                ? "It is the look of 1 clip, which keeps its place and loses the look."
+                : "It is the look of \(users.count) clips, which keep their place and lose "
+                    + "the look."
+        } else {
+            alert.informativeText =
+                users.count == 1
+                ? "It is used by 1 clip, which will be removed with it."
+                : "It is used by \(users.count) clips, which will be removed with it."
+        }
+        alert.addButton(
+            withTitle: entry.kind == .lut ? "Remove and Clear Looks" : "Remove and Delete Clips")
         alert.addButton(withTitle: "Cancel")
         alert.beginSheetModal(for: window) { response in
             guard response == .alertFirstButtonReturn else { return }

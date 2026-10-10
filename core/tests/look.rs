@@ -3,7 +3,7 @@
 //! through the C FFI exactly as `ReelCore.swift` drives it.
 //!
 //! Pinned here: the amount's range, refused in its own sentence at both
-//! ends; an unknown kind refused naming the eight; a kind alone landing at
+//! ends; an unknown kind refused naming the eight and `lut`; a kind alone landing at
 //! the default amount, and a new kind keeping the amount; an amount alone
 //! refused on a clip with no look; an action's end naming only an amount on
 //! a clip with no look evaluating as no look without losing its other keys;
@@ -105,8 +105,13 @@ fn the_amount_is_refused_past_either_end_in_its_own_sentence() {
 }
 
 #[test]
-fn an_unknown_kind_is_refused_naming_the_eight() {
-    let names: Vec<String> = KINDS.iter().map(|k| format!("`{k}`")).collect();
+fn an_unknown_kind_is_refused_naming_the_eight_and_lut() {
+    // `lut` (spec §11 GR-8) follows the eight built-ins.
+    let names: Vec<String> = KINDS
+        .iter()
+        .chain(["lut"].iter())
+        .map(|k| format!("`{k}`"))
+        .collect();
     assert_contains(
         &project().errors(&set_look(json!({"kind": "sepia"}))),
         &format!(

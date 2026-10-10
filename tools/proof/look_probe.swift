@@ -100,7 +100,7 @@ func bState(_ value: NSControl.StateValue) -> String {
     value == .on ? "on" : (value == .mixed ? "mixed" : "off")
 }
 func bIds(_ names: [String]) -> Set<UInt32> { Set(names.compactMap { bClips[$0] }) }
-let bNames = LookKind.allCases.map(\.displayName)
+let bNames = LookKind.builtIns.map(\.displayName)
 
 // B1 the menu
 do {
@@ -503,7 +503,7 @@ func definition(_ kind: LookKind) -> LookDefinition? {
 
 var timings: [String] = []
 var definitions: [LookKind: LookDefinition] = [:]
-for kind in LookKind.allCases {
+for kind in LookKind.builtIns {
     guard let found = definition(kind) else {
         timings.append("\(kind.rawValue) no definition")
         continue

@@ -39,7 +39,7 @@ extension EditorViewController {
     /// `.some(nil)` for None, nil for a tag no builder writes.
     private func lookKind(_ tag: Int) -> LookKind?? {
         if tag == Self.lookNoneTag { return .some(nil) }
-        return LookKind.allCases.indices.contains(tag) ? .some(LookKind.allCases[tag]) : nil
+        return LookKind.builtIns.indices.contains(tag) ? .some(LookKind.builtIns[tag]) : nil
     }
 
     // MARK: - Validation
