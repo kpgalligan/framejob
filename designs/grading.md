@@ -1737,3 +1737,34 @@ two caps missed — product code by 28 lines, two files over the cap that grew
 (`ProjectSnapshot.swift` +19, `edit_clip.rs` +2) — are for that verdict, not
 fixed here. The still-owed `CLAUDE.md` lines are GR2's through GR6b's, each in
 its own record above; GR7a adds none.
+
+**L3 paid (grading L3, after GR7a).** Two pure moves, no op, schema,
+catalog, format or render change. `StrokeProps`, `GradientStop`, `Gradient`
+and `ShapeProps` went whole from `ProjectSnapshot.swift` to a new
+`ShapeProps.swift` (`import Foundation`, nothing lost `private`);
+`detach_audio` and `set_enabled`, with the `// ---- enablement` banner, went
+from `core/src/edit_clip.rs` to a new `core/src/edit_detach.rs` inside its own
+`impl Project` (`mod edit_detach;` in `lib.rs`, nothing widened; the banner
+left above `set_reversed` now reads `reversal`). `wc -l`:
+`ProjectSnapshot.swift` 1,769 → 1,570 (1,750 at `f407f87`), `edit_clip.rs`
+757 → 661 (755 at `f407f87`); `ShapeProps.swift` is 204 and `edit_detach.rs`
+108, both under the new-file cap. L1's product-code net rises by the moves'
+header lines: `git diff --numstat --no-renames f407f87 -- app/Sources core/src
+app/Resources/Shaders`, with the two new files intent-added in a scratch copy
+of the index, sums to +5,194 −648 = **4,546** (`app/Sources` 2,922, `core/src`
+1,397, the shaders 227), 18 over GR7a's 4,528: `ShapeProps.swift`'s header +5
+net, `edit_detach.rs`'s module doc, `use` lines and `impl` braces against
+`edit_clip.rs`'s one added doc line +12, `lib.rs` +1. Verified: `make
+typecheck` exit 0 with exactly the four baseline warnings; the two moved
+blocks byte-identical (`diff` of `HEAD`'s `ProjectSnapshot.swift` lines
+1025–1222 against `ShapeProps.swift`'s last 198 lines, and of `HEAD`'s
+`edit_clip.rs` lines 661–756 against `edit_detach.rs`'s `impl` body, both
+empty); `cargo fmt --check`, `cargo test --release --test edit_tests
+detach_audio` (2 passed), `--test refusal_non_edits` (9 passed) and `--test
+op_default_booleans` (5 passed), `make lint` and `spec_index_proof.py`
+(150/150) exit 0; `make gate` PASS in 221 s (typecheck, fmt, lint, test 126 s,
+app 86 s). `grading_verdict.py sizes` reads committed `HEAD`, so its L3 lines
+cannot exist before this commit; they are recorded after it. No mutants: a
+pure move adds no decision. Owed `CLAUDE.md` lines: `core/CLAUDE.md`'s
+`edit_clip.rs` entry loses "detach" and gains an `edit_detach.rs` entry;
+`app/CLAUDE.md`'s file list and map gain `ShapeProps.swift`.

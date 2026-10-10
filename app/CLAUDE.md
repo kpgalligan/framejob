@@ -102,10 +102,12 @@ detail there.
   stop the list** — a later op still runs after one, exactly as after an
   identity — and the FIRST refusal is answered only when nothing applied.
 - `ProjectSnapshot.swift` · `TextProps.swift` · `MotionProps.swift` ·
-  `WordProps.swift` · `MediaSnapshot.swift` · `ActionSnapshot.swift` · `CompositionPlan.swift` — the `Codable`, READ-ONLY mirror
+  `WordProps.swift` · `MediaSnapshot.swift` · `ActionSnapshot.swift` · `ShapeProps.swift` · `CompositionPlan.swift` — the `Codable`, READ-ONLY mirror
   of spec §5.2 every view draws from. `CompositionPlan.swift` (a pure move out of
   `ProjectSnapshot.swift`, grading GR1) is the plan's Swift side (spec §7.2): `PlanSegment`,
-  `PlanRamp`, `PlanTrack`, `PlanInstruction` and `CompositionPlan`. `ActionSnapshot.swift` (a pure move out of
+  `PlanRamp`, `PlanTrack`, `PlanInstruction` and `CompositionPlan`. `ShapeProps.swift` (a pure
+  move out of `ProjectSnapshot.swift`, grading L3) holds the shape group: `StrokeProps`,
+  `GradientStop`, `Gradient` and `ShapeProps`. `ActionSnapshot.swift` (a pure move out of
   `ProjectSnapshot.swift`, B87) holds `ActionPatch`, `ActionSnapshot` and `ActionGraphicPatch` — an
   end's `graphic.props` and `kinds`, whose `dictionary` sends `props` only. `MediaSnapshot` (a pure move out of
   `ProjectSnapshot.swift`) carries a copy's or an ffmpeg conversion's `original`, and its `name` is

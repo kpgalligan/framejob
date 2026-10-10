@@ -229,7 +229,7 @@ governs a module now.
   `props` and refuses `in` by name. With a `schema`, a `null` for a prop
   an action on the clip names stores the schema's default (G-34 (d)).
 - `edit_clip.rs` — clip construction and placement callers: `add_clip`, move,
-  duplicate, delete, join, detach, `fit_scale` and `fill_scale` (Fit is a RESCUE for oversized
+  duplicate, delete, join, `fit_scale` and `fill_scale` (Fit is a RESCUE for oversized
   footage and honours `canvas.fit_new_clips`; Fill is a REQUIREMENT, ignores
   it, scales up as readily as down and clamps to `SCALE_MAX`). `whole_media_length`,
   `edit_clip_timing.rs`'s `trim_end` and `set_speed` hold a media clip's window INSIDE its file, each
@@ -245,6 +245,8 @@ governs a module now.
   `set_speed` takes a `rate` or a `duration` (Fit to duration), exactly one.
   `trim_start` advances a graphic's `in` through `graphic_advanced` (no speed,
   no head bound, saturating at 0); `trim_end` leaves `length` alone.
+- `edit_detach.rs` — `detach_audio` and `set_enabled`, a clip's video and
+  audio halves; a pure move out of `edit_clip.rs` (grading L3).
 - `edit_commit.rs` — the placement commit protocol: replacements preserve
   caller order and check old tracks before destination tracks; additions
   check caller-allocated candidates against the input project; both write

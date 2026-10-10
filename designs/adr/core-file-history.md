@@ -215,7 +215,11 @@ The size rule is in the root `CLAUDE.md` and `core/CLAUDE.md`; which modules are
 
 - `edit.rs`: exempt, its module doc being the op table's semantics half. If a cut is ever forced,
   the `Op` enum goes to `edit_ops.rs`, never in a feature phase.
-- `edit_clip.rs`: known debt, no seam named.
+- `edit_clip.rs`: grading L3 (on the `grading` branch) moved `detach_audio` and `set_enabled`,
+  with the `// ---- enablement` banner, to `edit_detach.rs`, a pure move; nothing widened. `wc -l
+  core/src/edit_clip.rs`: 757 before, 661 after; `edit_detach.rs` is 108. Still over the cap,
+  known debt. The next seam: `fit_scale` and `fill_scale` (the Fit and Fill rules, read by
+  `add_clip`, `add_shape_clip`, `edit_graphic.rs` and `edit_background.rs`) out whole.
 - `evaluate.rs`: none named (the composition plan left for `plan.rs` in grading GR1).
 - `ffi_graphic.rs`: at the new-module cap with nothing crate-free left to move (`diag_json` and
   `diag_error` name `Diagnostic`; road map 10 §10.7).

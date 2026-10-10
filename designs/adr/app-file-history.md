@@ -467,8 +467,11 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   `CompositionPlan`) went whole to `CompositionPlan.swift` with `import AppKit`, a pure move gated
   with GR1's other four before any grading code landed; nothing lost `private`. `wc -l
   app/Sources/ProjectSnapshot.swift`: 1871 before, 1750 after; `CompositionPlan.swift` is 123.
-  The next seam: the shape group (`StrokeProps`, `GradientStop`, `Gradient`, `ShapeProps`) out
-  whole to `ShapeProps.swift`.
+  Grading L3 (on the `grading` branch) paid the seam that move named: the shape group
+  (`StrokeProps`, `GradientStop`, `Gradient`, `ShapeProps`) went whole to `ShapeProps.swift` with
+  `import Foundation`, a pure move; nothing lost `private`. `wc -l
+  app/Sources/ProjectSnapshot.swift`: 1769 before, 1570 after; `ShapeProps.swift` is 204. The
+  next seam: `ColorAdjust` out whole to `GradeProps.swift`.
 - `Compositor.swift`: the mattes road map's MT1 (issue batch B89) moved `// MARK: - Shadows`
   through `blurKernel`, with `ShadowSurfaces`, to `Compositor+Shadow.swift`, and `render`'s
   per-layer uniforms-and-source block to `prepare` in `CompositorEffects.swift`, a pure move gated

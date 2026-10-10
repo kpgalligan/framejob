@@ -35,6 +35,7 @@ pub mod edit_canvas;
 pub mod edit_clip;
 mod edit_clip_timing;
 mod edit_commit;
+mod edit_detach;
 pub mod edit_edge;
 pub mod edit_graphic;
 pub mod edit_insert;
