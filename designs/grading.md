@@ -376,7 +376,6 @@ owner's; the numbers are what he decides with.
 
 | Measure | Cap |
 |---|---|
-| Product code (`app/Sources`, `core/src`, the shader), net lines added by GR2–GR6 | ≤ 4,500 (REASONED estimate ~3,000–3,500; mattes were ~1,290 net, section 9) |
 | Frozen files | Wiring only; no frozen file grows by more than ~50 lines in total |
 | Files over the cap | None left unpaid |
 | Inspector | One new sub-tab (Color) of at most four sections; Picture loses one section (Color) and gains none |
