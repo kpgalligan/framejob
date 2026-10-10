@@ -28,6 +28,7 @@ mod container_vorbis_setup;
 pub mod edit;
 pub mod edit_action;
 mod edit_action_graphic;
+mod edit_adjustment;
 pub mod edit_background;
 pub mod edit_canvas;
 pub mod edit_clip;

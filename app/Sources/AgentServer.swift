@@ -218,12 +218,12 @@ final class AgentServer {
         // The nest being looked into (AgentServer+Scope.swift)
         "set_scope": { $0.setScope },
         // Undo history (AgentServer+History.swift)
-        "undo": { $0.undoEdit },
-        "redo": { $0.redoEdit },
+        "undo": { $0.undoEdit }, "redo": { $0.redoEdit },
         // Clips (AgentServer+Clips.swift)
         "add_clip": { $0.addClip },
         "add_text_clip": { $0.addTextClip },
         "add_shape_clip": { $0.addShapeClip },
+        "add_adjustment_clip": { $0.addAdjustmentClip },  // AgentServer+Grading.swift
         // Backgrounds (AgentServer+Background.swift)
         "add_background": { $0.addBackground },
         "add_blurred_background": { $0.addBlurredBackground },

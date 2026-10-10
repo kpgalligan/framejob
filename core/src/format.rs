@@ -216,7 +216,10 @@ use crate::model::{Canvas, Project};
 /// `exposure`, `temperature`, `tint`, `highlights`, `shadows`, `whites`,
 /// `blacks`, `vibrance`, `fade` — each written only when not 0, so an
 /// untoned project writes exactly the text it did, and the reader's default
-/// is 0, so there is no migration step. The branch reads 1 to
+/// is 0, so there is no migration step. It is also the `adjustment` source
+/// kind (GR-6, amending GR-9), a new variant rather than an optional key: a
+/// build that does not know it refuses the file with serde's "unknown
+/// variant `adjustment`", so nothing is dropped silently. The branch reads 1 to
 /// [`BRANCH_BASE_VERSION`] and 1015, and refuses the numbers between in its
 /// own sentence: a later main file would open here and lose its new keys on
 /// save. At the merge 1015 is renumbered to main's next with one migration

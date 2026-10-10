@@ -167,7 +167,7 @@ governs a module now.
   `edit.rs` so no caller moved. A published interface, where the `Op` enum
   and the dispatch are its implementation. Its one reader in the crate is
   `op_schema.rs`, which carries the rows out through the FFI; the APP's
-  reader is every one of the fifty-nine op tools in the agent catalog,
+  reader is every one of the sixty op tools in the agent catalog,
   which print these rows instead of restating them. **A `Bound` is
   published only where the core REFUSES outside it** — `set_canvas`'s two
   dimensions, sourced from `edit_canvas.rs`'s own constants, and
@@ -413,6 +413,12 @@ governs a module now.
   IS the placement equation** between the region frame and canvas pixels,
   rotation and crop included; it composes `add_action` + `set_action` +
   `set_action_end` so a drag is one undo step and every refusal is inherited.
+- `edit_adjustment.rs` — `Source::Adjustment`'s rules (spec §11 GR-6):
+  `add_adjustment_clip`, and the refusals every other door asks it for — a
+  transition (from `add_transition`, `set_transition`, `set_transition_style`
+  and the overlap rule), a nest, and the blur, sharpen and pixelate filters
+  and any blend mode. The recipe draws it as `{"kind":"adjustment"}`, and on
+  a matte track it is dropped before the frame's mattes (inert).
 - `edit_background.rs` — `add_background` and `add_blurred_background`: one
   clip on a NEW back-most track, OPS rather than app-side composites because
   the composite carries constraints no half states. A blurred copy drops

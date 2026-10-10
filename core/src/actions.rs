@@ -32,6 +32,7 @@ use serde_json::{Map, Number, Value};
 
 use crate::actions_clamp::{clamp_audio, clamp_video};
 use crate::actions_graphic::evaluate_graphic;
+use crate::edit_adjustment::{clamp_adjustment, is_adjustment};
 use crate::model::{
     Action, AudioProps, Clip, ColorAdjust, Curve, GraphicProps, Project, ShapeProps, Source,
     TextProps, VideoProps,
@@ -430,7 +431,16 @@ impl Project {
             // The clip is in hand here, so the one non-range bound
             // `clamp_video` applies — a nest may not blend — is decided from
             // the source rather than guessed from the props.
-            video: clamp_video(evaluated_video, matches!(clip.source, Source::Nest { .. })),
+            // An adjustment clip's end is closed the same way (spec §11 GR-6).
+            video: {
+                let video =
+                    clamp_video(evaluated_video, matches!(clip.source, Source::Nest { .. }));
+                if is_adjustment(clip) {
+                    clamp_adjustment(video)
+                } else {
+                    video
+                }
+            },
             audio: clamp_audio(evaluated_audio),
             text: evaluated_text,
             // Shapes are not animatable in version 1: the §5.4 patch is a

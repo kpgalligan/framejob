@@ -39,6 +39,7 @@
 
 use serde_json::Value;
 
+use crate::edit_adjustment::check_adjustment_video;
 use crate::edit_clip_timing::{SPEED_MAX, SPEED_MIN};
 use crate::export::describe;
 use crate::model::{BlendMode, Clip, Project, Source, TextProps, VideoProps};
@@ -315,7 +316,8 @@ impl Project {
                 // `set_video` would have used.
                 Some(video) => {
                     check_video(video, self.source_size(clip))?;
-                    check_blend(clip, video)
+                    check_blend(clip, video)?;
+                    check_adjustment_video(clip, video)
                 }
                 None => Ok(()),
             },
@@ -372,6 +374,7 @@ impl Project {
                     }
                     check_video(&props, self.source_size(&clip))?;
                     check_blend(&clip, &props)?;
+                    check_adjustment_video(&clip, &props)?;
                     self.snap_motion(&mut props);
                     if let Some(slot) = next.clip_mut(id) {
                         slot.video = Some(props);

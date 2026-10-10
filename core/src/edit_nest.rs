@@ -47,6 +47,7 @@
 //! clip's track, so carried matte tracks land on the tracks in front of it
 //! and nest-then-unnest gives the picture back; it makes no track a matte.
 
+use crate::edit_adjustment::{adjustment_cannot_nest, is_adjustment};
 use crate::edit_clip::clip_end;
 use crate::model::{AudioProps, Clip, Enabled, Nest, Project, Source, Track, VideoProps};
 use crate::outcome::Outcome;
@@ -114,6 +115,10 @@ impl Project {
         }
         if selected.len() == 1 && matches!(selected[0].source, Source::Nest { .. }) {
             return Ok(Outcome::Identity);
+        }
+        // An adjustment clip grades the top level only (spec §11 GR-6).
+        if let Some(found) = selected.iter().find(|c| is_adjustment(c)) {
+            return Ok(Outcome::Refused(adjustment_cannot_nest(found.id)));
         }
 
         let earliest = selected.iter().map(|c| c.start).min().unwrap_or(0);

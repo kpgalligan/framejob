@@ -40,6 +40,9 @@ enum RecipeSourceRef: Codable, Equatable {
     case graphic(name: String, hash: String, frame: Int, propsJSON: String, ctxJSON: String)
     /// The media could not be resolved — draw a slate.
     case missing
+    /// An adjustment clip (spec §11 GR-6): no picture; the layer grades the
+    /// destination behind it (`Compositor+Adjustment.swift`).
+    case adjustment
 
     private enum CodingKeys: String, CodingKey {
         case kind, media, hash, text, shape
@@ -66,6 +69,7 @@ enum RecipeSourceRef: Codable, Equatable {
         case "shape":
             self = .shape(hash: c.lenient(.hash, ""), props: c.lenient(.shape, ShapeProps()))
         case "graphic": self = RecipeSourceRef.graphic(from: decoder)
+        case "adjustment": self = .adjustment
         default:
             self = .missing
         }
@@ -92,6 +96,8 @@ enum RecipeSourceRef: Codable, Equatable {
         case .graphic: try encodeGraphic(to: encoder)
         case .missing:
             try c.encode("missing", forKey: .kind)
+        case .adjustment:
+            try c.encode("adjustment", forKey: .kind)
         }
     }
 
@@ -103,7 +109,7 @@ enum RecipeSourceRef: Codable, Equatable {
         switch self {
         case .text(let hash, _, _), .shape(let hash, _): return hash
         case .graphic(_, let hash, _, _, _): return hash
-        case .track, .image, .missing: return nil
+        case .track, .image, .missing, .adjustment: return nil
         }
     }
 

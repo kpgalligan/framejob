@@ -85,7 +85,7 @@
 //! same times its `clips[]` are written in — not project time. A nest has
 //! no speed, so `t − nest_clip.start` is the whole mapping.
 //!
-//! **Seven ops are an `Err` with a scope**, naming themselves and the nest:
+//! **Eight ops are an `Err` with a scope**, naming themselves and the nest:
 //! `add_marker`, `set_marker`, `remove_marker` (a nest has no markers of
 //! its own — spec §5.2), `set_canvas` (a nest's size is FROZEN at the size
 //! the parent had when it was made, deliberately, and the rest of a canvas
@@ -93,7 +93,9 @@
 //! `add_media`, `relink_media`, `remove_media` (a nest references the
 //! parent's `media[]` in the parent's one id space, so a media edit inside
 //! a scope is an edit OUTSIDE it wearing a scope, which is the one thing a
-//! scope exists to prevent). Everything else — all fifty-two — works
+//! scope exists to prevent), and `add_adjustment_clip` (an adjustment clip
+//! grades what is behind it at the top level only, spec §11 GR-6).
+//! Everything else — all fifty-two — works
 //! inside a nest as it works on the timeline, `nest` and `unnest`
 //! included.
 //!
@@ -105,6 +107,7 @@
 //! | `add_text_clip` | The Title preset, centered, 5 s long when `duration` is absent; `text` patches it exactly as `set_text` would. |
 //! | `add_shape_clip` | The default rectangle, 5 s long when `duration` is absent — an `arrow` kind gets `arrow_end` on, since a headless arrow is a diagonal line; `shape` patches that preset exactly as `set_shape` would, so an explicit `arrow_end: false` still wins. |
 //! | `add_graphic_clip` | A clip drawn by the module `graphics/<name>.js` in the package, 5 s long when `duration` is absent, at `width` × `height` — the canvas's when absent, and an `Err` naming the canvas when a canvas side is over 8192 — with Fit scale as a shape's box has, `in` 0 and no `length`. `name` must match `^[a-z0-9][a-z0-9-]{0,62}$` (G-3); the core has no filesystem and never checks the module exists. `props` (absent: none) is checked against `schema` when one is given — key by key, by dotted path, type, range and membership, a colour normalised to lowercase `#rrggbb[aa]` — and for shape only without one (G-4); a `null` prop is dropped, and more than 64 is an `Err`. |
+//! | `add_adjustment_clip` | A clip with no picture of its own (`{"kind":"adjustment"}`), 5 s long when `duration` is absent, at scale 1 with default `video`: while it lasts its `video.color`, point filters and opacity (the strength) grade everything drawn behind it in its container, the canvas background included, never a track in front; on a track cut by a matte only inside the matte, and on a matte track nothing (spec §11 GR-6). An `Err` inside a scope; refused onto an overlap in the overlap rule's sentence. It takes no transition, nest, blur, sharpen, pixelate or blend (`edit_adjustment.rs`). |
 //! | `add_background` | A backdrop on a NEW back-most track, starting at 0, named "Background" and as long as the timeline unless `duration` says otherwise. With `media`, that file placed as `add_clip` would place it but for its SCALE — the right source kind, audio props when it has sound, and a FILL scale where `add_clip` takes a Fit one, because a plate that leaves the canvas showing down one side has failed at the one thing a background is for; with `color`, or with neither, a canvas-sized filled rectangle with no stroke at scale 1. The plate default is WHITE, not black: the canvas is already black, so a black plate is a command that appears to do nothing. `Err` for `media` and `color` together, an unknown media, a media with no pictures, a colour outside 0–1, a duration under a frame, or a timed media shorter than one canvas frame — a plate of a video or an audio file is held to that file's own whole length, given duration or default, so it never outruns what it shows (spec §11, D4-4). |
 //! | `add_blurred_background` | The screencast backdrop: `clip` copied onto a NEW back-most track at the same start, duration, speed and source window — so the two play the same frames — scaled to FILL the canvas, centred, uncropped, blended `normal` and blurred at full strength. The copy is muted (`enabled` becomes `{video: true, audio: false}`, `detach_audio`'s pair read the other way) and drops its `audio.duck` — the one field of that group that lowers OTHER material, so a copy keeping it would duck the mix including the clip it came from — along with its transition, its actions and its label; it is named "Blurred Background". `Err` for an unknown clip, a NEST (flattening drops a nest clip's own filters, so the copy would come out sharp), a source with no pixel size (text, audio-only), or a clip with no video properties. |
 //! | `insert_clip` | The insert edit: the clip `at` is strictly inside on `track` is split, every unlocked track opens by the media's whole length, then that media lands at `at`. Only the destination track is cut — straddlers elsewhere ride the shift whole. |
@@ -279,6 +282,13 @@ pub enum Op {
         props: Option<Value>,
         #[serde(default)]
         schema: Option<Value>,
+    },
+    /// No picture of its own: grades what is behind it (spec §11 GR-6).
+    AddAdjustmentClip {
+        track: u32,
+        at: Ticks,
+        #[serde(default)]
+        duration: Option<Ticks>,
     },
     /// `media` and `color` are alternatives, not a pair: a plate is either
     /// a picture or a colour, and naming both is an `Err` rather than a
@@ -636,8 +646,8 @@ pub enum Op {
 ///
 /// A struct rather than a bare [`Op`] because `scope` is the envelope's
 /// key and not any op's argument — it is spelled once, it means the same
-/// thing over all fifty-nine, and folding it into the enum would mean
-/// fifty-nine copies of one optional field. [`Project::apply_op`] still
+/// thing over all sixty, and folding it into the enum would mean
+/// sixty copies of one optional field. [`Project::apply_op`] still
 /// takes an `&Op` and knows nothing about nests.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Envelope {
@@ -663,7 +673,7 @@ pub struct Envelope {
 /// envelope key. A `#[serde(flatten)]` wrapper is not the way round it
 /// either: serde documents `deny_unknown_fields` as unsupported with
 /// `flatten`, and it would silently stop refusing typos. Removing the key
-/// before the typed decode keeps all three — the refusal, all fifty-nine
+/// before the typed decode keeps all three — the refusal, all sixty
 /// variants, and an envelope key that is not an argument.
 pub fn parse(op_json: &str) -> Result<Envelope, String> {
     let mut value: Value =
@@ -759,6 +769,11 @@ impl Project {
                 props.as_ref(),
                 schema.as_ref(),
             ),
+            Op::AddAdjustmentClip {
+                track,
+                at,
+                duration,
+            } => self.add_adjustment_clip(*track, *at, *duration),
             Op::AddBackground {
                 media,
                 color,

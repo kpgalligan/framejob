@@ -140,6 +140,22 @@ extension AgentServer {
                         + "arrow_end: false for a bare diagonal.",
                 ]),
             opTool(
+                "add_adjustment_clip",
+                "Adds an adjustment clip — Insert ▸ Adjustment Clip. It has no picture of its "
+                    + "own: while it lasts it grades everything drawn BEHIND it (every lower "
+                    + "track and the canvas background, never a track in front) with the "
+                    + "colour and the point filters (sepia, noir, vignette, invert) that "
+                    + "set_video gives it, and its opacity is the grade's strength. On a track "
+                    + "cut by a matte it grades only inside the matte; on a matte track it does "
+                    + "nothing. Refused inside a nest and in any transition or overlap — fade "
+                    + "it with opacity instead; blur, sharpen, pixelate and a blend mode are "
+                    + "errors on it.",
+                [
+                    "track": trackDescription,
+                    "at": "Start, \(ticks)",
+                    "duration": "Length \(ticks) Default 5 s (3000000).",
+                ]),
+            opTool(
                 "add_background",
                 "Puts a backdrop on a NEW back-most track, starting at 0 and running the "
                     + "timeline's length — Clip ▸ Add Background. With no arguments at all it "

@@ -605,6 +605,7 @@ fn op_table() -> Vec<Value> {
         json!({"op": "add_text_clip", "track": 5, "at": 0, "duration": 1200000}),
         json!({"op": "add_shape_clip", "track": 5, "at": 1800000}),
         json!({"op": "add_graphic_clip", "track": 5, "at": 0, "name": "lower-third"}),
+        json!({"op": "add_adjustment_clip", "track": 5, "at": 0}),
         json!({"op": "insert_clip", "track": 4, "media": 3, "at": 3000000}),
         json!({"op": "overwrite_clip", "track": 4, "media": 3, "at": 1200000}),
         json!({"op": "move_clip", "clips": [10], "delta": 600000}),

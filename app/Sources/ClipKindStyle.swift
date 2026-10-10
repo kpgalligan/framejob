@@ -32,6 +32,7 @@ enum ClipKindStyle {
         case shape
         case graphic
         case nest
+        case adjustment
     }
 
     static func kind(of clip: ClipSnapshot, in snapshot: ProjectSnapshot) -> Kind {
@@ -49,6 +50,8 @@ enum ClipKindStyle {
             return .graphic
         case .nest:
             return .nest
+        case .adjustment:
+            return .adjustment
         }
     }
 
@@ -63,6 +66,7 @@ enum ClipKindStyle {
         // Shape's ink until road map 10's G5 gives a graphic a token.
         case .graphic: return DS.clipShape
         case .nest: return DS.clipNest
+        case .adjustment: return DS.clipAdjustment
         }
     }
 
@@ -81,6 +85,7 @@ enum ClipKindStyle {
         case .shape: return ("square.on.circle", "▭")
         case .graphic: return ("curlybraces", "{}")
         case .nest: return ("square.stack.3d.down.right", "▤")
+        case .adjustment: return ("camera.filters", "◐")
         }
     }
 
@@ -96,6 +101,7 @@ enum ClipKindStyle {
         case .shape: return "shape"
         case .graphic: return "graphic"
         case .nest: return "nest"
+        case .adjustment: return "adjustment"
         }
     }
 }

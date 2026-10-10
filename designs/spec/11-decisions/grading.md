@@ -8,8 +8,9 @@ spike and the route, GR1 the pure moves on main, GR2 onwards on the `grading` br
 GR-2, GR-3 and GR-9 were recorded in GR2, before its code, from the owner's answers of
 2026-10-09 ("Start grading", then "All as recommended" to the brief's choices, and "All as
 recommended" again to GR2's nine choices). GR-4 and GR-5 were recorded in GR3, before its code,
-from the owner's "All as recommended" to GR3's eleven choices (2026-10-09). GR-6..GR-8 are later
-phases' and are recorded at their start. The brief's D2 and D3 (from the effects survey) are not recorded as written: GR-1
+from the owner's "All as recommended" to GR3's eleven choices (2026-10-09). GR-6 was recorded in GR4a, before its code,
+from the owner's "All as recommended" to GR4's twelve choices, both halves (2026-10-10). GR-7 and
+GR-8 are later phases' and are recorded at their start. The brief's D2 and D3 (from the effects survey) are not recorded as written: GR-1
 stands in their place.
 
 **Stands, and nothing here re-litigates it:** R5-1 (closed vocabularies, never a runtime); G-1;
@@ -123,6 +124,78 @@ Reelcut's own numbers, and nothing of Concat is opened, at design time or build 
     other scope (parade, vectorscope, histogram — tier 2). Its MCP mirror is `render_frame
     {waveform: true}`, which writes the same trace's counts beside the PNG; the panel itself is
     view state with no tool (§7.9's exemption).
+- **GR-6 — Adjustment clips: a clip kind with no picture that grades everything drawn behind it
+  in its container, by its opacity; inert on a matte track; refused in a nest, in any transition,
+  and with a neighbourhood filter or a blend.** The owner's twelve choices of 2026-10-10, each as
+  recommended; GR4a builds the core, the compositor, the MCP tool and the timeline, GR4b the menu
+  item and the inspector ([b] below).
+  - **The kind.** `Source::Adjustment`, written `{"kind":"adjustment"}`, with no media, size or
+    window. It is added by the op **`add_adjustment_clip {track, at, duration?}`** (an absent
+    `duration` is 5 s, as `add_text_clip`'s); the new clip's `video` is the defaults at scale 1.
+    While it lasts, its `video.color` (all thirteen keys), its point filters (sepia, noir,
+    vignette, invert) and its opacity, the **strength**, apply to what is already drawn behind it.
+  - **Reach.** Everything drawn behind it at that instant in its container: every lower track
+    and the canvas background, the whole frame; never a track in front. Its stored transform,
+    crop, corner, shadow, reflection, chroma, spotlight, obscure and motion placement are kept
+    and do nothing (refusing them would make Paste Attributes fail from any moved clip); a
+    motion preset's fades fade the grade.
+  - **The pass.** The compositor's eighth pipeline, `reelcut_adjust_fragment`, reads the target
+    it is drawing into (`[[color(0)]]`) with blending OFF and writes `mix(dst, graded, w)`, where
+    `graded` is the un-premultiplied destination through step 4c's colour and tone and the point
+    filters (the canvas's uv as their local position), re-premultiplied by the destination's own
+    alpha, and `w` is the opacity times the matte coverage. Alpha is preserved. An adjustment
+    layer whose colour is neutral and that has no point filter draws nothing.
+  - **Mattes (a correction to the road map).** On a track cut by a matte it grades only inside
+    the matte: the power window. On a matte track it is **inert**: it draws nothing and cuts
+    nothing (the core leaves it out of the recipe), because a matte group is one track and two
+    clips on one track share an instant only in a transition, which this entry refuses, so it
+    could only be the group's sole member and would act as an empty matte. [b] The Clip tab's
+    note says "An adjustment clip on a matte track has no effect."
+  - **Commands.** Split (two adjustment clips, actions divided), trim to any length, move,
+    ripple, insert time, close gap, and copy, paste and duplicate at the top level all work.
+    Refused: nest, a paste into an open nest, and every transition — `add_transition`,
+    `set_transition`, `set_transition_style` (which would otherwise mint a `cross_dissolve`) and
+    any overlap on its track, a neighbour trimmed or moved over it included, through the overlap
+    rule's one door (`check_overlap_rule`). Speed, reverse, freeze and detach audio keep their
+    media-only answers. Paste Attributes onto it lands unless the copied video group has blur,
+    sharpen, pixelate or a blend, and then the whole paste is refused (`check_blend`'s
+    precedent); an action's end carrying them is clamped by the evaluator.
+  - **The sentences** (exact; channel in brackets): nest [refused] "clip 12 is an adjustment
+    clip, and an adjustment clip cannot go inside a nest"; validate, for a file or a paste into a
+    scope [error] "clip 12 in nest 4 is an adjustment clip, and an adjustment clip cannot be
+    inside a nest"; the op inside a scope [error] "add_adjustment_clip has no meaning inside nest
+    4"; transition [refused] "clip 12 is an adjustment clip and cannot take a transition; fade it
+    with opacity instead"; overlap [refused] "clips 7 and 12 would overlap, and clip 12 is an
+    adjustment clip, which cannot take a transition; fade it with opacity instead"; filter
+    [error] "clip 12 is an adjustment clip and cannot take the blur filter" (or sharpen,
+    pixelate); blend [error] "clip 12 is an adjustment clip and cannot take a blend mode".
+  - **Show Ungraded (GR-4)** neutralises its colour as any clip's, so a neutral adjustment clip
+    with no point filter draws nothing and the frame is byte-identical to one without it; point
+    filters stay (GR-4 keeps filters).
+  - **The timeline.** A rose ink, `DS.clipAdjustment` (#8C3A5E), in both appearances; the symbol
+    `camera.filters` (fallback "◐"); the kind word "adjustment" and the fallback name
+    "Adjustment"; a flat body (a name strip and the action lane, no filmstrip or waveform), the
+    lane sized as picture. Selected, it has no frame and no handles in the preview (it has no
+    box); a click on the picture selects what is behind it.
+  - **[b] The menu.** Insert ▸ **Adjustment Clip**, the first item, above Graphic ▸; no toolbar
+    button, no context-menu item and no shortcut (bare letters belong to `keyDown`, §9). Its
+    span is the In/Out range if one is set, otherwise the selected clips' span, otherwise the
+    whole timeline; disabled while a nest is open and on an empty timeline with no range. Its
+    track is the front-most track if that is not a matte track and is free over the span,
+    otherwise a new front track named "Adjustment"; one undo step; the new clip is selected and
+    the inspector opens on Color.
+  - **[b] The inspector** (choice 4b): only Color and Clip. Color holds an **Adjustment** section
+    with one row, "Strength" (0–100 %, `video.opacity`), then Light, then Color; Clip holds
+    Timing and Motion (Motion's fades fade the grade; slide, zoom and spin do nothing). The point
+    filters are reachable through MCP and Paste Attributes only. A selection mixing in video
+    clips gets no Picture tab, and its Color tab no Strength row. Until GR4b lands an adjustment
+    clip shows Picture and Clip.
+  - **The format stays 1015 (amends GR-9's "1015 is 14 plus optional keys").** The kind is a new
+    `Source` variant, not an optional key: a build that does not know it refuses the file with
+    serde's "unknown variant `adjustment`" (`format::read`), so nothing is dropped silently.
+  - Not in it: adjustment clips inside nests, an adjustment clip's own transform or shape, and
+    refusing the transform keys. Risk accepted: an adjustment clip's stored placement keys are
+    inert and the Picture tab still shows them until GR4b.
 - **GR-9 — The branch writes project format 1015, refuses 15–1014 by name, and the merge
   renumbers.** The branch's `RC_FORMAT_VERSION` is **1015** (main's 14 plus a thousand), in
   `core/src/format.rs` and the header, so every main build refuses a branch-made project as "made
@@ -130,7 +203,8 @@ Reelcut's own numbers, and nothing of Concat is opened, at design time or build 
   `BRANCH_BASE_VERSION` is 14: the branch reads 1 to 14 and 1015, and refuses a file numbered 15
   to 1014 in its own sentence ("not one this grading build reads"), because a later main file
   would otherwise open and lose its new keys on save (owner choice 9). Above 1015 the existing
-  "newer" sentence answers. No migrate step: 1015 is 14 plus optional keys. **At the merge** 1015
+  "newer" sentence answers. No migrate step: 1015 is 14 plus optional keys (and, since GR-6,
+  the `adjustment` source kind, which an older build refuses by name). **At the merge** 1015
   is renumbered to main's next version, with one migration arm mapping 1015 to it, so branch-made
   projects still open; the gap refusal and `BRANCH_BASE_VERSION` go with it. Risk accepted: a
   project the owner saves on the branch opens only on the branch until the merge (he keeps his

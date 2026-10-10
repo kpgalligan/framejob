@@ -69,6 +69,16 @@ extension MetalRenderer {
             let layer = layers[index]
             guard layer.dissolve.count > depth else {
                 index += 1
+                // An adjustment clip grades what is behind it rather than
+                // drawing a picture (spec §11 GR-6, `Compositor+Adjustment.swift`).
+                if layer.isAdjustment {
+                    guard let matte = coverage.texture(for: layer) else {
+                        pass.suspend()
+                        throw MatteError.unordered
+                    }
+                    try drawAdjustment(layer, matte: matte, canvas: canvas, pass: &pass)
+                    continue
+                }
                 guard
                     let prepared = prepare(
                         layer, among: all, canvas: canvas, destination: destination,

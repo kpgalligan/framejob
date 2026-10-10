@@ -872,3 +872,112 @@ Waveform panel; the core map's `RecipeOptions.ungraded`. The comment at
 `EditorViewController+ZoomRegion.swift:204` ("both fill `canvasContainer`") is now
 loose — the region overlay fills the canvas view — though its conversion is explicit.
 GR4, adjustment clips, is next, and extends `layer`'s neutralising to them.
+
+## GR4a — adjustment clips: the kind, the op, the pass, the MCP tool (2026-10-10, on the `grading` branch)
+
+**Where.** The worktree `~/devel/reelcut-grading`, branch `grading`, at `6ecf46c`.
+GR4 did not fit one spec and is split: GR4a (this) is the core, the compositor,
+the MCP tool, the timeline style and the proof of the picture; GR4b is
+Insert ▸ Adjustment Clip, the inspector (Color and Clip only) and its screen. The
+owner's answer to GR4's twelve choices, both halves, was "All as recommended"
+(2026-10-10), including choice 8: inert on a matte track.
+
+**What landed.**
+- Spec §11 first: GR-6 in `designs/spec/11-decisions/grading.md` (all twelve
+  choices, GR4b's marked, the matte correction to this road map — on a matte
+  track the clip is INERT, not "the matte group's earlier members", because a
+  group is one track and two clips on one track share an instant only in a
+  transition, which GR-6 refuses — and the note amending GR-9: the format
+  stays 1015, the kind refused by name by a build that lacks it), its README
+  rows. Then §4.4, §5.2, §6 (06b), §7.3, §7.4, §7.5 (eight pipelines) and
+  §7.10, and the index's Lines cells.
+- Core: `Source::Adjustment` (`{"kind":"adjustment"}`), every exhaustive match
+  classified (`segment_of` none, `draws` true, `source_size` and the media id
+  none, `source_media` none). New `edit_adjustment.rs`: `add_adjustment_clip`
+  through `add_described_clip`, `is_adjustment`, `check_adjustment_video`
+  (beside both `check_blend` calls), `adjustment_overlap` (in
+  `check_overlap_rule`, the one placement door, so `set_gained_transitions`
+  never mints on one), `adjustment_transition` (`add_transition` after step 1
+  for either clip, `set_transition` with a kind, `set_transition_style` after
+  its neither-key identity), `adjustment_nested` (`check_clips` inside a nest,
+  so a file and a scoped paste meet it on the merged parent),
+  `adjustment_cannot_nest` (`nest_clips`), `clamp_adjustment` (the evaluator,
+  after `clamp_video`) and `inert_adjustment` (`frame_recipe_opts` drops it
+  before `frame_mattes`). The op's `edit.rs` row and dispatch, `op_table.rs`'s
+  row (`OP_COUNT` 60), `scope.rs`'s `refused_inside` arm, the recipe's
+  `layer_source` arm. The format and header comments. New
+  `core/tests/adjustment.rs` (18); `scope.rs`, `op_ticks.rs` (with
+  `common/op_ticks_clips.rs`), `op_nullability.rs` and `edit_tests.rs`
+  (its op-coverage table, an op-count failure only) take the sixtieth op.
+- App: `ClipSource.adjustment` in every switch (`ProjectSnapshot.swift` net
+  0), `RecipeSourceRef.adjustment`, `reelcut_adjust_fragment` appended to
+  `Compositor.metal`, new `Compositor+Adjustment.swift` (`isAdjustment`,
+  `isNeutralAdjustment`, `adjustPipeline`, `drawAdjustment`),
+  `Compositor.swift`'s `adjustPipeline` and `.absent` (net −1),
+  `encodeLayers`' branch, one arm each in `LayerRenderers.swift`,
+  `InspectorTab.swift`, `TimelineLayout.swift` and the frozen
+  `TimelineView.swift`; `DS.clipAdjustment` and `ClipKindStyle`'s rose kind;
+  `ReelOp.addAdjustmentClip`; new `AgentServer+Grading.swift` and the frozen
+  `AgentServer.swift`'s one table row (net 0); the catalog row, `set_video`'s
+  sentence and the assistant's topic.
+- Instruments: `adjustment_proof.py` (28 rows, seven mutants) and its README
+  section; `op_argument_proof.py` and `op_catalog_proof.py` at 90 tools and 60
+  ops; `phase9_proof.py`'s `REFUSED_INSIDE` and its section 6 sweep at eight
+  (`add_adjustment_clip` sent on the nest's own track), and `phase9_probe.py`'s
+  document-level check's label (its set stays the seven).
+
+**Sizes.** Product code about +460 net: changed files +246 −65, new files
+`edit_adjustment.rs` 184, `Compositor+Adjustment.swift` 75,
+`AgentServer+Grading.swift` 20. With GR2 and GR3, about 1,714 of "Worth
+keeping"'s ≤ 4,500. `recipe.rs` 537 → 546, `edit_transition.rs` 574 → 588,
+`ProjectSnapshot.swift` 1,784 → 1,784, `Compositor.swift` 724 → 723,
+`AgentServer.swift` 785 → 785, `AgentCatalog+Clips.swift` 513 → 529.
+
+**Measured.** 2026-10-10, Apple M2 Max, macOS 26.5.1, AC power.
+- Loop, Debug: `cargo test --release` for `adjustment` 18/18, `scope`,
+  `op_ticks`, `op_nullability`, `op_table`, `recipe`, `matte`, `ungraded`,
+  `add_transition`, `paste`, `nest`, `edit_tests` all green; `make lint`
+  clean; `make typecheck` 0 errors and the 4 baseline warnings;
+  `assistant_prompt_proof.py --probe` 14/14; `matte_spike.py --check --tree`
+  every scored row; `op_catalog_proof.py` 23/23 (60 ops) and
+  `op_argument_proof.py` 157/157 (90 product tools); `spec_index_proof.py`
+  150/150; `adjustment_proof.py` 28/28.
+- `make gate`: PASS in 199 s (typecheck 5 s, fmt 2 s, lint 1 s, test 101 s,
+  app 88 s).
+- Recorded, on the gate's Release build: `RC_PROOF_APP=release
+  adjustment_proof.py` 28/28, no skip (this host has the `hevc_alpha`
+  encoder), no `DEFAULTS MOVED`.
+- Mutants, each `adjustment_proof.py --mutant NAME` on Debug, all seven MUTANT
+  PASS (every named row failed, no other scored row did), on the final
+  instrument: `blending-on` A1; `ignores-matte` M1 Q1; `ignores-opacity` O1
+  O2; `front-graded` G1; `matte-track-not-inert` M2; `nest-allowed` R1;
+  `overlap-allowed` R5.
+- Fix pass 1, Debug: `phase9_proof.py` 224/224 (section 6's eight refusals,
+  `add_adjustment_clip` with `core/src/scope.rs`'s own sentence) with no
+  `Reelcut: ` line; `phase9_probe.py` 48/48 (the document-level set the
+  seven).
+
+**Deviations.** A1 compares the PREMULTIPLIED colour (±1), not the straight
+one: `render_frame`'s PNG is written from 8-bit premultiplied pixels, so at
+alpha 128 a straight value moves in steps of two (the first run read 177
+against 179 with a correct pass). R1–R7 hold the sentence as the exact TAIL of
+the MCP answer, because the app prefixes a refusal with `<tool>: <step> was
+refused at <op>: ` and an error with `<tool>: `. R3 sends the nest's own track,
+since the app's argument check refuses a timeline track inside a scope before
+the core is asked. `edit_tests.rs` was edited (its op-coverage table gains the
+op), as the spec's "any other suite that fails only on an op count" allows.
+`ReelOps.swift`'s comment on `documentLevelNames` and §7.4's sentence now say
+"the seven DOCUMENT-level ops": `add_adjustment_clip` is the eighth op the core
+refuses in a nest but is not document-level, so it is sent scoped and refused,
+not sent unscoped onto the timeline. `Compositor.swift`'s pipeline comments were
+tightened to hold its size (net −1).
+
+**Owed.** GR4b (the menu item, the inspector, the screen, GRD-3, the README
+bullet, the proof's menu and sub-tab rows); until it lands an adjustment clip
+shows Picture and Clip. The `CLAUDE.md` lines, owed by the phase that edits
+them (GR4a's spec kept every `CLAUDE.md` untouched): root, "eighty-nine product
+tools" → ninety; the app map's `Compositor+Adjustment.swift`,
+`AgentServer+Grading.swift`, `ClipSource.adjustment` and the eighth pipeline
+("Seven pipelines from five fragment functions" → eight from six); the core
+map's `edit_adjustment.rs` and `Source::Adjustment`, and `op_table.rs`'s
+"fifty-nine op tools".

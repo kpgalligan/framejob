@@ -350,11 +350,9 @@ final class MetalRenderer {
     /// combination itself. Built with `blending: false`, which is the whole
     /// correctness argument — see `pipelineDescriptor`.
     ///
-    /// Seven pipelines, then, from five fragment functions: plain, plain +
-    /// gather, blend, blend + gather, the shadow, the matte resolve
-    /// (`Compositor+Matte.swift`) and the dissolve mix
-    /// (`Compositor+Dissolve.swift`). `pipelineState(gather: blend:)` picks
-    /// one of the first four per layer.
+    /// Eight pipelines from six fragment functions: plain, plain + gather,
+    /// blend, blend + gather, the shadow, the matte resolve, the dissolve mix
+    /// and the adjustment pass (`Compositor+Adjustment.swift`, spec §11 GR-6).
     private let blendPipeline: MTLRenderPipelineState
     private let blendGatherPipeline: MTLRenderPipelineState
     /// The full-canvas quad that draws one blurred mask as a shadow (§7.5).
@@ -365,6 +363,7 @@ final class MetalRenderer {
     let mattePool: MattePool
     /// The routed dissolve's mix (spec §11 MT-8, `Compositor+Dissolve.swift`).
     let dissolvePipeline: MTLRenderPipelineState
+    let adjustPipeline: MTLRenderPipelineState
     let sampler: MTLSamplerState
     private let textureCache: CVMetalTextureCache
     /// Bound wherever the shader ignores the texture (the missing-media
@@ -466,7 +465,8 @@ final class MetalRenderer {
                     vertex: shadowVertex, fragment: resolveFragment)),
             let dissolvePipeline = try? device.makeRenderPipelineState(
                 descriptor: MetalRenderer.pipelineDescriptor(
-                    label: "Reelcut dissolve", vertex: shadowVertex, fragment: dissolveFragment))
+                    label: "Reelcut dissolve", vertex: shadowVertex, fragment: dissolveFragment)),
+            let adjustPipeline = MetalRenderer.adjustPipeline(device: device, library: library)
         else { return nil }
 
         let samplerDescriptor = MTLSamplerDescriptor()
@@ -509,6 +509,7 @@ final class MetalRenderer {
         self.matteResolvePipeline = matteResolvePipeline
         self.mattePool = MattePool(device: device)
         self.dissolvePipeline = dissolvePipeline
+        self.adjustPipeline = adjustPipeline
         self.sampler = sampler
         self.textureCache = cache
         self.placeholder = placeholder
@@ -522,10 +523,9 @@ final class MetalRenderer {
 
     /// The compositor's FIXED-FUNCTION blend, in descriptor form: source-over
     /// on PREMULTIPLIED colour, so the source factor is one and not source
-    /// alpha. The five layer and shadow pipelines and the dissolve mix come
-    /// through here (the matte resolve has its own, `matteResolveDescriptor`)
-    /// and four take it as written — a shadow is just another layer, drawn
-    /// under its own, and the mix lays its premultiplied pair source-over.
+    /// alpha. Every pipeline but the matte resolve (`matteResolveDescriptor`)
+    /// comes through here, and four take it as written — a shadow is just another
+    /// layer, drawn under its own, and the mix lays its premultiplied pair source-over.
     ///
     /// **`blending: false` is for a programmable-blend pipeline, and it is a
     /// correctness requirement rather than an optimisation.**
@@ -539,7 +539,7 @@ final class MetalRenderer {
     /// this and no opaque test catches it, which is why the proof carries a
     /// partial-opacity check (B6) whose only job is to fail when this line is
     /// wrong.
-    private static func pipelineDescriptor(
+    static func pipelineDescriptor(
         label: String, vertex: MTLFunction, fragment: MTLFunction, blending: Bool = true
     ) -> MTLRenderPipelineDescriptor {
         let descriptor = MTLRenderPipelineDescriptor()
@@ -571,8 +571,7 @@ final class MetalRenderer {
         }
     }
 
-    /// Drops the `CVMetalTexture`s wrapping the previous render context's
-    /// pixel buffers.
+    /// Drops the `CVMetalTexture`s wrapping the previous render context's pixel buffers.
     func flushPixelBufferTextures() {
         CVMetalTextureCacheFlush(textureCache, 0)
     }
@@ -621,9 +620,8 @@ final class MetalRenderer {
         var pass = DestinationPass(
             buffer: buffer, target: target, clear: clearColor(canvas.background),
             pipeline: pipeline, sampler: sampler)
-        // Opened eagerly: a recipe with no layers at all still has to CLEAR
-        // the destination, which is a recycled pixel buffer holding an old
-        // frame, not a blank one.
+        // Opened eagerly: a recipe with no layers still has to CLEAR the
+        // destination, a recycled pixel buffer holding an old frame.
         guard pass.open() != nil else { throw CompositorError.noDestinationTexture }
         try encodeLayers(
             canvasLayers, depth: 0, among: layers, coverage: coverage, canvas: canvas,
@@ -699,6 +697,7 @@ final class MetalRenderer {
             return .textured(drawn.texture, drawn.size, premultiplied: true, orientation: 0)
         case .missing:
             return .slate(layer.sourceSizeCG ?? CGSize(width: 640, height: 360))
+        case .adjustment: return .absent  // graded by `drawAdjustment`, never sampled
         }
     }
 

@@ -223,12 +223,14 @@ APP_STATE_TOOLS = {
     "delete_graphic", "rename_graphic", "restore_graphic",
 }
 
-# The seven ops `core/src/scope.rs` refuses inside a nest, and the sentence
-# it refuses them with. The message is the CORE's, and the app does not
+# The eight ops `core/src/scope.rs` refuses inside a nest, and the sentence
+# it refuses them with: the road map's seven document-level ops, and
+# `add_adjustment_clip` (grading GR4a, spec §11 GR-6), which is refused but
+# not document-level. The message is the CORE's, and the app does not
 # rewrite it.
 REFUSED_INSIDE = [
     "add_marker", "set_marker", "remove_marker", "set_canvas",
-    "add_media", "relink_media", "remove_media",
+    "add_media", "relink_media", "remove_media", "add_adjustment_clip",
 ]
 
 # `AgentServer+Render.swift`'s sentence, read the way six earlier scripts
@@ -628,7 +630,7 @@ def catalog_part(mcp):
           f"the injected property is a non-negative integer ({scope_property.get('type')}, "
           f"minimum {scope_property.get('minimum')})")
     for phrase, why in (
-            ("Seven ops have no meaning inside a nest",
+            ("Eight ops have no meaning inside a nest",
              "so a caller meets the refusal list before it trips over one"),
             ("still be refused for the whole DOCUMENT's sake",
              "so a caller meets the wide Err arm before it is surprised by one")):
@@ -1264,12 +1266,15 @@ def refusal_part(mcp):
     nest_clip = reported["clips"][0]["id"]
     inner = reported["nests"][0]["clips"][0]["id"]
     descriptor = {k: v for k, v in reported["media"][0].items() if k != "id"}
+    # The nest's own track: the app refuses a timeline track inside a scope
+    # before the core is asked, so add_adjustment_clip names this one.
+    inside_track = reported["nests"][0]["tracks"][0]["id"]
 
-    # All seven, each given arguments GOOD enough to reach the core. Four of
+    # All eight, each given arguments GOOD enough to reach the core. Four of
     # them are refused by the app's own id readers otherwise, and one by its
     # descriptor reader, which is why this fixture carries a marker, a media
     # in use and a media in nobody's use at all.
-    seven = {
+    refused = {
         "add_marker": {"at": 0, "scope": nest_id},
         "set_marker": {"marker": marker, "name": "x", "scope": nest_id},
         "remove_marker": {"marker": marker, "scope": nest_id},
@@ -1277,20 +1282,21 @@ def refusal_part(mcp):
         "add_media": {"descriptor": descriptor, "scope": nest_id},
         "relink_media": {"media": media, "path": MEDIA, "scope": nest_id},
         "remove_media": {"media": spare, "scope": nest_id},
+        "add_adjustment_clip": {"track": inside_track, "at": 0, "scope": nest_id},
     }
-    check(sorted(seven) == sorted(REFUSED_INSIDE),
-          "the seven ops with no meaning inside a nest are the ones this section sends")
-    for tool, args in seven.items():
+    check(sorted(refused) == sorted(REFUSED_INSIDE),
+          "the eight ops with no meaning inside a nest are the ones this section sends")
+    for tool, args in refused.items():
         message = refusal(mcp, tool, args)
         check(message == f"{tool} has no meaning inside nest {nest_id}",
               f"{tool} inside a nest refuses with core/src/scope.rs's own sentence: "
               f"{message!r}")
     # The control for the whole group: the SAME call without a scope works,
-    # so the seven refusals above are the scope's doing and not seven
+    # so the eight refusals above are the scope's doing and not eight
     # arguments that were wrong anyway.
     check(refusal(mcp, "remove_media", {"media": spare}) is None,
           "and remove_media of that same unused media, unscoped, applies — so what the "
-          "seven refuse is the scope and not the arguments")
+          "eight refuse is the scope and not the arguments")
     mcp.call_with("undo", {})
 
     # The order. `scope` decides which document the caller thinks it is
@@ -1826,7 +1832,7 @@ def main():
             frame_part, mcp)
     section("4 — one undo step per edit; entering and leaving are none", undo_part, mcp)
     section("5 — set_scope, in all its shapes", set_scope_part, mcp)
-    section("6 — the seven refusals, the order, and what an unscoped call still does",
+    section("6 — the eight refusals, the order, and what an unscoped call still does",
             refusal_part, mcp)
     section("7 — the wide Err arm: the caps and the depth, which a view cannot see",
             wide_err_part, mcp)

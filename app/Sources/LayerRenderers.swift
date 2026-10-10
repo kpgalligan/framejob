@@ -188,6 +188,7 @@ final class LayerRenderers {
         case .text(_, let props, _): return measuredSize(for: props)
         case .shape(_, let props): return layer.sourceSizeCG ?? props.boxSize
         case .track, .image, .graphic, .missing: return layer.sourceSizeCG
+        case .adjustment: return nil  // no box (spec §11 GR-6)
         }
     }
 

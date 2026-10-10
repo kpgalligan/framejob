@@ -47,7 +47,7 @@ detail there.
   It is also where the op table is read BACK: `ReelOp.coreNames()` over
   `rc_op_names`, and `ReelOp.coreSchemas()` over `rc_op_schemas` — every
   op's ARGUMENTS as JSON Schema, keyed by op name, which
-  `AgentCatalog.opTool` prints for all fifty-nine op tools.
+  `AgentCatalog.opTool` prints for all sixty op tools.
   `deinit` frees the Rust allocation. It also holds **the one read of
   `rc_project_apply`'s TWO message channels**, in the header's own order — a
   sentence is a refusal, an error message is invalid input, neither written
@@ -1093,6 +1093,7 @@ the key map behind it.
   leniently.
 - `Compositor.swift` · `Compositor+Uniforms.swift` · `Compositor+Shadow.swift` ·
   `Compositor+Matte.swift` · `MattePlan.swift` · `Compositor+Dissolve.swift` ·
+  `Compositor+Adjustment.swift` ·
   `CompositorEffects.swift` · `LayerUniforms.swift` (`LayerUniforms`,
   `ShadowUniforms`, `TransitionCode`) · `Resources/Shaders/Compositor.metal`
   — the per-layer pass. The working format is `rgba16Float`
@@ -1105,7 +1106,9 @@ the key map behind it.
   0…1 where the shader samples it. The uniform block's field ORDER is a contract with the
   shader checked only by reading both, so change them in one edit; it is 116
   floats (464 bytes), ending in the tone group (spec §11 GR-2: the nine tone
-  values, `toneEnabled`, and two reserved floats a next field can take). **Seven pipelines from five fragment functions**: the two
+  values, `toneEnabled`, and two reserved floats a next field can take). **Eight pipelines from six fragment functions** (the eighth,
+  `Compositor+Adjustment.swift`'s, is an adjustment clip's full-frame pass reading
+  the destination, blending off; spec §11 GR-6): the two
   programmable-blend pipelines MUST be built with fixed-function blending
   OFF, or the finished pixel is blended twice — invisible over an opaque
   destination, so a proof of it reads the ALPHA channel over a translucent
@@ -1864,7 +1867,7 @@ free.
   names). **A tool is built one of two ways**: `tool`, which declares its own
   schema, or `opTool`, which declares PROSE and prints the argument STRUCTURE
   from the core's published table (`Self.opSchemas` over `rc_op_schemas`).
-  **Every one of the fifty-nine op tools is `opTool`'s** and carries no
+  **Every one of the sixty op tools is `opTool`'s** and carries no
   `"type"`, no `"enum"` and no hand-written required list; `tool`'s remaining
   callers are the thirty APP-STATE tools, which have no op behind them
   and so nothing to read from the table — the eleven of the Projects group,
@@ -1900,7 +1903,7 @@ free.
   `AgentServer+Scope.swift` with the feature it is about; all five assert in
   debug, log `Reelcut: ` in release and start the server either way.
   `AgentServer+Gate.swift` is the CALL-time half of the same contract
-  (kpgalligan/reelcut#21): one comparison in `dispatch`, for all eighty-nine
+  (kpgalligan/reelcut#21): one comparison in `dispatch`, for all ninety
   product tools, of a caller's keys against the schema the tool published, every
   stranger refused by name — the tool, the strangers and the whole of what it
   takes — before the scope or any handler reads a thing. Its map is read once
@@ -2099,6 +2102,8 @@ free.
   nest, the playhead in ticks and seconds, the selection ascending, each
   label a key of `get_project`'s answer; `init(document:)` is main only. The
   system prompt names it by `tag`; F7 holds its text to the template.
+- `AgentServer+Grading.swift` — the grading tools' handlers: `add_adjustment_clip`
+  (spec §11 GR-6), mirroring Insert ▸ Adjustment Clip.
 - `AgentServer+DevTools.swift` — the dev tools' seam (road map 11, spec
   §11 V-1/V-2): the handler table, catalog rows and off-main set compiled
   only under `REELCUT_DEV_TOOLS`, which Debug and Release set and

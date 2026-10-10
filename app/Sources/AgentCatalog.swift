@@ -65,8 +65,8 @@ extension AgentServer {
     /// `import_graphic_asset`, `delete_graphic`, `rename_graphic`,
     /// `restore_graphic`). Every
     /// op tool is `opTool`'s since road map 7's D3·4, and `opTool` goes
-    /// through here, so this is still where all eighty-nine get `project`
-    /// and where all fifty-nine get `scope`.
+    /// through here, so this is still where all ninety get `project`
+    /// and where all sixty get `scope`.
     ///
     /// Internal rather than private for one reason and no other: three other
     /// files build tools with it or with `opTool`, and `private` on an
@@ -79,7 +79,7 @@ extension AgentServer {
         schema["project"] = Self.projectProperty
         // Road map 2's phase 9: every §6 OP also takes the envelope's
         // `scope`, and it is injected HERE for the reason `project` is —
-        // one edit site instead of fifty-nine, and the op somebody adds in
+        // one edit site instead of sixty, and the op somebody adds in
         // phase 10 cannot arrive with a tool that silently lacks it.
         //
         // Op-ness is the CORE's answer (`Self.opNames`, read through
@@ -123,7 +123,7 @@ extension AgentServer {
     /// injected keys are the same code and cannot come to differ: `project`
     /// on every tool, `scope` on every name the core calls an op.
     ///
-    /// **Every one of the fifty-nine op tools is built here** since road
+    /// **Every one of the sixty op tools is built here** since road
     /// map 7's D3·4 — the clip and action rows, the two transitions, the
     /// two graphics, the three raw media ops, the tracks, the markers and the canvas — so no
     /// tool anywhere declares an argument's type, its vocabulary or its
@@ -162,7 +162,7 @@ extension AgentServer {
     /// tools, and the startup parity check asks that each of them has a tool
     /// AND that the tool declares the property. One list, so the three
     /// cannot disagree — and a `static let`, so the FFI call and the JSON
-    /// decode behind it happen once per process instead of eighty-nine
+    /// decode behind it happen once per process instead of ninety
     /// times per catalog build.
     ///
     /// **An empty answer is a silent catastrophe, so it is not allowed to be
@@ -196,10 +196,10 @@ extension AgentServer {
             + "step. Omit it to edit whatever the app has OPEN — the timeline, or the nest "
             + "set_scope entered, exactly as an edit made by hand goes where the window is "
             + "looking — so this argument is how you act on a container you are not looking "
-            + "at, and get_project always says which one you are in. Seven ops have no "
+            + "at, and get_project always says which one you are in. Eight ops have no "
             + "meaning inside a nest and refuse by name when you ask for one: add_marker, "
-            + "set_marker, remove_marker, set_canvas, add_media, relink_media, remove_media. "
-            + "Those seven behave DIFFERENTLY when the scope is inherited from set_scope "
+            + "set_marker, remove_marker, set_canvas, add_media, relink_media, remove_media, "
+            + "add_adjustment_clip. The first seven behave DIFFERENTLY when the scope is inherited from set_scope "
             + "rather than asked for here, and the result says which: five of them, plus "
             + "set_marker's name / chapter / color and remove_marker, simply land on the "
             + "DOCUMENT and are named under document_ops. The two that carry a TIME — "

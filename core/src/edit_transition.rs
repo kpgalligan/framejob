@@ -21,6 +21,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::edit_adjustment::adjustment_transition;
 use crate::edit_clip::clip_end;
 use crate::model::{Clip, Curve, Project, Source, Transition, TransitionKind};
 use crate::model_words::rebase_words;
@@ -133,7 +134,11 @@ impl Project {
         clip: u32,
         kind: Option<TransitionKind>,
     ) -> Result<Outcome, String> {
-        let stored = self.require_clip(clip)?.transition_in;
+        let target = self.require_clip(clip)?;
+        if let (Some(_), Some(why)) = (kind, adjustment_transition(target)) {
+            return Ok(Outcome::Refused(why));
+        }
+        let stored = target.transition_in;
         let mut next = self.clone();
         if let Some(slot) = next.clip_mut(clip) {
             slot.transition_in = kind.map(|kind| match stored {
@@ -275,6 +280,11 @@ impl Project {
             }
             Some(p) => p.clone(),
         };
+        // Neither half may be an adjustment clip (spec §11 GR-6).
+        if let Some(why) = adjustment_transition(&later).or_else(|| adjustment_transition(&earlier))
+        {
+            return Ok(Outcome::Refused(why));
+        }
         if ripple {
             return self.add_transition_by_shift(&earlier, &later, kind, duration);
         }
@@ -496,9 +506,13 @@ impl Project {
         curve: Option<Curve>,
         audio: Option<bool>,
     ) -> Result<Outcome, String> {
-        let stored = self.require_clip(clip)?.transition_in;
+        let target = self.require_clip(clip)?;
+        let stored = target.transition_in;
         if curve.is_none() && audio.is_none() {
             return Ok(Outcome::Identity);
+        }
+        if let Some(why) = adjustment_transition(target) {
+            return Ok(Outcome::Refused(why));
         }
         let mut next = self.clone();
         if let Some(slot) = next.clip_mut(clip) {

@@ -140,8 +140,10 @@ extension ReelOp {
         return copy
     }
 
-    /// The seven ops `core/src/scope.rs`'s `refused_inside` answers
-    /// `"<op> has no meaning inside nest N"` to.
+    /// The seven DOCUMENT-level ops among those `core/src/scope.rs`'s
+    /// `refused_inside` answers `"<op> has no meaning inside nest N"` to. The
+    /// eighth, `add_adjustment_clip` (spec §11 GR-6), is refused for what it
+    /// places, not because it is the document's, so it is sent scoped.
     ///
     /// **The core owns this list and this is a mirror of it**, in the same
     /// sense that the typed factories above mirror the op table: change one,
@@ -270,6 +272,16 @@ extension ReelOp {
         a.put("props", props)
         a.put("schema", schema)
         return ReelOp(name: "add_graphic_clip", args: a.values)
+    }
+
+    /// An adjustment clip (spec §11 GR-6): no picture, it grades what is
+    /// behind it; `duration` defaults to 5 s.
+    static func addAdjustmentClip(track: UInt32, at: Ticks, duration: Ticks? = nil) -> ReelOp {
+        var a = OpArgs()
+        a.put("track", track)
+        a.put("at", at)
+        a.put("duration", duration)
+        return ReelOp(name: "add_adjustment_clip", args: a.values)
     }
 
     /// The kind-only shorthand for the one caller that wants nothing else:

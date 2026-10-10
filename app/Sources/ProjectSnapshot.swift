@@ -1264,6 +1264,7 @@ enum ClipSource: Codable, Equatable {
     /// mismatch to 0, so a nest clip silently lost its identity crossing
     /// the FFI. The two sides now agree.
     case nest(project: UInt32)
+    case adjustment  // no picture: grades what is behind it (spec §11 GR-6)
 
     private enum CodingKeys: String, CodingKey {
         case kind, media, at, project, reversed
@@ -1282,12 +1283,10 @@ enum ClipSource: Codable, Equatable {
             self = .still(id: c.lenient(.media, 0), at: c.lenient(.at, 0))
         case "image":
             self = .image(id: c.lenient(.media, 0))
-        case "text":
-            self = .text
-        case "shape":
-            self = .shape
-        case "graphic":
-            self = .graphic
+        case "text": self = .text
+        case "shape": self = .shape
+        case "graphic": self = .graphic
+        case "adjustment": self = .adjustment
         case "nest":
             self = .nest(project: c.lenient(.project, 0))
         default:
@@ -1309,8 +1308,7 @@ enum ClipSource: Codable, Equatable {
             try c.encode(at, forKey: .at)
         case .image(let id):
             try c.encode(id, forKey: .media)
-        case .text, .shape, .graphic:
-            break
+        case .text, .shape, .graphic, .adjustment: break
         case .nest(let project):
             try c.encode(project, forKey: .project)
         }
@@ -1320,7 +1318,7 @@ enum ClipSource: Codable, Equatable {
     var mediaID: UInt32? {
         switch self {
         case .media(let id, _, _), .still(let id, _), .image(let id): return id
-        case .text, .shape, .graphic, .nest: return nil
+        case .text, .shape, .graphic, .nest, .adjustment: return nil
         }
     }
 
@@ -1347,6 +1345,7 @@ enum ClipSource: Codable, Equatable {
         case .shape: return "shape"
         case .graphic: return "graphic"
         case .nest: return "nest"
+        case .adjustment: return "adjustment"
         }
     }
 
@@ -1356,7 +1355,7 @@ enum ClipSource: Codable, Equatable {
         switch self {
         case .media(_, let sourceIn, _): return sourceIn
         case .still(_, let at): return at
-        case .image, .text, .shape, .graphic, .nest: return 0
+        case .image, .text, .shape, .graphic, .nest, .adjustment: return 0
         }
     }
 
@@ -1471,6 +1470,7 @@ struct ClipSnapshot: Codable, Equatable, Identifiable {
         case .graphic: return "Graphic"
         case .still: return "Freeze Frame"
         case .nest: return "Nest"
+        case .adjustment: return "Adjustment"
         case .media, .image: return "Clip"
         }
     }
@@ -1712,7 +1712,7 @@ struct ProjectSnapshot: Codable, Equatable {
         case .nest:
             guard let n = nest(for: clip), n.width > 0, n.height > 0 else { return nil }
             return n.canvasSize
-        case .text:
+        case .text, .adjustment:
             return nil
         case .graphic:
             guard let g = clip.graphic, g.width > 0, g.height > 0 else { return nil }

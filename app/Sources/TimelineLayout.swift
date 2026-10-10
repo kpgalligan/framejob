@@ -146,7 +146,7 @@ struct TimelineLayout {
         guard clip.enabled.video else { return false }
         switch clip.source {
         case .media, .still, .image: return index.media(for: clip)?.hasVideo ?? false
-        case .text, .shape, .graphic, .nest: return true
+        case .text, .shape, .graphic, .nest, .adjustment: return true
         }
     }
 

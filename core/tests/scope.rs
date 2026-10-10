@@ -23,7 +23,7 @@
 //! reason.
 //!
 //! Around the oracle sit the cases the oracle cannot see, and they are the
-//! phase's real content: the seven refusals, the invariants a view is BLIND
+//! phase's real content: the eight refusals, the invariants a view is BLIND
 //! to (the document-wide caps and the nesting depth, which is why a scoped
 //! op has a wider `Err` arm than any other), and the two write-back rules
 //! that only a shared object can test — a `paste` that appends media, and
@@ -581,7 +581,7 @@ fn a_misspelt_argument_is_still_refused_beside_a_scope() {
 
 // ---- the refusal list ----------------------------------------------------
 
-/// The seven ops with no meaning inside a nest, with an argument list each
+/// The eight ops with no meaning inside a nest, with an argument list each
 /// that would otherwise be valid — so what the message reports is the
 /// refusal and not a bad argument.
 fn refused() -> Vec<(&'static str, Value)> {
@@ -603,11 +603,15 @@ fn refused() -> Vec<(&'static str, Value)> {
             json!({"op": "relink_media", "media": 1, "path": "/fixtures/moved.mov"}),
         ),
         ("remove_media", json!({"op": "remove_media", "media": 1})),
+        (
+            "add_adjustment_clip",
+            json!({"op": "add_adjustment_clip", "track": 2, "at": 20 * SEC}),
+        ),
     ]
 }
 
 #[test]
-fn the_seven_ops_with_no_meaning_inside_a_nest_are_errors_naming_themselves() {
+fn the_eight_ops_with_no_meaning_inside_a_nest_are_errors_naming_themselves() {
     let base = one_nest();
     for (name, op) in refused() {
         let mut scoped = op.clone();
@@ -626,7 +630,7 @@ fn every_refused_name_is_an_op_the_table_knows() {
     // table would be a lie the compiler cannot catch. `rc_op_names` is the
     // table as the host reads it.
     use reelcut_core::OP_NAMES;
-    assert_eq!(OP_NAMES.len(), 59, "a scope is an envelope key, not an op");
+    assert_eq!(OP_NAMES.len(), 60, "a scope is an envelope key, not an op");
     for (name, _) in refused() {
         assert!(
             OP_NAMES.contains(&name),
@@ -705,6 +709,10 @@ fn every_op() -> Vec<(&'static str, Value)> {
         (
             "add_graphic_clip",
             json!({"op":"add_graphic_clip","track":5,"at":20*SEC,"name":"g"}),
+        ),
+        (
+            "add_adjustment_clip",
+            json!({"op":"add_adjustment_clip","track":5,"at":20*SEC}),
         ),
         ("add_background", json!({"op":"add_background"})),
         (
@@ -873,12 +881,12 @@ fn every_op() -> Vec<(&'static str, Value)> {
 }
 
 #[test]
-fn every_op_in_the_table_works_inside_a_nest_except_the_seven() {
+fn every_op_in_the_table_works_inside_a_nest_except_the_eight() {
     // The empirical half of `scope.rs`'s exhaustive `refused_inside` match.
     // The match makes the compiler classify every op; this makes the
     // CLASSIFICATION true — that the fifty-two actually apply against a
     // real nest and come back through `validate` on the merged parent, and
-    // that exactly seven do not.
+    // that exactly eight do not.
     use reelcut_core::OP_NAMES;
     let base = every_kind();
     let table = every_op();
@@ -911,7 +919,7 @@ fn every_op_in_the_table_works_inside_a_nest_except_the_seven() {
 }
 
 #[test]
-fn the_same_seven_ops_still_work_without_a_scope() {
+fn the_same_eight_ops_still_work_without_a_scope() {
     // The refusal is about the scope and not about the op: each of these is
     // an ordinary edit on the timeline, which is what says the list bounds
     // a container rather than disabling a feature.
@@ -924,6 +932,7 @@ fn the_same_seven_ops_still_work_without_a_scope() {
     // `remove_media` refuses while a clip still shows the file, which is
     // its own documented rule — `with_clips` is the way through it.
     base.apply(&json!({"op": "remove_media", "media": 1, "with_clips": true}));
+    base.apply(&json!({"op": "add_adjustment_clip", "track": 2, "at": 20 * SEC}));
 }
 
 // ---- what the view cannot see: the caps ----------------------------------

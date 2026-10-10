@@ -256,7 +256,8 @@ impl Project {
             | Source::Text
             | Source::Shape
             | Source::Graphic
-            | Source::Nest { .. } => return None,
+            | Source::Nest { .. }
+            | Source::Adjustment => return None,
         };
 
         Some(Segment {
@@ -374,7 +375,13 @@ impl Project {
             Source::Media { media, .. } | Source::Still { media, .. } => {
                 self.media(*media).is_none_or(|m| m.has_video)
             }
-            Source::Image { .. } | Source::Text | Source::Shape | Source::Graphic => true,
+            // An adjustment clip draws by grading what is behind it
+            // (spec §11 GR-6), so it is a drawing instance like a shape.
+            Source::Image { .. }
+            | Source::Text
+            | Source::Shape
+            | Source::Graphic
+            | Source::Adjustment => true,
             Source::Nest { .. } => false,
         }
     }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ALL FIFTY-NINE op tools, against the core's own op table (road map 7's D3·4).
+"""ALL SIXTY op tools, against the core's own op table (road map 7's D3·4).
 
 `clip_catalog_proof.py` measured the forty-three clip and action tools when
 they stopped describing their own arguments. This measures the whole catalog:
@@ -274,7 +274,7 @@ def main():
 
     print("\n1 — the catalog is the core's op list plus the app's own tools")
     check(f"the core declares {len(ops)} ops and every one of them is a tool",
-          len(ops) == 59 and ops <= set(tools),
+          len(ops) == 60 and ops <= set(tools),
           f"{len(ops)} ops, missing tools: {sorted(ops - set(tools))}")
     group = sorted(ops)
     envelope = {

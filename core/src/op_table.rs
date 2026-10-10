@@ -9,7 +9,7 @@
 //!
 //! It is a module of its own because the table is a published interface —
 //! the tool catalog will read it rather than restate it — while the [`Op`]
-//! enum and the fifty-nine-way dispatch are the implementation of that
+//! enum and the sixty-way dispatch are the implementation of that
 //! interface. [`OP_NAMES`] is a projection of this table and is re-exported
 //! from `edit.rs` under its old name, so no caller anywhere moved.
 //!
@@ -82,7 +82,7 @@ use Kind::*;
 
 /// How many ops there are. `edit.rs`'s enum, its dispatch and this table
 /// all have exactly this many arms.
-pub const OP_COUNT: usize = 59;
+pub const OP_COUNT: usize = 60;
 
 /// One op's row: its name, and its arguments in the order the enum declares
 /// them — which is the order the decoder lists them back in.
@@ -241,6 +241,7 @@ pub const OP_TABLE: [OpRow; OP_COUNT] = [
          within(opt("width", Id), GRAPHIC_MIN_SIDE, GRAPHIC_MAX_SIDE),
          within(opt("height", Id), GRAPHIC_MIN_SIDE, GRAPHIC_MAX_SIDE),
          opt("props", Object), opt("schema", Object)]),
+    op("add_adjustment_clip", &[req("track", Id), req("at", Ticks), opt("duration", Ticks)]),
     op("add_background", &[opt("media", Id), opt("color", Color), opt("duration", Ticks)]),
     op("add_blurred_background", &[req("clip", Id)]),
     op("insert_clip", &[req("track", Id), req("media", Id), req("at", Ticks)]),

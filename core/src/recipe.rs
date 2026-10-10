@@ -220,10 +220,12 @@ impl Project {
 
         // The covering instances, collected once: the mattes are a relation
         // between them (`recipe_matte.rs`), answered per instance in order.
+        // An adjustment clip on a matte track is inert (spec §11 GR-6): it
+        // is dropped here, before the mattes are answered, so it cuts nothing.
         let instances: Vec<Instance> = self
             .drawing_instances()
             .into_iter()
-            .filter(|i| i.covers(t))
+            .filter(|i| i.covers(t) && !self.inert_adjustment(i))
             .collect();
         let mattes = self.frame_mattes(&instances);
         // So are the routed dissolves (`recipe_dissolve.rs`, spec §11 MT-8):
@@ -515,6 +517,13 @@ impl Project {
             // to keep the match exhaustive.
             Source::Nest { .. } => (missing_source(), Value::Null),
             Source::Graphic => graphic_source(clip, evaluated, clip_t, &self.canvas),
+            // No picture and no size: the compositor grades the destination
+            // with the layer's colour and filters (spec §11 GR-6).
+            Source::Adjustment => {
+                let mut source = Map::new();
+                source.insert("kind".to_string(), Value::from("adjustment"));
+                (Value::Object(source), Value::Null)
+            }
         }
     }
 }

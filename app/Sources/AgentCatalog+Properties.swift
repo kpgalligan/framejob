@@ -211,7 +211,9 @@ extension AgentServer {
                     + "Placement is spec §5.3: the source rectangle is centred at the "
                     + "canvas centre plus (x, y), scaled, then rotated about that centre, and "
                     + "crop removes edges in place without shifting the content. To animate a "
-                    + "property instead, add_action and then set_action_end.",
+                    + "property instead, add_action and then set_action_end. On an adjustment "
+                    + "clip only color, the point filters and opacity (the grade's strength) "
+                    + "do anything, and blur, sharpen, pixelate or a blend mode is an error.",
                 ["clips": clipsDescription, "patch": videoPatchDescription]),
             opTool(
                 "set_audio",

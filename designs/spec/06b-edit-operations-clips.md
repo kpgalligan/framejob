@@ -27,6 +27,15 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   (a string of at most 4096 characters, a number or a boolean, under a key matching
   `^[A-Za-z_][A-Za-z0-9_]{0,31}$`); a `null` prop is dropped unchecked, and more than 64 is an
   **error**. Every check runs before the placement.
+- **`add_adjustment_clip {track, at, duration=5 s}`** (grading branch, §11 GR-6) — Same placement
+  rules; a clip with no picture (`source.kind` `adjustment`) at scale 1 with default `video`. While
+  it lasts its `video.color`, point filters and `opacity` (the strength) grade everything drawn
+  behind it in its container, the canvas background included, never a track in front; on a track
+  cut by a matte only inside the matte; on a matte track nothing. An **error** inside a scope ("…
+  has no meaning inside nest N"). It is refused by `nest` and by every transition op
+  (`add_transition` either half, `set_transition` with a kind, `set_transition_style` with a key),
+  and the overlap rule refuses any overlap holding one, each in GR-6's sentence; blur, sharpen,
+  pixelate and a blend mode on it are **errors** from `set_video`, `paste` and `paste_attributes`.
 - **`add_background {media?, color?=white, duration?=the timeline's length}`** — A backdrop on a NEW
   back-most track, starting at 0 and named "Background". With `media`, that file placed as
   `add_clip` would place it but for its SCALE — the right source kind, audio props when it has

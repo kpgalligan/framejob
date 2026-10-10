@@ -62,6 +62,9 @@ enum DS {
         srgbRed: 0x24 / 255, green: 0x76 / 255, blue: 0x86 / 255, alpha: 1)
     static let clipNest = NSColor(
         srgbRed: 0x55 / 255, green: 0x59 / 255, blue: 0x5F / 255, alpha: 1)
+    /// An adjustment clip's rose (spec §11 GR-6), the same in both appearances.
+    static let clipAdjustment = NSColor(
+        srgbRed: 0x8C / 255, green: 0x3A / 255, blue: 0x5E / 255, alpha: 1)
 
     /// The empty lane and the alternating band that separates two tracks.
     static var timelineLane: NSColor { .underPageBackgroundColor }

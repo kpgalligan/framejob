@@ -31,6 +31,7 @@
 
 use crate::actions;
 use crate::audio::Side;
+use crate::edit_adjustment::adjustment_overlap;
 use crate::model::{Clip, Project, Transition, TransitionKind};
 use crate::model_query::clips_on;
 use crate::time::Ticks;
@@ -298,6 +299,11 @@ impl Project {
         for i in 0..placed.len() {
             if let (Some(a), Some(b)) = (placed.get(i), placed.get(i + 1)) {
                 if let Some(overlap) = overlap_of(a, b) {
+                    // No overlap may hold an adjustment clip (spec §11
+                    // GR-6): it cannot take the transition an overlap is.
+                    if let Some(why) = adjustment_overlap(a, b) {
+                        return Err(why);
+                    }
                     // Half of the SHORTER clip. Integer halving truncates,
                     // which errs toward refusing — the safe side, since an
                     // over-long overlap is what breaks the A/B assignment.

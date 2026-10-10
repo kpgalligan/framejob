@@ -18096,3 +18096,54 @@ CT).
 | `pending-dropped` | a frame offered while a pass is in flight is dropped, not kept | P7 |
 
 **Its record**: `designs/grading.md`'s GR3 section.
+
+## Road map grading — GR4a, adjustment clips (`adjustment_proof.py` N1, G1, U1, G2, F1, O1, O2, M1, Q1, M2, E1–E8, C1, A1, R1–R7, Z1 and seven mutants; `core/tests/adjustment.rs`; spec §11 GR-6; the `grading` branch)
+
+**What it answers.** That an adjustment clip (`add_adjustment_clip`) grades
+everything drawn behind it and nothing in front, by its colour, its point
+filters and its opacity, through the eighth pipeline, and that every rule GR-6
+refuses answers in its own sentence. On a four-track stack (a grey and a blue
+rectangle behind the clip, a red square in front, a dark background showing
+between): N1 a neutral clip changes no byte; G1 brightness +0.2 lifts every
+sample behind it by 0.2 and leaves the front square's bytes alone; U1
+`render_frame {ungraded}` is N1's frame; G2 exposure +1 is the linear-light
+doubling; F1 invert is 255 − v; O1 opacity 0.5 lands halfway and O2 an opacity
+action is halfway at its midpoint; M1 an alpha matte window in front of the
+clip grades only inside it, and Q1 is M1 as a `prores_422` export at
+[320, 180] (the Preview Quality path); M2 the clip's own track made a matte
+leaves the frame as if it were not there; E1–E5 are the opaque export rows and
+E6–E8 the alpha rows (over a transparent canvas, `hevc_alpha` skipped by name
+where the encoder is missing), each decoded middle frame within ±8 of
+`render_frame` and its alpha within ±2; C1 a split, a trim to 20 s and a paste
+grade the same; A1 reads the ALPHA channel over a transparent canvas (alpha
+unchanged, the premultiplied colour graded), which is the one row a blending
+pipeline fails; R1–R7 are GR-6's seven sentences, the transition sentence from
+all three transition ops, with the project and the last undo step unchanged.
+The module docstring lists every row and its fixture.
+
+```
+python3 tools/proof/adjustment_proof.py                  # Debug unless RC_PROOF_APP=release
+python3 tools/proof/adjustment_proof.py --only G1,M1     # run and score only these rows (and Z1)
+python3 tools/proof/adjustment_proof.py --mutant NAME    # one of the seven below
+cd core && cargo test --release --test adjustment
+```
+
+It launches its own instance on a scratch socket in a scratch home
+(`tools/proof/work/adjustment/home`), builds every fixture over MCP (shapes
+only, no media file), performs no menu item, closes every project it opens,
+and removes its work folder at the start and at exit. `--mutant` builds a tree
+copy as `tone_proof` does (a core mutant owns the copy's `core/` through
+`hevc_alpha_proof.own_core`) and reports MUTANT PASS only when every named row
+failed and no other scored row did.
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `blending-on` | the adjust pipeline built with fixed-function blending on | A1 |
+| `ignores-matte` | the pass's weight drops the matte coverage | M1 Q1 |
+| `ignores-opacity` | the pass's weight drops the opacity | O1 O2 |
+| `front-graded` | adjustment layers drawn after every other layer | G1 |
+| `matte-track-not-inert` | the recipe keeps an adjustment clip on a matte track | M2 |
+| `nest-allowed` | `nest` takes an adjustment clip | R1 |
+| `overlap-allowed` | the overlap rule's adjustment clause gone | R5 |
+
+**Its record**: `designs/grading.md`'s GR4a section.

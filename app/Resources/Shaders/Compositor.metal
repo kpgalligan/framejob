@@ -1764,3 +1764,36 @@ fragment float4 reelcut_dissolve_fragment(ShadowVaryings in [[stage_in]],
     }
     return saturate(mix(o, i, p));
 }
+
+// MARK: - The adjustment pass (spec §11 GR-6)
+
+// An adjustment clip's layer: no texture, one full-frame quad, blending OFF.
+// It reads what is already drawn behind it — the target `encodeLayers` is
+// drawing into — un-premultiplies it, grades it as step 3's colour adjust
+// (`gradeSample`, the chroma key off), step 4c's tone and step 5's point
+// filters would (the canvas's uv as the filters' local position), and
+// premultiplies it back by the destination's own alpha, so alpha is
+// preserved. The weight is the layer's opacity, its strength, times the
+// matte coverage sampled as step 7c samples it.
+fragment float4 reelcut_adjust_fragment(ShadowVaryings in [[stage_in]],
+                                        constant LayerUniforms &u [[buffer(0)]],
+                                        float4 dst [[color(0)]],
+                                        texture2d<float> matte [[texture(1)]],
+                                        sampler samp [[sampler(0)]]) {
+    float a = saturate(dst.a);
+    float3 c = saturate(dst.rgb / max(a, 1e-4));
+    c = gradeSample(c, 1.0, u).rgb;
+    if (u.toneEnabled > 0.5) {
+        c = gradeTone(c, u);
+    }
+    float2 local = canvasPixels(in.position.xy, float2(u.canvasPerDestX, u.canvasPerDestY))
+        / max(float2(u.canvasWidth, u.canvasHeight), float2(1.0));
+    for (int i = 0; i < 4; ++i) {
+        float2 slot = filterSlot(u, i);
+        c = pointFilter(int(slot.x + 0.5), clamp(slot.y, 0.0, 1.0), c, local);
+    }
+    c = saturate(c);
+    float4 g = float4(c * a, a);
+    float w = saturate(u.opacity * matte.sample(samp, local).r);
+    return mix(dst, g, w);
+}

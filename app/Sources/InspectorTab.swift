@@ -32,7 +32,7 @@ enum InspectorTab: Int, CaseIterable {
     /// an audio-only clip out of the video sections.
     static func hasPixels(_ clip: ClipSnapshot, in snapshot: ProjectSnapshot) -> Bool {
         switch clip.source {
-        case .text, .shape, .graphic, .nest:
+        case .text, .shape, .graphic, .nest, .adjustment:
             return true
         case .media, .still, .image:
             guard let media = snapshot.media(for: clip) else { return false }
@@ -67,7 +67,7 @@ enum InspectorTab: Int, CaseIterable {
     static func hasSourcePixels(_ clip: ClipSnapshot, in snapshot: ProjectSnapshot) -> Bool {
         switch clip.source {
         case .media, .still, .image: return true
-        case .text, .shape, .graphic, .nest: return false
+        case .text, .shape, .graphic, .nest, .adjustment: return false
         }
     }
 }

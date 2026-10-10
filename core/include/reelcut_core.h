@@ -112,8 +112,10 @@ extern "C" {
  *
  * Version 1015 is the grading branch's own number (spec §11 GR-9), main's 14
  * plus a thousand: tone, nine keys on `video.color` after `hue`, each written
- * only when not 0. The branch reads 1 to 14 and 1015 and refuses the numbers
- * between by name; the merge renumbers it to main's next. */
+ * only when not 0, and the `adjustment` source kind (GR-6), which a build
+ * that does not know it refuses as an unknown variant. The branch reads 1 to
+ * 14 and 1015 and refuses the numbers between by name; the merge renumbers
+ * it to main's next. */
 #define RC_FORMAT_VERSION 1015
 
 /* Reader caps enforced by the writer, so every file this build produces can
@@ -176,9 +178,9 @@ void rc_project_free(RcProject *p);
  * (core/src/scope.rs, spec section 6). With it the op is applied INSIDE that
  * nest — its tracks and clips at the top level, its own zero as time zero —
  * and the result is still a whole project, so undo stays a stack of these
- * handles. Absent and null both mean the timeline. Seven ops have no meaning
+ * handles. Absent and null both mean the timeline. Eight ops have no meaning
  * in a nest and are an error naming themselves and it (the three marker ops,
- * set_canvas, and the three media ops), and a scoped op has a WIDER error
+ * set_canvas, the three media ops, and add_adjustment_clip), and a scoped op has a WIDER error
  * arm than an unscoped one: the clip and track caps and the nesting depth are
  * document-wide and invisible from inside a nest, so an op can be valid
  * against the nest and still come back "too many clips", "too many tracks" or

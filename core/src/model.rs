@@ -310,6 +310,9 @@ pub enum Source {
         /// nest so the clip keeps its place on the timeline.
         project: u32,
     },
+    /// No picture of its own: grades what is drawn behind it in its
+    /// container (spec §11 GR-6, `edit_adjustment.rs`).
+    Adjustment,
 }
 
 /// Per-clip video/audio enablement. Detach Audio flips these across two

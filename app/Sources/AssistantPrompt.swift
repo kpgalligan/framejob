@@ -35,9 +35,9 @@ enum AssistantPrompt {
          ["add_track", "remove_track", "move_track", "set_track", "remove_empty_tracks"]),
         ("markers and the canvas (size, frame rate, background)",
          ["add_marker", "set_marker", "remove_marker", "set_canvas"]),
-        ("place clips: media, text, shapes, backgrounds, insert and overwrite edits, paste, "
-            + "duplicate",
-         ["add_clip", "add_text_clip", "add_shape_clip", "add_background",
+        ("place clips: media, text, shapes, backgrounds, adjustment clips that grade what is "
+            + "below, insert and overwrite edits, paste, duplicate",
+         ["add_clip", "add_text_clip", "add_shape_clip", "add_adjustment_clip", "add_background",
           "add_blurred_background", "insert_clip", "overwrite_clip", "paste", "duplicate"]),
         ("cut and time clips: move, trim, split, slip, roll, speed, reverse, freeze a frame, "
             + "detach audio, delete, ripple delete, delete or lift a range, insert time, close "

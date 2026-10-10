@@ -173,7 +173,7 @@ impl Project {
                 let found = self.nest(*project)?;
                 sized(found.width, found.height)
             }
-            Source::Text => None,
+            Source::Text | Source::Adjustment => None,
         }
     }
 
@@ -354,7 +354,11 @@ impl Project {
                 Source::Media { media, .. } => Some(*media),
                 Source::Still { media, .. } => Some(*media),
                 Source::Image { media } => Some(*media),
-                Source::Text | Source::Shape | Source::Graphic | Source::Nest { .. } => None,
+                Source::Text
+                | Source::Shape
+                | Source::Graphic
+                | Source::Nest { .. }
+                | Source::Adjustment => None,
             };
             if let Some(media) = referenced {
                 if self.is_missing_media(media) {
@@ -382,6 +386,9 @@ impl Project {
                         clip.id, project
                     ));
                 }
+            }
+            if !whose.is_empty() && crate::edit_adjustment::is_adjustment(clip) {
+                return Err(crate::edit_adjustment::adjustment_nested(clip.id, whose));
             }
             for action in &clip.actions {
                 if action.duration <= 0 {

@@ -309,7 +309,8 @@ def main():
         "add_media", "relink_media", "remove_media",
     }
     got = {row["name"] for row in answer["documentLevel"] if row["isDocumentLevel"]}
-    check("exactly the seven ops `core/src/scope.rs` refuses inside a nest are "
+    check("exactly the seven document-level ops `core/src/scope.rs` refuses inside a "
+          "nest (not add_adjustment_clip, the eighth, which stays scoped) are "
           "document-level, so those and only those are sent unscoped",
           got == expected_document_level, f"{sorted(got)}")
 
