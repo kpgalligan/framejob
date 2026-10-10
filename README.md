@@ -255,6 +255,15 @@ schema, §6 the op table, §7 the architecture.
   beside the preview, with red marks where highlights and shadows clip and
   the share of the frame clipping at each end. Neither is remembered: a
   window opens with both off.
+- **Adjustment clips** (the `grading` branch). **Insert ▸ Adjustment Clip**
+  places a clip that draws nothing of its own and grades everything behind
+  it — its Light, Color and point filters apply to the whole picture under
+  it, at a **Strength** (its opacity) you can fade or animate. It covers the
+  In/Out range, else the selected clips, else the whole timeline, on the
+  front track or a new "Adjustment" track, in one undo step, and opens the
+  inspector on its Color tab (Adjustment, Light, Color; there is no Picture
+  tab for it). On a matte track it does nothing, and the Clip tab says so;
+  it cannot go inside a nest or take a transition.
 - **Output.** **File ▸ Save Frame…** (⌥⌘E) writes the frame under the
   playhead as a PNG, JPEG or HEIC still — the same writer `render_frame`
   uses, so a still saved from the menu and one an agent asked for are the
@@ -426,7 +435,7 @@ Makefile              Build orchestration
 | `ProjectSnapshot.swift` | the `Codable` mirror of the §5.2 project JSON, the plan and the recipe, plus the §5.3 placement maths |
 | `ProjectDocument.swift` | NSDocument, `.reelcut` package read/write, and the single mutation point (`applyEdit`, the live-edit trio, undo as a handle stack) |
 | `MediaImporter.swift` | `AVURLAsset` probing (the one file allowed `async`/`await`), thumbnails, waveform peaks |
-| `CompositionBuilder.swift` · `Compositor.swift` · `LayerRenderers.swift` · `LayerRenderersText.swift` · `Playback.swift` · `RecipeSource.swift` | plan → `AVComposition`; the `AVVideoCompositing` Metal pipeline — seven pipelines from five fragment functions, one of them reading the destination so a layer can blend; text/shape/image textures, a shape's gradient and the three text reveals the recipe asks for; the player and its rebuild-vs-refresh rule; the registry the compositor reads a recipe from, one slot per document and per export |
+| `CompositionBuilder.swift` · `Compositor.swift` · `LayerRenderers.swift` · `LayerRenderersText.swift` · `Playback.swift` · `RecipeSource.swift` | plan → `AVComposition`; the `AVVideoCompositing` Metal pipeline — eight pipelines from six fragment functions, one of them reading the destination so a layer can blend; text/shape/image textures, a shape's gradient and the three text reveals the recipe asks for; the player and its rebuild-vs-refresh rule; the registry the compositor reads a recipe from, one slot per document and per export |
 | `CaptionImporter.swift` · `CaptionLayout.swift` · `CaptionStyle.swift` · `CaptionLooks.swift` · `CaptionPages.swift` · `Transcriber.swift` (+`Extract` `Jobs` `Languages`) · `CaptionExporter.swift` | captions in and out: the SubRip grammar, the placement every producer shares, the five word caption styles, the three looks a run may add to them (a sliding pill, a word that fills, a dim in pauses) and the pager that fills their pages to a measured width, on-device speech recognition and the cue builder over it, the extractor and the job list both engines share, and the `.srt` / `.vtt` writer |
 | `CloudTranscriber.swift` (+`Media`) · `MediaTranscript.swift` · `AssemblyAIClient.swift` (+`Session`) · `AssemblyAITranscript.swift` · `AssemblyAIConfiguration.swift` · `AssemblyAILanguages.swift` · `SecretStore.swift` · `CloudProgress.swift` · `CloudEstimate.swift` | captions from the cloud (road map 6): the run that groups clips by media and deletes what it fetched, the transcript cache in the package, AssemblyAI's five REST calls and their wire values, where the client speaks and what it says it is, the `0600` key file, the progress number and the price the sheet shows before the button |
 | `Exporter.swift` · `ExporterSettings.swift` · `ExporterWriter.swift` · `ExporterWriter+Settings.swift` · `ExporterAudioGain.swift` · `ExportSheetController.swift` (with `ExportSheetOptions` `ExportSheetResolve` `ExportSheetPresets` `ExportProgressSheetController`) | writing a file — two passes wherever it holds sound, the first measuring loudness — and rendering one frame offline; the settings each row becomes in AVFoundation's terms, and the loudness gain applied to the float mix and quantised once; the sheet's controls, the resolution behind them and the progress sheet |
@@ -550,8 +559,8 @@ knowing before reading a result: the clip and track caps and the nesting
 depth are document-wide and invisible from inside a nest, so an op that is
 perfectly valid against the nest still comes back "too many clips" or "nests
 are more than 8 deep". The ops themselves:
-`add_clip`, `add_text_clip`, `add_shape_clip`, `add_background`,
-`add_blurred_background`, `insert_clip`,
+`add_clip`, `add_text_clip`, `add_shape_clip`, `add_adjustment_clip`,
+`add_background`, `add_blurred_background`, `insert_clip`,
 `overwrite_clip`, `move_clip`, `trim_start`, `trim_end`, `rate_stretch`,
 `slip`, `roll`, `split`, `delete`, `ripple_delete`, `ripple_delete_range`,
 `ripple_delete_ranges`, `lift_range`, `insert_time`, `close_gap`,

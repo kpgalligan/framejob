@@ -309,6 +309,13 @@
    ],
    "note": "a selection"
   },
+  "insertAdjustmentClip:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+Adjustment.swift `func insertAdjustmentClip(`"
+   ],
+   "note": "an edit"
+  },
   "insertGraphicTemplate:": {
    "verdict": "none",
    "code": [

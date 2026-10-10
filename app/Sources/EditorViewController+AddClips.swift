@@ -93,7 +93,7 @@ extension EditorViewController {
     /// than trusting an id we predicted keeps this correct even if the core
     /// ever allocates differently — and it is why every command in this file
     /// reads the snapshot BEFORE it edits.
-    private func selectClips(addedSince before: ProjectSnapshot, in document: ProjectDocument) {
+    func selectClips(addedSince before: ProjectSnapshot, in document: ProjectDocument) {
         let existing = Set(before.clips.map { $0.id })
         let added = document.editedProject.snapshot.clips.map { $0.id }
             .filter { !existing.contains($0) }

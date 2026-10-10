@@ -56,6 +56,7 @@ extension UIMenu {
         "selectAllClipsOnTrack:": .plain,
         "selectAll:": .plain,
         "selectAfterPlayhead:": .plain,
+        "insertAdjustmentClip:": .plain,
         "insertGraphicTemplate:": .plain,
         "insertGraphicFromFile:": .sheet,
         "splitAtPlayhead:": .plain,

@@ -12,9 +12,18 @@ extension ClipPane {
     /// the Clip tab reads (the open nest's tracks inside one): nil unless
     /// every clip sits on a matte track and those tracks share one mode;
     /// then "Nothing is behind…" when none of them has a target (MT-2), else
-    /// "Matte for the track below (<mode>)…".
+    /// "Matte for the track below (<mode>)…". First of all, when every clip
+    /// is an adjustment clip on a matte track, the note says it does nothing
+    /// there (spec §11 GR-6: an adjustment clip grades what is behind it, and
+    /// a matte track draws nothing).
     static func matteNote(clips: [ClipSnapshot], tracks: [TrackSnapshot]) -> String? {
         guard !clips.isEmpty else { return nil }
+        if clips.allSatisfy({ clip in
+            InspectorTab.isAdjustment(clip)
+                && tracks.contains { $0.id == clip.track && $0.matte != .none }
+        }) {
+            return "An adjustment clip on a matte track has no effect."
+        }
         var matteTracks: [TrackSnapshot] = []
         for clip in clips {
             guard let track = tracks.first(where: { $0.id == clip.track }),

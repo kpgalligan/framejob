@@ -18097,7 +18097,7 @@ CT).
 
 **Its record**: `designs/grading.md`'s GR3 section.
 
-## Road map grading — GR4a, adjustment clips (`adjustment_proof.py` N1, G1, U1, G2, F1, O1, O2, M1, Q1, M2, E1–E8, C1, A1, R1–R7, Z1 and seven mutants; `core/tests/adjustment.rs`; spec §11 GR-6; the `grading` branch)
+## Road map grading — GR4a and GR4b, adjustment clips and their chrome (`adjustment_proof.py` N1, G1, U1, G2, F1, O1, O2, M1, Q1, M2, E1–E8, C1, A1, R1–R7, I1–I4, S1–S4, Z1 and thirteen mutants; `core/tests/adjustment.rs`; spec §11 GR-6; the `grading` branch)
 
 **What it answers.** That an adjustment clip (`add_adjustment_clip`) grades
 everything drawn behind it and nothing in front, by its colour, its point
@@ -18119,19 +18119,38 @@ grade the same; A1 reads the ALPHA channel over a transparent canvas (alpha
 unchanged, the premultiplied colour graded), which is the one row a blending
 pipeline fails; R1–R7 are GR-6's seven sentences, the transition sentence from
 all three transition ops, with the project and the last undo step unchanged.
-The module docstring lists every row and its fixture.
+
+GR4b's rows drive the chrome. I1–I4 perform Insert ▸ Adjustment Clip
+(`perform_menu_item`) over a back shape [0, 4 s) and a front shape
+[3 s, 4 s): I1 a 0.5–2.5 s range lands one clip on the front track, selected,
+the inspector on Clip ▸ Color of `[color, clip]`, one undo step "Add
+Adjustment Clip"; I2 the selection's span overlaps the front shape, so a new
+front "Adjustment" track takes it and one undo removes both; I3 a matte front
+track is never used; I4 the item is disabled ("is disabled here") inside a
+nest and on an empty project with no range, and a range there is the
+CONTROL. S1–S4 read the inspector's `snapshot_ui` layout dump over an image
+clip and an adjustment clip at opacity 0.75: S1 the adjustment clip alone gets
+`[color, clip]` and Strength "75%" in an Adjustment section above Light and
+Color (a section is named by a row of its own, because a header draws its
+title); S2 with the image too, Color has Light and no Strength; S3 the image
+alone keeps Picture (CONTROL); S4 the adjustment clip on a matte track shows
+"An adjustment clip on a matte track has no effect." The module docstring
+lists every row and its fixture.
 
 ```
 python3 tools/proof/adjustment_proof.py                  # Debug unless RC_PROOF_APP=release
 python3 tools/proof/adjustment_proof.py --only G1,M1     # run and score only these rows (and Z1)
-python3 tools/proof/adjustment_proof.py --mutant NAME    # one of the seven below
+python3 tools/proof/adjustment_proof.py --mutant NAME    # one of the thirteen below
 cd core && cargo test --release --test adjustment
 ```
 
 It launches its own instance on a scratch socket in a scratch home
 (`tools/proof/work/adjustment/home`), builds every fixture over MCP (shapes
-only, no media file), performs no menu item, closes every project it opens,
-and removes its work folder at the start and at exit. `--mutant` builds a tree
+only, and one PNG it renders itself; no media file), performs only Insert ▸
+Adjustment Clip (which persists nothing), closes every project it opens, and
+removes its work folder at the start and at exit. It launches with three
+argument-domain section pins (`video.adjustment` open, `video.light` and
+`video.color` closed), which S1 relies on. `--mutant` builds a tree
 copy as `tone_proof` does (a core mutant owns the copy's `core/` through
 `hevc_alpha_proof.own_core`) and reports MUTANT PASS only when every named row
 failed and no other scored row did.
@@ -18145,5 +18164,11 @@ failed and no other scored row did.
 | `matte-track-not-inert` | the recipe keeps an adjustment clip on a matte track | M2 |
 | `nest-allowed` | `nest` takes an adjustment clip | R1 |
 | `overlap-allowed` | the overlap rule's adjustment clause gone | R5 |
+| `span-ignores-range` | the In/Out range ignored by the span (the validator shares it) | I1 I4 |
+| `matte-front-taken` | a matte front track takes the clip | I3 |
+| `enabled-in-nest` | the item enabled with a nest open | I4 |
+| `picture-for-adjustment` | Picture offered with an adjustment clip | I1 S1 S2 |
+| `strength-in-mixed` | Strength shown for a mixed selection | S2 |
+| `adjustment-note-gone` | the adjustment matte note gone | S4 |
 
-**Its record**: `designs/grading.md`'s GR4a section.
+**Its record**: `designs/grading.md`'s GR4a and GR4b sections.

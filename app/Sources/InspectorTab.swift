@@ -14,8 +14,8 @@ import AppKit
 /// sections the SELECTION actually has is always the right tab for a clip.
 /// `ClipPane.makeSections()` is where that decision moved to.
 ///
-/// The three kind tests below outlived the tabs they were written for: they
-/// are now what decides which sections the Clip tab shows.
+/// The four kind tests below — three of them outlived the tabs they were
+/// written for — are now what decides which sections the Clip tab shows.
 enum InspectorTab: Int, CaseIterable {
     case clip, media, document, assistant
 
@@ -69,5 +69,13 @@ enum InspectorTab: Int, CaseIterable {
         case .media, .still, .image: return true
         case .text, .shape, .graphic, .nest, .adjustment: return false
         }
+    }
+
+    /// Whether the clip is an adjustment clip (spec §11 GR-6): it draws
+    /// nothing of its own and grades what is behind it, so it gets Color and
+    /// Clip and never Picture.
+    static func isAdjustment(_ clip: ClipSnapshot) -> Bool {
+        if case .adjustment = clip.source { return true }
+        return false
     }
 }

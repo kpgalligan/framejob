@@ -99,12 +99,13 @@ let bytesMatch = templateItems.map { item -> String in
     return same ? "ok" : "\(item.title): \(url.path) differs from \(source.path)"
 }
 let editIndex = barTitles.firstIndex(of: "Edit")
-check("M2 the menu bar has Insert right after Edit; Insert ▸ Graphic is the six templates by "
+check("M2 the menu bar has Insert right after Edit, holding Adjustment Clip then Graphic; "
+      + "Insert ▸ Graphic is the six templates by "
       + "title, a separator and From File…; each template's representedObject is a URL whose "
       + "bytes equal graphic/tests/graphics/",
       editIndex != nil && barTitles.indices.contains((editIndex ?? 0) + 1)
           && barTitles[(editIndex ?? 0) + 1] == "Insert"
-          && insert?.items.map(\.title) == ["Graphic"]
+          && insert?.items.map(\.title) == ["Adjustment Clip", "Graphic"]
           && graphicTitles == wantTitles
           && graphic?.items.last?.action
               == #selector(EditorViewController.insertGraphicFromFile(_:))

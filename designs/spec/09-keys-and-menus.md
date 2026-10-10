@@ -155,5 +155,13 @@ runs (`rename_graphic`, `delete_graphic`, `restore_graphic`). Rename and
 Delete are greyed in a project with no graphics, Restore when no version
 of any graphic is kept, and Rename also while a nest is open; §11 G-30 has
 the rules.
+The grading branch's GR4b puts **Adjustment Clip** first in Insert, above
+Graphic ▸, with no key equivalent: one adjustment clip over the In/Out range,
+else the selected clips' span, else the whole timeline, on the front track
+when it takes the clip and is not a matte, else on a new front track named
+"Adjustment"; one undo step, "Add Adjustment Clip", the new clip selected and
+the inspector on Clip ▸ Color. It is greyed while a nest is open and when
+there is nothing to cover (no range, no selection and an empty timeline);
+§11 GR-6 has the rules.
 All menu items are nil-target selectors validated in
 `validateUserInterfaceItem`.

@@ -2,7 +2,10 @@ import AppKit
 
 /// The menu bar's graphics rows (road map 10's G5b): the Insert menu and its
 /// Graphic submenu, and Help ▸ Graphics Reference's action; and File's three
-/// graphic-file items (spec §11 G-30, issue batch B84).
+/// graphic-file items (spec §11 G-30, issue batch B84). Insert holds
+/// Adjustment Clip first, above Graphic (spec §11 GR-6): a nil-target
+/// selector the editor implements and validates
+/// (`EditorViewController+Adjustment.swift`), with no key equivalent.
 ///
 /// **Insert ▸ Graphic lists the BUNDLED templates by file stem** —
 /// `GraphicTemplates.list(in:)`, never a compile, because chrome probes build
@@ -18,9 +21,11 @@ import AppKit
 /// while the bundled `GraphicsAPI.md` is there.
 extension AppDelegate {
 
-    /// "Insert", holding Graphic.
+    /// "Insert", holding Adjustment Clip, then Graphic.
     func insertMenu() -> NSMenu {
         let menu = NSMenu(title: "Insert")
+        menu.addItem(
+            item("Adjustment Clip", #selector(EditorViewController.insertAdjustmentClip(_:))))
         menu.addItem(submenuItem(graphicMenu()))
         return menu
     }

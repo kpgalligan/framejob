@@ -23,7 +23,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | **§4 — The regions in detail** | | |
 | [`04.1-toolbar.md`](04.1-toolbar.md) | 25 | The toolbar. |
 | [`04.2-preview-canvas.md`](04.2-preview-canvas.md) | 94 | The preview canvas: selection, handles, crop and region modes, on-canvas text, snapping, Show Ungraded and the waveform panel. |
-| [`04.3a-inspector-clip-tab.md`](04.3a-inspector-clip-tab.md) | 383 | The inspector's tab strip and its Clip tab: the sub-tabs and pinned block, the selection header and name field, sections, row marks, Reset/Clear; every video, audio, text and shape section. |
+| [`04.3a-inspector-clip-tab.md`](04.3a-inspector-clip-tab.md) | 396 | The inspector's tab strip and its Clip tab: the sub-tabs and pinned block, the selection header and name field, sections, row marks, Reset/Clear; every video, audio, text and shape section. |
 | [`04.3b-inspector-media-document-assistant.md`](04.3b-inspector-media-document-assistant.md) | 179 | The inspector's Media tab (find band, rows, drags, Consolidate, import, generate and export captions), Document tab and Assistant tab. |
 | [`04.4-timeline.md`](04.4-timeline.md) | 213 | The timeline: its bar, the level meter, ruler, tracks, clip bodies, gestures, entering a nest. |
 | **§5 — Editing model** | | |
@@ -51,7 +51,7 @@ included, and `make test` checks both (`tools/proof/spec_index_proof.py`).
 | [`07.9b-agent-lane-assistant.md`](07.9b-agent-lane-assistant.md) | 156 | The agent lane every tool call goes through, the bundled helper, the assistant session (its key, prices and spend), its prompt, and the Assistant tab as the session's door. |
 | [`07.10-rust-module-map.md`](07.10-rust-module-map.md) | 87 | The spec's Rust module map (core/CLAUDE.md is the live one). |
 | [`08-repo-layout.md`](08-repo-layout.md) | 66 | Repo layout, build, conventions. |
-| [`09-keys-and-menus.md`](09-keys-and-menus.md) | 159 | The keyboard map and every menu, and keys proposed but not yet bound. |
+| [`09-keys-and-menus.md`](09-keys-and-menus.md) | 167 | The keyboard map and every menu, and keys proposed but not yet bound. |
 | [`10-milestones.md`](10-milestones.md) | 70 | M1–M3 in build order; each step's *Verify* is an acceptance test. |
 | [`11-decisions/`](11-decisions/README.md) | 6069 in 18 files | Every decision already made, indexed by ID. |
 

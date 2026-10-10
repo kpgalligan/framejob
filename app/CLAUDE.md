@@ -541,7 +541,7 @@ the key map behind it.
   `AppDelegate.swift` (+`Menus`, +`ClipMenus` — the Clip menu's submenus, Add
   Background, Transition, Motion and Label, a pure move out of `+Menus`,
   grading GR1 — +`Recording`, +`GraphicMenu` — the Insert
-  menu's builder, File's three graphic-file items (`addGraphicFileItems(to:)`,
+  menu's builder (Adjustment Clip first, then Graphic ▸), File's three graphic-file items (`addGraphicFileItems(to:)`,
   called once from `fileMenu()` right after Add Image to Graphics…: a
   separator, then Rename Graphic…, Delete Graphic… and Restore Graphic
   Version…, no key equivalents, spec §11 G-30) and Help ▸ Graphics
@@ -784,13 +784,16 @@ the key map behind it.
   a pure move out of `ClipPane.swift`; `makeSections()` is its only caller) ·
   `ClipPane+Matte.swift` (`matteNote`, spec §11 MT-7: the note
   `ClipHeaderBlock` shows under the sub-tab strip when every selected clip
-  sits on a matte track of one mode; `structureSignature` carries whether it
-  shows) ·
+  sits on a matte track of one mode, or, when every one is an adjustment clip
+  on a matte track, "An adjustment clip on a matte track has no effect."
+  (GR-6); `structureSignature` carries whether it shows) ·
   `ClipSelectionHeader.swift`
   (`ClipSelectionHeaderView`, a pure move out of `ClipPane.swift`) ·
   `ClipPinnedBlock.swift` (`ClipSubTab` — seven cases in display order, text,
   shape, graphic, picture, color, sound, clip; `color` (spec §11 GR-2) shows only
-  when `videoClips` is non-empty and every clip has source pixels, and counts `color`; `graphic` counts `graphic.props`, a stale key included (G-34 (l), CI-6 amended) — with
+  when `videoClips` is non-empty and every clip has source pixels or is an
+  adjustment clip (then never Picture), and counts `color` — and `opacity` too
+  for an all-adjustment selection (GR-6); `graphic` counts `graphic.props`, a stale key included (G-34 (l), CI-6 amended) — with
   its `◆N` key count,
   `ClipSubTabsView`, and `ClipHeaderBlock` — header, lane, sub-tabs and, when given one, the matte
   note — which
@@ -805,7 +808,9 @@ the key map behind it.
   (CI-12: the lane's hatch, fades and wedges as geometry by the timeline's
   own gates, drawn under the bands; `Curve.laneName`; `CurveGlyphView`,
   beside the Curve popup because `OptionPopupControl` is not forked) · `VideoPane.swift` (+`Color` — the Color section, a pure move, grading GR1, writing a sparse `ColorPatch`;
-  +`Light` — the Light section, the nine tone rows (GR-2); +`Transition`,
+  +`Light` — the Light section, the nine tone rows (GR-2); +`Adjustment` — the
+  Adjustment section's one Strength row (`video.opacity`) and the selection's
+  adjustment tests (GR-6); +`Transition`,
   +`Motion`, +`Obscure` — the Obscure section, a pure move; +`Speed` — the
   Speed section, Fit to and the "Audio is silent above ×12" note, #190) · `AudioPane.swift` · `TextPane.swift` · `ShapePane.swift` ·
   `GraphicPane.swift` (the Graphic sub-tab, road map 10 §5j, spec §11 G-15:
@@ -1080,6 +1085,10 @@ the key map behind it.
   `Compositor.serve` offers each composed frame by recipe key; one pass in
   flight per key and one pending slot the newest frame replaces) ·
   `WaveformPanelView.swift` (the panel, its trace view, `UngradedTagView`) ·
+  `EditorViewController+Adjustment.swift` (Insert ▸ Adjustment Clip, spec §11
+  GR-6: its span — In/Out, else the selection, else the timeline — the
+  front-most free non-matte track or a new front "Adjustment" track, one undo
+  step, and its validator arm) ·
   `EditorViewController+Seeing.swift` (View ▸ Show Ungraded and View ▸
   Waveform, `installSeeing`, their validator arm; spec §11 GR-4, GR-5) — the
   grade's seeing tools. Show Ungraded sets `RecipeOptions.ungraded` on the

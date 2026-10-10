@@ -981,3 +981,99 @@ tools" → ninety; the app map's `Compositor+Adjustment.swift`,
 ("Seven pipelines from five fragment functions" → eight from six); the core
 map's `edit_adjustment.rs` and `Source::Adjustment`, and `op_table.rs`'s
 "fifty-nine op tools".
+
+## GR4b — adjustment clips in the chrome: Insert ▸ Adjustment Clip, the Color/Clip inspector, the matte note, screen 05c (2026-10-10, on the `grading` branch)
+
+**Where.** The worktree `~/devel/reelcut-grading`, branch `grading`, at `a5a6cdf`
+(GR4a). The owner's choices are GR-6's [b] items, decided 2026-10-10; none new.
+Decided inside GR-6: the undo name is "Add Adjustment Clip" (the MCP tool's); a
+range counts only when its end is after its start; the Adjustment section's
+summary is the strength ("75%"), its Reset sets opacity 1 (undo "Adjustment"),
+and it opens by the first-section rule; Color's `◆N` also counts an end's
+`opacity` for an all-adjustment selection (CI-6); the adjustment matte note
+shows when every selected clip is an adjustment clip on a matte track.
+
+**What landed.**
+- App: new `EditorViewController+Adjustment.swift` (84 lines:
+  `insertAdjustmentClip(_:)`, `adjustmentSpan` — the range, else the selected
+  clips' span, else the timeline — `adjustmentOps` — the front track when it is
+  not a matte and a pure trial of the op answers a project, else
+  `add_track "Adjustment"` and the clip on `nextId` — and the validator arm,
+  off with a nest open or nothing to cover). The frozen `EditorViewController.swift`
+  takes its one validator line. `selectClips(addedSince:in:)` is internal.
+  Insert holds Adjustment Clip first (`AppDelegate+GraphicMenu.swift`, no key);
+  `UIMenuTable`'s row. `InspectorTab.isAdjustment`, the fourth kind test. New
+  `VideoPane+Adjustment.swift` (60 lines: `allAdjustment`, `anyAdjustment`,
+  `allGradable`, `adjustmentSection()` — Strength, the opacity as 0–100 %).
+  `ClipPane.subTabs`: Picture never with an adjustment clip, Color when every
+  clip is gradable; `.color` puts Adjustment first for an all-adjustment
+  selection; the badge passes `adjustment:` to `ClipSubTab.keyedCount`, whose
+  new parameter is defaulted so every probe compiles unchanged.
+  `ClipPane.matteNote` answers "An adjustment clip on a matte track has no
+  effect." first, its other answers unchanged. `AgentServer+Grading.swift`'s
+  comment names the UI path.
+- Instruments: `adjustment_proof.py` gains I1–I4 and S1–S4 and six mutants, and
+  launches with three argument-domain section pins (`video.adjustment` open,
+  `video.light` and `video.color` closed); `inventory.json`'s
+  `insertAdjustmentClip:` row; `graphics_menu_probe.swift`'s M2 (Insert is
+  Adjustment Clip then Graphic) and the proof's docstring; `screens.py`'s
+  `adjust` fixture and its `video.adjustment` pin (open); the proof README's
+  section.
+- Documents: screen `05c-clip-adjustment` and the screens README's `adjust`
+  fixture; spec §4.3a (sub-tabs, the default, the Color list, the Adjustment
+  section, the badge, the note), §9 (Insert ▸ Adjustment Clip), GR-6 (the
+  "until GR4b" sentence gone, the risk rewritten) and its README row, the Lines
+  cells; GRD-3 in `docs/manual-checks.md`; the README's Adjustment clips
+  bullet, `add_adjustment_clip` in the op list and "eight pipelines from six".
+
+**Sizes.** Product code +179 net: changed files +55 −20, new files
+`EditorViewController+Adjustment.swift` 84 and `VideoPane+Adjustment.swift` 60.
+With GR2–GR4a, about 1,893 of "Worth keeping"'s ≤ 4,500.
+`EditorViewController.swift` 1,140 → 1,141 (wiring), `ClipPane.swift` 226 → 234,
+`ClipPinnedBlock.swift` 240 → 243, `ClipPane+Matte.swift` 38 → 47,
+`InspectorTab.swift` 73 → 81; `VideoPane.swift` (904) untouched.
+
+**Measured.** 2026-10-10, Apple M2 Max, AC power.
+- Loop, Debug: `make typecheck` 0 errors and the 4 baseline warnings;
+  `inventory.py --check` 5/5; `v2_menu.py --only H` 5/5 (102 rows);
+  `matte_chrome_probe.py` 10/10; `adjustment_proof.py --only
+  I1,I2,I3,I4,S1,S2,S3,S4` 9/9 (with Z1); `graphics_menu_proof.py` 27/27;
+  `clip_inspector2_proof.py` 33/33; `tone_proof.py --only P1,P2,P3,P4` 4/4;
+  `screens.py --only 05b-clip-color,10c-matte-track,05c-clip-adjustment` 8/8,
+  P2 passing (45 section ids pinned), 0 new layout problems;
+  `spec_index_proof.py` 150/150.
+- `make gate`: the first run failed in `test` on `graphic/`'s
+  `determinism.rs` `a_frame_is_the_same_after_300_others` ("over the 250 ms
+  budget at frame 285") under a load average of about 135 from another
+  session's builds; this phase touches nothing in `graphic/`. The second run
+  PASSED in 253 s (typecheck and fmt and lint skipped as passed, test 145 s,
+  app 108 s).
+- Recorded, on the gate's Release build: `RC_PROOF_APP=release
+  adjustment_proof.py` 36/36 (GR4a's 28 and GR4b's 8), no skip, no
+  `DEFAULTS MOVED`, no `Reelcut: ` line.
+- Mutants, each `adjustment_proof.py --mutant NAME` on Debug, all six MUTANT
+  PASS (every named row failed, no other scored row did), on the final
+  instrument, no `DEFAULTS MOVED`: `span-ignores-range` I1 I4 (34/36);
+  `matte-front-taken` I3; `enabled-in-nest` I4; `picture-for-adjustment` I1 S1
+  S2 (33/36); `strength-in-mixed` S2; `adjustment-note-gone` S4. GR4a's seven
+  were not re-run: no anchor of theirs moved.
+
+**Deviations.** A section header draws its title and puts no text in the
+`snapshot_ui` layout dump, so S1's "the headers Adjustment, Light and Color top
+to bottom" and S2's "has Light" read each section as the visible
+`InspectorSection` holding a row of its own (Strength, Exposure, Brightness),
+ordered by its frame; S1 also refuses "Scale" beside "Transform". The field reads
+"75%". Project SP's image is a `render_frame` PNG of a shape it then deletes,
+because `render_frame` has no frame of an empty timeline.
+
+**Owed.** The `CLAUDE.md` lines (the spec kept every `CLAUDE.md` untouched):
+the app map's `EditorViewController+Adjustment.swift` (Insert ▸ Adjustment
+Clip, its span and track rule, its validator arm), `VideoPane.swift`'s
+`+Adjustment`, `InspectorTab`'s four kind tests, `ClipPinnedBlock`'s `color`
+rule ("every clip has source pixels or is an adjustment clip; never Picture
+with one"), `ClipPane+Matte`'s adjustment note and `AppDelegate+GraphicMenu`'s
+Insert holding Adjustment Clip; and GR4a's still-owed lines (root "eighty-nine
+product tools" → ninety; the app map's `Compositor+Adjustment.swift`,
+`AgentServer+Grading.swift`, `ClipSource.adjustment` and "eight pipelines from
+six"; the core map's `edit_adjustment.rs` and `Source::Adjustment`, and
+`op_table.rs`'s "fifty-nine op tools"). The person check GRD-3.

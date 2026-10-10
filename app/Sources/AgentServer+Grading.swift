@@ -5,9 +5,9 @@ import Foundation
 
 extension AgentServer {
 
-    /// `add_adjustment_clip` — UI path: Insert ▸ Adjustment Clip (grading
-    /// GR4b's menu item). An omitted `duration` is the core's 5 s, as
-    /// `add_text_clip`'s is; every refusal is the core's sentence.
+    /// `add_adjustment_clip` — UI path: Insert ▸ Adjustment Clip. An
+    /// omitted `duration` is the core's 5 s, as `add_text_clip`'s is; every
+    /// refusal is the core's sentence.
     func addAdjustmentClip(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let track = try trackArg(a, "track", document)

@@ -33,8 +33,8 @@ with `Fonts/`, `GraphicTemplates/` (from `graphic/tests/graphics/`) and
 `GraphicsAPI.md` (from `docs/graphics-api.md`) copied beside it, over two
 COPIES of GM and a COPY of GF (`files`):
 M1  the probe builds (a failure is scored, never an exit);
-M2  `AppDelegate().buildMainMenu()`: Insert right after Edit; Insert ▸ Graphic
-    is Bar Chart, Callout, Counter, Kinetic Type, Lower Third, Title Card, a
+M2  `AppDelegate().buildMainMenu()`: Insert right after Edit, holding
+    Adjustment Clip then Graphic; Insert ▸ Graphic is Bar Chart, Callout, Counter, Kinetic Type, Lower Third, Title Card, a
     separator, From File…; each template's `representedObject` a URL whose
     bytes equal the source file;
 M3  File holds Add Font to Graphics… then Add Image to Graphics… right after

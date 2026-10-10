@@ -123,6 +123,11 @@ Built by `screens.py` on the first screen that names one, into
   matte track (it cuts Video); `stray` — a text clip reading "Reelcut", 5 s, on
   a `luma_inverted` matte track with a matte behind it (it cuts nothing). Ready
   once `video`'s peaks are cached.
+- `adjust` — `Adjust.reelcut` (grading GR4b, spec §11 GR-6): two tracks, back
+  to front Video and Adjustment, one clip each, both starting at 0: `video` —
+  `media/speech.mov`; `adjustment` — an adjustment clip, 5 s, at saturation −1
+  and opacity 0.75 (Strength 75%), so it greys three quarters of the video
+  behind it. Ready once `video`'s peaks are cached.
 
 ## Adding a screen
 

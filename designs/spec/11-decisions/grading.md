@@ -188,14 +188,14 @@ Reelcut's own numbers, and nothing of Concat is opened, at design time or build 
     with one row, "Strength" (0–100 %, `video.opacity`), then Light, then Color; Clip holds
     Timing and Motion (Motion's fades fade the grade; slide, zoom and spin do nothing). The point
     filters are reachable through MCP and Paste Attributes only. A selection mixing in video
-    clips gets no Picture tab, and its Color tab no Strength row. Until GR4b lands an adjustment
-    clip shows Picture and Clip.
+    clips gets no Picture tab, and its Color tab no Strength row.
   - **The format stays 1015 (amends GR-9's "1015 is 14 plus optional keys").** The kind is a new
     `Source` variant, not an optional key: a build that does not know it refuses the file with
     serde's "unknown variant `adjustment`" (`format::read`), so nothing is dropped silently.
   - Not in it: adjustment clips inside nests, an adjustment clip's own transform or shape, and
     refusing the transform keys. Risk accepted: an adjustment clip's stored placement keys are
-    inert and the Picture tab still shows them until GR4b.
+    inert and shown nowhere in the inspector; they stay reachable through MCP and Paste
+    Attributes.
 - **GR-9 — The branch writes project format 1015, refuses 15–1014 by name, and the merge
   renumbers.** The branch's `RC_FORMAT_VERSION` is **1015** (main's 14 plus a thousand), in
   `core/src/format.rs` and the header, so every main build refuses a branch-made project as "made

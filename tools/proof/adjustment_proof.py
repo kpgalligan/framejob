@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Road map "grading", phase GR4a (spec §11 GR-6) — adjustment clips end to
-end over MCP: `add_adjustment_clip`, the recipe's `{"kind":"adjustment"}`
-layer and the compositor's eighth pipeline (`reelcut_adjust_fragment`,
-blending OFF, reading the destination), read back as `render_frame` bytes and
-exports; and every refusal in its own sentence.
+"""Road map "grading", phases GR4a and GR4b (spec §11 GR-6) — adjustment
+clips end to end over MCP: `add_adjustment_clip`, the recipe's
+`{"kind":"adjustment"}` layer and the compositor's eighth pipeline
+(`reelcut_adjust_fragment`, blending OFF, reading the destination), read back
+as `render_frame` bytes and exports; every refusal in its own sentence; and
+GR4b's chrome: Insert ▸ Adjustment Clip, and the Clip tab an adjustment clip
+gets (Color with Adjustment ▸ Strength, Clip, and the matte note).
 
     python3 tools/proof/adjustment_proof.py [--app PATH] [--only G1,M1,...]
     python3 tools/proof/adjustment_proof.py --mutant NAME
@@ -12,9 +14,15 @@ Launches the built app `proof_app` picks (Debug unless `RC_PROOF_APP=release`)
 on a scratch socket of its own, and stops only that process. **The instance
 runs in a scratch home**, `CFFIXED_USER_HOME=tools/proof/work/adjustment/home`,
 and every package, PNG and export is under `tools/proof/work/adjustment/`,
-removed at the start and at exit. No menu item is performed. Every call is
-bounded (`CALL_BOUND`), every ffmpeg too (120 s). Every project is closed
-(`close_project`, discard).
+removed at the start and at exit. The run performs only Insert ▸ Adjustment
+Clip, which persists nothing. Every call is bounded (`CALL_BOUND`), every
+ffmpeg too (120 s). Every project is closed (`close_project`, discard).
+
+The instance is launched with three argument-domain section pins, plist
+fragments as `screens.py` sends them: `ReelcutInspectorSection.video.adjustment`
+`<false/>` (open), `.video.light` and `.video.color` `<true/>` (collapsed) —
+the stored value is COLLAPSED (`InspectorSection.swift`). S1 relies on these
+pins, not on the Color tab's first-section rule or the owner's domain.
 
 Project A, 640 × 360 at 30 fps, background (0.1, 0.1, 0.1), every clip 2 s
 from 0, five tracks back to front: T1 a grey 0.5 300 × 240 rectangle centred
@@ -72,6 +80,38 @@ a hard cut; on track 2 a shape nested into nest N.
   `set_transition_style {curve}`; R5 `trim_end` of the shape to 2.5 s; R6
   `set_video` with a blur filter; R7 `set_video` with blend `multiply`. And
   the project is unchanged and `undo` still names the same last step.
+Project MN, 640 × 360: track B holds shape S1 [0, 4 s); a front track F holds
+shape S2 [3 s, 4 s). Each row performs `["Insert", "Adjustment Clip"]`
+(`perform_menu_item`) on the project's window.
+- **I1**: nothing selected, `set_range` 0.5–2.5 s: exactly one clip is added,
+  kind `adjustment`, on F, at 0.5 s for 2 s, with no track added; the
+  selection is exactly that clip, and `select_inspector_tab {}` answers tab
+  `clip`, sub_tab `color`, sub_tabs `["color", "clip"]`. The last undo step
+  is "Add Adjustment Clip", and one `undo` restores the clip and track counts.
+- **I2**: the range cleared, S1 selected: a new front track named
+  "Adjustment" holds the one new clip [0, 4 s); one `undo` removes both.
+- **I3**: S2 deleted, F made an `alpha` matte, nothing selected, no range: a
+  new "Adjustment" track holds a clip [0, 4 s), and F stays empty.
+- **I4**: in project NS (a shape nested into a nest) with `set_scope` into the
+  nest, the perform is refused with "is disabled here" and the project is
+  unchanged; on an empty new project EM with no range it is refused the same
+  way. CONTROL: EM with a 0–1 s range lands one clip [0, 1 s) on its track.
+Project SP, 640 × 360: an image clip IM (`import_media` of a `render_frame`
+PNG) and an adjustment clip AJ on its own track at opacity 0.75. Each row
+sets the selection, `select_inspector_tab {tab: clip}` and reads the
+inspector's `snapshot_ui` layout dump as `screens.py`'s `check_expect` does
+(visible `text`).
+- **S1**: AJ selected gives sub_tabs `["color", "clip"]`, active `color`.
+  Under the launch's section pins the dump shows "Strength", a field reading
+  "75%", the sections Adjustment, Light and Color top to bottom, and no
+  "Transform" or "Scale". A section header draws its title and puts no text
+  in the dump, so each section is the visible `InspectorSection` holding a
+  row of its own: Strength, Exposure, Brightness.
+- **S2**: AJ and IM selected gives `["color", "clip"]`, and the Color dump has
+  Light (the section holding Exposure) and no "Strength".
+- **S3** (CONTROL): IM alone gives `["picture", "color", "clip"]`.
+- **S4**: AJ's track made `alpha`: the dump shows "An adjustment clip on a
+  matte track has no effect."
 - **Z1** (CONTROL): the fixtures hold, the projects close and the log holds
   no `Reelcut: ` line.
 
@@ -88,6 +128,12 @@ other scored row did:
   matte-track-not-inert  the recipe keeps an adjustment clip on a matte track: M2
   nest-allowed           `nest` takes an adjustment clip: R1
   overlap-allowed        the overlap rule's adjustment clause gone: R5
+  span-ignores-range     the In/Out range ignored by the span: I1 I4
+  matte-front-taken      a matte front track takes the clip: I3
+  enabled-in-nest        the item enabled with a nest open: I4
+  picture-for-adjustment Picture offered with an adjustment clip: I1 S1 S2
+  strength-in-mixed      Strength shown for a mixed selection: S2
+  adjustment-note-gone   the adjustment matte note gone: S4
 Exit 0 when every scored row passed (a mutant: caught); 1 when one failed
 (a mutant: survived); 2 when the control could not be performed.
 """
@@ -116,11 +162,22 @@ SEC = 600_000
 T = SEC // 2
 W, H = 640, 360
 ROWS = ["N1", "G1", "U1", "G2", "F1", "O1", "O2", "M1", "Q1", "M2", "E1", "E2", "E3", "E4",
-        "E5", "C1", "A1", "E6", "E7", "E8", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "Z1"]
+        "E5", "C1", "A1", "E6", "E7", "E8", "R1", "R2", "R3", "R4", "R5", "R6", "R7",
+        "I1", "I2", "I3", "I4", "S1", "S2", "S3", "S4", "Z1"]
 A_ROWS = {"N1", "G1", "U1", "G2", "F1", "O1", "O2", "M1", "Q1", "M2", "E1", "E2", "E3", "E4",
           "E5", "C1"}
 TR_ROWS = {"A1", "E6", "E7", "E8"}
 R_ROWS = {"R1", "R2", "R3", "R4", "R5", "R6", "R7"}
+MN_ROWS = {"I1", "I2", "I3"}
+S_ROWS = {"S1", "S2", "S3", "S4"}
+INSERT = ["Insert", "Adjustment Clip"]
+DISABLED = "is disabled here"
+MATTE_NOTE = "An adjustment clip on a matte track has no effect."
+# Argument-domain section pins (stored value: COLLAPSED), as screens.py sends them.
+SECTION_PINS = ["-ReelcutInspectorSection.video.adjustment", "<false/>",
+                "-ReelcutInspectorSection.video.light", "<true/>",
+                "-ReelcutInspectorSection.video.color", "<true/>"]
+ADJUST = "app/Sources/EditorViewController+Adjustment.swift"
 OPAQUE = [("E1", "h264", "mp4"), ("E2", "hevc", "mp4"), ("E3", "hevc_10bit", "mp4"),
           ("E4", "prores_422", "mov"), ("E5", "gif", "gif")]
 CLEAR = [("E6", "hevc_alpha", "mov"), ("E7", "prores_4444", "mov"), ("E8", "apng", "png")]
@@ -171,6 +228,28 @@ MUTANTS = {
         ".filter(|i| i.covers(t))")], ["M2"]),
     "nest-allowed": ([("core/src/edit_nest.rs", NEST_REFUSAL, "")], ["R1"]),
     "overlap-allowed": ([("core/src/transition.rs", OVERLAP_CLAUSE, "")], ["R5"]),
+    "span-ignores-range": ([(
+        ADJUST, "        if let range, range.end > range.start { return range }\n", "")],
+        ["I1", "I4"]),
+    "matte-front-taken": ([(
+        ADJUST, "if let front = snapshot.tracks.last, front.matte == .none {",
+        "if let front = snapshot.tracks.last {")], ["I3"]),
+    "enabled-in-nest": ([(
+        ADJUST, "guard let document = document, document.scope == nil else { return false }",
+        "guard let document = document else { return false }")], ["I4"]),
+    "picture-for-adjustment": ([(
+        "app/Sources/ClipPane.swift",
+        "if !binding.videoClips.isEmpty && !videoPane.anyAdjustment { tabs.append(.picture) }",
+        "if !binding.videoClips.isEmpty { tabs.append(.picture) }")], ["I1", "S1", "S2"]),
+    "strength-in-mixed": ([(
+        "app/Sources/ClipPane.swift",
+        "if videoPane.allAdjustment { sections.insert(videoPane.adjustmentSection(), at: 0) }",
+        "if videoPane.anyAdjustment { sections.insert(videoPane.adjustmentSection(), at: 0) }")],
+        ["S2"]),
+    "adjustment-note-gone": ([(
+        "app/Sources/ClipPane+Matte.swift",
+        "            return \"An adjustment clip on a matte track has no effect.\"\n", "")],
+        ["S4"]),
 }
 rows = {}
 skipped = {}
@@ -676,6 +755,246 @@ def run_rr(client, state):
     return close(client, doc.path)
 
 
+# ---- GR4b: Insert ▸ Adjustment Clip -------------------------------------------
+
+def shape_at(doc, track, at, duration):
+    return doc.added("add_shape_clip", track=track, at=at, duration=duration,
+                     shape={"kind": "rectangle", "width": 100, "height": 100, "stroke": None,
+                            "fill": [1, 1, 1, 1]})
+
+
+def insert(doc):
+    """Insert ▸ Adjustment Clip on the project's window: (the answer, the
+    clips added, the tracks added), each a list of objects."""
+    before = doc.project()
+    clips = {c["id"] for c in before.get("clips") or []}
+    tracks = {t["id"] for t in before.get("tracks") or []}
+    got = doc.call("perform_menu_item", path=INSERT)
+    after = doc.project()
+    return (got, [c for c in after.get("clips") or [] if c["id"] not in clips],
+            [t for t in after.get("tracks") or [] if t["id"] not in tracks])
+
+
+def counts(doc):
+    project = doc.project()
+    return len(project.get("clips") or []), len(project.get("tracks") or [])
+
+
+def view_state(doc):
+    got = reply(doc.call("get_project"))
+    return got.get("selection"), got.get("in_out_range")
+
+
+def tab_state(doc, **arguments):
+    got = reply(doc.call("select_inspector_tab", **arguments))
+    return got.get("tab"), got.get("sub_tab"), got.get("sub_tabs")
+
+
+def is_adjustment(clip):
+    return clip.get("source") == {"kind": "adjustment"}
+
+
+def placed(clip, track, start, duration):
+    return (is_adjustment(clip) and clip.get("track") == track and clip.get("start") == start
+            and clip.get("duration") == duration)
+
+
+def run_mn(client, state):
+    doc, b = opened(client, "MN", [0, 0, 0, 1])
+    s1 = shape_at(doc, b, 0, 4 * SEC) if b else None
+    f = doc.new_track() if s1 else None
+    s2 = shape_at(doc, f, 3 * SEC, SEC) if f else None
+    state["mn_fixture"] = None not in (b, s1, f, s2)
+    if not state["mn_fixture"]:
+        return close(client, doc.path) and False
+
+    # I1
+    doc.call("set_selection", clips=[])
+    ranged = doc.call("set_range", start=SEC // 2, end=SEC // 2 + 2 * SEC)
+    clips0, tracks0 = counts(doc)
+    got, new, made = insert(doc)
+    clip = new[0] if len(new) == 1 else {}
+    selection, _ = view_state(doc)
+    tabs = tab_state(doc)
+    step = last_step(doc)
+    doc.call("undo")
+    restored = counts(doc) == (clips0, tracks0)
+    check("I1 a 0.5–2.5 s range: one adjustment clip on F at 0.5 s for 2 s, no track added, "
+          "selected, the inspector on Clip ▸ Color of [color, clip]; one undo step "
+          "\"Add Adjustment Clip\"",
+          ranged["ok"] and got["ok"] and len(new) == 1 and not made
+          and placed(clip, f, SEC // 2, 2 * SEC) and selection == [clip.get("id")]
+          and tabs == ("clip", "color", ["color", "clip"]) and step == "Add Adjustment Clip"
+          and restored,
+          f"range {ranged.get('error', 'ok')}; perform {got.get('error', 'ok')}; added {new}; "
+          f"tracks added {made}; selection {selection}; tabs {tabs}; last step {step!r}; "
+          f"undo restored {restored}")
+
+    # I2
+    cleared = doc.call("set_range")
+    doc.call("set_selection", clips=[s1])
+    got, new, made = insert(doc)
+    clip = new[0] if len(new) == 1 else {}
+    track = made[0] if len(made) == 1 else {}
+    tracks = doc.project().get("tracks") or []
+    front = tracks[-1].get("id") if tracks else None
+    doc.call("undo")
+    restored = counts(doc) == (clips0, tracks0)
+    check("I2 no range, S1 selected: a new front track \"Adjustment\" holds the one clip "
+          "[0, 4 s); one undo removes both",
+          cleared["ok"] and got["ok"] and len(new) == 1 and len(made) == 1
+          and track.get("name") == "Adjustment" and front == track.get("id")
+          and placed(clip, track.get("id"), 0, 4 * SEC) and restored,
+          f"clear {cleared.get('error', 'ok')}; perform {got.get('error', 'ok')}; added {new}; "
+          f"tracks added {made}; front {front}; undo restored {restored}")
+
+    # I3
+    deleted = doc.call("delete", clips=[s2])
+    matted = doc.call("set_track", track=f, matte="alpha")
+    doc.call("set_selection", clips=[])
+    selection, span = view_state(doc)
+    got, new, made = insert(doc)
+    clip = new[0] if len(new) == 1 else {}
+    track = made[0] if len(made) == 1 else {}
+    on_f = [c for c in doc.clips() if c.get("track") == f]
+    check("I3 F an empty alpha matte, nothing selected, no range: a new \"Adjustment\" track "
+          "holds a clip [0, 4 s); F stays empty",
+          deleted["ok"] and matted["ok"] and selection == [] and span is None and got["ok"]
+          and len(new) == 1 and len(made) == 1 and track.get("name") == "Adjustment"
+          and placed(clip, track.get("id"), 0, 4 * SEC) and not on_f,
+          f"delete {deleted.get('error', 'ok')}; matte {matted.get('error', 'ok')}; perform "
+          f"{got.get('error', 'ok')}; added {new}; tracks added {made}; on F {on_f}")
+    return close(client, doc.path)
+
+
+def run_i4(client, state):
+    ns, track = opened(client, "NS", [0, 0, 0, 1])
+    inner = shape_at(ns, track, 0, 2 * SEC) if track else None
+    nested = ns.call("nest", clips=[inner]) if inner else {"ok": False}
+    nests = ns.project().get("nests") or []
+    nest = nests[0].get("id") if len(nests) == 1 else None
+    scoped = ns.call("set_scope", nest=nest) if nest else {"ok": False}
+    before = ns.project()
+    in_nest = ns.call("perform_menu_item", path=INSERT)
+    unchanged = ns.project() == before
+    ns.call("set_scope")
+    closed = close(client, ns.path)
+
+    em, em_track = opened(client, "EM", [0, 0, 0, 1])
+    empty_before = em.project()
+    empty = em.call("perform_menu_item", path=INSERT)
+    empty_unchanged = em.project() == empty_before
+    ranged = em.call("set_range", start=0, end=SEC)
+    got, new, made = insert(em)
+    clip = new[0] if len(new) == 1 else {}
+    closed = close(client, em.path) and closed
+    state["i4_fixture"] = (None not in (inner, nest, em_track) and nested["ok"]
+                           and scoped["ok"] and ranged["ok"])
+    check("I4 refused with \"is disabled here\" inside a nest and on an empty project with no "
+          "range, changing nothing; CONTROL: a 0–1 s range lands one clip [0, 1 s) on its track",
+          state["i4_fixture"] and not in_nest["ok"] and DISABLED in in_nest.get("error", "")
+          and unchanged and not empty["ok"] and DISABLED in empty.get("error", "")
+          and empty_unchanged and got["ok"] and len(new) == 1 and not made
+          and placed(clip, em_track, 0, SEC),
+          f"nest {in_nest.get('error', 'APPLIED')!r} unchanged {unchanged}; empty "
+          f"{empty.get('error', 'APPLIED')!r} unchanged {empty_unchanged}; control "
+          f"{got.get('error', 'ok')} added {new} tracks added {made}")
+    return closed
+
+
+def dump(doc, tag):
+    """The inspector's `snapshot_ui` layout dump: (every view, the error)."""
+    got = doc.call("snapshot_ui", window="editor", view="inspector",
+                   path=str(WORK / f"{tag}.png"))
+    path = reply(got).get("layout_path")
+    if not path:
+        return [], got.get("error", "no layout dump")
+    with open(path) as handle:
+        return json.load(handle).get("views") or [], ""
+
+
+def texts(views):
+    """The visible views' texts, as `screens.py`'s `check_expect` reads them."""
+    return {v.get("text") for v in views if not v.get("hidden")}
+
+
+def section_top(views, row):
+    """The top of the VISIBLE `InspectorSection` holding the row labelled
+    `row` (shown or collapsed), or None. A section header draws its title
+    and puts no text in the dump, so a section is named by a row of its own:
+    Strength is Adjustment's, Exposure Light's, Brightness Color's."""
+    by_index = {v.get("i"): v for v in views}
+    for label in (v for v in views if v.get("class") == "InspectorRowLabel"
+                  and v.get("text") == row):
+        view = label
+        while view is not None and view.get("class") != "InspectorSection":
+            view = by_index.get(view.get("parent"))
+        if view is not None and not view.get("hidden"):
+            return view["frame"][1]
+    return None
+
+
+def run_sp(client, state):
+    doc, back = opened(client, "SP", [0.2, 0.2, 0.2, 1])
+    # The image is a frame this project renders of a shape, which is then
+    # deleted: `render_frame` has no frame of an empty timeline.
+    plate = doc.rectangle(back, 300, 240, [0.2, 0.4, 0.6, 1]) if back else None
+    card = doc.frame("sp-card") if plate else None
+    if plate:
+        doc.call("delete", clips=[plate])
+    media = reply(doc.call("import_media", path=str(card.path))).get("media") if card else None
+    image = doc.added("add_clip", track=back, media=media, at=0) if media is not None else None
+    front = doc.new_track() if image else None
+    adj = doc.added("add_adjustment_clip", track=front, at=0, duration=2 * SEC) if front else None
+    strength = doc.video(adj, opacity=0.75) if adj else {"ok": False}
+    state["sp_fixture"] = None not in (image, adj) and strength["ok"]
+    if not state["sp_fixture"]:
+        return close(client, doc.path) and False
+
+    # S1
+    doc.call("set_selection", clips=[adj])
+    tabs = tab_state(doc, tab="clip")
+    views, error = dump(doc, "s1")
+    seen = texts(views)
+    tops = [section_top(views, row) for row in ("Strength", "Exposure", "Brightness")]
+    ordered = None not in tops and tops == sorted(tops) and len(set(tops)) == 3
+    field = "75%" in seen
+    check("S1 AJ alone: [color, clip] on color; \"Strength\", a field reading 75, the sections "
+          "Adjustment, Light and Color top to bottom, no \"Transform\"",
+          tabs == ("clip", "color", ["color", "clip"]) and not error and "Strength" in seen
+          and field and ordered and "Transform" not in seen and "Scale" not in seen,
+          f"tabs {tabs}; dump {error or 'ok'}; Strength {'Strength' in seen}; field {field}; "
+          f"section tops (Adjustment, Light, Color) {tops}")
+
+    # S2
+    doc.call("set_selection", clips=[adj, image])
+    tabs = tab_state(doc, tab="clip")
+    views, error = dump(doc, "s2")
+    seen = texts(views)
+    light = section_top(views, "Exposure") is not None
+    check("S2 AJ and IM: [color, clip]; the Color dump has Light and no \"Strength\"",
+          tabs[2] == ["color", "clip"] and tabs[1] == "color" and not error and light
+          and "Strength" not in seen,
+          f"tabs {tabs}; dump {error or 'ok'}; Light {light}; Strength {'Strength' in seen}")
+
+    # S3
+    doc.call("set_selection", clips=[image])
+    tabs = tab_state(doc, tab="clip")
+    check("S3 CONTROL: IM alone gives [picture, color, clip]",
+          tabs[2] == ["picture", "color", "clip"], f"tabs {tabs}")
+
+    # S4
+    matted = doc.call("set_track", track=front, matte="alpha")
+    doc.call("set_selection", clips=[adj])
+    tab_state(doc, tab="clip")
+    views, error = dump(doc, "s4")
+    check(f"S4 AJ's track an alpha matte: the dump shows \"{MATTE_NOTE}\"",
+          matted["ok"] and not error and MATTE_NOTE in texts(views),
+          f"matte {matted.get('error', 'ok')}; dump {error or 'ok'}; "
+          f"note {MATTE_NOTE in texts(views)}")
+    return close(client, doc.path)
+
+
 # ---- the run ------------------------------------------------------------------
 
 def tail(log, count=4):
@@ -747,7 +1066,7 @@ def main():
         binary = binary / "Contents/MacOS/Reelcut"
     config = proof_app.config()
     if args.mutant:
-        print(f"grading GR4a — the {args.mutant} MUTANT ({' '.join(named)} must FAIL)",
+        print(f"grading GR4 — the {args.mutant} MUTANT ({' '.join(named)} must FAIL)",
               flush=True)
         app, copy = build_mutant(args.mutant)
         if app is None:
@@ -755,13 +1074,15 @@ def main():
             return 2
         binary = app / "Contents/MacOS/Reelcut"
     else:
-        print(f"grading GR4a — adjustment clips over MCP ({config} build {binary})", flush=True)
+        print(f"grading GR4a/GR4b — adjustment clips over MCP ({config} build {binary})",
+              flush=True)
     if not binary.is_file():
         print(f"instrument failure: no app binary at {binary}")
         return 2
     log = WORK / "instance.log"
     state = {}
-    launched = mcp.launch(str(binary), [], env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
+    launched = mcp.launch(str(binary), SECTION_PINS,
+                          env=bounded.child_env({"CFFIXED_USER_HOME": str(HOME)}),
                           log_path=str(log), timeout=CALL_BOUND)
     closed = True
     try:
@@ -776,6 +1097,12 @@ def main():
                 closed = run_tr(launched.client, state) and closed
             if selected & R_ROWS:
                 closed = run_rr(launched.client, state) and closed
+            if selected & MN_ROWS:
+                closed = run_mn(launched.client, state) and closed
+            if "I4" in selected:
+                closed = run_i4(launched.client, state) and closed
+            if selected & S_ROWS:
+                closed = run_sp(launched.client, state) and closed
         except Exception as error:  # a row that could not run is a failure
             print(f"  instrument error: {type(error).__name__}: {error}", flush=True)
             closed = False

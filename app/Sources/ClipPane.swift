@@ -91,7 +91,11 @@ final class ClipPane: InspectorPaneView {
         let binding = self.binding
         let strip = ClipSubTabsView(
             tabs: subTabs, active: activeSubTab,
-            badge: { tab in binding.selectedAction.map { tab.keyedCount(in: $0.end) } ?? 0 },
+            badge: { [videoPane] tab in
+                binding.selectedAction.map {
+                    tab.keyedCount(in: $0.end, adjustment: videoPane.allAdjustment)
+                } ?? 0
+            },
             onSelect: { [weak inspector] in inspector?.selectClipSubTab($0) })
         return ClipHeaderBlock(
             binding: binding, inspector: inspector, subTabs: strip,
@@ -101,17 +105,18 @@ final class ClipPane: InspectorPaneView {
     // MARK: - Sub-tabs
 
     /// The selection's tabs, in display order: Text or Shape first for those
-    /// kinds, Picture for clips that draw, Color when every one of those has
-    /// source pixels (spec §11 GR-2: never text, shape, graphic, nest or an
-    /// audio-only file's clip, which draws nothing), Sound for clips with
-    /// audio, and Clip always, last.
+    /// kinds, Picture for clips that draw unless an adjustment clip is among
+    /// them (spec §11 GR-6: it draws nothing of its own), Color when every
+    /// one of those has source pixels or is an adjustment clip (GR-2, GR-6:
+    /// never text, shape, graphic, nest or an audio-only file's clip, which
+    /// draws nothing), Sound for clips with audio, and Clip always, last.
     var subTabs: [ClipSubTab] {
         var tabs: [ClipSubTab] = []
         if textPane.allText { tabs.append(.text) }
         if shapePane.allShape { tabs.append(.shape) }
         if graphicPane.allGraphic { tabs.append(.graphic) }
-        if !binding.videoClips.isEmpty { tabs.append(.picture) }
-        if !binding.videoClips.isEmpty && videoPane.allSourcePixels { tabs.append(.color) }
+        if !binding.videoClips.isEmpty && !videoPane.anyAdjustment { tabs.append(.picture) }
+        if !binding.videoClips.isEmpty && videoPane.allGradable { tabs.append(.color) }
         if !binding.audioClips.isEmpty { tabs.append(.sound) }
         tabs.append(.clip)
         return tabs
@@ -182,8 +187,11 @@ final class ClipPane: InspectorPaneView {
                 videoPane.obscureSection(),
             ]
         case .color:
-            // Light, then the Color section Picture used to hold (GR-2).
+            // Light, then the Color section Picture used to hold (GR-2);
+            // Adjustment's Strength first when every clip is an adjustment
+            // clip (GR-6).
             sections = [videoPane.lightSection(), videoPane.colorSection()]
+            if videoPane.allAdjustment { sections.insert(videoPane.adjustmentSection(), at: 0) }
         case .sound:
             sections = [
                 audioPane.volumeSection(), audioPane.fadeSection(), audioPane.duckSection(),

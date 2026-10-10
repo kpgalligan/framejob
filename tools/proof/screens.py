@@ -111,7 +111,9 @@ STEP_KEYS = {"call", "args", "until_absent", "within"}
 # (ClipPane.swift:210-214) because every section of that sub-tab defaults
 # closed — Sound's `audio.volume` (09) and Clip's `clip.timing` (10). A pin
 # stops the walk (InspectorSection.swift:143-146), so those two are pinned
-# OPEN; 09's and 10's `expect`s catch a pin that drifts.
+# OPEN; 09's and 10's `expect`s catch a pin that drifts. `video.adjustment` is
+# pinned OPEN as well, so 05c shows Strength: Light is pinned open there, so the
+# walk never reaches it.
 SECTIONS = {
     "audio.compressor": True, "audio.duck": True, "audio.fades": True, "audio.mix": True,
     "audio.noise": True, "audio.volume": False,
@@ -125,7 +127,8 @@ SECTIONS = {
     "shape.stroke": True,
     "text.animation": True, "text.backdrop": True, "text.box": True, "text.content": False,
     "text.font": True, "text.outline": True, "text.presets": True, "text.style": True,
-    "video.chroma": True, "video.color": True, "video.corner": True, "video.crop": True,
+    "video.adjustment": False, "video.chroma": True, "video.color": True, "video.corner": True,
+    "video.crop": True,
     "video.filters": True, "video.light": False, "video.motion": True, "video.obscure": True,
     "video.reflection": True, "video.shadow": True, "video.speed": True,
     "video.spotlight": True, "video.transform": False, "video.transition": True,
@@ -226,6 +229,8 @@ FIXTURES = {
     "matte": {"path": os.path.join(FIXTURE_DIR, "Matte.reelcut"),
               "clips": ["video", "window", "stray"], "media": ["speech.mov"],
               "sound": ["video"]},
+    "adjust": {"path": os.path.join(FIXTURE_DIR, "Adjust.reelcut"),
+               "clips": ["video", "adjustment"], "media": ["speech.mov"], "sound": ["video"]},
 }
 CANVAS = {"width": 960, "height": 540, "fps": [30, 1], "background": [0.0, 0.0, 0.0, 1.0],
           "fit_new_clips": True}
@@ -370,6 +375,8 @@ def build_fixture(mcp, name):
             ids = _animated_ops(mcp, path)
         elif name == "matte":
             ids = _matte_ops(mcp, path)
+        elif name == "adjust":
+            ids = _adjust_ops(mcp, path)
         mcp.call("save_project", project=path)
     except ToolError as error:
         raise FixtureError(f"building {name}: {error}") from error
@@ -507,6 +514,33 @@ def _matte_ops(mcp, path):
     ids["stray"] = clip_on("Stray")
     _call(mcp, "set_track", path, track=tracks["Window"], matte="alpha")
     _call(mcp, "set_track", path, track=tracks["Stray"], matte="luma_inverted")
+    return ids
+
+
+def _adjust_ops(mcp, path):
+    """Grading GR4b (spec §11 GR-6): back to front "Video" (`speech.mov`) and
+    "Adjustment" (an adjustment clip over 0–5 s at saturation −1 and opacity
+    0.75, so the preview shows the video three-quarters grey) — the Color tab an
+    adjustment clip gets (05c)."""
+    _call(mcp, "set_track", path, track=1, name="Video")
+    _call(mcp, "add_track", path, name="Adjustment")
+    tracks = {t["name"]: t["id"] for t in _project(mcp, path)["tracks"]}
+
+    def clip_on(track):
+        clips = [c for c in _project(mcp, path)["clips"] if c["track"] == tracks[track]]
+        if len(clips) != 1:
+            raise FixtureError(f"building adjust: track {track} holds {len(clips)} clips, not 1")
+        return clips[0]["id"]
+
+    ids = {}
+    video = _call(mcp, "import_media", path, path=os.path.join(MEDIA, "speech.mov"))
+    _call(mcp, "add_clip", path, media=_media_id(video), track=tracks["Video"], at=0)
+    ids["video"] = clip_on("Video")
+    _call(mcp, "add_adjustment_clip", path, track=tracks["Adjustment"], at=0,
+          duration=5 * SECOND)
+    ids["adjustment"] = clip_on("Adjustment")
+    _call(mcp, "set_video", path, clips=[ids["adjustment"]],
+          patch={"color": {"saturation": -1.0}, "opacity": 0.75})
     return ids
 
 
