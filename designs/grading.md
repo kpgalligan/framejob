@@ -1190,3 +1190,93 @@ spec kept every `CLAUDE.md` untouched): the app map's `LookProps.swift`,
 layer-stage fragments; the core map's `model_look.rs` and `VideoProps.look`,
 and "twenty-three" for the recipe layer's keys at `core/CLAUDE.md:475`; and
 GR4a's and GR4b's still-owed lines above.
+
+## GR5b — looks in the chrome: the Look section and its gallery, Clip ▸ Look ▸, screen 05d (2026-10-10, on the `grading` branch)
+
+**Where.** The worktree `~/devel/reelcut-grading`, branch `grading`, at `e3e391e`
+(GR5a). GR5b is the rest of GR5: GR-7's [b] items. The four user-visible points
+GR-7 [b] left open were put to the owner and accepted "As described" on
+2026-10-10, and are written into GR-7 [b] before the code: with an action
+selected a tile, None, Reset and the menu change the clip's own look and only
+Amount writes the action's end; a thumbnail renders the click's own op; the
+menu dashes an item some but not all targets carry, the gallery outlines the
+shared kind (None when no target has a look, nothing when mixed) and the summary
+is "mixed" when kinds or amounts differ; thumbnails ignore Show Ungraded.
+
+**What landed.**
+- Spec first: GR-7 [b] (the four points, the undo names, the two dev seams) and
+  its README row; §4.3a (Color lists Look; a *Look* bullet), §9 (Clip ▸ Look ▸
+  after Motion ▸), §7.4 (the four new files; `select_inspector_tab`'s
+  `section`, the dump default), §7.9a (`select_inspector_tab {tab?, sub_tab?,
+  section?}`, `look_thumbnails_pending`, `-RCDevLookGalleryDump`), and the
+  index's Lines cells.
+- App: new `LookGallery.swift` (257: the targets — pixels and source pixels or
+  an adjustment clip — the click's op `set_video {look: {kind}}` / `{look:
+  null}`, the thumbnail time, `shared`, `summary`, the 0.3 s settle on a
+  `.common` timer, render generations on one serial queue through
+  `Exporter.renderFrame` at 256 px with `RecipeOptions.none`, a lock-guarded
+  cancel token per generation, a weak registry for the playhead poke,
+  `isPending`, the dev dump), `LookGalleryView.swift` (190: the 3×3 grid,
+  `LookTileButton` with its aspect-fit thumbnail, name and accent outline; open
+  from `isHiddenOrHasHiddenAncestor` on `viewDidHide` / `viewDidUnhide` /
+  `viewDidMoveToWindow` and `refresh()`), `VideoPane+Look.swift` (47: the
+  section and its Amount row, `allLooked`) and `EditorViewController+Look.swift`
+  (64: `setLook:` and its validator, the Motion idiom's tags). Wiring:
+  `ClipPane` keeps `lookGallery`, appends the section last on Color and adds
+  `allLooked` to its signature; `inspectorPlayheadMoved` pokes the galleries
+  before its guard; the frozen `EditorViewController.swift` +1 (the validator
+  arm); `lookMenu()` and its row after Motion ▸; `UIMenuTable`'s `setLook:`;
+  the dev tool's `section` and `look_thumbnails_pending`. Product Swift: the
+  four new files 558 lines, changed files +120 −11. `ClipPane.swift` 234 →
+  240, `AgentServer+InspectorTab.swift` 147 → 228, `AppDelegate+Menus.swift`
+  504 → 508, `AppDelegate+ClipMenus.swift` 104 → 117,
+  `EditorViewController+Inspector.swift` 396 → 399.
+- Instruments: `look_proof.py` gains G1, G2, S1, S2, LM1–LM3, G3 and B1–B4
+  with seven mutants; `look_probe.swift` B1–B4; `inventory.json`'s `setLook:`;
+  `clip_inspector2_probe.swift`'s Color list; `v3_tools.py`'s L1 properties;
+  `screens.py`'s `video.look` pin, `NOT_SHOWN` row and `look` fixture; screen
+  05d and 05b's / 05c's waits and prose; GRD-4; the README's **Built-in looks**
+  bullet; the proof README's section.
+
+**Measured.** 2026-10-10, Apple M2 Max, AC power.
+- Loop, Debug: `make typecheck` 0 errors and the 4 baseline warnings;
+  `inventory.py --check` 5/5; `v2_menu.py --only H` 5/5 (103 rows);
+  `clip_inspector2_proof.py` 33/33; `look_proof.py --only
+  G1,G2,G3,S1,S2,LM1,LM2,LM3,B1,B2,B3,B4,Z1` 13/13 (G1's first generation
+  naming MOVIE at 0.5 s was generation 1; S1's three tile rows at y 329, 403,
+  477); `v3_tools.py --only L,T` 5/5; `screens.py --only
+  05b-clip-color,05c-clip-adjustment,05d-clip-look` 8/8, P2 pass, 0 new
+  problems, every PNG looked at; `spec_index_proof.py` 150/150.
+- `make gate`: PASS in 194 s (typecheck 5 s, test 102 s, app 86 s; fmt and
+  lint skipped as passed — no Rust changed).
+- Recorded, on the gate's Release build: `RC_PROOF_APP=release look_proof.py
+  compare tools/proof/work/gr5/control` 30/30 — GR5a's rows (N0 still
+  byte-identical) and GR5b's — no `Reelcut: ` line in either instance's log, no
+  `DEFAULTS MOVED`. L4's bakes 0.26–0.55 ms.
+- Mutants, each `look_proof.py --mutant NAME` on Debug, all seven MUTANT PASS
+  on their first run (every named row failed, no other scored row did):
+  `kind-drops-amount` G1 LM1 B3 B4; `menu-no-dash` B2;
+  `gallery-ignores-playhead` G1 G2 B3; `renders-while-closed` G3;
+  `amount-row-always` S2; `thumbnail-not-click` G1; `adjustment-not-a-target`
+  LM3 B2. GR5a's seven were not re-run: none of their anchors moved.
+
+**Deviations.** The spec's menu rows M1–M3 are LM1–LM3: GR5a's `look_proof.py`
+already has an M1 (teal_orange at 0.5), and rows are keyed by name; the two
+mutants that name them name LM1 and LM3. `v3_tools.py`'s T1 and T4 failed
+before this phase's edit — GR2's Color sub-tab was never added to their
+expected sub-tab lists — so T1's `[picture, color, sound, clip]` and `SUBS`
+gained `color`, which the spec's targeted `v3_tools.py --only L,T` needs. A
+`section` refusal puts back the tab and, when a sub-tab was picked, the sub-tab
+it showed (through `selectClipSubTab`, so the pick is then explicit). The
+gallery's outline reads the clips' own looks (what a tile writes, as the menu
+reads); the summary, `differs` and `allLooked` read the evaluated look, as every
+other section does. `AppDelegate+ClipMenus.swift`'s doc says "five builders".
+
+**Owed.** The `CLAUDE.md` lines (the spec kept every `CLAUDE.md` untouched):
+app/CLAUDE.md's map gains `LookGallery.swift`, `LookGalleryView.swift`,
+`VideoPane+Look.swift` and `EditorViewController+Look.swift`, `ClipPane`'s
+Color list (Light · Color · Look) and its `lookGallery`, the five Clip
+submenus, `select_inspector_tab`'s `section` and `-RCDevLookGalleryDump`; and
+its Hygiene list's one-frame render queues gain the gallery's
+(`LookGallery.queue`, "a third one-frame render joins this entry"). GRD-4 is the
+owner's. GR5a's, GR4a's and GR4b's still-owed lines above.

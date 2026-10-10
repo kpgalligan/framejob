@@ -1,14 +1,14 @@
 import AppKit
 
-/// The Clip menu's four submenus (spec §9): Add Background, Transition,
-/// Motion (with its three slot menus) and Label, and the label dot Label's
-/// rows carry.
+/// The Clip menu's five submenus (spec §9): Add Background, Transition,
+/// Motion (with its three slot menus), Look (the grading branch's GR5b) and
+/// Label, and the label dot Label's rows carry.
 ///
 /// A pure move out of `AppDelegate+Menus.swift` (grading GR1), which stood
 /// near app/CLAUDE.md's ~600-line cap with grading's own menu rows still to
 /// land: the builders came here whole, in their existing order, with their
 /// bodies untouched. **The toll is visibility**: `clipMenu()`, which stayed,
-/// calls the four builders, so they are internal rather than private, and
+/// calls the five builders, so they are internal rather than private, and
 /// they build their rows with `tagged`, which is internal there now, as `item`
 /// and `submenuItem` already were. `motionSlotMenu` and `labelDot` stay
 /// `private`: each is called only from inside this file.
@@ -58,6 +58,19 @@ extension AppDelegate {
                     #selector(EditorViewController.setMotionDuring(_:)))))
         menu.addItem(.separator())
         menu.addItem(item("Preview", #selector(EditorViewController.previewClipMotion(_:))))
+        return menu
+    }
+
+    /// Clip ▸ Look (spec §11 GR-7 [b]): the eight looks from `LookKind.allCases`
+    /// with the index as the tag, a separator, None as −1 — the
+    /// `transitionMenu()` idiom; `validateLookAction` checks and dashes them.
+    func lookMenu() -> NSMenu {
+        let menu = NSMenu(title: "Look")
+        for (index, kind) in LookKind.allCases.enumerated() {
+            menu.addItem(tagged(kind.displayName, #selector(EditorViewController.setLook(_:)), index))
+        }
+        menu.addItem(.separator())
+        menu.addItem(tagged("None", #selector(EditorViewController.setLook(_:)), -1))
         return menu
     }
 

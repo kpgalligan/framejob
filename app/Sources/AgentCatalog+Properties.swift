@@ -86,7 +86,7 @@ extension AgentServer {
     // for `blendClause`'s reason: the kind names are a non-literal operand.
     // They are `LookKind.allCases`, the core's order, which is the order the
     // UI paths it mirrors show them in: the Color sub-tab's Look section (its
-    // gallery and Amount row) and Clip ▸ Look ▸ (both GR5b).
+    // gallery and Amount row) and Clip ▸ Look ▸.
     private static let lookNames: [String] = LookKind.allCases.map { $0.rawValue }
     private static let lookClause: String =
         ", look (null, or {kind: \(lookNames.joined(separator: "|")), amount: 0–1} — one of "

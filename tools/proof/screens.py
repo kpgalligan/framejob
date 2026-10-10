@@ -113,7 +113,9 @@ STEP_KEYS = {"call", "args", "until_absent", "within"}
 # stops the walk (InspectorSection.swift:143-146), so those two are pinned
 # OPEN; 09's and 10's `expect`s catch a pin that drifts. `video.adjustment` is
 # pinned OPEN as well, so 05c shows Strength: Light is pinned open there, so the
-# walk never reaches it.
+# walk never reaches it. `video.look` is pinned OPEN so 05d shows the gallery;
+# it opens Look below Color on 05b and 05c too, whose `select_inspector_tab`
+# steps therefore wait out `look_thumbnails_pending` as 05d's does.
 SECTIONS = {
     "audio.compressor": True, "audio.duck": True, "audio.fades": True, "audio.mix": True,
     "audio.noise": True, "audio.volume": False,
@@ -129,7 +131,8 @@ SECTIONS = {
     "text.font": True, "text.outline": True, "text.presets": True, "text.style": True,
     "video.adjustment": False, "video.chroma": True, "video.color": True, "video.corner": True,
     "video.crop": True,
-    "video.filters": True, "video.light": False, "video.motion": True, "video.obscure": True,
+    "video.filters": True, "video.light": False, "video.look": False, "video.motion": True,
+    "video.obscure": True,
     "video.reflection": True, "video.shadow": True, "video.speed": True,
     "video.spotlight": True, "video.transform": False, "video.transition": True,
 }
@@ -207,6 +210,9 @@ NOT_SHOWN = {
                       "exits before any window; no screen launches with it",
     "ReelcutGraphicPrefetchOff": "a measurement switch that draws every graphic on the "
                                  "compositor's queue alone; no screen shows it",
+    "RCDevLookGalleryDump": "a dev launch default naming a folder the Look gallery writes "
+                            "its thumbnails to (look_proof.py's G rows); no screen launches "
+                            "with it",
 }
 
 # Filed layout defects, each named by its issue, and deliberate findings,
@@ -231,6 +237,8 @@ FIXTURES = {
               "sound": ["video"]},
     "adjust": {"path": os.path.join(FIXTURE_DIR, "Adjust.reelcut"),
                "clips": ["video", "adjustment"], "media": ["speech.mov"], "sound": ["video"]},
+    "look": {"path": os.path.join(FIXTURE_DIR, "Look.reelcut"),
+             "clips": ["video"], "media": ["speech.mov"], "sound": ["video"]},
 }
 CANVAS = {"width": 960, "height": 540, "fps": [30, 1], "background": [0.0, 0.0, 0.0, 1.0],
           "fit_new_clips": True}
@@ -377,6 +385,8 @@ def build_fixture(mcp, name):
             ids = _matte_ops(mcp, path)
         elif name == "adjust":
             ids = _adjust_ops(mcp, path)
+        elif name == "look":
+            ids = _look_ops(mcp, path)
         mcp.call("save_project", project=path)
     except ToolError as error:
         raise FixtureError(f"building {name}: {error}") from error
@@ -541,6 +551,22 @@ def _adjust_ops(mcp, path):
     ids["adjustment"] = clip_on("Adjustment")
     _call(mcp, "set_video", path, clips=[ids["adjustment"]],
           patch={"color": {"saturation": -1.0}, "opacity": 0.75})
+    return ids
+
+
+def _look_ops(mcp, path):
+    """Grading GR5b (spec §11 GR-7): one track, "Video", holding `speech.mov`
+    at 0 with the look `{teal_orange, 0.8}` — the Look section's gallery,
+    its outline and its Amount row (05d)."""
+    _call(mcp, "set_track", path, track=1, name="Video")
+    video = _call(mcp, "import_media", path, path=os.path.join(MEDIA, "speech.mov"))
+    _call(mcp, "add_clip", path, media=_media_id(video), track=1, at=0)
+    clips = _project(mcp, path)["clips"]
+    if len(clips) != 1:
+        raise FixtureError(f"building look: the project holds {len(clips)} clips, not 1")
+    ids = {"video": clips[0]["id"]}
+    _call(mcp, "set_video", path, clips=[ids["video"]],
+          patch={"look": {"kind": "teal_orange", "amount": 0.8}})
     return ids
 
 

@@ -5,7 +5,8 @@
   "steps": [
     {"call": "set_selection", "args": {"clips": ["$clip:adjustment"]}},
     {"call": "set_playhead", "args": {"t": 1500000}},
-    {"call": "select_inspector_tab", "args": {"tab": "clip", "sub_tab": "color"}}
+    {"call": "select_inspector_tab", "args": {"tab": "clip", "sub_tab": "color"},
+     "until_absent": "look_thumbnails_pending", "within": 60}
   ],
   "captures": [
     {"name": "window", "window": "editor"},
@@ -36,7 +37,8 @@ first and open, its summary "75%", with a Reset button. It has one row, Strength
 slider three quarters along, and a "75%" field with a chevron for the quick values
 0, 25, 50, 75 and 100. Below it the LIGHT section is open, summary "neutral", with
 05b's nine rows: Exposure ("0.00 EV", clipped at the field's edge as on 05b) through
-Fade. The COLOR section follows, closed and below the captured height.
+Fade. The COLOR section follows, closed, and then the LOOK section (GR5b), open,
+both below the captured height.
 
 In the light capture the inspector is white with black labels, the section headers
 light-grey bars with grey capitals, the Color sub-tab pale blue with a blue outline,

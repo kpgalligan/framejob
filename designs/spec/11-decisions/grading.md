@@ -272,6 +272,22 @@ Reelcut's own numbers, and nothing of Concat is opened, at design time or build 
     a separator, None; a checkmark on the shared kind, a dash when mixed; for the selected clips
     that take a grade (video, image, still, adjustment), off when none do; no shortcut; undo
     "Look".
+  - **[b] The four points choices 6–9 left open**, accepted by the owner "As described" on
+    2026-10-10 (GR5b): (1) **with an action selected**, a tile, None, Reset and Clip ▸ Look ▸
+    change the clip's OWN look (its base props), as Motion's section and menu do; only the
+    Amount row writes the action's end — in an end, `look: null` only stops animating the look
+    (`core/src/patch.rs`), so it could not remove one. (2) **A thumbnail renders the click's own
+    op**, `set_video {look: {kind}}`: each clip keeps its amount, 1 if it has none — for one
+    clip, or clips sharing an amount, that is choice 7's "the first clip's amount". (3)
+    **Mixed:** the menu dashes each item that some but not all of the targets carry (None: a
+    target with no look); the gallery outlines the shared kind, None when no target has a look,
+    and nothing when mixed; the summary is "mixed" when the kinds OR the amounts differ. (4)
+    **Thumbnails ignore Show Ungraded**, as an export does. Undo names: "Look" for a tile, None,
+    Reset and every menu item; "Amount" for the Amount row. Two dev seams, both absent from
+    Distribution (V-1): `select_inspector_tab`'s `section` scrolls the shown pane to a section
+    and its answer carries `look_thumbnails_pending` while the gallery has renders owed, and the
+    launch default `-RCDevLookGalleryDump <folder>` writes each completed generation's nine
+    thumbnails and a manifest there.
   - **The Concat rule stands**: the looks are the table's numbers and the textbook formulas above
     (Rec. 709 luma, the HSV hue ramp, IEC 61966-2-1 inside 4c); no Core Image, and nothing of
     Concat is opened at design or build time.

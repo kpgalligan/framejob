@@ -128,6 +128,10 @@ Built by `screens.py` on the first screen that names one, into
   `media/speech.mov`; `adjustment` — an adjustment clip, 5 s, at saturation −1
   and opacity 0.75 (Strength 75%), so it greys three quarters of the video
   behind it. Ready once `video`'s peaks are cached.
+- `look` — `Look.reelcut` (grading GR5b, spec §11 GR-7): one track, "Video",
+  holding `video` — `media/speech.mov` at 0 with the look `{teal_orange, 0.8}`
+  — so the Look section outlines Teal & Orange and shows its Amount row at 80%.
+  Ready once `video`'s peaks are cached.
 
 ## Adding a screen
 

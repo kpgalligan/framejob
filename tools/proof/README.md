@@ -7391,9 +7391,11 @@ python3 tools/proof/v3_tools.py [--app APP] [--only L,T,R]   # → 8/8
 
 - **L1**: as `screens.py`'s P1, plus the four dev tools in `dev_tools.py`'s
   order immediately before `import_media`, and `select_inspector_tab`'s
-  properties exactly `{tab, sub_tab, project}`, none required, no `scope`.
+  properties exactly `{tab, sub_tab, section, project}` (`section` since the
+  grading branch's GR5b), none required, no `scope`.
 - **T1**: with the video clip selected, `{}` answers `clip` / `picture` /
-  `[picture, sound, clip]`, and inspector captures before and after it are
+  `[picture, color, sound, clip]` (Color since the grading branch's GR2; T4's
+  sub-tab list names it too), and inspector captures before and after it are
   byte-identical. **T2**: `{tab: document}` answers `document` / null, and its
   dump shows `Frame rate` and no `Position X`. **T3**: `{tab: clip}` answers
   `picture`; `{tab: clip, sub_tab: clip}` answers `clip` and its dump shows
@@ -18173,7 +18175,7 @@ failed and no other scored row did.
 
 **Its record**: `designs/grading.md`'s GR4a and GR4b sections.
 
-## Road map grading — GR5a, looks end to end over MCP (`look_proof.py` N0, R1, K1, D1, P1, A0, M1, U2, U1, J1, A1, O1, X1, L1–L5, Z1 and seven mutants; `look_probe.swift`; `core/tests/look.rs`, `core/tests/ungraded.rs`; spec §11 GR-7; the `grading` branch)
+## Road map grading — GR5a and GR5b, looks end to end over MCP and in the chrome (`look_proof.py` N0, R1, K1, D1, P1, A0, M1, U2, U1, J1, A1, O1, X1, L1–L5 (GR5a); G1, G2, S1, S2, LM1–LM3, G3, B1–B4 (GR5b); Z1; fourteen mutants; `look_probe.swift`; `core/tests/look.rs`, `core/tests/ungraded.rs`; spec §11 GR-7; the `grading` branch)
 
 **What it answers.** That `set_video {patch: {look: {kind, amount}}}` reaches
 the compositor's step 4d through the recipe's `look` — the core's definition,
@@ -18203,20 +18205,43 @@ offsets 456 / 460 of 464, the eight bakes' milliseconds (a record), and
 than red at grey 0.2 and redder than blue at 0.8. The module docstring lists
 every row and its fixture.
 
+GR5b's rows are the Color sub-tab's Look section and Clip ▸ Look ▸, on project
+MG (MOVIE `{warm, 0.5}` and a grey card IM on one track, a text clip TX, an
+adjustment clip AJ). The instance is launched with argument-domain pins —
+`video.look` open, `video.light` and `video.color` closed — and
+`-RCDevLookGalleryDump`, so each completed thumbnail generation lands in the
+work folder as nine PNGs and a manifest. G1 holds each tile's PNG BYTE-identical
+to the click's own `set_video` followed by `render_frame {t, max_width: 256}`,
+and the nine distinct; G2 that nothing renders while nothing changes, and that
+the thumbnail time follows the playhead inside the clip and falls back to its
+start outside; S1 that `select_inspector_tab {section: video.look}` shows the
+nine names in reading order inside the captured inspector with no layout
+problem, and refuses an unknown section naming the held ones; S2 that the
+Amount row appears only when every selected clip has a look; LM1–LM3 Clip ▸
+Look ▸ over MCP (`perform_menu_item`): a kind keeps each clip's amount, None
+removes, undo "Look", disabled for a text clip and enabled for an adjustment
+clip (the spec's M1–M3, renamed because GR5a has an M1); G3 a second instance
+with the section pinned closed renders nothing. B1–B4 are `look_probe.swift`'s:
+the menu's items, tags and place; the validator's checkmarks and dashes; the
+model's pure answers; and the section in a headless `ClipPane`, a tile driven
+by `sendAction`.
+
 ```
 python3 tools/proof/look_proof.py                                   # Debug unless RC_PROOF_APP=release; N0 not run
 python3 tools/proof/look_proof.py --only D1,M1                      # run and score only these rows
 RC_PROOF_APP=release python3 tools/proof/look_proof.py capture DIR  # the neutral control, on the untouched tree
 RC_PROOF_APP=release python3 tools/proof/look_proof.py compare DIR  # every row, and N0 (scored on Release only)
-python3 tools/proof/look_proof.py --mutant NAME                     # one of the seven below
+python3 tools/proof/look_proof.py --only G1,G2,G3,S1,S2,LM1,LM2,LM3,B1,B2,B3,B4  # GR5b's rows
+python3 tools/proof/look_proof.py --mutant NAME                     # one of the fourteen below
 cd core && cargo test --release --test look --test ungraded
 ```
 
 It launches its own instance on a scratch socket in a scratch home
 (`tools/proof/work/look/home`), writes its fixtures (the 640×360 chart PNG, a
 640×360 grey-128 PNG, a 2 s `testsrc2` H.264 movie) into its work folder,
-performs no menu item, closes every project it opens, and removes its work
-folder at the start and at exit (the control folder is not under it).
+performs only Clip ▸ Look ▸ items (which persist nothing), closes every project
+it opens, and removes its work folder at the start and at exit (the control
+folder is not under it).
 `--mutant` builds a tree copy as `tone_proof` does, the probe over the copy's
 `app/Sources` and its shader, and reports MUTANT PASS only when every named
 row failed and no other scored row did; a core mutant also runs `cargo test
@@ -18232,5 +18257,14 @@ CT).
 | `amount-range-dropped` | `check_video`'s look amount range check removed | R1 CT |
 | `split-ignored` | `reelcut_look_bake` skips the split tone | L5 |
 | `kindless-look-kept` | `evaluate_clip`'s look guard removed | CT |
+| `kind-drops-amount` | `LookGallery.op` adds amount 1 | G1 LM1 B3 B4 |
+| `menu-no-dash` | the validator's `.mixed` becomes `.off` | B2 |
+| `gallery-ignores-playhead` | the thumbnail time is always the first clip's start | G1 G2 B3 |
+| `renders-while-closed` | the gallery counts as open whenever it is in a window | G3 |
+| `amount-row-always` | the Amount row for any selection | S2 |
+| `thumbnail-not-click` | the thumbnail's trial op adds amount 1 | G1 |
+| `adjustment-not-a-target` | an adjustment clip is no look target | LM3 B2 |
 
-**Its record**: `designs/grading.md`'s GR5a section.
+GR5a's seven are not re-run for GR5b: none of their anchors moved.
+
+**Its record**: `designs/grading.md`'s GR5a and GR5b sections.

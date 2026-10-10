@@ -50,7 +50,7 @@ from media_less_playback_probe import console_locked  # noqa: E402
 WORK = os.path.join(HERE, "work", "v3_tools")
 ROWS = ["L1", "T1", "T2", "T3", "T4", "R1", "R2", "R3"]
 TABS = ["clip", "media", "document", "assistant"]
-SUBS = ["text", "shape", "graphic", "picture", "sound", "clip"]
+SUBS = ["text", "shape", "graphic", "picture", "color", "sound", "clip"]
 states = {}
 
 
@@ -133,7 +133,8 @@ class Proof:
         block = names[at:at + len(DEV_TOOLS) + 1]
         schema = tools.get("select_inspector_tab", {}).get("inputSchema", {})
         props = set(schema.get("properties", {}))
-        shaped = (props == {"tab", "sub_tab", "project"} and schema.get("required", []) == []
+        shaped = (props == {"tab", "sub_tab", "section", "project"}
+                  and schema.get("required", []) == []
                   and "scope" not in props)
         ok = (alive and welcome and not parity and marker == len(DEV_TOOLS)
               and block == DEV_TOOLS + ["import_media"] and shaped)
@@ -156,7 +157,7 @@ class Proof:
         got = self.tab()
         after, b = self.inspector("t1_after")
         ok = (got.get("tab") == "clip" and got.get("sub_tab") == "picture"
-              and got.get("sub_tabs") == ["picture", "sound", "clip"] and a == b
+              and got.get("sub_tabs") == ["picture", "color", "sound", "clip"] and a == b
               and got.get("project") == self.demo)
         score("T1", "pass" if ok else "fail",
               f"{{}} answered tab {got.get('tab')!r} sub_tab {got.get('sub_tab')!r} sub_tabs "

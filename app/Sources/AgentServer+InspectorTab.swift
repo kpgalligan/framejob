@@ -18,7 +18,14 @@ import AppKit
 /// refused before anything moves; a sub-tab the selection does not have is
 /// found only after the tab is picked (the Clip pane is in the view tree
 /// only then), so that refusal is sent after the tab it found is picked
-/// again.
+/// again; so is a `section` the shown pane does not hold, after which the tab
+/// and the sub-tab it showed are picked again.
+///
+/// `section` (the grading branch's GR5b) scrolls the shown pane so that
+/// section's top is the visible top, clamped — writing no preference and
+/// opening nothing — and the answer says `look_thumbnails_pending` while a
+/// Look gallery in the shown pane owes renders (spec §11 GR-7 [b]), which is
+/// what a capture of its thumbnails waits out.
 extension AgentServer {
 
     func selectInspectorTab(_ a: [String: Any]) throws -> String {
@@ -42,6 +49,7 @@ extension AgentServer {
             }
             sub = found
         }
+        let section = try stringArg(a, "section")
         if sub != nil, tab != .clip {
             throw ToolError(
                 message: "sub_tab needs tab clip: the sub-tabs are the Clip tab's.")
@@ -56,6 +64,7 @@ extension AgentServer {
         }
         let project = UISnapshot.orNull(Self.path(of: document))
         guard let tab else {
+            if let section { try Self.scroll(inspector, to: section) }
             return try jsonResult(inspectorTabAnswer(inspector, project))
         }
         if sub != nil, inspector.selectedClips.isEmpty {
@@ -65,6 +74,7 @@ extension AgentServer {
         }
 
         let previous = inspector.tab
+        let previousSub = previous == .clip ? Self.clipPane(in: inspector)?.activeSubTab : nil
         inspector.select(tab)
         if let sub {
             let offered = Self.clipPane(in: inspector)?.subTabs ?? []
@@ -77,7 +87,65 @@ extension AgentServer {
             }
             inspector.selectClipSubTab(sub)
         }
+        if let section {
+            do {
+                try Self.scroll(inspector, to: section)
+            } catch {
+                inspector.select(previous)
+                if sub != nil, let previousSub { inspector.selectClipSubTab(previousSub) }
+                throw error
+            }
+        }
         return try jsonResult(inspectorTabAnswer(inspector, project))
+    }
+
+    /// The scroll view the inspector shows its pane in, and that pane. Main
+    /// thread.
+    private static func shownPane(
+        in inspector: InspectorViewController
+    ) -> (NSScrollView, InspectorPaneView)? {
+        var queue: [NSView] = [inspector.view]
+        while !queue.isEmpty {
+            let view = queue.removeFirst()
+            if let scroll = view as? NSScrollView, let pane = scroll.documentView as? InspectorPaneView {
+                return (scroll, pane)
+            }
+            queue.append(contentsOf: view.subviews)
+        }
+        return nil
+    }
+
+    /// Scrolls the shown pane so section `id`'s top is the visible top,
+    /// clamped to the pane; refused, naming the sections it holds, when it
+    /// holds no such section. Writes no preference and opens nothing.
+    private static func scroll(_ inspector: InspectorViewController, to id: String) throws {
+        let shown = shownPane(in: inspector)
+        let sections = shown?.1.sections ?? []
+        guard let (scroll, pane) = shown, let section = sections.first(where: { $0.id == id })
+        else {
+            let ids = sections.map(\.id)
+            throw ToolError(
+                message: "The shown pane has no section \(id); its sections are "
+                    + (ids.isEmpty ? "none" : ids.joined(separator: ", ")) + ".")
+        }
+        inspector.view.layoutSubtreeIfNeeded()
+        let clip = scroll.contentView
+        let top = section.convert(section.bounds, to: pane).minY
+        let bottom = max(0, pane.frame.height - clip.bounds.height)
+        clip.scroll(to: NSPoint(x: 0, y: min(max(0, top), bottom)))
+        scroll.reflectScrolledClipView(clip)
+    }
+
+    /// Whether a Look gallery in the shown pane owes renders. Main thread.
+    private static func lookPending(in inspector: InspectorViewController) -> Bool {
+        guard let pane = shownPane(in: inspector)?.1 else { return false }
+        var queue: [NSView] = [pane]
+        while !queue.isEmpty {
+            let view = queue.removeFirst()
+            if let gallery = view as? LookGalleryView, gallery.isPending { return true }
+            queue.append(contentsOf: view.subviews)
+        }
+        return false
     }
 
     /// What the inspector shows now: the tab and, on the Clip tab with a
@@ -93,13 +161,15 @@ extension AgentServer {
             sub = pane.activeSubTab.rawValue
             offered = pane.subTabs.map(\.rawValue)
         }
-        return [
+        var answer: [String: Any] = [
             "ok": true,
             "project": project,
             "tab": inspector.tab.title.lowercased(),
             "sub_tab": sub,
             "sub_tabs": offered,
         ]
+        if Self.lookPending(in: inspector) { answer["look_thumbnails_pending"] = true }
+        return answer
     }
 
     /// The Clip pane among the inspector's descendants — there only while the
@@ -127,7 +197,12 @@ extension AgentServer {
                 + "active sub-tab and the sub-tabs on offer. Refused, changing nothing: a "
                 + "sub_tab without tab clip, a sub_tab with no clip selected, and a sub_tab "
                 + "the selection does not have (the refusal names the ones it has). The pick "
-                + "is forgotten when the selection changes, as a click's is.",
+                + "is forgotten when the selection changes, as a click's is. section (with or "
+                + "without tab) then scrolls the shown pane so that section's top is the visible "
+                + "top, writing no preference and opening nothing; a section the pane does not "
+                + "hold is refused naming the ones it holds, with the tab and sub-tab put back. "
+                + "While a Look gallery in the shown pane is open and still owes thumbnails the "
+                + "answer carries look_thumbnails_pending: true, absent otherwise.",
             [
                 "tab": [
                     "type": "string",
@@ -140,6 +215,12 @@ extension AgentServer {
                     "description": "With tab clip: the sub-tab to show. The selection "
                         + "decides which it has (text, shape, graphic, picture, sound, and "
                         + "clip always).",
+                ],
+                "section": [
+                    "type": "string",
+                    "description": "A section id in the shown pane (video.look, "
+                        + "video.light, …) to scroll to the top of the inspector, after any "
+                        + "tab and sub_tab pick.",
                 ],
             ])
     }

@@ -296,6 +296,10 @@ extension AppDelegate {
         // submenus together (a recorded deviation from §5f's "after Label").
         // No key equivalent, for Remove Silences…' reason above.
         menu.addItem(submenuItem(motionMenu()))
+        // Grading's GR5b (spec §11 GR-7): Look ▸ right after Motion ▸, the menu
+        // half of the Color sub-tab's Look section. No key equivalent, for
+        // Remove Silences…' reason above.
+        menu.addItem(submenuItem(lookMenu()))
         menu.addItem(.separator())
         // Road map 2's phase 6c — what goes BEHIND the picture, in a group of
         // its own because neither item edits the selection: both put a clip on

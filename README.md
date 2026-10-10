@@ -264,6 +264,14 @@ schema, §6 the op table, §7 the architecture.
   inspector on its Color tab (Adjustment, Light, Color; there is no Picture
   tab for it). On a matte track it does nothing, and the Clip tab says so;
   it cannot go inside a nest or take a transition.
+- **Built-in looks** (the `grading` branch). The Color tab's **Look**
+  section is a gallery of eight looks — Warm, Cool, Teal & Orange, Vivid,
+  Faded, Vintage, Dramatic and Black & White — each tile a thumbnail of the
+  frame at the playhead with that look applied, beside None. A click sets
+  the look on every selected clip and keeps its strength; an **Amount** row
+  (0–100%) sets and animates how much of it applies. **Clip ▸ Look ▸** does
+  the same from the menu, with a checkmark on the selection's look. A look
+  is applied after Light and Color, on a video, image or adjustment clip.
 - **Output.** **File ▸ Save Frame…** (⌥⌘E) writes the frame under the
   playhead as a PNG, JPEG or HEIC still — the same writer `render_frame`
   uses, so a still saved from the menu and one an agent asked for are the

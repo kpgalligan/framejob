@@ -78,6 +78,7 @@ extension UIMenu {
         "setMotionOut:": .plain,
         "setMotionDuring:": .plain,
         "previewClipMotion:": .plain,
+        "setLook:": .plain,
         "addSolidColorBackground:": .plain,
         "addImageBackground:": .sheet,
         "addBlurredBackground:": .plain,

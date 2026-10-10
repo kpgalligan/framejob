@@ -146,7 +146,7 @@ let expected: [(String, ClipSubTab, [String])] = [
     ("text", .clip, ["clip.timing", "video.motion"]),
     ("av", .picture, ["video.transform", "video.crop", "video.corner", "video.chroma"]
         + picture),
-    ("av", .color, ["video.light", "video.color"]),
+    ("av", .color, ["video.light", "video.color", "video.look"]),
     ("av", .sound, ["audio.volume", "audio.fades", "audio.duck", "audio.noise",
                     "audio.compressor", "audio.mix"]),
     ("av", .clip, ["clip.timing", "video.speed", "video.motion"]),

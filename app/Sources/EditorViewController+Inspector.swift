@@ -95,6 +95,9 @@ extension EditorViewController {
     /// refreshing forty controls thirty times a second for a clip with no
     /// actions would be pure waste.
     func inspectorPlayheadMoved() {
+        // The Look gallery's thumbnail time follows the playhead whatever the
+        // clips hold, so it is poked before the guard (spec §11 GR-7 [b]).
+        if let document = document { LookGallery.playheadMoved(in: document) }
         guard let inspector = inspector,
               inspector.selectedClips.contains(where: { !$0.actions.isEmpty })
         else { return }

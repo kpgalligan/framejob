@@ -12,8 +12,12 @@
 //
 //   look_probe <request.json> <answer.json>
 //
+// GR5b adds B1–B4, over the app's chrome: `AppDelegate.lookMenu()`, the
+// validator `EditorViewController.validateLookAction`, `LookGallery`'s pure
+// answers and the Color tab's Look section in a headless `ClipPane`.
+//
 // One JSON object out: `rows`, each a name, ok and detail, the name starting
-// with its L-number.
+// with its L- or B-number.
 import AppKit
 import Metal
 
@@ -55,6 +59,234 @@ do {
             && flag == 460,
         "looked \(looked.lookAmount)/\(looked.lookEnabled); none \(none.lookEnabled); zero "
             + "\(zero.lookEnabled); stride \(stride), amount at \(amount), flag at \(flag)")
+}
+
+// MARK: - GR5b: the chrome (B1–B4)
+//
+// `request.json` names `package` (project MG, saved over MCP: MOVIE {warm,
+// 0.5} at 0, IM at 2 s with no look, TX, AJ) and `cool` (the same project with
+// IM at {cool, 0.5}), and `clips` (movie, image, text, adjustment → id). The
+// app is bootstrapped as `tone_probe.swift` and `e2_chrome.py` do; a tile is
+// driven by `sendAction(tile.action, to: tile.target)` and the inspector is
+// headless (no window), so no thumbnail renders and no default is written.
+
+final class ProbeDocumentController: NSDocumentController {
+    override var defaultType: String? { ProjectDocument.projectTypeIdentifier }
+}
+_ = ProbeDocumentController()
+let app = NSApplication.shared
+app.setActivationPolicy(.prohibited)
+let delegate = AppDelegate()
+delegate.applicationWillFinishLaunching(
+    Notification(name: NSApplication.willFinishLaunchingNotification, object: app))
+
+let bClips = (request["clips"] as? [String: NSNumber] ?? [:]).mapValues(\.uint32Value)
+func bOpened(_ key: String) -> ProjectDocument? {
+    guard let path = request[key] as? String else { return nil }
+    let document = ProjectDocument()
+    do {
+        try document.read(
+            from: URL(fileURLWithPath: path), ofType: "com.kgalligan.reelcut-project")
+    } catch {
+        return nil
+    }
+    return document
+}
+func bWalk(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(bWalk) }
+func bParsed(_ op: ReelOp) -> [String: Any] {
+    (try? JSONSerialization.jsonObject(with: Data(op.json.utf8))) as? [String: Any] ?? [:]
+}
+func bState(_ value: NSControl.StateValue) -> String {
+    value == .on ? "on" : (value == .mixed ? "mixed" : "off")
+}
+func bIds(_ names: [String]) -> Set<UInt32> { Set(names.compactMap { bClips[$0] }) }
+let bNames = LookKind.allCases.map(\.displayName)
+
+// B1 the menu
+do {
+    let menu = delegate.lookMenu()
+    let titles = menu.items.map { $0.isSeparatorItem ? "" : $0.title }
+    let tags = menu.items.filter { !$0.isSeparatorItem }.map(\.tag)
+    let keys = menu.items.map(\.keyEquivalent).filter { !$0.isEmpty }
+    let actions = Set(menu.items.filter { !$0.isSeparatorItem }.compactMap {
+        $0.action.map(NSStringFromSelector)
+    })
+    let clip = NSApp.mainMenu?.items.first { $0.title == "Clip" }?.submenu
+    let order = clip?.items.map(\.title) ?? []
+    let motion = order.firstIndex(of: "Motion")
+    let look = order.firstIndex(of: "Look")
+    check(
+        "B1 lookMenu() is the eight names, a separator, None; tags 0…7 and −1; no key "
+            + "equivalents; Clip ▸ Look follows Motion",
+        titles == bNames + ["", "None"] && tags == Array(0..<8) + [-1] && keys.isEmpty
+            && actions == ["setLook:"] && motion != nil && look == motion.map { $0 + 1 },
+        "titles \(titles); tags \(tags); keys \(keys); actions \(actions); Clip \(order)")
+}
+
+// B2 the validation
+do {
+    let plain = bOpened("package")
+    let cool = bOpened("cool")
+    if let plain, let cool, bClips.count == 4 {
+        // name, document, selection, the states wanted (kind or "None" → state), enabled
+        let cases: [(String, ProjectDocument, [String], [String: String], Bool)] = [
+            ("[MOVIE]", plain, ["movie"], ["Warm": "on"], true),
+            ("[MOVIE, IM+cool]", cool, ["movie", "image"], ["Warm": "mixed", "Cool": "mixed"], true),
+            ("[MOVIE, IM]", plain, ["movie", "image"], ["Warm": "mixed", "None": "mixed"], true),
+            ("[IM]", plain, ["image"], ["None": "on"], true),
+            ("[TX]", plain, ["text"], [:], false),
+            ("[TX, MOVIE]", plain, ["text", "movie"], ["Warm": "on"], true),
+            ("[AJ]", plain, ["adjustment"], ["None": "on"], true),
+        ]
+        var misses: [String] = []
+        for (name, document, selection, want, enabled) in cases {
+            document.selection = bIds(selection)
+            let controller = EditorViewController(document: document)
+            for (index, title) in (bNames + ["None"]).enumerated() {
+                let item = NSMenuItem(
+                    title: title, action: #selector(EditorViewController.setLook(_:)),
+                    keyEquivalent: "")
+                item.tag = index < 8 ? index : -1
+                let on = controller.validateUserInterfaceItem(item)
+                let state = bState(item.state)
+                let wanted = enabled ? (want[title] ?? "off") : state
+                if on != enabled || state != wanted {
+                    misses.append("\(name) \(title): enabled \(on) state \(state)")
+                }
+            }
+        }
+        check(
+            "B2 validation: [MOVIE] Warm on; [MOVIE, IM+cool] Warm, Cool mixed; [MOVIE, IM] Warm, "
+                + "None mixed; [IM] None on; [TX] disabled; [TX, MOVIE] Warm on; [AJ] enabled",
+            misses.isEmpty, misses.isEmpty ? "" : misses.joined(separator: "; "))
+    } else {
+        check("B2 the request names both packages and four clips", false, "\(request)")
+    }
+}
+
+// B3 the pure answers
+do {
+    let warm8 = LookProps(kind: .warm, amount: 0.8)
+    let summaries = [
+        LookGallery.summary([warm8, warm8]), LookGallery.summary([nil, nil]),
+        LookGallery.summary([warm8, LookProps(kind: .cool, amount: 0.8)]),
+        LookGallery.summary([warm8, LookProps(kind: .warm, amount: 0.5)]),
+        LookGallery.summary([warm8, nil]),
+    ]
+    let shared = [
+        LookGallery.shared([warm8, LookProps(kind: .warm, amount: 0.5)]),
+        LookGallery.shared([nil, nil]), LookGallery.shared([warm8, nil]),
+        LookGallery.shared([warm8, LookProps(kind: .cool)]), LookGallery.shared([]),
+    ]
+    let sharedOk = shared[0] == .some(.warm) && shared[1] == .some(nil) && shared[2] == nil
+        && shared[3] == nil && shared[4] == nil
+    let set = bParsed(LookGallery.op(.tealOrange, clips: [3, 5]))
+    let none = bParsed(LookGallery.op(nil, clips: [3]))
+    let wantSet: NSDictionary = ["look": ["kind": "teal_orange"]]
+    let opOk = set["op"] as? String == "set_video"
+        && (set["clips"] as? [NSNumber])?.map(\.uint32Value) == [3, 5]
+        && (set["patch"] as? NSDictionary) == wantSet
+        && ((none["patch"] as? [String: Any])?["look"] is NSNull)
+    var times: [Ticks] = []
+    if let document = bOpened("package"), let movie = bClips["movie"], let image = bClips["image"],
+       let m = document.project.snapshot.clips.first(where: { $0.id == movie }),
+       let i = document.project.snapshot.clips.first(where: { $0.id == image })
+    {
+        let second: Ticks = 600_000
+        times = [
+            LookGallery.time(first: m, playhead: second / 2),
+            LookGallery.time(first: m, playhead: m.end),
+            LookGallery.time(first: i, playhead: second),
+            LookGallery.time(first: i, playhead: i.start + second / 4),
+            m.start, i.start,
+        ]
+    }
+    let timeOk = times.count == 6 && times[0] == 300_000 && times[1] == times[4]
+        && times[2] == times[5] && times[3] == times[5] + 150_000
+    check(
+        "B3 summary \"Warm 80%\", \"none\", \"mixed\" by kind, by amount and by a missing look; "
+            + "shared; time (inside, at the end, before the clip); op's JSON has no amount",
+        summaries == ["Warm 80%", "none", "mixed", "mixed", "mixed"] && sharedOk && opOk
+            && timeOk,
+        "summaries \(summaries); shared \(shared); op \(set) / \(none); times \(times)")
+}
+
+// B4 the section
+do {
+    if let cool = bOpened("cool"), let plain = bOpened("package"), bClips.count == 4 {
+        let inspector = InspectorViewController()
+        var sent: [(String, [ReelOp])] = []
+        func pane(_ document: ProjectDocument, _ selection: [String]) -> ClipPane {
+            inspector.document = document
+            inspector.onEdit = { name, ops in
+                sent.append((name, ops))
+                document.applyEdit(name, ops)
+            }
+            document.selection = bIds(selection)
+            inspector.binding.invalidate()
+            let pane = ClipPane(inspector: inspector)
+            pane.binding.invalidate()
+            pane.choose(.color)
+            pane.rebuild()
+            pane.refresh()
+            return pane
+        }
+        func gallery(_ pane: ClipPane) -> LookGalleryView? {
+            pane.sections.first { $0.id == "video.look" }.flatMap { section in
+                bWalk(section).lazy.compactMap { $0 as? LookGalleryView }.first
+            }
+        }
+        func outlined(_ pane: ClipPane) -> [String] {
+            gallery(pane)?.tiles.filter(\.isOutlined).map { $0.kind?.displayName ?? "None" } ?? ["?"]
+        }
+        func look(_ document: ProjectDocument, _ name: String) -> LookProps? {
+            document.project.snapshot.clips.first { $0.id == bClips[name] }?.videoProps.look
+        }
+        let movieSections = pane(cool, ["movie"]).sections.map(\.id)
+        let adjustmentSections = pane(cool, ["adjustment"]).sections.map(\.id)
+        let movieOutline = outlined(pane(cool, ["movie"]))
+        let mixedOutline = outlined(pane(cool, ["movie", "image"]))
+        let image = pane(cool, ["image"])
+        let tiles = gallery(image)?.tiles ?? []
+        sent = []
+        if let warm = tiles.first(where: { $0.kind == .warm }) {
+            warm.sendAction(warm.action, to: warm.target)
+        }
+        let warmSent = sent
+        let warmOp = warmSent.first.flatMap { $0.1.count == 1 ? bParsed($0.1[0]) : nil } ?? [:]
+        let afterWarm = look(cool, "image")
+        let wantWarm: NSDictionary = ["look": ["kind": "warm"]]
+        let warmOk = warmSent.count == 1 && warmSent.first?.0 == "Look"
+            && warmOp["op"] as? String == "set_video"
+            && (warmOp["clips"] as? [NSNumber])?.map(\.uint32Value) == [bClips["image"] ?? 0]
+            && (warmOp["patch"] as? NSDictionary) == wantWarm
+            && afterWarm == LookProps(kind: .warm, amount: 0.5)
+        let after = pane(cool, ["image"])
+        sent = []
+        if let noneTile = gallery(after)?.tiles.first(where: { $0.kind == nil }) {
+            noneTile.sendAction(noneTile.action, to: noneTile.target)
+        }
+        let noneOp = sent.first.flatMap { $0.1.count == 1 ? bParsed($0.1[0]) : nil } ?? [:]
+        let noneOk = sent.count == 1 && sent.first?.0 == "Look"
+            && ((noneOp["patch"] as? [String: Any])?["look"] is NSNull)
+            && look(cool, "image") == nil
+        let imageOutline = outlined(pane(plain, ["image"]))
+        check(
+            "B4 Color sections [light, color, look] (AJ: adjustment first); Warm on IM+{cool, 0.5} "
+                + "sends one set_video {look: {kind: warm}} named \"Look\" and IM reads {warm, "
+                + "0.5}; None sends {look: null}; outlines [MOVIE] Warm, [MOVIE, IM+cool] none, "
+                + "[IM] None",
+            movieSections == ["video.light", "video.color", "video.look"]
+                && adjustmentSections == ["video.adjustment", "video.light", "video.color",
+                                          "video.look"]
+                && tiles.count == 9 && warmOk && noneOk && movieOutline == ["Warm"]
+                && mixedOutline.isEmpty && imageOutline == ["None"],
+            "sections \(movieSections) / \(adjustmentSections); tiles \(tiles.count); warm "
+                + "\(warmSent.map { ($0.0, $0.1.map(\.json)) }) → \(String(describing: afterWarm)); "
+                + "none \(noneOp); outlines \(movieOutline) \(mixedOutline) \(imageOutline)")
+    } else {
+        check("B4 the request names both packages and four clips", false, "\(request)")
+    }
 }
 
 // MARK: - The library: the tree's shader and the probe's kernels

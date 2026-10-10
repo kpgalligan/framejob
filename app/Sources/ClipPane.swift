@@ -40,6 +40,9 @@ final class ClipPane: InspectorPaneView {
     private var chosen: ClipSubTab?
     /// The sections the selected action keys, opened once per selection (CI-8).
     private let reveal = KeyedReveal()
+    /// The Look section's gallery model (spec §11 GR-7 [b]), kept here rather
+    /// than in the section so its thumbnails outlive a rebuild.
+    let lookGallery = LookGallery()
 
     override init(inspector: InspectorViewController) {
         videoPane = VideoPane(inspector: inspector)
@@ -84,6 +87,8 @@ final class ClipPane: InspectorPaneView {
             (binding.videoClips.isEmpty ? "-" : "px") + (binding.audioClips.isEmpty ? "-" : "au"),
             activeSubTab.rawValue, subTabs.map(\.rawValue).joined(separator: ","),
             matteNote == nil ? "-" : "matte",
+            // Whether every clip has a look adds or removes Look's Amount row.
+            videoPane.allLooked ? "look" : "-",
         ].joined(separator: "|")
     }
 
@@ -187,11 +192,12 @@ final class ClipPane: InspectorPaneView {
                 videoPane.obscureSection(),
             ]
         case .color:
-            // Light, then the Color section Picture used to hold (GR-2);
-            // Adjustment's Strength first when every clip is an adjustment
-            // clip (GR-6).
+            // Light, then the Color section Picture used to hold (GR-2), then
+            // Look (GR-7); Adjustment's Strength first when every clip is an
+            // adjustment clip (GR-6).
             sections = [videoPane.lightSection(), videoPane.colorSection()]
             if videoPane.allAdjustment { sections.insert(videoPane.adjustmentSection(), at: 0) }
+            sections.append(videoPane.lookSection(lookGallery))
         case .sound:
             sections = [
                 audioPane.volumeSection(), audioPane.fadeSection(), audioPane.duckSection(),

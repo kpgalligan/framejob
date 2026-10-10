@@ -539,7 +539,7 @@ the key map behind it.
   the outlines stay drawn under them.
 - `EditorWindowController.swift`, `WelcomeWindowController.swift`,
   `AppDelegate.swift` (+`Menus`, +`ClipMenus` — the Clip menu's submenus, Add
-  Background, Transition, Motion and Label, a pure move out of `+Menus`,
+  Background, Transition, Motion, Look and Label, a pure move out of `+Menus`,
   grading GR1 — +`Recording`, +`GraphicMenu` — the Insert
   menu's builder (Adjustment Clip first, then Graphic ▸), File's three graphic-file items (`addGraphicFileItems(to:)`,
   called once from `fileMenu()` right after Add Image to Graphics…: a
@@ -810,7 +810,11 @@ the key map behind it.
   beside the Curve popup because `OptionPopupControl` is not forked) · `VideoPane.swift` (+`Color` — the Color section, a pure move, grading GR1, writing a sparse `ColorPatch`;
   +`Light` — the Light section, the nine tone rows (GR-2); +`Adjustment` — the
   Adjustment section's one Strength row (`video.opacity`) and the selection's
-  adjustment tests (GR-6); +`Transition`,
+  adjustment tests (GR-6); +`Look` — the Look section, last in the Color
+  sub-tab (Light · Color · Look): the 3×3 gallery and an Amount row shown only
+  when every clip has a look (GR-7; `LookGallery.swift` renders its
+  thumbnails through `Exporter.renderFrame` at 256 px, 0.3 s after changes
+  settle and only while open; `LookGalleryView.swift` draws it); +`Transition`,
   +`Motion`, +`Obscure` — the Obscure section, a pure move; +`Speed` — the
   Speed section, Fit to and the "Audio is silent above ×12" note, #190) · `AudioPane.swift` · `TextPane.swift` · `ShapePane.swift` ·
   `GraphicPane.swift` (the Graphic sub-tab, road map 10 §5j, spec §11 G-15:
@@ -2177,7 +2181,13 @@ free.
   `selectClipSubTab(_:)`, the strips' own click paths, so a `snapshot_ui`
   capture is what a click shows. It runs on MAIN, not in `devOffMainTools`.
   With no tab it changes nothing, and answers the tab, the active sub-tab
-  and the sub-tabs on offer. Every refusal leaves the inspector as it was.
+  and the sub-tabs on offer. `section` scrolls a section into view, and the
+  answer's `look_thumbnails_pending` says the gallery is still rendering (GR-7).
+  Every refusal leaves the inspector as it was.
+- `EditorViewController+Look.swift` — Clip ▸ Look ▸ (the eight, a separator,
+  None; a checkmark or a dash; spec §11 GR-7) and its validator arm; the
+  dev-only launch default `-RCDevLookGalleryDump <folder>` writes each set of
+  thumbnails as PNGs for the proof.
 - `DevAppearance.swift` — `-RCDevAppearance light|dark`, a dev-only launch
   default (road map 11's V3). It sets `NSApp.appearance` from `main.swift`
   before `NSApplicationMain`, so every view is built in that look. A live
@@ -2420,8 +2430,8 @@ queue and the AssemblyAI client's delegate `OperationQueue` (spec §11's
 R6-7), the transcribe sheet's Download row's KVO main hop
 (`DispatchQueue.main.async` from `Progress`'s `fractionCompleted`
 observation), `FFmpegRewrap`'s serial queue, the container rewrap's per-input writer
-queues (`ContainerRewrapWriter.swift`), the two one-frame render
-queues (`eyedropperQueue`, `frameGrabQueue` — a third one-frame render joins
+queues (`ContainerRewrapWriter.swift`), the one-frame render
+queues (`eyedropperQueue`, `frameGrabQueue`, `LookGallery.queue` — a fourth one-frame render joins
 this entry rather than growing the list), `ScreenRecorder.shareableContent`'s
 global hop, `GraphicStore`'s serial queue (its file-system sources'
 handlers, the coalesced pass and the outbox; main publishes through

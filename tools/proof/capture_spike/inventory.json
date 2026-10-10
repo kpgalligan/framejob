@@ -467,6 +467,13 @@
    ],
    "note": "an edit, or a preview play"
   },
+  "setLook:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+Look.swift `func setLook(`"
+   ],
+   "note": "an edit"
+  },
   "addSolidColorBackground:": {
    "verdict": "none",
    "code": [

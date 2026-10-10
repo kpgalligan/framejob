@@ -5,7 +5,8 @@
   "steps": [
     {"call": "set_selection", "args": {"clips": ["$clip:video"]}},
     {"call": "set_playhead", "args": {"t": 1500000}},
-    {"call": "select_inspector_tab", "args": {"tab": "clip", "sub_tab": "color"}}
+    {"call": "select_inspector_tab", "args": {"tab": "clip", "sub_tab": "color"},
+     "until_absent": "look_thumbnails_pending", "within": 60}
   ],
   "captures": [
     {"name": "window", "window": "editor"},
@@ -31,7 +32,8 @@ of the rail), then Temperature, Tint, Highlights, Shadows, Whites, Blacks and
 Vibrance (each "0.00", knob in the middle), and Fade ("0.00", its knob at the
 left end, since fade runs 0 to 1). Below it the COLOR section is closed, summary
 "neutral" — the four Brightness, Contrast, Saturation and Hue rows that used to
-sit on Picture.
+sit on Picture. Under it the LOOK section's header (GR5b), open with the summary
+"none"; its gallery of looks starts below the captured height (05d shows it).
 
 In the light capture the inspector is white with black labels, the section
 headers light-grey bars with grey capitals, the Color sub-tab pale blue with a
