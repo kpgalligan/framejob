@@ -594,9 +594,8 @@ governs a module now.
 - `snap.rs` — candidates and `resolve`.
 - `format.rs` — `RC_FORMAT_VERSION`, the `MAX_*` caps (four of them
   `RC_MAX_*` in the header), read-any-version / write-current, the migration
-  hook. On the `grading` branch the version is 1015 and `BRANCH_BASE_VERSION`
-  14: a file numbered 15–1014 (a later main build's) is refused by name, so its
-  newer keys are never dropped on save (spec §11 GR-9).
+  hook; a file numbered 1015 (the grading branch's builds) is read as 15
+  (spec §11 GR-9).
 - `export.rs` · `export_overrides.rs` · `export_size.rs` · `export_table.rs`
   — settings resolution (`Project::export_settings`, the one thing that reads
   a canvas, a duration, a rate and an override against a preset row); how an
@@ -761,7 +760,8 @@ Export names mirror the Rust method exactly.
 `RC_FORMAT_VERSION` in `format.rs` **and** the `#define` in
 `core/include/reelcut_core.h`; the reader must keep accepting every prior
 version; the writer enforces the reader's caps. A bump whose new fields all
-carry a serde default needs no migrate step (versions 3 through 14 have none)
+carry a serde default needs no migrate step (versions 3 through 15 have none;
+15's one step only renumbers the branch's 1015)
 but still bumps, because unknown keys are ignored at every level by design
 and an older build would otherwise open the file, drop the new fields on read
 and write the loss back on the next save; a bump that changes a field's

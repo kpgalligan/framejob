@@ -485,7 +485,7 @@ if let neutral, let read = texels(neutral) {
 /// `kind`'s definition, read off the core's recipe for a one-clip project.
 func definition(_ kind: LookKind) -> LookDefinition? {
     let json = """
-        {"version": 1015, "canvas": {"width": 640, "height": 360, "fps": [30, 1]},
+        {"version": 15, "canvas": {"width": 640, "height": 360, "fps": [30, 1]},
          "media": [{"id": 1, "path": "/m/probe.mov", "kind": "video", "duration": 6000000,
                     "width": 640, "height": 360, "fps": [30, 1], "has_video": true,
                     "has_audio": false}],

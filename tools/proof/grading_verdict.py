@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Road map "grading" GR7a — the scripted half of the verdict: every "What it
-may cost" cap in `designs/grading.md` ("Worth keeping") measured for the
+may cost" cap in `archive/grading.md` ("Worth keeping") measured for the
 `grading` branch against main at the branch point `BASE`, and T4's script half.
 It writes no verdict; a RECORD row prints `cap held` or `cap missed by X` and
 never changes the exit status.

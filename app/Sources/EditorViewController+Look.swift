@@ -1,6 +1,6 @@
 import AppKit
 
-/// Clip ▸ Look ▸ (spec §11 GR-7 [b], the grading branch's GR5b): the eight
+/// Clip ▸ Look ▸ (spec §11 GR-7 [b], grading GR5b): the eight
 /// looks, a separator and None — the menu half of the Color sub-tab's Look
 /// section (`VideoPane+Look.swift`), and a UI path `set_video`'s `look`
 /// mirror names.

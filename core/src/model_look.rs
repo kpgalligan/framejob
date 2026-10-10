@@ -1,4 +1,4 @@
-//! The look vocabulary (spec §11 GR-7, format 1015 on the grading branch):
+//! The look vocabulary (spec §11 GR-7, format 15):
 //! [`Look`], the `video.look` a clip carries — one of the eight built-in
 //! [`LookKind`]s or an imported `.cube` LUT (`lut`, GR-8, naming its media),
 //! and how much of it — and each built-in kind's [`LookDefinition`], the

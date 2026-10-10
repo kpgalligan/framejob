@@ -3,14 +3,15 @@
 //! defaults, the recipe's `{"kind":"adjustment"}` layer, every sentence on
 //! its own channel, the commands that keep working (split, copy and paste),
 //! the inert clip on a matte track, the `ungraded` option, the evaluator's
-//! clamp of an action's end, and the 1015 round trip. What the pass does to
-//! a pixel is `tools/proof/adjustment_proof.py`'s.
+//! clamp of an action's end, and the round trip through the current format.
+//! What the pass does to a pixel is `tools/proof/adjustment_proof.py`'s.
 
 mod common;
 
 use serde_json::{json, Value};
 
 use common::{array, by_id, Handle, Outcome};
+use reelcut_core::format::RC_FORMAT_VERSION;
 
 /// Ticks per second (spec §5.1).
 const SEC: i64 = 600_000;
@@ -461,10 +462,13 @@ fn ungraded_neutralises_its_colour_and_keeps_its_point_filters() {
 }
 
 #[test]
-fn it_round_trips_through_format_1015() {
+fn it_round_trips_through_the_current_format() {
     let (handle, adjustment, _) = fixture();
     let text = handle.to_json();
-    assert!(text.contains("\"version\": 1015"), "{text}");
+    assert!(
+        text.contains(&format!("\"version\": {RC_FORMAT_VERSION}")),
+        "{text}"
+    );
     assert!(text.contains("\"kind\": \"adjustment\""), "{text}");
     let back = Handle::from_json(&text);
     assert_eq!(back.value(), handle.value());

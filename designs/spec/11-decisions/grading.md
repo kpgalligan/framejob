@@ -1,10 +1,12 @@
-# Spec §11 — decisions: Grading (road map "grading", on the `grading` branch)
+# Spec §11 — decisions: Grading (road map "grading")
 
 Part of spec §11, *Decisions made — do not re-litigate*. The index of every decision is
 [`README.md`](README.md).
 
-The road map that makes these is open: `designs/grading.md` holds each phase's record (GR0 the
-spike and the route, GR1 the pure moves on main, GR2 onwards on the `grading` branch). GR-1,
+The road map that made these is closed: its condensed record is `designs/adr/grading.md`, and
+the original, `archive/grading.md`, holds each phase's record (GR0 the spike and the route, GR1
+the pure moves on main, GR2 onwards on the `grading` branch, GR7b the owner's verdict and the
+merge's renumbering). GR-1,
 GR-2, GR-3 and GR-9 were recorded in GR2, before its code, from the owner's answers of
 2026-10-09 ("Start grading", then "All as recommended" to the brief's choices, and "All as
 recommended" again to GR2's nine choices). GR-4 and GR-5 were recorded in GR3, before its code,
@@ -22,16 +24,20 @@ R5-5; §7.5's blending in encoded sRGB; MT-1..MT-9; PR-1..PR-5; "media by refere
 formulas are textbook (the sRGB transfer functions of IEC 61966-2-1, Rec. 709 luma weights) and
 Reelcut's own numbers, and nothing of Concat is opened, at design time or build time.
 
-- **GR-1 — The grading experiment: tier 1 is IN on the branch; tiers 2 and 3 wait for the
-  verdict.** Tier 1 is tone, adjustment clips, looks and `.cube` LUT import, with a way to see the
+- **GR-1 — The grading experiment: tier 1 is IN, kept by the owner's verdict; tiers 2 and 3 are filed as issues.** Tier 1 is tone, adjustment clips, looks and `.cube` LUT import, with a way to see the
   grade: a before/after switch (View ▸ Show Ungraded, preview only) and one luma waveform. Flip and
   the shape mask leave the experiment (flip touches nothing about colour; a matte track over an
   adjustment clip does the mask's job). Wheels, curves, qualifiers, further scopes and the rest of
-  tiers 2 and 3 are not OUT: they wait for the owner's verdict at GR7 (`designs/grading.md`, "Worth
+  tiers 2 and 3 are not OUT: they wait for the owner's verdict at GR7 (`archive/grading.md`, "Worth
   keeping"). **Amends spec §1**: its non-goal "color grading beyond per-clip controls" and the bar
-  sentence's "scopes" no longer bind the branch, and road map 2 §4's "LUTs (`.cube`)" exclusion
-  (archived) is reversed by this entry. On main both stand until a merge. Risk accepted: the
-  experiment costs the phases it takes, and a "no" leaves the branch unmerged.
+  sentence's "scopes" no longer bind tier 1, and road map 2 §4's "LUTs (`.cube`)" exclusion
+  (archived) is reversed by this entry. Risk accepted: the experiment costs the phases it takes,
+  and a "no" leaves it unmerged. **Verdict (owner, 2026-10-10): kept**, merged into main; tiers 2
+  and 3 are deferred as issues, not out. The owner: "I think we can merge this", and "T1 and T3
+  look good to me. I'll get feedback later from others and we can adjust." T4 ran with test LUTs,
+  not one of his own ("LUT worked"); T2, T5 and T6 were not run by him, and GRD-1…GRD-6 were not
+  reported (they stay standing rows in `docs/manual-checks.md`, with GRD-7…GRD-10 added for T2,
+  T5, T6 and other people's feedback).
 - **GR-2 — Tone: nine keys under `video.color`, applied at step 4c behind a uniform flag;
   exposure and white balance in LOCAL linear light.**
   - The keys follow `hue` in this one order everywhere (the JSON, the uniforms, the inspector):
@@ -386,16 +392,18 @@ Reelcut's own numbers, and nothing of Concat is opened, at design time or build 
   - Risk accepted: a LUT that expects log or linear input draws wrong on Reelcut's encoded values
     unless the footage is what the LUT was made for, and nothing warns; non-default domains, 1D and
     shaper LUTs are refused, not read.
-- **GR-9 — The branch writes project format 1015, refuses 15–1014 by name, and the merge
-  renumbers.** The branch's `RC_FORMAT_VERSION` is **1015** (main's 14 plus a thousand), in
-  `core/src/format.rs` and the header, so every main build refuses a branch-made project as "made
+- **GR-9 — The branch wrote project format 1015 and refused 15–1014 by name; at the merge 1015
+  became 15.** The branch's `RC_FORMAT_VERSION` was **1015** (main's 14 plus a thousand), in
+  `core/src/format.rs` and the header, so every main build refused a branch-made project as "made
   by a newer Reelcut" instead of opening it and dropping its grades on the next save.
-  `BRANCH_BASE_VERSION` is 14: the branch reads 1 to 14 and 1015, and refuses a file numbered 15
-  to 1014 in its own sentence ("not one this grading build reads"), because a later main file
+  Its base version was 14: the branch read 1 to 14 and 1015, and refused a file numbered 15 to
+  1014 in its own sentence (naming the numbers it reads), because a later main file
   would otherwise open and lose its new keys on save (owner choice 9). Above 1015 the existing
-  "newer" sentence answers. No migrate step: 1015 is 14 plus optional keys (and, since GR-6,
-  the `adjustment` source kind, which an older build refuses by name). **At the merge** 1015
-  is renumbered to main's next version, with one migration arm mapping 1015 to it, so branch-made
-  projects still open; the gap refusal and `BRANCH_BASE_VERSION` go with it. Risk accepted: a
-  project the owner saves on the branch opens only on the branch until the merge (he keeps his
-  trial projects as copies).
+  "newer" sentence answered. The branch had no migrate step: 1015 is 14 plus optional keys (and, since GR-6,
+  the `adjustment` source kind, which an older build refuses by name). **At the merge** (GR7b,
+  2026-10-10) 1015 became **15**, main's next version. A file numbered 1015 is read as 15 by one
+  migration step (`migrate_1015_to_15` in `format.rs`, run before the "newer" gate, mapping to the
+  literal 15 so a later bump still runs its own steps from 15; `GRADING_BRANCH_VERSION` names
+  the number), so branch-made projects still open. The base-version constant and the gap refusal
+  are gone, and 16 and above, 1014 included, are "newer". Risk accepted: a project the owner saved on
+  the grading branch opened only there until the merge (he kept his trial projects as copies).

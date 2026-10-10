@@ -1777,3 +1777,127 @@ may cost" and from `grading_verdict.py` (L1 now prints the totals as a record:
 4,546 net at e969058); the root `CLAUDE.md` now says size rules are per file,
 never per feature. The phase records above that measure a running total
 against that budget are history, kept as written.
+
+## GR7b — the verdict and the merge's renumbering (2026-10-10, on the `grading` branch)
+
+**The verdict: kept.** The owner, 2026-10-10: "I think we can merge this."
+And: "T1 and T3 look good to me. I'll get feedback later from others and we
+can adjust." What he ran and what he did not, against the trial guide:
+- **T1** (a warm, dark clip with Light) and **T3** (a built-in look): run;
+  "look good to me". No time was reported for T1.
+- **T4** (a LUT): run with test LUTs, not one of his own: "LUT worked". The
+  script's figure on his own file (`grading_verdict.py measure --only T4 --lut
+  PATH`) was not taken; GR7a's on the phase's own LUT stands (max |Δ| 2 levels
+  against ffmpeg's `lut3d`).
+- **T2** (one adjustment clip over a whole video), **T5** (the Assistant) and
+  **T6** (a power window): not run by the owner. Each is now a standing row in
+  `docs/manual-checks.md`: GRD-7 (T2), GRD-8 (T5, on his own key and budget),
+  GRD-9 (T6; needing to be shown how brings the shape mask back as an issue).
+  GRD-10 is the feedback from others he named.
+- **GRD-1…GRD-6**: not reported. They stay standing rows, now worded for any
+  Release build.
+- **The caps, as measured** (GR7a, with the L3 payment): frozen files held
+  (`EditorViewController.swift` +3, the other four net 0); files over the cap
+  held after L3 (`ProjectSnapshot.swift` 1,750 → 1,570, `edit_clip.rs` 755 →
+  661); the inspector held (Color, four sections; Picture −Color); the menus
+  held (175 → 187 leaves, the four named items); an ungraded layer held
+  (+0.009 ms at 1080p, +0.002 ms at 4K); an ungraded export held (+0.33 %); a
+  graded frame held (2.724 ms median compositor average; a graded export
+  −0.17 % against ungraded).
+
+**What landed.**
+- Core: `RC_FORMAT_VERSION` is **15** (`core/src/format.rs` and the header's
+  `#define`, in lockstep). `GRADING_BRANCH_VERSION` (1015) and
+  `migrate_1015_to_15`, run in `read` right after the version is parsed and
+  before the "newer" gate, mapping 1015 to the literal 15 (so a later bump
+  still runs its own steps from 15). `BRANCH_BASE_VERSION` and the gap refusal
+  are gone: 16 and above, 1014 included, get the "newer" sentence. The
+  "Version 1015" doc paragraph is "Version 15", and the MIGRATION HOOK comment
+  says 3 through 15 need no rewrite. `core/tests/schema_v1015.rs` became
+  `schema_v15.rs` (`git mv`, rewritten: `every_earlier_version_opens_stamped_current`,
+  `a_1015_file_opens_as_15_with_its_grades_intact`,
+  `sixteen_to_1014_and_past_1015_are_newer`, and the two tone tests kept);
+  `adjustment.rs`'s round trip reads `RC_FORMAT_VERSION`; the "format 1015 on
+  the grading branch" doc text in `tone.rs`, `look.rs`, `model_props.rs` and
+  `model_look.rs` says "format 15".
+- Proofs: `phase9_proof.py`'s section 8 opens 1 to the current version and
+  `GRADING_BRANCH_VERSION` (a fixture literal), each stamped current;
+  `tone_proof.py`'s CT runs `schema_v15`; `look_probe.swift`'s fixture is
+  version 15; the proof READMEs and the grading instruments' docstrings point
+  at `archive/grading.md`.
+- Documents: spec §11 GR-1 (the verdict) and GR-9 (the outcome) amended in
+  place, the file's title and opening paragraph; their README rows; §1, §5.2
+  (format version 15) and the branch qualifier swept from §4.3a, §4.3b, §6b,
+  §6c, §7.1, §7.3, §7.4, §7.5, §7.7, §7.9a, §7.10, §9 and CI-5/CI-6's
+  amendment notes; the spec index's Lines cells; the README's four grading
+  bullets; `docs/manual-checks.md`'s Grading section (a self-contained intro,
+  GRD-7…GRD-10); the app's doc comments and `Compositor.metal`'s two
+  citations (now `designs/adr/grading.md`); `core/CLAUDE.md`'s `format.rs`
+  entry and its "Format changes" paragraph.
+- The close: this section, `designs/adr/grading.md`, this file moved to
+  `archive/grading.md`, its `archive/INDEX.md` row, and the root `CLAUDE.md`'s
+  ADR cell.
+
+**Verification**, 2026-10-10, Apple M2 Max, macOS 26.5.1, `powermode 0`, AC
+power.
+- `cd core && cargo test --release --test schema_v15 --test adjustment --test
+  tone --test look --test lut --test model_tests --test schema_v3 --test
+  schema_v14`: exit 0 — schema_v15 5 passed, adjustment 18, tone 6, look 10,
+  lut 12, model_tests 31, schema_v3 9, schema_v14 4. (The first run failed
+  `a_1015_file_opens_as_15_with_its_grades_intact` on the test's own oracle:
+  a LUT look is stored with `amount: 1.0`; the assertion now says so.)
+- `cd core && cargo test --release --no-fail-fast --test tone --test
+  schema_v15` (tone_proof's CT command): exit 0, 6 and 5 passed.
+- `make lint`: exit 0. `cargo fmt --check`: exit 0. `make typecheck`: exit 0,
+  0 errors and the 4 baseline warnings. `python3
+  tools/proof/spec_index_proof.py`: 150/150.
+- `make app-debug`, `proof_app.py launch`, then `phase9_proof.py` on Debug:
+  225/225; section 8 opened versions 1–15 and 1015, each "stamped 15 in
+  memory, its content intact", and refused 16 ("project format version 16 is
+  newer than this build understands (version 15); update Reelcut to open
+  it"). `grep "Reelcut: "` on its log printed nothing.
+- `look_proof.py --only L4,L5` (Debug): 1/1 — L5 ok; L4 recorded the eight
+  bakes at 0.26–0.58 ms.
+- `make gate`: PASS in 236 s (typecheck 4 s, fmt 2 s, lint 4 s, test 125 s,
+  app 101 s).
+- Recorded, on the gate's Release build: `proof_app.py launch --app
+  release`, then `RC_PROOF_APP=release phase9_proof.py`: 225/225, the same
+  section 8 (1–15 and 1015 stamped 15, 16 refused), no `Reelcut: ` line, no
+  `DEFAULTS MOVED`.
+- `git grep -n -E "BRANCH_BASE_VERSION|designs/grading\.md|not one this
+  grading build" -- . ':!archive'` (after the move): nothing. `git grep -n -i
+  -E "grading.? branch"` over the spec, README, docs, `core/src`,
+  `core/include`, `app` and the two `CLAUDE.md`s: only the expected history
+  lines (the `GRADING_BRANCH_VERSION` doc comment, `core/CLAUDE.md`'s
+  `format.rs` entry, the header's version comment, GR-9 and the opening
+  paragraph of `11-decisions/grading.md`, the GR-9 README row, and §5.2's
+  1015 sentence).
+
+**Mutants**, each an edit to `core/src/format.rs`, `cd core && cargo test
+--release --test schema_v15`, then the file restored and `git diff
+core/src/format.rs` compared byte for byte with the pre-mutant diff (equal):
+- `remap-dropped` (the `migrate_1015_to_15` call deleted): killed by exactly
+  `a_1015_file_opens_as_15_with_its_grades_intact` (4 passed, 1 failed).
+- `gap-kept` (the old gap refusal restored right after the remap, before the
+  newer gate): the first version wrote the old range literally (`> 14 &&
+  < 1015`, i.e. 15–1014), which also refuses the current 15 and failed three
+  tests; as the spec words it, `(16..=1014)`, it was killed by exactly
+  `sixteen_to_1014_and_past_1015_are_newer` (4 passed, 1 failed).
+
+**Issues** (the orchestrator's GitHub writes; numbers substituted at commit):
+- Closed as built: #118 (tone; its mask answered by a matte track over an
+  adjustment clip, GR-1, GRD-9; flip moved to #259), #120 (eight
+  looks, not ~24), #121 (adjustment clips; blur, sharpen, pixelate and blends
+  refused, no new mixed-overlap rule needed), #122 (LUT import, parsed by
+  `cube.rs`, not a `CubeLUT.swift`).
+- Filed: #259 (flip_x and flip_y), #260 (colour wheels),
+  #261 (curves), #262 (HSL qualifiers), #263
+  (vectorscope, RGB parade, histogram), #264 (Apple Log, S-Log, V-Log
+  through AVFoundation and a camera log LUT; needs a log clip).
+- Commented: #256 is grading's tier 3 (colour management: linear, log, HDR).
+- #258 left open for the owner, untouched.
+
+**Owed.** The merge of `grading` into main (the orchestrator's, by the branch
+plan: a throwaway worktree and a fast-forward). The owner's GRD-1…GRD-10 in
+`docs/manual-checks.md`, T4 on his own LUT whenever he has one, and other
+people's feedback (GRD-10), each adjustment filed as an issue.

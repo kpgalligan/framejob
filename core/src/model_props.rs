@@ -171,9 +171,8 @@ pub struct VideoProps {
     /// edit working on the numbers a person typed (spec §5.4, §7.3).
     pub motion: Option<Motion>,
     /// One of the eight built-in looks and its amount (spec §11 GR-7, format
-    /// 1015 on the grading branch), applied at step 4d after tone. `None`
-    /// is no look, and writes no key, so a look-less file's text is what it
-    /// was.
+    /// 15), applied at step 4d after tone. `None` is no look, and writes no
+    /// key, so a look-less file's text is what it was.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub look: Option<Look>,
 }
@@ -240,11 +239,11 @@ impl Default for Shadow {
 /// All thirteen are offsets from neutral: 0 changes nothing, which is why the
 /// derived `Default` is correct here.
 ///
-/// The nine after `hue` are tone (spec §11 GR-2, format 1015 on the grading
-/// branch), in the one order the uniforms and the inspector share. Each is
-/// written only when not 0 (`is_zero`), so an untoned file's text is what it
-/// was; readers that need every key — an action's interpolation, the patch
-/// template, the recipe — go through `actions::color_json`.
+/// The nine after `hue` are tone (spec §11 GR-2, format 15), in the one order
+/// the uniforms and the inspector share. Each is written only when not 0
+/// (`is_zero`), so an untoned file's text is what it was; readers that need
+/// every key — an action's interpolation, the patch template, the recipe —
+/// go through `actions::color_json`.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ColorAdjust {

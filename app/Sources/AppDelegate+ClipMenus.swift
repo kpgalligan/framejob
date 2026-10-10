@@ -1,7 +1,7 @@
 import AppKit
 
 /// The Clip menu's five submenus (spec §9): Add Background, Transition,
-/// Motion (with its three slot menus), Look (the grading branch's GR5b) and
+/// Motion (with its three slot menus), Look (grading GR5b) and
 /// Label, and the label dot Label's rows carry.
 ///
 /// A pure move out of `AppDelegate+Menus.swift` (grading GR1), which stood

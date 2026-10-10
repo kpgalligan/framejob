@@ -21,7 +21,7 @@ import AppKit
 /// again; so is a `section` the shown pane does not hold, after which the tab
 /// and the sub-tab it showed are picked again.
 ///
-/// `section` (the grading branch's GR5b) scrolls the shown pane so that
+/// `section` (grading GR5b) scrolls the shown pane so that
 /// section's top is the visible top, clamped — writing no preference and
 /// opening nothing — and the answer says `look_thumbnails_pending` while a
 /// Look gallery in the shown pane owes renders (spec §11 GR-7 [b]), which is

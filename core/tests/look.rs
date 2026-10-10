@@ -1,6 +1,6 @@
-//! Black-box tests for looks (spec §11 GR-7, format 1015 on the grading
-//! branch): `video.look {kind, amount}` and the recipe's `look`, driven
-//! through the C FFI exactly as `ReelCore.swift` drives it.
+//! Black-box tests for looks (spec §11 GR-7, format 15): `video.look {kind,
+//! amount}` and the recipe's `look`, driven through the C FFI exactly as
+//! `ReelCore.swift` drives it.
 //!
 //! Pinned here: the amount's range, refused in its own sentence at both
 //! ends; an unknown kind refused naming the eight and `lut`; a kind alone landing at

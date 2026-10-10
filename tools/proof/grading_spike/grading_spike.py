@@ -2,7 +2,7 @@
 """Road map "grading" GR0 — the grading spike: what tone and a 3D LUT cost an
 UNGRADED and a graded layer in the tree's own compositor shader under three
 routes, and whether a 10-bit biplanar source wins back deep decode's heavy-4K
-cost (#258). Both choosing rules are written in `designs/grading.md` ("GR0's
+cost (#258). Both choosing rules are written in `archive/grading.md` ("GR0's
 rules, written before measuring") with the constants below.
 
     python3 tools/proof/grading_spike/grading_spike.py --check [--mutant NAME]   # 10 frames, 1 run: B0–B2, K1–K5
@@ -88,7 +88,7 @@ sys.path.insert(0, str(PROOF / "graphics_spike"))
 import bounded  # noqa: E402
 import swift_build  # noqa: E402
 
-# ---- the rules' constants (designs/grading.md, "GR0's rules") -----------------
+# ---- the rules' constants (archive/grading.md, "GR0's rules") -----------------
 
 BOUND = {1080: 0.02, 2160: 0.06}
 ROUTE_ORDER = ("VA", "VF", "VC")

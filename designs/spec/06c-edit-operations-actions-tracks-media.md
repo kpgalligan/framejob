@@ -94,7 +94,7 @@ The rules every op shares are §6a; the clip ops are §6b.
   absent `probe` keeps the record (§11, #63). The descriptor and the probe both carry `original`,
   the WebM or Matroska file a `.mov` copy was made from (§11 #228-O): `add_media` stores it, a
   probe with one replaces the stored one, a probe without one clears it, and no probe keeps it.
-  **On the grading branch** (§11 GR-8) a `lut` row — a `.cube` file — carries no video, audio,
+  A `lut` row (§11 GR-8) — a `.cube` file — carries no video, audio,
   alpha or duration (`a lut media has no video, audio, alpha or duration`), and `remove_media` of a
   LUT refuses while it is some clip's base look (`media 7 is the look of clip 3; pass with_clips:
   true to remove it and clear their looks`); `with_clips` then clears those looks, on the timeline

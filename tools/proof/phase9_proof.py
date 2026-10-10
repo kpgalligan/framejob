@@ -178,17 +178,10 @@ def format_version():
 CURRENT_VERSION = format_version()
 
 
-def branch_base_version():
-    """`BRANCH_BASE_VERSION` off the tree's own `core/src/format.rs` (spec §11 GR-9: a
-    branch reads its base's versions and its own, and refuses the gap), or the current
-    version when the tree has none — every version from 1 is then readable."""
-    path = os.path.join(HERE, "..", "..", "core", "src", "format.rs")
-    with open(path) as f:
-        match = re.search(r"pub const BRANCH_BASE_VERSION: u32 = (\d+);", f.read())
-    return int(match.group(1)) if match else CURRENT_VERSION
-
-
-BASE_VERSION = branch_base_version()
+# The number the grading branch's builds wrote (spec §11 GR-9), a fixture literal:
+# the merge renumbered it, and a file stamped with it still opens as the current
+# version through `migrate_1015_to_15`.
+GRADING_BRANCH_VERSION = 1015
 
 # The whole catalog after phase 9: phase 7's 73 plus `set_scope`, which is
 # not an op — view state like `set_playhead`, `set_range` and
@@ -1498,9 +1491,8 @@ def versions_part(mcp):
     old_nest = {"id": 4, "track": 2, "start": 2 * SEC, "duration": 2 * SEC,
                 "source": {"kind": "nest", "project": "/gone/Old Group.reelcut"},
                 "video": {}}
-    # 1 to the branch's base, and the current version (spec §11 GR-9): on main they
-    # are one run, 1 to the current version.
-    readable = sorted(set(range(1, BASE_VERSION + 1)) | {CURRENT_VERSION})
+    # 1 to the current version, and the grading branch's 1015 (spec §11 GR-9).
+    readable = list(range(1, CURRENT_VERSION + 1)) + [GRADING_BRANCH_VERSION]
     for version in readable:
         extra = (old_nest,) if version == 1 else ()
         try:

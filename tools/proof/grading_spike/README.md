@@ -5,7 +5,7 @@ compositor shader, under three routes, and whether a 10-bit biplanar source
 wins back what deep decode costs the layer stage at 4K (#258). Nothing here is
 merged into `app/`; GR2 builds the chosen route. The two choosing rules, with
 the constants at the top of `grading_spike.py`, were written in
-`designs/grading.md` ("GR0's rules, written before measuring") before the
+`archive/grading.md` ("GR0's rules, written before measuring") before the
 first `--measure`.
 
 ```
@@ -163,5 +163,5 @@ python3 tools/proof/grading_spike/grading_spike.py --check --tree --mutant tree-
 perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.py --measure --tree   # GR7a's record
 ```
 
-**Its record** is `designs/grading.md`, "GR0 — the road map and the spike"
+**Its record** is `archive/grading.md`, "GR0 — the road map and the spike"
 (and, for `--tree`, "GR7a").

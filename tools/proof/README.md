@@ -7391,10 +7391,10 @@ python3 tools/proof/v3_tools.py [--app APP] [--only L,T,R]   # → 8/8
 
 - **L1**: as `screens.py`'s P1, plus the four dev tools in `dev_tools.py`'s
   order immediately before `import_media`, and `select_inspector_tab`'s
-  properties exactly `{tab, sub_tab, section, project}` (`section` since the
-  grading branch's GR5b), none required, no `scope`.
+  properties exactly `{tab, sub_tab, section, project}` (`section` since
+  grading GR5b), none required, no `scope`.
 - **T1**: with the video clip selected, `{}` answers `clip` / `picture` /
-  `[picture, color, sound, clip]` (Color since the grading branch's GR2; T4's
+  `[picture, color, sound, clip]` (Color since grading GR2; T4's
   sub-tab list names it too), and inspector captures before and after it are
   byte-identical. **T2**: `{tab: document}` answers `document` / null, and its
   dump shows `Frame rate` and no `Position X`. **T3**: `{tab: clip}` answers
@@ -17956,11 +17956,15 @@ four B93 probe mutants, since the fill they anchor in went generic.
 
 ## Road map grading — GR0, the grading spike (`grading_spike/`; #258)
 
+The road map is closed: its condensed record is `designs/adr/grading.md`,
+the phase records `archive/grading.md`, and its decisions
+`designs/spec/11-decisions/grading.md`.
+
 **What it answers.** What tone and a 3D LUT cost an ungraded and a graded
 layer in the tree's own `Compositor.metal` under three routes — a uniform flag
 (VF), function constants (VC), always on at neutral values (VA) — at 1920×1080
 and 3840×2160, the route chosen by a rule written beforehand in
-`designs/grading.md`; and for #258, whether a 10-bit biplanar source (`x420`,
+`archive/grading.md`; and for #258, whether a 10-bit biplanar source (`x420`,
 `x422`) wins back what a `64RGBAHalf` source costs the layer stage. Nothing is
 merged into `app/`. `grading_spike/README.md` has the variants, scenes, rows,
 statistic and mutants.
@@ -17989,9 +17993,9 @@ G 0.135, W 0.131 ms, so **X1: #258 stays open for the owner's choice**. D1
 killed (`anchor-missing` by B0, `exposure-encoded` by K2 and K4,
 `lut-axes-swapped` by K3, `adjust-ignores-destination` by K4,
 `biplanar-full-range` by K5, `neutral-drift` by K1). The full tables are
-`designs/grading.md`'s GR0 record.
+`archive/grading.md`'s GR0 record.
 
-## Road map grading — GR2, tone end to end over MCP (`tone_proof.py` N0–N2, E1, E2, W1, K1, F1, O1, A1, R1, X1, U1, M1, B1, P1–P4, Z1 and seven mutants; `tone_probe.swift`; `core/tests/tone.rs`, `core/tests/schema_v1015.rs`; spec §11 GR-2, GR-9; the `grading` branch)
+## Road map grading — GR2, tone end to end over MCP (`tone_proof.py` N0–N2, E1, E2, W1, K1, F1, O1, A1, R1, X1, U1, M1, B1, P1–P4, Z1 and seven mutants; `tone_probe.swift`; `core/tests/tone.rs`, `core/tests/schema_v15.rs`; spec §11 GR-2, GR-9; the `grading` branch)
 
 **What it answers.** That `set_video {patch: {color: {…}}}`'s nine tone keys
 reach the compositor's step 4c and do what spec §11 GR-2 says, in
@@ -18015,7 +18019,7 @@ python3 tools/proof/tone_proof.py --only E1,A1                      # run and sc
 RC_PROOF_APP=release python3 tools/proof/tone_proof.py capture DIR  # the neutral control, on the untouched tree
 RC_PROOF_APP=release python3 tools/proof/tone_proof.py compare DIR  # every row, and N0 (scored on Release only)
 python3 tools/proof/tone_proof.py --mutant NAME                     # one of the seven below
-cd core && cargo test --release --test tone --test schema_v1015
+cd core && cargo test --release --test tone --test schema_v15
 ```
 
 It launches its own instance on a scratch socket in a scratch home
@@ -18028,7 +18032,7 @@ folder at the start and at exit (the control folder is not under it).
 anchor asserted to occur once), builds the probe over the copy's
 `app/Sources`, and reports MUTANT PASS only when every named row failed and no
 other scored row did; a core mutant also runs `cargo test --release
---no-fail-fast --test tone --test schema_v1015` in the copy's core (row CT).
+--no-fail-fast --test tone --test schema_v15` in the copy's core (row CT).
 
 | Mutant | Edit | Must fail |
 |---|---|---|
@@ -18044,7 +18048,7 @@ GR2 also pinned the GR0 spike's shader to `4d742cc` (`grading_spike.py`'s
 `SHADER_COMMIT`) and made both spikes' benches hand their shader the first 104
 floats of `LayerUniforms`, since the tree's block grew a tone group.
 
-**Its record**: `designs/grading.md`'s GR2 section.
+**Its record**: `archive/grading.md`'s GR2 section.
 
 ## Road map grading — GR3, seeing the grade (`seeing_proof.py` U1–U4, W1, V1–V4, P1–P7, G1, H1, H2, Z1 and seven mutants; `waveform_probe.swift`; `core/tests/ungraded.rs`; spec §11 GR-4, GR-5; the `grading` branch)
 
@@ -18097,7 +18101,7 @@ CT).
 | `no-paused-refresh` | the two commands do not compose the paused frame again | V1 V2 |
 | `pending-dropped` | a frame offered while a pass is in flight is dropped, not kept | P7 |
 
-**Its record**: `designs/grading.md`'s GR3 section.
+**Its record**: `archive/grading.md`'s GR3 section.
 
 ## Road map grading — GR4a and GR4b, adjustment clips and their chrome (`adjustment_proof.py` N1, G1, U1, G2, F1, O1, O2, M1, Q1, M2, E1–E8, C1, A1, R1–R7, I1–I4, S1–S4, Z1 and thirteen mutants; `core/tests/adjustment.rs`; spec §11 GR-6; the `grading` branch)
 
@@ -18173,7 +18177,7 @@ failed and no other scored row did.
 | `strength-in-mixed` | Strength shown for a mixed selection | S2 |
 | `adjustment-note-gone` | the adjustment matte note gone | S4 |
 
-**Its record**: `designs/grading.md`'s GR4a and GR4b sections.
+**Its record**: `archive/grading.md`'s GR4a and GR4b sections.
 
 ## Road map grading — GR5a and GR5b, looks end to end over MCP and in the chrome (`look_proof.py` N0, R1, K1, D1, P1, A0, M1, U2, U1, J1, A1, O1, X1, L1–L5 (GR5a); G1, G2, S1, S2, LM1–LM3, G3, B1–B4 (GR5b); Z1; fourteen mutants; `look_probe.swift`; `core/tests/look.rs`, `core/tests/ungraded.rs`; spec §11 GR-7; the `grading` branch)
 
@@ -18271,7 +18275,7 @@ GR6a moved one anchor: `kindless-look-kept` now names `evaluate_clip`'s guard
 as it calls `lut.rs`'s `evaluates_as_look`. K1 expects the eight and `lut`
 (GR-8), and `look_probe.swift`'s B1/B2 and L4 walk `LookKind.builtIns`.
 
-**Its record**: `designs/grading.md`'s GR5a and GR5b sections.
+**Its record**: `archive/grading.md`'s GR5a and GR5b sections.
 
 ## Road map grading — GR6a and GR6b, `.cube` LUTs end to end over MCP (`lut_proof.py` T0, I1, R1, R2, N1, S1, A1, F1, K1, O1, X1, U1, J1, M1, C1, D1, P1, LG1, LG2, LM4, P2, T1, T2, P3, P4, P5, P6, P7, Z1 and seventeen mutants; `lut_probe.swift`; `core/tests/cube.rs`, `core/tests/lut.rs`; spec §11 GR-8; the `grading` branch)
 
@@ -18357,11 +18361,11 @@ did; a core mutant also runs `cargo test --release --no-fail-fast --test cube
 | `import-new-id-always` | Import LUT predicts `next_id` even for a listed file | P7 |
 | `summary-says-lut` | a LUT look's summary is "LUT" | P4 P6 |
 
-**Its record**: `designs/grading.md`'s GR6a and GR6b sections.
+**Its record**: `archive/grading.md`'s GR6a and GR6b sections.
 
 ## Road map grading — GR7a, the verdict's figures (`grading_verdict.py` L1–L4, H0, M1, G0, E1, E2, F4, T4, T4c, Z1 and four mutants; `grading_spike.py --tree`, `tree_bench.swift`, KT, TC and one mutant; the `grading` branch)
 
-**What it answers.** Every cap in `designs/grading.md`'s "What it may cost",
+**What it answers.** Every cap in `archive/grading.md`'s "What it may cost",
 measured for the branch against main at the branch point `f407f87` (`BASE`),
 and T4's script half — the figures the owner's trial reads. It writes no
 verdict: a RECORD row prints `cap held` or `cap missed by X` and never changes
@@ -18449,5 +18453,5 @@ dropped, the clip kept) G0; `measure --mutant menus-same-app` (the branch
 listing read from main's instance) M1; `grading_spike.py --check --tree
 --mutant tree-graded` KT. Each prints `mutant NAME: killed by …` or `SURVIVED`.
 
-**Its record** is `designs/grading.md`'s "GR7a" section, with every figure's
+**Its record** is `archive/grading.md`'s "GR7a" section, with every figure's
 command, host, power and load.

@@ -240,7 +240,7 @@ schema, §6 the op table, §7 the architecture.
   every export. The header tags the track ("Matte · Alpha"), its clips
   draw at half opacity with a dashed outline, and the Clip tab says which
   of a matte clip's settings have no effect.
-- **Light** (the `grading` branch, an experiment). A movie, image or still
+- **Light**. A movie, image or still
   clip has a **Color** sub-tab beside Picture: its **Light** section sets
   exposure (±3 stops, on linear light), temperature and tint (white balance,
   also on linear light), highlights, shadows, whites, blacks, vibrance and a
@@ -248,14 +248,13 @@ schema, §6 the op table, §7 the architecture.
   saturation and hue. Each slider writes only its own setting, so several
   clips keep their own other values; every one animates in an action, draws
   the same in the preview, stills and every export, and an untouched clip
-  renders exactly as before. A project saved by this build opens only in a
-  grading build (format 1015). **View ▸ Show Ungraded** (⌃⌘U) shows the
+  renders exactly as before. **View ▸ Show Ungraded** (⌃⌘U) shows the
   preview as if no clip were graded — a before/after switch for the window,
   never for an export — and **View ▸ Waveform** (⌃⌘W) puts a luma waveform
   beside the preview, with red marks where highlights and shadows clip and
   the share of the frame clipping at each end. Neither is remembered: a
   window opens with both off.
-- **Adjustment clips** (the `grading` branch). **Insert ▸ Adjustment Clip**
+- **Adjustment clips**. **Insert ▸ Adjustment Clip**
   places a clip that draws nothing of its own and grades everything behind
   it — its Light, Color and point filters apply to the whole picture under
   it, at a **Strength** (its opacity) you can fade or animate. It covers the
@@ -264,7 +263,7 @@ schema, §6 the op table, §7 the architecture.
   inspector on its Color tab (Adjustment, Light, Color; there is no Picture
   tab for it). On a matte track it does nothing, and the Clip tab says so;
   it cannot go inside a nest or take a transition.
-- **Built-in looks** (the `grading` branch). The Color tab's **Look**
+- **Built-in looks**. The Color tab's **Look**
   section is a gallery of eight looks — Warm, Cool, Teal & Orange, Vivid,
   Faded, Vintage, Dramatic and Black & White — each tile a thumbnail of the
   frame at the playhead with that look applied, beside None. A click sets
@@ -272,7 +271,7 @@ schema, §6 the op table, §7 the architecture.
   (0–100%) sets and animates how much of it applies. **Clip ▸ Look ▸** does
   the same from the menu, with a checkmark on the selection's look. A look
   is applied after Light and Color, on a video, image or adjustment clip.
-- **Imported LUTs** (the `grading` branch). A `.cube` 3D LUT is media: add
+- **Imported LUTs**. A `.cube` 3D LUT is media: add
   it with File ▸ Add Media…, a drop on the Media tab, or the Look section's
   **Import LUT…** button, which also applies it to the selected clips in one
   undo step. Each LUT gets a tile in the gallery's **Imported** group,

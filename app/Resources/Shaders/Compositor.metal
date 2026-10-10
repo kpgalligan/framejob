@@ -891,7 +891,7 @@ static inline ObscurePlan obscurePlan(constant LayerUniforms &u, float2 localPx,
 // MARK: - Tone (spec §11 GR-2)
 
 // The sRGB transfer functions (IEC 61966-2-1), on [0, 1]. Textbook formulas
-// only (the Concat rule, `designs/grading.md`), carried over from GR0's spike
+// only (the Concat rule, `designs/adr/grading.md`), carried over from GR0's spike
 // with its names and numbers.
 static inline float3 gradeDecode(float3 c) {
     c = clamp(c, 0.0, 1.0);
@@ -1073,7 +1073,7 @@ static inline float3 gradeLook(float3 rgb, texture3d<float> look, sampler samp,
 // TONE (spec §11 GR-2) joins that comparison as a ninth uniform read. GR0's
 // spike measured what the flag costs a full-bleed UNGRADED layer at 0.000 ms
 // at 1080p and 0.001 ms at 4K; a toned layer pays about 0.05 ms at 1080p and
-// 0.20 ms at 4K (`designs/grading.md`, GR0's T0 and T2).
+// 0.20 ms at 4K (`designs/adr/grading.md`, GR0's T0 and T2).
 //
 // What each effect DOES cost on that same layer, over the no-effect baseline:
 // a clip rectangle 0.02 ms, a reflection 0.02, a spotlight with its lens 0.04,

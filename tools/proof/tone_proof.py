@@ -79,7 +79,7 @@ and links the tree's `core/tests`), applies its edits (each anchor asserted
 to occur exactly once), builds it by the copy's own `make app-debug` (`make
 app` under `RC_PROOF_APP=release`) and runs every row on it, the probe built
 over the copy's `app/Sources`. A core mutant also runs `cargo test --release
---no-fail-fast --test tone --test schema_v1015` in the copy's own `core/` (row
+--no-fail-fast --test tone --test schema_v15` in the copy's own `core/` (row
 CT). MUTANT PASS when every named row FAILED and no other scored row did:
   exposure-encoded       exposure multiplies ENCODED values: E1 E2
   tone-before-obscure    step 4c moved before 4b: O1
@@ -815,7 +815,7 @@ def build_mutant(name):
 
 def core_test(copy):
     ran = bounded.run(["cargo", "test", "--release", "--no-fail-fast", "--test", "tone",
-                       "--test", "schema_v1015"], 900, cwd=str(copy / "core"))
+                       "--test", "schema_v15"], 900, cwd=str(copy / "core"))
     lines = (ran["stdout"] + ran["stderr"]).strip().splitlines()
     failed = [line.strip() for line in lines if line.strip().startswith("`--test ")]
     return ran["rc"] == 0 and not ran["expired"], failed or lines[-3:]
@@ -867,7 +867,7 @@ def main():
             passed_ct, last = core_test(copy)
             rows["CT"] = passed_ct
             print(("  ok   " if passed_ct else "  FAIL ") + "CT cargo test --test tone "
-                  "--test schema_v1015 in the copy's core\n       " + " | ".join(last),
+                  "--test schema_v15 in the copy's core\n       " + " | ".join(last),
                   flush=True)
             scored.append("CT")
     else:

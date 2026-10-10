@@ -1,7 +1,7 @@
 import AppKit
 
-/// The Color sub-tab's last section, **Look** (spec §11 GR-7 [b], the grading
-/// branch's GR5b): the gallery of the eight built-in looks and None, the
+/// The Color sub-tab's last section, **Look** (spec §11 GR-7 [b], grading
+/// GR5b): the gallery of the eight built-in looks and None, the
 /// imported LUTs and Import LUT… (GR-8 [b], GR6b), and an Amount row when
 /// every selected clip has a look.
 ///

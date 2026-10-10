@@ -1,6 +1,6 @@
-//! Black-box tests for tone (spec §11 GR-2, format 1015 on the grading
-//! branch): nine keys on `video.color` after `hue`, driven through the C FFI
-//! exactly as `ReelCore.swift` drives it.
+//! Black-box tests for tone (spec §11 GR-2, format 15): nine keys on
+//! `video.color` after `hue`, driven through the C FFI exactly as
+//! `ReelCore.swift` drives it.
 //!
 //! Pinned here: each key's range, refused in its own sentence at both ends;
 //! a neutral key absent from the written file and present everywhere a key

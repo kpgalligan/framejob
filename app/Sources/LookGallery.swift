@@ -1,7 +1,7 @@
 import AppKit
 
-/// The Look section's gallery model (spec §11 GR-7 [b], the grading branch's
-/// GR5b): which clips a look applies to, the op a tile or a menu item sends,
+/// The Look section's gallery model (spec §11 GR-7 [b], grading GR5b):
+/// which clips a look applies to, the op a tile or a menu item sends,
 /// and the nine thumbnails — None and the eight — each the composited frame
 /// with that tile's click applied, then one per imported `.cube` LUT (spec
 /// §11 GR-8 [b]), in the media list's order.

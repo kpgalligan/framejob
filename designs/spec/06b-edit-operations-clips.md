@@ -9,7 +9,7 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   whole frames, so the window stays inside the file and the segment plays at rate 1 (§11); a timed
   media shorter than one canvas frame is an `Err` naming the frame. A `lut` media is an `Err` (`media
   7 is a LUT: apply it as a look (set_video {look: {kind: "lut", media: 7}}), it is not placed as a
-  clip`, §11 GR-8 on the grading branch), and so is it for `insert_clip` and `overwrite_clip`.
+  clip`, §11 GR-8), and so is it for `insert_clip` and `overwrite_clip`.
   Refuses if the overlap rule fails.
 - **`add_text_clip {track, at, duration=5 s, text?}` / `add_shape_clip {…, shape?}`** — Same
   placement rules; default text is the Title preset centered, default shape the rectangle — except
@@ -29,7 +29,7 @@ The rules every op shares are §6a; the action, track, marker, canvas and media 
   (a string of at most 4096 characters, a number or a boolean, under a key matching
   `^[A-Za-z_][A-Za-z0-9_]{0,31}$`); a `null` prop is dropped unchecked, and more than 64 is an
   **error**. Every check runs before the placement.
-- **`add_adjustment_clip {track, at, duration=5 s}`** (grading branch, §11 GR-6) — Same placement
+- **`add_adjustment_clip {track, at, duration=5 s}`** (§11 GR-6) — Same placement
   rules; a clip with no picture (`source.kind` `adjustment`) at scale 1 with default `video`. While
   it lasts its `video.color`, point filters and `opacity` (the strength) grade everything drawn
   behind it in its container, the canvas background included, never a track in front; on a track
