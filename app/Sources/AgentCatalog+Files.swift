@@ -337,6 +337,21 @@ extension AgentServer {
                     ],
                     "format": frameFormatProperty,
                     "burn_in_timecode": burnInProperty,
+                    "ungraded": [
+                        "type": "boolean",
+                        "description": "Render as if no clip were graded — every clip's "
+                            + "video.color (Light and Color) neutral, everything else kept: "
+                            + "View ▸ Show Ungraded's picture. The view switch itself never "
+                            + "reaches this tool or an export. Default false.",
+                    ],
+                    "waveform": [
+                        "type": "boolean",
+                        "description": "Also measure the frame's luma waveform, View ▸ "
+                            + "Waveform's: the text says what share of pixels clips high and "
+                            + "low, and <image path>.waveform.json holds the 256 × 256 counts "
+                            + "(one array per column bin, indexed by level), the clip marks "
+                            + "and both percentages. Default false.",
+                    ],
                 ]),
             tool(
                 "export",

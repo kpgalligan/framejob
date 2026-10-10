@@ -257,8 +257,12 @@ char *rc_project_composition_plan(const RcProject *p);
 char *rc_project_frame_recipe(const RcProject *p, int64_t t);
 
 /* The same recipe, with the caller's OPTIONS. `opts_json` is
- * {"burn_in_timecode": bool} — or NULL, which is the defaults and is exactly
- * what rc_project_frame_recipe asks for, the two being one implementation.
+ * {"burn_in_timecode": bool, "ungraded": bool} (either key may be absent) —
+ * or NULL, which is the defaults and is exactly what rc_project_frame_recipe
+ * asks for, the two being one implementation.
+ *
+ * `ungraded` (spec 11 GR-4) writes every layer's `color` neutral — all
+ * thirteen keys, nested and matte layers included — and adds no layer.
  *
  * `burn_in_timecode` APPENDS a text layer (so, last: topmost) showing the
  * project timecode at `t`, spelled by the document's own timecode_frames, in

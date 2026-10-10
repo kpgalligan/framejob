@@ -36,8 +36,9 @@ extension EditorViewController {
             canvas.topAnchor.constraint(equalTo: canvasContainer.topAnchor),
             canvas.bottomAnchor.constraint(equalTo: canvasContainer.bottomAnchor),
             canvas.leadingAnchor.constraint(equalTo: canvasContainer.leadingAnchor),
-            canvas.trailingAnchor.constraint(equalTo: canvasContainer.trailingAnchor),
         ])
+        // The trailing edge is the waveform panel's leading one (GR-5).
+        installSeeing(beside: canvas)
 
         // One-line forwards only (app/CLAUDE.md): every body is a named method
         // on this controller or on the document.

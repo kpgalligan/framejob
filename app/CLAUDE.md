@@ -1075,6 +1075,17 @@ the key map behind it.
   `RecipeClipRect`, `RecipeLayerMatte`, `RecipeLayerDissolve`,
   `RecipeMatteGroup`, `RecipeLayer` (with `matte` and `dissolve`) and `FrameRecipe` (with `mattes`), out of
   `ProjectSnapshot.swift`; the canvas hit-tests through `CanvasLayerBox`.
+- `WaveformAnalyzer.swift` (`WaveformTrace`, the GPU pass over
+  `Resources/Shaders/Waveform.metal`) · `WaveformTap.swift` (`WaveformTaps`:
+  `Compositor.serve` offers each composed frame by recipe key; one pass in
+  flight per key and one pending slot the newest frame replaces) ·
+  `WaveformPanelView.swift` (the panel, its trace view, `UngradedTagView`) ·
+  `EditorViewController+Seeing.swift` (View ▸ Show Ungraded and View ▸
+  Waveform, `installSeeing`, their validator arm; spec §11 GR-4, GR-5) — the
+  grade's seeing tools. Show Ungraded sets `RecipeOptions.ungraded` on the
+  document's own key only, so an export or `render_frame`, which mint their
+  own keys, never see it. `armCanvasMode` pins the modal overlays to the
+  canvas, not the pane, because the panel shares the pane.
 - `TrackMatte.swift` — a track's matte mode, mirroring `model_matte.rs`: raw
   values, `displayName`, `shaderCode` (the case index — a shader
   discriminant, append only) and `target(of:in:)` (the core's
@@ -2336,7 +2347,9 @@ catalog entry declaring `scope`, and a comment naming the UI path. Handlers
 follow the canonical shape: `target(a)` → validate ids → `performGroupedEdit`
 → `jsonResult`; failures throw `ToolError` and return in-band
 (`isError: true`). View state and preferences are the one exemption, and it
-is a decision: Preview Quality, the preview window, the export queue, the
+is a decision: Preview Quality, the preview window, Show Ungraded and the
+Waveform panel (spec §11 GR-4, GR-5; `render_frame {ungraded, waveform}` is
+the capability), the export queue, the
 Media tab's search and sort, the Assistant tab (view state; the dev tool
 `select_inspector_tab` shows it in a Release build, and the assistant's own
 calls already are tool calls) and Settings' Assistant pane (the key, the model
@@ -2399,7 +2412,9 @@ straightening and the 8-bit rounding (`ExportStraightAlpha.swift`,
 `ExportStraightAlphaHalf.swift`, `DispatchQueue.concurrentPerform` over rows,
 inside the video pump), and the spend-month
 queue (`AssistantSpendMonth.queue`, Settings' ledger fold, answered by a
-main hop), and — not a queue but a seam all the same — the graphic
+main hop), the waveform tap's main hop (`WaveformTaps.finished` →
+`DispatchQueue.main.async`, from Metal's completion thread), and — not a
+queue but a seam all the same — the graphic
 prefetch's worker `Thread`s (`GraphicPrefetch.swift`, G-26). The recorder adds
 NO queue of its own:
 framework callbacks are stamped where they land and hopped to main. Colors,

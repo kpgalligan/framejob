@@ -217,9 +217,9 @@ final class Compositor: NSObject, AVVideoCompositing {
             try renderer.render(
                 recipe: recipe, into: destination, request: request, instruction: instruction)
             request.finish(withComposedVideoFrame: destination)
+            WaveformTaps.shared.offer(destination, key: instruction?.recipeKey ?? 0)
         } catch {
-            // A frame that will not compose is dropped, not fatal: the player
-            // shows the previous frame and playback continues.
+            // A frame that will not compose is dropped: the player shows the last one.
             request.finish(with: error)
         }
         record(CFAbsoluteTimeGetCurrent() - started)

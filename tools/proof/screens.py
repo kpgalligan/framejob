@@ -92,6 +92,9 @@ DEFAULT_APP = str(proof_app.bundle())
 DEFAULT_SCREENS = os.path.join(ROOT, "designs", "screens")
 SECOND = 600_000
 
+# The two `none` menu items a screen may perform: grading GR3's view toggles
+# (spec §11 GR-4, GR-5), which persist nothing, so no instance's defaults move.
+VIEW_SELECTORS = ("toggleShowUngraded:", "toggleWaveform:")
 STEP_TOOLS = ("set_selection", "set_playhead", "detect_silence", "perform_menu_item",
               "cancel_sheet", "select_inspector_tab")
 LOOKS = ("light", "dark")
@@ -621,9 +624,11 @@ def validate(front, menu, last):
                 leaf = menu.get(tuple(path))
                 if leaf is None:
                     bad(f"{where}: {' ▸ '.join(path)} is not a menu leaf")
-                if leaf.get("verdict") not in ("sheet", "window"):
+                if (leaf.get("verdict") not in ("sheet", "window")
+                        and leaf.get("selector") not in VIEW_SELECTORS):
                     bad(f"{where}: {' ▸ '.join(path)} has verdict {leaf.get('verdict')!r}, "
-                        "not sheet or window")
+                        "not sheet or window, and is not one of the view toggles "
+                        f"{', '.join(VIEW_SELECTORS)}")
                 if leaf.get("selector") == "newRecording:" or path == NEW_RECORDING:
                     if path != NEW_RECORDING or key != "steps" or not last:
                         bad("New Recording… must be the last screen run")

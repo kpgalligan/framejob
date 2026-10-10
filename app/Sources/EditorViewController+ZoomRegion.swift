@@ -202,7 +202,7 @@ extension EditorViewController {
     }
 
     /// The inverse, landed in the OVERLAY's own coordinates — which are the
-    /// canvas view's today (both fill `canvasContainer`, both are flipped),
+    /// canvas view's today (the overlay fills the canvas, both are flipped),
     /// but the conversion is spelled out rather than assumed.
     private func regionViewPoint(_ point: CGPoint) -> CGPoint {
         guard let canvas = previewCanvas, let region = canvasRegion else { return point }

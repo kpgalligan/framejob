@@ -40,6 +40,8 @@
 | ⌥⌘I | Toggle inspector |
 | ⌃⌘A | View ▸ Assistant — show the inspector, pick its Assistant tab and focus the composer (road map 12 A2, §11 AI-4). ⌘A is Select All and ⌥⌘A Deselect All; ⌃⌘A was free. Not a toggle: pressed on the Assistant tab it only refocuses the composer |
 | ⇧⌘P | Preview Window — a second window showing the same picture as the canvas, with no overlay (road map 2's phase 8b). A TOGGLE: the item carries a checkmark and the key both opens the window and puts it away |
+| ⌃⌘U | View ▸ Show Ungraded — the preview (and the Preview Window) as if no clip were graded, with an "Ungraded" tag (grading GR3, §11 GR-4). A checkmark toggle; view state, not persisted; never an export or Save Frame… |
+| ⌃⌘W | View ▸ Waveform — the luma waveform panel beside the preview (grading GR3, §11 GR-5). A checkmark toggle; view state, not persisted |
 | `,` / `.` (⇧ ×10) | Nudge the selection one frame |
 | ⌥-drag clip | Duplicate |
 | ⌥⇧-drag clip | Slip — the source under a fixed clip |
@@ -126,7 +128,9 @@ same player in an `NSPanel` — a panel because a titled window would become MAI
 and every ⌘-item whose action lives on the editor would stop resolving while
 the preview was focused; its window sets `isExcludedFromWindowsMenu` for the
 export queue's reason and autosaves its frame, which the queue's deliberately
-does not, so it stays on the display it was put on)), Window (Minimize,
+does not, so it stays on the display it was put on), then Show Ungraded ⌃⌘U
+and Waveform ⌃⌘W (grading GR3, §11 GR-4, GR-5: two checkmark toggles about the
+preview, view state that nothing persists)), Window (Minimize,
 Zoom, Export Queue — road map 2's phase 7e, the export sheet's Add to Queue
 button's other end, with no key equivalent because §9's "proposed, not yet
 bound" table claims no row for it and every bare letter belongs to the

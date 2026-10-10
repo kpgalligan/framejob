@@ -469,7 +469,8 @@ governs a module now.
   `recipe.rs`) is the twenty-two keys of a layer written in ONE place
   (`RecipeLayer.init(from:)` on the Swift side defaults a missing key
   silently, so a copied skeleton drifts with no diagnostic). `RecipeOptions`
-  is what a caller wanted besides `t` — the burn-in timecode — and is a
+  is what a caller wanted besides `t` — the burn-in timecode, and `ungraded`
+  (spec §11 GR-4: every layer's `color` written neutral) — and is a
   recipe option, never an export override, because the override table drops
   an unknown key in silence. A layer whose `transition` or `dissolve` is non-null is
   emitted `blend: "normal"` whatever the clip says: one of the core's TWO

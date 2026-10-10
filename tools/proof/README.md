@@ -18043,3 +18043,56 @@ GR2 also pinned the GR0 spike's shader to `4d742cc` (`grading_spike.py`'s
 floats of `LayerUniforms`, since the tree's block grew a tone group.
 
 **Its record**: `designs/grading.md`'s GR2 section.
+
+## Road map grading — GR3, seeing the grade (`seeing_proof.py` U1–U4, W1, V1–V4, P1–P7, G1, H1, H2, Z1 and seven mutants; `waveform_probe.swift`; `core/tests/ungraded.rs`; spec §11 GR-4, GR-5; the `grading` branch)
+
+**What it answers.** That the recipe's `ungraded` option draws the picture
+as if no clip were graded and nothing else, and reaches only what asks for it;
+and that the luma waveform counts what the person sees. U1 holds
+`render_frame {ungraded}` of a graded stack (two tracks, a nested clip, a
+luma-matte clip) to the bytes of the same stack before any grade; U2 and U3
+turn View ▸ Show Ungraded on in the window and find `render_frame` and a
+`prores_422` export still graded; U4 is the refusal of a non-boolean. W1 holds
+`render_frame {waveform}`'s counts on a 1920-column ramp to the rendered
+values bin by bin; V1 and V2 hold the shown panel's readouts (read through
+`snapshot_ui`) to `render_frame {waveform}`'s, graded and then ungraded; V3 the
+panel's 248 pt and the canvas beside it; V4 the "Ungraded" tag. P1–P7 are
+`waveform_probe.swift`, built by `swift_build.build` over `app/Sources` with
+the tree's own `Waveform.metal` compiled from source (a failed build is a
+scored FAILURE): the ramp, grey, the Rec. 709 weights, the rounding at both
+ends and the saturation, the marks at 0.5 %, the two commands moving no
+`UserDefaults` key and setting `ungraded` on the document's key only, and the
+tap's latest-wins slot. G1 records the pass's GPU time. H1 and H2 are the
+harness's fifteenth argument, `seeing=waveform,ungraded,ramp`, light and dark.
+The module docstring lists every row and its fixture.
+
+```
+python3 tools/proof/seeing_proof.py                  # Debug unless RC_PROOF_APP=release
+python3 tools/proof/seeing_proof.py --only U1,V1     # run and score only these rows
+python3 tools/proof/seeing_proof.py --mutant NAME    # one of the seven below
+cd core && cargo test --release --test ungraded
+```
+
+It launches its own instance on a scratch socket in a scratch home
+(`tools/proof/work/seeing/home`), writes its fixtures (a 640×360 grey-128 PNG,
+a 1920×360 ramp PNG, a 2 s `testsrc2` H.264 movie) into its work folder,
+performs only View ▸ Show Ungraded and View ▸ Waveform (which persist nothing,
+and are turned off again), closes every project it opens, and removes its work
+folder at the start and at exit. `--mutant` builds a tree copy as `tone_proof`
+does, builds the probe over the copy's `app/Sources` and shader, skips H1–H2
+(the harness builds the tree's own sources), and reports MUTANT PASS only when
+every named row failed and no other scored row did; a core mutant also runs
+`cargo test --release --no-fail-fast --test ungraded` in the copy's core (row
+CT).
+
+| Mutant | Edit | Must fail |
+|---|---|---|
+| `ungraded-ignored` | the option never reaches `layer` | U1 U3 V2 CT |
+| `ungraded-tone-only` | the option strips Light's nine and keeps Color's four | U1 CT |
+| `view-key-leaks` | a key with no options of its own reads another key's | U2 U3 |
+| `luma-weights-swapped` | the kernel weighs blue as red | P3 |
+| `level-floors` | the kernel floors Y′·255 instead of rounding it | P1 P2 P4 W1 V1 |
+| `no-paused-refresh` | the two commands do not compose the paused frame again | V1 V2 |
+| `pending-dropped` | a frame offered while a pass is in flight is dropped, not kept | P7 |
+
+**Its record**: `designs/grading.md`'s GR3 section.

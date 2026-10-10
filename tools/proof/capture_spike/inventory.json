@@ -672,6 +672,20 @@
    ],
    "note": "the preview window, shown or closed"
   },
+  "toggleShowUngraded:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+Seeing.swift `func toggleShowUngraded(`"
+   ],
+   "note": "view state, not persisted"
+  },
+  "toggleWaveform:": {
+   "verdict": "none",
+   "code": [
+    "app/Sources/EditorViewController+Seeing.swift `func toggleWaveform(`"
+   ],
+   "note": "view state, not persisted"
+  },
   "performMiniaturize:": {
    "verdict": "framework",
    "code": [

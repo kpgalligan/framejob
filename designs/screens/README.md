@@ -72,12 +72,15 @@ screens run in name order.
 
 Anything else — an unknown key, a missing required one, a step with its own
 `project`, a `$clip:` name the fixture lacks, a menu path that is not a leaf of
-the menu or not a `sheet`/`window` item — fails the screen as `front block: …`
+the menu or not a `sheet`/`window` item or a view toggle — fails the screen as `front block: …`
 before any of its steps runs.
 
 **Menu items.** `perform_menu_item` takes a path of titles as the menu shows
 them (`["File", "Export…"]`). Only items the dev tool classifies `sheet` or
-`window` are allowed, and File ▸ New Recording… only in the LAST screen run:
+`window` are allowed, and the two view toggles of grading GR3 (View ▸ Show
+Ungraded and View ▸ Waveform, `VIEW_SELECTORS` in `screens.py`), which persist
+nothing — a screen that turns one on turns it off in `after`. File ▸ New
+Recording… runs only in the LAST screen run:
 shown from the background its panel no longer takes key (spec §11, #137), but
 an instance that is active when it runs still gets a key panel whose default
 button is Record, and the script cannot hold its child inactive, so

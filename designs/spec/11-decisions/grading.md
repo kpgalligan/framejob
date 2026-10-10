@@ -7,8 +7,9 @@ The road map that makes these is open: `designs/grading.md` holds each phase's r
 spike and the route, GR1 the pure moves on main, GR2 onwards on the `grading` branch). GR-1,
 GR-2, GR-3 and GR-9 were recorded in GR2, before its code, from the owner's answers of
 2026-10-09 ("Start grading", then "All as recommended" to the brief's choices, and "All as
-recommended" again to GR2's nine choices). GR-4..GR-8 are later phases' and are recorded at
-their start. The brief's D2 and D3 (from the effects survey) are not recorded as written: GR-1
+recommended" again to GR2's nine choices). GR-4 and GR-5 were recorded in GR3, before its code,
+from the owner's "All as recommended" to GR3's eleven choices (2026-10-09). GR-6..GR-8 are later
+phases' and are recorded at their start. The brief's D2 and D3 (from the effects survey) are not recorded as written: GR-1
 stands in their place.
 
 **Stands, and nothing here re-litigates it:** R5-1 (closed vocabularies, never a runtime); G-1;
@@ -77,6 +78,51 @@ Reelcut's own numbers, and nothing of Concat is opened, at design time or build 
   so a stacked grade keeps its levels by construction (GR0's P1: −1 EV then +1 EV through
   `rgba16Float` kept 256 distinct levels of 256). The brief's dither fallback falls away. Linear
   light stays local to step 4c (GR-2); the blend, the dissolve and the matte stay in encoded sRGB.
+- **GR-4 — The `ungraded` recipe option: the preview and `render_frame` only, never an
+  export.** `RecipeOptions` (spec §7.3) gains `ungraded`: every layer's `video.color` (all
+  thirteen keys, Color's four and Light's nine) is written neutral, on every layer — nested
+  clips, matte clips and an action's end included — so the frame is the picture as if no clip
+  were graded. Chroma key, filters, opacity, blend, shadow, crop and every other key are kept.
+  GR4 and GR5 extend the same neutralising to adjustment clips and looks. The option travels on
+  the KEY (`RecipeSource`, §7.3's rule), never as an export override; the un-optioned recipe is
+  byte-identical to the one before it existed, and a non-boolean `ungraded` means off in the core
+  (the MCP door refuses it by name).
+  - **View ▸ Show Ungraded** (⌃⌘U), a checkmark toggle in the preview group after Preview
+    Window, sets it on the window's document key: the editor's preview and the Preview Window
+    (one player). A small "Ungraded" tag sits at the preview pane's top-left, inside the 24 pt
+    void, while it is on, and takes no clicks.
+  - **Never reached by the switch:** an export, Save Frame… (a deliverable, like an export), the
+    chroma-key eyedropper and `render_frame` — each mints or passes its own options.
+    `render_frame {ungraded: true}` asks for it explicitly.
+  - **Not persisted:** per window, off when a project opens, no `UserDefaults` key — so
+    `perform_menu_item` can drive it and no proof moves the defaults. It is view state with no
+    tool of its own (§7.9's Preview Quality exemption).
+- **GR-5 — The luma waveform: the composited preview frame, in a panel beside the preview, and
+  no export path.**
+  - **What it reads:** the composited, encoded (sRGB) preview frame at Preview Quality's size —
+    what the person sees, so ungraded while Show Ungraded is on — taken after the compositor has
+    finished it, by a tap that runs only while the panel is shown. Y′ is Rec. 709 luma
+    (0.2126 R′ + 0.7152 G′ + 0.0722 B′) of the saturated encoded values; x is the picture's
+    columns in 256 bins, y is Y′ in 256 levels (level = round(255 Y′)). Paused it is exact and
+    follows every edit; while playing it may lead the shown frame by the few frames AVFoundation
+    composes ahead. The tap is latest-wins: at most one pass in flight per window and ONE pending
+    frame, each newer frame replacing it and analysed when the pass in flight completes, so the
+    last frame composed after an edit is always the one shown.
+  - **What it shows:** a white trace with log density on a near-black well in both appearances;
+    graticule lines at 0/25/50/75/100 %, labelled 0, 50 and 100; the header "Waveform". A pixel
+    clips HIGH at level 255 (Y′ ≥ 254.5/255, what an 8-bit file writes as 255) and LOW at level
+    0 (Y′ < 0.5/255); a red 3 pt mark sits on the trace's top edge over each column where at
+    least 0.5 % of that column's pixels clip high, and on its bottom edge for low; two readouts
+    under the trace, "Highlights clipped 12.5 %" and "Shadows clipped 0.0 %" (the whole frame, one
+    decimal; "—" before the first frame).
+  - **Where:** **View ▸ Waveform** (⌃⌘W), a checkmark toggle after Show Ungraded: a fixed 248 pt
+    column at the right edge of the preview pane (between the picture and the inspector), the
+    pane's full height, not resizable; the picture shrinks to the rest, and off is zero width. Not
+    persisted, per window, off when a project opens.
+  - **What it is not:** no waveform over an export, in the Preview Window or of Save Frame…; no
+    other scope (parade, vectorscope, histogram — tier 2). Its MCP mirror is `render_frame
+    {waveform: true}`, which writes the same trace's counts beside the PNG; the panel itself is
+    view state with no tool (§7.9's exemption).
 - **GR-9 — The branch writes project format 1015, refuses 15–1014 by name, and the merge
   renumbers.** The branch's `RC_FORMAT_VERSION` is **1015** (main's 14 plus a thousand), in
   `core/src/format.rs` and the header, so every main build refuses a branch-made project as "made

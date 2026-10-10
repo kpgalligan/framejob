@@ -50,6 +50,13 @@ extension AgentServer {
     /// that can photograph one, so it is the instrument every claim about
     /// phase 7c's layer is made through.
     ///
+    /// **`ungraded` and `waveform` are View ▸ Show Ungraded's and View ▸
+    /// Waveform's mirror** (spec §11 GR-4, GR-5): the switch and the panel are
+    /// view state and never reach this tool, so it is asked here. `ungraded`
+    /// is a recipe option like `burn_in_timecode`; `waveform` measures the
+    /// frame just written through the panel's own `WaveformTrace` and writes
+    /// it beside the image as `<path>.waveform.json`.
+    ///
     /// **A graphic that warned or failed is named** (G-8, G3c): one sentence
     /// per report the frame's pin held, before the last. The set is the
     /// DOCUMENT's (`recipeKey`), not the scoped handle's: a nest draws the
@@ -83,7 +90,10 @@ extension AgentServer {
             }
             maxWidth = requested
         }
-        let options = RecipeOptions(burnInTimecode: try boolArg(a, "burn_in_timecode") ?? false)
+        let options = RecipeOptions(
+            burnInTimecode: try boolArg(a, "burn_in_timecode") ?? false,
+            ungraded: try boolArg(a, "ungraded") ?? false)
+        let wantsWaveform = try boolArg(a, "waveform") ?? false
         // Resolved BEFORE the render, so a mistyped folder is answered in a
         // millisecond rather than after a decode: `exportProject` orders its
         // own two the same way.
@@ -114,6 +124,9 @@ extension AgentServer {
         if options.burnInTimecode {
             text += ", with the project timecode burnt in"
         }
+        if options.ungraded {
+            text += ", with every grade removed"
+        }
         text += "."
         // Said where the caller can see it rather than only in the schema: a
         // frame off a transparent canvas (phase 7b) has just lost its alpha,
@@ -124,6 +137,10 @@ extension AgentServer {
         for report in rendered.graphics {
             text += " " + Self.graphicSentence(report)
         }
+        if wantsWaveform {
+            let waveform = try Self.writeWaveform(of: image, beside: url)
+            text += " " + waveform
+        }
         text += " Written to \(url.path)."
         return try callResult(
             content: [
@@ -133,6 +150,28 @@ extension AgentServer {
                 ],
                 ["type": "text", "text": text],
             ], isError: false)
+    }
+
+    /// `render_frame {waveform}`: the frame's trace written to
+    /// `<path>.waveform.json`, and the sentence that says so.
+    static func writeWaveform(of image: CGImage, beside url: URL) throws -> String {
+        guard let trace = WaveformAnalyzer.shared?.analyze(image: image) else {
+            throw ToolError(
+                message: "Wrote \(url.path), but its waveform could not be measured: the GPU "
+                    + "pass did not run.")
+        }
+        let file = URL(fileURLWithPath: url.path + ".waveform.json")
+        do {
+            let data = try JSONSerialization.data(
+                withJSONObject: trace.json(), options: [.sortedKeys])
+            try data.write(to: file)
+        } catch {
+            throw ToolError(message: "Could not write \(file.path): \(error.localizedDescription)")
+        }
+        let high = String(format: "%.1f", trace.highlightsPercent)
+        let low = String(format: "%.1f", trace.shadowsPercent)
+        return "Waveform: highlights clipped in \(high) % of pixels, shadows in \(low) %; "
+            + "its 256 × 256 counts are in \(file.path)."
     }
 
     /// One graphic's report as `render_frame` says it: failed at a frame,

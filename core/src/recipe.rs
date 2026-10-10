@@ -41,13 +41,15 @@
 //! more — a burnt frame and a previewed one must be one description — and
 //! the layer it adds is APPENDED, so [`Project::frame_recipe`] with no
 //! options is byte-for-byte the recipe this file emitted before the
-//! argument existed.
+//! argument existed. Grading GR3 gave it a second, `ungraded` (spec §11
+//! GR-4), which writes every layer's `video.color` neutral rather than
+//! adding a layer, so with it off the bytes are again what they were.
 
 use serde_json::{Map, Value};
 
 use crate::actions::Evaluated;
 use crate::evaluate::{json, number, Assignment};
-use crate::model::{BlendMode, Nest, Project, Source, VideoProps};
+use crate::model::{BlendMode, ColorAdjust, Nest, Project, Source, VideoProps};
 use crate::motion;
 use crate::nest::{Enclosing, Frame, Instance};
 use crate::recipe_graphic::graphic_source;
@@ -114,10 +116,10 @@ fn sorted(value: &Value) -> Value {
 /// What a recipe was asked for BESIDES the instant (spec §7.3, §7.9's
 /// `rc_project_frame_recipe_opts`).
 ///
-/// One member today — the timecode burn-in of road map 2's phase 7 — and a
-/// struct rather than a `bool` argument because the next one (a safe-area
-/// guide, a watermark, an overlay of the plan's segment boundaries) would
-/// otherwise be a second FFI signature and a third. One struct behind one
+/// Two members — the timecode burn-in of road map 2's phase 7 and the
+/// ungraded picture of grading GR3 (spec §11 GR-4) — and a struct rather
+/// than `bool` arguments because each would otherwise be a second FFI
+/// signature and a third. One struct behind one
 /// `opts_json` string is the shape the header already uses for
 /// `rc_export_settings`' `overrides_json`.
 ///
@@ -136,6 +138,9 @@ fn sorted(value: &Value) -> Value {
 pub struct RecipeOptions {
     /// Draw the project timecode at `t` over everything else.
     pub burn_in_timecode: bool,
+    /// Every layer's `video.color` neutral (all thirteen keys), nested and
+    /// matte layers included: the picture as if no clip were graded.
+    pub ungraded: bool,
 }
 
 impl RecipeOptions {
@@ -161,6 +166,10 @@ impl RecipeOptions {
         RecipeOptions {
             burn_in_timecode: value
                 .get("burn_in_timecode")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
+            ungraded: value
+                .get("ungraded")
                 .and_then(Value::as_bool)
                 .unwrap_or(false),
         }
@@ -232,7 +241,7 @@ impl Project {
                         transition,
                         dissolve,
                     };
-                    self.layer(instance, t, &assignment, roles)
+                    self.layer(instance, t, &assignment, roles, opts.ungraded)
                 },
             )
             .collect();
@@ -266,13 +275,15 @@ impl Project {
         }
     }
 
-    /// One layer of the recipe, its roles in the frame given (`LayerRoles`).
+    /// One layer of the recipe, its roles in the frame given (`LayerRoles`);
+    /// `ungraded` writes its `video.color` neutral (spec §11 GR-4).
     fn layer(
         &self,
         instance: &Instance,
         t: Ticks,
         assignment: &Assignment,
         roles: LayerRoles,
+        ungraded: bool,
     ) -> Value {
         let LayerRoles {
             drawn_into,
@@ -301,6 +312,11 @@ impl Project {
         if drawn_into {
             moved.shadow = None;
             moved.reflection = None;
+        }
+        // The ungraded option (GR-4): the grade neutral before `RecipeLayer`,
+        // the one writer of layer keys, so no key is added or dropped.
+        if ungraded {
+            moved.color = ColorAdjust::default();
         }
         let video = &moved;
         let (source, source_size) = self.layer_source(instance, &evaluated, clip_t, assignment);

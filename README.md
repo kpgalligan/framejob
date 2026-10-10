@@ -249,7 +249,12 @@ schema, §6 the op table, §7 the architecture.
   clips keep their own other values; every one animates in an action, draws
   the same in the preview, stills and every export, and an untouched clip
   renders exactly as before. A project saved by this build opens only in a
-  grading build (format 1015).
+  grading build (format 1015). **View ▸ Show Ungraded** (⌃⌘U) shows the
+  preview as if no clip were graded — a before/after switch for the window,
+  never for an export — and **View ▸ Waveform** (⌃⌘W) puts a luma waveform
+  beside the preview, with red marks where highlights and shadows clip and
+  the share of the frame clipping at each end. Neither is remembered: a
+  window opens with both off.
 - **Output.** **File ▸ Save Frame…** (⌥⌘E) writes the frame under the
   playhead as a PNG, JPEG or HEIC still — the same writer `render_frame`
   uses, so a still saved from the menu and one an agent asked for are the

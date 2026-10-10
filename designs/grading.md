@@ -774,3 +774,101 @@ encoded halving is 64, not 92), so it names E1 and E2. Exposure's field shows
 cases, `GradeProps.swift`, `VideoPane+Light.swift`; core map: `ColorAdjust`'s
 tone, format 1015 and its gap, `video_json`) are owed by the phase that edits
 them (GR2's spec kept `CLAUDE.md` untouched). GR3, seeing, is next.
+
+## GR3 — seeing the grade: Show Ungraded and the luma waveform (2026-10-09/10, on the `grading` branch)
+
+**Where.** The worktree `~/devel/reelcut-grading`, branch `grading`, at `0545902`
+(main merged in). The owner's answers to GR3's eleven choices were "All as
+recommended" (2026-10-09): View ▸ Show Ungraded ⌃⌘U and View ▸ Waveform ⌃⌘W after
+Preview Window; Show Ungraded strips all thirteen `video.color` keys on every layer;
+preview and Preview Window only; an "Ungraded" tag; neither persists; a fixed 248 pt
+panel; Rec. 709 Y′ of the composited encoded preview frame, 256 × 256, log density;
+clip marks at levels 255 and 0 over 0.5 % of a column and two readouts;
+`render_frame {ungraded, waveform}`; Save Frame… ignores the switch.
+
+**What landed.**
+- Spec §11 first: GR-4 (the option and the switch) and GR-5 (the waveform, its tap,
+  the panel) in `designs/spec/11-decisions/grading.md`, README rows. Then §4.2, §7.3,
+  §7.5, §7.9a, §9 and the index's Lines cells.
+- Core: `RecipeOptions.ungraded`, read by `of` (a non-boolean is off); `layer` writes
+  `moved.color` neutral before `RecipeLayer`, so no key is added and the un-optioned
+  recipe is byte-identical. The FFI comments in `ffi_query.rs` and the header; no
+  signature, op or format change. New `core/tests/ungraded.rs` (5), its oracle the
+  same project's JSON with every `video.color` removed (top level, a nest, a luma
+  matte clip, an action's end).
+- App: `RecipeOptions.ungraded` and its `json`; `Waveform.metal`
+  (`reelcut_waveform_bin`, one atomic add per pixel); `WaveformAnalyzer.swift`
+  (`WaveformTrace`, the pass, `analyze(image:)` in the image's own colour space);
+  `WaveformTap.swift` (`WaveformTaps`: own queue and texture cache, one pass in
+  flight per key, ONE pending frame replaced by each newer one, a token per attach,
+  one main hop); `Compositor.serve`'s one `offer` line; `WaveformPanelView.swift`
+  (the panel, `WaveformTraceView`, `UngradedTagView`);
+  `EditorViewController+Seeing.swift` (the two commands, `installSeeing`, the
+  validator); the canvas's trailing edge pinned to the panel; the modal canvas modes
+  pinned to the canvas, not the pane; the frozen file's one validator arm; the two
+  View items; the menu table and inventory rows; `render_frame`'s `ungraded` and
+  `waveform` (the JSON beside the image, one sentence before the last) and their
+  catalog rows.
+- Instruments: `seeing_proof.py`, `waveform_probe.swift`, the harness's fifteenth
+  argument `seeing`, `screens.py`'s `VIEW_SELECTORS` and the screen
+  `04b-preview-waveform`. GRD-2 in `docs/manual-checks.md`; the README's Light bullet.
+
+**Sizes.** Product code: +120 −34 in changed files and 720 lines in the five new
+files (`WaveformAnalyzer.swift` 189, `WaveformTap.swift` 159,
+`WaveformPanelView.swift` 243, `EditorViewController+Seeing.swift` 96,
+`Waveform.metal` 33), about +806 net; with GR2's ~448, about 1,254 of "Worth
+keeping"'s ≤ 4,500. `ReelCore.swift` 999 → 995 and `Compositor.swift` 724 → 724 (both
+over the cap, net ≤ 0); the frozen `EditorViewController.swift` +1 line (wiring);
+`core/src/recipe.rs` 521 → 537; `AgentServer+Render.swift` 583,
+`AgentCatalog+Files.swift` 579. Menus: the two View items the cap names.
+
+**Measured.** 2026-10-09/10, Apple M2 Max, macOS 26.5.1, AC power.
+- Loop, Debug: `seeing_proof.py` every row green; `cargo test --release --test
+  ungraded` 5/5, `--test recipe` 15/15, `--test model_tests` 31/31;
+  `make typecheck` 0 errors and the 4 baseline warnings; `make lint` clean;
+  `v2_menu.py --only H` 5/5; `inventory.py --check` 5/5; `spec_index_proof.py`
+  150/150; `screens.py --only 04b-preview-waveform` 6/6, 0 new problems;
+  `reference_build_selftest.py --integration` exit 0.
+- `make gate`: PASS in 237 s (typecheck 5 s, fmt 2 s, lint 1 s, test 132 s, app 97 s).
+- Recorded, on the gate's Release build and the final instrument:
+  `RC_PROOF_APP=release seeing_proof.py` 19/19 — U1 the ungraded stack equal to the
+  pre-grade bytes; U2 an un-optioned frame still graded with the switch on; U3 the
+  `prores_422` export within ±8 of the graded frame at 920 samples and 73 from the
+  ungraded one; U4 refused ("ungraded must be true or false."); W1 the 1920-column
+  ramp's 256 bins within their rendered values; V1 the panel's (46.5, 0.2) against
+  render_frame's (46.46, 0.21) at exposure +2; V2 (0.2, 0.2) against (0.21, 0.21)
+  ungraded; V3 the panel 248 pt with the canvas 1031 pt beside it in a 1279 pt pane,
+  and off the canvas 1279 pt; V4 the tag; P1–P7; H1–H2 light and dark; Z1. **G1
+  (recorded): the pass costs 0.168 ms at 1080p and 0.331 ms at 4K** (GPU time, median
+  of ten), only while the panel is shown.
+- Mutants, each `seeing_proof.py --mutant NAME` on Debug, all seven MUTANT PASS (every
+  named row failed, no other scored row did): `ungraded-ignored` U1 U3 V2 CT;
+  `ungraded-tone-only` U1 CT; `view-key-leaks` U2 U3; `luma-weights-swapped` P3;
+  `level-floors` P1 P2 P4 W1 V1; `no-paused-refresh` V1 V2; `pending-dropped` P7
+  (the orchestrator's row for the latest-wins slot: three 4K frames offered back to
+  back, the last delivered trace is the third's). The first pass found
+  `no-paused-refresh` surviving V1 — the exposure edit's own refresh was still
+  composing when the panel attached — so V1 now waits 2 s after the edit; and
+  `level-floors` and `ungraded-ignored` failing more rows than the spec named, all
+  true catches, so their named lists grew. Those three were run again on the final
+  instrument; the other four ran on an instrument that differed only in V1's wait
+  and those two lists.
+
+**Deviations.** The probe has P7 and the proof seven mutants (the orchestrator's
+addition). `level-floors` and `ungraded-ignored` name the rows they truly fail
+(above). H1–H2 are skipped under `--mutant` (the harness builds the tree's own
+sources). `recipe.rs` is 537 lines, against the spec's "≲535". The panel's width
+constraint is priority 999 so a pane narrower than 248 pt (unreachable: the split
+keeps 380 pt) squeezes it rather than logging a conflict. The harness prints
+`seeing trace X Y W H` so H2 can find the well. `WaveformTaps` has an internal
+`init(analyzer:)` for the probe's own kernel.
+
+**Owed.** GRD-2 (the owner, on real footage). The `CLAUDE.md` lines, owed by the
+phase that edits them (GR3's spec kept `CLAUDE.md` untouched): app map rows for
+`WaveformAnalyzer.swift`, `WaveformTap.swift`, `WaveformPanelView.swift`,
+`EditorViewController+Seeing.swift` and `Waveform.metal`; the hygiene list's new
+seam, the waveform tap's main hop; the agent-parity exemption's Show Ungraded and
+Waveform panel; the core map's `RecipeOptions.ungraded`. The comment at
+`EditorViewController+ZoomRegion.swift:204` ("both fill `canvasContainer`") is now
+loose — the region overlay fills the canvas view — though its conversion is explicit.
+GR4, adjustment clips, is next, and extends `layer`'s neutralising to them.

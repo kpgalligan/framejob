@@ -18,6 +18,7 @@
 //   harness <project.reelcut|welcome> <out.png> <light|dark>
 //           [w] [h] [selectIndex] [playheadSec] [sizeIndex 0-2] [clip|media|document]
 //           [candidateSpans] [expandSections] [mediaFilter] [selectAction] [subTab]
+//           [seeing]
 //
 // `selectIndex` picks the clip at that index in START order (-1 for none).
 // The PNG is written at the main screen's backing scale (2x on a Retina
@@ -72,6 +73,17 @@
 //                      own path, then four runloop turns. APPENDED, for
 //                      `tools/proof/clip_inspector2_proof.py`; compiled out
 //                      of a `-D HARNESS_REFERENCE_BUILD` harness.
+//   `seeing`           grading GR3 (spec §11 GR-4, GR-5): comma-separated
+//                      `waveform` (View ▸ Waveform on), `ungraded` (View ▸
+//                      Show Ungraded on) and `ramp` (the panel shows a fixed
+//                      256 × 360 ramp's trace), or "-"/absent for none. Both
+//                      toggles go through the editor's own commands; the
+//                      panel's tap is then detached, so no live frame can
+//                      replace the ramp and the capture is deterministic. With
+//                      `waveform`, one stdout line `seeing trace X Y W H`
+//                      gives the trace's rect in points, top-left origin.
+//                      APPENDED, for `tools/proof/seeing_proof.py`; compiled
+//                      out of a `-D HARNESS_REFERENCE_BUILD` harness.
 //
 //                      **It drives the app's own controls and sets nothing
 //                      itself**: `MediaPane.filter` is private and stays that
@@ -1004,6 +1016,36 @@ extension Harness {
         document.selectAction(ordered.indices.contains(index) ? ordered[index].id : nil)
         controller?.viewStateDidChange()
     }
+
+    /// The `seeing` argument (see the header); a nonzero exit code for an
+    /// unknown item.
+    static func applySeeing(_ items: [String], to controller: EditorViewController) -> Int32? {
+        if let unknown = items.first(where: { !["waveform", "ungraded", "ramp"].contains($0) }) {
+            FileHandle.standardError.write("seeing: unknown item \(unknown)\n".data(using: .utf8)!)
+            return 64
+        }
+        if items.contains("waveform") { controller.toggleWaveform(nil) }
+        if items.contains("ungraded") { controller.toggleShowUngraded(nil) }
+        if let key = controller.document?.recipeKey { WaveformTaps.shared.detach(key: key) }
+        guard let panel = controller.waveformPanel else { return nil }
+        if items.contains("ramp") {
+            let side = WaveformTrace.columns
+            var counts = [UInt32](repeating: 0, count: side * WaveformTrace.levels)
+            for column in 0..<side { counts[column * side + column] = 360 }
+            panel.show(WaveformTrace(counts: counts, width: side, height: 360))
+        }
+        controller.view.layoutSubtreeIfNeeded()
+        func walk(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(walk) }
+        if items.contains("waveform"),
+            let trace = walk(panel).first(where: { $0 is WaveformTraceView })
+        {
+            let root = controller.view
+            let r = trace.convert(trace.bounds, to: root)
+            let top = root.isFlipped ? r.minY : root.bounds.height - r.maxY
+            print("seeing trace \(r.minX) \(top) \(r.width) \(r.height)")
+        }
+        return nil
+    }
 }
 #endif
 
@@ -1076,6 +1118,8 @@ let mediaFilterSpec = arguments.count > 12 && arguments[12] != "-" ? arguments[1
 let selectActionSpec = arguments.count > 13 ? arguments[13] : ""
 /// The Clip tab's sub-tab — the fourteenth argument (see the header).
 let subTabSpec = arguments.count > 14 && arguments[14] != "-" ? arguments[14] : ""
+/// Grading GR3's seeing — the fifteenth argument (see the header).
+let seeingSpec = Harness.list(arguments.count > 15 ? arguments[15] : "-")
 
 Harness.pinDefaults(sizeIndex: sizeIndex, expand: expandSections)
 let app = NSApplication.shared
@@ -1224,6 +1268,15 @@ if !mediaFilterSpec.isEmpty {
         controller.view.layoutSubtreeIfNeeded()
     }
 }
+#if !HARNESS_REFERENCE_BUILD
+if !seeingSpec.isEmpty {
+    if let failed = Harness.applySeeing(seeingSpec, to: controller) { exit(failed) }
+    for _ in 0..<4 {
+        RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        controller.view.layoutSubtreeIfNeeded()
+    }
+}
+#endif
 do {
     try Harness.png(controller.view, to: outURL)
     print("wrote \(outURL.path)")

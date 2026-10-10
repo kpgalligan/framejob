@@ -1116,6 +1116,7 @@ extension EditorViewController: NSUserInterfaceValidations {
             if let answer = validateSaveFrameAction(action) { return answer }
             if let answer = validatePreviewQualityAction(action, item: item) { return answer }
             if let answer = validatePreviewWindowAction(action, item: item) { return answer }
+            if let answer = validateSeeingAction(action, item: item) { return answer }
             if let answer = validateGraphicMenuAction(action) { return answer }
             // The arms whose files are not `EditorViewController+…`: Remove
             // Silences' body and validator live at the foot of

@@ -29,8 +29,10 @@ final class RecipeSource {
     /// offline frame that asked for a burn-in must keep getting one across
     /// that. An absent entry is `RecipeOptions.none`, so a key nobody set
     /// options on answers exactly what it answered before this dictionary
-    /// existed — which is every key in the app but the ones `Exporter` mints
-    /// for an export and for an offline frame.
+    /// existed. A document's key asks only for `ungraded`, while View ▸ Show
+    /// Ungraded is on (spec §11 GR-4); `Exporter` mints keys of its own for an
+    /// export and for an offline frame, which is why the switch never reaches
+    /// them — never copy a document key's options onto one.
     private var options: [Int: RecipeOptions] = [:]
     private var nextKey = 1
 
@@ -72,7 +74,7 @@ final class RecipeSource {
     }
 
     /// What `key` wants of its recipes. `RecipeOptions.none` for a key that
-    /// never set any, which is every document's.
+    /// never set any, which is every document's but one showing ungraded.
     ///
     /// Published by whoever owns the key and read on the compositor's queue,
     /// like the project beside it — and NOT main-thread-only, because

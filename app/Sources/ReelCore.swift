@@ -101,24 +101,20 @@ struct RecipeOptions: Equatable {
     /// layer list, so topmost. The core builds it (`recipe_text.rs`); this
     /// side only asks.
     var burnInTimecode: Bool = false
+    /// Every layer's `video.color` neutral (spec §11 GR-4): View ▸ Show
+    /// Ungraded on a document's key, or `render_frame {ungraded}`.
+    var ungraded: Bool = false
 
     /// Every option off: the recipe as it has always been.
     static let none = RecipeOptions()
 
-    /// The core's `opts_json`, or nil for "ask the un-optioned export".
-    ///
-    /// Spelled by hand rather than encoded. There is one key and it is a
-    /// bool, a recipe is asked for once per composed frame, and
-    /// `JSONSerialization` would allocate a dictionary and a `Data` for a
-    /// twenty-five-byte constant. The key name is written once, here, and is
-    /// the only place in the app that has to match the header's
-    /// `{"burn_in_timecode": bool}`.
-    ///
-    /// A nil is not a failure — it is the argument `rc_project_frame_recipe`
-    /// itself passes, and the core documents the two exports as one
-    /// implementation.
+    /// The core's `opts_json`, or nil for "ask the un-optioned export" — the
+    /// argument `rc_project_frame_recipe` itself passes, the core documenting
+    /// the two exports as one. Spelled by hand: the only place in the app
+    /// that has to match the header's key names.
     var json: String? {
-        burnInTimecode ? "{\"burn_in_timecode\":true}" : nil
+        guard self != .none else { return nil }
+        return "{\"burn_in_timecode\":\(burnInTimecode),\"ungraded\":\(ungraded)}"
     }
 }
 
@@ -282,7 +278,7 @@ final class ReelProject {
     /// `err_out` — a query has nothing to report but its answer — so an
     /// `opts_json` the core cannot parse comes back as NULL, indistinguishable
     /// from a NULL project. That is not a hazard this side can reach: the
-    /// string comes from `RecipeOptions.json`, which is a constant, so it is
+    /// string comes from `RecipeOptions.json`, built from two bools, so it is
     /// always parseable. A nil here therefore keeps the meaning it has always
     /// had — the core had nothing to say — and every caller already handles
     /// it: `Compositor` renders the canvas background (a frame past the end
