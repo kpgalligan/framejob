@@ -136,4 +136,32 @@ grey) K4 on the ramp; `biplanar-full-range` (Y' = code/1023, C =
 (code−512)/1023) K5; `neutral-drift` (VA's exposure read as exposure + 0.05)
 K1. The script prints `mutant NAME: killed by …` or `SURVIVED`.
 
-**Its record** is `designs/grading.md`, "GR0 — the road map and the spike".
+**`--tree` (grading GR7a).** In place of the routes, what the branch BUILT:
+V0 is `Compositor.metal` as it stood at `f407f87` (`TREE_BASE`, main at the
+branch point; `git show`, a failed show is a B0 failure) and VT is the tree's
+own file, unpatched — matte_spike's `--tree` pattern. B1 compiles the two;
+B2 builds `tree_bench.swift` (`-O`, over `app/Sources`), which hands BOTH
+libraries the app's whole `LayerUniforms` (116 floats, 464 bytes, asserted;
+main's shader reads the first 104), binds the picture at `texture(0)`, a 1×1
+white placeholder at `texture(1)` and an identity 2³ `rgba16Float` lattice at
+`texture(2)`, and builds its pipelines as `bench.swift`'s `layerState`
+(`kGatherFilters` false, the same blending, `MetalRenderer.workingFormat`).
+One scene, S1 over a copy of `bench.swift`'s `halfPicture`; series V0:S1,
+VT:S1 and V0b:S1 in the same seeded SplitMix64 order, 5 warm-up and N timed
+frames each. **KT**, scored at both sizes before any timing: VT:S1 = V0:S1
+within 1/1023 over the whole frame. `--measure --tree` adds H0, C0 (|V0:S1 −
+V0b:S1|), F, T0 (VT:S1 − V0:S1) and **TC** (a RECORD: T0 ≤ `BOUND[h]` + C0 at
+1080 and 2160 — "What it may cost"'s UNGRADED-layer cap, +0.02 ms and
++0.06 ms). Mutant `tree-graded` (`--vt-exposure 0.5`: VT's draws carry +0.5
+EV with `toneEnabled` 1) must fail KT. Output under
+`work/grading_spike/tree-<check|measure|mutant-tree-graded>/` (`bench-<h>.json`
+of the same shape, `result.json`).
+
+```
+python3 tools/proof/grading_spike/grading_spike.py --check --tree                    # B0–B2, KT
+python3 tools/proof/grading_spike/grading_spike.py --check --tree --mutant tree-graded
+perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.py --measure --tree   # GR7a's record
+```
+
+**Its record** is `designs/grading.md`, "GR0 — the road map and the spike"
+(and, for `--tree`, "GR7a").

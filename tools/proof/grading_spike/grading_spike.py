@@ -53,6 +53,20 @@ figures), X1 (#258's outcome, a RECORD) and D1 (frames per second decoding two
 2 s 3840×2160 fixtures into each of four formats, interleaved, three runs).
 Exit 0 when every scored row passes, 1 when one fails, 2 when the host gate is
 shut. README: `tools/proof/grading_spike/README.md`.
+
+`--tree` (grading GR7a) measures what the branch built instead of the routes,
+matte_spike's `--tree` pattern: V0 is `Compositor.metal` at `TREE_BASE`
+f407f87 (main at the branch point; `git show`, a failed show is B0), VT the
+tree's own file unpatched; both compiled (B1) and timed by `tree_bench.swift`
+(B2), which hands both the app's whole 464-byte `LayerUniforms`. KT, scored at
+both sizes: VT:S1 = V0:S1 within 1/1023 over the frame. `--measure --tree` adds
+H0, C0, F, T0 (VT:S1 − V0:S1) and TC (a RECORD: T0 ≤ `BOUND[h]` + C0, "What it
+may cost"'s UNGRADED-layer cap). Mutant `tree-graded` (VT drawn at +0.5 EV with
+`toneEnabled` 1) must fail KT. Output under `work/grading_spike/tree-<check|
+measure|mutant-NAME>/`.
+
+    python3 tools/proof/grading_spike/grading_spike.py --check --tree [--mutant tree-graded]
+    python3 tools/proof/grading_spike/grading_spike.py --measure --tree
 """
 
 import argparse
@@ -82,6 +96,8 @@ WIN_SHARE = 0.5
 
 SHADER = "app/Resources/Shaders/Compositor.metal"
 SHADER_COMMIT = "4d742cc"
+TREE_BASE = "f407f87"   # --tree: main at the grading branch point (GR7a)
+TREE_MUTANTS = ("tree-graded",)
 WORK = PROOF / "work/grading_spike"
 SIZES = [(1920, 1080), (3840, 2160)]
 MUTANTS = ("anchor-missing", "exposure-encoded", "lut-axes-swapped",
@@ -636,6 +652,162 @@ def p1_rows(answers):
              "C4 gave 129)")
 
 
+# ---- --tree (GR7a): the tree's own shader against main's at the branch point -------
+
+def build_tree_shaders(folder):
+    shown = subprocess.run(["git", "-C", str(ROOT), "show", f"{TREE_BASE}:{SHADER}"],
+                           capture_output=True, text=True)
+    if shown.returncode != 0:
+        emit("B0", "FAIL", f"git show {TREE_BASE}:{SHADER} failed: {shown.stderr.strip()[-300:]}")
+        return None
+    texts = {"V0": shown.stdout, "VT": (ROOT / SHADER).read_text()}
+    emit("B0", "PASS", f"--tree: V0 {SHADER} at {TREE_BASE} ({texts['V0'].count(chr(10))} "
+         f"lines), VT the tree's own, unpatched ({texts['VT'].count(chr(10))} lines; no anchor "
+         "asked)")
+    libs = {}
+    for name, text in texts.items():
+        metal, air, lib = folder / f"{name}.metal", folder / f"{name}.air", folder / f"{name}.metallib"
+        metal.write_text(text)
+        step = run(["xcrun", "-sdk", "macosx", "metal", "-c", metal, "-o", air], 300)
+        if step["rc"] == 0 and not step["expired"]:
+            step = run(["xcrun", "-sdk", "macosx", "metallib", air, "-o", lib], 300)
+        if step["expired"] or step["rc"] != 0 or not lib.exists():
+            emit("B1", "FAIL", f"{name} did not compile: "
+                 f"{'expired' if step['expired'] else step['stderr'][-900:]}")
+            return None
+        libs[name] = lib
+    emit("B1", "PASS", f"{len(libs)} metallibs ({', '.join(libs)}) in {folder.relative_to(ROOT)}")
+    return libs
+
+
+def build_tree_bench():
+    folder = WORK / "tree-bench"
+    folder.mkdir(parents=True, exist_ok=True)
+    entry = folder / "main.swift"
+    source = (HERE / "tree_bench.swift").read_text()
+    if not entry.exists() or entry.read_text() != source:
+        entry.write_text(source)
+    try:
+        built = swift_build.build(sources=swift_build.app_sources() + [entry],
+                                  output=folder / "grading_tree_bench",
+                                  defines=["REELCUT_DEV_TOOLS"], optimize=True, timeout=1200)
+    except swift_build.SwiftBuildFailed as error:
+        emit("B2", "FAIL", f"tree_bench did not build (-O): {error} {error.diagnostics[:6]}")
+        return None
+    emit("B2", "PASS", f"tree_bench {'reused' if built.reused else f'built in {built.seconds} s'} "
+         f"(-O, over app/Sources, key {built.key}) — {built.binary.relative_to(ROOT)}")
+    return built.binary
+
+
+def tree_bench(binary, libs, size, folder, frames, runs, warmup, seed, exposure):
+    w, h = size
+    out = folder / f"bench-{h}.json"
+    out.unlink(missing_ok=True)
+    argv = [binary] + [x for name, lib in libs.items() for x in ("--lib", f"{name}={lib}")]
+    argv += ["--width", w, "--height", h, "--frames", frames, "--runs", runs,
+             "--warmup", warmup, "--seed", seed, "--vt-exposure", exposure, "--out", out]
+    ran = run(argv, 600)
+    if ran["expired"] or ran["rc"] != 0 or not out.exists():
+        emit(f"R{h}", "FAIL", f"tree_bench at {w}×{h} "
+             f"{'ran past 600 s' if ran['expired'] else 'exited ' + str(ran['rc'])}: "
+             f"{ran['stderr'][-900:]}")
+        return None
+    return json.loads(out.read_text())
+
+
+def tree_timing_rows(answers, result):
+    figures = result["figures"] = {}
+    for w, h in SIZES:
+        answer = answers[h]
+        f = {s: figure(answer, s) for s in answer["samples"]}
+        noise = abs(f["V0:S1"][0] - f["V0b:S1"][0])
+        over = f["VT:S1"][0] - f["V0:S1"][0]
+        bound = BOUND[h] + noise
+        figures[str(h)] = {"series": {s: {"median": m, "low": lo, "high": hi}
+                                      for s, (m, lo, hi) in f.items()},
+                           "noise_C0": noise, "overhead_T0": over, "bound": bound}
+        emit("C0", "CONTROL", f"{h}p V0 S1 twice: {ms(f['V0:S1'][0])} "
+             f"({ms(f['V0:S1'][1])}–{ms(f['V0:S1'][2])}) and {ms(f['V0b:S1'][0])} "
+             f"({ms(f['V0b:S1'][1])}–{ms(f['V0b:S1'][2])}): noise floor {ms(noise)}")
+        for s in sorted(f):
+            emit("F", "RECORD", f"{h}p {s}: {ms(f[s][0])} (runs {ms(f[s][1])}–{ms(f[s][2])})")
+        emit("T0", "RECORD", f"{h}p VT:S1 − V0:S1 {ms(over)}")
+        emit("TC", "RECORD", f"{h}p T0 {ms(over)} against ≤ BOUND {BOUND[h]:.2f} ms + C0 "
+             f"{ms(noise)} = {ms(bound)}: "
+             + ("cap held" if over <= bound else f"cap missed by {ms(over - bound)}"))
+
+
+def tree_main(args):
+    tag = "tree-" + (f"mutant-{args.mutant}" if args.mutant else
+                     ("measure" if args.measure else "check"))
+    folder = WORK / tag
+    shutil.rmtree(folder, ignore_errors=True)
+    folder.mkdir(parents=True)
+    started = datetime.datetime.now().astimezone()
+    print(f"grading_spike {tag} at {started:%Y-%m-%d %H:%M %Z}, seed {args.seed}", flush=True)
+    print(f"rules: BOUND = {BOUND}; V0 = {SHADER} at {TREE_BASE}, VT = the tree's own",
+          flush=True)
+    timing = args.measure
+    facts = None
+    if args.measure:
+        timing, facts = host_gate()
+        detail = (f"powermode {facts['powermode']}; drawing from {facts['power']}; "
+                  f"{facts['cpu']}; macOS {facts['macos']}; load before {facts['load_before']}")
+        emit("H0", "PASS" if timing else "SKIP", detail if timing else
+             f"{detail}: the host gate is shut, so every timing row is skipped")
+    exposure = 0.5 if args.mutant == "tree-graded" else 0
+    libs = build_tree_shaders(folder)
+    binary = build_tree_bench() if libs else None
+    answers = {}
+    scored_ok = libs is not None and binary is not None
+    if scored_ok:
+        frames, runs, warmup = (200, 3, 5) if timing else (10, 1, 1)
+        for size in SIZES:
+            answer = tree_bench(binary, libs, size, folder, frames, runs, warmup, args.seed,
+                                exposure)
+            if answer is None:
+                scored_ok = False
+                continue
+            answers[size[1]] = answer
+        for w, h in SIZES:
+            if h not in answers:
+                continue
+            entries = [k for k in answers[h]["k"] if k["row"] == "KT"]
+            if not entries:
+                emit("KT", "FAIL", f"{h}p: tree_bench reported no KT entry")
+                scored_ok = False
+            for entry in entries:
+                scored_ok &= entry["ok"]
+                emit("KT", "PASS" if entry["ok"] else "FAIL", f"{h}p {entry['variant']}: "
+                     f"{entry['detail']}")
+    result = {"tag": tag, "started": started.isoformat(), "seed": args.seed, "host": facts,
+              "tree_base": TREE_BASE, "rules": {"BOUND": BOUND}, "rows": ROWS,
+              "answers": {str(h): a for h, a in answers.items()}}
+    if args.measure and not timing:
+        for row in ("C0", "F", "T0", "TC"):
+            emit(row, "SKIP", "the host gate is shut (H0)")
+    elif timing and scored_ok and len(answers) == len(SIZES):
+        tree_timing_rows(answers, result)
+    elif timing:
+        emit("TC", "SKIP", "a scored row failed, so nothing is timed into a record")
+    if facts is not None:
+        facts["load_after"] = load()
+        facts["gpu"] = next((a["gpu"] for a in answers.values()), None)
+        emit("H0", "RECORD", f"GPU {facts['gpu']}; load after {facts['load_after']}")
+    result["exit"] = 0 if scored_ok else 1
+    if args.measure and not timing:
+        result["exit"] = 2
+    (folder / "result.json").write_text(json.dumps(result, indent=1, sort_keys=True,
+                                                   default=str))
+    failed = sorted({r["row"] for r in ROWS if r["verdict"] == "FAIL"})
+    if args.mutant:
+        print(f"mutant {args.mutant}: {'killed by ' + ', '.join(failed) if failed else 'SURVIVED'}")
+    print(f"grading_spike {tag}: {'all scored rows pass' if scored_ok else 'FAILED ' + ', '.join(failed)}"
+          f"{'; STOP: the host gate is shut' if result['exit'] == 2 else ''} "
+          f"— {(folder / 'result.json').relative_to(ROOT)}")
+    return result["exit"]
+
+
 # ---- main ---------------------------------------------------------------------
 
 def main():
@@ -643,11 +815,19 @@ def main():
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--check", action="store_true")
     mode.add_argument("--measure", action="store_true")
-    parser.add_argument("--mutant", choices=MUTANTS)
+    parser.add_argument("--mutant", choices=MUTANTS + TREE_MUTANTS)
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
+    parser.add_argument("--tree", action="store_true",
+                        help="the tree's own shader (VT) against main's at TREE_BASE (GR7a)")
     args = parser.parse_args()
     if args.mutant and args.measure:
         parser.error("a mutant runs with --check")
+    if args.tree and args.mutant and args.mutant not in TREE_MUTANTS:
+        parser.error(f"with --tree the mutant is one of {', '.join(TREE_MUTANTS)}")
+    if not args.tree and args.mutant in TREE_MUTANTS:
+        parser.error(f"{args.mutant} runs with --tree")
+    if args.tree:
+        return tree_main(args)
 
     tag = f"mutant-{args.mutant}" if args.mutant else ("measure" if args.measure else "check")
     folder = WORK / tag

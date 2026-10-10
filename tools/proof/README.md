@@ -18358,3 +18358,96 @@ did; a core mutant also runs `cargo test --release --no-fail-fast --test cube
 | `summary-says-lut` | a LUT look's summary is "LUT" | P4 P6 |
 
 **Its record**: `designs/grading.md`'s GR6a and GR6b sections.
+
+## Road map grading — GR7a, the verdict's figures (`grading_verdict.py` L1–L4, H0, M1, G0, E1, E2, F4, T4, T4c, Z1 and four mutants; `grading_spike.py --tree`, `tree_bench.swift`, KT, TC and one mutant; the `grading` branch)
+
+**What it answers.** Every cap in `designs/grading.md`'s "What it may cost",
+measured for the branch against main at the branch point `f407f87` (`BASE`),
+and T4's script half — the figures the owner's trial reads. It writes no
+verdict: a RECORD row prints `cap held` or `cap missed by X` and never changes
+the exit status; a scored row is about the instrument (it read, it built, it
+timed, the fixture is what it says).
+
+- **`sizes`** (git only, no app; `work/gr7/sizes.json`): **L1** `git diff
+  --numstat BASE HEAD` over `CAPPED` (`app/Sources`, `core/src`,
+  `app/Resources/Shaders` — the cap's own roots), scored that every root
+  contributes and `Compositor.metal` is listed; per root, in total against
+  4,500, and per first-parent commit in `BASE..HEAD` against its first parent;
+  `core/include`'s net printed beside the total, outside it, never capped.
+  **L2** each frozen file's lines at BASE and HEAD and its net against ~50.
+  **L3** every changed `.swift`/`.rs` under `app/Sources` or `core/src` that is
+  new and over 400 lines, or over 600, with BASE → HEAD; "unpaid" when it grew
+  outside `EXEMPT` (`edit.rs`, `ReelOps.swift`) and outside the frozen five
+  (listed "frozen: see L2"). **L4** `ClipSubTab`'s cases and each case's
+  `…Section(` calls in `ClipPane.makeSections()`, read with `git show` at both
+  commits: the sub-tabs added, Color's section count against 4, Picture's
+  sections lost and gained.
+- **`main-tree make` / `main-tree remove`**: main's comparison build comes only
+  from a throwaway `git worktree add --detach work/gr7/main f407f87` and a cold
+  `make app` there (bounded at 1500 s, run in the background and waited on
+  once); it is removed through `tree_copy.remove_tree` (lsregister `-u`) and
+  `git worktree prune`, in a command of its own.
+- **`measure`** (release-only kind; `RC_PROOF_APP=release`): every instance a
+  fresh `mcp.launch` with `-ReelcutCompositorTiming YES` as a launch argument
+  under the scratch `CFFIXED_USER_HOME` `work/gr7/run/home`, stopped by its own
+  pid; no menu item is performed. Main's build (`--main`, default the
+  worktree's Release binary) is resolved, freshness-checked and launched only
+  when M1, E1 or E2 is selected, so `--only H0,F4,T4,Z1` and `--only T4 --lut
+  PATH` need no main build. The movie is `work/gr7/media/testsrc2_1080_10s.mp4`
+  (ffmpeg `testsrc2` 1920×1080, 30 fps, 10 s, libx264 yuv420p CRF 18, BT.709
+  tags); the LUT `work/gr7/luts/gr7-camera-33.cube` is written from textbook
+  maths only (33³, red fastest: a smoothstep S-curve mixed at 0.5, gains 1.06 /
+  1.0 / 0.92, saturation 1.2 about the Rec. 709 luma, a clamp). Fixtures
+  (1920×1080, 30 fps, black): **U** the movie `seconds/10` times on track 1 and
+  again on track 2 at scale 0.5, (480, −270); **G** U with every clip at GR0's
+  ST tone and `teal_orange` 0.8 and a front adjustment clip over the whole at
+  exposure 0.2, vibrance 0.2; **F** 20 s, four full-frame tracks (warm, cool,
+  teal_orange, vivid at 0.8 over ST) and a front adjustment clip at exposure
+  0.2; **T** the movie at 0. **H0** the host gate (`grading_spike.host_gate`;
+  shut → every row a named SKIP, exit 2). **M1** `perform_menu_item {}` with no
+  project on main's instance and the branch's: the branch must hold View ▸
+  Show Ungraded, View ▸ Waveform, Insert ▸ Adjustment Clip and Clip ▸ Look ▸
+  Warm; the leaves added and removed, grouped by their first two path parts,
+  against the cap's four. **G0** `render_frame` at 0.5 s of G differs from U by
+  more than 8 levels and G holds one adjustment clip. **E1/E2** an h264
+  `size: document` export per fresh instance, timed by monotonic wall clock,
+  rounds alternating (mU, bU, bG) then (bG, bU, mU) (`run_ab`'s alternation):
+  E1 `median(bU)/median(mU) − 1` against 2 %, E2 `median(bG)/median(bU) − 1`
+  against 10 %, each series' runs and spread printed, `vm.loadavg` before and
+  after each export. **F4** fixture F exported `--rounds` times on the branch,
+  the compositor log's 120-frame windows averaged per run (precision's
+  `m1_export`), the median average against 8 ms; scored only when 3 exports
+  are timed (fewer, as under `--rounds 1`, is a named SKIP and a record). **T4** project T's frame at
+  0.5 s through the LUT at amount 1 (`render_frame`) against `ffmpeg -vf
+  lut3d=file=…:interp=trilinear` on the neutral frame, decoded to `rgb24`,
+  within ±2 at every pixel and channel; **T4c** (CONTROL, scored) the neutral
+  frame against ffmpeg's is more than 2 away; `--lut PATH` (expanded and
+  resolved, refused unless a file) adds the owner's file as a recorded line,
+  ffmpeg reading a safe-named copy so no `:` or `'` in its path reaches the
+  filter graph. **Z1** every project closes and no log holds `Reelcut: `.
+- **`grading_spike.py --tree`** (`grading_spike/README.md`): V0 main's
+  `Compositor.metal` at `f407f87`, VT the tree's own; KT (VT:S1 = V0:S1 within
+  1/1023, both sizes) and, with `--measure`, C0, F, T0 and the RECORD **TC**
+  (T0 ≤ +0.02 ms at 1080p and +0.06 ms at 4K, plus C0).
+
+```
+python3 tools/proof/grading_verdict.py sizes                               # L1–L4
+python3 tools/proof/grading_spike/grading_spike.py --check --tree          # B0–B2, KT
+perl -e 'alarm 1500; exec @ARGV' python3 tools/proof/grading_verdict.py main-tree make   # background; cold build
+perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.py --measure --tree
+RC_PROOF_APP=release perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_verdict.py measure --only H0,M1,G0,E1,E2,Z1
+RC_PROOF_APP=release perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_verdict.py measure --only H0,F4,T4,Z1
+python3 tools/proof/grading_verdict.py main-tree remove
+RC_PROOF_APP=release python3 tools/proof/grading_verdict.py measure --only T4 --lut PATH   # the owner's LUT; no main build
+```
+
+**Mutants** (each edits the driver's own behaviour): `sizes --mutant
+shader-not-counted` (the shader root dropped from `CAPPED`) must fail L1;
+`measure --mutant lut-not-applied` (the look skipped) T4; `measure --mutant
+graded-fixture-ungraded` (every clip's grade and the adjustment clip's colour
+dropped, the clip kept) G0; `measure --mutant menus-same-app` (the branch
+listing read from main's instance) M1; `grading_spike.py --check --tree
+--mutant tree-graded` KT. Each prints `mutant NAME: killed by …` or `SURVIVED`.
+
+**Its record** is `designs/grading.md`'s "GR7a" section, with every figure's
+command, host, power and load.

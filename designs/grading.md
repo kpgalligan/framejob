@@ -374,16 +374,18 @@ owner's; the numbers are what he decides with.
 
 ### What it may cost (checked by script at GR7)
 
-| Measure | Cap |
-|---|---|
-| Product code (`app/Sources`, `core/src`, the shader), net lines added by GR2–GR6 | ≤ 4,500 (REASONED estimate ~3,000–3,500; mattes were ~1,290 net, section 9) |
-| Frozen files | Wiring only; no frozen file grows by more than ~50 lines in total |
-| Files over the cap | None left unpaid |
-| Inspector | One new sub-tab (Color) of at most four sections; Picture loses one section (Color) and gains none |
-| Menus | Clip ▸ Look ▸, Insert ▸ Adjustment Clip, View ▸ Show Ungraded, View ▸ Waveform; nothing else |
-| An UNGRADED layer | At most +0.02 ms at 1080p and +0.06 ms at 4K over main, by the matte spike's method (the placeholder's 0.054 ms at 4K is the precedent) |
-| An ungraded project's export | Within 2 % of main's time on one fixture, three runs |
-| A graded frame | Four graded full-frame layers and one adjustment clip at 1080p within the 8 ms budget; a graded 60 s 1080p fixture exports at most 10 % slower than ungraded |
+| Measure | Cap | Measured (GR7a) |
+|---|---|---|
+| Product code (`app/Sources`, `core/src`, the shader), net lines added by GR2–GR6 | ≤ 4,500 (REASONED estimate ~3,000–3,500; mattes were ~1,290 net, section 9) | **4,528 net** (+4,878 −350: `app/Sources` 2,917, `core/src` 1,384, the shaders 227): **missed by 28 lines**. Outside it, never capped: `core/include` +50. (`grading_verdict.py sizes` L1) |
+| Frozen files | Wiring only; no frozen file grows by more than ~50 lines in total | `EditorViewController.swift` 1,139 → 1,142 (+3); the other four net 0: held. (L2) |
+| Files over the cap | None left unpaid | **2 unpaid, missed by 2 files**: `ProjectSnapshot.swift` 1,750 → 1,769 (+19), `edit_clip.rs` 755 → 757 (+2). Four more over 600 at net ≤ 0, two exempt tables, three frozen (L2's). (L3) |
+| Inspector | One new sub-tab (Color) of at most four sections; Picture loses one section (Color) and gains none | Color added, 4 sections (Light, Color, Adjustment, Look); Picture lost Color and gained none: held. (L4) |
+| Menus | Clip ▸ Look ▸, Insert ▸ Adjustment Clip, View ▸ Show Ungraded, View ▸ Waveform; nothing else | 175 → 187 leaves: Clip ▸ Look ▸ (9: the eight and None), Insert ▸ Adjustment Clip, View ▸ Show Ungraded, View ▸ Waveform; none removed: held. (`measure` M1) |
+| An UNGRADED layer | At most +0.02 ms at 1080p and +0.06 ms at 4K over main, by the matte spike's method (the placeholder's 0.054 ms at 4K is the precedent) | +0.009 ms at 1080p, +0.002 ms at 4K (C0 noise 0.000 at both): held. (`grading_spike.py --measure --tree` TC) |
+| An ungraded project's export | Within 2 % of main's time on one fixture, three runs | +0.33 % (medians 6.00 s against main's 5.98 s, 60 s at 1080p): held. (`measure` E1) |
+| A graded frame | Four graded full-frame layers and one adjustment clip at 1080p within the 8 ms budget; a graded 60 s 1080p fixture exports at most 10 % slower than ungraded | 2.724 ms median compositor average (worst window 7.07–7.70 ms): held; graded export −0.17 % against ungraded (5.99 s against 6.00 s): held. (`measure` F4, E2) |
+
+Each figure's command, host, power and load are in the GR7a record below.
 
 Kept if T1–T5 succeed, the owner says he would reach for it again, and every
 cap holds. A missed cap is a conversation, not an automatic no: the record says
@@ -391,6 +393,57 @@ which cap and by how much.
 
 ("Section 1" and "section 9" are the brief's: section 1 is "Tier 1 as answered"
 above, section 9 the brief's cost figures, quoted under GR0.)
+
+### The owner's trial guide (GR7)
+
+**The build.** The branch's Release build is
+`/Users/kevingalligan/devel/reelcut-grading/build/Build/Products/Release/Reelcut.app`.
+Quit every other Reelcut first — main's Release build has the same identity
+(`com.kgalligan.Reelcut`) and the same preferences — then open this one BY PATH:
+from the Finder, or `open /Users/kevingalligan/devel/reelcut-grading/build/Build/Products/Release/Reelcut.app`,
+never by name.
+
+**Work only on COPIES of projects.** A save on the branch writes format 1015,
+which every main build refuses to open. Duplicate a `.reelcut` package in the
+Finder and open the copy; keep the original for main.
+
+**In the same sitting**, run GRD-1…GRD-6 (`docs/manual-checks.md`, "Grading").
+
+- **T1 — a warm, dark clip.** Open a copy of a project with a camera clip that
+  is too warm and too dark; open View ▸ Waveform (⌃⌘W). Select the clip and, on
+  the Clip tab's Color sub-tab, use Light alone (Exposure, Temperature, Tint,
+  then Highlights … Fade if you want them) until it looks right on the waveform
+  and by eye; flip View ▸ Show Ungraded (⌃⌘U) to compare. Time it from
+  selecting the clip.
+- **T2 — one grade for a whole video.** In a copy of a real project, select
+  nothing and choose Insert ▸ Adjustment Clip (it covers the whole timeline),
+  then grade it on the Color sub-tab. Trim, move and reorder a few camera
+  clips under it and play across them.
+- **T3 — a look.** Select a clip (or the adjustment clip), open Color ▸ Look,
+  pick a built-in look in the gallery (or Clip ▸ Look ▸) and set Amount. Try a
+  few of the eight.
+- **T4 — your own LUT.** In the Look section, Import LUT… a `.cube` you already
+  have (a camera maker's or a bought one); it applies at 100 %. Look at the same
+  frame through the same LUT in another app. For the script's figure, give an
+  agent the file's path; it runs `RC_PROOF_APP=release python3
+  tools/proof/grading_verdict.py measure --only T4 --lut PATH` in the worktree
+  (Reelcut's frame against ffmpeg's `lut3d`, ±2 levels). That needs no main
+  build.
+- **T5 — the Assistant.** With your own key (Settings ▸ Assistant; it spends
+  from your own budget), open View ▸ Assistant and ask "make the camera clips
+  warmer and a bit brighter". Then look at Edit ▸ Undo: each op is one step.
+- **T6 — the task only: brighten a face inside an ellipse.** No steps are
+  given here, on purpose. Needing to be shown how is the answer.
+
+**What GR7b records**, from your answers: for each of T1–T6, done or not (T1:
+the time, under two minutes or not; T2: whether any edit needed a re-grade; T3:
+which look, and whether you would use one of the eight again; T4: imported and
+applied or not, how it compared by eye, and the script's figure on your file;
+T5: done through the tools, one undo step per op or not; T6: done without being
+shown or not); GRD-1…GRD-6, each pass or what you saw; whether you would reach
+for grading again; and the verdict — kept (the merge) or dropped — with the
+caps the measured column misses (product code by 28 lines, two unpaid files)
+weighed as "a conversation, not an automatic no".
 
 ## Phases
 
@@ -410,7 +463,8 @@ numstat (±50 %).
 | GR5 | branch | GR-7, then **looks**: `LookKind`, each definition as data, `video.look {kind, amount}`; `texture(2)` and its placeholder, step 4d, `LookTextures.swift` (the bake on the GPU, the LRU), the Look section with a gallery drawn by the compositor, Clip ▸ Look ▸. | Amount 0 bytes = no look; an identity definition exact on every 8-bit colour; each built-in differs; a gallery thumbnail = `render_frame` at its size; a look on an adjustment clip; a manual-check row (the owner tunes the eight). |
 | GR6a | branch | GR-8 (split like GR4 and GR5), then **LUT import**: the HLG/PQ/BT.2020 check first (T0; no log clip); `MediaKind::Lut` and `LookKind::Lut` through every site, `cube.rs`, `ffi_cube.rs`, `lut.rs`, parser tests; `MediaImporter+LUT.swift`, `LutTextures.swift`, the URLs a look reads (`RecipeSource.lookURLs`), the Media tab's glyph and Remove alert, Consolidate, relink, paste, the MCP mirror. | An identity `.cube` exact; a channel swap exact; sizes 2 and 65; refusals by name; a missing file draws ungraded; `remove_media` clears the looks; a paste across documents. |
 | GR6b | branch | The Look gallery's Imported group and its "Import LUT…" button, Clip ▸ Look ▸'s LUT items, the Look summary naming the file, the screen, the README bullet, its GRD row. | Thumbnails by GR-7's rule; the menu's items and states; one undo step "Import LUT". |
-| GR7 | branch | The owner's trial against "Worth keeping"; the figures; the verdict. Kept: the merge. Dropped: an ADR on main, the branch kept unmerged, the issues re-iced or closed. | The tables above, filled in. |
+| GR7a | branch | The scripted half: every "What it may cost" cap measured against main at the branch point (`grading_verdict.py`, `grading_spike.py --tree`, main's Release build from a throwaway worktree), T4's script half on a LUT the phase writes, and the owner's trial guide. No product code; no verdict. | The caps table's "Measured (GR7a)" column, each figure with its command, host, power and load. |
+| GR7b | branch | The owner's trial against "Worth keeping" (T1–T6 and GRD-1…GRD-6, by the trial guide); the verdict. Kept: the merge. Dropped: an ADR on main, the branch kept unmerged, the issues re-iced or closed. | The owner's answers to the trial guide, recorded. |
 
 ## Not established
 
@@ -1553,3 +1607,133 @@ Imported group and Import LUT… (`importLUT`, one undo step "Import LUT"), and
 the dump's `lut-<id>` and `tiles`; its dev-tools entry gains
 `UIMenu.fillDynamic`. GR6a's, GR5b's, GR5a's, GR4a's and GR4b's still-owed
 lines above.
+
+## GR7a — the verdict's figures: every cap measured, T4's script half, the trial guide (2026-10-10, on the `grading` branch)
+
+**Where.** The `grading` branch at 892bfd1, against main at the branch point
+`f407f87`. Main's comparison build came only from a throwaway `git worktree
+add --detach tools/proof/work/gr7/main f407f87` and a cold `make app` there
+(`grading_verdict.py main-tree make`: built in 169 s, load `{ 4.82 5.86 12.83 }`
+before and `{ 49.52 34.59 24.06 }` after), removed at the end by `main-tree
+remove` (`tree_copy.remove_tree`, then `git worktree prune`; `git worktree
+list` no longer shows it). The branch's side is the gate's Release build. No
+product code changed; no verdict is written here — it is GR7b's, the owner's.
+
+**What landed.**
+- `tools/proof/grading_verdict.py` (new): `sizes` (L1–L4, git only, `work/gr7/sizes.json`),
+  `main-tree make|remove`, and `measure` (H0, M1, G0, E1, E2, F4, T4, T4c, Z1)
+  with four mutants; the module doc is the row list.
+- `tools/proof/grading_spike/tree_bench.swift` (new) and `grading_spike.py
+  --tree`: GR0's GPU method on two libraries, V0 (`Compositor.metal` at
+  `f407f87`) and VT (the tree's own, unpatched), both handed the app's whole
+  464-byte `LayerUniforms`; rows B0–B2, KT, and with `--measure` H0, C0, F, T0
+  and TC; mutant `tree-graded`. The default mode is unchanged (`--check`: B0–B2
+  and 44 K rows pass).
+- Instruments' READMEs: `grading_spike/README.md`'s `--tree` section and the
+  proof README's "Road map grading — GR7a, the verdict's figures".
+- This document: the caps table's "Measured (GR7a)" column, the Phases table's
+  GR7 split into GR7a and GR7b, "The owner's trial guide (GR7)" under "Worth
+  keeping"; `docs/manual-checks.md`'s Grading section points to the guide.
+- Scratch, never committed, under the gitignored `tools/proof/work/gr7/`: the
+  movie `media/testsrc2_1080_10s.mp4` (ffmpeg `testsrc2` 1920×1080, 30 fps,
+  10 s, libx264 yuv420p CRF 18, BT.709 tags) and the LUT
+  `luts/gr7-camera-33.cube`, written from textbook maths only (33³, red
+  fastest: a smoothstep S-curve mixed at 0.5, gains 1.06 / 1.0 / 0.92,
+  saturation 1.2 about the Rec. 709 luma, a clamp; the Concat rule).
+
+**Host.** Apple M2 Max, macOS 26.5.1, `pmset -g` powermode 0, drawing from AC
+Power, for every command below. The load was high from other sessions
+(`ps` before the recorded runs: another session's Rasterize test binary,
+`mediaanalysisd` and `spindump`, about one core each); each command's load before and after
+is in the table.
+
+| Measure | Cap | Measured | Held or missed by | Command (load before → after) |
+|---|---|---|---|---|
+| Product code, net lines GR2–GR6b | ≤ 4,500 | 4,528 (+4,878 −350; `app/Sources` +3,161 −244 = 2,917, `core/src` +1,480 −96 = 1,384, `app/Resources/Shaders` +237 −10 = 227, both shaders listed); `core/include` +56 −6 = 50 beside it, outside it | **missed by 28 lines** | `python3 tools/proof/grading_verdict.py sizes` L1 (`{ 18.06 28.25 23.77 }` → `{ 17.26 27.91 23.68 }`) |
+| Frozen files | ~50 each | `EditorViewController.swift` 1,139 → 1,142 (+4 −1); `TimelineView.swift` 1,682 → 1,682 (+1 −1); `PreviewCanvasView.swift` 1,124 (untouched); `AgentServer.swift` 785 → 785 (+2 −2); `InspectorViewController.swift` 355 (untouched); together net 3 | held | `sizes` L2 |
+| Files over the cap | none unpaid | unpaid: `ProjectSnapshot.swift` 1,750 → 1,769 (+19), `edit_clip.rs` 755 → 757 (+2). Paid (net ≤ 0): `AgentServer+Clips.swift` 636 → 636, `CanvasSessions.swift` 1,090 → 1,090, `Compositor.swift` 724 → 723, `ReelCore.swift` 999 → 989. Exempt: `ReelOps.swift` 1,222 → 1,234, `edit.rs` 931 → 946. Frozen (L2's): `AgentServer.swift`, `EditorViewController.swift`, `TimelineView.swift`. No new file over 400 | **missed by 2 files** | `sizes` L3 |
+| Inspector | one sub-tab (Color), ≤ 4 sections; Picture −Color, +nothing | sub-tabs `text, shape, graphic, picture, sound, clip` → `… picture, color, sound, clip`; Color's `lightSection`, `colorSection`, `adjustmentSection`, `lookSection` (4); Picture lost `colorSection`, gained none | held | `sizes` L4 |
+| Menus | Clip ▸ Look ▸, Insert ▸ Adjustment Clip, View ▸ Show Ungraded, View ▸ Waveform | main 175 leaves, the branch 187: Clip ▸ Look ▸ 9 (Black & White, Cool, Dramatic, Faded, None, Teal & Orange, Vintage, Vivid, Warm), Insert ▸ Adjustment Clip, View ▸ Show Ungraded, View ▸ Waveform; none removed | held | `RC_PROOF_APP=release perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_verdict.py measure --only H0,M1,G0,E1,E2,Z1` M1 (`{ 15.22 27.13 23.45 }` → `{ 8.35 22.52 21.99 }`) |
+| An UNGRADED layer | +0.02 ms at 1080p, +0.06 ms at 4K, plus C0 | VT:S1 − V0:S1 = 0.009 ms at 1080p (V0 0.119, VT 0.127, runs 0.119–0.199 ms) and 0.002 ms at 4K (V0 0.479, VT 0.481 ms); C0 noise 0.000 ms at both; KT: VT's S1 = V0's exactly (max \|Δ\| 0.0) at both sizes | held | `perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_spike/grading_spike.py --measure --tree` TC (`{ 17.26 27.91 23.68 }` → `{ 16.19 27.52 23.56 }`) |
+| An ungraded project's export | ≤ 2 % over main | fixture U (60 s at 1080p, two video tracks, the upper at scale 0.5), h264, three rounds alternated: main 5.98 / 5.98 / 5.98 s (spread 0.0 %), the branch 6.00 / 6.00 / 6.02 s (spread 0.3 %); `median(bU)/median(mU) − 1` = +0.33 % | held | `measure` E1 (same command as M1) |
+| A graded 60 s export | ≤ 10 % over ungraded | fixture G (U, every clip at GR0's ST tone and `teal_orange` 0.8, a front adjustment clip at exposure 0.2, vibrance 0.2): 5.97 / 6.01 / 5.99 s (spread 0.7 %) against U's 6.00 s median; −0.17 % | held | `measure` E2 (same command) |
+| A graded frame | ≤ 8 ms at 1080p | fixture F (20 s, four full-frame tracks at ST with warm, cool, teal_orange, vivid at 0.8, and a front adjustment clip at exposure 0.2), three exports: compositor averages 2.712 / 2.724 / 2.792 ms over 5 windows of 120 frames each, worst windows 7.07 / 7.70 / 7.70 ms; median average 2.724 ms | held | `RC_PROOF_APP=release perl -e 'alarm 600; exec @ARGV' python3 tools/proof/grading_verdict.py measure --only H0,F4,T4,Z1` F4 (`{ 7.84 22.18 21.88 }` → `{ 8.28 21.80 21.74 }`) |
+
+The graded-against-ungraded fixtures are told apart before any time is taken:
+G0, `render_frame` at 0.5 s of G against U, max |Δ| 87 levels (at (1445,
+680), blue; must exceed 8), and G holds one adjustment clip. **The exports are
+encoder-bound at these sizes**: every 60 s export took 5.97–6.02 s whatever
+its grade, while the compositor's averages in the same runs moved — main's U
+1.245–1.275 ms, the branch's U 1.277–1.313 ms, G 1.697–1.735 ms per frame. So
+E1 and E2 say the grade costs no export time on this fixture, not that the
+compositor does no more work; F4 is the frame-time figure.
+
+**L1 per commit**, `git diff --numstat <commit>^1 <commit>` over the three
+capped roots (the records' own figures, which some took with the header, in
+brackets): GR2 99c0d8f +512 −66, net 446 (about 448); the merge 0545902 net 0;
+GR3 6ecf46c +841 −35, net 806 (about 806); GR4a a5a6cdf +528 −68, net 460
+(about 460); GR4b 09b056c +201 −20, net 181 (179); GR5a e3e391e +772 −60, net
+712 (about 710); GR5b c2b2794 +682 −11, net 671 (about 670 by GR6a's record;
+its own: 558 new, +120 −11 changed); GR6a 9d237f0 +1,224 −192, net 1,032 (about 1,067, with the
+header); GR6b 892bfd1 +268 −48, net 220 (220). The records summed to about
+4,560; the measured total over the cap's own roots is 4,528.
+
+**T4's script half.** Project T (the movie at 0, 1920×1080) at 0.5 s through
+`gr7-camera-33.cube` at amount 1 (`set_video {look: {kind: "lut", media,
+amount: 1}}`, then `render_frame`) against `ffmpeg -i t4-neutral.png -vf
+lut3d=file=…:interp=trilinear` on the neutral frame, both decoded to `rgb24`:
+**max |Δ| 2 levels** (at (78, 6), green) over 1920×1080×3 — within ±2, T4
+PASS. The CONTROL T4c: the neutral frame against ffmpeg's is 56 levels away
+(at (1, 2), red), so the LUT moves the frame. (`measure --only H0,F4,T4,Z1`.)
+The owner's own LUT is his to give: `measure --only T4 --lut PATH` adds its
+figure as a recorded line, and needs no main build.
+
+**T5: the owner's; no live run** (a paid call), on his own key and budget.
+
+**Verified.**
+- Loop: `grading_verdict.py sizes` exit 0; `grading_spike.py --check --tree`
+  exit 0 (B0–B2, KT at both sizes, max |Δ| 0.0); `grading_spike.py --check`
+  exit 0 (B0–B2 and 44 K rows, the default mode unchanged); `main-tree make`
+  exit 0; `RC_PROOF_APP=release grading_verdict.py measure --rounds 1 --seconds
+  10` exit 0, every row PASS (before the review's fix pass; on today's
+  instrument F4 is a named SKIP under `--rounds 1`).
+- `make gate`: PASS in 66 s (test 65 s; typecheck, fmt, lint and app skipped
+  as byte-identical to their last pass — no product input changed), and again
+  PASS in 66 s after this record and `docs/manual-checks.md` (a test input)
+  were written.
+- Recorded, on the gate's Release build, before the review's fix pass: `sizes` exit 0;
+  `grading_spike.py --measure --tree` exit 0; `measure --only
+  H0,M1,G0,E1,E2,Z1` exit 0 (11 projects closed, 12 logs, no `Reelcut: ` line);
+  `measure --only H0,F4,T4,Z1` exit 0 (4 projects closed, 4 logs, no `Reelcut: `
+  line). No run printed `DEFAULTS MOVED`; every instance ran under the scratch
+  `CFFIXED_USER_HOME` and was stopped by its own pid.
+- Mutants, each once on the final instrument, each killed by exactly its
+  row: `sizes --mutant shader-not-counted` L1 (the shader root unlisted);
+  `measure --only M1,Z1 --mutant menus-same-app` M1 (175 leaves on both sides,
+  all four paths missing); `measure --only G0,Z1 --seconds 10 --mutant
+  graded-fixture-ungraded` G0 (max |Δ| 0, the adjustment clip still 1);
+  `measure --only T4,Z1 --mutant lut-not-applied` T4 (56 levels; T4c still
+  PASS); `grading_spike.py --check --tree --mutant tree-graded` KT (0.1416,
+  i.e. 144.9 / 1023, at both sizes).
+- Review fix pass (`grading_verdict.py` only): `numstat` runs with
+  `--no-renames` and L3 fails on a changed path it cannot read at HEAD; ffmpeg
+  reads a copy of the LUT under a fixed name, so no character of the owner's
+  path reaches the filter graph; `--lut` is expanded, resolved and refused
+  unless a file; F4 under three exports is a named SKIP; M1 prints `added
+  none`; frame decoding runs under `bounded.run`. Re-run on the fixed
+  instrument, each exit 0: `sizes` (output unchanged) and its
+  `shader-not-counted` mutant (killed by L1); `measure --only H0,F4,T4,Z1`
+  (F4 PASS, T4 PASS 2 levels); `--only G0,Z1` (87 levels); `--lut` with a
+  path holding an apostrophe and colons (T4 PASS, 2 levels); the
+  `lut-not-applied` mutant (killed by T4); `make gate`. Not re-run: M1, E1
+  and E2, whose main build had been removed, and whose measuring code did not
+  change (M1's only change is its printed text). The recorded F4 figure,
+  2.724 ms, is the earlier run's: F4's measuring code did not change, and the
+  fix pass's run was taken at a load of 70–133 from another session.
+
+**Owed.** GR7b: the owner's trial (T1–T6 and GRD-1…GRD-6 by the trial guide
+above), T4's figure on his own LUT, T5 on his own key, and the verdict. The
+two caps missed — product code by 28 lines, two files over the cap that grew
+(`ProjectSnapshot.swift` +19, `edit_clip.rs` +2) — are for that verdict, not
+fixed here. The still-owed `CLAUDE.md` lines are GR2's through GR6b's, each in
+its own record above; GR7a adds none.
