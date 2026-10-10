@@ -451,10 +451,16 @@ governs a module now.
   whole grid frames back from the cut (`time::frames_within`). It does
   not enumerate timeline frames; final placements still pass
   `check_overlap_rule`.
-- `evaluate.rs` — `composition_plan()` (A/B assignment, instruction tiling)
-  and the `assign()` the recipe shares with it. `assign` leaves a clip's audio
-  out above `AUDIO_SPEED_MAX`, and `place` gives every plan audio track ONE
-  `pitch` (#190, #211).
+- `evaluate.rs` — the A/B assignment, `assign()`, that the plan and the
+  recipe share, and `drawing_instances`, which both the instruction tiling
+  and the layer list are built from. `assign` leaves a clip's audio out above
+  `AUDIO_SPEED_MAX`, and `place` gives every plan audio track ONE `pitch`
+  (#190, #211). `Segment`, `CompTrack` and `Assignment`'s tracks are
+  `pub(crate)` for `plan.rs` alone.
+- `plan.rs` — `composition_plan()` (spec §7.2): the plan's JSON from
+  `assign()`, the instruction tiling, and the decoder-budget warning
+  (`MAX_CONCURRENT_VIDEO_TRACKS`). Deterministic to the byte. A pure move
+  out of `evaluate.rs` (grading GR1).
 - `recipe.rs` · `recipe_layer.rs` · `recipe_text.rs` — `frame_recipe(t)`: the
   layer list at one instant. `RecipeLayer` (`recipe_layer.rs`, re-exported by
   `recipe.rs`) is the twenty-two keys of a layer written in ONE place

@@ -162,7 +162,7 @@ enum ReverseStatus: Equatable {
 /// recipes under — `AudioDSPSource`'s shape, for `AudioDSPSource`'s reasons.
 ///
 /// The two mirrors exist for the same underlying fact: `CompositionBuilder` is
-/// handed the composition PLAN, and the plan is `evaluate.rs`'s structural
+/// handed the composition PLAN, and the plan is `plan.rs`'s structural
 /// description of what to decode. `Source::Media.reversed` is deliberately not
 /// in it — the core does no pixel work, so reversal changes neither the plan
 /// nor the recipe (spec §11) — which leaves exactly one place for the answer

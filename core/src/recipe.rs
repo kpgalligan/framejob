@@ -1,8 +1,8 @@
 //! The frame recipe (spec §7.3): the back-to-front layer list at one
 //! instant, every property already resolved through actions.
 //!
-//! The other half of what the platform consumes; `evaluate.rs` holds the
-//! composition plan and the A/B assignment both halves share. They are split
+//! The other half of what the platform consumes; `plan.rs` holds the
+//! composition plan, `evaluate.rs` the A/B assignment both share. They are split
 //! because they change on different things — the plan is structural and is
 //! rebuilt only when its JSON differs, the recipe is asked for once per
 //! composed frame and again by the canvas overlay for hit-testing — but they

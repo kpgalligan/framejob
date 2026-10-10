@@ -226,7 +226,7 @@ split is a choice, not a toll.
 | Format | `format.rs` (419): the version and its paragraph; a `schema_vN.rs`; the header's `#define`. | The branch's number is GR-9's. |
 | Checks | `props_check.rs` (485): ranges. `edit_props.rs` (417): adjustment refusals (gather filters, blend), `clamp_video`. | Refusals in the rule's own sentence. |
 | Ops | New `edit_adjustment.rs`: `add_adjustment_clip`. `edit.rs` (exempt): its enum row and doc-table line. `op_table.rs` (348): its arguments. | `edit_clip.rs` (755) is over the cap with no seam named, so the op does not go there. |
-| `Source` classification | 92 `Source::` sites across 26 core files (`grep -c 'Source::' core/src/*.rs`). `evaluate.rs` is at **590**. | Any edit to `evaluate.rs` pays a toll first; GR4's design names the seam. |
+| `Source` classification | 92 `Source::` sites across 26 core files (`grep -c 'Source::' core/src/*.rs`). `evaluate.rs` is at **590**. | **Paid in GR1:** the composition plan out to `plan.rs` (590 → 381), because GR4's `Source::Adjustment` edits both of its exhaustive `Source` matches. |
 | LUT media | `edit_track.rs` (534): `uses_media`, `remove_media`; the 11 `MediaKind::` sites (`edit_clip.rs` 7, `edit_background.rs` 3, `edit_track.rs` 1); `validate`; `edit_paste.rs` (468), `edit_paste_attributes.rs` (306); `actions.rs`: `look.media` switches. New `cube.rs` (the parser) and an `ffi_*.rs` export. | |
 | Recipe | `recipe_layer.rs` (102): `look` and the tone fields, always present; `recipe.rs` (521): the adjustment layer's role and the `ungraded` option. | |
 | Tests | New `core/tests/tone.rs`, `adjustment.rs`, `look.rs`, `cube.rs`. | |
@@ -235,16 +235,16 @@ split is a choice, not a toll.
 
 | Step | Files | Toll first? |
 |---|---|---|
-| Snapshot | `ProjectSnapshot.swift` (**1,871**): `ColorAdjust`, `VideoProps`, `ClipSource`, `MediaKind`. | **Yes.** Its named seam: the composition plan out whole. New grading types in a new `GradeProps.swift`. |
+| Snapshot | `ProjectSnapshot.swift` (**1,871**): `ColorAdjust`, `VideoProps`, `ClipSource`, `MediaKind`. | **Paid in GR1:** the composition plan out whole to `CompositionPlan.swift` (1,871 → 1,750). New grading types in a new `GradeProps.swift`. |
 | Recipe decode | `FrameRecipe.swift` (365). | No. |
 | Uniforms | `LayerUniforms.swift` (267; out of `Compositor.swift`, now 724, in `7b80810`). A tone group (12 floats) and a look group (4) take it from 104 to 120 floats, 480 bytes. | **No longer a toll** (paid). The three 416 assertions above move in the same change. |
 | Fill and bind | `Compositor+Uniforms.swift` (152), `CompositorEffects.swift` (430), `Compositor+Dissolve.swift` (190, `drawLayer`: binds `texture(2)`). New `LookTextures.swift` (the 3D textures, the LRU, the bake). | No. |
 | Shader | `Compositor.metal`: steps 4c and 4d by GR0's route; `reelcut_adjust_fragment`, the eighth pipeline; the LUT at `texture(2)` with a placeholder. | A split into headers is optional; if made, one helper builds the shader for every instrument and lands on main first. |
-| Inspector | A seventh `ClipSubTab` case, `color` (`ClipPinnedBlock.swift`, 235); `ClipPane.makeSections()` (`ClipPane.swift`, 221) registers its sections (an unregistered section is invisible); `VideoPane.swift` (**959**) holds `colorSection`. New `VideoPane+Light.swift`, `VideoPane+Look.swift`. | **Yes for `VideoPane.swift`:** `colorSection` to `VideoPane+Color.swift`, pure, before Light joins it. |
+| Inspector | A seventh `ClipSubTab` case, `color` (`ClipPinnedBlock.swift`, 235); `ClipPane.makeSections()` (`ClipPane.swift`, 221) registers its sections (an unregistered section is invisible); `VideoPane.swift` (**959**) holds `colorSection`. New `VideoPane+Light.swift`, `VideoPane+Look.swift`. | **Paid in GR1 for `VideoPane.swift`:** `colorSection` to `VideoPane+Color.swift` (959 → 904), pure, before Light joins it. |
 | Typed builders | `ReelOps.swift` (exempt): `addAdjustmentClip`; `OpDictionaries.swift` (109). | No. |
-| Menus | `AppDelegate+Menus.swift` (579): Clip ▸ Look ▸; Insert ▸ Adjustment Clip (Insert is `AppDelegate+GraphicMenu.swift`'s); View ▸ Show Ungraded, View ▸ Waveform. | **Yes** before a submenu: a submenu builder out. The menu inventory gains rows. |
+| Menus | `AppDelegate+Menus.swift` (579): Clip ▸ Look ▸; Insert ▸ Adjustment Clip (Insert is `AppDelegate+GraphicMenu.swift`'s); View ▸ Show Ungraded, View ▸ Waveform. | **Paid in GR1:** the Clip menu's submenu builders out to `AppDelegate+ClipMenus.swift` (579 → 494). The menu inventory gains rows. |
 | Timeline | `ClipKindStyle.swift`: the adjustment clip's body. `TimelineView.swift` is frozen: wiring only. | No. |
-| MCP | `AgentCatalog+Clips.swift` (**706**): `set_video`'s prose gains the keys; `AgentServer+Clips.swift` (**636**). New `AgentServer+Grading.swift` and a catalog entry for `add_adjustment_clip`; `import_media` accepts `.cube`; `render_frame {ungraded}` (`AgentServer+Render.swift`, 545). | **Yes for `AgentCatalog+Clips.swift`:** the property rows and their vocabularies together. The root `CLAUDE.md`'s "eighty-nine product tools" becomes ninety then. |
+| MCP | `AgentCatalog+Clips.swift` (**706**): `set_video`'s prose gains the keys; `AgentServer+Clips.swift` (**636**). New `AgentServer+Grading.swift` and a catalog entry for `add_adjustment_clip`; `import_media` accepts `.cube`; `render_frame {ungraded}` (`AgentServer+Render.swift`, 545). | **Paid in GR1 for `AgentCatalog+Clips.swift`:** the property rows and their vocabularies together, to `AgentCatalog+Properties.swift` (706 → 513). The root `CLAUDE.md`'s "eighty-nine product tools" becomes ninety then. |
 | Import | `MediaImporter.swift` (591): `.cube` in a new `MediaImporter+LUT.swift`. `MediaConsolidator.swift` (321), `MediaRowView.swift` (520): the LUT glyph and "used by N clips". `CompositionBuilder.swift` (536): a LUT media is never an asset. | The `MediaKind`-shaped Swift sites each classified. |
 | Scope | New `ScopeView.swift` and a compute pass run only while the panel is open. | No. |
 
@@ -403,7 +403,7 @@ numstat (±50 %).
 | Phase | Where | What lands | Its proof holds |
 |---|---|---|---|
 | GR0 | main | This document; the spike against the tree's OWN shader: what tone and a 3D LUT cost an ungraded and a graded layer under three routes, the route chosen by a rule written beforehand; #258's biplanar measurement. | The spike's figures, host and power state named. |
-| GR1 | main | Pure moves, each gated alone: `VideoPane.colorSection` → `VideoPane+Color.swift`; `ProjectSnapshot.swift`'s composition plan → its own file; `AgentCatalog+Clips.swift`'s property rows and their vocabularies → their own file; a submenu builder out of `AppDelegate+Menus.swift`; `evaluate.rs` (590) a seam named and paid only if GR4's design shows it must change. (`LayerUniforms` already moved, `7b80810`.) | Renders byte-identical before and after; `make test` unchanged. |
+| GR1 | main | **Paid in GR1** (its record below): five pure moves, gated as one change with no grading code: `VideoPane.colorSection` → `VideoPane+Color.swift`; `ProjectSnapshot.swift`'s composition plan → `CompositionPlan.swift`; `AgentCatalog+Clips.swift`'s property rows and their vocabularies → `AgentCatalog+Properties.swift`; the Clip menu's submenu builders out of `AppDelegate+Menus.swift` → `AppDelegate+ClipMenus.swift`; `evaluate.rs` (590)'s composition plan → `plan.rs`, since GR4 must edit its exhaustive `Source` matches. (`LayerUniforms` already moved, `7b80810`.) | Renders byte-identical before and after; `make test` unchanged. |
 | GR2 | branch | GR-1..GR-3 and GR-9 with README rows, then **tone**: the nine keys, ranges, defaults, the schema file, recipe keys, `core/tests/tone.rs`; uniforms, step 4c by GR0's route, the Color sub-tab (Color moved, Light added), `set_video`'s prose. The branch's format number. | `tone_proof.py` over MCP: defaults byte-identical to main's build on one fixture; +1 EV on a mid-grey card where linear-light doubling says (±1); temperature raises red and lowers blue; whites and blacks move only their ends; fade lifts black; `render_frame` = export frame; undo and redo; a banding fixture's distinct-level count recorded. Mutants: exposure in encoded space; tone before the obscure regions; the flag gate ignoring a negative value; a range check dropped. |
 | GR3 | branch | **Seeing**: the `ungraded` recipe option (View ▸ Show Ungraded, `render_frame {ungraded}`) and the luma waveform panel (View ▸ Waveform), its compute pass run only while shown. | The option's bytes = the ungraded bytes; an export ignores the view switch; a known ramp's waveform (a probe, no photograph); harness captures light and dark; a manual-check row. |
 | GR4 | branch | GR-6, then **adjustment clips**: `Source::Adjustment`, every `Source` match classified, `add_adjustment_clip`, the refusals, the recipe role, `core/tests/adjustment.rs`; the eighth pipeline (`reelcut_adjust_fragment`, blending OFF, reads `[[color(0)]]`, weights by the matte coverage), Insert ▸ Adjustment Clip, the clip body, the inspector (Color and Clip only), the MCP tool. | Grades both tracks behind and not the one in front; opacity 0.5 halfway; matted = inside only; on a matte track it grades the matte group; each refusal in its sentence; Preview Quality; every export row including the two alpha rows (the ALPHA channel over a transparent canvas); blending OFF (a mutant turning it on, caught only over a translucent destination). |
@@ -605,3 +605,66 @@ its test step ran; the others skipped by stamp); `--measure` exit 0 as above.
 
 **Owed, outside this file:** the issue comments on #118, #120, #122, #124 and
 #258 (the orchestrator posts them). GR1's pure moves are next, on main.
+
+## GR1 — pure moves (2026-10-09, on main)
+
+**What landed.** Five pure moves, gated as one change with no grading code
+and no behaviour change. Each moved body is unchanged apart from the
+visibility listed with it (the Rust plan section was diffed against `HEAD`
+after `cargo fmt`: identical).
+
+| Move | `wc -l` before → after | New file | What widened |
+|---|---|---|---|
+| `core/src/evaluate.rs` → `plan.rs`: `MAX_CONCURRENT_VIDEO_TRACKS` and `// ---- the composition plan` to the end (`Instruction`, `composition_plan`, `instructions`, `warnings_for`) | 590 → 381 | `plan.rs`, 221 | `Segment` and its `to_json`; `CompTrack` and its `id`, `segments`, `voices`; `Assignment`'s `video` and `audio` — all `pub(crate)`. `composition_plan` stays an inherent `pub fn`, so `ffi_query.rs` and the tests did not change. |
+| `ProjectSnapshot.swift` → `CompositionPlan.swift`: `// MARK: - Composition plan (spec §7.2)` to the end | 1,871 → 1,750 | 123 | nothing |
+| `VideoPane.swift` → `VideoPane+Color.swift`: `// MARK: Colour` and `colorSection()` | 959 → 904 | 58 | nothing (`binding` was already internal) |
+| `AgentCatalog+Clips.swift` → `AgentCatalog+Properties.swift`: the five property rows (`set_video`, `set_audio`, `set_text`, `set_shape`, `set_clip`) as `propertyTools(clipsDescription:)`, spliced back after `unnest`, and the nineteen hoisted locals they read (three also read by `add_text_clip` and `add_shape_clip`), as static members with explicit types | 706 → 513 | 247 | `shapeNames`, `textPatchDescription` and `shapePatchDescription` are internal statics, because `add_text_clip` and `add_shape_clip` read them through typed locals; the other sixteen are `private static` |
+| `AppDelegate+Menus.swift` → `AppDelegate+ClipMenus.swift`: `backgroundMenu` through `labelDot` | 579 → 494 | 104 | `backgroundMenu`, `transitionMenu`, `motionMenu`, `labelMenu` and `tagged` became internal; `motionSlotMenu` and `labelDot` stay `private` |
+
+`textPatchDescription`'s static initializer names
+`AgentServer.textWordsClause`, not `Self.textWordsClause`: Swift refuses a
+covariant `Self` in a stored-property initializer, even on a final class.
+That is the spec's stated fallback. `propertyTools` binds the five patch
+descriptions to typed locals of the same names, so the five row bodies are
+byte-identical to what they were.
+
+**Why `evaluate.rs` was paid now.** Both of its `Source` matches are
+exhaustive (`segment_of` and `draws`), so GR4's `Source::Adjustment` cannot
+compile without editing the file, and it was at 590 of the ~600 cap. The cut
+is the one the file's own banner drew. `place`, `segment_of`, `assign` and
+`drawing_instances` stay, along with the comments that cite them, and so does
+`speed_limits_probe.py`'s mutant anchor `!match_pitch ||`. Every reader of
+`crate::evaluate::{json, number, Assignment}` kept its import.
+
+**Verification**, on 2026-10-09, AC power:
+- Controls taken from the untouched tree before any edit, never by stashing.
+  The Debug catalog was copied to `tools/proof/work/gr1/catalog-before.json`.
+  `RC_PROOF_APP=release python3 tools/proof/word_looks_proof.py --only B1`
+  ran on the `bd5bb65` Release build: 3/3, B1 `moved: []`
+  (`tools/proof/work/gr1/b1-before.txt`).
+- `cd core && cargo test --release --test evaluate_tests` (55 passed),
+  `--test matte` (8), `--test model_tests` (31) and `--test source_window`
+  (9), all passing. `make lint` was clean.
+- `make typecheck` after each Swift move: exit 0, 0 errors, exactly the 4
+  baseline warnings.
+- `make app-debug`, then the catalog compared parsed with
+  `tools/proof/work/gr1/catalog-before.json`: equal (exit 0), the tool order
+  included.
+- `python3 tools/proof/v2_menu.py --only H`: 5/5 pass. H1 found 0 problems
+  over 155 leaves and 99 live selectors, and H2's probe table and inventory
+  had 99 rows each, no differences.
+- `python3 tools/proof/spec_index_proof.py`: 147/147. The
+  `07.10-rust-module-map.md` Lines cell went from 85 to 86.
+- `make gate`: PASS in 315 s (typecheck 14 s with the 4 baseline warnings,
+  fmt 5 s, lint 2 s, test 202 s, app 90 s, with D25 and D26 ok). The Rust
+  suites passed 1,251 tests and failed none.
+- `RC_PROOF_APP=release python3 tools/proof/word_looks_proof.py --only B1`
+  ran on the gate's Release build: 3/3, B1 `moved: []`, the same as the
+  control (`tools/proof/work/gr1/b1-after.txt`). The 41 frames of fixture B
+  still match the digests recorded from `c66d8ab`.
+- No mutants: a pure move adds no decision.
+
+**Owed.** Nothing from GR1. GR2 opens the `grading` branch. The next named
+seams are in `designs/adr/app-file-history.md` and `core-file-history.md`:
+`ShapeProps.swift`, `VideoPane+Chroma.swift`, and the View menu's submenus.
+`AgentCatalog+Clips.swift` and `evaluate.rs` have none named.

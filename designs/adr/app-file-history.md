@@ -462,8 +462,13 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   B87 phase 3: `// MARK: - Actions`, `ActionPatch` and `ActionSnapshot`, a pure move gated alone
   before `ActionGraphicPatch` landed) and `FrameRecipe.swift` (the mattes road map's MT1, issue
   batch B89: `// MARK: - Frame recipe (spec §7.3)` out whole, a pure move gated alone before the
-  matte keys landed). The next seam: the composition plan (`// MARK: - Composition plan (spec
-  §7.2)`), out whole.
+  matte keys landed). The grading road map's GR1 paid the seam that move named: `// MARK: -
+  Composition plan (spec §7.2)` (`PlanSegment`, `PlanRamp`, `PlanTrack`, `PlanInstruction`,
+  `CompositionPlan`) went whole to `CompositionPlan.swift` with `import AppKit`, a pure move gated
+  with GR1's other four before any grading code landed; nothing lost `private`. `wc -l
+  app/Sources/ProjectSnapshot.swift`: 1871 before, 1750 after; `CompositionPlan.swift` is 123.
+  The next seam: the shape group (`StrokeProps`, `GradientStop`, `Gradient`, `ShapeProps`) out
+  whole to `ShapeProps.swift`.
 - `Compositor.swift`: the mattes road map's MT1 (issue batch B89) moved `// MARK: - Shadows`
   through `blurKernel`, with `ShadowSurfaces`, to `Compositor+Shadow.swift`, and `render`'s
   per-layer uniforms-and-source block to `prepare` in `CompositorEffects.swift`, a pure move gated
@@ -527,12 +532,25 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   `private`). `wc -l app/Sources/ExporterWriter.swift`: 782 before, 543 after;
   `ExporterWriter+Chapters.swift` is 248. No next seam is named.
 - `OptionControls.swift`: the precedent is `OptionControls+Choices.swift`.
-- `VideoPane.swift`: a section out as an extension, the precedent `VideoPane+Obscure.swift`.
+- `VideoPane.swift`: a section out as an extension, the precedent `VideoPane+Obscure.swift`. The
+  grading road map's GR1 moved `// MARK: Colour` and `colorSection()` to `VideoPane+Color.swift`
+  as an `extension VideoPane`, a pure move gated with GR1's other four before the grade section
+  landed; nothing lost `private` (`binding` was already internal). `wc -l
+  app/Sources/VideoPane.swift`: 959 before, 904 after; `VideoPane+Color.swift` is 58. The next
+  seam: `chromaSection` to `VideoPane+Chroma.swift`.
 - `AgentServer+Clips.swift`: the property doors (`// MARK: - Properties`, `set_video` …
   `set_transition_duration`) to `AgentServer+Properties.swift`. The action handlers went to
   `AgentServer+Actions.swift` in issue batch B87 phase 2.
 - `AgentCatalog+Clips.swift`: the action rows went to `AgentCatalog+Actions.swift` in issue batch
-  B87 phase 2; the property rows and the hoisted vocabularies they read are the next cut, together.
+  B87 phase 2. The grading road map's GR1 paid the next cut: the five property rows (`set_video`,
+  `set_audio`, `set_text`, `set_shape`, `set_clip`) and the nineteen hoisted locals they read went
+  to `AgentCatalog+Properties.swift`, the rows as `propertyTools(clipsDescription:)` spliced back
+  in after `unnest`, the locals as static members with explicit types — internal for
+  `shapeNames`, `textPatchDescription` and `shapePatchDescription`, which `add_text_clip` and
+  `add_shape_clip` still read through typed locals, `private` for the other sixteen; a pure move
+  gated with GR1's other four, the Debug catalog equal before and after, parsed. `wc -l
+  app/Sources/AgentCatalog+Clips.swift`: 706 before, 513 after; `AgentCatalog+Properties.swift`
+  is 247. No next seam is named.
 - `AgentServer+Scope.swift`: the envelope rule (`checkCallScope`, `effectiveScope`, `idScope`,
   `addressed`, `checkDocumentLevelTicks`, `scopeLanding`, `scopeFailure`) against `set_scope` the
   tool (`setScope`, `nestScopePath`, `pathToClip`, `applyNestScope`, `commonPrefix`,
@@ -548,7 +566,13 @@ to pay a toll starts from it. A file not listed has no named seam yet.
   and `refreshWanted` widened from `private` for that file alone (B30's shape). `player` stays
   private.
 - `AppDelegate+Menus.swift`: a submenu builder out (the precedent is
-  `AppDelegate+GraphicMenu.swift`).
+  `AppDelegate+GraphicMenu.swift`). The grading road map's GR1 moved the Clip menu's submenu
+  builders (`backgroundMenu`, `transitionMenu`, `motionMenu`, `motionSlotMenu`, `labelMenu`,
+  `labelDot`) to `AppDelegate+ClipMenus.swift`, a pure move gated with GR1's other four;
+  `backgroundMenu`, `transitionMenu`, `motionMenu`, `labelMenu` and `tagged` lost `private`
+  (`motionSlotMenu` and `labelDot` kept it). `wc -l app/Sources/AppDelegate+Menus.swift`: 579
+  before, 494 after; `AppDelegate+ClipMenus.swift` is 104. The next seam: the View menu's
+  submenus (`trackHeightMenu`, `previewQualityMenu`).
 - `Controls.swift`: held to the sync rule with Rasterize's copy (`app/CLAUDE.md` "Shared chrome");
   7 of its lines are the SH-2 fork of `drawBar` (#101).
 - `ReelOps.swift` is exempt (a table, one row per op). `TimelineView.swift`,

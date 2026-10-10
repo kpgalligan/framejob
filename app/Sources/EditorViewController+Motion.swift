@@ -13,7 +13,7 @@ import AppKit
 extension EditorViewController {
 
     /// The one tag that means None. `motionSlotMenu`
-    /// (`AppDelegate+Menus.swift`) writes it and nothing else negative, so a
+    /// (`AppDelegate+ClipMenus.swift`) writes it and nothing else negative, so a
     /// tag that is neither this nor an index into the vocabulary came from
     /// nowhere this app knows and is refused rather than read as None.
     static let motionNoneTag = -1

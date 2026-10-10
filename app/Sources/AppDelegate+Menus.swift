@@ -1,8 +1,9 @@
 import AppKit
 
 /// The whole menu bar (spec §9): `buildMainMenu()`, the ten menus it hangs off
-/// it (the eleventh, Insert, is `AppDelegate+GraphicMenu.swift`'s), the four
-/// submenus under those, and the three helpers every row is made with —
+/// it (the eleventh, Insert, is `AppDelegate+GraphicMenu.swift`'s), the
+/// submenus under those but the Clip menu's (`AppDelegate+ClipMenus.swift`'s,
+/// a pure move, grading GR1), and the three helpers every row is made with —
 /// `item`, `tagged` and `submenuItem`.
 ///
 /// **The seam is the one `AppDelegate.swift`'s own doc already promised.** A
@@ -26,7 +27,9 @@ import AppKit
 /// its own file, so `buildMainMenu()` is internal now —
 /// `applicationWillFinishLaunching` calls it from the other half — and so are
 /// `item` and `submenuItem`, which `AppDelegate+GraphicMenu.swift` builds the
-/// Insert menu with (road map 10's G5b). The other builders and helpers stay
+/// Insert menu with (road map 10's G5b), and `tagged`, which
+/// `AppDelegate+ClipMenus.swift`'s builders use (grading GR1), as `clipMenu()`
+/// here calls theirs. The other builders and helpers stay
 /// `private`, because Swift's `private` covers a type's extensions within one
 /// file and each is called only from inside this one. Nothing needed to
 /// become a stored property either, which is what makes an extension a legal
@@ -82,7 +85,7 @@ extension AppDelegate {
 
     /// A tagged item — the idiom for a menu built from an enum's cases, so
     /// the menu and the enum can never drift apart.
-    private func tagged(_ title: String, _ action: Selector?, _ tag: Int) -> NSMenuItem {
+    func tagged(_ title: String, _ action: Selector?, _ tag: Int) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
         item.tag = tag
         return item
@@ -353,94 +356,6 @@ extension AppDelegate {
         menu.addItem(
             item("Close Nest", #selector(EditorViewController.closeNest(_:)), "\u{F700}", [.command]))
         return menu
-    }
-
-    /// Clip ▸ Add Background ▸ — the two ways to make a plate, which are two
-    /// commands rather than one command with a source popup: the picture needs
-    /// a file chooser and the colour needs nothing at all. Not built from an
-    /// enum, so no tags: the ops themselves differ only in an argument, but
-    /// the paths to them do not.
-    private func backgroundMenu() -> NSMenu {
-        let menu = NSMenu(title: "Add Background")
-        menu.addItem(
-            item("Solid Color", #selector(EditorViewController.addSolidColorBackground(_:))))
-        menu.addItem(item("Image…", #selector(EditorViewController.addImageBackground(_:))))
-        return menu
-    }
-
-    /// Built from `TransitionKind.allCases` with the case's index as the tag,
-    /// so adding a transition to the model adds it to this menu for free.
-    private func transitionMenu() -> NSMenu {
-        let menu = NSMenu(title: "Transition")
-        for (index, kind) in TransitionKind.allCases.enumerated() {
-            menu.addItem(
-                tagged(kind.displayName, #selector(EditorViewController.setTransitionKind(_:)), index))
-        }
-        menu.addItem(.separator())
-        menu.addItem(
-            tagged("None", #selector(EditorViewController.setTransitionKind(_:)), -1))
-        return menu
-    }
-
-    /// Clip ▸ Motion: one submenu per slot, then Preview.
-    private func motionMenu() -> NSMenu {
-        let menu = NSMenu(title: "Motion")
-        let edges = EdgeMotion.allCases.map(\.displayName)
-        menu.addItem(
-            submenuItem(
-                motionSlotMenu("In", edges, #selector(EditorViewController.setMotionIn(_:)))))
-        menu.addItem(
-            submenuItem(
-                motionSlotMenu("Out", edges, #selector(EditorViewController.setMotionOut(_:)))))
-        menu.addItem(
-            submenuItem(
-                motionSlotMenu(
-                    "During", DuringMotion.allCases.map(\.displayName),
-                    #selector(EditorViewController.setMotionDuring(_:)))))
-        menu.addItem(.separator())
-        menu.addItem(item("Preview", #selector(EditorViewController.previewClipMotion(_:))))
-        return menu
-    }
-
-    /// One slot's kinds, the `transitionMenu()` idiom: the index as the tag,
-    /// a separator, None as −1.
-    private func motionSlotMenu(_ title: String, _ names: [String], _ action: Selector) -> NSMenu {
-        let menu = NSMenu(title: title)
-        for (index, name) in names.enumerated() {
-            menu.addItem(tagged(name, action, index))
-        }
-        menu.addItem(.separator())
-        menu.addItem(tagged("None", action, -1))
-        return menu
-    }
-
-    /// Built from `ClipLabel.allCases` with the case's index as the tag — the
-    /// `transitionMenu()` idiom — so the six colours, their order and their
-    /// inks come from the one file that owns them. Each item carries a dot in
-    /// its colour: a label IS a colour, and a menu of six colour words that
-    /// showed none would make the user picture them.
-    private func labelMenu() -> NSMenu {
-        let menu = NSMenu(title: "Label")
-        for (index, label) in ClipLabel.allCases.enumerated() {
-            let entry = tagged(
-                label.displayName, #selector(EditorViewController.setClipLabel(_:)), index)
-            entry.image = Self.labelDot(label.color)
-            menu.addItem(entry)
-        }
-        menu.addItem(.separator())
-        menu.addItem(tagged("None", #selector(EditorViewController.setClipLabel(_:)), -1))
-        return menu
-    }
-
-    /// A 10 pt filled circle — the timeline strip's 6 pt label dot at menu
-    /// size. Not a template image: the point of it is its colour.
-    private static func labelDot(_ color: NSColor) -> NSImage {
-        let image = NSImage(size: NSSize(width: 10, height: 10), flipped: false) { rect in
-            color.setFill()
-            NSBezierPath(ovalIn: rect.insetBy(dx: 0.5, dy: 0.5)).fill()
-            return true
-        }
-        return image
     }
 
     private func trackMenu() -> NSMenu {

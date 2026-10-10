@@ -11,7 +11,7 @@ import AVFoundation
 ///
 /// Chapters come from the PROJECT, never from the composition plan: the plan
 /// says what to decode and where to put it, and markers decode nothing, so
-/// `evaluate.rs` emits no marker key at all. `Exporter` reads them off the
+/// `plan.rs` emits no marker key at all. `Exporter` reads them off the
 /// snapshot of the handle it was given and hands them over here, which is
 /// also why an export shows the chapters the timeline had when the sheet was
 /// confirmed rather than the ones it has when the write ends.

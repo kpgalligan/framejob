@@ -78,6 +78,7 @@ pub mod op_schema;
 pub mod op_table;
 pub mod outcome;
 pub mod patch;
+pub mod plan;
 pub mod props_check;
 pub mod recipe;
 mod recipe_dissolve;

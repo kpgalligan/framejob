@@ -252,7 +252,7 @@ struct AudioDSPParameters: Equatable {
 ///
 /// **Why this is not simply read off the project.** The parameters are per
 /// clip, and `CompositionBuilder.build` is handed the composition PLAN, not
-/// the project: the plan is `evaluate.rs`'s structural description and carries
+/// the project: the plan is `plan.rs`'s structural description and carries
 /// no audio properties beyond the envelope and the time-pitch algorithm. Both
 /// callers do publish the project first — `Playback.update` and
 /// `Exporter.export` each call `RecipeSource.shared.set` before building — but

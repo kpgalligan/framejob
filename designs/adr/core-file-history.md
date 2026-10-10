@@ -216,6 +216,7 @@ The size rule is in the root `CLAUDE.md` and `core/CLAUDE.md`; which modules are
 - `edit.rs`: exempt, its module doc being the op table's semantics half. If a cut is ever forced,
   the `Op` enum goes to `edit_ops.rs`, never in a feature phase.
 - `edit_clip.rs`: known debt, no seam named.
+- `evaluate.rs`: none named (the composition plan left for `plan.rs` in grading GR1).
 - `ffi_graphic.rs`: at the new-module cap with nothing crate-free left to move (`diag_json` and
   `diag_error` name `Diagnostic`; road map 10 §10.7).
 - `core/tests/add_transition_edges.rs`: at the new-file cap; gives something up before it takes
@@ -223,7 +224,13 @@ The size rule is in the root `CLAUDE.md` and `core/CLAUDE.md`; which modules are
 
 ## Open items
 
-- `evaluate.rs` is at 590 of ~600 (since B52b moved `lifted` to `nest.rs`).
+- `evaluate.rs` was at 590 of ~600 (since B52b moved `lifted` to `nest.rs`). The grading road
+  map's GR1 paid the toll, a pure move gated before any grading code landed, because GR4's
+  `Source::Adjustment` must edit both of its exhaustive `Source` matches (`segment_of`, `draws`):
+  the composition plan (`MAX_CONCURRENT_VIDEO_TRACKS`, `Instruction`, `composition_plan`,
+  `instructions`, `warnings_for`) went whole to `plan.rs`; `Segment`, its `to_json`, `CompTrack`
+  and its three fields, and `Assignment`'s `video` and `audio` became `pub(crate)`. 590 → 381
+  lines; `plan.rs` is 221.
 - `recipe.rs` paid its toll in the mattes road map's MT1 (issue batch B89), a pure move gated
   alone before the matte keys landed: `RecipeLayer` and its `object()` went whole to
   `recipe_layer.rs`, which `recipe.rs` re-exports, taking it from 596 to 511 lines.

@@ -22,8 +22,9 @@ import Foundation
 extension AgentServer {
 
     /// `set_text`'s clause for format version 9's three word-caption keys,
-    /// spliced into its patch description by `AgentCatalog+Clips.swift`,
-    /// which is over the cap and gave it up as a pure move (issue batch B86).
+    /// spliced into its patch description by `AgentCatalog+Properties.swift`
+    /// (`AgentCatalog+Clips.swift`, over the cap, gave it up as a pure move in
+    /// issue batch B86, and the patch descriptions followed in grading GR1).
     /// The three looks of format version 12 (spec §11 W-12, W-13) are
     /// taught here: `glide`, `active_fill` and `pause_dim`.
     static let textWordsClause: String =
@@ -96,7 +97,7 @@ extension AgentServer {
     func captionTools() -> [[String: Any]] {
         // `export_captions`' container list, read off the exporter's own enum
         // rather than restated, and hoisted for the type-checker budget reason
-        // `AgentCatalog+Clips.swift`'s own hoisted clauses record.
+        // the clauses `AgentCatalog+Properties.swift` hoists record.
         let captionFormatNames = CaptionExporter.Format.allCases.map { $0.rawValue }
         let captionFormatProperty: [String: Any] = [
             "type": "string", "enum": captionFormatNames,

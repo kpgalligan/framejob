@@ -99,8 +99,10 @@ detail there.
   stop the list** — a later op still runs after one, exactly as after an
   identity — and the FIRST refusal is answered only when nothing applied.
 - `ProjectSnapshot.swift` · `TextProps.swift` · `MotionProps.swift` ·
-  `WordProps.swift` · `MediaSnapshot.swift` · `ActionSnapshot.swift` — the `Codable`, READ-ONLY mirror
-  of spec §5.2 every view draws from. `ActionSnapshot.swift` (a pure move out of
+  `WordProps.swift` · `MediaSnapshot.swift` · `ActionSnapshot.swift` · `CompositionPlan.swift` — the `Codable`, READ-ONLY mirror
+  of spec §5.2 every view draws from. `CompositionPlan.swift` (a pure move out of
+  `ProjectSnapshot.swift`, grading GR1) is the plan's Swift side (spec §7.2): `PlanSegment`,
+  `PlanRamp`, `PlanTrack`, `PlanInstruction` and `CompositionPlan`. `ActionSnapshot.swift` (a pure move out of
   `ProjectSnapshot.swift`, B87) holds `ActionPatch`, `ActionSnapshot` and `ActionGraphicPatch` — an
   end's `graphic.props` and `kinds`, whose `dictionary` sends `props` only. `MediaSnapshot` (a pure move out of
   `ProjectSnapshot.swift`) carries a copy's or an ffmpeg conversion's `original`, and its `name` is
@@ -533,7 +535,9 @@ the key map behind it.
   above the canvas's region grips (CI-16) and take every press while armed;
   the outlines stay drawn under them.
 - `EditorWindowController.swift`, `WelcomeWindowController.swift`,
-  `AppDelegate.swift` (+`Menus`, +`Recording`, +`GraphicMenu` — the Insert
+  `AppDelegate.swift` (+`Menus`, +`ClipMenus` — the Clip menu's submenus, Add
+  Background, Transition, Motion and Label, a pure move out of `+Menus`,
+  grading GR1 — +`Recording`, +`GraphicMenu` — the Insert
   menu's builder, File's three graphic-file items (`addGraphicFileItems(to:)`,
   called once from `fileMenu()` right after Add Image to Graphics…: a
   separator, then Rename Graphic…, Delete Graphic… and Restore Graphic
@@ -796,7 +800,7 @@ the key map behind it.
   holding a point wins, the one painted on top) · `ActionLaneDecor.swift`
   (CI-12: the lane's hatch, fades and wedges as geometry by the timeline's
   own gates, drawn under the bands; `Curve.laneName`; `CurveGlyphView`,
-  beside the Curve popup because `OptionPopupControl` is not forked) · `VideoPane.swift` (+`Transition`,
+  beside the Curve popup because `OptionPopupControl` is not forked) · `VideoPane.swift` (+`Color` — the Color section, a pure move, grading GR1; +`Transition`,
   +`Motion`, +`Obscure` — the Obscure section, a pure move; +`Speed` — the
   Speed section, Fit to and the "Audio is silent above ×12" note, #190) · `AudioPane.swift` · `TextPane.swift` · `ShapePane.swift` ·
   `GraphicPane.swift` (the Graphic sub-tab, road map 10 §5j, spec §11 G-15:
@@ -1835,7 +1839,9 @@ free.
   layout (the scale is over the cells alone, so the sheet is exactly
   `width × height ≤ max_width × maxSide`, `maxSide` being
   `GraphicLibrary.maxSide`), `maxCellPixels`, the painter and
-  `GraphicRaster.cgImage()`. `AgentCatalog.swift` (+`Clips`, +`Actions`, +`Audio`, +`Transitions`, +`Files`, +`Captions`, +`Graphics`,
+  `GraphicRaster.cgImage()`. `AgentCatalog.swift` (+`Clips`, +`Properties` — the five property rows and the patch
+  vocabularies, spliced in place by `propertyTools`, a pure move out of `+Clips`, grading GR1 —
+  +`Actions`, +`Audio`, +`Transitions`, +`Files`, +`Captions`, +`Graphics`,
   +`Declarations`)
   — the catalog, spliced in ORDER (`+Actions`' rows are appended to
   `+Clips`' array last) (`recording_probe.py` reads the last eleven
